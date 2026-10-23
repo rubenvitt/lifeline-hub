@@ -143,13 +143,13 @@ export function buildEintreffenGruppen(e: EintreffenGruppenEingabe): EintreffenG
 /** Kurze Hinweise eines Treffers: Vormerkung ohne Netz, Alarmierung, Abschnitt, Eintreffen. */
 export function trefferHinweise(
   t: EintreffenTreffer,
-  formatZeit: (wert: string) => string,
+  zeitpunkt: (wert: string) => string,
 ): string[] {
   const hinweise: string[] = [];
-  if (t.vorgemerktAt) hinweise.push(`vorgemerkt ${formatZeit(t.vorgemerktAt)}`);
-  if (t.alarmiertAt) hinweise.push(`alarmiert ${formatZeit(t.alarmiertAt)}`);
+  if (t.vorgemerktAt) hinweise.push(`vorgemerkt ${zeitpunkt(t.vorgemerktAt)}`);
+  if (t.alarmiertAt) hinweise.push(`alarmiert ${zeitpunkt(t.alarmiertAt)}`);
   if (t.abschnitt) hinweise.push(t.abschnitt);
-  if (t.eingetroffenAt) hinweise.push(`eingetroffen ${formatZeit(t.eingetroffenAt)}`);
+  if (t.eingetroffenAt) hinweise.push(`eingetroffen ${zeitpunkt(t.eingetroffenAt)}`);
   return hinweise;
 }
 

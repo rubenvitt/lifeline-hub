@@ -66,13 +66,13 @@ export function erlaeuterungEinzeilig(zelle: Pick<GefahrBewertung, 'beschreibung
 }
 
 /**
- * „geändert 101512OKT26 · Name“; ohne Namen (Konto entfernt) nur die Zeit. Die Zeit formatiert der
- * Aufrufer in der Anzeigezone (`useAnzeigeKonventionen().formatZeit`), wie `beurteilungText`.
+ * „geändert 101512okt26 · Name“; ohne Namen (Konto entfernt) nur die Zeit. Die Zeit formatiert der
+ * Aufrufer in der Anzeigezone (`useAnzeigeKonventionen().zeitpunkt`), wie `beurteilungText`.
  */
 export function geaendertText(
   zelle: Pick<GefahrBewertung, 'geaendert_at' | 'aktualisiert_von_name'>,
-  formatZeit: (utc: string) => string,
+  zeitpunkt: (utc: string) => string,
 ): string {
-  const zeit = `geändert ${formatZeit(zelle.geaendert_at)}`;
+  const zeit = `geändert ${zeitpunkt(zelle.geaendert_at)}`;
   return zelle.aktualisiert_von_name ? `${zeit} · ${zelle.aktualisiert_von_name}` : zeit;
 }

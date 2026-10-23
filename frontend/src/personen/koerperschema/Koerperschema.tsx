@@ -438,7 +438,7 @@ export function VerletzungsListe({ eintraege }: { eintraege: readonly Nummeriert
         <li key={v.id}>
           <span style={{ ...monoStil(13, 500) }}>{nummer}</span> {verletzungText(v)} ·{' '}
           <span style={monoStil(13)}>
-            <ZeitAnzeige wert={v.zeitpunkt_at} format="uhrzeit" />
+            <ZeitAnzeige wert={v.zeitpunkt_at} rolle="kurz" />
           </span>
         </li>
       ))}

@@ -12,7 +12,6 @@ import { leerZuNull } from '../../api/patchTriState';
 import { globalKeys } from '../../api/queryKeys';
 import type { Einheit, Einsatzabschnitt, EinheitTyp, Staerke } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeitMitTag } from '../../anzeige/format';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../../anzeige/StaerkeEingabe';
 import { InlineAngabe } from '../../components/InlineAngabe';
@@ -38,6 +37,7 @@ import { einheitStaerkeUrteilVon } from '../../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
 import { einheitStaerkeUrteil, statusKategorie } from '../../theme/statusFarben';
 import { collectNachfahren } from './einheitAnsichtKern';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /**
  * Speichert EINE Angabe der Einheit (LLH-1036, design.md D1): `etikett` nennt sie in der
@@ -444,7 +444,7 @@ function StatusZeile({
   const s = einheitStatusAnzeige(e.status);
   const seit = e.status.seit ? (
     <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
-      seit {formatUhrzeitMitTag(e.status.seit, konventionen)}
+      seit {zeitKurz(e.status.seit, konventionen)}
     </span>
   ) : null;
 

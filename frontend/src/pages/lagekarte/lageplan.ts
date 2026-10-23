@@ -155,7 +155,7 @@ export interface LegendenQuellen {
   bilder: readonly { id: number; name: string }[];
   jetztMs: number;
   /** Uhrzeit wie im Panel der Fachebenen („1430“, am Vortag „291430“). */
-  formatZeitKurz: (iso: string) => string;
+  zeitKurz: (iso: string) => string;
 }
 
 /**
@@ -184,7 +184,7 @@ export function lageplanLegende(q: LegendenQuellen): LageplanLegende {
   const veraltet: string[] = [];
   const fachebenen: LegendenFachebene[] = q.fachebenen.map(({ def }) => {
     const alter = fachebeneAlter(def.key, q.abgerufen[def.key], q.jetztMs);
-    const stand = alter ? `Stand ${q.formatZeitKurz(alter.abgerufen)}` : null;
+    const stand = alter ? `Stand ${q.zeitKurz(alter.abgerufen)}` : null;
     if (alter?.veraltet) veraltet.push(`${def.label} (${stand})`);
     return {
       schluessel: `fachebene-${def.key}`,

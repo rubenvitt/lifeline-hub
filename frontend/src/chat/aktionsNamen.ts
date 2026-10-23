@@ -4,7 +4,7 @@ import type { ChatNachricht } from '../api/types';
  * Zugängliche Namen der Aktionsauslöser, je Nachricht EINDEUTIG (LFH-683): Autor und Uhrzeit wie
  * in der Kopfzeile; die Uhrzeit ist minutengenau, zwei Nachrichten desselben Autors in derselben
  * Minute bekommen deshalb eine laufende Nummer in Listenreihenfolge. `zeit` ist der an die
- * Anzeigezone gebundene `formatZeitKurz` der Kopfzeile (LFH-913).
+ * Anzeigezone gebundene `zeitKurz` der Kopfzeile (LFH-913).
  */
 export function aktionsNamen(
   nachrichten: readonly ChatNachricht[],

@@ -90,7 +90,7 @@ export default function ErinnerungKarte({
 }: ErinnerungKarteProps) {
   const { id: einsatzId } = useParams();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const status = ERINNERUNG_STATUS[e.status] ?? ERINNERUNG_STATUS.offen;
   const istAbg = ansicht === 'abgeschlossen';
   // `ist_faellig` bleibt auf abgeschlossenen Erinnerungen true → Hervorhebung nur in der Offen-Ansicht.
@@ -114,7 +114,7 @@ export default function ErinnerungKarte({
     // Die Fälligkeit führt links in Mono; eine fällige Erinnerung trägt den Alarmrand.
     <KommKarte
       alarm={faellig}
-      zeit={e.faellig_at ? <ZeitAnzeige wert={e.faellig_at} format="uhrzeit" /> : undefined}
+      zeit={e.faellig_at ? <ZeitAnzeige wert={e.faellig_at} rolle="kurz" /> : undefined}
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
@@ -138,7 +138,7 @@ export default function ErinnerungKarte({
                   <IconUhr />
                 </span>
               )}{' '}
-              fällig: {formatZeit(e.faellig_at)}
+              fällig: {zeitpunkt(e.faellig_at)}
             </Text>
           )}
         </Space>
@@ -159,12 +159,12 @@ export default function ErinnerungKarte({
           <Space wrap size={[8, 4]}>
             {e.status === 'erledigt' && e.erledigt_at && (
               <Text type="secondary" style={{ fontSize: 13 }}>
-                Erledigt: {formatZeit(e.erledigt_at)}
+                Erledigt: {zeitpunkt(e.erledigt_at)}
               </Text>
             )}
             {e.status === 'quittiert' && e.quittiert_at && (
               <Text type="secondary" style={{ fontSize: 13 }}>
-                Erübrigt: {formatZeit(e.quittiert_at)}
+                Erübrigt: {zeitpunkt(e.quittiert_at)}
               </Text>
             )}
           </Space>

@@ -354,7 +354,7 @@ function NachforderungKarte({
   stellenJeId,
   zielNamen,
 }: NachforderungKarteProps) {
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const { token, rollen } = useRollen();
   const sperrgrundId = useId();
   const einheitSperrgrundId = useId();
@@ -369,7 +369,7 @@ function NachforderungKarte({
   // Im Board nennt die Stufe der Spaltenkopf bzw. das gewählte Segment; eine gehaltene Karte, die
   // inzwischen weiter ist, trägt ihre neue Stufe selbst. Ohne Spalte steht sie immer.
   const statusZeigen = spaltenStufe !== n.status;
-  const zeiten = kartenZeiten(n, formatZeit, jetzt);
+  const zeiten = kartenZeiten(n, zeitpunkt, jetzt);
   const ziel = zielZeile(n, zielNamen);
   const zusage = zusageZeilen(n);
   // Die Zusage geht über das Formular an der Karte, sobald die Seite es führt (LLH-1097 D10).
@@ -556,13 +556,13 @@ function NachforderungKarte({
         )}
         {abgelehnt && (
           <Text type="danger">
-            Abgelehnt{n.abgelehnt_at ? ` (${formatZeit(n.abgelehnt_at)})` : ''}
+            Abgelehnt{n.abgelehnt_at ? ` (${zeitpunkt(n.abgelehnt_at)})` : ''}
             {n.abgelehnt_grund ? `: ${n.abgelehnt_grund}` : ''}
           </Text>
         )}
         {zurueckgezogen && (
           <Text type="secondary" style={{ overflowWrap: 'anywhere' }}>
-            Zurückgezogen{n.zurueckgezogen_at ? ` (${formatZeit(n.zurueckgezogen_at)})` : ''}
+            Zurückgezogen{n.zurueckgezogen_at ? ` (${zeitpunkt(n.zurueckgezogen_at)})` : ''}
             {n.zurueckgezogen_grund ? `: ${n.zurueckgezogen_grund}` : ''}
           </Text>
         )}

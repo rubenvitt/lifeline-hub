@@ -45,7 +45,7 @@ function BefehlListenKarte({
         <>
           <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>Stand</span>
           <span>
-            <ZeitAnzeige wert={b.zeitstand} format="uhrzeit" />
+            <ZeitAnzeige wert={b.zeitstand} rolle="kurz" />
           </span>
         </>
       }
@@ -66,7 +66,7 @@ function BefehlListenKarte({
         <span>{b.ersteller_name}</span>
         {b.status === 'freigegeben' && b.freigegeben_at && (
           <span>
-            · freigegeben <ZeitAnzeige wert={b.freigegeben_at} format="uhrzeit" />
+            · freigegeben <ZeitAnzeige wert={b.freigegeben_at} rolle="kurz" />
             {b.freigegeben_von_name ? ` von ${b.freigegeben_von_name}` : ''}
           </span>
         )}

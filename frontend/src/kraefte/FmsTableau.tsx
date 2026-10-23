@@ -10,7 +10,6 @@ import {
   type KeyboardEvent,
 } from 'react';
 import type { EinsatzFahrzeug, Einheit, FahrzeugStatus } from '../api/types';
-import { formatUhrzeitMitTag } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StatusWahl, { type StatusBedienung } from '../components/StatusWahl';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -24,6 +23,7 @@ import {
   zifferZuordnung,
 } from './fmsTableauKern';
 import { fahrzeugStatus } from './meldebildRaster';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * FMS-Tableau — alle Fahrzeuge des Einsatzes auf einer Fläche, Status per Klick, die Ziffer als
@@ -255,7 +255,7 @@ export default function FmsTableau({
               const seit = bedienung.laeuft
                 ? '…'
                 : ef.status_seit
-                  ? formatUhrzeitMitTag(ef.status_seit, konventionen)
+                  ? zeitKurz(ef.status_seit, konventionen)
                   : '—';
               return (
                 <div

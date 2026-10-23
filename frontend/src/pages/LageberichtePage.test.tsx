@@ -477,7 +477,7 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
     expect(patches[0].abschnitte).toEqual(
       expect.arrayContaining([{ schluessel: 'auftrag', text: 'x' }]),
     );
-    expect(await screen.findByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
+    expect(await screen.findByText(/zuletzt gespeichert \d{4}/)).toBeInTheDocument();
   });
 
   it('warnt beim Reload, solange eine Fassung ungespeichert ist — und sonst nicht', async () => {

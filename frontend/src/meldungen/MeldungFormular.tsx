@@ -3,8 +3,9 @@ import { Button, Col, Collapse, Form, Input, InputNumber, Row, Space, Switch } f
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { ETB_INHALT_MAX, ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import KoordinatenFeld from '../anzeige/KoordinatenFeld';
@@ -189,7 +190,7 @@ export default function MeldungFormular({
   const fristMin = Form.useWatch('frist_min', form);
   const koord = Form.useWatch('koord', form);
   const istLagemeldung = meldungsart === 'lagemeldung';
-  const { formatiere } = useZeitEingabe();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const wortlautRef = useRef<TextAreaRef>(null);
   const [weitereOffen, setWeitereOffen] = useState(false);
 
@@ -292,7 +293,7 @@ export default function MeldungFormular({
       : undefined,
     richtung !== vorgaben.richtung ? etikett(RICHTUNG_OPTIONEN, richtung) : undefined,
     istLagemeldung && koord ? 'verortet' : undefined,
-    ereigniszeit ? `Ereignis ${formatiere(ereigniszeit, 'DD.MM. HH:mm')}` : undefined,
+    ereigniszeit ? `Ereignis ${zeitKurz(alsBackendZeit(ereigniszeit))}` : undefined,
     bestaetigungPflicht
       ? fristMin != null
         ? `Bestätigung ${fristMin} Min`

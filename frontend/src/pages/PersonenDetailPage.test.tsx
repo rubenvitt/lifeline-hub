@@ -1180,7 +1180,8 @@ describe('PersonenDetailPage — Patientenkopf (LLH-1094)', () => {
     render(einsatzAktiv, gesichtet);
     await screen.findByRole('heading', { name: /Person R-001/ });
     const zeit = within(kopf()).getByText(/^gesichtet /);
-    expect(zeit).toHaveTextContent(/^gesichtet \d{6} · vor 5 min · bestätigt: Dr\. Weiß$/);
+    // Rolle „kurz“ (LLH-1061): die Sichtung ist von heute, also nur die Uhrzeit.
+    expect(zeit).toHaveTextContent(/^gesichtet \d{4} · vor 5 min · bestätigt: Dr\. Weiß$/);
     expect(within(kopf()).getByText('SK I · akut')).toBeInTheDocument();
 
     await act(async () => {

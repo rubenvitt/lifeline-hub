@@ -68,7 +68,6 @@ import {
   type ZuflussSteuerung,
 } from '../../components/useZuflussSchleuse';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtg } from '../../anzeige/format';
 import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
 import {
   rollenFarbe,
@@ -98,6 +97,7 @@ import {
   UEBERGABE_OFFEN_AB_MIN,
   unterwegsAus,
 } from './uhsLage';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -387,7 +387,7 @@ function Wartezeit({ seit, vorwort }: { seit: string; vorwort?: string }) {
   return (
     <span
       data-lfh="wartezeit"
-      title={`seit ${taktischeDtg(seit, konventionen)}`}
+      title={`seit ${zeitKurz(seit, konventionen)}`}
       style={{ flex: 'none', fontSize: token.fontSizeSM, color: rollen.text2 }}
     >
       {vorwort && `${vorwort} `}

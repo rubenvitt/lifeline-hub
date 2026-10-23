@@ -311,7 +311,7 @@ describe('Zeitfensterkarte · Zeitzone beim Bearbeiten (LFH-692)', () => {
   it('zeigt dieselben Uhrzeiten wie die Karte', async () => {
     zeigeBerlin();
     await userEvent.click(screen.getByRole('button', { name: /^Bedarf bearbeiten zu / }));
-    expect(uhrzeitenText(zeitfenster(), BERLIN)).toBe('12:00–13:30');
+    expect(uhrzeitenText(zeitfenster(), BERLIN)).toBe('1200–1330');
     expect(await screen.findByRole('textbox', { name: 'Beginn' })).toHaveValue('241200sep26');
     expect(screen.getByRole('textbox', { name: 'Ende' })).toHaveValue('241330sep26');
   });

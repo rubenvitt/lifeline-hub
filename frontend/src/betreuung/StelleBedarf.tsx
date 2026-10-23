@@ -134,7 +134,7 @@ export default function StelleBedarf({
                 actions={[
                   <Space key="stand" size={8} wrap>
                     <StatusBadge phase={status.phase} label={status.label} ton={status.ton} />
-                    <ZeitAnzeige wert={n.angefordert_at} format="uhrzeit" />
+                    <ZeitAnzeige wert={n.angefordert_at} rolle="kurz" />
                   </Space>,
                 ]}
               >

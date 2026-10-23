@@ -13,7 +13,6 @@ import { useState } from 'react';
 import { App, Button, Descriptions, Tag, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
-import { taktischeDtgVoll } from '../../anzeige/format';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { PEGEL_MAX, fuegePegelHinzu, pegelAbfrage, pegelSchreibScope } from '../../api/pegel';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -41,6 +40,7 @@ import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 import FachebeneStand from './FachebeneStand';
+import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 
 interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
@@ -74,7 +74,7 @@ function useFmtZeit(): (v: string | null) => string | null {
   return (v) => {
     if (!v) return null;
     const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? v : taktischeDtgVoll(v, konventionen);
+    return Number.isNaN(d.getTime()) ? v : zeitpunkt(v, konventionen);
   };
 }
 

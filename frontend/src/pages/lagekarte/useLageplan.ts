@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../../anzeige/format';
 import type { KartenAufnahme } from './kartenAufnahme';
 import type { KartenHandle } from './Kartenflaeche';
 import { KARTE_NICHT_DARSTELLBAR } from './kartenGrafik';
 import { lageplanLegende, type LageplanLegende, type LegendenQuellen } from './lageplan';
 import { setzeKartenbild, setzeLageplanAnlage } from './lageplanBild';
 import type { BeginneKartenHandlung } from './useKartenFehler';
+import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 
 /** Was der Kopf des Lageplans nennt; die Seite weiß es, der Hook liest es erst bei der Aufnahme. */
 export interface LageplanKopf {
@@ -112,7 +112,7 @@ export function useLageplan({
     if (!aufnahme) return null;
     const stand = k.stand ?? new Date().toISOString();
     const legende = lageplanLegende({ ...quellenRef.current, jetztMs: Date.now() });
-    const zeilen = kopfZeilen(k, stand, (iso) => taktischeDtgVoll(iso, konventionenRef.current));
+    const zeilen = kopfZeilen(k, stand, (iso) => zeitpunkt(iso, konventionenRef.current));
     return { aufnahme, stand, legende, zeilen, einsatz: k.einsatz };
   }, [kartenRef]);
 

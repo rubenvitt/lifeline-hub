@@ -287,7 +287,7 @@ describe('DemoDatenPage — nicht importiert', () => {
     const z = demoServer(NICHT_IMPORTIERT);
     setup(admin);
     await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
-    expect(await screen.findByText('24.09.2026 10:00')).toBeInTheDocument();
+    expect(await screen.findByText('241000sep26')).toBeInTheDocument();
     expect(z.post).toBe(1);
     expect(toastsMit('Demo-Daten importiert')).toHaveLength(1);
     // Der Kopf-Slot ist bei aktivem Import leer.
@@ -302,7 +302,7 @@ describe('DemoDatenPage — importiert', () => {
     const stand = await screen.findByRole('region', { name: 'Stand' });
     expect(within(stand).getByText('Importiert')).toBeInTheDocument();
     // 08:00 UTC → 10:00 in Berlin (Sommerzeit). `dayjs(s)` läse 08:00.
-    expect(within(stand).getByText('24.09.2026 10:00')).toBeInTheDocument();
+    expect(within(stand).getByText('241000sep26')).toBeInTheDocument();
     const link = within(stand).getByRole('link', { name: 'ÜBUNG – Starkregen Musterstadt' });
     expect(link).toHaveAttribute('href', '/einsaetze/41');
 
@@ -385,7 +385,7 @@ describe('DemoDatenPage — importiert', () => {
     expect(z.neu).toBe(0);
     await userEvent.click(ok);
     await waitFor(() => expect(z.neu).toBe(1));
-    expect(await screen.findByText('24.09.2026 13:15')).toBeInTheDocument();
+    expect(await screen.findByText('241315sep26')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'ÜBUNG – Starkregen Musterstadt' })).toHaveAttribute(
       'href',
       '/einsaetze/52',
@@ -432,7 +432,7 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
     expect(screen.getByText('Neu-Import fehlgeschlagen')).toBeInTheDocument();
     expect(toastsMit('Katalogeintrag fehlt')).toHaveLength(0);
     // Der Stand ist unverändert.
-    expect(screen.getByText('24.09.2026 10:00')).toBeInTheDocument();
+    expect(screen.getByText('241000sep26')).toBeInTheDocument();
   });
 
   it('409: der Stand wird neu geladen, der Alert bleibt stehen', async () => {
@@ -479,7 +479,7 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
     expect(await screen.findByText('Kurz belegt')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Importieren' }));
-    expect(await screen.findByText('24.09.2026 10:00')).toBeInTheDocument();
+    expect(await screen.findByText('241000sep26')).toBeInTheDocument();
     expect(screen.queryByText('Kurz belegt')).not.toBeInTheDocument();
   });
 });

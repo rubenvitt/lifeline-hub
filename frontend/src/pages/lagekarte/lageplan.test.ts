@@ -95,7 +95,7 @@ function quellen(teil: Partial<LegendenQuellen> = {}): LegendenQuellen {
     abgerufen: {},
     bilder: [],
     jetztMs: jetzt,
-    formatZeitKurz: (iso) => iso.slice(11, 16).replace(':', ''),
+    zeitKurz: (iso) => iso.slice(11, 16).replace(':', ''),
     ...teil,
   };
 }

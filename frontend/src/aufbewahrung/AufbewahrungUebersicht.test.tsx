@@ -4,13 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import type { AufbewahrungEintrag, BenutzerAnzeige } from '../api/types';
-import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import AufbewahrungUebersicht from './AufbewahrungUebersicht';
 import { globalKeys } from '../api/queryKeys';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /** Übersicht. */
 
@@ -114,11 +115,11 @@ describe('AufbewahrungUebersicht', () => {
     // Zeitpunkt der Vormerkung — Pflichtangabe der Übersicht (Spec „Aufbewahrungsübersicht").
     expect(within(t).getByRole('columnheader', { name: /Vorgemerkt am/ })).toBeInTheDocument();
     expect(
-      within(t).getByText(formatZeit('2026-06-01 10:10:00', DEFAULT_KONVENTIONEN)),
+      within(t).getByText(zeitpunkt('2026-06-01 10:10:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
     // Karenz-Ende als taktische DTG, nicht als roher UTC-String.
     expect(
-      within(t).getByText(formatZeit('2026-07-01 10:10:00', DEFAULT_KONVENTIONEN)),
+      within(t).getByText(zeitpunkt('2026-07-01 10:10:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
     expect(t).not.toHaveTextContent('2026-07-01 10:10:00');
     // Keine DB-id im sichtbaren Text.
@@ -135,7 +136,7 @@ describe('AufbewahrungUebersicht', () => {
       within(t).getByRole('columnheader', { name: /Schwärzung auf Antrag ab/ }),
     ).toBeInTheDocument();
     expect(
-      within(t).getByText(formatZeit('2026-10-03 08:00:00', DEFAULT_KONVENTIONEN)),
+      within(t).getByText(zeitpunkt('2026-10-03 08:00:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
   });
 
@@ -203,10 +204,10 @@ describe('AufbewahrungUebersicht', () => {
     await within(t).findByText('E-2025-0001');
     expect(within(t).getByRole('columnheader', { name: /Löschung am/ })).toBeInTheDocument();
     expect(
-      within(t).getByText(formatZeit('2035-01-02 10:00:00', DEFAULT_KONVENTIONEN)),
+      within(t).getByText(zeitpunkt('2035-01-02 10:00:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
     expect(
-      within(t).getByText(formatZeit('2026-01-01 10:00:00', DEFAULT_KONVENTIONEN)),
+      within(t).getByText(zeitpunkt('2026-01-01 10:00:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
   });
 

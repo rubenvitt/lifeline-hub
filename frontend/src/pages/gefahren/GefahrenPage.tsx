@@ -79,7 +79,7 @@ export default function GefahrenPage() {
   const breit = abBreite('lg');
   // Druck des gewählten Gebiets (LLH-1364): „Drucken / als PDF“ als Nebenweg des Seitenkopfs.
   const druckWege = useDruckNebenwege();
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -461,7 +461,7 @@ export default function GefahrenPage() {
           sichtbarkeit="druck"
           zeilen={[
             { etikett: 'Warnstufe', wert: warnstufeFlaeche[aktuell.hoechste_warnstufe].label },
-            { etikett: 'Beurteilung', wert: beurteilungText(aktuell, formatZeit) },
+            { etikett: 'Beurteilung', wert: beurteilungText(aktuell, zeitpunkt) },
           ]}
         />
       )}

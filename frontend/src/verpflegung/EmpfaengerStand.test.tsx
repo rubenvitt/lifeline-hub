@@ -40,7 +40,7 @@ describe('EmpfaengerStand (LLH-1055 Teil II)', () => {
     expect(zeilen('stand-ohne-eintreffen')).toEqual(['Wasserrettung']);
     expect(screen.getByRole('heading', { level: 2, name: 'Verpflegt · 1' })).toBeVisible();
     // 09:40 UTC = 11:40 in Berlin (Suiten-Zone).
-    expect(zeilen('stand-verpflegt')).toEqual(['1. Gruppe · Florian 1-1 · 9 EP 11:40 · Deich']);
+    expect(zeilen('stand-verpflegt')).toEqual(['1. Gruppe · Florian 1-1 · 9 EP 1140 · Deich']);
   });
 
   it('die Gliederung rückt ein; der Zug nennt seine mitverpflegten Untereinheiten', () => {
@@ -52,7 +52,7 @@ describe('EmpfaengerStand (LLH-1055 Teil II)', () => {
       />,
     );
     expect(zeilen('stand-verpflegt')).toEqual([
-      '1. Zug · Florian 1 · 20 EP 11:40 · mit 2 Untereinheiten · Deich',
+      '1. Zug · Florian 1 · 20 EP 1140 · mit 2 Untereinheiten · Deich',
     ]);
     expect(
       screen.getByRole('heading', { level: 3, name: 'Noch nicht verpflegt · 0' }),
@@ -99,7 +99,7 @@ describe('EmpfaengerStand (LLH-1055 Teil II)', () => {
         ueberschrift="h2"
       />,
     );
-    expect(zeilen('stand-zufuehrung')).toEqual(['Zuführung Deich · 40 EP 11:40']);
+    expect(zeilen('stand-zufuehrung')).toEqual(['Zuführung Deich · 40 EP 1140']);
     expect(zeilen('stand-offen')[0]).toContain('Zuführung an Deich');
     expect(screen.getByRole('heading', { name: 'Verpflegt · 0' })).toBeVisible();
   });
@@ -172,7 +172,7 @@ describe('EmpfaengerStand (LLH-1055 Teil II)', () => {
     );
     expect(zeilen('stand-offen')).toEqual(['1. Zug · Florian 1 · 1/2/17//20 · Deich']);
     expect(zeilen('stand-verpflegt')).toEqual([
-      '1. Gruppe · Florian 1-1 · 9 EP 11:40 · anderswo verpflegt · 5 EP · Deich',
+      '1. Gruppe · Florian 1-1 · 9 EP 1140 · anderswo verpflegt · 5 EP · Deich',
       '2. Gruppe · Florian 1-2 · anderswo verpflegt · 40 EP · Deich',
     ]);
   });

@@ -100,7 +100,7 @@ export default function NachrichtenStrom({
 }: Props) {
   const behaelter = useRef<HTMLDivElement>(null);
   const { token } = theme.useToken();
-  const { formatZeit, formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitpunkt, zeitKurz } = useAnzeigeKonventionen();
   // Die id der JÜNGSTEN Nachricht unterscheidet die beiden Wachstumsrichtungen (siehe Effekt
   // unten). `nachrichten` ist aufsteigend sortiert.
   const juengsteId = nachrichten.length > 0 ? nachrichten[nachrichten.length - 1].id : null;
@@ -141,10 +141,7 @@ export default function NachrichtenStrom({
     if (loeschung && !loeschung.isPending && loeschung.error != null) loeschung.reset();
     setLoeschFrageId(id);
   };
-  const namen = useMemo(
-    () => aktionsNamen(nachrichten, formatZeitKurz),
-    [nachrichten, formatZeitKurz],
-  );
+  const namen = useMemo(() => aktionsNamen(nachrichten, zeitKurz), [nachrichten, zeitKurz]);
   const neueAnzahl = markeId === null ? 0 : nachrichten.filter((n) => n.id > markeId).length;
 
   /** Flankenwechsel am unteren Rand: Marke setzen bzw. räumen. */
@@ -270,13 +267,13 @@ export default function NachrichtenStrom({
                 title={
                   <Space size="small">
                     <Typography.Text strong>{n.autor_name}</Typography.Text>
-                    <Tooltip title={formatZeit(n.erstellt_at)}>
+                    <Tooltip title={zeitpunkt(n.erstellt_at)}>
                       <Typography.Text type="secondary" style={monoStil(12)}>
-                        {formatZeitKurz(n.erstellt_at)}
+                        {zeitKurz(n.erstellt_at)}
                       </Typography.Text>
                     </Tooltip>
                     {n.bearbeitet_at && (
-                      <Tooltip title={`bearbeitet am ${formatZeit(n.bearbeitet_at)}`}>
+                      <Tooltip title={`bearbeitet am ${zeitpunkt(n.bearbeitet_at)}`}>
                         <span style={{ display: 'inline-flex' }}>
                           <StatusChip ton="neutral" wort="bearbeitet" />
                         </span>

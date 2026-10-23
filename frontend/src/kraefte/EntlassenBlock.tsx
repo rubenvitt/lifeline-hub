@@ -57,7 +57,7 @@ export default function EntlassenBlock({
   fehler,
   aufgeklappt,
 }: EntlassenBlockProps) {
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   if (eintraege.length === 0) return null;
   const sortiert = [...eintraege].sort((a, b) =>
     (b.beendetAt ?? '').localeCompare(a.beendetAt ?? ''),
@@ -88,7 +88,7 @@ export default function EntlassenBlock({
                     </span>
                     {e.beendetAt ? (
                       <Typography.Text type="secondary">
-                        {endeWort} {formatZeitKurz(e.beendetAt)}
+                        {endeWort} {zeitKurz(e.beendetAt)}
                       </Typography.Text>
                     ) : null}
                     {aktion ? (

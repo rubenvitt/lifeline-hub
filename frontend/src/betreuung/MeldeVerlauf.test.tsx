@@ -13,6 +13,7 @@ import MeldeVerlauf from './MeldeVerlauf';
  */
 vi.mock('../anzeige/AnzeigeKonventionenContext', async () => {
   const format = await import('../anzeige/format');
+  const zeit = await import('../anzeige/zeitDarstellung');
   const konventionen = {
     ...format.DEFAULT_KONVENTIONEN,
     zeitzone: 'Asia/Kolkata',
@@ -20,8 +21,8 @@ vi.mock('../anzeige/AnzeigeKonventionenContext', async () => {
   return {
     useAnzeigeKonventionen: () => ({
       konventionen,
-      formatZeit: (s?: string | null) => format.formatZeit(s, konventionen),
-      formatZeitKurz: (s?: string | null) => format.formatZeitKurz(s, konventionen),
+      zeitpunkt: (s?: string | null) => zeit.zeitpunkt(s, konventionen),
+      zeitKurz: (s?: string | null) => zeit.zeitKurz(s, konventionen),
       formatKoordinate: () => '',
       formatDistanz: () => '',
     }),

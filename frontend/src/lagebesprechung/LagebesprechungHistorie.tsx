@@ -77,7 +77,7 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
       <ListenEintragMeta
         title={
           <>
-            Nr. {l.lfd_nr} · <ZeitAnzeige wert={l.abgehalten_at} format="kurz" />
+            Nr. {l.lfd_nr} · <ZeitAnzeige wert={l.abgehalten_at} rolle="kurz" />
           </>
         }
         description={

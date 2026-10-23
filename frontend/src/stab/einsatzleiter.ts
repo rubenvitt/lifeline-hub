@@ -1,7 +1,8 @@
 import type { Einsatzleiter } from '../api/types';
-import { taktischeDtg, type AnzeigeKonventionen } from '../anzeige/format';
+import { type AnzeigeKonventionen } from '../anzeige/format';
 import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
 import { md, ZUSTAND_GRUND } from './funkplan';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Der Einsatzleiter nach FwDV 100, gerechnet an EINER Stelle (LFH-1199). Kopfleiste der
@@ -55,7 +56,7 @@ export function einsatzleiterKurz(d: EinsatzleiterDarstellung): string {
 /** Bildschirmtext: Name, Vermerk und „seit“ als kurze taktische DTG. */
 export function einsatzleiterText(d: EinsatzleiterDarstellung, konv: AnzeigeKonventionen): string {
   const kurz = einsatzleiterKurz(d);
-  return d.art === 'erfasst' ? `${kurz} · seit ${taktischeDtg(d.seit, konv)}` : kurz;
+  return d.art === 'erfasst' ? `${kurz} · seit ${zeitKurz(d.seit, konv)}` : kurz;
 }
 
 /**

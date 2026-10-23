@@ -39,7 +39,6 @@ import { gibFahrzeugFrei, listeEinheiten, ordneFahrzeugZu } from '../api/einheit
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeitMitTag } from '../anzeige/format';
 import EinheitAngabe from '../kraefte/EinheitAngabe';
 import { funktionText } from '../kraefte/einsatzfunktionKern';
 import { FAHRZEUG_BEMERKUNG_MAX } from '../api/eingabegrenzen';
@@ -93,6 +92,7 @@ import MaterialAmOrt from '../kraefte/MaterialAmOrt';
 import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import { besatzungKandidaten, besatzungVorschlag } from '../kraefte/besatzungVorschlag';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Besatzung als Urteil (`StatusTag` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
@@ -821,7 +821,7 @@ export default function FahrzeugePage() {
       abBreite: 'xxl',
       zahl: true,
       sortWert: (ef) => ef.status_seit,
-      render: (_, ef) => (ef.status_seit ? formatUhrzeitMitTag(ef.status_seit, konventionen) : '—'),
+      render: (_, ef) => (ef.status_seit ? zeitKurz(ef.status_seit, konventionen) : '—'),
     },
     {
       title: 'Besatzung',

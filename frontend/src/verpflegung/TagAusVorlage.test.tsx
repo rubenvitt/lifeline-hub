@@ -140,9 +140,9 @@ describe('Tag aus Vorlage anlegen (LLH-1058) — Browser UTC, Anzeigezone Berlin
   it('zeigt jede aktive Mahlzeit am gewählten Tag in Berliner Zeit, die Nacht bis zum Folgetag', async () => {
     renderSeite();
     const f = await fenster('Frühstück');
-    expect(within(f).getByText('11.10. 06:30–08:00')).toBeInTheDocument();
+    expect(within(f).getByText('110630–0800')).toBeInTheDocument();
     expect(
-      within(await fenster('Nachtverpflegung')).getByText('11.10. 23:00–12.10. 01:00'),
+      within(await fenster('Nachtverpflegung')).getByText('112300–120100'),
     ).toBeInTheDocument();
     expect(within(await fenster('Mittag')).getByText(/warm/)).toBeInTheDocument();
     expect(listVerpflegungVorlagen).toHaveBeenCalledWith('aktiv');
@@ -186,7 +186,7 @@ describe('Tag aus Vorlage anlegen (LLH-1058) — Browser UTC, Anzeigezone Berlin
     const kraefte = within(await fenster('Mittag')).getByLabelText('Einsatzkräfte (EP) zu Mittag');
     await user.clear(kraefte);
     await user.type(kraefte, '200');
-    expect(screen.getByText('3 Zeitfenster am 11.10.')).toBeInTheDocument();
+    expect(screen.getByText('3 Zeitfenster am 11okt26')).toBeInTheDocument();
     await user.click(anlegenKnopf());
 
     await waitFor(() => expect(createTagAusVorlage).toHaveBeenCalledTimes(1));
@@ -218,7 +218,7 @@ describe('Tag aus Vorlage anlegen (LLH-1058) — Browser UTC, Anzeigezone Berlin
         },
       ],
     });
-    expect(await screen.findByText('3 Zeitfenster für den 11.10. angelegt')).toBeInTheDocument();
+    expect(await screen.findByText('3 Zeitfenster für den 11okt26 angelegt')).toBeInTheDocument();
     expect(await screen.findByTestId('ort')).toHaveTextContent('/einsaetze/1/verpflegung');
   });
 
@@ -274,7 +274,7 @@ describe('Tag aus Vorlage anlegen (LLH-1058) — Browser UTC, Anzeigezone Berlin
     ]);
     expect(
       await screen.findByText(
-        '1 Zeitfenster für den 11.10. angelegt · am Tag schon vorhanden: ‚Abendessen‘',
+        '1 Zeitfenster für den 11okt26 angelegt · am Tag schon vorhanden: ‚Abendessen‘',
       ),
     ).toBeInTheDocument();
   });
@@ -309,7 +309,7 @@ describe('Tag aus Vorlage anlegen (LLH-1058) — Browser UTC, Anzeigezone Berlin
     await user.click(anlegenKnopf());
     expect(
       await screen.findByText(
-        '3 Zeitfenster für den 11.10. angelegt · am Tag schon vorhanden: ‚Mittag‘',
+        '3 Zeitfenster für den 11okt26 angelegt · am Tag schon vorhanden: ‚Mittag‘',
       ),
     ).toBeInTheDocument();
   });
@@ -354,8 +354,8 @@ describe('Tag aus Vorlage anlegen (LLH-1058) — Browser UTC, Anzeigezone Berlin
 
   it('ohne `?tag=` gilt heute in der Anzeigezone', async () => {
     renderSeite({ adresse: '/einsaetze/1/verpflegung/aus-vorlage' });
-    const heute = dayjs().tz('Europe/Berlin').format('DD.MM.');
+    const heute = dayjs().tz('Europe/Berlin').format('DD');
     const f = await fenster('Frühstück');
-    expect(within(f).getByText(`${heute} 06:30–08:00`)).toBeInTheDocument();
+    expect(within(f).getByText(`${heute}0630–0800`)).toBeInTheDocument();
   });
 });

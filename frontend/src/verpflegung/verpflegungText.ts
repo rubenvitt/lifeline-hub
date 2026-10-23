@@ -3,10 +3,12 @@
  * Namen und Nachforderungs-Vorbelegung nicht auseinanderlaufen.
  *
  * Umgerechnet wird über `inZone` in der Zeitzone der Anzeige-Konventionen, damit dieselben
- * Uhrzeiten auf der Karte stehen wie im ETB-Eintrag, den der Server in der Org-Zeitzone schreibt.
+ * Uhrzeiten auf der Karte stehen wie im ETB-Eintrag, den der Server in der Org-Zeitzone schreibt;
+ * die Schreibweise kommt aus dem Formatkern (LLH-1061, taktisch `1200`).
  * Anführungszeichen ‚…‘ wie in den ETB-Sätzen (`src/verpflegung/mod.rs`).
  */
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import { tagUndUhrzeit, uhrzeit as uhrzeitRolle, zeitKurz } from '../anzeige/zeitDarstellung';
 import type {
   Kostform,
   Sonderkost,
@@ -48,13 +50,12 @@ export function zitat(bezeichnung: string): string {
   return `‚${bezeichnung}‘`;
 }
 
-/** „12:00" in der Anzeigezone; leer bei unlesbarem Wert. */
+/** „1200" bzw. „12:00" in der Anzeigezone; leer bei unlesbarem Wert. */
 export function uhrzeit(wire: string, konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN): string {
-  const d = inZone(wire, konv);
-  return d.isValid() ? d.format('HH:mm') : '';
+  return uhrzeitRolle(wire, konv);
 }
 
-/** „12:00–13:30" — nur die Uhrzeiten (Bezeichnung der Nachforderung, D9). */
+/** „1200–1330" — nur die Uhrzeiten (Bezeichnung der Nachforderung, D9). */
 export function uhrzeitenText(
   zf: Pick<VerpflegungZeitfenster, 'von_at' | 'bis_at'>,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
@@ -63,25 +64,22 @@ export function uhrzeitenText(
 }
 
 /**
- * „24.09. 12:00–13:30", über Mitternacht „24.09. 22:00–25.09. 02:00" — wie `zeitraum_text` im
- * Backend, damit Karte und ETB-Eintrag gleich lauten.
+ * „241200–1330", über Mitternacht „242200–250200" (bzw. „24.09. 12:00–13:30“) — der Anfang mit
+ * Tag, das Ende in der Rolle „kurz“ mit dem Tag des Anfangs als „heute“ (LLH-1061). Der Server
+ * schreibt `zeitraum_text` noch in der alten Form; er zieht in einem eigenen Schritt nach.
  */
 export function zeitraumText(
   zf: Pick<VerpflegungZeitfenster, 'von_at' | 'bis_at'>,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): string {
-  const v = inZone(zf.von_at, konv);
-  const b = inZone(zf.bis_at, konv);
-  if (!v.isValid() || !b.isValid()) return '';
-  const bisText =
-    v.format('YYYY-MM-DD') === b.format('YYYY-MM-DD')
-      ? b.format('HH:mm')
-      : b.format('DD.MM. HH:mm');
-  return `${v.format('DD.MM. HH:mm')}–${bisText}`;
+  const von = tagUndUhrzeit(zf.von_at, konv);
+  const bis = zeitKurz(zf.bis_at, konv, inZone(zf.von_at, konv));
+  if (!von || !bis) return '';
+  return `${von}–${bis}`;
 }
 
 /**
- * Zeilenkennung eines Zeitfensters für zugängliche Namen („Mittag 24.09. 12:00–13:30").
+ * Zeilenkennung eines Zeitfensters für zugängliche Namen („Mittag 241200–1330").
  * Die Bezeichnung allein reicht nicht: „Mittag" gibt es an jedem Einsatztag.
  */
 export function zeitfensterKennung(

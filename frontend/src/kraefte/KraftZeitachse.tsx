@@ -3,7 +3,6 @@ import type { Dayjs } from 'dayjs';
 import { useEffect, useRef, useState, type FocusEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeitMitTag } from '../anzeige/format';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { ladeZeitachse, streicheEreignis, trageNach, type KraftArt } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
@@ -29,6 +28,7 @@ import {
   kraftDauern,
 } from './zeitachse';
 import { serverJetzt } from '../offline/serveruhr';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Zeitachse einer Kraft (LFH-552) — Einheit-Detailseite und aufgeklappte Personalzeile teilen
@@ -100,7 +100,7 @@ export default function KraftZeitachse({
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useUhr(60_000);
-  const zeit = (utc: string) => formatUhrzeitMitTag(utc, konventionen);
+  const zeit = (utc: string) => zeitKurz(utc, konventionen);
 
   const [nachtragOffen, setNachtragOffen] = useState(false);
   const [streiche, setStreiche] = useState<ZeitachseEreignis | null>(null);

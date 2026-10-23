@@ -3,7 +3,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
-import { DEFAULT_KONVENTIONEN, formatUhrzeitMitTag, formatZeitKurz } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Lagebesprechung, LagebesprechungStand } from '../api/types';
 import { meHandler, server } from '../test/server';
@@ -11,6 +11,7 @@ import { renderMitProviders } from '../test/utils';
 import LagebesprechungPage from './LagebesprechungPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Seite „Lagebesprechung“ (LLH-1111): Termin, Vorbereitung (LFH-550), Abschluss und Verlauf — aus
@@ -272,7 +273,7 @@ describe('LagebesprechungPage · Rechte', () => {
     const p = await vorbereitungPaneel();
     const verlauf = await verlaufPaneel();
     await waitFor(() =>
-      expect(termin).toHaveTextContent(formatZeitKurz('2026-06-11 09:00:00', DEFAULT_KONVENTIONEN)),
+      expect(termin).toHaveTextContent(zeitKurz('2026-06-11 09:00:00', DEFAULT_KONVENTIONEN)),
     );
     await waitFor(() => expect(vorbereitungZeile(p, 'besprechung')).toHaveTextContent('Nr. 2'));
     expect(await within(verlauf).findByText(/Nr\. 1/)).toBeInTheDocument();
@@ -459,12 +460,12 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     await waitFor(() => expect(zeile(p, 'besprechung')).toHaveTextContent('Nr. 2'));
     expect(zeile(p, 'besprechung')).toHaveTextContent('Letzte Lagebesprechung');
     expect(zeile(p, 'besprechung')).toHaveTextContent(
-      `abgehalten ${formatUhrzeitMitTag('2026-06-11 08:00:00', DEFAULT_KONVENTIONEN)}`,
+      `abgehalten ${zeitKurz('2026-06-11 08:00:00', DEFAULT_KONVENTIONEN)}`,
     );
     expect(zeile(p, 'besprechung')).toHaveTextContent('Quelle: Lagebesprechung');
     expect(zeile(p, 'termin')).toHaveTextContent('Nächster Termin');
     expect(zeile(p, 'termin')).toHaveTextContent(
-      formatUhrzeitMitTag('2026-06-11 09:00:00', DEFAULT_KONVENTIONEN),
+      zeitKurz('2026-06-11 09:00:00', DEFAULT_KONVENTIONEN),
     );
   });
 

@@ -981,7 +981,7 @@ function useGarnitur(werte: readonly unknown[]): { nummer: number; neu: boolean 
 }
 
 /**
- * Zellen, die die Uhr lesen („1430“ heute, „161430“ sonst, `formatZeitKurz`), sähen den Tageswechsel
+ * Zellen, die die Uhr lesen („1430“ heute, „161430“ sonst, `zeitKurz`), sähen den Tageswechsel
  * sonst erst mit dem nächsten geänderten Datensatz. Die Viertelstunde trifft jede Tagesgrenze der
  * Anzeigezone, auch halbstündig versetzte; der erste Render danach zeichnet alles neu.
  */

@@ -33,10 +33,10 @@ export default function FachebeneStand({
 }: FachebeneStandProps) {
   const jetzt = useMinutenTakt();
   const { rollen } = useRollen();
-  const { formatZeit, formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitpunkt, zeitKurz } = useAnzeigeKonventionen();
   const alter = fachebeneAlter(quelle, abgerufen, jetzt);
   if (!alter) return null;
-  const zeit = form === 'voll' ? formatZeit(alter.abgerufen) : formatZeitKurz(alter.abgerufen);
+  const zeit = form === 'voll' ? zeitpunkt(alter.abgerufen) : zeitKurz(alter.abgerufen);
   return (
     <span
       data-lfh="fachebene-stand"

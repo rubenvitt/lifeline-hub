@@ -2,11 +2,12 @@ import { screen, within } from '@testing-library/react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_KONVENTIONEN, formatZeitKurz } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import type { ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import LagebesprechungZeile from './LagebesprechungZeile';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 dayjs.extend(utc);
 
@@ -28,7 +29,7 @@ function zeige(termin: string | null, freigaben: ModulFreigaben | undefined = fr
 describe('LagebesprechungZeile (LLH-1111)', () => {
   it('zeigt Termin und Zustand und springt in das Modul Lagebesprechung', () => {
     const zeile = zeige(wireAb(25));
-    expect(zeile).toHaveTextContent(formatZeitKurz(wireAb(25), DEFAULT_KONVENTIONEN));
+    expect(zeile).toHaveTextContent(zeitKurz(wireAb(25), DEFAULT_KONVENTIONEN));
     expect(within(zeile).getByText('in 25 min')).toBeInTheDocument();
     expect(within(zeile).getByRole('link', { name: 'Zur Lagebesprechung' })).toHaveAttribute(
       'href',

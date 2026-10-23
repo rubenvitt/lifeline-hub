@@ -11,7 +11,6 @@ import { legeLageberichtAn, listeLageberichte, schreibeLageberichtFort } from '.
 import type { LageberichtAbschnitt, LageberichtVorlageKey } from '../api/types';
 import { anzahl } from '../anzeige/anzahl';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import {
@@ -27,6 +26,7 @@ import NeuerLagevortragKnopf, { VORGABE_VORLAGE } from '../lageberichte/NeuerLag
 import LageberichtUebersicht from '../lageberichte/LageberichtUebersicht';
 import { loadStartinhalt } from '../lageberichte/startinhalt';
 import { hatNachfolger, teileUebersicht, titelVorschlag } from '../lageberichte/uebersicht';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Lageberichte: Übersicht und Anlegen (LLH-1064).
@@ -110,7 +110,7 @@ export default function LageberichtePage() {
         ? await loadStartinhalt(a.vorlage, {
             qc,
             einsatzId: a.einsatzId,
-            dtg: (iso) => taktischeDtgVoll(iso, konventionen),
+            dtg: (iso) => zeitpunkt(iso, konventionen),
           })
         : undefined;
       return legeLageberichtAn(a.einsatzId, {

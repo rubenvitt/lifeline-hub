@@ -98,7 +98,7 @@ interface MeldungKarteProps {
  * Chip „Bestätigung überfällig“, nicht als eigenes „Alarm“ daneben (LFH-959): ein Wort, wie
  * Kennzahlenband, Modulzähler und Lage-Dashboard.
  */
-function bestaetigungsAchse(m: Meldung, formatZeit: (wire?: string | null) => string): ReactNode {
+function bestaetigungsAchse(m: Meldung, zeitpunkt: (wire?: string | null) => string): ReactNode {
   if (!m.bestaetigung_pflicht) return null;
   if (m.ist_bestaetigt) {
     return <QuittungIndikator quittiert von={m.bestaetigt_von_name} am={m.bestaetigt_at} />;
@@ -119,7 +119,7 @@ function bestaetigungsAchse(m: Meldung, formatZeit: (wire?: string | null) => st
   return (
     <StatusChip
       ton="achtung"
-      wort={`Bestätigung offen bis ${formatZeit(m.bestaetigung_frist_at)}`}
+      wort={`Bestätigung offen bis ${zeitpunkt(m.bestaetigung_frist_at)}`}
     />
   );
 }
@@ -156,7 +156,7 @@ function MeldungKarte({
   // Ein Gerät (UHS-Laptop) springt nicht in die Aufträge (LFH-892).
   const darf = useGeraetDarf();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const status = MELDUNG_STATUS[m.status] ?? MELDUNG_STATUS.neu;
   // Hervorhebung einer unbestätigten überfälligen/eskalierten Sofortmeldung; dieselbe Regel
   // zählt das Kennzahlenband (`meldungKennzahlen.ts`).
@@ -266,7 +266,7 @@ function MeldungKarte({
       alarm={alarmiert}
       unbearbeitet={unbearbeitet}
       hervorgehoben={hervorgehoben}
-      zeit={m.ereigniszeit ? <ZeitAnzeige wert={m.ereigniszeit} format="uhrzeit" /> : '—'}
+      zeit={m.ereigniszeit ? <ZeitAnzeige wert={m.ereigniszeit} rolle="kurz" /> : '—'}
       nr={`#${m.lfd_nr}`}
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
@@ -296,7 +296,7 @@ function MeldungKarte({
           />
         </Space>
         <Space size={10} wrap>
-          {bestaetigungsAchse(m, formatZeit)}
+          {bestaetigungsAchse(m, zeitpunkt)}
         </Space>
       </Flex>
 
@@ -320,11 +320,11 @@ function MeldungKarte({
       <Flex align="center" gap={8} wrap style={{ marginTop: 8 }}>
         <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {WEG_LABEL[m.meldeweg]} · {MELDUNGSART_LABEL[m.meldungsart]} · Ereignis:{' '}
-          {formatZeit(m.ereigniszeit)}
+          {zeitpunkt(m.ereigniszeit)}
         </Text>
         {ansicht === 'abgeschlossen' && m.erledigt_at && (
           <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
-            Erledigt: {formatZeit(m.erledigt_at)}
+            Erledigt: {zeitpunkt(m.erledigt_at)}
           </Text>
         )}
         {m.bearbeiter_name && (

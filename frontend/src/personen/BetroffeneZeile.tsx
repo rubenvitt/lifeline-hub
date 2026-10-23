@@ -55,7 +55,7 @@ interface BetroffeneZeileProps {
   /** Anlegen. **Muss bei Ablehnung ablehnen** (`mutateAsync`). */
   onErfassen: (eingabe: PersonAnlegenEingabe) => Promise<unknown>;
   laeuft?: boolean;
-  /** Quittung der letzten Erfassung („Zuletzt: 14:19 R-048 Kowalski, Anna · SK III"). */
+  /** Quittung der letzten Erfassung („Zuletzt: 1419 R-048 Kowalski, Anna · SK III"). */
   zuletzt?: ReactNode;
   /** Zugriff auf das Feld (Kommandopalette, `?neu=1`). */
   feldRef?: Ref<InputRef>;

@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { formatZeitKurz, DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { renderMitProviders } from '../test/utils';
 import { ORIGINAL_TEXT } from '../components/DownloadAnker';
 import NachrichtenStrom from './NachrichtenStrom';
 import type { ChatNachricht } from '../api/types';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 function nachricht(over: Partial<ChatNachricht> = {}): ChatNachricht {
   return {
@@ -299,13 +300,13 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={vi.fn()}
       />,
     );
-    const meier = `Aktionen zu Nachricht von Meier, ${formatZeitKurz('2026-06-10 12:02:00', DEFAULT_KONVENTIONEN)}`;
-    const schulz = `Aktionen zu Nachricht von Schulz, ${formatZeitKurz('2026-06-10 12:05:00', DEFAULT_KONVENTIONEN)}`;
+    const meier = `Aktionen zu Nachricht von Meier, ${zeitKurz('2026-06-10 12:02:00', DEFAULT_KONVENTIONEN)}`;
+    const schulz = `Aktionen zu Nachricht von Schulz, ${zeitKurz('2026-06-10 12:05:00', DEFAULT_KONVENTIONEN)}`;
     expect(screen.getByRole('button', { name: meier })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: schulz })).toBeInTheDocument();
     // Dieselbe Uhrzeit steht sichtbar in der Kopfzeile.
     expect(
-      screen.getByText(formatZeitKurz('2026-06-10 12:02:00', DEFAULT_KONVENTIONEN)),
+      screen.getByText(zeitKurz('2026-06-10 12:02:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
   });
 
@@ -406,7 +407,7 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={vi.fn()}
       />,
     );
-    const zeit = formatZeitKurz('2026-06-10 12:02:05', DEFAULT_KONVENTIONEN);
+    const zeit = zeitKurz('2026-06-10 12:02:05', DEFAULT_KONVENTIONEN);
     const namen = screen
       .getAllByRole('button', { name: AKTIONEN })
       .map((k) => k.getAttribute('aria-label'));

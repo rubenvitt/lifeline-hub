@@ -69,7 +69,7 @@ export default function TerminPaneel({
             groesse="gross"
             zustand={zustand}
             ton={darstellung.rolle === 'achtung' ? 'achtung' : 'neutral'}
-            wert={termin ? <ZeitAnzeige wert={termin} format="kurz" /> : '—'}
+            wert={termin ? <ZeitAnzeige wert={termin} rolle="kurz" /> : '—'}
             notiz={darstellung.label}
           />
           <Kennzahl

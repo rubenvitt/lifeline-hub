@@ -2,7 +2,6 @@ import { Button, Space } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { taktischeDtg, taktischeDtgVoll } from '../../anzeige/format';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
 import { abrufZustand } from '../../api/abrufZustand';
@@ -42,6 +41,7 @@ import {
   type OrgKnoten,
   type WurzelFuehrungsstelle,
 } from './fuehrungsorganisation';
+import { zeitKurz, zeitpunkt } from '../../anzeige/zeitDarstellung';
 import './organigrammPrint.css';
 
 /**
@@ -133,7 +133,7 @@ function OrganigrammKopf({
             <div style={{ overflowWrap: 'anywhere' }}>{einsatzleiter.name}</div>
             <div style={{ ...monoStil(12, 500), color: rollen.gedaempft }}>
               {einsatzleiter.nichtMehrDisponiert && <span>nicht mehr disponiert · </span>}
-              <span>{`seit ${taktischeDtg(einsatzleiter.seit, konventionen)}`}</span>
+              <span>{`seit ${zeitKurz(einsatzleiter.seit, konventionen)}`}</span>
             </div>
           </>
         ) : (
@@ -385,10 +385,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
     mutationFn: async () => {
       // Der Stand der Daten, nicht des Klicks: eine Liste aus dem Zwischenspeicher trägt ihr
       // Alter in den unveränderlichen Bericht (Review LFH-626).
-      const stand = taktischeDtgVoll(
-        new Date(datenstand || Date.now()).toISOString(),
-        konventionen,
-      );
+      const stand = zeitpunkt(new Date(datenstand || Date.now()).toISOString(), konventionen);
       // EIN Aufruf mit Startinhalt (Spec `dokument-uebernahme`): der Bericht entsteht mit Text
       // oder gar nicht.
       const lb = await legeLageberichtAn(einsatz.id, {
@@ -408,7 +405,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
               einheitenZustand: einheiten.zustand,
               fuehrungsstelle,
               einsatzleiter,
-              dtg: (utc) => taktischeDtgVoll(utc, konventionen),
+              dtg: (utc) => zeitpunkt(utc, konventionen),
             }),
           },
         ],
@@ -437,7 +434,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
         zeilen={[
           {
             etikett: 'Stand',
-            wert: taktischeDtgVoll(new Date(datenstand || Date.now()).toISOString(), konventionen),
+            wert: zeitpunkt(new Date(datenstand || Date.now()).toISOString(), konventionen),
           },
         ]}
       />

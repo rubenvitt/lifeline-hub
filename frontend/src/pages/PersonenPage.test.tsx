@@ -1310,7 +1310,7 @@ describe('PersonenPage', () => {
       expect(koerper[0]).not.toHaveProperty('uhs_id');
       await waitFor(() => expect(feld()).toHaveFocus());
       const zuletzt = document.querySelector('[data-lfh="zuletzt"]')!;
-      expect(zuletzt).toHaveTextContent(/^Zuletzt: \d{4} R-060 Kowalski, Anna · SK III$/);
+      expect(zuletzt).toHaveTextContent(/^Zuletzt: (\d{2})?\d{4} R-060 Kowalski, Anna · SK III$/);
       // Die Zeile quittiert an sich selbst — kein Alert je Person, der weggeklickt werden müsste.
       expect(screen.queryByText(/Erfasst als R-060/)).not.toBeInTheDocument();
       // … und die neue Zeile steht hervorgehoben in der Liste.

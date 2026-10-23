@@ -32,14 +32,14 @@ const SCHEMA_FELDER: { key: keyof Auftrag; label: string; zeit?: boolean }[] = [
   { key: 'erteilt_at', label: 'Erteilt am', zeit: true },
 ];
 
-/** Die gesetzten Schemafelder eines Auftrags; `erteilt_at` über `formatZeit` der Anzeigezone. */
+/** Die gesetzten Schemafelder eines Auftrags; `erteilt_at` über `zeitpunkt` der Anzeigezone. */
 export function gefuellteFelder(
   a: Auftrag,
-  formatZeit: (wire?: string | null) => string,
+  zeitpunkt: (wire?: string | null) => string,
 ): { label: string; wert: string }[] {
   return SCHEMA_FELDER.map(({ key, label, zeit }) => {
     const roh = (a[key] ?? '') as string;
-    const wert = zeit && roh ? formatZeit(roh) : roh;
+    const wert = zeit && roh ? zeitpunkt(roh) : roh;
     return { label, wert };
   }).filter(({ wert }) => typeof wert === 'string' && wert.trim() !== '');
 }
@@ -61,7 +61,7 @@ export function AuftragZeit({ auftrag: a }: { auftrag: Auftrag }) {
     <>
       <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>erteilt</span>
       <span>
-        <ZeitAnzeige wert={a.erteilt_at} format="uhrzeit" />
+        <ZeitAnzeige wert={a.erteilt_at} rolle="kurz" />
       </span>
     </>
   );
@@ -86,7 +86,7 @@ export function AuftragKopf({
 }) {
   const { rollen } = useRollen();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const status = AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen;
   return (
     <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
@@ -116,7 +116,7 @@ export function AuftragKopf({
         )}
         {a.frist_at && (
           <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
-            Frist {formatZeit(a.frist_at)}
+            Frist {zeitpunkt(a.frist_at)}
           </Text>
         )}
       </Space>
@@ -192,13 +192,13 @@ export function AuftragEmpfaenger({
 
 /** Zeitpunkt, Person und Grund einer Aufhebung (LLH-1098); an einem anderen Auftrag nichts. */
 export function AuftragAufhebung({ auftrag: a }: { auftrag: Auftrag }) {
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   if (a.bearbeitungsstatus !== 'aufgehoben') return null;
   return (
     <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
       <Text style={{ fontSize: 13 }}>
         {[
-          `Aufgehoben am: ${a.aufgehoben_at ? formatZeit(a.aufgehoben_at) : '—'}`,
+          `Aufgehoben am: ${a.aufgehoben_at ? zeitpunkt(a.aufgehoben_at) : '—'}`,
           a.aufgehoben_von_name,
         ]
           .filter(Boolean)
@@ -217,18 +217,18 @@ export function AuftragVollzug({
   auftrag: Auftrag;
   ansicht: 'offen' | 'abgeschlossen';
 }) {
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   if (ansicht === 'abgeschlossen') {
     return (
       <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
         {a.vollzogen_at && (
           <Text type="secondary" style={{ fontSize: 13 }}>
-            Vollzogen am: {formatZeit(a.vollzogen_at)}
+            Vollzogen am: {zeitpunkt(a.vollzogen_at)}
           </Text>
         )}
         {a.abgenommen_at && (
           <Text type="secondary" style={{ fontSize: 13 }}>
-            Abgenommen am: {formatZeit(a.abgenommen_at)}
+            Abgenommen am: {zeitpunkt(a.abgenommen_at)}
           </Text>
         )}
         {a.vollzugsmeldung && (
@@ -250,8 +250,8 @@ export function AuftragVollzug({
 
 /** Die gefüllten Schemafelder als Tabelle; ohne Felder nichts. */
 export function AuftragSchema({ auftrag: a }: { auftrag: Auftrag }) {
-  const { formatZeit } = useAnzeigeKonventionen();
-  const details = gefuellteFelder(a, formatZeit);
+  const { zeitpunkt } = useAnzeigeKonventionen();
+  const details = gefuellteFelder(a, zeitpunkt);
   if (details.length === 0) return null;
   return (
     <Descriptions size="small" column={1} bordered>

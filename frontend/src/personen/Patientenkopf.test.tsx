@@ -514,9 +514,9 @@ describe('Patientenkopf — voller PAT-Kern (LLH-1324/1325/1326/1113, design.md 
       .map((li) => li.textContent);
     // Die jüngsten zuerst (gleiche Zeit: die spätere Erfassung), jede mit ihrer festen Nummer.
     expect(zeilen).toEqual([
-      '5 Fuß rechts, vorn · Verbrennung · 1140',
-      '4 Rücken, hinten · Schmerz · 1140',
-      '3 Thorax, vorn · Prellung/Schwellung · 1140',
+      '5 Fuß rechts, vorn · Verbrennung · 181140',
+      '4 Rücken, hinten · Schmerz · 181140',
+      '3 Thorax, vorn · Prellung/Schwellung · 181140',
     ]);
     expect(within(kopf).getByText('+ 1 weitere')).toBeInTheDocument();
   });
@@ -1134,9 +1134,9 @@ describe('Patientenkopf — Review PAT-Kern', () => {
         .getAllByRole('listitem')
         .map((li) => li.textContent),
     ).toEqual([
-      '5 Fuß rechts, vorn · Verbrennung · 1150',
-      '4 Rücken, hinten · Schmerz · 1140',
-      '3 Thorax, vorn · Prellung/Schwellung · 1130',
+      '5 Fuß rechts, vorn · Verbrennung · 181150',
+      '4 Rücken, hinten · Schmerz · 181140',
+      '3 Thorax, vorn · Prellung/Schwellung · 181130',
     ]);
     expect(within(kopf).getByText('+ 1 weitere')).toBeInTheDocument();
   });

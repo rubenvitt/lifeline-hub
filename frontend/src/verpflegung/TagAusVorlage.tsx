@@ -154,7 +154,7 @@ function TagAusVorlageInhalt({
       if (ergebnis.angelegt.length > 0) {
         void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       }
-      const text = quittungText(ergebnis, tag);
+      const text = quittungText(ergebnis, tag, konventionen);
       if (ergebnis.angelegt.length > 0) message.success(text);
       else message.info(text);
       if (stehtRef.current) void navigate(verpflegungPfad(einsatzId));
@@ -266,7 +266,7 @@ function TagAusVorlageInhalt({
         zusammenfassung={
           <>
             {gewaehlt.length === 1 ? '1 Zeitfenster' : `${gewaehlt.length} Zeitfenster`} am{' '}
-            {tagText(tag)}
+            {tagText(tag, konventionen)}
             {vorhanden > 0 && ` · ${vorhanden} schon angelegt`}
             {zuViele && (
               <Typography.Text type="danger" style={{ display: 'block' }}>
@@ -307,7 +307,7 @@ function TagAusVorlageInhalt({
     <EinsatzSeite
       breadcrumb={breadcrumb}
       titel={titel}
-      meta={tagText(tag)}
+      meta={tagText(tag, konventionen)}
       breite="schmal"
       dataUpdatedAt={planQuery.dataUpdatedAt}
       hinweis={

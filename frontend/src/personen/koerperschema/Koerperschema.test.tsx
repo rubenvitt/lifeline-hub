@@ -71,9 +71,9 @@ describe('Körperschema — lesen', () => {
         .getAllByRole('listitem')
         .map((li) => li.textContent),
     ).toEqual([
-      '1 Unterarm links, vorn · Fraktur-Verdacht · 1412',
-      '2 Kopf, vorn · Wunde/Blutung · 1412',
-      '3 Rücken, hinten · Schmerz · mittel · 1412',
+      '1 Unterarm links, vorn · Fraktur-Verdacht · 181412',
+      '2 Kopf, vorn · Wunde/Blutung · 181412',
+      '3 Rücken, hinten · Schmerz · mittel · 181412',
     ]);
   });
 

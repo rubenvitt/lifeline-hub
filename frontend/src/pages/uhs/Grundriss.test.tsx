@@ -26,8 +26,9 @@ import {
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 import { setzeMasse } from '../../test/elementMasse';
-import { DEFAULT_KONVENTIONEN, taktischeDtg } from '../../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../../anzeige/format';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /**
  * Der Abwurf eines Zugs, abgegriffen am `DndContext` (sonst unverändert): jsdom misst keine
@@ -2508,7 +2509,7 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
     expect(zeit).toHaveTextContent('wartet 12 min');
     expect(zeit).toHaveAttribute(
       'title',
-      `seit ${taktischeDtg('2026-10-18 08:00:00', DEFAULT_KONVENTIONEN)}`,
+      `seit ${zeitKurz('2026-10-18 08:00:00', DEFAULT_KONVENTIONEN)}`,
     );
     // Auf dem Platz wartet niemand: die Marke dort trägt keine Wartezeit.
     expect(within(screen.getByTestId('platz-karte')).queryByText(/min$/)).toBeNull();

@@ -7,7 +7,7 @@ import type { FormRule } from 'antd';
  *   Lage spricht vom 8-Stunden-Rhythmus; eine halbe Stunde steht als „:30“ wie auf der Uhr. Das
  *   Feld liest jede Anzeige zurück und dazu bloße Stunden („8“), „h:mm“, Minuten („90 min“) und
  *   das Dezimalkomma („7,5“), weil das die Eingaben sind, die eine Führungskraft tippt.
- * - **Wechselzeiten** taktisch („0600/1800“, `anzeige/format.ts:taktischeUhrzeit`); an den Server
+ * - **Wechselzeiten** taktisch („0600/1800“, wie die Rolle `uhrzeit` in `anzeige/zeitDarstellung.ts`); an den Server
  *   gehen sie als `HH:MM`, sortiert und ohne Doppel wie dort (`src/schichtmodell/mod.rs`,
  *   `WerteBody::check`).
  *

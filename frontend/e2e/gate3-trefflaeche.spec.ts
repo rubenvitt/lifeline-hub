@@ -2874,7 +2874,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
       name: /^Bedarf bearbeiten zu Mittag Deich /,
     });
     const zuruecknehmen = mittagKarte.getByRole('button', {
-      name: /^Zurücknehmen: Ausgabe 20 EP um \d\d:\d\d zu Mittag Deich /,
+      name: /^Zurücknehmen: Ausgabe 20 EP um \d{4} zu Mittag Deich /,
     });
     // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze.
     await expect(oeffnen).toHaveCount(2);

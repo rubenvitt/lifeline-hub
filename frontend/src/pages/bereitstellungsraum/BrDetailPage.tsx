@@ -251,7 +251,7 @@ export default function BrDetailPage() {
   // `beforeprint` rendert synchron (`useDruckModus`), die Uhr könnte bis zu einer Minute alt sein.
   const uhr = useUhr(60_000);
   const jetzt = druckt ? dayjs() : uhr;
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   // Abgerufene Kräfte stehen getrennt oben (LLH-1085), in derselben Halte-Fläche: wer gerade auf
   // eine Zeile zielt, dem schiebt auch ein fremder Abruf nichts darunter.
   const teilung = useMemo(
@@ -458,7 +458,7 @@ export default function BrDetailPage() {
   const seitAngabe = (seitAt: string | null | undefined) =>
     seitAt ? (
       <span data-lfh="br-seit" style={{ ...monoStil(12), color: rollen.gedaempft }}>
-        {seitText(formatZeitKurz(seitAt), wartezeitMinuten(seitAt, jetzt))}
+        {seitText(zeitKurz(seitAt), wartezeitMinuten(seitAt, jetzt))}
       </span>
     ) : null;
 
@@ -820,7 +820,7 @@ export default function BrDetailPage() {
                 titel="Längste Wartezeit"
                 groesse="klein"
                 wert={laengsteSeit ? dauerText(wartezeitMinuten(laengsteSeit, jetzt)) : '—'}
-                notiz={laengsteSeit ? `seit ${formatZeitKurz(laengsteSeit)}` : undefined}
+                notiz={laengsteSeit ? `seit ${zeitKurz(laengsteSeit)}` : undefined}
               />
             </Kennzahlenband>
           </div>
@@ -862,7 +862,7 @@ export default function BrDetailPage() {
                           <Space wrap size={token.marginXS}>
                             <StatusTag darstellung={brAbgerufen} />
                             <span style={monoStil(12)}>
-                              {abrufAngabe(formatZeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
+                              {abrufAngabe(zeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
                             </span>
                           </Space>
                         </div>
@@ -924,7 +924,7 @@ export default function BrDetailPage() {
                         <span>{v.aktion.name}</span>
                         {v.aktion.daten.unangemeldet && <UnangemeldetMarke />}
                         <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
-                          vorgemerkt {formatZeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
+                          vorgemerkt {zeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
                         </span>
                       </Space>
                     </ListenEintrag>

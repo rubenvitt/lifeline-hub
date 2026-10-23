@@ -28,33 +28,33 @@ const BERLIN = { zeitzone: 'Europe/Berlin' };
 describe('Zeitraumtexte (Zeitzone der Anzeige, nicht UTC)', () => {
   it('nennt 10:00–11:30 UTC im Sommer als 12:00–13:30 in Berlin', () => {
     const zf = zeitfenster();
-    expect(zeitraumText(zf, BERLIN)).toBe('24.09. 12:00–13:30');
-    expect(uhrzeitenText(zf, BERLIN)).toBe('12:00–13:30');
-    expect(zeitfensterKennung(zf, BERLIN)).toBe('Mittag 24.09. 12:00–13:30');
+    expect(zeitraumText(zf, BERLIN)).toBe('241200–1330');
+    expect(uhrzeitenText(zf, BERLIN)).toBe('1200–1330');
+    expect(zeitfensterKennung(zf, BERLIN)).toBe('Mittag 241200–1330');
   });
 
   it('beidseits der Sommerzeitgrenzen gegen den absoluten Zeitpunkt', () => {
     // 29.03.2026 01:00 UTC ist die Umstellung, 25.10.2026 01:00 UTC die Rückstellung.
     expect(
       zeitraumText({ von_at: '2026-03-29 00:30:00', bis_at: '2026-03-29 01:30:00' }, BERLIN),
-    ).toBe('29.03. 01:30–03:30');
+    ).toBe('290130–0330');
     expect(
       zeitraumText({ von_at: '2026-10-25 00:30:00', bis_at: '2026-10-25 01:30:00' }, BERLIN),
-    ).toBe('25.10. 02:30–02:30');
+    ).toBe('250230–0230');
   });
 
   it('über Mitternacht mit beiden Daten, wie `zeitraum_text` im Backend', () => {
     expect(
       zeitraumText({ von_at: '2026-09-24 20:00:00', bis_at: '2026-09-25 00:30:00' }, BERLIN),
-    ).toBe('24.09. 22:00–25.09. 02:30');
+    ).toBe('242200–250230');
   });
 
   it('ohne Zeitzone gilt die Ortszeit des Browsers (dayjs.utc(…).local())', () => {
     const zf = zeitfenster();
-    const erwartet = `${dayjs.utc(zf.von_at).local().format('HH:mm')}–${dayjs
+    const erwartet = `${dayjs.utc(zf.von_at).local().format('HHmm')}–${dayjs
       .utc(zf.bis_at)
       .local()
-      .format('HH:mm')}`;
+      .format('HHmm')}`;
     expect(uhrzeitenText(zf)).toBe(erwartet);
   });
 });
@@ -79,7 +79,7 @@ describe('nachforderungVorbelegung (design.md D9)', () => {
   it('Art, Bezeichnung mit Zeitraum, Anzahl = Fehlmenge, Begründung mit Bedarf und Ausgabe', () => {
     expect(nachforderungVorbelegung(zeitfenster(), BERLIN)).toStrictEqual({
       art: 'Verpflegung',
-      bezeichnung: 'Essensportionen ‚Mittag‘ 12:00–13:30',
+      bezeichnung: 'Essensportionen ‚Mittag‘ 1200–1330',
       anzahl: 20,
       begruendung: 'Unterdeckung Verpflegung ‚Mittag‘: Bedarf 250, ausgegeben 230.',
     });
@@ -111,7 +111,7 @@ describe('nachforderungVorbelegung (design.md D9)', () => {
       ),
     ).toStrictEqual({
       art: 'Verpflegung',
-      bezeichnung: 'Essensportionen ‚Mittag‘ 12:00–13:30',
+      bezeichnung: 'Essensportionen ‚Mittag‘ 1200–1330',
       anzahl: 3,
       begruendung:
         'Unterdeckung Verpflegung ‚Mittag‘: Bedarf 250, ausgegeben 250. Es fehlt Sonderkost: 3 vegan.',
@@ -135,7 +135,7 @@ describe('nachforderungVorbelegung (design.md D9)', () => {
 describe('meldungVorbelegung (Verpflegungsgerät, LFH-1044)', () => {
   it('nennt Zeitfenster mit Uhrzeiten, Bedarf, Ausgegebenes und Fehlmenge', () => {
     expect(meldungVorbelegung(zeitfenster(), BERLIN)).toBe(
-      'Fehlmenge Verpflegung ‚Mittag‘ 12:00–13:30: 20 EP (Bedarf 250, ausgegeben 230).',
+      'Fehlmenge Verpflegung ‚Mittag‘ 1200–1330: 20 EP (Bedarf 250, ausgegeben 230).',
     );
   });
 
@@ -149,7 +149,7 @@ describe('meldungVorbelegung (Verpflegungsgerät, LFH-1044)', () => {
         BERLIN,
       ),
     ).toBe(
-      'Fehlmenge Verpflegung ‚Mittag‘ 12:00–13:30: 3 EP (Bedarf 250, ausgegeben 250). Es fehlt Sonderkost: 3 vegan.',
+      'Fehlmenge Verpflegung ‚Mittag‘ 1200–1330: 3 EP (Bedarf 250, ausgegeben 250). Es fehlt Sonderkost: 3 vegan.',
     );
   });
 

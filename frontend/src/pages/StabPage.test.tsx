@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { DEFAULT_KONVENTIONEN, formatZeitKurz } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { modulRegistry } from '../einsatz/modulRegistry';
@@ -13,6 +13,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import StabPage from './StabPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 dayjs.extend(utc);
 
@@ -435,7 +436,7 @@ describe('StabPage · Zeile „Nächste Lagebesprechung“ (LLH-1111)', () => {
   it('zeigt Termin und Zustand aus dem Einsatzkopf und springt in die Lagebesprechung', async () => {
     rendere({ einsatzObj: einsatz({ naechste_lagebesprechung_at: wireAb(25) }) });
     const z = await zeile();
-    expect(z).toHaveTextContent(formatZeitKurz(wireAb(25), DEFAULT_KONVENTIONEN));
+    expect(z).toHaveTextContent(zeitKurz(wireAb(25), DEFAULT_KONVENTIONEN));
     expect(within(z).getByText('in 25 min')).toBeInTheDocument();
     expect(await within(z).findByRole('link', { name: 'Zur Lagebesprechung' })).toHaveAttribute(
       'href',

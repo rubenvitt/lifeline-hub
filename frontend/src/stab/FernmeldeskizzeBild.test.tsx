@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
-import { taktischeDtgVoll, DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import type { SkizzenLage } from '../api/fernmeldeskizzeVertrag';
 import {
   abschnitt,
@@ -34,6 +34,7 @@ import { eingepasst } from './skizze/ansicht';
 import { ZURUECK_DECKKRAFT } from './skizze/SkizzenElemente';
 import { VERSCHOBEN_MELDUNG } from './skizze/useSkizzenHandlungen';
 import { tippeZeit } from '../test/zeitEingabe';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Die Zeichenfläche als Ganzes (LFH-893, Spec-Szenarien aus `stab-fernmeldeskizze` und
@@ -266,7 +267,7 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
       const n = netz();
       return { ...n, schriftfeld: { ...n.schriftfeld!, gueltig_ab: '2026-10-04T16:00:00Z' } };
     };
-    const erwartet = taktischeDtgVoll('2026-10-04T16:00:00Z', DEFAULT_KONVENTIONEN);
+    const erwartet = zeitpunkt('2026-10-04T16:00:00Z', DEFAULT_KONVENTIONEN);
     const { unmount } = bild(mitGueltig());
     expect(element('schriftfeld')!.textContent).toContain(erwartet);
     unmount();

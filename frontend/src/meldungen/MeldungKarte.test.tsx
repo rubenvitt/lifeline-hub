@@ -4,10 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import MeldungKarte from './MeldungKarte';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import type { Meldung } from '../api/types';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   id: 1,
@@ -437,14 +438,14 @@ describe('MeldungKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
         </MemoryRouter>
       </AnzeigeKonventionenProvider>,
     );
-    expect(formatZeit('2026-06-12 09:00:00', berlin)).not.toBe(
-      formatZeit('2026-06-12 09:00:00', DEFAULT_KONVENTIONEN),
+    expect(zeitpunkt('2026-06-12 09:00:00', berlin)).not.toBe(
+      zeitpunkt('2026-06-12 09:00:00', DEFAULT_KONVENTIONEN),
     );
     expect(
-      screen.getByText(formatZeit('2026-06-12 09:00:00', berlin), { exact: false }),
+      screen.getByText(zeitpunkt('2026-06-12 09:00:00', berlin), { exact: false }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(`Bestätigung offen bis ${formatZeit('2026-06-12 09:30:00', berlin)}`),
+      screen.getByText(`Bestätigung offen bis ${zeitpunkt('2026-06-12 09:30:00', berlin)}`),
     ).toBeInTheDocument();
   });
 
@@ -465,7 +466,7 @@ describe('MeldungKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
       </AnzeigeKonventionenProvider>,
     );
     expect(
-      screen.getByText(formatZeit('2026-06-12 09:10:00', berlin), { exact: false }),
+      screen.getByText(zeitpunkt('2026-06-12 09:10:00', berlin), { exact: false }),
     ).toBeInTheDocument();
   });
 });

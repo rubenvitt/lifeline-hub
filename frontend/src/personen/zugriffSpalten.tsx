@@ -12,7 +12,7 @@ export const ZUGRIFF_SPALTEN: KatalogSpalte<PersonZugriff>[] = [
     title: 'Wann',
     dataIndex: 'zugriff_at',
     key: 'zugriff_at',
-    render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" />,
+    render: (v: string) => <ZeitAnzeige wert={v} rolle="zeitpunkt" />,
   },
   { title: 'Wer', dataIndex: 'benutzer_name', key: 'benutzer_name' },
   {

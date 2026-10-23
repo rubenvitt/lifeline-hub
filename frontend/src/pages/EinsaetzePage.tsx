@@ -172,7 +172,7 @@ export default function EinsaetzePage() {
 
 function EinsaetzeInhalt() {
   const navigate = useNavigate();
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const { token } = theme.useToken();
   const { rollen } = useRollen();
   const { benutzer } = useAuth();
@@ -479,7 +479,7 @@ function EinsaetzeInhalt() {
             }}
           >
             {kennung && <span data-lfh="einsatznummer">{kennung}</span>}
-            <span>seit {formatZeitKurz(e.begonnen_at)}</span>
+            <span>seit {zeitKurz(e.begonnen_at)}</span>
             {e.stichwort && <span>{e.stichwort}</span>}
           </span>
         </div>

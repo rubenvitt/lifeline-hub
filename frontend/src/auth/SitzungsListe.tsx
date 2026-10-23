@@ -64,7 +64,7 @@ export default function SitzungsListe({
 }: SitzungsListeProps) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   // Die Minute, damit „vor 12 min“ nicht stehen bleibt, solange die Liste offen ist.
   const jetzt = useMinutenTakt();
   const abfrage = useQuery({ queryKey, queryFn: laden });
@@ -116,11 +116,11 @@ export default function SitzungsListe({
                 </Space>
                 <span style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
                   angemeldet{' '}
-                  <span style={monoStil(token.fontSizeSM)}>{formatZeit(s.angemeldet_at)}</span>
+                  <span style={monoStil(token.fontSizeSM)}>{zeitpunkt(s.angemeldet_at)}</span>
                   {' · '}zuletzt{' '}
                   {zuletzt ?? (
                     <span style={monoStil(token.fontSizeSM)}>
-                      {formatZeit(s.zuletzt_gesehen_at)}
+                      {zeitpunkt(s.zuletzt_gesehen_at)}
                     </span>
                   )}
                 </span>

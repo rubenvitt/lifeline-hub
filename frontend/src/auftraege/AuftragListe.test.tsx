@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { Auftrag } from '../api/types';
 import { renderMitProviders } from '../test/utils';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
 import AuftragListe from './AuftragListe';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
   id: 1,
@@ -168,8 +169,8 @@ describe('AuftragKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
         <AuftragListe auftraege={[auftrag({ frist_at: '2026-07-14 12:00:00' })]} einsatzId={7} />
       </AnzeigeKonventionenProvider>,
     );
-    const erwartet = formatZeit('2026-07-14 12:00:00', berlin);
-    expect(erwartet).not.toBe(formatZeit('2026-07-14 12:00:00', DEFAULT_KONVENTIONEN));
+    const erwartet = zeitpunkt('2026-07-14 12:00:00', berlin);
+    expect(erwartet).not.toBe(zeitpunkt('2026-07-14 12:00:00', DEFAULT_KONVENTIONEN));
     expect(screen.getByText(`Frist ${erwartet}`)).toBeInTheDocument();
   });
 });

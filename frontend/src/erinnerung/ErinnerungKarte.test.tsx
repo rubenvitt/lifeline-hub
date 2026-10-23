@@ -3,9 +3,10 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import ErinnerungKarte from './ErinnerungKarte';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
 import type { Erinnerung } from '../api/types';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 function erinnerung(over: Partial<Erinnerung>): Erinnerung {
   return {
@@ -139,8 +140,8 @@ describe('ErinnerungKarte — Fälligkeit in der Anzeigezone (LFH-692)', () => {
         </MemoryRouter>
       </AnzeigeKonventionenProvider>,
     );
-    const erwartet = formatZeit('2026-06-11 10:00:00', berlin);
-    expect(erwartet).not.toBe(formatZeit('2026-06-11 10:00:00', DEFAULT_KONVENTIONEN));
+    const erwartet = zeitpunkt('2026-06-11 10:00:00', berlin);
+    expect(erwartet).not.toBe(zeitpunkt('2026-06-11 10:00:00', DEFAULT_KONVENTIONEN));
     expect(screen.getByText(`fällig: ${erwartet}`, { exact: false })).toBeInTheDocument();
   });
 });

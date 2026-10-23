@@ -63,7 +63,7 @@ export default function KanalListe({
 }: Props) {
   const [offen, setOffen] = useState(false);
   const { token, rollen } = useRollen();
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const leer = kanaele.length === 0;
 
   return (
@@ -150,7 +150,7 @@ export default function KanalListe({
                         title="Letzte Nachricht"
                         style={{ ...monoStil(11), color: rollen.schwach }}
                       >
-                        {formatZeitKurz(k.letzte_nachricht_at)}
+                        {zeitKurz(k.letzte_nachricht_at)}
                       </span>
                     )}
                   </span>

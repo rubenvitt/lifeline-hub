@@ -43,7 +43,7 @@ export default function LagebesprechungZeile({
         <Typography.Text strong>Nächste Lagebesprechung</Typography.Text>
         {termin && (
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-            <ZeitAnzeige wert={termin} format="kurz" />
+            <ZeitAnzeige wert={termin} rolle="kurz" />
           </span>
         )}
         <StatusTag darstellung={lagebesprechungZustand(termin, jetzt)} />

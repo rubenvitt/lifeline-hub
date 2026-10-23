@@ -27,7 +27,7 @@ function Nachgetragen({ erfassung, eingang }: { erfassung: string; eingang?: str
   return (
     <Typography.Text type="secondary" data-lfh="nachgetragen">
       {' '}
-      · nachgetragen <ZeitAnzeige wert={eingang} format="dtg" />
+      · nachgetragen <ZeitAnzeige wert={eingang} rolle="kurz" />
     </Typography.Text>
   );
 }
@@ -38,7 +38,7 @@ function Aufgehoben({ am }: { am?: string | null }) {
   return (
     <Typography.Text type="secondary" data-lfh="aufgehoben">
       {' '}
-      · aufgehoben <ZeitAnzeige wert={am} format="dtgVoll" />
+      · aufgehoben <ZeitAnzeige wert={am} rolle="zeitpunkt" />
     </Typography.Text>
   );
 }
@@ -150,7 +150,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
             type="secondary"
             style={{ fontSize: token.fontSizeSM, marginRight: token.marginXS }}
           >
-            <ZeitAnzeige wert={e.at} format="dtgVoll" />
+            <ZeitAnzeige wert={e.at} rolle="zeitpunkt" />
           </Typography.Text>
           {e.node}
         </li>

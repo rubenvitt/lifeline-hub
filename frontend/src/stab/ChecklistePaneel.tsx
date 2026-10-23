@@ -230,7 +230,7 @@ function ChecklistenZeile({
             <>
               {' · '}
               <span style={monoStil(token.fontSize)}>
-                erledigt <ZeitAnzeige wert={eintrag.erledigt_at} format="kurz" />
+                erledigt <ZeitAnzeige wert={eintrag.erledigt_at} rolle="kurz" />
               </span>
             </>
           )}

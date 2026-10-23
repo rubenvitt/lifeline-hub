@@ -188,7 +188,7 @@ function ZeitAngabe({
     <InlineAngabe<Dayjs | null>
       etikett={etikett}
       wert={alsZeitpunkt(wert) ?? null}
-      anzeige={wert ? <ZeitAnzeige wert={wert} format="dtgVoll" /> : null}
+      anzeige={wert ? <ZeitAnzeige wert={wert} rolle="zeitpunkt" /> : null}
       leer={(d) => d == null}
       gleich={(a, b) => (a == null || b == null ? a === b : a.valueOf() === b.valueOf())}
       darfSchreiben={darf}
@@ -758,7 +758,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
             </Datenfeld>
             <Datenfeld label="Stand" mono>
               {netz.stand ? (
-                <ZeitAnzeige wert={netz.stand} format="dtgVoll" />
+                <ZeitAnzeige wert={netz.stand} rolle="zeitpunkt" />
               ) : (
                 <Wert>{null}</Wert>
               )}

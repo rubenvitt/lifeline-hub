@@ -33,7 +33,7 @@ export interface SchriftfeldAngaben {
 
 /**
  * @param dtg wandelt einen Zeitstempel des Servers in die taktische DTG der Anzeigezone
- *   (`taktischeDtgVoll` mit den Konventionen des Einsatzes).
+ *   (`zeitpunkt` mit den Konventionen des Einsatzes).
  */
 export function schriftfeldAngaben(
   sf: Schriftfeld | null,

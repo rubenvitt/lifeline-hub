@@ -89,7 +89,6 @@ import {
   wetterPegelPfad,
 } from '../../routing/deeplinks';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
 import { abschnittLagezustand, etbTyp, rollenFarbe } from '../../theme/statusFarben';
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
@@ -110,6 +109,7 @@ import {
   type Marke,
 } from './ueberblickDaten';
 import NachforderungenPaneel, { aeltesteOffene } from './NachforderungenPaneel';
+import { leereUhrzeit, zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /**
  * Führung · Überblick — die Startseite eines Einsatzes. Die Bedeutung jeder Zahl steht in
@@ -493,8 +493,9 @@ export default function UeberblickPage() {
   };
 
   const zeile = listenZeileStil(rollen, token);
-  const uhrzeit = (s: string | null | undefined) => formatUhrzeit(s, konventionen);
-  const frist = (s: string | null | undefined) => formatUhrzeitMitTag(s, konventionen);
+  // Rolle „kurz“ (LLH-1061): die Liste reicht über Mitternacht; eine Lücke hält Ziffernbreite.
+  const kurz = (s: string | null | undefined) =>
+    zeitKurz(s, konventionen) || leereUhrzeit(konventionen);
   const auftraegeFehlen = auftraegeFrei && auftraegeQ.isError;
 
   /** Ziel einer Marke; die Lagebesprechung führt nur in ein freies Modul (LFH-888, LLH-1111). */
@@ -790,7 +791,7 @@ export default function UeberblickPage() {
                 onNeuladen={() =>
                   nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
                 }
-                zeilen={zeilen.map((z) => abschnittGliederung(z, einsatzId, frist, token, rollen))}
+                zeilen={zeilen.map((z) => abschnittGliederung(z, einsatzId, kurz, token, rollen))}
               />
 
               <ListenPaneel
@@ -817,7 +818,7 @@ export default function UeberblickPage() {
                       style={zeile}
                     >
                       <span style={{ ...monoStil(11), color: farbe, flex: '0 0 40px' }}>
-                        {uhrzeit(a.erteilt_at)}
+                        {kurz(a.erteilt_at)}
                       </span>
                       <span
                         style={{
@@ -841,7 +842,7 @@ export default function UeberblickPage() {
                         <span style={{ ...monoStil(10), color: rollen.schwach }}>
                           {[
                             empfaengerText(a) ? `an ${empfaengerText(a)}` : 'ohne Empfänger',
-                            a.frist_at ? `Frist ${frist(a.frist_at)}` : 'ohne Frist',
+                            a.frist_at ? `Frist ${kurz(a.frist_at)}` : 'ohne Frist',
                           ].join(' · ')}
                         </span>
                       </span>
@@ -902,7 +903,7 @@ export default function UeberblickPage() {
                       als="li"
                       typ="entscheidung"
                       typwort={etbTyp.entscheidung.label}
-                      zeit={uhrzeit(e.ereigniszeit)}
+                      zeit={kurz(e.ereigniszeit)}
                       nr={`Nr. ${e.lfd_nr}`}
                       meta={verfasserText(e)}
                       aktionen={
@@ -968,9 +969,7 @@ export default function UeberblickPage() {
                         minWidth: 52,
                       }}
                     >
-                      <span style={{ ...monoStil(13), color: markenFarbe(m) }}>
-                        {frist(m.zeit)}
-                      </span>
+                      <span style={{ ...monoStil(13), color: markenFarbe(m) }}>{kurz(m.zeit)}</span>
                       <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
                     </span>
                     <span

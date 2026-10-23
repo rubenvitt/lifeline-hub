@@ -15,10 +15,10 @@ export function istBeurteilt(g: MitBeurteilung): boolean {
 
 /**
  * „beurteilt 201512okt26 · Name“ oder „nicht beurteilt“. Die Zeit formatiert der Aufrufer in der
- * Anzeigezone (`useAnzeigeKonventionen().formatZeit`); ohne Namen (Konto entfernt) nur die Zeit.
+ * Anzeigezone (`useAnzeigeKonventionen().zeitpunkt`); ohne Namen (Konto entfernt) nur die Zeit.
  */
-export function beurteilungText(g: MitBeurteilung, formatZeit: (utc: string) => string): string {
+export function beurteilungText(g: MitBeurteilung, zeitpunkt: (utc: string) => string): string {
   if (!g.beurteilt_at) return NICHT_BEURTEILT;
-  const zeit = `beurteilt ${formatZeit(g.beurteilt_at)}`;
+  const zeit = `beurteilt ${zeitpunkt(g.beurteilt_at)}`;
   return g.beurteilt_von_name ? `${zeit} · ${g.beurteilt_von_name}` : zeit;
 }

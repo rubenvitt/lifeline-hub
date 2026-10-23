@@ -1231,7 +1231,7 @@ export default function LagekartePage() {
 
   // Lageplan (LLH-1051, Spec `lagekarte-druck`): Druck und Anlage des aktuellen Ausschnitts. Kopf
   // und Legende liest der Hook erst bei der Aufnahme; die Legende nennt nur, was gezeichnet ist.
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const lageplanStile = config?.online_styles ?? [];
   const lageplan = useLageplan({
     kartenRef,
@@ -1264,7 +1264,7 @@ export default function LagekartePage() {
           const b = bilder.find((x) => x.id === o.id);
           return b ? [{ id: b.id, name: b.name }] : [];
         }),
-      formatZeitKurz,
+      zeitKurz,
     },
     beginneHandlung: kartenFehler.beginne,
   });

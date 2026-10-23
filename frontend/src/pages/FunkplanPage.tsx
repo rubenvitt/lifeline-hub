@@ -2,7 +2,6 @@ import { Breadcrumb, Button, Flex, Space, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type Key, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AbrufZustand } from '../api/abrufZustand';
 import { legeBefehlAn } from '../api/befehle';
@@ -72,6 +71,7 @@ import { useNetzQuellen, useQuelle } from '../stab/useNetzQuellen';
 import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { modulName } from '../einsatz/modulRegistry';
 import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import './funkplanPrint.css';
 
 /**
@@ -612,9 +612,9 @@ export default function FunkplanPage() {
   // Ein Wortlaut für Lagebericht und Befehl: Baum, Lücken und Kommunikationsskizze. Die
   // Erreichbarkeit kennt das Markdown nicht.
   const funkplanText = () => {
-    const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
+    const stand = zeitpunkt(new Date().toISOString(), konventionen);
     const gueltigAbRoh = netz.schriftfeld?.gueltig_ab;
-    const gueltigAb = gueltigAbRoh ? taktischeDtgVoll(gueltigAbRoh, konventionen) : null;
+    const gueltigAb = gueltigAbRoh ? zeitpunkt(gueltigAbRoh, konventionen) : null;
     const text = rendereFunkplanMarkdown(zeilen, stand, luecken, quellen, { netz, gueltigAb });
     return { titel: `Funkplan ${stand}`, text };
   };
@@ -821,10 +821,7 @@ export default function FunkplanPage() {
             zeilen={[
               {
                 etikett: 'Stand',
-                wert: taktischeDtgVoll(
-                  new Date(datenstand || Date.now()).toISOString(),
-                  konventionen,
-                ),
+                wert: zeitpunkt(new Date(datenstand || Date.now()).toISOString(), konventionen),
               },
               ...(umfang ? [{ etikett: 'Umfang', wert: umfang }] : []),
             ]}

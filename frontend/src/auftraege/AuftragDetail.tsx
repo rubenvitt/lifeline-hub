@@ -94,9 +94,9 @@ export default function AuftragDetail({
   quittierFehlerGrund,
 }: AuftragDetailProps) {
   const { token, rollen } = useRollen();
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const kennung = auftragKennung(a);
-  const hasSchema = gefuellteFelder(a, formatZeit).length > 0;
+  const hasSchema = gefuellteFelder(a, zeitpunkt).length > 0;
   const verlauf = auftragVerlauf(a);
   const abschnitt = { marginTop: token.marginLG } as const;
   return (
@@ -176,7 +176,7 @@ export default function AuftragDetail({
               style={{ listStyle: 'none', display: 'flex', gap: token.marginSM, paddingBlock: 2 }}
             >
               <span style={{ ...monoStil(12), color: rollen.gedaempft, flex: '0 0 auto' }}>
-                <ZeitAnzeige wert={e.zeit} format="uhrzeit" />
+                <ZeitAnzeige wert={e.zeit} rolle="kurz" />
               </span>
               <span>{e.wort}</span>
             </li>

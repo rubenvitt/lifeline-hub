@@ -113,9 +113,7 @@ describe('useBedarfsvorschlag — Vorschlag aus beiden Quellen', () => {
     const { result } = rendere();
     await waitFor(() => expect(result.current.kraefte.wert).toBe(186));
     await waitFor(() => expect(result.current.betreute.wert).toBe(70));
-    expect(result.current.kraefte.hinweis).toMatch(
-      /^Vorschlag: Personal im Einsatz, Stand \d\d:\d\d$/,
-    );
+    expect(result.current.kraefte.hinweis).toMatch(/^Vorschlag: Personal im Einsatz, Stand \d{4}$/);
     expect(result.current.betreute.hinweis).toBe('Vorschlag: in Betreuung zum Beginn');
     // Der Stichtag der Kopfzahl ist der Beginn als Wire-String (UTC ohne Zonenkennung).
     expect(z.zeitpunkte).toEqual([VON]);
@@ -222,7 +220,7 @@ describe('useBedarfsvorschlag — Zeitfenster in der Zukunft', () => {
     const { result } = rendere({ jetzt: dayjs('2026-09-24T09:59:59Z') });
     await waitFor(() => expect(result.current.betreute.wert).toBe(70));
     expect(result.current.betreute.hinweis).toMatch(
-      /^Vorschlag: in Betreuung, Stand \d\d:\d\d, nicht zum Beginn$/,
+      /^Vorschlag: in Betreuung, Stand \d{4}, nicht zum Beginn$/,
     );
   });
 
@@ -230,7 +228,7 @@ describe('useBedarfsvorschlag — Zeitfenster in der Zukunft', () => {
     antworte(personal(3), MIT_MELDUNG);
     const { result } = rendere({ vonAt: undefined });
     await waitFor(() => expect(result.current.betreute.wert).toBe(70));
-    expect(result.current.betreute.hinweis).toMatch(/^Vorschlag: in Betreuung, Stand \d\d:\d\d$/);
+    expect(result.current.betreute.hinweis).toMatch(/^Vorschlag: in Betreuung, Stand \d{4}$/);
   });
 
   it('genau zum Beginn ist es nicht mehr Zukunft', async () => {
@@ -244,7 +242,7 @@ describe('useBedarfsvorschlag — Zeitfenster in der Zukunft', () => {
     antworte(personal(3), MIT_MELDUNG);
     const { result } = rendere({ jetzt: dayjs('2026-09-24T11:59:00+02:00') });
     await waitFor(() => expect(result.current.betreute.wert).toBe(70));
-    expect(result.current.betreute.hinweis).toMatch(/Stand \d\d:\d\d, nicht zum Beginn$/);
+    expect(result.current.betreute.hinweis).toMatch(/Stand \d{4}, nicht zum Beginn$/);
   });
 });
 
@@ -351,7 +349,7 @@ describe('useBedarfsvorschlag — Stand-Zeit in der Anzeigezone (LFH-692)', () =
         },
       );
       await waitFor(() => expect(result.current.kraefte.wert).toBe(186));
-      expect(result.current.kraefte.hinweis).toBe('Vorschlag: Personal im Einsatz, Stand 09:58');
+      expect(result.current.kraefte.hinweis).toBe('Vorschlag: Personal im Einsatz, Stand 0958');
     } finally {
       vi.useRealTimers();
     }

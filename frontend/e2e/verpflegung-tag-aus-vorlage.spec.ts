@@ -88,8 +88,8 @@ test('Mahlzeit in Stab-Schreibweise anlegen und den 29.03. aus dem Plan anlegen'
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/verpflegung/aus-vorlage$`));
     await page.goto(`/einsaetze/${e}/verpflegung/aus-vorlage?tag=2026-03-29`);
     const frueh = fenster(page, FRUEH);
-    await expect(frueh).toContainText('29.03. 06:30–08:00');
-    await expect(fenster(page, NACHT)).toContainText('29.03. 23:00–30.03. 01:00');
+    await expect(frueh).toContainText('290630–0800');
+    await expect(fenster(page, NACHT)).toContainText('292300–300100');
     // Nur die beiden dieses Laufs: andere Mahlzeiten der Organisation abwählen.
     for (const box of await page.getByRole('checkbox', { name: / anlegen$/ }).all()) {
       const name = (await box.getAttribute('aria-label')) ?? '';
@@ -101,7 +101,7 @@ test('Mahlzeit in Stab-Schreibweise anlegen und den 29.03. aus dem Plan anlegen'
       await f.getByLabel(`Betreute (EP) zu ${name}`).fill('0');
     }
     await page.getByRole('button', { name: 'Zeitfenster anlegen' }).click();
-    await expect(page.getByText('2 Zeitfenster für den 29.03. angelegt')).toBeVisible();
+    await expect(page.getByText('2 Zeitfenster für den 29mrz26 angelegt')).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/verpflegung$`));
 
     // Der Server hat die Uhrzeiten in Sommerzeit bekommen: 06:30 MESZ = 04:30 UTC.
@@ -150,7 +150,7 @@ test('390 px im Handschuh-Betrieb: Tag aus Vorlage und Verpflegungsplan ohne waa
 
     await page.goto(`/einsaetze/${e}/verpflegung/aus-vorlage?tag=2026-10-11`);
     const f = fenster(page, `Mittagessen mit einem langen Namen ${LAUF}`);
-    await expect(f).toContainText('11.10. 12:00–13:30');
+    await expect(f).toContainText('111200–1330');
     expect(await ueberlauf()).toBeLessThanOrEqual(0);
     // Die Wahl je Fenster hält den Boden der Stufe (Handschuh 72 px).
     const box = await f

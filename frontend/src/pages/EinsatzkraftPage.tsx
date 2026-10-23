@@ -110,7 +110,7 @@ export default function EinsatzkraftPage() {
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
   const { benutzer } = useAuth();
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const uhr = useUhr(60_000);
   const schreiben = useEinteilungSchreiben(einsatzId);
   const fristId = useId();
@@ -621,7 +621,7 @@ export default function EinsatzkraftPage() {
             {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
-                  entlassen <span style={monoStil(13)}>{formatZeitKurz(ep.beendet_at)}</span>
+                  entlassen <span style={monoStil(13)}>{zeitKurz(ep.beendet_at)}</span>
                 </span>
                 {imEinsatzSchreiben && (
                   <Button

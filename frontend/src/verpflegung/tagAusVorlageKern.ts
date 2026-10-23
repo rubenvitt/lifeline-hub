@@ -18,6 +18,8 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { naechsterTag, tagesgrenzen, uhrzeitAmTag } from '../anzeige/uhrzeit';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import type { AnzeigeKonventionen } from '../anzeige/format';
+import { kalendertag } from '../anzeige/zeitDarstellung';
 import type {
   TagAusVorlageEingabe,
   VerpflegungTagErgebnis,
@@ -118,16 +120,22 @@ export function buildTagAusVorlageEingabe(
   };
 }
 
-/** „11.10.“ — der Kalendertag, wie ihn Karte und ETB nennen. */
-export function tagText(tag: string): string {
-  return dayjs.utc(tag).format('DD.MM.');
+/** Der Kalendertag in der Schreibweise des Formatkerns: „11okt26“ bzw. „11.10.26“ (LLH-1061). */
+export function tagText(tag: string, konv: AnzeigeKonventionen): string {
+  return kalendertag(tag, konv);
 }
 
 /** Rückmeldung nach dem Anlegen: Zahl und Tag, dazu jedes übersprungene Fenster. */
-export function quittungText(ergebnis: VerpflegungTagErgebnis, tag: string): string {
+export function quittungText(
+  ergebnis: VerpflegungTagErgebnis,
+  tag: string,
+  konv: AnzeigeKonventionen,
+): string {
   const n = ergebnis.angelegt.length;
   const kopf =
-    n === 0 ? 'Kein Zeitfenster angelegt' : `${n} Zeitfenster für den ${tagText(tag)} angelegt`;
+    n === 0
+      ? 'Kein Zeitfenster angelegt'
+      : `${n} Zeitfenster für den ${tagText(tag, konv)} angelegt`;
   if (ergebnis.uebersprungen.length === 0) return kopf;
   return `${kopf} · am Tag schon vorhanden: ${ergebnis.uebersprungen.map(zitat).join(', ')}`;
 }

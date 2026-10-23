@@ -68,8 +68,8 @@ describe('AuftragKarte — Erteilungszeit (LFH-972)', () => {
   it('zeigt die Erteilungszeit, nicht den Erfassungszeitpunkt, und beschriftet sie sichtbar', () => {
     const { container } = renderKarte(auftrag());
     const spalte = container.querySelector<HTMLElement>('[data-lfh="komm-karte-zeit"]')!;
-    expect(within(spalte).getByText('2201')).toBeInTheDocument();
-    expect(within(spalte).queryByText('2326')).toBeNull();
+    expect(within(spalte).getByText('112201')).toBeInTheDocument();
+    expect(within(spalte).queryByText('112326')).toBeNull();
     // Die Beschriftung steht im Text, nicht nur als Tooltip: auf Touch gibt es kein Hover.
     expect(within(spalte).getByText('erteilt')).toBeVisible();
   });

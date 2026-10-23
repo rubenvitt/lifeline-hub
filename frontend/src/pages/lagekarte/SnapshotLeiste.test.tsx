@@ -28,13 +28,10 @@ import {
 } from './SnapshotLeiste';
 import { setzeViewportBreite } from '../../test/viewport';
 import { dichten } from '../../theme/tokens';
-import {
-  formatZeitKurz,
-  type AnzeigeKonventionen,
-  DEFAULT_KONVENTIONEN,
-} from '../../anzeige/format';
+import { type AnzeigeKonventionen, DEFAULT_KONVENTIONEN } from '../../anzeige/format';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../../test/prozessZone';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 type Snap = Record<string, unknown>;
 function snapshot(over: Snap = {}): Snap {
@@ -197,10 +194,10 @@ describe('SnapshotLeiste', () => {
       expect(t.length).toBe(4);
       return t;
     });
-    // Ohne Bezeichnung die Uhrzeit (`formatZeitKurz`, UTC-Wire-String).
+    // Ohne Bezeichnung die Uhrzeit (`zeitKurz`, UTC-Wire-String).
     expect(titel).toEqual([
       'Live',
-      formatZeitKurz('2026-07-24 10:15:00', DEFAULT_KONVENTIONEN),
+      zeitKurz('2026-07-24 10:15:00', DEFAULT_KONVENTIONEN),
       'Stand B',
       'Stand A',
     ]);
@@ -214,8 +211,8 @@ describe('SnapshotLeiste', () => {
       ],
       {},
     );
-    const zeitA = formatZeitKurz('2026-07-24 10:15:00', DEFAULT_KONVENTIONEN);
-    const zeitOhne = formatZeitKurz('2026-07-24 08:00:00', DEFAULT_KONVENTIONEN);
+    const zeitA = zeitKurz('2026-07-24 10:15:00', DEFAULT_KONVENTIONEN);
+    const zeitOhne = zeitKurz('2026-07-24 08:00:00', DEFAULT_KONVENTIONEN);
     await userEvent.click(screen.getByRole('combobox', { name: 'Stand' }));
     const optionen = await waitFor(() => {
       const o = Array.from(

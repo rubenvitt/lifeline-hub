@@ -120,7 +120,7 @@ export default function EintreffenDialog({
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const amGeraet = useAuthOptional()?.geraet != null;
   const [form] = Form.useForm<UnangemeldetFormular>();
   const [schritt, setSchritt] = useState<'suche' | 'neu'>('suche');
@@ -260,7 +260,7 @@ export default function EintreffenDialog({
   }
 
   const trefferZeile = (t: EintreffenTreffer) => {
-    const hinweise = trefferHinweise(t, formatZeitKurz);
+    const hinweise = trefferHinweise(t, zeitKurz);
     return (
       <ListenEintrag
         actions={[

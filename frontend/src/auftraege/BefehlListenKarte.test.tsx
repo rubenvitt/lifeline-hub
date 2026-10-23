@@ -63,7 +63,7 @@ describe('BefehlListenKarte (Spec `auftraege-befehle`, „Karte eines Befehls“
       }),
     );
     expect(screen.getByText('Freigegeben')).toBeInTheDocument();
-    expect(screen.getByText(/freigegeben 1040 von Meier/)).toBeInTheDocument();
+    expect(screen.getByText(/freigegeben 111040 von Meier/)).toBeInTheDocument();
   });
 
   it('zwei Fassungen desselben Titels unterscheiden sich an der v-Nummer', () => {

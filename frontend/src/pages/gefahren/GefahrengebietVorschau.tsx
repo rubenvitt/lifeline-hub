@@ -38,7 +38,7 @@ export default function GefahrengebietVorschau({
 }) {
   const select = useCallback((liste: Gefahrengebiet[]) => liste.find((g) => g.id === id), [id]);
   const abfrage = useQuery({ ...datensatzAbfrage.gefahrengebiete(einsatzId), select });
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
 
   return (
     <VorschauZustand abfrage={abfrage} sorte="Das Gefahrengebiet">
@@ -52,7 +52,7 @@ export default function GefahrengebietVorschau({
               {g.zonen_ids.length}
             </Datenfeld>
             {/* Statt der Zellzählung (LLH-1090): ob jemand die Matrix angesehen hat. */}
-            <Datenfeld label="Beurteilung">{beurteilungText(g, formatZeit)}</Datenfeld>
+            <Datenfeld label="Beurteilung">{beurteilungText(g, zeitpunkt)}</Datenfeld>
           </Datenraster>
           {/* Erst mit vorhandenem Gebiet: für ein verschwundenes gäbe es keine Matrix. */}
           <MatrixAuszug einsatzId={einsatzId} gebietId={g.id} />

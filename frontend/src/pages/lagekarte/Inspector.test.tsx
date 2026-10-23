@@ -404,7 +404,7 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     );
     const block = screen.getByRole('region', { name: 'Letzte Meldung' });
     expect(block).toHaveTextContent('Sickerstelle unverändert, Sandsackverbau hält.');
-    // Zeit nach der Anzeigekonvention des Paneels (`formatZeitKurz`), wie „Disponiert" im Raster.
+    // Zeit nach der Anzeigekonvention des Paneels (`zeitKurz`), wie „Disponiert" im Raster.
     expect(block).toHaveTextContent(/\d{2}11 · Funk$/);
     // Neben dem Raster, nicht darin — das `dl` bleibt Feld-für-Feld.
     const raster = container.querySelector('[data-lfh="auswahl-raster"]') as HTMLElement;

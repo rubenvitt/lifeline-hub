@@ -12,7 +12,6 @@ import type {
   TransportPrioritaet,
 } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeUhrzeit } from '../anzeige/format';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -30,6 +29,7 @@ import {
   TRANSPORT_PRIORITAET_REIHE,
   gueltig,
 } from './personMeta';
+import { uhrzeit } from '../anzeige/zeitDarstellung';
 
 /**
  * Die Paneele „Transport festlegen“ und „Maßnahme erfassen“ des Patientenkopfs (Change
@@ -207,7 +207,7 @@ export function MassnahmePaneel({
     if (!a.isPending && a.error != null) a.reset();
   }, []);
   const name = (m: Massnahme) =>
-    `Maßnahme ${MASSNAHME_WORT[m.art]} ${taktischeUhrzeit(m.zeitpunkt_at, konventionen)} aufheben`;
+    `Maßnahme ${MASSNAHME_WORT[m.art]} ${uhrzeit(m.zeitpunkt_at, konventionen)} aufheben`;
   return (
     <section aria-label="Maßnahme erfassen" data-lfh="massnahme-paneel">
       <ErfassungsFormular<MassnahmeWerte>
@@ -245,7 +245,7 @@ export function MassnahmePaneel({
               <li key={m.id}>
                 <Flex align="center" gap={token.marginSM} wrap>
                   <span>
-                    {MASSNAHME_WORT[m.art]} · <ZeitAnzeige wert={m.zeitpunkt_at} format="uhrzeit" />
+                    {MASSNAHME_WORT[m.art]} · <ZeitAnzeige wert={m.zeitpunkt_at} rolle="kurz" />
                     {m.bestaetigt_name && (
                       <Typography.Text type="secondary">
                         {` · bestätigt: ${m.bestaetigt_name}`}

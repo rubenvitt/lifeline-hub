@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { abrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -57,6 +56,7 @@ import { baueMedienlage, rendereMedienlageMarkdown } from '../stab/medienlage';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { medienkontaktStatus, pressemitteilungStatus } from '../theme/statusFarben';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Pressearbeit des Sachgebiets S5 (LFH-554), Zielkontext Stabsraum. Herleitung:
@@ -306,9 +306,7 @@ export default function PressePage() {
     mitteilungen: { zustand: abrufZustand(mitteilungenQuery), daten: mitteilungen },
     anrufe: { zustand: abrufZustand(anrufZaehlerQuery), daten: anrufZaehlerQuery.data ?? null },
   });
-  const medienlageText = rendereMedienlageMarkdown(medienlage, (w) =>
-    taktischeDtgVoll(w, konventionen),
-  );
+  const medienlageText = rendereMedienlageMarkdown(medienlage, (w) => zeitpunkt(w, konventionen));
 
   const waehleStatus = (k: Medienkontakt, ziel: MedienkontaktStatus) => {
     if (ziel === k.status || statusMutation.isPending) return;

@@ -3,7 +3,6 @@ import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { Breadcrumb, Button, Input, Popover, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -96,6 +95,7 @@ import Segmentleiste from '../components/instrument/Segmentleiste';
 import './kraefteuebersichtPrint.css';
 import { KennungsLink } from '../components/kennungsLink';
 import { funktionText } from '../kraefte/einsatzfunktionKern';
+import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Meldebild: Statusraster über alle Einheiten, als Kräftebaum (LLH-1025, Spec `kraeftebaum`).
@@ -318,7 +318,9 @@ function rasterSpalten(
       width: 90,
       render: (_t, z) =>
         (z.art === 'einheit' && z.einheitId != null) || z.art === 'fahrzeug' ? (
-          <span style={monoStil(12)}>{z.seit ? kontext.zeit(z.seit) : '—'}</span>
+          <span data-lfh="meldebild-seit" style={monoStil(12)}>
+            {z.seit ? kontext.zeit(z.seit) : '—'}
+          </span>
         ) : null,
     },
     // Kein `abBreite`: die Einsatzdauer gehört zum Einsatzwert im Lagevortrag und auf das
@@ -610,7 +612,7 @@ function RueckmeldungZelle({
     rolle === 'alarm' ? rollen.alarm : rolle === 'achtung' ? rollen.achtung : rollen.gedaempft;
   const wort = RUECKMELDUNG_WORT[anzeige.zustand];
   const l = anzeige.letzte;
-  const zeit = l ? formatUhrzeitMitTag(l.ereigniszeit, konventionen) : null;
+  const zeit = l ? zeitKurz(l.ereigniszeit, konventionen) : null;
   const beschreibung = l
     ? [wort, `letzte ${zeit}`, MELDEWEG_WORT[l.meldeweg], `Meldung Nr. ${l.lfd_nr}`].join(' · ')
     : wort;
@@ -838,9 +840,7 @@ export default function KraefteuebersichtPage() {
   const zulauf = useMemo(
     () =>
       nachforderungenDaten
-        ? zulaufBand(nachforderungenDaten, jetzt.valueOf(), (utc) =>
-            formatUhrzeitMitTag(utc, konventionen),
-          )
+        ? zulaufBand(nachforderungenDaten, jetzt.valueOf(), (utc) => zeitKurz(utc, konventionen))
         : null,
     [nachforderungenDaten, jetzt, konventionen],
   );
@@ -939,7 +939,7 @@ export default function KraefteuebersichtPage() {
         einsatzId,
         auftraegeZustand,
         {
-          zeit: (utc) => formatUhrzeitMitTag(utc, konventionen),
+          zeit: (utc) => zeitKurz(utc, konventionen),
           handStatus,
           handFehler: handFehler.grund,
         },
@@ -965,7 +965,7 @@ export default function KraefteuebersichtPage() {
   const uebernehmen = useMutation({
     mutationFn: async () => {
       // Stand in der Anzeigezone: die DTG landet als Text im Lagebericht (LFH-692).
-      const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
+      const stand = zeitpunkt(new Date().toISOString(), konventionen);
       // Der Lagebericht behält die Abschnittsgliederung: ein Meldetext wird nach Abschnitten
       // gelesen, das Raster am Schirm nach Einheiten verglichen.
       const bild = baueKraeftebild(
@@ -995,7 +995,7 @@ export default function KraefteuebersichtPage() {
               material: materialEntlassenQuery.data
                 ? toHerausgenommenesMaterial(materialEntlassenQuery.data)
                 : null,
-              dtg: (iso) => taktischeDtgVoll(iso, konventionen),
+              dtg: (iso) => zeitpunkt(iso, konventionen),
             },
       );
       // EIN Aufruf mit Startinhalt (LFH-548): der Bericht entsteht mit Text oder gar nicht. Das
@@ -1161,10 +1161,7 @@ export default function KraefteuebersichtPage() {
           zeilen={[
             {
               etikett: 'Stand',
-              wert: taktischeDtgVoll(
-                new Date(datenstand || Date.now()).toISOString(),
-                konventionen,
-              ),
+              wert: zeitpunkt(new Date(datenstand || Date.now()).toISOString(), konventionen),
             },
             { etikett: 'Umfang', wert: meta },
             ...(gefiltert

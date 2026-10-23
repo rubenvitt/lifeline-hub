@@ -119,12 +119,12 @@ function richtungText(a: Auftrag): string {
  * Die Angaben des Auftragsblatts (LLH-1171, Spec `druck-dokumente`, „Das Auftragsblatt liest in der
  * Reihenfolge der FwDV 100“): Empfänger, Auftrag, Priorität, Frist, dann die Lesefolge der Karte
  * ({@link READ_ORDER}), dann Richtung und Erteilzeit. Leere Angaben fallen weg; Zeiten über
- * `formatZeit` der Anzeigezone. Herleitung:
+ * `zeitpunkt` der Anzeigezone. Herleitung:
  * `openspec/changes/archive/2026-10-12-ianaw5k1-auftrag-drucken/design.md` (D4).
  */
 export function druckFelder(
   a: Auftrag,
-  formatZeit: (wire?: string | null) => string,
+  zeitpunkt: (wire?: string | null) => string,
 ): { etikett: string; wert: string }[] {
   const felder: { etikett: string; wert: string | null | undefined }[] = [
     {
@@ -133,10 +133,10 @@ export function druckFelder(
     },
     { etikett: 'Auftrag', wert: a.auftrag_text },
     { etikett: 'Priorität', wert: PRIO_META[a.prioritaet]?.label ?? a.prioritaet },
-    { etikett: 'Frist', wert: a.frist_at ? formatZeit(a.frist_at) : null },
+    { etikett: 'Frist', wert: a.frist_at ? zeitpunkt(a.frist_at) : null },
     ...READ_ORDER.map((key) => ({ etikett: READ_LABEL[key], wert: a[key] })),
     { etikett: 'Richtung', wert: richtungText(a) },
-    { etikett: 'Erteilt am', wert: formatZeit(a.erteilt_at) },
+    { etikett: 'Erteilt am', wert: zeitpunkt(a.erteilt_at) },
   ];
   return dropEmpty(felder);
 }

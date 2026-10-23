@@ -493,9 +493,9 @@ describe('Nachreichen (tasks.md 2.3)', () => {
 
     expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
     expect(
-      within(notice('Auftrag überfällig')).getByText('Auftrag #7 · 14:05'),
+      within(notice('Auftrag überfällig')).getByText('Auftrag #7 · 141405'),
     ).toBeInTheDocument();
-    expect(within(notice('Neuer Auftrag')).getByText('Auftrag #8 · 14:07')).toBeInTheDocument();
+    expect(within(notice('Neuer Auftrag')).getByText('Auftrag #8 · 141407')).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
 
@@ -510,7 +510,7 @@ describe('Nachreichen (tasks.md 2.3)', () => {
 
     expect(await screen.findByText('Sofortmeldung · RTW 2')).toBeInTheDocument();
     expect(
-      within(notice('Sofortmeldung · RTW 2')).getByText('Patient übergeben · 14:05'),
+      within(notice('Sofortmeldung · RTW 2')).getByText('Patient übergeben · 141405'),
     ).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
@@ -523,7 +523,7 @@ describe('Nachreichen (tasks.md 2.3)', () => {
 
     expect(await screen.findByText('Neuer Befehl')).toBeInTheDocument();
     expect(screen.getAllByText('Neuer Befehl')).toHaveLength(1);
-    expect(screen.getByText('14:05')).toBeInTheDocument();
+    expect(screen.getByText('141405')).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
 

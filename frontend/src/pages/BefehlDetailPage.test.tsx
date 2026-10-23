@@ -342,7 +342,7 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
       await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalled());
       // Der Zeitstempel sagt es sichtbar — ein unsichtbarer Autosave ist von „nicht gespeichert"
       // nicht zu unterscheiden.
-      expect(await screen.findByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
+      expect(await screen.findByText(/zuletzt gespeichert \d{4}/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
