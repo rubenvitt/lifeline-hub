@@ -177,7 +177,9 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
     await oeffneBearbeiten();
     await userEvent.clear(await screen.findByLabelText('Einsatzkräfte (EP)'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText('Bitte eine Anzahl angeben — 0, wenn niemand')).toBeVisible();
+    // antd blendet die Meldung animiert ein (Höhe 0, Deckkraft 0); erst danach ist sie sichtbar.
+    const meldung = await screen.findByText('Bitte eine Anzahl angeben — 0, wenn niemand');
+    await waitFor(() => expect(meldung).toBeVisible());
     expect(onBedarfSpeichern).not.toHaveBeenCalled();
   });
 
