@@ -1,0 +1,52 @@
+---
+/**
+ * Lesehilfen der Architekturseiten (LLH-1435), wie auf den Kapitelseiten der Anwenderdoku
+ * (`pages/doku/[kapitel].astro`): Liste unter 960 px zu, aktiver Eintrag im Bild, Abschnitt der
+ * Lesenden im Inhaltsverzeichnis am Rand markiert.
+ */
+---
+
+<script>
+  const klappe = document.querySelector<HTMLDetailsElement>('.doku-navi__klappe');
+  if (klappe && !matchMedia('(min-width: 960px)').matches) klappe.open = false;
+
+  const aktiv = document.querySelector<HTMLElement>('.doku-liste a[aria-current="page"]');
+  const navi = document.querySelector<HTMLElement>('.doku-navi');
+  if (aktiv && navi && matchMedia('(min-width: 960px)').matches) {
+    navi.scrollTop = aktiv.offsetTop - navi.clientHeight / 3;
+  }
+
+  const links = new Map(
+    [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')].map((a) => [
+      a.dataset.tocLink,
+      a,
+    ]),
+  );
+  const ueberschriften = [
+    ...document.querySelectorAll<HTMLElement>('.doku-text h2[id], .doku-text h3[id]'),
+  ];
+  let geplant = false;
+  function markiere() {
+    geplant = false;
+    let aktuell: HTMLElement | undefined;
+    for (const h of ueberschriften) {
+      if (h.getBoundingClientRect().top < 120) aktuell = h;
+      else break;
+    }
+    links.forEach((a, id) => {
+      if (id === aktuell?.id) a.setAttribute('aria-current', 'location');
+      else a.removeAttribute('aria-current');
+    });
+  }
+  addEventListener(
+    'scroll',
+    () => {
+      if (!geplant) {
+        geplant = true;
+        requestAnimationFrame(markiere);
+      }
+    },
+    { passive: true },
+  );
+  markiere();
+</script>

@@ -16,6 +16,7 @@ interface Props {
 const { titel, beschreibung } = Astro.props;
 const repo = 'https://github.com/rubenvitt/lifeline-hub';
 const inDoku = Astro.url.pathname.startsWith('/doku');
+const inArchitektur = Astro.url.pathname.startsWith('/architektur');
 ---
 
 <!doctype html>
@@ -57,14 +58,16 @@ const inDoku = Astro.url.pathname.startsWith('/doku');
         <a href="/#einsatz">Einsatztauglich</a>
         <a href="/#stand">Stand</a>
         <a href="/doku/" aria-current={inDoku ? 'page' : undefined}>Doku</a>
+        <a href="/architektur/" aria-current={inArchitektur ? 'page' : undefined}>Architektur</a>
       </nav>
       <div class="rechts">
-        <button class="suchknopf" type="button" data-such-oeffnen aria-label="Dokumentation durchsuchen">
+        <button class="suchknopf" type="button" data-such-oeffnen
+          aria-label={inArchitektur ? 'Architekturdokumentation durchsuchen' : 'Dokumentation durchsuchen'}>
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
             <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"></circle>
             <path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2"></path>
           </svg>
-          <span class="suchknopf__text">Doku durchsuchen</span>
+          <span class="suchknopf__text">{inArchitektur ? 'Architektur durchsuchen' : 'Doku durchsuchen'}</span>
           <kbd class="suchknopf__kuerzel" data-such-kuerzel>⌘K</kbd>
         </button>
         <div class="modus" role="group" aria-label="Darstellung">
@@ -78,7 +81,7 @@ const inDoku = Astro.url.pathname.startsWith('/doku');
     <main id="inhalt">
       <slot />
     </main>
-    <DokuSuche />
+    <DokuSuche bereich={inArchitektur ? 'architektur' : 'doku'} />
 
     <footer class="fuss">
       <div class="fuss-innen">

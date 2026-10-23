@@ -19,6 +19,10 @@ arc42, von Agenten geschrieben und laufend fortgeführt; ADRs nach
 - **Aussagen sind am Code belegt.** Wer eine Zahl, einen Ablauf oder eine Grenze nennt, nennt
   die Datei, in der sie steht. Was nicht belegbar ist, steht nicht da.
 - Prosa deutsch, Bezeichner wie im Code (Wurzel-`AGENTS.md`, Bezeichner-Sprache).
+- **Gerendert auf der Website** unter `/architektur/` (`website/AGENTS.md`, Architektur):
+  Kapitel 1–12 und die ADRs, Mermaid als Bild. Relative Links auf Kapitel, ADRs und
+  Anwenderdoku werden dort zu Seiten, Pfade in Backticks zu GitHub-Links. Also reines Markdown,
+  keine HTML-Einschübe; Kapitel beginnen mit `# N. Titel` und der Zeile `Stand: …`.
 
 ## Mitänderungsregel
 

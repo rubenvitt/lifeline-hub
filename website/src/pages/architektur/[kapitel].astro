@@ -1,0 +1,123 @@
+---
+/**
+ * Ein arc42-Kapitel der Architekturdokumentation (LLH-1435), gerendert aus
+ * `docs/architektur/NN-*.md`. Aufbereitung (Links, Pfade, Codeblöcke, Diagramme):
+ * `daten/architektur.ts`. Raster, Navigation und Satzbild wie die Anwenderdoku (`styles/doku.css`),
+ * Ergänzungen in `styles/architektur.css`.
+ */
+import { getCollection } from 'astro:content';
+import Grundriss from '../../layouts/Grundriss.astro';
+import ArchitekturNavi from '../../components/ArchitekturNavi.astro';
+import ArchitekturDiagramme from '../../components/ArchitekturDiagramme.astro';
+import Gliederung from '../../components/Gliederung.astro';
+import Lesehilfen from '../../components/Lesehilfen.astro';
+import {
+  aufbereiten,
+  githubAdresse,
+  gliederungVon,
+  kopfVon,
+  leseminuten,
+} from '../../daten/architektur';
+import '../../styles/doku.css';
+import '../../styles/architektur.css';
+
+export async function getStaticPaths() {
+  const kapitel = (await getCollection('architektur', (k) => k.id !== 'README'))
+    .map((eintrag) => ({ eintrag, kopf: kopfVon(eintrag.body ?? '') }))
+    .sort((a, b) => a.kopf.nummer - b.kopf.nummer);
+  return kapitel.map((k, i) => ({
+    params: { kapitel: k.eintrag.id },
+    props: { ...k, zurueck: kapitel[i - 1], weiter: kapitel[i + 1] },
+  }));
+}
+
+const { eintrag, kopf, zurueck, weiter } = Astro.props;
+const quelle = `docs/architektur/${eintrag.id}.md`;
+const html = aufbereiten(eintrag.rendered?.html ?? '', quelle);
+const gliederung = gliederungVon(html);
+const diagramme = (html.match(/data-mermaid/g) ?? []).length;
+const nummer = String(kopf.nummer).padStart(2, '0');
+---
+
+<Grundriss
+  titel={`${kopf.nummer}. ${kopf.titel} · Architektur · Lifeline Hub`}
+  beschreibung={`Architekturdokumentation Lifeline Hub nach arc42, Kapitel ${kopf.nummer}: ${kopf.titel}.`}
+>
+  <div class="doku-seite">
+    <ArchitekturNavi aktuell={eintrag.id} />
+
+    <article class="doku-kapitel arch-kapitel">
+      <p class="doku-pfad mono">
+        <a href="/architektur/">Architektur</a>
+        <span aria-hidden="true">/</span>
+        <span>arc42 · Kapitel {nummer}</span>
+      </p>
+      <header class="doku-kapitel__kopf">
+        <p class="arch-kapitel__nummer mono" aria-hidden="true">{nummer}</p>
+        <h1 class="doku-kapitel__titel">{kopf.titel}</h1>
+        <div class="doku-kapitel__meta">
+          <p class="doku-umfang mono">
+            {kopf.stand && <span>Stand {kopf.stand}</span>}
+            {diagramme > 0 && <span>{diagramme} {diagramme === 1 ? 'Diagramm' : 'Diagramme'}</span>}
+            <span>ca. {leseminuten(html)} Min. Lesezeit</span>
+          </p>
+        </div>
+      </header>
+
+      {
+        gliederung.length > 0 && (
+          <details class="doku-inhalt doku-inhalt--im-text">
+            <summary class="doku-label">Auf dieser Seite</summary>
+            <Gliederung gliederung={gliederung} art="im-text" />
+          </details>
+        )
+      }
+
+      <div class="doku-text arch-text">
+        <Fragment set:html={html} />
+      </div>
+
+      <nav class="doku-blaettern" aria-label="Kapitel blättern">
+        {
+          zurueck ? (
+            <a
+              class="doku-blaettern__link doku-blaettern__link--zurueck"
+              href={`/architektur/${zurueck.eintrag.id}/`}
+            >
+              <span class="doku-label">← Kapitel {zurueck.kopf.nummer}</span>
+              <span>{zurueck.kopf.titel}</span>
+            </a>
+          ) : (
+            <a class="doku-blaettern__link doku-blaettern__link--zurueck" href="/architektur/">
+              <span class="doku-label">← Übersicht</span>
+              <span>Architekturdokumentation</span>
+            </a>
+          )
+        }
+        {
+          weiter && (
+            <a
+              class="doku-blaettern__link doku-blaettern__link--weiter"
+              href={`/architektur/${weiter.eintrag.id}/`}
+            >
+              <span class="doku-label">Kapitel {weiter.kopf.nummer} →</span>
+              <span>{weiter.kopf.titel}</span>
+            </a>
+          )
+        }
+      </nav>
+      <p class="doku-quelle mono">
+        <a href={githubAdresse(quelle)} target="_blank" rel="noopener noreferrer"
+          >Kapitel auf GitHub ansehen ↗</a
+        >
+      </p>
+    </article>
+
+    <aside class="doku-rand" aria-label="Auf dieser Seite">
+      <p class="doku-label">Auf dieser Seite</p>
+      <Gliederung gliederung={gliederung} art="rand" />
+    </aside>
+  </div>
+  <ArchitekturDiagramme />
+  <Lesehilfen />
+</Grundriss>

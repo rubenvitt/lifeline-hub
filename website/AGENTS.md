@@ -37,11 +37,22 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   sichtbar ist die zum Modus passende, im Druck die helle. Ein fehlendes Bild bricht den Build.
   Ein Kapitel-PR ändert nur `docs/anwender/`, also stehen in den Build-Überwachungspfaden des
   Pages-Projekts `website/*` **und** `docs/anwender/*`.
+- **Architektur** (`src/pages/architektur/`, LLH-1435): die arc42-Doku aus `docs/architektur/`
+  (Kapitel und `entscheidungen/ADR-*.md`) als Collections `architektur` und `entscheidungen`;
+  das Schema der ADRs prüft ihren Kopf beim Bauen. Aufbereitung am gerenderten HTML in
+  `src/daten/architektur.ts`: relative Links auf Kapitel, ADRs und Anwenderdoku werden Seiten
+  der Website, alle übrigen und Pfade in Backticks (sofern es sie gibt) GitHub-Links auf
+  `alpha`; Codeblöcke einfarbig in den Rollen; ```` ```mermaid ```` zeichnet
+  `src/components/ArchitekturDiagramme.astro` im Browser mit dem Paket `mermaid` (exakt
+  gepinnt, eigener Chunk, lädt nur auf Seiten mit Diagramm, Farben aus den Rollen, Vollbild per
+  Klick). Ein reiner Doku-PR ändert nur `docs/architektur/`, also gehört auch
+  `docs/architektur/*` in die Build-Überwachungspfade des Pages-Projekts.
 - **Suche** (`src/components/DokuSuche.astro`, im `Grundriss` jeder Seite): Dialog über ⌘K /
   Strg+K, „/“ und den Suchknopf der Kopfleiste. Der Index `/doku/suche.json`
-  (`src/pages/doku/suche.json.ts`) entsteht beim Bauen aus denselben Kapiteln, mit den
+  (`src/pages/doku/suche.json.ts`, unter `/architektur/` stattdessen
+  `/architektur/suche.json`; gemeinsame Teile in `src/daten/suche.ts`) entsteht beim Bauen aus denselben Kapiteln, mit den
   Sprungmarken der gerenderten Überschriften, und lädt erst beim ersten Öffnen. Kein Suchdienst,
-  keine Bibliothek.
+  keine Suchbibliothek.
 - **Gestaltung wie die App** (`frontend/AGENTS.md`, Gestaltungssprache): Nachtbetrieb ist
   Vorgabe, Radius 0, Fugenraster, Rot bedient nichts, Zahlen in Mono. Schriften nur lokal,
   kein CDN.

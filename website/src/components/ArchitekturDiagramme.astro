@@ -1,0 +1,150 @@
+---
+/**
+ * Zeichnet die Diagramme der Architekturdokumentation (LLH-1435) im Browser: jede
+ * `figure[data-mermaid]` aus `daten/architektur.ts` trägt den Mermaid-Text als `<pre>`. Mermaid
+ * ist ein Paket der Website (kein CDN) und lädt erst, wenn die Seite ein Diagramm hat, als eigener
+ * Chunk. Farben und Schrift kommen aus den Rollen (`styles/rollen.css`); beim Wechsel Nacht/Tag
+ * zeichnet die Seite neu. Ohne Skript oder bei einem Fehler bleibt der Text stehen.
+ *
+ * Ein Klick aufs Diagramm oder der Knopf „Vollbild“ öffnet einen Dialog mit dem Diagramm in
+ * natürlicher Größe (breite Diagramme stehen im Text verkleinert), bei Bedarf scrollbar.
+ */
+---
+
+<dialog class="arch-vollbild" data-diagramm-dialog aria-label="Diagramm im Vollbild">
+  <div class="arch-vollbild__kopf">
+    <span class="doku-label" data-diagramm-titel>Diagramm</span>
+    <button class="arch-knopf mono" type="button" data-diagramm-schliessen>Esc</button>
+  </div>
+  <div class="arch-vollbild__flaeche" data-diagramm-flaeche></div>
+</dialog>
+
+<script>
+  const figuren = [...document.querySelectorAll<HTMLElement>('figure[data-mermaid]')];
+  const dialog = document.querySelector<HTMLDialogElement>('[data-diagramm-dialog]');
+  const flaeche = document.querySelector<HTMLElement>('[data-diagramm-flaeche]');
+  const titel = document.querySelector<HTMLElement>('[data-diagramm-titel]');
+
+  /** Überschrift, unter der ein Diagramm steht: Titel des Vollbilds. */
+  function ueberschriftVon(figur: HTMLElement): string {
+    let knoten: Element | null = figur.previousElementSibling;
+    while (knoten && !/^H[23]$/.test(knoten.tagName)) knoten = knoten.previousElementSibling;
+    return knoten?.textContent?.trim() || 'Diagramm';
+  }
+
+  function farben() {
+    const stil = getComputedStyle(document.documentElement);
+    const v = (name: string) => stil.getPropertyValue(name).trim();
+    return {
+      darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
+      background: v('--lfh-grund'),
+      fontFamily: v('--lfh-schrift-text'),
+      fontSize: '14px',
+      primaryColor: v('--lfh-flaeche-2'),
+      primaryBorderColor: v('--lfh-steuer-rahmen'),
+      primaryTextColor: v('--lfh-text'),
+      secondaryColor: v('--lfh-flaeche-3'),
+      tertiaryColor: v('--lfh-paneel'),
+      lineColor: v('--lfh-gedaempft'),
+      textColor: v('--lfh-text'),
+      mainBkg: v('--lfh-flaeche-2'),
+      nodeBorder: v('--lfh-steuer-rahmen'),
+      clusterBkg: v('--lfh-paneel'),
+      clusterBorder: v('--lfh-linie-stark'),
+      edgeLabelBackground: v('--lfh-grund'),
+      actorBkg: v('--lfh-flaeche-2'),
+      actorBorder: v('--lfh-steuer-rahmen'),
+      actorTextColor: v('--lfh-text'),
+      actorLineColor: v('--lfh-linie-stark'),
+      signalColor: v('--lfh-text-2'),
+      signalTextColor: v('--lfh-text'),
+      labelBoxBkgColor: v('--lfh-flaeche-3'),
+      labelBoxBorderColor: v('--lfh-steuer-rahmen'),
+      labelTextColor: v('--lfh-text'),
+      loopTextColor: v('--lfh-text-2'),
+      noteBkgColor: v('--lfh-flaeche-3'),
+      noteBorderColor: v('--lfh-bedien'),
+      noteTextColor: v('--lfh-text'),
+      activationBkgColor: v('--lfh-flaeche-3'),
+      activationBorderColor: v('--lfh-bedien'),
+      sequenceNumberColor: v('--lfh-auf-bedien'),
+    };
+  }
+
+  let zaehler = 0;
+
+  async function zeichne() {
+    const { default: mermaid } = await import('mermaid');
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'base',
+      themeVariables: farben(),
+      flowchart: { htmlLabels: true, curve: 'basis' },
+      sequence: {
+        mirrorActors: false,
+        showSequenceNumbers: false,
+        actorFontSize: 14,
+        messageFontSize: 14,
+        noteFontSize: 13,
+      },
+    });
+    for (const figur of figuren) {
+      const quelle = figur.querySelector<HTMLElement>('.arch-diagramm__quelle');
+      const text = quelle?.textContent ?? '';
+      if (!text.trim()) continue;
+      try {
+        const { svg } = await mermaid.render(`arch-diagramm-${(zaehler += 1)}`, text);
+        let bild = figur.querySelector<HTMLElement>('.arch-diagramm__bild');
+        if (!bild) {
+          bild = document.createElement('div');
+          bild.className = 'arch-diagramm__bild';
+          figur.prepend(bild);
+          const leiste = document.createElement('div');
+          leiste.className = 'arch-diagramm__leiste';
+          leiste.innerHTML =
+            '<button class="arch-knopf mono" type="button" data-vollbild>Vollbild</button>';
+          figur.append(leiste);
+          leiste.querySelector('button')?.addEventListener('click', () => oeffne(figur));
+          bild.addEventListener('click', () => oeffne(figur));
+        }
+        bild.innerHTML = svg;
+        figur.dataset.gezeichnet = '';
+      } catch {
+        // Ungültiger Text: der Mermaid-Text bleibt als Quelltext stehen.
+      }
+    }
+  }
+
+  function oeffne(figur: HTMLElement) {
+    const svg = figur.querySelector('.arch-diagramm__bild svg');
+    if (!dialog || !flaeche || !svg) return;
+    flaeche.innerHTML = '';
+    const kopie = svg.cloneNode(true) as SVGElement;
+    // Mermaid legt die natürliche Breite als `max-width` ab: im Vollbild mindestens diese, damit
+    // die Schrift ihre Größe behält; schmale Diagramme dürfen bis zur Fensterbreite wachsen.
+    const natuerlich = parseFloat((svg as SVGElement).style.maxWidth) || 900;
+    kopie.removeAttribute('style');
+    kopie.setAttribute('width', String(natuerlich));
+    kopie.style.width = `max(${natuerlich}px, min(100%, ${Math.round(natuerlich * 1.4)}px))`;
+    flaeche.append(kopie);
+    if (titel) titel.textContent = ueberschriftVon(figur);
+    dialog.showModal();
+  }
+
+  document
+    .querySelector('[data-diagramm-schliessen]')
+    ?.addEventListener('click', () => dialog?.close());
+  dialog?.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+
+  if (figuren.length) {
+    void zeichne();
+    // Nacht/Tag: der Grundriss setzt `data-theme` um; die Diagramme folgen.
+    new MutationObserver(() => void zeichne()).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+  }
+</script>
