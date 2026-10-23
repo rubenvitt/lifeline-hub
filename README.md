@@ -15,7 +15,7 @@ Einsatzleitung und Stab ohnehin arbeiten.
 
 Was mit dem Quelltext und den daraus gebauten Programmen erlaubt ist, steht allein in
 [LICENSE](LICENSE). Bitte vor dem ersten Betrieb lesen. Der Server zeigt denselben Text beim ersten
-Start und mit `lifeline-hub lizenz`.
+Start und mit `lifeline-hub lizenz`; der erste Start läuft erst, wenn die Lizenz angenommen ist.
 
 Beiträge von außen werden derzeit nicht angenommen. Fehlerberichte sind willkommen.
 
@@ -70,7 +70,8 @@ amd64 und arm64, getaggt mit der Version ohne `v` (etwa `1.0.0-alpha.99`). Daten
 Offline-Karten liegen im Volume `/data`.
 
 ```bash
-docker run -d -p 8080:8080 -v lifeline-daten:/data ghcr.io/rubenvitt/lifeline-hub:<version>
+docker run -d -p 8080:8080 -v lifeline-daten:/data -e LIFELINE_LIZENZ_AKZEPTIERT=true \
+  ghcr.io/rubenvitt/lifeline-hub:<version>
 ```
 
 **Direkt:** Das Ergebnis von „Bauen“ ist eine einzelne ausführbare Datei. Backend, eingebettete
@@ -78,11 +79,12 @@ Oberfläche, SQLite und OpenSSL stecken darin; auf dem Zielrechner wird weder No
 Webserver noch eine Datenbank installiert. Datei kopieren, starten:
 
 ```bash
-./target/release/lifeline-hub --db-path lifeline.db --bind 0.0.0.0:8080
+./target/release/lifeline-hub --db-path lifeline.db --bind 0.0.0.0:8080 --lizenz-akzeptiert
 ```
 
 Beim ersten Start entstehen Datenbank und Administrationskonto; der Lizenztext und das
-erzeugte Passwort stehen in der Ausgabe. Alles Weitere — TLS, Anmeldeverfahren, Offline-Karten, Sicherung — steht in
+erzeugte Passwort stehen in der Ausgabe. Ohne die Annahme der Lizenz (`--lizenz-akzeptiert`,
+im Container `LIFELINE_LIZENZ_AKZEPTIERT=true`) bricht der erste Start ab. Alles Weitere — TLS, Anmeldeverfahren, Offline-Karten, Sicherung — steht in
 [docs/betrieb/packaging.md](docs/betrieb/packaging.md).
 
 Für die Menschen, die die App im Einsatz bedienen, gibt es die Anwenderdokumentation in
