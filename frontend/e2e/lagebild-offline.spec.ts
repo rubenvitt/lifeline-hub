@@ -200,7 +200,7 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
       if (route.inhalt) await expect(page.getByText(route.inhalt).first()).toBeVisible();
       else await expect(kopf).toContainText('1 verortet');
       // Seitenweit, nicht nur im Seitenkopf: die Aufträge führen ihren Stand im Abschnittskopf.
-      const stand = page.getByText(/^Stand \d\d:\d\d$/).first();
+      const stand = page.getByText(/^Stand \d{4}$/).first();
       await expect(stand).toBeVisible({ timeout: 30_000 });
       standOnline.set(route.name, (await stand.textContent())!);
     }
@@ -238,7 +238,7 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
       const kopf = page.locator('[data-lfh="seitenkopf"]').first();
       if (route.inhalt) await expect(page.getByText(route.inhalt).first()).toBeVisible();
       else await expect(kopf).toContainText('1 verortet');
-      const anzeige = page.getByText(/^Stand \d\d:\d\d · offline$/).first();
+      const anzeige = page.getByText(/^Stand \d{4} · offline$/).first();
       await expect(anzeige).toBeVisible();
       const uhrzeit = (await anzeige.textContent())!.slice('Stand '.length, 'Stand '.length + 5);
       const online = standOnline.get(route.name)!.slice('Stand '.length);
@@ -348,7 +348,7 @@ test.describe('Kaltstart ohne Server (LFH-780)', () => {
     // Erst der Inhalt, dann die Adresse: `not.toHaveURL` gälte schon vor einer Umleitung.
     await expect(app.getByText('Kaltstart-Probe vorher')).toBeVisible();
     await expect(app, 'Kaltstart ohne Server: nicht auf der Anmeldung').not.toHaveURL(/\/login/);
-    await expect(app.getByText(/^Stand \d\d:\d\d · offline$/).first()).toBeVisible();
+    await expect(app.getByText(/^Stand \d{4} · offline$/).first()).toBeVisible();
     const feld = app.getByRole('textbox', { name: /Inhalt/ }).first();
     await feld.fill(inhalt);
     await feld.press('Enter');

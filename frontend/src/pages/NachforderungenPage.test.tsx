@@ -167,7 +167,7 @@ describe('NachforderungenPage', () => {
     expect(
       screen.queryByText('Angefordert', { selector: '[data-lfh="status-chip"] span' }),
     ).toBeNull();
-    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
   it('der Seitenkopf liest den Server-Zähler: offen und davon unterwegs', async () => {

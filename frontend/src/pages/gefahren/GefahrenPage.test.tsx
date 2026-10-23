@@ -65,7 +65,7 @@ describe('GefahrenPage', () => {
     expect((await screen.findAllByText('Nord'))[0]).toBeInTheDocument();
     // Erstes Gebiet automatisch gewählt → Matrix sichtbar.
     expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
   /**

@@ -15,13 +15,13 @@ import {
 } from '../components/Kopfleiste';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { formatiereDatenstand } from '../components/Datenstand';
-import { formatUhrzeitMitTag } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { ANSICHT_LABEL } from '../pages/einstellungen/geraeteKern';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import { GeraeteMenue } from './GeraeteMenue';
 import { useStellenName } from './stellenName';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 dayjs.extend(utc);
 
@@ -59,7 +59,7 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
   // Die Hülle hat keinen `EinsatzAnzeigeProvider` (`geraet/AGENTS.md`): der Hook liefert dort die
   // Browserzone, unter einem Provider dessen Zone (LFH-913).
   const { konventionen } = useAnzeigeKonventionen();
-  const uhrzeit = formatUhrzeitMitTag(laeuftAbAt, konventionen);
+  const uhrzeit = zeitKurz(laeuftAbAt, konventionen);
   const farbe = bald ? farbenDunkel.achtung : rahmenFarben.gedaempft;
   return (
     <div
@@ -101,6 +101,7 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
   const ohneVerbindung = useOhneVerbindung();
   const stand = useJuengsterDatenstand();
   const stelle = useStellenName(geraet);
+  const { konventionen } = useAnzeigeKonventionen();
   return (
     <header
       data-lfh="geraet-kopf"
@@ -139,7 +140,7 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
           // immer dunkel.
           <div
             data-lfh="kopf-datenstand"
-            aria-label={`Datenstand ${formatiereDatenstand(stand)}, offline`}
+            aria-label={`Datenstand ${formatiereDatenstand(stand, konventionen)}, offline`}
             role="img"
             style={{
               ...kopfZelleStil(token),
@@ -150,7 +151,7 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
               color: farbenDunkel.achtung,
             }}
           >
-            <span aria-hidden="true">Stand {formatiereDatenstand(stand)}</span>
+            <span aria-hidden="true">Stand {formatiereDatenstand(stand, konventionen)}</span>
           </div>
         )}
         <Uhr />

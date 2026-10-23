@@ -8,8 +8,10 @@ import {
   type ReactNode,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import dayjs from 'dayjs';
 import { formatVor } from '../anzeige/abstand';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { formatiereDatenstand } from '../components/Datenstand';
+import { formatiereUhr } from '../components/Kopfleiste';
 import { useAuth } from '../auth/AuthContext';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ladeLagemonitor } from '../api/lagemonitor';
@@ -493,6 +495,7 @@ function Statusleiste({
   onMenue: () => void;
 }) {
   const { rollen } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
   const verbindung = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus);
   const druck = useRef<number | undefined>(undefined);
   const loslassen = () => window.clearTimeout(druck.current);
@@ -545,10 +548,11 @@ function Statusleiste({
         }}
       >
         {standMs > 0
-          ? `${veraltet ? 'Veraltet · ' : ''}Stand ${dayjs(standMs).format('HH:mm')} · ${formatVor(standMs, jetzt)}`
+          ? `${veraltet ? 'Veraltet · ' : ''}Stand ${formatiereDatenstand(standMs, konventionen)} · ${formatVor(standMs, jetzt)}`
           : 'Kein Stand'}
       </span>
-      <span style={{ fontFamily: schrift.zahl }}>{dayjs(jetzt).format('HH:mm')}</span>
+      {/* Die Uhr ist eine Wanduhr wie im Kopf (Entscheidung E2, LLH-1045): dieselbe Stelle. */}
+      <span style={{ fontFamily: schrift.zahl }}>{formatiereUhr(jetzt)}</span>
     </footer>
   );
 }

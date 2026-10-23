@@ -155,7 +155,7 @@ describe('EinsatzabschnittePage', () => {
     expect(await findInTree('Nord')).toBeInTheDocument();
     // Im Baumknoten; das vorgewählte Detail nennt den Leiter ein zweites Mal.
     expect(within(screen.getByRole('tree')).getByText(/Leiter Nord/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
   it('weist Abschnitt, zugeordnete Einheiten und Personal mit dem ältesten Stand aus', async () => {

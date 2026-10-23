@@ -2205,10 +2205,10 @@ describe('LagekartePage · Neuentwurf S5', () => {
       expect(el).not.toBeNull();
       return el!;
     });
-    await waitFor(() => expect(within(kopf).getByText(/^Stand \d\d:\d\d$/)).toBeInTheDocument());
+    await waitFor(() => expect(within(kopf).getByText(/^Stand \d{4}$/)).toBeInTheDocument());
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     window.dispatchEvent(new Event('offline'));
-    expect(await within(kopf).findByText(/^Stand \d\d:\d\d · offline$/)).toBeInTheDocument();
+    expect(await within(kopf).findByText(/^Stand \d{4} · offline$/)).toBeInTheDocument();
     onLine.mockRestore();
     window.dispatchEvent(new Event('online'));
   });

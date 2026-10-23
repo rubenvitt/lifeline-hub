@@ -60,7 +60,7 @@ test('Offline-Kennzeichnung (LFH-723): der Seitenkopf bleibt bei 390 px, wie er 
       await page.goto(route.pfad);
       await stelleDichte(page, dichte);
       const kopf = page.locator('[data-lfh="seitenkopf"]').first();
-      const stand = kopf.getByText(/^Stand \d\d:\d\d$/);
+      const stand = kopf.getByText(/^Stand \d{4}$/);
       await expect(stand).toBeVisible({ timeout: 30_000 });
       await page.evaluate(async () => {
         await document.fonts.ready;
@@ -69,7 +69,7 @@ test('Offline-Kennzeichnung (LFH-723): der Seitenkopf bleibt bei 390 px, wie er 
       const standVorher = (await stand.boundingBox())!;
 
       await context.setOffline(true);
-      const offline = kopf.getByText(/^Stand \d\d:\d\d · offline$/);
+      const offline = kopf.getByText(/^Stand \d{4} · offline$/);
       await expect(offline).toBeVisible();
       const nachher = (await kopf.boundingBox())!;
       const standNachher = (await offline.boundingBox())!;
@@ -84,7 +84,7 @@ test('Offline-Kennzeichnung (LFH-723): der Seitenkopf bleibt bei 390 px, wie er 
       // Die Datenstand-Zeile bleibt einzeilig und im Fenster.
       expect(standNachher.height, name).toBe(standVorher.height);
       expect(standNachher.x + standNachher.width, name).toBeLessThanOrEqual(390);
-      await expect(kopf.getByText(/^Stand \d\d:\d\d$/)).toBeVisible();
+      await expect(kopf.getByText(/^Stand \d{4}$/)).toBeVisible();
     }
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

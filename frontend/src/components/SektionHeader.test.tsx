@@ -28,6 +28,6 @@ describe('SektionHeader', () => {
   it('zeigt den Query-Datenstand im Sektionskopf', () => {
     const zeit = new Date(2026, 5, 10, 9, 5).getTime();
     renderMitProviders(<SektionHeader titel="Liste" dataUpdatedAt={zeit} />);
-    expect(screen.getByText('Stand 09:05')).toBeInTheDocument();
+    expect(screen.getByText('Stand 100905')).toBeInTheDocument();
   });
 });
