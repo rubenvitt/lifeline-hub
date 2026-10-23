@@ -128,6 +128,19 @@ Für Einsatzleitung und Führungspersonal:
 Wortlaut, Absender, Meldeweg und Ereigniszeit stehen nicht im Formular: sie bleiben, wie die
 Meldung einging. Lehnt der Server ab, steht der Grund an der Karte, und das Formular bleibt offen.
 
+### Den Wortlaut einer Meldung berichtigen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Im Einsatztagebuch den Eintrag der Meldung berichtigen, wie im Kapitel
+   [Einsatztagebuch](einsatztagebuch.md) beschrieben. Der Eintrag trägt den Verweis „Meldung #… ↗“.
+2. In den Meldungen trägt die Karte danach die Marke „berichtigt“ und daneben „→ ETB Nr. …“. Der
+   Wortlaut auf der Karte bleibt der ursprüngliche.
+
+   ![Meldungskarte der Sanitätsgruppe UHS mit der Marke „berichtigt“ und dem Sprung „→ ETB Nr. …“ neben Priorität und Stufe, darunter der ursprüngliche Wortlaut](../bilder/meldungen/meldung-berichtigt.png)
+
+3. „→ ETB Nr. …“ öffnet die jüngste Berichtigung im Einsatztagebuch.
+
 ### Eine Meldung aus der Lage nehmen
 
 Für Einsatzleitung und Führungspersonal:
@@ -247,10 +260,9 @@ Die erste Übernahme in die Lage schreibt immer den Systemeintrag „Meldung #12
 aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
 
 Der Wortlaut einer Meldung bleibt, wie er einging; die Korrektur über „Bearbeiten“ ändert ihn
-nicht. Ist er falsch, wird im Einsatztagebuch der Eintrag der Meldung berichtigt. Die Karte zeigt
-dann die Marke „berichtigt“ und daneben „→ ETB Nr. …“, den Sprung auf die jüngste Berichtigung;
-der Wortlaut auf der Karte bleibt der ursprüngliche. Dieselbe Marke steht in der Vorschau der
-Meldung in der Sprungpalette. Auf einem gekoppelten Gerät fehlt die Marke,
+nicht. Ist er falsch, wird im Einsatztagebuch der Eintrag der Meldung berichtigt (Ablauf „Den
+Wortlaut einer Meldung berichtigen“). Die Marke „berichtigt“ der Karte steht auch in der Vorschau
+der Meldung in der Sprungpalette. Auf einem gekoppelten Gerät fehlt die Marke,
 weil es das Einsatztagebuch nicht zeigt.
 
 ### Was eine Korrektur bewirkt
