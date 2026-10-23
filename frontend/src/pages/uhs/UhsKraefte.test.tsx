@@ -7,6 +7,7 @@ import { renderMitProviders } from '../../test/utils';
 import type { UhsDetail, UhsKraft } from '../../api/types';
 import { PERSONAL_ADHOC_TEXT_MAX } from '../../api/eingabegrenzen';
 import UhsKraefte from './UhsKraefte';
+import { kopfFilterWaehlen } from '../../test/kopfFilter';
 
 /**
  * Kräfte der UHS (LFH-1045, Spec `uhs-staerke`): Stärke und Qualifikationen aus den zugeordneten
@@ -172,6 +173,37 @@ describe('UhsKraefte', () => {
     expect(screen.getByTestId('uhs-staerke')).toHaveTextContent('0/0/0//0');
     expect(screen.queryByRole('button', { name: 'Kraft zuordnen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /abziehen/ })).toBeNull();
+  });
+});
+
+describe('UhsKraefte · Sortieren und Filtern (LLH-1096)', () => {
+  const namen = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map(
+      (z) => z.querySelector('td')?.textContent,
+    );
+
+  it('Sortieren und Filtern ändern die Menge', async () => {
+    mitFreien();
+    renderMitProviders(
+      <UhsKraefte
+        einsatzId={1}
+        uhs={uhs({ kraefte: [bernd, anna, frei] })}
+        schreibgeschuetzt
+        einheitZuordnen={false}
+      />,
+    );
+    expect(namen()).toEqual(['Bernd Berg', 'Anna Arzt', 'Clara Frei']);
+
+    await kopfFilterWaehlen('Einheit', [/^SEG 1/]);
+    await waitFor(() => expect(namen()).toEqual(['Anna Arzt', 'Clara Frei']));
+    expect(document.querySelector('[data-lfh="filterhinweis"]')).toHaveTextContent(
+      '2 von 3 Kräften sichtbar',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    // Position nach der Stärke: Führer vor Mannschaft, ohne Position zuletzt.
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Position/ }));
+    await waitFor(() => expect(namen()).toEqual(['Anna Arzt', 'Bernd Berg', 'Clara Frei']));
   });
 });
 

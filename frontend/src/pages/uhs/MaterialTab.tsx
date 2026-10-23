@@ -34,6 +34,12 @@ interface Props {
  * Nachforderung, vorbelegt mit der Art Material und der UHS in der Begründung. Bezeichnung und
  * Anzahl trägt die Person ein. Ohne Schreibrecht oder Freigabe Nachforderungen fehlt er (nicht
  * gesperrt: die Erfassung dort ließe sich ohnehin nicht öffnen).
+ *
+ * Ohne Sortieren und Filtern (LLH-1096, Ausnahme mit Grund): `MaterialAmOrt` ist keine
+ * Vergleichsliste, sondern der eine Baustein für Material an einem Ort (Einheit, Fahrzeug, UHS,
+ * Bereitstellungsraum) mit Bedienung je Zeile. Eine gelöste Zeile hält ihre Stelle, bis die
+ * Bedienung den Baustein verlässt (LLH-1254); eine Sortierung oder ein Filter verschöbe oder
+ * verschluckte sie. Vergleichen über alle Orte geht in der Materialliste.
  */
 /**
  * Begründung der Fehlmenge (LLH-1133 D5): „Fehlmenge UHS «Turnhalle»“. Trägt die Bezeichnung das

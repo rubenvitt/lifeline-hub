@@ -11,6 +11,7 @@ import type { BrListenEintrag, Einheit, EinsatzAnzeige } from '../../api/types';
 import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
 import { einsatzFixture } from '../../test/fixtures';
 import { setzeViewportBreite } from '../../test/viewport';
+import { kopfFilterWaehlen } from '../../test/kopfFilter';
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Lage', ...over });
@@ -573,5 +574,63 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
     );
     act(() => vi.advanceTimersByTime(60_000));
     expect((await zeileVon('BR Sportplatz'))['Längste Wartezeit']).toBe('49 min');
+  });
+});
+
+describe('BereitstellungsraeumePage · Sortieren und Filtern (LLH-1096)', () => {
+  const OST = br({
+    id: 1,
+    bezeichnung: 'BR Ost',
+    status: 'aktiv',
+    abschnitt_name: 'Nord',
+    belegung: { einheiten: 1, fahrzeuge: 4, laengste_seit_at: null },
+  });
+  const WEST = br({
+    id: 2,
+    bezeichnung: 'BR West',
+    status: 'geplant',
+    abschnitt_name: 'Mitte',
+    belegung: { einheiten: 3, fahrzeuge: 1, laengste_seit_at: null },
+  });
+  const bezeichnungen = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map(
+      (z) => z.querySelector('td')?.textContent,
+    );
+
+  beforeEach(() => {
+    setzeViewportBreite(1366);
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([OST, WEST])),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    );
+  });
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    renderPage();
+    await screen.findByText('BR West');
+    expect(bezeichnungen()).toEqual(['BR Ost', 'BR West']);
+
+    await kopfFilterWaehlen('Abschnitt', [/^Mitte/]);
+    await waitFor(() => expect(bezeichnungen()).toEqual(['BR West']));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche')).toHaveTextContent('?f.abschnitt=Mitte'),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Fahrzeuge/ }));
+    await waitFor(() => expect(bezeichnungen()).toEqual(['BR West', 'BR Ost']));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche')).toHaveTextContent('?sort=fahrzeuge%3Aauf'),
+    );
+  });
+
+  it('eine Adresse mit Status-Filter und Sortierung zeigt dieselbe Liste', async () => {
+    renderPage('/einsaetze/1/bereitstellungsraeume/liste?f.status=aktiv,geplant&sort=einheiten:ab');
+    await screen.findByText('BR West');
+    expect(bezeichnungen()).toEqual(['BR West', 'BR Ost']);
+    expect(
+      screen.getByRole('button', { name: 'Filter Status: aktiv entfernen' }),
+    ).toBeInTheDocument();
   });
 });

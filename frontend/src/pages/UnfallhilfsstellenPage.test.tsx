@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import UnfallhilfsstellenPage from './UnfallhilfsstellenPage';
@@ -16,6 +16,7 @@ import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -44,6 +45,12 @@ const bhp50 = {
   storniert_at: null,
 };
 
+/** Die aktuelle Adresse im DOM: das Listengedächtnis schreibt Sortierung und Filter dorthin. */
+function OrtAnzeige() {
+  const ort = useLocation();
+  return <span data-testid="liste-ort">{ort.pathname + ort.search}</span>;
+}
+
 function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return {
@@ -53,6 +60,7 @@ function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
         <AntApp>
           <AuthProvider>
             <MemoryRouter initialEntries={[route]}>
+              <OrtAnzeige />
               <Routes>
                 <Route
                   path="/einsaetze/:id/unfallhilfsstellen/liste"
@@ -347,6 +355,61 @@ describe('UnfallhilfsstellenPage', () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(onAngelegt).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('UnfallhilfsstellenPage · Sortieren und Filtern (LLH-1096)', () => {
+  const ablage = {
+    ...bhp50,
+    id: 8,
+    typ: 'patientenablage',
+    bezeichnung: 'PA Nord',
+    status: 'geplant',
+    standort: 'Turnhalle',
+  };
+  const bezeichnungen = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map(
+      (z) => z.querySelector('td')?.textContent,
+    );
+
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([bhp50, ablage])),
+    );
+  });
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    renderPage();
+    await screen.findByText('PA Nord');
+    expect(bezeichnungen()).toEqual(['BHP 50', 'PA Nord']);
+
+    await kopfFilterWaehlen('Typ', [/^Patientenablage/]);
+    await waitFor(() => expect(bezeichnungen()).toEqual(['PA Nord']));
+    await waitFor(() =>
+      expect(screen.getByTestId('liste-ort')).toHaveTextContent(
+        '/einsaetze/1/unfallhilfsstellen/liste?f.typ=patientenablage',
+      ),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    // Status nach dem Lebenslauf: geplant vor aktiv.
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Status/ }));
+    await waitFor(() => expect(bezeichnungen()).toEqual(['PA Nord', 'BHP 50']));
+    await waitFor(() =>
+      expect(screen.getByTestId('liste-ort')).toHaveTextContent(
+        '/einsaetze/1/unfallhilfsstellen/liste?sort=status%3Aauf',
+      ),
+    );
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
+    renderPage('/einsaetze/1/unfallhilfsstellen/liste?f.status=aktiv');
+    await screen.findByText('BHP 50');
+    expect(screen.queryByText('PA Nord')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Status: aktiv entfernen' }),
+    ).toBeInTheDocument();
   });
 });
 

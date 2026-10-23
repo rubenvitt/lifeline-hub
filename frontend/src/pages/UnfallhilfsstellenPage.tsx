@@ -1,4 +1,4 @@
-import { Breadcrumb, Button, type TableColumnsType } from 'antd';
+import { Breadcrumb, Button } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { einsaetzePfad, einsatzPfad, uhsDetailPfad } from '../routing/deeplinks';
@@ -18,13 +18,38 @@ import {
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import { uhsStatus, uhsTyp } from '../theme/statusFarben';
-import KatalogTabelle from '../components/KatalogTabelle';
+import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
+
+const TYP_FILTER = (Object.keys(uhsTyp) as UhsTyp[]).map((t) => ({
+  text: uhsTyp[t].label,
+  value: t,
+}));
+/** Status in der Reihenfolge des Lebenslaufs (geplant → aktiv → aufgelöst), nicht nach Alphabet. */
+const STATUS_FOLGE = Object.keys(uhsStatus) as UhsStatus[];
+const STATUS_FILTER = STATUS_FOLGE.map((s) => ({ text: uhsStatus[s].label, value: s }));
+
+/** Was das Gedächtnis von den Spalten wissen muss; die Spalten selbst hängen an `einsatzId`. */
+const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
+  { key: 'bezeichnung', sorter: true },
+  { key: 'typ', sorter: true, filters: TYP_FILTER },
+  { key: 'status', sorter: true, filters: STATUS_FILTER },
+  { key: 'standort', sorter: true },
+];
 
 export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  /**
+   * Sortierung und Kopffilter stehen in der Adresse (LLH-1096, `components/listenGedaechtnis.ts`);
+   * der Hook gehört der Seite und steht vor jedem frühen Ausstieg. Ohne Vorgabe: unsortiert steht
+   * die Liste in der Reihenfolge des Servers wie bisher.
+   */
+  const gedaechtnis = useListenGedaechtnis('unfallhilfsstellen', GEDAECHTNIS_SPALTEN, {
+    einsatzId,
+  });
   // Live-Updates über useEinsatzLiveStream im EinsatzLayout.
 
   const einsatzQuery = useQuery({
@@ -50,21 +75,43 @@ export default function UnfallhilfsstellenPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, schreibgeschuetzt]);
 
-  const spalten: TableColumnsType<Uhs> = [
+  // Sortieren und Filtern (LLH-1096, Spec `tabellen-sortieren-filtern`): jede Spalte sortiert,
+  // Typ und Status sind Wertelisten und filtern. Standort ist Freitext: sortierbar, ohne Filter.
+  const spalten: KatalogSpalte<Uhs>[] = [
     {
+      key: 'bezeichnung',
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
+      sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
       render: (b: string, u) => (
         <KennungsLink to={uhsDetailPfad(einsatzId, u.id)}>{b}</KennungsLink>
       ),
     },
-    { title: 'Typ', dataIndex: 'typ', render: (t: UhsTyp) => uhsTyp[t].label },
     {
+      key: 'typ',
+      title: 'Typ',
+      dataIndex: 'typ',
+      sorter: (a, b) => uhsTyp[a.typ].label.localeCompare(uhsTyp[b.typ].label, 'de'),
+      filters: TYP_FILTER,
+      onFilter: (wert, u) => u.typ === wert,
+      render: (t: UhsTyp) => uhsTyp[t].label,
+    },
+    {
+      key: 'status',
       title: 'Status',
       dataIndex: 'status',
+      sorter: (a, b) => STATUS_FOLGE.indexOf(a.status) - STATUS_FOLGE.indexOf(b.status),
+      filters: STATUS_FILTER,
+      onFilter: (wert, u) => u.status === wert,
       render: (s: UhsStatus) => <StatusTag darstellung={uhsStatus[s]} />,
     },
-    { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
+    {
+      key: 'standort',
+      title: 'Standort',
+      dataIndex: 'standort',
+      sorter: (a, b) => (a.standort ?? '').localeCompare(b.standort ?? '', 'de'),
+      render: (s: string | null) => s ?? '—',
+    },
   ];
 
   // Zwei Ebenen, getrennt gehalten:
@@ -150,6 +197,8 @@ export default function UnfallhilfsstellenPage() {
             loading={uhsQuery.isLoading}
             dataSource={alle}
             columns={spalten}
+            gedaechtnis={gedaechtnis}
+            mehrzahl="Hilfsstellen"
             pagination={false}
             locale={{ emptyText: 'Noch keine Unfallhilfsstellen erfasst' }}
           />
