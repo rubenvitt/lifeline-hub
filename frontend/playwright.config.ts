@@ -195,7 +195,7 @@ export default defineConfig({
       name: 'Backend',
       // `--kritis-extrakt false`: der KRITIS-Import lüde sonst nach 60 s den
       // Deutschland-Extrakt (mehrere GB je Lauf); die Specs brauchen keinen Bestand.
-      command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw --kritis-extrakt false`,
+      command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw --kritis-extrakt false --lizenz-akzeptiert`,
       url: `${backendUrl}/api/health`,
       // Nie einen fremden Server übernehmen: ein laufender Dev-Stack hätte eine andere DB und ein
       // anderes Admin-Passwort.

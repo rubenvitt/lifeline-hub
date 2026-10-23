@@ -125,7 +125,8 @@ laufendes System beantwortbar ist, welche Version ausgeliefert wurde.
 ## Starten
 
 ```bash
-./target/release/lifeline-hub --db-path /var/lib/lifeline/lifeline.db --bind 0.0.0.0:8080
+./target/release/lifeline-hub --db-path /var/lib/lifeline/lifeline.db --bind 0.0.0.0:8080 \
+  --lizenz-akzeptiert
 ```
 
 Konfiguration per CLI-Flag oder ENV (Auszug):
@@ -137,6 +138,7 @@ Konfiguration per CLI-Flag oder ENV (Auszug):
 | `--org-name` | `LIFELINE_ORG_NAME` | `Meine Organisation` | Org-Name beim ersten Start |
 | `--admin-user` | `LIFELINE_ADMIN_USER` | `admin` | Initialer Admin (erster Start) |
 | `--admin-password` | `LIFELINE_ADMIN_PASSWORD` | *(generiert)* | Fehlt es, wird beim ersten Start ein Zufallspasswort ins Log geschrieben |
+| `--lizenz-akzeptiert` | `LIFELINE_LIZENZ_AKZEPTIERT` | `false` | Nimmt die Lizenz an; ohne bricht der erste Start ab (nur `true`/`false`) |
 
 > **Erstes Admin-Passwort:** Wurde kein `--admin-password` gesetzt, schreibt die
 > Binary beim ersten Start ein Zufallspasswort als Warnung ins Log. Mit systemd:
@@ -147,8 +149,12 @@ Konfiguration per CLI-Flag oder ENV (Auszug):
 Beim ersten Start legt die Binary die DB-Datei an, spielt die Migrationen ein
 und bootstrappt das Admin-Konto.
 
-> **Lizenz (LLH-1446):** Beim ersten Start steht der volle Lizenztext gerahmt auf
-> stderr, bei jedem weiteren Start eine Zeile im Log. `lifeline-hub lizenz` gibt den
+> **Lizenz (LLH-1446, LLH-1447):** Der erste Start auf leerer Datenbank verlangt
+> `--lizenz-akzeptiert` bzw. `LIFELINE_LIZENZ_AKZEPTIERT=true`. Ohne Schalter steht
+> der volle Lizenztext gerahmt auf stderr, und der Server bricht ab, bevor er
+> Organisation oder Admin anlegt. Mit Schalter steht der Text ebenso dort, und der
+> Start läuft weiter. Eine bestehende Installation startet ohne Schalter; jeder Start
+> schreibt eine Lizenzzeile ins Log. `lifeline-hub lizenz` gibt den
 > Text jederzeit aus, im Container auch `docker run --rm <abbild> lizenz`; dort liegt
 > er zusätzlich unter `/LICENSE`, am Release als `lifeline-hub-<version>-LIZENZ.txt`.
 > Einzige Quelle ist `LICENSE` im Repo; das Binary bettet die Datei beim Bauen ein,

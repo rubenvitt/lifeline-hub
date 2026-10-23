@@ -484,6 +484,13 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_DEMO_DATEN", default_value_t = false)]
     pub demo_daten: bool,
 
+    /// Die Lizenz (`LICENSE`, `lifeline-hub lizenz`) annehmen (LLH-1447). Nur der erste Start
+    /// auf leerer Datenbank verlangt ihn: ohne Schalter zeigt der Server dort den Lizenztext und
+    /// bricht ab, bevor er etwas anlegt. Eine bestehende Installation startet ohne. Die
+    /// Umgebungsvariable nimmt nur `true`/`false`.
+    #[arg(long, env = "LIFELINE_LIZENZ_AKZEPTIERT", default_value_t = false)]
+    pub lizenz_akzeptiert: bool,
+
     /// Web Push bei geschlossenem Tab (LLH-1223, Spec `web-push`). **Vorgabe AUS.** Push läuft
     /// immer über den Dienst des Browser-Herstellers (Google, Apple, Mozilla, Microsoft) im
     /// Internet; erst mit diesem Schalter baut der Server Verbindungen dorthin auf. Verlangt
@@ -848,6 +855,22 @@ mod tests {
         assert!(
             try_parse_mit_env("LIFELINE_DEMO_DATEN", "1", &["lifeline-hub"]).is_err(),
             "LIFELINE_DEMO_DATEN=1 muss ein Parse-Fehler sein, kein stilles Aus"
+        );
+    }
+
+    /// Die Lizenz gilt ohne Angabe als nicht angenommen (LLH-1447); die Env nimmt nur
+    /// `true`/`false`.
+    #[test]
+    fn lizenz_vorgabe_nicht_angenommen_und_zuschaltbar() {
+        assert!(!parse_hermetisch(["lifeline-hub"]).lizenz_akzeptiert);
+        assert!(parse_hermetisch(["lifeline-hub", "--lizenz-akzeptiert"]).lizenz_akzeptiert);
+        assert!(
+            parse_mit_env("LIFELINE_LIZENZ_AKZEPTIERT", "true", &["lifeline-hub"])
+                .lizenz_akzeptiert
+        );
+        assert!(
+            try_parse_mit_env("LIFELINE_LIZENZ_AKZEPTIERT", "ja", &["lifeline-hub"]).is_err(),
+            "LIFELINE_LIZENZ_AKZEPTIERT=ja muss ein Parse-Fehler sein, kein stilles Nein"
         );
     }
 

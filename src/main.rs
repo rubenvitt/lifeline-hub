@@ -109,6 +109,20 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     .await?;
     physisch_bereinigen(&pool).await;
 
+    // Die Installation verlangt die Annahme der Lizenz (LLH-1447), vor dem Bootstrap: ohne
+    // Schalter entsteht weder Organisation noch Admin. Der dev-seeds-Build ist nie eine
+    // Installation.
+    if !config.lizenz_akzeptiert
+        && !cfg!(feature = "dev-seeds")
+        && lifeline_hub::auth::bootstrap::ist_erster_start(&pool).await?
+    {
+        eprintln!("{}", lifeline_hub::lizenz::kasten());
+        anyhow::bail!(
+            "Lizenz nicht angenommen. Der erste Start verlangt --lizenz-akzeptiert oder \
+             LIFELINE_LIZENZ_AKZEPTIERT=true; der Text steht oben und in `lifeline-hub lizenz`."
+        );
+    }
+
     // `bootstrap_admin` läuft ZUERST: es legt auf leerer DB Organisation, Admin und
     // Default-Kataloge an. Nach `dev_seed` gäbe es schon Benutzer, und der Bootstrap wäre ein
     // No-op ohne Kataloge.

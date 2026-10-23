@@ -35,5 +35,9 @@ console.log('frontend/.env.local geschrieben:');
 console.log(`  Frontend (Vite):  http://localhost:${frontendPort}`);
 console.log(`  Backend (Proxy):  ${backendUrl}`);
 console.log('\nBackend passend starten (Repo-Root):');
-console.log(`  cargo run -- --bind 127.0.0.1:${backendPort}`);
-console.log('  (alternativ: LIFELINE_BIND=127.0.0.1:' + backendPort + ' cargo run)');
+console.log(`  cargo run -- --bind 127.0.0.1:${backendPort} --lizenz-akzeptiert`);
+console.log(
+  '  (alternativ: LIFELINE_BIND=127.0.0.1:' +
+    backendPort +
+    ' LIFELINE_LIZENZ_AKZEPTIERT=true cargo run)',
+);

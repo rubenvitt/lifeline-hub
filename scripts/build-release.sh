@@ -163,8 +163,8 @@ fi
 echo "==> Fertig: $BINARY"
 ls -lh "$BINARY"
 if [ "$AUF_HOST_LAUFFAEHIG" = 1 ]; then
-  echo "Start mit: $BINARY --db-path lifeline.db --bind 0.0.0.0:8080"
+  echo "Start mit: $BINARY --db-path lifeline.db --bind 0.0.0.0:8080 --lizenz-akzeptiert"
 else
   echo "Cross-Build für $TARGET — auf der Zielplattform starten mit:"
-  echo "  lifeline-hub --db-path lifeline.db --bind 0.0.0.0:8080"
+  echo "  lifeline-hub --db-path lifeline.db --bind 0.0.0.0:8080 --lizenz-akzeptiert"
 fi

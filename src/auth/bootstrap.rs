@@ -45,16 +45,22 @@ fn zufalls_passwort() -> String {
 /// Legt beim ersten Start eine Organisation und ein Admin-Konto an, sofern noch kein Benutzer
 /// existiert (idempotent). `admin_passwort = None` erzeugt ein Zufalls-Passwort, das im
 /// Ergebnis zurückkommt.
+/// Ob die Datenbank noch leer ist, der Start also die Installation ist: dann legt
+/// [`bootstrap_admin`] Organisation und Admin an.
+pub async fn ist_erster_start(pool: &SqlitePool) -> Result<bool, AppError> {
+    let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
+        .fetch_one(pool)
+        .await?;
+    Ok(anzahl == 0)
+}
+
 pub async fn bootstrap_admin(
     pool: &SqlitePool,
     org_name: &str,
     admin_benutzername: &str,
     admin_passwort: Option<&str>,
 ) -> Result<BootstrapErgebnis, AppError> {
-    let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
-        .fetch_one(pool)
-        .await?;
-    if anzahl > 0 {
+    if !ist_erster_start(pool).await? {
         return Ok(BootstrapErgebnis::default());
     }
     // Derselbe Weg wie Login und Anlage (LFH-921, LFH-981): sonst entstünde aus
