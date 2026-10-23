@@ -12,7 +12,8 @@ import { Formularpaneel } from '../../components/instrument';
 import {
   EINHEITEN_OPTIONEN,
   KOORDINATEN_OPTIONEN,
-  ZEITFORMAT_OPTIONEN,
+  ZEITDARSTELLUNG_OPTIONEN,
+  ZEITDARSTELLUNG_VORGABE,
   ZEITZONEN_OPTIONEN,
 } from './optionen';
 import {
@@ -125,18 +126,18 @@ export default function EinsatzAllgemein() {
             />
           </Form.Item>
           <Form.Item
-            label="Zeitformat"
-            name="zeitformat"
-            extra={orgHinweisSelect(orgDefaults?.zeitformat, ZEITFORMAT_OPTIONEN)}
+            label="Zeitdarstellung"
+            name="zeitdarstellung"
+            extra={orgHinweisSelect(orgDefaults?.zeitdarstellung, ZEITDARSTELLUNG_OPTIONEN)}
           >
             <Select
               allowClear
               placeholder={platzhalterVorgabeSelect(
-                orgDefaults?.zeitformat,
-                ZEITFORMAT_OPTIONEN,
-                '24 Stunden',
+                orgDefaults?.zeitdarstellung,
+                ZEITDARSTELLUNG_OPTIONEN,
+                ZEITDARSTELLUNG_VORGABE,
               )}
-              options={ZEITFORMAT_OPTIONEN}
+              options={ZEITDARSTELLUNG_OPTIONEN}
             />
           </Form.Item>
           <Form.Item

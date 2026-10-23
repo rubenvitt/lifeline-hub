@@ -108,8 +108,9 @@ describe('FristPaneel', () => {
     await fristSetzen(dialog, '2029-01-01 12:00');
     const rueckfrage = await rueckfrageFinden();
     expect(gesendet).toHaveLength(0);
-    expect(rueckfrage).toHaveTextContent('2030');
-    expect(rueckfrage).toHaveTextContent('2029');
+    // Volle DTG mit zweistelligem Jahr (LLH-1053, E1).
+    expect(rueckfrage).toHaveTextContent('011200okt30');
+    expect(rueckfrage).toHaveTextContent('011200jan29');
     const ok = within(rueckfrage).getByRole('button', { name: 'Verkürzen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     await userEvent.click(ok);

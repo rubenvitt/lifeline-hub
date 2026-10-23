@@ -168,6 +168,12 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Geräte-Einstellung des Koordinatensystems, ohne Personenbezug.',
   },
   {
+    ort: 'localStorage lifeline.zeitdarstellung',
+    datei: 'anzeige/zeitDarstellungStore.ts',
+    entscheidung: 'bleibt',
+    grund: 'Geräte-Einstellung der Zeitdarstellung (LLH-1053), ohne Personenbezug.',
+  },
+  {
     ort: 'localStorage lfh:alarm:mute',
     datei: 'alarm/alarmTon.ts',
     entscheidung: 'bleibt',

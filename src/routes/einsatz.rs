@@ -521,7 +521,7 @@ pub struct EinstellungenUpdate {
     pub fachebenen_sichtbar: Option<serde_json::Value>,
     // Anzeige-Konventionen (LFH-136); None/leer = projektweiter Default.
     pub zeitzone: Option<String>,
-    pub zeitformat: Option<String>,
+    pub zeitdarstellung: Option<String>,
     pub einheiten: Option<String>,
     pub koordinatenformat: Option<String>,
     // Verhalten & Automatik (LFH-133). Präfixe display-only; Startwerte/Fristen 1-basiert.
@@ -622,10 +622,10 @@ pub async fn einstellungen_setzen(
             return Err(AppError::Validation("Ungültige zeitzone".into()));
         }
     }
-    let zeitformat = bereinige(req.zeitformat);
-    if let Some(f) = zeitformat.as_deref() {
-        if !einstellungen::ist_gueltiges_zeitformat(f) {
-            return Err(AppError::Validation("Ungültiges zeitformat".into()));
+    let zeitdarstellung = bereinige(req.zeitdarstellung);
+    if let Some(f) = zeitdarstellung.as_deref() {
+        if !einstellungen::ist_gueltige_zeitdarstellung(f) {
+            return Err(AppError::Validation("Ungültige zeitdarstellung".into()));
         }
     }
     let einheiten = bereinige(req.einheiten);
@@ -753,7 +753,7 @@ pub async fn einstellungen_setzen(
             karten_zoom_start: req.karten_zoom_start,
             fachebenen_sichtbar: fachebenen.as_deref(),
             zeitzone: zeitzone.as_deref(),
-            zeitformat: zeitformat.as_deref(),
+            zeitdarstellung: zeitdarstellung.as_deref(),
             einheiten: einheiten.as_deref(),
             koordinatenformat: koordinatenformat.as_deref(),
             etb_nummer_praefix: etb_nummer_praefix.as_deref(),

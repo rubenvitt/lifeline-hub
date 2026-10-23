@@ -1,26 +1,22 @@
 /**
- * Reine Formatlogik für Anzeige-Konventionen: Zeit (Zeitzone + 24h/12h), Koordinaten
+ * Reine Formatlogik für Anzeige-Konventionen: Zeit (Zeitzone + Zeitdarstellung), Koordinaten
  * (WGS84/MGRS/UTM/GK) und Einheiten (metrisch/imperial). Provider/Hook delegieren hierher.
  */
-import dayjs, { type Dayjs } from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
-import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../api/types';
+import type { Dayjs } from 'dayjs';
+import type { EinheitenSystem, Koordinatenformat, Zeitdarstellung } from '../api/types';
 import { formatiere } from './koordinaten';
 import { zahlText } from './zahl';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
+import { inZone, leereUhrzeit, uhrzeit, zeitKurz, zeitMitTag, zeitpunkt } from './zeitDarstellung';
 
 export interface AnzeigeKonventionen {
   zeitzone?: string | null;
-  zeitformat?: Zeitformat | null;
+  zeitdarstellung?: Zeitdarstellung | null;
   einheiten?: EinheitenSystem | null;
   koordinatenformat?: Koordinatenformat | null;
 }
 
 /**
- * Default: alles null → lokal, 24h, dezimal, metrisch.
+ * Default: alles null → lokal, taktisch, dezimal, metrisch.
  *
  * Die Zeitformatierer unten nehmen ihn NICHT als Vorgabe, die Konventionen sind dort Pflicht
  * (LFH-913): ein Aufruf ohne Konventionen formatierte still in der Browserzone, auch unter dem
@@ -30,145 +26,86 @@ export interface AnzeigeKonventionen {
  */
 export const DEFAULT_KONVENTIONEN: AnzeigeKonventionen = {
   zeitzone: null,
-  zeitformat: null,
+  zeitdarstellung: null,
   einheiten: null,
   koordinatenformat: null,
 };
 
-/**
- * UTC-Wirestring → dayjs in der gewünschten Zeitzone (sonst lokal).
- * `d.tz(zone)` wirft bei ungültiger IANA-Zone; das Feld ist Freitext, ein Tippfehler ließe sonst
- * jedes Zeit-Rendering crashen — deshalb Fallback auf lokale Zeit.
- */
-export function inZone(utcStr: string, konv: AnzeigeKonventionen) {
-  const d = dayjs.utc(utcStr);
-  if (!konv.zeitzone) return d.local();
-  try {
-    return d.tz(konv.zeitzone);
-  } catch {
-    return d.local();
-  }
-}
+// Zeit: der Kern steht in `zeitDarstellung.ts` (LLH-1053). Die Namen hier sind dünne
+// Weiterleitungen auf seine drei Rollen, bis LLH-1061 die Aufrufer umstellt; sie folgen damit der
+// wirksamen Darstellung in den Konventionen, auch wenn der Name „taktisch“ sagt.
+export { inZone, MONATE_DTG } from './zeitDarstellung';
 
-/**
- * Deutsche Monats-Großkürzel für die taktische DTG; dayjs' `MMM` liefert nie großgeschrieben
- * ohne Punkt.
- */
-const MONATE_DE = [
-  'JAN',
-  'FEB',
-  'MÄR',
-  'APR',
-  'MAI',
-  'JUN',
-  'JUL',
-  'AUG',
-  'SEP',
-  'OKT',
-  'NOV',
-  'DEZ',
-];
-
-/** Taktische Uhrzeit „1430". BOS-Konvention ist 24h; das 12h/24h-Setting gilt hier nicht. */
+/** @deprecated `uhrzeit` aus `zeitDarstellung.ts`. */
 export function taktischeUhrzeit(
   utcStr: string | null | undefined,
   konv: AnzeigeKonventionen,
 ): string {
-  if (!utcStr) return '';
-  return inZone(utcStr, konv).format('HHmm');
+  return uhrzeit(utcStr, konv);
 }
 
-/** Taktische Datum-Zeit-Gruppe kurz „161430" (Tag + Uhrzeit, ohne Monat/Jahr). */
+/**
+ * @deprecated Tag und Uhrzeit ohne Heute-Prüfung (`161430` bzw. `16.10. 14:30`), die Form von
+ * `zeitKurz` an einem anderen Tag. Bleibt rein (liest keine Uhr), deshalb kein `zeitKurz`.
+ */
 export function taktischeDtg(utcStr: string | null | undefined, konv: AnzeigeKonventionen): string {
   if (!utcStr) return '';
-  return inZone(utcStr, konv).format('DDHHmm');
+  return zeitMitTag(inZone(utcStr, konv), konv.zeitdarstellung ?? 'taktisch');
 }
 
-/** Volle taktische DTG „161430JUL2026" (Tag + Uhrzeit + dt. Monatskürzel + Jahr). */
+/** @deprecated `zeitpunkt` aus `zeitDarstellung.ts`. */
 export function taktischeDtgVoll(
   utcStr: string | null | undefined,
   konv: AnzeigeKonventionen,
 ): string {
-  if (!utcStr) return '';
-  const d = inZone(utcStr, konv);
-  return `${d.format('DDHHmm')}${MONATE_DE[d.month()]}${d.format('YYYY')}`;
+  return zeitpunkt(utcStr, konv);
 }
 
 /**
- * Monatskürzel der Datum-Zeit-Gruppe nach FwDV/DV 810 (Ausgabe 2018, Sprech- und
- * Datenfunkverkehr: „Tag des Monats – Uhrzeitgruppe (hhmm), soweit erforderlich können Monat und
- * Jahr angefügt werden“, Beispiel „271938jan19“): klein, drei Buchstaben, ohne Umlaut.
- * Entscheidung E1 vom 17.10.2026 (LLH-1045). Der Zeit-Parser liest dieselbe Tabelle.
+ * Volle DTG „161430okt26“ eines Zeitpunkts in der Anzeigezone, immer taktisch: das Zeitfeld zeigt
+ * seinen Wert so, unabhängig von der Darstellung (Spec `zeiteingabe`, „Anzeige im Feld als
+ * Datum-Zeit-Gruppe“). Ohne gültige Zone in der Browserzone.
  */
-export const MONATE_DTG = [
-  'jan',
-  'feb',
-  'mrz',
-  'apr',
-  'mai',
-  'jun',
-  'jul',
-  'aug',
-  'sep',
-  'okt',
-  'nov',
-  'dez',
-] as const;
-
-/**
- * Volle DTG nach E1 „161430okt26“ (Tag, Uhrzeit, Monat klein, Jahr zweistellig) eines
- * Zeitpunkts in der Anzeigezone; ohne gültige Zone in der Browserzone. Das Zeitfeld zeigt seinen
- * Wert so (Spec `zeiteingabe`, „Anzeige im Feld als Datum-Zeit-Gruppe“). Die übrigen Anzeigen
- * stellt LLH-1053 von {@link taktischeDtgVoll} hierher um.
- */
-export function formatDtg(zeitpunkt: Dayjs, zone: string | null | undefined): string {
-  const d = inZone(zeitpunkt.utc().format('YYYY-MM-DD HH:mm:ss'), { zeitzone: zone });
-  return `${d.format('DDHHmm')}${MONATE_DTG[d.month()]}${d.format('YY')}`;
+export function formatDtg(zeitpunktWert: Dayjs, zone: string | null | undefined): string {
+  return zeitpunkt(zeitpunktWert, { zeitzone: zone, zeitdarstellung: 'taktisch' });
 }
 
-/** Volle Zeitangabe → taktische DTG „161430JUL2026". */
+/** @deprecated `zeitpunkt` aus `zeitDarstellung.ts`. */
 export function formatZeit(utcStr: string | null | undefined, konv: AnzeigeKonventionen): string {
-  return taktischeDtgVoll(utcStr, konv);
+  return zeitpunkt(utcStr, konv);
 }
 
-/** Kurze Zeitangabe → taktische Uhrzeit „1430" wenn heute, sonst kurze DTG „161430". */
+/** @deprecated `zeitKurz` aus `zeitDarstellung.ts`. */
 export function formatZeitKurz(
   utcStr: string | null | undefined,
   konv: AnzeigeKonventionen,
 ): string {
-  if (!utcStr) return '';
-  const d = inZone(utcStr, konv);
-  // „Heute" muss in derselben Zeitzone bestimmt werden, sonst kippt die Tagesgrenze.
-  const jetzt = konv.zeitzone ? dayjs().tz(konv.zeitzone) : dayjs();
-  return d.isSame(jetzt, 'day') ? d.format('HHmm') : d.format('DDHHmm');
+  return zeitKurz(utcStr, konv);
 }
 
 /**
- * Reine Uhrzeit `HH:mm` in der Anzeigezone — für Instrumente, die den Tag aus dem Zusammenhang
- * kennen. Der Leerwert `——:——` hat Ziffernbreite, damit eine Lücke in einer Instrumentenspalte
- * die Nachbarzeilen nicht verschiebt.
+ * @deprecated `uhrzeit` aus `zeitDarstellung.ts`; der Leerwert hat Ziffernbreite
+ * (`leereUhrzeit`), damit eine Lücke in einer Instrumentenspalte die Nachbarzeilen nicht
+ * verschiebt.
  */
 export function formatUhrzeit(
   utcStr: string | null | undefined,
   konv: AnzeigeKonventionen,
 ): string {
-  if (!utcStr) return '——:——';
-  return inZone(utcStr, konv).format('HH:mm');
+  if (!utcStr) return leereUhrzeit(konv);
+  return uhrzeit(utcStr, konv);
 }
 
 /**
- * Tagesbewusste Uhrzeit `HH:mm` (heute) bzw. `DD. HH:mm` (sonst) — für Fristen, bei denen
- * „in 20 Minuten" sonst nicht von „morgen früh" zu unterscheiden wäre. „Heute" in DERSELBEN
- * Zeitzone wie die Formatierung.
+ * @deprecated `zeitKurz` aus `zeitDarstellung.ts` — für Fristen, bei denen „in 20 Minuten“ sonst
+ * nicht von „morgen früh“ zu unterscheiden wäre; Leerwert wie {@link formatUhrzeit}.
  */
 export function formatUhrzeitMitTag(
   utcStr: string | null | undefined,
   konv: AnzeigeKonventionen,
 ): string {
-  if (!utcStr) return '——:——';
-  const d = inZone(utcStr, konv);
-  const jetzt = konv.zeitzone ? dayjs().tz(konv.zeitzone) : dayjs();
-  return d.isSame(jetzt, 'day') ? d.format('HH:mm') : d.format('DD. HH:mm');
+  if (!utcStr) return leereUhrzeit(konv);
+  return zeitKurz(utcStr, konv);
 }
 
 /**

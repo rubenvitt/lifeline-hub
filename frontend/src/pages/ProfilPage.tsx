@@ -31,6 +31,7 @@ import {
 } from '../api/sitzungen';
 import TotpPasswortDialog from '../auth/TotpPasswortDialog';
 import { huelleAnmeldungImBrowser, huelleSperrtPasskey } from '../huelle/faehigkeiten';
+import ZeitdarstellungGeraetWahl from '../anzeige/ZeitdarstellungGeraetWahl';
 
 interface TotpCodeWerte {
   code: string;
@@ -202,6 +203,11 @@ export default function ProfilPage() {
             <Datenfeld label="Systemrolle">{rollenText(benutzer)}</Datenfeld>
             <Datenfeld label="Organisation">{organisation?.name ?? '—'}</Datenfeld>
           </Datenraster>
+        </Paneel>
+
+        {/* Gerätewahl der Zeitdarstellung (LLH-1053, E3), wie das Koordinatensystem am Gerät. */}
+        <Paneel titel="Darstellung auf diesem Gerät" koerperPolster>
+          <ZeitdarstellungGeraetWahl />
         </Paneel>
 
         <Paneel titel="Sicherheit" koerperPolster>

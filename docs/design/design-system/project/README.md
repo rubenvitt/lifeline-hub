@@ -23,6 +23,7 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
 - **InlineAngabe (geschlossen, leer, offen)** (`components/InlineAngabe/`, Gruppe Bedienung)
 - **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
+- **BearbeitbaresPaneel (offen und gesperrt)** (`components/BearbeitbaresPaneel/`, Gruppe Formular)
 - **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
 - **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
 - **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)
@@ -70,6 +71,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `Schnellerfassungszeile` · `Datenraster`/`Datenfeld` (statt `Descriptions`) ·
   `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
   `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
+  `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
+  einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
   Dashboard-Baukasten (unten).
@@ -495,3 +498,22 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Hinweis, ETB-Eintrag), ihr Etikett ist „In der Lage ✓“; „übergeben“ steht dafür nie. Der
   ETB-Typ „Lage“ heißt in der Mehrzahl „Lagefeststellungen“, nie „Lagemeldungen“. Das Paneel des
   Lagebilds mit ETB-Einträgen heißt „Jüngste ETB-Einträge“.
+
+## Zeitdarstellung
+
+- **Zeitdarstellung** (LLH-1053, Spec `zeitdarstellung`, Entscheidungen E1–E4 aus LLH-1045): eine
+  Zeit für Menschen formatiert nur `anzeige/zeitDarstellung.ts`, in drei Rollen — `zeitpunkt`
+  (`101430okt26` bzw. `10.10.26 14:30`), `zeitKurz` (heute `1430`, sonst `091430` bzw. `14:30` /
+  `09.10. 14:30`) und `uhrzeit` (`1430` bzw. `14:30`, nur wo der Tag aus dem Zusammenhang folgt);
+  in Komponenten über `ZeitAnzeige rolle=…` oder die gebundenen Rollen aus
+  `useAnzeigeKonventionen()`. Die volle DTG schreibt Monat klein ohne Umlaut und das Jahr
+  zweistellig (FwDV/DV 810, Ausgabe 2018, Teil I 5.1.1.12). Die Darstellung (`taktisch`,
+  Vorgabe, oder `datum_uhrzeit`) steht in den Konventionen; wirksam ist Gerät vor Einsatz vor
+  Organisation vor Vorgabe (`wirksameZeitdarstellung`), die Gerätewahl liegt in
+  `anzeige/zeitDarstellungStore.ts` (Profil „Darstellung auf diesem Gerät“, Sprungpalette).
+  **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
+  sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
+  `.format('…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/` (Maschinenformate ab
+  `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts` mit Schuldmenge
+  `OFFEN`, die nur schrumpft (Abbau LLH-1061). Die alten Namen in `anzeige/format.ts`
+  (`formatZeit`, `formatUhrzeit` …) sind veraltete Weiterleitungen auf die Rollen.

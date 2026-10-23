@@ -10,7 +10,7 @@ import type { OrgEinstellungen } from '../../api/types';
 const VOLL = {
   org_id: 1,
   zeitzone: 'Europe/Berlin',
-  zeitformat: '12h',
+  zeitdarstellung: 'datum_uhrzeit',
   einheiten: 'imperial',
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
@@ -32,7 +32,7 @@ describe('zuUpdate', () => {
   it('mappt alle 14 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
     expect(zuUpdate(VOLL)).toEqual({
       zeitzone: 'Europe/Berlin',
-      zeitformat: '12h',
+      zeitdarstellung: 'datum_uhrzeit',
       einheiten: 'imperial',
       koordinatenformat: 'mgrs',
       retention_dauer_tage: 90,
@@ -69,7 +69,7 @@ describe('normalisiereAnzeige', () => {
   it('trimmt Strings, leer → null, füllt fehlende Enums mit null', () => {
     expect(normalisiereAnzeige({ zeitzone: '  Europe/Berlin  ', geocoder_url: '   ' })).toEqual({
       zeitzone: 'Europe/Berlin',
-      zeitformat: null,
+      zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: null,
       geocoder_url: null,

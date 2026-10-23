@@ -33,8 +33,10 @@ import {
 } from '../../src/theme/tokens';
 import { rollenFarbe, statusKategorie, warnstufeBalkenFarbe } from '../../src/theme/statusFarben';
 import type { Sichtungskategorie } from '../../src/api/types';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
   Augenbraue,
+  BearbeitbaresPaneel,
   DashboardFlaeche,
   Datenfeld,
   DatenfeldEingabe,
@@ -55,6 +57,7 @@ import {
 import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
 import { InlineAngabe } from '../../src/components/InlineAngabe';
+import { OffeneBearbeitungProvider } from '../../src/components/offeneBearbeitung';
 import { useSpeicherLeiste } from '../../src/components/speicherLeiste';
 import DokumentEntwurf from '../../src/entwurf/DokumentEntwurf';
 import { VORLAGEN } from '../../src/befehle/vorlagen';
@@ -108,6 +111,63 @@ function InlineAngabeBeispiel({ etikett, wert }: { etikett: string; wert: string
       onSpeichern={async (neu) => setGespeichert(neu)}
     />
   );
+}
+
+/**
+ * Zwei Paneele einer Ansicht unter EINEM Merker; „Funk“ wird in `interact` geöffnet, „Telefon“
+ * steht dann gesperrt mit Grund. Der Merker hängt die Rückfrage vor dem Verlassen ein, und die
+ * braucht einen Data Router (`useBlocker`).
+ */
+function BearbeitbaresPaneelBeispiel() {
+  const [router] = useState(() =>
+    createMemoryRouter([
+      {
+        path: '*',
+        element: (
+          <OffeneBearbeitungProvider>
+            <div className="ds-stapel">
+              <BearbeitbaresPaneel<{ rufname: string; kanal: string }>
+                titel="Funk"
+                ueberschrift="h3"
+                datensatz={{ geaendert_at: '2026-10-22 10:00:00' }}
+                werte={{ rufname: 'Florian Celle 1-46-1', kanal: '41' }}
+                felder={[
+                  {
+                    name: 'rufname',
+                    label: 'Rufname',
+                    anzeige: 'Florian Celle 1-46-1',
+                    eingabe: <Input />,
+                  },
+                  { name: 'kanal', label: 'Sprechgruppe', anzeige: '41', eingabe: <Input /> },
+                ]}
+                spalten={2}
+                onSpeichern={async () => undefined}
+                darfSchreiben
+              />
+              <BearbeitbaresPaneel<{ nummer: string }>
+                titel="Telefon"
+                ueberschrift="h3"
+                datensatz={{ geaendert_at: '2026-10-22 10:00:00' }}
+                werte={{ nummer: '05141 2026' }}
+                felder={[
+                  {
+                    name: 'nummer',
+                    label: 'Verbindung',
+                    anzeige: '05141 2026',
+                    eingabe: <Input />,
+                  },
+                ]}
+                spalten={2}
+                onSpeichern={async () => undefined}
+                darfSchreiben
+              />
+            </div>
+          </OffeneBearbeitungProvider>
+        ),
+      },
+    ]),
+  );
+  return <RouterProvider router={router} />;
 }
 
 function SpeicherleisteBeispiel() {
@@ -414,6 +474,26 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         </div>
       </div>
     ),
+  },
+  {
+    name: 'BearbeitbaresPaneel',
+    title: 'BearbeitbaresPaneel (offen und gesperrt)',
+    group: 'Formular',
+    height: 710,
+    source: 'components/instrument/BearbeitbaresPaneel.tsx',
+    content: () => <BearbeitbaresPaneelBeispiel />,
+    interact: async (container) => {
+      const ausloeser = [...container.querySelectorAll('button')].filter(
+        (knopf) => knopf.getAttribute('aria-label') === 'Funk bearbeiten',
+      );
+      if (ausloeser.length !== 2) {
+        throw new Error('Design System: Auslöser „Funk bearbeiten“ nicht gefunden');
+      }
+      for (const knopf of ausloeser) await act(async () => knopf.click());
+      if (container.querySelectorAll('[data-lfh="paneel-sperrgrund"]').length !== 2) {
+        throw new Error('Design System: „Telefon“ steht nicht gesperrt mit Grund');
+      }
+    },
   },
   {
     name: 'Speicherleiste',

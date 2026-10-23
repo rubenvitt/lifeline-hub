@@ -263,6 +263,11 @@ interface NachforderungKarteProps {
   /** Öffnet den Dialog „Als Material übernehmen“ (an eingetroffenen Karten). */
   onMaterialUebernehmen?: (id: number) => void;
   /**
+   * Öffnet den Dialog „Erfassten Posten zuordnen …“ (LLH-1259 D5): ein schon erfasster Posten
+   * bekommt den Bezug, statt dass die Übernahme einen zweiten anlegt.
+   */
+  onPostenZuordnen?: (id: number) => void;
+  /**
    * Bekannte Einheiten je Kennung (LLH-1383 D9), stabil über den Datenstand der Seite.
    * `null`/fehlend: Modul Einheiten nicht freigegeben oder Liste nicht da — dann nur die Zahl.
    */
@@ -339,6 +344,7 @@ function NachforderungKarte({
   materialJeId,
   materialGesperrt = false,
   onMaterialUebernehmen,
+  onPostenZuordnen,
   einheitenJeId,
   einheitGesperrt = false,
   onEinheitUebernehmen,
@@ -451,6 +457,14 @@ function NachforderungKarte({
             {etikett}
           </Button>
         ),
+      );
+    }
+    // Der zweite Weg (LLH-1259 D5); gesperrt nennt „Als Material übernehmen“ schon den Grund.
+    if (onPostenZuordnen && n.einheit_ids.length === 0 && !materialGesperrt) {
+      aktionen.push(
+        <Button key="zuordnen" onClick={() => onPostenZuordnen(n.id)}>
+          Erfassten Posten zuordnen …
+        </Button>,
       );
     }
   }

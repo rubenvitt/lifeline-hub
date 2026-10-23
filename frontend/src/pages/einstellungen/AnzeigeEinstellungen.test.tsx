@@ -21,7 +21,7 @@ import { adminFixture, authWertFixture, benutzerFixture } from '../../test/fixtu
 const VOLL = {
   org_id: 1,
   zeitzone: 'Europe/Berlin',
-  zeitformat: '12h',
+  zeitdarstellung: 'datum_uhrzeit',
   einheiten: 'imperial',
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
@@ -59,7 +59,7 @@ describe('AnzeigeEinstellungen', () => {
     await waitFor(() =>
       expect(speichereOrgEinstellungen).toHaveBeenCalledWith({
         zeitzone: 'Europe/Berlin',
-        zeitformat: '12h',
+        zeitdarstellung: 'datum_uhrzeit',
         einheiten: 'imperial',
         koordinatenformat: 'mgrs',
         // Einsatz-Default-Spalten NICHT genullt (aus geladenen Daten gemerged):
@@ -101,7 +101,7 @@ describe('AnzeigeEinstellungen', () => {
     vi.mocked(ladeOrgEinstellungen).mockResolvedValue({
       ...VOLL,
       zeitzone: null,
-      zeitformat: null,
+      zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: null,
     } as never);
@@ -109,7 +109,7 @@ describe('AnzeigeEinstellungen', () => {
 
     // Die AutoComplete zeigt den Platzhalter als Text, nicht als Attribut.
     expect(await screen.findByText('Gerätezeit (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByText('24 Stunden (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('Taktisch (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByText('Metrisch (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByText('WGS84 dezimal (Vorgabe)')).toBeInTheDocument();
     expect(

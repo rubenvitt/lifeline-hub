@@ -6330,10 +6330,10 @@
               "null"
             ]
           },
-          "zeitformat": {
+          "zeitdarstellung": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Zeitformat"
+                "$ref": "#/components/schemas/Zeitdarstellung"
               },
               {
                 "type": "null"
@@ -11765,10 +11765,10 @@
             "format": "int64",
             "description": "Skelett-Frist in Tagen ab Abschluss (LFH-750); fehlt = das Skelett bleibt unbegrenzt."
           },
-          "zeitformat": {
+          "zeitdarstellung": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Zeitformat"
+                "$ref": "#/components/schemas/Zeitdarstellung"
               },
               {
                 "type": "null"
@@ -11868,10 +11868,10 @@
             "format": "int64",
             "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
           },
-          "zeitformat": {
+          "zeitdarstellung": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Zeitformat"
+                "$ref": "#/components/schemas/Zeitdarstellung"
               },
               {
                 "type": "null"
@@ -17273,6 +17273,14 @@
           "bereitstellungsraum"
         ]
       },
+      "Zeitdarstellung": {
+        "type": "string",
+        "description": "Zeitdarstellung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitdarstellung`.\n`None` am Einsatz bzw. an der Organisation heißt Vorgabe, also taktisch; am Gerät kann\nman sie übersteuern, der Druck nie (LLH-1053, Spec `zeitdarstellung`). Löst das tote\n24h/12h-„Zeitformat\" ab (Migration `zeitdarstellung`).",
+        "enum": [
+          "taktisch",
+          "datum_uhrzeit"
+        ]
+      },
       "ZeitfensterAnzeige": {
         "type": "object",
         "description": "Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen).",
@@ -17372,14 +17380,6 @@
             "description": "Beginn, UTC ohne Zonenkennung."
           }
         }
-      },
-      "Zeitformat": {
-        "type": "string",
-        "description": "Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`\n(per-Variante, `rename_all` trifft die Ziffern-Kürzel nicht).",
-        "enum": [
-          "24h",
-          "12h"
-        ]
       },
       "ZugangsAngaben": {
         "type": "object",

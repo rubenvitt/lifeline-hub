@@ -117,6 +117,7 @@ export interface BoardKartenProps {
   materialJeId?: ReadonlyMap<number, UebernahmePosten> | null;
   materialGesperrt?: boolean;
   onMaterialUebernehmen?: (id: number) => void;
+  onPostenZuordnen?: (id: number) => void;
   einheitenJeId?: ReadonlyMap<number, UebernahmeEinheit> | null;
   einheitGesperrt?: boolean;
   onEinheitUebernehmen?: (id: number) => void;
@@ -272,6 +273,7 @@ export default function NachforderungBoard({
             materialJeId={karten.materialJeId}
             materialGesperrt={karten.materialGesperrt}
             onMaterialUebernehmen={karten.onMaterialUebernehmen}
+            onPostenZuordnen={karten.onPostenZuordnen}
             einheitenJeId={karten.einheitenJeId}
             einheitGesperrt={karten.einheitGesperrt}
             onEinheitUebernehmen={karten.onEinheitUebernehmen}

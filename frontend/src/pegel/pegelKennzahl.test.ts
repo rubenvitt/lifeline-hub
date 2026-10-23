@@ -37,23 +37,23 @@ const pegel = (over: Partial<PegelAnzeige> = {}): PegelAnzeige => ({
 
 describe('Zeit mit Versatz (die Falle der Wirestring-Formatierer)', () => {
   it('formatUhrzeit liest den Versatz und rechnet in die Anzeigezone', () => {
-    expect(formatUhrzeit('2026-09-22T14:05:00+02:00', BERLIN)).toBe('14:05');
+    expect(formatUhrzeit('2026-09-22T14:05:00+02:00', BERLIN)).toBe('1405');
     // Derselbe Zeitpunkt in UTC geschrieben ergibt dieselbe Ortszeit.
-    expect(formatUhrzeit('2026-09-22T12:05:00Z', BERLIN)).toBe('14:05');
+    expect(formatUhrzeit('2026-09-22T12:05:00Z', BERLIN)).toBe('1405');
     // Anders gezont: New York liegt sechs Stunden hinter Berlin.
     expect(formatUhrzeit('2026-09-22T14:05:00+02:00', { zeitzone: 'America/New_York' })).toBe(
-      '08:05',
+      '0805',
     );
   });
 
   it('hält beide Sommerzeit-Grenzen: der Versatz der Quelle wechselt mit', () => {
     // Letzte Messung vor dem Rückstellen (25.10.2026, 03:00 MESZ → 02:00 MEZ) …
-    expect(formatUhrzeit('2026-10-25T02:45:00+02:00', BERLIN)).toBe('02:45');
+    expect(formatUhrzeit('2026-10-25T02:45:00+02:00', BERLIN)).toBe('0245');
     // … und eine danach, jetzt mit +01:00 (01:15 UTC = 02:15 MEZ).
-    expect(formatUhrzeit('2026-10-25T02:15:00+01:00', BERLIN)).toBe('02:15');
+    expect(formatUhrzeit('2026-10-25T02:15:00+01:00', BERLIN)).toBe('0215');
     // Vorstellen (29.03.2026, 02:00 MEZ → 03:00 MESZ).
-    expect(formatUhrzeit('2026-03-29T01:45:00+01:00', BERLIN)).toBe('01:45');
-    expect(formatUhrzeit('2026-03-29T03:15:00+02:00', BERLIN)).toBe('03:15');
+    expect(formatUhrzeit('2026-03-29T01:45:00+01:00', BERLIN)).toBe('0145');
+    expect(formatUhrzeit('2026-03-29T03:15:00+02:00', BERLIN)).toBe('0315');
   });
 
   it('das Alter kommt aus Date.parse und ist absolut, nicht ortszeitlich', () => {

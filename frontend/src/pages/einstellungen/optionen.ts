@@ -2,7 +2,7 @@ import type {
   BenoetigteRolle,
   EinheitenSystem,
   Koordinatenformat,
-  Zeitformat,
+  Zeitdarstellung,
 } from '../../api/types';
 
 /**
@@ -47,10 +47,17 @@ export const ZEITZONEN_OPTIONEN = [
   'Asia/Tokyo',
 ].map((z) => ({ value: z }));
 
-export const ZEITFORMAT_OPTIONEN: { value: Zeitformat; label: string }[] = [
-  { value: '24h', label: '24 Stunden' },
-  { value: '12h', label: '12 Stunden (AM/PM)' },
+/**
+ * Zeitdarstellung (LLH-1053, Spec `zeitdarstellung`): das Beispiel im Namen zeigt die Schreibweise,
+ * die die Rolle „Zeitpunkt“ dann trägt (`anzeige/zeitDarstellung.ts`). Leer = Vorgabe, taktisch.
+ */
+export const ZEITDARSTELLUNG_OPTIONEN: { value: Zeitdarstellung; label: string }[] = [
+  { value: 'taktisch', label: 'Taktisch (101430okt26)' },
+  { value: 'datum_uhrzeit', label: 'Datum und Uhrzeit (10.10.26 14:30)' },
 ];
+
+/** Name der Vorgabe im Platzhalter eines leeren Felds „Zeitdarstellung“. */
+export const ZEITDARSTELLUNG_VORGABE = 'Taktisch';
 
 export const EINHEITEN_OPTIONEN: { value: EinheitenSystem; label: string }[] = [
   { value: 'metrisch', label: 'Metrisch (m, km)' },

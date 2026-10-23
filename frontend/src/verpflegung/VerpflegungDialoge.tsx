@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber, Modal, Typography } from 'antd';
+import { Collapse, Form, Input, InputNumber, Modal, Typography, type FormRule } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -29,7 +29,7 @@ import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe, ZeitraumEingabe, type Zeitraum } from '../anzeige/ZeitpunktEingabe';
-import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import {
   empfaengerFelder,
   empfaengerOptionen,
@@ -51,7 +51,9 @@ dayjs.extend(utc);
 
 /**
  * Die Erfassungsmasken des Fachmoduls Verpflegung, beide auf `ErfassungsModal`;
- * Server-Gründe (400/422) stehen IM Dialog (`SpeicherFehler`).
+ * Server-Gründe (400/422) stehen IM Dialog (`SpeicherFehler`). Ein bestehendes Zeitfenster wird
+ * nicht hier, sondern in seiner Karte bearbeitet (`ZeitfensterBearbeiten.tsx`, LLH-1139); die
+ * Abbildungen dafür (`zeitfensterPatch`, Optionen, Vorschlagshilfe, Zeitraumregel) stehen hier.
  *
  * FELDBUDGET: „Zeitfenster" zeigt bewusst VIER Felder, weil die beiden Bedarfsteile je einen
  * Vorschlag mit Herkunft tragen, der eingeklappt unsichtbar wäre; „Ausgabe nachtragen" höchstens
@@ -100,7 +102,7 @@ function sonderkostAnlegen(sk: SonderkostWerte | undefined): SonderkostEingabe |
 
 // ── Zeitfenster: reine Abbildungen ──────────────────────────────────────────────────────
 
-interface ZeitfensterWerte {
+export interface ZeitfensterWerte {
   bezeichnung: string;
   zeitraum: [Dayjs, Dayjs];
   bedarf_kraefte: number;
@@ -133,7 +135,7 @@ function isSameStellen(a: readonly number[], b: readonly number[]): boolean {
 }
 
 /** Wire-Zeit normalisiert — ein Vergleich roher Strings sähe „…:00" und „…:00.000" verschieden. */
-function normalisiert(wire: string): string {
+export function normalisiert(wire: string): string {
   return alsBackendZeit(dayjs.utc(wire));
 }
 
@@ -201,7 +203,7 @@ export function ausgabeBody(w: AusgabeWerte): AusgabeEingabe {
 
 // ── Bausteine ───────────────────────────────────────────────────────────────────────────
 
-function anzahlFeld(min = 0) {
+export function anzahlFeld(min = 0) {
   return <InputNumber min={min} precision={0} style={{ width: '100%' }} />;
 }
 
@@ -251,18 +253,18 @@ interface DialogBasis {
   onSchliessen: () => void;
 }
 
-// ── Zeitfenster anlegen / bearbeiten ────────────────────────────────────────────────────
+// ── Zeitfenster anlegen ─────────────────────────────────────────────────────────────────
 
-const VERPFLEGUNGSART_OPTIONEN = (Object.keys(VERPFLEGUNGSART_LABEL) as Verpflegungsart[]).map(
-  (a) => ({ value: a, label: VERPFLEGUNGSART_LABEL[a] }),
-);
+export const VERPFLEGUNGSART_OPTIONEN = (
+  Object.keys(VERPFLEGUNGSART_LABEL) as Verpflegungsart[]
+).map((a) => ({ value: a, label: VERPFLEGUNGSART_LABEL[a] }));
 
 /**
  * Wählbare Stellen eines Zeitfensters: die nicht aufgelösten in der Folge des Servers, dazu die
  * schon zugeordneten aufgelösten (sie dürfen bleiben, D4; eine neu hinzukommende aufgelöste lehnt
  * der Server ab und wird deshalb nicht angeboten).
  */
-function zeitfensterStellenOptionen(
+export function zeitfensterStellenOptionen(
   stellen: readonly Verpflegungsstelle[],
   vorher: Pick<VerpflegungZeitfenster, 'stelle_ids'> | null,
 ): { value: number; label: string }[] {
@@ -281,22 +283,28 @@ function zeitfensterStellenOptionen(
  * Feldhilfe eines Bedarfsfelds. Beim ANLEGEN steht der Vorschlag im Feld, die Hilfe nennt nur
  * die Herkunft; beim BEARBEITEN überschreibt der Vorschlag nichts, die Hilfe nennt die Zahl mit.
  */
-function vorschlagHilfe(v: Vorschlag, anlegen: boolean): string | undefined {
+export function vorschlagHilfe(v: Vorschlag, anlegen: boolean): string | undefined {
   if (v.hinweis == null) return undefined;
   if (anlegen || v.wert == null) return v.hinweis;
   return `Aktuell ${v.wert} — ${v.hinweis}`;
 }
 
-type ZeitfensterModus =
-  | { art: 'anlegen'; onErfassen: (body: ZeitfensterEingabe) => Promise<unknown> }
-  | {
-      art: 'bearbeiten';
-      zeitfenster: VerpflegungZeitfenster;
-      onErfassen: (patch: ZeitfensterPatch) => Promise<unknown>;
-    };
+/** Beide Enden: `required` hielte ein halbes Tupel `[Beginn, null]` für gefüllt. */
+export const ZEITRAUM_REGEL: FormRule = {
+  validator: (_, wert: Zeitraum | null | undefined) =>
+    wert?.[0] && wert?.[1]
+      ? Promise.resolve()
+      : Promise.reject(new Error('Bitte Beginn und Ende angeben')),
+};
+
+/** Pflicht eines Bedarfsfelds (Kräfte, Betreute); 0 ist eine Angabe. */
+export const BEDARF_REGEL: FormRule = {
+  required: true,
+  message: 'Bitte eine Anzahl angeben — 0, wenn niemand',
+};
 
 interface ZeitfensterDialogProps extends DialogBasis {
-  modus: ZeitfensterModus;
+  onErfassen: (body: ZeitfensterEingabe) => Promise<unknown>;
   einsatzId: number;
   /** `freigabenQuery.data` unverändert — `undefined` heißt „noch unbekannt" (Hook-Vertrag). */
   freigaben: ModulFreigaben | undefined;
@@ -308,7 +316,7 @@ interface ZeitfensterDialogProps extends DialogBasis {
 type Bedarfsfeld = 'bedarf_kraefte' | 'bedarf_betreute';
 
 export function ZeitfensterDialog({
-  modus,
+  onErfassen,
   einsatzId,
   freigaben,
   jetzt,
@@ -318,14 +326,12 @@ export function ZeitfensterDialog({
   onSchliessen,
 }: ZeitfensterDialogProps) {
   const [form] = Form.useForm<ZeitfensterWerte>();
-  const anlegen = modus.art === 'anlegen';
-  const vorher = modus.art === 'bearbeiten' ? modus.zeitfenster : null;
   // Die Grenze der Stellen kann scheitern: der Klappteil geht dann selbst auf.
   const [stellenOffen, setStellenOffen] = useState(false);
   const hasStellen = stellen.length > 0;
   const art = Form.useWatch('verpflegungsart', form) as Verpflegungsart | null | undefined;
   const gewaehlteStellen = (Form.useWatch('stelle_ids', form) as number[] | undefined) ?? [];
-  const stellenOptionen = zeitfensterStellenOptionen(stellen, vorher);
+  const stellenOptionen = zeitfensterStellenOptionen(stellen, null);
   const stellenKopf = [
     hasStellen ? 'Art und Stellen' : 'Art',
     art ? VERPFLEGUNGSART_LABEL[art] : undefined,
@@ -340,14 +346,7 @@ export function ZeitfensterDialog({
   // gerechnetes „jetzt".
   const zeitraum = Form.useWatch('zeitraum', form) as [Dayjs | null, Dayjs | null] | undefined;
   const beginn = zeitraum?.[0];
-  // Im ersten Render ist `useWatch` noch leer — beim Bearbeiten gilt bis dahin der gespeicherte
-  // Beginn, sonst ginge eine Kopfzahl-Anfrage „jetzt" hinaus.
-  const vonAt =
-    beginn && beginn.isValid()
-      ? alsBackendZeit(beginn)
-      : zeitraum === undefined && vorher
-        ? normalisiert(vorher.von_at)
-        : undefined;
+  const vonAt = beginn && beginn.isValid() ? alsBackendZeit(beginn) : undefined;
   const vorschlag = useBedarfsvorschlag({ einsatzId, vonAt, freigaben, jetzt });
 
   // Eigener Merker statt `isFieldTouched`: eine Vorbelegung per `setFieldValue` wäre sonst von der
@@ -361,44 +360,26 @@ export function ZeitfensterDialog({
   // Nur beim ANLEGEN, und nur wenn die Quelle geantwortet hat (`hinweis`): während sie lädt, ist
   // `wert` ebenfalls `null`, und ein Leeren ließe die Zahl flackern.
   useEffect(() => {
-    if (!anlegen || kraefteHinweis == null || beruehrt.current.bedarf_kraefte) return;
+    if (kraefteHinweis == null || beruehrt.current.bedarf_kraefte) return;
     form.setFieldValue('bedarf_kraefte', kraefteWert ?? undefined);
-  }, [anlegen, form, kraefteWert, kraefteHinweis]);
+  }, [form, kraefteWert, kraefteHinweis]);
   useEffect(() => {
-    if (!anlegen || betreuteHinweis == null || beruehrt.current.bedarf_betreute) return;
+    if (betreuteHinweis == null || beruehrt.current.bedarf_betreute) return;
     form.setFieldValue('bedarf_betreute', betreuteWert ?? undefined);
-  }, [anlegen, form, betreuteWert, betreuteHinweis]);
+  }, [form, betreuteWert, betreuteHinweis]);
 
   const merke = (feld: Bedarfsfeld) => () => {
     beruehrt.current[feld] = true;
   };
 
-  const initialValues: Partial<ZeitfensterWerte> | undefined = vorher
-    ? {
-        bezeichnung: vorher.bezeichnung,
-        zeitraum: [alsZeitpunkt(vorher.von_at)!, alsZeitpunkt(vorher.bis_at)!],
-        bedarf_kraefte: vorher.bedarf.kraefte,
-        bedarf_betreute: vorher.bedarf.betreute,
-        bedarf_weitere: vorher.bedarf.weitere,
-        sonderkost: { ...vorher.bedarf.sonderkost },
-        verpflegungsart: vorher.verpflegungsart ?? undefined,
-        ...(hasStellen ? { stelle_ids: [...vorher.stelle_ids] } : {}),
-      }
-    : undefined;
-
   return (
     <ErfassungsModal<ZeitfensterWerte>
       offen
-      titel={vorher ? `Bedarf bearbeiten: ${vorher.bezeichnung}` : 'Zeitfenster anlegen'}
+      titel="Zeitfenster anlegen"
       form={form}
-      erfassenText={anlegen ? 'Anlegen' : 'Speichern'}
+      erfassenText="Anlegen"
       laeuft={laeuft}
-      initialValues={initialValues}
-      onErfassen={(w) => {
-        if (modus.art === 'anlegen') return modus.onErfassen(zeitfensterAnlegenBody(w));
-        const patch = zeitfensterPatch(modus.zeitfenster, w);
-        return Object.keys(patch).length === 0 ? Promise.resolve() : modus.onErfassen(patch);
-      }}
+      onErfassen={(w) => onErfassen(zeitfensterAnlegenBody(w))}
       onPruefungGescheitert={(felder) => {
         if (felder.includes('stelle_ids')) setStellenOffen(true);
       }}
@@ -422,15 +403,7 @@ export function ZeitfensterDialog({
         name="zeitraum"
         label="Zeitraum"
         required
-        rules={[
-          {
-            // Beide Enden: `required` hielte ein halbes Tupel `[Beginn, null]` für gefüllt.
-            validator: (_, wert: Zeitraum | null | undefined) =>
-              wert?.[0] && wert?.[1]
-                ? Promise.resolve()
-                : Promise.reject(new Error('Bitte Beginn und Ende angeben')),
-          },
-        ]}
+        rules={[ZEITRAUM_REGEL]}
       >
         <ZeitraumEingabe placeholder={['Beginn', 'Ende']} style={{ width: '100%' }} />
       </Form.Item>
@@ -441,10 +414,10 @@ export function ZeitfensterDialog({
           // Einmal am ersten Feld, sichtbar statt Tooltip: am Tablet gibt es kein Hover (LFH-948).
           <>
             <div>EP = Essensportionen</div>
-            <div>{vorschlagHilfe(vorschlag.kraefte, anlegen)}</div>
+            <div>{vorschlagHilfe(vorschlag.kraefte, true)}</div>
           </>
         }
-        rules={[{ required: true, message: 'Bitte eine Anzahl angeben — 0, wenn niemand' }]}
+        rules={[BEDARF_REGEL]}
       >
         <InputNumber
           min={0}
@@ -456,8 +429,8 @@ export function ZeitfensterDialog({
       <Form.Item<ZeitfensterWerte>
         name="bedarf_betreute"
         label="Betreute (EP)"
-        extra={vorschlagHilfe(vorschlag.betreute, anlegen)}
-        rules={[{ required: true, message: 'Bitte eine Anzahl angeben — 0, wenn niemand' }]}
+        extra={vorschlagHilfe(vorschlag.betreute, true)}
+        rules={[BEDARF_REGEL]}
       >
         <InputNumber
           min={0}
@@ -504,10 +477,7 @@ export function ZeitfensterDialog({
         </>,
         { offen: stellenOffen, setOffen: setStellenOffen },
       )}
-      <SpeicherFehler
-        fehler={fehler}
-        titel={anlegen ? 'Zeitfenster konnte nicht angelegt werden' : 'Bedarf nicht gespeichert'}
-      />
+      <SpeicherFehler fehler={fehler} titel="Zeitfenster konnte nicht angelegt werden" />
     </ErfassungsModal>
   );
 }

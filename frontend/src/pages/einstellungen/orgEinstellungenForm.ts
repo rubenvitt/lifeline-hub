@@ -5,7 +5,7 @@ import type {
   Koordinatenformat,
   OrgEinstellungen,
   OrgEinstellungenUpdate,
-  Zeitformat,
+  Zeitdarstellung,
 } from '../../api/types';
 import { KATEGORIEN } from '../../aufbewahrung/kategorieText';
 
@@ -22,7 +22,7 @@ import { KATEGORIEN } from '../../aufbewahrung/kategorieText';
 /** Anzeige-Sektion: Darstellungs-Defaults + Geocoder. */
 export interface FormWerteAnzeige {
   zeitzone?: string;
-  zeitformat?: Zeitformat;
+  zeitdarstellung?: Zeitdarstellung;
   einheiten?: EinheitenSystem;
   koordinatenformat?: Koordinatenformat;
   geocoder_url?: string;
@@ -55,7 +55,7 @@ export interface KategorieFormWert {
 export function zuUpdate(e: OrgEinstellungen): OrgEinstellungenUpdate {
   return {
     zeitzone: e.zeitzone ?? null,
-    zeitformat: e.zeitformat ?? null,
+    zeitdarstellung: e.zeitdarstellung ?? null,
     einheiten: e.einheiten ?? null,
     koordinatenformat: e.koordinatenformat ?? null,
     retention_dauer_tage: e.retention_dauer_tage ?? null,
@@ -78,11 +78,11 @@ export function normalisiereAnzeige(
   w: FormWerteAnzeige,
 ): Pick<
   OrgEinstellungenUpdate,
-  'zeitzone' | 'zeitformat' | 'einheiten' | 'koordinatenformat' | 'geocoder_url'
+  'zeitzone' | 'zeitdarstellung' | 'einheiten' | 'koordinatenformat' | 'geocoder_url'
 > {
   return {
     zeitzone: w.zeitzone?.trim() || null,
-    zeitformat: w.zeitformat ?? null,
+    zeitdarstellung: w.zeitdarstellung ?? null,
     einheiten: w.einheiten ?? null,
     koordinatenformat: w.koordinatenformat ?? null,
     geocoder_url: w.geocoder_url?.trim() || null,
@@ -141,7 +141,7 @@ export function kategorieVorgaben(kategorien: FormWerteEinsatz['kategorien']): K
 export function initialAnzeige(e: OrgEinstellungen): FormWerteAnzeige {
   return {
     zeitzone: e.zeitzone ?? undefined,
-    zeitformat: e.zeitformat ?? undefined,
+    zeitdarstellung: e.zeitdarstellung ?? undefined,
     einheiten: e.einheiten ?? undefined,
     koordinatenformat: e.koordinatenformat ?? undefined,
     geocoder_url: e.geocoder_url ?? undefined,

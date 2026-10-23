@@ -453,7 +453,7 @@ describe('BefehlDetailPage — Zeitstand (LFH-350 · H60)', () => {
     renderMitZone(7);
 
     // 12:00 UTC → 14:00 Sommerzeit in Berlin.
-    expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
+    expect(await screen.findByText('Zeitstand: 251400jul26')).toBeInTheDocument();
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });

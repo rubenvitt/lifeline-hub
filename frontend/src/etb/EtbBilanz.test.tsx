@@ -107,7 +107,7 @@ describe('EtbBilanz', () => {
         e({ id: 1, lfd_nr: 5 }),
       ],
     });
-    const link = screen.getByRole('link', { name: /Nr\. 9 berichtigt Nr\. 5 um \d{2}:\d{2}/ });
+    const link = screen.getByRole('link', { name: /Nr\. 9 berichtigt Nr\. 5 um \d{4}/ });
     expect(link).toHaveAttribute('href', '/einsaetze/7/etb?eintrag=2');
   });
 

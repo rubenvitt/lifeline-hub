@@ -27,7 +27,7 @@ const BASIS = {
   karten_zoom_start: null,
   fachebenen_sichtbar: null,
   zeitzone: null,
-  zeitformat: null,
+  zeitdarstellung: null,
   einheiten: null,
   koordinatenformat: null,
   etb_nummer_praefix: null,

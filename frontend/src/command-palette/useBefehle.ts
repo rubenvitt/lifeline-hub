@@ -7,6 +7,7 @@ import { useDichte, useHelligkeit, useThemeMode } from '../theme/ThemeModeProvid
 import { listeEinsaetze, ladeModulFreigaben, ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
+import { setzeZeitdarstellung } from '../anzeige/zeitDarstellungStore';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { baueBefehle } from './befehle';
 import { leseZuletztModule, merkeModulBesuch } from '../einsatz/zuletztModule';
@@ -113,6 +114,7 @@ export function useBefehle(
         setDichte,
         setHelligkeit,
         setKoordinaten: setzeOverride,
+        setZeitdarstellung: setzeZeitdarstellung,
         logout: () => {
           void logout();
         },

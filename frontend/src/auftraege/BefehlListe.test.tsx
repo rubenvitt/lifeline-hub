@@ -317,7 +317,7 @@ describe('BefehlListe — Zeitstand (LFH-350 · H60)', () => {
     await waitFor(() =>
       expect(container.querySelector('[data-lfh="komm-karte-zeit"]')).toHaveTextContent('1400'),
     );
-    expect(await screen.findByText('251400JUL2026')).toBeInTheDocument();
+    expect(await screen.findByText('251400jul26')).toBeInTheDocument();
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });

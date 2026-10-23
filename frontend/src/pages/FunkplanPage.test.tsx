@@ -1477,7 +1477,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     await waitFor(() => expect(legeLageberichtAn).toHaveBeenCalledTimes(1));
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text;
     expect(text).toContain('## Kommunikationsskizze');
-    expect(text).toMatch(/\*\*Gültig ab:\*\* \d{6}[A-Z]{3}\d{4}/);
+    expect(text).toMatch(/\*\*Gültig ab:\*\* \d{6}[a-z]{3}\d{2}/);
     expect(text).toMatch(/TMO 311: .*ILS Musterhausen \(geplant\)/);
     expect(text).not.toContain('0221 112');
   });

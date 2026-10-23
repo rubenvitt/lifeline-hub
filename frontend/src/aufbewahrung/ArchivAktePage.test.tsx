@@ -301,7 +301,7 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
       ),
     );
     // 01.06. 18:00 UTC → 20:00 in Berlin (Sommerzeit).
-    expect(await screen.findByText('012000JUN2026')).toBeInTheDocument();
+    expect(await screen.findByText('012000jun26')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Frist ändern' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('textbox', { name: 'Neue Aufbewahrungsfrist' })).toHaveValue(
@@ -323,7 +323,7 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
       ),
     );
     // 01.06. 18:00 UTC → 14:00 in New York (EDT).
-    expect(await screen.findByText('011400JUN2026')).toBeInTheDocument();
+    expect(await screen.findByText('011400jun26')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Frist ändern' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('textbox', { name: 'Neue Aufbewahrungsfrist' })).toHaveValue(

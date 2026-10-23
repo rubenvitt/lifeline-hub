@@ -4,6 +4,7 @@ import type {
   EinsatzAnzeige,
   ModulFreigaben,
   Koordinatenformat,
+  Zeitdarstellung,
 } from '../api/types';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
@@ -197,6 +198,8 @@ export interface BefehlKontext {
   /** Setzt die gewählte Helligkeit (LFH-397); die Warnsperre gilt im Provider. */
   setHelligkeit: (h: Helligkeit) => void;
   setKoordinaten: (f: Koordinatenformat) => void;
+  /** Zeitdarstellung dieses Geräts (LLH-1053); `null` folgt wieder Einsatz und Organisation. */
+  setZeitdarstellung: (z: Zeitdarstellung | null) => void;
   logout: () => void;
   tastaturAktionen?: TastaturAktionen;
   userAgent?: string;

@@ -28,7 +28,7 @@ const VOLL = {
   karten_zoom_start: 12,
   fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
   zeitzone: 'Europe/Berlin',
-  zeitformat: '12h',
+  zeitdarstellung: 'datum_uhrzeit',
   einheiten: 'imperial',
   koordinatenformat: 'mgrs',
   etb_nummer_praefix: 'EB-',
@@ -58,7 +58,7 @@ describe('zuUpdate', () => {
       karten_zoom_start: 12,
       fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
       zeitzone: 'Europe/Berlin',
-      zeitformat: '12h',
+      zeitdarstellung: 'datum_uhrzeit',
       einheiten: 'imperial',
       koordinatenformat: 'mgrs',
       etb_nummer_praefix: 'EB-',
@@ -152,7 +152,7 @@ describe('normalisiereAllgemein', () => {
     expect(normalisiereAllgemein({ zeitzone: '  Europe/Berlin  ', standard_modul: '' })).toEqual({
       standard_modul: null,
       zeitzone: 'Europe/Berlin',
-      zeitformat: null,
+      zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: null,
     });
@@ -222,7 +222,7 @@ describe('initial* (Umkehr fuer die Formularvorbelegung)', () => {
     expect(initialAllgemein(VOLL)).toEqual({
       standard_modul: 'etb',
       zeitzone: 'Europe/Berlin',
-      zeitformat: '12h',
+      zeitdarstellung: 'datum_uhrzeit',
       einheiten: 'imperial',
       koordinatenformat: 'mgrs',
     });

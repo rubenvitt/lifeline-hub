@@ -65,15 +65,15 @@ describe('NachforderungKarte — Zeiten in der Anzeigezone (LFH-913)', () => {
         eingetroffen_at: '2026-06-12 09:30:00',
       }),
     );
-    expect(screen.getByText('Angefordert: 121100JUN2026')).toBeInTheDocument();
-    expect(screen.getByText('Zugesagt: 121110JUN2026')).toBeInTheDocument();
-    expect(screen.getByText('Unterwegs: 121120JUN2026')).toBeInTheDocument();
-    expect(screen.getByText('Eingetroffen: 121130JUN2026')).toBeInTheDocument();
+    expect(screen.getByText('Angefordert: 121100jun26')).toBeInTheDocument();
+    expect(screen.getByText('Zugesagt: 121110jun26')).toBeInTheDocument();
+    expect(screen.getByText('Unterwegs: 121120jun26')).toBeInTheDocument();
+    expect(screen.getByText('Eingetroffen: 121130jun26')).toBeInTheDocument();
   });
 
   it('Ablehnung als Berliner Zeit', () => {
     zeige(nf({ status: 'abgelehnt', ist_offen: false, abgelehnt_at: '2026-06-12 09:40:00' }));
-    expect(screen.getByText('Abgelehnt (121140JUN2026)')).toBeInTheDocument();
+    expect(screen.getByText('Abgelehnt (121140jun26)')).toBeInTheDocument();
   });
 });
 
@@ -151,6 +151,42 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
     expect(knopf).toHaveAccessibleDescription('Keine Berechtigung');
     await userEvent.click(knopf);
     expect(onMaterialUebernehmen).not.toHaveBeenCalled();
+  });
+
+  // LLH-1259 D5: neben der Übernahme der zweite Weg für schon von Hand erfasstes Material.
+  it('„Erfassten Posten zuordnen …“ neben der Übernahme, der Klick meldet die Nachforderung', async () => {
+    const onPostenZuordnen = vi.fn();
+    const { unmount } = zeigeKarte({
+      darfSchreiben: true,
+      onMaterialUebernehmen: vi.fn(),
+      onPostenZuordnen,
+    });
+    expect(screen.getByRole('button', { name: 'Als Material übernehmen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassten Posten zuordnen …' }));
+    expect(onPostenZuordnen).toHaveBeenCalledWith(1);
+    unmount();
+    // Auch mit übernommenem Posten (dann als Ergänzung), nie ohne Schreibrecht oder bei Sperre.
+    const zweite = zeigeKarte({
+      nachforderung: eingetroffen({ material_ids: [7] }),
+      darfSchreiben: true,
+      onPostenZuordnen: vi.fn(),
+    });
+    expect(screen.getByRole('button', { name: 'Erfassten Posten zuordnen …' })).toBeInTheDocument();
+    zweite.unmount();
+    const dritte = zeigeKarte({ onPostenZuordnen: vi.fn() });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
+    dritte.unmount();
+    zeigeKarte({ darfSchreiben: true, materialGesperrt: true, onPostenZuordnen: vi.fn() });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
+  });
+
+  it('keine Zuordnung, sobald eine Einheit übernommen ist (Material und Einheit schließen sich aus)', () => {
+    zeigeKarte({
+      nachforderung: eingetroffen({ einheit_ids: [11] }),
+      darfSchreiben: true,
+      onPostenZuordnen: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
   });
 
   it('zeigt je Posten Bezeichnung, Menge und Ort, die übernommene Menge und den Sprung', async () => {

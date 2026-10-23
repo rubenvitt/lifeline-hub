@@ -84,7 +84,7 @@ test('„Neuer Lagevortrag“ legt mit einem POST an und öffnet den Entwurf', a
   // Die Marke steht an den fünf Abschnitten mit Quelle, in Fassung 1 nicht auffällig.
   const marken = page.locator('[data-lfh="uebernahme-stand"]');
   await expect(marken).toHaveCount(MIT_QUELLE.length);
-  await expect(marken.first()).toHaveText(/^Stand der Übernahme \d{6}[A-ZÄ]{3}\d{4}$/);
+  await expect(marken.first()).toHaveText(/^Stand der Übernahme \d{6}[a-z]{3}\d{2}$/);
   await expect(page.getByRole('textbox', { name: 'Auftrag' })).toHaveValue('');
   // Nichts mehr leer, was eine Quelle hat: kein Sammelknopf.
   await expect(
@@ -199,5 +199,5 @@ test('die Übersicht zeigt die jüngste Freigabe vorn, Fortschreiben öffnet die
   // Der Stand der Übernahme kommt mit und ist auffällig: er stammt aus der Vorfassung.
   const marke = page.locator('[data-lfh="uebernahme-stand"]');
   await expect(marke).toHaveCount(1);
-  await expect(marke).toHaveText(/Stand der Übernahme 01\d{4}JAN2026 · aus der Vorfassung/);
+  await expect(marke).toHaveText(/Stand der Übernahme 01\d{4}jan26 · aus der Vorfassung/);
 });

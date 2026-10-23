@@ -32,7 +32,7 @@ const EINSTELLUNGEN = {
   karten_zoom_start: null,
   fachebenen_sichtbar: null,
   zeitzone: null,
-  zeitformat: null,
+  zeitdarstellung: null,
   einheiten: null,
   koordinatenformat: null,
   etb_nummer_praefix: null,
@@ -174,8 +174,8 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
       { route: '/einsaetze/1/einstellungen/allgemein', datenRouter: true },
     );
 
-    await nutzer.click(await screen.findByLabelText('Zeitformat'));
-    await nutzer.click(await screen.findByTitle('12 Stunden (AM/PM)'));
+    await nutzer.click(await screen.findByLabelText('Zeitdarstellung'));
+    await nutzer.click(await screen.findByTitle('Datum und Uhrzeit (10.10.26 14:30)'));
     await nutzer.click(screen.getByRole('tab', { name: 'Verhalten & Automatik' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
@@ -185,7 +185,7 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
     // Der gewählte Wert steht weiter im Feld (nicht nur als Option in der Auswahlliste).
     expect(
       screen
-        .getAllByTitle('12 Stunden (AM/PM)')
+        .getAllByTitle('Datum und Uhrzeit (10.10.26 14:30)')
         .some((el) => el.closest('.ant-select-dropdown') == null),
     ).toBe(true);
 

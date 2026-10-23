@@ -755,7 +755,7 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Kategorie`,
     );
     await pruefe(
-      // Verfasser · Zeitpunkt (DTG, z. B. „222020SEP2026" — ohne Doppelpunkt).
+      // Verfasser · Zeitpunkt (DTG, z. B. „222020sep26" — ohne Doppelpunkt).
       zeile.getByText(/^Administrator · /),
       KONTRAST_ZIEL[modus],
       `${modus}/Abgelegt`,

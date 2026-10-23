@@ -1836,10 +1836,10 @@ describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => 
     mockEndpunkte({ personen: [person('sk3')], lageberichte: [lagebericht] });
     renderMitZone();
     await kennzahlGeladen('Betroffene');
-    // 12:00 UTC → 14:00 Sommerzeit in Berlin; ein anderer Tag trägt den Tag voran.
+    // 12:00 UTC → 1400 Sommerzeit in Berlin; ein anderer Tag trägt den Tag voran (taktisch).
     const zelle = await waitFor(() => {
       const z = kennzahl('Lagebericht', 'Führungsstand');
-      expect(z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('25. 14:00');
+      expect(z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('251400');
       return z;
     });
     expect(zelle).toHaveTextContent('Freigegeben · Lage 14:00');

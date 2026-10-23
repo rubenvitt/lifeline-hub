@@ -9,7 +9,7 @@ describe('formatZeit', () => {
   it('parst UTC und gibt taktische DTG lokal zurück (TZ-robust)', () => {
     const wire = '2026-06-11 09:00:00';
     const d = dayjs.utc(wire).local();
-    const erwartet = `${d.format('DDHHmm')}JUN${d.format('YYYY')}`;
+    const erwartet = `${d.format('DDHHmm')}jun${d.format('YY')}`;
     expect(formatZeit(wire, DEFAULT_KONVENTIONEN)).toBe(erwartet);
   });
 
@@ -40,10 +40,11 @@ describe('formatZeitKurz', () => {
 });
 
 describe('formatZeit mit Konvention', () => {
-  it('wendet die Zeitzone an, ignoriert aber 12h (taktisch immer 24h)', () => {
+  it('wendet Zeitzone und Zeitdarstellung an (LLH-1053)', () => {
     const wire = '2026-06-11 15:00:00'; // 15:00 UTC → 17:00 Berlin
-    expect(formatZeit(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' })).toBe(
-      '111700JUN2026',
+    expect(formatZeit(wire, { zeitzone: 'Europe/Berlin' })).toBe('111700jun26');
+    expect(formatZeit(wire, { zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' })).toBe(
+      '11.06.26 17:00',
     );
   });
 });

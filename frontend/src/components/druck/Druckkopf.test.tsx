@@ -104,7 +104,7 @@ describe('Druckkopf', () => {
     );
     await screen.findByText('DRK Kreisverband Musterstadt');
     // 12:30 UTC = 21:30 in Tokio. Weder 1230 (UTC) noch die Zone der Testmaschine.
-    expect(within(kopf()).getByText('162130JUL2026')).toBeInTheDocument();
+    expect(within(kopf()).getByText('162130jul26')).toBeInTheDocument();
   });
 
   /**
@@ -139,12 +139,12 @@ describe('Druckkopf', () => {
       { client },
     );
     await screen.findByText('DRK Kreisverband Musterstadt');
-    expect(within(kopf()).getByText('162130JUL2026')).toBeInTheDocument();
+    expect(within(kopf()).getByText('162130jul26')).toBeInTheDocument();
 
     // 15:45 UTC = 00:45 am Folgetag in Tokio.
     vi.setSystemTime(new Date('2026-07-16T15:45:00Z'));
     window.dispatchEvent(new Event('beforeprint'));
-    expect(within(kopf()).getByText('170045JUL2026')).toBeInTheDocument();
+    expect(within(kopf()).getByText('170045jul26')).toBeInTheDocument();
   });
 
   it('ist bei sichtbarkeit="druck" am Bildschirm per Klasse verborgen, bei "immer" nicht', async () => {

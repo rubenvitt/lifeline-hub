@@ -6,7 +6,7 @@ import type {
   EinstellungenUpdate,
   FachebenenSichtbar,
   Koordinatenformat,
-  Zeitformat,
+  Zeitdarstellung,
 } from '../../api/types';
 
 /**
@@ -23,7 +23,7 @@ import type {
 export interface FormWerteAllgemein {
   standard_modul?: string;
   zeitzone?: string;
-  zeitformat?: Zeitformat;
+  zeitdarstellung?: Zeitdarstellung;
   einheiten?: EinheitenSystem;
   koordinatenformat?: Koordinatenformat;
 }
@@ -67,7 +67,7 @@ export function zuUpdate(e: EinsatzEinstellungen): EinstellungenUpdate {
     // (`FachebenenSichtbar` in `api/types.ts`).
     fachebenen_sichtbar: (e.fachebenen_sichtbar as FachebenenSichtbar | null) ?? null,
     zeitzone: e.zeitzone ?? null,
-    zeitformat: e.zeitformat ?? null,
+    zeitdarstellung: e.zeitdarstellung ?? null,
     einheiten: e.einheiten ?? null,
     koordinatenformat: e.koordinatenformat ?? null,
     etb_nummer_praefix: e.etb_nummer_praefix ?? null,
@@ -89,12 +89,12 @@ export function normalisiereAllgemein(
   w: FormWerteAllgemein,
 ): Pick<
   EinstellungenUpdate,
-  'standard_modul' | 'zeitzone' | 'zeitformat' | 'einheiten' | 'koordinatenformat'
+  'standard_modul' | 'zeitzone' | 'zeitdarstellung' | 'einheiten' | 'koordinatenformat'
 > {
   return {
     standard_modul: w.standard_modul || null,
     zeitzone: w.zeitzone?.trim() || null,
-    zeitformat: w.zeitformat ?? null,
+    zeitdarstellung: w.zeitdarstellung ?? null,
     einheiten: w.einheiten ?? null,
     koordinatenformat: w.koordinatenformat ?? null,
   };
@@ -146,7 +146,7 @@ export function initialAllgemein(e: EinsatzEinstellungen): FormWerteAllgemein {
   return {
     standard_modul: e.standard_modul ?? undefined,
     zeitzone: e.zeitzone ?? undefined,
-    zeitformat: e.zeitformat ?? undefined,
+    zeitdarstellung: e.zeitdarstellung ?? undefined,
     einheiten: e.einheiten ?? undefined,
     koordinatenformat: e.koordinatenformat ?? undefined,
   };

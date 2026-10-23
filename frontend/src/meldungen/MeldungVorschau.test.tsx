@@ -114,6 +114,26 @@ describe('MeldungVorschau (LFH-664)', () => {
     expect(link).toHaveAttribute('href', '/einsaetze/5/auftraege?auftrag=33');
   });
 
+  // LLH-1402: Die Vorschau ist die Karte der Seite, also trägt sie auch die Marke aus LLH-1382.
+  it('zeigt an einer berichtigten Meldung die Marke „berichtigt“ mit Sprung ins ETB', async () => {
+    meldungenHandler([meldung({ etb_berichtigung_id: 41, etb_berichtigung_lfd_nr: 9 })]);
+    renderMitProviders(<MeldungVorschau einsatzId={5} id={21} />);
+
+    const link = await screen.findByRole('link', { name: 'Berichtigung im ETB, Nr. 9' });
+    expect(link).toHaveAttribute('href', '/einsaetze/5/etb?eintrag=41');
+    expect(screen.getByText('berichtigt')).toBeInTheDocument();
+    expect(screen.getByText('Deich instabil')).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Berichtigung keine Marke', async () => {
+    meldungenHandler([meldung()]);
+    renderMitProviders(<MeldungVorschau einsatzId={5} id={21} />);
+
+    await screen.findByText('Deich instabil');
+    expect(screen.queryByText('berichtigt')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Berichtigung/ })).not.toBeInTheDocument();
+  });
+
   it('sagt, dass die Meldung nicht mehr vorhanden ist', async () => {
     meldungenHandler([meldung({ id: 20, inhalt: 'Andere Meldung' })]);
     renderMitProviders(<MeldungVorschau einsatzId={5} id={21} />);

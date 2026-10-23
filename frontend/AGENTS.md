@@ -59,6 +59,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `Schnellerfassungszeile` · `Datenraster`/`Datenfeld` (statt `Descriptions`) ·
   `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
   `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
+  `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
+  einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
   Dashboard-Baukasten (unten).
@@ -191,6 +193,40 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   im Detail; gewählt ist `auswahlFlaeche` ohne Linie (`KommKarte` `gewaehlt`). Ein Dokument wird
   weiter auf der Vollseite geschrieben. Vorbild Aufträge/Befehle; Einsatzabschnitte und Gefahren
   sind ältere Einzelbauten.
+
+**Bearbeiten in der Ansicht** (LLH-1139, Spec `formularseiten`, „Eine offene Bearbeitung je
+Ansicht“; schreibt LFH-19 und LFH-979 fort)
+
+1. **Ein bestehender Datensatz wird in seiner Ansicht bearbeitet**, nie in einem Formular, das die
+   Ansicht ersetzt oder verdeckt. Modal und Drawer bleiben fürs **Anlegen** (Erfassungs-Norm,
+   Feldbudget) und für kurze blockierende Aktionen.
+2. **Drei Stufen nach Umfang:** **Einzelwert** (Status, Lagezustand, Führer, Frist) über
+   `InlineAngabe`/`BemerkungZelle` am Wert, speichert sofort genau dieses Feld · **Paneel**
+   (zusammengehörige Werte, „Funk“, „Personendaten“) über `components/instrument/BearbeitbaresPaneel`
+   Modus `paneel`: „Bearbeiten“ im Paneelkopf schaltet nur dieses Paneel auf Eingaben, Speichern
+   und Abbrechen im Paneelfuß · **ganze Ansicht** nur, wo Felder fachlich zusammen geprüft werden
+   (Befehlsschema, Tier/Schaden), Modus `ansicht` mit Speichern-Leiste. Eine Karte, die selbst die
+   Ansicht eines Datensatzes ist, nimmt ebenfalls `ansicht` (Vorbild Verpflegung,
+   `verpflegung/ZeitfensterBearbeiten.tsx`).
+3. **Höchstens eine offene Bearbeitung je Seite** (ein Paneel oder die ganze Ansicht; ein
+   Einzelfeld zählt mit, sobald es einen Entwurf hat): jedes weitere „Bearbeiten“ ist gesperrt mit
+   „Erst „Titel“ speichern oder abbrechen“, sichtbar am Element. Getragen vom Merker
+   `components/offeneBearbeitung.tsx` (ein Paneel belegt die Seite beim Öffnen, die Rückfrage vor
+   dem Verlassen kommt erst mit einer Änderung); ohne Merker der Seite legt der Baustein seinen
+   eigenen an. Jede offene Bearbeitung trägt CAS über `useEditSitzung`.
+4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
+   Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
+   übernehmen“ / „Verwerfen und neu laden“.
+5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
+   `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
+   beim Schließen zurück auf „Bearbeiten“.
+6. **Jede bearbeitbare Detailansicht hat eine Item-Route** („Deeplink-Muster“).
+7. **Nach dem Anlegen springt die Seite in die neue Ansicht** (Vorbild Befehl), nicht zurück in
+   die Liste mit erneutem Öffnen.
+
+Kein Fach-Modul baut einen zweiten Baustein dafür; die Seiten stellen ihre Fach-Tickets um
+(Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte,
+Bereitstellungsraum, Betreuung).
 
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →
@@ -687,6 +723,22 @@ anwendbar), „nicht geprüft" ist keins.
   Kalenderzellen oder Format-Strings. Falle: antds `Input` baut sein Gerüst um, sobald ein Präfix
   oder Suffix kommt oder geht, und das Feld verliert mitten im Tippen den Fokus — das Suffix der
   Deutung steht deshalb immer im DOM.
+- **Zeitdarstellung** (LLH-1053, Spec `zeitdarstellung`, Entscheidungen E1–E4 aus LLH-1045): eine
+  Zeit für Menschen formatiert nur `anzeige/zeitDarstellung.ts`, in drei Rollen — `zeitpunkt`
+  (`101430okt26` bzw. `10.10.26 14:30`), `zeitKurz` (heute `1430`, sonst `091430` bzw. `14:30` /
+  `09.10. 14:30`) und `uhrzeit` (`1430` bzw. `14:30`, nur wo der Tag aus dem Zusammenhang folgt);
+  in Komponenten über `ZeitAnzeige rolle=…` oder die gebundenen Rollen aus
+  `useAnzeigeKonventionen()`. Die volle DTG schreibt Monat klein ohne Umlaut und das Jahr
+  zweistellig (FwDV/DV 810, Ausgabe 2018, Teil I 5.1.1.12). Die Darstellung (`taktisch`,
+  Vorgabe, oder `datum_uhrzeit`) steht in den Konventionen; wirksam ist Gerät vor Einsatz vor
+  Organisation vor Vorgabe (`wirksameZeitdarstellung`), die Gerätewahl liegt in
+  `anzeige/zeitDarstellungStore.ts` (Profil „Darstellung auf diesem Gerät“, Sprungpalette).
+  **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
+  sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
+  `.format('…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/` (Maschinenformate ab
+  `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts` mit Schuldmenge
+  `OFFEN`, die nur schrumpft (Abbau LLH-1061). Die alten Namen in `anzeige/format.ts`
+  (`formatZeit`, `formatUhrzeit` …) sind veraltete Weiterleitungen auf die Rollen.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
@@ -851,7 +903,10 @@ und `pages/personen/`.
 - **Eine Speichern-Leiste je Seite, und sie speichert jedes Feld der Seite** (LFH-979, Spec
   `formularseiten`): kein zweites `<Form>` mit eigenem Knopf daneben; ein PATCH schickt nur die
   geänderten Felder, der Toast nennt genau sie. Sofort wirkende Wege (Logo, Modulzeilen) sind
-  keine Felder.
+  keine Felder. **Gilt für Formularseiten** (Einstellungen, Stammdaten-Detail); in einer Ansicht
+  gilt stattdessen „höchstens eine offene Bearbeitung je Seite“ (LLH-1139, „Bearbeiten in der
+  Ansicht“ unter der UI-Form-Leitlinie): ein Paneel mit eigenem Fuß ist dort kein zweiter
+  Speicherweg.
 - **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
   `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
   `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei
@@ -1000,6 +1055,12 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   befehl, person, tier, schaden, einheiten, personal), sonst **Query-Param** `?<modul>=<id>`
   (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB `?eintrag=`);
   `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
+- **Jede Detailansicht, die bearbeitet werden kann, hat eine Item-Route** (LLH-1139, „Bearbeiten
+  in der Ansicht“): eine offene Bearbeitung braucht eine Adresse, auf die Verlassen-Schutz,
+  Brotkrume und Lesezeichen zeigen. Ein Query-Param bleibt Auswahl oder Zeilenmarke in einer Liste
+  und leitet, wo er eine Ansicht meint, auf die Route weiter (`?einheit=` wie unten). Die Route
+  entsteht mit dem Fach-Ticket, das die Ansicht bearbeitbar macht; offen ist sie für den
+  Einsatzabschnitt (`?abschnitt=` wählt heute im Detailpaneel).
 - **Zwei Bestands-Params neben einer Item-Route** (LLH-1060 D2): `?einheit=` an der
   Einheitenliste leitet auf `einheitDetailPfad` weiter (am Meldebild ist `?einheit=` ein Auftrag,
   `kraefteuebersichtPfad`, LLH-1049). `?personal=` bleibt **Zeilenmarke** der Personalliste

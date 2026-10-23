@@ -63,7 +63,7 @@ describe('FachebeneStand (LFH-591)', () => {
       <FachebeneStand quelle="hochwasser" abgerufen={ortszeit(30, 14, 30)} form="voll" />,
     );
     expect(screen.getByText(/Stand/).closest('[data-lfh="fachebene-stand"]')).toHaveTextContent(
-      /^Stand 301430SEP2026$/,
+      /^Stand 301430sep26$/,
     );
   });
 

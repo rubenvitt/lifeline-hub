@@ -60,7 +60,7 @@ describe('AuftragDruckPage', () => {
     expect(kopf()).toHaveTextContent('Hochwasser Nord');
     expect(kopf()).toHaveTextContent('E-2026-0005');
     // Stand als taktische DTG des Abrufs, in der Zone der Organisation.
-    expect(kopf().textContent).toMatch(/Stand\s*\d{6}[A-Z]{3}\d{4}/);
+    expect(kopf().textContent).toMatch(/Stand\s*\d{6}[a-z]{3}\d{2}/);
     expect(
       within(wurzeln[0] as HTMLElement).getByRole('heading', { level: 3, name: 'Quittung' }),
     ).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe('AuftragDruckPage', () => {
     // Statt „nicht quittiert“ steht jetzt der Zeitpunkt der Quittung als DTG (Minute 15, die
     // Stunde hängt an der Zone der Test-Umgebung).
     const wert = screen.getByText('Logistiktrupp', { selector: 'dt' }).nextElementSibling;
-    expect(wert?.textContent).toMatch(/^11\d{2}15JUN2026$/);
+    expect(wert?.textContent).toMatch(/^11\d{2}15jun26$/);
   });
 
   it('unbekannter Auftrag: „nicht gefunden“ mit Rückweg, kein Druck', async () => {
