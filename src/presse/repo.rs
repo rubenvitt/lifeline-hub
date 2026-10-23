@@ -135,12 +135,14 @@ pub async fn liste(
 
 /// Medienkontakte einer Phase (LFH-1075, D8): `Offen` alle offenen, `Abgeschlossen` die übrigen
 /// seitenweise ab dem Cursor ([`crate::kommunikation::Seite`]). Beide nach Eingang absteigend,
-/// Gleichstand über die Kennung, wie [`liste`] innerhalb einer Phase.
+/// Gleichstand über die Kennung, wie [`liste`] innerhalb einer Phase. `arten` engt auf diese Arten
+/// ein (leer: alle), im SQL vor dem `LIMIT` (LLH-1096), damit Seiten und Cursor stimmen.
 pub async fn liste_phase(
     pool: &SqlitePool,
     einsatz_id: i64,
     phase: crate::kommunikation::ListenPhase,
     seite: Option<&crate::kommunikation::Seite>,
+    arten: &[MedienkontaktArt],
 ) -> Result<Vec<MedienkontaktAnzeige>, AppError> {
     use crate::kommunikation::ListenPhase;
     let mut q = String::from(kontakt_select!());
@@ -149,6 +151,11 @@ pub async fn liste_phase(
         ListenPhase::Offen => " AND m.status = 'offen'",
         ListenPhase::Abgeschlossen => " AND m.status <> 'offen'",
     });
+    if !arten.is_empty() {
+        q.push_str(" AND m.art IN (");
+        q.push_str(&vec!["?"; arten.len()].join(", "));
+        q.push(')');
+    }
     let seite = seite.filter(|_| phase == ListenPhase::Abgeschlossen);
     if seite.is_some_and(|s| s.vor.is_some()) {
         q.push_str(" AND (m.eingang_at < ? OR (m.eingang_at = ? AND m.id < ?))");
@@ -158,6 +165,9 @@ pub async fn liste_phase(
         q.push_str(" LIMIT ?");
     }
     let mut query = sqlx::query_as::<_, Zeile>(sqlx::AssertSqlSafe(&*q)).bind(einsatz_id);
+    for art in arten {
+        query = query.bind(art.as_str());
+    }
     if let Some(seite) = seite {
         if let Some(vor) = &seite.vor {
             query = query

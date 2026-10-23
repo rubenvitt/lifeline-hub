@@ -8,6 +8,8 @@ import KatalogTabelle, {
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
 import { useViewport } from '../components/useViewport';
+import { nachText, nachZahl, werteAus } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -38,6 +40,12 @@ export default function MaterialTab() {
 
   const dienststatusMutation = useDienststatusMutation(setzeDienststatus, globalKeys.material());
 
+  const posten = materialQuery.data ?? [];
+  // Kategorie und Träger filtern mit den Werten der Zeilen (LLH-1096); ohne Wert kein Trichter.
+  const kategorieWerte = werteAus(posten, (m) => m.kategorie);
+  const traegerWerte = werteAus(posten, (m) => m.traegerorganisation);
+  const artFolge = Object.keys(ART_LABEL) as MaterialArt[];
+
   // Gleiche Bauform wie Fahrzeuge und Personal (LFH-980): Träger fällt unter `lg` weg, der
   // Spaltenschalter zählt ihn.
   const spalten: KatalogSpalte<Material>[] = [
@@ -64,24 +72,31 @@ export default function MaterialTab() {
         </Space>
       ),
     },
-    { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie', render: (t) => t ?? '—' },
+    {
+      title: 'Kategorie',
+      dataIndex: 'kategorie',
+      key: 'kategorie',
+      sorter: nachText((m: Material) => m.kategorie),
+      filters: kategorieWerte.length > 0 ? kategorieWerte : undefined,
+      onFilter: (wert, m) => m.kategorie === wert,
+      render: (t) => t ?? '—',
+    },
     {
       // Art des Stamms (LLH-1224): Vorgabe jeder neuen Disposition. Filterwerte fest aus dem
       // Wire-Enum, nicht aus den geladenen Zeilen (Begründung in `SprechgruppenTab`).
       title: 'Art',
       dataIndex: 'art',
       key: 'art',
-      filters: (Object.keys(ART_LABEL) as MaterialArt[]).map((a) => ({
-        text: ART_LABEL[a],
-        value: a,
-      })),
+      filters: artFolge.map((a) => ({ text: ART_LABEL[a], value: a })),
       onFilter: (wert, m) => m.art === wert,
+      sorter: nachZahl((m: Material) => artFolge.indexOf(m.art)),
       render: (a: MaterialArt) => ART_LABEL[a],
     },
     {
       title: 'Bestandsnummer',
       dataIndex: 'bestandsnummer',
       key: 'bestandsnummer',
+      sorter: nachText((m: Material) => m.bestandsnummer),
       render: (t) => (t ? <span style={monoStil(13)}>{t}</span> : '—'),
     },
     {
@@ -89,6 +104,9 @@ export default function MaterialTab() {
       dataIndex: 'traegerorganisation',
       key: 'traeger',
       abBreite: 'lg',
+      sorter: nachText((m: Material) => m.traegerorganisation),
+      filters: traegerWerte.length > 0 ? traegerWerte : undefined,
+      onFilter: (wert, m) => m.traegerorganisation === wert,
       render: (t) => t ?? '—',
     },
     ...dienststatusSpalten<Material>({
@@ -102,6 +120,11 @@ export default function MaterialTab() {
       },
     }),
   ];
+
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt die Reihenfolge des Servers.
+  const gedaechtnis = useListenGedaechtnis('stammdaten-material', spalten, {
+    ausDaten: ['kategorie', 'traeger'],
+  });
 
   return (
     <AdminPage
@@ -144,8 +167,10 @@ export default function MaterialTab() {
         <KatalogTabelle
           rowKey="id"
           loading={materialQuery.isLoading}
-          dataSource={materialQuery.data ?? []}
+          dataSource={posten}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Posten"
           locale={{ emptyText: 'Noch kein Material' }}
           // Durchsucht werden die vier Spalten mit Datenbezug (Bezeichnung, Kategorie, Bestandsnummer,
           // Träger); die Statusspalte ist render-only. Der Platzhalter nennt alle vier: das Feld wächst

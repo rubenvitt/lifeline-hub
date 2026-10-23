@@ -36,6 +36,7 @@ import type {
 } from '../api/types';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Kennzahl, Paneel, Segmentleiste, monoStil, useRollen } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
@@ -75,9 +76,22 @@ import { medienkontaktStatus, pressemitteilungStatus } from '../theme/statusFarb
  *   steht sie unter der Arbeitsliste und nicht darüber.
  * - **Blättern (LFH-1075):** offene Kontakte vollständig, erledigte seitenweise mit „Ältere
  *   laden“; Kopfzeile und Medienlage zählen über den ganzen Bestand (Kennzahlen).
+ * - **Filtern (LLH-1096, Spec `tabellen-sortieren-filtern`):** die Art filtert, als Auswahlfeld
+ *   über den Karten, im Servermodus der `Datensicht`: die offenen (vollständig geladen) filtert die
+ *   Seite selbst, die erledigten der Server vor dem Blättern (`art=`). Die Zahlen des Hinweises
+ *   kommen aus den Kennzahlen je Art, das Menü zählt nicht. Der Filter steht in der Adresse.
+ *   Keine Sortierung: die Folge (offene zuerst, dann jüngster Eingang) ist die Arbeitsfolge, und
+ *   die erledigten blättern über den Eingang. Den Status führt weiter die Segmentleiste.
  */
 
 type Sicht = 'alle' | 'offen';
+
+const ART_WERTE = ART_REIHENFOLGE.map((a) => ({ text: MEDIENKONTAKT_ART_LABEL[a], value: a }));
+
+/** Die Arten aus dem Kopffilter, unbekannte verworfen. */
+function artenAus(filter: Readonly<Record<string, readonly string[]>>): MedienkontaktArt[] {
+  return ART_REIHENFOLGE.filter((a) => filter.art?.includes(a));
+}
 
 interface KontaktWerte {
   art: MedienkontaktArt;
@@ -124,6 +138,7 @@ function kontaktSpalten() {
     {
       key: 'art',
       title: 'Art',
+      filter: { werte: ART_WERTE, trifft: (k, w) => k.art === w },
       render: (_t, k) => MEDIENKONTAKT_ART_LABEL[k.art],
     },
     {
@@ -145,6 +160,8 @@ function kontaktSpalten() {
   ]);
 }
 
+type PresseSpalte = ReturnType<typeof kontaktSpalten>[number]['key'];
+
 export default function PressePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -165,6 +182,10 @@ export default function PressePage() {
   const [antwortForm] = Form.useForm<AntwortWerte>();
   const [mitteilungForm] = Form.useForm<MitteilungWerte>();
   const spalten = useMemo(() => kontaktSpalten(), []);
+  const gedaechtnis = useListenGedaechtnis<PresseSpalte>('presse', spalten, { einsatzId });
+  const [arten, setArten] = useState<readonly MedienkontaktArt[]>(() =>
+    artenAus(gedaechtnis.start.filter),
+  );
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -176,8 +197,8 @@ export default function PressePage() {
     enabled: frei,
   });
   const erledigteQuery = useInfiniteQuery({
-    queryKey: einsatzKeys.medienkontakteErledigt(einsatzId),
-    queryFn: ({ pageParam }) => ladeErledigteMedienkontakte(einsatzId, pageParam),
+    queryKey: einsatzKeys.medienkontakteErledigt(einsatzId, arten),
+    queryFn: ({ pageParam }) => ladeErledigteMedienkontakte(einsatzId, pageParam, arten),
     initialPageParam: undefined as AbschlussCursor | undefined,
     getNextPageParam: (letzte) =>
       letzte.length < MEDIENKONTAKTE_SEITE ? undefined : eingangCursor(letzte[letzte.length - 1]),
@@ -201,6 +222,11 @@ export default function PressePage() {
   });
 
   const offene = offeneQuery.data;
+  // Die offenen sind vollständig geladen: der Kopffilter „Art“ wirkt auf sie hier, exakt.
+  const offeneGefiltert = useMemo(
+    () => (arten.length ? (offene ?? []).filter((k) => arten.includes(k.art)) : (offene ?? [])),
+    [offene, arten],
+  );
   const erledigte = useMemo(() => {
     const gesehen = new Set<number>();
     return (erledigteQuery.data?.pages ?? []).flat().filter((k) => {
@@ -216,7 +242,8 @@ export default function PressePage() {
   useQueryParamSelektion('kontakt', offeneQuery.isSuccess && erledigteQuery.isSuccess, (kid) => {
     setSicht('alle');
     setHervorgehoben(kid);
-    const geladen = [...(offene ?? []), ...erledigte].some((k) => k.id === kid);
+    // Sichtbar ist nur, was der Kopffilter lässt; ein verborgener Kontakt kommt einzeln dazu.
+    const geladen = [...offeneGefiltert, ...erledigte].some((k) => k.id === kid);
     setVerlinkteId(geladen ? null : kid);
   });
   const verlinkteQuery = useQuery({
@@ -227,9 +254,9 @@ export default function PressePage() {
   const verlinkte =
     verlinkteId != null && verlinkteQuery.data?.id === verlinkteId ? verlinkteQuery.data : null;
   const kontakte = useMemo(() => {
-    const alle = [...(offene ?? []), ...erledigte];
+    const alle = [...offeneGefiltert, ...erledigte];
     return verlinkte && !alle.some((k) => k.id === verlinkte.id) ? [...alle, verlinkte] : alle;
-  }, [offene, erledigte, verlinkte]);
+  }, [offeneGefiltert, erledigte, verlinkte]);
   const hervorgehobenGeladen = kontakte.some((k) => k.id === hervorgehoben);
   useEffect(() => {
     if (hervorgehoben != null && hervorgehobenGeladen) scrolleZurZeile(hervorgehoben);
@@ -292,11 +319,23 @@ export default function PressePage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  const sichtbar = sicht === 'offen' ? (offene ?? []) : kontakte;
+  const sichtbar = sicht === 'offen' ? offeneGefiltert : kontakte;
   // Die offenen sind vollständig geladen: die Zahl stimmt ohne Kennzahlen.
   const offeneAnfragen = (offene ?? []).filter((k) => k.art === 'anfrage').length;
   const kennzahlen = kennzahlenQuery.data;
   const listeGescheitert = offeneQuery.isError || (erledigteQuery.isError && !erledigteQuery.data);
+  // Treffer unter dem Kopffilter aus den Kennzahlen je Art (beide Phasen), nie aus dem Fenster.
+  const trefferGesamt =
+    kennzahlen == null
+      ? undefined
+      : arten.length
+        ? arten.reduce((n, a) => n + kennzahlen.je_art[a], 0)
+        : kennzahlen.gesamt;
+  const zahlen =
+    sicht === 'offen'
+      ? { treffer: offeneGefiltert.length, gesamt: offene?.length }
+      : { treffer: trefferGesamt, gesamt: kennzahlen?.gesamt };
+  const erledigteSoll = trefferGesamt == null ? undefined : trefferGesamt - offeneGefiltert.length;
   const mitteilungen = mitteilungenQuery.data ?? [];
   const ketten = kettenKoepfe(mitteilungen);
   const freigegeben = mitteilungen.filter((m) => m.status === 'freigegeben');
@@ -406,6 +445,14 @@ export default function PressePage() {
                 spalten={spalten}
                 daten={sichtbar}
                 zeilenSchluessel={(k) => k.id}
+                gedaechtnis={gedaechtnis}
+                mehrzahl="Medienkontakten"
+                serverseitig={{
+                  stand: JSON.stringify([sicht, arten]),
+                  onSuche: () => {},
+                  onFilter: (werte) => setArten(artenAus(werte)),
+                  zahlen,
+                }}
                 ladend={offeneQuery.isLoading || (sicht === 'alle' && erledigteQuery.isLoading)}
                 leerText={
                   sicht === 'offen' ? 'Keine offenen Medienkontakte' : 'Noch keine Medienkontakte'
@@ -445,7 +492,7 @@ export default function PressePage() {
             {sicht === 'alle' &&
               !listeGescheitert &&
               erledigteQuery.hasNextPage &&
-              (kennzahlen == null || erledigte.length < kennzahlen.gesamt - kennzahlen.offen) && (
+              (erledigteSoll == null || erledigte.length < erledigteSoll) && (
                 <Flex vertical align="center" gap={token.marginXS}>
                   <Button
                     onClick={() => void erledigteQuery.fetchNextPage()}
@@ -453,9 +500,9 @@ export default function PressePage() {
                   >
                     Ältere laden
                   </Button>
-                  {kennzahlen && (
+                  {trefferGesamt != null && (
                     <span style={{ color: token.colorTextSecondary }}>
-                      {(offene?.length ?? 0) + erledigte.length} von {kennzahlen.gesamt} geladen
+                      {offeneGefiltert.length + erledigte.length} von {trefferGesamt} geladen
                     </span>
                   )}
                 </Flex>

@@ -6,6 +6,7 @@ import { globalKeys } from '../api/queryKeys';
 import type { ArchivAkte, Schwaerzungsantrag } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { nachFolge, nachText, werteAusKatalog } from '../components/katalogVergleich';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
@@ -28,6 +29,10 @@ import SchwaerzungsantragDialog, { type AntragZielWahl } from './Schwaerzungsant
  *
  * Die Rücknahme hat keine Rückfrage (LFH-363): sie ist umkehrbar, ein neuer Antrag ist jederzeit
  * möglich. Der Antrag selbst fragt zurück (`SchwaerzungsantragDialog`).
+ *
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096): Art und Stand filtern, alle Spalten mit
+ * vergleichbarem Wert sortieren. Ohne Listengedächtnis: die Akte trägt mehrere Listen, ihre
+ * Adresse nur eine (`ArchivAktePage`, Register).
  */
 
 const leer = '—';
@@ -72,26 +77,40 @@ export default function Loeschersuchen({
       title: 'Ziel',
       width: 120,
       zahl: true,
+      sorter: nachText((a: Schwaerzungsantrag) => a.ziel_kennung),
       render: (_, a) => a.ziel_kennung,
     },
-    { key: 'art', title: 'Art', width: 220, render: (_, a) => ZIEL_ART[a.ziel_art] },
+    {
+      key: 'art',
+      title: 'Art',
+      width: 220,
+      sorter: nachText((a: Schwaerzungsantrag) => ZIEL_ART[a.ziel_art]),
+      filters: werteAusKatalog(ZIEL_ART),
+      onFilter: (w, a) => a.ziel_art === w,
+      render: (_, a) => ZIEL_ART[a.ziel_art],
+    },
     {
       key: 'aktenzeichen',
       title: 'Aktenzeichen',
       width: 170,
       zahl: true,
+      sorter: nachText((a: Schwaerzungsantrag) => a.aktenzeichen),
       render: (_, a) => a.aktenzeichen,
     },
     {
       key: 'stand',
       title: 'Stand',
       width: 150,
+      sorter: nachFolge(Object.keys(schwaerzungsantragStand), (a: Schwaerzungsantrag) => a.stand),
+      filters: werteAusKatalog(schwaerzungsantragStand),
+      onFilter: (w, a) => a.stand === w,
       render: (_, a) => <StatusTag darstellung={schwaerzungsantragStand[a.stand]} />,
     },
     {
       key: 'beantragt',
       title: 'Beantragt',
       width: 220,
+      sorter: nachText((a: Schwaerzungsantrag) => a.beantragt_at),
       render: (_, a) => (
         <>
           <ZeitAnzeige wert={a.beantragt_at} /> · {a.beantragt_von_name}
@@ -103,6 +122,7 @@ export default function Loeschersuchen({
       title: 'Vollzug ab',
       width: 160,
       zahl: true,
+      sorter: nachText((a: Schwaerzungsantrag) => a.faellig_at),
       render: (_, a) => <ZeitAnzeige wert={a.faellig_at} />,
     },
     {
@@ -172,6 +192,7 @@ export default function Loeschersuchen({
         columns={spalten}
         dataSource={abfrage.data}
         locale={{ emptyText: 'Kein Löschersuchen gestellt' }}
+        mehrzahl="Löschersuchen"
       />
     );
   }

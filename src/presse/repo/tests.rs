@@ -436,7 +436,7 @@ async fn phasen_teilen_die_liste_und_blaettern_ohne_luecke() {
         .unwrap();
 
     let voll = liste(&w.pool, w.e).await.unwrap();
-    let offen = liste_phase(&w.pool, w.e, ListenPhase::Offen, None)
+    let offen = liste_phase(&w.pool, w.e, ListenPhase::Offen, None, &[])
         .await
         .unwrap();
     assert_eq!(
@@ -449,7 +449,7 @@ async fn phasen_teilen_die_liste_und_blaettern_ohne_luecke() {
     let mut vor: Option<MedienkontaktAnzeige> = None;
     loop {
         let s = seite(vor.as_ref(), 2);
-        let teil = liste_phase(&w.pool, w.e, ListenPhase::Abgeschlossen, Some(&s))
+        let teil = liste_phase(&w.pool, w.e, ListenPhase::Abgeschlossen, Some(&s), &[])
             .await
             .unwrap();
         assert!(teil.len() <= 2);
@@ -571,10 +571,16 @@ async fn ruecknahme_wechselt_die_phase() {
         let pool = w.pool.clone();
         let e = w.e;
         async move {
-            liste_phase(&pool, e, ListenPhase::Abgeschlossen, Some(&seite(None, 10)))
-                .await
-                .unwrap()
-                .len()
+            liste_phase(
+                &pool,
+                e,
+                ListenPhase::Abgeschlossen,
+                Some(&seite(None, 10)),
+                &[],
+            )
+            .await
+            .unwrap()
+            .len()
         }
     };
     assert_eq!(erledigt(&w).await, 1);
@@ -582,8 +588,84 @@ async fn ruecknahme_wechselt_die_phase() {
         .await
         .unwrap();
     assert_eq!(erledigt(&w).await, 0);
-    let offen = liste_phase(&w.pool, w.e, ListenPhase::Offen, None)
+    let offen = liste_phase(&w.pool, w.e, ListenPhase::Offen, None, &[])
         .await
         .unwrap();
     assert_eq!(offen.iter().map(|k| k.id).collect::<Vec<_>>(), vec![id]);
+}
+
+/// LLH-1096, Kopffilter „Art“: die Einschränkung steht vor dem `LIMIT`, Seiten und Cursor bleiben
+/// lückenlos, und beide Phasen filtern.
+#[tokio::test]
+async fn phasen_filtern_nach_art_vor_dem_limit() {
+    use crate::kommunikation::ListenPhase;
+    let w = welt().await;
+    let ids = bestand(
+        &w,
+        &[
+            (
+                MedienkontaktArt::Anfrage,
+                "NDR",
+                "2026-09-30 09:00:00",
+                true,
+            ),
+            (MedienkontaktArt::Termin, "RTL", "2026-09-30 08:30:00", true),
+            (MedienkontaktArt::Termin, "RTL", "2026-09-30 08:20:00", true),
+            (
+                MedienkontaktArt::Anfrage,
+                "dpa",
+                "2026-09-30 08:00:00",
+                true,
+            ),
+            (
+                MedienkontaktArt::Abstimmung,
+                "Polizei",
+                "2026-09-30 10:00:00",
+                false,
+            ),
+            (
+                MedienkontaktArt::Anfrage,
+                "SAT.1",
+                "2026-09-30 10:30:00",
+                false,
+            ),
+        ],
+    )
+    .await;
+    let mut gelesen = Vec::new();
+    let mut vor: Option<MedienkontaktAnzeige> = None;
+    loop {
+        let teil = liste_phase(
+            &w.pool,
+            w.e,
+            ListenPhase::Abgeschlossen,
+            Some(&seite(vor.as_ref(), 1)),
+            &[MedienkontaktArt::Anfrage],
+        )
+        .await
+        .unwrap();
+        let fertig = teil.is_empty();
+        vor = teil.last().cloned();
+        gelesen.extend(teil.into_iter().map(|k| k.id));
+        if fertig {
+            break;
+        }
+        assert!(gelesen.len() <= ids.len(), "Cursor kommt nicht voran");
+    }
+    assert_eq!(
+        gelesen,
+        vec![ids[0], ids[3]],
+        "nur erledigte Anfragen, jüngste zuerst"
+    );
+
+    let offen = liste_phase(
+        &w.pool,
+        w.e,
+        ListenPhase::Offen,
+        None,
+        &[MedienkontaktArt::Abstimmung, MedienkontaktArt::Termin],
+    )
+    .await
+    .unwrap();
+    assert_eq!(offen.iter().map(|k| k.id).collect::<Vec<_>>(), vec![ids[4]]);
 }

@@ -2,6 +2,7 @@ import { Button, Space } from 'antd';
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import StatusTag from '../components/StatusTag';
 import type { KatalogSpalte } from '../components/KatalogTabelle';
+import { nachZahl } from '../components/katalogVergleich';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import type { Dienststatus } from '../api/types';
 import { dienststatus } from '../theme/statusFarben';
@@ -48,7 +49,8 @@ export const DIENSTSTATUS_HANDLUNG: Record<Dienststatus, string> = {
 type DienststatusMutation = ReturnType<typeof useDienststatusMutation>;
 
 /** Filterwerte in der Reihenfolge des Vertrags; der Wortlaut kommt von dort, nicht von hier. */
-const DIENSTSTATUS_FILTER = (Object.keys(dienststatus) as Dienststatus[]).map((s) => ({
+const DIENSTSTATUS_REIHENFOLGE = Object.keys(dienststatus) as Dienststatus[];
+const DIENSTSTATUS_FILTER = DIENSTSTATUS_REIHENFOLGE.map((s) => ({
   text: dienststatus[s].label,
   value: s,
 }));
@@ -87,6 +89,8 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
     // antd das Filterargument als `React.Key | boolean` typisiert.
     filters: DIENSTSTATUS_FILTER,
     onFilter: (wert, t) => t.dienststatus === String(wert),
+    // In der Folge des Vertrags (in Dienst vor außer Dienst), nicht nach dem Wort (LLH-1096).
+    sorter: nachZahl((t: T) => DIENSTSTATUS_REIHENFOLGE.indexOf(t.dienststatus)),
     render: (_, t) => <StatusTag darstellung={dienststatus[t.dienststatus]} />,
   };
   if (!istAdmin) return [status];

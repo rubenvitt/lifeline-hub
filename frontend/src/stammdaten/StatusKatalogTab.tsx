@@ -1,5 +1,6 @@
 import { Collapse, Form, Input, InputNumber, type TableColumnsType } from 'antd';
 import { monoStil } from '../components/instrument';
+import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
 import {
   aktualisiereStatus,
@@ -55,6 +56,8 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
      */
     filters: kategorien.map((k) => ({ text: statusKategorie[k].label, value: k })),
     onFilter: (wert, s) => s.kategorie === String(wert),
+    // In der Folge der Kategorien, nicht nach dem Wort (LLH-1096).
+    sorter: nachZahl((s: FahrzeugStatus) => kategorien.indexOf(s.kategorie)),
     render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
   },
   {
@@ -69,6 +72,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     title: 'FMS-Anker',
     dataIndex: 'fms_anker',
     key: 'fms_anker',
+    sorter: nachZahl((s: FahrzeugStatus) => s.fms_anker),
     // `== null`, nicht Wahrheitswert: 0 ist ein gültiger Anker.
     render: (f: number | null) => (f == null ? '—' : <span style={monoStil(12)}>{f}</span>),
   },
@@ -77,6 +81,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     title: 'Sortierung',
     dataIndex: 'sortier',
     key: 'sortier',
+    sorter: nachZahl((s: FahrzeugStatus) => s.sortier),
     render: (n: number) => <span style={monoStil(12)}>{n}</span>,
   },
 ];
@@ -154,6 +159,8 @@ const felder = (
 export default function StatusKatalogTab() {
   return (
     <KatalogVerwaltung<FahrzeugStatus, FormWerte>
+      listenSeite="stammdaten-status"
+      mehrzahl="Status"
       titel="Fahrzeug-Status"
       queryKey={globalKeys.fahrzeugStatus()}
       liste={listeFahrzeugStatus}

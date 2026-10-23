@@ -1,5 +1,6 @@
 import { Form, Input, InputNumber, type TableColumnsType } from 'antd';
 import { monoStil } from '../components/instrument';
+import { nachZahl } from '../components/katalogVergleich';
 import {
   aktualisiereQualifikation,
   deaktiviereQualifikation,
@@ -31,6 +32,7 @@ const spalten: TableColumnsType<Qualifikation> = [
     title: 'Sortierung',
     dataIndex: 'sortier',
     key: 'sortier',
+    sorter: nachZahl((q: Qualifikation) => q.sortier),
     render: (n: number) => <span style={monoStil(12)}>{n}</span>,
   },
 ];
@@ -58,6 +60,8 @@ export default function QualifikationenTab() {
   return (
     <KatalogVerwaltung<Qualifikation, FormWerte>
       titel="Qualifikationen"
+      listenSeite="stammdaten-qualifikationen"
+      mehrzahl="Qualifikationen"
       queryKey={globalKeys.qualifikationen()}
       liste={listeQualifikationen}
       legeAn={legeAn}

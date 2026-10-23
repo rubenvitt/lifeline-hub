@@ -3,6 +3,8 @@ import AdminPage from '../components/AdminPage';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenHinweise, ZeilenFehler } from '../components/SpeicherHinweis';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { nachText } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { Select } from '../components/Select';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -19,6 +21,9 @@ import type { StichwortVorschlag } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { auswahlWert, vorlageAusWert, vorlagenOptionen } from './einsatzVorlageModule';
+
+/** Filterwert der Stichworte ohne gekoppelte Vorlage. */
+const OHNE_VORLAGE = 'ohne';
 
 export default function StichworteTab() {
   const { benutzer } = useAuth();
@@ -101,6 +106,17 @@ export default function StichworteTab() {
 
   const vorschlaege = vorschlaegeQuery.data ?? [];
 
+  // Die Vorlage filtert nach den gekoppelten Vorlagen der Zeilen und „ohne Vorlage“ (LLH-1096); der
+  // Wert ist die Kennung der Vorlage, das Wort ihr Name.
+  const vorlageWerte = [
+    ...[...new Set(vorschlaege.flatMap((v) => (v.vorlage_id != null ? [v.vorlage_id] : [])))]
+      .map((id) => ({ text: vorlagenNamen.get(id) ?? `Vorlage ${id}`, value: String(id) }))
+      .sort((a, b) => a.text.localeCompare(b.text, 'de', { numeric: true })),
+    ...(vorschlaege.some((v) => v.vorlage_id == null)
+      ? [{ text: 'ohne Vorlage', value: OHNE_VORLAGE }]
+      : []),
+  ];
+
   const spalten: KatalogSpalte<StichwortVorschlag>[] = [
     {
       title: 'Stichwort',
@@ -127,6 +143,12 @@ export default function StichworteTab() {
        * sich ein. Leer = keine. Bedienen nur der Admin; die übrigen lesen den Namen.
        */
       suchText: (v) => (v.vorlage_id != null ? vorlagenNamen.get(v.vorlage_id) : undefined),
+      sorter: nachText((v: StichwortVorschlag) =>
+        v.vorlage_id != null ? vorlagenNamen.get(v.vorlage_id) : undefined,
+      ),
+      filters: vorlageWerte.length > 0 ? vorlageWerte : undefined,
+      onFilter: (wert, v) =>
+        wert === OHNE_VORLAGE ? v.vorlage_id == null : String(v.vorlage_id) === wert,
       render: (_, v: StichwortVorschlag) => {
         const name = v.vorlage_id != null ? vorlagenNamen.get(v.vorlage_id) : undefined;
         if (!istAdmin) return name ?? '—';
@@ -188,6 +210,11 @@ export default function StichworteTab() {
       : []),
   ];
 
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt die gepflegte Reihenfolge des Servers.
+  const gedaechtnis = useListenGedaechtnis('stammdaten-stichworte', spalten, {
+    ausDaten: ['vorlage'],
+  });
+
   return (
     <AdminPage
       titel="Einsatz-Stichworte"
@@ -218,6 +245,8 @@ export default function StichworteTab() {
           loading={vorschlaegeQuery.isLoading}
           dataSource={vorschlaege}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Stichworten"
           locale={{ emptyText: 'Noch keine Stichworte' }}
           // `text` und der Name der Vorlage (über `suchText`) tragen die Suche; die Aktionsspalte
           // ist render-only (dokumentierte Grenze im Kopf von `KatalogTabelle`).

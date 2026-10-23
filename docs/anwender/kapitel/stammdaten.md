@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
 ---
 
 ## Überblick
@@ -38,6 +38,24 @@ Personal („Person anlegen“) und Material („Material anlegen“) werden auf
 angelegt. Material trägt dazu die „Art“: „Gerät“ (Vorgabe) oder „Verbrauchsgut“. Mit „Speichern
 und nächste“ und „Werte behalten“ bleibt auch die Art für das nächste Material stehen. Die
 Materialliste lässt sich nach „Art“ filtern.
+
+### Eine Liste sortieren und filtern
+
+1. Unter „Stammdaten“ eine Liste öffnen, etwa „Fahrzeuge“.
+2. Auf den Kopf einer Spalte klicken, um nach ihr zu sortieren. Ein zweiter Klick kehrt die
+   Richtung um, ein dritter stellt die gewohnte Reihenfolge wieder her.
+3. Im Kopf einer Spalte das Trichterzeichen wählen, Werte ankreuzen und mit „OK“ übernehmen.
+   Hinter jedem Wert steht, wie viele Zeilen er träfe.
+4. Über der Tabelle stehen dann die gewählten Werte. Ein Klick auf einen Wert nimmt ihn heraus,
+   „Filter zurücksetzen“ nimmt alle Filter und die Suche zurück, die Sortierung bleibt.
+
+Gefiltert werden etwa die Fahrzeuge nach Typ, Träger und Status, das Personal nach
+Qualifikation, Stärke-Position und Träger, das Material nach Kategorie, Art und Träger, die
+Sprechgruppen nach Betriebsart, Netz und Sicherheit und die Stichworte nach ihrer Vorlage.
+Sortierung, Filter und Suche stehen in der Adresse der Seite: Neuladen und ein geteilter Link
+zeigen dieselbe Liste, und wer die Seite in derselben Sitzung wieder öffnet, findet sie so vor.
+Die Einheiten-Vorlagen stehen als Baum unter ihrer übergeordneten Vorlage und lassen sich nicht
+sortieren.
 
 ### Ein Fahrzeug außer Dienst nehmen
 

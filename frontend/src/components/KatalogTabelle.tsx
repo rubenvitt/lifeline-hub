@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type Key,
   type RefObject,
 } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
@@ -82,8 +83,10 @@ import '../theme/sprache.css';
  * **Sortieren und Filtern wie in `Datensicht`** (LLH-1086, Spec `tabellen-sortieren-filtern`).
  * Filter- und Sortierzustand einer Spalte mit `filters` bzw. `sorter` liegen KONTROLLIERT hier
  * (vorbelegt aus `defaultFilteredValue`/`defaultSortOrder` oder aus `gedaechtnis`); antd zeichnet
- * Trichter, Menü und Pfeil und filtert über das `onFilter` der Spalte. Bei Suche oder Filter steht
- * der `Filterhinweis` (Treffer von Gesamt) samt Chips je Wert, „Filter zurücksetzen“ leert beides.
+ * Trichter, Menü und Pfeil und filtert über das `onFilter` der Spalte; im Menü trägt jeder Wert
+ * seinen Zähler („Aktiv (3)“, LLH-1096), solange alle wirkenden Filter ein `onFilter` haben. Bei
+ * Suche oder Filter steht der `Filterhinweis` (Treffer von Gesamt) samt Chips je Wert, „Filter
+ * zurücksetzen“ leert beides.
  * Was man nicht sieht, wirkt nicht und steht nicht als Chip da. Eine Spalte mit EIGENEM
  * `filteredValue`/`sortOrder` bleibt beim Aufrufer — so `Datensicht`, die Hinweis und Chips selbst
  * zeigt. `onChange` des Aufrufers hört weiter mit.
@@ -828,21 +831,6 @@ export default function KatalogTabelle<T extends object>({
   );
 
   /**
-   * Fixiert wird die ERSTE Spalte: sie ist überall die menschenlesbare Kennung, ein Pflicht-Prop
-   * wäre Zeremonie. Unangetastet bleibt sie, wenn der Aufrufer eine Seite gewählt hat oder dort
-   * eine Spaltengruppe steht (deren Fixierung wirkungslos wäre).
-   */
-  const fixierteSpalten = useMemo(() => {
-    // Mono-Spalten bekommen ihre Klasse vor dem Fixieren; die Spaltenfolge bleibt.
-    const gestaltet = gezeigteSpalten?.map((s) =>
-      s.zahl ? { ...s, className: [s.className, 'lfh-zahl-spalte'].filter(Boolean).join(' ') } : s,
-    );
-    const erste = gestaltet?.[0];
-    if (!gestaltet || !erste || erste.fixed !== undefined || 'children' in erste) return gestaltet;
-    return [{ ...erste, fixed: 'left' as const }, ...gestaltet.slice(1)];
-  }, [gezeigteSpalten]);
-
-  /**
    * DIE EINE Quelle der gerenderten Zeilen. Bewusst nicht `effektiveDaten` genannt: der Name
    * bezeichnet in `Datensicht.tsx` eine größere Operation.
    */
@@ -879,6 +867,64 @@ export default function KatalogTabelle<T extends object>({
     return zeilen.length;
   }, [sichtbareZeilen, eigeneFilterSpalten, filterStand]);
   const eingeschraenkt = suchbegriff.trim() !== '' || filterListe.length > 0;
+
+  /**
+   * Zähler je Filterwert im Kopfmenü („Groß (3)“, LLH-1096, wie in `Datensicht`): wie viele Zeilen
+   * der Wert unter Suche und den ÜBRIGEN eigenen Filtern träfe. Gezählt wird mit dem `onFilter` der
+   * Spalten; fehlt es an der gezählten oder an einer übrigen aktiven Spalte, steht keine Zahl (eine
+   * falsche wäre schlimmer). Chips und Filterhinweis lesen weiter die Werte ohne Zahl.
+   */
+  const gezaehlteSpalten = useMemo(() => {
+    if (!gezeigteSpalten) return gezeigteSpalten;
+    const basis = sichtbareZeilen ?? [];
+    const pruefung = new Map(
+      eigeneFilterSpalten.map((s) => [
+        zustandsSchluessel(s)!,
+        'onFilter' in s ? s.onFilter : undefined,
+      ]),
+    );
+    const zaehlbar = (k: string) => {
+      for (const [andere, pruefe] of pruefung) {
+        if (andere !== k && (filterStand[andere]?.length ?? 0) > 0 && !pruefe) return false;
+      }
+      return pruefung.get(k) != null;
+    };
+    return gezeigteSpalten.map((spalte) => {
+      const k = zustandsSchluessel(spalte);
+      if (k == null || !pruefung.has(k) || !zaehlbar(k) || !('filters' in spalte)) return spalte;
+      let menge = basis;
+      for (const [andere, pruefe] of pruefung) {
+        const gewaehlt = filterStand[andere] ?? [];
+        if (andere === k || gewaehlt.length === 0 || !pruefe) continue;
+        menge = menge.filter((z) => gewaehlt.some((w) => pruefe(w, z)));
+      }
+      const pruefe = pruefung.get(k)!;
+      return {
+        ...spalte,
+        filters: (spalte.filters ?? []).map((f) => ({
+          ...f,
+          text: `${typeof f.text === 'string' || typeof f.text === 'number' ? f.text : String(f.value)} (${
+            menge.filter((z) => pruefe(f.value as Key | boolean, z)).length
+          })`,
+        })),
+      } as KatalogSpalte<T>;
+    });
+  }, [gezeigteSpalten, sichtbareZeilen, eigeneFilterSpalten, filterStand]);
+
+  /**
+   * Fixiert wird die ERSTE Spalte: sie ist überall die menschenlesbare Kennung, ein Pflicht-Prop
+   * wäre Zeremonie. Unangetastet bleibt sie, wenn der Aufrufer eine Seite gewählt hat oder dort
+   * eine Spaltengruppe steht (deren Fixierung wirkungslos wäre).
+   */
+  const fixierteSpalten = useMemo(() => {
+    // Mono-Spalten bekommen ihre Klasse vor dem Fixieren; die Spaltenfolge bleibt.
+    const gestaltet = gezaehlteSpalten?.map((s) =>
+      s.zahl ? { ...s, className: [s.className, 'lfh-zahl-spalte'].filter(Boolean).join(' ') } : s,
+    );
+    const erste = gestaltet?.[0];
+    if (!gestaltet || !erste || erste.fixed !== undefined || 'children' in erste) return gestaltet;
+    return [{ ...erste, fixed: 'left' as const }, ...gestaltet.slice(1)];
+  }, [gezaehlteSpalten]);
 
   /**
    * Hält den eigenen Zustand nach und reicht das Ereignis an den Aufrufer weiter. Spalten, die der

@@ -51,6 +51,15 @@ Für die Einsatzleitung:
 
 3. „Speichern“ wählen.
 
+### Die Mitglieder sortieren und filtern
+
+1. Im Reiter „Zugriff“ auf den Kopf „Name“, „Führungsstelle“ oder „Rolle“ klicken. Ein zweiter
+   Klick kehrt die Folge um.
+2. Für nur bestimmte Rollen das Trichterzeichen am Kopf „Rolle“ wählen und die Rollen ankreuzen.
+   Die Zahl hinter jeder Rolle nennt, wie viele Mitglieder sie tragen.
+
+Sortierung und Filter stehen in der Adresse: ein geteilter Link öffnet die Liste im selben Stand.
+
 ## Hintergrund
 
 ### Was die Rollen dürfen

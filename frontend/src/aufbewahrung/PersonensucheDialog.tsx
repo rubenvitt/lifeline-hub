@@ -4,6 +4,7 @@ import { suchePersonen } from '../api/aufbewahrung';
 import type { PersonTreffer } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { nachFolge, nachText, werteAusKatalog } from '../components/katalogVergleich';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
 import { personStatus, schwaerzungsantragStand } from '../theme/statusFarben';
@@ -20,6 +21,8 @@ import { ZIEL_ART } from './archivText';
  *
  * Tabelle: hier wird verglichen („welcher dieser Treffer ist es?“), fixierte Kennung. Die Suche
  * ist ein POST (Suchtext im Body, nie in der Adresse) und läuft deshalb als Mutation, ohne Cache.
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096) ohne Listengedächtnis: der Dialog legt nichts in
+ * die Adresse der Akte, und die Treffer gelten nur für diese eine Suche.
  */
 
 const MIN_SUCHTEXT = 3;
@@ -45,19 +48,36 @@ export default function PersonensucheDialog({
   });
 
   const spalten: KatalogSpalte<PersonTreffer>[] = [
-    { key: 'kennung', title: 'Kennung', width: 110, zahl: true, render: (_, t) => t.kennung },
-    { key: 'art', title: 'Art', width: 230, render: (_, t) => ZIEL_ART[t.art] },
+    {
+      key: 'kennung',
+      title: 'Kennung',
+      width: 110,
+      zahl: true,
+      sorter: nachText((t: PersonTreffer) => t.kennung),
+      render: (_, t) => t.kennung,
+    },
+    {
+      key: 'art',
+      title: 'Art',
+      width: 230,
+      sorter: nachText((t: PersonTreffer) => ZIEL_ART[t.art]),
+      filters: werteAusKatalog(ZIEL_ART).filter((w) => w.value !== 'einsatz'),
+      onFilter: (w, t) => t.art === w,
+      render: (_, t) => ZIEL_ART[t.art],
+    },
     {
       key: 'erfasst',
       title: 'Erfasst',
       width: 150,
       zahl: true,
+      sorter: nachText((t: PersonTreffer) => t.erfasst_at),
       render: (_, t) => <ZeitAnzeige wert={t.erfasst_at} />,
     },
     {
       key: 'status',
       title: 'Status',
       width: 140,
+      sorter: nachFolge(Object.keys(personStatus), (t: PersonTreffer) => t.person_status),
       render: (_, t) =>
         t.person_status ? <StatusTag darstellung={personStatus[t.person_status]} /> : leer,
     },
@@ -65,6 +85,7 @@ export default function PersonensucheDialog({
       key: 'antrag',
       title: 'Löschersuchen',
       width: 150,
+      sorter: nachFolge(Object.keys(schwaerzungsantragStand), (t: PersonTreffer) => t.antrag),
       render: (_, t) =>
         t.antrag != null ? <StatusTag darstellung={schwaerzungsantragStand[t.antrag]} /> : leer,
     },

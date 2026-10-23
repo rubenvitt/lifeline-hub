@@ -7,6 +7,8 @@ import KatalogTabelle, {
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
 import { useViewport } from '../components/useViewport';
+import { nachText, nachZahl, werteAus } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -17,13 +19,15 @@ import {
   POSITION_LABELS,
   setzeDienststatus,
 } from '../api/personal';
-import type { Personal } from '../api/types';
+import type { Personal, StaerkePosition } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { personalDetailPfad } from './stammdatenDetail';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
 import { KennungsLink } from '../components/kennungsLink';
+
+const POSITION_FOLGE = Object.keys(POSITION_LABELS) as StaerkePosition[];
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();
@@ -42,6 +46,11 @@ export default function PersonalTab() {
   });
 
   const dienststatusMutation = useDienststatusMutation(setzeDienststatus, globalKeys.personal());
+
+  const personen = personalQuery.data ?? [];
+  // Qualifikationen und Träger filtern mit den Werten der Zeilen (LLH-1096); ohne Wert kein Trichter.
+  const qualifikationWerte = werteAus(personen, (p) => p.qualifikationen.map((q) => q.label));
+  const traegerWerte = werteAus(personen, (p) => p.traegerorganisation);
 
   // Stärke-Position und Träger sind nachrangig und fallen unter `lg` weg; der Spaltenschalter
   // zählt sie und holt sie zurück (LFH-980).
@@ -80,11 +89,16 @@ export default function PersonalTab() {
       title: 'Personalnr.',
       dataIndex: 'personalnummer',
       key: 'personalnummer',
+      sorter: nachText((p: Personal) => p.personalnummer),
       render: (t) => t ?? '—',
     },
     {
       title: 'Qualifikationen',
       key: 'qualifikationen',
+      // Eine Person trägt mehrere: der Filter trifft, wer den Wert unter seinen hat. Ohne Sortierung,
+      // eine Menge hat keine Folge.
+      filters: qualifikationWerte.length > 0 ? qualifikationWerte : undefined,
+      onFilter: (wert, p) => p.qualifikationen.some((q) => q.label === wert),
       render: (_, p) =>
         p.qualifikationen.length ? (
           <Space size={[0, 4]} wrap>
@@ -105,6 +119,12 @@ export default function PersonalTab() {
        * träfen jede Mannschafts-Person (`mannschaft`), „Führer" mit Umlaut dagegen nichts. `render`
        * bekommt den ganzen Datensatz.
        */
+      filters: POSITION_FOLGE.map((pos) => ({ text: POSITION_LABELS[pos], value: pos })),
+      onFilter: (wert, p) => p.staerke_position === wert,
+      // In der Folge Führer, Unterführer, Mannschaft, nicht nach dem Wort.
+      sorter: nachZahl((p: Personal) =>
+        p.staerke_position ? POSITION_FOLGE.indexOf(p.staerke_position) : null,
+      ),
       render: (_, p) => (p.staerke_position ? POSITION_LABELS[p.staerke_position] : '—'),
     },
     {
@@ -112,6 +132,9 @@ export default function PersonalTab() {
       dataIndex: 'traegerorganisation',
       key: 'traeger',
       abBreite: 'lg',
+      sorter: nachText((p: Personal) => p.traegerorganisation),
+      filters: traegerWerte.length > 0 ? traegerWerte : undefined,
+      onFilter: (wert, p) => p.traegerorganisation === wert,
       render: (t) => t ?? '—',
     },
     ...dienststatusSpalten<Personal>({
@@ -125,6 +148,11 @@ export default function PersonalTab() {
       },
     }),
   ];
+
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt die Reihenfolge des Servers.
+  const gedaechtnis = useListenGedaechtnis('stammdaten-personal', spalten, {
+    ausDaten: ['qualifikationen', 'traeger'],
+  });
 
   return (
     <AdminPage
@@ -167,8 +195,10 @@ export default function PersonalTab() {
         <KatalogTabelle
           rowKey="id"
           loading={personalQuery.isLoading}
-          dataSource={personalQuery.data ?? []}
+          dataSource={personen}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Personen"
           /**
            * Die Suche liest die ROHWERTE der Spalten mit `dataIndex`, nicht das Gerenderte. Der
            * Platzhalter nennt genau die drei Spalten, die beitragen: Name, Personalnr., Träger.

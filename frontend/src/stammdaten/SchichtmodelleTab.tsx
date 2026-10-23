@@ -25,6 +25,8 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
+import { nachText, nachZahl } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 /**
@@ -117,7 +119,7 @@ export default function SchichtmodelleTab() {
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
       key: 'bezeichnung',
-      sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
+      sorter: nachText((m: Schichtmodell) => m.bezeichnung),
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (_: string, m) => (
         <Space size={[8, 4]} wrap>
@@ -131,18 +133,26 @@ export default function SchichtmodelleTab() {
       title: 'Regel',
       key: 'regel',
       suchText: (m) => formatRegel(m),
+      // Nach der Art der Regel (LLH-1096); der Wortlaut der Regel selbst ist kein Vergleichswert.
+      filters: [
+        { text: 'Rhythmus', value: 'rhythmus' },
+        { text: 'Wechselzeiten', value: 'wechselzeiten' },
+      ],
+      onFilter: (wert, m) => m.typ === wert,
       render: (_, m) => formatRegel(m),
     },
     {
       title: 'Vorwarnung',
       key: 'vorwarnung',
       abBreite: 'md',
+      sorter: nachZahl((m: Schichtmodell) => m.vorwarnung_minuten),
       render: (_, m) => <span style={monoStil(12)}>{formatDauer(m.vorwarnung_minuten)}</span>,
     },
     {
       title: 'Planungsvorlauf',
       key: 'planungsvorlauf',
       abBreite: 'lg',
+      sorter: nachZahl((m: Schichtmodell) => m.planungsvorlauf_minuten),
       render: (_, m) => <span style={monoStil(12)}>{formatDauer(m.planungsvorlauf_minuten)}</span>,
     },
     ...(istAdmin
@@ -170,6 +180,9 @@ export default function SchichtmodelleTab() {
         ]
       : []),
   ];
+
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt die Reihenfolge des Servers.
+  const gedaechtnis = useListenGedaechtnis('stammdaten-schichtmodelle', spalten);
 
   return (
     <AdminPage
@@ -209,6 +222,8 @@ export default function SchichtmodelleTab() {
           loading={modelleQuery.isLoading}
           dataSource={modelle}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Schichtmodellen"
           locale={{ emptyText: 'Noch keine Schichtmodelle' }}
           spaltenSchalter={{ bezeichnung: 'Schichtmodelle' }}
         />

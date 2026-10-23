@@ -5,6 +5,7 @@ import AdminPage from '../components/AdminPage';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useAuth } from '../auth/AuthContext';
@@ -22,6 +23,13 @@ export interface KatalogEintrag {
 export interface KatalogVerwaltungProps<T extends KatalogEintrag, W extends object> {
   /** Seitenkopf; muss dem Menü-Label in `admin/adminNav.tsx` gleichen. */
   titel: string;
+  /**
+   * Schlüssel des Listengedächtnisses (LLH-1096, `components/listenGedaechtnis.ts`): Sortierung,
+   * Kopffilter und Suche stehen in der Adresse, die Spaltenwahl am Gerät. Je Sektion eindeutig.
+   */
+  listenSeite: string;
+  /** Mehrzahl im Dativ für den `Filterhinweis` („2 von 9 Typen sichtbar“). */
+  mehrzahl?: string;
   queryKey: QueryKey;
   liste: () => Promise<T[]>;
   /** Schnellerfassung: Pflicht ist allein das Label, der Rest ist Vorbelegung. */
@@ -49,6 +57,8 @@ export interface KatalogVerwaltungProps<T extends KatalogEintrag, W extends obje
 
 export default function KatalogVerwaltung<T extends KatalogEintrag, W extends object>({
   titel,
+  listenSeite,
+  mehrzahl,
   queryKey,
   liste,
   legeAn,
@@ -143,6 +153,10 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
       ]
     : [];
 
+  const spaltenGesamt = [...spalten, ...aktionsSpalte];
+  // Einstieg bleibt die fachliche Reihenfolge des Servers (`sortier`), keine Vorgabesortierung.
+  const gedaechtnis = useListenGedaechtnis(listenSeite, spaltenGesamt);
+
   return (
     <AdminPage
       titel={titel}
@@ -186,7 +200,9 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
             rowKey="id"
             loading={query.isLoading}
             dataSource={query.data ?? []}
-            columns={[...spalten, ...aktionsSpalte]}
+            columns={spaltenGesamt}
+            gedaechtnis={gedaechtnis}
+            mehrzahl={mehrzahl}
             // Genannt wird nur das Label: die Suche liest Rohwerte, und nach den übrigen
             // Spalten tippt niemand (Kategorien bedient ihr Spaltenfilter).
             suche={{ platzhalter: 'Label' }}

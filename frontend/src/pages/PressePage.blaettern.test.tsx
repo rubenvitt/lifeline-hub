@@ -148,4 +148,28 @@ describe('PressePage · Blättern (LFH-1075)', () => {
     expect(karten()).toHaveLength(103);
     expect(ladeErledigteMedienkontakte).toHaveBeenCalledTimes(1);
   });
+
+  it('der Kopffilter „Art“ steht in der Adresse und engt die erledigten am Server ein (LLH-1096)', async () => {
+    setup('/einsaetze/1/stab/presse?f.art=termin');
+    expect(await screen.findByText('100 von 150 geladen')).toBeInTheDocument();
+    expect(karten()).toHaveLength(100);
+    expect(karten()[0]).toHaveTextContent('Termin 150');
+    expect(vi.mocked(ladeErledigteMedienkontakte).mock.calls[0][2]).toEqual(['termin']);
+    // Die Zahlen des Hinweises kommen aus den Kennzahlen je Art, nicht aus dem Fenster.
+    expect(document.querySelector('[data-lfh="filterhinweis"]')).toHaveTextContent(
+      '150 von 152 Medienkontakten',
+    );
+  });
+
+  it('nur Anfragen: die offenen filtert die Seite, „Ältere laden“ entfällt (LLH-1096)', async () => {
+    setup('/einsaetze/1/stab/presse?f.art=anfrage');
+    await waitFor(() => expect(karten()).toHaveLength(2));
+    await waitFor(() =>
+      expect(vi.mocked(ladeErledigteMedienkontakte).mock.lastCall?.[2]).toEqual(['anfrage']),
+    );
+    expect(screen.queryByRole('button', { name: 'Ältere laden' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Art: Anfrage entfernen' }),
+    ).toBeInTheDocument();
+  });
 });
