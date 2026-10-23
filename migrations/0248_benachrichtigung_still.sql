@@ -11,7 +11,7 @@
 -- umbenennen, Indizes wortgleich neu. Schema = 0214 1:1, geändert ist nur der CHECK auf `stufe`;
 -- seine Liste spiegelt `benachrichtigung::BenachrichtigungStufe::ALLE` (Guard
 -- `check_listen_entsprechen_dem_katalog`). Abgesichert von
--- db::tests::migration_0247_baut_benachrichtigung_mit_der_stufe_still_neu.
+-- db::tests::migration_0248_baut_benachrichtigung_mit_der_stufe_still_neu.
 CREATE TABLE benachrichtigung_neu (
     id           INTEGER PRIMARY KEY,
     einsatz_id   INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,

@@ -11096,7 +11096,7 @@ mod tests {
     /// Spalten, Schlüssel und Indizes bleiben; die DDL unterscheidet sich nur in der
     /// `stufe`-Liste, die neue Stufe geht durch, eine unbekannte nicht, und die Kaskade hält.
     #[tokio::test]
-    async fn migration_0247_baut_benachrichtigung_mit_der_stufe_still_neu() {
+    async fn migration_0248_baut_benachrichtigung_mit_der_stufe_still_neu() {
         let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 246).await;
         let (e, b) = bild_grundlage(&pool).await;
         sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
