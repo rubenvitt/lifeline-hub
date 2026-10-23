@@ -609,7 +609,7 @@ async fn abloesung_meldet_vorwarnung_und_faelligkeit_an_die_modul_leser() {
     assert_eq!(v["bezug_id"], id);
     let detail = v["detail"].as_str().unwrap_or_default();
     assert!(
-        detail.starts_with("Florian 1, ") && detail.len() == "Florian 1, 00:00".len(),
+        detail.starts_with("Florian 1, ") && detail.len() == "Florian 1, 0000".len(),
         "{v}"
     );
     assert_eq!(

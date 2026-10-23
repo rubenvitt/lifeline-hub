@@ -10,7 +10,7 @@
 //! ([`schreibe_tx`]), dazu die Kopplung an die Ablösung (LLH-1128, `abloesung::kopplung`):
 //! Eintreffen beginnt, Entlassung beendet die Schicht, ihre Streichung öffnet sie wieder.
 
-use chrono_tz::Tz;
+use crate::zeitdarstellung::Zeitstil;
 use sqlx::{SqliteConnection, SqlitePool};
 
 use super::perioden::{self, Ereignis, Verstoss};
@@ -718,44 +718,37 @@ pub async fn perioden_personal(
 
 // ── ETB-Texte ───────────────────────────────────────────────────────────────────────────────
 
-/// Zeitpunkt als ETB-Text in der Org-Zone: „30.09. 06:40". Unparsbares erscheint roh.
-pub fn zeit_text(zeitpunkt_at: &str, tz: Tz) -> String {
-    match crate::zeit::parse_utc(zeitpunkt_at) {
-        Some(t) => t.with_timezone(&tz).format("%d.%m. %H:%M").to_string(),
-        None => zeitpunkt_at.to_string(),
-    }
-}
-
-/// „Einheit «Florian 1» eingetroffen 30.09. 06:40 (nachgetragen)"
+/// „Zeitachse: Einheit «Florian 1» eingetroffen 300640sep26 (nachgetragen)" — die Zeit in der
+/// Darstellung des Einsatzes ([`Zeitstil`], LLH-1061).
 pub fn etb_text_nachtrag(
     kraft: Kraft,
     name: &str,
     art: ZeitachseArt,
     zeitpunkt_at: &str,
-    tz: Tz,
+    stil: Zeitstil,
 ) -> String {
     format!(
         "Zeitachse: {} «{name}» {} {} (nachgetragen)",
         kraft_wort(kraft),
         art.partizip(),
-        zeit_text(zeitpunkt_at, tz)
+        stil.zeitpunkt_text(zeitpunkt_at)
     )
 }
 
-/// „Zeitachse: Einheit «Florian 1» eingetroffen 30.09. 06:40 gestrichen — Grund: …"
+/// „Zeitachse: Einheit «Florian 1» eingetroffen 300640sep26 gestrichen — Grund: …"
 pub fn etb_text_streichung(
     kraft: Kraft,
     name: &str,
     art: ZeitachseArt,
     zeitpunkt_at: &str,
     grund: &str,
-    tz: Tz,
+    stil: Zeitstil,
 ) -> String {
     format!(
         "Zeitachse: {} «{name}» {} {} gestrichen — Grund: {grund}",
         kraft_wort(kraft),
         art.partizip(),
-        zeit_text(zeitpunkt_at, tz)
+        stil.zeitpunkt_text(zeitpunkt_at)
     )
 }
 

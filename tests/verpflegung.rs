@@ -119,7 +119,7 @@ async fn durchstich_anlegen_ausgabe_ruecknahme_loeschen() {
     let zid = zf["id"].as_i64().unwrap();
     assert_eq!(
         verpflegungs_etb(&app, &admin, e).await,
-        vec!["Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute), davon 15 Sonderkost."]
+        vec!["Verpflegung ‚Mittag‘ 241200sep26–1330 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute), davon 15 Sonderkost."]
     );
 
     // Ausgabe 120 EP um 11:40 Ortszeit (vor Beginn), kein ETB.
@@ -201,7 +201,7 @@ async fn patch_aendert_bedarf_und_leerlauf_schreibt_nichts() {
     assert_eq!(zf["fehlmenge"]["gesamt"], 270);
     assert_eq!(
         verpflegungs_etb(&app, &admin, e).await[1],
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 geändert: Bedarf 270 EP (vorher 250)."
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 geändert: Bedarf 270 EP (vorher 250)."
     );
 
     let (s, _) = anfrage(
@@ -1923,8 +1923,8 @@ async fn zeitfenster_etb_nennt_stellen() {
     assert_eq!(
         verpflegungs_etb(&app, &admin, e).await,
         vec![
-            "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute); warm; an ‚Ausgabe Turnhalle Nord‘, ‚Feldküche BR Sportplatz‘.",
-            "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Stellen keine (vorher ‚Ausgabe Turnhalle Nord‘, ‚Feldküche BR Sportplatz‘).",
+            "Verpflegung ‚Mittag‘ 241200sep26–1330 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute); warm; an ‚Ausgabe Turnhalle Nord‘, ‚Feldküche BR Sportplatz‘.",
+            "Verpflegung ‚Mittag‘ 241200sep26–1330 (Bedarf 250 EP) geändert: Stellen keine (vorher ‚Ausgabe Turnhalle Nord‘, ‚Feldküche BR Sportplatz‘).",
         ]
     );
 }
@@ -3053,7 +3053,7 @@ async fn tag_aus_vorlage_etb_wie_einzeln_und_ein_live_ereignis() {
     assert_eq!(sammel, verpflegungs_etb(&app, &admin, e2).await);
     assert_eq!(
         sammel[0],
-        "Verpflegung ‚Frühstück‘ 11.10. 06:30–08:00 angelegt: Bedarf 260 EP (186 Kräfte, \
+        "Verpflegung ‚Frühstück‘ 110630okt26–0800 angelegt: Bedarf 260 EP (186 Kräfte, \
          70 Betreute, 4 weitere), davon 12 Sonderkost."
     );
 }

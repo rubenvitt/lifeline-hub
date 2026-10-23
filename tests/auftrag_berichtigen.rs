@@ -10,7 +10,7 @@ use common::{
     setup_mit_pool_und_live,
 };
 
-/// 12.10.2026 15:00 Europe/Berlin (Vorgabezone ohne Org-Einstellung) = 13:00 UTC.
+/// 12.10.2099 15:00 Europe/Berlin (Vorgabezone ohne Org-Einstellung) = 13:00 UTC.
 const FRIST: &str = "2099-10-12 13:00:00";
 
 fn funktion(t: &str) -> Value {
@@ -124,7 +124,7 @@ async fn frist_und_prioritaet_berichtigen_nennt_beide_im_etb() {
         .unwrap_or_else(|| panic!("{a:?}"));
     assert_eq!(
         berichtigt["inhalt"],
-        "Auftrag #1 geändert: Priorität sofort (vorher normal), Frist 12.10. 16:00 (vorher 12.10. 15:00)."
+        "Auftrag #1 geändert: Priorität sofort (vorher normal), Frist 121600okt99 (vorher 121500okt99)."
     );
     assert_eq!(berichtigt["an"], "Logistiktrupp");
     assert_eq!(berichtigt["auftrag_id"], aid);
@@ -389,7 +389,7 @@ async fn frist_fuehrt_die_erinnerung_nach() {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(auto_erinnerung(&pool, aid).await, None, "geschlossen");
     assert!(inhalte(&anordnungen(&app, &admin, e).await)
-        .contains(&"Auftrag #1 geändert: Frist keine (vorher 12.10. 16:00).".to_string()));
+        .contains(&"Auftrag #1 geändert: Frist keine (vorher 121600okt99).".to_string()));
 
     let (s, _) = patch(&app, &admin, e, aid, json!({ "frist_at": FRIST })).await;
     assert_eq!(s, StatusCode::OK);
@@ -537,7 +537,7 @@ async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
     assert_eq!(j["frist_at"], "2099-10-12 14:00:00");
     assert_eq!(j["empfaenger"][0]["snap_anzeige"], "Logistiktrupp 1");
     assert!(inhalte(&anordnungen(&app, &admin, e).await)
-        .contains(&"Auftrag #1 geändert: Frist 12.10. 16:00 (vorher 12.10. 15:00).".to_string()));
+        .contains(&"Auftrag #1 geändert: Frist 121600okt99 (vorher 121500okt99).".to_string()));
 
     // Kommt ein Empfänger hinzu, wird nur er geprüft; der bisherige bleibt mit seiner Anzeige.
     let mut liste = bisher.as_array().unwrap().clone();
@@ -642,7 +642,7 @@ async fn zwei_aufgeloeste_einheiten_sind_keine_empfaenger_aenderung() {
         .collect();
     assert_eq!(
         geaendert,
-        ["Auftrag #1 geändert: Frist 12.10. 16:00 (vorher 12.10. 15:00)."]
+        ["Auftrag #1 geändert: Frist 121600okt99 (vorher 121500okt99)."]
     );
 }
 

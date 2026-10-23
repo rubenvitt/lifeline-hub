@@ -54,8 +54,8 @@
 //! Empfänger LLH-1055 „Empfänger einer Ausgabe“, „Empfängerliste der Verpflegung“,
 //! Verpflegungsplan LLH-1058).
 
+use crate::zeitdarstellung::Zeitstil;
 use chrono::{DateTime, Utc};
-use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -462,18 +462,12 @@ pub fn draht_lesen(feld: &str, s: &str) -> Result<DateTime<Utc>, AppError> {
     }
 }
 
-/// Zeitraum für den ETB-Text in der Zeitzone der Organisation (design.md D5):
-/// `TT.MM. HH:MM–HH:MM`, über Mitternacht (nach ORTSdatum) mit beiden Daten
-/// `TT.MM. HH:MM–TT.MM. HH:MM`. Der Server rechnet sonst in UTC, und eine beweissichernde
-/// Unterlage nennte still die falsche Uhrzeit.
-pub fn zeitraum_text(von: DateTime<Utc>, bis: DateTime<Utc>, tz: Tz) -> String {
-    let v = von.with_timezone(&tz);
-    let b = bis.with_timezone(&tz);
-    if v.date_naive() == b.date_naive() {
-        format!("{}–{}", v.format("%d.%m. %H:%M"), b.format("%H:%M"))
-    } else {
-        format!("{}–{}", v.format("%d.%m. %H:%M"), b.format("%d.%m. %H:%M"))
-    }
+/// Zeitraum für den ETB-Text in der Zeitzone der Organisation (design.md D5) und der
+/// Darstellung des Einsatzes (LLH-1061): `241200sep26–1330` bzw. `24.09.26 12:00–13:30`, über
+/// Mitternacht (nach ORTSdatum) mit beiden Tagen. Der Server rechnet sonst in UTC, und eine
+/// beweissichernde Unterlage nennte still die falsche Uhrzeit.
+pub fn zeitraum_text(von: DateTime<Utc>, bis: DateTime<Utc>, stil: Zeitstil) -> String {
+    stil.zeitraum(von, bis)
 }
 
 // ── ETB-Texte ───────────────────────────────────────────────────────────────────────────────
@@ -529,7 +523,7 @@ pub mod etb_text {
         art.map_or("ohne Angabe", Verpflegungsart::wort)
     }
 
-    /// „Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte,
+    /// „Verpflegung ‚Mittag‘ 241200sep26–1330 angelegt: Bedarf 250 EP (180 Kräfte,
     /// 70 Betreute), davon 15 Sonderkost.“ Art und Stellen (LLH-1040 D7) nur, wenn gesetzt:
     /// „…, davon 15 Sonderkost; warm; an ‚Feldküche BR Sportplatz‘, ‚Ausgabe Turnhalle Nord‘.“
     pub fn angelegt(
@@ -607,8 +601,8 @@ pub mod etb_text {
     /// Nennt nur, was sich geändert hat, und immer Bezeichnung, Zeitraum und Gesamtbedarf (Spec
     /// „Einsatztagebuch“). Hat sich der Gesamtbedarf geändert, steht er mit dem Vorwert in der
     /// Aufzählung, sonst im Kopf:
-    /// „Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 geändert: Bedarf 270 EP (vorher 250).“ bzw.
-    /// „Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Zeitraum (vorher …).“
+    /// „Verpflegung ‚Mittag‘ 241200sep26–1330 geändert: Bedarf 270 EP (vorher 250).“ bzw.
+    /// „Verpflegung ‚Mittag‘ 241200sep26–1330 (Bedarf 250 EP) geändert: Zeitraum (vorher …).“
     pub fn geaendert(bezeichnung: &str, zeitraum: &str, b: &Bedarf, a: &Aenderungen<'_>) -> String {
         let mut teile: Vec<String> = Vec::new();
         if let Some(v) = a.bezeichnung_vorher {
@@ -656,7 +650,7 @@ pub mod etb_text {
         format!("{kopf} geändert: {}.", teile.join(", "))
     }
 
-    /// „Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 gelöscht (Bedarf 250 EP).“
+    /// „Verpflegung ‚Mittag‘ 241200sep26–1330 gelöscht (Bedarf 250 EP).“
     pub fn geloescht(bezeichnung: &str, zeitraum: &str, b: &Bedarf) -> String {
         format!(
             "Verpflegung {} {zeitraum} gelöscht (Bedarf {} EP).",

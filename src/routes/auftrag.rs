@@ -593,8 +593,8 @@ pub async fn berichtigen(
     let b =
         crate::auftrag::validate_berichtigung(&state.pool, einsatz_id, auftrag_id, &req).await?;
     let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
-    // Dieselbe Zone wie die Zeiten in den ETB-Texten der Verpflegung (Org-Einstellung).
-    let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
+    // Dieselbe Zone und Darstellung wie die Zeiten in den ETB-Texten der Verpflegung.
+    let stil = crate::verpflegung::repo::zeitstil(&state.pool, einsatz_id).await?;
     let now = jetzt();
     let von_id = ctx.benutzer.id;
     let berichtigt = crate::write_retry!(&state.pool, |conn| {
@@ -604,7 +604,7 @@ pub async fn berichtigen(
             auftrag_id,
             von_id,
             etb_startwert,
-            tz,
+            stil,
             &b,
             &now,
         )
