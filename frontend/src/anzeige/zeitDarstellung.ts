@@ -11,7 +11,8 @@
  * | `uhrzeit`   | `1430`                    | `14:30`                        |
  *
  * `uhrzeit` nur, wo der Tag fest aus dem Zusammenhang folgt (eine Tagesspalte, ein Plan für einen
- * Tag). Die Darstellung kommt aus den Konventionen (`konventionen.zeitdarstellung`, wirksam nach
+ * Tag). Dazu {@link datum}, der Kalendertag eines Zeitpunkts ohne Uhrzeit (Tageskopf, `{datum}`
+ * im ETB-Baustein): taktisch der Tagesteil der DTG `10okt26`, sonst `10.10.26` (LLH-1061). Die Darstellung kommt aus den Konventionen (`konventionen.zeitdarstellung`, wirksam nach
  * {@link wirksameZeitdarstellung}); die Provider in `AnzeigeKonventionenContext.tsx` setzen sie.
  *
  * Volle DTG (Entscheidung E1, LLH-1045, 22.10.2026): Tag, Uhrzeit, Monat, Jahr zweistellig, alles
@@ -85,15 +86,22 @@ function darstellung(konv: AnzeigeKonventionen): Zeitdarstellung {
   return konv.zeitdarstellung ?? ZEITDARSTELLUNG_VORGABE;
 }
 
-/** Wert → Wanduhr der Anzeigezone; `null` bei leerem Wert. */
+/** Wert → Wanduhr der Anzeigezone; `null` bei leerem oder unlesbarem Wert. */
 function wanduhr(wert: Zeitwert, konv: AnzeigeKonventionen): Dayjs | null {
   if (!wert) return null;
+  if (typeof wert !== 'string' && !wert.isValid()) return null;
   const wire = typeof wert === 'string' ? wert : wert.utc().format('YYYY-MM-DD HH:mm:ss');
-  return inZone(wire, konv);
+  const d = inZone(wire, konv);
+  return d.isValid() ? d : null;
 }
 
 function dtgVoll(d: Dayjs): string {
   return `${d.format('DDHHmm')}${MONATE_DTG[d.month()]}${d.format('YY')}`;
+}
+
+/** Der Tagesteil der DTG: `10okt26`. */
+function tagDtg(d: Dayjs): string {
+  return `${d.format('DD')}${MONATE_DTG[d.month()]}${d.format('YY')}`;
 }
 
 /** Tag und Uhrzeit ohne Heute-Prüfung — die Form von `zeitKurz` an einem anderen Tag. */
@@ -127,6 +135,38 @@ export function zeitKurz(
   const heute = wanduhr(dayjs(jetzt), konv);
   const art = darstellung(konv);
   return heute && d.isSame(heute, 'day') ? nurUhrzeit(d, art) : zeitMitTag(d, art);
+}
+
+/**
+ * Kalendertag eines Zeitpunkts in der Anzeigezone, ohne Uhrzeit (LLH-1061): taktisch der Tagesteil
+ * der vollen DTG `10okt26`, bei „Datum und Uhrzeit“ `10.10.26` — dieselbe Schreibweise wie
+ * {@link zeitpunkt}, nur ohne die Uhrzeitgruppe.
+ */
+export function datum(wert: Zeitwert, konv: AnzeigeKonventionen): string {
+  const d = wanduhr(wert, konv);
+  if (!d) return '';
+  return darstellung(konv) === 'taktisch' ? tagDtg(d) : d.format('DD.MM.YY');
+}
+
+/**
+ * Ein Kalendertag `YYYY-MM-DD` (gespeichert ohne Uhrzeit und Zone, etwa ein Verpflegungstag) in
+ * der Schreibweise von {@link datum}. Ohne Zonenrechnung: der Tag IST schon der Tag.
+ */
+export function kalendertag(tag: string | null | undefined, konv: AnzeigeKonventionen): string {
+  if (!tag) return '';
+  const d = dayjs.utc(tag.slice(0, 10));
+  if (!d.isValid()) return '';
+  return darstellung(konv) === 'taktisch' ? tagDtg(d) : d.format('DD.MM.YY');
+}
+
+/**
+ * Tag und Uhrzeit ohne Heute-Prüfung (`101430` bzw. `10.10. 14:30`): die Form der Rolle „kurz“ an
+ * einem anderen Tag, für den Anfang eines Zeitraums, der den Tag nennen muss. Liest keine Uhr.
+ */
+export function tagUndUhrzeit(wert: Zeitwert, konv: AnzeigeKonventionen): string {
+  const d = wanduhr(wert, konv);
+  if (!d) return '';
+  return zeitMitTag(d, darstellung(konv));
 }
 
 /** Rolle „Uhrzeit“, nur wo der Tag aus dem Zusammenhang feststeht: `1430` bzw. `14:30`. */

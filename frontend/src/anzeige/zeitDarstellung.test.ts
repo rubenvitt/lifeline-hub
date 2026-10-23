@@ -3,6 +3,10 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { mitProzessZone } from '../test/prozessZone';
 import {
+  datum,
+  kalendertag,
+  tagUndUhrzeit,
+  leereUhrzeit,
   MONATE_DTG,
   uhrzeit,
   wirksameZeitdarstellung,
@@ -121,6 +125,35 @@ describe('Zeitdarstellung — drei Rollen (LLH-1053, Spec `zeitdarstellung`)', (
     expect(zeitpunkt(null, taktisch)).toBe('');
     expect(zeitKurz(undefined, datumUhrzeit)).toBe('');
     expect(uhrzeit('', taktisch)).toBe('');
+  });
+
+  it('Datum: der Tagesteil der DTG bzw. `10.10.26`, in der Anzeigezone (LLH-1061)', () => {
+    expect(datum(WERT, taktisch)).toBe('10okt26');
+    expect(datum(WERT, datumUhrzeit)).toBe('10.10.26');
+    // 31.10. 23:30 UTC ist in Berlin schon der 01.11.
+    expect(datum('2026-10-31 23:30:00', taktisch)).toBe('01nov26');
+    expect(datum(null, taktisch)).toBe('');
+  });
+
+  it('Tag und Uhrzeit ohne Heute-Prüfung, unlesbar bleibt leer', () => {
+    expect(tagUndUhrzeit(WERT, taktisch)).toBe('101430');
+    expect(tagUndUhrzeit(WERT, datumUhrzeit)).toBe('10.10. 14:30');
+    expect(tagUndUhrzeit('Unsinn', taktisch)).toBe('');
+    expect(zeitpunkt('Unsinn', taktisch)).toBe('');
+  });
+
+  it('Kalendertag ohne Zone: der gespeicherte Tag bleibt der Tag', () => {
+    expect(kalendertag('2026-03-29', taktisch)).toBe('29mrz26');
+    expect(kalendertag('2026-03-29', datumUhrzeit)).toBe('29.03.26');
+    expect(kalendertag('2026-03-29', { zeitzone: 'Pacific/Kiritimati' })).toBe('29mrz26');
+    expect(kalendertag('', taktisch)).toBe('');
+    expect(kalendertag('Unsinn', taktisch)).toBe('');
+  });
+
+  it('der Leerwert einer Zeitspalte hat die Ziffernbreite der Darstellung', () => {
+    expect(leereUhrzeit(taktisch)).toBe('————');
+    expect(leereUhrzeit(datumUhrzeit)).toBe('——:——');
+    expect(leereUhrzeit({})).toBe('————');
   });
 
   it('eine ungültige Zone crasht nicht, sondern fällt auf die Browserzone (hier UTC)', () => {
