@@ -515,6 +515,9 @@ export default function UeberblickPage() {
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 
+  // Beim Laden hält ein unsichtbares Meta seinen Platz wie bei „Einsatzabschnitte“: auf 390 px
+  // bricht der Kopf mit dem Meta um (79 → 94 px), erst mit den Daten schöbe das die Paneele
+  // darunter (Seiten-CLS 0,021–0,031, LLH-1053).
   const ueberfaelligMeta =
     zAuftraege === 'daten' && auftragszahl ? (
       <span
@@ -525,6 +528,10 @@ export default function UeberblickPage() {
         {auftragszahl.ueberfaellig > 0
           ? `${auftragszahl.ueberfaellig} überfällig`
           : 'keine überfällig'}
+      </span>
+    ) : zAuftraege === 'laden' ? (
+      <span data-lfh="paneel-meta-platzhalter" aria-hidden="true" style={{ visibility: 'hidden' }}>
+        keine überfällig
       </span>
     ) : undefined;
 
