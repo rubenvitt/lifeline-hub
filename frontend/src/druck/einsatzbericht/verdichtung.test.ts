@@ -110,7 +110,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     const b = verdichteEinsatzbericht(rohBericht(), konv);
     expect(b.vorlaeufig).toBe(true);
     const a = block(b, 'zeiten').abschnitte[0];
-    expect(wert(a, 'Beginn')).toBe('29.03.2026 01:30');
+    expect(wert(a, 'Beginn')).toBe('290130mrz26');
     expect(wert(a, 'Ende')).toBe('läuft');
     expect(wert(a, 'Dauer')).toBe('01:30 h (bis Stand)');
     expect(b.stand).toBe('290400mrz26');
@@ -125,7 +125,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     );
     expect(b.vorlaeufig).toBe(false);
     const a = block(b, 'zeiten').abschnitte[0];
-    expect(wert(a, 'Ende')).toBe('29.03.2026 03:10');
+    expect(wert(a, 'Ende')).toBe('290310mrz26');
     expect(wert(a, 'Dauer')).toBe('00:40 h');
   });
 
@@ -133,13 +133,13 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     const b = verdichteEinsatzbericht(rohBericht(), konv);
     const leitung = abschnitt(b, 'fuehrung', 'Einsatzleitung');
     expect(wert(leitung, 'Einsatzleiter')).toBe('Max Leiter');
-    expect(wert(leitung, 'Seit')).toBe('29.03.2026 01:40');
+    expect(wert(leitung, 'Seit')).toBe('290140mrz26');
     const stab = abschnitt(b, 'fuehrung', 'Stab');
     expect(wert(stab, 'S1')).toBe('bei der Einsatzleitung');
     expect(wert(stab, 'S2')).toBe('Sven Lage');
     expect(wert(stab, 'S6')).toBe('nicht vergeben');
     const lb = tabelle(abschnitt(b, 'fuehrung', 'Lagebesprechungen'));
-    expect(lb.zeilen).toEqual([['1', '29.03.2026 03:15', 'Riegelstellung halten']]);
+    expect(lb.zeilen).toEqual([['1', '290315mrz26', 'Riegelstellung halten']]);
   });
 
   it('Führung: ohne Einsatzleiter „nicht erfasst“, nie die App-Rolle (LFH-1199)', () => {
@@ -293,7 +293,7 @@ describe('3.3 Lage', () => {
     );
     const verzeichnis = tabelle(abschnitt(b, 'lage', 'Verzeichnis der Lageberichte'));
     expect(verzeichnis.zeilen.map((z) => z[1])).toEqual(['Erstlage', 'Lage 2', 'Lage 3']);
-    expect(verzeichnis.zeilen[0]).toEqual(['29.03.2026 01:45', 'Erstlage', 'v1', 'Max Leiter']);
+    expect(verzeichnis.zeilen[0]).toEqual(['290145mrz26', 'Erstlage', 'v1', 'Max Leiter']);
     const voll = abschnitt(b, 'lage', 'Letzter Lagebericht: Lage 3');
     const md = voll.inhalt.find((i) => i.art === 'markdown');
     expect(md && md.art === 'markdown' ? md.abschnitte.map((x) => x.text) : []).toEqual([
@@ -616,7 +616,7 @@ describe('Anlage Einheiten mit Einsatzzeiten (LFH-902, design.md D5)', () => {
     expect(tabelle(anlage(roh))).toEqual({
       art: 'tabelle',
       kopf: ['Einheit', 'Beginn', 'Ende', 'Einsatzzeit'],
-      zeilen: [['Zug 1 (Florian 1/1)', '01.06.2026 08:00', 'läuft', '6 h 32']],
+      zeilen: [['Zug 1 (Florian 1/1)', '010800jun26', 'läuft', '6 h 32']],
     });
   });
 
@@ -642,8 +642,8 @@ describe('Anlage Einheiten mit Einsatzzeiten (LFH-902, design.md D5)', () => {
       STAND_SOMMER,
     );
     expect(tabelle(anlage(roh)).zeilen).toEqual([
-      ['Gruppe 1', '01.06.2026 08:30', '01.06.2026 09:10', '40 min'],
-      ['Zug 1', '01.06.2026 09:00', '01.06.2026 11:30', '1 h 30'],
+      ['Gruppe 1', '010830jun26', '010910jun26', '40 min'],
+      ['Zug 1', '010900jun26', '011130jun26', '1 h 30'],
     ]);
   });
 
@@ -669,7 +669,7 @@ describe('Anlage Einheiten mit Einsatzzeiten (LFH-902, design.md D5)', () => {
       STAND_SOMMER,
     );
     expect(tabelle(anlage(roh)).zeilen).toEqual([
-      ['Zug 1', '01.06.2026 08:00', 'nicht erfasst', '4 h 00'],
+      ['Zug 1', '010800jun26', 'nicht erfasst', '4 h 00'],
     ]);
   });
 
@@ -764,8 +764,8 @@ describe('Anlage Personal je Kopf (LFH-902, design.md D5)', () => {
     expect(t.kopf).toEqual(['Name', 'Funktion', 'Einheit', 'Beginn', 'Ende', 'Einsatzzeit']);
     expect(t.zeilen).toEqual([
       ['Bert Bauer', 'Truppführerin', 'Bereitschaft', '—', '—', 'keine Zeitachse'],
-      ['Anna Abel', '—', 'Zug 1', '01.06.2026 08:00', '01.06.2026 09:00', '1 h 00'],
-      ['Zora Zander', 'Truppführerin', 'Zug 1', '01.06.2026 08:00', 'läuft', '6 h 32'],
+      ['Anna Abel', '—', 'Zug 1', '010800jun26', '010900jun26', '1 h 00'],
+      ['Zora Zander', 'Truppführerin', 'Zug 1', '010800jun26', 'läuft', '6 h 32'],
       ['Frei Kraft', 'Truppführerin', '—', '—', '—', 'keine Zeitachse'],
     ]);
   });
@@ -785,8 +785,8 @@ describe('Anlage Personal je Kopf (LFH-902, design.md D5)', () => {
       'Egon Entlassen',
       'Truppführerin',
       '—',
-      '01.06.2026 08:00',
-      '01.06.2026 08:30',
+      '010800jun26',
+      '010830jun26',
       '30 min',
     ]);
     expect(wert(a, 'Personen')).toBe('5');

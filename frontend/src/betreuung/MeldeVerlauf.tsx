@@ -7,7 +7,6 @@ import { einsatzKeys, type BetreuungVerlaufArt } from '../api/queryKeys';
 import type { BelegungVerlaufEintrag, StandVerlaufEintrag } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { formatZeitKurz } from '../anzeige/format';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import Zeitachseneintrag from '../components/instrument/Zeitachseneintrag';
 import {
@@ -25,6 +24,7 @@ import {
   standZeile,
   type VerlaufZeile,
 } from './verlauf';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Meldeverlauf eines Evakuierungsbezirks bzw. einer Betreuungsstelle.
@@ -166,12 +166,12 @@ export default function MeldeVerlauf({
             istNachgetragenMeldung(z) && (
               <span key="nachtrag">
                 <span aria-hidden="true">⧖ </span>nachgetragen um{' '}
-                <ZeitAnzeige wert={z.erfasst_at} format="kurz" />
+                <ZeitAnzeige wert={z.erfasst_at} rolle="kurz" />
               </span>
             ),
             zurueck && (
               <span key="zurueck">
-                zurückgenommen <ZeitAnzeige wert={z.zurueckgenommen_at} format="kurz" />
+                zurückgenommen <ZeitAnzeige wert={z.zurueckgenommen_at} rolle="kurz" />
                 {z.zurueckgenommen_von ? ` von ${z.zurueckgenommen_von}` : ''}
               </span>
             ),
@@ -181,7 +181,7 @@ export default function MeldeVerlauf({
               key={z.id}
               als="li"
               data-lfh="verlauf-eintrag"
-              zeit={<ZeitAnzeige wert={z.zeitpunkt_at} format="kurz" />}
+              zeit={<ZeitAnzeige wert={z.zeitpunkt_at} rolle="kurz" />}
               typ={zurueck ? 'berichtigung' : 'meldung'}
               typwort={zurueck ? 'zurückgenommen' : 'Meldung'}
               meta={z.aktuell ? aktuellWort(art) : undefined}
@@ -199,7 +199,7 @@ export default function MeldeVerlauf({
                   // Neutral: rot ist erst der Bestätigungsknopf; drei rote Knöpfe untereinander machten aus einer
                   // Liste eine Alarmfläche.
                   <Button
-                    aria-label={ruecknahmeName(z, formatZeitKurz(z.zeitpunkt_at, konventionen))}
+                    aria-label={ruecknahmeName(z, zeitKurz(z.zeitpunkt_at, konventionen))}
                     onClick={() => oeffne(z)}
                   >
                     Zurücknehmen
@@ -253,7 +253,7 @@ export default function MeldeVerlauf({
       >
         {ziel && (
           <>
-            <p>{rueckfrageFrage(art, ziel, formatZeitKurz(ziel.zeitpunkt_at, konventionen))}</p>
+            <p>{rueckfrageFrage(art, ziel, zeitKurz(ziel.zeitpunkt_at, konventionen))}</p>
             <p>Bleibt als „zurückgenommen“ in Verlauf und ETB.</p>
             <SpeicherFehler fehler={ruecknahme.error} titel="Rücknahme fehlgeschlagen" />
           </>

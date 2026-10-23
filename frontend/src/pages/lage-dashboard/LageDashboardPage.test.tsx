@@ -629,9 +629,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     });
     expect(zelle).toHaveTextContent('m');
     const notiz = zelle.querySelector('[data-lfh="kennzahl-notiz"]')?.textContent ?? '';
-    expect(notiz).toMatch(
-      /^WESER · steigend \+9 cm\/h · Stand (\d{2}\. )?\d{2}:\d{2} · \+1 weitere$/,
-    );
+    expect(notiz).toMatch(/^WESER · steigend \+9 cm\/h · Stand (\d{2})?\d{4} · \+1 weitere$/);
     expect(notiz).not.toContain('veraltet');
     expect(zelle.getAttribute('data-ton')).toBe('neutral');
     // Modul „Wetter & Pegel" frei (Freigabe des Servers) → die Kennzahl führt dorthin.
@@ -921,8 +919,9 @@ describe('LageDashboardPage — Seitenkopf', () => {
     render();
     await kennzahlGeladen('Betroffene');
     expect(screen.getByRole('heading', { level: 1, name: 'Lagebild' })).toBeInTheDocument();
+    // „jetzt“ in der Rolle „kurz“ (LLH-1061): heute nur die Uhrzeit, `1422`.
     expect(document.querySelector('.lfh-seitenkopf__meta')?.textContent).toMatch(
-      /\d{2}\.\d{2}\. \d{2}:\d{2}/,
+      /(^|\D)\d{4}(\D|$)/,
     );
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="datenstand"]')?.textContent).toMatch(
@@ -974,8 +973,8 @@ describe('LageDashboardPage — Wetterwarnung im Seitenkopf (LLH-1117)', () => {
     });
     expect(m.closest('[data-lfh="lagebild-meta"]')).not.toBeNull();
     // Beginn ist jetzt + 3 h: nach 21 Uhr liegt er am Folgetag, dann steht der Tag davor
-    // (`standZeit`: `DD. HH:mm`).
-    expect(m.textContent).toMatch(/^Unwetterwarnung Starkregen ab (\d\d\. )?\d\d:\d\d ↗$/);
+    // (`standZeit`, Rolle „kurz“: `241400` statt `1400`).
+    expect(m.textContent).toMatch(/^Unwetterwarnung Starkregen ab (\d\d)?\d{4} ↗$/);
     const link = within(m).getByRole('link', { name: /^Unwetterwarnung Starkregen ab / });
     expect(link).toHaveAttribute('href', '/einsaetze/1/wetter-pegel');
     // Nie im Kennzahlenband (LFH-640) und still: kein Toast, kein Hinweis.

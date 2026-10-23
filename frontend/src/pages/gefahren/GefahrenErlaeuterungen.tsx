@@ -23,7 +23,7 @@ export interface GefahrenErlaeuterungenProps {
  */
 export default function GefahrenErlaeuterungen({ matrix, onWaehlen }: GefahrenErlaeuterungenProps) {
   const { token } = useRollen();
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const zellen = zellenMitErlaeuterung(matrix);
   if (zellen.length === 0) return null;
   return (
@@ -54,7 +54,7 @@ export default function GefahrenErlaeuterungen({ matrix, onWaehlen }: GefahrenEr
               <span style={{ color: token.colorTextDescription }}>
                 {[
                   ...(z.gemeldet_von?.trim() ? [`gemeldet von ${z.gemeldet_von.trim()}`] : []),
-                  geaendertText(z, formatZeit),
+                  geaendertText(z, zeitpunkt),
                 ].join(' · ')}
               </span>
             </span>

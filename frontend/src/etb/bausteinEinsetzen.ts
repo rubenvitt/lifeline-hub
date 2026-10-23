@@ -1,5 +1,6 @@
 import { serverJetzt } from '../offline/serveruhr';
-import { zuWanduhr } from '../anzeige/zeitEingabe';
+import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
+import { datum, uhrzeit } from '../anzeige/zeitDarstellung';
 import type { EtbBaustein, EinsatzAnzeige, EtbTyp, MeldeWeg } from '../api/types';
 
 const TOKEN = () => /\{([a-z0-9_]+)\}/g;
@@ -18,11 +19,12 @@ interface AutoPlatzhalter {
   /** Kurzbeschreibung des automatisch eingesetzten Werts (für die Admin-UI). */
   beschreibung: string;
   /**
-   * Liefert den aktuellen Wert oder null/undefined, wenn er für den Einsatz fehlt. `zone` ist die
-   * Anzeigezone (`null` = Browserzone): Datum und Uhrzeit landen im ETB-Text und stehen in
-   * derselben Zone wie jede andere Zeit dort (LFH-692).
+   * Liefert den aktuellen Wert oder null/undefined, wenn er für den Einsatz fehlt. `konv` sind die
+   * Anzeigekonventionen (Zone, `null` = Browserzone, und Darstellung): Datum und Uhrzeit landen im
+   * ETB-Text und stehen in derselben Zone (LFH-692) und Schreibweise (LLH-1061) wie jede andere
+   * Zeit dort.
    */
-  wert: (einsatz: EinsatzAnzeige, zone: string | null) => string | null | undefined;
+  wert: (einsatz: EinsatzAnzeige, konv: AnzeigeKonventionen) => string | null | undefined;
 }
 
 /**
@@ -33,13 +35,13 @@ interface AutoPlatzhalter {
 export const AUTO_PLATZHALTER: AutoPlatzhalter[] = [
   {
     name: 'datum',
-    beschreibung: 'Aktuelles Datum (TT.MM.JJJJ)',
-    wert: (_e, zone) => zuWanduhr(serverJetzt(), zone).format('DD.MM.YYYY'),
+    beschreibung: 'Aktuelles Datum (taktisch 10okt26, sonst 10.10.26)',
+    wert: (_e, konv) => datum(serverJetzt(), konv),
   },
   {
     name: 'uhrzeit',
-    beschreibung: 'Aktuelle Uhrzeit (HH:MM)',
-    wert: (_e, zone) => zuWanduhr(serverJetzt(), zone).format('HH:mm'),
+    beschreibung: 'Aktuelle Uhrzeit (taktisch 1430, sonst 14:30)',
+    wert: (_e, konv) => uhrzeit(serverJetzt(), konv),
   },
   { name: 'einsatzort', beschreibung: 'Einsatzort', wert: (e) => e.einsatzort },
   { name: 'stichwort', beschreibung: 'Stichwort', wert: (e) => e.stichwort },
@@ -53,10 +55,10 @@ const AUTO_MAP = new Map(AUTO_PLATZHALTER.map((p) => [p.name, p.wert]));
 function autoWert(
   name: string,
   einsatz: EinsatzAnzeige,
-  zone: string | null,
+  konv: AnzeigeKonventionen,
 ): string | null | undefined {
   const fn = AUTO_MAP.get(name);
-  return fn ? fn(einsatz, zone) : undefined;
+  return fn ? fn(einsatz, konv) : undefined;
 }
 
 function istLeer(wert: string | null | undefined): boolean {
@@ -81,10 +83,10 @@ function tokensVon(...texte: (string | null | undefined)[]): string[] {
 export function ermittlePlatzhalter(
   baustein: EtbBaustein,
   einsatz: EinsatzAnzeige,
-  zone: string | null = null,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): string[] {
   return tokensVon(baustein.inhalt, baustein.veranlassung).filter((name) => {
-    const auto = autoWert(name, einsatz, zone);
+    const auto = autoWert(name, einsatz, konv);
     if (auto === undefined) return true; // manuell
     return istLeer(auto); // herabgestuft, wenn Auto-Wert fehlt
   });
@@ -94,10 +96,10 @@ function substituiere(
   text: string,
   einsatz: EinsatzAnzeige,
   manuelleWerte: Record<string, string>,
-  zone: string | null,
+  konv: AnzeigeKonventionen,
 ): string {
   return text.replace(TOKEN(), (_treffer, name: string) => {
-    const auto = autoWert(name, einsatz, zone);
+    const auto = autoWert(name, einsatz, konv);
     if (auto !== undefined && !istLeer(auto)) return auto as string;
     return manuelleWerte[name] ?? '';
   });
@@ -108,15 +110,15 @@ export function setzeBausteinEin(
   baustein: EtbBaustein,
   einsatz: EinsatzAnzeige,
   manuelleWerte: Record<string, string>,
-  zone: string | null = null,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): BausteinFelder {
   const felder: BausteinFelder = {
     typ: baustein.typ,
-    inhalt: substituiere(baustein.inhalt, einsatz, manuelleWerte, zone),
+    inhalt: substituiere(baustein.inhalt, einsatz, manuelleWerte, konv),
   };
   if (baustein.meldeweg) felder.meldeweg = baustein.meldeweg;
   if (baustein.veranlassung) {
-    felder.veranlassung = substituiere(baustein.veranlassung, einsatz, manuelleWerte, zone);
+    felder.veranlassung = substituiere(baustein.veranlassung, einsatz, manuelleWerte, konv);
   }
   return felder;
 }

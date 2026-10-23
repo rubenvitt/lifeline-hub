@@ -35,7 +35,7 @@ import {
 } from '../api/offlineKarten';
 import AutoAktualisierungZeile from './AutoAktualisierungZeile';
 import { listenTakt, statusTakt } from './aktualisierungTakt';
-import { ortszeit } from './ortszeit';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
@@ -76,6 +76,8 @@ function standAusUrl(url: string | null | undefined): string | null {
 export default function OfflineKartenVerwaltung() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
+  // Außerhalb eines Einsatzes: Konventionen der Organisation, sonst Vorgabe (LLH-1061).
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = theme.useToken();
@@ -186,7 +188,7 @@ export default function OfflineKartenVerwaltung() {
       render: (name: string, k: OfflineKarte) => {
         const stand = standAusUrl(k.quell_url);
         // LFH-993: seit wann die aktuelle Datei auf dem Gerät liegt (letzter erfolgreicher Download).
-        const seit = k.status === 'bereit' ? ortszeit(k.download_at) : '';
+        const seit = k.status === 'bereit' ? zeitpunkt(k.download_at) : '';
         return (
           <div>
             <div>{name}</div>

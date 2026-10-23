@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArchivAkte, PersonTreffer, Schwaerzungsantrag } from '../api/types';
-import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
@@ -17,6 +17,7 @@ import SchwaerzungsantragDialog, {
   personenUmfang,
   vollzugAb,
 } from './SchwaerzungsantragDialog';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /** Löschersuchen nach Art. 17 (LFH-751): Rückfrage, Personensuche, Paneel der Akte. */
 
@@ -255,7 +256,7 @@ describe('Loeschersuchen', () => {
     expect(screen.getAllByText('DS-2026-014')).toHaveLength(2);
     // „Vollzug ab“ beider Zeilen (gleiche Fälligkeit im Fixture).
     expect(
-      screen.getAllByText(formatZeit('2026-10-03 08:00:00', DEFAULT_KONVENTIONEN)),
+      screen.getAllByText(zeitpunkt('2026-10-03 08:00:00', DEFAULT_KONVENTIONEN)),
     ).toHaveLength(2);
     await userEvent.setup().click(knopf);
     await waitFor(() => expect(zurueck).toBe(1));

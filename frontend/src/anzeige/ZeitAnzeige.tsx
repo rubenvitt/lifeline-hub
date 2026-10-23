@@ -1,5 +1,4 @@
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
-import { taktischeDtg } from './format';
 import { uhrzeit, zeitKurz, zeitpunkt } from './zeitDarstellung';
 
 /**
@@ -12,24 +11,15 @@ import { uhrzeit, zeitKurz, zeitpunkt } from './zeitDarstellung';
  */
 export type ZeitRolle = 'zeitpunkt' | 'kurz' | 'uhrzeit';
 
-/** @deprecated Alte Formatnamen; `rolle` nehmen. `dtg` bleibt die reine Tagesform. */
-type ZeitFormatAlt = 'uhrzeit' | 'dtg' | 'dtgVoll' | 'kurz';
-
 export default function ZeitAnzeige({
   wert,
-  rolle,
-  format,
+  rolle = 'zeitpunkt',
 }: {
   wert?: string | null;
   rolle?: ZeitRolle;
-  /** @deprecated `rolle` nehmen (LLH-1053); bleibt, bis LLH-1061 die Aufrufer umstellt. */
-  format?: ZeitFormatAlt;
 }) {
   const { konventionen } = useAnzeigeKonventionen();
-  if (!rolle && format === 'dtg') return <>{taktischeDtg(wert, konventionen)}</>;
-  const wirksam: ZeitRolle =
-    rolle ?? (format === 'uhrzeit' ? 'uhrzeit' : format === 'kurz' ? 'kurz' : 'zeitpunkt');
-  if (wirksam === 'uhrzeit') return <>{uhrzeit(wert, konventionen)}</>;
-  if (wirksam === 'kurz') return <>{zeitKurz(wert, konventionen)}</>;
+  if (rolle === 'uhrzeit') return <>{uhrzeit(wert, konventionen)}</>;
+  if (rolle === 'kurz') return <>{zeitKurz(wert, konventionen)}</>;
   return <>{zeitpunkt(wert, konventionen)}</>;
 }

@@ -27,7 +27,7 @@ function Sonde() {
   const k = useAnzeigeKonventionen();
   return (
     <div>
-      <span data-testid="zeit">{k.formatZeit('2026-06-11 09:00:00')}</span>
+      <span data-testid="zeit">{k.zeitpunkt('2026-06-11 09:00:00')}</span>
       <span data-testid="koord">{k.formatKoordinate(51.1, 4.1)}</span>
       <span data-testid="format">{k.konventionen.koordinatenformat ?? 'null'}</span>
       <span data-testid="distanz">{k.formatDistanz(5000)}</span>

@@ -66,7 +66,6 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import type { Verbindungsart } from '../api/fernmeldeskizzeVertrag';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import { useRollen } from '../components/instrument';
@@ -127,6 +126,7 @@ import {
   type Wirkung,
   type ZiehDaten,
 } from './skizze/wirkung';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import './skizze/skizzeDruck.css';
 
 export interface FernmeldeskizzeBildProps {
@@ -285,7 +285,7 @@ function Skizze({
     () =>
       schriftfeldBlock(
         schriftfeldAngaben(angezeigt.schriftfeld, einsatzbezeichnung, angezeigt.stand, (z) =>
-          taktischeDtgVoll(z, konventionen),
+          zeitpunkt(z, konventionen),
         ),
       ),
     [angezeigt.schriftfeld, angezeigt.stand, einsatzbezeichnung, konventionen],

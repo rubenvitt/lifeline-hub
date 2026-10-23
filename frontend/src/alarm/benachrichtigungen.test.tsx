@@ -537,10 +537,10 @@ describe('Nachreichen (tasks.md 2.3)', () => {
 
     expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
     expect(
-      within(notice('Auftrag überfällig')).getByText('Auftrag #7 · 14:05'),
+      within(notice('Auftrag überfällig')).getByText('Auftrag #7 · 141405'),
     ).toBeInTheDocument();
     // Der Eingang steht im Band, nicht im Budget; für beide zusammen EIN Ton.
-    await waitFor(() => expect(band()).toHaveTextContent('Auftrag #8 · 14:07'));
+    await waitFor(() => expect(band()).toHaveTextContent('Auftrag #8 · 141407'));
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
 
@@ -555,7 +555,7 @@ describe('Nachreichen (tasks.md 2.3)', () => {
 
     expect(await screen.findByText('Sofortmeldung · RTW 2')).toBeInTheDocument();
     expect(
-      within(notice('Sofortmeldung · RTW 2')).getByText('Patient übergeben · 14:05'),
+      within(notice('Sofortmeldung · RTW 2')).getByText('Patient übergeben · 141405'),
     ).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
@@ -568,7 +568,7 @@ describe('Nachreichen (tasks.md 2.3)', () => {
 
     expect(await screen.findByText('Neuer Befehl')).toBeInTheDocument();
     expect(screen.getAllByText('Neuer Befehl')).toHaveLength(1);
-    expect(within(band()).getByText('14:05')).toBeInTheDocument();
+    expect(within(band()).getByText('141405')).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
 

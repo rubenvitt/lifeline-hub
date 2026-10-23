@@ -8,7 +8,7 @@ import {
 } from '../api/offlineKarten';
 import { globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { ortszeit } from './ortszeit';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 
 /** Auswahl des Prüfabstands (Stunden); der Server nimmt 1…168. */
 const ABSTAENDE = [1, 3, 6, 12, 24, 168];
@@ -36,6 +36,7 @@ export default function AutoAktualisierungZeile({
 }) {
   const qc = useQueryClient();
   const { token } = theme.useToken();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const speichern = useMutation({
     mutationFn: (body: AutoAktualisierungBody) => speichereAutoAktualisierung(body),
     onSuccess: (neu) => qc.setQueryData(globalKeys.adminKarteBereich('aktualisierung'), neu),
@@ -47,15 +48,15 @@ export default function AutoAktualisierungZeile({
 
   const zeiten: string[] = [];
   if (status.letzte_pruefung_at) {
-    zeiten.push(`zuletzt geprüft ${ortszeit(status.letzte_pruefung_at)}`);
+    zeiten.push(`zuletzt geprüft ${zeitpunkt(status.letzte_pruefung_at)}`);
   }
   if (status.automatisch && status.naechste_pruefung_at) {
-    zeiten.push(`nächste Prüfung ${ortszeit(status.naechste_pruefung_at)}`);
+    zeiten.push(`nächste Prüfung ${zeitpunkt(status.naechste_pruefung_at)}`);
   }
   if (status.bau_dienst === 'unerreichbar') {
     zeiten.push('Kartenbau-Dienst nicht erreichbar');
   } else if (status.bau_dienst === 'erreichbar' && status.naechster_bau_at) {
-    zeiten.push(`nächster Kartenbau ${ortszeit(status.naechster_bau_at)}`);
+    zeiten.push(`nächster Kartenbau ${zeitpunkt(status.naechster_bau_at)}`);
   }
 
   return (

@@ -151,15 +151,21 @@ describe('Tag aus der Vorlage — Bestand am Tag', () => {
 
 describe('Quittung', () => {
   it('nennt den Tag, die Zahl und jedes übersprungene Fenster', () => {
-    expect(tagText('2026-10-11')).toBe('11.10.');
+    const k = { zeitzone: 'Europe/Berlin' };
+    expect(tagText('2026-10-11', k)).toBe('11okt26');
+    expect(tagText('2026-10-11', { ...k, zeitdarstellung: 'datum_uhrzeit' })).toBe('11.10.26');
     expect(
-      quittungText({ angelegt: [zeitfenster(), zeitfenster()], uebersprungen: [] }, '2026-10-11'),
-    ).toBe('2 Zeitfenster für den 11.10. angelegt');
+      quittungText(
+        { angelegt: [zeitfenster(), zeitfenster()], uebersprungen: [] },
+        '2026-10-11',
+        k,
+      ),
+    ).toBe('2 Zeitfenster für den 11okt26 angelegt');
     expect(
-      quittungText({ angelegt: [zeitfenster()], uebersprungen: ['Mittag'] }, '2026-10-11'),
-    ).toBe('1 Zeitfenster für den 11.10. angelegt · am Tag schon vorhanden: ‚Mittag‘');
+      quittungText({ angelegt: [zeitfenster()], uebersprungen: ['Mittag'] }, '2026-10-11', k),
+    ).toBe('1 Zeitfenster für den 11okt26 angelegt · am Tag schon vorhanden: ‚Mittag‘');
     expect(
-      quittungText({ angelegt: [], uebersprungen: ['Frühstück', 'Mittag'] }, '2026-10-11'),
+      quittungText({ angelegt: [], uebersprungen: ['Frühstück', 'Mittag'] }, '2026-10-11', k),
     ).toBe('Kein Zeitfenster angelegt · am Tag schon vorhanden: ‚Frühstück‘, ‚Mittag‘');
   });
 });

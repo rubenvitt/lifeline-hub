@@ -3,12 +3,12 @@ import type { FormInstance } from 'antd';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import { ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useRollen } from '../components/instrument';
 import type { UebernahmeQuelle, Verfuegbarkeit } from './uebernahmeQuelle';
 import { standFeld, standJetzt } from './standFeld';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Übernahme-Knopf über einem Abschnitt eines Lagevortrag-Entwurfs (LFH-870, Spec
@@ -85,7 +85,7 @@ export default function AbschnittUebernahme({
         qc,
         einsatzId,
         freigaben,
-        dtg: (iso) => taktischeDtgVoll(iso, konventionen),
+        dtg: (iso) => zeitpunkt(iso, konventionen),
       });
       const bisher = form.getFieldValue(feld);
       if (typeof bisher === 'string' && bisher.trim() !== '') setErsetzen(text);

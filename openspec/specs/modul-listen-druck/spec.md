@@ -95,6 +95,18 @@ einer Angabe sein; die Sichtung steht als Kategorie in Worten.
 - **WHEN** Schäden mit den Registriernummern 3, 1 und 2 geladen sind
 - **THEN** stehen sie im Ausdruck in der Folge 1, 2, 3
 
+### Requirement: Zeiten im Ausdruck
+
+Jede Zeit im Ausdruck einer Modul-Liste (Spalte „erfasst“, Stand im Kopf) SHALL in der Rolle
+„Zeitpunkt“ der Spec `zeitdarstellung` stehen, in der Zeitzone und Darstellung von Einsatz bzw.
+Organisation; die Wahl am Gerät MUST NOT in den Ausdruck eingehen (LLH-1061).
+
+#### Scenario: Erfassungszeit taktisch
+
+- **WHEN** der Einsatz taktisch vorgibt, das Gerät „Datum und Uhrzeit“ gewählt hat und ein Schaden
+  mit Erfassung 10.10.2026 14:30 Uhr Ortszeit gedruckt wird
+- **THEN** steht in seiner Spalte „erfasst“ `101430okt26`
+
 ### Requirement: Personendruck wird protokolliert
 
 Jeder Abruf der Personen-Druckansicht MUST im Zugriffsprotokoll der Personen genau einen Eintrag

@@ -65,7 +65,7 @@ export default function BezirkKennzahlen({ bezirk }: { bezirk: Evakuierungsbezir
         <Kennzahl
           titel="Letzte Meldung"
           groesse="klein"
-          wert={stand ? <ZeitAnzeige wert={stand.zeitpunkt_at} format="kurz" /> : '—'}
+          wert={stand ? <ZeitAnzeige wert={stand.zeitpunkt_at} rolle="kurz" /> : '—'}
           notiz={stand ? undefined : 'keine Meldung'}
         />
       </Kennzahlenband>

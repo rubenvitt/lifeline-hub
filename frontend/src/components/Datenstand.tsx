@@ -2,6 +2,9 @@ import { Typography } from 'antd';
 import dayjs from 'dayjs';
 import { schrift, schriftskala } from '../theme/tokens';
 import { useOhneVerbindung } from '../offline/verbindung';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
+import { leereUhrzeit, zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
 
 interface DatenstandProps {
   /** TanStack-Query-Zeitstempel (`query.dataUpdatedAt`) in Millisekunden. */
@@ -9,14 +12,14 @@ interface DatenstandProps {
   /**
    * Vor dem ersten Abruf die Breite freihalten statt nichts zu zeigen (LFH-373): sonst erschiene
    * „Stand hh:mm" erst mit den Daten, bräche auf 390 px um und schöbe alles darunter nach unten
-   * (`e2e/leisten-flaeche.spec.ts`, „Laden ohne Sprung"). `HH:mm` in Mono mit Tabellenziffern —
-   * ein gleich langer Platzhalter ist gleich breit. Wirksam nur unter `md`: ab dort blendet
+   * (`e2e/leisten-flaeche.spec.ts`, „Laden ohne Sprung"). Die Uhrzeit in Mono mit
+   * Tabellenziffern — ein Platzhalter mit gleich vielen Ziffern der Darstellung ist gleich breit. Wirksam nur unter `md`: ab dort blendet
    * `EinsatzSeite.css` ihn aus, weil die spät eintreffende Meta ihn seitwärts schöbe.
    */
   platzHalten?: boolean;
   /**
    * Ohne Verbindung (LFH-723): der Stand ist vorgehalten und kommt nicht nach. Dann lautet die
-   * Anzeige „Stand 14:32 · offline" — die Uhrzeit bleibt die der letzten Server-Antwort
+   * Anzeige „Stand 1432 · offline" — die Uhrzeit bleibt die der letzten Server-Antwort
    * (`hydrate` übernimmt `dataUpdatedAt`), nicht die des Neuladens.
    *
    * Vorgabe ist der Verbindungszustand (`useOhneVerbindung`: Browser offline ODER Server nicht
@@ -29,9 +32,21 @@ interface DatenstandProps {
   offline?: boolean;
 }
 
-/** Formatiert einen Query-Zeitstempel in der lokalen Browserzeit. */
-export function formatiereDatenstand(dataUpdatedAt: number): string {
-  return dayjs(dataUpdatedAt).format('HH:mm');
+/**
+ * Formatiert einen Query-Zeitstempel in der Rolle „kurz“ der wirksamen Darstellung (LLH-1061:
+ * heute `1432`, sonst `221432`), aber bewusst in der GERÄTEZEIT (Spec `zeiteingabe`, Ausnahme
+ * Datenstand im Kopf): der Stand misst den Browser, nicht den Einsatz.
+ */
+export function formatiereDatenstand(
+  dataUpdatedAt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  return zeitKurz(dayjs(dataUpdatedAt), geraetezeit(konv));
+}
+
+/** Die Konventionen mit der Browserzone: Darstellung folgt der Wahl, die Zone dem Gerät. */
+function geraetezeit(konv: AnzeigeKonventionen): AnzeigeKonventionen {
+  return { ...konv, zeitzone: null };
 }
 
 /**
@@ -62,25 +77,29 @@ export default function Datenstand({
   offline: offlineVorgabe,
 }: DatenstandProps) {
   const ohneVerbindung = useOhneVerbindung();
+  const { konventionen } = useAnzeigeKonventionen();
   const offline = offlineVorgabe ?? ohneVerbindung;
   if (!dataUpdatedAt || !Number.isFinite(dataUpdatedAt)) {
     if (!platzHalten) return null;
-    // Unsichtbar UND stumm: ein Vorleser soll keinen Stand „00:00" hören.
+    // Unsichtbar UND stumm: ein Vorleser soll keinen Stand „0000" hören. Ziffernbreite der
+    // Darstellung, sonst wäre der Platzhalter breiter oder schmaler als der Stand danach.
     return (
       <Typography.Text
         data-lfh="datenstand-platzhalter"
         aria-hidden="true"
         style={{ ...STIL, visibility: 'hidden' }}
       >
-        Stand 00:00
+        {`Stand ${leereUhrzeit(konventionen).replace(/—/g, '0')}`}
       </Typography.Text>
     );
   }
-  const uhrzeit = formatiereDatenstand(dataUpdatedAt);
+  const uhrzeit = formatiereDatenstand(dataUpdatedAt, konventionen);
   return (
     <Typography.Text
       type="secondary"
-      title={`Letzte Aktualisierung: ${dayjs(dataUpdatedAt).format('DD.MM.YYYY HH:mm:ss')}`}
+      title={`Letzte Aktualisierung: ${zeitpunkt(dayjs(dataUpdatedAt), geraetezeit(konventionen))}`}
+      // Millisekundengenauer Anker für e2e: der Titel trägt seit LLH-1061 nur noch Minuten.
+      data-stand={dataUpdatedAt}
       aria-label={offline ? `Datenstand ${uhrzeit}, offline` : `Datenstand ${uhrzeit}`}
       style={STIL}
     >

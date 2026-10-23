@@ -98,7 +98,7 @@ export default function EtbBausteinFormModal({
         <Select options={ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }))} />
       </Form.Item>
       {/* Die automatischen Platzhalter als sichtbare Legende, kein Satz (LFH-1078); die Form
-         (TT.MM.JJJJ) gehört sichtbar dazu, nicht nur in einen `title` (Touch). Dass ein freier
+         (`10okt26`) gehört sichtbar dazu, nicht nur in einen `title` (Touch). Dass ein freier
          Platzhalter wie `{einheit}` beim Einsetzen abgefragt wird, zeigt das Beispiel im Feld;
          Klick-Chips wären eine neue Funktion. */}
       <Form.Item

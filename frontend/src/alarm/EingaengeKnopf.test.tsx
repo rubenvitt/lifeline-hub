@@ -4,7 +4,8 @@ import { http, HttpResponse } from 'msw';
 import { Route, Routes, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { BenachrichtigungAnzeige, BenachrichtigungEreignis } from '../api/types';
-import { DEFAULT_KONVENTIONEN, formatZeitKurz } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -120,7 +121,7 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     expect(within(frueher).getByText('Neuer Lagebericht')).toBeInTheDocument();
     // Taktische Zeit (heute „1405“, sonst mit Tag).
     expect(
-      within(neu).getByText(formatZeitKurz('2026-10-22 12:05:00', DEFAULT_KONVENTIONEN)),
+      within(neu).getByText(zeitKurz('2026-10-22 12:05:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
   });
 

@@ -9,10 +9,10 @@ import {
   einsatzleiterText,
 } from './einsatzleiter';
 import { fuehrungsstelleErfasst } from './fuehrungsstelle';
-import { taktischeDtgVoll } from '../anzeige/format';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 const konv = { zeitzone: 'Europe/Berlin' };
-const dtg = (utc: string) => taktischeDtgVoll(utc, konv);
+const dtg = (utc: string) => zeitpunkt(utc, konv);
 
 const anna: Einsatzleiter = {
   art: 'personal',

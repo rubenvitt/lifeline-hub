@@ -29,7 +29,10 @@ describe('zeitachse', () => {
     const jetzt = dayjs('2026-06-13 10:00:00');
     expect(tagesEtikett('2026-06-13', undefined, jetzt)).toBe('Heute');
     expect(tagesEtikett('2026-06-12', undefined, jetzt)).toBe('Gestern');
-    expect(tagesEtikett('2026-06-01', undefined, jetzt)).toBe('01.06.2026');
+    expect(tagesEtikett('2026-06-01', undefined, jetzt)).toBe('01jun26');
+    expect(tagesEtikett('2026-06-01', { zeitdarstellung: 'datum_uhrzeit' }, jetzt)).toBe(
+      '01.06.26',
+    );
   });
 
   it('bestimmt „Heute" in der Anzeigezone, nicht in der Browserzone (Review LFH-348)', () => {
@@ -189,11 +192,11 @@ describe('zeitachse', () => {
   it('nennt die Übergabe als Uhrzeit, an einem anderen Tag mit Datum', () => {
     const berlin = { zeitzone: 'Europe/Berlin' };
     // Am selben Tag (Berlin) genügt die Uhrzeit — der Tag steht im Kopf.
-    expect(uebergabeZeit('2026-06-12 11:14:00', '2026-06-12 13:05:00', berlin)).toBe('15:05');
+    expect(uebergabeZeit('2026-06-12 11:14:00', '2026-06-12 13:05:00', berlin)).toBe('1505');
     // 22:30 UTC am 12. ist in Berlin schon der 13.: anderer Tag als die Ereigniszeit.
-    expect(uebergabeZeit('2026-06-12 11:14:00', '2026-06-12 22:30:00', berlin)).toBe(
-      '13.06. 00:30',
-    );
+    expect(uebergabeZeit('2026-06-12 11:14:00', '2026-06-12 22:30:00', berlin)).toBe('130030');
+    const datum = { ...berlin, zeitdarstellung: 'datum_uhrzeit' as const };
+    expect(uebergabeZeit('2026-06-12 11:14:00', '2026-06-12 22:30:00', datum)).toBe('13.06. 00:30');
   });
 
   it('unterscheidet ungefiltert von gefiltert (Leerzustand „weggefiltert")', () => {

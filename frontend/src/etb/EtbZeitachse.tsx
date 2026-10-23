@@ -31,7 +31,8 @@ import {
 } from '../components/instrument';
 import { zeitachsenAufbau } from '../components/instrument/Zeitachseneintrag';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeit, inZone } from '../anzeige/format';
+import { inZone } from '../anzeige/format';
+import { uhrzeit, zeitKurz } from '../anzeige/zeitDarstellung';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import { etbPfad } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
@@ -52,6 +53,7 @@ import {
   einfrieren,
   type Einfrierstand,
   gruppiereNachStunde,
+  stundenKopf,
   teileZufluss,
   hatVerknuepfung,
   nachtragText,
@@ -320,8 +322,10 @@ export default function EtbZeitachse({
   // Wassermarke weiter auf der Serverordnung rechnen (`funkprotokollFolge`).
   const gruppen = useMemo(
     () =>
-      gruppiereNachStunde(funkprotokollFolge(sichtbar), (utc) =>
-        inZone(utc, konventionen).format('YYYY-MM-DD HH'),
+      gruppiereNachStunde(
+        funkprotokollFolge(sichtbar),
+        (utc) => inZone(utc, konventionen).format('YYYY-MM-DD HH'),
+        (utc) => stundenKopf(utc, konventionen),
       ),
     [sichtbar, konventionen],
   );
@@ -519,8 +523,8 @@ export default function EtbZeitachse({
                   <EtbBuendelzeile
                     schluessel={p.schluessel}
                     anzahl={p.zeilen.length}
-                    von={formatUhrzeit(p.zeilen[0].eintrag.ereigniszeit, konventionen)}
-                    bis={formatUhrzeit(letzte.eintrag.ereigniszeit, konventionen)}
+                    von={uhrzeit(p.zeilen[0].eintrag.ereigniszeit, konventionen)}
+                    bis={uhrzeit(letzte.eintrag.ereigniszeit, konventionen)}
                     offen={auf}
                     onUmschalten={umschalten}
                   />
@@ -865,7 +869,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
       return (
         <Zeitachseneintrag
           {...gemeinsam}
-          zeit={formatUhrzeit(p.erstellt_at, konventionen)}
+          zeit={zeitKurz(p.erstellt_at, konventionen)}
           // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der Sendezustand steht
           // als Chip in der Meta-Zeile, NICHT in der inhaltsbreiten Nummernspalte — dort machte ein
           // `nowrap`-Chip die Zeitspalte dieser Zeile breiter als die der Nachbarn.
@@ -914,7 +918,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
     return (
       <Zeitachseneintrag
         {...gemeinsam}
-        zeit={formatUhrzeit(e.ereigniszeit, konventionen)}
+        zeit={zeitKurz(e.ereigniszeit, konventionen)}
         nr={`Nr. ${e.lfd_nr}`}
         typ={e.typ}
         typwort={etbTyp[e.typ].label}

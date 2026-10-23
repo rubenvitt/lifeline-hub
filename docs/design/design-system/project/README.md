@@ -519,6 +519,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
   sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
   `.format('…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/` (Maschinenformate ab
-  `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts` mit Schuldmenge
-  `OFFEN`, die nur schrumpft (Abbau LLH-1061). Die alten Namen in `anzeige/format.ts`
-  (`formatZeit`, `formatUhrzeit` …) sind veraltete Weiterleitungen auf die Rollen.
+  `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`, Schuldmenge `OFFEN`
+  seit LLH-1061 leer. Nebenformen im Kern: `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26`
+  bzw. `10.10.26`), `tagUndUhrzeit` (Anfang eines Zeitraums), `leereUhrzeit` (Lücke in
+  Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe, Zeitraumende) über das `jetzt` von
+  `zeitKurz`. Der Datenstand rechnet in Gerätezeit (`components/Datenstand.tsx`), die Uhr des
+  Lagemonitors nimmt `formatiereUhr` der Kopfleiste.

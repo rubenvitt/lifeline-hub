@@ -700,9 +700,9 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
       await within(z).findByRole('switch', { name: 'Automatisch aktualisieren' }),
     ).toBeChecked();
     expect(within(z).getByText('alle 6 h')).toBeInTheDocument();
-    expect(within(z).getByText(/zuletzt geprüft 02\.10\.2026 10:00/)).toBeInTheDocument();
-    expect(within(z).getByText(/nächste Prüfung 02\.10\.2026 16:00/)).toBeInTheDocument();
-    expect(within(z).getByText(/nächster Kartenbau 01\.01\.2027 04:00/)).toBeInTheDocument();
+    expect(within(z).getByText(/zuletzt geprüft 021000okt26/)).toBeInTheDocument();
+    expect(within(z).getByText(/nächste Prüfung 021600okt26/)).toBeInTheDocument();
+    expect(within(z).getByText(/nächster Kartenbau 010400jan27/)).toBeInTheDocument();
   });
 
   it('Automatik aus: keine nächste Prüfung', async () => {
@@ -824,7 +824,7 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
     await screen.findByText('Deutschland – Bremen');
     expect(screen.getByText('Stand 2025-01-01')).toBeInTheDocument();
     // download_at '2026-06-26 11:00:00' ist UTC ohne Zone.
-    expect(screen.getByText('auf dem Gerät seit 26.06.2026 13:00')).toBeInTheDocument();
+    expect(screen.getByText('auf dem Gerät seit 261300jun26')).toBeInTheDocument();
   });
 
   it.each([

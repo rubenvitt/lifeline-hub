@@ -1,6 +1,7 @@
 import type { EtbFilterWerte } from '../api/etb';
 import type { EtbTyp } from '../api/types';
-import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import type { AnzeigeKonventionen } from '../anzeige/format';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 
 interface AuswahlOptionen {
@@ -12,12 +13,12 @@ interface AuswahlOptionen {
   einheitName: (id: number) => string | undefined;
 }
 
-/** Wire-Zeit (UTC ohne Zonenkennung) → „21.09.2026 08:00" in der Anzeigezone. */
+/** Wire-Zeit (UTC ohne Zonenkennung) → Rolle „Zeitpunkt“ (`210800sep26`) in der Anzeigezone. */
 function zeit(wire: string, konventionen: AnzeigeKonventionen): string | null {
   // `alsZeitpunkt` verwirft Unbrauchbares GANZ; ein rohes `dayjs(s)` läse den Wire-String als
   // Ortszeit und verschöbe den Zeitraum still um den Versatz.
   if (!alsZeitpunkt(wire)) return null;
-  return inZone(wire, konventionen).format('DD.MM.YYYY HH:mm');
+  return zeitpunkt(wire, konventionen);
 }
 
 /**

@@ -37,7 +37,7 @@ export interface KopfWarnung {
   stufe: WetterWarnstufe;
   /** Amtliche Bezeichnung der Stufe („Unwetterwarnung"), der zweite Kanal neben der Farbe. */
   stufenwort: string;
-  /** „Starkregen ab 18:11" (angekündigt) bzw. „Sturmböen bis 14:00" (gilt jetzt). */
+  /** „Starkregen ab 1811" (angekündigt) bzw. „Sturmböen bis 1400" (gilt jetzt). */
   text: string;
   /** Wie viele geltende oder angekündigte Warnungen die Marke außerdem nicht nennt. */
   weitere: number;

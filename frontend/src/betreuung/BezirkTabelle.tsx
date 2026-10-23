@@ -217,8 +217,7 @@ const bezirkSpalten = (
       sortWert: (b) => b.stand?.zeitpunkt_at,
       filter: { werte: STAND_WERTE, trifft: (b, w) => (b.stand ? 'gemeldet' : 'keine') === w },
       // `ZeitAnzeige` liest den Wire-String als UTC — nie `dayjs(s)`.
-      render: (_, b) =>
-        b.stand ? <ZeitAnzeige wert={b.stand.zeitpunkt_at} format="kurz" /> : leer,
+      render: (_, b) => (b.stand ? <ZeitAnzeige wert={b.stand.zeitpunkt_at} rolle="kurz" /> : leer),
     },
     {
       key: 'sammelstelle',

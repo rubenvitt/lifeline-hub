@@ -126,7 +126,7 @@ test('„Leerer Lagevortrag“ legt ohne Startinhalt an, der Entwurf füllt leer
   ).toHaveCount(0);
   // Gespeichert wird wie jede Änderung des Entwurfs.
   await page.getByRole('button', { name: 'Entwurf speichern' }).click();
-  await expect(page.getByText(/^zuletzt gespeichert \d{2}:\d{2}/)).toBeVisible();
+  await expect(page.getByText(/^zuletzt gespeichert \d{4}/)).toBeVisible();
 });
 
 test('der Pfeil legt einen freien Bericht an, die Übersicht zeigt ihn in Arbeit', async ({

@@ -4,7 +4,6 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import { ladeEinsatz } from '../api/einsaetze';
 import {
   ANRUFE_PAGE_SIZE,
@@ -58,6 +57,7 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { infotelefonStatus } from '../theme/statusFarben';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Informationstelefon des Sachgebiets S5 (LFH-554, Spec `stab-infotelefon`): das Protokoll der
@@ -532,7 +532,7 @@ export default function InfotelefonPage() {
                         darstellung: infotelefonStatus[s],
                       }))}
                       // Menschenlesbar und je Zeile verschieden: Anliegen plus Eingang (DTG).
-                      kennung={`Anruf ${ANLIEGEN_LABEL[a.anliegen]} ${taktischeDtgVoll(a.eingang_at, konventionen)}`}
+                      kennung={`Anruf ${ANLIEGEN_LABEL[a.anliegen]} ${zeitpunkt(a.eingang_at, konventionen)}`}
                       darfSchreiben={darfSchreiben && statusOptionen(a).length > 1}
                       laeuft={statusMutation.isPending && statusMutation.variables?.id === a.id}
                       gesperrt={statusMutation.isPending}

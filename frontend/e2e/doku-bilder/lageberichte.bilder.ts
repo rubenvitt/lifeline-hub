@@ -122,7 +122,7 @@ test.describe(KAPITEL, () => {
       .getByRole('textbox', { name: 'Zusammenfassung' })
       .fill('Lage in der Unterstadt angespannt, Betreuung gesichert.');
     await page.getByRole('button', { name: 'Entwurf speichern' }).click();
-    await expect(page.getByText(/^zuletzt gespeichert \d{2}:\d{2}/)).toBeVisible();
+    await expect(page.getByText(/^zuletzt gespeichert \d{4}/)).toBeVisible();
   });
 
   test('Rückfrage vor dem Freigeben', async ({ page }) => {

@@ -93,8 +93,9 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(within(z).getByText('Lage erkundet')).toBeInTheDocument();
     expect(within(z).getByText('Max')).toBeInTheDocument();
     expect(within(z).getByText('Funk')).toBeInTheDocument();
-    // Uhrzeit taktisch als HHMM (Anzeigezone, LLH-1053), nicht als Wire-String.
-    expect(within(z).getByText(/^\d{4}$/)).toBeInTheDocument();
+    // Rolle „kurz“ taktisch (LLH-1061): der Eintrag ist nicht von heute, also DDHHMM, nicht der
+    // Wire-String.
+    expect(z.querySelector('[data-lfh="zeitachse-zeit"]')).toHaveTextContent(/^23\d{4}$/);
   });
 
   it('setzt den Funktions-Snapshot hinter den Verfasser (LFH-615)', () => {
@@ -128,7 +129,7 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(gruppen).toHaveLength(2);
     // Der Name kommt aus dem Kopf (`aria-labelledby`), nicht aus einem eigenen `aria-label` —
     // sonst sagte der Vorleser die Stunde doppelt an (LFH-621).
-    expect(gruppen[0]).toHaveAccessibleName(/^23\.05\. · \d{2} Uhr$/);
+    expect(gruppen[0]).toHaveAccessibleName(/^23\d{2}00$/);
     expect(gruppen[0]).not.toHaveAttribute('aria-label');
     const texte = [...container.querySelectorAll('[data-zeile]')].map((z) => z.textContent);
     expect(texte[0]).toContain('eins');
@@ -293,7 +294,7 @@ describe('EtbZeitachse – der Eintrag', () => {
         }),
       ],
     });
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^23\.05\. · \d{2} Uhr$/);
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^23\d{2}00$/);
     expect(screen.getByRole('heading', { level: 3, name: 'Lage' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 5, name: 'Detail' })).toBeInTheDocument();
   });

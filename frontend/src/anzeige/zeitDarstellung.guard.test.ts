@@ -14,9 +14,8 @@
  * - Maschinenformate in ISO-Reihenfolge — das Literal beginnt mit `YYYY-MM-DD` (Wire, Tages-
  *   schlüssel, Dateinamen). Sie sieht kein Mensch als Zeitangabe.
  * - {@link AUSNAHMEN}: begründete Einzelfälle.
- * Die Schuldmenge {@link OFFEN} ist der Bestand vom 22.10.2026 (LLH-1061 baut ihn ab). Der Test
- * verlangt Gleichheit je Datei: eine neue Stelle macht ihn rot, eine bereinigte auch, bis die
- * Zahl hier sinkt. Die Liste schrumpft nur.
+ * Die Schuldmenge {@link OFFEN} (Bestand vom 22.10.2026) ist seit LLH-1061 leer; jede neue Stelle
+ * macht den Test rot.
  *
  * ── Was er NICHT sieht ──────────────────────────────────────────────────────────
  * Er liest Quelltext: ein Format aus einer Konstanten (`const F = 'HH:mm'; d.format(F)`),
@@ -53,29 +52,10 @@ const AUSNAHMEN: Record<string, string> = {
 };
 
 /**
- * Schuldmenge: Datei → Anzahl der Stellen am 22.10.2026. Nur verkleinern (LLH-1061); eine
- * Datei mit 0 fällt heraus.
+ * Schuldmenge: Datei → Anzahl der Stellen. Der Bestand vom 22.10.2026 ist mit LLH-1061 abgebaut;
+ * die Menge bleibt leer. Eine neue Stelle gehört in den Kern, nicht hierher.
  */
-const OFFEN: Record<string, number> = {
-  'admin/DemoDatenPage.tsx': 1,
-  'alarm/useBenachrichtigungen.ts': 1,
-  'components/Datenstand.tsx': 2,
-  'druck/DruckTabelle.tsx': 1,
-  'druck/einsatzbericht/verdichtung.ts': 1,
-  'etb/EtbDruckTabelle.tsx': 1,
-  'etb/bausteinEinsetzen.ts': 2,
-  'etb/druckAuswahl.ts': 1,
-  'etb/lesemarkeModell.ts': 3,
-  'etb/zeitachseModell.ts': 1,
-  'geraet/LagemonitorPage.tsx': 2,
-  'karten/ortszeit.ts': 1,
-  'lagemeldungen/zeitachse.ts': 3,
-  'pages/lage-dashboard/lagebild.ts': 2,
-  'pegel/pegelKennzahl.ts': 2,
-  'verpflegung/tagAusVorlageKern.ts': 1,
-  'verpflegung/useBedarfsvorschlag.ts': 1,
-  'verpflegung/verpflegungText.ts': 4,
-};
+const OFFEN: Record<string, number> = {};
 
 /** Die Zeitformate für Menschen in einem Quelltext. */
 function zeitFormate(inhalt: string): string[] {
@@ -96,8 +76,8 @@ function funde(quellen: [string, string][] = produktiv): Record<string, number> 
 }
 
 describe('Zeit für Menschen nur über den Kern in anzeige/ (LLH-1053)', () => {
-  it('kein neues `.format(…)` mit Zeit-Token außerhalb von anzeige/ — Schuldmenge nur schrumpfen', () => {
-    // Gleichheit statt „höchstens“: eine bereinigte Stelle verlangt, dass OFFEN mitschrumpft.
+  it('kein `.format(…)` mit Zeit-Token außerhalb von anzeige/ — die Schuldmenge ist leer (LLH-1061)', () => {
+    expect(OFFEN).toEqual({});
     expect(funde()).toEqual(OFFEN);
   });
 

@@ -654,11 +654,11 @@ export function personenSpalten(
       align: 'right',
       zahl: true,
       /**
-       * Taktische DTG `DDHHmm` statt reiner Uhrzeit: ein Einsatz dauert über Mitternacht.
-       * `taktischeDtg` ist rein; `kurz` läse die Wanduhr.
+       * Rolle „kurz“ statt reiner Uhrzeit: ein Einsatz dauert über Mitternacht — heute `1430`,
+       * sonst `091430` (LLH-1061). Den Tageswechsel zeichnet `Datensicht` nach (`viertelstunde`).
        */
       sortWert: seitWert,
-      render: (_, p) => <ZeitAnzeige wert={seitWert(p)} format="dtg" />,
+      render: (_, p) => <ZeitAnzeige wert={seitWert(p)} rolle="kurz" />,
     },
     /*
      * Die Aktionsspalte (design.md D3): schmal, feste Breite, ohne Beschriftung, nicht abwählbar.

@@ -2,7 +2,8 @@ import type { CSSProperties } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
 import type { EtbEintragAnzeige, EtbTyp, EtbZaehler } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
-import { formatUhrzeit, inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import { uhrzeit, zeitKurz } from '../anzeige/zeitDarstellung';
 import type { EtbZeile } from './etbZeile';
 import { istNachgetragen } from './typFarben';
 
@@ -26,14 +27,22 @@ function zeilenZeit(z: EtbZeile): string {
 interface Stundengruppe {
   /** `YYYY-MM-DD HH` in der Anzeigezone. */
   schluessel: string;
-  /** „23.05. · 14 Uhr". */
+  /** Beginn der Stunde in der Rolle „kurz“: heute `1400`, sonst `231400` ({@link stundenKopf}). */
   etikett: string;
   zeilen: EtbZeile[];
 }
 
-/** „2026-05-23 14" → „23.05. · 14 Uhr". */
-export function stundenEtikett(schluessel: string): string {
-  return `${schluessel.slice(8, 10)}.${schluessel.slice(5, 7)}. · ${schluessel.slice(11, 13)} Uhr`;
+/**
+ * Kopf einer Stundengruppe: der Beginn der Stunde in der Rolle „kurz“ des Formatkerns (LLH-1061,
+ * Spec `zeitdarstellung`) — taktisch heute `1400`, sonst `231400`, bei „Datum und Uhrzeit“
+ * `14:00` bzw. `23.05. 14:00`. Gerechnet in der Anzeigezone wie der Schlüssel.
+ */
+export function stundenKopf(
+  utc: string,
+  konv: AnzeigeKonventionen,
+  jetzt: number = Date.now(),
+): string {
+  return zeitKurz(inZone(utc, konv).startOf('hour'), konv, jetzt);
 }
 
 /**
@@ -52,6 +61,7 @@ export function stundenEtikett(schluessel: string): string {
 export function gruppiereNachStunde(
   zeilen: readonly EtbZeile[],
   stundeVon: (utc: string) => string,
+  kopfVon: (utc: string) => string,
 ): Stundengruppe[] {
   const gruppen: Stundengruppe[] = [];
   for (const z of zeilen) {
@@ -60,7 +70,7 @@ export function gruppiereNachStunde(
     if (letzte && letzte.schluessel === schluessel) {
       letzte.zeilen.push(z);
     } else {
-      gruppen.push({ schluessel, etikett: stundenEtikett(schluessel), zeilen: [z] });
+      gruppen.push({ schluessel, etikett: kopfVon(zeilenZeit(z)), zeilen: [z] });
     }
   }
   return gruppen;
@@ -461,9 +471,10 @@ export function berichtigungTitel(
 
 /**
  * Der Hinweis an einem Nachtrag (LLH-1088, Spec `etb-zeitachse-darstellung`, „Nachtrag mit Tag“):
- * am selben Kalendertag der Anzeigezone genügt die Uhrzeit („nachgetragen um 14:21“), über
- * Mitternacht steht die Erfassung mit Tag in taktischer Form („nachgetragen 110020“) — sonst läse
- * „um 00:20“ sich wie vor der Ereigniszeit. Ob es ein Nachtrag ist, sagt `istNachgetragen`.
+ * am selben Kalendertag der Anzeigezone genügt die Uhrzeit („nachgetragen um 1421“), über
+ * Mitternacht steht die Erfassung mit Tag („nachgetragen 110020“ bzw. „11.10. 00:20“) — sonst läse
+ * „um 0020“ sich wie vor der Ereigniszeit. Ob es ein Nachtrag ist, sagt `istNachgetragen`.
+ * Die Form ist die Rolle „kurz“ mit dem Tag der Ereigniszeit als „heute“ (LLH-1061).
  */
 export function nachtragText(
   ereigniszeit: string,
@@ -473,6 +484,6 @@ export function nachtragText(
   const ereignis = inZone(ereigniszeit, konv);
   const erfasst = inZone(receivedAt, konv);
   return ereignis.isSame(erfasst, 'day')
-    ? `nachgetragen um ${formatUhrzeit(receivedAt, konv)}`
-    : `nachgetragen ${erfasst.format('DDHHmm')}`;
+    ? `nachgetragen um ${uhrzeit(receivedAt, konv)}`
+    : `nachgetragen ${zeitKurz(receivedAt, konv, ereignis)}`;
 }

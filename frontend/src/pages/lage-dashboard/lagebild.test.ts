@@ -97,7 +97,7 @@ describe('standText', () => {
     expect(standText(JETZT - 40_000, JETZT)).toBe('Stand vor 40 s');
     expect(standText(JETZT - 5 * 60_000, JETZT)).toBe('Stand vor 5 min');
     // 10:00 UTC → 12:00 Sommerzeit in Berlin.
-    expect(standText(JETZT - 2 * 3_600_000, JETZT, BERLIN)).toBe('Stand 12:00');
+    expect(standText(JETZT - 2 * 3_600_000, JETZT, BERLIN)).toBe('Stand 1200');
   });
 
   it('ohne Abruf behauptet sie keinen Stand', () => {
@@ -106,8 +106,9 @@ describe('standText', () => {
 });
 
 describe('lagebildZeit', () => {
-  it('formatiert „TT.MM. HH:MM" in der Anzeigezone', () => {
-    expect(lagebildZeit(JETZT, BERLIN)).toBe('11.06. 14:00');
+  it('nennt „jetzt“ in der Rolle „kurz“ in der Anzeigezone (LLH-1061)', () => {
+    expect(lagebildZeit(JETZT, BERLIN)).toBe('1400');
+    expect(lagebildZeit(JETZT, { ...BERLIN, zeitdarstellung: 'datum_uhrzeit' })).toBe('14:00');
   });
 });
 
@@ -366,7 +367,7 @@ describe('baueLagebild', () => {
       BERLIN,
     ).kennzahlen[0];
     expect(k).toMatchObject({ etikett: 'Pegel', wert: '6,84', einheit: 'm', ton: 'neutral' });
-    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 13:05');
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 1305');
     expect(k.zielPfad).toBe('/einsaetze/1/einstellungen/pegel');
   });
 

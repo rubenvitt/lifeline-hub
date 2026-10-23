@@ -2,11 +2,11 @@ import { Button, Form, type FormInstance } from 'antd';
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import { useRollen } from '../components/instrument';
 import { loadAbschnittTexte } from './startinhalt';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
 import { standFeld } from './standFeld';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /** Beschriftung — exportiert, damit Tests sie nicht nachschreiben. */
 export const LEERE_FUELLEN = 'Leere Abschnitte aus dem Lagebild füllen';
@@ -60,7 +60,7 @@ export default function LeereAbschnitteFuellen({
       const texte = await loadAbschnittTexte(quellen, leer, {
         qc,
         einsatzId,
-        dtg: (iso) => taktischeDtgVoll(iso, konventionen),
+        dtg: (iso) => zeitpunkt(iso, konventionen),
       });
       let gesetzt = false;
       for (const { schluessel, text, uebernommen_at } of texte) {

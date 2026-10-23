@@ -11,7 +11,7 @@ import type { GlobalToken } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
-import { formatZeitKurz, type AnzeigeKonventionen } from '../../anzeige/format';
+import { type AnzeigeKonventionen } from '../../anzeige/format';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useLageSnapshots } from './useLageSnapshots';
 import { bandStil } from './KartenFuss';
@@ -20,6 +20,7 @@ import { Select } from '../../components/Select';
 import { schriftStil } from '../../components/instrument/rollenwerte';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /** Feste Anzeigedauer je Stand im Replay. */
 export const ANZEIGE_MS = 2500;
@@ -137,9 +138,9 @@ export function standBeschriftung(
   standAt: string,
   konv: AnzeigeKonventionen,
 ): StandBeschriftung {
-  // `formatZeitKurz` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String.
+  // `zeitKurz` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String.
   // In der Anzeigezone wie jede andere Zeit der Seite (LFH-913).
-  const zeit = formatZeitKurz(standAt, konv);
+  const zeit = zeitKurz(standAt, konv);
   const name = bezeichnung?.trim();
   return name
     ? { haupt: name, zeit, voll: `${name}, ${zeit}` }

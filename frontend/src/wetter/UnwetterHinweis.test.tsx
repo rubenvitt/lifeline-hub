@@ -75,13 +75,13 @@ describe('UnwetterHinweis', () => {
   it('formt den Zeitraum mit der Zeitzone des Einsatzes', async () => {
     // 16:13 UTC ist 12:13 in New York (Sommerzeit), in Berlin schon 18:13.
     const beschreibung = await hinweisBei('2026-10-04T16:13:00Z');
-    expect(beschreibung).toMatch(/seit 11:13(?!\d)/);
+    expect(beschreibung).toMatch(/seit 1113(?!\d)/);
     expect(beschreibung).not.toMatch(/seit \d{2}\. /);
   });
 
   it('setzt den Tag davor, wenn der Beginn in der Einsatzzone am Vortag liegt', async () => {
     // 04:30 UTC ist 00:30 in New York; der Beginn eine Stunde früher liegt dort am 03. um 23:30.
     const beschreibung = await hinweisBei('2026-10-04T04:30:00Z');
-    expect(beschreibung).toMatch(/seit 03\. 23:30(?!\d)/);
+    expect(beschreibung).toMatch(/seit 032330(?!\d)/);
   });
 });

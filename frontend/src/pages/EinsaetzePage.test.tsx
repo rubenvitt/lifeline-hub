@@ -8,13 +8,14 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
-import { formatZeitKurz, DEFAULT_KONVENTIONEN } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import EinsaetzePage, { kartenTitelStil } from './EinsaetzePage';
 import { dichten } from '../theme/tokens';
 import { adminFixture } from '../test/fixtures';
 import { tippeZeit } from '../test/zeitEingabe';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 const admin = adminFixture();
 
@@ -54,7 +55,7 @@ describe('EinsaetzePage', () => {
     setup();
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
     expect(screen.getByText('Deine Rolle: Einsatzleitung')).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
   it('öffnet den neuen Einsatz direkt nach dem Anlegen', async () => {
@@ -438,9 +439,9 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   it('die Karte nennt einen aus begonnen_at abgeleiteten Zeitstand', async () => {
     mockEinsaetze([e({ begonnen_at: '2026-06-08 06:12:00' })]);
     render();
-    // `formatZeitKurz` liefert je nach Tagesbezug verschiedene Formen; geprüft wird das Wort „seit"
+    // `zeitKurz` liefert je nach Tagesbezug verschiedene Formen; geprüft wird das Wort „seit"
     // plus der Funktionswert — die Formatierung prüft `format.test.ts`.
-    const erwartet = formatZeitKurz('2026-06-08 06:12:00', DEFAULT_KONVENTIONEN);
+    const erwartet = zeitKurz('2026-06-08 06:12:00', DEFAULT_KONVENTIONEN);
     expect(await screen.findByText(new RegExp(`seit ${erwartet}`))).toBeInTheDocument();
   });
 

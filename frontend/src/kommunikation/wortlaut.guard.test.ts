@@ -207,7 +207,7 @@ describe('Knöpfe nennen ihre Handlung (LFH-959)', () => {
         1,
       );
       expect(
-        quittierFunde('<Text>\n  Quittiert: {formatZeit(e.quittiert_at)}\n</Text>'),
+        quittierFunde('<Text>\n  Quittiert: {zeitpunkt(e.quittiert_at)}\n</Text>'),
       ).toHaveLength(1);
       expect(quittierFunde("e.status === 'quittiert' && onQuittieren?.(e.id)")).toEqual([]);
       expect(quittierFunde('// Quittiert = zur Kenntnis\nconst x = 1;')).toEqual([]);

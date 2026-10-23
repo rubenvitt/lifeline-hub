@@ -16,9 +16,9 @@ export default function QuittungIndikator({
   am?: string | null;
 }) {
   // Quittierzeit in der Anzeigezone (LFH-692).
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   if (!quittiert) return <StatusChip ton="neutral" wort="Quittung offen" />;
-  const zeit = formatZeit(am);
+  const zeit = zeitpunkt(am);
   return (
     <StatusChip
       ton="normal"

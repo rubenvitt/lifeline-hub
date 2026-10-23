@@ -49,7 +49,7 @@ export default function EinheitUebernahme({
   const { token } = useRollen();
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const [form] = Form.useForm<UebernahmeWerte>();
   const [offen, setOffen] = useState(false);
 
@@ -165,7 +165,7 @@ export default function EinheitUebernahme({
       titel="Übernahme"
       meta={
         einheit.nicht_uebernommen_seit
-          ? `eingetroffen ${formatZeitKurz(einheit.nicht_uebernommen_seit)}`
+          ? `eingetroffen ${zeitKurz(einheit.nicht_uebernommen_seit)}`
           : undefined
       }
       koerperPolster

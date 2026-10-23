@@ -21,7 +21,7 @@ import type {
   Stab,
   Verpflegung,
 } from '../../api/types';
-import { inZone, taktischeDtgVoll, type AnzeigeKonventionen } from '../../anzeige/format';
+import type { AnzeigeKonventionen } from '../../anzeige/format';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import { evakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
 import { einsatzDauer } from '../../einsatz/einsatzDauer';
@@ -49,6 +49,7 @@ import {
 } from '../../theme/statusFarben';
 import type { BerichtQuellen, EinsatzberichtRoh, QuellenErgebnis } from './abruf';
 import { BLOECKE, STANDARDUMFANG, ordneAuswahl, type BlockSchluessel } from './auswahl';
+import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 
 dayjs.extend(utc);
 
@@ -129,12 +130,12 @@ const textOder = (s: string | null | undefined): string => (s && s.trim() ? s : 
 const zahl = (n: number): string => String(n);
 
 /**
- * Zeitangabe im Berichtstext wie im ETB-Druck („29.03.2026 01:30“, Zone der Organisation): der
- * Bericht geht auch an Behörden. Die taktische DTG trägt nur der Stand im Druckkopf.
+ * Zeitangabe im Berichtstext wie im ETB-Druck: die Rolle „Zeitpunkt“ in der Darstellung von
+ * Einsatz bzw. Organisation (LLH-1061; `290130mrz26` bzw. `29.03.26 01:30`), nie die Gerätewahl.
  */
 function zeit(wire: string | null | undefined, konv: AnzeigeKonventionen): string {
   if (!wire) return LEER;
-  return inZone(wire, konv).format('DD.MM.YYYY HH:mm');
+  return zeitpunkt(wire, konv);
 }
 
 /** Ein Abschnitt, dessen Quelle ausgeblendet ist oder leer: dann nur der Vermerk. */
@@ -777,7 +778,7 @@ export function verdichteEinsatzbericht(
   const gewaehlt = ordneAuswahl(auswahl);
   return {
     vorlaeufig: einsatz.status === 'aktiv',
-    stand: taktischeDtgVoll(roh.geladenAt, konv),
+    stand: zeitpunkt(roh.geladenAt, konv),
     bloecke: BLOECKE.filter((b) => gewaehlt.includes(b.schluessel)).map((b) => ({
       schluessel: b.schluessel,
       titel: b.titel,

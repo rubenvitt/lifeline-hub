@@ -50,7 +50,7 @@ function Eintrag({ a, beiSprung }: { a: BenachrichtigungAnzeige; beiSprung: () =
             color: token.colorTextSecondary,
           }}
         >
-          <ZeitAnzeige wert={a.erstellt_at} format="kurz" />
+          <ZeitAnzeige wert={a.erstellt_at} rolle="kurz" />
         </span>
         <span style={{ minWidth: 0 }}>
           <span style={{ display: 'block', fontWeight: istNeu(a) ? 600 : 400 }}>

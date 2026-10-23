@@ -32,7 +32,7 @@ import {
   useRollen,
   type PaneelDatenzustand,
 } from '../components/instrument';
-import { formatUhrzeit } from '../anzeige/format';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { dwdWarnstufe } from '../theme/statusFarben';
 import {
   STAND_UNBEKANNT,
@@ -371,7 +371,7 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
                     }}
                   >
                     <time dateTime={s.zeitpunkt} style={{ color: rollen.text, minWidth: 40 }}>
-                      {formatUhrzeit(s.zeitpunkt, konv)}
+                      {zeitKurz(s.zeitpunkt, konv)}
                     </time>
                     <span style={{ minWidth: 64 }}>{temperaturText(s.temperatur_c)}</span>
                     <span style={{ minWidth: 96 }}>

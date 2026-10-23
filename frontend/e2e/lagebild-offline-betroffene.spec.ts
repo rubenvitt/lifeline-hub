@@ -170,7 +170,7 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
     //     geladen“, und kein „Fundort offen“.
     await page.goto(`/einsaetze/${einsatzId}/personen`);
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.getByText(/^Stand \d\d:\d\d · offline$/).first()).toBeVisible();
+    await expect(page.getByText(/^Stand \d{4} · offline$/).first()).toBeVisible();
     await expect(page.getByText(NAME).first()).toBeVisible();
     await expect(page.getByText('SK II').first()).toBeVisible();
     await expect(page.getByText(`UHS ${UHS}`).first()).toBeVisible();
@@ -184,7 +184,7 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
     // (5) UHS-Liste nach Kaltstart wie mit Netz. Die UHS-Detailseite liest ein eigenes Fach
     //     (`einsatz-uhs-detail`), das schon vor dieser Änderung nicht offline vorgehalten wird.
     await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen/liste`);
-    await expect(page.getByText(/^Stand \d\d:\d\d · offline$/).first()).toBeVisible();
+    await expect(page.getByText(/^Stand \d{4} · offline$/).first()).toBeVisible();
     await expect(page.getByText(UHS).first()).toBeVisible();
 
     await page.context().setOffline(false);

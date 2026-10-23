@@ -42,7 +42,7 @@ export function parseUhrzeit(eingabe: string): string | null {
   return `${String(stunde).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-/** „06:30“ → „0630“, die taktische Uhrzeit (BOS-Konvention, wie `format.ts:taktischeUhrzeit`). */
+/** „06:30“ → „0630“, die taktische Uhrzeit (BOS-Konvention, wie die Rolle `uhrzeit` in `zeitDarstellung.ts`). */
 export function taktischeUhrzeitAus(uhrzeit: string): string {
   return uhrzeit.replace(':', '');
 }

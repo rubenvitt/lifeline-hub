@@ -7,7 +7,7 @@ dayjs.extend(utc);
 
 /** 14:00 UTC — vor jedem Eintreffen der Fälle, außer wo ein Test es anders setzt. */
 const JETZT = dayjs.utc('2026-06-12 14:00:00').valueOf();
-/** Uhrzeit wie am Schirm, hier ohne Zone: die Zone prüft `formatUhrzeitMitTag` selbst. */
+/** Uhrzeit wie am Schirm, hier ohne Zone: die Zone prüft `zeitKurz` selbst. */
 const zeit = (utcStr: string) => dayjs.utc(utcStr).format('HH:mm');
 
 function nf(teil: Partial<ZulaufQuelle>): ZulaufQuelle {

@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
+quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
 ---
 
 ## Überblick
@@ -345,6 +345,28 @@ nach dem Abmelden stehen und gelten für jede Person, die sich an diesem Gerät 
   auf Wahl.
 - **Helligkeit** dunkelt die ganze Anzeige ab, für den abgedunkelten Führungsraum bei Nacht. Den
   Bildschirm selbst macht sie nicht heller als 100 %.
+
+### Zeitangaben
+
+Alle Zeiten stehen in der Schreibweise, die Einsatz und Organisation vorgeben; Vorgabe ist
+taktisch. Am Gerät lässt sie sich mit „Zeitdarstellung: …“ übersteuern.
+
+- **Taktisch**: ein Zeitpunkt als Datum-Zeit-Gruppe („101430okt26“). In Listen, Zeitachsen und
+  Kennzahlen steht heute nur die Uhrzeit („1430“), an anderen Tagen Tag und Uhrzeit („091430“).
+  Ein Tag allein steht als „10okt26“.
+- **Datum und Uhrzeit**: „10.10.26 14:30“, in Listen „14:30“ bzw. „09.10. 14:30“, ein Tag allein
+  „10.10.26“.
+
+Im Einsatztagebuch nennt der Kopf einer Stundengruppe den Beginn der Stunde („1400“, am Vortag
+„091400“). Ausdrucke (Einsatztagebuch, Listen, Einsatzbericht) folgen immer Einsatz und
+Organisation, nie der Wahl am Gerät; die Zeitspalte des gedruckten Einsatztagebuchs trägt die volle
+Datum-Zeit-Gruppe. Die Platzhalter „{uhrzeit}“ und „{datum}“ in Textbausteinen setzen „1430“ und
+„10okt26“ bzw. „14:30“ und „10.10.26“ ein.
+
+Die Uhr in der Kopfzeile bleibt eine Wanduhr in der Zeit des Geräts („14:30“); auch der
+Datenstand („Stand 1430“) zählt in der Zeit des Geräts. Texte, die der Server selbst schreibt (etwa
+automatische Einträge im Einsatztagebuch beim Eintreffen einer Einheit oder zu einer
+Verpflegung), nennen Zeiten noch als „30.09. 06:40“.
 
 ### Wie Zeitfelder Zeiten lesen
 

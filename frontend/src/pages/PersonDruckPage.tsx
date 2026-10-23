@@ -6,7 +6,6 @@ import { loadPersonDruck, registrierAnzeige } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
@@ -15,6 +14,7 @@ import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import { modulName } from '../einsatz/modulRegistry';
 import PersonDruckBlatt from '../personen/PersonDruckBlatt';
 import { parseRouteId, personDetailPfad, personenPfad } from '../routing/deeplinks';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Druckansicht einer Person (LLH-1120, Spec `druck-dokumente`, „Druckansicht einer Person“;
@@ -131,10 +131,7 @@ export default function PersonDruckPage() {
             zeilen={[
               {
                 etikett: 'Stand',
-                wert: taktischeDtgVoll(
-                  new Date(druckQuery.dataUpdatedAt).toISOString(),
-                  konventionen,
-                ),
+                wert: zeitpunkt(new Date(druckQuery.dataUpdatedAt).toISOString(), konventionen),
               },
             ]}
           />

@@ -33,13 +33,13 @@ describe('kopfWarnung (LLH-1117)', () => {
     expect(k).toEqual({
       stufe: 'schwer',
       stufenwort: 'Unwetterwarnung',
-      text: 'Starkregen ab 18:11',
+      text: 'Starkregen ab 1811',
       weitere: 0,
     });
   });
 
   it('eine geltende Warnung nennt ihr Ende, ohne Ende „bis auf Weiteres“', () => {
-    expect(kopfWarnung(teil([warnung({})]), JETZT)?.text).toBe('Sturmböen bis 14:00');
+    expect(kopfWarnung(teil([warnung({})]), JETZT)?.text).toBe('Sturmböen bis 1400');
     expect(kopfWarnung(teil([warnung({ ende: null })]), JETZT)?.text).toBe(
       'Sturmböen bis auf Weiteres',
     );
@@ -56,7 +56,7 @@ describe('kopfWarnung (LLH-1117)', () => {
     );
     expect(k?.stufe).toBe('extrem');
     expect(k?.stufenwort).toBe('Extremes Unwetter');
-    expect(k?.text).toBe('Orkan ab 15:00');
+    expect(k?.text).toBe('Orkan ab 1500');
     expect(k?.weitere).toBe(2);
   });
 
@@ -71,7 +71,7 @@ describe('kopfWarnung (LLH-1117)', () => {
   it('jede amtliche Stufe zählt, auch „Wetterwarnung“', () => {
     expect(
       kopfWarnung(teil([warnung({ stufe: 'gering', ereignis: 'FROST' })]), JETZT),
-    ).toMatchObject({ stufenwort: 'Wetterwarnung', text: 'Frost bis 14:00' });
+    ).toMatchObject({ stufenwort: 'Wetterwarnung', text: 'Frost bis 1400' });
   });
 
   it('Abwesenheit: keine Warnung, nur abgelaufene, kein Teil, kein Ort, Ausfall, zu alter Stand', () => {

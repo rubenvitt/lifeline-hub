@@ -123,7 +123,7 @@ describe('useEntwurfVerlustschutz', () => {
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
     expect(speichern).toHaveBeenCalledWith({ titel: 'Server 1x' });
     expect(await screen.findByText('sauber')).toBeInTheDocument();
-    expect(screen.getByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
+    expect(screen.getByText(/zuletzt gespeichert \d{4}/)).toBeInTheDocument();
   });
 
   it('lässt den Merker stehen, wenn während des laufenden Autosave weitergetippt wurde', async () => {
@@ -439,7 +439,7 @@ describe('useEntwurfVerlustschutz', () => {
 describe('useEntwurfVerlustschutz — „zuletzt gespeichert“ in der Anzeigezone (LFH-692)', () => {
   mitProzessZone('UTC');
 
-  it('Browser UTC, Anzeigezone Berlin: 10:32 UTC erscheint als 12:32', async () => {
+  it('Browser UTC, Anzeigezone Berlin: 10:32 UTC erscheint als 1232', async () => {
     vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-07-14T10:32:00Z'));
     try {
@@ -450,7 +450,7 @@ describe('useEntwurfVerlustschutz — „zuletzt gespeichert“ in der Anzeigezo
       );
       await userEvent.type(screen.getByLabelText('Titel'), 'x');
       await userEvent.tab();
-      expect(await screen.findByText('zuletzt gespeichert 12:32')).toBeInTheDocument();
+      expect(await screen.findByText('zuletzt gespeichert 1232')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

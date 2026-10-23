@@ -140,7 +140,7 @@ describe('EinsatzSeite', () => {
         <div>Inhalt</div>
       </EinsatzSeite>,
     );
-    expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
+    expect(screen.getByText('Stand 101407')).toBeInTheDocument();
   });
 
   // LFH-723: die Kennzeichnung „offline" folgt dem Online-Zustand des Browsers; keine Seite
@@ -152,13 +152,13 @@ describe('EinsatzSeite', () => {
         <div>Inhalt</div>
       </EinsatzSeite>,
     );
-    expect(screen.getByText('Stand 14:32')).toBeInTheDocument();
+    expect(screen.getByText('Stand 101432')).toBeInTheDocument();
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     window.dispatchEvent(new Event('offline'));
-    expect(await screen.findByText('Stand 14:32 · offline')).toBeInTheDocument();
+    expect(await screen.findByText('Stand 101432 · offline')).toBeInTheDocument();
     onLine.mockReturnValue(true);
     window.dispatchEvent(new Event('online'));
-    expect(await screen.findByText('Stand 14:32')).toBeInTheDocument();
+    expect(await screen.findByText('Stand 101432')).toBeInTheDocument();
     onLine.mockRestore();
   });
 

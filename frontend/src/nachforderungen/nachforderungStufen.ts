@@ -212,37 +212,37 @@ export function kartenZeiten(
     | 'unterwegs_at'
     | 'eingetroffen_at'
   >,
-  formatZeit: (zeit: string) => string,
+  zeitpunkt: (zeit: string) => string,
   jetzt?: number,
 ): KartenZeit[] {
   const zeilen: KartenZeit[] = [
     {
       schluessel: 'angefordert',
-      text: `Angefordert: ${formatZeit(n.angefordert_at)}${n.erstellt_von_name ? ` · ${n.erstellt_von_name}` : ''}`,
+      text: `Angefordert: ${zeitpunkt(n.angefordert_at)}${n.erstellt_von_name ? ` · ${n.erstellt_von_name}` : ''}`,
     },
   ];
   if (n.benoetigt_bis) {
-    zeilen.push({ schluessel: 'benoetigt', text: `Benötigt bis: ${formatZeit(n.benoetigt_bis)}` });
+    zeilen.push({ schluessel: 'benoetigt', text: `Benötigt bis: ${zeitpunkt(n.benoetigt_bis)}` });
   }
   if (n.zugesagt_at) {
-    zeilen.push({ schluessel: 'zugesagt', text: `Zugesagt: ${formatZeit(n.zugesagt_at)}` });
+    zeilen.push({ schluessel: 'zugesagt', text: `Zugesagt: ${zeitpunkt(n.zugesagt_at)}` });
   }
   if (n.eintreffen_erwartet_at && (n.status === 'zugesagt' || n.status === 'unterwegs')) {
     const nachBedarf = istNachBedarfszeit(n);
     const verstrichen = jetzt != null && istUeberfaellig(n, jetzt);
     zeilen.push({
       schluessel: 'erwartet',
-      text: `Eintreffen erwartet: ${formatZeit(n.eintreffen_erwartet_at)}${nachBedarf ? ' · nach Bedarfszeit' : ''}`,
+      text: `Eintreffen erwartet: ${zeitpunkt(n.eintreffen_erwartet_at)}${nachBedarf ? ' · nach Bedarfszeit' : ''}`,
       ...(nachBedarf || verstrichen ? { ton: 'achtung' as const } : {}),
     });
   }
   if (n.unterwegs_at) {
-    zeilen.push({ schluessel: 'unterwegs', text: `Unterwegs: ${formatZeit(n.unterwegs_at)}` });
+    zeilen.push({ schluessel: 'unterwegs', text: `Unterwegs: ${zeitpunkt(n.unterwegs_at)}` });
   }
   if (n.eingetroffen_at) {
     zeilen.push({
       schluessel: 'eingetroffen',
-      text: `Eingetroffen: ${formatZeit(n.eingetroffen_at)}`,
+      text: `Eingetroffen: ${zeitpunkt(n.eingetroffen_at)}`,
     });
   }
   return zeilen;

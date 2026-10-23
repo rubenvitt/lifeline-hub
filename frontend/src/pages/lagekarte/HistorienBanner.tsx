@@ -17,10 +17,10 @@ interface HistorienBannerProps {
  * Knopfblock.
  */
 export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: HistorienBannerProps) {
-  // `formatZeit` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String, den
+  // `zeitpunkt` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String, den
   // `new Date()` als Lokalzeit läse. Gebunden an die Anzeigezone (LFH-913).
-  const { formatZeit } = useAnzeigeKonventionen();
-  const stand = standAt ? formatZeit(standAt) : '';
+  const { zeitpunkt } = useAnzeigeKonventionen();
+  const stand = standAt ? zeitpunkt(standAt) : '';
   const beschreibung = [bezeichnung?.trim(), stand].filter(Boolean).join(' · ');
   return (
     <Alert

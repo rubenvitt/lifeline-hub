@@ -7,7 +7,8 @@ import {
 import { ApiError } from '../api/client';
 import type { BenachrichtigungAnzeige, BenachrichtigungEreignis } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { alsZeitpunkt, zuWanduhr } from '../anzeige/zeitEingabe';
+import type { AnzeigeKonventionen } from '../anzeige/format';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 import {
   BENACHRICHTIGUNG_WINDOW_EVENT,
   NACHREICHEN_WINDOW_EVENT,
@@ -156,16 +157,16 @@ export function useBenachrichtigungen(
   toasts: AlarmToasts,
   eingang?: Eingangshinweis,
 ): void {
-  // Über eine Ref: lädt die Anzeigezone nach, soll das nicht noch einmal nachreichen.
-  const zoneRef = useRef<string | null>(null);
-  zoneRef.current = useAnzeigeKonventionen().konventionen.zeitzone ?? null;
+  // Über eine Ref: laden Zone oder Darstellung nach, soll das nicht noch einmal nachreichen.
+  const konvRef = useRef<AnzeigeKonventionen>({});
+  konvRef.current = useAnzeigeKonventionen().konventionen;
 
   useEffect(() => {
     let aktiv = true;
 
     const uhrzeitVon = (a: BenachrichtigungAnzeige): string | null => {
-      const t = alsZeitpunkt(a.erstellt_at);
-      return t ? zuWanduhr(t, zoneRef.current).format('HH:mm') : null;
+      // Rolle „kurz“ (LLH-1061): nachgereicht kann auch eine von gestern sein.
+      return zeitKurz(a.erstellt_at, konvRef.current) || null;
     };
 
     const unbekannt = (id: number) =>

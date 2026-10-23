@@ -75,8 +75,23 @@ am Ende stehen, sodass der jüngste Eintrag ohne Rollen über der Erfassung sich
 - **THEN** steht der neue Eintrag ohne eigenes Rollen direkt über der Erfassungsleiste
 
 #### Scenario: Stundenwechsel
-- **WHEN** Einträge aus 13 und 14 Uhr geladen sind
-- **THEN** steht die Gruppe „13 Uhr“ über der Gruppe „14 Uhr“, und in jeder Gruppe wächst die laufende Nummer nach unten
+- **WHEN** Einträge aus 13 und 14 Uhr von heute geladen sind und die Darstellung taktisch ist
+- **THEN** steht die Gruppe „1300“ über der Gruppe „1400“, und in jeder Gruppe wächst die laufende Nummer nach unten
+
+### Requirement: Zeiten der Zeitachse aus dem Formatkern
+Die Zeitachse SHALL jede Zeit in den Rollen der Spec `zeitdarstellung` zeigen (LLH-1061): die
+Zeitspalte einer Zeile (gesendet, vorgemerkt oder abgelehnt) und der Kopf einer Stundengruppe in
+der Rolle „kurz“ — heute nur die Uhrzeit, an einem anderen Tag mit Tag —, Beginn und Ende einer
+Bündelzeile in der Rolle „Uhrzeit“, weil der Kopf ihrer Stundengruppe den Tag trägt. Die
+Darstellung MUST der wirksamen Wahl folgen (Gerät vor Einsatz vor Organisation).
+
+#### Scenario: Heute und Vortag, taktisch
+- **WHEN** am 10.10. ein Eintrag von 14:46 Uhr desselben Tages und einer vom 09.10. 14:46 Uhr in der Zeitachse stehen
+- **THEN** zeigt die Zeitspalte `1446` bzw. `091446`, und die Stundenköpfe lauten `1400` bzw. `091400`
+
+#### Scenario: Datum und Uhrzeit
+- **WHEN** die wirksame Darstellung „Datum und Uhrzeit“ ist
+- **THEN** zeigt dieselbe Zeitspalte `14:46` bzw. `09.10. 14:46`, und der Stundenkopf des Vortags lautet `09.10. 14:00`
 
 ### Requirement: Mitlaufen am Ende
 Steht die Seite am Ende und liegt der Fokus nicht in der Zeitachse, SHALL ein neuer fremder Eintrag
@@ -168,8 +183,9 @@ Kette nennen: „Berichtigung zu Nr. n“ und, wenn die Nummer des Grundeintrags
 
 ### Requirement: Nachtrag mit Tag
 Liegen Ereigniszeit und Erfassung eines Eintrags an verschiedenen Kalendertagen der Anzeigezone,
-SHALL der Hinweis „nachgetragen“ die Erfassung mit Tag in taktischer Form nennen; am selben Tag
-genügt die Uhrzeit.
+SHALL der Hinweis „nachgetragen“ die Erfassung mit Tag nennen; am selben Tag genügt die Uhrzeit.
+Die Schreibweise MUST der wirksamen Darstellung folgen (Spec `zeitdarstellung`): taktisch
+`110020` bzw. `1421`, sonst `11.10. 00:20` bzw. `14:21`.
 
 #### Scenario: Über Mitternacht
 - **WHEN** ein Eintrag die Ereigniszeit 10.10. 23:50 trägt und am 11.10. um 00:20 erfasst wurde

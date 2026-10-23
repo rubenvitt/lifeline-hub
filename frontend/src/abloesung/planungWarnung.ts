@@ -1,5 +1,6 @@
 import type { AbloesungPlanungWarnung } from '../api/types';
-import { formatZeitKurz, type AnzeigeKonventionen } from '../anzeige/format';
+import { type AnzeigeKonventionen } from '../anzeige/format';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Text einer Warnung beim Planen der ablösenden Einheit (LLH-1131, Spec `kraefte-abloesung`
@@ -13,7 +14,7 @@ export function planungWarnungText(w: AbloesungPlanungWarnung, konv: AnzeigeKonv
       return `${w.einheit_name} schon für Schicht ${w.abloesung_einheit_name ?? ''} geplant`.trim();
     case 'im_einsatz':
       return w.seit_at
-        ? `${w.einheit_name} steht selbst im Einsatz seit ${formatZeitKurz(w.seit_at, konv)}`
+        ? `${w.einheit_name} steht selbst im Einsatz seit ${zeitKurz(w.seit_at, konv)}`
         : `${w.einheit_name} steht selbst im Einsatz`;
   }
 }

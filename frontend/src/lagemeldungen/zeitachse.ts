@@ -1,5 +1,6 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import { kalendertag, zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Zeitachse der Lagemeldungen: Tagesgruppen und Zeitfenster, rein und ohne React.
@@ -44,7 +45,8 @@ function jetztInZone(
 }
 
 /**
- * Gruppenetikett: „Heute" / „Gestern" / `DD.MM.YYYY`. Nimmt die KONVENTIONEN statt eines
+ * Gruppenetikett: „Heute" / „Gestern" / sonst der Tag in der Schreibweise des Formatkerns
+ * (`01jun26` bzw. `01.06.26`, LLH-1061). Nimmt die KONVENTIONEN statt eines
  * `jetzt`, damit der Aufrufer die Zone nicht vergessen kann; verglichen wird mit dem heutigen
  * Schlüssel derselben Zone.
  */
@@ -56,7 +58,7 @@ export function tagesEtikett(
   const heute = jetztInZone(konv, jetzt);
   if (schluessel === heute.format('YYYY-MM-DD')) return 'Heute';
   if (schluessel === heute.subtract(1, 'day').format('YYYY-MM-DD')) return 'Gestern';
-  return dayjs(schluessel, 'YYYY-MM-DD').format('DD.MM.YYYY');
+  return kalendertag(schluessel, konv);
 }
 
 /** Trifft der Zeitpunkt in das Fenster? Grenzen einschließend (59 min drin, 61 min draußen). */
@@ -187,17 +189,15 @@ export function gruppiereNachTag<T extends LageEintragKern>(
 }
 
 /**
- * Zeit der Übergabe an die Lage für das Meta der Zeile: `HH:mm`, solange sie am Tag der
- * Ereigniszeit liegt (der steht im Tageskopf), sonst `DD.MM. HH:mm` — sonst läse sich eine am
- * Folgetag nachgereichte Übergabe als Uhrzeit des Ereignistags. Beides in der Anzeigezone.
+ * Zeit der Übergabe an die Lage für das Meta der Zeile: nur die Uhrzeit, solange sie am Tag der
+ * Ereigniszeit liegt (der steht im Tageskopf), sonst mit Tag — sonst läse sich eine am Folgetag
+ * nachgereichte Übergabe als Uhrzeit des Ereignistags. Beides in der Anzeigezone, in der Rolle
+ * „kurz“ mit dem Ereignistag als „heute“ (LLH-1061: `1430` bzw. `131430`).
  */
 export function uebergabeZeit(
   ereigniszeit: string,
   uebergabe: string,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): string {
-  const d = inZone(uebergabe, konv);
-  return tagesSchluessel(ereigniszeit, konv) === d.format('YYYY-MM-DD')
-    ? d.format('HH:mm')
-    : d.format('DD.MM. HH:mm');
+  return zeitKurz(uebergabe, konv, inZone(ereigniszeit, konv));
 }

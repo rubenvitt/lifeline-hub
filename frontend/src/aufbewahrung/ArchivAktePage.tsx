@@ -330,11 +330,11 @@ export function berichtigungText(
 export function archivHinweis(
   e: ArchivEtbEintrag,
   nrVonId: ReadonlyMap<number, number>,
-  formatZeit: (utc: string) => string,
+  zeitpunkt: (utc: string) => string,
 ): string | undefined {
   const teile = [
     istNachgetragen(e.ereigniszeit, e.received_at)
-      ? `nachgetragen um ${formatZeit(e.received_at)}`
+      ? `nachgetragen um ${zeitpunkt(e.received_at)}`
       : null,
     berichtigungText(e, nrVonId),
     e.veranlassung ? `Veranlassung: ${e.veranlassung}` : null,
@@ -344,7 +344,7 @@ export function archivHinweis(
 
 function ArchivEtb({ einsatzId }: { einsatzId: number }) {
   const { token } = theme.useToken();
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const [filter, setFilter] = useState<EtbFilter>('alle');
   const typ = filter === 'alle' ? undefined : filter;
   const abfrage = useInfiniteQuery({
@@ -378,13 +378,13 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
           <Zeitachseneintrag
             key={e.id}
             als="li"
-            zeit={<ZeitAnzeige wert={e.ereigniszeit} format="dtg" />}
+            zeit={<ZeitAnzeige wert={e.ereigniszeit} rolle="kurz" />}
             nr={`Nr. ${e.lfd_nr}`}
             typ={e.typ}
             typwort={etbTyp[e.typ].label}
             meta={e.von || e.an ? `${e.von || leer} → ${e.an || leer}` : undefined}
             toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
-            hinweis={archivHinweis(e, nrVonId, formatZeit)}
+            hinweis={archivHinweis(e, nrVonId, zeitpunkt)}
             verfasser={verfasserText(e)}
             weg={e.meldeweg ? MELDEWEG[e.meldeweg] : undefined}
           >

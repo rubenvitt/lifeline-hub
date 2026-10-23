@@ -17,6 +17,7 @@ import type { Person, PersonDetail } from '../api/types';
 import { formatKalenderdatum, parseKalenderdatum } from '../anzeige/kalenderdatum';
 import { Ortsfeld } from '../anzeige/Ortsfeld';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt, heuteInZone } from '../anzeige/zeitEingabe';
 import {
@@ -242,7 +243,8 @@ function PersonendatenInhalt({
   const { token, rollen } = useRollen();
   const { message, modal } = App.useApp();
   const qc = useQueryClient();
-  const { zone, formatiere } = useZeitEingabe();
+  const { zone } = useZeitEingabe();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const ohneNetz = useOhneVerbindung();
   const merkerGrund = useOffeneBearbeitungGrund();
   const grundId = useId();
@@ -588,7 +590,7 @@ function PersonendatenInhalt({
     isLeer: !person.vermisst_seit,
     mono: true,
     lesen: person.vermisst_seit ? (
-      <ZeitAnzeige wert={person.vermisst_seit} format="dtgVoll" />
+      <ZeitAnzeige wert={person.vermisst_seit} rolle="zeitpunkt" />
     ) : null,
     schreiben: (inZeileOhneAngabe) => (
       <PersonFeldAngabe<Dayjs | null, 'vermisst_seit'>
@@ -598,7 +600,9 @@ function PersonendatenInhalt({
         inZeileOhneAngabe={inZeileOhneAngabe}
         wert={alsZeitpunkt(person.vermisst_seit) ?? null}
         anzeige={
-          person.vermisst_seit ? <ZeitAnzeige wert={person.vermisst_seit} format="dtgVoll" /> : null
+          person.vermisst_seit ? (
+            <ZeitAnzeige wert={person.vermisst_seit} rolle="zeitpunkt" />
+          ) : null
         }
         leer={(d) => d === null}
         gleich={(a, b) => (a && b ? a.valueOf() === b.valueOf() : a === b)}
@@ -610,7 +614,7 @@ function PersonendatenInhalt({
             : null
         }
         zuWire={(d) => (d ? alsBackendZeit(d) : '')}
-        text={(w) => (w ? formatiere(dayjs.utc(w), 'DD.MM.YYYY HH:mm') : '')}
+        text={(w) => zeitpunkt(w)}
         eingabe={({ feld: f, popup, value, onChange }) => (
           <ZeitpunktEingabe
             {...f}

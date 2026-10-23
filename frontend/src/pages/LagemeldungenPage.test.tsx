@@ -106,7 +106,7 @@ describe('LagemeldungenPage', () => {
     // Typkante + Typwort des ETB-Typs „Lage" — kein Etikett, keine zweite Farbe.
     expect(zeile).toHaveAttribute('data-typ', 'lage');
     expect(within(zeile).getByText('Lage')).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
   /**
@@ -120,7 +120,7 @@ describe('LagemeldungenPage', () => {
     // In der Tagesgruppe genügt die taktische Uhrzeit in Ortszeit — der Tag steht im Kopf darüber.
     const ort = alsOrtszeit('2026-06-12 08:30:00')!;
     expect(screen.getByText(ort.format('HHmm'))).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: ort.format('DD.MM.YYYY') })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: '12jun26' })).toBeInTheDocument();
     expect(screen.queryByText('2026-06-12 08:30:00')).toBeNull();
   });
 
@@ -166,10 +166,8 @@ describe('LagemeldungenPage', () => {
     const hhmm = (s: string) => alsOrtszeit(s)!.format('HHmm');
     const zeile = within(sicht).getByText('Nachgereicht').closest('li') as HTMLElement;
     expect(within(zeile).getByText(hhmm('2026-06-12 11:14:00'))).toBeInTheDocument();
-    // Die Übernahme formatiert noch `lagemeldungen/zeitachse.ts` selbst (Schuldmenge, LLH-1061).
-    expect(zeile).toHaveTextContent(
-      `übernommen ${alsOrtszeit('2026-06-12 13:05:00')!.format('HH:mm')}`,
-    );
+    // Übernahme am selben Tag: nur die Uhrzeit, Rolle „kurz“ gegen den Ereignistag (LLH-1061).
+    expect(zeile).toHaveTextContent(`übernommen ${hhmm('2026-06-12 13:05:00')}`);
     // Später geschehen steht oben, auch wenn früher übergeben.
     const text = sicht.textContent ?? '';
     expect(text.indexOf('Pegel steigt')).toBeLessThan(text.indexOf('Nachgereicht'));
@@ -186,10 +184,9 @@ describe('LagemeldungenPage', () => {
     const text = sicht.textContent ?? '';
     // Liste absichtlich aufsteigend geliefert: nur so ist die Umkehr beweiskräftig.
     expect(text.indexOf('Neu')).toBeLessThan(text.indexOf('Alt'));
-    const tag = (s: string) => alsOrtszeit(s)!.format('DD.MM.YYYY');
-    expect(text.indexOf(tag('2026-06-13 07:00:00'))).toBeLessThan(
-      text.indexOf(tag('2026-06-12 09:00:00')),
-    );
+    // Tageskopf als Tagesteil der DTG (Rolle „Kalendertag“, LLH-1061).
+    expect(text.indexOf('13jun26')).toBeGreaterThan(-1);
+    expect(text.indexOf('13jun26')).toBeLessThan(text.indexOf('12jun26'));
   });
 
   it('filtert auf Einträge mit Koordinaten', async () => {

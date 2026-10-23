@@ -224,7 +224,7 @@ function InArbeitPaneel({
                 >
                   <span data-lfh="zuletzt-gespeichert">
                     {'zuletzt gespeichert '}
-                    {detail ? <ZeitAnzeige wert={detail.aktualisiert_at} format="kurz" /> : '—'}
+                    {detail ? <ZeitAnzeige wert={detail.aktualisiert_at} rolle="kurz" /> : '—'}
                   </span>
                   <span data-lfh="abschnitte-gefuellt">
                     {stand ? `${stand.gefuellt}/${stand.gesamt} Abschnitte` : '— Abschnitte'}

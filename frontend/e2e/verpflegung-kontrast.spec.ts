@@ -372,7 +372,7 @@ for (const modus of ['light', 'dark'] as const) {
     };
     for (const tragend of [
       ...KARTEN.flatMap((k) => [k.name, k.wort]),
-      /^\d\d\.\d\d\. \d\d:\d\d–(\d\d\.\d\d\. )?\d\d:\d\d$/,
+      /^\d{6}–(\d\d)?\d{4}$/,
       'fehlt 8 vegan',
       'fehlt 6 vegan',
       'Bedarf 12 · ausgegeben 4',

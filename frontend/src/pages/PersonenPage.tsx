@@ -165,8 +165,7 @@ function ZuletztText({ q }: { q: ZeilenQuittung }) {
   const p = q.person;
   return (
     <>
-      Zuletzt: <ZeitAnzeige wert={p.erfasst_at} format="uhrzeit" />{' '}
-      {registrierAnzeige(p.registrier_nr)}
+      Zuletzt: <ZeitAnzeige wert={p.erfasst_at} rolle="kurz" /> {registrierAnzeige(p.registrier_nr)}
       {nameText(p) ? ` ${nameText(p)}` : ''}
       {p.aktuelle_sichtung ? ` · ${SK_META[p.aktuelle_sichtung].label}` : ''}
     </>

@@ -1,7 +1,8 @@
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { uhrzeit } from '../anzeige/zeitDarstellung';
 import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
 
 /** Frist des stillen Autosave. */
@@ -24,7 +25,7 @@ interface VerlustschutzArgs<D, W extends object> {
 interface Verlustschutz<W extends object> {
   /** Gibt es eine Fassung im Formular, die noch nicht auf dem Server steht? */
   ungespeichert: boolean;
-  /** `HH:mm` des letzten erfolgreichen Speicherns (Autosave oder Knopf), sonst `null`. */
+  /** Uhrzeit (`1430` bzw. `14:30`) des letzten erfolgreichen Speicherns (Autosave oder Knopf), sonst `null`. */
   zuletztGespeichert: string | null;
   /** An `Form onValuesChange`. */
   markiereGeaendert: () => void;
@@ -111,10 +112,11 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   speichernRef.current = speichern;
   const onGespeichertRef = useRef(onGespeichert);
   onGespeichertRef.current = onGespeichert;
-  // „zuletzt gespeichert“ in der Anzeigezone (LFH-692); als Ref aus demselben Grund wie oben.
-  const { formatiere } = useZeitEingabe();
-  const uhrzeitRef = useRef(() => formatiere(dayjs(), 'HH:mm'));
-  uhrzeitRef.current = () => formatiere(dayjs(), 'HH:mm');
+  // „zuletzt gespeichert“ in der Anzeigezone (LFH-692) und in der Rolle „Uhrzeit“ des
+  // Formatkerns (LLH-1061, gespeichert ist eben); als Ref aus demselben Grund wie oben.
+  const { konventionen } = useAnzeigeKonventionen();
+  const uhrzeitRef = useRef(() => uhrzeit(dayjs(), konventionen));
+  uhrzeitRef.current = () => uhrzeit(dayjs(), konventionen);
 
   useEffect(() => {
     if (!daten) return;

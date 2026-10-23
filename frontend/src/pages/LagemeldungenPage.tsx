@@ -16,7 +16,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { LageMeldung, NeueMeldung } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
-import { formatUhrzeit } from '../anzeige/format';
+import { inZone, uhrzeit, zeitKurz } from '../anzeige/zeitDarstellung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise, ZeilenFehler } from '../components/SpeicherHinweis';
@@ -91,8 +91,8 @@ const HERKUNFT_OPTIONEN: SegmentOption<Herkunftsfilter>[] = [
  *   nicht die Übergabe (LLH-1039); die Übernahme steht als „übernommen …“ im Meta
  *   (`uebergabeZeit`).
  * - Tagesgruppen jüngster Tag zuerst, Tagesgrenze in der Anzeigezone (`lagemeldungen/zeitachse.ts`,
- *   `gruppiereNachTag` über `tagesSchluessel`/`tagesEtikett`). In der Gruppe genügt `HH:mm` — der
- *   Tag steht im Kopf.
+ *   `gruppiereNachTag` über `tagesSchluessel`/`tagesEtikett`). In der Gruppe genügt die Uhrzeit (`uhrzeit`) —
+ *   der Tag steht im Kopf; „gesehen“ trägt den Tag nur, wenn er ein anderer ist.
  * - Rückweg zur Quellmeldung über `meldungenPfad`, im Meta der Zeile.
  * - Filterachsen (Zeitfenster, Koordinaten, Herkunft, Freitext) als Filterleiste über der Achse,
  *   Prädikate in `filtereLagemeldungen`.
@@ -272,7 +272,7 @@ export default function LagemeldungenPage() {
     <Zeitachseneintrag
       key={l.id}
       als="li"
-      zeit={formatUhrzeit(l.ereigniszeit, konventionen)}
+      zeit={uhrzeit(l.ereigniszeit, konventionen)}
       typ="lage"
       typwort={
         l.meldungsart === 'lagemeldung'
@@ -307,7 +307,7 @@ export default function LagemeldungenPage() {
           {` · übernommen ${uebergabeZeit(l.ereigniszeit, l.erstellt_at, konventionen)}`}
           {!l.is_neu && l.gesehen_at && (
             <>
-              {` · gesehen ${formatUhrzeit(l.gesehen_at, konventionen)}`}
+              {` · gesehen ${zeitKurz(l.gesehen_at, konventionen, inZone(l.ereigniszeit, konventionen))}`}
               {l.gesehen_von_name && ` · ${l.gesehen_von_name}`}
             </>
           )}

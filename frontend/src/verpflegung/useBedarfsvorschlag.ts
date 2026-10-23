@@ -15,7 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { zuWanduhr } from '../anzeige/zeitEingabe';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { ladeBelegungKopfzahl } from '../api/betreuung';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
@@ -105,9 +105,10 @@ export function useBedarfsvorschlag({
     retry: false,
   });
 
-  // „Stand“ ist in beiden Feldern die Uhrzeit des Abrufs in der Anzeigezone, wie jede andere
-  // Uhrzeit im Dialog (LFH-692); vorher stand beim Betreuten-Feld „Stand jetzt“ (LFH-948).
-  const standVon = (ms: number) => zuWanduhr(dayjs(ms), konventionen.zeitzone).format('HH:mm');
+  // „Stand“ ist in beiden Feldern die Zeit des Abrufs in der Anzeigezone, wie jede andere
+  // Zeit im Dialog (LFH-692), in der Rolle „kurz“ (LLH-1061); vorher stand beim Betreuten-Feld
+  // „Stand jetzt“ (LFH-948).
+  const standVon = (ms: number) => zeitKurz(dayjs(ms), konventionen);
 
   let kraefte = LEER;
   // Ein Fehler lässt die Quelle leer; `data` eines früheren Erfolgs bliebe bei einem

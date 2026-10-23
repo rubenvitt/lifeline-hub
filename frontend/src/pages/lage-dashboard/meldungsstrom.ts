@@ -6,12 +6,9 @@
  */
 import type { EtbEintragAnzeige, MeldeWeg } from '../../api/types';
 import { verfasserText } from '../../etb/verfasser';
-import {
-  DEFAULT_KONVENTIONEN,
-  formatUhrzeit,
-  type AnzeigeKonventionen,
-} from '../../anzeige/format';
+import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../../anzeige/format';
 import { MELDEWEG_OPTIONEN } from '../../etb/schnellerfassungModell';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /** Wie viele Einträge das Paneel zeigt (Entwurf S3). */
 const STROM_ZEIGEN = 7;
@@ -88,10 +85,14 @@ export function stromQuelle(e: EtbEintragAnzeige): string {
   return [von, e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : null].filter(Boolean).join(' · ');
 }
 
-/** Ereigniszeit als `HH:mm` in der Anzeigezone. Rein. */
+/**
+ * Ereigniszeit in der Rolle „kurz“ (heute `1430`, sonst `091430`; LLH-1061) in der Anzeigezone.
+ * Rein, wenn `jetzt` hereinkommt.
+ */
 export function stromZeit(
   e: EtbEintragAnzeige,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  jetzt: number = Date.now(),
 ): string {
-  return formatUhrzeit(e.ereigniszeit, konv);
+  return zeitKurz(e.ereigniszeit, konv, jetzt);
 }

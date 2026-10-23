@@ -168,7 +168,7 @@ export default function Inspector({
   ohneOrt = false,
 }: InspectorProps) {
   const { token, rollen, dunkel } = useRollen();
-  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   // Eigene ids: der Inspector kann neben Feldern derselben Beschriftung stehen.
   const fachaufgabeId = useId();
   const organisationId = useId();
@@ -182,8 +182,8 @@ export default function Inspector({
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
   const bild = useMemo(() => markerBildUrl(marker, dunkel), [marker, dunkel]);
-  const raster = auswahlRaster(marker, roh, formatZeitKurz);
-  const letzte = letzteMeldungBlock(marker, roh, formatZeitKurz);
+  const raster = auswahlRaster(marker, roh, zeitKurz);
+  const letzte = letzteMeldungBlock(marker, roh, zeitKurz);
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);
   // Lage-Text und Verortung einer Lagemeldung (LLH-1066): schreibt in die Meldung, also mit deren

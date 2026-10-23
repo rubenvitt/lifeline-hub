@@ -5,13 +5,14 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
-import { DEFAULT_KONVENTIONEN, formatZeitKurz } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import type { LagebesprechungStand } from '../api/types';
 import { serverJetzt, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { tippeZeit } from '../test/zeitEingabe';
 import TerminPaneel from './TerminPaneel';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 dayjs.extend(utc);
 
@@ -76,7 +77,7 @@ describe('TerminPaneel · Zustand des Termins', () => {
   it('Termin in 25 min: taktische Zeit groß, Notiz „in 25 min“, neutral', () => {
     const p = zeige(stand({ naechste_lagebesprechung_at: wireAb(25) }));
     const k = terminKennzahl(p);
-    expect(wert(k)).toHaveTextContent(formatZeitKurz(wireAb(25), DEFAULT_KONVENTIONEN));
+    expect(wert(k)).toHaveTextContent(zeitKurz(wireAb(25), DEFAULT_KONVENTIONEN));
     expect(notiz(k)).toHaveTextContent('in 25 min');
     expect(k).toHaveAttribute('data-ton', 'neutral');
   });

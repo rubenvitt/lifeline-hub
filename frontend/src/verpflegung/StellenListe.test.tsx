@@ -73,7 +73,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
     expect(within(fk).getByText('Feldküche')).toBeInTheDocument();
     expect(within(fk).getByText('Am Sportplatz 2')).toBeInTheDocument();
     expect(within(fk).getByText('aktiv')).toBeInTheDocument();
-    expect(within(fk).getByText('Mittag 12:00–13:30')).toBeInTheDocument();
+    expect(within(fk).getByText('Mittag 1200–1330')).toBeInTheDocument();
     expect(within(fk).getByText('100 EP ausgegeben')).toBeInTheDocument();
 
     const deich = zeile('Zuführung Deich');

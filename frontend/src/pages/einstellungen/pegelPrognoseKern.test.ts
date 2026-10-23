@@ -61,7 +61,7 @@ describe('pegelPrognoseKern (LFH-628)', () => {
     expect(w.hoechststand_m).toBe(7.23);
     expect(w.zeitpunkt?.toISOString()).toBe('2026-09-22T16:00:00.000Z');
     expect(vorhersageSatz(v, JETZT, BERLIN)).toBe(
-      'PEGELONLINE-Vorhersage, gerechnet 07:00: höchster Wert 7,23 m um 18:00',
+      'PEGELONLINE-Vorhersage, gerechnet 0700: höchster Wert 7,23 m um 1800',
     );
     expect(vorhersageSatz({ ...v, abschaetzung: true }, JETZT, BERLIN)).toMatch(
       /\(Abschätzung, keine Vorhersage\)$/,

@@ -4,10 +4,10 @@ import { ladeStandVerlauf } from '../api/evakuierung';
 import { einsatzKeys } from '../api/queryKeys';
 import type { StandVerlaufEintrag } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatZeitKurz } from '../anzeige/format';
 import { monoStil, useRollen } from '../components/instrument';
 import { personenZahl } from './betreuungText';
 import { standStufen, stufenAussage, stufenGeometrie, type StandStufe } from './standlinieKern';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 const BREITE = 600;
 const HOEHE = 96;
@@ -54,7 +54,7 @@ export default function BezirkStandlinie({
   const g = stufenGeometrie(stufen, plan, BREITE, HOEHE);
   if (!g) return null;
 
-  const zeit = (s: StandStufe) => formatZeitKurz(wire(s.t), konventionen);
+  const zeit = (s: StandStufe) => zeitKurz(wire(s.t), konventionen);
   const erste = stufen[0];
   const letzte = stufen[stufen.length - 1];
   const beschriftung = { ...monoStil(11), color: rollen.schwach };

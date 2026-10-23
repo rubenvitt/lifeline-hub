@@ -664,7 +664,7 @@ describe('Rückfragen', () => {
       />,
     );
     const dialog = await screen.findByRole('dialog', { name: 'Ausgabe zurücknehmen?' });
-    const uhr = dayjs.utc('2026-09-24 09:40:00').local().format('HH:mm');
+    const uhr = dayjs.utc('2026-09-24 09:40:00').local().format('HHmm');
     expect(
       within(dialog).getByText(
         `120 EP um ${uhr} (Verpflegungsstelle Deich) zu ‚Mittag‘, davon 2 vegan.`,

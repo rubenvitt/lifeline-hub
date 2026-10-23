@@ -226,7 +226,7 @@ export default function Patientenkopf({
               />
               {person.aktuelle_sichtung_at && (
                 <Typography.Text type="secondary" data-lfh="sichtung-zeit">
-                  gesichtet <ZeitAnzeige wert={person.aktuelle_sichtung_at} format="dtg" /> ·{' '}
+                  gesichtet <ZeitAnzeige wert={person.aktuelle_sichtung_at} rolle="kurz" /> ·{' '}
                   {formatVor(person.aktuelle_sichtung_at, jetzt)}
                   {letzteSichtung?.bestaetigt_name &&
                     ` · bestätigt: ${letzteSichtung.bestaetigt_name}`}
@@ -255,14 +255,14 @@ export default function Patientenkopf({
                     {person.aufenthalt.seit && (
                       <>
                         {' '}
-                        · seit <ZeitAnzeige wert={person.aufenthalt.seit} format="dtg" />
+                        · seit <ZeitAnzeige wert={person.aufenthalt.seit} rolle="kurz" />
                       </>
                     )}
                   </>
                 ) : letzterVerbleib ? (
                   <>
                     {kurzVerbleib(letzterVerbleib)} ·{' '}
-                    <ZeitAnzeige wert={letzterVerbleib.zeitpunkt_at} format="dtg" />
+                    <ZeitAnzeige wert={letzterVerbleib.zeitpunkt_at} rolle="kurz" />
                   </>
                 ) : (
                   <Typography.Text type="secondary">ohne Aufenthalt</Typography.Text>
@@ -304,7 +304,7 @@ export default function Patientenkopf({
                   {person.transport_at && (
                     <Typography.Text type="secondary">
                       {' '}
-                      · <ZeitAnzeige wert={person.transport_at} format="dtg" />
+                      · <ZeitAnzeige wert={person.transport_at} rolle="kurz" />
                       {letzterTransport?.bestaetigt_name &&
                         ` · bestätigt: ${letzterTransport.bestaetigt_name}`}
                     </Typography.Text>
@@ -335,8 +335,7 @@ export default function Patientenkopf({
                   key: m.id,
                   inhalt: (
                     <>
-                      {MASSNAHME_WORT[m.art]} ·{' '}
-                      <ZeitAnzeige wert={m.zeitpunkt_at} format="uhrzeit" />
+                      {MASSNAHME_WORT[m.art]} · <ZeitAnzeige wert={m.zeitpunkt_at} rolle="kurz" />
                     </>
                   ),
                 }))}
@@ -374,7 +373,7 @@ export default function Patientenkopf({
                         <span style={monoStil(13)}>{nummer}</span> {regionName(v.ansicht, v.region)}{' '}
                         · {VERLETZUNG_ART_WORT[v.art]}
                         {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`} ·{' '}
-                        <ZeitAnzeige wert={v.zeitpunkt_at} format="uhrzeit" />
+                        <ZeitAnzeige wert={v.zeitpunkt_at} rolle="kurz" />
                       </>
                     ),
                   }))}
@@ -396,7 +395,7 @@ export default function Patientenkopf({
               <span data-lfh="letzte-notiz">
                 {letzteNotiz.text}{' '}
                 <Typography.Text type="secondary">
-                  · <ZeitAnzeige wert={letzteNotiz.erfasst_at} format="dtg" />
+                  · <ZeitAnzeige wert={letzteNotiz.erfasst_at} rolle="kurz" />
                 </Typography.Text>
               </span>
             ) : (
@@ -582,7 +581,7 @@ function VorgemerktListe({ eintraege }: { eintraege: readonly VorgemerkterPerson
           {v.aktion.daten.zeitpunkt_at && (
             <>
               {' · '}
-              <ZeitAnzeige wert={v.aktion.daten.zeitpunkt_at} format="uhrzeit" />
+              <ZeitAnzeige wert={v.aktion.daten.zeitpunkt_at} rolle="kurz" />
             </>
           )}
         </li>

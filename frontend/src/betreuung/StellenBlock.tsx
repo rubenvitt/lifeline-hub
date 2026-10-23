@@ -242,7 +242,7 @@ const stellenSpalten = (
       sortWert: (s) => s.belegung?.zeitpunkt_at,
       // `ZeitAnzeige` liest den Wire-String als UTC — nie `dayjs(s)`.
       render: (_, s) =>
-        s.belegung ? <ZeitAnzeige wert={s.belegung.zeitpunkt_at} format="kurz" /> : leer,
+        s.belegung ? <ZeitAnzeige wert={s.belegung.zeitpunkt_at} rolle="kurz" /> : leer,
     },
     {
       key: 'abschnitt',

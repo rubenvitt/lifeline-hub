@@ -13,7 +13,6 @@ import type {
   Fuehrungsstelle,
 } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtg } from '../anzeige/format';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { EINSATZLEITER_NAME_MAX } from '../api/eingabegrenzen';
@@ -25,6 +24,7 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
 import { personLabel } from '../kraefte/einsatzfunktionKern';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Zeile „Einsatzleiter“ der eigenen Führungsstelle (LFH-1199): eine disponierte Person oder ein
@@ -150,7 +150,7 @@ export default function EinsatzleiterAngabe({
           <>
             {einsatzleiterKurz(d)}
             {' · '}
-            <span style={monoStil(13)}>{`seit ${taktischeDtg(d.seit, konventionen)}`}</span>
+            <span style={monoStil(13)}>{`seit ${zeitKurz(d.seit, konventionen)}`}</span>
           </>
         ) : null
       }

@@ -6,9 +6,10 @@ import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import FachebenenInspector from './FachebenenInspector';
 import { fachebeneFarbenHell } from '../../theme/tokens';
-import { taktischeDtgVoll, DEFAULT_KONVENTIONEN } from '../../anzeige/format';
+import { DEFAULT_KONVENTIONEN } from '../../anzeige/format';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../../test/prozessZone';
+import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 
 describe('FachebenenInspector', () => {
   it('Warnung (DWD): Headline, Schwere-Label, Beschreibung, Handlungsempfehlung', () => {
@@ -91,7 +92,7 @@ describe('FachebenenInspector', () => {
       );
       const zeile = screen.getByText(/angekündigt/);
       expect(zeile).toHaveTextContent(
-        `angekündigt · ab ${taktischeDtgVoll(KUENFTIG, DEFAULT_KONVENTIONEN)}`,
+        `angekündigt · ab ${zeitpunkt(KUENFTIG, DEFAULT_KONVENTIONEN)}`,
       );
     });
 
@@ -345,7 +346,7 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('großes Hochwasser')).toBeInTheDocument();
     const zeile = screen.getByText(/Ebene abgerufen/).closest('[data-lfh="fachebene-stand"]')!;
     expect(zeile).toHaveTextContent(
-      `veraltet · Ebene abgerufen ${taktischeDtgVoll(vor40h, DEFAULT_KONVENTIONEN)}`,
+      `veraltet · Ebene abgerufen ${zeitpunkt(vor40h, DEFAULT_KONVENTIONEN)}`,
     );
   });
 
@@ -404,7 +405,7 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('145 µg/m³')).toBeInTheDocument();
     expect(screen.getByText('12 µg/m³')).toBeInTheDocument();
     expect(
-      screen.getByText(taktischeDtgVoll('2026-09-21T09:00:00+01:00', DEFAULT_KONVENTIONEN)),
+      screen.getByText(zeitpunkt('2026-09-21T09:00:00+01:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
     expect(screen.getByText('DEBB021')).toBeInTheDocument();
     expect(screen.getByText(/Verkehr/)).toBeInTheDocument();

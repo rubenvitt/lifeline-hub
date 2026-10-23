@@ -31,7 +31,7 @@ test.describe(KAPITEL, () => {
     await context.setOffline(true);
     // Kopfzeile, Seitenkopf und Betriebszeile zeigen das fehlende Netz.
     await expect(page.locator('[data-lfh="kopf-sync"]')).toHaveAttribute('data-zustand', 'offline');
-    await expect(page.getByText(/^Stand \d\d:\d\d · offline$/)).toBeVisible();
+    await expect(page.getByText(/^Stand \d{4} · offline$/)).toBeVisible();
     await expect(page.getByText('Offline — keine Verbindung zum Server.')).toBeVisible();
 
     // Erfassen wie mit Netz: der Eintrag wird vorgemerkt.

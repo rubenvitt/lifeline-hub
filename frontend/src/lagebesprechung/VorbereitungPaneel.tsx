@@ -8,7 +8,6 @@ import type { AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
 import type { EinsatzAnzeige, LagebesprechungStand, ModulFreigaben } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -23,6 +22,7 @@ import { baueLagebild, kennzahlReihe } from '../pages/lage-dashboard/lagebild';
 import { kraefteZustand, useLagebild } from '../pages/lage-dashboard/useLagebild';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { quellenLaden, vorbereitungMarkdown, vorbereitungsZeilen } from './vorbereitung';
+import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
 
 dayjs.extend(utc);
 
@@ -131,8 +131,8 @@ export default function VorbereitungPaneel({
 
   const uebernehmen = useMutation({
     mutationFn: async () => {
-      const titelDtg = taktischeDtgVoll(new Date().toISOString(), konv);
-      const standDtg = standWire ? taktischeDtgVoll(standWire, konv) : titelDtg;
+      const titelDtg = zeitpunkt(new Date().toISOString(), konv);
+      const standDtg = standWire ? zeitpunkt(standWire, konv) : titelDtg;
       const lb = await legeLageberichtAn(einsatzId, {
         vorlage: 'freitext',
         titel: `Vorbereitung Lagebesprechung ${titelDtg}`,
@@ -146,7 +146,7 @@ export default function VorbereitungPaneel({
   return (
     <Paneel
       titel="Vorbereitung"
-      meta={standWire ? `Stand ${formatUhrzeitMitTag(standWire, konv)}` : undefined}
+      meta={standWire ? `Stand ${zeitKurz(standWire, konv)}` : undefined}
       style={{ marginBottom: token.margin }}
       fuss={
         darfUebernehmen || uebernehmen.error != null ? (

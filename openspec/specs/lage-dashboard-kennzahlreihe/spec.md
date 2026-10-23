@@ -215,3 +215,19 @@ sein. Trägt der Einsatz `evakuiert`, MUST der Reiter den Vorrang von „Evakuie
 #### Scenario: Evakuierung angeordnet
 - **WHEN** der Einsatz `evakuiert` trägt
 - **THEN** steht unter dem Schalter „Platz 3 zeigt „Evakuiert“, solange eine Evakuierung angeordnet ist.“
+
+### Requirement: Zeiten in der Kennzahlreihe
+
+Zeitangaben in den Notizen der Kennzahlreihe und im Seitenkopf des Dashboards SHALL in der Rolle
+„kurz“ der Spec `zeitdarstellung` stehen (LLH-1061): die Einsatzdauer „seit …“ bzw. „beendet …“,
+der Datenstand des Pegels und die Zeit des Lagebilds im Kopf. Heute steht nur die Uhrzeit, an
+einem anderen Tag Tag und Uhrzeit. Der Kopf MUST auf schmalen Schirmen nicht breiter werden als
+mit der Uhrzeit allein.
+
+#### Scenario: Einsatzdauer seit gestern
+- **WHEN** der Einsatz am 09.10.2026 um 14:46 Uhr begann, heute der 10.10.2026 ist und die Darstellung taktisch ist
+- **THEN** trägt die Kennzahl „Einsatzdauer“ die Notiz „seit 091446“
+
+#### Scenario: Pegelstand von heute
+- **WHEN** die letzte Messung des Leitpegels heute um 14:05 Uhr lag
+- **THEN** nennt die Notiz der Pegel-Kennzahl „Stand 1405“

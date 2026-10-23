@@ -34,7 +34,7 @@ export default function GefahrenBeurteilung({
   className,
 }: GefahrenBeurteilungProps) {
   const { token } = useRollen();
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   return (
     <div
       data-lfh="gefahrengebiet-beurteilung"
@@ -52,8 +52,7 @@ export default function GefahrenBeurteilung({
       >
         {gebiet.beurteilt_at ? (
           <Typography.Text data-lfh="beurteilung-stand">
-            beurteilt{' '}
-            <span style={monoStil(token.fontSize)}>{formatZeit(gebiet.beurteilt_at)}</span>
+            beurteilt <span style={monoStil(token.fontSize)}>{zeitpunkt(gebiet.beurteilt_at)}</span>
             {gebiet.beurteilt_von_name ? ` · ${gebiet.beurteilt_von_name}` : ''}
           </Typography.Text>
         ) : (

@@ -64,9 +64,9 @@ Einträge je Typ und alle Entscheidungen zeigen.
 
 #### Scenario: Einsatzleiter im Block Führung
 
-- **WHEN** der Einsatzleiter „Anna Schulz“ seit 11.10.2026 14:30 erfasst ist und zwei Konten die
+- **WHEN** der Einsatzleiter „Anna Schulz“ seit 11.10.2026 14:30 Uhr erfasst ist und zwei Konten die
   App-Rolle Einsatzleitung tragen
-- **THEN** nennt der Block Führung unter „Einsatzleitung“ „Anna Schulz“ mit „seit 11.10.2026 14:30“
+- **THEN** nennt der Block Führung unter „Einsatzleitung“ „Anna Schulz“ mit „seit 111430okt26“ (Darstellung taktisch)
 - **AND** die beiden Konten stehen dort nicht
 
 #### Scenario: Kein Einsatzleiter erfasst
@@ -216,9 +216,9 @@ Bericht Ende und Dauer bis zum Abschluss nennen und keinen Vorläufig-Vermerk tr
 
 #### Scenario: Zwischenstand bei laufendem Einsatz
 
-- **WHEN** ein laufender Einsatz um 14:32 als Bericht gedruckt wird
-- **THEN** nennt der Kopf „Vorläufig – Einsatz läuft“ und den Stand 14:32
-- **AND** das Ende steht als „läuft“, die Dauer reicht bis 14:32
+- **WHEN** ein laufender Einsatz am 11.10.2026 um 14:32 Uhr als Bericht gedruckt wird
+- **THEN** nennt der Kopf „Vorläufig – Einsatz läuft“ und den Stand `111432okt26`
+- **AND** das Ende steht als „läuft“, die Dauer reicht bis 14:32 Uhr
 
 #### Scenario: Abgeschlossener Einsatz
 
@@ -230,7 +230,14 @@ Bericht Ende und Dauer bis zum Abschluss nennen und keinen Vorläufig-Vermerk tr
 
 Der Bericht SHALL ein Schnappschuss sein: Er zeigt die Daten zum Zeitpunkt des Öffnens bzw. des
 letzten „Neu laden“ und ändert sich danach nicht von selbst. Der Druckkopf MUST diesen Stand
-nennen. Alle Zeitangaben im Bericht MUST in der Zeitzone der Organisation stehen.
+nennen. Alle Zeitangaben im Bericht MUST in der Zeitzone der Organisation stehen, in der Rolle
+„Zeitpunkt“ der Spec `zeitdarstellung` und in der Darstellung von Einsatz bzw. Organisation; die
+Wahl am Gerät MUST NOT in den Bericht eingehen (LLH-1061).
+
+#### Scenario: Zeitangabe im Bericht
+
+- **WHEN** der Einsatz taktisch vorgibt und am 29.03.2026 um 01:30 Uhr Ortszeit begann
+- **THEN** steht als Beginn `290130mrz26`, bei der Darstellung „Datum und Uhrzeit“ `29.03.26 01:30`
 
 #### Scenario: Neue Daten nach dem Öffnen
 
@@ -304,8 +311,8 @@ zum Abschluss zählen. Einheiten ohne Zeitachse MUST NOT mit einer Einsatzzeit v
 
 #### Scenario: Einheit noch im Einsatz
 
-- **WHEN** eine Einheit seit 08:00 im laufenden Einsatz ist und der Bericht um 14:32 gedruckt wird
-- **THEN** steht sie mit Beginn 08:00, Ende „läuft“ und Einsatzzeit 6 h 32
+- **WHEN** eine Einheit seit 11.10.2026 08:00 Uhr im laufenden Einsatz ist und der Bericht um 14:32 Uhr gedruckt wird
+- **THEN** steht sie mit Beginn `110800okt26`, Ende „läuft“ und Einsatzzeit 6 h 32
 
 #### Scenario: Offene Periode nach dem Abschluss
 

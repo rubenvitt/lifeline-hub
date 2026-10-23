@@ -2,7 +2,6 @@ import { Breadcrumb, Button, Flex, Space, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type Key, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
-import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
@@ -65,6 +64,7 @@ import { modulName } from '../einsatz/modulRegistry';
 import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import './kommunikationsplanPrint.css';
 
 /**
@@ -625,10 +625,7 @@ export default function KommunikationsplanPage() {
           zeilen={[
             {
               etikett: 'Stand',
-              wert: taktischeDtgVoll(
-                new Date(datenstand || Date.now()).toISOString(),
-                konventionen,
-              ),
+              wert: zeitpunkt(new Date(datenstand || Date.now()).toISOString(), konventionen),
             },
           ]}
         />

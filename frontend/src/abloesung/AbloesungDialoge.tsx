@@ -2,7 +2,6 @@ import { Checkbox, Form, Input, Radio, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useId } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeitMitTag } from '../anzeige/format';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type { Abloesung, AbloesungArt, VollzugBody } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -18,6 +17,7 @@ import {
 import { abloeserIds } from './abloeser';
 import type { BesatzungOption } from './besatzung';
 import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog
@@ -121,7 +121,7 @@ export function SchichtBeginnenDialog({
     einheitId == null || eintreffenJeEinheit == null
       ? undefined
       : eintreffen != null
-        ? `Eintreffen ${formatUhrzeitMitTag(eintreffen, konventionen)}`
+        ? `Eintreffen ${zeitKurz(eintreffen, konventionen)}`
         : 'jetzt';
   return (
     <ErfassungsModal<BeginnWerte>

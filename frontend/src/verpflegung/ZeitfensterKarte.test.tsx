@@ -136,8 +136,8 @@ describe('ZeitfensterKarte — Einstufung (Spec „Deckung und Unterdeckung")', 
 
   it('zeigt Zeitraum und Aufteilung des Bedarfs', () => {
     const { karte } = zeige(zeitfenster());
-    const von = dayjs.utc('2026-09-24 10:00:00').local().format('DD.MM. HH:mm');
-    const bis = dayjs.utc('2026-09-24 11:30:00').local().format('HH:mm');
+    const von = dayjs.utc('2026-09-24 10:00:00').local().format('DDHHmm');
+    const bis = dayjs.utc('2026-09-24 11:30:00').local().format('HHmm');
     expect(karte.querySelector('[data-lfh="verpflegung-zeitraum"]')).toHaveTextContent(
       `${von}–${bis}`,
     );

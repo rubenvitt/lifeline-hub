@@ -16,7 +16,6 @@ import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../../anzeige/zeitEingabe';
-import { formatUhrzeitMitTag } from '../../anzeige/format';
 import {
   ladeGeraete,
   legeKopplungAn,
@@ -58,6 +57,7 @@ import {
   verlaengernVorbelegung,
   type StellenWert,
 } from './geraeteKern';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /**
  * Ohne Einsatzleitung lädt die Sektion nichts (der Server lässt nur sie zu, auch keinen Admin):
@@ -295,10 +295,10 @@ export default function EinsatzGeraete() {
                       ANSICHT_LABEL[k.ansicht],
                       STATUS_WORT[k.status],
                       k.status === 'widerrufen'
-                        ? `von ${k.widerrufen_von_name ?? '—'} um ${formatUhrzeitMitTag(k.widerrufen_at, konv)}`
-                        : `bis ${formatUhrzeitMitTag(k.laeuft_ab_at, konv)}`,
+                        ? `von ${k.widerrufen_von_name ?? '—'} um ${zeitKurz(k.widerrufen_at, konv)}`
+                        : `bis ${zeitKurz(k.laeuft_ab_at, konv)}`,
                       k.letzter_zugriff_at
-                        ? `zuletzt ${formatUhrzeitMitTag(k.letzter_zugriff_at, konv)}`
+                        ? `zuletzt ${zeitKurz(k.letzter_zugriff_at, konv)}`
                         : null,
                       `angelegt von ${k.erstellt_von_name}`,
                     ]
@@ -455,7 +455,7 @@ export default function EinsatzGeraete() {
         {anzeigeCode && (
           <div data-lfh="kopplungscode">
             <p>
-              {`Gültig bis ${formatUhrzeitMitTag(anzeigeCode.code.laeuft_ab_at, konv)}, einmal einlösbar, nur jetzt sichtbar.`}
+              {`Gültig bis ${zeitKurz(anzeigeCode.code.laeuft_ab_at, konv)}, einmal einlösbar, nur jetzt sichtbar.`}
             </p>
             <div
               style={{

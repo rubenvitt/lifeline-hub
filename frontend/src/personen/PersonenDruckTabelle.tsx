@@ -1,7 +1,8 @@
 import type { Person } from '../api/types';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { AnzeigeKonventionen } from '../anzeige/format';
-import DruckTabelle, { druckZeit, type DruckSpalte } from '../druck/DruckTabelle';
+import DruckTabelle, { type DruckSpalte } from '../druck/DruckTabelle';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import { koordinatenText } from './koordinate';
 import { SK_META, STATUS_META } from './personMeta';
 import { geschlechtAlter, nameText, verbleibText } from './personenSpalten';
@@ -33,7 +34,7 @@ export default function PersonenDruckTabelle({ personen, uhsName, konventionen }
       wert: (p) => [p.antreff_ort, koordinatenText(p)].filter(Boolean).join(' · ') || '—',
     },
     { titel: 'Verbleib', wert: (p) => verbleibText(p, uhsName) ?? '—' },
-    { titel: 'erfasst', mono: true, wert: (p) => druckZeit(p.erfasst_at, konventionen) },
+    { titel: 'erfasst', mono: true, wert: (p) => zeitpunkt(p.erfasst_at, konventionen) },
   ];
   return (
     <DruckTabelle

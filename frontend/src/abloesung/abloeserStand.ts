@@ -14,8 +14,9 @@
  * rechnet keine Vererbung und kein „geplant“ nach (`frontend/src/kraefte/AGENTS.md`, „Ablösung“).
  */
 import type { Abloesung, EinheitPerioden } from '../api/types';
-import { formatZeitKurz, type AnzeigeKonventionen } from '../anzeige/format';
+import { type AnzeigeKonventionen } from '../anzeige/format';
 import { abloeserIds } from './abloeser';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 export interface AbloeserStand {
   einheit_id: number;
@@ -86,8 +87,8 @@ export function buildAbloeserStand(
 /** Ein Ablöser als Text: „2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR …)“. */
 export function abloeserEintragText(s: AbloeserStand, konv: AnzeigeKonventionen): string {
   const teile = [s.einheit_name];
-  if (s.alarmiert_at) teile.push(`alarmiert ${formatZeitKurz(s.alarmiert_at, konv)}`);
-  if (s.eingetroffen_at) teile.push(`eingetroffen ${formatZeitKurz(s.eingetroffen_at, konv)}`);
+  if (s.alarmiert_at) teile.push(`alarmiert ${zeitKurz(s.alarmiert_at, konv)}`);
+  if (s.eingetroffen_at) teile.push(`eingetroffen ${zeitKurz(s.eingetroffen_at, konv)}`);
   const text = teile.join(' · ');
   return s.br_name ? `${text} (${s.br_name})` : text;
 }

@@ -13,7 +13,8 @@
  *    sonst läse ein Vorleser die Zahlen zweimal. Die Zeiger-Ablesung ergänzt nur.
  */
 import { useState, type PointerEvent } from 'react';
-import { formatUhrzeit, DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { monoStil, useRollen } from '../components/instrument';
 import { wasserstandMeter, type TrendRichtung } from '../pegel/pegelKennzahl';
 
@@ -157,7 +158,7 @@ export default function Verlaufslinie({
     setZeiger(naechster);
   };
   const abgelesen = zeiger != null ? g.punkte[zeiger] : null;
-  const zeit = (t: number) => formatUhrzeit(new Date(t).toISOString(), konv);
+  const zeit = (t: number) => zeitKurz(new Date(t).toISOString(), konv);
   const meta = { ...monoStil(11), color: rollen.gedaempft };
   const prognoseY = prognoseCm != null ? g.yFuer(prognoseCm) : null;
   const lage = beschriftungsHoehen(g, RAND, BESCHRIFTUNG_ABSTAND);

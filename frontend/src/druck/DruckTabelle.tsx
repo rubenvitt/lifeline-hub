@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { theme } from 'antd';
 import { monoStil } from '../components/instrument';
-import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
 
 /** Eine Spalte der Papierform: Kopfwort und Zelleninhalt als reiner Text. */
 export interface DruckSpalte<T> {
@@ -18,11 +17,6 @@ interface Props<T> {
   /** Bereits geordnet — die Tabelle sortiert nicht. */
   zeilen: readonly T[];
   schluessel: (zeile: T) => number | string;
-}
-
-/** Zeitpunkt auf Papier: Datum und Uhrzeit in der Anzeigezone, wie im ETB-Druck. */
-export function druckZeit(wire: string, konventionen: AnzeigeKonventionen): string {
-  return inZone(wire, konventionen).format('DD.MM.YYYY HH:mm');
 }
 
 /**

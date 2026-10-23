@@ -1,7 +1,8 @@
 import type { Tier } from '../../api/types';
 import { tierRegistrierAnzeige } from '../../api/einsatzTier';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
-import DruckTabelle, { druckZeit, type DruckSpalte } from '../../druck/DruckTabelle';
+import DruckTabelle, { type DruckSpalte } from '../../druck/DruckTabelle';
+import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { SPEZIES_META, TIER_STATUS, halterNummer, verbleibText } from './tierHelfer';
 
 interface Props {
@@ -31,7 +32,7 @@ export default function TiereDruckTabelle({ tiere, konventionen }: Props) {
     { titel: 'Rasse', wert: (t) => t.rasse_beschreibung ?? '—' },
     { titel: 'Halter', wert: halterText },
     { titel: 'Fundort', wert: (t) => t.antreff_ort ?? '—' },
-    { titel: 'erfasst', mono: true, wert: (t) => druckZeit(t.erfasst_at, konventionen) },
+    { titel: 'erfasst', mono: true, wert: (t) => zeitpunkt(t.erfasst_at, konventionen) },
   ];
   return (
     <DruckTabelle

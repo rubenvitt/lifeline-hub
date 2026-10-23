@@ -6,7 +6,6 @@ import { ladeAuftrag } from '../api/auftraege';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
@@ -15,6 +14,7 @@ import AuftragDruckBlatt from '../auftraege/AuftragDruckBlatt';
 import { auftragKennung } from '../auftraege/AuftragTeile';
 import { modulName } from '../einsatz/modulRegistry';
 import { auftraegePfad, parseRouteId } from '../routing/deeplinks';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Druckansicht eines Einzelauftrags (LLH-1171, Spec `druck-dokumente`, Change
@@ -137,10 +137,7 @@ export default function AuftragDruckPage() {
             zeilen={[
               {
                 etikett: 'Stand',
-                wert: taktischeDtgVoll(
-                  new Date(druckQuery.dataUpdatedAt).toISOString(),
-                  konventionen,
-                ),
+                wert: zeitpunkt(new Date(druckQuery.dataUpdatedAt).toISOString(), konventionen),
               },
             ]}
           />

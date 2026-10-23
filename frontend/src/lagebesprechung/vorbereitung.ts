@@ -1,10 +1,6 @@
 import type { AbrufZustand } from '../api/abrufZustand';
 import type { LagebesprechungStand, ModulZaehler } from '../api/types';
-import {
-  DEFAULT_KONVENTIONEN,
-  formatUhrzeitMitTag,
-  type AnzeigeKonventionen,
-} from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { modulZuRoute } from '../einsatz/modulRegistry';
 import {
   NICHT_FREIGEGEBEN,
@@ -17,6 +13,7 @@ import { stufenText } from '../nachforderungen/nachforderungStufen';
 import { SK_WORT } from '../personen/personMeta';
 import { sichtung as SK_META, warnstufeKennzahl } from '../theme/statusFarben';
 import { md, ZUSTAND_GRUND } from '../stab/funkplan';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Vorbereitung der Lagebesprechung (LFH-550; FwDV 100 Anl. 2: S2 bereitet vor).
@@ -209,7 +206,7 @@ export function vorbereitungsZeilen(
     zeile('lagebericht', 'Letzter Lagebericht', 'lageberichte', q.zustand.lageberichte, (l) =>
       l.fuehrung.bericht
         ? {
-            wert: formatUhrzeitMitTag(l.fuehrung.bericht.stand, konv),
+            wert: zeitKurz(l.fuehrung.bericht.stand, konv),
             notiz: `${l.fuehrung.bericht.statusLabel} · ${l.fuehrung.bericht.titel}`,
           }
         : { wert: 'keiner', notiz: 'noch nicht erstellt' },
@@ -218,13 +215,13 @@ export function vorbereitungsZeilen(
       letzte
         ? {
             wert: `Nr. ${letzte.lfd_nr}`,
-            notiz: `abgehalten ${formatUhrzeitMitTag(letzte.abgehalten_at, konv)}`,
+            notiz: `abgehalten ${zeitKurz(letzte.abgehalten_at, konv)}`,
           }
         : { wert: 'keine', notiz: 'noch keine abgehalten' },
     ),
     zeile('termin', 'Nächster Termin', 'lagebesprechung', q.zustand.besprechung, () => ({
       wert: q.besprechung?.naechste_lagebesprechung_at
-        ? formatUhrzeitMitTag(q.besprechung.naechste_lagebesprechung_at, konv)
+        ? zeitKurz(q.besprechung.naechste_lagebesprechung_at, konv)
         : 'kein Termin',
       notiz: null,
     })),

@@ -13,8 +13,9 @@ import { IconPlus } from '../icons';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { globalKeys } from '../api/queryKeys';
 import { MengenFeld } from '../components/MengenFeld';
-import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
@@ -165,7 +166,7 @@ export default function NachforderungFormular({
   abschnitte?: readonly ZielAbschnitt[];
 }) {
   const [form] = Form.useForm<FormWerte>();
-  const { formatiere } = useZeitEingabe();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const [weitereOffen, setWeitereOffen] = useState(false);
   const anzahlRef = useRef<HTMLDivElement>(null);
   // Einheitstypen der Organisation (aktive, Folge `sortier`) als dritte Vorschlagsgruppe.
@@ -271,7 +272,7 @@ export default function NachforderungFormular({
     prioritaet && prioritaet !== 'normal'
       ? `Priorität ${PRIORITAET_OPTIONEN.find((o) => o.value === prioritaet)?.label ?? ''}`
       : undefined,
-    benoetigtBis ? `bis ${formatiere(benoetigtBis, 'DD.MM. HH:mm')}` : undefined,
+    benoetigtBis ? `bis ${zeitKurz(alsBackendZeit(benoetigtBis))}` : undefined,
     details?.trim() ? 'Details' : undefined,
     begruendung?.trim() && begruendung.trim() !== begruendungVorgabe ? 'Begründung' : undefined,
   ].filter((t): t is string => !!t);

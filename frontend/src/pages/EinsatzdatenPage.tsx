@@ -190,7 +190,7 @@ function ZeitpunktAngabe({
     <InlineAngabe<Dayjs | null>
       etikett={etikett}
       wert={alsZeitpunkt(wire) ?? null}
-      anzeige={wire ? <ZeitAnzeige wert={wire} format="dtgVoll" /> : null}
+      anzeige={wire ? <ZeitAnzeige wert={wire} rolle="zeitpunkt" /> : null}
       leer={(d) => d === null}
       gleich={gleicherZeitpunkt}
       pflicht={pflicht}
@@ -1337,7 +1337,7 @@ export default function EinsatzdatenPage() {
                 etikett: 'Angelegt',
                 wert: (
                   <span style={monoStil(13)}>
-                    <ZeitAnzeige wert={einsatz.angelegt_at} format="dtgVoll" />
+                    <ZeitAnzeige wert={einsatz.angelegt_at} rolle="zeitpunkt" />
                   </span>
                 ),
               },

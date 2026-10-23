@@ -145,7 +145,7 @@ test.describe('Kommunikationsplan ohne Netz (LFH-848)', () => {
     await expect(page).not.toHaveURL(/\/login/);
     await expect(tabelle.getByRole('link', { name: NUMMER })).toBeVisible();
     await expect(tabelle.getByText('Besetzung nicht geladen')).toBeVisible();
-    await expect(page.getByText(/^Stand \d\d:\d\d · offline$/).first()).toBeVisible();
+    await expect(page.getByText(/^Stand \d{4} · offline$/).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Stelle hinzufügen' })).toBeDisabled();
     await expect(
       tabelle.getByRole('button', { name: 'Verbindung zu ILS Nord hinzufügen' }),

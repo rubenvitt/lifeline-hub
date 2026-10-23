@@ -324,7 +324,7 @@ describe('EinheitenPage', () => {
     // Ist 1/0/2 (Σ3) und Soll 1/3/18 (Σ22), BOS-Doppelstrich vor Gesamt.
     expect(within(zeile).getByText('1/0/2//3')).toBeInTheDocument();
     expect(within(zeile).getByText('1/3/18//22')).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
   /**

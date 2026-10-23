@@ -1,7 +1,8 @@
 import type { Schaden } from '../../api/types';
 import { schadenRegistrierAnzeige } from '../../api/einsatzSchaden';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
-import DruckTabelle, { druckZeit, type DruckSpalte } from '../../druck/DruckTabelle';
+import DruckTabelle, { type DruckSpalte } from '../../druck/DruckTabelle';
+import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { AUSMASS_META, STATUS_META, TYP_LABEL, gefahrText, geschaedigtText } from './schadenHelfer';
 
 interface Props {
@@ -31,7 +32,7 @@ export default function SchaedenDruckTabelle({ schaeden, konventionen }: Props) 
           : STATUS_META[s.status].label,
     },
     { titel: 'Geschädigt', wert: geschaedigtText },
-    { titel: 'erfasst', mono: true, wert: (s) => druckZeit(s.erfasst_at, konventionen) },
+    { titel: 'erfasst', mono: true, wert: (s) => zeitpunkt(s.erfasst_at, konventionen) },
   ];
   return (
     <DruckTabelle

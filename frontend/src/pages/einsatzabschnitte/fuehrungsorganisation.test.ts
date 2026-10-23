@@ -5,13 +5,13 @@ import Markdown from '../../components/Markdown';
 import type { Einheit, Einsatzabschnitt, Stabsfunktion } from '../../api/types';
 import { baueFunkplan, type FunkplanZeile } from '../../stab/funkplan';
 import type { EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
-import { taktischeDtgVoll } from '../../anzeige/format';
 import { abschnittStaerken } from './abschnittStaerke';
 import {
   baueFuehrungsorganisation,
   rendereFuehrungsorganisationMarkdown,
   type OrgKnoten,
 } from './fuehrungsorganisation';
+import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
   return {
@@ -66,7 +66,7 @@ function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined
   return undefined;
 }
 
-const DTG = (utc: string) => taktischeDtgVoll(utc, { zeitzone: 'Europe/Berlin' });
+const DTG = (utc: string) => zeitpunkt(utc, { zeitzone: 'Europe/Berlin' });
 const OHNE_EL: EinsatzleiterDarstellung = { art: 'nicht-erfasst' };
 
 describe('baueFuehrungsorganisation — Knotenaufbau', () => {

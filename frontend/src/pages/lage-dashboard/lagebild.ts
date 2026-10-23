@@ -23,12 +23,7 @@ import type {
   Uhs,
   Warnstufe,
 } from '../../api/types';
-import {
-  DEFAULT_KONVENTIONEN,
-  formatUhrzeitMitTag,
-  inZone,
-  type AnzeigeKonventionen,
-} from '../../anzeige/format';
+import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../../anzeige/format';
 import { staerkeText } from '../../anzeige/staerke';
 import { baueKraeftebild } from '../../kraefte/kraeftebild';
 import { LAGEBERICHT_STATUS } from '../../kommunikation/phase';
@@ -53,6 +48,7 @@ import {
   verdichteUhs,
   type SkVerteilung,
 } from './lageVerdichtung';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /**
  * Die Datenzustände einer Fläche. `fehler` und `leer` sind bewusst getrennt: Fehler darf nicht
@@ -239,17 +235,21 @@ export function einsatzdauerKennzahl(
     wert: einsatzdauer(einsatz.begonnen_at, jetzt, abgeschlossen),
     einheit: 'h',
     notiz: abgeschlossen
-      ? `beendet ${formatUhrzeitMitTag(abgeschlossen, konv)}`
-      : `seit ${formatUhrzeitMitTag(einsatz.begonnen_at, konv)}`,
+      ? `beendet ${zeitKurz(abgeschlossen, konv, jetzt)}`
+      : `seit ${zeitKurz(einsatz.begonnen_at, konv, jetzt)}`,
   };
 }
 
-/** „Lagebild 21.09. 14:22" — der Zeitpunkt in der Anzeigezone. Rein. */
+/**
+ * Zeit des Lagebilds im Seitenkopf: „jetzt“ in der Rolle „kurz“ (LLH-1061), also `1422` bzw.
+ * `14:22` — der Kopf ist eng (`e2e/lagebild-cls-schmal.spec.ts`), und „jetzt“ ist immer heute.
+ * In der Anzeigezone. Rein.
+ */
 export function lagebildZeit(
   jetzt: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): string {
-  return inZone(new Date(jetzt).toISOString(), konv).format('DD.MM. HH:mm');
+  return zeitKurz(new Date(jetzt).toISOString(), konv, jetzt);
 }
 
 /**
@@ -268,7 +268,7 @@ export function standText(
   const sekunden = Math.max(0, Math.round((jetzt - datenstand) / 1000));
   if (sekunden < 60) return `Stand vor ${sekunden} s`;
   if (sekunden < 3600) return `Stand vor ${Math.floor(sekunden / 60)} min`;
-  return `Stand ${inZone(new Date(datenstand).toISOString(), konv).format('HH:mm')}`;
+  return `Stand ${zeitKurz(new Date(datenstand).toISOString(), konv, jetzt)}`;
 }
 
 /** Schwelle der Notiz „n seit über 4 h" an „Vermisste" — gesetzt im Neuentwurf S3, keine Norm. */

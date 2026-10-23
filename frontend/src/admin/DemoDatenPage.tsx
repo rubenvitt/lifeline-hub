@@ -16,7 +16,7 @@ import type {
 } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { istAdmin } from '../einsatz/schreibrecht';
-import { alsOrtszeit } from '../anzeige/zeitEingabe';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { verweisStil } from '../etb/zeitachseModell';
 import { einsatzPfad } from '../routing/deeplinks';
 import { invalidiereNachDemoVorgang, useDemoDatenStatus } from './useDemoDaten';
@@ -121,13 +121,11 @@ function berichtZeile(z: DemoBerichtZeile, vorgang: DemoVorgang): string {
     : `${z.entfernt} entfernt · ${z.behalten} behalten`;
 }
 
-/** Wire-Zeit (UTC ohne Zone) in Ortszeit — über `alsOrtszeit`, nie `dayjs(s)`. */
-function ortszeit(s: string): string {
-  return alsOrtszeit(s)?.format('DD.MM.YYYY HH:mm') ?? s;
-}
-
 export default function DemoDatenPage() {
   const { benutzer, laedt: authLaedt } = useAuth();
+  // Wire-Zeit als Zeitpunkt über den Formatkern (LLH-1061), außerhalb eines Einsatzes mit den
+  // Konventionen der Organisation bzw. der Vorgabe.
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const demo = useDemoDatenStatus();
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -245,7 +243,7 @@ export default function DemoDatenPage() {
             </Datenfeld>
             {kopf && (
               <Datenfeld label="Importiert am" mono>
-                {ortszeit(kopf.importiert_at)}
+                {zeitpunkt(kopf.importiert_at)}
               </Datenfeld>
             )}
             {kopf && (
@@ -291,7 +289,7 @@ export default function DemoDatenPage() {
         {bericht && (
           <Paneel
             titel="Letzter Vorgang"
-            meta={`${VORGANG_LABEL[bericht.vorgang]} · ${ortszeit(bericht.zeitpunkt)}`}
+            meta={`${VORGANG_LABEL[bericht.vorgang]} · ${zeitpunkt(bericht.zeitpunkt)}`}
             koerperPolster
           >
             <Datenraster beschriftung="Bericht je Stammdatenart">

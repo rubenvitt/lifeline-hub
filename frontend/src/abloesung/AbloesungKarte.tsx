@@ -187,7 +187,7 @@ export default function AbloesungKarte({
         }}
       >
         <span style={{ ...monoStil(13, 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
-          <ZeitAnzeige wert={spalte.zeit} format="kurz" />
+          <ZeitAnzeige wert={spalte.zeit} rolle="kurz" />
         </span>
         <span style={{ ...monoStil(10), color: rollen.schwach }}>{spalte.wort}</span>
       </div>
@@ -209,7 +209,7 @@ export default function AbloesungKarte({
               data-lfh="abloesung-beginn"
               style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }}
             >
-              <ZeitAnzeige wert={s.beginn_at} format="kurz" />
+              <ZeitAnzeige wert={s.beginn_at} rolle="kurz" />
             </span>
           </Text>
           {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
@@ -272,7 +272,7 @@ export default function AbloesungKarte({
                     <>
                       {' · alarmiert '}
                       <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
-                        <ZeitAnzeige wert={a.alarmiert_at} format="kurz" />
+                        <ZeitAnzeige wert={a.alarmiert_at} rolle="kurz" />
                       </span>
                     </>
                   )}
@@ -280,7 +280,7 @@ export default function AbloesungKarte({
                     <>
                       {' · eingetroffen '}
                       <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
-                        <ZeitAnzeige wert={a.eingetroffen_at} format="kurz" />
+                        <ZeitAnzeige wert={a.eingetroffen_at} rolle="kurz" />
                       </span>
                     </>
                   )}
@@ -323,7 +323,7 @@ export default function AbloesungKarte({
                     <>
                       {w.einheit_name} steht selbst im Einsatz seit{' '}
                       <span data-lfh="abloesung-warnung-zeit" style={ZAHL}>
-                        <ZeitAnzeige wert={w.seit_at} format="kurz" />
+                        <ZeitAnzeige wert={w.seit_at} rolle="kurz" />
                       </span>
                     </>
                   ) : (
@@ -366,7 +366,7 @@ export default function AbloesungKarte({
                 <>
                   {' '}
                   <span style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }}>
-                    <ZeitAnzeige wert={s.beendet_at} format="kurz" />
+                    <ZeitAnzeige wert={s.beendet_at} rolle="kurz" />
                   </span>
                 </>
               )}

@@ -121,7 +121,7 @@ describe('Org-Zentrale (tasks.md 2.5)', () => {
     renderOrg();
     expect(await screen.findByText('Neuer Einsatz')).toBeInTheDocument();
     expect(screen.queryByText('Neuer Auftrag')).not.toBeInTheDocument();
-    expect(screen.getByText('Hochwasser Elbe · 14:05')).toBeInTheDocument();
+    expect(screen.getByText('Hochwasser Elbe · 141405')).toBeInTheDocument();
   });
 
   it('der Sammeltoast der Org-Zentrale springt in die Einsatzliste', async () => {
