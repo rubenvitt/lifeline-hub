@@ -11,6 +11,7 @@
  */
 import { ortCacheRaeumen } from '../anzeige/ortCache';
 import { erfassungsSitzungRaeumen } from '../components/erfassungsSitzung';
+import { listenGedaechtnisRaeumen } from '../components/listenGedaechtnis';
 import { entwuerfeAufraeumen, entwuerfeRaeumen } from '../etb/entwuerfe/entwurfStore';
 import { gemerkteStellenRaeumen } from '../verpflegung/stellenGedaechtnis';
 import { personErfassungsQuittungenAufraeumen, personErfassungsQuittungenRaeumen } from './queue';
@@ -85,6 +86,20 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Letzter Antreff- bzw. Schadensort; ein zweiter Benutzer im selben Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LFH-785).',
   },
   {
+    ort: 'sessionStorage lfh:liste:<seite>:<einsatz>',
+    datei: 'components/listenGedaechtnis.ts',
+    entscheidung: 'jeder-ausgang',
+    grund:
+      'Sortierung, Spaltenfilter und Suchbegriff einer Liste für den Rückweg ohne Adressparameter (LLH-1086); ein Suchbegriff kann einen Namen tragen, die nächste Person im Tab bekäme ihn sonst vorbelegt.',
+  },
+  {
+    ort: 'localStorage lfh:spalten:<seite>',
+    datei: 'components/listenGedaechtnis.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Gewählte Spalten einer Liste je Seite (LLH-1086): Geräte-Einstellung aus Spaltenschlüsseln, ohne Personenbezug und ohne Einsatzinhalt.',
+  },
+  {
     ort: 'localStorage lfh:verpflegung:stelle:<einsatz>',
     datei: 'verpflegung/stellenGedaechtnis.ts',
     entscheidung: 'jeder-ausgang',
@@ -153,6 +168,12 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Geräte-Einstellung des Koordinatensystems, ohne Personenbezug.',
   },
   {
+    ort: 'localStorage lifeline.zeitdarstellung',
+    datei: 'anzeige/zeitDarstellungStore.ts',
+    entscheidung: 'bleibt',
+    grund: 'Geräte-Einstellung der Zeitdarstellung (LLH-1053), ohne Personenbezug.',
+  },
+  {
     ort: 'localStorage lfh:alarm:mute',
     datei: 'alarm/alarmTon.ts',
     entscheidung: 'bleibt',
@@ -215,6 +236,7 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     personErfassungsQuittungen: personErfassungsQuittungenRaeumen,
     ortCache: ortCacheRaeumen,
     erfassungsSitzung: erfassungsSitzungRaeumen,
+    listenGedaechtnis: listenGedaechtnisRaeumen,
     verpflegungsstelle: gemerkteStellenRaeumen,
     ...(anlass === 'abmelden' ? { etbEntwuerfe: entwuerfeRaeumen } : {}),
   });

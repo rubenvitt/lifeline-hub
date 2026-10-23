@@ -2,13 +2,14 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { schaedenAttrappe } from '../test/schaedenAttrappe';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 import SchaedenPage from './SchaedenPage';
 
 /**
@@ -19,6 +20,7 @@ import SchaedenPage from './SchaedenPage';
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   setzeViewportBreite(1366);
+  sessionStorage.clear();
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -74,7 +76,15 @@ const BESTAND = Array.from({ length: 250 }, (_, i) => {
   });
 });
 
-function render() {
+/** Die aktuelle Adresse, wie der Router sie hält (LLH-1086). */
+const ort = { aktuell: '' };
+function Ortsfuehler() {
+  const l = useLocation();
+  ort.aktuell = `${l.pathname}${l.search}`;
+  return null;
+}
+
+function render(route = '/einsaetze/1/schaeden') {
   const attrappe = schaedenAttrappe(1, () => BESTAND);
   server.use(
     meHandler(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
@@ -82,10 +92,13 @@ function render() {
     ...attrappe.handler,
   );
   renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
-    </Routes>,
-    { route: '/einsaetze/1/schaeden' },
+    <>
+      <Ortsfuehler />
+      <Routes>
+        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+      </Routes>
+    </>,
+    { route },
   );
   return attrappe;
 }
@@ -116,11 +129,8 @@ describe('SchaedenPage · Blättern (LFH-1075)', () => {
     await screen.findByText('S-250');
     expect(screen.queryByText('S-100')).toBeNull();
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Ausmaß' }));
-    const option = (await screen.findAllByText('groß')).find((el) =>
-      el.closest('.ant-select-item-option'),
-    );
-    await userEvent.click(option!);
+    // Der Filter sitzt im Spaltenkopf (LLH-1086).
+    await kopfFilterWaehlen('Ausmaß', ['groß']);
 
     expect(await screen.findByText('S-100')).toBeInTheDocument();
     await waitFor(() => expect(zeilen()).toHaveLength(1));
@@ -152,7 +162,7 @@ describe('SchaedenPage · Blättern (LFH-1075)', () => {
     await waitFor(() => expect(zeilen()[0]).toHaveAttribute('data-row-key', '1001'));
   });
 
-  it('ein Segmentwechsel fragt den Status am Server ab und beginnt ohne Suche', async () => {
+  it('ein Segmentwechsel fragt den Status am Server ab', async () => {
     const { abrufe } = render();
     await screen.findByText('S-250');
     await userEvent.click(screen.getByRole('radio', { name: 'Abgeschlossen' }));
@@ -160,5 +170,49 @@ describe('SchaedenPage · Blättern (LFH-1075)', () => {
     await waitFor(() => expect(zeilen()).toHaveLength(8));
     expect(abrufe[abrufe.length - 1].get('status')).toBe('abgeschlossen');
     expect(screen.queryByRole('button', { name: 'Ältere laden' })).toBeNull();
+  });
+});
+
+// 100 Zeilen je Seite plus Kopffilter: das Vorgabebudget von 10 s reicht auf einer belasteten
+// Maschine nicht (die Nachbartests dieser Datei liegen schon allein bei 9–11 s).
+describe('SchaedenPage · Zustand in der Adresse (LLH-1086)', { timeout: 30_000 }, () => {
+  it('die erste Abfrage geht mit Filter und Sortierung aus der Adresse hinaus', async () => {
+    const { abrufe } = render('/einsaetze/1/schaeden?f.ausmass=gross&sort=ort:auf');
+    expect(await screen.findByText('S-100')).toBeInTheDocument();
+    expect(abrufe[0].get('ausmass')).toBe('gross');
+    expect(abrufe[0].get('sortierung')).toBe('ort_auf');
+    expect(
+      screen.getByRole('button', { name: 'Filter Ausmaß: groß entfernen' }),
+    ).toBeInTheDocument();
+    const hinweis = document.querySelector('[data-lfh="filterhinweis"]');
+    await waitFor(() => expect(hinweis).toHaveTextContent('1 von 242 Schäden sichtbar'));
+  });
+
+  it('ein Kopffilter schreibt sich in die Adresse, „Filter zurücksetzen“ nimmt ihn heraus', async () => {
+    render();
+    await screen.findByText('S-250');
+    await kopfFilterWaehlen('Ausmaß', ['groß']);
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/schaeden?f.ausmass=gross'));
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/schaeden'));
+  });
+
+  it('der Rückweg ohne Parameter holt den gemerkten Stand der Sitzung', async () => {
+    sessionStorage.setItem('lfh:liste:schaeden:1', 'f.ausmass=gross');
+    const { abrufe } = render();
+    expect(await screen.findByText('S-100')).toBeInTheDocument();
+    expect(abrufe[0].get('ausmass')).toBe('gross');
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/schaeden?f.ausmass=gross'));
+  });
+
+  it('ein Segmentwechsel behält den Filter sichtbar und fragt ihn mit ab', async () => {
+    const { abrufe } = render('/einsaetze/1/schaeden?f.ausmass=gross');
+    expect(await screen.findByText('S-100')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Alle' }));
+    await waitFor(() => expect(abrufe[abrufe.length - 1].get('status')).toBeNull());
+    expect(abrufe[abrufe.length - 1].get('ausmass')).toBe('gross');
+    expect(
+      screen.getByRole('button', { name: 'Filter Ausmaß: groß entfernen' }),
+    ).toBeInTheDocument();
   });
 });

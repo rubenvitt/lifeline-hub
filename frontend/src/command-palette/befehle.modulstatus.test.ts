@@ -40,6 +40,7 @@ function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
     setDichte: vi.fn(),
     setHelligkeit: vi.fn(),
     setKoordinaten: vi.fn(),
+    setZeitdarstellung: vi.fn(),
     logout: vi.fn(),
     ...over,
   };

@@ -37,3 +37,15 @@ Ziel führen wie zuvor.
 #### Scenario: Sprung zu den Lageberichten aus der ETB-Schnellerfassung
 - **WHEN** in der ETB-Schnellerfassung der Sprung zu den Lageberichten ausgelöst wird
 - **THEN** öffnet sich die Lageberichtsliste des Einsatzes wie zuvor
+
+### Requirement: Listenzustand in der Adresse
+
+Sortierung, Filter und Suche einer Tabelle MUST über `listenZustandParams` in die Adresse
+geschrieben und über `parseListenZustand` gelesen werden (Kodierung siehe
+`tabellen-sortieren-filtern`). Ein Zustand MUST den Weg durch `URLSearchParams` unverändert
+überstehen, auch mit Komma, Leerzeichen und Umlaut im Wert.
+
+#### Scenario: Round-Trip
+- **WHEN** ein Zustand mit Sortierung `ort:ab`, Filter `typ=sturm,flut` und Suche „Deich 7“ geschrieben und wieder gelesen wird
+- **THEN** kommt derselbe Zustand heraus, und fremde Parameter der Adresse stehen weiter da
+

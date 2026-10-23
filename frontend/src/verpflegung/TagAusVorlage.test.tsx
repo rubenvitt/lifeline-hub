@@ -84,7 +84,7 @@ function renderSeite({
           <AnzeigeKonventionenProvider
             konventionen={{
               zeitzone: 'Europe/Berlin',
-              zeitformat: null,
+              zeitdarstellung: null,
               einheiten: null,
               koordinatenformat: null,
             }}

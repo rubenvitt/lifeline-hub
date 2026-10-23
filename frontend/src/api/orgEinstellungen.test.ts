@@ -13,7 +13,7 @@ const beispielAnzeige: OrgEinstellungen = {
   org_id: 1,
   aufbewahrung_kategorien: [],
   zeitzone: 'Europe/Berlin',
-  zeitformat: '24h',
+  zeitdarstellung: 'taktisch',
   einheiten: 'metrisch',
   koordinatenformat: 'wgs84',
   retention_dauer_tage: 30,
@@ -39,7 +39,7 @@ describe('ladeOrgEinstellungen', () => {
       org_id: 1,
       aufbewahrung_kategorien: [],
       zeitzone: null,
-      zeitformat: null,
+      zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: null,
       retention_dauer_tage: null,
@@ -65,7 +65,7 @@ describe('speichereOrgEinstellungen', () => {
     let empfangenerBody: unknown;
     const update: OrgEinstellungenUpdate = {
       zeitzone: 'UTC',
-      zeitformat: null,
+      zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: null,
       retention_dauer_tage: null,
@@ -100,7 +100,7 @@ describe('speichereOrgEinstellungen', () => {
     let empfangenerBody: unknown;
     const update: OrgEinstellungenUpdate = {
       zeitzone: null,
-      zeitformat: null,
+      zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: null,
       retention_dauer_tage: null,

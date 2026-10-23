@@ -65,16 +65,23 @@ done
 
 # apt-pakete.sh: Attrappen für sudo, dpkg und apt-get. Das erste `update` hängt; der zweite
 # Versuch muss update UND install neu fahren, mit den Paketen als getrennten Argumenten.
+# Die sudo-Attrappe benimmt sich wie Ubuntus sudo (LLH-1420): der Befehl läuft in einer eigenen
+# Sitzung, und ein Signal an die Prozessgruppe reicht sie nicht weiter. Das hängende apt-get darf
+# den Abbruch nicht überleben, sonst hielte es auf dem Runner den dpkg-Lock.
 ATTRAPPEN="$ARBEIT/bin"
 mkdir -p "$ATTRAPPEN"
-printf '#!/bin/sh\nexec "$@"\n' > "$ATTRAPPEN/sudo"
+if command -v setsid > /dev/null; then
+  printf '#!/usr/bin/env bash\ntrap true TERM INT\nsetsid -w "$@"\n' > "$ATTRAPPEN/sudo"
+else # macOS kennt kein setsid: dort prüft der Fall nur den Ablauf, die CI auch die Sitzung.
+  printf '#!/bin/sh\nexec "$@"\n' > "$ATTRAPPEN/sudo"
+fi
 printf '#!/bin/sh\nexit 0\n' > "$ATTRAPPEN/dpkg"
 cat > "$ATTRAPPEN/apt-get" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >> "$ARBEIT/apt.log"
 if [[ " \$* " == *" update "* ]] && [ ! -e "$ARBEIT/einmal-gehangen" ]; then
-  touch "$ARBEIT/einmal-gehangen"
-  sleep 60
+  echo "\$\$" > "$ARBEIT/einmal-gehangen"
+  exec sleep 60
 fi
 EOF
 chmod +x "$ATTRAPPEN"/*
@@ -82,14 +89,21 @@ rc=0
 PATH="$ATTRAPPEN:$PATH" APT_FRIST_SEK=1 "$SKRIPTE/apt-pakete.sh" nasm libgtk-3-dev \
   > "$ARBEIT/aus" 2>&1 || rc=$?
 erwartet="$(printf '%s\n' \
-  "-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update" \
-  "-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update" \
-  "-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --no-install-recommends -y nasm libgtk-3-dev")"
+  "-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120 update" \
+  "-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120 update" \
+  "-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120 install --no-install-recommends -y nasm libgtk-3-dev")"
 if [ "$rc" -eq 0 ] && [ "$(cat "$ARBEIT/apt.log")" = "$erwartet" ]; then
   ok "apt-pakete: hängendes update wird abgebrochen, zweiter Versuch installiert"
 else
   rot "apt-pakete: Exit $rc, Aufrufe:"
   cat "$ARBEIT/apt.log" "$ARBEIT/aus" >&2
+fi
+# Ein Zombie zählt als beendet: wo PID 1 nicht erntet (Container), bleibt er stehen.
+if [[ "$(ps -o stat= -p "$(cat "$ARBEIT/einmal-gehangen")" 2> /dev/null)" =~ ^[^Z] ]]; then
+  rot "apt-pakete: abgebrochenes apt-get läuft noch (hielte den dpkg-Lock)"
+  kill "$(cat "$ARBEIT/einmal-gehangen")" 2> /dev/null || true
+else
+  ok "  abgebrochenes apt-get ist beendet"
 fi
 rc=0
 "$SKRIPTE/apt-pakete.sh" > /dev/null 2>&1 || rc=$?

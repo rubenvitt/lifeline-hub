@@ -1,5 +1,5 @@
 import { IconChevronRechts, IconChevronRunter } from '../icons';
-import { Button, ConfigProvider, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, ConfigProvider, Popconfirm, Typography, theme } from 'antd';
 import type { CSSProperties, HTMLAttributes, Key, ReactNode, TableHTMLAttributes } from 'react';
 import type { TableColumnType } from 'antd';
 import {
@@ -24,6 +24,7 @@ import { Select } from './Select';
 import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
+import Filterhinweis from './instrument/Filterhinweis';
 import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import { zielEinzug } from './instrument/zielEinzug';
 import { useViewport, type AbBreitePunkt } from './useViewport';
@@ -52,6 +53,8 @@ import {
 } from './useZuflussSchleuse';
 import { FENSTER_EINTRAG, FENSTER_ENDE, useFensterAusschnitt } from './fensterAusschnitt';
 import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleuse';
+import { aktiveFilter, FilterChips, filterMerkmale, kopfGefiltertStil } from './tabellenFilter';
+import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGedaechtnis';
 
 /**
  * Datensicht-Primitiv der Einsatzmodule (LFH-330 · B2): EINE Spaltendefinition je Modul, zwei
@@ -77,14 +80,17 @@ import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleu
  * Kartenplan erscheint dort nicht. Aufgeklappt wird nur über `aufklappen`, in BEIDEN Zweigen mit
  * einem Zustand (LFH-697).
  *
- * ── FÜNF ZUSICHERUNGEN ──
+ * ── SECHS ZUSICHERUNGEN ──
  *
  * 1. **Genau EIN Zweig im Baum**, kein Umschalten per verborgener Fläche: ein verborgener Zweig
  *    machte jedes „unter md keine Tabelle“-Gate bedeutungslos und montierte Steuerelemente
  *    doppelt.
  * 2. **EINE Reihenfolge, EINE Menge für beide Zweige.** antds Sortier- und Filterhaken sind am
  *    Spaltentyp abgeschnitten, weil `Table` deren Zustand intern hält; sortiert und gefiltert
- *    wird hier, die Tabelle bekommt nur den Pfeil.
+ *    wird hier. Die Tabelle bekommt Pfeil und Kopfmenü KONTROLLIERT (`sortOrder`,
+ *    `filteredValue`, kein `onFilter`, LLH-1086): sie zeichnet nur, die Menge entsteht in
+ *    `effektiveDaten` bzw. am Server. Der Kartenzweig hat keinen Kopf und trägt Sortierauswahl
+ *    und Auswahlfelder in der Werkzeugzeile, über demselben Zustand.
  * 3. **EINE Sichtbarkeitswahrheit.** `abBreite` ersetzt antds Breiten-Prop, das Verbergen-Flag
  *    ist gestrichen, beide Ausblendungsgründe fließen in DENSELBEN Zähler (Kriterium 14).
  * 4. **Das Tastaturziel der Zeile ist die Titelzelle.** Bei gesetztem `titel.ziel` rendert sie
@@ -94,6 +100,14 @@ import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleu
  *    Maus- bzw. Stiftzeiger über ihr (LFH-1020), sind Zeilenmenge und -reihenfolge eingefroren,
  *    im Baum auf jeder Ebene; Zellinhalte laufen weiter; Zufluss erscheint als Banner (WCAG 3.2.5,
  *    CLS ≤ 0,1). Die Werkzeugzeile steht IMMER, auch leer.
+ * 6. **Eine Einschränkung ist sichtbar und gemerkt** (LLH-1086, Spec `tabellen-sortieren-filtern`).
+ *    Wirkt eine Suche oder ein Filter, steht der `Filterhinweis` (Treffer von Gesamt, im Servermodus
+ *    nur aus der Serverzählung) und je Wert ein Chip; „Filter zurücksetzen“ leert Suche und Filter,
+ *    nicht die Sortierung. Was man nicht sieht, wirkt nicht: der Filter einer ausgeblendeten Spalte
+ *    bleibt im Zustand, schneidet nichts und steht deshalb auch nicht als Chip da. Mit `gedaechtnis`
+ *    beginnen Sortierung, Filter, Suche und Spaltenwahl beim gemerkten Stand und gehen entprellt
+ *    zurück (`components/listenGedaechtnis.ts`); Hinweis und Chips erscheinen nur bei
+ *    Einschränkung, als Antwort auf die eigene Wahl.
  *
  * ── VIER FALLEN ──
  *
@@ -447,6 +461,12 @@ export interface ServerSicht {
   onSuche: (begriff: string) => void;
   /** Nur Spalten mit gewähltem Wert; eine leere Auswahl fehlt im Objekt. */
   onFilter: (werte: Readonly<Record<string, readonly string[]>>) => void;
+  /**
+   * Zahlen für den `Filterhinweis` (LLH-1086), aus einer SERVERZÄHLUNG: Treffer unter Suche und
+   * Filter, Gesamtzahl ohne sie. Die Sicht kennt nur das geladene Fenster und zählt deshalb nicht
+   * selbst; fehlt eine Zahl, steht keine.
+   */
+  zahlen?: { treffer?: number; gesamt?: number };
 }
 
 // ── Props ────────────────────────────────────────────────────────────────────────────
@@ -487,6 +507,15 @@ interface DatensichtProps<T extends object, K extends string> {
   zufluss?: Zufluss;
   /** Servermodus, siehe {@link ServerSicht}. Schließt `gruppen` und `baum` aus. */
   serverseitig?: ServerSicht;
+  /**
+   * Gedächtnis der Liste (LLH-1086, `components/listenGedaechtnis.ts`): Sortierung, Filter und
+   * Suche beginnen mit dem Stand aus Adresse oder Sitzung und werden entprellt zurückgemeldet; die
+   * Spaltenwahl beginnt mit dem Stand des Geräts. Die Vorgabe-Sortierung trägt dann das
+   * Gedächtnis (`vorgabe`), nicht `standardSortierung`.
+   */
+  gedaechtnis?: ListenGedaechtnis<NoInfer<K>>;
+  /** Mehrzahl im Dativ für den `Filterhinweis` („12 von 48 Schäden sichtbar“); Vorgabe „Einträgen“. */
+  mehrzahl?: string;
 
   // Spaltensichtbarkeit — Voreinstellung ODER kontrolliert
   spaltenAusVoreinstellung?: readonly NoInfer<K>[];
@@ -1024,6 +1053,8 @@ export default function Datensicht<T extends object, const K extends string>(
     aufklappen,
     zeilenFehler,
     halten = false,
+    gedaechtnis,
+    mehrzahl,
   } = props;
 
   const { token } = theme.useToken();
@@ -1047,7 +1078,9 @@ export default function Datensicht<T extends object, const K extends string>(
   const gefrorenesGerippe = schleuse.art === 'gefroren' ? schleuse.gerippe : null;
 
   // ── Zustand: Voreinstellung ODER kontrolliert, nie beides ──────────────────────────
-  const [eigeneSortierung, setEigeneSortierung] = useState<Sortierung<K>>(standardSortierung);
+  const [eigeneSortierung, setEigeneSortierung] = useState<Sortierung<K>>(
+    gedaechtnis ? gedaechtnis.start.sortierung : standardSortierung,
+  );
   const aktiveSortierung = sortierung !== undefined ? sortierung : eigeneSortierung;
   const setzeSortierung = useCallback(
     (s: Sortierung<K>) => {
@@ -1059,41 +1092,81 @@ export default function Datensicht<T extends object, const K extends string>(
   );
 
   const [eigeneSpaltenAus, setEigeneSpaltenAus] = useState<readonly K[]>(
-    spaltenAusVoreinstellung ?? [],
+    () =>
+      (gedaechtnis?.spaltenStart.aus as readonly K[] | undefined) ?? spaltenAusVoreinstellung ?? [],
   );
   const aktiveSpaltenAus = spaltenAus ?? eigeneSpaltenAus;
+  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Bewusst unkontrolliert, weil kein
+  // Konsument diese Hälfte braucht.
+  const [spaltenAn, setSpaltenAn] = useState<readonly K[]>(
+    () => (gedaechtnis?.spaltenStart.an as readonly K[] | undefined) ?? [],
+  );
+  const meldeSpalten = gedaechtnis?.meldeSpalten;
   const setzeSpaltenAus = useCallback(
     (k: K[]) => {
       if (spaltenAus === undefined) setEigeneSpaltenAus(k);
       onSpaltenAus?.(k);
+      meldeSpalten?.({ aus: k, an: spaltenAn });
       // Eine Spaltenumschaltung IST eine Benutzeraktion: blendet man eine gefilterte Spalte aus, wird
       // ihr Filter unwirksam, und die freigegebenen Zeilen sind die Antwort auf den Klick, kein
       // Zufluss. Ohne diesen Aufruf zählte die Schleuse sie als neu. Greift nur für den eingebauten
       // Schalter (keine Seite nutzt den kontrollierten Weg).
       nachBenutzeraktion();
     },
-    [spaltenAus, onSpaltenAus, nachBenutzeraktion],
+    [spaltenAus, onSpaltenAus, nachBenutzeraktion, meldeSpalten, spaltenAn],
   );
-
-  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Bewusst unkontrolliert, weil kein
-  // Konsument diese Hälfte braucht.
-  const [spaltenAn, setSpaltenAn] = useState<readonly K[]>([]);
   const setzeSpaltenAn = useCallback(
     (k: K[]) => {
       setSpaltenAn(k);
+      meldeSpalten?.({ aus: aktiveSpaltenAus, an: k });
       // Aus demselben Grund wie oben: die freigegebenen Zeilen sind die Antwort auf den Klick.
       nachBenutzeraktion();
     },
-    [nachBenutzeraktion],
+    [nachBenutzeraktion, meldeSpalten, aktiveSpaltenAus],
   );
 
-  const [suchbegriff, setSuchbegriff] = useState('');
-  const [filterWerte, setFilterWerte] = useState<Record<string, readonly string[]>>({});
+  const [suchbegriff, setSuchbegriff] = useState(() => gedaechtnis?.start.suche ?? '');
+  const [filterWerte, setFilterWerte] = useState<Readonly<Record<string, readonly string[]>>>(
+    () => gedaechtnis?.start.filter ?? {},
+  );
   const filterZuruecksetzen = useCallback(() => {
     setSuchbegriff('');
     setFilterWerte({});
     nachBenutzeraktion();
   }, [nachBenutzeraktion]);
+  /** Einen Filter einer Spalte setzen; ein leerer fällt aus dem Zustand (und aus der Adresse). */
+  const setzeFilter = useCallback(
+    (spalte: string, werte: readonly string[]) => {
+      setFilterWerte((vorher) => {
+        const { [spalte]: _alt, ...rest } = vorher;
+        void _alt;
+        return werte.length > 0 ? { ...rest, [spalte]: werte } : rest;
+      });
+      nachBenutzeraktion();
+    },
+    [nachBenutzeraktion],
+  );
+
+  /**
+   * DAS GEDÄCHTNIS HÖRT MIT (LLH-1086): jede Änderung von Sortierung, Filter oder Suche geht
+   * entprellt an `gedaechtnis.melde` (Adresse und Sitzung), der Anfangsstand nicht — er kommt ja
+   * von dort. Beim Aushängen wird nichts nachgemeldet: die Seite ist dann schon weg, eine
+   * Adressänderung führte zurück.
+   */
+  const melde = gedaechtnis?.melde;
+  const ersterStand = useRef(true);
+  useEffect(() => {
+    if (ersterStand.current) {
+      ersterStand.current = false;
+      return;
+    }
+    if (!melde) return;
+    const frist = setTimeout(
+      () => melde({ sortierung: aktiveSortierung, filter: filterWerte, suche: suchbegriff }),
+      GEDAECHTNIS_ENTPRELLUNG_MS,
+    );
+    return () => clearTimeout(frist);
+  }, [melde, aktiveSortierung, filterWerte, suchbegriff]);
 
   // ── Formwahl ──────────────────────────────────────────────────────────────────────
   // Steht HIER, weil die Ebenen-Registrierung darunter sie liest: der Spaltenschalter existiert
@@ -1227,10 +1300,8 @@ export default function Datensicht<T extends object, const K extends string>(
   const leerInhalt: ReactNode =
     // Im Servermodus IST `daten` schon die eingeschränkte Menge.
     einschraenkungAktiv && (daten.length > 0 || imServermodus) ? (
-      <Space direction="vertical" align="center" size={token.marginXS}>
-        <Typography.Text type="secondary">Keine Treffer für die gewählten Filter</Typography.Text>
-        <Button onClick={filterZuruecksetzen}>Filter zurücksetzen</Button>
-      </Space>
+      // Der Rückweg steht im `Filterhinweis` darüber (LLH-1086), ein zweiter Knopf hieße gleich.
+      <Typography.Text type="secondary">Keine Treffer für die gewählten Filter</Typography.Text>
     ) : (
       leerText
     );
@@ -1384,6 +1455,24 @@ export default function Datensicht<T extends object, const K extends string>(
 
   // ── Werkzeugzeile ─────────────────────────────────────────────────────────────────
   const filterSpalten = gezeigteSpalten.filter((s) => s.filter != null);
+  /** „Ort, aufsteigend“ / „Ort, absteigend“ je sortierbarer Spalte, für den Kartenzweig. */
+  const sortierOptionen = spalten.flatMap((s) => {
+    if (!s.sortWert || 'children' in s) return [];
+    const etikett = etikettVon(s) ?? s.key;
+    return [
+      { value: `${s.key}:auf`, label: `${etikett}, aufsteigend` },
+      { value: `${s.key}:ab`, label: `${etikett}, absteigend` },
+    ];
+  });
+  /** Chips und Merkmale aus den WIRKSAMEN Filtern: was man nicht sieht, wirkt nicht. */
+  const filterListe = aktiveFilter(
+    filterSpalten.map((s) => ({
+      key: s.key,
+      etikett: etikettVon(s) ?? s.key,
+      werte: s.filter!.werte,
+    })),
+    wirksameFilterWerte,
+  );
   /**
    * Gruppiert wird über die EINGEFRORENE Achse, solange die Schleuse zu ist. Der Rückfall auf die
    * frische Achse gilt nur für Zeilen, die beim Einfrieren nicht dabei waren; eine Zeile mit
@@ -1484,7 +1573,10 @@ export default function Datensicht<T extends object, const K extends string>(
             }}
             style={{
               height: token.controlHeight,
-              width: '100%',
+              // Schrumpfbar statt `width: 100%`: bei 390 px stehen Suche und „Sortieren“ in EINER
+              // Zeile, die erste Karte bleibt im ersten Bild (`betroffene-handy.spec.ts`).
+              flex: '1 1 140px',
+              minWidth: 0,
               maxWidth: 220,
               paddingInline: token.paddingSM,
               border: `1px solid ${token.colorBorder}`,
@@ -1495,7 +1587,42 @@ export default function Datensicht<T extends object, const K extends string>(
             }}
           />
         )}
+        {/* Sortierauswahl des Kartenzweigs (LLH-1086): die Karte hat keinen Kopf, der Pfeil fehlt. */}
+        {!alsTabelle && sortierOptionen.length > 0 && (
+          <Select
+            allowClear
+            aria-label="Sortieren"
+            prefix={
+              <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
+                Sortieren:
+              </span>
+            }
+            placeholder="wie geliefert"
+            value={
+              aktiveSortierung
+                ? `${aktiveSortierung.spalte}:${aktiveSortierung.richtung}`
+                : undefined
+            }
+            onChange={(wert?: string) => {
+              if (!wert) {
+                setzeSortierung(null);
+                return;
+              }
+              const trenner = wert.lastIndexOf(':');
+              setzeSortierung({
+                spalte: wert.slice(0, trenner) as K,
+                richtung: wert.slice(trenner + 1) === 'ab' ? 'ab' : 'auf',
+              });
+            }}
+            options={sortierOptionen}
+            // Neben der Suche in derselben Zeile (siehe dort); ein langer Wert kürzt mit Auslassung.
+            style={{ flex: '1 1 160px', minWidth: 0, maxWidth: 280 }}
+          />
+        )}
+        {/* Im Tabellenzweig sitzt der Filter im Spaltenkopf (LLH-1086); die Karte hat keinen Kopf
+            und behält das Auswahlfeld je Filterspalte. */}
         {baum == null &&
+          !alsTabelle &&
           filterSpalten.map((spalte) => (
             <Select
               key={spalte.key}
@@ -1515,10 +1642,7 @@ export default function Datensicht<T extends object, const K extends string>(
               }
               placeholder="alle"
               value={[...(filterWerte[spalte.key] ?? [])]}
-              onChange={(werte: string[]) => {
-                setFilterWerte((vorher) => ({ ...vorher, [spalte.key]: werte }));
-                nachBenutzeraktion();
-              }}
+              onChange={(werte: string[]) => setzeFilter(spalte.key, werte)}
               options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
               style={{ minWidth: 160 }}
             />
@@ -1567,6 +1691,51 @@ export default function Datensicht<T extends object, const K extends string>(
    * für seine Breitenrechnung. Die Zieltypisierung als {@link KatalogSpalte} macht das Durchreichen
    * sichtbar; als `TableColumnsType` fiele das Feld still weg.
    */
+  /**
+   * Zähler je Filterwert („Groß (3)“, LLH-1086): wie viele Zeilen der Wert unter Suche und den
+   * ÜBRIGEN Filtern hätte — der eigene Filter zählt nicht mit, sonst stünden alle anderen Werte auf 0.
+   * `null` im Servermodus (nur das geladene Fenster) und im Baum (keine Filter).
+   */
+  // Als Zeichenkette gemerkt: die Zähler gehen in die Spalten und damit in die Garnitur, und ein
+  // neuer Datenstand mit gleichen Zählern darf nicht jede Zelle neu zeichnen (LFH-949, D4).
+  const zaehlStand = useMemo(() => {
+    if (imServermodus || baum) return null;
+    const ergebnis: [string, [string, number][]][] = [];
+    for (const spalte of gezeigteSpalten) {
+      if (!spalte.filter) continue;
+      const { [spalte.key]: _eigen, ...uebrige } = wirksameFilterWerte;
+      void _eigen;
+      const menge = effektiveDaten({
+        daten,
+        spalten,
+        sortierung: null,
+        suchbegriff,
+        filterWerte: uebrige,
+        baum: false,
+      });
+      ergebnis.push([
+        spalte.key,
+        spalte.filter.werte.map((w) => [
+          w.value,
+          menge.filter((z) => spalte.filter!.trifft(z, w.value)).length,
+        ]),
+      ]);
+    }
+    return JSON.stringify(ergebnis);
+  }, [imServermodus, baum, gezeigteSpalten, wirksameFilterWerte, daten, spalten, suchbegriff]);
+  const filterZaehlung = useMemo(
+    () =>
+      zaehlStand == null
+        ? null
+        : new Map(
+            (JSON.parse(zaehlStand) as [string, [string, number][]][]).map(
+              ([k, werte]) => [k, new Map(werte)] as const,
+            ),
+          ),
+    [zaehlStand],
+  );
+  const kopfStilGefiltert = useMemo(() => kopfGefiltertStil(rollenwerte(token)), [token]);
+
   const antdSpalten = useMemo<KatalogSpalte<T>[]>(
     () =>
       gezeigteSpalten.map((spalte) => {
@@ -1581,7 +1750,6 @@ export default function Datensicht<T extends object, const K extends string>(
         } = spalte;
         void etikett;
         void suchText;
-        void filter;
         void _ab;
         void immerSichtbar;
         const gebaut: KatalogSpalte<T> = { ...antd };
@@ -1605,6 +1773,30 @@ export default function Datensicht<T extends object, const K extends string>(
           };
         }
 
+        /**
+         * DER FILTER IM KOPF (LLH-1086): antd zeichnet Trichter und Menü, der Zustand ist
+         * KONTROLLIERT (`filteredValue`) und ohne `onFilter` — antd filtert damit nicht selbst,
+         * gefiltert wird in `effektiveDaten` bzw. am Server (Zusicherung 2). Im Clientmodus trägt
+         * jeder Wert seinen Zähler; im Servermodus sähe die Sicht nur das geladene Fenster.
+         */
+        if (filter) {
+          const gewaehlt = filterWerte[spalte.key] ?? [];
+          const zaehler = filterZaehlung?.get(spalte.key);
+          gebaut.filters = filter.werte.map((w) => ({
+            text: zaehler ? `${w.text} (${zaehler.get(w.value) ?? 0})` : w.text,
+            value: w.value,
+          }));
+          gebaut.filteredValue = gewaehlt.length > 0 ? [...gewaehlt] : null;
+          gebaut.filterMultiple = true;
+          if (gewaehlt.length > 0) {
+            const eigen = antd.onHeaderCell;
+            gebaut.onHeaderCell = (s) => {
+              const basis = eigen?.(s) ?? {};
+              return { ...basis, style: { ...basis.style, ...kopfStilGefiltert } };
+            };
+          }
+        }
+
         if (!sortWert) return gebaut;
         // `sorter: true` heißt für antd „extern sortiert“: nur der Pfeil, sortiert wird in
         // `effektiveDaten`.
@@ -1619,7 +1811,15 @@ export default function Datensicht<T extends object, const K extends string>(
               : null,
         };
       }),
-    [gezeigteSpalten, aktiveSortierung, karte, token.controlHeight],
+    [
+      gezeigteSpalten,
+      aktiveSortierung,
+      karte,
+      token.controlHeight,
+      filterWerte,
+      filterZaehlung,
+      kopfStilGefiltert,
+    ],
   );
 
   /**
@@ -1991,7 +2191,23 @@ export default function Datensicht<T extends object, const K extends string>(
            * LÖSCHEN: antds Zyklus endet mit `columnKey === undefined`, und ein früher Rücksprung darauf
            * ließe die Tabelle für immer absteigend.
            */
-          onChange={(_seite, _filter, sorter) => {
+          onChange={(_seite, filter, sorter, extra) => {
+            /**
+             * Kopffilter (LLH-1086): antd meldet die Wahl aller Spalten; übernommen werden nur
+             * Spalten mit eigenem `filter`. Eine Filteränderung meldet auch den (unveränderten)
+             * Sortierzustand mit, deshalb entscheidet `action`.
+             */
+            if (extra?.action === 'filter') {
+              for (const spalte of gezeigteSpalten) {
+                if (!spalte.filter) continue;
+                const neu = (filter[spalte.key] ?? []).map(String);
+                const alt = filterWerte[spalte.key] ?? [];
+                if (neu.length !== alt.length || neu.some((w, i) => w !== alt[i])) {
+                  setzeFilter(spalte.key, neu);
+                }
+              }
+              return;
+            }
             const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
             if (einzeln == null) return;
             const spalte = einzeln.columnKey as K | undefined;
@@ -2369,6 +2585,36 @@ export default function Datensicht<T extends object, const K extends string>(
   return (
     <section ref={wurzel} aria-label={bezeichnung} {...zuflussBereich}>
       {werkzeugzeile}
+      {einschraenkungAktiv && baum == null && (
+        // Hinweis und Chips stehen nur bei Einschränkung; sie erscheinen als Antwort auf die
+        // eigene Wahl, nicht als Zufluss, und belegen sonst keinen Platz.
+        <div
+          data-lfh="datensicht-einschraenkung"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: token.marginXS,
+            marginBlockEnd: token.marginXS,
+          }}
+        >
+          <Filterhinweis
+            treffer={imServermodus ? serverseitig?.zahlen?.treffer : zeilen.length}
+            gesamt={imServermodus ? serverseitig?.zahlen?.gesamt : daten.length}
+            merkmale={filterMerkmale(suchbegriff, filterListe)}
+            onZuruecksetzen={filterZuruecksetzen}
+            dinge={mehrzahl}
+          />
+          <FilterChips
+            filter={filterListe}
+            onEntfernen={(spalte, wert) =>
+              setzeFilter(
+                spalte,
+                (filterWerte[spalte] ?? []).filter((w) => w !== wert),
+              )
+            }
+          />
+        </div>
+      )}
       {verdeckteFehlerBlock}
       {/* GENAU EIN Zweig im Baum, kein Umschalten per verborgener Fläche. */}
       {alsTabelle ? tabelle : kartenZweig}

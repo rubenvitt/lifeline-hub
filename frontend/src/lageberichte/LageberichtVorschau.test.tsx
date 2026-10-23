@@ -53,8 +53,8 @@ describe('LageberichtVorschau (LFH-664)', () => {
     expect(screen.getByText('Anna Adler')).toBeInTheDocument();
     expect(screen.getByText('Bernd Berg')).toBeInTheDocument();
     // Zeitstand und Freigabezeit in der taktischen DTG (Anzeigezone Europe/Berlin).
-    expect(screen.getByText('161430JUL2026')).toBeInTheDocument();
-    expect(screen.getByText('161445JUL2026')).toBeInTheDocument();
+    expect(screen.getByText('161430jul26')).toBeInTheDocument();
+    expect(screen.getByText('161445jul26')).toBeInTheDocument();
     // Der Titel ist schon Kopf der Palette und steht hier nicht noch einmal.
     expect(screen.queryByText('Lage 14 Uhr')).not.toBeInTheDocument();
     expect(screen.getByText('Pegel steigt weiter.')).toBeInTheDocument();

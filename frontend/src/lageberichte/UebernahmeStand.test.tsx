@@ -21,7 +21,7 @@ const marke = () => document.querySelector('[data-lfh="uebernahme-stand"]');
 describe('UebernahmeStand (LLH-1357)', () => {
   it('zeigt den Stand der Übernahme als DTG', () => {
     renderMitProviders(<Probe stand="2026-10-21 10:30:00" />);
-    expect(marke()).toHaveTextContent(`${STAND_DER_UEBERNAHME} 211230OKT2026`);
+    expect(marke()).toHaveTextContent(`${STAND_DER_UEBERNAHME} 211230okt26`);
     expect(marke()).not.toHaveTextContent(AUS_DER_VORFASSUNG);
     expect(marke()).not.toHaveAttribute('data-aus-vorfassung');
   });
@@ -35,7 +35,7 @@ describe('UebernahmeStand (LLH-1357)', () => {
   it('ein Stand aus der Vorfassung ist auffällig, mit Wort neben der Farbe', () => {
     renderMitProviders(<Probe stand="2026-10-21 09:55:00" grenze="2026-10-21 11:50:00" />);
     expect(marke()).toHaveTextContent(
-      `${STAND_DER_UEBERNAHME} 211155OKT2026 · ${AUS_DER_VORFASSUNG}`,
+      `${STAND_DER_UEBERNAHME} 211155okt26 · ${AUS_DER_VORFASSUNG}`,
     );
     expect(marke()).toHaveAttribute('data-aus-vorfassung', 'true');
     // Das Zeichen ist Schmuck, die Wörter tragen die Aussage.

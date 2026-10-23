@@ -11,7 +11,7 @@ import type { Block, Einsatzbericht, Inhalt } from './verdichtung';
  */
 
 function bericht(...bloecke: Block[]): Einsatzbericht {
-  return { vorlaeufig: false, stand: '091200OKT2026', bloecke };
+  return { vorlaeufig: false, stand: '091200okt26', bloecke };
 }
 
 const zeilen = (n: number, titel?: string): Inhalt => ({

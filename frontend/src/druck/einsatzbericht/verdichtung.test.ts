@@ -113,7 +113,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     expect(wert(a, 'Beginn')).toBe('29.03.2026 01:30');
     expect(wert(a, 'Ende')).toBe('läuft');
     expect(wert(a, 'Dauer')).toBe('01:30 h (bis Stand)');
-    expect(b.stand).toBe('290400MÄR2026');
+    expect(b.stand).toBe('290400mrz26');
   });
 
   it('abgeschlossener Einsatz: Ende und Dauer bis zum Abschluss, nicht vorläufig', () => {

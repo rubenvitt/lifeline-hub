@@ -45,6 +45,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { modulName } from '../einsatz/modulRegistry';
 import { useCsvExport } from '../components/useCsvExport';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 
 /**
@@ -200,6 +201,12 @@ const SERVER_SPALTE: Partial<Record<SchadenSpaltenKey, SchadenSortSpalte>> = {
   verortet: 'verortet',
 };
 
+/** Vorgabe wie die Serverordnung: der jüngste Schaden oben. Steht nicht in der Adresse. */
+const VORGABE_SORTIERUNG: DatensichtSortierung<SchadenSpaltenKey> = {
+  spalte: 'reg',
+  richtung: 'ab',
+};
+
 /** Keine Sortierung heißt Serverordnung: jüngste Nummer zuerst. */
 function serverSortierung(s: DatensichtSortierung<SchadenSpaltenKey>): SchadenSortierung {
   const spalte = s && SERVER_SPALTE[s.spalte];
@@ -240,21 +247,29 @@ export default function SchaedenPage() {
 
   const { token } = theme.useToken();
   const [sicht, setSicht] = useState<SchaedenSicht>('offen');
-  // Suche, Spaltenfilter und Sortierung wirken am Server (LFH-1075); `Datensicht` meldet sie.
-  const [suche, setSuche] = useState('');
-  const [spaltenFilter, setSpaltenFilter] = useState<Readonly<Record<string, readonly string[]>>>(
-    {},
-  );
-  const [sortierung, setSortierung] = useState<DatensichtSortierung<SchadenSpaltenKey>>({
-    spalte: 'reg',
-    richtung: 'ab',
+  const spalten = useMemo(() => schaedenSpalten(einsatzId), [einsatzId]);
+  /**
+   * Sortierung, Spaltenfilter und Suche stehen in der Adresse (LLH-1086, Vorbild für den Rollout
+   * LLH-1096): Zurück, Neuladen und ein geteilter Link zeigen dieselbe Sicht. Die erste Abfrage
+   * geht schon mit dem wiederhergestellten Stand hinaus.
+   */
+  const gedaechtnis = useListenGedaechtnis<SchadenSpaltenKey>('schaeden', spalten, {
+    vorgabe: VORGABE_SORTIERUNG,
+    einsatzId,
   });
-  const wechsleSicht = useCallback((s: SchaedenSicht) => {
-    // Die Sicht baut `Datensicht` neu auf (Schlüssel), Suche und Spaltenfilter beginnen leer.
-    setSicht(s);
-    setSuche('');
-    setSpaltenFilter({});
-  }, []);
+  // Suche, Spaltenfilter und Sortierung wirken am Server (LFH-1075); `Datensicht` meldet sie.
+  const [suche, setSuche] = useState(() => gedaechtnis.start.suche.trim());
+  const [spaltenFilter, setSpaltenFilter] = useState<Readonly<Record<string, readonly string[]>>>(
+    () => gedaechtnis.start.filter,
+  );
+  const [sortierung, setSortierung] = useState<DatensichtSortierung<SchadenSpaltenKey>>(
+    () => gedaechtnis.start.sortierung,
+  );
+  /**
+   * Die Sicht baut `Datensicht` neu auf (Schlüssel); Suche und Spaltenfilter nimmt sie aus dem
+   * Gedächtnis mit, denn sie stehen in der Adresse und wirken am Server auf jede Statusmenge.
+   */
+  const wechsleSicht = useCallback((s: SchaedenSicht) => setSicht(s), []);
 
   const [erfassenOffen, setErfassenOffen] = useState(false);
 
@@ -301,7 +316,6 @@ export default function SchaedenPage() {
   });
 
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
-  const spalten = useMemo(() => schaedenSpalten(einsatzId), [einsatzId]);
   // CSV des ganzen Einsatzes (LLH-1115): alle Schäden, Gefahr und Schadensgrad in Worten. Lesen,
   // ohne Schreib-Riegel.
   const csvExport = useCsvExport(einsatzId, 'schaeden', ladeSchaedenExport);
@@ -340,6 +354,8 @@ export default function SchaedenPage() {
   const geladen = schaedenQuery.data?.pages.flat() ?? [];
   const ausschnitt = ausschnittQuery.data;
   const ausschnittZahl = ausschnitt && (sicht === 'alle' ? ausschnitt.gesamt : ausschnitt[sicht]);
+  const bestand = bestandQuery.data;
+  const bestandZahl = bestand && (sicht === 'alle' ? bestand.gesamt : bestand[sicht]);
 
   /**
    * Listenzustand — an der Stelle der Liste entschieden, nie als Frühausstieg.
@@ -445,7 +461,9 @@ export default function SchaedenPage() {
              * reichte React dieselbe Instanz über alle vier Mengen weiter, und Suchbegriff und
              * Spaltenfilter im Primitiv filterten eine fremde Menge: im Reiter „Offen" nach einer
              * Straße gesucht, auf „Alle" gewechselt, und dort fehlen still Zeilen. Dieselbe Falle
-             * ist an `PersonenPage` und `TierePage` behoben.
+             * ist an `PersonenPage` und `TierePage` behoben. Seit LLH-1086 nimmt die neue Instanz
+             * Suche und Filter sichtbar aus dem Gedächtnis mit (Adresse, Chips, Filterhinweis); sie
+             * wirken am Server auf die neue Statusmenge, nichts filtert still.
              */
             key={sicht}
             bezeichnung="Schäden im Einsatz"
@@ -455,6 +473,8 @@ export default function SchaedenPage() {
             ladend={schaedenQuery.isLoading}
             leerText="Keine Schäden in dieser Sicht"
             suche={{ platzhalter: 'S-Nr., Ort, Beschreibung' }}
+            mehrzahl="Schäden"
+            gedaechtnis={gedaechtnis}
             // Vorgabe wie die Serverordnung: der jüngste Schaden oben. Ein Sortierklick lädt neu.
             sortierung={sortierung}
             onSortierung={setSortierung}
@@ -463,6 +483,8 @@ export default function SchaedenPage() {
               stand: schaedenQuery.isPlaceholderData ? 'vorläufig' : JSON.stringify(seitenKey),
               onSuche: setSuche,
               onFilter: setSpaltenFilter,
+              // Serverzählung für den Filterhinweis: Treffer in dieser Statusmenge von allen darin.
+              zahlen: { treffer: ausschnittZahl, gesamt: bestandZahl },
             }}
             onZeileKlick={(s) => navigate(schadenDetailPfad(einsatzId, s.id))}
             karte={schadenKarte(einsatzId)}

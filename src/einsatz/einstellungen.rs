@@ -17,9 +17,9 @@ pub fn ist_gueltiger_basemap_modus(s: &str) -> bool {
 
 // Anzeige-Konventionen (LFH-136) — Whitelist-Validierung in Rust statt DB-CHECK.
 
-/// Ob `s` ein gültiges Zeitformat ist.
-pub fn ist_gueltiges_zeitformat(s: &str) -> bool {
-    Zeitformat::parse(s).is_some()
+/// Ob `s` eine gültige Zeitdarstellung ist (LLH-1053).
+pub fn ist_gueltige_zeitdarstellung(s: &str) -> bool {
+    Zeitdarstellung::parse(s).is_some()
 }
 
 /// Ob `s` ein gültiges Einheiten-System ist.
@@ -38,12 +38,14 @@ wire_enum! {
 }
 
 wire_enum! {
-    /// Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`
-    /// (per-Variante, `rename_all` trifft die Ziffern-Kürzel nicht).
+    /// Zeitdarstellung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitdarstellung`.
+    /// `None` am Einsatz bzw. an der Organisation heißt Vorgabe, also taktisch; am Gerät kann
+    /// man sie übersteuern, der Druck nie (LLH-1053, Spec `zeitdarstellung`). Löst das tote
+    /// 24h/12h-„Zeitformat" ab (Migration `zeitdarstellung`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-    pub enum Zeitformat {
-        VierundzwanzigStunden => "24h",
-        ZwoelfStunden => "12h",
+    pub enum Zeitdarstellung {
+        Taktisch => "taktisch",
+        DatumUhrzeit => "datum_uhrzeit",
     }
 }
 
@@ -136,7 +138,7 @@ pub struct EinsatzEinstellungen {
     pub fachebenen_sichtbar: Option<String>,
     // Anzeige-Konventionen (LFH-136); None = projektweiter Default.
     pub zeitzone: Option<String>,
-    pub zeitformat: Option<String>,
+    pub zeitdarstellung: Option<String>,
     pub einheiten: Option<String>,
     pub koordinatenformat: Option<String>,
     // Verhalten & Automatik (LFH-133); None = projektweiter Default.
@@ -167,7 +169,7 @@ impl EinsatzEinstellungen {
             karten_zoom_start: None,
             fachebenen_sichtbar: None,
             zeitzone: None,
-            zeitformat: None,
+            zeitdarstellung: None,
             einheiten: None,
             koordinatenformat: None,
             etb_nummer_praefix: None,
@@ -229,7 +231,7 @@ impl EinsatzEinstellungen {
                 .as_deref()
                 .and_then(|s| serde_json::from_str(s).ok()),
             zeitzone: self.zeitzone.clone(),
-            zeitformat: self.zeitformat.clone(),
+            zeitdarstellung: self.zeitdarstellung.clone(),
             einheiten: self.einheiten.clone(),
             koordinatenformat: self.koordinatenformat.clone(),
             etb_nummer_praefix: self.etb_nummer_praefix.clone(),
@@ -262,8 +264,8 @@ pub struct EinstellungenAnzeige {
     pub karten_zoom_start: Option<f64>,
     pub fachebenen_sichtbar: Option<serde_json::Value>,
     pub zeitzone: Option<String>,
-    #[schema(value_type = Option<Zeitformat>)]
-    pub zeitformat: Option<String>,
+    #[schema(value_type = Option<Zeitdarstellung>)]
+    pub zeitdarstellung: Option<String>,
     #[schema(value_type = Option<EinheitenSystem>)]
     pub einheiten: Option<String>,
     #[schema(value_type = Option<Koordinatenformat>)]
@@ -303,7 +305,7 @@ pub async fn laden_oder_default(
 ) -> Result<EinsatzEinstellungen, AppError> {
     let row = sqlx::query_as::<_, EinsatzEinstellungen>(
         "SELECT einsatz_id, standard_modul, basemap_modus, karten_zoom_start, \
-                fachebenen_sichtbar, zeitzone, zeitformat, einheiten, koordinatenformat, \
+                fachebenen_sichtbar, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
                 etb_nummer_praefix, etb_nummer_start, meldung_nummer_praefix, meldung_nummer_start, \
                 auftrag_nummer_praefix, auftrag_nummer_start, meldung_bestaetigung_frist_min, \
                 auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, retention_dauer_tage, \
@@ -334,7 +336,7 @@ pub struct EinstellungenDaten<'a> {
     pub karten_zoom_start: Option<f64>,
     pub fachebenen_sichtbar: Option<&'a str>,
     pub zeitzone: Option<&'a str>,
-    pub zeitformat: Option<&'a str>,
+    pub zeitdarstellung: Option<&'a str>,
     pub einheiten: Option<&'a str>,
     pub koordinatenformat: Option<&'a str>,
     // Verhalten & Automatik (LFH-133).
@@ -361,7 +363,7 @@ pub async fn speichern(
     sqlx::query(
         "INSERT INTO einsatz_einstellungen \
             (einsatz_id, standard_modul, basemap_modus, karten_zoom_start, \
-             fachebenen_sichtbar, zeitzone, zeitformat, einheiten, koordinatenformat, \
+             fachebenen_sichtbar, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
              etb_nummer_praefix, etb_nummer_start, meldung_nummer_praefix, meldung_nummer_start, \
              auftrag_nummer_praefix, auftrag_nummer_start, meldung_bestaetigung_frist_min, \
              auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, retention_dauer_tage, \
@@ -373,7 +375,7 @@ pub async fn speichern(
              karten_zoom_start = excluded.karten_zoom_start, \
              fachebenen_sichtbar = excluded.fachebenen_sichtbar, \
              zeitzone = excluded.zeitzone, \
-             zeitformat = excluded.zeitformat, \
+             zeitdarstellung = excluded.zeitdarstellung, \
              einheiten = excluded.einheiten, \
              koordinatenformat = excluded.koordinatenformat, \
              etb_nummer_praefix = excluded.etb_nummer_praefix, \
@@ -396,7 +398,7 @@ pub async fn speichern(
     .bind(daten.karten_zoom_start)
     .bind(daten.fachebenen_sichtbar)
     .bind(daten.zeitzone)
-    .bind(daten.zeitformat)
+    .bind(daten.zeitdarstellung)
     .bind(daten.einheiten)
     .bind(daten.koordinatenformat)
     .bind(daten.etb_nummer_praefix)
@@ -515,7 +517,7 @@ mod tests {
                     r#"{"nina":true,"dwd":false,"pegelonline":false,"kritis":false}"#,
                 ),
                 zeitzone: Some("Europe/Berlin"),
-                zeitformat: Some("24h"),
+                zeitdarstellung: Some("taktisch"),
                 einheiten: Some("metrisch"),
                 koordinatenformat: Some("mgrs"),
                 ..Default::default()
@@ -527,7 +529,7 @@ mod tests {
         assert_eq!(gespeichert.basemap_modus.as_deref(), Some("offline"));
         assert_eq!(gespeichert.karten_zoom_start, Some(12.0));
         assert_eq!(gespeichert.zeitzone.as_deref(), Some("Europe/Berlin"));
-        assert_eq!(gespeichert.zeitformat.as_deref(), Some("24h"));
+        assert_eq!(gespeichert.zeitdarstellung.as_deref(), Some("taktisch"));
         assert_eq!(gespeichert.einheiten.as_deref(), Some("metrisch"));
         assert_eq!(gespeichert.koordinatenformat.as_deref(), Some("mgrs"));
         assert!(gespeichert.geaendert_at.is_some());
@@ -544,7 +546,7 @@ mod tests {
                 karten_zoom_start: None,
                 fachebenen_sichtbar: None,
                 zeitzone: None,
-                zeitformat: None,
+                zeitdarstellung: None,
                 einheiten: None,
                 koordinatenformat: None,
                 ..Default::default()
@@ -555,7 +557,7 @@ mod tests {
         assert_eq!(zweite.standard_modul, None);
         assert_eq!(zweite.basemap_modus.as_deref(), Some("online"));
         // Upsert überschreibt auch die Anzeige-Konventionen (Vollersatz).
-        assert_eq!(zweite.zeitformat, None);
+        assert_eq!(zweite.zeitdarstellung, None);
         assert_eq!(zweite.koordinatenformat, None);
 
         let anzahl: i64 =
@@ -590,11 +592,12 @@ mod tests {
 
     #[test]
     fn anzeige_konventionen_validatoren() {
-        // Zeitformat
-        assert!(ist_gueltiges_zeitformat("24h"));
-        assert!(ist_gueltiges_zeitformat("12h"));
-        assert!(!ist_gueltiges_zeitformat("48h"));
-        assert!(!ist_gueltiges_zeitformat(""));
+        // Zeitdarstellung
+        assert!(ist_gueltige_zeitdarstellung("taktisch"));
+        assert!(ist_gueltige_zeitdarstellung("datum_uhrzeit"));
+        assert!(!ist_gueltige_zeitdarstellung("24h"));
+        assert!(!ist_gueltige_zeitdarstellung("12h"));
+        assert!(!ist_gueltige_zeitdarstellung(""));
 
         // Einheiten
         assert!(ist_gueltiges_einheiten_system("metrisch"));

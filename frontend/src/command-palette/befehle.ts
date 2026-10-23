@@ -10,6 +10,7 @@ import {
   IconPfeileAuswaerts,
   IconPfeileEinwaerts,
   IconSonne,
+  IconUhr,
   IconZahnrad,
   type Icon,
 } from '../icons';
@@ -45,7 +46,7 @@ import type { Befehl, BefehlKontext, Oeffnung, TastaturAktionId } from './typen'
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
-import type { Koordinatenformat } from '../api/types';
+import type { Koordinatenformat, Zeitdarstellung } from '../api/types';
 
 /** Kontext einer Moduloption: der volle Kategoriename. */
 function kategorieKontext(key: KategorieKey): string | undefined {
@@ -244,6 +245,13 @@ const KOORD_BEFEHLE: { format: Koordinatenformat; label: string }[] = [
   { format: 'utm', label: 'UTM' },
   { format: 'mgrs', label: 'MGRS / UTMREF' },
   { format: 'gk', label: 'Gauß-Krüger' },
+];
+
+/** Zeitdarstellung dieses Geräts (LLH-1053), dieselbe Wahl wie im Profil. */
+const ZEIT_BEFEHLE: { id: string; art: Zeitdarstellung | null; label: string }[] = [
+  { id: 'zeit:taktisch', art: 'taktisch', label: 'Zeitdarstellung: Taktisch' },
+  { id: 'zeit:datum_uhrzeit', art: 'datum_uhrzeit', label: 'Zeitdarstellung: Datum und Uhrzeit' },
+  { id: 'zeit:vorgabe', art: null, label: 'Zeitdarstellung: Vorgabe des Einsatzes' },
 ];
 
 interface TastaturEreignis {
@@ -519,6 +527,16 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       icon: IconGlobus,
       schlagworte: ['koordinaten', 'format', c.format],
       ausfuehren: () => k.setKoordinaten(c.format),
+    });
+  }
+  for (const z of ZEIT_BEFEHLE) {
+    befehle.push({
+      id: z.id,
+      gruppe: 'einstellungen',
+      label: z.label,
+      icon: IconUhr,
+      schlagworte: ['zeit', 'uhrzeit', 'dtg', 'taktisch', 'datum', 'format'],
+      ausfuehren: () => k.setZeitdarstellung(z.art),
     });
   }
 

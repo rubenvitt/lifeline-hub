@@ -52,10 +52,23 @@ Zuschlag: Die Summe aller Kostformen MUST den Gesamtbedarf bzw. die Menge der Au
 Das System SHALL Bezeichnung, Beginn, Ende, Bedarf und Sonderkost eines Zeitfensters
 änderbar machen. Ein Zeitfenster MUST sich nur löschen lassen, solange es keine nicht
 zurückgenommene Ausgabe hat; zurückgenommene Ausgaben werden mit ihm entfernt.
+Die Oberfläche MUST ein Zeitfenster in seiner Karte bearbeiten, nicht in einem Dialog (LLH-1139):
+„Bedarf bearbeiten“ macht die Karte zur Eingabe mit Bezeichnung, Zeitraum, Bedarf, Sonderkost,
+Art und Stellen, Speichern MUST nur die geänderten Felder senden, und höchstens eine Karte der
+Seite MUST zugleich bearbeitet werden (Spec `formularseiten`, „Eine offene Bearbeitung je
+Ansicht“).
 
 #### Scenario: Bedarf erhöhen
 - **WHEN** der Bedarf Betreute eines Zeitfensters von 70 auf 90 geändert wird
 - **THEN** beträgt der Gesamtbedarf 270 EP und die Fehlmenge steigt um 20
+
+#### Scenario: Bedarf in der Karte bearbeiten
+- **WHEN** eine Person mit Planungsrecht an der Karte „Mittag“ „Bedarf bearbeiten“ wählt, die Betreuten von 70 auf 90 ändert und speichert
+- **THEN** öffnet sich kein Dialog, die Änderung geht als einziges Feld hinaus, und die Karte zeigt danach wieder Bedarf, Ausgaben und Aktionen
+
+#### Scenario: Eine Karte zur Zeit
+- **WHEN** die Karte „Mittag“ bearbeitet wird
+- **THEN** steht „Bedarf bearbeiten“ an den übrigen Karten gesperrt mit „Erst „Mittag“ speichern oder abbrechen“
 
 #### Scenario: Löschen mit Ausgaben
 - **WHEN** ein Zeitfenster mit mindestens einer gültigen Ausgabe gelöscht werden soll

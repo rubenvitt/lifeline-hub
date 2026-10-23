@@ -20,73 +20,46 @@ import {
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-// Taktische Schreibweise (1430 / 161430 / 161430JUL2026, dt. Monatskürzel).
-describe('taktische Zeit-Varianten', () => {
-  const wire = '2026-07-16 12:30:00'; // fest, Zeitzone-Tests unten
+// Die alten Namen leiten auf die Rollen aus `zeitDarstellung.ts` weiter (LLH-1053); dort stehen
+// die ausführlichen Fälle. Hier nur, dass jede Weiterleitung die richtige Rolle trifft.
+describe('alte Zeitformatierer leiten auf die Rollen weiter', () => {
+  const wire = '2026-07-16 12:30:00'; // 16.07.2026 14:30 Berlin
+  const berlin = { zeitzone: 'Europe/Berlin' };
+  const datum = { zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' as const };
 
-  it('taktischeUhrzeit = HHmm (1230 UTC → 1430 Berlin)', () => {
-    expect(taktischeUhrzeit(wire, { zeitzone: 'Europe/Berlin' })).toBe('1430');
+  it('taktischeUhrzeit → uhrzeit', () => {
+    expect(taktischeUhrzeit(wire, berlin)).toBe('1430');
+    expect(taktischeUhrzeit(wire, datum)).toBe('14:30');
   });
-  it('taktischeDtg = DDHHmm (161430)', () => {
-    expect(taktischeDtg(wire, { zeitzone: 'Europe/Berlin' })).toBe('161430');
+  it('taktischeDtg → Tag und Uhrzeit ohne Heute-Prüfung (rein)', () => {
+    expect(taktischeDtg(wire, berlin)).toBe('161430');
+    expect(taktischeDtg(wire, datum)).toBe('16.07. 14:30');
   });
-  it('taktischeDtgVoll = DDHHmm + dt. Monatskürzel + Jahr (161430JUL2026)', () => {
-    expect(taktischeDtgVoll(wire, { zeitzone: 'Europe/Berlin' })).toBe('161430JUL2026');
-    // Umlaut-Monat: März → MÄR
-    expect(taktischeDtgVoll('2026-03-01 06:00:00', { zeitzone: 'Europe/Berlin' })).toBe(
-      '010700MÄR2026',
-    );
+  it('taktischeDtgVoll und formatZeit → zeitpunkt', () => {
+    expect(taktischeDtgVoll(wire, berlin)).toBe('161430jul26');
+    expect(formatZeit(wire, berlin)).toBe('161430jul26');
+    expect(formatZeit(wire, datum)).toBe('16.07.26 14:30');
+    // März ohne Umlaut (E1).
+    expect(taktischeDtgVoll('2026-03-01 06:00:00', berlin)).toBe('010700mrz26');
   });
   it('leer/null → leerer String', () => {
     expect(taktischeUhrzeit(null, DEFAULT_KONVENTIONEN)).toBe('');
     expect(taktischeDtgVoll(undefined, DEFAULT_KONVENTIONEN)).toBe('');
-  });
-});
-
-describe('formatZeit (taktische DTG)', () => {
-  it('DEFAULT_KONVENTIONEN = taktische DTG in Lokalzeit', () => {
-    const wire = '2026-06-11 09:00:00';
-    const d = dayjs.utc(wire).local();
-    const erwartet = `${d.format('DDHHmm')}JUN${d.format('YYYY')}`;
-    expect(formatZeit(wire, DEFAULT_KONVENTIONEN)).toBe(erwartet);
-  });
-
-  it('wendet die Zeitzone an (TZ-robust)', () => {
-    const wire = '2026-06-11 09:00:00';
-    // 09:00 UTC → 11:00 Berlin (Sommerzeit) bzw. 05:00 New York.
-    expect(formatZeit(wire, { zeitzone: 'Europe/Berlin' })).toBe('111100JUN2026');
-    expect(formatZeit(wire, { zeitzone: 'America/New_York' })).toBe('110500JUN2026');
-  });
-
-  it('ignoriert das 12h-Setting — taktisch ist immer 24h', () => {
-    const wire = '2026-06-11 15:00:00'; // 15:00 UTC → 17:00 Berlin
-    expect(formatZeit(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' })).toBe(
-      '111700JUN2026',
-    );
-  });
-
-  it('leer/null → leerer String', () => {
-    expect(formatZeit(null, DEFAULT_KONVENTIONEN)).toBe('');
-    expect(formatZeit(undefined, DEFAULT_KONVENTIONEN)).toBe('');
     expect(formatZeit('', DEFAULT_KONVENTIONEN)).toBe('');
   });
-
   it('ungültige Zeitzone crasht nicht, fällt auf lokal zurück (Review LFH-136)', () => {
-    const wire = '2026-06-11 09:00:00';
-    const lokal = formatZeit(wire, DEFAULT_KONVENTIONEN); // Default = lokal
+    const lokal = formatZeit(wire, DEFAULT_KONVENTIONEN);
     expect(() => formatZeit(wire, { zeitzone: 'Europe/Brelin' })).not.toThrow();
     expect(formatZeit(wire, { zeitzone: 'Müll/Quatsch' })).toBe(lokal);
   });
 });
 
-describe('formatZeitKurz (taktisch)', () => {
-  it('Uhrzeit 1430 wenn heute, sonst kurze DTG 161430', () => {
-    const heute = dayjs().utc().format('YYYY-MM-DD HH:mm:ss');
-    expect(formatZeitKurz(heute, DEFAULT_KONVENTIONEN)).toBe(
-      dayjs.utc(heute).local().format('HHmm'),
-    );
-    const alt = dayjs().utc().subtract(3, 'day').format('YYYY-MM-DD HH:mm:ss');
-    expect(formatZeitKurz(alt, DEFAULT_KONVENTIONEN)).toBe(dayjs.utc(alt).local().format('DDHHmm'));
+describe('formatZeitKurz → zeitKurz', () => {
+  afterEach(() => vi.useRealTimers());
+  it('heute nur die Uhrzeit, sonst Tag und Uhrzeit', () => {
+    vi.setSystemTime(new Date('2026-07-16T18:00:00Z'));
+    expect(formatZeitKurz('2026-07-16 12:30:00', { zeitzone: 'Europe/Berlin' })).toBe('1430');
+    expect(formatZeitKurz('2026-07-13 12:30:00', { zeitzone: 'Europe/Berlin' })).toBe('131430');
   });
 });
 
@@ -123,14 +96,20 @@ describe('formatKoordinate', () => {
   });
 });
 
-describe('formatUhrzeit', () => {
-  it('rechnet den UTC-Wirestring in die Zone um', () => {
-    expect(formatUhrzeit('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe('11:00');
+describe('formatUhrzeit → uhrzeit', () => {
+  it('rechnet den UTC-Wirestring in die Zone um, in der wirksamen Darstellung', () => {
+    expect(formatUhrzeit('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe('1100');
+    expect(
+      formatUhrzeit('2026-06-11 09:00:00', {
+        zeitzone: 'Europe/Berlin',
+        zeitdarstellung: 'datum_uhrzeit',
+      }),
+    ).toBe('11:00');
   });
 
-  it('liefert den Leerstrich, wenn nichts da ist', () => {
-    expect(formatUhrzeit(null, DEFAULT_KONVENTIONEN)).toBe('——:——');
-    expect(formatUhrzeit(undefined, DEFAULT_KONVENTIONEN)).toBe('——:——');
+  it('liefert einen Leerstrich in Ziffernbreite, wenn nichts da ist', () => {
+    expect(formatUhrzeit(null, DEFAULT_KONVENTIONEN)).toBe('————');
+    expect(formatUhrzeit(undefined, { zeitdarstellung: 'datum_uhrzeit' })).toBe('——:——');
   });
 
   it('fällt bei ungültiger Zone auf lokale Zeit zurück statt zu werfen', () => {
@@ -138,26 +117,32 @@ describe('formatUhrzeit', () => {
   });
 });
 
-describe('formatUhrzeitMitTag', () => {
+describe('formatUhrzeitMitTag → zeitKurz', () => {
   afterEach(() => vi.useRealTimers());
 
   it('zeigt nur die Uhrzeit, wenn der Zeitpunkt heute liegt (in der Anzeigezone)', () => {
     // Systemzeit 22:00 Berlin am 11.06. — derselbe Tag wie der Wirestring unten.
     vi.setSystemTime(new Date('2026-06-11T20:00:00Z'));
-    expect(formatUhrzeitMitTag('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe('11:00');
+    expect(formatUhrzeitMitTag('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe('1100');
   });
 
   it('stellt den Tag voran, wenn der Zeitpunkt nicht heute liegt (in der Anzeigezone)', () => {
     // Systemzeit 08:00 Berlin am 12.06. — ein Tag nach dem Wirestring unten.
     vi.setSystemTime(new Date('2026-06-12T06:00:00Z'));
     expect(formatUhrzeitMitTag('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe(
-      '11. 11:00',
+      '111100',
     );
+    expect(
+      formatUhrzeitMitTag('2026-06-11 09:00:00', {
+        zeitzone: 'Europe/Berlin',
+        zeitdarstellung: 'datum_uhrzeit',
+      }),
+    ).toBe('11.06. 11:00');
   });
 
   it('liefert den Leerstrich, wenn nichts da ist', () => {
-    expect(formatUhrzeitMitTag(null, DEFAULT_KONVENTIONEN)).toBe('——:——');
-    expect(formatUhrzeitMitTag(undefined, DEFAULT_KONVENTIONEN)).toBe('——:——');
+    expect(formatUhrzeitMitTag(null, DEFAULT_KONVENTIONEN)).toBe('————');
+    expect(formatUhrzeitMitTag(undefined, DEFAULT_KONVENTIONEN)).toBe('————');
   });
 });
 
@@ -203,5 +188,9 @@ describe('formatDtg (DTG nach FwDV/DV 810, Entscheidung E1)', () => {
 
   it('nimmt beim Jahreswechsel Tag, Monat und Jahr der Anzeigezone', () => {
     expect(formatDtg(dayjs.utc('2026-12-31 23:30:00'), 'Europe/Berlin')).toBe('010030jan27');
+  });
+
+  it('bleibt taktisch: das Zeitfeld zeigt immer die DTG (Spec `zeiteingabe`)', () => {
+    expect(formatDtg(dayjs.utc('2026-10-17 12:30:00'), 'Europe/Berlin')).toBe('171430okt26');
   });
 });

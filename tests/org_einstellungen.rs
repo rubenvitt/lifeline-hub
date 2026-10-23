@@ -139,7 +139,7 @@ async fn put_als_admin_gueltig_persistiert() {
 
     let body = serde_json::json!({
         "zeitzone": "Europe/Berlin",
-        "zeitformat": "24h",
+        "zeitdarstellung": "taktisch",
         "einheiten": "metrisch",
         "koordinatenformat": "mgrs",
         "retention_dauer_tage": 365,
@@ -160,7 +160,7 @@ async fn put_als_admin_gueltig_persistiert() {
     let (get_status, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
     assert_eq!(get_status, StatusCode::OK);
     assert_eq!(get_body["zeitzone"], "Europe/Berlin");
-    assert_eq!(get_body["zeitformat"], "24h");
+    assert_eq!(get_body["zeitdarstellung"], "taktisch");
     assert_eq!(get_body["einheiten"], "metrisch");
     assert_eq!(get_body["koordinatenformat"], "mgrs");
     assert_eq!(get_body["retention_dauer_tage"], 365);

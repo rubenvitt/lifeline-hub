@@ -32,6 +32,12 @@ export interface DatenfeldEingabeProps {
   rules?: FormRule[];
   /** Über alle Spalten (Freitext, Auswahl mit langen Einträgen). */
   breit?: boolean;
+  /**
+   * Hilfe unter der Eingabe (antds `extra`, etwa ein Vorschlag mit Herkunft, LLH-1139); die
+   * Eingabe verweist per `aria-describedby` auf sie. Keine Bedienerklärung (`frontend/AGENTS.md`,
+   * „Texte“).
+   */
+  hilfe?: ReactNode;
   /** Genau eine Eingabe (`Input`, `Select`, `InputNumber` …), die `id` annimmt. */
   children: ReactElement<{ id?: string }>;
 }
@@ -41,6 +47,7 @@ export default function DatenfeldEingabe({
   name,
   rules,
   breit = false,
+  hilfe,
   children,
 }: DatenfeldEingabeProps) {
   const { token, rollen } = useRollen();
@@ -52,7 +59,7 @@ export default function DatenfeldEingabe({
         <label htmlFor={eingabeId}>{label}</label>
       </Augenbraue>
       <dd style={{ margin: 0, minWidth: 0 }}>
-        <Form.Item name={name} rules={rules} style={{ marginBottom: 0 }}>
+        <Form.Item name={name} rules={rules} extra={hilfe} style={{ marginBottom: 0 }}>
           {cloneElement(children, { id: eingabeId })}
         </Form.Item>
       </dd>

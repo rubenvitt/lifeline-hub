@@ -91,7 +91,7 @@ describe('GefahrengebietVorschau (LFH-664)', () => {
     renderMitProviders(<GefahrengebietVorschau einsatzId={5} id={3} />);
 
     expect(
-      await screen.findByText(/^beurteilt \d{6}[A-Z]{3}\d{4} · Einsatzleitung$/),
+      await screen.findByText(/^beurteilt \d{6}[a-z]{3}\d{2} · Einsatzleitung$/),
     ).toBeInTheDocument();
     expect(screen.queryByText('nicht beurteilt')).not.toBeInTheDocument();
   });

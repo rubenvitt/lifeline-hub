@@ -14,8 +14,8 @@ sichtbaren Text stehen; „Standard“ MUST NOT in dieser Bedeutung stehen. Ausg
 benannte Dinge mit eigener Spec („Standard-Rufname“, „Standardansicht“).
 
 #### Scenario: Platzhalter einer Org-Einstellung
-- **WHEN** ein Admin die Anzeige-Konventionen öffnet und das Feld „Zeitformat“ leer ist
-- **THEN** lautet der Platzhalter „24 Stunden (Vorgabe)“, und die Seite enthält weder „Default“ noch „Fallback“
+- **WHEN** ein Admin die Anzeige-Konventionen öffnet und das Feld „Zeitdarstellung“ leer ist
+- **THEN** lautet der Platzhalter „Taktisch (Vorgabe)“, und die Seite enthält weder „Default“ noch „Fallback“
 
 #### Scenario: Verwaltungsseite der Einsatz-Vorgaben
 - **WHEN** ein Admin im Verwaltungsmenü die Vorgaben für neue Einsätze öffnet
@@ -33,8 +33,8 @@ Ein leeres Feld in den Einsatz-Einstellungen, für das die Organisation einen We
 MUST diesen Wert als „Vorgabe der Organisation: <Wert>“ zeigen.
 
 #### Scenario: Org-Vorgabe im Einsatz
-- **WHEN** die Organisation das Zeitformat „12 Stunden (AM/PM)“ vorgibt und der Einsatz keines gesetzt hat
-- **THEN** steht unter dem Feld „Vorgabe der Organisation: 12 Stunden (AM/PM)“, der Platzhalter lautet „12 Stunden (AM/PM) (Vorgabe)“, und der Einsatz speichert weiter `null`
+- **WHEN** die Organisation die Zeitdarstellung „Datum und Uhrzeit (10.10.26 14:30)“ vorgibt und der Einsatz keine gesetzt hat
+- **THEN** steht unter dem Feld „Vorgabe der Organisation: Datum und Uhrzeit (10.10.26 14:30)“, der Platzhalter lautet „Datum und Uhrzeit (10.10.26 14:30) (Vorgabe)“, und der Einsatz speichert weiter `null`
 
 #### Scenario: Keine Org-Vorgabe
 - **WHEN** die Organisation für ein Feld keinen Wert gesetzt hat

@@ -1057,6 +1057,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/material/{em_id}/reaktivieren",
             post(routes::einsatz_material::reaktivieren),
         )
+        // LLH-1259: einen vorhandenen Posten nachträglich mit einer Nachforderung verknüpfen.
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}/nachforderung",
+            post(routes::einsatz_material::verknuepfen),
+        )
         // LLH-1093: einen Posten auf zwei Zeilen aufteilen.
         .route(
             "/api/einsaetze/{id}/material/{em_id}/aufteilen",

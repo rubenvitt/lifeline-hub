@@ -12,8 +12,8 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einsatz::einstellungen::{
     ist_gueltige_frist_min, ist_gueltige_geocoder_url, ist_gueltige_retention_dauer,
-    ist_gueltige_skelett_dauer, ist_gueltige_zeitzone, ist_gueltiges_einheiten_system,
-    ist_gueltiges_koordinatenformat, ist_gueltiges_nummer_praefix, ist_gueltiges_zeitformat,
+    ist_gueltige_skelett_dauer, ist_gueltige_zeitdarstellung, ist_gueltige_zeitzone,
+    ist_gueltiges_einheiten_system, ist_gueltiges_koordinatenformat, ist_gueltiges_nummer_praefix,
 };
 use crate::einsatz::modul::{
     ist_ausblendbar, ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key, BENOETIGTE_ROLLEN,
@@ -35,7 +35,7 @@ use std::collections::HashMap;
 #[derive(Debug, Deserialize)]
 pub struct OrgEinstellungenUpdate {
     pub zeitzone: Option<String>,
-    pub zeitformat: Option<String>,
+    pub zeitdarstellung: Option<String>,
     pub einheiten: Option<String>,
     pub koordinatenformat: Option<String>,
     // Aufbewahrung.
@@ -93,10 +93,10 @@ pub async fn setzen(
             return Err(AppError::Validation("Ungültige zeitzone".into()));
         }
     }
-    let zeitformat = bereinige(req.zeitformat);
-    if let Some(f) = zeitformat.as_deref() {
-        if !ist_gueltiges_zeitformat(f) {
-            return Err(AppError::Validation("Ungültiges zeitformat".into()));
+    let zeitdarstellung = bereinige(req.zeitdarstellung);
+    if let Some(f) = zeitdarstellung.as_deref() {
+        if !ist_gueltige_zeitdarstellung(f) {
+            return Err(AppError::Validation("Ungültige zeitdarstellung".into()));
         }
     }
     let einheiten = bereinige(req.einheiten);
@@ -202,7 +202,7 @@ pub async fn setzen(
         benutzer.id,
         OrgEinstellungenDaten {
             zeitzone: zeitzone.as_deref(),
-            zeitformat: zeitformat.as_deref(),
+            zeitdarstellung: zeitdarstellung.as_deref(),
             einheiten: einheiten.as_deref(),
             koordinatenformat: koordinatenformat.as_deref(),
             retention_dauer_tage: req.retention_dauer_tage,

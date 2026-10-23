@@ -121,6 +121,14 @@ describe('ProfilPage — Kopfdaten (LFH-345)', () => {
     setup();
     expect(await screen.findByText('Sicherheit')).toBeInTheDocument();
   });
+
+  it('bietet die Zeitdarstellung dieses Geräts an (LLH-1053)', async () => {
+    setup();
+    expect(await screen.findByText('Darstellung auf diesem Gerät')).toBeInTheDocument();
+    expect(
+      screen.getByRole('radiogroup', { name: 'Zeitdarstellung auf diesem Gerät' }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('ProfilPage — Passkey-Enroll (LFH-275)', () => {

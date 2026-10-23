@@ -14,7 +14,7 @@ export function istBeurteilt(g: MitBeurteilung): boolean {
 }
 
 /**
- * „beurteilt 201512OKT2026 · Name“ oder „nicht beurteilt“. Die Zeit formatiert der Aufrufer in der
+ * „beurteilt 201512okt26 · Name“ oder „nicht beurteilt“. Die Zeit formatiert der Aufrufer in der
  * Anzeigezone (`useAnzeigeKonventionen().formatZeit`); ohne Namen (Konto entfernt) nur die Zeit.
  */
 export function beurteilungText(g: MitBeurteilung, formatZeit: (utc: string) => string): string {

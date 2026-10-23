@@ -139,15 +139,25 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     const m = karte(page, 'Mittag Stellen');
     await m.getByRole('button', { name: /^Aktionen zu Zeitfenster Mittag Stellen/ }).click();
     await (await offenesMenue(page)).getByText('Bedarf bearbeiten').click();
-    const bedarf = page.getByRole('dialog', { name: 'Bedarf bearbeiten: Mittag Stellen' });
-    await bedarf.getByRole('button', { name: /^Art und Stellen/ }).click();
+    // Bearbeiten in der Ansicht (LLH-1139): die Karte selbst wird zur Eingabe, kein Dialog.
+    const bedarf = m.getByRole('form', { name: 'Mittag Stellen bearbeiten' });
+    await expect(bedarf).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(bedarf.getByLabel('Bezeichnung')).toBeFocused();
     await waehle(page, bedarf, 'Art', 'warm');
     await waehle(page, bedarf, 'Stellen', 'Feldküche BR Sportplatz', 'Ausgabe Turnhalle Nord');
-    await bedarf.getByText('Bedarf bearbeiten: Mittag Stellen').click();
-    await expect(
-      bedarf.getByRole('button', { name: 'Art und Stellen · warm · 2 Stellen' }),
-    ).toBeVisible();
+    // Die Auswahlliste schließen, ohne etwas zu wählen: ein Klick auf ein Etikett daneben.
+    await bedarf.getByText('Weitere Personen (EP)').click();
+    const patch = page.waitForResponse(
+      (r) => r.request().method() === 'PATCH' && r.url().endsWith(`/zeitfenster/${mittag}`),
+    );
     await bedarf.getByRole('button', { name: 'Speichern' }).click();
+    const antwort = await patch;
+    expect(antwort.ok()).toBeTruthy();
+    // Nur die geänderten Felder gehen hinaus (Spec `formularseiten`, „PATCH nur geänderter Felder“).
+    const body = antwort.request().postDataJSON() as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['stelle_ids', 'verpflegungsart']);
+    expect(body.verpflegungsart).toBe('warm');
     await expect(bedarf).toHaveCount(0);
     await expect(m.locator('[data-lfh="verpflegungsart"]')).toHaveText('warm');
 

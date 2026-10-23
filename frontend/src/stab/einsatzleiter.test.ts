@@ -150,9 +150,7 @@ describe('einsatzleiterMarkdown', () => {
       zustand: 'daten',
       daten: fs({ ...weber, name: '*KBM* [Weber]' }),
     });
-    expect(einsatzleiterMarkdown(d, dtg)).toBe(
-      '\\*KBM\\* \\[Weber\\] (extern) (seit 111500OKT2026)',
-    );
+    expect(einsatzleiterMarkdown(d, dtg)).toBe('\\*KBM\\* \\[Weber\\] (extern) (seit 111500okt26)');
   });
 
   it('nicht erfasst und Grund', () => {
