@@ -19,7 +19,8 @@ import {
   schienenMitEinemTeilnehmer,
   type KanalQuellen,
   type SkizzenQuelle,
-  einheitenOhneErreichbarkeit,
+  einheitenOhneFunkrufname,
+  einheitenOhneTelefon,
   einheitenOhneSprechgruppe,
   leitstelleOhneVerbindung,
   lokaleSprechgruppenOhneZuordnung,
@@ -44,15 +45,20 @@ function sg(id: number, bezeichnung: string, lokal = false): Sprechgruppe {
 }
 
 function abschnitt(id: number, sprechgruppen: Sprechgruppe[] = []): Einsatzabschnitt {
-  return { id, einsatz_id: 1, name: `A${id}`, sortier: id, sprechgruppen };
+  return { id, einsatz_id: 1, name: `A${id}`, sortier: id, sprechgruppen, verbindungen: [] };
 }
 
 function einheit(
   id: number,
   {
     sprechgruppen = [],
-    erreichbarkeit = null,
-  }: { sprechgruppen?: Sprechgruppe[]; erreichbarkeit?: string | null } = {},
+    funkrufname = null,
+    verbindungen = [],
+  }: {
+    sprechgruppen?: Sprechgruppe[];
+    funkrufname?: string | null;
+    verbindungen?: Einheit['verbindungen'];
+  } = {},
 ): Einheit {
   return {
     id,
@@ -60,7 +66,8 @@ function einheit(
     name: `E${id}`,
     sortier: id,
     sprechgruppen,
-    erreichbarkeit,
+    funkrufname,
+    verbindungen,
     fahrzeug_mitglieder: [],
     material_mitglieder: [],
     personal_mitglieder: [],
@@ -81,7 +88,7 @@ const fs = (
   p: Partial<Fuehrungsstelle> = {},
 ): FuehrungsstelleQuelle => ({
   zustand: 'daten',
-  daten: { art: 'mobil', sprechgruppen, fahrzeug_ids: [], ...p },
+  daten: { art: 'mobil', sprechgruppen, fahrzeug_ids: [], verbindungen: [], ...p },
 });
 
 describe('abschnitteOhneSprechgruppe', () => {
@@ -104,7 +111,7 @@ describe('abschnitteOhneSprechgruppe', () => {
   });
 });
 
-describe('einheitenOhneSprechgruppe / einheitenOhneErreichbarkeit', () => {
+describe('einheitenOhneSprechgruppe / einheitenOhneFunkrufname / einheitenOhneTelefon', () => {
   it('trifft Einheiten ohne Sprechgruppe', () => {
     const l = einheitenOhneSprechgruppe(
       daten([einheit(1), einheit(2, { sprechgruppen: [sg(1, '311')] })]),
@@ -112,19 +119,33 @@ describe('einheitenOhneSprechgruppe / einheitenOhneErreichbarkeit', () => {
     expect(l.treffer.map((e) => e.id)).toEqual([1]);
   });
 
-  it('zählt eine leere oder nur aus Leerzeichen bestehende Erreichbarkeit als fehlend', () => {
-    const l = einheitenOhneErreichbarkeit(
+  it('zählt einen leeren oder nur aus Leerzeichen bestehenden Funkrufnamen als fehlend', () => {
+    const l = einheitenOhneFunkrufname(
       daten([
-        einheit(1, { erreichbarkeit: '0171 1234567' }),
-        einheit(2, { erreichbarkeit: '   ' }),
+        einheit(1, { funkrufname: 'Florian 1' }),
+        einheit(2, { funkrufname: '   ' }),
         einheit(3),
       ]),
     );
     expect(l.treffer.map((e) => e.id)).toEqual([2, 3]);
   });
 
+  // LLH-1134: Telefon heißt Festnetz oder Mobil; E-Mail oder Fax allein reicht nicht.
+  it('trifft Einheiten ohne Festnetz- oder Mobilverbindung', () => {
+    const l = einheitenOhneTelefon(
+      daten([
+        einheit(1, { verbindungen: [{ id: 1, mittel: 'mobil', wert: '0171 1234567' }] }),
+        einheit(2, { verbindungen: [{ id: 2, mittel: 'festnetz', wert: '0421 1' }] }),
+        einheit(3, { verbindungen: [{ id: 3, mittel: 'email', wert: 'zug@example.org' }] }),
+        einheit(4, { funkrufname: 'Florian 4' }),
+      ]),
+    );
+    expect(l.treffer.map((e) => e.id)).toEqual([3, 4]);
+  });
+
   it('reicht den Zustand der Quelle durch', () => {
-    expect(einheitenOhneErreichbarkeit({ zustand: 'fehler', daten: [] }).zustand).toBe('fehler');
+    expect(einheitenOhneFunkrufname({ zustand: 'fehler', daten: [] }).zustand).toBe('fehler');
+    expect(einheitenOhneTelefon({ zustand: 'gesperrt', daten: [] }).zustand).toBe('gesperrt');
   });
 });
 
@@ -699,7 +720,8 @@ describe('countLuecken', () => {
   const leer = {
     abschnitteOhneSprechgruppe: daten<Einsatzabschnitt>([]),
     einheitenOhneSprechgruppe: daten<Einheit>([]),
-    einheitenOhneErreichbarkeit: daten<Einheit>([]),
+    einheitenOhneFunkrufname: daten<Einheit>([]),
+    einheitenOhneTelefon: daten<Einheit>([]),
     verbindungenOhneGemeinsameSprechgruppe: daten<Verbindung>([]),
     lokaleSprechgruppenOhneZuordnung: daten<Sprechgruppe>([]),
   };
@@ -714,9 +736,10 @@ describe('countLuecken', () => {
       ...leer,
       abschnitteOhneSprechgruppe: daten([{ id: 4 } as Einsatzabschnitt]),
       einheitenOhneSprechgruppe: daten([einheit]),
-      einheitenOhneErreichbarkeit: daten([einheit]),
+      einheitenOhneFunkrufname: daten([einheit]),
+      einheitenOhneTelefon: daten([einheit]),
     };
-    expect(countLuecken(luecken, netzLeer)).toEqual({ zustand: 'daten', anzahl: 3 });
+    expect(countLuecken(luecken, netzLeer)).toEqual({ zustand: 'daten', anzahl: 4 });
   });
 
   it('ohne Lücke ist die Zahl 0, nicht leer', () => {
@@ -747,7 +770,7 @@ describe('countLuecken', () => {
     };
     const luecken = {
       ...leer,
-      einheitenOhneErreichbarkeit: { zustand: 'laden' as const, treffer: [] },
+      einheitenOhneTelefon: { zustand: 'laden' as const, treffer: [] },
     };
     expect(countLuecken(luecken, netz).anzahl).toBeNull();
     expect(countLuecken(leer, netz)).toEqual({ zustand: 'fehler', anzahl: null });

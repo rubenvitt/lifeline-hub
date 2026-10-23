@@ -49,7 +49,15 @@ const TMO311 = sg(4, 'TMO', '311');
 const DMO505 = sg(5, 'DMO', '505');
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
-  return { id, einsatz_id: 1, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
 }
 
 function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
@@ -65,6 +73,7 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
     ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     status: { quelle: 'ohne', verteilung: [] },
+    verbindungen: [],
     ...p,
   } as Einheit;
 }
@@ -124,7 +133,7 @@ const LEER_SKIZZE: Fernmeldeskizze = {
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 const fs = (p: Partial<Fuehrungsstelle> = {}): FernmeldenetzQuellen['fuehrungsstelle'] => ({
   zustand: 'daten',
-  daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], ...p },
+  daten: { art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [], ...p },
 });
 
 function quellen(
@@ -237,12 +246,12 @@ describe('baueFernmeldenetz · Stellen', () => {
     expect(lueckenArten(netz, 'ab-1')).not.toContain('keine-gemeinsame');
   });
 
-  it('Wurzel mit erfasster Führungsstelle: Rufname, Schiene, keine Erreichbarkeit', () => {
+  it('Wurzel mit erfasster Führungsstelle: Rufname, Schiene, kein Telefon', () => {
     const netz = baueFernmeldenetz(
       quellen({
         fuehrungsstelle: fs({
           rufname: 'Florian Musterstadt 10/1',
-          erreichbarkeit: '0171 GEHEIM',
+          verbindungen: [{ id: 1, mittel: 'mobil', wert: '0171 GEHEIM', hinweis: null }],
           sprechgruppen: [TMO311],
         }),
       }),
@@ -255,6 +264,9 @@ describe('baueFernmeldenetz · Stellen', () => {
     });
     expect(netz.schienen[0].teilnehmer).toEqual([{ element: 'fs', status: 'bestehend' }]);
     expect(JSON.stringify(netz.stellen)).not.toContain('GEHEIM');
+    // LLH-1134: die Skizze ist Funk — kein Kommunikationsmittel, keine Verbindung im Modell.
+    expect(stelleMit(netz, 'fs')).not.toHaveProperty('kommunikationsmittel');
+    expect(stelleMit(netz, 'fs')).not.toHaveProperty('verbindungen');
   });
 
   it('Wurzel mit Bezeichnung: Überschrift bleibt „Einsatzleitung“, die Bezeichnung ist Zusatz (LFH-1181)', () => {
@@ -292,7 +304,11 @@ describe('baueFernmeldenetz · Stellen', () => {
       quellen({
         abschnitte: daten([abschnitt(1, { name: 'EA 1 Gesundheit', kurzbezeichnung: 'EA 1' })]),
         einheiten: daten([
-          einheit(10, { name: '1. Zug', abschnitt_id: 1, erreichbarkeit: '0160 X' }),
+          einheit(10, {
+            name: '1. Zug',
+            abschnitt_id: 1,
+            verbindungen: [{ id: 2, mittel: 'mobil', wert: '0160 X', hinweis: null }],
+          }),
         ]),
       }),
     );

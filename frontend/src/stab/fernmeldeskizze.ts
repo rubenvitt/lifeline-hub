@@ -14,7 +14,6 @@ import type {
   Verbindungsstatus,
   Verkehrsart,
 } from '../api/types';
-import { kommunikationsmittelLabel } from '../components/kommunikationsmittel';
 import {
   baueFuehrungsorganisation,
   type OrgKnoten,
@@ -67,8 +66,9 @@ import type { Herkunft } from './sprechgruppenplan';
  *
  * Die Führungsorganisation (`baueFuehrungsorganisation`) ist nur noch Vorlage für Auto-Layout und
  * Fokusfolge (`baum`). Verwaiste Bezüge (Verbindung, Lagezeile auf ein fehlendes Element) fallen
- * weg; eine fehlende Quelle wird benannt und ist nie eine leere. Erreichbarkeit und Rufnummern
- * kommen nicht ins Modell, Personennamen auch nicht.
+ * weg; eine fehlende Quelle wird benannt und ist nie eine leere. Telefon, Kommunikationsmittel und
+ * Rufnummern kommen nicht ins Modell (LLH-1134: Funk und Telefon getrennt; die Skizze ist Funk),
+ * Personennamen auch nicht.
  *
  * Herleitung: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D2, D7, D8, D11);
  * Ausstattung: Spec `stab-fernmeldeskizze`, „Führungsmittel und Funktionen im Kasten“ (LFH-1029).
@@ -160,7 +160,6 @@ export type NetzStelle =
       /** Warum keine Gegenstelle dasteht, sonst `null`. */
       hinweis: string | null;
       tz: TzProps;
-      kommunikationsmittel: string | null;
       ausstattung: SkizzenAusstattung[];
     })
   | (NetzStelleBasis & {
@@ -169,7 +168,6 @@ export type NetzStelle =
       tz: TzProps;
       /** Die übergeordnete Stelle im Baum: `fs` oder `ab-<id>`. */
       oben: string | null;
-      kommunikationsmittel: string | null;
       ausstattung: SkizzenAusstattung[];
     })
   | (NetzStelleBasis & {
@@ -178,7 +176,6 @@ export type NetzStelle =
       tz: TzProps;
       /** Die übergeordnete Stelle im Baum: `fs`, `ab-<id>`, `eh-<id>`; `null` = ohne Abschnitt. */
       oben: string | null;
-      kommunikationsmittel: string | null;
     })
   | (NetzStelleBasis & {
       art: 'extern';
@@ -502,9 +499,6 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
           ? null
           : 'Gegenstelle nicht erfasst',
     tz: baueTzProps({ objekttyp: 'abschnitt' }),
-    kommunikationsmittel: fsErfasst
-      ? kommunikationsmittelLabel(fsDaten?.kommunikationsmittel)
-      : null,
     // Die Besetzung ist eine eigene Angabe: sie steht auch ohne erfasste Gegenstelle.
     ausstattung: [
       ...(q.besetzung.zustand === 'daten' ? stabAusstattung(q.besetzung.daten) : []),
@@ -546,7 +540,6 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
         luecken: [],
         tz: k.tz,
         oben,
-        kommunikationsmittel: kommunikationsmittelLabel(a.kommunikationsmittel),
         ausstattung,
       });
     } else {
@@ -565,7 +558,6 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
         luecken: [],
         tz: k.tz,
         oben,
-        kommunikationsmittel: kommunikationsmittelLabel(e.kommunikationsmittel),
       });
     }
     for (const c of k.kinder) besuche(c, k.key, k.art === 'abschnitt' ? k.key : abschnittOben);

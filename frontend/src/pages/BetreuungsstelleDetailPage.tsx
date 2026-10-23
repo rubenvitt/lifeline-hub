@@ -447,10 +447,10 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       )}
       {zelle(
         'erreichbarkeit',
-        'Erreichbarkeit',
+        'Kontakt',
         <Input count={zeichenGrenze(BETREUUNG_ERREICHBARKEIT_MAX)} />,
         s.erreichbarkeit ?? leer,
-        { mono: true, rules: [zeichenRegel(BETREUUNG_ERREICHBARKEIT_MAX, 'Erreichbarkeit')] },
+        { mono: true, rules: [zeichenRegel(BETREUUNG_ERREICHBARKEIT_MAX, 'Kontakt')] },
       )}
       {zelle('notiz', 'Notiz', <Input.TextArea autoSize={{ minRows: 2 }} />, s.notiz ?? leer, {
         breit: true,

@@ -124,7 +124,7 @@ beforeEach(() => {
   vi.mocked(ladeStab).mockReset().mockResolvedValue(STAB);
   vi.mocked(ladeFuehrungsstelle)
     .mockReset()
-    .mockResolvedValue({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] });
+    .mockResolvedValue({ art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [] });
 });
 
 const MELDEBILD = () =>
@@ -270,6 +270,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
       art: 'mobil',
       sprechgruppen: [],
+      verbindungen: [],
       fahrzeug_ids: [],
       einsatzleiter: {
         art: 'personal',
@@ -304,6 +305,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
       bezeichnung: 'ELW 2 Musterstadt',
       rufname: 'Florian 10/1',
       sprechgruppen: [],
+      verbindungen: [],
       fahrzeug_ids: [],
     });
     const text = await erzeuge();

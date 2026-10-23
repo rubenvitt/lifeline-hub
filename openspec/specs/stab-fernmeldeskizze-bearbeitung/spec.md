@@ -175,11 +175,12 @@ Der Name bei „gez.“ MUST bei der Aufbewahrung geschwärzt werden.
 
 ### Requirement: Eigenschaftspaneel des gewählten Elements
 Das gewählte Element SHALL seine Angaben in einem Paneel neben der Fläche zeigen, inline
-bearbeitbar nach den Bearbeitungsprimitiven des Projekts: Stelle mit Rufname und
-Kommunikationsmittel und dem Verweis „zum Datensatz“; Schiene mit Betriebsart, Bezeichnung,
+bearbeitbar nach den Bearbeitungsprimitiven des Projekts: Stelle mit Rufname und dem Verweis
+„zum Datensatz“; Schiene mit Betriebsart, Bezeichnung,
 Hinweis, Herkunft und Teilnehmern (nur lesend, mit Verweis auf die Sprechgruppe); Verbindung mit
-Art, Medium, Status, Betriebsart und Hinweis. Rufname und Kommunikationsmittel MUST im Datensatz
-der Stelle gespeichert werden.
+Art, Medium, Status, Betriebsart und Hinweis. Der Rufname MUST im Datensatz der Stelle gespeichert
+werden, beim Abschnitt als dessen Rufname. Telefon und weitere Verbindungen MUST NOT im Paneel
+stehen; sie werden am Datensatz gepflegt.
 
 #### Scenario: Rufname im Paneel
 - **WHEN** eine Person „1. Zug“ wählt und im Paneel den Rufnamen „Florian Musterstadt 1/1“ setzt

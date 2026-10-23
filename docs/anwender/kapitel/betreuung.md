@@ -49,7 +49,7 @@ anlegen“.
    ![Seite der Betreuungsstelle „Sporthalle Nord“ mit Belegung in Zahlen, Angaben der Stelle und Meldeverlauf](../bilder/betreuung/stelle.png)
 
 3. Unter „Stelle“ stehen Bezeichnung, Art, Kapazität, Einsatzabschnitt, Standort, Koordinate,
-   Leitung, Erreichbarkeit und Notiz, unter „Meldeverlauf“ alle Belegungsmeldungen der Stelle.
+   Leitung, Kontakt und Notiz, unter „Meldeverlauf“ alle Belegungsmeldungen der Stelle.
 4. Unter „Betroffene hier“ stehen die Betroffenen, deren Verbleib „Notunterkunft“ auf diese
    Stelle zeigt; ein Klick öffnet die Person. Ohne Zugriff auf „Betroffene“ steht dort „Keine
    Berechtigung“.
@@ -75,7 +75,7 @@ Ohne Zugriff auf „Nachforderungen“ steht dort „Bedarf · Keine Berechtigun
 
 1. „Betreuungsstelle anlegen“ wählen, „Bezeichnung“ und „Art“ angeben („Anlaufstelle“,
    „Betreuungsstelle“, „Betreuungsplatz“, „Notunterkunft“), dazu „Kapazität (Personen)“ und
-   unter „Weitere Angaben“ „Standort“, „Leitung“, „Erreichbarkeit“ und „Notiz“. Den Standort
+   unter „Weitere Angaben“ „Standort“, „Leitung“, „Kontakt“ und „Notiz“. Den Standort
    mit Enter oder „Ort suchen“ suchen und einen Treffer wählen: die Stelle ist damit verortet und
    erscheint auf der Lagekarte. Ohne Treffer bleibt der Standort freier Text; eine Koordinate
    lässt sich gleich ins Feld tippen, „Auf Karte wählen“ setzt den Punkt auf einer großen Karte.
@@ -151,9 +151,9 @@ keine Stelle mehr.
 ### Einsatztagebuch
 
 Jede Anlage, jede Belegungsmeldung und jeder Statuswechsel einer Stelle steht im
-Einsatztagebuch, eine Rücknahme als Berichtigung. Eine geänderte Leitung oder Erreichbarkeit
-steht dort nur als „weitere Angaben“, ohne Namen und Nummer. Beim Schwärzen des Einsatzes werden
-Leitung und Erreichbarkeit geleert.
+Einsatztagebuch, eine Rücknahme als Berichtigung. Eine geänderte Leitung oder ein geänderter
+Kontakt steht dort nur als „weitere Angaben“, ohne Namen und Nummer. Beim Schwärzen des Einsatzes
+werden Leitung und Kontakt geleert.
 
 ### Verpflegung
 

@@ -22,8 +22,6 @@ pub struct EinheitDaten<'a> {
     pub bemerkung: Option<&'a str>,
     /// Eigener Rufname der Einheit (Freitext, z. B. „Florian HM 12/44“).
     pub funkrufname: Option<&'a str>,
-    pub kommunikationsmittel: Option<&'a str>,
-    pub erreichbarkeit: Option<&'a str>,
     pub sortier: i64,
     /// Taktisches Zeichen (Fachaufgabe, Organisation) schon beim Anlegen, etwa aus einer
     /// Einheiten-Vorlage (LLH-1049); später pflegt es `aktualisiere_position`.
@@ -45,8 +43,6 @@ struct Row {
     fuehrer_name: Option<String>,
     bemerkung: Option<String>,
     funkrufname: Option<String>,
-    kommunikationsmittel: Option<String>,
-    erreichbarkeit: Option<String>,
     sortier: i64,
     lat: Option<f64>,
     lon: Option<f64>,
@@ -198,7 +194,7 @@ const SELECT_AUFGELOEST: &str = "\
     SELECT e.id, e.einsatz_id, e.abschnitt_id, ab.name AS abschnitt_name, \
            e.ueber_einheit_id, e.typ_id, t.label AS typ_label, e.name, \
            e.fuehrer_id, fp.snap_name AS fuehrer_name, e.bemerkung, e.funkrufname, \
-           e.kommunikationsmittel, e.erreichbarkeit, e.sortier, \
+           e.sortier, \
            e.lat, e.lon, e.tz_fachaufgabe, e.tz_organisation, \
            e.aktueller_br_id, \
            e.soll_fuehrer, e.soll_unterfuehrer, e.soll_mannschaft, \
@@ -276,6 +272,7 @@ struct Anreicherung {
     fahrzeuge: HashMap<i64, Vec<super::EinheitMitgliedFahrzeug>>,
     material: HashMap<i64, Vec<super::EinheitMitgliedMaterial>>,
     sprechgruppen: HashMap<i64, Vec<crate::sprechgruppe::SprechgruppeAnzeige>>,
+    verbindungen: HashMap<i64, Vec<crate::stab::kommunikation::KommunikationsVerbindung>>,
 }
 
 /// Kumulierte Ist-Stärke einer Einheit: eigene plus alle unterstellten, rein im Speicher.
@@ -311,7 +308,7 @@ pub fn kumuliere(
     summe
 }
 
-/// Lädt die Anreicherung eines ganzen Einsatzes in konstant vielen Abfragen (6).
+/// Lädt die Anreicherung eines ganzen Einsatzes in konstant vielen Abfragen (7).
 async fn anreicherung_laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Anreicherung, AppError> {
     Ok(Anreicherung {
         staerken: load_staerken_je_einheit(pool, einsatz_id).await?,
@@ -320,6 +317,12 @@ async fn anreicherung_laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Anreic
         material: mitglied_repo::material_mitglieder_map(pool, einsatz_id).await?,
         sprechgruppen: crate::sprechgruppe::repo::lade_einheit_sprechgruppen_map(pool, einsatz_id)
             .await?,
+        verbindungen: crate::einsatz::verbindungen::lade_map(
+            &mut *pool.acquire().await?,
+            einsatz_id,
+            crate::einsatz::verbindungen::Bezug::Einheit(0),
+        )
+        .await?,
     })
 }
 
@@ -365,6 +368,10 @@ async fn zu_anzeige_batch(
             .sprechgruppen
             .remove(&row.id)
             .unwrap_or_default();
+        let verbindungen = anreicherung
+            .verbindungen
+            .remove(&row.id)
+            .unwrap_or_default();
 
         out.push(EinheitAnzeige {
             id: row.id,
@@ -379,8 +386,6 @@ async fn zu_anzeige_batch(
             fuehrer_name: row.fuehrer_name,
             bemerkung: row.bemerkung,
             funkrufname: row.funkrufname,
-            kommunikationsmittel: row.kommunikationsmittel,
-            erreichbarkeit: row.erreichbarkeit,
             sortier: row.sortier,
             lat: row.lat,
             lon: row.lon,
@@ -394,6 +399,7 @@ async fn zu_anzeige_batch(
             fahrzeug_mitglieder,
             material_mitglieder,
             sprechgruppen,
+            verbindungen,
             status,
             aufgeloest_at: row.aufgeloest_at,
             aufgeloest_von: row.aufgeloest_von,
@@ -580,9 +586,8 @@ pub async fn anlegen_tx(
         "INSERT INTO einsatz_einheit \
             (einsatz_id, abschnitt_id, ueber_einheit_id, typ_id, name, \
              soll_fuehrer, soll_unterfuehrer, soll_mannschaft, bemerkung, funkrufname, \
-             kommunikationsmittel, erreichbarkeit, sortier, angelegt_von, \
-             tz_fachaufgabe, tz_organisation) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             sortier, angelegt_von, tz_fachaufgabe, tz_organisation) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.abschnitt_id)
@@ -594,8 +599,6 @@ pub async fn anlegen_tx(
     .bind(daten.soll_mannschaft)
     .bind(daten.bemerkung)
     .bind(daten.funkrufname)
-    .bind(daten.kommunikationsmittel)
-    .bind(daten.erreichbarkeit)
     .bind(daten.sortier)
     .bind(angelegt_von)
     .bind(daten.tz_fachaufgabe)
@@ -618,8 +621,6 @@ pub struct EinheitPatch<'a> {
     pub soll_mannschaft: Option<Option<i64>>,
     pub bemerkung: Option<Option<&'a str>>,
     pub funkrufname: Option<Option<&'a str>>,
-    pub kommunikationsmittel: Option<Option<&'a str>>,
-    pub erreichbarkeit: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
 }
 
@@ -674,8 +675,8 @@ pub async fn soll_roh(
 /// falls die Einheit nicht zum Einsatz gehört.
 ///
 /// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und
-/// eine verschobene Bind-Kette kann gleichtypige Nachbarn (`kommunikationsmittel`↔
-/// `erreichbarkeit`, `abschnitt_id`↔`ueber_einheit_id`) nicht still vertauschen.
+/// eine verschobene Bind-Kette kann gleichtypige Nachbarn (`bemerkung`↔`funkrufname`,
+/// `abschnitt_id`↔`ueber_einheit_id`) nicht still vertauschen.
 pub async fn patche(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -695,11 +696,9 @@ pub async fn patche(
             soll_unterfuehrer = CASE WHEN ?11 IS NULL THEN soll_unterfuehrer ELSE ?12 END, \
             soll_mannschaft = CASE WHEN ?13 IS NULL THEN soll_mannschaft ELSE ?14 END, \
             bemerkung = CASE WHEN ?15 IS NULL THEN bemerkung ELSE ?16 END, \
-            kommunikationsmittel = CASE WHEN ?17 IS NULL THEN kommunikationsmittel ELSE ?18 END, \
-            erreichbarkeit = CASE WHEN ?19 IS NULL THEN erreichbarkeit ELSE ?20 END, \
-            sortier = CASE WHEN ?21 IS NULL THEN sortier ELSE ?22 END, \
-            funkrufname = CASE WHEN ?23 IS NULL THEN funkrufname ELSE ?24 END \
-         WHERE id = ?25 AND einsatz_id = ?26",
+            sortier = CASE WHEN ?17 IS NULL THEN sortier ELSE ?18 END, \
+            funkrufname = CASE WHEN ?19 IS NULL THEN funkrufname ELSE ?20 END \
+         WHERE id = ?21 AND einsatz_id = ?22",
     )
     .bind(patch.abschnitt_id.map(|_| 1_i64))
     .bind(patch.abschnitt_id.and_then(|v| v))
@@ -717,10 +716,6 @@ pub async fn patche(
     .bind(patch.soll_mannschaft.and_then(|v| v))
     .bind(patch.bemerkung.map(|_| 1_i64))
     .bind(patch.bemerkung.and_then(|v| v))
-    .bind(patch.kommunikationsmittel.map(|_| 1_i64))
-    .bind(patch.kommunikationsmittel.and_then(|v| v))
-    .bind(patch.erreichbarkeit.map(|_| 1_i64))
-    .bind(patch.erreichbarkeit.and_then(|v| v))
     .bind(patch.sortier.map(|_| 1_i64))
     .bind(patch.sortier)
     .bind(patch.funkrufname.map(|_| 1_i64))
@@ -1623,8 +1618,6 @@ mod tests {
             soll_mannschaft: m,
             bemerkung: None,
             funkrufname: None,
-            kommunikationsmittel: None,
-            erreichbarkeit: None,
             sortier: 0,
             tz_fachaufgabe: None,
             tz_organisation: None,
@@ -1660,8 +1653,7 @@ mod tests {
                     ueber_abschnitt_id: None,
                     leiter_id: None,
                     bemerkung: None,
-                    kommunikationsmittel: None,
-                    erreichbarkeit: None,
+                    rufname: None,
                     sortier: 0,
                     kurzbezeichnung: None,
                     lagezustand: None,
@@ -1967,7 +1959,7 @@ mod tests {
         .is_ok());
     }
 
-    /// Nicht gesendete Spalten bleiben stehen (Bemerkung, Kommunikation, Soll-Trio, `sortier`).
+    /// Nicht gesendete Spalten bleiben stehen (Bemerkung, Funkrufname, Soll-Trio, `sortier`).
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -1986,8 +1978,6 @@ mod tests {
                 soll_mannschaft: Some(18),
                 bemerkung: Some("Bem"),
                 funkrufname: Some("Florian HM 12/44"),
-                kommunikationsmittel: Some("digitalfunk"),
-                erreichbarkeit: Some("0170/1"),
                 sortier: 42,
                 tz_fachaufgabe: None,
                 tz_organisation: None,
@@ -2011,13 +2001,11 @@ mod tests {
         assert_eq!(nachher.name, "Umbenannt");
         assert_eq!(nachher.bemerkung.as_deref(), Some("Bem"));
         assert_eq!(nachher.funkrufname.as_deref(), Some("Florian HM 12/44"));
-        assert_eq!(nachher.kommunikationsmittel.as_deref(), Some("digitalfunk"));
-        assert_eq!(nachher.erreichbarkeit.as_deref(), Some("0170/1"));
         assert_eq!(nachher.soll, Some(crate::staerke::Staerke::neu(1, 3, 18)));
         assert_eq!(nachher.sortier, 42);
     }
 
-    /// Bind-Reihenfolge der zwölf Flag/Wert-Paare: alle Spalten in EINEM Patch auf distinkte Werte
+    /// Bind-Reihenfolge der zehn Flag/Wert-Paare: alle Spalten in EINEM Patch auf distinkte Werte
     /// setzen und einzeln prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
@@ -2056,8 +2044,6 @@ mod tests {
                 soll_mannschaft: Some(Some(30)),
                 bemerkung: Some(Some("B")),
                 funkrufname: Some(Some("F")),
-                kommunikationsmittel: Some(Some("K")),
-                erreichbarkeit: Some(Some("E")),
                 sortier: Some(7),
             },
         )
@@ -2070,8 +2056,6 @@ mod tests {
         assert_eq!(nachher.soll, Some(crate::staerke::Staerke::neu(2, 5, 30)));
         assert_eq!(nachher.bemerkung.as_deref(), Some("B"));
         assert_eq!(nachher.funkrufname.as_deref(), Some("F"));
-        assert_eq!(nachher.kommunikationsmittel.as_deref(), Some("K"));
-        assert_eq!(nachher.erreichbarkeit.as_deref(), Some("E"));
         assert_eq!(nachher.sortier, 7);
     }
 
@@ -2673,12 +2657,14 @@ mod tests {
 
     /// Jeder Fremdschlüssel auf `einsatz_einheit` ist eine Spur (Review LLH-1079, O1, wie D4 bei
     /// Personen): eine Einheit, auf die etwas verweist, wird aufgelöst statt gelöscht. Ausgenommen
-    /// sind nur die Unterstellung (rückt beim Auflösen hoch) und die Sprechgruppen (gehen mit).
+    /// sind nur die Unterstellung (rückt beim Auflösen hoch), die Sprechgruppen und die
+    /// Verbindungen (LLH-1134; beide Angaben der Einheit selbst, sie gehen per Kaskade mit).
     #[tokio::test]
     async fn jeder_verweis_auf_eine_einheit_ist_spur() {
         const KEINE_SPUR: &[(&str, &str)] = &[
             ("einsatz_einheit", "ueber_einheit_id"),
             ("einsatz_einheit_sprechgruppe", "einheit_id"),
+            ("einsatz_verbindung", "einheit_id"),
         ];
         let pool = crate::db::test_pool().await;
         let verweise: Vec<(String, String)> = sqlx::query_as(

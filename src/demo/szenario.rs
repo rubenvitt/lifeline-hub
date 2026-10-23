@@ -388,6 +388,10 @@ pub struct AbschnittVorlage {
     pub lagezustand: Option<AbschnittLagezustand>,
     pub abschnittsauftrag: &'static str,
     pub sortier: i64,
+    /// Funkrufname der Abschnittsleitung (LLH-1134).
+    pub rufname: &'static str,
+    /// Mobilnummer der Abschnittsleitung als Verbindung (LLH-1134), frei erfunden.
+    pub mobil: Option<&'static str>,
 }
 
 /// Einheit des Drehbuchs. `typ` ist das Label aus dem Einheitstyp-Katalog, `abschnitt` der
@@ -1043,6 +1047,8 @@ pub const DREHBUCH: &[Schritt] = &[
             lagezustand: Some(AbschnittLagezustand::Angespannt),
             abschnittsauftrag: "Sanitätsdienstliche Versorgung der Betroffenen",
             sortier: 10,
+            rufname: "Rotkreuz Musterstadt 1/10-1",
+            mobil: Some("0170 0000101"),
         },
     ),
     abschnitt(
@@ -1055,6 +1061,8 @@ pub const DREHBUCH: &[Schritt] = &[
             lagezustand: Some(AbschnittLagezustand::Planmaessig),
             abschnittsauftrag: "Betreuung und Unterbringung evakuierter Anwohner",
             sortier: 20,
+            rufname: "Rotkreuz Musterstadt 1/20-1",
+            mobil: None,
         },
     ),
     abschnitt(
@@ -1067,6 +1075,8 @@ pub const DREHBUCH: &[Schritt] = &[
             lagezustand: Some(AbschnittLagezustand::Planmaessig),
             abschnittsauftrag: "Versorgung mit Material, Verpflegung und Strom",
             sortier: 30,
+            rufname: "Rotkreuz Musterstadt 1/30-1",
+            mobil: None,
         },
     ),
     s(
@@ -1157,6 +1167,8 @@ pub const DREHBUCH: &[Schritt] = &[
             lagezustand: Some(AbschnittLagezustand::Kritisch),
             abschnittsauftrag: "Sichtung und Erstversorgung in der Turnhalle Musterstadt",
             sortier: 11,
+            rufname: "Rotkreuz Musterstadt 1/11-1",
+            mobil: None,
         },
     ),
     s(

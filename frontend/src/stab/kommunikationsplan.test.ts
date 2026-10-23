@@ -25,7 +25,15 @@ import {
 import type { Quelle } from './luecken';
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
-  return { id, einsatz_id: 1, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
 }
 
 function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
@@ -41,6 +49,7 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
     ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     status: { quelle: 'ohne', verteilung: [] },
+    verbindungen: [],
     ...p,
   } as Einheit;
 }
@@ -75,7 +84,10 @@ function quellen(p: Partial<KommunikationsplanQuellen> = {}): Kommunikationsplan
 }
 
 function fs(p: Partial<Fuehrungsstelle> = {}): KommunikationsplanQuellen['fuehrungsstelle'] {
-  return { zustand: 'daten', daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], ...p } };
+  return {
+    zustand: 'daten',
+    daten: { art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [], ...p },
+  };
 }
 
 describe('baueKommunikationsplan', () => {
@@ -249,8 +261,10 @@ describe('baueKommunikationsplan', () => {
           abschnitt(1, {
             name: 'EA Nord',
             kurzbezeichnung: 'EA N',
-            kommunikationsmittel: 'festnetz',
-            erreichbarkeit: '0421 77',
+            verbindungen: [
+              { id: 11, mittel: 'festnetz', wert: '0421 77' },
+              { id: 12, mittel: 'email', wert: 'ea-nord@example.org', hinweis: 'Lagezentrum' },
+            ],
           }),
           abschnitt(2),
         ]),
@@ -258,11 +272,9 @@ describe('baueKommunikationsplan', () => {
           einheit(5, {
             name: '1. Zug',
             funkrufname: 'Florian 1',
-            kommunikationsmittel: 'mobil',
-            erreichbarkeit: '0151 23456',
+            verbindungen: [{ id: 21, mittel: 'mobil', wert: '0151 23456' }],
           }),
-          einheit(6, { name: '2. Zug' }),
-          einheit(7, { name: '3. Zug', kommunikationsmittel: 'digitalfunk' }),
+          einheit(6, { name: '2. Zug', funkrufname: 'Florian 2' }),
         ]),
       }),
     );
@@ -270,25 +282,27 @@ describe('baueKommunikationsplan', () => {
     expect(plan[1].zeilen).toHaveLength(1);
     expect(ab).toMatchObject({ art: 'abschnitt', kennung: 'EA Nord', nebentext: 'EA N' });
     expect(ab.art === 'abschnitt' && ab.ziel).toBe('/einsaetze/7/einsatzabschnitte?abschnitt=1');
+    // LLH-1134: alle Verbindungen des Datensatzes, nicht eine abgeleitete.
+    expect(ab.verbindungen).toHaveLength(2);
     expect(ab.verbindungen[0]).toMatchObject({
       mittelLabel: 'Festnetz',
       wert: '0421 77',
       verweis: 'tel:042177',
     });
+    expect(ab.verbindungen[1]).toMatchObject({
+      mittelLabel: 'E-Mail',
+      hinweis: 'Lagezentrum',
+      verweis: 'mailto:ea-nord@example.org',
+    });
 
-    expect(plan[2].zeilen.map((z) => z.kennung)).toEqual(['1. Zug', '3. Zug']);
-    const [zug1, zug3] = plan[2].zeilen;
+    // Ein Funkrufname allein ist keine Verbindung: der 2. Zug fehlt.
+    expect(plan[2].zeilen.map((z) => z.kennung)).toEqual(['1. Zug']);
+    const [zug1] = plan[2].zeilen;
     expect(zug1.art === 'einheit' && zug1.ziel).toBe('/einsaetze/7/einheiten/5');
     expect(zug1.verbindungen[0]).toMatchObject({
       mittelLabel: 'Mobil',
       wert: '0151 23456',
       verweis: 'tel:015123456',
-    });
-    // Digitalfunk ohne Erreichbarkeit: das Mittel steht, nichts ist antippbar.
-    expect(zug3.verbindungen[0]).toMatchObject({
-      mittelLabel: 'Digitalfunk',
-      wert: '',
-      verweis: null,
     });
   });
 
@@ -296,7 +310,10 @@ describe('baueKommunikationsplan', () => {
     const plan = baueKommunikationsplan(
       quellen({
         stellen: { zustand: 'laden', daten: [] },
-        einheiten: { zustand: 'gesperrt', daten: [einheit(1, { erreichbarkeit: '1' })] },
+        einheiten: {
+          zustand: 'gesperrt',
+          daten: [einheit(1, { verbindungen: [{ id: 1, mittel: 'mobil', wert: '1' }] })],
+        },
       }),
     );
     expect(plan.map((g) => g.zustand)).toEqual(['laden', 'daten', 'gesperrt', 'laden']);
@@ -306,7 +323,7 @@ describe('baueKommunikationsplan', () => {
   it('erfindet keine Zeile für eine nicht erfasste Führungsstelle', () => {
     for (const fuehrungsstelle of [
       { zustand: 'daten', daten: null },
-      fs({ rufname: '  ', erreichbarkeit: '' }),
+      fs({ rufname: '  ', verbindungen: [] }),
     ] as const) {
       const plan = baueKommunikationsplan(quellen({ fuehrungsstelle }));
       expect(plan.flatMap((g) => g.zeilen)).toEqual([]);
@@ -328,8 +345,7 @@ describe('baueKommunikationsplan', () => {
         ]),
         fuehrungsstelle: fs({
           rufname: 'Florian Bremen 11/1',
-          kommunikationsmittel: 'mobil',
-          erreichbarkeit: '0170 1234567',
+          verbindungen: [{ id: 3, mittel: 'mobil', wert: '0170 1234567' }],
         }),
       }),
     );
@@ -343,7 +359,7 @@ describe('baueKommunikationsplan', () => {
       ziel: '/einsaetze/7/einsatzdaten',
       verbindungen: [
         {
-          schluessel: 'fs-v',
+          schluessel: 'fs-v3',
           mittel: 'mobil',
           mittelLabel: 'Mobil',
           wert: '0170 1234567',
@@ -587,7 +603,9 @@ describe('Kanäle externer Stellen (LFH-893)', () => {
     const plan = baueKommunikationsplan(
       quellen({
         stellen: daten([stelle(1, { stellenart: 'funktion', funktion: 's2' })]),
-        abschnitte: daten([abschnitt(4, { kommunikationsmittel: 'festnetz' })]),
+        abschnitte: daten([
+          abschnitt(4, { verbindungen: [{ id: 4, mittel: 'festnetz', wert: '0421 1' }] }),
+        ]),
       }),
     );
     expect(plan[0].zeilen[0].kanaele).toEqual([]);

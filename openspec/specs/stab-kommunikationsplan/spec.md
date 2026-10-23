@@ -58,7 +58,7 @@ Quelle. Die Spalte „Stelle“ MUST eine menschenlesbare Kennung tragen und bei
 Bildlauf stehen bleiben.
 
 #### Scenario: Gruppenfolge
-- **WHEN** ein Einsatz eine Verbindung für S2, einen Abschnitt mit Erreichbarkeit und die Leitstelle
+- **WHEN** ein Einsatz eine Verbindung für S2, einen Abschnitt mit einer Verbindung und die Leitstelle
   erfasst hat
 - **THEN** steht S2 vor dem Abschnitt und der Abschnitt vor der Leitstelle
 
@@ -131,21 +131,61 @@ Verbindungen, Sprechgruppen und Skizzen-Verbindungen nennt.
   Bestätigung sind Stelle, Zuordnung und Skizzen-Verbindung weg
 
 ### Requirement: Abschnitte und Einheiten werden abgeleitet, nicht doppelt gepflegt
-Für jeden Abschnitt und jede Einheit mit Kommunikationsmittel oder Erreichbarkeit SHALL der
-Kommunikationsplan eine Zeile aus diesen vorhandenen Angaben zeigen. Diese Zeilen MUST NOT hier
-bearbeitbar sein; ihre Kennung MUST zum Datensatz führen, an dem die Angaben gepflegt werden.
-Abschnitte und Einheiten ohne beide Angaben MUST NOT erscheinen. Für Abschnitte und Einheiten
-MUST NOT eine zweite Datenhaltung entstehen.
+Für jeden Abschnitt und jede Einheit mit mindestens einer Verbindung SHALL der Kommunikationsplan
+eine Zeile mit allen ihren Verbindungen in deren Reihenfolge zeigen. Diese Zeilen MUST NOT hier
+bearbeitbar sein; ihre Kennung MUST zum Datensatz führen, an dem die Verbindungen gepflegt werden.
+Abschnitte und Einheiten ohne Verbindung MUST NOT erscheinen, auch nicht mit Rufname oder
+Sprechgruppe. Für Abschnitte und Einheiten MUST NOT eine zweite Datenhaltung entstehen.
 
-#### Scenario: Einheit mit Erreichbarkeit
-- **WHEN** die Einheit „1. Zug“ das Kommunikationsmittel „Mobil“ und die Erreichbarkeit
-  „0151 23456“ trägt
+#### Scenario: Einheit mit Verbindung
+- **WHEN** die Einheit „1. Zug“ die Verbindung „Mobil · 0151 23456“ trägt
 - **THEN** zeigt der Kommunikationsplan in der Gruppe Einheiten die Zeile „1. Zug“ mit „Mobil ·
   0151 23456“, und ein Tippen auf „1. Zug“ öffnet die Detailseite der Einheit
 
-#### Scenario: Einheit ohne Angaben
-- **WHEN** eine Einheit weder Kommunikationsmittel noch Erreichbarkeit trägt
+#### Scenario: Abschnitt mit mehreren Verbindungen
+- **WHEN** der Abschnitt „EA Nord“ die Verbindungen „Festnetz · 0421 77“ und „E-Mail ·
+  ea-nord@example.org“ trägt
+- **THEN** zeigt seine Zeile beide Verbindungen in dieser Reihenfolge, die erste als
+  Telefonverweis, die zweite als E-Mail-Verweis
+
+#### Scenario: Einheit ohne Verbindung
+- **WHEN** eine Einheit einen Funkrufnamen, aber keine Verbindung trägt
 - **THEN** erscheint sie nicht im Kommunikationsplan
+
+### Requirement: Verbindungen an Abschnitt, Einheit und Führungsstelle
+Abschnitt, Einheit und die eigene Führungsstelle SHALL Verbindungen außerhalb des Funks tragen,
+typisiert wie die Verbindungen einer gepflegten Stelle: Mittel (Festnetz, Mobil, Fax, E-Mail,
+Messenger, Melder, Sonstiges), Wert (Nummer oder Adresse) und optional ein Hinweis. Funk und
+Telefon stehen getrennt: Funk zeigt sich an Rufname und Sprechgruppen, die Verbindungen stehen
+unter „Telefon und weitere Verbindungen“. Ein Datensatz SHALL höchstens 10 Verbindungen tragen,
+Wert und Hinweis je höchstens 200 Zeichen; ein leerer Wert, ein unbekanntes Mittel oder eine
+Überschreitung MUST mit 400 abgelehnt werden. Die Verbindungen SHALL als ganze Liste mit dem
+Datensatz gespeichert werden; das Entfernen eines Abschnitts oder einer Einheit MUST ihre
+Verbindungen mit entfernen. Ein Schreiben mit den Altfeldern `kommunikationsmittel` oder
+`erreichbarkeit` MUST mit 400 abgelehnt werden statt still verworfen. Ein Abschnitt SHALL einen
+Rufnamen (Funkrufname der Abschnittsleitung, höchstens 200 Zeichen) tragen.
+
+Bei der Einführung SHALL eine vorhandene Erreichbarkeit verlustfrei zu einer Verbindung werden:
+mit dem Mittel Mobil bzw. Festnetz, wenn das Kommunikationsmittel so lautete, sonst (Digitalfunk,
+leer) mit dem Mittel Sonstiges. Ein Kommunikationsmittel ohne Erreichbarkeit MUST NOT eine
+Verbindung ergeben. Wert und Hinweis sind personenbezogen und SHALL bei der Schwärzung eines
+Einsatzes und beim Löschersuchen für die führende Person eines Abschnitts oder einer Einheit
+geschwärzt werden; Mittel und Reihenfolge bleiben. Ein gesicherter Lagestand MUST die
+Verbindungen nicht einfrieren.
+
+#### Scenario: Überführung einer Erreichbarkeit
+- **WHEN** eine Einheit vor der Einführung das Kommunikationsmittel „Digitalfunk“ und die
+  Erreichbarkeit „ISSI 4711“ trug
+- **THEN** trägt sie danach die Verbindung „Sonstiges · ISSI 4711“, und eine Einheit mit
+  Kommunikationsmittel „Digitalfunk“ ohne Erreichbarkeit trägt keine Verbindung
+
+#### Scenario: Veralteter Client
+- **WHEN** ein Client beim Ändern einer Einheit noch `erreichbarkeit` sendet
+- **THEN** antwortet der Server mit 400, und an der Einheit ändert sich nichts
+
+#### Scenario: Abschnitt entfernen
+- **WHEN** ein Abschnitt mit zwei Verbindungen entfernt wird
+- **THEN** sind auch seine beiden Verbindungen entfernt
 
 ### Requirement: Rechteweiche je Quelle
 Der Kommunikationsplan SHALL Abschnitte, Einheiten, Besetzung des Stabs und die gepflegten Stellen

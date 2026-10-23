@@ -61,8 +61,6 @@ async fn seed_einheit(
             soll_mannschaft: None,
             bemerkung: None,
             funkrufname: None,
-            kommunikationsmittel: None,
-            erreichbarkeit: None,
             sortier: 0,
             tz_fachaufgabe: None,
             tz_organisation: None,
@@ -170,8 +168,6 @@ async fn snapshot_friert_fachdaten_ein_umbenennen_aendert_stand_nicht() {
             soll_mannschaft: None,
             bemerkung: None,
             funkrufname: None,
-            kommunikationsmittel: None,
-            erreichbarkeit: None,
             sortier: None,
         },
     )
@@ -197,6 +193,56 @@ async fn snapshot_friert_fachdaten_ein_umbenennen_aendert_stand_nicht() {
         !namen.contains(&"THW Zug 2"),
         "Live-Umbenennung darf den Stand nicht ändern: {namen:?}"
     );
+}
+
+/// LLH-1134: Telefon und weitere Verbindungen an Einheit und Abschnitt friert der Stand nicht ein
+/// (personenbezogen, kein Schwärzungspfad im Dokument); live stehen sie weiter.
+#[tokio::test]
+async fn snapshot_friert_keine_verbindungen_ein() {
+    use lifeline_hub::einsatz::verbindungen::{ersetzen, Bezug, Verbindung};
+    use lifeline_hub::stab::kommunikation::Verbindungsmittel;
+    let (pool, einsatz_id, benutzer_id, org_id) = setup().await;
+    let einheit_id = seed_einheit(&pool, einsatz_id, org_id, benutzer_id, "Zug A").await;
+    let abschnitt_id: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+    )
+    .bind(einsatz_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let nummer = |wert: &str| Verbindung {
+        mittel: Verbindungsmittel::Mobil,
+        wert: wert.into(),
+        hinweis: None,
+    };
+    ersetzen(
+        &pool,
+        einsatz_id,
+        Bezug::Einheit(einheit_id),
+        &[nummer("0170 4711")],
+    )
+    .await
+    .unwrap();
+    ersetzen(
+        &pool,
+        einsatz_id,
+        Bezug::Abschnitt(abschnitt_id),
+        &[nummer("0170 0815")],
+    )
+    .await
+    .unwrap();
+
+    let snap = repo::erzeuge(&pool, einsatz_id, benutzer_id, Some("Stand"), None)
+        .await
+        .unwrap();
+    let text = snap.daten.to_string();
+    assert!(!text.contains("4711") && !text.contains("0815"), "{text}");
+    assert_eq!(snap.daten["einheiten"][0]["verbindungen"], json!([]));
+    assert_eq!(snap.daten["abschnitte"][0]["verbindungen"], json!([]));
+    let live = einheit_repo::laden(&pool, einsatz_id, einheit_id)
+        .await
+        .unwrap();
+    assert_eq!(live.verbindungen.len(), 1);
 }
 
 #[tokio::test]

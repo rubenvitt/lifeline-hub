@@ -133,6 +133,7 @@ export function rohBericht(
     fuehrungsstelle: daten({
       art: 'mobil',
       sprechgruppen: [],
+      verbindungen: [],
       fahrzeug_ids: [],
       einsatzleiter: {
         art: 'personal',

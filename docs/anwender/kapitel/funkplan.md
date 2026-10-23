@@ -29,8 +29,10 @@ Einsatzleitung und Führungspersonal.
 
 3. Einen Namen in den Lücken oder im Plan wählen. Er führt zum Datensatz, an dem die Angabe
    fehlt: Abschnitt, Einheit oder, bei der eigenen Führungsstelle, „auf Einsatzdaten erfassen“.
-4. Dort Sprechgruppen, Kommunikationsmittel und Erreichbarkeit eintragen. Der Funkplan zeigt die
-   Änderung sofort.
+4. Dort Rufname und Sprechgruppen (Funk) sowie Telefon und weitere Verbindungen eintragen. Der
+   Funkplan zeigt die Änderung sofort.
+5. Beim Abschnitt steht in der Spalte „Rufname/OPTA“ sein „Rufname“; fehlt er, die
+   „Kurzbezeichnung“. Die Spalte „Telefon“ zeigt die Festnetz- und Mobilnummern des Datensatzes.
 
 ### Den Funkplan weitergeben
 
@@ -118,7 +120,8 @@ Trägt die eigene Führungsstelle eine Bezeichnung, etwa „ELW 2 Musterstadt“
 neben „Führungsstelle“ und in der Skizze als eigene Zeile unter „Einsatzleitung“.
 
 Auch im Kommunikationsplan stehen Abschnitte, Einheiten und die eigene Führungsstelle nur
-abgeleitet; ihre Angaben pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“
+abgeleitet, mit allen ihren Verbindungen unter „Telefon und weitere Verbindungen“; ihre Angaben
+pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“
 (siehe [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Die Führungsstelle steht dort als
 erste Zeile unter „Einsatzleitung und Stab“, sobald sie erfasst ist, mit ihrem Rufnamen und dem
 Einsatzleiter, etwa „Florian Kreis 10-1 · Einsatzleiter Anna Schulz“; ist keiner festgelegt, steht
@@ -140,20 +143,21 @@ trotzdem im Plan, und über dem Plan steht „Rufnummer nicht übernommen“ mit
 ### Lücken
 
 Das Paneel „Lücken“ nennt Abschnitte und Einheiten ohne Sprechgruppe, Einheiten ohne
-Erreichbarkeit, Verbindungen ohne gemeinsame Sprechgruppe, einsatzlokale Sprechgruppen ohne
+Funkrufname, Einheiten ohne Telefon, Verbindungen ohne gemeinsame Sprechgruppe, einsatzlokale Sprechgruppen ohne
 Zuordnung, Sprechgruppen mit nur einem Teilnehmer, eine fehlende Verbindung zur Leitstelle und
 eine nicht erfasste eigene Führungsstelle. Fehlt eine Quelle, steht „—“ mit Grund statt einer 0.
 Der Kopf des Paneels zählt alle Lücken zusammen, etwa „6 Lücken“; eine Einheit ohne Sprechgruppe
-und ohne Erreichbarkeit zählt dabei zweimal, die fehlende eigene Führungsstelle nicht. Fehlt eine
+und ohne Telefon zählt dabei zweimal, die fehlende eigene Führungsstelle nicht. Fehlt eine
 Quelle, steht dort keine Zahl. Dieselbe Zahl steht auf der Seite „Stab“ am Werkzeug „Funkplan“.
 
 ### Was nicht vorkommt
 
-- Die „Erreichbarkeit“ zeigt die Tabelle am Bildschirm erst bei großer Fensterbreite, im Druck
+- Die Spalte „Telefon“ zeigt die Tabelle am Bildschirm erst bei großer Fensterbreite, im Druck
   immer, im Lagebericht nie.
 - Kontaktangaben des Personals stehen nie im Kommunikationsplan; die Besetzung einer Funktion
   steht dort nur als Nebentext.
-- Die Skizze zeigt keine Rufnummern und keine Personennamen.
+- Die Skizze zeigt keine Rufnummern und keine Personennamen; im Eigenschaftspaneel einer Stelle
+  steht nur der Rufname, Telefon und weitere Verbindungen pflegt man am Datensatz.
 - Weder Funkplan noch Skizze noch Kommunikationsplan schreiben ins Einsatztagebuch. Der
   Kommunikationsplan geht nicht in den Lagebericht; er wird gedruckt.
 

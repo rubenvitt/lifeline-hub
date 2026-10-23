@@ -115,8 +115,7 @@ const ABSCHNITT_A1 = {
   tz_organisation: null,
   sprechgruppe_tmo: null,
   sprechgruppe_dmo: null,
-  kommunikationsmittel: null,
-  erreichbarkeit: null,
+  verbindungen: [],
   sprechgruppen: [],
 };
 
@@ -145,6 +144,7 @@ const EINHEIT_E10 = {
   tz_organisation: null,
   aktueller_br_id: null,
   sprechgruppen: [],
+  verbindungen: [],
   status: { quelle: 'ohne' as const, verteilung: [] },
   unangemeldet: false,
 };

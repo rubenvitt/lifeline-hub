@@ -60,9 +60,9 @@ Stabs.
 Jeder Abschnitt und jede Einheit SHALL in der Skizze Bezeichnung und Rufname zeigen, mit denselben
 Werten wie die Tabelle; ihre Sprechgruppen zeigt die Skizze über die Schienen, an denen sie hängen.
 Fehlt jede Sprechgruppe, MUST „keine Sprechgruppe“ als Wort am Element stehen, nicht nur als
-Farbe. Namen der Leitung, Stärke und Erreichbarkeit MUST NOT in der Skizze erscheinen; dass eine
-Leitung besetzt ist, zeigt allein das Funktionszeichen im Kasten. Das Kommunikationsmittel SHALL im
-Eigenschaftspaneel des gewählten Elements stehen.
+Farbe. Namen der Leitung, Stärke, Telefon und weitere Verbindungen (Rufnummern, Adressen) MUST NOT
+in der Skizze erscheinen; dass eine Leitung besetzt ist, zeigt allein das Funktionszeichen im
+Kasten. Die Skizze zeigt nur Funk: Rufname und Sprechgruppen.
 
 #### Scenario: Gleiche Werte wie die Tabelle
 
@@ -75,10 +75,10 @@ Eigenschaftspaneel des gewählten Elements stehen.
 - **WHEN** einer Einheit keine Sprechgruppe zugeordnet ist
 - **THEN** trägt ihr Element „keine Sprechgruppe“ als Wort und hängt an keiner Schiene
 
-#### Scenario: Erreichbarkeit bleibt in der Tabelle
+#### Scenario: Telefon bleibt in der Tabelle
 
-- **WHEN** einer Einheit eine Erreichbarkeit erfasst ist
-- **THEN** erscheint sie in der Skizze weder am Bildschirm noch im Druck
+- **WHEN** einer Einheit die Verbindung „Mobil · 0151 23456“ erfasst ist
+- **THEN** erscheint die Nummer in der Skizze weder am Bildschirm noch im Druck
 
 #### Scenario: Name der Abschnittsleitung bleibt in der Tabelle
 
@@ -108,7 +108,7 @@ die Lücke steht schon an der Stelle. Die Zahl MUST dieselbe sein wie im Lücken
 ### Requirement: Einsatzleitung ohne erfundene Gegenstelle
 
 Ist die eigene Führungsstelle erfasst, SHALL die Skizze sie als obersten Kasten „Einsatzleitung“
-mit ihrem Rufnamen zeigen, an den Schienen ihrer Sprechgruppen, nie mit ihrer Erreichbarkeit. Ist
+mit ihrem Rufnamen zeigen, an den Schienen ihrer Sprechgruppen, nie mit ihren Verbindungen. Ist
 sie nicht erfasst, SHALL an ihrer Stelle die benannte Lücke „Einsatzleitung: Gegenstelle nicht
 erfasst“ stehen, ohne Stichleitung, und die obersten Abschnitte tragen kein Urteil gegen sie. Die
 Skizze MUST NOT einen Rufnamen oder eine Sprechgruppe der Einsatzleitung aus anderen Daten
@@ -124,9 +124,9 @@ Sachgebiete stehen nur als Funktionszeichen im Kasten „Einsatzleitung“.
 #### Scenario: Wurzel mit erfasster Führungsstelle
 
 - **WHEN** die Führungsstelle mit Rufname „Florian Musterstadt 10/1“, „TMO 311“ und einer
-  Erreichbarkeit erfasst ist
+  Festnetznummer erfasst ist
 - **THEN** zeigt der Kasten „Einsatzleitung“ den Rufnamen und hängt an der Schiene „TMO 311“, und
-  die Erreichbarkeit fehlt
+  die Festnetznummer fehlt
 
 ### Requirement: Fehlende Quellen werden benannt
 
@@ -372,7 +372,7 @@ Die Skizze SHALL die externen Stellen des Kommunikationsplans (Leitstelle, Behö
 Verbindungsperson, sonstige) und die Komponenten der Skizze (Repeater, Gateway, Basisstation,
 mobile Basisstation, Antenne, Vermittlung) als eigene Elemente mit Zeichen und Bezeichnung zeigen,
 an den Schienen ihrer Sprechgruppen. Führungsfunktionen des Kommunikationsplans MUST NOT als
-eigenes Element erscheinen. Erreichbarkeit und Rufnummern MUST NOT erscheinen.
+eigenes Element erscheinen. Verbindungen und Rufnummern MUST NOT erscheinen.
 
 #### Scenario: Leitstelle am Kanal
 - **WHEN** die Stelle „ILS Musterhausen“ der Art Leitstelle die Sprechgruppe „TMO SL AS“ trägt

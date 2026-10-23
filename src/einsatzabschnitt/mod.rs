@@ -1,6 +1,7 @@
 pub mod repo;
 
 use crate::sprechgruppe::SprechgruppeAnzeige;
+use crate::stab::kommunikation::KommunikationsVerbindung;
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -47,8 +48,10 @@ pub struct EinsatzabschnittAnzeige {
     pub sprechgruppe_tmo: Option<String>,
     /// Historischer Freitext-Wert (eingefroren; nicht mehr schreibbar).
     pub sprechgruppe_dmo: Option<String>,
-    pub kommunikationsmittel: Option<String>,
-    pub erreichbarkeit: Option<String>,
+    /// Funkrufname der Abschnittsleitung (LLH-1134), z. B. „Florian Musterstadt 1/10-1“; der
+    /// Funkplan nimmt ihn vor der Kurzbezeichnung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rufname: Option<String>,
     pub sortier: i64,
     /// Kurzbezeichnung/Rufname im Einsatz, z. B. „EA-N" (LFH-608); je Einsatz eindeutig.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -62,6 +65,9 @@ pub struct EinsatzabschnittAnzeige {
     pub abschnittsauftrag: Option<String>,
     /// Zugeordnete Sprechgruppen (aus Katalogeintrag oder einsatz-lokal).
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
+    /// Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
+    /// Personenbezogen: geschwärzt, nie im Lagebericht.
+    pub verbindungen: Vec<KommunikationsVerbindung>,
 }
 
 // ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────

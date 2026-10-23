@@ -223,8 +223,6 @@ pub async fn uebernehmen_tx(
                         soll_mannschaft: None,
                         bemerkung: None,
                         funkrufname: Some(name),
-                        kommunikationsmittel: None,
-                        erreichbarkeit: None,
                         sortier: 0,
                         tz_fachaufgabe: None,
                         tz_organisation: None,

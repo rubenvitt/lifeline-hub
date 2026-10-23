@@ -4,7 +4,7 @@
  * (`InlineAngabe`, `ZeitpunktEingabe`, `Segmentleiste`). Jede Änderung geht über die Handlungen
  * der Fläche (`useSkizzenHandlungen.ts`) und damit über `SkizzenAktionen` und den Befehlsstapel.
  *
- * - **Stelle:** Rufname und Kommunikationsmittel im Datensatz der Stelle, Kanäle mit „Lösen“,
+ * - **Stelle:** Rufname im Datensatz der Stelle (LLH-1134: kein Telefon), Kanäle mit „Lösen“,
  *   Lücken, „Verbinden mit …“ und „zum Datensatz ↗“ (ein Sprung, keine Handlung).
  * - **Ohne Recht** (D8) nennt das Paneel den Grund („Einheiten: kein Schreibrecht“) und zeigt
  *   die Werte nur lesend; ohne Schreibweg im Einsatz und mobil ebenso.
@@ -35,7 +35,6 @@ import {
   Segmentleiste,
   useRollen,
 } from '../../components/instrument';
-import { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../../components/kommunikationsmittel';
 import { Select } from '../../components/Select';
 import Tastenkuerzel from '../../components/Tastenkuerzel';
 import { funkplanPfad } from '../../routing/deeplinks';
@@ -312,11 +311,6 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
       const grund = griffGrund(netz, stelle.key, kontext);
       const darf = grund == null;
       const kanaele = stiche.filter((s) => s.stelle === stelle.key);
-      const mittelWert =
-        'kommunikationsmittel' in stelle
-          ? (KOMMUNIKATIONSMITTEL_OPTIONEN.find((o) => o.label === stelle.kommunikationsmittel)
-              ?.value ?? null)
-          : null;
       inhalt = (
         <>
           {kopf(anzeigeName(stelle), ART_WORT[stelle.art])}
@@ -373,29 +367,18 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
             {stelle.art === 'fuehrungsstelle' ||
             stelle.art === 'abschnitt' ||
             stelle.art === 'einheit' ? (
-              <>
-                <Datenfeld label="Rufname" mono>
-                  {stelle.art === 'fuehrungsstelle' && !stelle.erfasst ? (
-                    <Wert>{stelle.hinweis}</Wert>
-                  ) : (
-                    <TextAngabe
-                      etikett="Rufname"
-                      wert={stelle.rufname}
-                      darf={darf}
-                      onSpeichern={(r) => h.setzeRufname(stelle.key, r, stelle.rufname)}
-                    />
-                  )}
-                </Datenfeld>
-                <Datenfeld label="Kommunikationsmittel">
-                  <AuswahlAngabe<string>
-                    etikett="Kommunikationsmittel"
-                    wert={mittelWert}
-                    optionen={KOMMUNIKATIONSMITTEL_OPTIONEN}
+              <Datenfeld label="Rufname" mono>
+                {stelle.art === 'fuehrungsstelle' && !stelle.erfasst ? (
+                  <Wert>{stelle.hinweis}</Wert>
+                ) : (
+                  <TextAngabe
+                    etikett="Rufname"
+                    wert={stelle.rufname}
                     darf={darf}
-                    onSpeichern={(m) => h.setzeKommunikationsmittel(stelle.key, m, mittelWert)}
+                    onSpeichern={(r) => h.setzeRufname(stelle.key, r, stelle.rufname)}
                   />
-                </Datenfeld>
-              </>
+                )}
+              </Datenfeld>
             ) : null}
             <Datenfeld label="Kanäle">
               {kanaele.length === 0 ? (

@@ -131,7 +131,7 @@ export function entferneKomponente(einsatzId: number, komponenteId: number): Pro
 
 // ── Punkt-zu-Punkt-Verbindungen (D3) ───────────────────────────────────────────────────────────
 
-/** Keine Rufnummer: Erreichbarkeit steht im Kommunikationsplan (D3). */
+/** Keine Rufnummer: Telefon und Verbindungen stehen im Kommunikationsplan (D3). */
 export interface NeueSkizzenVerbindung {
   von: SkizzenBezug;
   nach: SkizzenBezug;

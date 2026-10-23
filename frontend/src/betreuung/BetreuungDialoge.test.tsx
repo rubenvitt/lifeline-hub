@@ -630,7 +630,7 @@ describe('StelleAnlegenDialog', () => {
     );
   });
 
-  it('LLH-1044: Leitung und Erreichbarkeit unter „Weitere Angaben“, getrimmt; über 200 Zeichen gesperrt', async () => {
+  it('LLH-1044: Leitung und Kontakt unter „Weitere Angaben“, getrimmt; über 200 Zeichen gesperrt', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <StelleAnlegenDialog
@@ -656,7 +656,7 @@ describe('StelleAnlegenDialog', () => {
 
     await userEvent.clear(leitung);
     await userEvent.type(leitung, '  Frau Schulz ');
-    await userEvent.type(within(dialog).getByLabelText('Erreichbarkeit'), 'Kanal 3');
+    await userEvent.type(within(dialog).getByLabelText('Kontakt'), 'Kanal 3');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({

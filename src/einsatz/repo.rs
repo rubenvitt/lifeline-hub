@@ -2801,6 +2801,61 @@ mod tests {
         );
     }
 
+    /// LLH-1134: die Verbindungen an Abschnitt, Einheit und Führungsstelle sind PII — der Wert
+    /// wird Platzhalter, der Hinweis NULL; das Mittel (kein PII) bleibt.
+    #[tokio::test]
+    async fn schwaerzung_trifft_die_verbindungen() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name, rufname) VALUES (?, 'Nord', \
+             'Rotkreuz 1/10-1') RETURNING id",
+        )
+        .bind(einsatz.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let liste = [crate::einsatz::verbindungen::Verbindung {
+            mittel: crate::stab::kommunikation::Verbindungsmittel::Mobil,
+            wert: "0170 98765".into(),
+            hinweis: Some("nur Anna".into()),
+        }];
+        for bezug in [
+            crate::einsatz::verbindungen::Bezug::Abschnitt(abschnitt),
+            crate::einsatz::verbindungen::Bezug::Fuehrungsstelle,
+        ] {
+            crate::einsatz::verbindungen::ersetzen(&pool, einsatz.id, bezug, &liste)
+                .await
+                .unwrap();
+        }
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let zeilen: Vec<(String, String, Option<String>)> = sqlx::query_as(
+            "SELECT mittel, wert, hinweis FROM einsatz_verbindung WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(einsatz.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(zeilen.len(), 2);
+        for (mittel, wert, hinweis) in zeilen {
+            assert_eq!(mittel, "mobil", "das Mittel ist kein PII");
+            assert_ne!(wert, "0170 98765", "der Wert ist PII");
+            assert_eq!(hinweis, None, "der Hinweis ist PII");
+        }
+    }
+
     /// Bereitet einen schwärzbaren Einsatz vor (abgeschlossen + soft-gelöscht).
     async fn schwaerzbarer_einsatz(pool: &SqlitePool) -> (i64, i64) {
         let leit = benutzer_anlegen(pool, "leit").await;

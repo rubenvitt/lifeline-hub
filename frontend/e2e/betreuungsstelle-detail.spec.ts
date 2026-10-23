@@ -4,7 +4,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 /**
  * Detailseite einer Betreuungsstelle (LLH-1044): aus der Übersicht über die Kennung hinein,
  * „Belegung melden“ aus dem Kopf, die Zahl im Band „Belegung in Zahlen“ folgt; Leitung und
- * Erreichbarkeit in der Ansicht bearbeiten. Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`).
+ * Kontakt in der Ansicht bearbeiten. Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`).
  */
 
 async function senden<T = { id: number }>(
@@ -61,10 +61,10 @@ test('Übersicht → Detailseite → Belegung melden: die Kennzahl folgt, Stammd
   await expect(band).toContainText('Belegt115fast voll');
   await expect(band).toContainText('Frei5');
 
-  // Leitung und Erreichbarkeit: Bearbeiten am Paneel „Stelle“, Speichern in der Leiste.
+  // Leitung und Kontakt (LLH-1134, vormals „Erreichbarkeit“): Bearbeiten am Paneel „Stelle“, Speichern in der Leiste.
   await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
   await page.getByLabel('Leitung').fill('Frau Schulz');
-  await page.getByLabel('Erreichbarkeit').fill('Kanal 3');
+  await page.getByLabel('Kontakt', { exact: true }).fill('Kanal 3');
   await page.getByRole('button', { name: 'Speichern', exact: true }).click();
   await expect(page.getByLabel('Leitung')).toHaveCount(0);
   const raster = page.locator('dl[aria-label="Stammdaten der Stelle"]');

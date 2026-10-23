@@ -138,8 +138,7 @@ const ABSCHNITTE: Einsatzabschnitt[] = [
     name: 'Abschnitt Nord',
     sortier: 1,
     sprechgruppen: [],
-    kommunikationsmittel: 'festnetz',
-    erreichbarkeit: '0421 500',
+    verbindungen: [{ id: 41, mittel: 'festnetz', wert: '0421 500', hinweis: null }],
   },
 ];
 
@@ -149,8 +148,7 @@ const EINHEITEN = [
     einsatz_id: 1,
     name: '1. Zug',
     funkrufname: 'Florian 1/10',
-    kommunikationsmittel: 'mobil',
-    erreichbarkeit: '0160 222',
+    verbindungen: [{ id: 42, mittel: 'mobil', wert: '0160 222', hinweis: null }],
     sortier: 1,
     unangemeldet: false,
     sprechgruppen: [],
@@ -212,6 +210,7 @@ beforeEach(() => {
   vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
     art: 'mobil',
     sprechgruppen: [],
+    verbindungen: [],
     fahrzeug_ids: [],
   });
   for (const f of [
@@ -288,9 +287,8 @@ describe('KommunikationsplanPage — Anzeige', () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
       art: 'mobil',
       rufname: 'Florian Bremen 11/1',
-      kommunikationsmittel: 'festnetz',
-      erreichbarkeit: '0421 999',
       sprechgruppen: [],
+      verbindungen: [{ id: 51, mittel: 'festnetz', wert: '0421 999', hinweis: null }],
       fahrzeug_ids: [],
     });
     const { container } = setup();
@@ -324,6 +322,7 @@ describe('KommunikationsplanPage — Anzeige', () => {
       art: 'mobil',
       rufname: 'Florian Kreis 10-1',
       sprechgruppen: [],
+      verbindungen: [],
       fahrzeug_ids: [],
       einsatzleiter: {
         art: 'personal',
@@ -354,7 +353,7 @@ describe('KommunikationsplanPage — Anzeige', () => {
     let geladen = false;
     vi.mocked(ladeFuehrungsstelle).mockImplementation(async () => {
       geladen = true;
-      return { art: 'mobil', rufname: '  ', sprechgruppen: [], fahrzeug_ids: [] };
+      return { art: 'mobil', rufname: '  ', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [] };
     });
     const { container } = setup();
     await screen.findByText('Polizei PI Nord');

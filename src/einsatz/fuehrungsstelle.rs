@@ -1,5 +1,5 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): die Gegenstelle des Funkplans (ELW,
-//! Einsatzleitung) mit Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und den
+//! Einsatzleitung) mit Rufname, Sprechgruppen, Telefon und weiteren Verbindungen (LLH-1134) und den
 //! Fahrzeugen, die sie tragen (LFH-1106), dazu der Einsatzleiter nach FwDV 100 (LFH-1199). Seit
 //! LFH-1181 ein Ort mit Ausstattung: Art (mobil, ortsfest), Bezeichnung und Standort (Adresse,
 //! Koordinate; `migrations/0179_einsatz_fuehrungsstelle_ort.sql`).
@@ -61,12 +61,9 @@ pub struct FuehrungsstelleAnzeige {
     /// Zugeordnete Sprechgruppen (Katalog oder einsatzlokal), sortiert wie an Abschnitt und
     /// Einheit.
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
-    /// Kommunikationsart-Schlüssel (`routes::support::KOMMUNIKATIONSMITTEL`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kommunikationsmittel: Option<String>,
+    /// Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
     /// Personenbezogen: wird geschwärzt und steht nie im Lagebericht.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub erreichbarkeit: Option<String>,
+    pub verbindungen: Vec<crate::stab::kommunikation::KommunikationsVerbindung>,
     /// Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.
     /// Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
     /// Fahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“).
@@ -243,8 +240,9 @@ pub struct FuehrungsstellePatch<'a> {
     pub standort_lat: Option<Option<f64>>,
     pub standort_lon: Option<Option<f64>>,
     pub rufname: Option<Option<&'a str>>,
-    pub kommunikationsmittel: Option<Option<&'a str>>,
-    pub erreichbarkeit: Option<Option<&'a str>>,
+    /// Ersetzt die Verbindungen vollständig (LLH-1134); geprüft von
+    /// `verbindungen::pruefe_liste`.
+    pub verbindungen: Option<&'a [super::verbindungen::Verbindung]>,
     /// Ersetzt die Zuordnung vollständig. Die IDs prüft der Aufrufer vorher
     /// (`sprechgruppe::repo::pruefe_zuordenbar`).
     pub sprechgruppe_ids: Option<&'a [i64]>,
@@ -279,8 +277,6 @@ struct Zeile {
     standort_lat: Option<f64>,
     standort_lon: Option<f64>,
     rufname: Option<String>,
-    kommunikationsmittel: Option<String>,
-    erreichbarkeit: Option<String>,
     #[sqlx(flatten)]
     einsatzleiter: EinsatzleiterSpalten,
 }
@@ -342,7 +338,7 @@ async fn load_tx(
 ) -> Result<FuehrungsstelleAnzeige, AppError> {
     let zeile = sqlx::query_as::<_, Zeile>(
         "SELECT fs.art, fs.bezeichnung, fs.standort_adresse, fs.standort_lat, fs.standort_lon, \
-                fs.rufname, fs.kommunikationsmittel, fs.erreichbarkeit, \
+                fs.rufname, \
                 fs.einsatzleiter_art, fs.einsatzleiter_personal_id, fs.einsatzleiter_name, \
                 fs.einsatzleiter_seit, ep.id IS NOT NULL AS einsatzleiter_noch_disponiert \
          FROM einsatz_fuehrungsstelle fs \
@@ -370,6 +366,7 @@ async fn load_tx(
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
+    let verbindungen = super::verbindungen::lade_fuehrungsstelle(&mut *conn, einsatz_id).await?;
     let Some(z) = zeile else {
         return Ok(FuehrungsstelleAnzeige {
             art: FuehrungsstellenArt::Mobil,
@@ -379,8 +376,7 @@ async fn load_tx(
             standort_lon: None,
             rufname: None,
             sprechgruppen: sprechgruppen.iter().map(Sprechgruppe::anzeige).collect(),
-            kommunikationsmittel: None,
-            erreichbarkeit: None,
+            verbindungen,
             fahrzeug_ids,
             einsatzleiter: None,
         });
@@ -396,8 +392,7 @@ async fn load_tx(
         standort_lon: z.standort_lon,
         rufname: z.rufname,
         sprechgruppen: sprechgruppen.iter().map(Sprechgruppe::anzeige).collect(),
-        kommunikationsmittel: z.kommunikationsmittel,
-        erreichbarkeit: z.erreichbarkeit,
+        verbindungen,
         fahrzeug_ids,
         einsatzleiter: z.einsatzleiter.anzeige(),
     })
@@ -593,8 +588,6 @@ pub async fn patch_tx(
         ("bezeichnung", patch.bezeichnung),
         ("standort_adresse", patch.standort_adresse),
         ("rufname", patch.rufname),
-        ("kommunikationsmittel", patch.kommunikationsmittel),
-        ("erreichbarkeit", patch.erreichbarkeit),
     ] {
         let Some(wert) = wert else { continue };
         sqlx::query(sqlx::AssertSqlSafe(format!(
@@ -603,6 +596,15 @@ pub async fn patch_tx(
         .bind(wert)
         .bind(einsatz_id)
         .execute(&mut *conn)
+        .await?;
+    }
+    if let Some(liste) = patch.verbindungen {
+        super::verbindungen::ersetzen_tx(
+            conn,
+            einsatz_id,
+            super::verbindungen::Bezug::Fuehrungsstelle,
+            liste,
+        )
         .await?;
     }
     if let Some(ids) = patch.sprechgruppe_ids {

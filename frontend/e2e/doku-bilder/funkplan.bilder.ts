@@ -87,8 +87,7 @@ test.describe(KAPITEL, () => {
       const elw = fahrzeuge.find((f) => f.funkrufname === 'Musterstadt 11-1');
       await fuelle(api, 'patch', `${e}/fuehrungsstelle`, {
         rufname: 'Florian Musterstadt 11-1',
-        kommunikationsmittel: 'digitalfunk',
-        erreichbarkeit: '0561 123 4567',
+        verbindungen: [{ mittel: 'festnetz', wert: '0561 123 4567' }],
         sprechgruppe_ids: [el.id, dmo.id],
         fahrzeug_ids: elw ? [elw.id] : [],
       });
@@ -103,8 +102,7 @@ test.describe(KAPITEL, () => {
       `${abschnitte}/${await idNachName(api, abschnitte, 'Sanitätsdienst')}`,
       {
         sprechgruppe_ids: [el.id, san.id],
-        kommunikationsmittel: 'digitalfunk',
-        erreichbarkeit: '0170 555 0101',
+        verbindungen: [{ mittel: 'mobil', wert: '0170 555 0101' }],
       },
     );
     await fuelle(
@@ -117,8 +115,7 @@ test.describe(KAPITEL, () => {
     );
     await fuelle(api, 'patch', `${abschnitte}/${await idNachName(api, abschnitte, 'Betreuung')}`, {
       sprechgruppe_ids: [el.id],
-      kommunikationsmittel: 'mobil',
-      erreichbarkeit: '0170 555 0202',
+      verbindungen: [{ mittel: 'mobil', wert: '0170 555 0202' }],
     });
     const einheiten = `${e}/einheiten`;
     for (const name of ['Sanitätszug Musterstadt', 'Rettungsstaffel']) {

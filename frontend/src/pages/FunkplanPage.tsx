@@ -20,6 +20,7 @@ import { useDruckModus } from '../components/druck/useDruckModus';
 import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { VERBINDUNGSMITTEL_LABEL, verbindungsVerweis } from '../components/verbindungen';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useOhneVerbindung } from '../offline/verbindung';
@@ -92,8 +93,9 @@ import './funkplanPrint.css';
  * - **Form:** `form="tabelle"` in jeder Breite (Vergleichsfläche, `NUR_TABELLE`). Kein Suchen,
  *   Sortieren oder Filtern, die Ordnung ist der Baum (D3, D4). Bearbeitet wird am Datensatz, jede
  *   Zeile führt über ihre Kennung dorthin (D7).
- * - **Erreichbarkeit** ist personenbezogen: am Schirm ab `xl`, im Druck immer, im Lagebericht nie
- *   (D5, Entscheidung 30.09.2026).
+ * - **Telefon** (Festnetz und Mobil aus den Verbindungen des Datensatzes, LLH-1134) ist
+ *   personenbezogen: am Schirm ab `xl`, im Druck immer, im Lagebericht nie (D5, Entscheidung
+ *   30.09.2026). Funk steht getrennt davon in Rufname, TMO und DMO.
  * - **Drei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6;
  *   LFH-848, `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` D8): „Tabelle“, „Skizze“
  *   (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`) und „Sprechgruppen“ (Kanalbelegung,
@@ -110,8 +112,7 @@ import './funkplanPrint.css';
  *   Skizze hängt die Funkplan-Tabelle als Anlage ab neuer Seite an (`data-lfh="druck-anlage"`).
  */
 
-type SpalteKey =
-  'stelle' | 'rufname' | 'leitung' | 'tmo' | 'dmo' | 'kommunikation' | 'erreichbarkeit';
+type SpalteKey = 'stelle' | 'rufname' | 'leitung' | 'tmo' | 'dmo' | 'telefon';
 
 function Mono({ children }: { children: ReactNode }) {
   return <span style={monoStil(12)}>{children}</span>;
@@ -130,6 +131,24 @@ function Untereinander({ werte }: { werte: string[] }) {
       {werte.map((w) => (
         <Mono key={w}>{w}</Mono>
       ))}
+    </Flex>
+  );
+}
+
+/** Festnetz und Mobil untereinander, je mit Mittel; wählbar über `tel:` (LLH-1134). */
+function TelefonZelle({ zeile: z }: { zeile: FunkplanZeile }) {
+  if (z.telefon.length === 0) return <Leer />;
+  return (
+    <Flex vertical>
+      {z.telefon.map((v) => {
+        const verweis = verbindungsVerweis(v.mittel, v.wert);
+        const nummer = <Mono>{v.wert}</Mono>;
+        return (
+          <span key={v.id}>
+            {VERBINDUNGSMITTEL_LABEL[v.mittel]} {verweis ? <a href={verweis}>{nummer}</a> : nummer}
+          </span>
+        );
+      })}
     </Flex>
   );
 }
@@ -166,8 +185,9 @@ function LeitungZelle({ zeile: z }: { zeile: FunkplanZeile }) {
 }
 
 /**
- * Spalten. Breiten aus der Messung vor dem Bau (design.md D4, Nachtrag): Σ Zahlbreiten 860 +
- * `mindestBreite` 160 = 1020 px bei 1050 px Contentbreite am Fükw mit offenem Panel. Genau EINE
+ * Spalten. Breiten aus der Messung vor dem Bau (design.md D4, Nachtrag): Σ Zahlbreiten 810 +
+ * `mindestBreite` 160 = 970 px bei 1050 px Contentbreite am Fükw mit offenem Panel (LLH-1134:
+ * „Telefon“ 200 statt „Kommunikationsmittel“ 110 und „Erreichbarkeit“ 140). Genau EINE
  * fließende Spalte (Leiter/Führer), alle übrigen mit Zahlbreite (LFH-523).
  */
 function funkplanSpalten(druckt: boolean) {
@@ -207,26 +227,15 @@ function funkplanSpalten(druckt: boolean) {
         z.art === 'sammel' || z.art === 'fahrzeug' ? null : <Untereinander werte={z.dmo} />,
     },
     {
-      title: 'Kommunikationsmittel',
-      key: 'kommunikation' as SpalteKey,
-      width: 110,
-      render: (_t, z) =>
-        z.art === 'sammel' || z.art === 'fahrzeug' ? null : (z.kommunikationsmittel ?? <Leer />),
-    },
-    {
-      title: 'Erreichbarkeit',
-      key: 'erreichbarkeit' as SpalteKey,
-      width: 140,
+      title: 'Telefon',
+      key: 'telefon' as SpalteKey,
+      width: 200,
       // Personenbezogen: am Schirm erst ab `xl`. `abBreite` misst die Fensterbreite, nicht
       // `@media print` — im Druck deshalb ohne, sonst verlöre ein Ausdruck aus schmalem Fenster
       // die Spalte (D5; beide Druckwege laufen über `beforeprint`).
       ...(druckt ? {} : { abBreite: 'xl' as const }),
       render: (_t, z) =>
-        z.art === 'sammel' || z.art === 'fahrzeug' ? null : z.erreichbarkeit ? (
-          <Mono>{z.erreichbarkeit}</Mono>
-        ) : (
-          <Leer />
-        ),
+        z.art === 'sammel' || z.art === 'fahrzeug' ? null : <TelefonZelle zeile={z} />,
     },
   ]);
 }
@@ -609,8 +618,8 @@ export default function FunkplanPage() {
   const aufklappbar = useMemo(() => aufklappbareSchluessel(zeilen), [zeilen]);
   const aufgeklappt = aufklappbar.filter((k) => !zugeklappt.has(k));
 
-  // Ein Wortlaut für Lagebericht und Befehl: Baum, Lücken und Kommunikationsskizze. Die
-  // Erreichbarkeit kennt das Markdown nicht.
+  // Ein Wortlaut für Lagebericht und Befehl: Baum, Lücken und Kommunikationsskizze. Das
+  // Telefon kennt das Markdown nicht.
   const funkplanText = () => {
     const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
     const gueltigAbRoh = netz.schriftfeld?.gueltig_ab;
@@ -864,8 +873,19 @@ export default function FunkplanPage() {
               onWahl={onLueckenWahl}
             />
             <LueckenZeile
-              titel="Einheiten ohne Erreichbarkeit"
-              luecke={luecken.einheitenOhneErreichbarkeit}
+              titel="Einheiten ohne Funkrufname"
+              luecke={luecken.einheitenOhneFunkrufname}
+              treffer={(e) => ({
+                key: e.id,
+                name: e.name,
+                ziel: einheitDetailPfad(einsatzId, e.id),
+                element: `eh-${e.id}`,
+              })}
+              onWahl={onLueckenWahl}
+            />
+            <LueckenZeile
+              titel="Einheiten ohne Telefon"
+              luecke={luecken.einheitenOhneTelefon}
               treffer={(e) => ({
                 key: e.id,
                 name: e.name,

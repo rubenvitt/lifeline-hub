@@ -420,6 +420,7 @@ function einheit(over: Partial<Einheit> & Pick<Einheit, 'id'>): Einheit {
     sprechgruppen: [],
     status: { quelle: 'ohne', verteilung: [] },
     unangemeldet: false,
+    verbindungen: [],
     ...over,
   };
 }

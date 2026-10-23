@@ -894,8 +894,8 @@ async fn liste_mischt_keine_kraefte_aus_einem_zweiten_einsatz() {
 
 // ---------- LFH-306: Teil-PATCH mit Tri-State ----------
 
-/// Bildet eine Einheit mit VOLL besetzten Nebenfeldern (Soll-Trio, Bemerkung,
-/// Kommunikationsmittel, Erreichbarkeit, Sortierung) und ordnet ihr eine Sprechgruppe zu.
+/// Bildet eine Einheit mit VOLL besetzten Nebenfeldern (Soll-Trio, Bemerkung, Funkrufname,
+/// Verbindungen, Sortierung) und ordnet ihr eine Sprechgruppe zu.
 async fn einheit_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64) -> i64 {
     let (s, json) = anfrage(
         app,
@@ -905,7 +905,8 @@ async fn einheit_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64) -
         Some(&format!(
             r#"{{"name":"1. Zug","soll_fuehrer":1,"soll_unterfuehrer":3,"soll_mannschaft":18,
                  "bemerkung":"Bem","funkrufname":"Florian HM 12/44",
-                 "kommunikationsmittel":"digitalfunk","erreichbarkeit":"0170/12345","sortier":42,"sprechgruppe_ids":[{sg}]}}"#
+                 "verbindungen":[{{"mittel":"mobil","wert":"0170/12345","hinweis":"Zugführer"}}],
+                 "sortier":42,"sprechgruppe_ids":[{sg}]}}"#
         )),
     )
     .await;
@@ -916,9 +917,10 @@ async fn einheit_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64) -
 /// **Der fachliche Kern des Commits.** Bildet exakt den `fuehrerSetzen`-Aufruf der
 /// Einheiten-Seite nach: ein PATCH, der NUR `fuehrer_id` trägt. Unter dem alten Vollersatz
 /// löschte dieser Request stillschweigend Kommunikationsmittel, Erreichbarkeit und die
-/// Sprechgruppen-Zuordnung der Einheit und nullte das Soll-Trio.
+/// Sprechgruppen-Zuordnung der Einheit und nullte das Soll-Trio. Seit LLH-1134 sind es die
+/// Verbindungen.
 #[tokio::test]
-async fn patch_fuehrer_laesst_kommunikationsmittel_erreichbarkeit_und_sprechgruppen_stehen() {
+async fn patch_fuehrer_laesst_verbindungen_und_sprechgruppen_stehen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -938,8 +940,9 @@ async fn patch_fuehrer_laesst_kommunikationsmittel_erreichbarkeit_und_sprechgrup
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["fuehrer_id"], ep);
     assert_eq!(json["name"], "1. Zug", "Pflichtfeld unberührt");
-    assert_eq!(json["kommunikationsmittel"], "digitalfunk");
-    assert_eq!(json["erreichbarkeit"], "0170/12345");
+    assert_eq!(json["verbindungen"][0]["mittel"], "mobil");
+    assert_eq!(json["verbindungen"][0]["wert"], "0170/12345");
+    assert_eq!(json["verbindungen"][0]["hinweis"], "Zugführer");
     assert_eq!(json["bemerkung"], "Bem");
     assert_eq!(json["funkrufname"], "Florian HM 12/44");
     assert_eq!(json["sortier"], 42);
@@ -1489,76 +1492,67 @@ async fn funkrufname_anlegen_aendern_und_leeren() {
     assert!(!json.as_object().unwrap().contains_key("funkrufname"));
 }
 
-// ---------- LFH-140: kommunikationsmittel ist ein Schlüssel, kein Freitext ----------
+// ---------- LLH-1134: Telefon und weitere Verbindungen ----------
 
-/// Gegenstück zu `tests/einsatzabschnitt.rs`: dieselbe Retain-Begründung gilt für die
-/// Einheit (LFH-108), also dieselbe Prüfung an POST und PATCH.
+/// Gegenstück zu `tests/einsatzabschnitt.rs`: Verbindungen ersetzen beim Bilden und Ändern die
+/// Liste, ein unbekanntes Mittel ist 400, und die Altfelder sind 400 statt still verworfen.
 #[tokio::test]
-async fn kommunikationsmittel_unbekannt_ist_400_bei_post_und_patch() {
+async fn verbindungen_beim_bilden_und_aendern_altfelder_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let basis = format!("/api/einsaetze/{einsatz}/einheiten");
 
+    for body in [
+        r#"{"name":"1. Zug","kommunikationsmittel":"digitalfunk"}"#,
+        r#"{"name":"1. Zug","erreichbarkeit":"0151"}"#,
+        r#"{"name":"1. Zug","verbindungen":[{"mittel":"funk","wert":"0151"}]}"#,
+    ] {
+        let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: {json}");
+    }
+    let (_, liste) = anfrage(&app, "GET", &basis, &admin, None).await;
+    assert!(
+        liste.as_array().unwrap().is_empty(),
+        "abgelehnt bildet nichts"
+    );
+
     let (s, json) = anfrage(
         &app,
         "POST",
         &basis,
         &admin,
-        Some(r#"{"name":"1. Zug","kommunikationsmittel":"Frau Meyer 0151"}"#),
+        Some(r#"{"name":"1. Zug","verbindungen":[{"mittel":"mobil","wert":"0151 1"}]}"#),
     )
     .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
-    assert!(json["error"]
-        .as_str()
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    assert_eq!(json["verbindungen"][0]["wert"], "0151 1");
+    assert!(json.get("erreichbarkeit").is_none());
+    let pfad = format!("{basis}/{}", json["id"]);
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"verbindungen":[{"mittel":"fax","wert":"0511 9"},{"mittel":"mobil","wert":"0151 2"}]}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let werte: Vec<&str> = json["verbindungen"]
+        .as_array()
         .unwrap()
-        .contains("Kommunikationsmittel"));
-
-    let (s, json) = anfrage(
-        &app,
-        "POST",
-        &basis,
-        &admin,
-        Some(r#"{"name":"1. Zug","kommunikationsmittel":"digitalfunk"}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    assert_eq!(json["kommunikationsmittel"], "digitalfunk");
-    let e = json["id"].as_i64().unwrap();
-    let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(r#"{"name":"2. Zug"}"#)).await;
-    assert_eq!(s, StatusCode::CREATED);
-    assert!(json["kommunikationsmittel"].is_null());
-
-    let pfad = format!("{basis}/{e}");
-    let (s, _) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"kommunikationsmittel":"Funk"}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST);
-    let (s, json) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"kommunikationsmittel":"mobil"}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    assert_eq!(json["kommunikationsmittel"], "mobil");
-    let (s, json) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"kommunikationsmittel":""}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    assert!(json["kommunikationsmittel"].is_null());
+        .iter()
+        .map(|v| v["wert"].as_str().unwrap())
+        .collect();
+    assert_eq!(werte, ["0511 9", "0151 2"]);
+    for body in [
+        r#"{"erreichbarkeit":""}"#,
+        r#"{"kommunikationsmittel":null}"#,
+    ] {
+        let (s, _) = anfrage(&app, "PATCH", &pfad, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}");
+    }
 }
 
 // ── Auflösen und Stornieren (LLH-1079) ──────────────────────────────────────────────────────
@@ -1792,8 +1786,8 @@ async fn name_ueber_der_grenze_ist_400_und_schreibt_nichts() {
     assert_eq!(eintrag(&liste, e)["name"], "Z".repeat(200));
 }
 
-/// Spec `eingabegrenzen`, „Freitexte einer Einheit sind begrenzt“ (LLH-1242): Bemerkung,
-/// Funkrufname und Erreichbarkeit über der Grenze sind beim Bilden und beim Ändern 400, bevor etwas
+/// Spec `eingabegrenzen`, „Freitexte einer Einheit sind begrenzt“ (LLH-1242): Bemerkung und
+/// Funkrufname über der Grenze (Verbindungen: `verbindungen_beim_bilden_und_aendern_altfelder_400`) sind beim Bilden und beim Ändern 400, bevor etwas
 /// geschrieben wird; genau an der Grenze wird gespeichert.
 #[tokio::test]
 async fn freitexte_ueber_der_grenze_sind_400_und_schreiben_nichts() {
@@ -1806,7 +1800,6 @@ async fn freitexte_ueber_der_grenze_sind_400_und_schreiben_nichts() {
     for (feld, etikett, max) in [
         ("bemerkung", "Bemerkung", 2_000),
         ("funkrufname", "Funkrufname", 200),
-        ("erreichbarkeit", "Erreichbarkeit", 200),
     ] {
         let zu_lang = "Z".repeat(max + 1);
         let body = serde_json::json!({ "name": "Zug 2", feld: zu_lang }).to_string();

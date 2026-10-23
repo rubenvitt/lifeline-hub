@@ -77,7 +77,7 @@ async function seede(page: Page, einsatzId: string) {
     expect(a.status(), `Verbindung: ${await a.text()}`).toBe(201);
   }
   const ab = await page.request.post(`${basis}/abschnitte`, {
-    data: { name: ABSCHNITT, kommunikationsmittel: 'festnetz', erreichbarkeit: '0421 500' },
+    data: { name: ABSCHNITT, verbindungen: [{ mittel: 'festnetz', wert: '0421 500' }] },
   });
   expect(ab.ok(), `Abschnitt: ${await ab.text()}`).toBeTruthy();
 }

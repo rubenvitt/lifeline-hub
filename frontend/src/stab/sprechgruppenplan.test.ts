@@ -29,7 +29,15 @@ function sg(
 }
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
-  return { id, einsatz_id: 1, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
 }
 
 function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
@@ -45,6 +53,7 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
     ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     status: { quelle: 'ohne', verteilung: [] },
+    verbindungen: [],
     ...p,
   } as Einheit;
 }
@@ -53,7 +62,7 @@ const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 const ohne = <T>(zustand: 'gesperrt' | 'fehler' | 'laden'): Quelle<T> => ({ zustand, daten: [] });
 const fs = (p: Partial<Fuehrungsstelle> = {}): FunkplanQuellen['fuehrungsstelle'] => ({
   zustand: 'daten',
-  daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], ...p },
+  daten: { art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [], ...p },
 });
 
 function quellen(p: Partial<FunkplanQuellen> = {}): FunkplanQuellen {

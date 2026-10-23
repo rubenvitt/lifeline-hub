@@ -21,7 +21,7 @@ Führungspersonal. Eine Pressemitteilung gibt nur die Einsatzleitung frei.
    „Pressearbeit“ wählen.
 2. „Medienkontakt erfassen“ wählen.
 3. „Art“ (Anfrage, Abstimmung oder Termin), „Medium“ und „Thema“ eintragen. Unter „Ansprechperson
-   und Uhrzeit“ stehen „Ansprechperson“, „Erreichbarkeit“ und „Eingang“ (leer gilt jetzt).
+   und Uhrzeit“ stehen „Ansprechperson“, „Telefon / E-Mail“ und „Eingang“ (leer gilt jetzt).
 
    ![Dialog „Medienkontakt erfassen“ mit Art, Medium und Thema](../bilder/presse-infotelefon/medienkontakt.png)
 
@@ -128,7 +128,7 @@ diesen Stand in den Abschnitt „Medienlage“.
 
 ### Personenbezug
 
-Ansprechperson, Erreichbarkeit, Anrufer, Rückrufnummer, Notizen und die Freitexte des Presse-Logs
+Ansprechperson, Telefon / E-Mail, Anrufer, Rückrufnummer, Notizen und die Freitexte des Presse-Logs
 sind personenbezogen. Die App schwärzt sie, wenn die Aufbewahrungsfrist des Einsatzes abläuft.
 
 ### Vermisstensuche

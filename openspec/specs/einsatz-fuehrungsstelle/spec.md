@@ -2,7 +2,7 @@
 
 ## Purpose
 Hält je Einsatz die eigene Führungsstelle (ELW, Einsatzleitung) als Gegenstelle für Funkplan und
-Fernmeldeskizze fest: Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit, die
+Fernmeldeskizze fest: Rufname, Sprechgruppen, Telefon und weitere Verbindungen, die
 Fahrzeuge, die sie tragen, und den Einsatzleiter mit seiner Übergabe im ETB, samt Rechten,
 Live-Verhalten und Schwärzung.
 
@@ -10,28 +10,30 @@ Live-Verhalten und Schwärzung.
 
 ### Requirement: Angaben der eigenen Führungsstelle
 Ein Einsatz SHALL genau eine eigene Führungsstelle tragen. Sie hat eine Art (`mobil` oder
-`ortsfest`) und acht optionale Angaben: Einsatzleiter, Bezeichnung, Standort (Adresse und
-Koordinate), Rufname, Sprechgruppen (TMO und DMO), Kommunikationsmittel, Erreichbarkeit und
+`ortsfest`) und sieben optionale Angaben: Einsatzleiter, Bezeichnung, Standort (Adresse und
+Koordinate), Rufname, Sprechgruppen (TMO und DMO), Verbindungen (Telefon und weitere, Capability
+`stab-kommunikationsplan`, „Verbindungen an Abschnitt, Einheit und Führungsstelle“) und
 Führungsfahrzeuge (null oder mehr disponierte Fahrzeuge dieses Einsatzes, die die Führungsstelle
-tragen). Ist keine der acht Angaben gesetzt, gilt die Führungsstelle als nicht erfasst; die Art
+tragen). Die Altfelder Kommunikationsmittel und Erreichbarkeit machen sie nicht erfasst. Ist keine
+der sieben Angaben gesetzt, gilt die Führungsstelle als nicht erfasst; die Art
 allein macht sie nicht erfasst. Die Führungsstelle je Person (Einsatzmitgliedschaft) MUST davon
 unberührt bleiben.
 
 #### Scenario: Neuer Einsatz
 - **WHEN** ein Einsatz angelegt wird
-- **THEN** liefert der Abruf der Führungsstelle die Art `mobil` und alle acht Angaben leer, und sie gilt als nicht erfasst
+- **THEN** liefert der Abruf der Führungsstelle die Art `mobil` und alle sieben Angaben leer, und sie gilt als nicht erfasst
 
 #### Scenario: Nur Rufname
 - **WHEN** nur der Rufname „Florian Musterstadt 10/1“ gespeichert ist
-- **THEN** gilt die Führungsstelle als erfasst, und Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und Einsatzleiter bleiben leer
+- **THEN** gilt die Führungsstelle als erfasst, und Sprechgruppen, Verbindungen und Einsatzleiter bleiben leer
 
 #### Scenario: Nur ein Fahrzeug
 - **WHEN** der Führungsstelle nur der disponierte ELW 2 „Florian Musterstadt 10/1“ zugeordnet ist
-- **THEN** gilt sie als erfasst, und Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und Einsatzleiter bleiben leer
+- **THEN** gilt sie als erfasst, und Rufname, Sprechgruppen, Verbindungen und Einsatzleiter bleiben leer
 
 #### Scenario: Nur ein Einsatzleiter
 - **WHEN** an der Führungsstelle nur der Einsatzleiter „KBM Weber“ erfasst ist
-- **THEN** gilt sie als erfasst, und die übrigen fünf Angaben bleiben leer
+- **THEN** gilt sie als erfasst, und die übrigen sechs Angaben bleiben leer
 
 #### Scenario: Nur Bezeichnung
 - **WHEN** nur die Bezeichnung „TEL Rathaus“ gespeichert ist
@@ -61,11 +63,12 @@ Einsatzkopf.
 ### Requirement: Ändern als Teil-Patch mit den Rechten der Kopfdaten
 Die Führungsstelle SHALL sich mit denselben Rechten ändern lassen wie die Kopfdaten des Einsatzes.
 Jede Angabe MUST einzeln änderbar sein: eine fehlende Angabe bleibt unverändert, `null` oder leerer
-Text leert sie. Gesendete Sprechgruppen MUST die Zuordnung vollständig ersetzen. An einem nicht
+Text leert sie. Gesendete Sprechgruppen und gesendete Verbindungen MUST die Zuordnung bzw. Liste
+vollständig ersetzen. An einem nicht
 aktiven Einsatz MUST jede Änderung abgelehnt werden.
 
 #### Scenario: Zwei Angaben nacheinander
-- **WHEN** Person A den Rufname und Person B danach aus einem älteren Stand die Erreichbarkeit speichert
+- **WHEN** Person A den Rufname und Person B danach aus einem älteren Stand die Verbindungen speichert
 - **THEN** trägt die Führungsstelle beide Angaben
 
 #### Scenario: Beobachter ändert
@@ -77,18 +80,23 @@ aktiven Einsatz MUST jede Änderung abgelehnt werden.
 - **THEN** wird die Änderung mit 409 abgelehnt
 
 ### Requirement: Prüfung der Angaben
-Das Kommunikationsmittel MUST einer der Werte sein, die auch Abschnitt und Einheit annehmen; ein
-unbekannter Wert ergibt 400. Eine Sprechgruppe MUST dem Katalog der Organisation oder den
-einsatzlokalen Sprechgruppen dieses Einsatzes angehören; jede andere ergibt 422. Eine abgelehnte
-Änderung MUST keine Angabe teilweise speichern.
+Verbindungen MUST die Prüfung der Capability `stab-kommunikationsplan` bestehen (Mittel, Länge,
+Anzahl); sonst ergibt sich 400. Die Altfelder Kommunikationsmittel und Erreichbarkeit ergeben 400.
+Eine Sprechgruppe MUST dem Katalog der Organisation oder den einsatzlokalen Sprechgruppen dieses
+Einsatzes angehören; jede andere ergibt 422. Eine abgelehnte Änderung MUST keine Angabe teilweise
+speichern.
 
 #### Scenario: Fremde Sprechgruppe
 - **WHEN** die Sprechgruppen einer anderen Organisation oder eines anderen Einsatzes zugeordnet werden sollen
 - **THEN** antwortet der Server mit 422, und weder Sprechgruppen noch eine im selben Aufruf gesendete andere Angabe sind gespeichert
 
-#### Scenario: Unbekanntes Kommunikationsmittel
-- **WHEN** als Kommunikationsmittel ein unbekannter Wert gesendet wird
+#### Scenario: Unbekanntes Verbindungsmittel
+- **WHEN** eine Verbindung mit dem Mittel „digitalfunk“ gesendet wird
 - **THEN** antwortet der Server mit 400
+
+#### Scenario: Altfeld
+- **WHEN** ein Client noch `erreichbarkeit` sendet
+- **THEN** antwortet der Server mit 400, und keine Angabe ist gespeichert
 
 ### Requirement: Fahrzeuge der Führungsstelle
 Der Abruf SHALL die zugeordneten Fahrzeuge nur als IDs der Disposition liefern, nie mit
@@ -106,7 +114,7 @@ ohne eine Angabe teilweise zu speichern.
 
 ### Requirement: Bearbeitung auf der Seite Einsatzdaten
 Die Seite Einsatzdaten SHALL ein Paneel „Eigene Führungsstelle“ mit Einsatzleiter, Art,
-Bezeichnung, Standort, Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und
+Bezeichnung, Standort, Rufname, Sprechgruppen, „Telefon und weitere Verbindungen“ und
 Führungsfahrzeugen zeigen. Jede
 Angabe MUST einzeln in der Leseansicht bearbeitbar sein und beim Speichern genau ihr eigenes Feld
 senden; der Standort sendet Adresse und Koordinate zusammen. Ein unveränderter Wert sendet nichts.
@@ -154,16 +162,16 @@ neu abrufen. Eine abgelehnte Änderung MUST kein Ereignis verteilen.
 - **WHEN** auf Schirm A der Rufname der Führungsstelle gespeichert wird und Schirm B den Funkplan offen hat
 - **THEN** zeigt Schirm B die Zeile der Führungsstelle mit dem neuen Rufnamen ohne Neuladen
 
-### Requirement: Erreichbarkeit wird geschwärzt
-Die Erreichbarkeit der Führungsstelle und der Name des Einsatzleiters (eingefrorener Name einer
+### Requirement: Verbindungen werden geschwärzt
+Wert und Hinweis der Verbindungen der Führungsstelle und der Name des Einsatzleiters (eingefrorener Name einer
 Person wie Freitext) sind personenbezogen und MUST bei der Schwärzung des Einsatzes entfernt werden.
 Adresse und Koordinate ihres Standorts können eine Privatadresse verraten und MUST ebenfalls
-entfernt werden. Art, Bezeichnung, Rufname, Kommunikationsmittel, Sprechgruppen-Zuordnung, die Art
-des Einsatzleiters und sein „seit“ SHALL als Führungsstruktur erhalten bleiben.
+entfernt werden. Art, Bezeichnung, Rufname, Mittel der Verbindungen, Sprechgruppen-Zuordnung, die
+Art des Einsatzleiters und sein „seit“ SHALL als Führungsstruktur erhalten bleiben.
 
 #### Scenario: Schwärzung nach Fristablauf
 - **WHEN** ein Einsatz mit erfasster Führungsstelle und dem Einsatzleiter „Anna Schulz“ geschwärzt wird
-- **THEN** sind ihre Erreichbarkeit und der Name des Einsatzleiters leer, und Rufname, Kommunikationsmittel, Sprechgruppen und „seit“ sind unverändert
+- **THEN** sind Wert und Hinweis ihrer Verbindungen und der Name des Einsatzleiters geschwärzt, und Rufname, Mittel der Verbindungen, Sprechgruppen und „seit“ sind unverändert
 
 ### Requirement: Einsatzleiter als Person oder Freitext
 Der Einsatzleiter SHALL entweder eine Person aus dem disponierten Personal dieses Einsatzes oder ein
