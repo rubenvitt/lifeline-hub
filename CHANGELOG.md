@@ -1,3 +1,37 @@
+## [1.0.0-alpha.152](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.151...v1.0.0-alpha.152) (2026-10-23)
+
+### Lagekarte
+
+- **Adresssuche ohne Internet:** Die Ortssuche in der Lagekarte und im Ortsfeld (mit und ohne Einsatz) sucht zuerst in den installierten Offline-Karten und erst danach beim Geocoder. Treffer aus der Offline-Karte stehen oben und tragen den Zusatz „aus Offline-Karte“.
+- Ist der Geocoder nicht erreichbar, liefert die Suche trotzdem die Treffer aus der Offline-Karte. Füllen diese alle fünf Plätze der Trefferliste, fragt Lifeline Hub den Geocoder gar nicht erst an.
+- Zeigt der Geocoder einen Ort mit gleichem Namen, der weniger als 30 m von einem Treffer aus der Offline-Karte entfernt liegt, erscheint er nicht noch einmal in der Liste.
+- **Ortsname ohne Internet:** In der Ort-Vorschau steht die nächste Adresse im Umkreis von 75 m aus der Offline-Karte. Der Geocoder wird nur gefragt, wenn dort keine passende Adresse liegt.
+
+### Einsatztagebuch
+
+- **Von/An mit Vorschlägen:** Die Felder Von und An schlagen in festen Gruppen vor: „Im Einsatz“ (Funkrufnamen), „Stammdaten“ (Fahrzeuge, externe Stellen) und „Zuletzt verwendet“. Ein Wort am Eintrag zeigt, woher er stammt, nicht nur eine Farbe. Demo-Einträge stehen am Ende der Liste.
+- Frei eingetippte Werte lassen sich mit „In Stammdaten übernehmen“ in die Stammdaten aufnehmen. Wer dafür kein Recht hat, sieht die Schaltfläche gesperrt und den Grund dazu.
+- Die Eingabetaste verhält sich wie bisher: Bei offener Vorschlagsliste übernimmt sie einen Vorschlag nur, wenn er vorher mit den Pfeiltasten gewählt wurde, sonst wird der Eintrag abgeschickt. Im Handschuh-Modus sind die Zeilen der Vorschlagsliste größer.
+- Die Liste „Zuletzt verwendet“ wird auf dem Gerät gespeichert und beim Abmelden gelöscht.
+
+### Kommunikation
+
+- Absender und Empfänger im Meldungsformular haben dieselben Vorschläge wie Von/An im Einsatztagebuch.
+
+### Führung
+
+- **Offene Vorgänge im Überblick:** Das neue Paneel „Offene Vorgänge“ ersetzt im Führungsüberblick die Paneele „Offene Aufträge“ und „Nachforderungen“. Es hat fünf Abschnitte in fester Reihenfolge: Meldungen, Aufträge, Nachforderungen, Erinnerungen und Ablösungen.
+- Jeder Abschnitt zeigt die Anzahl offener Vorgänge, die drei dringendsten Einträge mit direktem Sprung dorthin und einen Link „alle ↗“ ins jeweilige Modul.
+- Ohne offene Vorgänge steht dort „keine“. Ist ein Bereich gesperrt, steht „—“ mit Grund. Wurde der Bereich mangels Netz nie geladen, steht „ohne Netz nicht geladen“.
+- Mit der Umschaltung „alle / meine Stelle“ lassen sich die Einträge auf die eigene Stelle beschränken. Die Zahlen bleiben dabei gleich.
+- Bei den Nachforderungen zählt der Überblick jetzt auch die überfälligen: Sie sind zugesagt oder unterwegs, aber der erwartete Eintreffzeitpunkt ist vorbei. Es gilt dieselbe Regel wie auf dem Nachforderungs-Board.
+
+### Betrieb und Installation
+
+- Offline-Karten kommen jetzt mit einem Adressindex. Lifeline Hub lädt ihn mit der Region herunter, aktualisiert ihn zusammen mit der Karte und prüft seine Prüfsumme. Beim Löschen einer Region und beim Aufräumen nach dem Start wird er mit entfernt.
+- Der Kartendienst baut den Adressindex für jede Region aus denselben OpenStreetMap-Daten wie die Karte und nennt ihn im Kartenkatalog. Ältere Kataloge ohne Adressindex funktionieren weiter. Scheitert der Bau des Index, wird die Region trotzdem bereitgestellt, nur ohne Index.
+- Für das Update ist keine Datenbankmigration nötig.
+
 ## [1.0.0-alpha.151](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.150...v1.0.0-alpha.151) (2026-10-23)
 
 ### Wichtige Änderungen
