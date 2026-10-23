@@ -11096,8 +11096,8 @@ mod tests {
     /// Spalten, Schlüssel und Indizes bleiben; die DDL unterscheidet sich nur in der
     /// `stufe`-Liste, die neue Stufe geht durch, eine unbekannte nicht, und die Kaskade hält.
     #[tokio::test]
-    async fn migration_0248_baut_benachrichtigung_mit_der_stufe_still_neu() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 247).await;
+    async fn migration_0249_baut_benachrichtigung_mit_der_stufe_still_neu() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 248).await;
         let (e, b) = bild_grundlage(&pool).await;
         sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
             "INSERT INTO benachrichtigung (id, einsatz_id, benutzer_id, art, stufe, bezug_typ, \
@@ -11135,10 +11135,10 @@ mod tests {
                 .execute(&pool)
                 .await
                 .is_err(),
-            "vor 0248 kennt der CHECK die Stufe still nicht"
+            "vor 0249 kennt der CHECK die Stufe still nicht"
         );
 
-        migriere_bis(&pool, 248).await;
+        migriere_bis(&pool, 249).await;
 
         let nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
         assert_eq!(
