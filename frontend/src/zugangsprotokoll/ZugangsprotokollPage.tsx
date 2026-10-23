@@ -54,6 +54,13 @@ import {
  * am Server (neueste zuerst, „Ältere laden“), deshalb Servermodus der `Datensicht` ohne Suche,
  * Spaltenfilter und Sortierung: die Filter stehen in der Leiste darüber und in der URL. Kein
  * Live-Abgleich: geladen wird beim Öffnen und bei Filterwechsel.
+ *
+ * Bewusste Ausnahme vom Sortieren und Filtern im Spaltenkopf (LLH-1096, Spec
+ * `tabellen-sortieren-filtern`): ein Protokoll liest man in seiner Zeitfolge, und der Server
+ * blättert per Schlüssel nach `id` — eine andere Sortierung zeigte nur die geladenen Seiten
+ * umgeordnet. Ereignis und Aktion nimmt der Server je genau einen Wert; ein Kopffilter mit
+ * mehreren Werten bräuchte eine neue Abfrage. Der Zustand steht trotzdem in der Adresse
+ * (`spur`, `von`, `bis`, `konto`, `ereignis`, `aktion`), nur mit eigenen Namen.
  */
 
 const leer = '—';
