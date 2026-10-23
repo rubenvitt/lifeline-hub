@@ -14,7 +14,10 @@ import KatalogTabelle, {
 import { SeitenFehler } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
+import { nachText, nachZahl } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { EINSATZART_LABELS } from '../einsatz/einsatzart';
+import type { Einsatzart } from '../api/types';
 import EinsatzVorlageFormModal from './EinsatzVorlageFormModal';
 import { moduleText, sichtbarAnzahl } from './einsatzVorlageModule';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
@@ -25,6 +28,8 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
  * Verwaltung, pflegen nur der System-Admin (Rechte-Muster wie die Nachbarsektionen, LFH-345).
  * Die Reihenfolge ist die des Servers (`sortier`), deshalb kein `defaultSortOrder`.
  */
+const EINSATZART_FOLGE = Object.keys(EINSATZART_LABELS) as Einsatzart[];
+
 export default function EinsatzVorlagenTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -55,13 +60,19 @@ export default function EinsatzVorlagenTab() {
       dataIndex: 'bezeichnung',
       key: 'bezeichnung',
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
-      sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
+      sorter: nachText((v: EinsatzVorlage) => v.bezeichnung),
       render: (text: string) => <span style={{ overflowWrap: 'anywhere' }}>{text}</span>,
     },
     {
       title: 'Einsatzart',
       key: 'einsatzart',
       suchText: (v) => (v.einsatzart ? EINSATZART_LABELS[v.einsatzart] : undefined),
+      // Feste Werte aus dem Wire-Enum (LLH-1096), in seiner Folge sortiert; ohne Art hinten.
+      filters: EINSATZART_FOLGE.map((a) => ({ text: EINSATZART_LABELS[a], value: a })),
+      onFilter: (wert, v) => v.einsatzart === wert,
+      sorter: nachZahl((v: EinsatzVorlage) =>
+        v.einsatzart ? EINSATZART_FOLGE.indexOf(v.einsatzart) : null,
+      ),
       render: (_, v) => (v.einsatzart ? EINSATZART_LABELS[v.einsatzart] : '—'),
     },
     {
@@ -112,6 +123,9 @@ export default function EinsatzVorlagenTab() {
       : []),
   ];
 
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt die Reihenfolge des Servers (`sortier`).
+  const gedaechtnis = useListenGedaechtnis('stammdaten-einsatz-vorlagen', spalten);
+
   return (
     <AdminPage
       titel="Einsatz-Vorlagen"
@@ -152,6 +166,8 @@ export default function EinsatzVorlagenTab() {
           loading={query.isLoading}
           dataSource={query.data ?? []}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Vorlagen"
           suche={{ platzhalter: 'Bezeichnung oder Einsatzart' }}
           locale={{ emptyText: 'Noch keine Einsatz-Vorlagen' }}
         />

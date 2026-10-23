@@ -36,7 +36,7 @@ const labels = (c: HTMLElement) =>
  * und das Menü hängt in einem Portal unter `document.body`, nicht unter dem `container`.
  */
 async function menueEintrag(text: string): Promise<HTMLElement> {
-  const treffer = (await screen.findAllByText(text)).find((k) =>
+  const treffer = (await screen.findAllByText(new RegExp(`^${text} \\(\\d+\\)$`))).find((k) =>
     k.closest('.ant-table-filter-dropdown'),
   );
   if (!treffer) throw new Error(`Kein Filtereintrag „${text}" im Menü`);

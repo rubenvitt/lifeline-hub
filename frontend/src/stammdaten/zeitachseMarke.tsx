@@ -2,6 +2,8 @@ import { Alert, Form } from 'antd';
 import type { ZeitachseMarke } from '../api/types';
 import { Select } from '../components/Select';
 import { MARKE_WORT } from '../kraefte/zeitachse';
+import { nachZahl } from '../components/katalogVergleich';
+import type { Key } from 'react';
 
 /**
  * Zeitachsen-Marke im Status-Katalog (LFH-552): ein Wechsel auf einen markierten Status schreibt
@@ -15,6 +17,13 @@ export const markeSpalte = {
   title: 'Zeitachse',
   dataIndex: 'zeitachse_marke',
   key: 'zeitachse_marke',
+  // Geschlossene Achse (LLH-1096): filtern nach der Marke, sortieren in ihrer Folge, ohne hinten.
+  filters: MARKEN.map((m) => ({ text: MARKE_WORT[m], value: m })),
+  onFilter: (wert: Key | boolean, s: { zeitachse_marke?: ZeitachseMarke | null }) =>
+    s.zeitachse_marke === wert,
+  sorter: nachZahl((s: { zeitachse_marke?: ZeitachseMarke | null }) =>
+    s.zeitachse_marke ? MARKEN.indexOf(s.zeitachse_marke) : null,
+  ),
   render: (m: ZeitachseMarke | null | undefined) => (m ? MARKE_WORT[m] : '—'),
 };
 

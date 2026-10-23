@@ -164,14 +164,13 @@ const ONFILTER_MUSTER = /\bonFilter:/g;
 const SUCHE_MUSTER = /\bsuche=\{/g;
 
 /**
- * Die drei Kataloge OHNE Filterachse — jeder mit Begründung, und jeder muss GEBRAUCHT werden.
+ * Die zwei Kataloge OHNE Filterachse — jeder mit Begründung, und jeder muss GEBRAUCHT werden.
  * Bekommt einer doch eine Filterachse, meldet {@link ordnungsBefunde} den Eintrag als tot; er
  * deckte sonst still den nächsten Rückbau (Bauart wie {@link AUSNAHMEN}).
  */
 const OHNE_FILTERACHSE: Record<string, string> = {
-  // `StichwortVorschlag` = `{ id, text }`: keine Spalte trägt eine Achse zum Sieben.
-  'stammdaten/StichworteTab.tsx':
-    'nur Text und Aktionen — der Datensatz trägt keine siebbare Achse',
+  // `stammdaten/StichworteTab.tsx` stand hier bis LLH-1096: seit der Kopplung an eine
+  // Einsatz-Vorlage (LLH-1375) filtert es nach ihr.
   // Die einzige denkbare Achse wäre `aktiv`, und die siebt der Server
   // (`personal/qualifikation_repo.rs`, `aktiv = 1`).
   'stammdaten/QualifikationenTab.tsx':
@@ -393,7 +392,7 @@ describe('KatalogTabelle-Ordnung', () => {
     expect(KATALOG_QUELLEN.map((q) => q.pfad)).toEqual(KATALOGE);
   });
 
-  it('jeder Katalog trägt Sortierung, Suche und — bis auf drei begründete — eine Filterachse', () => {
+  it('jeder Katalog trägt Sortierung, Suche und — bis auf zwei begründete — eine Filterachse', () => {
     expect(
       ordnungsBefunde(KATALOG_QUELLEN, OHNE_FILTERACHSE),
       `Die vierzehn Kataloge haben mit LFH-330 Sortierung, Filter und Suche bekommen. Wer ` +

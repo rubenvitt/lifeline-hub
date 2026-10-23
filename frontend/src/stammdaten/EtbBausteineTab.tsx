@@ -2,6 +2,8 @@ import { Button, Popconfirm, Space, Typography, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { nachZahl } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -13,6 +15,8 @@ import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+
+const TYP_FOLGE = Object.keys(etbTyp) as EtbBaustein['typ'][];
 
 export default function EtbBausteineTab() {
   const { benutzer } = useAuth();
@@ -89,6 +93,8 @@ export default function EtbBausteineTab() {
         value: t,
       })),
       onFilter: (wert, b) => b.typ === wert,
+      // In der Folge der ETB-Typen, nicht nach dem Wort (LLH-1096).
+      sorter: nachZahl((b: EtbBaustein) => TYP_FOLGE.indexOf(b.typ)),
       // Typ als KANTE + TYPWORT wie auf der ETB-Zeitachse, nicht als Etikett: derselbe Typ sieht im
       // Katalog aus wie im Tagebuch, das er befüllt.
       render: (t: EtbBaustein['typ']) => {
@@ -114,6 +120,7 @@ export default function EtbBausteineTab() {
       title: 'Sortierung',
       dataIndex: 'sortier',
       key: 'sortier',
+      sorter: nachZahl((b: EtbBaustein) => b.sortier),
       // Zahlen in Mono — die Spalte wird zeilenweise verglichen.
       render: (n: number) => <span style={monoStil(12)}>{n}</span>,
     },
@@ -146,6 +153,9 @@ export default function EtbBausteineTab() {
         ] as KatalogSpalte<EtbBaustein>[])
       : []),
   ];
+
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt `sortier`, die Folge im ETB.
+  const gedaechtnis = useListenGedaechtnis('stammdaten-etb-bausteine', spalten);
 
   return (
     <AdminPage
@@ -191,6 +201,8 @@ export default function EtbBausteineTab() {
           loading={query.isLoading}
           dataSource={query.data ?? []}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Bausteinen"
           /**
            * Beides: der `suchText`-Haken der Leitspalte hält den Inhalt im Korpus. Der Platzhalter ist
            * an den Haken gebunden — wer ihn entfernt, nimmt hier „oder Inhalt" mit heraus.

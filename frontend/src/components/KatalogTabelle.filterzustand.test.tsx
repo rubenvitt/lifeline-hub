@@ -5,7 +5,7 @@ import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { kopfFilterWaehlen, kopfFilterWerte } from '../test/kopfFilter';
 import KatalogTabelle, { type KatalogSpalte } from './KatalogTabelle';
 import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGedaechtnis';
 
@@ -64,7 +64,7 @@ describe('KatalogTabelle · Filterzustand (LLH-1086)', () => {
       />,
     );
     expect(hinweis()).toBeNull();
-    await kopfFilterWaehlen('Aktiv', ['inaktiv']);
+    await kopfFilterWaehlen('Aktiv', [/^inaktiv/]);
     await waitFor(() => expect(namen()).toEqual(['OSM']));
     expect(
       screen.getByRole('button', { name: 'Filter Aktiv: inaktiv entfernen' }),
@@ -84,12 +84,12 @@ describe('KatalogTabelle · Filterzustand (LLH-1086)', () => {
         suche={{ platzhalter: 'Name' }}
       />,
     );
-    await kopfFilterWaehlen('Aktiv', ['aktiv']);
+    await kopfFilterWaehlen('Aktiv', [/^aktiv/]);
     await waitFor(() => expect(namen()).toEqual(['Basemap', 'Topo']));
     await userEvent.click(screen.getByRole('button', { name: 'Filter Aktiv: aktiv entfernen' }));
     await waitFor(() => expect(namen()).toEqual(['Basemap', 'OSM', 'Topo']));
 
-    await kopfFilterWaehlen('Aktiv', ['aktiv']);
+    await kopfFilterWaehlen('Aktiv', [/^aktiv/]);
     await userEvent.type(screen.getByPlaceholderText('Name'), 'Top');
     await waitFor(() => expect(namen()).toEqual(['Topo']));
     expect(hinweis()).toHaveTextContent('„Top“');
@@ -97,6 +97,35 @@ describe('KatalogTabelle · Filterzustand (LLH-1086)', () => {
     await waitFor(() => expect(namen()).toEqual(['Basemap', 'OSM', 'Topo']));
     expect(screen.getByPlaceholderText('Name')).toHaveValue('');
     expect(hinweis()).toBeNull();
+  });
+
+  it('das Kopfmenü zählt je Wert unter Suche und den übrigen Filtern (LLH-1096)', async () => {
+    setzeViewportBreite(1366);
+    renderMitProviders(
+      <KatalogTabelle<Quelle>
+        rowKey="id"
+        columns={spalten()}
+        dataSource={ZEILEN}
+        suche={{ platzhalter: 'Name' }}
+      />,
+    );
+    expect(await kopfFilterWerte('Aktiv')).toEqual(['aktiv (2)', 'inaktiv (1)']);
+    await userEvent.keyboard('{Escape}');
+    await userEvent.type(screen.getByPlaceholderText('Name'), 'O');
+    await waitFor(() => expect(namen()).toEqual(['OSM', 'Topo']));
+    expect(await kopfFilterWerte('Aktiv')).toEqual(['aktiv (1)', 'inaktiv (1)']);
+  });
+
+  it('ohne `onFilter` zählt das Kopfmenü nicht', async () => {
+    setzeViewportBreite(1366);
+    const ohne = spalten().map((s) => {
+      if (s.key !== 'aktiv') return s;
+      const { onFilter: _weg, ...rest } = s;
+      void _weg;
+      return rest;
+    });
+    renderMitProviders(<KatalogTabelle<Quelle> rowKey="id" columns={ohne} dataSource={ZEILEN} />);
+    expect(await kopfFilterWerte('Aktiv')).toEqual(['aktiv', 'inaktiv']);
   });
 
   it('der Aufrufer bekommt onChange weiter', async () => {
@@ -110,7 +139,7 @@ describe('KatalogTabelle · Filterzustand (LLH-1086)', () => {
         onChange={onChange}
       />,
     );
-    await kopfFilterWaehlen('Aktiv', ['inaktiv']);
+    await kopfFilterWaehlen('Aktiv', [/^inaktiv/]);
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(onChange.mock.lastCall?.[1]).toMatchObject({ aktiv: ['nein'] });
   });

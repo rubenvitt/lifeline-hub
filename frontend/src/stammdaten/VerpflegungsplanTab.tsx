@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { taktischeUhrzeitAus } from '../anzeige/uhrzeit';
 import { globalKeys } from '../api/queryKeys';
-import type { VerpflegungVorlage } from '../api/types';
+import type { VerpflegungVorlage, Verpflegungsart } from '../api/types';
 import { listVerpflegungVorlagen, updateVerpflegungVorlage } from '../api/verpflegungVorlagen';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
@@ -16,6 +16,8 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
+import { nachText, nachZahl } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { VERPFLEGUNGSART_LABEL } from '../verpflegung/verpflegungText';
 import MahlzeitDialog from './MahlzeitDialog';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
@@ -33,6 +35,8 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
  * (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“). Live über das Org-Ereignis
  * `stammdaten` (Prefix `verpflegung-vorlagen` in `ORG_STREAM_EVENTS`).
  */
+const ART_FOLGE = Object.keys(VERPFLEGUNGSART_LABEL) as Verpflegungsart[];
+
 export default function VerpflegungsplanTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -60,6 +64,7 @@ export default function VerpflegungsplanTab() {
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
       key: 'bezeichnung',
+      sorter: nachText((m: VerpflegungVorlage) => m.bezeichnung),
       // Unter `md` gedeckelt, damit Zeit und Aktionen daneben im Bild bleiben (wie Sprechgruppen).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (b: string) => <span style={{ overflowWrap: 'anywhere' }}>{b}</span>,
@@ -68,6 +73,8 @@ export default function VerpflegungsplanTab() {
       title: 'Zeit',
       key: 'zeit',
       immerSichtbar: true,
+      // Nach dem Beginn; eine Mahlzeit am Folgetag steht hinter allen des Tages (LLH-1096).
+      sorter: nachText((m: VerpflegungVorlage) => `${m.folgetag ? 1 : 0}${m.beginn}`),
       render: (_, m) => (
         <span style={{ whiteSpace: 'nowrap' }}>
           <span style={monoStil(13)}>
@@ -84,6 +91,11 @@ export default function VerpflegungsplanTab() {
     {
       title: 'Art',
       key: 'art',
+      filters: ART_FOLGE.map((a) => ({ text: VERPFLEGUNGSART_LABEL[a], value: a })),
+      onFilter: (wert, m) => m.verpflegungsart === wert,
+      sorter: nachZahl((m: VerpflegungVorlage) =>
+        m.verpflegungsart ? ART_FOLGE.indexOf(m.verpflegungsart) : null,
+      ),
       render: (_, m) => (m.verpflegungsart ? VERPFLEGUNGSART_LABEL[m.verpflegungsart] : '—'),
     },
     {
@@ -142,6 +154,9 @@ export default function VerpflegungsplanTab() {
   ];
 
   const geschaltet = schalten.variables?.aktiv;
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt die Reihenfolge des Servers.
+  const gedaechtnis = useListenGedaechtnis('stammdaten-verpflegungsplan', spalten);
+
   return (
     <AdminPage
       titel="Verpflegungsplan"
@@ -175,6 +190,8 @@ export default function VerpflegungsplanTab() {
           loading={query.isLoading}
           dataSource={query.data ?? []}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Mahlzeiten"
           locale={{ emptyText: 'Noch keine Mahlzeiten' }}
           suche={{ platzhalter: 'Bezeichnung' }}
         />

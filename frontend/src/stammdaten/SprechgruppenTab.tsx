@@ -8,6 +8,8 @@ import KatalogTabelle, {
 } from '../components/KatalogTabelle';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { useViewport } from '../components/useViewport';
+import { nachText, werteAus } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -50,6 +52,11 @@ export default function SprechgruppenTab() {
 
   // Der Hinweis ist nachrangig und fällt unter `lg` weg; Status und Aktionen stehen rechts fixiert
   // und sind nicht abwählbar (LFH-980).
+  const sprechgruppen = sprechgruppenQuery.data ?? [];
+  // Netz und Sicherheit filtern mit den Werten der Zeilen (LLH-1096); ohne Wert kein Trichter.
+  const netzWerte = werteAus(sprechgruppen, (sg) => sg.netz);
+  const sicherheitWerte = werteAus(sprechgruppen, (sg) => sg.sicherheit);
+
   const spalten: KatalogSpalte<Sprechgruppe>[] = [
     {
       title: 'Bezeichnung',
@@ -77,6 +84,7 @@ export default function SprechgruppenTab() {
         { text: 'DMO', value: 'DMO' },
       ],
       onFilter: (wert, sg) => sg.betriebsart === wert,
+      sorter: nachText((sg: Sprechgruppe) => sg.betriebsart),
       // Eine Betriebsart ist eine KENNUNG, kein Zustand — Mono statt einer Etikettfarbe, die
       // TMO und DMO Bedeutungen andichtete (blau = Bedienung, orange = Achtung).
       render: (ba: string) => <span style={monoStil(12, 500)}>{ba}</span>,
@@ -87,6 +95,9 @@ export default function SprechgruppenTab() {
       dataIndex: 'netz',
       key: 'netz',
       abBreite: 'lg',
+      sorter: nachText((sg: Sprechgruppe) => sg.netz),
+      filters: netzWerte.length > 0 ? netzWerte : undefined,
+      onFilter: (wert, sg) => sg.netz === wert,
       render: (n?: string) => (n ? <span style={monoStil(12, 500)}>{n}</span> : '—'),
     },
     {
@@ -94,6 +105,9 @@ export default function SprechgruppenTab() {
       dataIndex: 'sicherheit',
       key: 'sicherheit',
       abBreite: 'lg',
+      sorter: nachText((sg: Sprechgruppe) => sg.sicherheit),
+      filters: sicherheitWerte.length > 0 ? sicherheitWerte : undefined,
+      onFilter: (wert, sg) => sg.sicherheit === wert,
       render: (n?: string) => (n ? <span style={monoStil(12, 500)}>{n}</span> : '—'),
     },
     {
@@ -101,6 +115,7 @@ export default function SprechgruppenTab() {
       dataIndex: 'hinweis',
       key: 'hinweis',
       abBreite: 'lg',
+      // Weder Sortierung noch Filter (LLH-1096): Freitext ist kein Vergleichswert, die Suche deckt ihn.
       /**
        * Die einzige Freitextspalte — ungekürzt trieb sie die Zeilenhöhe. `showTitle` hält den vollen
        * Wert erreichbar, und der Hinweis steht namentlich im Suchplatzhalter. Gekappt wird an der
@@ -179,6 +194,11 @@ export default function SprechgruppenTab() {
       : []),
   ];
 
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt die fachliche Reihenfolge des Servers.
+  const gedaechtnis = useListenGedaechtnis('stammdaten-sprechgruppen', spalten, {
+    ausDaten: ['netz', 'sicherheit'],
+  });
+
   return (
     <AdminPage
       titel="Sprechgruppen"
@@ -221,8 +241,10 @@ export default function SprechgruppenTab() {
         <KatalogTabelle
           rowKey="id"
           loading={sprechgruppenQuery.isLoading}
-          dataSource={sprechgruppenQuery.data ?? []}
+          dataSource={sprechgruppen}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Sprechgruppen"
           locale={{ emptyText: 'Noch keine Sprechgruppen' }}
           suche={{ platzhalter: 'Bezeichnung, Betriebsart, Netz oder Hinweis' }}
           spaltenSchalter={{ bezeichnung: 'Sprechgruppen' }}

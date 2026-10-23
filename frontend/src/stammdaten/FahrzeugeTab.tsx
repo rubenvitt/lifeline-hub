@@ -8,6 +8,8 @@ import KatalogTabelle, {
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
 import { useViewport } from '../components/useViewport';
+import { nachText, nachZahl, werteAus } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -19,7 +21,7 @@ import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
-import { staerkeText } from '../anzeige/staerke';
+import { staerkeSumme, staerkeText } from '../anzeige/staerke';
 import { KennungsLink } from '../components/kennungsLink';
 
 export default function FahrzeugeTab() {
@@ -39,6 +41,12 @@ export default function FahrzeugeTab() {
   });
 
   const dienststatusMutation = useDienststatusMutation(setzeDienststatus, globalKeys.fahrzeuge());
+
+  const fahrzeuge = fahrzeugeQuery.data ?? [];
+  // Typ und Träger filtern mit den Werten der Zeilen (LLH-1096, Muster der Einsatzliste); ohne Wert
+  // kein Trichter.
+  const typWerte = werteAus(fahrzeuge, (f) => f.fahrzeugtyp);
+  const traegerWerte = werteAus(fahrzeuge, (f) => f.traegerorganisation);
 
   // Träger und Kennzeichen sind nachrangig und fallen unter `lg` weg; der Spaltenschalter zählt
   // sie und holt sie zurück (LFH-980).
@@ -77,12 +85,23 @@ export default function FahrzeugeTab() {
         </Space>
       ),
     },
-    { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'fahrzeugtyp', render: (t) => t ?? '—' },
+    {
+      title: 'Typ',
+      dataIndex: 'fahrzeugtyp',
+      key: 'fahrzeugtyp',
+      sorter: nachText((f: Fahrzeug) => f.fahrzeugtyp),
+      filters: typWerte.length > 0 ? typWerte : undefined,
+      onFilter: (wert, f) => f.fahrzeugtyp === wert,
+      render: (t) => t ?? '—',
+    },
     {
       title: 'Träger',
       dataIndex: 'traegerorganisation',
       key: 'traeger',
       abBreite: 'lg',
+      sorter: nachText((f: Fahrzeug) => f.traegerorganisation),
+      filters: traegerWerte.length > 0 ? traegerWerte : undefined,
+      onFilter: (wert, f) => f.traegerorganisation === wert,
       render: (t) => t ?? '—',
     },
     {
@@ -90,11 +109,14 @@ export default function FahrzeugeTab() {
       dataIndex: 'kennzeichen',
       key: 'kennzeichen',
       abBreite: 'lg',
+      sorter: nachText((f: Fahrzeug) => f.kennzeichen),
       render: (t) => (t ? <span style={monoStil(12)}>{t}</span> : '—'),
     },
     {
       title: 'Stärke',
       key: 'staerke',
+      // Nach der Gesamtstärke (Σ), wie sie hinter „//“ steht.
+      sorter: nachZahl((f: Fahrzeug) => staerkeSumme(f.staerke)),
       render: (_, f) => <span style={monoStil(12)}>{staerkeText(f.staerke)}</span>,
     },
     ...dienststatusSpalten<Fahrzeug>({
@@ -108,6 +130,14 @@ export default function FahrzeugeTab() {
       },
     }),
   ];
+
+  /**
+   * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, `components/listenGedaechtnis.ts`).
+   * Keine Vorgabesortierung: die Reihenfolge des Servers ist der Einstieg (siehe Leitspalte).
+   */
+  const gedaechtnis = useListenGedaechtnis('stammdaten-fahrzeuge', spalten, {
+    ausDaten: ['fahrzeugtyp', 'traeger'],
+  });
 
   return (
     <AdminPage
@@ -150,8 +180,10 @@ export default function FahrzeugeTab() {
         <KatalogTabelle
           rowKey="id"
           loading={fahrzeugeQuery.isLoading}
-          dataSource={fahrzeugeQuery.data ?? []}
+          dataSource={fahrzeuge}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Fahrzeugen"
           locale={{ emptyText: 'Noch keine Fahrzeuge' }}
           // Durchsucht werden die vier Spalten mit Datenbezug (Funkrufname, Typ, Träger, Kennzeichen);
           // Stärke und Status sind render-only. Der Platzhalter nennt alle vier: das Feld wächst mit

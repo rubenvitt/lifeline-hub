@@ -75,6 +75,11 @@ export function staerkeText(s: Staerke | null | undefined): string {
   return `${fuehrer}/${unterfuehrer}/${mannschaft}//${fuehrer + unterfuehrer + mannschaft}`;
 }
 
+/** Die Gesamtstärke Σ (der Wert hinter „//“), `null` ohne Angabe; Sortierwert der Listen (LLH-1096). */
+export function staerkeSumme(s: Staerke | null | undefined): number | null {
+  return s ? s.fuehrer + s.unterfuehrer + s.mannschaft : null;
+}
+
 /** „1 Kraft“, „4 Kräfte“: Kräfte an UHS als Zahl (LFH-1045, Lage-Dashboard). */
 export function kraefteText(anzahl: number): string {
   return `${anzahl} ${anzahl === 1 ? 'Kraft' : 'Kräfte'}`;

@@ -7,6 +7,9 @@ import { renderMitProviders } from '../test/utils';
 import MaterialTab from './MaterialTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { ort, Ortsfuehler } from '../test/ortsfuehler';
+import { setzeViewportBreite } from '../test/viewport';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -27,13 +30,23 @@ const material = {
 
 // Voreinstellung bleibt EIN Posten: die Prüfungen unten greifen „Bearbeiten" per `getByRole`
 // (Einzahl), eine zweite Zeile machte sie mehrdeutig.
-function render(benutzer: typeof admin, posten = [material]) {
+function render(
+  benutzer: typeof admin,
+  posten: unknown[] = [material],
+  route = '/admin/stammdaten/material',
+) {
   server.use(
     meHandler(benutzer),
     http.get('/api/material', () => HttpResponse.json(posten)),
     http.get('/api/material-kategorien', () => HttpResponse.json(['Betreuung'])),
   );
-  return renderMitProviders(<MaterialTab />);
+  return renderMitProviders(
+    <>
+      <Ortsfuehler />
+      <MaterialTab />
+    </>,
+    { route },
+  );
 }
 
 describe('MaterialTab', () => {
@@ -186,7 +199,7 @@ describe('MaterialTab', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    await userEvent.click(within(menue).getByText('außer Dienst'));
+    await userEvent.click(within(menue).getByText(/^außer Dienst \(\d+\)$/));
     await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
 
     await waitFor(() => expect(zeilen()).toHaveLength(1));
@@ -214,7 +227,7 @@ describe('MaterialTab', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    await userEvent.click(within(menue).getByText('Gerät'));
+    await userEvent.click(within(menue).getByText(/^Gerät \(\d+\)$/));
     await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
     await waitFor(() => expect(zeilen()).toHaveLength(1));
     expect(zeilen()[0].textContent).toContain('Stromerzeuger');
@@ -320,5 +333,57 @@ describe('MaterialTab — Demo-Marke', () => {
     const demo = container.querySelector('[data-row-key="2"]') as HTMLElement;
     expect(within(demo).getByText('Demo')).toBeInTheDocument();
     expect(within(echt).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096): Kategorie und Träger filtern mit Werten aus den
+ * Zeilen, Art und Status mit festen Werten; jede vergleichbare Spalte sortiert, der Stand steht in
+ * der Adresse.
+ */
+describe('MaterialTab · Sortieren und Filtern (LLH-1096)', () => {
+  const feldbett = {
+    ...material,
+    id: 2,
+    bezeichnung: 'Feldbett',
+    kategorie: 'Unterkunft',
+    bestandsnummer: 'B-0001',
+    traegerorganisation: 'ASB',
+    art: 'geraet',
+  };
+  const decke = { ...material, bestandsnummer: 'B-0100', traegerorganisation: 'DRK' };
+  const folge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, [decke, feldbett]);
+    await screen.findByText('Wolldecke');
+    expect(folge()).toEqual(['1', '2']);
+
+    await kopfFilterWaehlen('Kategorie', ['Unterkunft (1)']);
+    await waitFor(() => expect(folge()).toEqual(['2']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/stammdaten/material?f.kategorie=Unterkunft'),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Bestandsnummer/ }));
+    await waitFor(() => expect(folge()).toEqual(['2', '1']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/stammdaten/material?sort=bestandsnummer%3Aauf'),
+    );
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, [decke, feldbett], '/admin/stammdaten/material?f.traeger=DRK');
+    await screen.findByText('Wolldecke');
+    expect(screen.queryByText('Feldbett')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Träger: DRK entfernen' }),
+    ).toBeInTheDocument();
   });
 });

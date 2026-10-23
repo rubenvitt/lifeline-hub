@@ -1,5 +1,7 @@
 import { Form, Input, InputNumber, type TableColumnsType } from 'antd';
 import { monoStil } from '../components/instrument';
+import { nachZahl } from '../components/katalogVergleich';
+import { staerkeSumme } from '../anzeige/staerke';
 import { aktualisiereTyp, deaktiviereTyp, legeTypAn, listeEinheitTypen } from '../api/einheitTypen';
 import type { EinheitTyp, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -28,6 +30,8 @@ const spalten: TableColumnsType<EinheitTyp> = [
   {
     title: 'Soll-Stärke (F/UF/M//Σ)',
     key: 'soll',
+    // Nach der Gesamtstärke (Σ); ohne Soll hinten (LLH-1096).
+    sorter: nachZahl((t: EinheitTyp) => staerkeSumme(t.soll)),
     // Mono an der AUFRUFSTELLE, nicht im Primitiv: `StaerkeAnzeige` rendert bewusst ein
     // Fragment, damit zusammengesetzte Textzeilen nicht in mehrere Textknoten zerfallen.
     render: (_, t) => (
@@ -90,6 +94,8 @@ export default function EinheitTypenTab() {
   return (
     <KatalogVerwaltung<EinheitTyp, FormWerte>
       titel="Einheitstypen"
+      listenSeite="stammdaten-einheit-typen"
+      mehrzahl="Typen"
       queryKey={globalKeys.einheitTypen()}
       liste={listeEinheitTypen}
       legeAn={legeAn}

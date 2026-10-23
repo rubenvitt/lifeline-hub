@@ -7,6 +7,9 @@ import { renderMitProviders } from '../test/utils';
 import FahrzeugeTab from './FahrzeugeTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { ort, Ortsfuehler } from '../test/ortsfuehler';
+import { setzeViewportBreite } from '../test/viewport';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -31,7 +34,11 @@ const fahrzeug = {
 
 // Voreinstellung bleibt EIN Fahrzeug: die Prüfungen unten greifen „Bearbeiten" per
 // `getByRole` (Einzahl), eine zweite Zeile machte sie mehrdeutig.
-function render(benutzer: typeof admin, fahrzeuge = [fahrzeug]) {
+function render(
+  benutzer: typeof admin,
+  fahrzeuge: unknown[] = [fahrzeug],
+  route = '/admin/stammdaten/fahrzeuge',
+) {
   server.use(
     meHandler(benutzer),
     http.get('/api/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
@@ -39,7 +46,13 @@ function render(benutzer: typeof admin, fahrzeuge = [fahrzeug]) {
       HttpResponse.json({ fahrzeugtyp: ['LF 20'], traegerorganisation: [], standort: [] }),
     ),
   );
-  return renderMitProviders(<FahrzeugeTab />);
+  return renderMitProviders(
+    <>
+      <Ortsfuehler />
+      <FahrzeugeTab />
+    </>,
+    { route },
+  );
 }
 
 describe('FahrzeugeTab', () => {
@@ -166,9 +179,8 @@ describe('FahrzeugeTab', () => {
 
     // Erst der Griff, dann der Klick: so meldet ein fehlender Filter sich hier statt erst am
     // leeren Filtermenü.
-    const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
-    expect(ausloeser, 'die Statusspalte muss einen Filter tragen').not.toBeNull();
-    await userEvent.click(ausloeser!);
+    // Seit LLH-1096 filtern auch Typ und Träger: gegriffen über den Namen des Auslösers.
+    await userEvent.click(screen.getByRole('button', { name: /^Status filtern/ }));
     // Das Filtermenü hängt in einem Portal an `document.body`. Die Auswahl wird DARIN gegriffen:
     // „außer Dienst" steht auch als Etikett in der Statusspalte, ein Griff über `screen` träfe
     // zwei Knoten.
@@ -177,7 +189,7 @@ describe('FahrzeugeTab', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    await userEvent.click(within(menue).getByText('außer Dienst'));
+    await userEvent.click(within(menue).getByText(/^außer Dienst \(\d+\)$/));
     await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
 
     await waitFor(() => expect(zeilen()).toHaveLength(1));
@@ -283,5 +295,58 @@ describe('FahrzeugeTab — Demo-Marke', () => {
     const demo = container.querySelector('[data-row-key="2"]') as HTMLElement;
     expect(within(demo).getByText('Demo')).toBeInTheDocument();
     expect(within(echt).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096, Rollout des Musters aus LLH-1086): Typ und Träger
+ * filtern mit Werten aus den Zeilen, jede vergleichbare Spalte sortiert, der Stand steht in der
+ * Adresse.
+ */
+describe('FahrzeugeTab · Sortieren und Filtern (LLH-1096)', () => {
+  const rtw = {
+    ...fahrzeug,
+    id: 2,
+    funkrufname: 'Rotkreuz 2',
+    fahrzeugtyp: 'RTW',
+    traegerorganisation: 'DRK',
+    kennzeichen: 'AA-B 9',
+    staerke: { fuehrer: 0, unterfuehrer: 0, mannschaft: 2 },
+  };
+  const folge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, [fahrzeug, rtw]);
+    await screen.findByText('Florian 1');
+    expect(folge()).toEqual(['1', '2']);
+
+    await kopfFilterWaehlen('Typ', ['RTW (1)']);
+    await waitFor(() => expect(folge()).toEqual(['2']));
+    await waitFor(() => expect(ort.aktuell).toBe('/admin/stammdaten/fahrzeuge?f.fahrzeugtyp=RTW'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Kennzeichen/ }));
+    await waitFor(() => expect(folge()).toEqual(['2', '1']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/stammdaten/fahrzeuge?sort=kennzeichen%3Aauf'),
+    );
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Stärke/ }));
+    await waitFor(() => expect(folge()).toEqual(['2', '1']));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Stärke/ }));
+    await waitFor(() => expect(folge()).toEqual(['1', '2']));
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste, auch bevor die Zeilen da sind', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, [fahrzeug, rtw], '/admin/stammdaten/fahrzeuge?f.traeger=DRK');
+    await screen.findByText('Rotkreuz 2');
+    expect(screen.queryByText('Florian 1')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Träger: DRK entfernen' }),
+    ).toBeInTheDocument();
   });
 });

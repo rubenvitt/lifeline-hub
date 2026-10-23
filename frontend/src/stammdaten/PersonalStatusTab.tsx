@@ -1,5 +1,6 @@
 import { Collapse, Form, Input, InputNumber, type TableColumnsType } from 'antd';
 import { monoStil } from '../components/instrument';
+import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
 import {
   aktualisiereStatus,
@@ -49,6 +50,8 @@ const spalten: TableColumnsType<PersonalStatus> = [
      */
     filters: kategorien.map((k) => ({ text: statusKategorie[k].label, value: k })),
     onFilter: (wert, s) => s.kategorie === wert,
+    // In der Folge der Kategorien, nicht nach dem Wort (LLH-1096).
+    sorter: nachZahl((s: PersonalStatus) => kategorien.indexOf(s.kategorie)),
     render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
   },
   {
@@ -64,6 +67,7 @@ const spalten: TableColumnsType<PersonalStatus> = [
     title: 'Sortierung',
     dataIndex: 'sortier',
     key: 'sortier',
+    sorter: nachZahl((s: PersonalStatus) => s.sortier),
     render: (n: number) => <span style={monoStil(12)}>{n}</span>,
   },
 ];
@@ -120,6 +124,8 @@ const felder = (
 export default function PersonalStatusTab() {
   return (
     <KatalogVerwaltung<PersonalStatus, FormWerte>
+      listenSeite="stammdaten-personal-status"
+      mehrzahl="Status"
       titel="Personal-Status"
       queryKey={globalKeys.personalStatus()}
       liste={listePersonalStatus}
