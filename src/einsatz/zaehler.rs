@@ -3,7 +3,8 @@
 //! Gezählt wird nur, wo die Bedeutung belegt ist: die Gesamtmengen von ETB, Betroffenen,
 //! Einheiten, Einsatzabschnitten und Dokumenten (LFH-666), die Handlungsmengen der vier
 //! Kommunikationsmodule, die neuen Lagemeldungen (LLH-1206) und die offenen Nachforderungen je
-//! Stufe (LLH-1078). Ein weiteres Modul braucht eine eigene Entscheidung.
+//! Stufe (LLH-1078) samt den überfälligen (LLH-1145). Ein weiteres Modul braucht eine eigene
+//! Entscheidung.
 //!
 //! **Fehlt ≠ 0.** Jedes Feld fehlt, wenn der Benutzer das Modul nicht sehen darf
 //! ([`crate::einsatz::berechtigung::erlaubte_module`]); eine 0 wäre eine Auskunft über ein
@@ -64,9 +65,10 @@ pub struct AuftragsZaehler {
     pub ueberfaellig: i64,
 }
 
-/// Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.
-/// Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an
-/// der Uhr, und dieser Abruf läuft nur bei Live-Ereignissen.
+/// Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs), davon je Stufe und davon
+/// überfällig (LLH-1145). Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den
+/// letzten 12 h“ hinge an der Uhr, und dieser Abruf läuft nur bei Live-Ereignissen. „Überfällig“
+/// hängt ebenso an der Uhr wie bei den Aufträgen: der Stand des letzten Abrufs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct NachforderungsZaehler {
     pub offen: i64,
@@ -76,6 +78,19 @@ pub struct NachforderungsZaehler {
     pub zugesagt: i64,
     /// Davon „unterwegs“.
     pub unterwegs: i64,
+    /// Davon überfällig (LLH-1145): zugesagt oder unterwegs, erwartetes Eintreffen verstrichen —
+    /// dieselbe Regel wie das Board (`istUeberfaellig` in
+    /// `frontend/src/nachforderungen/nachforderungStufen.ts`).
+    pub ueberfaellig: i64,
+}
+
+/// Was an einer Nachforderung gezählt wird. Das Flag kommt aus dem SQL-Fragment
+/// `nachforderung::repo::ist_ueberfaellig_sql`; gezählt wird darüber in
+/// [`zaehle_nachforderungen`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NachforderungsMerkmale {
+    pub status: NachforderungStatus,
+    pub ist_ueberfaellig: bool,
 }
 
 /// Was an einem Auftrag gezählt wird. Die Flags kommen aus denselben SQL-Fragmenten wie in der
@@ -160,29 +175,35 @@ pub fn zaehle_meldungen_gewichtet(
     z
 }
 
-/// Zählregel der Nachforderungen: offen nach [`NachforderungStatus::ist_offen`], davon je Stufe.
-/// Dieselbe Regel kennt das Board im Browser (`zaehleNachforderungen` in
+/// Zählregel der Nachforderungen: offen nach [`NachforderungStatus::ist_offen`], davon je Stufe
+/// und davon überfällig (nur unter den offenen, wie bei den Aufträgen). Dieselbe Regel kennt das
+/// Board im Browser (`zaehleNachforderungen` in
 /// `frontend/src/nachforderungen/nachforderungStufen.ts`); das Fixture hält beide gleich.
-pub fn zaehle_nachforderungen(status: &[NachforderungStatus]) -> NachforderungsZaehler {
-    zaehle_nachforderungen_gewichtet(status.iter().map(|s| (*s, 1)))
+pub fn zaehle_nachforderungen(nachforderungen: &[NachforderungsMerkmale]) -> NachforderungsZaehler {
+    zaehle_nachforderungen_gewichtet(nachforderungen.iter().map(|m| (*m, 1)))
 }
 
-/// [`zaehle_nachforderungen`] über Gruppen gleichen Status mit ihrer Anzahl
-/// (`nachforderung::repo::zaehlen`, `GROUP BY status`).
+/// [`zaehle_nachforderungen`] über Gruppen gleicher Merkmale mit ihrer Anzahl
+/// (`nachforderung::repo::zaehlen`, `GROUP BY` Status und Fragment).
 pub fn zaehle_nachforderungen_gewichtet(
-    gruppen: impl IntoIterator<Item = (NachforderungStatus, i64)>,
+    gruppen: impl IntoIterator<Item = (NachforderungsMerkmale, i64)>,
 ) -> NachforderungsZaehler {
     let mut z = NachforderungsZaehler {
         offen: 0,
         angefordert: 0,
         zugesagt: 0,
         unterwegs: 0,
+        ueberfaellig: 0,
     };
-    for (s, n) in gruppen {
+    for (m, n) in gruppen {
+        let s = m.status;
         if !s.ist_offen() {
             continue;
         }
         z.offen += n;
+        if m.ist_ueberfaellig {
+            z.ueberfaellig += n;
+        }
         match s {
             NachforderungStatus::Angefordert => z.angefordert += n,
             NachforderungStatus::Zugesagt => z.zugesagt += n,
@@ -372,7 +393,8 @@ pub async fn berechne(
         });
     }
     if erlaubt.contains("nachforderungen") {
-        z.nachforderungen = Some(crate::nachforderung::repo::zaehlen(pool, einsatz_id).await?);
+        z.nachforderungen =
+            Some(crate::nachforderung::repo::zaehlen(pool, einsatz_id, jetzt).await?);
     }
     Ok(z)
 }
@@ -408,6 +430,7 @@ mod tests {
                 angefordert: 1,
                 zugesagt: 0,
                 unterwegs: 0,
+                ueberfaellig: 0,
             }),
         };
         let v = serde_json::to_value(&voll).unwrap();
@@ -500,12 +523,21 @@ mod tests {
             N::Abgelehnt,
             N::Zurueckgezogen,
         ];
-        let n_zeilen: Vec<_> = stati
+        let n_merkmale: Vec<_> = stati
+            .iter()
+            .flat_map(|s| {
+                [false, true].map(|ist_ueberfaellig| NachforderungsMerkmale {
+                    status: *s,
+                    ist_ueberfaellig,
+                })
+            })
+            .collect();
+        let n_zeilen: Vec<_> = n_merkmale
             .iter()
             .enumerate()
-            .flat_map(|(i, s)| std::iter::repeat_n(*s, ausgeschrieben(gewicht(i))))
+            .flat_map(|(i, m)| std::iter::repeat_n(*m, ausgeschrieben(gewicht(i))))
             .collect();
-        let n_gruppen = stati.iter().enumerate().map(|(i, s)| (*s, gewicht(i)));
+        let n_gruppen = n_merkmale.iter().enumerate().map(|(i, m)| (*m, gewicht(i)));
         assert_eq!(
             zaehle_nachforderungen_gewichtet(n_gruppen),
             zaehle_nachforderungen(&n_zeilen)
@@ -515,14 +547,18 @@ mod tests {
     #[test]
     fn nachforderungen_offen_ist_die_summe_der_drei_stufen() {
         use NachforderungStatus as N;
+        let m = |status| NachforderungsMerkmale {
+            status,
+            ist_ueberfaellig: false,
+        };
         let z = zaehle_nachforderungen(&[
-            N::Angefordert,
-            N::Zugesagt,
-            N::Zugesagt,
-            N::Unterwegs,
-            N::Eingetroffen,
-            N::Abgelehnt,
-            N::Zurueckgezogen,
+            m(N::Angefordert),
+            m(N::Zugesagt),
+            m(N::Zugesagt),
+            m(N::Unterwegs),
+            m(N::Eingetroffen),
+            m(N::Abgelehnt),
+            m(N::Zurueckgezogen),
         ]);
         assert_eq!(
             z,
@@ -531,8 +567,29 @@ mod tests {
                 angefordert: 1,
                 zugesagt: 2,
                 unterwegs: 1,
+                ueberfaellig: 0,
             }
         );
+    }
+
+    /// LLH-1145: überfällig zählt nur unter den offenen — ein eingetroffener mit verstrichenem
+    /// Eintreffen ist erledigt, auch wenn ein Aufrufer das Flag ungefiltert liefert.
+    #[test]
+    fn nachforderungen_ueberfaellig_nur_unter_den_offenen() {
+        use NachforderungStatus as N;
+        let m = |status, ist_ueberfaellig| NachforderungsMerkmale {
+            status,
+            ist_ueberfaellig,
+        };
+        let z = zaehle_nachforderungen(&[
+            m(N::Zugesagt, true),
+            m(N::Unterwegs, true),
+            m(N::Unterwegs, false),
+            m(N::Eingetroffen, true),
+            m(N::Abgelehnt, true),
+        ]);
+        assert_eq!(z.offen, 3);
+        assert_eq!(z.ueberfaellig, 2);
     }
 
     #[test]

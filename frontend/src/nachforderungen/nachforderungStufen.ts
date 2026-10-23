@@ -18,7 +18,9 @@ dayjs.extend(utc);
  *   letzten {@link EINGETROFFEN_STUNDEN} h, ältere stehen darunter gesammelt.
  * - **Zeitzeilen** {@link kartenZeiten}: dazu das erwartete Eintreffen einer Zusage (LLH-1097 D7),
  *   im Ton `achtung`, sobald es verstrichen ist ({@link istUeberfaellig}) oder nach „benötigt bis“
- *   liegt. „überfällig“ zählt nur der Client, ohne Alarm ({@link zaehleUeberfaellig}).
+ *   liegt. „überfällig“ zählt das Board über seine Karten ({@link zaehleUeberfaellig}), ohne Alarm;
+ *   seit LLH-1145 zählt der Server dieselbe Regel im Modulzähler (`nachforderungen.ueberfaellig`,
+ *   Führung · Überblick, „Offene Vorgänge“), gehalten über das Fixture.
  */
 
 /** Die Stufen in der Folge der Spalten. */
@@ -50,14 +52,25 @@ export function istOffen(status: NachforderungStatus): boolean {
   return status !== 'eingetroffen' && status !== 'abgelehnt' && status !== 'zurueckgezogen';
 }
 
-/** Die Zählregel der offenen Nachforderungen je Stufe (Parität mit dem Server, Fixture). */
+/**
+ * Die Zählregel der offenen Nachforderungen je Stufe und davon überfällig (Parität mit dem
+ * Server, Fixture; „überfällig“ seit LLH-1145 auch im Modulzähler, nach {@link istUeberfaellig}).
+ */
 export function zaehleNachforderungen(
-  liste: ReadonlyArray<Pick<Nachforderung, 'status'>>,
+  liste: ReadonlyArray<Pick<Nachforderung, 'status' | 'eintreffen_erwartet_at'>>,
+  jetzt: number,
 ): NachforderungsZahlen {
-  const z: NachforderungsZahlen = { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0 };
+  const z: NachforderungsZahlen = {
+    offen: 0,
+    angefordert: 0,
+    zugesagt: 0,
+    unterwegs: 0,
+    ueberfaellig: 0,
+  };
   for (const n of liste) {
     if (!istOffen(n.status)) continue;
     z.offen += 1;
+    if (istUeberfaellig(n, jetzt)) z.ueberfaellig += 1;
     if (n.status === 'angefordert') z.angefordert += 1;
     else if (n.status === 'zugesagt') z.zugesagt += 1;
     else if (n.status === 'unterwegs') z.unterwegs += 1;

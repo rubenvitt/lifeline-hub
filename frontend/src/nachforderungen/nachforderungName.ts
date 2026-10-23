@@ -20,3 +20,19 @@ export function nachforderungName(
   const details = n.bezeichnung?.trim();
   return details ? `${kurz} — ${details}` : kurz;
 }
+
+/** Adressat-Kategorie → Anzeigewort (Karte und Überblick, LLH-1145). */
+const ADRESSAT_LABEL: Record<string, string> = {
+  leitstelle: 'Leitstelle',
+  nachbar_ea: 'Nachbar-EA',
+  uebergeordnet: 'Übergeordnete Führung',
+  andere_bos: 'Andere BOS',
+};
+
+/** „Leitstelle“, „Andere BOS (THW OV Musterstadt)“ — an wen die Nachforderung ging. */
+export function adressatText(
+  n: Pick<Nachforderung, 'adressat_kategorie' | 'adressat_bezeichnung'>,
+): string {
+  const kategorie = ADRESSAT_LABEL[n.adressat_kategorie] ?? n.adressat_kategorie;
+  return n.adressat_bezeichnung ? `${kategorie} (${n.adressat_bezeichnung})` : kategorie;
+}

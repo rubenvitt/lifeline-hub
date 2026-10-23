@@ -266,7 +266,9 @@ describe('StabPage', () => {
 
   it('Nachforderungen stehen bei S1 und S4 mit den offenen aus dem Modulzähler (LLH-1078)', async () => {
     rendere({
-      zaehler: { nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 } },
+      zaehler: {
+        nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2, ueberfaellig: 0 },
+      },
     });
     for (const k of ['S1', 'S4']) {
       const g = await screen.findByRole('group', { name: `Werkzeuge ${k}` });

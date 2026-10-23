@@ -37,7 +37,7 @@ import {
 import { EINHEITEN_SCHRIFT, einheitenSprungAufbau } from './einheitenSprung';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 import { istUeberfaellig, kartenZeiten } from './nachforderungStufen';
-import { nachforderungName } from './nachforderungName';
+import { adressatText, nachforderungName } from './nachforderungName';
 import { EINHEITEN_VERKNUEPFT, einheitenEinleitung, kannAbschliessen } from './nurVorwaerts';
 import { zielZeile, type ZielAbschnitt, type ZielNamen, type ZielRaum } from './zielVorschlaege';
 import { zusageZeilen } from './zusage';
@@ -46,13 +46,6 @@ import BearbeitenFormular from './BearbeitenFormular';
 
 const { Text } = Typography;
 
-/** Adressat-Kategorie → Anzeigelabel (modul-spezifisch, bleibt lokal). */
-const ADRESSAT_LABEL: Record<string, string> = {
-  leitstelle: 'Leitstelle',
-  nachbar_ea: 'Nachbar-EA',
-  uebergeordnet: 'Übergeordnete Führung',
-  andere_bos: 'Andere BOS',
-};
 /** Nächster linearer Status (für die Weiterschalten-Aktion). */
 const NAECHSTER: Partial<Record<NachforderungStatus, NachforderungStatus>> = {
   angefordert: 'zugesagt',
@@ -369,7 +362,7 @@ function NachforderungKarte({
   const ueberfaellig = jetzt != null && istUeberfaellig(n, jetzt);
   const name = nachforderungName(n);
   const menge = n.anzahl != null ? `${n.anzahl}× ` : '';
-  const adressat = `${ADRESSAT_LABEL[n.adressat_kategorie] ?? n.adressat_kategorie}${n.adressat_bezeichnung ? ` (${n.adressat_bezeichnung})` : ''}`;
+  const adressat = adressatText(n);
   // Im Board nennt die Stufe der Spaltenkopf bzw. das gewählte Segment; eine gehaltene Karte, die
   // inzwischen weiter ist, trägt ihre neue Stufe selbst. Ohne Spalte steht sie immer.
   const statusZeigen = spaltenStufe !== n.status;

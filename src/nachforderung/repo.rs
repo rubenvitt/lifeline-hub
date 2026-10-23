@@ -361,23 +361,51 @@ pub async fn list(
     query.fetch_all(pool).await.map_err(Into::into)
 }
 
-/// Zählt die Nachforderungen eines Einsatzes je Status (LLH-1078, Modulzähler): EINE Abfrage ohne
-/// Listenspalten (LFH-935), gezählt wird darüber mit [`crate::einsatz::zaehler::zaehle_nachforderungen_gewichtet`].
+/// Überfällig (LLH-1145): zugesagt oder unterwegs und das erwartete Eintreffen liegt vor `jetzt`
+/// (genau jetzt ist noch nicht überfällig). Trägt EIN `?` für `jetzt`. Dieselbe Regel wie das
+/// Board (`istUeberfaellig` in `frontend/src/nachforderungen/nachforderungStufen.ts`), gehalten über
+/// das Fixture `tests/fixtures/verdichtung/regeln.json`. Die Liste trägt die Spalte bewusst nicht
+/// (keine Spalte mit `jetzt` in der Anzeige-Abfrage): die Karte rechnet mit der Uhr des Browsers.
+macro_rules! ist_ueberfaellig_sql {
+    () => {
+        "(n.status IN ('zugesagt', 'unterwegs') AND n.eintreffen_erwartet_at IS NOT NULL \
+          AND n.eintreffen_erwartet_at < ?)"
+    };
+}
+
+/// Zählt die Nachforderungen eines Einsatzes je Status und „überfällig“ (LLH-1078, LLH-1145,
+/// Modulzähler): EINE Abfrage ohne Listenspalten (LFH-935), gezählt wird darüber mit
+/// [`crate::einsatz::zaehler::zaehle_nachforderungen_gewichtet`]. Bind-Reihenfolge: `jetzt`
+/// (Fragment im SELECT), dann `einsatz_id`.
 pub async fn zaehlen(
     pool: &SqlitePool,
     einsatz_id: i64,
+    jetzt: &str,
 ) -> Result<crate::einsatz::zaehler::NachforderungsZaehler, AppError> {
-    let zeilen: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT n.status, COUNT(*) FROM nachforderung n WHERE n.einsatz_id = ? GROUP BY n.status",
-    )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
+    const SQL: &str = concat!(
+        "SELECT n.status, ",
+        ist_ueberfaellig_sql!(),
+        " AS ist_ueberfaellig, COUNT(*) FROM nachforderung n WHERE n.einsatz_id = ? \
+         GROUP BY 1, 2"
+    );
+    let zeilen: Vec<(String, bool, i64)> = sqlx::query_as(SQL)
+        .bind(jetzt)
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?;
     let gruppen = zeilen
         .into_iter()
-        .map(|(status, anzahl)| {
+        .map(|(status, ist_ueberfaellig, anzahl)| {
             super::NachforderungStatus::parse(&status)
-                .map(|s| (s, anzahl))
+                .map(|status| {
+                    (
+                        crate::einsatz::zaehler::NachforderungsMerkmale {
+                            status,
+                            ist_ueberfaellig,
+                        },
+                        anzahl,
+                    )
+                })
                 .ok_or_else(|| AppError::Internal(format!("Unbekannter Status: {status}")))
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -1925,6 +1953,40 @@ mod tests {
         assert_eq!(verweis, Some(n.id));
     }
 
+    /// LLH-1145: das Fragment `ist_ueberfaellig_sql` im Zähler — überfällig erst NACH dem
+    /// erwarteten Eintreffen (genau dann noch nicht, wie `istUeberfaellig` im Board), eine
+    /// angeforderte ohne Eintreffen nie.
+    #[tokio::test]
+    async fn zaehler_ueberfaellig_ab_dem_verstrichenen_eintreffen() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "")).await.unwrap();
+        create(&pool, e, b, daten("KTW", "")).await.unwrap();
+        sage_zu(
+            &pool,
+            e,
+            n.id,
+            b,
+            &ZusageDaten {
+                anzahl: None,
+                rufnamen: &namen(&[]),
+                eintreffen_erwartet_at: Some("2026-06-12 13:30:00"),
+            },
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap();
+        for (jetzt, erwartet) in [
+            ("2026-06-12 13:29:59", 0),
+            ("2026-06-12 13:30:00", 0),
+            ("2026-06-12 13:30:01", 1),
+        ] {
+            let z = zaehlen(&pool, e, jetzt).await.unwrap();
+            assert_eq!(z.offen, 2, "{jetzt}");
+            assert_eq!(z.ueberfaellig, erwartet, "{jetzt}");
+        }
+    }
+
     /// Akzeptanz: Zusage 1 von 2 → eine Position „zugesagt 1× RTW“, eine „angefordert 1× RTW“ mit
     /// denselben Angaben und derselben Wartezeit; genau ein ETB-Eintrag nennt beides.
     #[tokio::test]
@@ -2223,7 +2285,7 @@ mod tests {
             "Nachforderung 2× RTW: zurückgezogen (nicht mehr benötigt)"
         );
         assert_eq!(verweis, Some(n.id));
-        let z = zaehlen(&pool, e).await.unwrap();
+        let z = zaehlen(&pool, e, "2026-06-12 09:30:00").await.unwrap();
         assert_eq!(z.offen, 0);
     }
 

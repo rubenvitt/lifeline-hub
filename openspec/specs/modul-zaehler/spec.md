@@ -20,11 +20,11 @@ Das System SHALL unter `GET /api/einsaetze/{id}/modul-zaehler` für die folgende
 | `chat` | `ungelesen`: für den anfragenden Benutzer ungelesene Nachrichten über alle Kanäle |
 | `dokumente` | `gesamt`: alle nicht gelöschten Dokumente der Dokumentenablage des Einsatzes |
 | `lagemeldungen` | `neu`: Lagemeldungen, die noch niemand als gesehen gekennzeichnet hat |
-| `nachforderungen` | `offen`: Nachforderungen mit Status „angefordert“, „zugesagt“ oder „unterwegs“; `angefordert`, `zugesagt`, `unterwegs`: davon je Status |
+| `nachforderungen` | `offen`: Nachforderungen mit Status „angefordert“, „zugesagt“ oder „unterwegs“; `angefordert`, `zugesagt`, `unterwegs`: davon je Status; `ueberfaellig`: davon zugesagt oder unterwegs mit verstrichenem erwartetem Eintreffen |
 
 Für andere Module MUST die Antwort keinen Zähler enthalten.
 
-Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig“, „ungelesen“ und „neu“ MUST mit den gleichnamigen Angaben der jeweiligen Listen-Endpunkte übereinstimmen. `dokumente.gesamt` MUST der Zahl der Einträge entsprechen, die der Listen-Endpunkt der Dokumente liefert. `lagemeldungen.neu` MUST der Zahl der Einträge mit `is_neu = true` entsprechen, die der Listen-Endpunkt der Lagemeldungen liefert. `nachforderungen.offen` MUST der Zahl der Einträge mit `ist_offen = true` entsprechen, die der Listen-Endpunkt der Nachforderungen liefert, und `offen` MUST die Summe aus `angefordert`, `zugesagt` und `unterwegs` sein. Eingetroffene und abgelehnte Nachforderungen zählt der Zähler nicht.
+Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig“, „ungelesen“ und „neu“ MUST mit den gleichnamigen Angaben der jeweiligen Listen-Endpunkte übereinstimmen. `dokumente.gesamt` MUST der Zahl der Einträge entsprechen, die der Listen-Endpunkt der Dokumente liefert. `lagemeldungen.neu` MUST der Zahl der Einträge mit `is_neu = true` entsprechen, die der Listen-Endpunkt der Lagemeldungen liefert. `nachforderungen.offen` MUST der Zahl der Einträge mit `ist_offen = true` entsprechen, die der Listen-Endpunkt der Nachforderungen liefert, und `offen` MUST die Summe aus `angefordert`, `zugesagt` und `unterwegs` sein. `nachforderungen.ueberfaellig` MUST nach derselben Regel zählen wie das Etikett „überfällig“ des Boards (Status „zugesagt“ oder „unterwegs“ und erwartetes Eintreffen echt vor dem Abrufzeitpunkt); ein gemeinsames Fixture hält Server und Browser gleich. Eingetroffene und abgelehnte Nachforderungen zählt der Zähler nicht.
 
 #### Scenario: Zähler eines Einsatzes
 - **WHEN** ein Mitglied mit Zugriff auf alle Module den Endpunkt aufruft und der Einsatz 4 Betroffene hat, davon 1 storniert
@@ -56,7 +56,11 @@ Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig�
 
 #### Scenario: Offene Nachforderungen
 - **WHEN** der Einsatz zwei angeforderte, eine zugesagte, eine unterwegs befindliche, eine eingetroffene und eine abgelehnte Nachforderung hat
-- **THEN** ist `nachforderungen` gleich `{ offen: 4, angefordert: 2, zugesagt: 1, unterwegs: 1 }`, und die Nachforderungsliste liefert 4 Einträge mit `ist_offen = true`
+- **THEN** ist `nachforderungen` gleich `{ offen: 4, angefordert: 2, zugesagt: 1, unterwegs: 1, ueberfaellig: 0 }`, und die Nachforderungsliste liefert 4 Einträge mit `ist_offen = true`
+
+#### Scenario: Überfällige Nachforderungen
+- **WHEN** eine zugesagte Nachforderung ihr erwartetes Eintreffen vor einer Minute hatte, eine unterwegs befindliche es in einer Stunde hat und eine eingetroffene es vor einer Stunde hatte
+- **THEN** ist `nachforderungen.ueberfaellig: 1`, und das Board trägt genau an der ersten Karte „überfällig“
 
 #### Scenario: Leerer Einsatz
 - **WHEN** ein Modul erlaubt ist, aber keine Datensätze hat

@@ -64,7 +64,12 @@ export {
 export { default as MatrixPaneel, type Matrixzeile } from './MatrixPaneel';
 export { MATRIX_KLASSE } from './matrixGeometrie';
 export { default as StromPaneel } from './StromPaneel';
-export { default as ListenPaneel, listenZeileStil } from './ListenPaneel';
+export {
+  default as ListenPaneel,
+  ListenAbschnitt,
+  listenZeileStil,
+  type ListenAbschnittZustand,
+} from './ListenPaneel';
 export {
   default as GliederungsPaneel,
   GLIEDERUNG_KLASSE,

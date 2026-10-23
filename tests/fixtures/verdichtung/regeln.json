@@ -97,17 +97,19 @@
     "erwartet": { "offen": 4, "unterwegs": 1, "abgeschlossen": 6, "patienten": 4, "sk1": 1, "sk2": 2, "sk3": 1, "sk4": 0 }
   },
   "nachforderungen": {
-    "_zweck": "LLH-1078: Modulzähler `nachforderungen` (src/einsatz/zaehler.rs) und Spaltenköpfe des Boards (frontend/src/nachforderungen/nachforderungStufen.ts). Offen = angefordert + zugesagt + unterwegs; eingetroffen, abgelehnt und zurückgezogen (LLH-1097) sind abgeschlossen.",
+    "_zweck": "LLH-1078: Modulzähler `nachforderungen` (src/einsatz/zaehler.rs) und Spaltenköpfe des Boards (frontend/src/nachforderungen/nachforderungStufen.ts). Offen = angefordert + zugesagt + unterwegs; eingetroffen, abgelehnt und zurückgezogen (LLH-1097) sind abgeschlossen. LLH-1145: überfällig = zugesagt oder unterwegs mit erwartetem Eintreffen vor `jetzt` (Board-Regel `istUeberfaellig`, SQL-Fragment `nachforderung::repo::ist_ueberfaellig_sql`); `ist_ueberfaellig` ist das Flag, das der Server aus dem Fragment liest.",
+    "jetzt": "2026-06-12 12:00:00",
     "faelle": [
-      { "name": "angefordert", "status": "angefordert", "offen": true, "stufe": "angefordert" },
-      { "name": "angefordert, sofort", "status": "angefordert", "offen": true, "stufe": "angefordert" },
-      { "name": "zugesagt", "status": "zugesagt", "offen": true, "stufe": "zugesagt" },
-      { "name": "unterwegs", "status": "unterwegs", "offen": true, "stufe": "unterwegs" },
-      { "name": "unterwegs, zweite Fuhr", "status": "unterwegs", "offen": true, "stufe": "unterwegs" },
-      { "name": "eingetroffen", "status": "eingetroffen", "offen": false, "stufe": "eingetroffen" },
-      { "name": "abgelehnt", "status": "abgelehnt", "offen": false, "stufe": "abgelehnt" },
-      { "name": "zurückgezogen", "status": "zurueckgezogen", "offen": false, "stufe": "zurueckgezogen" }
+      { "name": "angefordert", "status": "angefordert", "offen": true, "stufe": "angefordert", "ist_ueberfaellig": false },
+      { "name": "angefordert, sofort", "status": "angefordert", "offen": true, "stufe": "angefordert", "ist_ueberfaellig": false },
+      { "name": "zugesagt, Eintreffen verstrichen", "status": "zugesagt", "eintreffen_erwartet_at": "2026-06-12 11:30:00", "offen": true, "stufe": "zugesagt", "ist_ueberfaellig": true },
+      { "name": "unterwegs, Eintreffen später", "status": "unterwegs", "eintreffen_erwartet_at": "2026-06-12 12:30:00", "offen": true, "stufe": "unterwegs", "ist_ueberfaellig": false },
+      { "name": "unterwegs, zweite Fuhr, Eintreffen verstrichen", "status": "unterwegs", "eintreffen_erwartet_at": "2026-06-12 11:59:00", "offen": true, "stufe": "unterwegs", "ist_ueberfaellig": true },
+      { "name": "unterwegs, Eintreffen genau jetzt", "status": "unterwegs", "eintreffen_erwartet_at": "2026-06-12 12:00:00", "offen": true, "stufe": "unterwegs", "ist_ueberfaellig": false },
+      { "name": "eingetroffen nach verstrichenem Eintreffen", "status": "eingetroffen", "eintreffen_erwartet_at": "2026-06-12 10:00:00", "offen": false, "stufe": "eingetroffen", "ist_ueberfaellig": false },
+      { "name": "abgelehnt", "status": "abgelehnt", "offen": false, "stufe": "abgelehnt", "ist_ueberfaellig": false },
+      { "name": "zurückgezogen", "status": "zurueckgezogen", "offen": false, "stufe": "zurueckgezogen", "ist_ueberfaellig": false }
     ],
-    "erwartet": { "offen": 5, "angefordert": 2, "zugesagt": 1, "unterwegs": 2 }
+    "erwartet": { "offen": 6, "angefordert": 2, "zugesagt": 1, "unterwegs": 3, "ueberfaellig": 2 }
   }
 }

@@ -543,7 +543,7 @@ describe('Kennzahl „Nachforderungen offen" (LLH-1371)', () => {
   it('Wert und Notiz aus dem Modulzähler: offen, „n unterwegs", kein Ton, Ziel Modulseite', () => {
     const k = zelle({
       zustand: 'daten',
-      zahl: { offen: 5, angefordert: 2, zugesagt: 1, unterwegs: 2 },
+      zahl: { offen: 5, angefordert: 2, zugesagt: 1, unterwegs: 2, ueberfaellig: 0 },
     });
     expect(k).toMatchObject({
       etikett: 'Nachforderungen offen',
@@ -557,7 +557,10 @@ describe('Kennzahl „Nachforderungen offen" (LLH-1371)', () => {
 
   it('gewählt bei null offenen: Wert „0", die Zelle bleibt stehen', () => {
     expect(
-      zelle({ zustand: 'daten', zahl: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0 } }),
+      zelle({
+        zustand: 'daten',
+        zahl: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0, ueberfaellig: 0 },
+      }),
     ).toMatchObject({ etikett: 'Nachforderungen offen', wert: '0', notiz: '0 unterwegs' });
   });
 

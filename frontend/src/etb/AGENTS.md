@@ -105,8 +105,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
   Lesemarke. Schlüssel ist der älteste Eintrag (offen bleibt offen); ein Sprung klappt im Render
   auf. Kein Bündel unter `typ=system`, unter `q` und nie im Druck.
 - **Modulzähler** (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`): ETB, Betroffene, Einheiten,
-  Abschnitte, Dokumente (LFH-666) als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat als
-  Handlungsmenge. Der Server zählt sie per Aggregat ohne Listen zu laden, über dieselben
+  Abschnitte, Dokumente (LFH-666) als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat,
+  Lagemeldungen und Nachforderungen (davon überfällig, LLH-1145) als Handlungsmenge. Der Server zählt sie per Aggregat ohne Listen zu laden, über dieselben
   SQL-Fragmente wie die Listen (LFH-935, `tests/modul_zaehler_abfragen.rs`). Ablösung (Uhr), Betreuung und Wetter/Pegel (LFH-663) zählt der Browser
   (`ClientZaehlerQuelle`). Ohne Recht **fehlt** das Modul (`berechtigung::erlaubte_module`). Wer
   eine gezählte Liste invalidiert, invalidiert `modulZaehler` mit (`ZAEHLER_LISTEN_KEYS`,

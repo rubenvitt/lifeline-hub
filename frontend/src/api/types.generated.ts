@@ -4538,9 +4538,10 @@ export interface components {
          */
         NachforderungStatus: "angefordert" | "zugesagt" | "unterwegs" | "eingetroffen" | "abgelehnt" | "zurueckgezogen";
         /**
-         * @description Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.
-         *     Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an
-         *     der Uhr, und dieser Abruf läuft nur bei Live-Ereignissen.
+         * @description Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs), davon je Stufe und davon
+         *     überfällig (LLH-1145). Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den
+         *     letzten 12 h“ hinge an der Uhr, und dieser Abruf läuft nur bei Live-Ereignissen. „Überfällig“
+         *     hängt ebenso an der Uhr wie bei den Aufträgen: der Stand des letzten Abrufs.
          */
         NachforderungsZaehler: {
             /**
@@ -4550,6 +4551,13 @@ export interface components {
             angefordert: number;
             /** Format: int64 */
             offen: number;
+            /**
+             * Format: int64
+             * @description Davon überfällig (LLH-1145): zugesagt oder unterwegs, erwartetes Eintreffen verstrichen —
+             *     dieselbe Regel wie das Board (`istUeberfaellig` in
+             *     `frontend/src/nachforderungen/nachforderungStufen.ts`).
+             */
+            ueberfaellig: number;
             /**
              * Format: int64
              * @description Davon „unterwegs“.
