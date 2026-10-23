@@ -7,7 +7,8 @@ Belegung: Aus einer eingetroffenen Nachforderung entstehen Einheiten mit den Ruf
 die auf die Nachforderung verweisen. Die Nachforderung zeigt, welche Einheiten aus ihr stammen,
 und die Einheit, woher sie kommt (LLH-1383). Am Bereitstellungsraum des Ziels steht schon vor dem
 Eintreffen, wer erwartet wird, und das Eintreffen am Raum verknüpft die Einheit mit der
-Nachforderung (LLH-1387). Eine Fehlübernahme lässt sich je Einheit nachvollziehbar stornieren,
+Nachforderung (LLH-1387), auch ein Fahrzeug ohne Einheit, das dabei zur Einheit wird (LLH-1444).
+Eine Fehlübernahme lässt sich je Einheit nachvollziehbar stornieren,
 auch mit Buchung im Raum (LLH-1388).
 
 ## Requirements
@@ -163,7 +164,7 @@ dabei angelegte Einheit MUST dann in derselben Transaktion auf sie verweisen, un
 MUST sie unter ihren Einheiten nennen. Die Nachforderung MUST zum Einsatz gehören und den Raum als
 Ziel haben (sonst 404) und zugesagt, unterwegs oder eingetroffen sein (sonst 422); mehr verknüpfte
 Einheiten als ihre Anzahl MUST mit 422 abgelehnt werden, eine Einheit mit Verweis auf eine andere
-Nachforderung mit 409, ein einheitenloses Fahrzeug mit 422. Die Stufe der Nachforderung MUST
+Nachforderung mit 409. Die Stufe der Nachforderung MUST
 unverändert bleiben („Eintreffen melden“ bleibt der Führung). Genau ein ETB-Eintrag MUST entstehen
 und auf die Nachforderung verweisen: bei einer bekannten Einheit „Nachforderung 2× RTW: 83-1 im BR
 Nord eingetroffen“, bei einer neu angelegten der Eintrag ihrer Meldung an die Einsatzleitung, die
@@ -179,6 +180,37 @@ zusätzlich die Freigaben Nachforderungen und Einheiten verlangen (403 vor jedem
 #### Scenario: Ziel ist ein anderer Raum
 - **WHEN** am BR Süd eine Kraft mit Verweis auf eine Nachforderung mit Ziel „BR Nord“ eintrifft
 - **THEN** antwortet der Server mit 404, und nichts wird gebucht
+
+### Requirement: Fahrzeug ohne Einheit wird beim Eintreffen mit Verweis zur Einheit
+
+Trifft am Bereitstellungsraum ein Fahrzeug ohne Einheit mit Verweis auf eine Nachforderung ein,
+SHALL das System es in derselben Transaktion zur Einheit machen wie „Als eigene Einheit führen“:
+Name und Funkrufname der Einheit MUST der Funkrufname des Fahrzeugs sein, die Einheit MUST das
+Soll des Fahrzeugs tragen, das Fahrzeug MUST ihr angehören und jede aktive Person seiner Besatzung
+ohne Einheit MUST mitkommen. Die Einheit MUST statt des Fahrzeugs in den Raum eintreten, ihr
+Eintreffen in der Zeitachse tragen, auf die Nachforderung verweisen und unter deren Einheiten
+stehen; das Kennzeichen „nicht übernommen“ MUST sie nicht tragen. Ein Fahrzeug, das fremd,
+beendet, einer Einheit zugehörig oder schon in einem Raum ist, MUST wie beim Eintritt mit 404 bzw.
+409 abgelehnt werden, ohne dass eine Einheit entsteht; ist die Anzahl der Nachforderung erreicht,
+MUST das System mit 422 antworten und nichts anlegen. Genau ein ETB-Eintrag MUST entstehen und auf
+die Nachforderung verweisen: „Nachforderung 2× RTW: Fahrzeug RTW 2 als Einheit übernommen, im BR
+Nord eingetroffen“, mit mitgekommener Besatzung „…, Besatzung: Anna“. Ohne Verweis MUST das
+Fahrzeug wie bisher selbst eintreten. Das gekoppelte Gerät des Raums MUST das ebenso dürfen; es
+schickt keinen Freitext dafür. Die Oberfläche MUST nach der Doppelbuchungs-Warnung „Diese buchen“
+auch bei einem Fahrzeug den Verweis mitschicken.
+
+#### Scenario: RTW 2 kommt als Fahrzeug
+- **WHEN** am BR Nord das Fahrzeug „RTW 2“ ohne Einheit mit Besatzung „Anna“ mit Verweis auf die unterwegs befindliche Nachforderung „2× RTW“ eintrifft
+- **THEN** gibt es die Einheit „RTW 2“ mit dem Fahrzeug und „Anna“, sie steht im BR Nord und verweist auf die Nachforderung, die Nachforderung nennt sie und bleibt unterwegs
+- **AND** das ETB enthält genau einen neuen Eintrag „Nachforderung 2× RTW: Fahrzeug RTW 2 als Einheit übernommen, im BR Nord eingetroffen, Besatzung: Anna“ mit Verweis auf die Nachforderung
+
+#### Scenario: Ohne Verweis bleibt es ein Fahrzeug
+- **WHEN** am BR Nord das Fahrzeug „RTW 3“ ohne Einheit ohne Verweis eintrifft
+- **THEN** tritt das Fahrzeug selbst ein, und keine Einheit entsteht
+
+#### Scenario: Schon in einem Raum
+- **WHEN** das Fahrzeug „RTW 3“ schon im BR Nord steht und mit Verweis noch einmal eintreffen soll
+- **THEN** antwortet der Server mit 409, keine Einheit entsteht, und die Nachforderung nennt keine weitere
 
 ### Requirement: Übernahme an der Karte
 

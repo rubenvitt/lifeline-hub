@@ -174,28 +174,7 @@ pub async fn belege_tx(
             cache.ok_or(AppError::NotFound)?
         }
         ObjektTyp::Fahrzeug => {
-            // Ein entlassenes oder storniertes Fahrzeug belegt keinen Raum mehr (409,
-            // LLH-1079); fremd → 404.
-            crate::fahrzeug::disposition_repo::require_aktiv_tx(&mut *conn, einsatz_id, objekt_id)
-                .await?;
-            let row: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
-                "SELECT einheit_id, aktueller_br_id FROM einsatz_fahrzeug \
-                 WHERE id = ? AND einsatz_id = ?",
-            )
-            .bind(objekt_id)
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-            let (einheit_id, aktueller_br_id) = row.ok_or(AppError::NotFound)?;
-            // Einheit-bringt-Fahrzeuge: ein Fahrzeug mit Einheit belegt nicht selbst.
-            if einheit_id.is_some() {
-                return Err(AppError::Conflict(
-                    "Fahrzeug gehört einer Einheit — Belegung nur für einheitenlose Fahrzeuge \
-                     möglich"
-                        .into(),
-                ));
-            }
-            aktueller_br_id
+            einheitenloses_fahrzeug_br_tx(&mut *conn, einsatz_id, objekt_id).await?
         }
     };
 
@@ -868,13 +847,42 @@ pub async fn verlauf(
 
 // ─── Interne Helpers ────────────────────────────────────────────────────────
 
+/// Der aktuelle Raum eines einheitenlosen Fahrzeugs, mit den Prüfungen der Belegung: fremd 404,
+/// entlassen oder storniert 409 (LLH-1079), einer Einheit zugehörig 409 (Einheit bringt
+/// Fahrzeuge). [`belege_tx`] und die Übernahme eines Fahrzeugs als Einheit beim Eintreffen
+/// (LLH-1444, `eintreffen::fahrzeug_als_einheit_tx`) teilen sie.
+pub(super) async fn einheitenloses_fahrzeug_br_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+) -> Result<Option<i64>, AppError> {
+    crate::fahrzeug::disposition_repo::require_aktiv_tx(&mut *conn, einsatz_id, ef_id).await?;
+    let row: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
+        "SELECT einheit_id, aktueller_br_id FROM einsatz_fahrzeug \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (einheit_id, aktueller_br_id) = row.ok_or(AppError::NotFound)?;
+    // Einheit-bringt-Fahrzeuge: ein Fahrzeug mit Einheit belegt nicht selbst.
+    if einheit_id.is_some() {
+        return Err(AppError::Conflict(
+            "Fahrzeug gehört einer Einheit — Belegung nur für einheitenlose Fahrzeuge möglich"
+                .into(),
+        ));
+    }
+    Ok(aktueller_br_id)
+}
+
 /// Prüft die Art-Vorbedingung (Annahme 4 der Spec):
 /// - eintritt: aktueller_br_id muss NULL sein
 /// - wechsel / austritt: aktueller_br_id muss gesetzt sein
 /// - austritt zusätzlich: der übergebene `br_id` muss dem `aktueller_br_id` des
 ///   Objekts entsprechen — sonst trägt das Event eine falsche br_id (ETB-Text
 ///   „verlässt BR X" wäre falsch). Bei Mismatch `Conflict`.
-fn check_art_vorbedingung(
+pub(super) fn check_art_vorbedingung(
     art: &BrBelegungsArt,
     aktueller_br_id: Option<i64>,
     br_id: i64,

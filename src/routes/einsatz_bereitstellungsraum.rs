@@ -813,7 +813,8 @@ pub async fn eintreffen(
         ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
     }
     // Der Verweis auf eine Nachforderung schreibt an der Einheit und liest die Nachforderung
-    // (LLH-1387 D4): beide Rechte, 403 vor jedem Lesen.
+    // (LLH-1387 D4): beide Rechte, 403 vor jedem Lesen. Ein Fahrzeug wird dabei zur Einheit
+    // (LLH-1444); das Recht dafür ist wie bei „Als eigene Einheit führen“ das an den Einheiten.
     if body.nachforderung_id.is_some() {
         ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
             .await?;
@@ -902,8 +903,9 @@ async fn notify_eintreffen(
     if g.nachforderung_id.is_some() {
         super::nachforderung::sse(state, einsatz_id);
     }
-    // Eine unangemeldete Kraft bringt neue Fahrzeuge; ein bekanntes Fahrzeug steht im Raum.
-    if g.meldung_id.is_some() || g.objekt_typ == ObjektTyp::Fahrzeug {
+    // Eine unangemeldete Kraft bringt neue Fahrzeuge; ein bekanntes Fahrzeug steht im Raum oder
+    // ist zur Einheit geworden (LLH-1444).
+    if g.meldung_id.is_some() || g.objekt_typ == ObjektTyp::Fahrzeug || g.als_einheit {
         for ef_id in &g.fahrzeug_ids {
             super::einsatz_fahrzeug::sse_fahrzeug(state, einsatz_id, *ef_id);
         }

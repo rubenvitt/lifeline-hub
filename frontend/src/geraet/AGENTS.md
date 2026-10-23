@@ -124,8 +124,8 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Raum (LLH-1387, Gruppe „Aus Nachforderungen“) liest das Gerät nur über
   `…/bereitstellungsraeume/{bid}/erwartet` (Projektion `nachforderung::erwartet`, von den Freitexten
   nur Art und Rufnamen); `GET …/nachforderungen` und `nachforderungen` in den Lese-Modulen bleiben
-  gesperrt. Beim Buchen trägt `nachforderung_id` den Verweis an die Einheit; eine Stufe schaltet
-  das Gerät nie. Ohne Netz merkt der Dialog vor (Teil III; Regeln in
+  gesperrt. Beim Buchen trägt `nachforderung_id` den Verweis an die Einheit (ein einheitenloses
+  Fahrzeug wird dabei serverseitig zur Einheit, LLH-1444); eine Stufe schaltet das Gerät nie. Ohne Netz merkt der Dialog vor (Teil III; Regeln in
   `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“). Abrufen ist eine Führungsentscheidung
   (LLH-1085): `br-abrufen` ist an keinem Gerät wahr, „Abrufen“, „Abrufen und austragen“ und „Abruf
   zurücknehmen“ fehlen dort. Das Gerät sieht abgerufene Kräfte live unter „Abgerufen“ (ohne Ton,
