@@ -60,8 +60,10 @@ import {
 } from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { useModulZaehler, useUnbearbeiteteMeldungen } from './useModulZaehler';
+import { useModulZaehler } from './useModulZaehler';
 import { setzeAppBadge } from '../alarm/appBadge';
+import EingaengeKnopf from '../alarm/EingaengeKnopf';
+import { useUngeleseneEingaenge } from '../alarm/useBenachrichtigungVerlauf';
 import { einsatzKennung } from './einsatzKennung';
 import UnwetterHinweis from '../wetter/UnwetterHinweis';
 import { useAktiveWarnung } from './useAktiveWarnung';
@@ -259,11 +261,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Tab-Titel aus dem Menünamen (LFH-954, Entscheidung 3: „Seite · Einsatz · lifeline-hub“). Hier
   // im Rahmen, nicht je Seite: so tragen auch Unterrouten und die Lagekarte ohne `EinsatzSeite`
   // einen Titel, und der Name kommt aus derselben Quelle wie das Menü. Davor die Zahl der
-  // unbearbeiteten Meldungen, auch am App-Badge (LLH-1062): so steht ein stiller Eingang im
-  // Hintergrund-Tab und an der installierten App.
-  const unbearbeitet = useUnbearbeiteteMeldungen({ einsatzId, freigaben: modulFreigaben });
-  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung], unbearbeitet);
-  useEffect(() => setzeAppBadge(unbearbeitet), [unbearbeitet]);
+  // ungelesenen Eingänge, auch am App-Badge (LLH-1062, LLH-1143 D8): dieselbe Zahl wie am Knopf
+  // „Eingänge“, so steht ein stiller Eingang im Hintergrund-Tab und an der installierten App.
+  const ungelesen = useUngeleseneEingaenge(einsatzId);
+  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung], ungelesen);
+  useEffect(() => setzeAppBadge(ungelesen), [ungelesen]);
   useEffect(() => () => setzeAppBadge(0), []);
   // Der letzte Ort für den Rückweg von Profil und Verwaltung (LFH-954, `letzterOrt.ts`): jede
   // Ankunft zählt, auch ein Deep-Link. Nur der Pfad, keine Suche: dort stehen Freitextfilter, und
@@ -477,8 +479,14 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           <div data-lfh="kopf-alarm" style={kopfZelleStil(zellToken)}>
             {/* Eigener Provider (geteilter Query-Key, kein zweiter Abruf): der Kopf liegt außerhalb
                des Inhalts-Providers, und der Ablösungshinweis nennt eine Uhrzeit (LFH-692). */}
+            {/* Eingänge neben der Alarmzentrale (LLH-1143): beide ZEIGEN einen Zustand. */}
+            <EingaengeKnopf einsatzId={einsatzId} />
             <EinsatzAnzeigeProvider einsatzId={einsatzId}>
-              <AlarmZentrale einsatzId={einsatzId} darfSichten={darfImEinsatzSchreiben(einsatz)} />
+              <AlarmZentrale
+                einsatzId={einsatzId}
+                darfSichten={darfImEinsatzSchreiben(einsatz)}
+                eingaengeUngelesen={ungelesen}
+              />
             </EinsatzAnzeigeProvider>
           </div>
           <SyncAnzeige

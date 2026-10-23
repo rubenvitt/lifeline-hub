@@ -953,11 +953,21 @@ und `pages/personen/`.
 - **Live-Updates springen nicht unter dem Cursor:** Sammelbanner statt Einschieben (CLS ≤ 0,1,
   WCAG 3.2.5); Alarmbudget EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Stufen. **Kein Blinken auf
   lesbarem Text.**
-- **Ein Eingang ist Information, kein Alarm** (LLH-1062, Spec `benachrichtigungen`,
-  „Eingangshinweis“): neue Meldungen stehen gebündelt in EINEM eigenen Platz neben den drei
-  Toastplätzen (`alarm/useEingangshinweis.tsx`) und verbrauchen weder Budget noch Alarmton; der
-  dezente Ton höchstens 1 je 2 min, kein neuer Eintrag während einer Eingabe (erst beim Verlassen
-  des Feldes), keiner auf der Seite, deren Sammelbanner ihn trägt. Kein eigener Zeitgeber.
+- **Ein Eingang ist Information, kein Alarm** (LLH-1062, LLH-1143, Spec `benachrichtigungen`,
+  „Eingangshinweis“): alle Eingänge eines Einsatzes (Stufe `hinweis`) stehen gebündelt im
+  Eingangsband **unten** (`alarm/Eingangsband.tsx`, `alarm/useEingangshinweis.tsx`), nie als
+  antd-Notification: die drei Toastplätze oben tragen nur Alarme, Org-Hinweise und Unwetter, und
+  `maxCount` zählt das Band nicht. Der dezente Ton höchstens 1 je 2 min, kein neuer Eintrag
+  während einer Eingabe (erst beim Verlassen des Feldes), keiner auf der Seite, deren
+  Sammelbanner ihn trägt. Kein eigener Zeitgeber. e2e-Greifer: `[data-lfh="eingangsband"]`.
+- **Eine Zahl für Eingänge** (LLH-1143, Spec `benachrichtigungen`, „Ungelesene Eingänge im
+  Tab-Titel“): Knopf „Eingänge“ (`alarm/EingaengeKnopf.tsx`, Zelle `kopf-alarm`), Tab-Titel und
+  App-Badge lesen denselben Verlauf (`alarm/useBenachrichtigungVerlauf.ts`, ein Key, ein Abruf);
+  abgeglichen wird er nur im Knopf (`useVerlaufAbgleich`). Keine zweite Zahl daneben. Die Zahl
+  steht als Plakette über dem Zeichen (`alarm/EingaengeZahl.tsx`, nimmt keine Breite). Bündelt
+  der Kopf die Alarmzentrale (`useKopfBuendelt`, Handschirm und Tablet mit Finger), trägt deren
+  Ziel Zahl und Eintrag „Eingänge“, kein eigener Knopf: der Kopf hat dort keine 48 px übrig.
+  Ab `lg` gibt die Suchbasis die Breite des Knopfs her (`KOPF_SUCHE_FLEX`, Umbruchpunkt bleibt).
 
 ## Frontend — Keine Arbeitsplatzachse (LFH-456)
 
@@ -971,9 +981,11 @@ Spec `bedien-arbeitsplatz`).
   taugt. Was je Standort verschieden ist, trägt die Kontext-Achse **am Gerät**; „Fükw-Arbeitsplatz“
   in `theme/dichte.ts` meint das Gerät. Keine Wahl einer „Arbeitsweise“, keine Vorbelegung
   von Startziel, Primäraktion, Modulreihenfolge oder Dichte je Person; `standard_modul` gilt für
-  den ganzen Einsatz. Je Person liegen nur das Palettengedächtnis „Zuletzt“
-  und der ETB-Standard-Rufname (`benutzer_einstellungen::BEKANNTE_SCHLUESSEL`, geschlossener
-  Schlüsselraum; der Rufname ist ein Wert, keine Arbeitsweise).
+  den ganzen Einsatz. Je Person liegen nur das Palettengedächtnis „Zuletzt“,
+  der ETB-Standard-Rufname (`benutzer_einstellungen::BEKANNTE_SCHLUESSEL`, geschlossener
+  Schlüsselraum; der Rufname ist ein Wert, keine Arbeitsweise) und der **Gelesen-Stand** der
+  Benachrichtigungen (Server, `benachrichtigung.quittiert_at`, LLH-1143: ein Zustand, keine
+  Arbeitsweise; er wandert mit der Person auf jedes Gerät).
 - **Nicht zuständig für Rechte:** Sichtbarkeit und Schreibrecht kommen allein aus `EinsatzRolle`,
   Systemrolle und Modulfreigabe (`einsatz/schreibrecht.ts`, `berechtigung::erlaubte_module`). Ein
   Einstieg prüft die Modulfreigabe seines Ziels (`istSprungGesperrt`, gesperrt sichtbar: Knopf

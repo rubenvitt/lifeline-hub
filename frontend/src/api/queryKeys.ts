@@ -67,6 +67,10 @@ export const EINSATZ_KEYS = {
   // Verlauf eines Raums (LLH-1095): eigener Prefix, lädt erst beim Aufklappen; live über
   // `bereitstellungsraum`, nicht auf der Platte.
   brVerlauf: 'einsatz-br-verlauf',
+  // Erwartete Kräfte aus Nachforderungen mit Ziel = Raum (LLH-1387): eigener Prefix, lädt nur im
+  // offenen Dialog „Eintreffen buchen“; live über `nachforderung` (Führung) und
+  // `bereitstellungsraum` (eine Buchung am Gerät), nicht auf der Platte.
+  brErwartet: 'einsatz-br-erwartet',
   kartenbilder: 'einsatz-kartenbilder',
   etb: 'etb',
   befehle: 'einsatz-befehle',
@@ -117,6 +121,9 @@ export const EINSATZ_KEYS = {
   geraete: 'einsatz-geraete',
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
   modulFreigaben: 'einsatz-modul-freigaben',
+  // Verlauf der eigenen Benachrichtigungen samt ungelesenen Eingängen (LLH-1143): Knopf
+  // „Eingänge“, Tab-Titel und App-Badge lesen denselben Key.
+  benachrichtigungVerlauf: 'einsatz-benachrichtigung-verlauf',
   ortVorschau: 'ort-vorschau',
   // Auf dem Gerät dekodierte HEIC-Vorschau eines Anhangs (LFH-759): Object-URLs, die
   // `erzeugeQueryClient` beim Verlassen des Caches freigibt.
@@ -296,10 +303,16 @@ export const EINSATZ_STREAM_EVENTS = {
   erinnerung: [EINSATZ_KEYS.erinnerungen, EINSATZ_KEYS.modulZaehler],
   auftrag: [EINSATZ_KEYS.auftraege, EINSATZ_KEYS.modulZaehler],
   // Der Modulzähler zählt die offenen Nachforderungen je Stufe (LLH-1078).
-  nachforderung: [EINSATZ_KEYS.nachforderungen, EINSATZ_KEYS.modulZaehler],
+  // Erwartete Kräfte eines Raums lesen Status, Zusage und Verweise (LLH-1387).
+  nachforderung: [EINSATZ_KEYS.nachforderungen, EINSATZ_KEYS.brErwartet, EINSATZ_KEYS.modulZaehler],
   meldung: [EINSATZ_KEYS.meldungen, EINSATZ_KEYS.lagemeldungen, EINSATZ_KEYS.modulZaehler],
   // Liste + Detail + Verlauf (Prefix-Match: ['einsatz-br-detail', einsatzId] trifft alle brIds).
-  bereitstellungsraum: [EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail, EINSATZ_KEYS.brVerlauf],
+  bereitstellungsraum: [
+    EINSATZ_KEYS.br,
+    EINSATZ_KEYS.brDetail,
+    EINSATZ_KEYS.brVerlauf,
+    EINSATZ_KEYS.brErwartet,
+  ],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
   // Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
   etb: [EINSATZ_KEYS.etb, EINSATZ_KEYS.modulZaehler],
@@ -490,6 +503,10 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
  * - `uhsPlanBild` (LFH-999): der Key trägt den sha256 aus dem live geführten Detail; ein neuer
  *   Plan ist ein neuer Key, ein Live-Refetch lüde dieselben Bytes noch einmal.
+ * - `benachrichtigungVerlauf` (LLH-1143): das Ereignis `benachrichtigung` ist empfängergebunden
+ *   und steht deshalb nicht in `EINSATZ_STREAM_EVENTS` (`live/benachrichtigungListener.ts`); die
+ *   Zentrale gleicht den Verlauf bei jedem ihrer Ereignisse über den Sammler ab
+ *   (`alarm/useBenachrichtigungVerlauf.ts`).
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einstellungen,
@@ -500,6 +517,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.modulVorgaben,
   EINSATZ_KEYS.geraete,
   EINSATZ_KEYS.modulFreigaben,
+  EINSATZ_KEYS.benachrichtigungVerlauf,
   EINSATZ_KEYS.ortVorschau,
   EINSATZ_KEYS.ortSuche,
   EINSATZ_KEYS.einsatzortSuche,
@@ -590,6 +608,8 @@ export const einsatzKeys = {
   modulFreigaben: (einsatzId: number | null) => [EINSATZ_KEYS.modulFreigaben, einsatzId] as const,
   // Invalidierungs-Prefix über ALLE Einsätze: eine Org-Vorgabe wirkt auf jeden Einsatz der Org.
   modulFreigabenAlle: () => [EINSATZ_KEYS.modulFreigaben] as const,
+  benachrichtigungVerlauf: (einsatzId: number) =>
+    [EINSATZ_KEYS.benachrichtigungVerlauf, einsatzId] as const,
 
   // Personen / Personal
   personen: (einsatzId: number) => [EINSATZ_KEYS.personen, einsatzId] as const,
@@ -847,6 +867,8 @@ export const einsatzKeys = {
   brDetail: (einsatzId: number, brId: number) => [EINSATZ_KEYS.brDetail, einsatzId, brId] as const,
   brVerlauf: (einsatzId: number, brId: number) =>
     [EINSATZ_KEYS.brVerlauf, einsatzId, brId] as const,
+  brErwartet: (einsatzId: number, brId: number) =>
+    [EINSATZ_KEYS.brErwartet, einsatzId, brId] as const,
 
   // Befehle
   befehle: (einsatzId: number) => [EINSATZ_KEYS.befehle, einsatzId] as const,
@@ -1287,7 +1309,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“), die Bild-Anlagen an
  * Lagebericht und Befehl (LFH-1028: ohne Netz lädt kein Bild), die Tierliste und mit ihr die
  * Kartenebene „Tiere" (LLH-1123: sie trägt Halterkontakt und Kennzeichnung; ohne Netz zeigt die
- * Karte keine Tiere, wie keine Bereitstellungsräume).
+ * Karte keine Tiere, wie keine Bereitstellungsräume), der Verlauf der Benachrichtigungen
+ * (LLH-1143: Lesestand und Text nur vom Server; Offline-Lesen ist ein eigener Schritt).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {

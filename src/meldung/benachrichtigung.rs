@@ -50,9 +50,10 @@ impl MeldungQuelle {
     }
 }
 
-/// Ob eine Meldung ein *Eingang* ist (design.md E3): dringend, eine Lagemeldung oder von einem
-/// Gerät. Ein Eingang geht als Hinweis an alle, die ihn bearbeiten können; eine normale Meldung
-/// von Hand bleibt still. Sofortmeldungen sind nie ein Eingang, sie alarmieren.
+/// Ob eine Meldung ein *Eingang mit Einsatzleitung* ist (design.md E3): dringend, eine
+/// Lagemeldung oder von einem Gerät. Mit Empfängerfunktion erreicht er zusätzlich die
+/// Einsatzleitung; eine normale Meldung mit Funktion nur die Funktion. Sofortmeldungen sind nie
+/// ein Eingang, sie alarmieren.
 pub fn ist_eingang(meldung: &MeldungAnzeige, quelle: MeldungQuelle) -> bool {
     !meldung.ist_sofort()
         && (meldung.prioritaet == Prioritaet::Dringend
@@ -65,7 +66,9 @@ pub fn ist_eingang(meldung: &MeldungAnzeige, quelle: MeldungQuelle) -> bool {
 /// - Eingang mit Empfängerfunktion: „Neue Meldung“ an die Funktion und die Einsatzleitung.
 /// - Eingang ohne Empfängerfunktion: an alle mit Schreibrecht im Modul Meldungen.
 /// - Sonst mit Empfängerfunktion: an die Funktion (Spec „Meldung an mich“).
-/// - Sonst: keiner (still). Kein Rückschluss vom Freitext auf eine Funktion.
+/// - Sonst (normale Meldung von Hand ohne Funktion): an alle mit Schreibrecht im Modul Meldungen
+///   (LLH-1143, design.md D5; Entscheidung zu LLH-1142 E1: jede neue Meldung ist ein Eingang).
+///   Kein Rückschluss vom Freitext auf eine Funktion.
 pub fn anlass(meldung: &MeldungAnzeige, quelle: MeldungQuelle) -> Option<Anlass> {
     if meldung.ist_sofort() {
         return None;
@@ -88,12 +91,12 @@ pub fn anlass(meldung: &MeldungAnzeige, quelle: MeldungQuelle) -> Option<Anlass>
         ),
         (true, None) => Some(basis.an(Adressat::ModulSchreiber(MODUL))),
         (false, Some(f)) => Some(basis.an(Adressat::Funktion(f))),
-        (false, None) => None,
+        (false, None) => Some(basis.an(Adressat::ModulSchreiber(MODUL))),
     }
 }
 
-/// Meldet eine gerade erfasste Meldung ([`anlass`]); ohne Anlass nichts. Eine unlesbare Quelle
-/// gilt als Hand: lieber still als ein Fehler nach dem Commit.
+/// Meldet eine gerade erfasste Meldung ([`anlass`]); ohne Anlass (Sofortmeldung) nichts. Eine
+/// unlesbare Quelle gilt als Hand: dann wie eine normale Meldung, kein Fehler nach dem Commit.
 pub async fn erfasst(pool: &SqlitePool, live: &LiveHub, meldung: &MeldungAnzeige) {
     let quelle = MeldungQuelle::von(pool, meldung)
         .await

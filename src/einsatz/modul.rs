@@ -248,6 +248,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Modulfreigaben (LFH-669): modul-los wie die Zähler. Die Antwort IST die Auskunft über
     // die Modulrechte des Benutzers; ein Modul-Gate davor wäre ein Zirkel.
     ("/api/einsaetze/{id}/modul-freigaben", None),
+    // Verlauf und „alle gelesen“ der Benachrichtigungen (LLH-1143): modul-los wie die Zähler.
+    // Berechtigung ist die eigene Empfängerzeile; das Modulrecht am Bezug prüft der Handler je
+    // Eintrag (`benachrichtigung::aufloesung::Leserecht`).
+    ("/api/einsaetze/{id}/benachrichtigungen", None),
     // Kopfdaten, Abschluss, Frist, Einstellungen, Modul-Overrides und Mitglieder
     // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
     // [`EINSATZ_WURZEL`].

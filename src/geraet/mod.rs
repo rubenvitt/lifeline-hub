@@ -390,6 +390,12 @@ const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
         "GET",
         "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/verlauf",
     ),
+    // Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum, ohne Freitexte außer Art und
+    // Rufnamen (LLH-1387 design.md D1/D2); die Nachforderungsliste bleibt gesperrt.
+    (
+        "GET",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/erwartet",
+    ),
     (
         "POST",
         "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
@@ -692,6 +698,12 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/einheiten"),
             ("GET", "/api/einsaetze/{id}/einheiten/zeitachse"),
             ("POST", "/api/einsaetze/{id}/meldungen"),
+            // Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum, ohne Freitexte
+            // (LLH-1387 design.md D1).
+            (
+                "GET",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/erwartet",
+            ),
         ] {
             assert!(darf_route(b, m, p), "BR-Gerät darf {m} {p}");
         }
@@ -708,7 +720,8 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/personen"),
             ("GET", "/api/einsaetze/{id}/uhs"),
             // Nachforderungen bleiben der Führung, auch mit Ziel = eigener Raum (LLH-1383
-            // design.md D11): weder lesen noch „Eintreffen melden“ noch als Einheit übernehmen.
+            // design.md D11): weder die Liste lesen noch „Eintreffen melden“ noch als Einheit
+            // übernehmen. Was erwartet wird, liest das Gerät nur über `…/erwartet` (LLH-1387).
             ("GET", "/api/einsaetze/{id}/nachforderungen"),
             ("POST", "/api/einsaetze/{id}/nachforderungen/{nid}/status"),
             ("POST", "/api/einsaetze/{id}/einheiten/aus-nachforderung"),

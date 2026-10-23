@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/repo.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/repo.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs]
 ---
 
 ## Überblick
@@ -84,12 +84,18 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist. Im Zustan
 1. Den Raum öffnen und im Seitenkopf „Eintreffen buchen“ wählen.
 2. In „Name oder Funkrufname“ den Namen, den Typ oder einen Funkrufnamen der Kraft eingeben. Die Treffer stehen
    unter „Erwartet“ und „Im Einsatz“, je mit Typ, den Funkrufnamen ihrer Fahrzeuge und, falls
-   bekannt, „alarmiert …“, dem Abschnitt oder „eingetroffen …“.
+   bekannt, „alarmiert …“, dem Abschnitt oder „eingetroffen …“. Darüber stehen unter „Aus
+   Nachforderungen“ die Kräfte, die eine Nachforderung mit diesem Raum als Ziel erwartet: je
+   Rufname der Zusage eine Zeile mit Art, „Nachforderung 2× RTW“, Stufe und „erwartet …“, ohne
+   genannten Rufnamen eine Zeile „RTW ohne Rufname“.
 
    ![Dialog „Eintreffen buchen“ mit leerer Suche und der Gruppe „Im Einsatz“: drei Einheiten mit Typ, den Funkrufnamen ihrer Fahrzeuge und ihrem Abschnitt, je mit dem Knopf „Eintreffen“, darunter „Nicht in der Liste“](../bilder/bereitstellungsraeume/eintreffen.png)
 
 3. Beim Treffer „Eintreffen“ wählen. Die Bestätigung lautet „… gebucht“; die Kraft steht danach
-   in der Belegung des Raums.
+   in der Belegung des Raums. Unter „Aus Nachforderungen“ bucht „Eintreffen“ die Einheit, die im
+   Einsatz schon so heißt; gibt es keine, öffnet sich die Erfassung mit Rufname und Art als
+   „Funkrufname“ und „Fahrzeugtyp“, darüber „Aus Nachforderung 2× RTW“, und „Eintreffen buchen“
+   legt sie an. Beide Wege verknüpfen die Einheit mit der Nachforderung.
 4. Steht die Kraft nicht in der Liste, „Nicht in der Liste“ wählen. „Funkrufname“ ist mit der Suche
    vorbelegt; bei Bedarf „Trägerorganisation“, „Fahrzeugtyp“ und „Stärke“ eintragen, unter
    „Bemerkung“ einen freien Text, unter „Weiteres Fahrzeug“ mit „Fahrzeug hinzufügen“ die übrigen
@@ -260,11 +266,22 @@ eingetroffenen Kräfte mit dem Haken „In BR … eintragen“ ein (Kapitel
 [Nachforderungen](nachforderung.md)). Die Belegung zeigt sie wie jede eingetroffene Einheit, mit
 dem Zeitpunkt von „Eintreffen melden“; die Zeitachse jeder Einheit nennt das Eintreffen im Raum.
 Das Einsatztagebuch bekommt keinen Eintrag je Einheit, sondern einen für die ganze Übernahme, etwa
-„Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2), im BR Nord eingetroffen“. Am
-gekoppelten Gerät des Raums stehen Nachforderungen nicht; dort bucht „Eintreffen buchen“, was
-ankommt. Wird die Übernahme einer Einheit storniert, bucht die App ihren Austritt; der Verlauf
-des Raums zeigt Eintritt und Austritt, bei einer angelegten Einheit mit der Notiz „Einheit
-aufgelöst“, bei einer verknüpften mit „Übernahme storniert“.
+„Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2), im BR Nord eingetroffen“. Wird die
+Übernahme einer Einheit storniert, bucht die App ihren Austritt; der Verlauf des Raums zeigt
+Eintritt und Austritt, bei einer angelegten Einheit mit der Notiz „Einheit aufgelöst“, bei einer
+verknüpften mit „Übernahme storniert“.
+
+Schon vorher, solange die Nachforderung zugesagt oder unterwegs ist, nennt „Eintreffen buchen“ ihre
+Kräfte unter „Aus Nachforderungen“, am Desktop wie am gekoppelten Gerät des Raums. Von der
+Nachforderung zeigt die Gruppe nur Art, Anzahl, Stufe, die Rufnamen der Zusage und das erwartete
+Eintreffen, keine Details, Begründung oder Adressaten; ohne Freigabe des Moduls Nachforderungen
+fehlt sie. Eine so gebuchte Einheit verweist auf die Nachforderung, die Karte der Nachforderung
+nennt sie, und ihr Rufname verschwindet aus der Gruppe; ist die Anzahl erreicht, die ganze
+Nachforderung. Die Stufe bleibt: „Eintreffen melden“ an der Karte bleibt der Einsatzleitung. Das
+Einsatztagebuch bekommt genau einen Eintrag mit Verweis auf die Nachforderung, etwa „Nachforderung
+2× RTW: 83-1 im BR Nord eingetroffen“; eine dabei neu angelegte Einheit meldet sich wie jede
+unangemeldete Kraft bei der Einsatzleitung, mit „aus Nachforderung 2× RTW“ statt „unangemeldet“,
+und trägt „nicht übernommen“, bis die Einsatzleitung sie übernimmt.
 
 ### Was ein Abruf schreibt
 

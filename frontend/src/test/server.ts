@@ -29,6 +29,17 @@ export const server = setupServer(
    */
   http.get('/api/benachrichtigungen', () => HttpResponse.json([])),
   /**
+   * Verlauf der Eingänge eines Einsatzes (LLH-1143) — leer als Default. Der Knopf „Eingänge“ im
+   * Einsatz-Rahmen fragt ihn beim Mount ab; Tests mit Einträgen überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:id/benachrichtigungen', () =>
+    HttpResponse.json({ eintraege: [], ungelesen: 0 }),
+  ),
+  http.post(
+    '/api/einsaetze/:id/benachrichtigungen/gelesen',
+    () => new HttpResponse(null, { status: 204 }),
+  ),
+  /**
    * Eigene Führungsstelle (LFH-849/LFH-1181) — nicht erfasst als Default, der echte Zustand eines
    * neuen Einsatzes. Checkliste, Organigramm und Lagekarte lesen sie mit; Tests mit Angaben
    * überschreiben per `server.use()`.
@@ -206,6 +217,14 @@ export const server = setupServer(
    * überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
+  /**
+   * Erwartete Kräfte eines Raums aus Nachforderungen (LLH-1387) — keine als Default. Der Dialog
+   * „Eintreffen buchen“ fragt sie beim Öffnen ab; Tests mit Nachforderungen überschreiben per
+   * `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume/:brId/erwartet', () =>
+    HttpResponse.json([]),
+  ),
   /**
    * Tiere — leer als Default. Die Lagekarte fragt sie mit Freigabe `tiere` ab (Ebene „Tiere",
    * LLH-1123); Tests mit Tieren überschreiben per `server.use()`.

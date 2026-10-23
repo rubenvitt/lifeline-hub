@@ -128,6 +128,19 @@ Für Einsatzleitung und Führungspersonal:
 Wortlaut, Absender, Meldeweg und Ereigniszeit stehen nicht im Formular: sie bleiben, wie die
 Meldung einging. Lehnt der Server ab, steht der Grund an der Karte, und das Formular bleibt offen.
 
+### Den Wortlaut einer Meldung berichtigen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Im Einsatztagebuch den Eintrag der Meldung berichtigen, wie im Kapitel
+   [Einsatztagebuch](einsatztagebuch.md) beschrieben. Der Eintrag trägt den Verweis „Meldung #… ↗“.
+2. In den Meldungen trägt die Karte danach die Marke „berichtigt“ und daneben „→ ETB Nr. …“. Der
+   Wortlaut auf der Karte bleibt der ursprüngliche.
+
+   ![Meldungskarte der Sanitätsgruppe UHS mit der Marke „berichtigt“ und dem Sprung „→ ETB Nr. …“ neben Priorität und Stufe, darunter der ursprüngliche Wortlaut](../bilder/meldungen/meldung-berichtigt.png)
+
+3. „→ ETB Nr. …“ öffnet die jüngste Berichtigung im Einsatztagebuch.
+
 ### Eine Meldung aus der Lage nehmen
 
 Für Einsatzleitung und Führungspersonal:
@@ -186,14 +199,14 @@ Eine neue Meldung meldet sich in drei Stufen:
 | Meldung | Was geschieht |
 |---|---|
 | Sofortmeldung | Alarm mit Ton (siehe oben) |
-| dringend, Lagemeldung oder von einem gekoppelten Gerät | Hinweis **„Neue Meldung“** mit dezentem Ton |
-| normal, von Hand erfasst | kein Ton und kein Hinweis; die Zahl der unbearbeiteten Meldungen steht vorn im Tab-Titel, etwa „(3) Lagekarte · …“, und am Symbol der installierten App |
+| dringend, Lagemeldung oder von einem gekoppelten Gerät | Eingang **„Neue Meldung“** mit dezentem Ton |
+| normal, von Hand erfasst | ebenfalls Eingang **„Neue Meldung“**; er zählt wie jeder Eingang vorn im Tab-Titel, etwa „(3) Lagekarte · …“, und am Symbol der installierten App |
 
 Den Hinweis bekommen alle, die im Einsatz Meldungen bearbeiten dürfen (Einsatzleitung und
 Führungspersonal), nicht Beobachter, nicht gekoppelte Geräte und nicht die Person, die die
 Meldung erfasst hat. Trägt die Meldung eine Empfängerfunktion, bekommen ihn nur die Personen
-dieser Funktion und die Einsatzleitung. Eine normale Meldung mit Empfängerfunktion bekommen die
-Personen der Funktion ebenfalls als Hinweis. Wählt man im Formular die Meldungsart
+dieser Funktion und die Einsatzleitung; eine normale Meldung mit Empfängerfunktion nur die
+Personen der Funktion. Wählt man im Formular die Meldungsart
 „Lagemeldung“, steht S2 als Empfängerfunktion schon da; sie lässt sich ändern oder leeren.
 
 Wer eine Funktion besetzt, steht in der Stab-Besetzung; ist die Funktion dort nicht besetzt
@@ -203,9 +216,9 @@ Einsatzes. Wer das Modul „Meldungen“ nicht sehen darf, bekommt keinen Hinwei
 Wird eine Meldung, die keine Lagemeldung ist, zum ersten Mal in die Lage übernommen, bekommen S2
 und die Einsatzleitung den Hinweis **„In die Lage übernommen“** mit Sprung zu den Lagemeldungen.
 
-Alle Hinweise auf Meldungen stehen gebündelt in **einem** Hinweis, etwa „3 neue Meldungen“, mit
-Absender und Anfang des Wortlauts der jüngsten zwei. Er belegt keinen der Plätze der übrigen
-Hinweise und Alarme, und sein Ton kommt höchstens alle zwei Minuten.
+Alle Hinweise auf Meldungen stehen gebündelt im **Eingangsband** unten, etwa „3 neue Meldungen“,
+mit Absender und Anfang des Wortlauts der jüngsten zwei; andere Eingänge stehen mit darin. Es
+belegt keinen der Plätze der Alarme, und sein Ton kommt höchstens alle zwei Minuten.
 
 - **„Sichten“** an einer Meldung im Hinweis setzt sie auf „Gesichtet“. Sobald jemand eine
   Meldung sichtet, bestätigt oder weiter bearbeitet, verschwindet ihr Hinweis bei allen. Eine
@@ -247,10 +260,9 @@ Die erste Übernahme in die Lage schreibt immer den Systemeintrag „Meldung #12
 aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
 
 Der Wortlaut einer Meldung bleibt, wie er einging; die Korrektur über „Bearbeiten“ ändert ihn
-nicht. Ist er falsch, wird im Einsatztagebuch der Eintrag der Meldung berichtigt. Die Karte zeigt
-dann die Marke „berichtigt“ und daneben „→ ETB Nr. …“, den Sprung auf die jüngste Berichtigung;
-der Wortlaut auf der Karte bleibt der ursprüngliche. Dieselbe Marke steht in der Vorschau der
-Meldung in der Sprungpalette. Auf einem gekoppelten Gerät fehlt die Marke,
+nicht. Ist er falsch, wird im Einsatztagebuch der Eintrag der Meldung berichtigt (Ablauf „Den
+Wortlaut einer Meldung berichtigen“). Die Marke „berichtigt“ der Karte steht auch in der Vorschau
+der Meldung in der Sprungpalette. Auf einem gekoppelten Gerät fehlt die Marke,
 weil es das Einsatztagebuch nicht zeigt.
 
 ### Was eine Korrektur bewirkt
