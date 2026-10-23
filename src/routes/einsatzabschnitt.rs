@@ -2,6 +2,7 @@ use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Einsatzabschnitte;
+use crate::einsatz::verbindungen::{self, VerbindungBody, ABSCHNITT_RUFNAME_MAX};
 use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, AbschnittPatch};
 use crate::einsatzabschnitt::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
@@ -9,11 +10,12 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    deserialize_optional_field, pflicht, pruefe_kommunikationsmittel, trimme, trimme_tri,
+    deserialize_optional_field, optional_max, optional_max_tri, pflicht, trimme, trimme_tri,
 };
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
+use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Abschnitt (Fläche/Symbol) hat sich geändert.
@@ -69,8 +71,14 @@ pub struct AbschnittBody {
     pub ueber_abschnitt_id: Option<i64>,
     pub leiter_id: Option<i64>,
     pub bemerkung: Option<String>,
-    pub kommunikationsmittel: Option<String>,
-    pub erreichbarkeit: Option<String>,
+    /// Funkrufname der Abschnittsleitung (LLH-1134).
+    pub rufname: Option<String>,
+    /// Telefon und weitere Verbindungen (LLH-1134), in Eingabefolge.
+    pub verbindungen: Option<Vec<VerbindungBody>>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): gesetzt → 400, nie still verworfen.
+    pub kommunikationsmittel: Option<IgnoredAny>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): gesetzt → 400, nie still verworfen.
+    pub erreichbarkeit: Option<IgnoredAny>,
     #[serde(default)]
     pub sortier: i64,
     /// Sprechgruppen-IDs; `Some` ersetzt die Zuordnung vollständig, `None` lässt sie unverändert.
@@ -94,11 +102,17 @@ pub async fn create(
         .sprechgruppe_ids
         .map(crate::sprechgruppe::normalisiere_ids)
         .transpose()?;
+    verbindungen::lehne_altfelder_ab(
+        body.kommunikationsmittel.is_some(),
+        body.erreichbarkeit.is_some(),
+    )?;
+    let neue_verbindungen = body
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
     let name = pflicht(&body.name, "Name")?;
     let bemerkung = trimme(body.bemerkung);
-    let mittel = trimme(body.kommunikationsmittel);
-    pruefe_kommunikationsmittel(mittel.as_deref())?;
-    let erreichbar = trimme(body.erreichbarkeit);
+    let rufname = optional_max(body.rufname, "Rufname", ABSCHNITT_RUFNAME_MAX)?;
     let kurz = trimme(body.kurzbezeichnung);
     if let Some(k) = &kurz {
         check_kurzbezeichnung(k)?;
@@ -116,8 +130,7 @@ pub async fn create(
             ueber_abschnitt_id: body.ueber_abschnitt_id,
             leiter_id: body.leiter_id,
             bemerkung: bemerkung.as_deref(),
-            kommunikationsmittel: mittel.as_deref(),
-            erreichbarkeit: erreichbar.as_deref(),
+            rufname: rufname.as_deref(),
             sortier: body.sortier,
             kurzbezeichnung: kurz.as_deref(),
             lagezustand,
@@ -132,6 +145,16 @@ pub async fn create(
             einsatz_id,
             anzeige.id,
             &ids,
+        )
+        .await?;
+        anzeige = abschnitt_repo::load(&state.pool, einsatz_id, anzeige.id).await?;
+    }
+    if let Some(liste) = neue_verbindungen {
+        verbindungen::ersetzen(
+            &state.pool,
+            einsatz_id,
+            verbindungen::Bezug::Abschnitt(anzeige.id),
+            &liste,
         )
         .await?;
         anzeige = abschnitt_repo::load(&state.pool, einsatz_id, anzeige.id).await?;
@@ -161,9 +184,15 @@ pub struct AbschnittPatchBody {
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub kommunikationsmittel: Option<Option<String>>,
+    pub rufname: Option<Option<String>>,
+    /// Ersetzt die Verbindungen vollständig (LLH-1134); fehlt = unverändert.
+    pub verbindungen: Option<Vec<VerbindungBody>>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): im Body (auch `null`) → 400.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub erreichbarkeit: Option<Option<String>>,
+    pub kommunikationsmittel: Option<Option<IgnoredAny>>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): im Body (auch `null`) → 400.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub erreichbarkeit: Option<Option<IgnoredAny>>,
     pub sortier: Option<i64>,
     /// Sprechgruppen-IDs; `Some` ersetzt die Zuordnung vollständig, `None` lässt sie
     /// unverändert — das Feld war schon vor LFH-306 tri-state.
@@ -199,10 +228,16 @@ pub async fn update(
         }
         None => None,
     };
+    verbindungen::lehne_altfelder_ab(
+        body.kommunikationsmittel.is_some(),
+        body.erreichbarkeit.is_some(),
+    )?;
+    let neue_verbindungen = body
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
     let bemerkung = trimme_tri(body.bemerkung);
-    let mittel = trimme_tri(body.kommunikationsmittel);
-    pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
-    let erreichbar = trimme_tri(body.erreichbarkeit);
+    let rufname = optional_max_tri(body.rufname, "Rufname", ABSCHNITT_RUFNAME_MAX)?;
     let kurz = trimme_tri(body.kurzbezeichnung);
     if let Some(Some(k)) = &kurz {
         check_kurzbezeichnung(k)?;
@@ -222,8 +257,7 @@ pub async fn update(
             ueber_abschnitt_id: body.ueber_abschnitt_id,
             leiter_id: body.leiter_id,
             bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
-            kommunikationsmittel: mittel.as_ref().map(|v| v.as_deref()),
-            erreichbarkeit: erreichbar.as_ref().map(|v| v.as_deref()),
+            rufname: rufname.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
             kurzbezeichnung: kurz.as_ref().map(|v| v.as_deref()),
             abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
@@ -271,6 +305,16 @@ pub async fn update(
             einsatz_id,
             aid,
             &ids,
+        )
+        .await?;
+        anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
+    }
+    if let Some(liste) = neue_verbindungen {
+        verbindungen::ersetzen(
+            &state.pool,
+            einsatz_id,
+            verbindungen::Bezug::Abschnitt(aid),
+            &liste,
         )
         .await?;
         anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;

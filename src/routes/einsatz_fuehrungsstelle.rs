@@ -16,15 +16,16 @@ use crate::einsatz::fuehrungsstelle::{
     FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
 };
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
+use crate::einsatz::verbindungen::{self, VerbindungBody};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::routes::support::{
-    deserialize_optional_field, hoechstens, parse_enum, pruefe_kommunikationsmittel,
-    pruefe_koordinate, trimme_tri,
+    deserialize_optional_field, hoechstens, parse_enum, pruefe_koordinate, trimme_tri,
 };
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
+use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 /// PATCH-Body, Tri-State je Feld: absent = unverändert, `null`/`""` = leeren.
@@ -44,10 +45,15 @@ pub struct FuehrungsstellePatchBody {
     pub standort_lon: Option<Option<f64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub rufname: Option<Option<String>>,
+    /// Telefon und weitere Verbindungen (LLH-1134); ersetzt die Liste vollständig, absent lässt
+    /// sie unverändert.
+    pub verbindungen: Option<Vec<VerbindungBody>>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): im Body (auch `null`) → 400.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub kommunikationsmittel: Option<Option<String>>,
+    pub kommunikationsmittel: Option<Option<IgnoredAny>>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): im Body (auch `null`) → 400.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub erreichbarkeit: Option<Option<String>>,
+    pub erreichbarkeit: Option<Option<IgnoredAny>>,
     /// Ersetzt die Zuordnung vollständig; `null` oder `[]` leert sie, absent lässt sie
     /// unverändert.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -194,9 +200,14 @@ pub async fn aendern(
         hoechstens(a, "Adresse", FUEHRUNGSSTELLE_ADRESSE_MAX)?;
     }
     let rufname = trimme_tri(body.rufname);
-    let mittel = trimme_tri(body.kommunikationsmittel);
-    pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
-    let erreichbarkeit = trimme_tri(body.erreichbarkeit);
+    verbindungen::lehne_altfelder_ab(
+        body.kommunikationsmittel.is_some(),
+        body.erreichbarkeit.is_some(),
+    )?;
+    let neue_verbindungen = body
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
     let einsatzleiter: Option<Option<CheckedEinsatzleiter>> = body
         .einsatzleiter
         .map(|e| e.map(check_einsatzleiter).transpose())
@@ -208,8 +219,7 @@ pub async fn aendern(
         && body.standort_lat.is_none()
         && body.standort_lon.is_none()
         && rufname.is_none()
-        && mittel.is_none()
-        && erreichbarkeit.is_none()
+        && neue_verbindungen.is_none()
         && ids.is_none()
         && fahrzeug_ids.is_none()
         && einsatzleiter.is_none()
@@ -235,8 +245,7 @@ pub async fn aendern(
         standort_lat: body.standort_lat,
         standort_lon: body.standort_lon,
         rufname: rufname.as_ref().map(|v| v.as_deref()),
-        kommunikationsmittel: mittel.as_ref().map(|v| v.as_deref()),
-        erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
+        verbindungen: neue_verbindungen.as_deref(),
         sprechgruppe_ids: ids.as_deref(),
         fahrzeug_ids: fahrzeug_ids.as_deref(),
         einsatzleiter: einsatzleiter.as_ref().map(|e| {

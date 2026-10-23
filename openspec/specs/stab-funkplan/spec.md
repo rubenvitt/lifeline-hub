@@ -84,13 +84,17 @@ Tabelle MUST NOT sortierbar, filterbar oder durchsuchbar sein.
 
 ### Requirement: Spalten mit fixierter menschenlesbarer Kennung
 Die Tabelle SHALL diese Spalten führen: Stelle, Rufname/OPTA, Leiter/Führer, TMO-Sprechgruppen,
-DMO-Sprechgruppen, Kommunikationsmittel, Erreichbarkeit.
+DMO-Sprechgruppen, Telefon. Funk und Telefon stehen getrennt: Funk zeigt sich an Rufname und
+Sprechgruppen, „Telefon“ zeigt die Verbindungen der Mittel Festnetz und Mobil aus den
+Verbindungen des Datensatzes (Capability `stab-kommunikationsplan`, „Verbindungen an Abschnitt,
+Einheit und Führungsstelle“). Eine Spalte „Kommunikationsmittel“ oder „Erreichbarkeit“ MUST NOT
+es geben.
 - Die Spalte „Stelle“ MUST beim waagerechten Bildlauf stehen bleiben und MUST NOT ausblendbar
   sein. Sie MUST eine menschenlesbare Kennung tragen, nie eine Datenbank-Kennung: beim Abschnitt
   und bei der Einheit den Namen, beim Fahrzeug den Funkrufnamen.
-- Die Spalte „Rufname/OPTA“ MUST beim Abschnitt die Kurzbezeichnung, bei der Einheit den
-  Funkrufnamen und beim Fahrzeug die OPTA zeigen, jeweils nur, wenn sie erfasst sind. Ein
-  fehlender Wert MUST NOT aus anderen Angaben erraten werden.
+- Die Spalte „Rufname/OPTA“ MUST beim Abschnitt den Rufnamen und, wenn keiner erfasst ist, die
+  Kurzbezeichnung, bei der Einheit den Funkrufnamen und beim Fahrzeug die OPTA zeigen, jeweils
+  nur, wenn sie erfasst sind. Ein fehlender Wert MUST NOT aus anderen Angaben erraten werden.
 - Sprechgruppen MUST aus den Zuordnungen stammen, getrennt nach Betriebsart. Die eingefrorenen
   Altfelder der Sprechgruppen MUST NOT verwendet werden.
 - Rufnamen, OPTA und Sprechgruppen MUST in Festbreitenschrift mit gleich breiten Ziffern stehen.
@@ -99,9 +103,16 @@ DMO-Sprechgruppen, Kommunikationsmittel, Erreichbarkeit.
 - **WHEN** einer Einheit die Sprechgruppen „TMO 311“ und „DMO 505“ zugeordnet sind
 - **THEN** steht „311“ in der Spalte TMO und „505“ in der Spalte DMO derselben Zeile
 
+#### Scenario: Rufname des Abschnitts vor der Kurzbezeichnung
+- **WHEN** der Abschnitt „EA Nord“ die Kurzbezeichnung „EA N“ und den Rufnamen
+  „Rotkreuz Musterstadt 1/10-1“ trägt
+- **THEN** zeigt seine Zeile in der Spalte „Rufname/OPTA“ „Rotkreuz Musterstadt 1/10-1“; ohne
+  Rufnamen zeigt sie „EA N“
+
 #### Scenario: Leeres Feld
-- **WHEN** einem Abschnitt kein Kommunikationsmittel erfasst ist
-- **THEN** bleibt die Zelle als „—“ leer, und das System erfindet keinen Wert
+- **WHEN** einem Abschnitt keine Verbindung der Mittel Festnetz oder Mobil erfasst ist
+- **THEN** bleibt die Zelle „Telefon“ als „—“ leer, und das System erfindet keinen Wert, auch
+  nicht aus einer E-Mail-Adresse oder einem Fax
 
 ### Requirement: Fahrzeugführer nur mit Leserecht auf Personal
 Die Spalte Leiter/Führer SHALL beim Abschnitt den Leiter und bei der Einheit den Führer zeigen.
@@ -142,7 +153,8 @@ sonst nennt sie den Grund.
 Oberhalb der Tabelle SHALL der Funkplan diese Lücken als Anzahl zeigen:
 - Abschnitte ohne Sprechgruppe
 - Einheiten ohne Sprechgruppe
-- Einheiten ohne Erreichbarkeit
+- Einheiten ohne Funkrufname
+- Einheiten ohne Telefon (keine Verbindung der Mittel Festnetz oder Mobil)
 - einsatzlokale Sprechgruppen, die weder einem Abschnitt noch einer Einheit noch der eigenen
   Führungsstelle zugeordnet sind
 - Verbindungen ohne gemeinsame Sprechgruppe: eine Stelle und ihre übergeordnete Stelle haben beide
@@ -177,9 +189,13 @@ jeder Darstellung des Funkplans (Tabelle, Skizze und Sprechgruppen) dieselben se
 
 #### Scenario: Einheiten gesperrt
 - **WHEN** die Einheitenliste mit 403 abgelehnt wird
-- **THEN** zeigen „Einheiten ohne Sprechgruppe“, „Einheiten ohne Erreichbarkeit“,
-  „einsatzlokale Sprechgruppen ohne Zuordnung“ und „Verbindungen ohne gemeinsame Sprechgruppe“
-  „—“ mit Grund, nicht „0“
+- **THEN** zeigen „Einheiten ohne Sprechgruppe“, „Einheiten ohne Funkrufname“, „Einheiten ohne
+  Telefon“, „einsatzlokale Sprechgruppen ohne Zuordnung“ und „Verbindungen ohne gemeinsame
+  Sprechgruppe“ „—“ mit Grund, nicht „0“
+
+#### Scenario: Funkrufname und Telefon getrennt
+- **WHEN** die Einheit „1. Zug“ den Funkrufnamen „Florian 1“, aber nur eine E-Mail-Adresse trägt
+- **THEN** zählt sie bei „Einheiten ohne Telefon“, aber nicht bei „Einheiten ohne Funkrufname“
 
 #### Scenario: Einheit ohne gemeinsamen Kanal mit ihrem Abschnitt
 - **WHEN** der Abschnitt „EA Nord“ die Sprechgruppe „TMO 311“ trägt und die ihm zugeordnete
@@ -219,7 +235,7 @@ Ist die eigene Führungsstelle des Einsatzes erfasst, SHALL der Funkplan sie als
 Abschnitten zeigen. Die Zeile trägt:
 
 - die Stelle „Führungsstelle“,
-- Rufname, TMO- und DMO-Sprechgruppen, Kommunikationsmittel und Erreichbarkeit aus ihren Angaben,
+- Rufname, TMO- und DMO-Sprechgruppen und Telefon aus ihren Angaben,
 - in der Spalte Leiter/Führer den erfassten Einsatzleiter, in derselben Darstellung wie die
   Kopfleiste der Einsatzdaten, und „—“, wenn keiner erfasst ist.
 
@@ -248,10 +264,10 @@ erfasst“.
 
 #### Scenario: Führungsstelle im Druck
 - **WHEN** der Funkplan mit erfasster Führungsstelle gedruckt wird
-- **THEN** ist die Zeile der Führungsstelle die erste Zeile des Ausdrucks, samt Erreichbarkeit
+- **THEN** ist die Zeile der Führungsstelle die erste Zeile des Ausdrucks, samt Telefon
 
-### Requirement: Erreichbarkeit schützen
-Die Erreichbarkeit ist personenbezogen.
+### Requirement: Telefon schützen
+Das Telefon ist personenbezogen.
 - Am Bildschirm SHALL sie erst ab der Breite `xl` gezeigt werden. Darunter lässt sie sich über den
   Spaltenschalter einblenden, und der Schalter zählt sie als ausgeblendet mit.
 - Im Druck SHALL sie immer erscheinen, unabhängig von der Fensterbreite.
@@ -259,11 +275,11 @@ Die Erreichbarkeit ist personenbezogen.
 
 #### Scenario: Schmales Fenster
 - **WHEN** der Funkplan in einem Fenster unter `xl` angezeigt wird
-- **THEN** fehlt die Spalte Erreichbarkeit, und der Spaltenschalter nennt eine ausgeblendete Spalte
+- **THEN** fehlt die Spalte Telefon, und der Spaltenschalter nennt eine ausgeblendete Spalte
 
 #### Scenario: Druck aus schmalem Fenster
 - **WHEN** der Funkplan aus einem Fenster unter `xl` gedruckt wird
-- **THEN** enthält der Ausdruck die Spalte Erreichbarkeit
+- **THEN** enthält der Ausdruck die Spalte Telefon
 
 ### Requirement: Deeplink je Zeile, keine Bearbeitung
 Jede Zeile SHALL zum Datensatz führen, an dem ihre Angaben gepflegt werden:
@@ -295,7 +311,7 @@ der Capability `druck-dokumente` gelten unverändert.
 ### Requirement: In Lagebericht übernehmen
 Personen mit Schreibrecht im Einsatz SHALL den aktuellen Funkplan mit einer Aktion in einen neuen
 Lagebericht (Vorlage Freitext) mit dem Titel „Funkplan <DTG>“ übernehmen können.
-- Der Inhalt MUST den Baum mit allen Spalten außer der Erreichbarkeit wiedergeben, eine erfasste
+- Der Inhalt MUST den Baum mit allen Spalten außer dem Telefon wiedergeben, eine erfasste
   Führungsstelle als erste Zeile. Fehlt eine Quelle (gesperrt, nicht geladen), MUST der Bericht sie
   mit Grund nennen. „Keine Kräfte erfasst“ MUST er nur schreiben, wenn Abschnitte, Einheiten und
   Fahrzeuge geladen sind.
@@ -316,11 +332,11 @@ Lagebericht (Vorlage Freitext) mit dem Titel „Funkplan <DTG>“ übernehmen k�
 #### Scenario: Übernahme gelingt
 - **WHEN** eine Person mit Schreibrecht „In Lagebericht übernehmen“ wählt
 - **THEN** entsteht genau ein Lagebericht „Funkplan <DTG>“ mit dem Funkplan als Text, ohne
-  Erreichbarkeit, und er wird geöffnet
+  Telefon, und er wird geöffnet
 
 #### Scenario: Führungsstelle im Lagebericht
-- **WHEN** die Führungsstelle mit Rufname und Erreichbarkeit erfasst ist und der Funkplan übernommen wird
-- **THEN** beginnt die Gliederung des Lageberichts mit der Führungsstelle samt Rufname, und ihre Erreichbarkeit steht nirgends im Text
+- **WHEN** die Führungsstelle mit Rufname und einer Mobilnummer erfasst ist und der Funkplan übernommen wird
+- **THEN** beginnt die Gliederung des Lageberichts mit der Führungsstelle samt Rufname, und ihre Mobilnummer steht nirgends im Text
 
 #### Scenario: Übernahme scheitert
 - **WHEN** das Anlegen des Lageberichts abgelehnt wird
@@ -425,7 +441,7 @@ Quelle zeigen und MUST NOT eine Teilsumme zeigen. Die Stab-Seite MUST dieselbe Z
 Rechnung zeigen. Sie MUST in jeder Darstellung des Funkplans dieselbe sein.
 
 #### Scenario: Summe
-- **WHEN** das Lücken-Paneel „1“ bei „Abschnitte ohne Sprechgruppe“, „1“ bei „Einheiten ohne Sprechgruppe“ und „1“ bei „Einheiten ohne Erreichbarkeit“ zeigt, für dieselbe Einheit, und sonst keine Lücke
+- **WHEN** das Lücken-Paneel „1“ bei „Abschnitte ohne Sprechgruppe“, „1“ bei „Einheiten ohne Sprechgruppe“ und „1“ bei „Einheiten ohne Telefon“ zeigt, für dieselbe Einheit, und sonst keine Lücke
 - **THEN** zeigt der Kopf des Lücken-Paneels „3 Lücken“, und die S6-Kachel der Stab-Seite zeigt „3“ am Funkplan
 
 #### Scenario: Keine Lücke

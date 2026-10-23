@@ -408,8 +408,7 @@ impl Ablauf<'_> {
                         ueber_abschnitt_id: ueber,
                         leiter_id: None,
                         bemerkung: None,
-                        kommunikationsmittel: None,
-                        erreichbarkeit: None,
+                        rufname: Some(v.rufname),
                         sortier: v.sortier,
                         kurzbezeichnung: Some(v.kurzbezeichnung),
                         lagezustand: v.lagezustand,
@@ -417,6 +416,20 @@ impl Ablauf<'_> {
                     },
                 )
                 .await?;
+                // Telefon wie `routes/einsatzabschnitt.rs::create` mit `verbindungen` (LLH-1134).
+                if let Some(nummer) = v.mobil {
+                    crate::einsatz::verbindungen::ersetzen_tx(
+                        conn,
+                        self.einsatz_id,
+                        crate::einsatz::verbindungen::Bezug::Abschnitt(id),
+                        &[crate::einsatz::verbindungen::Verbindung {
+                            mittel: crate::stab::kommunikation::Verbindungsmittel::Mobil,
+                            wert: nummer.to_string(),
+                            hinweis: None,
+                        }],
+                    )
+                    .await?;
+                }
                 self.abschnitte.insert(v.schluessel, id);
                 self.system_etb(
                     conn,
@@ -445,8 +458,6 @@ impl Ablauf<'_> {
                         soll_mannschaft: None,
                         bemerkung: None,
                         funkrufname: None,
-                        kommunikationsmittel: None,
-                        erreichbarkeit: None,
                         sortier: v.sortier,
                         tz_fachaufgabe: None,
                         tz_organisation: None,

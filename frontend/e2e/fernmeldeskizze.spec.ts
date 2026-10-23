@@ -309,9 +309,9 @@ test('Ziehen: Einheit auf die Schiene, Tabelle und Detailseite im zweiten Kontex
     );
     await detail.goto(`/einsaetze/${einsatzId}/einheiten/${n.zug}`);
     await strom2;
-    // Seit LLH-1036 stehen die Sprechgruppen an ihrer Zeile im Paneel „Funk und Kommunikation“,
-    // je Betriebsart wie im Abschnittsdetail („TMO BN_BOS · DMO …“).
-    const funk = detail.getByRole('region', { name: 'Funk und Kommunikation' });
+    // Seit LLH-1036 stehen die Sprechgruppen an ihrer Zeile im Paneel „Funk“ (LLH-1134: Telefon
+    // getrennt), je Betriebsart wie im Abschnittsdetail („TMO BN_BOS · DMO …“).
+    const funk = detail.getByRole('region', { name: 'Funk', exact: true });
     await expect(funk).toContainText('TMO BN_BOS');
     await expect(funk).not.toContainText('314_F*');
 
@@ -974,7 +974,17 @@ test('Ruhige Fläche am Schirm (1366 × 768): schließt sich eine Lücke ganz ob
   const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
   await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
-  const ohne = (await a.post('einheiten', { name: 'Zug Ohne', abschnitt_id: ea })).id;
+  // Funkrufname und Telefon: „Zug Ohne“ fehlt nur die Sprechgruppe. Sonst stünde er seit LLH-1134
+  // in zwei weiteren Lücken (ohne Funkrufname, ohne Telefon), das Paneel wüchse um eine Zeile mit
+  // Betroffenen, und die Fläche begänne unter dem Fenster.
+  const ohne = (
+    await a.post('einheiten', {
+      name: 'Zug Ohne',
+      funkrufname: 'Florian Zug Ohne',
+      abschnitt_id: ea,
+      verbindungen: [{ mittel: 'mobil', wert: '0170 555 0303' }],
+    })
+  ).id;
   const lueckeOhne = page.locator('[data-lfh="funkplan-luecke"]', {
     hasText: 'Einheiten ohne Sprechgruppe',
   });

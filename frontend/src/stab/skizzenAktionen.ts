@@ -96,7 +96,6 @@ export interface SkizzenAktionen {
   /** Tri-State: fehlend = unverändert, `null` = leeren. */
   setzeSchriftfeld(felder: Partial<Schriftfeld>): Promise<Schriftfeld>;
 
-  /** Rufname bzw. Kommunikationsmittel im Datensatz der Stelle (Abschnitt, Einheit, Führungsstelle). */
+  /** Rufname im Datensatz der Stelle (Abschnitt, Einheit, Führungsstelle). */
   setzeRufname(stelle: string, rufname: string | null): Promise<void>;
-  setzeKommunikationsmittel(stelle: string, mittel: string | null): Promise<void>;
 }

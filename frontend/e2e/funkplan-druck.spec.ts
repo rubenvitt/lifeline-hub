@@ -2,10 +2,10 @@ import { expect, test } from '@playwright/test';
 import {
   A4_DRUCKBREITE,
   EINHEIT_ZWEI,
-  ERREICHBAR,
   FAHRZEUG,
   SG_LANG,
   SUBPIXEL,
+  TELEFON,
   anmelden,
   einsatzAnlegen,
   oeffne,
@@ -20,7 +20,7 @@ import {
  * WebKit prüfen die Mechanik unter Druckmedium (`DRUCK_SPECS`, LFH-915); ein PDF erzeugt diese
  * Spec nicht, sie braucht deshalb keinen Chromium-Zweig.
  *
- * - DRUCKPFAD bei A4-Breite (680 px, unter `xl`): alle Knoten offen, die Erreichbarkeit steht
+ * - DRUCKPFAD bei A4-Breite (680 px, unter `xl`): alle Knoten offen, das Telefon (LLH-1134) steht
  *   trotzdem da (`beforeprint` selbst ausgelöst, `emulateMedia` feuert es nicht), nichts ragt
  *   rechts aus der Druckwurzel.
  * - SPRECHGRUPPEN im Druck: Druckkopf „Funkplan – Sprechgruppen“, Bedienung aus, die letzte
@@ -28,13 +28,11 @@ import {
  *
  * Der Druckschritt der Führungsstelle bleibt in `funkplan.spec.ts` (Erfassung und Übernahme).
  *
- * Mutationsprobe (Prüfliste LFH-548): `abBreite: 'xl'` an der Erreichbarkeit auch im Druck → der
+ * Mutationsprobe (Prüfliste LFH-548): `abBreite: 'xl'` am Telefon auch im Druck → der
  * Druckpfad wird rot.
  */
 
-test('Druckpfad bei A4-Breite: alles offen, Erreichbarkeit da, nichts ragt heraus', async ({
-  page,
-}) => {
+test('Druckpfad bei A4-Breite: alles offen, Telefon da, nichts ragt heraus', async ({ page }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Funkplan Druck ${Date.now()}`);
   await seede(page, einsatzId);
@@ -42,7 +40,9 @@ test('Druckpfad bei A4-Breite: alles offen, Erreichbarkeit da, nichts ragt herau
   await oeffne(page, einsatzId);
 
   // Vorbedingung: unter `xl` fehlt die personenbezogene Spalte am Schirm.
-  await expect(tabelle(page).getByRole('columnheader', { name: 'Erreichbarkeit' })).toHaveCount(0);
+  await expect(
+    tabelle(page).getByRole('columnheader', { name: 'Telefon', exact: true }),
+  ).toHaveCount(0);
   // Einen Knoten zuklappen: der Druck muss ihn wieder öffnen (hier über `beforeprint` + Knopf).
   await tabelle(page).locator(`tr[data-row-key^="eh-"] td`).nth(1).click();
   await expect(tabelle(page).getByText(FAHRZEUG)).toHaveCount(0);
@@ -58,8 +58,10 @@ test('Druckpfad bei A4-Breite: alles offen, Erreichbarkeit da, nichts ragt herau
   await page.emulateMedia({ media: 'print' });
 
   await expect(tabelle(page).getByText(FAHRZEUG)).toHaveCount(1);
-  await expect(tabelle(page).getByRole('columnheader', { name: 'Erreichbarkeit' })).toHaveCount(1);
-  await expect(tabelle(page).getByText(ERREICHBAR)).toHaveCount(1);
+  await expect(
+    tabelle(page).getByRole('columnheader', { name: 'Telefon', exact: true }),
+  ).toHaveCount(1);
+  await expect(tabelle(page).getByText(TELEFON)).toHaveCount(1);
 
   const lage = await page.evaluate(() => {
     const wurzel = document.querySelector('.funkplan-print-root')!.getBoundingClientRect();

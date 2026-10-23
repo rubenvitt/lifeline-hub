@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Sprechgruppe } from '../api/types';
-import {
-  KOMMUNIKATIONSMITTEL_OPTIONEN,
-  kommunikationsmittelLabel,
-  mitBetriebsart,
-  teileSprechgruppen,
-} from './kommunikationsmittel';
+import * as modul from './kommunikationsmittel';
+import { mitBetriebsart, teileSprechgruppen } from './kommunikationsmittel';
 
 function sg(id: number, betriebsart: 'TMO' | 'DMO'): Sprechgruppe {
   return {
@@ -18,28 +14,9 @@ function sg(id: number, betriebsart: 'TMO' | 'DMO'): Sprechgruppe {
   };
 }
 
-describe('kommunikationsmittelLabel', () => {
-  it('übersetzt die drei Schlüssel des Backends', () => {
-    expect(kommunikationsmittelLabel('digitalfunk')).toBe('Digitalfunk');
-    expect(kommunikationsmittelLabel('mobil')).toBe('Mobil');
-    expect(kommunikationsmittelLabel('festnetz')).toBe('Festnetz');
-  });
-
-  it('zeigt einen unbekannten Schlüssel roh statt ihn zu verschlucken', () => {
-    expect(kommunikationsmittelLabel('satellit')).toBe('satellit');
-  });
-
-  it('liefert für leer null', () => {
-    expect(kommunikationsmittelLabel(null)).toBeNull();
-    expect(kommunikationsmittelLabel('')).toBeNull();
-  });
-
-  it('hält die Auswahloptionen deckungsgleich mit den Labels', () => {
-    expect(KOMMUNIKATIONSMITTEL_OPTIONEN).toEqual([
-      { value: 'digitalfunk', label: 'Digitalfunk' },
-      { value: 'mobil', label: 'Mobil' },
-      { value: 'festnetz', label: 'Festnetz' },
-    ]);
+describe('Kommunikationsmittel (LLH-1134)', () => {
+  it('gibt es nicht mehr: Telefon und weitere Verbindungen sind typisiert (`verbindungen.ts`)', () => {
+    expect(Object.keys(modul).sort()).toEqual(['mitBetriebsart', 'teileSprechgruppen']);
   });
 });
 

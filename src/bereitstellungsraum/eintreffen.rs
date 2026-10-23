@@ -586,8 +586,6 @@ async fn unangemeldet_tx(
             soll_mannschaft: None,
             bemerkung: u.bemerkung.as_deref(),
             funkrufname: Some(&erstes.funkrufname),
-            kommunikationsmittel: None,
-            erreichbarkeit: None,
             sortier: 0,
             tz_fachaufgabe: None,
             tz_organisation: None,

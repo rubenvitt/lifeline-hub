@@ -1,4 +1,4 @@
-import type { AbschnittLagezustand, Einsatzabschnitt } from './types';
+import type { AbschnittLagezustand, Einsatzabschnitt, NeueVerbindung } from './types';
 import { apiGet, apiSend } from './client';
 
 export interface AbschnittEingabe {
@@ -6,8 +6,13 @@ export interface AbschnittEingabe {
   ueber_abschnitt_id?: number | null;
   leiter_id?: number | null;
   bemerkung?: string | null;
-  kommunikationsmittel?: string | null;
-  erreichbarkeit?: string | null;
+  /** LLH-1134: Funkrufname der Abschnittsleitung (Freitext, `null` leert). */
+  rufname?: string | null;
+  /**
+   * LLH-1134: Telefon und weitere Verbindungen; ersetzt die Liste vollständig (`[]` leert).
+   * `kommunikationsmittel`/`erreichbarkeit` lehnt der Server mit 400 ab.
+   */
+  verbindungen?: NeueVerbindung[];
   sortier?: number;
   /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
   sprechgruppe_ids?: number[];

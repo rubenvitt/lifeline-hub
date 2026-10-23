@@ -330,8 +330,9 @@ async fn abschnitt_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64)
         &format!("/api/einsaetze/{einsatz}/abschnitte"),
         cookie,
         Some(&format!(
-            r#"{{"name":"Nord","bemerkung":"Bem","kommunikationsmittel":"digitalfunk",
-                 "erreichbarkeit":"0151 23456","sortier":42,"sprechgruppe_ids":[{sg}]}}"#
+            r#"{{"name":"Nord","bemerkung":"Bem","rufname":"Florian Nord 1",
+                 "verbindungen":[{{"mittel":"mobil","wert":"0151 23456"}}],
+                 "sortier":42,"sprechgruppe_ids":[{sg}]}}"#
         )),
     )
     .await;
@@ -340,11 +341,11 @@ async fn abschnitt_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64)
 }
 
 /// **Der unterscheidende Test der Route.** Ein Patch, der nur `name` trägt, darf Leiter,
-/// Erreichbarkeit, Kommunikationsmittel, Bemerkung, Sortierung und die
-/// Sprechgruppen-Zuordnung nicht anfassen. Unter dem alten Vollersatz nullte derselbe
+/// Rufname, Verbindungen, Bemerkung, Sortierung und die Sprechgruppen-Zuordnung nicht
+/// anfassen. Unter dem alten Vollersatz nullte derselbe
 /// Request sie alle (und `sortier` fiel per `#[serde(default)]` auf 0).
 #[tokio::test]
-async fn patch_nur_name_laesst_leiter_und_erreichbarkeit_stehen() {
+async fn patch_nur_name_laesst_leiter_und_verbindungen_stehen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -367,8 +368,12 @@ async fn patch_nur_name_laesst_leiter_und_erreichbarkeit_stehen() {
     assert_eq!(json["name"], "Nord-neu");
     assert_eq!(json["leiter_id"], ep, "Leiter unberührt");
     assert_eq!(json["bemerkung"], "Bem");
-    assert_eq!(json["kommunikationsmittel"], "digitalfunk");
-    assert_eq!(json["erreichbarkeit"], "0151 23456");
+    assert_eq!(json["rufname"], "Florian Nord 1");
+    assert_eq!(
+        json["verbindungen"],
+        serde_json::json!([{"id": json["verbindungen"][0]["id"], "mittel": "mobil",
+                            "wert": "0151 23456"}])
+    );
     assert_eq!(
         json["sortier"], 42,
         "NOT-NULL-Spalte darf nicht auf 0 fallen"
@@ -380,29 +385,30 @@ async fn patch_nur_name_laesst_leiter_und_erreichbarkeit_stehen() {
     );
 }
 
-/// Grenzt gegen den vorigen ab: `null` leert genau das gesendete Feld — und nur das.
+/// Grenzt gegen den vorigen ab: `null` leert genau das gesendete Feld — und nur das; eine leere
+/// Liste leert die Verbindungen und nur sie.
 #[tokio::test]
-async fn patch_erreichbarkeit_null_loescht_nur_dieses_feld() {
+async fn patch_rufname_null_und_leere_verbindungen_loeschen_nur_diese_felder() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/abschnitte/{a}");
 
-    let (status, json) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/abschnitte/{a}"),
-        &admin,
-        Some(r#"{"erreichbarkeit":null}"#),
-    )
-    .await;
+    let (status, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"rufname":null}"#)).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(json["erreichbarkeit"].is_null());
+    assert!(json.get("rufname").is_none(), "{json}");
     assert_eq!(
-        json["kommunikationsmittel"], "digitalfunk",
+        json["verbindungen"][0]["wert"], "0151 23456",
         "Nachbar bleibt"
     );
+    assert_eq!(json["bemerkung"], "Bem", "Nachbar bleibt");
+
+    let (status, json) =
+        anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"verbindungen":[]}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["verbindungen"], serde_json::json!([]));
     assert_eq!(json["bemerkung"], "Bem", "Nachbar bleibt");
 }
 
@@ -489,95 +495,87 @@ async fn patch_leerer_name_ist_400_absenter_laesst_namen_stehen() {
     assert_eq!(json["sortier"], 9);
 }
 
-// ---------- LFH-140: kommunikationsmittel ist ein Schlüssel, kein Freitext ----------
+// ---------- LLH-1134: Funk und Telefon getrennt ----------
 
-/// Die Registry hält `kommunikationsmittel` als Retain („Schlüssel, kein Personenbezug“).
-/// Das stimmt nur, wenn die Route nichts außer den drei Schlüsseln der Oberfläche annimmt
-/// (`FunkErreichbarkeit.tsx`) — ein direkter API-Schreiber könnte sonst eine Rufnummer
-/// hineinschreiben, die die Schwärzung überlebt. Unbekannt → 400 (LFH-267), leer/fehlend
-/// bleibt erlaubt.
+/// Verbindungen ersetzen die Liste in Eingabefolge; Mittel, Wert und Hinweis werden geprüft
+/// (alles 400, das Feld für sich) und ein abgelehnter Patch ändert nichts.
 #[tokio::test]
-async fn kommunikationsmittel_unbekannt_ist_400_bei_post_und_patch() {
+async fn verbindungen_werden_ersetzt_und_geprueft() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let basis = format!("/api/einsaetze/{einsatz}/abschnitte");
-
-    let (s, json) = anfrage(
-        &app,
-        "POST",
-        &basis,
-        &admin,
-        Some(r#"{"name":"Nord","kommunikationsmittel":"Herr Müller 0170 111"}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
-    assert!(json["error"]
-        .as_str()
-        .unwrap()
-        .contains("Kommunikationsmittel"));
-
-    // Gegenprobe: gültiger Schlüssel, fehlendes Feld und Leerstring sind erlaubt.
-    let (s, json) = anfrage(
-        &app,
-        "POST",
-        &basis,
-        &admin,
-        Some(r#"{"name":"Nord","kommunikationsmittel":"mobil"}"#),
-    )
-    .await;
+    let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(r#"{"name":"Nord"}"#)).await;
     assert_eq!(s, StatusCode::CREATED);
-    assert_eq!(json["kommunikationsmittel"], "mobil");
-    let a = json["id"].as_i64().unwrap();
-    for body in [
-        r#"{"name":"Süd"}"#,
-        r#"{"name":"Ost","kommunikationsmittel":"  "}"#,
-    ] {
-        let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(body)).await;
-        assert_eq!(s, StatusCode::CREATED, "{body}");
-        assert!(json["kommunikationsmittel"].is_null(), "{body}");
-    }
+    assert_eq!(json["verbindungen"], serde_json::json!([]));
+    let pfad = format!("{basis}/{}", json["id"]);
 
-    let pfad = format!("{basis}/{a}");
-    let (s, _) = anfrage(
+    let (s, json) = anfrage(
         &app,
         "PATCH",
         &pfad,
         &admin,
-        Some(r#"{"kommunikationsmittel":"tetra privat"}"#),
+        Some(
+            r#"{"verbindungen":[{"mittel":"festnetz","wert":" 0511 1 ","hinweis":" Lagezentrum "},
+                                {"mittel":"email","wert":"ea-nord@example.org","hinweis":""}]}"#,
+        ),
     )
     .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let v = &json["verbindungen"];
+    assert_eq!(v[0]["mittel"], "festnetz");
+    assert_eq!(v[0]["wert"], "0511 1");
+    assert_eq!(v[0]["hinweis"], "Lagezentrum");
+    assert_eq!(v[1]["mittel"], "email");
+    assert!(v[1].get("hinweis").is_none(), "leerer Hinweis ist keiner");
+
+    let lang = "1".repeat(201);
+    for body in [
+        r#"{"verbindungen":[{"mittel":"digitalfunk","wert":"4711"}]}"#.to_string(),
+        r#"{"verbindungen":[{"mittel":"mobil","wert":"  "}]}"#.to_string(),
+        format!(r#"{{"verbindungen":[{{"mittel":"mobil","wert":"{lang}"}}]}}"#),
+        format!(
+            r#"{{"verbindungen":[{}]}}"#,
+            vec![r#"{"mittel":"mobil","wert":"1"}"#; 11].join(",")
+        ),
+        format!(r#"{{"rufname":"{lang}"}}"#),
+    ] {
+        let (s, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: {json}");
+    }
     let (_, json) = anfrage(&app, "GET", &basis, &admin, None).await;
-    let nord = json
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|x| x["id"] == a)
-        .unwrap();
     assert_eq!(
-        nord["kommunikationsmittel"], "mobil",
+        json[0]["verbindungen"].as_array().unwrap().len(),
+        2,
         "abgelehnt heißt unverändert"
     );
+}
 
-    let (s, json) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"kommunikationsmittel":"festnetz"}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    assert_eq!(json["kommunikationsmittel"], "festnetz");
-    let (s, json) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"kommunikationsmittel":null}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    assert!(json["kommunikationsmittel"].is_null());
+/// Kommunikationsmittel und Erreichbarkeit werden nicht mehr geschrieben: ein veralteter Client,
+/// der sie noch schickt, bekommt 400 statt eines stillen Verlusts — auch mit `null`.
+#[tokio::test]
+async fn altfelder_kommunikationsmittel_und_erreichbarkeit_sind_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}/abschnitte");
+    for body in [
+        r#"{"name":"Nord","kommunikationsmittel":"mobil"}"#,
+        r#"{"name":"Nord","erreichbarkeit":"0170 1"}"#,
+    ] {
+        let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: {json}");
+        assert!(json["error"].as_str().unwrap().contains("verbindungen"));
+    }
+    let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(r#"{"name":"Nord"}"#)).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert!(json.get("kommunikationsmittel").is_none() && json.get("erreichbarkeit").is_none());
+    let pfad = format!("{basis}/{}", json["id"]);
+    for body in [
+        r#"{"erreichbarkeit":null}"#,
+        r#"{"kommunikationsmittel":"festnetz"}"#,
+    ] {
+        let (s, _) = anfrage(&app, "PATCH", &pfad, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}");
+    }
 }

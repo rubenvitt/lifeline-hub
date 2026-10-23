@@ -8,6 +8,7 @@ import type {
   Sprechgruppe,
   Verbindungsstatus,
 } from '../api/types';
+import { telefonVerbindungen } from '../components/verbindungen';
 import { FUEHRUNGSSTELLE_STELLE, type FuehrungsstelleQuelle } from './fuehrungsstelle';
 import type { NetzLuecken } from './fernmeldeskizze';
 import type { FunkplanLuecken } from './funkplan';
@@ -46,8 +47,14 @@ export function einheitenOhneSprechgruppe(einheiten: Quelle<Einheit>): Luecke<Ei
   return filtere(einheiten, (e) => e.sprechgruppen.length === 0);
 }
 
-export function einheitenOhneErreichbarkeit(einheiten: Quelle<Einheit>): Luecke<Einheit> {
-  return filtere(einheiten, (e) => !e.erreichbarkeit?.trim());
+/** Einheiten ohne eigenen Funkrufname (LLH-1134: Funk und Telefon getrennt). */
+export function einheitenOhneFunkrufname(einheiten: Quelle<Einheit>): Luecke<Einheit> {
+  return filtere(einheiten, (e) => !e.funkrufname?.trim());
+}
+
+/** Einheiten ohne Festnetz- oder Mobilverbindung (LLH-1134). */
+export function einheitenOhneTelefon(einheiten: Quelle<Einheit>): Luecke<Einheit> {
+  return filtere(einheiten, (e) => telefonVerbindungen(e.verbindungen).length === 0);
 }
 
 /** Weitere Träger von Sprechgruppen (LFH-893): externe Stellen und Komponenten der Skizze. */

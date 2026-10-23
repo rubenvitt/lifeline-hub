@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
-import FunkErreichbarkeit from '../../components/FunkErreichbarkeit';
+import FunkUndTelefon from '../../components/FunkUndTelefon';
 import StatusTag from '../../components/StatusTag';
 import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
 import { abschnittLagezustand } from '../../theme/statusFarben';
@@ -47,14 +47,12 @@ export default function AbschnittDaten({
           {a.abschnittsauftrag}
         </Datenfeld>
       )}
-      <Datenfeld label="Funk / Erreichbarkeit" breit>
-        <FunkErreichbarkeit
-          sprechgruppen={a.sprechgruppen}
-          kommunikationsmittel={a.kommunikationsmittel}
-          erreichbarkeit={a.erreichbarkeit}
-          leerText="keine Funk-Angaben"
-        />
-      </Datenfeld>
+      {/* Funk und Telefon getrennt (LLH-1134). */}
+      <FunkUndTelefon
+        rufname={a.rufname}
+        sprechgruppen={a.sprechgruppen}
+        verbindungen={a.verbindungen}
+      />
       <Datenfeld label="Stärke (F/UF/M//Σ)" mono>
         {staerken ? <StaerkeAnzeige wert={staerken.eigene} /> : staerkenErsatz}
       </Datenfeld>

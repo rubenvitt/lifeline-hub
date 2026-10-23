@@ -10,10 +10,11 @@ import type {
   Stab,
   StellenKanal,
   Stellenart,
+  KommunikationsVerbindung,
   Verbindungsmittel,
 } from '../api/types';
 import { anzahl } from '../anzeige/anzahl';
-import { kommunikationsmittelLabel } from '../components/kommunikationsmittel';
+import { VERBINDUNGSMITTEL_LABEL, verbindungsVerweis } from '../components/verbindungen';
 import { einheitDetailPfad, einsatzabschnittePfad, einsatzdatenPfad } from '../routing/deeplinks';
 import { besetzungDarstellung, zeileFuer } from './besetzung';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from './einsatzleiter';
@@ -33,8 +34,8 @@ import { bedingungszeichenText } from './skizzenZeichen';
  *
  * - **Gepflegt** sind nur Stellen ohne eigenes Heim: Führungsfunktionen und externe Stellen
  *   (Server, `api/kommunikationsplan.ts`).
- * - **Abgeleitet** sind Abschnitte und Einheiten mit Kommunikationsmittel oder Erreichbarkeit;
- *   ihre Angaben werden dort gepflegt, die Zeile führt hin. Keine zweite Datenhaltung.
+ * - **Abgeleitet** sind Abschnitte und Einheiten mit Verbindungen (LLH-1134): alle ihre
+ *   Verbindungen, dort gepflegt, die Zeile führt hin. Keine zweite Datenhaltung.
  * - **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist ebenso abgeleitet: erste Zeile der
  *   Gruppe „Einsatzleitung und Stab“, sobald sie erfasst ist (`fuehrungsstelleErfasst`, dieselbe
  *   Regel wie im Funkplan), gepflegt auf Einsatzdaten.
@@ -119,20 +120,13 @@ export function verbindungAusRufnummer(
   return wert ? { mittel: 'festnetz', wert } : undefined;
 }
 
-/** Festnetz und Mobil teilen die Labels mit Abschnitt und Einheit (`kommunikationsmittel.ts`). */
-export const VERBINDUNGSMITTEL_LABEL: Record<Verbindungsmittel, string> = {
-  festnetz: 'Festnetz',
-  mobil: 'Mobil',
-  fax: 'Fax',
-  email: 'E-Mail',
-  messenger: 'Messenger',
-  melder: 'Melder',
-  sonstiges: 'Sonstiges',
-};
-
-export const VERBINDUNGSMITTEL_OPTIONEN = (
-  Object.entries(VERBINDUNGSMITTEL_LABEL) as [Verbindungsmittel, string][]
-).map(([value, label]) => ({ value, label }));
+// Labels, Optionen und Verweis teilen Stellen, Abschnitte, Einheiten und Führungsstelle
+// (LLH-1134); der Re-Export hält die bestehenden Importe stabil.
+export {
+  VERBINDUNGSMITTEL_LABEL,
+  VERBINDUNGSMITTEL_OPTIONEN,
+  verbindungsVerweis,
+} from '../components/verbindungen';
 
 /** Eine Verbindung, wie die Tabelle sie zeigt. `verweis` ist ein `tel:`/`mailto:`-Ziel. */
 export interface VerbindungsAnzeige {
@@ -191,48 +185,21 @@ export interface KommunikationsplanQuellen {
   fuehrungsstelle: FuehrungsstelleQuelle;
 }
 
-/**
- * `tel:` nur für Festnetz und Mobil, auf Ziffern und ein führendes `+` reduziert; `mailto:` nur
- * mit `@`. Bleibt nichts Wählbares übrig, ist der Wert Text (design.md D5).
- */
-export function verbindungsVerweis(mittel: Verbindungsmittel | null, wert: string): string | null {
-  const w = wert.trim();
-  if (mittel === 'festnetz' || mittel === 'mobil') {
-    const plus = w.startsWith('+') ? '+' : '';
-    const ziffern = w.replace(/\D/g, '');
-    return ziffern.length >= 3 ? `tel:${plus}${ziffern}` : null;
-  }
-  if (mittel === 'email') return w.includes('@') && !/\s/.test(w) ? `mailto:${w}` : null;
-  return null;
-}
-
-/** Schlüssel der Abschnitts-/Einheitsangabe → Verbindungsmittel, soweit es eins gibt. */
-function mittelAusKommunikationsmittel(
-  schluessel: string | null | undefined,
-): Verbindungsmittel | null {
-  return schluessel === 'festnetz' || schluessel === 'mobil' ? schluessel : null;
-}
-
-/** Die eine Verbindung einer abgeleiteten Zeile aus Kommunikationsmittel und Erreichbarkeit. */
-function abgeleiteteVerbindung(
+/** Die Verbindungen eines Datensatzes als Tabellenzeilen; `id` nur bei gepflegten Stellen. */
+function anzeigen(
   schluessel: string,
-  kommunikationsmittel: string | null | undefined,
-  erreichbarkeit: string | null | undefined,
+  verbindungen: readonly KommunikationsVerbindung[],
+  mitId: boolean,
 ): VerbindungsAnzeige[] {
-  const label = kommunikationsmittelLabel(kommunikationsmittel);
-  const wert = erreichbarkeit?.trim() ?? '';
-  if (!label && !wert) return [];
-  const mittel = mittelAusKommunikationsmittel(kommunikationsmittel);
-  return [
-    {
-      schluessel: `${schluessel}-v`,
-      mittel,
-      mittelLabel: label,
-      wert,
-      hinweis: null,
-      verweis: wert ? verbindungsVerweis(mittel, wert) : null,
-    },
-  ];
+  return verbindungen.map((v) => ({
+    schluessel: `${schluessel}-v${v.id}`,
+    ...(mitId ? { id: v.id } : {}),
+    mittel: v.mittel,
+    mittelLabel: VERBINDUNGSMITTEL_LABEL[v.mittel],
+    wert: v.wert,
+    hinweis: v.hinweis ?? null,
+    verweis: verbindungsVerweis(v.mittel, v.wert),
+  }));
 }
 
 /** Grund am „—“ der Besetzung, wenn der Stab nicht frei ist (LLH-1180, design.md D8). */
@@ -280,22 +247,14 @@ function gepflegteZeile(
       : { nebentext: STELLENART_LABEL[stelle.stellenart] }),
     kanaele: istFunktion ? [] : stelle.sprechgruppen.map(kanalText),
     stelle,
-    verbindungen: stelle.verbindungen.map((v) => ({
-      schluessel: `${schluessel}-v${v.id}`,
-      id: v.id,
-      mittel: v.mittel,
-      mittelLabel: VERBINDUNGSMITTEL_LABEL[v.mittel],
-      wert: v.wert,
-      hinweis: v.hinweis ?? null,
-      verweis: verbindungsVerweis(v.mittel, v.wert),
-    })),
+    verbindungen: anzeigen(schluessel, stelle.verbindungen, true),
   };
 }
 
 /**
  * Die Zeile der eigenen Führungsstelle (LFH-1148): erfasst mit Rufname und Einsatzleiter als
- * Nebentext (LLH-1168, nur über `einsatzleiter.ts`, nie aus Besetzung oder App-Rolle) und der
- * Verbindung aus Kommunikationsmittel und Erreichbarkeit; nicht erfasst keine Zeile. Fehlt die
+ * Nebentext (LLH-1168, nur über `einsatzleiter.ts`, nie aus Besetzung oder App-Rolle) und allen
+ * ihren Verbindungen (LLH-1134); nicht erfasst keine Zeile. Fehlt die
  * Quelle, steht die Zeile mit Grund da, denn ihr Fehlen hieße sonst „nicht erfasst“. Lädt sie
  * noch, steht nichts.
  */
@@ -312,10 +271,7 @@ function fuehrungsstelleZeile(q: KommunikationsplanQuellen): KommunikationsZeile
       zustand === 'daten' ? fuehrungsstelleNebentext(q.fuehrungsstelle) : ZUSTAND_GRUND[zustand],
     kanaele: [],
     ziel: einsatzdatenPfad(q.einsatzId),
-    verbindungen:
-      zustand === 'daten'
-        ? abgeleiteteVerbindung(schluessel, daten?.kommunikationsmittel, daten?.erreichbarkeit)
-        : [],
+    verbindungen: zustand === 'daten' ? anzeigen(schluessel, daten?.verbindungen ?? [], false) : [],
   };
 }
 
@@ -326,8 +282,8 @@ function fuehrungsstelleNebentext(quelle: FuehrungsstelleQuelle): string {
   return rufname ? `${rufname} · ${leiter}` : leiter;
 }
 
-function hatAngaben(x: { kommunikationsmittel?: string | null; erreichbarkeit?: string | null }) {
-  return Boolean(x.kommunikationsmittel?.trim() || x.erreichbarkeit?.trim());
+function hatAngaben(x: { verbindungen?: readonly KommunikationsVerbindung[] | null }) {
+  return (x.verbindungen?.length ?? 0) > 0;
 }
 
 /** Die vier Gruppen in fester Folge (Spec „Stellen in festen Gruppen“). */
@@ -359,10 +315,10 @@ export function baueKommunikationsplan(q: KommunikationsplanQuellen): Kommunikat
           art: 'abschnitt',
           schluessel,
           kennung: a.name,
-          nebentext: a.kurzbezeichnung ?? null,
+          nebentext: a.rufname ?? a.kurzbezeichnung ?? null,
           kanaele: [],
           ziel: einsatzabschnittePfad(q.einsatzId, { abschnitt: a.id }),
-          verbindungen: abgeleiteteVerbindung(schluessel, a.kommunikationsmittel, a.erreichbarkeit),
+          verbindungen: anzeigen(schluessel, a.verbindungen, false),
         };
       }),
     ),
@@ -378,7 +334,7 @@ export function baueKommunikationsplan(q: KommunikationsplanQuellen): Kommunikat
           nebentext: e.funkrufname ?? null,
           kanaele: [],
           ziel: einheitDetailPfad(q.einsatzId, e.id),
-          verbindungen: abgeleiteteVerbindung(schluessel, e.kommunikationsmittel, e.erreichbarkeit),
+          verbindungen: anzeigen(schluessel, e.verbindungen, false),
         };
       }),
     ),

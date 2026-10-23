@@ -135,7 +135,8 @@ export function baueFuehrungsorganisation(
       key,
       id: a.id,
       name: a.name,
-      rufname: a.kurzbezeichnung ?? null,
+      // Wie der Funkplan (LLH-1134): der Rufname der Abschnittsleitung vor der Kurzbezeichnung.
+      rufname: a.rufname?.trim() || a.kurzbezeichnung || null,
       leitung: a.leiter_name ?? null,
       // Derselbe Aufruf wie der Gliederungsbaum (`buildBaum`): inklusive aller Unterabschnitte.
       staerke: einheitenFehlen
@@ -239,7 +240,7 @@ export function wurzelFuehrungsstelle(
  * (der Einsatzleiter, LFH-1199; Stab nur, wenn übergeben — also freigegeben und geladen), fehlende
  * Quellen, dann die
  * Gliederung als verschachtelte Liste. Namen laufen durch `md()`: im Bericht stehen sie als Text,
- * nie als Auszeichnung. Erreichbarkeit führt das Organigramm nicht, also auch nicht hier.
+ * nie als Auszeichnung. Telefon führt das Organigramm nicht, also auch nicht hier.
  */
 export function rendereFuehrungsorganisationMarkdown(
   org: Fuehrungsorganisation,

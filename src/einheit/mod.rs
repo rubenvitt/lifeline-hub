@@ -54,11 +54,6 @@ pub const BEMERKUNG_MAX: usize = 2_000;
 /// (`einheit_vorlage::FUNKRUFNAME_MAX`) liegt darunter. Spiegel: `EINHEIT_FUNKRUFNAME_MAX`.
 pub const FUNKRUFNAME_MAX: usize = 200;
 
-/// Höchstlänge der Erreichbarkeit (Rufnummer oder kurzer Freitext) einer Einheit nach dem
-/// Trimmen, in `POST/PATCH …/einheiten` (LLH-1242 design.md D1). Spiegel:
-/// `EINHEIT_ERREICHBARKEIT_MAX`.
-pub const ERREICHBARKEIT_MAX: usize = 200;
-
 /// Default-Einheitstyp-Katalog je neu angelegter Organisation
 /// (label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier).
 /// **Muss mit dem Seed in `migrations/0015_einheit_typ.sql` übereinstimmen.**
@@ -210,10 +205,6 @@ pub struct EinheitAnzeige {
     /// einem Fahrzeugmitglied ab.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub funkrufname: Option<String>,
-    /// Funk/Kommunikation (LFH-108): Freitext-Schlüssel (digitalfunk/mobil/festnetz).
-    pub kommunikationsmittel: Option<String>,
-    /// Funk/Kommunikation (LFH-108): Rufnummer/Freitext (PII → schwaerze_einsatz).
-    pub erreichbarkeit: Option<String>,
     pub sortier: i64,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
@@ -228,6 +219,9 @@ pub struct EinheitAnzeige {
     pub fahrzeug_mitglieder: Vec<EinheitMitgliedFahrzeug>,
     pub material_mitglieder: Vec<EinheitMitgliedMaterial>,
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
+    /// Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
+    /// Personenbezogen: geschwärzt, nie im Lagebericht.
+    pub verbindungen: Vec<crate::stab::kommunikation::KommunikationsVerbindung>,
     /// Status der Einheit mit „Seit“ (LFH-609) — abgeleitet oder Handstatus.
     pub status: EinheitStatus,
     /// Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur

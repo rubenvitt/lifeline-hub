@@ -16,6 +16,7 @@ pub mod schwaerzung_nachlauf;
 pub mod schwaerzung_person;
 pub mod schwaerzung_registry;
 pub mod skelett_loeschung;
+pub mod verbindungen;
 pub mod zaehler;
 
 use crate::stab::Sachgebiet;

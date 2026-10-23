@@ -659,8 +659,6 @@ pub async fn bilde_tx(
                 soll_mannschaft: soll.map(|s| i64::from(s.mannschaft)),
                 bemerkung: None,
                 funkrufname: k.funkrufname.as_deref(),
-                kommunikationsmittel: None,
-                erreichbarkeit: None,
                 sortier: k.sortier,
                 tz_fachaufgabe: k.tz_fachaufgabe.as_deref(),
                 tz_organisation: k.tz_organisation.as_deref(),

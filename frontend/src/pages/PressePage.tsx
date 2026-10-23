@@ -559,7 +559,7 @@ export default function PressePage() {
                   <Form.Item label="Ansprechperson" name="kontakt_name">
                     <Input maxLength={PRESSE_KURZ_MAX} />
                   </Form.Item>
-                  <Form.Item label="Erreichbarkeit" name="kontakt_erreichbarkeit">
+                  <Form.Item label="Telefon / E-Mail" name="kontakt_erreichbarkeit">
                     <Input placeholder="Telefon oder E-Mail" maxLength={PRESSE_THEMA_MAX} />
                   </Form.Item>
                   {/* Leer setzt der Server jetzt (`routes/presse.rs`, `zeit_oder_jetzt`). */}

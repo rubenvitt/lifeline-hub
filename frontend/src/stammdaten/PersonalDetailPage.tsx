@@ -209,7 +209,7 @@ export default function PersonalDetailPage() {
             </Row>
           </Formularpaneel>
 
-          <Formularpaneel titel="Erreichbarkeit & Konto">
+          <Formularpaneel titel="Kontakt & Konto">
             <Row gutter={token.margin}>
               <Col xs={24} lg={12}>
                 <Form.Item label="Telefon" name="telefon">

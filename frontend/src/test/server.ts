@@ -45,7 +45,7 @@ export const server = setupServer(
    * überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:id/fuehrungsstelle', () =>
-    HttpResponse.json({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] }),
+    HttpResponse.json({ art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [] }),
   ),
   /**
    * Versionsstand der Instanz — „nichts Neues" als Default (Lesestand gleich laufende Version,

@@ -19,6 +19,7 @@ describe('OrganigrammBild — ohne darstellbares Zeichen', () => {
           name: 'EA Nord',
           sortier: 1,
           sprechgruppen: [],
+          verbindungen: [],
         } as Einsatzabschnitt,
       ],
       [],

@@ -90,6 +90,15 @@ pub enum Bezug {
     SelbstId,
     /// Fremdschlüssel auf die Wurzel der Personenart (`WHERE {spalte} = ?`).
     Spalte(&'static str),
+    /// Eine Ebene über einen Datensatz, der die Person führt (LLH-1134): die Zeile gehört zur
+    /// Person, wenn ihr `spalte` auf eine Zeile von `eltern` zeigt, deren `fk` die Person ist
+    /// (`WHERE {spalte} IN (SELECT id FROM {eltern} WHERE {fk} = ?)`). Beide Kanten prüft der
+    /// Guard gegen `pragma_foreign_key_list`.
+    Ueber {
+        spalte: &'static str,
+        eltern: &'static str,
+        fk: &'static str,
+    },
 }
 
 /// Ob eine Scrub-Spalte an der Person hängt.
@@ -382,6 +391,29 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         bezug: Bezug::Spalte("fuehrer_id"),
         spalten: &[("erreichbarkeit", Mit), ("bemerkung", Ohne(O_OBJEKT))],
     },
+    // Telefon und weitere Verbindungen (LLH-1134) folgen der Erreichbarkeit: an Abschnitt und
+    // Einheit oft die Nummer der führenden Person. Die der Führungsstelle gehören der Stelle
+    // (wie früher deren Erreichbarkeit) und treffen hier nie (`abschnitt_id`/`einheit_id` leer).
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "einsatz_verbindung",
+        bezug: Bezug::Ueber {
+            spalte: "abschnitt_id",
+            eltern: "einsatzabschnitt",
+            fk: "leiter_id",
+        },
+        spalten: &[("wert", Mit), ("hinweis", Mit)],
+    },
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "einsatz_verbindung",
+        bezug: Bezug::Ueber {
+            spalte: "einheit_id",
+            eltern: "einsatz_einheit",
+            fk: "fuehrer_id",
+        },
+        spalten: &[("wert", Mit), ("hinweis", Mit)],
+    },
     // ---------- Anrufende und Ansprechpersonen ----------
     PersonenBezug {
         art: PersonenArt::InfotelefonAnruf,
@@ -463,12 +495,15 @@ pub async fn scrubbe_person(
             .find(|t| t.tabelle == b.tabelle)
             .expect("Personenbezug auf eine Tabelle außerhalb der Registry (Guard)");
         let bezug = match b.bezug {
-            Bezug::SelbstId => "id",
-            Bezug::Spalte(s) => s,
+            Bezug::SelbstId => "id = ?".to_string(),
+            Bezug::Spalte(s) => format!("{s} = ?"),
+            Bezug::Ueber { spalte, eltern, fk } => {
+                format!("{spalte} IN (SELECT id FROM {eltern} WHERE {fk} = ?)")
+            }
         };
         let (sets, platzhalter_binds) = set_zuweisungen(&scrubs);
         let sql = format!(
-            "UPDATE {} SET {} WHERE {} AND {bezug} = ?",
+            "UPDATE {} SET {} WHERE {} AND {bezug}",
             b.tabelle,
             sets.join(", "),
             where_klausel(regel)

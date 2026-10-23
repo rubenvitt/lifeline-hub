@@ -12,8 +12,9 @@ pub struct AbschnittDaten<'a> {
     pub ueber_abschnitt_id: Option<i64>,
     pub leiter_id: Option<i64>,
     pub bemerkung: Option<&'a str>,
-    pub kommunikationsmittel: Option<&'a str>,
-    pub erreichbarkeit: Option<&'a str>,
+    /// Funkrufname der Abschnittsleitung (LLH-1134). Telefon und weitere Verbindungen setzt
+    /// `einsatz::verbindungen::ersetzen`.
+    pub rufname: Option<&'a str>,
     pub sortier: i64,
     pub kurzbezeichnung: Option<&'a str>,
     pub lagezustand: Option<AbschnittLagezustand>,
@@ -24,7 +25,7 @@ const SELECT_AUFGELOEST: &str = "\
     SELECT a.id, a.einsatz_id, a.ueber_abschnitt_id, a.name, a.leiter_id, \
            p.snap_name AS leiter_name, a.bemerkung, \
            a.flaeche_geojson, a.tz_fachaufgabe, a.tz_organisation, \
-           a.sprechgruppe_tmo, a.sprechgruppe_dmo, a.kommunikationsmittel, a.erreichbarkeit, \
+           a.sprechgruppe_tmo, a.sprechgruppe_dmo, a.rufname, \
            a.sortier, a.kurzbezeichnung, a.lagezustand, a.abschnittsauftrag \
     FROM einsatzabschnitt a \
     LEFT JOIN einsatz_personal p ON p.id = a.leiter_id";
@@ -43,8 +44,7 @@ struct Row {
     tz_organisation: Option<String>,
     sprechgruppe_tmo: Option<String>,
     sprechgruppe_dmo: Option<String>,
-    kommunikationsmittel: Option<String>,
-    erreichbarkeit: Option<String>,
+    rufname: Option<String>,
     sortier: i64,
     kurzbezeichnung: Option<String>,
     lagezustand: Option<String>,
@@ -65,8 +65,7 @@ fn build_anzeige(row: Row) -> EinsatzabschnittAnzeige {
         tz_organisation: row.tz_organisation,
         sprechgruppe_tmo: row.sprechgruppe_tmo,
         sprechgruppe_dmo: row.sprechgruppe_dmo,
-        kommunikationsmittel: row.kommunikationsmittel,
-        erreichbarkeit: row.erreichbarkeit,
+        rufname: row.rufname,
         sortier: row.sortier,
         kurzbezeichnung: row.kurzbezeichnung,
         // Der DB-CHECK lässt nur drei Werte zu; ein unlesbarer Altwert fällt auf „nicht beurteilt“,
@@ -77,6 +76,7 @@ fn build_anzeige(row: Row) -> EinsatzabschnittAnzeige {
             .and_then(AbschnittLagezustand::parse),
         abschnittsauftrag: row.abschnittsauftrag,
         sprechgruppen: Vec::new(), // befüllt durch load()/list()
+        verbindungen: Vec::new(),  // befüllt durch load()/list()
     }
 }
 
@@ -93,6 +93,12 @@ async fn build_anzeige_batch(
     }
     let mut sprechgruppen =
         crate::sprechgruppe::repo::lade_abschnitt_sprechgruppen_map(pool, einsatz_id).await?;
+    let mut verbindungen = crate::einsatz::verbindungen::lade_map(
+        &mut *pool.acquire().await?,
+        einsatz_id,
+        crate::einsatz::verbindungen::Bezug::Abschnitt(0),
+    )
+    .await?;
     Ok(rows
         .into_iter()
         .map(|row| {
@@ -100,6 +106,7 @@ async fn build_anzeige_batch(
             let mut anzeige = build_anzeige(row);
             // Jeder Abschnitt kommt im Satz genau einmal vor → entnehmen statt klonen.
             anzeige.sprechgruppen = sprechgruppen.remove(&id).unwrap_or_default();
+            anzeige.verbindungen = verbindungen.remove(&id).unwrap_or_default();
             anzeige
         })
         .collect())
@@ -257,17 +264,15 @@ pub async fn create_tx(
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatzabschnitt \
             (einsatz_id, ueber_abschnitt_id, name, leiter_id, bemerkung, \
-             kommunikationsmittel, erreichbarkeit, sortier, \
-             kurzbezeichnung, lagezustand, abschnittsauftrag) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             rufname, sortier, kurzbezeichnung, lagezustand, abschnittsauftrag) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.ueber_abschnitt_id)
     .bind(daten.name)
     .bind(daten.leiter_id)
     .bind(daten.bemerkung)
-    .bind(daten.kommunikationsmittel)
-    .bind(daten.erreichbarkeit)
+    .bind(daten.rufname)
     .bind(daten.sortier)
     .bind(daten.kurzbezeichnung)
     .bind(daten.lagezustand.map(|l| l.as_str()))
@@ -285,8 +290,7 @@ pub struct AbschnittPatch<'a> {
     pub ueber_abschnitt_id: Option<Option<i64>>,
     pub leiter_id: Option<Option<i64>>,
     pub bemerkung: Option<Option<&'a str>>,
-    pub kommunikationsmittel: Option<Option<&'a str>>,
-    pub erreichbarkeit: Option<Option<&'a str>>,
+    pub rufname: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
     pub kurzbezeichnung: Option<Option<&'a str>>,
     // Der Lagezustand fehlt absichtlich: `set_lagezustand_tx` schreibt ihn samt ETB-Eintrag in
@@ -350,8 +354,8 @@ async fn check_kurzbezeichnung_frei(
 /// Abschnitt nicht zum Einsatz gehört.
 ///
 /// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und eine
-/// verschobene Bind-Kette kann gleichtypige Nachbarn (`kommunikationsmittel`↔`erreichbarkeit`)
-/// nicht still vertauschen.
+/// verschobene Bind-Kette kann gleichtypige Nachbarn (`bemerkung`↔`rufname`) nicht still
+/// vertauschen.
 pub async fn update(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -367,12 +371,11 @@ pub async fn update(
             name = CASE WHEN ?3 IS NULL THEN name ELSE ?4 END, \
             leiter_id = CASE WHEN ?5 IS NULL THEN leiter_id ELSE ?6 END, \
             bemerkung = CASE WHEN ?7 IS NULL THEN bemerkung ELSE ?8 END, \
-            kommunikationsmittel = CASE WHEN ?9 IS NULL THEN kommunikationsmittel ELSE ?10 END, \
-            erreichbarkeit = CASE WHEN ?11 IS NULL THEN erreichbarkeit ELSE ?12 END, \
-            sortier = CASE WHEN ?13 IS NULL THEN sortier ELSE ?14 END, \
-            kurzbezeichnung = CASE WHEN ?15 IS NULL THEN kurzbezeichnung ELSE ?16 END, \
-            abschnittsauftrag = CASE WHEN ?17 IS NULL THEN abschnittsauftrag ELSE ?18 END \
-         WHERE id = ?19 AND einsatz_id = ?20",
+            rufname = CASE WHEN ?9 IS NULL THEN rufname ELSE ?10 END, \
+            sortier = CASE WHEN ?11 IS NULL THEN sortier ELSE ?12 END, \
+            kurzbezeichnung = CASE WHEN ?13 IS NULL THEN kurzbezeichnung ELSE ?14 END, \
+            abschnittsauftrag = CASE WHEN ?15 IS NULL THEN abschnittsauftrag ELSE ?16 END \
+         WHERE id = ?17 AND einsatz_id = ?18",
     )
     .bind(patch.ueber_abschnitt_id.map(|_| 1_i64))
     .bind(patch.ueber_abschnitt_id.and_then(|v| v))
@@ -382,10 +385,8 @@ pub async fn update(
     .bind(patch.leiter_id.and_then(|v| v))
     .bind(patch.bemerkung.map(|_| 1_i64))
     .bind(patch.bemerkung.and_then(|v| v))
-    .bind(patch.kommunikationsmittel.map(|_| 1_i64))
-    .bind(patch.kommunikationsmittel.and_then(|v| v))
-    .bind(patch.erreichbarkeit.map(|_| 1_i64))
-    .bind(patch.erreichbarkeit.and_then(|v| v))
+    .bind(patch.rufname.map(|_| 1_i64))
+    .bind(patch.rufname.and_then(|v| v))
     .bind(patch.sortier.map(|_| 1_i64))
     .bind(patch.sortier)
     .bind(patch.kurzbezeichnung.map(|_| 1_i64))
@@ -614,8 +615,7 @@ mod tests {
             leiter_id: leiter,
             bemerkung: None,
             sortier: 0,
-            kommunikationsmittel: None,
-            erreichbarkeit: None,
+            rufname: None,
             kurzbezeichnung: None,
             lagezustand: None,
             abschnittsauftrag: None,
@@ -675,7 +675,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn funk_felder_anlegen_und_aktualisieren() {
+    async fn rufname_anlegen_und_aktualisieren() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
 
@@ -683,41 +683,17 @@ mod tests {
             &pool,
             einsatz,
             AbschnittDaten {
-                name: "Nord",
-                ueber_abschnitt_id: None,
-                leiter_id: None,
-                bemerkung: None,
-                sortier: 0,
-                kommunikationsmittel: Some("digitalfunk"),
-                erreichbarkeit: Some("0151 23456"),
-                kurzbezeichnung: None,
-                lagezustand: None,
-                abschnittsauftrag: None,
+                rufname: Some("Florian Nord 1"),
+                ..daten("Nord", None, None)
             },
         )
         .await
         .unwrap();
-        assert_eq!(a.kommunikationsmittel.as_deref(), Some("digitalfunk"));
-        assert_eq!(a.erreichbarkeit.as_deref(), Some("0151 23456"));
+        assert_eq!(a.rufname.as_deref(), Some("Florian Nord 1"));
+        assert!(a.verbindungen.is_empty());
 
-        // `kommunikationsmittel` geändert, `erreichbarkeit` explizit per `Some(None)` geleert.
+        // Gegenprobe: ein Patch OHNE den Rufnamen fasst ihn nicht an, `Some(None)` leert ihn.
         let b = update(
-            &pool,
-            einsatz,
-            a.id,
-            AbschnittPatch {
-                kommunikationsmittel: Some(Some("mobil")),
-                erreichbarkeit: Some(None),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        assert_eq!(b.kommunikationsmittel.as_deref(), Some("mobil"));
-        assert_eq!(b.erreichbarkeit, None);
-
-        // Gegenprobe: ein Patch OHNE die beiden Keys fasst sie nicht an.
-        let c = update(
             &pool,
             einsatz,
             a.id,
@@ -728,12 +704,53 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(c.name, "Nord-neu");
-        assert_eq!(
-            c.kommunikationsmittel.as_deref(),
-            Some("mobil"),
-            "unberührt"
-        );
+        assert_eq!(b.rufname.as_deref(), Some("Florian Nord 1"), "unberührt");
+        let c = update(
+            &pool,
+            einsatz,
+            a.id,
+            AbschnittPatch {
+                rufname: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(c.rufname, None);
+    }
+
+    /// Die Anzeige trägt die Verbindungen des Abschnitts (LLH-1134), nicht die eines anderen.
+    #[tokio::test]
+    async fn anzeige_traegt_eigene_verbindungen() {
+        use crate::einsatz::verbindungen::{ersetzen, Bezug, Verbindung};
+        use crate::stab::kommunikation::Verbindungsmittel;
+        let pool = crate::db::test_pool().await;
+        let (einsatz, nord) = seed_abschnitt(&pool).await;
+        let sued = create(&pool, einsatz, daten("Süd", None, None))
+            .await
+            .unwrap();
+        ersetzen(
+            &pool,
+            einsatz,
+            Bezug::Abschnitt(nord),
+            &[Verbindung {
+                mittel: Verbindungsmittel::Mobil,
+                wert: "0170 1".into(),
+                hinweis: Some("EAL".into()),
+            }],
+        )
+        .await
+        .unwrap();
+        let liste = list(&pool, einsatz).await.unwrap();
+        let n = liste.iter().find(|a| a.id == nord).unwrap();
+        assert_eq!(n.verbindungen.len(), 1);
+        assert_eq!(n.verbindungen[0].wert, "0170 1");
+        assert_eq!(n.verbindungen[0].hinweis.as_deref(), Some("EAL"));
+        assert!(load(&pool, einsatz, sued.id)
+            .await
+            .unwrap()
+            .verbindungen
+            .is_empty());
     }
 
     /// Ober- und Unterabschnitt entstehen in EINER Transaktion; die Parent-Prüfung muss den noch

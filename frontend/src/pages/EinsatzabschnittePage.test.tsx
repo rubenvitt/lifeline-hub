@@ -46,8 +46,8 @@ const funkAbschnitt = {
   tz_organisation: null,
   sprechgruppe_tmo: '412_F_DRK',
   sprechgruppe_dmo: null,
-  kommunikationsmittel: 'digitalfunk',
-  erreichbarkeit: '0151 23456',
+  rufname: 'Rotkreuz Nord 1/10-1',
+  verbindungen: [{ id: 1, mittel: 'mobil', wert: '0151 23456', hinweis: null }],
   sortier: 0,
   sprechgruppen: [tmoSprechgruppe],
 };
@@ -244,6 +244,7 @@ describe('EinsatzabschnittePage', () => {
             ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 },
             sortier: 0,
             sprechgruppen: [],
+            verbindungen: [],
             fahrzeug_mitglieder: [],
             personal_mitglieder: [],
             material_mitglieder: [],
@@ -257,6 +258,7 @@ describe('EinsatzabschnittePage', () => {
             ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
             sortier: 1,
             sprechgruppen: [],
+            verbindungen: [],
             fahrzeug_mitglieder: [],
             personal_mitglieder: [],
             material_mitglieder: [],
@@ -393,12 +395,13 @@ describe('EinsatzabschnittePage', () => {
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
     expect(within(detail).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
     expect(within(detail).queryByRole('textbox')).toBeNull();
+    // LLH-1134: Funk (Rufname) und Telefon stehen getrennt.
     expect(
-      within(detail).getByRole('button', { name: 'Kommunikationsmittel bearbeiten' }),
-    ).toHaveAccessibleDescription('Digitalfunk');
+      within(detail).getByRole('button', { name: 'Rufname bearbeiten' }),
+    ).toHaveAccessibleDescription('Rotkreuz Nord 1/10-1');
     expect(
-      within(detail).getByRole('button', { name: 'Erreichbarkeit / Nummer bearbeiten' }),
-    ).toHaveAccessibleDescription('0151 23456');
+      within(detail).getByRole('button', { name: 'Telefon und weitere Verbindungen bearbeiten' }),
+    ).toHaveAccessibleDescription(/0151 23456/);
     expect(within(detail).getByRole('radiogroup', { name: 'Lagezustand' })).toBeInTheDocument();
   });
 
@@ -414,24 +417,21 @@ describe('EinsatzabschnittePage', () => {
     expect(screen.queryByLabelText('Sprechgruppe TMO')).not.toBeInTheDocument();
   });
 
-  it('Kommunikationsmittel: genau dieses Feld geht hinaus', async () => {
+  it('Rufname: genau dieses Feld geht hinaus', async () => {
     const nord = { ...funkAbschnitt };
     server.use(...handlers('einsatzleitung', 'aktiv', [nord]));
     const bodies = recordPatches(nord);
     renderPage();
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
-    await userEvent.click(
-      within(detail).getByRole('button', { name: 'Kommunikationsmittel bearbeiten' }),
-    );
-    await userEvent.click(within(detail).getByRole('combobox', { name: 'Kommunikationsmittel' }));
-    await userEvent.click(await screen.findByText('Mobil'));
-    await userEvent.click(
-      within(detail).getByRole('button', { name: 'Kommunikationsmittel speichern' }),
-    );
-    await waitFor(() => expect(bodies).toEqual([{ kommunikationsmittel: 'mobil' }]));
+    await userEvent.click(within(detail).getByRole('button', { name: 'Rufname bearbeiten' }));
+    const feld = within(detail).getByRole('textbox', { name: 'Rufname' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Rotkreuz Nord 2');
+    await userEvent.click(within(detail).getByRole('button', { name: 'Rufname speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ rufname: 'Rotkreuz Nord 2' }]));
     expect(
-      await within(detail).findByRole('button', { name: 'Kommunikationsmittel bearbeiten' }),
-    ).toHaveAccessibleDescription('Mobil');
+      await within(detail).findByRole('button', { name: 'Rufname bearbeiten' }),
+    ).toHaveAccessibleDescription('Rotkreuz Nord 2');
   });
 
   it('Abschnittsleiter ablösen: genau `leiter_id` geht hinaus (LFH-1208)', async () => {
@@ -561,7 +561,7 @@ describe('EinsatzabschnittePage', () => {
     server.use(...handlers('beobachter', 'aktiv', [funkAbschnitt]));
     renderPage();
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
-    expect(within(detail).getByText('Digitalfunk')).toBeInTheDocument();
+    expect(within(detail).getByText('Rotkreuz Nord 1/10-1')).toBeInTheDocument();
     expect(
       within(detail).queryByRole('button', { name: /bearbeiten|eintragen|Auflösen/ }),
     ).toBeNull();

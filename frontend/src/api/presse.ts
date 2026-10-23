@@ -104,7 +104,7 @@ export function legeMedienkontaktAn(
   return apiSend<Medienkontakt>(`${basis(einsatzId)}/medienkontakte`, 'POST', body);
 }
 
-/** Kein Backend-Schema: Teiländerung; `null` leert Ansprechperson bzw. Erreichbarkeit. */
+/** Kein Backend-Schema: Teiländerung; `null` leert Ansprechperson bzw. Telefon / E-Mail. */
 export interface MedienkontaktPatch {
   medium?: string;
   thema?: string;

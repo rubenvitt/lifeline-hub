@@ -134,7 +134,7 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     renderRoute('/admin/stammdaten/personal');
 
     expect(await screen.findByRole('button', { name: 'Person anlegen' })).toBeInTheDocument();
-    expect(screen.queryByText('Erreichbarkeit & Konto')).not.toBeInTheDocument();
+    expect(screen.queryByText('Kontakt & Konto')).not.toBeInTheDocument();
   });
 
   it('speichert den vollen Feldsatz in EINEM Absenden', async () => {

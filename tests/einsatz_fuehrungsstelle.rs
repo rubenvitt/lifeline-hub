@@ -83,7 +83,7 @@ async fn neuer_einsatz_hat_leere_fuehrungsstelle() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []}),
         "leere Angaben fehlen im JSON, die Art steht mit ihrer Vorgabe (LFH-1181)"
     );
 }
@@ -158,30 +158,27 @@ async fn jede_angabe_einzeln_und_leeren() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(json["rufname"], "Florian Musterstadt 10/1", "getrimmt");
 
-    // Aus einem älteren Stand nur die Erreichbarkeit: der Rufname bleibt.
+    // Nur die Verbindungen (LLH-1134): der Rufname bleibt.
     let (_, json) = patchen(
         &app,
         &admin,
         einsatz,
-        json!({"erreichbarkeit": "0171 1234567", "kommunikationsmittel": "digitalfunk"}),
+        json!({"verbindungen": [{"mittel": "festnetz", "wert": "0511 1234567"}]}),
     )
     .await;
     assert_eq!(json["rufname"], "Florian Musterstadt 10/1");
-    assert_eq!(json["erreichbarkeit"], "0171 1234567");
-    assert_eq!(json["kommunikationsmittel"], "digitalfunk");
+    assert_eq!(json["verbindungen"][0]["mittel"], "festnetz");
+    assert_eq!(json["verbindungen"][0]["wert"], "0511 1234567");
 
-    // `null` und leerer Text leeren; ein fehlendes Feld bleibt.
-    let (_, json) = patchen(
-        &app,
-        &admin,
-        einsatz,
-        json!({"rufname": null, "erreichbarkeit": "   "}),
-    )
-    .await;
+    // `null` leert den Rufnamen; die fehlenden Verbindungen bleiben.
+    let (_, json) = patchen(&app, &admin, einsatz, json!({"rufname": null})).await;
     assert!(json.get("rufname").is_none(), "{json:?}");
-    assert!(json.get("erreichbarkeit").is_none(), "{json:?}");
-    assert_eq!(json["kommunikationsmittel"], "digitalfunk");
+    assert_eq!(json["verbindungen"][0]["wert"], "0511 1234567");
     assert_eq!(lesen(&app, &admin, einsatz).await.1, json);
+
+    // Eine leere Liste leert die Verbindungen.
+    let (_, json) = patchen(&app, &admin, einsatz, json!({"verbindungen": []})).await;
+    assert_eq!(json["verbindungen"], json!([]));
 }
 
 #[tokio::test]
@@ -240,7 +237,7 @@ async fn fremde_sprechgruppe_ist_422_und_speichert_nichts() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []}),
         "auch der Rufname aus demselben Aufruf ist nicht gespeichert"
     );
 }
@@ -283,7 +280,7 @@ async fn null_leert_die_sprechgruppen() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []})
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []})
     );
 }
 
@@ -298,7 +295,7 @@ async fn leerer_patch_legt_nichts_an() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []})
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []})
     );
     let zeilen: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?")
@@ -340,24 +337,24 @@ async fn ein_fehler_im_schreiben_hinterlaesst_nichts() {
 
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []})
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []})
     );
 }
 
 #[tokio::test]
-async fn unbekanntes_kommunikationsmittel_ist_400() {
+async fn altfelder_und_unbekanntes_verbindungsmittel_sind_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    let (status, _) = patchen(
-        &app,
-        &admin,
-        einsatz,
-        json!({"kommunikationsmittel": "brieftaube"}),
-    )
-    .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
+    for body in [
+        json!({"kommunikationsmittel": "mobil"}),
+        json!({"erreichbarkeit": "0171 1"}),
+        json!({"verbindungen": [{"mittel": "brieftaube", "wert": "1"}]}),
+    ] {
+        let (status, _) = patchen(&app, &admin, einsatz, body.clone()).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    }
 }
 
 #[tokio::test]
@@ -412,7 +409,8 @@ async fn fahrzeuge_ersetzen_die_zuordnung_und_liefern_nur_ids() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": [elw.min(kdow), elw.max(kdow)]}),
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [],
+               "fahrzeug_ids": [elw.min(kdow), elw.max(kdow)]}),
         "nur IDs, aufsteigend, entdoppelt"
     );
 
@@ -448,7 +446,7 @@ async fn fahrzeug_eines_anderen_einsatzes_ist_422_und_speichert_nichts() {
     }
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []}),
         "auch der Rufname bleibt ungespeichert"
     );
 }
@@ -523,7 +521,7 @@ async fn entlassenes_fahrzeug_ist_409_vor_nicht_disponiertem_422() {
     }
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []}),
         "auch der Rufname bleibt ungespeichert"
     );
 }
@@ -646,7 +644,7 @@ async fn erfolg_feuert_einsatz_ablehnung_nicht() {
 // ---------- Schwärzung ----------
 
 #[tokio::test]
-async fn schwaerzung_nullt_nur_die_erreichbarkeit() {
+async fn schwaerzung_nimmt_nur_die_verbindungswerte() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -657,8 +655,7 @@ async fn schwaerzung_nullt_nur_die_erreichbarkeit() {
         einsatz,
         json!({
             "rufname": "Florian 10/1",
-            "kommunikationsmittel": "digitalfunk",
-            "erreichbarkeit": "0171 1234567",
+            "verbindungen": [{"mittel": "mobil", "wert": "0171 1234567", "hinweis": "EL"}],
             "sprechgruppe_ids": [tmo],
         }),
     )
@@ -678,9 +675,10 @@ async fn schwaerzung_nullt_nur_die_erreichbarkeit() {
     let nachher = lifeline_hub::einsatz::fuehrungsstelle::load(&pool, einsatz)
         .await
         .unwrap();
-    assert_eq!(nachher.erreichbarkeit, None);
+    assert_eq!(nachher.verbindungen.len(), 1, "Mittel und Zahl bleiben");
+    assert_eq!(nachher.verbindungen[0].wert, "[geschwärzt]");
+    assert_eq!(nachher.verbindungen[0].hinweis, None);
     assert_eq!(nachher.rufname.as_deref(), Some("Florian 10/1"));
-    assert_eq!(nachher.kommunikationsmittel.as_deref(), Some("digitalfunk"));
     assert_eq!(nachher.sprechgruppen.len(), 1);
 }
 
@@ -739,7 +737,7 @@ async fn nur_die_art_macht_die_stelle_nicht_erfasst() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"art": "ortsfest", "sprechgruppen": [], "fahrzeug_ids": []}),
+        json!({"art": "ortsfest", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []}),
         "keine weitere Angabe gesetzt"
     );
     assert_eq!(lesen(&app, &admin, einsatz).await.1["art"], "ortsfest");
@@ -1402,7 +1400,7 @@ async fn scheitert_der_etb_eintrag_scheitert_die_aenderung() {
 
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []})
+        json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []})
     );
 }
 
@@ -1476,7 +1474,7 @@ async fn schwaerzung_nullt_den_namen_des_einsatzleiters() {
         einsatz,
         json!({
             "rufname": "Florian 10/1",
-            "erreichbarkeit": "0171 1234567",
+            "verbindungen": [{"mittel": "mobil", "wert": "0171 1234567"}],
             "einsatzleiter": {"art": "personal", "personal_id": anna, "seit": "2026-10-11T12:00:00Z"},
         }),
     )
@@ -1496,7 +1494,7 @@ async fn schwaerzung_nullt_den_namen_des_einsatzleiters() {
     let nachher = lifeline_hub::einsatz::fuehrungsstelle::load(&pool, einsatz)
         .await
         .unwrap();
-    assert_eq!(nachher.erreichbarkeit, None);
+    assert_eq!(nachher.verbindungen[0].wert, "[geschwärzt]");
     assert_eq!(nachher.rufname.as_deref(), Some("Florian 10/1"));
     let el = nachher.einsatzleiter.expect("Art und seit bleiben");
     assert_eq!(el.name, None);

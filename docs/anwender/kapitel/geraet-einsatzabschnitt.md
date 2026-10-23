@@ -22,7 +22,7 @@ Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
 ### Abschnitt und Einheiten im Blick behalten
 
 1. „Abschnitt“ öffnen. Oben stehen „Kurzbezeichnung“, „Abschnittsleiter“, „Lagezustand“,
-   „Abschnittsauftrag“, „Funk / Erreichbarkeit“ und die Stärke, einmal für den Abschnitt und
+   „Abschnittsauftrag“, „Funk“ (Rufname und Sprechgruppen), „Telefon“ und die Stärke, einmal für den Abschnitt und
    einmal einschließlich der Unterabschnitte.
 2. Darunter listet „Einheiten“ alle Einheiten des Teilbaums mit Abschnitt, Stärke und Status.
 

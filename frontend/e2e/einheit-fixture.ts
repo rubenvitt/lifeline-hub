@@ -70,8 +70,9 @@ export const ANGABEN = [
   'Soll-Stärke',
   'Bemerkung',
   'Sprechgruppen',
-  'Kommunikationsmittel',
-  'Erreichbarkeit / Nummer',
+  // LLH-1134: Funk und Telefon getrennt; die typisierte Liste ersetzt Kommunikationsmittel und
+  // Erreichbarkeit.
+  'Telefon und weitere Verbindungen',
   'Fachaufgabe',
   'Organisation',
 ] as const;

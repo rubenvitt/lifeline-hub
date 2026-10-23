@@ -25,7 +25,12 @@ import { ZEICHEN_UNTERLAGE } from '../../zeichen/unterlage';
 
 vi.mock('../../api/einsaetze', () => ({
   ladeModulFreigaben: vi.fn(),
-  ladeFuehrungsstelle: vi.fn(async () => ({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] })),
+  ladeFuehrungsstelle: vi.fn(async () => ({
+    art: 'mobil',
+    sprechgruppen: [],
+    verbindungen: [],
+    fahrzeug_ids: [],
+  })),
 }));
 vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../../api/lageberichte', () => ({
@@ -42,7 +47,15 @@ const EINSATZ = {
 } as EinsatzAnzeige;
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
-  return { id, einsatz_id: 1, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
 }
 
 function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
@@ -58,6 +71,7 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
     ist: { fuehrer: 1, unterfuehrer: 2, mannschaft: 6 },
     ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 6 },
     status: { quelle: 'ohne', verteilung: [] },
+    verbindungen: [],
     ...p,
   } as Einheit;
 }
@@ -316,6 +330,7 @@ describe('Organigramm — Klappzustand im Container', () => {
       art: 'ortsfest',
       bezeichnung: 'TEL Rathaus',
       sprechgruppen: [],
+      verbindungen: [],
       fahrzeug_ids: [],
     });
     const { unmount } = container();
@@ -378,6 +393,7 @@ describe('Organigramm — Klappzustand im Container', () => {
       antworte({
         art: 'mobil',
         sprechgruppen: [],
+        verbindungen: [],
         fahrzeug_ids: [],
         einsatzleiter: {
           art: 'extern',
@@ -529,6 +545,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValueOnce({
       art: 'mobil',
       sprechgruppen: [],
+      verbindungen: [],
       fahrzeug_ids: [],
       einsatzleiter: {
         art: 'extern',

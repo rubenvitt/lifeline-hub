@@ -1,9 +1,10 @@
 //! Kommunikationsplan des S6 (LFH-848): Verbindungen außerhalb des Funks je Stelle.
 //!
 //! **Gepflegt werden nur Stellen ohne eigenes Heim:** Führungsfunktionen aus dem Katalog
-//! (LFH-549) und externe Stellen (Leitstelle, Behörde, Verbindungsperson, sonstige). Abschnitte
-//! und Einheiten tragen Kommunikationsmittel und Erreichbarkeit selbst (0047, 0086); der Client
-//! leitet ihre Zeilen ab, hier entsteht keine zweite Datenhaltung.
+//! (LFH-549) und externe Stellen (Leitstelle, Behörde, Verbindungsperson, sonstige). Abschnitte,
+//! Einheiten und die eigene Führungsstelle tragen ihre Verbindungen selbst
+//! (`einsatz::verbindungen`, LLH-1134); der Client leitet ihre Zeilen ab, hier entsteht keine
+//! zweite Datenhaltung.
 //!
 //! **Die Verbindung gehört der Stelle, nicht einer Person.** Wechselt die Besetzung von S2, bleibt
 //! „S2 Mobil 0170 …“ stehen; aus dem Einsatzpersonal wird nichts übernommen.
@@ -44,9 +45,9 @@ wire_enum! {
 wire_enum! {
     /// Mittel einer Verbindung. Wire == `as_str()`.
     ///
-    /// Bewusst getrennt von `KOMMUNIKATIONSMITTEL` an Abschnitt und Einheit (drei Schlüssel, eine
-    /// Erreichbarkeit je Datensatz, design.md D2). Funk steht im Funkplan; eine ISSI oder
-    /// Einzelrufnummer ist `sonstiges` mit Hinweis.
+    /// Seit LLH-1134 auch die Verbindungen an Abschnitt, Einheit und Führungsstelle
+    /// (`einsatz::verbindungen`). Funk steht im Funkplan; eine ISSI oder Einzelrufnummer ist
+    /// `sonstiges` mit Hinweis.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum Verbindungsmittel {
         Festnetz => "festnetz",
@@ -70,7 +71,7 @@ impl Stellenart {
 pub const TEXT_MAX: usize = 200;
 
 /// Eine Verbindung einer Stelle.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct KommunikationsVerbindung {
     pub id: i64,
     pub mittel: Verbindungsmittel,

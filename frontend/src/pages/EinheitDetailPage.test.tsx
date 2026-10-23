@@ -271,7 +271,8 @@ const PANEELE = [
   'Fahrzeuge und Besatzung',
   'Zeitachse',
   'Material',
-  'Funk und Kommunikation',
+  'Funk',
+  'Telefon und weitere Verbindungen',
   'Taktisches Zeichen',
   'Einheit auflösen',
 ];
