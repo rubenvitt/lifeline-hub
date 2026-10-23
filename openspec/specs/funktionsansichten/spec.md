@@ -220,7 +220,9 @@ das Ausrücken als Austritt, ruft aber selbst nicht ab.
 | `bereitstellungsraeume`: eigener BR mit Belegung, abgerufene Kräfte mit Ziel | L |
 | `bereitstellungsraeume`: Verlauf der Belegung des eigenen BR | L |
 | `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt), Ausrücken einer abgerufenen Kraft bestätigen (Austritt) | S |
-| `bereitstellungsraeume`: Eintreffen am eigenen BR buchen, auch eine unangemeldete Kraft anlegen (Einheit mit Fahrzeugen, Meldung an die Einsatzleitung) | S |
+| `bereitstellungsraeume`: Eintreffen am eigenen BR buchen, auch eine unangemeldete Kraft anlegen (Einheit mit Fahrzeugen, Meldung an die Einsatzleitung), auf Wunsch mit Verweis auf eine Nachforderung mit Ziel = eigener BR | S |
+| `bereitstellungsraeume`: erwartete Kräfte aus Nachforderungen mit Ziel = eigener BR (Art, Anzahl, Stufe, offene Rufnamen, erwartetes Eintreffen) | L |
+| `nachforderungen`: Liste, Stufen, Zusage, Übernahme als Einheit | — |
 | `bereitstellungsraeume`: eigenen BR in Betrieb nehmen (`geplant → aktiv`) | S |
 | `bereitstellungsraeume`: Kräfte abrufen, Abruf zurücknehmen, in einen anderen BR verlegen | — |
 | `bereitstellungsraeume`: BR anlegen, Stammdaten ändern, auflösen, stornieren | — |
@@ -265,6 +267,13 @@ das Ausrücken als Austritt, ruft aber selbst nicht ab.
 
 - **WHEN** das Gerät des BR Sportplatz den Verlauf des BR Schule abruft
 - **THEN** antwortet der Server mit 404
+
+#### Scenario: Erwartete Kräfte des eigenen BR
+
+- **WHEN** eine Nachforderung „2× RTW“ mit Ziel BR Sportplatz und Zusage „83-1“, „83-2“ unterwegs ist
+- **AND** das Gerät des BR Sportplatz die erwarteten Kräfte abruft
+- **THEN** nennt die Antwort Art, Anzahl, Stufe, die Rufnamen und das erwartete Eintreffen, aber weder Details, Begründung, Adressat noch Gründe
+- **AND** die erwarteten Kräfte des BR Schule und die Nachforderungsliste bleiben dem Gerät verschlossen (404 bzw. 403)
 
 #### Scenario: Wechsel im Verlauf des eigenen BR
 

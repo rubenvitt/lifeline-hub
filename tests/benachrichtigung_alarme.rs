@@ -262,7 +262,7 @@ async fn neue_sofortmeldung_alarmiert_alle_leser_ausser_der_erfasserin() {
     w.sofortmeldung("annika", w.anna, "sofort-1").await;
     assert_eq!(w.empfaenger("sofortmeldung").await.len(), 3);
 
-    // Eine gewöhnliche Meldung bleibt still.
+    // Eine gewöhnliche Meldung alarmiert nicht: sie ist ein Eingang (LLH-1143 D5), kein Alarm.
     let cookie = w.cookie("bertram").await;
     let (s, v) = anfrage(
         &w.app,
@@ -281,11 +281,15 @@ async fn neue_sofortmeldung_alarmiert_alle_leser_ausser_der_erfasserin() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
-    let (gesamt,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM benachrichtigung")
-        .fetch_one(&w.pool)
-        .await
-        .unwrap();
-    assert_eq!(gesamt, 3);
+    assert_eq!(w.empfaenger("sofortmeldung").await.len(), 3);
+    let (alarme,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM benachrichtigung WHERE stufe = 'alarm' AND bezug_id = ?",
+    )
+    .bind(v["id"].as_i64().unwrap())
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(alarme, 0, "kein Alarm für die gewöhnliche Meldung");
 }
 
 /// Wer das Modul Meldungen nicht lesen darf, bekommt den Alarm nicht.

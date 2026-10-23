@@ -681,6 +681,25 @@ mit Grund stehen; ohne Schreibrecht MUST sie fehlen.
 - **WHEN** ein Gerät einer anderen Ansicht als `bereitstellungsraum` die Seite eines Raums zeigt
 - **THEN** fehlt „Eintreffen buchen“
 
+### Requirement: Erwartete Kräfte aus Nachforderungen im Dialog
+Der Dialog „Eintreffen buchen“ SHALL über „Erwartet“ die Gruppe „Aus Nachforderungen“ zeigen: je
+offenem Rufnamen einer Nachforderung mit Ziel = dieser Raum eine Zeile mit Art, Nachforderung,
+Stufe und erwartetem Eintreffen, dazu eine Zeile „ohne Rufname“, solange mehr erwartet wird, als
+Rufnamen genannt sind (LLH-1387). „Eintreffen“ an einer Zeile MUST eine gleichnamige buchbare
+Einheit mit Verweis auf die Nachforderung buchen, sonst die Erfassung mit Rufname als Funkrufname
+und Art als Fahrzeugtyp öffnen, die mit „Eintreffen buchen“ ebenfalls mit Verweis bucht. Eine so
+angebotene Einheit MUST NOT zusätzlich unter „Erwartet“ oder „Im Einsatz“ stehen. Ohne Freigabe
+Nachforderungen MUST die Gruppe ohne Fehlermeldung fehlen.
+
+#### Scenario: Erwartete Kraft buchen
+- **WHEN** die Nachforderung „2× RTW“ mit Ziel „BR Sportplatz“ und Zusage „83-1“, „83-2“ unterwegs ist und im Einsatz keine Kraft „83-2“ geführt wird
+- **AND** der Einweiser im Dialog unter „Aus Nachforderungen“ bei „83-2“ „Eintreffen“ und dann „Eintreffen buchen“ wählt
+- **THEN** ist „83-2“ als Einheit mit Verweis auf die Nachforderung im Raum gebucht, und die Nachforderung nennt sie
+
+#### Scenario: Gleichnamige Einheit
+- **WHEN** im Einsatz die Einheit „83-1“ ohne Raum geführt wird
+- **THEN** bucht „Eintreffen“ bei „83-1“ unter „Aus Nachforderungen“ diese Einheit mit Verweis, und „83-1“ steht nicht noch einmal unter „Erwartet“
+
 ### Requirement: Unangemeldete Kraft in der Oberfläche erfassen
 „Nicht in der Liste“ im Dialog „Eintreffen buchen“ SHALL die Erfassung einer unangemeldeten
 Kraft mit vier sichtbaren Feldern öffnen (Funkrufname, Trägerorganisation, Fahrzeugtyp, Stärke),

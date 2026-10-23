@@ -8,6 +8,7 @@ import type {
   BrVerlaufEintrag,
   EintreffenEingabe,
   EintreffenErgebnis,
+  ErwarteteKraft,
   ObjektTyp,
   BrBelegungsArt,
 } from './types';
@@ -37,6 +38,16 @@ export function ladeBr(einsatzId: number, brId: number): Promise<BrDetail> {
 export function loadBrVerlauf(einsatzId: number, brId: number): Promise<BrVerlaufEintrag[]> {
   return apiGet<BrVerlaufEintrag[]>(
     `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/verlauf`,
+  );
+}
+
+/**
+ * Erwartete Kräfte aus Nachforderungen mit Ziel = dieser Raum (LLH-1387): nur Art, Anzahl, Stufe,
+ * offene Rufnamen und erwartetes Eintreffen. Ohne Freigabe Nachforderungen 403.
+ */
+export function loadBrErwartet(einsatzId: number, brId: number): Promise<ErwarteteKraft[]> {
+  return apiGet<ErwarteteKraft[]>(
+    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/erwartet`,
   );
 }
 

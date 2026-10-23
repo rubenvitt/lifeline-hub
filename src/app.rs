@@ -269,6 +269,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/benachrichtigungen/{id}/quittieren",
             post(routes::benachrichtigung::quittieren),
         )
+        // Verlauf und „alle gelesen“ eines Einsatzes (LLH-1143, design.md D3/D4).
+        .route(
+            "/api/einsaetze/{id}/benachrichtigungen",
+            get(routes::benachrichtigung::verlauf),
+        )
+        .route(
+            "/api/einsaetze/{id}/benachrichtigungen/gelesen",
+            post(routes::benachrichtigung::gelesen),
+        )
         // Web Push (LLH-1223): ohne `--web-push` 404 aus dem Handler.
         .route("/api/web-push", get(routes::web_push::stand))
         .route(
@@ -1422,6 +1431,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/verlauf",
             get(routes::einsatz_bereitstellungsraum::verlauf),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/erwartet",
+            get(routes::einsatz_bereitstellungsraum::erwartet),
         )
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",

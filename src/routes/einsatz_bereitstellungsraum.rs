@@ -14,7 +14,9 @@ use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
 };
-use crate::einsatz::modul::{Auftraege, Bereitstellungsraeume, Einheiten, Fahrzeuge};
+use crate::einsatz::modul::{
+    Auftraege, Bereitstellungsraeume, Einheiten, Fahrzeuge, Nachforderungen,
+};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -325,6 +327,25 @@ pub async fn verlauf(
     br_repo::laden(&state.pool, einsatz_id, br_id).await?;
     Ok(Json(
         belegung_repo::verlauf(&state.pool, einsatz_id, br_id).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/bereitstellungsraeume/{bid}/erwartet — erwartete Kräfte aus
+/// Nachforderungen mit Ziel = dieser Raum (LLH-1387, design.md D1–D3): Rechte wie das Detail und
+/// dazu die Freigabe Nachforderungen (403 vor jedem Lesen); das BR-Gerät nur am eigenen Raum
+/// (fremd 404). Ohne Freitexte außer Art und Rufnamen (`nachforderung::erwartet`).
+pub async fn erwartet(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<Vec<crate::nachforderung::erwartet::ErwarteteKraft>>, AppError> {
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
+        .await?;
+    let einsatz_id = ctx.einsatz.id;
+    br_repo::laden(&state.pool, einsatz_id, br_id).await?;
+    Ok(Json(
+        crate::nachforderung::erwartet::fuer_raum(&state.pool, einsatz_id, br_id).await?,
     ))
 }
 
@@ -791,6 +812,13 @@ pub async fn eintreffen(
         ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
         ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
     }
+    // Der Verweis auf eine Nachforderung schreibt an der Einheit und liest die Nachforderung
+    // (LLH-1387 D4): beide Rechte, 403 vor jedem Lesen.
+    if body.nachforderung_id.is_some() {
+        ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
+            .await?;
+        ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+    }
     support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
     // Replay vor dem Aktiv-Gate und vor jeder Zustandsprüfung (D8).
     if let Some(cid) = client_id.as_deref() {
@@ -811,7 +839,7 @@ pub async fn eintreffen(
         etb_startwert: etb_startwert(&state.pool, einsatz_id).await?,
     };
     let gebucht = match crate::write_retry!(&state.pool, |conn| {
-        eintreffen::eintreffen_tx(conn, &rahmen, &erfassung).await
+        eintreffen::eintreffen_tx(conn, &rahmen, &erfassung, body.nachforderung_id).await
     }) {
         Ok(g) => g,
         Err(fehler) => {
@@ -869,6 +897,10 @@ async fn notify_eintreffen(
     sse_br(state, einsatz_id, br_id);
     if let Some(einheit_id) = g.einheit_id {
         super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);
+    }
+    // Die Nachforderung nennt die verknüpfte Einheit (LLH-1387 D4).
+    if g.nachforderung_id.is_some() {
+        super::nachforderung::sse(state, einsatz_id);
     }
     // Eine unangemeldete Kraft bringt neue Fahrzeuge; ein bekanntes Fahrzeug steht im Raum.
     if g.meldung_id.is_some() || g.objekt_typ == ObjektTyp::Fahrzeug {

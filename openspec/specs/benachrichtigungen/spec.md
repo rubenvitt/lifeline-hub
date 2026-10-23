@@ -10,8 +10,10 @@ Fremdem überflutet zu werden.
 ### Requirement: Drei Stufen
 
 Jede Benachrichtigung SHALL genau eine Stufe tragen. *Alarm*: lauter Ton, Toast, OS-Meldung bei
-verdecktem Tab. *Hinweis*: dezenter Ton, Toast, OS-Meldung bei verdecktem Tab. *Still*: kein
-Ton, kein Toast, keine OS-Meldung; das Ereignis zeigt sich nur in Zählern, Marken und Listen.
+verdecktem Tab. *Hinweis* (Eingang): dezenter Ton, OS-Meldung bei verdecktem Tab, zählt als
+ungelesener Eingang. *Still*: kein Ton, kein Toast, keine OS-Meldung; die Benachrichtigung steht
+nur im Verlauf, schon gelesen, und zählt nie. Still wird eine Benachrichtigung für einen
+Empfänger, der ihre Art abgeschaltet hat.
 Toasts beider lauten Stufen MUST stehen bleiben, bis sie geschlossen oder geöffnet werden.
 Hat der Nutzer Push auf einem Gerät eingeschaltet, SHALL eine Benachrichtigung beider lauten
 Stufen dort auch bei geschlossener App als OS-Meldung erscheinen (Spec `web-push`).
@@ -31,6 +33,41 @@ Stufen dort auch bei geschlossener App als OS-Meldung erscheinen (Spec `web-push
 #### Scenario: Stilles Ereignis
 - **WHEN** eine Chat-Nachricht ohne Erwähnung eingeht
 - **THEN** ändert sich nur der Zähler am Modul Chat; es gibt keinen Ton und keinen Toast
+
+#### Scenario: Still für einen Empfänger
+- **WHEN** Person A die Art „Neuer Auftrag“ abgeschaltet hat und ein Auftrag an sie erteilt wird
+- **THEN** steht „Neuer Auftrag“ in ihrem Verlauf als gelesen, ohne Ton, ohne Hinweis und ohne dass die Zahl ihrer ungelesenen Eingänge steigt
+
+### Requirement: Verlauf der Benachrichtigungen
+
+Der Server SHALL je Person und Einsatz einen Verlauf ihrer Benachrichtigungen liefern, jüngste
+zuerst, höchstens 200, mit Text, Zeit, Stufe und Sprungziel, und dazu die Zahl ihrer ungelesenen
+Eingänge. Alarme und Stilles MUST NOT mitgezählt werden. Der Verlauf MUST dieselbe Rechteprüfung
+wie das Lesen einer Benachrichtigung anwenden; nur wer den Einsatz lesen darf, erhält ihn.
+Ungelesene Benachrichtigungen SHALL 24 Stunden im Verlauf bleiben, gelesene 24 Stunden nach dem
+Lesen.
+
+#### Scenario: Zwei Eingänge und ein Alarm
+- **WHEN** Person A zwei Hinweise „Neuer Auftrag“ und einen Alarm „Auftrag überfällig“ erhalten hat
+- **THEN** nennt ihr Verlauf alle drei, den Alarm zuerst, und zwei ungelesene Eingänge
+
+#### Scenario: Recht am Modul verloren
+- **WHEN** Person A das Modul Aufträge nicht mehr sehen darf
+- **THEN** fehlen ihre Benachrichtigungen zu Aufträgen im Verlauf und in der Zahl
+
+### Requirement: Alle gelesen
+
+Eine Person SHALL ihre Benachrichtigungen eines Einsatzes bis zu einer Kennung auf einmal als
+gelesen markieren können. Alarme MUST davon unberührt bleiben. Der Server MUST es ihren übrigen
+Verbindungen mit genau einem Ereignis melden, gleich wie viele Benachrichtigungen es betrifft.
+
+#### Scenario: Zwei Tabs
+- **WHEN** Person A in einem Tab „Alle gelesen“ wählt und den Einsatz in einem zweiten Tab offen hat
+- **THEN** zeigt auch der zweite Tab keine ungelesenen Eingänge mehr, und ein offener Alarm bleibt stehen
+
+#### Scenario: Zweites Gerät
+- **WHEN** Person A ihre Eingänge am Tablet gelesen hat und danach am Laptop den Einsatz öffnet
+- **THEN** sind sie auch dort gelesen
 
 ### Requirement: Der Server bestimmt die Empfänger
 
@@ -247,11 +284,12 @@ Anforderung „Sofortmeldung alarmiert“ gelten, ohne zweite Benachrichtigung.
 
 ### Requirement: Eingang einer Meldung
 
-Eine dringende Meldung, jede Lagemeldung und jede Meldung von einem gekoppelten Gerät SHALL beim
-Erfassen als Hinweis „Neue Meldung“ alle Mitglieder mit Schreibrecht im Modul Meldungen
-erreichen, nie Beobachter und nie den Erfasser. Mit Empfängerfunktion MUST er stattdessen deren
-Nutzer und die Einsatzleitung erreichen. Eine normale Meldung von Hand ohne Empfängerfunktion
-MUST still bleiben; eine Sofortmeldung bleibt bei ihrem Alarm.
+Jede Meldung, die keine Sofortmeldung ist, SHALL beim Erfassen ohne Empfängerfunktion als
+Hinweis „Neue Meldung“ alle Mitglieder mit Schreibrecht im Modul Meldungen erreichen, nie
+Beobachter und nie den Erfasser. Eine dringende Meldung, jede Lagemeldung und jede Meldung von
+einem gekoppelten Gerät MUST mit Empfängerfunktion stattdessen deren Nutzer und die
+Einsatzleitung erreichen; eine normale Meldung mit Empfängerfunktion nur deren Nutzer (Anforderung
+„Meldung an mich“). Eine Sofortmeldung bleibt bei ihrem Alarm.
 
 #### Scenario: Dringende Meldung
 - **WHEN** Person A eine dringende Meldung ohne Empfängerfunktion erfasst, B und C Führungspersonal sind und D Beobachterin
@@ -270,8 +308,8 @@ MUST still bleiben; eine Sofortmeldung bleibt bei ihrem Alarm.
 - **THEN** erhalten A und C den Hinweis, das übrige Führungspersonal nicht
 
 #### Scenario: Normale Meldung von Hand
-- **WHEN** eine Meldung mit Priorität normal ohne Empfängerfunktion von Hand erfasst wird
-- **THEN** erhält niemand eine Benachrichtigung; sie zählt bei den unbearbeiteten Meldungen
+- **WHEN** Person A eine Meldung mit Priorität normal ohne Empfängerfunktion von Hand erfasst
+- **THEN** erhalten alle anderen mit Schreibrecht im Modul Meldungen den Hinweis „Neue Meldung“, A und Beobachter nicht
 
 ### Requirement: In die Lage übernommen
 
@@ -310,15 +348,29 @@ unberührt bleiben.
 
 ### Requirement: Eingangshinweis
 
-Hinweise der Art „Neue Meldung“ SHALL gebündelt in einem stehenden Hinweis neben dem Budget der
-Toasts erscheinen. Ein Eintrag MUST Absender und Anfang des Wortlauts nennen (über die
-Abfrage der Meldung); mehrere MUST als „‹n› neue Meldungen“ mit den jüngsten zwei Einträgen und
-der Zahl der übrigen erscheinen. Je neue Meldung SHALL „Sichten“ bereitstehen, wenn die Person
-schreiben darf. Der dezente Ton MUST höchstens einmal je zwei Minuten spielen.
+Alle Eingänge eines Einsatzes (Stufe Hinweis, außer den Org-Arten) SHALL gebündelt in einem
+stehenden Eingangsband erscheinen: unten, auf schmalen Schirmen über die Breite, ab dem
+Tablet-Querformat rechts, getrennt von den Toasts oben. Das Band MUST NOT einen Platz der Toasts
+belegen oder einen Toast verdrängen. Ein Eintrag einer Meldung MUST Absender und Anfang des
+Wortlauts nennen (über die Abfrage der Meldung), ein anderer Eingang Titel und Detailzeile des
+Servers; mehrere MUST als „‹n› neue Meldungen“ bzw., sind andere Eingänge dabei, „‹n› neue
+Eingänge“ mit den jüngsten zwei Einträgen und der Zahl der übrigen erscheinen. Ein Eintrag
+springt mit „Öffnen“ zum Objekt; mehrere aus einem Modul springen in das Modul, aus mehreren
+Modulen öffnet „Ansehen“ den Verlauf, ohne zu quittieren. Je neue Meldung SHALL „Sichten“
+bereitstehen, wenn die Person schreiben darf. Der dezente Ton MUST höchstens einmal je zwei
+Minuten spielen.
 
 #### Scenario: Zehn Meldungen in einer Minute
 - **WHEN** binnen einer Minute zehn Lagemeldungen von Geräten eingehen
 - **THEN** steht ein Hinweis „10 neue Meldungen“, und der dezente Ton spielt einmal
+
+#### Scenario: Eingänge aus mehreren Modulen
+- **WHEN** eine Meldung und zwei neue Aufträge eingehen
+- **THEN** steht ein Band „3 neue Eingänge“, und „Ansehen“ öffnet den Verlauf am Knopf „Eingänge“, alle drei bleiben ungelesen
+
+#### Scenario: Alle gelesen auf einem anderen Gerät
+- **WHEN** Person A auf dem Telefon „Alle gelesen“ wählt, während am Laptop das Band steht
+- **THEN** verschwindet das Band am Laptop, ein danach eingegangener Eintrag bleibt
 
 #### Scenario: Sichten im Hinweis
 - **WHEN** Person A im Hinweis bei einer Meldung „Sichten“ wählt
@@ -338,16 +390,24 @@ zeigen, auf der Seite Lagemeldungen keine Übernahmen; dort trägt das Sammelban
 - **WHEN** eine dringende Meldung eingeht, während Person A die Seite Meldungen offen hat
 - **THEN** erscheint kein Hinweis und kein Ton; das Sammelbanner der Seite trägt die Meldung
 
-### Requirement: Unbearbeitete Meldungen im Tab-Titel
+### Requirement: Ungelesene Eingänge im Tab-Titel
 
-Der Tab-Titel eines Einsatzes SHALL die Zahl der Meldungen im Status Neu voranstellen, „(3)
-Lagekarte · Einsatz · lifeline-hub“, sofern das Modul Meldungen sichtbar und frei ist. Wo der
-Browser es kann, MUST dieselbe Zahl am Symbol der installierten App stehen. Ohne unbearbeitete
-Meldungen entfällt die Zahl.
+Der Tab-Titel eines Einsatzes SHALL die Zahl der ungelesenen Eingänge der angemeldeten Person
+voranstellen, „(3) Lagekarte · Einsatz · lifeline-hub“: dieselbe Zahl wie am Knopf „Eingänge“
+(Stufe Hinweis, nicht quittiert; Alarme und Stilles zählen nicht). Wo der Browser es kann, MUST
+dieselbe Zahl am Symbol der installierten App stehen. Ohne ungelesene Eingänge entfällt die Zahl.
+Der Knopf „Eingänge“ MUST die Zahl auch im zugänglichen Namen tragen („Eingänge, 3 ungelesen“),
+nie nur als Ziffer. Bündelt der Kopf die Alarmzentrale zu einem Ziel (Handschirm, Tablet mit
+Finger), SHALL dieses Ziel die Zahl und einen Eintrag „Eingänge“ tragen statt eines eigenen
+Knopfs; der Kopf MUST dadurch nicht umbrechen.
 
 #### Scenario: Stiller Eingang
-- **WHEN** drei Meldungen mit Priorität normal von Hand erfasst werden und noch niemand sie gesichtet hat
-- **THEN** beginnt der Tab-Titel mit „(3)“, ohne Ton und ohne Hinweis
+- **WHEN** drei Meldungen mit Priorität normal von Hand erfasst werden und Person B keine davon geöffnet hat
+- **THEN** beginnt Bs Tab-Titel mit „(3)“, und der Knopf „Eingänge“ heißt „Eingänge, 3 ungelesen“
+
+#### Scenario: Gelesen auf einem anderen Gerät
+- **WHEN** Person B auf dem Telefon „Alle gelesen“ wählt
+- **THEN** entfällt die Zahl auch im Tab-Titel ihres Laptops, ohne Neuladen
 
 ### Requirement: Lagemeldung schlägt S2 vor
 
@@ -450,19 +510,19 @@ Hinweis erhalten. Wer ihn nicht lesen darf, MUST NOT von ihm erfahren.
 
 ### Requirement: Gemeinsames Budget und Bündelung
 
-Alle Benachrichtigungen SHALL ein gemeinsames Budget teilen: höchstens drei einzelne Toasts sind
-sichtbar. Ab der vierten fasst ein Sammeltoast die älteren zusammen und nennt je Art die Zahl und
-einen Sprung; die jüngste bleibt einzeln stehen. Dieselbe Benachrichtigung MUST höchstens einmal
-erscheinen. Ausgenommen sind Benachrichtigungen der Art „Neue Meldung“: sie stehen im
-Eingangshinweis und MUST NOT einen Platz des Budgets belegen.
+Alarme, Org-Hinweise und die Unwetterwarnung SHALL ein gemeinsames Budget teilen: höchstens drei
+einzelne Toasts sind sichtbar. Ab der vierten fasst ein Sammeltoast die älteren zusammen und nennt
+je Art die Zahl und einen Sprung; die jüngste bleibt einzeln stehen. Dieselbe Benachrichtigung
+MUST höchstens einmal erscheinen. Eingänge eines Einsatzes stehen im Eingangsband und MUST NOT
+einen Platz des Budgets belegen.
 
-#### Scenario: Fünf Hinweise
-- **WHEN** binnen kurzer Zeit zwei neue Aufträge, ein Befehl und zwei Nachforderungs-Hinweise eintreffen
-- **THEN** steht der jüngste einzeln, und ein Sammeltoast „4 weitere Hinweise“ nennt die übrigen mit je einem Sprung zu Aufträge, Befehle und Nachforderungen
+#### Scenario: Fünf Alarme
+- **WHEN** binnen kurzer Zeit zwei überfällige Aufträge, eine Sofortmeldung und zwei fällige Ablösungen eintreffen
+- **THEN** steht der jüngste einzeln, und ein Sammeltoast „4 weitere Alarme“ nennt die übrigen mit je einem Sprung zu Aufträge, Meldungen und Ablösung
 
-#### Scenario: Eingang neben drei Toasts
-- **WHEN** drei Hinweise „Neuer Auftrag“ einzeln stehen und eine dringende Meldung eingeht
-- **THEN** stehen die drei weiter einzeln, und die Meldung erscheint im Eingangshinweis
+#### Scenario: Eingang neben drei Alarmen
+- **WHEN** drei Alarme einzeln stehen und eine Meldung eingeht
+- **THEN** stehen die drei weiter einzeln, und die Meldung erscheint im Eingangsband
 
 ### Requirement: Quittieren gilt für alle Verbindungen des Nutzers
 
@@ -470,7 +530,7 @@ Schließt oder öffnet ein Nutzer den Toast einer Benachrichtigung, SHALL sie f�
 und ihre Toasts und OS-Meldungen MUST auf all seinen offenen Verbindungen verschwinden.
 
 #### Scenario: Zwei Tabs
-- **WHEN** Person A den Einsatz in zwei Tabs offen hat und den Toast „Neuer Auftrag“ im ersten schließt
+- **WHEN** Person A den Einsatz in zwei Tabs offen hat und den Toast „Auftrag überfällig“ im ersten schließt
 - **THEN** verschwindet der Toast auch im zweiten Tab
 
 ### Requirement: Kategorien je Nutzer abschaltbar

@@ -1022,6 +1022,14 @@ export interface components {
             /** Format: int64 */
             einsatz_id: number;
             /**
+             * Format: int64
+             * @description „Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes
+             *     bis einschließlich dieser Kennung gelesen. Steht nur am Quittier-Ereignis von
+             *     `POST …/benachrichtigungen/gelesen`; die übrigen Felder nennen die jüngste davon, ein
+             *     älterer Client liest es als deren Einzelquittung.
+             */
+            gelesen_bis?: number | null;
+            /**
              * @description `true`: der Empfänger hat sie quittiert, ihre Toasts auf seinen anderen Verbindungen
              *     verschwinden (Spec „Quittieren gilt für alle Verbindungen des Nutzers“).
              */
@@ -1029,11 +1037,30 @@ export interface components {
             stufe: components["schemas"]["BenachrichtigungStufe"];
         };
         /**
-         * @description Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“). Die dritte Stufe, *still*, erzeugt
-         *     keine Benachrichtigung und hat deshalb keinen Wert.
+         * @description Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“; LLH-1143, Entscheidung zu LLH-1142
+         *     E1: Alarm, Eingang, Still). Die Stufe einer Art ist fest ([`BenachrichtigungArt::stufe`]);
+         *     *still* entsteht erst beim Empfänger, wenn er die Art abgeschaltet hat oder die Vorgabe
+         *     seiner Rolle sie still stellt ([`aufloesung`]).
          * @enum {string}
          */
-        BenachrichtigungStufe: "alarm" | "hinweis";
+        BenachrichtigungStufe: "alarm" | "hinweis" | "still";
+        /**
+         * @description Der Verlauf eines Einsatzes für den Knopf „Eingänge“ (LLH-1143, design.md D3): die jüngsten
+         *     eigenen Benachrichtigungen samt Text und die Zahl der ungelesenen Eingänge darunter.
+         */
+        BenachrichtigungVerlauf: {
+            /**
+             * @description Jüngste zuerst, höchstens [`repo::LISTE_MAX`]; ohne die, deren Modul der Nutzer nicht
+             *     (mehr) lesen darf.
+             */
+            eintraege: components["schemas"]["BenachrichtigungAnzeige"][];
+            /**
+             * Format: int64
+             * @description Ungelesene Eingänge (Stufe `hinweis`, unquittiert) unter `eintraege`; Alarme und Stilles
+             *     zählen nie.
+             */
+            ungelesen: number;
+        };
         /** @description Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten. */
         BenutzerAnzeige: {
             aktiv: boolean;
@@ -2512,6 +2539,12 @@ export interface components {
             /** @description Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen). */
             client_id?: string | null;
             kraft?: components["schemas"]["KraftAngabe"] | null;
+            /**
+             * Format: int64
+             * @description Nachforderung, aus der die Kraft erwartet wird (LLH-1387, design.md D4): die Einheit
+             *     bekommt den Verweis. Nur mit Ziel = dieser Raum, nicht für ein einheitenloses Fahrzeug.
+             */
+            nachforderung_id?: number | null;
             unangemeldet?: components["schemas"]["UnangemeldetEingabe"] | null;
             /**
              * @description Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in
@@ -2670,6 +2703,29 @@ export interface components {
         ErinnerungsZaehler: {
             /** Format: int64 */
             faellig: number;
+        };
+        /** @description Eine Nachforderung mit Ziel = Raum, deren Kräfte noch erwartet werden. */
+        ErwarteteKraft: {
+            /** Format: int64 */
+            anzahl?: number | null;
+            /** @description Art der Nachforderung („RTW“, „SEG“). */
+            art: string;
+            /** @description Voraussichtliches Eintreffen laut Zusage (UTC ohne Zone); fehlt ohne Angabe. */
+            eintreffen_erwartet_at?: string | null;
+            /** Format: int64 */
+            nachforderung_id: number;
+            /**
+             * Format: int64
+             * @description Noch erwartete Anzahl: die Anzahl abzüglich der verknüpften Einheiten; fehlt ohne Anzahl.
+             */
+            offen?: number | null;
+            /**
+             * @description Rufnamen der Zusage, die noch keine verknüpfte Einheit gleichen Namens oder Funkrufnamens
+             *     tragen, in Eingabefolge.
+             */
+            rufnamen: string[];
+            /** @description `zugesagt` oder `unterwegs`. */
+            status: components["schemas"]["NachforderungStatus"];
         };
         /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`). */
         EtbAnzahlAnzeige: {
@@ -3224,6 +3280,14 @@ export interface components {
          * @enum {string}
          */
         Gefahrentyp: "atemgifte" | "angstreaktion" | "ausbreitung" | "atomare_strahlung" | "chemische_stoffe" | "erkrankung_verletzung" | "explosion" | "elektrizitaet" | "einsturz" | "absturz" | "brand" | "durchbruch" | "ertrinken";
+        /** @description Body von `POST …/benachrichtigungen/gelesen`. */
+        GelesenEingabe: {
+            /**
+             * Format: int64
+             * @description Die jüngste gelesene Benachrichtigung: alles bis einschließlich ihr gilt als gelesen.
+             */
+            bis_id: number;
+        };
         /**
          * @description Ein GeoJSON-Feature. `geometry` ist optional (NINA liefert Einträge ohne Geometrie),
          *     `properties` sind flache Skalar-Properties (MapLibre stringifiziert Verschachteltes).

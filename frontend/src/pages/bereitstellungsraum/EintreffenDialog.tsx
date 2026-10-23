@@ -7,6 +7,7 @@ import {
   FAHRZEUG_ADHOC_TEXT_MAX,
   SAMMEL_MAX,
 } from '../../api/eingabegrenzen';
+import { loadBrErwartet } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheitenPerioden } from '../../api/kraefteZeitachse';
 import { einsatzKeys } from '../../api/queryKeys';
 import type {
@@ -31,11 +32,15 @@ import { erfasseEintreffenOfflineFaehig } from '../../offline/schreiben';
 import {
   buildEintreffenEingabe,
   buildEintreffenGruppen,
+  buildNachgefordertZeilen,
   findDoppelbuchung,
   kraftEingabe,
+  nachgefordertHinweise,
+  nachgefordertZiel,
   trefferHinweise,
   type EintreffenGruppen,
   type EintreffenTreffer,
+  type NachgefordertZeile,
 } from './eintreffenKern';
 
 /** Die Felder von Schritt 2 (unangemeldete Kraft). */
@@ -62,6 +67,11 @@ const FAHRZEUG_FELDER = ['funkrufname', 'traegerorganisation', 'fahrzeugtyp'] as
 const KEINE_WEITEREN = [] as const;
 const KEINE_GRUPPEN: EintreffenGruppen = { erwartet: [], imEinsatz: [] };
 const KEINE_VORGEMERKT: readonly EintreffenEingabe[] = [];
+
+/** Beschriftung einer Zeile „Aus Nachforderungen“: Rufname, sonst die Art „ohne Rufname“. */
+function zeilenName(z: NachgefordertZeile): string {
+  return z.rufname ?? `${z.art} ohne Rufname`;
+}
 
 /** 422 „… ist schon im Einsatz“ (D9): die Serverprüfung fand eine gleichnamige Kraft. */
 function isDoppelbuchung(fehler: unknown): boolean {
@@ -101,6 +111,11 @@ export interface EintreffenDialogProps {
  * Schritt 2, der eine unangemeldete Kraft mit dem Suchtext als Funkrufnamen anlegt. Am Gerät
  * vollflächig. Ablehnungen stehen im Dialog (`SpeicherFehler`), kein Fehler-Toast.
  *
+ * Über „Erwartet“ steht „Aus Nachforderungen“ (LLH-1387, design.md D6): die offenen Rufnamen der
+ * Nachforderungen mit Ziel = dieser Raum. Eine Zeile bucht die gleichnamige Einheit oder führt
+ * vorbelegt zu Schritt 2; beide Wege senden den Verweis `nachforderung_id`. Ohne Freigabe (403)
+ * oder ohne Netz fehlt die Gruppe still.
+ *
  * Ohne Netz (Teil III, `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“) geht die Buchung
  * mit `client_id` in die Offline-Queue: Hinweis „Offline vorgemerkt“, der Dialog schließt, die
  * Seite zeigt sie unter „Vorgemerkt“. Eine Ablehnung beim Nachsenden landet im
@@ -126,6 +141,8 @@ export default function EintreffenDialog({
   const [schritt, setSchritt] = useState<'suche' | 'neu'>('suche');
   const [suche, setSuche] = useState('');
   const [klappOffen, setKlappOffen] = useState<string[]>([]);
+  // Die Nachforderung, aus der Schritt 2 eine Kraft anlegt (LLH-1387); `null` = unangemeldet.
+  const [herkunft, setHerkunft] = useState<NachgefordertZeile | null>(null);
   const trotzdemRef = useRef(false);
   const steuerung = useRef<ErfassungsFormularSteuerung>(null);
   const sucheRef = useRef<HTMLInputElement>(null);
@@ -136,6 +153,14 @@ export default function EintreffenDialog({
     queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
     queryFn: () => listeEinheitenPerioden(einsatzId),
     enabled: offen,
+  });
+
+  // Erwartete Kräfte aus Nachforderungen (LLH-1387): ohne Freigabe 403, dann ohne Gruppe.
+  const erwartetQuery = useQuery({
+    queryKey: einsatzKeys.brErwartet(einsatzId, br.id),
+    queryFn: () => loadBrErwartet(einsatzId, br.id),
+    enabled: offen,
+    retry: false,
   });
 
   const imRaum = useMemo(
@@ -174,6 +199,31 @@ export default function EintreffenDialog({
     [offen, einheiten, fahrzeuge, periodenQuery.data, imRaum, vorgemerkt, suche],
   );
 
+  const nachgefordert = useMemo(
+    () =>
+      offen && erwartetQuery.data
+        ? buildNachgefordertZeilen(erwartetQuery.data, suche).map((z) => ({
+            zeile: z,
+            ziel: nachgefordertZiel(z, { einheiten, fahrzeuge, kandidaten: alle, vorgemerkt }),
+          }))
+        : [],
+    [offen, erwartetQuery.data, suche, einheiten, fahrzeuge, alle, vorgemerkt],
+  );
+  // Eine Einheit, die eine Zeile „Aus Nachforderungen“ bucht, steht nicht noch einmal darunter.
+  const angeboten = useMemo(
+    () =>
+      new Set(
+        nachgefordert.flatMap(({ ziel }) =>
+          ziel.art === 'buchen' ? [`${ziel.treffer.art}-${ziel.treffer.id}`] : [],
+        ),
+      ),
+    [nachgefordert],
+  );
+  const ohneAngebotene = (treffer: readonly EintreffenTreffer[]) =>
+    angeboten.size === 0 ? treffer : treffer.filter((t) => !angeboten.has(`${t.art}-${t.id}`));
+  const erwartetTreffer = ohneAngebotene(gruppen.erwartet);
+  const imEinsatzTreffer = ohneAngebotene(gruppen.imEinsatz);
+
   const buchung = useMutation({
     // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
     // (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
@@ -195,9 +245,11 @@ export default function EintreffenDialog({
         return;
       }
       message.success(
-        ergebnis.daten.unangemeldet
-          ? `${b.name} unangemeldet gebucht, Einsatzleitung informiert`
-          : `${b.name} gebucht`,
+        !ergebnis.daten.unangemeldet
+          ? `${b.name} gebucht`
+          : b.daten.nachforderung_id != null
+            ? `${b.name} gebucht, Einsatzleitung informiert`
+            : `${b.name} unangemeldet gebucht, Einsatzleitung informiert`,
       );
       onGebucht?.(ergebnis.daten);
       for (const queryKey of eintreffenQueryKeys(einsatzId, br.id)) {
@@ -210,6 +262,7 @@ export default function EintreffenDialog({
     setSchritt('suche');
     setSuche('');
     setKlappOffen([]);
+    setHerkunft(null);
     trotzdemRef.current = false;
     buchung.reset();
     onClose();
@@ -227,14 +280,33 @@ export default function EintreffenDialog({
     );
   }
 
-  function zuSchrittZwei() {
+  function zuSchrittZwei(aus: NachgefordertZeile | null = null) {
     buchung.reset();
     // Der Speicher von `form` überlebt das Aushängen von Schritt 2 (Zurück, Schließen) und gewänne
     // beim Einhängen gegen `initialValues` (Falle wie an `ErfassungsModal`): Schritt 2 beginnt
-    // deshalb hier leer mit dem aktuellen Suchtext.
+    // deshalb hier leer mit dem aktuellen Suchtext, aus einer Nachforderung mit Rufname und Art.
     form.resetFields();
-    form.setFieldsValue({ funkrufname: suche.trim() });
+    form.setFieldsValue(
+      aus
+        ? { funkrufname: aus.rufname ?? '', fahrzeugtyp: aus.art }
+        : { funkrufname: suche.trim() },
+    );
+    setHerkunft(aus);
     setSchritt('neu');
+  }
+
+  function bucheNachgefordert({ zeile, ziel }: (typeof nachgefordert)[number]) {
+    if (ziel.art === 'buchen') {
+      buchung.mutate(
+        {
+          daten: { ...kraftEingabe(ziel.treffer), nachforderung_id: zeile.nachforderungId },
+          name: ziel.treffer.name,
+        },
+        { onSuccess: () => close() },
+      );
+    } else if (ziel.art === 'neu') {
+      zuSchrittZwei(zeile);
+    }
   }
 
   // Ein Ausweg (Kreuz, Maske, Escape) während der Buchung bliebe ohne Ort für die Antwort.
@@ -301,6 +373,59 @@ export default function EintreffenDialog({
     );
   };
 
+  const nachgefordertZeile = ({ zeile, ziel }: (typeof nachgefordert)[number]) => {
+    const hinweise = nachgefordertHinweise(zeile, formatZeitKurz);
+    if (ziel.art === 'vorgemerkt') hinweise.unshift('vorgemerkt');
+    return (
+      <ListenEintrag
+        actions={[
+          <Button
+            key="eintreffen"
+            aria-label={`Eintreffen ${zeilenName(zeile)}`}
+            onClick={() => bucheNachgefordert({ zeile, ziel })}
+            loading={
+              buchung.isPending &&
+              buchung.variables?.daten.nachforderung_id === zeile.nachforderungId &&
+              buchung.variables.daten.kraft != null &&
+              ziel.art === 'buchen' &&
+              buchung.variables.daten.kraft.objekt_id === ziel.treffer.id
+            }
+            // Ohne Netz schon vorgemerkt: ein zweiter Tipp reihte eine zweite Buchung ein.
+            disabled={buchung.isPending || ziel.art === 'vorgemerkt'}
+          >
+            Eintreffen
+          </Button>,
+        ]}
+      >
+        <Flex vertical gap={2} style={{ minWidth: 0 }}>
+          <Space size={token.marginXS} wrap>
+            <span>{zeilenName(zeile)}</span>
+            {zeile.rufname != null && (
+              <Typography.Text type="secondary">{zeile.art}</Typography.Text>
+            )}
+          </Space>
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+            {hinweise.join(' · ')}
+          </Typography.Text>
+        </Flex>
+      </ListenEintrag>
+    );
+  };
+
+  const gruppeNachgefordert: ReactNode = nachgefordert.length > 0 && (
+    <section aria-label="Aus Nachforderungen" style={{ marginTop: token.marginSM }}>
+      <Typography.Text strong>
+        Aus Nachforderungen{' '}
+        <Typography.Text type="secondary">{nachgefordert.length}</Typography.Text>
+      </Typography.Text>
+      <Liste
+        dataSource={nachgefordert}
+        rowKey={(n) => n.zeile.schluessel}
+        renderItem={nachgefordertZeile}
+      />
+    </section>
+  );
+
   const gruppe = (titel: string, treffer: readonly EintreffenTreffer[]): ReactNode =>
     treffer.length > 0 && (
       <section aria-label={titel} style={{ marginTop: token.marginSM }}>
@@ -331,13 +456,14 @@ export default function EintreffenDialog({
         fallback="Buchen fehlgeschlagen"
       />
       <div>
-        {gruppe('Erwartet', gruppen.erwartet)}
-        {gruppe('Im Einsatz', gruppen.imEinsatz)}
-        {gruppen.erwartet.length + gruppen.imEinsatz.length === 0 && (
+        {gruppeNachgefordert}
+        {gruppe('Erwartet', erwartetTreffer)}
+        {gruppe('Im Einsatz', imEinsatzTreffer)}
+        {nachgefordert.length + erwartetTreffer.length + imEinsatzTreffer.length === 0 && (
           <Typography.Text type="secondary">Keine Treffer</Typography.Text>
         )}
       </div>
-      <Button block onClick={zuSchrittZwei}>
+      <Button block onClick={() => zuSchrittZwei()}>
         Nicht in der Liste
       </Button>
     </Flex>
@@ -345,14 +471,26 @@ export default function EintreffenDialog({
 
   const schrittZwei = (
     <>
-      <Button type="link" onClick={() => setSchritt('suche')} style={{ paddingInline: 0 }}>
+      <Button
+        type="link"
+        onClick={() => {
+          setHerkunft(null);
+          setSchritt('suche');
+        }}
+        style={{ paddingInline: 0 }}
+      >
         Zurück zur Suche
       </Button>
+      {herkunft && (
+        <Typography.Paragraph type="secondary">
+          {`Aus Nachforderung ${herkunft.kurz}`}
+        </Typography.Paragraph>
+      )}
       <ErfassungsFormular<UnangemeldetFormular>
         form={form}
         initialValues={{ funkrufname: suche.trim() }}
         steuerungRef={steuerung}
-        erfassenText="Unangemeldet buchen"
+        erfassenText={herkunft ? 'Eintreffen buchen' : 'Unangemeldet buchen'}
         gesperrt={doppel != null}
         speicherung={buchung}
         speicherFehlerTitel="Nicht gebucht"
@@ -361,7 +499,10 @@ export default function EintreffenDialog({
           const trotzdem = trotzdemRef.current;
           trotzdemRef.current = false;
           return buchung.mutateAsync({
-            daten: buildEintreffenEingabe(w, { trotzdemAnlegen: trotzdem }),
+            daten: buildEintreffenEingabe(w, {
+              trotzdemAnlegen: trotzdem,
+              nachforderungId: herkunft?.nachforderungId,
+            }),
             name: w.funkrufname.trim(),
           });
         }}

@@ -63,6 +63,8 @@ export type BenachrichtigungBezugTyp = S['BenachrichtigungBezugTyp'];
 export type BenachrichtigungAnzeige = S['BenachrichtigungAnzeige'];
 /** Nutzlast von `benachrichtigung` (Einsatz-Strom) und `org_benachrichtigung` (Org-Kanal). */
 export type BenachrichtigungEreignis = S['BenachrichtigungEreignis'];
+/** Verlauf eines Einsatzes samt Zahl der ungelesenen Eingänge (LLH-1143, design.md D3). */
+export type BenachrichtigungVerlauf = S['BenachrichtigungVerlauf'];
 /** Antwort von `GET /api/web-push` (LLH-1223): Schlüssel der Instanz, Abo dieser Sitzung. */
 export type WebPushStand = S['WebPushStand'];
 
@@ -440,6 +442,8 @@ export type BrVerlaufArt = S['BrVerlaufArt'];
 export type BrVerlaufEintrag = S['BrVerlaufEintrag'];
 // LLH-1075: Eintreffen buchen (bekannt oder unangemeldet), Übernehmen einer unangemeldeten Einheit.
 export type EintreffenEingabe = S['EintreffenEingabe'];
+/** Erwartete Kraft aus einer Nachforderung mit Ziel = Raum (LLH-1387). */
+export type ErwarteteKraft = S['ErwarteteKraft'];
 export type EintreffenErgebnis = S['EintreffenErgebnis'];
 export type EintreffenZeitachse = S['EintreffenZeitachse'];
 export type UebernahmeBody = S['UebernahmeBody'];

@@ -538,14 +538,18 @@ pub async fn update_status(
         (n, _, Some(spalte)) if n + 1 == alt_stufe => (format!("{spalte} = NULL"), false),
         _ => return Err(ungueltig()),
     };
-    // Ebenso ohne übernommene Einheit (LLH-1383, design.md D8).
+    // Ebenso ohne übernommene Einheit (LLH-1383, design.md D8); seit LLH-1387 (D5) gilt das für
+    // jede Rücknahme, weil am Raum gebuchte Einheiten den Verweis schon vor dem Eintreffen tragen.
     let ohne_posten = if erwartet == super::STATUS_EINGETROFFEN {
-        " AND NOT EXISTS (SELECT 1 FROM einsatz_material em \
-           WHERE em.nachforderung_id = nachforderung.id AND em.beendet_als IS NOT 'storniert') \
-          AND NOT EXISTS (SELECT 1 FROM einsatz_einheit ee \
-           WHERE ee.nachforderung_id = nachforderung.id)"
+        format!(
+            " AND NOT EXISTS (SELECT 1 FROM einsatz_material em \
+               WHERE em.nachforderung_id = nachforderung.id \
+                 AND em.beendet_als IS NOT 'storniert'){OHNE_EINHEITEN}"
+        )
+    } else if !vorwaerts {
+        OHNE_EINHEITEN.to_string()
     } else {
-        ""
+        String::new()
     };
     let sql = format!(
         "UPDATE nachforderung SET status = ?, {stempel} WHERE id = ? AND status = ?{ohne_posten}"
@@ -563,6 +567,10 @@ pub async fn update_status(
     })
 }
 
+/// Bedingung eines UPDATE auf `nachforderung`: keine verknüpfte Einheit (LLH-1387 design.md D5).
+const OHNE_EINHEITEN: &str = " AND NOT EXISTS (SELECT 1 FROM einsatz_einheit ee \
+     WHERE ee.nachforderung_id = nachforderung.id)";
+
 /// Lehnt eine Nachforderung ab (Abzweig): setzt status='abgelehnt', Zeitstempel und Grund —
 /// nur wenn der Bestandsstatus `erwartet` unverändert ist (optimistische Sperre). Schreibt in
 /// derselben Transaktion den Systemeintrag mit Grund (LLH-1104 D6) und liefert dessen
@@ -575,18 +583,21 @@ pub async fn lehne_ab(
     erwartet: &str,
     jetzt: &str,
 ) -> Result<Option<i64>, AppError> {
+    // Nicht mit verknüpfter Einheit (LLH-1387 D5); die verständliche 422 prüft der Handler.
+    let sql = format!(
+        "UPDATE nachforderung SET status = ?, abgelehnt_at = COALESCE(abgelehnt_at, ?), \
+         abgelehnt_grund = COALESCE(abgelehnt_grund, ?) WHERE id = ? AND status = ?\
+         {OHNE_EINHEITEN}"
+    );
     crate::write_retry!(pool, |conn| {
-        let r = sqlx::query(
-            "UPDATE nachforderung SET status = ?, abgelehnt_at = COALESCE(abgelehnt_at, ?), \
-             abgelehnt_grund = COALESCE(abgelehnt_grund, ?) WHERE id = ? AND status = ?",
-        )
-        .bind(super::STATUS_ABGELEHNT)
-        .bind(jetzt)
-        .bind(grund)
-        .bind(id)
-        .bind(erwartet)
-        .execute(&mut *conn)
-        .await?;
+        let r = sqlx::query(sqlx::AssertSqlSafe(&*sql))
+            .bind(super::STATUS_ABGELEHNT)
+            .bind(jetzt)
+            .bind(grund)
+            .bind(id)
+            .bind(erwartet)
+            .execute(&mut *conn)
+            .await?;
         if r.rows_affected() == 0 {
             return Ok(None);
         }
@@ -791,19 +802,21 @@ pub async fn ziehe_zurueck(
     erwartet: &str,
     jetzt: &str,
 ) -> Result<Option<i64>, AppError> {
+    // Nicht mit verknüpfter Einheit (LLH-1387 D5); die verständliche 422 prüft der Handler.
+    let sql = format!(
+        "UPDATE nachforderung SET status = ?, \
+         zurueckgezogen_at = COALESCE(zurueckgezogen_at, ?), zurueckgezogen_grund = ? \
+         WHERE id = ? AND status = ?{OHNE_EINHEITEN}"
+    );
     crate::write_retry!(pool, |conn| {
-        let r = sqlx::query(
-            "UPDATE nachforderung SET status = ?, \
-             zurueckgezogen_at = COALESCE(zurueckgezogen_at, ?), zurueckgezogen_grund = ? \
-             WHERE id = ? AND status = ?",
-        )
-        .bind(super::STATUS_ZURUECKGEZOGEN)
-        .bind(jetzt)
-        .bind(grund)
-        .bind(id)
-        .bind(erwartet)
-        .execute(&mut *conn)
-        .await?;
+        let r = sqlx::query(sqlx::AssertSqlSafe(&*sql))
+            .bind(super::STATUS_ZURUECKGEZOGEN)
+            .bind(jetzt)
+            .bind(grund)
+            .bind(id)
+            .bind(erwartet)
+            .execute(&mut *conn)
+            .await?;
         if r.rows_affected() == 0 {
             return Ok(None);
         }
@@ -907,6 +920,20 @@ pub async fn aktualisiere(
         };
         let rufnamen: &[String] = aenderung.rufnamen.unwrap_or(&alte_rufnamen);
         pruefe_rufnamen_zahl(rufnamen, anzahl)?;
+        // Nicht unter die verknüpften Einheiten (LLH-1387 D5).
+        if let Some(a) = aenderung.anzahl {
+            let verknuepft: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM einsatz_einheit WHERE nachforderung_id = ?",
+            )
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+            if a < verknuepft {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Aus der Nachforderung sind schon {verknuepft} Einheiten übernommen"
+                )));
+            }
+        }
         pruefe_eintreffen(eta, &alt.angefordert_at)?;
 
         // Was sich ändert, in der Folge der Karte; daraus Wortlaut und „nichts zu tun“.

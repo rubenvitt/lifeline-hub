@@ -90,6 +90,11 @@ mod tests {
             "Auskunft und Schwärzung finden jede Kraft des Einsatzes, auch beendete",
         ),
         (
+            "src/bereitstellungsraum/eintreffen.rs",
+            1,
+            "Mengenprüfung beim Verknüpfen einer am Raum eintreffenden Einheit mit ihrer Nachforderung zählt jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1387)",
+        ),
+        (
             "src/einheit/aus_nachforderung.rs",
             1,
             "Mengenprüfung der Übernahme aus einer Nachforderung zählt jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1383)",
@@ -115,9 +120,14 @@ mod tests {
             "Vorprüfung der Sammel-Disposition (Personal und Fahrzeuge) liest auch beendete Zeilen, um „schon disponiert“ von „entlassen“ zu unterscheiden",
         ),
         (
+            "src/nachforderung/erwartet.rs",
+            1,
+            "Offene Menge der am Raum erwarteten Kräfte zieht jede verknüpfte Einheit ab, auch aufgelöste (sie war da, LLH-1387)",
+        ),
+        (
             "src/nachforderung/repo.rs",
-            4,
-            "Verweis auf übernommene Einheiten und Rücknahmesperre der Nachforderung zählen jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1383)",
+            8,
+            "Verweis auf übernommene Einheiten, Rücknahme-, Ablehnungs- und Rückzugssperre sowie Mengenuntergrenze der Nachforderung zählen jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1383, LLH-1387)",
         ),
         (
             "src/personal/disposition_repo.rs",

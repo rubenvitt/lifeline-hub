@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { http, HttpResponse } from 'msw';
@@ -16,11 +16,14 @@ import { server } from '../test/server';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import { spieleAlarmTon } from './alarmTon';
 import { schliesseAlleDesktopAlarme } from './desktopAlarm';
+import { EINGAENGE_OEFFNEN_EVENT } from './eingaenge';
 import { EINGANG_TON_ABSTAND_MS, setzeEingangTonZurueck } from './useEingangshinweis';
 
 /**
  * Eingangshinweis (LLH-1062, Spec `benachrichtigungen`, „Eingangshinweis“): neue Meldungen und
- * Übernahmen in die Lage gebündelt an einem eigenen Platz, Ton gedrosselt, Sichten räumt.
+ * Übernahmen in die Lage gebündelt an einem eigenen Platz, Ton gedrosselt, Sichten räumt. Seit
+ * LLH-1143 (design.md D7) ist der Platz das Eingangsband unten und trägt ALLE Eingänge des
+ * Einsatzes; die Toasts tragen nur noch Alarme.
  */
 
 vi.mock('./webPush', async (original) => ({
@@ -130,8 +133,9 @@ function Rahmen({ darfSichten }: { darfSichten: boolean }) {
 }
 
 function renderZentrale({ start = '/einsaetze/1/lagekarte', darfSichten = true } = {}) {
+  // Dieselbe Toast-Grenze wie `main.tsx`: der Eingang darf dort keinen Alarm verdrängen.
   return render(
-    <AntApp>
+    <AntApp notification={{ maxCount: 3 }}>
       <MemoryRouter initialEntries={[start]}>
         <Routes>
           <Route path="/einsaetze/:id/*" element={<Rahmen darfSichten={darfSichten} />} />
@@ -141,24 +145,36 @@ function renderZentrale({ start = '/einsaetze/1/lagekarte', darfSichten = true }
   );
 }
 
-/** Der Eingangshinweis: die eine Notification mit dem Titel. */
+/** Der Eingangshinweis: das eine Eingangsband mit dem Titel. */
 function hinweis(titel: string | RegExp): HTMLElement {
-  const el = screen.getByText(titel).closest<HTMLElement>('.ant-notification-notice');
+  const el = screen.getByText(titel).closest<HTMLElement>('[data-lfh="eingangsband"]');
   if (!el) throw new Error(`kein Hinweis „${String(titel)}“`);
   return el;
 }
 
+/** Die Toasts der Zentrale (antd-Notifications). */
+function toasts(): NodeListOf<HTMLElement> {
+  return document.querySelectorAll<HTMLElement>('.ant-notification-notice');
+}
+
 async function warteBisWeg(titel: string | RegExp) {
-  await waitFor(() => {
-    for (const el of screen.queryAllByText(titel)) {
-      const n = el.closest<HTMLElement>('.ant-notification-notice');
-      if (n) {
-        fireEvent.transitionEnd(n);
-        fireEvent.animationEnd(n);
-      }
-    }
-    expect(screen.queryByText(titel)).not.toBeInTheDocument();
-  });
+  await waitFor(() => expect(screen.queryByText(titel)).not.toBeInTheDocument());
+}
+
+/** Ein anderer Eingang als eine Meldung, wie der Server ihn liest. */
+function auftragEingang(id: number, auftrag: number): BenachrichtigungAnzeige {
+  return {
+    id,
+    einsatz_id: 1,
+    art: 'auftrag_erteilt',
+    stufe: 'hinweis',
+    bezug_typ: 'auftrag',
+    bezug_id: auftrag,
+    erstellt_at: '2026-10-21 12:00:00',
+    titel: 'Neuer Auftrag',
+    detail: `Auftrag #${auftrag}`,
+    pfad: `/einsaetze/1/auftraege?auftrag=${auftrag}`,
+  };
 }
 
 let jetzt = Date.UTC(2026, 9, 21, 12, 0);
@@ -184,9 +200,10 @@ describe('Eingangshinweis (LLH-1062)', () => {
     renderZentrale();
     live(b);
 
-    const titel = await screen.findByText('Neue Meldung · UHS Nord');
+    await screen.findByText('Neue Meldung · UHS Nord');
     const n = hinweis('Neue Meldung · UHS Nord');
-    expect(titel.closest('.ant-notification-notice-info')).not.toBeNull();
+    // Ein eigenes Band, kein Toast.
+    expect(toasts()).toHaveLength(0);
     expect(within(n).getByText('Decken knapp, 20 Stück benötigt')).toBeInTheDocument();
     expect(within(n).getByRole('button', { name: 'Sichten: UHS Nord' })).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
@@ -212,7 +229,8 @@ describe('Eingangshinweis (LLH-1062)', () => {
     expect(within(n).getByText('+ 8 weitere')).toBeInTheDocument();
     expect(within(n).getByRole('button', { name: 'Zu Meldungen' })).toBeInTheDocument();
     // Ein Platz, kein Sammeltoast des Budgets.
-    expect(document.querySelectorAll('.ant-notification-notice')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-lfh="eingangsband"]')).toHaveLength(1);
+    expect(toasts()).toHaveLength(0);
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
 
     // Nach zwei Minuten darf der nächste Eingang wieder tönen.
@@ -345,27 +363,95 @@ describe('Eingangshinweis (LLH-1062)', () => {
     expect(ton).not.toHaveBeenCalled();
   });
 
-  it('der Eingang verbraucht das Toast-Budget nicht', async () => {
-    const auftraege: BenachrichtigungAnzeige[] = [1, 2, 3].map((n) => ({
+  it('der Eingang verdrängt keinen Alarm: drei Alarme stehen, das Band daneben (D7)', async () => {
+    const alarme: BenachrichtigungAnzeige[] = [1, 2, 3].map((n) => ({
       id: 1800 + n,
       einsatz_id: 1,
-      art: 'auftrag_erteilt',
-      stufe: 'hinweis',
+      art: 'auftrag_ueberfaellig',
+      stufe: 'alarm',
       bezug_typ: 'auftrag',
       bezug_id: n,
       erstellt_at: '2026-10-21 12:00:00',
-      titel: `Neuer Auftrag ${n}`,
+      titel: `Auftrag ${n} überfällig`,
       pfad: `/einsaetze/1/auftraege?auftrag=${n}`,
     }));
     const b = eingang(1810, 141);
-    serverMit([...auftraege, b], { 141: { absender: 'UHS Ost', inhalt: 'Ruhig' } });
+    serverMit([...alarme, b], { 141: { absender: 'UHS Ost', inhalt: 'Ruhig' } });
     renderZentrale();
-    for (const a of auftraege) live(a);
-    for (const n of [1, 2, 3]) await screen.findByText(`Neuer Auftrag ${n}`);
+    for (const a of alarme) live(a);
+    for (const n of [1, 2, 3]) await screen.findByText(`Auftrag ${n} überfällig`);
     live(b);
     expect(await screen.findByText('Neue Meldung · UHS Ost')).toBeInTheDocument();
-    // Alle drei Aufträge stehen weiter einzeln, kein Sammeltoast.
-    for (const n of [1, 2, 3]) expect(screen.getByText(`Neuer Auftrag ${n}`)).toBeInTheDocument();
-    expect(screen.queryByText(/weitere Hinweise/)).not.toBeInTheDocument();
+    // Alle drei Alarme stehen weiter einzeln, kein Sammeltoast, keiner verdrängt (`maxCount` 3).
+    for (const n of [1, 2, 3])
+      expect(screen.getByText(`Auftrag ${n} überfällig`)).toBeInTheDocument();
+    expect(toasts()).toHaveLength(3);
+    expect(screen.queryByText(/weitere/)).not.toBeInTheDocument();
+  });
+
+  it('ein neuer Auftrag ist ein Eingang: Band statt Toast, „Öffnen“ springt und quittiert', async () => {
+    const a = auftragEingang(1901, 12);
+    const s = serverMit([a], {});
+    renderZentrale();
+    live(a);
+    const n = await waitFor(() => hinweis('Neuer Auftrag'));
+    expect(within(n).getByText('Auftrag #12')).toBeInTheDocument();
+    expect(toasts()).toHaveLength(0);
+    expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
+    await userEvent.click(within(n).getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege?auftrag=12');
+    await waitFor(() => expect(s.quittiert).toEqual([1901]));
+  });
+
+  it('gemischte Eingänge: „3 neue Eingänge“, „Ansehen“ öffnet den Verlauf, ohne zu quittieren', async () => {
+    const liste = [eingang(2001, 151), auftragEingang(2002, 13), auftragEingang(2003, 14)];
+    const s = serverMit(liste, { 151: { absender: 'EA Nord', inhalt: 'Lage ruhig' } });
+    const geoeffnet: number[] = [];
+    const merken = (ev: Event) =>
+      geoeffnet.push((ev as CustomEvent<{ einsatzId: number }>).detail.einsatzId);
+    window.addEventListener(EINGAENGE_OEFFNEN_EVENT, merken);
+    try {
+      renderZentrale();
+      for (const b of liste) live(b);
+      const n = await waitFor(() => hinweis('3 neue Eingänge'));
+      // Eine Meldung nennt ihren Absender, ein anderer Eingang seinen Titel.
+      expect(within(n).getAllByText('Neuer Auftrag')).toHaveLength(2);
+      await userEvent.click(within(n).getByRole('button', { name: 'Ansehen' }));
+      expect(geoeffnet).toEqual([1]);
+      await warteBisWeg('3 neue Eingänge');
+      expect(s.quittiert).toEqual([]);
+    } finally {
+      window.removeEventListener(EINGAENGE_OEFFNEN_EVENT, merken);
+    }
+  });
+
+  it('„Alle gelesen“ auf einem anderen Gerät räumt das Band bis zur gemeldeten Kennung', async () => {
+    const liste = [auftragEingang(2101, 21), auftragEingang(2102, 22), auftragEingang(2104, 24)];
+    const s = serverMit(liste, {});
+    renderZentrale();
+    for (const b of liste) live(b);
+    await waitFor(() => hinweis('3 neue Eingänge'));
+    act(() => {
+      const detail: BenachrichtigungEreignis = {
+        ...ereignis(liste[1], true),
+        gelesen_bis: 2102,
+      };
+      window.dispatchEvent(new CustomEvent(BENACHRICHTIGUNG_WINDOW_EVENT, { detail }));
+    });
+    // 2104 kam nach „Alle gelesen“ und bleibt.
+    const n = await waitFor(() => hinweis('Neuer Auftrag'));
+    expect(within(n).getByText('Auftrag #24')).toBeInTheDocument();
+    expect(s.quittiert).toEqual([]);
+  });
+
+  it('auf schmalen Schirmen steht das Band über die ganze Breite, ab md rechts', async () => {
+    const a = auftragEingang(2201, 31);
+    serverMit([a], {});
+    setzeViewportBreite(390);
+    renderZentrale();
+    live(a);
+    const schmal = await waitFor(() => hinweis('Neuer Auftrag'));
+    expect(schmal.style.insetInlineStart).not.toBe('auto');
+    expect(schmal.style.position).toBe('fixed');
   });
 });
