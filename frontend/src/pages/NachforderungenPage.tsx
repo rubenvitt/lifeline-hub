@@ -77,6 +77,7 @@ import { useMinutenTakt } from '../components/useMinutenTakt';
 import { useViewport } from '../components/useViewport';
 import { fruehereArten } from '../nachforderungen/artVorschlaege';
 import { nachforderungName } from '../nachforderungen/nachforderungName';
+import { ruecknahmeSperre } from '../nachforderungen/nurVorwaerts';
 import type { ZielNamen } from '../nachforderungen/zielVorschlaege';
 import {
   NACHFORDERUNG_BEZUG_PARAM,
@@ -391,6 +392,17 @@ export default function NachforderungenPage() {
       invalidiere();
     },
   });
+  /*
+   * Der Rückgängig-Knopf nur, wo der Server die Rücknahme annimmt (LLH-1395): mit verknüpfter
+   * Einheit „nur vorwärts“ (LLH-1387 D5). Geprüft am Stand der Antwort, denn eine am Raum
+   * gebuchte Einheit kann während der Fortschaltung dazugekommen sein. Sonst bestätigt der Toast
+   * den Status und nennt den Grund, warum kein Rückweg da ist.
+   */
+  const meldeMitRueckweg = (n: Nachforderung, text: string, aufRueckgaengig: () => void) => {
+    const sperre = ruecknahmeSperre(n);
+    if (sperre == null) zeigeRueckgaengig(message, text, aufRueckgaengig);
+    else message.success(`${text} · ${sperre}, kein Rückgängig`);
+  };
   const statusMutation = useMutation({
     mutationFn: ({
       nfId,
@@ -402,9 +414,9 @@ export default function NachforderungenPage() {
     }) => setzeNachforderungStatus(einsatzId, nfId, status),
     // Eine neue Fortschaltung an der Karte räumt deren alten Grund.
     onMutate: ({ nfId }) => kartenFehler.beginne(nfId),
-    onSuccess: (_daten, { nfId, status, vorher }) => {
+    onSuccess: (daten, { nfId, status, vorher }) => {
       if (vorher) {
-        zeigeRueckgaengig(message, `Status: ${NACHFORDERUNG_STATUS[status]?.label ?? status}`, () =>
+        meldeMitRueckweg(daten, `Status: ${NACHFORDERUNG_STATUS[status]?.label ?? status}`, () =>
           ruecknahmeMutation.mutate({ nfId, status: vorher }),
         );
       }
@@ -448,8 +460,8 @@ export default function NachforderungenPage() {
   const zusageMutation = useMutation({
     mutationFn: ({ nfId, zusage }: { nfId: number; zusage: NachforderungZusageEingabe }) =>
       erfasseZusage(einsatzId, nfId, zusage),
-    onSuccess: (_daten, { nfId }) => {
-      zeigeRueckgaengig(message, `Status: ${NACHFORDERUNG_STATUS.zugesagt.label}`, () =>
+    onSuccess: (daten, { nfId }) => {
+      meldeMitRueckweg(daten, `Status: ${NACHFORDERUNG_STATUS.zugesagt.label}`, () =>
         ruecknahmeMutation.mutate({ nfId, status: 'angefordert' }),
       );
       return zeigeEigeneHandlung(nfId);

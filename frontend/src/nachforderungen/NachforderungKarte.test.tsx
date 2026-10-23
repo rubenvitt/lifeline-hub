@@ -364,6 +364,27 @@ describe('NachforderungKarte — Als Einheit übernehmen (LLH-1383 D9)', () => {
     zeige({ nachforderung: rtw({ einheit_ids: [11, 12] }), einheitenJeId: null });
     expect(screen.getByText('2 Einheiten übernommen')).toBeInTheDocument();
   });
+
+  /** LLH-1395: vor dem Eintreffen verknüpft nur die Buchung am Raum (LLH-1387 D4). */
+  it('unterwegs mit am Raum gebuchter Einheit: „am Raum eingetroffen“, nicht „übernommen“', () => {
+    const unterwegs = rtw({
+      status: 'unterwegs',
+      ist_offen: true,
+      eingetroffen_at: null,
+      einheit_ids: [11],
+    });
+    const { unmount } = zeige({
+      nachforderung: unterwegs,
+      einheitenJeId: new Map([[11, { id: 11, name: 'Rettung', funkrufname: '83-1' }]]),
+    });
+    expect(screen.getByText(/Am Raum eingetroffen/)).toHaveTextContent(
+      'Am Raum eingetroffen: 83-1 ↗',
+    );
+    expect(screen.queryByText(/übernommen/)).toBeNull();
+    unmount();
+    zeige({ nachforderung: { ...unterwegs, einheit_ids: [11, 12] }, einheitenJeId: null });
+    expect(screen.getByText('2 Einheiten am Raum eingetroffen')).toBeInTheDocument();
+  });
 });
 
 /** LLH-1082 (design.md D7): der Stellenbezug steht als Zeile mit Sprung auf die Stelle. */
@@ -627,6 +648,42 @@ describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
     expect(onZurueckziehen).toHaveBeenCalledWith(1);
   });
 
+  /**
+   * LLH-1395: mit verknüpfter Einheit lehnt der Server Zurückziehen und Ablehnen mit 422 ab
+   * (LLH-1387 D5). Beide stehen gesperrt mit dem Grund im Eintrag, ein Klick meldet nichts.
+   */
+  it('mit verknüpfter Einheit: Zurückziehen und Ablehnen gesperrt mit Grund', async () => {
+    const onZurueckziehen = vi.fn();
+    const onAblehnen = vi.fn();
+    renderMitProviders(
+      <MitFormular
+        nachforderung={nf({ bezeichnung: null, status: 'unterwegs', einheit_ids: [11] })}
+        spaltenStufe="unterwegs"
+        darfSchreiben
+        onStatus={vi.fn()}
+        onZusage={vi.fn()}
+        onBearbeiten={vi.fn()}
+        onZurueckziehen={onZurueckziehen}
+        onAblehnen={onAblehnen}
+      />,
+    );
+    // Vorwärts bleibt offen.
+    expect(screen.getByRole('button', { name: 'Eintreffen melden' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Nachforderung 2× RTW' }));
+    const eintraege = await screen.findAllByRole('menuitem');
+    expect(eintraege.map((e) => e.textContent)).toEqual([
+      'Bearbeiten',
+      'Zurückziehen (Einheiten verknüpft)',
+      'Ablehnen (Einheiten verknüpft)',
+    ]);
+    expect(eintraege[1]).toHaveAttribute('aria-disabled', 'true');
+    expect(eintraege[2]).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(eintraege[1]);
+    await userEvent.click(eintraege[2]);
+    expect(onZurueckziehen).not.toHaveBeenCalled();
+    expect(onAblehnen).not.toHaveBeenCalled();
+  });
+
   it('Bearbeiten sendet nur Geändertes; unverändert schließt ohne Anfrage', async () => {
     const onBearbeiten = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
@@ -657,6 +714,38 @@ describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
     await userEvent.type(anzahl, '3');
     await userEvent.click(screen.getByRole('button', { name: 'Änderung speichern' }));
     expect(onBearbeiten).toHaveBeenCalledWith(1, { anzahl: 3 });
+  });
+
+  /** LLH-1395: die Anzahl fällt nicht unter die verknüpften Einheiten (LLH-1387 D5, sonst 422). */
+  it('Bearbeiten: Anzahl unter den verknüpften Einheiten sendet nicht', async () => {
+    const onBearbeiten = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <MitFormular
+        nachforderung={nf({
+          bezeichnung: null,
+          anzahl: 3,
+          status: 'unterwegs',
+          einheit_ids: [11, 12],
+        })}
+        spaltenStufe="unterwegs"
+        darfSchreiben
+        onBearbeiten={onBearbeiten}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Nachforderung 3× RTW' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Bearbeiten' }));
+    const anzahl = screen.getByRole('spinbutton', { name: 'Anzahl' });
+    await userEvent.clear(anzahl);
+    await userEvent.type(anzahl, '1');
+    await userEvent.click(screen.getByRole('button', { name: 'Änderung speichern' }));
+    expect(
+      await screen.findByText('Mindestens 2: so viele Einheiten sind verknüpft'),
+    ).toBeInTheDocument();
+    expect(onBearbeiten).not.toHaveBeenCalled();
+    await userEvent.clear(anzahl);
+    await userEvent.type(anzahl, '2');
+    await userEvent.click(screen.getByRole('button', { name: 'Änderung speichern' }));
+    expect(onBearbeiten).toHaveBeenCalledWith(1, { anzahl: 2 });
   });
 
   it('zurückgezogen: neutral, ohne Alarmrand, mit Grund und ohne Aktionen', () => {

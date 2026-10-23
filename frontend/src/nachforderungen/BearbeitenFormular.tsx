@@ -69,8 +69,23 @@ export default function BearbeitenFormular({
     ),
   );
   const wohinOptionen = useMemo(() => zielOptionen(raeume, abschnitte), [raeume, abschnitte]);
-  const mengenRegeln: Rule[] =
-    n.anzahl != null ? [{ required: true, message: 'Anzahl ist erforderlich' }] : [];
+  // Nicht unter die verknüpften Einheiten (LLH-1387 D5): der Server lehnte mit 422 ab (LLH-1395).
+  const verknuepft = n.einheit_ids.length;
+  const mengenRegeln: Rule[] = [
+    ...(n.anzahl != null ? [{ required: true, message: 'Anzahl ist erforderlich' }] : []),
+    ...(verknuepft > 0
+      ? [
+          {
+            validator: (_: unknown, wert: number | null | undefined) =>
+              wert != null && wert < verknuepft
+                ? Promise.reject(
+                    new Error(`Mindestens ${verknuepft}: so viele Einheiten sind verknüpft`),
+                  )
+                : Promise.resolve(),
+          },
+        ]
+      : []),
+  ];
 
   const speichern = (w: AenderungWerte) => {
     const body = aenderungBody(n, start, w, raeume, abschnitte);
