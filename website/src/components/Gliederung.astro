@@ -1,0 +1,37 @@
+---
+/** Inhaltsverzeichnis einer Architekturseite: klappbar im Text, am Rand ab 1240 px (`doku.css`). */
+import type { Gliederung } from '../daten/architektur';
+
+interface Props {
+  gliederung: Gliederung[];
+  /** `im-text` oder `rand`. */
+  art: 'im-text' | 'rand';
+}
+const { gliederung, art } = Astro.props;
+const marke = art === 'rand';
+---
+
+{
+  gliederung.length > 0 && (
+    <ol class="doku-toc" data-toc={marke ? '' : undefined}>
+      {gliederung.map((g) => (
+        <li>
+          <a href={`#${g.id}`} data-toc-link={marke ? g.id : undefined}>
+            {g.titel}
+          </a>
+          {g.unter.length > 0 && (
+            <ul>
+              {g.unter.map((u) => (
+                <li>
+                  <a href={`#${u.id}`} data-toc-link={marke ? u.id : undefined}>
+                    {u.titel}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ol>
+  )
+}

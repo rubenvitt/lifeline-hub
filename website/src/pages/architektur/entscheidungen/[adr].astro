@@ -1,0 +1,191 @@
+---
+/**
+ * Eine Architekturentscheidung (LLH-1435), gerendert aus
+ * `docs/architektur/entscheidungen/ADR-*.md`. Der Kopf der Datei (Status, Datum, `gilt_fuer`,
+ * Herleitung) steht als Kopf der Seite; die Regeln tragen ihr Schlüsselwort als Marke.
+ * Form der Entscheidungen: `docs/architektur/AGENTS.md`, „Entscheidungen (ADRs)“.
+ */
+import { getCollection } from 'astro:content';
+import Grundriss from '../../../layouts/Grundriss.astro';
+import ArchitekturNavi from '../../../components/ArchitekturNavi.astro';
+import Gliederung from '../../../components/Gliederung.astro';
+import Lesehilfen from '../../../components/Lesehilfen.astro';
+import {
+  STATUS_NAME,
+  adresseFuer,
+  aufbereiten,
+  githubAdresse,
+  gliederungVon,
+  regelnHervorheben,
+} from '../../../daten/architektur';
+import '../../../styles/doku.css';
+import '../../../styles/architektur.css';
+
+export async function getStaticPaths() {
+  const alle = (await getCollection('entscheidungen')).sort((a, b) =>
+    a.data.id.localeCompare(b.data.id),
+  );
+  return alle.map((eintrag, i) => ({
+    params: { adr: eintrag.id },
+    props: { eintrag, alle, zurueck: alle[i - 1], weiter: alle[i + 1] },
+  }));
+}
+
+const { eintrag, alle, zurueck, weiter } = Astro.props;
+const d = eintrag.data;
+const quelle = `docs/architektur/entscheidungen/${eintrag.id}.md`;
+const html = regelnHervorheben(aufbereiten(eintrag.rendered?.html ?? '', quelle)).replace(
+  /(<h2[^>]*>Prüfung<\/h2>)/,
+  '$1<p class="arch-hinweis">Läuft in jedem Pull Request im Sammel-Gate (Schritt 16, <code>scripts/check-architektur.sh</code>). Scheitert sie, gilt die Entscheidung im Code nicht mehr: Code zurückführen oder eine neue Entscheidung festhalten.</p>',
+);
+const gliederung = gliederungVon(html);
+const regeln = (html.match(/class="arch-regel /g) ?? []).length;
+const adrAdresse = (id: string | undefined) => {
+  const ziel = alle.find((a) => a.data.id === id);
+  return ziel ? `/architektur/entscheidungen/${ziel.id}/` : undefined;
+};
+const herleitung = (d.herleitung ?? []).map((pfad) => ({ pfad, ...adresseFuer(pfad) }));
+if (herleitung.length) gliederung.push({ id: 'herleitung', titel: 'Herleitung', unter: [] });
+---
+
+<Grundriss
+  titel={`${d.id}: ${d.titel} · Architektur · Lifeline Hub`}
+  beschreibung={`Architekturentscheidung ${d.id} von Lifeline Hub: ${d.titel}.`}
+>
+  <div class="doku-seite">
+    <ArchitekturNavi aktuell={eintrag.id} />
+
+    <article class="doku-kapitel arch-kapitel">
+      <p class="doku-pfad mono">
+        <a href="/architektur/">Architektur</a>
+        <span aria-hidden="true">/</span>
+        <a href="/architektur/#entscheidungen">Entscheidungen</a>
+        <span aria-hidden="true">/</span>
+        <span>{d.id}</span>
+      </p>
+      <header class="doku-kapitel__kopf">
+        <p class="arch-adr__kennung mono">
+          <span>{d.id}</span>
+          <span class={`arch-status arch-status--${d.status}`}>{STATUS_NAME[d.status]}</span>
+        </p>
+        <h1 class="doku-kapitel__titel">{d.titel}</h1>
+        <dl class="arch-adr__fakten">
+          <div>
+            <dt class="doku-label">Entschieden</dt>
+            <dd class="mono">{d.datum.split('-').reverse().join('.')}</dd>
+          </div>
+          <div>
+            <dt class="doku-label">Regeln</dt>
+            <dd class="mono">{regeln}</dd>
+          </div>
+          {
+            d.ersetzt && (
+              <div>
+                <dt class="doku-label">Ersetzt</dt>
+                <dd class="mono">
+                  <a href={adrAdresse(d.ersetzt)}>{d.ersetzt}</a>
+                </dd>
+              </div>
+            )
+          }
+          {
+            d.ersetzt_durch && (
+              <div>
+                <dt class="doku-label">Ersetzt durch</dt>
+                <dd class="mono">
+                  <a href={adrAdresse(d.ersetzt_durch)}>{d.ersetzt_durch}</a>
+                </dd>
+              </div>
+            )
+          }
+          <div class="arch-adr__gilt">
+            <dt class="doku-label">Gilt für</dt>
+            <dd>
+              <ul class="arch-chips">
+                {d.gilt_fuer.map((m) => <li class="mono">{m}</li>)}
+              </ul>
+            </dd>
+          </div>
+        </dl>
+      </header>
+
+      {
+        gliederung.length > 0 && (
+          <details class="doku-inhalt doku-inhalt--im-text">
+            <summary class="doku-label">Auf dieser Seite</summary>
+            <Gliederung gliederung={gliederung} art="im-text" />
+          </details>
+        )
+      }
+
+      <div class="doku-text arch-text arch-text--adr">
+        <Fragment set:html={html} />
+        {
+          herleitung.length > 0 && (
+            <>
+              <h2 id="herleitung">Herleitung</h2>
+              <ul class="arch-herleitung">
+                {herleitung.map((h) => (
+                  <li>
+                    <a
+                      href={h.adresse}
+                      target={h.extern ? '_blank' : undefined}
+                      rel={h.extern ? 'noopener noreferrer' : undefined}
+                      data-extern={h.extern ? '' : undefined}
+                    >
+                      <code>{h.pfad}</code>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )
+        }
+      </div>
+
+      <nav class="doku-blaettern" aria-label="Entscheidungen blättern">
+        {
+          zurueck ? (
+            <a
+              class="doku-blaettern__link doku-blaettern__link--zurueck"
+              href={`/architektur/entscheidungen/${zurueck.id}/`}
+            >
+              <span class="doku-label">← {zurueck.data.id}</span>
+              <span>{zurueck.data.titel}</span>
+            </a>
+          ) : (
+            <a
+              class="doku-blaettern__link doku-blaettern__link--zurueck"
+              href="/architektur/09-architekturentscheidungen/"
+            >
+              <span class="doku-label">← Kapitel 9</span>
+              <span>Architekturentscheidungen</span>
+            </a>
+          )
+        }
+        {
+          weiter && (
+            <a
+              class="doku-blaettern__link doku-blaettern__link--weiter"
+              href={`/architektur/entscheidungen/${weiter.id}/`}
+            >
+              <span class="doku-label">{weiter.data.id} →</span>
+              <span>{weiter.data.titel}</span>
+            </a>
+          )
+        }
+      </nav>
+      <p class="doku-quelle mono">
+        <a href={githubAdresse(quelle)} target="_blank" rel="noopener noreferrer"
+          >Entscheidung auf GitHub ansehen ↗</a
+        >
+      </p>
+    </article>
+
+    <aside class="doku-rand" aria-label="Auf dieser Seite">
+      <p class="doku-label">Auf dieser Seite</p>
+      <Gliederung gliederung={gliederung} art="rand" />
+    </aside>
+  </div>
+  <Lesehilfen />
+</Grundriss>

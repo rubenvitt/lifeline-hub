@@ -1,0 +1,83 @@
+---
+/**
+ * Seitenleiste der Architekturdokumentation (LLH-1435): Suche, die zwölf arc42-Kapitel und die
+ * Entscheidungen. Gleiche Form wie die Kapitelliste der Anwenderdoku (`styles/doku.css`).
+ */
+import { getCollection } from 'astro:content';
+import { kopfVon } from '../daten/architektur';
+
+interface Props {
+  /** Kennung der offenen Seite (Dateiname ohne `.md`). */
+  aktuell: string;
+}
+const { aktuell } = Astro.props;
+
+const kapitel = (await getCollection('architektur', (k) => k.id !== 'README'))
+  .map((k) => ({ id: k.id, ...kopfVon(k.body ?? '') }))
+  .sort((a, b) => a.nummer - b.nummer);
+const entscheidungen = (await getCollection('entscheidungen')).sort((a, b) =>
+  a.data.id.localeCompare(b.data.id),
+);
+const inEntscheidung = entscheidungen.some((e) => e.id === aktuell);
+const ort = inEntscheidung
+  ? 'Entscheidungen'
+  : `Kapitel ${String(kapitel.find((k) => k.id === aktuell)?.nummer ?? '').padStart(2, '0')}`;
+---
+
+<nav class="doku-navi" aria-label="Architekturdokumentation">
+  <button class="doku-suchfeld" type="button" data-such-oeffnen>
+    <span>Suchen</span>
+    <kbd class="mono" data-such-kuerzel>⌘K</kbd>
+  </button>
+  <details class="doku-navi__klappe" open>
+    <summary class="doku-navi__summary">
+      <span>Inhalt</span>
+      <span class="doku-navi__ort mono">{ort}</span>
+    </summary>
+    <p class="arch-navi__start"><a href="/architektur/">Übersicht</a></p>
+    <details class="doku-navi__bereich" open={!inEntscheidung}>
+      <summary>
+        <span>arc42-Kapitel</span>
+        <span class="doku-navi__zahl mono">{kapitel.length}</span>
+      </summary>
+      <ul class="doku-liste">
+        {
+          kapitel.map((k) => (
+            <li>
+              <a
+                class="arch-navi__eintrag"
+                href={`/architektur/${k.id}/`}
+                aria-current={k.id === aktuell ? 'page' : undefined}
+              >
+                <span class="mono arch-navi__nummer">{String(k.nummer).padStart(2, '0')}</span>
+                <span>{k.titel}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </details>
+    <details class="doku-navi__bereich" open={inEntscheidung}>
+      <summary>
+        <span>Entscheidungen</span>
+        <span class="doku-navi__zahl mono">{entscheidungen.length}</span>
+      </summary>
+      <ul class="doku-liste">
+        {
+          entscheidungen.map((e) => (
+            <li>
+              <a
+                class="arch-navi__eintrag"
+                href={`/architektur/entscheidungen/${e.id}/`}
+                aria-current={e.id === aktuell ? 'page' : undefined}
+              >
+                <span class="mono arch-navi__nummer">{e.data.id.replace('ADR-', '')}</span>
+                <span>{e.data.titel}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </details>
+  </details>
+</nav>

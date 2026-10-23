@@ -5,10 +5,23 @@
  * Der Index (`/doku/suche.json`) lädt erst beim ersten Öffnen. Treffer: Kapitel und einzelne
  * Abschnitte (`###`, also vor allem die Abläufe) mit Sprungmarke. Umlaute zählen wie ihre
  * Grundbuchstaben („gerat“ findet „Gerät“). Bedienung: ↑ ↓ wählen, ↵ öffnen, Esc schließen.
+ *
+ * Unter `/architektur/` sucht derselbe Dialog in der Architekturdokumentation
+ * (`/architektur/suche.json`): Kapitel, Entscheidungen und alle ihre Abschnitte.
  */
+interface Props {
+  bereich?: 'doku' | 'architektur';
+}
+const { bereich = 'doku' } = Astro.props;
+const architektur = bereich === 'architektur';
 ---
 
-<dialog class="such-dialog" data-such-dialog aria-label="Dokumentation durchsuchen">
+<dialog
+  class="such-dialog"
+  data-such-dialog
+  data-such-index={architektur ? '/architektur/suche.json' : '/doku/suche.json'}
+  aria-label={architektur ? 'Architekturdokumentation durchsuchen' : 'Dokumentation durchsuchen'}
+>
   <div class="such-kopf">
     <svg class="such-lupe" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
       <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.75"></circle>
@@ -17,7 +30,7 @@
     <input
       class="such-eingabe"
       type="search"
-      placeholder="Kapitel und Abläufe durchsuchen"
+      placeholder={architektur ? 'Kapitel und Entscheidungen durchsuchen' : 'Kapitel und Abläufe durchsuchen'}
       autocomplete="off"
       spellcheck="false"
       role="combobox"
@@ -30,7 +43,11 @@
     <button class="such-schliessen mono" type="button" data-such-schliessen>Esc</button>
   </div>
   <p class="such-stand mono" aria-live="polite" data-such-stand>
-    Suchbegriff eingeben, etwa „Passkey“, „Ablösung“ oder „Sichtung“.
+    {
+      architektur
+        ? 'Suchbegriff eingeben, etwa „SSE“, „Extractor“ oder „Warteschlange“.'
+        : 'Suchbegriff eingeben, etwa „Passkey“, „Ablösung“ oder „Sichtung“.'
+    }
   </p>
   <ul class="such-treffer" id="such-treffer" role="listbox" aria-label="Treffer" data-such-treffer>
   </ul>
@@ -50,13 +67,14 @@
   }
   interface Kapitel {
     k: string;
+    u?: string;
     t: string;
     b: string;
     kurz: string;
     a: Abschnitt[];
   }
   interface Eintrag {
-    art: 'Kapitel' | 'Ablauf' | 'Abschnitt';
+    art: 'Kapitel' | 'Entscheidung' | 'Ablauf' | 'Abschnitt';
     adresse: string;
     titel: string;
     pfad: string;
@@ -87,14 +105,15 @@
   let aktiv = 0;
 
   function ladeIndex(): Promise<void> {
-    laden ??= fetch('/doku/suche.json')
+    laden ??= fetch(dialog?.dataset.suchIndex ?? '/doku/suche.json')
       .then((r) => r.json() as Promise<Kapitel[]>)
       .then((kapitel) => {
         eintraege = kapitel.flatMap((k) => {
           const ueberblick = k.a.find((a) => a.e === 2)?.x ?? k.kurz;
+          const basis = k.u ?? `/doku/${k.k}/`;
           const kopf: Eintrag = {
-            art: 'Kapitel',
-            adresse: `/doku/${k.k}/`,
+            art: k.k.startsWith('ADR-') ? 'Entscheidung' : 'Kapitel',
+            adresse: basis,
             titel: k.t,
             pfad: k.b,
             text: k.kurz || ueberblick,
@@ -105,14 +124,13 @@
           let h2 = '';
           const teile: Eintrag[] = [];
           for (const a of k.a) {
-            if (a.e === 2) {
-              h2 = a.t;
-              continue;
-            }
-            const pfad = `${k.t} › ${h2}`;
+            if (a.e === 2) h2 = a.t;
+            // Anwenderdoku: `##` gliedert nur, Treffer sind die `###`. Architektur: beide.
+            if (a.e === 2 && !k.u) continue;
+            const pfad = a.e === 2 ? k.t : `${k.t} › ${h2}`;
             teile.push({
               art: h2 === 'Abläufe' ? 'Ablauf' : 'Abschnitt',
-              adresse: `/doku/${k.k}/#${a.id}`,
+              adresse: `${basis}#${a.id}`,
               titel: a.t,
               pfad,
               text: a.x,
@@ -139,7 +157,7 @@
       else if (e.suchText.includes(w)) punkte += 1;
       else return 0;
     }
-    if (e.art === 'Kapitel') punkte += 2;
+    if (e.art === 'Kapitel' || e.art === 'Entscheidung') punkte += 2;
     return punkte;
   }
 
