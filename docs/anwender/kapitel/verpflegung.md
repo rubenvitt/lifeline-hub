@@ -2,7 +2,7 @@
 titel: Verpflegung
 gruppen: [fuehrung]
 reihenfolge: 370
-quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/zaehltasteStil.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/StelleDialog.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/stellenGedaechtnis.ts, frontend/src/verpflegung/empfaengerKern.ts, frontend/src/verpflegung/EmpfaengerStand.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/verpflegung/useBedarfsvorschlag.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/verpflegung/TagAusVorlage.tsx, frontend/src/verpflegung/tagAusVorlageKern.ts, frontend/src/anzeige/uhrzeit.ts, frontend/src/offline/schreiben.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/modulRegistry.ts, frontend/src/stab/sachgebiete.ts, src/routes/verpflegung.rs, src/verpflegung/repo.rs, src/verpflegung/deckung.rs, src/verpflegung/stelle.rs, src/verpflegung/vorlage.rs, openspec/specs/kraefte-verpflegung/spec.md, openspec/specs/stab-versorgung/spec.md]
+quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/ZeitfensterBearbeiten.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/zaehltasteStil.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/StelleDialog.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/stellenGedaechtnis.ts, frontend/src/verpflegung/empfaengerKern.ts, frontend/src/verpflegung/EmpfaengerStand.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/verpflegung/useBedarfsvorschlag.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/verpflegung/TagAusVorlage.tsx, frontend/src/verpflegung/tagAusVorlageKern.ts, frontend/src/anzeige/uhrzeit.ts, frontend/src/offline/schreiben.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/modulRegistry.ts, frontend/src/stab/sachgebiete.ts, src/routes/verpflegung.rs, src/verpflegung/repo.rs, src/verpflegung/deckung.rs, src/verpflegung/stelle.rs, src/verpflegung/vorlage.rs, openspec/specs/kraefte-verpflegung/spec.md, openspec/specs/stab-versorgung/spec.md]
 ---
 
 ## Überblick
@@ -62,13 +62,14 @@ Für Einsatzleitung und Führungspersonal:
 
 Für Einsatzleitung und Führungspersonal:
 
-1. Beim Anlegen im Dialog „Zeitfenster anlegen“, sonst auf der Karte über „Bedarf bearbeiten“,
-   „Art und Stellen“ aufklappen.
+1. Beim Anlegen im Dialog „Zeitfenster anlegen“ „Art und Stellen“ aufklappen. Bei einem
+   bestehenden Zeitfenster auf der Karte „Bedarf bearbeiten“ wählen; „Art“ und „Stellen“ stehen
+   dort direkt unter dem Bedarf.
 2. Unter „Stellen“ eine oder mehrere Stellen wählen. Ohne Stelle gilt das Zeitfenster
    einsatzweit.
 3. Unter „Art“ bei Bedarf „warm“, „kalt“ oder „Getränke“ wählen.
-4. „Anlegen“ oder „Speichern“ wählen. Zugeklappt nennt der Kopf die Wahl, etwa „Art und Stellen ·
-   warm · 2 Stellen“; auf der Karte steht die Art neben dem Zeitraum.
+4. „Anlegen“ oder „Speichern“ wählen. Im Dialog nennt der zugeklappte Kopf die Wahl, etwa „Art und
+   Stellen · warm · 2 Stellen“; auf der Karte steht die Art neben dem Zeitraum.
 
 ### Sehen, wo ausgegeben wurde
 
@@ -194,8 +195,10 @@ Für Einsatzleitung und Führungspersonal:
 Für Einsatzleitung und Führungspersonal:
 
 1. Auf der Karte „Bedarf bearbeiten“ wählen. Ab drei Aktionen liegt es im Menü „Aktionen zu
-   Zeitfenster …“ (drei Punkte). Bezeichnung, Zeitraum, Bedarf und Sonderkost ändern und „Speichern“
-   wählen.
+   Zeitfenster …“ (drei Punkte). Die Karte zeigt jetzt statt der Zahlen die Felder: Bezeichnung,
+   Zeitraum, Bedarf und Sonderkost ändern und „Speichern“ wählen (oder die Eingabetaste drücken).
+   „Abbrechen“ oder die Escape-Taste verwirft die Änderung. Solange eine Karte in Bearbeitung ist,
+   ist „Bedarf bearbeiten“ an den anderen Karten gesperrt.
 2. Fehlt etwas, „Nachfordern“ wählen. Die App öffnet die Erfassung einer Nachforderung mit Art
    „Verpflegung“, der Fehlmenge als Anzahl und einer Begründung, die das Zeitfenster nennt.
 3. Ein Zeitfenster ohne gültige Ausgabe mit „Löschen“ entfernen und die Rückfrage mit „Löschen“

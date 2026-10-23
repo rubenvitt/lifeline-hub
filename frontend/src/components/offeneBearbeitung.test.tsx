@@ -10,6 +10,7 @@ import {
   OffeneBearbeitungProvider,
   sperrGrundOffeneBearbeitung,
   useOffeneBearbeitung,
+  useOffeneBearbeitungBelegung,
   useOffeneBearbeitungGrund,
 } from './offeneBearbeitung';
 
@@ -259,5 +260,93 @@ describe('offene Bearbeitung · ohne Seitenkontext', () => {
     await user.click(screen.getByRole('link', { name: 'Betroffene' }));
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+/**
+ * Belegung durch ein Paneel (LLH-1139, Spec `formularseiten`, „Eine offene Bearbeitung je
+ * Ansicht“): ein offenes Paneel sperrt die übrigen sofort, die Rückfrage kommt erst mit einer
+ * Änderung.
+ *
+ * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
+ * - „offen“ wie „geändert“ behandelt (Verlassen-Schutz bei jeder Belegung): rot in „offen ohne
+ *   Änderung sperrt, fragt aber nicht“.
+ * - Rückfrage immer eingehängt statt nur bei Belegung: rot in „ohne Belegung kein Data Router
+ *   nötig“ (`useBlocker` wirft im `MemoryRouter`).
+ */
+function PaneelAttrappe({ etikett }: { etikett: string }) {
+  const { gesperrt, melde } = useOffeneBearbeitungBelegung(etikett);
+  return (
+    <div>
+      <button type="button" disabled={gesperrt != null} onClick={() => melde('offen')}>
+        {etikett} öffnen
+      </button>
+      <button type="button" onClick={() => melde('geaendert')}>
+        {etikett} ändern
+      </button>
+      <button type="button" onClick={() => melde('zu')}>
+        {etikett} schließen
+      </button>
+      {gesperrt && <span>{gesperrt}</span>}
+    </div>
+  );
+}
+
+function PaneelSeite() {
+  return (
+    <Routes>
+      <Route
+        path="/ansicht"
+        element={
+          <OffeneBearbeitungProvider>
+            <PaneelAttrappe etikett="Funk" />
+            <PaneelAttrappe etikett="Telefon" />
+            <Angabe etikett="Name" />
+            <Link to="/liste">Liste</Link>
+          </OffeneBearbeitungProvider>
+        }
+      />
+      <Route path="/liste" element={<div>LISTE</div>} />
+    </Routes>
+  );
+}
+
+describe('offene Bearbeitung · Belegung durch ein Paneel', () => {
+  it('offen ohne Änderung sperrt die übrigen sofort, fragt beim Verlassen aber nicht', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<PaneelSeite />, { route: '/ansicht', datenRouter: true });
+    await user.click(screen.getByRole('button', { name: 'Funk öffnen' }));
+    expect(screen.getByRole('button', { name: 'Telefon öffnen' })).toBeDisabled();
+    // Grund am gesperrten Paneel und am gesperrten Einzelfeld.
+    expect(screen.getAllByText('Erst „Funk“ speichern oder abbrechen')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Name eintragen' })).toBeDisabled();
+    await user.click(screen.getByRole('link', { name: 'Liste' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('geändert fragt beim Verlassen; geschlossen gibt die Seite frei', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<PaneelSeite />, { route: '/ansicht', datenRouter: true });
+    await user.click(screen.getByRole('button', { name: 'Funk öffnen' }));
+    await user.click(screen.getByRole('button', { name: 'Funk ändern' }));
+    await user.click(screen.getByRole('link', { name: 'Liste' }));
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await user.click(screen.getByRole('button', { name: 'Bleiben' }));
+    await user.click(screen.getByRole('button', { name: 'Funk schließen' }));
+    expect(screen.getByRole('button', { name: 'Telefon öffnen' })).toBeEnabled();
+    await user.click(screen.getByRole('link', { name: 'Liste' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
+
+  it('ohne Belegung kein Data Router nötig (die Rückfrage hängt erst mit Belegung ein)', () => {
+    expect(() =>
+      renderMitProviders(
+        <OffeneBearbeitungProvider>
+          <PaneelAttrappe etikett="Funk" />
+        </OffeneBearbeitungProvider>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByRole('button', { name: 'Funk öffnen' })).toBeEnabled();
   });
 });
