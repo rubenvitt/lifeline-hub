@@ -825,7 +825,7 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
     renderMitProviders(
       <AnzeigeKonventionenProvider konventionen={BERLIN}>
         <ZeitfensterDialog
-          modus={{ art: 'anlegen', onErfassen }}
+          onErfassen={onErfassen}
           einsatzId={1}
           freigaben={FREIGABEN}
           jetzt={JETZT}
