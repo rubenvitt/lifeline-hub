@@ -257,7 +257,11 @@ pub const MAX_BACKUP_INTERVALL_MINUTEN: u64 = 365 * 24 * 60;
 
 /// Laufzeit-Konfiguration für den lifeline-hub-Server.
 #[derive(Parser, Debug, Clone)]
-#[command(version, about = "lifeline-hub Server")]
+#[command(
+    version,
+    about = "lifeline-hub Server",
+    after_help = crate::lizenz::hinweis_kurz()
+)]
 pub struct Config {
     /// Pfad zur SQLite-Datenbankdatei.
     #[arg(long, env = "LIFELINE_DB_PATH", default_value = "lifeline.db")]
@@ -702,6 +706,8 @@ pub enum Command {
     /// Betroffenheit zu beurteilen. Bewusst ein CLI-Subkommando und nicht `/api/health`:
     /// die Angabe geht Operatoren etwas an, nicht jeden, der den Port erreicht.
     SqliteVersion,
+    /// Den Lizenztext ausgeben (LLH-1446, Quelle: `LICENSE`).
+    Lizenz,
 }
 
 #[cfg(test)]

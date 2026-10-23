@@ -6,6 +6,7 @@
 #
 #   dist/linux-amd64/lifeline-hub
 #   dist/linux-arm64/lifeline-hub
+#   LICENSE
 
 # Legt /data mit den Rechten des nonroot-Nutzers an (distroless kann weder `mkdir` noch
 # `chown`). Docker übernimmt diese Rechte beim ersten Mount eines frischen Volumes; sonst gehörte
@@ -24,6 +25,8 @@ FROM gcr.io/distroless/cc-debian13:nonroot
 ARG TARGETARCH
 COPY --from=vorbereitung --chown=nonroot:nonroot /data /data
 COPY --chmod=755 dist/linux-${TARGETARCH}/lifeline-hub /usr/local/bin/lifeline-hub
+# Dieselbe Datei, die das Binary einbettet (LLH-1446); `docker run … lizenz` gibt sie aus.
+COPY LICENSE /LICENSE
 
 ENV LIFELINE_DB_PATH=/data/lifeline.db \
     LIFELINE_BIND=0.0.0.0:8080
