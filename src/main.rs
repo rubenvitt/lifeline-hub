@@ -56,6 +56,10 @@ async fn main() -> anyhow::Result<()> {
             .await
         }
         Some(Command::SqliteVersion) => cmd_sqlite_version().await,
+        Some(Command::Lizenz) => {
+            print!("{}", lifeline_hub::lizenz::TEXT);
+            Ok(())
+        }
         None => run_server(config).await,
     }
 }
@@ -93,6 +97,7 @@ async fn physisch_bereinigen(pool: &sqlx::SqlitePool) {
 /// Startet den HTTP-Server (Standardlauf ohne Subkommando).
 async fn run_server(config: Config) -> anyhow::Result<()> {
     tracing::info!(db_path = %config.db_path, bind = %config.bind, "Starte lifeline-hub");
+    tracing::info!("{}", lifeline_hub::lizenz::hinweis_kurz());
 
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
@@ -115,6 +120,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     )
     .await?;
     if ergebnis.admin_angelegt {
+        // Erster Start auf leerer DB, also die Installation (LLH-1446): der volle Lizenztext
+        // gerahmt auf stderr, an Log-Filter und verlustbehaftetem Log-Puffer vorbei.
+        eprintln!("{}", lifeline_hub::lizenz::kasten());
         tracing::info!("Admin-Konto '{}' angelegt", config.admin_user);
         // Im dev-seeds-Build setzt `dev_seed` das Admin-Passwort auf das Dev-Passwort zurück — ein
         // generiertes Passwort also nicht bewerben.

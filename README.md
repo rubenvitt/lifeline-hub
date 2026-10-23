@@ -11,12 +11,11 @@ Einsatzleitung und Stab ohnehin arbeiten.
 > Bedienung ändern sich laufend, Migrationspfade zwischen Ständen sind nicht zugesichert.
 > Wer das produktiv in einer echten Lage einsetzt, tut das auf eigenes Risiko.
 
-## Lizenz — alle Rechte vorbehalten
+## Lizenz
 
-**Dieses Repository steht unter keiner Open-Source-Lizenz.** Der Quelltext ist einsehbar,
-damit die Arbeitsweise nachvollziehbar ist; es wird damit **kein** Recht zur Nutzung,
-Vervielfältigung, Veränderung oder Weitergabe eingeräumt. Öffentliche Sichtbarkeit ist keine
-Erlaubnis. Wer das Projekt einsetzen oder darauf aufbauen möchte, fragt vorher an.
+Was mit dem Quelltext und den daraus gebauten Programmen erlaubt ist, steht allein in
+[LICENSE](LICENSE). Bitte vor dem ersten Betrieb lesen. Der Server zeigt denselben Text beim ersten
+Start und mit `lifeline-hub lizenz`.
 
 Beiträge von außen werden derzeit nicht angenommen. Fehlerberichte sind willkommen.
 
@@ -82,8 +81,8 @@ Webserver noch eine Datenbank installiert. Datei kopieren, starten:
 ./target/release/lifeline-hub --db-path lifeline.db --bind 0.0.0.0:8080
 ```
 
-Beim ersten Start entstehen Datenbank und Administrationskonto; das erzeugte Passwort steht
-im Log. Alles Weitere — TLS, Anmeldeverfahren, Offline-Karten, Sicherung — steht in
+Beim ersten Start entstehen Datenbank und Administrationskonto; der Lizenztext und das
+erzeugte Passwort stehen in der Ausgabe. Alles Weitere — TLS, Anmeldeverfahren, Offline-Karten, Sicherung — steht in
 [docs/betrieb/packaging.md](docs/betrieb/packaging.md).
 
 Für die Menschen, die die App im Einsatz bedienen, gibt es die Anwenderdokumentation in

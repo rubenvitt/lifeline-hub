@@ -3,6 +3,8 @@ name = "lifeline-hub"
 # Die Anwendungsversion steht EINMAL, in [workspace.package] — die Desktop-Hülle erbt sie mit.
 version.workspace = true
 edition = "2021"
+# Einzige Quelle der Lizenz (LLH-1446, `src/lizenz.rs`).
+license-file = "LICENSE"
 
 [dependencies]
 axum = { version = "0.8", features = ["multipart"] }

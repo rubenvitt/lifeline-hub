@@ -100,6 +100,10 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   Stände gepinnt mit Commit in `drittanbieter-quellen.txt`, Selbsttest in Schritt 8). Ein neuer
   Stand einer Bibliothek im Binary heißt: Liste nachziehen (Herleitung
   `frontend/src/heic/LIESMICH.md`).
+- **Eigene Lizenz** (LLH-1446): `LICENSE` ist die einzige Quelle. Das Binary bettet sie ein
+  (`src/lizenz.rs`, Unterbefehl `lizenz`), das Abbild legt sie unter `/LICENSE` ab, `artefakte.yml`
+  hängt sie als `lifeline-hub-<version>-LIZENZ.txt` ans Release und vergleicht im Starttest die
+  Ausgabe des Abbilds mit der Datei. Kein Lizenztext an anderer Stelle, README und Doku verweisen.
 - **Advisories** (`scripts/check-deps.sh`): Rust `.cargo/audit.toml` (Ignorierliste mit
   Begründung); Frontend nur `overrides` in `frontend/pnpm-workspace.yaml`, jeder `high`-Fund bricht
   (`--audit-level=high`).

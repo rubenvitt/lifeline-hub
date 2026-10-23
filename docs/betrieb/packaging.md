@@ -147,6 +147,13 @@ Konfiguration per CLI-Flag oder ENV (Auszug):
 Beim ersten Start legt die Binary die DB-Datei an, spielt die Migrationen ein
 und bootstrappt das Admin-Konto.
 
+> **Lizenz (LLH-1446):** Beim ersten Start steht der volle Lizenztext gerahmt auf
+> stderr, bei jedem weiteren Start eine Zeile im Log. `lifeline-hub lizenz` gibt den
+> Text jederzeit aus, im Container auch `docker run --rm <abbild> lizenz`; dort liegt
+> er zusätzlich unter `/LICENSE`, am Release als `lifeline-hub-<version>-LIZENZ.txt`.
+> Einzige Quelle ist `LICENSE` im Repo; das Binary bettet die Datei beim Bauen ein,
+> ein Lizenzwechsel ändert also nur diese Datei.
+
 ## Lokaler Betrieb (ELW / Mini-PC)
 
 `--bind 0.0.0.0:8080` macht den Server im lokalen WLAN erreichbar. Eine Eingabe

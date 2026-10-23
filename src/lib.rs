@@ -51,6 +51,7 @@ pub mod lage_zone;
 pub mod lagebericht;
 pub mod lagebesprechung;
 pub mod live;
+pub mod lizenz;
 pub mod log_drossel;
 pub mod material;
 pub mod meldung;

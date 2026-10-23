@@ -289,6 +289,19 @@ jobs:
               shasum -a 256 "$f" > "$f.sha256"
             done )
 
+      # Die Lizenz neben die Binaries (LLH-1446). Ein Tag von davor hat keine LICENSE.
+      - name: Lizenz
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ ! -f quelle/LICENSE ]; then
+            echo "::notice::Tag ohne LICENSE, Schritt übersprungen."
+            exit 0
+          fi
+          cp quelle/LICENSE "versand/lifeline-hub-$VERSION-LIZENZ.txt"
+          ( cd versand && shasum -a 256 "lifeline-hub-$VERSION-LIZENZ.txt" > "lifeline-hub-$VERSION-LIZENZ.txt.sha256" )
+
       - name: Hochladen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -403,6 +416,9 @@ jobs:
           version="$(docker run --rm --platform linux/amd64 "ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION" sqlite-version)"
           echo "eingebettetes SQLite: $version"
           [ -n "$version" ] || { echo "FEHLER: Abbild startet, liefert aber keine SQLite-Version." >&2; exit 1; }
+          # Die Lizenz kommt aus dem Binary, nicht aus einer zweiten Kopie (LLH-1446).
+          docker run --rm --platform linux/amd64 "ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION" lizenz | cmp - LICENSE \
+            || { echo "FEHLER: \`lizenz\` im Abbild weicht von LICENSE ab." >&2; exit 1; }
 
   # Zweites Abbild, selbes Muster wie `docker` oben: fertige Binaries, kein Build aus Quelle.
   # Eigener Job statt eines weiteren Schritts dort, damit ein Fehler hier das Hauptabbild
