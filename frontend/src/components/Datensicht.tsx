@@ -1093,13 +1093,15 @@ export default function Datensicht<T extends object, const K extends string>(
 
   const [eigeneSpaltenAus, setEigeneSpaltenAus] = useState<readonly K[]>(
     () =>
-      (gedaechtnis?.spaltenStart.aus as readonly K[] | undefined) ?? spaltenAusVoreinstellung ?? [],
+      (gedaechtnis?.spaltenStart?.aus as readonly K[] | undefined) ??
+      spaltenAusVoreinstellung ??
+      [],
   );
   const aktiveSpaltenAus = spaltenAus ?? eigeneSpaltenAus;
   // Per Breite weggefallene, von Hand zurückgeholte Spalten. Bewusst unkontrolliert, weil kein
   // Konsument diese Hälfte braucht.
   const [spaltenAn, setSpaltenAn] = useState<readonly K[]>(
-    () => (gedaechtnis?.spaltenStart.an as readonly K[] | undefined) ?? [],
+    () => (gedaechtnis?.spaltenStart?.an as readonly K[] | undefined) ?? [],
   );
   const meldeSpalten = gedaechtnis?.meldeSpalten;
   const setzeSpaltenAus = useCallback(

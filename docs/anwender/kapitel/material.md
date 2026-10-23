@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
 ---
 
 ## Überblick
@@ -32,12 +32,18 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
    steht je Ort die Zahl der Posten, auf schmalen Schirmen über jeder Gruppe. „Nach Status“ im
    Kopf gruppiert nach den Status, „aufgebraucht“ zuletzt; „Nach Ort“ kehrt zurück. Die Wahl
    gilt für diesen Einsatz, bis die Seite verlassen wird.
-4. In „Bezeichnung, Kategorie, Ort“ suchen oder nach „Ort“ und „Status“ filtern. Der Filter „Ort“
-   kennt „ohne Ort“ und jede Einheit, jedes Fahrzeug, jede UHS und jeden Bereitstellungsraum der
-   Liste. Der Filter „Status“ kennt zusätzlich „aufgebraucht“.
-5. Auf schmaleren Schirmen, auch am Fükw, ist die Spalte „Kategorie“ ausgeblendet; die Kategorie
-   steht dann gedämpft unter der Bezeichnung. „Spalten“ zeigt, wie viele Spalten fehlen, und
-   blendet sie wieder ein.
+4. In „Bezeichnung, Kategorie, Ort“ suchen, oder im Kopf der Spalten „Kategorie“, „Ort“, „Status“
+   und „Träger“ filtern: das Trichterzeichen öffnet die Werte zum Ankreuzen, „OK“ übernimmt sie.
+   Der Filter „Ort“ kennt „ohne Ort“ und jede Einheit, jedes Fahrzeug, jede UHS und jeden
+   Bereitstellungsraum der Liste. Der Filter „Status“ kennt zusätzlich „aufgebraucht“. Ein Klick
+   auf einen Spaltenkopf sortiert innerhalb der Gruppen nach dieser Spalte, ein zweiter kehrt die
+   Folge um. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der Treffer und je
+   Wert ein Knopf, etwa „Status: defekt“, der genau diesen Filter entfernt; „Filter zurücksetzen“
+   leert Suche und Filter. Auf dem Handy stehen Filter und „Sortieren“ als Auswahlfelder über der
+   Liste.
+5. Auf schmaleren Schirmen, auch am Fükw, sind die Spalten „Kategorie“ und „Träger“ ausgeblendet;
+   die Kategorie steht dann gedämpft unter der Bezeichnung. „Spalten“ zeigt, wie viele Spalten
+   fehlen, und blendet sie wieder ein. Gefiltert wird nur nach Spalten, die in der Liste stehen.
 
 ### Material aus dem Stamm disponieren
 
@@ -344,6 +350,13 @@ Stornieren stehen im Einsatztagebuch, mit alter und neuer Menge bzw. altem und n
   Tauchpumpen für Keller Hauptstraße»“.
 
 Eine Bemerkung ändert das Einsatztagebuch nicht.
+
+### Filter und Sortierung bleiben stehen
+
+Suche, Filter und Sortierung stehen in der Adresse der Seite. Zurück aus einem anderen Modul, Neuladen und ein
+weitergegebener Link zeigen dieselbe Liste. Wer die Liste später über das Modulpanel wieder öffnet,
+findet die Einschränkung vom letzten Mal, bis zur Abmeldung. Welche Spalten ausgeblendet sind,
+merkt sich das Gerät.
 
 ### Rechte und ohne Netz
 

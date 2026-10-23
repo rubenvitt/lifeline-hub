@@ -124,6 +124,9 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, 'onLine');
   onlineManager.setOnline(true);
   localStorage.clear(); // Persistenz (z. B. gemerkte Basemap/UHS) nicht zwischen Tests lecken lassen
+  // Gemerkte Listenstände (LLH-1086, `lfh:liste:<seite>:<einsatz>`) gelten je Sitzung: ein Filter
+  // aus einem Test stünde sonst im nächsten derselben Seite vorbelegt da (LLH-1096).
+  sessionStorage.clear();
   setzeViewportZurueck(); // Breite/Zeigerart/Zuhörer zurück auf den Ausgangszustand
   setzeMasseZurueck(); // gesetzte Layout-Maße (`elementMasse.ts`) nicht in den nächsten Test lecken
   // Vorgehaltenes Lagebild (LFH-723): jeder `AuthProvider` legt bei bestätigter Sitzung einen

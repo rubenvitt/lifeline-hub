@@ -384,7 +384,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Adresse (`?sort=ort:auf&f.ausmass=gross&q=`, `routing/deeplinks.ts`), sonst gilt der Stand der
   Sitzung; die Spaltenwahl liegt am Gerät — beides über `useListenGedaechtnis`
   (`components/listenGedaechtnis.ts`), den die SEITE hält und als `gedaechtnis` an
-  `Datensicht`/`KatalogTabelle` reicht. Vorbild Schäden; Rollout auf alle Listen LLH-1096.
+  `Datensicht`/`KatalogTabelle` reicht; ohne gemerkte Spaltenwahl gilt `spaltenAusVoreinstellung`.
+  Spalten, die beim ersten Rendern noch nicht feststehen (Werte aus den Zeilen, Spalte hinter einer
+  Freigabe), nennt die Seite als `ausDaten`, sonst fiele ihr Filter aus der Adresse. Eine Sicht im
+  Baummodus sortiert und filtert nicht (Meldebild, Funkplan, Kommunikationsplan; Kommentar an der
+  Sicht). Vorbild Schäden, dazu Fahrzeuge, Personal, Material, Sprechgruppen; Rollout LLH-1096.
   Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
   Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
 - **Kopfwerkzeuge der `KatalogTabelle` folgen der Dichte** (LLH-1227): Suche und Spaltenschalter

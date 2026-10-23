@@ -34,6 +34,7 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
+import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KATEGORIE_WERTE, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
@@ -53,7 +54,9 @@ import EinheitAngabe from '../kraefte/EinheitAngabe';
 import FahrzeugAngabe from '../kraefte/FahrzeugAngabe';
 import PositionAngabe from '../kraefte/PositionAngabe';
 import { buildEinheitGruppen } from '../kraefte/einteilungKern';
-import { buildEinheitOptions } from '../kraefte/kraeftebaumKern';
+import { abschnittDerEinheit, buildEinheitOptions } from '../kraefte/kraeftebaumKern';
+import { POSITION_LABELS } from '../api/personal';
+import type { StaerkePosition } from '../api/types';
 import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
 
 /**
@@ -61,9 +64,55 @@ import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
  * Einheit, Fahrzeug und Position in der Zeile änderbar, der Name führt in die Personenansicht
  * (`EinsatzkraftPage`). Entlassen, Stornieren und die Zeitachse stehen nur dort (D8).
  */
+type PersonalSpalteKey =
+  | 'name'
+  | 'funktion'
+  | 'traeger'
+  | 'einheit'
+  | 'abschnitt'
+  | 'fahrzeug'
+  | 'position'
+  | 'status'
+  | 'einsatzdauer'
+  | 'ruhe'
+  | 'bemerkung';
+
+/** Die Positionen in Stärke-Folge (Führer, Unterführer, Mannschaft): Werteliste und Sortierachse. */
+const POSITION_FOLGE = Object.keys(POSITION_LABELS) as StaerkePosition[];
+const POSITION_WERTE = POSITION_FOLGE.map((p) => ({ text: POSITION_LABELS[p], value: p }));
+
+/**
+ * Was das Listengedächtnis beim Aufbau der Seite prüft (LLH-1096, Herleitung in `FahrzeugePage.tsx`):
+ * feste Achsen mit ihren Werten; Träger nimmt seine Werte aus den Zeilen, Einheit, Abschnitt und
+ * Fahrzeug stehen hinter der Freigabe ihres Moduls (`ausDaten`). Muss zu `spalten` passen.
+ */
+const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
+  { key: 'name', sortWert: true },
+  { key: 'funktion', sortWert: true },
+  { key: 'position', sortWert: true, filter: { werte: POSITION_WERTE } },
+  { key: 'status', sortWert: true, filter: { werte: KATEGORIE_WERTE } },
+  { key: 'einsatzdauer', sortWert: true },
+  { key: 'ruhe', sortWert: true },
+];
+const GEDAECHTNIS_AUS_DATEN: readonly PersonalSpalteKey[] = [
+  'traeger',
+  'einheit',
+  'abschnitt',
+  'fahrzeug',
+];
+
 export default function PersonalPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  /**
+   * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, Muster der Schadenliste); der
+   * Hook gehört der Seite und steht vor jedem frühen Ausstieg.
+   */
+  const gedaechtnis = useListenGedaechtnis<PersonalSpalteKey>('personal', GEDAECHTNIS_SPALTEN, {
+    vorgabe: { spalte: 'name', richtung: 'auf' },
+    einsatzId,
+    ausDaten: GEDAECHTNIS_AUS_DATEN,
+  });
   const qc = useQueryClient();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [disponierenOffen, setDisponierenOffen] = useState(false);
@@ -211,6 +260,16 @@ export default function PersonalPage() {
     abschnitte,
   );
   const fahrzeuge = fahrzeugeQuery.data ?? [];
+  // Der Abschnitt einer Kraft ist der ihrer Einheit, sonst der geerbte (dieselbe Lesart wie die
+  // Abschnitt-Spalte der Fahrzeugliste, LLH-1073).
+  const abschnittJe = abschnittDerEinheit(einheiten);
+  const abschnittName = (ep: EinsatzPersonal) => {
+    const a = ep.einheit_id != null ? abschnittJe.get(ep.einheit_id) : null;
+    return a ? (a.name ?? `Abschnitt ${a.id}`) : null;
+  };
+  const abschnittWerte = [...new Set(eps.map(abschnittName).filter((w): w is string => !!w))]
+    .sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
+    .map((w) => ({ text: w, value: w }));
   const stati = statusQuery.data ?? [];
   const vorschlaege = einsatzfunktionVorschlaege({
     vergeben: eps.map((ep) => ep.einsatzfunktion),
@@ -338,12 +397,15 @@ export default function PersonalPage() {
       dataIndex: 'traegerorganisation',
       key: 'traeger',
       width: 160,
+      sortWert: (ep) => ep.traegerorganisation,
       filter: traegerFilter,
       render: (t) => t ?? '—',
     },
     ...(einheitenFrei
       ? [
           {
+            // Kein Filter (LLH-1096): die Liste gliedert schon nach Einheit (`gruppen`), jede
+            // Einheit steht als eigener Block mit Zähler.
             title: 'Einheit',
             key: 'einheit' as const,
             width: 150,
@@ -367,11 +429,32 @@ export default function PersonalPage() {
               />
             ),
           },
+          {
+            // Lesend und erst ab `xxl` (wie auf der Fahrzeugseite): die Einheit nennt ihn mittelbar,
+            // und die Spalte nähme dem Namen bei 1440 die Breite (LFH-975). Filter Abschnitt
+            // (LLH-1096) über den Spaltenschalter auch schmaler.
+            title: 'Abschnitt',
+            key: 'abschnitt' as const,
+            width: 130,
+            abBreite: 'xxl' as const,
+            sortWert: (ep: EinsatzPersonal) => abschnittName(ep),
+            filter:
+              abschnittWerte.length > 0
+                ? {
+                    werte: abschnittWerte,
+                    trifft: (ep: EinsatzPersonal, w: string) => abschnittName(ep) === w,
+                  }
+                : undefined,
+            render: (_: unknown, ep: EinsatzPersonal) => abschnittName(ep) ?? '—',
+          },
         ]
       : []),
     ...(fahrzeugeFrei
       ? [
           {
+            // Kein Filter (LLH-1096): wer auf einem Fahrzeug sitzt, zeigt die Fahrzeugliste unter
+            // „Details“; ein weiteres Auswahlfeld schöbe auf 390 px die erste Karte unter die
+            // Werkzeugzeile (Kartenzweig, `e65f82a0`).
             title: 'Fahrzeug',
             key: 'fahrzeug' as const,
             width: 150,
@@ -395,6 +478,8 @@ export default function PersonalPage() {
       title: 'Position',
       key: 'position',
       width: 140,
+      sortWert: (ep) => (ep.staerke_position ? POSITION_FOLGE.indexOf(ep.staerke_position) : null),
+      filter: { werte: POSITION_WERTE, trifft: (ep, w) => ep.staerke_position === w },
       render: (_, ep) => (
         <PositionAngabe
           kennung={ep.name}
@@ -414,6 +499,8 @@ export default function PersonalPage() {
         werte: KATEGORIE_WERTE,
         trifft: (ep, w) => kategorieVon(ep.status_kategorie) === w,
       },
+      // Nach dem Wort des Katalogs; ohne Status ans Ende.
+      sortWert: (ep) => ep.status_label,
       // Kein `Select` mit Mindestbreite (die 390-px-Karte scheiterte daran). Deskriptor ganz
       // gespreizt — Herleitung in `FahrzeugePage.tsx`.
       render: (_, ep) => (
@@ -429,15 +516,18 @@ export default function PersonalPage() {
       title: 'Einsatzdauer',
       key: 'einsatzdauer',
       width: 104,
+      sortWert: (ep) => (periodenBereit ? dauernJePerson.get(ep.id)?.laufend?.minuten : null),
       render: (_, ep) => dauerZelle(dauernJePerson.get(ep.id)?.laufend?.minuten),
     },
     {
       title: 'Ruhe',
       key: 'ruhe',
       width: 88,
+      sortWert: (ep) => (periodenBereit ? dauernJePerson.get(ep.id)?.ruheMinuten : null),
       render: (_, ep) => dauerZelle(dauernJePerson.get(ep.id)?.ruheMinuten),
     },
     {
+      // Weder Sortierung noch Filter (LLH-1096): eine Notiz in Freitext ist kein Vergleichswert.
       title: 'Bemerkung',
       key: 'bemerkung',
       width: 200,
@@ -545,7 +635,8 @@ export default function PersonalPage() {
             ladend={epQuery.isLoading}
             leerText="Noch kein Personal disponiert"
             suche={{ platzhalter: 'Name, Funktion' }}
-            standardSortierung={{ spalte: 'name', richtung: 'auf' }}
+            mehrzahl="Kräften"
+            gedaechtnis={gedaechtnis}
             spaltenAusVoreinstellung={['traeger', 'ruhe', 'bemerkung']}
             zeilenFehler={(p) => zeilen.grund(p.id)}
             gruppen={

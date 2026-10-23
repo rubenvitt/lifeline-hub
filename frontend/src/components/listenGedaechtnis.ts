@@ -53,8 +53,12 @@ export interface ListenGedaechtnis<K extends string = string> {
    * Seite per `key` neu aufbaut (Reiterwechsel), dort, wo die vorige aufgehört hat.
    */
   readonly start: ListenZustand<K>;
-  /** Die Spaltenwahl, bei der ein Träger beginnt (gespeichert, danach zuletzt gemeldet). */
-  readonly spaltenStart: SpaltenWahl;
+  /**
+   * Die Spaltenwahl, bei der ein Träger beginnt (gespeichert, danach zuletzt gemeldet). `null`, solange
+   * das Gerät für diese Seite nichts gemerkt hat: dann gilt die Voreinstellung der Seite
+   * (`spaltenAusVoreinstellung`), nicht „alle Spalten an“ (LLH-1096).
+   */
+  readonly spaltenStart: SpaltenWahl | null;
   melde: (zustand: ListenZustand<K>) => void;
   meldeSpalten: (wahl: SpaltenWahl) => void;
 }
@@ -89,17 +93,26 @@ function gleicheSortierung(a: ListenSortierung, b: ListenSortierung): boolean {
  * Prüft einen Stand aus Adresse oder Speicher gegen das Spaltenregister: unbekannte Spalten und
  * Werte fallen weg (ein Query-Key, den der Server mit 400 quittiert, wäre schlimmer als kein
  * Filter), eine fehlende oder unbekannte Sortierung wird zur Vorgabe. Rein und exportiert.
+ *
+ * `ausDaten` (LLH-1096): Spalten, die beim Aufbau der Seite noch nicht feststehen, weil ihre
+ * Filterwerte aus den geladenen Zeilen kommen (Träger, Typ) oder die Spalte hinter einer
+ * Modulfreigabe steht (Einheit, Abschnitt). Ihr Filter und ihre Sortierung bleiben ungeprüft stehen;
+ * nur im Clientmodus, wo ein Wert ohne Treffer als Chip mit leerer Menge dasteht, statt am Server
+ * zu scheitern.
  */
 export function bereinigeListenZustand<K extends string>(
   roh: ListenZustandAdresse,
   spalten: readonly GedaechtnisSpalte[],
   vorgabe: ListenSortierung<K>,
+  ausDaten: ReadonlySet<string> = new Set(),
 ): ListenZustand<K> {
-  const sortierbar = new Set<string>();
-  const erlaubt = new Map<string, Set<string>>();
+  const sortierbar = new Set<string>(ausDaten);
+  const erlaubt = new Map<string, Set<string> | null>();
+  for (const k of ausDaten) erlaubt.set(k, null);
   for (const s of spalten) {
     if (typeof s.key !== 'string') continue;
     if (s.sortWert != null || (s.sorter != null && s.sorter !== false)) sortierbar.add(s.key);
+    if (ausDaten.has(s.key)) continue;
     const werte = s.filter?.werte.map((w) => w.value) ?? s.filters?.map((w) => String(w.value));
     if (werte) erlaubt.set(s.key, new Set(werte));
   }
@@ -111,8 +124,8 @@ export function bereinigeListenZustand<K extends string>(
   const filter: Record<string, readonly string[]> = {};
   for (const [spalte, werte] of Object.entries(roh.filter)) {
     const menge = erlaubt.get(spalte);
-    if (!menge) continue;
-    const gueltig = werte.filter((w) => menge.has(w));
+    if (menge === undefined) continue;
+    const gueltig = werte.filter((w) => (menge === null ? w !== '' : menge.has(w)));
     if (gueltig.length > 0) filter[spalte] = gueltig;
   }
   return { sortierung, filter, suche: roh.suche };
@@ -163,24 +176,29 @@ export function listenGedaechtnisRaeumen(): void {
   }
 }
 
-function spaltenWahlLesen(schluessel: string, bekannt: ReadonlySet<string>): SpaltenWahl {
-  const leer: SpaltenWahl = { aus: [], an: [] };
+function spaltenWahlLesen(schluessel: string, bekannt: ReadonlySet<string>): SpaltenWahl | null {
   const roh = sicherLesen(schluessel);
-  if (roh == null) return leer;
+  if (roh == null) return null;
   try {
     const wert = JSON.parse(roh) as Partial<Record<keyof SpaltenWahl, unknown>>;
     const liste = (x: unknown) =>
       Array.isArray(x) ? x.filter((k): k is string => typeof k === 'string' && bekannt.has(k)) : [];
     return { aus: liste(wert.aus), an: liste(wert.an) };
   } catch {
-    return leer;
+    // Kaputt gilt als nicht gemerkt: die Voreinstellung der Seite greift.
+    return null;
   }
 }
 
 export function useListenGedaechtnis<K extends string = string>(
   seite: string,
   spalten: readonly GedaechtnisSpalte[],
-  optionen: { vorgabe?: ListenSortierung<NoInfer<K>>; einsatzId?: number } = {},
+  optionen: {
+    vorgabe?: ListenSortierung<NoInfer<K>>;
+    einsatzId?: number;
+    /** Siehe {@link bereinigeListenZustand}: Spalten, die erst mit den Daten feststehen. */
+    ausDaten?: readonly NoInfer<K>[];
+  } = {},
 ): ListenGedaechtnis<K> {
   const [searchParams, setSearchParams] = useSearchParams();
   const vorgabe = optionen.vorgabe ?? null;
@@ -196,14 +214,22 @@ export function useListenGedaechtnis<K extends string = string>(
       ? searchParams
       : new URLSearchParams(sitzungLesen(listenSchluessel) ?? '');
     return {
-      zustand: bereinigeListenZustand<K>(parseListenZustand(quelle), spalten, vorgabe),
+      zustand: bereinigeListenZustand<K>(
+        parseListenZustand(quelle),
+        spalten,
+        vorgabe,
+        new Set(optionen.ausDaten ?? []),
+      ),
       ausSpeicher: !ausAdresse && hatListenZustand(quelle),
     };
   });
   const [spaltenStart] = useState(() =>
     spaltenWahlLesen(
       spaltenSchluessel,
-      new Set(spalten.flatMap((s) => (typeof s.key === 'string' ? [s.key] : []))),
+      new Set([
+        ...spalten.flatMap((s) => (typeof s.key === 'string' ? [s.key] : [])),
+        ...(optionen.ausDaten ?? []),
+      ]),
     ),
   );
 
@@ -237,7 +263,7 @@ export function useListenGedaechtnis<K extends string = string>(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- einmalig, `anfang` steht fest
   }, []);
 
-  const aktuelleSpalten = useRef(spaltenStart);
+  const aktuelleSpalten = useRef<SpaltenWahl | null>(spaltenStart);
   const meldeSpalten = useCallback(
     (wahl: SpaltenWahl) => {
       aktuelleSpalten.current = wahl;

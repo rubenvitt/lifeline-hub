@@ -3,7 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { Link, Route, Routes } from 'react-router';
+import { Link, Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -11,6 +11,7 @@ import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { listeVon, oeffne, waehle } from '../test/auswahlListe';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 const admin = adminFixture();
 
@@ -28,7 +29,7 @@ const em = {
   bezeichnung: 'Wolldecke',
   kategorie: 'Betreuung',
   bestandsnummer: null as string | null,
-  traegerorganisation: null,
+  traegerorganisation: null as string | null,
   menge: 50,
   status: 'einsatzbereit',
   art: 'verbrauchsgut',
@@ -57,6 +58,7 @@ function render(
   materialListe: (typeof em)[],
   entlasseneDaten: unknown[] = [],
   orte: { einheiten?: unknown[]; fahrzeuge?: unknown[]; br?: unknown[] } = {},
+  route = '/einsaetze/1/material',
 ) {
   server.use(
     meHandler(admin),
@@ -76,19 +78,30 @@ function render(
     http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json(orte.br ?? BR)),
   );
   return renderMitProviders(
-    <Routes>
-      <Route
-        path="/einsaetze/:id/material"
-        element={
-          <>
-            <MaterialPage />
-            <Link to="/einsaetze/2/material">Zu Einsatz 2</Link>
-          </>
-        }
-      />
-    </Routes>,
-    { route: '/einsaetze/1/material' },
+    <>
+      <Ortsfuehler />
+      <Routes>
+        <Route
+          path="/einsaetze/:id/material"
+          element={
+            <>
+              <MaterialPage />
+              <Link to="/einsaetze/2/material">Zu Einsatz 2</Link>
+            </>
+          }
+        />
+      </Routes>
+    </>,
+    { route },
   );
+}
+
+/** Die aktuelle Adresse, wie der Router sie hält (LLH-1096). */
+const ort = { aktuell: '' };
+function Ortsfuehler() {
+  const l = useLocation();
+  ort.aktuell = `${l.pathname}${l.search}`;
+  return null;
 }
 
 /**
@@ -425,11 +438,12 @@ describe('MaterialPage', () => {
 
   it('am Fükw weicht die Kategorie, im Zähler und in der Suche (LLH-1093, Prüfliste)', async () => {
     // Mit der Spalte „Ort“ passte die Tabelle bei 1366 px nicht mehr; die lesende Kategorie weicht
-    // unter `xxl`, über den Spaltenschalter zurückzuholen.
+    // unter `xxl`, über den Spaltenschalter zurückzuholen. Ebenso der Träger (LLH-1096).
     setzeViewportBreite(1366);
     render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
-    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Träger/ })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: /^Kategorie/ })).toBeNull();
     expect(screen.getByRole('columnheader', { name: 'Ort' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Aktionen' })).toBeInTheDocument();
@@ -447,7 +461,7 @@ describe('MaterialPage', () => {
     );
 
     // Von Hand zurückgeholt: die Spalte steht, die zweite Zeile weicht.
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Kategorie' }));
     expect(await screen.findByRole('columnheader', { name: /^Kategorie/ })).toBeInTheDocument();
     expect(bezeichnungsZelle()).not.toHaveTextContent('Betreuung');
@@ -2000,5 +2014,55 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     await screen.findByText('Wolldecke');
     await keinAbrufNachFreigaben(client, abrufe);
     expect(screen.queryByText(/aus Nachforderung/)).toBeNull();
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096, Rollout des Musters aus LLH-1086): Kategorie,
+ * Ort, Status und Träger filtern, jede vergleichbare Spalte sortiert, der Stand steht in der
+ * Adresse.
+ */
+describe('MaterialPage · Sortieren und Filtern (LLH-1096)', () => {
+  const zweites = {
+    ...em,
+    id: 11,
+    material_id: 6,
+    bezeichnung: 'Feldbett',
+    menge: 5,
+    traegerorganisation: 'ASB',
+  };
+  const erstes = { ...em, traegerorganisation: 'DRK' };
+  const folge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1600);
+    render(einsatzAktiv, [erstes, zweites]);
+    await screen.findByText('Wolldecke');
+    expect(folge()).toEqual(['11', '10']);
+
+    await kopfFilterWaehlen('Träger', ['DRK (1)']);
+    await waitFor(() => expect(folge()).toEqual(['10']));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?f.traeger=DRK'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Menge/ }));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?sort=menge%3Aauf'));
+    expect(folge()).toEqual(['11', '10']);
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Menge/ }));
+    await waitFor(() => expect(folge()).toEqual(['10', '11']));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?sort=menge%3Aab'));
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
+    setzeViewportBreite(1600);
+    render(einsatzAktiv, [erstes, zweites], [], {}, '/einsaetze/1/material?f.traeger=ASB');
+    await screen.findByText('Feldbett');
+    expect(screen.queryByText('Wolldecke')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Träger: ASB entfernen' }),
+    ).toBeInTheDocument();
   });
 });

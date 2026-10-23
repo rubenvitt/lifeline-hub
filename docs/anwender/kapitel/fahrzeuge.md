@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 330
-quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs]
+quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs]
 ---
 
 ## Überblick
@@ -29,8 +29,14 @@ entlassen dürfen Einsatzleitung und Führungspersonal.
 
    ![Fahrzeugliste mit Funkrufname, Einheit, FMS-Status, Besatzung und dem Menü „Weitere Aktionen“ je Fahrzeug, darüber „Spalten · 6 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
 
-3. In „Funkrufname, Typ, Kennzeichen“ suchen oder unter „Einheit“ und „Status“ filtern; steht die
-   Spalte „Abschnitt“ in der Liste, auch nach Abschnitt.
+3. In „Funkrufname, Typ, Kennzeichen“ suchen, oder im Kopf der Spalten „Typ“, „Einheit“,
+   „Abschnitt“, „Status“ und „Träger“ filtern: das Trichterzeichen öffnet die Werte zum Ankreuzen,
+   „OK“ übernimmt sie. Gefiltert wird nur nach Spalten, die in der Liste stehen. Ein Klick auf einen
+   Spaltenkopf sortiert nach dieser Spalte, ein zweiter kehrt die Folge um; die Gruppen nach Status
+   bleiben dabei stehen. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der
+   Treffer und je Wert ein Knopf, etwa „Träger: ASB“, der genau diesen Filter entfernt; „Filter
+   zurücksetzen“ leert Suche und Filter. Auf dem Handy stehen Filter und „Sortieren“ als
+   Auswahlfelder über der Liste.
 
 ### Fahrzeuge aus dem Stamm disponieren
 
@@ -278,6 +284,13 @@ Block „Beladung“.
 Ein Fahrzeug hat keinen eigenen Abschnitt; die Spalte „Abschnitt“ zeigt den der Einheit, und hat
 die Einheit keinen, den ihrer nächsten Über-Einheit mit Abschnitt. Das FMS-Tableau gliedert nach
 demselben Abschnitt.
+
+### Filter und Sortierung bleiben stehen
+
+Suche, Filter und Sortierung stehen in der Adresse der Seite. Zurück aus einem anderen Modul, Neuladen und ein
+weitergegebener Link zeigen dieselbe Liste. Wer die Liste später über das Modulpanel wieder öffnet,
+findet die Einschränkung vom letzten Mal, bis zur Abmeldung. Welche Spalten ausgeblendet sind,
+merkt sich das Gerät.
 
 ### Angaben aus dem Stamm
 
