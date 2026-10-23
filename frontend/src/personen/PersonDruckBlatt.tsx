@@ -30,7 +30,7 @@ export default function PersonDruckBlatt({
   person: PersonDetail;
 }) {
   const { token } = theme.useToken();
-  const { formatZeit } = useAnzeigeKonventionen();
+  const { zeitpunkt } = useAnzeigeKonventionen();
   const titel = (text: string): Titel => ({
     ebene: 3,
     text,
@@ -60,14 +60,14 @@ export default function PersonDruckBlatt({
     {
       etikett: 'Sichtung',
       wert: k
-        ? `${SK[k].label} · ${SK_WORT[k]}${p.aktuelle_sichtung_at ? ` · ${formatZeit(p.aktuelle_sichtung_at)}` : ''}`
+        ? `${SK[k].label} · ${SK_WORT[k]}${p.aktuelle_sichtung_at ? ` · ${zeitpunkt(p.aktuelle_sichtung_at)}` : ''}`
         : 'ungesichtet',
     },
     { etikett: 'Zustand / Verdacht', wert: p.zustand || '—' },
     {
       etikett: 'Transport',
       wert: transport
-        ? `${transport}${p.transport_at ? ` · ${formatZeit(p.transport_at)}` : ''}`
+        ? `${transport}${p.transport_at ? ` · ${zeitpunkt(p.transport_at)}` : ''}`
         : 'kein Transport',
     },
     { etikett: 'PAT-Nummer', wert: p.pat_nummer || '—' },
@@ -87,7 +87,7 @@ export default function PersonDruckBlatt({
     massnahmen.length > 0
       ? massnahmen.map((m) => ({
           etikett: MASSNAHME_WORT[m.art],
-          wert: formatZeit(m.zeitpunkt_at),
+          wert: zeitpunkt(m.zeitpunkt_at),
         }))
       : [{ etikett: 'Maßnahmen', wert: 'keine' }];
 

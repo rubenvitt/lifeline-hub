@@ -7,7 +7,6 @@ import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
@@ -18,6 +17,7 @@ import EtbDruckTabelle from '../etb/EtbDruckTabelle';
 import { etbPfad, parseEtbFilter } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
 import { modulName } from '../einsatz/modulRegistry';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /** „1 200 Einträge" — Tausender mit geschütztem Leerzeichen, Einzahl bei genau einem. */
 function umfang(anzahl: number): string {
@@ -180,8 +180,8 @@ export default function EtbDruckPage() {
                 etikett: 'Stand',
                 wert:
                   stand.hoechsteLfdNr != null
-                    ? `${taktischeDtgVoll(stand.geladenAt, konventionen)} · bis Nr. ${stand.hoechsteLfdNr}`
-                    : taktischeDtgVoll(stand.geladenAt, konventionen),
+                    ? `${zeitpunkt(stand.geladenAt, konventionen)} · bis Nr. ${stand.hoechsteLfdNr}`
+                    : zeitpunkt(stand.geladenAt, konventionen),
               },
             ]}
           />

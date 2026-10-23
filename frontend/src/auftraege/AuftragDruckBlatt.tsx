@@ -18,8 +18,8 @@ import { dropEmpty, druckFelder } from './auftragsschemaKern';
  */
 export default function AuftragDruckBlatt({ auftrag: a }: { auftrag: Auftrag }) {
   const { token } = theme.useToken();
-  const { formatZeit } = useAnzeigeKonventionen();
-  const zeit = (wire?: string | null) => (wire ? formatZeit(wire) : null);
+  const { zeitpunkt } = useAnzeigeKonventionen();
+  const zeit = (wire?: string | null) => (wire ? zeitpunkt(wire) : null);
 
   const titel = (text: string): Titel => ({
     ebene: 3,
@@ -31,7 +31,7 @@ export default function AuftragDruckBlatt({ auftrag: a }: { auftrag: Auftrag }) 
 
   const quittung: Zeile[] = a.empfaenger.map((e) => ({
     etikett: mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung),
-    wert: e.quittiert_at ? formatZeit(e.quittiert_at) : 'nicht quittiert',
+    wert: e.quittiert_at ? zeitpunkt(e.quittiert_at) : 'nicht quittiert',
   }));
 
   const bearbeitung = dropEmpty([
@@ -51,7 +51,7 @@ export default function AuftragDruckBlatt({ auftrag: a }: { auftrag: Auftrag }) 
   // `auftrag-druck-blatt`: Anker des Druck-Gates (`e2e/druck-fluss.spec.ts`) für die Titel.
   return (
     <div data-lfh="auftrag-druck-blatt">
-      <ZeilenListe titel={[titel('Auftrag')]} zeilen={druckFelder(a, formatZeit)} />
+      <ZeilenListe titel={[titel('Auftrag')]} zeilen={druckFelder(a, zeitpunkt)} />
       <ZeilenListe titel={[titel('Quittung')]} zeilen={quittung} />
       <ZeilenListe titel={[titel('Bearbeitung')]} zeilen={bearbeitung} />
     </div>

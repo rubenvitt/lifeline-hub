@@ -170,8 +170,8 @@ describe('EtbDruckPage', () => {
     await fertig();
     expect(nummern()).toEqual([11, 12, 13]);
     const zeile = within(zeileNr(12));
-    expect(zeile.getByText('25.09.2026 16:15')).toBeInTheDocument();
-    expect(zeile.getByText('nachgetragen um 17:40')).toBeInTheDocument();
+    expect(zeile.getByText('251615sep26')).toBeInTheDocument();
+    expect(zeile.getByText('nachgetragen um 1740')).toBeInTheDocument();
     // Gegenaussage: ein pünktlich erfasster Eintrag trägt keinen Nachtrag.
     expect(within(zeileNr(11)).queryByText(/nachgetragen/)).toBeNull();
   });
@@ -181,7 +181,7 @@ describe('EtbDruckPage', () => {
     rendere();
     await fertig();
     // 06:00Z = 15:00 in Tokio; UTC wäre 06:00, die Gate-Zone Berlin 08:00.
-    expect(within(zeileNr(1)).getByText('25.09.2026 15:00')).toBeInTheDocument();
+    expect(within(zeileNr(1)).getByText('251500sep26')).toBeInTheDocument();
   });
 
   /**

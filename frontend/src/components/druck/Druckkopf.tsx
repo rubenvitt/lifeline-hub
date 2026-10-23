@@ -6,7 +6,7 @@ import { ladeOrganisation, orgLogoPfad } from '../../api/organisation';
 import { globalKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../../anzeige/format';
+import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 
 /** Eine Angabe unter dem Titel: „Stand", „Auswahl" o. Ä. — vom Aufrufer geliefert. */
 interface DruckkopfZeile {
@@ -92,7 +92,7 @@ export default function Druckkopf({
     // Die DRUCKENDE Person, nicht die Urheberin: „Erstellt von" läse sich als Urheberschaft. Zwei
     // Zeilen statt „Gedruckt: DTG · Name": die DTG bleibt ein eigener, maschinenlesbarer Wert.
     { etikett: 'Gedruckt von', wert: benutzer?.anzeigename ?? '—' },
-    { etikett: 'Gedruckt am', wert: taktischeDtgVoll(jetzt.toISOString(), konventionen) },
+    { etikett: 'Gedruckt am', wert: zeitpunkt(jetzt.toISOString(), konventionen) },
   ];
 
   return (

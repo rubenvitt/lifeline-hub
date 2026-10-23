@@ -3,6 +3,7 @@ import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import Markdown from '../components/Markdown';
 import { monoStil } from '../components/instrument';
 import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import { uhrzeit, zeitpunkt } from '../anzeige/zeitDarstellung';
 import { formatGroesse } from '../karten/formatGroesse';
 import { etbTyp } from '../theme/statusFarben';
 import { istNachgetragen } from './typFarben';
@@ -64,15 +65,18 @@ interface Props {
   konventionen: AnzeigeKonventionen;
 }
 
-function zeit(wire: string, konventionen: AnzeigeKonventionen): string {
-  return inZone(wire, konventionen).format('DD.MM.YYYY HH:mm');
-}
-
-/** „nachgetragen um 10:40" — mit Datum nur, wenn die Erfassung an einem anderen Tag lag. */
+/**
+ * „nachgetragen um 1040" — als voller Zeitpunkt nur, wenn die Erfassung an einem anderen Tag lag
+ * (LLH-1061: Rollen des Formatkerns, Darstellung von Einsatz bzw. Organisation).
+ */
 function nachtrag(e: EtbEintragAnzeige, konventionen: AnzeigeKonventionen): string {
   const ereignis = inZone(e.ereigniszeit, konventionen);
   const erfasst = inZone(e.received_at, konventionen);
-  return `nachgetragen um ${erfasst.format(erfasst.isSame(ereignis, 'day') ? 'HH:mm' : 'DD.MM.YYYY HH:mm')}`;
+  return `nachgetragen um ${
+    erfasst.isSame(ereignis, 'day')
+      ? uhrzeit(e.received_at, konventionen)
+      : zeitpunkt(e.received_at, konventionen)
+  }`;
 }
 
 /** Typ, Von/An und Meldeweg in einer Zeile: was am schmalen Schirm über dem Inhalt steht. */
@@ -140,7 +144,7 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
                 className="druckansicht-zeit"
                 style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}
               >
-                <div>{zeit(e.ereigniszeit, konventionen)}</div>
+                <div>{zeitpunkt(e.ereigniszeit, konventionen)}</div>
                 {istNachgetragen(e.ereigniszeit, e.received_at) && (
                   <div style={hinweis}>{nachtrag(e, konventionen)}</div>
                 )}

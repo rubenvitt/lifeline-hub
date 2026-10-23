@@ -89,9 +89,9 @@ Filter SHALL der Kopf „vollständiges Tagebuch“ nennen.
 
 #### Scenario: Zeitraum in der Org-Zeitzone
 
-- **WHEN** der Filter von 08:00 bis 12:00 Uhr Ortszeit (Org-Zeitzone Europe/Berlin, Sommerzeit)
-  reicht
-- **THEN** nennt der Kopf den Zeitraum mit 08:00 und 12:00 Uhr, nicht in UTC
+- **WHEN** der Filter am 21.09.2026 von 08:00 bis 12:00 Uhr Ortszeit (Org-Zeitzone Europe/Berlin,
+  Sommerzeit) reicht und die Darstellung taktisch ist
+- **THEN** nennt der Kopf den Zeitraum mit `210800sep26` und `211200sep26`, nicht in UTC
 
 #### Scenario: Einheit ohne lesbaren Namen
 
@@ -118,7 +118,10 @@ Zeitachse am Bildschirm. Die Nummernfolge macht Lücken und Nachträge auf Papie
 
 Jeder Eintrag SHALL mit laufender Nummer, Ereigniszeit, Typwort, Von und An (falls
 vorhanden), Meldeweg (falls vorhanden), Inhalt und Erfasser samt Funktion (falls vorhanden)
-gedruckt werden. Alle Zeiten MUST in der Zeitzone der Organisation stehen. Ein Eintrag MUST NOT
+gedruckt werden. Alle Zeiten MUST in der Zeitzone der Organisation stehen. Die Ereigniszeit SHALL
+in der Rolle „Zeitpunkt“ der Spec `zeitdarstellung` stehen, taktisch also als volle DTG
+(`101430okt26`), in der Darstellung von Einsatz bzw. Organisation; die Wahl am Gerät MUST NOT in
+den Ausdruck eingehen (LLH-1061). Ein Eintrag MUST NOT
 über einen Seitenrand geteilt werden, solange er auf eine Seite passt; der Tabellenkopf SHALL
 sich auf jeder Seite wiederholen.
 
@@ -127,16 +130,24 @@ sich auf jeder Seite wiederholen.
 - **WHEN** ein Meldungseintrag von „Florian 1“ an „ELW“ gedruckt wird
 - **THEN** stehen Nummer, Ereigniszeit, „Meldung“, Von, An, Inhalt und Erfasser im Ausdruck
 
+#### Scenario: Volle DTG in der Zeitspalte
+
+- **WHEN** der Einsatz taktisch vorgibt, das Gerät „Datum und Uhrzeit“ gewählt hat und ein Eintrag
+  mit Ereigniszeit 10.10.2026 14:30 Uhr Ortszeit gedruckt wird
+- **THEN** steht in seiner Zeitspalte `101430okt26`
+
 ### Requirement: Nachträge sind erkennbar
 
 Ein nachgetragener Eintrag (Ereigniszeit deutlich vor der Erfassung) SHALL an seiner
-laufenden Nummer stehen und neben der Ereigniszeit „nachgetragen um <Erfassungszeit>“ tragen.
+laufenden Nummer stehen und neben der Ereigniszeit „nachgetragen um <Erfassungszeit>“ tragen:
+am selben Tag in der Rolle „Uhrzeit“, an einem anderen Tag in der Rolle „Zeitpunkt“.
 
 #### Scenario: Nachtrag
 
-- **WHEN** Eintrag Nr. 12 um 10:40 Uhr für ein Ereignis um 09:15 Uhr erfasst wurde
-- **THEN** steht er zwischen Nr. 11 und Nr. 13 mit Ereigniszeit 09:15 Uhr und
-  „nachgetragen um 10:40“
+- **WHEN** Eintrag Nr. 12 am 21.09.2026 um 10:40 Uhr für ein Ereignis um 09:15 Uhr erfasst wurde
+  und die Darstellung taktisch ist
+- **THEN** steht er zwischen Nr. 11 und Nr. 13 mit Ereigniszeit `210915sep26` und
+  „nachgetragen um 1040“
 
 ### Requirement: Berichtigungen sind in beiden Richtungen sichtbar
 

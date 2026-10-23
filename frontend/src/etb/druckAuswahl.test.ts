@@ -31,29 +31,13 @@ describe('auswahlZeilen', () => {
 
   it.each([
     // Sommerzeit (MESZ, UTC+2): 06:00Z → 08:00, 10:00Z → 12:00 (Szenario der Spec).
-    [
-      '2026-09-21 06:00:00',
-      '2026-09-21 10:00:00',
-      'Zeitraum: 21.09.2026 08:00 bis 21.09.2026 12:00',
-    ],
+    ['2026-09-21 06:00:00', '2026-09-21 10:00:00', 'Zeitraum: 210800sep26 bis 211200sep26'],
     // Winterzeit (MEZ, UTC+1).
-    [
-      '2026-01-15 07:00:00',
-      '2026-01-15 11:00:00',
-      'Zeitraum: 15.01.2026 08:00 bis 15.01.2026 12:00',
-    ],
+    ['2026-01-15 07:00:00', '2026-01-15 11:00:00', 'Zeitraum: 150800jan26 bis 151200jan26'],
     // Beginn der Sommerzeit am 29.03.2026: 00:30Z = 01:30 MEZ, 01:30Z = 03:30 MESZ.
-    [
-      '2026-03-29 00:30:00',
-      '2026-03-29 01:30:00',
-      'Zeitraum: 29.03.2026 01:30 bis 29.03.2026 03:30',
-    ],
+    ['2026-03-29 00:30:00', '2026-03-29 01:30:00', 'Zeitraum: 290130mrz26 bis 290330mrz26'],
     // Ende der Sommerzeit am 25.10.2026: 00:30Z = 02:30 MESZ, 01:30Z = 02:30 MEZ.
-    [
-      '2026-10-25 00:30:00',
-      '2026-10-25 01:30:00',
-      'Zeitraum: 25.10.2026 02:30 bis 25.10.2026 02:30',
-    ],
+    ['2026-10-25 00:30:00', '2026-10-25 01:30:00', 'Zeitraum: 250230okt26 bis 250230okt26'],
   ])('nennt den Zeitraum %s bis %s in der Org-Zone', (von, bis, erwartet) => {
     expect(zeilen({ von, bis })).toEqual([erwartet]);
   });
@@ -61,12 +45,12 @@ describe('auswahlZeilen', () => {
   it('rechnet in der gesetzten Zone, nicht in der der Maschine', () => {
     // New York im September: UTC−4. 12:00Z → 08:00.
     expect(zeilen({ von: '2026-09-21 12:00:00' }, { zeitzone: 'America/New_York' })).toEqual([
-      'Zeitraum: ab 21.09.2026 08:00',
+      'Zeitraum: ab 210800sep26',
     ]);
   });
 
   it('nennt einen offenen Zeitraum mit „ab" bzw. „bis"', () => {
-    expect(zeilen({ bis: '2026-09-21 10:00:00' })).toEqual(['Zeitraum: bis 21.09.2026 12:00']);
+    expect(zeilen({ bis: '2026-09-21 10:00:00' })).toEqual(['Zeitraum: bis 211200sep26']);
   });
 
   it('nennt eine Einheit mit Namen', () => {
@@ -97,7 +81,7 @@ describe('auswahlZeilen', () => {
       zeilen({ q: 'Damm', typ: 'meldung', von: '2026-09-21 06:00:00', einheit_id: 3 }),
     ).toEqual([
       'Typ: Meldung',
-      'Zeitraum: ab 21.09.2026 08:00',
+      'Zeitraum: ab 210800sep26',
       'Suchbegriff: „Damm“',
       'betrifft eine Einheit (Name nicht verfügbar)',
     ]);

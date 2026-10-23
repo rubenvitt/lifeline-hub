@@ -6,11 +6,11 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { taktischeDtgVoll } from '../anzeige/format';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
  * Was der Rahmen von der Abfrage der Seite braucht — eine Teilmenge von `UseQueryResult`. Die
@@ -162,7 +162,7 @@ export default function ListenDruckSeite({
             zeilen={[
               { etikett: 'Auswahl', wert: auswahl },
               { etikett: 'Umfang', wert: umfang(stand.anzahl) },
-              { etikett: 'Stand', wert: taktischeDtgVoll(stand.geladenAt, konventionen) },
+              { etikett: 'Stand', wert: zeitpunkt(stand.geladenAt, konventionen) },
             ]}
           />
           {stand.anzahl === 0 ? (
