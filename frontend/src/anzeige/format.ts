@@ -6,7 +6,7 @@ import type { Dayjs } from 'dayjs';
 import type { EinheitenSystem, Koordinatenformat, Zeitdarstellung } from '../api/types';
 import { formatiere } from './koordinaten';
 import { zahlText } from './zahl';
-import { inZone, leereUhrzeit, uhrzeit, zeitKurz, zeitMitTag, zeitpunkt } from './zeitDarstellung';
+import { zeitpunkt } from './zeitDarstellung';
 
 export interface AnzeigeKonventionen {
   zeitzone?: string | null;
@@ -31,35 +31,9 @@ export const DEFAULT_KONVENTIONEN: AnzeigeKonventionen = {
   koordinatenformat: null,
 };
 
-// Zeit: der Kern steht in `zeitDarstellung.ts` (LLH-1053). Die Namen hier sind dünne
-// Weiterleitungen auf seine drei Rollen, bis LLH-1061 die Aufrufer umstellt; sie folgen damit der
-// wirksamen Darstellung in den Konventionen, auch wenn der Name „taktisch“ sagt.
+// Zeit: der Kern steht in `zeitDarstellung.ts` (LLH-1053); seine drei Rollen nimmt man von dort.
+// Die alten Namen (`formatZeit`, `formatUhrzeit`, `taktischeDtg` …) sind mit LLH-1061 entfallen.
 export { inZone, MONATE_DTG } from './zeitDarstellung';
-
-/** @deprecated `uhrzeit` aus `zeitDarstellung.ts`. */
-export function taktischeUhrzeit(
-  utcStr: string | null | undefined,
-  konv: AnzeigeKonventionen,
-): string {
-  return uhrzeit(utcStr, konv);
-}
-
-/**
- * @deprecated Tag und Uhrzeit ohne Heute-Prüfung (`161430` bzw. `16.10. 14:30`), die Form von
- * `zeitKurz` an einem anderen Tag. Bleibt rein (liest keine Uhr), deshalb kein `zeitKurz`.
- */
-export function taktischeDtg(utcStr: string | null | undefined, konv: AnzeigeKonventionen): string {
-  if (!utcStr) return '';
-  return zeitMitTag(inZone(utcStr, konv), konv.zeitdarstellung ?? 'taktisch');
-}
-
-/** @deprecated `zeitpunkt` aus `zeitDarstellung.ts`. */
-export function taktischeDtgVoll(
-  utcStr: string | null | undefined,
-  konv: AnzeigeKonventionen,
-): string {
-  return zeitpunkt(utcStr, konv);
-}
 
 /**
  * Volle DTG „161430okt26“ eines Zeitpunkts in der Anzeigezone, immer taktisch: das Zeitfeld zeigt
@@ -68,44 +42,6 @@ export function taktischeDtgVoll(
  */
 export function formatDtg(zeitpunktWert: Dayjs, zone: string | null | undefined): string {
   return zeitpunkt(zeitpunktWert, { zeitzone: zone, zeitdarstellung: 'taktisch' });
-}
-
-/** @deprecated `zeitpunkt` aus `zeitDarstellung.ts`. */
-export function formatZeit(utcStr: string | null | undefined, konv: AnzeigeKonventionen): string {
-  return zeitpunkt(utcStr, konv);
-}
-
-/** @deprecated `zeitKurz` aus `zeitDarstellung.ts`. */
-export function formatZeitKurz(
-  utcStr: string | null | undefined,
-  konv: AnzeigeKonventionen,
-): string {
-  return zeitKurz(utcStr, konv);
-}
-
-/**
- * @deprecated `uhrzeit` aus `zeitDarstellung.ts`; der Leerwert hat Ziffernbreite
- * (`leereUhrzeit`), damit eine Lücke in einer Instrumentenspalte die Nachbarzeilen nicht
- * verschiebt.
- */
-export function formatUhrzeit(
-  utcStr: string | null | undefined,
-  konv: AnzeigeKonventionen,
-): string {
-  if (!utcStr) return leereUhrzeit(konv);
-  return uhrzeit(utcStr, konv);
-}
-
-/**
- * @deprecated `zeitKurz` aus `zeitDarstellung.ts` — für Fristen, bei denen „in 20 Minuten“ sonst
- * nicht von „morgen früh“ zu unterscheiden wäre; Leerwert wie {@link formatUhrzeit}.
- */
-export function formatUhrzeitMitTag(
-  utcStr: string | null | undefined,
-  konv: AnzeigeKonventionen,
-): string {
-  if (!utcStr) return leereUhrzeit(konv);
-  return zeitKurz(utcStr, konv);
 }
 
 /**

@@ -104,8 +104,7 @@ function tagDtg(d: Dayjs): string {
   return `${d.format('DD')}${MONATE_DTG[d.month()]}${d.format('YY')}`;
 }
 
-/** Tag und Uhrzeit ohne Heute-Prüfung — die Form von `zeitKurz` an einem anderen Tag. */
-export function zeitMitTag(d: Dayjs, art: Zeitdarstellung): string {
+function zeitMitTag(d: Dayjs, art: Zeitdarstellung): string {
   return art === 'taktisch' ? d.format('DDHHmm') : d.format('DD.MM. HH:mm');
 }
 

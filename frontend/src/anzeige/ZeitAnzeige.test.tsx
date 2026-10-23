@@ -46,12 +46,3 @@ describe('ZeitAnzeige — Rollen (LLH-1053)', () => {
     expect(zeige(<ZeitAnzeige wert={null} />, BERLIN)).toBe('');
   });
 });
-
-describe('ZeitAnzeige — alte Formatnamen leiten weiter', () => {
-  it('dtgVoll → Zeitpunkt, uhrzeit → Uhrzeit, kurz → kurz', () => {
-    expect(zeige(<ZeitAnzeige wert={wire} format="dtgVoll" />, BERLIN)).toBe('161430jul26');
-  });
-  it('dtg bleibt die reine Tagesform', () => {
-    expect(zeige(<ZeitAnzeige wert={wire} format="dtg" />, BERLIN)).toBe('161430');
-  });
-});

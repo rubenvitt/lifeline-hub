@@ -16,8 +16,6 @@ import {
   DEFAULT_KONVENTIONEN,
   effektivesKoordinatenformat,
   formatKoordinate,
-  formatZeit,
-  formatZeitKurz,
   formatDistanz,
   type AnzeigeKonventionen,
 } from './format';
@@ -28,10 +26,6 @@ interface AnzeigeKonventionenHook {
   zeitpunkt: (utcStr?: string | null) => string;
   zeitKurz: (utcStr?: string | null) => string;
   uhrzeit: (utcStr?: string | null) => string;
-  /** @deprecated `zeitpunkt` (LLH-1053). */
-  formatZeit: (utcStr?: string | null) => string;
-  /** @deprecated `zeitKurz` (LLH-1053). */
-  formatZeitKurz: (utcStr?: string | null) => string;
   formatKoordinate: (lat: number, lon: number) => string;
   formatDistanz: (meter: number) => string;
 }
@@ -43,8 +37,6 @@ function bindeFormatter(konventionen: AnzeigeKonventionen): AnzeigeKonventionenH
     zeitpunkt: (s) => zeitpunkt(s, konventionen),
     zeitKurz: (s) => zeitKurz(s, konventionen),
     uhrzeit: (s) => uhrzeit(s, konventionen),
-    formatZeit: (s) => formatZeit(s, konventionen),
-    formatZeitKurz: (s) => formatZeitKurz(s, konventionen),
     formatKoordinate: (lat, lon) => formatKoordinate(lat, lon, konventionen),
     formatDistanz: (m) => formatDistanz(m, konventionen),
   };
