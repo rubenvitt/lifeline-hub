@@ -303,10 +303,20 @@ pub fn download_client() -> reqwest::Client {
 pub async fn entferne_download_dateien(karten_dir: &Path, id: i64) {
     let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles"))).await;
     let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles.part"))).await;
-    // LLH-1119: der Adressindex gehört zur Karte und geht mit ihr.
+    // LLH-1119: der Adressindex gehört zur Karte und geht mit ihr, samt `.part`-Rest. Die Pfade
+    // kommen aus dem Verzeichnis, aus der ID nur der Name zum Vergleich: so wird nie ein Pfad
+    // gelöscht, der nicht als Eintrag im Kartenverzeichnis steht.
     let index = crate::karte::adressindex::dateiname(id);
-    let _ = tokio::fs::remove_file(karten_dir.join(&index)).await;
-    let _ = tokio::fs::remove_file(karten_dir.join(format!("{index}.part"))).await;
+    let index_part = format!("{index}.part");
+    let Ok(mut eintraege) = tokio::fs::read_dir(karten_dir).await else {
+        return;
+    };
+    while let Ok(Some(eintrag)) = eintraege.next_entry().await {
+        let name = eintrag.file_name();
+        if name == index.as_str() || name == index_part.as_str() {
+            let _ = tokio::fs::remove_file(eintrag.path()).await;
+        }
+    }
 }
 
 /// Crash-Recovery beim Start: hängende Downloads (`laedt`) auf `fehler` setzen, danach jede
