@@ -65,7 +65,8 @@ import { infotelefonStatus } from '../theme/statusFarben';
  * Funkprotokoll-Ordnung (LLH-1149): ältester Anruf oben, jüngster unten direkt über der
  * Erfassung, die Seite öffnet am Ende und läuft dort neuen Anrufen nach
  * (`components/useFunkprotokollLauf.ts`). Keine Sortierung, kein Spaltenfilter; nur die
- * Segmentleiste „alle / offene Rückrufe“, die serverseitig filtert.
+ * Segmentleiste „alle / offene Rückrufe“, die serverseitig filtert. Bewusste Ausnahme vom Rollout
+ * LLH-1096: eine Zeitachse hat keinen Spaltenkopf, und ihre Folge ist die Aussage.
  *
  * **Fenster und Zählung** (LLH-732, Change `w6hgfndx-infotelefon-zaehler`, design.md D6): Die
  * Zeitachse lädt Seiten zu {@link ANRUFE_PAGE_SIZE} Anrufen, „Ältere laden“ (oben) fügt die

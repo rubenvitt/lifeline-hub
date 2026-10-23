@@ -90,11 +90,22 @@ aus einer Serverzählung kommen; fehlt sie, steht keine Zahl.
 - **WHEN** in der seitenweise geladenen Schadenliste im Kopf „Ausmaß“ „katastrophal“ gewählt wird
 - **THEN** fragt die Seite den Server mit diesem Filter und zeigt einen Schaden weit hinten ohne Nachladen
 
+#### Scenario: Presse-Log nach Art
+- **WHEN** im Presse-Log mit vielen erledigten Terminen im Auswahlfeld „Art“ „Termin“ gewählt wird
+- **THEN** fragt die Seite die erledigten mit `art=termin` am Server ab, filtert die vollständig geladenen offenen selbst, und der Filterhinweis nennt die Zahl der Termine aus den Kennzahlen
+
 ### Requirement: KatalogTabelle übernimmt das Muster
 Eine `KatalogTabelle` mit Spaltenfiltern SHALL dieselben Chips und denselben Filterhinweis
 zeigen, sofern der Aufrufer Filter und Sortierung nicht selbst kontrolliert. Mit `gedaechtnis`
-MUST sie ihren Zustand wie die `Datensicht` in Adresse und Sitzung halten.
+MUST sie ihren Zustand wie die `Datensicht` in Adresse und Sitzung halten. Ihr Kopfmenü SHALL je
+Wert zählen wie das der `Datensicht`, unter Suche und den übrigen eigenen Filtern; fehlt der
+Spalte oder einem anderen aktiven Filter das Prädikat (`onFilter`), MUST es ohne Zahl bleiben.
+Teilen sich mehrere Listen eine Seite (Archivakte), MUST NOT eine davon die Adresse beschreiben.
 
 #### Scenario: Aufrufer kontrolliert selbst
 - **WHEN** eine Spalte `filteredValue` vom Aufrufer bekommt
 - **THEN** zeigt die `KatalogTabelle` dafür weder Chip noch Hinweis
+
+#### Scenario: Zähler im Kopfmenü der Stammdaten
+- **WHEN** in den Stammdaten „Fahrzeuge“ nach „RTW“ gesucht und das Kopfmenü „Träger“ geöffnet wird
+- **THEN** nennt jeder Träger die Zahl der RTW, die er trägt

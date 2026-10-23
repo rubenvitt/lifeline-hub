@@ -82,12 +82,25 @@ pub struct KontakteParams {
     vor_zeit: Option<String>,
     vor_id: Option<i64>,
     limit: Option<i64>,
+    /// Arten, kommagetrennt, eine muss zutreffen; nur mit `phase` (LLH-1096, Kopffilter „Art“).
+    art: Option<String>,
+}
+
+/// Arten aus `art=anfrage,termin`; ein unbekannter Wert ist für sich unbrauchbar → 400 (LFH-305).
+fn arten(roh: Option<&str>) -> Result<Vec<MedienkontaktArt>, AppError> {
+    roh.into_iter()
+        .flat_map(|r| r.split(','))
+        .map(str::trim)
+        .filter(|w| !w.is_empty())
+        .map(art)
+        .collect()
 }
 
 /// GET /api/einsaetze/{id}/stab/medienkontakte — ohne `phase` alle, offene zuerst, dann jüngster
 /// Eingang. `phase=offen` alle offenen, `phase=abgeschlossen` die übrigen seitenweise
 /// (`vor_zeit` = Eingang, `vor_id`, `limit`; LFH-1075, D8, Regeln über
-/// [`crate::kommunikation::phase_und_seite`]).
+/// [`crate::kommunikation::phase_und_seite`]). `art` engt beide Phasen auf die genannten Arten ein,
+/// vor dem `LIMIT` (LLH-1096); ohne `phase` ist es 422, wie ein Cursor ohne Phase.
 pub async fn medienkontakte_liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Stab>,
@@ -99,10 +112,16 @@ pub async fn medienkontakte_liste(
         p.vor_id,
         p.limit,
     )?;
+    let arten = arten(p.art.as_deref())?;
     Ok(Json(match phase {
+        None if !arten.is_empty() => {
+            return Err(AppError::UnprocessableEntity(
+                "art nur zusammen mit phase".into(),
+            ))
+        }
         None => repo::liste(&state.pool, ctx.einsatz.id).await?,
         Some(phase) => {
-            repo::liste_phase(&state.pool, ctx.einsatz.id, phase, seite.as_ref()).await?
+            repo::liste_phase(&state.pool, ctx.einsatz.id, phase, seite.as_ref(), &arten).await?
         }
     }))
 }

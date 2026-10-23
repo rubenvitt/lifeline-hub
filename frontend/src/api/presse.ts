@@ -43,10 +43,14 @@ export function ladeOffeneMedienkontakte(einsatzId: number): Promise<Medienkonta
   return apiGet<Medienkontakt[]>(`${basis(einsatzId)}/medienkontakte?phase=offen`);
 }
 
-/** Eine Seite erledigter Medienkontakte, jüngster Eingang zuerst (LFH-1075). */
+/**
+ * Eine Seite erledigter Medienkontakte, jüngster Eingang zuerst (LFH-1075). `arten` engt am Server
+ * ein, vor dem Blättern (Kopffilter „Art“, LLH-1096); leer heißt alle.
+ */
 export function ladeErledigteMedienkontakte(
   einsatzId: number,
   vor?: AbschlussCursor,
+  arten: readonly MedienkontaktArt[] = [],
   limit: number = MEDIENKONTAKTE_SEITE,
 ): Promise<Medienkontakt[]> {
   return apiGet<Medienkontakt[]>(
@@ -55,6 +59,7 @@ export function ladeErledigteMedienkontakte(
       vor_zeit: vor?.zeit,
       vor_id: vor?.id,
       limit,
+      art: arten.length ? arten.join(',') : undefined,
     }),
   );
 }

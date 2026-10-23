@@ -29,7 +29,9 @@ Führungspersonal. Eine Pressemitteilung gibt nur die Einsatzleitung frei.
 
 ### Eine Anfrage beantworten oder einen Kontakt abschließen
 
-1. In der „Pressearbeit“ im „Presse-Log“ den Kontakt suchen; „offen“ zeigt nur die offenen.
+1. In der „Pressearbeit“ im „Presse-Log“ den Kontakt suchen; „offen“ zeigt nur die offenen, das
+   Auswahlfeld „Art“ nur die gewählten Arten, auch unter den noch nicht geladenen erledigten. Die
+   Wahl der Art steht in der Adresse und gilt nach dem Neuladen weiter.
 
    ![Seite „Pressearbeit“ mit Presse-Log, Pressemitteilungen und Medienlage](../bilder/presse-infotelefon/pressearbeit.png)
 

@@ -216,7 +216,10 @@ describe('PressePage (LFH-554)', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: /beantworten/ });
+    // Ohne Namen: antd vergibt im Test jede `useId` als `test-id`, und seit dem Auswahlfeld „Art“
+    // (LLH-1096) zeigt `aria-labelledby` des Dialogs auf dessen Element.
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Anfrage von NDR 1 beantworten');
     await userEvent.click(
       within(dialog).getByRole('button', { name: 'Als beantwortet speichern' }),
     );
@@ -331,7 +334,10 @@ describe('PressePage — Eingabegrenzen (LFH-937)', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
     );
-    const dialog = await screen.findByRole('dialog', { name: /beantworten/ });
+    // Ohne Namen: antd vergibt im Test jede `useId` als `test-id`, und seit dem Auswahlfeld „Art“
+    // (LLH-1096) zeigt `aria-labelledby` des Dialogs auf dessen Element.
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Anfrage von NDR 1 beantworten');
     expect(within(dialog).getByLabelText('Freigegeben durch')).toHaveAttribute('maxlength', '200');
     const antwort = within(dialog).getByLabelText('Gegebene Antwort');
     fireEvent.change(antwort, { target: { value: 'a'.repeat(6_400) } });

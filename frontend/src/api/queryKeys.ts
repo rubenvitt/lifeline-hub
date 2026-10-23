@@ -783,9 +783,20 @@ export const einsatzKeys = {
   /** Alle offenen Medienkontakte (LFH-1075). */
   medienkontakteOffen: (einsatzId: number) =>
     [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'offen'] as const,
-  /** Seitenkette der erledigten Medienkontakte (LFH-1075). */
-  medienkontakteErledigt: (einsatzId: number) =>
-    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'abgeschlossen'] as const,
+  /**
+   * Seitenkette der erledigten Medienkontakte (LFH-1075); ohne `arten` zugleich der Prefix aller
+   * Ketten, mit ihnen die am Server nach Art gefilterte (LLH-1096, letztes Glied `anfrage,termin`).
+   */
+  medienkontakteErledigt: (einsatzId: number, arten: readonly string[] = []) =>
+    arten.length
+      ? ([
+          EINSATZ_KEYS.presse,
+          einsatzId,
+          'medienkontakte',
+          'abgeschlossen',
+          arten.join(','),
+        ] as const)
+      : ([EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'abgeschlossen'] as const),
   /** Zahlen und Medien über den ganzen Bestand, Grundlage der Medienlage (LFH-1075). */
   medienkontaktKennzahlen: (einsatzId: number) =>
     [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'kennzahlen'] as const,

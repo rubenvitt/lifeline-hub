@@ -173,7 +173,10 @@ werden geschwärzt, `rueckruf` und `antwort` per `PlatzhalterWennGesetzt`; die M
 Übernahme-Bausteins,
 `frontend/src/entwurf/AGENTS.md`) nimmt nie Namen, Nummern oder Thema; ihre Kontaktzahlen und
 Medien kommen aus `…/medienkontakte/kennzahlen` über den ganzen Bestand, nicht aus der
-geladenen Liste (LFH-1075). Das Presse-Log lädt offene ganz, erledigte seitenweise. **Nicht offline**: die
+geladenen Liste (LFH-1075). Das Presse-Log lädt offene ganz, erledigte seitenweise; die Art
+filtert im Servermodus der `Datensicht` (LLH-1096): die offenen filtert die Seite, die erledigten
+der Server (`art=`, je Filter eine Kette unter dem Prefix `medienkontakteErledigt`), die Zahlen
+kommen aus `je_art` der Kennzahlen. **Nicht offline**: die
 Keys fehlen in `LAGEBILD_OFFLINE` (LFH-767). **Informationstelefon: Fenster und Zählung** (LLH-732,
 `openspec/changes/archive/2026-10-13-w6hgfndx-infotelefon-zaehler/design.md`): die Liste lädt
 immer seitenweise (`ANRUFE_PAGE_SIZE`, Cursor Eingang + Kennung, „Ältere laden“), „offene Rückrufe“

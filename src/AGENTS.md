@@ -246,7 +246,8 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `…/schaeden/auswahl`), nicht die Vollliste.
 - **Das Presse-Log trennt nach Phase wie die Meldungen** (LFH-1075), Ordnung und Cursor über
   `eingang_at`; offen ist nur `offen`. `…/medienkontakte/kennzahlen` trägt Zahlen und Namen der
-  Medien, nie Personenbezug.
+  Medien, nie Personenbezug. `art=` (kommagetrennt, nur mit `phase`) engt beide Phasen vor dem
+  `LIMIT` ein (LLH-1096, Kopffilter „Art“).
 - **Ausnahme: das Informationstelefon blättert ohne Phase** (LLH-732): ein Protokoll ist eine
   gemischte Zeitachse, und bei einer Großlage gehen auch die offenen Rückrufe in die Hunderte.
   `…/infotelefon` liefert immer eine Seite (`kommunikation::parse_page`, Cursor `eingang_at` + `id`),

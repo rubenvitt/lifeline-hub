@@ -23,10 +23,11 @@ export function presseLeseAttrappe(quelle: Quelle) {
     ladeErledigteMedienkontakte: async (
       einsatzId: number,
       vor?: AbschlussCursor,
+      arten: readonly string[] = [],
       limit: number = MEDIENKONTAKTE_SEITE_ATTRAPPE,
     ) =>
       (await quelle(einsatzId))
-        .filter((k) => k.status !== 'offen')
+        .filter((k) => k.status !== 'offen' && (arten.length === 0 || arten.includes(k.art)))
         .sort(nachEingang)
         .filter(
           (k) => !vor || k.eingang_at < vor.zeit || (k.eingang_at === vor.zeit && k.id < vor.id),

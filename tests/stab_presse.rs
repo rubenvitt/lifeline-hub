@@ -677,12 +677,30 @@ async fn phasenliste_statuscodes() {
             "vor_zeit=2026-09-30%2008:00:00&vor_id=3",
             StatusCode::UNPROCESSABLE_ENTITY,
         ),
+        // LLH-1096: Kopffilter „Art“, kommagetrennt, nur mit Phase.
+        ("phase=offen&art=anfrage,termin", StatusCode::OK),
+        ("phase=abgeschlossen&art=termin&limit=5", StatusCode::OK),
+        ("phase=offen&art=anfrage,brief", StatusCode::BAD_REQUEST),
+        ("art=anfrage", StatusCode::UNPROCESSABLE_ENTITY),
     ] {
         let (s, j) = anfrage(&app, "GET", &format!("{b}?{q}"), &admin, None).await;
         assert_eq!(s, code, "{q}: {j:?}");
     }
     let (_, j) = anfrage(&app, "GET", &format!("{b}?phase=offen"), &admin, None).await;
     assert_eq!(j.as_array().unwrap().len(), 1);
+    let (_, j) = anfrage(
+        &app,
+        "GET",
+        &format!("{b}?phase=offen&art=termin"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        j.as_array().unwrap().len(),
+        0,
+        "die Anfrage ist kein Termin"
+    );
     let (_, j) = anfrage(
         &app,
         "GET",
