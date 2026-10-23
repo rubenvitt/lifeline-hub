@@ -9,7 +9,7 @@ interface FachebeneStandProps {
   quelle: FachebeneQuelle;
   /** Abrufzeitpunkt des Servers (`FachebeneAntwort.abgerufen`). Ohne ihn steht nichts da. */
   abgerufen: string | undefined;
-  /** `kurz` fürs Panel („1430“, am Vortag „291430“), `voll` für den Inspector („301430SEP2026“). */
+  /** `kurz` fürs Panel („1430“, am Vortag „291430“), `voll` für den Inspector („301430sep26“). */
   form?: 'kurz' | 'voll';
   /** Wort vor der Zeit. Im Inspector „Ebene abgerufen“, damit es nicht als Messzeit des Objekts gilt. */
   praefix?: string;

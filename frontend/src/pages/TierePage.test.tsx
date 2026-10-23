@@ -914,7 +914,7 @@ describe('TierePage', () => {
     // Muster statt Fixwert: ohne `EinsatzAnzeigeProvider` rendert die Zeit in der Zeitzone des
     // Testrechners.
     const dtg = screen
-      .getAllByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/)
+      .getAllByText(/^\d{6}(jan|feb|mrz|apr|mai|jun|jul|aug|sep|okt|nov|dez)26$/)
       .map((e) => e.textContent);
     expect(dtg).toHaveLength(3);
     // Drei verschiedene Werte: die Fixtures teilen `geaendert_at`, ein `render` auf dem falschen
@@ -943,7 +943,7 @@ describe('TierePage', () => {
     // Etikett und Wert: das Etikett ist der zweite Kanal der Karte.
     expect(screen.getByText('seit')).toBeInTheDocument();
     expect(
-      screen.getByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/),
+      screen.getByText(/^\d{6}(jan|feb|mrz|apr|mai|jun|jul|aug|sep|okt|nov|dez)26$/),
     ).toBeInTheDocument();
     // Das Tastaturziel der Zeile ist der Titel-Link, nicht die Kartenfläche.
     expect(screen.getByRole('link', { name: 'T-001' })).toHaveAttribute(

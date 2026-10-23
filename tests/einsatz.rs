@@ -1559,7 +1559,7 @@ async fn einstellungen_put_anzeige_konventionen_speichert_und_liest_zurueck() {
         id,
         json!({
             "zeitzone": "Europe/Berlin",
-            "zeitformat": "12h",
+            "zeitdarstellung": "datum_uhrzeit",
             "einheiten": "imperial",
             "koordinatenformat": "mgrs"
         }),
@@ -1567,7 +1567,7 @@ async fn einstellungen_put_anzeige_konventionen_speichert_und_liest_zurueck() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(v["zeitzone"], "Europe/Berlin");
-    assert_eq!(v["zeitformat"], "12h");
+    assert_eq!(v["zeitdarstellung"], "datum_uhrzeit");
     assert_eq!(v["einheiten"], "imperial");
     assert_eq!(v["koordinatenformat"], "mgrs");
 
@@ -1584,7 +1584,8 @@ async fn einstellungen_put_ungueltige_konventionen_sind_400() {
     let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
     let id = einsatz["id"].as_i64().unwrap();
 
-    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "zeitformat": "48h" })).await;
+    let (status, _) =
+        einstellungen_put(&app, &admin, id, json!({ "zeitdarstellung": "12h" })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     let (status, _) = einstellungen_put(&app, &admin, id, json!({ "einheiten": "nautisch" })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -1754,7 +1755,7 @@ async fn einstellungen_freeze_409_je_nummernkreis_und_xor() {
         &app,
         &admin,
         id,
-        json!({ "etb_nummer_praefix": null, "etb_nummer_start": null, "zeitformat": "12h" }),
+        json!({ "etb_nummer_praefix": null, "etb_nummer_start": null, "zeitdarstellung": "datum_uhrzeit" }),
     )
     .await;
     assert_eq!(

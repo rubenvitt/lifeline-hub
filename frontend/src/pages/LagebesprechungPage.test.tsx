@@ -613,7 +613,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     );
     expect(anfragen).toHaveLength(1);
     expect(anfragen[0]).toMatchObject({ vorlage: 'freitext' });
-    expect(String(anfragen[0].titel)).toMatch(/^Vorbereitung Lagebesprechung \d{6}[A-Z]{3}\d{4}$/);
+    expect(String(anfragen[0].titel)).toMatch(/^Vorbereitung Lagebesprechung \d{6}[a-z]{3}\d{2}$/);
     const text = (anfragen[0].abschnitte as Array<{ schluessel: string; text: string }>)[0];
     expect(text.schluessel).toBe('text');
     expect(text.text).toContain('**Stand:**');

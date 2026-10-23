@@ -219,7 +219,7 @@ describe('FachebenenInspector', () => {
     // Deutsches Zahlformat mit drei Nachkommastellen — so zeigt auch das BfS die Werte.
     expect(screen.getByText('0,700 µSv/h')).toBeInTheDocument();
     // Taktische DTG in der Anzeigezone: 09:00 UTC = 11:00 MESZ.
-    expect(screen.getByText('211100SEP2026')).toBeInTheDocument();
+    expect(screen.getByText('211100sep26')).toBeInTheDocument();
     expect(screen.getByText('stark erhöht')).toBeInTheDocument();
     expect(screen.getByText('in Betrieb')).toBeInTheDocument();
     // Ortsnamen sind nicht eindeutig — die Kennung ist der Schlüssel für den Abgleich mit ODL-Info.
@@ -253,7 +253,7 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('stark erhöht')).toBeInTheDocument();
     expect(screen.getByText('Grundpegel')).toBeInTheDocument();
     // Stand als taktische DTG in der Anzeigezone: 12:00 UTC = 14:00 MESZ.
-    expect(screen.getByText('0,060 µSv/h (Stand 211400SEP2026)')).toBeInTheDocument();
+    expect(screen.getByText('0,060 µSv/h (Stand 211400sep26)')).toBeInTheDocument();
     expect(screen.getByText('3,17 ×')).toBeInTheDocument();
     // Die Schwellen als Literale (Backend `FAKTOR_ERHOEHT`/`FAKTOR_STARK`), sonst prüfte der Test
     // sich selbst. „über", nicht „ab": genau 1,5 × ist noch `normal`, genau 3 × noch `erhoeht`.
@@ -1139,7 +1139,7 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
 describe('FachebenenInspector — Zeiten in der Anzeigezone (LFH-913)', () => {
   mitProzessZone('UTC');
 
-  it('ein Messzeitpunkt von 08:00 UTC steht als Berliner 241000JUL2026 da', () => {
+  it('ein Messzeitpunkt von 08:00 UTC steht als Berliner 241000jul26 da', () => {
     render(
       <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
         <FachebenenInspector
@@ -1153,6 +1153,6 @@ describe('FachebenenInspector — Zeiten in der Anzeigezone (LFH-913)', () => {
         />
       </AnzeigeKonventionenProvider>,
     );
-    expect(screen.getByText('241000JUL2026')).toBeInTheDocument();
+    expect(screen.getByText('241000jul26')).toBeInTheDocument();
   });
 });

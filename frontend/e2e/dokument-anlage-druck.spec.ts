@@ -112,7 +112,7 @@ test('Fernmeldeskizze als Anlage: Bild aus dem Browser, eingefroren mit der Frei
   const blatt = page.locator('[data-lfh="druckwurzel"] [data-lfh="druck-anlage"]');
   await expect(blatt).toBeVisible();
   await expect(blatt.getByRole('heading', { level: 2 })).toHaveText(
-    /^Anlage 1: Fernmeldeskizze, Stand \d{6}[A-Z]{3}\d{4}$/,
+    /^Anlage 1: Fernmeldeskizze, Stand \d{6}[a-z]{3}\d{2}$/,
   );
   const lage = await blatt.evaluate((el) => {
     const img = el.querySelector('img')!;

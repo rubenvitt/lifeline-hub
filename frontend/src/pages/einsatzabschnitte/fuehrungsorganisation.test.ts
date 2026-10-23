@@ -330,7 +330,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       dtg: DTG,
     });
     expect(mit).toContain(
-      '## Einsatzleitung\n\n- Einsatzleiter: \\*KBM\\* Weber (extern) (seit 111430OKT2026)\n',
+      '## Einsatzleitung\n\n- Einsatzleiter: \\*KBM\\* Weber (extern) (seit 111430okt26)\n',
     );
     expect(mit).not.toContain('Leitung nicht erfasst');
     const grund = rendereFuehrungsorganisationMarkdown(org, {

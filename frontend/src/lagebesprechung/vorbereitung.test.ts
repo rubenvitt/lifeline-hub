@@ -250,13 +250,13 @@ describe('vorbereitungMarkdown', () => {
           zustand: 'daten',
         },
       ],
-      '111400JUN2026',
+      '111400jun26',
     );
     expect(text).toBe(
       [
         '# Vorbereitung Lagebesprechung',
         '',
-        '**Stand:** 111400JUN2026',
+        '**Stand:** 111400jun26',
         '',
         '- **Betroffene:** 3 (2 Patienten) — Quelle: Betroffene',
         '- **Meldungen offen:** — (nicht freigegeben) — Quelle: Meldungen',

@@ -10,7 +10,8 @@ import { globalKeys } from '../../api/queryKeys';
 import {
   EINHEITEN_OPTIONEN,
   KOORDINATEN_OPTIONEN,
-  ZEITFORMAT_OPTIONEN,
+  ZEITDARSTELLUNG_OPTIONEN,
+  ZEITDARSTELLUNG_VORGABE,
   ZEITZONEN_OPTIONEN,
 } from './optionen';
 import { NUR_ADMIN } from '../../components/nurAnsicht';
@@ -117,11 +118,11 @@ export default function AnzeigeEinstellungen() {
               showSearch={teilwortSuche}
             />
           </Form.Item>
-          <Form.Item label="Zeitformat" name="zeitformat">
+          <Form.Item label="Zeitdarstellung" name="zeitdarstellung">
             <Select
               allowClear
-              placeholder={mitVorgabe('24 Stunden')}
-              options={ZEITFORMAT_OPTIONEN}
+              placeholder={mitVorgabe(ZEITDARSTELLUNG_VORGABE)}
+              options={ZEITDARSTELLUNG_OPTIONEN}
             />
           </Form.Item>
           <Form.Item label="Einheiten" name="einheiten">

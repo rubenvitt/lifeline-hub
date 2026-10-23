@@ -816,8 +816,8 @@ describe('NachrichtenStrom — Zeiten in der Anzeigezone (LFH-913)', () => {
       screen.getByRole('button', { name: 'Aktionen zu Nachricht von Max, 101200' }),
     ).toBeInTheDocument();
     await userEvent.hover(screen.getByText('101200'));
-    expect(await screen.findByText('101200JUN2026')).toBeInTheDocument();
+    expect(await screen.findByText('101200jun26')).toBeInTheDocument();
     await userEvent.hover(screen.getByText('bearbeitet'));
-    expect(await screen.findByText('bearbeitet am 101230JUN2026')).toBeInTheDocument();
+    expect(await screen.findByText('bearbeitet am 101230jun26')).toBeInTheDocument();
   });
 });
