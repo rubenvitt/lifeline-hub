@@ -67,6 +67,10 @@ export const EINSATZ_KEYS = {
   // Verlauf eines Raums (LLH-1095): eigener Prefix, lädt erst beim Aufklappen; live über
   // `bereitstellungsraum`, nicht auf der Platte.
   brVerlauf: 'einsatz-br-verlauf',
+  // Erwartete Kräfte aus Nachforderungen mit Ziel = Raum (LLH-1387): eigener Prefix, lädt nur im
+  // offenen Dialog „Eintreffen buchen“; live über `nachforderung` (Führung) und
+  // `bereitstellungsraum` (eine Buchung am Gerät), nicht auf der Platte.
+  brErwartet: 'einsatz-br-erwartet',
   kartenbilder: 'einsatz-kartenbilder',
   etb: 'etb',
   befehle: 'einsatz-befehle',
@@ -299,10 +303,16 @@ export const EINSATZ_STREAM_EVENTS = {
   erinnerung: [EINSATZ_KEYS.erinnerungen, EINSATZ_KEYS.modulZaehler],
   auftrag: [EINSATZ_KEYS.auftraege, EINSATZ_KEYS.modulZaehler],
   // Der Modulzähler zählt die offenen Nachforderungen je Stufe (LLH-1078).
-  nachforderung: [EINSATZ_KEYS.nachforderungen, EINSATZ_KEYS.modulZaehler],
+  // Erwartete Kräfte eines Raums lesen Status, Zusage und Verweise (LLH-1387).
+  nachforderung: [EINSATZ_KEYS.nachforderungen, EINSATZ_KEYS.brErwartet, EINSATZ_KEYS.modulZaehler],
   meldung: [EINSATZ_KEYS.meldungen, EINSATZ_KEYS.lagemeldungen, EINSATZ_KEYS.modulZaehler],
   // Liste + Detail + Verlauf (Prefix-Match: ['einsatz-br-detail', einsatzId] trifft alle brIds).
-  bereitstellungsraum: [EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail, EINSATZ_KEYS.brVerlauf],
+  bereitstellungsraum: [
+    EINSATZ_KEYS.br,
+    EINSATZ_KEYS.brDetail,
+    EINSATZ_KEYS.brVerlauf,
+    EINSATZ_KEYS.brErwartet,
+  ],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
   // Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
   etb: [EINSATZ_KEYS.etb, EINSATZ_KEYS.modulZaehler],
@@ -846,6 +856,8 @@ export const einsatzKeys = {
   brDetail: (einsatzId: number, brId: number) => [EINSATZ_KEYS.brDetail, einsatzId, brId] as const,
   brVerlauf: (einsatzId: number, brId: number) =>
     [EINSATZ_KEYS.brVerlauf, einsatzId, brId] as const,
+  brErwartet: (einsatzId: number, brId: number) =>
+    [EINSATZ_KEYS.brErwartet, einsatzId, brId] as const,
 
   // Befehle
   befehle: (einsatzId: number) => [EINSATZ_KEYS.befehle, einsatzId] as const,

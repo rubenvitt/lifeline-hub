@@ -4,12 +4,15 @@
  * Name, Typ und Funkrufnamen, Doppelbuchungs-Hinweis und die Request-Körper.
  * Teil III: ohne Netz vorgemerkte Buchungen (Offline-Queue) kennt der Server
  * noch nicht; sie gelten weder als frei buchbar noch als Kraft im Einsatz.
+ * LLH-1387: die Gruppe „Aus Nachforderungen“ aus den erwarteten Kräften des
+ * Raums (Rufnamen der Zusage) und der Verweis auf die Nachforderung beim Buchen.
  */
 import type {
   Einheit,
   EinheitPerioden,
   EinsatzFahrzeug,
   EintreffenEingabe,
+  ErwarteteKraft,
   Staerke,
 } from '../../api/types';
 import { abschnittDerEinheit, COLLATOR } from '../../kraefte/kraeftebaumKern';
@@ -232,7 +235,7 @@ const text = (w: string | null | undefined) => {
 /** Körper für eine unangemeldete Kraft; leere Felder fehlen. */
 export function buildEintreffenEingabe(
   werte: UnangemeldetWerte,
-  opts: { trotzdemAnlegen?: boolean } = {},
+  opts: { trotzdemAnlegen?: boolean; nachforderungId?: number | null } = {},
 ): EintreffenEingabe & { unangemeldet: NonNullable<EintreffenEingabe['unangemeldet']> } {
   const organisation = text(werte.traegerorganisation);
   const fahrzeug = (funkrufname: string, typ: string | null | undefined) => ({
@@ -253,5 +256,81 @@ export function buildEintreffenEingabe(
       ...(bemerkung ? { bemerkung } : {}),
       ...(opts.trotzdemAnlegen ? { trotzdem_anlegen: true } : {}),
     },
+    ...(opts.nachforderungId != null ? { nachforderung_id: opts.nachforderungId } : {}),
   };
+}
+
+// ---------- Aus Nachforderungen (LLH-1387, design.md D6) ----------
+
+/** Eine Zeile der Gruppe „Aus Nachforderungen“: ein offener Rufname oder „ohne Rufname“. */
+export interface NachgefordertZeile {
+  schluessel: string;
+  nachforderungId: number;
+  /** Rufname aus der Zusage; `null` für eine erwartete Kraft ohne genannten Rufnamen. */
+  rufname: string | null;
+  art: string;
+  /** Kurzname der Nachforderung wie im ETB: „2× RTW“. */
+  kurz: string;
+  status: ErwarteteKraft['status'];
+  erwartetAt: string | null;
+}
+
+/**
+ * Je offenem Rufnamen eine Zeile; ist mehr offen als Rufnamen genannt sind (ohne Anzahl: keine
+ * Rufnamen), dazu eine Zeile „ohne Rufname“. Die Suche trifft Rufname und Art.
+ */
+export function buildNachgefordertZeilen(
+  erwartet: readonly ErwarteteKraft[],
+  suche = '',
+): NachgefordertZeile[] {
+  const s = normalizeFunkrufname(suche);
+  const zeilen: NachgefordertZeile[] = [];
+  for (const k of erwartet) {
+    const kurz = k.anzahl != null ? `${k.anzahl}× ${k.art}` : k.art;
+    const basis = {
+      nachforderungId: k.nachforderung_id,
+      art: k.art,
+      kurz,
+      status: k.status,
+      erwartetAt: k.eintreffen_erwartet_at ?? null,
+    };
+    const ohneRufname = (k.offen ?? (k.rufnamen.length === 0 ? 1 : 0)) > k.rufnamen.length;
+    const namen: (string | null)[] = [...k.rufnamen, ...(ohneRufname ? [null] : [])];
+    for (const rufname of namen) {
+      const trifft =
+        !s ||
+        normalizeFunkrufname(k.art).includes(s) ||
+        (rufname != null && normalizeFunkrufname(rufname).includes(s));
+      if (!trifft) continue;
+      zeilen.push({ ...basis, schluessel: `${k.nachforderung_id}-${rufname ?? ''}`, rufname });
+    }
+  }
+  return zeilen;
+}
+
+/** Hinweise einer Zeile: Nachforderung, Stufe, erwartetes Eintreffen. */
+export function nachgefordertHinweise(
+  z: NachgefordertZeile,
+  formatZeit: (wert: string) => string,
+): string[] {
+  const hinweise = [`Nachforderung ${z.kurz}`, z.status];
+  if (z.erwartetAt) hinweise.push(`erwartet ${formatZeit(z.erwartetAt)}`);
+  return hinweise;
+}
+
+/**
+ * Was „Eintreffen“ an einer Zeile tut: eine gleichnamige buchbare Einheit buchen (mit Verweis),
+ * nichts, solange eine Buchung desselben Namens ohne Netz vorgemerkt ist, sonst die Neuanlage
+ * mit dem Rufnamen. Ein einheitenloses Fahrzeug lässt sich nicht verknüpfen: Neuanlage, deren
+ * Doppelbuchungs-Hinweis es nennt.
+ */
+export function nachgefordertZiel(
+  z: NachgefordertZeile,
+  d: Parameters<typeof findDoppelbuchung>[1],
+): { art: 'buchen'; treffer: EintreffenTreffer } | { art: 'vorgemerkt' } | { art: 'neu' } {
+  if (z.rufname == null) return { art: 'neu' };
+  const doppel = findDoppelbuchung(z.rufname, d);
+  if (doppel?.vorgemerkt) return { art: 'vorgemerkt' };
+  if (doppel?.treffer?.art === 'einheit') return { art: 'buchen', treffer: doppel.treffer };
+  return { art: 'neu' };
 }

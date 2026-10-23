@@ -5,8 +5,10 @@ Was auf eine Nachforderung hin an Kräften eingetroffen ist, steht ohne zweite E
 Einheit im Einsatz und, wenn die Nachforderung einen Bereitstellungsraum als Ziel hat, in dessen
 Belegung: Aus einer eingetroffenen Nachforderung entstehen Einheiten mit den Rufnamen der Zusage,
 die auf die Nachforderung verweisen. Die Nachforderung zeigt, welche Einheiten aus ihr stammen,
-und die Einheit, woher sie kommt (LLH-1383). Eine Fehlübernahme lässt sich je Einheit
-nachvollziehbar stornieren, auch mit Buchung im Raum (LLH-1388).
+und die Einheit, woher sie kommt (LLH-1383). Am Bereitstellungsraum des Ziels steht schon vor dem
+Eintreffen, wer erwartet wird, und das Eintreffen am Raum verknüpft die Einheit mit der
+Nachforderung (LLH-1387). Eine Fehlübernahme lässt sich je Einheit nachvollziehbar stornieren,
+auch mit Buchung im Raum (LLH-1388).
 
 ## Requirements
 
@@ -71,17 +73,19 @@ aufgelöste oder schon aus einer Nachforderung übernommene mit 409.
 - **THEN** antwortet der Server mit 422 „Einheiten werden erst nach dem Eintreffen übernommen“, und es entsteht keine Einheit
 
 #### Scenario: Gekoppeltes Gerät des Raums
-- **WHEN** das gekoppelte Gerät eines Bereitstellungsraums Nachforderungen liest oder eine Übernahme versucht, auch mit Ziel des eigenen Raums
+- **WHEN** das gekoppelte Gerät eines Bereitstellungsraums die Nachforderungsliste liest, eine Stufe schaltet oder eine Übernahme versucht, auch mit Ziel des eigenen Raums
 - **THEN** antwortet der Server mit 403
 
 ### Requirement: Rücknahme nach Übernahme als Einheit gesperrt
 
-Ist aus einer Nachforderung mindestens eine Einheit übernommen, MUST die Rücknahme von
-„Eingetroffen“ auf „Unterwegs“ mit 422 und dem Grund „Aus der Nachforderung sind Einheiten
-übernommen“ abgelehnt werden; auch eine gleichzeitig laufende Übernahme MUST NOT eine
-zurückgenommene Nachforderung mit Einheiten hinterlassen. Eine aufgelöste Einheit, die als
-aufgelöst stehen bleibt, MUST weiter als übernommen zählen; eine Einheit, deren Übernahme
-storniert ist, und eine beim Auflösen gelöschte MUST NOT zählen.
+Ist aus einer Nachforderung mindestens eine Einheit übernommen oder am Raum mit ihr verknüpft, MUST
+jede Rücknahme einer Stufe (auch „Eingetroffen“ auf „Unterwegs“), das Ablehnen und das Zurückziehen
+mit 422 und dem Grund „Aus der Nachforderung sind Einheiten übernommen“ abgelehnt werden, und die
+Anzahl MUST NOT unter die Zahl der verknüpften Einheiten sinken (422) (LLH-1387); auch eine
+gleichzeitig laufende Übernahme MUST NOT eine zurückgenommene Nachforderung mit Einheiten
+hinterlassen. Eine aufgelöste Einheit, die als aufgelöst stehen bleibt, MUST weiter als übernommen
+zählen; eine Einheit, deren Übernahme storniert ist, und eine beim Auflösen gelöschte MUST NOT
+zählen.
 
 #### Scenario: Rückgängig nach der Übernahme
 - **WHEN** nach der Übernahme von „83-1“ die Stufe „Eingetroffen“ zurückgenommen werden soll
@@ -90,6 +94,10 @@ storniert ist, und eine beim Auflösen gelöschte MUST NOT zählen.
 #### Scenario: Nach dem Storno
 - **WHEN** die einzige übernommene Einheit storniert ist
 - **THEN** kann die Stufe „Eingetroffen“ wieder zurückgenommen werden
+
+#### Scenario: Am Raum eingetroffen, noch unterwegs
+- **WHEN** an der Nachforderung „2× RTW“ im Status „Unterwegs“ am Raum „83-1“ mit Verweis gebucht ist und die Einsatzleitung sie zurückziehen, ablehnen oder auf „Zugesagt“ zurücksetzen will
+- **THEN** antwortet der Server mit 422, und „Eintreffen melden“ bleibt möglich
 
 ### Requirement: Storno einer Fehlübernahme
 
@@ -121,6 +129,49 @@ schon stornierte mit 409 und eine ohne Herkunft mit 422 abgelehnt werden. Eine F
 - **WHEN** die Einsatzleitung in der Ansicht einer übernommenen Einheit „Übernahme stornieren“ bestätigt
 - **THEN** zeigt das Board die Nachforderung hervorgehoben
 - **AND** ohne Freigabe Nachforderungen oder ohne Herkunft steht der Abschnitt „Übernahme stornieren“ nicht da
+
+### Requirement: Erwartete Kräfte am Bereitstellungsraum
+
+Das System SHALL je Bereitstellungsraum die Nachforderungen mit diesem Raum als Ziel im Status
+„Zugesagt“ oder „Unterwegs“ liefern, deren Anzahl die verknüpften Einheiten noch nicht erreichen,
+geordnet nach erwartetem Eintreffen (ohne Angabe zuletzt). Jeder Eintrag MUST genau Kennung, Art,
+Anzahl, Stufe, die Rufnamen der Zusage ohne verknüpfte Einheit gleichen Namens oder
+Funkrufnamens, die noch offene Anzahl und das erwartete Eintreffen tragen; Details, Begründung,
+Adressat, Ziel als Ort, Ablehnungs- und Rückzugsgrund, Priorität und Ersteller MUST fehlen. Das
+Lesen MUST die Rechte am Raum und die Freigabe Nachforderungen verlangen (403); das gekoppelte
+Gerät des Raums MUST nur den eigenen Raum lesen (sonst 404).
+
+#### Scenario: Unterwegs zum BR Nord
+- **WHEN** die Nachforderung „2× RTW“ mit Ziel „BR Nord“ und Zusage „83-1“, „83-2“ unterwegs ist und „83-1“ schon mit Verweis gebucht ist
+- **THEN** nennt die Liste des BR Nord die Nachforderung mit dem Rufnamen „83-2“ und einer offenen Anzahl von 1
+
+#### Scenario: Eingetroffen oder abgelehnt
+- **WHEN** eine Nachforderung mit Ziel „BR Nord“ angefordert, eingetroffen, abgelehnt oder zurückgezogen ist
+- **THEN** fehlt sie in der Liste des BR Nord
+
+### Requirement: Eintreffen am Raum mit Verweis auf die Nachforderung
+
+Das Eintreffen am Bereitstellungsraum SHALL optional eine Nachforderung nennen; die gebuchte oder
+dabei angelegte Einheit MUST dann in derselben Transaktion auf sie verweisen, und die Nachforderung
+MUST sie unter ihren Einheiten nennen. Die Nachforderung MUST zum Einsatz gehören und den Raum als
+Ziel haben (sonst 404) und zugesagt, unterwegs oder eingetroffen sein (sonst 422); mehr verknüpfte
+Einheiten als ihre Anzahl MUST mit 422 abgelehnt werden, eine Einheit mit Verweis auf eine andere
+Nachforderung mit 409, ein einheitenloses Fahrzeug mit 422. Die Stufe der Nachforderung MUST
+unverändert bleiben („Eintreffen melden“ bleibt der Führung). Genau ein ETB-Eintrag MUST entstehen
+und auf die Nachforderung verweisen: bei einer bekannten Einheit „Nachforderung 2× RTW: 83-1 im BR
+Nord eingetroffen“, bei einer neu angelegten der Eintrag ihrer Meldung an die Einsatzleitung, die
+statt „unangemeldet“ „aus Nachforderung 2× RTW“ nennt; die neu angelegte Einheit MUST wie jede am
+Raum angelegte das Kennzeichen „nicht übernommen“ tragen. Mit Verweis MUST das Eintreffen
+zusätzlich die Freigaben Nachforderungen und Einheiten verlangen (403 vor jedem Lesen).
+
+#### Scenario: Bekannte Einheit aus der Nachforderung
+- **WHEN** am BR Nord die Einheit „83-1“ mit Verweis auf die unterwegs befindliche Nachforderung „2× RTW“ eintrifft
+- **THEN** verweist „83-1“ auf die Nachforderung, die Nachforderung nennt „83-1“ und bleibt unterwegs
+- **AND** das ETB enthält genau einen neuen Eintrag „Nachforderung 2× RTW: 83-1 im BR Nord eingetroffen“ mit Verweis auf die Nachforderung
+
+#### Scenario: Ziel ist ein anderer Raum
+- **WHEN** am BR Süd eine Kraft mit Verweis auf eine Nachforderung mit Ziel „BR Nord“ eintrifft
+- **THEN** antwortet der Server mit 404, und nichts wird gebucht
 
 ### Requirement: Übernahme an der Karte
 

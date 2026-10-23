@@ -252,6 +252,7 @@ use utoipa::OpenApi;
         crate::meldung::Meldungsart,
         crate::nachforderung::NachforderungAnzeige,
         crate::nachforderung::arten::NachforderungArtUeblich,
+        crate::nachforderung::erwartet::ErwarteteKraft,
         crate::nachforderung::NachforderungStatus,
         crate::org::einstellungen::OrgEinstellungenAnzeige,
         crate::org::modul_einstellung::OrgModulEinstellung,

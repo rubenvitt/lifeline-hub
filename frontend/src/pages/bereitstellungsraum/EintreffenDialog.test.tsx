@@ -194,6 +194,75 @@ describe('EintreffenDialog — Schritt 1 (LLH-1075, design.md D14)', () => {
   });
 });
 
+describe('EintreffenDialog — Aus Nachforderungen (LLH-1387, design.md D6)', () => {
+  function erwartetMit(antwort: () => Response) {
+    server.use(http.get('/api/einsaetze/1/bereitstellungsraeume/1/erwartet', antwort));
+  }
+  const NACHFORDERUNG = {
+    nachforderung_id: 4,
+    art: 'RTW',
+    anzahl: 2,
+    status: 'unterwegs',
+    rufnamen: ['83-1', '83-2'],
+    offen: 2,
+  };
+
+  it('nennt die offenen Rufnamen vor „Erwartet“ und bucht eine gleichnamige Einheit mit Verweis', async () => {
+    erwartetMit(() => HttpResponse.json([NACHFORDERUNG]));
+    const { onClose } = zeige({ einheiten: [...EINHEITEN, einheit(32, '83-1')] });
+    const gruppe = await screen.findByRole('region', { name: 'Aus Nachforderungen' });
+    expect(within(gruppe).getByText('83-2')).toBeInTheDocument();
+    expect(within(gruppe).getAllByText(/Nachforderung 2× RTW/)).toHaveLength(2);
+    const text = dialog().textContent ?? '';
+    expect(text.indexOf('Aus Nachforderungen')).toBeLessThan(text.indexOf('Erwartet'));
+    // Die gleichnamige Einheit steht nur einmal, unter der Nachforderung.
+    expect(screen.getAllByRole('button', { name: 'Eintreffen 83-1' })).toHaveLength(1);
+    await userEvent.click(within(gruppe).getByRole('button', { name: 'Eintreffen 83-1' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(koerper).toEqual([
+      { kraft: { objekt_typ: 'einheit', objekt_id: 32 }, nachforderung_id: 4 },
+    ]);
+  });
+
+  it('ohne gleichnamige Kraft führt die Zeile vorbelegt zu Schritt 2 und bucht mit Verweis', async () => {
+    erwartetMit(() => HttpResponse.json([NACHFORDERUNG]));
+    const { onClose } = zeige();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eintreffen 83-2' }));
+    expect(await screen.findByRole('textbox', { name: 'Funkrufname' })).toHaveValue('83-2');
+    expect(screen.getByRole('textbox', { name: 'Fahrzeugtyp' })).toHaveValue('RTW');
+    expect(within(dialog()).getByText('Aus Nachforderung 2× RTW')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Eintreffen buchen' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(koerper).toEqual([
+      {
+        unangemeldet: { fahrzeuge: [{ funkrufname: '83-2', fahrzeugtyp: 'RTW' }] },
+        nachforderung_id: 4,
+      },
+    ]);
+  });
+
+  it('„Zurück zur Suche“ löst den Bezug: „Nicht in der Liste“ bucht ohne Verweis', async () => {
+    erwartetMit(() => HttpResponse.json([NACHFORDERUNG]));
+    zeige();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eintreffen 83-2' }));
+    await screen.findByText('Aus Nachforderung 2× RTW');
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Suche' }));
+    await zuSchrittZwei('Florian 3');
+    expect(screen.queryByText('Aus Nachforderung 2× RTW')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Unangemeldet buchen' })).toBeInTheDocument();
+  });
+
+  it('ohne Freigabe Nachforderungen (403) fehlt die Gruppe still', async () => {
+    erwartetMit(() => HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }));
+    zeige();
+    expect(
+      await screen.findByRole('button', { name: 'Eintreffen HLF 20 FF Musterstadt' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Aus Nachforderungen' })).toBeNull();
+    expect(within(dialog()).queryByText('Kein Zugriff')).toBeNull();
+  });
+});
+
 describe('EintreffenDialog — Schritt 2: unangemeldet', () => {
   it('übernimmt den Suchtext als Funkrufname', async () => {
     zeige();

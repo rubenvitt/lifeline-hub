@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { EinheitPerioden, Einheit, EinsatzFahrzeug } from '../../api/types';
+import type { EinheitPerioden, Einheit, EinsatzFahrzeug, ErwarteteKraft } from '../../api/types';
 import {
   buildEintreffenEingabe,
   buildEintreffenGruppen,
+  buildNachgefordertZeilen,
   findDoppelbuchung,
   kraftEingabe,
+  nachgefordertHinweise,
+  nachgefordertZiel,
   normalizeFunkrufname,
   trefferHinweise,
   type EintreffenTreffer,
@@ -455,5 +458,96 @@ describe('buildEintreffenEingabe', () => {
     expect(
       buildEintreffenEingabe({ funkrufname: 'X', staerke: null }).unangemeldet,
     ).not.toHaveProperty('staerke');
+  });
+});
+
+const erwartet = (mehr: Partial<ErwarteteKraft> = {}): ErwarteteKraft => ({
+  nachforderung_id: 4,
+  art: 'RTW',
+  anzahl: 2,
+  status: 'unterwegs',
+  rufnamen: ['83-1', '83-2'],
+  offen: 2,
+  ...mehr,
+});
+
+describe('buildNachgefordertZeilen (LLH-1387, design.md D6)', () => {
+  it('eine Zeile je offenem Rufnamen mit Kurzname der Nachforderung', () => {
+    const z = buildNachgefordertZeilen([erwartet()]);
+    expect(z.map((x) => [x.rufname, x.kurz, x.nachforderungId])).toEqual([
+      ['83-1', '2× RTW', 4],
+      ['83-2', '2× RTW', 4],
+    ]);
+  });
+
+  it('mehr offen als Rufnamen: dazu eine Zeile ohne Rufname', () => {
+    const z = buildNachgefordertZeilen([erwartet({ rufnamen: ['83-1'], offen: 2 })]);
+    expect(z.map((x) => x.rufname)).toEqual(['83-1', null]);
+  });
+
+  it('ohne Anzahl und ohne Rufnamen eine Zeile ohne Rufname, mit Rufnamen keine', () => {
+    const ohne = erwartet({ anzahl: undefined, offen: undefined, rufnamen: [] });
+    expect(buildNachgefordertZeilen([ohne]).map((x) => [x.rufname, x.kurz])).toEqual([
+      [null, 'RTW'],
+    ]);
+    const mit = erwartet({ anzahl: undefined, offen: undefined, rufnamen: ['83-1'] });
+    expect(buildNachgefordertZeilen([mit]).map((x) => x.rufname)).toEqual(['83-1']);
+  });
+
+  it('die Suche trifft Rufname und Art', () => {
+    const liste = [erwartet(), erwartet({ nachforderung_id: 5, art: 'SEG', rufnamen: ['Sani 1'] })];
+    expect(buildNachgefordertZeilen(liste, ' 83-2').map((x) => x.rufname)).toEqual(['83-2']);
+    expect(buildNachgefordertZeilen(liste, 'seg').map((x) => x.rufname)).toEqual(['Sani 1', null]);
+  });
+});
+
+describe('nachgefordertHinweise', () => {
+  it('nennt Nachforderung, Stufe und erwartetes Eintreffen', () => {
+    const [z] = buildNachgefordertZeilen([
+      erwartet({ status: 'zugesagt', eintreffen_erwartet_at: '2026-10-22 15:30:00' }),
+    ]);
+    expect(nachgefordertHinweise(z!, (w) => `um ${w}`)).toEqual([
+      'Nachforderung 2× RTW',
+      'zugesagt',
+      'erwartet um 2026-10-22 15:30:00',
+    ]);
+  });
+});
+
+describe('nachgefordertZiel', () => {
+  const kandidaten = (einheiten: Einheit[]) => ({
+    einheiten,
+    fahrzeuge: [],
+    kandidaten: buildEintreffenGruppen({ einheiten }),
+  });
+
+  it('eine gleichnamige buchbare Einheit wird gebucht', () => {
+    const [z] = buildNachgefordertZeilen([erwartet()]);
+    const ziel = nachgefordertZiel(z!, kandidaten([einheit(7, '83-1')]));
+    expect(ziel).toMatchObject({ art: 'buchen', treffer: { art: 'einheit', id: 7 } });
+  });
+
+  it('ohne gleichnamige Kraft oder ohne Rufname geht es zur Neuanlage', () => {
+    const [a, , ohne] = buildNachgefordertZeilen([erwartet({ offen: 3 })]);
+    expect(nachgefordertZiel(a!, kandidaten([])).art).toBe('neu');
+    expect(nachgefordertZiel(ohne!, kandidaten([einheit(7, '83-1')])).art).toBe('neu');
+  });
+
+  it('eine vorgemerkte Buchung desselben Rufnamens ist vorgemerkt', () => {
+    const [z] = buildNachgefordertZeilen([erwartet()]);
+    const ziel = nachgefordertZiel(z!, {
+      ...kandidaten([]),
+      vorgemerkt: [{ unangemeldet: { fahrzeuge: [{ funkrufname: '83-1' }] } }],
+    });
+    expect(ziel.art).toBe('vorgemerkt');
+  });
+});
+
+describe('buildEintreffenEingabe mit Nachforderung (LLH-1387)', () => {
+  it('trägt den Verweis mit', () => {
+    expect(
+      buildEintreffenEingabe({ funkrufname: '83-1' }, { nachforderungId: 4 }).nachforderung_id,
+    ).toBe(4);
+    expect(buildEintreffenEingabe({ funkrufname: '83-1' })).not.toHaveProperty('nachforderung_id');
   });
 });

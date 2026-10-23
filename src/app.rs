@@ -1433,6 +1433,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_bereitstellungsraum::verlauf),
         )
         .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/erwartet",
+            get(routes::einsatz_bereitstellungsraum::erwartet),
+        )
+        .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
             patch(routes::einsatz_bereitstellungsraum::update),
         )

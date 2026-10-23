@@ -6426,6 +6426,14 @@
               }
             ]
           },
+          "nachforderung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nachforderung, aus der die Kraft erwartet wird (LLH-1387, design.md D4): die Einheit\nbekommt den Verweis. Nur mit Ziel = dieser Raum, nicht für ein einheitenloses Fahrzeug."
+          },
           "unangemeldet": {
             "oneOf": [
               {
@@ -6818,6 +6826,59 @@
           "faellig": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ErwarteteKraft": {
+        "type": "object",
+        "description": "Eine Nachforderung mit Ziel = Raum, deren Kräfte noch erwartet werden.",
+        "required": [
+          "nachforderung_id",
+          "art",
+          "status",
+          "rufnamen"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "art": {
+            "type": "string",
+            "description": "Art der Nachforderung („RTW“, „SEG“)."
+          },
+          "eintreffen_erwartet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Voraussichtliches Eintreffen laut Zusage (UTC ohne Zone); fehlt ohne Angabe."
+          },
+          "nachforderung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offen": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Noch erwartete Anzahl: die Anzahl abzüglich der verknüpften Einheiten; fehlt ohne Anzahl."
+          },
+          "rufnamen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Rufnamen der Zusage, die noch keine verknüpfte Einheit gleichen Namens oder Funkrufnamens\ntragen, in Eingabefolge."
+          },
+          "status": {
+            "$ref": "#/components/schemas/NachforderungStatus",
+            "description": "`zugesagt` oder `unterwegs`."
           }
         }
       },
