@@ -266,6 +266,17 @@ export interface components {
          * @enum {string}
          */
         AdressatKategorie: "leitstelle" | "nachbar_ea" | "uebergeordnet" | "andere_bos";
+        /** @description Der Adressindex einer Region im Manifest (`OfflineKatalogEintrag::adressindex`). */
+        AdressindexEintrag: {
+            /**
+             * Format: int64
+             * @description Dateigröße in Bytes.
+             */
+            groesse: number;
+            /** @description SHA256 (hex, lowercase); der Hub prüft den Download dagegen. */
+            sha256: string;
+            url: string;
+        };
         /**
          * @description Laufende Phase einer Karte in der Verwaltung.
          * @enum {string}
@@ -4674,6 +4685,7 @@ export interface components {
          *     und rendern mit dem beschrifteten Offline-Style (Shortbread-Layer + eingebettete Glyphs/Sprite).
          */
         OfflineKatalogEintrag: {
+            adressindex?: components["schemas"]["AdressindexEintrag"] | null;
             /** Format: int64 */
             groesse: number;
             /**
@@ -4886,9 +4898,15 @@ export interface components {
             lat: number;
             /** Format: double */
             lon: number;
-            /** @description Anzeigename des Geocoders (bei Nominatim `display_name`). */
+            /** @description Anzeigename des Geocoders (bei Nominatim `display_name`) bzw. der Offline-Karte. */
             name: string;
+            quelle: components["schemas"]["OrtTrefferQuelle"];
         };
+        /**
+         * @description Woher ein Treffer der Ortssuche stammt (LLH-1119).
+         * @enum {string}
+         */
+        OrtTrefferQuelle: "offline_karte" | "geocoder";
         /**
          * @description LFH-265: beide Felder werden ABSENT statt present-null serialisiert, damit der generierte
          *     `peilung?`/`ortsname?` ehrlich ist. Wire-Änderung — gepinnt per `contains_key` in

@@ -159,6 +159,7 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
             quelle: "Eigenbau (karten-build, Planetiler-Shortbread)".into(),
             sha256: None,
             gruppe: Some(gruppe.into()),
+            adressindex: None,
         }
     }
     // Deckungsgleich mit dem Regionssatz des karten-service (`karten-service/src/regions.rs`): DE,
@@ -1145,6 +1146,7 @@ mod tests {
             quelle: "q".into(),
             sha256: Some("abc123".into()),
             gruppe: None,
+            adressindex: None,
         };
         let j = serde_json::to_string(&mit_pin).unwrap();
         assert!(j.contains("\"sha256\":\"abc123\""), "sha256 im JSON: {j}");
@@ -1162,6 +1164,7 @@ mod tests {
             quelle: "test".into(),
             sha256,
             gruppe: None,
+            adressindex: None,
         }
     }
 

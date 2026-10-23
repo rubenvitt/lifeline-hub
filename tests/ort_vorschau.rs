@@ -370,3 +370,38 @@ async fn org_vorschau_ungueltige_koordinate_ist_400_ohne_login_401() {
     let (s, _v) = get(&app, "/api/ort-vorschau?lat=50.7&lon=9.7", "").await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
 }
+
+/// LLH-1119: Mit Adressindex der Offline-Karte kommt der Ortsname ohne Geocoder (der Geocoder der
+/// Org ist hier ein geschlossener Port), aus der nächsten Adresse im Umkreis.
+#[tokio::test]
+async fn ortsname_aus_dem_adressindex_der_offline_karte() {
+    let (app, pool, kd) = setup_mit_pool().await;
+    std::fs::copy(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/adressindex/testgebiet.adressen.sqlite"),
+        kd.join("testgebiet.adressen.sqlite"),
+    )
+    .unwrap();
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_mit_einsatzort(&pool).await;
+    let (s, v) = get(
+        &app,
+        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=52.6201&lon=13.78"),
+        &cookie,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        v["ortsname"].as_str(),
+        Some("Hauptstraße 12, 12345 Musterstadt")
+    );
+    assert!(v.as_object().unwrap().contains_key("peilung"));
+    // Fern jeder Adresse im Index: kein Ortsname (Geocoder unerreichbar).
+    let (_, v) = get(
+        &app,
+        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=52.70&lon=13.70"),
+        &cookie,
+    )
+    .await;
+    assert!(!v.as_object().unwrap().contains_key("ortsname"), "{v}");
+}

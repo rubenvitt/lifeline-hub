@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="handgeschrieben (LLH-1119)">
+  <!-- Region „Testgebiet“: Musterstadt (PLZ 12345) und Nachbardorf (PLZ 12399), abseits der
+       Koordinaten anderer e2e-Specs. Je ein Fall, den der Adressindex unterscheiden muss. -->
+
+  <!-- 1: Adress-Node mit Straße, Hausnummer, PLZ, Ort -->
+  <node id="1" version="1" lat="52.6200000" lon="13.7800000">
+    <tag k="addr:street" v="Hauptstraße"/>
+    <tag k="addr:housenumber" v="12"/>
+    <tag k="addr:postcode" v="12345"/>
+    <tag k="addr:city" v="Musterstadt"/>
+  </node>
+  <!-- 2: Nachbaradresse derselben Straße -->
+  <node id="2" version="1" lat="52.6202000" lon="13.7806000">
+    <tag k="addr:street" v="Hauptstraße"/>
+    <tag k="addr:housenumber" v="14"/>
+    <tag k="addr:postcode" v="12345"/>
+    <tag k="addr:city" v="Musterstadt"/>
+  </node>
+  <!-- 3: Adresse mit Ortsteil -->
+  <node id="3" version="1" lat="52.6250000" lon="13.7700000">
+    <tag k="addr:street" v="Bahnhofstraße"/>
+    <tag k="addr:housenumber" v="1"/>
+    <tag k="addr:postcode" v="12345"/>
+    <tag k="addr:city" v="Musterstadt"/>
+    <tag k="addr:suburb" v="Altstadt"/>
+  </node>
+  <!-- 4: Adresse ohne Straße (addr:place) -->
+  <node id="4" version="1" lat="52.6300000" lon="13.7900000">
+    <tag k="addr:place" v="Siedlung Waldfrieden"/>
+    <tag k="addr:housenumber" v="3"/>
+    <tag k="addr:postcode" v="12345"/>
+    <tag k="addr:city" v="Musterstadt"/>
+  </node>
+  <!-- 5: gleichnamige Adresse im Nachbarort -->
+  <node id="5" version="1" lat="52.7000000" lon="13.9000000">
+    <tag k="addr:street" v="Hauptstraße"/>
+    <tag k="addr:housenumber" v="12"/>
+    <tag k="addr:postcode" v="12399"/>
+    <tag k="addr:city" v="Nachbardorf"/>
+  </node>
+  <!-- 6/7: Orte -->
+  <node id="6" version="1" lat="52.6210000" lon="13.7810000">
+    <tag k="place" v="town"/>
+    <tag k="name" v="Musterstadt"/>
+  </node>
+  <node id="7" version="1" lat="52.7010000" lon="13.9010000">
+    <tag k="place" v="village"/>
+    <tag k="name" v="Nachbardorf"/>
+  </node>
+  <!-- 8: keine Adresse: Hausnummer ohne Straße und ohne addr:place -->
+  <node id="8" version="1" lat="52.6400000" lon="13.7500000">
+    <tag k="addr:housenumber" v="99"/>
+    <tag k="addr:city" v="Musterstadt"/>
+  </node>
+  <!-- 9: keine Adresse: Straße ohne Hausnummer; fremd getaggt -->
+  <node id="9" version="1" lat="52.6410000" lon="13.7510000">
+    <tag k="addr:street" v="Hauptstraße"/>
+    <tag k="amenity" v="bench"/>
+  </node>
+  <!-- 10: place ohne Namen, place eines nicht indizierten Typs -->
+  <node id="10" version="1" lat="52.6420000" lon="13.7520000">
+    <tag k="place" v="village"/>
+  </node>
+  <node id="11" version="1" lat="52.6430000" lon="13.7530000">
+    <tag k="place" v="island"/>
+    <tag k="name" v="Werder"/>
+  </node>
+
+  <!-- 13: Gebäude-Way mit Adresse; Rechteck 13,7802..13,7804 / 52,6203..52,6205 (Mitte 13,7803 / 52,6204) -->
+  <node id="101" version="1" lat="52.6203000" lon="13.7802000"/>
+  <node id="102" version="1" lat="52.6203000" lon="13.7804000"/>
+  <node id="103" version="1" lat="52.6205000" lon="13.7804000"/>
+  <node id="104" version="1" lat="52.6205000" lon="13.7802000"/>
+  <way id="1001" version="1">
+    <nd ref="101"/>
+    <nd ref="102"/>
+    <nd ref="103"/>
+    <nd ref="104"/>
+    <nd ref="101"/>
+    <tag k="building" v="house"/>
+    <tag k="addr:street" v="Hauptstraße"/>
+    <tag k="addr:housenumber" v="13"/>
+    <tag k="addr:postcode" v="12345"/>
+    <tag k="addr:city" v="Musterstadt"/>
+  </way>
+  <!-- Straßen-Way ohne Adresse: kein Eintrag (Straßen kommen aus den Adressen) -->
+  <node id="111" version="1" lat="52.6190000" lon="13.7790000"/>
+  <node id="112" version="1" lat="52.6210000" lon="13.7820000"/>
+  <way id="1002" version="1">
+    <nd ref="111"/>
+    <nd ref="112"/>
+    <tag k="highway" v="residential"/>
+    <tag k="name" v="Hauptstraße"/>
+  </way>
+  <!-- Relation mit Adresse: bewusst nicht indiziert -->
+  <relation id="2001" version="1">
+    <member type="way" ref="1001" role="outer"/>
+    <tag k="type" v="multipolygon"/>
+    <tag k="addr:street" v="Hauptstraße"/>
+    <tag k="addr:housenumber" v="15"/>
+    <tag k="addr:city" v="Musterstadt"/>
+  </relation>
+</osm>

@@ -2,7 +2,8 @@
 //!
 //! Liefert `{peilung, ortsname}` für die Koordinaten-Plausibilitätsprüfung.
 //! Die Peilung (nächster verorteter Marker) wird bedingungslos berechnet; `ortsname`
-//! wird via Reverse-Geocoding gefüllt (org-konfigurierbarer Geocoder, Cache, Rate-Limit).
+//! kommt aus dem Adressindex der Offline-Karten (LLH-1119, nächste Adresse ≤ 75 m), sonst
+//! via Reverse-Geocoding (org-konfigurierbarer Geocoder, Cache, Rate-Limit).
 //! Auth/Scope wie andere /api/einsaetze/:id/*-Routen (Einsatz-Mitglied, Lesezugriff).
 //!
 //! GET /api/ort-vorschau?lat=&lon= (LLH-1376, Spec `ortsfeld`, „Ortsname als Vorschlag“): derselbe
@@ -133,9 +134,9 @@ fn pruefe_koordinate(lat: f64, lon: f64) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Ortsname best-effort beim Geocoder der Organisation `org_id`: `reverse()` liefert bei
-/// offline/Timeout/Rate-Limit `None`, der Request wird nie wegen eines Geocoder-Fehlers
-/// abgebrochen. Ein `Err` kommt nur aus den Org-Einstellungen (DB-Fehler = echter 500).
+/// Ortsname best-effort: zuerst aus dem Adressindex der Offline-Karten (LLH-1119), sonst beim
+/// Geocoder der Organisation `org_id`: `reverse()` liefert bei offline/Timeout/Rate-Limit `None`,
+/// der Request wird nie wegen eines Geocoder-Fehlers abgebrochen. Ein `Err` kommt nur aus den Org-Einstellungen (DB-Fehler = echter 500).
 /// Der Reverse-Geocoding-Cache liegt in einer eigenen Cache-DB (F09/LFH-240: keine Konkurrenz um
 /// den operativen Writer); Fallback auf den operativen Pool, falls sie nicht anlegbar ist.
 async fn ortsname(
@@ -145,6 +146,12 @@ async fn ortsname(
     lat: f64,
     lon: f64,
 ) -> Result<Option<String>, AppError> {
+    // LLH-1119: zuerst die nächste Adresse aus dem Adressindex der Offline-Karten — dann verlässt
+    // die Koordinate den Server nicht, und ohne Netz gibt es trotzdem einen Ortsnamen.
+    if let Some(ortsname) = geocoding::offline::naechste_adresse(karten_dir, lat, lon).await {
+        return Ok(Some(ortsname));
+    }
+
     let org = org_einst::laden_oder_default(pool, org_id).await?;
     let base = org
         .geocoder_url

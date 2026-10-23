@@ -180,7 +180,10 @@ async fn treffer_viewbox_und_ausfall() {
     assert_eq!(
         json["treffer"],
         serde_json::json!([
-            { "lat": 51.1604, "lon": 10.4514, "name": "Hauptstraße 12, Musterstadt" }
+            {
+                "lat": 51.1604, "lon": 10.4514, "name": "Hauptstraße 12, Musterstadt",
+                "quelle": "geocoder"
+            }
         ])
     );
     {

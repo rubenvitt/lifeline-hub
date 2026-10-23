@@ -3,6 +3,7 @@
 //! definiertem Offline-Verhalten. `FachebenenState` trägt außerdem Basis-URLs und Bremsen der
 //! Einsatz-Nachschlagequellen (Pegel, Wetter).
 
+pub mod adressindex;
 pub mod assets;
 pub mod auto_aktualisierung;
 pub mod cache;

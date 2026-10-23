@@ -17,6 +17,12 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
     let cfg = ServiceConfig::parse();
+    // Braucht weder Storage noch Manifest — vor deren Aufbau.
+    if let Command::Adressindex { pbf, out } = &cfg.command {
+        let n = karten_service::adressindex::baue_adressindex(pbf, out).await?;
+        tracing::info!(adressen = n, ziel = %out.display(), "Adressindex gebaut");
+        return Ok(());
+    }
 
     let storage: Arc<dyn Storage> = Arc::new(S3Storage::neu(&cfg.storage_bucket, &cfg.base_url)?);
     let runner: Arc<dyn build::BuildRunner> = Arc::new(build::make_runner::MakeRunner {
@@ -67,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Build { slug, all } => {
             build_lokal(slug, all, &registry, runner, storage, bestand).await
         }
+        Command::Adressindex { .. } => unreachable!("oben behandelt"),
     }
 }
 

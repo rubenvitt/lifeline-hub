@@ -16,7 +16,7 @@ import { KarteWaehlen } from './KarteWaehlen';
 import type { LatLon } from './koordinaten';
 import { erkenneKoordinate } from './koordinatenErkennung';
 import { OrtZeile } from './OrtZeile';
-import { adressAussage, adressBegriff } from './ortssuche';
+import { adressAussage, adressBegriff, OFFLINE_KARTE_ZUSATZ } from './ortssuche';
 import { useOrtVorschau } from './useOrtVorschau';
 
 /**
@@ -494,6 +494,11 @@ function OrtsfeldTreffer({
             }}
           >
             <span style={{ overflowWrap: 'anywhere' }}>{t.kurz ?? t.name}</span>
+            {t.quelle === 'offline_karte' && (
+              <span style={{ color: rollen.text2, fontSize: token.fontSizeSM }}>
+                {OFFLINE_KARTE_ZUSATZ}
+              </span>
+            )}
             {t.kurz && (
               <span
                 // Umbrechen statt abschneiden: eine Zeile ohne Umbruch ginge mit voller Breite in die

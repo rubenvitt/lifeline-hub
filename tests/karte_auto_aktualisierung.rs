@@ -119,6 +119,7 @@ fn neuer_eintrag(name: &str, slug: &str) -> OfflineKatalogEintrag {
         quelle: "t".into(),
         sha256: Some(SHA_NEU.into()),
         gruppe: None,
+        adressindex: None,
     }
 }
 

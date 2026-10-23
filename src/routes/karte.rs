@@ -998,6 +998,7 @@ mod update_check_tests {
             quelle: "t".into(),
             sha256,
             gruppe: None,
+            adressindex: None,
         }
     }
 
@@ -1540,6 +1541,11 @@ pub(crate) async fn starte_in_place_reload(
         .await;
         let ausgang =
             verarbeite_in_place_ergebnis(&pool, &karten_dir, id, &neue_quell_url, ergebnis).await;
+        // LLH-1119: Adressindex des neuen Stands, solange der Slot noch belegt ist.
+        if ausgang.is_ok() {
+            crate::karte::adressindex::lade_zur_karte(&client, &karten_dir, id, &neue_quell_url)
+                .await;
+        }
         download::schreibe_fortschritt(&fortschritt_map).remove(&id);
         auto.melde_ergebnis(id, &neue_quell_url, sha256_erwartet.as_deref(), ausgang);
     });
@@ -1618,6 +1624,7 @@ pub async fn offline_download(
     let fortschritt_map = state.download_fortschritt.clone();
     let id = karte.id;
     let sha256_erwartet = body.sha256_erwartet.clone();
+    let quell_url = url.to_string();
     tokio::spawn(async move {
         let dateiname = format!("karte-{id}.mbtiles");
         let part = karten_dir.join(format!("{dateiname}.part"));
@@ -1660,6 +1667,9 @@ pub async fn offline_download(
                         erg.groesse
                     );
                     finalisiere_erfolgreichen_download(&pool, id).await;
+                    // LLH-1119: Adressindex der Region, solange der Slot noch belegt ist.
+                    crate::karte::adressindex::lade_zur_karte(&client, &karten_dir, id, &quell_url)
+                        .await;
                 }
             }
             Err(fehler) => {

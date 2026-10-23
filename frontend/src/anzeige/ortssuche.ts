@@ -18,7 +18,15 @@ export interface GefundenerOrt {
   beschriftung: string;
   /** Eine Koordinate steht in Mono mit `tabular-nums` (`frontend/AGENTS.md`, `schriftskala`). */
   art: 'koordinate' | 'adresse';
+  /** Treffer aus dem Adressindex einer Offline-Karte (LLH-1119); die Liste nennt die Quelle. */
+  ausOfflineKarte?: boolean;
 }
+
+/**
+ * Zusatz an einem Adresstreffer aus dem Adressindex einer Offline-Karte (LLH-1119, Spec
+ * `lagekarte-ortssuche`, „Adresssuche aus der Offline-Karte“): Lagekarte und Ortsfeld.
+ */
+export const OFFLINE_KARTE_ZUSATZ = 'aus Offline-Karte';
 
 /**
  * Der getrimmte Suchtext, wenn er als Adresse gesucht werden darf, sonst `null`: zu kurz, zu

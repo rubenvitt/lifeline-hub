@@ -244,3 +244,30 @@ gültiges Token MUST er mit 401 antworten.
 
 - **WHEN** `GET /zeitplan` ohne oder mit falschem Token gerufen wird
 - **THEN** antwortet der karten-service mit 401
+
+### Requirement: Der Adressindex kommt mit der Region
+
+Führt das Manifest des karten-service zu einer Region einen Adressindex (URL, Größe, SHA256),
+SHALL der Hub ihn nach jedem erfolgreichen Download und jedem In-Place-Reload dieser Karte
+mitladen, über eine Teildatei, gegen die Prüfsumme geprüft, und erst danach den vorhandenen Index
+der Karte ersetzen. Ein Fehler beim Index MUST die Karte `bereit` lassen und einen vorhandenen
+Index stehen lassen. Das Löschen einer heruntergeladenen Karte MUST ihren Index mit entfernen.
+Der karten-service SHALL den Index aus demselben OSM-Auszug bauen wie die Karte; scheitert nur der
+Index, MUST die Karte trotzdem veröffentlicht werden, ohne Index im Manifest. Ein Manifest ohne
+Adressindex MUST für den Hub gültig bleiben.
+
+#### Scenario: Download bringt den Index mit
+
+- **WHEN** eine Karte fertig lädt und ihr Katalog-Eintrag einen Adressindex führt
+- **THEN** liegt danach `karte-<id>.adressen.sqlite` im Kartenverzeichnis, und die Adresssuche
+  findet seine Adressen
+
+#### Scenario: Falsche Prüfsumme
+
+- **WHEN** der geladene Index nicht zur Prüfsumme im Manifest passt
+- **THEN** bleibt die Karte bereit, und ein vorhandener Index bleibt unverändert
+
+#### Scenario: Index-Bau scheitert
+
+- **WHEN** der karten-service die Karte baut, der Adressindex aber scheitert
+- **THEN** wird die Karte veröffentlicht, und ihr Manifest-Eintrag führt keinen Adressindex

@@ -748,6 +748,7 @@ mod tests {
             quelle: "t".into(),
             sha256: Some(sha.into()),
             gruppe: None,
+            adressindex: None,
         }
     }
 

@@ -2,7 +2,7 @@
 titel: Karten
 gruppen: [administration]
 reihenfolge: 640
-quellen: [frontend/src/karten/OnlineQuellenVerwaltung.tsx, frontend/src/karten/OnlineQuelleFormModal.tsx, frontend/src/karten/AusKatalogModal.tsx, frontend/src/karten/OfflineKartenVerwaltung.tsx, frontend/src/karten/OfflineRegionPicker.tsx, frontend/src/karten/AutoAktualisierungZeile.tsx, frontend/src/karten/KartenOfflineSektion.tsx, src/routes/karte.rs, src/karte/auto_aktualisierung.rs]
+quellen: [frontend/src/karten/OnlineQuellenVerwaltung.tsx, frontend/src/karten/OnlineQuelleFormModal.tsx, frontend/src/karten/AusKatalogModal.tsx, frontend/src/karten/OfflineKartenVerwaltung.tsx, frontend/src/karten/OfflineRegionPicker.tsx, frontend/src/karten/AutoAktualisierungZeile.tsx, frontend/src/karten/KartenOfflineSektion.tsx, src/routes/karte.rs, src/karte/auto_aktualisierung.rs, src/karte/adressindex.rs]
 ---
 
 ## Überblick
@@ -93,6 +93,11 @@ die nächste Prüfung ansteht.
 - „Jetzt aktualisieren“ lädt einen vorhandenen neueren Stand sofort („Update lädt“) oder stößt
   einen Neubau an („Neubau gestartet“). Ist nichts Neueres da, meldet die App „Die Karte ist
   aktuell“.
+- Eine Region aus dem eigenen Kartenbau bringt einen Adressindex mit. Der Server lädt ihn nach
+  dem Herunterladen und nach jeder Aktualisierung der Karte mit; danach findet die Adresssuche
+  die Adressen dieser Region auch ohne Internet (siehe [Einsatzdaten](einsatzdaten.md)). Scheitert
+  nur der Adressindex, bleibt die Karte in Betrieb, und ein schon vorhandener Index bleibt
+  stehen. „Löschen“ entfernt den Index mit der Karte.
 - „Bauen & laden“ und „Jetzt aktualisieren“ mit Neubau brauchen den Kartenbau-Dienst. Ist er
   nicht eingerichtet, stehen nicht gebaute Regionen als „Nicht gebaut“ da.
 - „Löschen“ fragt mit „Offline-Karte löschen?“ nach. Offline-Karten brauchen viel Platz auf dem
