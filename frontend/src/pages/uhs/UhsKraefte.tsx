@@ -15,7 +15,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { StaerkePosition, UhsDetail, UhsKraft } from '../../api/types';
 import { staerkeText } from '../../anzeige/staerke';
 import { ErfassungsModal } from '../../components/Erfassung';
-import KatalogTabelle from '../../components/KatalogTabelle';
+import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabelle';
 import { Select } from '../../components/Select';
 import { teilwortSuche } from '../../components/teilwortSuche';
 import { Datenfeld, Datenraster } from '../../components/instrument';
@@ -30,6 +30,14 @@ interface Props {
   schreibgeschuetzt: boolean;
   /** „Einheit zuordnen“: nur die Einsatzleitung, kein Gerät (Server 403). */
   einheitZuordnen: boolean;
+}
+
+/** Positionen in der Reihenfolge der Stärke (F/UF/M), nicht nach Alphabet. */
+const POSITION_FOLGE = POSITION_OPTIONEN.map((o) => o.value);
+const POSITION_FILTER = POSITION_OPTIONEN.map((o) => ({ text: o.label, value: o.value }));
+
+function positionRang(k: UhsKraft): number {
+  return k.staerke_position ? POSITION_FOLGE.indexOf(k.staerke_position) : POSITION_FOLGE.length;
 }
 
 interface KraftWerte {
@@ -111,13 +119,28 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
 
   const keineFreie = ohneUhsQuery.isSuccess && ohneUhs.length === 0;
 
-  const columns = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
+  // Filterwerte Einheit aus den Kräften dieser UHS: eine feste Liste gibt es hier nicht.
+  const einheitFilter = [...new Set(uhs.kraefte.flatMap((k) => (k.einheit ? [k.einheit] : [])))]
+    .sort((a, b) => a.localeCompare(b, 'de'))
+    .map((name) => ({ text: name, value: name }));
+
+  // Sortieren und Filtern (LLH-1096, Spec `tabellen-sortieren-filtern`): jede Spalte außer der
+  // Aktion sortiert, Position und Einheit sind Wertelisten und filtern. Ohne Listengedächtnis: die
+  // Liste ist ein Reiter der UHS-Detailseite (und der Bereich „UHS“ am Gerät), deren Adresse die
+  // UHS meint; Sortierung und Filter gelten, solange der Reiter offen ist.
+  const columns: KatalogSpalte<UhsKraft>[] = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
+    },
     // Die eine Funktionsangabe (Einsatzfunktion vor Qualifikation), die Qualifikation darunter wie
     // in der Personalliste (LLH-1067, `kraefte/einsatzfunktionKern.ts`).
     {
       title: 'Funktion',
       key: 'funktion',
+      sorter: (a, b) => (funktionText(a) ?? '').localeCompare(funktionText(b) ?? '', 'de'),
       render: (_: unknown, k: UhsKraft) => {
         const text = funktionText(k);
         const qualifikation = k.funktion?.trim();
@@ -140,12 +163,18 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
       title: 'Position',
       dataIndex: 'staerke_position',
       key: 'position',
+      sorter: (a, b) => positionRang(a) - positionRang(b),
+      filters: POSITION_FILTER,
+      onFilter: (wert, k) => k.staerke_position === wert,
       render: (p: StaerkePosition | undefined) => (p ? POSITION_LABELS[p] : '—'),
     },
     {
       title: 'Einheit',
       dataIndex: 'einheit',
       key: 'einheit',
+      sorter: (a, b) => (a.einheit ?? '').localeCompare(b.einheit ?? '', 'de'),
+      filters: einheitFilter.length > 0 ? einheitFilter : undefined,
+      onFilter: (wert, k) => k.einheit === wert,
       render: (v: string | undefined) => v ?? '—',
     },
     ...(bedienbar
@@ -225,6 +254,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
         rowKey="id"
         dataSource={uhs.kraefte}
         columns={columns}
+        mehrzahl="Kräften"
         pagination={false}
         locale={{ emptyText: 'Keine Kraft an dieser UHS' }}
       />

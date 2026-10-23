@@ -102,6 +102,8 @@ Für den UHS-Laptop:
    Grundriss, wo „Plätze bearbeiten“ Plätze anlegt und ändert.
 3. „Kräfte“ zeigt die Stärke der UHS und ihre Kräfte. „Kraft zuordnen“ holt eine Person des
    Einsatzes an die UHS, „Kraft erfassen“ legt eine neue an, „Abziehen“ nimmt sie wieder heraus.
+   Ein Klick auf einen Spaltenkopf sortiert die Kräfte, im Kopf von „Position“ und „Einheit“ lässt
+   sich filtern.
 
    ![Bereich „UHS“ am Laptop mit dem Reiter „Kräfte“, der Stärke und den Kräften der UHS](../bilder/geraet-uhs/laptop-uhs.png)
 

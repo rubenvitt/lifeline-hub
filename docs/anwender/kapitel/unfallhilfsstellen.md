@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
 ---
 
 ## Überblick
@@ -36,6 +36,21 @@ Die Patienten selbst sind Betroffene; ihre Sichtung und ihren Verbleib führt da
 Ein Lageplan als Hintergrund des Grundrisses lässt sich über „Plan“ hochladen oder aus den Dateien
 der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und „Plätze anlegen“ hinter
 „Plätze bearbeiten“; dort lassen sich Plätze auch verschieben und löschen.
+
+### Die Liste der Unfallhilfsstellen sortieren und filtern
+
+1. In der Brotkrumenleiste „Unfallhilfsstellen“ wählen. Die Liste zeigt je Stelle Bezeichnung,
+   Typ, Status und Standort.
+2. Im Kopf der Spalten „Typ“ und „Status“ filtern: das Trichterzeichen öffnet die Werte zum
+   Ankreuzen, „OK“ übernimmt sie. Ist die Liste eingeschränkt, steht darüber die Zahl der Treffer
+   und je Wert ein Knopf, etwa „Status: aktiv“, der genau diesen Filter entfernt; „Filter
+   zurücksetzen“ leert alle.
+3. Ein Klick auf einen Spaltenkopf sortiert nach dieser Spalte, ein zweiter kehrt die Folge um.
+   Der Status sortiert in der Folge „geplant“, „aktiv“, „aufgelöst“.
+
+Sortierung und Filter stehen in der Adresse: Zurück, Neuladen und ein geteilter Link zeigen
+dieselbe Liste, und wer über das Modulmenü zurückkommt, findet sie so vor, wie er sie verlassen
+hat.
 
 ### Die Belegung ablesen
 
@@ -190,6 +205,10 @@ Der Kopf der Stelle nennt ihre Stärke und, mit Freigabe des Moduls Material, di
 Posten samt Ausfall; Ausfall fasst defekt, verbraucht, Desinfektion nötig und aufgebraucht
 zusammen (Kapitel [Material](material.md)). Unter „Kräfte“ werden Kräfte und Einheiten mit „Kraft
 zuordnen“ und „Einheit zuordnen“ an die Stelle gesetzt, „Kraft erfassen“ legt eine Kraft neu an.
+Die Tabelle der Kräfte sortiert per Klick auf den Spaltenkopf nach Name, Funktion, Position oder
+Einheit und filtert im Kopf von „Position“ und „Einheit“; das gilt, solange der Bereich offen ist.
+Die Liste unter „Material“ bleibt ohne Sortierung, sie steht wie an jedem Ort; vergleichen über
+alle Orte geht in der Materialliste.
 Unter „Material“ holt „Material zuordnen …“ Material des Einsatzes an die Stelle: Posten ohne Ort
 und Posten an einem anderen Ort. Geräte und Posten, die sich nicht aufteilen lassen, hängt die Wahl
 ohne Rückfrage um; bei einem Verbrauchsgut, das sich aufteilen lässt, fragt die App vorher die
