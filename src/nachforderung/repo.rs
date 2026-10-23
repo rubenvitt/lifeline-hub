@@ -365,7 +365,7 @@ pub async fn list(
 /// (genau jetzt ist noch nicht überfällig). Trägt EIN `?` für `jetzt`. Dieselbe Regel wie das
 /// Board (`istUeberfaellig` in `frontend/src/nachforderungen/nachforderungStufen.ts`), gehalten über
 /// das Fixture `tests/fixtures/verdichtung/regeln.json`. Die Liste trägt die Spalte bewusst nicht
-/// (keine Spalte mit `jetzt` in [`ANZEIGE_SELECT`]): die Karte rechnet mit der Uhr des Browsers.
+/// (keine Spalte mit `jetzt` in der Anzeige-Abfrage): die Karte rechnet mit der Uhr des Browsers.
 macro_rules! ist_ueberfaellig_sql {
     () => {
         "(n.status IN ('zugesagt', 'unterwegs') AND n.eintreffen_erwartet_at IS NOT NULL \
