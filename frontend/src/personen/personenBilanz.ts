@@ -81,7 +81,7 @@ export function lueckenText(l: Luecken): string | null {
 
 // ── Verbleib ────────────────────────────────────────────────────────────────────────────
 
-type VerbleibKlasse = VerbleibArt | 'unterwegs' | 'uhs' | 'offen';
+export type VerbleibKlasse = VerbleibArt | 'unterwegs' | 'uhs' | 'offen';
 
 /**
  * Klasse des Verbleibs: ein Eigentransport ohne Übergabe ist „unterwegs“ (LLH-1332), sonst die

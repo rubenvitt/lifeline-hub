@@ -9,11 +9,15 @@ describe('tiereDruckAuswahl', () => {
 
   it('nennt Sicht und Spezies mit den Wörtern der Liste', () => {
     expect(tiereDruckAuswahl({ sicht: 'aktiv' })).toBe('Sicht: Offen');
-    expect(tiereDruckAuswahl({ sicht: 'vermisst', spezies: 'hund' })).toBe(
+    expect(tiereDruckAuswahl({ sicht: 'vermisst', spezies: ['hund'] })).toBe(
       'Sicht: Vermisst · Spezies: Hund',
     );
-    expect(tiereDruckAuswahl({ sicht: 'alle', spezies: 'nutzgefluegel' })).toBe(
+    expect(tiereDruckAuswahl({ sicht: 'alle', spezies: ['nutzgefluegel'] })).toBe(
       'Spezies: Nutzgeflügel',
+    );
+    // Mehrere aus dem Kopffilter der Liste (LLH-1096).
+    expect(tiereDruckAuswahl({ sicht: 'alle', spezies: ['hund', 'katze'] })).toBe(
+      'Spezies: Hund, Katze',
     );
   });
 });

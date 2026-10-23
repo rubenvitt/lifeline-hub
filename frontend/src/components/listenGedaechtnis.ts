@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import {
   hatListenZustand,
   listenZustandParams,
+  ohneListenSuche,
   parseListenZustand,
   type ListenZustandAdresse,
 } from '../routing/deeplinks';
@@ -22,7 +23,9 @@ import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
  * an `Datensicht`/`KatalogTabelle`); der Rollout auf alle Listen ist LLH-1096.
  *
  * Geschrieben wird mit `replace`: ein Klick auf einen Filter ist kein Verlaufsschritt, Zurück führt
- * auf die vorige Seite. Fremde Parameter (`?neu=1`, `?einheit=`) bleiben stehen. Beide Speicherorte
+ * auf die vorige Seite. Mit `sucheInAdresse: false` (Betroffene, LLH-1096) bleibt der Suchbegriff
+ * nur in der Sitzung: er kann einen Namen tragen, und die Adresse landet im Browserverlauf, in
+ * Lesezeichen und in jedem geteilten Link; eine Suche in einer alten Adresse wird geräumt. Fremde Parameter (`?neu=1`, `?einheit=`) bleiben stehen. Beide Speicherorte
  * stehen in `GERAETESPEICHER` (`offline/geraetRaeumung.ts`).
  */
 
@@ -198,6 +201,8 @@ export function useListenGedaechtnis<K extends string = string>(
     einsatzId?: number;
     /** Siehe {@link bereinigeListenZustand}: Spalten, die erst mit den Daten feststehen. */
     ausDaten?: readonly NoInfer<K>[];
+    /** `false`: der Suchbegriff steht nur in der Sitzung, nie in der Adresse (Personendaten). */
+    sucheInAdresse?: boolean;
   } = {},
 ): ListenGedaechtnis<K> {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -206,13 +211,13 @@ export function useListenGedaechtnis<K extends string = string>(
     optionen.einsatzId != null ? `:${optionen.einsatzId}` : ''
   }`;
   const spaltenSchluessel = `${SPALTEN_PRAEFIX}${seite}`;
+  const sucheInAdresse = optionen.sucheInAdresse ?? true;
 
   // Beim Aufbau EINMAL gelesen: danach schreibt nur noch der Hook selbst in die Adresse.
   const [anfang] = useState(() => {
-    const ausAdresse = hatListenZustand(searchParams);
-    const quelle = ausAdresse
-      ? searchParams
-      : new URLSearchParams(sitzungLesen(listenSchluessel) ?? '');
+    const adresse = sucheInAdresse ? searchParams : ohneListenSuche(searchParams);
+    const ausAdresse = hatListenZustand(adresse);
+    const quelle = ausAdresse ? adresse : new URLSearchParams(sitzungLesen(listenSchluessel) ?? '');
     return {
       zustand: bereinigeListenZustand<K>(
         parseListenZustand(quelle),
@@ -221,6 +226,8 @@ export function useListenGedaechtnis<K extends string = string>(
         new Set(optionen.ausDaten ?? []),
       ),
       ausSpeicher: !ausAdresse && hatListenZustand(quelle),
+      // Eine Suche in der Adresse, die dort nicht stehen soll: beim Aufbau wegschreiben.
+      sucheRaeumen: !sucheInAdresse && adresse.toString() !== searchParams.toString(),
     };
   });
   const [spaltenStart] = useState(() =>
@@ -238,6 +245,8 @@ export function useListenGedaechtnis<K extends string = string>(
   aktuelleParams.current = searchParams;
   const vorgabeRef = useRef(vorgabe);
   vorgabeRef.current = vorgabe;
+  const sucheInAdresseRef = useRef(sucheInAdresse);
+  sucheInAdresseRef.current = sucheInAdresse;
 
   const aktuell = useRef(anfang.zustand);
   const melde = useCallback(
@@ -248,7 +257,10 @@ export function useListenGedaechtnis<K extends string = string>(
         listenSchluessel,
         listenZustandParams(new URLSearchParams(), adresse).toString(),
       );
-      const neu = listenZustandParams(aktuelleParams.current, adresse);
+      const neu = listenZustandParams(
+        aktuelleParams.current,
+        sucheInAdresseRef.current ? adresse : { ...adresse, suche: '' },
+      );
       if (neu.toString() === aktuelleParams.current.toString()) return;
       setSearchParams(neu, { replace: true });
     },
@@ -258,7 +270,7 @@ export function useListenGedaechtnis<K extends string = string>(
   // Der Rückweg ohne Parameter: der gemerkte Stand gehört in die Adresse, damit Neuladen und Teilen
   // ihn tragen.
   useEffect(() => {
-    if (anfang.ausSpeicher) melde(anfang.zustand);
+    if (anfang.ausSpeicher || anfang.sucheRaeumen) melde(anfang.zustand);
     // Nur beim Aufbau.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- einmalig, `anfang` steht fest
   }, []);

@@ -36,7 +36,14 @@ Sprechgruppen des Funkplans) folgt dem Muster.
 
 ### Requirement: Kartenzweig zeigt dieselbe Menge
 Unterhalb der Breite `md` SHALL die Sicht dieselbe Menge zeigen wie die Tabelle. Sie MUST die
-Filter als Auswahlfelder und die Sortierung über ein Auswahlfeld „Sortieren“ anbieten.
+Filter als Auswahlfelder und die Sortierung über ein Auswahlfeld „Sortieren“ anbieten. Ausgenommen
+sind Filter, die die Seite als `ohneKartenfeld` kennzeichnet, weil jedes weitere Feld die erste
+Karte aus dem ersten Bild schöbe und die Seite die Achse schon über der Liste führt; ein solcher
+Filter MUST weiter wirken und als Chip erscheinen.
+
+#### Scenario: Betroffene am Handy
+- **WHEN** die Adresse `…/personen?f.sk=sk1` bei 390 px geöffnet wird
+- **THEN** zeigen die Karten nur Personen mit SK I, über der Liste steht der Chip „Sichtung: SK I“, und weder Sichtung noch Status noch Verbleib haben ein Auswahlfeld
 
 #### Scenario: Wechsel auf den Handschirm
 - **WHEN** die gefilterte Schadenliste auf 390 px Breite schrumpft
@@ -76,6 +83,10 @@ gemerkt werden.
 #### Scenario: Voreinstellung ohne gemerkte Spaltenwahl
 - **WHEN** die Personalliste auf einem Gerät geöffnet wird, das für sie noch keine Spaltenwahl gemerkt hat
 - **THEN** sind die voreingestellt ausgeblendeten Spalten „Träger“, „Ruhe“ und „Bemerkung“ ausgeblendet
+
+#### Scenario: Suche mit Personendaten bleibt aus der Adresse
+- **WHEN** in der Betroffenenliste nach einem Namen gesucht und nach Verbleib gefiltert wird
+- **THEN** steht der Filter in der Adresse, der Suchbegriff nur im Stand der Sitzung; eine Suche in einer alten Adresse wird beim Öffnen weggeräumt
 
 #### Scenario: Filter auf Werte aus den Daten
 - **WHEN** die Adresse `…/fahrzeuge?f.traeger=ASB` neu geladen wird, bevor die Fahrzeuge geladen sind

@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs]
 ---
 
 ## Überblick
@@ -39,7 +39,14 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
    Transportpriorität; die älteste Sichtung steht oben. Ein Tipp auf Kennung oder Name öffnet die
    Person, ein Tipp auf die Sichtung öffnet die Sichtungswahl.
 5. Der Statusfilter („Alle“, „Erfasst“, „Vermisst“, „Betroffen“, „Verstorben“) und die Suche
-   nach R-Nr., PAT-Nr., Name oder Fundort engen die Liste ein.
+   nach R-Nr., PAT-Nr., Name oder Fundort engen die Liste ein. Feiner geht es im Kopf der Spalten
+   „Sichtung“, „Status“, „Verbleib“ und „Abschnitt“: das Trichterzeichen öffnet die Werte zum
+   Ankreuzen, etwa „SK I“ oder „Offen“, „OK“ übernimmt sie. Ein Klick auf einen Spaltenkopf
+   sortiert nach dieser Spalte, die Sichtung in der Folge SK I bis unverletzt, ein zweiter kehrt
+   die Folge um. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der Treffer
+   und je Wert ein Knopf, etwa „Sichtung: SK I“, der genau diesen Filter entfernt; „Filter
+   zurücksetzen“ leert Suche und Filter. Der Abschnitt ist der der Unfallhilfsstelle, in der die
+   Person gerade ist; die Spalte steht unter 1600 px Fensterbreite unter „Spalten“.
 6. „Abgeschlossene zeigen“ neben dem Statusfilter nimmt die abgeschlossenen Patienten wieder in
    Zeilen, Sichtungsraster und Karte auf; die Zahl dahinter sagt, wie viele es sind. Ohne
    abgeschlossene Patienten steht der Schalter nicht da.
@@ -328,6 +335,15 @@ neu eintreffende Personen nicht in die Liste, und die Reihenfolge bleibt; ein Ba
 nennt sie („1 neuer Eintrag — anzeigen“). So springt keine Zeile unter dem Finger weg. Wird eine
 Sichtung aus der Liste abgelehnt, steht der Grund an der Zeile; ist die Zeile gerade nicht zu
 sehen, über der Liste.
+
+### Filter und Sortierung bleiben stehen
+
+Sortierung und Filter der Liste stehen in der Adresse der Seite. Zurück aus der Ansicht einer
+Person, Neuladen und ein weitergegebener Link zeigen dieselbe Liste. Der Suchbegriff steht nicht
+in der Adresse, weil er einen Namen tragen kann: er bleibt beim Zurück und beim Wiederöffnen über
+das Modulpanel stehen, bis zur Abmeldung, und fällt beim Wechsel des Statusfilters weg. Auf dem
+Handy stehen Sichtung, Status und Verbleib nicht als eigene Auswahlfelder über der Liste; ein
+Filter aus einem Link wirkt dort trotzdem und steht als Knopf darüber.
 
 ### Unterwegs und abgeschlossen
 

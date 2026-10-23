@@ -127,9 +127,16 @@ export default function GeraetPatientenPage() {
       prioritaet: p.transport_prioritaet,
       seit: (uhs ? wartetSeit(p.id, uhs.belegungen) : null) ?? seitWert(p),
     });
+  /*
+   * Ohne Kopffilter und ohne Listengedächtnis (LLH-1096, bewusste Ausnahme): die Startseite einer
+   * Ein-Aufgaben-Fläche (`geraet/AGENTS.md`, Spec `feldgeraet-bedienung`, „Start am Tablet“) zeigt
+   * nur die Patienten der eigenen UHS, nach Dringlichkeit; ein Filter verbärge einen Wartenden,
+   * und die Adresse eines Geräts teilt niemand. Sortieren per Kopf bleibt, Suche auch.
+   */
   const spalten = spaltenFuer<Person>()([
     ...register
       .filter((s) => GERAET_SPALTEN.has(s.key))
+      .map((s): (typeof register)[number] => ({ ...s, filter: undefined }))
       .map((s): (typeof register)[number] =>
         s.key === 'sk'
           ? { ...s, sortWert: dringlichkeit }

@@ -14,6 +14,8 @@ import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -90,7 +92,15 @@ function renderPage(pfad = '/einsaetze/1/evakuierung') {
         <AuthProvider>
           <MemoryRouter initialEntries={[pfad]}>
             <Routes>
-              <Route path="/einsaetze/:id/evakuierung" element={<EvakuierungPage />} />
+              <Route
+                path="/einsaetze/:id/evakuierung"
+                element={
+                  <>
+                    <EvakuierungPage />
+                    <OrtAnzeige />
+                  </>
+                }
+              />
               <Route path="/einsaetze/:id/lagekarte" element={<LagekarteSonde />} />
               <Route path="/einsaetze/:id/evakuierung/:bezirkId" element={<DetailSonde />} />
             </Routes>
@@ -100,6 +110,16 @@ function renderPage(pfad = '/einsaetze/1/evakuierung') {
     </QueryClientProvider>,
   );
   return { ...ergebnis, client };
+}
+
+/** Die Adresse der Liste selbst (Sortieren und Filtern, LLH-1096). */
+function OrtAnzeige() {
+  const ort = useLocation();
+  return (
+    <div data-testid="liste-ort" hidden>
+      {ort.search}
+    </div>
+  );
 }
 
 /** Ziel des Sprungs „Auf Karte zeigen": zeigt die angesteuerte Adresse. */
@@ -682,5 +702,36 @@ describe('EvakuierungPage (LLH-1034)', () => {
     await waitFor(() =>
       expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'laeuft' }),
     );
+  });
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse (LLH-1096)', async () => {
+    setzeViewportBreite(1440);
+    renderPage();
+    await screen.findByText('Hafenviertel');
+    const adresse = () => screen.getByTestId('liste-ort').textContent;
+
+    await kopfFilterWaehlen('Stand', ['Keine Meldung (1)']);
+    await waitFor(() => expect(screen.queryByText('Uferstraße 12–40')).toBeNull());
+    expect(screen.getByText('Hafenviertel')).toBeInTheDocument();
+    await waitFor(() => expect(adresse()).toBe('?f.stand=keine'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await screen.findByText('Uferstraße 12–40');
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Bezirk/ }));
+    await waitFor(() => expect(adresse()).toBe('?sort=bezeichnung%3Aauf'));
+    const folge = [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+    expect(folge).toEqual(['bezirk-6', 'bezirk-5']);
+  });
+
+  it('der Abschnitt filtert mit den Werten der Bezirke, auch aus der Adresse (LLH-1096)', async () => {
+    setzeViewportBreite(1440);
+    renderPage('/einsaetze/1/evakuierung?f.abschnitt=Deichwache%20Nord');
+    expect(await screen.findByText('Uferstraße 12–40')).toBeInTheDocument();
+    expect(screen.queryByText('Hafenviertel')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Abschnitt: Deichwache Nord entfernen' }),
+    ).toBeInTheDocument();
   });
 });
