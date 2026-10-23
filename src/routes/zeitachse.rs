@@ -130,7 +130,7 @@ async fn nachtragen(
     let zeitpunkt = nachtrag_zeit(&body.zeitpunkt_at, &jetzt)?;
     let notiz = notiz(body.notiz);
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
+    let stil = crate::verpflegung::repo::zeitstil(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
         require_aktiv_tx(conn, einsatz_id, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
@@ -155,7 +155,7 @@ async fn nachtragen(
             einsatz_id,
             benutzer_id,
             startwert,
-            &repo::etb_text_nachtrag(kraft, &name, art, &zeitpunkt, tz),
+            &repo::etb_text_nachtrag(kraft, &name, art, &zeitpunkt, stil),
         )
         .await?;
         Ok((etb_id, beruehrt))
@@ -177,7 +177,7 @@ async fn streichen(
         return Err(AppError::Validation("Grund fehlt".into()));
     }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
+    let stil = crate::verpflegung::repo::zeitstil(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
         require_aktiv_tx(conn, einsatz_id, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
@@ -187,7 +187,7 @@ async fn streichen(
             einsatz_id,
             benutzer_id,
             startwert,
-            &repo::etb_text_streichung(kraft, &name, g.art, &g.zeitpunkt_at, &grund, tz),
+            &repo::etb_text_streichung(kraft, &name, g.art, &g.zeitpunkt_at, &grund, stil),
         )
         .await?;
         Ok((etb_id, g.beruehrt))

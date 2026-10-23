@@ -626,10 +626,13 @@ export function parsePersonenDruckAuswahl(params: URLSearchParams): PersonenDruc
   };
 }
 
-/** Auswahl der Tiere-Druckansicht: Statussicht und optional eine Spezies. */
+/**
+ * Auswahl der Tiere-Druckansicht: Statussicht und optional Spezies (seit LLH-1096 mehrere, wie der
+ * Kopffilter der Liste; `spezies=hund,katze`).
+ */
 export interface TiereDruckAuswahl {
   sicht: TiereSicht;
-  spezies?: Spezies;
+  spezies?: readonly Spezies[];
 }
 
 const TIERE_SICHT_ERLAUBT: Record<TiereSicht, true> = {
@@ -651,7 +654,7 @@ const SPEZIES_ERLAUBT: Record<Spezies, true> = {
 export function tiereDruckPfad(einsatzId: number, auswahl: TiereDruckAuswahl): string {
   return mitQuery(`${einsatzModulPfad(einsatzId, 'tiere')}/druck`, {
     sicht: auswahl.sicht === 'alle' ? undefined : auswahl.sicht,
-    spezies: auswahl.spezies,
+    spezies: auswahl.spezies?.length ? auswahl.spezies.join(',') : undefined,
   });
 }
 
@@ -665,9 +668,10 @@ export function parseTiereDruckAuswahl(params: URLSearchParams): TiereDruckAuswa
         ? (sicht as TiereSicht)
         : 'alle',
   };
-  if (spezies && Object.prototype.hasOwnProperty.call(SPEZIES_ERLAUBT, spezies)) {
-    auswahl.spezies = spezies as Spezies;
-  }
+  const bekannt = (spezies ?? '')
+    .split(',')
+    .filter((s): s is Spezies => Object.prototype.hasOwnProperty.call(SPEZIES_ERLAUBT, s));
+  if (bekannt.length > 0) auswahl.spezies = bekannt;
   return auswahl;
 }
 
@@ -1475,6 +1479,13 @@ const SORT_AUS = 'aus';
 
 function istListenParam(name: string): boolean {
   return name === SORT_PARAM || name === SUCHE_PARAM || name.startsWith(FILTER_PRAEFIX);
+}
+
+/** Kopie der Adresse ohne Suchbegriff (Liste mit `sucheInAdresse: false`, LLH-1096). */
+export function ohneListenSuche(params: URLSearchParams): URLSearchParams {
+  const kopie = new URLSearchParams(params);
+  kopie.delete(SUCHE_PARAM);
+  return kopie;
 }
 
 /** Trägt die Adresse einen Listenzustand? Sonst gilt der gemerkte Stand der Seite. */

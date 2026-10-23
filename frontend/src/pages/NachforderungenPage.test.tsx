@@ -253,6 +253,35 @@ describe('NachforderungenPage', () => {
     );
   });
 
+  /**
+   * LLH-1395: mit am Raum gebuchter Einheit lehnt der Server jede Rücknahme mit 422 ab (LLH-1387
+   * D5), aus „eingetroffen“ ebenso mit übernommenem Material (LLH-1226 D9). Der Toast bestätigt
+   * dann den Status und nennt den Grund, ein Rückgängig-Knopf fehlt.
+   */
+  it.each([
+    {
+      fall: 'verknüpfte Einheit',
+      vorher: nf({ status: 'unterwegs', einheit_ids: [11] }),
+      knopf: 'Eintreffen melden',
+      nachher: nf({ status: 'eingetroffen', ist_offen: false, einheit_ids: [11] }),
+    },
+    {
+      fall: 'am Raum gebucht, während die Karte stand',
+      vorher: nf({ status: 'zugesagt' }),
+      knopf: 'Abfahrt melden',
+      nachher: nf({ status: 'unterwegs', einheit_ids: [11] }),
+    },
+  ])('ohne Rückgängig-Knopf bei $fall', async ({ vorher, knopf, nachher }) => {
+    listeNachforderungen.mockResolvedValue([vorher]);
+    setzeNachforderungStatus.mockResolvedValue(nachher);
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: knopf }));
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/Einheiten verknüpft, kein Rückgängig/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rückgängig' })).toBeNull();
+  });
+
   it('lehnt eine Nachforderung mit Grund ab (über Dialog)', async () => {
     lehneNachforderungAb.mockResolvedValue(nf({ status: 'abgelehnt' }));
     renderPage();

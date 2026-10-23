@@ -258,7 +258,7 @@ nicht ausgeschaltet ist. Der gemeldete Vollzug schreibt immer eine „Meldung“
 
 Berichtigen und Aufheben schreiben immer eine „Anordnung“, auch bei ausgeschalteten
 automatischen Einträgen: „Auftrag #4 aufgehoben: Lage hat sich erledigt“ bzw. „Auftrag #4
-geändert: …“ mit neuem und vorherigem Wert, etwa „Frist 12.10. 16:00 (vorher 12.10. 15:00)“.
+geändert: …“ mit neuem und vorherigem Wert, etwa „Frist 121600okt26 (vorher 121500okt26)“.
 Die Felder des Befehlsschemas erscheinen dort nur mit ihrem Namen. Die ursprüngliche Anordnung
 bleibt unverändert stehen.
 

@@ -36,8 +36,12 @@ import {
   vorgemerktJePerson,
   zeilenMenueEintraege,
   zeilenMenueName,
+  type PersonenAbschnitt,
+  type PersonenSpaltenKey,
   type PersonZeilenAktion,
 } from '../personen/personenSpalten';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
 import {
   FILTER_OPTIONEN,
   SICHT_VORGABE,
@@ -62,7 +66,7 @@ import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
 import VerbleibErfassung from '../personen/VerbleibErfassung';
 import { UebergabeDialog } from '../personen/UebergabeQuittieren';
 import SichtungDialog from '../personen/SichtungDialog';
-import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
 import { useDichte } from '../theme/ThemeModeProvider';
 import { dichten } from '../theme/tokens';
 import '../personen/betroffene.css';
@@ -83,7 +87,7 @@ import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useHalteQuellen } from '../components/useHalteQuellen';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
-import { modulName } from '../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 
 /**
  * Betroffene: das Formular wird zur Zeile.
@@ -114,6 +118,15 @@ import { modulName } from '../einsatz/modulRegistry';
  */
 
 const SEITENLEISTE_BREITE = 268;
+
+/**
+ * Was das Listengedächtnis beim Aufbau der Seite prüft (LLH-1096, Herleitung in `FahrzeugePage.tsx`):
+ * das Register selbst, ohne Bedienung, denn Sortier- und Filterachsen hängen an keinen Daten. Nur
+ * der Abschnitt nimmt seine Werte aus den Zeilen und steht hinter der Freigabe der Abschnitte
+ * (`ausDaten`).
+ */
+const GEDAECHTNIS_SPALTEN = personenSpalten(() => undefined);
+const GEDAECHTNIS_AUS_DATEN: readonly PersonenSpaltenKey[] = ['abschnitt'];
 /** Ohne Abgleich: eine feste leere Menge, damit die gemerkten Spalten stehen bleiben. */
 const KEINE_GEFUNDENEN: readonly Person[] = [];
 
@@ -170,6 +183,21 @@ export default function PersonenPage() {
   const feldRef = useRef<InputRef>(null);
   const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
   const sicht = sichtNachEinsatz[einsatzId] ?? SICHT_VORGABE;
+  /**
+   * Sortierung und Kopffilter stehen in der Adresse (LLH-1096, Muster der Schadenliste); der Hook
+   * gehört der Seite und steht vor jedem frühen Ausstieg. Die Suche NICHT (`sucheInAdresse`): sie
+   * trägt Namen von Betroffenen, und die Adresse landet in Verlauf, Lesezeichen und geteilten Links.
+   */
+  const gedaechtnis = useListenGedaechtnis<PersonenSpaltenKey | 'abgleich'>(
+    'personen',
+    GEDAECHTNIS_SPALTEN,
+    {
+      vorgabe: { spalte: 'reg', richtung: 'ab' },
+      einsatzId,
+      ausDaten: GEDAECHTNIS_AUS_DATEN,
+      sucheInAdresse: false,
+    },
+  );
 
   const aendereSichtFuer = (zielEinsatzId: number, aenderung: (alt: Sicht) => Sicht) => {
     setSichtNachEinsatz((alt) => ({
@@ -201,6 +229,16 @@ export default function PersonenPage() {
     queryFn: () => listeUhs(einsatzId),
   });
   const uhsListe = uhsQuery.data ?? [];
+  /**
+   * Die Abschnitte für die Spalte „Abschnitt“ (LLH-1096): der Abschnitt einer Person ist der ihrer
+   * aktuellen UHS. Nur mit freiem Modul Einsatzabschnitte; sonst fehlt die Spalte.
+   */
+  const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', useModulFreigaben(einsatzId));
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled: abschnitteFrei,
+  });
 
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -725,10 +763,32 @@ export default function PersonenPage() {
       selectZeilenAktion,
     ],
   );
+  const abschnitteDaten = abschnitteFrei ? abschnitteQuery.data : undefined;
+  /**
+   * Werte sind die Abschnitte der UHS, nicht die der Zeilen: so hängt das Register an keinem
+   * `person`-Ereignis, und die Zeilen bleiben gemerkt (LFH-949). Der Zähler im Kopfmenü nennt 0.
+   */
+  const abschnitt = useMemo((): PersonenAbschnitt | undefined => {
+    if (!abschnitteDaten) return undefined;
+    const abschnittNamen = new Map(abschnitteDaten.map((a) => [a.id, a.name]));
+    const uhsAbschnitt = new Map(
+      (uhsDaten ?? []).flatMap((u) =>
+        u.abschnitt_id != null && abschnittNamen.has(u.abschnitt_id)
+          ? [[u.id, abschnittNamen.get(u.abschnitt_id)!] as const]
+          : [],
+      ),
+    );
+    const name = (p: Person) =>
+      p.aktuelle_uhs_id != null ? (uhsAbschnitt.get(p.aktuelle_uhs_id) ?? null) : null;
+    const werte = [...new Set(uhsAbschnitt.values())]
+      .sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
+      .map((w) => ({ text: w, value: w }));
+    return { name, werte };
+  }, [abschnitteDaten, uhsDaten]);
   const register = useMemo(() => {
     const namen = new Map((uhsDaten ?? []).map((u) => [u.id, u.bezeichnung]));
-    return personenSpalten((id) => namen.get(id), bedienung);
-  }, [uhsDaten, bedienung]);
+    return personenSpalten((id) => namen.get(id), bedienung, abschnitt);
+  }, [uhsDaten, bedienung, abschnitt]);
   /**
    * Die Spaltenliste der Zeilen-Ansicht: Register plus Abgleichspalte. Durch
    * `spaltenFuer<Person>()` geführt, nicht annotiert — eine Annotation weitete die
@@ -1086,7 +1146,12 @@ export default function PersonenPage() {
                 beschriftung="Personen nach Status filtern"
                 optionen={FILTER_OPTIONEN}
                 wert={sicht.filter}
-                onWechsel={(filter) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }))}
+                onWechsel={(filter) => {
+                  // Der Suchbegriff gehört zur Menge des Reiters (meist ein Name daraus), Sortierung
+                  // und Kopffilter gehen mit (LLH-1096): die Sicht beginnt beim gemeldeten Stand.
+                  gedaechtnis.melde({ ...gedaechtnis.start, suche: '' });
+                  aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }));
+                }}
               />
               {/* Abgeschlossene stehen nicht in den Standardansichten (LLH-1332, Spec
                   `betroffene-lagedaten`); die Zahl sagt, wie viele fehlen. Ohne Abgeschlossene
@@ -1145,9 +1210,9 @@ export default function PersonenPage() {
                  * Filter mit fünf Datenmengen, und bei konstantem Schlüssel filterte ein
                  * Suchbegriff aus „Vermisst" die Menge von „Betroffen".
                  *
-                 * Gewollter Preis: mit dem Filterwechsel fallen Sortierung, Spaltenauswahl,
-                 * Spaltenfilter und Zeilenschleuse zurück — alle vier sind Zustand im Primitiv und
-                 * gehören zur jeweiligen Menge.
+                 * Sortierung, Kopffilter, Suche und Spaltenwahl beginnen nach dem Wechsel beim
+                 * zuletzt gemeldeten Stand (`gedaechtnis`, LLH-1096), so wie auf jeder Liste mit
+                 * Gedächtnis; nur die Zeilenschleuse fällt zurück.
                  */
                 key={`liste-${sicht.filter}`}
                 bezeichnung="Personen"
@@ -1157,7 +1222,8 @@ export default function PersonenPage() {
                 ladend={personenQuery.isLoading}
                 leerText={leerText}
                 suche={{ platzhalter: 'R-Nr., PAT-Nr., Name, Fundort' }}
-                standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
+                mehrzahl="Personen"
+                gedaechtnis={gedaechtnis}
                 onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
                 zeilenKlasse={zeilenKlasse}
                 karte={listenKarte}

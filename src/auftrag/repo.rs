@@ -2,6 +2,7 @@ use crate::error::AppError;
 use crate::kommunikation::{
     repo as krepo, OBJEKT_AUFTRAG, VOLLZUG_IN_ARBEIT, VOLLZUG_OFFEN, VOLLZUG_VOLLZOGEN,
 };
+use crate::zeitdarstellung::Zeitstil;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 
@@ -1289,12 +1290,9 @@ impl BerichtigungsStand {
     }
 }
 
-/// Frist in der Zone des Einsatzes für den ETB-Text („12.10. 16:00“).
-fn frist_text(frist: &Option<String>, tz: chrono_tz::Tz) -> Option<String> {
-    frist.as_deref().map(|f| match crate::zeit::parse_utc(f) {
-        Some(t) => t.with_timezone(&tz).format("%d.%m. %H:%M").to_string(),
-        None => f.to_string(),
-    })
+/// Frist für den ETB-Text in Zone und Darstellung des Einsatzes („121600okt26“, LLH-1061).
+fn frist_text(frist: &Option<String>, stil: Zeitstil) -> Option<String> {
+    frist.as_deref().map(|f| stil.zeitpunkt_text(f))
 }
 
 /// Ergebnis einer Berichtigung: die ETB-Anordnung (`None` ohne fachliche Änderung, dann wurde
@@ -1318,7 +1316,7 @@ pub async fn berichtigen_tx(
     auftrag_id: i64,
     von_id: i64,
     etb_startwert: i64,
-    tz: chrono_tz::Tz,
+    stil: Zeitstil,
     b: &super::ValidierteBerichtigung,
     jetzt: &str,
 ) -> Result<Berichtigt, AppError> {
@@ -1409,8 +1407,8 @@ pub async fn berichtigen_tx(
     let frist = match &b.frist_at {
         Some(f) if *f != alt.frist_at => {
             aenderungen.push(Aenderung::Frist {
-                neu: frist_text(f, tz),
-                vorher: frist_text(&alt.frist_at, tz),
+                neu: frist_text(f, stil),
+                vorher: frist_text(&alt.frist_at, stil),
             });
             Some(f.clone())
         }

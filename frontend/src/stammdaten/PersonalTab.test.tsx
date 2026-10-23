@@ -7,6 +7,9 @@ import { renderMitProviders } from '../test/utils';
 import PersonalTab from './PersonalTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { ort, Ortsfuehler } from '../test/ortsfuehler';
+import { setzeViewportBreite } from '../test/viewport';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -67,14 +70,18 @@ const statusTrichter = () =>
     .querySelector<HTMLElement>('.ant-table-filter-trigger')!;
 
 async function menueEintrag(text: string): Promise<HTMLElement> {
-  const treffer = (await screen.findAllByText(text)).find((k) =>
+  const treffer = (await screen.findAllByText(new RegExp(`^${text} \\(\\d+\\)$`))).find((k) =>
     k.closest('.ant-table-filter-dropdown'),
   );
   if (!treffer) throw new Error(`Kein Filtereintrag „${text}" im Menü`);
   return treffer;
 }
 
-function render(benutzer: typeof admin, liste: unknown[] = personal) {
+function render(
+  benutzer: typeof admin,
+  liste: unknown[] = personal,
+  route = '/admin/stammdaten/personal',
+) {
   server.use(
     meHandler(benutzer),
     http.get('/api/personal', () => HttpResponse.json(liste)),
@@ -86,7 +93,13 @@ function render(benutzer: typeof admin, liste: unknown[] = personal) {
     ),
     http.get('/api/benutzer', () => HttpResponse.json([])),
   );
-  return renderMitProviders(<PersonalTab />);
+  return renderMitProviders(
+    <>
+      <Ortsfuehler />
+      <PersonalTab />
+    </>,
+    { route },
+  );
 }
 
 describe('PersonalTab', () => {
@@ -323,5 +336,55 @@ describe('PersonalTab — Demo-Marke', () => {
     const demo = container.querySelector('[data-row-key="2"]') as HTMLElement;
     expect(within(demo).getByText('Demo')).toBeInTheDocument();
     expect(within(echt).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096): Qualifikationen und Träger filtern mit Werten
+ * aus den Zeilen, die Stärke-Position mit ihren drei Werten; der Stand steht in der Adresse.
+ */
+describe('PersonalTab · Sortieren und Filtern (LLH-1096)', () => {
+  const folge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, zweiPersonen);
+    await screen.findByText('Thomas Müller');
+    expect(folge()).toEqual(['1', '2']);
+
+    // Werte stehen einzeln kodiert in der Liste (das Komma trennt, `routing/deeplinks.ts`).
+    await kopfFilterWaehlen('Qualifikationen', ['Sanitäter (1)']);
+    await waitFor(() => expect(folge()).toEqual(['1']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/stammdaten/personal?f.qualifikationen=Sanit%25C3%25A4ter'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Personalnr/ }));
+    await waitFor(() => expect(folge()).toEqual(['2', '1']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/stammdaten/personal?sort=personalnummer%3Aauf'),
+    );
+  });
+
+  it('die Stärke-Position filtert nach ihren drei Werten', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, zweiPersonen);
+    await screen.findByText('Thomas Müller');
+    await kopfFilterWaehlen('Stärke-Position', ['Mannschaft (1)']);
+    await waitFor(() => expect(folge()).toEqual(['2']));
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, zweiPersonen, '/admin/stammdaten/personal?f.traeger=THW');
+    await screen.findByText('Ömer Berg');
+    expect(screen.queryByText('Thomas Müller')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Träger: THW entfernen' }),
+    ).toBeInTheDocument();
   });
 });

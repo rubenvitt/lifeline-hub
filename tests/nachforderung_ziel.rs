@@ -175,7 +175,7 @@ async fn ziel_bereitstellungsraum_und_bedarfszeit_kommen_in_anzeige_und_etb() {
     assert!(n.get("ziel_name").is_none());
     assert_eq!(
         etb_inhalt(&app, &admin, e, &n).await,
-        "Nachforderung: 2× RTW → BR Nord, benötigt bis 21.10. 15:30 — Transport aus UHS Turnhalle"
+        "Nachforderung: 2× RTW → BR Nord, benötigt bis 211530okt26 — Transport aus UHS Turnhalle"
     );
     assert_eq!(liste(&app, &admin, e).await[0]["ziel_br_id"], br);
 }

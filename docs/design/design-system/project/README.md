@@ -392,7 +392,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Spalten, die beim ersten Rendern noch nicht feststehen (Werte aus den Zeilen, Spalte hinter einer
   Freigabe), nennt die Seite als `ausDaten`, sonst fiele ihr Filter aus der Adresse. Eine Sicht im
   Baummodus sortiert und filtert nicht (Meldebild, Funkplan, Kommunikationsplan; Kommentar an der
-  Sicht). Vorbild Schäden, dazu Fahrzeuge, Personal, Material, Sprechgruppen; Rollout LLH-1096.
+  Sicht). Ein Filter mit `ohneKartenfeld` hat im Kartenzweig kein Auswahlfeld (Betroffene, Status
+  der Tiere: die Seite führt die Achse schon, die erste Karte bleibt im ersten Bild), wirkt aber
+  und steht als Chip da. Vorbild Schäden, dazu Fahrzeuge, Personal, Material, Sprechgruppen,
+  Betroffene, Tiere, Evakuierung; Rollout LLH-1096. Gerätestartseiten bleiben ohne Kopffilter
+  (Kommentar an der Seite).
   Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
   Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
 - **Kopfwerkzeuge der `KatalogTabelle` folgen der Dichte** (LLH-1227): Suche und Spaltenschalter

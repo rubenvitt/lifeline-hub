@@ -53,8 +53,8 @@ export const TIER_STATUS: Record<TierStatus, { label: string; ton: StatusTon }> 
 
 /**
  * Filterkette der Tierliste als reine Funktion. Die Freitextsuche läuft im `Datensicht`-Primitiv
- * (`suchText` der Spalten); der Spezies-Filter ist eine Seiten-Steuerung neben den Reitern, weil er
- * zusammen mit der Statusachse gelesen wird.
+ * (`suchText` der Spalten), der Spezies-Filter im Spaltenkopf (LLH-1096). Hier gefiltert wird nur
+ * für den Druck: Statussicht und die Spezies aus dem Kopffilter der Liste.
  */
 
 /** Status-Sichten: 'alle' = kein Filter; sonst Status-Filter. */
@@ -88,10 +88,10 @@ export function halterVorbelegung(
 /** Zeilenmenge aus Statussicht UND Spezies — Schnittmenge, keine Vereinigung. */
 export function filterTiere(
   alle: readonly Tier[],
-  opts: { sicht: TiereSicht; spezies?: Spezies },
+  opts: { sicht: TiereSicht; spezies?: readonly Spezies[] },
 ): readonly Tier[] {
   const { sicht, spezies } = opts;
   return alle
     .filter((t) => sicht === 'alle' || t.status === sicht)
-    .filter((t) => !spezies || t.spezies === spezies);
+    .filter((t) => !spezies?.length || spezies.includes(t.spezies));
 }

@@ -8,6 +8,8 @@ import { adminFixture } from '../test/fixtures';
 import type { ExterneStelle } from '../api/types';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import ExterneStellenTab from './ExterneStellenTab';
+import { ort, Ortsfuehler } from '../test/ortsfuehler';
+import { setzeViewportBreite } from '../test/viewport';
 
 /** LFH-1194, design.md D10: Verwaltung des Katalogs „Externe Stellen“. */
 
@@ -31,7 +33,11 @@ const KATALOG: ExterneStelle[] = [
 const bezeichnungen = (c: HTMLElement) =>
   [...c.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
 
-function render(benutzer: typeof admin, liste: ExterneStelle[] = KATALOG) {
+function render(
+  benutzer: typeof admin,
+  liste: ExterneStelle[] = KATALOG,
+  route = '/admin/stammdaten/externe-stellen',
+) {
   let abgerufen = '';
   server.use(
     meHandler(benutzer),
@@ -40,7 +46,16 @@ function render(benutzer: typeof admin, liste: ExterneStelle[] = KATALOG) {
       return HttpResponse.json(liste);
     }),
   );
-  return { ...renderMitProviders(<ExterneStellenTab />), abgerufen: () => abgerufen };
+  return {
+    ...renderMitProviders(
+      <>
+        <Ortsfuehler />
+        <ExterneStellenTab />
+      </>,
+      { route },
+    ),
+    abgerufen: () => abgerufen,
+  };
 }
 
 describe('ExterneStellenTab', () => {
@@ -64,7 +79,7 @@ describe('ExterneStellenTab', () => {
     const kopf = screen.getByRole('columnheader', { name: /^Art/ });
     await userEvent.click(kopf.querySelector('.ant-table-filter-trigger') as HTMLElement);
     const korb = document.querySelector('.ant-table-filter-dropdown') as HTMLElement;
-    await userEvent.click(within(korb).getByText('Polizei'));
+    await userEvent.click(within(korb).getByText(/^Polizei \(\d+\)$/));
     await userEvent.click(within(korb).getByRole('button', { name: 'OK' }));
     await waitFor(() => expect(bezeichnungen(container)).toEqual(['Polizei Musterstadt']));
   });
@@ -75,7 +90,7 @@ describe('ExterneStellenTab', () => {
     const kopf = screen.getByRole('columnheader', { name: /^Aktiv/ });
     await userEvent.click(kopf.querySelector('.ant-table-filter-trigger') as HTMLElement);
     const korb = document.querySelector('.ant-table-filter-dropdown') as HTMLElement;
-    await userEvent.click(within(korb).getByText('Inaktiv'));
+    await userEvent.click(within(korb).getByText(/^Inaktiv \(\d+\)$/));
     await userEvent.click(within(korb).getByRole('button', { name: 'OK' }));
     await waitFor(() => expect(bezeichnungen(container)).toEqual(['Ordnungsamt']));
   });
@@ -121,5 +136,38 @@ describe('ExterneStellenTab', () => {
     expect(screen.getByRole('button', { name: 'Externe Stelle anlegen' })).toBeDisabled();
     expect(screen.getByText(STAMMDATEN_RECHTE_TEXT)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Sortieren im Spaltenkopf (LLH-1096): Art in der Folge des Katalogs, Rufnummer und Funkrufname
+ * sortieren; der Stand steht in der Adresse und kommt aus ihr zurück.
+ */
+describe('ExterneStellenTab · Sortieren (LLH-1096)', () => {
+  it('Art und Rufnummer sortieren, die Adresse trägt die Sortierung', async () => {
+    setzeViewportBreite(1600);
+    const { container } = render(nichtAdmin);
+    await screen.findByText('Polizei Musterstadt');
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Rufnummer/ }));
+    await waitFor(() => expect(bezeichnungen(container)[0]).toBe('Ordnungsamt'));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/stammdaten/externe-stellen?sort=rufnummer%3Aauf'),
+    );
+  });
+
+  it('eine Adresse mit Sortierung zeigt die sortierte Liste', async () => {
+    setzeViewportBreite(1600);
+    const { container } = render(
+      nichtAdmin,
+      KATALOG,
+      '/admin/stammdaten/externe-stellen?sort=art%3Aab',
+    );
+    await screen.findByText('Polizei Musterstadt');
+    // Folge des Katalogs (Leitstelle, Polizei, Behörde) absteigend.
+    expect(bezeichnungen(container)).toEqual([
+      'Ordnungsamt',
+      'Polizei Musterstadt',
+      'ILS Musterkreis zuständig',
+    ]);
   });
 });

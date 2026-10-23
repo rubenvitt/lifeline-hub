@@ -88,6 +88,32 @@ den Druck eingehen.
 - **WHEN** der Einsatz taktisch vorgibt, das Gerät „Datum und Uhrzeit“ gewählt hat und gedruckt wird
 - **THEN** steht im Druckbild `101430okt26`, am Bildschirm danach wieder `10.10.26 14:30`
 
+### Requirement: Servertexte
+Texte, die der Server fertig schreibt und speichert oder verteilt (Systemeinträge und Meldungen im
+ETB, Detailzeile eines Hinweises), SHALL Zeitpunkte in der Darstellung von Einsatz bzw.
+Organisation nennen, Vorgabe taktisch (LLH-1061); die Gerätewahl MUST NOT eingehen. Sie bildet nur
+`src/zeitdarstellung.rs`. Ein Zeitpunkt steht in der Rolle „Zeitpunkt“, ein Zeitraum als Zeitpunkt
+und Uhrzeit, wenn das Ende am selben Ortstag liegt, sonst als zwei Zeitpunkte; die Rolle „kurz“
+MUST NOT vorkommen, denn ein gespeicherter Text weiß nicht, wann er gelesen wird. Wo der Tag aus
+dem Zusammenhang feststeht (Fälligkeit einer Ablösung im Hinweis), steht die Rolle „Uhrzeit“.
+Geschriebene Einträge MUST unverändert bleiben (E4).
+
+#### Scenario: Nachtrag in voller DTG
+- **WHEN** weder Einsatz noch Organisation eine Darstellung wählen und ein Eintreffen für 30.09.2026 06:40 Ortszeit nachgetragen wird
+- **THEN** nennt der ETB-Eintrag `300640sep26`
+
+#### Scenario: Zeitraum in beiden Darstellungen
+- **WHEN** ein Verpflegungs-Zeitfenster am 24.09.2026 von 12:00 bis 13:30 Ortszeit angelegt wird
+- **THEN** nennt der ETB-Eintrag taktisch `241200sep26–1330`, bei „Datum und Uhrzeit“ `24.09.26 12:00–13:30`, und über Mitternacht beide Tage (`242200sep26–250200sep26`)
+
+#### Scenario: Einsatz vor Organisation
+- **WHEN** die Organisation „Datum und Uhrzeit“ wählt und der Einsatz „Taktisch“
+- **THEN** schreibt der Server für diesen Einsatz `300640sep26`
+
+#### Scenario: Alteinträge bleiben
+- **WHEN** ein Einsatz von „Datum und Uhrzeit“ auf „Taktisch“ umgestellt wird
+- **THEN** behalten die vorher geschriebenen ETB-Einträge ihren Wortlaut, neue nennen die volle DTG
+
 ### Requirement: Eine Formatstelle
 Zeitangaben für Menschen SHALL nur der Formatkern in `frontend/src/anzeige/` bilden. Ein Wächter
 MUST jede neue Formatierung mit Datums- oder Uhrzeit-Token außerhalb davon ablehnen; Maschinen-

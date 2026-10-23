@@ -2,7 +2,7 @@
 titel: Tiere
 gruppen: [alle, fuehrung]
 reihenfolge: 540
-quellen: [frontend/src/pages/TierePage.tsx, frontend/src/pages/TiereDetailPage.tsx, frontend/src/pages/tiere/tierHelfer.ts, frontend/src/personen/HalterPicker.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/tiere/TierVerortung.tsx, frontend/src/pages/lagekarte/tierMarker.ts, src/routes/einsatz_tier.rs, src/tier/mod.rs]
+quellen: [frontend/src/pages/TierePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/TiereDetailPage.tsx, frontend/src/pages/tiere/tierHelfer.ts, frontend/src/personen/HalterPicker.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/tiere/TierVerortung.tsx, frontend/src/pages/lagekarte/tierMarker.ts, src/routes/einsatz_tier.rs, src/tier/mod.rs]
 ---
 
 ## Überblick
@@ -23,9 +23,20 @@ Halter zuordnen.
    ![Liste der Tiere in der Sicht „Alle“ mit aktiven, vermissten und abgeschlossenen Tieren](../bilder/tiere/liste.png)
 
 2. Die Leiste „Offen“, „Vermisst“, „Abgeschlossen“, „Alle“ wählt die Sicht; „Offen“ zeigt die
-   aktiven Tiere. Daneben engt „Spezies“ die Liste ein, die Suche findet T-Nr., Rufname und
-   Rasse.
-3. Ein Klick auf eine Zeile öffnet die Seite des Tiers.
+   aktiven Tiere. Die Suche findet T-Nr., Rufname und Rasse.
+3. Im Kopf der Spalten „Spezies“ und „Status“ filtern: das Trichterzeichen öffnet die Werte zum
+   Ankreuzen, etwa „Katze“, „OK“ übernimmt sie; unter „Alle“ grenzt der Status auf mehrere Werte
+   zugleich ein, etwa „Aktiv“ und „Vermisst“. Ein Klick auf einen Spaltenkopf sortiert nach dieser
+   Spalte, ein zweiter kehrt die Folge um. Ist die Liste eingeschränkt, steht darüber „Gefiltert“
+   mit der Zahl der Treffer und je Wert ein Knopf, etwa „Spezies: Katze“, der genau diesen Filter
+   entfernt; „Filter zurücksetzen“ leert Suche und Filter. Auf dem Handy steht „Spezies“ als
+   Auswahlfeld über der Liste, daneben „Sortieren“.
+4. Ein Klick auf eine Zeile öffnet die Seite des Tiers.
+
+Sortierung, Filter und Suche stehen in der Adresse der Seite: Zurück aus der Seite eines Tiers,
+Neuladen und ein weitergegebener Link zeigen dieselbe Liste. Beim Wechsel der Sicht bleiben
+Sortierung und Filter stehen, die Suche fällt weg. Ein neu erfasstes Tier, das ein Filter auf
+Spezies oder Status verbergen würde, nimmt diesen Filter zurück.
 
 ### Ein Tier erfassen
 
@@ -133,7 +144,7 @@ vermisst → aktiv (aufgefunden)“, der Verbleib als Handlung („Tier T-… (H
 
 ### Druck und Export
 
-„Drucken / als PDF“ druckt die Liste in der gewählten Sicht und Spezies, „CSV exportieren“ gibt
+„Drucken / als PDF“ druckt die Liste in der gewählten Sicht und mit den Spezies aus dem Filter, „CSV exportieren“ gibt
 alle nicht stornierten Tiere als Tabelle aus.
 
 ### Rechte

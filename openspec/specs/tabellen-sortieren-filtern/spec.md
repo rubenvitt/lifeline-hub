@@ -36,7 +36,14 @@ Sprechgruppen des Funkplans) folgt dem Muster.
 
 ### Requirement: Kartenzweig zeigt dieselbe Menge
 Unterhalb der Breite `md` SHALL die Sicht dieselbe Menge zeigen wie die Tabelle. Sie MUST die
-Filter als Auswahlfelder und die Sortierung über ein Auswahlfeld „Sortieren“ anbieten.
+Filter als Auswahlfelder und die Sortierung über ein Auswahlfeld „Sortieren“ anbieten. Ausgenommen
+sind Filter, die die Seite als `ohneKartenfeld` kennzeichnet, weil jedes weitere Feld die erste
+Karte aus dem ersten Bild schöbe und die Seite die Achse schon über der Liste führt; ein solcher
+Filter MUST weiter wirken und als Chip erscheinen.
+
+#### Scenario: Betroffene am Handy
+- **WHEN** die Adresse `…/personen?f.sk=sk1` bei 390 px geöffnet wird
+- **THEN** zeigen die Karten nur Personen mit SK I, über der Liste steht der Chip „Sichtung: SK I“, und weder Sichtung noch Status noch Verbleib haben ein Auswahlfeld
 
 #### Scenario: Wechsel auf den Handschirm
 - **WHEN** die gefilterte Schadenliste auf 390 px Breite schrumpft
@@ -77,6 +84,10 @@ gemerkt werden.
 - **WHEN** die Personalliste auf einem Gerät geöffnet wird, das für sie noch keine Spaltenwahl gemerkt hat
 - **THEN** sind die voreingestellt ausgeblendeten Spalten „Träger“, „Ruhe“ und „Bemerkung“ ausgeblendet
 
+#### Scenario: Suche mit Personendaten bleibt aus der Adresse
+- **WHEN** in der Betroffenenliste nach einem Namen gesucht und nach Verbleib gefiltert wird
+- **THEN** steht der Filter in der Adresse, der Suchbegriff nur im Stand der Sitzung; eine Suche in einer alten Adresse wird beim Öffnen weggeräumt
+
 #### Scenario: Filter auf Werte aus den Daten
 - **WHEN** die Adresse `…/fahrzeuge?f.traeger=ASB` neu geladen wird, bevor die Fahrzeuge geladen sind
 - **THEN** bleibt der Filter stehen und zeigt nach dem Laden nur die Fahrzeuge des ASB
@@ -90,11 +101,22 @@ aus einer Serverzählung kommen; fehlt sie, steht keine Zahl.
 - **WHEN** in der seitenweise geladenen Schadenliste im Kopf „Ausmaß“ „katastrophal“ gewählt wird
 - **THEN** fragt die Seite den Server mit diesem Filter und zeigt einen Schaden weit hinten ohne Nachladen
 
+#### Scenario: Presse-Log nach Art
+- **WHEN** im Presse-Log mit vielen erledigten Terminen im Auswahlfeld „Art“ „Termin“ gewählt wird
+- **THEN** fragt die Seite die erledigten mit `art=termin` am Server ab, filtert die vollständig geladenen offenen selbst, und der Filterhinweis nennt die Zahl der Termine aus den Kennzahlen
+
 ### Requirement: KatalogTabelle übernimmt das Muster
 Eine `KatalogTabelle` mit Spaltenfiltern SHALL dieselben Chips und denselben Filterhinweis
 zeigen, sofern der Aufrufer Filter und Sortierung nicht selbst kontrolliert. Mit `gedaechtnis`
-MUST sie ihren Zustand wie die `Datensicht` in Adresse und Sitzung halten.
+MUST sie ihren Zustand wie die `Datensicht` in Adresse und Sitzung halten. Ihr Kopfmenü SHALL je
+Wert zählen wie das der `Datensicht`, unter Suche und den übrigen eigenen Filtern; fehlt der
+Spalte oder einem anderen aktiven Filter das Prädikat (`onFilter`), MUST es ohne Zahl bleiben.
+Teilen sich mehrere Listen eine Seite (Archivakte), MUST NOT eine davon die Adresse beschreiben.
 
 #### Scenario: Aufrufer kontrolliert selbst
 - **WHEN** eine Spalte `filteredValue` vom Aufrufer bekommt
 - **THEN** zeigt die `KatalogTabelle` dafür weder Chip noch Hinweis
+
+#### Scenario: Zähler im Kopfmenü der Stammdaten
+- **WHEN** in den Stammdaten „Fahrzeuge“ nach „RTW“ gesucht und das Kopfmenü „Träger“ geöffnet wird
+- **THEN** nennt jeder Träger die Zahl der RTW, die er trägt

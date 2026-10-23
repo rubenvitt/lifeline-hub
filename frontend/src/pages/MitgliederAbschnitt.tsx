@@ -1,7 +1,7 @@
 import { Alert, Button, Flex, Form, Modal, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useState } from 'react';
+import { useId, useState, type Key } from 'react';
 import type { EinsatzRolle, MitgliedAnzeige } from '../api/types';
 import {
   entferneMitglied,
@@ -16,6 +16,8 @@ import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { einsatzKeys } from '../api/queryKeys';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { useViewport } from '../components/useViewport';
+import { nachText, nachZahl } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import Datenstand from '../components/Datenstand';
 import { Paneel, useRollen } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -337,12 +339,28 @@ export default function MitgliederAbschnitt({
     );
   };
 
+  /**
+   * Sortieren und Filtern im Kopf (LLH-1096): Name und Führungsstelle sortieren, die Rolle nach ihrem
+   * Rang (Einsatzleitung zuerst) und filtert nach ihren drei Werten. Beide Bauformen tragen dieselben
+   * Schlüssel, damit der Stand beim Wechsel der Breite bleibt.
+   */
+  const nameSortierung = nachText((m: MitgliedAnzeige) => m.anzeigename);
+  const stelleSortierung = nachText(
+    (m: MitgliedAnzeige) => m.fuehrungsstelle_anzeige || m.fuehrungsstelle,
+  );
+  const rolleOrdnung = {
+    sorter: nachZahl((m: MitgliedAnzeige) => RANG[m.einsatz_rolle]),
+    filters: EINSATZ_ROLLE_OPTIONEN.map((r) => ({ text: r.label, value: r.value })),
+    onFilter: (wert: Key | boolean, m: MitgliedAnzeige) => m.einsatz_rolle === wert,
+  };
+
   const spalten: KatalogSpalte<MitgliedAnzeige>[] = istSchmal
     ? [
         {
           title: 'Name',
           key: 'name',
           mindestBreite: SCHMAL_NAME_MIN,
+          sorter: nameSortierung,
           render: (_, m) => (
             <div style={{ minWidth: 0, overflowWrap: 'break-word' }}>
               <div>{m.anzeigename}</div>
@@ -361,6 +379,7 @@ export default function MitgliederAbschnitt({
           title: darfVerwalten ? 'Rolle · Aktion' : 'Rolle',
           key: 'rolle',
           width: SCHMAL_ROLLE,
+          ...rolleOrdnung,
           render: (_, m) => (
             <Flex vertical gap={token.marginXS} align="flex-start">
               {rolleFeld(m)}
@@ -370,13 +389,14 @@ export default function MitgliederAbschnitt({
         },
       ]
     : [
-        { title: 'Name', dataIndex: 'anzeigename' },
+        { title: 'Name', dataIndex: 'anzeigename', key: 'name', sorter: nameSortierung },
         {
           title: 'Führungsstelle',
           key: 'fuehrungsstelle',
+          sorter: stelleSortierung,
           render: (_, m) => fuehrungsstelle(m),
         },
-        { title: 'Rolle', key: 'rolle', render: (_, m) => rolleFeld(m) },
+        { title: 'Rolle', key: 'rolle', ...rolleOrdnung, render: (_, m) => rolleFeld(m) },
         {
           // Beschriftet: eine namenlose Spalte ist für einen Screenreader eine Zelle ohne
           // Zugehörigkeit.
@@ -385,6 +405,8 @@ export default function MitgliederAbschnitt({
           render: (_, m) => aktion(m),
         },
       ];
+
+  const gedaechtnis = useListenGedaechtnis('einsatz-mitglieder', spalten, { einsatzId });
 
   return (
     // Ein Paneel mit Augenbraue: Zählung und Datenstand stehen im Kopf rechts, die Hinzufügen-Zeile
@@ -454,6 +476,8 @@ export default function MitgliederAbschnitt({
         loading={mitgliederQuery.isLoading}
         columns={spalten}
         dataSource={mitglieder}
+        gedaechtnis={gedaechtnis}
+        mehrzahl="Mitgliedern"
       />
       {stelleZiel !== null &&
         stelleZiel.einsatzId === einsatzId &&

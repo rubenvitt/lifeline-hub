@@ -12,6 +12,8 @@ import { globalKeys } from '../api/queryKeys';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { ort, Ortsfuehler } from '../test/ortsfuehler';
 
 /** Übersicht. */
 
@@ -80,18 +82,21 @@ function Ort() {
   return <output aria-label="Ort">{useLocation().pathname}</output>;
 }
 
-function zeige(me: BenutzerAnzeige = ME_ADMIN) {
+function zeige(me: BenutzerAnzeige = ME_ADMIN, route = '/admin/aufbewahrung') {
   server.use(
     meHandler(me),
     http.get('/api/aufbewahrung', () => HttpResponse.json(EINTRAEGE)),
   );
   return renderMitProviders(
-    <Routes>
-      <Route path="/admin/aufbewahrung" element={<AufbewahrungUebersicht />} />
-      <Route path="/admin/aufbewahrung/:einsatzId" element={<Ort />} />
-      <Route path="/admin/stammdaten/stichworte" element={<Ort />} />
-    </Routes>,
-    { route: '/admin/aufbewahrung' },
+    <>
+      <Ortsfuehler />
+      <Routes>
+        <Route path="/admin/aufbewahrung" element={<AufbewahrungUebersicht />} />
+        <Route path="/admin/aufbewahrung/:einsatzId" element={<Ort />} />
+        <Route path="/admin/stammdaten/stichworte" element={<Ort />} />
+      </Routes>
+    </>,
+    { route },
   );
 }
 
@@ -162,18 +167,32 @@ describe('AufbewahrungUebersicht', () => {
     expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
   });
 
-  it('filtert je Zustand über die Segmentleiste', async () => {
+  it('filtert im Kopf „Zustand“, mehrere Zustände zugleich, und schreibt den Filter in die Adresse (LLH-1096)', async () => {
     zeige();
     const t = await tabelle();
     await within(t).findByText('E-2026-0007');
-    await userEvent.click(screen.getByRole('radio', { name: 'geschwärzt' }));
-    await waitFor(() => expect(within(t).queryByText('E-2026-0007')).toBeNull());
+    expect(screen.queryByRole('radiogroup', { name: 'Zustand' })).toBeNull();
+    await kopfFilterWaehlen('Zustand', ['geschwärzt (1)', 'zur Löschung vorgemerkt (1)']);
+    await waitFor(() => expect(within(t).queryByText('E-2026-0008')).toBeNull());
     expect(within(t).getByText('E-2025-0001')).toBeInTheDocument();
-    expect(within(t).queryByText('E-2026-0008')).toBeNull();
-    await userEvent.click(screen.getByRole('radio', { name: 'Frist läuft' }));
-    expect(await screen.findByText('Kein Einsatz im Zustand „Frist läuft“')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('radio', { name: 'alle' }));
-    expect(await within(t).findByText('E-2026-0008')).toBeInTheDocument();
+    expect(within(t).getByText('E-2026-0007')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/aufbewahrung?f.zustand=vorgemerkt%2Cgeschwaerzt'),
+    );
+  });
+
+  it('beginnt beim Stand aus der Adresse: Zustand gefiltert, nach Frist sortiert (LLH-1096)', async () => {
+    zeige(ME_ADMIN, '/admin/aufbewahrung?f.zustand=ohne_frist,geschwaerzt&sort=nummer:ab');
+    const t = await tabelle();
+    await within(t).findByText('E-2026-0008');
+    expect(within(t).queryByText('E-2026-0007')).toBeNull();
+    const nummern = [...t.querySelectorAll('tbody tr[data-row-key] td:first-child')].map(
+      (z) => z.textContent,
+    );
+    expect(nummern).toEqual(['ohne Nr. · Altlage Ost', 'E-2026-0008', 'E-2025-0001']);
+    expect(
+      screen.getByRole('button', { name: 'Filter Zustand: geschwärzt entfernen' }),
+    ).toBeInTheDocument();
   });
 
   it('führt per Zeilenklick in die Akte unter der stabilen id', async () => {

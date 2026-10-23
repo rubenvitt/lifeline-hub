@@ -117,7 +117,7 @@ describe('OnlineQuellenVerwaltung', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    await userEvent.click(within(menue).getByText('inaktiv'));
+    await userEvent.click(within(menue).getByText(/^inaktiv \(\d+\)$/));
     await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
 
     await waitFor(() => expect(zeilen()).toHaveLength(1));
@@ -577,7 +577,7 @@ describe('OnlineQuellenVerwaltung · Spaltenschalter', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    await userEvent.click(within(filter).getByText('inaktiv'));
+    await userEvent.click(within(filter).getByText(/^inaktiv \(\d+\)$/));
     await userEvent.click(within(filter).getByRole('button', { name: 'OK' }));
     await waitFor(() => expect(zeilen()).toHaveLength(1));
 

@@ -9,6 +9,9 @@ import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
 import { einsatzKeys } from '../api/queryKeys';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { ort, Ortsfuehler } from '../test/ortsfuehler';
+import { setzeViewportBreite } from '../test/viewport';
 
 // Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
 vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
@@ -790,5 +793,68 @@ describe('MitgliederAbschnitt', () => {
       expect(screen.queryByRole('combobox', { name: 'Person zum Aufnehmen' })).toBeNull();
       expect(gefragt).toBe(false);
     });
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096): Name und Führungsstelle sortieren, die Rolle
+ * sortiert nach ihrem Rang und filtert nach ihren drei Werten; der Stand steht in der Adresse.
+ */
+describe('MitgliederAbschnitt · Sortieren und Filtern (LLH-1096)', () => {
+  const folge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+  const zwei = [
+    mitglied({ benutzer_id: 2, anzeigename: 'Eva Einsatz', fuehrungsstelle: 'S2' }),
+    mitglied({
+      benutzer_id: 3,
+      anzeigename: 'Anna Leitung',
+      einsatz_rolle: 'einsatzleitung',
+      fuehrungsstelle: 'EL',
+    }),
+  ];
+  function zeige(route = '/einsaetze/7/einstellungen/zugriff') {
+    setzeViewportBreite(1600);
+    server.use(
+      meHandler(benutzerFixture({ id: 9 })),
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(zwei)),
+      http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <>
+        <Ortsfuehler />
+        <MitgliederAbschnitt
+          einsatzId={7}
+          darfVerwalten={false}
+          darfFuehrungsstelleVerwalten={false}
+        />
+      </>,
+      { route },
+    );
+  }
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    zeige();
+    await screen.findByText('Anna Leitung');
+    expect(folge()).toEqual(['2', '3']);
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Name/ }));
+    await waitFor(() => expect(folge()).toEqual(['3', '2']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/einsaetze/7/einstellungen/zugriff?sort=name%3Aauf'),
+    );
+    await kopfFilterWaehlen('Rolle', ['Einsatzleitung (1)']);
+    await waitFor(() => expect(folge()).toEqual(['3']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe(
+        '/einsaetze/7/einstellungen/zugriff?sort=name%3Aauf&f.rolle=einsatzleitung',
+      ),
+    );
+  });
+
+  it('die Rolle sortiert nach ihrem Rang, die Adresse trägt es zurück', async () => {
+    zeige('/einsaetze/7/einstellungen/zugriff?sort=rolle%3Aauf');
+    await screen.findByText('Anna Leitung');
+    expect(folge()).toEqual(['3', '2']);
   });
 });

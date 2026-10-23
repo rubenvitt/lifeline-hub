@@ -49,8 +49,14 @@ export default function GeraetBetroffenePage() {
   });
 
   const register = personenSpalten(() => undefined);
+  /*
+   * Ohne Kopffilter und ohne Listengedächtnis (LLH-1096, bewusste Ausnahme): die Startseite einer
+   * Ein-Aufgaben-Fläche (`geraet/AGENTS.md`, Betreuungsstelle) mit wenigen Zeilen in zwei Gruppen,
+   * „Aufnehmen“ als einzige Aufgabe; Nr., Person und Zeit tragen keine Werteliste. Sortieren per
+   * Kopf bleibt, Suche auch.
+   */
   const spalten = spaltenFuer<Person>()([
-    ...register.filter((s) => GERAET_SPALTEN.has(s.key)),
+    ...register.filter((s) => GERAET_SPALTEN.has(s.key)).map((s) => ({ ...s, filter: undefined })),
     {
       title: 'Verbleib',
       key: 'ort',

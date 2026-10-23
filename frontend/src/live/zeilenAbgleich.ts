@@ -114,11 +114,21 @@ const ZIELE: Record<ZeilenZiel, Ziel> = {
       (k: Medienkontakt) => (k.status === 'offen' ? k : null),
       vergleicheNachEingang,
     ),
-    fenster(einsatzKeys.medienkontakteErledigt, false, (k: Medienkontakt) => ({
-      zeile: k.status === 'offen' ? null : k,
-      vergleich: vergleicheNachEingang,
-      seite: MEDIENKONTAKTE_SEITE,
-    })),
+    // Je Kopffilter „Art“ eine Kette (LLH-1096): ihr letztes Key-Glied nennt die Arten, eine
+    // Kette ohne Filter endet mit `abgeschlossen`.
+    fenster(
+      (e) => einsatzKeys.medienkontakteErledigt(e),
+      true,
+      (k: Medienkontakt, cacheKey) => {
+        const arten = cacheKey.length > 4 ? String(cacheKey[4]).split(',') : null;
+        const passt = k.status !== 'offen' && (arten == null || arten.includes(k.art));
+        return {
+          zeile: passt ? k : null,
+          vergleich: vergleicheNachEingang,
+          seite: MEDIENKONTAKTE_SEITE,
+        };
+      },
+    ),
     einzeln<Medienkontakt>(einsatzKeys.medienkontaktEinzelnAlle),
   ]),
   // Auswahl, Seitenketten und Einzelabrufe liegen unter `schaeden(e)`, die Marker daneben.

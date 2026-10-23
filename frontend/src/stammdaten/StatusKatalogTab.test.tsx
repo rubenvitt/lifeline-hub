@@ -119,7 +119,7 @@ describe('StatusKatalogTab', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    await userEvent.click(within(menue).getByText('verfügbar'));
+    await userEvent.click(within(menue).getByText(/^verfügbar \(\d+\)$/));
     await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
 
     await waitFor(() => expect(zeilen()).toHaveLength(1));

@@ -28,6 +28,7 @@ import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import * as dateiSpeichern from '../components/dateiSpeichern';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 /**
  * Die echte Karte braucht WebGL, jsdom hat keins — Stub nach dem Muster von
@@ -1906,5 +1907,124 @@ describe('PersonenPage — Abgeschlossene (LLH-1332)', () => {
     expect(screen.queryByText(/^Entlassen/)).toBeNull();
     await userEvent.click(schalter);
     expect(await screen.findByText(/^Entlassen/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096, Rollout des Musters aus LLH-1086): Sichtung,
+ * Status, Verbleib und Abschnitt filtern, jede vergleichbare Spalte sortiert, Sortierung und Filter
+ * stehen in der Adresse. Die Suche nicht: sie trägt Namen von Betroffenen.
+ */
+describe('PersonenPage · Sortieren und Filtern (LLH-1096)', () => {
+  const ort = { aktuell: '' };
+  function Ortsfuehler() {
+    const l = useLocation();
+    ort.aktuell = `${l.pathname}${l.search}`;
+    return null;
+  }
+  const uhs = { id: 5, bezeichnung: 'UHS Nord', abschnitt_id: 30 };
+  const rot: Person = {
+    ...person,
+    id: 20,
+    registrier_nr: 20,
+    name: 'Rot',
+    status: 'betroffen',
+    aktuelle_sichtung: 'sk1',
+    aktuelle_uhs_id: 5,
+  };
+  const gruen: Person = {
+    ...person,
+    id: 21,
+    registrier_nr: 21,
+    name: 'Grün',
+    status: 'betroffen',
+    aktuelle_sichtung: 'sk3',
+  };
+  function rendereMitOrt(route = '/einsaetze/1/personen') {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([rot, gruen])),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([uhs])),
+      http.get('/api/einsaetze/1/abschnitte', () =>
+        HttpResponse.json([{ id: 30, name: 'EA Nord' }]),
+      ),
+    );
+    return renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/personen"
+          element={
+            <>
+              <Ortsfuehler />
+              <PersonenPage />
+            </>
+          }
+        />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1600);
+    rendereMitOrt();
+    await screen.findByText('Grün, Max');
+
+    await kopfFilterWaehlen('Sichtung', ['SK I (1)']);
+    await waitFor(() => expect(screen.queryByText('Grün, Max')).toBeNull());
+    expect(screen.getByText('Rot, Max')).toBeInTheDocument();
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/personen?f.sk=sk1'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await waitFor(() => expect(regFolge()).toEqual(['R-021', 'R-020']));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Sichtung/ }));
+    await waitFor(() => expect(regFolge()).toEqual(['R-020', 'R-021']));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/personen?sort=sk%3Aauf'));
+  });
+
+  it('der Abschnitt ist der der aktuellen UHS', async () => {
+    setzeViewportBreite(1600);
+    rendereMitOrt();
+    await screen.findByText('Grün, Max');
+    await kopfFilterWaehlen('Abschnitt', ['EA Nord (1)']);
+    await waitFor(() => expect(screen.queryByText('Grün, Max')).toBeNull());
+    expect(screen.getByText('Rot, Max')).toBeInTheDocument();
+  });
+
+  it('Verbleib filtert nach seiner Klasse; die Suche bleibt aus der Adresse', async () => {
+    setzeViewportBreite(1600);
+    rendereMitOrt();
+    await screen.findByText('Grün, Max');
+    await kopfFilterWaehlen('Verbleib', ['Offen (1)']);
+    await waitFor(() => expect(screen.queryByText('Rot, Max')).toBeNull());
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/personen?f.verbleib=offen'));
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Suche in Personen' }), 'Grün');
+    await act(() => new Promise((r) => setTimeout(r, 400)));
+    expect(ort.aktuell).toBe('/einsaetze/1/personen?f.verbleib=offen');
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
+    setzeViewportBreite(1600);
+    rendereMitOrt('/einsaetze/1/personen?f.status=betroffen&f.sk=sk3');
+    await screen.findByText('Grün, Max');
+    expect(screen.queryByText('Rot, Max')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Sichtung: SK III entfernen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('am Handy stehen Sichtung, Status und Verbleib nicht als Auswahlfeld über der Liste', async () => {
+    setzeViewportBreite(390);
+    rendereMitOrt('/einsaetze/1/personen?f.sk=sk1');
+    expect(await screen.findByText('Rot, Max')).toBeInTheDocument();
+    expect(screen.queryByText('Grün, Max')).toBeNull();
+    for (const feld of ['Sichtung', 'Status', 'Verbleib']) {
+      expect(screen.queryByRole('combobox', { name: feld })).toBeNull();
+    }
+    expect(
+      screen.getByRole('button', { name: 'Filter Sichtung: SK I entfernen' }),
+    ).toBeInTheDocument();
   });
 });

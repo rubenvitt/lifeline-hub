@@ -2,7 +2,7 @@
 titel: Evakuierung
 gruppen: [alle, fuehrung]
 reihenfolge: 525
-quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkKartenbild.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, src/routes/evakuierung.rs, src/betreuung/repo.rs]
+quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkKartenbild.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, src/routes/evakuierung.rs, src/betreuung/repo.rs]
 ---
 
 ## Überblick
@@ -29,7 +29,15 @@ Bezirke. Jeder Bezirk hat eine eigene Seite mit allem, was zu ihm gehört.
 3. Die Tabelle nennt je Bezirk den Räumungszustand („angeordnet“, „läuft“, „geräumt“,
    „aufgehoben“), evakuiert von geplant, die Zeit des letzten Stands, die Sammelstelle, die
    zugeordneten Flächen der Lagekarte und den Einsatzabschnitt. „≈“ kennzeichnet eine geschätzte
-   Zahl. Der Filter „Räumung“ engt die Tabelle ein.
+   Zahl. Im Kopf der Spalten „Räumung“, „Stand“ und „Abschnitt“ filtern: das Trichterzeichen
+   öffnet die Werte zum Ankreuzen, unter „Stand“ etwa „Keine Meldung“ für die Bezirke, die noch
+   nichts gemeldet haben; „OK“ übernimmt sie. Ein Klick auf einen Spaltenkopf sortiert nach dieser
+   Spalte, ein zweiter kehrt die Folge um. Ist die Tabelle eingeschränkt, steht darüber „Gefiltert“
+   mit der Zahl der Treffer und je Wert ein Knopf, der genau diesen Filter entfernt; „Filter
+   zurücksetzen“ leert die Filter. Sortierung und Filter stehen in der Adresse der Seite: Zurück
+   aus einem Bezirk, Neuladen und ein weitergegebener Link zeigen dieselbe Tabelle. Stand und
+   Abschnitt weichen auf schmalen Schirmen unter „Spalten“; ihr Filter wirkt nur, solange die
+   Spalte zu sehen ist.
 4. „Verlauf“ an einem Bezirk klappt alle Standmeldungen dazu auf.
 5. Die Bezeichnung eines Bezirks öffnet seine Seite.
 

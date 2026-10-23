@@ -8,10 +8,11 @@ use crate::staerke::Staerke;
 use crate::verpflegung::stelle::{VerpflegungsstelleArt, VerpflegungsstelleStatus};
 use crate::verpflegung::{SonderkostEingabe, VerpflegungEmpfaenger, Verpflegungsart};
 use crate::write_retry;
+use crate::zeitdarstellung::Zeitdarstellung;
 use axum::http::StatusCode;
 
 const STARTWERT: i64 = 1;
-const TZ: Tz = ZEITZONE_VORGABE;
+const STIL: Zeitstil = Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::Taktisch);
 
 struct Welt {
     pool: SqlitePool,
@@ -117,7 +118,7 @@ async fn anlegen_in(
     eingabe: ZeitfensterEingabe,
 ) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        create_zeitfenster_tx(conn, e, w.b, STARTWERT, TZ, &eingabe).await
+        create_zeitfenster_tx(conn, e, w.b, STARTWERT, STIL, &eingabe).await
     })
 }
 
@@ -132,7 +133,7 @@ async fn aendern_in(
     a: ZeitfensterAenderung,
 ) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        update_zeitfenster_tx(conn, e, id, w.b, STARTWERT, TZ, &a).await
+        update_zeitfenster_tx(conn, e, id, w.b, STARTWERT, STIL, &a).await
     })
 }
 
@@ -142,7 +143,7 @@ async fn aendern(w: &Welt, id: i64, a: ZeitfensterAenderung) -> Result<Geschrieb
 
 async fn loeschen_in(w: &Welt, e: i64, id: i64) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        delete_zeitfenster_tx(conn, e, id, w.b, STARTWERT, TZ).await
+        delete_zeitfenster_tx(conn, e, id, w.b, STARTWERT, STIL).await
     })
 }
 
@@ -198,7 +199,7 @@ async fn zeitfenster_anlegen_mit_gesamtbedarf_und_etb_in_ortszeit() {
         etb(&w.pool, w.e).await,
         vec![(
             "system".to_string(),
-            "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, \
+            "Verpflegung ‚Mittag‘ 241200sep26–1330 angelegt: Bedarf 250 EP (180 Kräfte, \
              70 Betreute)."
                 .to_string()
         )]
@@ -501,7 +502,7 @@ async fn bedarf_erhoehen_hebt_gesamt_und_fehlmenge_und_nennt_vorwert() {
         eintraege[1],
         (
             "system".to_string(),
-            "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 geändert: Bedarf 270 EP (vorher 250)."
+            "Verpflegung ‚Mittag‘ 241200sep26–1330 geändert: Bedarf 270 EP (vorher 250)."
                 .to_string()
         )
     );
@@ -548,8 +549,8 @@ async fn zeitraum_aendern_nennt_den_vorherigen_zeitraum() {
     .unwrap();
     assert_eq!(
         etb(&w.pool, w.e).await[1].1,
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–14:00 (Bedarf 250 EP) geändert: Zeitraum \
-         (vorher 24.09. 12:00–13:30)."
+        "Verpflegung ‚Mittag‘ 241200sep26–1400 (Bedarf 250 EP) geändert: Zeitraum \
+         (vorher 241200sep26–1330)."
     );
 }
 
@@ -582,7 +583,7 @@ async fn loeschen_mit_gueltiger_ausgabe_ist_422_danach_erlaubt() {
     assert_eq!(eintraege.len(), 2, "Anlegen + Löschen");
     assert_eq!(
         eintraege[1].1,
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 gelöscht (Bedarf 250 EP)."
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 gelöscht (Bedarf 250 EP)."
     );
 }
 
@@ -789,20 +790,67 @@ async fn lookup_nach_client_id_ist_einsatzgebunden() {
 #[tokio::test]
 async fn zeitzone_kommt_aus_der_org_sonst_berlin() {
     let w = welt().await;
-    assert_eq!(zeitzone(&w.pool, w.e).await.unwrap(), ZEITZONE_VORGABE);
+    let zone = |w: &Welt| {
+        let pool = w.pool.clone();
+        let e = w.e;
+        async move { zeitstil(&pool, e).await.unwrap().zone }
+    };
+    assert_eq!(zone(&w).await, ZEITZONE_VORGABE);
     sqlx::query("INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'America/New_York')")
         .execute(&w.pool)
         .await
         .unwrap();
-    assert_eq!(
-        zeitzone(&w.pool, w.e).await.unwrap(),
-        chrono_tz::America::New_York
-    );
+    assert_eq!(zone(&w).await, chrono_tz::America::New_York);
     sqlx::query("UPDATE org_einstellungen SET zeitzone = 'Kein/Ort' WHERE org_id = 1")
         .execute(&w.pool)
         .await
         .unwrap();
-    assert_eq!(zeitzone(&w.pool, w.e).await.unwrap(), ZEITZONE_VORGABE);
+    assert_eq!(zone(&w).await, ZEITZONE_VORGABE);
+}
+
+/// LLH-1061: die Darstellung der ETB-Texte folgt Einsatz vor Organisation, Vorgabe taktisch.
+#[tokio::test]
+async fn darstellung_kommt_aus_einsatz_sonst_org_sonst_taktisch() {
+    let w = welt().await;
+    let darstellung = |w: &Welt| {
+        let pool = w.pool.clone();
+        let e = w.e;
+        async move { zeitstil(&pool, e).await.unwrap().darstellung }
+    };
+    assert_eq!(darstellung(&w).await, Zeitdarstellung::Taktisch);
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitdarstellung) VALUES (1, 'datum_uhrzeit')",
+    )
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(darstellung(&w).await, Zeitdarstellung::DatumUhrzeit);
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitdarstellung) VALUES (?, 'taktisch')",
+    )
+    .bind(w.e)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(darstellung(&w).await, Zeitdarstellung::Taktisch);
+}
+
+/// LLH-1061: stellt der Einsatz „Datum und Uhrzeit“ ein, schreibt das ETB den Zeitraum so.
+#[tokio::test]
+async fn etb_zeitraum_in_der_darstellung_des_einsatzes() {
+    let w = welt().await;
+    let stil = Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::DatumUhrzeit);
+    let eingabe = mittag();
+    let e = w.e;
+    write_retry!(&w.pool, |conn| {
+        create_zeitfenster_tx(conn, e, w.b, STARTWERT, stil, &eingabe).await
+    })
+    .unwrap();
+    assert_eq!(
+        etb(&w.pool, w.e).await[0].1,
+        "Verpflegung ‚Mittag‘ 24.09.26 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, \
+         70 Betreute)."
+    );
 }
 
 // ── Verpflegungsstellen (LLH-1040) ──────────────────────────────────────────────────────────
@@ -1852,7 +1900,7 @@ async fn tag_in(
     fenster: Vec<ZeitfensterEingabe>,
 ) -> Result<TagGeschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        zeitfenster_aus_vorlage_tx(conn, e, w.b, STARTWERT, TZ, von, bis, &fenster).await
+        zeitfenster_aus_vorlage_tx(conn, e, w.b, STARTWERT, STIL, von, bis, &fenster).await
     })
 }
 
@@ -1898,7 +1946,7 @@ async fn tag_aus_vorlage_legt_drei_zeitfenster_wie_einzeln_an() {
     assert_eq!(sammel, etb(&w.pool, w.e2).await);
     assert_eq!(
         sammel[0].1,
-        "Verpflegung ‚Frühstück‘ 11.10. 06:30–08:00 angelegt: Bedarf 120 EP (100 Kräfte, \
+        "Verpflegung ‚Frühstück‘ 110630okt26–0800 angelegt: Bedarf 120 EP (100 Kräfte, \
          20 Betreute)."
     );
 }

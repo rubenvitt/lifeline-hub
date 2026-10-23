@@ -263,4 +263,26 @@ describe('Zeilenabgleich in Seitenketten (LFH-1075)', () => {
     expect(ids(qc.getQueryData(einsatzKeys.medienkontakteErledigt(E)))).toEqual([[3]]);
     expect(inval).not.toHaveBeenCalled();
   });
+
+  it('ein erledigter Termin kommt nur in die Kette ohne Filter und die der Termine (LLH-1096)', async () => {
+    const { qc, zeilen } = aufbau();
+    const termin = { ...kontakt(6, 'erledigt', '2026-10-08T07:00:00'), art: 'termin' };
+    qc.setQueryData(einsatzKeys.medienkontakteOffen(E), []);
+    for (const arten of [[], ['termin'], ['anfrage']]) {
+      qc.setQueryData(
+        einsatzKeys.medienkontakteErledigt(E, arten),
+        ketten([kontakt(3, 'erledigt', '2026-10-08T04:00:00')]),
+      );
+    }
+    api.ladeMedienkontakt.mockResolvedValue(termin);
+
+    zeilen.vormerken('medienkontakte', 6);
+    await fenster();
+
+    expect(ids(qc.getQueryData(einsatzKeys.medienkontakteErledigt(E)))).toEqual([[6, 3]]);
+    expect(ids(qc.getQueryData(einsatzKeys.medienkontakteErledigt(E, ['termin'])))).toEqual([
+      [6, 3],
+    ]);
+    expect(ids(qc.getQueryData(einsatzKeys.medienkontakteErledigt(E, ['anfrage'])))).toEqual([[3]]);
+  });
 });

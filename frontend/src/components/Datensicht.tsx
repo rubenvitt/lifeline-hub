@@ -228,6 +228,13 @@ export type DatensichtSpalte<T, K extends string = string> = AntdErbe<T> & {
   filter?: {
     werte: readonly { readonly text: string; readonly value: string }[];
     trifft: (zeile: T, wert: string) => boolean;
+    /**
+     * Kein Auswahlfeld im Kartenzweig (LLH-1096): wo jedes weitere Feld die erste Karte am Handy aus
+     * dem ersten Bild schöbe (Betroffene, `e2e/betroffene-handy.spec.ts`) und die Seite die Achse
+     * schon über der Liste führt (Statusleiste, Sichtungsraster). Ein wirkender Wert (aus Adresse
+     * oder Tabelle) schneidet weiter und steht als Chip da; die Menge bleibt dieselbe.
+     */
+    ohneKartenfeld?: boolean;
   };
   /** Erst ab dieser Breite in der TABELLE sichtbar (Ersatz für antds Breiten-Prop). */
   abBreite?: AbBreitePunkt;
@@ -1625,30 +1632,32 @@ export default function Datensicht<T extends object, const K extends string>(
             und behält das Auswahlfeld je Filterspalte. */}
         {baum == null &&
           !alsTabelle &&
-          filterSpalten.map((spalte) => (
-            <Select
-              key={spalte.key}
-              mode="multiple"
-              allowClear
-              maxTagCount="responsive"
-              aria-label={etikettVon(spalte) ?? spalte.key}
-              /*
-               * Das Etikett steht als PRÄFIX im Feld (LFH-967): nach der Wahl verschwindet der
-               * Platzhalter, und „Anlaufstelle ×“ allein sagt nicht, zu welcher Achse der Wert
-               * gehört. Der zugängliche Name trägt es schon, deshalb `aria-hidden`.
-               */
-              prefix={
-                <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
-                  {etikettVon(spalte) ?? spalte.key}:
-                </span>
-              }
-              placeholder="alle"
-              value={[...(filterWerte[spalte.key] ?? [])]}
-              onChange={(werte: string[]) => setzeFilter(spalte.key, werte)}
-              options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
-              style={{ minWidth: 160 }}
-            />
-          ))}
+          filterSpalten
+            .filter((spalte) => !spalte.filter!.ohneKartenfeld)
+            .map((spalte) => (
+              <Select
+                key={spalte.key}
+                mode="multiple"
+                allowClear
+                maxTagCount="responsive"
+                aria-label={etikettVon(spalte) ?? spalte.key}
+                /*
+                 * Das Etikett steht als PRÄFIX im Feld (LFH-967): nach der Wahl verschwindet der
+                 * Platzhalter, und „Anlaufstelle ×“ allein sagt nicht, zu welcher Achse der Wert
+                 * gehört. Der zugängliche Name trägt es schon, deshalb `aria-hidden`.
+                 */
+                prefix={
+                  <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
+                    {etikettVon(spalte) ?? spalte.key}:
+                  </span>
+                }
+                placeholder="alle"
+                value={[...(filterWerte[spalte.key] ?? [])]}
+                onChange={(werte: string[]) => setzeFilter(spalte.key, werte)}
+                options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
+                style={{ minWidth: 160 }}
+              />
+            ))}
         {alsTabelle && (
           <SpaltenSchalter
             bezeichnung={bezeichnung}

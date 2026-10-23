@@ -13,6 +13,7 @@ import KatalogTabelle, {
 import { KennungsLink } from '../components/kennungsLink';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { useAuth } from '../auth/AuthContext';
 import { loadEinheitVorlagen } from '../api/einheitVorlagen';
 import { globalKeys } from '../api/queryKeys';
@@ -48,6 +49,11 @@ export default function EinheitVorlagenTab() {
     v.ueber_vorlage_id != null ? names.get(v.ueber_vorlage_id) : undefined;
   const rows = orderAsTree(vorlagen);
 
+  /**
+   * Ein Baum (Unterstellung eingerückt, `orderAsTree`): keine Sortierung, ihre Folge ist die Aussage
+   * (Spec `tabellen-sortieren-filtern`, „Baum ohne Sortieren und Filtern“, LLH-1096). Der Aktiv-Filter
+   * stand schon vorher da und blendet nur Zeilen aus; er bleibt und steht wie überall in der Adresse.
+   */
   const columns: KatalogSpalte<VorlageRow>[] = [
     {
       title: 'Name',
@@ -116,6 +122,8 @@ export default function EinheitVorlagenTab() {
     },
   ];
 
+  const gedaechtnis = useListenGedaechtnis('stammdaten-einheiten', columns);
+
   return (
     <AdminPage
       titel="Einheiten-Vorlagen"
@@ -139,6 +147,8 @@ export default function EinheitVorlagenTab() {
           loading={vorlagenQuery.isLoading}
           dataSource={rows}
           columns={columns}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Vorlagen"
           locale={{ emptyText: 'Noch keine Einheiten-Vorlagen' }}
           suche={{ platzhalter: 'Name, Typ, Unterstellung oder Fahrzeug' }}
           spaltenSchalter={{ bezeichnung: 'Einheiten-Vorlagen' }}

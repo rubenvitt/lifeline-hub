@@ -85,7 +85,10 @@ Anzahl MUST NOT unter die Zahl der verknüpften Einheiten sinken (422) (LLH-1387
 gleichzeitig laufende Übernahme MUST NOT eine zurückgenommene Nachforderung mit Einheiten
 hinterlassen. Eine aufgelöste Einheit, die als aufgelöst stehen bleibt, MUST weiter als übernommen
 zählen; eine Einheit, deren Übernahme storniert ist, und eine beim Auflösen gelöschte MUST NOT
-zählen.
+zählen. Die Oberfläche MUST diese Regel spiegeln, damit kein Bedienelement in die 422 führt
+(LLH-1395): „Zurückziehen“ und „Ablehnen“ stehen im Menü der Karte gesperrt mit dem Grund
+„(Einheiten verknüpft)“, der Hinweis nach einem Schritt bietet kein „Rückgängig“ und nennt den
+Grund, und „Bearbeiten“ sendet keine Anzahl unter der Zahl der verknüpften Einheiten.
 
 #### Scenario: Rückgängig nach der Übernahme
 - **WHEN** nach der Übernahme von „83-1“ die Stufe „Eingetroffen“ zurückgenommen werden soll
@@ -98,6 +101,10 @@ zählen.
 #### Scenario: Am Raum eingetroffen, noch unterwegs
 - **WHEN** an der Nachforderung „2× RTW“ im Status „Unterwegs“ am Raum „83-1“ mit Verweis gebucht ist und die Einsatzleitung sie zurückziehen, ablehnen oder auf „Zugesagt“ zurücksetzen will
 - **THEN** antwortet der Server mit 422, und „Eintreffen melden“ bleibt möglich
+
+#### Scenario: Die Karte bietet keinen Weg in die 422
+- **WHEN** die Karte „2× RTW“ im Status „Unterwegs“ mit am Raum gebuchter „83-1“ angezeigt wird und die Einsatzleitung „Eintreffen melden“ wählt
+- **THEN** stehen „Zurückziehen (Einheiten verknüpft)“ und „Ablehnen (Einheiten verknüpft)“ gesperrt im Menü, und der Hinweis „Status: Eingetroffen · Einheiten verknüpft, kein Rückgängig“ trägt keinen Knopf „Rückgängig“
 
 ### Requirement: Storno einer Fehlübernahme
 
@@ -197,13 +204,19 @@ als „Schon im Einsatz, wird verknüpft“ genannt und verknüpft statt neu ang
 
 Die Karte einer Nachforderung MUST ihre übernommenen Einheiten nennen: mit Freigabe Einheiten
 „Als Einheit übernommen: …“ mit einem Sprung je Einheit in deren Ansicht, sonst nur die Zahl
-(„2 Einheiten übernommen“). Die Ansicht einer übernommenen Einheit MUST in den Kopfdaten das Feld
+(„2 Einheiten übernommen“). Vor dem Eintreffen der Nachforderung (zugesagt, unterwegs) kommt ein
+Verweis nur aus der Buchung am Raum; die Karte MUST dann „Am Raum eingetroffen: …“ bzw. „2 Einheiten
+am Raum eingetroffen“ zeigen statt „übernommen“ (LLH-1395). Die Ansicht einer übernommenen Einheit MUST in den Kopfdaten das Feld
 „Herkunft“ mit „aus Nachforderung #n“ zeigen, mit Freigabe Nachforderungen als Sprung ins Board mit
 hervorgehobener Karte.
 
 #### Scenario: Von der Einheit zur Nachforderung
 - **WHEN** die Einsatzleitung an der Karte „83-1“ wählt und in der Ansicht der Einheit „aus Nachforderung #4“
 - **THEN** zeigt das Board die Nachforderung #4 in ihrer Stufe hervorgehoben
+
+#### Scenario: Am Raum eingetroffen, Nachforderung noch unterwegs
+- **WHEN** „83-1“ am Raum mit Verweis auf die Nachforderung „2× RTW“ im Status „Unterwegs“ gebucht ist
+- **THEN** nennt die Karte „Am Raum eingetroffen: 83-1 ↗“, nicht „Als Einheit übernommen“
 
 ### Requirement: Vorschläge für „Wer“
 

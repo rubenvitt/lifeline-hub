@@ -7,6 +7,9 @@ import { renderMitProviders } from '../test/utils';
 import SprechgruppenTab from './SprechgruppenTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { ort, Ortsfuehler } from '../test/ortsfuehler';
+import { setzeViewportBreite } from '../test/viewport';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -54,12 +57,22 @@ const aktivPaar = [
 const bezeichnungen = (c: HTMLElement) =>
   [...c.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
 
-function render(benutzer: typeof admin, liste: (typeof sprechgruppe)[] = [sprechgruppe]) {
+function render(
+  benutzer: typeof admin,
+  liste: unknown[] = [sprechgruppe],
+  route = '/admin/stammdaten/sprechgruppen',
+) {
   server.use(
     meHandler(benutzer),
     http.get('/api/sprechgruppen', () => HttpResponse.json(liste)),
   );
-  return renderMitProviders(<SprechgruppenTab />);
+  return renderMitProviders(
+    <>
+      <Ortsfuehler />
+      <SprechgruppenTab />
+    </>,
+    { route },
+  );
 }
 
 describe('SprechgruppenTab', () => {
@@ -112,7 +125,7 @@ describe('SprechgruppenTab', () => {
     const kopf = screen.getByRole('columnheader', { name: /Betriebsart/ });
     await userEvent.click(kopf.querySelector('.ant-table-filter-trigger') as HTMLElement);
     const korb = document.querySelector('.ant-table-filter-dropdown') as HTMLElement;
-    await userEvent.click(within(korb).getByText('DMO'));
+    await userEvent.click(within(korb).getByText(/^DMO \(\d+\)$/));
     // `test/utils.tsx` montiert `ConfigProvider` ohne Locale — die Schaltfläche heißt „OK".
     await userEvent.click(within(korb).getByRole('button', { name: 'OK' }));
     await waitFor(() => expect(bezeichnungen(container)).toEqual(['208_D_DRK']));
@@ -161,7 +174,7 @@ describe('SprechgruppenTab', () => {
     await userEvent.click(kopf.querySelector('.ant-table-filter-trigger') as HTMLElement);
     const korb = document.querySelector('.ant-table-filter-dropdown') as HTMLElement;
     // „Inaktiv" steht auch als Tag im Tabellenkörper, deshalb auf den Korb verengt.
-    await userEvent.click(within(korb).getByText('Inaktiv'));
+    await userEvent.click(within(korb).getByText(/^Inaktiv \(\d+\)$/));
     await userEvent.click(within(korb).getByRole('button', { name: 'OK' }));
     await waitFor(() => expect(bezeichnungen(container)).toEqual(['208_D_DRK']));
   });
@@ -262,5 +275,56 @@ describe('SprechgruppenTab — Fehlschlag des Deaktivierens (LFH-473)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Sprechgruppe deaktivieren' }));
     await keinStehenderFehler('Sprechgruppe ist einem laufenden Einsatz zugeordnet');
     expect(versuch).toBe(2);
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096): Netz und Sicherheit filtern mit Werten aus den
+ * Zeilen, die Betriebsart sortiert; der Stand steht in der Adresse. Der Hinweis ist Freitext und
+ * bleibt ohne.
+ */
+describe('SprechgruppenTab · Sortieren und Filtern (LLH-1096)', () => {
+  const paar = [
+    { ...sprechgruppe, id: 1, betriebsart: 'TMO', netz: 'BOS-Nord', sicherheit: null },
+    {
+      ...sprechgruppe,
+      id: 2,
+      bezeichnung: '208_D_DRK',
+      betriebsart: 'DMO',
+      netz: null,
+      sicherheit: 'offen',
+    },
+  ];
+  const folge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, paar);
+    await screen.findByText('412_F_DRK');
+    expect(folge()).toEqual(['1', '2']);
+
+    await kopfFilterWaehlen('Netz', ['BOS-Nord (1)']);
+    await waitFor(() => expect(folge()).toEqual(['1']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/stammdaten/sprechgruppen?f.netz=BOS-Nord'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Betriebsart/ }));
+    await waitFor(() => expect(folge()).toEqual(['2', '1']));
+    await waitFor(() =>
+      expect(ort.aktuell).toBe('/admin/stammdaten/sprechgruppen?sort=betriebsart%3Aauf'),
+    );
+    expect(screen.queryByRole('button', { name: /^Hinweis filtern/ })).toBeNull();
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, paar, '/admin/stammdaten/sprechgruppen?f.sicherheit=offen');
+    await screen.findByText('208_D_DRK');
+    expect(screen.queryByText('412_F_DRK')).toBeNull();
   });
 });

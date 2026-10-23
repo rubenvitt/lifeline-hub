@@ -655,8 +655,11 @@ async fn listen_je_kraft_nur_mit_ereignissen() {
 }
 
 #[test]
-fn etb_texte_in_der_org_zone() {
-    let tz: Tz = "Europe/Berlin".parse().unwrap();
+fn etb_texte_in_der_org_zone_und_voller_dtg() {
+    let tz = crate::zeitdarstellung::Zeitstil::new(
+        chrono_tz::Europe::Berlin,
+        crate::zeitdarstellung::Zeitdarstellung::Taktisch,
+    );
     // 04:40 UTC = 06:40 MESZ
     let s = etb_text_nachtrag(
         Kraft::Einheit(1),
@@ -667,7 +670,7 @@ fn etb_texte_in_der_org_zone() {
     );
     assert_eq!(
         s,
-        "Zeitachse: Einheit «Florian 1» eingetroffen 30.09. 06:40 (nachgetragen)"
+        "Zeitachse: Einheit «Florian 1» eingetroffen 300640sep26 (nachgetragen)"
     );
     let s = etb_text_streichung(
         Kraft::Person(1),
@@ -679,7 +682,7 @@ fn etb_texte_in_der_org_zone() {
     );
     assert_eq!(
         s,
-        "Zeitachse: Person «Anna» alarmiert 30.09. 06:10 gestrichen — Grund: Zeit verwechselt"
+        "Zeitachse: Person «Anna» alarmiert 300610sep26 gestrichen — Grund: Zeit verwechselt"
     );
 }
 

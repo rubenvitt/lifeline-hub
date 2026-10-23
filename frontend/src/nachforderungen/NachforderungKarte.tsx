@@ -38,6 +38,7 @@ import { EINHEITEN_SCHRIFT, einheitenSprungAufbau } from './einheitenSprung';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 import { istUeberfaellig, kartenZeiten } from './nachforderungStufen';
 import { nachforderungName } from './nachforderungName';
+import { EINHEITEN_VERKNUEPFT, einheitenEinleitung, kannAbschliessen } from './nurVorwaerts';
 import { zielZeile, type ZielAbschnitt, type ZielNamen, type ZielRaum } from './zielVorschlaege';
 import { zusageZeilen } from './zusage';
 import ZusageFormular from './ZusageFormular';
@@ -134,26 +135,29 @@ function UebernommenePosten({
 
 /**
  * Die übernommenen Einheiten (LLH-1383 D9): „Als Einheit übernommen: 83-1 ↗, 83-2 ↗“, je Einheit
- * der Sprung in ihr Detail. Kennt die Seite keine davon (Modul nicht freigegeben, Liste noch nicht
- * da), steht nur die Zahl; eine unbekannte (aufgelöste) zählt als „weitere“.
+ * der Sprung in ihr Detail; vor dem Eintreffen der Nachforderung „Am Raum eingetroffen: …“
+ * (LLH-1395, `einheitenEinleitung`). Kennt die Seite keine davon (Modul nicht freigegeben, Liste
+ * noch nicht da), steht nur die Zahl; eine unbekannte (aufgelöste) zählt als „weitere“.
  */
 function UebernommeneEinheiten({
   nachforderung: n,
   einheitenJeId,
 }: {
-  nachforderung: Pick<Nachforderung, 'einsatz_id' | 'einheit_ids'>;
+  nachforderung: Pick<Nachforderung, 'einsatz_id' | 'einheit_ids' | 'status'>;
   einheitenJeId: ReadonlyMap<number, UebernahmeEinheit> | null | undefined;
 }) {
   const { token } = theme.useToken();
   const bekannt = einheitenJeId ? uebernommeneEinheiten(n, einheitenJeId) : [];
+  const einleitung = einheitenEinleitung(n);
   if (bekannt.length === 0) {
+    const zahl = n.einheit_ids.length === 1 ? '1 Einheit' : `${n.einheit_ids.length} Einheiten`;
     return (
       <Text
         type="secondary"
         style={{ fontSize: EINHEITEN_SCHRIFT }}
         data-lfh="nachforderung-einheiten"
       >
-        {n.einheit_ids.length === 1 ? '1 Einheit' : `${n.einheit_ids.length} Einheiten`} übernommen
+        {zahl} {einleitung === 'Am Raum eingetroffen' ? 'am Raum eingetroffen' : 'übernommen'}
       </Text>
     );
   }
@@ -177,7 +181,7 @@ function UebernommeneEinheiten({
       }
       data-lfh="nachforderung-einheiten"
     >
-      Als Einheit übernommen:{' '}
+      {einleitung}:{' '}
       {bekannt.map((e, i) => {
         const ziel = einheitDetailPfad(n.einsatz_id, e.id);
         const inhalt = (
@@ -378,24 +382,31 @@ function NachforderungKarte({
 
   /*
    * Bearbeiten, Zurückziehen und Ablehnen gebündelt (D10, ab drei Aktionen): beide Abschlüsse sind
-   * unumkehrbar und stehen rot hinter dem Trenner; jeder fragt im Dialog der Seite mit Grund.
+   * unumkehrbar und stehen rot hinter dem Trenner; jeder fragt im Dialog der Seite mit Grund. Mit
+   * verknüpfter Einheit lehnt der Server beide ab (LLH-1387 D5): sie stehen gesperrt mit dem Grund
+   * im Eintrag (LLH-1395, Muster LFH-966), statt in eine 422 zu führen.
    */
+  const abschlussGesperrt = !kannAbschliessen(n);
+  const abschluss = (
+    key: 'zurueckziehen' | 'ablehnen',
+    label: string,
+  ): MenueEintrag<MenueAktion> =>
+    abschlussGesperrt
+      ? { key, label: `${label} (${EINHEITEN_VERKNUEPFT})`, gefahr: true, gesperrt: true }
+      : { key, label, gefahr: true };
   const menue: MenueEintrag<MenueAktion>[] =
     darfSchreiben && n.ist_offen
       ? [
           ...(onFormular && onBearbeiten
             ? [{ key: 'bearbeiten' as const, label: 'Bearbeiten' }]
             : []),
-          ...(onZurueckziehen
-            ? [{ key: 'zurueckziehen' as const, label: 'Zurückziehen', gefahr: true as const }]
-            : []),
-          ...(onAblehnen
-            ? [{ key: 'ablehnen' as const, label: 'Ablehnen', gefahr: true as const }]
-            : []),
+          ...(onZurueckziehen ? [abschluss('zurueckziehen', 'Zurückziehen')] : []),
+          ...(onAblehnen ? [abschluss('ablehnen', 'Ablehnen')] : []),
         ]
       : [];
   const waehle = (key: MenueAktion) => {
     if (key === 'bearbeiten') onFormular?.(n.id, 'bearbeiten');
+    else if (abschlussGesperrt) return;
     else if (key === 'zurueckziehen') onZurueckziehen?.(n.id);
     else onAblehnen?.(n.id);
   };

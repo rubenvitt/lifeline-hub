@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { Evakuierungsbezirk, Raeumungszustand } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KennungsLink } from '../components/kennungsLink';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
@@ -45,6 +46,12 @@ import { gebietZeichnenText } from './gebietZeichnen';
  * schreibt die Detailseite.
  *
  * Der Zeilenschlüssel trägt ein Präfix (`bezirk-5`).
+ *
+ * Sortieren und Filtern (LLH-1096, Muster der Schadenliste): Räumung, Stand („gemeldet“ / „keine
+ * Meldung“) und Abschnitt filtern im Spaltenkopf, jede Spalte mit vergleichbarem Wert sortiert;
+ * die Sammelstelle ist Freitext und bleibt ohne. Sortierung und Filter stehen in der Adresse.
+ * Stand und Abschnitt weichen in schmalen Breiten wie bisher; ihr Filter wirkt dann nicht (Spec,
+ * „was man nicht sieht, wirkt nicht“), ein Auswahlfeld kommt nicht dazu (Tabelle in jeder Breite).
  */
 
 export type BezirkAktion = 'karte' | 'zeichnen' | 'raeumung' | 'stornieren';
@@ -73,6 +80,41 @@ export function bezirkMenue(
   return [...karte, eintrag('zeichnen', gebietZeichnenText(b.flaechen)), ...MENUE];
 }
 
+/** Werte des Standfilters: ob für den Bezirk eine Meldung vorliegt („keine Meldung“ statt 0). */
+const STAND_WERTE = [
+  { text: 'Gemeldet', value: 'gemeldet' },
+  { text: 'Keine Meldung', value: 'keine' },
+];
+const RAEUMUNG_WERTE = RAEUMUNG_FOLGE.map((r: Raeumungszustand) => ({
+  text: raeumungszustand[r].label,
+  value: r as string,
+}));
+
+/**
+ * Was das Listengedächtnis beim Aufbau prüft (LLH-1096, Herleitung in `pages/FahrzeugePage.tsx`):
+ * feste Achsen mit ihren Werten; der Abschnitt nimmt seine Werte aus den Bezirken (`ausDaten`).
+ * Muss zu `bezirkSpalten` passen.
+ */
+const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
+  { key: 'bezeichnung', sortWert: true },
+  { key: 'raeumung', sortWert: true, filter: { werte: RAEUMUNG_WERTE } },
+  { key: 'evakuiert', sortWert: true },
+  { key: 'stand', sortWert: true, filter: { werte: STAND_WERTE } },
+  { key: 'flaeche', sortWert: true },
+];
+// Alle Spaltenschlüssel, auch die ohne Sortierung und Filter: Die Datensicht typisiert das Gedächtnis
+// über die Schlüssel ihrer Spalten.
+type GedaechtnisKey =
+  | 'bezeichnung'
+  | 'raeumung'
+  | 'evakuiert'
+  | 'stand'
+  | 'sammelstelle'
+  | 'flaeche'
+  | 'abschnitt'
+  | 'aktionen';
+const GEDAECHTNIS_AUS_DATEN: readonly GedaechtnisKey[] = ['abschnitt'];
+
 /** Breite, in der ein langer Bezirksname unter `md` umbricht (wie bei den Stellen). */
 const KENNUNG_MAX_PX = 150;
 
@@ -88,6 +130,8 @@ const bezirkSpalten = (
   meldenInKennung: boolean,
   kennungAbstand: number,
   balkenFarbe: string,
+  /** Die Abschnitte der Bezirke, für den Filter; leer heißt kein Filter. */
+  abschnittWerte: readonly { text: string; value: string }[],
 ) => {
   const meldeKnopf = (b: Evakuierungsbezirk) =>
     darfSchreiben ? (
@@ -139,13 +183,7 @@ const bezirkSpalten = (
       key: 'raeumung',
       title: 'Räumung',
       sortWert: (b) => RAEUMUNG_FOLGE.indexOf(b.raeumung),
-      filter: {
-        werte: RAEUMUNG_FOLGE.map((r: Raeumungszustand) => ({
-          text: raeumungszustand[r].label,
-          value: r,
-        })),
-        trifft: (b, w) => b.raeumung === w,
-      },
+      filter: { werte: RAEUMUNG_WERTE, trifft: (b, w) => b.raeumung === w },
       render: (_, b) => <StatusTag darstellung={raeumungszustand[b.raeumung]} />,
     },
     {
@@ -177,6 +215,7 @@ const bezirkSpalten = (
       zahl: true,
       abBreite: 'md',
       sortWert: (b) => b.stand?.zeitpunkt_at,
+      filter: { werte: STAND_WERTE, trifft: (b, w) => (b.stand ? 'gemeldet' : 'keine') === w },
       // `ZeitAnzeige` liest den Wire-String als UTC — nie `dayjs(s)`.
       render: (_, b) => (b.stand ? <ZeitAnzeige wert={b.stand.zeitpunkt_at} rolle="kurz" /> : leer),
     },
@@ -184,6 +223,7 @@ const bezirkSpalten = (
       key: 'sammelstelle',
       title: 'Sammelstelle',
       abBreite: 'lg',
+      // Weder Sortierung noch Filter (LLH-1096): Freitext, kein Vergleichswert.
       suchText: (b) => b.sammelstelle,
       render: (_, b) => b.sammelstelle ?? leer,
     },
@@ -209,6 +249,11 @@ const bezirkSpalten = (
       key: 'abschnitt',
       title: 'Abschnitt',
       abBreite: 'xl',
+      sortWert: (b) => b.abschnitt_name,
+      filter:
+        abschnittWerte.length > 0
+          ? { werte: abschnittWerte, trifft: (b, w) => b.abschnitt_name === w }
+          : undefined,
       suchText: (b) => b.abschnitt_name,
       render: (_, b) => b.abschnitt_name ?? leer,
     },
@@ -268,6 +313,21 @@ export default function BezirkTabelle({
   const { rollen } = useRollen();
   const { istSchmal } = useViewport();
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
+  const gedaechtnis = useListenGedaechtnis<GedaechtnisKey>('evakuierung', GEDAECHTNIS_SPALTEN, {
+    vorgabe: null,
+    einsatzId,
+    ausDaten: GEDAECHTNIS_AUS_DATEN,
+  });
+  // Die Namen als ein Schlüssel: neue Spalten nur, wenn sich die Menge der Abschnitte ändert.
+  const abschnittNamen = [
+    ...new Set(bezirke.map((b) => b.abschnitt_name).filter((n): n is string => !!n)),
+  ]
+    .sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
+    .join('\n');
+  const abschnittWerte = useMemo(
+    () => (abschnittNamen ? abschnittNamen.split('\n').map((n) => ({ text: n, value: n })) : []),
+    [abschnittNamen],
+  );
   const spalten = useMemo(
     () =>
       bezirkSpalten(
@@ -279,6 +339,7 @@ export default function BezirkTabelle({
         istSchmal,
         token.marginXS,
         rollen.gedaempft,
+        abschnittWerte,
       ),
     [
       einsatzId,
@@ -289,6 +350,7 @@ export default function BezirkTabelle({
       istSchmal,
       token.marginXS,
       rollen.gedaempft,
+      abschnittWerte,
     ],
   );
   const aufklappen = useMemo(
@@ -317,6 +379,8 @@ export default function BezirkTabelle({
       ladend={ladend}
       // Der Anlegen-Knopf steht im Seitenkopf (die EINE Primäraktion).
       leerText="Keine Evakuierungsbezirke"
+      mehrzahl="Bezirken"
+      gedaechtnis={gedaechtnis}
       karte={KARTE}
       aufklappen={aufklappen}
     />

@@ -727,7 +727,7 @@ describe('KatalogTabelle · durchgereichte Sortierung und Filter', () => {
 
     const klickeFilter = async (container: HTMLElement) => {
       await userEvent.click(container.querySelector<HTMLElement>('.ant-table-filter-trigger')!);
-      await userEvent.click(await screen.findByText('Löschfahrzeug'));
+      await userEvent.click(await screen.findByText(/^Löschfahrzeug( \(\d+\))?$/));
       await userEvent.click(
         document.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
       );
@@ -1168,7 +1168,7 @@ describe('KatalogTabelle · Kopfwerkzeuge nach Dichte (LLH-1227)', () => {
     }
 
     await userEvent.click(ausloeser());
-    await userEvent.click(await screen.findByText('Löschfahrzeug'));
+    await userEvent.click(await screen.findByText(/^Löschfahrzeug \(\d+\)$/));
     await userEvent.click(
       document.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
     );

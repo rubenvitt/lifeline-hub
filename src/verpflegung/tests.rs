@@ -4,6 +4,7 @@
 
 use super::*;
 use crate::einsatz::nummer::{zone_oder_vorgabe, ZEITZONE_VORGABE};
+use crate::zeitdarstellung::{Zeitdarstellung, Zeitstil};
 use axum::http::StatusCode;
 
 fn utc(s: &str) -> DateTime<Utc> {
@@ -11,7 +12,11 @@ fn utc(s: &str) -> DateTime<Utc> {
 }
 
 fn berlin(von: &str, bis: &str) -> String {
-    zeitraum_text(utc(von), utc(bis), ZEITZONE_VORGABE)
+    zeitraum_text(
+        utc(von),
+        utc(bis),
+        Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::Taktisch),
+    )
 }
 
 // ── zeitraum_text ───────────────────────────────────────────────────────────────────────────
@@ -21,7 +26,7 @@ fn berlin(von: &str, bis: &str) -> String {
 fn zeitraum_in_ortszeit_nicht_utc() {
     assert_eq!(
         berlin("2026-09-24 10:00:00", "2026-09-24 11:30:00"),
-        "24.09. 12:00–13:30"
+        "241200sep26–1330"
     );
 }
 
@@ -30,17 +35,17 @@ fn zeitraum_in_ortszeit_nicht_utc() {
 fn sommerzeitbeginn_beidseits_der_grenze() {
     assert_eq!(
         berlin("2026-03-28 10:00:00", "2026-03-28 11:00:00"),
-        "28.03. 11:00–12:00",
+        "281100mrz26–1200",
         "Tag davor: MEZ (+1)"
     );
     assert_eq!(
         berlin("2026-03-29 00:30:00", "2026-03-29 01:30:00"),
-        "29.03. 01:30–03:30",
+        "290130mrz26–0330",
         "über die Grenze: die Stunde 02:xx gibt es nicht"
     );
     assert_eq!(
         berlin("2026-03-30 10:00:00", "2026-03-30 11:00:00"),
-        "30.03. 12:00–13:00",
+        "301200mrz26–1300",
         "Tag danach: MESZ (+2)"
     );
 }
@@ -50,17 +55,17 @@ fn sommerzeitbeginn_beidseits_der_grenze() {
 fn sommerzeitende_beidseits_der_grenze() {
     assert_eq!(
         berlin("2026-10-24 10:00:00", "2026-10-24 11:00:00"),
-        "24.10. 12:00–13:00",
+        "241200okt26–1300",
         "Tag davor: MESZ (+2)"
     );
     assert_eq!(
         berlin("2026-10-25 00:30:00", "2026-10-25 01:30:00"),
-        "25.10. 02:30–02:30",
+        "250230okt26–0230",
         "00:30 UTC und 01:30 UTC sind beide 02:30 Ortszeit"
     );
     assert_eq!(
         berlin("2026-10-26 10:00:00", "2026-10-26 11:00:00"),
-        "26.10. 11:00–12:00",
+        "261100okt26–1200",
         "Tag danach: MEZ (+1)"
     );
 }
@@ -70,17 +75,17 @@ fn sommerzeitende_beidseits_der_grenze() {
 fn ueber_mitternacht_nach_ortsdatum() {
     assert_eq!(
         berlin("2026-09-24 21:30:00", "2026-09-24 22:30:00"),
-        "24.09. 23:30–25.09. 00:30",
+        "242330sep26–250030sep26",
         "UTC ein Tag, Ortszeit zwei Tage → beide Daten"
     );
     assert_eq!(
         berlin("2026-09-24 22:30:00", "2026-09-24 23:30:00"),
-        "25.09. 00:30–01:30",
+        "250030sep26–0130",
         "UTC ein Tag, Ortszeit ein (anderer) Tag → ein Datum"
     );
     assert_eq!(
         berlin("2026-09-24 20:00:00", "2026-09-25 04:00:00"),
-        "24.09. 22:00–25.09. 06:00"
+        "242200sep26–250600sep26"
     );
 }
 
@@ -88,8 +93,12 @@ fn ueber_mitternacht_nach_ortsdatum() {
 fn andere_org_zeitzone_und_rueckfall() {
     let ny = zone_oder_vorgabe(Some("America/New_York"));
     assert_eq!(
-        zeitraum_text(utc("2026-09-24 16:00:00"), utc("2026-09-24 17:30:00"), ny),
-        "24.09. 12:00–13:30"
+        zeitraum_text(
+            utc("2026-09-24 16:00:00"),
+            utc("2026-09-24 17:30:00"),
+            Zeitstil::new(ny, Zeitdarstellung::DatumUhrzeit)
+        ),
+        "24.09.26 12:00–13:30"
     );
     assert_eq!(zone_oder_vorgabe(None), ZEITZONE_VORGABE);
     assert_eq!(
@@ -178,19 +187,19 @@ fn etb_angelegt_nennt_zeitraum_bedarf_aufteilung_und_sonderkost() {
         },
     );
     assert_eq!(
-        etb_text::angelegt("Mittag", "24.09. 12:00–13:30", &b, None, &[]),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, \
+        etb_text::angelegt("Mittag", "241200sep26–1330", &b, None, &[]),
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 angelegt: Bedarf 250 EP (180 Kräfte, \
          70 Betreute), davon 15 Sonderkost."
     );
     assert_eq!(
         etb_text::angelegt(
             "Nacht",
-            "24.09. 23:00–25.09. 01:00",
+            "242300sep26–250100sep26",
             &bedarf(0, 0, 0, Sonderkost::default()),
             None,
             &[]
         ),
-        "Verpflegung ‚Nacht‘ 24.09. 23:00–25.09. 01:00 angelegt: Bedarf 0 EP."
+        "Verpflegung ‚Nacht‘ 242300sep26–250100sep26 angelegt: Bedarf 0 EP."
     );
 }
 
@@ -203,8 +212,8 @@ fn etb_geaendert_nennt_neuen_und_alten_gesamtbedarf() {
         ..Default::default()
     };
     assert_eq!(
-        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 geändert: Bedarf 270 EP (vorher 250)."
+        etb_text::geaendert("Mittag", "241200sep26–1330", &b, &a),
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 geändert: Bedarf 270 EP (vorher 250)."
     );
 }
 
@@ -213,13 +222,13 @@ fn etb_geaendert_ohne_neuen_gesamtbedarf_nennt_ihn_im_kopf() {
     let b = bedarf(180, 70, 0, Sonderkost::default());
     let a = etb_text::Aenderungen {
         bezeichnung_vorher: Some("Mittagessen"),
-        zeitraum_vorher: Some("24.09. 11:30–13:00"),
+        zeitraum_vorher: Some("241130sep26–1300"),
         ..Default::default()
     };
     assert_eq!(
-        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Bezeichnung \
-         (vorher ‚Mittagessen‘), Zeitraum (vorher 24.09. 11:30–13:00)."
+        etb_text::geaendert("Mittag", "241200sep26–1330", &b, &a),
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 (Bedarf 250 EP) geändert: Bezeichnung \
+         (vorher ‚Mittagessen‘), Zeitraum (vorher 241130sep26–1300)."
     );
     let a = etb_text::Aenderungen {
         aufteilung: true,
@@ -236,8 +245,8 @@ fn etb_geaendert_ohne_neuen_gesamtbedarf_nennt_ihn_im_kopf() {
         },
     );
     assert_eq!(
-        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Aufteilung \
+        etb_text::geaendert("Mittag", "241200sep26–1330", &b, &a),
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 (Bedarf 250 EP) geändert: Aufteilung \
          (200 Kräfte, 50 Betreute), Sonderkost 4 (vorher 0)."
     );
     assert!(!a.leer());
@@ -249,10 +258,10 @@ fn etb_geloescht_nennt_zeitraum_und_bedarf() {
     assert_eq!(
         etb_text::geloescht(
             "Mittag",
-            "24.09. 12:00–13:30",
+            "241200sep26–1330",
             &bedarf(180, 70, 0, Sonderkost::default())
         ),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 gelöscht (Bedarf 250 EP)."
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 gelöscht (Bedarf 250 EP)."
     );
 }
 
@@ -278,35 +287,35 @@ fn etb_angelegt_nennt_art_und_stellen_nur_wenn_gesetzt() {
     assert_eq!(
         etb_text::angelegt(
             "Mittag",
-            "24.09. 12:00–13:30",
+            "241200sep26–1330",
             &b,
             Some(Verpflegungsart::Warm),
             &stellen
         ),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, \
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 angelegt: Bedarf 250 EP (180 Kräfte, \
          70 Betreute), davon 15 Sonderkost; warm; an ‚Feldküche BR Sportplatz‘, \
          ‚Ausgabe Turnhalle Nord‘."
     );
     assert_eq!(
         etb_text::angelegt(
             "Getränke",
-            "24.09. 12:00–13:30",
+            "241200sep26–1330",
             &bedarf(120, 0, 0, Sonderkost::default()),
             Some(Verpflegungsart::Getraenke),
             &[]
         ),
-        "Verpflegung ‚Getränke‘ 24.09. 12:00–13:30 angelegt: Bedarf 120 EP (120 Kräfte); \
+        "Verpflegung ‚Getränke‘ 241200sep26–1330 angelegt: Bedarf 120 EP (120 Kräfte); \
          Getränke."
     );
     assert_eq!(
         etb_text::angelegt(
             "Mittag",
-            "24.09. 12:00–13:30",
+            "241200sep26–1330",
             &bedarf(10, 0, 0, Sonderkost::default()),
             None,
             &namen(&["Zuführung Deich"])
         ),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 angelegt: Bedarf 10 EP (10 Kräfte); an \
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 angelegt: Bedarf 10 EP (10 Kräfte); an \
          ‚Zuführung Deich‘."
     );
 }
@@ -323,8 +332,8 @@ fn etb_geaendert_nennt_art_und_stellen_jetzt_und_vorher() {
     };
     assert!(!a.leer());
     assert_eq!(
-        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Art kalt \
+        etb_text::geaendert("Mittag", "241200sep26–1330", &b, &a),
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 (Bedarf 250 EP) geändert: Art kalt \
          (vorher warm), Stellen ‚A‘, ‚B‘ (vorher ‚A‘)."
     );
     let a = etb_text::Aenderungen {
@@ -333,8 +342,8 @@ fn etb_geaendert_nennt_art_und_stellen_jetzt_und_vorher() {
         ..Default::default()
     };
     assert_eq!(
-        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Art ohne Angabe \
+        etb_text::geaendert("Mittag", "241200sep26–1330", &b, &a),
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 (Bedarf 250 EP) geändert: Art ohne Angabe \
          (vorher Getränke), Stellen keine (vorher ‚A‘)."
     );
     let a = etb_text::Aenderungen {
@@ -343,8 +352,8 @@ fn etb_geaendert_nennt_art_und_stellen_jetzt_und_vorher() {
         ..Default::default()
     };
     assert_eq!(
-        etb_text::geaendert("Mittag", "24.09. 12:00–13:30", &b, &a),
-        "Verpflegung ‚Mittag‘ 24.09. 12:00–13:30 (Bedarf 250 EP) geändert: Art warm \
+        etb_text::geaendert("Mittag", "241200sep26–1330", &b, &a),
+        "Verpflegung ‚Mittag‘ 241200sep26–1330 (Bedarf 250 EP) geändert: Art warm \
          (vorher ohne Angabe), Stellen ‚A‘ (vorher keine)."
     );
 }

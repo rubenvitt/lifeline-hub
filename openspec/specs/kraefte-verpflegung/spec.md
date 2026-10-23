@@ -250,7 +250,7 @@ Erfassen und Zurücknehmen einer Ausgabe MUST keinen ETB-Eintrag schreiben.
 
 #### Scenario: Zeitraum in Ortszeit
 - **WHEN** die Organisation die Zeitzone Europe/Berlin führt und ein Zeitfenster am 24.09. von 10:00 bis 11:30 UTC angelegt wird
-- **THEN** nennt der ETB-Eintrag den Zeitraum 24.09. 12:00–13:30
+- **THEN** nennt der ETB-Eintrag den Zeitraum 241200sep26–1330 (Darstellung taktisch, Spec `zeitdarstellung`, „Servertexte“)
 
 #### Scenario: Ausgabe ohne ETB
 - **WHEN** eine Ausgabe erfasst oder zurückgenommen wird

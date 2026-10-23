@@ -19,6 +19,7 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { nachFolge, nachText, nachZahl, werteAusKatalog } from '../components/katalogVergleich';
 import Markdown from '../components/Markdown';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import SichtungsTag from '../components/SichtungsTag';
@@ -46,6 +47,7 @@ import {
   personStatus,
   schadenAusmass,
   schadenStatus,
+  sichtung,
 } from '../theme/statusFarben';
 import { standVerworfen } from './archivAbruf';
 import { ETB_TYPEN, VERBLEIB_ART, VERBLEIB_STATUS, primaeraktion } from './archivText';
@@ -81,18 +83,50 @@ const ETB_SEITE = 100;
 type EtbFilter = EtbTyp | 'alle';
 const MELDEWEG = Object.fromEntries(MELDEWEG_OPTIONEN.map((o) => [o.value, o.label]));
 
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096, Spec `tabellen-sortieren-filtern`): die Register
+ * sortieren nach Nummer, Status und Zeiten und filtern nach ihren festen Katalogen. Ohne
+ * Listengedächtnis: drei Register und die Löschersuchen teilen sich eine Seite, ihre Adresse trägt
+ * nur eine Liste (`sort=`, `f.<spalte>=`). Die Wahl gilt, solange die Akte offen ist.
+ */
+// Zeiten kommen als ISO-Zeitstempel in UTC: ihre Textfolge ist die Zeitfolge.
+type Register = { registrier_nr: number; erfasst_at: string; storniert_at?: string | null };
+
+const OHNE_SICHTUNG = 'ohne';
+const SICHTUNG_WERTE = [
+  ...werteAusKatalog(sichtung),
+  { text: 'ohne Sichtung', value: OHNE_SICHTUNG },
+];
+
+function nrSpalte<T extends Register & { registrier_anzeige: string }>(): KatalogSpalte<T> {
+  return {
+    key: 'nr',
+    title: 'Nr.',
+    width: 90,
+    zahl: true,
+    sorter: nachZahl((z: T) => z.registrier_nr),
+    render: (_, z) => z.registrier_anzeige,
+  };
+}
+
 const personSpalten: KatalogSpalte<ArchivPerson>[] = [
-  { key: 'nr', title: 'Nr.', width: 90, zahl: true, render: (_, p) => p.registrier_anzeige },
+  nrSpalte<ArchivPerson>(),
   {
     key: 'status',
     title: 'Status',
     width: 150,
+    sorter: nachFolge(Object.keys(personStatus), (p: ArchivPerson) => p.status),
+    filters: werteAusKatalog(personStatus),
+    onFilter: (w, p) => p.status === w,
     render: (_, p) => <StatusTag darstellung={personStatus[p.status]} />,
   },
   {
     key: 'sichtung',
     title: 'Sichtung',
     width: 130,
+    sorter: nachFolge(Object.keys(sichtung), (p: ArchivPerson) => p.aktuelle_sichtung),
+    filters: SICHTUNG_WERTE,
+    onFilter: (w, p) => (p.aktuelle_sichtung ?? OHNE_SICHTUNG) === w,
     render: (_, p) =>
       p.aktuelle_sichtung ? <SichtungsTag kategorie={p.aktuelle_sichtung} /> : leer,
   },
@@ -115,6 +149,7 @@ const personSpalten: KatalogSpalte<ArchivPerson>[] = [
     title: 'Erfasst',
     width: 150,
     zahl: true,
+    sorter: nachText((z: Register) => z.erfasst_at),
     render: (_, p) => <ZeitAnzeige wert={p.erfasst_at} />,
   },
   {
@@ -122,6 +157,7 @@ const personSpalten: KatalogSpalte<ArchivPerson>[] = [
     title: 'Storniert',
     width: 150,
     zahl: true,
+    sorter: nachText((z: Register) => z.storniert_at),
     render: (_, p) => (p.storniert_at ? <ZeitAnzeige wert={p.storniert_at} /> : leer),
   },
   {
@@ -141,12 +177,23 @@ const personSpalten: KatalogSpalte<ArchivPerson>[] = [
 ];
 
 const tierSpalten: KatalogSpalte<ArchivTier>[] = [
-  { key: 'nr', title: 'Nr.', width: 90, zahl: true, render: (_, t) => t.registrier_anzeige },
-  { key: 'art', title: 'Tierart', width: 140, render: (_, t) => SPEZIES_META[t.spezies] },
+  nrSpalte<ArchivTier>(),
+  {
+    key: 'art',
+    title: 'Tierart',
+    width: 140,
+    sorter: nachText((t: ArchivTier) => SPEZIES_META[t.spezies]),
+    filters: werteAusKatalog(SPEZIES_META),
+    onFilter: (w, t) => t.spezies === w,
+    render: (_, t) => SPEZIES_META[t.spezies],
+  },
   {
     key: 'status',
     title: 'Status',
     width: 150,
+    sorter: nachFolge(Object.keys(TIER_STATUS), (t: ArchivTier) => t.status),
+    filters: werteAusKatalog(TIER_STATUS),
+    onFilter: (w, t) => t.status === w,
     render: (_, t) => (
       <StatusChip ton={TIER_STATUS[t.status].ton} wort={TIER_STATUS[t.status].label} />
     ),
@@ -166,6 +213,7 @@ const tierSpalten: KatalogSpalte<ArchivTier>[] = [
     title: 'Erfasst',
     width: 150,
     zahl: true,
+    sorter: nachText((z: Register) => z.erfasst_at),
     render: (_, t) => <ZeitAnzeige wert={t.erfasst_at} />,
   },
   {
@@ -173,29 +221,46 @@ const tierSpalten: KatalogSpalte<ArchivTier>[] = [
     title: 'Storniert',
     width: 150,
     zahl: true,
+    sorter: nachText((z: Register) => z.storniert_at),
     render: (_, t) => (t.storniert_at ? <ZeitAnzeige wert={t.storniert_at} /> : leer),
   },
 ];
 
 const schadenSpalten: KatalogSpalte<ArchivSchaden>[] = [
-  { key: 'nr', title: 'Nr.', width: 90, zahl: true, render: (_, s) => s.registrier_anzeige },
-  { key: 'typ', title: 'Typ', width: 160, render: (_, s) => TYP_LABEL[s.typ] },
+  nrSpalte<ArchivSchaden>(),
+  {
+    key: 'typ',
+    title: 'Typ',
+    width: 160,
+    sorter: nachText((s: ArchivSchaden) => TYP_LABEL[s.typ]),
+    filters: werteAusKatalog(TYP_LABEL),
+    onFilter: (w, s) => s.typ === w,
+    render: (_, s) => TYP_LABEL[s.typ],
+  },
   {
     key: 'ausmass',
     title: 'Ausmaß',
     width: 140,
+    sorter: nachFolge(Object.keys(schadenAusmass), (s: ArchivSchaden) => s.ausmass),
+    filters: werteAusKatalog(schadenAusmass),
+    onFilter: (w, s) => s.ausmass === w,
     render: (_, s) => <StatusTag darstellung={schadenAusmass[s.ausmass]} />,
   },
   {
     key: 'status',
     title: 'Status',
     width: 150,
+    sorter: nachFolge(Object.keys(schadenStatus), (s: ArchivSchaden) => s.status),
+    filters: werteAusKatalog(schadenStatus),
+    onFilter: (w, s) => s.status === w,
     render: (_, s) => <StatusTag darstellung={schadenStatus[s.status]} />,
   },
   {
     key: 'abschluss',
     title: 'Abschlussgrund',
     width: 190,
+    filters: werteAusKatalog(ABSCHLUSS_LABEL),
+    onFilter: (w, s) => s.abschluss_grund === w,
     render: (_, s) => (s.abschluss_grund ? ABSCHLUSS_LABEL[s.abschluss_grund] : leer),
   },
   {
@@ -203,6 +268,7 @@ const schadenSpalten: KatalogSpalte<ArchivSchaden>[] = [
     title: 'Erfasst',
     width: 150,
     zahl: true,
+    sorter: nachText((z: Register) => z.erfasst_at),
     render: (_, s) => <ZeitAnzeige wert={s.erfasst_at} />,
   },
   {
@@ -210,6 +276,7 @@ const schadenSpalten: KatalogSpalte<ArchivSchaden>[] = [
     title: 'Storniert',
     width: 150,
     zahl: true,
+    sorter: nachText((z: Register) => z.storniert_at),
     render: (_, s) => (s.storniert_at ? <ZeitAnzeige wert={s.storniert_at} /> : leer),
   },
 ];
@@ -217,11 +284,13 @@ const schadenSpalten: KatalogSpalte<ArchivSchaden>[] = [
 function Registerteil<T extends object>({
   titel,
   leerText,
+  mehrzahl,
   spalten,
   daten,
 }: {
   titel: string;
   leerText: string;
+  mehrzahl: string;
   spalten: KatalogSpalte<T>[];
   daten: T[];
 }) {
@@ -237,6 +306,7 @@ function Registerteil<T extends object>({
         columns={spalten}
         dataSource={daten}
         locale={{ emptyText: leerText }}
+        mehrzahl={mehrzahl}
       />
     </section>
   );
@@ -466,18 +536,21 @@ function AkteInhalt({
         <Paneel titel="Register" koerperPolster>
           <Registerteil
             titel="Personen"
+            mehrzahl="Personen"
             leerText="Keine Personen erfasst"
             spalten={personSpalten}
             daten={akte.personen}
           />
           <Registerteil
             titel="Tiere"
+            mehrzahl="Tieren"
             leerText="Keine Tiere erfasst"
             spalten={tierSpalten}
             daten={akte.tiere}
           />
           <Registerteil
             titel="Schäden"
+            mehrzahl="Schäden"
             leerText="Keine Schäden erfasst"
             spalten={schadenSpalten}
             daten={akte.schaeden}

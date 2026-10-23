@@ -15,6 +15,7 @@ import type { Tier } from '../api/types';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import * as dateiSpeichern from '../components/dateiSpeichern';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -94,7 +95,9 @@ async function warteBisDialogWeg(timeout?: number) {
       }
       // Am Feld gemessen, nicht an der Dialogrolle: `destroyOnHidden` ist die Zusicherung, dass ein
       // geschlossener Dialog keine Felder stehen lässt.
-      expect(screen.queryByLabelText('Rufname')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('textbox', { name: 'Rufname', hidden: true }),
+      ).not.toBeInTheDocument();
     },
     timeout != null ? { timeout } : undefined,
   );
@@ -217,23 +220,25 @@ describe('TierePage', () => {
     expect(screen.getByRole('searchbox', { name: 'Suche in Tiere im Einsatz' })).toHaveValue('');
   });
 
-  it('filtert nach Spezies', async () => {
+  it('filtert nach Spezies im Spaltenkopf (LLH-1096)', async () => {
     render(einsatzAktiv, [
       tierBasis,
       { ...tierBasis, id: 12, registrier_nr: 3, spezies: 'katze', rufname: 'Felix' },
     ]);
     await screen.findByText('Rex');
-    // Nach Namen, nicht „die einzige Combobox der Seite": die Werkzeugzeile von `Datensicht` kann
-    // ein zweites combobox-artiges Element mitbringen.
-    await userEvent.click(screen.getByRole('combobox', { name: 'Spezies' }));
-    // Tabellenzelle und Dropdown-Option tragen beide "Katze" → auf die Option zielen.
-    const katzeOption = (await screen.findAllByText('Katze')).find((el) =>
-      el.closest('.ant-select-item-option'),
-    );
-    expect(katzeOption).toBeTruthy();
-    await userEvent.click(katzeOption!);
+    // Kein Auswahlfeld neben den Reitern mehr: die Spezies sitzt im Kopf der Spalte.
+    expect(screen.queryByRole('combobox', { name: 'Spezies' })).toBeNull();
+    await kopfFilterWaehlen('Spezies', ['Katze (1)']);
     expect(await screen.findByText('Felix')).toBeInTheDocument();
-    expect(screen.queryByText('Rex')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Rex')).not.toBeInTheDocument());
+  });
+
+  it('am Handy steht die Spezies als Auswahlfeld über der Liste, der Status nicht (LLH-1096)', async () => {
+    setzeViewportBreite(390);
+    render(einsatzAktiv, [tierBasis]);
+    await screen.findByText('Rex');
+    expect(screen.getByRole('combobox', { name: 'Spezies' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull();
   });
 
   /**
@@ -582,7 +587,7 @@ describe('TierePage', () => {
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     const dialog = await screen.findByRole('dialog');
-    // Im Dialog gesucht: die zweite Combobox der Seite ist der Spezies-Filter der Werkzeugzeile.
+    // Im Dialog gesucht: die Seite kann weitere Comboboxen tragen (Sortieren im Kartenzweig).
     await waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveFocus());
   });
 
@@ -600,7 +605,7 @@ describe('TierePage', () => {
 
     // Kein Klick auf „Erfassen": nur die Enter-Taste im Feld belegt, dass der Absende-Knopf im
     // Formular liegt.
-    await userEvent.type(screen.getByLabelText('Rufname'), 'Mimi{Enter}');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Rufname' }), 'Mimi{Enter}');
 
     await waitFor(() => expect(body.rufname).toBe('Mimi'));
     // Die Ableitung aus dem Modus bleibt.
@@ -638,7 +643,7 @@ describe('TierePage', () => {
     expect(katze).toBeTruthy();
     await userEvent.click(katze!);
     await userEvent.type(screen.getByLabelText('Fundort'), 'Sammelstelle Nord');
-    await userEvent.type(screen.getByLabelText('Rufname'), 'Rex');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Rufname' }), 'Rex');
 
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(wortlaute).toHaveLength(1));
@@ -657,10 +662,10 @@ describe('TierePage', () => {
      */
     await expect(warteBisDialogWeg(400)).rejects.toThrow();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByLabelText('Rufname')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Rufname' })).toBeInTheDocument();
     expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
     // Einzelfeld geleert, Wiederholfelder stehen.
-    await waitFor(() => expect(screen.getByLabelText('Rufname')).toHaveValue(''));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Rufname' })).toHaveValue(''));
     expect(screen.getByLabelText('Fundort')).toHaveValue('Sammelstelle Nord');
 
     // Zweiter Satz: die Übernahme steht auch im Wortlaut, nicht bloß im Feld.
@@ -765,7 +770,7 @@ describe('TierePage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     await userEvent.type(screen.getByLabelText('Fundort'), 'Wartort Tier');
-    await userEvent.type(screen.getByLabelText('Rufname'), 'Warte-Tier');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Rufname' }), 'Warte-Tier');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await postStart;
     expect(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i })).toBeDisabled();
@@ -1113,12 +1118,11 @@ describe('TierePage — Einstieg in den Druck (LFH-727)', () => {
     expect(link).not.toHaveClass('ant-btn-primary');
   });
 
-  it('nimmt Sicht und Spezies nach einem Wechsel mit', async () => {
+  it('nimmt Sicht und Spezies (aus dem Kopffilter) nach einem Wechsel mit', async () => {
     render(einsatzAktiv, [tierBasis, tierVermisst]);
     await screen.findByText('T-001');
     await userEvent.click(screen.getByRole('radio', { name: 'Vermisst' }));
-    await userEvent.click(screen.getByRole('combobox', { name: 'Spezies' }));
-    await userEvent.click(await screen.findByTitle('Katze'));
+    await kopfFilterWaehlen('Spezies', [/^Katze/]);
     await waitFor(async () =>
       expect(await druckLink()).toHaveAttribute(
         'href',
@@ -1271,5 +1275,58 @@ describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
     await waitFor(() => expect(client.isMutating()).toBe(0));
     expect(within(dialogB).queryByRole('alert')).toBeNull();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096, Rollout des Musters aus LLH-1086): Status und
+ * Spezies filtern, jede vergleichbare Spalte sortiert, der Stand steht in der Adresse.
+ */
+describe('TierePage · Sortieren und Filtern (LLH-1096)', () => {
+  const felix: Tier = {
+    ...tierBasis,
+    id: 12,
+    registrier_nr: 3,
+    spezies: 'katze',
+    rufname: 'Felix',
+  };
+  const folge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+  const adresse = () => screen.getByTestId('suche').textContent;
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1366);
+    render(einsatzAktiv, [tierBasis, felix]);
+    await screen.findByText('Felix');
+
+    await kopfFilterWaehlen('Spezies', ['Katze (1)']);
+    await waitFor(() => expect(folge()).toEqual(['12']));
+    await waitFor(() => expect(adresse()).toBe('?f.spezies=katze'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await waitFor(() => expect(folge()).toHaveLength(2));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Rufname/ }));
+    await waitFor(() => expect(folge()).toEqual(['12', String(tierBasis.id)]));
+    await waitFor(() => expect(adresse()).toBe('?sort=rufname%3Aauf'));
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
+    setzeViewportBreite(1366);
+    render(einsatzAktiv, [tierBasis, felix], '/einsaetze/1/tiere?f.spezies=hund');
+    expect(await screen.findByText('Rex')).toBeInTheDocument();
+    expect(screen.queryByText('Felix')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Spezies: Hund entfernen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('der Status filtert im Kopf über die Reiter hinweg', async () => {
+    setzeViewportBreite(1366);
+    render(einsatzAktiv, [tierBasis, tierVermisst], '/einsaetze/1/tiere?f.status=vermisst');
+    await userEvent.click(await screen.findByRole('radio', { name: 'Alle' }));
+    expect(await screen.findByText('T-002')).toBeInTheDocument();
+    expect(screen.queryByText('T-001')).toBeNull();
   });
 });

@@ -205,6 +205,26 @@ describe('Datensicht · Kartenzweig (LLH-1086)', () => {
     ).toBeInTheDocument();
     expect(hinweis()).toHaveTextContent('1 von 3 Schäden sichtbar');
   });
+
+  it('ein Filter mit `ohneKartenfeld` hat kein Auswahlfeld, wirkt aber und steht als Chip da (LLH-1096)', () => {
+    setzeViewportBreite(390);
+    const ohneFeld = spalten.map((s) =>
+      s.key === 'typ' && s.filter ? { ...s, filter: { ...s.filter, ohneKartenfeld: true } } : s,
+    );
+    rendere({
+      spalten: ohneFeld,
+      gedaechtnis: {
+        start: { sortierung: null, filter: { typ: ['sturm'] }, suche: '' },
+        spaltenStart: null,
+        melde: vi.fn(),
+        meldeSpalten: vi.fn(),
+      },
+    });
+    expect(screen.queryByRole('combobox', { name: 'Typ' })).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Ausmaß' })).toBeInTheDocument();
+    expect(karten()).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Filter Typ: Sturm entfernen' })).toBeInTheDocument();
+  });
 });
 
 describe('Datensicht · Gedächtnis (LLH-1086)', () => {

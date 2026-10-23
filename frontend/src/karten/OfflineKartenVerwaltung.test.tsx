@@ -196,7 +196,7 @@ describe('OfflineKartenVerwaltung', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    await userEvent.click(within(menue).getByText('lädt'));
+    await userEvent.click(within(menue).getByText(/^lädt \(\d+\)$/));
     await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
 
     await waitFor(() => expect(zeilen()).toHaveLength(1));

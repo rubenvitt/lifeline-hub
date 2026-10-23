@@ -337,7 +337,7 @@ describe('BenutzerPage', () => {
     const status = screen.getByRole('columnheader', { name: /Status/ });
     await userEvent.click(status.querySelector('.ant-table-filter-trigger') as HTMLElement);
     const korb = document.querySelector('.ant-table-filter-dropdown') as HTMLElement;
-    await userEvent.click(within(korb).getByText('deaktiviert'));
+    await userEvent.click(within(korb).getByText(/^deaktiviert \(\d+\)$/));
     // `test/utils.tsx` montiert `ConfigProvider` ohne Locale — die Schaltfläche heißt „OK".
     await userEvent.click(within(korb).getByRole('button', { name: 'OK' }));
     await waitFor(() => expect(namen()).toEqual(['Eva']));

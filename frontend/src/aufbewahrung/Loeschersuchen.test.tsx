@@ -7,6 +7,7 @@ import type { ArchivAkte, PersonTreffer, Schwaerzungsantrag } from '../api/types
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 import Loeschersuchen, { antragswege } from './Loeschersuchen';
 import PersonensucheDialog from './PersonensucheDialog';
 import SchwaerzungsantragDialog, {
@@ -265,6 +266,33 @@ describe('Loeschersuchen', () => {
       expect(screen.queryByRole('button', { name: 'Antrag für R-042 zurücknehmen' })).toBeNull(),
     );
     expect(screen.getByText('Admin Zwei', { exact: false })).toBeInTheDocument();
+  });
+
+  it('filtert im Kopf „Stand“ und sortiert nach dem Ziel (LLH-1096)', async () => {
+    server.use(
+      http.get(`${BASIS}/schwaerzungsantraege`, () =>
+        HttpResponse.json([
+          antrag(),
+          antrag({
+            id: 2,
+            ziel_kennung: 'IT-5',
+            ziel_art: 'infotelefon_anruf',
+            stand: 'vollzogen',
+          }),
+          antrag({ id: 3, ziel_kennung: 'EK-9', ziel_art: 'externe_kraft', stand: 'vollzogen' }),
+        ]),
+      ),
+    );
+    renderMitProviders(<Loeschersuchen einsatzId={7} akte={akte('frist_laeuft')} />);
+    await screen.findByText('R-042');
+    const ziele = () =>
+      [...document.querySelectorAll('tbody tr[data-row-key] td:first-child')].map(
+        (z) => z.textContent,
+      );
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Ziel/ }));
+    await waitFor(() => expect(ziele()).toEqual(['EK-9', 'IT-5', 'R-042']));
+    await kopfFilterWaehlen('Stand', ['vollzogen (2)']);
+    await waitFor(() => expect(ziele()).toEqual(['EK-9', 'IT-5']));
   });
 
   it('Rücknahme zu spät (409): Fehler am Paneel, Liste lädt neu', async () => {

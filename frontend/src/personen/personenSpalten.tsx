@@ -15,9 +15,16 @@ import { fehlerText } from '../api/client';
 import { PERSON_ZUSTAND_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
 import { personDetailPfad } from '../routing/deeplinks';
-import type { Person } from '../api/types';
+import type { Person, PersonStatus } from '../api/types';
 import { formatKalenderdatum } from '../anzeige/kalenderdatum';
-import { STATUS_META, TRANSPORT_ART_WORT, transportRang } from './personMeta';
+import {
+  SK_META,
+  SK_REIHE,
+  SK_WORT,
+  STATUS_META,
+  TRANSPORT_ART_WORT,
+  transportRang,
+} from './personMeta';
 import PrioritaetMarke from './PrioritaetMarke';
 import { kontamination } from '../theme/statusFarben';
 import { GESCHLECHT_KURZ } from './personBefehl';
@@ -31,6 +38,7 @@ import {
   lueckenVon,
   verbleibKlasse,
   verbleibLabel,
+  type VerbleibKlasse,
 } from './personenBilanz';
 import ZeilenSichtung, { type ZeilenRueckmeldung } from './ZeilenSichtung';
 
@@ -183,6 +191,55 @@ function TransportZelle({ p }: { p: Person }) {
       )}
     </span>
   );
+}
+
+/*
+ * Sortieren und Filtern (LLH-1096, Spec `tabellen-sortieren-filtern`): Sichtung, Status, Verbleib
+ * und (mit Abschnitten) Abschnitt filtern im Spaltenkopf; jede Spalte mit vergleichbarem Wert
+ * sortiert. Zustand / Verdacht und Vermerk sind Freitext und bleiben ohne beides. Sichtung, Status
+ * und Verbleib haben im Kartenzweig KEIN Auswahlfeld (`ohneKartenfeld`): jedes weitere Feld
+ * schöbe am Handy die erste Karte aus dem ersten Bild (`e2e/betroffene-handy.spec.ts`), und die
+ * Seite führt Status (Statusleiste) und Sichtung (Sichtungsraster) dort schon über der Liste.
+ */
+
+/** Wort mit großem Anfang für die Werteliste (wie die Statusleiste: „Erfasst“, LFH-963). */
+const gross = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+
+/** Sichtung in der Reihe der Dringlichkeit, „ohne Sichtung“ zuletzt. */
+const OHNE_SICHTUNG = 'ohne';
+const SICHTUNG_WERTE = [
+  ...SK_REIHE.map((k) => ({ text: SK_META[k].label, value: k as string })),
+  { text: SK_WORT.ohne, value: OHNE_SICHTUNG },
+];
+
+/** Die Status im Lebenslauf einer Person (erfasst … abgemeldet): Werteliste und Sortierachse. */
+const STATUS_FOLGE = Object.keys(STATUS_META) as PersonStatus[];
+const STATUS_WERTE = STATUS_FOLGE.map((s) => ({ text: gross(STATUS_META[s].label), value: s }));
+
+/** Verbleib nach Klasse (nicht je UHS-Name): offen zuerst, dann vom Platz weg zum Ende. */
+const VERBLEIB_FOLGE: readonly VerbleibKlasse[] = [
+  'offen',
+  'uhs',
+  'unterwegs',
+  'transport',
+  'notunterkunft',
+  'vor_ort',
+  'entlassung',
+  'verstorben',
+];
+const VERBLEIB_WERTE = VERBLEIB_FOLGE.map((k) => ({
+  text: k === 'uhs' ? 'UHS' : k === 'offen' ? 'Offen' : gross(verbleibLabel(k)),
+  value: k as string,
+}));
+
+/**
+ * Der Abschnitt einer Person: der ihrer aktuellen UHS (LLH-1096). Eine Person trägt selbst keinen;
+ * die Seite reicht ihn nur, wenn das Modul Einsatzabschnitte frei ist.
+ */
+export interface PersonenAbschnitt {
+  name: (p: Person) => string | null;
+  /** Die Abschnitte, an denen eine UHS hängt; ohne Werte kein Filter. */
+  werte: readonly { text: string; value: string }[];
 }
 
 /** Bedienung der Zeilen; ohne sie bleibt das Register reine Anzeige. */
@@ -444,6 +501,7 @@ function VerbleibZelle({
 export function personenSpalten(
   uhsName: (id: number) => string | undefined,
   bedienung?: PersonenBedienung,
+  abschnitt?: PersonenAbschnitt,
 ) {
   return spaltenFuer<Person>()([
     {
@@ -475,6 +533,13 @@ export function personenSpalten(
       title: 'Sichtung',
       key: 'sk',
       width: 104,
+      // In der Reihe der Dringlichkeit (`SK_REIHE`), ohne Sichtung hinten.
+      sortWert: (p) => (p.aktuelle_sichtung ? SK_REIHE.indexOf(p.aktuelle_sichtung) : null),
+      filter: {
+        werte: SICHTUNG_WERTE,
+        trifft: (p, w) => (p.aktuelle_sichtung ?? OHNE_SICHTUNG) === w,
+        ohneKartenfeld: true,
+      },
       render: (_, p) =>
         bedienung?.rueckmeldung && isSichtungBedienbar(p, bedienung) ? (
           <ZeilenSichtung
@@ -493,6 +558,7 @@ export function personenSpalten(
       // Feste Breite mit Platz für den Platzhalter-Knopf — KEINE weitere Fließspalte neben Person
       // und Vermerk.
       width: 140,
+      // Weder Sortierung noch Filter (LLH-1096): Freitext ist kein Vergleichswert.
       suchText: (p) => p.zustand,
       render: (_, p) => <ZustandZelle p={p} bedienung={bedienung} />,
     },
@@ -500,21 +566,51 @@ export function personenSpalten(
       title: 'Status',
       key: 'status',
       width: 118,
+      sortWert: (p) => STATUS_FOLGE.indexOf(p.status),
+      filter: { werte: STATUS_WERTE, trifft: (p, w) => p.status === w, ohneKartenfeld: true },
       render: (_, p) => <StatusTag darstellung={STATUS_META[p.status]} />,
     },
     {
       title: 'Fundort',
       key: 'fundort',
       abBreite: 'lg',
+      // Weder Sortierung noch Filter (LLH-1096): Freitext samt Koordinate, kein Vergleichswert.
       suchText: (p) => [p.antreff_ort, koordinatenText(p)].filter(Boolean).join(' ') || null,
       render: (_, p) => <FundortZelle p={p} />,
     },
     {
       title: 'Verbleib',
       key: 'verbleib',
+      sortWert: (p) => verbleibText(p, uhsName),
+      filter: {
+        werte: VERBLEIB_WERTE,
+        trifft: (p, w) => verbleibKlasse(p) === w,
+        ohneKartenfeld: true,
+      },
       suchText: (p) => verbleibText(p, uhsName),
       render: (_, p) => <VerbleibZelle p={p} uhsName={uhsName} bedienung={bedienung} />,
     },
+    ...(abschnitt
+      ? [
+          {
+            // Lesend und erst ab `xxl` (wie im Personal, LLH-1096): Person und Vermerk fließen,
+            // eine weitere Spalte nähme ihnen am Fükw die Breite. Über den Spaltenschalter zurück.
+            title: 'Abschnitt',
+            key: 'abschnitt' as const,
+            width: 130,
+            abBreite: 'xxl' as const,
+            sortWert: (p: Person) => abschnitt.name(p),
+            filter:
+              abschnitt.werte.length > 0
+                ? {
+                    werte: abschnitt.werte,
+                    trifft: (p: Person, w: string) => abschnitt.name(p) === w,
+                  }
+                : undefined,
+            render: (_: unknown, p: Person) => abschnitt.name(p) ?? <Leerzelle offen={false} />,
+          },
+        ]
+      : []),
     {
       title: 'Transport',
       key: 'transport',
@@ -536,6 +632,7 @@ export function personenSpalten(
       key: 'vermerk',
       abBreite: 'xxl',
       mindestBreite: 160,
+      // Weder Sortierung noch Filter (LLH-1096): eine Notiz in Freitext ist kein Vergleichswert.
       suchText: (p) => p.notiz,
       render: (_, p) =>
         nichtGeladen(p, 'notiz') ? (

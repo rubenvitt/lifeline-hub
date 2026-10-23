@@ -48,7 +48,9 @@ Zeitachse zurück.
 
 1. In „Betroffene“, „Tiere“ oder „Schäden“ bei Bedarf die Liste filtern.
 2. Im Kopf der Seite „Drucken / als PDF“ wählen; auf schmalen Bildschirmen steht der Punkt unter
-   „Weitere“. Die Druckansicht übernimmt den Filter.
+   „Weitere“. Die Druckansicht übernimmt bei den Betroffenen den Statusfilter und „Nur Lücken
+   zeigen“, bei den Tieren die Sicht und die Spezies aus dem Spaltenfilter, bei den Schäden die
+   Sicht; weitere Spaltenfilter und die Suche druckt sie nicht mit.
 
    ![Druckansicht der Betroffenenliste mit dem Hinweis „Zugriff wird protokolliert.“, Druckkopf und Tabelle](../bilder/drucken-export/listen-druckansicht.png)
 

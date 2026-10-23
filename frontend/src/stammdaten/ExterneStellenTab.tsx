@@ -8,6 +8,8 @@ import KatalogTabelle, {
 } from '../components/KatalogTabelle';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { useViewport } from '../components/useViewport';
+import { nachText, nachZahl } from '../components/katalogVergleich';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -83,6 +85,8 @@ export default function ExterneStellenTab() {
         value: art,
       })),
       onFilter: (wert, s) => s.art === wert,
+      // In der Folge des Katalogs, wie der Server die Stellen ordnet, nicht nach dem Wort.
+      sorter: nachZahl((s: ExterneStelle) => EXTERNE_STELLE_ARTEN.indexOf(s.art)),
       render: (art: ExterneStelleArt) => EXTERNE_STELLE_ART_LABEL[art],
     },
     {
@@ -90,6 +94,7 @@ export default function ExterneStellenTab() {
       dataIndex: 'rufnummer',
       key: 'rufnummer',
       abBreite: 'lg',
+      sorter: nachText((s: ExterneStelle) => s.rufnummer),
       render: (r?: string) => (r ? <span style={monoStil(12, 500)}>{r}</span> : '—'),
     },
     {
@@ -97,6 +102,7 @@ export default function ExterneStellenTab() {
       dataIndex: 'funkrufname',
       key: 'funkrufname',
       abBreite: 'lg',
+      sorter: nachText((s: ExterneStelle) => s.funkrufname),
       render: (f?: string) => (f ? <span style={monoStil(12, 500)}>{f}</span> : '—'),
     },
     {
@@ -166,6 +172,9 @@ export default function ExterneStellenTab() {
       : []),
   ];
 
+  // Stand in der Adresse (LLH-1096); Einstieg bleibt die fachliche Reihenfolge des Servers.
+  const gedaechtnis = useListenGedaechtnis('stammdaten-externe-stellen', spalten);
+
   return (
     <AdminPage
       titel="Externe Stellen"
@@ -205,6 +214,8 @@ export default function ExterneStellenTab() {
           loading={stellenQuery.isLoading}
           dataSource={stellenQuery.data ?? []}
           columns={spalten}
+          gedaechtnis={gedaechtnis}
+          mehrzahl="Stellen"
           locale={{ emptyText: 'Noch keine externen Stellen' }}
           suche={{ platzhalter: 'Bezeichnung, Rufnummer oder Funkrufname' }}
           spaltenSchalter={{ bezeichnung: 'Externe Stellen' }}

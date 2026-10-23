@@ -10,6 +10,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import ArchivAktePage, { archivHinweis, berichtigungText } from './ArchivAktePage';
 import { adminFixture } from '../test/fixtures';
 import { globalKeys } from '../api/queryKeys';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 /** Archivakte. */
 
@@ -168,6 +169,30 @@ describe('ArchivAktePage — Inhalt', () => {
     zeige('frist_laeuft', undefined, undefined, mitTieren);
     expect(await screen.findByText('freigelassen')).toBeInTheDocument();
     expect(screen.queryByText('an Tierarzt übergeben')).toBeNull();
+  });
+
+  it('ein Register sortiert und filtert im Kopf, ohne die Adresse der Akte (LLH-1096)', async () => {
+    const basis = akte('frist_laeuft');
+    const zweiSchaeden: ArchivAkte = {
+      ...basis,
+      schaeden: [
+        ...basis.schaeden,
+        {
+          registrier_nr: 2,
+          registrier_anzeige: 'S-002',
+          typ: 'sachschaden',
+          ausmass: 'gross',
+          status: 'offen',
+          erfasst_at: '2026-05-01 08:00:00',
+        },
+      ],
+    };
+    zeige('frist_laeuft', undefined, undefined, zweiSchaeden);
+    expect(await screen.findByText('S-002')).toBeInTheDocument();
+    await kopfFilterWaehlen('Ausmaß', ['groß (1)']);
+    await waitFor(() => expect(screen.queryByText('S-001')).toBeNull());
+    expect(screen.getByText('S-002')).toBeInTheDocument();
+    expect(window.location.search).toBe('');
   });
 
   it('Register mit Registriernummer und Kategorie, Zustand mit Wort', async () => {
