@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { theme, Typography } from 'antd';
+import { Typography } from 'antd';
 import { ladeAufbewahrung } from '../api/aufbewahrung';
 import { globalKeys } from '../api/queryKeys';
-import type { AufbewahrungEintrag, AufbewahrungZustand } from '../api/types';
+import type { AufbewahrungEintrag } from '../api/types';
 import { adminAufbewahrungAktePfad, defaultAdminPfad } from '../admin/adminNav';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuth } from '../auth/AuthContext';
@@ -12,7 +11,7 @@ import AdminPage from '../components/AdminPage';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
-import { Segmentleiste } from '../components/instrument';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { istAdmin } from '../einsatz/schreibrecht';
 import { aufbewahrungZustand } from '../theme/statusFarben';
 import { standVerworfen } from './archivAbruf';
@@ -38,9 +37,13 @@ import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
  *
  * Ein endgültig gelöschter Einsatz (LFH-750) ist nur noch eine Zeile des Löschprotokolls: ohne
  * Bezeichnung und ohne Akte, also ohne Link und ohne Zeilenklick.
+ *
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096, Spec `tabellen-sortieren-filtern`): jede Spalte
+ * sortiert, der Zustand filtert im Kopf (mehrere Zustände zugleich, je Wert gezählt) und ersetzt
+ * die frühere Segmentleiste „Zustand“, die genau einen zuließ. Eine gefilterte leere Liste zeigt
+ * den Filter-Leerzustand der `Datensicht`. Sortierung und Filter stehen in der Adresse und tragen
+ * den Rückweg aus der Akte.
  */
-
-type Filter = AufbewahrungZustand | 'alle';
 
 const leer = '—';
 
@@ -79,6 +82,10 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
     title: 'Zustand',
     width: 200,
     sortWert: (e) => ZUSTAND_RANG[e.zustand],
+    filter: {
+      werte: ZUSTAENDE.map((z) => ({ text: aufbewahrungZustand[z].label, value: z })),
+      trifft: (e, wert) => e.zustand === wert,
+    },
     render: (_, e) => <StatusTag darstellung={aufbewahrungZustand[e.zustand]} />,
   },
   {
@@ -172,19 +179,10 @@ const KARTE: Kartenplan<AufbewahrungEintrag, Spalte> = {
   sekundaer: ['bezeichnung', 'frist', 'karenz'],
 };
 
-/** Reine Filterfunktion — „alle" oder genau ein Zustand. */
-function filtereAufbewahrung(
-  eintraege: readonly AufbewahrungEintrag[],
-  filter: Filter,
-): AufbewahrungEintrag[] {
-  return filter === 'alle' ? [...eintraege] : eintraege.filter((e) => e.zustand === filter);
-}
-
 export default function AufbewahrungUebersicht() {
   const { benutzer, laedt: authLaedt } = useAuth();
   const navigate = useNavigate();
-  const { token } = theme.useToken();
-  const [filter, setFilter] = useState<Filter>('alle');
+  const gedaechtnis = useListenGedaechtnis<Spalte>('aufbewahrung', spalten);
   const admin = istAdmin(benutzer);
   const abfrage = useQuery({
     queryKey: globalKeys.aufbewahrung(),
@@ -195,7 +193,6 @@ export default function AufbewahrungUebersicht() {
   // über den Bestand — kein Leertext unter dem Fehler (LFH-756, Prinzip aus LFH-612).
   const eintraege = abfrage.isError && standVerworfen(abfrage.error) ? undefined : abfrage.data;
   const ohneStand = abfrage.isError && eintraege === undefined;
-  const daten = useMemo(() => filtereAufbewahrung(eintraege ?? [], filter), [eintraege, filter]);
 
   if (!authLaedt && !admin) return <Navigate to={defaultAdminPfad()} replace />;
 
@@ -215,35 +212,21 @@ export default function AufbewahrungUebersicht() {
       }
     >
       {!ohneStand && (
-        <>
-          <Segmentleiste<Filter>
-            beschriftung="Zustand"
-            wert={filter}
-            onWechsel={setFilter}
-            optionen={[
-              { wert: 'alle', label: 'alle' },
-              ...ZUSTAENDE.map((z) => ({ wert: z, label: aufbewahrungZustand[z].label })),
-            ]}
-            style={{ marginBottom: token.marginSM }}
-          />
-          <Datensicht
-            bezeichnung="Aufbewahrung"
-            form="tabelle"
-            spalten={spalten}
-            daten={daten}
-            zeilenSchluessel={(e) => `einsatz-${e.einsatz_id}`}
-            ladend={abfrage.isLoading}
-            leerText={
-              filter === 'alle'
-                ? 'Keine abgeschlossenen Einsätze'
-                : `Kein Einsatz im Zustand „${aufbewahrungZustand[filter].label}“`
-            }
-            karte={KARTE}
-            onZeileKlick={(e) => {
-              if (!istGeloescht(e)) navigate(adminAufbewahrungAktePfad(e.einsatz_id));
-            }}
-          />
-        </>
+        <Datensicht
+          bezeichnung="Aufbewahrung"
+          form="tabelle"
+          spalten={spalten}
+          daten={eintraege ?? []}
+          zeilenSchluessel={(e) => `einsatz-${e.einsatz_id}`}
+          ladend={abfrage.isLoading}
+          leerText="Keine abgeschlossenen Einsätze"
+          karte={KARTE}
+          mehrzahl="Einsätzen"
+          gedaechtnis={gedaechtnis}
+          onZeileKlick={(e) => {
+            if (!istGeloescht(e)) navigate(adminAufbewahrungAktePfad(e.einsatz_id));
+          }}
+        />
       )}
     </AdminPage>
   );

@@ -55,7 +55,10 @@ Für System-Admins:
 Für System-Admins:
 
 1. In der Verwaltung „Aufbewahrung“ öffnen.
-2. Unter „Zustand“ einen Zustand wählen, etwa „Frist läuft“ oder „fällig“.
+2. Über das Trichterzeichen am Kopf „Zustand“ einen oder mehrere Zustände ankreuzen, etwa
+   „Frist läuft“ und „fällig“; die Zahl hinter jedem Zustand nennt, wie viele Einsätze ihn tragen.
+   Ein Klick auf einen Spaltenkopf sortiert, etwa nach „Frist“. Sortierung und Filter stehen in der
+   Adresse und gelten beim Rückweg aus der Archivakte wieder.
 
    ![Übersicht „Aufbewahrung“ mit zwei abgeschlossenen Einsätzen, einer ohne Frist, einer mit laufender Frist](../bilder/aufbewahrung/uebersicht.png)
 
@@ -65,7 +68,9 @@ Für System-Admins:
 
 Die Archivakte zeigt Aufbewahrung, Datenkategorien, Löschersuchen, Register und das
 Einsatztagebuch, alles pseudonym: „ohne Namen, Kontakte, Orte und Sachverhalt“. Oben steht je
-nach Zustand „Frist ändern“ oder „Wiederherstellen“.
+nach Zustand „Frist ändern“ oder „Wiederherstellen“. Die Register und die Löschersuchen
+sortieren und filtern ebenfalls im Spaltenkopf, etwa nach „Status“ oder „Ausmaß“; diese Wahl gilt,
+solange die Akte offen ist.
 
 ### Einem Löschersuchen nachkommen
 

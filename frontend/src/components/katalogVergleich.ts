@@ -61,3 +61,29 @@ export function werteAus<T>(
     .sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
     .map((w) => ({ text: w, value: w }));
 }
+
+/**
+ * Filterwerte aus einem festen Katalog (Zustand, Status, Art): Schlüssel als Wert, Beschriftung als
+ * Text, in der Folge des Katalogs. Ein Katalog mit Darstellungen (`theme/statusFarben.ts`) gibt
+ * deren `label` her.
+ */
+export function werteAusKatalog(
+  katalog: Readonly<Record<string, string | { readonly label: string }>>,
+): { text: string; value: string }[] {
+  return Object.entries(katalog).map(([value, w]) => ({
+    text: typeof w === 'string' ? w : w.label,
+    value,
+  }));
+}
+
+/** Vergleich in der Folge eines festen Katalogs; ein unbekannter oder leerer Wert steht hinten. */
+export function nachFolge<T>(
+  folge: readonly string[],
+  wert: (zeile: T) => string | null | undefined,
+) {
+  return nachZahl<T>((z) => {
+    const w = wert(z);
+    const i = w == null ? -1 : folge.indexOf(w);
+    return i < 0 ? null : i;
+  });
+}
