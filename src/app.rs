@@ -516,6 +516,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/auftraege/{aid}/aufheben",
             post(routes::auftrag::aufheben),
         )
+        // Gewählte Lagekennzahlen (LLH-1371): Lageplatz B des Kennzahlenbands, Gate `OhneModul`.
+        .route(
+            "/api/einsaetze/{id}/lagekennzahl-wahl",
+            put(routes::lagekennzahl_wahl::setzen),
+        )
         // Maßgebliche Pegel: Kennzahl für Dashboard und Überblick, Gate `OhneModul`.
         .route(
             "/api/einsaetze/{id}/pegel",
@@ -1042,6 +1047,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/material/{em_id}/reaktivieren",
             post(routes::einsatz_material::reaktivieren),
+        )
+        // LLH-1259: einen vorhandenen Posten nachträglich mit einer Nachforderung verknüpfen.
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}/nachforderung",
+            post(routes::einsatz_material::verknuepfen),
         )
         // LLH-1093: einen Posten auf zwei Zeilen aufteilen.
         .route(
@@ -1710,6 +1720,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Ortssuche ohne Einsatz, für „Einsatz anlegen“ (LFH-1175).
         .route("/api/ort-suche", get(routes::ort_suche::in_org))
+        // Ortsname ohne Einsatz, für das Ortsfeld beim Anlegen (LLH-1376).
+        .route("/api/ort-vorschau", get(routes::ort_vorschau::in_org))
         .route(
             "/api/externe-stellen",
             get(routes::externe_stelle::list).post(routes::externe_stelle::create),
@@ -1960,6 +1972,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/stornieren",
             post(routes::einsatz_einheit::stornieren),
+        )
+        // LLH-1388: Fehlübernahme aus einer Nachforderung stornieren.
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/uebernahme-stornieren",
+            post(routes::einsatz_einheit::uebernahme_stornieren),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen",

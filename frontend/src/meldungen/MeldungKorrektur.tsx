@@ -4,6 +4,7 @@ import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import type {
   Einheit,
   Einsatzabschnitt,
+  Fuehrungsfunktion,
   Meldung,
   MeldungKorrekturPatch,
   MeldungPrioritaet,
@@ -26,6 +27,9 @@ export interface VonGruppe {
   options: { value: string; label: string }[];
 }
 
+/** Auswahl der Empfängerfunktion, wie `meldungsFunktionsOptionen` sie baut. */
+export type FunktionsAuswahl = { value: Fuehrungsfunktion; label: string }[];
+
 /** Die Von-Auswahl aus Einheiten und Abschnitten des Einsatzes; leere Gruppen entfallen. */
 export function vonOptionenAus(
   einheiten: Pick<Einheit, 'id' | 'name'>[] = [],
@@ -47,6 +51,11 @@ interface Props {
   meldung: Meldung;
   vonOptionen?: VonGruppe[];
   /**
+   * Auswahl der Empfängerfunktion (LLH-1381, `meldungsFunktionsOptionen`). Leer ⇒ das Feld
+   * entfällt, wie im Erfassen.
+   */
+  funktionsOptionen?: FunktionsAuswahl;
+  /**
    * Speichern der Änderung. **Muss bei Ablehnung ablehnen** (`mutateAsync`): nur dann bleibt die
    * Bearbeitung offen; den Grund zeigt die Karte (`ZeilenFehler`).
    */
@@ -56,8 +65,8 @@ interface Props {
 }
 
 /**
- * Korrektur einer Meldung an ihrer Karte (LLH-1066, design.md D9): Art, Priorität, Richtung, Von
- * und Empfänger. Wortlaut, Absender, Meldeweg und Ereigniszeit bleiben, wie die Meldung einging,
+ * Korrektur einer Meldung an ihrer Karte (LLH-1066, design.md D9): Art, Priorität, Richtung, Von,
+ * Empfängerfunktion (LLH-1381) und Empfänger. Wortlaut, Absender, Meldeweg und Ereigniszeit bleiben, wie die Meldung einging,
  * und stehen deshalb nicht im Formular. Gesendet wird nur, was sich geändert hat.
  *
  * Kartenmuster bis zum Baustein „Bearbeiten in der Ansicht“ (LLH-1022): **später auf Baustein
@@ -66,6 +75,7 @@ interface Props {
 export default function MeldungKorrektur({
   meldung,
   vonOptionen = [],
+  funktionsOptionen = [],
   onSpeichern,
   onFertig,
 }: Props) {
@@ -136,6 +146,21 @@ export default function MeldungKorrektur({
                 allowClear
                 placeholder="nicht zugeordnet"
                 options={vonOptionen}
+              />
+            </Form.Item>
+          </Col>
+        )}
+        {funktionsOptionen.length > 0 && (
+          // Bleibt die Meldung „Neu“, geht ihr Hinweis an die neue Funktion (LLH-1381). Anders als
+          // im Erfassen füllt die Wahl den Empfänger nicht vor: die Korrektur ändert nur, was man
+          // ändert.
+          <Col xs={24} sm={12}>
+            <Form.Item name="empfaenger_funktion" label="Empfängerfunktion">
+              <Select<Fuehrungsfunktion>
+                aria-label="Empfängerfunktion"
+                allowClear
+                placeholder="keine"
+                options={funktionsOptionen}
               />
             </Form.Item>
           </Col>

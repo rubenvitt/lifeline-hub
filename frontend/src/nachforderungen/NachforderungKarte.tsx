@@ -1,5 +1,6 @@
-import { Button, Flex, Space, Typography } from 'antd';
+import { Button, Flex, Space, Typography, theme } from 'antd';
 import { memo, useId, type ReactNode } from 'react';
+import { Link } from 'react-router';
 import type {
   Einheit,
   EinsatzMaterial,
@@ -33,6 +34,7 @@ import {
   kannEinheitUebernehmen,
   uebernommeneEinheiten,
 } from './einheitUebernahme';
+import { EINHEITEN_SCHRIFT, einheitenSprungAufbau } from './einheitenSprung';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 import { istUeberfaellig, kartenZeiten } from './nachforderungStufen';
 import { nachforderungName } from './nachforderungName';
@@ -142,28 +144,64 @@ function UebernommeneEinheiten({
   nachforderung: Pick<Nachforderung, 'einsatz_id' | 'einheit_ids'>;
   einheitenJeId: ReadonlyMap<number, UebernahmeEinheit> | null | undefined;
 }) {
+  const { token } = theme.useToken();
   const bekannt = einheitenJeId ? uebernommeneEinheiten(n, einheitenJeId) : [];
   if (bekannt.length === 0) {
     return (
-      <Text type="secondary" style={{ fontSize: 13 }} data-lfh="nachforderung-einheiten">
+      <Text
+        type="secondary"
+        style={{ fontSize: EINHEITEN_SCHRIFT }}
+        data-lfh="nachforderung-einheiten"
+      >
         {n.einheit_ids.length === 1 ? '1 Einheit' : `${n.einheit_ids.length} Einheiten`} übernommen
       </Text>
     );
   }
+  // Eine aufgelöste Einheit kennt die Liste der aktiven nicht: sie zählt mit.
+  const weitere = n.einheit_ids.length - bekannt.length;
+  // Fließend im Satz (kompakt) oder gereiht mit vollem Boden (Tablet, Handschuh), LLH-1410.
+  const aufbau = einheitenSprungAufbau(token);
+  const gereiht = aufbau.art === 'gereiht';
   return (
-    <Text style={{ display: 'block', fontSize: 13 }} data-lfh="nachforderung-einheiten">
+    <Text
+      style={
+        gereiht
+          ? {
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              columnGap: token.marginXXS,
+              fontSize: EINHEITEN_SCHRIFT,
+            }
+          : { display: 'block', fontSize: EINHEITEN_SCHRIFT }
+      }
+      data-lfh="nachforderung-einheiten"
+    >
       Als Einheit übernommen:{' '}
-      {bekannt.map((e, i) => (
-        <span key={e.id}>
-          {i > 0 && ', '}
-          <KennungsLink to={einheitDetailPfad(n.einsatz_id, e.id)}>
+      {bekannt.map((e, i) => {
+        const ziel = einheitDetailPfad(n.einsatz_id, e.id);
+        const inhalt = (
+          <>
             {e.funkrufname?.trim() || e.name} <span aria-hidden="true">↗</span>
-          </KennungsLink>
-        </span>
-      ))}
-      {/* Eine aufgelöste Einheit kennt die Liste der aktiven nicht: sie zählt mit. */}
-      {bekannt.length < n.einheit_ids.length &&
-        `, ${n.einheit_ids.length - bekannt.length} weitere`}
+          </>
+        );
+        // Das Komma hängt am Link, damit es nie allein eine Zeile beginnt.
+        const komma = i < bekannt.length - 1 || weitere > 0 ? ',' : null;
+        return (
+          <span key={e.id}>
+            {i > 0 && ' '}
+            {aufbau.art === 'fliessend' ? (
+              <Link to={ziel} style={aufbau.link}>
+                {inhalt}
+              </Link>
+            ) : (
+              <KennungsLink to={ziel}>{inhalt}</KennungsLink>
+            )}
+            {komma}
+          </span>
+        );
+      })}
+      {weitere > 0 && ` ${weitere} weitere`}
     </Text>
   );
 }
@@ -224,6 +262,11 @@ interface NachforderungKarteProps {
   materialGesperrt?: boolean;
   /** Öffnet den Dialog „Als Material übernehmen“ (an eingetroffenen Karten). */
   onMaterialUebernehmen?: (id: number) => void;
+  /**
+   * Öffnet den Dialog „Erfassten Posten zuordnen …“ (LLH-1259 D5): ein schon erfasster Posten
+   * bekommt den Bezug, statt dass die Übernahme einen zweiten anlegt.
+   */
+  onPostenZuordnen?: (id: number) => void;
   /**
    * Bekannte Einheiten je Kennung (LLH-1383 D9), stabil über den Datenstand der Seite.
    * `null`/fehlend: Modul Einheiten nicht freigegeben oder Liste nicht da — dann nur die Zahl.
@@ -301,6 +344,7 @@ function NachforderungKarte({
   materialJeId,
   materialGesperrt = false,
   onMaterialUebernehmen,
+  onPostenZuordnen,
   einheitenJeId,
   einheitGesperrt = false,
   onEinheitUebernehmen,
@@ -413,6 +457,14 @@ function NachforderungKarte({
             {etikett}
           </Button>
         ),
+      );
+    }
+    // Der zweite Weg (LLH-1259 D5); gesperrt nennt „Als Material übernehmen“ schon den Grund.
+    if (onPostenZuordnen && n.einheit_ids.length === 0 && !materialGesperrt) {
+      aktionen.push(
+        <Button key="zuordnen" onClick={() => onPostenZuordnen(n.id)}>
+          Erfassten Posten zuordnen …
+        </Button>,
       );
     }
   }

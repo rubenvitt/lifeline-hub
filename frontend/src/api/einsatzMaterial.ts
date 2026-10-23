@@ -133,6 +133,25 @@ export function teileAuf(
 }
 
 /**
+ * Einen vorhandenen Posten nachträglich mit einer eingetroffenen Nachforderung verknüpfen
+ * (LLH-1259, design.md D1): eigener Schreibweg, der PATCH nimmt den Bezug nicht an. Trägt die
+ * Nachforderung schon einen Posten, lehnt der Server ohne `ergaenzen` mit 409 ab; `ergaenzen` geht
+ * nur als `true` auf den Draht.
+ */
+export function verknuepfeNachforderung(
+  einsatzId: number,
+  emId: number,
+  nachforderungId: number,
+  ergaenzen: boolean,
+): Promise<EinsatzMaterial> {
+  return apiSend<EinsatzMaterial>(
+    `/api/einsaetze/${einsatzId}/material/${emId}/nachforderung`,
+    'POST',
+    { nachforderung_id: nachforderungId, ...(ergaenzen ? { ergaenzen: true } : {}) },
+  );
+}
+
+/**
  * Aus dem Einsatz genommenes Material (LLH-1079 Teil II, Block „Aus dem Einsatz genommen“). Auf
  * dem Draht heißt der Endzustand wie bei jeder Kraft `entlassen`.
  */

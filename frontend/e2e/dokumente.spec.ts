@@ -1,4 +1,5 @@
 import { expect, test, type FileChooser, type Locator, type Page } from '@playwright/test';
+import { kopfFilterWaehlen } from './kopffilter-kern';
 import { waehleIn } from './auswahl-kern';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
@@ -226,8 +227,8 @@ test('legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im
   expect(download.suggestedFilename()).toBe('Lageplan Nord.pdf');
 
   // ── 4 · Kategorie-Filter ──────────────────────────────────────────────────────────────
-  const werkzeuge = page.locator('[data-lfh="datensicht-werkzeuge"]');
-  await waehleIn(werkzeuge.getByRole('combobox', { name: 'Kategorie' }), 'Foto');
+  // Im Tabellenzweig sitzt der Filter im Spaltenkopf (LLH-1086).
+  await kopfFilterWaehlen(page, 'Kategorie', ['Foto']);
   await expect(lageplan, 'gefiltert: die Lagekarte ist weg').toHaveCount(0);
   await expect(foto, 'gefiltert: das Foto bleibt').toBeVisible();
 

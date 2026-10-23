@@ -164,7 +164,7 @@ test('Meldebild: der Baum-Einzug hält bei langen Namen, 390 und 1440 px', async
 });
 
 /**
- * NACHWEIS 3 — das Statusband bricht um, statt waagerecht zu scrollen. Gemessen bei 1024 px,
+ * NACHWEIS 3 — das Statusband (Paneelreihe, LLH-1140) bricht um, statt waagerecht zu scrollen. Gemessen bei 1024 px,
  * wo die Inhaltsbreite unter 950 px liegt (eigens zugesichert).
  *
  * Gesät werden Personal UND Einheiten mit je einem Fahrzeug, damit beide Gruppen stehen; weil
@@ -195,8 +195,8 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
 
   const band = page.locator('[data-lfh="meldebild-statusband"]');
-  await expect(band.getByRole('region', { name: 'Einheiten je Status' })).toBeVisible();
-  await expect(band.getByRole('region', { name: 'Personal je Status' })).toBeVisible();
+  await expect(band.getByRole('region', { name: 'Einheiten nach FMS-Status' })).toBeVisible();
+  await expect(band.getByRole('region', { name: 'Personal nach Status' })).toBeVisible();
 
   const mass = await band.evaluate((el) => ({
     scrollWidth: el.scrollWidth,
@@ -211,21 +211,20 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
     `Band scrollt waagerecht: ${mass.scrollWidth}px Inhalt in ${mass.clientWidth}px Fläche`,
   ).toBeLessThanOrEqual(mass.clientWidth + SUBPIXEL);
 
-  // Jede Kennzahl ohne Bildlauf erreichbar: ein Band, das eine Zelle gar nicht rendert, scrollt
-  // ebenfalls nicht. Drei Kennzahlen: „keine Rückmeldung" steht als eigene daneben.
+  // Jedes Paneel ohne Bildlauf erreichbar: ein Band, das ein Paneel gar nicht rendert, scrollt
+  // ebenfalls nicht. Drei Plätze: „keine Rückmeldung" steht als eigene Kennzahl daneben.
   await expect(band.getByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeVisible();
-  const zellen = band.locator('[data-lfh="kennzahl"]');
-  await expect(zellen, 'Einheiten, Personal und keine Rückmeldung').toHaveCount(3);
-  for (let i = 0; i < 3; i += 1) await expect(zellen.nth(i)).toBeInViewport();
-  // EIN Fugenraster, das nach Breite füllt — und keine Füllkachel (Spec `kraeftebaum`,
-  // „Statusband ohne Füllkacheln“): vorher standen bei vier Status zwei leere Kacheln da.
-  await expect(band.locator('[data-lfh="kennzahlenband"]')).toHaveCount(1);
+  const plaetze = band.locator('[data-lfh="paneel"], [data-lfh="meldebild-rueckmeldung"]');
+  await expect(plaetze, 'Einheiten, Personal und keine Rückmeldung').toHaveCount(3);
+  for (let i = 0; i < 3; i += 1) await expect(plaetze.nth(i)).toBeInViewport();
+  // EINE Paneelreihe im Fugenraster (Dashboard-Baukasten, LLH-1140) — und keine Füllkachel
+  // (Spec `kraeftebaum`, „Statusband ohne Füllkacheln“).
+  await expect(band.locator('[data-lfh="meldebild-statusband-paneele"]')).toHaveCount(1);
   await expect(band.locator('[data-lfh="meldebild-bandluecke"]')).toHaveCount(0);
-  // Die Aufgliederung trägt die vier Einheiten, als Bild mit Wortlaut.
-  await expect(
-    band.getByRole('img', { name: /^Einheiten nach Status: / }),
-    'Aufgliederung der Einheiten',
-  ).toHaveCount(1);
+  // Die Verteilung trägt die vier Einheiten: Summe im Kopf, je Status eine Zeile mit Zahl.
+  const einheiten = band.getByRole('region', { name: 'Einheiten nach FMS-Status' });
+  await expect(einheiten.getByText('4 Einheiten')).toBeVisible();
+  await expect(einheiten.locator('[data-lfh="statusband-einheit-wert"]').first()).toBeVisible();
   // Und das Meta im Seitenkopf nennt Einheiten und Stärke in BOS-Schreibweise.
   await expect(
     page.locator('[data-lfh="seitenkopf"]').getByText(/Einheiten? · Stärke \d+\/\d+\/\d+\/\/\d+/),

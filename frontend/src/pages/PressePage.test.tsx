@@ -287,7 +287,7 @@ describe('PressePage — Eingang in der Anzeigezone (LFH-692)', () => {
     await userEvent.click(within(dialog).getByText('Ansprechperson und Uhrzeit'));
     const eingang = within(dialog).getByRole('textbox', { name: 'Eingang' });
     await userEvent.click(eingang);
-    await userEvent.type(eingang, '30.09.2026 13:00');
+    await userEvent.type(eingang, '301300sep26');
     // Enter übernimmt die Zeit und sendet (Erfassungs-Norm).
     await userEvent.keyboard('{Enter}');
     await waitFor(() =>

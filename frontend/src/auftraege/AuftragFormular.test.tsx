@@ -1,15 +1,34 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
+import type { NeuerAuftrag } from '../api/types';
 import AuftragFormular from './AuftragFormular';
+import { tippeZeit, zeitFeld } from '../test/zeitEingabe';
 
 // Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
 vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
   useFunktionsVorschlaege: (await import('../test/fuehrungsfunktionen')).vorschlaegeFuer,
+}));
+
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div role="group" aria-label={`Karte: ${etikett}`}>
+      {punkt && `${punkt.lat},${punkt.lon}`}
+    </div>
+  ),
 }));
 
 /** Klappteil „Ausführung“: Mittel, Ziel, Weg, Zeit nach FwDV 100 (LLH-1091). */
@@ -220,6 +239,45 @@ describe('AuftragFormular — Frist und Erteilung in der Anzeigezone (LFH-692)',
           frist_at: '2026-09-24 11:00:00',
           erteilt_at: '2026-09-24 08:00:00',
         }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('LLH-1077: „1430“ + Enter in der Frist, „0945“ in „erteilt am“ (Berliner Zeit)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 10:00 Berliner Zeit: die Frist 14:30 liegt heute vor uns, die Erteilung 09:45 dahinter.
+    vi.setSystemTime(new Date('2026-09-24T08:00:00Z'));
+    try {
+      const onAnlegen = vi.fn();
+      renderMitProviders(
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <AuftragFormular
+            card={false}
+            senden={false}
+            abschnitte={[{ id: 1, name: 'Abschnitt Nord' }]}
+            einheiten={[{ id: 2, name: 'LZ 1' }]}
+            onAnlegen={onAnlegen}
+          />
+        </AnzeigeKonventionenProvider>,
+      );
+      const user = userEvent.setup();
+      await openWeitere();
+      await user.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+      await user.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+      const erteilt = await screen.findByRole('textbox', { name: 'Erteilt am (optional)' });
+      // Getippt und verlassen (Enter sendete schon hier ab, Erfassungs-Norm); Enter in der Frist.
+      await user.clear(erteilt);
+      await user.type(erteilt, '0945');
+      await tippeZeit(user, zeitFeld('Frist (Quittung/Vollzug)'), '1430');
+      await waitFor(() =>
+        expect(onAnlegen).toHaveBeenCalledWith(
+          expect.objectContaining({
+            frist_at: '2026-09-24 12:30:00',
+            erteilt_at: '2026-09-24 07:45:00',
+          }),
+        ),
       );
     } finally {
       vi.useRealTimers();
@@ -616,5 +674,66 @@ describe('AuftragFormular — Berichtigen (LLH-1098)', () => {
     await userEvent.type(screen.getByLabelText('Weg'), ' über B 3 ');
     await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
     await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith({ weg: 'über B 3' }));
+  });
+});
+
+/**
+ * Ziel als Ortsfeld (LLH-1114, Spec `auftragsschema`, „Das Ziel trägt eine Koordinate“): im Einsatz
+ * sucht das Feld über die Ortssuche; ein Treffer geht mit Text und Koordinate hinaus, Freitext nur
+ * als Text. Mutationsprobe: die Koordinate nicht abbilden → rot in „ein Treffer …“.
+ */
+describe('AuftragFormular — Ziel als Ortsfeld (LLH-1114)', () => {
+  function mitOrtssuche() {
+    server.use(
+      http.get('/api/einsaetze/:eid', ({ params }) =>
+        HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
+      ),
+      http.get('/api/einsaetze/:eid/ort-vorschau', () =>
+        HttpResponse.json({ ortsname: null, peilung: null }),
+      ),
+      http.get('/api/einsaetze/:eid/ort-suche', () =>
+        HttpResponse.json({
+          zustand: 'ok',
+          treffer: [
+            { lat: 53.0775, lon: 8.81, name: 'Deich km 3, Musterstadt', kurz: 'Deich km 3' },
+          ],
+        }),
+      ),
+    );
+  }
+
+  async function bisZumZiel(onAnlegen: (d: NeuerAuftrag) => Promise<unknown>) {
+    rendern({ onAnlegen, einsatzId: 7 });
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Deich sichern');
+    await openAusfuehrung();
+  }
+
+  it('ein Treffer schickt Ziel und Koordinate mit, Enter sendet nicht ab', async () => {
+    mitOrtssuche();
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    await bisZumZiel(onAnlegen);
+    await userEvent.type(screen.getByLabelText('Ziel / Ort'), 'Deich{Enter}');
+    await userEvent.click(await screen.findByRole('button', { name: /Deich km 3, Musterstadt/ }));
+    expect(onAnlegen).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: 'Karte: Ziel' })).toHaveTextContent('53.0775,8.81');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ ort: 'Deich km 3', ort_lat: 53.0775, ort_lon: 8.81 }),
+    );
+  });
+
+  it('Freitext geht nur als Text hinaus', async () => {
+    mitOrtssuche();
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    await bisZumZiel(onAnlegen);
+    await userEvent.type(screen.getByLabelText('Ziel / Ort'), ' Deich km 3 ');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    const rumpf = onAnlegen.mock.calls[0][0];
+    expect(rumpf.ort).toBe('Deich km 3');
+    expect(rumpf).not.toHaveProperty('ort_lat');
+    expect(rumpf).not.toHaveProperty('ort_lon');
   });
 });

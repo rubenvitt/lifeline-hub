@@ -158,3 +158,56 @@ describe('berichtigungAus (LLH-1098)', () => {
     expect(berichtigungAus(werte, { ...werte, empfaenger: [] }, katalog, false)).toEqual({});
   });
 });
+
+/**
+ * Ziel mit Koordinate (LLH-1114, Spec `auftragsschema`, „Das Ziel trägt eine Koordinate“): das Ziel
+ * ist ein Ortsfeld; die Koordinate geht nur bei einer Änderung hinaus und dann als Paar.
+ */
+describe('Ziel als Ortsfeld (LLH-1114)', () => {
+  const katalog = [{ funktion: 's3' }] as never;
+  const verortet = () =>
+    vorbelegungAus(auftrag({ ort: 'Deich km 3', ort_lat: 53.1, ort_lon: 8.8 }));
+
+  it('belegt das Ziel mit Text und gespeicherter Koordinate vor', () => {
+    expect(verortet().werte.ort).toEqual({
+      text: 'Deich km 3',
+      koordinate: { lat: 53.1, lon: 8.8 },
+      quelle: 'karte',
+    });
+    expect(vorbelegungAus(auftrag()).werte.ort).toEqual({ text: '', koordinate: null });
+  });
+
+  it('eine Textkorrektur behält den Punkt und schickt nur den Text', () => {
+    const { werte } = verortet();
+    const nachher = { ...werte, ort: { ...werte.ort, text: 'Deich km 3,5' } };
+    expect(berichtigungAus(werte, nachher, katalog, true)).toEqual({ ort: 'Deich km 3,5' });
+  });
+
+  it('ein neuer Punkt geht als Paar hinaus', () => {
+    const { werte } = vorbelegungAus(auftrag({ ort: 'Deich km 3' }));
+    const nachher = {
+      ...werte,
+      ort: { text: 'Deich km 3', koordinate: { lat: 53.2, lon: 8.7 }, quelle: 'karte' as const },
+    };
+    expect(berichtigungAus(werte, nachher, katalog, true)).toEqual({
+      ort_lat: 53.2,
+      ort_lon: 8.7,
+    });
+  });
+
+  it('ein geleertes Ziel geht als null, der Punkt fällt mit', () => {
+    const { werte } = verortet();
+    expect(
+      berichtigungAus(werte, { ...werte, ort: { text: ' ', koordinate: null } }, katalog, true),
+    ).toEqual({ ort: null });
+  });
+
+  it('ein entfernter Punkt neben stehendem Text geht als Paar aus null', () => {
+    const { werte } = verortet();
+    const nachher = { ...werte, ort: { text: 'Deich km 3', koordinate: null } };
+    expect(berichtigungAus(werte, nachher, katalog, true)).toEqual({
+      ort_lat: null,
+      ort_lon: null,
+    });
+  });
+});

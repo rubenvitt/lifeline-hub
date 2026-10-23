@@ -1362,7 +1362,7 @@ test.describe('Gate 1', () => {
  * 1180 nicht über, „Einheit“, „Fahrzeug“ und „Einsatzdauer“ stehen ohne Spaltenschalter und ohne
  * Querscrollen im Bild — auch mit offener Einheitsangabe —, und eine gewöhnliche Zeile bleibt
  * höchstens 48 px hoch. Die Personalliste trägt keine Zeilenaktion mehr („Entlassen“ steht in der
- * Personenansicht); der Aufklapp-Auslöser „Besatzung“ der Fahrzeuge verdoppelt die Zeilenhöhe
+ * Personenansicht); der Aufklapp-Auslöser „Details“ der Fahrzeuge verdoppelt die Zeilenhöhe
  * nicht.
  *
  * GEMESSEN WIRD DIE BILDLAUFFLÄCHE DER TABELLE, nicht `document.body.scrollWidth`: die
@@ -1575,12 +1575,12 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         }
       }
 
-      // ── Fahrzeuge: der Aufklapp-Auslöser „Besatzung“ neben dem Funkrufnamen.
+      // ── Fahrzeuge: der Aufklapp-Auslöser „Details“ neben dem Funkrufnamen (LLH-1255).
       await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
       const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
       const zeile = region.locator('tr.ant-table-row').filter({ hasText: KRAFT_FAHRZEUG });
       await expect(zeile).toHaveCount(1);
-      const ausloeser = zeile.getByRole('button', { name: /Besatzung/ });
+      const ausloeser = zeile.getByRole('button', { name: /^Details zu / });
       await expect(ausloeser).toHaveCount(1);
       const name = zeile.getByText(KRAFT_FAHRZEUG, { exact: true }).first();
       const [z, a, n] = await Promise.all([
@@ -2090,7 +2090,7 @@ test.describe('Gate 1 · Fahrzeug als eigene Einheit (LLH-1073)', () => {
         await expect(eigene).toBeHidden();
 
         // Dialog 2: Personal der Einheit übernehmen.
-        await region.getByRole('button', { name: `Besatzung zu ${UEBERNAHME_FAHRZEUG}` }).click();
+        await region.getByRole('button', { name: `Details zu ${UEBERNAHME_FAHRZEUG}` }).click();
         await page.getByRole('button', { name: 'Personal der Einheit übernehmen' }).click();
         const uebernahme = page.getByRole('dialog');
         await expect(uebernahme.getByRole('checkbox')).toHaveCount(2);

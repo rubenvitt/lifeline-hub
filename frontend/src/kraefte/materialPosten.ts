@@ -1,4 +1,4 @@
-import type { EinsatzMaterial, MaterialArt, MaterialStatus } from '../api/types';
+import type { EinsatzMaterial, Material, MaterialArt, MaterialStatus } from '../api/types';
 import type { StatusOption } from '../components/StatusWahl';
 import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 
@@ -32,6 +32,25 @@ export const ART_OPTIONEN: readonly { wert: MaterialArt; label: string }[] = (
 export function isAufgebraucht(em: Zeile): boolean {
   return em.art === 'verbrauchsgut' && em.ausgegeben >= em.menge;
 }
+
+/**
+ * Stamm-Geräte mit Bestandsnummer, die schon aktiv im Einsatz stehen (LLH-1256): ein solches Gerät
+ * ist ein bestimmtes Stück, der Server lehnt eine zweite aktive Disposition mit 409 ab. Die Auswahl
+ * „Material disponieren“ sperrt sie mit {@link STUECK_IM_EINSATZ}. `ems` ist die Liste der aktiven
+ * Posten (die herausgenommenen kommen getrennt).
+ */
+export function stueckeImEinsatz(
+  pool: readonly Pick<Material, 'id' | 'art' | 'bestandsnummer'>[],
+  ems: readonly Pick<EinsatzMaterial, 'material_id'>[],
+): Set<number> {
+  const aktiv = new Set(ems.map((em) => em.material_id));
+  return new Set(
+    pool.filter((m) => m.art === 'geraet' && m.bestandsnummer && aktiv.has(m.id)).map((m) => m.id),
+  );
+}
+
+/** Grund an einem gesperrten Stück in der Auswahl. */
+export const STUECK_IM_EINSATZ = 'schon im Einsatz';
 
 /** Darstellung im Text eines aufgebrauchten Postens. */
 export const AUFGEBRAUCHT = 'aufgebraucht';

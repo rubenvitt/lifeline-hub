@@ -851,6 +851,8 @@ impl Ablauf<'_> {
                     self.einsatz_id,
                     self.admin_id,
                     &crate::uhs::repo::NeueDaten {
+                        lat: None,
+                        lon: None,
                         typ: v.typ.as_str(),
                         bezeichnung: v.bezeichnung,
                         abschnitt_id: Some(abschnitt),
@@ -1188,6 +1190,7 @@ impl Ablauf<'_> {
                         absicht: None,
                         lage: None,
                         ort: v.ort,
+                        ort_punkt: None,
                         zeit: None,
                         mittel: None,
                         verbindung: None,

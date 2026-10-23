@@ -459,6 +459,26 @@ pub async fn austritt_bei_aufloesung_tx(
     einheit_id: i64,
     benutzer_id: i64,
 ) -> Result<Option<i64>, AppError> {
+    austritt_einheit_tx(
+        conn,
+        einsatz_id,
+        einheit_id,
+        benutzer_id,
+        "Einheit aufgelöst",
+    )
+    .await
+}
+
+/// Austritt einer Einheit aus ihrem aktuellen Raum mit `notiz`, Cache geleert, in der Transaktion
+/// des Aufrufers; `None`, wenn sie in keinem Raum steht. Gemeinsam für Auflösen und den Storno
+/// einer Übernahme aus einer Nachforderung (LLH-1388, design.md D3).
+pub async fn austritt_einheit_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    benutzer_id: i64,
+    notiz: &str,
+) -> Result<Option<i64>, AppError> {
     let br_id: Option<i64> = sqlx::query_scalar(
         "SELECT aktueller_br_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
     )
@@ -477,7 +497,7 @@ pub async fn austritt_bei_aufloesung_tx(
         ObjektTyp::Einheit,
         einheit_id,
         &BrBelegungsArt::Austritt,
-        Some("Einheit aufgelöst"),
+        Some(notiz),
         benutzer_id,
     )
     .await?;
@@ -1989,6 +2009,7 @@ mod tests {
             absicht: None,
             lage: None,
             ort: Some("EA Deich"),
+            ort_punkt: None,
             zeit: None,
             mittel: None,
             verbindung: None,

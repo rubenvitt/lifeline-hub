@@ -136,7 +136,7 @@ describe('EtbEintragVorschau (LFH-664)', () => {
     renderMitProviders(<EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />);
 
     expect(
-      await screen.findByRole('link', { name: 'fax.pdf, 2.0 KB, Anhang zu Nr. 12 herunterladen' }),
+      await screen.findByRole('link', { name: 'fax.pdf, 2,0 KB, Anhang zu Nr. 12 herunterladen' }),
     ).toHaveAttribute('href', '/api/einsaetze/5/etb/40/anhaenge/9');
   });
 

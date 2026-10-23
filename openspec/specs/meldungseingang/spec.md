@@ -107,6 +107,30 @@ Meldung MUST seinen Typ behalten; die Korrektur steht als eigener Systemeintrag 
 - **WHEN** eine Person die Art einer Meldung von „Sonstige“ auf „Lagemeldung“ ändert
 - **THEN** behält ihr ETB-Eintrag den Typ „Meldung“, und ein Systemeintrag nennt die Änderung
 
+### Requirement: Die Empfängerfunktion lässt sich nachträglich korrigieren
+Mit Schreibrecht am Modul Meldungen SHALL sich die Empfängerfunktion einer Meldung im selben PATCH
+setzen, ändern und leeren lassen (LLH-1381), geprüft wie beim Erfassen: ein unbekannter Code MUST
+mit HTTP 400, Führungshilfspersonal, Fachberater und ein nicht eingeschaltetes S7 MUST mit HTTP 422
+abgelehnt werden. Der Systemeintrag MUST die Funktion mit altem und neuem Kürzel nennen, eine
+fehlende als „keine“. Steht die Meldung auf „Neu“, MUST der Server nach dem Commit ihre Hinweise
+„Neue Meldung“ nach der Regel des Eingangs (Spec `benachrichtigungen`, „Eingang einer Meldung“,
+„Meldung an mich“) mit dem neuen Stand neu ausrichten, ausgelöst vom Korrigierenden: die offenen
+Hinweise derer, die nicht mehr gemeint sind, MUST für sie erledigt sein; wer neu gemeint ist und
+zu dieser Meldung noch keinen Hinweis hatte, MUST ihn bekommen; je Person MUST es höchstens
+einen Hinweis zur Meldung geben. Eine Meldung, die nicht mehr „Neu“ ist, MUST NOT einen Hinweis auslösen.
+
+#### Scenario: Funktion von S3 auf S2 korrigiert
+- **WHEN** eine Person an einer neuen Lagemeldung #3 an S3 die Empfängerfunktion auf S2 ändert, Person A S2 besetzt, B S3 und C die Einsatzleitung
+- **THEN** erhält A den Hinweis „Neue Meldung“, der Hinweis von B ist erledigt, C behält seinen einen Hinweis, und das ETB enthält „Meldung #3: Empfängerfunktion S3 → S2“
+
+#### Scenario: Gesichtete Meldung korrigiert
+- **WHEN** eine Person die Empfängerfunktion einer schon gesichteten Meldung von S3 auf S2 ändert
+- **THEN** erhält niemand einen Hinweis
+
+#### Scenario: Fachberater als Empfängerfunktion
+- **WHEN** eine Person die Empfängerfunktion einer Meldung auf „Fachberater“ setzen will
+- **THEN** antwortet das System mit HTTP 422, und die Funktion bleibt
+
 ### Requirement: Eine Korrektur der Art hält die Lagerelevanz
 Ändert eine Person die Art einer Meldung nachträglich auf „Lagemeldung“, SHALL die Meldung im
 selben Schritt lagerelevant werden, mit dem Zeitpunkt der Änderung als Übernahme und neu für die
@@ -262,3 +286,31 @@ Wiederholung.
 #### Scenario: Live-Ereignisse
 - **WHEN** eine Person im ETB einen Eintrag vom Typ „Meldung“ ohne „Nur protokollieren“ erfasst
 - **THEN** erhalten die verbundenen Clients des Einsatzes das ETB-Ereignis des Eintrags und das Ereignis „meldung“
+
+### Requirement: Eine berichtigte Meldung zeigt die Berichtigung
+Der Wortlaut einer Meldung bleibt unverändert; eine inhaltliche Korrektur ist nur als
+ETB-Berichtigung ihres Eintrags möglich (LLH-1382). Meldung und Lagemeldung SHALL dann id und
+laufende Nummer der jüngsten Berichtigung tragen, die direkt auf den ETB-Eintrag der Meldung zeigt
+(`etb_berichtigung_id`, `etb_berichtigung_lfd_nr`); ohne Berichtigung MUST beide Felder fehlen.
+Eine Berichtigung aus einem anderen Einsatz MUST NOT zählen. Meldungskarte und Zeile der
+Lagemeldungen SHALL die Marke „berichtigt“ mit einem Sprung auf diese Berichtigung im ETB zeigen
+(`?eintrag=`); ohne Berichtigung MUST keine Marke stehen. Die Lage MUST weiter den Lage-Text bzw.
+den Wortlaut zeigen, nicht den Text der Berichtigung. Ein gekoppeltes Gerät MUST NOT die Marke
+zeigen, denn es hat kein ETB. Das Erfassen einer Berichtigung des Eintrags einer Meldung MUST
+zusätzlich zum ETB-Ereignis das Ereignis „meldung“ auslösen.
+
+#### Scenario: Berichtigter Eintrag einer Meldung
+- **WHEN** eine Person im ETB den Eintrag von Meldung #3 zweimal berichtigt, zuletzt mit ETB-Nr. 9
+- **THEN** trägt Meldung #3 die Nummer 9 und die id dieser Berichtigung, ihre Karte zeigt „berichtigt“ mit dem Sprung „→ ETB Nr. 9“, und ihr Wortlaut bleibt
+
+#### Scenario: Lagemeldung berichtigt
+- **WHEN** der ETB-Eintrag einer Lagemeldung berichtigt wird
+- **THEN** zeigt ihre Zeile in den Lagemeldungen die Marke „berichtigt“ mit dem Sprung ins ETB, und ihr Text bleibt Lage-Text oder Wortlaut
+
+#### Scenario: Ohne Berichtigung
+- **WHEN** der ETB-Eintrag einer Meldung nicht berichtigt ist
+- **THEN** fehlen beide Felder, und Karte und Zeile zeigen keine Marke
+
+#### Scenario: Berichtigung live
+- **WHEN** eine Person den ETB-Eintrag einer Meldung berichtigt
+- **THEN** erhalten die verbundenen Clients des Einsatzes das ETB-Ereignis und das Ereignis „meldung“

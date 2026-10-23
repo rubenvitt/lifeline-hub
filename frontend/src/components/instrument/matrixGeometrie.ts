@@ -1,5 +1,5 @@
 /**
- * Klassen der Gefahrenmatrix. Die Spaltengeometrie steht in `gefahrenmatrix.css`, weil sie an der
+ * Klassen der Gefahrenmatrix. Die Spaltengeometrie steht in `matrixPaneel.css`, weil sie an der
  * Breite des Paneels hängt (Container-Abfrage) — das kann ein Inline-Stil nicht. Zeilen und Legende
  * nehmen dieselben Klassen; das hält die Legende bündig unter den Segmenten.
  */

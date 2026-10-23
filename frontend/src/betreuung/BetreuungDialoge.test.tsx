@@ -11,6 +11,7 @@ import type { Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { renderMitProviders } from '../test/utils';
 import { server } from '../test/server';
+import { tippeZeit } from '../test/zeitEingabe';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import {
   BelegungMeldenDialog,
@@ -1045,6 +1046,41 @@ describe('Ortsangaben über das Ortsfeld (LLH-1121)', () => {
         art: 'betreuungsstelle',
         standort: 'Sportplatzweg 3',
       }),
+    );
+  });
+});
+
+/** LLH-1077: der Zeitpunkt einer Meldung wird taktisch getippt und mit Enter übernommen. */
+describe('StandMeldenDialog — Zeitpunkt getippt (LLH-1077)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('„1430“ + Enter gilt heute 14:30 Berliner Zeit und meldet', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 15:00 Berliner Zeit: 14:30 ist eben vorbei.
+    vi.setSystemTime(new Date('2026-09-24T13:00:00Z'));
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <StandMeldenDialog
+          bezirk={bezirk()}
+          laeuft={false}
+          fehler={null}
+          onErfassen={onErfassen}
+          onSchliessen={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Stand melden: Uferstraße 12–40' });
+    await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), '480');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await tippeZeit(userEvent.setup(), within(dialog).getByLabelText('Zeitpunkt'), '1430');
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(
+        expect.objectContaining({ evakuiert: 480, zeitpunkt_at: '2026-09-24 12:30:00' }),
+      ),
     );
   });
 });

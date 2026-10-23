@@ -86,3 +86,15 @@ noch breitenabhängig wegfallende Spalten zeigen. Alle ihre Spalten MUST sichtba
 #### Scenario: Stammdaten-Reiter ohne Schalter
 - **WHEN** der Stammdaten-Reiter „Fahrzeuge“ geöffnet wird
 - **THEN** gibt es keinen Spaltenschalter, und alle Spalten des Reiters stehen in der Tabelle
+
+### Requirement: Spaltenwahl am Gerät gemerkt
+
+Hält die Seite ein Listengedächtnis (`useListenGedaechtnis`), SHALL die Handwahl des
+Spaltenschalters (ab- und zurückgewählte Spalten) je Seite am Gerät gemerkt werden und beim
+nächsten Öffnen gelten, einsatzübergreifend. Unbekannte Spalten im Speicher MUST verworfen
+werden.
+
+#### Scenario: Wiederkehr auf die Schadenliste
+- **WHEN** in der Schadenliste „Status“ abgewählt und die Seite später erneut geöffnet wird
+- **THEN** bleibt „Status“ ausgeblendet, und der Schalter zählt sie
+

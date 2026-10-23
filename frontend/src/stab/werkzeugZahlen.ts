@@ -6,6 +6,7 @@ import {
   auftraegeNotiz,
   auftragsStand,
   meldungenNotiz,
+  nachforderungenNotiz,
   NICHT_FREIGEGEBEN,
   type ZaehlerAbfrage,
 } from '../pages/lage-dashboard/fuehrungsZahlen';
@@ -132,9 +133,10 @@ export function werkzeugZahl(
   if (quelle === 'meldungen' && quellen.zaehler.data.meldungen) {
     return { ...basis, notiz: meldungenNotiz(quellen.zaehler.data.meldungen) };
   }
-  // LLH-1078: die offenen, davon unterwegs — dieselbe Notiz wie im Seitenkopf der Nachforderungen.
+  // LLH-1078: die offenen, davon unterwegs — dieselbe Notiz wie im Seitenkopf der Nachforderungen
+  // und auf der Lagekennzahl im Band (LLH-1371).
   if (quelle === 'nachforderungen' && quellen.zaehler.data.nachforderungen) {
-    return { ...basis, notiz: `${quellen.zaehler.data.nachforderungen.unterwegs} unterwegs` };
+    return { ...basis, notiz: nachforderungenNotiz(quellen.zaehler.data.nachforderungen) };
   }
   return basis;
 }

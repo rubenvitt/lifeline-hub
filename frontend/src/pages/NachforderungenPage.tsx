@@ -15,6 +15,7 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { istKonflikt } from '../api/client';
 import {
   disponiereAdhoc,
+  verknuepfeNachforderung,
   listEinsatzMaterial,
   listEntlassenesMaterial,
 } from '../api/einsatzMaterial';
@@ -54,6 +55,7 @@ import NachforderungFormular, {
 } from '../nachforderungen/NachforderungFormular';
 import type { KartenFormular, StellenVerweis } from '../nachforderungen/NachforderungKarte';
 import MaterialUebernahmeModal from '../nachforderungen/MaterialUebernahmeModal';
+import PostenZuordnenModal from '../nachforderungen/PostenZuordnenModal';
 import EinheitUebernahmeModal from '../nachforderungen/EinheitUebernahmeModal';
 import {
   einheitenBody,
@@ -174,6 +176,8 @@ export default function NachforderungenPage() {
   const [uebernahme, setUebernahme] = useState<{ n: Nachforderung; ergaenzen: boolean } | null>(
     null,
   );
+  /** „Erfassten Posten zuordnen …“ (LLH-1259 D5), Absicht wie bei der Übernahme. */
+  const [zuordnen, setZuordnen] = useState<{ n: Nachforderung; ergaenzen: boolean } | null>(null);
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
@@ -181,7 +185,7 @@ export default function NachforderungenPage() {
   const freigaben = freigabenQuery.data;
   // Posten lesen nur bei bedienbarem Modul Material, erst wenn die Freigaben feststehen
   // (`istKeyFreigegeben` gibt Unbekanntes nicht frei, Muster `VerpflegungPage`); und nur, wenn eine
-  // Karte Posten zeigt oder übernommen wird — sonst bliebe der Abruf ohne Leser.
+  // Karte Posten zeigt, übernommen oder zugeordnet wird — sonst bliebe der Abruf ohne Leser.
   const materialFrei = istKeyFreigegeben('material', freigaben);
   /*
    * Knopf und Abruf hängen an derselben Bedingung (Review): bedienbar nur bei `materialFrei`. Sonst
@@ -192,7 +196,9 @@ export default function NachforderungenPage() {
   const freigabenBekannt = !freigabenQuery.isPending;
   const materialGesperrt = freigabenBekannt && !materialFrei;
   const needsMaterial =
-    uebernahme != null || (nfQuery.data ?? []).some((n) => n.material_ids.length > 0);
+    uebernahme != null ||
+    zuordnen != null ||
+    (nfQuery.data ?? []).some((n) => n.material_ids.length > 0);
   // Derselbe Schlüssel und Abruf wie die Materialliste: ein Cache-Fach, live über `material`.
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
@@ -513,6 +519,39 @@ export default function NachforderungenPage() {
   });
 
   /*
+   * Erfassten Posten zuordnen (LLH-1259 D1/D5): der eigene Schreibweg setzt den Bezug eines schon
+   * erfassten Postens. Eine 409 heißt „schon übernommen“ oder „der Posten hat schon einen Bezug“:
+   * die Seite lädt neu und schaltet wie bei der Übernahme auf „als weiteren Posten“, sobald die
+   * Nachforderung einen Posten trägt; ein schon verknüpfter Posten fällt aus der Auswahl.
+   */
+  const zuordnenMutation = useMutation({
+    mutationFn: ({ n, emId, ergaenzen }: { n: Nachforderung; emId: number; ergaenzen: boolean }) =>
+      verknuepfeNachforderung(einsatzId, emId, n.id, ergaenzen),
+    onSuccess: () => {
+      message.success('Posten zugeordnet');
+      void qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      return invalidiere();
+    },
+    onError: async (e, { n }) => {
+      if (!istKonflikt(e)) {
+        void invalidiere();
+        return;
+      }
+      await Promise.all([
+        invalidiere(),
+        qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) }),
+      ]);
+      const frisch = qc
+        .getQueryData<Nachforderung[]>(einsatzKeys.nachforderungen(einsatzId))
+        ?.find((x) => x.id === n.id);
+      if (frisch && isErgaenzen(frisch)) {
+        setZuordnen((z) => (z && z.n.id === n.id ? { ...z, ergaenzen: true } : z));
+      }
+    },
+  });
+
+  /*
    * Als Einheit übernehmen (LLH-1383 D2): ein POST, der die Einheiten anlegt oder verknüpft und
    * im Raum bucht. Ablehnungen stehen im Dialog (`speicherung`); jede lädt Nachforderungen und
    * Einheiten neu, damit „wird verknüpft“ und der Rest aus dem frischen Stand kommen.
@@ -635,6 +674,15 @@ export default function NachforderungenPage() {
     const m = uebernahmeRef.current;
     if (!m.isPending && m.error != null) m.reset();
     setUebernahme({ n, ergaenzen: isErgaenzen(n) });
+  }, []);
+  const zuordnenRef = useRef(zuordnenMutation);
+  zuordnenRef.current = zuordnenMutation;
+  const onPostenZuordnen = useCallback((nfId: number) => {
+    const n = stand.current.alle?.find((x) => x.id === nfId);
+    if (!n) return;
+    const m = zuordnenRef.current;
+    if (!m.isPending && m.error != null) m.reset();
+    setZuordnen({ n, ergaenzen: isErgaenzen(n) });
   }, []);
   const einheitMutationRef = useRef(einheitMutation);
   einheitMutationRef.current = einheitMutation;
@@ -774,6 +822,7 @@ export default function NachforderungenPage() {
     materialJeId,
     materialGesperrt,
     onMaterialUebernehmen: freigabenBekannt ? onMaterialUebernehmen : undefined,
+    onPostenZuordnen: freigabenBekannt ? onPostenZuordnen : undefined,
     einheitenJeId,
     einheitGesperrt,
     onEinheitUebernehmen: freigabenBekannt ? onEinheitUebernehmen : undefined,
@@ -795,6 +844,9 @@ export default function NachforderungenPage() {
   // Der Dialog liest die Nachforderung im aktuellen Stand (Posten, Rest der Anzahl).
   const uebernahmeN = uebernahme
     ? (nfQuery.data?.find((n) => n.id === uebernahme.n.id) ?? uebernahme.n)
+    : null;
+  const zuordnenN = zuordnen
+    ? (nfQuery.data?.find((n) => n.id === zuordnen.n.id) ?? zuordnen.n)
     : null;
   const einheitN = einheitUebernahme
     ? (nfQuery.data?.find((n) => n.id === einheitUebernahme.id) ?? einheitUebernahme)
@@ -948,6 +1000,7 @@ export default function NachforderungenPage() {
             ablehnenId != null ||
             zurueckziehenId != null ||
             uebernahme != null ||
+            zuordnen != null ||
             einheitUebernahme != null ||
             wirksamesFormular != null
           }
@@ -973,6 +1026,23 @@ export default function NachforderungenPage() {
           });
         }}
         onSchliessen={() => setUebernahme(null)}
+      />
+      <PostenZuordnenModal
+        einsatzId={einsatzId}
+        nachforderung={darfSchreiben && materialFrei ? zuordnenN : null}
+        ergaenzen={zuordnen?.ergaenzen ?? false}
+        material={materialQuery.data}
+        laeuft={zuordnenMutation.isPending}
+        speicherung={zuordnenMutation}
+        onZuordnen={(emId) => {
+          if (!zuordnenN || !zuordnen) return Promise.resolve();
+          return zuordnenMutation.mutateAsync({
+            n: zuordnenN,
+            emId,
+            ergaenzen: zuordnen.ergaenzen,
+          });
+        }}
+        onSchliessen={() => setZuordnen(null)}
       />
       <EinheitUebernahmeModal
         nachforderung={darfSchreiben && einheitenFrei ? einheitN : null}

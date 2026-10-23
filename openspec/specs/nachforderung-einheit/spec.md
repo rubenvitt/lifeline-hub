@@ -5,7 +5,8 @@ Was auf eine Nachforderung hin an Kräften eingetroffen ist, steht ohne zweite E
 Einheit im Einsatz und, wenn die Nachforderung einen Bereitstellungsraum als Ziel hat, in dessen
 Belegung: Aus einer eingetroffenen Nachforderung entstehen Einheiten mit den Rufnamen der Zusage,
 die auf die Nachforderung verweisen. Die Nachforderung zeigt, welche Einheiten aus ihr stammen,
-und die Einheit, woher sie kommt (LLH-1383).
+und die Einheit, woher sie kommt (LLH-1383). Eine Fehlübernahme lässt sich je Einheit
+nachvollziehbar stornieren, auch mit Buchung im Raum (LLH-1388).
 
 ## Requirements
 
@@ -79,8 +80,8 @@ Ist aus einer Nachforderung mindestens eine Einheit übernommen, MUST die Rückn
 „Eingetroffen“ auf „Unterwegs“ mit 422 und dem Grund „Aus der Nachforderung sind Einheiten
 übernommen“ abgelehnt werden; auch eine gleichzeitig laufende Übernahme MUST NOT eine
 zurückgenommene Nachforderung mit Einheiten hinterlassen. Eine aufgelöste Einheit, die als
-aufgelöst stehen bleibt, MUST weiter als übernommen zählen; eine stornierte oder beim Auflösen
-gelöschte Einheit MUST NOT zählen.
+aufgelöst stehen bleibt, MUST weiter als übernommen zählen; eine Einheit, deren Übernahme
+storniert ist, und eine beim Auflösen gelöschte MUST NOT zählen.
 
 #### Scenario: Rückgängig nach der Übernahme
 - **WHEN** nach der Übernahme von „83-1“ die Stufe „Eingetroffen“ zurückgenommen werden soll
@@ -89,6 +90,37 @@ gelöschte Einheit MUST NOT zählen.
 #### Scenario: Nach dem Storno
 - **WHEN** die einzige übernommene Einheit storniert ist
 - **THEN** kann die Stufe „Eingetroffen“ wieder zurückgenommen werden
+
+### Requirement: Storno einer Fehlübernahme
+
+Das System MUST je Einheit „Übernahme stornieren“ anbieten, auch wenn die Übernahme sie in einen
+Bereitstellungsraum gebucht hat. Die Übernahme MUST festhalten, ob sie eine Einheit angelegt oder
+verknüpft und welchen Eintritt sie gebucht hat. Der Storno MUST in einer Transaktion den Verweis
+auf die Nachforderung lösen und genau einen ETB-Systemeintrag mit Verweis auf die Nachforderung
+schreiben, der Einheit, Austritt und Folge nennt. Eine von der Übernahme angelegte Einheit MUST
+wie im Normalweg aufgelöst werden (Austritt aus ihrem Raum, mit Spur als aufgelöst stehen
+bleibend, ohne Spur gelöscht). Eine verknüpfte Einheit MUST aktiv bleiben und MUST nur dann
+austreten, wenn der von der Übernahme gebuchte Eintritt noch ihr jüngstes Belegungsereignis ist.
+Der Storno MUST NOT löschen, was im Raumverlauf oder in der Zeitachse steht. Er MUST
+Schreibrecht und Freigabe Einheiten verlangen und ohne Freigabe Nachforderungen mit 403
+antworten, bevor er liest; eine Einheit eines anderen Einsatzes MUST mit 404, eine aufgelöste oder
+schon stornierte mit 409 und eine ohne Herkunft mit 422 abgelehnt werden. Eine Frist gilt nicht.
+
+#### Scenario: Ziel BR Nord, dann Storno
+- **WHEN** „83-1“ und „83-2“ aus der Nachforderung „2× RTW“ mit Ziel „BR Nord“ übernommen und in BR Nord gebucht sind und die Einsatzleitung an „83-1“ „Übernahme stornieren“ bestätigt
+- **THEN** ist „83-1“ aufgelöst, steht nicht mehr in BR Nord und verweist nicht mehr auf die Nachforderung
+- **AND** der Verlauf von BR Nord zeigt den Austritt von „83-1“
+- **AND** das ETB enthält genau einen neuen Eintrag „Nachforderung 2× RTW: Übernahme von 83-1 storniert, aus BR Nord ausgetreten, Einheit aufgelöst“ mit Verweis auf die Nachforderung
+- **AND** „Eingetroffen“ bleibt gesperrt, bis auch „83-2“ storniert ist
+
+#### Scenario: Verknüpfte Einheit
+- **WHEN** die Übernahme einer verknüpften Einheit storniert wird, die schon vorher in „BR Süd“ stand
+- **THEN** bleibt sie aktiv in „BR Süd“, und das ETB nennt „Übernahme von … storniert, Verknüpfung gelöst“
+
+#### Scenario: Storno an der Einheit
+- **WHEN** die Einsatzleitung in der Ansicht einer übernommenen Einheit „Übernahme stornieren“ bestätigt
+- **THEN** zeigt das Board die Nachforderung hervorgehoben
+- **AND** ohne Freigabe Nachforderungen oder ohne Herkunft steht der Abschnitt „Übernahme stornieren“ nicht da
 
 ### Requirement: Übernahme an der Karte
 

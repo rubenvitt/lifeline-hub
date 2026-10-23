@@ -16,6 +16,7 @@ import {
   type MaterialOrtRef,
   type OrtNamen,
   ortPostFields,
+  stueckeImEinsatz,
 } from './materialPosten';
 
 const ALLE: MaterialStatus[] = [
@@ -194,5 +195,24 @@ describe('ortPostFields (LLH-1225 D7, LLH-1226)', () => {
     expect(ortPostFields(OHNE_ORT_WERT)).toBeUndefined();
     expect(ortPostFields('quatsch')).toBeUndefined();
     expect(ortPostFields(undefined)).toBeUndefined();
+  });
+});
+
+/** LLH-1256: nur ein Stamm-Gerät mit Bestandsnummer ist ein bestimmtes Stück. */
+describe('stueckeImEinsatz', () => {
+  const stamm = (id: number, art: 'geraet' | 'verbrauchsgut', bestandsnummer: string | null) => ({
+    id,
+    art,
+    bestandsnummer,
+  });
+  it('nennt aktive Geräte mit Bestandsnummer, nicht Verbrauchsgut, nicht Geräte ohne Nummer', () => {
+    const pool = [
+      stamm(1, 'geraet', 'SE-1'),
+      stamm(2, 'geraet', null),
+      stamm(3, 'verbrauchsgut', 'WD-1'),
+      stamm(4, 'geraet', 'SE-2'),
+    ];
+    const ems = [{ material_id: 1 }, { material_id: 2 }, { material_id: 3 }, { material_id: null }];
+    expect([...stueckeImEinsatz(pool, ems)]).toEqual([1]);
   });
 });

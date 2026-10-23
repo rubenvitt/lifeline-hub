@@ -361,29 +361,31 @@ for (const modus of ['light', 'dark'] as const) {
       expect.soft(werte.textKontrast, kontext).toBeGreaterThanOrEqual(schranke);
     }
 
-    // (1) STATUSBAND — Zahl und Legende der Einheiten, Zahl und Wort der Kennzahl „keine
-    // Rückmeldung“ (alarm), je auf der neutralen Zellfläche.
+    // (1) STATUSBAND — je Status Wort und Zahl im Paneel „Einheiten nach FMS-Status“ (LLH-1140),
+    // Zahl und Wort der Kennzahl „keine Rückmeldung“ (alarm), je auf der Paneelfläche.
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
-    const einheiten = page.getByRole('region', { name: 'Einheiten je Status' });
-    // Vorbedingung: alle drei Töne stehen in der Aufgliederung, sonst misst die Legende weniger.
-    await expect(
-      einheiten.locator('[data-lfh="aufgliederung"] [data-segment]'),
-      'drei Statussegmente',
-    ).toHaveCount(BAND_TOENE.length);
-    await pruefe(
-      einheiten.locator('[data-lfh="kennzahl-wert"]'),
-      'Statusband',
-      'Zahl Einheiten',
-      ZIEL[modus],
+    const einheiten = page.getByRole('region', { name: 'Einheiten nach FMS-Status' });
+    // Vorbedingung: alle drei Töne stehen in der Verteilung, sonst misst sie weniger.
+    await expect(einheiten.getByRole('listitem'), 'drei Statuszeilen').toHaveCount(
+      BAND_TOENE.length,
     );
-    await pruefe(
-      einheiten.locator('[data-lfh="aufgliederung-legende"]'),
-      'Statusband',
-      'Legende Einheiten',
-      ZIEL[modus],
-    );
+    for (let i = 0; i < BAND_TOENE.length; i += 1) {
+      const zeile = einheiten.getByRole('listitem').nth(i);
+      await pruefe(
+        zeile.locator('[data-lfh="statusband-einheit-wert"]'),
+        'Statusband',
+        `Zahl Status ${i + 1}`,
+        ZIEL[modus],
+      );
+      await pruefe(
+        zeile.locator('[data-lfh="statusband-einheit-wort"]'),
+        'Statusband',
+        `Wort Status ${i + 1}`,
+        ZIEL[modus],
+      );
+    }
     // Keine Einheit hat je zurückgemeldet: die Kennzahl steht im Ton alarm.
     const rueckmeldung = page
       .getByRole('region', { name: 'Einheiten ohne Rückmeldung' })

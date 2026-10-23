@@ -3,7 +3,7 @@ import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import { delay, http, HttpResponse, type HttpHandler } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useNavigate } from 'react-router';
+import { Route, Routes, useNavigate, useSearchParams } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinheitDetailPage from './EinheitDetailPage';
@@ -1014,3 +1014,70 @@ describe('EinheitDetailPage · Übernahme einer unangemeldeten Einheit (LLH-1075
     expect(screen.queryByRole('region', { name: 'Übernahme' })).toBeNull();
   });
 });
+
+/** Storno einer Fehlübernahme aus einer Nachforderung (LLH-1388, design.md D7). */
+describe('EinheitDetailPage · Übernahme stornieren (LLH-1388)', () => {
+  const aus = (nachforderungId: number | null) =>
+    http.get('/api/einsaetze/1/einheiten', () =>
+      HttpResponse.json([{ ...einheiten[0], nachforderung_id: nachforderungId ?? undefined }]),
+    );
+
+  function rendereMitBoard() {
+    return renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+        <Route path="/einsaetze/:id/nachforderungen" element={<BoardMitKarte />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten/10' },
+    );
+  }
+
+  it('storniert und springt ins Board mit der hervorgehobenen Karte', async () => {
+    let storniert = false;
+    server.use(
+      aus(4),
+      http.post('/api/einsaetze/1/einheiten/10/uebernahme-stornieren', () => {
+        storniert = true;
+        return HttpResponse.json({ id: 4, einheit_ids: [] });
+      }),
+      ...handlers(),
+    );
+    rendereMitBoard();
+    const paneel = await screen.findByRole('region', { name: 'Übernahme stornieren' });
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Übernahme stornieren' }));
+    const blase = await screen.findByRole('tooltip');
+    await userEvent.click(within(blase).getByRole('button', { name: 'Übernahme stornieren' }));
+    await waitFor(() => expect(storniert).toBe(true));
+    expect(await screen.findByText('Board, Karte 4')).toBeInTheDocument();
+  });
+
+  it('ohne Herkunft kein Paneel', async () => {
+    zeige(aus(null));
+    await screen.findByRole('region', { name: 'Einheit auflösen' });
+    expect(screen.queryByRole('region', { name: 'Übernahme stornieren' })).toBeNull();
+  });
+
+  it('ohne Freigabe Nachforderungen kein Paneel', async () => {
+    zeige(
+      aus(4),
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
+      ),
+    );
+    await screen.findByRole('region', { name: 'Einheit auflösen' });
+    expect(screen.queryByRole('region', { name: 'Übernahme stornieren' })).toBeNull();
+  });
+
+  it('Beobachter: kein Paneel', async () => {
+    server.use(aus(4), ...handlers('beobachter'));
+    rendere();
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    expect(screen.queryByRole('region', { name: 'Übernahme stornieren' })).toBeNull();
+  });
+});
+
+function BoardMitKarte() {
+  const [params] = useSearchParams();
+  const karte = params.get('nachforderung');
+  return <div>Board, Karte {karte}</div>;
+}

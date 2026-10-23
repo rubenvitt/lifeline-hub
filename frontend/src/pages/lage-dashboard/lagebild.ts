@@ -41,6 +41,11 @@ import type { EvakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
 import type { EvakuierungKennzahlZustand } from '../../betreuung/useEvakuierungKennzahl';
 import { kennzahlTeile } from '../../betreuung/betreuungText';
 import {
+  nachforderungenNotiz,
+  type NachforderungsZaehler,
+  type Zaehlstand,
+} from './fuehrungsZahlen';
+import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
   verdichtePersonen,
@@ -71,6 +76,7 @@ export const KENNZAHL_ETIKETTEN = [
   'Verbleib offen',
   'Betroffene',
   'Evakuiert',
+  'Nachforderungen offen',
   'Schäden offen',
   'Kräfte',
   'Vermisste',
@@ -96,7 +102,9 @@ type Lageplatz = 'A' | 'B';
  * Build bei einer neuen `Lagekennzahl`-Variante.
  *
  * „Evakuiert" ist aktiv, sobald eine Evakuierung angeordnet ist (`src/einsatz/lagekennzahl.rs`),
- * nie abhängig von der Zahl der Evakuierten.
+ * nie abhängig von der Zahl der Evakuierten. „Nachforderungen offen" ist aktiv, solange es am
+ * Einsatz gewählt ist (LLH-1371, Einstellungen › Kennzahlen), nie abhängig von der Zahl; eine
+ * angeordnete Evakuierung geht ihm auf Platz B vor (Rang).
  */
 const LAGEKENNZAHL: Record<
   Lagekennzahl,
@@ -104,6 +112,7 @@ const LAGEKENNZAHL: Record<
 > = {
   pegel: { etikett: 'Pegel', platz: 'A', rang: 0 },
   evakuiert: { etikett: 'Evakuiert', platz: 'B', rang: 0 },
+  nachforderungen: { etikett: 'Nachforderungen offen', platz: 'B', rang: 1 },
 };
 
 /**
@@ -216,6 +225,25 @@ export function einsatzdauer(beginn: string, jetzt: number, ende?: string | null
   return `${Math.floor(minuten / 60)}:${String(minuten % 60).padStart(2, '0')}`;
 }
 
+/**
+ * Die Kennzahl „Einsatzdauer“ (Wert, Einheit, Notiz) — eine Heimat für Lagebild und Überblick
+ * (LFH-550, LLH-1140). Rein.
+ */
+export function einsatzdauerKennzahl(
+  einsatz: Pick<EinsatzAnzeige, 'begonnen_at'> & { abgeschlossen_at?: string | null },
+  jetzt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): { wert: string; einheit: 'h'; notiz: string } {
+  const abgeschlossen = einsatz.abgeschlossen_at ?? null;
+  return {
+    wert: einsatzdauer(einsatz.begonnen_at, jetzt, abgeschlossen),
+    einheit: 'h',
+    notiz: abgeschlossen
+      ? `beendet ${formatUhrzeitMitTag(abgeschlossen, konv)}`
+      : `seit ${formatUhrzeitMitTag(einsatz.begonnen_at, konv)}`,
+  };
+}
+
 /** „Lagebild 21.09. 14:22" — der Zeitpunkt in der Anzeigezone. Rein. */
 export function lagebildZeit(
   jetzt: number,
@@ -324,6 +352,14 @@ function evakuiertZelle(e: EvakuierungStand): Pick<Kennzahl, 'wert' | 'notiz'> {
   }
 }
 
+/** Wert und Notiz der Zelle „Nachforderungen offen" aus dem Zählerstand. Rein. */
+function nachforderungenZelle(
+  z: Zaehlstand<NachforderungsZaehler> | undefined,
+): Pick<Kennzahl, 'wert' | 'notiz'> {
+  if (z?.zustand !== 'daten') return { wert: '', notiz: '' };
+  return { wert: String(z.zahl.offen), notiz: nachforderungenNotiz(z.zahl) };
+}
+
 export interface Rohdaten {
   einsatz: EinsatzAnzeige;
   personen: Person[];
@@ -350,6 +386,12 @@ export interface Rohdaten {
    * Ohne Angabe führt die Zelle nirgends hin, auch beim Laden.
    */
   evakuierungZiel?: string;
+  /**
+   * Offene Nachforderungen aus dem Modulzähler (`fuehrungsZahlen.ts:nachforderungsStand`) für die
+   * Zelle „Nachforderungen offen" (LLH-1371) — dieselbe Zahl wie Modulmenü und Board (LFH-550).
+   * Ohne Angabe keine Zahl; den Zustand der Zelle (auch `gesperrt`) entscheidet die Seite.
+   */
+  nachforderungen?: Zaehlstand<NachforderungsZaehler>;
 }
 
 /**
@@ -375,7 +417,6 @@ export function baueLagebild(
   const schaeden = verdichteSchaeden(r.schaeden);
   const gefahren = verdichteGefahrengebiete(r.gefahren);
   const bericht = neuesterLagebericht(r.lageberichte);
-  const abgeschlossen = r.einsatz.abgeschlossen_at ?? null;
   const pegel = pegelKennzahl(r.pegel, jetzt, konv);
   const versorgung = versorgungsBilanz(r.personen);
 
@@ -439,6 +480,14 @@ export function baueLagebild(
       zielPfad: r.evakuierungZiel,
       ohneZiel: r.evakuierungZiel == null,
     },
+    'Nachforderungen offen': {
+      // Kein Ton: offene Nachforderungen warten meist auf Dritte, eine Schwelle gibt es nicht
+      // (LLH-1371 D7). Wert und Notiz wie die Werkzeugkachel des Boards.
+      etikett: 'Nachforderungen offen',
+      ...nachforderungenZelle(r.nachforderungen),
+      ton: 'neutral',
+      route: 'nachforderungen',
+    },
     'Schäden offen': {
       etikett: 'Schäden offen',
       wert: String(schaeden.offen),
@@ -448,11 +497,7 @@ export function baueLagebild(
     },
     Einsatzdauer: {
       etikett: 'Einsatzdauer',
-      wert: einsatzdauer(r.einsatz.begonnen_at, jetzt, abgeschlossen),
-      einheit: 'h',
-      notiz: abgeschlossen
-        ? `beendet ${formatUhrzeitMitTag(abgeschlossen, konv)}`
-        : `seit ${formatUhrzeitMitTag(r.einsatz.begonnen_at, konv)}`,
+      ...einsatzdauerKennzahl(r.einsatz, jetzt, konv),
       ton: 'neutral',
       route: 'einsatzdaten',
     },

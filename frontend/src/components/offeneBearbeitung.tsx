@@ -42,7 +42,11 @@ import VerlassenRueckfrage from './VerlassenRueckfrage';
  *   Lesefassung ohne Seitenkontext stehen.
  * - `aktiv` (Schreibrecht) und `schluessel` (Datensatz-ID) gehen an `useFormularVerlassenSchutz`.
  *
- * LLH-1139 („Bearbeiten in der Ansicht“) kann denselben Kontext später für Paneele nutzen.
+ * - **Paneele belegen die Seite schon beim Öffnen** (LLH-1139, `BearbeitbaresPaneel`, Spec
+ *   `formularseiten`, „Eine offene Bearbeitung je Ansicht“): `useOffeneBearbeitungBelegung` meldet
+ *   `offen` (sperrt die übrigen, keine Rückfrage) und `geaendert` (dazu der Verlassen-Schutz).
+ * - Die Rückfrage hängt nur ein, solange etwas angemeldet ist: eine Seite ohne offene Bearbeitung
+ *   braucht keinen Data Router.
  */
 
 /** Sperrgrund für die übrigen Felder; wenige Wörter (`frontend/AGENTS.md`, „Texte“). */
@@ -53,6 +57,8 @@ export function sperrGrundOffeneBearbeitung(etikett: string): string {
 interface Eintrag {
   id: string;
   etikett: string;
+  /** `false`: offen ohne Änderung (ein Paneel im Bearbeiten-Zustand) — sperrt, fragt nicht. */
+  geaendert: boolean;
 }
 
 interface OffeneBearbeitungContextValue {
@@ -79,7 +85,7 @@ export function OffeneBearbeitungProvider({
     aktiv,
     schluessel,
   });
-  const hatEntwurf = eintraege.length > 0;
+  const hatEntwurf = eintraege.some((e) => e.geaendert);
 
   useEffect(() => {
     if (hatEntwurf) geaendert();
@@ -87,7 +93,12 @@ export function OffeneBearbeitungProvider({
   }, [hatEntwurf, geaendert, gespeichert, fassung]);
 
   const anmelden = useCallback((eintrag: Eintrag) => {
-    setEintraege((alt) => (alt.some((e) => e.id === eintrag.id) ? alt : [...alt, eintrag]));
+    setEintraege((alt) => {
+      const da = alt.find((e) => e.id === eintrag.id);
+      if (!da) return [...alt, eintrag];
+      if (da.geaendert === eintrag.geaendert) return alt;
+      return alt.map((e) => (e.id === eintrag.id ? eintrag : e));
+    });
   }, []);
   const abmelden = useCallback((id: string) => {
     setEintraege((alt) => (alt.some((e) => e.id === id) ? alt.filter((e) => e.id !== id) : alt));
@@ -106,7 +117,7 @@ export function OffeneBearbeitungProvider({
   return (
     <OffeneBearbeitungContext.Provider value={wert}>
       {children}
-      <VerlassenRueckfrage ungespeichert={ungespeichert} />
+      {eintraege.length > 0 && <VerlassenRueckfrage ungespeichert={ungespeichert} />}
     </OffeneBearbeitungContext.Provider>
   );
 }
@@ -118,20 +129,19 @@ export interface OffeneBearbeitung {
   onEntwurf: (geaendert: boolean) => void;
 }
 
-/**
- * Meldet ein Feld beim Merker der Seite an. `etikett` ist das Etikett der Angabe; es steht im
- * Sperrgrund der übrigen Felder.
- */
-export function useOffeneBearbeitung(etikett: string): OffeneBearbeitung {
+/** Zustand einer Bearbeitung beim Merker: zu, offen ohne Änderung, offen mit Änderung. */
+export type BelegungsZustand = 'zu' | 'offen' | 'geaendert';
+
+function useAnmeldung(etikett: string) {
   const kontext = useContext(OffeneBearbeitungContext);
   const id = useId();
   const anmelden = kontext?.anmelden;
   const abmelden = kontext?.abmelden;
 
-  const onEntwurf = useCallback(
-    (isGeaendert: boolean) => {
-      if (isGeaendert) anmelden?.({ id, etikett });
-      else abmelden?.(id);
+  const melde = useCallback(
+    (zustand: BelegungsZustand) => {
+      if (zustand === 'zu') abmelden?.(id);
+      else anmelden?.({ id, etikett, geaendert: zustand === 'geaendert' });
     },
     [anmelden, abmelden, id, etikett],
   );
@@ -142,7 +152,37 @@ export function useOffeneBearbeitung(etikett: string): OffeneBearbeitung {
   const halter = kontext?.halter ?? null;
   const gesperrt =
     halter && !kontext?.isAngemeldet(id) ? sperrGrundOffeneBearbeitung(halter.etikett) : undefined;
+  return { gesperrt, melde };
+}
+
+/**
+ * Meldet ein Feld beim Merker der Seite an. `etikett` ist das Etikett der Angabe; es steht im
+ * Sperrgrund der übrigen Felder.
+ */
+export function useOffeneBearbeitung(etikett: string): OffeneBearbeitung {
+  const { gesperrt, melde } = useAnmeldung(etikett);
+  const onEntwurf = useCallback(
+    (isGeaendert: boolean) => melde(isGeaendert ? 'geaendert' : 'zu'),
+    [melde],
+  );
   return { gesperrt, onEntwurf };
+}
+
+/**
+ * Belegung durch eine Bearbeitung, die schon OFFEN die Seite hält (Paneel, ganze Ansicht;
+ * `components/instrument/BearbeitbaresPaneel.tsx`, LLH-1139): `melde('offen')` beim Öffnen,
+ * `melde('geaendert')` bei der ersten Änderung, `melde('zu')` beim Schließen.
+ */
+export function useOffeneBearbeitungBelegung(etikett: string): {
+  gesperrt: string | undefined;
+  melde: (zustand: BelegungsZustand) => void;
+} {
+  return useAnmeldung(etikett);
+}
+
+/** Ob ein Merker der Seite da ist; ohne legt `BearbeitbaresPaneel` seinen eigenen an. */
+export function useHatOffeneBearbeitung(): boolean {
+  return useContext(OffeneBearbeitungContext) != null;
 }
 
 /**

@@ -87,6 +87,9 @@ export interface UhsEingabe {
   abschnitt_id?: number | null;
   standort?: string | null;
   notiz?: string | null;
+  /** Koordinate aus dem Ortsfeld (LLH-1114): beide oder keine, sonst 422. */
+  lat?: number | null;
+  lon?: number | null;
 }
 
 export function legeUhsAn(einsatzId: number, daten: UhsEingabe): Promise<Uhs> {

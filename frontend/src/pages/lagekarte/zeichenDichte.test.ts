@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Drawing } from '@einsatzzeichen/schema';
-import { beobachtePixeldichte, rastereZeichenNeu, type ZeichenKarte } from './zeichenDichte';
+import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
+import {
+  beobachtePixeldichte,
+  rastereZeichenNeu,
+  zeichneKartenZeichen,
+  type ZeichenKarte,
+} from './zeichenDichte';
 
 /** Ein Fenster, dessen Pixeldichte der Test von Hand wechselt — wie ein Monitor- oder Zoomwechsel. */
 function testFenster(start: number) {
@@ -136,5 +142,32 @@ describe('rastereZeichenNeu', () => {
     // Das kaputte Bild fehlt jetzt; der Resolver versucht es beim nächsten Layout erneut.
     expect(t.bilder.has('ez|a')).toBe(false);
     expect(t.bilder.has('ez|b')).toBe(true);
+  });
+});
+
+// LLH-1141: mit welchem Render-Theme ein Bild entsteht, sagt allein der Schlüssel (`markerIconKey`).
+// Der Resolver und das Neu-Rastern bei Dichtewechsel zeichnen beide über diesen einen Weg.
+describe('zeichneKartenZeichen', () => {
+  const karte = { hasImage: () => false, addImage: () => {} };
+
+  it('rastert ein Nachtbild mit dem Theme `dark` der Bibliothek', () => {
+    const zeichne = vi.fn();
+    zeichneKartenZeichen(karte, 'ez|dark|x', ZEICHNUNG, { size: 34, pixelRatio: 2 }, zeichne);
+    expect(zeichne).toHaveBeenCalledWith(karte, 'ez|dark|x', ZEICHNUNG, {
+      size: 34,
+      pixelRatio: 2,
+      theme: ZEICHEN_THEME_DUNKEL,
+    });
+  });
+
+  it('rastert ein Tagbild ohne Theme, wie bisher (Referenzpalette)', () => {
+    const zeichne = vi.fn();
+    zeichneKartenZeichen(karte, 'ez|x', ZEICHNUNG, { size: 34, pixelRatio: 1 }, zeichne);
+    expect(zeichne).toHaveBeenCalledWith(karte, 'ez|x', ZEICHNUNG, { size: 34, pixelRatio: 1 });
+  });
+
+  it('wirft auf eine belegte ID wie addSymbolImage (der Aufrufer fängt)', () => {
+    const belegt = { hasImage: (id: string) => id === 'ez|x', addImage: () => {} };
+    expect(() => zeichneKartenZeichen(belegt, 'ez|x', ZEICHNUNG, { size: 34 })).toThrow();
   });
 });

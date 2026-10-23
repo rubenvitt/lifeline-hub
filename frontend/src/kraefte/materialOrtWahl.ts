@@ -279,3 +279,12 @@ export function buildZuordnenOptions(
       options: options.sort(nachText),
     }));
 }
+
+/**
+ * Der Grund neben einer leeren Auswahl „Material zuordnen …“ (LLH-1255): liegt alles laufende
+ * Material schon hier, gibt es kein anderes; gibt es keines, nennt der Grund den Einsatz. „Ohne
+ * Ort“ wäre beides Mal falsch, weil die Auswahl auch Posten an anderen Orten anbietet.
+ */
+export function zuordnenLeerText(material: readonly ZuordnenPosten[]): string {
+  return filterAktive(material).length > 0 ? 'Kein anderes Material' : 'Kein Material im Einsatz';
+}

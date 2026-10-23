@@ -50,5 +50,5 @@ export function useBasemap({
     [basemap, onlineStil, config],
   );
 
-  return { onlineStil, style, basisAttribution };
+  return { onlineStil, style, basisAttribution, kartenThemeEffektiv };
 }

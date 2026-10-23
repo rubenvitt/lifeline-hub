@@ -845,6 +845,68 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     });
   });
 
+  describe('Nachforderungen offen (LLH-1371)', () => {
+    const ZAEHLER = {
+      auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
+      meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+      nachforderungen: { offen: 4, angefordert: 1, zugesagt: 1, unterwegs: 2 },
+    };
+
+    it('gewählt: Platz 3 zeigt die Zahl des Modulzählers mit „n unterwegs", Ziel Modulseite', async () => {
+      mockEndpunkte({ lagekennzahlen: ['nachforderungen'], zaehler: ZAEHLER });
+      render();
+      const zelle = await kennzahlGeladen('Nachforderungen offen');
+      expect(etiketten()).toEqual([
+        'Verbleib offen',
+        'Betroffene',
+        'Nachforderungen offen',
+        'Kräfte',
+        'Vermisste',
+        'Einsatzdauer',
+      ]);
+      await waitFor(() =>
+        expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('4'),
+      );
+      expect(zelle).toHaveTextContent('2 unterwegs');
+      expect(zelle).toHaveAttribute('href', '/einsaetze/1/nachforderungen');
+      expect(zelle.getAttribute('data-ton')).toBe('neutral');
+    });
+
+    it('nicht gewählt: kein Platz für Nachforderungen, auch wenn welche offen sind', async () => {
+      mockEndpunkte({ lagekennzahlen: [], zaehler: ZAEHLER });
+      render();
+      await kennzahlGeladen('Betroffene');
+      expect(etiketten()).toEqual(REIHE_OHNE_AUSLOESER);
+    });
+
+    it('Modul nicht frei (Feld fehlt im Zähler): Platz bleibt, „—" mit Grund, ohne Link', async () => {
+      mockEndpunkte({
+        lagekennzahlen: ['nachforderungen'],
+        zaehler: { auftraege: ZAEHLER.auftraege, meldungen: ZAEHLER.meldungen },
+      });
+      render();
+      await kennzahlGeladen('Betroffene');
+      await waitFor(() =>
+        expect(kennzahl('Nachforderungen offen')).toHaveTextContent('nicht freigegeben'),
+      );
+      const zelle = kennzahl('Nachforderungen offen');
+      expect(etiketten()[2]).toBe('Nachforderungen offen');
+      expect(zelle.tagName).not.toBe('A');
+      expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
+    });
+
+    it('Evakuierung angeordnet: „Evakuiert" geht vor, die Wahl bleibt unsichtbar', async () => {
+      mockEndpunkte({
+        lagekennzahlen: ['evakuiert', 'nachforderungen'],
+        bezirke: [bezirk(640, 600)],
+        zaehler: ZAEHLER,
+      });
+      render();
+      await kennzahlGeladen('Evakuiert');
+      expect(etiketten()[2]).toBe('Evakuiert');
+    });
+  });
+
   it('Deep-Link: Klick auf „Betroffene" führt ins Personen-Modul', async () => {
     mockEndpunkte({ personen: [person('sk1')] });
     render();
@@ -1017,7 +1079,7 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     expect(within(box).getByText('2 Gebiete')).toBeInTheDocument();
 
     // Legende bündig unter den Segmenten: dieselbe Zeilenklasse UND dasselbe Vier-Stufen-
-    // Raster wie die Balken (die Geometrie steht in `gefahrenmatrix.css`, geprüft in
+    // Raster wie die Balken (die Geometrie steht in `components/instrument/matrixPaneel.css`, geprüft in
     // `matrixGeometrie.test.ts`; jsdom rechnet weder Layout noch Container-Abfragen).
     const legende = box.querySelector<HTMLElement>('[data-lfh="gefahrenlegende"]')!;
     const balken = zeilen[0].querySelector<HTMLElement>('[data-lfh="gefahrenbalken"]')!;
@@ -1172,7 +1234,7 @@ describe('LageDashboardPage — Sichtung', () => {
       z.querySelector<HTMLElement>('[data-lfh="sichtung-anteil"]')?.style.width;
     expect(zeilen.map(breite)).toEqual(['25%', '0%', '75%', '0%']);
     // Die BBK-Farbe steht im Farbfeld, das Kürzel ist der zweite Kanal.
-    expect(zeilen[0].querySelector('[data-lfh="sichtungsfeld"]')).not.toBeNull();
+    expect(zeilen[0].querySelector('[data-lfh="sichtung-feld"]')).not.toBeNull();
     expect(zeilen[0]).toHaveTextContent('SK I');
     expect(within(box).getByText('Ohne Sichtung')).toBeInTheDocument();
     // Ohne jeden Verbleib: niemand unterwegs, alle fünf angetroffen und offen.

@@ -88,7 +88,7 @@ test.describe(KAPITEL, () => {
     );
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
-    await page.getByRole('button', { name: /^Besatzung zu .*83-1$/ }).click();
+    await page.getByRole('button', { name: /^Details zu .*83-1$/ }).click();
     const block = page.locator('[data-lfh="besatzung-block"]');
     await expect(block.getByText('andere Einheit')).toBeVisible();
     await page.mouse.move(0, 0);
@@ -121,7 +121,7 @@ test.describe(KAPITEL, () => {
     await fuelle(page, 'post', basis, { adhoc: { bezeichnung: 'Stromerzeuger' } });
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
-    await page.getByRole('button', { name: /^Besatzung zu .*83-1$/ }).click();
+    await page.getByRole('button', { name: /^Details zu .*83-1$/ }).click();
     const block = page.locator('[data-lfh="beladung-block"]');
     await expect(block.getByText('6 von 10 übrig')).toBeVisible();
     await expect(block.getByRole('combobox', { name: 'Material zuordnen' })).toBeEnabled();
@@ -267,7 +267,7 @@ test.describe(KAPITEL, () => {
     }
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/fahrzeuge?ansicht=liste`);
-    await page.getByRole('button', { name: /^Besatzung zu .*83-2$/ }).click();
+    await page.getByRole('button', { name: /^Details zu .*83-2$/ }).click();
     await page.getByRole('button', { name: 'Personal der Einheit übernehmen' }).click();
     const dialog = page
       .locator('.ant-modal')

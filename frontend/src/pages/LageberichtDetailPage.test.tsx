@@ -535,7 +535,7 @@ describe('LageberichtDetailPage — Entwurfsdruck (LFH-731)', () => {
 
     // Tippen und Verlassen übernimmt ins Formular; Enter schickte es ab und speicherte.
     await userEvent.clear(feld);
-    await userEvent.type(feld, '25.07.2026 16:30');
+    await userEvent.type(feld, '251630jul26');
     await userEvent.tab();
     // 16:30 Ortszeit (Berlin, Sommerzeit) = 14:30 UTC → in der Anzeigezone wieder 16:30.
     await waitFor(() => expect(within(kopf()).getByText('251630JUL2026')).toBeInTheDocument());

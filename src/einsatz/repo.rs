@@ -279,7 +279,7 @@ macro_rules! einsatzleiter_joins {
 
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
-    // Die beiden EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607); sie
+    // Die drei EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607/LLH-1371); sie
     // stehen wortgleich auch in `liste_fuer`, das Bezirksprädikat wie `istAktiverBezirk` im
     // Frontend — siehe `lagekennzahl::ableiten`.
     sqlx::query_as::<_, Einsatz>(concat!(
@@ -292,7 +292,9 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
-                    AS evakuierung_angeordnet, ",
+                    AS evakuierung_angeordnet, \
+                EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = e.id \
+                        AND w.kennzahl = 'nachforderungen') AS nachforderungen_gewaehlt, ",
         teilschwaerzungen_spalte!(),
         ", ",
         einsatzleiter_spalten!(),
@@ -413,6 +415,7 @@ pub async fn liste_fuer(
         meine_fuehrungsfunktion: Option<String>,
         pegel_festgelegt: bool,
         evakuierung_angeordnet: bool,
+        nachforderungen_gewaehlt: bool,
         teilschwaerzungen: Option<i64>,
         #[sqlx(flatten)]
         einsatzleiter: super::fuehrungsstelle::EinsatzleiterSpalten,
@@ -443,7 +446,9 @@ pub async fn liste_fuer(
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
-                    AS evakuierung_angeordnet, ",
+                    AS evakuierung_angeordnet, \
+                EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = e.id \
+                        AND w.kennzahl = 'nachforderungen') AS nachforderungen_gewaehlt, ",
         teilschwaerzungen_spalte!(),
         ", ",
         einsatzleiter_spalten!(),
@@ -554,6 +559,7 @@ pub async fn liste_fuer(
                 lagekennzahlen: super::lagekennzahl::ableiten(
                     r.pegel_festgelegt,
                     r.evakuierung_angeordnet,
+                    r.nachforderungen_gewaehlt,
                 ),
                 teilschwaerzungen: r.teilschwaerzungen,
                 einsatzleiter: r.einsatzleiter.anzeige(),
@@ -2048,6 +2054,8 @@ mod tests {
             einsatz.id,
             leit,
             crate::uhs::repo::NeueDaten {
+                lat: None,
+                lon: None,
                 typ: "behandlungsplatz",
                 bezeichnung: "BHP 50",
                 abschnitt_id: None,
@@ -2119,6 +2127,8 @@ mod tests {
             einsatz.id,
             leit,
             crate::uhs::repo::NeueDaten {
+                lat: None,
+                lon: None,
                 typ: "behandlungsplatz",
                 bezeichnung: "BHP 50",
                 abschnitt_id: None,

@@ -59,8 +59,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `Schnellerfassungszeile` · `Datenraster`/`Datenfeld` (statt `Descriptions`) ·
   `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
   `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
+  `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
+  einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
-  von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen`.
+  von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
+  Dashboard-Baukasten (unten).
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
@@ -115,7 +118,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (LFH-606), Rückmeldung (LFH-610), ETB-Zählung (LFH-612).
 - **Kennzahlenband** (LFH-640): immer sechs Plätze (vier Kern, zwei Lage), jede Kennzahl ein
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
-  per Messwert; Neuzuschnitt während der Betrachtung als Sammelbanner
+  per Messwert — eine Kennzahl ohne Fachentscheidung wird gewählt (Einstellungen › Kennzahlen,
+  LLH-1371); Neuzuschnitt während der Betrachtung als Sammelbanner
   (`docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`). Die Fuge
   zeichnet die Zelle, nicht der Rastergrund: Grund `flaeche`, Umriss je Zelle über
   `[data-fugenraster]` (`components/instrument/fugenraster.ts`), damit eine leere Restspur keine
@@ -128,6 +132,24 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`notizZeilenSchmal`), ab `md` als Boden und Deckel (`notizZeilen`, „Lage in Zahlen“ drei
   Zeilen; Längeres endet mit „…“ und steht ganz im `title`). Die tragende Aussage einer Notiz
   steht deshalb vorn (LFH-691, `openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`).
+- **Dashboard-Baukasten** (LLH-1140, Vorbild Lagebild): jede Fläche, die eine Lage in Zahlen
+  zeigt (Lagebild, Führung · Überblick, Meldebild-Kopf), baut sich aus denselben Bausteinen in
+  `components/instrument/`.
+  Kopf: `EinsatzSeite` mit Datenstand und `WarnstufenHinweis` (nur bei Ton achtung/alarm; die
+  Warnstufe ist keine Kennzahl). Reihe 1: `Kennzahlenband`, sechs Plätze (Regel oben).
+  Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
+  `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
+  (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
+  Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband „Führungsstand“ als
+  `Kennzahlenband` mit `groesse="klein"`, Zahlen aus dem Modulzähler. Jedes Paneel geht durch
+  `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, `PaneelZustand`; `gesperrt` nennt
+  den Grund, ohne Sprung und Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
+  Anteilsbalken je Kategorie: Sichtung, FMS-Status), `MatrixPaneel` (Stufenmatrix: Gefahren),
+  `StromPaneel` (Zeitachseneinträge mit Sammelbanner), `ListenPaneel` (kurze Liste mit
+  „n weitere ↗“) oder `GliederungsPaneel` (Teile mit Lagekante, Kopf, Zahlspalte). Laden, Fehler,
+  Leer und Gesperrt sehen verschieden aus; eine unbekannte Zahl steht als „—“, nie als 0. Balken
+  ergänzen die Zahl, nie ersetzen sie; Farben kommen aufgelöst vom Aufrufer, der Baustein trägt
+  keine Statuskarte. Ein neuer Paneeltyp kommt als Baustein hierher, nicht lokal in eine Seite.
 - **Eine Heimat je Zahl** (LFH-550,
   `openspec/changes/archive/2026-09-30-lfh-550-lagebesprechung-eine-verdichtung/design.md`):
   Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig)
@@ -171,6 +193,40 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   im Detail; gewählt ist `auswahlFlaeche` ohne Linie (`KommKarte` `gewaehlt`). Ein Dokument wird
   weiter auf der Vollseite geschrieben. Vorbild Aufträge/Befehle; Einsatzabschnitte und Gefahren
   sind ältere Einzelbauten.
+
+**Bearbeiten in der Ansicht** (LLH-1139, Spec `formularseiten`, „Eine offene Bearbeitung je
+Ansicht“; schreibt LFH-19 und LFH-979 fort)
+
+1. **Ein bestehender Datensatz wird in seiner Ansicht bearbeitet**, nie in einem Formular, das die
+   Ansicht ersetzt oder verdeckt. Modal und Drawer bleiben fürs **Anlegen** (Erfassungs-Norm,
+   Feldbudget) und für kurze blockierende Aktionen.
+2. **Drei Stufen nach Umfang:** **Einzelwert** (Status, Lagezustand, Führer, Frist) über
+   `InlineAngabe`/`BemerkungZelle` am Wert, speichert sofort genau dieses Feld · **Paneel**
+   (zusammengehörige Werte, „Funk“, „Personendaten“) über `components/instrument/BearbeitbaresPaneel`
+   Modus `paneel`: „Bearbeiten“ im Paneelkopf schaltet nur dieses Paneel auf Eingaben, Speichern
+   und Abbrechen im Paneelfuß · **ganze Ansicht** nur, wo Felder fachlich zusammen geprüft werden
+   (Befehlsschema, Tier/Schaden), Modus `ansicht` mit Speichern-Leiste. Eine Karte, die selbst die
+   Ansicht eines Datensatzes ist, nimmt ebenfalls `ansicht` (Vorbild Verpflegung,
+   `verpflegung/ZeitfensterBearbeiten.tsx`).
+3. **Höchstens eine offene Bearbeitung je Seite** (ein Paneel oder die ganze Ansicht; ein
+   Einzelfeld zählt mit, sobald es einen Entwurf hat): jedes weitere „Bearbeiten“ ist gesperrt mit
+   „Erst „Titel“ speichern oder abbrechen“, sichtbar am Element. Getragen vom Merker
+   `components/offeneBearbeitung.tsx` (ein Paneel belegt die Seite beim Öffnen, die Rückfrage vor
+   dem Verlassen kommt erst mit einer Änderung); ohne Merker der Seite legt der Baustein seinen
+   eigenen an. Jede offene Bearbeitung trägt CAS über `useEditSitzung`.
+4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
+   Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
+   übernehmen“ / „Verwerfen und neu laden“.
+5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
+   `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
+   beim Schließen zurück auf „Bearbeiten“.
+6. **Jede bearbeitbare Detailansicht hat eine Item-Route** („Deeplink-Muster“).
+7. **Nach dem Anlegen springt die Seite in die neue Ansicht** (Vorbild Befehl), nicht zurück in
+   die Liste mit erneutem Öffnen.
+
+Kein Fach-Modul baut einen zweiten Baustein dafür; die Seiten stellen ihre Fach-Tickets um
+(Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte,
+Bereitstellungsraum, Betreuung).
 
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →
@@ -216,7 +272,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Kartenfußs hält die Sicht selbst (LLH-1130).
 - **Eine geblätterte Liste nimmt den Servermodus der `Datensicht`** (LFH-1075, Prop
   `serverseitig`): Suche (entprellt) und Spaltenfilter gehen an den Server, die Sortierung
-  kontrolliert; die Sicht filtert und sortiert nicht noch einmal. `stand` ist die Abfrage der
+  kontrolliert; die Sicht filtert und sortiert nicht noch einmal (auch nicht über den Kopffilter,
+  LLH-1086; seine Zahlen reicht die Seite über `serverseitig.zahlen`). `stand` ist die Abfrage der
   gezeigten Zeilen, ihr Wechsel kein Zufluss. Nachladen per „Ältere laden“ unter der Sicht,
   Zahlen aus `…/kennzahlen` (Vorbild `pages/SchaedenPage.tsx`).
   `naechste_lagebesprechung_at` = absolute Wiedervorlage-Schnellwahl, kein berechneter Rhythmus
@@ -422,6 +479,21 @@ anwendbar), „nicht geprüft" ist keins.
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt
   die wirkliche Sichtbarkeit.
+- **Eine Vergleichstabelle ist sortier- und filterbar, im Spaltenkopf** (LLH-1086, Spec
+  `tabellen-sortieren-filtern`): Sortieren per Klick auf den Kopf, Filter über antds
+  Spaltenfilter (kontrolliert, im Clientmodus mit Zähler „Groß (3)“), je aktivem Wert ein Chip
+  (`components/tabellenFilter.tsx`) und darüber der `Filterhinweis` (Treffer von Gesamt,
+  „Filter zurücksetzen“ leert Suche und Filter, nicht die Sortierung). Die gefilterte Kopfzelle
+  trägt eine 2-px-Linie in `bedien`. Was man nicht sieht, wirkt nicht: der Filter einer
+  ausgeblendeten Spalte schneidet nichts und steht nicht als Chip da. Der Kartenzweig zeigt
+  dieselbe Menge und sortiert über „Sortieren“. Im Servermodus zählt das Kopfmenü nicht und die
+  Zahlen kommen vom Server (`serverseitig.zahlen`). Sortierung, Filter und Suche stehen in der
+  Adresse (`?sort=ort:auf&f.ausmass=gross&q=`, `routing/deeplinks.ts`), sonst gilt der Stand der
+  Sitzung; die Spaltenwahl liegt am Gerät — beides über `useListenGedaechtnis`
+  (`components/listenGedaechtnis.ts`), den die SEITE hält und als `gedaechtnis` an
+  `Datensicht`/`KatalogTabelle` reicht. Vorbild Schäden; Rollout auf alle Listen LLH-1096.
+  Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
+  Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
 - **Kopfwerkzeuge der `KatalogTabelle` folgen der Dichte** (LLH-1227): Suche und Spaltenschalter
   stehen `paddingSM` auseinander, antds Spaltenfilter-Auslöser hält `controlHeightSM` und liegt
   in der Tab-Folge (Name „<Spalte> filtern“, Enter/Leertaste öffnen), beides im Primitiv, nie je
@@ -590,7 +662,8 @@ anwendbar), „nicht geprüft" ist keins.
   Suche wird hineingereicht (im Einsatz `sucheOrtImEinsatz`, ohne Einsatz `sucheOrtInOrg`), beide
   ohne Lagekarten-Recht. Eine getippte Koordinate erkennt das Feld selbst. Speichert das Ziel eine
   Koordinate, bekommt das Feld `karte` (Vorschau mit ziehbarer Nadel, im Einsatz Ort-Zeile mit
-  `exclude` des Objekts, „Auf Karte wählen“); `quelle` im Wert sagt, ob die Koordinate am Text
+  `exclude` des Objekts, ohne Einsatz nur der Ortsname eines Kartenpunkts über die Ort-Vorschau der
+  Organisation, LLH-1376; „Auf Karte wählen“); `quelle` im Wert sagt, ob die Koordinate am Text
   hängt (`adresse`, `koordinate`) oder auf der Karte gesetzt ist (`karte`). **Personenbezogene
   Adressen nie an den Geocoder:** `ohneSuche="personenbezogen"` (reiner Text, auch keine
   Ort-Vorschau); so „Herkunft / Adresse“ der Person. Den gespeicherten Punkt ohne Bearbeitung zeigt
@@ -599,12 +672,20 @@ anwendbar), „nicht geprüft" ist keins.
   Abbildungen aus `anzeige/ortsfeldFormular.ts` (LLH-1121): `ortFelder` (Text und Koordinate
   gehen gemeinsam hinaus, die Koordinate nur mit Text), `ortsfeldAusGespeichert` (beim Bearbeiten
   steht eine gespeicherte Koordinate als `quelle: 'karte'`, eine Textkorrektur behält sie),
-  `ortRegeln` (Pflicht und Länge am Text). Eingebaut in Einsatzort, Schaden, Standort der
-  Betreuungs- und Verpflegungsstelle und Sammelstelle des Bezirks.
+  `ortRegeln` (Pflicht und Länge am Text), `ortEingabe` (für einen POST: ohne Angabe fehlt das Feld).
+  Eingebaut in Einsatzort, Schaden, Standort der Betreuungs- und Verpflegungsstelle, Sammelstelle
+  des Bezirks, Standort von UHS (Anlegen) und Bereitstellungsraum, Fundort eines Tiers und Ziel
+  eines Auftrags (LLH-1114).
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
   kommt erst nach dem Sweep.
+- **Dezimalzahlen nehmen `components/DezimalFeld.tsx`, Anzeigen den Zahlenkern `anzeige/zahl.ts`**
+  (LLH-1146): „1.20 km“ liest eine Einsatzkraft als 1.200. Das Feld zeigt das Komma und nimmt Komma
+  wie Punkt an (Pflichtname `beschriftung`, Pflicht `stellen`, ohne Stufenknöpfe); Anzeigen
+  schreiben `zahlText(wert, { stellen })` (de-DE, echtes „−“), nie `toFixed`. Koordinaten und
+  Wire-/URL-Werte bleiben mit Punkt. Guard `anzeige/zahl.guard.test.ts`: `toFixed` nur an den dort
+  bewerteten Stellen, kein Dezimal-`InputNumber` außerhalb des Bausteins.
 - **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`,
   `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`): jede Zeiteingabe nimmt
   `anzeige/ZeitpunktEingabe.tsx` (`ZeitpunktEingabe`, `ZeitraumEingabe`), nie antds `DatePicker`
@@ -802,7 +883,10 @@ und `pages/personen/`.
 - **Eine Speichern-Leiste je Seite, und sie speichert jedes Feld der Seite** (LFH-979, Spec
   `formularseiten`): kein zweites `<Form>` mit eigenem Knopf daneben; ein PATCH schickt nur die
   geänderten Felder, der Toast nennt genau sie. Sofort wirkende Wege (Logo, Modulzeilen) sind
-  keine Felder.
+  keine Felder. **Gilt für Formularseiten** (Einstellungen, Stammdaten-Detail); in einer Ansicht
+  gilt stattdessen „höchstens eine offene Bearbeitung je Seite“ (LLH-1139, „Bearbeiten in der
+  Ansicht“ unter der UI-Form-Leitlinie): ein Paneel mit eigenem Fuß ist dort kein zweiter
+  Speicherweg.
 - **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
   `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
   `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei
@@ -951,6 +1035,12 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   befehl, person, tier, schaden, einheiten, personal), sonst **Query-Param** `?<modul>=<id>`
   (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB `?eintrag=`);
   `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
+- **Jede Detailansicht, die bearbeitet werden kann, hat eine Item-Route** (LLH-1139, „Bearbeiten
+  in der Ansicht“): eine offene Bearbeitung braucht eine Adresse, auf die Verlassen-Schutz,
+  Brotkrume und Lesezeichen zeigen. Ein Query-Param bleibt Auswahl oder Zeilenmarke in einer Liste
+  und leitet, wo er eine Ansicht meint, auf die Route weiter (`?einheit=` wie unten). Die Route
+  entsteht mit dem Fach-Ticket, das die Ansicht bearbeitbar macht; offen ist sie für den
+  Einsatzabschnitt (`?abschnitt=` wählt heute im Detailpaneel).
 - **Zwei Bestands-Params neben einer Item-Route** (LLH-1060 D2): `?einheit=` an der
   Einheitenliste leitet auf `einheitDetailPfad` weiter (am Meldebild ist `?einheit=` ein Auftrag,
   `kraefteuebersichtPfad`, LLH-1049). `?personal=` bleibt **Zeilenmarke** der Personalliste
@@ -960,7 +1050,10 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   `?befehl=` wählt einen Befehl im Reiter „Einsatzbefehle“ (`auftraegePfad`), die Item-Route des
   Befehls bleibt Vollseite für Entwurf, Druck und Deeplink.
 - **Filter gehören in die URL** (`etbPfad`/`parseEtbFilter`, `mitQuery` kodiert). Unbekannter
-  Enum-Wert wird ganz verworfen (exhaustiver `Record<EtbTyp, true>`).
+  Enum-Wert wird ganz verworfen (exhaustiver `Record<EtbTyp, true>`). Für Tabellen gilt eine
+  gemeinsame Kodierung (LLH-1086, `listenZustandParams`/`parseListenZustand`): `sort=<spalte>:auf|ab`
+  (`aus` = bewusst unsortiert, die Vorgabe steht nicht da), `f.<spalte>=a,b`, `q=`; geschrieben
+  mit `replace`, fremde Parameter bleiben, Unbekanntes prüft `bereinigeListenZustand` weg.
 - **Zeit in der URL** ist UTC ohne Zone (`dayjs(s)` läse Ortszeit) — Umkehr in `anzeige/zeitEingabe.ts`
   mit eigenem Test. Kodierung per Round-Trip durch `URLSearchParams` prüfen.
 - Filterleiste nur bei **fremder** Änderung neu aufsetzen (nach der Navigation); entprellt wird

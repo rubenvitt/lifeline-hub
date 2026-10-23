@@ -1,6 +1,9 @@
 import { Col, Collapse, Form, Input, Row, type FormInstance } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { ortEingabe, ortRegeln } from '../anzeige/ortsfeldFormular';
 import { serverJetzt } from '../offline/serveruhr';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
@@ -123,9 +126,56 @@ const PLACEHOLDER: Partial<Record<SchemaFeld, string>> = {
   zeit: 'z. B. sofort, bis 14:00, nach Eintreffen',
 };
 
-/** Ein Freitextfeld des Befehlsschemas mit Etikett, Zähler und Längenregel aus dem Kern. */
-function SchemaFeldInput({ feld }: { feld: SchemaFeld }) {
+/**
+ * Ziel ohne Einsatz (nur Tests und Einbettungen ohne `einsatzId`): reiner Text im Wert eines
+ * Ortsfelds, damit die Formularwerte dieselbe Form haben.
+ */
+function ZielText({
+  value,
+  onChange,
+  ...rest
+}: {
+  value?: OrtsfeldWert;
+  onChange?: (w: OrtsfeldWert) => void;
+  id?: string;
+  'aria-label'?: string;
+}) {
+  return (
+    <Input
+      {...rest}
+      value={value?.text ?? ''}
+      onChange={(e) => onChange?.({ text: e.target.value, koordinate: null })}
+      count={BEFEHLSFELD_ZAEHLER}
+    />
+  );
+}
+
+/**
+ * Ein Feld des Befehlsschemas mit Etikett, Zähler und Längenregel aus dem Kern. Das Ziel ist im
+ * Einsatz ein Ortsfeld (LLH-1114): Suche, Karte und Koordinate; Enter darin sucht, statt abzusenden.
+ */
+function SchemaFeldInput({ feld, einsatzId }: { feld: SchemaFeld; einsatzId?: number }) {
   const label = FORM_LABEL[feld];
+  if (feld === 'ort') {
+    return (
+      <Form.Item
+        name="ort"
+        rules={ortRegeln(AUFTRAG_BEFEHLSFELD_MAX, VALIDATION_NAME.ort)}
+        label={label}
+      >
+        {einsatzId != null ? (
+          <EinsatzOrtsfeld
+            einsatzId={einsatzId}
+            etikett="Ziel"
+            aria-label={label}
+            count={BEFEHLSFELD_ZAEHLER}
+          />
+        ) : (
+          <ZielText aria-label={label} />
+        )}
+      </Form.Item>
+    );
+  }
   return (
     <Form.Item
       name={feld}
@@ -142,14 +192,22 @@ function SchemaFeldInput({ feld }: { feld: SchemaFeld }) {
 }
 
 /** Zwei Schemafelder nebeneinander, unter `sm` gestapelt. */
-function SchemaRow({ links, rechts }: { links: SchemaFeld; rechts: SchemaFeld }) {
+function SchemaRow({
+  links,
+  rechts,
+  einsatzId,
+}: {
+  links: SchemaFeld;
+  rechts: SchemaFeld;
+  einsatzId?: number;
+}) {
   return (
     <Row gutter={16}>
       <Col xs={24} sm={12}>
-        <SchemaFeldInput feld={links} />
+        <SchemaFeldInput feld={links} einsatzId={einsatzId} />
       </Col>
       <Col xs={24} sm={12}>
-        <SchemaFeldInput feld={rechts} />
+        <SchemaFeldInput feld={rechts} einsatzId={einsatzId} />
       </Col>
     </Row>
   );
@@ -270,11 +328,13 @@ export default function AuftragFormular({
       return Object.keys(patch).length === 0 ? Promise.resolve() : berichtigen.onSpeichern(patch);
     }
     const empfaenger = alleEmpfaenger(w, funktionen.katalog);
+    const ziel = ortEingabe(w.ort);
     return onAnlegen({
       auftrag_text: w.text.trim(),
       absicht: w.absicht?.trim() || undefined,
       lage: w.lage?.trim() || undefined,
-      ort: w.ort?.trim() || undefined,
+      ort: ziel.text,
+      ...(ziel.lat != null ? { ort_lat: ziel.lat, ort_lon: ziel.lon } : {}),
       zeit: w.zeit?.trim() || undefined,
       mittel: w.mittel?.trim() || undefined,
       verbindung: w.verbindung?.trim() || undefined,
@@ -295,7 +355,7 @@ export default function AuftragFormular({
    */
   const ausfuehrungFelder = (
     <>
-      <SchemaRow links="mittel" rechts="ort" />
+      <SchemaRow links="mittel" rechts="ort" einsatzId={einsatzId} />
       <SchemaRow links="weg" rechts="zeit" />
     </>
   );
@@ -377,7 +437,7 @@ export default function AuftragFormular({
           text: initialText ?? '',
           absicht: '',
           lage: '',
-          ort: '',
+          ort: { text: '', koordinate: null },
           zeit: '',
           mittel: '',
           verbindung: '',

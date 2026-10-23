@@ -6,6 +6,7 @@ import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenConte
 import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import ErinnerungFormular from './ErinnerungFormular';
+import { tippeZeit, zeitFeld } from '../test/zeitEingabe';
 // Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
 vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
   useFunktionsVorschlaege: (await import('../test/fuehrungsfunktionen')).vorschlaegeFuer,
@@ -118,6 +119,29 @@ describe('ErinnerungFormular — Fälligkeit in der Anzeigezone (LFH-692)', () =
         expect.objectContaining({ faellig_at: '2026-09-24 11:00:00' }),
       ),
     );
+  });
+
+  it('LLH-1077: „1430“ + Enter in „Fällig“ gilt heute 14:30 Berliner Zeit und legt an', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 10:00 Berliner Zeit: die Frist 14:30 liegt heute noch vor uns.
+    vi.setSystemTime(new Date('2026-09-24T08:00:00Z'));
+    try {
+      const onAnlegen = vi.fn().mockResolvedValue({});
+      renderMitProviders(
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />
+        </AnzeigeKonventionenProvider>,
+      );
+      await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
+      await tippeZeit(userEvent.setup(), zeitFeld('Fällig'), '1430');
+      await waitFor(() =>
+        expect(onAnlegen).toHaveBeenCalledWith(
+          expect.objectContaining({ faellig_at: '2026-09-24 12:30:00' }),
+        ),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

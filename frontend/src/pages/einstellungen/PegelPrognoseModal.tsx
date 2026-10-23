@@ -1,4 +1,4 @@
-import { Alert, App, Button, Form, InputNumber } from 'antd';
+import { Alert, App, Button, Form } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeVorhersage, pegelSchreibScope, setzePrognose } from '../../api/pegel';
@@ -6,6 +6,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { PegelAnzeige } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
+import { DezimalFeld } from '../../components/DezimalFeld';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useRollen } from '../../components/instrument';
@@ -113,12 +114,11 @@ export default function PegelPrognoseModal({
         name="hoechststand_m"
         rules={[{ required: true, message: 'Höchststand angeben' }]}
       >
-        <InputNumber
+        <DezimalFeld
+          beschriftung="Erwarteter Höchststand (m)"
+          stellen={2}
           min={-10}
           max={50}
-          step={0.01}
-          precision={2}
-          decimalSeparator=","
           style={{ width: '100%' }}
           placeholder="z. B. 7,10"
         />

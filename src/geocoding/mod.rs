@@ -182,8 +182,13 @@ async fn geocode_und_schreibe(
             tracing::debug!("Geocoder HTTP {}", r.status());
             None
         }
+        // Ohne URL: sie trüge die Koordinate (LLH-1376, keine Koordinate im Log).
         Err(e) => {
-            tracing::debug!("Geocoder-Fetch: {e}");
+            tracing::debug!(
+                "Geocoder-Fetch fehlgeschlagen (timeout={}, connect={})",
+                e.is_timeout(),
+                e.is_connect()
+            );
             None
         }
     };

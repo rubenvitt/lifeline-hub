@@ -6,6 +6,7 @@ import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvide
 import { ApiError } from '../api/client';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 import Datensicht, { spaltenFuer, type Kartenplan } from './Datensicht';
 import type { ZeilenGrund } from './useZeilenFehler';
 
@@ -261,8 +262,13 @@ describe.each(['tabelle', 'karte'] as const)(
 
     it('ein Spaltenfilter blendet die Zeile aus: der Grund steht über der Liste', async () => {
       rendere(new Map([[1, abgelehnt]]));
-      await userEvent.click(screen.getByRole('combobox', { name: 'Gruppe' }));
-      await userEvent.click(await screen.findByTitle('Gruppe B'));
+      // Im Tabellenzweig sitzt der Filter im Spaltenkopf (LLH-1086), in der Karte im Auswahlfeld.
+      if (form === 'tabelle') {
+        await kopfFilterWaehlen('Gruppe', [/^Gruppe B/]);
+      } else {
+        await userEvent.click(screen.getByRole('combobox', { name: 'Gruppe' }));
+        await userEvent.click(await screen.findByTitle('Gruppe B'));
+      }
       const block = verdeckt() as HTMLElement | null;
       expect(block).not.toBeNull();
       expect(within(block!).getByRole('alert')).toHaveTextContent('Anna · Status abgelehnt');

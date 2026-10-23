@@ -1332,9 +1332,9 @@ function materialAmOrtFlaechen(
     },
     {
       pfad: `${R}/fahrzeuge`,
-      anker: knopf('Besatzung zu Florian 15'),
+      anker: knopf('Details zu Florian 15'),
       vorbereiten: async (page) => {
-        await knopf('Besatzung zu Florian 15')(page).click();
+        await knopf('Details zu Florian 15')(page).click();
         await expect(knopf('Decken Fahrzeug ausgeben')(page)).toBeVisible();
       },
       ziele: ziele('Fahrzeug', /^(Decken|Trage) Fahrzeug vom Fahrzeug lösen$/),
@@ -1377,6 +1377,73 @@ test('C15 · Material am Ort (Beobachter): Bedienung fehlt, die Posten stehen', 
           sorte: 'UHS Reiter (Beobachter)',
           ziele: segment(/^(Belegung|Material|Kräfte|Bewegungen|Dateien)$/, 'tab'),
           mindestens: 2,
+        },
+      ],
+    },
+  ]);
+});
+
+// ── C16 · Kopffilter und Filterleiste der Tabellen (LLH-1086) ─────────────────────────
+// Sortieren und Filtern im Spaltenkopf (Spec `tabellen-sortieren-filtern`) an der Vorbildseite
+// Schäden: die Filterauslöser im Kopf (unbeschriftet, Boden `controlHeightSM`), die Chips der
+// aktiven Filter und „Filter zurücksetzen“ im Filterhinweis. Der Filter kommt aus der Adresse,
+// damit Chips und Hinweis schon beim Laden stehen.
+
+async function schaedenSaeen(page: Page, einsatzId: string) {
+  for (const [ausmass, ort] of [
+    ['gross', 'Deichweg 2'],
+    ['gering', 'Bachstraße 1'],
+  ]) {
+    await seed(page, `/api/einsaetze/${einsatzId}/schaeden`, { typ: 'sachschaden', ausmass, ort });
+  }
+}
+
+const kopfFilterZiel: Ziel = {
+  sorte: 'Tabelle Kopffilter',
+  ziele: (page) => inMain(page).getByRole('button', { name: /^(Typ|Ausmaß|Gefahr) filtern/ }),
+  mindestens: 3,
+  kurz: true,
+};
+
+test('C16 · Kopffilter, Filterchips und „Filter zurücksetzen“ halten 72 px, kompakt bleibt kleiner', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 1086 Schäden ${Date.now()}`);
+  await schaedenSaeen(page, einsatzId);
+  await messeFlaechen(page, [
+    {
+      pfad: `/einsaetze/${einsatzId}/schaeden?f.ausmass=gross`,
+      anker: (page) => inMain(page).getByText('Deichweg 2'),
+      ziele: [
+        kopfFilterZiel,
+        { sorte: 'Tabelle Filterchip', ziele: knopf(/^Filter .+ entfernen$/), mindestens: 1 },
+        {
+          sorte: 'Tabelle Filter zurücksetzen',
+          ziele: knopf('Filter zurücksetzen'),
+          mindestens: 1,
+        },
+      ],
+    },
+  ]);
+});
+
+test('C16 · Kopffilter und Filterchips (Beobachter): Erfassen fehlt, die Filterbedienung hält 72 px', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 1086 SchädenB ${Date.now()}`);
+  await schaedenSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await messeImRollenzweig(page, 'beobachter', [
+    {
+      pfad: `/einsaetze/${einsatzId}/schaeden?f.ausmass=gross`,
+      anker: (page) => inMain(page).getByText('Deichweg 2'),
+      fehlt: (page) => page.getByRole('button', { name: 'Schaden erfassen' }),
+      ziele: [
+        { ...kopfFilterZiel, sorte: 'Tabelle Kopffilter (Beobachter)' },
+        {
+          sorte: 'Tabelle Filterchip (Beobachter)',
+          ziele: knopf(/^Filter .+ entfernen$/),
+          mindestens: 1,
         },
       ],
     },

@@ -3,15 +3,34 @@ import AnlegenDrawer, { type AnlegenDrawerSlot } from '../../components/AnlegenD
 import { legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum } from '../../api/types';
+import { EinsatzOrtsfeld } from '../../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../../anzeige/Ortsfeld';
+import { ortEingabe } from '../../anzeige/ortsfeldFormular';
 
-/** Wiederverwendbarer Drawer zum Anlegen eines Bereitstellungsraums (Liste, Leerzustand, Switcher). */
+/** Formularwerte: der Standort ist ein Ortsfeld (Text und Koordinate, LLH-1114). */
+type BrFormular = Omit<BrEingabe, 'standort' | 'lat' | 'lon'> & { standort?: OrtsfeldWert };
+
+/** Formular → POST-Rumpf: Standort als Text, die Koordinate nur mit Text. */
+function brEingabe({ standort, ...rest }: BrFormular): BrEingabe {
+  const { text, lat, lon } = ortEingabe(standort);
+  return {
+    ...rest,
+    ...(text != null ? { standort: text } : {}),
+    ...(lat != null ? { lat, lon } : {}),
+  };
+}
+
+/**
+ * Wiederverwendbarer Drawer zum Anlegen eines Bereitstellungsraums (Liste, Leerzustand, Switcher).
+ * Der Standort ist ein Ortsfeld (LLH-1114, Spec `ortsfeld`) und verortet den Raum gleich mit.
+ */
 export default function BrAnlegenDrawer(props: AnlegenDrawerSlot<Bereitstellungsraum>) {
   return (
-    <AnlegenDrawer<Bereitstellungsraum, BrEingabe>
+    <AnlegenDrawer<Bereitstellungsraum, BrFormular>
       {...props}
       titel="Bereitstellungsraum anlegen"
       erfolgText="Bereitstellungsraum angelegt"
-      legeAn={legeBrAn}
+      legeAn={(einsatzId, w) => legeBrAn(einsatzId, brEingabe(w))}
       listenKey={einsatzKeys.br}
     >
       <Form.Item
@@ -22,7 +41,7 @@ export default function BrAnlegenDrawer(props: AnlegenDrawerSlot<Bereitstellungs
         <Input placeholder="z. B. BR Ost" />
       </Form.Item>
       <Form.Item label="Standort (optional)" name="standort">
-        <Input placeholder="Adresse / Hinweis" />
+        <EinsatzOrtsfeld einsatzId={props.einsatzId} etikett="Standort" />
       </Form.Item>
       <Form.Item label="Notiz (optional)" name="notiz">
         <Input.TextArea rows={3} />

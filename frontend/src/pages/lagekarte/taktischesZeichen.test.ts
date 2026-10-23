@@ -13,8 +13,11 @@ import {
   fachaufgabeAusFahrzeugtyp,
   fachaufgabeAusFunktion,
   GRUNDZEICHEN_IDS,
+  AUSMASS_FARBE,
   type TzProps,
 } from './taktischesZeichen';
+import { ohneKommentare } from '../../test/ohneKommentare';
+import { schadenAusmassFarben } from '../../theme/tokens';
 
 // Die Fachobjekt-Zeichen zeichnet @einsatzzeichen über den Adapter (LFH-835); die genaue
 // Abbildung pinnt zeichen/fachobjektZeichen.test.ts. Hier nur: die Ableitung ist zeichenbar.
@@ -275,6 +278,25 @@ describe('GRUNDZEICHEN_IDS', () => {
 describe('einsatzortTz', () => {
   it('nutzt das Grundzeichen anlass', () => {
     expect(einsatzortTz().grundzeichen).toBe('anlass');
+  });
+});
+
+const quelltext = Object.values(
+  import.meta.glob('./taktischesZeichen.ts', { query: '?raw', import: 'default', eager: true }),
+)[0] as string;
+
+// LLH-1141: Farbwerte nur aus dem Theme (`frontend/AGENTS.md`, „Farbe und Zeichen“).
+describe('AUSMASS_FARBE', () => {
+  it('kommt aus der Kartenpalette des Themes, ohne eigenes Hex-Literal in pages/', () => {
+    for (const [ausmass, farbe] of Object.entries(AUSMASS_FARBE)) {
+      expect(farbe, ausmass).toBe(schadenAusmassFarben[ausmass as keyof typeof AUSMASS_FARBE]);
+    }
+    const quelle = ohneKommentare(quelltext).join('\n');
+    expect(quelle.match(/#[0-9a-f]{3,8}\b/gi) ?? []).toEqual([]);
+  });
+
+  it('färbt einen Schaden ohne Ausmaß in der Palettenfarbe für unbekannt', () => {
+    expect(schadenTz(null).farbe).toBe(schadenAusmassFarben.unbekannt);
   });
 });
 

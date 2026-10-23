@@ -152,6 +152,7 @@ async fn einsatz_mit_auftraegen(pool: &SqlitePool, benutzer: i64, n: usize) -> i
                 absicht: None,
                 lage: None,
                 ort: None,
+                ort_punkt: None,
                 zeit: None,
                 mittel: None,
                 verbindung: None,

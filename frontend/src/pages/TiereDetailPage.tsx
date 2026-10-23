@@ -46,8 +46,9 @@ import type { AbschlussGrund, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 import TierAnhaenge from './tiere/TierAnhaenge';
 import TierVerortung from './tiere/TierVerortung';
-import { KoordinatenDatenfeld } from '../anzeige/KoordinatenFeld';
-import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { ortFelder, ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -61,12 +62,12 @@ import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSc
  * beim Absenden in das XOR-Feldpaar zerlegt wird.
  */
 /**
- * Formularwerte: die Fundort-Koordinate steht als ein Wert der `KoordinatenEingabe` im Formular
- * (`koord`) und geht über `alsLatLon` als Paar an den Server (LLH-1123).
+ * Formularwerte: der Fundort ist ein Ortsfeld (LLH-1114) mit Text und Koordinate; beides geht über
+ * `ortFelder` hinaus, die Koordinate nur neben einem Text (LLH-1123: als Paar).
  */
-type TierFormWerte = Omit<TierPatch, 'antreff_lat' | 'antreff_lon'> & {
+type TierFormWerte = Omit<TierPatch, 'antreff_ort' | 'antreff_lat' | 'antreff_lon'> & {
   halter?: HalterWert | null;
-  koord?: KoordinatenWert;
+  antreff_ort?: OrtsfeldWert;
 };
 
 const STATUS_META = TIER_STATUS;
@@ -352,11 +353,7 @@ export default function TiereDetailPage() {
       farbe_beschreibung: t.farbe_beschreibung,
       kennzeichnung: t.kennzeichnung,
       groesse_gewicht: t.groesse_gewicht,
-      antreff_ort: t.antreff_ort,
-      koord:
-        t.antreff_lat != null && t.antreff_lon != null
-          ? { lat: t.antreff_lat, lon: t.antreff_lon }
-          : null,
+      antreff_ort: ortsfeldAusGespeichert(t.antreff_ort, t.antreff_lat, t.antreff_lon),
       notiz: t.notiz,
       halter:
         t.halter_person_id != null
@@ -432,13 +429,16 @@ export default function TiereDetailPage() {
         { mono: true },
       )}
       {zelle('groesse_gewicht', 'Größe / Gewicht', <Input />, t.groesse_gewicht ?? '—')}
-      {zelle('antreff_ort', 'Fundort', <Input />, t.antreff_ort ?? '—')}
+      {zelle(
+        'antreff_ort',
+        'Fundort',
+        <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Fundort" />,
+        t.antreff_ort ?? '—',
+      )}
       {/* Verortung sichtbar machen wie am Schaden (LLH-1123): eine unverortete Lage, die niemand als
           unverortet sieht, ist so gut wie nicht erfasst. Verortet wird über die Karte; im
-          Bearbeiten-Modus lässt sich die Koordinate auch eintippen oder leeren. */}
-      {bearbeiten ? (
-        <KoordinatenDatenfeld label="Verortung" name="koord" einsatzId={einsatzId} />
-      ) : (
+          Bearbeiten-Modus über das Ortsfeld „Fundort“ (LLH-1114). */}
+      {!bearbeiten && (
         <TierVerortung
           einsatzId={einsatzId}
           tier={t}
@@ -538,7 +538,7 @@ export default function TiereDetailPage() {
             scrollToFirstError={{ focus: true }}
             onFinish={(daten) => {
               const h = daten.halter ?? null;
-              const koord = alsLatLon(daten.koord);
+              const fundort = ortFelder(daten.antreff_ort);
               const patch: TierPatch = {
                 rasse_beschreibung: daten.rasse_beschreibung,
                 rufname: daten.rufname,
@@ -547,10 +547,10 @@ export default function TiereDetailPage() {
                 farbe_beschreibung: daten.farbe_beschreibung,
                 kennzeichnung: daten.kennzeichnung,
                 groesse_gewicht: daten.groesse_gewicht,
-                antreff_ort: daten.antreff_ort,
+                antreff_ort: fundort.text,
                 // Paar: beide gesetzt oder beide leer (`null`), nie ein halbes.
-                antreff_lat: koord?.lat ?? null,
-                antreff_lon: koord?.lon ?? null,
+                antreff_lat: fundort.lat,
+                antreff_lon: fundort.lon,
                 notiz: daten.notiz,
                 // Halter XOR: immer beide Felder explizit senden (das nicht gewählte ist null).
                 halter_person_id: h?.typ === 'person' ? h.refId : null,

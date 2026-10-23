@@ -787,3 +787,134 @@ async fn korrektur_in_und_aus_der_lage_meldet_und_raeumt_die_uebernahme() {
     korrigieren(json!({ "lagerelevant": false })).await;
     assert_eq!(w.offen("meldung", "lage_uebernahme", id).await, 0);
 }
+
+// ───────────────────────── Empfängerfunktion korrigiert (LLH-1381) ─────────────────────────
+
+impl Welt {
+    /// Korrigiert als `cookie` die Meldung `id` per PATCH; erwartet 200.
+    async fn korrigieren(&self, cookie: &str, id: i64, body: Value) -> Value {
+        let (s, v) = anfrage(
+            &self.app,
+            "PATCH",
+            &format!("/api/einsaetze/{}/meldungen/{id}", self.einsatz),
+            cookie,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        v
+    }
+
+    /// Die offenen Empfänger der Art `meldung` zu Bezug `meldung`/`id`, aufsteigend.
+    async fn offen_an(&self, id: i64) -> Vec<i64> {
+        sqlx::query_scalar(
+            "SELECT benutzer_id FROM benachrichtigung \
+             WHERE art = 'meldung' AND bezug_typ = 'meldung' AND bezug_id = ? \
+               AND quittiert_at IS NULL ORDER BY benutzer_id",
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap()
+    }
+}
+
+/// Akzeptanzkriterium LLH-1381: die Empfängerfunktion einer neuen Lagemeldung von S3 auf S2
+/// korrigiert. S2 bekommt den Hinweis, der von S3 ist erledigt; die Einsatzleitung behält ihren
+/// einen Hinweis und bekommt keinen zweiten.
+#[tokio::test]
+async fn korrigierte_empfaengerfunktion_erreicht_die_neue_funktion() {
+    let w = welt().await;
+    w.mitgliedschaft_funktion(w.carla, "el").await;
+    let id = w
+        .erfassen(
+            &w.admin,
+            json!({ "meldungsart": "lagemeldung", "empfaenger_funktion": "s3" }),
+        )
+        .await["id"]
+        .as_i64()
+        .unwrap();
+    assert_eq!(w.offen_an(id).await, vec![w.bert, w.carla]);
+
+    let m = w
+        .korrigieren(&w.admin, id, json!({ "empfaenger_funktion": "s2" }))
+        .await;
+    assert_eq!(m["empfaenger_funktion"], "s2");
+    assert_eq!(w.offen_an(id).await, vec![w.anna, w.carla]);
+    assert_eq!(
+        w.empfaenger("meldung", id).await,
+        vec![w.anna, w.bert, w.carla],
+        "je Person höchstens ein Hinweis"
+    );
+    let bert = w.lesen(&w.cookie("bertram").await).await;
+    assert!(
+        bert.iter().all(|b| b["quittiert_at"].is_string()),
+        "{bert:?}"
+    );
+    let anna = w.lesen(&w.cookie("annika").await).await;
+    assert_eq!(anna.len(), 1);
+    assert_eq!(anna[0]["titel"], "Neue Meldung");
+}
+
+/// Auch der stille Fall „Meldung an mich“ (normal, von Hand) folgt der Funktion. Wer korrigiert,
+/// bekommt nichts, auch wenn er die neue Funktion besetzt.
+#[tokio::test]
+async fn meldung_an_mich_folgt_der_korrektur_nicht_an_den_korrigierenden() {
+    let w = welt().await;
+    let id = w
+        .erfassen(&w.admin, json!({ "empfaenger_funktion": "s3" }))
+        .await["id"]
+        .as_i64()
+        .unwrap();
+    assert_eq!(w.offen_an(id).await, vec![w.bert]);
+
+    w.korrigieren(
+        &w.cookie("annika").await,
+        id,
+        json!({ "empfaenger_funktion": "s2" }),
+    )
+    .await;
+    assert!(w.offen_an(id).await.is_empty());
+
+    // Funktion geleert: eine normale Meldung von Hand ohne Funktion bleibt still.
+    w.korrigieren(&w.admin, id, json!({ "empfaenger_funktion": "s3" }))
+        .await;
+    assert_eq!(
+        w.offen_an(id).await,
+        Vec::<i64>::new(),
+        "Bert hatte ihn schon"
+    );
+    w.korrigieren(&w.admin, id, json!({ "empfaenger_funktion": null }))
+        .await;
+    assert!(w.offen_an(id).await.is_empty());
+}
+
+/// Akzeptanzkriterium LLH-1381: eine schon gesichtete Meldung löst mit der Korrektur keinen
+/// neuen Hinweis aus.
+#[tokio::test]
+async fn gesichtete_meldung_meldet_nach_der_korrektur_nicht() {
+    let w = welt().await;
+    let id = w
+        .erfassen(
+            &w.admin,
+            json!({ "prioritaet": "dringend", "empfaenger_funktion": "s3" }),
+        )
+        .await["id"]
+        .as_i64()
+        .unwrap();
+    let (s, v) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/meldungen/{id}/status", w.einsatz),
+        &w.cookie("bertram").await,
+        Some(&json!({ "status": "gesichtet" }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(w.offen_an(id).await.is_empty());
+
+    w.korrigieren(&w.admin, id, json!({ "empfaenger_funktion": "s2" }))
+        .await;
+    assert!(w.offen_an(id).await.is_empty());
+    assert!(!w.empfaenger("meldung", id).await.contains(&w.anna));
+}

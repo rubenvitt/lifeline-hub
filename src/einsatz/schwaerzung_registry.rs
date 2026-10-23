@@ -1102,6 +1102,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status_seit", G_ZEIT),
             // Herkunft aus einer Nachforderung (LLH-1383, design.md D7).
             retain("nachforderung_id", G_FK),
+            // Wirkung der Übernahme für den Storno (LLH-1388): Kennzeichen „angelegt“ und Belegungs-FK.
+            retain("nachforderung_angelegt", G_ENUM),
+            retain("nachforderung_belegung_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -1776,6 +1779,19 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("prognose_gesetzt_at", G_ZEIT),
         ],
     },
+    // Gewählte Lagekennzahlen (LLH-1371): eine Darstellungsentscheidung, kein Personenbezug.
+    TabellenRegel {
+        tabelle: "einsatz_lagekennzahl_wahl",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("kennzahl", G_ENUM),
+            retain("gewaehlt_von_id", G_FK),
+            retain("gewaehlt_at", G_ZEIT),
+        ],
+    },
     TabellenRegel {
         tabelle: "einsatz_einstellungen",
         scoping: Scoping::EinsatzId,
@@ -2155,6 +2171,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("absicht", Strategie::NullSetzen, Z_EINSATZ),
             scrub("lage", Strategie::NullSetzen, Z_EINSATZ),
             scrub("ort", Strategie::NullSetzen, Z_EINSATZ),
+            // Koordinate des Ziels (LLH-1114) geht mit dem Text: das Ziel kann eine Privatadresse
+            // sein, anders als Betreuungs- oder Sammelstelle (dort Geo-Skelett).
+            scrub("ort_lat", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("ort_lon", Strategie::NullSetzen, Z_EINSATZ),
             scrub("zeit", Strategie::NullSetzen, Z_EINSATZ),
             scrub("mittel", Strategie::NullSetzen, Z_EINSATZ),
             scrub("verbindung", Strategie::NullSetzen, Z_EINSATZ),

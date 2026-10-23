@@ -19,6 +19,7 @@ import {
   patchEinheitZeichen,
   patcheEinheit,
   setzeEinheitStatus,
+  storniereUebernahme,
   type EinheitPatch,
   type EinheitZeichenPatch,
 } from '../api/einheiten';
@@ -36,6 +37,7 @@ import EinheitFunk from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
 import EinheitAufloesen from './einheit/EinheitAufloesen';
 import EinheitUebernahme from './einheit/EinheitUebernahme';
+import EinheitUebernahmeStorno from './einheit/EinheitUebernahmeStorno';
 import EinheitMaterial from './einheit/EinheitMaterial';
 import FahrzeugeBesatzung from './einheit/FahrzeugeBesatzung';
 import ZuordnenAuswahl from './einheit/ZuordnenAuswahl';
@@ -245,6 +247,17 @@ function EinheitAnsicht({
     },
   });
 
+  // Storno einer Fehlübernahme (LLH-1388, D7): danach ins Board mit der hervorgehobenen Karte, wo
+  // die Rücknahme von „Eingetroffen“ der nächste Schritt ist — für angelegte wie verknüpfte gleich.
+  const uebernahmeStorno = useMutation({
+    mutationFn: () => storniereUebernahme(einsatzId, einheitId),
+    onSuccess: (n) => {
+      void navigate(nachforderungenPfad(einsatzId, { nachforderung: n.id }));
+      invalidate();
+      qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
+    },
+  });
+
   /** „Als Einheitsführer“ im Menü einer Person: derselbe Weg wie die Kopfzeile (D1). */
   const setFuehrer = (epId: number) =>
     patch.mutateAsync({ etikett: 'Einheitsführer', patch: { fuehrer_id: epId } });
@@ -402,6 +415,14 @@ function EinheitAnsicht({
           onPatchZeichen={(etikett, p) => patchZeichen.mutateAsync({ etikett, patch: p })}
         />
 
+        {rechte.canEditEinheit &&
+          aktuell.nachforderung_id != null &&
+          istKeyFreigegeben('nachforderungen', freigaben) && (
+            <EinheitUebernahmeStorno
+              nachforderungId={aktuell.nachforderung_id}
+              onStornieren={() => uebernahmeStorno.mutateAsync()}
+            />
+          )}
         {rechte.canEditEinheit && <EinheitAufloesen onAufloesen={() => aufloesen.mutateAsync()} />}
       </div>
     </EinsatzSeite>

@@ -8,6 +8,7 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
 import {
   istKeyFreigegeben,
+  istPfadGesperrt,
   istSprungGesperrt,
   KEINE_BERECHTIGUNG,
   modulRegistry,
@@ -17,15 +18,26 @@ import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
   Augenbraue,
+  DashboardFlaeche,
+  GliederungsPaneel,
   Kennzahl,
   Kennzahlenband,
-  Paneel,
-  StatusZelle,
+  ListenPaneel,
+  NUR_VORLESER,
+  PaneelReihe,
+  StromPaneel,
+  Verteilungsliste,
+  WarnstufenHinweis,
   Zeitachseneintrag,
+  listenZeileStil,
   monoStil,
   useRollen,
+  type DashboardZustand,
+  type Gliederungszeile,
   type KennzahlZustand,
+  type Verteilungszeile,
 } from '../../components/instrument';
+import { anteil } from '../../components/instrument/Aufgliederung';
 import { einsatzKeys } from '../../api/queryKeys';
 import { schlechtesterZustand, type AbrufZustand } from '../../api/abrufZustand';
 import { verfasserText } from '../../etb/verfasser';
@@ -47,8 +59,12 @@ import { ladeModulZaehler } from '../../api/modulZaehler';
 import {
   NICHT_FREIGEGEBEN,
   auftragsStand,
+  meldungenNotiz,
+  meldungsStand,
   nachforderungsStand,
 } from '../lage-dashboard/fuehrungsZahlen';
+import { einsatzdauerKennzahl } from '../lage-dashboard/lagebild';
+import { NICHT_BEURTEILT } from '../gefahren/beurteilung';
 import { pegelAbfrage } from '../../api/pegel';
 import { wetterAbfrage } from '../../api/wetter';
 import { unwetterLage } from '../../wetter/unwetter';
@@ -59,12 +75,13 @@ import {
   auftraegePfad,
   einheitenPfad,
   einsaetzePfad,
+  einsatzModulPfad,
   einsatzabschnittePfad,
   erinnerungenPfad,
   etbPfad,
-  gefahrenPfad,
   kraefteuebersichtPfad,
   lageberichtePfad,
+  meldungenPfad,
   personenPfad,
   lagebesprechungPfad,
   abloesungPfad,
@@ -88,15 +105,11 @@ import {
   naechsteMarken,
   offeneAuftraege,
   warnstufeKennzahlVon,
-  warnstufeNotiz,
   ueberblickRechteText,
   type AbschnittZeile,
   type Marke,
 } from './ueberblickDaten';
-import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
-import Zustandsfeld from './Zustandsfeld';
 import NachforderungenPaneel, { aeltesteOffene } from './NachforderungenPaneel';
-import './ueberblick.css';
 
 /**
  * Führung · Überblick — die Startseite eines Einsatzes. Die Bedeutung jeder Zahl steht in
@@ -216,7 +229,6 @@ export default function UeberblickPage() {
   const { waehle, linkFaenger } = useModulWahl();
   const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
-  const breit = abBreite('lg');
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useJetzt();
 
@@ -480,7 +492,7 @@ export default function UeberblickPage() {
     for (const { q, frei } of quellen) if (frei) void q.refetch();
   };
 
-  const zeile = zeilenzielStil(rollen, token);
+  const zeile = listenZeileStil(rollen, token);
   const uhrzeit = (s: string | null | undefined) => formatUhrzeit(s, konventionen);
   const frist = (s: string | null | undefined) => formatUhrzeitMitTag(s, konventionen);
   const auftraegeFehlen = auftraegeFrei && auftraegeQ.isError;
@@ -521,6 +533,44 @@ export default function UeberblickPage() {
       ? 'Entscheidungen der letzten Stunde'
       : 'Letzte Entscheidungen';
 
+  // ── Seitenkopf: Warnstufe wie im Lagebild (Dashboard-Baukasten, LLH-1140) ── Sie ist keine
+  // Kennzahl: der Hinweis steht nur bei Ton achtung/alarm. Was die Kennzahl außerdem trug, steht
+  // daneben: nicht beurteilte Gebiete (LLH-1090, Offenes sieht nicht wie Entwarnung aus) und die
+  // Pegel-Notiz (LFH-606).
+  const warnTon =
+    zWarnstufe === 'daten' && (warnstufe.ton === 'alarm' || warnstufe.ton === 'achtung')
+      ? warnstufe.ton
+      : null;
+  const nichtBeurteilt =
+    zWarnstufe === 'daten' && warnstufe.nichtBeurteilt > 0
+      ? `${warnstufe.nichtBeurteilt} ${NICHT_BEURTEILT}`
+      : null;
+  const kopfLage =
+    warnTon || nichtBeurteilt || pegelNotiz ? (
+      <span
+        data-lfh="ueberblick-lage-kopf"
+        style={{
+          display: 'inline-flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: token.padding,
+        }}
+      >
+        {warnTon && <WarnstufenHinweis ton={warnTon}>Warnstufe {warnstufe.wort}</WarnstufenHinweis>}
+        {nichtBeurteilt && (
+          <span data-lfh="warnstufe-offen" style={{ color: rollen.achtungText }}>
+            {nichtBeurteilt}
+          </span>
+        )}
+        {pegelNotiz && <span data-lfh="kopf-pegel">{pegelNotiz}</span>}
+      </span>
+    ) : undefined;
+
+  const meldungsstand = meldungsStand(zaehlerQ);
+  const dauer = einsatz ? einsatzdauerKennzahl(einsatz, jetzt.valueOf(), konventionen) : null;
+  const einsatzdatenZiel = einsatzModulPfad(einsatzId, 'einsatzdaten');
+  const bandSpalten = abBreite('xl') ? 6 : abBreite('md') ? 3 : 2;
+
   return (
     // Jeder Link der Seite ist eine Modulwahl für „Zuletzt besucht" (LFH-436, `useModulWahl`).
     // `display: contents`: die Hülle trägt nur den Fänger und nimmt am Layout nicht teil.
@@ -536,6 +586,7 @@ export default function UeberblickPage() {
             ]}
           />
         }
+        meta={kopfLage}
         dataUpdatedAt={einsatzQ.dataUpdatedAt}
         // Bedingt übergeben: ein JSX-Element ist immer truthy und hinterließe ein leeres `div` mit
         // Außenabstand.
@@ -582,14 +633,20 @@ export default function UeberblickPage() {
             NICHTS im Inhalt, auch kein „wird abgerufen“: jeder sichtbare Platzhalter rückte mit dem
             Hinweis nach unten. Das Laden zeigt der Spinner am Einsatznamen der Kopfleiste. */}
         {einsatzQ.isLoading ? null : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
-            {/* Notizplatz wie im Lage-Dashboard: unter `md` Boden (LFH-629), ab `md` drei Zeilen
-              Boden und Deckel (LFH-691). */}
-            <Kennzahlenband beschriftung="Lage in Zahlen" notizZeilenSchmal={2} notizZeilen={3}>
+          <DashboardFlaeche kennung="ueberblick">
+            {/* Sechs Plätze wie im Lagebild (Kennzahlenband, LFH-640; Belegung LLH-1140 E1).
+              Notizplatz wie dort: unter `md` Boden (LFH-629), ab `md` drei Zeilen Boden und
+              Deckel (LFH-691). */}
+            <Kennzahlenband
+              beschriftung="Lage in Zahlen"
+              spalten={bandSpalten}
+              notizZeilenSchmal={2}
+              notizZeilen={3}
+              style={{ border: 'none' }}
+            >
               {/* Gesperrt: „—" mit Grund und ohne Link, wie die Aufträge aus dem Modulzähler. */}
               <Kennzahl
                 titel="Betroffene"
-                groesse="gross"
                 zustand={kennzahlZustand(zBetroffene)}
                 wert={zBetroffene === 'gesperrt' ? '—' : betroffene.anzahl}
                 einheit={zBetroffene === 'gesperrt' ? undefined : 'Pers.'}
@@ -600,7 +657,6 @@ export default function UeberblickPage() {
               />
               <Kennzahl
                 titel="Kräfte im Einsatz"
-                groesse="gross"
                 zustand={kennzahlZustand(zKraefte)}
                 wert={zKraefte === 'gesperrt' ? '—' : kraefte.gesamt}
                 // „Σ“ wie in der Stärkeschreibweise darunter, nicht „Ges.“ (LFH-973).
@@ -609,21 +665,7 @@ export default function UeberblickPage() {
                 ziel={meldebildGesperrt ? undefined : kraefteuebersichtPfad(einsatzId)}
               />
               <Kennzahl
-                titel="Warnstufe"
-                groesse="gross"
-                zustand={kennzahlZustand(zWarnstufe)}
-                ton={zWarnstufe === 'gesperrt' ? 'neutral' : warnstufe.ton}
-                wert={zWarnstufe === 'gesperrt' ? '—' : warnstufe.wort}
-                notiz={
-                  zWarnstufe === 'gesperrt'
-                    ? [NICHT_FREIGEGEBEN, pegelNotiz].filter(Boolean).join(' · ')
-                    : warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz, warnstufe.nichtBeurteilt)
-                }
-                ziel={zWarnstufe === 'gesperrt' ? undefined : gefahrenPfad(einsatzId)}
-              />
-              <Kennzahl
                 titel="Offene Aufträge"
-                groesse="gross"
                 zustand={
                   auftragsstand.zustand === 'laden' || auftragsstand.zustand === 'fehler'
                     ? auftragsstand.zustand
@@ -645,9 +687,31 @@ export default function UeberblickPage() {
                 }
                 ziel={auftragsstand.zustand === 'gesperrt' ? undefined : auftraegePfad(einsatzId)}
               />
+              {/* Aus dem Modulzähler wie im Lagebild (LFH-550); die überfällige Bestätigung ist
+                ein Alarmbeitrag. */}
+              <Kennzahl
+                titel="Meldungen offen"
+                zustand={
+                  meldungsstand.zustand === 'laden' || meldungsstand.zustand === 'fehler'
+                    ? meldungsstand.zustand
+                    : 'daten'
+                }
+                ton={
+                  meldungsstand.zustand === 'daten' &&
+                  meldungsstand.zahl.bestaetigung_ueberfaellig > 0
+                    ? 'alarm'
+                    : 'neutral'
+                }
+                wert={meldungsstand.zustand === 'daten' ? meldungsstand.zahl.offen : '—'}
+                notiz={
+                  meldungsstand.zustand === 'daten'
+                    ? meldungenNotiz(meldungsstand.zahl)
+                    : NICHT_FREIGEGEBEN
+                }
+                ziel={meldungsstand.zustand === 'gesperrt' ? undefined : meldungenPfad(einsatzId)}
+              />
               <Kennzahl
                 titel="Einsatzabschnitte"
-                groesse="gross"
                 zustand={kennzahlZustand(zAbschnitteZahl)}
                 wert={zAbschnitteZahl === 'gesperrt' ? '—' : (abschnitte?.length ?? 0)}
                 notiz={
@@ -659,11 +723,21 @@ export default function UeberblickPage() {
                 }
                 ziel={zAbschnitteZahl === 'gesperrt' ? undefined : einsatzabschnittePfad(einsatzId)}
               />
+              <Kennzahl
+                titel="Einsatzdauer"
+                wert={dauer?.wert ?? ''}
+                einheit={dauer?.einheit}
+                notiz={dauer?.notiz}
+                zustand={dauer ? 'daten' : 'laden'}
+                ziel={istPfadGesperrt(einsatzdatenZiel, freigaben) ? undefined : einsatzdatenZiel}
+              />
             </Kennzahlenband>
 
-            <div style={rasterStil(breit, token.marginLG)}>
-              <Paneel
+            <PaneelReihe kennung="ueberblick-paneele">
+              <GliederungsPaneel
                 titel="Einsatzabschnitte"
+                kennung="ueberblick-abschnitt"
+                zustand={mitLeer(zAbschnitte, zeilen.length === 0)}
                 // Beim Laden hält ein unsichtbares Meta seinen Platz (Muster `Datenstand
                 // platzHalten`): auf 390 px bricht der Kopf mit dem Meta um (38 → 52 px), und
                 // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883).
@@ -681,6 +755,10 @@ export default function UeberblickPage() {
                     </span>
                   ) : undefined
                 }
+                sprung={{
+                  label: modulName('einsatzabschnitte'),
+                  onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
+                }}
                 fuss={
                   zAbschnitte === 'daten' && zeilen.length > 0 && auftraegeFehlen ? (
                     <span style={{ ...monoStil(10), color: rollen.schwach }}>
@@ -688,360 +766,264 @@ export default function UeberblickPage() {
                     </span>
                   ) : undefined
                 }
-              >
-                <Zustandsfeld
-                  zustand={zAbschnitte}
-                  leer={zeilen.length === 0}
-                  leerText={
-                    abschnitteHinweis
-                      ? `Noch keine Abschnitte, Einheiten oder Personal erfasst. ${abschnitteHinweis}`
-                      : 'Noch keine Abschnitte und keine Kräfte erfasst.'
-                  }
-                  leerAktion={
-                    darfSchreiben
-                      ? { text: 'Abschnitt anlegen', ziel: einsatzabschnittePfad(einsatzId) }
-                      : undefined
-                  }
-                  onNeuladen={() =>
-                    nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
-                  }
-                >
-                  {/* Die Legende der Statusraster steht über den Zeilen, nicht am Fuß (LFH-962):
-                      am Handy läge der Fuß 500–700 px unter dem ersten Raster, und auf Touch
-                      gibt es kein `title`. */}
-                  <div
-                    data-lfh="status-legende"
-                    style={{
-                      ...monoStil(10),
-                      color: rollen.schwach,
-                      padding: `${token.paddingXS}px ${token.padding}px`,
-                      borderBlockEnd: `1px solid ${rollen.linie}`,
-                    }}
-                  >
-                    Einheiten nach Status: bereit · gebunden · Ausfall
-                  </div>
-                  <ul
-                    className="ueberblick-abschnitte"
-                    style={{ listStyle: 'none', margin: 0, padding: 0 }}
-                  >
-                    {zeilen.map((z) => (
-                      <li key={z.key}>
-                        <AbschnittEintrag
-                          zeile={z}
-                          zeit={frist}
-                          ziel={
-                            z.abschnittId != null
-                              ? einsatzabschnittePfad(einsatzId, { abschnitt: z.abschnittId })
-                              : einheitenPfad(einsatzId)
-                          }
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </Zustandsfeld>
-              </Paneel>
+                leerText={
+                  abschnitteHinweis
+                    ? `Noch keine Abschnitte, Einheiten oder Personal erfasst. ${abschnitteHinweis}`
+                    : 'Noch keine Abschnitte und keine Kräfte erfasst.'
+                }
+                gesperrtText={GESPERRT}
+                leerAktion={
+                  darfSchreiben
+                    ? {
+                        label: 'Abschnitt anlegen',
+                        onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
+                      }
+                    : undefined
+                }
+                onNeuladen={() =>
+                  nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
+                }
+                zeilen={zeilen.map((z) => abschnittGliederung(z, einsatzId, frist, token, rollen))}
+              />
 
-              {/* Rechte Spalte: Aufträge, darunter die Nachforderungen (LLH-1078). */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: token.marginLG,
-                  minWidth: 0,
+              <ListenPaneel
+                titel="Offene Aufträge"
+                zustand={zAuftraege}
+                meta={ueberfaelligMeta}
+                sprung={{
+                  label: modulName('auftraege'),
+                  onKlick: () => waehle(auftraegePfad(einsatzId)),
                 }}
-              >
-                <Paneel titel="Offene Aufträge" meta={ueberfaelligMeta}>
-                  <Zustandsfeld
-                    zustand={zAuftraege}
-                    leer={offene.length === 0}
-                    leerText="Keine offenen Aufträge."
-                    leerAktion={{ text: 'Zu den Aufträgen', ziel: auftraegePfad(einsatzId) }}
-                    onNeuladen={() => nachladen(qAuftraege)}
-                  >
-                    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                      {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
-                        const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
-                        return (
-                          <li key={a.id}>
-                            <Link
-                              to={auftraegePfad(einsatzId, { auftrag: a.id })}
-                              data-lfh="ueberblick-auftrag"
-                              style={zeile}
-                            >
-                              <span style={{ ...monoStil(11), color: farbe, flex: '0 0 40px' }}>
-                                {uhrzeit(a.erteilt_at)}
-                              </span>
-                              <span
-                                style={{
-                                  flex: '1 1 auto',
-                                  minWidth: 0,
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: 4,
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: 12,
-                                    lineHeight: 1.45,
-                                    color: rollen.text2,
-                                    overflowWrap: 'anywhere',
-                                  }}
-                                >
-                                  {a.auftrag_text}
-                                </span>
-                                <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                                  {[
-                                    empfaengerText(a)
-                                      ? `an ${empfaengerText(a)}`
-                                      : 'ohne Empfänger',
-                                    a.frist_at ? `Frist ${frist(a.frist_at)}` : 'ohne Frist',
-                                  ].join(' · ')}
-                                </span>
-                              </span>
-                              <span
-                                style={{
-                                  ...monoStil(10),
-                                  letterSpacing: '0.06em',
-                                  color: farbe,
-                                  flex: '0 0 auto',
-                                }}
-                              >
-                                {a.ist_ueberfaellig ? 'überfällig' : 'läuft'}
-                              </span>
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {offene.length > AUFTRAEGE_MAX && (
-                      <Link
-                        to={auftraegePfad(einsatzId)}
+                leerText="Keine offenen Aufträge."
+                gesperrtText={GESPERRT}
+                onNeuladen={() => nachladen(qAuftraege)}
+                eintraege={offene}
+                max={AUFTRAEGE_MAX}
+                schluessel={(a) => a.id}
+                weitere={{ ziel: auftraegePfad(einsatzId), name: 'offene Aufträge' }}
+                zeile={(a) => {
+                  const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
+                  return (
+                    <Link
+                      to={auftraegePfad(einsatzId, { auftrag: a.id })}
+                      data-lfh="ueberblick-auftrag"
+                      style={zeile}
+                    >
+                      <span style={{ ...monoStil(11), color: farbe, flex: '0 0 40px' }}>
+                        {uhrzeit(a.erteilt_at)}
+                      </span>
+                      <span
                         style={{
-                          ...zeile,
-                          ...monoStil(11),
-                          color: rollen.bedien,
-                          borderBlockEnd: 0,
+                          flex: '1 1 auto',
+                          minWidth: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4,
                         }}
                       >
-                        alle {offene.length} offenen Aufträge ↗
-                      </Link>
-                    )}
-                  </Zustandsfeld>
-                </Paneel>
-
-                <NachforderungenPaneel
-                  einsatzId={einsatzId}
-                  zustand={zNachforderungen}
-                  zahlen={nachforderungsstand.zustand === 'daten' ? nachforderungsstand.zahl : null}
-                  aelteste={aelteste}
-                  jetzt={jetzt.valueOf()}
-                  darfSchreiben={darfSchreiben}
-                  onNeuladen={() => {
-                    nachladen(qNachforderungen);
-                    void zaehlerQ.refetch();
-                  }}
-                />
-              </div>
-
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  display: 'flex',
-                  flexDirection: breit ? 'row' : 'column',
-                  minWidth: 0,
-                }}
-              >
-                <Paneel
-                  titel={entscheidungTitel}
-                  style={{ flex: '1 1 auto' }}
-                  meta={
-                    zEntscheidungen === 'daten' &&
-                    entscheidungen.modus === 'zuletzt' &&
-                    entscheidungen.eintraege.length > 0
-                      ? 'keine in der letzten Stunde'
-                      : undefined
-                  }
-                  aktion={
-                    // Kein Sprung ins gesperrte ETB (wie die Kennzahlen ohne Link).
-                    zEntscheidungen === 'gesperrt' ? undefined : (
-                      <Link
-                        to={etbPfad(einsatzId, { typ: 'entscheidung' })}
-                        aria-label="Entscheidungen im Einsatztagebuch öffnen"
+                        <span
+                          style={{
+                            fontSize: 12,
+                            lineHeight: 1.45,
+                            color: rollen.text2,
+                            overflowWrap: 'anywhere',
+                          }}
+                        >
+                          {a.auftrag_text}
+                        </span>
+                        <span style={{ ...monoStil(10), color: rollen.schwach }}>
+                          {[
+                            empfaengerText(a) ? `an ${empfaengerText(a)}` : 'ohne Empfänger',
+                            a.frist_at ? `Frist ${frist(a.frist_at)}` : 'ohne Frist',
+                          ].join(' · ')}
+                        </span>
+                      </span>
+                      <span
                         style={{
-                          ...monoStil(11),
-                          color: rollen.bedien,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          minHeight: token.controlHeight,
-                          paddingInline: token.paddingXS,
+                          ...monoStil(10),
+                          letterSpacing: '0.06em',
+                          color: farbe,
+                          flex: '0 0 auto',
                         }}
                       >
-                        ETB ↗
-                      </Link>
-                    )
-                  }
-                >
-                  <Zustandsfeld
-                    zustand={zEntscheidungen}
-                    leer={entscheidungen.eintraege.length === 0}
-                    leerText="Noch keine Entscheidung im Einsatztagebuch."
-                    leerAktion={
-                      darfSchreiben
-                        ? { text: 'Eintrag erfassen', ziel: etbPfad(einsatzId, { neu: true }) }
-                        : undefined
-                    }
-                    onNeuladen={() => nachladen(qEtb)}
-                  >
-                    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                      {entscheidungen.eintraege.map((e) => {
-                        // Aus dem ETB-Eintrag selbst, nicht aus der Auftragsliste — die bekommt nicht,
-                        // wer das Aufträge-Modul gesperrt hat.
-                        const folgeWort = folgeText(e.folgeauftraege.length);
-                        return (
-                          <Zeitachseneintrag
-                            key={e.id}
-                            als="li"
-                            typ="entscheidung"
-                            typwort={etbTyp.entscheidung.label}
-                            zeit={uhrzeit(e.ereigniszeit)}
-                            nr={`Nr. ${e.lfd_nr}`}
-                            meta={verfasserText(e)}
-                            aktionen={
-                              folgeWort ? (
-                                <span
-                                  data-lfh="entscheidung-folge"
-                                  style={{
-                                    ...monoStil(10),
-                                    letterSpacing: '0.06em',
-                                    color: rollen.bedien,
-                                  }}
-                                >
-                                  {folgeWort}
-                                </span>
-                              ) : undefined
-                            }
-                          >
-                            {e.inhalt}
-                          </Zeitachseneintrag>
-                        );
-                      })}
-                    </ul>
-                  </Zustandsfeld>
-                </Paneel>
+                        {a.ist_ueberfaellig ? 'überfällig' : 'läuft'}
+                      </span>
+                    </Link>
+                  );
+                }}
+              />
 
-                <Paneel
-                  titel="Nächste Marken"
-                  style={
-                    breit
-                      ? {
-                          flex: `0 0 ${MARKEN_BREITE}px`,
-                          width: MARKEN_BREITE,
-                          borderInlineStart: 0,
-                        }
-                      : { borderBlockStart: 0 }
-                  }
-                  meta={
-                    zMarken === 'daten' && marken.weitere > 0
-                      ? `+${marken.weitere} weitere`
-                      : undefined
-                  }
-                  fuss={
-                    // Im Leerzustand steht der Hinweis im Leertext.
-                    zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
-                      <span style={{ fontSize: 12, color: rollen.gedaempft }}>{markenHinweis}</span>
-                    ) : undefined
-                  }
-                >
-                  <Zustandsfeld
-                    zustand={zMarken}
-                    leer={marken.marken.length === 0}
-                    leerText={
-                      markenHinweis
-                        ? `Keine sichtbaren Fristen. ${markenHinweis}`
-                        : 'Keine anstehenden Fristen.'
-                    }
-                    onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
-                  >
-                    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                      {marken.marken.map((m) => (
-                        <li key={m.key}>
-                          <MarkenZeile
-                            ziel={markenZiel(m)}
-                            ton={m.ton}
-                            style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
+              <StromPaneel
+                titel={entscheidungTitel}
+                zustand={mitLeer(zEntscheidungen, entscheidungen.eintraege.length === 0)}
+                meta={
+                  zEntscheidungen === 'daten' &&
+                  entscheidungen.modus === 'zuletzt' &&
+                  entscheidungen.eintraege.length > 0
+                    ? 'keine in der letzten Stunde'
+                    : undefined
+                }
+                sprung={{
+                  label: 'ETB',
+                  onKlick: () => waehle(etbPfad(einsatzId, { typ: 'entscheidung' })),
+                }}
+                leerText="Noch keine Entscheidung im Einsatztagebuch."
+                gesperrtText={GESPERRT}
+                leerAktion={
+                  darfSchreiben
+                    ? {
+                        label: 'Eintrag erfassen',
+                        onKlick: () => waehle(etbPfad(einsatzId, { neu: true })),
+                      }
+                    : undefined
+                }
+                onNeuladen={() => nachladen(qEtb)}
+                listeName="Entscheidungen"
+                // Die Auswahl rechnet die Seite je Takt neu (letzte Stunde); einen Zufluss mit
+                // Wassermarke hat sie nicht, also kein Banner.
+                neu={0}
+                bannerText=""
+                onAnzeigen={() => undefined}
+              >
+                {entscheidungen.eintraege.map((e) => {
+                  // Aus dem ETB-Eintrag selbst, nicht aus der Auftragsliste — die bekommt nicht,
+                  // wer das Aufträge-Modul gesperrt hat.
+                  const folgeWort = folgeText(e.folgeauftraege.length);
+                  return (
+                    <Zeitachseneintrag
+                      key={e.id}
+                      als="li"
+                      typ="entscheidung"
+                      typwort={etbTyp.entscheidung.label}
+                      zeit={uhrzeit(e.ereigniszeit)}
+                      nr={`Nr. ${e.lfd_nr}`}
+                      meta={verfasserText(e)}
+                      aktionen={
+                        folgeWort ? (
+                          <span
+                            data-lfh="entscheidung-folge"
+                            style={{
+                              ...monoStil(10),
+                              letterSpacing: '0.06em',
+                              color: rollen.bedien,
+                            }}
                           >
-                            <span
-                              style={{
-                                flex: '0 0 auto',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                minWidth: 52,
-                              }}
-                            >
-                              <span style={{ ...monoStil(13), color: markenFarbe(m) }}>
-                                {frist(m.zeit)}
-                              </span>
-                              <span style={{ ...monoStil(10), color: markenFarbe(m) }}>
-                                {m.wort}
-                              </span>
-                            </span>
-                            <span
-                              style={{
-                                flex: '1 1 auto',
-                                minWidth: 0,
-                                fontSize: 12,
-                                lineHeight: 1.4,
-                                color: rollen.gedaempft,
-                                overflowWrap: 'anywhere',
-                              }}
-                            >
-                              {m.text}
-                            </span>
-                          </MarkenZeile>
-                        </li>
-                      ))}
-                    </ul>
-                  </Zustandsfeld>
-                </Paneel>
-              </div>
-            </div>
-          </div>
+                            {folgeWort}
+                          </span>
+                        ) : undefined
+                      }
+                    >
+                      {e.inhalt}
+                    </Zeitachseneintrag>
+                  );
+                })}
+              </StromPaneel>
+            </PaneelReihe>
+
+            <PaneelReihe kennung="ueberblick-paneele-fristen">
+              <ListenPaneel
+                titel="Nächste Marken"
+                zustand={zMarken}
+                // Die Marken kommen aus mehreren Modulen: kein Sprung, die Zahl der weiteren als
+                // Meta (`naechsteMarken` kürzt selbst).
+                meta={
+                  zMarken === 'daten' && marken.weitere > 0
+                    ? `+${marken.weitere} weitere`
+                    : undefined
+                }
+                fuss={
+                  // Im Leerzustand steht der Hinweis im Leertext.
+                  zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
+                    <span style={{ fontSize: 12, color: rollen.gedaempft }}>{markenHinweis}</span>
+                  ) : undefined
+                }
+                leerText={
+                  markenHinweis
+                    ? `Keine sichtbaren Fristen. ${markenHinweis}`
+                    : 'Keine anstehenden Fristen.'
+                }
+                gesperrtText={GESPERRT}
+                onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
+                eintraege={marken.marken}
+                max={marken.marken.length}
+                schluessel={(m) => m.key}
+                zeile={(m) => (
+                  <MarkenZeile
+                    ziel={markenZiel(m)}
+                    ton={m.ton}
+                    style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
+                  >
+                    <span
+                      style={{
+                        flex: '0 0 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minWidth: 52,
+                      }}
+                    >
+                      <span style={{ ...monoStil(13), color: markenFarbe(m) }}>
+                        {frist(m.zeit)}
+                      </span>
+                      <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
+                    </span>
+                    <span
+                      style={{
+                        flex: '1 1 auto',
+                        minWidth: 0,
+                        fontSize: 12,
+                        lineHeight: 1.4,
+                        color: rollen.gedaempft,
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {m.text}
+                    </span>
+                  </MarkenZeile>
+                )}
+              />
+
+              <NachforderungenPaneel
+                einsatzId={einsatzId}
+                zustand={zNachforderungen}
+                zahlen={nachforderungsstand.zustand === 'daten' ? nachforderungsstand.zahl : null}
+                aelteste={aelteste}
+                jetzt={jetzt.valueOf()}
+                darfSchreiben={darfSchreiben}
+                onNeuladen={() => {
+                  nachladen(qNachforderungen);
+                  void zaehlerQ.refetch();
+                }}
+              />
+            </PaneelReihe>
+          </DashboardFlaeche>
         )}
       </EinsatzSeite>
     </div>
   );
 }
 
-/** Visuell verborgen, für Vorleser da — dieselbe Clip-Bauform wie in `instrument/Status`. */
-const NUR_VORLESER: CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0, 0, 0, 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-};
+/** Grund im Zustand `gesperrt`: das Modul einer Quelle ist für die Person nicht freigegeben. */
+const GESPERRT = 'Modul nicht freigegeben.';
+
+/** Abrufzustand → Paneelzustand; `leer` gilt nur im Zustand `daten`. */
+function mitLeer(z: Zustand, leer: boolean): DashboardZustand {
+  return z === 'daten' && leer ? 'leer' : z;
+}
 
 /**
- * Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester Auftrag
- * (sonst jüngster offener Auftrag) mit Auftragszählung und letzte Rückmeldung · Stärke und
- * Einheiten je Statuskategorie. Die ganze Zeile ist der Link auf den Abschnitt.
+ * Eine Abschnittszeile für das `GliederungsPaneel`: Lagekante · Name/Kürzel/Leiter/Einheiten/
+ * Lagezustand · fester Auftrag (sonst jüngster offener Auftrag) mit Auftragszählung und letzter
+ * Rückmeldung · Stärke und Einheiten je Statuskategorie als Verteilung (Zahl + Balken mit Wort).
+ * Die ganze Zeile ist der Link auf den Abschnitt.
  */
-function AbschnittEintrag({
-  zeile,
-  ziel,
-  zeit,
-}: {
-  zeile: AbschnittZeile;
-  ziel: string;
+function abschnittGliederung(
+  zeile: AbschnittZeile,
+  einsatzId: number,
   /** Tagesbewusste Uhrzeit — eine Rückmeldung von gestern ist nicht „14:11". */
-  zeit: (utc: string | null | undefined) => string;
-}) {
-  const { token, rollen } = useRollen();
+  zeit: (utc: string | null | undefined) => string,
+  token: Parameters<typeof rollenFarbe>[1],
+  rollen: ReturnType<typeof useRollen>['rollen'],
+): Gliederungszeile {
   const [juengster, ...weitere] = zeile.auftraege;
   const { auftragsbilanz } = zeile;
   const verteilung = zeile.einheitenStatus;
@@ -1059,30 +1041,30 @@ function AbschnittEintrag({
   ]
     .filter(Boolean)
     .join(' · ');
-  return (
-    <Link
-      to={ziel}
-      data-lfh="ueberblick-abschnitt"
-      // Raster mit Containerabfrage (LFH-952, `ueberblick.css`): ab schmaler Liste stehen Name und
-      // Stärke oben, der Auftrag darunter. `display` inline, weil `zeilenzielStil` Flex setzt.
-      className="ueberblick-abschnitt"
-      style={{ ...zeilenzielStil(rollen, token), display: 'grid', paddingBlock: token.padding }}
-    >
-      {/* Lagekante: Farbe nur als Rand, das Wort steht im StatusTag daneben. Ohne Beurteilung
-          durchsichtig — eine graue Kante sähe aus wie eine Stufe „neutral". */}
-      <span
-        aria-hidden
-        data-lfh="abschnitt-lagekante"
-        data-rolle={lage?.rolle}
-        className="ueberblick-abschnitt__kante"
-        style={{
-          background: lage ? rollenFarbe(lage.rolle, token) : 'transparent',
-        }}
-      />
-      <span
-        className="ueberblick-abschnitt__name"
-        style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}
-      >
+  const summe = verteilung.bereit + verteilung.gebunden + verteilung.ausfall + verteilung.ohne;
+  const status: Verteilungszeile[] = (
+    [
+      ['bereit', verteilung.bereit, 'normal'],
+      ['gebunden', verteilung.gebunden, 'bedien'],
+      ['Ausfall', verteilung.ausfall, 'alarm'],
+    ] as const
+  ).map(([wort, wert, rolle]) => ({
+    schluessel: wort,
+    wort,
+    wert,
+    anteil: anteil(wert, summe),
+    balkenFarbe: rollenFarbe(rolle, token),
+  }));
+  return {
+    schluessel: zeile.key,
+    ziel:
+      zeile.abschnittId != null
+        ? einsatzabschnittePfad(einsatzId, { abschnitt: zeile.abschnittId })
+        : einheitenPfad(einsatzId),
+    // Lagekante: Farbe nur als Rand, das Wort steht im StatusTag daneben.
+    kante: lage ? { farbe: rollenFarbe(lage.rolle, token), rolle: lage.rolle } : null,
+    kopf: (
+      <>
         <span style={{ fontSize: 14, fontWeight: 500, overflowWrap: 'anywhere' }}>
           {zeile.name}
         </span>
@@ -1110,20 +1092,10 @@ function AbschnittEintrag({
             )}
           </span>
         )}
-      </span>
-      <span
-        className="ueberblick-abschnitt__auftrag"
-        style={{
-          minWidth: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 7,
-          fontSize: 12,
-          lineHeight: 1.45,
-          color: rollen.gedaempft,
-          overflowWrap: 'anywhere',
-        }}
-      >
+      </>
+    ),
+    inhalt: (
+      <>
         {zeile.abschnittsauftrag ? (
           <span>{zeile.abschnittsauftrag}</span>
         ) : juengster ? (
@@ -1171,46 +1143,23 @@ function AbschnittEintrag({
             )}
           </span>
         )}
-      </span>
-      <span
-        className="ueberblick-abschnitt__staerke"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-          gap: 6,
-        }}
-      >
+      </>
+    ),
+    zahl: (
+      <>
         <span style={monoStil(15)}>{zeile.staerkeText}</span>
         <Augenbraue>F/UF/M//Ges</Augenbraue>
-        {/* Kein `aria-label` am Raster: im Link bildet sich der Name aus dem Inhalt, ein Label
-            ersetzte die Wörter der Zellen. */}
-        <span
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 1,
-            background: rollen.linie,
-            width: '100%',
-          }}
-        >
-          <StatusZelle ton="normal" hoehe={24} wert={verteilung.bereit} wort="bereit" />
-          <StatusZelle ton="bedien" hoehe={24} wert={verteilung.gebunden} wort="gebunden" />
-          <StatusZelle
-            ton={verteilung.ausfall > 0 ? 'alarm' : 'neutral'}
-            hoehe={24}
-            wert={verteilung.ausfall}
-            wort="Ausfall"
-          />
-        </span>
+        {/* Einheiten je Status als Verteilung: Wort, Zahl, Balken (Dashboard-Baukasten). Kein
+            `aria-label` an der Liste: im Link bildet sich der Name aus dem Inhalt. */}
+        <Verteilungsliste kennung="abschnitt-status" dichte="zeile" zeilen={status} />
         {verteilung.ohne > 0 && (
           <span style={{ ...monoStil(10), color: rollen.schwach }}>
             +{verteilung.ohne} ohne Status
           </span>
         )}
-      </span>
-    </Link>
-  );
+      </>
+    ),
+  };
 }
 
 /**

@@ -18,11 +18,12 @@ import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
+import BerichtigtMarke from './BerichtigtMarke';
 import { KennungsLink } from '../components/kennungsLink';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import MeldungKorrektur, { type VonGruppe } from './MeldungKorrektur';
+import MeldungKorrektur, { type FunktionsAuswahl, type VonGruppe } from './MeldungKorrektur';
 
 const { Text } = Typography;
 
@@ -70,6 +71,8 @@ interface MeldungKarteProps {
   onKorrigieren?: (meldungId: number, aenderung: MeldungKorrekturPatch) => Promise<unknown>;
   /** Auswahl des Von-Bezugs für „Bearbeiten“; stabil übergeben, die Karte ist `memo`. */
   vonOptionen?: VonGruppe[];
+  /** Auswahl der Empfängerfunktion für „Bearbeiten“ (LLH-1381); stabil übergeben. */
+  funktionsOptionen?: FunktionsAuswahl;
   /** „Aus der Lage nehmen“ an einer übernommenen Meldung, die keine Lagemeldung ist (LLH-1066). */
   onAusDerLage?: (meldungId: number) => void;
   /**
@@ -143,6 +146,7 @@ function MeldungKarte({
   onAuftragErteilen,
   onKorrigieren,
   vonOptionen,
+  funktionsOptionen,
   onAusDerLage,
   auftragGesperrt = false,
   fehlerGrund,
@@ -284,6 +288,12 @@ function MeldungKarte({
                 ↗ Auftrag
               </KennungsLink>
             ))}
+          {/* Eine ETB-Berichtigung des Eintrags dieser Meldung (LLH-1382): der Wortlaut unten bleibt. */}
+          <BerichtigtMarke
+            einsatzId={einsatzId}
+            berichtigungId={m.etb_berichtigung_id}
+            berichtigungLfdNr={m.etb_berichtigung_lfd_nr}
+          />
         </Space>
         <Space size={10} wrap>
           {bestaetigungsAchse(m, formatZeit)}
@@ -340,6 +350,7 @@ function MeldungKarte({
         <MeldungKorrektur
           meldung={m}
           vonOptionen={vonOptionen}
+          funktionsOptionen={funktionsOptionen}
           onSpeichern={(aenderung) => onKorrigieren(m.id, aenderung)}
           onFertig={() => setBearbeiten(false)}
         />

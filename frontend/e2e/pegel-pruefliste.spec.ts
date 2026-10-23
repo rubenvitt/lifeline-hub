@@ -907,7 +907,10 @@ for (const [route, text] of [
       await expect(band.locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
       await wartenBisRuhig(page);
       const marke = await pegel.freigeben();
-      await expect(band.getByText(text)).toBeVisible();
+      // Im Überblick steht der Pegel seit LLH-1140 im Seitenkopf (die Warnstufe hat dort keinen
+      // Kennzahlplatz mehr), im Lagebild im Band.
+      const ort = route === 'ueberblick' ? page.locator('[data-lfh="ueberblick-lage-kopf"]') : band;
+      await expect(ort.getByText(text)).toBeVisible();
       await wartenBisRuhig(page);
       const b = await beitragAb(page, marke);
       werte.push(

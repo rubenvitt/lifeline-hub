@@ -1,6 +1,6 @@
 import { IconPlus, IconTrichter } from '../icons';
-import { useSprungSperre } from '../einsatz/useSprungSperre';
-import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
+import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
+import { istKeyFreigegeben, KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { Breadcrumb, Button, Input, Popover, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
@@ -9,7 +9,13 @@ import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { auftraegePfad, einheitenPfad, lageberichtDetailPfad } from '../routing/deeplinks';
+import {
+  auftraegePfad,
+  einheitenPfad,
+  lageberichtDetailPfad,
+  meldungenPfad,
+  nachforderungenPfad,
+} from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -21,6 +27,8 @@ import { listEinsatzMaterial, listEntlassenesMaterial } from '../api/einsatzMate
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeOffeneAuftraege } from '../api/auftraege';
 import { holeRueckmeldungen } from '../api/meldungen';
+import { listeNachforderungen } from '../api/nachforderungen';
+import { zulaufBand } from '../kraefte/zulauf';
 import {
   MELDEWEG_WORT,
   RUECKMELDUNG_ROLLE,
@@ -92,8 +100,8 @@ import { funktionText } from '../kraefte/einsatzfunktionKern';
 /**
  * Meldebild: Statusraster über alle Einheiten, als Kräftebaum (LLH-1025, Spec `kraeftebaum`).
  *
- * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Kennzahl
- * Einheiten und Personal mit Aufgliederung, „keine Rückmeldung") → Werkzeugzeile außerhalb des
+ * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Paneele
+ * Einheiten nach FMS-Status und Personal nach Status, „keine Rückmeldung"; LLH-1140) → Werkzeugzeile außerhalb des
  * Primitivs, einzeilig (Auswahlzeile, Suche, „Filter (n)“, Stufe, Lagebericht, Druck) → Raster als
  * Baum: Einheit → Untereinheiten, darunter ihre Fahrzeuge mit Besatzung, „Ohne Fahrzeug“ und das
  * Material als Gruppe. Die Elternzeile zeigt die kumulierte Stärke, Verteilung und Tönung bleiben
@@ -637,6 +645,10 @@ export default function KraefteuebersichtPage() {
   const sprungGesperrt = useSprungSperre(einsatzId);
   const einheitenGesperrt = sprungGesperrt('einheiten');
   const lageberichtGesperrt = sprungGesperrt('lageberichte');
+  const meldungenGesperrt = sprungGesperrt('meldungen');
+  // Zulauf aus Nachforderungen (LLH-1384, design.md D7): nur mit Freigabe des Moduls, sonst weder
+  // Abruf noch Kennzahl. Dieselben Freigaben aus dem Rahmen-Cache wie die Sprungsperre.
+  const nachforderungenFrei = istKeyFreigegeben('nachforderungen', useModulFreigaben(einsatzId));
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const qc = useQueryClient();
@@ -718,6 +730,13 @@ export default function KraefteuebersichtPage() {
   const periodenQuery = useQuery({
     queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
     queryFn: () => listeEinheitenPerioden(einsatzId),
+  });
+  // Fünfter Zusatzabruf (LLH-1384): derselbe Cache wie das Board, live über `nachforderung`.
+  // Scheitert er, fehlt nur die Kennzahl „Zulauf“.
+  const nachforderungenQuery = useQuery({
+    queryKey: einsatzKeys.nachforderungen(einsatzId),
+    queryFn: () => listeNachforderungen(einsatzId, {}),
+    enabled: nachforderungenFrei,
   });
 
   const traeger = useMemo(
@@ -806,6 +825,24 @@ export default function KraefteuebersichtPage() {
     }),
     // `einheitBand` liest den Status an der Einheit selbst, nicht über den Katalog.
     [gefiltertRoh, raster, rueckmeldungDaten],
+  );
+  /**
+   * Zulauf (LLH-1384): nur mit lesbaren Daten. Zählt nicht in Stärke, Einheiten oder Personal
+   * (design.md D3); bei gesetztem Filter blendet die Seite ihn unten aus (D8). Hängt an `jetzt`:
+   * „überfällig“ schlägt mit der Uhr um.
+   */
+  const nachforderungenDaten =
+    nachforderungenFrei && abrufZustand(nachforderungenQuery) === 'daten'
+      ? nachforderungenQuery.data
+      : undefined;
+  const zulauf = useMemo(
+    () =>
+      nachforderungenDaten
+        ? zulaufBand(nachforderungenDaten, jetzt.valueOf(), (utc) =>
+            formatUhrzeitMitTag(utc, konventionen),
+          )
+        : null,
+    [nachforderungenDaten, jetzt, konventionen],
   );
 
   /**
@@ -1150,7 +1187,18 @@ export default function KraefteuebersichtPage() {
             }
             personal={band.personal}
             rueckmeldung={band.rueckmeldung}
+            // Der Zulauf gehört zu keiner Auswahl (design.md D8, wie die Entlassenen im
+            // Lagebericht): gefiltert entfällt er.
+            zulauf={gefiltert ? null : zulauf}
+            zulaufZiel={nachforderungenPfad(einsatzId)}
+            // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
+            rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
             zustand={listenFehler ? 'fehler' : listenLaden ? 'laden' : 'daten'}
+            onNeuladen={() => {
+              void personalQuery.refetch();
+              void fahrzeugeQuery.refetch();
+              void einheitenQuery.refetch();
+            }}
           />
         </div>
 

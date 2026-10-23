@@ -2416,8 +2416,7 @@ async fn empfaengerliste_ohne_personenangaben() {
             "funkrufname": "Florian Hannover 2",
             "ueber_einheit_id": zug,
             "abschnitt_id": deich,
-            "erreichbarkeit": "0171 4711815",
-            "kommunikationsmittel": "mobil",
+            "verbindungen": [{ "mittel": "mobil", "wert": "0171 4711815" }],
             "bemerkung": "Bemerkung Kanarienvogel",
         }),
     )

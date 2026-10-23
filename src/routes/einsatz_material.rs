@@ -6,6 +6,7 @@ use crate::einsatz::modul::{Material, Nachforderungen};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::geraet::{stelle, Bindungsart};
 use crate::live::LiveEvent;
 use crate::material::disposition_repo::{self, AdhocDaten, MaterialPatch};
 use crate::material::ort::{self, MaterialOrt, OrtPatch};
@@ -75,13 +76,18 @@ pub async fn liste(
 ) -> Result<Json<Vec<EinsatzMaterialAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let aktiv = ctx.einsatz.ist_aktiv();
-    Ok(Json(
-        if parse_flag(params.entlassene.as_deref(), "entlassene")? {
-            disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
-        } else {
-            disposition_repo::list(&state.pool, einsatz_id, aktiv).await?
-        },
-    ))
+    let mut liste = if parse_flag(params.entlassene.as_deref(), "entlassene")? {
+        disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
+    } else {
+        disposition_repo::list(&state.pool, einsatz_id, aktiv).await?
+    };
+    // Stellenbindung (LLH-1252): ein Gerät liest nur das Material seines Bereitstellungsraums,
+    // jedes andere Gerät keins (`frontend/src/geraet/AGENTS.md`, „Stellenbindung je Art“).
+    if let Some(geraet) = ctx.geraet.as_ref() {
+        let sicht = stelle::sicht(Some(geraet), Bindungsart::Bereitstellungsraum);
+        liste.retain(|em| em.br_id.is_some_and(|br| sicht.sieht(br)));
+    }
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]
@@ -579,6 +585,63 @@ pub async fn aufteilen(
         sse_ort(&state, einsatz_id, ziel);
     }
     Ok((StatusCode::CREATED, Json(vec![ausgang, neu])))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VerknuepfenBody {
+    pub nachforderung_id: i64,
+    /// Wie bei der Übernahme (LLH-1226 D3): fehlt = `false`, dann ist ein schon übernommener
+    /// Posten der Nachforderung 409.
+    pub ergaenzen: Option<bool>,
+}
+
+/// POST /api/einsaetze/{id}/material/{em_id}/nachforderung — einen vorhandenen Posten nachträglich
+/// mit einer eingetroffenen Nachforderung verknüpfen (LLH-1259, design.md D1–D4); der PATCH nimmt
+/// `nachforderung_id` bewusst nicht an. Gleiche Prüfungen wie die Übernahme. Reihenfolge: 400
+/// (Feld) → 403 (Nachforderungen nicht freigegeben, vor jedem Lesen) → in der Transaktion 404/409
+/// (Posten: fremd, beendet, schon mit Bezug) → 404/422/409 (Nachforderung: fremd, nicht
+/// eingetroffen, schon übernommen ohne `ergaenzen`). Bezug und genau ein ETB-Eintrag atomar.
+/// Liefert den Posten.
+pub async fn verknuepfen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<VerknuepfenBody>,
+) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let nachforderung_id = body.nachforderung_id;
+    let ergaenzen = body.ergaenzen.unwrap_or(false);
+    // Erst die Freigabe (403), sonst verriete 404 gegen 200 die Nachforderung (LLH-1226 D1).
+    ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
+        .await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let anzeige = crate::write_retry!(&state.pool, |conn| {
+        let posten = disposition_repo::check_verknuepfbar_tx(conn, einsatz_id, em_id).await?;
+        let herkunft = crate::nachforderung::repo::check_uebernahme_tx(
+            conn,
+            einsatz_id,
+            nachforderung_id,
+            ergaenzen,
+        )
+        .await?;
+        disposition_repo::set_nachforderung_tx(conn, einsatz_id, em_id, nachforderung_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::material::etb_text_mit_nachforderung_verknuepft(
+                &posten.bezeichnung,
+                posten.menge,
+                &herkunft,
+            ),
+        )
+        .await?;
+        disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await
+    })?;
+    sse_material(&state, einsatz_id, em_id);
+    notify_nachforderung(&state, &anzeige);
+    Ok(Json(anzeige))
 }
 
 /// POST /api/einsaetze/{id}/material/{em_id}/entlassen — aus dem Einsatz nehmen (LLH-1079, Spec

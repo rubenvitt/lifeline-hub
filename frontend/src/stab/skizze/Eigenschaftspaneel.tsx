@@ -16,7 +16,7 @@ import type { Dayjs } from 'dayjs';
 import { forwardRef, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
+import { ZeitpunktEingabe, type ZeitArt } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import type {
   Komponentenart,
@@ -173,11 +173,14 @@ function ZeitAngabe({
   etikett,
   wert,
   darf,
+  art,
   onSpeichern,
 }: {
   etikett: string;
   wert: string | null;
   darf: boolean;
+  /** Feldart der Zeiteingabe; ohne Art eine Planungszeit (`frontend/AGENTS.md`). */
+  art?: ZeitArt;
   onSpeichern: (w: string | null) => Promise<unknown>;
 }) {
   return (
@@ -193,6 +196,7 @@ function ZeitAngabe({
         <ZeitpunktEingabe
           {...feld}
           {...popup}
+          art={art}
           style={{ width: '100%' }}
           value={value}
           onChange={(d) => onChange(d ?? null)}
@@ -729,6 +733,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                 etikett="gez. DTG"
                 wert={sf?.gez_at ?? null}
                 darf={darf}
+                art="ereignis"
                 onSpeichern={(v) =>
                   h.setzeSchriftfeld({ gez_at: v }, { gez_at: sf?.gez_at ?? null })
                 }

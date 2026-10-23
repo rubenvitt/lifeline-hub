@@ -17,6 +17,16 @@ pub const ADHOC_TEXT_MAX: usize = 200;
 /// Bemerkung zu einem Material-Posten im Einsatz (LLH-1093); wie `personal::BEMERKUNG_MAX`.
 pub const BEMERKUNG_MAX: usize = 2_000;
 
+/// Bezeichnung, Kategorie, Bestandsnummer, Trägerorganisation und Standort eines Materials im
+/// Stamm (LLH-1258, `POST/PATCH /api/material`), Zeichen nach dem Trimmen. So weit wie
+/// [`ADHOC_TEXT_MAX`]: Bezeichnung, Kategorie, Bestandsnummer und Träger gehen beim Disponieren
+/// als Snapshot in denselben Posten wie ein Ad-hoc-Eintrag. Spiegel: `MATERIAL_STAMM_TEXT_MAX`.
+pub const STAMM_TEXT_MAX: usize = 200;
+
+/// Bemerkung eines Materials im Stamm (LLH-1258); wie [`BEMERKUNG_MAX`]. Spiegel:
+/// `MATERIAL_STAMM_BEMERKUNG_MAX`.
+pub const STAMM_BEMERKUNG_MAX: usize = 2_000;
+
 /// Interner Material-Stamm-Datensatz (alle Spalten von `material`).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Material {
@@ -101,6 +111,20 @@ wire_enum! {
         Verbrauchsgut => "verbrauchsgut",
     }
     try_from = |s| format!("Ungültige MaterialArt: {s}");
+}
+
+impl MaterialStatus {
+    /// Anzeigewort im ETB („Status «einsatzbereit» → «im Einsatz»“, LLH-1257), gleich dem Wort der
+    /// Oberfläche (`materialStatus` in `frontend/src/theme/statusFarben.ts`).
+    pub fn label(self) -> &'static str {
+        match self {
+            MaterialStatus::Einsatzbereit => "einsatzbereit",
+            MaterialStatus::ImEinsatz => "im Einsatz",
+            MaterialStatus::Defekt => "defekt",
+            MaterialStatus::Verbraucht => "verbraucht",
+            MaterialStatus::DesinfektionNoetig => "Desinfektion nötig",
+        }
+    }
 }
 
 impl MaterialArt {
@@ -225,11 +249,10 @@ pub fn check_zeile(
             MaterialStatus::Verbraucht | MaterialStatus::DesinfektionNoetig
         )
     {
-        let wort = match status {
-            MaterialStatus::Verbraucht => "verbraucht",
-            _ => "Desinfektion nötig",
-        };
-        return Err(U(format!("Status «{wort}» gibt es nur für Geräte")));
+        return Err(U(format!(
+            "Status «{}» gibt es nur für Geräte",
+            status.label()
+        )));
     }
     Ok(())
 }
@@ -307,6 +330,31 @@ mod tests {
         assert_eq!(MaterialArt::Verbrauchsgut.label(), "Verbrauchsgut");
     }
 
+    /// LLH-1257: der ETB-Wortlaut eines Statuswechsels nennt je Status das Anzeigewort der
+    /// Oberfläche (`materialStatus` in `frontend/src/theme/statusFarben.ts`), nie den Wire-Wert.
+    #[test]
+    fn etb_wortlaut_des_statuswechsels_nennt_je_status_das_label() {
+        use MaterialStatus::*;
+        let faelle = [
+            (Einsatzbereit, "einsatzbereit"),
+            (ImEinsatz, "im Einsatz"),
+            (Defekt, "defekt"),
+            (Verbraucht, "verbraucht"),
+            (DesinfektionNoetig, "Desinfektion nötig"),
+        ];
+        for (status, wort) in faelle {
+            assert_eq!(status.label(), wort);
+            assert_eq!(
+                etb_text_status_wechsel("Trage", Einsatzbereit, status),
+                format!("Material «Trage»: Status «einsatzbereit» → «{wort}»")
+            );
+            assert_eq!(
+                etb_text_status_wechsel("Trage", status, Defekt),
+                format!("Material «Trage»: Status «{wort}» → «defekt»")
+            );
+        }
+    }
+
     #[test]
     fn anzeige_ohne_org_id() {
         let m = Material {
@@ -350,6 +398,21 @@ pub fn etb_text_aus_nachforderung(basis: &str, nachforderung_bezeichnung: &str) 
     format!("{basis}, aus Nachforderung «{nachforderung_bezeichnung}»")
 }
 
+/// System-ETB beim nachträglichen Verknüpfen eines vorhandenen Postens mit einer eingetroffenen
+/// Nachforderung (LLH-1259, design.md D3): „Material «Feldbetten» (×20) mit Nachforderung
+/// «20 Feldbetten» verknüpft“. Die Bezeichnung der Nachforderung ist auf
+/// [`crate::nachforderung::BEZEICHNUNG_MAX`] begrenzt.
+pub fn etb_text_mit_nachforderung_verknuepft(
+    bezeichnung: &str,
+    menge: i64,
+    nachforderung_bezeichnung: &str,
+) -> String {
+    format!(
+        "Material «{bezeichnung}» (×{menge}) mit Nachforderung «{nachforderung_bezeichnung}» \
+         verknüpft"
+    )
+}
+
 /// System-ETB bei jedem Ortswechsel eines Postens, auf jedem Weg (LLH-1224, design.md D11): alter
 /// und neuer Ort im Wortlaut von [`ort::ort_text_tx`], leer „ohne Ort“.
 pub fn etb_text_ort_gewechselt(
@@ -361,7 +424,8 @@ pub fn etb_text_ort_gewechselt(
     format!("Material «{bezeichnung}» (×{menge}): {vorher} → {nachher}")
 }
 
-/// System-ETB bei einem Statuswechsel eines Postens, mit den Wire-Werten des Status.
+/// System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status
+/// ([`MaterialStatus::label`], LLH-1257), nicht den Wire-Werten.
 pub fn etb_text_status_wechsel(
     bezeichnung: &str,
     vorher: MaterialStatus,
@@ -369,8 +433,8 @@ pub fn etb_text_status_wechsel(
 ) -> String {
     format!(
         "Material «{bezeichnung}»: Status «{}» → «{}»",
-        vorher.as_str(),
-        nachher.as_str()
+        vorher.label(),
+        nachher.label()
     )
 }
 

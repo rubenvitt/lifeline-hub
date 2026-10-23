@@ -1113,7 +1113,7 @@ async function messeBesatzungsAusloeser(
       await stelleDichte(page, dichte);
 
       // Datenanker: beide gesäten Fahrzeuge tragen ihren Auslöser.
-      const ausloeser = page.getByRole('button', { name: /^Besatzung zu Florian Musterstadt 3\// });
+      const ausloeser = page.getByRole('button', { name: /^Details zu Florian Musterstadt 3\// });
       await expect(ausloeser).toHaveCount(BESATZUNG_FAHRZEUGE.length);
       // Vorbedingung: der erwartete Zweig steht.
       if (zweig === 'tabelle') {
@@ -1133,7 +1133,7 @@ async function messeBesatzungsAusloeser(
       );
 
       const erster = page.getByRole('button', {
-        name: `Besatzung zu ${BESATZUNG_FAHRZEUGE[0]}`,
+        name: `Details zu ${BESATZUNG_FAHRZEUGE[0]}`,
         exact: true,
       });
       await expect(erster).toHaveAttribute('aria-expanded', 'false');
@@ -1183,7 +1183,7 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
   // Datenanker vor der Abwesenheit: die Seite trägt ihre Fahrzeuge.
   await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
   await expect(
-    page.getByRole('button', { name: /^Besatzung zu Florian Musterstadt 3\// }),
+    page.getByRole('button', { name: /^Details zu Florian Musterstadt 3\// }),
   ).toHaveCount(BESATZUNG_FAHRZEUGE.length);
   await expect(
     page.getByRole('button', { name: 'Ad-hoc-Fahrzeug', exact: true }),
@@ -2944,11 +2944,36 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
         `Abstand „Zurücknehmen" ↔ nächstes Ziel der Karte (handschuh, gemessen ${lueckeZurueck}px)`,
       ).toBeGreaterThanOrEqual(16);
     }
+
+    // Bearbeiten in der Karte (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten in der Ansicht“):
+    // Speichern/Abbrechen folgen derselben Staffel, Escape schließt ohne Aufruf.
+    await bearbeiten.click();
+    const bearbeitung = mittagKarte.getByRole('form', { name: 'Mittag Deich bearbeiten' });
+    await expect(bearbeitung).toBeVisible();
+    const speichern = bearbeitung.getByRole('button', { name: 'Speichern', exact: true });
+    const abbrechen = bearbeitung.getByRole('button', { name: 'Abbrechen', exact: true });
+    const hSpeichern = await haeltStufe(speichern, soll, `Speichern in der Karte (${dichte})`);
+    const hAbbrechen = await haeltStufe(abbrechen, soll, `Abbrechen in der Karte (${dichte})`);
+    const sb = (await speichern.boundingBox())!;
+    const ab = (await abbrechen.boundingBox())!;
+    const [erster, zweiterKnopf] = sb.x < ab.x ? [sb, ab] : [ab, sb];
+    const lueckeLeiste = Math.round(zweiterKnopf.x - (erster.x + erster.width));
+    if (dichte === 'handschuh') {
+      expect(
+        lueckeLeiste,
+        `Abstand „Speichern" ↔ „Abbrechen" (handschuh, gemessen ${lueckeLeiste}px)`,
+      ).toBeGreaterThanOrEqual(16);
+    }
+    await bearbeitung.getByRole('textbox', { name: 'Bezeichnung' }).press('Escape');
+    await expect(bearbeitung).toHaveCount(0);
+    await expect(bearbeiten).toBeFocused();
+
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Ausgabe öffnen ${sprung}, Dreipunkt ${dreipunkt}, ` +
         `Ausgabe nachtragen ${nachtrag}, Bedarf bearbeiten ${zweiter}, Zurücknehmen ${zurueck}, ` +
         `Kopf ${kopf}, Abstand Menü ${lueckeMenue}, Abstand Knopf ${lueckeKnopf}, ` +
-        `Abstand Nachtragen ${lueckeZweiter}, Abstand Zurücknehmen ${lueckeZurueck}`,
+        `Abstand Nachtragen ${lueckeZweiter}, Abstand Zurücknehmen ${lueckeZurueck}, ` +
+        `Speichern ${hSpeichern}, Abbrechen ${hAbbrechen}, Abstand Leiste ${lueckeLeiste}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

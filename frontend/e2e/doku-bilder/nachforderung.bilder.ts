@@ -28,6 +28,11 @@ import {
  *   nachforderung-material-posten.png
  *                                frontend/src/nachforderungen/NachforderungKarte.tsx
  *                                (übernommene Posten)
+ *   nachforderung-einheit-uebernehmen.png
+ *                                frontend/src/nachforderungen/EinheitUebernahmeModal.tsx
+ *   nachforderung-einheit-weitere.png
+ *                                frontend/src/nachforderungen/NachforderungKarte.tsx
+ *                                (übernommene Einheiten, „Weitere Einheit übernehmen“)
  */
 
 const KAPITEL = 'nachforderung';
@@ -115,6 +120,64 @@ async function nachforderungenFuellen(api: APIRequestContext) {
     einheit_id: staffel!.id,
     nachforderung_id: saecke.id,
   });
+}
+
+/**
+ * Eine eingetroffene RTW-/KTW-Nachforderung für „Als Einheit übernehmen“ (LLH-1383) mit dem
+ * Bereitstellungsraum des Demo-Einsatzes als Ziel und den Rufnamen der Zusage; mit `uebernommen`
+ * sind so viele davon schon als Einheiten übernommen. Erst im Test angelegt, nicht in
+ * `beforeAll`: das Board-Bild zeigt den Stand ohne sie. Die Rufnamen sind andere als die der
+ * Demo-Fahrzeuge („Musterstadt 83-1“), sonst lehnte der Server die Übernahme ab.
+ */
+async function einheitNachforderung(
+  art: 'RTW' | 'KTW',
+  bezeichnung: string,
+  rufnamen: string[],
+  uebernommen = 0,
+): Promise<number> {
+  const api = await apiAlsAdmin();
+  const demo = await demoEinsatz(api);
+  const basis = `/api/einsaetze/${demo.id}`;
+  const lies = async <T>(pfad: string): Promise<T> => {
+    const antwort = await api.get(pfad);
+    expect(antwort.ok(), `${pfad}: ${antwort.status()}`).toBe(true);
+    return (await antwort.json()) as T;
+  };
+  // Der Typ steht im Katalog: der Dialog belegt ihn aus der Art vor.
+  let typ = (await lies<{ id: number; label: string }[]>('/api/einheit-typen')).find(
+    (t) => t.label === art,
+  );
+  typ ??= await fuelle<{ id: number; label: string }>(api, 'post', '/api/einheit-typen', {
+    label: art,
+    sortier: 90,
+  });
+  const raum = (
+    await lies<{ id: number; bezeichnung: string }[]>(`${basis}/bereitstellungsraeume`)
+  ).find((r) => r.bezeichnung === 'Parkplatz Stadion Nord');
+  expect(raum, 'Demo-Bereitstellungsraum „Parkplatz Stadion Nord“ fehlt').toBeTruthy();
+  const nf = await fuelle<{ id: number }>(api, 'post', `${basis}/nachforderungen`, {
+    art,
+    anzahl: rufnamen.length,
+    bezeichnung,
+    ziel_br_id: raum!.id,
+    adressat_kategorie: 'uebergeordnet',
+    adressat_bezeichnung: 'Kreisbereitschaftsleitung',
+    prioritaet: 'dringend',
+  });
+  await fuelle(api, 'post', `${basis}/nachforderungen/${nf.id}/zusage`, { rufnamen });
+  for (const status of ['unterwegs', 'eingetroffen']) {
+    await fuelle(api, 'post', `${basis}/nachforderungen/${nf.id}/status`, { status });
+  }
+  if (uebernommen > 0) {
+    await fuelle(api, 'post', `${basis}/einheiten/aus-nachforderung`, {
+      nachforderung_id: nf.id,
+      einheiten: rufnamen.slice(0, uebernommen).map((name) => ({ name })),
+      typ_id: typ.id,
+      in_bereitstellungsraum: true,
+    });
+  }
+  await api.dispose();
+  return nf.id;
 }
 
 /** Öffnet die Nachforderungen des Demo-Einsatzes. */
@@ -218,5 +281,44 @@ test.describe(KAPITEL, () => {
     await expect(karte.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeVisible();
     await fokusWeg(page);
     await fotografiere(karte, KAPITEL, 'nachforderung-material-posten');
+  });
+
+  test('Dialog „Als Einheit übernehmen“', async ({ page }) => {
+    const id = await einheitNachforderung('RTW', 'Zwei RTW für Transporte ab Deich Nord', [
+      'Nachbarstadt 83-1',
+      'Nachbarstadt 83-2',
+    ]);
+    await nachforderungenOeffnen(page);
+    const karte = page.locator(`[data-nachforderung-id="${id}"]`);
+    await karte.getByRole('button', { name: 'Als Einheit übernehmen' }).click();
+    const dialog = page.getByRole('dialog', { name: '„RTW“ als Einheit übernehmen' });
+    await expect(dialog).toBeVisible();
+    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    // Vorbelegt: die Rufnamen der Zusage, der Typ aus der Art und der Haken für den Raum.
+    await expect(dialog).toContainText('Nachbarstadt 83-1');
+    await expect(dialog).toContainText('Nachbarstadt 83-2');
+    await expect(dialog.getByText('RTW', { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByRole('checkbox', { name: 'In BR Parkplatz Stadion Nord eintragen' }),
+    ).toBeChecked();
+    await fokusWeg(page);
+    await fotografiere(dialog, KAPITEL, 'nachforderung-einheit-uebernehmen');
+  });
+
+  test('Karte mit übernommenen Einheiten', async ({ page }) => {
+    const id = await einheitNachforderung(
+      'KTW',
+      'Drei KTW für die Verlegung aus der UHS Turnhalle',
+      ['Nachbarstadt 85-1', 'Nachbarstadt 85-2', 'Nachbarstadt 85-3'],
+      2,
+    );
+    await nachforderungenOeffnen(page);
+    const karte = page.locator(`[data-nachforderung-id="${id}"]`);
+    await expect(karte).toContainText(
+      'Als Einheit übernommen: Nachbarstadt 85-1 ↗, Nachbarstadt 85-2 ↗',
+    );
+    await expect(karte.getByRole('button', { name: 'Weitere Einheit übernehmen' })).toBeVisible();
+    await fokusWeg(page);
+    await fotografiere(karte, KAPITEL, 'nachforderung-einheit-weitere');
   });
 });

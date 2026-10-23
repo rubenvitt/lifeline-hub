@@ -7,6 +7,7 @@ import { App as AntApp } from 'antd';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import { mitProzessZone } from '../test/prozessZone';
+import { tippeZeit } from '../test/zeitEingabe';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import {
@@ -225,6 +226,31 @@ describe('PressemitteilungDetailPage — Zeitstand in der Anzeigezone (LFH-692)'
     await waitFor(() => expect(aktualisierePressemitteilung).toHaveBeenCalled());
     expect(vi.mocked(aktualisierePressemitteilung).mock.calls[0]).toContainEqual(
       expect.objectContaining({ zeitstand: '2026-09-30 12:00:00' }),
+    );
+  });
+
+  it('LLH-1077: ein getippter Zeitstand „301630sep26“ + Enter geht als 14:30 UTC hinaus', async () => {
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <Routes>
+          <Route
+            path="/einsaetze/:id/stab/presse/mitteilungen/:mitteilungId"
+            element={<PressemitteilungDetailPage />}
+          />
+        </Routes>
+      </AnzeigeKonventionenProvider>,
+      { route: '/einsaetze/1/stab/presse/mitteilungen/4', datenRouter: true },
+    );
+    const feld = await screen.findByRole('textbox', { name: 'Zeitstand' });
+    await waitFor(() => expect(feld).toHaveValue('301400sep26'));
+    await tippeZeit(userEvent.setup(), feld, '301630sep26');
+    await waitFor(() => expect(feld).toHaveValue('301630sep26'));
+    // Enter übernimmt; gespeichert wird über den Knopf (ein Enter im Formular täte dasselbe).
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() =>
+      expect(vi.mocked(aktualisierePressemitteilung).mock.lastCall).toContainEqual(
+        expect.objectContaining({ zeitstand: '2026-09-30 14:30:00' }),
+      ),
     );
   });
 });

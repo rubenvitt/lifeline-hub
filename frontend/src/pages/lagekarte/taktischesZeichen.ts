@@ -4,6 +4,7 @@
 // seitdem hier, nur mit den Werten, die der Hub für Fachobjekte vergibt (design.md D9). Freie
 // Zeichen tippt der Leseadapter `zeichen/freiesZeichen.ts` als `string`, denn sie sind Eingabe.
 import type { Ausmass, Gefahrentyp, Schadensgrad, UhsTyp } from '../../api/types';
+import { schadenAusmassFarben } from '../../theme/tokens';
 
 /** Grundzeichen der Fachobjekte; jedes hat einen Körper in `fachobjektZeichen` (`KOERPER`). */
 export const GRUNDZEICHEN_IDS = [
@@ -260,14 +261,15 @@ export function baueTzProps(e: TzEingabe): TzProps {
   };
 }
 
-// Schaden-Ausmaß → Farbe (einzige Quelle; marker.ts bezieht die Schaden-Farbe über schadenTz).
+// Schaden-Ausmaß → Farbe (einzige Quelle; marker.ts bezieht die Schaden-Farbe über schadenTz). Die
+// Werte stehen in der Kartenpalette des Themes (`schadenAusmassFarben`, LLH-1141).
 export const AUSMASS_FARBE: Record<Ausmass, string> = {
-  gering: '#52c41a',
-  mittel: '#faad14',
-  gross: '#fa8c16',
-  katastrophal: '#f5222d',
+  gering: schadenAusmassFarben.gering,
+  mittel: schadenAusmassFarben.mittel,
+  gross: schadenAusmassFarben.gross,
+  katastrophal: schadenAusmassFarben.katastrophal,
 };
-const AUSMASS_FALLBACK = '#8c8c8c';
+const AUSMASS_FALLBACK = schadenAusmassFarben.unbekannt;
 
 /** Einsatzort (id:0): DV-102-Grundzeichen „anlass" (Einsatz-/Schadensanlass). */
 export function einsatzortTz(): TzProps {

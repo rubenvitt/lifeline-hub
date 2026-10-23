@@ -105,4 +105,22 @@ describe('useOrtVorschau', () => {
     await waitFor(() => expect(result.current.data?.ortsname).toBe('Aus Local-Store'));
     expect(result.current.data?.peilung?.richtung).toBe('N');
   });
+
+  it('ohne Einsatz fragt sie die Ort-Vorschau der Organisation, ohne `exclude` (LLH-1376)', async () => {
+    const abfragen: URL[] = [];
+    server.use(
+      http.get('/api/ort-vorschau', ({ request }) => {
+        abfragen.push(new URL(request.url));
+        return HttpResponse.json({ ortsname: 'Am Anger 1, Musterdorf' });
+      }),
+    );
+    const { result } = renderHook(
+      () => useOrtVorschau(null, { lat: 50.7, lon: 9.7 }, 'einsatzort:1', 0),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.data?.ortsname).toBe('Am Anger 1, Musterdorf'));
+    expect(abfragen).toHaveLength(1);
+    expect(abfragen[0].searchParams.get('lat')).toBe('50.7');
+    expect(abfragen[0].searchParams.has('exclude')).toBe(false);
+  });
 });

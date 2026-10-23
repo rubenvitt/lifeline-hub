@@ -113,7 +113,7 @@ describe('OfflineKartenVerwaltung', () => {
     render();
     expect(await screen.findByText('Deutschland – Bremen')).toBeInTheDocument();
     expect(screen.getByText('bereit')).toBeInTheDocument();
-    expect(screen.getByText('42.0 MB')).toBeInTheDocument();
+    expect(screen.getByText('42,0 MB')).toBeInTheDocument();
     expect(screen.getByText('© OpenStreetMap contributors (ODbL)')).toBeInTheDocument();
   });
 
@@ -160,8 +160,8 @@ describe('OfflineKartenVerwaltung', () => {
       'Deutschland – Saarland',
     ]);
 
-    // Aufsteigend nach Bytes: 9,5 MB vor 42,0 MB (über die formatierte Zeichenkette stünde „9.1 MB"
-    // hinter „42.0 MB"). Die unbekannte Größe steht VORNE. Das fängt die Umkehrung
+    // Aufsteigend nach Bytes: 9,5 MB vor 42,0 MB (über die formatierte Zeichenkette stünde „9,1 MB"
+    // hinter „42,0 MB"). Die unbekannte Größe steht VORNE. Das fängt die Umkehrung
     // (`?? Infinity`) und den Absturz auf `null`, unterscheidet aber `?? -1` nicht von `?? 0`.
     await userEvent.click(screen.getByRole('columnheader', { name: /Größe/ }));
     await waitFor(() =>

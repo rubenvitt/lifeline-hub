@@ -267,7 +267,31 @@ it('zählt aufgebrauchte Verbrauchsgüter unter „aufgebraucht“ und nennt sie
     '- **Material (Positionen):** 4 (im Einsatz: 1, defekt: 1, aufgebraucht: 2)',
   );
   expect(md).toContain('- Mtl. M1 ×50 [aufgebraucht]');
-  expect(md).toContain('- Mtl. M2 ×50 [im_einsatz]');
+  expect(md).toContain('- Mtl. M2 ×50 [im Einsatz]');
+});
+
+// LLH-1257: die Unterzeile eines Postens nennt das Wort aus `materialStatus`, nie den Wire-Wert.
+it('nennt in der Unterzeile je Status das Label, nicht den Wire-Wert', () => {
+  const bild = baueKraeftebild(
+    [],
+    [],
+    [],
+    [],
+    [
+      mat(1, null, 'einsatzbereit'),
+      mat(2, null, 'im_einsatz'),
+      mat(3, null, 'defekt'),
+      mat(4, null, 'verbraucht'),
+      mat(5, null, 'desinfektion_noetig'),
+    ],
+  );
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  expect(md).toContain('- Mtl. M1 ×1 [einsatzbereit]');
+  expect(md).toContain('- Mtl. M2 ×1 [im Einsatz]');
+  expect(md).toContain('- Mtl. M3 ×1 [defekt]');
+  expect(md).toContain('- Mtl. M4 ×1 [verbraucht]');
+  expect(md).toContain('- Mtl. M5 ×1 [Desinfektion nötig]');
+  expect(md).not.toMatch(/im_einsatz|desinfektion_noetig/);
 });
 
 it('filtert Personal nach Trägerorganisation und Summe zieht mit', () => {

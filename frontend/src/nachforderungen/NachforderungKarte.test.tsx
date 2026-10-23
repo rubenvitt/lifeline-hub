@@ -3,7 +3,9 @@ import { useState, type ComponentProps } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { ConfigProvider } from 'antd';
 import { renderMitProviders } from '../test/utils';
+import { antdToken, farbenHell, type Dichte } from '../theme/tokens';
 import { server } from '../test/server';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
@@ -151,6 +153,42 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
     expect(onMaterialUebernehmen).not.toHaveBeenCalled();
   });
 
+  // LLH-1259 D5: neben der Übernahme der zweite Weg für schon von Hand erfasstes Material.
+  it('„Erfassten Posten zuordnen …“ neben der Übernahme, der Klick meldet die Nachforderung', async () => {
+    const onPostenZuordnen = vi.fn();
+    const { unmount } = zeigeKarte({
+      darfSchreiben: true,
+      onMaterialUebernehmen: vi.fn(),
+      onPostenZuordnen,
+    });
+    expect(screen.getByRole('button', { name: 'Als Material übernehmen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassten Posten zuordnen …' }));
+    expect(onPostenZuordnen).toHaveBeenCalledWith(1);
+    unmount();
+    // Auch mit übernommenem Posten (dann als Ergänzung), nie ohne Schreibrecht oder bei Sperre.
+    const zweite = zeigeKarte({
+      nachforderung: eingetroffen({ material_ids: [7] }),
+      darfSchreiben: true,
+      onPostenZuordnen: vi.fn(),
+    });
+    expect(screen.getByRole('button', { name: 'Erfassten Posten zuordnen …' })).toBeInTheDocument();
+    zweite.unmount();
+    const dritte = zeigeKarte({ onPostenZuordnen: vi.fn() });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
+    dritte.unmount();
+    zeigeKarte({ darfSchreiben: true, materialGesperrt: true, onPostenZuordnen: vi.fn() });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
+  });
+
+  it('keine Zuordnung, sobald eine Einheit übernommen ist (Material und Einheit schließen sich aus)', () => {
+    zeigeKarte({
+      nachforderung: eingetroffen({ einheit_ids: [11] }),
+      darfSchreiben: true,
+      onPostenZuordnen: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
+  });
+
   it('zeigt je Posten Bezeichnung, Menge und Ort, die übernommene Menge und den Sprung', async () => {
     zeigeKarte({
       nachforderung: eingetroffen({ material_ids: [7, 8] }),
@@ -267,6 +305,46 @@ describe('NachforderungKarte — Als Einheit übernehmen (LLH-1383 D9)', () => {
       'href',
       '/einsaetze/1/einheiten/11',
     );
+  });
+
+  /**
+   * LLH-1410: in der schmalen Board-Spalte stand jeder Link als unteilbarer Block von Steuerhöhe
+   * auf eigener Zeile. In `kompakt` fließen sie im Satz; ab dem Tablet behalten sie den Boden.
+   */
+  function einheitenLinks(dichte: Dichte) {
+    const { unmount } = renderMitProviders(
+      <ConfigProvider theme={{ token: antdToken(farbenHell, dichte) }}>
+        <NachforderungKarte
+          nachforderung={rtw({ einheit_ids: [11, 12] })}
+          einheitenJeId={
+            new Map([
+              [11, { id: 11, name: 'Nachbarstadt 85-1', funkrufname: null }],
+              [12, { id: 12, name: 'Nachbarstadt 85-2', funkrufname: null }],
+            ])
+          }
+        />
+      </ConfigProvider>,
+    );
+    const zeile = screen.getByText(/Als Einheit übernommen/);
+    const stile = within(zeile)
+      .getAllByRole('link')
+      .map((a) => ({ display: a.style.display, minHeight: a.style.minHeight }));
+    const flex = zeile.style.display;
+    unmount();
+    return { stile, flex };
+  }
+
+  it('kompakt: die Links fließen im Satz, ohne Steuerboden (LLH-1410)', () => {
+    const { stile, flex } = einheitenLinks('kompakt');
+    expect(stile).toHaveLength(2);
+    for (const s of stile) expect(s).toEqual({ display: 'inline', minHeight: '' });
+    expect(flex).not.toBe('flex');
+  });
+
+  it('Handschuh: die Links behalten den Boden 72 und stehen in Reihen (LLH-1410)', () => {
+    const { stile, flex } = einheitenLinks('handschuh');
+    for (const s of stile) expect(s.minHeight).toBe('72px');
+    expect(flex).toBe('flex');
   });
 
   it('„Wer“ der Zusage schlägt die Einheiten des Einsatzes vor (D10)', async () => {

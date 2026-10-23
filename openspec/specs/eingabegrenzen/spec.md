@@ -366,3 +366,26 @@ MUST für jedes dieser Felder dieselbe Grenze kennen und einen längeren Wert ni
 #### Scenario: Maske hält die Grenze
 - **WHEN** jemand in der Einheit-Ansicht eine Bemerkung über 2 000 Zeichen eingibt
 - **THEN** nennt das Feld die Überlänge, kürzt nicht und sendet nichts
+
+### Requirement: Freitexte des Material-Stamms sind begrenzt
+Bezeichnung, Kategorie, Bestandsnummer, Trägerorganisation und Standort eines Materials im Stamm
+MUST höchstens 200 Zeichen, seine Bemerkung MUST höchstens 2 000 Zeichen lang sein, jeweils nach dem
+Trimmen, beim Anlegen und beim Ändern. Ein längerer Wert MUST mit 400 abgelehnt werden, bevor etwas
+geschrieben wird. Die Materialmaske der Stammdaten MUST für jedes dieser Felder dieselbe Grenze
+kennen und einen längeren Wert nicht senden.
+
+#### Scenario: Zu lange Bezeichnung beim Anlegen
+- **WHEN** ein Material mit einer Bezeichnung aus 201 Zeichen angelegt werden soll
+- **THEN** antwortet der Server mit 400, und kein Material entsteht
+
+#### Scenario: Zu lange Bemerkung beim Ändern
+- **WHEN** die Bemerkung eines Materials auf 2 001 Zeichen geändert werden soll
+- **THEN** antwortet der Server mit 400, und die Bemerkung bleibt
+
+#### Scenario: Genau an der Grenze
+- **WHEN** die Bestandsnummer 200 Zeichen und die Bemerkung 2 000 Zeichen lang sind
+- **THEN** speichert der Server beide Werte
+
+#### Scenario: Maske hält die Grenze
+- **WHEN** jemand in der Materialmaske eine Bemerkung über 2 000 Zeichen eingibt
+- **THEN** nennt das Feld die Überlänge, kürzt nicht und sendet nichts

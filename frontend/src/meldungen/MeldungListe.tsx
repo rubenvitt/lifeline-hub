@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { SeitenLeer } from '../components/SeitenZustand';
 import type { Meldung, MeldungKorrekturPatch, MeldungStatus } from '../api/types';
 import MeldungKarte from './MeldungKarte';
-import type { VonGruppe } from './MeldungKorrektur';
+import type { FunktionsAuswahl, VonGruppe } from './MeldungKorrektur';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 interface BearbeiterOption {
@@ -30,6 +30,8 @@ interface MeldungListeProps {
   onKorrigieren?: (meldungId: number, aenderung: MeldungKorrekturPatch) => Promise<unknown>;
   /** Von-Auswahl der Korrektur. */
   vonOptionen?: VonGruppe[];
+  /** Empfängerfunktionen der Korrektur (LLH-1381). */
+  funktionsOptionen?: FunktionsAuswahl;
   /** „Aus der Lage nehmen“ (LLH-1066). */
   onAusDerLage?: (meldungId: number) => void;
   /** Aufträge ohne Freigabe: „Auftrag erteilen“ steht gesperrt mit Grund. */
@@ -58,6 +60,7 @@ export default function MeldungListe({
   onAuftragErteilen,
   onKorrigieren,
   vonOptionen,
+  funktionsOptionen,
   onAusDerLage,
   auftragGesperrt,
   kartenFehler,
@@ -82,6 +85,7 @@ export default function MeldungListe({
           onAuftragErteilen={onAuftragErteilen}
           onKorrigieren={onKorrigieren}
           vonOptionen={vonOptionen}
+          funktionsOptionen={funktionsOptionen}
           onAusDerLage={onAusDerLage}
           auftragGesperrt={auftragGesperrt}
           fehlerGrund={kartenFehler?.(m.id) ?? null}

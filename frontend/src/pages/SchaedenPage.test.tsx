@@ -12,6 +12,7 @@ import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { schaedenAttrappe } from '../test/schaedenAttrappe';
 import * as dateiSpeichern from '../components/dateiSpeichern';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -956,11 +957,8 @@ describe('SchaedenPage — Gefahr und CSV (LLH-1115)', () => {
       { route: '/einsaetze/1/schaeden' },
     );
     await screen.findByText('S-002');
-    await userEvent.click(screen.getByRole('combobox', { name: 'Gefahr' }));
-    const option = (await screen.findAllByText('Atemgifte')).find((el) =>
-      el.closest('.ant-select-item-option'),
-    );
-    await userEvent.click(option!);
+    // Der Filter sitzt im Spaltenkopf (LLH-1086).
+    await kopfFilterWaehlen('Gefahr', ['Atemgifte']);
     await waitFor(() => expect(screen.queryByText('S-002')).toBeNull());
     expect(screen.getByText('S-001')).toBeInTheDocument();
     expect(attrappe.abrufe[attrappe.abrufe.length - 1].get('gefahrenart')).toBe('atemgifte');

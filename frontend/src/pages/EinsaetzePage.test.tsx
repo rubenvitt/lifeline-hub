@@ -14,6 +14,7 @@ import { globalKeys } from '../api/queryKeys';
 import EinsaetzePage, { kartenTitelStil } from './EinsaetzePage';
 import { dichten } from '../theme/tokens';
 import { adminFixture } from '../test/fixtures';
+import { tippeZeit } from '../test/zeitEingabe';
 
 const admin = adminFixture();
 
@@ -995,6 +996,38 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
     expect(rumpf!.begonnen_at).toBe('2026-07-14 10:00:00');
   });
 
+  it('LLH-1077: „1130“ + Enter in der Alarmzeit legt den Einsatz mit 11:30 Berliner Zeit an', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-07-14T10:00:00Z'));
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      meHandler(admin),
+      http.get('/api/org-einstellungen', () =>
+        HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
+      ),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
+      http.post('/api/einsaetze', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
+      }),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+      </Routes>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    const dialog = await screen.findByRole('dialog');
+    const alarmzeit = within(dialog).getByLabelText('Alarmzeit');
+    await waitFor(() => expect(alarmzeit).toHaveValue('141200jul26'));
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Sturm Süd');
+    // 12:00 Berliner Zeit: die Alarmzeit 11:30 liegt heute (Ereignis), Enter legt an.
+    await tippeZeit(userEvent.setup(), alarmzeit, '1130');
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf!.begonnen_at).toBe('2026-07-14 09:30:00');
+  });
+
   it('LFH-966: ein abgelehntes Anlegen steht im Dialog, ohne Toast; Abbrechen räumt es', async () => {
     server.use(
       meHandler(admin),
@@ -1068,6 +1101,10 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
           ],
         });
       }),
+      // Ort-Vorschau ohne Einsatz (LLH-1376): nur der Ortsname.
+      http.get('/api/ort-vorschau', () =>
+        HttpResponse.json({ ortsname: 'Marktplatz 3, 12345 Musterstadt' }),
+      ),
     );
     renderMitProviders(
       <Routes>
@@ -1126,6 +1163,22 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
       einsatzort_lon: 10.4514,
     });
     expect(begriffe).toEqual([]);
+  });
+
+  it('zu einer getippten Koordinate kommt der Ortsname als Vorschlag (LLH-1376)', async () => {
+    const { rumpfe } = aufbau();
+    await dialogOeffnen();
+    await userEvent.type(screen.getByLabelText('Einsatzort'), '51.16040, 10.45140');
+    expect(await screen.findByText('Marktplatz 3, 12345 Musterstadt')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Als Adresse übernehmen' }));
+    expect(screen.getByLabelText('Einsatzort')).toHaveValue('Marktplatz 3, 12345 Musterstadt');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(1));
+    expect(rumpfe[0]).toMatchObject({
+      einsatzort: 'Marktplatz 3, 12345 Musterstadt',
+      einsatzort_lat: 51.1604,
+      einsatzort_lon: 10.4514,
+    });
   });
 
   it('leer schickt keinen Einsatzort', async () => {

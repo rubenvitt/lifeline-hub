@@ -848,7 +848,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
         "Fahrzeug «Musterstadt 83-1»: 2 Kräfte als Besatzung zugeordnet: Anna Probe, Paul Probe",
         "Fahrzeug «Musterstadt 64-1»: «Lena Beispiel» als Besatzung zugeordnet",
         "Material «Sanitätsrucksack» (×1) disponiert, Ort Einheit «Rettungsstaffel»",
-        "Material «Sanitätsrucksack»: Status «einsatzbereit» → «desinfektion_noetig»",
+        "Material «Sanitätsrucksack»: Status «einsatzbereit» → «Desinfektion nötig»",
     ] {
         assert!(inhalte.contains(&literal), "fehlt: {literal}");
     }
@@ -1016,8 +1016,11 @@ async fn ueberblick_zeigt_evakuiert_und_keinen_pegel() {
     let e = crate::einsatz::repo::laden(&pool, erg.einsatz_id)
         .await
         .unwrap();
-    let kennzahlen =
-        crate::einsatz::lagekennzahl::ableiten(e.pegel_festgelegt, e.evakuierung_angeordnet);
+    let kennzahlen = crate::einsatz::lagekennzahl::ableiten(
+        e.pegel_festgelegt,
+        e.evakuierung_angeordnet,
+        e.nachforderungen_gewaehlt,
+    );
     assert_eq!(
         kennzahlen,
         vec![crate::einsatz::lagekennzahl::Lagekennzahl::Evakuiert]

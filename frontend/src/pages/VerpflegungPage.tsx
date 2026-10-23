@@ -40,6 +40,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
+import { OffeneBearbeitungProvider } from '../components/offeneBearbeitung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { Sammelbanner, sammelbannerKurz, Segmentleiste, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
@@ -116,7 +117,6 @@ const STELLE_STATUS_ERFOLG: Record<VerpflegungsstelleStatus, string> = {
 
 type Dialog =
   | { art: 'anlegen' }
-  | { art: 'bearbeiten'; zf: VerpflegungZeitfenster }
   | { art: 'ausgabe'; zf: VerpflegungZeitfenster }
   | { art: 'ruecknahme'; zf: VerpflegungZeitfenster; ausgabe: VerpflegungAusgabe }
   | { art: 'loeschen'; zf: VerpflegungZeitfenster }
@@ -551,81 +551,66 @@ export default function VerpflegungPage() {
           }
         />
       ) : (
-        <section
-          aria-label={
-            ansicht === 'laufend' ? 'Laufende und anstehende Zeitfenster' : 'Vergangene Zeitfenster'
-          }
-        >
-          {liste.map((zf) => (
-            <ZeitfensterKarte
-              key={zf.id}
-              zeitfenster={zf}
-              jetzt={jetzt}
-              darfSchreiben={darfSchreiben}
-              nachforderungenFrei={nachforderungenFrei}
-              nachforderungName={(nfId) => nachforderungNamen.get(nfId)}
-              onAusgabeNachtragen={(x) => {
-                nachtrag.zuruecksetzen();
-                setDialog({ art: 'ausgabe', zf: x });
-              }}
-              onBearbeiten={
-                planen
-                  ? (x) => {
-                      aendernMut.reset();
-                      setDialog({ art: 'bearbeiten', zf: x });
-                    }
-                  : undefined
-              }
-              onNachfordern={nachfordern}
-              nachschub={geraet ? 'melden' : 'nachfordern'}
-              onLoeschen={
-                planen
-                  ? (x) => {
-                      loeschenMut.reset();
-                      setDialog({ art: 'loeschen', zf: x });
-                    }
-                  : undefined
-              }
-              onZuruecknehmen={(a, x) => {
-                ruecknahmeMut.reset();
-                setDialog({ art: 'ruecknahme', zf: x, ausgabe: a });
-              }}
-              ausstehend={ausstehendJe.get(zf.id)}
-              stellen={stellen}
-              empfaenger={empfaengerListe}
-            />
-          ))}
-        </section>
+        // Höchstens eine Karte im Bearbeiten-Zustand, Rückfrage vor dem Verlassen mit Änderung
+        // (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten in der Ansicht“).
+        <OffeneBearbeitungProvider aktiv={darfSchreiben}>
+          <section
+            aria-label={
+              ansicht === 'laufend'
+                ? 'Laufende und anstehende Zeitfenster'
+                : 'Vergangene Zeitfenster'
+            }
+          >
+            {liste.map((zf) => (
+              <ZeitfensterKarte
+                key={zf.id}
+                zeitfenster={zf}
+                jetzt={jetzt}
+                darfSchreiben={darfSchreiben}
+                nachforderungenFrei={nachforderungenFrei}
+                nachforderungName={(nfId) => nachforderungNamen.get(nfId)}
+                onAusgabeNachtragen={(x) => {
+                  nachtrag.zuruecksetzen();
+                  setDialog({ art: 'ausgabe', zf: x });
+                }}
+                onBedarfSpeichern={
+                  planen ? (x, patch) => aendernMut.mutateAsync({ zfId: x.id, patch }) : undefined
+                }
+                freigaben={freigaben}
+                onNachfordern={nachfordern}
+                nachschub={geraet ? 'melden' : 'nachfordern'}
+                onLoeschen={
+                  planen
+                    ? (x) => {
+                        loeschenMut.reset();
+                        setDialog({ art: 'loeschen', zf: x });
+                      }
+                    : undefined
+                }
+                onZuruecknehmen={(a, x) => {
+                  ruecknahmeMut.reset();
+                  setDialog({ art: 'ruecknahme', zf: x, ausgabe: a });
+                }}
+                ausstehend={ausstehendJe.get(zf.id)}
+                stellen={stellen}
+                empfaenger={empfaengerListe}
+              />
+            ))}
+          </section>
+        </OffeneBearbeitungProvider>
       )}
 
       {/* Dialoge je Ziel frisch montiert und außerhalb der Karten: `initialValues` greift nur
           beim Einhängen, und der Speicher von rc-field-form überlebt sonst ein Schließen. */}
       {dialog?.art === 'anlegen' && (
         <ZeitfensterDialog
-          modus={{ art: 'anlegen', onErfassen: (body) => anlegenMut.mutateAsync(body) }}
+          onErfassen={(body) => anlegenMut.mutateAsync(body)}
           einsatzId={einsatzId}
           freigaben={freigaben}
           jetzt={jetzt}
           stellen={stellen}
           laeuft={anlegenMut.isPending}
           fehler={anlegenMut.error}
-          onSchliessen={schliesse}
-        />
-      )}
-      {dialog?.art === 'bearbeiten' && (
-        <ZeitfensterDialog
-          key={`b-${dialog.zf.id}`}
-          modus={{
-            art: 'bearbeiten',
-            zeitfenster: dialog.zf,
-            onErfassen: (patch) => aendernMut.mutateAsync({ zfId: dialog.zf.id, patch }),
-          }}
-          einsatzId={einsatzId}
-          freigaben={freigaben}
-          jetzt={jetzt}
-          stellen={stellen}
-          laeuft={aendernMut.isPending}
-          fehler={aendernMut.error}
           onSchliessen={schliesse}
         />
       )}

@@ -591,6 +591,13 @@ export interface components {
             lfd_nr?: number | null;
             mittel?: string | null;
             ort?: string | null;
+            /**
+             * Format: double
+             * @description Koordinate des Ziels (LLH-1114), nur neben `ort`; beide fehlen ohne Punkt (LFH-265).
+             */
+            ort_lat?: number | null;
+            /** Format: double */
+            ort_lon?: number | null;
             prioritaet: components["schemas"]["Prioritaet"];
             /**
              * Format: int64
@@ -2020,7 +2027,7 @@ export interface components {
             /**
              * @description Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
              *     Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,
-             *     Evakuierung angeordnet), nie durch Messwerte.
+             *     Evakuierung angeordnet, gewählt per `lagekennzahl::waehlen`), nie durch Messwerte.
              *
              *     **Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb
              *     `#[schema(required)]` und kein `skip_serializing_if`.
@@ -3606,6 +3613,17 @@ export interface components {
              * @description Wer sie in die Lage übernommen hat; bei einer Lagemeldung ihr Erfasser.
              */
             erstellt_von_id: number;
+            /**
+             * Format: int64
+             * @description Abgeleitet (LLH-1382): jüngste ETB-Berichtigung des Eintrags der Meldung, wie an der
+             *     Meldung. `text` bleibt Lage-Text oder Wortlaut (design.md D1). Fehlt in alten Ständen.
+             */
+            etb_berichtigung_id?: number | null;
+            /**
+             * Format: int64
+             * @description Abgeleitet: laufende Nummer dieser Berichtigung im ETB.
+             */
+            etb_berichtigung_lfd_nr?: number | null;
             /** @description Zeitpunkt der ersten Kenntnisnahme (UTC); fehlt, solange neu. */
             gesehen_at?: string | null;
             /**
@@ -3855,7 +3873,11 @@ export interface components {
          *     Reihenfolge der Ausgabe von [`ableiten`].
          * @enum {string}
          */
-        Lagekennzahl: "pegel" | "evakuiert";
+        Lagekennzahl: "pegel" | "evakuiert" | "nachforderungen";
+        /** @description Antwort der Wahl: die gespeicherten gewählten Lagekennzahlen. */
+        LagekennzahlWahl: {
+            gewaehlt: components["schemas"]["Lagekennzahl"][];
+        };
         /**
          * @description Lagemeldungen: noch von niemandem als gesehen gekennzeichnet (LLH-1206). Für alle Benutzer
          *     gleich, anders als der Chat.
@@ -4192,6 +4214,18 @@ export interface components {
             erstellt_at: string;
             /** @description Frist überschritten + unbestätigt (vom Erinnerungs-Tick gesetzt, Re-Highlight). */
             eskaliert: boolean;
+            /**
+             * Format: int64
+             * @description Abgeleitet (LLH-1382): die jüngste ETB-Berichtigung des Eintrags `etb_meldung_id`, für die
+             *     Marke „berichtigt“ und den Sprung ins ETB. Der Wortlaut `inhalt` bleibt, wie er einging.
+             */
+            etb_berichtigung_id?: number | null;
+            /**
+             * Format: int64
+             * @description Abgeleitet: laufende Nummer dieser Berichtigung im ETB, gesetzt genau mit
+             *     `etb_berichtigung_id`.
+             */
+            etb_berichtigung_lfd_nr?: number | null;
             /** Format: int64 */
             etb_meldung_id?: number | null;
             /** Format: int64 */

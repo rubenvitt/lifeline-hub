@@ -69,6 +69,22 @@ macro_rules! is_neu_sql {
     };
 }
 
+/// Jüngste ETB-Berichtigung des Eintrags der Meldung (Alias `m`, LLH-1382, design.md D2): id und
+/// Nummer als zwei Spalten `etb_berichtigung_id`/`etb_berichtigung_lfd_nr`, NULL ohne
+/// Berichtigung. Dieselbe Regel wie im ETB (jüngste direkte Berichtigung, `typ = 'berichtigung'`,
+/// nur im selben Einsatz wie `etb::repo::berichtigungen_nachladen`); Index `idx_etb_berichtigt`.
+/// Meldung und Lagemeldung beziehen die Spalten von hier, es gibt kein zweites Fragment.
+macro_rules! etb_berichtigung_sql {
+    () => {
+        "(SELECT b.id FROM etb_eintrag b WHERE b.typ = 'berichtigung' \
+            AND b.berichtigt_eintrag_id = m.etb_meldung_id AND b.einsatz_id = m.einsatz_id \
+            ORDER BY b.lfd_nr DESC LIMIT 1) AS etb_berichtigung_id, \
+         (SELECT b.lfd_nr FROM etb_eintrag b WHERE b.typ = 'berichtigung' \
+            AND b.berichtigt_eintrag_id = m.etb_meldung_id AND b.einsatz_id = m.einsatz_id \
+            ORDER BY b.lfd_nr DESC LIMIT 1) AS etb_berichtigung_lfd_nr"
+    };
+}
+
 /// Die Bestätigungs-Achse einer Meldung (Alias `ks`), geteilt von Liste und Zählung.
 macro_rules! quittung_join_sql {
     () => {
@@ -99,8 +115,9 @@ const ANZEIGE_SELECT: &str = concat!(
     " AS ist_bestaetigt, ",
     ist_ueberfaellig_sql!(),
     " AS ist_ueberfaellig, \
-            m.einheit_id, m.abschnitt_id \
-     FROM meldung m \
+            m.einheit_id, m.abschnitt_id, ",
+    etb_berichtigung_sql!(),
+    " FROM meldung m \
      LEFT JOIN benutzer b ON b.id = m.bearbeiter_id",
     quittung_join_sql!(),
     " LEFT JOIN benutzer qb ON qb.id = ks.quittiert_von_id"
@@ -480,6 +497,22 @@ pub async fn anlegen_zu_etb_tx(
         einfuegen_tx(&mut *conn, einsatz_id, erfasser_id, client_id, daten).await?;
     verlinke_tx(&mut *conn, meldung_id, etb_id).await?;
     Ok(meldung_id)
+}
+
+/// Ob der ETB-Eintrag `etb_id` der Eintrag einer Meldung dieses Einsatzes ist (`etb_meldung_id`).
+/// Eine Berichtigung dieses Eintrags zeigt sich an der Meldung (LLH-1382, design.md D5).
+pub async fn is_etb_eintrag_einer_meldung(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    etb_id: i64,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (SELECT 1 FROM meldung WHERE einsatz_id = ? AND etb_meldung_id = ?)",
+    )
+    .bind(einsatz_id)
+    .bind(etb_id)
+    .fetch_one(pool)
+    .await?)
 }
 
 /// Beidseitiger Backlink Meldung ↔ ETB-Eintrag (Pattern B, beide Richtungen).
@@ -1039,8 +1072,9 @@ macro_rules! lage_anzeige_select {
              g.anzeigename AS gesehen_von_name, \
              m.meldungsart, m.prioritaet, m.status AS meldung_status, m.richtung, \
              EXISTS (SELECT 1 FROM geraet_kopplung gk WHERE gk.benutzer_id = m.erfasst_von_id) \
-               AS is_von_geraet \
-             FROM meldung m \
+               AS is_von_geraet, ",
+            etb_berichtigung_sql!(),
+            " FROM meldung m \
              LEFT JOIN benutzer g ON g.id = m.lage_gesehen_von_id"
         )
     };
@@ -1300,6 +1334,60 @@ mod tests {
         assert_eq!(m.eingang_at, "2026-06-12 09:05:00");
         assert!(m.etb_meldung_id.is_some(), "ETB-Meldung wird erzeugt");
         assert!(liste_lage_meldungen(&pool, e).await.unwrap().is_empty());
+    }
+
+    /// LLH-1382, design.md D2: eine Berichtigung aus einem fremden Einsatz legte sonst id und
+    /// Nummer eines anderen Einsatzes offen; die Route verhindert sie, das Fragment auch.
+    #[tokio::test]
+    async fn berichtigung_aus_fremdem_einsatz_erscheint_nicht_an_der_meldung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Lage ruhig", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Fremd') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        crate::etb::repo::anlegen(
+            &pool,
+            fremd,
+            b,
+            crate::etb::repo::EintragDaten {
+                typ: "berichtigung",
+                inhalt: "Fremd",
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: None,
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: m.etb_meldung_id,
+            },
+        )
+        .await
+        .unwrap();
+
+        let geladen = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
+        assert_eq!(geladen.etb_berichtigung_id, None);
+        assert_eq!(geladen.etb_berichtigung_lfd_nr, None);
+        assert!(
+            !is_etb_eintrag_einer_meldung(&pool, fremd, m.etb_meldung_id.unwrap())
+                .await
+                .unwrap()
+        );
+        assert!(
+            is_etb_eintrag_einer_meldung(&pool, e, m.etb_meldung_id.unwrap())
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]
@@ -2890,6 +2978,7 @@ mod tests {
             absicht: None,
             lage: None,
             ort: None,
+            ort_punkt: None,
             zeit: None,
             mittel: None,
             verbindung: None,

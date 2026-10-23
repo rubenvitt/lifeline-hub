@@ -31,7 +31,12 @@ import MaterialAdhocDialog from './MaterialAdhocDialog';
 import MaterialAusgabeModal from './MaterialAusgabeModal';
 import MaterialHierherModal from './MaterialHierherModal';
 import { useMaterialOrtKontext } from './MaterialOrtAngabe';
-import { buildZuordnenOptions, type OrtPosten, type ZuordnenPosten } from './materialOrtWahl';
+import {
+  buildZuordnenOptions,
+  zuordnenLeerText,
+  type OrtPosten,
+  type ZuordnenPosten,
+} from './materialOrtWahl';
 import {
   hoechsteTeilmenge,
   materialDarstellung,
@@ -59,7 +64,7 @@ import { useMaterialOrt } from './useMaterialOrt';
  *   Rückfrage (LFH-363: die gelöste Zuordnung ist umkehrbar, über die Auswahl darunter und über
  *   „Rückgängig“ im Hinweis). Die gelöste Zeile hält ihre Stelle als „Gelöst“, bis die Bedienung
  *   den Baustein verlassen hat ({@link useHoldGeloest}, LLH-1254).
- * - Kopfzahl „n Posten · k Ausfall“ aus der einen Material-Zählung.
+ * - Kopfzahl „n Posten · k Ausfall“ aus der einen Material-Zählung; ohne Zeile nur der Leertext.
  * - „Material zuordnen …“: wählen schreibt, Gruppen „Ohne Ort“ und „An anderem Ort“
  *   ({@link buildZuordnenOptions}). Ein aufteilbares Verbrauchsgut fragt zuerst die Menge
  *   ({@link MaterialHierherModal}, vorbelegt mit der ganzen Menge; t1hvaqzu, design.md D6): die
@@ -438,6 +443,10 @@ export default function MaterialAmOrt({
   });
 
   const zuordnenGrund = zuordnenFehler.grund('zuordnen');
+  // Ohne Zeile sagt der Leertext alles; „0 Posten“ daneben wäre derselbe Leerzustand zweimal
+  // (LLH-1255). Ein Platzhalter „Gelöst“ ist eine Zeile: dort bleibt die Kopfzahl, sonst rückte
+  // ohne Titel alles darunter hoch.
+  const showKopfzahl = kopfzahl && halten.rows.length > 0;
   const sperre = !materialFrei ? MODUL_MATERIAL_GESPERRT : sperrgrund;
   const [erfassenOffen, setErfassenOffen] = useState(false);
   // Neben der Auswahl; gesperrt nennt die Auswahl daneben den Grund, der Knopf verweist darauf.
@@ -453,10 +462,10 @@ export default function MaterialAmOrt({
 
   return (
     <div data-lfh="material-am-ort" {...halten.rootProps}>
-      {(titel || kopfzahl) && (
+      {(titel || showKopfzahl) && (
         <Space size={token.marginXS} style={{ marginBottom: token.marginXS }}>
           {titel && <Typography.Text type="secondary">{titel}</Typography.Text>}
-          {kopfzahl && (
+          {showKopfzahl && (
             <span
               data-testid="material-am-ort-kopf"
               style={{ ...monoStil(12), color: rollen.gedaempft }}
@@ -741,7 +750,7 @@ function ZuordnenAuswahl({
         // Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗“, kein Knopf. Erfasst wird
         // daneben am Ort (LLH-1133); der Sprung führt nur noch in die Materialliste.
         <Typography.Text type="secondary" id={grundId}>
-          Kein Material ohne Ort –{' '}
+          {zuordnenLeerText(angebot.data ?? [])} –{' '}
           {materialGesperrt ? (
             sprungGesperrtText(modulName('material'))
           ) : (

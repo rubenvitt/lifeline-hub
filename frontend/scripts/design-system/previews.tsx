@@ -31,22 +31,28 @@ import {
   antdThema,
   type Dichte,
 } from '../../src/theme/tokens';
-import { statusKategorie } from '../../src/theme/statusFarben';
+import { rollenFarbe, statusKategorie, warnstufeBalkenFarbe } from '../../src/theme/statusFarben';
 import type { Sichtungskategorie } from '../../src/api/types';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
   Augenbraue,
+  BearbeitbaresPaneel,
+  DashboardFlaeche,
   Datenfeld,
   DatenfeldEingabe,
   Datenraster,
   FeldFehler,
   Kennzahl,
   Kennzahlenband,
+  MatrixPaneel,
   Paneel,
   PaneelZeile,
   Sammelbanner,
   Segmentleiste,
   StatusChip,
   StatusZelle,
+  VerteilungsPaneel,
+  useRollen,
 } from '../../src/components/instrument';
 import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
@@ -54,6 +60,7 @@ import { InlineAngabe } from '../../src/components/InlineAngabe';
 import FunkUndTelefon from '../../src/components/FunkUndTelefon';
 import { VerbindungenAngabe } from '../../src/components/VerbindungenFeld';
 import type { KommunikationsVerbindung } from '../../src/api/types';
+import { OffeneBearbeitungProvider } from '../../src/components/offeneBearbeitung';
 import { useSpeicherLeiste } from '../../src/components/speicherLeiste';
 import DokumentEntwurf from '../../src/entwurf/DokumentEntwurf';
 import { VORLAGEN } from '../../src/befehle/vorlagen';
@@ -127,6 +134,63 @@ function VerbindungenBeispiel() {
   );
 }
 
+/**
+ * Zwei Paneele einer Ansicht unter EINEM Merker; „Funk“ wird in `interact` geöffnet, „Telefon“
+ * steht dann gesperrt mit Grund. Der Merker hängt die Rückfrage vor dem Verlassen ein, und die
+ * braucht einen Data Router (`useBlocker`).
+ */
+function BearbeitbaresPaneelBeispiel() {
+  const [router] = useState(() =>
+    createMemoryRouter([
+      {
+        path: '*',
+        element: (
+          <OffeneBearbeitungProvider>
+            <div className="ds-stapel">
+              <BearbeitbaresPaneel<{ rufname: string; kanal: string }>
+                titel="Funk"
+                ueberschrift="h3"
+                datensatz={{ geaendert_at: '2026-10-22 10:00:00' }}
+                werte={{ rufname: 'Florian Celle 1-46-1', kanal: '41' }}
+                felder={[
+                  {
+                    name: 'rufname',
+                    label: 'Rufname',
+                    anzeige: 'Florian Celle 1-46-1',
+                    eingabe: <Input />,
+                  },
+                  { name: 'kanal', label: 'Sprechgruppe', anzeige: '41', eingabe: <Input /> },
+                ]}
+                spalten={2}
+                onSpeichern={async () => undefined}
+                darfSchreiben
+              />
+              <BearbeitbaresPaneel<{ nummer: string }>
+                titel="Telefon"
+                ueberschrift="h3"
+                datensatz={{ geaendert_at: '2026-10-22 10:00:00' }}
+                werte={{ nummer: '05141 2026' }}
+                felder={[
+                  {
+                    name: 'nummer',
+                    label: 'Verbindung',
+                    anzeige: '05141 2026',
+                    eingabe: <Input />,
+                  },
+                ]}
+                spalten={2}
+                onSpeichern={async () => undefined}
+                darfSchreiben
+              />
+            </div>
+          </OffeneBearbeitungProvider>
+        ),
+      },
+    ]),
+  );
+  return <RouterProvider router={router} />;
+}
+
 function SpeicherleisteBeispiel() {
   const leiste = useSpeicherLeiste({ hasAbbrechen: true });
   return (
@@ -186,6 +250,70 @@ function DokumentEntwurfBeispiel() {
   );
 }
 
+/**
+ * Zwei Paneeltypen des Dashboard-Baukastens in ihrer Fläche: eine Verteilung (Einheiten nach
+ * Status, eine Kategorie mit Ausfall „—“) und eine Stufenmatrix. Farben aus dem Vertrag, aufgelöst
+ * im Thema der Karte.
+ */
+function DashboardBeispiel() {
+  const { token, rollen } = useRollen();
+  const verteilung = [
+    { schluessel: 'frei', wort: 'frei', rolle: 'normal', wert: 12 },
+    { schluessel: 'unterwegs', wort: 'unterwegs', rolle: 'bedien', wert: 9 },
+    { schluessel: 'am-ort', wort: 'am Einsatzort', rolle: 'bedien', wert: 8 },
+    { schluessel: 'ausser-dienst', wort: 'außer Dienst', rolle: 'alarm', wert: null },
+  ] as const;
+  return (
+    <DashboardFlaeche>
+      <VerteilungsPaneel
+        titel="Einheiten nach FMS-Status"
+        ueberschrift="h3"
+        kennung="fms"
+        zustand="daten"
+        meta="29 Einheiten"
+        sprung={{ label: 'Meldebild', onKlick: nichts }}
+        leerText="Keine Einheiten im Einsatz."
+        gesperrtText="Modul Einheiten nicht freigegeben."
+        onNeuladen={nichts}
+        zeilen={verteilung.map((z) => ({
+          schluessel: z.schluessel,
+          wort: z.wort,
+          wert: z.wert,
+          anteil: (z.wert ?? 0) / 29,
+          balkenFarbe: rollenFarbe(z.rolle, token),
+        }))}
+      />
+      <MatrixPaneel
+        titel="Gefahrenmatrix"
+        ueberschrift="h3"
+        kennung="gefahren"
+        zustand="daten"
+        meta="2 Gebiete"
+        sprung={{ label: 'Gefahren', onKlick: nichts }}
+        leerText="Keine Gefahr über Stufe „keine“."
+        gesperrtText="Modul Gefahren nicht freigegeben."
+        onNeuladen={nichts}
+        stufen={['niedrig', 'mittel', 'hoch', 'akut']}
+        zeilen={(
+          [
+            ['Brand', 'hoch', 3, 'alarm'],
+            ['Einsturz', 'mittel', 2, 'achtung'],
+            ['Gas', 'niedrig', 1, 'neutral'],
+          ] as const
+        ).map(([name, stufe, rang, ton]) => ({
+          schluessel: name,
+          name,
+          beschriftung: `${name}: ${stufe}`,
+          rang,
+          farbe: warnstufeBalkenFarbe(stufe, token) ?? rollen.gedaempft,
+          stufenwort: stufe,
+          ton,
+        }))}
+      />
+    </DashboardFlaeche>
+  );
+}
+
 const SICHTUNGEN: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot', 'unverletzt'];
 
 /** Die feste Liste der vorgestellten Bausteine (design.md D4), in Kartenreihenfolge. */
@@ -204,6 +332,16 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         <PaneelZeile>EA 3 Bereitstellung</PaneelZeile>
       </Paneel>
     ),
+  },
+  {
+    name: 'Dashboard',
+    title: 'Dashboard-Baukasten (Verteilung und Matrix)',
+    group: 'Flächen',
+    height: 976,
+    source: 'components/instrument/DashboardPaneel.tsx',
+    ruleHead: 'Dashboard-Baukasten',
+    styles: ['components/instrument/matrixPaneel.css'],
+    content: () => <DashboardBeispiel />,
   },
   {
     name: 'Datenraster',
@@ -403,6 +541,26 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         </div>
       </div>
     ),
+  },
+  {
+    name: 'BearbeitbaresPaneel',
+    title: 'BearbeitbaresPaneel (offen und gesperrt)',
+    group: 'Formular',
+    height: 710,
+    source: 'components/instrument/BearbeitbaresPaneel.tsx',
+    content: () => <BearbeitbaresPaneelBeispiel />,
+    interact: async (container) => {
+      const ausloeser = [...container.querySelectorAll('button')].filter(
+        (knopf) => knopf.getAttribute('aria-label') === 'Funk bearbeiten',
+      );
+      if (ausloeser.length !== 2) {
+        throw new Error('Design System: Auslöser „Funk bearbeiten“ nicht gefunden');
+      }
+      for (const knopf of ausloeser) await act(async () => knopf.click());
+      if (container.querySelectorAll('[data-lfh="paneel-sperrgrund"]').length !== 2) {
+        throw new Error('Design System: „Telefon“ steht nicht gesperrt mit Grund');
+      }
+    },
   },
   {
     name: 'Speicherleiste',

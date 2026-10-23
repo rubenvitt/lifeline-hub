@@ -117,13 +117,49 @@ filtern, nur auf- und zuklappen.
 
 ### Requirement: Statusband ohne Füllkacheln
 
-Das Statusband SHALL die Einheiten je FMS-Status und das Personal je Zustand als Zahl mit
-Aufgliederung zeigen und MUST NOT leere Kacheln zum Auffüllen zeigen. „Keine Rückmeldung“ MUST nur
-erscheinen, wenn es sie gibt.
+Das Statusband SHALL die Einheiten je FMS-Status und das Personal je Zustand als Paneele des
+Dashboard-Baukastens zeigen („Einheiten nach FMS-Status“, „Personal nach Status“): je Status eine
+Zeile mit Wort, Zahl und Anteilsbalken, die Summe im Paneelkopf (LLH-1140). Es MUST NOT leere
+Kacheln zum Auffüllen zeigen, und ein unbekannter Stand MUST NOT als 0 erscheinen. „Keine
+Rückmeldung“ MUST nur erscheinen, wenn es sie gibt, als eigene Kennzahl mit Sprung in die Meldungen.
 
 #### Scenario: Wenige Status
 - **WHEN** alle zwölf Personen gebunden sind
-- **THEN** zeigt das Band „Personal 12“ mit einem Segment „gebunden“ und keine leere Kachel
+- **THEN** zeigt das Paneel „Personal nach Status“ im Kopf „12 Kräfte“ und eine Zeile „gebunden 12“ mit vollem Balken, und keine leere Kachel
+
+#### Scenario: Ausfall
+- **WHEN** die Listen der Kräfte nicht abrufbar sind
+- **THEN** zeigen beide Paneele „Stand unbekannt“ mit „Erneut abrufen“ und keine Zahl
+
+### Requirement: Zulauf aus Nachforderungen
+
+Das Statusband SHALL eine eigene Kennzahl „Zulauf“ zeigen, solange eine Nachforderung des Einsatzes
+angefordert, zugesagt oder unterwegs ist (LLH-1384). Ihre Zahl MUST die Menge sein, die zugesagt
+oder unterwegs ist; je Nachforderung ihre Anzahl, ohne Anzahl 1, abzüglich der schon als Einheit
+übernommenen. Die Notiz MUST je Art, Stufe und erwartetem Eintreffen einen Eintrag nennen:
+zugesagt „+n Art, Eintreffen HH:MM“, unterwegs „+n Art unterwegs, Eintreffen HH:MM“, angefordert
+„n Art angefordert“ ohne Beitrag zur Zahl. Eingetroffene, abgelehnte und zurückgezogene
+Nachforderungen MUST NOT zum Zulauf zählen. Der Zulauf MUST NOT in Stärke, Einheitenzahl oder
+Personal zählen. Ist ein erwartetes Eintreffen verstrichen, MUST der Eintrag „überfällig“ tragen
+und die Kennzahl im Ton „achtung“ stehen, ohne Ton, Toast oder Hinweis. Die Kennzahl MUST auf das
+Board der Nachforderungen führen.
+
+Ohne Freigabe des Moduls Nachforderungen MUST das Meldebild die Nachforderungen weder abrufen noch
+die Kennzahl zeigen, auch nicht ohne Freitexte; ebenso, solange sie laden, gescheitert oder
+gesperrt sind. Bei gesetztem Filter MUST der Zulauf entfallen: er gehört zu keiner Auswahl.
+
+#### Scenario: Zwei RTW zugesagt
+- **WHEN** eine Nachforderung „2× RTW“ mit erwartetem Eintreffen 15:30 zugesagt ist
+- **THEN** zeigt das Statusband „Zulauf 2“ mit „+2 RTW, Eintreffen 15:30“
+- **AND** die Stärke im Kopf bleibt unverändert
+
+#### Scenario: Eingetroffen oder zurückgezogen
+- **WHEN** die einzige offene Nachforderung als eingetroffen gemeldet oder zurückgezogen wird
+- **THEN** entfällt die Kennzahl „Zulauf“
+
+#### Scenario: Ohne Freigabe Nachforderungen
+- **WHEN** eine Person das Meldebild liest, die das Modul Nachforderungen nicht lesen darf
+- **THEN** fragt das Meldebild keine Nachforderungen ab, und das Statusband zeigt keinen Zulauf
 
 ### Requirement: Lagebericht-Text folgt dem Kräftebaum
 

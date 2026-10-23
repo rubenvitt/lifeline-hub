@@ -363,6 +363,10 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   vorbei (eine gesichtete Meldung, eine gesehene Lagemeldung), quittiert es die offenen Zeilen
   ALLER Empfänger zu diesem Bezug und stellt jedem sein Quittier-Ereignis zu. Ein Alarm wird so
   nie erledigt; ihn quittiert jeder selbst.
+- **Neu adressiert nur über `benachrichtigung::umadressieren`** (LLH-1381): ändert sich, wer
+  gemeint ist (korrigierte Empfängerfunktion), löst es den neuen Anlass über
+  `aufloesung::empfaenger` auf, erledigt die offenen Zeilen der nicht mehr Gemeinten und legt nur
+  für Gemeinte ohne jede Zeile zum Bezug eine an: je Person höchstens eine.
 - **Web Push (LLH-1223, Spec `web-push`) nur aus `melden`:** nach `zustellen` dieselben
   Ereignisse an die Abos der Empfänger (`web_push::WebPush::versenden`), nebenläufig, nie
   abgewartet. Die Nutzlast ist das Live-Ereignis (nur Kennungen), verschlüsselt nach RFC 8291;
@@ -420,6 +424,10 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   alarmiert); nicht pflichtig → Pflicht und Frist ab jetzt. Ein Systemeintrag je wirksamer Korrektur
   mit Verweis auf die Meldung; Empfänger und Lage-Text stehen darin ohne Wert (Scrub). Geräte
   erreichen die Route nicht (keine Routenliste).
+  Die Empfängerfunktion (LLH-1381) prüft der Handler wie beim Erfassen
+  (`routes::meldung::empfaenger_funktion_pruefen`) und schreibt sie in eigener Anweisung derselben
+  Tx; ändert sie sich, richtet `meldung::benachrichtigung::empfaengerfunktion_korrigiert` die
+  Hinweise neu aus, nur solange die Meldung „Neu“ ist.
 
 ## Backend — Bereitstellungsraum (LLH-1085, LLH-1107)
 

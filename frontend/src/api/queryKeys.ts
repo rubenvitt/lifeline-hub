@@ -989,6 +989,8 @@ export const GLOBAL_KEYS = {
   // Ortssuche ohne Einsatz (LFH-1175), etwa beim Anlegen. Nicht `ort-suche`: das ist der
   // Einsatz-Prefix der Lagekarte, ein gleicher Wire-String träfe dessen Fach.
   orgOrtSuche: 'org-ort-suche',
+  // Ort-Vorschau ohne Einsatz (LLH-1376), aus demselben Grund nicht `ort-vorschau`.
+  orgOrtVorschau: 'org-ort-vorschau',
   // Katalog „Externe Stellen“ (LFH-1194). Nicht im Lagebild: ohne Netz bleibt die meldende
   // Stelle Freitext, und Rufnummern gehören nicht ohne Not auf die Platte.
   externeStellen: 'externe-stellen',
@@ -1147,6 +1149,9 @@ export const globalKeys = {
   adminKarteBereich: (bereich: AdminKarteBereich) => [GLOBAL_KEYS.adminKarte, bereich] as const,
   karteConfig: () => [GLOBAL_KEYS.karteConfig] as const,
   orgOrtSuche: (begriff: string) => [GLOBAL_KEYS.orgOrtSuche, begriff] as const,
+  // Gerundete Koordinaten wie `einsatzKeys.ortVorschau`; die Rundung passiert im Aufrufer.
+  orgOrtVorschau: (lat: number | null, lon: number | null) =>
+    [GLOBAL_KEYS.orgOrtVorschau, lat, lon] as const,
 
   // Externe Fachebenen. `kritis` und `energie` tragen eine BBox im Key und haben einen eigenen
   // Accessor, sonst entstünden zwei Cache-Fächer für denselben Zustand. `bbox` ist
@@ -1221,6 +1226,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `zugangsprotokoll`: geladen beim Öffnen und bei Filterwechsel, nie live (LFH-1097).
  * - `orgOrtSuche`: Adresssuche auf Enter wie `ortSuche` (LFH-1175); nie live, nie offline (der
  *   Suchtext kann eine Personenadresse sein).
+ * - `orgOrtVorschau`: abgeleiteter Geo-Lookup wie `ortVorschau` (LLH-1376); live zu invalidieren
+ *   wäre schädlich (Nominatim-ToS).
  */
 export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
@@ -1236,6 +1243,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.fachebene,
   GLOBAL_KEYS.zugangsprotokoll,
   GLOBAL_KEYS.orgOrtSuche,
+  GLOBAL_KEYS.orgOrtVorschau,
 ] as const satisfies readonly GlobalKey[];
 
 /**

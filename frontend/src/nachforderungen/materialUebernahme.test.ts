@@ -3,6 +3,7 @@ import type { EinsatzMaterial, Nachforderung } from '../api/types';
 import { OHNE_ORT_WERT } from '../kraefte/materialPosten';
 import {
   isErgaenzen,
+  zuordenbarePosten,
   uebernahmeBody,
   uebernahmeVorbelegung,
   uebernommenePosten,
@@ -115,5 +116,34 @@ describe('uebernahmeBody (D1, D3)', () => {
     expect(uebernahmeBody(nf({ material_ids: [7] }), w, true).optionen.ergaenzen).toBe(true);
     // Ein Live-Abgleich brachte den Posten eines anderen Platzes: ohne Absicht kein Ergänzen.
     expect(uebernahmeBody(nf({ material_ids: [7] }), w, false).optionen.ergaenzen).toBe(false);
+  });
+});
+
+describe('zuordenbarePosten (LLH-1259 D5)', () => {
+  type Z = Pick<EinsatzMaterial, 'id' | 'bezeichnung' | 'nachforderung_id' | 'beendet_at'>;
+  const z = (id: number, bezeichnung: string, over: Partial<Z> = {}): Z => ({
+    id,
+    bezeichnung,
+    nachforderung_id: null,
+    beendet_at: null,
+    ...over,
+  });
+
+  it('nur aktive Posten ohne Bezug; passende Bezeichnung zuerst, sonst alphabetisch', () => {
+    const material = [
+      z(1, 'Wolldecken'),
+      z(2, 'Feldbetten', { nachforderung_id: 9 }),
+      z(3, 'Feldbett (Spende)'),
+      z(4, 'Feldbetten', { beendet_at: '2026-10-22T10:00:00Z' }),
+      z(5, 'Bänke'),
+      z(6, 'feldbetten THW'),
+    ];
+    expect(zuordenbarePosten({ art: 'Feldbett' }, material).map((p) => p.id)).toEqual([3, 6, 5, 1]);
+  });
+
+  it('ohne freien Posten leer', () => {
+    expect(
+      zuordenbarePosten({ art: 'Feldbett' }, [z(2, 'Feldbetten', { nachforderung_id: 9 })]),
+    ).toEqual([]);
   });
 });

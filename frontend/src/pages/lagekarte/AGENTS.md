@@ -225,6 +225,17 @@ diese Zusage.
   selbst keinen (`getSource` vor `isSourceLoaded`).
   Browser-Nachweis mit der Fixture-Basemap (`e2e/kartenFixture.ts`, „gelesen“ = dekodiert):
   `e2e/lagekarte-kartengrundlage.spec.ts`, `e2e/lagekarte-kachelpfad.spec.ts`.
+- **Zeichen auf dunkler Grundlage rastern mit dem Render-Theme `dark`** (LLH-1141, Spec
+  `lagekarte-taktische-zeichen`): ist das aufgelöste Kartenthema `dark` (`loeseKartenTheme`, Prop
+  `kartenTheme` der `Kartenflaeche`), rastert jedes Zeichen (Fachobjekt und freies Zeichen) mit
+  `ZEICHEN_THEME_DUNKEL` (`zeichen/zeichenTheme.ts`, Theme `dark` von @einsatzzeichen, ESZ-119):
+  weiße Hinterlegung eng an der Tinte, Kopfmarken und Fahrwerk weiß, Körper unverändert; am Tag
+  ohne Theme. Keine helle Fläche hinter dem Zeichen, kein eigenes Einfärben oder Invertieren. Das
+  Thema steht im Bildschlüssel (`ez|dark|…`, nur `markerIconKey`/`baueZeichenRegistry` bilden
+  ihn): ein Wechsel gibt jedem Marker ein neues Bild, kein Neuladen. Gezeichnet wird nur über
+  `zeichneKartenZeichen` (`zeichenDichte.ts`), nie direkt über `addSymbolImage`. Der Lageplan
+  zeigt die Karte, wie sie steht. Die Inspector-Kachel eines Fachobjekts nimmt auf dunklem Paneel
+  dasselbe Theme. Nachweis `e2e/lagekarte-zeichen-kontrast.spec.ts` (Pixel, ≥ 3 : 1).
 - **Vertagte Kartendaten tragen einen Schlüssel** (LFH-943, D2/D3 in
   `openspec/changes/archive/2026-10-05-lfh-943-945-lagekarte-ressourcen/design.md`):
   `wendeKartenDatenAn(map, schluessel, anwenden)` hält je Karte und Schlüssel höchstens eine

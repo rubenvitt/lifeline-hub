@@ -34,6 +34,8 @@ pub struct AuftragDaten<'a> {
     pub absicht: Option<&'a str>,
     pub lage: Option<&'a str>,
     pub ort: Option<&'a str>,
+    /// Koordinate des Ziels (LLH-1114), nur neben `ort` (geprüft in `auftrag::eingabe`).
+    pub ort_punkt: Option<(f64, f64)>,
     pub zeit: Option<&'a str>,
     pub mittel: Option<&'a str>,
     pub verbindung: Option<&'a str>,
@@ -113,7 +115,7 @@ macro_rules! vollzug_join_sql {
 /// Quittungs-Aggregat (Subquery auf auftrag_empfaenger) und abgeleiteten Feldern.
 /// `jetzt` wird als ERSTER `?` gebunden (computed columns vor WHERE), dann WHERE.
 const ANZEIGE_SELECT: &str = concat!(
-    "SELECT a.id, a.einsatz_id, a.lfd_nr, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
+    "SELECT a.id, a.einsatz_id, a.lfd_nr, a.auftrag_text, a.absicht, a.lage, a.ort, a.ort_lat, a.ort_lon, a.zeit, a.mittel, \
             a.verbindung, a.sicherheit, a.weg, a.prioritaet, a.richtung, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
             a.vollzugsmeldung, a.abgenommen_at, a.abgenommen_von_id, a.etb_anordnung_id, \
             a.quell_etb_eintrag_id, \
@@ -611,9 +613,9 @@ pub async fn anlegen_tx(
     // Insert, kein read-then-write). Startwert aus den Einstellungen (Default 1).
     let auftrag_id: i64 = sqlx::query_scalar(
         "INSERT INTO auftrag \
-           (einsatz_id, lfd_nr, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, sicherheit, \
-            weg, prioritaet, richtung, frist_at, erteilt_at, erstellt_von_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+           (einsatz_id, lfd_nr, auftrag_text, absicht, lage, ort, ort_lat, ort_lon, zeit, mittel, \
+            verbindung, sicherheit, weg, prioritaet, richtung, frist_at, erteilt_at, erstellt_von_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM auftrag WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -623,6 +625,8 @@ pub async fn anlegen_tx(
     .bind(daten.absicht)
     .bind(daten.lage)
     .bind(daten.ort)
+    .bind(daten.ort_punkt.map(|p| p.0))
+    .bind(daten.ort_punkt.map(|p| p.1))
     .bind(daten.zeit)
     .bind(daten.mittel)
     .bind(daten.verbindung)
@@ -1261,6 +1265,8 @@ struct BerichtigungsStand {
     absicht: Option<String>,
     lage: Option<String>,
     ort: Option<String>,
+    ort_lat: Option<f64>,
+    ort_lon: Option<f64>,
     zeit: Option<String>,
     mittel: Option<String>,
     verbindung: Option<String>,
@@ -1334,8 +1340,8 @@ pub async fn berichtigen_tx(
         ));
     }
     let alt: BerichtigungsStand = sqlx::query_as(
-        "SELECT auftrag_text, prioritaet, frist_at, absicht, lage, ort, zeit, mittel, verbindung, \
-                sicherheit, weg FROM auftrag WHERE id = ?",
+        "SELECT auftrag_text, prioritaet, frist_at, absicht, lage, ort, ort_lat, ort_lon, zeit, \
+                mittel, verbindung, sicherheit, weg FROM auftrag WHERE id = ?",
     )
     .bind(auftrag_id)
     .fetch_one(&mut *conn)
@@ -1410,13 +1416,29 @@ pub async fn berichtigen_tx(
         }
         _ => None,
     };
+    // Koordinate des Ziels (LLH-1114, design.md D3/D4): hängt am Text — ohne Text kein Punkt,
+    // ein geleerter Text leert ihn mit. Ein neuer Punkt ist eine Änderung von „Ziel/Ort“.
+    let alt_punkt = alt.ort_lat.zip(alt.ort_lon);
+    let ort_nachher = b.schema[2].as_ref().unwrap_or(&alt.ort);
+    let ort_punkt = match (ort_nachher, b.ort_punkt) {
+        (None, Some(Some(_))) => {
+            return Err(AppError::UnprocessableEntity(
+                "Eine Koordinate des Ziels braucht einen Text „Ziel/Ort“".into(),
+            ))
+        }
+        (None, _) => None,
+        (Some(_), Some(neu)) => neu,
+        (Some(_), None) => alt_punkt,
+    };
     let mut schema: Vec<Option<String>> = alt.schema().into_iter().cloned().collect();
     for (i, neu) in b.schema.iter().enumerate() {
-        if let Some(neu) = neu {
-            if *neu != schema[i] {
-                aenderungen.push(Aenderung::Schemafeld(super::eingabe::SCHEMAFELDER[i].1));
-                schema[i] = neu.clone();
-            }
+        let text_neu = neu.as_ref().filter(|n| **n != schema[i]);
+        // Index 2 ist „Ziel/Ort“ (`SCHEMAFELDER`): dort zählt auch ein neuer Punkt.
+        if text_neu.is_some() || (i == 2 && ort_punkt != alt_punkt) {
+            aenderungen.push(Aenderung::Schemafeld(super::eingabe::SCHEMAFELDER[i].1));
+        }
+        if let Some(n) = text_neu {
+            schema[i] = n.clone();
         }
     }
     if aenderungen.is_empty() && neue_empfaenger.is_none() {
@@ -1426,7 +1448,8 @@ pub async fn berichtigen_tx(
     let frist_wert = frist.clone().unwrap_or(alt.frist_at.clone());
     sqlx::query(
         "UPDATE auftrag SET auftrag_text = ?, prioritaet = ?, frist_at = ?, absicht = ?, lage = ?, \
-           ort = ?, zeit = ?, mittel = ?, verbindung = ?, sicherheit = ?, weg = ? WHERE id = ?",
+           ort = ?, ort_lat = ?, ort_lon = ?, zeit = ?, mittel = ?, verbindung = ?, sicherheit = ?, \
+           weg = ? WHERE id = ?",
     )
     .bind(&text)
     .bind(&prioritaet)
@@ -1434,6 +1457,8 @@ pub async fn berichtigen_tx(
     .bind(&schema[0])
     .bind(&schema[1])
     .bind(&schema[2])
+    .bind(ort_punkt.map(|p| p.0))
+    .bind(ort_punkt.map(|p| p.1))
     .bind(&schema[3])
     .bind(&schema[4])
     .bind(&schema[5])
@@ -1594,6 +1619,7 @@ mod tests {
             absicht: None,
             lage: None,
             ort: None,
+            ort_punkt: None,
             zeit: None,
             mittel: None,
             verbindung: None,

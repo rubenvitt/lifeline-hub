@@ -1,6 +1,7 @@
 import { addSymbolImage, type MapLike, type SymbolImageOptions } from '@einsatzzeichen/maplibre';
 import type { Drawing } from '@einsatzzeichen/schema';
-import { ZEICHEN_KARTEN_PX } from './markerIcons';
+import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
+import { bildKartenTheme, ZEICHEN_KARTEN_PX } from './markerIcons';
 
 /**
  * Die Zeichen (Fachobjekte und freie Zeichen) folgen der Pixeldichte des Bildschirms (LFH-842). Der Resolver in
@@ -49,6 +50,34 @@ export interface ZeichenKarte extends MapLike {
   removeImage(id: string): void;
 }
 
+/**
+ * Der eine Weg, auf dem die Lagekarte ein Zeichen als Kartenbild anlegt, für den Resolver
+ * (`kartenbildResolver.ts`) und {@link rastereZeichenNeu}. Wie `addSymbolImage`
+ * (@einsatzzeichen/maplibre), nur rastert es ein Bild, dessen Schlüssel für die dunkle
+ * Kartengrundlage steht (`bildKartenTheme`, LLH-1141), mit dem Render-Theme `dark` der Bibliothek
+ * (`zeichen/zeichenTheme.ts`); am Tag ohne Theme wie bisher. Eine belegte ID ist ein Fehler wie
+ * dort; beide Aufrufer fangen ihn.
+ */
+export function zeichneKartenZeichen(
+  karte: MapLike,
+  id: string,
+  drawing: Drawing,
+  optionen: SymbolImageOptions,
+  zeichne: (
+    karte: MapLike,
+    id: string,
+    drawing: Drawing,
+    optionen: SymbolImageOptions,
+  ) => unknown = addSymbolImage,
+): void {
+  zeichne(
+    karte,
+    id,
+    drawing,
+    bildKartenTheme(id) === 'dark' ? { ...optionen, theme: ZEICHEN_THEME_DUNKEL } : optionen,
+  );
+}
+
 type Zeichne = (
   karte: ZeichenKarte,
   id: string,
@@ -67,7 +96,7 @@ export function rastereZeichenNeu(
   karte: ZeichenKarte,
   registry: ReadonlyMap<string, Drawing>,
   pixelRatio: number,
-  zeichne: Zeichne = addSymbolImage,
+  zeichne: Zeichne = zeichneKartenZeichen,
 ): void {
   let ids: string[];
   try {

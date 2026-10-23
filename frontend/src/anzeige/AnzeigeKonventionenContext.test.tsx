@@ -287,7 +287,7 @@ describe('useAnzeigeKonventionen', () => {
 
     // 09:00 UTC → Berlin 11:00 taktisch; 5000 m → imperial; beides aus dem Org-Default. Auf die
     // Distanz warten: die taktische Zeit kann zufällig dem Lokalzeit-Default gleichen.
-    await waitFor(() => expect(screen.getByTestId('distanz').textContent).toBe('3.11 mi'));
+    await waitFor(() => expect(screen.getByTestId('distanz').textContent).toBe('3,11 mi'));
     expect(screen.getByTestId('zeit').textContent).toBe('111100JUN2026');
   });
 });

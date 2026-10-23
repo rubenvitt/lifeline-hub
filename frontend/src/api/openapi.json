@@ -1551,6 +1551,21 @@
               "null"
             ]
           },
+          "ort_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Koordinate des Ziels (LLH-1114), nur neben `ort`; beide fehlen ohne Punkt (LFH-265)."
+          },
+          "ort_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
           "prioritaet": {
             "$ref": "#/components/schemas/Prioritaet"
           },
@@ -5145,7 +5160,7 @@
             "items": {
               "$ref": "#/components/schemas/Lagekennzahl"
             },
-            "description": "Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im\nLage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,\nEvakuierung angeordnet), nie durch Messwerte.\n\n**Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb\n`#[schema(required)]` und kein `skip_serializing_if`."
+            "description": "Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im\nLage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,\nEvakuierung angeordnet, gewählt per `lagekennzahl::waehlen`), nie durch Messwerte.\n\n**Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb\n`#[schema(required)]` und kein `skip_serializing_if`."
           },
           "leitstellen_nr": {
             "type": [
@@ -9091,6 +9106,22 @@
             "format": "int64",
             "description": "Wer sie in die Lage übernommen hat; bei einer Lagemeldung ihr Erfasser."
           },
+          "etb_berichtigung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abgeleitet (LLH-1382): jüngste ETB-Berichtigung des Eintrags der Meldung, wie an der\nMeldung. `text` bleibt Lage-Text oder Wortlaut (design.md D1). Fehlt in alten Ständen."
+          },
+          "etb_berichtigung_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abgeleitet: laufende Nummer dieser Berichtigung im ETB."
+          },
           "gesehen_at": {
             "type": [
               "string",
@@ -9705,8 +9736,24 @@
         "description": "Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.\n\nDie Plätze und Füllkennzahlen stehen im Frontend (`pages/lage-dashboard/lagebild.ts`);\nhier steht nur, welche Auslöser gesetzt sind. Die Reihenfolge der Varianten ist die\nReihenfolge der Ausgabe von [`ableiten`].",
         "enum": [
           "pegel",
-          "evakuiert"
+          "evakuiert",
+          "nachforderungen"
         ]
+      },
+      "LagekennzahlWahl": {
+        "type": "object",
+        "description": "Antwort der Wahl: die gespeicherten gewählten Lagekennzahlen.",
+        "required": [
+          "gewaehlt"
+        ],
+        "properties": {
+          "gewaehlt": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Lagekennzahl"
+            }
+          }
+        }
       },
       "LagemeldungsZaehler": {
         "type": "object",
@@ -10566,6 +10613,22 @@
           "eskaliert": {
             "type": "boolean",
             "description": "Frist überschritten + unbestätigt (vom Erinnerungs-Tick gesetzt, Re-Highlight)."
+          },
+          "etb_berichtigung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abgeleitet (LLH-1382): die jüngste ETB-Berichtigung des Eintrags `etb_meldung_id`, für die\nMarke „berichtigt“ und den Sprung ins ETB. Der Wortlaut `inhalt` bleibt, wie er einging."
+          },
+          "etb_berichtigung_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abgeleitet: laufende Nummer dieser Berichtigung im ETB, gesetzt genau mit\n`etb_berichtigung_id`."
           },
           "etb_meldung_id": {
             "type": [

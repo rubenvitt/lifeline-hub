@@ -3993,6 +3993,128 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
     assert!(v["personen"].is_null(), "{v}");
 }
 
+/// LLH-1252 (Entscheidung Ruben 22.10.2026): das BR-Gerät liest das Material seines Raums über
+/// die Materialliste, serverseitig geschnitten; Material anderer Räume, anderer Orte und ohne Ort
+/// fehlt, auch unter `?entlassene=1`. Zuordnen, Lösen, Status, Ausgeben und Erfassen bleiben der
+/// Führungsstelle (nur lesen). Ein anderes Gerät liest die Materialliste nicht.
+#[tokio::test]
+async fn br_geraet_liest_nur_das_material_des_eigenen_raums() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let material = format!("/api/einsaetze/{einsatz}/material");
+    let posten = |body: Value| {
+        let app = app.clone();
+        let admin = admin.clone();
+        let material = material.clone();
+        async move {
+            let (s, v) = anfrage_json(&app, "POST", &material, &admin, Some(&body)).await;
+            assert_eq!(s, StatusCode::CREATED, "{v}");
+            v["id"].as_i64().unwrap()
+        }
+    };
+    let lichtmast =
+        posten(json!({"adhoc": {"bezeichnung": "Lichtmast"}, "br_id": sportplatz})).await;
+    posten(json!({"adhoc": {"bezeichnung": "Trage"}, "br_id": schule})).await;
+    let frei = posten(json!({"adhoc": {"bezeichnung": "Stromerzeuger"}})).await;
+
+    let ids = |v: &Value| -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["id"].as_i64().unwrap())
+            .collect()
+    };
+    let (s, v) = anfrage(&app, "GET", &material, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(ids(&v), vec![lichtmast], "nur der eigene Raum: {v}");
+    assert_eq!(v[0]["bezeichnung"], "Lichtmast");
+    let (_, v) = anfrage(&app, "GET", &material, &admin, None).await;
+    assert_eq!(ids(&v).len(), 3, "die Person sieht alles: {v}");
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{material}?entlassene=1"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(
+        ids(&v).iter().all(|id| *id == lichtmast),
+        "entlassene nur aus dem eigenen Raum: {v}"
+    );
+    // Die Freigabe des Moduls Material sieht das Gerät jetzt, Zähler gibt es dafür keine.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/modul-freigaben"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["material"]["zugriff"], true, "{v}");
+
+    // Nur lesen: kein Schreibweg des Moduls Material steht in der Routenliste.
+    for (m, pfad, body) in [
+        (
+            "PATCH",
+            format!("{material}/{frei}"),
+            Some(json!({"br_id": sportplatz})),
+        ),
+        (
+            "PATCH",
+            format!("{material}/{lichtmast}"),
+            Some(json!({"br_id": null})),
+        ),
+        (
+            "PATCH",
+            format!("{material}/{lichtmast}"),
+            Some(json!({"status": "defekt"})),
+        ),
+        (
+            "POST",
+            format!("{material}/{lichtmast}/aufteilen"),
+            Some(json!({"menge": 1})),
+        ),
+        ("POST", format!("{material}/{lichtmast}/entlassen"), None),
+        (
+            "POST",
+            material.clone(),
+            Some(json!({"adhoc": {"bezeichnung": "Funkgerät"}, "br_id": sportplatz})),
+        ),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+    let (_, v) = anfrage(&app, "GET", &material, &admin, None).await;
+    let lm = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == lichtmast)
+        .unwrap();
+    assert_eq!(lm["br_id"], sportplatz, "nicht gelöst: {lm}");
+    assert_eq!(lm["status"], "einsatzbereit", "{lm}");
+
+    // Ein anderes Gerät (UHS-Tablet) liest die Materialliste nicht.
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS 1").await;
+    let (_, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "uhs-tablet", "stelle_id": uhs, "bezeichnung": "Tablet"}),
+    )
+    .await;
+    let tablet = koppeln(&app, &code, None).await.cookie.unwrap();
+    let (s, _) = anfrage(&app, "GET", &material, &tablet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "UHS-Tablet");
+}
+
 /// LLH-1383 design.md D11: eine Nachforderung mit Ziel = eigener Raum bleibt der Führung. Das
 /// BR-Gerät liest sie nicht, meldet ihr Eintreffen nicht und übernimmt sie nicht als Einheit; das
 /// Eintreffen am Raum bucht es weiter über „Eintreffen buchen“.

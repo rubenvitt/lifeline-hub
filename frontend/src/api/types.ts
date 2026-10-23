@@ -43,6 +43,8 @@ export type EinsatzRolle = S['EinsatzRolle'];
 export type Einsatzart = S['Einsatzart'];
 /** Aktive lagebezogene Kennzahl am Einsatz (LFH-640) — Auslöser eines Lageplatzes im Lage-Dashboard. */
 export type Lagekennzahl = S['Lagekennzahl'];
+/** Antwort der Wahl der Lagekennzahlen (LLH-1371, `PUT …/lagekennzahl-wahl`). */
+export type LagekennzahlWahl = S['LagekennzahlWahl'];
 export type EinsatzAnzeige = S['EinsatzAnzeige'];
 export type MitgliedAnzeige = S['MitgliedAnzeige'];
 export type MitgliedAuswahl = S['MitgliedAuswahl'];
@@ -1177,6 +1179,9 @@ export interface NeuerAuftrag {
   absicht?: string;
   lage?: string;
   ort?: string;
+  /** Koordinate des Ziels (LLH-1114), nur als Paar und nur neben `ort`. */
+  ort_lat?: number;
+  ort_lon?: number;
   zeit?: string;
   mittel?: string;
   verbindung?: string;
@@ -1206,6 +1211,9 @@ export type AuftragPatch = {
   prioritaet?: AuftragPrioritaet;
   /** 'YYYY-MM-DD HH:MM' (UTC); `null` entfernt die Frist. */
   frist_at?: string | null;
+  /** Koordinate des Ziels (LLH-1114): nur als Paar; `null` entfernt sie, ein leeres Ziel auch. */
+  ort_lat?: number | null;
+  ort_lon?: number | null;
 } & Partial<Record<AuftragSchemafeld, string | null>>;
 
 /** Kein Backend-Schema: Body von `POST …/auftraege/{aid}/aufheben` (LLH-1098), FE-lokal. */
@@ -1274,6 +1282,8 @@ export interface MeldungKorrekturPatch {
   einheit_id?: number | null;
   abschnitt_id?: number | null;
   empfaenger?: string | null;
+  /** Empfängerfunktion aus dem Katalog wie beim Erfassen (LLH-1381); `null` leert. */
+  empfaenger_funktion?: Fuehrungsfunktion | null;
   /** `true` übernimmt in die Lage, `false` nimmt aus der Lage (nicht bei einer Lagemeldung). */
   lagerelevant?: boolean;
   /** Leer oder `null`: der Wortlaut gilt. */

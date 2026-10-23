@@ -39,7 +39,9 @@ Für Einsatzleitung und Führungspersonal:
 
 1. In der Übersicht „Neu“ wählen, oder im Seitenkopf eines Raums den Namen öffnen und „+ Neuer BR“
    wählen.
-2. „Bezeichnung“ eingeben, bei Bedarf „Standort (optional)“ und „Notiz (optional)“.
+2. „Bezeichnung“ eingeben, bei Bedarf „Standort (optional)“ und „Notiz (optional)“. Den Standort
+   mit Enter oder „Ort suchen“ suchen und einen Treffer wählen, dann ist der Raum gleich verortet;
+   ohne Treffer bleibt er freier Text.
 
    ![Seitenleiste „Bereitstellungsraum anlegen“ mit Bezeichnung „BR Süd“, Standort und Notiz](../bilder/bereitstellungsraeume/anlegen.png)
 
@@ -53,6 +55,7 @@ Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv i
 1. Den Raum öffnen und bei „Raumdaten“ „Bearbeiten“ wählen.
 2. Im Dialog „Bereitstellungsraum bearbeiten“ „Bezeichnung“, „Standort (optional)“ oder
    „Notiz (optional)“ ändern. Ein geleertes Feld löscht die Angabe; die Bezeichnung bleibt Pflicht.
+   Eine Korrektur am Text des Standorts behält den Punkt, ein neuer Treffer versetzt ihn.
 
    ![Dialog „Bereitstellungsraum bearbeiten“ mit Bezeichnung „Parkplatz Stadion Nord“, Standort und Notiz](../bilder/bereitstellungsraeume/bearbeiten.png)
 
@@ -259,7 +262,9 @@ dem Zeitpunkt von „Eintreffen melden“; die Zeitachse jeder Einheit nennt das
 Das Einsatztagebuch bekommt keinen Eintrag je Einheit, sondern einen für die ganze Übernahme, etwa
 „Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2), im BR Nord eingetroffen“. Am
 gekoppelten Gerät des Raums stehen Nachforderungen nicht; dort bucht „Eintreffen buchen“, was
-ankommt.
+ankommt. Wird die Übernahme einer Einheit storniert, bucht die App ihren Austritt; der Verlauf
+des Raums zeigt Eintritt und Austritt, bei einer angelegten Einheit mit der Notiz „Einheit
+aufgelöst“, bei einer verknüpften mit „Übernahme storniert“.
 
 ### Was ein Abruf schreibt
 

@@ -46,6 +46,8 @@ Für Einsatzleitung und Führungspersonal:
 1. „Material disponieren“ wählen.
 2. Unter „Material“ einen Posten wählen und bei einem Verbrauchsgut die „Menge“ eingeben. Bei
    einem Gerät steht die Menge fest auf 1, mit dem Hinweis „Ein Gerät steht je Stück im Einsatz“.
+   Ein Gerät mit Bestandsnummer, das schon im Einsatz steht, ist gesperrt und trägt den Zusatz
+   „schon im Einsatz“.
 3. Unter „Ort“ eine Einheit, ein Fahrzeug, eine UHS oder einen Bereitstellungsraum wählen, oder
    „ohne Ort“ stehen lassen.
 
@@ -186,7 +188,8 @@ Für Einsatzleitung und Führungspersonal, wenn ein Posten den Einsatz verlässt
 
    ![Aufgeklappter Block „Aus dem Einsatz genommen (1)“ unter der Materialliste mit einem Posten, seiner Menge, dem Zeitpunkt und dem Knopf „Erneut disponieren“](../bilder/material/aus-dem-einsatz.png)
 
-4. Kommt der Posten zurück, „Erneut disponieren“ wählen.
+4. Kommt der Posten zurück, „Erneut disponieren“ wählen. Ein Gerät mit Bestandsnummer, das
+   inzwischen wieder disponiert ist, kommt so nicht zurück: die Meldung nennt den Grund.
 
 ### Eine Fehldisposition stornieren
 
@@ -208,7 +211,9 @@ auf den Posten über; eine spätere Änderung am Stamm ändert disponierte Poste
 Ad-hoc-Posten bekommt die Art aus dem Dialog und wechselt sie über das Zeilenmenü.
 
 - **Gerät:** steht je Stück im Einsatz, mit Menge 1 und einem der fünf Status. Wer zwei Tragen
-  braucht, disponiert sie zweimal.
+  braucht, disponiert sie zweimal. Ein Gerät mit Bestandsnummer ist ein bestimmtes Stück und
+  steht höchstens einmal im Einsatz; erst wenn es aus dem Einsatz genommen ist, lässt es sich
+  wieder disponieren.
 - **Verbrauchsgut:** steht mit seiner Menge im Einsatz und kennt nur einsatzbereit, im Einsatz und
   defekt. Was davon ausgegeben ist, zeigt die Mengenzelle als Rest, etwa „30 von 50 übrig“;
   ohne Ausgabe steht nur die Menge. Ist
@@ -224,19 +229,25 @@ auf demselben Weg gespeichert.
 ### Material an Einheit, Fahrzeug, UHS und Bereitstellungsraum
 
 Jeder Ort zeigt sein Material selbst, mit Menge, Status und der Zahl der Posten: die Seite einer
-Einheit im Paneel „Material“, die Fahrzeugliste im Aufklapper unter „Beladung“, eine UHS im Bereich
+Einheit im Paneel „Material“, die Fahrzeugliste unter „Details“ im Block „Beladung“, eine UHS im Bereich
 „Material“ (die Zahl steht auch im Kopf der UHS) und ein Bereitstellungsraum in der Sektion „Material“ (Kapitel [Einheiten](einheiten.md),
 [Fahrzeuge und FMS](fahrzeuge.md), [Unfallhilfsstellen](unfallhilfsstellen.md),
 [Bereitstellungsräume](bereitstellungsraeume.md)). Dort holt „Material zuordnen …“ Posten ohne
 Ort und Posten von einem anderen Ort her, der Knopf zum Lösen („Aus Einheit lösen“, „Vom Fahrzeug
 lösen“, „Lösen“) setzt den Posten auf „ohne Ort“, und „Ausgeben“ öffnet denselben Dialog wie in der
-Liste. Die Statusanzeige eines Postens setzt den Status wie die Spalte „Status“ der Liste, mit
+Liste. Liegt kein Posten am Ort, steht dort nur „Kein Material“ (am Fahrzeug „Keine Beladung“).
+Gibt es nichts, was „Material zuordnen …“ herholen könnte, ist die Auswahl gesperrt; daneben steht
+„Kein anderes Material“, wenn alles laufende Material schon an diesem Ort liegt, und „Kein
+Material im Einsatz“, wenn es noch keines gibt, jeweils mit dem Sprung in die Materialliste. Die
+Statusanzeige eines Postens setzt den Status wie die Spalte „Status“ der Liste, mit
 denselben Status je Art. „Material erfassen“ legt Ad-hoc-Material an und ordnet es in einem
 Schritt diesem Ort zu. Jeder dieser Wege speichert genauso wie die Liste. An einer UHS meldet
 „Fehlmenge melden“ fehlendes Material als Nachforderung (Kapitel
 [Nachforderungen](nachforderung.md)). Zuordnen, Erfassen, Status, Lösen und Ausgeben verlangen Schreibrecht im Einsatz und die Freigabe des Moduls Material; das
 Recht auf das Modul des Orts, etwa Einheiten, genügt dafür nicht. Einheit und UHS zeigen ihr
-Material auch ohne diese Freigabe, Fahrzeugliste und Bereitstellungsraum nicht.
+Material auch ohne diese Freigabe, Fahrzeugliste und Bereitstellungsraum nicht. Das Tablet eines
+Bereitstellungsraums zeigt das Material seines Raums nur an (Kapitel [Bereitstellungsraum am
+Gerät](geraet-bereitstellungsraum.md)), ein UHS-Laptop das seiner UHS.
 
 Endet ein Ort, bleibt der Posten im Einsatz:
 
