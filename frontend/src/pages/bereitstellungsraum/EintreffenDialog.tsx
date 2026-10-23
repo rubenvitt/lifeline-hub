@@ -374,7 +374,7 @@ export default function EintreffenDialog({
   };
 
   const nachgefordertZeile = ({ zeile, ziel }: (typeof nachgefordert)[number]) => {
-    const hinweise = nachgefordertHinweise(zeile, formatZeitKurz);
+    const hinweise = nachgefordertHinweise(zeile, zeitKurz);
     if (ziel.art === 'vorgemerkt') hinweise.unshift('vorgemerkt');
     return (
       <ListenEintrag
