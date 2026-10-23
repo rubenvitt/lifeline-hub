@@ -12,6 +12,7 @@ import { legeLageberichtAn } from '../api/lageberichte';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
@@ -64,6 +65,7 @@ import {
   baueSprechgruppenplan,
   fehlendText,
   sprechgruppenplanLeerText,
+  type Herkunft,
   type SprechgruppenZeile,
   type TeilnehmerAngabe,
 } from '../stab/sprechgruppenplan';
@@ -281,6 +283,17 @@ function TeilnehmerZelle({ angabe }: { angabe: TeilnehmerAngabe }) {
  * Kennung und Hinweis brechen um, statt die Summe zu sprengen. Im Druck neutralisiert
  * `druck/druck.css` die Breiten (A4 ohne Überhang, `e2e/funkplan-druck.spec.ts`).
  */
+const BETRIEBSART_WERTE = (['TMO', 'DMO'] as const).map((b) => ({ text: b, value: b }));
+const HERKUNFT_WERTE = (Object.keys(HERKUNFT_LABEL) as Herkunft[]).map((h) => ({
+  text: HERKUNFT_LABEL[h],
+  value: h,
+}));
+
+/**
+ * Sortieren und Filtern (LLH-1096, Muster der Schadenliste): jede Spalte mit vergleichbarem Wert
+ * sortiert, die Betriebsart (in „Bedingung“) und die Herkunft filtern. Ohne Sortierung gilt die
+ * Folge des Plans (TMO vor DMO, `sprechgruppenOrdnung.ts`).
+ */
 function sprechgruppenSpalten() {
   return spaltenFuer<SprechgruppenZeile>()([
     {
@@ -288,6 +301,7 @@ function sprechgruppenSpalten() {
       key: 'sprechgruppe' as SprechgruppenSpalteKey,
       width: 200,
       immerSichtbar: true,
+      sortWert: (z) => z.bezeichnung,
       render: (_t, z) => (
         <span style={{ overflowWrap: 'anywhere' }}>
           <Mono>{z.bezeichnung}</Mono>
@@ -300,6 +314,8 @@ function sprechgruppenSpalten() {
       title: 'Bedingung',
       key: 'bedingung' as SprechgruppenSpalteKey,
       width: 160,
+      sortWert: (z) => z.bedingung,
+      filter: { werte: BETRIEBSART_WERTE, trifft: (z, w) => z.betriebsart === w },
       render: (_t, z) => (
         <span style={{ overflowWrap: 'anywhere' }}>
           <Mono>{z.bedingung}</Mono>
@@ -310,6 +326,7 @@ function sprechgruppenSpalten() {
       title: 'Hinweis',
       key: 'hinweis' as SprechgruppenSpalteKey,
       width: 160,
+      sortWert: (z) => z.hinweis,
       render: (_t, z) =>
         z.hinweis ? <span style={{ overflowWrap: 'anywhere' }}>{z.hinweis}</span> : <Leer />,
     },
@@ -317,15 +334,66 @@ function sprechgruppenSpalten() {
       title: 'Herkunft',
       key: 'herkunft' as SprechgruppenSpalteKey,
       width: 110,
+      sortWert: (z) => HERKUNFT_LABEL[z.herkunft],
+      filter: { werte: HERKUNFT_WERTE, trifft: (z, w) => z.herkunft === w },
       render: (_t, z) => HERKUNFT_LABEL[z.herkunft],
     },
     {
       title: 'Teilnehmer',
       key: 'teilnehmer' as SprechgruppenSpalteKey,
       mindestBreite: 300,
+      // Nach ihrer Zahl; ohne Strukturquelle ist sie unbekannt und steht hinten.
+      sortWert: (z) => (z.teilnehmer.art === 'unbekannt' ? null : z.teilnehmer.teilnehmer.length),
       render: (_t, z) => <TeilnehmerZelle angabe={z.teilnehmer} />,
     },
   ]);
+}
+
+/**
+ * Die Darstellung „Sprechgruppen“ samt Listengedächtnis (LLH-1096, `components/listenGedaechtnis.ts`):
+ * Sortierung und Kopffilter stehen in der Adresse. Der Hook steht hier und nicht in der Seite, weil
+ * nur diese Darstellung eine flache Liste ist; in Tabelle und Skizze schriebe er sonst einen
+ * gemerkten Stand in die Adresse, der dort nichts bedeutet. Die Spalten hängen an keinen Daten.
+ */
+function SprechgruppenSicht({
+  einsatzId,
+  spalten,
+  daten,
+  ladend,
+  leerText,
+}: {
+  einsatzId: number;
+  spalten: ReturnType<typeof sprechgruppenSpalten>;
+  daten: readonly SprechgruppenZeile[];
+  ladend: boolean;
+  leerText: ReactNode;
+}) {
+  const gedaechtnis = useListenGedaechtnis<SprechgruppenSpalteKey>('sprechgruppen', spalten, {
+    einsatzId,
+  });
+  return (
+    // Flach und schreibgeschützt, Vergleichsfläche wie die Tabelle („wer funkt auf 311?“).
+    // Zwei Sichten in einer Datei: der `key` trennt ihren Zustand (`datensicht.guard`).
+    <Datensicht
+      key="sprechgruppen"
+      bezeichnung="Sprechgruppen"
+      form="tabelle"
+      spalten={spalten}
+      daten={daten}
+      zeilenSchluessel="key"
+      ladend={ladend}
+      leerText={leerText}
+      mehrzahl="Sprechgruppen"
+      gedaechtnis={gedaechtnis}
+      // Die Sprechgruppe hat keine eigene Seite: zugeordnet wird an Führungsstelle,
+      // Abschnitt und Einheit, dorthin führen die Teilnehmer.
+      karte={{
+        art: 'plan',
+        titel: { spalte: 'sprechgruppe' },
+        sekundaer: ['bedingung', 'herkunft', 'teilnehmer'],
+      }}
+    />
+  );
 }
 
 /** Höchstens so viele Betroffene je Lücke, danach „+n weitere". */
@@ -1060,15 +1128,10 @@ export default function FunkplanPage() {
               onHalten={onSkizzeHaelt}
             />
           ) : ansicht === 'sprechgruppen' ? (
-            // Flach und schreibgeschützt, Vergleichsfläche wie die Tabelle („wer funkt auf 311?“).
-            // Zwei Sichten in einer Datei: der `key` trennt ihren Zustand (`datensicht.guard`).
-            <Datensicht
-              key="sprechgruppen"
-              bezeichnung="Sprechgruppen"
-              form="tabelle"
+            <SprechgruppenSicht
+              einsatzId={einsatzId}
               spalten={sgSpalten}
               daten={sprechgruppenplan}
-              zeilenSchluessel="key"
               ladend={
                 quellen.abschnitte.zustand === 'laden' ||
                 quellen.einheiten.zustand === 'laden' ||
@@ -1076,15 +1139,16 @@ export default function FunkplanPage() {
                 quellen.fuehrungsstelle.zustand === 'laden'
               }
               leerText={sprechgruppenplanLeerText(quellen)}
-              // Die Sprechgruppe hat keine eigene Seite: zugeordnet wird an Führungsstelle,
-              // Abschnitt und Einheit, dorthin führen die Teilnehmer.
-              karte={{
-                art: 'plan',
-                titel: { spalte: 'sprechgruppe' },
-                sekundaer: ['bedingung', 'herkunft', 'teilnehmer'],
-              }}
             />
           ) : (
+            /*
+             * Weder Sortierung noch Kopffilter (LLH-1096, Ausnahme wie das Meldebild): die Tabelle
+             * ist ein Baum der Führungsorganisation (Führungsstelle → Abschnitt → Einheit →
+             * Fahrzeug), und im Baummodus verbietet `Datensicht` beides. Die Folge IST die
+             * Aussage (wer wem untersteht, auf welchem Kanal), ein Filter rissen Kinder aus ihrer
+             * Elternzeile. Vergleichen nach Betriebsart und Herkunft geht in „Sprechgruppen“;
+             * Stellen ohne Sprechgruppe nennt das Lücken-Paneel.
+             */
             <Datensicht
               key="funkplan"
               bezeichnung="Funkplan"

@@ -20,6 +20,7 @@ import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
 import { ladeStab } from '../api/stab';
 import { ApiError } from '../api/client';
 import { freigabenFixture } from '../test/fixtures';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 import type {
   Einheit,
   EinsatzAnzeige,
@@ -1091,6 +1092,34 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     expect(await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Sprechgruppen' })).toBeNull();
+  });
+
+  /**
+   * Sortieren und Filtern im Spaltenkopf (LLH-1096): die flache Kanalbelegung ist eine
+   * Vergleichstabelle („wer funkt auf 311?“) und folgt dem Muster der Schadenliste. Die
+   * Funkplan-Tabelle selbst ist ein Baum und bleibt ohne (Kommentar an der Sicht).
+   */
+  it('Sortieren und Filtern ändern die Menge und die Adresse (LLH-1096)', async () => {
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
+    const folge = () =>
+      [...plan().querySelectorAll('tr[data-row-key^="sg-"]')].map((z) =>
+        z.getAttribute('data-row-key'),
+      );
+    await waitFor(() => expect(folge()).toEqual(['sg-1', 'sg-2', 'sg-9']));
+    expect(screen.getByRole('button', { name: /^Herkunft filtern/ })).toBeInTheDocument();
+
+    await kopfFilterWaehlen('Bedingung', ['DMO (2)']);
+    await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9']));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?f.bedingung=DMO'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await waitFor(() => expect(folge()).toHaveLength(3));
+
+    await userEvent.click(within(plan()).getByRole('columnheader', { name: /^Sprechgruppe/ }));
+    await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9', 'sg-1']));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche')).toHaveTextContent('?sort=sprechgruppe%3Aauf'),
+    );
   });
 });
 

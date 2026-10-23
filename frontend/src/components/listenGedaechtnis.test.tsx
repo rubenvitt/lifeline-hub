@@ -82,6 +82,47 @@ describe('bereinigeListenZustand (LLH-1086)', () => {
   });
 });
 
+describe('bereinigeListenZustand · Spalten aus den Daten (LLH-1096)', () => {
+  it('lässt Filter und Sortierung einer Spalte stehen, deren Werte erst mit den Daten kommen', () => {
+    expect(
+      bereinigeListenZustand(
+        {
+          sortierung: { spalte: 'traeger', richtung: 'ab' },
+          filter: { traeger: ['ASB', ''], fremd: ['x'] },
+          suche: '',
+        },
+        SPALTEN,
+        VORGABE,
+        new Set(['traeger']),
+      ),
+    ).toEqual({
+      sortierung: { spalte: 'traeger', richtung: 'ab' },
+      filter: { traeger: ['ASB'] },
+      suche: '',
+    });
+  });
+
+  it('der Hook reicht `ausDaten` durch', () => {
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={['/s?f.traeger=ASB&sort=traeger:auf']}>{children}</MemoryRouter>
+    );
+    const hook = renderHook(
+      () =>
+        useListenGedaechtnis('fahrzeuge', SPALTEN, {
+          vorgabe: VORGABE,
+          einsatzId: 7,
+          ausDaten: ['traeger'],
+        }),
+      { wrapper },
+    );
+    expect(hook.result.current.start).toEqual({
+      sortierung: { spalte: 'traeger', richtung: 'auf' },
+      filter: { traeger: ['ASB'] },
+      suche: '',
+    });
+  });
+});
+
 describe('useListenGedaechtnis (LLH-1086)', () => {
   it('liest den Stand aus der Adresse', () => {
     const { hook } = aufbauen('/s?sort=ausmass:auf&f.typ=sturm&q=Deich');
@@ -133,9 +174,13 @@ describe('useListenGedaechtnis (LLH-1086)', () => {
     });
   });
 
-  it('ein kaputter Spaltenspeicher gilt als leer', () => {
+  it('ein kaputter Spaltenspeicher gilt als nicht gemerkt', () => {
     localStorage.setItem('lfh:spalten:schaeden', '{kaputt');
-    expect(aufbauen('/s').hook.result.current.spaltenStart).toEqual({ aus: [], an: [] });
+    expect(aufbauen('/s').hook.result.current.spaltenStart).toBeNull();
+  });
+
+  it('ohne gemerkte Wahl ist die Spaltenwahl offen, damit die Voreinstellung der Seite gilt (LLH-1096)', () => {
+    expect(aufbauen('/s').hook.result.current.spaltenStart).toBeNull();
   });
 
   it('jeder Ausgang räumt die gemerkten Listenstände, fremde Sitzungswerte bleiben', () => {

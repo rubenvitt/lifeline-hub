@@ -24,6 +24,16 @@ gefiltert „<Spalte> filtern, gefiltert“. Die gefilterte Kopfzelle MUST eine 
 - **WHEN** auf den Kopf „Ort“ geklickt wird
 - **THEN** stehen die Schäden nach Ort aufsteigend
 
+### Requirement: Baum ohne Sortieren und Filtern
+Eine Sicht im Baummodus (Meldebild, Funkplan, Kommunikationsplan) MUST NOT sortieren oder filtern:
+ihre Folge ist die Aussage, und die Aggregate der Elternzeilen lögen, fiele eine Zeile weg. Die
+Ausnahme MUST als Kommentar an der Sicht stehen; eine flache Darstellung derselben Daten (die
+Sprechgruppen des Funkplans) folgt dem Muster.
+
+#### Scenario: Funkplan und Sprechgruppen
+- **WHEN** im Fernmeldewesen der Reiter „Funkplan“ und danach „Sprechgruppen“ gewählt wird
+- **THEN** trägt die Funkplan-Tabelle keinen Sortier- oder Filterauslöser, die Sprechgruppen filtern im Kopf „Bedingung“ nach TMO und DMO
+
 ### Requirement: Kartenzweig zeigt dieselbe Menge
 Unterhalb der Breite `md` SHALL die Sicht dieselbe Menge zeigen wie die Tabelle. Sie MUST die
 Filter als Auswahlfelder und die Sortierung über ein Auswahlfeld „Sortieren“ anbieten.
@@ -62,6 +72,14 @@ gemerkt werden.
 #### Scenario: Rückweg über das Modulmenü
 - **WHEN** die Schadenliste ohne Parameter erneut geöffnet wird, nachdem in dieser Sitzung gefiltert wurde
 - **THEN** steht der gemerkte Filter da und auch in der Adresse
+
+#### Scenario: Voreinstellung ohne gemerkte Spaltenwahl
+- **WHEN** die Personalliste auf einem Gerät geöffnet wird, das für sie noch keine Spaltenwahl gemerkt hat
+- **THEN** sind die voreingestellt ausgeblendeten Spalten „Träger“, „Ruhe“ und „Bemerkung“ ausgeblendet
+
+#### Scenario: Filter auf Werte aus den Daten
+- **WHEN** die Adresse `…/fahrzeuge?f.traeger=ASB` neu geladen wird, bevor die Fahrzeuge geladen sind
+- **THEN** bleibt der Filter stehen und zeigt nach dem Laden nur die Fahrzeuge des ASB
 
 ### Requirement: Servermodus filtert nicht doppelt
 Im Servermodus SHALL die Sicht Kopffilter, Suche und Sortierung an die Seite melden und MUST NOT

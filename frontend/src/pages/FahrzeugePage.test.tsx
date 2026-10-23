@@ -12,6 +12,7 @@ import FahrzeugePage from './FahrzeugePage';
 import type { EinsatzAnzeige } from '../api/types';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { listeVon, oeffne, waehle } from '../test/auswahlListe';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; dass die Systemrolle
 // fürs Schreiben nicht zählt, deckt schreibrecht.test.ts ab.
@@ -84,6 +85,7 @@ function render(
     benutzer?: ReturnType<typeof benutzerFixture>;
     weitereRouten?: ReactNode;
     material?: unknown[];
+    route?: string;
   } = {},
 ) {
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
@@ -107,12 +109,23 @@ function render(
     http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
-      {optionen.weitereRouten}
-    </Routes>,
-    { route: '/einsaetze/7/fahrzeuge' },
+    <>
+      <Ortsfuehler />
+      <Routes>
+        <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
+        {optionen.weitereRouten}
+      </Routes>
+    </>,
+    { route: optionen.route ?? '/einsaetze/7/fahrzeuge' },
   );
+}
+
+/** Die aktuelle Adresse, wie der Router sie hält (LLH-1096). */
+const ort = { aktuell: '' };
+function Ortsfuehler() {
+  const l = useLocation();
+  ort.aktuell = `${l.pathname}${l.search}`;
+  return null;
 }
 
 /**
@@ -2066,5 +2079,53 @@ describe('FahrzeugePage · Beladung im Aufklapper (LLH-1225 Teil II, design.md D
     // Unter md ist der Bereich als Region nach seinem Auslöser benannt (LFH-697).
     const bereich = screen.getByRole('region', { name: 'Details zu Florian 1' });
     expect(await within(bereich).findByText('Stromerzeuger')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096, Rollout des Musters aus LLH-1086): jede
+ * vergleichbare Spalte sortiert, Status, Abschnitt, Träger und Typ filtern, und der Stand steht in
+ * der Adresse.
+ */
+describe('FahrzeugePage · Sortieren und Filtern (LLH-1096)', () => {
+  const zweites = {
+    ...ef,
+    id: 11,
+    fahrzeug_id: 2,
+    funkrufname: 'Florian 2',
+    kennzeichen: 'AA-ZZ 9',
+    fahrzeugtyp: 'MTW',
+    traegerorganisation: 'ASB',
+  };
+  const erstes = { ...ef, traegerorganisation: 'DRK' };
+  const reihenfolge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1600);
+    render(einsatz(), [], [erstes, zweites]);
+    await screen.findByText('Florian 2');
+    expect(reihenfolge()).toEqual(['10', '11']);
+
+    await kopfFilterWaehlen('Träger', ['ASB (1)']);
+    await waitFor(() => expect(reihenfolge()).toEqual(['11']));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge?f.traeger=ASB'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Kennzeichen/ }));
+    await waitFor(() => expect(reihenfolge()).toEqual(['11', '10']));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge?sort=kennzeichen%3Aauf'));
+  });
+
+  it('eine Adresse mit Filter und Sortierung zeigt dieselbe Liste', async () => {
+    setzeViewportBreite(1600);
+    render(einsatz(), [], [erstes, zweites], [], [], {
+      route: '/einsaetze/7/fahrzeuge?f.typ=LF+20&sort=traeger:ab',
+    });
+    await screen.findByText('Florian 1');
+    expect(screen.queryByText('Florian 2')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Filter Typ: LF 20 entfernen' })).toBeInTheDocument();
   });
 });

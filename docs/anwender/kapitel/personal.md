@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 320
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
@@ -27,11 +27,19 @@ Führungspersonal.
    der Folge des Kräftebaums; eine unterstellte Einheit trägt ihren Pfad, etwa „Zug 1 › Staffel A“.
    Über der Tabelle steht je Gruppe die Zahl der Personen, etwa „1 nicht eingeteilt · 4
    Rettungsstaffel“; auf dem Handy trägt jede Gruppe einen Kopf über ihren Karten. In „Name,
-   Funktion“ suchen oder unter „Status“ eine Kategorie wählen.
+   Funktion“ suchen, oder im Kopf der Spalten „Position“, „Status“, „Träger“ und „Abschnitt“
+   filtern: das Trichterzeichen öffnet die Werte zum Ankreuzen, „OK“ übernimmt sie. Ein Klick auf
+   einen Spaltenkopf sortiert innerhalb der Einheiten nach dieser Spalte, ein zweiter kehrt die
+   Folge um. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der Treffer und je
+   Wert ein Knopf, etwa „Position: Mannschaft“, der genau diesen Filter entfernt; „Filter
+   zurücksetzen“ leert Suche und Filter. Auf dem Handy stehen Filter und „Sortieren“ als
+   Auswahlfelder über der Liste.
 
    ![Personalliste mit der Gruppenzeile „1 nicht eingeteilt · 2 Sanitätszug Musterstadt · 4 Rettungsstaffel …“; je Person Name, Funktion, Einheit, Fahrzeug, Position als Kürzel, Status und Einsatzdauer, zuerst die nicht eingeteilte Ad-hoc-Kraft Tim Neu](../bilder/personal/personal.png)
 
-3. Unter „Spalten“ die ausgeblendeten Spalten „Träger“, „Ruhe“ und „Bemerkung“ einblenden.
+3. Unter „Spalten“ die ausgeblendeten Spalten „Träger“, „Ruhe“ und „Bemerkung“ einblenden; unter
+   1600 px Fensterbreite auch „Abschnitt“. Gefiltert wird nur nach Spalten, die in der Liste
+   stehen. Der Abschnitt ist der der Einheit, sonst der ihrer nächsten Über-Einheit mit Abschnitt.
 
 ### Personal aus dem Stamm disponieren
 
@@ -255,6 +263,13 @@ altem und neuem Wert, etwa „Person «Anna Probe»: Funktion «—» → «Spre
 einer Einheit, einem Fahrzeug oder einer UHS und ihre Freigabe stehen dort ebenfalls, ebenso
 berichtigte Angaben einer Ad-hoc-Person mit altem und neuem Wert. Position und Bemerkung ändern es
 nicht.
+
+### Filter und Sortierung bleiben stehen
+
+Suche, Filter und Sortierung stehen in der Adresse der Seite. Zurück aus der Ansicht einer Person, Neuladen und ein
+weitergegebener Link zeigen dieselbe Liste. Wer die Liste später über das Modulpanel wieder öffnet,
+findet die Einschränkung vom letzten Mal, bis zur Abmeldung. Welche Spalten ausgeblendet sind,
+merkt sich das Gerät.
 
 ### Rechte und ohne Netz
 

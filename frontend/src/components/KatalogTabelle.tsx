@@ -655,10 +655,10 @@ export default function KatalogTabelle<T extends object>({
   // ── Spaltenschalter ───────────────────────────────────────────────────────────────
   // Zählung und Schalter kommen aus `SpaltenSchalter.tsx`; hier wohnt nur der Zustand.
   const [spaltenAus, setSpaltenAusRoh] = useState<readonly string[]>(
-    () => gedaechtnis?.spaltenStart.aus ?? [],
+    () => gedaechtnis?.spaltenStart?.aus ?? [],
   );
   const [spaltenAn, setSpaltenAnRoh] = useState<readonly string[]>(
-    () => gedaechtnis?.spaltenStart.an ?? [],
+    () => gedaechtnis?.spaltenStart?.an ?? [],
   );
   const meldeSpalten = gedaechtnis?.meldeSpalten;
   const setSpaltenAus = useCallback(

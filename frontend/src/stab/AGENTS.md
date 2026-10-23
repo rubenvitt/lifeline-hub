@@ -121,7 +121,9 @@ Netzes kommt dorthin, nie in eine Seite), Druckform außerhalb des Sichtbereichs
 `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
 `stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen` (dazu externe Stellen mit Status und
 Komponenten der Skizze, LFH-893): zugeordnete plus einsatzlokale
-Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Spalte „Bedingung“ statt „Betriebsart“
+Sprechgruppen, nach `id` entdoppelt, TMO vor DMO; im Spaltenkopf sortier- und filterbar (Betriebsart
+in „Bedingung“, Herkunft), Stand in der Adresse über `SprechgruppenSicht` (LLH-1096). Die
+Funkplan-Tabelle und der Kommunikationsplan sind Bäume und bleiben ohne Sortieren und Filtern. Spalte „Bedingung“ statt „Betriebsart“
 (LFH-1030), Summe der festen Breiten bleibt 630. Die eigene Führungsstelle ist erster Teilnehmer
 ihrer Sprechgruppen und Strukturquelle (LFH-1018). Fehlt eine Strukturquelle, steht „—“ bzw.
 „unvollständig“ mit Grund, nie „keine“. Eigene `key` je `Datensicht` (zwei Sichten in einer Datei).

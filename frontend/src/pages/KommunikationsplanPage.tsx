@@ -696,6 +696,14 @@ export default function KommunikationsplanPage() {
           </div>
         )}
 
+        {/*
+          Weder Sortierung noch Kopffilter (LLH-1096, Ausnahme wie Meldebild und Funkplan): der Plan
+          ist ein Baum aus vier Gruppen, und im Baummodus verbietet `Datensicht` beides. Die Gruppen
+          SIND die Achse Stellenart (Einsatzleitung und Stab, externe Stellen, Abschnitte,
+          Einheiten), eine leere Gruppe nennt ihren Grund; zugeklappt wird statt gefiltert. Ein
+          Filter nach Verbindungsmittel risse Stellen aus ihrer Gruppe, und den Grund einer leeren
+          Gruppe sähe man nicht mehr.
+        */}
         <Datensicht
           bezeichnung="Kommunikationsplan"
           form="tabelle"
