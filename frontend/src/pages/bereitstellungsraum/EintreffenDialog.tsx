@@ -268,9 +268,16 @@ export default function EintreffenDialog({
     onClose();
   }
 
-  function bucheTreffer(t: EintreffenTreffer, nachher?: () => void) {
+  /** Bucht eine bekannte Kraft; mit `nachforderungId` trägt sie den Verweis (LLH-1396). */
+  function bucheTreffer(t: EintreffenTreffer, nachher?: () => void, nachforderungId?: number) {
     buchung.mutate(
-      { daten: kraftEingabe(t), name: t.name },
+      {
+        daten: {
+          ...kraftEingabe(t),
+          ...(nachforderungId != null ? { nachforderung_id: nachforderungId } : {}),
+        },
+        name: t.name,
+      },
       {
         onSuccess: () => {
           nachher?.();
@@ -322,6 +329,11 @@ export default function EintreffenDialog({
       ? findDoppelbuchung(funkrufname, { einheiten, fahrzeuge, kandidaten: alle, vorgemerkt })
       : null;
   const serverDoppel = schritt === 'neu' && isDoppelbuchung(buchung.error);
+  // Aus einer Nachforderung trägt „Diese buchen“ den Verweis mit (LLH-1396); ein Fahrzeug ohne
+  // Einheit lässt sich nicht verknüpfen (Server 422), es geht sichtbar ohne Verweis.
+  const doppelVerweis =
+    herkunft != null && doppel?.treffer?.art === 'einheit' ? herkunft.nachforderungId : undefined;
+  const doppelOhneVerweis = herkunft != null && doppel?.treffer?.art === 'fahrzeug';
   const bemerkung = Form.useWatch('bemerkung', form) as string | undefined;
   const weitere = (Form.useWatch('weitere', form) ?? []) as UnangemeldetFormular['weitere'];
   const weitereNamen = (weitere ?? []).map((w) => w?.funkrufname?.trim()).filter(Boolean);
@@ -640,9 +652,16 @@ export default function EintreffenDialog({
             // Unter dem Titel statt daneben: bei 390 px drückte die Knopfreihe den Titel auf null.
             description={
               <Space size="middle" wrap>
+                {doppelOhneVerweis && (
+                  <Typography.Text type="secondary">
+                    Fahrzeug ohne Einheit: ohne Verweis auf die Nachforderung
+                  </Typography.Text>
+                )}
                 {doppel?.treffer && (
                   <Button
-                    onClick={() => bucheTreffer(doppel.treffer!, () => form.resetFields())}
+                    onClick={() =>
+                      bucheTreffer(doppel.treffer!, () => form.resetFields(), doppelVerweis)
+                    }
                     loading={buchung.isPending && buchung.variables?.daten.kraft != null}
                   >
                     Diese buchen

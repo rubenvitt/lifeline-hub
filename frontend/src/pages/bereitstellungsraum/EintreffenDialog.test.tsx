@@ -252,6 +252,35 @@ describe('EintreffenDialog — Aus Nachforderungen (LLH-1387, design.md D6)', ()
     expect(screen.getByRole('button', { name: 'Unangemeldet buchen' })).toBeInTheDocument();
   });
 
+  it('„Diese buchen“ nach der Doppelbuchungs-Warnung behält den Verweis (LLH-1396)', async () => {
+    erwartetMit(() => HttpResponse.json([NACHFORDERUNG]));
+    const { onClose } = zeige();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eintreffen 83-2' }));
+    const feld = await screen.findByRole('textbox', { name: 'Funkrufname' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'fl-mus 1-44-1');
+    expect(await screen.findByText('Schon im Einsatz: FL-MUS 1-44-1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Diese buchen' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(koerper).toEqual([
+      { kraft: { objekt_typ: 'einheit', objekt_id: 30 }, nachforderung_id: 4 },
+    ]);
+  });
+
+  it('ein Fahrzeug ohne Einheit bucht „Diese buchen“ ohne Verweis und sagt es (LLH-1396)', async () => {
+    erwartetMit(() => HttpResponse.json([{ ...NACHFORDERUNG, rufnamen: ['RTW 2'], offen: 1 }]));
+    const { onClose } = zeige();
+    const gruppe = await screen.findByRole('region', { name: 'Aus Nachforderungen' });
+    await userEvent.click(within(gruppe).getByRole('button', { name: 'Eintreffen RTW 2' }));
+    expect(await screen.findByText('Schon im Einsatz: RTW 2')).toBeInTheDocument();
+    expect(
+      within(dialog()).getByText(/Fahrzeug ohne Einheit: ohne Verweis auf die Nachforderung/),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Diese buchen' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(koerper).toEqual([{ kraft: { objekt_typ: 'fahrzeug', objekt_id: 6 } }]);
+  });
+
   it('ohne Freigabe Nachforderungen (403) fehlt die Gruppe still', async () => {
     erwartetMit(() => HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }));
     zeige();
