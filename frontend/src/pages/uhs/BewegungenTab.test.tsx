@@ -7,6 +7,7 @@ import { renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
 import type { UhsDetail } from '../../api/types';
 import BewegungenTab from './BewegungenTab';
+import { kopfFilterWaehlen } from '../../test/kopfFilter';
 
 const uhs = {
   einsatz_id: 1,
@@ -52,7 +53,7 @@ describe('BewegungenTab (LFH-25)', () => {
   it('setzt die Zeit in die Zahlenschrift', async () => {
     server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])));
     renderMitProviders(<BewegungenTab uhs={uhs} />, { route: '/einsaetze/1/unfallhilfsstellen/3' });
-    const zeit = await screen.findByText(/JUN2026$/);
+    const zeit = await screen.findByText(/jun26$/);
     expect(zeit.style.fontFamily).toContain('JetBrains Mono');
     expect(zeit.style.fontVariantNumeric).toBe('tabular-nums');
   });
@@ -163,12 +164,12 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
   });
 
-  it('filtert die Bewegungsarten über die Werkzeugzeile auf die ZEILENMENGE', async () => {
+  it('filtert die Bewegungsarten über den Spaltenkopf auf die ZEILENMENGE', async () => {
     const { container } = await rendereDrei();
     expect(zeilenSchluessel(container)).toHaveLength(3);
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Art' }));
-    await userEvent.click(await screen.findByTitle('Austritt'));
+    // Der Filter sitzt im Spaltenkopf (LLH-1086), mit Zähler je Wert.
+    await kopfFilterWaehlen('Art', [/^Austritt \(\d+\)$/]);
 
     /**
      * Gemessen wird nur die Zeilenmenge: `getByText('Austritt')` erfüllte schon das Etikett des
@@ -282,7 +283,8 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
     });
 
     expect(suchfeld()).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Art' })).toBeInTheDocument();
+    // Der Artfilter sitzt im Spaltenkopf (LLH-1086), der auch leer steht.
+    expect(screen.getByRole('button', { name: 'Art filtern' })).toBeInTheDocument();
     expect(await screen.findByText('Keine Bewegungen erfasst')).toBeInTheDocument();
     expect(suchfeld()).toBeInTheDocument();
   });

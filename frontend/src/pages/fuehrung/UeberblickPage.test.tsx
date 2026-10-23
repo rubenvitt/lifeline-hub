@@ -515,7 +515,7 @@ describe('UeberblickPage', () => {
       return el!;
     });
     expect(rueck).toHaveTextContent('Verbau hält');
-    const uhr = dayjs.utc(zeit).local().format('HH:mm');
+    const uhr = dayjs.utc(zeit).local().format('HHmm');
     expect(rueck).toHaveTextContent(uhr);
     // Die Zeit trägt im Linknamen ihre Bedeutung, nicht als nackte Uhrzeit.
     expect(zeile).toHaveAccessibleName(new RegExp(`Letzte Rückmeldung:\\s*${uhr}\\s+Verbau hält`));
@@ -1066,6 +1066,11 @@ describe('UeberblickPage', () => {
     const auftraege = paneel('Offene Aufträge');
     expect(within(auftraege).getByText('wird abgerufen')).toBeInTheDocument();
     expect(auftraege.querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
+    // Das Meta „keine überfällig“ hält im Laden unsichtbar seinen Platz: auf 390 px bricht der
+    // Kopf mit ihm um (79 → 94 px), und erst mit den Daten schöbe das alles darunter (LLH-1053).
+    const metaPlatz = auftraege.querySelector('[data-lfh="paneel-meta-platzhalter"]');
+    expect(metaPlatz).toHaveTextContent('keine überfällig');
+    expect(metaPlatz).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('Körper erst mit dem Einsatz: davor weder Band noch Paneele noch Rechtehinweis (LFH-629)', async () => {

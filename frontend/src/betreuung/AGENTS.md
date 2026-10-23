@@ -90,7 +90,11 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   der EP; Ausgabe verweist nur per Kennung (`nachforderung_id`, `verpflegungsstelle_id`, Empfänger
   `einheit_id` oder `abschnitt_id`); Einstufung im Client (`verpflegung/deckung.ts`); ins ETB nur
   Zeitfenster und Bedarf (Org-Zeitzone), dazu Art und Stellen des Zeitfensters und
-  Inbetriebnahme/Auflösung einer Stelle; kein Modulzähler.
+  Inbetriebnahme/Auflösung einer Stelle; kein Modulzähler. Ein Zeitfenster wird in seiner Karte
+  bearbeitet (LLH-1139, `verpflegung/ZeitfensterBearbeiten.tsx`, `frontend/AGENTS.md`, „Bearbeiten
+  in der Ansicht“): „Bedarf bearbeiten“ ohne Modal, dieselben Felder wie beim Anlegen, nur
+  geänderte Schlüssel über `zeitfensterPatch` gegen den Stand beim Öffnen, eine offene Karte je
+  Seite; `ZeitfensterDialog` legt nur an. Der PATCH hat keinen CAS (kein 409).
   **Verpflegungsstellen** (LLH-1040, `src/verpflegung/stelle.rs`): Status wie BR
   (`geplant → aktiv → aufgeloest`, Storno nur geplant ohne Ausgabe und ohne laufende
   Gerätekopplung, sonst 409 „Gerät gekoppelt“ und „Stornieren“ gesperrt mit Grund, LLH-1048), Zuordnung zum Zeitfenster

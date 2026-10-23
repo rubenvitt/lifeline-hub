@@ -2479,7 +2479,7 @@ export interface components {
              */
             rueckmeldung_frist_min?: number | null;
             standard_modul?: string | null;
-            zeitformat?: components["schemas"]["Zeitformat"] | null;
+            zeitdarstellung?: components["schemas"]["Zeitdarstellung"] | null;
             zeitzone?: string | null;
         };
         /**
@@ -4748,7 +4748,7 @@ export interface components {
              * @description Skelett-Frist in Tagen ab Abschluss (LFH-750); fehlt = das Skelett bleibt unbegrenzt.
              */
             skelett_dauer_tage?: number | null;
-            zeitformat?: components["schemas"]["Zeitformat"] | null;
+            zeitdarstellung?: components["schemas"]["Zeitdarstellung"] | null;
             zeitzone?: string | null;
         };
         /**
@@ -4776,7 +4776,7 @@ export interface components {
              * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
              */
             rueckmeldung_frist_min?: number | null;
-            zeitformat?: components["schemas"]["Zeitformat"] | null;
+            zeitdarstellung?: components["schemas"]["Zeitdarstellung"] | null;
             zeitzone?: string | null;
         };
         /**
@@ -6886,6 +6886,14 @@ export interface components {
          * @enum {string}
          */
         ZeitachseQuelle: "status" | "einheit" | "abloesung" | "nachtrag" | "disposition" | "bereitstellungsraum";
+        /**
+         * @description Zeitdarstellung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitdarstellung`.
+         *     `None` am Einsatz bzw. an der Organisation heißt Vorgabe, also taktisch; am Gerät kann
+         *     man sie übersteuern, der Druck nie (LLH-1053, Spec `zeitdarstellung`). Löst das tote
+         *     24h/12h-„Zeitformat" ab (Migration `zeitdarstellung`).
+         * @enum {string}
+         */
+        Zeitdarstellung: "taktisch" | "datum_uhrzeit";
         /** @description Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen). */
         ZeitfensterAnzeige: {
             angelegt_at: string;
@@ -6927,12 +6935,6 @@ export interface components {
             /** @description Beginn, UTC ohne Zonenkennung. */
             von_at: string;
         };
-        /**
-         * @description Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`
-         *     (per-Variante, `rename_all` trifft die Ziffern-Kürzel nicht).
-         * @enum {string}
-         */
-        Zeitformat: "24h" | "12h";
         /**
          * @description Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
          *     `admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren

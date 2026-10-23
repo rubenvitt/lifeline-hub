@@ -544,7 +544,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     await userEvent.click(knopf);
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text;
-    expect(text).toMatch(/- Einsatzleiter: KBM Weber \(extern\) \(seit 11\d{4}OKT2026\)/);
+    expect(text).toMatch(/- Einsatzleiter: KBM Weber \(extern\) \(seit 11\d{4}okt26\)/);
   });
 
   it('sperrt die Übernahme, solange die Führungsstelle lädt', async () => {
@@ -569,7 +569,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     await userEvent.click(knopf);
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
     const eingabe = vi.mocked(legeLageberichtAn).mock.calls[0][1];
-    expect(eingabe.titel).toMatch(/^Führungsorganisation 01\d{4}JAN2026$/);
+    expect(eingabe.titel).toMatch(/^Führungsorganisation 01\d{4}jan26$/);
   });
 
   it('schreibt einen gescheiterten Stababruf in den Bericht', async () => {

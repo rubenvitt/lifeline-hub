@@ -29,7 +29,7 @@ import { adminFixture, authWertFixture, benutzerFixture } from '../../test/fixtu
 const VOLL = {
   org_id: 1,
   zeitzone: 'Europe/Berlin',
-  zeitformat: '12h',
+  zeitdarstellung: 'datum_uhrzeit',
   einheiten: 'imperial',
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
@@ -70,7 +70,7 @@ describe('EinsatzDefaults', () => {
       expect(speichereOrgEinstellungen).toHaveBeenCalledWith({
         // Anzeige-Spalten NICHT genullt (aus geladenen Daten gemerged):
         zeitzone: 'Europe/Berlin',
-        zeitformat: '12h',
+        zeitdarstellung: 'datum_uhrzeit',
         einheiten: 'imperial',
         koordinatenformat: 'mgrs',
         geocoder_url: 'https://geo.example',

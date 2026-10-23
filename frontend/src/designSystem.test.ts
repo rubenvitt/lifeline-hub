@@ -16,6 +16,7 @@ import {
   cutBullet,
   cutSection,
   DESIGN_SYSTEM_COMMAND,
+  README_RULES,
   README_SECTIONS,
 } from '../scripts/design-system/readme';
 import {
@@ -196,13 +197,23 @@ describe('README des Design Systems', () => {
       '- **Gestaltungsregel**: bleibt.',
       '',
     ].join('\n'),
-  ).join('\n');
+  )
+    .concat(
+      README_RULES.map(({ head }) => `- **${head}** (X-1): Regel aus einem anderen Abschnitt.`),
+    )
+    .join('\n');
   const readme = buildReadme(agents, [], []);
 
   it('trägt die Gestaltungsregeln, nicht den Ablauf der Entwürfe', () => {
     expect(readme).toContain('**Gestaltungsregel**');
     expect(readme).not.toContain(prozessRegel);
     expect(readme).not.toContain('Veröffentlichen nach dem Merge');
+  });
+
+  it('trägt die einzelnen Regeln aus anderen Abschnitten (Zeitdarstellung, LLH-1053)', () => {
+    expect(README_RULES.map((r) => r.head)).toContain('Zeitdarstellung');
+    expect(readme).toContain('## Zeitdarstellung');
+    expect(readme).toContain('- **Zeitdarstellung** (X-1): Regel aus einem anderen Abschnitt.');
   });
 
   it('nennt den Befehl mit mise', () => {

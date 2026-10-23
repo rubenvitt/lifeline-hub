@@ -140,6 +140,42 @@ laufende Übernahme MUST NOT eine zurückgenommene Nachforderung mit Posten hint
 - **WHEN** an einer eingetroffenen Nachforderung ohne Posten „Rückgängig“ gewählt wird
 - **THEN** steht sie wieder auf „Unterwegs“
 
+### Requirement: Vorhandenen Posten zuordnen
+
+Das System SHALL einen aktiven Posten ohne Verweis nachträglich mit einer eingetroffenen
+Nachforderung desselben Einsatzes verknüpfen können, über einen eigenen Schreibweg; der PATCH
+eines Postens MUST einen Verweis weiterhin ignorieren (LLH-1259). Die Verknüpfung MUST dieselben
+Prüfungen wie die Übernahme anwenden: 403 ohne Freigabe der Nachforderungen vor jedem Lesen, 404
+für eine fremde oder unbekannte Nachforderung, 422 für eine nicht eingetroffene und 409 ohne
+„ergänzen“, wenn sie schon einen zählenden Posten trägt. Ein unbekannter oder fremder Posten MUST
+mit 404, ein stornierter oder aus dem Einsatz genommener mit 409 und ein Posten, der schon auf eine
+Nachforderung verweist, mit 409 abgelehnt werden. Verweis und genau ein ETB-Eintrag MUST in einer
+Transaktion entstehen; Menge, Ort, Art und Status des Postens MUST unverändert bleiben. Danach
+MUST der Posten wie ein übernommener zählen, auch für die Rücknahmesperre, und das System MUST
+die Live-Ereignisse `material` und `nachforderung` senden.
+
+#### Scenario: Von Hand erfasste Feldbetten
+- **WHEN** 20 Feldbetten schon als Posten im Einsatz stehen und die Einsatzleitung sie der eingetroffenen Nachforderung „20 Feldbetten für die Notunterkunft“ zuordnet
+- **THEN** verweist der Posten auf die Nachforderung, ihre Karte zählt ihn, und das ETB enthält „Material «Feldbetten» (×20) mit Nachforderung «20 Feldbetten für die Notunterkunft» verknüpft“
+- **AND** die Rücknahme von „Eingetroffen“ auf „Unterwegs“ antwortet mit 422
+
+#### Scenario: Posten schon zugeordnet
+- **WHEN** ein Posten, der schon auf eine Nachforderung verweist, einer anderen zugeordnet werden soll
+- **THEN** antwortet der Server mit 409, und beide Nachforderungen bleiben unverändert
+
+### Requirement: Zuordnen an der eingetroffenen Nachforderung
+
+Die Oberfläche SHALL an jeder eingetroffenen Nachforderung ohne übernommene Einheit neben der
+Übernahme „Erfassten Posten zuordnen …“ anbieten, nur mit Schreibrecht im Einsatz und bei
+freigegebenem Modul Material. Der Dialog MUST nur aktive Posten ohne Verweis anbieten, je Posten
+Bezeichnung, Menge und Ort, solche mit der Art der Nachforderung in der Bezeichnung zuerst. Trägt
+die Nachforderung schon einen Posten, MUST der Knopf „Als weiteren Posten zuordnen“ heißen.
+Antwortet der Server mit 409, MUST der Dialog offen bleiben und den Grund nennen.
+
+#### Scenario: Kein freier Posten
+- **WHEN** jeder Posten des Einsatzes schon auf eine Nachforderung verweist
+- **THEN** nennt der Dialog „Kein Posten ohne Nachforderung im Einsatz“, und „Zuordnen“ ist gesperrt
+
 ### Requirement: Bezug über den Lebenszyklus des Postens
 
 Ein beim Aufteilen entstehender Posten MUST den Verweis auf die Nachforderung übernehmen. Ein

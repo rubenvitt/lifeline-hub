@@ -114,15 +114,15 @@ describe('PersonVerlauf', () => {
   it('rendert den Zeitstempel taktisch (DTG), nicht als Wire-String', () => {
     const { container } = renderVerlauf(person);
     const text = container.textContent ?? '';
-    // Taktische DTG „270930MAI2026" — Tag+Uhrzeit, dt. Monatskürzel, Jahr.
-    expect(text).toMatch(/\d{6}MAI2026/);
+    // Taktische DTG „270930mai26" — Tag+Uhrzeit, dt. Monatskürzel, Jahr.
+    expect(text).toMatch(/\d{6}mai26/);
     expect(text).not.toContain('2026-05-27');
   });
 
   it('stellt den Zeitstempel VOR den Eintrag', () => {
     const { container } = renderVerlauf(person);
     const erste = container.querySelector('li')?.textContent ?? '';
-    expect(erste).toMatch(/^\d{6}MAI2026/);
+    expect(erste).toMatch(/^\d{6}mai26/);
   });
 
   it('zeigt bei leerem Verlauf „noch kein Verlauf"', () => {
@@ -230,8 +230,8 @@ describe('PersonVerlauf — PAT-Kern (Change y18v58dt-pat-kern)', () => {
 
   it('kennzeichnet aufgehobene Maßnahmen und Verletzungen', () => {
     const z = zeilen(kern);
-    expect(z[2]).toMatch(/aufgehoben \d{6}MAI2026/);
-    expect(z[3]).toMatch(/aufgehoben \d{6}MAI2026/);
+    expect(z[2]).toMatch(/aufgehoben \d{6}mai26/);
+    expect(z[3]).toMatch(/aufgehoben \d{6}mai26/);
     expect(z[4]).not.toMatch(/aufgehoben/);
     expect(z[5]).not.toMatch(/aufgehoben/);
   });

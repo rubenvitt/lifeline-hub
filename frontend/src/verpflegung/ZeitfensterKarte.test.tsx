@@ -44,7 +44,7 @@ function zeige(
     darfSchreiben: true,
     nachforderungenFrei: true,
     onAusgabeNachtragen: vi.fn(),
-    onBearbeiten: vi.fn(),
+    onBedarfSpeichern: vi.fn().mockResolvedValue(undefined),
     onNachfordern: vi.fn(),
     onLoeschen: vi.fn(),
     onZuruecknehmen: vi.fn(),
@@ -270,7 +270,7 @@ describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
       ausgegeben: { gesamt: 250, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
       fehlmenge: { gesamt: 0, sonderkost: KEINE_SONDERKOST },
     });
-    const { props } = zeige(zf, { jetzt: VORBEI, onBearbeiten: undefined });
+    const { props } = zeige(zf, { jetzt: VORBEI, onBedarfSpeichern: undefined });
     expect(screen.queryByRole('link', { name: /^Ausgabe öffnen/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: `Ausgabe nachtragen zu ${kennung}` }));
     expect(props.onAusgabeNachtragen).toHaveBeenCalledWith(zf);
@@ -312,7 +312,7 @@ describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
       {
         nachforderungenFrei: false,
         nachschub: 'melden',
-        onBearbeiten: undefined,
+        onBedarfSpeichern: undefined,
         onLoeschen: undefined,
       },
       true,
@@ -389,7 +389,7 @@ describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
     zeige(zf, {
       nachforderungenFrei: false,
       nachschub: 'melden',
-      onBearbeiten: undefined,
+      onBedarfSpeichern: undefined,
       onLoeschen: undefined,
       onNachfordern,
     });
@@ -408,7 +408,7 @@ describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
       {
         nachforderungenFrei: false,
         nachschub: 'melden',
-        onBearbeiten: undefined,
+        onBedarfSpeichern: undefined,
         onLoeschen: undefined,
       },
     );

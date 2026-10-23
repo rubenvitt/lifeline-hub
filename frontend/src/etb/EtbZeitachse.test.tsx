@@ -93,8 +93,8 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(within(z).getByText('Lage erkundet')).toBeInTheDocument();
     expect(within(z).getByText('Max')).toBeInTheDocument();
     expect(within(z).getByText('Funk')).toBeInTheDocument();
-    // Uhrzeit als HH:MM (Anzeigezone), nicht als Wire-String.
-    expect(within(z).getByText(/^\d{2}:\d{2}$/)).toBeInTheDocument();
+    // Uhrzeit taktisch als HHMM (Anzeigezone, LLH-1053), nicht als Wire-String.
+    expect(within(z).getByText(/^\d{4}$/)).toBeInTheDocument();
   });
 
   it('setzt den Funktions-Snapshot hinter den Verfasser (LFH-615)', () => {
@@ -139,14 +139,14 @@ describe('EtbZeitachse – der Eintrag', () => {
     ).toBeInTheDocument();
   });
 
-  it('beschriftet einen Nachtrag mit „nachgetragen um HH:MM" — das ⧖ ist Zierde', () => {
+  it('beschriftet einen Nachtrag mit „nachgetragen um HHMM" — das ⧖ ist Zierde', () => {
     const { container } = renderZeitachse({
       eintraege: [
         eintrag({ ereigniszeit: '2026-05-23 09:00:00', received_at: '2026-05-23 10:00:00' }),
       ],
     });
     const z = zeileVon(container, 'eintrag-1');
-    expect(z).toHaveTextContent(/nachgetragen um \d{2}:\d{2}/);
+    expect(z).toHaveTextContent(/nachgetragen um \d{4}/);
     // Das Zeichen steht, aber für Vorleser verborgen: die Aussage trägt das Wort.
     const glyphe = within(z).getByText('⧖', { exact: false });
     expect(glyphe.closest('[aria-hidden="true"]')).not.toBeNull();

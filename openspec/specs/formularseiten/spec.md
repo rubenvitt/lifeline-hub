@@ -2,7 +2,9 @@
 
 ## Purpose
 Formularseiten in Verwaltung und Einstellungen speichern über genau einen sichtbaren Weg, melden
-nur, was wirklich gespeichert wurde, und verlieren keine Eingabe still beim Verlassen.
+nur, was wirklich gespeichert wurde, und verlieren keine Eingabe still beim Verlassen. Ansichten
+eines Datensatzes werden an Ort und Stelle bearbeitet, mit höchstens einer offenen Bearbeitung je
+Seite (LLH-1139).
 
 ## Requirements
 
@@ -87,3 +89,47 @@ bestehen bleiben, weil die neue Eingabe nicht gespeichert ist.
 #### Scenario: Eingabe während des Speicherns
 - **WHEN** ein Speichern läuft, die Person ein weiteres Feld ändert und das Speichern danach gelingt
 - **THEN** fragt die Seite beim Verlassen weiterhin nach
+
+### Requirement: Eine offene Bearbeitung je Ansicht
+Eine Ansicht, deren Angaben paneelweise oder als Ganzes bearbeitet werden, SHALL höchstens eine
+offene Bearbeitung zugleich zulassen (ein Paneel oder die ganze Ansicht; ein Einzelfeld mit
+geändertem Entwurf zählt mit). Solange eine Bearbeitung offen ist, MUST jedes andere „Bearbeiten“
+der Seite gesperrt sein und den Grund „Erst „<Titel>“ speichern oder abbrechen“ sichtbar am Element
+tragen. Speichern MUST nur die geänderten Felder senden; ohne Änderung MUST kein Speicheraufruf
+erfolgen. Hat sich der Datensatz seit dem Öffnen geändert (409), MUST die Seite nachfragen und
+„Meine Änderung übernehmen“ und „Verwerfen und neu laden“ anbieten. Eine offene Bearbeitung mit
+Änderung MUST die Rückfrage vor dem Verlassen auslösen; eine offene Bearbeitung ohne Änderung
+MUST NOT nachfragen. Für eine solche Ansicht gilt „Ein Speicherweg je Formularseite“ nicht: ein
+Paneel mit eigenem Speichern ist kein zweiter Speicherweg.
+
+#### Scenario: Nur ein Paneel offen
+- **WHEN** in einer Ansicht das Paneel „Funk“ im Bearbeiten-Zustand steht
+- **THEN** ist „Bearbeiten“ am Paneel „Telefon“ gesperrt mit „Erst „Funk“ speichern oder abbrechen“, und nach „Abbrechen“ an „Funk“ ist es wieder bedienbar
+
+#### Scenario: PATCH nur geänderter Felder
+- **WHEN** im Paneel „Funk“ nur der Kanal von 41 auf 42 geändert und gespeichert wird
+- **THEN** enthält der Aufruf nur den Kanal, und das Paneel zeigt danach wieder seine Werte
+
+#### Scenario: Ohne Änderung kein Aufruf
+- **WHEN** ein Paneel geöffnet und ohne Änderung gespeichert wird
+- **THEN** geht kein Speicheraufruf raus, und das Paneel schließt
+
+#### Scenario: Konflikt
+- **WHEN** jemand anderes den Datensatz nach dem Öffnen gespeichert hat und das Speichern mit 409 abgelehnt wird
+- **THEN** fragt die Seite „Zwischenzeitlich geändert“; „Meine Änderung übernehmen“ sendet die eigene Änderung ohne Basisstand, „Verwerfen und neu laden“ schließt das Paneel und lädt den Datensatz neu
+
+#### Scenario: Verlassen-Schutz im Paneel
+- **WHEN** im offenen Paneel ein Feld geändert ist und jemand einen Link auf eine andere Seite wählt
+- **THEN** erscheint die Rückfrage, und nach „Bleiben“ steht die Eingabe unverändert im Feld
+
+#### Scenario: Offenes Paneel ohne Änderung
+- **WHEN** ein Paneel geöffnet, aber nichts geändert ist und jemand die Seite verlässt
+- **THEN** wechselt die Seite ohne Rückfrage
+
+#### Scenario: Enter speichert
+- **WHEN** im offenen Paneel ein Feld geändert und Enter gedrückt wird
+- **THEN** wird die Änderung gespeichert
+
+#### Scenario: Escape bricht ab
+- **WHEN** im offenen Paneel Escape gedrückt wird
+- **THEN** schließt das Paneel ohne zu senden, und der Fokus steht wieder auf „Bearbeiten“

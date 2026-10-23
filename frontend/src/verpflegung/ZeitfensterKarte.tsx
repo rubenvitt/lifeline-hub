@@ -1,13 +1,17 @@
 import { Button, Collapse, Flex, Tag, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
+import { useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type {
+  ModulFreigaben,
   VerpflegungAusgabe,
   VerpflegungEmpfaenger,
   Verpflegungsstelle,
   VerpflegungZeitfenster,
+  ZeitfensterPatch,
 } from '../api/types';
 import { MenueAusloeser } from '../components/MenueAusloeser';
+import { useOffeneBearbeitungGrund } from '../components/offeneBearbeitung';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
 import {
@@ -23,6 +27,7 @@ import type { VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
 import EmpfaengerStand from './EmpfaengerStand';
+import ZeitfensterBearbeiten from './ZeitfensterBearbeiten';
 import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
 import { LEERE_EMPFAENGER, empfaengerText, verpflegungsstand } from './empfaengerKern';
 import { stellenName, zeilenJeStelle } from './stellenKern';
@@ -53,7 +58,14 @@ export interface ZeitfensterKarteProps {
   nachforderungName?: (id: number) => string | undefined;
   /** „Ausgabe nachtragen“: das Formular mit Zeitpunkt, Ort und Bemerkung (LLH-1032, D8). */
   onAusgabeNachtragen?: (zf: VerpflegungZeitfenster) => void;
-  onBearbeiten?: (zf: VerpflegungZeitfenster) => void;
+  /**
+   * „Bedarf bearbeiten“ an der Karte (LLH-1139): schaltet die Karte in den Bearbeiten-Zustand und
+   * speichert nur die geänderten Felder. Lehnt bei Ablehnung ab (`mutateAsync`), der Grund steht
+   * an der Karte. Ohne: keine Aktion „Bedarf bearbeiten“ (Gerät, ohne Planungsrecht).
+   */
+  onBedarfSpeichern?: (zf: VerpflegungZeitfenster, patch: ZeitfensterPatch) => Promise<unknown>;
+  /** `freigabenQuery.data` für die Bedarfsvorschläge beim Bearbeiten. */
+  freigaben?: ModulFreigaben;
   onNachfordern?: (zf: VerpflegungZeitfenster) => void;
   /**
    * Weg des Nachschubs bei Fehlmenge: „Nachfordern" (Vorgabe, braucht das Modul Nachforderungen)
@@ -87,6 +99,8 @@ interface Aktion {
   key: Aktionsschluessel;
   label: string;
   danger?: boolean;
+  /** Kurzgrund, warum die Aktion gerade nicht geht (eine andere Bearbeitung ist offen). */
+  gesperrt?: string;
 }
 
 /**
@@ -114,6 +128,12 @@ interface Aktion {
  * Schirms ein Sprung „Ausgabe öffnen“ mit `?stelle=` in die Ausgabeansicht, unter denselben
  * Bedingungen wie der Sprung der Karte. Ausgaben an einer Stelle nennen die Stelle statt des Orts.
  *
+ * Bearbeiten in der Ansicht (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten in der Ansicht“): „Bedarf
+ * bearbeiten“ öffnet kein Modal, die Karte selbst wird zur Eingabe (`ZeitfensterBearbeiten`): der
+ * Kopf bleibt, Kennzahlen, Ausgaben und Aktionen weichen den Feldern mit Speichern/Abbrechen
+ * darunter. Höchstens eine Karte der Seite ist offen (Merker der Seite); an den übrigen steht
+ * „Bedarf bearbeiten“ gesperrt mit Grund.
+ *
  * Empfänger (LLH-1055 Teil II): jede Ausgabe nennt ihren Empfänger („an 2. Gruppe“, „Zuführung
  * Deich“). Die Klappe „Einheiten“ nennt im Kopf, wie viele noch nicht verpflegt, ohne Eintreffen
  * und verpflegt sind, und zeigt aufgeklappt `EmpfaengerStand` ohne Wahlknöpfe (gewählt wird in
@@ -126,7 +146,8 @@ export default function ZeitfensterKarte({
   nachforderungenFrei,
   nachforderungName,
   onAusgabeNachtragen,
-  onBearbeiten,
+  onBedarfSpeichern,
+  freigaben,
   onNachfordern,
   nachschub = 'nachfordern',
   onLoeschen,
@@ -144,13 +165,36 @@ export default function ZeitfensterKarte({
   const kante = stufe === 'offen' ? rollen.linie : rollenFarbe(darstellung.rolle, token);
   const kennung = zeitfensterKennung(zf, konventionen);
   const kostformen = belegteKostformen(zf.bedarf.sonderkost, zf.ausgegeben.sonderkost);
+  const [bearbeiten, setBearbeiten] = useState(false);
+  // Grund, solange eine ANDERE Bearbeitung der Seite offen ist (die eigene blendet die Aktionen aus).
+  const bearbeitenGesperrt = useOffeneBearbeitungGrund();
+  const sperrGrundId = useId();
+  const aktionenRef = useRef<HTMLDivElement>(null);
+  // Ziel der Fokusrückgabe: „Bedarf bearbeiten“ oder, gebündelt, der Menüauslöser — erst nach dem
+  // Schließen wieder im Baum, deshalb beim Lesen gesucht.
+  const ausloeserRef = useMemo<RefObject<HTMLElement | null>>(
+    () => ({
+      get current() {
+        return (
+          aktionenRef.current?.querySelector<HTMLElement>(
+            '[data-aktion="bearbeiten"], [aria-label^="Aktionen zu"]',
+          ) ?? null
+        );
+      },
+    }),
+    [],
+  );
 
   // ── Aktionen, gezählt NACH der Rechteprüfung ──────────────────────────────────────────
   const hatGueltigeAusgabe = zf.ausgaben.some((a) => a.zurueckgenommen_at == null);
   const aktionen: Aktion[] = darfSchreiben
     ? ([
         onAusgabeNachtragen && { key: 'nachtragen', label: 'Ausgabe nachtragen' },
-        onBearbeiten && { key: 'bearbeiten', label: 'Bedarf bearbeiten' },
+        onBedarfSpeichern && {
+          key: 'bearbeiten',
+          label: 'Bedarf bearbeiten',
+          gesperrt: bearbeitenGesperrt,
+        },
         onNachfordern &&
           (nachschub === 'melden' || nachforderungenFrei) &&
           nachforderungsAnzahl(zf) > 0 && {
@@ -185,7 +229,7 @@ export default function ZeitfensterKarte({
   const gebuendelt = aktionen.length >= 3;
   const fuehreAus = (key: Aktionsschluessel) => {
     if (key === 'nachtragen') onAusgabeNachtragen?.(zf);
-    if (key === 'bearbeiten') onBearbeiten?.(zf);
+    if (key === 'bearbeiten') setBearbeiten(true);
     if (key === 'nachfordern') onNachfordern?.(zf);
     if (key === 'loeschen') onLoeschen?.(zf);
   };
@@ -229,269 +273,310 @@ export default function ZeitfensterKarte({
         <StatusTag darstellung={darstellung} />
       </Flex>
 
-      <Kennzahlenband beschriftung={`Deckung ${kennung}`}>
-        <Kennzahl
-          titel="Bedarf"
-          wert={zf.bedarf.gesamt}
-          einheit="EP"
-          groesse="klein"
-          aufgliederung={{
-            titel: 'Bedarf nach Personengruppe',
-            segmente: [
-              { label: 'Kräfte', wert: zf.bedarf.kraefte, farbe: rollen.text2 },
-              { label: 'Betreute', wert: zf.bedarf.betreute, farbe: rollen.gedaempft },
-              { label: 'weitere', wert: zf.bedarf.weitere, farbe: rollen.linieStark },
-            ],
-          }}
-        />
-        <Kennzahl titel="ausgegeben" wert={zf.ausgegeben.gesamt} einheit="EP" groesse="klein" />
-        <Kennzahl
-          titel="fehlt"
-          wert={zf.fehlmenge.gesamt}
-          einheit="EP"
-          groesse="klein"
-          ton={FEHLT_TON[stufe]}
-        />
-      </Kennzahlenband>
-
-      {jeStelle.length > 0 && (
-        <ul
-          aria-label={`Ausgegeben je Stelle zu ${kennung}`}
-          data-lfh="verpflegung-je-stelle"
-          style={{
-            listStyle: 'none',
-            margin: 0,
-            paddingBlock: token.paddingXS,
-            paddingInline: token.padding,
-          }}
-        >
-          {jeStelle.map((z) => {
-            const waehlbar =
-              z.stelleId != null &&
-              stellen.some((s) => s.id === z.stelleId && s.status !== 'aufgeloest');
-            return (
-              <li
-                key={z.stelleId ?? 'ohne'}
-                data-stelle={z.stelleId ?? undefined}
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  columnGap: token.marginSM,
-                  rowGap: token.marginXXS,
-                  paddingBlock: 2,
-                }}
-              >
-                <span data-lfh="je-stelle-text" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-                  {z.bezeichnung}
-                  {z.kennzeichen.map((k) => (
-                    <span key={k} style={{ color: rollen.text2 }}>
-                      {' · '}
-                      {k}
-                    </span>
-                  ))}
-                  {' · '}
-                  <span style={monoStil(13, 500)}>{z.ausgegeben} EP</span>
-                </span>
-                {sprungJeStelle && waehlbar && (
-                  <SprungKnopf
-                    to={pfade.verpflegungAusgabe(zf.einsatz_id, zf.id, { stelle: z.stelleId! })}
-                    zugaenglicherName={`Ausgabe öffnen an ${z.bezeichnung} zu ${kennung}`}
-                  >
-                    Ausgabe öffnen
-                  </SprungKnopf>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {kostformen.length > 0 && (
+      {bearbeiten && onBedarfSpeichern ? (
         <div
-          data-lfh="verpflegung-sonderkost"
-          style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
+          data-lfh="verpflegung-bearbeiten"
+          style={{ paddingInline: token.padding, borderBlockStart: `1px solid ${rollen.flaeche2}` }}
         >
-          <Augenbraue>Sonderkost</Augenbraue>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {kostformen.map((k) => {
-              const fehlt = zf.fehlmenge.sonderkost[k];
-              return (
-                <li
-                  key={k}
-                  data-kostform={k}
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    columnGap: token.marginSM,
-                    alignItems: 'baseline',
-                    paddingBlock: 2,
-                  }}
-                >
-                  <span style={{ minWidth: '12ch' }}>{KOSTFORM_LABEL[k]}</span>
-                  <span style={{ ...monoStil(12), color: rollen.text2 }}>
-                    Bedarf {zf.bedarf.sonderkost[k]} · ausgegeben {zf.ausgegeben.sonderkost[k]}
-                  </span>
-                  <span
-                    data-lfh="sonderkost-fehlt"
+          <ZeitfensterBearbeiten
+            zeitfenster={zf}
+            freigaben={freigaben}
+            jetzt={jetzt}
+            stellen={stellen}
+            onSpeichern={(patch) => onBedarfSpeichern(zf, patch)}
+            onSchliessen={() => setBearbeiten(false)}
+            ausloeserRef={ausloeserRef}
+          />
+        </div>
+      ) : (
+        <>
+          <Kennzahlenband beschriftung={`Deckung ${kennung}`}>
+            <Kennzahl
+              titel="Bedarf"
+              wert={zf.bedarf.gesamt}
+              einheit="EP"
+              groesse="klein"
+              aufgliederung={{
+                titel: 'Bedarf nach Personengruppe',
+                segmente: [
+                  { label: 'Kräfte', wert: zf.bedarf.kraefte, farbe: rollen.text2 },
+                  { label: 'Betreute', wert: zf.bedarf.betreute, farbe: rollen.gedaempft },
+                  { label: 'weitere', wert: zf.bedarf.weitere, farbe: rollen.linieStark },
+                ],
+              }}
+            />
+            <Kennzahl titel="ausgegeben" wert={zf.ausgegeben.gesamt} einheit="EP" groesse="klein" />
+            <Kennzahl
+              titel="fehlt"
+              wert={zf.fehlmenge.gesamt}
+              einheit="EP"
+              groesse="klein"
+              ton={FEHLT_TON[stufe]}
+            />
+          </Kennzahlenband>
+
+          {jeStelle.length > 0 && (
+            <ul
+              aria-label={`Ausgegeben je Stelle zu ${kennung}`}
+              data-lfh="verpflegung-je-stelle"
+              style={{
+                listStyle: 'none',
+                margin: 0,
+                paddingBlock: token.paddingXS,
+                paddingInline: token.padding,
+              }}
+            >
+              {jeStelle.map((z) => {
+                const waehlbar =
+                  z.stelleId != null &&
+                  stellen.some((s) => s.id === z.stelleId && s.status !== 'aufgeloest');
+                return (
+                  <li
+                    key={z.stelleId ?? 'ohne'}
+                    data-stelle={z.stelleId ?? undefined}
                     style={{
-                      ...monoStil(12, fehlt > 0 ? 500 : 400),
-                      color:
-                        fehlt > 0 && stufe === 'unterdeckung' ? rollen.alarmText : rollen.text2,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      columnGap: token.marginSM,
+                      rowGap: token.marginXXS,
+                      paddingBlock: 2,
                     }}
                   >
-                    {fehlt > 0 ? `fehlt ${fehlt} ${KOSTFORM_LABEL[k]}` : 'gedeckt'}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      {(zf.ausgaben.length > 0 || ausstehend.length > 0) && (
-        <ul
-          aria-label={`Ausgaben zu ${kennung}`}
-          data-lfh="verpflegung-ausgaben"
-          style={{
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            borderBlockStart: `1px solid ${rollen.flaeche2}`,
-          }}
-        >
-          {zf.ausgaben.map((a) => {
-            const zurueck = a.zurueckgenommen_at != null;
-            const uhr = uhrzeit(a.zeitpunkt_at, konventionen);
-            const sk = sonderkostText(a.sonderkost);
-            const nfId = a.nachforderung_id;
-            const nfName =
-              nfId != null && nachforderungenFrei ? nachforderungName?.(nfId) : undefined;
-            const verweis =
-              nfId == null ? null : nfName ? `Nachforderung: ${nfName}` : `Nachforderung #${nfId}`;
-            return (
-              <Zeitachseneintrag
-                key={a.id}
-                als="li"
-                data-lfh="verpflegung-ausgabe"
-                data-zurueckgenommen={zurueck ? 'true' : undefined}
-                zeit={uhr}
-                typwort={zurueck ? 'zurückgenommen' : 'Ausgabe'}
-                hinweis={a.bemerkung ?? undefined}
-                aktionen={
-                  darfSchreiben && !zurueck && onZuruecknehmen ? (
-                    <Button
-                      aria-label={`Zurücknehmen: Ausgabe ${a.menge} EP um ${uhr} zu ${kennung}`}
-                      onClick={() => onZuruecknehmen(a, zf)}
+                    <span
+                      data-lfh="je-stelle-text"
+                      style={{ minWidth: 0, overflowWrap: 'anywhere' }}
                     >
-                      Zurücknehmen
-                    </Button>
-                  ) : undefined
-                }
-              >
-                <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
-                  <span style={monoStil(13, 500)}>{a.menge} EP</span>
-                  {anText(a)}
-                  {woText(a.verpflegungsstelle_id, a.ort)}
-                  {sk ? ` · ${sk}` : ''}
-                  {verweis != null && (
-                    <>
+                      {z.bezeichnung}
+                      {z.kennzeichen.map((k) => (
+                        <span key={k} style={{ color: rollen.text2 }}>
+                          {' · '}
+                          {k}
+                        </span>
+                      ))}
                       {' · '}
-                      <span data-lfh="ausgabe-nachforderung">{verweis}</span>
-                    </>
-                  )}
-                </span>
-              </Zeitachseneintrag>
-            );
-          })}
-          {ausstehend.map((v) => {
-            const d = v.aktion.daten;
-            const sk = sonderkostText(sonderkostVoll(d.sonderkost));
-            return (
-              <Zeitachseneintrag
-                key={`ausstehend-${v.id ?? d.client_id}`}
-                als="li"
-                data-lfh="verpflegung-ausgabe-ausstehend"
-                zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
-                typwort="ausstehend"
-                hinweis="Offline vorgemerkt"
-              >
-                <span style={{ color: rollen.text2 }}>
-                  <span style={monoStil(13, 500)}>{d.menge} EP</span>
-                  {anText(d)}
-                  {woText(d.verpflegungsstelle_id, d.ort)}
-                  {sk ? ` · ${sk}` : ''}
-                </span>
-              </Zeitachseneintrag>
-            );
-          })}
-        </ul>
-      )}
+                      <span style={monoStil(13, 500)}>{z.ausgegeben} EP</span>
+                    </span>
+                    {sprungJeStelle && waehlbar && (
+                      <SprungKnopf
+                        to={pfade.verpflegungAusgabe(zf.einsatz_id, zf.id, { stelle: z.stelleId! })}
+                        zugaenglicherName={`Ausgabe öffnen an ${z.bezeichnung} zu ${kennung}`}
+                      >
+                        Ausgabe öffnen
+                      </SprungKnopf>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-      {hatEinheiten && (
-        <Collapse
-          ghost
-          data-lfh="verpflegung-einheiten"
-          style={{ borderBlockStart: `1px solid ${rollen.flaeche2}` }}
-          items={[
-            {
-              key: 'einheiten',
-              label: einheitenKopf,
-              children: (
-                <EmpfaengerStand
-                  zeitfenster={zf}
-                  empfaenger={empfaenger}
-                  ausstehend={vorgemerkt}
-                  ueberschrift="h2"
-                />
-              ),
-            },
-          ]}
-        />
-      )}
-
-      {(sprung || aktionen.length > 0) && (
-        // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen.
-        <Flex
-          justify="flex-end"
-          wrap
-          gap={token.marginSM}
-          data-lfh="verpflegung-aktionen"
-          style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
-        >
-          {sprung && (
-            // Kein `type="primary"`: die EINE Primäraktion der Seite steht im Kopf.
-            <SprungKnopf
-              to={pfade.verpflegungAusgabe(zf.einsatz_id, zf.id)}
-              zugaenglicherName={`Ausgabe öffnen zu ${kennung}`}
+          {kostformen.length > 0 && (
+            <div
+              data-lfh="verpflegung-sonderkost"
+              style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
             >
-              Ausgabe öffnen
-            </SprungKnopf>
+              <Augenbraue>Sonderkost</Augenbraue>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {kostformen.map((k) => {
+                  const fehlt = zf.fehlmenge.sonderkost[k];
+                  return (
+                    <li
+                      key={k}
+                      data-kostform={k}
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        columnGap: token.marginSM,
+                        alignItems: 'baseline',
+                        paddingBlock: 2,
+                      }}
+                    >
+                      <span style={{ minWidth: '12ch' }}>{KOSTFORM_LABEL[k]}</span>
+                      <span style={{ ...monoStil(12), color: rollen.text2 }}>
+                        Bedarf {zf.bedarf.sonderkost[k]} · ausgegeben {zf.ausgegeben.sonderkost[k]}
+                      </span>
+                      <span
+                        data-lfh="sonderkost-fehlt"
+                        style={{
+                          ...monoStil(12, fehlt > 0 ? 500 : 400),
+                          color:
+                            fehlt > 0 && stufe === 'unterdeckung' ? rollen.alarmText : rollen.text2,
+                        }}
+                      >
+                        {fehlt > 0 ? `fehlt ${fehlt} ${KOSTFORM_LABEL[k]}` : 'gedeckt'}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
-          {gebuendelt ? (
-            <MenueAusloeser
-              eintraege={aktionen.map((a) => ({
-                key: a.key,
-                label: a.label,
-                ...(a.danger ? { gefahr: true as const } : {}),
-              }))}
-              zugaenglicherName={`Aktionen zu Zeitfenster ${kennung}`}
-              onWahl={fuehreAus}
+
+          {(zf.ausgaben.length > 0 || ausstehend.length > 0) && (
+            <ul
+              aria-label={`Ausgaben zu ${kennung}`}
+              data-lfh="verpflegung-ausgaben"
+              style={{
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                borderBlockStart: `1px solid ${rollen.flaeche2}`,
+              }}
+            >
+              {zf.ausgaben.map((a) => {
+                const zurueck = a.zurueckgenommen_at != null;
+                const uhr = uhrzeit(a.zeitpunkt_at, konventionen);
+                const sk = sonderkostText(a.sonderkost);
+                const nfId = a.nachforderung_id;
+                const nfName =
+                  nfId != null && nachforderungenFrei ? nachforderungName?.(nfId) : undefined;
+                const verweis =
+                  nfId == null
+                    ? null
+                    : nfName
+                      ? `Nachforderung: ${nfName}`
+                      : `Nachforderung #${nfId}`;
+                return (
+                  <Zeitachseneintrag
+                    key={a.id}
+                    als="li"
+                    data-lfh="verpflegung-ausgabe"
+                    data-zurueckgenommen={zurueck ? 'true' : undefined}
+                    zeit={uhr}
+                    typwort={zurueck ? 'zurückgenommen' : 'Ausgabe'}
+                    hinweis={a.bemerkung ?? undefined}
+                    aktionen={
+                      darfSchreiben && !zurueck && onZuruecknehmen ? (
+                        <Button
+                          aria-label={`Zurücknehmen: Ausgabe ${a.menge} EP um ${uhr} zu ${kennung}`}
+                          onClick={() => onZuruecknehmen(a, zf)}
+                        >
+                          Zurücknehmen
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
+                      <span style={monoStil(13, 500)}>{a.menge} EP</span>
+                      {anText(a)}
+                      {woText(a.verpflegungsstelle_id, a.ort)}
+                      {sk ? ` · ${sk}` : ''}
+                      {verweis != null && (
+                        <>
+                          {' · '}
+                          <span data-lfh="ausgabe-nachforderung">{verweis}</span>
+                        </>
+                      )}
+                    </span>
+                  </Zeitachseneintrag>
+                );
+              })}
+              {ausstehend.map((v) => {
+                const d = v.aktion.daten;
+                const sk = sonderkostText(sonderkostVoll(d.sonderkost));
+                return (
+                  <Zeitachseneintrag
+                    key={`ausstehend-${v.id ?? d.client_id}`}
+                    als="li"
+                    data-lfh="verpflegung-ausgabe-ausstehend"
+                    zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
+                    typwort="ausstehend"
+                    hinweis="Offline vorgemerkt"
+                  >
+                    <span style={{ color: rollen.text2 }}>
+                      <span style={monoStil(13, 500)}>{d.menge} EP</span>
+                      {anText(d)}
+                      {woText(d.verpflegungsstelle_id, d.ort)}
+                      {sk ? ` · ${sk}` : ''}
+                    </span>
+                  </Zeitachseneintrag>
+                );
+              })}
+            </ul>
+          )}
+
+          {hatEinheiten && (
+            <Collapse
+              ghost
+              data-lfh="verpflegung-einheiten"
+              style={{ borderBlockStart: `1px solid ${rollen.flaeche2}` }}
+              items={[
+                {
+                  key: 'einheiten',
+                  label: einheitenKopf,
+                  children: (
+                    <EmpfaengerStand
+                      zeitfenster={zf}
+                      empfaenger={empfaenger}
+                      ausstehend={vorgemerkt}
+                      ueberschrift="h2"
+                    />
+                  ),
+                },
+              ]}
             />
-          ) : (
-            aktionen.map((a) => (
-              <Button
-                key={a.key}
-                danger={a.danger}
-                aria-label={`${a.label} zu ${kennung}`}
-                onClick={() => fuehreAus(a.key)}
-              >
-                {a.label}
-              </Button>
-            ))
           )}
-        </Flex>
+
+          {(sprung || aktionen.length > 0) && (
+            // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen.
+            <Flex
+              justify="flex-end"
+              wrap
+              gap={token.marginSM}
+              data-lfh="verpflegung-aktionen"
+              ref={aktionenRef}
+              style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
+            >
+              {bearbeitenGesperrt && aktionen.some((a) => a.key === 'bearbeiten') && (
+                // Der Grund steht sichtbar am Element, nie nur im Tooltip (Touch, LFH-1078).
+                <span
+                  id={sperrGrundId}
+                  data-lfh="verpflegung-sperrgrund"
+                  style={{ alignSelf: 'center', color: rollen.gedaempft, marginInlineEnd: 'auto' }}
+                >
+                  {bearbeitenGesperrt}
+                </span>
+              )}
+              {sprung && (
+                // Kein `type="primary"`: die EINE Primäraktion der Seite steht im Kopf.
+                <SprungKnopf
+                  to={pfade.verpflegungAusgabe(zf.einsatz_id, zf.id)}
+                  zugaenglicherName={`Ausgabe öffnen zu ${kennung}`}
+                >
+                  Ausgabe öffnen
+                </SprungKnopf>
+              )}
+              {gebuendelt ? (
+                <MenueAusloeser
+                  eintraege={aktionen.map((a) => ({
+                    key: a.key,
+                    label: a.label,
+                    ...(a.danger ? { gefahr: true as const } : {}),
+                    ...(a.gesperrt ? { gesperrt: true as const } : {}),
+                  }))}
+                  zugaenglicherName={`Aktionen zu Zeitfenster ${kennung}`}
+                  onWahl={fuehreAus}
+                />
+              ) : (
+                aktionen.map((a) => (
+                  <Button
+                    key={a.key}
+                    danger={a.danger}
+                    data-aktion={a.key}
+                    disabled={a.gesperrt != null}
+                    aria-describedby={a.gesperrt != null ? sperrGrundId : undefined}
+                    aria-label={`${a.label} zu ${kennung}`}
+                    onClick={() => fuehreAus(a.key)}
+                  >
+                    {a.label}
+                  </Button>
+                ))
+              )}
+            </Flex>
+          )}
+        </>
       )}
     </article>
   );

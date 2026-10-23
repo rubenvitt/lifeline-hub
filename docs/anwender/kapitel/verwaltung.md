@@ -21,7 +21,9 @@ Nachschlagen.
 ### Darstellung und Ortsdienst vorgeben
 
 1. Oben „Verwaltung“ öffnen und unter „Einstellungen“ „Anzeige“ wählen.
-2. Unter „Darstellung“ „Zeitzone“, „Zeitformat“, „Einheiten“ und „Koordinatenformat“ wählen.
+2. Unter „Darstellung“ „Zeitzone“, „Zeitdarstellung“, „Einheiten“ und „Koordinatenformat“ wählen.
+   „Zeitdarstellung“ ist „Taktisch“ (101430okt26, die Vorgabe) oder „Datum und Uhrzeit“
+   (10.10.26 14:30).
 3. Unter „Ort-Vorschau“ bei Bedarf eine eigene „Geocoder-URL“ eintragen.
 
    ![Seite „Anzeige-Konventionen“ mit Darstellung und Ort-Vorschau, alle Felder auf der Vorgabe](../bilder/verwaltung/anzeige.png)

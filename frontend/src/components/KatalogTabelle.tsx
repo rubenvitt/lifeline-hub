@@ -22,6 +22,13 @@ import { useRollen } from './instrument/rollenwerte';
 import { useDruckModus } from './druck/useDruckModus';
 import { useRahmenObenFuer } from './rahmenOben';
 import { useFokusUnterKopf } from './fokusUnterKopf';
+import Filterhinweis from './instrument/Filterhinweis';
+import { aktiveFilter, FilterChips, filterMerkmale, kopfGefiltertStil } from './tabellenFilter';
+import {
+  GEDAECHTNIS_ENTPRELLUNG_MS,
+  type ListenGedaechtnis,
+  type ListenSortierung,
+} from './listenGedaechtnis';
 // Kopfzellen-Typografie und Mono-Spalten liegen als Klassen in der Gestaltungssprache
 // (`.lfh-katalog …`). Der Import gehört HIERHER: nicht jeder Konsument montiert `EinsatzSeite`.
 import '../theme/sprache.css';
@@ -71,6 +78,15 @@ import '../theme/sprache.css';
  * Stufe): er bekommt den Boden `controlHeightSM` über {@link filterKopfStil} und `sprache.css`,
  * und {@link useFilterTastatur} nimmt ihn in die Tab-Folge (Enter/Leertaste öffnen, Escape
  * schließt und gibt den Fokus zurück, das trägt antds Dropdown).
+ *
+ * **Sortieren und Filtern wie in `Datensicht`** (LLH-1086, Spec `tabellen-sortieren-filtern`).
+ * Filter- und Sortierzustand einer Spalte mit `filters` bzw. `sorter` liegen KONTROLLIERT hier
+ * (vorbelegt aus `defaultFilteredValue`/`defaultSortOrder` oder aus `gedaechtnis`); antd zeichnet
+ * Trichter, Menü und Pfeil und filtert über das `onFilter` der Spalte. Bei Suche oder Filter steht
+ * der `Filterhinweis` (Treffer von Gesamt) samt Chips je Wert, „Filter zurücksetzen“ leert beides.
+ * Was man nicht sieht, wirkt nicht und steht nicht als Chip da. Eine Spalte mit EIGENEM
+ * `filteredValue`/`sortOrder` bleibt beim Aufrufer — so `Datensicht`, die Hinweis und Chips selbst
+ * zeigt. `onChange` des Aufrufers hört weiter mit.
  *
  * ── DREI ZUSTÄNDE, DIE LADEUNTERDRÜCKUNG LEBT HIER ──
  *
@@ -184,6 +200,14 @@ export type KatalogTabelleProps<T> = Omit<
    * Knopfs, damit zwei Schalter unterscheidbar bleiben. `Datensicht` setzt es NIE.
    */
   spaltenSchalter?: { bezeichnung: string };
+  /**
+   * Gedächtnis der Tabelle (LLH-1086, `components/listenGedaechtnis.ts`): Sortierung, Filter, Suche
+   * und Spaltenwahl beginnen beim gemerkten Stand und gehen entprellt zurück. `Datensicht` setzt es
+   * NIE, sie trägt ihr eigenes.
+   */
+  gedaechtnis?: ListenGedaechtnis;
+  /** Mehrzahl im Dativ für den `Filterhinweis` („3 von 9 Quellen sichtbar“); Vorgabe „Einträgen“. */
+  mehrzahl?: string;
 };
 
 /**
@@ -539,6 +563,60 @@ function schaltbareFassung<T>(
   return { schaltbar, ohneSchluessel };
 }
 
+/** Der Zustandsschlüssel einer Spalte: `key`, sonst ein einfacher `dataIndex` (wie antds Filter). */
+function zustandsSchluessel<T>(spalte: KatalogSpalte<T>): string | undefined {
+  if (typeof spalte.key === 'string') return spalte.key;
+  if (!('children' in spalte) && 'dataIndex' in spalte && typeof spalte.dataIndex === 'string') {
+    return spalte.dataIndex;
+  }
+  return undefined;
+}
+
+/** Filtert das Primitiv diese Spalte selbst (und nicht der Aufrufer über `filteredValue`)? */
+function filterIntern<T>(spalte: KatalogSpalte<T>): boolean {
+  return (
+    !('children' in spalte) &&
+    spalte.filters != null &&
+    !('filteredValue' in spalte) &&
+    zustandsSchluessel(spalte) != null
+  );
+}
+
+/** Sortiert das Primitiv diese Spalte kontrolliert (und nicht der Aufrufer über `sortOrder`)? */
+function sortierungIntern<T>(spalte: KatalogSpalte<T>): boolean {
+  return (
+    !('children' in spalte) &&
+    spalte.sorter != null &&
+    spalte.sorter !== false &&
+    !('sortOrder' in spalte) &&
+    zustandsSchluessel(spalte) != null
+  );
+}
+
+function vorbelegteFilter<T>(
+  spalten: readonly KatalogSpalte<T>[],
+): Readonly<Record<string, readonly string[]>> {
+  const stand: Record<string, readonly string[]> = {};
+  for (const s of spalten) {
+    if (!filterIntern(s) || !('defaultFilteredValue' in s) || !s.defaultFilteredValue) continue;
+    if (s.defaultFilteredValue.length > 0) {
+      stand[zustandsSchluessel(s)!] = s.defaultFilteredValue.map(String);
+    }
+  }
+  return stand;
+}
+
+function vorbelegteSortierung<T>(spalten: readonly KatalogSpalte<T>[]): ListenSortierung {
+  for (const s of spalten) {
+    if (!sortierungIntern(s) || !('defaultSortOrder' in s) || !s.defaultSortOrder) continue;
+    return {
+      spalte: zustandsSchluessel(s)!,
+      richtung: s.defaultSortOrder === 'ascend' ? 'auf' : 'ab',
+    };
+  }
+  return null;
+}
+
 export default function KatalogTabelle<T extends object>({
   columns,
   dataSource,
@@ -547,10 +625,20 @@ export default function KatalogTabelle<T extends object>({
   locale,
   suche,
   spaltenSchalter,
+  gedaechtnis,
+  mehrzahl,
   ...rest
 }: KatalogTabelleProps<T>) {
-  const [suchbegriff, setSuchbegriff] = useState('');
+  const [suchbegriff, setSuchbegriff] = useState(() => gedaechtnis?.start.suche ?? '');
+  // Filter und Sortierung der Spalten, die das Primitiv selbst führt (siehe Dateikopf, LLH-1086).
+  const [filterStand, setFilterStand] = useState<Readonly<Record<string, readonly string[]>>>(
+    () => gedaechtnis?.start.filter ?? vorbelegteFilter(columns ?? []),
+  );
+  const [sortStand, setSortStand] = useState<ListenSortierung>(() =>
+    gedaechtnis ? gedaechtnis.start.sortierung : vorbelegteSortierung(columns ?? []),
+  );
   const { token, rollen, dunkel } = useRollen();
+  const kopfStilGefiltert = useMemo(() => kopfGefiltertStil(rollen), [rollen]);
   const { abBreite } = useViewport();
   const feldRef = useRef<InputRef>(null);
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
@@ -566,8 +654,27 @@ export default function KatalogTabelle<T extends object>({
 
   // ── Spaltenschalter ───────────────────────────────────────────────────────────────
   // Zählung und Schalter kommen aus `SpaltenSchalter.tsx`; hier wohnt nur der Zustand.
-  const [spaltenAus, setSpaltenAus] = useState<readonly string[]>([]);
-  const [spaltenAn, setSpaltenAn] = useState<readonly string[]>([]);
+  const [spaltenAus, setSpaltenAusRoh] = useState<readonly string[]>(
+    () => gedaechtnis?.spaltenStart.aus ?? [],
+  );
+  const [spaltenAn, setSpaltenAnRoh] = useState<readonly string[]>(
+    () => gedaechtnis?.spaltenStart.an ?? [],
+  );
+  const meldeSpalten = gedaechtnis?.meldeSpalten;
+  const setSpaltenAus = useCallback(
+    (k: string[]) => {
+      setSpaltenAusRoh(k);
+      meldeSpalten?.({ aus: k, an: spaltenAn });
+    },
+    [meldeSpalten, spaltenAn],
+  );
+  const setSpaltenAn = useCallback(
+    (k: string[]) => {
+      setSpaltenAnRoh(k);
+      meldeSpalten?.({ aus: spaltenAus, an: k });
+    },
+    [meldeSpalten, spaltenAus],
+  );
   const [spaltenOffen, setSpaltenOffen] = useState(false);
   const { schaltbar, ohneSchluessel } = useMemo(
     () => schaltbareFassung(columns ?? [], spaltenSchalter != null),
@@ -600,19 +707,39 @@ export default function KatalogTabelle<T extends object>({
     );
   }, [abBreiteOhneSchalter]);
 
-  const filterZuruecksetzen = useCallback(() => setSuchbegriff(''), []);
+  const filterZuruecksetzen = useCallback(() => {
+    setSuchbegriff('');
+    setFilterStand({});
+  }, []);
+  const internGefiltert = (columns ?? []).some(filterIntern);
+
+  // Das Gedächtnis hört mit, entprellt und ohne den Anfangsstand (wie in `Datensicht`).
+  const melde = gedaechtnis?.melde;
+  const ersterStand = useRef(true);
+  useEffect(() => {
+    if (ersterStand.current) {
+      ersterStand.current = false;
+      return;
+    }
+    if (!melde) return;
+    const frist = setTimeout(
+      () => melde({ sortierung: sortStand, filter: filterStand, suche: suchbegriff }),
+      GEDAECHTNIS_ENTPRELLUNG_MS,
+    );
+    return () => clearTimeout(frist);
+  }, [melde, sortStand, filterStand, suchbegriff]);
   const oeffneSpalten = useCallback(() => setSpaltenOffen(true), []);
   // Nur melden, was die Werkzeugzeile auch hält (`hatWaehlbareSpalten`, dieselbe Wahrheit wie der
   // Schalter).
   const tastaturAktionen: TastaturAktionen = {
-    ...(suche != null ? { 'filter-zuruecksetzen': filterZuruecksetzen } : {}),
+    ...(suche != null || internGefiltert ? { 'filter-zuruecksetzen': filterZuruecksetzen } : {}),
     ...(schalterDa ? { spalten: oeffneSpalten } : {}),
   };
   useTastaturEbene({
     name: 'Katalogtabelle-Filter',
     wurzel: werkzeugWurzel,
     aktionen: tastaturAktionen,
-    aktiv: suche != null || schalterDa,
+    aktiv: suche != null || schalterDa || internGefiltert,
   });
 
   /**
@@ -637,9 +764,68 @@ export default function KatalogTabelle<T extends object>({
       void etikett;
       void immerSichtbar;
       void _ab;
-      return antd as KatalogSpalte<T>;
+      const gebaut = { ...antd } as KatalogSpalte<T> & {
+        defaultFilteredValue?: unknown;
+        defaultSortOrder?: unknown;
+      };
+      const k = zustandsSchluessel(spalte);
+      // Kontrolliert (LLH-1086): die Vorbelegung ist schon im Zustand, antd bekommt den Stand.
+      if (k != null && filterIntern(spalte)) {
+        delete gebaut.defaultFilteredValue;
+        const gewaehlt = filterStand[k] ?? [];
+        gebaut.filteredValue = gewaehlt.length > 0 ? [...gewaehlt] : null;
+        if (gewaehlt.length > 0) {
+          const eigen = spalte.onHeaderCell;
+          gebaut.onHeaderCell = (s) => {
+            const basis = eigen?.(s) ?? {};
+            return { ...basis, style: { ...basis.style, ...kopfStilGefiltert } };
+          };
+        }
+      }
+      if (k != null && sortierungIntern(spalte)) {
+        delete gebaut.defaultSortOrder;
+        gebaut.sortOrder =
+          sortStand?.spalte === k ? (sortStand.richtung === 'auf' ? 'ascend' : 'descend') : null;
+      }
+      return gebaut as KatalogSpalte<T>;
     });
-  }, [columns, spaltenSchalter, schaltbar, spaltenAus, spaltenAn, abBreite]);
+  }, [
+    columns,
+    spaltenSchalter,
+    schaltbar,
+    spaltenAus,
+    spaltenAn,
+    abBreite,
+    filterStand,
+    sortStand,
+    kopfStilGefiltert,
+  ]);
+
+  /**
+   * Die wirksamen eigenen Filter: nur gezeigte Spalten, wie antd sie anwendet. Daraus Chips,
+   * Merkmale und die Trefferzahl; ohne `onFilter` (der Aufrufer filtert selbst) zählt das Primitiv
+   * nicht.
+   */
+  const eigeneFilterSpalten = useMemo(() => {
+    const intern = new Set((columns ?? []).filter(filterIntern).map(zustandsSchluessel));
+    return (gezeigteSpalten ?? []).filter((s) => intern.has(zustandsSchluessel(s)));
+  }, [gezeigteSpalten, columns]);
+  const filterListe = aktiveFilter(
+    eigeneFilterSpalten.map((s) => ({
+      key: zustandsSchluessel(s)!,
+      etikett:
+        (columns ?? []).find((c) => zustandsSchluessel(c) === zustandsSchluessel(s))?.etikett ??
+        (typeof s.title === 'string' ? s.title : zustandsSchluessel(s)!),
+      werte: ('filters' in s ? (s.filters ?? []) : []).map((f) => ({
+        text:
+          typeof f.text === 'string' || typeof f.text === 'number'
+            ? String(f.text)
+            : String(f.value),
+        value: String(f.value),
+      })),
+    })),
+    filterStand,
+  );
 
   /**
    * Fixiert wird die ERSTE Spalte: sie ist überall die menschenlesbare Kennung, ein Pflicht-Prop
@@ -675,6 +861,65 @@ export default function KatalogTabelle<T extends object>({
       }),
     );
   }, [dataSource, columns, suchbegriff]);
+
+  /**
+   * Treffer unter Suche UND eigenen Filtern für den `Filterhinweis` (LLH-1086), mit denselben
+   * `onFilter` wie antd. Filtert eine aktive Spalte ohne `onFilter` (der Aufrufer filtert selbst),
+   * zählt das Primitiv nicht: eine falsche Zahl wäre schlimmer als keine.
+   */
+  const trefferZahl = useMemo(() => {
+    let zeilen = sichtbareZeilen ?? [];
+    for (const spalte of eigeneFilterSpalten) {
+      const gewaehlt = filterStand[zustandsSchluessel(spalte)!] ?? [];
+      if (gewaehlt.length === 0) continue;
+      const pruefe = 'onFilter' in spalte ? spalte.onFilter : undefined;
+      if (!pruefe) return undefined;
+      zeilen = zeilen.filter((z) => gewaehlt.some((w) => pruefe(w, z)));
+    }
+    return zeilen.length;
+  }, [sichtbareZeilen, eigeneFilterSpalten, filterStand]);
+  const eingeschraenkt = suchbegriff.trim() !== '' || filterListe.length > 0;
+
+  /**
+   * Hält den eigenen Zustand nach und reicht das Ereignis an den Aufrufer weiter. Spalten, die der
+   * Aufrufer kontrolliert, bleiben unberührt.
+   */
+  const aufruferOnChange = rest.onChange;
+  const beiAenderung = useCallback<NonNullable<TableProps<T>['onChange']>>(
+    (seite, filter, sorter, extra) => {
+      if (extra?.action === 'filter') {
+        setFilterStand((vorher) => {
+          const neu: Record<string, readonly string[]> = { ...vorher };
+          for (const spalte of eigeneFilterSpalten) {
+            const k = zustandsSchluessel(spalte)!;
+            const werte = (filter[k] ?? []).map(String);
+            if (werte.length > 0) neu[k] = werte;
+            else delete neu[k];
+          }
+          return neu;
+        });
+      }
+      if (extra?.action === 'sort') {
+        const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
+        const k =
+          typeof einzeln?.columnKey === 'string'
+            ? einzeln.columnKey
+            : typeof einzeln?.field === 'string'
+              ? einzeln.field
+              : undefined;
+        const spalte = (columns ?? []).find((c) => zustandsSchluessel(c) === k);
+        if (k != null && spalte && sortierungIntern(spalte)) {
+          setSortStand(
+            einzeln?.order
+              ? { spalte: k, richtung: einzeln.order === 'ascend' ? 'auf' : 'ab' }
+              : null,
+          );
+        }
+      }
+      aufruferOnChange?.(seite, filter, sorter, extra);
+    },
+    [eigeneFilterSpalten, columns, aufruferOnChange],
+  );
 
   /**
    * Die gedeckelte Tabellenbreite, gerechnet über `fixierteSpalten`, die WIRKLICH gerenderte
@@ -757,11 +1002,37 @@ export default function KatalogTabelle<T extends object>({
           )}
         </div>
       )}
+      {eingeschraenkt && (
+        <div
+          data-lfh="katalog-einschraenkung"
+          style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBlockEnd: 8 }}
+        >
+          <Filterhinweis
+            treffer={trefferZahl}
+            gesamt={dataSource?.length}
+            merkmale={filterMerkmale(suchbegriff, filterListe)}
+            onZuruecksetzen={filterZuruecksetzen}
+            dinge={mehrzahl}
+          />
+          <FilterChips
+            filter={filterListe}
+            onEntfernen={(spalte, wert) =>
+              setFilterStand((vorher) => {
+                const rest = (vorher[spalte] ?? []).filter((w) => w !== wert);
+                const { [spalte]: _alt, ...uebrig } = vorher;
+                void _alt;
+                return rest.length > 0 ? { ...uebrig, [spalte]: rest } : uebrig;
+              })
+            }
+          />
+        </div>
+      )}
       {/* Geschachtelter Provider nur für die Tabellen-Tokens: er erbt Algorithmus, Rollen und Dichte
           und färbt NUR diese Tabelle; `tokens.ts:antdKomponenten` bleibt die globale Stelle. */}
       <ConfigProvider theme={{ components: { Table: tabellenTokens(rollen, dunkel, token) } }}>
         <Table<T>
           {...rest}
+          onChange={beiAenderung}
           ref={tabelleRef}
           className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
           style={{ ...filterKopfStil(token), ...rest.style }}

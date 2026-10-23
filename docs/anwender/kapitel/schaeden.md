@@ -2,7 +2,7 @@
 titel: Schäden
 gruppen: [alle, fuehrung]
 reihenfolge: 550
-quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/pages/schaeden/GefahrAuswahl.tsx, frontend/src/pages/schaeden/gefahrWorte.ts, frontend/src/pages/schaeden/SchaedenDruckTabelle.tsx, frontend/src/zeichen/fachobjektZeichen.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs]
+quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/pages/schaeden/GefahrAuswahl.tsx, frontend/src/pages/schaeden/gefahrWorte.ts, frontend/src/pages/schaeden/SchaedenDruckTabelle.tsx, frontend/src/zeichen/fachobjektZeichen.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs]
 ---
 
 ## Überblick
@@ -21,9 +21,13 @@ und einen Ort, bei Bedarf eine Gefahr und einen Schadensgrad. Er ist „offen“
 
    ![Liste der Schäden in der Sicht „Alle“ mit offenen, übergebenen und abgeschlossenen Schäden](../bilder/schaeden/liste.png)
 
-2. Die Leiste „Offen“, „Übergeben“, „Abgeschlossen“, „Alle“ wählt die Sicht. Die Filter „Typ“,
-   „Ausmaß“, „Gefahr“ und „Verortet“ und die Suche nach S-Nr., Ort und Beschreibung engen die
-   Liste ein.
+2. Die Leiste „Offen“, „Übergeben“, „Abgeschlossen“, „Alle“ wählt die Sicht. Die Suche nach
+   S-Nr., Ort und Beschreibung engt die Liste ein, ebenso die Filter im Kopf der Spalten „Typ“,
+   „Ausmaß“, „Gefahr“ und „Verortet“: das Trichterzeichen im Spaltenkopf öffnet die Werte zum
+   Ankreuzen, „OK“ übernimmt sie. Ein Klick auf den Spaltenkopf sortiert nach dieser Spalte. Ist
+   die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der Treffer und je Wert ein
+   Knopf, etwa „Ausmaß: groß“, der genau diesen Filter entfernt; „Filter zurücksetzen“ leert Suche
+   und Filter. Auf dem Handy stehen Filter und „Sortieren“ als Auswahlfelder über der Liste.
 3. Der Status nennt bei übergebenen Schäden, an wen sie gingen. „Gefahr“ nennt Gefahr und
    Schadensgrad, etwa „Elektrizität · total zerstört“. „Verortet“ zeigt, ob der Schaden auf der
    Karte steht.
@@ -133,6 +137,13 @@ Offline-Karten gehen weiter.
 Das Einsatztagebuch vermerkt Anlegen (mit Typ, Ausmaß, Gefahr und Schadensgrad, ohne Ort),
 Übergabe (ohne Empfänger), Abschluss (mit Grund) und Stornieren, jeweils mit der
 Registriernummer.
+
+### Filter und Sortierung bleiben stehen
+
+Suche, Filter und Sortierung stehen in der Adresse der Seite. Zurück aus einem Schaden, Neuladen
+und ein weitergegebener Link zeigen dieselbe Liste. Wer die Schäden später über das Modulpanel
+wieder öffnet, findet die Einschränkung vom letzten Mal, bis zur Abmeldung. Welche Spalten
+ausgeblendet sind, merkt sich das Gerät.
 
 ### Druck und Export
 

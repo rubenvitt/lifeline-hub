@@ -326,7 +326,7 @@ describe('baueLagebild', () => {
     expect(dauer.wert).toBe('6:41');
     expect(dauer.einheit).toBe('h');
     // 05:19 UTC → 07:19 Berlin; derselbe Tag wie „jetzt" braucht keinen Tag.
-    expect(dauer.notiz).toMatch(/^seit (\d{2}\. )?07:19$/);
+    expect(dauer.notiz).toMatch(/^seit (\d{2})?0719$/);
   });
 
   it('Betroffene zählen alle, die Notiz nur Patienten (SK I–IV)', () => {

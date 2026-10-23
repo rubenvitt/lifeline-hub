@@ -30,6 +30,7 @@ function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
     setDichte: vi.fn(),
     setHelligkeit: vi.fn(),
     setKoordinaten: vi.fn(),
+    setZeitdarstellung: vi.fn(),
     logout: vi.fn(),
     ...over,
   };
@@ -341,6 +342,19 @@ describe('baueBefehle — Schnelleinstellungen', () => {
     expect(k.setThemeModus).toHaveBeenCalledWith('dark');
     b.find((x) => x.id === 'koord:mgrs')!.ausfuehren();
     expect(k.setKoordinaten).toHaveBeenCalledWith('mgrs' as Koordinatenformat);
+  });
+
+  it('schaltet die Zeitdarstellung dieses Geräts, auch zurück auf die Vorgabe (LLH-1053)', () => {
+    const k = kontext();
+    const b = baueBefehle(k);
+    b.find((x) => x.id === 'zeit:datum_uhrzeit')!.ausfuehren();
+    expect(k.setZeitdarstellung).toHaveBeenCalledWith('datum_uhrzeit');
+    b.find((x) => x.id === 'zeit:taktisch')!.ausfuehren();
+    expect(k.setZeitdarstellung).toHaveBeenCalledWith('taktisch');
+    const vorgabe = b.find((x) => x.id === 'zeit:vorgabe')!;
+    expect(vorgabe.label).toBe('Zeitdarstellung: Vorgabe des Einsatzes');
+    vorgabe.ausfuehren();
+    expect(k.setZeitdarstellung).toHaveBeenCalledWith(null);
   });
 
   it('Schnelleinstellung Bediendichte ruft setDichte mit der Stufe', () => {

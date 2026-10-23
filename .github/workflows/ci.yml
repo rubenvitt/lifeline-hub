@@ -184,6 +184,10 @@ jobs:
       # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): Schritt 4 testet
       # sie mit (`cargo test -p lifeline-desktop`). Umgebung wie nasm, kein Schritt neben check-all.sh.
       - name: System-Werkzeuge für die nativen Crates
+        # Die WebKit-Pakete sind groß: bei tröpfelndem Spiegel reichen 300 s je Versuch nicht
+        # (LLH-1420). Was ein abgebrochener Versuch schon geladen hat, bleibt im apt-Cache liegen.
+        env:
+          APT_FRIST_SEK: "600"
         run: >-
           ./scripts/apt-pakete.sh nasm
           libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev

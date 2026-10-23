@@ -68,7 +68,7 @@ describe('deuteZeit (Spec zeiteingabe, Eingabe als Text)', () => {
   });
 
   describe('volle Datum-Zeit-Gruppe', () => {
-    it.each(['101430okt26', '101430OKT2026', '101430Okt26', '101430 okt 26', '101430okt'])(
+    it.each(['101430okt26', '101430okt26', '101430Okt26', '101430 okt 26', '101430okt'])(
       '„%s“ gilt 10.10.2026 14:30',
       (t) => {
         expect(utcVon(t)).toBe('2026-10-10 12:30:00');

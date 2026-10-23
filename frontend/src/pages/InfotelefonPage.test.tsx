@@ -287,7 +287,7 @@ describe('InfotelefonPage (LFH-554)', () => {
     const eintrag = (await screen.findByText('sucht Vater')).closest('li') as HTMLElement;
     await userEvent.click(
       within(eintrag).getByRole('button', {
-        name: /^Status von Anruf Vermisstensuche \d{6}[A-Z]{3}\d{4} ändern$/,
+        name: /^Status von Anruf Vermisstensuche \d{6}[a-z]{3}\d{2} ändern$/,
       }),
     );
     await userEvent.click(await screen.findByRole('menuitem', { name: /erledigt/ }));

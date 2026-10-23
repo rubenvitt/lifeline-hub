@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waehleIn } from './auswahl-kern';
+import { kopfFilterWaehlen } from './kopffilter-kern';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -62,10 +62,10 @@ async function pruefeSchaeden(page: Page, einsatzId: string, schwerNr: number) {
   const nummer = `S-${String(schwerNr).padStart(3, '0')}`;
   // Vorbedingung: der katastrophale Schaden steht nicht in der ersten Seite.
   await expect(page.getByText(nummer, { exact: true })).toHaveCount(0);
-  await waehleIn(page.getByRole('combobox', { name: 'Ausmaß' }), 'katastrophal');
+  // Der Filter sitzt im Spaltenkopf (LLH-1086).
+  await kopfFilterWaehlen(page, 'Ausmaß', ['katastrophal']);
   await expect(page.getByText(nummer, { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ältere laden' })).toHaveCount(0);
-  await page.keyboard.press('Escape');
 }
 
 test.describe('Schadenliste seitenweise', () => {
@@ -76,8 +76,13 @@ test.describe('Schadenliste seitenweise', () => {
     const { einsatzId, schwerNr } = await einsatzMitSchaeden(page);
     await pruefeSchaeden(page, einsatzId, schwerNr);
 
-    // „Ältere laden“ in der Vorgabesicht.
+    // „Ältere laden“ in der Vorgabesicht. Der Rückweg ohne Parameter bringt den Stand der Sitzung
+    // mit (LLH-1086, Spec `tabellen-sortieren-filtern`): erst „Filter zurücksetzen“.
     await page.goto(`/einsaetze/${einsatzId}/schaeden`);
+    await expect(
+      page.getByRole('button', { name: 'Filter Ausmaß: katastrophal entfernen' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Filter zurücksetzen' }).click();
     await expect(page.getByText(`100 von ${SCHAEDEN} geladen`)).toBeVisible();
     await page.getByRole('button', { name: 'Ältere laden' }).click();
     await expect(page.getByText(`200 von ${SCHAEDEN} geladen`)).toBeVisible();

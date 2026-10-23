@@ -84,4 +84,21 @@ describe('DatenfeldEingabe', () => {
     const schmal = screen.getByLabelText('Ort').closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     expect(schmal.style.gridColumn).toBe('');
   });
+
+  it('zeigt eine Hilfe unter der Eingabe und verweist von der Eingabe auf sie (LLH-1139)', () => {
+    renderMitProviders(
+      <Form>
+        <Datenraster>
+          <DatenfeldEingabe label="Betreute (EP)" name="betreute" hilfe="Aktuell 70 — gemeldet">
+            <InputNumber />
+          </DatenfeldEingabe>
+        </Datenraster>
+      </Form>,
+    );
+    // Mutationsprobe: ohne `extra` am `Form.Item` fehlt der Text; ohne Verweis die Beschreibung.
+    expect(screen.getByText('Aktuell 70 — gemeldet')).toBeVisible();
+    expect(screen.getByRole('spinbutton', { name: 'Betreute (EP)' })).toHaveAccessibleDescription(
+      'Aktuell 70 — gemeldet',
+    );
+  });
 });

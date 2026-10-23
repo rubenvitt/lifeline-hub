@@ -11,6 +11,7 @@ import PersonalPage from './PersonalPage';
 import type { EinsatzAnzeige } from '../api/types';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 const admin = adminFixture();
 
@@ -709,7 +710,10 @@ describe('PersonalPage', () => {
         screen.getByRole('button', { name: new RegExp(`Spalten · ${anzahl} ausgeblendet`) }),
       ).toBeInTheDocument();
       for (const kopf of ['Einheit', 'Fahrzeug', 'Position', 'Status', 'Einsatzdauer']) {
-        expect(screen.getByRole('columnheader', { name: kopf })).toBeInTheDocument();
+        // Am Anfang: der Kopf „Status“ trägt dahinter den Filterauslöser (LLH-1086).
+        expect(
+          screen.getByRole('columnheader', { name: new RegExp(`^${kopf}`) }),
+        ).toBeInTheDocument();
       }
     },
   );
@@ -752,9 +756,8 @@ describe('PersonalPage', () => {
   it('der Status bleibt Filter der Statusspalte', async () => {
     render(einsatz(), [epGebunden, epOhne]);
     await bereit();
-    // Die Filter stehen in der Werkzeugzeile der `Datensicht`.
-    await userEvent.click(screen.getByRole('combobox', { name: 'Status' }));
-    await userEvent.click(await screen.findByTitle('verfügbar'));
+    // Der Filter steht im Spaltenkopf der `Datensicht` (LLH-1086), mit Zähler je Wert.
+    await kopfFilterWaehlen('Status', [/^verfügbar \(\d+\)$/]);
     await waitFor(() => expect(screen.queryByText('Thomas Müller')).toBeNull());
     expect(screen.getByText('Zora Zebra')).toBeInTheDocument();
   });

@@ -30,6 +30,15 @@ export const README_SECTIONS: readonly { head: string; title: string; skip?: rea
   ];
 
 /**
+ * Einzelne Spiegelstriche aus anderen Abschnitten von `frontend/AGENTS.md`, die ein Entwurf
+ * kennen muss (Kopf `- **<head>**`), je als eigener Abschnitt hinter den obigen. Zeitdarstellung
+ * (LLH-1053): ein Entwurf, der Zeiten zeigt, schreibt sie wie die App.
+ */
+export const README_RULES: readonly { head: string; title: string }[] = [
+  { head: 'Zeitdarstellung', title: 'Zeitdarstellung' },
+];
+
+/**
  * Der Text eines Abschnitts ohne seine Überschrift, ohne die Spiegelstriche in `skip` (Kopf
  * `- **<skip>**` samt Fortsetzungszeilen). Fehlt einer davon, bricht es ab: sonst stünde eine
  * umbenannte Regel still wieder in der README.
@@ -120,6 +129,9 @@ export function buildReadme(
   ];
   for (const { head, title, skip } of README_SECTIONS) {
     parts.push(`## ${title}`, '', cutSection(agents, head, skip), '');
+  }
+  for (const { head, title } of README_RULES) {
+    parts.push(`## ${title}`, '', cutBullet(agents, head), '');
   }
   return `${parts.join('\n').trimEnd()}\n`;
 }

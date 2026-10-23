@@ -7,6 +7,7 @@ import {
   useAnzeigeKonventionen,
 } from './AnzeigeKonventionenContext';
 import { setzeOverride } from './koordinatenSystemStore';
+import { setzeZeitdarstellung, zeitdarstellungVergessenFuerTests } from './zeitDarstellungStore';
 import type { EinsatzEinstellungen, OrgEinstellungen } from '../api/types';
 import { ApiError } from '../api/client';
 
@@ -43,7 +44,7 @@ function einstellungenMock(partial: Partial<EinsatzEinstellungen> = {}): Einsatz
     karten_zoom_start: null,
     fachebenen_sichtbar: null,
     zeitzone: null,
-    zeitformat: null,
+    zeitdarstellung: null,
     einheiten: null,
     koordinatenformat: null,
     etb_nummer_praefix: null,
@@ -72,7 +73,7 @@ function orgDefaultsMock(partial: Partial<OrgEinstellungen> = {}): OrgEinstellun
     org_id: 1,
     aufbewahrung_kategorien: [],
     zeitzone: null,
-    zeitformat: null,
+    zeitdarstellung: null,
     einheiten: null,
     koordinatenformat: null,
     retention_dauer_tage: null,
@@ -107,7 +108,7 @@ describe('useAnzeigeKonventionen', () => {
       karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: 'Europe/Berlin',
-      zeitformat: '12h',
+      zeitdarstellung: 'datum_uhrzeit',
       einheiten: 'metrisch',
       koordinatenformat: 'mgrs',
       etb_nummer_praefix: null,
@@ -135,8 +136,8 @@ describe('useAnzeigeKonventionen', () => {
     );
 
     await waitFor(() => expect(screen.getByTestId('koord').textContent).toBe('31U ES 77019 61520'));
-    // 09:00 UTC → Berlin 11:00, 12h-Format.
-    expect(screen.getByTestId('zeit').textContent).toBe('111100JUN2026');
+    // 09:00 UTC → Berlin 11:00, Darstellung „Datum und Uhrzeit“ des Einsatzes.
+    expect(screen.getByTestId('zeit').textContent).toBe('11.06.26 11:00');
     expect(screen.getByTestId('format').textContent).toBe('mgrs');
   });
 
@@ -148,7 +149,7 @@ describe('useAnzeigeKonventionen', () => {
       karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: null,
-      zeitformat: null,
+      zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: null,
       etb_nummer_praefix: null,
@@ -188,7 +189,7 @@ describe('useAnzeigeKonventionen', () => {
       karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: null,
-      zeitformat: null,
+      zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: 'wgs84',
       etb_nummer_praefix: null,
@@ -265,15 +266,15 @@ describe('useAnzeigeKonventionen', () => {
     expect(screen.getByTestId('koord').textContent).toBe('51.10000, 4.10000');
   });
 
-  it('zieht auch andere Konventionen (Zeitzone/Zeitformat/Einheiten) aus dem Org-Default', async () => {
+  it('zieht auch andere Konventionen (Zeitzone/Zeitdarstellung/Einheiten) aus dem Org-Default', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue(
       einstellungenMock({
         zeitzone: null,
-        zeitformat: null,
+        zeitdarstellung: null,
         einheiten: null,
         org_defaults: orgDefaultsMock({
           zeitzone: 'Europe/Berlin',
-          zeitformat: '12h',
+          zeitdarstellung: 'datum_uhrzeit',
           einheiten: 'imperial',
         }),
       }),
@@ -285,10 +286,10 @@ describe('useAnzeigeKonventionen', () => {
       </EinsatzAnzeigeProvider>,
     );
 
-    // 09:00 UTC → Berlin 11:00 taktisch; 5000 m → imperial; beides aus dem Org-Default. Auf die
-    // Distanz warten: die taktische Zeit kann zufällig dem Lokalzeit-Default gleichen.
+    // 09:00 UTC → Berlin 11:00 als „Datum und Uhrzeit“; 5000 m → imperial; alles aus dem
+    // Org-Default.
     await waitFor(() => expect(screen.getByTestId('distanz').textContent).toBe('3,11 mi'));
-    expect(screen.getByTestId('zeit').textContent).toBe('111100JUN2026');
+    expect(screen.getByTestId('zeit').textContent).toBe('11.06.26 11:00');
   });
 });
 
@@ -348,5 +349,95 @@ describe('OrgAnzeigeProvider — Zone außerhalb eines Einsatzes (LFH-692)', () 
       </OrgAnzeigeProvider>,
     );
     await waitFor(() => expect(screen.getByTestId('zone').textContent).toBe('Europe/Vienna'));
+  });
+});
+
+describe('Zeitdarstellung: Gerät vor Einsatz vor Organisation, Druck ohne Gerät (LLH-1053)', () => {
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => {
+    act(() => setzeZeitdarstellung(null));
+    localStorage.clear();
+    zeitdarstellungVergessenFuerTests();
+  });
+
+  it('die Gerätewahl wirkt sofort in einer offenen Ansicht', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue(
+      einstellungenMock({ zeitzone: 'Europe/Berlin' }),
+    );
+    renderMitProviders(
+      <EinsatzAnzeigeProvider einsatzId={1}>
+        <Sonde />
+      </EinsatzAnzeigeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('zeit').textContent).toBe('111100jun26'));
+
+    act(() => setzeZeitdarstellung('datum_uhrzeit'));
+    expect(screen.getByTestId('zeit').textContent).toBe('11.06.26 11:00');
+
+    act(() => setzeZeitdarstellung(null));
+    expect(screen.getByTestId('zeit').textContent).toBe('111100jun26');
+  });
+
+  it('wirkt auch ohne Browserspeicher bis zum Neuladen', async () => {
+    vi.stubGlobal('localStorage', null);
+    try {
+      vi.mocked(ladeEinstellungen).mockResolvedValue(
+        einstellungenMock({ zeitzone: 'Europe/Berlin' }),
+      );
+      renderMitProviders(
+        <EinsatzAnzeigeProvider einsatzId={1}>
+          <Sonde />
+        </EinsatzAnzeigeProvider>,
+      );
+      await waitFor(() => expect(screen.getByTestId('zeit').textContent).toBe('111100jun26'));
+      act(() => setzeZeitdarstellung('datum_uhrzeit'));
+      expect(screen.getByTestId('zeit').textContent).toBe('11.06.26 11:00');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('der Druck zeigt die Darstellung des Einsatzes, auch wenn das Gerät anders gewählt hat', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue(
+      einstellungenMock({ zeitzone: 'Europe/Berlin', zeitdarstellung: 'taktisch' }),
+    );
+    act(() => setzeZeitdarstellung('datum_uhrzeit'));
+    renderMitProviders(
+      <EinsatzAnzeigeProvider einsatzId={1}>
+        <Sonde />
+      </EinsatzAnzeigeProvider>,
+    );
+    await waitFor(() => expect(ladeEinstellungen).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(screen.getByTestId('zeit').textContent).toBe('11.06.26 11:00'));
+
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    expect(screen.getByTestId('zeit').textContent).toBe('111100jun26');
+
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
+    expect(screen.getByTestId('zeit').textContent).toBe('11.06.26 11:00');
+  });
+
+  it('der Druck folgt der Organisation, wenn der Einsatz nichts vorgibt', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue(
+      orgDefaultsMock({ zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' }),
+    );
+    act(() => setzeZeitdarstellung('taktisch'));
+    renderMitProviders(
+      <OrgAnzeigeProvider>
+        <Sonde />
+      </OrgAnzeigeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('zeit').textContent).toBe('111100jun26'));
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    expect(screen.getByTestId('zeit').textContent).toBe('11.06.26 11:00');
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
   });
 });

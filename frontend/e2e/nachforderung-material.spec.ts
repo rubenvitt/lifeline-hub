@@ -7,7 +7,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Browser: Nachforderung per API absetzen und bis „Eingetroffen“ schalten → „Als Material
  * übernehmen“ → Gerät, Ort wählen → „Übernehmen“; die Karte zeigt den Posten, das ETB die
  * Herkunft. Zweiter Weg „Weiteren Posten übernehmen“. Danach führt der Verweis an der
- * Materialzeile zurück auf die hervorgehobene Karte. Gewartet wird auf Inhaltsanker, nie auf
+ * Materialzeile zurück auf die hervorgehobene Karte. Dazu der Weg für schon erfasstes Material:
+ * „Erfassten Posten zuordnen …“ (LLH-1259). Gewartet wird auf Inhaltsanker, nie auf
  * `networkidle` (LFH-385).
  */
 
@@ -104,5 +105,58 @@ test('eingetroffene Tauchpumpen als Material übernehmen, ergänzen und über de
   await expect(eingetroffen.locator(`[data-nachforderung-id="${nfId}"]`)).toHaveAttribute(
     'data-hervorgehoben',
     'true',
+  );
+});
+
+test('vorhandenen Posten einer eingetroffenen Nachforderung zuordnen: die Karte zählt ihn, die Rücknahme ist gesperrt (LLH-1259)', async ({
+  page,
+}) => {
+  const { einsatzId, nfId } = await seed(page);
+  const basis = `/api/einsaetze/${einsatzId}`;
+  // Das Material stand schon von Hand im Einsatz, bevor die Nachforderung eintraf.
+  const posten = await post(page, `${basis}/material`, {
+    adhoc: { bezeichnung: 'Tauchpumpe THW' },
+    menge: 1,
+  });
+  await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
+  const eingetroffen = page.locator('[data-lfh="board-spalte"][data-stufe="eingetroffen"]');
+  const karte = eingetroffen.locator(`[data-nachforderung-id="${nfId}"]`);
+  await expect(karte).toContainText(BEDARF);
+
+  await karte.getByRole('button', { name: 'Erfassten Posten zuordnen …' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Erfassten Posten „Tauchpumpe“ zuordnen' });
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  await waehleIn(dialog.getByRole('combobox', { name: 'Posten' }), 'Tauchpumpe THW · 1 · ohne Ort');
+  const antwort = page.waitForResponse(
+    (r) =>
+      r.url().endsWith(`${basis}/material/${posten.id}/nachforderung`) &&
+      r.request().method() === 'POST',
+  );
+  await dialog.getByRole('button', { name: 'Zuordnen' }).click();
+  expect((await antwort).status()).toBe(200);
+  await expect(dialog).toHaveCount(0);
+
+  // Die Karte zählt den Posten wie eine Übernahme; kein zweiter Posten ist entstanden.
+  await expect(karte).toContainText('Tauchpumpe THW · 1 · ohne Ort');
+  await expect(karte).toContainText('übernommen 1 von 3');
+  await expect(karte.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeVisible();
+  const material = await page.request.get(`${basis}/material`);
+  expect(((await material.json()) as unknown[]).length).toBe(1);
+  await expect
+    .poll(() => etbInhalte(page, einsatzId))
+    .toContain(`Material «Tauchpumpe THW» (×1) mit Nachforderung «${BEDARF}» verknüpft`);
+
+  // Die Rücknahme auf „Unterwegs“ ist gesperrt, wie nach einer Übernahme.
+  const ruecknahme = await page.request.post(`${basis}/nachforderungen/${nfId}/status`, {
+    data: { status: 'unterwegs' },
+  });
+  expect(ruecknahme.status()).toBe(422);
+  expect(await ruecknahme.json()).toMatchObject({
+    error: 'Aus der Nachforderung ist Material übernommen',
+  });
+  await page.reload();
+  await expect(eingetroffen.locator(`[data-nachforderung-id="${nfId}"]`)).toContainText(
+    'übernommen 1 von 3',
   );
 });

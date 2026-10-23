@@ -185,14 +185,14 @@ describe('useDrucken / DruckKnopf', () => {
       );
       await screen.findByText(ORG.name);
       expect(document.querySelector('[data-lfh="druckkopf"]')!.textContent).toContain(
-        '162130JUL2026',
+        '162130jul26',
       );
 
       // Stunden später: 15:45 UTC = 00:45 am Folgetag in Tokio.
       vi.setSystemTime(new Date('2026-07-16T15:45:00Z'));
       await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
       await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
-      expect(aufPapier).toContain('170045JUL2026');
+      expect(aufPapier).toContain('170045jul26');
     } finally {
       vi.useRealTimers();
     }

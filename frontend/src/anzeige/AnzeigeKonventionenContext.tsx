@@ -9,6 +9,9 @@ import { ladeEinstellungen } from '../api/einsaetze';
 import { ladeOrgEinstellungen } from '../api/orgEinstellungen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { useKoordinatenSystemOverride } from './koordinatenSystemStore';
+import { useZeitdarstellungGeraet } from './zeitDarstellungStore';
+import { useDruckModus } from '../components/druck/useDruckModus';
+import { uhrzeit, wirksameZeitdarstellung, zeitKurz, zeitpunkt } from './zeitDarstellung';
 import {
   DEFAULT_KONVENTIONEN,
   effektivesKoordinatenformat,
@@ -21,7 +24,13 @@ import {
 
 interface AnzeigeKonventionenHook {
   konventionen: AnzeigeKonventionen;
+  /** Die drei Rollen aus `zeitDarstellung.ts`, an Zone und wirksame Darstellung gebunden. */
+  zeitpunkt: (utcStr?: string | null) => string;
+  zeitKurz: (utcStr?: string | null) => string;
+  uhrzeit: (utcStr?: string | null) => string;
+  /** @deprecated `zeitpunkt` (LLH-1053). */
   formatZeit: (utcStr?: string | null) => string;
+  /** @deprecated `zeitKurz` (LLH-1053). */
   formatZeitKurz: (utcStr?: string | null) => string;
   formatKoordinate: (lat: number, lon: number) => string;
   formatDistanz: (meter: number) => string;
@@ -31,6 +40,9 @@ interface AnzeigeKonventionenHook {
 function bindeFormatter(konventionen: AnzeigeKonventionen): AnzeigeKonventionenHook {
   return {
     konventionen,
+    zeitpunkt: (s) => zeitpunkt(s, konventionen),
+    zeitKurz: (s) => zeitKurz(s, konventionen),
+    uhrzeit: (s) => uhrzeit(s, konventionen),
     formatZeit: (s) => formatZeit(s, konventionen),
     formatZeitKurz: (s) => formatZeitKurz(s, konventionen),
     formatKoordinate: (lat, lon) => formatKoordinate(lat, lon, konventionen),
@@ -82,6 +94,10 @@ export function EinsatzAnzeigeProvider({
   });
 
   const override = useKoordinatenSystemOverride();
+  // Zeitdarstellung: Gerät vor Einsatz vor Organisation; im Druck nie das Gerät (LLH-1053, E4).
+  // `useDruckModus` rendert per `flushSync` vor dem Einfrieren des Druckbilds.
+  const zeitGeraet = useZeitdarstellungGeraet();
+  const druckt = useDruckModus();
   // Umgebender Provider (z. B. `OrgAnzeigeProvider` über der Archivakte): greift, wenn die
   // Einsatz-Einstellungen nicht lesbar sind (LFH-692, Spec `zeiteingabe`, „Zone außerhalb eines
   // Einsatzes“). Ohne umgebenden Provider sind das die Defaults — Alt-Verhalten.
@@ -92,7 +108,13 @@ export function EinsatzAnzeigeProvider({
     // Backend-Resolver `effektive_*`.
     const konventionen: AnzeigeKonventionen = {
       zeitzone: data?.zeitzone ?? data?.org_defaults?.zeitzone ?? aussen.zeitzone ?? null,
-      zeitformat: data?.zeitformat ?? data?.org_defaults?.zeitformat ?? aussen.zeitformat ?? null,
+      zeitdarstellung: wirksameZeitdarstellung({
+        geraet: zeitGeraet,
+        einsatz: data?.zeitdarstellung,
+        // Der umgebende Provider rechnet selbst schon Gerät und Druck ein.
+        org: data?.org_defaults?.zeitdarstellung ?? aussen.zeitdarstellung,
+        druck: druckt,
+      }),
       einheiten: data?.einheiten ?? data?.org_defaults?.einheiten ?? aussen.einheiten ?? null,
       // Der app-weite Anwender-Override (localStorage) sticht zusätzlich alles.
       koordinatenformat: effektivesKoordinatenformat(
@@ -104,17 +126,19 @@ export function EinsatzAnzeigeProvider({
     return bindeFormatter(konventionen);
   }, [
     data?.zeitzone,
-    data?.zeitformat,
+    data?.zeitdarstellung,
     data?.einheiten,
     data?.koordinatenformat,
     data?.org_defaults?.zeitzone,
-    data?.org_defaults?.zeitformat,
+    data?.org_defaults?.zeitdarstellung,
     data?.org_defaults?.einheiten,
     data?.org_defaults?.koordinatenformat,
     aussen.zeitzone,
-    aussen.zeitformat,
+    aussen.zeitdarstellung,
     aussen.einheiten,
     override,
+    zeitGeraet,
+    druckt,
   ]);
 
   return (
@@ -137,16 +161,30 @@ export function OrgAnzeigeProvider({ children }: { children: ReactNode }) {
     retry: false,
   });
   const override = useKoordinatenSystemOverride();
+  const zeitGeraet = useZeitdarstellungGeraet();
+  const druckt = useDruckModus();
 
   const wert = useMemo<AnzeigeKonventionenHook>(
     () =>
       bindeFormatter({
         zeitzone: data?.zeitzone ?? null,
-        zeitformat: data?.zeitformat ?? null,
+        zeitdarstellung: wirksameZeitdarstellung({
+          geraet: zeitGeraet,
+          org: data?.zeitdarstellung,
+          druck: druckt,
+        }),
         einheiten: data?.einheiten ?? null,
         koordinatenformat: effektivesKoordinatenformat(override, null, data?.koordinatenformat),
       }),
-    [data?.zeitzone, data?.zeitformat, data?.einheiten, data?.koordinatenformat, override],
+    [
+      data?.zeitzone,
+      data?.zeitdarstellung,
+      data?.einheiten,
+      data?.koordinatenformat,
+      override,
+      zeitGeraet,
+      druckt,
+    ],
   );
 
   return (

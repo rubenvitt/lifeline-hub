@@ -322,7 +322,7 @@ describe('GefahrenPage', () => {
       const stand = await screen.findByText(/^beurteilt /, {
         selector: '[data-lfh="beurteilung-stand"]',
       });
-      expect(stand).toHaveTextContent(/^beurteilt \d{6}[A-Z]{3}\d{4} · Einsatzleitung$/);
+      expect(stand).toHaveTextContent(/^beurteilt \d{6}[a-z]{3}\d{2} · Einsatzleitung$/);
       expect(screen.queryByText('nicht beurteilt')).toBeNull();
     });
 
@@ -625,7 +625,7 @@ describe('GefahrenPage · Druck (LLH-1364)', () => {
     expect(kopf).not.toBeNull();
     expect(kopf).toHaveTextContent('Gefahrenbewertung – Nord');
     expect(kopf).toHaveTextContent(/Warnstufe\s*hoch/);
-    expect(kopf).toHaveTextContent(/Beurteilung\s*beurteilt \d{6}[A-Z]{3}\d{4} · Einsatzleitung/);
+    expect(kopf).toHaveTextContent(/Beurteilung\s*beurteilt \d{6}[a-z]{3}\d{2} · Einsatzleitung/);
     const liste = w!.querySelector<HTMLElement>('[data-lfh="gefahren-erlaeuterungen"]');
     expect(liste).not.toBeNull();
     expect(liste).toHaveTextContent('Elektrizität × Menschen');
