@@ -670,6 +670,47 @@ pub async fn require_aktiv_tx(
     }
 }
 
+/// Setzt den Bezug eines Postens auf die Nachforderung `nachforderung_id` (LLH-1259, design.md
+/// D2). Posten ([`check_verknuepfbar_tx`]) und Nachforderung
+/// (`nachforderung::repo::check_uebernahme_tx`) prüft der Aufrufer vorher in derselben
+/// Transaktion; die Bedingungen im UPDATE sind nur das Netz dahinter.
+pub async fn set_nachforderung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    nachforderung_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_material SET nachforderung_id = ? \
+         WHERE id = ? AND einsatz_id = ? AND nachforderung_id IS NULL AND beendet_als IS NULL",
+    )
+    .bind(nachforderung_id)
+    .bind(em_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Darf der Posten eine Nachforderung bekommen (LLH-1259, design.md D2)? Unbekannt oder fremd
+/// 404, beendet 409 ([`beendet_conflict`]), schon mit Bezug 409 (ein Posten wird nicht
+/// umgehängt). Liefert den Posten (Bezeichnung und Menge für den ETB-Text).
+pub async fn check_verknuepfbar_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+) -> Result<EinsatzMaterialAnzeige, AppError> {
+    require_aktiv_tx(&mut *conn, einsatz_id, em_id).await?;
+    let posten = load_anzeige_tx(&mut *conn, einsatz_id, em_id, true).await?;
+    if posten.nachforderung_id.is_some() {
+        return Err(AppError::Conflict(format!(
+            "«{}» ist schon aus einer Nachforderung übernommen",
+            posten.bezeichnung
+        )));
+    }
+    Ok(posten)
+}
+
 /// Der 409 an beendetem Material (Lebenszyklus), je Endzustand.
 pub fn beendet_conflict(beendet_als: &str) -> AppError {
     AppError::Conflict(match beendet_als {

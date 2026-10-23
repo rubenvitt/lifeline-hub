@@ -398,6 +398,21 @@ pub fn etb_text_aus_nachforderung(basis: &str, nachforderung_bezeichnung: &str) 
     format!("{basis}, aus Nachforderung «{nachforderung_bezeichnung}»")
 }
 
+/// System-ETB beim nachträglichen Verknüpfen eines vorhandenen Postens mit einer eingetroffenen
+/// Nachforderung (LLH-1259, design.md D3): „Material «Feldbetten» (×20) mit Nachforderung
+/// «20 Feldbetten» verknüpft“. Die Bezeichnung der Nachforderung ist auf
+/// [`crate::nachforderung::BEZEICHNUNG_MAX`] begrenzt.
+pub fn etb_text_mit_nachforderung_verknuepft(
+    bezeichnung: &str,
+    menge: i64,
+    nachforderung_bezeichnung: &str,
+) -> String {
+    format!(
+        "Material «{bezeichnung}» (×{menge}) mit Nachforderung «{nachforderung_bezeichnung}» \
+         verknüpft"
+    )
+}
+
 /// System-ETB bei jedem Ortswechsel eines Postens, auf jedem Weg (LLH-1224, design.md D11): alter
 /// und neuer Ort im Wortlaut von [`ort::ort_text_tx`], leer „ohne Ort“.
 pub fn etb_text_ort_gewechselt(

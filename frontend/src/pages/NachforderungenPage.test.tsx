@@ -20,6 +20,7 @@ import {
   NACHFORDERUNG_ABLEHNEN_GRUND_MAX,
   NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX,
 } from '../api/eingabegrenzen';
+import { waehle } from '../test/auswahlListe';
 
 /*
  * Die Uhr steht auf dem Einsatztag (nur `Date`): „Eingetroffen“ zeigt die letzten 12 h, die
@@ -516,7 +517,7 @@ describe('NachforderungenPage', () => {
       within(karte as HTMLElement)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Als Einheit übernehmen', 'Als Material übernehmen']);
+    ).toEqual(['Als Einheit übernehmen', 'Als Material übernehmen', 'Erfassten Posten zuordnen …']);
     expect(stufeVon('2 RTW zur Verstärkung')).toBe('eingetroffen');
   });
 
@@ -1097,6 +1098,36 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     renderPage();
     expect(await screen.findByText('Sandsäcke · 1200 · ohne Ort')).toBeInTheDocument();
     expect(screen.getByText('übernommen 1200 von 2000')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeInTheDocument();
+  });
+
+  // LLH-1259 D5: ein schon von Hand erfasster Posten wird zugeordnet, die Karte zählt ihn danach.
+  it('ordnet einen vorhandenen Posten zu: POST an den eigenen Schreibweg, die Karte zählt ihn', async () => {
+    let verknuepft = false;
+    listeNachforderungen.mockImplementation(() =>
+      Promise.resolve([sandsaecke({ material_ids: verknuepft ? [7] : [] })]),
+    );
+    materialServer(() => [posten({ nachforderung_id: verknuepft ? 4 : null })]);
+    const aufrufe: { em: string; koerper: unknown }[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/material/:em/nachforderung', async ({ request, params }) => {
+        aufrufe.push({ em: String(params.em), koerper: await request.json() });
+        verknuepft = true;
+        return HttpResponse.json(posten());
+      }),
+    );
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Erfassten Posten zuordnen …' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Erfassten Posten „Sandsäcke“ zuordnen');
+    await within(dialog).findByRole('combobox', { name: 'Posten' });
+    await waehle('Posten', 'Sandsäcke · 1200 · ohne Ort');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
+    await waitFor(() => expect(aufrufe).toEqual([{ em: '7', koerper: { nachforderung_id: 4 } }]));
+    expect(await screen.findByText('Posten zugeordnet')).toBeInTheDocument();
+    expect(await screen.findByText('übernommen 1200 von 2000')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeInTheDocument();
   });
 
