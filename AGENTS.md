@@ -29,12 +29,15 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server |
 | `frontend/src/geraet/AGENTS.md` | Gekoppelte Geräte: Hülle, Funktionsansichten, Stellenbindung, Lagemonitor, Client und Server |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
+| `docs/architektur/AGENTS.md` | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs) und ihre Prüfungen |
 | `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Bilder und Bildlauf, Wächter, Mitänderungsregel, Kapitelpakete, Hilfe in der App |
 | `src/AGENTS.md` | Statuscodes, Typ-Codegen, Anhänge, Schutzköpfe, Admin-Schreibwege am Einsatz, Org-Ereignisse, Benachrichtigungen, Demo-Daten, Aufbewahrung, ClamAV |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
 | `scripts/AGENTS.md` | Sammel-Gate im Detail, Werkzeugversionen, Bauziel, Advisories, Release |
 
+- **Vor einer Änderung `scripts/adr-fuer.sh <pfad>…`**: nennt die Architekturentscheidungen
+  (`docs/architektur/entscheidungen/`), die für die Dateien gelten, mit ihren Regeln.
 - **Eine Regel steht genau einmal**, in der Datei des Bereichs, der sie trägt; eine neue
   Bereichsdatei kommt in diese Tabelle. Diese Datei bleibt unter 200 Zeilen: was nur einen
   Bereich betrifft, gehört nicht hierher.

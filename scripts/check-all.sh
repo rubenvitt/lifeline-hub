@@ -27,7 +27,8 @@ set -euo pipefail
 #                    Migrationsnummern gegen origin/alpha,
 #                    Werkzeugversionen aus mise.toml,
 #                    fertige OpenSpec-Changes archiviert,
-#                    Schreibweisen der Dateinamen            (Sekunden bis ~1:30)
+#                    Schreibweisen der Dateinamen,
+#                    Architekturdoku und ihre Entscheidungen (Sekunden bis ~1:30)
 #   --nur rust       cargo test (Workspace, Hülle getrennt),
 #                    Dev-Seed mit Feature dev-seeds          (~19 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
@@ -91,7 +92,7 @@ FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=15
+SCHRITTE=16
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -105,7 +106,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die fünfzehn Schritte, je als Funktion ───────────────────────────────────────────
+# ── Die sechzehn Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -391,17 +392,27 @@ schritt_15() {
   ohne_dev_env cargo test "${auswahl[@]}" --test dev_present --bin lifeline-hub
 }
 
+schritt_16() {
+  echo "==> [16/$SCHRITTE] Architekturdoku vollständig, Entscheidungen gelten (LLH-1435)"
+  # Kapitel 5 nennt jedes Modul, jede akzeptierte ADR besteht ihre Prüfung (docs/architektur/
+  # AGENTS.md). Erst der Selbsttest, dann die Prüfung: der Wächter irrt in beide Richtungen still
+  # (ließe er ein neues Modul durch, veraltete die Bausteinsicht unbemerkt; schlüge er auf eine
+  # gültige Doku an, würde er abgeschaltet).
+  "$ROOT/scripts/check-architektur.test.sh"
+  "$ROOT/scripts/check-architektur.sh"
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Suiten bekommen je einen eigenen Runner. Schritt 15 fährt
 # im Bündel `rust` mit: er nutzt die Abhängigkeiten, die Schritt 4 gerade gebaut hat.
-BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13 14"
+BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13 14 16"
 BUENDEL_rust="4 15"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16"
 
-# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die fünfzehn Schritte, jeden einmal —
+# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die sechzehn Schritte, jeden einmal —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
