@@ -847,9 +847,7 @@ export default function UeberblickPage() {
                         minWidth: 52,
                       }}
                     >
-                      <span style={{ ...monoStil(13), color: markenFarbe(m) }}>
-                        {kurz(m.zeit)}
-                      </span>
+                      <span style={{ ...monoStil(13), color: markenFarbe(m) }}>{kurz(m.zeit)}</span>
                       <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
                     </span>
                     <span

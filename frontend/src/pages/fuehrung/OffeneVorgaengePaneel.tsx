@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import dayjs from 'dayjs';
 import type { Abloesung, Auftrag, Erinnerung, Meldung, Nachforderung } from '../../api/types';
 import { formatVor } from '../../anzeige/abstand';
-import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
+import { leereUhrzeit, zeitKurz } from '../../anzeige/zeitDarstellung';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { einstufungOf } from '../../abloesung/einstufung';
 import { berechneAbloesungZaehler } from '../../einsatz/useModulZaehler';
@@ -120,8 +120,8 @@ export default function OffeneVorgaengePaneel({
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const zeile = listenZeileStil(rollen, token);
-  const uhrzeit = (s: string | null | undefined) => formatUhrzeit(s, konventionen);
-  const frist = (s: string | null | undefined) => formatUhrzeitMitTag(s, konventionen);
+  const kurz = (s: string | null | undefined) =>
+    zeitKurz(s, konventionen) || leereUhrzeit(konventionen);
   const meine = sicht === 'meine';
   const zahlWort = meine ? 'im Einsatz' : undefined;
   const leerText = meine ? 'keine für meine Stelle' : 'keine';
@@ -289,7 +289,7 @@ export default function OffeneVorgaengePaneel({
                 data-alarm={alarm || undefined}
                 style={mitKante(alarm)}
               >
-                {zeit(uhrzeit(m.eingang_at))}
+                {zeit(kurz(m.eingang_at))}
                 {text(
                   m.inhalt,
                   [m.absender && `von ${m.absender}`, m.empfaenger && `an ${m.empfaenger}`]
@@ -331,12 +331,12 @@ export default function OffeneVorgaengePaneel({
               data-alarm={a.ist_ueberfaellig || undefined}
               style={mitKante(a.ist_ueberfaellig)}
             >
-              {zeit(uhrzeit(a.erteilt_at))}
+              {zeit(kurz(a.erteilt_at))}
               {text(
                 a.auftrag_text,
                 [
                   empfaengerText(a) ? `an ${empfaengerText(a)}` : 'ohne Empfänger',
-                  a.frist_at ? `Frist ${frist(a.frist_at)}` : 'ohne Frist',
+                  a.frist_at ? `Frist ${kurz(a.frist_at)}` : 'ohne Frist',
                 ].join(' · '),
               )}
               {a.ist_ueberfaellig
@@ -379,10 +379,7 @@ export default function OffeneVorgaengePaneel({
                 {zeit(formatVor(n.angefordert_at, jetzt))}
                 {text(
                   nachforderungName(n),
-                  [
-                    `an ${adressatText(n)}`,
-                    n.benoetigt_bis ? `bis ${frist(n.benoetigt_bis)}` : null,
-                  ]
+                  [`an ${adressatText(n)}`, n.benoetigt_bis ? `bis ${kurz(n.benoetigt_bis)}` : null]
                     .filter(Boolean)
                     .join(' · '),
                 )}
@@ -406,7 +403,7 @@ export default function OffeneVorgaengePaneel({
           zeile: (e) => (
             // Kein Einzeldeeplink: die Erinnerungsseite kennt keinen `?erinnerung=` (design.md D6).
             <Link to={erinnerungenPfad(einsatzId)} data-lfh="vorgang-erinnerung" style={zeile}>
-              {zeit(frist(e.faellig_at))}
+              {zeit(kurz(e.faellig_at))}
               {text(e.titel, e.empfaenger_anzeige ? `an ${e.empfaenger_anzeige}` : null)}
               {e.ist_faellig ? wort('fällig', 'achtung') : wort('bald', null)}
             </Link>
@@ -433,7 +430,7 @@ export default function OffeneVorgaengePaneel({
                 data-alarm={ueberfaellig || undefined}
                 style={mitKante(ueberfaellig)}
               >
-                {zeit(frist(a.faellig_at))}
+                {zeit(kurz(a.faellig_at))}
                 {text(a.einheit_name, a.abschnitt_name ?? null)}
                 {ueberfaellig ? wort('überfällig', 'alarm') : wort('bald fällig', 'achtung')}
               </Link>
