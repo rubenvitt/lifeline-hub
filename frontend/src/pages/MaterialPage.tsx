@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
@@ -196,6 +196,7 @@ const GRUPPIERUNG_OPTIONEN = [
 export default function MaterialPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { token } = theme.useToken();
   /**
    * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, Muster der Schadenliste); der
    * Hook gehört der Seite und steht vor jedem frühen Ausstieg.
@@ -903,7 +904,9 @@ export default function MaterialPage() {
        * Dialog mit Absende-Knopf im `<form>`. Vorher stand hier eine Maske, die direkt absendete.
        */
       aktionen={
-        <Space wrap style={{ minWidth: 0 }}>
+        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+        // `paddingXS` ließ 3 / 5 / 7 px.
+        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
           {/* Gruppierung (LLH-1225 D4): eine Segmentleiste darf im Kopf stehen
               (`frontend/AGENTS.md`, „Nebenwege im Kopf“); je Einsatz im State, ohne Speicher. */}
           <Segmentleiste<Gruppierung>

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
-import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
+import { renderMitProviders as renderMitBasisProviders, sortTarget } from '../test/utils';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import { dichten } from '../theme/tokens';
@@ -1507,9 +1507,13 @@ describe('Datensicht · Tabellenzweig', () => {
 
     // Sortiert wird im Primitiv; die Tabelle bekommt nur `sorter: true` für den Pfeil. Antds Zyklus
     // endet in „keine Sortierung", also wieder der Serverordnung.
-    await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
+    await userEvent.click(
+      sortTarget(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!),
+    );
     expect(namen(container)).toEqual(['Rotkreuz 2', 'Florian 3', 'Florian 1']);
-    await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
+    await userEvent.click(
+      sortTarget(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!),
+    );
     expect(namen(container)).toEqual(['Florian 1', 'Rotkreuz 2', 'Florian 3']);
 
     await userEvent.type(
@@ -1529,7 +1533,9 @@ describe('Datensicht · Tabellenzweig', () => {
     expect(
       [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent),
     ).toEqual(['Florian 1', 'Florian 3', 'Rotkreuz 2']);
-    await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
+    await userEvent.click(
+      sortTarget(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!),
+    );
     expect(onSortierung).toHaveBeenCalledWith({ spalte: 'funkrufname', richtung: 'ab' });
 
     // Kontrolliert heißt kontrolliert: ohne Zutun des Aufrufers bleibt die Anzeige stehen.

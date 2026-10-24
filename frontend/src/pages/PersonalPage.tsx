@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Button, Space, Tag } from 'antd';
+import { Alert, Breadcrumb, Button, Space, Tag, theme } from 'antd';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -104,6 +104,7 @@ const GEDAECHTNIS_AUS_DATEN: readonly PersonalSpalteKey[] = [
 export default function PersonalPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { token } = theme.useToken();
   /**
    * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, Muster der Schadenliste); der
    * Hook gehört der Seite und steht vor jedem frühen Ausstieg.
@@ -580,7 +581,9 @@ export default function PersonalPage() {
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
       aktionen={
         darfSchreiben && (
-          <Space wrap style={{ minWidth: 0 }}>
+          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+          // `paddingXS` ließ 3 / 5 / 7 px.
+          <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
             <Button type="primary" onClick={() => setDisponierenOffen(true)}>
               Personal disponieren
             </Button>
