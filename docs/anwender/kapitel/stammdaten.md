@@ -310,7 +310,9 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
   und der Planungsvorlauf, wie lange vorher der Hinweis „Keine ablösende Einheit geplant“
   erscheint, solange keine geplant ist (Kapitel [Ablösung](abloesung.md)); beide höchstens einen
   Tag und mit dem Modell in den Einsatz übernommen.
-- Dauern stehen als „8 h“, „7:30 h“ oder „45 min“, Wechselzeiten taktisch wie „0600/1800“.
+- Dauern stehen als „8 h“, „7:30 h“ oder „45 min“. Wechselzeiten stehen in der Zeitdarstellung,
+  taktisch wie „0600/1800“, bei „Datum und Uhrzeit“ wie „06:00/18:00“; im Feld „Wechselzeiten“
+  stehen sie immer taktisch.
 - Höchstens ein Modell ist die „Vorgabe der Organisation“. Wer ein anderes als Vorgabe setzt,
   nimmt dem bisherigen die Markierung ab. Jeder neue Einsatz bekommt eine Kopie der Vorgabe; die
   Einsatzanlage nennt sie als „Schichtmodell: … (Vorgabe)“. Ohne Vorgabe bekommt ein Einsatz
@@ -324,7 +326,7 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
 ### Verpflegungsplan
 
 - Uhrzeiten lassen sich als „0630“, „06:30“, „630“ oder „6:30“ eintragen; die Tabelle zeigt sie
-  als „0630–0800“. Ein Ende vor dem Beginn heißt: die Mahlzeit endet am nächsten Tag, die Tabelle
+  als „0630–0800“, bei „Datum und Uhrzeit“ als „06:30–08:00“. Ein Ende vor dem Beginn heißt: die Mahlzeit endet am nächsten Tag, die Tabelle
   zeigt dann „+1 Tag“. Ende und Beginn dürfen nicht gleich sein.
 - Unter den aktiven Mahlzeiten ist jede Bezeichnung nur einmal erlaubt, ohne Unterschied von
   Groß- und Kleinschreibung. Eine Mahlzeit lässt sich nicht löschen, nur deaktivieren; das fragt
