@@ -1200,7 +1200,9 @@ async function materialSaeen(page: Page, einsatzId: string) {
     adhoc: { bezeichnung: 'Feldbett' },
     menge: 4,
   });
-  const zuordnung = await page.request.put(`${E}/einheiten/${einheit.id}/material/${verortet.id}`);
+  const zuordnung = await page.request.patch(`${E}/material/${verortet.id}`, {
+    data: { einheit_id: einheit.id },
+  });
   expect(zuordnung.ok(), `Einheit zuordnen: ${zuordnung.status()}`).toBe(true);
   const verortung = await page.request.patch(`${E}/material/${feldbett.id}`, {
     data: { uhs_id: uhs.id },

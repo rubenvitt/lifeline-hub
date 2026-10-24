@@ -444,19 +444,10 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let em = json["id"].as_i64().unwrap();
     let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
 
-    // Zuordnen.
-    assert_eq!(
-        anfrage(
-            &app,
-            "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
-            &admin,
-            None
-        )
-        .await
-        .0,
-        StatusCode::NO_CONTENT
-    );
+    // Zuordnen über die Material-Disposition (LLH-1253: die Einheiten-Route gibt es nicht mehr).
+    let zuordnen = format!(r#"{{"einheit_id":{eid}}}"#);
+    let (s, json) = material_patch(&app, &admin, einsatz, em, &zuordnen).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
     let (_, liste) = anfrage(
         &app,
         "GET",
@@ -484,19 +475,9 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
         .unwrap();
     assert_eq!(einheit["material_mitglieder"].as_array().unwrap().len(), 1);
 
-    // Explizit freigeben (HTTP-Route material_freigeben).
-    assert_eq!(
-        anfrage(
-            &app,
-            "DELETE",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
-            &admin,
-            None
-        )
-        .await
-        .0,
-        StatusCode::NO_CONTENT
-    );
+    // Explizit lösen: `einheit_id: null` lässt den Posten ohne Ort.
+    let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"einheit_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
     let (_, liste_frei) = anfrage(
         &app,
         "GET",
@@ -510,14 +491,8 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
         "Freigeben löst die Zuordnung"
     );
     // Wieder zuordnen, damit der anschließende Auflösen-Block weiterhin greift.
-    anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, json) = material_patch(&app, &admin, einsatz, em, &zuordnen).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
 
     // Auflösen gibt Material frei.
     assert_eq!(
@@ -544,23 +519,6 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
         liste2.as_array().unwrap()[0]["einheit_id"].is_null(),
         "Auflösen gibt Material frei"
     );
-}
-
-#[tokio::test]
-async fn fremde_em_id_an_einheit_ist_404() {
-    let app = setup().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
-    let (status, _) = anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/999999"),
-        &admin,
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 /// LFH-66: Jede Material-Mutation publiziert ein `material`-Live-Event — auch eine
@@ -626,18 +584,15 @@ async fn material_an_einheit_zuordnen_publiziert_material_event() {
 
     // Erst NACH dem Aufbau abonnieren → isoliert die Events der Zuordnung.
     let mut rx = live.abonniere(einsatz);
-    assert_eq!(
-        anfrage(
-            &app,
-            "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
-            &admin,
-            None
-        )
-        .await
-        .0,
-        StatusCode::NO_CONTENT
-    );
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        &format!(r#"{{"einheit_id":{eid}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
 
     // Unter den publizierten Events (einheit/etb/material) muss ein `material`-Event sein.
     let mut events = Vec::new();
@@ -817,15 +772,15 @@ async fn create_uhs(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -
 
 async fn in_einheit(app: &axum::Router, cookie: &str, einsatz: i64, em: i64) -> i64 {
     let einheit = einheit_bilden(app, cookie, einsatz, "1. Zug").await;
-    let (s, _) = anfrage(
+    let (s, json) = material_patch(
         app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/material/{em}"),
         cookie,
-        None,
+        einsatz,
+        em,
+        &format!(r#"{{"einheit_id":{einheit}}}"#),
     )
     .await;
-    assert_eq!(s, StatusCode::NO_CONTENT, "Material der Einheit zuordnen");
+    assert_eq!(s, StatusCode::OK, "Material der Einheit zuordnen: {json}");
     einheit
 }
 
@@ -1105,19 +1060,12 @@ async fn material_aus_dem_einsatz_nehmen_stornieren_reaktivieren() {
         StatusCode::CONFLICT
     );
     let einheit = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
-    for (methode, pfad, body) in [
-        ("PATCH", format!("material/{decke}"), Some(r#"{"menge":2}"#)),
-        ("PUT", format!("einheiten/{einheit}/material/{decke}"), None),
+    for body in [
+        r#"{"menge":2}"#.to_string(),
+        format!(r#"{{"einheit_id":{einheit}}}"#),
     ] {
-        let (s, json) = anfrage(
-            &app,
-            methode,
-            &format!("/api/einsaetze/{einsatz}/{pfad}"),
-            &admin,
-            body,
-        )
-        .await;
-        assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
+        let (s, json) = material_patch(&app, &admin, einsatz, decke, &body).await;
+        assert_eq!(s, StatusCode::CONFLICT, "{body}: {json}");
     }
 
     let (s, _) = aktion(&app, &admin, einsatz, decke, "reaktivieren").await;
@@ -3570,4 +3518,89 @@ async fn verknuepfen_mit_vorhandenem_posten_braucht_ergaenzen() {
         material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
         vec![erste, em]
     );
+}
+
+/// Spec `material-modell`, „Ein Schreibweg für den Ort“, Scenario „Frühere Einheiten-Route“
+/// (LLH-1253): `PUT`/`DELETE …/einheiten/{eid}/material/{em}` gibt es nicht mehr. Beide sind 404,
+/// der Posten bleibt, wo er war, und kein ETB-Eintrag entsteht.
+#[tokio::test]
+async fn fruehere_einheiten_materialroute_ist_404_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let a = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+    let ohne_ort = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 3).await;
+    let an_a = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        an_a,
+        &format!(r#"{{"einheit_id":{a}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    for (methode, em) in [("PUT", ohne_ort), ("DELETE", an_a)] {
+        let (s, _) = anfrage(
+            &app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/einheiten/{a}/material/{em}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{methode}");
+    }
+    assert!(material_zeile(&app, &admin, einsatz, ohne_ort).await["einheit_id"].is_null());
+    assert_eq!(
+        material_zeile(&app, &admin, einsatz, an_a).await["einheit_id"],
+        a
+    );
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+}
+
+/// Spec `material-modell`, „Ein Schreibweg für den Ort“, Scenario „Einheiten-Recht ohne Freigabe
+/// Material“ (LLH-1253): ist das Modul Material ausgeblendet, kommt eine Person mit Schreibrecht
+/// im Einsatz auf keinem Weg an den Ort eines Postens, auch nicht über die Einheit.
+#[tokio::test]
+async fn ohne_freigabe_material_setzt_kein_weg_den_ort() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let a = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 3).await;
+    let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, frieda_id, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/material"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+
+    let (s, json) = material_patch(
+        &app,
+        &frieda,
+        einsatz,
+        em,
+        &format!(r#"{{"einheit_id":{a}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Material-Disposition: {json}");
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{a}/material/{em}"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "frühere Einheiten-Route");
+    assert!(material_zeile(&app, &admin, einsatz, em).await["einheit_id"].is_null());
 }

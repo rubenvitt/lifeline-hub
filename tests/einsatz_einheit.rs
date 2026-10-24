@@ -650,15 +650,15 @@ async fn liste_gliederung_mitglieder_staerke_und_sprechgruppen_je_einheit() {
     let mat_a = material_anlegen(&app, &admin, einsatz, "Wolldecke").await;
     let mat_b = material_anlegen(&app, &admin, einsatz, "Absperrband").await;
     for em in [mat_b, mat_a] {
-        let (s, _) = anfrage(
+        let (s, json) = anfrage(
             &app,
-            "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{verpflegung}/material/{em}"),
+            "PATCH",
+            &format!("/api/einsaetze/{einsatz}/material/{em}"),
             &admin,
-            None,
+            Some(&format!(r#"{{"einheit_id":{verpflegung}}}"#)),
         )
         .await;
-        assert_eq!(s, StatusCode::NO_CONTENT);
+        assert_eq!(s, StatusCode::OK, "{json}");
     }
 
     // ── EIN Listenabruf, dann Feld für Feld prüfen ──────────────────────────
@@ -1659,16 +1659,16 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
         async move {
             anfrage(
                 &app,
-                "PUT",
-                &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/material/{em}"),
                 &admin,
-                None,
+                Some(&format!(r#"{{"einheit_id":{eid}}}"#)),
             )
             .await
         }
     };
     let (s, json) = zuordnen(a).await;
-    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    assert_eq!(s, StatusCode::OK, "{json}");
     let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
     assert!(texte
         .iter()
@@ -1676,7 +1676,7 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
 
     let mut rx = live.abonniere(einsatz);
     let (s, json) = zuordnen(b).await;
-    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    assert_eq!(s, StatusCode::OK, "{json}");
     let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
     assert!(
         texte
@@ -1712,7 +1712,7 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
 
     let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
     let (s, _) = zuordnen(b).await;
-    assert_eq!(s, StatusCode::NO_CONTENT, "dieselbe Einheit");
+    assert_eq!(s, StatusCode::OK, "dieselbe Einheit");
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
     assert_eq!(
         common::objekt_ereignisse(&mut rx, &[("einheit", "einheit_id")]),
@@ -1722,15 +1722,15 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
 
     // Mit einem Mitglied bleibt die Einheit beim Auflösen als aufgelöst stehen (LLH-1079).
     let trage = material_anlegen(&app, &admin, einsatz, "Trage").await;
-    let (s, _) = anfrage(
+    let (s, json) = anfrage(
         &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{a}/material/{trage}"),
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{trage}"),
         &admin,
-        None,
+        Some(&format!(r#"{{"einheit_id":{a}}}"#)),
     )
     .await;
-    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(s, StatusCode::OK, "{json}");
     let (s, _) = anfrage(
         &app,
         "DELETE",
