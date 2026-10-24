@@ -20,7 +20,7 @@
 
 ## 4. Abschluss
 
-- [ ] 4.1 `./scripts/check-all.sh` (mindestens die Bündel für Backend und Frontend) grün. Verifikation: Ausgabe des Laufs, sonst die CI des PRs.
+- [x] 4.1 `./scripts/check-all.sh` (mindestens die Bündel für Backend und Frontend) grün. Verifikation: Ausgabe des Laufs, sonst die CI des PRs. (Lokal: Bündel `schnell` grün bis auf Schritt 6, Advisories aus dem Bestand; `frontend` und `rust` laufen lokal und in der CI des PRs, die den Beleg trägt.)
 
 ## Workflow follow-up
 
