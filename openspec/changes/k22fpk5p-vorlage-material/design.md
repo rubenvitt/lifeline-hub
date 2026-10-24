@@ -162,7 +162,14 @@ ohnehin für jede neue Einheit läuft. Die Antwort `AusVorlageErgebnis` nennt `m
 - [Stamm-Art ändert sich nach der Pflege, etwa ein Gerät bekommt eine Bestandsnummer bei Menge 3] →
   Vorschau und Bilden lesen den Stamm von jetzt, und ein Gerät mit Bestandsnummer ergibt genau
   einen Posten (Spec). Die Vorlage selbst bleibt stehen, bis der Admin sie speichert. Dann greift
-  die Prüfung aus D2.
+  die Prüfung aus D2; der Client schickt ein Stück dabei mit Menge 1, sonst sperrte die alte Menge
+  jedes Speichern. Nachtrag aus dem Review:
+  - Ein Verbrauchsgut mit großer Menge, das im Stamm zum Gerät wird, ergäbe einen Posten je Stück.
+    Deshalb deckelt das Bilden Geräte auf `GERAET_JE_POSITION_MAX` (die Vorschau zeigt die
+    gedeckelte Menge), und der PUT nimmt höchstens 100 000 je Position (400).
+  - Dasselbe Gerät in zwei Vorlagen eines Baums, das erst später eine Bestandsnummer bekommt, ließ
+    das Bilden mit 409 scheitern. Die zweite Position gilt jetzt im Plan als „im Einsatz“, der
+    Grund steht an der Zeile.
 - [Die Positions-ID ändert sich mit jedem Ersetzen der Liste] → Wird die Vorlage zwischen Vorschau
   und Bilden gespeichert, meldet das Bilden „nicht in der Vorlage“ an der Zeile, wie bei
   Fahrzeugen und Personen. Die Seite lädt die Vorschau neu.

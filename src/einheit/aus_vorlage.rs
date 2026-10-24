@@ -19,7 +19,9 @@
 
 use crate::einheit::mitglied_repo;
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten};
-use crate::einheit_vorlage::{repo as vorlage_repo, EinheitVorlage, EinheitVorlageMaterial};
+use crate::einheit_vorlage::{
+    repo as vorlage_repo, EinheitVorlage, EinheitVorlageMaterial, GERAET_JE_POSITION_MAX,
+};
 use crate::error::{AppError, ZeilenArt, ZeilenGrund};
 use crate::fahrzeug::besatzung_repo;
 use crate::katalog::DIENSTSTATUS_IN_DIENST;
@@ -292,11 +294,16 @@ fn ist_stueck(m: &EinheitVorlageMaterial) -> bool {
 
 /// Die Mengen der Posten, die eine Position beim Bilden ergibt (Spec `kraefte-disposition`,
 /// „Material beim Bilden aus Vorlage“): ein Gerät mit Bestandsnummer genau einen, ein Gerät einen
-/// je Stück, ein Verbrauchsgut einen mit der Menge.
+/// je Stück, höchstens [`GERAET_JE_POSITION_MAX`], ein Verbrauchsgut einen mit der Menge. Der
+/// Deckel greift, wenn die Stamm-Art nach der Pflege auf Gerät gestellt wurde: die Pflege prüft
+/// ihn nur beim Speichern, die Vorschau zeigt die gedeckelte Menge.
 pub fn posten_mengen(m: &EinheitVorlageMaterial) -> Vec<i64> {
     match m.art {
         _ if ist_stueck(m) => vec![1],
-        MaterialArt::Geraet => vec![1; usize::try_from(m.menge.max(1)).unwrap_or(1)],
+        MaterialArt::Geraet => {
+            let stueck = m.menge.clamp(1, GERAET_JE_POSITION_MAX);
+            vec![1; usize::try_from(stueck).unwrap_or(1)]
+        }
         MaterialArt::Verbrauchsgut => vec![m.menge],
     }
 }
@@ -494,13 +501,16 @@ async fn load_material_zustaende_tx(
         .into_iter()
         .collect()
     };
+    // Dasselbe Stück an zwei Positionen des Baums (Bestandsnummer erst nach der Pflege vergeben):
+    // die erste bringt es in den Einsatz, jede weitere gilt als „im Einsatz“. So steht der Grund
+    // an der Zeile, statt dass das Schreiben mit 409 scheitert.
+    let mut vergeben: std::collections::HashSet<i64> = std::collections::HashSet::new();
     Ok(positionen
         .into_iter()
         .map(|m| {
-            let zustand = material_zustand(
-                m.dienststatus == DIENSTSTATUS_IN_DIENST,
-                ist_stueck(m) && im_einsatz.contains(&m.material_id),
-            );
+            let stueck_belegt = ist_stueck(m)
+                && (im_einsatz.contains(&m.material_id) || !vergeben.insert(m.material_id));
+            let zustand = material_zustand(m.dienststatus == DIENSTSTATUS_IN_DIENST, stueck_belegt);
             (m.id, zustand)
         })
         .collect())

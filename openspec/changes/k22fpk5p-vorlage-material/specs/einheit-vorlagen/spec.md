@@ -5,7 +5,8 @@ Das System SHALL je Vorlage eine Liste von Material-Positionen führen. Jede Pos
 Stamm-Material der eigenen Organisation, eine Menge von mindestens 1 und als Ort entweder die
 Einheit der Vorlage oder ein Fahrzeug derselben Vorlage tragen. Dasselbe Material MAY in einer
 Vorlage mehrfach stehen, etwa auf zwei Fahrzeugen. Die Liste MUST als Ganzes ersetzt werden und
-höchstens 50 Positionen haben (400 sonst). Eine Menge unter 1 MUST mit 400 abgelehnt werden. Ein
+höchstens 50 Positionen haben (400 sonst). Eine Menge unter 1 oder über 100 000 MUST mit 400
+abgelehnt werden. Ein
 Gerät MUST höchstens Menge 10 tragen, ein Gerät mit Bestandsnummer genau Menge 1. Ein Gerät mit
 Bestandsnummer MUST im selben Vorlagen-Baum höchstens einmal stehen. Jeder dieser Verstöße und
 ein Fahrzeug außerhalb der Vorlage MUST mit 422 abgelehnt werden. Neu aufnehmen MUST NOT ein
@@ -57,8 +58,9 @@ Baums und je Fahrzeug und Person der Vorlage den Zustand im Einsatz als einen vo
 „gebunden“ (mit Einheit oder Fahrzeug), „außer Dienst“, „entlassen“. Eine stornierte Kraft MUST
 als „neu“ gelten. Je Material-Position MUST die Vorschau Bezeichnung, Art, Menge, Ort in der
 Vorlage und den Zustand als einen von „neu“, „außer Dienst“, „schon im Einsatz“ nennen. „Schon im
-Einsatz“ gilt nur für ein Gerät mit Bestandsnummer, das aktiv im Einsatz steht. Ein Gerät mit
-Bestandsnummer MUST mit Menge 1 erscheinen. Art und Bestandsnummer MUST aus dem Stamm von jetzt
+Einsatz“ gilt nur für ein Gerät mit Bestandsnummer, das aktiv im Einsatz steht oder an einer
+früheren Position desselben Baums schon vorkommt. Ein Gerät mit Bestandsnummer MUST mit Menge 1
+erscheinen, ein anderes Gerät mit höchstens 10. Art und Bestandsnummer MUST aus dem Stamm von jetzt
 stammen. Die Vorschau MUST NOT etwas schreiben; maßgeblich bleibt die Prüfung beim Bilden.
 
 #### Scenario: Fahrzeug in anderer Einheit

@@ -51,6 +51,10 @@ pub const MATERIAL_JE_VORLAGE_MAX: usize = 50;
 /// Posten je Stück. Darüber 422, ein Zustand der Art.
 pub const GERAET_JE_POSITION_MAX: i64 = 10;
 
+/// Höchstmenge einer Material-Position (LLH-1261, `src/AGENTS.md`, „Eingabegrenzen“): darüber
+/// 400. Der Deckel für Geräte ist [`GERAET_JE_POSITION_MAX`] (422, eine Frage der Art).
+pub const MENGE_JE_POSITION_MAX: i64 = 100_000;
+
 /// Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;
 /// die Detailseite braucht keinen Einzel-GET (Spec `einheit-vorlagen`, „Pflege in der
 /// Verwaltung“).
@@ -188,8 +192,8 @@ pub struct MaterialEntry {
     pub fahrzeug_id: Option<i64>,
 }
 
-/// Material-Liste von außen: höchstens [`MATERIAL_JE_VORLAGE_MAX`] Positionen, jede mit Menge ab
-/// 1 (sonst 400). Nicht entdoppelt: dasselbe Material darf mehrfach stehen.
+/// Material-Liste von außen: höchstens [`MATERIAL_JE_VORLAGE_MAX`] Positionen, jede mit Menge von
+/// 1 bis [`MENGE_JE_POSITION_MAX`] (sonst 400). Nicht entdoppelt: dasselbe Material darf mehrfach stehen.
 pub fn normalize_material(
     entries: Vec<MaterialEntry>,
 ) -> Result<Vec<MaterialEntry>, crate::error::AppError> {
@@ -202,6 +206,11 @@ pub fn normalize_material(
         return Err(crate::error::AppError::Validation(
             "Menge muss mindestens 1 sein".into(),
         ));
+    }
+    if entries.iter().any(|e| e.menge > MENGE_JE_POSITION_MAX) {
+        return Err(crate::error::AppError::Validation(format!(
+            "Menge höchstens {MENGE_JE_POSITION_MAX} je Position"
+        )));
     }
     Ok(entries)
 }

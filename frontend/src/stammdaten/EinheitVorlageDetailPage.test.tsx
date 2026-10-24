@@ -426,6 +426,52 @@ describe('EinheitVorlageDetailPage', () => {
     );
   });
 
+  it('ein Stück mit alter Menge über 1 geht mit Menge 1, damit die Liste speicherbar bleibt', async () => {
+    const calls = handler();
+    server.use(
+      http.get('/api/einheit-vorlagen', () =>
+        HttpResponse.json(
+          VORLAGEN.map((v) =>
+            v.id === RETTUNGSSTAFFEL.id
+              ? {
+                  ...v,
+                  material: [
+                    ...RETTUNGSSTAFFEL.material,
+                    {
+                      id: 82,
+                      material_id: 64,
+                      bezeichnung: 'Trage',
+                      art: 'geraet',
+                      bestandsnummer: 'TR-2',
+                      menge: 3,
+                      dienststatus: 'in_dienst',
+                      ist_demo: false,
+                    },
+                  ],
+                }
+              : v,
+          ),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDetail(RETTUNGSSTAFFEL.id);
+    const paneel = await screen.findByRole('region', { name: 'Material' });
+    await user.click(
+      within(paneel).getByRole('button', { name: 'Wolldecke aus der Vorlage entfernen' }),
+    );
+    await waitFor(() =>
+      expect(calls.material).toEqual([
+        {
+          material: [
+            { material_id: 62, menge: 1, fahrzeug_id: 32 },
+            { material_id: 64, menge: 1, fahrzeug_id: null },
+          ],
+        },
+      ]),
+    );
+  });
+
   it('ein Stück hat Menge 1 fest; eine Ablehnung steht im Paneel', async () => {
     handler();
     server.use(

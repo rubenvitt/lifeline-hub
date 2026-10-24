@@ -2,13 +2,13 @@
 
 ### Requirement: Material beim Bilden aus Vorlage
 Das Bilden aus einer Vorlage SHALL die gewählten Material-Positionen in derselben Transaktion
-disponieren. Ein Gerät MUST je Stück einen Posten mit Menge 1 ergeben, ein Gerät mit
-Bestandsnummer genau einen; ein Verbrauchsgut MUST einen Posten mit der Menge der Position ergeben.
+disponieren. Ein Gerät MUST je Stück einen Posten mit Menge 1 ergeben, höchstens 10 je Position,
+ein Gerät mit Bestandsnummer genau einen; ein Verbrauchsgut MUST einen Posten mit der Menge der Position ergeben.
 Art und Bestandsnummer MUST aus dem Stamm von jetzt stammen. Ort jedes Postens MUST das Fahrzeug
 der Position sein, wenn es mitkommt, sonst die Einheit ihrer Vorlage. Eine Position, die nicht
 (mehr) in der Vorlage steht, die außer Dienst steht oder deren Gerät mit Bestandsnummer schon aktiv
-im Einsatz steht, MUST mit 422 und einem Grund an dieser Position abgelehnt werden, ohne dass etwas
-angelegt ist.
+im Einsatz steht oder an einer früheren Position derselben Bildung vorkommt, MUST mit 422 und einem
+Grund an dieser Position abgelehnt werden, ohne dass etwas angelegt ist.
 
 #### Scenario: Rucksack auf dem RTW, Decken an der Staffel
 - **WHEN** die Führung die Rettungsstaffel mit RTW 1, dem Rucksack auf RTW 1 und 50 Wolldecken bildet

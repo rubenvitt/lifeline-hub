@@ -1022,6 +1022,12 @@ fn material_von_aussen_wird_gedeckelt_und_menge_geprueft() {
         normalize_material(vec![posten(1, 0, None)]),
         Err(AppError::Validation(_))
     ));
+    let hoechst = super::MENGE_JE_POSITION_MAX;
+    assert!(normalize_material(vec![posten(1, hoechst, None)]).is_ok());
+    assert!(matches!(
+        normalize_material(vec![posten(1, hoechst + 1, None)]),
+        Err(AppError::Validation(_))
+    ));
     let doppelt = vec![posten(1, 1, None), posten(1, 2, None)];
     assert_eq!(
         normalize_material(doppelt.clone()).unwrap(),

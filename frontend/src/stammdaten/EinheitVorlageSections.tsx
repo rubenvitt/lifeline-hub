@@ -387,7 +387,11 @@ function isStueck(m: Pick<EinheitVorlageMaterial, 'art' | 'bestandsnummer'>): bo
   return m.art === 'geraet' && m.bestandsnummer != null;
 }
 
-/** Die Liste in PUT-Form, mit einer geänderten oder ohne eine Position. */
+/**
+ * Die Liste in PUT-Form, mit einer geänderten oder ohne eine Position. Ein Stück geht immer mit
+ * Menge 1: bekam ein Gerät erst nach der Pflege eine Bestandsnummer, sperrte seine alte Menge
+ * sonst jedes Speichern der Liste (422).
+ */
 function toMaterialInput(
   material: readonly EinheitVorlageMaterial[],
   change?: { id: number; patch: Partial<EinheitVorlageMaterialEingabe> | null },
@@ -395,7 +399,7 @@ function toMaterialInput(
   return material.flatMap((m) => {
     const row: EinheitVorlageMaterialEingabe = {
       material_id: m.material_id,
-      menge: m.menge,
+      menge: isStueck(m) ? 1 : m.menge,
       fahrzeug_id: m.fahrzeug_id ?? null,
     };
     if (change?.id !== m.id) return [row];

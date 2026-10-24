@@ -1647,6 +1647,58 @@ fn posten_mengen_je_art() {
         posten_mengen(&pos(MaterialArt::Verbrauchsgut, 50, None)),
         vec![50]
     );
+    // Stamm-Art später auf Gerät gestellt: nie mehr als `GERAET_JE_POSITION_MAX` Stück, auch bei
+    // riesiger Menge (kein Abbruch, keine Flut von Posten).
+    assert_eq!(
+        posten_mengen(&pos(MaterialArt::Geraet, 100_000, None)).len(),
+        crate::einheit_vorlage::GERAET_JE_POSITION_MAX as usize
+    );
+    assert_eq!(
+        posten_mengen(&pos(MaterialArt::Geraet, i64::MAX, None)).len(),
+        crate::einheit_vorlage::GERAET_JE_POSITION_MAX as usize
+    );
+}
+
+/// Ein Gerät ohne Nummer stand in zwei Vorlagen eines Baums und bekam später eine Bestandsnummer:
+/// die zweite Position gilt als „schon im Einsatz“ (die erste bringt es), Grund an der Zeile statt
+/// eines 409 beim Schreiben.
+#[tokio::test]
+async fn dasselbe_stueck_zweimal_im_baum_sperrt_die_zweite_position() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let rucksack = material(&pool, "Rucksack", MaterialArt::Geraet, None).await;
+    let posten = MaterialEntry {
+        material_id: rucksack,
+        menge: 1,
+        fahrzeug_id: None,
+    };
+    let zug = vrepo::replace_material(&pool, 1, z.zug, &[posten])
+        .await
+        .unwrap();
+    let staffel = vrepo::replace_material(&pool, 1, z.staffel, &[posten])
+        .await
+        .unwrap();
+    sqlx::query("UPDATE material SET bestandsnummer = 'R-1' WHERE id = ?")
+        .bind(rucksack)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let erste = zug.material[0].id;
+    let zweite = staffel.material[0].id;
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
+    assert_eq!(plan.material[&erste], VorschauMaterialZustand::Neu);
+    assert_eq!(plan.material[&zweite], VorschauMaterialZustand::ImEinsatz);
+    match bilde_mit_material(&pool, &z, &[], &[erste, zweite]).await {
+        Err(AppError::Zeilen { zeilen, .. }) => {
+            assert_eq!(
+                (zeilen[0].art, zeilen[0].id, zeilen[0].grund.as_str()),
+                (ZeilenArt::Material, zweite, "schon im Einsatz")
+            );
+        }
+        andere => panic!("erwartet Zeilen: {andere:?}"),
+    }
+    let g = bilde_mit_material(&pool, &z, &[], &[erste]).await.unwrap();
+    assert_eq!(g.material.len(), 1);
 }
 
 #[test]
