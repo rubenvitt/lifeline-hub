@@ -1186,10 +1186,84 @@ async fn berichtigung_laesst_keine_offene_periode_zu() {
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    assert!(
+        json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Erneut disponieren"),
+        "der 422 kommt aus der Prüfung auf eine offene Periode: {json:?}"
+    );
 
     let (_, nachher) = zeitachse(&w.app, &w.admin, &pfad).await;
     assert_eq!(vorher, nachher);
     assert_eq!(system_etb_anzahl(&w.app, &w.admin, w.e).await, etb_vorher);
+}
+
+/// Spec „Fehleintrag einer früheren Periode streichen“: zwei abgeschlossene Perioden, das
+/// Eintreffen der ersten fällt weg, beide bleiben geschlossen, die Person bleibt entlassen.
+#[tokio::test]
+async fn fehleintrag_einer_frueheren_periode_streichen() {
+    let (app, pool) = setup_mit_pool().await;
+    let w = welt_in(app).await;
+    sqlx::query("UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? WHERE personal_id = ?")
+        .bind(vor(8, 0))
+        .bind(w.ep)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let pfad = w.person_pfad();
+    let falsch = vor(7, 30);
+    for (art, zeitpunkt) in [
+        ("eintreffen", falsch.clone()),
+        ("entlassung", vor(6, 0)),
+        ("alarmierung", vor(5, 0)),
+        ("eintreffen", vor(4, 0)),
+    ] {
+        let (s, json) = w
+            .nachtrag(
+                &pfad,
+                &format!(r#"{{"art":"{art}","zeitpunkt_at":"{zeitpunkt}"}}"#),
+            )
+            .await;
+        assert_eq!(s, StatusCode::CREATED, "{art}: {json:?}");
+    }
+    let (s, json) = anfrage(&w.app, "POST", &format!("{pfad}/entlassen"), &w.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+
+    let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let erstes = z["ereignisse"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["art"] == "eintreffen" && e["zeitpunkt_at"] == falsch.as_str())
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, z) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/zeitachse/{erstes}/streichen"),
+        &w.admin,
+        Some(r#"{"grund":"falsche Person"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    let perioden = z["perioden"].as_array().unwrap();
+    assert_eq!(perioden.len(), 2, "{z:?}");
+    assert!(perioden.iter().all(|p| p["ende_at"].is_string()), "{z:?}");
+    assert!(
+        perioden[0].get("eintreffen_at").is_none_or(|v| v.is_null()),
+        "{z:?}"
+    );
+    let (_, json) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personal?entlassene=1", w.e),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(json[0]["beendet_als"], "entlassen");
 }
 
 /// Spec „Stornierte Person“ und „Aufgelöste Einheit“: dort bleiben Nachtrag und Streichung 409.

@@ -78,7 +78,9 @@ Nach `schreibe_tx` bzw. `streiche_tx` fragt der Handler bei einer entlassenen Pe
 „Die Person ist entlassen; eine offene Einsatzperiode entsteht nur über ‚Erneut disponieren‘“.
 `write_retry!` rollt die Transaktion bei einem Fehler zurück, es bleibt also nichts geschrieben,
 auch kein ETB-Eintrag. Eine Person ohne Ereignisse oder mit nur geschlossenen Perioden bleibt
-regelkonform.
+regelkonform. Folge: Eine ganz fehlende Periode lässt sich nach dem Entlassen nicht nachtragen,
+weil schon ihr erstes Ereignis eine Periode öffnet. Das nennt die Anwenderdoku; zwei Ereignisse
+in einem Schritt gehören zum Nachzug LLH-1455.
 
 *Alternative:* Vorabprüfung rein über `perioden` (Kandidat einfügen bzw. streichen, letzte
 Periode ansehen). Gleichwertig, aber eine zweite Kopie der Regel neben `schreibe_tx`. Die
@@ -86,7 +88,7 @@ Nachprüfung nutzt die schon vorhandene Abfrage und kann nicht von der Schreiblo
 
 ### D4 — ETB-Vermerk als Zusatz am bestehenden Text
 
-`etb_text_nachtrag` und `etb_text_streichung` bekommen ein Flag `berichtigt: bool`. Der Nachtrag
+`etb_text_nachtrag` und `etb_text_streichung` bekommen ein Flag `is_berichtigung: bool`. Der Nachtrag
 lautet dann „Zeitachse: Person «Anna» eingetroffen 300630sep26 (nachgetragen, berichtigt nach
 Entlassung)“, die Streichung „Zeitachse: Person «Anna» eingetroffen 300640sep26 gestrichen
 (berichtigt nach Entlassung) — Grund: …“. „nach Entlassung“ sagt, warum an einer beendeten Kraft
@@ -98,7 +100,7 @@ geschrieben wurde. Ein bloßes „berichtigt“ läse sich wie jede Streichung.
 `rechteText={einsatzRechteGrund(...)}`, auch für eine entlassene Person. Alle anderen Paneele
 behalten `darfSchreiben = imEinsatzSchreiben && !isEntlassen`. `KraftZeitachse` bekommt den Prop
 `beendet`. Ist er gesetzt, sperrt sie den Streichen-Knopf des Ereignisses, das die letzte Periode
-mit einer Entlassung schließt, mit dem Kurzgrund „Erst erneut disponieren“ (LFH-966: was der
+mit einer Entlassung schließt, mit dem Kurzgrund „erst erneut disponieren“ (LFH-966: was der
 Server sicher ablehnt, steht gesperrt mit Kurzgrund). Welches Ereignis das ist, berechnet eine
 reine Funktion in `kraefte/zeitachse.ts` aus Perioden und Ereignissen (Vitest). Einen Nachtrag,
 der eine Periode öffnen würde, sperrt der Client nicht vorab. Das sagt die 422 im Dialog, denn
@@ -110,8 +112,12 @@ die Prüfung hängt am eingegebenen Zeitpunkt.
   Anwenderdoku rät, sie vor dem Entlassen nachzutragen. Der Nachzug LLH-1455 „Zeitpunkt
   berichtigen“ (in einem Schritt ersetzen, auch für aktive Kräfte) schließt die Lücke.
 - [Live-Aktualisierung der Ansicht einer entlassenen Person] → `publiziere` meldet die Person
-  schon über `sse_personal`. Die Umsetzung prüft per Test, dass die Zeitachsen-Abfrage der
-  Ansicht danach neu lädt.
+  schon über `sse_personal`, und das Ereignis `personal` lädt die Zeitachse neu
+  (`live/liveInvalidierung.ts`). Kein neuer Mechanismus, daher kein eigener Test.
+- [Eine Streichung an einer Einheit streicht die Fan-out-Kopie auch an einer inzwischen
+  entlassenen Person und kann deren letzte Periode öffnen] → Bestand aus LFH-552, nicht durch
+  diese Change entstanden; Nachzug auf dem Board. Bis dahin heilt ein Nachtrag „Entlassung“ an
+  der Person den Zustand.
 - [Der Wächter, der Abfragen der Kräftetabellen auf den Zustand prüft] → Die neue
   Zustandsabfrage liest `beendet_als` und muss nicht in die Ausnahmeliste. Das bestätigt der
   Lauf von `cargo test`.

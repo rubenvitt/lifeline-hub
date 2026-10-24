@@ -194,17 +194,19 @@ nicht im Einsatz sind. Eine entlassene Person fehlt dort; sie kommt über „Ern
 Block „Entlassen“ zurück, mit ihrer Zeitachse. Ad-hoc-Kräfte gibt es nur im Einsatz; im
 Personalstamm erscheinen sie nicht.
 
+Ein Absenden nimmt höchstens 50 Personen auf und gilt ganz oder gar nicht: Steht eine Person
+inzwischen außer Dienst, ist sie schon disponiert oder entlassen, legt die App niemanden an und
+nennt den Grund je Person.
+
 ### Berichtigen nach dem Entlassen
 
 Eine entlassene Person bleibt im Nachweis, deshalb lässt sich ihre Zeitachse weiter berichtigen.
 Jede Berichtigung schreibt einen Eintrag ins Einsatztagebuch mit dem Vermerk „berichtigt nach
-Entlassung“. Eine offene Einsatzperiode entsteht dabei nie: Ein Nachtrag nach der Entlassung und
-die Streichung der Entlassung selbst lehnt die App ab. Eine stornierte Person und eine aufgelöste
+Entlassung“. Eine offene Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag ab, der
+eine Periode beginnen würde, etwa ein Eintreffen nach der Entlassung, und ebenso die Streichung
+der Entlassung, mit der die letzte Periode endet. Deshalb lässt sich auch eine ganz fehlende
+Periode nach dem Entlassen nicht mehr nachtragen. Eine stornierte Person und eine aufgelöste
 Einheit lassen sich nicht berichtigen.
-
-Ein Absenden nimmt höchstens 50 Personen auf und gilt ganz oder gar nicht: Steht eine Person
-inzwischen außer Dienst, ist sie schon disponiert oder entlassen, legt die App niemanden an und
-nennt den Grund je Person.
 
 ### Einsatzfunktion und Qualifikation
 
@@ -301,7 +303,8 @@ der Ansicht, statt eine Person als nicht eingeteilt zu zeigen. Ohne Freigabe der
 gruppiert die Liste nicht.
 
 Die Ansicht einer entlassenen Person bleibt lesbar, mit der Marke „entlassen“ und dem Zeitpunkt;
-ändern und nachtragen lässt sich dort nichts, bis sie erneut disponiert ist. Die Ansicht einer
+ändern lässt sich dort nur die Zeitachse (Nachtragen, Streichen), bis sie erneut disponiert ist.
+Die Ansicht einer
 stornierten Person meldet „Nicht (mehr) im Einsatz“.
 
 Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts

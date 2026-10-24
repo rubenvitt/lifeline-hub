@@ -86,9 +86,13 @@ export function abschliessendeEntlassungId(
 ): number | null {
   const letzte = perioden?.[perioden.length - 1];
   if (!letzte?.ende_at || letzte.ende_art !== 'entlassung') return null;
-  const treffer = ereignisse?.find(
-    (e) => e.art === 'entlassung' && e.gestrichen_at == null && e.zeitpunkt_at === letzte.ende_at,
-  );
+  // Die letzte passende: bei gleicher Sekunde gilt die Reihenfolge der Erfassung (Server
+  // `perioden::gehe`), die abschließende Entlassung ist also die spätere.
+  const treffer = [...(ereignisse ?? [])]
+    .reverse()
+    .find(
+      (e) => e.art === 'entlassung' && e.gestrichen_at == null && e.zeitpunkt_at === letzte.ende_at,
+    );
   return treffer?.id ?? null;
 }
 

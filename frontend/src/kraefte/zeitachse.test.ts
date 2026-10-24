@@ -126,6 +126,25 @@ describe('abschliessendeEntlassungId (LLH-1263, Spec „Abschließende Entlassun
     expect(abschliessendeEntlassungId(geschlossen, ereignisse)).toBe(4);
   });
 
+  it('bei zwei Entlassungen in derselben Sekunde die spätere (Reihenfolge der Erfassung)', () => {
+    const zweiPerioden: Einsatzperiode[] = [
+      { ...geschlossen[0] },
+      {
+        beginn_at: w('14:00'),
+        anker: 'alarmierung',
+        ende_at: w('14:00'),
+        ende_art: 'entlassung',
+      },
+    ];
+    expect(
+      abschliessendeEntlassungId(zweiPerioden, [
+        ...ereignisse,
+        ereignis(6, 'alarmierung', '14:00'),
+        ereignis(7, 'entlassung', '14:00'),
+      ]),
+    ).toBe(7);
+  });
+
   it('keine bei offener letzter Periode', () => {
     const offen: Einsatzperiode[] = [
       ...geschlossen,

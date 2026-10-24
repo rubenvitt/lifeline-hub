@@ -41,7 +41,7 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
  * - Streichung: unumkehrbar und ohne serverseitigen Rückweg, deshalb Rückfrage mit Pflichtgrund
  *   (LFH-343/363); ein Ereignis aus der Ablösung streicht nur deren Rücknahme.
  * - Ohne Schreibrecht nennt `RechteHinweis` den Grund, die Knöpfe stehen gesperrt da (M16).
- * - Entlassene Person (`beendet`, LLH-1263): Nachtrag und Streichung bleiben, aber eine offene
+ * - Entlassene Person (`isBeendet`, LLH-1263): Nachtrag und Streichung bleiben, aber eine offene
  *   Periode darf nicht entstehen. Die Entlassung, die die letzte Periode schließt, steht deshalb
  *   gesperrt mit Kurzgrund (LFH-966); einen Nachtrag, der eine Periode öffnet, meldet die 422 im
  *   Dialog, weil das am eingegebenen Zeitpunkt hängt.
@@ -76,7 +76,7 @@ export interface KraftZeitachseProps {
   /** Grund, wenn nicht geschrieben werden darf. */
   rechteText?: string;
   /** Die Kraft ist entlassen (LLH-1263): die abschließende Entlassung steht gesperrt. */
-  beendet?: boolean;
+  isBeendet?: boolean;
 }
 
 /** Kurzgrund am gesperrten Streichen der abschließenden Entlassung (LFH-966). */
@@ -105,7 +105,7 @@ export default function KraftZeitachse({
   kennung,
   darfSchreiben,
   rechteText = ZEITACHSE_RECHTE_TEXT,
-  beendet = false,
+  isBeendet = false,
 }: KraftZeitachseProps) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
@@ -207,7 +207,7 @@ export default function KraftZeitachse({
   const dauern = kraftDauern(query.data?.perioden, jetzt.valueOf());
   // Ohne Schreibrecht nennt schon `RechteHinweis` den Grund, ein zweiter stünde doppelt.
   const gesperrtId =
-    beendet && darfSchreiben
+    isBeendet && darfSchreiben
       ? abschliessendeEntlassungId(query.data?.perioden, query.data?.ereignisse)
       : null;
   const sperrGrundId = useId();

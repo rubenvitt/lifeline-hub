@@ -59,7 +59,7 @@ const ZEITACHSE: Zeitachse = {
   ],
 };
 
-function rendere(darfSchreiben = true, daten: Zeitachse = ZEITACHSE, beendet = false) {
+function rendere(darfSchreiben = true, daten: Zeitachse = ZEITACHSE, isBeendet = false) {
   server.use(http.get(PFAD, () => HttpResponse.json(daten)));
   return renderMitProviders(
     <KraftZeitachse
@@ -68,7 +68,7 @@ function rendere(darfSchreiben = true, daten: Zeitachse = ZEITACHSE, beendet = f
       id={7}
       kennung="Anna"
       darfSchreiben={darfSchreiben}
-      beendet={beendet}
+      isBeendet={isBeendet}
     />,
   );
 }
@@ -278,7 +278,7 @@ describe('KraftZeitachse (LFH-552)', () => {
       ).toBeVisible();
     });
 
-    it('ohne `beendet` bleibt dieselbe Entlassung streichbar', async () => {
+    it('ohne `isBeendet` bleibt dieselbe Entlassung streichbar', async () => {
       rendere(true, ENTLASSEN);
       await waitFor(() => expect(eintraege()).toHaveLength(4));
       expect(screen.getByRole('button', { name: /^Entlassung .* streichen$/ })).toBeEnabled();

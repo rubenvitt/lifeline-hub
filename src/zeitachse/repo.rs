@@ -732,16 +732,16 @@ const BERICHTIGT: &str = "berichtigt nach Entlassung";
 
 /// „Zeitachse: Einheit «Florian 1» eingetroffen 300640sep26 (nachgetragen)" — die Zeit in der
 /// Darstellung des Einsatzes ([`Zeitstil`], LLH-1061). An einer entlassenen Person
-/// (`berichtigt`) „(nachgetragen, berichtigt nach Entlassung)".
+/// (`is_berichtigung`) „(nachgetragen, berichtigt nach Entlassung)".
 pub fn etb_text_nachtrag(
     kraft: Kraft,
     name: &str,
     art: ZeitachseArt,
     zeitpunkt_at: &str,
     stil: Zeitstil,
-    berichtigt: bool,
+    is_berichtigung: bool,
 ) -> String {
-    let vermerk = if berichtigt {
+    let vermerk = if is_berichtigung {
         format!("nachgetragen, {BERICHTIGT}")
     } else {
         "nachgetragen".into()
@@ -755,7 +755,7 @@ pub fn etb_text_nachtrag(
 }
 
 /// „Zeitachse: Einheit «Florian 1» eingetroffen 300640sep26 gestrichen — Grund: …", an einer
-/// entlassenen Person (`berichtigt`) „… gestrichen (berichtigt nach Entlassung) — Grund: …".
+/// entlassenen Person (`is_berichtigung`) „… gestrichen (berichtigt nach Entlassung) — Grund: …".
 pub fn etb_text_streichung(
     kraft: Kraft,
     name: &str,
@@ -763,9 +763,9 @@ pub fn etb_text_streichung(
     zeitpunkt_at: &str,
     grund: &str,
     stil: Zeitstil,
-    berichtigt: bool,
+    is_berichtigung: bool,
 ) -> String {
-    let vermerk = if berichtigt {
+    let vermerk = if is_berichtigung {
         format!(" ({BERICHTIGT})")
     } else {
         String::new()

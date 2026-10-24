@@ -617,7 +617,7 @@ export default function EinsatzkraftPage() {
             kennung={ep.name}
             darfSchreiben={imEinsatzSchreiben}
             rechteText={einsatzRechteGrund(einsatz.status)}
-            beendet={isEntlassen}
+            isBeendet={isEntlassen}
           />
         </Paneel>
 
