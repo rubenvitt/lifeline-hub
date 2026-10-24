@@ -29,7 +29,7 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (lokal `--geaendert` vor dem PR, voll in der CI des PRs).
+- [x] 5.1 `./scripts/check-all.sh` grün (lokal `--geaendert` vor dem PR, voll in der CI des PRs). Lokal am 24.10.2026: `--nur schnell` grün bis auf Schritt 6 (Advisories zod/undici aus dem unveränderten Lockfile, auf `alpha` ebenso rot, nicht diese Change); `--nur frontend` grün (17880 Tests); Rust `--lib` grün (3506) und die 23 berührten Integrationstest-Binaries grün. Volle Rust-Suite und e2e passten nicht auf die Platte dieser Sitzung und laufen in der CI des PRs.
 
 ## Workflow follow-up
 
