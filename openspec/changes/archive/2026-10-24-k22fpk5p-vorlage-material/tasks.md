@@ -6,7 +6,7 @@ Zunder LLH-1261 (`k22fpk5p`). Jede Aufgabe entsteht per TDD. Backend wird mit
 
 ## 1. Vorlage: Material-Positionen (Backend)
 
-- [x] 1.1 Migration `einheit_vorlage_material` (D1) mit der nächsten freien Nummer über `origin/alpha`; `scripts/check-migrationen.sh` grün, dazu ein `db::tests`-Fall: Kaskade beim Löschen der Vorlage, Material bleibt NO ACTION. (Nummer 0250; die neue Tabelle steht auch in den Wächtern `demo::schema_tests` (erlaubte Kaskade), `stammdaten_tests` und `schwaerzung_registry` (nie einsatzbezogen).)
+- [x] 1.1 Migration `einheit_vorlage_material` (D1) mit der nächsten freien Nummer über `origin/alpha`; `scripts/check-migrationen.sh` grün, dazu ein `db::tests`-Fall: Kaskade beim Löschen der Vorlage, Material bleibt NO ACTION. (Nummer 0250, nach dem Merge von LLH-1445 vom Autofix auf 0251 gelegt; die neue Tabelle steht auch in den Wächtern `demo::schema_tests` (erlaubte Kaskade), `stammdaten_tests` und `schwaerzung_registry` (nie einsatzbezogen).)
 - [x] 1.2 DTO `EinheitVorlageMaterial` und `EinheitVorlage.material`, Lesen in `repo` (Liste und `load_tree_tx`) live aus dem Stamm; Test in `einheit_vorlage/tests.rs`: Liste nennt Bezeichnung, Art, Bestandsnummer, Menge, Fahrzeug, Dienststatus.
 - [x] 1.3 Ersetzen `replace_material_tx` mit den Prüfungen aus D2 (400 Deckel und Menge, 422 Verweis, Fahrzeug außerhalb, neu außer Dienst, Gerät über 10, Bestandsnummer mit Menge über 1, Bestandsnummer zweimal im Baum); je Regel ein Test, dazu „später außer Dienst bleibt speicherbar“ und „dasselbe Verbrauchsgut auf zwei Fahrzeugen“.
 - [x] 1.4 Ersetzen der Fahrzeugliste löst die Fahrzeugbindung des Materials auf entfernten Fahrzeugen (D2); Test.

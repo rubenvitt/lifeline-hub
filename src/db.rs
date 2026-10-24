@@ -7035,12 +7035,12 @@ mod tests {
         assert_eq!(kinder, 0, "Kindzeilen kaskadieren an der Vorlage");
     }
 
-    // --- Migration 0250: Material-Positionen der Einheiten-Vorlage (LLH-1261) ---
+    // --- Migration 0251: Material-Positionen der Einheiten-Vorlage (LLH-1261) ---
 
     /// Positionen fallen mit ihrer Vorlage, halten aber Material und Fahrzeug fest (NO ACTION,
     /// Demo-Löschweg); die Menge ist mindestens 1, dasselbe Material darf zweimal stehen.
     #[tokio::test]
-    async fn migration_0250_legt_material_positionen_mit_ihren_regeln_an() {
+    async fn migration_0251_legt_material_positionen_mit_ihren_regeln_an() {
         let pool = test_pool().await;
         let id = |sql: &'static str| sqlx::query_scalar::<_, i64>(sql);
         let org = id("INSERT INTO organisation (name) VALUES ('A') RETURNING id")
