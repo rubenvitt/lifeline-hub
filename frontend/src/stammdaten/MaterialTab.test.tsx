@@ -3,7 +3,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import MaterialTab from './MaterialTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
@@ -260,7 +260,7 @@ describe('MaterialTab', () => {
     // statt den fehlenden Sortierkopf.
     const kopf = container.querySelector<HTMLElement>('th.ant-table-column-has-sorters');
     expect(kopf, 'die Leitspalte muss sortierbar sein').not.toBeNull();
-    await userEvent.click(kopf!);
+    await userEvent.click(sortTarget(kopf!));
     expect(ersteZeile()).toContain('B-Schlauch 5 m');
   });
 
@@ -370,7 +370,9 @@ describe('MaterialTab · Sortieren und Filtern (LLH-1096)', () => {
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Bestandsnummer/ }));
+    await userEvent.click(
+      sortTarget(screen.getByRole('columnheader', { name: /^Bestandsnummer/ })),
+    );
     await waitFor(() => expect(folge()).toEqual(['2', '1']));
     await waitFor(() =>
       expect(ort.aktuell).toBe('/admin/stammdaten/material?sort=bestandsnummer%3Aauf'),

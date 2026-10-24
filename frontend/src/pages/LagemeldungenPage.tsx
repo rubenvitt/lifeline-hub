@@ -323,7 +323,9 @@ export default function LagemeldungenPage() {
       }
       aktionen={
         (l.is_neu && darfSchreiben) || (darfErfassen && bearbeitetId !== l.meldung_id) ? (
-          <Space wrap>
+          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+          // `paddingXS` ließ 3 / 5 / 7 px.
+          <Space wrap size={token.marginSM}>
             {l.is_neu && darfSchreiben && (
               <Button
                 disabled={ohneVerbindung}

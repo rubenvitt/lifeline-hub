@@ -499,6 +499,20 @@ pub async fn austritt_fahrzeug_bei_entlassung_tx(
     ef_id: i64,
     benutzer_id: i64,
 ) -> Result<Option<i64>, AppError> {
+    austritt_fahrzeug_tx(conn, einsatz_id, ef_id, benutzer_id, "Fahrzeug entlassen").await
+}
+
+/// Austritt eines Fahrzeugs aus seinem aktuellen Raum mit `notiz`, Cache geleert, in der
+/// Transaktion des Aufrufers; `None`, wenn es in keinem steht. Gemeinsam für das Entlassen und die
+/// Überführung eines Fahrzeugs in eine Einheit bei der Übernahme aus einer Nachforderung
+/// (LLH-1448, Change `o659va5r-nachforderung-herkunft` D5).
+pub async fn austritt_fahrzeug_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+    notiz: &str,
+) -> Result<Option<i64>, AppError> {
     let br_id: Option<i64> = sqlx::query_scalar(
         "SELECT aktueller_br_id FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
     )
@@ -517,7 +531,7 @@ pub async fn austritt_fahrzeug_bei_entlassung_tx(
         ObjektTyp::Fahrzeug,
         ef_id,
         &BrBelegungsArt::Austritt,
-        Some("Fahrzeug entlassen"),
+        Some(notiz),
         benutzer_id,
     )
     .await?;
@@ -851,7 +865,7 @@ pub async fn verlauf(
 /// entlassen oder storniert 409 (LLH-1079), einer Einheit zugehörig 409 (Einheit bringt
 /// Fahrzeuge). [`belege_tx`] und die Übernahme eines Fahrzeugs als Einheit beim Eintreffen
 /// (LLH-1444, `eintreffen::fahrzeug_als_einheit_tx`) teilen sie.
-pub(super) async fn einheitenloses_fahrzeug_br_tx(
+pub(crate) async fn einheitenloses_fahrzeug_br_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
