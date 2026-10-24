@@ -20,7 +20,8 @@
 - [x] 3.3 Rust-Test „RTW 2 steht als Fahrzeug im Einsatz“: Übernahme gelingt (vorher 422), die Einheit trägt Typ, Fahrzeug und Besatzung, angelegt = 1, genau ein ETB-Eintrag im Wortlaut der Spec. Erst rot sehen, dann D5 Schritte 1, 3, 4 und D6 umsetzen, grün; Unit-Test für `etb_text` mit „aus Fahrzeug“ und Besatzung.
 - [x] 3.4 Rust-Test „Fahrzeug steht im BR Nord“ (mit und ohne Haken): Austritt des Fahrzeugs mit Notiz, Eintritt der Einheit zum alten Zeitpunkt, `nachforderung_belegung_id` gesetzt. Erst rot sehen, dann D5 Schritte 2 und 5 umsetzen, grün.
 - [x] 3.5 Rust-Test „Storno der Überführung“: Einheit aufgelöst, Fahrzeug und Besatzung ohne Einheit; „Zwei gleichnamige Fahrzeuge ohne Einheit“ → 422, nichts angelegt. Grün.
-- [x] 3.6 `Uebernommen` um `fahrzeug_ids` und `br_ids` erweitern, die Route `aus_nachforderung` meldet Live für sie und die Besatzung (D5); bestehender Routentest bzw. ein neuer in `tests/` belegt die Antwort.
+- [x] 3.6 `Uebernommen` um `fahrzeug_ids` und `br_ids` erweitern, die Route `aus_nachforderung` meldet Live für sie und die Besatzung (D5); bestehender Routentest bzw. ein neuer in `tests/` belegt die Antwort. (Belegt sind die Wirkungen über die HTTP-Tests in `tests/nachforderung_einheit.rs`; die Live-Meldungen selbst prüft kein Test, wie bei der übrigen Übernahme-Route.)
+- [x] 3.7 Review-Funde: abgerufenes Fahrzeug → 409, Eintritt zum Zeitpunkt von Eintritt/Wechsel des Fahrzeugs (`abgerufenes_fahrzeug_wird_erst_nach_aufheben_ueberfuehrt`, erst rot, dann grün); Storno einer überführten Einheit im Raum (Austritt, ETB) im Raum-Test; Zahl-Zeilen der Karte als Block (Vitest erst rot, dann grün).
 
 ## 4. Storno nach Verknüpfung am Raum — LLH-1449 (`zglesj5a`)
 

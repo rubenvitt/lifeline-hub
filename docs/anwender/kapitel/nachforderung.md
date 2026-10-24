@@ -418,8 +418,8 @@ Einheit im Einsatz gleicht (Name oder Funkrufname, ohne Groß/Klein), verknüpft
 Heißt ein Fahrzeug ohne Einheit so, wird es zur Einheit: Sie trägt den Funkrufnamen, das Soll des
 Fahrzeugs und den gewählten Typ, das Fahrzeug und seine Besatzung ohne Einheit kommen mit. Steht
 das Fahrzeug in einem Bereitstellungsraum, tritt es dort aus, und die Einheit tritt zu der Zeit
-ein, zu der das Fahrzeug gekommen war. Das Einsatztagebuch nennt den Eintrag dann „RTW 2 aus
-Fahrzeug“. Gehört das gleichnamige Fahrzeug schon einer Einheit oder heißen mehrere Fahrzeuge ohne
+ein, zu der das Fahrzeug gekommen war; ist es dort abgerufen, lehnt die App ab, bis der Abruf
+aufgehoben ist. Das Einsatztagebuch nennt den Eintrag dann „RTW 2 aus Fahrzeug“. Gehört das gleichnamige Fahrzeug schon einer Einheit oder heißen mehrere Fahrzeuge ohne
 Einheit so, lehnt die App ab und nennt den Namen. Insgesamt trägt eine Nachforderung höchstens so
 viele Einheiten, wie sie anfordert.
 

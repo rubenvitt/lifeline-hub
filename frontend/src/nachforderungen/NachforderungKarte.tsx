@@ -180,7 +180,8 @@ function EinheitenZeile({
     return (
       <Text
         type="secondary"
-        style={{ fontSize: EINHEITEN_SCHRIFT }}
+        // Block: mit zwei Wegen stehen beide Zeilen im selben Space-Item der Karte (LLH-1445).
+        style={{ display: 'block', fontSize: EINHEITEN_SCHRIFT }}
         data-lfh="nachforderung-einheiten"
       >
         {zahl} {einleitung === 'Am Raum eingetroffen' ? 'am Raum eingetroffen' : 'übernommen'}

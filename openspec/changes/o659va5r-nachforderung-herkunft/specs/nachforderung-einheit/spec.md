@@ -8,16 +8,11 @@ Gleicht ein neuer Eintrag der Übernahme dem Funkrufnamen genau eines aktiven Fa
 Einheit, SHALL das System dieses Fahrzeug in derselben Transaktion zur Einheit machen wie beim
 Eintreffen mit Verweis (Name, Funkrufname, Soll, Fahrzeug und Besatzung ohne Einheit), mit dem
 gewählten Typ, statt mit 422 abzulehnen. Die Einheit MUST als von der Übernahme angelegt gelten.
-Steht das Fahrzeug in einem Raum, MUST es austreten und die Einheit dort eintreten.
 
 #### Scenario: RTW 2 steht als Fahrzeug im Einsatz
 - **WHEN** aus der eingetroffenen Nachforderung „2× RTW“ der Eintrag „RTW 2“ übernommen wird und im Einsatz das Fahrzeug „RTW 2“ ohne Einheit mit Besatzung „Anna“ geführt wird
 - **THEN** gibt es die Einheit „RTW 2“ vom gewählten Typ mit dem Fahrzeug und „Anna“, sie verweist auf die Nachforderung, und die Nachforderung nennt sie
 - **AND** das ETB enthält genau einen neuen Eintrag „Nachforderung 2× RTW: als Einheit übernommen (RTW 2 aus Fahrzeug), Besatzung: Anna“ mit Verweis auf die Nachforderung
-
-#### Scenario: Fahrzeug steht im BR Nord
-- **WHEN** das Fahrzeug „RTW 2“ ohne Einheit im BR Nord steht und „RTW 2“ aus einer Nachforderung übernommen wird, mit oder ohne Haken „In BR … eintragen“
-- **THEN** zeigt der Verlauf von BR Nord den Austritt des Fahrzeugs und den Eintritt der Einheit „RTW 2“ zum Zeitpunkt, zu dem das Fahrzeug eingetreten war, und die Einheit steht im BR Nord
 
 #### Scenario: Storno der Überführung
 - **WHEN** die Übernahme der aus dem Fahrzeug entstandenen Einheit „RTW 2“ storniert wird
@@ -26,6 +21,22 @@ Steht das Fahrzeug in einem Raum, MUST es austreten und die Einheit dort eintret
 #### Scenario: Zwei gleichnamige Fahrzeuge ohne Einheit
 - **WHEN** im Einsatz zwei aktive Fahrzeuge ohne Einheit „RTW 2“ heißen und „RTW 2“ übernommen werden soll
 - **THEN** antwortet der Server mit 422 und nennt den Namen, und es entsteht keine Einheit
+
+### Requirement: Überführtes Fahrzeug macht der Einheit im Raum Platz
+
+Steht das überführte Fahrzeug in einem Bereitstellungsraum, MUST es dort austreten und die neue
+Einheit in denselben Raum eintreten, zu dem Zeitpunkt, zu dem das Fahrzeug eingetreten war; mit
+oder ohne Buchung im Raum des Ziels bleibt sie dort. Ist das Fahrzeug im Raum abgerufen, MUST der
+Server mit 409 antworten und nichts anlegen.
+
+#### Scenario: Fahrzeug steht im BR Nord
+- **WHEN** das Fahrzeug „RTW 2“ ohne Einheit im BR Nord steht und „RTW 2“ aus einer Nachforderung übernommen wird, mit oder ohne Haken „In BR … eintragen“
+- **THEN** zeigt der Verlauf von BR Nord den Austritt des Fahrzeugs und den Eintritt der Einheit „RTW 2“ zum Zeitpunkt, zu dem das Fahrzeug eingetreten war, und die Einheit steht im BR Nord
+
+#### Scenario: Fahrzeug ist abgerufen
+- **WHEN** das Fahrzeug „RTW 2“ ohne Einheit im BR Nord abgerufen ist und „RTW 2“ übernommen werden soll
+- **THEN** antwortet der Server mit 409 und nennt den Abruf, und es entsteht keine Einheit
+- **AND** nach „Abruf aufheben“ gelingt die Übernahme, und die Einheit tritt zum Zeitpunkt ein, zu dem das Fahrzeug eingetreten war
 
 ## MODIFIED Requirements
 

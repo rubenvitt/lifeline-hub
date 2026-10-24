@@ -381,10 +381,10 @@ impl Uebernahme {
 }
 
 /// Macht ein gleichnamiges Fahrzeug ohne Einheit zur Einheit (LLH-1448, Change
-/// `o659va5r-nachforderung-herkunft` D5): Prüfung des Fahrzeugs (fremd 404, beendet oder einer
-/// Einheit zugehörig 409), steht es in einem Raum, sein Austritt „Als Einheit übernommen“ mit dem
-/// Zeitpunkt seines jüngsten Belegungsereignisses für den Eintritt der Einheit, dann die Überführung
-/// mit dem Typ der Übernahme. Liefert die Einheit und die Namen der mitgekommenen Besatzung.
+/// `o659va5r-nachforderung-herkunft` D5): Prüfung des Fahrzeugs (fremd 404, beendet, einer Einheit
+/// zugehörig oder abgerufen 409), steht es in einem Raum, sein Austritt „Als Einheit übernommen“
+/// mit dem Zeitpunkt seines Eintritts (oder Wechsels) in diesen Raum für den Eintritt der Einheit,
+/// dann die Überführung mit dem Typ der Übernahme. Liefert die Einheit und die Namen der mitgekommenen Besatzung.
 async fn ueberfuehren_tx(
     conn: &mut SqliteConnection,
     r: &Rahmen<'_>,
@@ -396,9 +396,30 @@ async fn ueberfuehren_tx(
         .await?
     {
         Some(br_id) => {
+            // Ein abgerufenes Fahrzeug bleibt, wie es ist: als Einheit stünde es wieder wartend im
+            // Raum, und der Abruf wäre ohne Kraft (Review zu LLH-1448).
+            let juengstes: String = sqlx::query_scalar(
+                "SELECT art FROM br_belegung \
+                 WHERE einsatz_id = ? AND objekt_typ = 'fahrzeug' AND objekt_id = ? \
+                 ORDER BY id DESC LIMIT 1",
+            )
+            .bind(r.einsatz_id)
+            .bind(ef_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            if juengstes == "abruf" {
+                return Err(AppError::Conflict(
+                    "Das gleichnamige Fahrzeug ist abgerufen; erst nach dem Aufheben des Abrufs \
+                     oder dem Ausrücken als Einheit übernehmen"
+                        .into(),
+                ));
+            }
+            // Der Zeitpunkt, zu dem es in den Raum kam (Eintritt oder Wechsel), nicht der eines
+            // späteren Abrufs oder seiner Aufhebung.
             let zeitpunkt: String = sqlx::query_scalar(
                 "SELECT zeitpunkt_at FROM br_belegung \
                  WHERE einsatz_id = ? AND objekt_typ = 'fahrzeug' AND objekt_id = ? \
+                   AND art IN ('eintritt', 'wechsel') \
                  ORDER BY id DESC LIMIT 1",
             )
             .bind(r.einsatz_id)

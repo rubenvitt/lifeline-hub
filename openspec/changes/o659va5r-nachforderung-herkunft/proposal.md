@@ -50,8 +50,8 @@ Keine.
   `src/einheit/aus_nachforderung.rs` (`uebernehmen_tx`, `stornieren_tx`, ETB-Wortlaut),
   `src/routes/einsatz_einheit.rs` (Live für Fahrzeuge und Räume der Überführung),
   `src/nachforderung/mod.rs` und `repo.rs` (DTO-Feld `einheit_ids_am_raum`).
-- **Frontend:** `frontend/src/nachforderungen/nurVorwaerts.ts` (`einheitenEinleitung` je
-  Einheit) und `NachforderungKarte.tsx` (`UebernommeneEinheiten` in zwei Gruppen), generierte Typen.
+- **Frontend:** `frontend/src/nachforderungen/nurVorwaerts.ts` (`einheitenGruppen` statt
+  `einheitenEinleitung`) und `NachforderungKarte.tsx` (`UebernommeneEinheiten` in zwei Gruppen), generierte Typen.
 - **API:** Das Antwortfeld `einheit_ids_am_raum` kommt additiv hinzu. Eine Übernahme, die bisher mit
   422 abgelehnt wurde, gelingt jetzt.
 - **Doku:** Ein Anwenderkapitel zur Nachforderung, falls es die Einleitung der Karte beschreibt.

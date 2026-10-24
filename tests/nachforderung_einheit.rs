@@ -1066,4 +1066,118 @@ async fn gleichnamiges_fahrzeug_im_raum_macht_der_einheit_platz() {
             "{name}: die Übernahme hält ihre Buchung"
         );
     }
+
+    // Storno einer überführten Einheit im Raum: sie tritt aus und wird aufgelöst.
+    let rtw2 = einheiten(&app, &admin, e)
+        .await
+        .into_iter()
+        .find(|x| x["name"] == "RTW 2")
+        .expect("Einheit RTW 2")["id"]
+        .as_i64()
+        .unwrap();
+    let (s, j) = storniere(&app, &admin, e, rtw2).await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert!(verlauf(&app, &admin, e, nord)
+        .await
+        .iter()
+        .any(|z| z["art"] == "austritt" && z["objekt_typ"] == "einheit" && z["objekt_id"] == rtw2));
+    assert!(etb(&app, &admin, e).await.iter().any(|x| x["inhalt"]
+        == "Nachforderung 2× RTW: Übernahme von RTW 2 storniert, aus BR Nord ausgetreten, \
+            Einheit aufgelöst"));
+}
+
+/// Review-Fund zu LLH-1448: ein abgerufenes Fahrzeug ohne Einheit wird nicht überführt (409),
+/// sonst stünde die Einheit wieder wartend im Raum und der Abruf wäre ohne Kraft. Nach „Abruf
+/// aufheben“ gelingt die Überführung, und die Einheit tritt zum Zeitpunkt ein, zu dem das Fahrzeug
+/// eingetreten war, nicht zu dem des Abrufs oder seiner Aufhebung.
+#[tokio::test]
+async fn abgerufenes_fahrzeug_wird_erst_nach_aufheben_ueberfuehrt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = raum(&app, &admin, e, "Nord").await;
+    let n = nachforderung(
+        &app,
+        &admin,
+        e,
+        json!({ "ziel_br_id": nord }),
+        "eingetroffen",
+    )
+    .await;
+    let ef = adhoc_fahrzeug(&app, &admin, e, "RTW 2").await;
+    let belegung = format!("/api/einsaetze/{e}/bereitstellungsraeume/{nord}/belegung");
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &belegung,
+        &admin,
+        Some(&json!({ "objekt_typ": "fahrzeug", "objekt_id": ef, "art": "eintritt" }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let damals = "2026-01-02 10:00:00";
+    sqlx::query(
+        "UPDATE br_belegung SET zeitpunkt_at = ? WHERE objekt_typ = 'fahrzeug' AND objekt_id = ?",
+    )
+    .bind(damals)
+    .bind(ef)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let abruf = format!("/api/einsaetze/{e}/bereitstellungsraeume/{nord}/abruf");
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &abruf,
+        &admin,
+        Some(
+            &json!({ "objekt_typ": "fahrzeug", "objekt_id": ef, "auftrag_text": "Pumpen" })
+                .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Abruf: {j:?}");
+
+    let aktiv = einheiten(&app, &admin, e).await.len();
+    let body = json!({ "nachforderung_id": n, "einheiten": [{ "name": "RTW 2" }] });
+    let (s, j) = uebernehmen(&app, &admin, e, body.clone()).await;
+    assert_eq!(s, StatusCode::CONFLICT, "abgerufen: {j:?}");
+    assert!(j["error"].as_str().unwrap().contains("abgerufen"), "{j:?}");
+    assert_eq!(
+        einheiten(&app, &admin, e).await.len(),
+        aktiv,
+        "nichts angelegt"
+    );
+    assert_eq!(einheit_von(&pool, "einsatz_fahrzeug", ef).await, None);
+
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("{abruf}/aufheben"),
+        &admin,
+        Some(&json!({ "objekt_typ": "fahrzeug", "objekt_id": ef }).to_string()),
+    )
+    .await;
+    assert!(s.is_success(), "Abruf aufheben: {s} {j:?}");
+    let (s, j) = uebernehmen(&app, &admin, e, body).await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let neu = j["einheit_ids"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()
+        .as_i64()
+        .unwrap();
+    let zeitpunkt: String = sqlx::query_scalar(
+        "SELECT zeitpunkt_at FROM br_belegung \
+         WHERE objekt_typ = 'einheit' AND objekt_id = ? AND art = 'eintritt'",
+    )
+    .bind(neu)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        zeitpunkt, damals,
+        "Eintrittszeit des Fahrzeugs, nicht die des Abrufs"
+    );
 }

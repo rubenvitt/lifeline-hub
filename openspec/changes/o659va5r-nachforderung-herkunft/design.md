@@ -69,10 +69,12 @@ Lesen: `ANZEIGE_SELECT` bekommt eine zweite Unterabfrage `einheit_ids_am_raum` (
 
 ### D2 Karte gruppiert je Einheit
 
-`einheitenEinleitung` wird zu einer Zuordnung je Einheit: `einleitungJeEinheit(n, id)` liefert
-„Am Raum eingetroffen“, wenn die Einheit in `einheit_ids_am_raum` steht oder der Status `zugesagt`
-bzw. `unterwegs` ist, sonst „Als Einheit übernommen“. `UebernommeneEinheiten` zeigt bis zu zwei
-Zeilen in fester Folge (zuerst am Raum, dann übernommen), jede mit ihrer Zahl bzw. ihren Sprüngen.
+`einheitenEinleitung` weicht `einheitenGruppen(n)`: eine Einheit gehört zu „Am Raum eingetroffen“,
+wenn sie in `einheit_ids_am_raum` steht oder der Status `zugesagt` bzw. `unterwegs` ist, sonst zu
+„Als Einheit übernommen“. `UebernommeneEinheiten` zeigt bis zu zwei
+Zeilen in fester Folge (zuerst am Raum, dann übernommen), jede mit ihrer Zahl bzw. ihren Sprüngen
+(`EinheitenZeile`); auch die Zahl steht als Block, weil beide Zeilen im selben Element der Karte
+liegen.
 Unbekannte (aufgelöste) Einheiten zählen in ihrer Gruppe als „weitere“. Die Statusregel bleibt als
 Rückfall, deshalb braucht das Frontend keinen dritten Zustand.
 
@@ -105,8 +107,10 @@ einer gemeinsamen Bestandsabfrage verhindert, dass die beiden Prüfungen auseina
 Für `Zeile::Neu(name)` mit `Some(ef_id)` in Schritt 5 von `uebernehmen_tx`:
 1. Den aktuellen Raum des Fahrzeugs über `einheitenloses_fahrzeug_br_tx` lesen (prüft auch 404
    und 409).
-2. Steht es in einem Raum, Zeitpunkt seines jüngsten Belegungsereignisses lesen und das Fahrzeug mit
-   der Notiz „Als Einheit übernommen“ austreten lassen. `austritt_fahrzeug_bei_entlassung_tx` wird
+2. Steht es in einem Raum: Ist sein jüngstes Belegungsereignis ein Abruf, 409 (als Einheit stünde
+   es wieder wartend im Raum, der Abruf wäre ohne Kraft; Fund aus dem Review). Sonst den Zeitpunkt
+   seines jüngsten Eintritts oder Wechsels lesen (nicht den eines Abrufs oder seiner Aufhebung)
+   und das Fahrzeug mit der Notiz „Als Einheit übernommen“ austreten lassen. `austritt_fahrzeug_bei_entlassung_tx` wird
    dazu zu `austritt_fahrzeug_tx(…, notiz)`; das Entlassen ruft es mit „Fahrzeug entlassen“ auf.
 3. `fahrzeug_zur_einheit_tx` mit dem Typ der Übernahme.
 4. Verweis wie jede neue Einheit: `nachforderung_angelegt = 1`, `nachforderung_am_raum = 0`.

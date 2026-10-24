@@ -412,8 +412,9 @@ describe('NachforderungKarte — Als Einheit übernehmen (LLH-1383 D9)', () => {
       nachforderung: rtw({ einheit_ids: [11, 12], einheit_ids_am_raum: [11] }),
       einheitenJeId: null,
     });
-    expect(screen.getByText('1 Einheit am Raum eingetroffen')).toBeInTheDocument();
-    expect(screen.getByText('1 Einheit übernommen')).toBeInTheDocument();
+    // Jede Zahl steht auf eigener Zeile, nicht inline aneinander (beide im selben Space-Item).
+    expect(screen.getByText('1 Einheit am Raum eingetroffen')).toHaveStyle({ display: 'block' });
+    expect(screen.getByText('1 Einheit übernommen')).toHaveStyle({ display: 'block' });
   });
 
   it('eine unbekannte Einheit zählt in ihrer Gruppe als „weitere“', () => {
