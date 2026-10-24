@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useFormularVerlassenSchutz } from './useFormularVerlassenSchutz';
-import VerlassenRueckfrage from './VerlassenRueckfrage';
+import VerlassenRueckfrage, { VerlassenDialog } from './VerlassenRueckfrage';
 
 /**
  * Merker „offene Bearbeitung“ einer Ansicht mit feldweiser Bearbeitung (LLH-1103, Change
@@ -47,6 +47,9 @@ import VerlassenRueckfrage from './VerlassenRueckfrage';
  *   `offen` (sperrt die übrigen, keine Rückfrage) und `geaendert` (dazu der Verlassen-Schutz).
  * - Die Rückfrage hängt nur ein, solange etwas angemeldet ist: eine Seite ohne offene Bearbeitung
  *   braucht keinen Data Router.
+ * - **Wechsel in der Seite** (LLH-1415): eine Segmentleiste oder ein Reiter ohne Pfadwechsel, der
+ *   die offene Bearbeitung aushängt, geht über `useWechselNachRueckfrage` — dieselbe Rückfrage
+ *   (`VerlassenDialog`), ohne Änderung still. Der Provider muss dafür auch die Leiste umfassen.
  */
 
 /** Sperrgrund für die übrigen Felder; wenige Wörter (`frontend/AGENTS.md`, „Texte“). */
@@ -67,6 +70,8 @@ interface OffeneBearbeitungContextValue {
   isAngemeldet: (id: string) => boolean;
   anmelden: (eintrag: Eintrag) => void;
   abmelden: (id: string) => void;
+  /** Führt `wechsel` aus, mit geänderter offener Bearbeitung erst nach „Verwerfen“. */
+  nachRueckfrage: (wechsel: () => void) => void;
 }
 
 const OffeneBearbeitungContext = createContext<OffeneBearbeitungContextValue | null>(null);
@@ -86,6 +91,9 @@ export function OffeneBearbeitungProvider({
     schluessel,
   });
   const hatEntwurf = eintraege.some((e) => e.geaendert);
+  // Ein Wechsel in der Seite, der auf die Rückfrage wartet (in ein Objekt gepackt: `useState`
+  // riefe eine Funktion als Updater auf).
+  const [angehalten, setAngehalten] = useState<{ wechsel: () => void } | null>(null);
 
   useEffect(() => {
     if (hatEntwurf) geaendert();
@@ -104,20 +112,48 @@ export function OffeneBearbeitungProvider({
     setEintraege((alt) => (alt.some((e) => e.id === id) ? alt.filter((e) => e.id !== id) : alt));
   }, []);
 
+  const nachRueckfrage = useCallback(
+    (wechsel: () => void) => {
+      if (ungespeichert) setAngehalten({ wechsel });
+      else wechsel();
+    },
+    [ungespeichert],
+  );
+
+  useEffect(() => {
+    // Wie beim Pfadwechsel: erledigt sich die Änderung, während die Rückfrage steht (die Karte
+    // entfällt mit dem Live-Stand), den angehaltenen Wechsel nachholen.
+    if (angehalten && !ungespeichert) {
+      setAngehalten(null);
+      angehalten.wechsel();
+    }
+  }, [angehalten, ungespeichert]);
+
   const wert = useMemo<OffeneBearbeitungContextValue>(
     () => ({
       halter: eintraege[0] ?? null,
       isAngemeldet: (id) => eintraege.some((e) => e.id === id),
       anmelden,
       abmelden,
+      nachRueckfrage,
     }),
-    [eintraege, anmelden, abmelden],
+    [eintraege, anmelden, abmelden, nachRueckfrage],
   );
 
   return (
     <OffeneBearbeitungContext.Provider value={wert}>
       {children}
       {eintraege.length > 0 && <VerlassenRueckfrage ungespeichert={ungespeichert} />}
+      {angehalten && (
+        <VerlassenDialog
+          offen={ungespeichert}
+          onBleiben={() => setAngehalten(null)}
+          onVerwerfen={() => {
+            setAngehalten(null);
+            angehalten.wechsel();
+          }}
+        />
+      )}
     </OffeneBearbeitungContext.Provider>
   );
 }
@@ -184,6 +220,26 @@ export function useOffeneBearbeitungBelegung(etikett: string): {
 export function useHatOffeneBearbeitung(): boolean {
   return useContext(OffeneBearbeitungContext) != null;
 }
+
+/**
+ * Wechsel nur nach Rückfrage (LLH-1415): für einen Wechsel IN der Seite (Segmentleiste, Reiter),
+ * der die offene Bearbeitung aushängt. Mit geänderter offener Bearbeitung kommt erst die Rückfrage
+ * des Pfadwechsels („Bleiben“ lässt alles stehen, „Verwerfen“ führt `wechsel` aus), ohne Änderung
+ * oder ohne Merker der Seite wechselt es sofort.
+ *
+ * ```tsx
+ * const nachRueckfrage = useWechselNachRueckfrage();
+ * <Segmentleiste wert={ansicht} onWechsel={(w) => nachRueckfrage(() => setAnsicht(w))} … />
+ * ```
+ *
+ * „Verwerfen“ verwirft nur, weil der Wechsel die Bearbeitung aushängt; ein Wechsel, der sie stehen
+ * lässt, braucht keine Rückfrage. Der Aufrufer muss unter dem `OffeneBearbeitungProvider` liegen.
+ */
+export function useWechselNachRueckfrage(): (wechsel: () => void) => void {
+  return useContext(OffeneBearbeitungContext)?.nachRueckfrage ?? sofort;
+}
+
+const sofort = (wechsel: () => void) => wechsel();
 
 /**
  * Der Sperrgrund der Seite, solange ein Feld einen Entwurf hat, sonst `undefined`: für EINE Zeile

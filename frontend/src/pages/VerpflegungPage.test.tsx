@@ -5,7 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  Routes,
+  Route,
+  RouterProvider,
+  useLocation,
+} from 'react-router';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import type {
@@ -693,6 +700,89 @@ describe('VerpflegungPage (LFH-634)', () => {
       await userEvent.click(screen.getByRole('radio', { name: /laufend/ }));
       expect(kartenNamen()).toEqual(['Imbiss', 'Mittag', 'Abend']);
       expect(sammelbanner()).toBeNull();
+    });
+  });
+
+  describe('Segmentwechsel bei offener Bearbeitung (LLH-1415)', () => {
+    /**
+     * Mit Data Router: die Rückfrage vor dem Pfadwechsel (`useBlocker`) hängt ein, sobald eine
+     * Karte in Bearbeitung ist.
+     */
+    function renderPageMitDatenRouter() {
+      server.use(meHandler(benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Leitung' })));
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const router = createMemoryRouter(
+        [{ path: '/einsaetze/:id/verpflegung', element: <VerpflegungPage /> }],
+        { initialEntries: ['/einsaetze/1/verpflegung'] },
+      );
+      return render(
+        <QueryClientProvider client={client}>
+          <AntApp>
+            <AuthProvider>
+              <RouterProvider router={router} />
+            </AuthProvider>
+          </AntApp>
+        </QueryClientProvider>,
+      );
+    }
+
+    async function bearbeiteMittag() {
+      const menue = await oeffneMenue(mittag());
+      await userEvent.click(within(menue).getByText('Bedarf bearbeiten'));
+      return screen.findByRole('form', { name: 'Mittag bearbeiten' });
+    }
+
+    it('mit Änderung fragt nach; „Bleiben“ lässt Segment und Eingabe stehen', async () => {
+      renderPageMitDatenRouter();
+      await screen.findAllByRole('article');
+      const formular = await bearbeiteMittag();
+      await userEvent.type(within(formular).getByLabelText('Bezeichnung'), 'essen');
+
+      await userEvent.click(screen.getByRole('radio', { name: /vergangen/ }));
+      const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+      expect(dialog).toHaveTextContent(
+        'Noch nicht gespeicherte Änderungen gehen beim Verlassen verloren.',
+      );
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+
+      expect(screen.getByRole('radio', { name: /laufend/ })).toBeChecked();
+      expect(screen.getByRole('radio', { name: /vergangen/ })).not.toBeChecked();
+      expect(
+        within(screen.getByRole('form', { name: 'Mittag bearbeiten' })).getByLabelText(
+          'Bezeichnung',
+        ),
+      ).toHaveValue('Mittagessen');
+      expect(aendereZeitfenster).not.toHaveBeenCalled();
+    });
+
+    it('„Verwerfen“ wechselt, die Eingabe ist weg', async () => {
+      renderPageMitDatenRouter();
+      await screen.findAllByRole('article');
+      const formular = await bearbeiteMittag();
+      await userEvent.type(within(formular).getByLabelText('Bezeichnung'), 'essen');
+
+      await userEvent.click(screen.getByRole('radio', { name: /^Stellen/ }));
+      const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Verwerfen' }));
+
+      expect(screen.getByRole('radio', { name: /^Stellen/ })).toBeChecked();
+      expect(screen.queryByRole('form', { name: 'Mittag bearbeiten' })).toBeNull();
+      await userEvent.click(screen.getByRole('radio', { name: /laufend/ }));
+      expect(await karte(mittag())).toBeInTheDocument();
+      expect(screen.queryByRole('form', { name: 'Mittag bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Ungespeicherte Änderungen' })).toBeNull();
+      expect(aendereZeitfenster).not.toHaveBeenCalled();
+    });
+
+    it('ohne Änderung wechselt die Seite still', async () => {
+      renderPageMitDatenRouter();
+      await screen.findAllByRole('article');
+      await bearbeiteMittag();
+
+      await userEvent.click(screen.getByRole('radio', { name: /vergangen/ }));
+      expect(await karte(fruehstueck())).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /vergangen/ })).toBeChecked();
+      expect(screen.queryByRole('dialog', { name: 'Ungespeicherte Änderungen' })).toBeNull();
     });
   });
 

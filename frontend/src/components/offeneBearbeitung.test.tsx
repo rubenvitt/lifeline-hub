@@ -1,4 +1,4 @@
-import { act, renderHook, screen } from '@testing-library/react';
+import { act, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Input } from 'antd';
 import { useState } from 'react';
@@ -12,6 +12,7 @@ import {
   useOffeneBearbeitung,
   useOffeneBearbeitungBelegung,
   useOffeneBearbeitungGrund,
+  useWechselNachRueckfrage,
 } from './offeneBearbeitung';
 
 /**
@@ -348,5 +349,122 @@ describe('offene Bearbeitung · Belegung durch ein Paneel', () => {
       ),
     ).not.toThrow();
     expect(screen.getByRole('button', { name: 'Funk öffnen' })).toBeEnabled();
+  });
+});
+
+/**
+ * Wechsel in der Seite (Segmentleiste, Reiter), der die offene Bearbeitung aushängt (LLH-1415):
+ * dieselbe Rückfrage wie beim Pfadwechsel, ohne Änderung still.
+ *
+ * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
+ * - `useWechselNachRueckfrage` wechselt immer sofort (Prüfung auf `ungespeichert` entfernt): rot in
+ *   „Rückfrage bei Entwurf“, „Verwerfen wechselt“ und „nach „Bleiben“ …“.
+ * - „Verwerfen“ ruft den Wechsel nicht: rot in „Verwerfen wechselt“.
+ * - Der angehaltene Wechsel bleibt nach „Bleiben“ stehen (`setAngehalten(null)` entfernt): rot in
+ *   „nach „Bleiben“ wechselt ein späteres Speichern nicht nach“.
+ * - Effekt „Änderung erledigt sich während der Rückfrage“ entfernt: rot in „entfällt die Änderung
+ *   …“.
+ */
+function Leiste({ onWechsel }: { onWechsel: () => void }) {
+  const nachRueckfrage = useWechselNachRueckfrage();
+  return (
+    <button type="button" onClick={() => nachRueckfrage(onWechsel)}>
+      Zu Segment B
+    </button>
+  );
+}
+
+function SeiteMitLeiste({
+  mitProvider = true,
+  mitAngabe = true,
+}: {
+  mitProvider?: boolean;
+  /** `false`: das Feld entfällt von außen (Live-Stand), während die Rückfrage steht. */
+  mitAngabe?: boolean;
+}) {
+  const [segment, setSegment] = useState<'a' | 'b'>('a');
+  const inhalt = (
+    <>
+      <Leiste onWechsel={() => setSegment('b')} />
+      {segment === 'a' ? mitAngabe && <Angabe etikett="Name" /> : <div>SEGMENT B</div>}
+    </>
+  );
+  return mitProvider ? <OffeneBearbeitungProvider>{inhalt}</OffeneBearbeitungProvider> : inhalt;
+}
+
+describe('offene Bearbeitung · Wechsel in der Seite (LLH-1415)', () => {
+  const rendernMitLeiste = (ui = <SeiteMitLeiste />) =>
+    renderMitProviders(ui, { datenRouter: true });
+
+  it('ohne Änderung wechselt still, auch bei offenem Feld', async () => {
+    const user = userEvent.setup();
+    rendernMitLeiste();
+    await user.click(screen.getByRole('button', { name: 'Name eintragen' }));
+    await user.click(screen.getByRole('button', { name: 'Zu Segment B' }));
+    expect(screen.getByText('SEGMENT B')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Rückfrage bei Entwurf: „Bleiben“ behält Segment und Eingabe', async () => {
+    const user = userEvent.setup();
+    rendernMitLeiste();
+    await user.click(screen.getByRole('button', { name: 'Name eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Mül');
+    await user.click(screen.getByRole('button', { name: 'Zu Segment B' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    // Derselbe Wortlaut wie beim Pfadwechsel (`VerlassenRueckfrage`).
+    expect(dialog).toHaveTextContent(
+      'Noch nicht gespeicherte Änderungen gehen beim Verlassen verloren.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Bleiben' }));
+    expect(screen.queryByText('SEGMENT B')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Mül');
+  });
+
+  it('Verwerfen wechselt', async () => {
+    const user = userEvent.setup();
+    rendernMitLeiste();
+    await user.click(screen.getByRole('button', { name: 'Name eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Mül');
+    await user.click(screen.getByRole('button', { name: 'Zu Segment B' }));
+    await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('SEGMENT B')).toBeInTheDocument();
+  });
+
+  it('nach „Bleiben“ wechselt ein späteres Speichern nicht nach', async () => {
+    const user = userEvent.setup();
+    rendernMitLeiste();
+    await user.click(screen.getByRole('button', { name: 'Name eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Mül');
+    await user.click(screen.getByRole('button', { name: 'Zu Segment B' }));
+    await user.click(await screen.findByRole('button', { name: 'Bleiben' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'ler{Enter}');
+    expect(await screen.findByRole('button', { name: 'Name bearbeiten' })).toBeInTheDocument();
+    expect(screen.queryByText('SEGMENT B')).toBeNull();
+  });
+
+  it('entfällt die Änderung, während die Rückfrage steht, wird der Wechsel nachgeholt', async () => {
+    const user = userEvent.setup();
+    const { rerender } = rendernMitLeiste();
+    await user.click(screen.getByRole('button', { name: 'Name eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Mül');
+    await user.click(screen.getByRole('button', { name: 'Zu Segment B' }));
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+
+    rerender(<SeiteMitLeiste mitAngabe={false} />);
+    expect(await screen.findByText('SEGMENT B')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Ungespeicherte Änderungen' })).toBeNull(),
+    );
+  });
+
+  it('ohne Merker der Seite wechselt sofort', async () => {
+    const user = userEvent.setup();
+    rendernMitLeiste(<SeiteMitLeiste mitProvider={false} />);
+    await user.click(screen.getByRole('button', { name: 'Name eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Mül');
+    await user.click(screen.getByRole('button', { name: 'Zu Segment B' }));
+    expect(screen.getByText('SEGMENT B')).toBeInTheDocument();
   });
 });
