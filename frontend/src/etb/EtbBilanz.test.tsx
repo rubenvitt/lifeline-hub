@@ -17,6 +17,7 @@ function e(over: Partial<EtbEintragAnzeige>): EtbEintragAnzeige {
     received_at: '2026-05-23 10:00:00',
     folgeauftraege: [],
     berichtigt_durch: [],
+    einheiten: [],
     anhaenge: [],
     ...over,
   };

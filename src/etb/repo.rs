@@ -1,4 +1,4 @@
-use super::{BerichtigungVerweis, EtbEintragAnzeige, FolgeauftragVerweis};
+use super::{BerichtigungVerweis, EinheitVerweis, EtbEintragAnzeige, FolgeauftragVerweis};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
@@ -427,7 +427,64 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     folgeauftraege_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     anhaenge_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     berichtigungen_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
+    einheiten_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     Ok(eintrag)
+}
+
+/// Füllt `einheiten` (LLH-1266) für alle übergebenen Einträge mit EINER Abfrage nach — das
+/// Muster von [`folgeauftraege_nachladen`]. Die Einsatzgrenze hält die Abfrage selbst (Join auf
+/// den Eintrag), wie [`berichtigungen_nachladen`]. Aufgelöste Einheiten zählen mit: der Verweis
+/// führt auf ihre lesende Ansicht.
+async fn einheiten_nachladen(
+    pool: &SqlitePool,
+    eintraege: &mut [EtbEintragAnzeige],
+) -> Result<(), AppError> {
+    if eintraege.is_empty() {
+        return Ok(());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT ez.eintrag_id, ee.id, ee.name FROM etb_eintrag_einheit ez \
+         JOIN etb_eintrag g ON g.id = ez.eintrag_id \
+         JOIN einsatz_einheit ee ON ee.id = ez.einheit_id AND ee.einsatz_id = g.einsatz_id \
+         WHERE ez.eintrag_id IN (",
+    );
+    let mut ids = qb.separated(", ");
+    for e in eintraege.iter() {
+        ids.push_bind(e.id);
+    }
+    qb.push(") ORDER BY ee.id");
+    let zeilen: Vec<(i64, i64, String)> = qb.build_query_as().fetch_all(pool).await?;
+    if zeilen.is_empty() {
+        return Ok(());
+    }
+    let index: HashMap<i64, usize> = eintraege
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id, i))
+        .collect();
+    for (eintrag, id, name) in zeilen {
+        if let Some(&i) = index.get(&eintrag) {
+            eintraege[i].einheiten.push(EinheitVerweis { id, name });
+        }
+    }
+    Ok(())
+}
+
+/// Hält fest, dass ein Eintrag eine Einheit nennt (Tabelle `etb_eintrag_einheit`, LLH-1266):
+/// der Systemeintrag der Auflösung, damit der Filter „betrifft Einheit“ ihn findet und die
+/// Zeitachse auf die aufgelöste Einheit verweist. Die Verknüpfung ist eine Spur der Einheit
+/// (`einheit::repo::SPUREN_EINHEIT`): nur an eine Einheit hängen, die stehen bleibt.
+pub async fn link_einheit_tx(
+    conn: &mut SqliteConnection,
+    eintrag_id: i64,
+    einheit_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query("INSERT OR IGNORE INTO etb_eintrag_einheit (eintrag_id, einheit_id) VALUES (?, ?)")
+        .bind(eintrag_id)
+        .bind(einheit_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
 }
 
 /// Füllt `folgeauftraege` (LFH-636) für alle übergebenen Einträge mit EINER Abfrage nach —
@@ -633,10 +690,11 @@ pub struct EtbFilter {
     pub erfasser_id: Option<i64>,
     /// Filter „betrifft Einheit" (LFH-616). Ein ETB-Eintrag hat keine Einheit-Spalte; er
     /// betrifft eine Einheit, wenn EINER von zwei Wegen trägt:
-    /// 1. **Empfänger beim Schreiben**: der Eintrag hängt an einem Auftrag, und die Einheit
-    ///    war Empfänger, als er geschrieben wurde (Tabelle `etb_eintrag_einheit`, LLH-1175;
-    ///    Anordnung und Vollzugsmeldung). Nach einer Berichtigung bleibt die Erteilung beim
-    ///    alten Kreis, die Anordnung „… geändert: Empfänger …“ steht unter altem und neuem.
+    /// 1. **Festgehalten beim Schreiben** (Tabelle `etb_eintrag_einheit`): der Eintrag hängt an
+    ///    einem Auftrag, und die Einheit war Empfänger, als er geschrieben wurde (LLH-1175;
+    ///    Anordnung und Vollzugsmeldung), oder er ist der Systemeintrag ihrer Auflösung
+    ///    (LLH-1266). Nach einer Berichtigung bleibt die Erteilung beim alten Kreis, die
+    ///    Anordnung „… geändert: Empfänger …“ steht unter altem und neuem.
     /// 2. **Name in von/an**: `von` oder `an` ist — getrimmt, ASCII-Groß/Klein egal — der
     ///    AKTUELLE Einheitsname. Das deckt den freien Funkverkehr ab, die Mehrheit im ETB.
     ///    Grenzen, bewusst: nach einer Umbenennung fallen ältere Einträge heraus; eine
@@ -808,6 +866,7 @@ pub async fn abfrage(
     folgeauftraege_nachladen(pool, &mut eintraege).await?;
     anhaenge_nachladen(pool, &mut eintraege).await?;
     berichtigungen_nachladen(pool, &mut eintraege).await?;
+    einheiten_nachladen(pool, &mut eintraege).await?;
     Ok(eintraege)
 }
 

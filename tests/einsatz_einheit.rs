@@ -1642,6 +1642,113 @@ async fn aufloesen_bleibt_im_nachweis_und_stornieren_nur_ohne_spur() {
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 6);
 }
 
+/// LLH-1266 (Change `oq1yp0k5-aufgeloeste-einheit-lesend`): der Server liefert die letzte
+/// Besetzung einer aufgelösten Einheit, und der ETB-Eintrag der Auflösung nennt sie
+/// (`einheiten`), auch unter dem Filter „betrifft Einheit“. Ein Handeintrag trägt eine leere
+/// Liste; die stornierte Fehlanlage verknüpft nichts.
+#[tokio::test]
+async fn aufgeloeste_einheit_liefert_letzte_besetzung_und_etb_verweis() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zug = einheit_bilden(&app, &admin, einsatz, "Florian 1").await;
+    let leer = einheit_bilden(&app, &admin, einsatz, "Fehlanlage").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
+    let pfad = |e: i64, rest: &str| format!("/api/einsaetze/{einsatz}/einheiten/{e}{rest}");
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &pfad(zug, &format!("/personal/{ep}")),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(&app, "DELETE", &pfad(zug, ""), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(&app, "POST", &pfad(leer, "/stornieren"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        &admin,
+        Some(r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Handeintrag"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let (_, aufgeloeste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten?aufgeloeste=1"),
+        &admin,
+        None,
+    )
+    .await;
+    let besetzung = &aufgeloeste[0]["letzte_besetzung"];
+    assert_eq!(besetzung["personal"][0]["ep_id"], ep, "{aufgeloeste}");
+    assert_eq!(besetzung["personal"][0]["name"], "Anna");
+    assert_eq!(besetzung["fahrzeuge"], serde_json::json!([]));
+    assert_eq!(besetzung["material"], serde_json::json!([]));
+    let (_, aktive) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(aktive
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|e| !e.as_object().unwrap().contains_key("letzte_besetzung")));
+
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let eintrag = |inhalt: &str| {
+        etb.as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["inhalt"] == inhalt)
+            .unwrap_or_else(|| panic!("{inhalt} fehlt: {etb}"))
+            .clone()
+    };
+    assert_eq!(
+        eintrag("Einheit «Florian 1» aufgelöst")["einheiten"],
+        serde_json::json!([{ "id": zug, "name": "Florian 1" }])
+    );
+    assert_eq!(
+        eintrag("Einheit «Fehlanlage» storniert (Fehlanlage)")["einheiten"],
+        serde_json::json!([])
+    );
+    assert_eq!(eintrag("Handeintrag")["einheiten"], serde_json::json!([]));
+
+    let (_, gefiltert) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb?einheit_id={zug}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(
+        gefiltert
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["inhalt"] == "Einheit «Florian 1» aufgelöst"),
+        "{gefiltert}"
+    );
+}
+
 /// Spec `material-liste`, „Umhängen nennt die alte Einheit“ (LLH-1093, design.md D5), im
 /// Wortlaut des Ortswechsels (LLH-1224 D11): der ETB-Eintrag nennt beide Einheiten, beide werden
 /// live gemeldet; dieselbe Einheit noch einmal schreibt nichts; eine aufgelöste Zieleinheit ist

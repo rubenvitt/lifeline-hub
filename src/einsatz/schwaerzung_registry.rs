@@ -1105,6 +1105,32 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Wirkung der Übernahme für den Storno (LLH-1388): Kennzeichen „angelegt“ und Belegungs-FK.
             retain("nachforderung_angelegt", G_ENUM),
             retain("nachforderung_belegung_id", G_FK),
+            // Kennzeichen „letzte Besetzung festgehalten“ (LLH-1266, Mig 0250).
+            retain("besetzung_festgehalten", G_ENUM),
+        ],
+    },
+    // Letzte Besetzung einer aufgelösten Einheit (LLH-1266, Mig 0250): wer und was beim Auflösen
+    // dazugehörte. Nur Verweise, Marke und Menge; Name und Bezeichnung stecken in den
+    // Dispositionszeilen und werden dort geschwärzt, wie bei der Besatzung einer Schicht. Die
+    // Zuordnung zur Einheit ist Skelett der Führungsdokumentation → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_einheit_letzte_besetzung",
+        scoping: Scoping::UeberParent {
+            fk: "einheit_id",
+            parent: "einsatz_einheit",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einheit_id", G_FK),
+            retain("art", G_ENUM),
+            retain("personal_id", G_FK),
+            retain("fahrzeug_id", G_FK),
+            retain("material_id", G_FK),
+            retain("ist_fuehrer", G_KONFIG),
+            retain("auf_fahrzeug_id", G_FK),
+            retain("menge", G_ZAEHLER),
         ],
     },
     TabellenRegel {

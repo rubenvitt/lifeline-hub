@@ -242,6 +242,16 @@ describe('KraftZeitachse (LFH-552)', () => {
     expect(screen.getByRole('button', { name: /^Alarmierung .* streichen$/ })).toBeDisabled();
   });
 
+  it('lesend (aufgelöste Einheit, LLH-1266): Ereignisse ohne Nachtragen, Streichen und Rechte-Hinweis', async () => {
+    server.use(http.get(PFAD, () => HttpResponse.json(ZEITACHSE)));
+    renderMitProviders(
+      <KraftZeitachse einsatzId={1} art="person" id={7} kennung="Anna" darfSchreiben lesend />,
+    );
+    await waitFor(() => expect(eintraege()).toHaveLength(3));
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByText(ZEITACHSE_RECHTE_TEXT)).toBeNull();
+  });
+
   describe('Vorbelegung des Zeitpunkts', () => {
     afterEach(() => {
       vi.useRealTimers();

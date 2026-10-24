@@ -52,6 +52,7 @@ function eintrag(over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
     befehl_id: null,
     folgeauftraege: [],
     berichtigt_durch: [],
+    einheiten: [],
     anhaenge: [],
     ...over,
   };

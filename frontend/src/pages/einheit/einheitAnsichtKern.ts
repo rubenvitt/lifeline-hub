@@ -4,6 +4,9 @@ import type {
   EinsatzFahrzeug,
   EinsatzPersonal,
   Fahrzeug,
+  LetzteBesetzung,
+  LetztePerson,
+  LetztesFahrzeug,
   ModulFreigaben,
   Personal,
 } from '../../api/types';
@@ -298,4 +301,36 @@ export function buildPersonMenuItems(
     items.push({ key: 'aus-einheit', label: 'Aus Einheit lösen', gefahr: true });
   }
   return items;
+}
+
+// ── Aufgelöste Einheit (LLH-1266) ─────────────────────────────────────────────
+
+/** Ein Fahrzeug der letzten Besetzung mit den Personen, die auf ihm saßen. */
+export interface LetztesFahrzeugMitBesatzung {
+  fahrzeug: LetztesFahrzeug;
+  besatzung: LetztePerson[];
+}
+
+/**
+ * Gliedert die festgehaltene Besetzung einer aufgelösten Einheit nach Fahrzeugen (Change
+ * `oq1yp0k5-aufgeloeste-einheit-lesend`, design.md D3): eine Person, deren Sitz ein festgehaltenes
+ * Fahrzeug ist, steht unter ihm, jede andere unter „Ohne Fahrzeug“. Jede Person genau einmal, in
+ * der Folge des Servers (Führer zuerst).
+ */
+export function gliedereLetzteBesetzung(b: LetzteBesetzung): {
+  fahrzeuge: LetztesFahrzeugMitBesatzung[];
+  ohneFahrzeug: LetztePerson[];
+} {
+  const fahrzeuge = b.fahrzeuge.map((fahrzeug) => ({
+    fahrzeug,
+    besatzung: [] as LetztePerson[],
+  }));
+  const jeId = new Map(fahrzeuge.map((f) => [f.fahrzeug.ef_id, f]));
+  const ohneFahrzeug: LetztePerson[] = [];
+  for (const p of b.personal) {
+    const ziel = p.auf_fahrzeug_id != null ? jeId.get(p.auf_fahrzeug_id) : undefined;
+    if (ziel) ziel.besatzung.push(p);
+    else ohneFahrzeug.push(p);
+  }
+  return { fahrzeuge, ohneFahrzeug };
 }

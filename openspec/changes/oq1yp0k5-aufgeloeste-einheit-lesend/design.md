@@ -152,4 +152,5 @@ wird.
 
 ## Open Questions
 
-- Verweise an Auftragseinträgen ja (Vorschlag) oder nur am Systemeintrag der Auflösung?
+- ~~Verweise an Auftragseinträgen ja oder nur am Systemeintrag der Auflösung?~~ Entschieden bei
+  der Freigabe (24.10.2026): auch an Auftragseinträgen.

@@ -37,6 +37,7 @@ function e(over: Partial<EtbEintragAnzeige>): EtbEintragAnzeige {
     received_at: '2026-05-23 10:00:00',
     folgeauftraege: [],
     berichtigt_durch: [],
+    einheiten: [],
     anhaenge: [],
     ...over,
   };
@@ -392,6 +393,8 @@ describe('hatVerknuepfung (LFH-636)', () => {
     // LLH-1104: Meldung und Nachforderung sind Kopplungen wie Befehl und Auftrag.
     expect(hatVerknuepfung(e({ meldung_id: 4, meldung_lfd_nr: 12 }))).toBe(true);
     expect(hatVerknuepfung(e({ nachforderung_id: 7 }))).toBe(true);
+    // LLH-1266: genannte Einheiten ebenso.
+    expect(hatVerknuepfung(e({ einheiten: [{ id: 20, name: 'Florian 1' }] }))).toBe(true);
   });
 });
 
@@ -465,6 +468,8 @@ describe('buendleSystemfolgen (LLH-1106)', () => {
       { received_at: '2026-05-23 10:30:00' },
       { anhaenge: [{ id: 1 } as EtbEintragAnzeige['anhaenge'][number]] },
       { auftrag_id: 7 },
+      // Der Eintrag der Auflösung mit Verweis auf die Einheit steht einzeln (LLH-1266).
+      { einheiten: [{ id: 20, name: 'Florian 1' }] },
     ];
     for (const over of brecher) {
       const posten = buendleSystemfolgen(

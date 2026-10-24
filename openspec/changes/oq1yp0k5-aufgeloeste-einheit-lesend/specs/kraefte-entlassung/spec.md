@@ -32,10 +32,10 @@ gelöschte oder stornierte Einheit MUST nichts festhalten.
 
 #### Scenario: Letzte Besetzung festgehalten
 - **WHEN** die Einheit „Florian 1“ mit Führerin Anna Beck und Ben Kurz auf dem Fahrzeug
-  „Florian 1-83-1“ und einem Materialposten „Trage“ mit Menge 2 aufgelöst wird
+  „Florian 1-83-1“ und dem Materialposten „Wolldecke“ mit Menge 20 aufgelöst wird
 - **THEN** liefert die Liste der aufgelösten Einheiten für „Florian 1“ als letzte Besetzung beide
-  Personen, Anna Beck als Führerin, beide auf „Florian 1-83-1“, das Fahrzeug und „Trage“ mit
-  Menge 2, obwohl keine dieser Kräfte der Einheit noch angehört
+  Personen, Anna Beck als Führerin, beide auf „Florian 1-83-1“, das Fahrzeug und „Wolldecke“ mit
+  Menge 20, obwohl keine dieser Kräfte der Einheit noch angehört
 
 #### Scenario: Festgehaltene Kraft wird später storniert
 - **WHEN** eine Person nach dem Auflösen ihrer Einheit als Fehldisposition storniert wird
