@@ -89,8 +89,7 @@ Erinnerungen und Ablösungen. Die Zahl jedes Abschnitts ist dieselbe wie im Modu
 
 Jeder Abschnitt zeigt höchstens drei Einträge, das Überfällige zuerst; ein überfälliger Eintrag
 trägt dazu einen roten Rand links und das Wort „überfällig“. Ein Klick auf einen Eintrag öffnet
-ihn im Modul, hervorgehoben; eine Erinnerung öffnet die Liste der Erinnerungen. Alle weiteren
-erreicht „alle ↗“. Steht „keine“, gibt es nichts Offenes. Steht „ohne Netz nicht geladen“, war
+ihn im Modul, hervorgehoben. Alle weiteren erreicht „alle ↗“. Steht „keine“, gibt es nichts Offenes. Steht „ohne Netz nicht geladen“, war
 die Liste ohne Verbindung noch nie geladen; das heißt nicht, dass nichts offen ist.
 
 „meine Stelle“ zeigt die Vorgänge, die an eine eigene Funktion gehen (die besetzten Sachgebiete,
@@ -104,7 +103,8 @@ Lagebesprechung, der erwartete Höchststand an einem maßgeblichen Pegel, fälli
 Beginn angekündigter Unwetterwarnungen der Stufen schwer und extrem. Eine verstrichene Frist steht
 als „überfällig“ ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben. Pegelprognose
 und Unwetterbeginn sind Erwartungen, keine Fristen: Verstrichen fallen sie heraus. Es stehen
-höchstens sechs Marken da, der Rest als „+… weitere“.
+höchstens sechs Marken da, der Rest als „+… weitere“. Ein Klick auf die Marke eines Auftrags oder
+einer Erinnerung öffnet den Auftrag oder die Erinnerung hervorgehoben im Modul.
 
 ### Rechte und gesperrte Module
 
