@@ -1,8 +1,13 @@
-import { Button, Space } from 'antd';
+import { Button, Space, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../../api/client';
 import { gibFahrzeugFrei, gibPersonalFrei } from '../../api/einheiten';
-import { gibBesatzungFrei, ordneBesatzungZu, updateDisposition } from '../../api/einsatzFahrzeuge';
+import {
+  gibBesatzungFrei,
+  updateDisposition,
+  zuordnenBesatzungMenge,
+} from '../../api/einsatzFahrzeuge';
 import { listeFahrzeugStatus } from '../../api/fahrzeugStatus';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, StaerkePosition } from '../../api/types';
@@ -20,6 +25,8 @@ import { RechteHinweis, ZeilenFehler } from '../../components/SpeicherHinweis';
 import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
 import { useZeilenFehler, type ZeilenGrund } from '../../components/useZeilenFehler';
+import BesatzungUebernehmenDialog from '../../kraefte/BesatzungUebernehmenDialog';
+import { besatzungKandidaten, besatzungVorschlag } from '../../kraefte/besatzungVorschlag';
 import { FahrzeugZeichen } from '../../kraefte/EinheitZeichen';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { fmsStatusOptionen } from '../../kraefte/fmsTableauKern';
@@ -34,6 +41,7 @@ import {
 import { PositionsMarken } from '../../kraefte/KraeftebaumZelle';
 import { fmsEtikett } from '../../kraefte/meldebildRaster';
 import { fahrzeugStatusDarstellung } from '../../kraefte/mittelStatus';
+import { gruendeJeKraft } from '../../kraefte/sammelDisposition';
 import { einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
 import { besatzungsUrteil, statusKategorie } from '../../theme/statusFarben';
 import {
@@ -57,6 +65,11 @@ import {
  * Was bedienbar ist, sagt allein {@link EinheitRechte}. Lösen ist umkehrbar und wirkt ohne
  * Rückfrage (Regel „Destruktiv ist nicht gleich destruktiv“); jeder Grund steht an seiner Zeile
  * (`useZeilenFehler`, Schlüssel `ep_id` bzw. `ef_id`), kein Toast.
+ *
+ * SAMMELROUTE (LLH-1267): „Auf <Funkrufname>“ ordnet über dieselbe Route zu wie „Personal der
+ * Einheit übernehmen“ (`zuordnenBesatzungMenge`, LLH-1073 D12), mit genau einer Kraft; je
+ * Fahrzeug öffnet der Knopf den Dialog der Fahrzeugliste mit dem Vorschlag bis zum Soll. Lösen
+ * vom Fahrzeug bleibt auf der Einzelroute, eine Sammelroute dafür gibt es nicht.
  */
 
 interface FahrzeugeBesatzungProps {
@@ -164,6 +177,11 @@ export default function FahrzeugeBesatzung({
    * Antwort, auch bei zwei Aktionen an zwei Zeilen zugleich (eine Mutation kennt nur ihre letzte).
    */
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  /** Offener Dialog „Personal der Einheit übernehmen“ samt Vorwahl beim Öffnen (LLH-1073 D12). */
+  const [uebernehmenFuer, setUebernehmenFuer] = useState<{
+    fahrzeug: EinsatzFahrzeug;
+    vorgewaehlt: number[];
+  } | null>(null);
   const markPending = (key: string, on: boolean) =>
     setPending((prev) => {
       const next = new Set(prev);
@@ -194,10 +212,19 @@ export default function FahrzeugeBesatzung({
     onSettled: (_d, _e, epId) => trackPerson(epId).end(),
   });
   const besatzungZuordnen = useMutation({
-    mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
+    mutationFn: (v: { efId: number; epId: number }) =>
+      zuordnenBesatzungMenge(einsatzId, v.efId, [v.epId]),
     onMutate: (v) => trackPerson(v.epId).start(),
     onSuccess: invalidate,
-    onError: (e, v) => personErrors.melde(v.epId, e, 'Nicht auf das Fahrzeug gesetzt'),
+    onError: (e, v) => {
+      // Die Sammelroute nennt den Grund je Person (`zeilen`), die Meldung spricht von allen.
+      const grund = gruendeJeKraft(e, 'personal').get(v.epId);
+      const fehler =
+        grund != null && e instanceof ApiError
+          ? new ApiError(e.status, `Nicht auf das Fahrzeug gesetzt: ${grund}`)
+          : e;
+      personErrors.melde(v.epId, fehler, 'Nicht auf das Fahrzeug gesetzt');
+    },
     onSettled: (_d, _e, v) => trackPerson(v.epId).end(),
   });
   const besatzungLoesen = useMutation({
@@ -314,10 +341,46 @@ export default function FahrzeugeBesatzung({
     </span>
   );
 
-  /** Rechts: Status (bei Recht die Wahl) und rot „Aus Einheit lösen“, abgesetzt (`size="middle"`). */
-  const renderFahrzeugActions = (efId: number, status: ReactNode) => (
+  /**
+   * „Personal der Einheit übernehmen“ (LLH-1267): nur wo die Besatzung steht und geschrieben
+   * werden darf; ohne freie Kräfte gesperrt, der Grund sichtbar daneben (LLH-1073 D12).
+   */
+  const renderUebernehmen = (ef: EinsatzFahrzeug) => {
+    if (!canBesatzung || !personal) return null;
+    const kandidaten = besatzungKandidaten(personal, ef);
+    return (
+      <Space size="small" wrap>
+        <Button
+          disabled={kandidaten.length === 0}
+          onClick={() =>
+            setUebernehmenFuer({
+              fahrzeug: ef,
+              vorgewaehlt: besatzungVorschlag({
+                kandidaten,
+                crew: personal.filter((p) => p.fahrzeug_id === ef.id),
+                soll: ef.soll_besatzung ?? null,
+                fuehrerId: einheit.fuehrer_id ?? null,
+              }).vorgewaehlt,
+            })
+          }
+        >
+          Personal der Einheit übernehmen
+        </Button>
+        {kandidaten.length === 0 && (
+          <Typography.Text type="secondary">keine freien Kräfte der Einheit</Typography.Text>
+        )}
+      </Space>
+    );
+  };
+
+  /**
+   * Rechts: Status (bei Recht die Wahl), „Personal der Einheit übernehmen“ und rot „Aus Einheit
+   * lösen“, abgesetzt (`size="middle"`).
+   */
+  const renderFahrzeugActions = (efId: number, status: ReactNode, uebernehmen?: ReactNode) => (
     <Space size="middle" wrap style={{ marginInlineStart: 'auto' }}>
       {status}
+      {uebernehmen}
       {rechte.canEditEinheit && (
         <Button
           danger
@@ -379,6 +442,7 @@ export default function FahrzeugeBesatzung({
               if (!isPending) fmsStatus.mutate({ efId: ef.id, statusId });
             }}
           />,
+          renderUebernehmen(ef),
         )}
         {errorRow(fahrzeugErrors.grund(ef.id))}
       </div>
@@ -486,6 +550,15 @@ export default function FahrzeugeBesatzung({
         content
       )}
       {children}
+      {personal && (
+        <BesatzungUebernehmenDialog
+          einsatzId={einsatzId}
+          auftrag={uebernehmenFuer}
+          personal={personal}
+          fuehrerId={einheit.fuehrer_id ?? null}
+          onSchliessen={() => setUebernehmenFuer(null)}
+        />
+      )}
     </Paneel>
   );
 }
