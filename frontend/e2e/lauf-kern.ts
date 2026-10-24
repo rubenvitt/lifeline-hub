@@ -1,5 +1,6 @@
+import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { accessSync, constants, existsSync } from 'node:fs';
+import { accessSync, constants, existsSync, readdirSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 
@@ -131,4 +132,40 @@ export function viteServer(frontendPort: number, backendUrl: string) {
     reuseExistingServer: false,
     timeout: 60_000,
   };
+}
+
+/** Browserablage des Abbilds der Claude-Cloud-Sitzung (dort `PLAYWRIGHT_BROWSERS_PATH`). */
+const CLOUD_BROWSER_DIR = '/opt/pw-browsers';
+
+/**
+ * Ersatz-Chromium für die Cloud-Sitzung (LLH-1439): das Abbild bringt unter `/opt/pw-browsers`
+ * einen Chromium-Build mit, der nicht zum Playwright des Repos passen muss (erwartet 1234, dort
+ * lagen 1194 und später 1243), und `playwright install` ist dort gesperrt. Fehlt der erwartete
+ * Browser und liegt dort einer, kommt sein Pfad zurück, für `launchOptions.executablePath` im
+ * Projekt `chromium`. Bevorzugt die Headless-Shell (sie fährt Playwright headless, so auch die
+ * CI), sonst das volle Chromium, je der höchste Build.
+ *
+ * Sonst `undefined`, und die Konfiguration bleibt, wie sie ist: mit installiertem Browser (CI,
+ * Entwicklerrechner) ändert sich nichts, und ohne `/opt/pw-browsers` meldet Playwright den
+ * fehlenden Browser wie bisher. Bewusst nur dieses Verzeichnis, nicht Playwrights eigener Cache:
+ * dort hieße ein alter Build nach einem Update „`playwright install`“, nicht „nimm ihn“.
+ */
+export function fallbackChromiumPath(): string | undefined {
+  if (existsSync(chromium.executablePath()) || !existsSync(CLOUD_BROWSER_DIR)) return undefined;
+  const candidates = [
+    {
+      pattern: /^chromium_headless_shell-(\d+)$/,
+      file: 'chrome-headless-shell-linux64/chrome-headless-shell',
+    },
+    { pattern: /^chromium-(\d+)$/, file: 'chrome-linux64/chrome' },
+  ];
+  const entries = readdirSync(CLOUD_BROWSER_DIR);
+  for (const { pattern, file } of candidates) {
+    const match = entries
+      .map((name) => ({ name, build: Number(pattern.exec(name)?.[1] ?? 0) }))
+      .filter(({ name, build }) => build > 0 && existsSync(join(CLOUD_BROWSER_DIR, name, file)))
+      .sort((a, b) => b.build - a.build)[0];
+    if (match) return join(CLOUD_BROWSER_DIR, match.name, file);
+  }
+  return undefined;
 }
