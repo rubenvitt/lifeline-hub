@@ -25,7 +25,9 @@ außer an Stab-Daten selbst: die Besetzung (Nebentext im Kommunikationsplan, Sac
 Seiten prüfen `useModulFreigabe(einsatzId, 'fernmeldewesen')` fail-closed (der Rahmen rendert bei
 gescheitertem Freigabeabruf). Die API-Pfade bleiben `…/stab/kommunikationsplan…` und
 `…/stab/fernmeldeskizze…` (Marker `Fernmeldewesen`, `PFAD_KEY`), live über `fernmeldewesen`, Keys
-unter `einsatzKeys.fernmeldewesen*`. Reiter nur über `fernmeldewesen/FernmeldewesenReiter.tsx`. Die
+unter `einsatzKeys.fernmeldewesen*`. Reiter nur über `fernmeldewesen/FernmeldewesenReiter.tsx`; die
+Darstellung des Funkplans ist Zustand der Adresse (`?ansicht=`, per `replace`, Vorgabe „Funkplan“
+ohne Parameter, wie `?reiter=` der Aufträge, LLH-1432), Zurück landet im selben Reiter. Die
 Altadressen `stab/funkplan` und `stab/kommunikationsplan` leiten dauerhaft um und gehören über
 `ALTPFAD_MODUL` (`einsatz/modulRegistry.ts`) dem Fernmeldewesen; Einstiege von der Stab-Seite,
 Sprungmarken und Palette prüfen dessen Freigabe (`istSprungGesperrt('fernmeldewesen')`).
