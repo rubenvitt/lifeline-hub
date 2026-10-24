@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { anmelden, einsatzAnlegen } from './trefflaeche-kern';
 
 /**
  * Abstände der `InlineAngabe` je Dichtestufe (LLH-1271, Bedien-Leitlinie Kriterium 2, „Abstand
@@ -15,17 +15,20 @@ import { einsatzAnlegen } from './einsatz-kern';
  *  - **Speichern ↔ Abbrechen** der offenen Angabe: `size="middle"` (11 / 18 / 26). Die Klasse
  *    prüft `InlineAngabe.test.tsx`; ob die Fuge im Browser ankommt, belegt nur dieser Lauf.
  *  - **Kein Querlauf** mit offener Angabe, bei 390 px und am Fükw (1366 × 768).
+ *  - **Kein Umbruch des Werts** bei 720 px: der Wertknopf steht um `paddingSM` vor und durfte
+ *    trotzdem nur 100 % des Kartenfelds breit sein, „Rettungsstaffel Süd“ brach zweizeilig um.
  *
  * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
  *  - alte Fuge `gap: token.padding` in `kartenFelderStil` (`Datensicht.tsx`): rot in
  *    „Kartenfelder“ (komfortabel 7, handschuh 10).
  *  - `size="middle"` am `<Space>` der Angabe entfernt: rot in „Speichern ↔ Abbrechen“.
+ *  - `maxWidth: '100%'` statt `calc(100% + paddingSM)` in `wertAngabeStil`: rot in „Kartenfeld“
+ *    (der Wert bricht um).
  *
  * Seeding per API als Admin; die Fugen hängen an keiner Rolle, nur am Schreibrecht, ohne das
  * es keine Angabe zum Bearbeiten gibt.
  */
 
-const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const SUBPIXEL = 0.5;
 const HANDSCHIRM = { width: 390, height: 844 };
@@ -35,21 +38,13 @@ const FUEKW = { width: 1366, height: 768 };
 
 /** Böden als Literale, nicht aus `theme/tokens` — sonst prüfte der Test den Token gegen sich. */
 const STAFFEL = [
-  { dichte: 'kompakt', ziel: 0 },
-  { dichte: 'komfortabel', ziel: 8 },
-  { dichte: 'handschuh', ziel: 16 },
+  { dichte: 'kompakt', soll: 30, ziel: 0 },
+  { dichte: 'komfortabel', soll: 48, ziel: 8 },
+  { dichte: 'handschuh', soll: 72, ziel: 16 },
 ] as const;
 
 const KRAFT = 'Abstandsprobe, Henrike';
 const EINHEIT = 'Rettungsstaffel Süd';
-
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
-}
 
 async function post(page: Page, pfad: string, data: unknown) {
   const antwort = await page.request.post(pfad, { data });
@@ -58,7 +53,7 @@ async function post(page: Page, pfad: string, data: unknown) {
 }
 
 /** Stellt die Stufe und lädt neu: `ThemeModeProvider` liest den Speicher nur beim Montieren. */
-async function stelleDichte(page: Page, dichte: string) {
+async function setDichte(page: Page, dichte: string) {
   await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
     DICHTE_SCHLUESSEL,
     dichte,
@@ -121,8 +116,15 @@ async function knopffuge(page: Page, bereich: Locator, ziel: number, lauf: strin
 /**
  * Kleinste Lücke zwischen zwei Zielen in den Feldern der einen Personalkarte. Vorbedingung ist die
  * gesäte Folge: gefüllt, Aufforderung, gefüllt — sonst mäße der Lauf den Fall nicht, um den es geht.
+ * Bei 720 px ist Platz genug: dort steht jeder Wert einzeilig, also genau in der Stufenhöhe.
  */
-async function kartenfelder(page: Page, ziel: number, lauf: string) {
+async function kartenfelder(
+  page: Page,
+  soll: number,
+  ziel: number,
+  lauf: string,
+  einzeilig: boolean,
+) {
   const karte = page.locator('[data-lfh="datensicht-karte"]');
   await expect(karte).toHaveCount(1);
   await expect(
@@ -148,6 +150,14 @@ async function kartenfelder(page: Page, ziel: number, lauf: string) {
     kleinste,
     `Kartenfelder (${lauf}): kleinste Lücke zwischen Zielen ${kleinste.toFixed(1)}px`,
   ).toBeGreaterThanOrEqual(ziel - SUBPIXEL);
+  if (einzeilig) {
+    for (const [i, k] of kaesten.entries()) {
+      expect(
+        k.height,
+        `Kartenfeld ${i + 1} (${lauf}): ${k.height}px hoch, Soll ${soll} — der Wert bricht um`,
+      ).toBeLessThanOrEqual(soll + SUBPIXEL);
+    }
+  }
   return kleinste;
 }
 
@@ -156,6 +166,7 @@ test('InlineAngabe hält die Dichte-Staffel: Kartenfelder, Speichern ↔ Abbrech
 }) => {
   test.setTimeout(120_000);
   await anmelden(page);
+  // Per API: der Spec prüft den Anlegedialog nicht (frontend/e2e/AGENTS.md, LFH-1114).
   const einsatzId = await einsatzAnlegen(page, `E2E InlineAngabe Abstände ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
   const einheit = await post(page, `${basis}/einheiten`, { name: EINHEIT });
@@ -170,14 +181,14 @@ test('InlineAngabe hält die Dichte-Staffel: Kartenfelder, Speichern ↔ Abbrech
   expect(position.ok(), await position.text()).toBeTruthy();
 
   const gemessen: string[] = [];
-  for (const { dichte, ziel } of STAFFEL) {
+  for (const { dichte, soll, ziel } of STAFFEL) {
     // ── Kartenzweig: Felder bei 720 und 390 px, Knöpfe und Querlauf bei 390 px
     await page.setViewportSize(KARTE_BREIT);
     await page.goto(`/einsaetze/${einsatzId}/personal`);
-    await stelleDichte(page, dichte);
-    const breit = await kartenfelder(page, ziel, `720 px, ${dichte}`);
+    await setDichte(page, dichte);
+    const breit = await kartenfelder(page, soll, ziel, `720 px, ${dichte}`, true);
     await page.setViewportSize(HANDSCHIRM);
-    const schmal = await kartenfelder(page, ziel, `390 px, ${dichte}`);
+    const schmal = await kartenfelder(page, soll, ziel, `390 px, ${dichte}`, false);
     gemessen.push(`${dichte}: Kartenfelder ${breit.toFixed(1)} / ${schmal.toFixed(1)}px`);
     await ohneQuerlauf(page, `390 px, ${dichte}`);
     const karte = page.locator('[data-lfh="datensicht-karte"]');

@@ -193,6 +193,9 @@ export function wertAngabeStil(token: {
     color: 'inherit',
     font: 'inherit',
     marginInlineStart: -token.paddingSM,
+    // Um den Vorsprung breiter als der Behälter: sonst endete der Knopf `paddingSM` vor dessen
+    // Rand, und im Kartenfeld, das sich nach dem Inhalt bemisst, bräche der Wert um.
+    maxWidth: `calc(100% + ${token.paddingSM}px)`,
   };
 }
 

@@ -2620,6 +2620,7 @@ describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
  * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
  * - `columnGap: token.padding` (alte Fuge): rot in „Zielabstand“ (komfortabel 7, handschuh 10).
  * - `marginInline` statt `marginInlineStart` im Wertknopf: rot in „rückt nur am Anfang vor“.
+ * - `maxWidth: '100%'` im Wertknopf: rot in „rückt nur am Anfang vor“.
  */
 describe('Datensicht · Kartenfuge neben einer InlineAngabe', () => {
   const tokenVon = (stufe: keyof typeof dichten) => ({
@@ -2635,6 +2636,8 @@ describe('Datensicht · Kartenfuge neben einer InlineAngabe', () => {
       expect(stil.marginInlineStart).toBe(-dichten[stufe].abstand.sm);
       expect(stil.marginInline).toBeUndefined();
       expect(stil.marginInlineEnd).toBeUndefined();
+      // Der Knopf darf um den Vorsprung über den Behälter hinaus, sonst bricht der Wert um.
+      expect(stil.maxWidth).toBe(`calc(100% + ${dichten[stufe].abstand.sm}px)`);
     }
   });
 
