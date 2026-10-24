@@ -15,16 +15,16 @@
 
 ## 3. Übernahme überführt ein Fahrzeug ohne Einheit — LLH-1448 (`n11hhwje`)
 
-- [ ] 3.1 Refactor ohne Verhaltensänderung: `fahrzeug_zur_einheit_tx` aus `fahrzeug_als_einheit_tx` ziehen (D3) und `austritt_fahrzeug_bei_entlassung_tx` zu `austritt_fahrzeug_tx(…, notiz)` machen; bestehende Tests in `eintreffen` und zum Entlassen bleiben grün.
-- [ ] 3.2 Rust-Test für `check_namen_uebernahme_tx` (D4): Einheit → 422, Fahrzeug mit Einheit → 422, genau ein Fahrzeug ohne Einheit → `Some`, zwei → 422, frei → `None`. Erst rot sehen, dann umsetzen, grün.
-- [ ] 3.3 Rust-Test „RTW 2 steht als Fahrzeug im Einsatz“: Übernahme gelingt (vorher 422), die Einheit trägt Typ, Fahrzeug und Besatzung, angelegt = 1, genau ein ETB-Eintrag im Wortlaut der Spec. Erst rot sehen, dann D5 Schritte 1, 3, 4 und D6 umsetzen, grün; Unit-Test für `etb_text` mit „aus Fahrzeug“ und Besatzung.
-- [ ] 3.4 Rust-Test „Fahrzeug steht im BR Nord“ (mit und ohne Haken): Austritt des Fahrzeugs mit Notiz, Eintritt der Einheit zum alten Zeitpunkt, `nachforderung_belegung_id` gesetzt. Erst rot sehen, dann D5 Schritte 2 und 5 umsetzen, grün.
-- [ ] 3.5 Rust-Test „Storno der Überführung“: Einheit aufgelöst, Fahrzeug und Besatzung ohne Einheit; „Zwei gleichnamige Fahrzeuge ohne Einheit“ → 422, nichts angelegt. Grün.
-- [ ] 3.6 `Uebernommen` um `fahrzeug_ids` und `br_ids` erweitern, die Route `aus_nachforderung` meldet Live für sie und die Besatzung (D5); bestehender Routentest bzw. ein neuer in `tests/` belegt die Antwort.
+- [x] 3.1 Refactor ohne Verhaltensänderung: `fahrzeug_zur_einheit_tx` aus `fahrzeug_als_einheit_tx` ziehen (D3) und `austritt_fahrzeug_bei_entlassung_tx` zu `austritt_fahrzeug_tx(…, notiz)` machen; bestehende Tests in `eintreffen` und zum Entlassen bleiben grün.
+- [x] 3.2 Rust-Test für `check_namen_uebernahme_tx` (D4): Einheit → 422, Fahrzeug mit Einheit → 422, genau ein Fahrzeug ohne Einheit → `Some`, zwei → 422, frei → `None`. Erst rot sehen, dann umsetzen, grün.
+- [x] 3.3 Rust-Test „RTW 2 steht als Fahrzeug im Einsatz“: Übernahme gelingt (vorher 422), die Einheit trägt Typ, Fahrzeug und Besatzung, angelegt = 1, genau ein ETB-Eintrag im Wortlaut der Spec. Erst rot sehen, dann D5 Schritte 1, 3, 4 und D6 umsetzen, grün; Unit-Test für `etb_text` mit „aus Fahrzeug“ und Besatzung.
+- [x] 3.4 Rust-Test „Fahrzeug steht im BR Nord“ (mit und ohne Haken): Austritt des Fahrzeugs mit Notiz, Eintritt der Einheit zum alten Zeitpunkt, `nachforderung_belegung_id` gesetzt. Erst rot sehen, dann D5 Schritte 2 und 5 umsetzen, grün.
+- [x] 3.5 Rust-Test „Storno der Überführung“: Einheit aufgelöst, Fahrzeug und Besatzung ohne Einheit; „Zwei gleichnamige Fahrzeuge ohne Einheit“ → 422, nichts angelegt. Grün.
+- [x] 3.6 `Uebernommen` um `fahrzeug_ids` und `br_ids` erweitern, die Route `aus_nachforderung` meldet Live für sie und die Besatzung (D5); bestehender Routentest bzw. ein neuer in `tests/` belegt die Antwort.
 
 ## 4. Storno nach Verknüpfung am Raum — LLH-1449 (`zglesj5a`)
 
-- [ ] 4.1 Rust-Tests „Am Raum verknüpft, dann Storno“ (D7) für bekannte Einheit und Fahrzeug→Einheit: aktiv, gleicher Raum, kein Austritt im Verlauf, ETB „Verknüpfung gelöst“. Ohne Codeänderung grün; Mutationsprobe (Storno bucht testweise aus) macht ihn rot.
+- [x] 4.1 Rust-Tests „Am Raum verknüpft, dann Storno“ (D7) für bekannte Einheit und Fahrzeug→Einheit: aktiv, gleicher Raum, kein Austritt im Verlauf, ETB „Verknüpfung gelöst“. Ohne Codeänderung grün; Mutationsprobe (Storno bucht testweise aus) macht ihn rot. (`tests/nachforderung_erwartet.rs`, `storno_nach_verknuepfung_am_raum_bucht_nicht_aus`; Probe am 24.10.2026 rot, zurückgenommen.)
 
 ## 5. Abschluss
 

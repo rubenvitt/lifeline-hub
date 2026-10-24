@@ -670,6 +670,66 @@ pub fn etb_text_fahrzeug_als_einheit(
     text
 }
 
+/// Was [`fahrzeug_zur_einheit_tx`] angelegt hat: Einheit, ihr Name, die mitgekommene Besatzung.
+pub type ZurEinheit = (i64, String, Vec<(i64, String)>);
+
+/// Macht ein einheitenloses Fahrzeug zur Einheit wie „Als eigene Einheit führen“ (LLH-1073
+/// D9/D10): Name und Funkrufname = Funkrufname des Fahrzeugs, das Soll des Fahrzeugs, der Typ
+/// `typ_id`, das Fahrzeug gehört ihr an, die Besatzung ohne Einheit kommt mit. In der Transaktion
+/// des Aufrufers; die Prüfung des Fahrzeugs (fremd, beendet, einer Einheit zugehörig) und seines
+/// Raums trägt der Aufrufer. Gemeinsam für das Eintreffen mit Verweis (LLH-1444) und die Übernahme
+/// aus einer Nachforderung (LLH-1448, Change `o659va5r-nachforderung-herkunft` D3).
+pub async fn fahrzeug_zur_einheit_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    benutzer_id: i64,
+    ef_id: i64,
+    typ_id: Option<i64>,
+) -> Result<ZurEinheit, AppError> {
+    use crate::einheit::{mitglied_repo, repo as einheit_repo};
+    let (name, soll_fuehrer, soll_unterfuehrer, soll_mannschaft): (
+        String,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+    ) = sqlx::query_as(
+        "SELECT coalesce(f.funkrufname, ef.snap_funkrufname), \
+                f.staerke_fuehrer, f.staerke_unterfuehrer, f.staerke_mannschaft \
+         FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+         WHERE ef.id = ? AND ef.einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let einheit_id = einheit_repo::anlegen_tx(
+        &mut *conn,
+        einsatz_id,
+        org_id,
+        &einheit_repo::EinheitDaten {
+            name: &name,
+            abschnitt_id: None,
+            ueber_einheit_id: None,
+            typ_id,
+            soll_fuehrer,
+            soll_unterfuehrer,
+            soll_mannschaft,
+            bemerkung: None,
+            funkrufname: Some(&name),
+            sortier: 0,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
+        },
+        benutzer_id,
+    )
+    .await?;
+    mitglied_repo::zuordnen_fahrzeug_menge_tx(&mut *conn, einsatz_id, einheit_id, &[ef_id]).await?;
+    let besatzung =
+        mitglied_repo::mitnehmen_besatzung_tx(&mut *conn, einsatz_id, einheit_id, &[ef_id]).await?;
+    Ok((einheit_id, name, besatzung))
+}
+
 /// Ein einheitenloses Fahrzeug trifft mit Verweis auf eine Nachforderung ein (LLH-1444,
 /// Entscheidung 23.10.2026): es wird in der Transaktion der Buchung zur Einheit wie bei „Als eigene
 /// Einheit führen“ (LLH-1073 D9/D10: Name und Funkrufname = Funkrufname des Fahrzeugs, das Soll
@@ -685,51 +745,11 @@ async fn fahrzeug_als_einheit_tx(
     ef_id: i64,
     h: &Herkunft,
 ) -> Result<Gebucht, AppError> {
-    use crate::einheit::{mitglied_repo, repo as einheit_repo};
     let aktuell =
         belegung_repo::einheitenloses_fahrzeug_br_tx(&mut *conn, r.einsatz_id, ef_id).await?;
     belegung_repo::check_art_vorbedingung(&BrBelegungsArt::Eintritt, aktuell, r.br_id)?;
-    let (name, soll_fuehrer, soll_unterfuehrer, soll_mannschaft): (
-        String,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-    ) = sqlx::query_as(
-        "SELECT coalesce(f.funkrufname, ef.snap_funkrufname), \
-                f.staerke_fuehrer, f.staerke_unterfuehrer, f.staerke_mannschaft \
-         FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
-         WHERE ef.id = ? AND ef.einsatz_id = ?",
-    )
-    .bind(ef_id)
-    .bind(r.einsatz_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    let einheit_id = einheit_repo::anlegen_tx(
-        &mut *conn,
-        r.einsatz_id,
-        r.org_id,
-        &einheit_repo::EinheitDaten {
-            name: &name,
-            abschnitt_id: None,
-            ueber_einheit_id: None,
-            typ_id: None,
-            soll_fuehrer,
-            soll_unterfuehrer,
-            soll_mannschaft,
-            bemerkung: None,
-            funkrufname: Some(&name),
-            sortier: 0,
-            tz_fachaufgabe: None,
-            tz_organisation: None,
-        },
-        r.benutzer_id,
-    )
-    .await?;
-    mitglied_repo::zuordnen_fahrzeug_menge_tx(&mut *conn, r.einsatz_id, einheit_id, &[ef_id])
-        .await?;
-    let besatzung =
-        mitglied_repo::mitnehmen_besatzung_tx(&mut *conn, r.einsatz_id, einheit_id, &[ef_id])
-            .await?;
+    let (einheit_id, name, besatzung) =
+        fahrzeug_zur_einheit_tx(conn, r.einsatz_id, r.org_id, r.benutzer_id, ef_id, None).await?;
     verknuepfe_tx(conn, r, h, einheit_id).await?;
     let e = eintritt_einheit_tx(conn, r, einheit_id).await?;
     let namen: Vec<String> = besatzung.iter().map(|(_, n)| n.clone()).collect();
@@ -780,40 +800,91 @@ pub async fn check_namen_frei_tx(
     einsatz_id: i64,
     namen: &[&str],
 ) -> Result<(), AppError> {
-    let bestand: Vec<(String, String, Option<String>)> = sqlx::query_as(
-        "SELECT 'Einheit', name, funkrufname FROM einsatz_einheit \
-         WHERE einsatz_id = ?1 AND aufgeloest_at IS NULL \
-         UNION ALL \
-         SELECT 'Fahrzeug', coalesce(f.funkrufname, ef.snap_funkrufname, ''), NULL \
-         FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
-         WHERE ef.einsatz_id = ?1 AND ef.beendet_at IS NULL",
-    )
-    .bind(einsatz_id)
-    .fetch_all(&mut *conn)
-    .await?;
+    let bestand = namensbestand_tx(conn, einsatz_id).await?;
     for neu in namen {
-        let schluessel = normalize(neu);
-        for (art, name, funkrufname) in &bestand {
-            let trifft = normalize(name) == schluessel
-                || funkrufname
-                    .as_deref()
-                    .is_some_and(|f| normalize(f) == schluessel);
-            if trifft {
-                return Err(AppError::UnprocessableEntity(format!(
-                    "{neu} ist schon im Einsatz ({art} «{name}»)"
-                )));
-            }
+        if let Some(b) = treffer(&bestand, neu).next() {
+            return Err(name_vergeben(neu, b));
         }
     }
     Ok(())
 }
 
+/// Namensprüfung der Übernahme aus einer Nachforderung (LLH-1448, Change
+/// `o659va5r-nachforderung-herkunft` D4): wie [`check_namen_frei_tx`], nur ein Name, der genau
+/// einem aktiven Fahrzeug **ohne** Einheit gleicht (und sonst nichts), nennt dieses Fahrzeug,
+/// damit die Übernahme es zur Einheit macht. Mehrere gleichnamige Fahrzeuge ohne Einheit → 422.
+/// Je Name in Eingabefolge `Some(einsatz_fahrzeug.id)` oder `None` (frei).
 pub async fn check_namen_uebernahme_tx(
-    _conn: &mut SqliteConnection,
-    _einsatz_id: i64,
-    _namen: &[&str],
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    namen: &[&str],
 ) -> Result<Vec<Option<i64>>, AppError> {
-    todo!("LLH-1448")
+    let bestand = namensbestand_tx(conn, einsatz_id).await?;
+    let mut ergebnis = Vec::with_capacity(namen.len());
+    for neu in namen {
+        let gleich: Vec<&Bestand> = treffer(&bestand, neu).collect();
+        let fahrzeug_ohne_einheit = |b: &&Bestand| b.art == "Fahrzeug" && b.einheit_id.is_none();
+        if let Some(b) = gleich.iter().find(|b| !fahrzeug_ohne_einheit(b)) {
+            return Err(name_vergeben(neu, b));
+        }
+        match gleich.as_slice() {
+            [] => ergebnis.push(None),
+            [b] => ergebnis.push(Some(b.id)),
+            _ => {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "{neu} heißt mehr als ein Fahrzeug ohne Einheit im Einsatz"
+                )))
+            }
+        }
+    }
+    Ok(ergebnis)
+}
+
+/// Eine aktive Kraft des Einsatzes mit ihren Namen, für die Doppelbuchung über Namen.
+#[derive(sqlx::FromRow)]
+struct Bestand {
+    art: String,
+    id: i64,
+    name: String,
+    funkrufname: Option<String>,
+    /// Bei einem Fahrzeug die Einheit, der es angehört; bei einer Einheit `None`.
+    einheit_id: Option<i64>,
+}
+
+async fn namensbestand_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Vec<Bestand>, AppError> {
+    Ok(sqlx::query_as::<_, Bestand>(
+        "SELECT 'Einheit' AS art, id, name, funkrufname, NULL AS einheit_id \
+         FROM einsatz_einheit WHERE einsatz_id = ?1 AND aufgeloest_at IS NULL \
+         UNION ALL \
+         SELECT 'Fahrzeug', ef.id, coalesce(f.funkrufname, ef.snap_funkrufname, ''), NULL, \
+                ef.einheit_id \
+         FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+         WHERE ef.einsatz_id = ?1 AND ef.beendet_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
+/// Die Kräfte, deren Name oder Funkrufname nach [`normalize`] `neu` gleicht.
+fn treffer<'a>(bestand: &'a [Bestand], neu: &str) -> impl Iterator<Item = &'a Bestand> {
+    let schluessel = normalize(neu);
+    bestand.iter().filter(move |b| {
+        normalize(&b.name) == schluessel
+            || b.funkrufname
+                .as_deref()
+                .is_some_and(|f| normalize(f) == schluessel)
+    })
+}
+
+fn name_vergeben(neu: &str, b: &Bestand) -> AppError {
+    AppError::UnprocessableEntity(format!(
+        "{neu} ist schon im Einsatz ({} «{}»)",
+        b.art, b.name
+    ))
 }
 
 async fn unangemeldet_tx(
@@ -1446,7 +1517,7 @@ mod tests {
         // Ein beendetes Fahrzeug zählt nicht.
         sqlx::query("UPDATE einsatz_fahrzeug SET beendet_at = '2026-05-28 15:00:00' WHERE id = ?")
             .bind(frei)
-            .execute(&pool)
+            .execute(&mut *conn)
             .await
             .unwrap();
         assert_eq!(
