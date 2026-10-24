@@ -5,12 +5,15 @@ import {
   HANDSCHIRM,
   STAFFEL,
   SUBPIXEL,
+  ZIELABSTAND,
   alleHaltenStufe,
   anlegen,
   anmelden,
   einsatzAnlegen,
   gegenprobe,
+  haeltStufe,
   kurzeAchseHaelt,
+  ruhigeHoehe,
   stelleDichte,
 } from './trefflaeche-kern';
 
@@ -1448,6 +1451,185 @@ test('C16 · Kopffilter und Filterchips (Beobachter): Erfassen fehlt, die Filter
       ],
     },
   ]);
+});
+
+// ── C17 · Erfassungsdialog (LLH-1274) ─────────────────────────────────────────────────
+// Die geteilte Hülle `ErfassungsModal` (`components/Erfassung.tsx`) am Übernahme-Dialog aus
+// LLH-1226, im Handschuh auf dem Führungs-Tablet quer und auf dem Handschirm. Gemessen wurde
+// vorher: das Schließkreuz (72 px, antds `modalCloseBtnSize` = Steuerhöhe) stand 9 px über dem
+// ersten Feld, auf 390 px ragte „Übernehmen“ 6 px unter den Rand des Schirms.
+
+/** Führungs-Tablet quer (Bedien-Leitlinie, Kontext Führungs-Tablet). */
+const TABLET_QUER = { width: 1024, height: 768 };
+
+async function eingetroffeneNachforderung(page: Page, einsatzId: string) {
+  const E = `/api/einsaetze/${einsatzId}`;
+  const nf = await seed(page, `${E}/nachforderungen`, {
+    art: 'Tauchpumpe',
+    bezeichnung: '3 Tauchpumpen für Keller Hauptstraße',
+    anzahl: 3,
+    adressat_kategorie: 'leitstelle',
+  });
+  for (const status of ['zugesagt', 'unterwegs', 'eingetroffen']) {
+    await seed(page, `${E}/nachforderungen/${nf.id}/status`, { status });
+  }
+  return nf.id;
+}
+
+/**
+ * Öffnet den Übernahme-Dialog und misst ihn, ohne zu rollen: Abstand vom Schließkreuz zum Körper
+ * (er beginnt mit dem ersten Feld, Leitlinie ≥ 16 px im Handschuh), Kreuz und Knöpfe halten
+ * 72 px, und der Hauptknopf liegt ganz im Schirm und ist dort das oberste Element (LFH-355:
+ * sichtbar heißt nicht treffbar). Zum Schluss „Abbrechen“ geklickt, nicht nur gesehen.
+ */
+async function messeErfassungsdialog(
+  page: Page,
+  einsatzId: string,
+  nfId: number,
+  wo: string,
+  schmal: boolean,
+) {
+  await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
+  // Der Knopf der Query-Devtools steht nur im DEV-Build, gegen den die Suite fährt, unten rechts
+  // über dem Fuß des Dialogs (wie `dialoge-handy.spec.ts`); im Betrieb gibt es ihn nicht.
+  await page.addStyleTag({ content: '[class*="tsqd-open-btn"] { display: none !important; }' });
+  // Auf dem Handschirm zeigt das Board eine Stufe je Reiter.
+  if (schmal)
+    await inMain(page)
+      .getByRole('tab', { name: /^Eingetroffen \d+$/ })
+      .click();
+  const karte = inMain(page).locator(`[data-nachforderung-id="${nfId}"]`);
+  await karte.getByRole('button', { name: 'Als Material übernehmen' }).click();
+  const dialog = page.getByRole('dialog', { name: '„Tauchpumpe“ als Material übernehmen' });
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  await expect(dialog.getByRole('radio', { name: 'Verbrauchsgut' })).toBeChecked();
+
+  const kreuz = dialog.locator('.ant-modal-close');
+  await haeltStufe(kreuz, HANDSCHUH, `${wo}: Schließkreuz`);
+  const k = (await kreuz.boundingBox())!;
+  const koerper = (await dialog.locator('.ant-modal-body').boundingBox())!;
+  const abstand = koerper.y - (k.y + k.height);
+  expect(
+    abstand,
+    `${wo}: Schließkreuz ${abstand} px über dem ersten Feld, Soll ≥ ${ZIELABSTAND.handschuh}`,
+  ).toBeGreaterThanOrEqual(ZIELABSTAND.handschuh - SUBPIXEL);
+
+  const haupt = dialog.getByRole('button', { name: 'Übernehmen', exact: true });
+  const abbrechen = dialog.getByRole('button', { name: 'Abbrechen', exact: true });
+  await haeltStufe(haupt, HANDSCHUH, `${wo}: Übernehmen`);
+  await haeltStufe(abbrechen, HANDSCHUH, `${wo}: Abbrechen`);
+  const schirm = page.viewportSize()!;
+  const h = (await haupt.boundingBox())!;
+  expect(h.y, `${wo}: „Übernehmen“ beginnt im Schirm`).toBeGreaterThanOrEqual(-SUBPIXEL);
+  expect(
+    h.y + h.height,
+    `${wo}: „Übernehmen“ endet bei ${h.y + h.height} px, der Schirm bei ${schirm.height}`,
+  ).toBeLessThanOrEqual(schirm.height + SUBPIXEL);
+  const oben = await haupt.evaluate((knopf) => {
+    const r = knopf.getBoundingClientRect();
+    const treffer = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return treffer != null && knopf.contains(treffer);
+  });
+  expect(oben, `${wo}: in der Mitte von „Übernehmen“ liegt nichts darüber`).toBe(true);
+
+  await abbrechen.click();
+  await expect(dialog).toHaveCount(0);
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `${wo}: Kreuz ${abstand} px über dem Körper`,
+  });
+}
+
+/**
+ * Der Fuß klebt, also darf er kein Feld verdecken, das der Tabulator erreicht (WCAG 2.4.11):
+ * der Dialog rollt jedes über ihn (`scroll-padding` am `.ant-modal-wrap`, `index.css`). Gemessen
+ * am Ad-hoc-Material mit aufgeklappten „Weitere Angaben“, auf 390 px im Handschuh höher als der
+ * Schirm. Jeder Halt im Körper endet über dem Fuß, bis der Lauf im Fuß ankommt.
+ */
+async function fussVerdecktKeinFeld(page: Page, einsatzId: string, wo: string) {
+  await page.goto(`/einsaetze/${einsatzId}/material`);
+  await page.addStyleTag({ content: '[class*="tsqd-open-btn"] { display: none !important; }' });
+  await inMain(page).getByRole('button', { name: 'Ad-hoc-Material', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Ad-hoc-Material ohne Stammeintrag' });
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
+  await expect(dialog.getByLabel('Bestandsnummer')).toBeVisible();
+  // Erst wenn der Klappteil steht: mitten im Aufklappen wächst der Dialog unter dem Rollen.
+  await ruhigeHoehe(dialog.locator('.ant-modal-container'), `${wo}: Dialog`);
+  await dialog.getByLabel('Bezeichnung').focus();
+  const halte: string[] = [];
+  let imFuss = false;
+  for (let i = 0; i < 20 && !imFuss; i += 1) {
+    await page.keyboard.press('Tab');
+    const halt = await page.evaluate(() => {
+      const fokus = document.activeElement as HTMLElement | null;
+      const fuss = document.querySelector('[data-lfh="erfassung-fuss"]');
+      if (!fokus || !fuss) return null;
+      return {
+        name: fokus.getAttribute('aria-label') || fokus.id || fokus.tagName,
+        imFuss: fuss.contains(fokus),
+        unten: fokus.getBoundingClientRect().bottom,
+        fussOben: fuss.getBoundingClientRect().top,
+      };
+    });
+    expect(halt, `${wo}: Tab ${i + 1} landet im Dialog`).not.toBeNull();
+    imFuss = halt!.imFuss;
+    if (imFuss) break;
+    halte.push(`${halt!.name} ${Math.round(halt!.unten)}/${Math.round(halt!.fussOben)}`);
+    expect(
+      halt!.unten,
+      `${wo}: „${halt!.name}“ endet bei ${halt!.unten} px, der Fuß beginnt bei ${halt!.fussOben}`,
+    ).toBeLessThanOrEqual(halt!.fussOben + SUBPIXEL);
+  }
+  expect(imFuss, `${wo}: der Lauf erreicht den Fuß`).toBe(true);
+  expect(
+    halte.length,
+    `${wo}: der Lauf hält an mehreren Feldern (${halte.join(', ')})`,
+  ).toBeGreaterThanOrEqual(5);
+  test.info().annotations.push({ type: 'messwert', description: `${wo}: ${halte.join(' | ')}` });
+  await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
+test('C17 · Erfassungsdialog: Schließkreuz ≥ 16 px über dem ersten Feld, „Übernehmen“ im Schirm, auf 1024 und 390 px im Handschuh', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 1274 Erfassungsdialog ${Date.now()}`);
+  const nfId = await eingetroffeneNachforderung(page, einsatzId);
+  await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
+  await stelleDichte(page, 'handschuh');
+  for (const [wo, groesse] of [
+    ['1024 px', TABLET_QUER],
+    ['390 px', HANDSCHIRM],
+  ] as const) {
+    await page.setViewportSize(groesse);
+    await messeErfassungsdialog(page, einsatzId, nfId, wo, groesse === HANDSCHIRM);
+  }
+  await fussVerdecktKeinFeld(page, einsatzId, '390 px');
+});
+
+test('C17 · Erfassungsdialog (Führungspersonal): dieselben Abstände auf 1024 und 390 px im Handschuh', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `E2E 1274 ErfassungsdialogF ${Date.now()}`);
+  const nfId = await eingetroffeneNachforderung(page, einsatzId);
+  await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
+  await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
+  await stelleDichte(page, 'handschuh');
+  await expect(
+    page.getByRole('button', { name: 'Benutzermenü' }),
+    'Vorbedingung: die Sitzung gehört dem Führungspersonal',
+  ).toContainText('E2E fuehrungspersonal');
+  for (const [wo, groesse] of [
+    ['1024 px (Führungspersonal)', TABLET_QUER],
+    ['390 px (Führungspersonal)', HANDSCHIRM],
+  ] as const) {
+    await page.setViewportSize(groesse);
+    await messeErfassungsdialog(page, einsatzId, nfId, wo, groesse === HANDSCHIRM);
+  }
+  await fussVerdecktKeinFeld(page, einsatzId, '390 px (Führungspersonal)');
 });
 
 // ── Sichtungswahl (LLH-1083, Spec `sichtungswahl`, „Trefferfläche jeder Kategorie“) ─────
