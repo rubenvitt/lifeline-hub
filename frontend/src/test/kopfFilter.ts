@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
  * ersten. Offen ist ein Menü, das rc-trigger nicht mit `pointer-events: none` stilllegt (das setzt
  * es genau bei `open === false`); nach dem Klick auf den Auslöser darf genau eines offen sein.
  */
-async function openKopfFilter(spalte: string): Promise<HTMLElement> {
+export async function openKopfFilter(spalte: string): Promise<HTMLElement> {
   const ausloeser = await screen.findByRole('button', { name: new RegExp(`^${spalte} filtern`) });
   await userEvent.click(ausloeser);
   return waitFor(() => {
@@ -57,4 +57,11 @@ export async function kopfFilterWerte(spalte: string): Promise<string[]> {
   return [...menue.querySelectorAll('.ant-dropdown-menu-title-content')].map(
     (e) => e.textContent ?? '',
   );
+}
+
+/** Die Texte der angehakten, noch nicht bestätigten Werte in einem offenen Filtermenü. */
+export function angehakteWerte(menue: HTMLElement): string[] {
+  return [...menue.querySelectorAll('.ant-dropdown-menu-item')]
+    .filter((e) => e.querySelector('.ant-checkbox-checked') != null)
+    .map((e) => e.querySelector('.ant-dropdown-menu-title-content')?.textContent ?? '');
 }
