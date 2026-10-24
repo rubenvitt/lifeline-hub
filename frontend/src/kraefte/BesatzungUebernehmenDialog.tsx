@@ -25,6 +25,8 @@ export interface BesatzungUebernehmenDialogProps {
   personal: readonly EinsatzPersonal[];
   /** Führer der Einheit des Fahrzeugs, nur mit Freigabe `einheiten` bekannt. */
   fuehrerId: number | null;
+  /** Nach dem Übernehmen, mit den zugeordneten Kräften: der Aufrufer räumt etwa ihre Zeilengründe. */
+  onUebernommen?: (epIds: readonly number[]) => void;
   onSchliessen: () => void;
 }
 
@@ -48,6 +50,7 @@ export default function BesatzungUebernehmenDialog({
   auftrag,
   personal,
   fuehrerId,
+  onUebernommen,
   onSchliessen,
 }: BesatzungUebernehmenDialogProps) {
   const qc = useQueryClient();
@@ -99,6 +102,7 @@ export default function BesatzungUebernehmenDialog({
         einsatzKeys.etb(einsatzId),
       ])
         void qc.invalidateQueries({ queryKey: key });
+      onUebernommen?.(v.epIds);
     },
   });
   const gruende = gruendeJeKraft(mutation.error, 'personal');

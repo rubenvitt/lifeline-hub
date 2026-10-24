@@ -547,6 +547,50 @@ describe('FahrzeugeBesatzung · Personal der Einheit übernehmen (LLH-1267)', ()
     await waitFor(() => expect(bodies).toEqual([{ ep_ids: [7, 4] }]));
   });
 
+  it('die Vorwahl zählt die sitzende Besatzung gegen das Soll, der Einheitsführer steht vorn', async () => {
+    // 83-1: Soll 1/1/4, es sitzen F, UF, M. Frei sind ein Unterführer, Dora und der Führer der
+    // Einheit (ohne Position, als Mannschaft); drei Mannschaftsplätze sind offen, der UF-Platz nicht.
+    zeige({
+      e: einheit({ fuehrer_id: 8 }),
+      personal: [
+        ...PERSONAL,
+        person(7, 'Gerd Unter', { staerke_position: 'unterfuehrer' }),
+        person(8, 'Zora Leitung'),
+      ],
+    });
+    await userEvent.click(uebernehmenKnopf('83-1'));
+    const dialog = await screen.findByRole('dialog', { name: 'Personal der Einheit auf 83-1' });
+    expect(
+      within(dialog)
+        .getAllByRole('checkbox')
+        .map((c) => c.closest('label')?.textContent),
+    ).toEqual(['Zora Leitung', 'Gerd UnterUnterführer', 'Dora Ohne']);
+    expect(within(dialog).getByRole('checkbox', { name: /Zora Leitung/ })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Gerd Unter/ })).not.toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Dora Ohne/ })).toBeChecked();
+  });
+
+  it('nach dem Übernehmen ist ein alter Grund an der Person geräumt', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/fahrzeuge/31/besatzung', () =>
+        HttpResponse.json({ error: 'Fahrzeug ist storniert' }, { status: 409 }),
+      ),
+      http.post(
+        '/api/einsaetze/1/fahrzeuge/30/besatzung',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+    );
+    zeige();
+    await userEvent.click(within(await oeffneMenue('Dora Ohne')).getByText('Auf 83-2'));
+    expect(
+      await within(personZeile('Dora Ohne')).findByText('Fahrzeug ist storniert'),
+    ).toBeVisible();
+    await userEvent.click(uebernehmenKnopf('83-1'));
+    const dialog = await screen.findByRole('dialog', { name: 'Personal der Einheit auf 83-1' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(within(paneel()).queryByText('Fahrzeug ist storniert')).toBeNull());
+  });
+
   it('ohne freie Kräfte der Einheit gesperrt, der Grund steht daneben', () => {
     zeige({
       personal: PERSONAL.map((p) => (p.id === 4 ? { ...p, fahrzeug_id: 31 } : p)),

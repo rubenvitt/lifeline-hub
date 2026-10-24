@@ -739,6 +739,10 @@ for (const viewport of [
     }) => {
       test.setTimeout(90_000);
       await page.setViewportSize(viewport);
+      // Mit „Personal der Einheit übernehmen“ in der Fahrzeugzeile (LLH-1267) rollt das Menü der
+      // Person bei 390 px an den unteren Rand, unter den Knopf der Devtools, den es nur im
+      // DEV-Build gibt.
+      await ohneDevtoolsKnopf(page);
       const { ziele } = await einheitFokusBereit(page, dichte);
       // Keine Speicherleiste mehr, die während der Eingabe im Bild klebt (LLH-1036).
       await expect(
@@ -757,7 +761,9 @@ for (const viewport of [
       if (viewport.width >= 992) {
         expect(befund.stoppsInRegion, 'der Lauf erreicht die Rail').toBeGreaterThan(0);
       }
-      expect(befund.fixierteKandidaten).toBeGreaterThan(0);
+      // Unter `md` rollt der Rahmen mit (LFH-952): ohne den Devtools-Knopf klebt dort nichts, die
+      // Prüfung läuft gegen keinen Verdecker. Ab `md` klebt der Kopf, und er muss gezählt sein.
+      if (viewport.width >= 768) expect(befund.fixierteKandidaten).toBeGreaterThan(0);
       expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
       test.info().annotations.push({
         type: 'messwert',

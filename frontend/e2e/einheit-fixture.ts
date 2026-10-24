@@ -96,7 +96,9 @@ export function kopfFelder(page: Page): { name: string; huelle: Locator; fokus: 
  * Menü der Person, die FMS-Wahl und „Aus Einheit lösen“ des Fahrzeugs und die beiden
  * Auswahlfelder, im Paneel „Material“ Lösen und Auswahl. `reihen` sind benachbarte Ziele (auf
  * einer Zeile oder Zeile über Zeile), `stapel` je Paneel die letzte Zeilenaktion über dem ersten
- * Auswahlfeld.
+ * Auswahlfeld. `uebernehmen` ist „Personal der Einheit übernehmen“ (LLH-1267): hier gesperrt, weil
+ * die einzige Kraft der Einheit schon sitzt; es hält die Trefffläche, ist aber kein Tabulatorstopp
+ * und steht deshalb nicht unter `ziele`.
  */
 export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug: string }) {
   const besatzung = zuordnungsKarte(page, 'Fahrzeuge und Besatzung');
@@ -108,6 +110,9 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
   const fahrzeugLoesen = fahrzeugZeile.getByRole('button', {
     name: 'Aus Einheit lösen',
     exact: true,
+  });
+  const uebernehmen = fahrzeugZeile.getByRole('button', {
+    name: 'Personal der Einheit übernehmen',
   });
   const personMenue = besatzung.getByRole('button', {
     name: `Aktionen zu Person ${namen.personal}`,
@@ -123,6 +128,7 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
       'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]',
     );
   return {
+    uebernehmen,
     ziele: [
       { name: 'Person: Aktionen', ziel: personMenue, fokus: personMenue },
       { name: 'Fahrzeug: Status', ziel: fmsStatus, fokus: fmsStatus },
@@ -138,7 +144,8 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
       { name: 'Materialzeile', zeile: material.locator('[data-lfh="material-am-ort-zeile"]') },
     ],
     reihen: [
-      [fmsStatus, fahrzeugLoesen],
+      [fmsStatus, uebernehmen],
+      [uebernehmen, fahrzeugLoesen],
       [huelle(personZuordnen), huelle(fahrzeugZuordnen)],
       // Zeile über Zeile: Funkrufname über dem Namen der Person, Lösen über ihrem Menü.
       [

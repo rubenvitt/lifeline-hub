@@ -182,6 +182,9 @@ export default function FahrzeugeBesatzung({
     fahrzeug: EinsatzFahrzeug;
     vorgewaehlt: number[];
   } | null>(null);
+  // Fällt die Besatzung weg (Freigabe entzogen), schließt der Dialog und öffnet nicht von selbst
+  // wieder, wenn sie zurückkommt.
+  if (!canBesatzung && uebernehmenFuer) setUebernehmenFuer(null);
   const markPending = (key: string, on: boolean) =>
     setPending((prev) => {
       const next = new Set(prev);
@@ -550,12 +553,16 @@ export default function FahrzeugeBesatzung({
         content
       )}
       {children}
-      {personal && (
+      {canBesatzung && personal && (
         <BesatzungUebernehmenDialog
           einsatzId={einsatzId}
           auftrag={uebernehmenFuer}
           personal={personal}
           fuehrerId={einheit.fuehrer_id ?? null}
+          // Ein alter Grund an einer Person gilt bis zum nächsten Absenden, auch über den Dialog.
+          onUebernommen={(epIds) => {
+            for (const epId of epIds) personErrors.beginne(epId);
+          }}
           onSchliessen={() => setUebernehmenFuer(null)}
         />
       )}
