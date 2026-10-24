@@ -1,8 +1,11 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
 import {
   detailBereit,
+  seedEinheitPersonalGesperrt,
   einheitMitZuordnungen,
+  checkGesperrtReady,
+  zuordnungTargetsGesperrt,
   kopfFelder,
   zeilenAusloeser,
   zuordnungsKarte,
@@ -762,6 +765,77 @@ for (const viewport of [
       test.info().annotations.push({
         type: 'messwert',
         description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, davon ${befund.stoppsInRegion} in der Rail, ${befund.verdeckt.length} Verdeckungen`,
+      });
+    });
+  }
+}
+
+/**
+ * Modulsperre per Override als eigene Achse (`e2e/AGENTS.md`, LFH-820; LLH-1270): ohne Freigabe
+ * Personal stehen Fahrzeug und Person flach unter „Ohne Besatzung · Modul Personal gesperrt“. Der
+ * Admin sät und sieht den Zweig nie; Beobachter und Führungspersonal tabben. Gezählt werden die
+ * Ziele, die der Rolle bleiben; das gesperrte „Person zuordnen …“ ist kein Tabulatorstopp.
+ */
+for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
+  for (const viewport of [
+    { width: 1366, height: 520 },
+    { width: 390, height: 420 },
+  ]) {
+    test(`Einheit (${rolle === 'beobachter' ? 'Beobachter' : 'Führungspersonal'}, Modulsperre Personal): verbleibende Ziele frei bei ${viewport.width}px, kompakt und handschuh`, async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize(viewport);
+      await anmelden(page);
+      const { pfad, namen } = await seedEinheitPersonalGesperrt(page, rolle);
+      const messwerte: string[] = [];
+      for (const dichte of ['kompakt', 'handschuh']) {
+        await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+        await page.goto(pfad);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        await checkGesperrtReady(page, rolle);
+        const ziele: { name: string; fokus: Locator }[] =
+          rolle === 'fuehrungspersonal'
+            ? [
+                ...kopfFelder(page).map(({ name, fokus }) => ({ name, fokus })),
+                {
+                  name: 'Einheit auflösen',
+                  fokus: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
+                    name: 'Einheit auflösen',
+                    exact: true,
+                  }),
+                },
+              ]
+            : [];
+        for (const { name, fokus } of zuordnungTargetsGesperrt(page, namen, rolle).ziele) {
+          ziele.push({ name, fokus });
+        }
+        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 19);
+        for (const { name, fokus } of ziele) {
+          await expect(fokus, name).toHaveCount(1);
+          await fokus.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
+        }
+        const stopps = await stoppsEinUmlauf(page);
+        await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
+        const befund = await pruefeFokusVerdeckung(page, stopps, 'Tab', {
+          region: 'nav[aria-label="Kategorien"]',
+        });
+        expect(
+          befund.besuchteZiele.sort(),
+          `${dichte}: jedes verbleibende Ziel muss per Tab besucht werden`,
+        ).toEqual(ziele.map(({ name }) => name).sort());
+        if (viewport.width >= 992) {
+          expect(befund.stoppsInRegion, 'der Lauf erreicht die Rail').toBeGreaterThan(0);
+        }
+        expect(befund.fixierteKandidaten).toBeGreaterThan(0);
+        expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+        messwerte.push(
+          `${dichte}: ${befund.besuchteZiele.length} Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,
+        );
+      }
+      test.info().annotations.push({
+        type: 'messwert',
+        description: `${viewport.width}px ${rolle}: ${messwerte.join(' | ')}`,
       });
     });
   }
