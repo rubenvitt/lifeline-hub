@@ -1107,11 +1107,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("nachforderung_belegung_id", G_FK),
             // Weg des Verweises (LLH-1445): am Raum gesetzt oder nicht.
             retain("nachforderung_am_raum", G_ENUM),
-            // Kennzeichen „letzte Besetzung festgehalten“ (LLH-1266, Mig 0250).
+            // Kennzeichen „letzte Besetzung festgehalten“ (LLH-1266, Mig 0251).
             retain("besetzung_festgehalten", G_ENUM),
         ],
     },
-    // Letzte Besetzung einer aufgelösten Einheit (LLH-1266, Mig 0250): wer und was beim Auflösen
+    // Letzte Besetzung einer aufgelösten Einheit (LLH-1266, Mig 0251): wer und was beim Auflösen
     // dazugehörte. Nur Verweise, Marke und Menge; Name und Bezeichnung stecken in den
     // Dispositionszeilen und werden dort geschwärzt, wie bei der Besatzung einer Schicht. Die
     // Zuordnung zur Einheit ist Skelett der Führungsdokumentation → RETAIN.

@@ -145,7 +145,7 @@ Auftrag an viele Einheiten wird die Hinweiszeile länger (sie bricht um).
 
 ## Migration Plan
 
-Eine Migration mit der nächsten freien Nummer über `origin/alpha` (heute 0250): Tabelle samt
+Eine Migration mit der nächsten freien Nummer über `origin/alpha` (heute 0251, nach dem Umlegen gegen eine gleichzeitig gemergte 0250): Tabelle samt
 Index auf `einheit_id` und die Spalte `besetzung_festgehalten INTEGER NOT NULL DEFAULT 0`. Kein
 Rückfüllen. Rückweg: Tabelle und Spalte bleiben ungenutzt stehen, wenn der Code zurückgerollt
 wird.
