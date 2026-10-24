@@ -31,6 +31,7 @@ const nf = (over: Partial<Nachforderung> & { id: number }): Nachforderung => ({
   ist_offen: true,
   material_ids: [],
   einheit_ids: [],
+  einheit_ids_am_raum: [],
   zusage_rufnamen: [],
   betreuungsstelle_id: 8,
   ...over,

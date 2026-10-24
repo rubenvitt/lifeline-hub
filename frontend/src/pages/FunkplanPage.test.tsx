@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Routes, Route, useLocation } from 'react-router';
 import { http, HttpResponse } from 'msw';
 import { QueryClient } from '@tanstack/react-query';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { server } from '../test/server';
 import FunkplanPage from './FunkplanPage';
 import { ladeEinsatz, ladeFuehrungsstelle, ladeModulFreigaben } from '../api/einsaetze';
@@ -1115,7 +1115,9 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     await waitFor(() => expect(folge()).toHaveLength(3));
 
-    await userEvent.click(within(plan()).getByRole('columnheader', { name: /^Sprechgruppe/ }));
+    await userEvent.click(
+      sortTarget(within(plan()).getByRole('columnheader', { name: /^Sprechgruppe/ })),
+    );
     await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9', 'sg-1']));
     await waitFor(() =>
       expect(screen.getByTestId('suche')).toHaveTextContent('?sort=sprechgruppe%3Aauf'),

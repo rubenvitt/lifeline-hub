@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
-import { renderMitProviders, setzeOnline } from '../test/utils';
+import { renderMitProviders, setzeOnline, sortTarget } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
@@ -1978,7 +1978,7 @@ describe('PersonenPage · Sortieren und Filtern (LLH-1096)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     await waitFor(() => expect(regFolge()).toEqual(['R-021', 'R-020']));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Sichtung/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Sichtung/ })));
     await waitFor(() => expect(regFolge()).toEqual(['R-020', 'R-021']));
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/personen?sort=sk%3Aauf'));
   });

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import BenutzerPage from './BenutzerPage';
 import { adminFixture } from '../test/fixtures';
@@ -328,7 +328,7 @@ describe('BenutzerPage', () => {
 
     // Zweimal klicken: aufsteigend ist hier die Serverreihenfolge, erst absteigend beweist das
     // Sortieren.
-    const kopf = screen.getByRole('columnheader', { name: /Name/ });
+    const kopf = sortTarget(screen.getByRole('columnheader', { name: /Name/ }));
     await userEvent.click(kopf);
     await userEvent.click(kopf);
     await waitFor(() => expect(namen()).toEqual(['Eva', 'Admin']));

@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import EinheitTypenTab from './EinheitTypenTab';
 import { adminFixture } from '../test/fixtures';
 
@@ -66,7 +66,7 @@ describe('EinheitTypenTab', () => {
     // nicht: hier antwortet msw.
     expect(labels()).toEqual(['Zug', 'Sonstige']);
 
-    await userEvent.click(screen.getByRole('columnheader', { name: /Label/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /Label/ })));
     await waitFor(() => expect(labels()).toEqual(['Sonstige', 'Zug']));
 
     await userEvent.type(screen.getByPlaceholderText('Label'), 'Zug');

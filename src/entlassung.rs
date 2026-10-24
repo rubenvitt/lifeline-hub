@@ -126,8 +126,8 @@ mod tests {
         ),
         (
             "src/nachforderung/repo.rs",
-            8,
-            "Verweis auf übernommene Einheiten, Rücknahme-, Ablehnungs- und Rückzugssperre sowie Mengenuntergrenze der Nachforderung zählen jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1383, LLH-1387)",
+            10,
+            "Verweis auf übernommene und am Raum verknüpfte Einheiten, Rücknahme-, Ablehnungs- und Rückzugssperre sowie Mengenuntergrenze der Nachforderung zählen jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1383, LLH-1387, LLH-1445)",
         ),
         (
             "src/personal/disposition_repo.rs",

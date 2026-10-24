@@ -34,6 +34,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   ist_offen: true,
   material_ids: [],
   einheit_ids: [],
+  einheit_ids_am_raum: [],
   zusage_rufnamen: [],
   ...over,
 });
