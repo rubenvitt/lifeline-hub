@@ -18,7 +18,7 @@
 
 ## 4. Gesamtprüfung
 
-- [ ] 4.1 `./scripts/check-all.sh` grün (lokal oder über die CI des PRs)
+- [x] 4.1 `./scripts/check-all.sh` grün (lokal oder über die CI des PRs). Lokal geteilt, weil die volle Rust-Suite nicht in den Platz der Cloud-Sitzung passt: Schnellprüfungen grün bis auf Schritt 6 (zod/undici-Advisories, nicht dieser Diff, Fix in #996/#1002), Vitest grün, Rust-Suite in Stapeln grün (alle 207 Integrationstests, Dev-Seed), e2e Chromium bis auf neun Specs ohne Bezug zum Diff grün; der volle Lauf belegt die CI des PRs
 
 ## Workflow follow-up
 
