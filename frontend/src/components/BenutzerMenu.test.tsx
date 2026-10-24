@@ -86,6 +86,37 @@ describe('BenutzerMenu — ab xl', () => {
     expect(knopf).toHaveAttribute('aria-label', 'Benutzermenü');
   });
 
+  /*
+   * LLH-1272: im Einsatzrahmen kommt die Funktion erst mit dem Einsatz, davor steht der Name. An der
+   * Umbruchgrenze des Kopfs brachen 4 px Unterschied („Administrator“ → „Einsatzleitung“) ihn auf
+   * zwei Zeilen um, und die Seite sprang (CLS 0,556). Die Gegenprobe ohne `haeltPlatz` hält die
+   * Breite frei, damit der Test nicht an einer immer gesetzten Breite grün wird.
+   */
+  it.each([
+    ['ohne Funktion (Einsatz lädt)', undefined],
+    ['mit Funktion', 'Einsatzleitung'],
+  ])('mit haeltPlatz hält das Etikett seine Breite, %s', async (_fall, funktion) => {
+    server.use(meHandler(benutzer));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <BenutzerMenu funktion={funktion} haeltPlatz />
+      </ThemeModeProvider>,
+    );
+    const etikett = (await screen.findByText(funktion ?? ANZEIGENAME)) as HTMLElement;
+    expect(etikett.style.width).toBe('180px');
+    // Ohne `inline-block` griffe die Breite im Inline-`span` von antds Knopf nicht (gemessen
+    // 75,5 px statt 180); die Wirkung belegt `e2e/rahmen-cls-dichte.spec.ts`.
+    expect(etikett.style.display).toBe('inline-block');
+    expect(etikett.style.textOverflow).toBe('ellipsis');
+  });
+
+  it('ohne haeltPlatz richtet sich das Etikett nach seinem Text', async () => {
+    zeige();
+    const etikett = (await screen.findByText(ANZEIGENAME)) as HTMLElement;
+    expect(etikett.style.width).toBe('');
+    expect(etikett.style.maxWidth).toBe('180px');
+  });
+
   it('zeigt die gebaute Frontend-Version sichtbar im Dropdown', async () => {
     zeige();
     await oeffne();

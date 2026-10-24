@@ -47,6 +47,12 @@ const HELLIGKEIT_PRAEFIX = 'helligkeit:';
 const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
 
 /**
+ * Breite des Etiketts am Trigger: Deckel für Funktion und Namen, mit `haeltPlatz` auch ihre feste
+ * Breite (LLH-1272).
+ */
+const ETIKETT_BREITE = 180;
+
+/**
  * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im TEXT — zweiter
  * Kanal nach WCAG 1.4.1 und über den zugänglichen Namen prüfbar.
  */
@@ -76,8 +82,17 @@ function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Ico
  *
  * Angebunden über `useThemeMode`/`useDichte`, NICHT über die Kommandopalette: deren Hook wirft
  * außerhalb seines Providers, und der Test-Wrapper rendert keinen.
+ *
+ * `haeltPlatz` (im Einsatz-Kopf, LLH-1272): das Etikett hält die Breite {@link ETIKETT_BREITE},
+ * statt sich nach dem Text zu richten. Die Funktion kommt erst mit dem Einsatz, davor steht der
+ * Name, und an der Umbruchgrenze des Kopfs reichten 4 px Unterschied für eine zweite Kopfzeile:
+ * Rail, Panel und Inhalt sprangen 52 px (CLS 0,556). Vorbild ist `WortPlatz` in `Kopfleiste.tsx`;
+ * hier ist der längste Wortlaut nicht bekannt, deshalb der Deckel als Breite.
  */
-export default function BenutzerMenu({ funktion }: { funktion?: string | null } = {}) {
+export default function BenutzerMenu({
+  funktion,
+  haeltPlatz = false,
+}: { funktion?: string | null; haeltPlatz?: boolean } = {}) {
   const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
   const { data: versionsstand } = useVersionsstand();
@@ -323,7 +338,12 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
           <>
             <span
               style={{
-                maxWidth: 180,
+                // `inline-block`: antd hüllt die Kinder des Knopfs in ein Inline-`span`, eine
+                // Breite griffe sonst nicht.
+                display: 'inline-block',
+                width: haeltPlatz ? ETIKETT_BREITE : undefined,
+                maxWidth: ETIKETT_BREITE,
+                textAlign: 'start',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',

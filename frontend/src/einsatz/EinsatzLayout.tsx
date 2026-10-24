@@ -504,7 +504,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           <div
             style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
           >
-            <BenutzerMenu funktion={einsatz?.meine_funktion} />
+            {/* Das Etikett hält seine Breite: die Funktion kommt erst mit dem Einsatz (LLH-1272). */}
+            <BenutzerMenu funktion={einsatz?.meine_funktion} haeltPlatz />
           </div>
         </KopfRechts>
       </Header>
