@@ -34,7 +34,7 @@ Zunder LLH-1261 (`k22fpk5p`). Jede Aufgabe entsteht per TDD. Backend wird mit
 ## 4. Doku und Gates
 
 - [x] 4.1 Anwenderdoku: `docs/anwender/kapitel/stammdaten.md` (Sektion Material der Einheiten-Vorlage) und `docs/anwender/kapitel/einheiten.md` (Material beim Bilden aus Vorlage), Regeln aus `docs/anwender/AGENTS.md`; Wächter der Anwenderdoku grün. (Bilder unverändert: Die Demo-Vorlagen führen kein Material, die fotografierten Ansichten bleiben gleich.)
-- [ ] 4.2 `./scripts/check-all.sh` grün (Bündel `schnell` lokal, voll in der CI des PRs).
+- [x] 4.2 `./scripts/check-all.sh` grün (Bündel `schnell` lokal, voll in der CI des PRs). (Lokal: `--nur schnell` grün bis auf Schritt 6, zwei neue `high`-Advisories in Frontend-Dev-Abhängigkeiten (zod, undici), Lockfile in diesem Branch unverändert, also nicht von diesem PR. Dazu die Rust-Tests der berührten Module und Integrationstests (Vorlage, Bilden, Wire-Kontrakt), Vitest voll und e2e `einheit-aus-vorlage` in Chromium. Die volle Rust-Suite passt nicht auf die Platte der Cloud-Sitzung (Linker: kein Platz); sie belegt die CI dieses PRs.)
 
 ## Workflow follow-up
 
