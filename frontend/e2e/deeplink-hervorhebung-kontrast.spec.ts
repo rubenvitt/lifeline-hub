@@ -7,7 +7,8 @@ import { flaeche, kontrast, schattenKontrast } from './kontrast-kern';
  * (Meldung, Auftrag, Einsatzbefehl) tragen dieselbe Form statt eines Rings; eine alarmierte Karte
  * behält ihre Alarmfläche, die Markierung legt nur die Linie darüber (LFH-896). Eine gewählte, nicht
  * angesprungene Karte (Muster „Liste + Detailpaneel“) trägt die Auswahlfläche und keine Linie
- * (Change oxgob5gk, Spec „Markierung bleibt von der Auswahl unterscheidbar“). Gemessen im Browser,
+ * (Change oxgob5gk, Spec „Markierung bleibt von der Auswahl unterscheidbar“). Der Materialposten per
+ * `?material=` (LLH-1260) trägt dieselbe Zeilenform. Gemessen im Browser,
  * weil jsdom kein CSS rechnet (`css: false`) und antd seine Zellfarben zur Laufzeit injiziert.
  *
  * Böden als Literale (Kriterium 5 und WCAG 1.4.11): Text Tag ≥ 7, Nacht ≥ 5; Linie ≥ 3 gegen
@@ -152,6 +153,46 @@ for (const modus of ['light', 'dark'] as const) {
         `Zelle ${i}: ${JSON.stringify(unterZeiger)}`,
       ).toBeGreaterThanOrEqual(LINIE);
     }
+  });
+
+  test(`${modus}: Materialposten per ?material= — dieselbe Fläche und Linie (LLH-1260)`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await anmelden(page, modus);
+    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E 1260 ${modus} ${Date.now()}`,
+    });
+    const ids: number[] = [];
+    for (const bezeichnung of ['Feldbett', 'Tauchpumpe', 'Wolldecke']) {
+      const posten = await post(page, `/api/einsaetze/${einsatzId}/material`, {
+        adhoc: { bezeichnung },
+        menge: 1,
+      });
+      ids.push(posten.id);
+    }
+
+    await page.goto(`/einsaetze/${einsatzId}/material?material=${ids[1]}`);
+    const zeile = page.locator(`tr[data-row-key="${ids[1]}"]`);
+    await expect(zeile).toHaveClass(/zeile-hervorgehoben/);
+    // Apply-then-clean: der Parameter ist geräumt, die Markierung bleibt stehen.
+    await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/material$`));
+    await zeigerWeg(page);
+
+    const zellen = zeile.locator('> td');
+    const nachbarZellen = page.locator(`tr[data-row-key="${ids[0]}"] > td`);
+    await expect(async () => {
+      const anzahl = await zellen.count();
+      for (let i = 0; i < anzahl; i += 1) {
+        const m = await schattenKontrast(zellen.nth(i), nachbarZellen.nth(i));
+        const text = `Zelle ${i}: ${JSON.stringify(m)}`;
+        expect(m.gegenFlaeche, text).toBeGreaterThanOrEqual(LINIE);
+        expect(m.gegenNachbar, text).toBeGreaterThanOrEqual(LINIE);
+        await pruefeRollen(page, zellen.nth(i), nachbarZellen.nth(i), `Zelle ${i}`);
+      }
+      await pruefeText(zellen, TEXT[modus], 'markierter Posten');
+    }).toPass({ timeout: 10_000 });
   });
 
   test(`${modus}: Karte per Deeplink auf 390 px`, async ({ page }) => {

@@ -8,8 +8,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * übernehmen“ → Gerät, Ort wählen → „Übernehmen“; die Karte zeigt den Posten, das ETB die
  * Herkunft. Zweiter Weg „Weiteren Posten übernehmen“. Danach führt der Verweis an der
  * Materialzeile zurück auf die hervorgehobene Karte. Dazu der Weg für schon erfasstes Material:
- * „Erfassten Posten zuordnen …“ (LLH-1259). Gewartet wird auf Inhaltsanker, nie auf
- * `networkidle` (LFH-385).
+ * „Erfassten Posten zuordnen …“ (LLH-1259); „Material ↗“ springt dann auf den Posten (LLH-1260).
+ * Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
 
 const BEDARF = '3 Tauchpumpen für Keller Hauptstraße';
@@ -159,4 +159,12 @@ test('vorhandenen Posten einer eingetroffenen Nachforderung zuordnen: die Karte 
   await expect(eingetroffen.locator(`[data-nachforderung-id="${nfId}"]`)).toContainText(
     'übernommen 1 von 3',
   );
+
+  // Ein Posten im Einsatz: „Material ↗“ springt auf seine Zeile und hebt sie hervor (LLH-1260).
+  await karte.getByRole('link', { name: 'Material' }).click();
+  const zeile = page
+    .getByRole('region', { name: 'Material im Einsatz', exact: true })
+    .locator(`[data-row-key="${posten.id}"]`);
+  await expect(zeile).toHaveClass(/zeile-hervorgehoben/);
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/material$`));
 });

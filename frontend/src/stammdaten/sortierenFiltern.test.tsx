@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { adminFixture } from '../test/fixtures';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import { ort, Ortsfuehler } from '../test/ortsfuehler';
@@ -105,7 +105,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     zeige(<EtbBausteineTab />, '/admin/stammdaten/etb-bausteine');
     await screen.findByText('b');
     expect(folge()).toEqual(['1', '2']);
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Sortierung/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Sortierung/ })));
     await waitFor(() => expect(folge()).toEqual(['2', '1']));
     await waitFor(() =>
       expect(ort.aktuell).toBe('/admin/stammdaten/etb-bausteine?sort=sortier%3Aauf'),
@@ -141,7 +141,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     );
     zeige(<SchichtmodelleTab />, '/admin/stammdaten/schichtmodelle');
     await screen.findByText('Wechsel');
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Vorwarnung/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Vorwarnung/ })));
     await waitFor(() => expect(folge()).toEqual(['2', '1']));
     await kopfFilterWaehlen('Regel', ['Wechselzeiten (1)']);
     await waitFor(() => expect(folge()).toEqual(['2']));
@@ -160,8 +160,8 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     );
     zeige(<VerpflegungsplanTab />, '/admin/stammdaten/verpflegungsplan');
     await screen.findByText('Mittag');
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Zeit/ }));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Zeit/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Zeit/ })));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Zeit/ })));
     // Absteigend: die Nachtverpflegung am Folgetag zuerst, das Frühstück zuletzt.
     await waitFor(() => expect(folge()).toEqual(['4', '3', '2', '1']));
     await kopfFilterWaehlen('Art', ['warm (1)']);
@@ -199,7 +199,7 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     zeige(<StatusKatalogTab />, '/admin/stammdaten/status?sort=fms_anker%3Aauf');
     await screen.findByText('einsatzbereit');
     expect(folge()).toEqual(['2', '1']);
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Sortierung/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Sortierung/ })));
     await waitFor(() => expect(folge()).toEqual(['1', '2']));
     await waitFor(() => expect(ort.aktuell).toBe('/admin/stammdaten/status?sort=sortier%3Aauf'));
   });
@@ -228,9 +228,9 @@ describe('Stammdaten · Sortieren und Filtern (LLH-1096)', () => {
     );
     zeige(<EinheitTypenTab />, '/admin/stammdaten/einheit-typen');
     await screen.findByText('Zug');
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Soll-Stärke/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Soll-Stärke/ })));
     await waitFor(() => expect(folge()).toEqual(['3', '2', '1']));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Soll-Stärke/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Soll-Stärke/ })));
     await waitFor(() => expect(folge()).toEqual(['2', '3', '1']));
   });
 

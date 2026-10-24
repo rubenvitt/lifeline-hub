@@ -11188,4 +11188,38 @@ mod tests {
             .unwrap();
         assert_eq!(rest, 0, "die Zeilen fallen weiter mit dem Einsatz");
     }
+
+    /// LLH-1445 (Change `o659va5r-nachforderung-herkunft`, design.md D1): der Bestand gilt als
+    /// nicht am Raum verknüpft (0), der Schalter nimmt nur 0 und 1.
+    #[tokio::test]
+    async fn migration_0250_einheit_haelt_die_verknuepfung_am_raum() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 249).await;
+        let (e, _) = bild_grundlage(&pool).await;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '83-1') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, 250).await;
+
+        let am_raum: i64 =
+            sqlx::query_scalar("SELECT nachforderung_am_raum FROM einsatz_einheit WHERE id = ?")
+                .bind(alt)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(am_raum, 0, "Bestand: nicht am Raum verknüpft");
+        sqlx::query("UPDATE einsatz_einheit SET nachforderung_am_raum = 1 WHERE id = ?")
+            .bind(alt)
+            .execute(&pool)
+            .await
+            .expect("1 ist erlaubt");
+        sqlx::query("UPDATE einsatz_einheit SET nachforderung_am_raum = 2 WHERE id = ?")
+            .bind(alt)
+            .execute(&pool)
+            .await
+            .expect_err("nur 0 oder 1");
+    }
 }
