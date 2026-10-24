@@ -240,6 +240,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     test: {
+      // Zeitzone der Suite (LLH-1433, Regel in `frontend/AGENTS.md`, „Zeiteingabe in der
+      // Anzeigezone“): im Hauptprozess gesetzt, bevor ein Worker startet.
+      globalSetup: './src/test/suitenZone.ts',
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
       css: false,
