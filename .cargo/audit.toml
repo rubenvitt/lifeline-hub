@@ -58,26 +58,25 @@ ignore = [
     "RUSTSEC-2026-0368",
     "RUSTSEC-2026-0369",
 
-    # RUSTSEC-2026-0387 (LLH-1269) — Timing-Schwankungen in Operationen von `crypto-bigint`
-    # 0.5.5, die konstante Laufzeit zusichern. Gefixt erst in `crypto-bigint` >= 0.7.6.
+    # RUSTSEC-2026-0387 (LLH-1275) — Timing-Unterschiede in `crypto-bigint` 0.5.5 bei
+    # Operationen, die konstante Laufzeit versprechen. Gefixt erst in `crypto-bigint` >= 0.7.6.
     #
-    # Kein Upgrade möglich: `crypto-bigint` 0.5 kommt nur über `elliptic-curve` 0.13 →
-    # `p256`/`p384` 0.13, und die ziehen `openidconnect` 4.0.1 (ES256/ES384) und `age` 0.12.1
-    # (über `hpke`) herein. Beide sind die neuesten Versionen und verlangen `p256` 0.13
-    # (Stand 24.10.2026). Der Sprung auf 0.7 geht nur mit `elliptic-curve` 0.14.
+    # Kein Upgrade möglich: der Pfad ist crypto-bigint 0.5.5 ← elliptic-curve 0.13.8 ←
+    # p256 0.13 / p384 0.13 ← openidconnect 4.0.1 bzw. age 0.12.1 (über hpke) ← lifeline-hub.
+    # Die ganze RustCrypto-Linie 0.13 hängt an crypto-bigint 0.5, die 0.7 erst an
+    # elliptic-curve 0.14. Beide Direktabhängigen verlangen p256 0.13 (Stand 24.10.2026).
     #
-    # Warum das Risiko hier nicht trägt: Ein Timing-Kanal verrät nur Geheimnisse, mit denen
-    # gerechnet wird. `openidconnect` nutzt P-256/P-384 hier nur zum PRÜFEN der Signatur eines
-    # ID-Tokens mit dem ÖFFENTLICHEN Schlüssel des Identity Providers (JWKS); die
-    # Client-Authentisierung läuft über `client_secret` (siehe RUSTSEC-2023-0071 oben), kein
-    # privater EC-Schlüssel. Die Sicherungen verschlüsseln mit `age` nur an X25519-Empfänger
-    # und entschlüsseln nur mit X25519-Identitäten (`src/backup/verschluesselung.rs`,
-    # `age` ohne Vorgabe-Features, also ohne Plugins); X25519 rechnet ohne `crypto-bigint`.
-    # Eine Rechnung mit einem geheimen P-256/P-384-Skalar gibt es in diesem Programm nicht.
+    # Warum das Risiko hier nicht trägt: ein Timing-Angriff braucht eine Operation mit einem
+    # GEHEIMEN Wert, deren Laufzeit der Angreifer misst. Die gibt es auf diesen Pfaden nicht.
+    # openidconnect nutzt P-256/P-384 nur zum PRÜFEN von ES256/ES384-Signaturen des Identity
+    # Providers, mit dessen öffentlichem Schlüssel aus dem JWKS (wie bei RUSTSEC-2023-0071
+    # oben: Relying Party, kein privater Schlüssel). age verschlüsselt die Backups mit
+    # X25519 (`src/backup/verschluesselung.rs`), nicht mit P-256; P-256-Identitäten gibt es in
+    # age nur über Plugins, und die sind aus (`default-features = false` in `Cargo.toml`).
     #
-    # Neu bewerten, wenn: (a) `openidconnect` und `age` auf `p256` 0.14 gehen (dann Upgrade
-    # und Ignore streichen), (b) die Anmeldung `private_key_jwt` mit einem EC-Schlüssel nutzt
-    # oder das Projekt selbst Tokens signiert, (c) die Sicherungen P-256-Empfänger oder
-    # -Identitäten (etwa `age`-Plugins) annehmen.
+    # Neu bewerten, wenn: (a) openidconnect oder age auf elliptic-curve 0.14 gehen (dann
+    # Upgrade und Ignore streichen), (b) lifeline-hub selbst mit einem privaten P-256/P-384-
+    # Schlüssel signiert oder entschlüsselt (etwa private_key_jwt beim IdP, eigene JWTs,
+    # ECDH), (c) das age-Feature `plugin` eingeschaltet wird.
     "RUSTSEC-2026-0387",
 ]

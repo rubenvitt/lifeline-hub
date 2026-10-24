@@ -1,7 +1,10 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import {
   detailBereit,
+  seedEinheitPersonalGesperrt,
   einheitMitZuordnungen,
+  checkGesperrtReady,
+  zuordnungTargetsGesperrt,
   kopfFelder,
   zeilenAusloeser,
   zuordnungsKarte,
@@ -559,6 +562,99 @@ test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhs
     .toBeGreaterThanOrEqual(72 - SUBPIXEL);
   await haeltStufe(name, 72, 'Handschuhauslöser nach Wiederherstellung');
 });
+
+// Modulsperre per Override als eigene Achse (`e2e/AGENTS.md`, LFH-820; LLH-1270): ohne Freigabe
+// Personal fehlt die Besatzung, Fahrzeug und Person stehen flach, darüber „Ohne Besatzung · Modul
+// Personal gesperrt“ (LLH-1036 D5). Der Admin ist nie gesperrt und sieht diesen Zweig nie; er sät,
+// Beobachter und Führungspersonal messen, je auf Fükw und Handschirm.
+
+for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
+  for (const viewport of [FUEKW, HANDSCHIRM]) {
+    test(`Einheit (${rolle === 'beobachter' ? 'Beobachter' : 'Führungspersonal'}, Modulsperre Personal) bei ${viewport.width}px: flache Zeilen und verbleibende Ziele halten 30 / 48 / 72 px`, async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize(viewport);
+      await anmelden(page);
+      const { pfad, namen } = await seedEinheitPersonalGesperrt(page, rolle);
+      const je = new Map<string, number>();
+      const messwerte: string[] = [];
+      for (const { dichte, soll } of STAFFEL) {
+        await page.goto(pfad);
+        await stelleDichte(page, dichte);
+        await checkGesperrtReady(page, rolle);
+        const gesperrt = zuordnungTargetsGesperrt(page, namen, rolle);
+        const ziele: { name: string; ziel: Locator }[] = [];
+        if (rolle === 'fuehrungspersonal') {
+          for (const { name, huelle } of kopfFelder(page)) ziele.push({ name, ziel: huelle });
+          ziele.push({
+            name: 'Einheit auflösen',
+            ziel: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
+              name: 'Einheit auflösen',
+              exact: true,
+            }),
+          });
+        }
+        for (const { name, ziel } of gesperrt.ziele) ziele.push({ name, ziel });
+        // Beobachter: nur der Funkrufname. Führungspersonal: 12 Angaben, „Einheit auflösen“ und
+        // sechs Zuordnungsziele; „Person zuordnen …“ zählt als gesperrtes Ziel extra.
+        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 19);
+
+        let kleinsteZeile = Infinity;
+        for (const { name, zeile } of gesperrt.zeilen) {
+          kleinsteZeile = Math.min(
+            kleinsteZeile,
+            await haeltStufe(zeile, soll, `${name} (${dichte})`),
+          );
+        }
+        je.set(`${dichte} Zeile`, kleinsteZeile);
+        let minimum = Infinity;
+        for (const { name, ziel } of ziele) {
+          const hoehe = await haeltStufe(ziel, soll, `${name} (${dichte})`);
+          const breite = (await ziel.boundingBox())!.width;
+          expect(breite, `${name} (${dichte}): Breite`).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+          minimum = Math.min(minimum, hoehe, breite);
+          if (name === 'Funkrufname (Link)') je.set(`${dichte} Funkrufname`, hoehe);
+        }
+        for (const { name, ziel, feld } of gesperrt.gesperrt) {
+          // Gesperrt statt versteckt: ein gesperrtes Ziel ist ein sichtbares Ziel.
+          await expect(feld, `Vorbedingung: ${name}`).toBeDisabled();
+          minimum = Math.min(minimum, await haeltStufe(ziel, soll, `${name} (${dichte})`));
+        }
+
+        let kleinsterAbstand = Infinity;
+        if (dichte !== 'kompakt') {
+          const boden = dichte === 'handschuh' ? 16 : 8;
+          for (const [links, rechts] of gesperrt.reihen) {
+            const a = (await links.boundingBox())!;
+            const b = (await rechts.boundingBox())!;
+            const abstand = Math.max(b.x - a.x - a.width, b.y - a.y - a.height);
+            kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
+            expect
+              .soft(abstand, `Aktionsabstand ${dichte}: ${links} → ${rechts}`)
+              .toBeGreaterThanOrEqual(boden - SUBPIXEL);
+          }
+          for (const { name, aktion, auswahl } of gesperrt.stapel) {
+            const knopf = (await aktion.boundingBox())!;
+            const feld = (await auswahl.boundingBox())!;
+            const abstand = feld.y - (knopf.y + knopf.height);
+            kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
+            expect(abstand, `${name}: Abstand Aktion/Zuordnung ${dichte}`).toBeGreaterThanOrEqual(
+              boden - SUBPIXEL,
+            );
+          }
+        }
+        messwerte.push(
+          `${dichte} (Soll ≥ ${soll}): ${ziele.length + gesperrt.gesperrt.length} Ziele, kleinste Achse ${minimum.toFixed(2)}px, flache Zeile ${kleinsteZeile}px` +
+            (Number.isFinite(kleinsterAbstand) ? `, Abstand ${kleinsterAbstand}px` : ''),
+        );
+      }
+      gegenprobe(je, 'Zeile');
+      gegenprobe(je, 'Funkrufname');
+      test.info().annotations.push({ type: 'messwert', description: messwerte.join(' | ') });
+    });
+  }
+}
 
 // ── Einsatz-Navigationsrahmen ───────────────────────────────────────────────────────
 //
