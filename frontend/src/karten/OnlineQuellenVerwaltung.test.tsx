@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import type { OnlineQuelle } from '../api/onlineQuellen';
 import OnlineQuellenVerwaltung from './OnlineQuellenVerwaltung';
@@ -87,7 +87,7 @@ describe('OnlineQuellenVerwaltung', () => {
     // steht bewusst un-alphabetisch, sonst bliebe ein versehentliches `defaultSortOrder` unbemerkt.
     expect(namen()).toEqual(['OpenStreetMap', 'Basemap.de']);
 
-    await userEvent.click(screen.getByRole('columnheader', { name: /Name/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /Name/ })));
     await waitFor(() => expect(namen()).toEqual(['Basemap.de', 'OpenStreetMap']));
 
     await userEvent.type(
