@@ -3,7 +3,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import FahrzeugeTab from './FahrzeugeTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
@@ -329,14 +329,14 @@ describe('FahrzeugeTab · Sortieren und Filtern (LLH-1096)', () => {
     await waitFor(() => expect(ort.aktuell).toBe('/admin/stammdaten/fahrzeuge?f.fahrzeugtyp=RTW'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Kennzeichen/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Kennzeichen/ })));
     await waitFor(() => expect(folge()).toEqual(['2', '1']));
     await waitFor(() =>
       expect(ort.aktuell).toBe('/admin/stammdaten/fahrzeuge?sort=kennzeichen%3Aauf'),
     );
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Stärke/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Stärke/ })));
     await waitFor(() => expect(folge()).toEqual(['2', '1']));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Stärke/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Stärke/ })));
     await waitFor(() => expect(folge()).toEqual(['1', '2']));
   });
 

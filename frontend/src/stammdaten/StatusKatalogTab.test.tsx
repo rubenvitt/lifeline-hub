@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import StatusKatalogTab from './StatusKatalogTab';
 import { adminFixture } from '../test/fixtures';
 
@@ -103,7 +103,9 @@ describe('StatusKatalogTab', () => {
     const zeilen = () => container.querySelectorAll('tr.ant-table-row');
 
     expect(zeilen()[0].textContent).toContain('einsatzbereit');
-    await userEvent.click(container.querySelector('th.ant-table-column-has-sorters')!);
+    await userEvent.click(
+      sortTarget(container.querySelector<HTMLElement>('th.ant-table-column-has-sorters')!),
+    );
     expect(zeilen()[0].textContent).toContain('disponiert');
 
     // Erst der Griff, dann der Klick: so meldet ein fehlender Filter sich hier statt erst am

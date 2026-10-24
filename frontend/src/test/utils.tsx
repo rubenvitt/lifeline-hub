@@ -86,3 +86,12 @@ export function renderMitProviders(ui: ReactElement, options: ProviderOptions = 
   }
   return { client, ...render(ui, { wrapper: Wrapper, ...renderOptionen }) };
 }
+
+/**
+ * Die Sortierfläche einer sortierbaren Kopfzelle, sonst die Zelle selbst. Ein Klick auf die Zelle
+ * trifft in jsdom ihre Polsterung, und die sortiert nicht (LLH-1273, `polsterKlickRiegel` in
+ * `components/KatalogTabelle.tsx`); der Mensch klickt den Titel.
+ */
+export function sortTarget(kopfZelle: HTMLElement): HTMLElement {
+  return kopfZelle.querySelector<HTMLElement>('.ant-table-column-sorters') ?? kopfZelle;
+}

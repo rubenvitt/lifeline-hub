@@ -1113,7 +1113,9 @@ export default function KraefteuebersichtPage() {
         meta={meta}
         dataUpdatedAt={datenstand}
         aktionen={
-          <Space className="kraefte-no-print" wrap>
+          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+          // `paddingXS` ließ 3 / 5 / 7 px.
+          <Space className="kraefte-no-print" wrap size={token.marginSM}>
             {/* Sekundär: der Abschnitt-Filter. Er wirkt wie alle Filter außerhalb des Primitivs
                 auf die Rohlisten. */}
             <Select

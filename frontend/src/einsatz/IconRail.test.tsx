@@ -120,13 +120,14 @@ describe('IconRail', () => {
     expect(spalte.style.top).toBe('var(--lfh-rahmen-oben, 0px)');
     expect(spalte.style.height).toBe('calc(100dvh - var(--lfh-rahmen-oben, 0px))');
     expect(spalte.style.overflowY).toBe('auto');
-    // Der Fokusabstand zum Fuß hängt am Scrollport der Spalte, nicht an den Zielen (LLH-1241).
-    expect(spalte.style.getPropertyValue('scroll-padding-block-end')).toBe(
-      'var(--lfh-fuss-fokusabstand, 0px)',
-    );
     const haupt = spalte.querySelector<HTMLElement>('[data-lfh="rail-haupt"]')!;
     expect(haupt.style.position).toBe('');
-    expect(spalte.querySelector('[data-lfh="rail-fuss"]')).not.toBeNull();
+    // Der Fuß klebt nicht in der Spalte (LLH-1273): reicht die Höhe nicht, folgt er den
+    // Kategorien, statt über ihnen zu liegen. Ans Ende schiebt ihn `marginTop: auto`.
+    const fuss = spalte.querySelector<HTMLElement>('[data-lfh="rail-fuss"]')!;
+    expect(fuss).not.toBeNull();
+    expect(fuss.style.position).toBe('');
+    expect(fuss.style.marginTop).toBe('auto');
     // Fünf Kategorien in der Gruppe, „Einstellungen“ nicht: es steht im Fuß.
     expect(haupt.querySelectorAll('button')).toHaveLength(5);
     expect(haupt.querySelector('[aria-label="Einstellungen"]')).toBeNull();
