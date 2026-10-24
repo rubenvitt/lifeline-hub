@@ -11284,7 +11284,8 @@
           "ist_offen",
           "material_ids",
           "zusage_rufnamen",
-          "einheit_ids"
+          "einheit_ids",
+          "einheit_ids_am_raum"
         ],
         "properties": {
           "abgelehnt_at": {
@@ -11370,6 +11371,14 @@
               "format": "int64"
             },
             "description": "Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen Einheiten, aufsteigend, auch\naufgelöste; leer ohne Übernahme (LLH-1383, design.md D7). Nur Kennungen: Namen liest die\nOberfläche aus dem Modul Einheiten."
+          },
+          "einheit_ids_am_raum": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Abgeleitet: die Teilmenge von `einheit_ids`, deren Verweis das Eintreffen am\nBereitstellungsraum gesetzt hat, aufsteigend (LLH-1445, Change\n`o659va5r-nachforderung-herkunft` D1). Die Karte nennt sie „am Raum eingetroffen“."
           },
           "einsatz_id": {
             "type": "integer",

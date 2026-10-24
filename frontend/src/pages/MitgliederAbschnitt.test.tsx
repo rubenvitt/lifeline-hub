@@ -7,7 +7,7 @@ import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
 import { einsatzKeys } from '../api/queryKeys';
-import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import { ort, Ortsfuehler } from '../test/ortsfuehler';
@@ -838,7 +838,7 @@ describe('MitgliederAbschnitt · Sortieren und Filtern (LLH-1096)', () => {
     zeige();
     await screen.findByText('Anna Leitung');
     expect(folge()).toEqual(['2', '3']);
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Name/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Name/ })));
     await waitFor(() => expect(folge()).toEqual(['3', '2']));
     await waitFor(() =>
       expect(ort.aktuell).toBe('/einsaetze/7/einstellungen/zugriff?sort=name%3Aauf'),

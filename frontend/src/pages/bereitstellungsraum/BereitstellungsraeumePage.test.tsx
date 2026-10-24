@@ -4,7 +4,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, sortTarget } from '../../test/utils';
 import BereitstellungsraeumePage from './BereitstellungsraeumePage';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrListenEintrag, Einheit, EinsatzAnzeige } from '../../api/types';
@@ -618,7 +618,7 @@ describe('BereitstellungsraeumePage · Sortieren und Filtern (LLH-1096)', () => 
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Fahrzeuge/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Fahrzeuge/ })));
     await waitFor(() => expect(bezeichnungen()).toEqual(['BR West', 'BR Ost']));
     await waitFor(() =>
       expect(screen.getByTestId('suche')).toHaveTextContent('?sort=fahrzeuge%3Aauf'),

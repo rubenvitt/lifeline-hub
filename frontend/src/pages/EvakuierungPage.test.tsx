@@ -13,7 +13,7 @@ import type { EvakuierungUebersicht, Evakuierungsbezirk } from '../api/types';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
-import { setzeOnline } from '../test/utils';
+import { setzeOnline, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 
@@ -717,7 +717,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     await screen.findByText('Uferstraße 12–40');
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Bezirk/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Bezirk/ })));
     await waitFor(() => expect(adresse()).toBe('?sort=bezeichnung%3Aauf'));
     const folge = [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
       z.getAttribute('data-row-key'),

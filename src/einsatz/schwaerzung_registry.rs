@@ -1105,6 +1105,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Wirkung der Übernahme für den Storno (LLH-1388): Kennzeichen „angelegt“ und Belegungs-FK.
             retain("nachforderung_angelegt", G_ENUM),
             retain("nachforderung_belegung_id", G_FK),
+            // Weg des Verweises (LLH-1445): am Raum gesetzt oder nicht.
+            retain("nachforderung_am_raum", G_ENUM),
             // Kennzeichen „letzte Besetzung festgehalten“ (LLH-1266, Mig 0250).
             retain("besetzung_festgehalten", G_ENUM),
         ],

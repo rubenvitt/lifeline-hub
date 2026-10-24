@@ -4553,6 +4553,12 @@ export interface components {
              *     Oberfläche aus dem Modul Einheiten.
              */
             einheit_ids: number[];
+            /**
+             * @description Abgeleitet: die Teilmenge von `einheit_ids`, deren Verweis das Eintreffen am
+             *     Bereitstellungsraum gesetzt hat, aufsteigend (LLH-1445, Change
+             *     `o659va5r-nachforderung-herkunft` D1). Die Karte nennt sie „am Raum eingetroffen“.
+             */
+            einheit_ids_am_raum: number[];
             /** Format: int64 */
             einsatz_id: number;
             /** @description Voraussichtliches Eintreffen laut Zusage (UTC, D3); fehlt ohne Angabe. */
