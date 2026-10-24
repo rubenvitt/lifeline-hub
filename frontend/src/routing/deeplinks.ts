@@ -225,8 +225,13 @@ export function einsatzberichtPfad(
 /** Umkehr von {@link einsatzberichtPfad}: unbekannte Schlüssel fallen weg, leer = Standardumfang. */
 export { parseBerichtAuswahl };
 
-export function erinnerungenPfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'erinnerungen');
+/**
+ * Erinnerungsseite. `?erinnerung=<id>` steuert eine Erinnerung an (LLH-1429): die Seite wählt
+ * ihre Ansicht (offen oder abgeschlossen), rollt die Karte ins Bild und hebt sie hervor (Spec
+ * `deeplink-hervorhebung`); der Parameter wird nach dem Lesen geräumt.
+ */
+export function erinnerungenPfad(einsatzId: number, opts: { erinnerung?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'erinnerungen'), { erinnerung: opts.erinnerung });
 }
 
 // ── Listen mit Query-Selektion / Schnellerfassung ────────────────────────────

@@ -31,6 +31,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
 export default function ErinnerungenPage() {
   const { id } = useParams();
@@ -42,6 +43,11 @@ export default function ErinnerungenPage() {
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   // Inline-Anlegen-Formular: per Kopf-Button auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
+  // Sprung `?erinnerung=` (LLH-1429): die angesprungene Karte, die noch ins Bild zu rollende und
+  // die gesuchte, die nicht unter den offenen steht.
+  const [hervorgehobenId, setHervorgehobenId] = useState<number | null>(null);
+  const [scrollZiel, setScrollZiel] = useState<number | null>(null);
+  const [sucheErinnerung, setSucheErinnerung] = useState<number | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -64,7 +70,8 @@ export default function ErinnerungenPage() {
     initialPageParam: undefined as AbschlussCursor | undefined,
     getNextPageParam: (letzte) =>
       letzte.length < ERINNERUNGEN_SEITE ? undefined : erinnerungCursor(letzte[letzte.length - 1]),
-    enabled: ansicht === 'abgeschlossen',
+    // Auch für einen Sprung auf eine Erinnerung, die nicht unter den offenen steht.
+    enabled: ansicht === 'abgeschlossen' || sucheErinnerung != null,
   });
   const abgeschlossene = useMemo(() => {
     const gesehen = new Set<number>();
@@ -74,6 +81,45 @@ export default function ErinnerungenPage() {
       return true;
     });
   }, [abgeschlosseneQuery.data]);
+
+  /*
+   * Sprung `?erinnerung=<id>` (LLH-1429, Spec `deeplink-hervorhebung`, `frontend/AGENTS.md`
+   * „Deeplink-Muster“): steht die Erinnerung unter den offenen, zeigt die Seite die Offen-Ansicht,
+   * sonst sucht sie in der geladenen Seite der abgeschlossenen. Gefunden, rollt die Karte einmal
+   * ins Bild und bleibt hervorgehoben; eine unbekannte Kennung ändert nichts. Kein Blättern bis
+   * zur Erinnerung. Der Parameter wird geräumt (`useQueryParamSelektion`). Erst wenn auch der
+   * Einsatz da ist: vorher steht statt der Karten der Ladekreis.
+   */
+  const springeZu = (eid: number, ziel: 'offen' | 'abgeschlossen') => {
+    setAnsicht(ziel);
+    setHervorgehobenId(eid);
+    setScrollZiel(eid);
+  };
+  useQueryParamSelektion('erinnerung', offeneQuery.isSuccess && einsatzQuery.isSuccess, (eid) => {
+    if ((offeneQuery.data ?? []).some((e) => e.id === eid)) {
+      setSucheErinnerung(null);
+      springeZu(eid, 'offen');
+    } else {
+      setSucheErinnerung(eid);
+    }
+  });
+  // Erst entscheiden, wenn die abgeschlossenen frisch stehen, sonst entschiede ein alter Stand.
+  const abgeschlosseneBereit = abgeschlosseneQuery.isFetched && !abgeschlosseneQuery.isFetching;
+  useEffect(() => {
+    if (sucheErinnerung == null || !abgeschlosseneBereit) return;
+    if (abgeschlossene.some((e) => e.id === sucheErinnerung)) {
+      springeZu(sucheErinnerung, 'abgeschlossen');
+    }
+    setSucheErinnerung(null);
+  }, [sucheErinnerung, abgeschlosseneBereit, abgeschlossene]);
+  // Einmal ins Bild rollen, sobald die Karte steht (nach dem Ansichtswechsel oder den Daten).
+  useEffect(() => {
+    if (scrollZiel == null) return;
+    const karte = document.querySelector(`[data-erinnerung-id="${scrollZiel}"]`);
+    if (!karte) return;
+    karte.scrollIntoView?.({ block: 'center' });
+    setScrollZiel(null);
+  }, [scrollZiel, ansicht, offeneQuery.data, abgeschlossene, einsatzQuery.data]);
 
   // „Heute fällig“ nach dem Kalendertag der Anzeigezone (LFH-692).
   const { konventionen } = useAnzeigeKonventionen();
@@ -191,6 +237,7 @@ export default function ErinnerungenPage() {
     onErledigen: (eid: number) => erledigenMutation.mutate({ einsatzId, eid }),
     onQuittieren: (eid: number) => quittierenMutation.mutate({ einsatzId, eid }),
     zeilenFehler: kartenFehler.grund,
+    hervorgehobenId,
   };
   /*
    * Steht die Karte eines Grundes in der gezeigten Ansicht nicht (Ansicht gewechselt, Karte
