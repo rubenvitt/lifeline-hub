@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -303,6 +303,7 @@ const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
 export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { benutzer } = useAuth();
@@ -964,7 +965,9 @@ export default function FahrzeugePage() {
       }
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
       aktionen={
-        <Space wrap style={{ minWidth: 0 }}>
+        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+        // `paddingXS` ließ 3 / 5 / 7 px.
+        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
           <Segmentleiste<FahrzeugeAnsicht>
             beschriftung="Ansicht"

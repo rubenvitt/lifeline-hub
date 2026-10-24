@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArchivAkte, PersonTreffer, Schwaerzungsantrag } from '../api/types';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import Loeschersuchen, { antragswege } from './Loeschersuchen';
 import PersonensucheDialog from './PersonensucheDialog';
@@ -289,7 +289,7 @@ describe('Loeschersuchen', () => {
       [...document.querySelectorAll('tbody tr[data-row-key] td:first-child')].map(
         (z) => z.textContent,
       );
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Ziel/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Ziel/ })));
     await waitFor(() => expect(ziele()).toEqual(['EK-9', 'IT-5', 'R-042']));
     await kopfFilterWaehlen('Stand', ['vollzogen (2)']);
     await waitFor(() => expect(ziele()).toEqual(['EK-9', 'IT-5']));

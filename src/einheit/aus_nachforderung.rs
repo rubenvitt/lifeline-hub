@@ -96,8 +96,11 @@ pub struct Rahmen<'a> {
 pub struct Uebernommen {
     /// Die übernommenen Einheiten in Zeilenfolge.
     pub einheit_ids: Vec<i64>,
-    /// Der Raum, in den gebucht wurde; `None` ohne Buchung.
-    pub br_id: Option<i64>,
+    /// Die Räume, in die gebucht wurde: der des Ziels und die, in denen ein überführtes Fahrzeug
+    /// stand (LLH-1448); leer ohne Buchung.
+    pub br_ids: Vec<i64>,
+    /// Die Fahrzeuge, die dabei zur Einheit wurden (LLH-1448).
+    pub fahrzeug_ids: Vec<i64>,
     /// Der eine ETB-Eintrag (D6).
     pub etb_id: i64,
     pub personen: Vec<i64>,
@@ -107,8 +110,15 @@ pub struct Uebernommen {
 
 /// ETB-Wortlaut (D6): „Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2), im BR Nord
 /// eingetroffen“; ist nur ein Teil gebucht, „…, im BR Nord eingetroffen: 83-1“; ohne Buchung ohne
-/// Zusatz. `raum` ist die Bezeichnung des Raums und die gebuchten Namen.
-pub fn etb_text(kurz: &str, namen: &[String], raum: Option<(&str, &[String])>) -> String {
+/// Zusatz. `raum` ist die Bezeichnung des Raums und die gebuchten Namen. Ein überführtes Fahrzeug
+/// steht in `namen` als „RTW 2 aus Fahrzeug“, seine mitgekommene Besatzung am Ende
+/// („…, Besatzung: Anna“, LLH-1448, Change `o659va5r-nachforderung-herkunft` D6).
+pub fn etb_text(
+    kurz: &str,
+    namen: &[String],
+    raum: Option<(&str, &[String])>,
+    besatzung: &[String],
+) -> String {
     let wort = if namen.len() == 1 {
         "als Einheit übernommen"
     } else {
@@ -125,13 +135,17 @@ pub fn etb_text(kurz: &str, namen: &[String], raum: Option<(&str, &[String])>) -
             ));
         }
     }
+    if !besatzung.is_empty() {
+        text.push_str(&format!(", Besatzung: {}", besatzung.join(", ")));
+    }
     text
 }
 
 /// Die Übernahme in der Transaktion des Aufrufers (D2 Schritt 4). Fehlerfolge: Nachforderung
 /// fremd 404, nicht eingetroffen 422, mehr Einheiten als die Anzahl 422, Raum gewünscht ohne Ziel
-/// Raum 422, Raum nicht belegbar 404/422, Name schon im Einsatz 422, bestehende Einheit fremd 404,
-/// aufgelöst oder schon übernommen 409. Ein Fehler rollt alles zurück.
+/// Raum 422, Raum nicht belegbar 404/422, Name schon im Einsatz 422 (außer als genau ein Fahrzeug
+/// ohne Einheit: das wird zur Einheit, LLH-1448), bestehende Einheit fremd 404, aufgelöst oder
+/// schon übernommen 409. Ein Fehler rollt alles zurück.
 pub async fn uebernehmen_tx(
     conn: &mut SqliteConnection,
     r: &Rahmen<'_>,
@@ -193,7 +207,8 @@ pub async fn uebernehmen_tx(
             .await?,
         ),
     };
-    // 4. Neue Namen gibt es nicht zweimal im Einsatz (D3).
+    // 4. Neue Namen gibt es nicht zweimal im Einsatz (D3); ein gleichnamiges Fahrzeug ohne
+    // Einheit wird zur Einheit (LLH-1448, D4).
     let neue: Vec<&str> = zeilen
         .iter()
         .filter_map(|z| match z {
@@ -201,37 +216,48 @@ pub async fn uebernehmen_tx(
             Zeile::Bestehend(_) => None,
         })
         .collect();
-    eintreffen::check_namen_frei_tx(&mut *conn, r.einsatz_id, &neue).await?;
+    let mut fahrzeuge = eintreffen::check_namen_uebernahme_tx(&mut *conn, r.einsatz_id, &neue)
+        .await?
+        .into_iter();
 
     // 5. Anlegen bzw. verknüpfen, in Zeilenfolge.
-    let mut einheiten: Vec<(i64, String, Option<i64>)> = Vec::with_capacity(zeilen.len());
+    let mut ergebnis = Uebernommen::default();
+    let mut einheiten: Vec<Uebernahme> = Vec::with_capacity(zeilen.len());
+    let mut besatzung: Vec<String> = Vec::new();
     for zeile in zeilen {
         let angelegt = matches!(zeile, Zeile::Neu(_));
-        let (id, name, aktueller_br) = match zeile {
-            Zeile::Neu(name) => {
-                let id = super::repo::anlegen_tx(
-                    &mut *conn,
-                    r.einsatz_id,
-                    r.org_id,
-                    &super::repo::EinheitDaten {
-                        name,
-                        abschnitt_id: None,
-                        ueber_einheit_id: None,
-                        typ_id: r.typ_id,
-                        soll_fuehrer: None,
-                        soll_unterfuehrer: None,
-                        soll_mannschaft: None,
-                        bemerkung: None,
-                        funkrufname: Some(name),
-                        sortier: 0,
-                        tz_fachaufgabe: None,
-                        tz_organisation: None,
-                    },
-                    r.benutzer_id,
-                )
-                .await?;
-                (id, name.clone(), None)
-            }
+        let mut u = match zeile {
+            Zeile::Neu(name) => match fahrzeuge.next().flatten() {
+                Some(ef_id) => {
+                    let (u, mit) = ueberfuehren_tx(&mut *conn, r, ef_id, &mut ergebnis).await?;
+                    besatzung.extend(mit);
+                    u
+                }
+                None => {
+                    let id = super::repo::anlegen_tx(
+                        &mut *conn,
+                        r.einsatz_id,
+                        r.org_id,
+                        &super::repo::EinheitDaten {
+                            name,
+                            abschnitt_id: None,
+                            ueber_einheit_id: None,
+                            typ_id: r.typ_id,
+                            soll_fuehrer: None,
+                            soll_unterfuehrer: None,
+                            soll_mannschaft: None,
+                            bemerkung: None,
+                            funkrufname: Some(name),
+                            sortier: 0,
+                            tz_fachaufgabe: None,
+                            tz_organisation: None,
+                        },
+                        r.benutzer_id,
+                    )
+                    .await?;
+                    Uebernahme::neu(id, name.clone())
+                }
+            },
             Zeile::Bestehend(id) => {
                 super::repo::require_aktiv_tx(&mut *conn, r.einsatz_id, *id).await?;
                 let (name, verweis, aktueller_br): (String, Option<i64>, Option<i64>) =
@@ -248,7 +274,10 @@ pub async fn uebernehmen_tx(
                         "«{name}» ist schon aus einer Nachforderung übernommen"
                     )));
                 }
-                (*id, name, aktueller_br)
+                Uebernahme {
+                    aktueller_br,
+                    ..Uebernahme::neu(*id, name)
+                }
             }
         };
         // Mit der Herkunft ihrer Wirkung (LLH-1388 D2): angelegt oder verknüpft.
@@ -258,72 +287,224 @@ pub async fn uebernehmen_tx(
         )
         .bind(r.nachforderung_id)
         .bind(angelegt)
-        .bind(id)
+        .bind(u.id)
         .bind(r.einsatz_id)
         .execute(&mut *conn)
         .await?;
-        einheiten.push((id, name, aktueller_br));
+        // Ein überführtes Fahrzeug, das in einem Raum stand: die Einheit tritt dort ein (D5).
+        if let Some(platz) = u.platz.take() {
+            eintritt_tx(
+                &mut *conn,
+                r,
+                u.id,
+                platz.br_id,
+                &platz.zeitpunkt,
+                &mut ergebnis,
+            )
+            .await?;
+            u.aktueller_br = Some(platz.br_id);
+        }
+        einheiten.push(u);
     }
 
     // 6. Buchen (D5): wer schon in einem Raum steht, bleibt dort.
-    let mut ergebnis = Uebernommen {
-        einheit_ids: einheiten.iter().map(|(id, _, _)| *id).collect(),
-        br_id: raum.as_ref().map(|b| b.id),
-        ..Uebernommen::default()
-    };
+    ergebnis.einheit_ids = einheiten.iter().map(|u| u.id).collect();
     let mut gebucht: Vec<String> = Vec::new();
     if let Some(br) = &raum {
         let zeitpunkt = eingetroffen_at.as_deref().unwrap_or(r.jetzt);
-        let rahmen = eintreffen::Rahmen {
-            einsatz_id: r.einsatz_id,
-            org_id: r.org_id,
-            br_id: br.id,
-            benutzer_id: r.benutzer_id,
-            zeitpunkt_at: zeitpunkt,
-            eingang_at: r.jetzt,
-            client_id: None,
-            etb_startwert: r.etb_startwert,
-        };
-        for (id, name, aktueller_br) in &einheiten {
-            if aktueller_br.is_some() {
+        for u in &einheiten {
+            if u.aktueller_br.is_some() {
                 continue;
             }
-            let Eintritt {
-                belegung_id,
-                personen,
-                abloesung,
-                hinweise,
-                ..
-            } = eintreffen::eintritt_einheit_tx(&mut *conn, &rahmen, *id).await?;
-            // Der Storno bucht genau diesen Eintritt wieder aus (LLH-1388 D3).
-            sqlx::query(
-                "UPDATE einsatz_einheit SET nachforderung_belegung_id = ? \
-                 WHERE id = ? AND einsatz_id = ?",
-            )
-            .bind(belegung_id)
-            .bind(*id)
-            .bind(r.einsatz_id)
-            .execute(&mut *conn)
-            .await?;
-            ergebnis.personen.extend(personen);
-            ergebnis.abloesung.extend(abloesung);
-            ergebnis.hinweise.extend(hinweise);
-            gebucht.push(name.clone());
+            eintritt_tx(&mut *conn, r, u.id, br.id, zeitpunkt, &mut ergebnis).await?;
+            gebucht.push(u.name.clone());
+        }
+        if !ergebnis.br_ids.contains(&br.id) {
+            ergebnis.br_ids.push(br.id);
         }
     }
 
     // 7. Genau ein ETB-Eintrag mit Verweis auf die Nachforderung (D6).
-    let namen: Vec<String> = einheiten.iter().map(|(_, n, _)| n.clone()).collect();
+    let namen: Vec<String> = einheiten
+        .iter()
+        .map(|u| {
+            if u.aus_fahrzeug {
+                format!("{} aus Fahrzeug", u.name)
+            } else {
+                u.name.clone()
+            }
+        })
+        .collect();
     let text = etb_text(
         &nachforderung_repo::kurzname(anzahl, &art),
         &namen,
         raum.as_ref()
             .map(|b| (b.bezeichnung.as_str(), gebucht.as_slice())),
+        &besatzung,
     );
     ergebnis.etb_id =
         nachforderung_repo::protokollieren_tx(conn, r.nachforderung_id, r.benutzer_id, &text)
             .await?;
+    ergebnis.personen.sort_unstable();
+    ergebnis.personen.dedup();
     Ok(ergebnis)
+}
+
+/// Eine Einheit der Übernahme auf dem Weg durch die Schritte 5–7.
+struct Uebernahme {
+    id: i64,
+    name: String,
+    /// Der Raum, in dem sie schon steht; wer dort steht, bleibt (D5).
+    aktueller_br: Option<i64>,
+    /// Aus einem gleichnamigen Fahrzeug ohne Einheit entstanden (LLH-1448).
+    aus_fahrzeug: bool,
+    /// Der Raum des überführten Fahrzeugs und sein Eintrittszeitpunkt, bis die Einheit dort
+    /// eintritt.
+    platz: Option<Platz>,
+}
+
+struct Platz {
+    br_id: i64,
+    zeitpunkt: String,
+}
+
+impl Uebernahme {
+    fn neu(id: i64, name: String) -> Self {
+        Self {
+            id,
+            name,
+            aktueller_br: None,
+            aus_fahrzeug: false,
+            platz: None,
+        }
+    }
+}
+
+/// Macht ein gleichnamiges Fahrzeug ohne Einheit zur Einheit (LLH-1448, Change
+/// `o659va5r-nachforderung-herkunft` D5): Prüfung des Fahrzeugs (fremd 404, beendet, einer Einheit
+/// zugehörig oder abgerufen 409), steht es in einem Raum, sein Austritt „Als Einheit übernommen“
+/// mit dem Zeitpunkt seines Eintritts (oder Wechsels) in diesen Raum für den Eintritt der Einheit,
+/// dann die Überführung mit dem Typ der Übernahme. Liefert die Einheit und die Namen der mitgekommenen Besatzung.
+async fn ueberfuehren_tx(
+    conn: &mut SqliteConnection,
+    r: &Rahmen<'_>,
+    ef_id: i64,
+    ergebnis: &mut Uebernommen,
+) -> Result<(Uebernahme, Vec<String>), AppError> {
+    use crate::bereitstellungsraum::belegung_repo;
+    let platz = match belegung_repo::einheitenloses_fahrzeug_br_tx(&mut *conn, r.einsatz_id, ef_id)
+        .await?
+    {
+        Some(br_id) => {
+            // Ein abgerufenes Fahrzeug bleibt, wie es ist: als Einheit stünde es wieder wartend im
+            // Raum, und der Abruf wäre ohne Kraft (Review zu LLH-1448).
+            let juengstes: String = sqlx::query_scalar(
+                "SELECT art FROM br_belegung \
+                 WHERE einsatz_id = ? AND objekt_typ = 'fahrzeug' AND objekt_id = ? \
+                 ORDER BY id DESC LIMIT 1",
+            )
+            .bind(r.einsatz_id)
+            .bind(ef_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            if juengstes == "abruf" {
+                return Err(AppError::Conflict(
+                    "Das gleichnamige Fahrzeug ist abgerufen; erst nach dem Aufheben des Abrufs \
+                     oder dem Ausrücken als Einheit übernehmen"
+                        .into(),
+                ));
+            }
+            // Der Zeitpunkt, zu dem es in den Raum kam (Eintritt oder Wechsel), nicht der eines
+            // späteren Abrufs oder seiner Aufhebung.
+            let zeitpunkt: String = sqlx::query_scalar(
+                "SELECT zeitpunkt_at FROM br_belegung \
+                 WHERE einsatz_id = ? AND objekt_typ = 'fahrzeug' AND objekt_id = ? \
+                   AND art IN ('eintritt', 'wechsel') \
+                 ORDER BY id DESC LIMIT 1",
+            )
+            .bind(r.einsatz_id)
+            .bind(ef_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            belegung_repo::austritt_fahrzeug_tx(
+                &mut *conn,
+                r.einsatz_id,
+                ef_id,
+                r.benutzer_id,
+                "Als Einheit übernommen",
+            )
+            .await?;
+            Some(Platz { br_id, zeitpunkt })
+        }
+        None => None,
+    };
+    let (id, name, besatzung) = eintreffen::fahrzeug_zur_einheit_tx(
+        conn,
+        r.einsatz_id,
+        r.org_id,
+        r.benutzer_id,
+        ef_id,
+        r.typ_id,
+    )
+    .await?;
+    ergebnis.fahrzeug_ids.push(ef_id);
+    ergebnis
+        .personen
+        .extend(besatzung.iter().map(|(id, _)| *id));
+    Ok((
+        Uebernahme {
+            aus_fahrzeug: true,
+            platz,
+            ..Uebernahme::neu(id, name)
+        },
+        besatzung.into_iter().map(|(_, n)| n).collect(),
+    ))
+}
+
+/// Eintritt einer übernommenen Einheit in den Raum `br_id` zum Zeitpunkt `zeitpunkt` (D5): der
+/// Storno bucht genau diesen Eintritt wieder aus (LLH-1388 D3); was gemeldet wird, sammelt
+/// `ergebnis`.
+async fn eintritt_tx(
+    conn: &mut SqliteConnection,
+    r: &Rahmen<'_>,
+    einheit_id: i64,
+    br_id: i64,
+    zeitpunkt: &str,
+    ergebnis: &mut Uebernommen,
+) -> Result<(), AppError> {
+    let rahmen = eintreffen::Rahmen {
+        einsatz_id: r.einsatz_id,
+        org_id: r.org_id,
+        br_id,
+        benutzer_id: r.benutzer_id,
+        zeitpunkt_at: zeitpunkt,
+        eingang_at: r.jetzt,
+        client_id: None,
+        etb_startwert: r.etb_startwert,
+    };
+    let Eintritt {
+        belegung_id,
+        personen,
+        abloesung,
+        hinweise,
+        ..
+    } = eintreffen::eintritt_einheit_tx(&mut *conn, &rahmen, einheit_id).await?;
+    sqlx::query(
+        "UPDATE einsatz_einheit SET nachforderung_belegung_id = ? \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(belegung_id)
+    .bind(einheit_id)
+    .bind(r.einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    if !ergebnis.br_ids.contains(&br_id) {
+        ergebnis.br_ids.push(br_id);
+    }
+    ergebnis.personen.extend(personen);
+    ergebnis.abloesung.extend(abloesung);
+    ergebnis.hinweise.extend(hinweise);
+    Ok(())
 }
 
 /// ETB-Wortlaut des Stornos (LLH-1388 D3): „Nachforderung 2× RTW: Übernahme von 83-1 storniert,
@@ -355,7 +536,8 @@ pub struct Storniert {
 }
 
 /// Storno einer Fehlübernahme in der Transaktion des Aufrufers (LLH-1388, design.md D3): fremd
-/// 404, aufgelöst 409, ohne Herkunft 422, gleichzeitig storniert 409. Verweis und Herkunft weg;
+/// 404, aufgelöst 409, ohne Herkunft 422, gleichzeitig storniert 409. Verweis und Herkunft weg
+/// (auch die Herkunft „am Raum“, LLH-1445);
 /// eine angelegte Einheit wird aufgelöst wie im Normalweg (Austritt, Mitglieder frei, ohne Spur
 /// gelöscht), eine verknüpfte verlässt nur den Raum, den die Übernahme gebucht hat, und nur, wenn
 /// dieser Eintritt noch ihr jüngstes Belegungsereignis ist. Genau ein ETB-Eintrag mit Verweis auf
@@ -390,7 +572,7 @@ pub async fn stornieren_tx(
             .await?;
     let geloest = sqlx::query(
         "UPDATE einsatz_einheit SET nachforderung_id = NULL, nachforderung_angelegt = 0, \
-             nachforderung_belegung_id = NULL \
+             nachforderung_belegung_id = NULL, nachforderung_am_raum = 0 \
          WHERE id = ? AND einsatz_id = ? AND nachforderung_id = ?",
     )
     .bind(einheit_id)
@@ -545,21 +727,33 @@ mod tests {
     fn etb_text_nennt_einheiten_und_raum() {
         let namen = vec!["83-1".to_string(), "83-2".to_string()];
         assert_eq!(
-            etb_text("2× RTW", &namen, None),
+            etb_text("2× RTW", &namen, None, &[]),
             "Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2)"
         );
         assert_eq!(
-            etb_text("2× RTW", &namen, Some(("Nord", namen.as_slice()))),
+            etb_text("2× RTW", &namen, Some(("Nord", namen.as_slice())), &[]),
             "Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2), im BR Nord eingetroffen"
         );
         assert_eq!(
-            etb_text("2× RTW", &namen, Some(("Nord", &namen[..1]))),
+            etb_text("2× RTW", &namen, Some(("Nord", &namen[..1])), &[]),
             "Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2), im BR Nord \
              eingetroffen: 83-1"
         );
         assert_eq!(
-            etb_text("RTW", &namen[..1], Some(("Nord", &[]))),
+            etb_text("RTW", &namen[..1], Some(("Nord", &[])), &[]),
             "Nachforderung RTW: als Einheit übernommen (83-1)"
+        );
+        // LLH-1448 D6: ein überführtes Fahrzeug und seine Besatzung.
+        let ueberfuehrt = vec!["RTW 2 aus Fahrzeug".to_string()];
+        assert_eq!(
+            etb_text(
+                "2× RTW",
+                &ueberfuehrt,
+                Some(("Nord", &[])),
+                &["Anna".to_string(), "Berta".to_string()]
+            ),
+            "Nachforderung 2× RTW: als Einheit übernommen (RTW 2 aus Fahrzeug), Besatzung: Anna, \
+             Berta"
         );
     }
 
