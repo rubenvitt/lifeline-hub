@@ -59,7 +59,7 @@ const ZEITACHSE: Zeitachse = {
   ],
 };
 
-function rendere(darfSchreiben = true, daten: Zeitachse = ZEITACHSE) {
+function rendere(darfSchreiben = true, daten: Zeitachse = ZEITACHSE, beendet = false) {
   server.use(http.get(PFAD, () => HttpResponse.json(daten)));
   return renderMitProviders(
     <KraftZeitachse
@@ -68,6 +68,7 @@ function rendere(darfSchreiben = true, daten: Zeitachse = ZEITACHSE) {
       id={7}
       kennung="Anna"
       darfSchreiben={darfSchreiben}
+      beendet={beendet}
     />,
   );
 }
@@ -240,6 +241,49 @@ describe('KraftZeitachse (LFH-552)', () => {
     expect(screen.getByText(ZEITACHSE_RECHTE_TEXT)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Alarmierung .* streichen$/ })).toBeDisabled();
+  });
+
+  describe('entlassene Person (LLH-1263)', () => {
+    const ENTLASSEN: Zeitachse = {
+      ereignisse: [
+        ...ZEITACHSE.ereignisse,
+        {
+          id: 4,
+          art: 'entlassung',
+          zeitpunkt_at: '2026-09-30 06:00:00',
+          quelle: 'disposition',
+          erfasst_von: 1,
+          erfasst_at: '2026-09-30 06:00:00',
+        },
+      ],
+      perioden: [
+        {
+          ...ZEITACHSE.perioden[0],
+          ende_at: '2026-09-30 06:00:00',
+          ende_art: 'entlassung',
+        },
+      ],
+    };
+
+    it('Nachtragen und Streichen bedienbar, die abschließende Entlassung gesperrt mit Grund', async () => {
+      rendere(true, ENTLASSEN, true);
+      await waitFor(() => expect(eintraege()).toHaveLength(4));
+      expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /^Eintreffen .* streichen$/ })).toBeEnabled();
+      const ende = screen.getByRole('button', { name: /^Entlassung .* streichen$/ });
+      expect(ende).toBeDisabled();
+      expect(ende).toHaveAccessibleDescription('erst erneut disponieren');
+      expect(
+        within(eintraege()[3] as HTMLElement).getByText('erst erneut disponieren'),
+      ).toBeVisible();
+    });
+
+    it('ohne `beendet` bleibt dieselbe Entlassung streichbar', async () => {
+      rendere(true, ENTLASSEN);
+      await waitFor(() => expect(eintraege()).toHaveLength(4));
+      expect(screen.getByRole('button', { name: /^Entlassung .* streichen$/ })).toBeEnabled();
+      expect(screen.queryByText('erst erneut disponieren')).toBeNull();
+    });
   });
 
   describe('Vorbelegung des Zeitpunkts', () => {

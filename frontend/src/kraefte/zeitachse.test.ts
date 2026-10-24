@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { Einsatzperiode } from '../api/types';
-import { ankerText, dauerText, HERKUNFT_WORT, kraftDauern, NACHTRAG_ARTEN } from './zeitachse';
+import type { Einsatzperiode, ZeitachseEreignis } from '../api/types';
+import {
+  abschliessendeEntlassungId,
+  ankerText,
+  dauerText,
+  HERKUNFT_WORT,
+  kraftDauern,
+  NACHTRAG_ARTEN,
+} from './zeitachse';
 
 /** UTC-Millisekunden eines Wirestrings des 30.09.2026. */
 function um(uhr: string): number {
@@ -79,5 +86,66 @@ describe('Wörter', () => {
 
   it('Ablösung lässt sich nicht nachtragen', () => {
     expect(NACHTRAG_ARTEN).not.toContain('abloesung');
+  });
+});
+
+describe('abschliessendeEntlassungId (LLH-1263, Spec „Abschließende Entlassung streichen“)', () => {
+  function ereignis(
+    id: number,
+    art: ZeitachseEreignis['art'],
+    uhr: string,
+    gestrichen = false,
+  ): ZeitachseEreignis {
+    return {
+      id,
+      art,
+      zeitpunkt_at: w(uhr),
+      quelle: 'nachtrag',
+      erfasst_at: w(uhr),
+      erfasst_von: 1,
+      gestrichen_at: gestrichen ? w('15:00') : null,
+    };
+  }
+  const geschlossen: Einsatzperiode[] = [
+    {
+      beginn_at: w('06:10'),
+      anker: 'alarmierung',
+      eintreffen_at: w('06:40'),
+      ende_at: w('14:00'),
+      ende_art: 'entlassung',
+    },
+  ];
+  const ereignisse = [
+    ereignis(1, 'alarmierung', '06:10'),
+    ereignis(2, 'eintreffen', '06:40'),
+    ereignis(3, 'entlassung', '12:00', true),
+    ereignis(4, 'entlassung', '14:00'),
+  ];
+
+  it('nennt die nicht gestrichene Entlassung, die die letzte Periode schließt', () => {
+    expect(abschliessendeEntlassungId(geschlossen, ereignisse)).toBe(4);
+  });
+
+  it('keine bei offener letzter Periode', () => {
+    const offen: Einsatzperiode[] = [
+      ...geschlossen,
+      { beginn_at: w('15:00'), anker: 'eintreffen', eintreffen_at: w('15:00') },
+    ];
+    expect(abschliessendeEntlassungId(offen, ereignisse)).toBeNull();
+  });
+
+  it('keine, wenn eine Ablösung die letzte Periode schließt', () => {
+    const abgeloest: Einsatzperiode[] = [{ ...geschlossen[0], ende_art: 'abloesung' }];
+    expect(
+      abschliessendeEntlassungId(abgeloest, [
+        ...ereignisse.slice(0, 2),
+        ereignis(5, 'abloesung', '14:00'),
+      ]),
+    ).toBeNull();
+  });
+
+  it('keine ohne Perioden', () => {
+    expect(abschliessendeEntlassungId([], [])).toBeNull();
+    expect(abschliessendeEntlassungId(undefined, undefined)).toBeNull();
   });
 });

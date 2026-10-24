@@ -6,8 +6,13 @@
 //! hier normalisiert (`etb::normalisiere_zeit`, 400 bei Unparsbarem), nie im Repo.
 //!
 //! Statuscodes (LFH-267): Art fehlt/unbekannt/`abloesung`, Zeitpunkt fehlt, leerer Grund → 400;
-//! Zukunft, Perioden-Verstoß, doppelte Streichung, Streichen eines Ablösungsereignisses → 422;
+//! Zukunft, Perioden-Verstoß, doppelte Streichung, Streichen eines Ablösungsereignisses, offene
+//! Periode an einer entlassenen Person → 422; stornierte Person, aufgelöste Einheit → 409;
 //! fremde Kraft oder fremdes Ereignis → 404.
+//!
+//! An einer entlassenen Person sind Nachtrag und Streichung erlaubt (LLH-1263, Spec
+//! `kraefte-entlassung`, „Zeitachse einer entlassenen Person berichtigen“): danach bleibt keine
+//! Periode offen, und das ETB vermerkt „berichtigt nach Entlassung“.
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -103,19 +108,43 @@ async fn publiziere(
         .await;
 }
 
-/// Nachtrag und Streichung sind Schreibwege an der Kraft: an einer entlassenen oder stornierten
-/// Person und an einer aufgelösten Einheit 409 (LLH-1079, Spec `kraefte-entlassung`), fremd 404.
-async fn require_aktiv_tx(
+/// Nachtrag und Streichung sind Schreibwege an der Kraft: an einer stornierten Person und an
+/// einer aufgelösten Einheit 409 (LLH-1079, Spec `kraefte-entlassung`), fremd 404. Eine
+/// entlassene Person lässt sich berichtigen (LLH-1263, design.md D1/D2): dann `true`.
+async fn require_berichtigbar_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     kraft: Kraft,
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
+    use crate::entlassung::BeendetAls;
+    use crate::personal::disposition_repo;
     match kraft {
         Kraft::Person(id) => {
-            crate::personal::disposition_repo::require_aktiv_tx(conn, einsatz_id, id).await
+            match disposition_repo::lebenszustand_tx(conn, einsatz_id, id).await? {
+                None => Ok(false),
+                Some(BeendetAls::Entlassen) => Ok(true),
+                Some(als) => Err(disposition_repo::beendet_conflict(als.as_str())),
+            }
         }
-        Kraft::Einheit(id) => crate::einheit::repo::require_aktiv_tx(conn, einsatz_id, id).await,
+        Kraft::Einheit(id) => crate::einheit::repo::require_aktiv_tx(conn, einsatz_id, id)
+            .await
+            .map(|()| false),
     }
+}
+
+/// Nach dem Schreiben an einer entlassenen Person: eine offene Periode entsteht nur über das
+/// erneute Disponieren (design.md D3). Der Fehler rollt die Transaktion zurück, samt ETB.
+async fn require_ohne_offene_periode_tx(
+    conn: &mut sqlx::SqliteConnection,
+    kraft: Kraft,
+) -> Result<(), AppError> {
+    if repo::has_offene_periode_kraft_tx(conn, kraft).await? {
+        return Err(AppError::UnprocessableEntity(
+            "Die Person ist entlassen; eine offene Einsatzperiode entsteht nur über „Erneut disponieren“"
+                .into(),
+        ));
+    }
+    Ok(())
 }
 
 async fn nachtragen(
@@ -132,7 +161,7 @@ async fn nachtragen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let stil = crate::verpflegung::repo::zeitstil(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
-        require_aktiv_tx(conn, einsatz_id, kraft).await?;
+        let berichtigt = require_berichtigbar_tx(conn, einsatz_id, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
         let (ergebnis, beruehrt) = repo::schreibe_tx(
             conn,
@@ -150,12 +179,15 @@ async fn nachtragen(
         if let Schreibergebnis::Ausgelassen(v) = ergebnis {
             return Err(AppError::UnprocessableEntity(v.to_string()));
         }
+        if berichtigt {
+            require_ohne_offene_periode_tx(conn, kraft).await?;
+        }
         let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             benutzer_id,
             startwert,
-            &repo::etb_text_nachtrag(kraft, &name, art, &zeitpunkt, stil),
+            &repo::etb_text_nachtrag(kraft, &name, art, &zeitpunkt, stil, berichtigt),
         )
         .await?;
         Ok((etb_id, beruehrt))
@@ -179,15 +211,26 @@ async fn streichen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let stil = crate::verpflegung::repo::zeitstil(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
-        require_aktiv_tx(conn, einsatz_id, kraft).await?;
+        let berichtigt = require_berichtigbar_tx(conn, einsatz_id, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
         let g = repo::streiche_tx(conn, einsatz_id, benutzer_id, kraft, zid, &grund, false).await?;
+        if berichtigt {
+            require_ohne_offene_periode_tx(conn, kraft).await?;
+        }
         let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             benutzer_id,
             startwert,
-            &repo::etb_text_streichung(kraft, &name, g.art, &g.zeitpunkt_at, &grund, stil),
+            &repo::etb_text_streichung(
+                kraft,
+                &name,
+                g.art,
+                &g.zeitpunkt_at,
+                &grund,
+                stil,
+                berichtigt,
+            ),
         )
         .await?;
         Ok((etb_id, g.beruehrt))

@@ -502,7 +502,16 @@ pub async fn has_offene_periode_tx(
     conn: &mut SqliteConnection,
     einheit_id: i64,
 ) -> Result<bool, AppError> {
-    let bestand = bestand_tx(conn, Kraft::Einheit(einheit_id)).await?;
+    has_offene_periode_kraft_tx(conn, Kraft::Einheit(einheit_id)).await
+}
+
+/// Wie [`has_offene_periode_tx`] für jede Kraft, auch eine Person (LLH-1263: eine entlassene
+/// Person bleibt nach einer Berichtigung ohne offene Periode).
+pub async fn has_offene_periode_kraft_tx(
+    conn: &mut SqliteConnection,
+    kraft: Kraft,
+) -> Result<bool, AppError> {
+    let bestand = bestand_tx(conn, kraft).await?;
     Ok(perioden::bilde_nachsichtig(&bestand)
         .last()
         .is_some_and(|p| p.ende_at.is_none()))
@@ -718,24 +727,35 @@ pub async fn perioden_personal(
 
 // ── ETB-Texte ───────────────────────────────────────────────────────────────────────────────
 
+/// Vermerk an einer entlassenen Person (LLH-1263, design.md D4).
+const BERICHTIGT: &str = "berichtigt nach Entlassung";
+
 /// „Zeitachse: Einheit «Florian 1» eingetroffen 300640sep26 (nachgetragen)" — die Zeit in der
-/// Darstellung des Einsatzes ([`Zeitstil`], LLH-1061).
+/// Darstellung des Einsatzes ([`Zeitstil`], LLH-1061). An einer entlassenen Person
+/// (`berichtigt`) „(nachgetragen, berichtigt nach Entlassung)".
 pub fn etb_text_nachtrag(
     kraft: Kraft,
     name: &str,
     art: ZeitachseArt,
     zeitpunkt_at: &str,
     stil: Zeitstil,
+    berichtigt: bool,
 ) -> String {
+    let vermerk = if berichtigt {
+        format!("nachgetragen, {BERICHTIGT}")
+    } else {
+        "nachgetragen".into()
+    };
     format!(
-        "Zeitachse: {} «{name}» {} {} (nachgetragen)",
+        "Zeitachse: {} «{name}» {} {} ({vermerk})",
         kraft_wort(kraft),
         art.partizip(),
         stil.zeitpunkt_text(zeitpunkt_at)
     )
 }
 
-/// „Zeitachse: Einheit «Florian 1» eingetroffen 300640sep26 gestrichen — Grund: …"
+/// „Zeitachse: Einheit «Florian 1» eingetroffen 300640sep26 gestrichen — Grund: …", an einer
+/// entlassenen Person (`berichtigt`) „… gestrichen (berichtigt nach Entlassung) — Grund: …".
 pub fn etb_text_streichung(
     kraft: Kraft,
     name: &str,
@@ -743,9 +763,15 @@ pub fn etb_text_streichung(
     zeitpunkt_at: &str,
     grund: &str,
     stil: Zeitstil,
+    berichtigt: bool,
 ) -> String {
+    let vermerk = if berichtigt {
+        format!(" ({BERICHTIGT})")
+    } else {
+        String::new()
+    };
     format!(
-        "Zeitachse: {} «{name}» {} {} gestrichen — Grund: {grund}",
+        "Zeitachse: {} «{name}» {} {} gestrichen{vermerk} — Grund: {grund}",
         kraft_wort(kraft),
         art.partizip(),
         stil.zeitpunkt_text(zeitpunkt_at)

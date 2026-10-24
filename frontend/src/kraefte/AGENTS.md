@@ -13,7 +13,12 @@ Spec `kraefte-zeitachse`): Alarmierung/Eintreffen/Ablösung/Entlassung je Einhei
 `einsatz_kraft_zeitachse` (append-only, Streichung mit Grund statt Löschen; Guard
 `repo_ist_append_only`); Zeitpunkte der Zeitachse stehen nie als Spalten an den
 Dispositionstabellen. Der Lebenszustand einer Zeile (`beendet_*`, `aufgeloest_*`, LLH-1079) ist
-keine Zeitachse: Dauer und Perioden rechnen nur aus der Zeitachse. Einziger Schreibpfad
+keine Zeitachse: Dauer und Perioden rechnen nur aus der Zeitachse. Nachtrag und Streichung an
+einer entlassenen Person sind der einzige Schreibweg an einer beendeten Kraft neben dem erneuten
+Disponieren (LLH-1263, `src/routes/zeitachse.rs`): danach ist keine Periode offen (sonst 422),
+das ETB vermerkt „berichtigt nach Entlassung“, die stornierte Person und die aufgelöste Einheit
+bleiben bei 409; der Client sperrt die abschließende Entlassung (`abschliessendeEntlassungId`).
+Einziger Schreibpfad
 `zeitachse::repo::schreibe_tx` (Perioden-Regeln rein in `zeitachse/perioden.rs`; ein Verstoß
 bricht nie den Statuswechsel). Ereignisse entstehen aus `zeitachse_marke` am Status-Katalog
 (Bestand ohne Marke, nie aus dem Label raten), aus Ablösung, Nachtrag, Entlassen und dem

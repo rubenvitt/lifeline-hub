@@ -33,8 +33,11 @@
   Anker einer Periode ohne Alarmierung, die abschließende Entlassung), lässt sich auch an einer
   aktiven Kraft nicht in einem Schritt ersetzen: erst streichen bricht die Ordnung, erst
   nachtragen verdoppelt. Das ist eine bestehende Grenze der Zeitachse und braucht einen eigenen
-  Weg („Zeitpunkt berichtigen“). Für die entlassene Person heißt das: Die Entlassungszeit
-  berichtigt man über „Erneut disponieren“, dann streichen und nachtragen, dann wieder entlassen.
+  Weg („Zeitpunkt berichtigen“, Nachzug LLH-1455). Für die entlassene Person heißt das: Die
+  abschließende Entlassung lässt sich nach dem Entlassen nicht mehr verschieben. Über „Erneut
+  disponieren“ ginge es nur in mehreren Schritten, weil das erneute Disponieren eine neue
+  Periode beginnt. Die Anwenderdoku rät deshalb, die Entlassungszeit vor dem Entlassen
+  nachzutragen.
 - Berichtigung an einer aufgelösten Einheit oder einer stornierten Person.
 - Fahrzeuge: Sie haben keine eigene Zeitachse (`Kraft` kennt nur Einheit und Person).
 
@@ -103,9 +106,9 @@ die Prüfung hängt am eingegebenen Zeitpunkt.
 
 ## Risks / Trade-offs
 
-- [Eine Entlassungszeit lässt sich an einer entlassenen Person nicht direkt berichtigen] → Der
-  Umweg über „Erneut disponieren“ steht in der Anwenderdoku. Ein Nachzug „Zeitpunkt berichtigen“
-  (atomares Ersetzen, auch für aktive Kräfte) wird am Checkpoint vorgeschlagen.
+- [Eine Entlassungszeit lässt sich an einer entlassenen Person nicht berichtigen] → Die
+  Anwenderdoku rät, sie vor dem Entlassen nachzutragen. Der Nachzug LLH-1455 „Zeitpunkt
+  berichtigen“ (in einem Schritt ersetzen, auch für aktive Kräfte) schließt die Lücke.
 - [Live-Aktualisierung der Ansicht einer entlassenen Person] → `publiziere` meldet die Person
   schon über `sse_personal`. Die Umsetzung prüft per Test, dass die Zeitachsen-Abfrage der
   Ansicht danach neu lädt.

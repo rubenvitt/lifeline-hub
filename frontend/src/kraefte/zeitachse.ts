@@ -1,6 +1,12 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import type { Einsatzperiode, ZeitachseArt, ZeitachseMarke, ZeitachseQuelle } from '../api/types';
+import type {
+  Einsatzperiode,
+  ZeitachseArt,
+  ZeitachseEreignis,
+  ZeitachseMarke,
+  ZeitachseQuelle,
+} from '../api/types';
 
 dayjs.extend(utc);
 
@@ -66,6 +72,24 @@ export function kraftDauern(
     gesamtMinuten: gesamt,
     ruheMinuten: ende == null ? null : minutenZwischen(ende, jetztMs),
   };
+}
+
+/**
+ * Die Entlassung, die die letzte Periode schließt (LLH-1263): an einer entlassenen Person lehnt
+ * der Server ihre Streichung ab (422), weil sonst eine offene Periode entstünde. Der Client sperrt
+ * deshalb diesen einen Knopf mit Kurzgrund (LFH-966). `null`, wenn die letzte Periode offen ist
+ * oder mit einer Ablösung endet.
+ */
+export function abschliessendeEntlassungId(
+  perioden: readonly Einsatzperiode[] | undefined,
+  ereignisse: readonly ZeitachseEreignis[] | undefined,
+): number | null {
+  const letzte = perioden?.[perioden.length - 1];
+  if (!letzte?.ende_at || letzte.ende_art !== 'entlassung') return null;
+  const treffer = ereignisse?.find(
+    (e) => e.art === 'entlassung' && e.gestrichen_at == null && e.zeitpunkt_at === letzte.ende_at,
+  );
+  return treffer?.id ?? null;
 }
 
 /**

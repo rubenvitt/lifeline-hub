@@ -504,12 +504,27 @@ pub async fn update(
 
 /// Jeder Schreibweg an einer Kraft fragt zuerst hier (design.md D6): `NotFound`, wenn die Zeile
 /// nicht zum Einsatz gehört, `Conflict` (Lebenszyklus, `src/AGENTS.md`), wenn sie entlassen oder
-/// storniert ist. Nur das erneute Disponieren schreibt an einer beendeten Kraft.
+/// storniert ist. Nur das erneute Disponieren und die Berichtigung der Zeitachse einer entlassenen
+/// Person ([`lebenszustand_tx`], LLH-1263) schreiben an einer beendeten Kraft.
 pub async fn require_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
 ) -> Result<(), AppError> {
+    match lebenszustand_tx(conn, einsatz_id, ep_id).await? {
+        None => Ok(()),
+        Some(als) => Err(beendet_conflict(als.as_str())),
+    }
+}
+
+/// Endzustand der Person (`None` = aktiv), `NotFound`, wenn die Zeile nicht zum Einsatz gehört.
+/// Für den einen Weg, der an einer entlassenen Person schreibt, ohne sie zu reaktivieren: die
+/// Berichtigung ihrer Zeitachse (LLH-1263, `routes::zeitachse`).
+pub async fn lebenszustand_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<Option<crate::entlassung::BeendetAls>, AppError> {
     let ende: Option<Option<String>> = sqlx::query_scalar(
         "SELECT beendet_als FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
     )
@@ -517,10 +532,12 @@ pub async fn require_aktiv_tx(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    match ende.ok_or(AppError::NotFound)? {
-        None => Ok(()),
-        Some(als) => Err(beendet_conflict(&als)),
-    }
+    ende.ok_or(AppError::NotFound)?
+        .map(|als| {
+            crate::entlassung::BeendetAls::parse(&als)
+                .ok_or_else(|| AppError::Internal(format!("Unbekannter Endzustand '{als}'")))
+        })
+        .transpose()
 }
 
 /// Der 409 an einer beendeten Kraft (Lebenszyklus), je Endzustand.
