@@ -5,7 +5,7 @@ import { gibFahrzeugFrei, gibPersonalFrei } from '../../api/einheiten';
 import { gibBesatzungFrei, ordneBesatzungZu, updateDisposition } from '../../api/einsatzFahrzeuge';
 import { listeFahrzeugStatus } from '../../api/fahrzeugStatus';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
-import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, StaerkePosition } from '../../api/types';
+import type { Einheit, StaerkePosition } from '../../api/types';
 import { kraefteText } from '../../anzeige/staerke';
 import {
   Augenbraue,
@@ -19,16 +19,16 @@ import { MenueAusloeser } from '../../components/MenueAusloeser';
 import { RechteHinweis, ZeilenFehler } from '../../components/SpeicherHinweis';
 import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
-import { useZeilenFehler, type ZeilenGrund } from '../../components/useZeilenFehler';
+import type { ZeilenGrund } from '../../components/useZeilenFehler';
 import { FahrzeugZeichen } from '../../kraefte/EinheitZeichen';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { fmsStatusOptionen } from '../../kraefte/fmsTableauKern';
 import {
   besatzungText,
   fremdText,
-  mittelDerEinheit,
   needsOhneFahrzeugKnoten,
   type FahrzeugImBaum,
+  type MittelDerEinheit,
   type PersonImBaum,
 } from '../../kraefte/kraeftebaumKern';
 import { PositionsMarken } from '../../kraefte/KraeftebaumZelle';
@@ -39,9 +39,11 @@ import { besatzungsUrteil, statusKategorie } from '../../theme/statusFarben';
 import {
   besatzungGrund,
   buildPersonMenuItems,
+  hasNoMitglieder,
   type EinheitRechte,
   type PersonMenuKey,
 } from './einheitAnsichtKern';
+import type { BesatzungErrors } from './useBesatzungErrors';
 
 /**
  * Paneel „Fahrzeuge und Besatzung“ der Einheit-Ansicht (LLH-1036 Teil II, design.md D5, D9, D10,
@@ -56,17 +58,20 @@ import {
  *
  * Was bedienbar ist, sagt allein {@link EinheitRechte}. Lösen ist umkehrbar und wirkt ohne
  * Rückfrage (Regel „Destruktiv ist nicht gleich destruktiv“); jeder Grund steht an seiner Zeile
- * (`useZeilenFehler`, Schlüssel `ep_id` bzw. `ef_id`), kein Toast.
+ * (`useZeilenFehler`, Schlüssel `ep_id` bzw. `ef_id`), kein Toast. Die Gründe hält die Seite
+ * (`errors`, `useBesatzungErrors`): ist die Zeile nach der Antwort weg, steht ihr Grund im
+ * Seitenhinweis (LLH-1269).
  */
 
 interface FahrzeugeBesatzungProps {
   einsatzId: number;
   einheit: Einheit;
-  einheiten: readonly Einheit[];
-  /** Einsatzpersonal; nur mit `rechte.hasBesatzung` abgefragt, sonst `undefined`. */
-  personal: readonly EinsatzPersonal[] | undefined;
-  /** Einsatzfahrzeuge; ebenso. */
-  fahrzeuge: readonly EinsatzFahrzeug[] | undefined;
+  /**
+   * Die Besatzung aus `buildBesatzungMittel`: erst mit Freigabe Personal und Fahrzeuge und beiden
+   * Listen, sonst `null` (Mitglieder flach aus dem DTO). Die Seite rechnet sie einmal, denn gegen
+   * dieselben Zeilen prüft sie, ob ein Grund seinen Ort verloren hat (`visibleBesatzungRows`).
+   */
+  mittel: MittelDerEinheit | null;
   rechte: EinheitRechte;
   /**
    * Stand der beiden Listen, wenn die Besatzung erscheinen soll: solange sie laden, steht der
@@ -77,6 +82,8 @@ interface FahrzeugeBesatzungProps {
   onReload?: () => void;
   /** „Als Einheitsführer“: derselbe Weg wie die Kopfzeile, genau `{ fuehrer_id }` (D1). */
   onSetFuehrer: (epId: number) => Promise<unknown>;
+  /** Gründe abgelehnter Aktionen je Zeile; die Seite hält sie (`useBesatzungErrors`). */
+  errors: BesatzungErrors;
   /** Die Auswahlfelder „Person zuordnen …“ und „Fahrzeug zuordnen …“ am Ende (D2). */
   children?: ReactNode;
 }
@@ -115,27 +122,18 @@ const fromMitglied = (m: Einheit['personal_mitglieder'][number]): PersonRow => (
 export default function FahrzeugeBesatzung({
   einsatzId,
   einheit,
-  einheiten,
-  personal,
-  fahrzeuge,
+  mittel,
   rechte,
   listState = 'daten',
   onReload = () => {},
   onSetFuehrer,
+  errors,
   children,
 }: FahrzeugeBesatzungProps) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
   const einheitId = einheit.id;
   const reason = besatzungGrund(rechte);
-  /**
-   * Die Besatzung steht erst, wenn beide Listen da sind. Solange sie laden, steht nur der
-   * Ladezustand; fehlt eine (Fehler), stehen die Mitglieder flach aus dem DTO.
-   */
-  const mittel =
-    rechte.hasBesatzung && personal && fahrzeuge
-      ? mittelDerEinheit(einheitId, { personal, fahrzeuge, material: [], einheiten })
-      : null;
   // Besatzungswege und FMS-Wahl nur, wo die Besatzung zu sehen ist (D5).
   const canBesatzung = rechte.canEditBesatzung && mittel != null;
 
@@ -157,8 +155,7 @@ export default function FahrzeugeBesatzung({
       void qc.invalidateQueries({ queryKey: key });
   }
 
-  const personErrors = useZeilenFehler<number>();
-  const fahrzeugErrors = useZeilenFehler<number>();
+  const { person: personErrors, fahrzeug: fahrzeugErrors } = errors;
   /*
    * Was je Zeile gerade läuft (`p<ep_id>`, `f<ef_id>`): die Rückmeldung steht am Auslöser vor der
    * Antwort, auch bei zwei Aktionen an zwei Zeilen zugleich (eine Mutation kennt nur ihre letzte).
@@ -464,9 +461,6 @@ export default function FahrzeugeBesatzung({
     );
   }
 
-  const isEmpty =
-    einheit.fahrzeug_mitglieder.length === 0 && einheit.personal_mitglieder.length === 0;
-
   return (
     <Paneel
       titel="Fahrzeuge und Besatzung"
@@ -488,7 +482,7 @@ export default function FahrzeugeBesatzung({
           {null}
         </PaneelZustand>
       )}
-      {rechte.hasBesatzung && listState === 'laden' ? null : isEmpty ? (
+      {rechte.hasBesatzung && listState === 'laden' ? null : hasNoMitglieder(einheit) ? (
         <span style={{ color: rollen.gedaempft }}>—</span>
       ) : (
         content
