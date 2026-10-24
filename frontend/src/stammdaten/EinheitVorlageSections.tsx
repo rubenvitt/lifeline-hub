@@ -450,7 +450,7 @@ function MengeFeld({
       max={max}
       precision={0}
       disabled={disabled}
-      style={{ width: 96 }}
+      style={{ width: '100%', maxWidth: 120 }}
       value={wert}
       onChange={setWert}
       onBlur={commit}
