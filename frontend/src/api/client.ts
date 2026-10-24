@@ -76,7 +76,14 @@ export class ApiError extends Error {
   }
 }
 
-const ZEILEN_ARTEN: readonly ZeilenArt[] = ['personal', 'fahrzeug'];
+/** Jede Art des Wire-Enums `ZeilenArt`; der `Record` macht eine neue Art hier zur Pflicht. */
+const ZEILEN_ARTEN_JE: Readonly<Record<ZeilenArt, true>> = {
+  personal: true,
+  fahrzeug: true,
+  // Material-Position einer Einheiten-Vorlage (LLH-1261).
+  material: true,
+};
+const ZEILEN_ARTEN = Object.keys(ZEILEN_ARTEN_JE) as readonly ZeilenArt[];
 
 /** Nur wohlgeformte Zeilen; ein schiefer Eintrag fällt weg, statt einen falschen Grund zu zeigen. */
 function leseZeilen(roh: unknown): ZeilenGrund[] {

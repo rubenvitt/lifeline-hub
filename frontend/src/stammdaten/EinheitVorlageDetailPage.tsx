@@ -34,6 +34,7 @@ import { einheitVorlageDetailPath, einheitVorlageListPath } from './stammdatenDe
 import { orderAsTree, subtreeIds } from './einheitVorlagenBaum';
 import {
   FahrzeugeSection,
+  MaterialSection,
   StammbesetzungSection,
   UntereinheitenSection,
 } from './EinheitVorlageSections';
@@ -412,6 +413,7 @@ function DetailContent({
         />
         <FahrzeugeSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={isAdmin} />
         <StammbesetzungSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={isAdmin} />
+        <MaterialSection vorlage={vorlage} vorlagen={vorlagen} isAdmin={isAdmin} />
       </AdminPage>
     </div>
   );

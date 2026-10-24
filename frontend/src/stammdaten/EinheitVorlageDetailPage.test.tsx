@@ -48,6 +48,33 @@ const FAHRZEUGE = [
   fahrzeug(34, 'Rotkreuz Musterstadt 83-3', 'ausser_dienst'),
 ];
 
+function material(
+  id: number,
+  bezeichnung: string,
+  art: 'geraet' | 'verbrauchsgut',
+  bestandsnummer: string | null = null,
+  dienststatus = 'in_dienst',
+) {
+  return {
+    id,
+    bezeichnung,
+    art,
+    bestandsnummer,
+    dienststatus,
+    angelegt_at: '2026-05-26 09:00:00',
+    ist_demo: false,
+  };
+}
+
+/** LLH-1261: 61 und 62 stehen in der Staffel; 63 ist ein Stück im selben Baum, 65 außer Dienst. */
+const MATERIAL = [
+  material(61, 'Wolldecke', 'verbrauchsgut'),
+  material(62, 'Sanitätsrucksack', 'geraet'),
+  material(63, 'Stromerzeuger', 'geraet', 'SE-1'),
+  material(64, 'Trage', 'geraet', 'TR-2'),
+  material(65, 'Absaugpumpe', 'geraet', null, 'ausser_dienst'),
+];
+
 const PERSONAL = [
   person(41, 'Anna Zugführer', 'fuehrer'),
   person(42, 'Ben Sani', 'mannschaft'),
@@ -59,10 +86,11 @@ interface Calls {
   patch: unknown[];
   fahrzeuge: unknown[];
   personal: unknown[];
+  material: unknown[];
 }
 
 function handler(benutzer = admin) {
-  const calls: Calls = { list: 0, patch: [], fahrzeuge: [], personal: [] };
+  const calls: Calls = { list: 0, patch: [], fahrzeuge: [], personal: [], material: [] };
   server.use(
     meHandler(benutzer),
     http.get('/api/einheit-vorlagen', () => {
@@ -72,6 +100,7 @@ function handler(benutzer = admin) {
     http.get('/api/einheit-typen', () => HttpResponse.json(EINHEIT_TYPEN)),
     http.get('/api/fahrzeuge', () => HttpResponse.json(FAHRZEUGE)),
     http.get('/api/personal', () => HttpResponse.json(PERSONAL)),
+    http.get('/api/material', () => HttpResponse.json(MATERIAL)),
     http.patch('/api/einheit-vorlagen/:id', async ({ request }) => {
       calls.patch.push(await request.json());
       return HttpResponse.json(SANITAETSZUG);
@@ -83,6 +112,10 @@ function handler(benutzer = admin) {
     http.put('/api/einheit-vorlagen/:id/personal', async ({ request }) => {
       calls.personal.push(await request.json());
       return HttpResponse.json(SANITAETSZUG);
+    }),
+    http.put('/api/einheit-vorlagen/:id/material', async ({ request }) => {
+      calls.material.push(await request.json());
+      return HttpResponse.json(RETTUNGSSTAFFEL);
     }),
   );
   return calls;
@@ -275,6 +308,173 @@ describe('EinheitVorlageDetailPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('zeigt Material mit Art, Menge und Ort und ändert Menge und Ort als ganze Liste (LLH-1261)', async () => {
+    const calls = handler();
+    const user = userEvent.setup();
+    renderDetail(RETTUNGSSTAFFEL.id);
+    const paneel = await screen.findByRole('region', { name: 'Material' });
+    expect(within(paneel).getByText('Wolldecke')).toBeInTheDocument();
+    expect(within(paneel).getByText('Verbrauchsgut')).toBeInTheDocument();
+    expect(within(paneel).getByText('Gerät')).toBeInTheDocument();
+    expect(within(paneel).getByLabelText('Menge Wolldecke')).toHaveValue('50');
+    // Ohne Fahrzeug steht „an der Einheit“, der Rucksack liegt auf 83-1.
+    expect(within(paneel).getByText('an der Einheit')).toBeInTheDocument();
+    expect(within(paneel).getByTitle('Rotkreuz Musterstadt 83-1')).toBeInTheDocument();
+
+    const menge = within(paneel).getByLabelText('Menge Wolldecke');
+    await user.clear(menge);
+    await user.type(menge, '40{Enter}');
+    await waitFor(() =>
+      expect(calls.material).toEqual([
+        {
+          material: [
+            { material_id: 61, menge: 40, fahrzeug_id: null },
+            { material_id: 62, menge: 1, fahrzeug_id: 32 },
+          ],
+        },
+      ]),
+    );
+
+    await user.click(within(paneel).getByLabelText('Ort Wolldecke'));
+    // Der Titel steht auch am gewählten Wert des Rucksacks; geklickt wird die Option der Liste.
+    const optionen = await screen.findAllByTitle('Rotkreuz Musterstadt 83-1');
+    const option = optionen.find((e) => e.classList.contains('ant-select-item-option'));
+    if (!option) throw new Error('Option 83-1 fehlt');
+    await user.click(option);
+    await waitFor(() =>
+      expect(calls.material[1]).toEqual({
+        material: [
+          { material_id: 61, menge: 50, fahrzeug_id: 32 },
+          { material_id: 62, menge: 1, fahrzeug_id: 32 },
+        ],
+      }),
+    );
+  });
+
+  it('eine gleiche oder leere Menge schickt nichts', async () => {
+    const calls = handler();
+    const user = userEvent.setup();
+    renderDetail(RETTUNGSSTAFFEL.id);
+    const paneel = await screen.findByRole('region', { name: 'Material' });
+    const menge = within(paneel).getByLabelText('Menge Wolldecke');
+    await user.click(menge);
+    await user.tab();
+    await user.clear(menge);
+    await user.tab();
+    expect(menge).toHaveValue('50');
+    expect(calls.material).toEqual([]);
+  });
+
+  it('fügt Material in Dienst hinzu, ein Stück nur, wenn es nicht schon im Baum steht', async () => {
+    const calls = handler();
+    const user = userEvent.setup();
+    server.use(
+      http.get('/api/einheit-vorlagen', () =>
+        HttpResponse.json(
+          VORLAGEN.map((v) =>
+            v.id === SANITAETSZUG.id
+              ? {
+                  ...v,
+                  material: [
+                    {
+                      id: 80,
+                      material_id: 63,
+                      bezeichnung: 'Stromerzeuger',
+                      art: 'geraet',
+                      bestandsnummer: 'SE-1',
+                      menge: 1,
+                      dienststatus: 'in_dienst',
+                      ist_demo: false,
+                    },
+                  ],
+                }
+              : v,
+          ),
+        ),
+      ),
+    );
+    renderDetail(RETTUNGSSTAFFEL.id);
+    const paneel = await screen.findByRole('region', { name: 'Material' });
+    await user.click(within(paneel).getByLabelText('Material wählen'));
+    // Verbrauchsgut und Gerät ohne Nummer dürfen mehrfach stehen; SE-1 steht am Zug (selber Baum),
+    // die Absaugpumpe ist außer Dienst.
+    expect(await screen.findByTitle('Trage (TR-2)')).toBeInTheDocument();
+    expect(screen.getByTitle('Wolldecke')).toBeInTheDocument();
+    expect(screen.queryByTitle('Stromerzeuger (SE-1)')).toBeNull();
+    expect(screen.queryByTitle('Absaugpumpe')).toBeNull();
+    await user.click(screen.getByTitle('Trage (TR-2)'));
+    await user.click(within(paneel).getByRole('button', { name: 'Material hinzufügen' }));
+    await waitFor(() =>
+      expect(calls.material).toEqual([
+        {
+          material: [
+            { material_id: 61, menge: 50, fahrzeug_id: null },
+            { material_id: 62, menge: 1, fahrzeug_id: 32 },
+            { material_id: 64, menge: 1 },
+          ],
+        },
+      ]),
+    );
+
+    await user.click(
+      within(paneel).getByRole('button', { name: 'Wolldecke aus der Vorlage entfernen' }),
+    );
+    await waitFor(() =>
+      expect(calls.material[1]).toEqual({
+        material: [{ material_id: 62, menge: 1, fahrzeug_id: 32 }],
+      }),
+    );
+  });
+
+  it('ein Stück hat Menge 1 fest; eine Ablehnung steht im Paneel', async () => {
+    handler();
+    server.use(
+      http.get('/api/einheit-vorlagen', () =>
+        HttpResponse.json(
+          VORLAGEN.map((v) =>
+            v.id === RETTUNGSSTAFFEL.id
+              ? {
+                  ...v,
+                  material: [
+                    {
+                      id: 81,
+                      material_id: 63,
+                      bezeichnung: 'Stromerzeuger',
+                      art: 'geraet',
+                      bestandsnummer: 'SE-1',
+                      menge: 1,
+                      dienststatus: 'ausser_dienst',
+                      ist_demo: false,
+                    },
+                  ],
+                }
+              : v,
+          ),
+        ),
+      ),
+      http.put('/api/einheit-vorlagen/:id/material', () =>
+        HttpResponse.json(
+          { error: 'Gerät «Stromerzeuger» steht schon in «Zug» im selben Vorlagen-Baum' },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDetail(RETTUNGSSTAFFEL.id);
+    const paneel = await screen.findByRole('region', { name: 'Material' });
+    expect(within(paneel).getByLabelText('Menge Stromerzeuger')).toBeDisabled();
+    expect(within(paneel).getByText('SE-1')).toBeInTheDocument();
+    expect(within(paneel).getByText('außer Dienst')).toBeInTheDocument();
+    await user.click(
+      within(paneel).getByRole('button', { name: 'Stromerzeuger aus der Vorlage entfernen' }),
+    );
+    expect(
+      await within(paneel).findByText(
+        'Gerät «Stromerzeuger» steht schon in «Zug» im selben Vorlagen-Baum',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('ohne Admin-Recht nur Ansicht: Grund genannt, Speichern gesperrt, keine Zeilenaktionen', async () => {
     handler(nichtAdmin);
     renderDetail(SANITAETSZUG.id);
@@ -283,5 +483,7 @@ describe('EinheitVorlageDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Untereinheit anlegen' })).toBeDisabled();
     expect(within(panel('Fahrzeuge')).queryByRole('button')).toBeNull();
     expect(screen.queryByLabelText('Person wählen')).toBeNull();
+    expect(within(panel('Material')).queryByRole('button')).toBeNull();
+    expect(screen.queryByLabelText('Material wählen')).toBeNull();
   });
 });

@@ -252,6 +252,8 @@ export type ZeilenArt = S['ZeilenArt'];
 export type EinheitVorlage = S['EinheitVorlage'];
 export type EinheitVorlageFahrzeug = S['EinheitVorlageFahrzeug'];
 export type EinheitVorlagePersonal = S['EinheitVorlagePersonal'];
+/** Material-Position einer Vorlage (LLH-1261): Stamm-Material, Menge, Ort Einheit oder Fahrzeug. */
+export type EinheitVorlageMaterial = S['EinheitVorlageMaterial'];
 
 // ============================== LLH-1049 Einheit aus Vorlage ==============================
 /** Vorschau einer Vorlage im Einsatz: Baum und Zustand jeder Kraft (Spec `einheit-vorlagen`). */
@@ -260,6 +262,9 @@ export type VorschauKnoten = S['VorschauKnoten'];
 export type VorschauFahrzeug = S['VorschauFahrzeug'];
 export type VorschauPersonal = S['VorschauPersonal'];
 export type VorschauZustand = S['VorschauZustand'];
+/** Material-Position in der Vorschau (LLH-1261): neu, außer Dienst oder schon im Einsatz. */
+export type VorschauMaterial = S['VorschauMaterial'];
+export type VorschauMaterialZustand = S['VorschauMaterialZustand'];
 export type AusVorlageErgebnis = S['AusVorlageErgebnis'];
 
 /** POST-Body des Bildens (`AusVorlageBody` in `src/routes/einsatz_einheit.rs`). Kein
@@ -271,6 +276,8 @@ export interface AusVorlageEingabe {
   abschnitt_id?: number | null;
   fahrzeuge: { fahrzeug_id: number; umhaengen: boolean }[];
   personal: { personal_id: number; umhaengen: boolean }[];
+  /** Gewählte Material-Positionen der Vorlage (LLH-1261); ohne „umhängen“. */
+  material: { vorlage_material_id: number }[];
 }
 
 /** POST-Body einer Einheiten-Vorlage (`VorlageBody` in `src/routes/einheit_vorlage.rs`). Kein
@@ -304,6 +311,14 @@ export interface PatchEinheitVorlage {
   bemerkung?: string | null;
   sortier?: number;
   aktiv?: boolean;
+}
+
+/** Eine Material-Position im PUT (LLH-1261). Kein Backend-Schema, FE-lokal. Ohne Fahrzeug liegt
+ *  sie an der Einheit. */
+export interface EinheitVorlageMaterialEingabe {
+  material_id: number;
+  menge: number;
+  fahrzeug_id?: number | null;
 }
 
 /** Eine Zeile der Stammbesetzung im PUT. Kein Backend-Schema, FE-lokal. */

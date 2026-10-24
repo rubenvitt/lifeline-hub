@@ -1,4 +1,4 @@
-import { Button, Space, Typography, theme } from 'antd';
+import { Button, InputNumber, Space, Typography, theme } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DemoMarke from '../components/DemoMarke';
@@ -7,16 +7,24 @@ import { KennungsLink } from '../components/kennungsLink';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { mitVorgabe } from '../components/vorgabeText';
-import { replaceVorlageFahrzeuge, replaceVorlagePersonal } from '../api/einheitVorlagen';
+import {
+  replaceVorlageFahrzeuge,
+  replaceVorlageMaterial,
+  replaceVorlagePersonal,
+} from '../api/einheitVorlagen';
 import { listeFahrzeuge } from '../api/fahrzeuge';
+import { listeMaterial } from '../api/material';
 import { POSITION_LABELS, POSITION_OPTIONEN, listePersonal } from '../api/personal';
 import { globalKeys } from '../api/queryKeys';
 import type {
   EinheitVorlage,
+  EinheitVorlageMaterial,
+  EinheitVorlageMaterialEingabe,
   EinheitVorlagePersonal,
   EinheitVorlagePersonalEingabe,
   StaerkePosition,
 } from '../api/types';
+import { ART_LABEL } from '../kraefte/materialPosten';
 import { demoGroupedOptions } from './demoAuswahl';
 import {
   einheitVorlageDetailPath,
@@ -27,9 +35,9 @@ import { treeIds } from './einheitVorlagenBaum';
 import EinheitVorlageFormModal from './EinheitVorlageFormModal';
 
 /**
- * Die drei Listen der Vorlagen-Detailseite (LLH-1042): Untereinheiten, Fahrzeuge,
- * Stammbesetzung. Jeder Handgriff speichert sofort die ganze Liste (PUT, Spec `einheit-vorlagen`,
- * „Fahrzeuge und Stammbesetzung der Vorlage“); der Grund einer Ablehnung steht im Paneel, bis zum
+ * Die Listen der Vorlagen-Detailseite (LLH-1042): Untereinheiten, Fahrzeuge, Stammbesetzung und
+ * Material (LLH-1261). Jeder Handgriff speichert sofort die ganze Liste (PUT, Spec
+ * `einheit-vorlagen`, „Fahrzeuge und Stammbesetzung der Vorlage“, „Material der Vorlage“); der Grund einer Ablehnung steht im Paneel, bis zum
  * nächsten Versuch (LFH-1077). Warnungen stehen als Wort am Eintrag („außer Dienst“, „auch in …“),
  * nie nur als Farbe.
  */
@@ -362,6 +370,205 @@ export function StammbesetzungSection({ vorlage, vorlagen, isAdmin }: SectionPro
             onChange={setSelected}
             loading={personalQuery.isLoading}
             options={demoGroupedOptions(candidates, (p) => p.name)}
+          />
+        </Row>
+      )}
+    </Paneel>
+  );
+}
+
+// ── Material (LLH-1261) ──────────────────────────────────────────────────────────────────────
+
+/** Höchstmenge eines Geräts je Position (`GERAET_JE_POSITION_MAX` im Server, design.md D2). */
+export const GERAET_JE_POSITION_MAX = 10;
+
+/** Ein bestimmtes Stück: Gerät mit Bestandsnummer, Menge fest 1 und einmal im Baum. */
+function isStueck(m: Pick<EinheitVorlageMaterial, 'art' | 'bestandsnummer'>): boolean {
+  return m.art === 'geraet' && m.bestandsnummer != null;
+}
+
+/** Die Liste in PUT-Form, mit einer geänderten oder ohne eine Position. */
+function toMaterialInput(
+  material: readonly EinheitVorlageMaterial[],
+  change?: { id: number; patch: Partial<EinheitVorlageMaterialEingabe> | null },
+): EinheitVorlageMaterialEingabe[] {
+  return material.flatMap((m) => {
+    const row: EinheitVorlageMaterialEingabe = {
+      material_id: m.material_id,
+      menge: m.menge,
+      fahrzeug_id: m.fahrzeug_id ?? null,
+    };
+    if (change?.id !== m.id) return [row];
+    return change.patch === null ? [] : [{ ...row, ...change.patch }];
+  });
+}
+
+/**
+ * Menge einer Position: gespeichert wird beim Verlassen des Felds oder mit Enter, nicht je
+ * Tastendruck; ein leeres oder gleiches Feld schickt nichts, und derselbe Wert geht nicht zweimal
+ * hinaus (Enter, dann Verlassen), bis der Server eine neue Menge liefert.
+ */
+function MengeFeld({
+  bezeichnung,
+  menge,
+  max,
+  disabled,
+  onCommit,
+}: {
+  bezeichnung: string;
+  menge: number;
+  max?: number;
+  disabled: boolean;
+  onCommit: (menge: number) => void;
+}) {
+  const [wert, setWert] = useState<number | null>(menge);
+  const [gespeichert, setGespeichert] = useState(menge);
+  const [gesendet, setGesendet] = useState<number | null>(null);
+  if (gespeichert !== menge) {
+    // Der Server hat eine neue Menge geliefert: das Feld folgt ihr.
+    setGespeichert(menge);
+    setWert(menge);
+    setGesendet(null);
+  }
+  const commit = () => {
+    if (wert == null || wert < 1 || wert === menge) {
+      setWert(menge);
+      return;
+    }
+    if (wert === gesendet) return;
+    setGesendet(wert);
+    onCommit(wert);
+  };
+  return (
+    <InputNumber
+      aria-label={`Menge ${bezeichnung}`}
+      min={1}
+      max={max}
+      precision={0}
+      disabled={disabled}
+      style={{ width: 96 }}
+      value={wert}
+      onChange={setWert}
+      onBlur={commit}
+      onPressEnter={commit}
+    />
+  );
+}
+
+export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<number | undefined>();
+  const materialQuery = useQuery({
+    queryKey: globalKeys.materialListe('alle'),
+    queryFn: () => listeMaterial(false),
+    enabled: isAdmin,
+  });
+  const replace = useMutation({
+    mutationFn: (material: EinheitVorlageMaterialEingabe[]) =>
+      replaceVorlageMaterial(vorlage.id, material),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.einheitVorlagen() }),
+  });
+
+  // Zur Wahl steht, was in Dienst ist; ein Stück (Gerät mit Bestandsnummer) nur, solange es
+  // nirgends im selben Vorlagen-Baum steht. Verbrauchsgut darf mehrfach stehen.
+  const tree = treeIds(vorlagen, vorlage.id);
+  const stueckeImBaum = new Set(
+    vorlagen
+      .filter((v) => tree.has(v.id))
+      .flatMap((v) => v.material.filter(isStueck).map((m) => m.material_id)),
+  );
+  const candidates = (materialQuery.data ?? []).filter(
+    (m) => m.dienststatus === 'in_dienst' && !(isStueck(m) && stueckeImBaum.has(m.id)),
+  );
+  const fahrzeugOptions = vorlage.fahrzeuge.map((f) => ({
+    value: f.fahrzeug_id,
+    label: f.funkrufname,
+  }));
+
+  return (
+    <Paneel titel="Material" meta={vorlage.material.length} style={{ marginBlockStart: 16 }}>
+      <SpeicherFehler fehler={replace.error} />
+      {vorlage.material.length === 0 ? (
+        <PaneelZeile>Kein Material</PaneelZeile>
+      ) : (
+        vorlage.material.map((m) => {
+          const update = (patch: Partial<EinheitVorlageMaterialEingabe> | null) =>
+            replace.mutate(toMaterialInput(vorlage.material, { id: m.id, patch }));
+          return (
+            <Row
+              key={m.id}
+              actions={
+                <>
+                  <MengeFeld
+                    bezeichnung={m.bezeichnung}
+                    menge={m.menge}
+                    max={m.art === 'geraet' ? GERAET_JE_POSITION_MAX : undefined}
+                    disabled={!isAdmin || replace.isPending || isStueck(m)}
+                    onCommit={(menge) => update({ menge })}
+                  />
+                  <Select<number>
+                    aria-label={`Ort ${m.bezeichnung}`}
+                    allowClear
+                    disabled={!isAdmin || replace.isPending || fahrzeugOptions.length === 0}
+                    style={SELECT_STYLE}
+                    placeholder="an der Einheit"
+                    value={m.fahrzeug_id ?? undefined}
+                    options={fahrzeugOptions}
+                    onChange={(value) => update({ fahrzeug_id: value ?? null })}
+                  />
+                  {isAdmin && (
+                    <Button
+                      danger
+                      disabled={replace.isPending}
+                      aria-label={`${m.bezeichnung} aus der Vorlage entfernen`}
+                      onClick={() => update(null)}
+                    >
+                      Entfernen
+                    </Button>
+                  )}
+                </>
+              }
+            >
+              <span>{m.bezeichnung}</span>
+              {m.bestandsnummer && <span style={monoStil(13)}>{m.bestandsnummer}</span>}
+              <Typography.Text type="secondary">{ART_LABEL[m.art]}</Typography.Text>
+              {m.ist_demo && <DemoMarke />}
+              {m.dienststatus === 'ausser_dienst' && (
+                <StatusChip ton="achtung" wort="außer Dienst" />
+              )}
+            </Row>
+          );
+        })
+      )}
+      {isAdmin && (
+        <Row
+          actions={
+            <Button
+              disabled={selected == null}
+              loading={replace.isPending}
+              onClick={() => {
+                if (selected == null) return;
+                replace.mutate(
+                  [...toMaterialInput(vorlage.material), { material_id: selected, menge: 1 }],
+                  { onSuccess: () => setSelected(undefined) },
+                );
+              }}
+            >
+              Material hinzufügen
+            </Button>
+          }
+        >
+          <Select<number>
+            aria-label="Material wählen"
+            placeholder="Material wählen"
+            style={SELECT_STYLE}
+            value={selected}
+            onChange={setSelected}
+            loading={materialQuery.isLoading}
+            options={demoGroupedOptions(
+              candidates,
+              (m) => `${m.bezeichnung}${m.bestandsnummer ? ` (${m.bestandsnummer})` : ''}`,
+            )}
           />
         </Row>
       )}

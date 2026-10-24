@@ -21,19 +21,19 @@ Zunder LLH-1261 (`k22fpk5p`). Jede Aufgabe entsteht per TDD. Backend wird mit
 - [x] 2.4 `bilde_tx` disponiert die Wahl nach den Personen (D3, D5): Gerät je Stück, Bestandsnummer genau ein Posten, Verbrauchsgut mit Menge, Ort Fahrzeug wenn es mitkommt, sonst Einheit; `Gebildet.material`. Tests: Rucksack auf RTW, Decken an der Staffel, Gerät mit Menge 3, Fahrzeug abgewählt, 422 ohne jede Schreibspur.
 - [x] 2.5 `etb_text_aus_vorlage` mit Material-Teil und Budget (D6); Tests für die Form „Material: 50× Wolldecke, 1× Sanitätsrucksack“, „und N weitere“ und den erweiterten Höchstfall unter `etb::INHALT_MAX`.
 - [x] 2.6 Handler: Body `material: [{vorlage_material_id}]` mit Deckel 50 vor dem Entdoppeln (400), `fordere_zielmodul::<Material>` (403), Vorschau mit Sperre des Moduls, `sse_material` je Posten nach dem Commit, `AusVorlageErgebnis.material` (D7); Routentests für 400, 403, Vorschau gesperrt, ein ETB-Eintrag.
-- [ ] 2.7 Typ-Codegen: `scripts/check-typ-codegen.sh` grün, beide generierten Dateien mitcommittet.
+- [x] 2.7 Typ-Codegen: `scripts/check-typ-codegen.sh` grün, beide generierten Dateien mitcommittet. (Im Container braucht der Typecheck `NODE_OPTIONS=--max-old-space-size=6144`, sonst bricht `tsc` am Heap ab.)
 
 ## 3. Frontend
 
-- [ ] 3.1 `api/einheitVorlagen.ts`: `replaceVorlageMaterial`; Testdaten in `test/einheitVorlagen.ts` mit Material; Vitest in `api/einheitVorlagen.test.ts`.
-- [ ] 3.2 `MaterialSection` auf der Detailseite (D8): Liste, Hinzufügen aus dem Stamm (nur in Dienst), Menge (Bestandsnummer fest 1), Ort Einheit oder Fahrzeug der Vorlage, „außer Dienst“ als Wort, nur lesen ohne Admin, 422 an der Sektion; Vitest in `EinheitVorlageDetailPage.test.tsx`.
-- [ ] 3.3 `ausVorlageKern.ts`: Wahl `material` mit Vorgabe an, Sperre, `anDerEinheit`, Zusammenfassung „N Material“ nur mit Material, Anfrage, Gründe je Zeile; Vitest im Kerntest.
-- [ ] 3.4 `EinheitAusVorlagePage.tsx`: Material-Zeilen je Einheit mit Häkchen, Zustandswort, Menge, Ort und „an der Einheit“, Sperre des Moduls als Hinweis, Grund an der Zeile; Vitest in `EinheitAusVorlagePage.test.tsx`.
-- [ ] 3.5 e2e `frontend/e2e/einheit-aus-vorlage.spec.ts` erweitert: Vorlage mit Rucksack auf RTW und Decken an der Staffel bilden, Posten über die API am richtigen Ort, ein ETB-Eintrag mit „Material:“.
+- [x] 3.1 `api/einheitVorlagen.ts`: `replaceVorlageMaterial`; Testdaten in `test/einheitVorlagen.ts` mit Material; Vitest in `api/einheitVorlagen.test.ts`.
+- [x] 3.2 `MaterialSection` auf der Detailseite (D8): Liste, Hinzufügen aus dem Stamm (nur in Dienst), Menge (Bestandsnummer fest 1), Ort Einheit oder Fahrzeug der Vorlage, „außer Dienst“ als Wort, nur lesen ohne Admin, 422 an der Sektion; Vitest in `EinheitVorlageDetailPage.test.tsx`.
+- [x] 3.3 `ausVorlageKern.ts`: Wahl `material` mit Vorgabe an, Sperre, `anDerEinheit`, Zusammenfassung „N Material“ nur mit Material, Anfrage, Gründe je Zeile; Vitest im Kerntest.
+- [x] 3.4 `EinheitAusVorlagePage.tsx`: Material-Zeilen je Einheit mit Häkchen, Zustandswort, Menge, Ort und „an der Einheit“, Sperre des Moduls als Hinweis, Grund an der Zeile; Vitest in `EinheitAusVorlagePage.test.tsx`. (Dabei gefunden: `api/client.ts` ließ in `ApiError.zeilen` nur `personal` und `fahrzeug` durch; die Liste ist jetzt ein `Record` über `ZeilenArt`, eine neue Art macht den Typecheck rot. Test in `api/client.test.ts`.)
+- [x] 3.5 e2e `frontend/e2e/einheit-aus-vorlage.spec.ts` erweitert: Vorlage mit Rucksack auf RTW und Decken an der Staffel bilden, Posten über die API am richtigen Ort, ein ETB-Eintrag mit „Material:“. (Gesät über `seedeVorlagenMaterial` in `e2e/vorlage-kern.ts`; lokal in Chromium 2/2 grün.)
 
 ## 4. Doku und Gates
 
-- [ ] 4.1 Anwenderdoku: `docs/anwender/kapitel/stammdaten.md` (Sektion Material der Einheiten-Vorlage) und `docs/anwender/kapitel/einheiten.md` (Material beim Bilden aus Vorlage), Regeln aus `docs/anwender/AGENTS.md`; Wächter der Anwenderdoku grün.
+- [x] 4.1 Anwenderdoku: `docs/anwender/kapitel/stammdaten.md` (Sektion Material der Einheiten-Vorlage) und `docs/anwender/kapitel/einheiten.md` (Material beim Bilden aus Vorlage), Regeln aus `docs/anwender/AGENTS.md`; Wächter der Anwenderdoku grün. (Bilder unverändert: Die Demo-Vorlagen führen kein Material, die fotografierten Ansichten bleiben gleich.)
 - [ ] 4.2 `./scripts/check-all.sh` grün (Bündel `schnell` lokal, voll in der CI des PRs).
 
 ## Workflow follow-up
