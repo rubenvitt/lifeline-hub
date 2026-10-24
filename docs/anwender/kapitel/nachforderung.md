@@ -136,7 +136,9 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
 
 Die Karte zeigt danach je übernommenem Posten Bezeichnung, Menge und Ort, bei einer
 Nachforderung mit Anzahl etwa „übernommen 1 von 3“, und „Material ↗“ führt in die
-[Materialliste](material.md).
+[Materialliste](material.md). Steht genau ein Posten der Nachforderung im Einsatz, springt der
+Verweis auf dessen Zeile und hebt sie hervor; bei mehreren zeigt die Liste alle, jeder mit „aus
+Nachforderung: …“.
 
 ### Weiteren Posten übernehmen
 
