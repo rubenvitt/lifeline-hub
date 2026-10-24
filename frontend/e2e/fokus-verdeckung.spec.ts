@@ -712,7 +712,7 @@ async function einheitFokusBereit(page: Page, dichte: string) {
 /**
  * Tabulatorstopps eines ganzen Umlaufs durch das Dokument: vom Brotkrumen „Einheiten“ über das
  * Inhaltsende hinaus durch Kopf, Rail und Modulpanel zurück in den Seitenkopf. Der Rahmen gehört
- * mit in den Lauf, seit die Rail ihre letzte Kategorie über den klebenden Fuß rollt (LLH-1241).
+ * mit in den Lauf, seit kein Ziel der Rail mehr unter ihrem Fuß liegt (LLH-1241, LLH-1273).
  * Zu knapp gezählt fehlt ein Ziel in `besuchteZiele`, der Test wird also nicht still grün.
  */
 async function stoppsEinUmlauf(page: Page): Promise<number> {
@@ -1019,16 +1019,18 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
 });
 
 /**
- * Rail (LLH-1241): bei 1366 × 520 in `handschuh` passen Kategorien und Fuß (Griff „Menü“,
- * Einstellungen) nicht unter den Kopf, und die Spalte rollt in sich. Getabbt lag
- * „Kommunikation“ ganz unter dem klebenden Fuß, weil `scroll-margin` an den Zielen die Spalte nicht
- * rollte. Gemessen wird vorwärts vom Benutzermenü in die Rail und rückwärts wieder hinaus, und zwar
- * strenger als der Kern: kein Kategorie-Ziel darf den Fuß auch nur überlappen.
+ * Rail (LLH-1241, LLH-1273): bei 1366 × 520 in `handschuh` passen Kategorien und Fuß (Griff „Menü“,
+ * Einstellungen) nicht unter den Kopf, und die Spalte rollt in sich. Getabbt lag „Kommunikation“
+ * ganz unter dem klebenden Fuß (LLH-1241, damals mit `scroll-padding` an der Spalte behoben);
+ * ungetabbt blieb es dort, unsichtbar und nicht antippbar (LLH-1273). Seitdem klebt der Fuß nicht
+ * und folgt den Kategorien. Gemessen wird vorwärts vom Benutzermenü in die Rail und rückwärts
+ * wieder hinaus, strenger als der Kern: kein Kategorie-Ziel darf den Fuß auch nur überlappen, und
+ * die Ziele im Fuß kommen beim Tabben ins Bild.
  *
- * Gegenprobe im selben Test: ohne `scroll-padding` an der Spalte meldet der Kern das Ziel als
- * verdeckt. Ohne sie bewiese ein grüner Lauf nur, dass die Spalte gerade nicht rollen musste.
+ * Gegenprobe im selben Test: mit der alten Bauform (Fuß `sticky; bottom: 0`) liegt die letzte
+ * Kategorie unter dem Fuß. Ohne sie bewiese ein grüner Lauf nur, dass die Spalte gerade passte.
  */
-test('Rail (LLH-1241): kein Kategorie-Ziel liegt beim Tabben unter dem klebenden Fuß (1366 × 520, handschuh)', async ({
+test('Rail (LLH-1241, LLH-1273): kein Kategorie-Ziel liegt unter dem Fuß, auch nicht beim Tabben (1366 × 520, handschuh)', async ({
   page,
 }) => {
   await anmelden(page);
@@ -1042,17 +1044,9 @@ test('Rail (LLH-1241): kein Kategorie-Ziel liegt beim Tabben unter dem klebenden
   const rail = page.getByRole('navigation', { name: 'Kategorien' });
   const spalte = rail.locator('[data-lfh="rail-spalte"]');
   const fuss = rail.locator('[data-lfh="rail-fuss"]');
-  await expect(fuss).toHaveCSS('position', 'sticky');
-  // Vorbedingungen: die Spalte rollt, und die letzte Kategorie beginnt unter dem Fuß.
+  // Vorbedingung: die Spalte rollt, sonst wäre die Aussage leer.
   expect(await spalte.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
-  const letzte = rail.locator('[data-lfh="rail-haupt"] button').last();
-  expect(
-    await letzte.evaluate(
-      (el, f) => el.getBoundingClientRect().top >= f!.getBoundingClientRect().top,
-      await fuss.elementHandle(),
-    ),
-    'die letzte Kategorie liegt vor dem Fokus ganz unter dem Fuß',
-  ).toBe(true);
+  await expect(fuss).not.toHaveCSS('position', 'sticky');
 
   const kategorien = await rail.locator('[data-lfh="rail-haupt"] button').all();
   const namen: string[] = [];
@@ -1061,52 +1055,87 @@ test('Rail (LLH-1241): kein Kategorie-Ziel liegt beim Tabben unter dem klebenden
     namen.push(name);
     await k.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
   }
-  const zieleImFuss = await fuss.locator('button').count();
+  const fussZiele = fuss.locator('button');
+  const zieleImFuss = await fussZiele.count();
+  for (let i = 0; i < zieleImFuss; i += 1) {
+    await fussZiele.nth(i).evaluate((el) => el.setAttribute('data-e2e-fuss', 'ja'));
+  }
   const schritte = namen.length + zieleImFuss;
   const startpunkt = page.getByRole('button', { name: 'Benutzermenü' });
 
-  /** Überlappung jedes Kategorie-Stopps mit dem Fuß in px (0 = frei). */
+  /** Überlappung jeder Kategorie mit dem Fuß in px (0 = frei), gemessen ohne Fokus. */
+  const ueberlappungJetzt = () =>
+    rail.evaluate((nav) => {
+      const fussOben = nav.querySelector('[data-lfh="rail-fuss"]')!.getBoundingClientRect().top;
+      return [...nav.querySelectorAll<HTMLElement>('[data-lfh="rail-haupt"] button')]
+        .map((b) => ({
+          name: b.getAttribute('aria-label'),
+          ueber: b.getBoundingClientRect().bottom - fussOben,
+        }))
+        .filter((m) => m.ueber > 0.5)
+        .map((m) => `${m.name}: ${Math.round(m.ueber)} px unter dem Fuß`);
+    });
+  expect(await ueberlappungJetzt(), 'vor dem Fokus liegt keine Kategorie unter dem Fuß').toEqual(
+    [],
+  );
+
+  /** Überlappung jedes Kategorie-Stopps mit dem Fuß, und ob die Ziele im Fuß im Bild standen. */
   async function laufe(taste: 'Tab' | 'Shift+Tab') {
     const ueberlappung: string[] = [];
     const besucht = new Set<string>();
+    let fussImBild = 0;
     for (let i = 0; i < schritte; i += 1) {
       await page.keyboard.press(taste);
       const m = await page.evaluate(() => {
         const f = document.activeElement;
-        const kennung = f?.getAttribute('data-e2e-fokus');
-        if (!f || !kennung) return null;
+        if (!f) return null;
+        const r = f.getBoundingClientRect();
+        const s = document.querySelector('[data-lfh="rail-spalte"]')!.getBoundingClientRect();
+        if (f.getAttribute('data-e2e-fuss')) {
+          return {
+            fuss: r.top >= s.top - 0.5 && r.bottom <= Math.min(s.bottom, innerHeight) + 0.5,
+          };
+        }
+        const kennung = f.getAttribute('data-e2e-fokus');
+        if (!kennung) return null;
         const fussOben = document
           .querySelector('[data-lfh="rail-fuss"]')!
           .getBoundingClientRect().top;
-        return { kennung, ueber: f.getBoundingClientRect().bottom - fussOben };
+        return { kennung, ueber: r.bottom - fussOben };
       });
       if (m == null) continue;
+      if ('fuss' in m) {
+        if (m.fuss) fussImBild += 1;
+        continue;
+      }
       besucht.add(m.kennung);
       if (m.ueber > 0.5) ueberlappung.push(`${m.kennung}: ${Math.round(m.ueber)} px unter dem Fuß`);
     }
-    return { ueberlappung, besucht: [...besucht].sort() };
+    return { ueberlappung, besucht: [...besucht].sort(), fussImBild };
   }
 
   await startpunkt.focus();
   const vorwaerts = await laufe('Tab');
   expect(vorwaerts.besucht, 'vorwärts jede Kategorie besucht').toEqual([...namen].sort());
   expect(vorwaerts.ueberlappung, vorwaerts.ueberlappung.join('\n')).toEqual([]);
+  expect(vorwaerts.fussImBild, 'vorwärts steht jedes Ziel im Fuß beim Fokus im Bild').toBe(
+    zieleImFuss,
+  );
   // Rückwärts vom letzten Ziel im Fuß.
-  await fuss.locator('button').last().focus();
+  await fussZiele.last().focus();
   const rueckwaerts = await laufe('Shift+Tab');
   expect(rueckwaerts.besucht, 'rückwärts jede Kategorie besucht').toEqual([...namen].sort());
   expect(rueckwaerts.ueberlappung, rueckwaerts.ueberlappung.join('\n')).toEqual([]);
 
-  // Gegenprobe: ohne Padding an der Spalte rollt nichts, und der Kern sieht die Verdeckung.
-  await spalte.evaluate((el) => {
-    el.style.scrollPaddingBlockEnd = '0px';
-    el.scrollTop = 0;
+  // Gegenprobe: mit klebendem Fuß liegt die letzte Kategorie wieder unter ihm.
+  await fuss.evaluate((el) => {
+    el.style.position = 'sticky';
+    el.style.bottom = '0px';
   });
-  await startpunkt.focus();
-  const ohne = await pruefeFokusVerdeckung(page, schritte);
+  await spalte.evaluate((el) => (el.scrollTop = 0));
   expect(
-    ohne.verdeckt.join('\n'),
-    'ohne Padding liegt die letzte Kategorie unter dem Fuß',
+    (await ueberlappungJetzt()).join('\n'),
+    'mit klebendem Fuß liegt die letzte Kategorie unter ihm',
   ).toContain(namen[namen.length - 1]);
 });
 

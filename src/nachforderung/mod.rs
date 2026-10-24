@@ -217,6 +217,12 @@ pub struct NachforderungAnzeige {
     #[sqlx(try_from = "String")]
     #[schema(value_type = Vec<i64>)]
     pub einheit_ids: MaterialIds,
+    /// Abgeleitet: die Teilmenge von `einheit_ids`, deren Verweis das Eintreffen am
+    /// Bereitstellungsraum gesetzt hat, aufsteigend (LLH-1445, Change
+    /// `o659va5r-nachforderung-herkunft` D1). Die Karte nennt sie „am Raum eingetroffen“.
+    #[sqlx(try_from = "String")]
+    #[schema(value_type = Vec<i64>)]
+    pub einheit_ids_am_raum: MaterialIds,
 }
 
 /// Rufnamen einer Zusage, gelesen aus dem JSON-Array der Spalte `zusage_rufnamen` (NULL → `[]` im
