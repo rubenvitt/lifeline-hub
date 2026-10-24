@@ -87,6 +87,16 @@ type MenueAktion = 'bearbeiten' | 'zurueckziehen' | 'ablehnen';
 const AUS_DEM_EINSATZ = 'aus dem Einsatz genommen';
 
 /**
+ * Ziel von „Material ↗“ (LLH-1260): der Posten, wenn genau einer noch im Einsatz steht. Bei
+ * mehreren gibt es kein eindeutiges Ziel, ein herausgenommener steht nicht in der Liste; dann
+ * führt der Sprung in die Liste, wo die Zeilen „aus Nachforderung: …“ tragen.
+ */
+function sprungZiel(posten: readonly UebernahmePosten[]): number | undefined {
+  const aktiv = posten.filter((p) => p.beendet_at == null);
+  return aktiv.length === 1 ? aktiv[0].id : undefined;
+}
+
+/**
  * Die übernommenen Posten mit Bezeichnung, Menge und Ort (D10), darunter „übernommen 1200 von
  * 2000“ und der Sprung in die Materialliste. Eigene Komponente, damit die Orte (Einheiten, UHS …)
  * nur geladen werden, wenn eine Karte Posten zeigt; die Abrufe teilen die Schlüssel der
@@ -118,7 +128,7 @@ function UebernommenePosten({
       )}
       {/* Ein Sprung ist keine Handlung (LFH-616): eine Zeile, abgesetzt von den Knöpfen. */}
       <div data-lfh="inspector-sprung">
-        <KennungsLink to={materialPfad(n.einsatz_id)}>
+        <KennungsLink to={materialPfad(n.einsatz_id, { material: sprungZiel(posten) })}>
           Material <span aria-hidden="true">↗</span>
         </KennungsLink>
       </div>

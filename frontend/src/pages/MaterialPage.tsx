@@ -4,7 +4,12 @@ import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
-import Datensicht, { spaltenFuer, useSpalteAusgeblendet } from '../components/Datensicht';
+import Datensicht, {
+  HERVORGEHOBEN,
+  scrolleZurZeile,
+  spaltenFuer,
+  useSpalteAusgeblendet,
+} from '../components/Datensicht';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import {
   nichtGefundenInhalt,
@@ -36,6 +41,7 @@ import { MATERIAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialArt, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad, nachforderungenPfad } from '../routing/deeplinks';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import MaterialVerdichtung from '../kraefte/MaterialVerdichtung';
 import MaterialOrtAngabe, {
   ortSuchText,
@@ -255,6 +261,20 @@ export default function MaterialPage() {
     queryKey: globalKeys.materialListe('im-dienst'),
     queryFn: () => listeMaterial(true),
   });
+  /**
+   * `?material=<id>` ist Zeilenmarke (LLH-1260, Sprung aus der Nachforderung): der Posten wird
+   * hervorgehoben und ins Bild gerollt (best-effort). Die Gruppen der Liste klappen nicht zu, die
+   * Zeile steht also immer da. Ein herausgenommener Posten steht nicht in der Liste und markiert
+   * nichts.
+   */
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  useQueryParamSelektion('material', emQuery.isSuccess, (mid) => {
+    if ((emQuery.data ?? []).some((m) => m.id === mid)) setHighlightId(mid);
+  });
+  useEffect(() => {
+    if (highlightId == null) return;
+    scrolleZurZeile(highlightId);
+  }, [highlightId]);
   /*
    * Herkunft aus einer Nachforderung (LLH-1226 D8/D11): der Posten trägt nur die Kennung, den Namen
    * löst die Liste der Nachforderungen auf — nur bei bedienbarem Modul (`istKeyFreigegeben` gibt
@@ -960,6 +980,7 @@ export default function MaterialPage() {
             mehrzahl="Posten"
             gedaechtnis={gedaechtnis}
             zeilenFehler={(em) => zeilen.grund(em.id)}
+            zeilenKlasse={(em) => (em.id === highlightId ? HERVORGEHOBEN : undefined)}
             gruppen={{
               ...(gruppierung === 'ort'
                 ? buildOrtGruppierung(ems, ortKontext.namen, einheitFolge ?? [])

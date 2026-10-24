@@ -200,11 +200,48 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
     expect(screen.getByText('Sandsäcke · 1200 · ohne Ort')).toBeInTheDocument();
     expect(await screen.findByText('Sandsäcke · 300 · Staffel A')).toBeInTheDocument();
     expect(screen.getByText('übernommen 1500 von 2000')).toBeInTheDocument();
+    // Zwei Posten im Einsatz: kein eindeutiges Ziel, der Sprung führt in die Liste (LLH-1260).
     expect(screen.getByRole('link', { name: /Material/ })).toHaveAttribute(
       'href',
       '/einsaetze/1/material',
     );
     expect(screen.queryByText(/Posten übernommen/)).toBeNull();
+  });
+
+  it('ein Posten im Einsatz: „Material ↗“ springt auf seine Zeile (LLH-1260)', () => {
+    zeigeKarte({
+      nachforderung: eingetroffen({ material_ids: [7] }),
+      materialJeId: new Map([[7, sandsaecke]]),
+    });
+    expect(screen.getByRole('link', { name: /Material/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/material?material=7',
+    );
+  });
+
+  it('nur ein Posten steht noch im Einsatz: der Sprung trifft ihn, nicht den herausgenommenen (LLH-1260)', () => {
+    zeigeKarte({
+      nachforderung: eingetroffen({ material_ids: [7, 8] }),
+      materialJeId: new Map([
+        [7, { ...sandsaecke, beendet_at: '2026-06-12 10:00:00' }],
+        [8, { ...sandsaecke, id: 8, menge: 300 }],
+      ]),
+    });
+    expect(screen.getByRole('link', { name: /Material/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/material?material=8',
+    );
+  });
+
+  it('kein Posten mehr im Einsatz: der Sprung führt in die Liste (LLH-1260)', () => {
+    zeigeKarte({
+      nachforderung: eingetroffen({ material_ids: [7] }),
+      materialJeId: new Map([[7, { ...sandsaecke, beendet_at: '2026-06-12 10:00:00' }]]),
+    });
+    expect(screen.getByRole('link', { name: /Material/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/material',
+    );
   });
 
   it('ein aus dem Einsatz genommener Posten steht mit seinem Zustand, ohne Anzahl kein Verhältnis', () => {

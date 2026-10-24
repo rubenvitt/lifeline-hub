@@ -203,6 +203,50 @@ describe('MaterialPage', () => {
     expect(screen.queryByRole('spinbutton')).toBeNull();
   });
 
+  it('hebt per ?material=<id> den Posten hervor und räumt den Parameter (LLH-1260)', async () => {
+    const decke = { ...em, id: 11, bezeichnung: 'Feldbett', einheit_id: 2 };
+    const { container } = render(
+      einsatzAktiv,
+      [em, decke],
+      [],
+      {},
+      '/einsaetze/1/material?material=11',
+    );
+    await screen.findByText('Feldbett');
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="11"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+    expect(container.querySelector('[data-row-key="10"]')).not.toHaveClass('zeile-hervorgehoben');
+    // Apply-then-clean: ein stehender Parameter pinnte die Markierung bei Zurück und Neuladen.
+    await waitFor(() => expect(ort.aktuell).not.toContain('material='));
+  });
+
+  it('ein unbekannter Posten in ?material= markiert nichts (LLH-1260)', async () => {
+    const { container } = render(einsatzAktiv, [em], [], {}, '/einsaetze/1/material?material=99');
+    await screen.findByText('Wolldecke');
+    await waitFor(() => expect(ort.aktuell).not.toContain('material='));
+    expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+  });
+
+  it('auch im Kartenzweig trägt der angesprungene Posten die Markierung (LLH-1260)', async () => {
+    setzeViewportBreite(390);
+    const decke = { ...em, id: 11, bezeichnung: 'Feldbett' };
+    const { container } = render(
+      einsatzAktiv,
+      [em, decke],
+      [],
+      {},
+      '/einsaetze/1/material?material=11',
+    );
+    await screen.findByText('Feldbett');
+    expect(container.querySelector('.ant-table'), 'Gegenprobe: keine Tabelle').toBeNull();
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-lfh="datensicht-karte"].zeile-hervorgehoben'),
+      ).toHaveTextContent('Feldbett'),
+    );
+  });
+
   it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
     let freigeben: (() => void) | undefined;
     const gate = new Promise<void>((resolve) => {
