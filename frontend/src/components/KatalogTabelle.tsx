@@ -273,6 +273,43 @@ export function filterKopfStil(token: { controlHeightSM: number; paddingSM: numb
   } as CSSProperties;
 }
 
+/**
+ * Boden der Sortierfläche einer sortierbaren Kopfzelle als Variable an der Tabellenwurzel, rein und
+ * exportiert (LLH-1273; gelesen in `theme/sprache.css`). Ziel ist nur der Inhalt der Zelle, damit
+ * ihre Polsterung die Ziele benachbarter Spalten trennt ({@link polsterKlickRiegel}); er hält die
+ * Steuerhöhe `controlHeight` (30 / 48 / 72) und ragt dafür senkrecht um den Einzug aus
+ * {@link filterKopfStil} in die Polsterung.
+ */
+export function sortierKopfStyle(token: { controlHeight: number }) {
+  return { '--lfh-sortier-ziel': `${token.controlHeight}px` } as CSSProperties;
+}
+
+/** Was in einer sortierbaren Kopfzelle trifft: die Sortierfläche und der Filterauslöser. */
+const KOPF_ZIELE = '.ant-table-column-sorters, .ant-table-filter-trigger';
+
+/**
+ * Ein Klick in die Polsterung einer sortierbaren Kopfzelle sortiert nicht (LLH-1273). antd hängt
+ * den Sortierklick an die ganze Zelle, zwei sortierbare Köpfe stießen deshalb ohne Lücke
+ * aneinander. Der Riegel hält den Klick in der Erfassungsphase an der Zelle an, bevor ihr Hörer
+ * ihn sieht. Die Zelle bleibt dabei selbst Trefferfläche: unter einer fixierten Kopfzelle rollen
+ * die übrigen durch, und ein Klick in ihre Polsterung darf nicht auf die verdeckte Spalte fallen
+ * (das tat er mit `pointer-events: none`). Fokus und Tasten bleiben an der Zelle.
+ *
+ * Nur was im DOM IN der Zelle liegt, wird angehalten: das Filtermenü steht als Portal im `body`,
+ * Reacts Ereignisse laufen aber durch den React-Baum und kämen sonst mit „OK“ und den Kästchen
+ * hier an.
+ */
+export function polsterKlickRiegel(e: {
+  target: EventTarget | null;
+  currentTarget: EventTarget | null;
+  stopPropagation(): void;
+}) {
+  const { target, currentTarget } = e;
+  if (!(target instanceof Element) || !(currentTarget instanceof Element)) return;
+  if (!currentTarget.contains(target)) return;
+  if (!target.closest(KOPF_ZIELE)) e.stopPropagation();
+}
+
 /** antds Filter-Auslöser im Kopf; die Messzeile im Körper trägt eine stumme Kopie. */
 const FILTER_AUSLOESER = 'thead .ant-table-filter-trigger';
 
@@ -921,9 +958,22 @@ export default function KatalogTabelle<T extends object>({
     const gestaltet = gezaehlteSpalten?.map((s) =>
       s.zahl ? { ...s, className: [s.className, 'lfh-zahl-spalte'].filter(Boolean).join(' ') } : s,
     );
-    const erste = gestaltet?.[0];
-    if (!gestaltet || !erste || erste.fixed !== undefined || 'children' in erste) return gestaltet;
-    return [{ ...erste, fixed: 'left' as const }, ...gestaltet.slice(1)];
+    // Sortierbare Kopfzellen tragen den Riegel gegen Klicks in die Polsterung (LLH-1273).
+    const verriegelt = gestaltet?.map((s) => {
+      if (!('sorter' in s) || !s.sorter) return s;
+      const eigen = s.onHeaderCell;
+      return {
+        ...s,
+        onHeaderCell: (spalte: Parameters<NonNullable<typeof eigen>>[0]) => ({
+          ...eigen?.(spalte),
+          onClickCapture: polsterKlickRiegel,
+        }),
+      };
+    });
+    const erste = verriegelt?.[0];
+    if (!verriegelt || !erste || erste.fixed !== undefined || 'children' in erste)
+      return verriegelt;
+    return [{ ...erste, fixed: 'left' as const }, ...verriegelt.slice(1)];
   }, [gezaehlteSpalten]);
 
   /**
@@ -1081,7 +1131,7 @@ export default function KatalogTabelle<T extends object>({
           onChange={beiAenderung}
           ref={tabelleRef}
           className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
-          style={{ ...filterKopfStil(token), ...rest.style }}
+          style={{ ...filterKopfStil(token), ...sortierKopfStyle(token), ...rest.style }}
           columns={fixierteSpalten}
           dataSource={sichtbareZeilen}
           loading={loading}

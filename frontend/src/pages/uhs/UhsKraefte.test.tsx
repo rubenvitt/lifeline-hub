@@ -3,7 +3,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, sortTarget } from '../../test/utils';
 import type { UhsDetail, UhsKraft } from '../../api/types';
 import { PERSONAL_ADHOC_TEXT_MAX } from '../../api/eingabegrenzen';
 import UhsKraefte from './UhsKraefte';
@@ -202,7 +202,7 @@ describe('UhsKraefte · Sortieren und Filtern (LLH-1096)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     // Position nach der Stärke: Führer vor Mannschaft, ohne Position zuletzt.
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Position/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Position/ })));
     await waitFor(() => expect(namen()).toEqual(['Anna Arzt', 'Bernd Berg', 'Clara Frei']));
   });
 });

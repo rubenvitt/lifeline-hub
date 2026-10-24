@@ -312,7 +312,7 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const jetzt = useMinutenTakt();
   const dauer = einsatz ? einsatzDauer(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt) : null;
   const linie = `1px solid ${farben.linie}`;
-  const { fussRef } = useFussFokusabstand('dokument');
+  const { fussRef } = useFussFokusabstand();
   return (
     <div
       // Testanker für den e2e-Trefflächennachweis. Der inline-Rahmen hat als einziger
@@ -344,8 +344,8 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
       </div>
       <ModulListe {...liste} />
       {dauer && (
-        // `sticky; bottom: 0` wie der Rail-Fuß: die Seite scrollt im Dokument, der Fuß hängt so am
-        // Fensterrand statt am Seitenende. Den Fokusabstand über ihm hält `index.css` per
+        // `sticky; bottom: 0`: die Seite scrollt im Dokument, der Fuß hängt so am Fensterrand statt
+        // am Seitenende. Den Fokusabstand über ihm hält `index.css` per
         // `scroll-padding` am Dokument, solange der Fokus im Panel steht (`fussFokusabstand`).
         <div
           ref={fussRef}

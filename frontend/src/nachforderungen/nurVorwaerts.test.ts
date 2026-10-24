@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
 import {
   EINHEITEN_VERKNUEPFT,
-  einheitenEinleitung,
+  einheitenGruppen,
   kannAbschliessen,
   kannZuruecknehmen,
   ruecknahmeSperre,
@@ -60,15 +60,39 @@ describe('nur vorwärts (LLH-1387 D5)', () => {
 
 /**
  * Vor dem Eintreffen der Nachforderung kommt ein Verweis nur aus der Buchung am Raum (LLH-1387
- * D4): dort ist die Einheit am Raum eingetroffen, nicht von der Führung übernommen.
+ * D4). Danach nennt der Server die am Raum verknüpften Einheiten (`einheit_ids_am_raum`,
+ * LLH-1445); alle übrigen sind übernommen.
  */
-describe('einheitenEinleitung', () => {
-  it('zugesagt und unterwegs: „am Raum eingetroffen“', () => {
-    expect(einheitenEinleitung(n('unterwegs'))).toBe('Am Raum eingetroffen');
-    expect(einheitenEinleitung(n('zugesagt'))).toBe('Am Raum eingetroffen');
+describe('einheitenGruppen', () => {
+  type Einleitung = Pick<Nachforderung, 'status' | 'einheit_ids' | 'einheit_ids_am_raum'>;
+  const g = (
+    status: NachforderungStatus,
+    einheit_ids: number[],
+    einheit_ids_am_raum: number[] = [],
+  ): Einleitung => ({ status, einheit_ids, einheit_ids_am_raum });
+
+  it('zugesagt und unterwegs: alle „am Raum eingetroffen“', () => {
+    for (const status of ['zugesagt', 'unterwegs'] as const) {
+      expect(einheitenGruppen(g(status, [11, 12]))).toEqual([
+        { einleitung: 'Am Raum eingetroffen', ids: [11, 12] },
+      ]);
+    }
   });
 
-  it('eingetroffen: „Als Einheit übernommen“', () => {
-    expect(einheitenEinleitung(n('eingetroffen'))).toBe('Als Einheit übernommen');
+  it('eingetroffen ohne Verknüpfung am Raum: alle „Als Einheit übernommen“', () => {
+    expect(einheitenGruppen(g('eingetroffen', [11, 12]))).toEqual([
+      { einleitung: 'Als Einheit übernommen', ids: [11, 12] },
+    ]);
+  });
+
+  it('eingetroffen mit beiden Wegen: zuerst am Raum, dann übernommen, je in Folge', () => {
+    expect(einheitenGruppen(g('eingetroffen', [11, 12, 13], [12]))).toEqual([
+      { einleitung: 'Am Raum eingetroffen', ids: [12] },
+      { einleitung: 'Als Einheit übernommen', ids: [11, 13] },
+    ]);
+  });
+
+  it('ohne Einheiten keine Gruppe', () => {
+    expect(einheitenGruppen(g('eingetroffen', []))).toEqual([]);
   });
 });

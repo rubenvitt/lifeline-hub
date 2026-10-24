@@ -92,6 +92,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   - **Stehenbleiben, gestuft** (LFH-952, Spec `einsatztauglichkeit-layout`): ab `md` klebt der
     Kopf (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` die Rail-Kategorien darunter; unter
     `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung (offline, Live `lost`).
+    Der Fuß der Rail (Griff „Menü“, Einstellungen) klebt nicht: reicht die Höhe nicht, folgt er den
+    Kategorien, statt sie zu verdecken (LLH-1273, `e2e/gate3-trefflaeche.spec.ts` „Rail“).
   - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
     rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, gemessen,
     nie gerechnet). Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
@@ -515,6 +517,13 @@ anwendbar), „nicht geprüft" ist keins.
   stehen `paddingSM` auseinander, antds Spaltenfilter-Auslöser hält `controlHeightSM` und liegt
   in der Tab-Folge (Name „<Spalte> filtern“, Enter/Leertaste öffnen), beides im Primitiv, nie je
   Seite. Nachweis `e2e/katalogtabelle-kopf-dichte.spec.ts`.
+- **Eine sortierbare Kopfzelle sortiert nur über ihren Inhalt** (LLH-1273): antd hängt den Klick
+  an die ganze Zelle, zwei sortierbare Köpfe stießen ohne Lücke aneinander. `KatalogTabelle` hält
+  einen Klick in die Polsterung an (`polsterKlickRiegel`), der Inhalt reicht senkrecht bis an den
+  Zellrand und auf `controlHeight` (`sortierKopfStyle`, `theme/sprache.css`); die Polsterung trennt
+  die Spalten. Nicht über `pointer-events: none`: unter einer fixierten Zelle fiele der Tipp auf
+  die verdeckte Spalte. Unit-Tests klicken über `sortTarget` (`test/utils.tsx`). Nachweis
+  `e2e/gate3-trefflaeche.spec.ts` „Personal (LLH-1273)“.
 - **Das Aufklappsymbol im Baum der `Datensicht` folgt der Dichte** (LLH-1240): antds Symbol steht
   in einem Knopf mit Höhe `controlHeight` und Breite `controlHeightSM` (`baumSymbolZielStil`),
   der Text daneben mittig in derselben Höhe (`baumTextStil`); im Druck fällt der Boden. Nachweis
@@ -822,6 +831,9 @@ anwendbar), „nicht geprüft" ist keins.
   Breite (Schloss in `AppLayout.tsx`). Jede Textfarbe im Rahmen steht in
   `theme/rahmenKontrast.test.ts` und wird dort gerechnet (der Test sieht keine Verwendung, nur
   die Liste). Gilt für jede weitere dauerdunkle Fläche.
+- **Ein `<Space>` in `aktionen` nennt seinen Abstand** (LLH-1273): ohne `size` stehen die Knöpfe
+  3 / 5 / 7 px auseinander, auch im Seitenkopf, dessen Hülle selbst `marginSM` hält. Vorgabe
+  `size={token.marginSM}` (7 / 11 / 16); Wächter `components/aktionenSpace.guard.test.ts`.
 - **Rot steht nicht bündig neben Neutralem:** `<Space>` mit `danger` und weiterer Aktion trägt
   `size="middle"` (`aktionsabstand.guard.test.ts`). Dialogfüße halten dieselbe Stufe (LFH-653,
   11/18/26 px, Leitlinie ≥ 8 / ≥ 16): der Fuß der Erfassungs-Hülle über `size="middle"`, antds
