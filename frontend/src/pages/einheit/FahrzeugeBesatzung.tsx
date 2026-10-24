@@ -314,26 +314,50 @@ export default function FahrzeugeBesatzung({
     </span>
   );
 
-  /** Rechts: Status (bei Recht die Wahl) und rot „Aus Einheit lösen“, abgesetzt (`size="middle"`). */
-  const renderFahrzeugActions = (efId: number, status: ReactNode) => (
-    <Space size="middle" wrap style={{ marginInlineStart: 'auto' }}>
-      {status}
-      {rechte.canEditEinheit && (
-        <Button
-          danger
-          loading={pending.has(`f${efId}`)}
-          onClick={() => fahrzeugLoesen.mutate(efId)}
-        >
-          Aus Einheit lösen
-        </Button>
-      )}
-    </Space>
-  );
+  /**
+   * Rechts: Status und rot „Aus Einheit lösen“, abgesetzt (`size="middle"`). Im Baum ist der Status
+   * die FMS-Wahl, flach aus dem DTO nur das Wort. Die Wahl steht im Quelltext in derselben Reihe
+   * wie der rote Knopf, damit der Abstands-Wächter sie sieht
+   * (`components/aktionsabstand.guard.test.ts`, LLH-1268).
+   */
+  const renderFahrzeugActions = (
+    efId: number,
+    status: { wahl: FahrzeugImBaum['fahrzeug'] } | { wort: ReactNode },
+  ) => {
+    // Gesperrt ist nur die eigene Zeile: eine Wahl an einem anderen Fahrzeug geht hinaus.
+    const isPending = pending.has(`f${efId}`);
+    return (
+      <Space size="middle" wrap style={{ marginInlineStart: 'auto' }}>
+        {'wahl' in status ? (
+          <StatusWahl<number>
+            darstellung={fahrzeugStatusDarstellung(
+              status.wahl,
+              status.wahl.status_id != null ? ankerByStatus.get(status.wahl.status_id) : null,
+            )}
+            farbe={status.wahl.status_farbe ?? null}
+            aktuell={status.wahl.status_id ?? null}
+            optionen={fmsStatusOptionen(katalog)}
+            kennung={status.wahl.funkrufname}
+            laeuft={isPending}
+            darfSchreiben={canBesatzung}
+            onWaehlen={(statusId) => {
+              if (!isPending) fmsStatus.mutate({ efId, statusId });
+            }}
+          />
+        ) : (
+          status.wort
+        )}
+        {rechte.canEditEinheit && (
+          <Button danger loading={isPending} onClick={() => fahrzeugLoesen.mutate(efId)}>
+            Aus Einheit lösen
+          </Button>
+        )}
+      </Space>
+    );
+  };
 
   const renderFahrzeugRow = (f: FahrzeugImBaum) => {
     const ef = f.fahrzeug;
-    // Gesperrt ist nur die eigene Zeile: eine Wahl an einem anderen Fahrzeug geht hinaus.
-    const isPending = pending.has(`f${ef.id}`);
     return (
       <div data-lfh="einheit-fahrzeug" style={rowStyle}>
         <FahrzeugZeichen
@@ -362,24 +386,7 @@ export default function FahrzeugeBesatzung({
           <span style={monoStil(12)}>{besatzungText(f)}</span>
           {secondaryText([fremdText(f)])}
         </span>
-        {renderFahrzeugActions(
-          ef.id,
-          <StatusWahl<number>
-            darstellung={fahrzeugStatusDarstellung(
-              ef,
-              ef.status_id != null ? ankerByStatus.get(ef.status_id) : null,
-            )}
-            farbe={ef.status_farbe ?? null}
-            aktuell={ef.status_id ?? null}
-            optionen={fmsStatusOptionen(katalog)}
-            kennung={ef.funkrufname}
-            laeuft={isPending}
-            darfSchreiben={canBesatzung}
-            onWaehlen={(statusId) => {
-              if (!isPending) fmsStatus.mutate({ efId: ef.id, statusId });
-            }}
-          />,
-        )}
+        {renderFahrzeugActions(ef.id, { wahl: ef })}
         {errorRow(fahrzeugErrors.grund(ef.id))}
       </div>
     );
@@ -434,20 +441,21 @@ export default function FahrzeugeBesatzung({
             />
             {renderFunkrufname(m.ef_id, m.funkrufname)}
             {secondaryText([m.fahrzeugtyp])}
-            {renderFahrzeugActions(
-              m.ef_id,
-              <StatusTag
-                darstellung={
-                  m.status
-                    ? {
-                        ...statusKategorie[m.status.kategorie],
-                        label: fmsEtikett(m.status.label, m.status.fms_anker),
-                      }
-                    : { rolle: 'neutral', label: 'kein Status' }
-                }
-                farbe={m.status?.farbe ?? null}
-              />,
-            )}
+            {renderFahrzeugActions(m.ef_id, {
+              wort: (
+                <StatusTag
+                  darstellung={
+                    m.status
+                      ? {
+                          ...statusKategorie[m.status.kategorie],
+                          label: fmsEtikett(m.status.label, m.status.fms_anker),
+                        }
+                      : { rolle: 'neutral', label: 'kein Status' }
+                  }
+                  farbe={m.status?.farbe ?? null}
+                />
+              ),
+            })}
             {errorRow(fahrzeugErrors.grund(m.ef_id))}
           </div>
         ))}

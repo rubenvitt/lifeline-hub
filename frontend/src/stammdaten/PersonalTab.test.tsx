@@ -3,7 +3,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import PersonalTab from './PersonalTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
@@ -200,7 +200,9 @@ describe('PersonalTab', () => {
     // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte; ob der Klick am
     // 390-px-Schirm ankommt, belegt jsdom NICHT. Die Erwartung ist zugleich die Kollationsprobe:
     // byteweise käme „Ömer" hinter „Thomas".
-    await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
+    await userEvent.click(
+      sortTarget(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!),
+    );
     expect(namen(container)).toEqual(['Ömer Berg', 'Thomas Müller']);
 
     // Träger: eine Spalte mit Datenbezug, deren Rohwert ein Mensch auch so tippt.
@@ -363,7 +365,7 @@ describe('PersonalTab · Sortieren und Filtern (LLH-1096)', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
 
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Personalnr/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Personalnr/ })));
     await waitFor(() => expect(folge()).toEqual(['2', '1']));
     await waitFor(() =>
       expect(ort.aktuell).toBe('/admin/stammdaten/personal?sort=personalnummer%3Aauf'),

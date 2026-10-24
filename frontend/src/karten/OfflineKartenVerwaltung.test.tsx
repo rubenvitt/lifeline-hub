@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { AktualisierungsStatus } from '../api/offlineKarten';
 import { mitProzessZone } from '../test/prozessZone';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import type { BauJob, OfflineKarte, OfflineKatalogEintrag } from '../api/offlineKarten';
 import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
@@ -163,7 +163,7 @@ describe('OfflineKartenVerwaltung', () => {
     // Aufsteigend nach Bytes: 9,5 MB vor 42,0 MB (über die formatierte Zeichenkette stünde „9,1 MB"
     // hinter „42,0 MB"). Die unbekannte Größe steht VORNE. Das fängt die Umkehrung
     // (`?? Infinity`) und den Absturz auf `null`, unterscheidet aber `?? -1` nicht von `?? 0`.
-    await userEvent.click(screen.getByRole('columnheader', { name: /Größe/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /Größe/ })));
     await waitFor(() =>
       expect(namen()).toEqual([
         'Deutschland – Saarland',

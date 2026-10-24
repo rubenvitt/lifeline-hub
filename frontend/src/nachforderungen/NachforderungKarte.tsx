@@ -38,7 +38,12 @@ import { EINHEITEN_SCHRIFT, einheitenSprungAufbau } from './einheitenSprung';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 import { istUeberfaellig, kartenZeiten } from './nachforderungStufen';
 import { adressatText, nachforderungName } from './nachforderungName';
-import { EINHEITEN_VERKNUEPFT, einheitenEinleitung, kannAbschliessen } from './nurVorwaerts';
+import {
+  EINHEITEN_VERKNUEPFT,
+  einheitenGruppen,
+  kannAbschliessen,
+  type EinheitenEinleitung,
+} from './nurVorwaerts';
 import { zielZeile, type ZielAbschnitt, type ZielNamen, type ZielRaum } from './zielVorschlaege';
 import { zusageZeilen } from './zusage';
 import ZusageFormular from './ZusageFormular';
@@ -127,27 +132,56 @@ function UebernommenePosten({
 }
 
 /**
- * Die übernommenen Einheiten (LLH-1383 D9): „Als Einheit übernommen: 83-1 ↗, 83-2 ↗“, je Einheit
- * der Sprung in ihr Detail; vor dem Eintreffen der Nachforderung „Am Raum eingetroffen: …“
- * (LLH-1395, `einheitenEinleitung`). Kennt die Seite keine davon (Modul nicht freigegeben, Liste
- * noch nicht da), steht nur die Zahl; eine unbekannte (aufgelöste) zählt als „weitere“.
+ * Die verknüpften Einheiten (LLH-1383 D9): „Als Einheit übernommen: 83-1 ↗, 83-2 ↗“, je Einheit
+ * der Sprung in ihr Detail; am Raum verknüpfte in einer eigenen Zeile „Am Raum eingetroffen: …“
+ * davor (LLH-1395, LLH-1445, `einheitenGruppen`).
  */
 function UebernommeneEinheiten({
   nachforderung: n,
   einheitenJeId,
 }: {
-  nachforderung: Pick<Nachforderung, 'einsatz_id' | 'einheit_ids' | 'status'>;
+  nachforderung: Pick<
+    Nachforderung,
+    'einsatz_id' | 'einheit_ids' | 'einheit_ids_am_raum' | 'status'
+  >;
+  einheitenJeId: ReadonlyMap<number, UebernahmeEinheit> | null | undefined;
+}) {
+  return einheitenGruppen(n).map((g) => (
+    <EinheitenZeile
+      key={g.einleitung}
+      einsatzId={n.einsatz_id}
+      einleitung={g.einleitung}
+      ids={g.ids}
+      einheitenJeId={einheitenJeId}
+    />
+  ));
+}
+
+/**
+ * Eine Zeile verknüpfter Einheiten eines Wegs. Kennt die Seite keine davon (Modul nicht
+ * freigegeben, Liste noch nicht da), steht nur die Zahl; eine unbekannte (aufgelöste) zählt als
+ * „weitere“.
+ */
+function EinheitenZeile({
+  einsatzId,
+  einleitung,
+  ids,
+  einheitenJeId,
+}: {
+  einsatzId: number;
+  einleitung: EinheitenEinleitung;
+  ids: number[];
   einheitenJeId: ReadonlyMap<number, UebernahmeEinheit> | null | undefined;
 }) {
   const { token } = theme.useToken();
-  const bekannt = einheitenJeId ? uebernommeneEinheiten(n, einheitenJeId) : [];
-  const einleitung = einheitenEinleitung(n);
+  const bekannt = einheitenJeId ? uebernommeneEinheiten({ einheit_ids: ids }, einheitenJeId) : [];
   if (bekannt.length === 0) {
-    const zahl = n.einheit_ids.length === 1 ? '1 Einheit' : `${n.einheit_ids.length} Einheiten`;
+    const zahl = ids.length === 1 ? '1 Einheit' : `${ids.length} Einheiten`;
     return (
       <Text
         type="secondary"
-        style={{ fontSize: EINHEITEN_SCHRIFT }}
+        // Block: mit zwei Wegen stehen beide Zeilen im selben Space-Item der Karte (LLH-1445).
+        style={{ display: 'block', fontSize: EINHEITEN_SCHRIFT }}
         data-lfh="nachforderung-einheiten"
       >
         {zahl} {einleitung === 'Am Raum eingetroffen' ? 'am Raum eingetroffen' : 'übernommen'}
@@ -155,7 +189,7 @@ function UebernommeneEinheiten({
     );
   }
   // Eine aufgelöste Einheit kennt die Liste der aktiven nicht: sie zählt mit.
-  const weitere = n.einheit_ids.length - bekannt.length;
+  const weitere = ids.length - bekannt.length;
   // Fließend im Satz (kompakt) oder gereiht mit vollem Boden (Tablet, Handschuh), LLH-1410.
   const aufbau = einheitenSprungAufbau(token);
   const gereiht = aufbau.art === 'gereiht';
@@ -176,7 +210,7 @@ function UebernommeneEinheiten({
     >
       {einleitung}:{' '}
       {bekannt.map((e, i) => {
-        const ziel = einheitDetailPfad(n.einsatz_id, e.id);
+        const ziel = einheitDetailPfad(einsatzId, e.id);
         const inhalt = (
           <>
             {e.funkrufname?.trim() || e.name} <span aria-hidden="true">↗</span>

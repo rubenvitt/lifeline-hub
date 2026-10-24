@@ -39,6 +39,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   ist_offen: true,
   material_ids: [],
   einheit_ids: [],
+  einheit_ids_am_raum: [],
   zusage_rufnamen: [],
   ...over,
 });
@@ -384,6 +385,63 @@ describe('NachforderungKarte — Als Einheit übernehmen (LLH-1383 D9)', () => {
     unmount();
     zeige({ nachforderung: { ...unterwegs, einheit_ids: [11, 12] }, einheitenJeId: null });
     expect(screen.getByText('2 Einheiten am Raum eingetroffen')).toBeInTheDocument();
+  });
+
+  /** LLH-1445: nach dem Eintreffen trennt die Karte die Wege je Einheit. */
+  it('eingetroffen mit beiden Wegen: zwei Zeilen, je mit ihren Sprüngen', () => {
+    zeige({
+      nachforderung: rtw({ einheit_ids: [11, 12], einheit_ids_am_raum: [11] }),
+      einheitenJeId: new Map([
+        [11, { id: 11, name: 'Rettung', funkrufname: '83-1' }],
+        [12, { id: 12, name: '83-2', funkrufname: null }],
+      ]),
+    });
+    const amRaum = screen.getByText(/Am Raum eingetroffen/);
+    expect(amRaum).toHaveTextContent(/^Am Raum eingetroffen: 83-1 ↗$/);
+    expect(within(amRaum).getByRole('link', { name: '83-1' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten/11',
+    );
+    expect(screen.getByText(/Als Einheit übernommen/)).toHaveTextContent(
+      /^Als Einheit übernommen: 83-2 ↗$/,
+    );
+  });
+
+  it('eingetroffen mit beiden Wegen ohne bekannte Einheiten: je Weg die Zahl', () => {
+    zeige({
+      nachforderung: rtw({ einheit_ids: [11, 12], einheit_ids_am_raum: [11] }),
+      einheitenJeId: null,
+    });
+    // Jede Zahl steht auf eigener Zeile, nicht inline aneinander (beide im selben Space-Item).
+    expect(screen.getByText('1 Einheit am Raum eingetroffen')).toHaveStyle({ display: 'block' });
+    expect(screen.getByText('1 Einheit übernommen')).toHaveStyle({ display: 'block' });
+  });
+
+  it('eine unbekannte Einheit zählt in ihrer Gruppe als „weitere“', () => {
+    zeige({
+      nachforderung: rtw({ anzahl: 3, einheit_ids: [11, 12, 13], einheit_ids_am_raum: [11, 13] }),
+      einheitenJeId: new Map([
+        [11, { id: 11, name: '83-1', funkrufname: null }],
+        [12, { id: 12, name: '83-2', funkrufname: null }],
+      ]),
+    });
+    expect(screen.getByText(/Am Raum eingetroffen/)).toHaveTextContent(
+      'Am Raum eingetroffen: 83-1 ↗, 1 weitere',
+    );
+    expect(screen.getByText(/Als Einheit übernommen/)).toHaveTextContent(
+      /^Als Einheit übernommen: 83-2 ↗$/,
+    );
+  });
+
+  it('eine vor LLH-1445 am Raum verknüpfte Einheit bleibt nach dem Eintreffen „übernommen“', () => {
+    zeige({
+      nachforderung: rtw({ einheit_ids: [11], einheit_ids_am_raum: [] }),
+      einheitenJeId: new Map([[11, { id: 11, name: '83-1', funkrufname: null }]]),
+    });
+    expect(screen.getByText(/Als Einheit übernommen/)).toHaveTextContent(
+      'Als Einheit übernommen: 83-1 ↗',
+    );
+    expect(screen.queryByText(/Am Raum/)).toBeNull();
   });
 });
 
