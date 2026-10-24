@@ -1877,6 +1877,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einheit-vorlagen/{id}/personal",
             put(routes::einheit_vorlage::replace_personal),
         )
+        .route(
+            "/api/einheit-vorlagen/{id}/material",
+            put(routes::einheit_vorlage::replace_material),
+        )
         // Verpflegungsplan (LLH-1058): Lesen für alle der Org, Schreiben Admin.
         .route(
             "/api/verpflegung-vorlagen",

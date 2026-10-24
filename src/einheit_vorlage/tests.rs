@@ -1,6 +1,9 @@
 use super::repo::{self, NewVorlage, VorlagePatch};
-use super::{normalize_fahrzeug_ids, normalize_personal, PersonalEntry};
+use super::{
+    normalize_fahrzeug_ids, normalize_material, normalize_personal, MaterialEntry, PersonalEntry,
+};
 use crate::error::AppError;
+use crate::material::MaterialArt;
 use crate::staerke::{Staerke, StaerkePosition};
 use sqlx::SqlitePool;
 
@@ -46,6 +49,35 @@ async fn person(pool: &SqlitePool, org_id: i64, name: &str) -> i64 {
         .fetch_one(pool)
         .await
         .unwrap()
+}
+
+/// Stamm-Material der Org mit Art und optionaler Bestandsnummer (LLH-1261).
+async fn material(
+    pool: &SqlitePool,
+    org_id: i64,
+    bezeichnung: &str,
+    art: MaterialArt,
+    bestandsnummer: Option<&str>,
+) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO material (org_id, bezeichnung, art, bestandsnummer) VALUES (?, ?, ?, ?) \
+         RETURNING id",
+    )
+    .bind(org_id)
+    .bind(bezeichnung)
+    .bind(art.as_str())
+    .bind(bestandsnummer)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+fn posten(material_id: i64, menge: i64, fahrzeug_id: Option<i64>) -> MaterialEntry {
+    MaterialEntry {
+        material_id,
+        menge,
+        fahrzeug_id,
+    }
 }
 
 async fn ausser_dienst(pool: &SqlitePool, tabelle: &str, id: i64) {
@@ -780,4 +812,220 @@ fn listen_von_aussen_werden_entdoppelt_und_gedeckelt() {
         normalize_personal(zu_viele),
         Err(AppError::Validation(_))
     ));
+}
+
+// ── Material (LLH-1261) ──────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn material_wird_als_ganze_liste_ersetzt_mit_ort_und_stamm() {
+    let pool = crate::db::test_pool().await;
+    let o = org(&pool, "A").await;
+    let t = typ(&pool, o, "Staffel", None).await;
+    let v = vorlage(&pool, o, "Rettungsstaffel", t, None).await;
+    let rtw1 = fahrzeug(&pool, o, "RTW 1").await;
+    let rtw2 = fahrzeug(&pool, o, "RTW 2").await;
+    repo::replace_fahrzeuge(&pool, o, v, &[rtw1, rtw2])
+        .await
+        .unwrap();
+    let decke = material(&pool, o, "Wolldecke", MaterialArt::Verbrauchsgut, None).await;
+    let rucksack = material(&pool, o, "Sanitätsrucksack", MaterialArt::Geraet, None).await;
+    let se = material(&pool, o, "Stromerzeuger", MaterialArt::Geraet, Some("SE-1")).await;
+
+    let nach = repo::replace_material(
+        &pool,
+        o,
+        v,
+        &[
+            posten(decke, 50, None),
+            posten(rucksack, 1, Some(rtw1)),
+            posten(rucksack, 3, Some(rtw2)),
+            posten(se, 1, None),
+        ],
+    )
+    .await
+    .unwrap();
+    let zeilen: Vec<(i64, i64, Option<i64>)> = nach
+        .material
+        .iter()
+        .map(|m| (m.material_id, m.menge, m.fahrzeug_id))
+        .collect();
+    assert_eq!(
+        zeilen,
+        vec![
+            (decke, 50, None),
+            (rucksack, 1, Some(rtw1)),
+            (rucksack, 3, Some(rtw2)),
+            (se, 1, None)
+        ],
+        "Reihenfolge der Liste, dasselbe Material zweimal"
+    );
+    let stromer = &nach.material[3];
+    assert_eq!(stromer.bezeichnung, "Stromerzeuger");
+    assert_eq!(stromer.art, MaterialArt::Geraet);
+    assert_eq!(stromer.bestandsnummer.as_deref(), Some("SE-1"));
+    assert_eq!(stromer.dienststatus, "in_dienst");
+    assert!(!stromer.ist_demo);
+    assert_eq!(nach.material[0].art, MaterialArt::Verbrauchsgut);
+
+    let gelistet = repo::list(&pool, o, true).await.unwrap();
+    assert_eq!(gelistet[0].material, nach.material, "Liste liest dasselbe");
+
+    let nach = repo::replace_material(&pool, o, v, &[posten(decke, 20, None)])
+        .await
+        .unwrap();
+    assert_eq!(nach.material.len(), 1);
+    assert_eq!(nach.material[0].menge, 20);
+    let leer = repo::replace_material(&pool, o, v, &[]).await.unwrap();
+    assert!(leer.material.is_empty());
+}
+
+#[tokio::test]
+async fn material_regeln_sind_422() {
+    let pool = crate::db::test_pool().await;
+    let a = org(&pool, "A").await;
+    let b = org(&pool, "B").await;
+    let t = typ(&pool, a, "Zug", None).await;
+    let v = vorlage(&pool, a, "Zug", t, None).await;
+    let fz = fahrzeug(&pool, a, "Nicht in der Vorlage").await;
+    let decke = material(&pool, a, "Wolldecke", MaterialArt::Verbrauchsgut, None).await;
+    let rucksack = material(&pool, a, "Rucksack", MaterialArt::Geraet, None).await;
+    let se = material(&pool, a, "Stromerzeuger", MaterialArt::Geraet, Some("SE-1")).await;
+    let fremd = material(&pool, b, "Fremd", MaterialArt::Geraet, None).await;
+    let aus = material(&pool, a, "Aus", MaterialArt::Verbrauchsgut, None).await;
+    ausser_dienst(&pool, "material", aus).await;
+
+    for (liste, was) in [
+        (vec![posten(fremd, 1, None)], "fremdes Material"),
+        (vec![posten(4711, 1, None)], "unbekanntes Material"),
+        (vec![posten(aus, 5, None)], "neu und außer Dienst"),
+        (
+            vec![posten(decke, 5, Some(fz))],
+            "Fahrzeug außerhalb der Vorlage",
+        ),
+        (vec![posten(rucksack, 11, None)], "Gerät über 10"),
+        (vec![posten(se, 2, None)], "Bestandsnummer mit Menge 2"),
+        (
+            vec![posten(se, 1, None), posten(se, 1, None)],
+            "Bestandsnummer zweimal in der Liste",
+        ),
+    ] {
+        let fehler = repo::replace_material(&pool, a, v, &liste)
+            .await
+            .unwrap_err();
+        assert!(is_422(&fehler), "{was}: {fehler:?}");
+    }
+    let stand = repo::replace_material(&pool, a, v, &[posten(rucksack, 10, None)])
+        .await
+        .expect("Gerät mit Menge 10");
+    assert_eq!(stand.material[0].menge, 10);
+    let fehler = repo::replace_material(&pool, b, v, &[]).await.unwrap_err();
+    assert!(matches!(fehler, AppError::NotFound), "{fehler:?}");
+}
+
+#[tokio::test]
+async fn material_spaeter_ausser_dienst_bleibt_speicherbar() {
+    let pool = crate::db::test_pool().await;
+    let o = org(&pool, "A").await;
+    let t = typ(&pool, o, "Zug", None).await;
+    let v = vorlage(&pool, o, "Zug", t, None).await;
+    let decke = material(&pool, o, "Wolldecke", MaterialArt::Verbrauchsgut, None).await;
+    repo::replace_material(&pool, o, v, &[posten(decke, 50, None)])
+        .await
+        .unwrap();
+    ausser_dienst(&pool, "material", decke).await;
+    let nach = repo::replace_material(&pool, o, v, &[posten(decke, 40, None)])
+        .await
+        .unwrap();
+    assert_eq!(nach.material[0].dienststatus, "ausser_dienst");
+    assert_eq!(nach.material[0].menge, 40);
+}
+
+#[tokio::test]
+async fn geraet_mit_bestandsnummer_einmal_im_baum() {
+    let pool = crate::db::test_pool().await;
+    let o = org(&pool, "A").await;
+    let t = typ(&pool, o, "Zug", None).await;
+    let zug = vorlage(&pool, o, "Zug", t, None).await;
+    let staffel = vorlage(&pool, o, "Staffel", t, Some(zug)).await;
+    let anderer = vorlage(&pool, o, "Anderer", t, None).await;
+    let se = material(&pool, o, "Stromerzeuger", MaterialArt::Geraet, Some("SE-1")).await;
+    let decke = material(&pool, o, "Wolldecke", MaterialArt::Verbrauchsgut, None).await;
+
+    repo::replace_material(
+        &pool,
+        o,
+        zug,
+        &[posten(se, 1, None), posten(decke, 5, None)],
+    )
+    .await
+    .unwrap();
+    let fehler = repo::replace_material(&pool, o, staffel, &[posten(se, 1, None)])
+        .await
+        .unwrap_err();
+    assert!(is_422(&fehler), "{fehler:?}");
+    repo::replace_material(&pool, o, staffel, &[posten(decke, 5, None)])
+        .await
+        .expect("Verbrauchsgut darf im Baum mehrfach stehen");
+    repo::replace_material(&pool, o, anderer, &[posten(se, 1, None)])
+        .await
+        .expect("in einem anderen Baum erlaubt");
+
+    // Umhängen prüft das Material mit: „Anderer“ unter den Zug brächte SE-1 zweimal in den Baum.
+    let fehler = repo::update(&pool, o, anderer, unter(Some(zug)))
+        .await
+        .unwrap_err();
+    assert!(is_422(&fehler), "{fehler:?}");
+}
+
+#[tokio::test]
+async fn fahrzeug_aus_der_vorlage_legt_sein_material_an_die_einheit() {
+    let pool = crate::db::test_pool().await;
+    let o = org(&pool, "A").await;
+    let t = typ(&pool, o, "Staffel", None).await;
+    let v = vorlage(&pool, o, "Staffel", t, None).await;
+    let rtw1 = fahrzeug(&pool, o, "RTW 1").await;
+    let rtw2 = fahrzeug(&pool, o, "RTW 2").await;
+    repo::replace_fahrzeuge(&pool, o, v, &[rtw1, rtw2])
+        .await
+        .unwrap();
+    let rucksack = material(&pool, o, "Rucksack", MaterialArt::Geraet, None).await;
+    repo::replace_material(
+        &pool,
+        o,
+        v,
+        &[
+            posten(rucksack, 1, Some(rtw1)),
+            posten(rucksack, 1, Some(rtw2)),
+        ],
+    )
+    .await
+    .unwrap();
+    let nach = repo::replace_fahrzeuge(&pool, o, v, &[rtw2]).await.unwrap();
+    let orte: Vec<Option<i64>> = nach.material.iter().map(|m| m.fahrzeug_id).collect();
+    assert_eq!(orte, vec![None, Some(rtw2)]);
+}
+
+#[test]
+fn material_von_aussen_wird_gedeckelt_und_menge_geprueft() {
+    let genau: Vec<MaterialEntry> = (0..super::MATERIAL_JE_VORLAGE_MAX as i64)
+        .map(|i| posten(i, 1, None))
+        .collect();
+    assert_eq!(normalize_material(genau.clone()).unwrap(), genau);
+    let zu_viele: Vec<MaterialEntry> = (0..=super::MATERIAL_JE_VORLAGE_MAX as i64)
+        .map(|i| posten(i, 1, None))
+        .collect();
+    assert!(matches!(
+        normalize_material(zu_viele),
+        Err(AppError::Validation(_))
+    ));
+    assert!(matches!(
+        normalize_material(vec![posten(1, 0, None)]),
+        Err(AppError::Validation(_))
+    ));
+    let doppelt = vec![posten(1, 1, None), posten(1, 2, None)];
+    assert_eq!(
+        normalize_material(doppelt.clone()).unwrap(),
+        doppelt,
+        "dasselbe Material darf mehrfach stehen"
+    );
 }

@@ -1,7 +1,7 @@
 //! Katalog „Einheiten-Vorlagen“ (LLH-1042, Spec `openspec/specs/einheit-vorlagen`). Lesen: jeder
 //! Angemeldete der Organisation (LLH-1049 liest im Einsatz); Schreiben: Admin. Kein DELETE —
-//! `aktiv` schaltet in beide Richtungen. Fahrzeuge und Stammbesetzung werden je als ganze Liste
-//! ersetzt (PUT).
+//! `aktiv` schaltet in beide Richtungen. Fahrzeuge, Stammbesetzung und Material (LLH-1261) werden
+//! je als ganze Liste ersetzt (PUT).
 //! `stammdaten` meldet die Middleware `routes::live::stammdaten_live` (Präfix in
 //! `STAMMDATEN_PFADE`).
 
@@ -9,8 +9,8 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einheit_vorlage::repo::{self, NewVorlage, VorlagePatch};
 use crate::einheit_vorlage::{
-    normalize_fahrzeug_ids, normalize_personal, EinheitVorlage, PersonalEntry, BEMERKUNG_MAX,
-    FUNKRUFNAME_MAX, NAME_MAX, TZ_MAX,
+    normalize_fahrzeug_ids, normalize_material, normalize_personal, EinheitVorlage, MaterialEntry,
+    PersonalEntry, BEMERKUNG_MAX, FUNKRUFNAME_MAX, NAME_MAX, TZ_MAX,
 };
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -230,5 +230,42 @@ pub async fn replace_personal(
     let entries = normalize_personal(entries)?;
     Ok(Json(
         repo::replace_personal(&state.pool, benutzer.org_id, id, &entries).await?,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MaterialZeile {
+    pub material_id: i64,
+    pub menge: i64,
+    pub fahrzeug_id: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MaterialBody {
+    pub material: Vec<MaterialZeile>,
+}
+
+/// PUT /api/einheit-vorlagen/{id}/material — Admin (LLH-1261). Ersetzt die Material-Positionen
+/// durch genau diese Liste (Reihenfolge = Anzeige). Zu lang oder Menge unter 1 → 400; fremdes oder
+/// neu außer Dienst gestelltes Material, Fahrzeug außerhalb der Vorlage, Gerät über der
+/// Höchstmenge und Gerät mit Bestandsnummer mit Menge über 1 oder zweimal im Baum → 422.
+pub async fn replace_material(
+    State(state): State<AppState>,
+    AdminUser(benutzer): AdminUser,
+    PfadParam(id): PfadParam<i64>,
+    JsonBody(body): JsonBody<MaterialBody>,
+) -> Result<Json<EinheitVorlage>, AppError> {
+    let entries = normalize_material(
+        body.material
+            .into_iter()
+            .map(|z| MaterialEntry {
+                material_id: z.material_id,
+                menge: z.menge,
+                fahrzeug_id: z.fahrzeug_id,
+            })
+            .collect(),
+    )?;
+    Ok(Json(
+        repo::replace_material(&state.pool, benutzer.org_id, id, &entries).await?,
     ))
 }

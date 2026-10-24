@@ -327,14 +327,17 @@ pub fn etb_text_storniert(name: &str) -> String {
 
 /// Der eine System-ETB beim Bilden aus einer Vorlage (LLH-1049, design.md D11): „Einheit «1. Zug»
 /// aus Vorlage «Sanitätszug Musterstadt» gebildet; Untereinheiten: «Rettungsstaffel»;
-/// 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Name A, Name B; umgehängt: RTW 2 aus «2. Zug»“.
-/// Leere Teile entfallen. Systemtext: keine Grenze am Eingang (`src/AGENTS.md`, „Eingabegrenzen“).
+/// 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Name A, Name B; Material: 50× Wolldecke;
+/// umgehängt: RTW 2 aus «2. Zug»“. Leere Teile entfallen. Systemtext: keine Grenze am Eingang
+/// (`src/AGENTS.md`, „Eingabegrenzen“). Das Material (LLH-1261) bekommt, was bis
+/// `etb::INHALT_MAX` übrig bleibt; der Rest erscheint als Zahl (design.md D6).
 pub fn etb_text_aus_vorlage(
     einheit: &str,
     vorlage: &str,
     untereinheiten: &[String],
     fahrzeuge: &[String],
     kraefte: &[String],
+    material: &[String],
     umgehaengt: &[String],
 ) -> String {
     let mut teile = vec![format!(
@@ -369,10 +372,53 @@ pub fn etb_text_aus_vorlage(
         };
         teile.push(format!("{} {wort}: {}", kraefte.len(), kraefte.join(", ")));
     }
-    if !umgehaengt.is_empty() {
-        teile.push(format!("umgehängt: {}", umgehaengt.join(", ")));
+    let umgehaengt =
+        (!umgehaengt.is_empty()).then(|| format!("umgehängt: {}", umgehaengt.join(", ")));
+    if !material.is_empty() {
+        let fest: usize = teile
+            .iter()
+            .chain(umgehaengt.iter())
+            .map(|t| t.chars().count() + 2)
+            .sum();
+        teile.push(material_teil(
+            material,
+            crate::etb::INHALT_MAX.saturating_sub(fest + 2),
+        ));
     }
+    teile.extend(umgehaengt);
     teile.join("; ")
+}
+
+/// „Material: 50× Wolldecke, 1× Rucksack“, höchstens `budget` Zeichen; passt nicht alles, endet
+/// die Liste mit „ und N weitere“ (Platz dafür ist reserviert), passt keine, steht nur die Zahl.
+fn material_teil(material: &[String], budget: usize) -> String {
+    let ganz = format!("Material: {}", material.join(", "));
+    if ganz.chars().count() <= budget {
+        return ganz;
+    }
+    let schluss = |rest: usize| format!(" und {rest} weitere");
+    let reserve = schluss(material.len()).chars().count();
+    let mut text = String::from("Material: ");
+    let mut laenge = text.chars().count();
+    for (i, m) in material.iter().enumerate() {
+        let trenner = if i == 0 { 0 } else { 2 };
+        let noetig = laenge + trenner + m.chars().count();
+        if noetig + reserve > budget {
+            let rest = material.len() - i;
+            if i == 0 {
+                text.push_str(&format!("{rest} Positionen"));
+            } else {
+                text.push_str(&schluss(rest));
+            }
+            return text;
+        }
+        if i > 0 {
+            text.push_str(", ");
+        }
+        text.push_str(m);
+        laenge = noetig;
+    }
+    text
 }
 
 /// System-ETB beim Übernehmen einer unangemeldeten Einheit (LLH-1075, design.md D10): nennt die
@@ -473,25 +519,28 @@ mod etb_text_tests {
                 &s(&["Rettungsstaffel", "Trupp"]),
                 &s(&["ELW 1", "RTW 1", "RTW 2"]),
                 &s(&["Name A", "Name B"]),
+                &s(&["50× Wolldecke", "1× Sanitätsrucksack"]),
                 &s(&["RTW 2 aus «2. Zug»", "Name B von «83-4»"]),
             ),
             "Einheit «1. Zug» aus Vorlage «Sanitätszug Musterstadt» gebildet; Untereinheiten: \
              «Rettungsstaffel», «Trupp»; 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Name A, \
-             Name B; umgehängt: RTW 2 aus «2. Zug», Name B von «83-4»"
+             Name B; Material: 50× Wolldecke, 1× Sanitätsrucksack; umgehängt: RTW 2 aus «2. Zug», \
+             Name B von «83-4»"
         );
         assert_eq!(
-            etb_text_aus_vorlage("Staffel", "Staffel", &[], &[], &[], &[]),
+            etb_text_aus_vorlage("Staffel", "Staffel", &[], &[], &[], &[], &[]),
             "Einheit «Staffel» aus Vorlage «Staffel» gebildet"
         );
         assert_eq!(
-            etb_text_aus_vorlage("A", "V", &[], &s(&["ELW"]), &s(&["Anna"]), &[]),
+            etb_text_aus_vorlage("A", "V", &[], &s(&["ELW"]), &s(&["Anna"]), &[], &[]),
             "Einheit «A» aus Vorlage «V» gebildet; 1 Fahrzeug: ELW; 1 Kraft: Anna"
         );
     }
 
     /// Höchstfall (design.md D11): 20 Einheiten mit Namen à `NAME_MAX`, 50 Fahrzeuge
     /// (Funkrufname à 40), 50 Personen (Name à 80), zehn davon aus Einheiten mit Namen à
-    /// `NAME_MAX` umgehängt — der Systemtext bleibt unter `etb::INHALT_MAX`.
+    /// `NAME_MAX` umgehängt, dazu 50 Material-Positionen mit Bezeichnung à `STAMM_TEXT_MAX`
+    /// (LLH-1261) — der Systemtext bleibt unter `etb::INHALT_MAX`, das Material endet als Zahl.
     #[test]
     fn aus_vorlage_hoechstfall_bleibt_unter_der_etb_grenze() {
         let lang = |c: char, n: usize| std::iter::repeat_n(c, n).collect::<String>();
@@ -502,17 +551,48 @@ mod etb_text_tests {
         let umgehaengt: Vec<String> = (0..10)
             .map(|_| format!("{} aus «{}»", lang('P', 80), lang('A', NAME_MAX)))
             .collect();
+        let material: Vec<String> = (0..50)
+            .map(|_| format!("10× {}", lang('M', crate::material::STAMM_TEXT_MAX)))
+            .collect();
         let text = etb_text_aus_vorlage(
             &einheit,
             &lang('V', crate::einheit_vorlage::NAME_MAX),
             &unter,
             &fahrzeuge,
             &kraefte,
+            &material,
             &umgehaengt,
         );
         let zeichen = text.chars().count();
-        assert!(zeichen > 12_000, "{zeichen}");
-        assert!(zeichen < crate::etb::INHALT_MAX, "{zeichen}");
+        assert!(zeichen > 19_000, "{zeichen}");
+        assert!(zeichen <= crate::etb::INHALT_MAX, "{zeichen}");
+        assert!(text.contains(" weitere; umgehängt: "), "Rest als Zahl");
+        assert!(text.ends_with(&format!("aus «{}»", lang('A', NAME_MAX))));
+    }
+
+    #[test]
+    fn material_teil_endet_als_zahl_wenn_das_budget_nicht_reicht() {
+        let m = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let liste = m(&["50× Wolldecke", "1× Rucksack", "2× Trage"]);
+        assert_eq!(
+            material_teil(&liste, 1_000),
+            "Material: 50× Wolldecke, 1× Rucksack, 2× Trage"
+        );
+        // „Material: 50× Wolldecke“ (23) + Reserve „ und 3 weitere“ (14) passt in 40, der Rucksack
+        // nicht mehr.
+        assert_eq!(
+            material_teil(&liste, 40),
+            "Material: 50× Wolldecke und 2 weitere"
+        );
+        assert_eq!(material_teil(&liste, 5), "Material: 3 Positionen");
+        let genau = "Material: 50× Wolldecke, 1× Rucksack, 2× Trage"
+            .chars()
+            .count();
+        assert_eq!(
+            material_teil(&liste, genau),
+            "Material: 50× Wolldecke, 1× Rucksack, 2× Trage",
+            "passt alles genau, braucht es keine Reserve"
+        );
     }
 
     #[test]

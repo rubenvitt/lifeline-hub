@@ -10,7 +10,7 @@ use crate::einheit::{
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::{
-    Bereitstellungsraeume, Einheiten, Fahrzeuge, Nachforderungen, Personal,
+    Bereitstellungsraeume, Einheiten, Fahrzeuge, Material, Nachforderungen, Personal,
 };
 use crate::einsatz::verbindungen::{self, VerbindungBody};
 use crate::error::AppError;
@@ -369,10 +369,12 @@ pub async fn aus_vorlage_vorschau(
     let gesperrt = aus_vorlage::Lesen {
         fahrzeuge: is_gesperrt(ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await)?,
         personal: is_gesperrt(ctx.fordere_zielmodul::<Personal>(&state.pool).await)?,
+        material: is_gesperrt(ctx.fordere_zielmodul::<Material>(&state.pool).await)?,
     };
     let lesen = aus_vorlage::Lesen {
         fahrzeuge: !gesperrt.fahrzeuge,
         personal: !gesperrt.personal,
+        material: !gesperrt.material,
     };
     let mut conn = state.pool.acquire().await?;
     let plan = aus_vorlage::plan_tx(
@@ -406,6 +408,13 @@ pub struct AusVorlagePerson {
     pub umhaengen: bool,
 }
 
+/// Eine Material-Position der Vorlage im Body des Bildens (LLH-1261).
+#[derive(Debug, Deserialize)]
+pub struct AusVorlageMaterial {
+    /// Die Position (`einheit_vorlage_material.id`).
+    pub vorlage_material_id: i64,
+}
+
 /// Body von `POST …/einheiten/aus-vorlage` (D3). Der Einheitenbaum kommt aus der Vorlage.
 #[derive(Debug, Deserialize)]
 pub struct AusVorlageBody {
@@ -420,6 +429,9 @@ pub struct AusVorlageBody {
     /// Höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln.
     #[serde(default)]
     pub personal: Vec<AusVorlagePerson>,
+    /// Höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln (LLH-1261).
+    #[serde(default)]
+    pub material: Vec<AusVorlageMaterial>,
 }
 
 /// Prüft eine Liste von außen gegen `SAMMEL_MAX` (vor dem Entdoppeln, 400) und entdoppelt je
@@ -440,8 +452,8 @@ fn check_wahl(
 /// POST /api/einsaetze/{id}/einheiten/aus-vorlage — Einheit samt Untereinheiten, Fahrzeugen und
 /// gewählter Stammbesetzung aus einer Vorlage bilden (LLH-1049, Spec `kraefte-disposition`,
 /// „Einheit aus Vorlage bilden“). Alles oder nichts in einer Transaktion: Gründe je Zeile 422,
-/// mit Fahrzeugen das Recht am Modul Fahrzeuge, mit Personen das am Modul Personal (403 vor jedem
-/// Schreiben). Genau ein ETB-Sammeleintrag in der Transaktion, Ereignisse nach dem Commit, auch an
+/// mit Fahrzeugen das Recht am Modul Fahrzeuge, mit Personen das am Modul Personal, mit Material
+/// das am Modul Material (LLH-1261; 403 vor jedem Schreiben). Genau ein ETB-Sammeleintrag in der Transaktion, Ereignisse nach dem Commit, auch an
 /// Einheiten, aus denen umgehängt wurde.
 pub async fn aus_vorlage_bilden(
     State(state): State<AppState>,
@@ -469,6 +481,20 @@ pub async fn aus_vorlage_bilden(
             .collect(),
         "Personen",
     )?;
+    // Material-Positionen haben kein „umhängen“; die Liste läuft durch dieselbe Prüfung.
+    let material: Vec<i64> = check_wahl(
+        body.material
+            .iter()
+            .map(|m| aus_vorlage::Wahl {
+                id: m.vorlage_material_id,
+                umhaengen: false,
+            })
+            .collect(),
+        "Material-Positionen",
+    )?
+    .into_iter()
+    .map(|w| w.id)
+    .collect();
     let name = body
         .name
         .as_deref()
@@ -480,6 +506,9 @@ pub async fn aus_vorlage_bilden(
     if !personal.is_empty() {
         ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     }
+    if !material.is_empty() {
+        ctx.fordere_zielmodul::<Material>(&state.pool).await?;
+    }
     let einsatz_id = ctx.einsatz.id;
     let kontext = crate::kraefte_disposition::Kontext {
         einsatz_id,
@@ -489,12 +518,14 @@ pub async fn aus_vorlage_bilden(
     let lesen = aus_vorlage::Lesen {
         fahrzeuge: !fahrzeuge.is_empty(),
         personal: !personal.is_empty(),
+        material: !material.is_empty(),
     };
     let anfrage = aus_vorlage::Anfrage {
         name: name.as_deref(),
         abschnitt_id: body.abschnitt_id,
         fahrzeuge: &fahrzeuge,
         personal: &personal,
+        material: &material,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (gebildet, etb_id) = crate::write_retry!(&state.pool, |conn| {
@@ -536,6 +567,9 @@ pub async fn aus_vorlage_bilden(
     for p in &gebildet.personal {
         sse_personal(&state, einsatz_id, p.id);
     }
+    for em in &gebildet.material {
+        super::einsatz_material::sse_material(&state, einsatz_id, *em);
+    }
     let einheit_ids: Vec<i64> = gebildet.einheiten.iter().map(|e| e.id).collect();
     Ok((
         StatusCode::CREATED,
@@ -544,6 +578,7 @@ pub async fn aus_vorlage_bilden(
             einheit_ids,
             fahrzeuge: gebildet.fahrzeuge.iter().map(|f| f.id).collect(),
             personal: gebildet.personal.iter().map(|p| p.id).collect(),
+            material: gebildet.material.clone(),
         }),
     ))
 }

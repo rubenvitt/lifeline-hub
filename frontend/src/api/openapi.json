@@ -1855,7 +1855,8 @@
           "einheit_id",
           "einheit_ids",
           "fahrzeuge",
-          "personal"
+          "personal",
+          "material"
         ],
         "properties": {
           "einheit_id": {
@@ -1878,6 +1879,14 @@
               "format": "int64"
             },
             "description": "Die übernommenen Fahrzeuge (`einsatz_fahrzeug.id`)."
+          },
+          "material": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Die neuen Material-Posten (`einsatz_material.id`), LLH-1261."
           },
           "personal": {
             "type": "array",
@@ -4915,7 +4924,8 @@
           "aktiv",
           "ist_demo",
           "fahrzeuge",
-          "personal"
+          "personal",
+          "material"
         ],
         "properties": {
           "aktiv": {
@@ -4946,6 +4956,13 @@
           "ist_demo": {
             "type": "boolean",
             "description": "Trägt die Zeile eine Demo-Marke (Spec `demo-daten`)? Live aus `demo_herkunft`."
+          },
+          "material": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EinheitVorlageMaterial"
+            },
+            "description": "Material-Positionen in der Reihenfolge der Pflege (LLH-1261)."
           },
           "name": {
             "type": "string"
@@ -5044,6 +5061,60 @@
           },
           "ist_demo": {
             "type": "boolean"
+          }
+        }
+      },
+      "EinheitVorlageMaterial": {
+        "type": "object",
+        "description": "Eine Material-Position einer Vorlage (LLH-1261). Bezeichnung, Art, Bestandsnummer und\nDienststatus kommen live aus dem Stamm.",
+        "required": [
+          "id",
+          "material_id",
+          "bezeichnung",
+          "art",
+          "menge",
+          "dienststatus",
+          "ist_demo"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/MaterialArt"
+          },
+          "bestandsnummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "dienststatus": {
+            "$ref": "#/components/schemas/Dienststatus"
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fahrzeug der Vorlage, auf dem die Position liegt; fehlt an der Einheit."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Die Position (`einheit_vorlage_material.id`); das Bilden wählt sie hierüber."
+          },
+          "ist_demo": {
+            "type": "boolean"
+          },
+          "material_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "menge": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -16463,7 +16534,8 @@
           "vorlage_id",
           "knoten",
           "fahrzeuge_gesperrt",
-          "personal_gesperrt"
+          "personal_gesperrt",
+          "material_gesperrt"
         ],
         "properties": {
           "fahrzeuge_gesperrt": {
@@ -16476,6 +16548,10 @@
               "$ref": "#/components/schemas/VorschauKnoten"
             },
             "description": "Die Einheiten des Baums, die Wurzel vorn, Eltern vor ihren Kindern."
+          },
+          "material_gesperrt": {
+            "type": "boolean",
+            "description": "Das Modul Material ist für die Rolle nicht freigegeben: keine Materialzeilen (LLH-1261)."
           },
           "personal_gesperrt": {
             "type": "boolean",
@@ -16546,7 +16622,8 @@
           "typ_label",
           "soll_eigen",
           "fahrzeuge",
-          "personal"
+          "personal",
+          "material"
         ],
         "properties": {
           "fahrzeuge": {
@@ -16560,6 +16637,12 @@
               "string",
               "null"
             ]
+          },
+          "material": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorschauMaterial"
+            }
           },
           "name": {
             "type": "string"
@@ -16616,6 +16699,65 @@
             "format": "int64"
           }
         }
+      },
+      "VorschauMaterial": {
+        "type": "object",
+        "description": "Eine Material-Position der Vorlage und ihr Zustand im Einsatz (LLH-1261). Art und\nBestandsnummer aus dem Stamm von jetzt; ein Gerät mit Bestandsnummer meldet Menge 1.",
+        "required": [
+          "vorlage_material_id",
+          "material_id",
+          "bezeichnung",
+          "art",
+          "menge",
+          "zustand"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/MaterialArt"
+          },
+          "bestandsnummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fahrzeug der Vorlage (Stamm-ID), auf dem die Position liegt; fehlt an der Einheit."
+          },
+          "material_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "menge": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vorlage_material_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Die Position (`einheit_vorlage_material.id`); das Bilden wählt sie hierüber."
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/VorschauMaterialZustand"
+          }
+        }
+      },
+      "VorschauMaterialZustand": {
+        "type": "string",
+        "description": "Zustand einer Material-Position der Vorlage im Einsatz (LLH-1261, design.md D4). Jedes\nBilden legt neue Posten an; „frei“, „gebunden“ und „entlassen“ gibt es deshalb nicht.",
+        "enum": [
+          "neu",
+          "ausser_dienst",
+          "im_einsatz"
+        ]
       },
       "VorschauPersonal": {
         "type": "object",
@@ -17251,7 +17393,8 @@
         "description": "Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können\nkollidieren (LLH-1100, D2). Beim Disponieren sind es Stamm-IDs, in einer Mengen-Anfrage im\nEinsatz die der Disposition (LLH-1073). Wire == `as_str()`.",
         "enum": [
           "personal",
-          "fahrzeug"
+          "fahrzeug",
+          "material"
         ]
       },
       "ZeilenFehler": {
