@@ -57,4 +57,26 @@ ignore = [
     "RUSTSEC-2026-0367",
     "RUSTSEC-2026-0368",
     "RUSTSEC-2026-0369",
+
+    # RUSTSEC-2026-0387 (LLH-1275) — Timing-Unterschiede in `crypto-bigint` 0.5.5 bei
+    # Operationen, die konstante Laufzeit versprechen. Gefixt erst in `crypto-bigint` >= 0.7.6.
+    #
+    # Kein Upgrade möglich: der Pfad ist crypto-bigint 0.5.5 ← elliptic-curve 0.13.8 ←
+    # p256 0.13 / p384 0.13 ← openidconnect 4.0.1 bzw. age 0.12.1 (über hpke) ← lifeline-hub.
+    # Die ganze RustCrypto-Linie 0.13 hängt an crypto-bigint 0.5, die 0.7 erst an
+    # elliptic-curve 0.14. Beide Direktabhängigen verlangen p256 0.13 (Stand 24.10.2026).
+    #
+    # Warum das Risiko hier nicht trägt: ein Timing-Angriff braucht eine Operation mit einem
+    # GEHEIMEN Wert, deren Laufzeit der Angreifer misst. Die gibt es auf diesen Pfaden nicht.
+    # openidconnect nutzt P-256/P-384 nur zum PRÜFEN von ES256/ES384-Signaturen des Identity
+    # Providers, mit dessen öffentlichem Schlüssel aus dem JWKS (wie bei RUSTSEC-2023-0071
+    # oben: Relying Party, kein privater Schlüssel). age verschlüsselt die Backups mit
+    # X25519 (`src/backup/verschluesselung.rs`), nicht mit P-256; P-256-Identitäten gibt es in
+    # age nur über Plugins, und die sind aus (`default-features = false` in `Cargo.toml`).
+    #
+    # Neu bewerten, wenn: (a) openidconnect oder age auf elliptic-curve 0.14 gehen (dann
+    # Upgrade und Ignore streichen), (b) lifeline-hub selbst mit einem privaten P-256/P-384-
+    # Schlüssel signiert oder entschlüsselt (etwa private_key_jwt beim IdP, eigene JWTs,
+    # ECDH), (c) das age-Feature `plugin` eingeschaltet wird.
+    "RUSTSEC-2026-0387",
 ]
