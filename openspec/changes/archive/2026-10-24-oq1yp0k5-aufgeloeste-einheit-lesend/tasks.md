@@ -70,5 +70,7 @@ Frontend relativ zu `frontend/src/`.
       (Mitänderungsregel, `docs/anwender/AGENTS.md`)
 - [x] 6.2 Kommentar in `EntlassenBlock` (`ziel` fehlt nicht mehr für Einheiten) und Dateikopf von
       `EinheitDetailPage` nachziehen
-- [ ] 6.3 `./scripts/check-all.sh` grün (bzw. die CI des PRs)
-- [ ] 6.4 Review (`superpowers:requesting-code-review`), dann `/opsx:archive` im selben Branch
+- [x] 6.3 `./scripts/check-all.sh` grün (bzw. die CI des PRs) — lokal: Lib-Suite, `einsatz_einheit`,
+      Typ-Drift, Lint, Typecheck, betroffene Vitest-Dateien und die neue e2e grün; die volle Rust-Suite
+      sprengte den Plattenplatz der Cloud-Sitzung, sie belegt die CI des PRs
+- [x] 6.4 Review (`superpowers:requesting-code-review`), dann `/opsx:archive` im selben Branch

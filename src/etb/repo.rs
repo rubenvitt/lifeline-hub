@@ -427,7 +427,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     folgeauftraege_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     anhaenge_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     berichtigungen_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
-    einheiten_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
+    load_einheiten(pool, std::slice::from_mut(&mut eintrag)).await?;
     Ok(eintrag)
 }
 
@@ -435,7 +435,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
 /// Muster von [`folgeauftraege_nachladen`]. Die Einsatzgrenze hält die Abfrage selbst (Join auf
 /// den Eintrag), wie [`berichtigungen_nachladen`]. Aufgelöste Einheiten zählen mit: der Verweis
 /// führt auf ihre lesende Ansicht.
-async fn einheiten_nachladen(
+async fn load_einheiten(
     pool: &SqlitePool,
     eintraege: &mut [EtbEintragAnzeige],
 ) -> Result<(), AppError> {
@@ -866,7 +866,7 @@ pub async fn abfrage(
     folgeauftraege_nachladen(pool, &mut eintraege).await?;
     anhaenge_nachladen(pool, &mut eintraege).await?;
     berichtigungen_nachladen(pool, &mut eintraege).await?;
-    einheiten_nachladen(pool, &mut eintraege).await?;
+    load_einheiten(pool, &mut eintraege).await?;
     Ok(eintraege)
 }
 
