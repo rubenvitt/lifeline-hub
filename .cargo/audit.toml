@@ -57,4 +57,27 @@ ignore = [
     "RUSTSEC-2026-0367",
     "RUSTSEC-2026-0368",
     "RUSTSEC-2026-0369",
+
+    # RUSTSEC-2026-0387 (LLH-1269) — Timing-Schwankungen in Operationen von `crypto-bigint`
+    # 0.5.5, die konstante Laufzeit zusichern. Gefixt erst in `crypto-bigint` >= 0.7.6.
+    #
+    # Kein Upgrade möglich: `crypto-bigint` 0.5 kommt nur über `elliptic-curve` 0.13 →
+    # `p256`/`p384` 0.13, und die ziehen `openidconnect` 4.0.1 (ES256/ES384) und `age` 0.12.1
+    # (über `hpke`) herein. Beide sind die neuesten Versionen und verlangen `p256` 0.13
+    # (Stand 24.10.2026). Der Sprung auf 0.7 geht nur mit `elliptic-curve` 0.14.
+    #
+    # Warum das Risiko hier nicht trägt: Ein Timing-Kanal verrät nur Geheimnisse, mit denen
+    # gerechnet wird. `openidconnect` nutzt P-256/P-384 hier nur zum PRÜFEN der Signatur eines
+    # ID-Tokens mit dem ÖFFENTLICHEN Schlüssel des Identity Providers (JWKS); die
+    # Client-Authentisierung läuft über `client_secret` (siehe RUSTSEC-2023-0071 oben), kein
+    # privater EC-Schlüssel. Die Sicherungen verschlüsseln mit `age` nur an X25519-Empfänger
+    # und entschlüsseln nur mit X25519-Identitäten (`src/backup/verschluesselung.rs`,
+    # `age` ohne Vorgabe-Features, also ohne Plugins); X25519 rechnet ohne `crypto-bigint`.
+    # Eine Rechnung mit einem geheimen P-256/P-384-Skalar gibt es in diesem Programm nicht.
+    #
+    # Neu bewerten, wenn: (a) `openidconnect` und `age` auf `p256` 0.14 gehen (dann Upgrade
+    # und Ignore streichen), (b) die Anmeldung `private_key_jwt` mit einem EC-Schlüssel nutzt
+    # oder das Projekt selbst Tokens signiert, (c) die Sicherungen P-256-Empfänger oder
+    # -Identitäten (etwa `age`-Plugins) annehmen.
+    "RUSTSEC-2026-0387",
 ]
