@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { beobachteShifts, bericht, ruheShifts } from './cls-kern';
-import { anmeldenAlsAdmin } from './rollen-kern';
+import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
  * Der App-Rahmen springt beim Laden nicht, in keiner Stufe der Dichte-Staffel (LLH-1272, aus den
@@ -13,7 +13,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * der Kopf im ersten Bild einzeilig und danach zweizeilig: Rail, Panel und Inhalt sprangen 52 px
  * (`komfortabel`) bzw. 72 px (`handschuh`), Seiten-CLS 0,556. Am 15.10.2026 lag die Kante genau bei
  * 1280 px; seit dem Knopf „Eingänge“ (LLH-1143) lag sie bei 1296–1298 px, der Sprung blieb. Seitdem
- * hält das Etikett seine Breite (`haeltPlatz` in `components/BenutzerMenu.tsx`).
+ * hat das Etikett eine feste Breite (`hasFixedWidth` in `components/BenutzerMenu.tsx`).
  *
  * ZWEI MESSUNGEN, weil die Kante mit jedem Kopfinhalt wandert:
  *  - am Arbeitsplatzmaß 1280 × 800 (Akzeptanzkriterium) auf drei Stichprobenseiten;
@@ -21,6 +21,9 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  *    Kopf zweizeilig steht, und die kleinste einzeilige, und lädt dort neu. Nur dort wird ein
  *    Abruf, der eine Kopfzelle verbreitert, zum Sprung; bei 1280 px allein wäre der Spec seit
  *    LLH-1143 grün gewesen, obwohl der Fehler bestand.
+ *
+ * ROLLEN (LFH-435, `e2e/AGENTS.md`): ohne Funktion trägt das Etikett den Namen, und die
+ * Alarmzentrale im Kopf hängt am Schreibrecht. Die Kante wird deshalb auch als Beobachter gesucht.
  *
  * Gemessen wird die SEITE ab der Navigation: die Summe aller `layout-shift`-Einträge ohne
  * Eingabe-Folge (`cls-kern.ts`), nie kleiner als die CLS nach web.dev.
@@ -58,14 +61,14 @@ const SEITEN = ['ueberblick', 'kraefteuebersicht', 'etb'] as const;
 
 const kopf = (page: Page) => page.locator('[data-lfh="rahmen-kopf"]');
 
-async function stelleDichte(page: Page, dichte: Dichte) {
+async function storeDichte(page: Page, dichte: Dichte) {
   await page.addInitScript(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
     DICHTE_SCHLUESSEL,
     dichte,
   ] as const);
 }
 
-async function einsatzAnlegen(page: Page): Promise<string> {
+async function createEinsatz(page: Page): Promise<string> {
   const r = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Rahmen CLS ${Date.now()}` },
   });
@@ -73,11 +76,15 @@ async function einsatzAnlegen(page: Page): Promise<string> {
   return String(((await r.json()) as { id: number }).id);
 }
 
-/** Vorbereitung jedes Tests: angemeldet, Einsatz, Stufe und Shift-Beobachter vor jedem Dokument. */
-async function vorbereiten(page: Page, dichte: Dichte): Promise<string> {
+/**
+ * Vorbereitung jedes Tests: als Admin angemeldet, Einsatz gesät, bei Bedarf als Beobachter
+ * weiter; Stufe und Shift-Beobachter vor jedem Dokument.
+ */
+async function prepare(page: Page, dichte: Dichte, rolle: 'admin' | 'beobachter' = 'admin') {
   await anmeldenAlsAdmin(page);
-  const einsatzId = await einsatzAnlegen(page);
-  await stelleDichte(page, dichte);
+  const einsatzId = await createEinsatz(page);
+  if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await storeDichte(page, dichte);
   await beobachteShifts(page);
   return einsatzId;
 }
@@ -86,7 +93,7 @@ async function vorbereiten(page: Page, dichte: Dichte): Promise<string> {
  * Lädt die Seite und misst bis zur Ruhe. Anker des Endzustands: Seitenkopf und Modulpanel
  * stehen, der Einsatzname hat das Ladezeichen im Kopf ersetzt, kein Ladezeichen im Inhalt.
  */
-async function messe(page: Page, pfad: string, dichte: Dichte) {
+async function measure(page: Page, pfad: string, dichte: Dichte) {
   await page.goto(pfad);
   // Vorbedingung der Zahl: gemessen wird die Stufe, die der Test nennt.
   await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
@@ -97,33 +104,31 @@ async function messe(page: Page, pfad: string, dichte: Dichte) {
   return ruheShifts(page);
 }
 
-const kopfHoehe = async (page: Page) => (await kopf(page).boundingBox())!.height;
+const kopfHeight = async (page: Page) => (await kopf(page).boundingBox())!.height;
 
 /**
- * Die Umbruchkante des fertig geladenen Kopfs: `zweizeilig` ist die größte Breite mit mehr als
- * einer Kopfzeile, `einzeilig` die kleinste mit einer. Gesucht per Halbierung über
- * `setViewportSize` im selben Dokument; der Kopf hängt an keiner Breite außer über `useViewport`,
- * und zwischen `xl` und Full HD ändert sich dort nichts.
+ * Die Umbruchkante des fertig geladenen Kopfs: `twoRows` ist die größte Breite mit mehr als einer
+ * Kopfzeile, `oneRow` die kleinste mit einer. Gesucht per Halbierung über `setViewportSize` im
+ * selben Dokument; zwischen `xl` und Full HD hängt der Kopf an keiner weiteren Breitenstufe.
+ * `boundingBox` liest das Layout nach dem Resize frisch.
  */
-async function umbruchKante(page: Page) {
+async function findWrapEdge(page: Page) {
   await page.setViewportSize({ width: KANTE_BIS, height: ARBEITSPLATZ.height });
-  const eineZeile = await kopfHoehe(page);
-  const istEinzeilig = async (breite: number) => {
+  const rowHeight = await kopfHeight(page);
+  const isEinzeilig = async (breite: number) => {
     await page.setViewportSize({ width: breite, height: ARBEITSPLATZ.height });
-    // Ein Frame, damit der Resize-Beobachter des Viewport-Stores gelaufen ist.
-    await page.evaluate(() => new Promise((fertig) => requestAnimationFrame(fertig)));
-    return (await kopfHoehe(page)) <= eineZeile + 1;
+    return (await kopfHeight(page)) <= rowHeight + 1;
   };
-  let zweizeilig = KANTE_VON;
-  let einzeilig = KANTE_BIS;
+  let twoRows = KANTE_VON;
+  let oneRow = KANTE_BIS;
   // Vorbedingung: die Kante liegt im Suchbereich; sonst mäße der Test nichts.
-  expect(await istEinzeilig(zweizeilig), `Kopf bei ${KANTE_VON} px zweizeilig`).toBe(false);
-  while (einzeilig - zweizeilig > 1) {
-    const mitte = Math.floor((zweizeilig + einzeilig) / 2);
-    if (await istEinzeilig(mitte)) einzeilig = mitte;
-    else zweizeilig = mitte;
+  expect(await isEinzeilig(twoRows), `Kopf bei ${KANTE_VON} px zweizeilig`).toBe(false);
+  while (oneRow - twoRows > 1) {
+    const mitte = Math.floor((twoRows + oneRow) / 2);
+    if (await isEinzeilig(mitte)) oneRow = mitte;
+    else twoRows = mitte;
   }
-  return { zweizeilig, einzeilig, eineZeile };
+  return { twoRows, oneRow, rowHeight };
 }
 
 /*
@@ -137,11 +142,11 @@ for (const dichte of ['kompakt', 'komfortabel'] as const) {
   }) => {
     test.setTimeout(120_000);
     await page.setViewportSize(ARBEITSPLATZ);
-    const einsatzId = await vorbereiten(page, dichte);
+    const einsatzId = await prepare(page, dichte);
 
     const werte: string[] = [];
     for (const seite of SEITEN) {
-      const m = await messe(page, `/einsaetze/${einsatzId}/${seite}`, dichte);
+      const m = await measure(page, `/einsaetze/${einsatzId}/${seite}`, dichte);
       werte.push(`${seite}: ${bericht(m)}`);
       expect.soft(m.summe, `${seite}, ${dichte}: ${bericht(m)}`).toBeLessThan(CLS_GUT);
     }
@@ -151,38 +156,46 @@ for (const dichte of ['kompakt', 'komfortabel'] as const) {
 
 /*
  * `kompakt` steht hier nicht: dort lag die Kante vor dem Fix unter `xl`, und darunter trägt das
- * Benutzermenü kein Etikett, nur die Initialen; es gab dort nichts, was nach dem Laden wuchs.
+ * Benutzermenü kein Etikett, nur die Initialen; es gab dort nichts, was nach dem Laden wuchs. Mit
+ * der festen Breite liegt sie knapp über `xl` und damit zu nah am Rand des Suchbereichs.
  */
 for (const dichte of ['komfortabel', 'handschuh'] as const) {
-  test(`Rahmen an der Umbruchkante des Kopfs, ${dichte}: kein Sprung beim Laden`, async ({
-    page,
-  }) => {
-    test.setTimeout(120_000);
-    const einsatzId = await vorbereiten(page, dichte);
-    const pfad = `/einsaetze/${einsatzId}/ueberblick`;
-    await page.setViewportSize(ARBEITSPLATZ);
-    await messe(page, pfad, dichte);
-    const kante = await umbruchKante(page);
+  for (const rolle of ['admin', 'beobachter'] as const) {
+    test(`Rahmen an der Umbruchkante des Kopfs, ${dichte}, ${rolle}: kein Sprung beim Laden`, async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      const einsatzId = await prepare(page, dichte, rolle);
+      const pfad = `/einsaetze/${einsatzId}/ueberblick`;
+      await page.setViewportSize(ARBEITSPLATZ);
+      await measure(page, pfad, dichte);
+      // Der Rollenzweig ist Vorbedingung der Zahl (LFH-435): ohne ihn mäße der Beobachter-Fall
+      // den Admin-Zustand.
+      await expect(
+        page.getByText('nur Einsatzleitung und Führungspersonal', { exact: true }),
+      ).toHaveCount(rolle === 'beobachter' ? 1 : 0);
+      const kante = await findWrapEdge(page);
 
-    const werte: string[] = [`Kante ${kante.zweizeilig}/${kante.einzeilig} px`];
-    for (const [breite, zeilen] of [
-      [kante.zweizeilig, 'zweizeilig'],
-      [kante.einzeilig, 'einzeilig'],
-    ] as const) {
-      await page.setViewportSize({ width: breite, height: ARBEITSPLATZ.height });
-      const m = await messe(page, pfad, dichte);
-      // Vorbedingung: nach dem Neuladen steht der Kopf wie bei der Suche, sonst läge die
-      // Messung neben der Kante.
-      const hoehe = await kopfHoehe(page);
-      expect(
-        hoehe > kante.eineZeile + 1 ? 'zweizeilig' : 'einzeilig',
-        `Kopf bei ${breite} px`,
-      ).toBe(zeilen);
-      werte.push(`${breite} px (${zeilen}): ${bericht(m)}`);
-      expect
-        .soft(m.summe, `${dichte} bei ${breite} px (${zeilen}): ${bericht(m)}`)
-        .toBeLessThanOrEqual(HAUS_GRENZE);
-    }
-    test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
-  });
+      const werte: string[] = [`Kante ${kante.twoRows}/${kante.oneRow} px`];
+      for (const [breite, zeilen] of [
+        [kante.twoRows, 'zweizeilig'],
+        [kante.oneRow, 'einzeilig'],
+      ] as const) {
+        await page.setViewportSize({ width: breite, height: ARBEITSPLATZ.height });
+        const m = await measure(page, pfad, dichte);
+        // Vorbedingung: nach dem Neuladen steht der Kopf wie bei der Suche, sonst läge die
+        // Messung neben der Kante.
+        const hoehe = await kopfHeight(page);
+        expect(
+          hoehe > kante.rowHeight + 1 ? 'zweizeilig' : 'einzeilig',
+          `Kopf bei ${breite} px`,
+        ).toBe(zeilen);
+        werte.push(`${breite} px (${zeilen}): ${bericht(m)}`);
+        expect
+          .soft(m.summe, `${dichte}, ${rolle} bei ${breite} px (${zeilen}): ${bericht(m)}`)
+          .toBeLessThanOrEqual(HAUS_GRENZE);
+      }
+      test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
+    });
+  }
 }

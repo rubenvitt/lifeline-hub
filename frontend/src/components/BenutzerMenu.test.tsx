@@ -88,33 +88,36 @@ describe('BenutzerMenu — ab xl', () => {
 
   /*
    * LLH-1272: im Einsatzrahmen kommt die Funktion erst mit dem Einsatz, davor steht der Name. An der
-   * Umbruchgrenze des Kopfs brachen 4 px Unterschied („Administrator“ → „Einsatzleitung“) ihn auf
-   * zwei Zeilen um, und die Seite sprang (CLS 0,556). Die Gegenprobe ohne `haeltPlatz` hält die
+   * Umbruchkante des Kopfs brachen 4 px Unterschied („Administrator“ → „Einsatzleitung“) ihn auf
+   * zwei Zeilen um, und die Seite sprang (CLS 0,556). Die Gegenprobe ohne `hasFixedWidth` hält die
    * Breite frei, damit der Test nicht an einer immer gesetzten Breite grün wird.
    */
   it.each([
     ['ohne Funktion (Einsatz lädt)', undefined],
     ['mit Funktion', 'Einsatzleitung'],
-  ])('mit haeltPlatz hält das Etikett seine Breite, %s', async (_fall, funktion) => {
+  ])('mit hasFixedWidth hält das Etikett seine Breite, %s', async (_fall, funktion) => {
     server.use(meHandler(benutzer));
     renderMitProviders(
       <ThemeModeProvider>
-        <BenutzerMenu funktion={funktion} haeltPlatz />
+        <BenutzerMenu funktion={funktion} hasFixedWidth />
       </ThemeModeProvider>,
     );
     const etikett = (await screen.findByText(funktion ?? ANZEIGENAME)) as HTMLElement;
-    expect(etikett.style.width).toBe('180px');
-    // Ohne `inline-block` griffe die Breite im Inline-`span` von antds Knopf nicht (gemessen
-    // 75,5 px statt 180); die Wirkung belegt `e2e/rahmen-cls-dichte.spec.ts`.
+    expect(etikett.style.width).toBe('120px');
+    // Ohne `inline-block` griffe die Breite im Inline-`span` von antds Knopf nicht (gemessen:
+    // das Etikett blieb so breit wie sein Text); die Wirkung belegt `e2e/rahmen-cls-dichte.spec.ts`.
     expect(etikett.style.display).toBe('inline-block');
     expect(etikett.style.textOverflow).toBe('ellipsis');
+    // Was „…“ abschneidet, steht ganz im `title`.
+    expect(etikett).toHaveAttribute('title', funktion ?? ANZEIGENAME);
   });
 
-  it('ohne haeltPlatz richtet sich das Etikett nach seinem Text', async () => {
+  it('ohne hasFixedWidth richtet sich das Etikett nach seinem Text', async () => {
     zeige();
     const etikett = (await screen.findByText(ANZEIGENAME)) as HTMLElement;
     expect(etikett.style.width).toBe('');
     expect(etikett.style.maxWidth).toBe('180px');
+    expect(etikett).not.toHaveAttribute('title');
   });
 
   it('zeigt die gebaute Frontend-Version sichtbar im Dropdown', async () => {
