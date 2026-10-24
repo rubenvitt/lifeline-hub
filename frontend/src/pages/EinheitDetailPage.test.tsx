@@ -1013,6 +1013,51 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     ).toHaveAttribute('data-fehler');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
+
+  /**
+   * LLH-1269: entfernt ein Live-Ereignis die Zeile nach der Ablehnung, ginge der Grund mit ihr
+   * verloren. Er steht dann im Seitenhinweis, mit der Kennung der Zeile, und lässt sich schließen:
+   * an der Zeile räumte ihn das nächste Absenden, ohne Zeile gibt es keins.
+   */
+  it('Grund an einer live entfernten Zeile: steht als Seitenhinweis, schließbar', async () => {
+    const { client } = zeige(
+      ...mitglieder(),
+      http.delete('/api/einsaetze/1/einheiten/10/personal/1', abgelehnt('Person ist schon gelöst')),
+      http.delete(
+        '/api/einsaetze/1/einheiten/10/fahrzeug/30',
+        abgelehnt('Fahrzeug ist schon gelöst'),
+      ),
+    );
+    await screen.findByText('FW 1/44-1');
+    await userEvent.click(
+      within(zeileVon('FW 1/44-1')).getByRole('button', { name: 'Aus Einheit lösen' }),
+    );
+    await within(zeileVon('FW 1/44-1')).findByText('Fahrzeug ist schon gelöst');
+    await waehleImMenue('Max Mustermann', 'Aus Einheit lösen');
+    await within(zeileVon('Max Mustermann')).findByText('Person ist schon gelöst');
+    // Gegenprobe: solange die Zeilen stehen, steht der Grund nur dort.
+    expect(screen.queryByText(/nicht geändert/i)).toBeNull();
+
+    // Das Live-Ereignis: Person und Fahrzeug sind nicht mehr in der Einheit.
+    server.use(
+      ...mitMitgliedern([
+        { ep_id: 2, name: 'Uwe Unter', staerke_position: null, ist_fuehrer: false },
+      ]).handler,
+    );
+    await act(() => client.invalidateQueries());
+    await waitFor(() =>
+      expect(within(paneel(BESATZUNG)).queryByText('Max Mustermann', { exact: false })).toBeNull(),
+    );
+
+    const hinweis = screen.getByText('Nicht geändert').closest('.ant-alert') as HTMLElement;
+    expect(within(paneel(BESATZUNG)).queryByText(/schon gelöst/)).toBeNull();
+    expect(hinweis).toHaveTextContent('FW 1/44-1 · Fahrzeug ist schon gelöst');
+    expect(hinweis).toHaveTextContent('Max Mustermann · Person ist schon gelöst');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Hinweis schließen' }));
+    await waitFor(() => expect(screen.queryByText(/schon gelöst/)).toBeNull());
+  });
 });
 
 describe('EinheitDetailPage — Zeitachse (LFH-552)', () => {

@@ -30,10 +30,15 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { Einheit, EinsatzAnzeige } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
+import { GewanderteGruende } from '../components/GewanderteGruende';
 import { einheitenPfad, nachforderungenPfad, parseRouteId } from '../routing/deeplinks';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
-import { buildEinheitRechte } from './einheit/einheitAnsichtKern';
+import {
+  buildBesatzungMittel,
+  buildEinheitRechte,
+  visibleBesatzungRows,
+} from './einheit/einheitAnsichtKern';
 import EinheitKopf from './einheit/EinheitKopf';
 import EinheitFunk, {
   type SprechgruppenAenderung,
@@ -45,6 +50,7 @@ import EinheitUebernahme from './einheit/EinheitUebernahme';
 import EinheitUebernahmeStorno from './einheit/EinheitUebernahmeStorno';
 import EinheitMaterial from './einheit/EinheitMaterial';
 import FahrzeugeBesatzung from './einheit/FahrzeugeBesatzung';
+import { useBesatzungErrors } from './einheit/useBesatzungErrors';
 import ZuordnenAuswahl from './einheit/ZuordnenAuswahl';
 
 /**
@@ -181,6 +187,32 @@ function EinheitAnsicht({
     queryFn: () => listEinsatzMaterial(einsatzId),
     enabled: freigabenDa && rechte.hasMaterialListe,
   });
+  const besatzungPersonal = rechte.hasBesatzung ? personalQuery.data : undefined;
+  const besatzungFahrzeuge = rechte.hasBesatzung ? fahrzeugeQuery.data : undefined;
+  const besatzungListState =
+    personalQuery.isError || fahrzeugeQuery.isError
+      ? 'fehler'
+      : personalQuery.data && fahrzeugeQuery.data
+        ? 'daten'
+        : 'laden';
+  /*
+   * Die Gründe des Paneels „Fahrzeuge und Besatzung“ hält die Seite (LLH-1269): entfernt ein
+   * Live-Ereignis die Zeile nach der Ablehnung, steht der Grund im Seitenhinweis. Solange die
+   * Besatzung lädt, zeigt das Paneel keine Zeile, und kein Grund hat seinen Ort verloren.
+   */
+  const besatzungMittel = buildBesatzungMittel(
+    aktuell,
+    einheiten,
+    besatzungPersonal,
+    besatzungFahrzeuge,
+    rechte,
+  );
+  const besatzungErrors = useBesatzungErrors(
+    rechte.hasBesatzung && besatzungListState === 'laden'
+      ? null
+      : visibleBesatzungRows(aktuell, besatzungMittel),
+  );
+
   // Die Vorgabe der Organisation füllt ein Zeichen ohne eigene Organisation, wie auf der Karte.
   const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });
   const orgDefault = orgQuery.data?.tz_organisation ?? null;
@@ -309,6 +341,15 @@ function EinheitAnsicht({
         />
       }
       titel={aktuell.name}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        besatzungErrors.orphaned.length > 0 && (
+          <GewanderteGruende
+            gruende={besatzungErrors.orphaned}
+            onSchliessen={besatzungErrors.dismissOrphaned}
+          />
+        )
+      }
       // Typ und Stärke im Mono-Meta des Seitenkopfs. Soll nur, wenn gesetzt — eine erfundene
       // Soll-Stärke wäre eine Behauptung.
       meta={
@@ -377,22 +418,15 @@ function EinheitAnsicht({
         <FahrzeugeBesatzung
           einsatzId={einsatzId}
           einheit={aktuell}
-          einheiten={einheiten}
-          personal={rechte.hasBesatzung ? personalQuery.data : undefined}
-          fahrzeuge={rechte.hasBesatzung ? fahrzeugeQuery.data : undefined}
+          mittel={besatzungMittel}
           rechte={rechte}
-          listState={
-            personalQuery.isError || fahrzeugeQuery.isError
-              ? 'fehler'
-              : personalQuery.data && fahrzeugeQuery.data
-                ? 'daten'
-                : 'laden'
-          }
+          listState={besatzungListState}
           onReload={() => {
             void personalQuery.refetch();
             void fahrzeugeQuery.refetch();
           }}
           onSetFuehrer={setFuehrer}
+          errors={besatzungErrors}
         >
           {/* Erst mit den Freigaben: die Auswahl fragt den Stamm nur mit Freigabe ab, und ein
               Feld, das kurz offen und dann gesperrt stünde, spränge unter dem Zeiger. */}
