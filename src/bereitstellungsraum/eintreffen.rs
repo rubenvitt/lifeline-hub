@@ -803,6 +803,14 @@ pub async fn check_namen_frei_tx(
     Ok(())
 }
 
+pub async fn check_namen_uebernahme_tx(
+    _conn: &mut SqliteConnection,
+    _einsatz_id: i64,
+    _namen: &[&str],
+) -> Result<Vec<Option<i64>>, AppError> {
+    todo!("LLH-1448")
+}
+
 async fn unangemeldet_tx(
     conn: &mut SqliteConnection,
     r: &Rahmen<'_>,
@@ -1402,6 +1410,46 @@ mod tests {
     fn normalisiert_unicode_und_leerzeichen() {
         assert_eq!(normalize("  Müller  1 "), normalize("MÜLLER 1"));
         assert_ne!(normalize("Müller 1"), normalize("Müller 11"));
+    }
+
+    /// LLH-1448 (Change `o659va5r-nachforderung-herkunft`, design.md D4): ein Name der Übernahme,
+    /// der genau einem aktiven Fahrzeug ohne Einheit gleicht, nennt dieses Fahrzeug; eine Einheit,
+    /// ein Fahrzeug einer Einheit und mehrere gleichnamige Fahrzeuge ohne Einheit bleiben 422.
+    #[tokio::test]
+    async fn namen_der_uebernahme_kennen_das_fahrzeug_ohne_einheit() {
+        let pool = test_pool().await;
+        let (_, e) = basis(&pool).await;
+        let einheit_id = einheit(&pool, e, "83-1").await;
+        fahrzeug(&pool, e, "HLF 1", Some(einheit_id)).await;
+        let frei = fahrzeug(&pool, e, "RTW 2", None).await;
+        fahrzeug(&pool, e, "RTW 3", None).await;
+        fahrzeug(&pool, e, "rtw  3", None).await;
+        let mut conn = pool.acquire().await.unwrap();
+
+        assert_eq!(
+            check_namen_uebernahme_tx(&mut conn, e, &["83-9", "rtw 2"])
+                .await
+                .unwrap(),
+            vec![None, Some(frei)]
+        );
+        for name in ["83-1", "HLF 1", "RTW 3"] {
+            match check_namen_uebernahme_tx(&mut conn, e, &["83-9", name]).await {
+                Err(AppError::UnprocessableEntity(m)) => assert!(m.contains(name), "{name}: {m}"),
+                anders => panic!("{name}: {anders:?}"),
+            }
+        }
+        // Ein beendetes Fahrzeug zählt nicht.
+        sqlx::query("UPDATE einsatz_fahrzeug SET beendet_at = '2026-05-28 15:00:00' WHERE id = ?")
+            .bind(frei)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            check_namen_uebernahme_tx(&mut conn, e, &["RTW 2"])
+                .await
+                .unwrap(),
+            vec![None]
+        );
     }
 
     // ─── Bekannte Kraft ─────────────────────────────────────────────────────

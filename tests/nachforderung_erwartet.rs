@@ -752,6 +752,191 @@ async fn fahrzeug_ohne_einheit_wird_mit_verweis_zur_einheit() {
     assert_eq!(lade(&app, &admin, e, n).await["einheit_ids"], json!([neu]));
 }
 
+async fn am_raum(pool: &sqlx::SqlitePool, einheit: i64) -> i64 {
+    sqlx::query_scalar("SELECT nachforderung_am_raum FROM einsatz_einheit WHERE id = ?")
+        .bind(einheit)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// LLH-1445 (Change `o659va5r-nachforderung-herkunft`, design.md D1): jeder Eintreffen-Weg mit
+/// Verweis hält fest, dass die Buchung am Raum ihn gesetzt hat (bekannte Einheit, unangemeldet
+/// angelegt, Fahrzeug zur Einheit). Eine schon übernommene Einheit, die später mit demselben
+/// Verweis am Raum eintrifft, bleibt übernommen.
+#[tokio::test]
+async fn eintreffen_mit_verweis_haelt_die_verknuepfung_am_raum_fest() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = raum(&app, &admin, e, "Nord").await;
+    let n = nachforderung(
+        &app,
+        &admin,
+        e,
+        "RTW",
+        json!({ "ziel_br_id": nord, "anzahl": 4 }),
+        Some(json!({ "rufnamen": ["83-1", "83-2", "RTW 2", "83-4"] })),
+        "unterwegs",
+    )
+    .await;
+
+    let bekannt = einheit_bilden(&app, &admin, e, "83-1").await;
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "kraft": { "objekt_typ": "einheit", "objekt_id": bekannt },
+                "nachforderung_id": n }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    assert_eq!(am_raum(&pool, bekannt).await, 1, "bekannte Einheit");
+
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "unangemeldet": { "fahrzeuge": [{ "funkrufname": "83-2", "fahrzeugtyp": "RTW" }] },
+                "nachforderung_id": n }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let unangemeldet = j["einheit_id"].as_i64().unwrap();
+    assert_eq!(am_raum(&pool, unangemeldet).await, 1, "unangemeldet");
+
+    let ef = adhoc_fahrzeug(&app, &admin, e, "RTW 2").await;
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "kraft": { "objekt_typ": "fahrzeug", "objekt_id": ef }, "nachforderung_id": n }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let aus_fahrzeug = j["einheit_id"].as_i64().unwrap();
+    assert_eq!(am_raum(&pool, aus_fahrzeug).await, 1, "Fahrzeug zur Einheit");
+
+    // Erst übernommen, dann mit demselben Verweis am Raum: bleibt übernommen.
+    status(&app, &admin, e, n, "eingetroffen", StatusCode::OK).await;
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/einheiten/aus-nachforderung"),
+        &admin,
+        Some(&json!({ "nachforderung_id": n, "einheiten": [{ "name": "83-4" }] }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let uebernommen = j["einheit_ids"][0].as_i64().unwrap();
+    assert_eq!(am_raum(&pool, uebernommen).await, 0, "übernommen");
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "kraft": { "objekt_typ": "einheit", "objekt_id": uebernommen },
+                "nachforderung_id": n }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    assert_eq!(
+        am_raum(&pool, uebernommen).await,
+        0,
+        "derselbe Verweis am Raum ändert die Herkunft nicht"
+    );
+}
+
+/// LLH-1449 (Entscheidung 24.10.2026, Change `o659va5r-nachforderung-herkunft` D7): der Storno
+/// einer am Raum verknüpften Einheit löst nur den Verweis. Die Einheit steht dort und bleibt aktiv
+/// im Raum, der Verlauf zeigt keinen Austritt, auch bei einem dabei zur Einheit gewordenen
+/// Fahrzeug. Die Herkunft „am Raum“ ist danach zurückgesetzt (LLH-1445).
+#[tokio::test]
+async fn storno_nach_verknuepfung_am_raum_bucht_nicht_aus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = raum(&app, &admin, e, "Nord").await;
+    let n = nachforderung(
+        &app,
+        &admin,
+        e,
+        "RTW",
+        json!({ "ziel_br_id": nord }),
+        Some(json!({ "rufnamen": ["83-1", "RTW 2"] })),
+        "unterwegs",
+    )
+    .await;
+    let bekannt = einheit_bilden(&app, &admin, e, "83-1").await;
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "kraft": { "objekt_typ": "einheit", "objekt_id": bekannt },
+                "nachforderung_id": n }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let ef = adhoc_fahrzeug(&app, &admin, e, "RTW 2").await;
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "kraft": { "objekt_typ": "fahrzeug", "objekt_id": ef }, "nachforderung_id": n }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let aus_fahrzeug = j["einheit_id"].as_i64().unwrap();
+
+    for (id, name) in [(bekannt, "83-1"), (aus_fahrzeug, "RTW 2")] {
+        let vorher = etb(&app, &admin, e).await.len();
+        let (s, j) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/einheiten/{id}/uebernahme-stornieren"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{name}: {j:?}");
+        let x = einheit(&app, &admin, e, id).await;
+        assert!(x.get("nachforderung_id").is_none(), "{name}: {x:?}");
+        assert_eq!(x["aktueller_br_id"], nord, "{name} bleibt im BR Nord");
+        assert_eq!(am_raum(&pool, id).await, 0, "{name}: Herkunft zurückgesetzt");
+        let nach = etb(&app, &admin, e).await;
+        assert_eq!(nach.len(), vorher + 1, "{nach:#?}");
+        let text = format!("Nachforderung 2× RTW: Übernahme von {name} storniert, Verknüpfung gelöst");
+        assert!(
+            nach.iter().any(|x| x["inhalt"] == text.as_str()),
+            "{text}: {nach:#?}"
+        );
+    }
+    assert_eq!(
+        einheit_von(&pool, "einsatz_fahrzeug", ef).await,
+        Some(aus_fahrzeug),
+        "das Fahrzeug gehört weiter der Einheit"
+    );
+    let (s, verlauf) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{nord}/verlauf"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{verlauf:?}");
+    assert!(
+        verlauf.as_array().unwrap().iter().all(|z| z["art"] != "austritt"),
+        "kein Austritt: {verlauf:?}"
+    );
+    assert_eq!(lade(&app, &admin, e, n).await["einheit_ids"], json!([]));
+}
+
 /// D5: mit verknüpfter Einheit vor dem Eintreffen gehen Rücknahme, Ablehnen und Zurückziehen
 /// nicht, die Anzahl nicht unter die Verknüpften; vorwärts bleibt frei.
 #[tokio::test]
