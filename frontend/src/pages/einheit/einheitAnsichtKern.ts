@@ -18,7 +18,11 @@ import {
 } from '../../components/nurAnsicht';
 import { istSprungGesperrt } from '../../einsatz/modulRegistry';
 import { personLabel } from '../../kraefte/einsatzfunktionKern';
-import { filterAktive } from '../../kraefte/kraeftebaumKern';
+import {
+  filterAktive,
+  mittelDerEinheit,
+  type MittelDerEinheit,
+} from '../../kraefte/kraeftebaumKern';
 import {
   fahrzeugLabel,
   fahrzeugSuchtext,
@@ -133,6 +137,64 @@ export function besatzungGrund(rechte: EinheitRechte): string | null {
   if (rechte.hasBesatzung) return null;
   if (!rechte.hasPersonalLink && !rechte.hasFahrzeugLink) return MODULE_PERSONAL_FAHRZEUGE_GESPERRT;
   return rechte.hasPersonalLink ? MODUL_FAHRZEUGE_GESPERRT : MODUL_PERSONAL_GESPERRT;
+}
+
+/**
+ * Die Besatzung, wie das Paneel „Fahrzeuge und Besatzung“ sie zeigt: die Rechnung des Meldebilds
+ * (`mittelDerEinheit`), nur mit Freigabe Personal und Fahrzeuge und erst, wenn beide Listen da
+ * sind. `null`: Fahrzeuge und Mitglieder stehen flach aus dem Einheit-DTO (D5).
+ */
+export function buildBesatzungMittel(
+  einheit: Einheit,
+  einheiten: readonly Einheit[],
+  personal: readonly EinsatzPersonal[] | undefined,
+  fahrzeuge: readonly EinsatzFahrzeug[] | undefined,
+  rechte: EinheitRechte,
+): MittelDerEinheit | null {
+  return rechte.hasBesatzung && personal && fahrzeuge
+    ? mittelDerEinheit(einheit.id, { personal, fahrzeuge, material: [], einheiten })
+    : null;
+}
+
+/** Ohne Fahrzeug und Person im Einheit-DTO zeigt das Paneel „—“, auch wenn die Listen noch eine führen. */
+export function hasNoMitglieder(einheit: Einheit): boolean {
+  return einheit.fahrzeug_mitglieder.length === 0 && einheit.personal_mitglieder.length === 0;
+}
+
+/** Die Zeilen des Paneels „Fahrzeuge und Besatzung“ mit ihrer Kennung (Name, Funkrufname). */
+export interface VisibleBesatzungRows {
+  /** `ep_id` → Name. */
+  personen: ReadonlyMap<number, string>;
+  /** `ef_id` → Funkrufname. */
+  fahrzeuge: ReadonlyMap<number, string>;
+}
+
+/**
+ * Welche Personen- und Fahrzeugzeilen das Paneel gerade zeigt (LLH-1269): ein Grund, dessen Zeile
+ * nicht darunter ist, gehört in den Seitenhinweis (`frontend/AGENTS.md`, „Rückwege und Fehler“).
+ * Dieselbe Fallunterscheidung wie das Paneel: ohne Mitglieder im DTO keine Zeile, mit `mittel` die
+ * Besatzung, sonst flach.
+ */
+export function visibleBesatzungRows(
+  einheit: Einheit,
+  mittel: MittelDerEinheit | null,
+): VisibleBesatzungRows {
+  if (hasNoMitglieder(einheit)) return { personen: new Map(), fahrzeuge: new Map() };
+  if (mittel == null) {
+    return {
+      personen: new Map(einheit.personal_mitglieder.map((m) => [m.ep_id, m.name])),
+      fahrzeuge: new Map(einheit.fahrzeug_mitglieder.map((m) => [m.ef_id, m.funkrufname])),
+    };
+  }
+  return {
+    personen: new Map(
+      [...mittel.fahrzeuge.flatMap((f) => f.besatzung), ...mittel.ohneFahrzeug].map((x) => [
+        x.person.id,
+        x.person.name,
+      ]),
+    ),
+    fahrzeuge: new Map(mittel.fahrzeuge.map((f) => [f.fahrzeug.id, f.fahrzeug.funkrufname])),
+  };
 }
 
 // ── Zuordnen aus Einsatz und Stamm (D7, D8) ───────────────────────────────────
