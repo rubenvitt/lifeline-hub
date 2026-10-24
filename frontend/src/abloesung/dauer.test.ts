@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatDauer, formatUhrzeiten, parseDauer, parseUhrzeiten } from './dauer';
+import {
+  formatDauer,
+  formatUhrzeiten,
+  parseDauer,
+  parseUhrzeiten,
+  uhrzeitenFeldText,
+} from './dauer';
 
 describe('formatDauer (LLH-1122)', () => {
   it('schreibt ganze Stunden als „8 h“, nie mit Dezimalpunkt', () => {
@@ -50,9 +56,17 @@ describe('parseDauer (LLH-1122)', () => {
 });
 
 describe('Wechselzeiten (LLH-1122)', () => {
-  it('zeigt Wanduhrzeiten taktisch: „0600/1800“', () => {
-    expect(formatUhrzeiten(['06:00', '18:00'])).toBe('0600/1800');
-    expect(formatUhrzeiten(['14:30'])).toBe('1430');
+  it('zeigt Wanduhrzeiten in der Darstellung: taktisch „0600/1800“, sonst „06:00/18:00“ (LLH-1437)', () => {
+    expect(formatUhrzeiten(['06:00', '18:00'], { zeitdarstellung: 'taktisch' })).toBe('0600/1800');
+    expect(formatUhrzeiten(['14:30'], {})).toBe('1430');
+    expect(formatUhrzeiten(['06:00', '18:00'], { zeitdarstellung: 'datum_uhrzeit' })).toBe(
+      '06:00/18:00',
+    );
+    expect(formatUhrzeiten(['14:30'], { zeitdarstellung: 'datum_uhrzeit' })).toBe('14:30');
+  });
+  it('das Feld bleibt taktisch, egal welche Darstellung gilt: „0600/1800“', () => {
+    expect(uhrzeitenFeldText(['06:00', '18:00'])).toBe('0600/1800');
+    expect(uhrzeitenFeldText(['14:30'])).toBe('1430');
   });
   it('liest taktisch und mit Doppelpunkt, getrennt durch Leerzeichen, Komma oder Schrägstrich', () => {
     expect(parseUhrzeiten('0600 1800')).toEqual({ art: 'zeiten', zeiten: ['06:00', '18:00'] });
@@ -66,11 +80,14 @@ describe('Wechselzeiten (LLH-1122)', () => {
       zeiten: ['06:00', '18:00'],
     });
   });
-  it('liest die eigene Anzeige zurück', () => {
-    expect(parseUhrzeiten(formatUhrzeiten(['06:00', '18:00']))).toEqual({
-      art: 'zeiten',
-      zeiten: ['06:00', '18:00'],
-    });
+  it('liest den eigenen Feldtext und beide Anzeigen zurück', () => {
+    for (const text of [
+      uhrzeitenFeldText(['06:00', '18:00']),
+      formatUhrzeiten(['06:00', '18:00'], { zeitdarstellung: 'taktisch' }),
+      formatUhrzeiten(['06:00', '18:00'], { zeitdarstellung: 'datum_uhrzeit' }),
+    ]) {
+      expect(parseUhrzeiten(text), text).toEqual({ art: 'zeiten', zeiten: ['06:00', '18:00'] });
+    }
   });
   it('nennt die erste unlesbare Uhrzeit', () => {
     expect(parseUhrzeiten('0600 2460')).toEqual({ art: 'ungueltig', text: '2460' });

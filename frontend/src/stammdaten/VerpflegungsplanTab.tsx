@@ -1,7 +1,8 @@
 import { Button, Space, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { taktischeUhrzeitAus } from '../anzeige/uhrzeit';
+import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { uhrzeitOhneDatum } from '../anzeige/zeitDarstellung';
 import { globalKeys } from '../api/queryKeys';
 import type { VerpflegungVorlage, Verpflegungsart } from '../api/types';
 import { listVerpflegungVorlagen, updateVerpflegungVorlage } from '../api/verpflegungVorlagen';
@@ -29,7 +30,9 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
  *
  * Eine Tabelle wie die übrigen Kataloge (LFH-330): die Mahlzeiten werden an ihren Zeiten
  * verglichen. Die Folge ist die des Servers (nach Beginn), keine Vorsortierung. Uhrzeiten stehen
- * taktisch („0630–0800“), eine Mahlzeit über Mitternacht trägt „+1 Tag“.
+ * in der Zeitdarstellung („0630–0800“ bzw. „06:30–08:00“, LLH-1437), eine Mahlzeit über
+ * Mitternacht trägt „+1 Tag“. Die Seite liegt außerhalb jedes Einsatzes: die Darstellung kommt
+ * aus Gerät und Organisation (`OrgAnzeigeProvider`).
  *
  * Gelöscht wird nicht: Deaktivieren und Aktivieren sind umkehrbar und fragen deshalb nicht nach
  * (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“). Live über das Org-Ereignis
@@ -38,7 +41,16 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 const ART_FOLGE = Object.keys(VERPFLEGUNGSART_LABEL) as Verpflegungsart[];
 
 export default function VerpflegungsplanTab() {
+  return (
+    <OrgAnzeigeProvider>
+      <VerpflegungsplanInhalt />
+    </OrgAnzeigeProvider>
+  );
+}
+
+function VerpflegungsplanInhalt() {
   const { benutzer } = useAuth();
+  const { konventionen } = useAnzeigeKonventionen();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { istSchmal } = useViewport();
@@ -78,7 +90,7 @@ export default function VerpflegungsplanTab() {
       render: (_, m) => (
         <span style={{ whiteSpace: 'nowrap' }}>
           <span style={monoStil(13)}>
-            {taktischeUhrzeitAus(m.beginn)}–{taktischeUhrzeitAus(m.ende)}
+            {uhrzeitOhneDatum(m.beginn, konventionen)}–{uhrzeitOhneDatum(m.ende, konventionen)}
           </span>
           {m.folgetag && (
             <Typography.Text type="secondary" style={{ ...monoStil(12), marginInlineStart: 6 }}>

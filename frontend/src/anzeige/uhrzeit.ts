@@ -8,7 +8,8 @@
  * - **Maske** ({@link parseUhrzeit}): „HHMM“ (Stab-Schreibweise), „HH:MM“ und die kurzen Formen
  *   „HMM“ und „H:MM“, getrimmt, 00:00 bis 23:59, nur ASCII-Ziffern. Heraus geht immer `HH:MM`;
  *   der Server nimmt nur „HH:MM“ und „HHMM“.
- * - **Anzeige**: taktisch „0630“ ({@link taktischeUhrzeitAus}).
+ * - **Feld**: taktisch „0630“ ({@link taktischeUhrzeitAus}), so wie man sie tippt. Die
+ *   **Anzeige** folgt der Zeitdarstellung (`zeitDarstellung.ts:uhrzeitOhneDatum`, LLH-1437).
  * - **Sommerzeit**: eine Uhrzeit, die es an dem Tag zweimal gibt (Rückstellung, in Berlin
  *   25.10.2026 02:30), gilt beim ersten Mal; eine, die es nicht gibt (Vorstellung, 29.03.2026
  *   02:30), rückt um die Lücke nach vorn (03:30) — nie früher als gewünscht, wie `zuWanduhr`.
@@ -42,7 +43,10 @@ export function parseUhrzeit(eingabe: string): string | null {
   return `${String(stunde).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-/** „06:30“ → „0630“, die taktische Uhrzeit (BOS-Konvention, wie die Rolle `uhrzeit` in `zeitDarstellung.ts`). */
+/**
+ * „06:30“ → „0630“: der Text eines Eingabefelds (BOS-Konvention). Die Anzeige nimmt
+ * `uhrzeitOhneDatum` aus `zeitDarstellung.ts`, die der gewählten Darstellung folgt (LLH-1437).
+ */
 export function taktischeUhrzeitAus(uhrzeit: string): string {
   return uhrzeit.replace(':', '');
 }

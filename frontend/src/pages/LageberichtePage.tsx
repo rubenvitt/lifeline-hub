@@ -11,7 +11,6 @@ import { legeLageberichtAn, listeLageberichte, schreibeLageberichtFort } from '.
 import type { LageberichtAbschnitt, LageberichtVorlageKey } from '../api/types';
 import { anzahl } from '../anzeige/anzahl';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import {
   SeitenFehler,
@@ -58,7 +57,6 @@ export default function LageberichtePage() {
   const einsatzId = Number(id);
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { formatiere } = useZeitEingabe();
   const { konventionen } = useAnzeigeKonventionen();
 
   // Der Einsatz, in dem die Seite gerade steht: eine Antwort aus einem verlassenen Einsatz
@@ -104,7 +102,7 @@ export default function LageberichtePage() {
   // Kein `onError`: der Grund steht im Seitenhinweis, bis zum nächsten Versuch.
   const anlegenMutation = useMutation({
     mutationFn: async (a: Anlegen) => {
-      const titel = titelVorschlag(a.vorlage, dayjs(), formatiere);
+      const titel = titelVorschlag(a.vorlage, dayjs(), konventionen);
       // Scheitert nicht: was fehlt, steht als „— (Grund)“ im Abschnitt.
       const abschnitte: LageberichtAbschnitt[] | undefined = a.ausLagebild
         ? await loadStartinhalt(a.vorlage, {

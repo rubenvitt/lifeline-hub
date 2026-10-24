@@ -1,15 +1,20 @@
 import type { FormRule } from 'antd';
+import type { AnzeigeKonventionen } from '../anzeige/format';
+import { uhrzeitOhneDatum } from '../anzeige/zeitDarstellung';
 
 /**
- * Dauern und Wanduhrzeiten der Ablösung (LLH-1122): Anzeige und Eingabe in einer Form.
+ * Dauern und Wanduhrzeiten der Ablösung (LLH-1122): Dauern in Anzeige und Eingabe in einer Form,
+ * Wechselzeiten getrennt (LLH-1437).
  *
  * - **Dauer** („Rhythmus 8 h“, „7:30 h“, „45 min“): nie „8.0“ oder „7,5“ in der Anzeige. Die
  *   Lage spricht vom 8-Stunden-Rhythmus; eine halbe Stunde steht als „:30“ wie auf der Uhr. Das
  *   Feld liest jede Anzeige zurück und dazu bloße Stunden („8“), „h:mm“, Minuten („90 min“) und
  *   das Dezimalkomma („7,5“), weil das die Eingaben sind, die eine Führungskraft tippt.
- * - **Wechselzeiten** taktisch („0600/1800“, wie die Rolle `uhrzeit` in `anzeige/zeitDarstellung.ts`); an den Server
- *   gehen sie als `HH:MM`, sortiert und ohne Doppel wie dort (`src/schichtmodell/mod.rs`,
- *   `WerteBody::check`).
+ * - **Wechselzeiten** zeigt {@link formatUhrzeiten} in der Zeitdarstellung („0600/1800“ bzw.
+ *   „06:00/18:00“, Rolle `uhrzeit` über `anzeige/zeitDarstellung.ts:uhrzeitOhneDatum`); das Feld
+ *   steht immer taktisch ({@link uhrzeitenFeldText}), so wie man sie tippt. Die Maske liest beide
+ *   Formen. An den Server gehen sie als `HH:MM`, sortiert und ohne Doppel wie dort
+ *   (`src/schichtmodell/mod.rs`, `WerteBody::check`).
  *
  * Rein; die Grenzen kommen aus `api/eingabegrenzen.ts`.
  */
@@ -91,8 +96,13 @@ export function dauerRegel(opts: {
   };
 }
 
-/** `['06:00', '18:00']` → „0600/1800“. */
-export function formatUhrzeiten(zeiten: readonly string[]): string {
+/** Anzeige: `['06:00', '18:00']` → „0600/1800“ bzw. „06:00/18:00“, je nach Darstellung. */
+export function formatUhrzeiten(zeiten: readonly string[], konv: AnzeigeKonventionen): string {
+  return zeiten.map((z) => uhrzeitOhneDatum(z, konv)).join('/');
+}
+
+/** Vorbelegung des Feldes „Wechselzeiten“: `['06:00', '18:00']` → „0600/1800“, immer taktisch. */
+export function uhrzeitenFeldText(zeiten: readonly string[]): string {
   return zeiten.map((z) => z.replace(':', '')).join('/');
 }
 
