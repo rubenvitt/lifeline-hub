@@ -5172,11 +5172,11 @@ test('Personal (LLH-1273): Kopfaktionen halten den Zielabstand, sortierbare Spal
 test('Personal (LLH-1273): ein Tipp in die Polsterung sortiert nicht, auch nicht über der fixierten Spalte, der Titel sortiert', async ({
   page,
 }) => {
-  // Tablet quer im Handschuh: die Tabelle läuft waagerecht über, die Namensspalte ist fixiert.
+  // Tablet hoch im Handschuh: die Tabelle läuft waagerecht über, die Namensspalte ist fixiert.
   // Unter ihr rollen die übrigen Kopfzellen durch; ein Tipp in ihre Polsterung fiel mit
   // `pointer-events: none` an der Zelle auf die verdeckte Spalte (Review LLH-1273).
   test.setTimeout(90_000);
-  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.setViewportSize({ width: 768, height: 1024 });
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personal Polster`);
   await seedPersonal(page, einsatzId);
@@ -5188,11 +5188,13 @@ test('Personal (LLH-1273): ein Tipp in die Polsterung sortiert nicht, auch nicht
   const kopf = main.locator('.ant-table-thead').first();
   const fixiert = kopf.locator('th.ant-table-column-has-sorters.ant-table-cell-fix-start').first();
   await expect(fixiert).toHaveCount(1);
-  const rollend = main.locator('.ant-table-content, .ant-table-header').first();
+  // Der Kopf klebt als eigene Tabelle (`.ant-table-header`) und rollt mit dem Körper.
+  const kopfRolle = main.locator('.ant-table-header').first();
+  const koerper = main.locator('.ant-table-body').first();
   // Vorbedingung: die Tabelle läuft über, sonst rollte nichts unter die fixierte Zelle.
-  expect(await rollend.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeGreaterThan(100);
-  await rollend.evaluate((el) => (el.scrollLeft = el.scrollWidth));
-  await expect.poll(() => rollend.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+  expect(await kopfRolle.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeGreaterThan(100);
+  await koerper.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+  await expect.poll(() => kopfRolle.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
 
   // Punkte in der Polsterung der fixierten Zelle: rechts und links neben dem Inhalt, mittig.
   const punkte = await fixiert.evaluate((th) => {
@@ -5204,6 +5206,15 @@ test('Personal (LLH-1273): ein Tipp in die Polsterung sortiert nicht, auch nicht
       { x: (z.left + inhalt.left) / 2, y },
     ];
   });
+  const sortStand = () =>
+    kopf.evaluate((t) =>
+      [...t.querySelectorAll('th[aria-sort]')]
+        .map((th) => `${th.textContent}:${th.getAttribute('aria-sort')}`)
+        .join(),
+    );
+  const vorher = { stand: await sortStand(), adresse: page.url() };
+  // Vorbedingung: die Namensspalte trägt eine Richtung, die ein falscher Klick kehren würde.
+  expect(vorher.stand).toMatch(/ascending|descending/);
   for (const p of punkte) {
     // Getroffen wird die fixierte Zelle selbst, keine verdeckte Spalte darunter.
     const getroffen = await page.evaluate(
@@ -5219,13 +5230,20 @@ test('Personal (LLH-1273): ein Tipp in die Polsterung sortiert nicht, auch nicht
     expect(getroffen, `Tipp bei x ${Math.round(p.x)}`).toEqual({ fixiert: true, inhalt: false });
     await page.mouse.click(p.x, p.y);
   }
-  // Nichts sortiert: keine Spalte trägt eine Richtung, die Adresse keine Sortierung.
-  await expect(kopf.locator('th[aria-sort]')).toHaveCount(0);
-  await expect(page).not.toHaveURL(/[?&]sort=/);
+  // Nichts sortiert: dieselbe Richtung, dieselbe Adresse.
+  expect(await sortStand(), 'Tipps in die Polsterung ändern die Sortierung nicht').toBe(
+    vorher.stand,
+  );
+  // Länger als die Entprellung des Listengedächtnisses (`GEDAECHTNIS_ENTPRELLUNG_MS`, 300 ms): ein
+  // falscher Klick stünde jetzt in der Adresse.
+  await page.waitForTimeout(1000);
+  expect(page.url()).toBe(vorher.adresse);
 
-  // Gegenprobe: der Titel derselben Zelle sortiert.
+  // Gegenprobe: der Titel derselben Zelle kehrt die Richtung.
+  const richtung = await fixiert.getAttribute('aria-sort');
   await fixiert.locator('.ant-table-column-title').click();
-  await expect(fixiert).toHaveAttribute('aria-sort', /ascending|descending/);
+  await expect(fixiert).not.toHaveAttribute('aria-sort', richtung ?? '');
+  // Die Adresse folgt entprellt (`listenGedaechtnis`).
   await expect(page).toHaveURL(/[?&]sort=/);
 });
 

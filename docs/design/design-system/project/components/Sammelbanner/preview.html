@@ -527,7 +527,7 @@
   outline-offset: -2px;
 }
 .ant-table-wrapper.lfh-katalog .ant-table-thead > tr > th.ant-table-column-has-sorters {
-  pointer-events: none;
+  cursor: default;
 }
 .ant-table-wrapper.lfh-katalog
   .ant-table-thead
@@ -538,13 +538,7 @@
   min-height: var(--lfh-sortier-ziel, 0px);
   margin-block: calc(-1 * var(--lfh-filter-einzug, 0px));
   padding-block: var(--lfh-filter-einzug, 0px);
-  pointer-events: auto;
-}
-.ant-table-wrapper.lfh-katalog
-  .ant-table-thead
-  th.ant-table-column-has-sorters
-  .ant-table-filter-trigger {
-  pointer-events: auto;
+  cursor: pointer;
 }
 [data-lfh='datensicht-baum-ziel']:hover > .ant-table-row-expand-icon {
   border-color: currentcolor;

@@ -418,11 +418,13 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   stehen `paddingSM` auseinander, antds Spaltenfilter-Auslöser hält `controlHeightSM` und liegt
   in der Tab-Folge (Name „<Spalte> filtern“, Enter/Leertaste öffnen), beides im Primitiv, nie je
   Seite. Nachweis `e2e/katalogtabelle-kopf-dichte.spec.ts`.
-- **Eine sortierbare Kopfzelle trifft nur mit ihrem Inhalt** (LLH-1273): antd hängt den Klick an
-  die ganze Zelle, zwei sortierbare Köpfe stießen ohne Lücke aneinander. `theme/sprache.css`
-  nimmt der Zelle die Trefferfläche und gibt sie ihrem Inhalt, der bis an den Zellrand und auf
-  `controlHeight` reicht (`sortierKopfStil`); die Polsterung trennt die Spalten. Nachweis
-  `e2e/gate3-trefflaeche.spec.ts` „Personal (LLH-1273)“, abgetastet per `elementFromPoint`.
+- **Eine sortierbare Kopfzelle sortiert nur über ihren Inhalt** (LLH-1273): antd hängt den Klick
+  an die ganze Zelle, zwei sortierbare Köpfe stießen ohne Lücke aneinander. `KatalogTabelle` hält
+  einen Klick in die Polsterung an (`polsterKlickRiegel`), der Inhalt reicht senkrecht bis an den
+  Zellrand und auf `controlHeight` (`sortierKopfStyle`, `theme/sprache.css`); die Polsterung trennt
+  die Spalten. Nicht über `pointer-events: none`: unter einer fixierten Zelle fiele der Tipp auf
+  die verdeckte Spalte. Unit-Tests klicken über `sortTarget` (`test/utils.tsx`). Nachweis
+  `e2e/gate3-trefflaeche.spec.ts` „Personal (LLH-1273)“.
 - **Das Aufklappsymbol im Baum der `Datensicht` folgt der Dichte** (LLH-1240): antds Symbol steht
   in einem Knopf mit Höhe `controlHeight` und Breite `controlHeightSM` (`baumSymbolZielStil`),
   der Text daneben mittig in derselben Höhe (`baumTextStil`); im Druck fällt der Boden. Nachweis
