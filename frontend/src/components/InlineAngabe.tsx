@@ -175,6 +175,27 @@ export function leerKnopfStil(
   };
 }
 
+/**
+ * Stil des gefüllten Wertknopfs — rein und exportiert (Muster `wertKnopfStil`). Der Knopf rückt
+ * NUR am Anfang um `paddingSM` vor, damit sein Text bündig unter dem Etikett steht; die leere
+ * Aufforderung (`leerKnopfStil`) rückt nicht vor. Ein Vorrücken am Ende zöge in einer Flex-Reihe
+ * das nächste Ziel heran. Den Vorsprung am Anfang gleicht die Kartenfuge aus (`kartenFelderStil`
+ * in `Datensicht.tsx`): hinter einer Aufforderung lag der Wert sonst 7 / 10 px statt ≥ 8 / ≥ 16
+ * vor ihr (LLH-1271).
+ */
+export function wertAngabeStil(token: {
+  controlHeight: number;
+  paddingXS: number;
+  paddingSM: number;
+}): CSSProperties {
+  return {
+    ...wertKnopfStil(token),
+    color: 'inherit',
+    font: 'inherit',
+    marginInlineStart: -token.paddingSM,
+  };
+}
+
 export function InlineAngabe<T>({
   etikett,
   kennung,
@@ -466,12 +487,7 @@ export function InlineAngabe<T>({
         disabled={isGesperrt}
         aria-label={`${name} bearbeiten`}
         aria-describedby={isGesperrt ? `${wertId} ${sperrBeschreibung}` : wertId}
-        style={{
-          ...wertKnopfStil(token),
-          color: 'inherit',
-          font: 'inherit',
-          marginInline: -token.paddingSM,
-        }}
+        style={wertAngabeStil(token)}
         onClick={oeffnen}
       >
         <span id={wertId}>{anzeige}</span>
