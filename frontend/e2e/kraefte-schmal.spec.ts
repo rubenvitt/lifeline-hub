@@ -460,18 +460,30 @@ test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue 
     return ((await antwort.json()) as unknown[]).length;
   };
 
+  /**
+   * Geklickt wird nur in einen stehenden Dialog (LLH-1275, Muster `einsatz-kern.ts`): ohne die
+   * Wache fielen „Abbrechen“ und „Bilden“ in jedem Lauf in `ant-zoom-appear-active`, das zweite
+   * Öffnen in `ant-zoom-leave-active`. Unter Last verfehlte der Klick den wachsenden Knopf, der
+   * Dialog blieb offen und seine Maske fing das nächste Öffnen ab.
+   */
+  const dialog = page.getByRole('dialog', { name: 'Einheit bilden' });
+  const dialogOeffnen = async () => {
+    await bildenKnopf.click();
+    await expect(dialog).toBeVisible();
+    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  };
+
   const vorher = await anzahlEinheiten();
 
   // Öffnen und ABBRECHEN: die Zahl bleibt gleich.
-  await bildenKnopf.click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
+  await dialogOeffnen();
   await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+  // Ausgezoomt und abgehängt (`destroyOnHidden`): erst dann öffnet der Knopf einen neuen Dialog.
+  await expect(dialog).toBeHidden();
   expect(await anzahlEinheiten(), 'Abbrechen darf nichts anlegen').toBe(vorher);
 
   // Absenden MIT Namen: genau ein Datensatz, und er heisst wie eingegeben.
-  await bildenKnopf.click();
-  await expect(dialog).toBeVisible();
+  await dialogOeffnen();
   await dialog.getByLabel('Name').fill('2. Zug');
   await dialog.getByRole('button', { name: 'Bilden' }).click();
 
