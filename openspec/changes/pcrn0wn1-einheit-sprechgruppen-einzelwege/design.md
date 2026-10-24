@@ -47,7 +47,11 @@
 Die Seite schickt die Anfragen der Reihe nach (eine `useMutation` mit `{ hinzu, weg }`), erst alle
 Lösungen, dann alle Zuordnungen. Die erste Ablehnung bricht ab und lehnt das Versprechen ab:
 `InlineAngabe` lässt die Zeile mit dem Entwurf offen und zeigt den Grund (Spec „Fehler am Ort der
-Handlung“). In jedem Fall (Erfolg wie Ablehnung) lädt die Seite danach `einheiten` und `etb` neu
+Handlung“). Jeden angekommenen Schritt meldet die Seite an `EinheitFunk` zurück, das den
+Vergleichsstand aus D1 darum fortschreibt: wer nach einer Teilablehnung neu wählt und speichert,
+schickt genau, was gegenüber dem Gespeicherten fehlt (ohne das schlösse etwa „7 gelöst, 8
+abgelehnt, 7 wieder gewählt“ die Zeile ohne Anfrage, Befund aus dem Review). In jedem Fall
+(Erfolg wie Ablehnung) lädt die Seite danach `einheiten` und `etb` neu
 und wartet auf `einheiten`, damit die Zeile den gespeicherten Stand zeigt (Vertrag von
 `onSpeichern`: „erfüllt erst, wenn der neue Stand im Cache steht“). Erfolgsmeldung wie bisher
 „Sprechgruppen gespeichert“.

@@ -517,6 +517,37 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
     ).toBeInTheDocument();
   });
 
+  /**
+   * Nach einer Teilablehnung rückt der Vergleichsstand um das Gespeicherte vor (Review): 7 ist
+   * gelöst, 8 abgelehnt; wer nun 7 wieder wählt, ordnet 7 neu zu, statt dass die Zeile ohne
+   * Anfrage schließt.
+   */
+  it('nach Teilablehnung: erneutes Speichern schickt, was gegenüber dem Gespeicherten fehlt', async () => {
+    const sg = sprechgruppenServer([7], 8);
+    zeige(...sg.handler);
+    await userEvent.click(await screen.findByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    const feld = screen.getByRole('combobox', { name: 'Sprechgruppen' }).closest('.ant-select')!;
+    await waitFor(() =>
+      expect(feld.querySelectorAll('.ant-select-selection-item')).toHaveLength(1),
+    );
+    await userEvent.click(feld.querySelector('.ant-select-clear')!);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await userEvent.click(await screen.findByTitle('DMO 31'));
+    await userEvent.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    expect(await within(paneel('Funk')).findByRole('alert')).toHaveTextContent(
+      'Sprechgruppe ist deaktiviert',
+    );
+
+    // 8 aufgeben, 7 zurück: genau eine Zuordnung für 7, die Zeile schließt mit 7.
+    const offen = screen.getByRole('combobox', { name: 'Sprechgruppen' }).closest('.ant-select')!;
+    await userEvent.click(offen.querySelector('.ant-select-clear')!);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await userEvent.click(await screen.findByTitle('412_F_DRK'));
+    await userEvent.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() => expect(paneel('Funk')).toHaveTextContent('TMO 412_F_DRK'));
+    expect(sg.aufrufe).toEqual(['DELETE 7', 'PUT 8', 'PUT 7']);
+  });
+
   it('Zeichen: genau `tz_organisation` an den Lageweg, keine Koordinate', async () => {
     const zeichen = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10/position', einheiten[0]);
     const angaben = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10', einheiten[0]);

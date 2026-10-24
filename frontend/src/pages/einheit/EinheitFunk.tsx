@@ -16,11 +16,18 @@ export interface SprechgruppenAenderung {
   weg: number[];
 }
 
+/** Ein am Server angekommener Teil der Änderung. */
+export type SprechgruppenSchritt = { art: 'hinzu' | 'weg'; id: number };
+
 /**
- * Schreibt die Änderung über die Einzelwege (LLH-1265, D2). Erfüllt erst, wenn der neue Stand
- * im Cache steht; lehnt bei der ersten Ablehnung ab, dann zeigt die Zeile den Grund.
+ * Schreibt die Änderung über die Einzelwege (LLH-1265, D2) und meldet jeden angekommenen Schritt
+ * über `onSchritt`. Erfüllt erst, wenn der neue Stand im Cache steht; lehnt bei der ersten
+ * Ablehnung ab, dann zeigt die Zeile den Grund.
  */
-export type EinheitSprechgruppenHandler = (aenderung: SprechgruppenAenderung) => Promise<unknown>;
+export type EinheitSprechgruppenHandler = (
+  aenderung: SprechgruppenAenderung,
+  onSchritt: (schritt: SprechgruppenSchritt) => void,
+) => Promise<unknown>;
 
 /**
  * Womit man die Einheit erreicht (LLH-1036, design.md D2; LLH-1134): Funk und Telefon getrennt,
@@ -47,16 +54,22 @@ export default function EinheitFunk({
   onSprechgruppen: EinheitSprechgruppenHandler;
 }) {
   const sprechgruppenIds = (e.sprechgruppen ?? []).map((s) => s.id);
-  const beimOeffnenRef = useRef<number[]>(sprechgruppenIds);
-  function speichereSprechgruppen(neu: number[]) {
-    const alt = beimOeffnenRef.current;
+  // Vergleichsstand: der Serverstand beim Öffnen, fortgeschrieben um jeden angekommenen Schritt.
+  // Nach einer Teilablehnung bleibt die Zeile offen; ein erneutes Speichern schickt dann nur, was
+  // gegenüber dem Gespeicherten fehlt, und schließt nicht still ohne Anfrage.
+  const idsAtOpenRef = useRef<number[]>(sprechgruppenIds);
+  function saveSprechgruppen(neu: number[]) {
+    const alt = idsAtOpenRef.current;
     const aenderung = {
       hinzu: neu.filter((id) => !alt.includes(id)),
       weg: alt.filter((id) => !neu.includes(id)),
     };
     // Nur fremde Änderungen seit dem Öffnen: hier ist nichts zu senden.
     if (aenderung.hinzu.length === 0 && aenderung.weg.length === 0) return Promise.resolve();
-    return onSprechgruppen(aenderung);
+    return onSprechgruppen(aenderung, ({ art, id }) => {
+      const ids = idsAtOpenRef.current;
+      idsAtOpenRef.current = art === 'hinzu' ? [...ids, id] : ids.filter((x) => x !== id);
+    });
   }
   const { tmo, dmo } = teileSprechgruppen(e.sprechgruppen);
   const sprechgruppenText = [
@@ -79,9 +92,9 @@ export default function EinheitFunk({
               gleich={isSameIds}
               darfSchreiben={canEdit}
               onOeffnen={() => {
-                beimOeffnenRef.current = sprechgruppenIds;
+                idsAtOpenRef.current = sprechgruppenIds;
               }}
-              onSpeichern={speichereSprechgruppen}
+              onSpeichern={saveSprechgruppen}
               eingabe={({ feld, popup, value, onChange }) => (
                 <SprechgruppenPicker
                   einsatzId={einsatzId}

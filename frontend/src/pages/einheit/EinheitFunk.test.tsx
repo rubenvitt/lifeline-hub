@@ -81,7 +81,9 @@ describe('EinheitFunk', () => {
     await user.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
     await user.click(await screen.findByTitle('314_F_DMO'));
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
-    await waitFor(() => expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [8], weg: [] }));
+    await waitFor(() =>
+      expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [8], weg: [] }, expect.any(Function)),
+    );
     expect(onSprechgruppen).toHaveBeenCalledTimes(1);
     expect(onPatch).not.toHaveBeenCalled();
   });
@@ -93,7 +95,12 @@ describe('EinheitFunk', () => {
     const feld = await sprechgruppenAuswahl(2);
     await user.click(feld.querySelector('.ant-select-clear')!);
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
-    await waitFor(() => expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [], weg: [7, 8] }));
+    await waitFor(() =>
+      expect(onSprechgruppen).toHaveBeenCalledWith(
+        { hinzu: [], weg: [7, 8] },
+        expect.any(Function),
+      ),
+    );
     expect(onPatch).not.toHaveBeenCalled();
   });
 
@@ -106,7 +113,26 @@ describe('EinheitFunk', () => {
     rerender(einheit({ sprechgruppen: [tmo, dmo] }));
     await user.click(feld.querySelector('.ant-select-clear')!);
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
-    await waitFor(() => expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [], weg: [7] }));
+    await waitFor(() =>
+      expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [], weg: [7] }, expect.any(Function)),
+    );
+  });
+
+  it('der Stand beim Öffnen gilt, nicht der beim Einhängen', async () => {
+    const user = userEvent.setup();
+    const { onSprechgruppen, rerender } = renderFunk(einheit({ sprechgruppen: [tmo] }));
+    // 314_F_DMO kommt dazu, bevor die Zeile geöffnet wird; das Entfernen muss es lösen.
+    rerender(einheit({ sprechgruppen: [tmo, dmo] }));
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    const feld = await sprechgruppenAuswahl(2);
+    await user.click(feld.querySelector('.ant-select-clear')!);
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() =>
+      expect(onSprechgruppen).toHaveBeenCalledWith(
+        { hinzu: [], weg: [7, 8] },
+        expect.any(Function),
+      ),
+    );
   });
 
   it('Sprechgruppen unverändert: keine Anfrage', async () => {

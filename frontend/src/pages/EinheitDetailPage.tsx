@@ -35,7 +35,10 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { buildEinheitRechte } from './einheit/einheitAnsichtKern';
 import EinheitKopf from './einheit/EinheitKopf';
-import EinheitFunk, { type SprechgruppenAenderung } from './einheit/EinheitFunk';
+import EinheitFunk, {
+  type SprechgruppenAenderung,
+  type SprechgruppenSchritt,
+} from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
 import EinheitAufloesen from './einheit/EinheitAufloesen';
 import EinheitUebernahme from './einheit/EinheitUebernahme';
@@ -216,15 +219,26 @@ function EinheitAnsicht({
   });
   /*
    * Sprechgruppen über die Einzelwege (LLH-1265, D2): erst lösen, dann zuordnen, eine Anfrage nach
-   * der anderen; die erste Ablehnung hält an und steht an der Zeile. Die Wege antworten ohne
-   * Körper, deshalb wartet die Seite in jedem Fall auf den neu geladenen Stand, auch nach einer
-   * Teilablehnung. Jede wirksame Änderung schreibt der Server ins Tagebuch, deshalb auch `etb`.
+   * der anderen; jeder angekommene Schritt geht an `onSchritt`, die erste Ablehnung hält an und
+   * steht an der Zeile. Die Wege antworten ohne Körper, deshalb wartet die Seite in jedem Fall auf
+   * den neu geladenen Stand, auch nach einer Teilablehnung. Jede wirksame Änderung schreibt der
+   * Server ins Tagebuch, deshalb auch `etb`.
    */
   const sprechgruppen = useMutation({
-    mutationFn: async ({ hinzu, weg }: SprechgruppenAenderung) => {
+    mutationFn: async (v: {
+      aenderung: SprechgruppenAenderung;
+      onSchritt: (schritt: SprechgruppenSchritt) => void;
+    }) => {
+      const { aenderung, onSchritt } = v;
       try {
-        for (const sg of weg) await loeseEinheitSprechgruppe(einsatzId, einheitId, sg);
-        for (const sg of hinzu) await ordneEinheitSprechgruppeZu(einsatzId, einheitId, sg);
+        for (const id of aenderung.weg) {
+          await loeseEinheitSprechgruppe(einsatzId, einheitId, id);
+          onSchritt({ art: 'weg', id });
+        }
+        for (const id of aenderung.hinzu) {
+          await ordneEinheitSprechgruppeZu(einsatzId, einheitId, id);
+          onSchritt({ art: 'hinzu', id });
+        }
       } finally {
         qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
         await qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
@@ -426,7 +440,9 @@ function EinheitAnsicht({
           einsatzId={einsatzId}
           canEdit={rechte.canEditEinheit}
           onPatch={(etikett, p) => patch.mutateAsync({ etikett, patch: p })}
-          onSprechgruppen={(aenderung) => sprechgruppen.mutateAsync(aenderung)}
+          onSprechgruppen={(aenderung, onSchritt) =>
+            sprechgruppen.mutateAsync({ aenderung, onSchritt })
+          }
         />
 
         <EinheitZeichenPaneel
