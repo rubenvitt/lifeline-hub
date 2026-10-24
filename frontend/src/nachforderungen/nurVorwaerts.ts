@@ -48,16 +48,36 @@ export function kannAbschliessen(n: Pick<Nachforderung, 'einheit_ids'>): boolean
   return !hatVerknuepfteEinheiten(n);
 }
 
+/** Wie die Karte eine verknüpfte Einheit einleitet. */
+export type EinheitenEinleitung = 'Am Raum eingetroffen' | 'Als Einheit übernommen';
+
+/** Die verknüpften Einheiten einer Einleitung, in der Folge von `einheit_ids`. */
+export interface EinheitenGruppe {
+  einleitung: EinheitenEinleitung;
+  ids: number[];
+}
+
 /**
- * Wie die Karte ihre verknüpften Einheiten einleitet. Vor dem Eintreffen der Nachforderung
- * verknüpft nur die Buchung am Raum (LLH-1387 D4): die Einheit ist dort eingetroffen, nicht von
- * der Führung übernommen. Ab „eingetroffen“ bleibt „übernommen“, auch für eine vorher am Raum
- * gebuchte: der Verweis allein sagt nicht, welcher Weg ihn gesetzt hat.
+ * Die verknüpften Einheiten der Karte nach ihrem Weg (LLH-1445): am Raum eingetroffen ist, wen
+ * der Server unter `einheit_ids_am_raum` nennt, und vor dem Eintreffen der Nachforderung jede
+ * (nur die Buchung am Raum verknüpft dann, LLH-1387 D4); alle übrigen sind übernommen. Feste Folge
+ * am Raum vor übernommen, leere Gruppen fallen weg. Eine vor LLH-1445 am Raum verknüpfte Einheit
+ * kennt der Server nicht als solche: sie heißt nach dem Eintreffen „übernommen“.
  */
-export function einheitenEinleitung(
-  n: Pick<Nachforderung, 'status'>,
-): 'Am Raum eingetroffen' | 'Als Einheit übernommen' {
-  return n.status === 'zugesagt' || n.status === 'unterwegs'
-    ? 'Am Raum eingetroffen'
-    : 'Als Einheit übernommen';
+export function einheitenGruppen(
+  n: Pick<Nachforderung, 'status' | 'einheit_ids' | 'einheit_ids_am_raum'>,
+): EinheitenGruppe[] {
+  const vorEintreffen = n.status === 'zugesagt' || n.status === 'unterwegs';
+  const amRaum = new Set(n.einheit_ids_am_raum);
+  const gruppen: EinheitenGruppe[] = [
+    {
+      einleitung: 'Am Raum eingetroffen',
+      ids: n.einheit_ids.filter((id) => vorEintreffen || amRaum.has(id)),
+    },
+    {
+      einleitung: 'Als Einheit übernommen',
+      ids: n.einheit_ids.filter((id) => !vorEintreffen && !amRaum.has(id)),
+    },
+  ];
+  return gruppen.filter((g) => g.ids.length > 0);
 }
