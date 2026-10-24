@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import StichworteTab from './StichworteTab';
 import { adminFixture } from '../test/fixtures';
 import { offeneRueckfrage } from '../test/rueckfrage';
@@ -143,7 +143,7 @@ describe('StichworteTab', () => {
     // statt den fehlenden Sortierkopf.
     const kopf = container.querySelector<HTMLElement>('th.ant-table-column-has-sorters');
     expect(kopf, 'die Leitspalte muss sortierbar sein').not.toBeNull();
-    await userEvent.click(kopf!);
+    await userEvent.click(sortTarget(kopf!));
     expect(ersteZeile()).toContain('H2');
   });
 

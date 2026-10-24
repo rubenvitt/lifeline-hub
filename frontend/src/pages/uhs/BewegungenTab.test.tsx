@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, sortTarget } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
 import type { UhsDetail } from '../../api/types';
 import BewegungenTab from './BewegungenTab';
@@ -189,7 +189,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
 
   it('über die Zeitspalte lässt sich auf älteste zuerst drehen', async () => {
     const { container } = await rendereDrei();
-    const kopf = screen.getByRole('columnheader', { name: /Zeit/ });
+    const kopf = sortTarget(screen.getByRole('columnheader', { name: /Zeit/ }));
 
     /**
      * Antds Zyklus ist auf → ab → keine, die Sicht startet auf ab. Der erste Klick landet also bei

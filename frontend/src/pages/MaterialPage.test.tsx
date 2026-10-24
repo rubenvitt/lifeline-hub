@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
@@ -2048,10 +2048,10 @@ describe('MaterialPage · Sortieren und Filtern (LLH-1096)', () => {
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?f.traeger=DRK'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Menge/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Menge/ })));
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?sort=menge%3Aauf'));
     expect(folge()).toEqual(['11', '10']);
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Menge/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Menge/ })));
     await waitFor(() => expect(folge()).toEqual(['10', '11']));
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?sort=menge%3Aab'));
   });

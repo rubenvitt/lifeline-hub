@@ -212,7 +212,10 @@ const ANZEIGE_SELECT: &str =
             n.eintreffen_erwartet_at, n.anzahl_angefordert, n.teilung_aus_id, \
             n.zurueckgezogen_at, n.zurueckgezogen_grund, \
             (SELECT json_group_array(ee.id ORDER BY ee.id) FROM einsatz_einheit ee \
-             WHERE ee.nachforderung_id = n.id) AS einheit_ids \
+             WHERE ee.nachforderung_id = n.id) AS einheit_ids, \
+            (SELECT json_group_array(ee.id ORDER BY ee.id) FROM einsatz_einheit ee \
+             WHERE ee.nachforderung_id = n.id AND ee.nachforderung_am_raum = 1) \
+              AS einheit_ids_am_raum \
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
