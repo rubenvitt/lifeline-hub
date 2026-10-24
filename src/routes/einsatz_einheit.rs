@@ -301,8 +301,12 @@ pub async fn aus_nachforderung(
     for id in &ergebnis.einheit_ids {
         sse_einheit(&state, einsatz_id, *id);
     }
-    if let Some(br_id) = ergebnis.br_id {
-        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
+    // Ein zur Einheit gewordenes Fahrzeug und die Räume, in denen es stand (LLH-1448).
+    for ef_id in &ergebnis.fahrzeug_ids {
+        sse_fahrzeug(&state, einsatz_id, *ef_id);
+    }
+    for br_id in &ergebnis.br_ids {
+        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, *br_id);
     }
     for ep_id in &ergebnis.personen {
         sse_personal(&state, einsatz_id, *ep_id);

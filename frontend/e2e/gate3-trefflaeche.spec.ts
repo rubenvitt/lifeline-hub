@@ -1,7 +1,10 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import {
   detailBereit,
+  seedEinheitPersonalGesperrt,
   einheitMitZuordnungen,
+  checkGesperrtReady,
+  zuordnungTargetsGesperrt,
   kopfFelder,
   zeilenAusloeser,
   zuordnungsKarte,
@@ -556,6 +559,99 @@ test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhs
     .toBeGreaterThanOrEqual(72 - SUBPIXEL);
   await haeltStufe(name, 72, 'Handschuhauslöser nach Wiederherstellung');
 });
+
+// Modulsperre per Override als eigene Achse (`e2e/AGENTS.md`, LFH-820; LLH-1270): ohne Freigabe
+// Personal fehlt die Besatzung, Fahrzeug und Person stehen flach, darüber „Ohne Besatzung · Modul
+// Personal gesperrt“ (LLH-1036 D5). Der Admin ist nie gesperrt und sieht diesen Zweig nie; er sät,
+// Beobachter und Führungspersonal messen, je auf Fükw und Handschirm.
+
+for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
+  for (const viewport of [FUEKW, HANDSCHIRM]) {
+    test(`Einheit (${rolle === 'beobachter' ? 'Beobachter' : 'Führungspersonal'}, Modulsperre Personal) bei ${viewport.width}px: flache Zeilen und verbleibende Ziele halten 30 / 48 / 72 px`, async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize(viewport);
+      await anmelden(page);
+      const { pfad, namen } = await seedEinheitPersonalGesperrt(page, rolle);
+      const je = new Map<string, number>();
+      const messwerte: string[] = [];
+      for (const { dichte, soll } of STAFFEL) {
+        await page.goto(pfad);
+        await stelleDichte(page, dichte);
+        await checkGesperrtReady(page, rolle);
+        const gesperrt = zuordnungTargetsGesperrt(page, namen, rolle);
+        const ziele: { name: string; ziel: Locator }[] = [];
+        if (rolle === 'fuehrungspersonal') {
+          for (const { name, huelle } of kopfFelder(page)) ziele.push({ name, ziel: huelle });
+          ziele.push({
+            name: 'Einheit auflösen',
+            ziel: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
+              name: 'Einheit auflösen',
+              exact: true,
+            }),
+          });
+        }
+        for (const { name, ziel } of gesperrt.ziele) ziele.push({ name, ziel });
+        // Beobachter: nur der Funkrufname. Führungspersonal: 12 Angaben, „Einheit auflösen“ und
+        // sechs Zuordnungsziele; „Person zuordnen …“ zählt als gesperrtes Ziel extra.
+        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 19);
+
+        let kleinsteZeile = Infinity;
+        for (const { name, zeile } of gesperrt.zeilen) {
+          kleinsteZeile = Math.min(
+            kleinsteZeile,
+            await haeltStufe(zeile, soll, `${name} (${dichte})`),
+          );
+        }
+        je.set(`${dichte} Zeile`, kleinsteZeile);
+        let minimum = Infinity;
+        for (const { name, ziel } of ziele) {
+          const hoehe = await haeltStufe(ziel, soll, `${name} (${dichte})`);
+          const breite = (await ziel.boundingBox())!.width;
+          expect(breite, `${name} (${dichte}): Breite`).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+          minimum = Math.min(minimum, hoehe, breite);
+          if (name === 'Funkrufname (Link)') je.set(`${dichte} Funkrufname`, hoehe);
+        }
+        for (const { name, ziel, feld } of gesperrt.gesperrt) {
+          // Gesperrt statt versteckt: ein gesperrtes Ziel ist ein sichtbares Ziel.
+          await expect(feld, `Vorbedingung: ${name}`).toBeDisabled();
+          minimum = Math.min(minimum, await haeltStufe(ziel, soll, `${name} (${dichte})`));
+        }
+
+        let kleinsterAbstand = Infinity;
+        if (dichte !== 'kompakt') {
+          const boden = dichte === 'handschuh' ? 16 : 8;
+          for (const [links, rechts] of gesperrt.reihen) {
+            const a = (await links.boundingBox())!;
+            const b = (await rechts.boundingBox())!;
+            const abstand = Math.max(b.x - a.x - a.width, b.y - a.y - a.height);
+            kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
+            expect
+              .soft(abstand, `Aktionsabstand ${dichte}: ${links} → ${rechts}`)
+              .toBeGreaterThanOrEqual(boden - SUBPIXEL);
+          }
+          for (const { name, aktion, auswahl } of gesperrt.stapel) {
+            const knopf = (await aktion.boundingBox())!;
+            const feld = (await auswahl.boundingBox())!;
+            const abstand = feld.y - (knopf.y + knopf.height);
+            kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
+            expect(abstand, `${name}: Abstand Aktion/Zuordnung ${dichte}`).toBeGreaterThanOrEqual(
+              boden - SUBPIXEL,
+            );
+          }
+        }
+        messwerte.push(
+          `${dichte} (Soll ≥ ${soll}): ${ziele.length + gesperrt.gesperrt.length} Ziele, kleinste Achse ${minimum.toFixed(2)}px, flache Zeile ${kleinsteZeile}px` +
+            (Number.isFinite(kleinsterAbstand) ? `, Abstand ${kleinsterAbstand}px` : ''),
+        );
+      }
+      gegenprobe(je, 'Zeile');
+      gegenprobe(je, 'Funkrufname');
+      test.info().annotations.push({ type: 'messwert', description: messwerte.join(' | ') });
+    });
+  }
+}
 
 // ── Einsatz-Navigationsrahmen ───────────────────────────────────────────────────────
 //
@@ -5030,4 +5126,320 @@ test('Personenansicht (Beobachter): die Sprünge folgen der Staffel, Schreibziel
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Sprünge, kleinste ${kleinste}px`);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Handschuh-Dichte: Rail, Personal-Kopf, sortierbare Spaltenköpfe (LLH-1273) ─────────
+//
+// Drei Befunde der Prüflisten LLH-1036 Teil I und LLH-1060, alle Bestand im Rahmen bzw. im
+// Primitiv: „Kommunikation“ lag bei 1366 × 520 unter dem klebenden Fuß der Rail, „Personal
+// disponieren“ und „Ad-hoc-Person“ standen 7 px auseinander, und sortierbare Spaltenköpfe
+// stießen aneinander, weil antd die ganze Kopfzelle samt Polsterung zum Ziel macht.
+
+/**
+ * Trefferstreifen eines Tabellenkopfs: tastet die Zeile waagerecht in ihrer Mitte ab und ordnet
+ * jedem Pixel das Ziel zu, das ein Finger dort träfe (`elementFromPoint`): die Sortierfläche oder
+ * den Filterauslöser einer Spalte, sonst nichts. Die Polsterung einer sortierbaren Kopfzelle ist
+ * kein Ziel, ihren Klick hält `polsterKlickRiegel` an; dass das wirkt, belegt der Klick-Fall
+ * unten. Liefert die Lücken zwischen den Zielen benachbarter Spalten; Auslöser und Sortierfläche
+ * derselben Spalte sind antds Verschachtelung.
+ */
+async function kopfZielLuecken(kopf: Locator): Promise<{ ziele: number; luecken: number[] }> {
+  return kopf.evaluate((thead) => {
+    const zellen = [...thead.querySelectorAll<HTMLElement>('th')];
+    const r = thead.getBoundingClientRect();
+    const y = r.top + r.height / 2;
+    const links = Math.max(0, Math.ceil(r.left));
+    const rechts = Math.min(window.innerWidth, Math.floor(r.right));
+    type Lauf = { spalte: number; von: number; bis: number };
+    const laeufe: Lauf[] = [];
+    for (let x = links; x < rechts; x += 1) {
+      const ziel = document
+        .elementFromPoint(x, y)
+        ?.closest('.ant-table-column-sorters, .ant-table-filter-trigger')
+        ?.closest('th');
+      const spalte = ziel && thead.contains(ziel) ? zellen.indexOf(ziel) : -1;
+      if (spalte < 0) continue;
+      const letzter = laeufe[laeufe.length - 1];
+      if (letzter && letzter.spalte === spalte && letzter.bis === x - 1) letzter.bis = x;
+      else laeufe.push({ spalte, von: x, bis: x });
+    }
+    const luecken: number[] = [];
+    for (let i = 1; i < laeufe.length; i += 1) {
+      if (laeufe[i]!.spalte !== laeufe[i - 1]!.spalte) {
+        luecken.push(laeufe[i]!.von - laeufe[i - 1]!.bis - 1);
+      }
+    }
+    return { ziele: new Set(laeufe.map((l) => l.spalte)).size, luecken };
+  });
+}
+
+/** Trefferhöhe der Sortierfläche einer Kopfzelle: senkrecht abgetastet in ihrer Textmitte. */
+async function sortierTrefferHoehe(kopfZelle: Locator): Promise<number> {
+  return kopfZelle.evaluate((th) => {
+    const titel = th.querySelector('.ant-table-column-title') ?? th;
+    const t = titel.getBoundingClientRect();
+    const x = t.left + Math.min(t.width / 2, 8);
+    const zeile = th.closest('thead')!.getBoundingClientRect();
+    let hoehe = 0;
+    for (let y = Math.floor(zeile.top) - 20; y < Math.ceil(zeile.bottom) + 20; y += 1) {
+      const treffer = document.elementFromPoint(x, y);
+      if (treffer?.closest('.ant-table-column-sorters')?.closest('th') === th) {
+        hoehe += 1;
+      }
+    }
+    return hoehe;
+  });
+}
+
+async function seedPersonal(page: Page, einsatzId: string) {
+  for (const name of ['Messkraft Kopf A', 'Messkraft Kopf B']) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+      data: { adhoc: { name } },
+    });
+    expect(antwort.ok(), `Seeding ${name}: ${await antwort.text()}`).toBeTruthy();
+  }
+}
+
+/** Misst die sortierbaren Spaltenköpfe der Personalliste in einer Stufe; liefert die Anmerkung. */
+async function measurePersonalKopf(page: Page, dichte: keyof typeof ZIELABSTAND, soll: number) {
+  const main = page.getByRole('main');
+  // Datenanker: beide Kräfte stehen in der Tabelle.
+  await expect(main.getByText('Messkraft Kopf B', { exact: true })).toBeVisible();
+  const kopf = main.locator('.ant-table-thead').first();
+  const sortierbar = kopf.locator('th.ant-table-column-has-sorters');
+  // Name, Funktion, Position, Status, Einsatzdauer stehen am Fükw ohne Spaltenschalter.
+  const anzahl = await mindestensKnoten(sortierbar, 4, `sortierbare Spaltenköpfe (${dichte})`);
+
+  const { ziele, luecken } = await kopfZielLuecken(kopf);
+  expect(ziele, 'jede sortierbare Spalte im Bild trifft').toBeGreaterThanOrEqual(4);
+  const kleinsteLuecke = Math.min(...luecken);
+  const sollAbstand = ZIELABSTAND[dichte];
+  if (sollAbstand != null) {
+    expect(
+      kleinsteLuecke,
+      `kleinste Lücke zwischen den Zielen benachbarter Spaltenköpfe (${dichte}): ${luecken.join(', ')}`,
+    ).toBeGreaterThanOrEqual(sollAbstand - SUBPIXEL);
+  }
+  let kleinsteHoehe = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < anzahl; i += 1) {
+    const hoehe = await sortierTrefferHoehe(sortierbar.nth(i));
+    expect(
+      hoehe,
+      `Trefferhöhe der Sortierfläche #${i + 1} (${dichte}, Soll ≥ ${soll})`,
+    ).toBeGreaterThanOrEqual(soll - 1);
+    kleinsteHoehe = Math.min(kleinsteHoehe, hoehe);
+  }
+  return `Spaltenköpfe ${anzahl}, Lücke ≥ ${kleinsteLuecke}px, Höhe ≥ ${kleinsteHoehe}px`;
+}
+
+test('Personal (LLH-1273): Kopfaktionen halten den Zielabstand, sortierbare Spaltenköpfe stoßen nicht aneinander und halten die Stufe', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personal Kopf`);
+  await seedPersonal(page, einsatzId);
+
+  const main = page.getByRole('main');
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    await stelleDichte(page, dichte);
+    const disponieren = main.getByRole('button', { name: 'Personal disponieren', exact: true });
+    const adhoc = main.getByRole('button', { name: 'Ad-hoc-Person', exact: true });
+    await haeltStufe(disponieren, soll, `Personal disponieren (${dichte})`);
+    await haeltStufe(adhoc, soll, `Ad-hoc-Person (${dichte})`);
+    const a = (await disponieren.boundingBox())!;
+    const b = (await adhoc.boundingBox())!;
+    const abstand = Math.max(b.x - a.x - a.width, b.y - a.y - a.height);
+    const sollAbstand = ZIELABSTAND[dichte];
+    if (sollAbstand != null) {
+      expect(abstand, `Personal disponieren → Ad-hoc-Person (${dichte})`).toBeGreaterThanOrEqual(
+        sollAbstand - SUBPIXEL,
+      );
+    }
+    const kopf = await measurePersonalKopf(page, dichte, soll);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Kopfaktionen ${abstand}px auseinander, ${kopf}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Personal (LLH-1273): ein Tipp in die Polsterung sortiert nicht, auch nicht über der fixierten Spalte, der Titel sortiert', async ({
+  page,
+}) => {
+  // Tablet hoch im Handschuh: die Tabelle läuft waagerecht über, die Namensspalte ist fixiert.
+  // Unter ihr rollen die übrigen Kopfzellen durch; ein Tipp in ihre Polsterung fiel mit
+  // `pointer-events: none` an der Zelle auf die verdeckte Spalte (Review LLH-1273).
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personal Polster`);
+  await seedPersonal(page, einsatzId);
+  await page.goto(`/einsaetze/${einsatzId}/personal`);
+  await stelleDichte(page, 'handschuh');
+  const main = page.getByRole('main');
+  await expect(main.getByText('Messkraft Kopf B', { exact: true })).toBeVisible();
+
+  const kopf = main.locator('.ant-table-thead').first();
+  const fixiert = kopf.locator('th.ant-table-column-has-sorters.ant-table-cell-fix-start').first();
+  await expect(fixiert).toHaveCount(1);
+  // Der Kopf klebt als eigene Tabelle (`.ant-table-header`) und rollt mit dem Körper.
+  const kopfRolle = main.locator('.ant-table-header').first();
+  const koerper = main.locator('.ant-table-body').first();
+  // Vorbedingung: die Tabelle läuft über, sonst rollte nichts unter die fixierte Zelle.
+  expect(await kopfRolle.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeGreaterThan(100);
+  await koerper.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+  await expect.poll(() => kopfRolle.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+
+  // Punkte in der Polsterung der fixierten Zelle: rechts und links neben dem Inhalt, mittig.
+  const punkte = await fixiert.evaluate((th) => {
+    const z = th.getBoundingClientRect();
+    const inhalt = th.querySelector('.ant-table-column-sorters')!.getBoundingClientRect();
+    const y = z.top + z.height / 2;
+    return [
+      { x: (inhalt.right + z.right) / 2, y },
+      { x: (z.left + inhalt.left) / 2, y },
+    ];
+  });
+  const sortStand = () =>
+    kopf.evaluate((t) =>
+      [...t.querySelectorAll('th[aria-sort]')]
+        .map((th) => `${th.textContent}:${th.getAttribute('aria-sort')}`)
+        .join(),
+    );
+  const vorher = { stand: await sortStand(), adresse: page.url() };
+  // Vorbedingung: die Namensspalte trägt eine Richtung, die ein falscher Klick kehren würde.
+  expect(vorher.stand).toMatch(/ascending|descending/);
+  for (const p of punkte) {
+    // Getroffen wird die fixierte Zelle selbst, keine verdeckte Spalte darunter.
+    const getroffen = await page.evaluate(
+      ([x, y]) => {
+        const t = document.elementFromPoint(x, y);
+        return {
+          fixiert: !!t?.closest('th.ant-table-cell-fix-start'),
+          inhalt: !!t?.closest('.ant-table-column-sorters, .ant-table-filter-trigger'),
+        };
+      },
+      [p.x, p.y] as const,
+    );
+    expect(getroffen, `Tipp bei x ${Math.round(p.x)}`).toEqual({ fixiert: true, inhalt: false });
+    await page.mouse.click(p.x, p.y);
+  }
+  // Nichts sortiert: dieselbe Richtung, dieselbe Adresse.
+  expect(await sortStand(), 'Tipps in die Polsterung ändern die Sortierung nicht').toBe(
+    vorher.stand,
+  );
+  // Länger als die Entprellung des Listengedächtnisses (`GEDAECHTNIS_ENTPRELLUNG_MS`, 300 ms): ein
+  // falscher Klick stünde jetzt in der Adresse.
+  await page.waitForTimeout(1000);
+  expect(page.url()).toBe(vorher.adresse);
+
+  // Gegenprobe: der Titel derselben Zelle kehrt die Richtung.
+  const richtung = await fixiert.getAttribute('aria-sort');
+  await fixiert.locator('.ant-table-column-title').click();
+  await expect(fixiert).not.toHaveAttribute('aria-sort', richtung ?? '');
+  // Die Adresse folgt entprellt (`listenGedaechtnis`).
+  await expect(page).toHaveURL(/[?&]sort=/);
+});
+
+test('Personal (Beobachter, LLH-1273): ohne Kopfaktionen halten die sortierbaren Spaltenköpfe Abstand und Stufe', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personal Kopf Lesend`);
+  await seedPersonal(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const main = page.getByRole('main');
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    await stelleDichte(page, dichte);
+    const kopf = await measurePersonalKopf(page, dichte, soll);
+    // Nach dem Datenanker: ohne Schreibrecht fehlen beide Kopfaktionen.
+    for (const name of ['Personal disponieren', 'Ad-hoc-Person']) {
+      await expect(
+        main.getByRole('button', { name, exact: true }),
+        `Vorbedingung: ohne Schreibrecht kein „${name}“`,
+      ).toHaveCount(0);
+    }
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): ${kopf}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test.describe('Rail bei 1366 × 520 in Handschuh (LLH-1273)', () => {
+  test.use({ hasTouch: true });
+
+  /** Name des Knopfs, den ein Tipp auf den Punkt träfe. */
+  const getroffen = (page: Page, x: number, y: number) =>
+    page.evaluate(
+      ([px, py]) =>
+        document.elementFromPoint(px, py)?.closest('button')?.getAttribute('aria-label'),
+      [x, y] as const,
+    );
+
+  test('alle fünf Kategorien sind ohne Wischen antippbar, der Fuß kommt per Wischen ins Bild', async ({
+    page,
+  }) => {
+    await anmelden(page);
+    await page.setViewportSize({ width: 1366, height: 520 });
+    const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Rail`);
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    await stelleDichte(page, 'handschuh');
+
+    const rail = page.getByRole('navigation', { name: 'Kategorien' });
+    const spalte = rail.locator('[data-lfh="rail-spalte"]');
+    const fuss = rail.locator('[data-lfh="rail-fuss"]');
+    const kategorien = rail.locator('[data-lfh="rail-haupt"] button');
+    // Vorbedingung: die Spalte reicht nicht für Kategorien UND Fuß. Sonst bewiese der Tipp nichts.
+    expect(await spalte.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
+    await expect(kategorien).toHaveCount(5);
+
+    // Ohne Wischen: jede Kategorie steht ganz im Bild, über dem Fuß, und trifft oben, in der Mitte
+    // und unten.
+    const sicht = (await spalte.boundingBox())!;
+    const sichtUnten = Math.min(sicht.y + sicht.height, 520);
+    const fussOben = (await fuss.boundingBox())!.y;
+    for (const k of await kategorien.all()) {
+      const name = (await k.getAttribute('aria-label'))!;
+      const b = (await k.boundingBox())!;
+      expect(b.height, `${name}: die Stufe bleibt`).toBeGreaterThanOrEqual(72 - SUBPIXEL);
+      expect(b.y + b.height, `${name} endet im Bild`).toBeLessThanOrEqual(sichtUnten + SUBPIXEL);
+      expect(b.y + b.height, `${name} endet über dem Fuß`).toBeLessThanOrEqual(fussOben + SUBPIXEL);
+      for (const anteil of [0.1, 0.5, 0.9]) {
+        expect(
+          await getroffen(page, b.x + b.width / 2, b.y + b.height * anteil),
+          `${name}: Treffer bei ${anteil * 100} % der Höhe`,
+        ).toBe(name);
+      }
+    }
+    const kommunikation = rail.getByRole('button', { name: 'Kommunikation', exact: true });
+    const k = (await kommunikation.boundingBox())!;
+    await page.touchscreen.tap(k.x + k.width / 2, k.y + k.height / 2);
+    await expect(kommunikation).toHaveAttribute('aria-current', 'true');
+
+    // Der Fuß steht hinter den Kategorien. Gewischt wird wie mit dem Finger auf der Rail: ein
+    // Rollen über der Spalte, kein `scrollIntoView` von außen.
+    await page.mouse.move(sicht.x + sicht.width / 2, sicht.y + sicht.height / 3);
+    await page.mouse.wheel(0, 400);
+    await expect
+      .poll(() => spalte.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop))
+      .toBeLessThanOrEqual(1);
+    const einstellungen = rail.getByRole('button', { name: 'Einstellungen', exact: true });
+    const e = (await einstellungen.boundingBox())!;
+    expect(e.y + e.height, 'Einstellungen endet nach dem Wischen im Bild').toBeLessThanOrEqual(
+      sichtUnten + SUBPIXEL,
+    );
+    expect(await getroffen(page, e.x + e.width / 2, e.y + e.height / 2)).toBe('Einstellungen');
+    await page.touchscreen.tap(e.x + e.width / 2, e.y + e.height / 2);
+    await expect(einstellungen).toHaveAttribute('aria-current', 'true');
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `Kommunikation endet ${Math.round(fussOben - k.y - k.height)}px über dem Fuß, Sicht bis ${Math.round(sichtUnten)}px`,
+    });
+  });
 });

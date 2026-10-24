@@ -75,8 +75,8 @@ for (const { dichte, viewport, boden } of STUFEN) {
       ).toBeGreaterThanOrEqual(boden - SUBPIXEL);
 
       // Kein anderes Bedienziel im Kopf steht näher als der Zielabstand: sortierbare Kopfzellen
-      // (die ganze Zelle ist das Ziel) und weitere Auslöser. Die eigene Kopfzelle zählt nicht,
-      // sie umschließt den Auslöser.
+      // und weitere Auslöser. Gemessen wird streng gegen die ganze Zelle, obwohl seit LLH-1273 nur
+      // ihr Inhalt trifft. Die eigene Kopfzelle zählt nicht, sie umschließt den Auslöser.
       if (soll != null) {
         const nachbarn = await kopf(page).evaluate((thead) => {
           const eigen = thead.querySelector('.ant-table-filter-trigger')!;

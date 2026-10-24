@@ -376,7 +376,9 @@ export default function PressePage() {
         />
       }
       aktionen={
-        <Space wrap>
+        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+        // `paddingXS` ließ 3 / 5 / 7 px.
+        <Space wrap size={token.marginSM}>
           <Button
             onClick={() => {
               kontaktMutation.reset();
