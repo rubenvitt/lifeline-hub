@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import SprechgruppenTab from './SprechgruppenTab';
 import { adminFixture } from '../test/fixtures';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
@@ -117,7 +117,7 @@ describe('SprechgruppenTab', () => {
 
     // Aufsteigend nach Bezeichnung, numerisch: 42 vor 208 vor 412. Zeichenweise käme
     // 208, 412, 42 heraus — die Erwartung fällt also auch, wenn nur `numeric: true` verschwindet.
-    await userEvent.click(screen.getByRole('columnheader', { name: /Bezeichnung/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /Bezeichnung/ })));
     await waitFor(() =>
       expect(bezeichnungen(container)).toEqual(['42_F_DRK', '208_D_DRK', '412_F_DRK']),
     );
@@ -313,7 +313,7 @@ describe('SprechgruppenTab · Sortieren und Filtern (LLH-1096)', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
 
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Betriebsart/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Betriebsart/ })));
     await waitFor(() => expect(folge()).toEqual(['2', '1']));
     await waitFor(() =>
       expect(ort.aktuell).toBe('/admin/stammdaten/sprechgruppen?sort=betriebsart%3Aauf'),

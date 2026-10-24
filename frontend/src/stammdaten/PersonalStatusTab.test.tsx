@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import PersonalStatusTab from './PersonalStatusTab';
 import { adminFixture } from '../test/fixtures';
 
@@ -98,7 +98,9 @@ describe('PersonalStatusTab', () => {
 
     // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte; ob der Klick am
     // 390-px-Schirm ankommt, belegt jsdom NICHT.
-    await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
+    await userEvent.click(
+      sortTarget(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!),
+    );
     expect(labels(container)).toEqual(['alarmiert', 'dienstbereit']);
 
     const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
