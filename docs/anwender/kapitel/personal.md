@@ -227,9 +227,11 @@ unabhängig: Wechselt eine Person die Einheit, bleibt sie auf ihrem Fahrzeug. F�
 Fahrzeug einer anderen Einheit, steht daneben „andere Einheit“; das Meldebild zeigt sie unter
 „Ohne Fahrzeug“ ihrer Einheit mit „fährt auf …“. Mitfahrer sind so sichtbar, aber erlaubt.
 
-Führt eine Person ihre Einheit und wechselt die Einheit, ist die Einheit danach ohne Führer. Liste
-und Ansicht zeigen deshalb vor dem Wechsel die Marke „Einheitsführer“ am Wert; das Einsatztagebuch
-nennt nur die neue Zuordnung.
+Wechselt eine Person die Einheit, nennt das Einsatztagebuch die alte und die neue Einheit, etwa
+„Person «Anna Probe»: Einheit «Zug 1» → «Zug 2»“. Führt sie ihre Einheit, ist die Einheit danach
+ohne Führer. Liste und Ansicht zeigen deshalb vor dem Wechsel die Marke „Einheitsführer“ am Wert,
+und der Eintrag sagt es dazu: „…, Einheitsführer von «Zug 1» endet“. Dieselbe Einheit noch einmal
+gewählt ändert nichts.
 
 Die Stärke-Position bestimmt, ob die Person als Führer, Unterführer oder Mannschaft zählt;
 Einheitsführer ist ein eigenes Merkmal der Einheit.

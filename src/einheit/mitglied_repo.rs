@@ -20,43 +20,74 @@ async fn pruefe_einheit_tx(
     t.map(|_| ()).ok_or(AppError::NotFound)
 }
 
+/// Ergebnis von [`zuordnen_personal_tx`] (LLH-1262, Gegenstück zu [`FahrzeugZuordnung`]): der
+/// Snapshot-Name für den ETB-Text, die Einheit, der die Person vorher angehörte (ID für das
+/// Ereignis, Name für den Text), die Einheiten, deren Führung sie dabei abgibt, und ob sich die
+/// Zuordnung geändert hat.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersonalZuordnung {
+    pub name: String,
+    pub vorher: Option<(i64, String)>,
+    pub fuehrung_endet: Vec<(i64, String)>,
+    pub is_changed: bool,
+}
+
 /// Ordnet eine Personal-Dispozeile einer Einheit zu (exklusiv), auf offener Connection/Tx
 /// (F06/LFH-244 Tier-A: atomar mit dem System-ETB-Eintrag). Eine bereits andernorts
-/// zugeordnete Kraft wechselt; war sie dort Führer, wird dieser Verweis bereinigt.
-/// `NotFound`, falls Dispozeile oder Einheit nicht zum Einsatz gehören. Liefert den Namen.
+/// zugeordnete Kraft wechselt; war sie dort Führer, endet diese Führung, und das Ergebnis nennt
+/// sie. Dieselbe Einheit noch einmal schreibt nichts, auch die Führung bleibt (LLH-1262, wie
+/// LLH-1073 D2 am Fahrzeug). `NotFound`, falls Dispozeile oder Einheit nicht zum Einsatz gehören.
 pub async fn zuordnen_personal_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ep_id: i64,
-) -> Result<String, AppError> {
+) -> Result<PersonalZuordnung, AppError> {
     pruefe_einheit_tx(conn, einsatz_id, einheit_id).await?;
-    let name: Option<String> = sqlx::query_scalar(
-        "SELECT snap_name FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    let zeile: Option<(String, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT p.snap_name, p.einheit_id, e.name FROM einsatz_personal p \
+         LEFT JOIN einsatz_einheit e ON e.id = p.einheit_id \
+         WHERE p.id = ? AND p.einsatz_id = ?",
     )
     .bind(ep_id)
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let name = name.ok_or(AppError::NotFound)?;
+    let (name, vorher_id, vorher_name) = zeile.ok_or(AppError::NotFound)?;
     // Eine entlassene oder stornierte Kraft wird keinem Verband mehr zugeordnet (409, LLH-1079).
     crate::personal::disposition_repo::require_nicht_beendet(&mut *conn, einsatz_id, ep_id).await?;
+    let vorher = vorher_id.zip(vorher_name);
+    if vorher_id == Some(einheit_id) {
+        return Ok(PersonalZuordnung {
+            name,
+            vorher,
+            fuehrung_endet: Vec::new(),
+            is_changed: false,
+        });
+    }
 
-    // Stale Führer-Verweis bereinigen (Person war evtl. anderswo Führer).
-    sqlx::query(
-        "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?",
+    // Führer-Verweis bereinigen (Person war evtl. anderswo Führer); die Führung endet.
+    let mut fuehrung_endet: Vec<(i64, String)> = sqlx::query_as(
+        "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ? \
+         RETURNING id, name",
     )
     .bind(ep_id)
     .bind(einsatz_id)
-    .execute(&mut *conn)
+    .fetch_all(&mut *conn)
     .await?;
+    fuehrung_endet.sort_by_key(|(id, _)| *id);
     sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(einheit_id)
         .bind(ep_id)
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
-    Ok(name)
+    Ok(PersonalZuordnung {
+        name,
+        vorher,
+        fuehrung_endet,
+        is_changed: true,
+    })
 }
 
 /// Pool-Wrapper (eigene Tx, hält die beiden UPDATEs atomar).
@@ -65,11 +96,11 @@ pub async fn zuordnen_personal(
     einsatz_id: i64,
     einheit_id: i64,
     ep_id: i64,
-) -> Result<String, AppError> {
+) -> Result<PersonalZuordnung, AppError> {
     let mut tx = pool.begin().await?;
-    let name = zuordnen_personal_tx(&mut tx, einsatz_id, einheit_id, ep_id).await?;
+    let zuordnung = zuordnen_personal_tx(&mut tx, einsatz_id, einheit_id, ep_id).await?;
     tx.commit().await?;
-    Ok(name)
+    Ok(zuordnung)
 }
 
 /// Gibt eine Personal-Dispozeile aus ihrer Einheit frei (`einheit_id = NULL`), auf offener
@@ -741,7 +772,7 @@ mod tests {
         let ep = person(&pool, einsatz, "Anna", Some("mannschaft")).await;
 
         assert_eq!(
-            zuordnen_personal(&pool, einsatz, a, ep).await.unwrap(),
+            zuordnen_personal(&pool, einsatz, a, ep).await.unwrap().name,
             "Anna"
         );
         assert_eq!(einheit_von(&pool, ep).await, Some(a));
