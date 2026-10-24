@@ -83,8 +83,9 @@ anderer Text eintragen.
    vom Einsatzort; danach „Speichern“ wählen.
 5. „Rufname“, „Sprechgruppen“, „Telefon und weitere Verbindungen“ und „Führungsfahrzeuge“
    Zeile für Zeile eintragen und speichern wie jede andere Angabe. Rufname und Sprechgruppen sind
-   der Funk; unter „Telefon und weitere Verbindungen“ fügt „Verbindung hinzufügen“ je Nummer oder
-   Adresse eine Zeile mit Mittel und Hinweis an, wie bei Abschnitt und Einheit. Bei
+   der Funk. Unter „Telefon und weitere Verbindungen“ wählt ein Tipp auf eine Nummer sie;
+   geändert wird über „Bearbeiten“ neben der Liste, und „Verbindung hinzufügen“ fügt je Nummer
+   oder Adresse eine Zeile mit Mittel und Hinweis an, wie bei Abschnitt und Einheit. Bei
    „ortsfest“ stehen die Führungsfahrzeuge eingeklappt; ein Klick auf die Anzahl öffnet sie.
    Beim „Rufname“ schlägt die Liste die Funkrufnamen der Führungsfahrzeuge vor; Tippen grenzt
    sie ein, ein Eintrag übernimmt den Funkrufnamen unverändert, freier Text bleibt möglich.

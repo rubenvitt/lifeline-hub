@@ -7,11 +7,14 @@ Kommunikationsplans. Abschnitt, Einheit und eigene Führungsstelle nehmen ihn un
 
 - **Lesen** (`VerbindungenListe`): je Verbindung das Mittel gedämpft, der Wert in Mono,
   `tel:` nur für Festnetz und Mobil, `mailto:` nur mit `@` (`verbindungen.ts`), der Hinweis
-  gedämpft dahinter.
-- **Bearbeiten** (`VerbindungenAngabe`): eine `InlineAngabe` über die ganze Liste; der
-  Server ersetzt sie vollständig (`verbindungen`). Leere Zeilen fallen beim Speichern weg, ein
-  Hinweis ohne Nummer wird nicht gesendet. Höchstens `VERBINDUNGEN_MAX` Einträge, Wert und
-  Hinweis je höchstens `VERBINDUNG_TEXT_MAX` Zeichen (Spiegel der Servergrenzen).
+  gedämpft dahinter. Der Verweis ist ein Bedienziel und trägt den Boden der Dichte-Staffel
+  (`kennungsLinkStil`, ein `<a>` erbt keine Steuerhöhe).
+- **Bearbeiten** (`VerbindungenAngabe`): eine `InlineAngabe` über die ganze Liste, mit
+  `bearbeitenDaneben` — die Verweise stehen nicht im Wertknopf, „Bearbeiten“ steht daneben
+  (LLH-1426: der Klick auf die Nummer wählt). Der Server ersetzt die Liste vollständig
+  (`verbindungen`). Leere Zeilen fallen beim Speichern weg, ein Hinweis ohne Nummer wird nicht
+  gesendet. Höchstens `VERBINDUNGEN_MAX` Einträge, Wert und Hinweis je höchstens
+  `VERBINDUNG_TEXT_MAX` Zeichen (Spiegel der Servergrenzen).
 
 Aus `frontend/src/components/FunkUndTelefon.tsx`:
 
