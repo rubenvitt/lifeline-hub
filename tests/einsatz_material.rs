@@ -562,9 +562,8 @@ async fn reine_bemerkung_publiziert_material_event() {
     assert_eq!(data["material_id"], em);
 }
 
-/// LFH-66: Auch das Zuordnen von Material an eine Einheit publiziert ein
-/// `material`-Live-Event (analog fahrzeug/personal in einsatz_einheit) — nicht nur
-/// als Beifang des `einheit`-Events.
+/// LFH-66: Auch das Zuordnen von Material an eine Einheit (Material-PATCH mit `einheit_id`)
+/// publiziert ein `material`-Live-Event — nicht nur als Beifang des `einheit`-Events.
 #[tokio::test]
 async fn material_an_einheit_zuordnen_publiziert_material_event() {
     let (app, live) = setup_mit_live().await;
