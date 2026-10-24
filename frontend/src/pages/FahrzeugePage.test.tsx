@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import FahrzeugePage from './FahrzeugePage';
@@ -2114,7 +2114,7 @@ describe('FahrzeugePage · Sortieren und Filtern (LLH-1096)', () => {
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge?f.traeger=ASB'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Kennzeichen/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Kennzeichen/ })));
     await waitFor(() => expect(reihenfolge()).toEqual(['11', '10']));
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge?sort=kennzeichen%3Aauf'));
   });

@@ -4,7 +4,6 @@ import { IconSeitenleisteAuf, IconSeitenleisteZu } from '../icons';
 import { railBreite } from '../components/Kopfleiste';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
-import { fussFokusabstandScrollportStil, useFussFokusabstand } from './fussFokusabstand';
 
 interface Props {
   kategorien: Kategorie[];
@@ -93,7 +92,6 @@ const ETIKETT_STIL: CSSProperties = {
  */
 export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick, panel }: Props) {
   const { token } = theme.useToken();
-  const { wurzelRef, fussRef } = useFussFokusabstand('spalte');
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
@@ -128,7 +126,6 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
 
   return (
     <nav
-      ref={wurzelRef}
       aria-label="Kategorien"
       style={{
         display: 'flex',
@@ -146,10 +143,10 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
          Fuß unten, zusammen höchstens so hoch wie das Fenster unter dem Rahmen. Zwei getrennt
          klebende Teile (Kategorien oben, Fuß unten) überlappten bei geringer Höhe in `handschuh`,
          und keiner rollte die verdeckte Kategorie frei. Reicht die Höhe nicht, rollt die Spalte in
-         sich; der Fuß klebt an ihrem Ende, und `scroll-padding-block-end` der Spalte in seiner Höhe
-         rollt ein fokussiertes Ziel über ihn (WCAG 2.4.11, `fussFokusabstand`, LLH-1241).
-         Steht über dem Kopf eine Zeile im Fluss (Betriebszeile ab `md`), liegt der Fuß um ihre
-         Höhe unter dem Fensterrand, bis die Seite so weit gerollt ist. */}
+         sich, und der Fuß folgt den Kategorien (LLH-1273): die Kategorien stehen zuerst im Bild,
+         nichts liegt unter einem klebenden Teil. Steht über dem Kopf eine Zeile im Fluss
+         (Betriebszeile ab `md`), endet die Spalte um ihre Höhe unter dem Fensterrand, bis die Seite
+         so weit gerollt ist. */}
       <div
         data-lfh="rail-spalte"
         style={{
@@ -159,25 +156,19 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',
-          ...fussFokusabstandScrollportStil,
         }}
       >
         <div data-lfh="rail-haupt" style={{ display: 'flex', flexDirection: 'column' }}>
           {haupt.map(ziel)}
         </div>
         {fuss.length > 0 && (
-          // `sticky; bottom: 0` am Ende der Spalte; auf hohen Fenstern schiebt ihn `marginTop: auto`
-          // dorthin. Der Grund ist nötig, weil in einer rollenden Spalte Ziele darunter vorbeiziehen.
+          // Auf hohen Fenstern schiebt ihn `marginTop: auto` ans Ende der Spalte. Er klebt NICHT
+          // (LLH-1273): bei 1366 × 520 in `handschuh` lagen „Lage“ und „Kommunikation“ ganz unter
+          // dem klebenden Fuß und waren ohne Wischen weder zu sehen noch anzutippen. Reicht die Höhe
+          // nicht, steht er hinter den Kategorien und kommt per Wischen oder Tab ins Bild.
           <div
-            ref={fussRef}
             data-lfh="rail-fuss"
-            style={{
-              marginTop: 'auto',
-              position: 'sticky',
-              bottom: 0,
-              background: rahmenFarben.grund,
-              borderTop: `1px solid ${rahmenFarben.linie}`,
-            }}
+            style={{ marginTop: 'auto', borderTop: `1px solid ${rahmenFarben.linie}` }}
           >
             {panel && (
               // Griff des Modulmenüs (LFH-952, D5): sichtbar, weil das Panel am Tablet quer ohne

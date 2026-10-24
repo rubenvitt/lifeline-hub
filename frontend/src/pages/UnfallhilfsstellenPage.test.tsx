@@ -1,3 +1,4 @@
+import { sortTarget } from '../test/utils';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -394,7 +395,7 @@ describe('UnfallhilfsstellenPage · Sortieren und Filtern (LLH-1096)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     // Status nach dem Lebenslauf: geplant vor aktiv.
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Status/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Status/ })));
     await waitFor(() => expect(bezeichnungen()).toEqual(['PA Nord', 'BHP 50']));
     await waitFor(() =>
       expect(screen.getByTestId('liste-ort')).toHaveTextContent(

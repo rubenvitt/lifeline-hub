@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
@@ -201,6 +201,50 @@ describe('MaterialPage', () => {
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     expect(within(zeile).getByText('50')).toBeInTheDocument();
     expect(screen.queryByRole('spinbutton')).toBeNull();
+  });
+
+  it('hebt per ?material=<id> den Posten hervor und räumt den Parameter (LLH-1260)', async () => {
+    const decke = { ...em, id: 11, bezeichnung: 'Feldbett', einheit_id: 2 };
+    const { container } = render(
+      einsatzAktiv,
+      [em, decke],
+      [],
+      {},
+      '/einsaetze/1/material?material=11',
+    );
+    await screen.findByText('Feldbett');
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="11"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+    expect(container.querySelector('[data-row-key="10"]')).not.toHaveClass('zeile-hervorgehoben');
+    // Apply-then-clean: ein stehender Parameter pinnte die Markierung bei Zurück und Neuladen.
+    await waitFor(() => expect(ort.aktuell).not.toContain('material='));
+  });
+
+  it('ein unbekannter Posten in ?material= markiert nichts (LLH-1260)', async () => {
+    const { container } = render(einsatzAktiv, [em], [], {}, '/einsaetze/1/material?material=99');
+    await screen.findByText('Wolldecke');
+    await waitFor(() => expect(ort.aktuell).not.toContain('material='));
+    expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+  });
+
+  it('auch im Kartenzweig trägt der angesprungene Posten die Markierung (LLH-1260)', async () => {
+    setzeViewportBreite(390);
+    const decke = { ...em, id: 11, bezeichnung: 'Feldbett' };
+    const { container } = render(
+      einsatzAktiv,
+      [em, decke],
+      [],
+      {},
+      '/einsaetze/1/material?material=11',
+    );
+    await screen.findByText('Feldbett');
+    expect(container.querySelector('.ant-table'), 'Gegenprobe: keine Tabelle').toBeNull();
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-lfh="datensicht-karte"].zeile-hervorgehoben'),
+      ).toHaveTextContent('Feldbett'),
+    );
   });
 
   it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
@@ -2048,10 +2092,10 @@ describe('MaterialPage · Sortieren und Filtern (LLH-1096)', () => {
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?f.traeger=DRK'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Menge/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Menge/ })));
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?sort=menge%3Aauf'));
     expect(folge()).toEqual(['11', '10']);
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Menge/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Menge/ })));
     await waitFor(() => expect(folge()).toEqual(['10', '11']));
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?sort=menge%3Aab'));
   });
