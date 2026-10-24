@@ -10,6 +10,7 @@ import type {
 } from '../../api/types';
 import {
   besatzungGrund,
+  buildBesatzungMittel,
   buildEinheitRechte,
   buildFahrzeugZuordnenGroups,
   buildPersonMenuItems,
@@ -17,6 +18,7 @@ import {
   collectNachfahren,
   toKraftError,
   parseZuordnenWert,
+  visibleBesatzungRows,
   type EinheitRechte,
 } from './einheitAnsichtKern';
 
@@ -147,6 +149,59 @@ describe('besatzungGrund (design.md D5)', () => {
     );
     // Der Beobachter sieht die Besatzung, er bedient sie nur nicht.
     expect(besatzungGrund(buildEinheitRechte(false, freigaben()))).toBeNull();
+  });
+});
+
+/** Die Zeilen des Paneels, gegen die ein Grund seinen Ort prüft (LLH-1269). */
+describe('visibleBesatzungRows', () => {
+  const zug = {
+    id: 10,
+    ueber_einheit_id: null,
+    fuehrer_id: null,
+    personal_mitglieder: [
+      { ep_id: 1, name: 'Anna', staerke_position: null, ist_fuehrer: false },
+      { ep_id: 2, name: 'Bernd', staerke_position: null, ist_fuehrer: false },
+    ],
+    fahrzeug_mitglieder: [{ ef_id: 30, funkrufname: '83-1', fahrzeugtyp: null, status: null }],
+  } as unknown as Einheit;
+  const personal = [
+    ep(1, { name: 'Anna', einheit_id: 10, fahrzeug_id: 30 }),
+    ep(2, { name: 'Bernd', einheit_id: 10 }),
+  ];
+  const fahrzeuge = [{ id: 30, funkrufname: '83-1', einheit_id: 10 } as EinsatzFahrzeug];
+
+  it('mit Besatzung: die Personen auf dem Fahrzeug und ohne Fahrzeug, die Fahrzeuge', () => {
+    const rechte = buildEinheitRechte(true, freigaben());
+    const rows = visibleBesatzungRows(
+      zug,
+      buildBesatzungMittel(zug, [zug], personal, fahrzeuge, rechte),
+    );
+    expect([...rows.personen]).toEqual(
+      expect.arrayContaining([
+        [1, 'Anna'],
+        [2, 'Bernd'],
+      ]),
+    );
+    expect(rows.personen.size).toBe(2);
+    expect([...rows.fahrzeuge]).toEqual([[30, '83-1']]);
+  });
+
+  it('ohne Freigabe Personal: flach aus dem DTO', () => {
+    const rechte = buildEinheitRechte(true, freigaben(['personal']));
+    expect(buildBesatzungMittel(zug, [zug], personal, fahrzeuge, rechte)).toBeNull();
+    const rows = visibleBesatzungRows(zug, null);
+    expect([...rows.personen.keys()]).toEqual([1, 2]);
+    expect([...rows.fahrzeuge.keys()]).toEqual([30]);
+  });
+
+  it('ohne Mitglieder im DTO: keine Zeile, auch wenn die Listen noch eine führen', () => {
+    const leer = { ...zug, personal_mitglieder: [], fahrzeug_mitglieder: [] } as Einheit;
+    const rechte = buildEinheitRechte(true, freigaben());
+    const rows = visibleBesatzungRows(
+      leer,
+      buildBesatzungMittel(leer, [leer], personal, fahrzeuge, rechte),
+    );
+    expect(rows.personen.size + rows.fahrzeuge.size).toBe(0);
   });
 });
 

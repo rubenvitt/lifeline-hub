@@ -19,14 +19,13 @@ import { MenueAusloeser } from '../../components/MenueAusloeser';
 import { RechteHinweis, ZeilenFehler } from '../../components/SpeicherHinweis';
 import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
-import { useZeilenFehler, type ZeilenGrund } from '../../components/useZeilenFehler';
+import type { ZeilenGrund } from '../../components/useZeilenFehler';
 import { FahrzeugZeichen } from '../../kraefte/EinheitZeichen';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { fmsStatusOptionen } from '../../kraefte/fmsTableauKern';
 import {
   besatzungText,
   fremdText,
-  mittelDerEinheit,
   needsOhneFahrzeugKnoten,
   type FahrzeugImBaum,
   type PersonImBaum,
@@ -38,10 +37,12 @@ import { einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
 import { besatzungsUrteil, statusKategorie } from '../../theme/statusFarben';
 import {
   besatzungGrund,
+  buildBesatzungMittel,
   buildPersonMenuItems,
   type EinheitRechte,
   type PersonMenuKey,
 } from './einheitAnsichtKern';
+import type { BesatzungErrors } from './useBesatzungErrors';
 
 /**
  * Paneel „Fahrzeuge und Besatzung“ der Einheit-Ansicht (LLH-1036 Teil II, design.md D5, D9, D10,
@@ -56,7 +57,9 @@ import {
  *
  * Was bedienbar ist, sagt allein {@link EinheitRechte}. Lösen ist umkehrbar und wirkt ohne
  * Rückfrage (Regel „Destruktiv ist nicht gleich destruktiv“); jeder Grund steht an seiner Zeile
- * (`useZeilenFehler`, Schlüssel `ep_id` bzw. `ef_id`), kein Toast.
+ * (`useZeilenFehler`, Schlüssel `ep_id` bzw. `ef_id`), kein Toast. Die Gründe hält die Seite
+ * (`errors`, `useBesatzungErrors`): ist die Zeile nach der Antwort weg, steht ihr Grund im
+ * Seitenhinweis (LLH-1269).
  */
 
 interface FahrzeugeBesatzungProps {
@@ -77,6 +80,8 @@ interface FahrzeugeBesatzungProps {
   onReload?: () => void;
   /** „Als Einheitsführer“: derselbe Weg wie die Kopfzeile, genau `{ fuehrer_id }` (D1). */
   onSetFuehrer: (epId: number) => Promise<unknown>;
+  /** Gründe abgelehnter Aktionen je Zeile; die Seite hält sie (`useBesatzungErrors`). */
+  errors: BesatzungErrors;
   /** Die Auswahlfelder „Person zuordnen …“ und „Fahrzeug zuordnen …“ am Ende (D2). */
   children?: ReactNode;
 }
@@ -122,6 +127,7 @@ export default function FahrzeugeBesatzung({
   listState = 'daten',
   onReload = () => {},
   onSetFuehrer,
+  errors,
   children,
 }: FahrzeugeBesatzungProps) {
   const qc = useQueryClient();
@@ -132,10 +138,7 @@ export default function FahrzeugeBesatzung({
    * Die Besatzung steht erst, wenn beide Listen da sind. Solange sie laden, steht nur der
    * Ladezustand; fehlt eine (Fehler), stehen die Mitglieder flach aus dem DTO.
    */
-  const mittel =
-    rechte.hasBesatzung && personal && fahrzeuge
-      ? mittelDerEinheit(einheitId, { personal, fahrzeuge, material: [], einheiten })
-      : null;
+  const mittel = buildBesatzungMittel(einheit, einheiten, personal, fahrzeuge, rechte);
   // Besatzungswege und FMS-Wahl nur, wo die Besatzung zu sehen ist (D5).
   const canBesatzung = rechte.canEditBesatzung && mittel != null;
 
@@ -157,8 +160,7 @@ export default function FahrzeugeBesatzung({
       void qc.invalidateQueries({ queryKey: key });
   }
 
-  const personErrors = useZeilenFehler<number>();
-  const fahrzeugErrors = useZeilenFehler<number>();
+  const { person: personErrors, fahrzeug: fahrzeugErrors } = errors;
   /*
    * Was je Zeile gerade läuft (`p<ep_id>`, `f<ef_id>`): die Rückmeldung steht am Auslöser vor der
    * Antwort, auch bei zwei Aktionen an zwei Zeilen zugleich (eine Mutation kennt nur ihre letzte).
