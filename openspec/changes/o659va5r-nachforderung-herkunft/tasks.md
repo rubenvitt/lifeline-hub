@@ -2,16 +2,16 @@
 
 ## 1. Herkunft am Raum festhalten — LLH-1445 (`d25v3ukf`), Backend
 
-- [ ] 1.1 Migration `0250_einheit_nachforderung_am_raum.sql` (design.md D1) mit Test `db::tests::migration_0250_*` (Vorgabe 0, CHECK lehnt 2 ab); `scripts/check-migrationen.sh` gegen `origin/alpha` grün.
-- [ ] 1.2 Rust-Test in `bereitstellungsraum::eintreffen`: Eintreffen mit Verweis setzt `nachforderung_am_raum = 1` für bekannte Einheit, unangemeldet angelegte und Fahrzeug→Einheit; derselbe Verweis noch einmal ändert nichts. Erst rot sehen, dann `verknuepfe_tx` umsetzen, grün.
-- [ ] 1.3 Rust-Test in `einheit::aus_nachforderung`: Übernahme setzt 0, Storno setzt 0 zurück. `uebernehmen_tx` und `stornieren_tx` nachziehen, grün.
-- [ ] 1.4 `einheit_ids_am_raum` in `ANZEIGE_SELECT` und `NachforderungAnzeige` (D1); Rust-Test am Lesen (eine am Raum, eine übernommen → nur die erste im neuen Feld). `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten.
+- [x] 1.1 Migration `0250_einheit_nachforderung_am_raum.sql` (design.md D1) mit Test `db::tests::migration_0250_*` (Vorgabe 0, CHECK lehnt 2 ab); `scripts/check-migrationen.sh` gegen `origin/alpha` grün.
+- [x] 1.2 Rust-Test (`tests/nachforderung_erwartet.rs`, `eintreffen_mit_verweis_haelt_die_verknuepfung_am_raum_fest`): Eintreffen mit Verweis setzt `nachforderung_am_raum = 1` für bekannte Einheit, unangemeldet angelegte und Fahrzeug→Einheit; derselbe Verweis noch einmal ändert nichts. Erst rot sehen, dann `verknuepfe_tx` umsetzen, grün.
+- [x] 1.3 Rust-Test (`tests/nachforderung_erwartet.rs`): Übernahme bleibt 0 (sie verknüpft nur Einheiten ohne Verweis, Vorgabe 0 genügt), Storno setzt 0 zurück (`storno_nach_verknuepfung_am_raum_bucht_nicht_aus`). `stornieren_tx` nachgezogen, grün.
+- [x] 1.4 `einheit_ids_am_raum` in `ANZEIGE_SELECT` und `NachforderungAnzeige` (D1); Rust-Test am Lesen (eine am Raum, eine übernommen → nur die erste im neuen Feld). `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten.
 
 ## 2. Karte trennt die Wege — LLH-1445 (`d25v3ukf`), Frontend
 
-- [ ] 2.1 Vitest in `nurVorwaerts.test.ts`: Zuordnung je Einheit (am Raum laut Feld, Status zugesagt/unterwegs → am Raum, sonst übernommen). Erst rot sehen, dann `einheitenEinleitung` zu einer Zuordnung je Einheit umbauen (D2), grün.
-- [ ] 2.2 Vitest an der Karte (Szenarien „Eingetroffen mit beiden Wegen“, „Ohne Freigabe Einheiten“, „Verknüpfung vor dieser Änderung“). Erst rot sehen, dann `UebernommeneEinheiten` in zwei Gruppen umsetzen, grün; bestehende Karten-Tests bleiben grün.
-- [ ] 2.3 Anwenderdoku prüfen (`docs/anwender/`, Kapitel Nachforderungen): beschreibt sie die Einleitung der Karte, den Satz anpassen nach `docs/anwender/AGENTS.md`; sonst Vermerk im PR.
+- [x] 2.1 Vitest in `nurVorwaerts.test.ts`: Zuordnung je Einheit (am Raum laut Feld, Status zugesagt/unterwegs → am Raum, sonst übernommen). Erst rot sehen, dann `einheitenEinleitung` zu einer Zuordnung je Einheit umbauen (D2), grün.
+- [x] 2.2 Vitest an der Karte (Szenarien „Eingetroffen mit beiden Wegen“, „Ohne Freigabe Einheiten“, „Verknüpfung vor dieser Änderung“). Erst rot sehen, dann `UebernommeneEinheiten` in zwei Gruppen umsetzen, grün; bestehende Karten-Tests bleiben grün.
+- [x] 2.3 Anwenderdoku prüfen (`docs/anwender/`, Kapitel Nachforderungen): beschreibt sie die Einleitung der Karte, den Satz anpassen nach `docs/anwender/AGENTS.md`; sonst Vermerk im PR. (Kapitel `nachforderung.md` angepasst, Wächter grün; das Bild „Weitere Einheit übernehmen“ zeigt nur übernommene Einheiten und bleibt gleich.)
 
 ## 3. Übernahme überführt ein Fahrzeug ohne Einheit — LLH-1448 (`n11hhwje`)
 

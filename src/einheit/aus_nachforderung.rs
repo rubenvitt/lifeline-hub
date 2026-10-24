@@ -355,7 +355,8 @@ pub struct Storniert {
 }
 
 /// Storno einer Fehlübernahme in der Transaktion des Aufrufers (LLH-1388, design.md D3): fremd
-/// 404, aufgelöst 409, ohne Herkunft 422, gleichzeitig storniert 409. Verweis und Herkunft weg;
+/// 404, aufgelöst 409, ohne Herkunft 422, gleichzeitig storniert 409. Verweis und Herkunft weg
+/// (auch die Herkunft „am Raum“, LLH-1445);
 /// eine angelegte Einheit wird aufgelöst wie im Normalweg (Austritt, Mitglieder frei, ohne Spur
 /// gelöscht), eine verknüpfte verlässt nur den Raum, den die Übernahme gebucht hat, und nur, wenn
 /// dieser Eintritt noch ihr jüngstes Belegungsereignis ist. Genau ein ETB-Eintrag mit Verweis auf
@@ -390,7 +391,7 @@ pub async fn stornieren_tx(
             .await?;
     let geloest = sqlx::query(
         "UPDATE einsatz_einheit SET nachforderung_id = NULL, nachforderung_angelegt = 0, \
-             nachforderung_belegung_id = NULL \
+             nachforderung_belegung_id = NULL, nachforderung_am_raum = 0 \
          WHERE id = ? AND einsatz_id = ? AND nachforderung_id = ?",
     )
     .bind(einheit_id)

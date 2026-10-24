@@ -2,7 +2,7 @@
 titel: Nachforderungen
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts, frontend/src/pages/einheit/EinheitUebernahmeStorno.tsx, migrations/0246_einheit_nachforderung_herkunft.sql, src/nachforderung/erwartet.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/nachforderungen/PostenZuordnenModal.tsx, frontend/src/nachforderungen/nurVorwaerts.ts]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts, frontend/src/pages/einheit/EinheitUebernahmeStorno.tsx, migrations/0246_einheit_nachforderung_herkunft.sql, migrations/0250_einheit_nachforderung_am_raum.sql, src/nachforderung/erwartet.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/nachforderungen/PostenZuordnenModal.tsx, frontend/src/nachforderungen/nurVorwaerts.ts]
 ---
 
 ## Überblick
@@ -415,14 +415,20 @@ Jeder Eintrag unter „Einheiten“ legt eine Einheit an, deren Name und Funkruf
 mit dem gewählten Typ und damit dessen Soll-Stärke; Abschnitt, Unterstellung und Besatzung
 bleiben leer und lassen sich in der Ansicht der Einheit nachtragen. Ein Eintrag, der einer
 Einheit im Einsatz gleicht (Name oder Funkrufname, ohne Groß/Klein), verknüpft sie stattdessen.
-Heißt schon ein Fahrzeug im Einsatz so, lehnt die App ab und nennt den Namen. Insgesamt trägt
-eine Nachforderung höchstens so viele Einheiten, wie sie anfordert.
+Heißt ein Fahrzeug ohne Einheit so, wird es zur Einheit: Sie trägt den Funkrufnamen, das Soll des
+Fahrzeugs und den gewählten Typ, das Fahrzeug und seine Besatzung ohne Einheit kommen mit. Steht
+das Fahrzeug in einem Bereitstellungsraum, tritt es dort aus, und die Einheit tritt zu der Zeit
+ein, zu der das Fahrzeug gekommen war. Das Einsatztagebuch nennt den Eintrag dann „RTW 2 aus
+Fahrzeug“. Gehört das gleichnamige Fahrzeug schon einer Einheit oder heißen mehrere Fahrzeuge ohne
+Einheit so, lehnt die App ab und nennt den Namen. Insgesamt trägt eine Nachforderung höchstens so
+viele Einheiten, wie sie anfordert.
 
 Hat die Nachforderung einen Bereitstellungsraum als Ziel, kann die Einheit schon vorher entstehen:
 bucht der Raum über „Eintreffen buchen“ eine Kraft unter „Aus Nachforderungen“, verweist sie auf
-die Nachforderung, und die Karte nennt sie, auch solange die Nachforderung noch zugesagt oder
-unterwegs ist, dann als „Am Raum eingetroffen: 83-1 ↗“ statt „Als Einheit übernommen“ (Kapitel
-[Bereitstellungsräume](bereitstellungsraeume.md)). Die Stufe bleibt; „Eintreffen melden“
+die Nachforderung, und die Karte nennt sie als „Am Raum eingetroffen: 83-1 ↗“ statt „Als Einheit
+übernommen“, auch nach „Eintreffen melden“ (Kapitel
+[Bereitstellungsräume](bereitstellungsraeume.md)). Tragen beide Wege Einheiten, zeigt die Karte
+zwei Zeilen, zuerst „Am Raum eingetroffen“, dann „Als Einheit übernommen“. Die Stufe bleibt; „Eintreffen melden“
 setzt die Einsatzleitung. „Als Einheit übernehmen“ bietet danach nur die Rufnamen an, die noch
 keine Einheit tragen, und zählt die verknüpften mit.
 
@@ -445,7 +451,9 @@ mit Eintrag im Raum. Der Verweis auf die Nachforderung entfällt. Eine Einheit, 
 Übernahme entstanden ist, verlässt ihren Raum und wird aufgelöst; ohne jede Spur verschwindet
 sie ganz. Eine verknüpfte Einheit, die schon vorher im Einsatz stand, bleibt; sie verlässt nur den
 Raum, in den die Übernahme sie eingetragen hat, und auch den nur, solange sie seitdem nicht
-gewechselt hat oder abgerufen wurde. Die Zeitachse der Einheit behält ihr Eintreffen. Das
+gewechselt hat oder abgerufen wurde. Eine Einheit, die am Raum mit der Nachforderung verknüpft
+wurde, bleibt in ihrem Raum, denn sie steht dort; der Storno löst nur den Verweis. Eine falsche
+Buchung im Raum wird im Raum korrigiert. Die Zeitachse der Einheit behält ihr Eintreffen. Das
 Einsatztagebuch hält den Storno in einem Eintrag der Nachforderung fest, etwa „Nachforderung 2×
 RTW: Übernahme von 83-1 storniert, aus BR Nord ausgetreten, Einheit aufgelöst“, bei einer
 verknüpften Einheit mit „Verknüpfung gelöst“ am Ende. Stornieren dürfen Einsatzleitung und

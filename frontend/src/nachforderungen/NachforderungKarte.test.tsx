@@ -437,7 +437,9 @@ describe('NachforderungKarte — Als Einheit übernehmen (LLH-1383 D9)', () => {
       nachforderung: rtw({ einheit_ids: [11], einheit_ids_am_raum: [] }),
       einheitenJeId: new Map([[11, { id: 11, name: '83-1', funkrufname: null }]]),
     });
-    expect(screen.getByText(/Als Einheit übernommen/)).toHaveTextContent('Als Einheit übernommen: 83-1 ↗');
+    expect(screen.getByText(/Als Einheit übernommen/)).toHaveTextContent(
+      'Als Einheit übernommen: 83-1 ↗',
+    );
     expect(screen.queryByText(/Am Raum/)).toBeNull();
   });
 });

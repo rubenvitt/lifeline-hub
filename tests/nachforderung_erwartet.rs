@@ -818,7 +818,11 @@ async fn eintreffen_mit_verweis_haelt_die_verknuepfung_am_raum_fest() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{j:?}");
     let aus_fahrzeug = j["einheit_id"].as_i64().unwrap();
-    assert_eq!(am_raum(&pool, aus_fahrzeug).await, 1, "Fahrzeug zur Einheit");
+    assert_eq!(
+        am_raum(&pool, aus_fahrzeug).await,
+        1,
+        "Fahrzeug zur Einheit"
+    );
 
     // Erst übernommen, dann mit demselben Verweis am Raum: bleibt übernommen.
     status(&app, &admin, e, n, "eingetroffen", StatusCode::OK).await;
@@ -831,7 +835,14 @@ async fn eintreffen_mit_verweis_haelt_die_verknuepfung_am_raum_fest() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{j:?}");
-    let uebernommen = j["einheit_ids"][0].as_i64().unwrap();
+    // Die Antwort ist die Nachforderung: die neue Einheit ist die jüngste ihrer Einheiten.
+    let uebernommen = j["einheit_ids"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()
+        .as_i64()
+        .unwrap();
     assert_eq!(am_raum(&pool, uebernommen).await, 0, "übernommen");
     let (s, j) = eintreffen(
         &app,
@@ -847,6 +858,17 @@ async fn eintreffen_mit_verweis_haelt_die_verknuepfung_am_raum_fest() {
         am_raum(&pool, uebernommen).await,
         0,
         "derselbe Verweis am Raum ändert die Herkunft nicht"
+    );
+
+    // Die Antwort der Nachforderung nennt die am Raum verknüpften als Teilmenge.
+    let nf = lade(&app, &admin, e, n).await;
+    assert_eq!(
+        nf["einheit_ids"],
+        json!([bekannt, unangemeldet, aus_fahrzeug, uebernommen])
+    );
+    assert_eq!(
+        nf["einheit_ids_am_raum"],
+        json!([bekannt, unangemeldet, aus_fahrzeug])
     );
 }
 
@@ -907,10 +929,15 @@ async fn storno_nach_verknuepfung_am_raum_bucht_nicht_aus() {
         let x = einheit(&app, &admin, e, id).await;
         assert!(x.get("nachforderung_id").is_none(), "{name}: {x:?}");
         assert_eq!(x["aktueller_br_id"], nord, "{name} bleibt im BR Nord");
-        assert_eq!(am_raum(&pool, id).await, 0, "{name}: Herkunft zurückgesetzt");
+        assert_eq!(
+            am_raum(&pool, id).await,
+            0,
+            "{name}: Herkunft zurückgesetzt"
+        );
         let nach = etb(&app, &admin, e).await;
         assert_eq!(nach.len(), vorher + 1, "{nach:#?}");
-        let text = format!("Nachforderung 2× RTW: Übernahme von {name} storniert, Verknüpfung gelöst");
+        let text =
+            format!("Nachforderung 2× RTW: Übernahme von {name} storniert, Verknüpfung gelöst");
         assert!(
             nach.iter().any(|x| x["inhalt"] == text.as_str()),
             "{text}: {nach:#?}"
@@ -931,7 +958,11 @@ async fn storno_nach_verknuepfung_am_raum_bucht_nicht_aus() {
     .await;
     assert_eq!(s, StatusCode::OK, "{verlauf:?}");
     assert!(
-        verlauf.as_array().unwrap().iter().all(|z| z["art"] != "austritt"),
+        verlauf
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|z| z["art"] != "austritt"),
         "kein Austritt: {verlauf:?}"
     );
     assert_eq!(lade(&app, &admin, e, n).await["einheit_ids"], json!([]));

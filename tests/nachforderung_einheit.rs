@@ -900,7 +900,10 @@ async fn gleichnamiges_fahrzeug_ohne_einheit_wird_zur_einheit() {
     assert_eq!(x["typ_id"], typ_id);
     assert_eq!(x["nachforderung_id"], n);
     assert_eq!(einheit_von(&pool, "einsatz_fahrzeug", ef).await, Some(neu));
-    assert_eq!(einheit_von(&pool, "einsatz_personal", anna).await, Some(neu));
+    assert_eq!(
+        einheit_von(&pool, "einsatz_personal", anna).await,
+        Some(neu)
+    );
     let angelegt: i64 =
         sqlx::query_scalar("SELECT nachforderung_angelegt FROM einsatz_einheit WHERE id = ?")
             .bind(neu)
@@ -922,11 +925,17 @@ async fn gleichnamiges_fahrzeug_ohne_einheit_wird_zur_einheit() {
     // Storno: die Einheit wird aufgelöst, Fahrzeug und Besatzung sind wieder frei.
     let (s, j) = storniere(&app, &admin, e, neu).await;
     assert_eq!(s, StatusCode::OK, "{j:?}");
-    assert!(einheiten(&app, &admin, e).await.iter().all(|x| x["id"] != neu));
+    assert!(einheiten(&app, &admin, e)
+        .await
+        .iter()
+        .all(|x| x["id"] != neu));
     assert_eq!(einheit_von(&pool, "einsatz_fahrzeug", ef).await, None);
     assert_eq!(einheit_von(&pool, "einsatz_personal", anna).await, None);
-    assert!(etb(&app, &admin, e).await.iter().any(|x| x["inhalt"]
-        == "Nachforderung 2× RTW: Übernahme von RTW 2 storniert, Einheit aufgelöst"));
+    assert!(etb(&app, &admin, e)
+        .await
+        .iter()
+        .any(|x| x["inhalt"]
+            == "Nachforderung 2× RTW: Übernahme von RTW 2 storniert, Einheit aufgelöst"));
 
     // Zwei gleichnamige Fahrzeuge ohne Einheit: nicht eindeutig, 422, nichts angelegt.
     adhoc_fahrzeug(&app, &admin, e, "RTW 5").await;
@@ -970,7 +979,10 @@ async fn gleichnamiges_fahrzeug_im_raum_macht_der_einheit_platz() {
             "POST",
             &format!("/api/einsaetze/{e}/bereitstellungsraeume/{nord}/belegung"),
             &admin,
-            Some(&json!({ "objekt_typ": "fahrzeug", "objekt_id": ef, "art": "eintritt" }).to_string()),
+            Some(
+                &json!({ "objekt_typ": "fahrzeug", "objekt_id": ef, "art": "eintritt" })
+                    .to_string(),
+            ),
         )
         .await;
         assert_eq!(s, StatusCode::CREATED, "{j:?}");
@@ -993,20 +1005,33 @@ async fn gleichnamiges_fahrzeug_im_raum_macht_der_einheit_platz() {
         )
         .await;
         assert_eq!(s, StatusCode::CREATED, "{name}: {j:?}");
-        let neu = j["einheit_ids"][0].as_i64().unwrap();
+        // Die Antwort ist die Nachforderung: die neue Einheit ist die jüngste ihrer Einheiten.
+        let neu = j["einheit_ids"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()
+            .as_i64()
+            .unwrap();
         let x = einheiten(&app, &admin, e)
             .await
             .into_iter()
             .find(|x| x["id"] == neu)
             .expect("Einheit");
-        assert_eq!(x["aktueller_br_id"], nord, "{name}: die Einheit steht im BR Nord");
+        assert_eq!(
+            x["aktueller_br_id"], nord,
+            "{name}: die Einheit steht im BR Nord"
+        );
         let fahrzeug_br: Option<i64> =
             sqlx::query_scalar("SELECT aktueller_br_id FROM einsatz_fahrzeug WHERE id = ?")
                 .bind(ef)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(fahrzeug_br, None, "{name}: das Fahrzeug belegt nicht mehr selbst");
+        assert_eq!(
+            fahrzeug_br, None,
+            "{name}: das Fahrzeug belegt nicht mehr selbst"
+        );
 
         let v = verlauf(&app, &admin, e, nord).await;
         assert!(
@@ -1024,13 +1049,21 @@ async fn gleichnamiges_fahrzeug_im_raum_macht_der_einheit_platz() {
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert_eq!(zeitpunkt, damals, "{name}: Eintritt zum Zeitpunkt des Fahrzeugs");
-        let gebucht: Option<i64> =
-            sqlx::query_scalar("SELECT nachforderung_belegung_id FROM einsatz_einheit WHERE id = ?")
-                .bind(neu)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(gebucht, Some(eintritt), "{name}: die Übernahme hält ihre Buchung");
+        assert_eq!(
+            zeitpunkt, damals,
+            "{name}: Eintritt zum Zeitpunkt des Fahrzeugs"
+        );
+        let gebucht: Option<i64> = sqlx::query_scalar(
+            "SELECT nachforderung_belegung_id FROM einsatz_einheit WHERE id = ?",
+        )
+        .bind(neu)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            gebucht,
+            Some(eintritt),
+            "{name}: die Übernahme hält ihre Buchung"
+        );
     }
 }

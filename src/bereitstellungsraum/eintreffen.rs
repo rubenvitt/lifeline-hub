@@ -413,12 +413,17 @@ async fn verknuepfe_tx(
             )));
         }
     }
-    sqlx::query("UPDATE einsatz_einheit SET nachforderung_id = ? WHERE id = ? AND einsatz_id = ?")
-        .bind(h.id)
-        .bind(einheit_id)
-        .bind(r.einsatz_id)
-        .execute(&mut *conn)
-        .await?;
+    // Der Weg des Verweises (LLH-1445, design.md D1): die Karte nennt die Einheit „am Raum
+    // eingetroffen“, nicht „übernommen“.
+    sqlx::query(
+        "UPDATE einsatz_einheit SET nachforderung_id = ?, nachforderung_am_raum = 1 \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(h.id)
+    .bind(einheit_id)
+    .bind(r.einsatz_id)
+    .execute(&mut *conn)
+    .await?;
     Ok(())
 }
 

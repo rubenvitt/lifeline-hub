@@ -59,8 +59,8 @@ Schreiben:
 - `verknuepfe_tx` setzt beim Setzen des Verweises auch `nachforderung_am_raum = 1`. Hat die Einheit
   schon denselben Verweis, ändert sich nichts. Eine schon übernommene Einheit bleibt also
   „übernommen“, wenn sie später mit Verweis am Raum eintrifft.
-- `uebernehmen_tx` setzt den Verweis nur an Einheiten ohne Verweis (eine verknüpfte führt in 409)
-  und schreibt `nachforderung_am_raum = 0` ausdrücklich mit.
+- `uebernehmen_tx` setzt den Verweis nur an Einheiten ohne Verweis (eine verknüpfte führt in 409);
+  deren Wert ist 0 (Vorgabe oder vom Storno zurückgesetzt), sie schreibt ihn deshalb nicht.
 - `stornieren_tx` setzt den Wert mit den anderen Herkunftsfeldern zurück auf 0.
 
 Lesen: `ANZEIGE_SELECT` bekommt eine zweite Unterabfrage `einheit_ids_am_raum` (Teilmenge von
