@@ -15,6 +15,7 @@ import KatalogTabelle, {
   filterKopfStil,
   fliessBreite,
   setzeKopfFreiraum,
+  sortierKopfStil,
   tabellenTokens,
   type KatalogSpalte,
   suchfeldStil,
@@ -1118,6 +1119,16 @@ describe('KatalogTabelle · Kopfwerkzeuge nach Dichte (LLH-1227)', () => {
     expect(ziel('handschuh')).toBe('72px');
   });
 
+  it('Sortierfläche: Boden 30 / 48 / 72 px als Variable (LLH-1273)', () => {
+    const ziel = (s: keyof typeof dichten) =>
+      (sortierKopfStil({ controlHeight: dichten[s].zeilenhoehe }) as Record<string, unknown>)[
+        '--lfh-sortier-ziel'
+      ];
+    expect(ziel('kompakt')).toBe('30px');
+    expect(ziel('komfortabel')).toBe('48px');
+    expect(ziel('handschuh')).toBe('72px');
+  });
+
   it('setzt die Variablen an der Tabellenwurzel und behält ein übergebenes style', () => {
     const { container } = renderMitProviders(
       <KatalogTabelle<Zeile>
@@ -1129,6 +1140,7 @@ describe('KatalogTabelle · Kopfwerkzeuge nach Dichte (LLH-1227)', () => {
     );
     const wurzel = container.querySelector<HTMLElement>('.ant-table-wrapper.lfh-katalog')!;
     expect(wurzel.style.getPropertyValue('--lfh-filter-ziel')).toMatch(/^\d+px$/);
+    expect(wurzel.style.getPropertyValue('--lfh-sortier-ziel')).toMatch(/^\d+px$/);
     expect(wurzel.style.marginTop).toBe('3px');
   });
 

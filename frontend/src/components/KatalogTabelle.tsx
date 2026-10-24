@@ -273,6 +273,16 @@ export function filterKopfStil(token: { controlHeightSM: number; paddingSM: numb
   } as CSSProperties;
 }
 
+/**
+ * Boden der Sortierfläche einer sortierbaren Kopfzelle als Variable an der Tabellenwurzel, rein und
+ * exportiert (LLH-1273; gelesen in `theme/sprache.css`). Ziel ist nur der Inhalt der Zelle, damit
+ * ihre Polsterung die Ziele benachbarter Spalten trennt; er hält die Steuerhöhe `controlHeight`
+ * (30 / 48 / 72) und ragt dafür um den Einzug aus {@link filterKopfStil} in die Polsterung.
+ */
+export function sortierKopfStil(token: { controlHeight: number }) {
+  return { '--lfh-sortier-ziel': `${token.controlHeight}px` } as CSSProperties;
+}
+
 /** antds Filter-Auslöser im Kopf; die Messzeile im Körper trägt eine stumme Kopie. */
 const FILTER_AUSLOESER = 'thead .ant-table-filter-trigger';
 
@@ -1081,7 +1091,7 @@ export default function KatalogTabelle<T extends object>({
           onChange={beiAenderung}
           ref={tabelleRef}
           className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
-          style={{ ...filterKopfStil(token), ...rest.style }}
+          style={{ ...filterKopfStil(token), ...sortierKopfStil(token), ...rest.style }}
           columns={fixierteSpalten}
           dataSource={sichtbareZeilen}
           loading={loading}
