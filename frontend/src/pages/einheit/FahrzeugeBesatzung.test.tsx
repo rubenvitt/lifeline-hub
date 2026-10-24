@@ -7,7 +7,7 @@ import { renderMitProviders } from '../../test/utils';
 import { freigabenFixture } from '../../test/fixtures';
 import type { ComponentProps } from 'react';
 import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, ModulFreigaben } from '../../api/types';
-import { buildEinheitRechte } from './einheitAnsichtKern';
+import { buildBesatzungMittel, buildEinheitRechte } from './einheitAnsichtKern';
 import FahrzeugeBesatzung from './FahrzeugeBesatzung';
 import { useBesatzungErrors } from './useBesatzungErrors';
 
@@ -114,7 +114,7 @@ const KATALOG = [
 ];
 
 /** Hält die Gründe wie die Seite; ob ein Grund ohne Zeile in den Seitenhinweis geht, prüft deren Test. */
-function MitGruenden(props: Omit<ComponentProps<typeof FahrzeugeBesatzung>, 'errors'>) {
+function WithErrors(props: Omit<ComponentProps<typeof FahrzeugeBesatzung>, 'errors'>) {
   return <FahrzeugeBesatzung {...props} errors={useBesatzungErrors(null)} />;
 }
 
@@ -140,13 +140,17 @@ function zeige({
   const onSetFuehrer = vi.fn<(epId: number) => Promise<unknown>>().mockResolvedValue(undefined);
   const onReload = vi.fn();
   const r = renderMitProviders(
-    <MitGruenden
+    <WithErrors
       einsatzId={1}
       einheit={e}
-      einheiten={[e, GAST]}
       // Wie die Seite: ohne Freigabe oder solange eine Liste lädt bzw. fehlt, keine Liste.
-      personal={rechte.hasBesatzung && listState === 'daten' ? personal : undefined}
-      fahrzeuge={rechte.hasBesatzung && listState === 'daten' ? fahrzeuge : undefined}
+      mittel={buildBesatzungMittel(
+        e,
+        [e, GAST],
+        listState === 'daten' ? personal : undefined,
+        listState === 'daten' ? fahrzeuge : undefined,
+        rechte,
+      )}
       rechte={rechte}
       listState={listState}
       onReload={onReload}

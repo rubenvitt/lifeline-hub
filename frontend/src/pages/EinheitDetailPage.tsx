@@ -195,13 +195,17 @@ function EinheitAnsicht({
    * Live-Ereignis die Zeile nach der Ablehnung, steht der Grund im Seitenhinweis. Solange die
    * Besatzung lädt, zeigt das Paneel keine Zeile, und kein Grund hat seinen Ort verloren.
    */
+  const besatzungMittel = buildBesatzungMittel(
+    aktuell,
+    einheiten,
+    besatzungPersonal,
+    besatzungFahrzeuge,
+    rechte,
+  );
   const besatzungErrors = useBesatzungErrors(
     rechte.hasBesatzung && besatzungListState === 'laden'
       ? null
-      : visibleBesatzungRows(
-          aktuell,
-          buildBesatzungMittel(aktuell, einheiten, besatzungPersonal, besatzungFahrzeuge, rechte),
-        ),
+      : visibleBesatzungRows(aktuell, besatzungMittel),
   );
 
   // Die Vorgabe der Organisation füllt ein Zeichen ohne eigene Organisation, wie auf der Karte.
@@ -380,9 +384,7 @@ function EinheitAnsicht({
         <FahrzeugeBesatzung
           einsatzId={einsatzId}
           einheit={aktuell}
-          einheiten={einheiten}
-          personal={besatzungPersonal}
-          fahrzeuge={besatzungFahrzeuge}
+          mittel={besatzungMittel}
           rechte={rechte}
           listState={besatzungListState}
           onReload={() => {

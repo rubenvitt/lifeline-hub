@@ -30,11 +30,11 @@ export interface BesatzungErrorsState extends BesatzungErrors {
 export function useBesatzungErrors(visible: VisibleBesatzungRows | null): BesatzungErrorsState {
   const person = useZeilenFehler<number>();
   const fahrzeug = useZeilenFehler<number>();
-  const namen = useRef(new Map<string, string>());
+  const names = useRef(new Map<string, string>());
   useLayoutEffect(() => {
     if (visible == null) return;
-    for (const [id, name] of visible.fahrzeuge) namen.current.set(`f${id}`, name);
-    for (const [id, name] of visible.personen) namen.current.set(`p${id}`, name);
+    for (const [id, name] of visible.fahrzeuge) names.current.set(`f${id}`, name);
+    for (const [id, name] of visible.personen) names.current.set(`p${id}`, name);
   }, [visible]);
 
   // Gründe ohne Zeile; solange die Besatzung lädt, keiner.
@@ -46,7 +46,7 @@ export function useBesatzungErrors(visible: VisibleBesatzungRows | null): Besatz
     ids.flatMap((id): GewanderterGrund[] => {
       const grund = store.grund(id);
       const schluessel = `${prefix}${id}`;
-      return grund ? [{ schluessel, kennung: namen.current.get(schluessel), grund }] : [];
+      return grund ? [{ schluessel, kennung: names.current.get(schluessel), grund }] : [];
     });
 
   return {

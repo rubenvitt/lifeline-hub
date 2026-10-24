@@ -5,7 +5,7 @@ import { gibFahrzeugFrei, gibPersonalFrei } from '../../api/einheiten';
 import { gibBesatzungFrei, ordneBesatzungZu, updateDisposition } from '../../api/einsatzFahrzeuge';
 import { listeFahrzeugStatus } from '../../api/fahrzeugStatus';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
-import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, StaerkePosition } from '../../api/types';
+import type { Einheit, StaerkePosition } from '../../api/types';
 import { kraefteText } from '../../anzeige/staerke';
 import {
   Augenbraue,
@@ -28,6 +28,7 @@ import {
   fremdText,
   needsOhneFahrzeugKnoten,
   type FahrzeugImBaum,
+  type MittelDerEinheit,
   type PersonImBaum,
 } from '../../kraefte/kraeftebaumKern';
 import { PositionsMarken } from '../../kraefte/KraeftebaumZelle';
@@ -37,8 +38,8 @@ import { einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
 import { besatzungsUrteil, statusKategorie } from '../../theme/statusFarben';
 import {
   besatzungGrund,
-  buildBesatzungMittel,
   buildPersonMenuItems,
+  hasNoMitglieder,
   type EinheitRechte,
   type PersonMenuKey,
 } from './einheitAnsichtKern';
@@ -65,11 +66,12 @@ import type { BesatzungErrors } from './useBesatzungErrors';
 interface FahrzeugeBesatzungProps {
   einsatzId: number;
   einheit: Einheit;
-  einheiten: readonly Einheit[];
-  /** Einsatzpersonal; nur mit `rechte.hasBesatzung` abgefragt, sonst `undefined`. */
-  personal: readonly EinsatzPersonal[] | undefined;
-  /** Einsatzfahrzeuge; ebenso. */
-  fahrzeuge: readonly EinsatzFahrzeug[] | undefined;
+  /**
+   * Die Besatzung aus `buildBesatzungMittel`: erst mit Freigabe Personal und Fahrzeuge und beiden
+   * Listen, sonst `null` (Mitglieder flach aus dem DTO). Die Seite rechnet sie einmal, denn gegen
+   * dieselben Zeilen prüft sie, ob ein Grund seinen Ort verloren hat (`visibleBesatzungRows`).
+   */
+  mittel: MittelDerEinheit | null;
   rechte: EinheitRechte;
   /**
    * Stand der beiden Listen, wenn die Besatzung erscheinen soll: solange sie laden, steht der
@@ -120,9 +122,7 @@ const fromMitglied = (m: Einheit['personal_mitglieder'][number]): PersonRow => (
 export default function FahrzeugeBesatzung({
   einsatzId,
   einheit,
-  einheiten,
-  personal,
-  fahrzeuge,
+  mittel,
   rechte,
   listState = 'daten',
   onReload = () => {},
@@ -134,11 +134,6 @@ export default function FahrzeugeBesatzung({
   const { token, rollen } = useRollen();
   const einheitId = einheit.id;
   const reason = besatzungGrund(rechte);
-  /**
-   * Die Besatzung steht erst, wenn beide Listen da sind. Solange sie laden, steht nur der
-   * Ladezustand; fehlt eine (Fehler), stehen die Mitglieder flach aus dem DTO.
-   */
-  const mittel = buildBesatzungMittel(einheit, einheiten, personal, fahrzeuge, rechte);
   // Besatzungswege und FMS-Wahl nur, wo die Besatzung zu sehen ist (D5).
   const canBesatzung = rechte.canEditBesatzung && mittel != null;
 
@@ -458,9 +453,6 @@ export default function FahrzeugeBesatzung({
     );
   }
 
-  const isEmpty =
-    einheit.fahrzeug_mitglieder.length === 0 && einheit.personal_mitglieder.length === 0;
-
   return (
     <Paneel
       titel="Fahrzeuge und Besatzung"
@@ -482,7 +474,7 @@ export default function FahrzeugeBesatzung({
           {null}
         </PaneelZustand>
       )}
-      {rechte.hasBesatzung && listState === 'laden' ? null : isEmpty ? (
+      {rechte.hasBesatzung && listState === 'laden' ? null : hasNoMitglieder(einheit) ? (
         <span style={{ color: rollen.gedaempft }}>—</span>
       ) : (
         content

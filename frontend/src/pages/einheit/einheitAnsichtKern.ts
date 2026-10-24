@@ -153,6 +153,11 @@ export function buildBesatzungMittel(
     : null;
 }
 
+/** Ohne Fahrzeug und Person im Einheit-DTO zeigt das Paneel „—“, auch wenn die Listen noch eine führen. */
+export function hasNoMitglieder(einheit: Einheit): boolean {
+  return einheit.fahrzeug_mitglieder.length === 0 && einheit.personal_mitglieder.length === 0;
+}
+
 /** Die Zeilen des Paneels „Fahrzeuge und Besatzung“ mit ihrer Kennung (Name, Funkrufname). */
 export interface VisibleBesatzungRows {
   /** `ep_id` → Name. */
@@ -171,9 +176,7 @@ export function visibleBesatzungRows(
   einheit: Einheit,
   mittel: MittelDerEinheit | null,
 ): VisibleBesatzungRows {
-  if (einheit.fahrzeug_mitglieder.length === 0 && einheit.personal_mitglieder.length === 0) {
-    return { personen: new Map(), fahrzeuge: new Map() };
-  }
+  if (hasNoMitglieder(einheit)) return { personen: new Map(), fahrzeuge: new Map() };
   if (mittel == null) {
     return {
       personen: new Map(einheit.personal_mitglieder.map((m) => [m.ep_id, m.name])),
