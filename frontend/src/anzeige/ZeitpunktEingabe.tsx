@@ -56,8 +56,6 @@ export interface ZeitEingabeKontext {
   zone: string | null;
   /** Zu nennende Zone, wenn sie von der Browserzone abweicht, sonst `null`. */
   zonenHinweis: string | null;
-  /** Zeitpunkt als Text in der Anzeigezone (für Chips, Titel, Stand-Zeiten). */
-  formatiere: (zeitpunkt: Dayjs, format: string) => string;
   /** Liegt der Kalendertag einer Wanduhr nach „heute“ der Anzeigezone? */
   istZukunftstag: (wanduhr: Dayjs) => boolean;
 }
@@ -71,7 +69,6 @@ export function useZeitEingabe(): ZeitEingabeKontext {
     () => ({
       zone,
       zonenHinweis,
-      formatiere: (d, format) => zuWanduhr(d, zone).format(format),
       istZukunftstag: (w) => istZukunftstag(w, zone),
     }),
     [zone, zonenHinweis],

@@ -1,6 +1,12 @@
 import type { SchichtmodellTyp, SchichtmodellWerteBody } from '../api/types';
 import { mitVorgabe } from '../components/vorgabeText';
-import { dauerFeldText, dauerMinuten, formatDauer, formatUhrzeiten, parseUhrzeiten } from './dauer';
+import {
+  dauerFeldText,
+  dauerMinuten,
+  formatDauer,
+  parseUhrzeiten,
+  uhrzeitenFeldText,
+} from './dauer';
 import type { RegelFelder } from './schichtmodellText';
 
 /**
@@ -41,7 +47,7 @@ export function toFormWerte(m: SchichtmodellVorlage | null): SchichtmodellFormWe
     bezeichnung: m.bezeichnung,
     typ: m.typ,
     rhythmus: m.typ === 'rhythmus' ? dauerFeldText(m.rhythmus_minuten) : undefined,
-    wechselzeiten: m.typ === 'wechselzeiten' ? formatUhrzeiten(m.wechselzeiten ?? []) : undefined,
+    wechselzeiten: m.typ === 'wechselzeiten' ? uhrzeitenFeldText(m.wechselzeiten ?? []) : undefined,
     mindestdauer: m.typ === 'wechselzeiten' ? dauerFeldText(m.mindestdauer_minuten) : undefined,
     vorwarnung:
       m.vorwarnung_minuten === VORWARNUNG_VORGABE_MINUTEN

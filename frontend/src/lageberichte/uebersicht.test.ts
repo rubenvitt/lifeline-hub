@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import type { LageberichtAbschnitt, LageberichtKopf } from '../api/types';
 import {
   abschnittsFuellstand,
@@ -9,6 +10,8 @@ import {
   textAuszug,
   titelVorschlag,
 } from './uebersicht';
+
+dayjs.extend(utc);
 
 function kopf(teil: Partial<LageberichtKopf> & { id: number }): LageberichtKopf {
   return {
@@ -137,12 +140,20 @@ describe('textAuszug', () => {
 });
 
 describe('titelVorschlag', () => {
-  const formatiere = (d: dayjs.Dayjs, f: string) => d.format(f);
-  const jetzt = dayjs('2026-06-02T14:10:00');
+  /** 02.06.2026 14:10 in Berlin (Sommerzeit, UTC+2). */
+  const jetzt = dayjs.utc('2026-06-02 12:10:00');
+  const BERLIN = 'Europe/Berlin';
 
-  it('nennt die Uhrzeit taktisch je Vorlage', () => {
-    expect(titelVorschlag('lagebericht', jetzt, formatiere)).toBe('Lageüberblick 1410');
-    expect(titelVorschlag('lagebeurteilung', jetzt, formatiere)).toBe('Lagebeurteilung 1410');
-    expect(titelVorschlag('freitext', jetzt, formatiere)).toBe('Bericht 1410');
+  it('nennt die Uhrzeit taktisch je Vorlage, in der Anzeigezone', () => {
+    const taktisch = { zeitzone: BERLIN, zeitdarstellung: 'taktisch' } as const;
+    expect(titelVorschlag('lagebericht', jetzt, taktisch)).toBe('Lageüberblick 1410');
+    expect(titelVorschlag('lagebeurteilung', jetzt, taktisch)).toBe('Lagebeurteilung 1410');
+    expect(titelVorschlag('freitext', jetzt, taktisch)).toBe('Bericht 1410');
+  });
+
+  it('folgt der Darstellung „Datum und Uhrzeit“ (LLH-1437)', () => {
+    const datumUhrzeit = { zeitzone: BERLIN, zeitdarstellung: 'datum_uhrzeit' } as const;
+    expect(titelVorschlag('lagebericht', jetzt, datumUhrzeit)).toBe('Lageüberblick 14:10');
+    expect(titelVorschlag('freitext', jetzt, datumUhrzeit)).toBe('Bericht 14:10');
   });
 });

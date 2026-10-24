@@ -14,6 +14,7 @@ import type { Schichtmodell, SchichtmodellWerteBody } from '../api/types';
 import { formatDauer } from '../abloesung/dauer';
 import SchichtmodellModal from '../abloesung/SchichtmodellModal';
 import { formatRegel } from '../abloesung/schichtmodellText';
+import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
 import { StatusChip, monoStil } from '../components/instrument';
@@ -44,9 +45,20 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
  *   bisherige wieder her, wenn der zweite Schritt scheitert). Umkehrbar, ohne Rückfrage.
  * - **Löschen** ist unumkehrbar und fragt nach; Einsätze behalten ihre Kopie (ein Satz zur Folge).
  * - Live über das Org-Ereignis `stammdaten` (`globalKeys.schichtmodelle`).
+ * - Wechselzeiten in der Zeitdarstellung (LLH-1437); außerhalb jedes Einsatzes kommt sie aus Gerät
+ *   und Organisation (`OrgAnzeigeProvider`).
  */
 export default function SchichtmodelleTab() {
+  return (
+    <OrgAnzeigeProvider>
+      <SchichtmodelleInhalt />
+    </OrgAnzeigeProvider>
+  );
+}
+
+function SchichtmodelleInhalt() {
   const { benutzer } = useAuth();
+  const { konventionen } = useAnzeigeKonventionen();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -132,14 +144,14 @@ export default function SchichtmodelleTab() {
     {
       title: 'Regel',
       key: 'regel',
-      suchText: (m) => formatRegel(m),
+      suchText: (m) => formatRegel(m, konventionen),
       // Nach der Art der Regel (LLH-1096); der Wortlaut der Regel selbst ist kein Vergleichswert.
       filters: [
         { text: 'Rhythmus', value: 'rhythmus' },
         { text: 'Wechselzeiten', value: 'wechselzeiten' },
       ],
       onFilter: (wert, m) => m.typ === wert,
-      render: (_, m) => formatRegel(m),
+      render: (_, m) => formatRegel(m, konventionen),
     },
     {
       title: 'Vorwarnung',

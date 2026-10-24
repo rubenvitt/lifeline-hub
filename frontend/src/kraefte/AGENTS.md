@@ -54,8 +54,9 @@ Beginnen; der Client zeigt sie nur (Karte „(Vorgabe Einsatz)“, Platzhalter �
 greift. Die Vorwarnzeit kommt je Schicht aus dem DTO (`vorwarnung_minuten`, aus dem
 Schichtmodell des Einsatzes), nie aus einer Konstante im Client (`abloesung/einstufung.ts`,
 `abloesung/useUhr.ts`). Dauern stehen nur über `abloesung/dauer.ts` („8 h“, „7:30 h“, nie
-Dezimal), Wechselzeiten taktisch, Regeltexte über `abloesung/schichtmodellText.ts`. Die Vorgabe
-der Organisation wechselt in den zwei Schritten, die der Server verlangt, nur über
+Dezimal), Wechselzeiten im Feld taktisch, angezeigt in der Zeitdarstellung (`formatUhrzeiten`,
+LLH-1437), Regeltexte über `abloesung/schichtmodellText.ts`. Die Vorgabe der Organisation
+wechselt in den zwei Schritten, die der Server verlangt, nur über
 `api/schichtmodelle.ts:setOrgVorgabe`. **Knoten-Modell** (LLH-1118 Punkt 1): eine Untereinheit
 ohne eigene laufende Schicht erbt die ihres nächsten Vorfahren; der Server ermittelt das beim
 Lesen (`abloesung::vererbung`, DTO `erbende_einheiten` an der tragenden Schicht), der Client

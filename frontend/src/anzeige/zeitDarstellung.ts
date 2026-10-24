@@ -12,8 +12,11 @@
  *
  * `uhrzeit` nur, wo der Tag fest aus dem Zusammenhang folgt (eine Tagesspalte, ein Plan für einen
  * Tag). Dazu {@link datum}, der Kalendertag eines Zeitpunkts ohne Uhrzeit (Tageskopf, `{datum}`
- * im ETB-Baustein): taktisch der Tagesteil der DTG `10okt26`, sonst `10.10.26` (LLH-1061). Die Darstellung kommt aus den Konventionen (`konventionen.zeitdarstellung`, wirksam nach
- * {@link wirksameZeitdarstellung}); die Provider in `AnzeigeKonventionenContext.tsx` setzen sie.
+ * im ETB-Baustein): taktisch der Tagesteil der DTG `10okt26`, sonst `10.10.26` (LLH-1061), und
+ * {@link uhrzeitOhneDatum}, eine Wanduhrzeit `HH:MM` ohne Tag in der Form von `uhrzeit`
+ * (LLH-1437). Die Darstellung kommt aus den Konventionen (`konventionen.zeitdarstellung`, wirksam
+ * nach {@link wirksameZeitdarstellung}); die Provider in `AnzeigeKonventionenContext.tsx` setzen
+ * sie.
  *
  * Volle DTG (Entscheidung E1, LLH-1045, 22.10.2026): Tag, Uhrzeit, Monat, Jahr zweistellig, alles
  * klein und ohne Leerzeichen. Quelle der Systematik: FwDV/DV 810 „Sprech- und Datenfunkverkehr“,
@@ -173,6 +176,27 @@ export function uhrzeit(wert: Zeitwert, konv: AnzeigeKonventionen): string {
   const d = wanduhr(wert, konv);
   if (!d) return '';
   return nurUhrzeit(d, darstellung(konv));
+}
+
+/** `HH:MM` am Anfang einer Wanduhrzeit vom Server (`src/uhrzeit.rs`). */
+const WANDUHRZEIT = /^(\d{2}):(\d{2})/;
+
+/**
+ * Eine Uhrzeit `HH:MM` ohne Tag und Zone (Spec `zeiteingabe`, „Uhrzeit ohne Datum“: Beginn einer
+ * Mahlzeit im Verpflegungsplan, Wechselzeit eines Schichtmodells) in der Schreibweise von
+ * {@link uhrzeit}: `1430` bzw. `14:30` (LLH-1437). Ohne Zonenrechnung, wie {@link kalendertag}:
+ * die Wanduhrzeit IST schon die Uhrzeit. Unlesbares steht, wie es kam; umgedeutet wird nichts.
+ * Nur für die Anzeige — ein Eingabefeld zeigt seinen Wert taktisch (`uhrzeit.ts`,
+ * `taktischeUhrzeitAus`), so wie man ihn tippt.
+ */
+export function uhrzeitOhneDatum(
+  hhmm: string | null | undefined,
+  konv: AnzeigeKonventionen,
+): string {
+  if (!hhmm) return '';
+  const m = WANDUHRZEIT.exec(hhmm);
+  if (!m) return hhmm;
+  return darstellung(konv) === 'taktisch' ? `${m[1]}${m[2]}` : `${m[1]}:${m[2]}`;
 }
 
 /**

@@ -10,7 +10,10 @@
  *
  * ── Was er prüft ────────────────────────────────────────────────────────────────
  * Produktivcode außerhalb von `anzeige/` ruft kein `.format('…')` mit einem Zeit-Token (`HH`,
- * `mm`, `DD`, `YYYY`) im Literal. Nicht gezählt:
+ * `mm`, `DD`, `YYYY`) im Literal, und kein `formatiere(…, '…')` mit einem solchen Literal unter
+ * den Argumenten (LLH-1437): ein Helfer dieses Namens reicht ein Format an `dayjs` durch und
+ * liefe sonst am Kern vorbei, immer taktisch. Die Koordinaten-`formatiere(lat, lon, 'mgrs')`
+ * trägt kein Zeit-Token und zählt nicht. Nicht gezählt:
  * - Maschinenformate in ISO-Reihenfolge — das Literal beginnt mit `YYYY-MM-DD` (Wire, Tages-
  *   schlüssel, Dateinamen). Sie sieht kein Mensch als Zeitangabe.
  * - {@link AUSNAHMEN}: begründete Einzelfälle.
@@ -19,7 +22,8 @@
  *
  * ── Was er NICHT sieht ──────────────────────────────────────────────────────────
  * Er liest Quelltext: ein Format aus einer Konstanten (`const F = 'HH:mm'; d.format(F)`),
- * `toLocaleTimeString` oder `Intl.DateTimeFormat` fängt er nicht. Die Regel gilt trotzdem.
+ * `toLocaleTimeString`, `Intl.DateTimeFormat` oder ein Helfer anderen Namens, der eine Uhrzeit
+ * selbst zusammensetzt (`z.replace(':', '')`), fängt er nicht. Die Regel gilt trotzdem.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -40,6 +44,13 @@ const produktiv = Object.entries(dateien).filter(
 
 /** Ein `.format(` mit einem String-Literal als erstem Argument (auch über einen Zeilenumbruch). */
 const FORMAT_AUFRUF = /\.format\(\s*(['"`])([^'"`]*?)\1/g;
+/**
+ * Ein `formatiere(…)` (LLH-1437) samt Argumenten, eine Klammerebene tief (`formatiere(dayjs(),
+ * 'HHmm')`); gezählt wird jedes String-Literal darin, auch hinter einem `? :`.
+ */
+const FORMATIERE_AUFRUF = /\bformatiere\(((?:[^()]|\([^()]*\))*)\)/g;
+/** Ein String-Literal. */
+const LITERAL = /(['"`])([^'"`]*?)\1/g;
 /** Zeit-Token im Literal. */
 const ZEIT_TOKEN = /HH|mm|DD|YYYY/;
 /** Maschinenformat in ISO-Reihenfolge: nicht für Menschen. */
@@ -59,9 +70,13 @@ const OFFEN: Record<string, number> = {};
 
 /** Die Zeitformate für Menschen in einem Quelltext. */
 function zeitFormate(inhalt: string): string[] {
-  return [...inhalt.matchAll(FORMAT_AUFRUF)]
-    .map((m) => m[2])
-    .filter((f) => ZEIT_TOKEN.test(f) && !MASCHINENFORMAT.test(f));
+  const formate = [...inhalt.matchAll(FORMAT_AUFRUF)].map((m) => m[2]);
+  const ueberFormatiere = [...inhalt.matchAll(FORMATIERE_AUFRUF)].flatMap((aufruf) =>
+    [...aufruf[1].matchAll(LITERAL)].map((m) => m[2]),
+  );
+  return [...formate, ...ueberFormatiere].filter(
+    (f) => ZEIT_TOKEN.test(f) && !MASCHINENFORMAT.test(f),
+  );
 }
 
 function funde(quellen: [string, string][] = produktiv): Record<string, number> {
@@ -76,7 +91,7 @@ function funde(quellen: [string, string][] = produktiv): Record<string, number> 
 }
 
 describe('Zeit für Menschen nur über den Kern in anzeige/ (LLH-1053)', () => {
-  it('kein `.format(…)` mit Zeit-Token außerhalb von anzeige/ — die Schuldmenge ist leer (LLH-1061)', () => {
+  it('kein `.format(…)` oder `formatiere(…)` mit Zeit-Token außerhalb von anzeige/ — die Schuldmenge ist leer (LLH-1061, LLH-1437)', () => {
     expect(OFFEN).toEqual({});
     expect(funde()).toEqual(OFFEN);
   });
@@ -103,6 +118,27 @@ describe('Zeit für Menschen nur über den Kern in anzeige/ (LLH-1053)', () => {
       ['/src/pages/NeueSeite.tsx', "export const x = dayjs().format('HH:mm');"],
     ]);
     expect(mitNeuem['pages/NeueSeite.tsx']).toBe(1);
+    expect(mitNeuem).not.toEqual(OFFEN);
+  });
+
+  it('das Muster greift auch an `formatiere(…)` (LLH-1437)', () => {
+    expect(zeitFormate("const t = `Lageüberblick ${formatiere(dayjs(), 'HHmm')}`;")).toEqual([
+      'HHmm',
+    ]);
+    expect(zeitFormate("formatiere(z, heute ? 'HHmm' : 'DDHHmm')")).toEqual(['HHmm', 'DDHHmm']);
+    expect(zeitFormate('formatiere(\n  jetzt,\n  "HH:mm",\n)')).toEqual(['HH:mm']);
+    // Maschinenformate, Koordinaten und Namensvettern zählen nicht.
+    expect(zeitFormate("formatiere(z, 'YYYY-MM-DD') === formatiere(jetzt, 'YYYY-MM-DD')")).toEqual(
+      [],
+    );
+    expect(zeitFormate("formatiere(p.lat, p.lon, 'mgrs')")).toEqual([]);
+    expect(zeitFormate("formatiereUhr(ms); formatiereDatenstand(x, 'HH:mm')")).toEqual([]);
+    // Ein neues `formatiere(x, 'HHmm')` außerhalb von anzeige/ macht den ersten Fall rot.
+    const mitNeuem = funde([
+      ...produktiv,
+      ['/src/lageberichte/neuerTitel.ts', "export const t = (x) => formatiere(x, 'HHmm');"],
+    ]);
+    expect(mitNeuem['lageberichte/neuerTitel.ts']).toBe(1);
     expect(mitNeuem).not.toEqual(OFFEN);
   });
 });

@@ -1,7 +1,9 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
+import type { AnzeigeKonventionen } from '../../anzeige/format';
 import { ApiError } from '../../api/client';
 import * as anlagenApi from '../../api/dokumentAnlagen';
 import * as befehleApi from '../../api/befehle';
@@ -45,9 +47,10 @@ function zeige({
     Promise.resolve({ datei: BILD, standAt: STAND }),
   ),
   onSchliessen = vi.fn(),
+  konventionen = {} as AnzeigeKonventionen,
 } = {}) {
   renderMitProviders(
-    <>
+    <AnzeigeKonventionenProvider konventionen={konventionen}>
       <LageplanAnlageDialog
         offen
         einsatzId={3}
@@ -57,7 +60,7 @@ function zeige({
         onSchliessen={onSchliessen}
       />
       <Ort />
-    </>,
+    </AnzeigeKonventionenProvider>,
     { route: '/einsaetze/3/lagekarte' },
   );
   return { erstelleAnlage, onSchliessen };
@@ -78,6 +81,28 @@ beforeEach(() => {
 });
 
 describe('LageplanAnlageDialog', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('der Titel des neuen Lagevortrags folgt der Darstellung „Datum und Uhrzeit“ (LLH-1437)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 12:30 UTC = 14:30 Sommerzeit in Berlin.
+    vi.setSystemTime(new Date('2026-10-10T12:30:00Z'));
+    vi.mocked(berichteApi.legeLageberichtAn).mockResolvedValue({
+      id: 12,
+      titel: 'Lageüberblick 14:30',
+    } as never);
+    zeige({ konventionen: { zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' } });
+    await userEvent.click(await screen.findByRole('radio', { name: 'Neuer Lagevortrag' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anfügen' }));
+    await waitFor(() => expect(berichteApi.legeLageberichtAn).toHaveBeenCalled());
+    expect(berichteApi.legeLageberichtAn).toHaveBeenCalledWith(3, {
+      vorlage: 'lagebericht',
+      titel: 'Lageüberblick 14:30',
+    });
+  });
+
   it('bietet offene Entwürfe beider Dokumente und einen neuen Lagevortrag, nie Freigegebenes', async () => {
     zeige();
     expect(
