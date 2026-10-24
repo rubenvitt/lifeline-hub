@@ -433,15 +433,88 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
     expect(bodies[0]).toEqual({ fuehrer_id: 1 });
   });
 
-  it('Sprechgruppen: der PATCH trägt genau `sprechgruppe_ids`', async () => {
-    const { bodies, handler } = zeichneAuf('patch', '/api/einsaetze/1/einheiten/10', einheiten[0]);
-    zeige(handler);
+  /**
+   * Spielt die Einzelwege der Sprechgruppen (LLH-1265): `aufrufe` hält jede Anfrage als
+   * „PUT 8“/„DELETE 7“ fest, die Liste liefert den fortgeschriebenen Stand. `ablehnen` nennt eine
+   * Sprechgruppe, deren Zuordnung der Server ablehnt; ein PATCH landet in `patches`.
+   */
+  function sprechgruppenServer(start: number[], ablehnen?: number) {
+    const katalog = [tmoSprechgruppe, dmoSprechgruppe];
+    let ids = [...start];
+    const aufrufe: string[] = [];
+    const patches: unknown[] = [];
+    const stand = () => ({
+      ...einheiten[0],
+      sprechgruppen: ids.map((id) => katalog.find((k) => k.id === id)),
+    });
+    return {
+      aufrufe,
+      patches,
+      handler: [
+        http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([stand()])),
+        http.put('/api/einsaetze/1/einheiten/10/sprechgruppen/:sg', ({ params }) => {
+          const sg = Number(params.sg);
+          aufrufe.push(`PUT ${sg}`);
+          if (sg === ablehnen) {
+            return HttpResponse.json({ error: 'Sprechgruppe ist deaktiviert' }, { status: 422 });
+          }
+          if (!ids.includes(sg)) ids = [...ids, sg];
+          return new HttpResponse(null, { status: 204 });
+        }),
+        http.delete('/api/einsaetze/1/einheiten/10/sprechgruppen/:sg', ({ params }) => {
+          const sg = Number(params.sg);
+          aufrufe.push(`DELETE ${sg}`);
+          ids = ids.filter((id) => id !== sg);
+          return new HttpResponse(null, { status: 204 });
+        }),
+        http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
+          patches.push(await request.json());
+          return HttpResponse.json(stand());
+        }),
+      ],
+    };
+  }
+
+  it('Sprechgruppe hinzugefügt: genau eine Zuordnung über den Einzelweg, kein PATCH', async () => {
+    const sg = sprechgruppenServer([7]);
+    zeige(...sg.handler);
     await userEvent.click(await screen.findByRole('button', { name: 'Sprechgruppen bearbeiten' }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
     await userEvent.click(await screen.findByTitle('DMO 31'));
     await userEvent.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
-    await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toEqual({ sprechgruppe_ids: [7, 8] });
+    expect(await screen.findByText('Sprechgruppen gespeichert')).toBeInTheDocument();
+    expect(sg.aufrufe).toEqual(['PUT 8']);
+    expect(sg.patches).toHaveLength(0);
+    // Die Zeile zeigt nach dem Speichern den Serverstand mit beiden.
+    await waitFor(() => expect(paneel('Funk')).toHaveTextContent('TMO 412_F_DRK · DMO 31'));
+  });
+
+  it('Sprechgruppen teilweise abgelehnt: Grund an der Zeile, gespeichert bleibt die erste Änderung', async () => {
+    const sg = sprechgruppenServer([7], 8);
+    zeige(...sg.handler);
+    await userEvent.click(await screen.findByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    const feld = screen.getByRole('combobox', { name: 'Sprechgruppen' }).closest('.ant-select')!;
+    await waitFor(() =>
+      expect(feld.querySelectorAll('.ant-select-selection-item')).toHaveLength(1),
+    );
+    await userEvent.click(feld.querySelector('.ant-select-clear')!);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await userEvent.click(await screen.findByTitle('DMO 31'));
+    await userEvent.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+
+    expect(await within(paneel('Funk')).findByRole('alert')).toHaveTextContent(
+      'Sprechgruppe ist deaktiviert',
+    );
+    // Erst gelöst, dann zugeordnet (D2); die Eingabe bleibt offen, kein Toast.
+    expect(sg.aufrufe).toEqual(['DELETE 7', 'PUT 8']);
+    expect(screen.getByRole('combobox', { name: 'Sprechgruppen' })).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Bearbeitung von Sprechgruppen abbrechen' }),
+    );
+    expect(
+      await within(paneel('Funk')).findByRole('button', { name: 'Sprechgruppen eintragen' }),
+    ).toBeInTheDocument();
   });
 
   it('Zeichen: genau `tz_organisation` an den Lageweg, keine Koordinate', async () => {

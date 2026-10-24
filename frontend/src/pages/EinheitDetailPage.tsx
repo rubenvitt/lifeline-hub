@@ -16,6 +16,8 @@ import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import {
   listeEinheiten,
   loeseEinheitAuf,
+  loeseEinheitSprechgruppe,
+  ordneEinheitSprechgruppeZu,
   patchEinheitZeichen,
   patcheEinheit,
   setzeEinheitStatus,
@@ -33,7 +35,7 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { buildEinheitRechte } from './einheit/einheitAnsichtKern';
 import EinheitKopf from './einheit/EinheitKopf';
-import EinheitFunk from './einheit/EinheitFunk';
+import EinheitFunk, { type SprechgruppenAenderung } from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
 import EinheitAufloesen from './einheit/EinheitAufloesen';
 import EinheitUebernahme from './einheit/EinheitUebernahme';
@@ -211,6 +213,24 @@ function EinheitAnsicht({
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       message.success(`${v.etikett} gespeichert`);
     },
+  });
+  /*
+   * Sprechgruppen über die Einzelwege (LLH-1265, D2): erst lösen, dann zuordnen, eine Anfrage nach
+   * der anderen; die erste Ablehnung hält an und steht an der Zeile. Die Wege antworten ohne
+   * Körper, deshalb wartet die Seite in jedem Fall auf den neu geladenen Stand, auch nach einer
+   * Teilablehnung. Jede wirksame Änderung schreibt der Server ins Tagebuch, deshalb auch `etb`.
+   */
+  const sprechgruppen = useMutation({
+    mutationFn: async ({ hinzu, weg }: SprechgruppenAenderung) => {
+      try {
+        for (const sg of weg) await loeseEinheitSprechgruppe(einsatzId, einheitId, sg);
+        for (const sg of hinzu) await ordneEinheitSprechgruppeZu(einsatzId, einheitId, sg);
+      } finally {
+        qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+        await qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      }
+    },
+    onSuccess: () => message.success('Sprechgruppen gespeichert'),
   });
   // Das Zeichen geht über den Lageweg, ohne Tagebuch-Eintrag (D4).
   const patchZeichen = useMutation({
@@ -406,6 +426,7 @@ function EinheitAnsicht({
           einsatzId={einsatzId}
           canEdit={rechte.canEditEinheit}
           onPatch={(etikett, p) => patch.mutateAsync({ etikett, patch: p })}
+          onSprechgruppen={(aenderung) => sprechgruppen.mutateAsync(aenderung)}
         />
 
         <EinheitZeichenPaneel

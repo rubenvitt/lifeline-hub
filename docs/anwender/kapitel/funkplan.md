@@ -179,8 +179,10 @@ Quelle, steht dort keine Zahl. Dieselbe Zahl steht auf der Seite „Stab“ am W
   steht dort nur als Nebentext.
 - Die Skizze zeigt keine Rufnummern und keine Personennamen; im Eigenschaftspaneel einer Stelle
   steht nur der Rufname, Telefon und weitere Verbindungen pflegt man am Datensatz.
-- Weder Funkplan noch Skizze noch Kommunikationsplan schreiben ins Einsatztagebuch. Der
-  Kommunikationsplan geht nicht in den Lagebericht; er wird gedruckt.
+- Weder Funkplan noch Skizze noch Kommunikationsplan schreiben ins Einsatztagebuch. Ausnahme:
+  Ordnet die Skizze einer Einheit eine Sprechgruppe zu oder löst sie, steht das im
+  Einsatztagebuch, wie bei derselben Änderung auf der Seite der Einheit. Der Kommunikationsplan
+  geht nicht in den Lagebericht; er wird gedruckt.
 
 ### Skizze als Anlage
 
