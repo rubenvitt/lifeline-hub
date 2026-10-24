@@ -5041,11 +5041,11 @@ test('Personenansicht (Beobachter): die Sprünge folgen der Staffel, Schreibziel
 
 /**
  * Trefferstreifen eines Tabellenkopfs: tastet die Zeile waagerecht in ihrer Mitte ab und ordnet
- * jedem Pixel das Ziel zu, das ein Finger dort träfe (`elementFromPoint`): einen Filterauslöser,
- * eine sortierbare Kopfzelle oder nichts. Gemessen wird so, was der Treffer wirklich trifft, nicht
- * das Rechteck eines Knotens: antd hängt den Klick an die Kopfzelle, ihr Rechteck sagt nichts
- * darüber, ob ihre Polsterung trifft. Liefert die Lücken zwischen zwei VERSCHIEDENEN Zielen
- * benachbarter Spalten; Auslöser und Sortierfläche derselben Spalte sind antds Verschachtelung.
+ * jedem Pixel das Ziel zu, das ein Finger dort träfe (`elementFromPoint`): die Sortierfläche oder
+ * den Filterauslöser einer Spalte, sonst nichts. Die Polsterung einer sortierbaren Kopfzelle ist
+ * kein Ziel, ihren Klick hält `polsterKlickRiegel` an; dass das wirkt, belegt der Klick-Fall
+ * unten. Liefert die Lücken zwischen den Zielen benachbarter Spalten; Auslöser und Sortierfläche
+ * derselben Spalte sind antds Verschachtelung.
  */
 async function kopfZielLuecken(kopf: Locator): Promise<{ ziele: number; luecken: number[] }> {
   return kopf.evaluate((thead) => {
@@ -5057,13 +5057,11 @@ async function kopfZielLuecken(kopf: Locator): Promise<{ ziele: number; luecken:
     type Lauf = { spalte: number; von: number; bis: number };
     const laeufe: Lauf[] = [];
     for (let x = links; x < rechts; x += 1) {
-      const treffer = document.elementFromPoint(x, y);
-      const th = treffer?.closest('th');
-      const ziel =
-        th && thead.contains(th) && th.classList.contains('ant-table-column-has-sorters')
-          ? th
-          : treffer?.closest('.ant-table-filter-trigger')?.closest('th');
-      const spalte = ziel && thead.contains(ziel) ? zellen.indexOf(ziel as HTMLElement) : -1;
+      const ziel = document
+        .elementFromPoint(x, y)
+        ?.closest('.ant-table-column-sorters, .ant-table-filter-trigger')
+        ?.closest('th');
+      const spalte = ziel && thead.contains(ziel) ? zellen.indexOf(ziel) : -1;
       if (spalte < 0) continue;
       const letzter = laeufe[laeufe.length - 1];
       if (letzter && letzter.spalte === spalte && letzter.bis === x - 1) letzter.bis = x;
@@ -5089,11 +5087,7 @@ async function sortierTrefferHoehe(kopfZelle: Locator): Promise<number> {
     let hoehe = 0;
     for (let y = Math.floor(zeile.top) - 20; y < Math.ceil(zeile.bottom) + 20; y += 1) {
       const treffer = document.elementFromPoint(x, y);
-      if (
-        treffer &&
-        treffer.closest('th') === th &&
-        !treffer.closest('.ant-table-filter-trigger')
-      ) {
+      if (treffer?.closest('.ant-table-column-sorters')?.closest('th') === th) {
         hoehe += 1;
       }
     }
@@ -5101,7 +5095,7 @@ async function sortierTrefferHoehe(kopfZelle: Locator): Promise<number> {
   });
 }
 
-async function personalSaeen(page: Page, einsatzId: string) {
+async function seedPersonal(page: Page, einsatzId: string) {
   for (const name of ['Messkraft Kopf A', 'Messkraft Kopf B']) {
     const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
       data: { adhoc: { name } },
@@ -5111,7 +5105,7 @@ async function personalSaeen(page: Page, einsatzId: string) {
 }
 
 /** Misst die sortierbaren Spaltenköpfe der Personalliste in einer Stufe; liefert die Anmerkung. */
-async function personalKopfMessen(page: Page, dichte: keyof typeof ZIELABSTAND, soll: number) {
+async function measurePersonalKopf(page: Page, dichte: keyof typeof ZIELABSTAND, soll: number) {
   const main = page.getByRole('main');
   // Datenanker: beide Kräfte stehen in der Tabelle.
   await expect(main.getByText('Messkraft Kopf B', { exact: true })).toBeVisible();
@@ -5149,7 +5143,7 @@ test('Personal (LLH-1273): Kopfaktionen halten den Zielabstand, sortierbare Spal
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personal Kopf`);
-  await personalSaeen(page, einsatzId);
+  await seedPersonal(page, einsatzId);
 
   const main = page.getByRole('main');
   const gemessen: string[] = [];
@@ -5169,10 +5163,70 @@ test('Personal (LLH-1273): Kopfaktionen halten den Zielabstand, sortierbare Spal
         sollAbstand - SUBPIXEL,
       );
     }
-    const kopf = await personalKopfMessen(page, dichte, soll);
+    const kopf = await measurePersonalKopf(page, dichte, soll);
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Kopfaktionen ${abstand}px auseinander, ${kopf}`);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Personal (LLH-1273): ein Tipp in die Polsterung sortiert nicht, auch nicht über der fixierten Spalte, der Titel sortiert', async ({
+  page,
+}) => {
+  // Tablet quer im Handschuh: die Tabelle läuft waagerecht über, die Namensspalte ist fixiert.
+  // Unter ihr rollen die übrigen Kopfzellen durch; ein Tipp in ihre Polsterung fiel mit
+  // `pointer-events: none` an der Zelle auf die verdeckte Spalte (Review LLH-1273).
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personal Polster`);
+  await seedPersonal(page, einsatzId);
+  await page.goto(`/einsaetze/${einsatzId}/personal`);
+  await stelleDichte(page, 'handschuh');
+  const main = page.getByRole('main');
+  await expect(main.getByText('Messkraft Kopf B', { exact: true })).toBeVisible();
+
+  const kopf = main.locator('.ant-table-thead').first();
+  const fixiert = kopf.locator('th.ant-table-column-has-sorters.ant-table-cell-fix-start').first();
+  await expect(fixiert).toHaveCount(1);
+  const rollend = main.locator('.ant-table-content, .ant-table-header').first();
+  // Vorbedingung: die Tabelle läuft über, sonst rollte nichts unter die fixierte Zelle.
+  expect(await rollend.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeGreaterThan(100);
+  await rollend.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+  await expect.poll(() => rollend.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+
+  // Punkte in der Polsterung der fixierten Zelle: rechts und links neben dem Inhalt, mittig.
+  const punkte = await fixiert.evaluate((th) => {
+    const z = th.getBoundingClientRect();
+    const inhalt = th.querySelector('.ant-table-column-sorters')!.getBoundingClientRect();
+    const y = z.top + z.height / 2;
+    return [
+      { x: (inhalt.right + z.right) / 2, y },
+      { x: (z.left + inhalt.left) / 2, y },
+    ];
+  });
+  for (const p of punkte) {
+    // Getroffen wird die fixierte Zelle selbst, keine verdeckte Spalte darunter.
+    const getroffen = await page.evaluate(
+      ([x, y]) => {
+        const t = document.elementFromPoint(x, y);
+        return {
+          fixiert: !!t?.closest('th.ant-table-cell-fix-start'),
+          inhalt: !!t?.closest('.ant-table-column-sorters, .ant-table-filter-trigger'),
+        };
+      },
+      [p.x, p.y] as const,
+    );
+    expect(getroffen, `Tipp bei x ${Math.round(p.x)}`).toEqual({ fixiert: true, inhalt: false });
+    await page.mouse.click(p.x, p.y);
+  }
+  // Nichts sortiert: keine Spalte trägt eine Richtung, die Adresse keine Sortierung.
+  await expect(kopf.locator('th[aria-sort]')).toHaveCount(0);
+  await expect(page).not.toHaveURL(/[?&]sort=/);
+
+  // Gegenprobe: der Titel derselben Zelle sortiert.
+  await fixiert.locator('.ant-table-column-title').click();
+  await expect(fixiert).toHaveAttribute('aria-sort', /ascending|descending/);
+  await expect(page).toHaveURL(/[?&]sort=/);
 });
 
 test('Personal (Beobachter, LLH-1273): ohne Kopfaktionen halten die sortierbaren Spaltenköpfe Abstand und Stufe', async ({
@@ -5182,7 +5236,7 @@ test('Personal (Beobachter, LLH-1273): ohne Kopfaktionen halten die sortierbaren
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personal Kopf Lesend`);
-  await personalSaeen(page, einsatzId);
+  await seedPersonal(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   const main = page.getByRole('main');
@@ -5190,7 +5244,7 @@ test('Personal (Beobachter, LLH-1273): ohne Kopfaktionen halten die sortierbaren
   for (const { dichte, soll } of STAFFEL) {
     await page.goto(`/einsaetze/${einsatzId}/personal`);
     await stelleDichte(page, dichte);
-    const kopf = await personalKopfMessen(page, dichte, soll);
+    const kopf = await measurePersonalKopf(page, dichte, soll);
     // Nach dem Datenanker: ohne Schreibrecht fehlen beide Kopfaktionen.
     for (const name of ['Personal disponieren', 'Ad-hoc-Person']) {
       await expect(

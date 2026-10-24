@@ -39,7 +39,7 @@ function spaceInAktionen(quelle: string): string[] {
     const erstesElement = rest.search(/<[A-Za-z>]/);
     if (erstesElement < 0 || !rest.startsWith('<Space', erstesElement)) continue;
     const tag = rest.slice(erstesElement, rest.indexOf('>', erstesElement) + 1);
-    if (/^<Space\b/.test(tag)) funde.push(tag);
+    if (/^<Space[\s>]/.test(tag)) funde.push(tag);
   }
   return funde;
 }
@@ -69,5 +69,7 @@ describe('Aktionen-Guard (LLH-1273)', () => {
       '<Space wrap>',
     ]);
     expect(spaceInAktionen('aktionen={<Button>x</Button>}')).toEqual([]);
+    // `Space.Compact` trägt in `size` die Steuergröße, keinen Abstand.
+    expect(spaceInAktionen('aktionen={<Space.Compact>')).toEqual([]);
   });
 });

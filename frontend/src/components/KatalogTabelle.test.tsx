@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { TableColumnsType, TableProps } from 'antd';
+import { theme, type TableColumnsType, type TableProps } from 'antd';
 import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
@@ -15,7 +15,8 @@ import KatalogTabelle, {
   filterKopfStil,
   fliessBreite,
   setzeKopfFreiraum,
-  sortierKopfStil,
+  polsterKlickRiegel,
+  sortierKopfStyle,
   tabellenTokens,
   type KatalogSpalte,
   suchfeldStil,
@@ -710,7 +711,10 @@ describe('KatalogTabelle · durchgereichte Sortierung und Filter', () => {
 
     // Der Auslöser sitzt in der fixierten Kopfzelle. jsdom rechnet kein Layout — dass der Klick
     // am 390-px-Schirm ankommt, ist hier NICHT belegt.
-    const kopf = container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!;
+    // Geklickt wird der Titel: ein Klick auf die Zelle selbst trifft ihre Polsterung (LLH-1273).
+    const kopf = container.querySelector<HTMLElement>(
+      'th.ant-table-cell-fix-start .ant-table-column-title',
+    )!;
     await userEvent.click(kopf);
     expect(namen(container)).toEqual(['Florian 1/44/1', 'Rotkreuz 2/83/1']);
   });
@@ -1121,12 +1125,51 @@ describe('KatalogTabelle · Kopfwerkzeuge nach Dichte (LLH-1227)', () => {
 
   it('Sortierfläche: Boden 30 / 48 / 72 px als Variable (LLH-1273)', () => {
     const ziel = (s: keyof typeof dichten) =>
-      (sortierKopfStil({ controlHeight: dichten[s].zeilenhoehe }) as Record<string, unknown>)[
+      (sortierKopfStyle({ controlHeight: dichten[s].zeilenhoehe }) as Record<string, unknown>)[
         '--lfh-sortier-ziel'
       ];
     expect(ziel('kompakt')).toBe('30px');
     expect(ziel('komfortabel')).toBe('48px');
     expect(ziel('handschuh')).toBe('72px');
+  });
+
+  it('Polsterriegel: ein Klick in die Polsterung hält an, einer auf Inhalt oder Auslöser nicht', () => {
+    const zelle = document.createElement('th');
+    zelle.innerHTML =
+      '<div class="ant-table-filter-column"><div class="ant-table-column-sorters"><span>Typ</span></div>' +
+      '<span class="ant-table-filter-trigger"><i></i></span></div>';
+    const angehalten = (ziel: Element) => {
+      const stop = vi.fn();
+      polsterKlickRiegel({ target: ziel, currentTarget: zelle, stopPropagation: stop });
+      return stop.mock.calls.length > 0;
+    };
+    expect(angehalten(zelle)).toBe(true);
+    expect(angehalten(zelle.querySelector('.ant-table-filter-column')!)).toBe(true);
+    expect(angehalten(zelle.querySelector('.ant-table-column-sorters span')!)).toBe(false);
+    expect(angehalten(zelle.querySelector('.ant-table-filter-trigger i')!)).toBe(false);
+    // Das Filtermenü steht als Portal außerhalb der Zelle: seine Klicks laufen durch.
+    expect(angehalten(document.createElement('button'))).toBe(false);
+  });
+
+  it('sortiert über den Titel, nicht über einen Klick auf die Kopfzelle selbst (LLH-1273)', () => {
+    const onChange = vi.fn();
+    renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname', sorter: true },
+          { title: 'Typ', dataIndex: 'typ', key: 'typ' },
+        ]}
+        dataSource={ZEILEN}
+        onChange={onChange}
+      />,
+    );
+    const titel = screen.getAllByText('Funkrufname').find((el) => el.closest('thead'))!;
+    fireEvent.click(titel.closest('th')!);
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(titel);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0]![3]).toMatchObject({ action: 'sort' });
   });
 
   it('setzt die Variablen an der Tabellenwurzel und behält ein übergebenes style', () => {
@@ -1140,7 +1183,10 @@ describe('KatalogTabelle · Kopfwerkzeuge nach Dichte (LLH-1227)', () => {
     );
     const wurzel = container.querySelector<HTMLElement>('.ant-table-wrapper.lfh-katalog')!;
     expect(wurzel.style.getPropertyValue('--lfh-filter-ziel')).toMatch(/^\d+px$/);
-    expect(wurzel.style.getPropertyValue('--lfh-sortier-ziel')).toMatch(/^\d+px$/);
+    // Die Steuerhöhe, nicht die kleine (`controlHeightSM`): der Test-Provider trägt antds Vorgabe.
+    expect(wurzel.style.getPropertyValue('--lfh-sortier-ziel')).toBe(
+      `${theme.getDesignToken().controlHeight}px`,
+    );
     expect(wurzel.style.marginTop).toBe('3px');
   });
 

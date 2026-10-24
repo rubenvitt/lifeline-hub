@@ -709,7 +709,7 @@ async function einheitFokusBereit(page: Page, dichte: string) {
 /**
  * Tabulatorstopps eines ganzen Umlaufs durch das Dokument: vom Brotkrumen „Einheiten“ über das
  * Inhaltsende hinaus durch Kopf, Rail und Modulpanel zurück in den Seitenkopf. Der Rahmen gehört
- * mit in den Lauf, seit die Rail ihre letzte Kategorie über den klebenden Fuß rollt (LLH-1241).
+ * mit in den Lauf, seit kein Ziel der Rail mehr unter ihrem Fuß liegt (LLH-1241, LLH-1273).
  * Zu knapp gezählt fehlt ein Ziel in `besuchteZiele`, der Test wird also nicht still grün.
  */
 async function stoppsEinUmlauf(page: Page): Promise<number> {

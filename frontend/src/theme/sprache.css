@@ -369,14 +369,14 @@
 }
 /* Sortierbare Kopfzelle (LLH-1273, Kriterium 2). antd hängt den Klick an die ganze Zelle samt
    Polsterung, zwei sortierbare Köpfe stießen deshalb ohne Lücke aneinander. Ziel ist hier nur ihr
-   Inhalt (`.ant-table-column-sorters`, mit Filter auch der Auslöser): die Zelle selbst trifft
-   nicht, ihre Polsterung (11 / 18 / 26 px je Seite) trennt die Ziele benachbarter Spalten. Der
-   Klick erreicht weiter den Hörer der Zelle, und Fokus und Tasten bleiben an ihr. `position`
-   fängt antds Klickfläche `::after` (`inset: 0`) im Inhalt statt in der Zelle. Senkrecht reicht
-   der Inhalt bis an den Zellrand, mindestens auf die Steuerhöhe (`--lfh-sortier-ziel`, 30 / 48 /
-   72 px, `sortierKopfStil` in `KatalogTabelle.tsx`), wie der Filter-Auslöser um den Einzug. */
+   Inhalt (`.ant-table-column-sorters`, mit Filter auch der Auslöser); einen Klick in die Polsterung
+   (11 / 18 / 26 px je Seite) hält `polsterKlickRiegel` in `KatalogTabelle.tsx` an, der Zeiger zeigt
+   dort keine Hand. `position` fängt antds Klickfläche `::after` (`inset: 0`) im Inhalt statt in
+   der Zelle. Senkrecht reicht der Inhalt bis an den Zellrand, mindestens auf die Steuerhöhe
+   (`--lfh-sortier-ziel`, 30 / 48 / 72 px, `sortierKopfStyle`), wie der Filter-Auslöser um den
+   Einzug. */
 .ant-table-wrapper.lfh-katalog .ant-table-thead > tr > th.ant-table-column-has-sorters {
-  pointer-events: none;
+  cursor: default;
 }
 .ant-table-wrapper.lfh-katalog
   .ant-table-thead
@@ -387,13 +387,7 @@
   min-height: var(--lfh-sortier-ziel, 0px);
   margin-block: calc(-1 * var(--lfh-filter-einzug, 0px));
   padding-block: var(--lfh-filter-einzug, 0px);
-  pointer-events: auto;
-}
-.ant-table-wrapper.lfh-katalog
-  .ant-table-thead
-  th.ant-table-column-has-sorters
-  .ant-table-filter-trigger {
-  pointer-events: auto;
+  cursor: pointer;
 }
 /* Aufklappsymbol im Baum der `Datensicht` (LLH-1240): der Knopf trägt den Boden der Staffel
    inline (`baumSymbolZielStil`), hier nur, was inline nicht geht. Rand unter dem Zeiger wie antds

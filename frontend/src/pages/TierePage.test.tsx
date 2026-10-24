@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, sortTarget } from '../test/utils';
 import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
 import { NetzFehler } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -928,7 +928,7 @@ describe('TierePage', () => {
     // Vorgabe ist die Nummer, absteigend …
     expect(regFolge()).toEqual(['T-003', 'T-002', 'T-001']);
     // … und ein Klick auf den seit-Kopf ordnet nach Zeit, ältestes zuerst.
-    await userEvent.click(screen.getByRole('columnheader', { name: 'seit' }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: 'seit' })));
     expect(regFolge()).toEqual(['T-001', 'T-003', 'T-002']);
   });
 
@@ -1307,7 +1307,7 @@ describe('TierePage · Sortieren und Filtern (LLH-1096)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     await waitFor(() => expect(folge()).toHaveLength(2));
-    await userEvent.click(screen.getByRole('columnheader', { name: /^Rufname/ }));
+    await userEvent.click(sortTarget(screen.getByRole('columnheader', { name: /^Rufname/ })));
     await waitFor(() => expect(folge()).toEqual(['12', String(tierBasis.id)]));
     await waitFor(() => expect(adresse()).toBe('?sort=rufname%3Aauf'));
   });
