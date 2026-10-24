@@ -317,7 +317,7 @@ export interface LetztesFahrzeugMitBesatzung {
  * Fahrzeug ist, steht unter ihm, jede andere unter „Ohne Fahrzeug“. Jede Person genau einmal, in
  * der Folge des Servers (Führer zuerst).
  */
-export function gliedereLetzteBesetzung(b: LetzteBesetzung): {
+export function groupLetzteBesetzung(b: LetzteBesetzung): {
   fahrzeuge: LetztesFahrzeugMitBesatzung[];
   ohneFahrzeug: LetztePerson[];
 } {

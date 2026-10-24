@@ -78,10 +78,13 @@ export default function EinheitDetailPage() {
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
   const aktuell = einheiten.find((e) => e.id === einheitId) ?? null;
   // Die aufgelösten erst, wenn die aktive Liste da ist und die Einheit nicht nennt (LLH-1266).
+  // Immer frisch: die Gliederung hält sie im Cache, vielleicht noch aus der Zeit, als diese
+  // Einheit aktiv war.
   const aufgeloesteQuery = useQuery({
     queryKey: einsatzKeys.einheitenAufgeloeste(einsatzId),
     queryFn: () => listAufgeloesteEinheiten(einsatzId),
     enabled: idGueltig && einheitenQuery.isSuccess && aktuell == null,
+    refetchOnMount: 'always',
   });
   const aufgeloest = aufgeloesteQuery.data?.find((e) => e.id === einheitId) ?? null;
   const freigaben = useModulFreigaben(einsatzId);
@@ -121,7 +124,10 @@ export default function EinheitDetailPage() {
       />
     );
   }
-  if (!aktuell && aufgeloesteQuery.isPending) return <SeitenSkeleton />;
+  // Auch während ein veralteter Stand nachlädt: er kennt die eben aufgelöste Einheit noch nicht.
+  if (!aktuell && (aufgeloesteQuery.isPending || aufgeloesteQuery.isFetching)) {
+    return <SeitenSkeleton />;
+  }
   if (!aktuell && aufgeloesteQuery.isError) {
     return (
       <SeitenFehler

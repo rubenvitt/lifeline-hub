@@ -17,7 +17,7 @@ import { KennungsLink } from '../../components/kennungsLink';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import KraftZeitachse from '../../kraefte/KraftZeitachse';
 import { einheitenPfad, einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
-import { gliedereLetzteBesetzung, type EinheitRechte } from './einheitAnsichtKern';
+import { groupLetzteBesetzung, type EinheitRechte } from './einheitAnsichtKern';
 
 /** Satz an Stelle der Kräfte, wenn die Einheit vor dem Festhalten aufgelöst wurde. */
 export const BESETZUNG_NICHT_FESTGEHALTEN =
@@ -111,7 +111,7 @@ export default function EinheitAufgeloestAnsicht({
       </Paneel>
     );
   } else {
-    const { fahrzeuge, ohneFahrzeug } = gliedereLetzteBesetzung(besetzung);
+    const { fahrzeuge, ohneFahrzeug } = groupLetzteBesetzung(besetzung);
     kraefte = (
       <>
         <Paneel

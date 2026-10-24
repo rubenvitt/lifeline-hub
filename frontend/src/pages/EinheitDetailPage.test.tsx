@@ -5,7 +5,8 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useNavigate, useSearchParams } from 'react-router';
 import { server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { einsatzKeys } from '../api/queryKeys';
 import EinheitDetailPage from './EinheitDetailPage';
 import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 
@@ -437,6 +438,35 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Anna Beck' })).toBeNull());
     expect(screen.queryByRole('link', { name: 'Florian 1-83-1' })).toBeNull();
     expect(screen.getByText('Florian 1-83-1')).toBeInTheDocument();
+  });
+
+  it('eine veraltete Liste der aufgelösten im Cache zeigt nie „gibt es nicht (mehr)“', async () => {
+    // Die Gliederung hat die aufgelösten geladen, als die Einheit noch aktiv war (Review LLH-1266).
+    const client = neuerQueryClient();
+    client.setQueryDefaults(einsatzKeys.einheitenAufgeloeste(1), { gcTime: Infinity });
+    client.setQueryData(einsatzKeys.einheitenAufgeloeste(1), []);
+    let aktivGeladen = false;
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('aufgeloeste') !== '1') {
+          aktivGeladen = true;
+          return HttpResponse.json(einheiten);
+        }
+        await delay(200);
+        return HttpResponse.json([aufgeloest]);
+      }),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten/20', client },
+    );
+    await waitFor(() => expect(aktivGeladen).toBe(true));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Florian 1', level: 1 })).toBeInTheDocument();
   });
 
   it('eine aktive Einheit fragt die aufgelösten nicht ab', async () => {
