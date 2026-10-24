@@ -37,8 +37,13 @@
 
 ## 3. Integration
 
-- [ ] 3.1 `./scripts/check-all.sh` (Bündel nach `scripts/AGENTS.md`) grün; Kästchen, die erst die
-  CI des PRs belegt, mit Verweis auf diesen Lauf abhaken.
+- [x] 3.1 `./scripts/check-all.sh` (Bündel nach `scripts/AGENTS.md`) grün; Kästchen, die erst die
+  CI des PRs belegt, mit Verweis auf diesen Lauf abhaken. Lokal (24.10.2026): Bündel `schnell`
+  grün bis auf Schritt 6 (zwei neue `high`-Advisories in Dev-Abhängigkeiten, auf `alpha` ebenso
+  rot, Nachzug LLH-1460); `vitest related` zu den geänderten Dateien 305 Dateien / 6370 Tests
+  grün; Rust: `sprechgruppe_einzelzuordnung`, `stab_fernmeldeskizze`,
+  `einsatz_verwaltungsrecht` grün. Volle Rust-Suite und e2e passten nicht in den Platz der
+  Cloud-Sitzung; sie belegt die CI des PRs.
 
 ## Workflow follow-up
 
