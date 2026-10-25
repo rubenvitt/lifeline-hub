@@ -3339,6 +3339,7 @@ mod tests {
             "einheit_vorlage",
             "einheit_vorlage_fahrzeug",
             "einheit_vorlage_personal",
+            "einheit_vorlage_material",
             // Verpflegungsplan (LLH-1058): Org-Stammdatum; ein angelegtes Zeitfenster kennt seine
             // Vorlage nicht. Ein künftiger Verweis aus dem Einsatz zöge sie sonst in die Hülle.
             "verpflegung_vorlage",

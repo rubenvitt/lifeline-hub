@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::einheit_vorlage::repo::{self as vrepo, NewVorlage, VorlagePatch};
-use crate::einheit_vorlage::PersonalEntry;
+use crate::einheit_vorlage::{MaterialEntry, PersonalEntry};
 use crate::katalog::KATEGORIE_GEBUNDEN;
 use crate::personal::status_repo::{self, StatusDaten};
 use sqlx::SqlitePool;
@@ -217,12 +217,14 @@ async fn setup(pool: &SqlitePool) -> Zug {
 const ALLES: Lesen = Lesen {
     fahrzeuge: true,
     personal: true,
+    material: true,
 };
 
 /// Für [`vorschau`]: kein Modul gesperrt.
 const NICHTS_GESPERRT: Lesen = Lesen {
     fahrzeuge: false,
     personal: false,
+    material: false,
 };
 
 async fn load_plan(pool: &SqlitePool, z: &Zug, vorlage: i64) -> Result<Plan, AppError> {
@@ -316,6 +318,7 @@ fn anfrage<'a>(fahrzeuge: &'a [Wahl], personal: &'a [Wahl]) -> Anfrage<'a> {
         abschnitt_id: None,
         fahrzeuge,
         personal,
+        material: &[],
     }
 }
 
@@ -341,6 +344,7 @@ async fn plan_traegt_den_aktiven_baum_wurzel_vorn() {
         Lesen {
             fahrzeuge: false,
             personal: false,
+            material: false,
         },
     );
     assert_eq!(v.vorlage_id, z.zug);
@@ -354,6 +358,7 @@ async fn plan_traegt_den_aktiven_baum_wurzel_vorn() {
         Lesen {
             fahrzeuge: false,
             personal: false,
+            material: false,
         },
     );
     assert_eq!(v.knoten.len(), 1);
@@ -492,6 +497,7 @@ async fn fahrzeugzeilen_nennen_zustand_und_einheit() {
         Lesen {
             fahrzeuge: false,
             personal: false,
+            material: false,
         },
     );
     let rtw2 = &v.knoten[1].fahrzeuge[1];
@@ -518,6 +524,7 @@ async fn gesperrte_module_bleiben_in_der_vorschau_leer() {
     let gesperrt = Lesen {
         fahrzeuge: true,
         personal: false,
+        material: false,
     };
     let plan = plan_tx(
         &mut conn,
@@ -527,6 +534,7 @@ async fn gesperrte_module_bleiben_in_der_vorschau_leer() {
         Lesen {
             fahrzeuge: !gesperrt.fahrzeuge,
             personal: !gesperrt.personal,
+            material: !gesperrt.material,
         },
     )
     .await
@@ -635,6 +643,7 @@ async fn personenzeilen_nennen_zustand_einheit_und_fahrzeug() {
         Lesen {
             fahrzeuge: false,
             personal: false,
+            material: false,
         },
     );
     let zf = &v.knoten[0].personal[0];
@@ -697,6 +706,7 @@ fn abgleich_nennt_je_zeile_den_grund_fahrzeuge_vor_personen() {
             (4, lage_p(Entlassen, None, None)),
             (6, lage_p(Gebunden, Some("2. Zug"), Some("83-4"))),
         ]),
+        material: HashMap::new(),
     };
     let fahrzeuge = [
         Wahl {
@@ -746,10 +756,11 @@ fn abgleich_nennt_je_zeile_den_grund_fahrzeuge_vor_personen() {
             umhaengen: false,
         },
     ];
-    let gruende: Vec<(ZeilenArt, i64, String)> = check_against_plan(&plan, &fahrzeuge, &personal)
-        .into_iter()
-        .map(|z| (z.art, z.id, z.grund))
-        .collect();
+    let gruende: Vec<(ZeilenArt, i64, String)> =
+        check_against_plan(&plan, &fahrzeuge, &personal, &[])
+            .into_iter()
+            .map(|z| (z.art, z.id, z.grund))
+            .collect();
     let f = ZeilenArt::Fahrzeug;
     let p = ZeilenArt::Personal;
     assert_eq!(
@@ -768,7 +779,7 @@ fn abgleich_nennt_je_zeile_den_grund_fahrzeuge_vor_personen() {
         id: 2,
         umhaengen: true,
     }];
-    assert!(check_against_plan(&plan, &umhaengen, &umhaengen).is_empty());
+    assert!(check_against_plan(&plan, &umhaengen, &umhaengen, &[]).is_empty());
 }
 
 /// Der Abgleich läuft vor dem ersten Schreiben: eine Ablehnung legt keine Einheit an.
@@ -837,7 +848,7 @@ async fn entlassenes_fahrzeug_wird_wieder_aufgenommen_storniertes_ist_neu() {
         (VorschauZustand::Entlassen, None, None)
     );
     assert_eq!(plan.fahrzeuge[&z.rtw2].zustand, VorschauZustand::Neu);
-    assert!(check_against_plan(&plan, &wahl(&[z.rtw1, z.rtw2]), &[]).is_empty());
+    assert!(check_against_plan(&plan, &wahl(&[z.rtw1, z.rtw2]), &[], &[]).is_empty());
 
     let g = bilde(&pool, &z, &anfrage(&wahl(&[z.rtw1, z.rtw2]), &[]))
         .await
@@ -884,6 +895,7 @@ async fn einheitenbaum_mit_kopfdaten_der_vorlage() {
             abschnitt_id: Some(abschnitt),
             fahrzeuge: &[],
             personal: &[],
+            material: &[],
         },
     )
     .await
@@ -1455,4 +1467,361 @@ async fn etb_text_aus_dem_ergebnis() {
          «Rettungsstaffel»; 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Rettsan Rita, \
          Rettsan Rolf; umgehängt: RTW 2 aus «2. Zug»"
     );
+}
+
+// ── Material (LLH-1261) ──────────────────────────────────────────────────────────────────────
+
+/// Stamm-Material der Org 1 mit Art und optionaler Bestandsnummer.
+async fn material(
+    pool: &SqlitePool,
+    bezeichnung: &str,
+    art: MaterialArt,
+    bestandsnummer: Option<&str>,
+) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO material (org_id, bezeichnung, art, bestandsnummer) VALUES (1, ?, ?, ?) \
+         RETURNING id",
+    )
+    .bind(bezeichnung)
+    .bind(art.as_str())
+    .bind(bestandsnummer)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Die Staffel bekommt 50 Wolldecken an der Einheit, einen Rucksack auf RTW 1, drei Rucksäcke
+/// auf RTW 2 und den Stromerzeuger „SE-1“; liefert die Positionen in dieser Reihenfolge.
+async fn staffel_mit_material(pool: &SqlitePool, z: &Zug) -> (Vec<i64>, i64) {
+    let decke = material(pool, "Wolldecke", MaterialArt::Verbrauchsgut, None).await;
+    let rucksack = material(pool, "Sanitätsrucksack", MaterialArt::Geraet, None).await;
+    let se = material(pool, "Stromerzeuger", MaterialArt::Geraet, Some("SE-1")).await;
+    let posten = |material_id, menge, fahrzeug_id| MaterialEntry {
+        material_id,
+        menge,
+        fahrzeug_id,
+    };
+    let v = vrepo::replace_material(
+        pool,
+        1,
+        z.staffel,
+        &[
+            posten(decke, 50, None),
+            posten(rucksack, 1, Some(z.rtw1)),
+            posten(rucksack, 3, Some(z.rtw2)),
+            posten(se, 1, None),
+        ],
+    )
+    .await
+    .unwrap();
+    (v.material.iter().map(|m| m.id).collect(), se)
+}
+
+/// Ein Posten im Einsatz: Material, Menge, Art und Ort (Einheit bzw. Fahrzeug im Einsatz).
+async fn posten_im_einsatz(
+    pool: &SqlitePool,
+    einsatz: i64,
+) -> Vec<(String, i64, String, Option<i64>, Option<i64>)> {
+    sqlx::query_as(
+        "SELECT snap_bezeichnung, menge, art, einheit_id, einsatz_fahrzeug_id \
+         FROM einsatz_material WHERE einsatz_id = ? AND beendet_at IS NULL ORDER BY id",
+    )
+    .bind(einsatz)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+#[test]
+fn material_zustand_je_fall() {
+    use VorschauMaterialZustand::*;
+    assert_eq!(material_zustand(true, false), Neu);
+    assert_eq!(material_zustand(false, false), AusserDienst);
+    assert_eq!(material_zustand(true, true), ImEinsatz);
+    assert_eq!(
+        material_zustand(false, true),
+        ImEinsatz,
+        "aktiv vor Dienststatus"
+    );
+}
+
+#[tokio::test]
+async fn vorschau_nennt_material_mit_zustand() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let (pos, se) = staffel_mit_material(&pool, &z).await;
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
+    let v = vorschau(&plan, NICHTS_GESPERRT);
+    assert!(!v.material_gesperrt);
+    assert!(v.knoten[0].material.is_empty());
+    let zeilen: Vec<(i64, i64, Option<i64>, VorschauMaterialZustand)> = v.knoten[1]
+        .material
+        .iter()
+        .map(|m| (m.vorlage_material_id, m.menge, m.fahrzeug_id, m.zustand))
+        .collect();
+    use VorschauMaterialZustand::*;
+    assert_eq!(
+        zeilen,
+        vec![
+            (pos[0], 50, None, Neu),
+            (pos[1], 1, Some(z.rtw1), Neu),
+            (pos[2], 3, Some(z.rtw2), Neu),
+            (pos[3], 1, None, Neu),
+        ]
+    );
+    assert_eq!(v.knoten[1].material[0].art, MaterialArt::Verbrauchsgut);
+    assert_eq!(
+        v.knoten[1].material[3].bestandsnummer.as_deref(),
+        Some("SE-1")
+    );
+
+    // SE-1 aktiv im Einsatz → im Einsatz; Wolldecken schon im Einsatz bleiben neu.
+    let mut conn = pool.acquire().await.unwrap();
+    material_repo::disponiere_stamm_tx(&mut conn, z.k.einsatz_id, 1, se, 1, z.k.benutzer_id, None)
+        .await
+        .unwrap();
+    let decke = v.knoten[1].material[0].material_id;
+    material_repo::disponiere_stamm_tx(
+        &mut conn,
+        z.k.einsatz_id,
+        1,
+        decke,
+        10,
+        z.k.benutzer_id,
+        None,
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
+    assert_eq!(plan.material[&pos[3]], ImEinsatz);
+    assert_eq!(plan.material[&pos[0]], Neu);
+
+    // Später außer Dienst, und ein Gerät mit Bestandsnummer zeigt Menge 1, auch wenn die
+    // Position mehr trägt (Stamm geändert).
+    ausser_dienst(&pool, "material", decke).await;
+    sqlx::query("UPDATE einheit_vorlage_material SET menge = 3 WHERE id = ?")
+        .bind(pos[3])
+        .execute(&pool)
+        .await
+        .unwrap();
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
+    assert_eq!(plan.material[&pos[0]], AusserDienst);
+    let v = vorschau(&plan, NICHTS_GESPERRT);
+    assert_eq!(v.knoten[1].material[3].menge, 1);
+
+    let gesperrt = vorschau(
+        &plan,
+        Lesen {
+            fahrzeuge: false,
+            personal: false,
+            material: true,
+        },
+    );
+    assert!(gesperrt.material_gesperrt);
+    assert!(gesperrt.knoten.iter().all(|k| k.material.is_empty()));
+}
+
+#[test]
+fn posten_mengen_je_art() {
+    let pos = |art, menge, nummer: Option<&str>| EinheitVorlageMaterial {
+        id: 1,
+        material_id: 1,
+        bezeichnung: "X".into(),
+        art,
+        bestandsnummer: nummer.map(Into::into),
+        menge,
+        fahrzeug_id: None,
+        dienststatus: "in_dienst".into(),
+        ist_demo: false,
+    };
+    assert_eq!(
+        posten_mengen(&pos(MaterialArt::Geraet, 3, None)),
+        vec![1, 1, 1]
+    );
+    assert_eq!(
+        posten_mengen(&pos(MaterialArt::Geraet, 3, Some("SE-1"))),
+        vec![1]
+    );
+    assert_eq!(
+        posten_mengen(&pos(MaterialArt::Verbrauchsgut, 50, None)),
+        vec![50]
+    );
+    // Stamm-Art später auf Gerät gestellt: nie mehr als `GERAET_JE_POSITION_MAX` Stück, auch bei
+    // riesiger Menge (kein Abbruch, keine Flut von Posten).
+    assert_eq!(
+        posten_mengen(&pos(MaterialArt::Geraet, 100_000, None)).len(),
+        crate::einheit_vorlage::GERAET_JE_POSITION_MAX as usize
+    );
+    assert_eq!(
+        posten_mengen(&pos(MaterialArt::Geraet, i64::MAX, None)).len(),
+        crate::einheit_vorlage::GERAET_JE_POSITION_MAX as usize
+    );
+}
+
+/// Ein Gerät ohne Nummer stand in zwei Vorlagen eines Baums und bekam später eine Bestandsnummer:
+/// die zweite Position gilt als „schon im Einsatz“ (die erste bringt es), Grund an der Zeile statt
+/// eines 409 beim Schreiben.
+#[tokio::test]
+async fn dasselbe_stueck_zweimal_im_baum_sperrt_die_zweite_position() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let rucksack = material(&pool, "Rucksack", MaterialArt::Geraet, None).await;
+    let posten = MaterialEntry {
+        material_id: rucksack,
+        menge: 1,
+        fahrzeug_id: None,
+    };
+    let zug = vrepo::replace_material(&pool, 1, z.zug, &[posten])
+        .await
+        .unwrap();
+    let staffel = vrepo::replace_material(&pool, 1, z.staffel, &[posten])
+        .await
+        .unwrap();
+    sqlx::query("UPDATE material SET bestandsnummer = 'R-1' WHERE id = ?")
+        .bind(rucksack)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let erste = zug.material[0].id;
+    let zweite = staffel.material[0].id;
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
+    assert_eq!(plan.material[&erste], VorschauMaterialZustand::Neu);
+    assert_eq!(plan.material[&zweite], VorschauMaterialZustand::ImEinsatz);
+    match bilde_mit_material(&pool, &z, &[], &[erste, zweite]).await {
+        Err(AppError::Zeilen { zeilen, .. }) => {
+            assert_eq!(
+                (zeilen[0].art, zeilen[0].id, zeilen[0].grund.as_str()),
+                (ZeilenArt::Material, zweite, "schon im Einsatz")
+            );
+        }
+        andere => panic!("erwartet Zeilen: {andere:?}"),
+    }
+    let g = bilde_mit_material(&pool, &z, &[], &[erste]).await.unwrap();
+    assert_eq!(g.material.len(), 1);
+}
+
+#[test]
+fn abgleich_nennt_gruende_am_material() {
+    use VorschauMaterialZustand::*;
+    let plan = Plan {
+        knoten: Vec::new(),
+        fahrzeuge: HashMap::new(),
+        personal: HashMap::new(),
+        material: HashMap::from([(1, Neu), (2, AusserDienst), (3, ImEinsatz)]),
+    };
+    let gruende: Vec<(ZeilenArt, i64, String)> = check_against_plan(&plan, &[], &[], &[3, 1, 2, 9])
+        .into_iter()
+        .map(|z| (z.art, z.id, z.grund))
+        .collect();
+    let m = ZeilenArt::Material;
+    assert_eq!(
+        gruende,
+        vec![
+            (m, 3, "schon im Einsatz".to_string()),
+            (m, 2, "außer Dienst".to_string()),
+            (m, 9, "nicht in der Vorlage".to_string()),
+        ]
+    );
+}
+
+async fn bilde_mit_material(
+    pool: &SqlitePool,
+    z: &Zug,
+    fahrzeuge: &[Wahl],
+    material: &[i64],
+) -> Result<Gebildet, AppError> {
+    bilde(
+        pool,
+        z,
+        &Anfrage {
+            material,
+            ..anfrage(fahrzeuge, &[])
+        },
+    )
+    .await
+}
+
+#[tokio::test]
+async fn material_liegt_beim_bilden_am_richtigen_ort() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let (pos, _) = staffel_mit_material(&pool, &z).await;
+    let g = bilde_mit_material(&pool, &z, &wahl(&[z.elw, z.rtw1, z.rtw2]), &pos)
+        .await
+        .unwrap();
+    let staffel = g.einheiten[1].id;
+    let rtw1 = g.fahrzeuge[1].id;
+    let rtw2 = g.fahrzeuge[2].id;
+    let posten = posten_im_einsatz(&pool, z.k.einsatz_id).await;
+    let s = |t: &str| t.to_string();
+    assert_eq!(
+        posten,
+        vec![
+            (s("Wolldecke"), 50, s("verbrauchsgut"), Some(staffel), None),
+            (s("Sanitätsrucksack"), 1, s("geraet"), None, Some(rtw1)),
+            (s("Sanitätsrucksack"), 1, s("geraet"), None, Some(rtw2)),
+            (s("Sanitätsrucksack"), 1, s("geraet"), None, Some(rtw2)),
+            (s("Sanitätsrucksack"), 1, s("geraet"), None, Some(rtw2)),
+            (s("Stromerzeuger"), 1, s("geraet"), Some(staffel), None),
+        ],
+        "Gerät je Stück, Verbrauchsgut mit Menge, Fahrzeug wenn es mitkommt"
+    );
+    assert_eq!(g.material.len(), 6);
+    assert_eq!(
+        g.material_namen,
+        vec![
+            "50× Wolldecke",
+            "1× Sanitätsrucksack",
+            "3× Sanitätsrucksack",
+            "1× Stromerzeuger"
+        ]
+    );
+    assert!(etb_text("Sanitätszug Musterstadt", &g).contains(
+        "Material: 50× Wolldecke, 1× Sanitätsrucksack, 3× Sanitätsrucksack, 1× Stromerzeuger"
+    ));
+}
+
+#[tokio::test]
+async fn material_eines_abgewaehlten_fahrzeugs_liegt_an_der_einheit() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let (pos, _) = staffel_mit_material(&pool, &z).await;
+    let g = bilde_mit_material(&pool, &z, &wahl(&[z.elw, z.rtw2]), &pos[1..2])
+        .await
+        .unwrap();
+    let staffel = g.einheiten[1].id;
+    let posten = posten_im_einsatz(&pool, z.k.einsatz_id).await;
+    assert_eq!(posten.len(), 1);
+    assert_eq!((posten[0].3, posten[0].4), (Some(staffel), None));
+}
+
+#[tokio::test]
+async fn material_gruende_vor_dem_ersten_schreiben() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let (pos, se) = staffel_mit_material(&pool, &z).await;
+    let mut conn = pool.acquire().await.unwrap();
+    material_repo::disponiere_stamm_tx(&mut conn, z.k.einsatz_id, 1, se, 1, z.k.benutzer_id, None)
+        .await
+        .unwrap();
+    drop(conn);
+    match bilde_mit_material(&pool, &z, &wahl(&[z.elw]), &pos).await {
+        Err(AppError::Zeilen { zeilen, .. }) => {
+            assert_eq!(zeilen.len(), 1);
+            assert_eq!(
+                (zeilen[0].art, zeilen[0].id, zeilen[0].grund.as_str()),
+                (ZeilenArt::Material, pos[3], "schon im Einsatz")
+            );
+        }
+        andere => panic!("erwartet Zeilen: {andere:?}"),
+    }
+    let einheiten = zaehle(
+        &pool,
+        "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?",
+        z.k.einsatz_id,
+    )
+    .await;
+    assert_eq!(einheiten, 0);
+    assert_eq!(posten_im_einsatz(&pool, z.k.einsatz_id).await.len(), 1);
 }

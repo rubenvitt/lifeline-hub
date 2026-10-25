@@ -650,15 +650,15 @@ async fn liste_gliederung_mitglieder_staerke_und_sprechgruppen_je_einheit() {
     let mat_a = material_anlegen(&app, &admin, einsatz, "Wolldecke").await;
     let mat_b = material_anlegen(&app, &admin, einsatz, "Absperrband").await;
     for em in [mat_b, mat_a] {
-        let (s, _) = anfrage(
+        let (s, json) = anfrage(
             &app,
-            "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{verpflegung}/material/{em}"),
+            "PATCH",
+            &format!("/api/einsaetze/{einsatz}/material/{em}"),
             &admin,
-            None,
+            Some(&format!(r#"{{"einheit_id":{verpflegung}}}"#)),
         )
         .await;
-        assert_eq!(s, StatusCode::NO_CONTENT);
+        assert_eq!(s, StatusCode::OK, "{json}");
     }
 
     // ── EIN Listenabruf, dann Feld für Feld prüfen ──────────────────────────
@@ -1659,16 +1659,16 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
         async move {
             anfrage(
                 &app,
-                "PUT",
-                &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/material/{em}"),
                 &admin,
-                None,
+                Some(&format!(r#"{{"einheit_id":{eid}}}"#)),
             )
             .await
         }
     };
     let (s, json) = zuordnen(a).await;
-    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    assert_eq!(s, StatusCode::OK, "{json}");
     let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
     assert!(texte
         .iter()
@@ -1676,7 +1676,7 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
 
     let mut rx = live.abonniere(einsatz);
     let (s, json) = zuordnen(b).await;
-    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    assert_eq!(s, StatusCode::OK, "{json}");
     let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
     assert!(
         texte
@@ -1712,7 +1712,7 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
 
     let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
     let (s, _) = zuordnen(b).await;
-    assert_eq!(s, StatusCode::NO_CONTENT, "dieselbe Einheit");
+    assert_eq!(s, StatusCode::OK, "dieselbe Einheit");
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
     assert_eq!(
         common::objekt_ereignisse(&mut rx, &[("einheit", "einheit_id")]),
@@ -1722,15 +1722,15 @@ async fn material_umhaengen_nennt_die_alte_einheit() {
 
     // Mit einem Mitglied bleibt die Einheit beim Auflösen als aufgelöst stehen (LLH-1079).
     let trage = material_anlegen(&app, &admin, einsatz, "Trage").await;
-    let (s, _) = anfrage(
+    let (s, json) = anfrage(
         &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{a}/material/{trage}"),
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{trage}"),
         &admin,
-        None,
+        Some(&format!(r#"{{"einheit_id":{a}}}"#)),
     )
     .await;
-    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(s, StatusCode::OK, "{json}");
     let (s, _) = anfrage(
         &app,
         "DELETE",
@@ -2428,3 +2428,133 @@ async fn ohne_freigabe_fahrzeuge_darf_die_rolle_das_fahrzeug_als_einheit_fuehren
     let neu = json["id"].as_i64().unwrap();
     assert_eq!(einheit_des_fahrzeugs(&pool, ef).await, Some(neu));
 }
+
+/// LLH-1262, Gegenstück zu `fahrzeug_umhaengen_nennt_die_alte_einheit`: eine Person, die von
+/// «Zug 1» nach «Zug 2» wechselt, steht im ETB mit beiden Einheiten, und beide Einheiten samt der
+/// Person werden gemeldet; dieselbe Einheit noch einmal schreibt und meldet nichts. Die
+/// Personenansicht und die Personalliste schreiben über dieselbe Route (`useEinteilungSchreiben`,
+/// LLH-1060 D3), der Test deckt beide Wege.
+#[tokio::test]
+async fn person_umhaengen_nennt_die_alte_einheit() {
+    let (app, pool, live) = common::setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zug1 = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let zug2 = einheit_bilden(&app, &admin, einsatz, "Zug 2").await;
+    let anna = kraft_anlegen(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    personal_zuordnen(&app, &admin, einsatz, zug1, anna).await;
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Einheit «Zug 1»: «Anna» zugeordnet"),
+        "{texte:?}"
+    );
+
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    let mut rx = live.abonniere(einsatz);
+    personal_zuordnen(&app, &admin, einsatz, zug2, anna).await;
+
+    assert_eq!(bezug_der_person(&pool, anna).await, (Some(zug2), None));
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 1);
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        texte
+            .iter()
+            .any(|t| t == "Person «Anna»: Einheit «Zug 1» → «Zug 2»"),
+        "{texte:?}"
+    );
+    let mut gemeldet = common::objekt_ereignisse(&mut rx, PERSON_ZIELE);
+    gemeldet.sort();
+    let mut erwartet = vec![
+        ("einheit".to_string(), zug1),
+        ("einheit".to_string(), zug2),
+        ("personal".to_string(), anna),
+    ];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet, "alte und neue Einheit, die Person");
+
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    personal_zuordnen(&app, &admin, einsatz, zug2, anna).await;
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        anzahl,
+        "dieselbe Einheit schreibt nichts"
+    );
+    assert_eq!(
+        common::objekt_ereignisse(&mut rx, PERSON_ZIELE),
+        vec![],
+        "dieselbe Einheit meldet nichts"
+    );
+}
+
+/// LLH-1262: Wechselt der Einheitsführer von «Zug 1» nach «Zug 2», endet seine Führung von
+/// «Zug 1», und der eine ETB-Eintrag sagt es; gemeldet werden beide Einheiten und die Person.
+/// Derselbe Führer noch einmal in seine Einheit behält die Führung.
+#[tokio::test]
+async fn person_umhaengen_beendet_die_fuehrung() {
+    let (app, pool, live) = common::setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zug1 = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let zug2 = einheit_bilden(&app, &admin, einsatz, "Zug 2").await;
+    let chef = kraft_anlegen(&app, &admin, einsatz, "Chef", "fuehrer").await;
+    personal_zuordnen(&app, &admin, einsatz, zug1, chef).await;
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{zug1}"),
+        &admin,
+        Some(&format!(r#"{{"fuehrer_id":{chef}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let fuehrer_von = |eid: i64| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, Option<i64>>(
+                "SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?",
+            )
+            .bind(eid)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+
+    let anzahl = system_etb_anzahl(&app, &admin, einsatz).await;
+    personal_zuordnen(&app, &admin, einsatz, zug1, chef).await;
+    assert_eq!(
+        fuehrer_von(zug1).await,
+        Some(chef),
+        "dieselbe Einheit behält den Führer"
+    );
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl);
+
+    let mut rx = live.abonniere(einsatz);
+    personal_zuordnen(&app, &admin, einsatz, zug2, chef).await;
+
+    assert_eq!(bezug_der_person(&pool, chef).await, (Some(zug2), None));
+    assert_eq!(
+        fuehrer_von(zug1).await,
+        None,
+        "die Führung von «Zug 1» endet"
+    );
+    assert_eq!(fuehrer_von(zug2).await, None, "in «Zug 2» führt er nicht");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, anzahl + 1);
+    let texte = common::system_etb_inhalte(&app, &admin, einsatz).await;
+    let erwartet = "Person «Chef»: Einheit «Zug 1» → «Zug 2», Einheitsführer von «Zug 1» endet";
+    assert!(texte.iter().any(|t| t == erwartet), "{texte:?}");
+    let mut gemeldet = common::objekt_ereignisse(&mut rx, PERSON_ZIELE);
+    gemeldet.sort();
+    let mut erwartet = vec![
+        ("einheit".to_string(), zug1),
+        ("einheit".to_string(), zug2),
+        ("personal".to_string(), chef),
+    ];
+    erwartet.sort();
+    assert_eq!(gemeldet, erwartet, "alte und neue Einheit, die Person");
+}
+
+/// Die Ereignisse, die ein Einheitswechsel einer Person auslöst (LLH-1262).
+const PERSON_ZIELE: &[(&str, &str)] = &[("einheit", "einheit_id"), ("personal", "personal_id")];

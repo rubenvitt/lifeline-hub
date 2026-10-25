@@ -96,8 +96,9 @@ SCHRITTE=16
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
-# ist die Zielumgebung, die Anzeigezone ist Ortszeit (anzeige/zeitEingabe.ts). Ein alleinstehendes
-# `pnpm test`/`pnpm e2e` läuft nicht durch diesen Wrapper.
+# ist die Zielumgebung, die Anzeigezone ist Ortszeit (anzeige/zeitEingabe.ts). Vitest legt die
+# Zone auch allein fest und liest dafür `TZ_ERZWUNGEN` (`frontend/src/test/suitenZone.ts`,
+# LLH-1433); ein alleinstehendes `pnpm e2e` läuft nicht durch diesen Wrapper.
 export TZ="${TZ_ERZWUNGEN:-Europe/Berlin}"
 echo "==> Zeitzone für den Lauf: $TZ"
 
@@ -201,12 +202,16 @@ pw_browser_pruefen() {
   fehlend="$(PW_PRUEF_PROJEKTE="$projekte" $PNPM -C "$FE" exec node --input-type=module -e "
     import * as pw from '@playwright/test';
     import { existsSync } from 'node:fs';
+    import { pathToFileURL } from 'node:url';
+    // Das Ersatz-Chromium der Cloud-Sitzung zählt wie in der Config (LLH-1439, e2e/lauf-kern.ts).
+    const { fallbackChromiumPath } = await import(pathToFileURL('e2e/lauf-kern.ts').href);
     const fehlt = [];
     for (const name of process.env.PW_PRUEF_PROJEKTE.split(',')) {
       if (!['chromium', 'firefox', 'webkit'].includes(name)) {
         console.error('Unbekanntes Playwright-Projekt in PW_PROJEKTE: ' + name);
         process.exit(2);
       }
+      if (name === 'chromium' && fallbackChromiumPath()) continue;
       if (!existsSync(pw[name].executablePath())) fehlt.push(name);
     }
     console.log(fehlt.join(' '));

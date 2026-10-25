@@ -669,8 +669,12 @@ anwendbar), „nicht geprüft" ist keins.
   `{ beschreibungId }`, Verweis auf einen Grund an anderer Stelle; der Auslöser ist `disabled`),
   `onEntwurf` (nur die Wechsel geändert ↔ unverändert), `onOeffnen`/`onSchliessen` (Serverstand
   für einen Feld-CAS festhalten, ein offenes Feld an seinem Ort halten) und `OFFEN_LASSEN` als
-  Ergebnis von `onSpeichern` (nichts gespeichert, Eingabe bleibt offen). `BemerkungZelle` trägt
-  `gesperrt` ebenso: Grund am Feld, ein offenes Feld behält den Entwurf und sendet nicht.
+  Ergebnis von `onSpeichern` (nichts gespeichert, Eingabe bleibt offen). **Kein Bedienziel im
+  Wertknopf** (LLH-1426): trägt die Anzeige eigene Ziele (`tel:`/`mailto:` der Verbindungen),
+  nimmt die Angabe `bearbeitenDaneben` (Anzeige als Inhalt, Knopf „Bearbeiten“ daneben wie bei
+  `BearbeitbaresPaneel`); ein Ziel im Wertknopf warnt in der Entwicklung,
+  `test/verschachtelteZiele.ts` prüft im Vitest. `BemerkungZelle` trägt `gesperrt` ebenso: Grund
+  am Feld, ein offenes Feld behält den Entwurf und sendet nicht.
   Personendaten werden nur so geschrieben (`frontend/src/personen/AGENTS.md`).
   Einsatzdaten haben nur den Zeilenweg (LFH-1170): eine Zeile schickt ihre Angabe
   (`patcheEinsatz`); ein Vollformular gibt es nicht. Ausnahmen (LFH-1175, Spec
@@ -721,9 +725,11 @@ anwendbar), „nicht geprüft" ist keins.
   über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über `useZeitEingabe().formatiere`;
   `.local()` steht nur in `anzeige/` (Guard `anzeige/zeitEingabe.guard.test.ts`). Außerhalb eines
   Einsatzes `OrgAnzeigeProvider`. „Jetzt“ beim Erfassen: `frontend/src/offline/AGENTS.md`,
-  „Schreiben ohne Netz“. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Zonentests
-  stellen die Prozesszone per `test/prozessZone.ts` auf UTC — unter der Suiten-Zone Berlin wäre
-  Anzeigezone Berlin blind. Eine **Uhrzeit ohne Datum** (Verpflegungsplan, LLH-1058, Spec
+  „Schreiben ohne Netz“. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Die Suiten-Zone
+  Europe/Berlin legt Vitest selbst fest (`test/suitenZone.ts`, LLH-1433), ein `TZ` der Shell
+  wirkt nicht, `TZ_ERZWUNGEN` wählt bewusst eine andere. Zonentests stellen die Prozesszone per
+  `test/prozessZone.ts` auf UTC — unter der Suiten-Zone wäre Anzeigezone Berlin blind. Eine
+  **Uhrzeit ohne Datum** (Verpflegungsplan, LLH-1058, Spec
   `zeiteingabe`, „Uhrzeit ohne Datum“) liest nur `anzeige/uhrzeit.ts:parseUhrzeit` („0630“, „6:30“)
   und legt nur `uhrzeitAmTag` in der Anzeigezone auf einen Tag (doppelte Stunde: die erste, Lücke:
   nach vorn); die Tagesgrenzen `tagesgrenzen`. Ein **Kalenderdatum ohne Uhrzeit** (Geburtsdatum,
@@ -1182,6 +1188,14 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 `pnpm lint` mit `--max-warnings 0`; Warnungen an der Wurzel beheben. `exhaustive-deps`
 strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur begründet,
 `-next-line` an der gemeldeten Zeile mit Kommentar; keine Block-Disables, keine toten Direktiven.
+
+## Frontend — Heap für `tsc` (LLH-1405)
+
+`typecheck` und `build` starten `tsc` über `node --max-old-space-size=4096` (`package.json`): der
+Typcheck braucht rund 2,3 GB Heap, Node setzt unter 16 GiB Arbeitsspeicher nur 2 GB (Cloud-Sitzung,
+macOS-Runner), und `tsc` bricht mit „JavaScript heap out of memory“ ab. Als Option am Aufruf statt
+`NODE_OPTIONS`, damit das Skript in jeder Shell läuft; sie schlägt ein `NODE_OPTIONS` von außen.
+Wächst der Bedarf, die Zahl dort heben.
 
 ## Frontend — Browserspeicher (LFH-942)
 

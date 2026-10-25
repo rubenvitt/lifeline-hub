@@ -599,16 +599,25 @@ impl Ablauf<'_> {
             Vorgang::PersonalZuEinheit { personal, einheit } => {
                 let ep_id = frueher(&self.personal, "Personal", personal)?;
                 let (einheit_id, einheit_name) = frueher(&self.einheiten, "Einheit", einheit)?;
-                let person = crate::einheit::mitglied_repo::zuordnen_personal_tx(
+                let z = crate::einheit::mitglied_repo::zuordnen_personal_tx(
                     conn,
                     self.einsatz_id,
                     einheit_id,
                     ep_id,
                 )
                 .await?;
+                // Derselbe Wortlaut wie die Route (LLH-1262): ein Wechsel nennt die vorige
+                // Einheit und eine dabei endende Führung.
+                let fuehrung: Vec<&str> =
+                    z.fuehrung_endet.iter().map(|(_, n)| n.as_str()).collect();
                 self.system_etb(
                     conn,
-                    &crate::einheit::etb_text_personal_zugeordnet(einheit_name, &person),
+                    &crate::einheit::etb_text_personal_eingeteilt(
+                        einheit_name,
+                        &z.name,
+                        z.vorher.as_ref().map(|(_, n)| n.as_str()),
+                        &fuehrung,
+                    ),
                 )
                 .await
             }

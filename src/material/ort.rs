@@ -3,9 +3,10 @@
 //! Ein Posten liegt an höchstens EINEM Ort: einer Einheit, einem Fahrzeug (Beladung), einer UHS,
 //! einem Bereitstellungsraum oder keinem („ohne Ort“). Die Datenbank hält das als CHECK über die
 //! vier Spalten `einheit_id`, `einsatz_fahrzeug_id`, `uhs_id`, `br_id`
-//! (`migrations/0197_material_modell.sql`). Jeder Schreibweg, der den Ort ändert (Material-PATCH
-//! und -POST, Zuordnen und Freigeben aus der Einheit), geht über [`set_ort_tx`]: Vorwert lesen,
-//! nur ein neues Ziel prüfen, alle vier Spalten in einer Anweisung schreiben. Den Wortlaut im ETB
+//! (`migrations/0197_material_modell.sql`). Jeder Schreibweg, der den Ort ändert, geht über
+//! [`set_ort_tx`]: Vorwert lesen, nur ein neues Ziel prüfen, alle vier Spalten in einer Anweisung
+//! schreiben. Über HTTP ist das allein die Material-Disposition (PATCH, Disponieren, Aufteilen;
+//! Spec `material-modell`, „Ein Schreibweg für den Ort“, LLH-1253). Den Wortlaut im ETB
 //! liefert [`ort_text_tx`] mit [`super::etb_text_ort_gewechselt`].
 
 use crate::error::AppError;

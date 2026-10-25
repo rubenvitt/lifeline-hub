@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Routes, Route, useNavigate } from 'react-router';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
 import { App as AntApp } from 'antd';
 import ErinnerungenPage from './ErinnerungenPage';
 import {
@@ -16,6 +16,7 @@ import {
 } from '../api/erinnerungen';
 import { ApiError } from '../api/client';
 import type { Erinnerung } from '../api/types';
+import { erinnerungenPfad } from '../routing/deeplinks';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
@@ -101,12 +102,22 @@ function ZuEinsatz2() {
   );
 }
 
-function renderPage(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+/** Zeigt die aktuelle Adresse, damit ein Test das Räumen des Parameters sieht. */
+function Ort() {
+  const ort = useLocation();
+  return <div data-testid="ort">{ort.pathname + ort.search}</div>;
+}
+
+function renderPage(
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  start = '/einsaetze/1/erinnerungen',
+) {
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={['/einsaetze/1/erinnerungen']}>
+        <MemoryRouter initialEntries={[start]}>
           <ZuEinsatz2 />
+          <Ort />
           <Routes>
             <Route path="/einsaetze/:id/erinnerungen" element={<ErinnerungenPage />} />
           </Routes>
@@ -517,5 +528,64 @@ describe('ErinnerungenPage · Ablehnung am Ort (LFH-1077)', () => {
     expect(screen.queryByText('Fälligkeit liegt zurück')).toBeNull();
     // Das laufende Anlegen des vorigen Einsatzes hält das Paneel hier nicht offen.
     expect(paneel().getByRole('button', { name: 'Formular schließen' })).toBeEnabled();
+  });
+});
+
+describe('ErinnerungenPage · Sprung ?erinnerung= (LLH-1429)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /** Die Karte einer Erinnerung, sobald sie im DOM steht. */
+  const karteVon = (id: number) =>
+    waitFor(() => {
+      const k = document.querySelector(`[data-erinnerung-id="${id}"]`);
+      expect(k).not.toBeNull();
+      return k as HTMLElement;
+    });
+
+  it('?erinnerung= auf eine offene hebt ihre Karte hervor, rollt sie ins Bild und räumt den Parameter (LLH-1429)', async () => {
+    const scroll = vi.fn();
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      renderPage(undefined, erinnerungenPfad(1, { erinnerung: 7 }));
+      const karte = await karteVon(7);
+      expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+      await waitFor(() => expect(scroll).toHaveBeenCalled());
+      expect(scroll.mock.contexts[0]).toBe(karte);
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/erinnerungen$/),
+      );
+      // Die abgeschlossenen braucht der Sprung auf eine offene nicht.
+      expect(listeAbgeschlosseneErinnerungen).not.toHaveBeenCalled();
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
+  it('?erinnerung= auf eine abgeschlossene wechselt in ihre Ansicht und hebt nur sie hervor (LLH-1429)', async () => {
+    renderPage(undefined, erinnerungenPfad(1, { erinnerung: 9 }));
+    const karte = await karteVon(9);
+    expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+    expect(screen.getByText('Zur Kenntnis')).toBeInTheDocument();
+    expect(screen.queryByText('Lagemeldung')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-erinnerung-id="8"]')).not.toHaveAttribute(
+      'data-hervorgehoben',
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/erinnerungen$/),
+    );
+  });
+
+  it('?erinnerung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt (LLH-1429)', async () => {
+    renderPage(undefined, erinnerungenPfad(1, { erinnerung: 99 }));
+    await screen.findByText('Lagemeldung');
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/erinnerungen$/),
+    );
+    await waitFor(() => expect(listeAbgeschlosseneErinnerungen).toHaveBeenCalled());
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(screen.getByText('Lagemeldung')).toBeInTheDocument();
+    expect(screen.queryByText('Zur Kenntnis')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
   });
 });

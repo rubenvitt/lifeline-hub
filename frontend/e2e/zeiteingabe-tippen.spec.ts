@@ -10,6 +10,10 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * dasselbe prüft: eine Ereigniszeit vor jetzt fällt kurz nach Mitternacht auf gestern, eine Frist
  * nach jetzt kurz vor Mitternacht auf morgen; erwartet wird in beiden Fällen genau der Zeitpunkt,
  * aus dem die Uhrzeit stammt. Browser in Europe/Berlin, wie die Anzeigezone ohne Org-Zone.
+ *
+ * In der Nacht, in der die Sommerzeit endet, gibt es 02:00–02:59 zweimal; eine getippte Uhrzeit
+ * daraus gilt beim ersten Mal (Spec `zeiteingabe`, „Uhrzeit ohne Datum“). Der Test wählt deshalb
+ * eine eindeutige Uhrzeit (`eindeutig`, LLH-1470), sonst erwartete er womöglich das zweite Mal.
  */
 
 test.use({ timezoneId: 'Europe/Berlin' });
@@ -21,6 +25,18 @@ function umJetzt(minuten: number): Date {
   const d = new Date(Date.now() + minuten * 60_000);
   d.setUTCSeconds(0, 0);
   return d;
+}
+
+/**
+ * Rückt `d` in Feldrichtung um je eine Stunde weiter, solange seine Uhrzeit in der Anzeigezone
+ * eine Stunde früher oder später noch einmal vorkommt (doppelte Stunde der Rückstellung).
+ */
+function eindeutig(d: Date, richtung: 1 | -1): Date {
+  let t = d;
+  const doppelt = (x: Date) =>
+    [-1, 1].some((h) => hhmm(new Date(x.getTime() + h * 3_600_000)) === hhmm(x));
+  while (doppelt(t)) t = new Date(t.getTime() + richtung * 3_600_000);
+  return t;
 }
 
 /** Die Uhrzeit als „HHMM“ in der Anzeigezone, so wie sie diktiert würde. */
@@ -58,7 +74,7 @@ test('ETB-Chip „Ereigniszeit“: HHMM + Enter übernimmt ohne Maus, der Eintra
   const feld = page.getByPlaceholder('Inhalt …');
   await feld.fill(inhalt);
 
-  const zeit = umJetzt(-20);
+  const zeit = eindeutig(umJetzt(-20), -1);
   await page.getByRole('button', { name: 'Feld', exact: true }).click();
   await page.getByRole('option', { name: /^Ereigniszeit/ }).click();
   const chip = page.getByRole('textbox', { name: 'Ereigniszeit' });
@@ -93,7 +109,7 @@ test('Auftragsfrist: HHMM + Enter übernimmt die Frist und erteilt den Auftrag',
   const text = `Hydrant freilegen ${Date.now()}`;
   await dialog.getByLabel('Auftrag / Was').fill(text);
 
-  const frist = umJetzt(90);
+  const frist = eindeutig(umJetzt(90), 1);
   const feld = dialog.getByRole('textbox', { name: 'Frist (Quittung/Vollzug)' });
   await feld.fill(hhmm(frist));
   // Enter übernimmt die Frist und sendet ab (Erfassungs-Norm).
@@ -126,10 +142,12 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
   // Ohne Vorgabe beginnt mit dem Eintreffen keine Schicht (Spec `kraefte-abloesung`).
   await sende('put', 'abloesungen/schichtmodell', { schichtmodell: null }, 'keine Vorgabe');
   const einheit = await sende('post', 'einheiten', { name: 'Florian Süd' }, 'Einheit');
+  // Der Beginn liegt nach dem Eintreffen, auch wenn `eindeutig` ihn zurückrückt.
+  const beginn = eindeutig(umJetzt(-30), -1);
   await sende(
     'post',
     `einheiten/${einheit.id}/zeitachse`,
-    { art: 'eintreffen', zeitpunkt_at: draht(umJetzt(-60)) },
+    { art: 'eintreffen', zeitpunkt_at: draht(new Date(beginn.getTime() - 30 * 60_000)) },
     'Eintreffen',
   );
 
@@ -143,7 +161,6 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
   await expect(dialog.getByTitle('Florian Süd', { exact: true })).toBeVisible();
   await dialog.getByRole('textbox', { name: 'Rhythmus' }).fill('6');
 
-  const beginn = umJetzt(-30);
   const feld = dialog.getByRole('textbox', { name: 'Im Einsatz seit' });
   await feld.fill(hhmm(beginn));
   await feld.press('Enter');

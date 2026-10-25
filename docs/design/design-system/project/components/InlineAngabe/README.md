@@ -49,5 +49,15 @@ optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
 - Erfüllt `onSpeichern` mit `OFFEN_LASSEN`, bleibt die Eingabe mit dem Entwurf offen, ohne
   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
 
+── ANZEIGE MIT EIGENEN BEDIENZIELEN (LLH-1426) ───────────────────────────────────────
+
+Der Wertknopf umschließt die Anzeige. Trägt sie selbst Ziele (`tel:`/`mailto:` der
+Verbindungen), stünde ein Link in einem Button: der Klick auf die Nummer öffnete die Bearbeitung
+statt zu wählen, und ein Screenreader fände verschachtelte Ziele (axe `nested-interactive`). Mit
+`bearbeitenDaneben` ist die Anzeige Inhalt, und daneben steht ein eigener Knopf „Bearbeiten“ —
+die Sprache von `BearbeitbaresPaneel` (Knopf mit dem Wort, Name „… bearbeiten“, Fokus kehrt
+dorthin zurück). Name und Beschreibung bleiben die des Wertknopfs, die leere Angabe behält ihre
+Aufforderung „… eintragen“. Steckt ohne den Modus ein Ziel im Wertknopf, warnt die Entwicklung.
+
 Quelle: `frontend/src/components/InlineAngabe.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert (der Zustand nach einem Klick im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

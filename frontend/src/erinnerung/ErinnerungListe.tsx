@@ -12,6 +12,8 @@ interface ErinnerungListeProps {
   onQuittieren: (id: number) => void;
   /** Grund der zuletzt abgelehnten Aktion je Erinnerung (`grund` aus `useZeilenFehler`). */
   zeilenFehler?: (id: number) => ZeilenGrund | null;
+  /** Per `?erinnerung=` angesprungene Erinnerung (LLH-1429): ihre Karte wird hervorgehoben. */
+  hervorgehobenId?: number | null;
 }
 
 /** Kartenboard der Erinnerungen; Darstellung und Logik liegen in der Karte. */
@@ -22,6 +24,7 @@ export default function ErinnerungListe({
   onErledigen,
   onQuittieren,
   zeilenFehler,
+  hervorgehobenId,
 }: ErinnerungListeProps) {
   if (erinnerungen.length === 0) return <SeitenLeer titel="Keine Erinnerungen" />;
   return (
@@ -35,6 +38,7 @@ export default function ErinnerungListe({
           onErledigen={onErledigen}
           onQuittieren={onQuittieren}
           fehlerGrund={zeilenFehler?.(e.id) ?? null}
+          hervorgehoben={e.id === hervorgehobenId}
         />
       ))}
     </>

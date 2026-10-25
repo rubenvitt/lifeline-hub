@@ -145,3 +145,22 @@ describe('ErinnerungKarte — Fälligkeit in der Anzeigezone (LFH-692)', () => {
     expect(screen.getByText(`fällig: ${erwartet}`, { exact: false })).toBeInTheDocument();
   });
 });
+
+describe('ErinnerungKarte — Deeplink-Hervorhebung (LLH-1429)', () => {
+  const karte = () => document.querySelector('[data-erinnerung-id="1"]');
+
+  it('trägt die Hervorhebung nur, wenn sie angesprungen ist', () => {
+    const { unmount } = renderKarte(<ErinnerungKarte erinnerung={erinnerung({})} />);
+    expect(karte()).not.toBeNull();
+    expect(karte()).not.toHaveAttribute('data-hervorgehoben');
+    unmount();
+    renderKarte(<ErinnerungKarte erinnerung={erinnerung({})} hervorgehoben />);
+    expect(karte()).toHaveAttribute('data-hervorgehoben', 'true');
+  });
+
+  it('eine fällige behält angesprungen ihren Alarm: Gefahr gewinnt', () => {
+    renderKarte(<ErinnerungKarte erinnerung={erinnerung({ ist_faellig: true })} hervorgehoben />);
+    expect(karte()).toHaveAttribute('data-hervorgehoben', 'true');
+    expect(karte()).toHaveAttribute('data-alarm', 'true');
+  });
+});

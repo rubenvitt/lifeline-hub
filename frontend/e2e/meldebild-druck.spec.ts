@@ -360,9 +360,9 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
   });
   expect(material.ok(), `Seeding Material: ${material.status()}`).toBeTruthy();
   const materialId = ((await material.json()) as { id: number }).id;
-  const zuordnung = await page.request.put(
-    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/material/${materialId}`,
-  );
+  const zuordnung = await page.request.patch(`/api/einsaetze/${einsatzId}/material/${materialId}`, {
+    data: { einheit_id: einheitId },
+  });
   expect(zuordnung.ok(), `Material zuordnen: ${zuordnung.status()}`).toBeTruthy();
   const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
     data: {

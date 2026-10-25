@@ -10,7 +10,7 @@ use crate::einheit::{
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::{
-    Bereitstellungsraeume, Einheiten, Fahrzeuge, Nachforderungen, Personal,
+    Bereitstellungsraeume, Einheiten, Fahrzeuge, Material, Nachforderungen, Personal,
 };
 use crate::einsatz::verbindungen::{self, VerbindungBody};
 use crate::error::AppError;
@@ -18,7 +18,6 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::katalog::StatusKategorie;
 use crate::live::LiveEvent;
-use crate::material::ort::{self as material_ort, MaterialOrt};
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
     pruefe_koordinate,
@@ -373,10 +372,12 @@ pub async fn aus_vorlage_vorschau(
     let gesperrt = aus_vorlage::Lesen {
         fahrzeuge: is_gesperrt(ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await)?,
         personal: is_gesperrt(ctx.fordere_zielmodul::<Personal>(&state.pool).await)?,
+        material: is_gesperrt(ctx.fordere_zielmodul::<Material>(&state.pool).await)?,
     };
     let lesen = aus_vorlage::Lesen {
         fahrzeuge: !gesperrt.fahrzeuge,
         personal: !gesperrt.personal,
+        material: !gesperrt.material,
     };
     let mut conn = state.pool.acquire().await?;
     let plan = aus_vorlage::plan_tx(
@@ -410,6 +411,13 @@ pub struct AusVorlagePerson {
     pub umhaengen: bool,
 }
 
+/// Eine Material-Position der Vorlage im Body des Bildens (LLH-1261).
+#[derive(Debug, Deserialize)]
+pub struct AusVorlageMaterial {
+    /// Die Position (`einheit_vorlage_material.id`).
+    pub vorlage_material_id: i64,
+}
+
 /// Body von `POST …/einheiten/aus-vorlage` (D3). Der Einheitenbaum kommt aus der Vorlage.
 #[derive(Debug, Deserialize)]
 pub struct AusVorlageBody {
@@ -424,6 +432,9 @@ pub struct AusVorlageBody {
     /// Höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln.
     #[serde(default)]
     pub personal: Vec<AusVorlagePerson>,
+    /// Höchstens `kraefte_disposition::SAMMEL_MAX` vor dem Entdoppeln (LLH-1261).
+    #[serde(default)]
+    pub material: Vec<AusVorlageMaterial>,
 }
 
 /// Prüft eine Liste von außen gegen `SAMMEL_MAX` (vor dem Entdoppeln, 400) und entdoppelt je
@@ -444,8 +455,8 @@ fn check_wahl(
 /// POST /api/einsaetze/{id}/einheiten/aus-vorlage — Einheit samt Untereinheiten, Fahrzeugen und
 /// gewählter Stammbesetzung aus einer Vorlage bilden (LLH-1049, Spec `kraefte-disposition`,
 /// „Einheit aus Vorlage bilden“). Alles oder nichts in einer Transaktion: Gründe je Zeile 422,
-/// mit Fahrzeugen das Recht am Modul Fahrzeuge, mit Personen das am Modul Personal (403 vor jedem
-/// Schreiben). Genau ein ETB-Sammeleintrag in der Transaktion, Ereignisse nach dem Commit, auch an
+/// mit Fahrzeugen das Recht am Modul Fahrzeuge, mit Personen das am Modul Personal, mit Material
+/// das am Modul Material (LLH-1261; 403 vor jedem Schreiben). Genau ein ETB-Sammeleintrag in der Transaktion, Ereignisse nach dem Commit, auch an
 /// Einheiten, aus denen umgehängt wurde.
 pub async fn aus_vorlage_bilden(
     State(state): State<AppState>,
@@ -473,6 +484,20 @@ pub async fn aus_vorlage_bilden(
             .collect(),
         "Personen",
     )?;
+    // Material-Positionen haben kein „umhängen“; die Liste läuft durch dieselbe Prüfung.
+    let material: Vec<i64> = check_wahl(
+        body.material
+            .iter()
+            .map(|m| aus_vorlage::Wahl {
+                id: m.vorlage_material_id,
+                umhaengen: false,
+            })
+            .collect(),
+        "Material-Positionen",
+    )?
+    .into_iter()
+    .map(|w| w.id)
+    .collect();
     let name = body
         .name
         .as_deref()
@@ -484,6 +509,9 @@ pub async fn aus_vorlage_bilden(
     if !personal.is_empty() {
         ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     }
+    if !material.is_empty() {
+        ctx.fordere_zielmodul::<Material>(&state.pool).await?;
+    }
     let einsatz_id = ctx.einsatz.id;
     let kontext = crate::kraefte_disposition::Kontext {
         einsatz_id,
@@ -493,12 +521,14 @@ pub async fn aus_vorlage_bilden(
     let lesen = aus_vorlage::Lesen {
         fahrzeuge: !fahrzeuge.is_empty(),
         personal: !personal.is_empty(),
+        material: !material.is_empty(),
     };
     let anfrage = aus_vorlage::Anfrage {
         name: name.as_deref(),
         abschnitt_id: body.abschnitt_id,
         fahrzeuge: &fahrzeuge,
         personal: &personal,
+        material: &material,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (gebildet, etb_id) = crate::write_retry!(&state.pool, |conn| {
@@ -540,6 +570,9 @@ pub async fn aus_vorlage_bilden(
     for p in &gebildet.personal {
         sse_personal(&state, einsatz_id, p.id);
     }
+    for em in &gebildet.material {
+        super::einsatz_material::sse_material(&state, einsatz_id, *em);
+    }
     let einheit_ids: Vec<i64> = gebildet.einheiten.iter().map(|e| e.id).collect();
     Ok((
         StatusCode::CREATED,
@@ -548,6 +581,7 @@ pub async fn aus_vorlage_bilden(
             einheit_ids,
             fahrzeuge: gebildet.fahrzeuge.iter().map(|f| f.id).collect(),
             personal: gebildet.personal.iter().map(|p| p.id).collect(),
+            material: gebildet.material.clone(),
         }),
     ))
 }
@@ -1020,7 +1054,11 @@ async fn notify_aufgeloest(
     .await;
 }
 
-/// PUT .../einheiten/{eid}/personal/{ep_id} — Person zuordnen. ETB-Eintrag.
+/// PUT .../einheiten/{eid}/personal/{ep_id} — Person zuordnen oder umhängen, aus der Einheit
+/// wie aus Personalliste und Personenansicht (LLH-1060 D3). ETB-Eintrag, der beim Umhängen die
+/// vorige Einheit und eine dabei endende Führung nennt; gemeldet werden die neue, die vorige und
+/// jede Einheit, deren Führung endet, und die Person. Dieselbe Einheit noch einmal schreibt und
+/// meldet nichts (LLH-1262, Gegenstück zu LLH-1073 D2 am Fahrzeug).
 pub async fn personal_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -1028,23 +1066,35 @@ pub async fn personal_zuordnen(
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    // F06/LFH-244 Tier-A: Zuordnung (inkl. Stale-Führer-Bereinigung) + System-ETB-Eintrag
-    // atomar in EINER Tx. Der Personalname kommt aus dem Write und speist den ETB-Text.
+    // F06/LFH-244 Tier-A: Zuordnung (inkl. Führer-Bereinigung) + System-ETB-Eintrag atomar in
+    // EINER Tx. Name, vorige Einheit und endende Führung kommen aus dem Write.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
-        let person = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &crate::einheit::etb_text_personal_zugeordnet(&einheit, &person),
-        )
-        .await?;
-        Ok(())
+    let zuordnung = crate::write_retry!(&state.pool, |conn| {
+        let z = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+        if z.is_changed {
+            let fuehrung: Vec<&str> = z.fuehrung_endet.iter().map(|(_, n)| n.as_str()).collect();
+            let text = crate::einheit::etb_text_personal_eingeteilt(
+                &einheit,
+                &z.name,
+                z.vorher.as_ref().map(|(_, n)| n.as_str()),
+                &fuehrung,
+            );
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        }
+        Ok(z)
     })?;
-    sse_einheit(&state, einsatz_id, eid);
-    sse_personal(&state, einsatz_id, ep_id);
+    if zuordnung.is_changed {
+        let mut einheiten = vec![eid];
+        einheiten.extend(zuordnung.vorher.iter().map(|(id, _)| *id));
+        einheiten.extend(zuordnung.fuehrung_endet.iter().map(|(id, _)| *id));
+        einheiten.sort_unstable();
+        einheiten.dedup();
+        for e in einheiten {
+            sse_einheit(&state, einsatz_id, e);
+        }
+        sse_personal(&state, einsatz_id, ep_id);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -1148,70 +1198,6 @@ pub async fn fahrzeug_freigeben(
     sse_einheit(&state, einsatz_id, eid);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     super::einsatz_bereitstellungsraum::sse_br_der_einheit(&state, einsatz_id, eid).await;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-/// PUT .../einheiten/{eid}/material/{em_id} — Material an die Einheit (Recht Einheiten). Der
-/// eine Ort geht über `material::ort::set_ort_tx` (LLH-1224, design.md D9): ein Posten an einer
-/// anderen Einheit, einem Fahrzeug, einer UHS oder einem Bereitstellungsraum wechselt hierher. Ein
-/// ETB-Eintrag mit altem und neuem Ort, beide Orte werden gemeldet; derselbe Ort schreibt nichts.
-pub async fn material_zuordnen(
-    State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Einheiten>,
-    PfadParam((_eid, eid, em_id)): PfadParam<(i64, i64, i64)>,
-) -> Result<StatusCode, AppError> {
-    set_material_ort(&state, &ctx, eid, em_id, Some(MaterialOrt::Einheit(eid))).await
-}
-
-/// DELETE .../einheiten/{eid}/material/{em_id} — Material von der Einheit lösen: danach ohne Ort
-/// (LLH-1224). 404, wenn der Posten nicht an dieser Einheit liegt. ETB-Eintrag.
-pub async fn material_freigeben(
-    State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Einheiten>,
-    PfadParam((_eid, eid, em_id)): PfadParam<(i64, i64, i64)>,
-) -> Result<StatusCode, AppError> {
-    set_material_ort(&state, &ctx, eid, em_id, None).await
-}
-
-/// Gemeinsamer Weg von PUT und DELETE: `ziel` `None` heißt „von `eid` lösen“.
-async fn set_material_ort(
-    state: &AppState,
-    ctx: &EinsatzSchreibzugriff<Einheiten>,
-    eid: i64,
-    em_id: i64,
-    ziel: Option<MaterialOrt>,
-) -> Result<StatusCode, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    einheit_name(state, einsatz_id, eid).await?;
-    // F06/LFH-244 Tier-A: Ort + System-ETB-Eintrag atomar.
-    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let wechsel = crate::write_retry!(&state.pool, |conn| {
-        if ziel.is_none()
-            && material_ort::load_ort_tx(conn, einsatz_id, em_id).await?
-                != Some(MaterialOrt::Einheit(eid))
-        {
-            return Err(AppError::NotFound);
-        }
-        let wechsel = material_ort::set_ort_tx(conn, einsatz_id, em_id, ziel).await?;
-        if wechsel.is_changed() {
-            let em =
-                crate::material::disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true)
-                    .await?;
-            let text = crate::material::etb_text_ort_gewechselt(
-                &em.bezeichnung,
-                em.menge,
-                &material_ort::ort_text_tx(conn, einsatz_id, wechsel.vorher).await?,
-                &material_ort::ort_text_tx(conn, einsatz_id, wechsel.nachher).await?,
-            );
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
-        }
-        Ok(wechsel)
-    })?;
-    if wechsel.is_changed() {
-        super::einsatz_material::sse_ortswechsel(state, einsatz_id, wechsel);
-        sse_material(state, einsatz_id, em_id);
-    }
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -1,6 +1,6 @@
 import { Button, Form, Input, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useRef, useState, type FocusEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FocusEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
@@ -22,6 +22,7 @@ import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import {
   ART_WORT,
   HERKUNFT_WORT,
+  abschliessendeEntlassungId,
   NACHTRAG_ARTEN,
   ankerText,
   dauerText,
@@ -40,6 +41,10 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
  * - Streichung: unumkehrbar und ohne serverseitigen Rückweg, deshalb Rückfrage mit Pflichtgrund
  *   (LFH-343/363); ein Ereignis aus der Ablösung streicht nur deren Rücknahme.
  * - Ohne Schreibrecht nennt `RechteHinweis` den Grund, die Knöpfe stehen gesperrt da (M16).
+ * - Entlassene Person (`isBeendet`, LLH-1263): Nachtrag und Streichung bleiben, aber eine offene
+ *   Periode darf nicht entstehen. Die Entlassung, die die letzte Periode schließt, steht deshalb
+ *   gesperrt mit Kurzgrund (LFH-966); einen Nachtrag, der eine Periode öffnet, meldet die 422 im
+ *   Dialog, weil das am eingegebenen Zeitpunkt hängt.
  *
  * ZUFLUSS (LFH-861, Prüfliste LFH-552 Kriterium 12, WCAG 3.2.5): steht Fokus ODER Zeiger in der
  * Liste, friert die MENGE der Ereignisse ein; ein fremdes neues wartet hinter dem Sammelbanner
@@ -70,7 +75,12 @@ export interface KraftZeitachseProps {
   darfSchreiben: boolean;
   /** Grund, wenn nicht geschrieben werden darf. */
   rechteText?: string;
+  /** Die Kraft ist entlassen (LLH-1263): die abschließende Entlassung steht gesperrt. */
+  isBeendet?: boolean;
 }
+
+/** Kurzgrund am gesperrten Streichen der abschließenden Entlassung (LFH-966). */
+export const ENTLASSUNG_GESPERRT_TEXT = 'erst erneut disponieren';
 
 export const ZEITACHSE_RECHTE_TEXT = 'kein Schreibrecht';
 
@@ -95,6 +105,7 @@ export default function KraftZeitachse({
   kennung,
   darfSchreiben,
   rechteText = ZEITACHSE_RECHTE_TEXT,
+  isBeendet = false,
 }: KraftZeitachseProps) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
@@ -194,6 +205,12 @@ export default function KraftZeitachse({
   });
 
   const dauern = kraftDauern(query.data?.perioden, jetzt.valueOf());
+  // Ohne Schreibrecht nennt schon `RechteHinweis` den Grund, ein zweiter stünde doppelt.
+  const gesperrtId =
+    isBeendet && darfSchreiben
+      ? abschliessendeEntlassungId(query.data?.perioden, query.data?.ereignisse)
+      : null;
+  const sperrGrundId = useId();
   const zustand = query.isPending
     ? 'laden'
     : query.isError
@@ -274,17 +291,39 @@ export default function KraftZeitachse({
                   aktionen={
                     // Nach der Art: auch die Kopie an einer Person streicht nur die Rücknahme der Ablösung.
                     !gestrichen && e.art !== 'abloesung' ? (
-                      <Button
-                        danger
-                        disabled={!darfSchreiben}
-                        aria-label={`${beschreibung} streichen`}
-                        onClick={() => {
-                          streichung.reset();
-                          setStreiche(e);
-                        }}
-                      >
-                        Streichen
-                      </Button>
+                      e.id === gesperrtId ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: token.paddingXS,
+                          }}
+                        >
+                          <span id={sperrGrundId} style={{ color: rollen.gedaempft }}>
+                            {ENTLASSUNG_GESPERRT_TEXT}
+                          </span>
+                          <Button
+                            danger
+                            disabled
+                            aria-label={`${beschreibung} streichen`}
+                            aria-describedby={sperrGrundId}
+                          >
+                            Streichen
+                          </Button>
+                        </span>
+                      ) : (
+                        <Button
+                          danger
+                          disabled={!darfSchreiben}
+                          aria-label={`${beschreibung} streichen`}
+                          onClick={() => {
+                            streichung.reset();
+                            setStreiche(e);
+                          }}
+                        >
+                          Streichen
+                        </Button>
+                      )
                     ) : undefined
                   }
                 >
