@@ -2,7 +2,7 @@
 
 ## Context
 
-`theme/schriften.ts` meldet neun Schnitte über die FontFace-API an (`meldeSchriftenAn`, aufgerufen
+`theme/schriften.ts` meldet neun Schnitte über die FontFace-API an (`registerSchriften`, aufgerufen
 in `main.tsx` vor dem Rendern), alle mit `display: 'swap'`. Was der Bildschirm braucht, lädt der
 Browser bei der ersten Layoutberechnung. Der Rest kommt im Leerlauf nach `load`, weil der Druck ihn
 setzt (LFH-1108). Das Rendern wartet heute auf nichts: Das erste Bild steht in der Ersatzschrift,
@@ -34,7 +34,7 @@ Warum das an der Kopfleiste springt: siehe proposal.md, „Why“.
 
 ### D1: Warten vor dem ersten `render`, nicht CSS-`font-display`
 
-`meldeSchriftenAn` gibt ein Promise zurück. Es erfüllt sich, sobald alle Bildschirm-Schnitte
+`registerSchriften` gibt ein Promise zurück. Es erfüllt sich, sobald alle Bildschirm-Schnitte
 geladen sind oder 300 ms vergangen sind, je nachdem, was zuerst eintritt. Die Bildschirm-Schnitte
 lädt es dafür sofort aktiv (`FontFace.load()`), statt auf die Layoutberechnung zu warten.
 `main.tsx` ruft `createRoot(...).render(...)` erst in dessen `then`. Ein Fehlschlag eines Schnitts

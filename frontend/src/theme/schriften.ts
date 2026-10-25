@@ -63,7 +63,7 @@ export const SCHRIFTSCHNITTE: readonly Schriftschnitt[] = [
  * der Druck setzt ihn (Archivo 700 in Markdown-Fettdruck). Scheitert ein Schnitt, steht der Text
  * in der Ersatzschrift.
  */
-export function meldeSchriftenAn(menge: FontFaceSet = document.fonts): void {
+export function registerSchriften(menge: FontFaceSet = document.fonts): void {
   const schnitte = SCHRIFTSCHNITTE.map((s) => {
     const schnitt = new FontFace(s.familie, `url(${JSON.stringify(s.datei)}) format('woff2')`, {
       weight: String(s.gewicht),
@@ -73,13 +73,13 @@ export function meldeSchriftenAn(menge: FontFaceSet = document.fonts): void {
     menge.add(schnitt);
     return schnitt;
   });
-  const ladeAlle = () => {
+  const loadAll = () => {
     for (const schnitt of schnitte) schnitt.load().catch(() => undefined);
   };
-  const nachLeerlauf = () =>
+  const afterIdle = () =>
     typeof requestIdleCallback === 'function'
-      ? requestIdleCallback(ladeAlle, { timeout: 5000 })
-      : setTimeout(ladeAlle, 1000);
-  if (document.readyState === 'complete') nachLeerlauf();
-  else window.addEventListener('load', nachLeerlauf, { once: true });
+      ? requestIdleCallback(loadAll, { timeout: 5000 })
+      : setTimeout(loadAll, 1000);
+  if (document.readyState === 'complete') afterIdle();
+  else window.addEventListener('load', afterIdle, { once: true });
 }

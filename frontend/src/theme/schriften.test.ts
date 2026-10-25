@@ -6,7 +6,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SCHRIFTSCHNITTE, meldeSchriftenAn } from './schriften';
+import { SCHRIFTSCHNITTE, registerSchriften } from './schriften';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -51,7 +51,7 @@ describe('Schriften (LFH-1108)', () => {
     vi.stubGlobal('FontFace', Schnitt);
     const menge: Schnitt[] = [];
 
-    meldeSchriftenAn({ add: (s: Schnitt) => menge.push(s) } as unknown as FontFaceSet);
+    registerSchriften({ add: (s: Schnitt) => menge.push(s) } as unknown as FontFaceSet);
 
     expect(menge.map((s) => [s.family, s.descriptors])).toEqual(
       SCHRIFTSCHNITTE.map((s) => [

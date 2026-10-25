@@ -13,13 +13,13 @@ import { registerSW } from 'virtual:pwa-register';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { appRouten } from './App';
-import { meldeSchriftenAn } from './theme/schriften';
+import { registerSchriften } from './theme/schriften';
 import { ThemeModeProvider } from './theme/ThemeModeProvider';
 import { erzeugeQueryClient } from './api/queryClient';
 import { meldeAppAktualisierungVerfuegbar, setzeAppAktualisierer } from './pwa/appAktualisierung';
 
 dayjs.extend(utc);
-meldeSchriftenAn();
+registerSchriften();
 
 const updateSW = registerSW({
   immediate: true,

@@ -3,12 +3,12 @@
 ## 1. Wartefunktion in `theme/schriften.ts`
 
 - [ ] 1.1 `SCHRIFTSCHNITTE` kennzeichnet je Eintrag die Bildschirm-Schnitte (Archivo 400/500/600, Archivo Narrow 600, JetBrains Mono 400/500), D2; Test in `theme/schriften.test.ts`: genau diese sechs sind gekennzeichnet (rot, bevor die Kennzeichnung existiert)
-- [ ] 1.2 `meldeSchriftenAn` lädt die Bildschirm-Schnitte sofort und gibt ein Promise zurück, das sich nach ihnen oder nach der Frist (Konstante 300 ms, D4) erfüllt; ein gescheiterter Schnitt zählt als fertig; Uhr injizierbar. Tests mit gestubbtem `FontFace` und Fake-Timern: erfüllt sich nach den sechs Ladevorgängen, erfüllt sich bei hängendem Schnitt genau nach 300 ms und nicht davor, erfüllt sich bei einem abgelehnten Schnitt sofort; der bestehende Test „lädt alle, sobald der Browser Luft hat“ bleibt grün
+- [ ] 1.2 `registerSchriften` lädt die Bildschirm-Schnitte sofort und gibt ein Promise zurück, das sich nach ihnen oder nach der Frist (Konstante 300 ms, D4) erfüllt; ein gescheiterter Schnitt zählt als fertig; Uhr injizierbar. Tests mit gestubbtem `FontFace` und Fake-Timern: erfüllt sich nach den sechs Ladevorgängen, erfüllt sich bei hängendem Schnitt genau nach 300 ms und nicht davor, erfüllt sich bei einem abgelehnten Schnitt sofort; der bestehende Test „lädt alle, sobald der Browser Luft hat“ bleibt grün
 - [ ] 1.3 Dateikopf von `schriften.ts` nennt die Frist und LLH-1272 neben der `swap`-Abwägung aus LFH-352; prüfen mit `pnpm exec eslint` und `prettier --check` auf der Datei
 
 ## 2. Rendern nach den Schriften (`main.tsx`)
 
-- [ ] 2.1 `main.tsx` rendert erst im `then` von `meldeSchriftenAn()` (D1), Service-Worker-Registrierung und `QueryClient` bleiben davor; prüfen mit `tsc --noEmit` (über `scripts/check-typ-codegen.sh` bzw. Typecheck) und einem Start im Browser (die App erscheint)
+- [ ] 2.1 `main.tsx` rendert erst im `then` von `registerSchriften()` (D1), Service-Worker-Registrierung und `QueryClient` bleiben davor; prüfen mit `tsc --noEmit` (über `scripts/check-typ-codegen.sh` bzw. Typecheck) und einem Start im Browser (die App erscheint)
 
 ## 3. Nachweis im Browser (`e2e/rahmen-cls-dichte.spec.ts`)
 
