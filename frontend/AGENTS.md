@@ -669,8 +669,12 @@ anwendbar), „nicht geprüft" ist keins.
   `{ beschreibungId }`, Verweis auf einen Grund an anderer Stelle; der Auslöser ist `disabled`),
   `onEntwurf` (nur die Wechsel geändert ↔ unverändert), `onOeffnen`/`onSchliessen` (Serverstand
   für einen Feld-CAS festhalten, ein offenes Feld an seinem Ort halten) und `OFFEN_LASSEN` als
-  Ergebnis von `onSpeichern` (nichts gespeichert, Eingabe bleibt offen). `BemerkungZelle` trägt
-  `gesperrt` ebenso: Grund am Feld, ein offenes Feld behält den Entwurf und sendet nicht.
+  Ergebnis von `onSpeichern` (nichts gespeichert, Eingabe bleibt offen). **Kein Bedienziel im
+  Wertknopf** (LLH-1426): trägt die Anzeige eigene Ziele (`tel:`/`mailto:` der Verbindungen),
+  nimmt die Angabe `bearbeitenDaneben` (Anzeige als Inhalt, Knopf „Bearbeiten“ daneben wie bei
+  `BearbeitbaresPaneel`); ein Ziel im Wertknopf warnt in der Entwicklung,
+  `test/verschachtelteZiele.ts` prüft im Vitest. `BemerkungZelle` trägt `gesperrt` ebenso: Grund
+  am Feld, ein offenes Feld behält den Entwurf und sendet nicht.
   Personendaten werden nur so geschrieben (`frontend/src/personen/AGENTS.md`).
   Einsatzdaten haben nur den Zeilenweg (LFH-1170): eine Zeile schickt ihre Angabe
   (`patcheEinsatz`); ein Vollformular gibt es nicht. Ausnahmen (LFH-1175, Spec
