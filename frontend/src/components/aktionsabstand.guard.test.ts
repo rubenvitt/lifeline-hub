@@ -22,6 +22,10 @@
  *   • eine Größe aus Variable oder Ausdruck (`size={weit}`);
  *   • destruktive Aktionen, die nicht als `<Button danger>` geschrieben sind (z. B.
  *     Menüeinträge mit `danger: true`);
+ *   • Nachbaraktionen außer `<Button>` und der FMS-`<StatusWahl>` (LLH-1268), etwa einen
+ *     `MenueAusloeser`;
+ *   • Aktionen, die als Variable in die Reihe kommen (`{aktionen}`, `{status}`), siehe
+ *     {@link BEWERTET_OHNE_SCANNER_DECKUNG};
  *   • Nachbarschaften außerhalb der unten gelisteten Dateien ({@link BEREICH}).
  *
  * ── Warum gescopt ───────────────────────────────────────────────────────────────
@@ -86,6 +90,10 @@ const MIT_NACHBARSCHAFT = [
   // ── Übernahme einer unangemeldeten Einheit (LLH-1075) ───────────────────
   // „Übernehmen“ neben dem roten „Abweisen“, in der Einheit-Ansicht und an der Meldung.
   'pages/einheit/EinheitUebernahme.tsx',
+  // ── Fahrzeugzeile der Einheit-Ansicht (LLH-1036 Teil II, LLH-1268) ───────
+  // Die FMS-`StatusWahl` neben dem roten „Aus Einheit lösen“. Die Personen tragen ihre Aktionen
+  // im Menü (rot hinter dem Trenner).
+  'pages/einheit/FahrzeugeBesatzung.tsx',
   // ── Offline-Wiederherstellung (LFH-746) ───────────────────────────────────
   // „Verwerfen" (`danger`) neben „Erneut versuchen" und, bei einem ETB-Eintrag mit Anhängen,
   // „Ohne Anhänge senden" — eine Reihe je abgelehnter Karte.
@@ -109,10 +117,6 @@ const BEWERTET_OHNE_SCANNER_DECKUNG = [
   // hinter dem Trenner des Menüs. Die Knöpfe stehen in `AuftragHandlungen`, die Karte der
   // Geräteansicht und das Detailpaneel setzen sie ein (Change oxgob5gk, design.md D4).
   'auftraege/AuftragTeile.tsx',
-  // LLH-1036 Teil II: Fahrzeugzeile der Einheit-Ansicht, die FMS-`StatusWahl` (kein `<Button>` im
-  // Quelltext) neben dem roten „Aus Einheit lösen“ in `<Space size="middle">`. Die Personen
-  // tragen ihre Aktionen im Menü (rot hinter dem Trenner).
-  'pages/einheit/FahrzeugeBesatzung.tsx',
 ];
 
 /**
@@ -217,7 +221,8 @@ export function reihenIn(quelltext: string): Reihe[] {
   const text = ohneKommentare(quelltext);
   const offen: Reihe[] = [];
   const fertig: Reihe[] = [];
-  const muster = /<Space(?=[\s/>{])|<\/Space>|<Button(?=[\s/>{])/g;
+  // `<StatusWahl<number>` trägt ein Typargument, daher auch `<` nach dem Namen.
+  const muster = /<Space(?=[\s/>{])|<\/Space>|<Button(?=[\s/>{])|<StatusWahl(?=[\s/>{<])/g;
 
   for (const treffer of text.matchAll(muster)) {
     const start = treffer.index;
@@ -229,12 +234,13 @@ export function reihenIn(quelltext: string): Reihe[] {
     const ende = tagEnde(text, start);
     if (ende === -1) continue;
     const tag = text.slice(start, ende + 1);
-    if (treffer[0] === '<Button') {
+    if (treffer[0] !== '<Space') {
       // Kein `.at(-1)`: `tsconfig` steht auf `lib: ES2020`, dort bricht es `tsc`.
       const innerste = offen[offen.length - 1];
       if (!innerste) continue;
       innerste.knoepfe += 1;
-      if (/\bdanger\b/.test(tag)) innerste.destruktiv = true;
+      // Rot ist nur ein `<Button danger>`; die StatusWahl zählt als neutrale Nachbarin.
+      if (treffer[0] === '<Button' && /\bdanger\b/.test(tag)) innerste.destruktiv = true;
       continue;
     }
     // Selbstschließendes `<Space />` umschließt nichts.
@@ -336,6 +342,18 @@ describe('Abstands-Guard (LFH-363 · B5c)', () => {
     const quelle =
       '<Space><Button onClick={() => tu()}>Los</Button><Button danger>Weg</Button></Space>';
     expect(reihenIn(quelle)).toHaveLength(1);
+  });
+
+  it('zählt die FMS-StatusWahl als Aktion neben einem roten Knopf (LLH-1268)', () => {
+    const quelle = [
+      '<Space>',
+      '<StatusWahl<number> aktuell={2} onWaehlen={(s) => tu(s)} />',
+      '<Button danger>Aus Einheit lösen</Button>',
+      '</Space>',
+    ].join('\n');
+    expect(reihenIn(quelle)).toHaveLength(1);
+    expect(befunde({ x: quelle })).toHaveLength(1);
+    expect(befunde({ x: quelle.replace('<Space>', '<Space size="middle">') })).toEqual([]);
   });
 
   it('übersieht eine Reihe im Kommentar', () => {
