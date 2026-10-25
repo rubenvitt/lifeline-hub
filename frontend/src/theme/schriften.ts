@@ -25,7 +25,14 @@
    Schriften im Druck).
 
    `display: 'swap'` ist Absicht: lieber sofort in der Systemschrift lesbar
-   als eine Sekunde lang gar nichts — im Einsatz zählt der erste Blick. */
+   als eine Sekunde lang gar nichts — im Einsatz zählt der erste Blick.
+
+   VOR DEM ERSTEN BILD (LLH-1272): Die Bildschirm-Schnitte (`bildschirm`) lädt die App sofort, und
+   `main.tsx` rendert erst, wenn sie da sind, höchstens aber nach `SCHRIFT_FRIST_MS`. Sonst stand
+   das erste Bild in der Ersatzschrift (auf Linux DejaVu Sans, breiter als Archivo), und an der
+   Umbruchkante sprang der Kopf nach dem Schriftwechsel von zwei Zeilen auf eine. Die Abwägung oben
+   bleibt: Die Frist liegt weit unter einer Sekunde, ein langsamer oder gescheiterter Schnitt
+   tauscht danach wie bisher. Herleitung: Change `rr7jhc12-schriften-vor-erstem-bild`. */
 
 import archivo400 from '../assets/fonts/archivo-400.woff2';
 import archivo500 from '../assets/fonts/archivo-500.woff2';
@@ -38,32 +45,49 @@ import jetbrainsMono600 from '../assets/fonts/jetbrains-mono-600.woff2';
 import { TEXT_FONT_FAMILY_ATTR } from '@einsatzzeichen/core';
 import zeichenText500 from '@einsatzzeichen/core/fonts/text-medium.woff2';
 
-/** Ein Schnitt einer Schriftrolle: Familie, Gewicht und Adresse der woff2. */
+/**
+ * Ein Schnitt einer Schriftrolle: Familie, Gewicht und Adresse der woff2. `bildschirm` heißt: das
+ * erste Bild wartet auf ihn (LLH-1272), weil er Zeilen trägt, deren Breite den Umbruch des Rahmens
+ * entscheidet. Archivo 700 und JetBrains Mono 600 tun das nicht, die Einsatzzeichen braucht erst
+ * eine Karte oder Skizze.
+ */
 export interface Schriftschnitt {
   familie: string;
   gewicht: number;
   datei: string;
+  bildschirm?: true;
 }
 
+/**
+ * Höchstens so lange wartet das erste Bild auf die Bildschirm-Schnitte (LLH-1272, design.md D4):
+ * unter der Schwelle, ab der ein leerer Schirm als Warten auffällt; aus dem HTTP-Cache dauern sie
+ * wenige Millisekunden.
+ */
+export const SCHRIFT_FRIST_MS = 300;
+
 export const SCHRIFTSCHNITTE: readonly Schriftschnitt[] = [
-  { familie: 'LFH Archivo', gewicht: 400, datei: archivo400 },
-  { familie: 'LFH Archivo', gewicht: 500, datei: archivo500 },
-  { familie: 'LFH Archivo', gewicht: 600, datei: archivo600 },
+  { familie: 'LFH Archivo', gewicht: 400, datei: archivo400, bildschirm: true },
+  { familie: 'LFH Archivo', gewicht: 500, datei: archivo500, bildschirm: true },
+  { familie: 'LFH Archivo', gewicht: 600, datei: archivo600, bildschirm: true },
   { familie: 'LFH Archivo', gewicht: 700, datei: archivo700 },
-  { familie: 'LFH Archivo Narrow', gewicht: 600, datei: archivoNarrow600 },
-  { familie: 'LFH JetBrains Mono', gewicht: 400, datei: jetbrainsMono400 },
-  { familie: 'LFH JetBrains Mono', gewicht: 500, datei: jetbrainsMono500 },
+  { familie: 'LFH Archivo Narrow', gewicht: 600, datei: archivoNarrow600, bildschirm: true },
+  { familie: 'LFH JetBrains Mono', gewicht: 400, datei: jetbrainsMono400, bildschirm: true },
+  { familie: 'LFH JetBrains Mono', gewicht: 500, datei: jetbrainsMono500, bildschirm: true },
   { familie: 'LFH JetBrains Mono', gewicht: 600, datei: jetbrainsMono600 },
   { familie: TEXT_FONT_FAMILY_ATTR, gewicht: 500, datei: zeichenText500 },
 ];
 
 /**
- * Meldet alle Schnitte an. Was der Bildschirm braucht, lädt der Browser bei Bedarf wie bei
- * `@font-face`; den Rest lädt die App, sobald die Seite geladen ist und der Browser Luft hat, denn
- * der Druck setzt ihn (Archivo 700 in Markdown-Fettdruck). Scheitert ein Schnitt, steht der Text
- * in der Ersatzschrift.
+ * Meldet alle Schnitte an. Die Bildschirm-Schnitte lädt sie sofort; das Ergebnis erfüllt sich,
+ * sobald sie geladen sind, spätestens nach `SCHRIFT_FRIST_MS` (LLH-1272). Ein gescheiterter Schnitt
+ * zählt als fertig, sein Text steht dann in der Ersatzschrift. Den Rest lädt die App, sobald die
+ * Seite geladen ist und der Browser Luft hat, denn der Druck setzt ihn (Archivo 700 in
+ * Markdown-Fettdruck). `wait` ist die Uhr der Frist.
  */
-export function registerSchriften(menge: FontFaceSet = document.fonts): void {
+export function registerSchriften(
+  menge: FontFaceSet = document.fonts,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((fertig) => setTimeout(fertig, ms)),
+): Promise<void> {
   const schnitte = SCHRIFTSCHNITTE.map((s) => {
     const schnitt = new FontFace(s.familie, `url(${JSON.stringify(s.datei)}) format('woff2')`, {
       weight: String(s.gewicht),
@@ -71,10 +95,20 @@ export function registerSchriften(menge: FontFaceSet = document.fonts): void {
       display: 'swap',
     });
     menge.add(schnitt);
-    return schnitt;
+    return { schnitt, bildschirm: s.bildschirm === true };
   });
+  const bildschirm = Promise.all(
+    schnitte
+      .filter((s) => s.bildschirm)
+      .map((s) =>
+        s.schnitt.load().then(
+          () => undefined,
+          () => undefined,
+        ),
+      ),
+  );
   const loadAll = () => {
-    for (const schnitt of schnitte) schnitt.load().catch(() => undefined);
+    for (const s of schnitte) if (!s.bildschirm) s.schnitt.load().catch(() => undefined);
   };
   const afterIdle = () =>
     typeof requestIdleCallback === 'function'
@@ -82,4 +116,5 @@ export function registerSchriften(menge: FontFaceSet = document.fonts): void {
       : setTimeout(loadAll, 1000);
   if (document.readyState === 'complete') afterIdle();
   else window.addEventListener('load', afterIdle, { once: true });
+  return Promise.race([bildschirm.then(() => undefined), wait(SCHRIFT_FRIST_MS)]);
 }

@@ -15,6 +15,13 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * 1280 px; seit dem Knopf „Eingänge“ (LLH-1143) lag sie bei 1296–1298 px, der Sprung blieb. Seitdem
  * hat das Etikett eine feste Breite (`hasFixedWidth` in `components/BenutzerMenu.tsx`).
  *
+ * DIE ZWEITE URSACHE fand die CI an der Kante (Seiten-CLS 0,58–0,60): der Schriftwechsel. Das erste
+ * Bild stand in der Ersatzschrift (auf dem Ubuntu-Runner DejaVu Sans, breiter als Archivo), der
+ * Kopf zweizeilig; nach dem Laden von Archivo stand er einzeilig. Seitdem wartet das erste Bild auf
+ * die Bildschirm-Schnitte, höchstens 300 ms (`theme/schriften.ts`, `main.tsx`). Die beiden Fälle
+ * „Schriften …“ unten prüfen den Mechanismus, unabhängig von der Ersatzschrift der Maschine: lokal
+ * (Inter) sprang der Kopf auch ohne das Warten nicht.
+ *
  * ZWEI MESSUNGEN, weil die Kante mit jedem Kopfinhalt wandert:
  *  - am Arbeitsplatzmaß 1280 × 800 (Akzeptanzkriterium) auf drei Stichprobenseiten;
  *  - an der Kante selbst: der Test sucht je Stufe die größte Breite, bei der der fertig geladene
@@ -199,3 +206,85 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     });
   }
 }
+
+/** Die Schnitte, auf die das erste Bild wartet (`bildschirm` in `theme/schriften.ts`). */
+const BILDSCHIRM_SCHNITTE = [
+  'LFH Archivo 400',
+  'LFH Archivo 500',
+  'LFH Archivo 600',
+  'LFH Archivo Narrow 600',
+  'LFH JetBrains Mono 400',
+  'LFH JetBrains Mono 500',
+];
+
+/**
+ * Notiert beim ersten Knoten in `#root`, welche Schnitte schon geladen sind, und wann. Das ist der
+ * Zeitpunkt des ersten Inhalts der App; ein CLS-Wert hinge an der Ersatzschrift der Maschine.
+ */
+async function noteFontsAtFirstContent(page: Page) {
+  await page.addInitScript(() => {
+    const notiz = { geladen: [] as string[], zeit: -1 };
+    (window as unknown as { __lfhErstesBild: typeof notiz }).__lfhErstesBild = notiz;
+    const beobachter = new MutationObserver(() => {
+      const wurzel = document.getElementById('root');
+      if (!wurzel || wurzel.childNodes.length === 0) return;
+      beobachter.disconnect();
+      notiz.zeit = Math.round(performance.now());
+      notiz.geladen = [...document.fonts]
+        .filter((f) => f.status === 'loaded')
+        .map((f) => `${f.family.replace(/^["']|["']$/g, '')} ${f.weight}`);
+    });
+    beobachter.observe(document, { childList: true, subtree: true });
+  });
+}
+
+const firstContent = (page: Page) =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __lfhErstesBild: { geladen: string[]; zeit: number } })
+        .__lfhErstesBild,
+  );
+
+/**
+ * Hält jeden Schriftabruf `ms` zurück und lässt ihn dann durch. Nur Abrufe vom Typ `font`: im
+ * Vite-Dev-Server ist der `import` einer woff2 ein Modulabruf (`…woff2?import`), ihn zu verzögern
+ * hielte die ganze App an.
+ */
+async function delayFonts(page: Page, ms: number) {
+  await page.route(/\.woff2(\?|$)/, async (route) => {
+    if (route.request().resourceType() === 'font') {
+      await new Promise((weiter) => setTimeout(weiter, ms));
+    }
+    await route.continue().catch(() => undefined);
+  });
+}
+
+test('Schriften kommen verzögert: das erste Bild steht in den Bildschirm-Schnitten', async ({
+  page,
+}) => {
+  const einsatzId = await prepare(page, 'komfortabel');
+  await noteFontsAtFirstContent(page);
+  // Unter der Frist von 300 ms: ohne das Warten in `main.tsx` stünde sicher die Ersatzschrift.
+  await delayFonts(page, 150);
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  await expect(page.locator('[data-lfh="seitenkopf"]')).toBeVisible();
+  const notiz = await firstContent(page);
+  expect(notiz.zeit, 'erster Inhalt notiert').toBeGreaterThanOrEqual(0);
+  expect(notiz.geladen, `beim ersten Inhalt nach ${notiz.zeit} ms`).toEqual(
+    expect.arrayContaining(BILDSCHIRM_SCHNITTE),
+  );
+});
+
+test('Schriften kommen nicht: die App rendert trotzdem, in der Ersatzschrift', async ({ page }) => {
+  test.setTimeout(60_000);
+  const einsatzId = await prepare(page, 'komfortabel');
+  await noteFontsAtFirstContent(page);
+  // Weit über der Frist: wartete die App auf die Schriften, stünde der Seitenkopf erst danach.
+  await delayFonts(page, 15_000);
+  // Nur bis `commit`: das `load`-Ereignis wartet auf die offenen Schriftabrufe.
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`, { waitUntil: 'commit' });
+  await expect(page.locator('[data-lfh="seitenkopf"]')).toBeVisible({ timeout: 10_000 });
+  const notiz = await firstContent(page);
+  expect(notiz.zeit, 'erster Inhalt notiert').toBeGreaterThanOrEqual(0);
+  expect(notiz.geladen, 'beim ersten Inhalt').not.toContain('LFH Archivo 400');
+});
