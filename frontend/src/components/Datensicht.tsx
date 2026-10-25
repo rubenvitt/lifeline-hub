@@ -164,6 +164,23 @@ export function baumSymbolZielStil(token: {
   };
 }
 
+/**
+ * Reihe der Kartenfelder — rein und exportiert, damit die Fuge je Stufe ohne Layout prüfbar ist.
+ * Der gefüllte Wert einer `InlineAngabe` rückt am Anfang um `paddingSM` in die Fuge vor
+ * (`wertAngabeStil`), die leere Aufforderung nicht. Quer steht die Fuge deshalb um genau diesen
+ * Vorsprung weiter: sonst lag ein Wert hinter einer Aufforderung nur `padding − paddingSM`
+ * (7 / 10 px) vor ihr, Kriterium 2 verlangt komfortabel ≥ 8, handschuh ≥ 16 (LLH-1271). Gemessen
+ * in `e2e/inline-angabe-dichte.spec.ts`.
+ */
+export function kartenFelderStil(token: { padding: number; paddingSM: number }): CSSProperties {
+  return {
+    display: 'flex',
+    flexWrap: 'wrap',
+    rowGap: token.padding,
+    columnGap: token.padding + token.paddingSM,
+  };
+}
+
 /** Textblock einer Baumzeile; mit Knopf hält er dessen Höhe und mittet den Inhalt. */
 export function baumTextStil(token: { controlHeight: number }, mitKnopf: boolean): CSSProperties {
   return mitKnopf
@@ -2385,7 +2402,7 @@ export default function Datensicht<T extends object, const K extends string>(
               )}
             </div>
             {felder.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: token.padding }}>
+              <div style={kartenFelderStil(token)}>
                 {felder.map((spalte) => (
                   <span
                     key={spalte.key}
