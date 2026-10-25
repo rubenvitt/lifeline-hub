@@ -133,12 +133,18 @@ Für Einsatzleitung und Führungspersonal:
    Soll, mit „unterbesetzt“ oder „Soll erfüllt“, und wer davon aus einer anderen Einheit oder
    ohne Einheit mitfährt.
 
-   ![Paneel „Fahrzeuge und Besatzung“ der Rettungsstaffel mit zwei RTW, je mit FMS-Status, Besatzung Ist und Soll und den Personen darauf, Anna Probe als Einheitsführerin, einer Kraft unter „Ohne Fahrzeug“ und den Auswahlfeldern „Person zuordnen …“ und „Fahrzeug zuordnen …“](../bilder/einheiten/besatzung.png)
+   ![Paneel „Fahrzeuge und Besatzung“ der Rettungsstaffel mit zwei RTW, je mit FMS-Status, Besatzung Ist und Soll, „Personal der Einheit übernehmen“ und den Personen darauf, Anna Probe als Einheitsführerin, einer Kraft unter „Ohne Fahrzeug“ und den Auswahlfeldern „Person zuordnen …“ und „Fahrzeug zuordnen …“](../bilder/einheiten/besatzung.png)
 
 5. Im selben Menü setzt „Als Einheitsführer“ die Person als Einheitsführer, „Vom Fahrzeug
    lösen“ nimmt sie vom Fahrzeug und lässt sie in der Einheit, „Aus Einheit lösen“ löst sie aus
    der Einheit.
-6. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
+6. Mehrere Personen auf einmal setzt „Personal der Einheit übernehmen“ in der Zeile des
+   Fahrzeugs: derselbe Dialog wie in der [Fahrzeugliste](fahrzeuge.md), mit den Kräften der
+   Einheit, die auf keinem Fahrzeug sitzen, angehakt bis zur Soll-Stärke, ohne Soll alle.
+   „Übernehmen“ setzt alle gewählten in einem Schritt auf das Fahrzeug. Ist der Knopf gesperrt,
+   steht daneben „keine freien Kräfte der Einheit“; wer unter „Ohne Fahrzeug“ mit „fährt auf …“
+   steht, sitzt schon auf einem Fahrzeug einer anderen Einheit.
+7. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
    löst das Fahrzeug aus der Einheit. Gelöste Kräfte bleiben im Einsatz, nur ohne Einheit.
 
 ### Material zuordnen, lösen und ausgeben
@@ -171,6 +177,23 @@ Für Einsatzleitung und Führungspersonal:
    „Aufgelöst“ mit dem Zeitpunkt.
 
    ![Aufgeklappter Block „Aufgelöst (1)“ unter der Gliederung mit einer Einheit und dem Zeitpunkt der Auflösung](../bilder/einheiten/aufgeloest.png)
+
+### Eine aufgelöste Einheit nachlesen
+
+Für alle, die das Modul Einheiten sehen:
+
+1. Auf der Seite „Einheiten“ den Block „Aufgelöst“ unter der Gliederung aufklappen und den Namen
+   der Einheit wählen. Im Einsatztagebuch führt der Eintrag „Einheit «…» aufgelöst“ mit dem
+   Verweis „Einheit «Name»“ ebenfalls dorthin.
+2. Die Seite zeigt im Kopf „aufgelöst“ mit dem Zeitpunkt, darunter die Kopfdaten, im Paneel
+   „Letzte Besatzung“ die Fahrzeuge mit den Personen, die darauf saßen, und wer ohne Fahrzeug dazu
+   gehörte (der Einheitsführer mit „EF“), das Material mit seiner Menge beim Auflösen und die
+   Zeitachse.
+3. Die Seite lässt sich nur lesen: kein Feld, kein Menü, kein Knopf. Namen von Personen und
+   Fahrzeugen führen zu deren Seiten, wenn ihr Modul freigegeben ist.
+
+Für eine Einheit, die aufgelöst wurde, bevor die App die Besetzung festhielt, steht statt Besatzung
+und Material „Letzte Besetzung nicht festgehalten“.
 
 ### Eine unangemeldete Einheit übernehmen oder abweisen
 
@@ -246,8 +269,8 @@ Fahrzeug“ mit „fährt auf …“.
 
 Die Besatzung zeigt die Seite nur, wenn die Module Personal und Fahrzeuge beide freigegeben
 sind. Fehlt eine Freigabe, stehen Fahrzeuge und Personen ohne Besatzung untereinander, darüber
-„Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“ und die FMS-Wahl fehlen
-dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
+„Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“, „Personal der
+Einheit übernehmen“ und die FMS-Wahl fehlen dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
 „Person zuordnen …“ bzw. „Fahrzeug zuordnen …“ nichts an und nennt den Grund. Ohne Freigabe Material
 stehen die Posten der Einheit weiter im Paneel „Material“, „Material zuordnen …“ steht gesperrt mit
 „Modul Material gesperrt“, und „Aus Einheit lösen“ und „Ausgeben“ fehlen.
@@ -293,7 +316,9 @@ Eine aufgelöste Einheit verschwindet aus Gliederung, Stärke, Statusband, Lagem
 Auswahllisten. Ihre Mitglieder bleiben im Einsatz, nur ohne Einheit; eine laufende Ablösung endet,
 ein Bereitstellungsraum trägt ihren Austritt ein. Mit Zeitachse und Einsatztagebuch bleibt sie im
 Nachweis: im Block „Aufgelöst“, in „insgesamt eingesetzt“ und in der Anlage „Einheiten mit
-Einsatzzeiten“ des Einsatzberichts. Eine Einheit ohne jede Spur (keine Mitglieder, keine
+Einsatzzeiten“ des Einsatzberichts. Wer und was beim Auflösen zur Einheit gehörte, hält die App
+fest; die Seite der aufgelösten Einheit zeigt es nur lesend („Eine aufgelöste Einheit nachlesen“).
+Eine Person, die danach als Fehldisposition storniert wird, fehlt dort. Eine Einheit ohne jede Spur (keine Mitglieder, keine
 Ereignisse, kein Eintrag im Tagebuch, keine Ablösung, kein Bereitstellungsraum, kein Auftrag, keine
 Meldung, kein Dokument, kein Verteiler, keine Verpflegungsausgabe) wird beim Auflösen ganz
 gelöscht. Eine Einheit, an die Verpflegung ausgegeben wurde, bleibt als aufgelöst stehen, auch wenn
@@ -302,7 +327,9 @@ sich nichts mehr ändern.
 
 ### Einsatztagebuch
 
-Ins Einsatztagebuch schreibt die App selbst: das Bilden und Auflösen einer Einheit, eine neue
+Ins Einsatztagebuch schreibt die App selbst: das Bilden und Auflösen einer Einheit (der Eintrag
+der Auflösung verweist mit „Einheit «Name»“ auf ihre Seite, ebenso ein Auftrag auf jede Einheit,
+an die er geht), eine neue
 Abschnittszuordnung, einen Wechsel des Einheitsführers, einen Statuswechsel von Hand und jedes
 Zuordnen und Lösen von Personal, Fahrzeugen und Material. Eine Kraft aus dem Stamm bekommt einen
 Eintrag für Disposition und Einheit zusammen, wie im Modul Personal bzw. Fahrzeuge. Das Setzen

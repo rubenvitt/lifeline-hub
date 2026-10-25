@@ -14,6 +14,7 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import {
+  listAufgeloesteEinheiten,
   listeEinheiten,
   loeseEinheitAuf,
   loeseEinheitSprechgruppe,
@@ -45,6 +46,7 @@ import EinheitFunk, {
   type SprechgruppenSchritt,
 } from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
+import EinheitAufgeloestAnsicht from './einheit/EinheitAufgeloestAnsicht';
 import EinheitAufloesen from './einheit/EinheitAufloesen';
 import EinheitUebernahme from './einheit/EinheitUebernahme';
 import EinheitUebernahmeStorno from './einheit/EinheitUebernahmeStorno';
@@ -62,6 +64,10 @@ import ZuordnenAuswahl from './einheit/ZuordnenAuswahl';
  * Die Seite lädt die Einheit und reicht sie an {@link EinheitAnsicht} mit `key={einheitId}`: der
  * Wechsel zu einer anderen Einheit baut den Inhalt neu, und kein Grund einer abgelehnten Zeile
  * und keine offene Eingabe gehört dann noch zur vorigen.
+ *
+ * Steht die Einheit nicht unter den aktiven, fragt die Seite die aufgelösten und zeigt eine
+ * gefundene nur lesend (LLH-1266, `EinheitAufgeloestAnsicht`). Wird die geöffnete Einheit
+ * anderswo aufgelöst, verliert die aktive Liste sie, und die Seite fällt von selbst dorthin.
  */
 export default function EinheitDetailPage() {
   const { id, einheitId: einheitIdParam } = useParams();
@@ -82,6 +88,17 @@ export default function EinheitDetailPage() {
   });
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
   const aktuell = einheiten.find((e) => e.id === einheitId) ?? null;
+  // Die aufgelösten erst, wenn die aktive Liste da ist und die Einheit nicht nennt (LLH-1266).
+  // Immer frisch: die Gliederung hält sie im Cache, vielleicht noch aus der Zeit, als diese
+  // Einheit aktiv war.
+  const aufgeloesteQuery = useQuery({
+    queryKey: einsatzKeys.einheitenAufgeloeste(einsatzId),
+    queryFn: () => listAufgeloesteEinheiten(einsatzId),
+    enabled: idGueltig && einheitenQuery.isSuccess && aktuell == null,
+    refetchOnMount: 'always',
+  });
+  const aufgeloest = aufgeloesteQuery.data?.find((e) => e.id === einheitId) ?? null;
+  const freigaben = useModulFreigaben(einsatzId);
 
   // Ungültige Route-ID führt zurück zur Liste.
   if (!idGueltig) return <Navigate to={einheitenPfad(einsatzId)} replace />;
@@ -106,8 +123,34 @@ export default function EinheitDetailPage() {
     );
   }
 
+  if (!aktuell && aufgeloest) {
+    return (
+      <EinheitAufgeloestAnsicht
+        key={einheitId}
+        einsatzId={einsatzId}
+        einsatz={einsatzQuery.data}
+        einheit={aufgeloest}
+        rechte={buildEinheitRechte(false, freigaben)}
+        stand={aufgeloesteQuery.dataUpdatedAt}
+      />
+    );
+  }
+  // Auch während ein veralteter Stand nachlädt: er kennt die eben aufgelöste Einheit noch nicht.
+  if (!aktuell && (aufgeloesteQuery.isPending || aufgeloesteQuery.isFetching)) {
+    return <SeitenSkeleton />;
+  }
+  if (!aktuell && aufgeloesteQuery.isError) {
+    return (
+      <SeitenFehler
+        text="Aufgelöste Einheiten konnten nicht geladen werden"
+        ursache={aufgeloesteQuery.error}
+        onWiederholen={() => void aufgeloesteQuery.refetch()}
+      />
+    );
+  }
+
   /**
-   * Die Liste kam an, die Einheit ist nicht darin (aufgelöst oder erfundene ID). Ein anderer Fall
+   * Die Listen kamen an, die Einheit ist in keiner (gelöscht oder erfundene ID). Ein anderer Fall
    * als „Abruf gescheitert" und deshalb ein eigener Wortlaut samt Weg zurück.
    */
   if (!aktuell) {
@@ -419,6 +462,7 @@ function EinheitAnsicht({
           einsatzId={einsatzId}
           einheit={aktuell}
           mittel={besatzungMittel}
+          personal={besatzungPersonal}
           rechte={rechte}
           listState={besatzungListState}
           onReload={() => {

@@ -346,6 +346,11 @@ export interface SprechgruppeEingabe {
 export type Einsatzabschnitt = S['EinsatzabschnittAnzeige'];
 export type AbschnittLagezustand = S['AbschnittLagezustand'];
 export type Einheit = S['EinheitAnzeige'];
+/** Beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266), nur an aufgelösten. */
+export type LetzteBesetzung = S['LetzteBesetzung'];
+export type LetztePerson = S['LetztePerson'];
+export type LetztesFahrzeug = S['LetztesFahrzeug'];
+export type LetztesMaterial = S['LetztesMaterial'];
 export type EinheitStatus = S['EinheitStatus'];
 export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];

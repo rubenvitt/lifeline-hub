@@ -432,7 +432,8 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
     const main = page.getByRole('main');
     const ziele = kopfFelder(page).map(({ name, huelle }) => ({ name, ziel: huelle }));
     const zuordnung = zuordnungsZiele(page, namen);
-    // Nachbarn auf einer Zeile: FMS-Wahl und rotes „Aus Einheit lösen“, die beiden Auswahlfelder.
+    // Nachbarn auf einer Zeile: FMS-Wahl, „Personal der Einheit übernehmen“ und rotes „Aus
+    // Einheit lösen“, die beiden Auswahlfelder.
     const aktionsreihen: Locator[][] = [...zuordnung.reihen];
     let kleinsteZeile = Infinity;
     let kleinsterAbstand = Infinity;
@@ -441,6 +442,8 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
       kleinsteZeile = Math.min(kleinsteZeile, await haeltStufe(zeile, soll, `${name} (${dichte})`));
     }
     for (const { name, ziel } of zuordnung.ziele) ziele.push({ name, ziel });
+    // Gesperrt (die Kraft sitzt schon) hält er dieselbe Stufe (LLH-1267).
+    ziele.push({ name: 'Personal der Einheit übernehmen', ziel: zuordnung.uebernehmen });
     if (dichte !== 'kompakt') {
       for (const { name, aktion, auswahl } of zuordnung.stapel) {
         // Abstand ab letzter wirklicher Trefffläche, nicht ab der gepolsterten Zeilenhülle.
@@ -461,8 +464,8 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
       }),
     });
     // 12 Angaben (LLH-1134: „Telefon und weitere Verbindungen“ statt Kommunikationsmittel und
-    // Erreichbarkeit), 7 Zuordnungsziele, „Einheit auflösen“.
-    expect(ziele).toHaveLength(20);
+    // Erreichbarkeit), 7 Zuordnungsziele, „Personal der Einheit übernehmen“, „Einheit auflösen“.
+    expect(ziele).toHaveLength(21);
     let minimum = Infinity;
     const miss = async (name: string, ziel: Locator) => {
       const hoehe = await haeltStufe(ziel, soll, `${name} (${dichte})`);

@@ -1007,7 +1007,15 @@ async fn end_einheit(
             einheit_repo::Aufloesung::Aufloesen => crate::einheit::etb_text_aufgeloest(&name),
             einheit_repo::Aufloesung::Stornieren => crate::einheit::etb_text_storniert(&name),
         };
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        // Der Eintrag der Auflösung nennt die stehen gebliebene Einheit (LLH-1266, design.md D4):
+        // Filter „betrifft Einheit“ und Verweis auf ihre lesende Ansicht. Die Spurprüfung ist
+        // gelaufen; eine gelöschte Einheit verknüpft nichts.
+        if !ergebnis.geloescht {
+            crate::etb::repo::link_einheit_tx(conn, etb_id, eid).await?;
+        }
         Ok(ergebnis)
     })?;
     notify_aufgeloest(state, einsatz_id, eid, &ergebnis).await;

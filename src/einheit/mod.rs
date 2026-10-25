@@ -240,6 +240,59 @@ pub struct EinheitAnzeige {
     /// den Kurznamen liest die Oberfläche aus dem Modul Nachforderungen. Fehlt ohne Herkunft.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nachforderung_id: Option<i64>,
+    /// Wer und was beim Auflösen dazugehörte (LLH-1266, Change
+    /// `oq1yp0k5-aufgeloeste-einheit-lesend`, design.md D2). Nur `GET …/einheiten?aufgeloeste=1`
+    /// füllt es; es fehlt an aktiven Einheiten und an solchen, die aufgelöst wurden, bevor das
+    /// System die Besetzung festhielt. Stärke und Mitgliederlisten zählen es nie mit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letzte_besetzung: Option<LetzteBesetzung>,
+}
+
+/// Die beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266, design.md D1/D2). Namen
+/// kommen beim Lesen aus den Dispositionszeilen; eine später stornierte Kraft fehlt.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LetzteBesetzung {
+    pub personal: Vec<LetztePerson>,
+    pub fahrzeuge: Vec<LetztesFahrzeug>,
+    pub material: Vec<LetztesMaterial>,
+}
+
+/// Eine Person der letzten Besetzung.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LetztePerson {
+    /// `einsatz_personal.id` der Dispozeile.
+    pub ep_id: i64,
+    pub name: String,
+    /// Qualifikation (Snapshot), wie [`EinheitMitgliedPerson::funktion`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub funktion: Option<String>,
+    /// Einsatzfunktion (LLH-1067).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatzfunktion: Option<String>,
+    /// Sie führte die Einheit.
+    pub ist_fuehrer: bool,
+    /// `einsatz_fahrzeug.id` des Fahrzeugs, auf dem sie saß; fehlt ohne Fahrzeug.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auf_fahrzeug_id: Option<i64>,
+}
+
+/// Ein Fahrzeug der letzten Besetzung.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LetztesFahrzeug {
+    /// `einsatz_fahrzeug.id` der Dispozeile.
+    pub ef_id: i64,
+    pub funkrufname: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fahrzeugtyp: Option<String>,
+}
+
+/// Ein Materialposten der letzten Besetzung, mit seiner Menge beim Auflösen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LetztesMaterial {
+    /// `einsatz_material.id` der Dispozeile.
+    pub em_id: i64,
+    pub bezeichnung: String,
+    pub menge: i64,
 }
 
 #[cfg(test)]
