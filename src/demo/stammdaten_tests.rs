@@ -130,7 +130,11 @@ async fn bild_org(pool: &SqlitePool, org_id: i64) -> Vec<(&'static str, Vec<Stri
     ] {
         bild.push((tabelle, zeilen(pool, tabelle, "org_id = ?", org_id).await));
     }
-    for tabelle in ["einheit_vorlage_fahrzeug", "einheit_vorlage_personal"] {
+    for tabelle in [
+        "einheit_vorlage_fahrzeug",
+        "einheit_vorlage_personal",
+        "einheit_vorlage_material",
+    ] {
         bild.push((
             tabelle,
             zeilen(
@@ -1360,4 +1364,75 @@ async fn schichtmodell_wird_angelegt_und_markiert_oder_mitbenutzt() {
         .unwrap();
     assert_eq!(modelle.len(), 1);
     assert!(!modelle[0].ist_demo, "mitbenutzt → keine Marke");
+}
+
+/// LLH-1261: Material-Positionen folgen derselben Regel wie Fahrzeuge. Die Demo-Vorlage nimmt ihre
+/// Positionen per Kaskade mit; ein Demo-Material, auf das eine eigene Vorlage verweist, bleibt.
+#[tokio::test]
+async fn material_einer_eigenen_vorlage_haelt_das_demo_material() {
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+    let demo_material: Vec<i64> = sqlx::query_scalar(
+        "SELECT datensatz_id FROM demo_herkunft WHERE tabelle = 'material' ORDER BY datensatz_id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert!(demo_material.len() >= 2, "{demo_material:?}");
+    let zug = erg.einheit_vorlagen["san_zug"];
+    let typ: i64 = sqlx::query_scalar("SELECT typ_id FROM einheit_vorlage WHERE id = ?")
+        .bind(zug)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let posten = |material_id| crate::einheit_vorlage::MaterialEntry {
+        material_id,
+        menge: 1,
+        fahrzeug_id: None,
+    };
+    crate::einheit_vorlage::repo::replace_material(&pool, a.org, zug, &[posten(demo_material[0])])
+        .await
+        .unwrap();
+    let eigen = crate::einheit_vorlage::repo::create(
+        &pool,
+        a.org,
+        crate::einheit_vorlage::repo::NewVorlage {
+            name: "Eigener Zug",
+            typ_id: typ,
+            ueber_vorlage_id: None,
+            funkrufname: None,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
+            soll: None,
+            bemerkung: None,
+            sortier: 0,
+        },
+    )
+    .await
+    .unwrap();
+    crate::einheit_vorlage::repo::replace_material(
+        &pool,
+        a.org,
+        eigen.id,
+        &[posten(demo_material[1])],
+    )
+    .await
+    .unwrap();
+
+    let bericht = entfernen(&pool, a.org).await;
+
+    assert_eq!(
+        entfernt_behalten(&bericht, DemoStammdatenArt::Material),
+        (demo_material.len() as i64 - 1, 1),
+        "nur das Material der eigenen Vorlage bleibt"
+    );
+    let liste = vorlagen(&pool, a.org).await;
+    assert!(liste.iter().all(|v| v.id != zug), "die Demo-Vorlage fällt");
+    let eigen_nachher = liste.iter().find(|v| v.id == eigen.id).unwrap();
+    assert_eq!(eigen_nachher.material.len(), 1);
+    assert_eq!(eigen_nachher.material[0].material_id, demo_material[1]);
+    assert!(!eigen_nachher.material[0].ist_demo, "Marke fällt");
 }

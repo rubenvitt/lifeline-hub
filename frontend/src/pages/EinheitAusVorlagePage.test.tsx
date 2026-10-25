@@ -12,6 +12,7 @@ import type {
   VorlageVorschau,
   VorschauFahrzeug,
   VorschauKnoten,
+  VorschauMaterial,
   VorschauPersonal,
 } from '../api/types';
 import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
@@ -34,6 +35,7 @@ const knoten = (
   fahrzeuge: VorschauFahrzeug[],
   personal: VorschauPersonal[],
   ueber_vorlage_id?: number,
+  material: VorschauMaterial[] = [],
 ) =>
   ({
     vorlage_id,
@@ -44,18 +46,36 @@ const knoten = (
     soll_eigen: false,
     fahrzeuge,
     personal,
+    material,
   }) as VorschauKnoten;
+const mat = (
+  vorlage_material_id: number,
+  bezeichnung: string,
+  extra: Partial<VorschauMaterial> = {},
+): VorschauMaterial => ({
+  vorlage_material_id,
+  material_id: vorlage_material_id + 1000,
+  bezeichnung,
+  art: 'geraet',
+  menge: 1,
+  zustand: 'neu',
+  ...extra,
+});
 
 /** Der Demo-„Sanitätszug Musterstadt“; Abweichungen je Stamm-ID. */
 function sanitaetszug(
   fahrzeuge: Partial<Record<number, Partial<VorschauFahrzeug>>> = {},
   personal: Partial<Record<number, Partial<VorschauPersonal>>> = {},
-  modul: Partial<Pick<VorlageVorschau, 'fahrzeuge_gesperrt' | 'personal_gesperrt'>> = {},
+  modul: Partial<
+    Pick<VorlageVorschau, 'fahrzeuge_gesperrt' | 'personal_gesperrt' | 'material_gesperrt'>
+  > = {},
+  material: VorschauMaterial[] = [],
 ): VorlageVorschau {
   return {
     vorlage_id: 5,
     fahrzeuge_gesperrt: false,
     personal_gesperrt: false,
+    material_gesperrt: false,
     ...modul,
     knoten: [
       knoten(
@@ -80,6 +100,7 @@ function sanitaetszug(
           ps(203, 'Dirk Dahl', { ...personal[203] }),
         ],
         5,
+        material,
       ),
     ],
   };
@@ -373,6 +394,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
         { personal_id: 200, umhaengen: false },
         { personal_id: 203, umhaengen: false },
       ],
+      material: [],
     });
     expect(await screen.findByText('Einheit gebildet')).toBeInTheDocument();
   });
@@ -528,5 +550,71 @@ describe('EinheitAusVorlagePage · Absenden', () => {
     await warteAufBaum();
     expect(screen.getByText('Höchstens 50 Fahrzeuge je Bildung')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Einheit bilden' })).toBeDisabled();
+  });
+});
+
+describe('EinheitAusVorlagePage · Material (LLH-1261)', () => {
+  /** Decken an der Staffel, ein Rucksack auf RTW 1, SE-1 schon im Einsatz. */
+  const MATERIAL = [
+    mat(1, 'Wolldecke', { art: 'verbrauchsgut', menge: 50 }),
+    mat(2, 'Sanitätsrucksack', { fahrzeug_id: 20 }),
+    mat(3, 'Stromerzeuger', { bestandsnummer: 'SE-1', zustand: 'im_einsatz' }),
+  ];
+  const mitMaterial = (modul: Parameters<typeof sanitaetszug>[2] = {}) =>
+    http.get('/api/einsaetze/1/einheiten/aus-vorlage/5', () =>
+      HttpResponse.json(sanitaetszug({}, {}, modul, MATERIAL)),
+    );
+
+  it('hakt Material vor, sperrt „schon im Einsatz“ und zählt es in der Zusammenfassung', async () => {
+    zeige(mitMaterial());
+    await warteAufBaum();
+    expect(kaestchen('material-1')).toBeChecked();
+    expect(kaestchen('material-2')).toBeChecked();
+    expect(kaestchen('material-3')).not.toBeChecked();
+    expect(kaestchen('material-3')).toBeDisabled();
+    expect(zustand('material-1')).toBe('neu');
+    expect(zustand('material-3')).toBe('schon im Einsatz');
+    expect(screen.getByRole('checkbox', { name: /50× Wolldecke/ })).toBe(kaestchen('material-1'));
+    expect(
+      screen.getByText('1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte, 2 Material'),
+    ).toBeInTheDocument();
+    // Der Rucksack liegt auf RTW 1, solange es mitkommt; sonst an der Einheit.
+    expect(zeile('material-2')).toHaveTextContent('auf «RTW 1»');
+    expect(zeile('material-1')).not.toHaveTextContent('an der Einheit');
+    await userEvent.click(kaestchen('fahrzeug-20'));
+    expect(zeile('material-2')).toHaveTextContent('an der Einheit');
+  });
+
+  it('sendet die gewählten Positionen; ein Grund steht an der Zeile', async () => {
+    let body: AusVorlageEingabe | null = null;
+    zeige(
+      mitMaterial(),
+      http.post('/api/einsaetze/1/einheiten/aus-vorlage', async ({ request }) => {
+        body = (await request.json()) as AusVorlageEingabe;
+        return HttpResponse.json(
+          {
+            error: 'Nicht alle Kräfte lassen sich übernehmen',
+            zeilen: [{ art: 'material', id: 2, grund: 'schon im Einsatz' }],
+          },
+          { status: 422 },
+        );
+      }),
+    );
+    await warteAufBaum();
+    await userEvent.click(kaestchen('material-1'));
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
+    await waitFor(() => expect(zeile('material-2')).toHaveTextContent('schon im Einsatz'));
+    expect(body!.material).toEqual([{ vorlage_material_id: 2 }]);
+    // Gleiche ID als Fahrzeug oder Person bleibt ohne Grund.
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('ein gesperrtes Modul Material steht als Wort, ohne Zeilen und ohne Zählung', async () => {
+    const ohne = sanitaetszug({}, {}, { material_gesperrt: true });
+    zeige(http.get('/api/einsaetze/1/einheiten/aus-vorlage/5', () => HttpResponse.json(ohne)));
+    await warteAufBaum();
+    expect(screen.getByText('Material gesperrt')).toBeInTheDocument();
+    expect(screen.getByText('1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte')).toBeInTheDocument();
+    expect(document.querySelector('[data-zeile^="material-"]')).toBeNull();
   });
 });

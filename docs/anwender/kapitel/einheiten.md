@@ -57,12 +57,13 @@ Für Einsatzleitung und Führungspersonal:
 3. Auf der Seite „Einheit aus Vorlage bilden“ den „Name“ der obersten Einheit prüfen und bei Bedarf
    einen „Abschnitt“ wählen.
 4. Im Baum der Vorlage anhaken, was mitkommt. Fahrzeuge, die neu oder im Einsatz frei sind, sind
-   angehakt, Personen nicht; jede Zeile nennt rechts ihren Zustand im Einsatz.
+   angehakt, Personen nicht, Material ist angehakt; jede Zeile nennt rechts ihren Zustand im
+   Einsatz.
 
    ![Seite „Einheit aus Vorlage bilden“ mit Name und Abschnitt, darunter Sanitätszug und Rettungsstaffel mit ihren Fahrzeugen, der Besatzung und dem Zustand je Zeile](../bilder/einheiten/vorlage-bilden.png)
 
 5. „Einheit bilden“ wählen. Neben dem Knopf steht, was entsteht, etwa „1 Zug, 1 Staffel,
-   3 Fahrzeuge, 2 Kräfte“. Die App öffnet das Meldebild mit der neuen Einheit markiert, ihre
+   3 Fahrzeuge, 2 Kräfte“, mit Material der Vorlage auch „2 Material“. Die App öffnet das Meldebild mit der neuen Einheit markiert, ihre
    Untereinheiten und Fahrzeuge aufgeklappt.
 
 ### Angaben einer Einheit ändern
@@ -331,19 +332,26 @@ Eine gewählte Person, deren Fahrzeug nicht mitkommt, steht mit „ohne Fahrzeug
 Fahrzeug in die Einheit. Sitzt eine Person ohne Einheit schon auf ihrem Fahrzeug aus der Vorlage und wird dieses
 abgewählt, steht an ihr „verlässt «…»“: sie steigt beim Bilden aus.
 
+Material der Vorlage steht je Einheit unter „Material“, mit Menge und Bezeichnung. Beim Bilden
+kommt es in den Einsatz: ein Gerät als ein Posten je Stück, ein Verbrauchsgut als ein Posten mit
+seiner Menge. Es liegt auf seinem Fahrzeug, wenn das mitkommt, sonst an der Einheit; eine angehakte
+Zeile nennt den Ort („auf «RTW 1»“ bzw. „an der Einheit“). Gesperrt ist Material, das „außer Dienst“
+steht, und ein Gerät mit Bestandsnummer, das „schon im Einsatz“ steht. Verbrauchsgut und Geräte
+ohne Bestandsnummer lassen sich mehrfach in den Einsatz holen und stehen immer als „neu“.
+
 Das Bilden gelingt ganz oder gar nicht. Hat sich seit dem Öffnen der Seite etwas geändert, etwa
 ein Fahrzeug ist inzwischen einem anderen Zug zugeordnet, entsteht nichts; der Grund steht an der
 Zeile, und die Zeilen zeigen den neuen Stand. Ein gesetztes Häkchen bleibt dabei stehen, die Kraft
 wird nicht still umgehängt; unter ihr steht „umhängen aus «2. Zug»“ bzw. „umhängen von «RTW 3»“, und
-ein Klick darauf übernimmt sie beim nächsten Bilden. Je Bildung sind höchstens 50 Fahrzeuge und
-50 Personen möglich; darüber bleibt „Einheit bilden“ gesperrt und nennt die Grenze. Eine Vorlage
+ein Klick darauf übernimmt sie beim nächsten Bilden. Je Bildung sind höchstens 50 Fahrzeuge,
+50 Personen und 50 Zeilen Material möglich; darüber bleibt „Einheit bilden“ gesperrt und nennt die Grenze. Eine Vorlage
 mit mehr als 20 Einheiten lässt sich nicht bilden.
 
-Ohne Freigabe des Moduls Fahrzeuge oder Personal fehlen dessen Zeilen; über dem Baum steht
-„Fahrzeuge gesperrt“ bzw. „Personal gesperrt“, und gebildet werden nur die Einheiten mit dem, was
-freigegeben ist. Ohne Freigabe des Meldebilds öffnet die App nach dem Bilden die Seite der neuen
+Ohne Freigabe des Moduls Fahrzeuge, Personal oder Material fehlen dessen Zeilen; über dem Baum
+steht „Fahrzeuge gesperrt“, „Personal gesperrt“ bzw. „Material gesperrt“, und gebildet werden nur
+die Einheiten mit dem, was freigegeben ist. Ohne Freigabe des Meldebilds öffnet die App nach dem Bilden die Seite der neuen
 Einheit. Ins Einsatztagebuch schreibt die App einen Eintrag für die ganze Bildung, mit Untereinheiten,
-Fahrzeugen, Kräften und wer woher umgehängt wurde.
+Fahrzeugen, Kräften, Material und wer woher umgehängt wurde.
 
 ### Aus einer Nachforderung
 

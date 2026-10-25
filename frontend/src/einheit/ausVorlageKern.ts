@@ -5,6 +5,8 @@ import type {
   Einheit,
   VorlageVorschau,
   VorschauFahrzeug,
+  VorschauMaterial,
+  VorschauMaterialZustand,
   VorschauPersonal,
   VorschauZustand,
   ZeilenArt,
@@ -18,6 +20,10 @@ import type {
  *
  * Maßgeblich ist der Server: er plant beim Absenden neu und lehnt mit Gründen je Zeile ab. Der
  * Kern entscheidet nichts, was der Server anders sähe; er zeigt nur vorab, was kommt.
+ *
+ * Material der Vorlage (LLH-1261, Change `k22fpk5p-vorlage-material` D3, D4, D8): Häkchen je
+ * Position, Vorgabe an, gesperrt „außer Dienst“ und „schon im Einsatz“, kein „umhängen“; eine
+ * Position, deren Fahrzeug nicht mitkommt, liegt „an der Einheit“.
  */
 
 /** Wahl einer Zeile: angehakt, und ob das Häkchen an einer gebundenen Kraft gesetzt wurde. */
@@ -30,13 +36,17 @@ export interface WahlEintrag {
   umhaengen: boolean;
 }
 
-/** Wahl je Stamm-ID; Fahrzeug- und Personen-IDs kollidieren, deshalb zwei Karten. */
+/**
+ * Wahl je Stamm-ID; Fahrzeug- und Personen-IDs kollidieren, deshalb getrennte Karten. Material je
+ * Position (`vorlage_material_id`), nur angehakt oder nicht.
+ */
 export interface Wahl {
   fahrzeuge: ReadonlyMap<number, WahlEintrag>;
   personal: ReadonlyMap<number, WahlEintrag>;
+  material: ReadonlyMap<number, boolean>;
 }
 
-export const LEERE_WAHL: Wahl = { fahrzeuge: new Map(), personal: new Map() };
+export const LEERE_WAHL: Wahl = { fahrzeuge: new Map(), personal: new Map(), material: new Map() };
 
 type Zeile = VorschauFahrzeug | VorschauPersonal;
 
@@ -64,6 +74,15 @@ export function allePersonen(v: VorlageVorschau): VorschauPersonal[] {
   return v.knoten.flatMap((k) => k.personal);
 }
 
+export function alleMaterial(v: VorlageVorschau): VorschauMaterial[] {
+  return v.knoten.flatMap((k) => k.material);
+}
+
+/** Gesperrt: außer Dienst oder ein Stück, das schon im Einsatz steht (D4). */
+export function isMaterialGesperrt(zustand: VorschauMaterialZustand): boolean {
+  return zustand !== 'neu';
+}
+
 /**
  * Gleicht die Wahl mit einer (neuen) Vorschau ab: getroffene Wahl bleibt, eine neu erscheinende
  * Zeile bekommt ihre Vorgabe (D14).
@@ -81,10 +100,22 @@ export function reconcileWahl(wahl: Wahl, v: VorlageVorschau): Wahl {
     }
     return neu;
   };
+  const material = new Map(wahl.material);
+  for (const m of alleMaterial(v)) {
+    if (!material.has(m.vorlage_material_id)) {
+      material.set(m.vorlage_material_id, !isMaterialGesperrt(m.zustand));
+    }
+  }
   return {
     fahrzeuge: ergaenze(wahl.fahrzeuge, alleFahrzeuge(v), 'fahrzeug', (f) => f.fahrzeug_id),
     personal: ergaenze(wahl.personal, allePersonen(v), 'personal', (p) => p.personal_id),
+    material,
   };
+}
+
+/** Setzt das Häkchen einer Material-Position. */
+export function setMaterialWahl(wahl: Wahl, m: VorschauMaterial, an: boolean): Wahl {
+  return { ...wahl, material: new Map(wahl.material).set(m.vorlage_material_id, an) };
 }
 
 function idVon(art: ZeilenArt, z: Zeile): number {
@@ -145,6 +176,18 @@ export function zustandWort(_art: ZeilenArt, zeile: Zeile): string {
   }
 }
 
+/** Der Zustand einer Material-Position als Wort (D4); „schon im Einsatz“ wie in der Auswahl. */
+export function materialZustandWort(m: VorschauMaterial): string {
+  switch (m.zustand) {
+    case 'neu':
+      return 'neu';
+    case 'ausser_dienst':
+      return 'außer Dienst';
+    case 'im_einsatz':
+      return 'schon im Einsatz';
+  }
+}
+
 /** Kommt das Fahrzeug mit? Angehakt, nicht gesperrt, und gebunden nur mit „umhängen“. */
 export function kommtMit(f: VorschauFahrzeug, wahl: Wahl): boolean {
   const e = wahl.fahrzeuge.get(f.fahrzeug_id);
@@ -160,6 +203,14 @@ function fahrzeugKommtMit(v: VorlageVorschau, fahrzeugId: number, wahl: Wahl): b
 /** „ohne Fahrzeug“: die Person hat in der Vorlage ein Fahrzeug, und es kommt nicht mit (D4). */
 export function ohneFahrzeug(p: VorschauPersonal, v: VorlageVorschau, wahl: Wahl): boolean {
   return p.fahrzeug_id != null && !fahrzeugKommtMit(v, p.fahrzeug_id, wahl);
+}
+
+/**
+ * „an der Einheit“: die Position liegt in der Vorlage auf einem Fahrzeug, das nicht mitkommt; der
+ * Server legt sie dann an die Einheit (D3).
+ */
+export function anDerEinheit(m: VorschauMaterial, v: VorlageVorschau, wahl: Wahl): boolean {
+  return m.fahrzeug_id != null && !fahrzeugKommtMit(v, m.fahrzeug_id, wahl);
 }
 
 /**
@@ -186,14 +237,18 @@ export function gewaehlteZeilen(v: VorlageVorschau, wahl: Wahl) {
     personal: v.personal_gesperrt
       ? []
       : allePersonen(v).filter((p) => wahl.personal.get(p.personal_id)?.an),
+    material: v.material_gesperrt
+      ? []
+      : alleMaterial(v).filter((m) => wahl.material.get(m.vorlage_material_id) === true),
   };
 }
 
 const zahlWort = (n: number, eins: string, viele: string) => `${n} ${n === 1 ? eins : viele}`;
 
 /**
- * „1 Zug, 1 Staffel, 3 Fahrzeuge, 6 Kräfte“: Einheiten je Typ in Baumfolge, mehrere eines Typs
- * mit „×“ (den Plural eines Typnamens kennt der Kern nicht); ein gesperrter Teil fehlt.
+ * „1 Zug, 1 Staffel, 3 Fahrzeuge, 6 Kräfte, 2 Material“: Einheiten je Typ in Baumfolge, mehrere
+ * eines Typs mit „×“ (den Plural eines Typnamens kennt der Kern nicht); ein gesperrter Teil fehlt,
+ * Material nur, wenn die Vorlage welches führt.
  */
 export function zusammenfassung(v: VorlageVorschau, wahl: Wahl): string {
   const typen = new Map<string, number>();
@@ -202,6 +257,9 @@ export function zusammenfassung(v: VorlageVorschau, wahl: Wahl): string {
   const g = gewaehlteZeilen(v, wahl);
   if (!v.fahrzeuge_gesperrt) teile.push(zahlWort(g.fahrzeuge.length, 'Fahrzeug', 'Fahrzeuge'));
   if (!v.personal_gesperrt) teile.push(zahlWort(g.personal.length, 'Kraft', 'Kräfte'));
+  if (!v.material_gesperrt && alleMaterial(v).length > 0) {
+    teile.push(`${g.material.length} Material`);
+  }
   return teile.join(', ');
 }
 
@@ -210,6 +268,9 @@ export function deckelGrund(v: VorlageVorschau, wahl: Wahl): string | null {
   const g = gewaehlteZeilen(v, wahl);
   if (g.fahrzeuge.length > SAMMEL_MAX) return `Höchstens ${SAMMEL_MAX} Fahrzeuge je Bildung`;
   if (g.personal.length > SAMMEL_MAX) return `Höchstens ${SAMMEL_MAX} Personen je Bildung`;
+  if (g.material.length > SAMMEL_MAX) {
+    return `Höchstens ${SAMMEL_MAX} Material-Positionen je Bildung`;
+  }
   return null;
 }
 
@@ -230,7 +291,7 @@ export interface AnfrageEingabe {
   wahl: Wahl;
 }
 
-/** Body des Bildens (D3): gewählte Zeilen der Vorschau in Baumfolge, je mit „umhängen“. */
+/** Body des Bildens (D3): gewählte Zeilen der Vorschau in Baumfolge, Kräfte je mit „umhängen“. */
 export function buildAnfrage({
   vorlageId,
   name,
@@ -251,6 +312,7 @@ export function buildAnfrage({
       personal_id: p.personal_id,
       umhaengen: wahl.personal.get(p.personal_id)?.umhaengen === true,
     })),
+    material: g.material.map((m) => ({ vorlage_material_id: m.vorlage_material_id })),
   };
 }
 
