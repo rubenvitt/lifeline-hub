@@ -976,7 +976,11 @@ async fn notify_aufgeloest(
     .await;
 }
 
-/// PUT .../einheiten/{eid}/personal/{ep_id} — Person zuordnen. ETB-Eintrag.
+/// PUT .../einheiten/{eid}/personal/{ep_id} — Person zuordnen oder umhängen, aus der Einheit
+/// wie aus Personalliste und Personenansicht (LLH-1060 D3). ETB-Eintrag, der beim Umhängen die
+/// vorige Einheit und eine dabei endende Führung nennt; gemeldet werden die neue, die vorige und
+/// jede Einheit, deren Führung endet, und die Person. Dieselbe Einheit noch einmal schreibt und
+/// meldet nichts (LLH-1262, Gegenstück zu LLH-1073 D2 am Fahrzeug).
 pub async fn personal_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -984,23 +988,35 @@ pub async fn personal_zuordnen(
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    // F06/LFH-244 Tier-A: Zuordnung (inkl. Stale-Führer-Bereinigung) + System-ETB-Eintrag
-    // atomar in EINER Tx. Der Personalname kommt aus dem Write und speist den ETB-Text.
+    // F06/LFH-244 Tier-A: Zuordnung (inkl. Führer-Bereinigung) + System-ETB-Eintrag atomar in
+    // EINER Tx. Name, vorige Einheit und endende Führung kommen aus dem Write.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
-        let person = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &crate::einheit::etb_text_personal_zugeordnet(&einheit, &person),
-        )
-        .await?;
-        Ok(())
+    let zuordnung = crate::write_retry!(&state.pool, |conn| {
+        let z = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+        if z.is_changed {
+            let fuehrung: Vec<&str> = z.fuehrung_endet.iter().map(|(_, n)| n.as_str()).collect();
+            let text = crate::einheit::etb_text_personal_eingeteilt(
+                &einheit,
+                &z.name,
+                z.vorher.as_ref().map(|(_, n)| n.as_str()),
+                &fuehrung,
+            );
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        }
+        Ok(z)
     })?;
-    sse_einheit(&state, einsatz_id, eid);
-    sse_personal(&state, einsatz_id, ep_id);
+    if zuordnung.is_changed {
+        let mut einheiten = vec![eid];
+        einheiten.extend(zuordnung.vorher.iter().map(|(id, _)| *id));
+        einheiten.extend(zuordnung.fuehrung_endet.iter().map(|(id, _)| *id));
+        einheiten.sort_unstable();
+        einheiten.dedup();
+        for e in einheiten {
+            sse_einheit(&state, einsatz_id, e);
+        }
+        sse_personal(&state, einsatz_id, ep_id);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -815,8 +815,9 @@ pub async fn bilde_tx(
                     let ep_id = lage
                         .ep_id
                         .ok_or_else(|| AppError::Internal("Person im Einsatz ohne Zeile".into()))?;
-                    let name =
-                        mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+                    let name = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id)
+                        .await?
+                        .name;
                     let ziel_ef = p.fahrzeug_id.and_then(|f| ef_von.get(&f).copied());
                     match (ziel_ef, &lage.fahrzeug) {
                         (Some(ef), _) => {
