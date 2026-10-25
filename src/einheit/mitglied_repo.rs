@@ -227,17 +227,20 @@ pub async fn zuordnen_fahrzeug(
 }
 
 /// Gibt ein Fahrzeug aus seiner Einheit frei, auf offener Connection/Tx. `NotFound`, falls
-/// nicht zu dieser Einheit.
+/// nicht zu dieser Einheit. Liefert den aufgelösten Funkrufnamen für den ETB-Text, wie
+/// [`zuordnen_fahrzeug_tx`] (LLH-1264).
 pub async fn freigeben_fahrzeug_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ef_id: i64,
 ) -> Result<String, AppError> {
-    let name: Option<String> = sqlx::query_scalar(
-        "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
-    ).bind(ef_id).bind(einsatz_id).bind(einheit_id).fetch_optional(&mut *conn).await?;
-    let name = name.ok_or(AppError::NotFound)?;
+    let anzeige =
+        crate::fahrzeug::disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+    if anzeige.einheit_id != Some(einheit_id) {
+        return Err(AppError::NotFound);
+    }
+    let name = anzeige.funkrufname;
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE id = ?")
         .bind(ef_id)
         .execute(&mut *conn)
@@ -551,12 +554,20 @@ pub async fn personal_mitglieder_map(
 
 /// Spalten eines Fahrzeug-Mitglieds samt aufgelöstem FMS-Status (LFH-609). EINE Quelle
 /// für die Einzel- und die Sammelabfrage, damit beide dasselbe Mitglied liefern.
+/// Funkrufname und Typ folgen der Regel von `disposition_repo::zu_anzeige` (LLH-1264): Stamm
+/// live nur im aktiven Einsatz bei Fahrzeug in Dienst, sonst der Snapshot vom Disponieren.
 const FAHRZEUG_MITGLIED_SPALTEN: &str = "\
-    ef.einheit_id, ef.id AS ef_id, ef.snap_funkrufname AS funkrufname, \
-    ef.snap_fahrzeugtyp AS fahrzeugtyp, ef.status_seit, \
+    ef.einheit_id, ef.id AS ef_id, \
+    CASE WHEN fz.id IS NOT NULL AND ez.status = 'aktiv' AND fz.dienststatus = 'in_dienst' \
+         THEN fz.funkrufname ELSE ef.snap_funkrufname END AS funkrufname, \
+    CASE WHEN fz.id IS NOT NULL AND ez.status = 'aktiv' AND fz.dienststatus = 'in_dienst' \
+         THEN fz.fahrzeugtyp ELSE ef.snap_fahrzeugtyp END AS fahrzeugtyp, \
+    ef.status_seit, \
     s.id AS status_id, s.label AS status_label, s.kategorie AS status_kategorie, \
     s.farbe AS status_farbe, s.fms_anker AS status_fms_anker, s.sortier AS status_sortier \
-    FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug_status s ON s.id = ef.status_id";
+    FROM einsatz_fahrzeug ef JOIN einsatz ez ON ez.id = ef.einsatz_id \
+    LEFT JOIN fahrzeug fz ON fz.id = ef.fahrzeug_id \
+    LEFT JOIN fahrzeug_status s ON s.id = ef.status_id";
 
 #[derive(sqlx::FromRow)]
 struct FahrzeugZeileMitEinheit {
@@ -959,6 +970,100 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(einheit, None);
+    }
+
+    /// LLH-1264: Wird der Stamm nach dem Disponieren umbenannt, zeigen Mitgliederliste,
+    /// Sammelabfrage, Zuordnung und Freigabe den aktuellen Namen und Typ (Regel von
+    /// `disposition_repo::zu_anzeige`); außer Dienst oder im abgeschlossenen Einsatz gilt der
+    /// Snapshot. Ein Ad-hoc-Fahrzeug zeigt seinen im Einsatz geänderten Namen.
+    #[tokio::test]
+    async fn mitglieder_und_zuordnung_zeigen_den_aktuellen_funkrufnamen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, a, b) = setup(&pool).await;
+        let fz: i64 = sqlx::query_scalar(
+            "INSERT INTO fahrzeug (org_id, funkrufname, fahrzeugtyp) \
+             VALUES (1, 'Florian 1', 'LF 20') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let ef: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, fahrzeug_id, snap_funkrufname, \
+                                           snap_fahrzeugtyp) \
+             VALUES (?, ?, 'Florian 1', 'LF 20') RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(fz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE fahrzeug SET funkrufname = 'Florian 1 NEU', fahrzeugtyp = 'HLF 20' WHERE id = ?")
+            .bind(fz)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let z = zuordnen_fahrzeug(&pool, einsatz, a, ef).await.unwrap();
+        assert_eq!(z.funkrufname, "Florian 1 NEU");
+        let namen = |ms: Vec<EinheitMitgliedFahrzeug>| {
+            ms.into_iter()
+                .map(|m| (m.funkrufname, m.fahrzeugtyp))
+                .collect::<Vec<_>>()
+        };
+        let neu = vec![("Florian 1 NEU".to_string(), Some("HLF 20".to_string()))];
+        assert_eq!(namen(fahrzeug_mitglieder(&pool, a).await.unwrap()), neu);
+        let mut map = fahrzeug_mitglieder_map(&pool, einsatz).await.unwrap();
+        assert_eq!(namen(map.remove(&a).unwrap()), neu);
+
+        // Stamm außer Dienst → Snapshot, wie in der Fahrzeugliste.
+        sqlx::query("UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?")
+            .bind(fz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let alt = vec![("Florian 1".to_string(), Some("LF 20".to_string()))];
+        assert_eq!(namen(fahrzeug_mitglieder(&pool, a).await.unwrap()), alt);
+        sqlx::query("UPDATE fahrzeug SET dienststatus = 'in_dienst' WHERE id = ?")
+            .bind(fz)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            freigeben_fahrzeug_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, ef)
+                .await
+                .unwrap(),
+            "Florian 1 NEU"
+        );
+
+        // Ad-hoc: der im Einsatz geänderte Name (Snapshot-Spalte) erscheint sofort.
+        let adhoc: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname, einheit_id) \
+             VALUES (?, 'Extern 1', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET snap_funkrufname = 'Extern 1 NEU' WHERE id = ?")
+            .bind(adhoc)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            fahrzeug_mitglieder(&pool, b).await.unwrap()[0].funkrufname,
+            "Extern 1 NEU"
+        );
+
+        // Abgeschlossener Einsatz → Snapshot.
+        zuordnen_fahrzeug(&pool, einsatz, a, ef).await.unwrap();
+        sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(namen(fahrzeug_mitglieder(&pool, a).await.unwrap()), alt);
     }
 
     /// LLH-1238: Umhängen nimmt die Besatzung aus der alten oder ohne Einheit mit; der Führer der
