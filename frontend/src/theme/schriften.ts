@@ -32,7 +32,8 @@
    das erste Bild in der Ersatzschrift (auf Linux DejaVu Sans, breiter als Archivo), und an der
    Umbruchkante sprang der Kopf nach dem Schriftwechsel von zwei Zeilen auf eine. Die Abwägung oben
    bleibt: Die Frist liegt weit unter einer Sekunde, ein langsamer oder gescheiterter Schnitt
-   tauscht danach wie bisher. Herleitung: Change `rr7jhc12-schriften-vor-erstem-bild`. */
+   tauscht danach wie bisher. Herleitung:
+   `openspec/changes/archive/2026-10-25-rr7jhc12-schriften-vor-erstem-bild/design.md`. */
 
 import archivo400 from '../assets/fonts/archivo-400.woff2';
 import archivo500 from '../assets/fonts/archivo-500.woff2';
