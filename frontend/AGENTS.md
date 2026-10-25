@@ -1189,6 +1189,14 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur begründet,
 `-next-line` an der gemeldeten Zeile mit Kommentar; keine Block-Disables, keine toten Direktiven.
 
+## Frontend — Heap für `tsc` (LLH-1405)
+
+`typecheck` und `build` starten `tsc` über `node --max-old-space-size=4096` (`package.json`): der
+Typcheck braucht rund 2,3 GB Heap, Node setzt unter 16 GiB Arbeitsspeicher nur 2 GB (Cloud-Sitzung,
+macOS-Runner), und `tsc` bricht mit „JavaScript heap out of memory“ ab. Als Option am Aufruf statt
+`NODE_OPTIONS`, damit das Skript in jeder Shell läuft; sie schlägt ein `NODE_OPTIONS` von außen.
+Wächst der Bedarf, die Zahl dort heben.
+
 ## Frontend — Browserspeicher (LFH-942)
 
 - **`localStorage` nur über `lib/sichererSpeicher`** (`sicherLesen`, `sicherSchreiben`,
