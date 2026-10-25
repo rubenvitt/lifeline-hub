@@ -428,6 +428,7 @@ function EinheitAnsicht({
           einsatzId={einsatzId}
           einheit={aktuell}
           mittel={besatzungMittel}
+          personal={besatzungPersonal}
           rechte={rechte}
           listState={besatzungListState}
           onReload={() => {

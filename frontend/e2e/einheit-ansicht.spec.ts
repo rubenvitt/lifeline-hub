@@ -7,7 +7,9 @@ import { FUEKW, anmelden, einsatzAnlegen, stelleDichte } from './trefflaeche-ker
  * Einheit-Ansicht (LLH-1036, Spec `einheit-ansicht`) am echten Backend, in `kompakt` und
  * `handschuh` am Fükw-Schirm: eine Angabe an ihrer Zeile ändern schickt genau ihr Feld, das
  * taktische Zeichen landet auch im Meldebild, Person und Fahrzeug kommen aus dem Stamm in die
- * Einheit und die Person über ihr Menü auf das Fahrzeug, und der Beobachter sieht nur die Ansicht.
+ * Einheit und die Person über ihr Menü auf das Fahrzeug, „Personal der Einheit übernehmen“ setzt
+ * die freien Kräfte in einem Schritt auf ein Fahrzeug (LLH-1267), und der Beobachter sieht nur die
+ * Ansicht.
  *
  * Belegt wird je Handgriff der Körper der Anfrage: das alte Formular schickte den ganzen Stand vom
  * Öffnen und überschrieb so still, was ein anderer Arbeitsplatz geändert hatte. Die Treffflächen
@@ -41,6 +43,18 @@ function recordSammel(page: Page, einsatzId: string) {
   return bodies;
 }
 
+/** Körper aller Besatzungs-Zuordnungen über die Sammelroute (LLH-1073 D12), in Reihenfolge. */
+function recordBesatzung(page: Page, einsatzId: string) {
+  const bodies: { pfad: string; body: unknown }[] = [];
+  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/fahrzeuge/\\d+/besatzung$`);
+  page.on('request', (r: Request) => {
+    if (r.method() === 'POST' && pattern.test(r.url())) {
+      bodies.push({ pfad: new URL(r.url()).pathname, body: r.postDataJSON() });
+    }
+  });
+  return bodies;
+}
+
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
   const antwort = await page.request.post(pfad, { data });
   expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBe(true);
@@ -54,6 +68,29 @@ async function ordneZu(paneel: Locator, feld: string, suche: string, titel: stri
   await eingabe.fill(suche);
   await waehleStehend(paneel.page(), titel);
   await expect(offeneAuswahl(paneel.page())).toHaveCount(0);
+}
+
+async function put(page: Page, pfad: string): Promise<void> {
+  const antwort = await page.request.put(pfad);
+  expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBe(true);
+}
+
+/** `einsatz_personal.id` der Kraft mit diesem Namen im Einsatz. */
+async function epIdVon(page: Page, einsatzId: string, name: string): Promise<number> {
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/personal`);
+  const liste = (await antwort.json()) as { id: number; name: string }[];
+  const treffer = liste.find((p) => p.name === name);
+  if (!treffer) throw new Error(`Kraft ${name} nicht im Einsatz`);
+  return treffer.id;
+}
+
+/** `einsatz_fahrzeug.id` des Fahrzeugs mit diesem Funkrufnamen im Einsatz. */
+async function efIdVon(page: Page, einsatzId: string, funkrufname: string): Promise<number> {
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/fahrzeuge`);
+  const liste = (await antwort.json()) as { id: number; funkrufname: string }[];
+  const treffer = liste.find((f) => f.funkrufname === funkrufname);
+  if (!treffer) throw new Error(`Fahrzeug ${funkrufname} nicht im Einsatz`);
+  return treffer.id;
 }
 
 async function createEinheit(page: Page, einsatzId: string, name: string): Promise<number> {
@@ -145,6 +182,7 @@ for (const dichte of DICHTEN) {
       await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
       await stelleDichte(page, dichte);
       const bodies = recordSammel(page, einsatzId);
+      const besatzung = recordBesatzung(page, einsatzId);
 
       const paneel = page.getByRole('region', { name: 'Fahrzeuge und Besatzung' });
       await expect(paneel).toContainText('—');
@@ -170,6 +208,63 @@ for (const dichte of DICHTEN) {
       await page.getByRole('menuitem', { name: `Auf ${fahrzeug}` }).click();
       await expect(aufFahrzeug.getByRole('link', { name: person })).toBeVisible();
       await expect(ohne).toHaveCount(0);
+      // Über die Sammelroute mit genau dieser Kraft (LLH-1267).
+      const epId = await epIdVon(page, einsatzId, person);
+      expect(besatzung).toEqual([
+        {
+          pfad: `/api/einsaetze/${einsatzId}/fahrzeuge/${await efIdVon(page, einsatzId, fahrzeug)}/besatzung`,
+          body: { ep_ids: [epId] },
+        },
+      ]);
+    });
+
+    test('Personal der Einheit übernehmen: die freien Kräfte in einem Schritt auf das Fahrzeug', async ({
+      page,
+    }) => {
+      const einsatzId = await einsatzAnlegen(page, `E2E 1267 Übernahme ${dichte} ${Date.now()}`);
+      const einheitId = await createEinheit(page, einsatzId, '5. Zug');
+      const efId = await post(page, `/api/einsaetze/${einsatzId}/fahrzeuge`, {
+        adhoc: { funkrufname: `Ü ${dichte} 83-1` },
+      });
+      await put(page, `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/fahrzeug/${efId}`);
+      const epIds: number[] = [];
+      for (const name of ['Ü Berta', 'Ü Carl']) {
+        const epId = await post(page, `/api/einsaetze/${einsatzId}/personal`, { adhoc: { name } });
+        await put(page, `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`);
+        epIds.push(epId);
+      }
+      await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
+      await stelleDichte(page, dichte);
+      const bodies = recordBesatzung(page, einsatzId);
+
+      const paneel = page.getByRole('region', { name: 'Fahrzeuge und Besatzung' });
+      const aufFahrzeug = paneel.getByRole('group', { name: `Fahrzeug Ü ${dichte} 83-1` });
+      const ohne = paneel.getByRole('group', { name: 'Ohne Fahrzeug' });
+      await expect(ohne.getByRole('link', { name: 'Ü Carl' })).toBeVisible();
+      await aufFahrzeug.getByRole('button', { name: 'Personal der Einheit übernehmen' }).click();
+      const dialog = page.getByRole('dialog', {
+        name: `Personal der Einheit auf Ü ${dichte} 83-1`,
+      });
+      // Ohne Soll am Fahrzeug sind alle freien Kräfte vorgewählt.
+      await expect(dialog.getByRole('checkbox', { name: 'Ü Berta' })).toBeChecked();
+      await expect(dialog.getByRole('checkbox', { name: 'Ü Carl' })).toBeChecked();
+      await dialog.getByRole('button', { name: 'Übernehmen' }).click();
+      await expect(dialog).toHaveCount(0);
+
+      await expect(aufFahrzeug.getByRole('link', { name: 'Ü Berta' })).toBeVisible();
+      await expect(aufFahrzeug.getByRole('link', { name: 'Ü Carl' })).toBeVisible();
+      await expect(ohne).toHaveCount(0);
+      // Jetzt ist niemand mehr frei: gesperrt, der Grund steht daneben.
+      await expect(
+        aufFahrzeug.getByRole('button', { name: 'Personal der Einheit übernehmen' }),
+      ).toBeDisabled();
+      await expect(aufFahrzeug.getByText('keine freien Kräfte der Einheit')).toBeVisible();
+      expect(bodies).toEqual([
+        {
+          pfad: `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung`,
+          body: { ep_ids: epIds },
+        },
+      ]);
     });
 
     test('Beobachter: keine Stifte, kein Menü, keine Auswahl, kein Auflösen', async ({ page }) => {

@@ -131,12 +131,18 @@ Für Einsatzleitung und Führungspersonal:
    Soll, mit „unterbesetzt“ oder „Soll erfüllt“, und wer davon aus einer anderen Einheit oder
    ohne Einheit mitfährt.
 
-   ![Paneel „Fahrzeuge und Besatzung“ der Rettungsstaffel mit zwei RTW, je mit FMS-Status, Besatzung Ist und Soll und den Personen darauf, Anna Probe als Einheitsführerin, einer Kraft unter „Ohne Fahrzeug“ und den Auswahlfeldern „Person zuordnen …“ und „Fahrzeug zuordnen …“](../bilder/einheiten/besatzung.png)
+   ![Paneel „Fahrzeuge und Besatzung“ der Rettungsstaffel mit zwei RTW, je mit FMS-Status, Besatzung Ist und Soll, „Personal der Einheit übernehmen“ und den Personen darauf, Anna Probe als Einheitsführerin, einer Kraft unter „Ohne Fahrzeug“ und den Auswahlfeldern „Person zuordnen …“ und „Fahrzeug zuordnen …“](../bilder/einheiten/besatzung.png)
 
 5. Im selben Menü setzt „Als Einheitsführer“ die Person als Einheitsführer, „Vom Fahrzeug
    lösen“ nimmt sie vom Fahrzeug und lässt sie in der Einheit, „Aus Einheit lösen“ löst sie aus
    der Einheit.
-6. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
+6. Mehrere Personen auf einmal setzt „Personal der Einheit übernehmen“ in der Zeile des
+   Fahrzeugs: derselbe Dialog wie in der [Fahrzeugliste](fahrzeuge.md), mit den Kräften der
+   Einheit, die auf keinem Fahrzeug sitzen, angehakt bis zur Soll-Stärke, ohne Soll alle.
+   „Übernehmen“ setzt alle gewählten in einem Schritt auf das Fahrzeug. Ist der Knopf gesperrt,
+   steht daneben „keine freien Kräfte der Einheit“; wer unter „Ohne Fahrzeug“ mit „fährt auf …“
+   steht, sitzt schon auf einem Fahrzeug einer anderen Einheit.
+7. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
    löst das Fahrzeug aus der Einheit. Gelöste Kräfte bleiben im Einsatz, nur ohne Einheit.
 
 ### Material zuordnen, lösen und ausgeben
@@ -261,8 +267,8 @@ Fahrzeug“ mit „fährt auf …“.
 
 Die Besatzung zeigt die Seite nur, wenn die Module Personal und Fahrzeuge beide freigegeben
 sind. Fehlt eine Freigabe, stehen Fahrzeuge und Personen ohne Besatzung untereinander, darüber
-„Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“ und die FMS-Wahl fehlen
-dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
+„Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“, „Personal der
+Einheit übernehmen“ und die FMS-Wahl fehlen dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
 „Person zuordnen …“ bzw. „Fahrzeug zuordnen …“ nichts an und nennt den Grund. Ohne Freigabe Material
 stehen die Posten der Einheit weiter im Paneel „Material“, „Material zuordnen …“ steht gesperrt mit
 „Modul Material gesperrt“, und „Aus Einheit lösen“ und „Ausgeben“ fehlen.
