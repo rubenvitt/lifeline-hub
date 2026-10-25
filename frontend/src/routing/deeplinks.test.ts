@@ -197,6 +197,14 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
     expect(materialPfad(7)).toBe('/einsaetze/7/material');
   });
 
+  it('materialPfad mit ?material= steuert einen Posten an und übersteht den Round-Trip (LLH-1260)', () => {
+    const pfad = materialPfad(E, { material: 12 });
+    expect(pfad).toBe('/einsaetze/5/material?material=12');
+    expect(parseRouteId(new URLSearchParams(pfad.split('?')[1]).get('material') ?? undefined)).toBe(
+      12,
+    );
+  });
+
   it('kraefteuebersichtPfad', () => {
     expect(kraefteuebersichtPfad(E)).toBe('/einsaetze/5/kraefteuebersicht');
   });

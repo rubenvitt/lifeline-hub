@@ -204,9 +204,13 @@ export function einsatzdatenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'einsatzdaten');
 }
 
-/** Material des Einsatzes (`MaterialPage`); Sprungziel des Sperrgrunds im UHS-Materialreiter. */
-export function materialPfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'material');
+/**
+ * Material des Einsatzes (`MaterialPage`); Sprungziel des Sperrgrunds im UHS-Materialreiter.
+ * `?material=<id>` ist Zeilenmarke (LLH-1260, Sprung aus der Nachforderung): die Seite hebt den
+ * Posten hervor, rollt ihn ins Bild und räumt den Parameter.
+ */
+export function materialPfad(einsatzId: number, opts: { material?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'material'), { material: opts.material });
 }
 
 /**
