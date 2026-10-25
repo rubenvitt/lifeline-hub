@@ -97,7 +97,8 @@ const isEqualTrimmed = (a: string, b: string) => a.trim() === b.trim();
  *
  * ENTLASSEN UND STORNIEREN (D11) stehen nur hier, im letzten Abschnitt: Entlassen ohne Rückfrage
  * mit Rückgängig-Toast, Stornieren mit `Popconfirm` am sichtbaren Knopf (LFH-363; die `<Modal>`
- * aus LLH-1079 galt dem Zeilenmenü). Eine entlassene Person steht nur lesend da (D12).
+ * aus LLH-1079 galt dem Zeilenmenü). Eine entlassene Person steht nur lesend da (D12), bis auf
+ * ihre Zeitachse: Nachtrag und Streichung berichtigen den Nachweis (LLH-1263).
  */
 export default function EinsatzkraftPage() {
   const { id, epId: epIdParam } = useParams();
@@ -274,7 +275,10 @@ export default function EinsatzkraftPage() {
   const ep = (aktiv ?? entlassen)!;
   const isEntlassen = !aktiv;
   const imEinsatzSchreiben = darfImEinsatzSchreiben(einsatz);
-  /** Eine entlassene Kraft lehnt der Server bei jedem Schreibweg ab (409, D12). */
+  /**
+   * Eine entlassene Kraft lehnt der Server bei jedem Schreibweg ab (409, D12), außer an ihrer
+   * Zeitachse (LLH-1263, Spec `kraefte-entlassung`): die bekommt `imEinsatzSchreiben`.
+   */
   const darfSchreiben = imEinsatzSchreiben && !isEntlassen;
   const rechteText = isEntlassen ? 'entlassen' : einsatzRechteGrund(einsatz.status);
 
@@ -611,8 +615,9 @@ export default function EinsatzkraftPage() {
             art="person"
             id={ep.id}
             kennung={ep.name}
-            darfSchreiben={darfSchreiben}
-            rechteText={rechteText}
+            darfSchreiben={imEinsatzSchreiben}
+            rechteText={einsatzRechteGrund(einsatz.status)}
+            isBeendet={isEntlassen}
           />
         </Paneel>
 

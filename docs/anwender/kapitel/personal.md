@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 320
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
@@ -173,6 +173,18 @@ Für Einsatzleitung und Führungspersonal, in der Ansicht der Person:
 
 5. Kommt die Person zurück, „Erneut disponieren“ wählen, im Block oder in ihrer Ansicht.
 
+### Die Zeitachse einer entlassenen Person berichtigen
+
+Für Einsatzleitung und Führungspersonal, solange der Einsatz läuft:
+
+1. Unter der Personalliste „Entlassen“ aufklappen und den Namen der Person wählen.
+2. Im Paneel „Zeitachse“ ein falsches Ereignis mit „Streichen“ und einem Grund streichen, ein
+   fehlendes mit „Nachtragen“ ergänzen. Alles andere in der Ansicht bleibt gesperrt.
+3. Lehnt die App ab, weil sonst wieder eine offene Einsatzperiode entstünde, steht der Grund im
+   Dialog. Die Entlassung, mit der die letzte Periode endet, lässt sich nicht streichen; daneben
+   steht „erst erneut disponieren“. Die Entlassungszeit deshalb vor dem Entlassen nachtragen
+   (Ablauf oben).
+
 ## Hintergrund
 
 ### Wer zur Auswahl steht
@@ -185,6 +197,16 @@ Personalstamm erscheinen sie nicht.
 Ein Absenden nimmt höchstens 50 Personen auf und gilt ganz oder gar nicht: Steht eine Person
 inzwischen außer Dienst, ist sie schon disponiert oder entlassen, legt die App niemanden an und
 nennt den Grund je Person.
+
+### Berichtigen nach dem Entlassen
+
+Eine entlassene Person bleibt im Nachweis, deshalb lässt sich ihre Zeitachse weiter berichtigen.
+Jede Berichtigung schreibt einen Eintrag ins Einsatztagebuch mit dem Vermerk „berichtigt nach
+Entlassung“. Eine offene Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag ab, der
+eine Periode beginnen würde, etwa ein Eintreffen nach der Entlassung, und ebenso die Streichung
+der Entlassung, mit der die letzte Periode endet. Deshalb lässt sich auch eine ganz fehlende
+Periode nach dem Entlassen nicht mehr nachtragen. Eine stornierte Person und eine aufgelöste
+Einheit lassen sich nicht berichtigen.
 
 ### Einsatzfunktion und Qualifikation
 
@@ -281,7 +303,8 @@ der Ansicht, statt eine Person als nicht eingeteilt zu zeigen. Ohne Freigabe der
 gruppiert die Liste nicht.
 
 Die Ansicht einer entlassenen Person bleibt lesbar, mit der Marke „entlassen“ und dem Zeitpunkt;
-ändern und nachtragen lässt sich dort nichts, bis sie erneut disponiert ist. Die Ansicht einer
+ändern lässt sich dort nur die Zeitachse (Nachtragen, Streichen), bis sie erneut disponiert ist.
+Die Ansicht einer
 stornierten Person meldet „Nicht (mehr) im Einsatz“.
 
 Ohne Netz bleibt die Liste mit dem zuletzt geladenen Stand lesbar; ändern lässt sich nichts
