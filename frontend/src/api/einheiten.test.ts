@@ -41,13 +41,14 @@ describe('api/einheiten — Einheit aus Vorlage (LLH-1049)', () => {
       abschnitt_id: null,
       fahrzeuge: [{ fahrzeug_id: 4, umhaengen: true }],
       personal: [{ personal_id: 9, umhaengen: false }],
+      material: [{ vorlage_material_id: 7 }],
     });
 
     expect(vorschau.vorlage_id).toBe(3);
     expect(ergebnis.einheit_id).toBe(11);
     expect(seen).toEqual([
       'GET /api/einsaetze/5/einheiten/aus-vorlage/3',
-      'POST /api/einsaetze/5/einheiten/aus-vorlage {"vorlage_id":3,"name":"1. Zug","abschnitt_id":null,"fahrzeuge":[{"fahrzeug_id":4,"umhaengen":true}],"personal":[{"personal_id":9,"umhaengen":false}]}',
+      'POST /api/einsaetze/5/einheiten/aus-vorlage {"vorlage_id":3,"name":"1. Zug","abschnitt_id":null,"fahrzeuge":[{"fahrzeug_id":4,"umhaengen":true}],"personal":[{"personal_id":9,"umhaengen":false}],"material":[{"vorlage_material_id":7}]}',
     ]);
   });
 });

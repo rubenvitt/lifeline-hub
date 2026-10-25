@@ -21,6 +21,7 @@ export function einheitVorlageFixture(overrides: Partial<EinheitVorlage> = {}): 
     ist_demo: false,
     fahrzeuge: [],
     personal: [],
+    material: [],
     ...overrides,
   };
 }
@@ -74,6 +75,28 @@ export const RETTUNGSSTAFFEL = einheitVorlageFixture({
     },
   ],
   personal: [],
+  // LLH-1261: Wolldecken an der Einheit, ein Rucksack auf dem RTW.
+  material: [
+    {
+      id: 71,
+      material_id: 61,
+      bezeichnung: 'Wolldecke',
+      art: 'verbrauchsgut',
+      menge: 50,
+      dienststatus: 'in_dienst',
+      ist_demo: false,
+    },
+    {
+      id: 72,
+      material_id: 62,
+      bezeichnung: 'Sanitätsrucksack',
+      art: 'geraet',
+      menge: 1,
+      fahrzeug_id: 32,
+      dienststatus: 'in_dienst',
+      ist_demo: true,
+    },
+  ],
 });
 
 export const LOESCHZUG = einheitVorlageFixture({

@@ -11,14 +11,23 @@
 //! Vorschau und Bilden rechnen dieselbe Planung ([`plan_tx`]): Baum der Vorlage, dann je Art
 //! eine `json_each`-Abfrage für den Zustand aller Kräfte (`src/AGENTS.md`, „Eingabegrenzen“).
 //! Maßgeblich ist nur die Planung in der Transaktion des Bildens.
+//!
+//! Material der Vorlage (LLH-1261, Change `k22fpk5p-vorlage-material`, design.md D3–D7): jede
+//! gewählte Position wird nach den Personen über den Schreibweg des Material-Modells disponiert
+//! (Gerät je Stück, Verbrauchsgut mit Menge) und an das Fahrzeug gelegt, wenn es mitkommt, sonst
+//! an die Einheit ihrer Vorlage.
 
 use crate::einheit::mitglied_repo;
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten};
-use crate::einheit_vorlage::{repo as vorlage_repo, EinheitVorlage};
+use crate::einheit_vorlage::{
+    repo as vorlage_repo, EinheitVorlage, EinheitVorlageMaterial, GERAET_JE_POSITION_MAX,
+};
 use crate::error::{AppError, ZeilenArt, ZeilenGrund};
 use crate::fahrzeug::besatzung_repo;
 use crate::katalog::DIENSTSTATUS_IN_DIENST;
 use crate::kraefte_disposition::{self, Kontext, PersonalWahl, Regeln, Ziel};
+use crate::material::ort::{self as material_ort, MaterialOrt};
+use crate::material::{disposition_repo as material_repo, MaterialArt};
 use crate::staerke::{Staerke, StaerkePosition};
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
@@ -32,6 +41,10 @@ pub const KNOTEN_MAX: usize = 20;
 
 /// Grund: die ID steht nicht (mehr) in der Vorlage.
 pub const GRUND_NICHT_IN_VORLAGE: &str = "nicht in der Vorlage";
+
+/// Grund: ein Gerät mit Bestandsnummer steht schon aktiv im Einsatz (Wort der Auswahl „Material
+/// disponieren“, Spec `material-modell`).
+pub const GRUND_SCHON_IM_EINSATZ: &str = "schon im Einsatz";
 
 /// Meldung des 422 mit Gründen je Zeile.
 pub const MELDUNG_ZEILEN: &str = "Nicht alle Kräfte lassen sich übernehmen";
@@ -56,6 +69,21 @@ wire_enum! {
     try_from = |s| format!("Ungültiger Zustand: {s}");
 }
 
+wire_enum! {
+    /// Zustand einer Material-Position der Vorlage im Einsatz (LLH-1261, design.md D4). Jedes
+    /// Bilden legt neue Posten an; „frei“, „gebunden“ und „entlassen“ gibt es deshalb nicht.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum VorschauMaterialZustand {
+        /// Wird disponiert.
+        Neu => "neu",
+        /// Im Stamm außer Dienst: gesperrt.
+        AusserDienst => "ausser_dienst",
+        /// Gerät mit Bestandsnummer, das schon aktiv im Einsatz steht: gesperrt.
+        ImEinsatz => "im_einsatz",
+    }
+    try_from = |s| format!("Ungültiger Material-Zustand: {s}");
+}
+
 /// Vorschau einer Vorlage im Einsatz (D2): der Baum mit dem Zustand jeder Kraft. Schreibt nichts.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct VorlageVorschau {
@@ -66,6 +94,8 @@ pub struct VorlageVorschau {
     pub fahrzeuge_gesperrt: bool,
     /// Das Modul Personal ist für die Rolle nicht freigegeben: keine Personenzeilen.
     pub personal_gesperrt: bool,
+    /// Das Modul Material ist für die Rolle nicht freigegeben: keine Materialzeilen (LLH-1261).
+    pub material_gesperrt: bool,
 }
 
 /// Eine Einheit des Vorlagen-Baums mit ihren Kopfdaten.
@@ -90,6 +120,25 @@ pub struct VorschauKnoten {
     pub soll_eigen: bool,
     pub fahrzeuge: Vec<VorschauFahrzeug>,
     pub personal: Vec<VorschauPersonal>,
+    pub material: Vec<VorschauMaterial>,
+}
+
+/// Eine Material-Position der Vorlage und ihr Zustand im Einsatz (LLH-1261). Art und
+/// Bestandsnummer aus dem Stamm von jetzt; ein Gerät mit Bestandsnummer meldet Menge 1.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct VorschauMaterial {
+    /// Die Position (`einheit_vorlage_material.id`); das Bilden wählt sie hierüber.
+    pub vorlage_material_id: i64,
+    pub material_id: i64,
+    pub bezeichnung: String,
+    pub art: MaterialArt,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bestandsnummer: Option<String>,
+    pub menge: i64,
+    /// Fahrzeug der Vorlage (Stamm-ID), auf dem die Position liegt; fehlt an der Einheit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fahrzeug_id: Option<i64>,
+    pub zustand: VorschauMaterialZustand,
 }
 
 /// Ein Stamm-Fahrzeug der Vorlage und sein Zustand im Einsatz.
@@ -149,6 +198,8 @@ pub struct AusVorlageErgebnis {
     pub fahrzeuge: Vec<i64>,
     /// Die übernommenen Personen (`einsatz_personal.id`).
     pub personal: Vec<i64>,
+    /// Die neuen Material-Posten (`einsatz_material.id`), LLH-1261.
+    pub material: Vec<i64>,
 }
 
 /// Ein benannter Bezug im Einsatz (ID und Name).
@@ -182,6 +233,7 @@ pub struct PersonalLage {
 pub struct Lesen {
     pub fahrzeuge: bool,
     pub personal: bool,
+    pub material: bool,
 }
 
 /// Die Planung einer Bildung: der aktive Baum der Vorlage und je Kraft ihre Lage im Einsatz.
@@ -192,6 +244,8 @@ pub struct Plan {
     /// Stamm-ID → Lage; leer, wenn die Art nicht gelesen wurde.
     pub fahrzeuge: HashMap<i64, FahrzeugLage>,
     pub personal: HashMap<i64, PersonalLage>,
+    /// Position (`einheit_vorlage_material.id`) → Zustand; leer, wenn nicht gelesen.
+    pub material: HashMap<i64, VorschauMaterialZustand>,
 }
 
 /// Zustand eines Stamm-Fahrzeugs (D4). `beendet_als` ist der Endzustand einer beendeten
@@ -219,6 +273,44 @@ pub fn personal_zustand(in_dienst: bool, zeile: Option<(Option<&str>, bool)>) ->
         Some((Some("entlassen"), _)) => VorschauZustand::Entlassen,
         _ => VorschauZustand::Neu,
     }
+}
+
+/// Zustand einer Material-Position (D4): ein aktives Stück im Einsatz zählt vor dem Dienststatus,
+/// wie bei Fahrzeugen.
+pub fn material_zustand(in_dienst: bool, stueck_im_einsatz: bool) -> VorschauMaterialZustand {
+    if stueck_im_einsatz {
+        VorschauMaterialZustand::ImEinsatz
+    } else if !in_dienst {
+        VorschauMaterialZustand::AusserDienst
+    } else {
+        VorschauMaterialZustand::Neu
+    }
+}
+
+/// Ein bestimmtes Stück: Gerät mit Bestandsnummer (Spec `material-modell`).
+fn ist_stueck(m: &EinheitVorlageMaterial) -> bool {
+    m.art == MaterialArt::Geraet && m.bestandsnummer.is_some()
+}
+
+/// Die Mengen der Posten, die eine Position beim Bilden ergibt (Spec `kraefte-disposition`,
+/// „Material beim Bilden aus Vorlage“): ein Gerät mit Bestandsnummer genau einen, ein Gerät einen
+/// je Stück, höchstens [`GERAET_JE_POSITION_MAX`], ein Verbrauchsgut einen mit der Menge. Der
+/// Deckel greift, wenn die Stamm-Art nach der Pflege auf Gerät gestellt wurde: die Pflege prüft
+/// ihn nur beim Speichern, die Vorschau zeigt die gedeckelte Menge.
+pub fn posten_mengen(m: &EinheitVorlageMaterial) -> Vec<i64> {
+    match m.art {
+        _ if ist_stueck(m) => vec![1],
+        MaterialArt::Geraet => {
+            let stueck = m.menge.clamp(1, GERAET_JE_POSITION_MAX);
+            vec![1; usize::try_from(stueck).unwrap_or(1)]
+        }
+        MaterialArt::Verbrauchsgut => vec![m.menge],
+    }
+}
+
+/// Die Menge, die Vorschau und ETB für eine Position nennen.
+fn wirksame_menge(m: &EinheitVorlageMaterial) -> i64 {
+    posten_mengen(m).iter().sum()
 }
 
 fn ids_json(ids: impl IntoIterator<Item = i64>) -> String {
@@ -380,6 +472,50 @@ async fn load_personal_lagen_tx(
         .collect())
 }
 
+/// Zustand aller Material-Positionen des Baums: der Stamm steht schon an der Position (live
+/// gelesen mit der Vorlage), dazu **eine** Anweisung für die Stücke, die aktiv im Einsatz stehen.
+async fn load_material_zustaende_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    knoten: &[EinheitVorlage],
+) -> Result<HashMap<i64, VorschauMaterialZustand>, AppError> {
+    let positionen: Vec<&EinheitVorlageMaterial> =
+        knoten.iter().flat_map(|k| k.material.iter()).collect();
+    let stuecke: Vec<i64> = positionen
+        .iter()
+        .filter(|m| ist_stueck(m))
+        .map(|m| m.material_id)
+        .collect();
+    let im_einsatz: std::collections::HashSet<i64> = if stuecke.is_empty() {
+        Default::default()
+    } else {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT DISTINCT material_id FROM einsatz_material \
+             WHERE einsatz_id = ?1 AND beendet_at IS NULL \
+               AND material_id IN (SELECT value FROM json_each(?2))",
+        )
+        .bind(einsatz_id)
+        .bind(ids_json(stuecke))
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .collect()
+    };
+    // Dasselbe Stück an zwei Positionen des Baums (Bestandsnummer erst nach der Pflege vergeben):
+    // die erste bringt es in den Einsatz, jede weitere gilt als „im Einsatz“. So steht der Grund
+    // an der Zeile, statt dass das Schreiben mit 409 scheitert.
+    let mut vergeben: std::collections::HashSet<i64> = std::collections::HashSet::new();
+    Ok(positionen
+        .into_iter()
+        .map(|m| {
+            let stueck_belegt = ist_stueck(m)
+                && (im_einsatz.contains(&m.material_id) || !vergeben.insert(m.material_id));
+            let zustand = material_zustand(m.dienststatus == DIENSTSTATUS_IN_DIENST, stueck_belegt);
+            (m.id, zustand)
+        })
+        .collect())
+}
+
 /// Plant die Bildung aus der Vorlage `vorlage_id` (D2): fremd oder unbekannt → 404, deaktivierte
 /// Wurzel → 422, mehr als [`KNOTEN_MAX`] Einheiten → 422. Danach je gelesener Art eine Abfrage für
 /// die Lage aller Kräfte des Baums. Schreibt nichts.
@@ -424,10 +560,16 @@ pub async fn plan_tx(
     } else {
         HashMap::new()
     };
+    let material = if lesen.material {
+        load_material_zustaende_tx(conn, einsatz_id, &knoten).await?
+    } else {
+        HashMap::new()
+    };
     Ok(Plan {
         knoten,
         fahrzeuge,
         personal,
+        material,
     })
 }
 
@@ -489,6 +631,26 @@ pub fn vorschau(plan: &Plan, gesperrt: Lesen) -> VorlageVorschau {
                     })
                     .collect()
             },
+            material: if gesperrt.material {
+                Vec::new()
+            } else {
+                k.material
+                    .iter()
+                    .filter_map(|m| {
+                        let zustand = *plan.material.get(&m.id)?;
+                        Some(VorschauMaterial {
+                            vorlage_material_id: m.id,
+                            material_id: m.material_id,
+                            bezeichnung: m.bezeichnung.clone(),
+                            art: m.art,
+                            bestandsnummer: m.bestandsnummer.clone(),
+                            menge: wirksame_menge(m),
+                            fahrzeug_id: m.fahrzeug_id,
+                            zustand,
+                        })
+                    })
+                    .collect()
+            },
         })
         .collect();
     VorlageVorschau {
@@ -496,6 +658,7 @@ pub fn vorschau(plan: &Plan, gesperrt: Lesen) -> VorlageVorschau {
         knoten,
         fahrzeuge_gesperrt: gesperrt.fahrzeuge,
         personal_gesperrt: gesperrt.personal,
+        material_gesperrt: gesperrt.material,
     }
 }
 
@@ -517,9 +680,15 @@ pub fn grund_gebunden(einheit: Option<&Bezug>, fahrzeug: Option<&Bezug>) -> Stri
 
 /// Abgleich Anfrage ↔ Plan (D6, Schritt 2), rein und **vor dem ersten Schreiben**: je Zeile ein
 /// Grund für „nicht in der Vorlage“, „außer Dienst“ und „gebunden ohne umhängen“; Fahrzeuge vor
-/// Personen, in der Reihenfolge der Anfrage. Eine entlassene Kraft ist übernehmbar, sie wird
-/// erneut disponiert (D4). Leer = alles übernehmbar.
-pub fn check_against_plan(plan: &Plan, fahrzeuge: &[Wahl], personal: &[Wahl]) -> Vec<ZeilenGrund> {
+/// Personen vor Material, in der Reihenfolge der Anfrage. Eine entlassene Kraft ist übernehmbar,
+/// sie wird erneut disponiert (D4). Eine Material-Position hat „schon im Einsatz“ statt
+/// „gebunden“ (LLH-1261, D4). Leer = alles übernehmbar.
+pub fn check_against_plan(
+    plan: &Plan,
+    fahrzeuge: &[Wahl],
+    personal: &[Wahl],
+    material: &[i64],
+) -> Vec<ZeilenGrund> {
     let mut zeilen = Vec::new();
     let zeile = |art, id, grund: String| ZeilenGrund { art, id, grund };
     for w in fahrzeuge {
@@ -556,6 +725,19 @@ pub fn check_against_plan(plan: &Plan, fahrzeuge: &[Wahl], personal: &[Wahl]) ->
             zeilen.push(zeile(ZeilenArt::Personal, w.id, g));
         }
     }
+    for &id in material {
+        let grund = match plan.material.get(&id) {
+            None => Some(GRUND_NICHT_IN_VORLAGE),
+            Some(VorschauMaterialZustand::AusserDienst) => {
+                Some(kraefte_disposition::GRUND_AUSSER_DIENST)
+            }
+            Some(VorschauMaterialZustand::ImEinsatz) => Some(GRUND_SCHON_IM_EINSATZ),
+            Some(VorschauMaterialZustand::Neu) => None,
+        };
+        if let Some(g) = grund {
+            zeilen.push(zeile(ZeilenArt::Material, id, g.to_string()));
+        }
+    }
     zeilen
 }
 
@@ -581,6 +763,10 @@ pub struct Gebildet {
     pub alte_einheiten: Vec<i64>,
     /// Fahrzeuge, von denen eine Person gelöst wurde (Ereignis `fahrzeug`).
     pub alte_fahrzeuge: Vec<i64>,
+    /// Neue Material-Posten (`einsatz_material.id`) in Vorlagenreihenfolge (LLH-1261).
+    pub material: Vec<i64>,
+    /// Je gewählter Position „Menge× Bezeichnung“ für den ETB-Text.
+    pub material_namen: Vec<String>,
 }
 
 /// Die Anfrage des Bildens, schon geprüft und entdoppelt.
@@ -591,6 +777,8 @@ pub struct Anfrage<'a> {
     pub abschnitt_id: Option<i64>,
     pub fahrzeuge: &'a [Wahl],
     pub personal: &'a [Wahl],
+    /// Gewählte Material-Positionen (`einheit_vorlage_material.id`), LLH-1261.
+    pub material: &'a [i64],
 }
 
 fn push_unique(list: &mut Vec<i64>, id: i64) {
@@ -602,15 +790,15 @@ fn push_unique(list: &mut Vec<i64>, id: i64) {
 /// Bildet die Einheit aus dem Plan in der Transaktion des Aufrufers (D6, Schritte 2–5): Abgleich
 /// (422 mit Gründen je Zeile, nichts geschrieben), Einheiten top-down mit den Kopfdaten der
 /// Vorlage (D9), Fahrzeuge vor Personen (neu und entlassen über den Baustein je Einheit, Bestand
-/// zugeordnet), Besatzung nach der Vorlage. Schreibt kein ETB, sendet nichts; ein Fehler mitten
-/// darin rollt der Aufrufer mit der ganzen Transaktion zurück.
+/// zugeordnet), Besatzung nach der Vorlage, danach das Material (LLH-1261). Schreibt kein ETB,
+/// sendet nichts; ein Fehler mitten darin rollt der Aufrufer mit der ganzen Transaktion zurück.
 pub async fn bilde_tx(
     conn: &mut SqliteConnection,
     kontext: Kontext,
     plan: &Plan,
     anfrage: &Anfrage<'_>,
 ) -> Result<Gebildet, AppError> {
-    let zeilen = check_against_plan(plan, anfrage.fahrzeuge, anfrage.personal);
+    let zeilen = check_against_plan(plan, anfrage.fahrzeuge, anfrage.personal, anfrage.material);
     if !zeilen.is_empty() {
         return Err(AppError::Zeilen {
             meldung: MELDUNG_ZEILEN.into(),
@@ -864,6 +1052,39 @@ pub async fn bilde_tx(
             gebildet.personal.push(b);
         }
     }
+
+    // Material je Einheit in Vorlagenreihenfolge (LLH-1261, D3/D5): auf das Fahrzeug, wenn es
+    // mitkommt, sonst an die Einheit. Der Schreibweg des Material-Modells prüft Art und Stück.
+    for k in &plan.knoten {
+        let eid = einheit_von[&k.id];
+        for m in k
+            .material
+            .iter()
+            .filter(|m| anfrage.material.contains(&m.id))
+        {
+            let ort = match m.fahrzeug_id.and_then(|f| ef_von.get(&f).copied()) {
+                Some(ef) => MaterialOrt::Fahrzeug(ef),
+                None => MaterialOrt::Einheit(eid),
+            };
+            for menge in posten_mengen(m) {
+                let em = material_repo::disponiere_stamm_tx(
+                    conn,
+                    einsatz_id,
+                    kontext.org_id,
+                    m.material_id,
+                    menge,
+                    kontext.benutzer_id,
+                    None,
+                )
+                .await?;
+                material_ort::set_ort_tx(conn, einsatz_id, em, Some(ort)).await?;
+                gebildet.material.push(em);
+            }
+            gebildet
+                .material_namen
+                .push(format!("{}× {}", wirksame_menge(m), m.bezeichnung));
+        }
+    }
     Ok(gebildet)
 }
 
@@ -877,6 +1098,7 @@ pub fn etb_text(vorlage: &str, g: &Gebildet) -> String {
         &unter,
         &namen(&g.fahrzeuge),
         &namen(&g.personal),
+        &g.material_namen,
         &g.umgehaengt
             .iter()
             .map(|u| format!("{} {}", u.name, u.woher))

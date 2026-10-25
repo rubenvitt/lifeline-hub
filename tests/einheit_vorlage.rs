@@ -192,6 +192,7 @@ async fn ohne_admin_recht_403_aber_lesen_geht_nur_aktive() {
         ("PATCH", format!("/{v}"), r#"{"name":"Neu"}"#),
         ("PUT", format!("/{v}/fahrzeuge"), r#"{"fahrzeug_ids":[]}"#),
         ("PUT", format!("/{v}/personal"), r#"{"personal":[]}"#),
+        ("PUT", format!("/{v}/material"), r#"{"material":[]}"#),
     ] {
         let (status, _) = send(&app, methode, &erika, &pfad, rumpf).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{methode} {pfad}");
@@ -355,6 +356,90 @@ async fn zuordnungen_und_zusammenhangsfehler() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
+/// LLH-1261: Material-Positionen über den PUT, mit 400 vor und 422 in der Prüfung.
+#[tokio::test]
+async fn material_der_vorlage_ueber_put() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+    let staffel = typ_id(&pool, org, "Staffel").await;
+    let (_, json) = create(
+        &app,
+        &admin,
+        &format!(r#"{{"name":"Rettungsstaffel","typ_id":{staffel}}}"#),
+    )
+    .await;
+    let v = id(&json);
+    let rtw = fahrzeug(&pool, org, "RTW 1").await;
+    let (status, _) = send(
+        &app,
+        "PUT",
+        &admin,
+        &format!("/{v}/fahrzeuge"),
+        &format!(r#"{{"fahrzeug_ids":[{rtw}]}}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let material = |bezeichnung: &'static str, art: &'static str| {
+        sqlx::query_scalar::<_, i64>(
+            "INSERT INTO material (org_id, bezeichnung, art) VALUES (?, ?, ?) RETURNING id",
+        )
+        .bind(org)
+        .bind(bezeichnung)
+        .bind(art)
+    };
+    let decke = material("Wolldecke", "verbrauchsgut")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let rucksack = material("Sanitätsrucksack", "geraet")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    let (status, json) = send(
+        &app,
+        "PUT",
+        &admin,
+        &format!("/{v}/material"),
+        &format!(
+            r#"{{"material":[{{"material_id":{decke},"menge":50}},{{"material_id":{rucksack},"menge":1,"fahrzeug_id":{rtw}}}]}}"#
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    assert_eq!(json["material"][0]["bezeichnung"], "Wolldecke");
+    assert_eq!(json["material"][0]["art"], "verbrauchsgut");
+    assert_eq!(json["material"][0]["menge"], 50);
+    assert!(json["material"][0].get("fahrzeug_id").is_none(), "{json}");
+    assert_eq!(json["material"][1]["fahrzeug_id"], rtw);
+    assert!(json["material"][1]["id"].as_i64().is_some());
+
+    for (rumpf, erwartet) in [
+        (
+            format!(r#"{{"material":[{{"material_id":{decke},"menge":0}}]}}"#),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            format!(r#"{{"material":[{{"material_id":{rucksack},"menge":11}}]}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            r#"{"material":[{"material_id":4711,"menge":1}]}"#.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let (status, json) = send(&app, "PUT", &admin, &format!("/{v}/material"), &rumpf).await;
+        assert_eq!(status, erwartet, "{rumpf}: {json}");
+    }
+    let (_, json) = anfrage(&app, "GET", PFAD, &admin, None).await;
+    assert_eq!(
+        json[0]["material"].as_array().unwrap().len(),
+        2,
+        "Abgelehntes ändert nichts"
+    );
+}
+
 #[tokio::test]
 async fn org_grenze() {
     let (app, pool) = setup_mit_pool().await;
@@ -410,6 +495,15 @@ async fn org_grenze() {
         StatusCode::NOT_FOUND,
         "Stammbesetzung fremder Vorlage"
     );
+    let (status, _) = send(
+        &app,
+        "PUT",
+        &bert,
+        &format!("/{a}/material"),
+        r#"{"material":[]}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "Material fremder Vorlage");
 
     // Verweise auf Typ, Vorlage und Fahrzeug der anderen Org sind 422.
     let (status, _) = create(&app, &bert, &format!(r#"{{"name":"X","typ_id":{zug_a}}}"#)).await;

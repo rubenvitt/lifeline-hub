@@ -1695,6 +1695,7 @@ fn zeilen_art_wire() {
     enum_wire!(lifeline_hub::error::ZeilenArt {
         Personal => "personal",
         Fahrzeug => "fahrzeug",
+        Material => "material",
     } in lifeline_hub::error::ZeilenArt::ALLE);
 }
 
@@ -1707,4 +1708,13 @@ fn vorschau_zustand_wire() {
         AusserDienst => "ausser_dienst",
         Entlassen => "entlassen",
     } in lifeline_hub::einheit::aus_vorlage::VorschauZustand::ALLE);
+}
+
+#[test]
+fn vorschau_material_zustand_wire() {
+    enum_wire!(lifeline_hub::einheit::aus_vorlage::VorschauMaterialZustand {
+        Neu => "neu",
+        AusserDienst => "ausser_dienst",
+        ImEinsatz => "im_einsatz",
+    } in lifeline_hub::einheit::aus_vorlage::VorschauMaterialZustand::ALLE);
 }

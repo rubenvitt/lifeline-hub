@@ -710,6 +710,8 @@ export interface components {
             einheit_ids: number[];
             /** @description Die übernommenen Fahrzeuge (`einsatz_fahrzeug.id`). */
             fahrzeuge: number[];
+            /** @description Die neuen Material-Posten (`einsatz_material.id`), LLH-1261. */
+            material: number[];
             /** @description Die übernommenen Personen (`einsatz_personal.id`). */
             personal: number[];
         };
@@ -1989,6 +1991,8 @@ export interface components {
             id: number;
             /** @description Trägt die Zeile eine Demo-Marke (Spec `demo-daten`)? Live aus `demo_herkunft`. */
             ist_demo: boolean;
+            /** @description Material-Positionen in der Reihenfolge der Pflege (LLH-1261). */
+            material: components["schemas"]["EinheitVorlageMaterial"][];
             name: string;
             personal: components["schemas"]["EinheitVorlagePersonal"][];
             soll?: components["schemas"]["Staerke"] | null;
@@ -2020,6 +2024,31 @@ export interface components {
             fahrzeugtyp?: string | null;
             funkrufname: string;
             ist_demo: boolean;
+        };
+        /**
+         * @description Eine Material-Position einer Vorlage (LLH-1261). Bezeichnung, Art, Bestandsnummer und
+         *     Dienststatus kommen live aus dem Stamm.
+         */
+        EinheitVorlageMaterial: {
+            art: components["schemas"]["MaterialArt"];
+            bestandsnummer?: string | null;
+            bezeichnung: string;
+            dienststatus: components["schemas"]["Dienststatus"];
+            /**
+             * Format: int64
+             * @description Fahrzeug der Vorlage, auf dem die Position liegt; fehlt an der Einheit.
+             */
+            fahrzeug_id?: number | null;
+            /**
+             * Format: int64
+             * @description Die Position (`einheit_vorlage_material.id`); das Bilden wählt sie hierüber.
+             */
+            id: number;
+            ist_demo: boolean;
+            /** Format: int64 */
+            material_id: number;
+            /** Format: int64 */
+            menge: number;
         };
         /** @description Eine Person der Stammbesetzung. */
         EinheitVorlagePersonal: {
@@ -6635,6 +6664,8 @@ export interface components {
             fahrzeuge_gesperrt: boolean;
             /** @description Die Einheiten des Baums, die Wurzel vorn, Eltern vor ihren Kindern. */
             knoten: components["schemas"]["VorschauKnoten"][];
+            /** @description Das Modul Material ist für die Rolle nicht freigegeben: keine Materialzeilen (LLH-1261). */
+            material_gesperrt: boolean;
             /** @description Das Modul Personal ist für die Rolle nicht freigegeben: keine Personenzeilen. */
             personal_gesperrt: boolean;
             /** Format: int64 */
@@ -6663,6 +6694,7 @@ export interface components {
         VorschauKnoten: {
             fahrzeuge: components["schemas"]["VorschauFahrzeug"][];
             funkrufname?: string | null;
+            material: components["schemas"]["VorschauMaterial"][];
             name: string;
             personal: components["schemas"]["VorschauPersonal"][];
             soll?: components["schemas"]["Staerke"] | null;
@@ -6680,6 +6712,36 @@ export interface components {
             /** Format: int64 */
             vorlage_id: number;
         };
+        /**
+         * @description Eine Material-Position der Vorlage und ihr Zustand im Einsatz (LLH-1261). Art und
+         *     Bestandsnummer aus dem Stamm von jetzt; ein Gerät mit Bestandsnummer meldet Menge 1.
+         */
+        VorschauMaterial: {
+            art: components["schemas"]["MaterialArt"];
+            bestandsnummer?: string | null;
+            bezeichnung: string;
+            /**
+             * Format: int64
+             * @description Fahrzeug der Vorlage (Stamm-ID), auf dem die Position liegt; fehlt an der Einheit.
+             */
+            fahrzeug_id?: number | null;
+            /** Format: int64 */
+            material_id: number;
+            /** Format: int64 */
+            menge: number;
+            /**
+             * Format: int64
+             * @description Die Position (`einheit_vorlage_material.id`); das Bilden wählt sie hierüber.
+             */
+            vorlage_material_id: number;
+            zustand: components["schemas"]["VorschauMaterialZustand"];
+        };
+        /**
+         * @description Zustand einer Material-Position der Vorlage im Einsatz (LLH-1261, design.md D4). Jedes
+         *     Bilden legt neue Posten an; „frei“, „gebunden“ und „entlassen“ gibt es deshalb nicht.
+         * @enum {string}
+         */
+        VorschauMaterialZustand: "neu" | "ausser_dienst" | "im_einsatz";
         /** @description Eine Person der Stammbesetzung und ihr Zustand im Einsatz. */
         VorschauPersonal: {
             /**
@@ -6966,7 +7028,7 @@ export interface components {
          *     Einsatz die der Disposition (LLH-1073). Wire == `as_str()`.
          * @enum {string}
          */
-        ZeilenArt: "personal" | "fahrzeug";
+        ZeilenArt: "personal" | "fahrzeug" | "material";
         /**
          * @description Antwort einer an einzelnen Zeilen abgelehnten Mengen-Anfrage (422, LLH-1100): der Umschlag
          *     `{error}` und je abgelehnter Zeile ein [`ZeilenGrund`].

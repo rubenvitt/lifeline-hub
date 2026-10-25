@@ -1,5 +1,5 @@
 import { Button, Checkbox, ConfigProvider, Form, Modal, Space, Typography, theme } from 'antd';
-import type { FormInstance, FormProps } from 'antd';
+import type { FormInstance, FormProps, GlobalToken } from 'antd';
 import {
   useCallback,
   useEffect,
@@ -12,6 +12,7 @@ import {
   type Ref,
 } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import { FOKUSABSTAND_ERFASSUNG, useFokusabstandUnten } from './fokusabstandUnten';
 import { SpeicherFehler } from './SpeicherHinweis';
 import { useViewport } from './useViewport';
 import './Erfassung.css';
@@ -60,6 +61,10 @@ import './Erfassung.css';
  * unten, dem Daumen am nächsten, der Primärknopf. Nebeneinander waren die drei Knöpfe der Serie
  * auf 390 px breiter als der Dialog und liefen links hinaus („Abbrechen“ bei x = −75). Ab `md`
  * bleibt die Reihe rechtsbündig und bricht im Notfall um (`wrap`), statt hinauszulaufen.
+ *
+ * **Im Dialog klebt der Fuß am unteren Rand** (LLH-1274, `klebenderFuss`), solange der Dialog
+ * höher ist als der Schirm, und der Dialogkopf hält das 72-px-Schließkreuz des Handschuhs vom
+ * ersten Feld fern (`kopfBoden`). Inline auf einer Seite klebt der Fuß nicht.
  *
  * **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes Enter bleibt der Primär-Knopf).
  * Das Kürzel hängt am Wurzel-`div`, unabhängig davon, ob antd unbekannte Props ans `form`
@@ -201,6 +206,11 @@ interface ErfassungsFormularProps<T> {
    * Knopf trägt sie als Beschreibung (`aria-describedby`).
    */
   zusammenfassung?: ReactNode;
+  /**
+   * Nur für `ErfassungsModal`: der Fuß steht am unteren Rand des Dialogs, solange der Dialog höher
+   * ist als der Schirm (LLH-1274). Inline auf einer Seite klebt er nicht.
+   */
+  fussKlebt?: boolean;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -235,9 +245,11 @@ export function ErfassungsFormular<T extends object>({
   speicherFehlerTitel,
   speicherFehlerFallback,
   zusammenfassung,
+  fussKlebt = false,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
+  const fussRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ERFASSUNG);
   const zusammenfassungId = useId();
   const { istSchmal } = useViewport();
   const wurzel = useRef<HTMLDivElement>(null);
@@ -423,10 +435,13 @@ export function ErfassungsFormular<T extends object>({
           />
         )}
         <div
+          ref={fussKlebt ? fussRef : undefined}
+          data-lfh={fussKlebt ? 'erfassung-fuss' : undefined}
           style={{
             marginTop: token.margin,
             paddingTop: token.paddingSM,
             borderTop: `1px solid ${token.colorBorderSecondary}`,
+            ...(fussKlebt ? klebenderFuss(token) : undefined),
           }}
         >
           {/* EINSTELLUNG — eigene Zeile über der Aktion (siehe Dateikopf). Sie steht im Serienmodus
@@ -535,6 +550,65 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
 }
 
 /**
+ * Der klebende Fuß der Dialoghülle (LLH-1274). Auf 390 px im Handschuh ist der Dialog höher als der
+ * Schirm, „Übernehmen“ lag 6 px unter dem Rand und war erst nach Rollen zu erreichen. Klebend
+ * steht die Knopfleiste unten im Schirm, solange der Dialog darüber hinausreicht; reicht er nicht,
+ * steht sie wie zuvor unter dem letzten Feld (`sticky` ändert dann nichts).
+ *
+ * Der Fuß reicht über das untere Polster des Dialogs (`paddingMD`, negativer Rand), damit er
+ * geklebt nicht bündig am Schirmrand endet und ungeklebt aussieht wie bisher. Der Grund deckt
+ * die Felder, die darunter durchrollen.
+ */
+function klebenderFuss(token: GlobalToken) {
+  return {
+    position: 'sticky',
+    bottom: 0,
+    zIndex: 1,
+    background: token.colorBgElevated,
+    marginBottom: -token.paddingMD,
+    paddingBottom: token.paddingMD,
+  } as const;
+}
+
+/** Was {@link kopfBoden} vom Theme braucht; `theme.useToken()` erfüllt es. */
+type KopfToken = Pick<
+  GlobalToken,
+  | 'fontSizeHeading5'
+  | 'lineHeightHeading5'
+  | 'padding'
+  | 'paddingMD'
+  | 'paddingSM'
+  | 'marginXS'
+  | 'controlHeight'
+>;
+
+/** Höhe der Titelzeile; antd tippt `fontSizeHeading5` auch als Text („16px“). */
+export function titelzeilenHoehe(
+  token: Pick<KopfToken, 'fontSizeHeading5' | 'lineHeightHeading5'>,
+) {
+  return Number.parseFloat(String(token.fontSizeHeading5)) * token.lineHeightHeading5;
+}
+
+/**
+ * Mindesthöhe des Dialogkopfs, damit das Schließkreuz `paddingSM` (7 / 11 / 16 px) über dem
+ * Körper endet und damit über dem ersten Feld (LLH-1274; Leitlinie ≥ 8 / ≥ 16 px zwischen zwei
+ * Zielen, `kompakt` die Spacing-Ausnahme). antd macht das Kreuz so groß wie die Steuerhöhe
+ * (`modalCloseBtnSize`, 72 px im Handschuh) und mittelt es nur auf seinen gedachten Kopf
+ * (`modalHeaderHeight` = Titelzeile + 2 × `padding`), der Körper beginnt aber schon nach der
+ * Titelzeile: im Handschuh stand das Kreuz 22 px in den Körper hinein, 9 px über dem ersten Feld.
+ *
+ * Gerechnet mit antds Formeln (`antd/es/modal/style`): Unterkante des Kreuzes ab Oberkante des
+ * Dialogs = (Kopf + Kreuz) / 2, der Körper beginnt bei `paddingMD` + Kopf + `marginXS`. Ein
+ * Boden, keine feste Höhe: ein umbrechender Titel wächst weiter. In `kompakt` greift er nicht
+ * (22 gegen die Titelzeile von 24 px). Nachweis: C17 in `e2e/trefflaeche-pruefflaechen.spec.ts`.
+ */
+export function kopfBoden(token: KopfToken): number {
+  const titelzeile = titelzeilenHoehe(token);
+  const kreuzUnten = (titelzeile + 2 * token.padding + token.controlHeight) / 2;
+  return kreuzUnten + token.paddingSM - token.paddingMD - token.marginXS;
+}
+
+/**
  * Dieselbe Hülle als Dialog. `footer={null}`, weil die Knöpfe **im** Formular liegen;
  * `destroyOnHidden`, damit ein geschlossener Dialog keine Felder im Baum stehen lässt.
  *
@@ -556,6 +630,7 @@ export function ErfassungsModal<T extends object>({
   ...rest
 }: ErfassungsModalProps<T>) {
   const { form } = rest;
+  const { token } = theme.useToken();
   const sperrtAbbruch = rest.speicherung?.isPending === true;
   const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
   const schliessen = useCallback(() => {
@@ -576,8 +651,14 @@ export function ErfassungsModal<T extends object>({
       footer={null}
       destroyOnHidden
       keyboard={false}
+      styles={{ header: { minHeight: kopfBoden(token) } }}
     >
-      <ErfassungsFormular<T> onAbbrechen={onAbbrechen} {...rest} steuerungRef={formularSteuerung} />
+      <ErfassungsFormular<T>
+        onAbbrechen={onAbbrechen}
+        {...rest}
+        steuerungRef={formularSteuerung}
+        fussKlebt
+      />
     </Modal>
   );
 }
