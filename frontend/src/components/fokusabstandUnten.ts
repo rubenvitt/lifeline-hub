@@ -27,6 +27,8 @@ export const FOKUSABSTAND_ETB = '--lfh-etb-fokusabstand';
 export const FOKUSABSTAND_SPEICHERLEISTE = '--lfh-speicherleiste-fokusabstand';
 /** Tastenfeld der Ausgabeansicht (LLH-1032): `scroll-padding` am Scrollport (`index.css`). */
 export const FOKUSABSTAND_ZAEHLTASTEN = '--lfh-zaehltasten-fokusabstand';
+/** Klebender Fuß der Erfassungs-Hülle im Dialog (LLH-1274): `scroll-padding` am Dialog (`index.css`). */
+export const FOKUSABSTAND_ERFASSUNG = '--lfh-erfassung-fokusabstand';
 
 /**
  * Callback-Ref-Körper: misst die Leiste, schreibt Höhe + `abstand` als `variable` an `<html>`

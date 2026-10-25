@@ -218,6 +218,16 @@ main:has([data-lfh='zaehltasten']) {
   scroll-padding-block-end: var(--lfh-modulpanel-fokusabstand, 0px);
 }
 
+/* Erfassungsdialog: Fokusabstand zum klebenden Fuß der Hülle (LLH-1274, WCAG 2.4.11), aus demselben
+   gemessenen Grund wie die Speicherleiste `scroll-padding` am SCROLLPORT, hier antds `.ant-modal-wrap`
+   (der Dialog rollt in ihm, nicht im Dokument). Ohne ihn blieb im Ad-hoc-Material auf 390 px im
+   Handschuh der Kopf „Weitere Angaben“ getabbt ganz unter dem Fuß. Die Höhe setzt
+   `components/fokusabstandUnten.ts` am `<html>` und nimmt sie beim Schließen wieder weg. Nachweis
+   C17 in `e2e/trefflaeche-pruefflaechen.spec.ts`. */
+:root .ant-modal-wrap:has([data-lfh='erfassung-fuss']) {
+  scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
+}
+
 /* Fokusabstand zum klebenden Rahmen oben (LFH-952, WCAG 2.4.11, `frontend/AGENTS.md`, Rahmen).
    `scroll-padding-block-start` am SCROLLPORT, nicht `scroll-margin` an den Zielen: rückwärts
    getabbt bleibt ein Ziel, das schon im Fenster liegt, sonst ganz hinter dem Kopf (gemessen in
