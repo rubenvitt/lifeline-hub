@@ -725,9 +725,11 @@ anwendbar), „nicht geprüft" ist keins.
   über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über `useZeitEingabe().formatiere`;
   `.local()` steht nur in `anzeige/` (Guard `anzeige/zeitEingabe.guard.test.ts`). Außerhalb eines
   Einsatzes `OrgAnzeigeProvider`. „Jetzt“ beim Erfassen: `frontend/src/offline/AGENTS.md`,
-  „Schreiben ohne Netz“. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Zonentests
-  stellen die Prozesszone per `test/prozessZone.ts` auf UTC — unter der Suiten-Zone Berlin wäre
-  Anzeigezone Berlin blind. Eine **Uhrzeit ohne Datum** (Verpflegungsplan, LLH-1058, Spec
+  „Schreiben ohne Netz“. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Die Suiten-Zone
+  Europe/Berlin legt Vitest selbst fest (`test/suitenZone.ts`, LLH-1433), ein `TZ` der Shell
+  wirkt nicht, `TZ_ERZWUNGEN` wählt bewusst eine andere. Zonentests stellen die Prozesszone per
+  `test/prozessZone.ts` auf UTC — unter der Suiten-Zone wäre Anzeigezone Berlin blind. Eine
+  **Uhrzeit ohne Datum** (Verpflegungsplan, LLH-1058, Spec
   `zeiteingabe`, „Uhrzeit ohne Datum“) liest nur `anzeige/uhrzeit.ts:parseUhrzeit` („0630“, „6:30“)
   und legt nur `uhrzeitAmTag` in der Anzeigezone auf einen Tag (doppelte Stunde: die erste, Lücke:
   nach vorn); die Tagesgrenzen `tagesgrenzen`. Ein **Kalenderdatum ohne Uhrzeit** (Geburtsdatum,
