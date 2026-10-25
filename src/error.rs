@@ -65,6 +65,8 @@ crate::wire_enum::wire_enum! {
         Personal => "personal",
         /// Fahrzeug (`fahrzeug.id`, im Einsatz `einsatz_fahrzeug.id`).
         Fahrzeug => "fahrzeug",
+        /// Material-Position einer Einheiten-Vorlage (`einheit_vorlage_material.id`, LLH-1261).
+        Material => "material",
     }
     try_from = |s| format!("Ungültige Zeilenart: {s}");
 }

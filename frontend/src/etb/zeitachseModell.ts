@@ -408,7 +408,7 @@ export function verweisStil(token: { controlHeight: number }): CSSProperties {
 
 /**
  * Trägt der Eintrag einen gekoppelten Verweis — rückwärts (Befehl, Lagebericht, Auftrag, der
- * ihn erzeugt hat) oder vorwärts (Folgeaufträge, LFH-636)? EINE Stelle für die Frage, weil
+ * ihn erzeugt hat), vorwärts (Folgeaufträge, LFH-636) oder auf genannte Einheiten (LLH-1266)? EINE Stelle für die Frage, weil
  * `EtbZeitachse` den Verweisblock nur bei `true` einhängt und `EtbBacklinkBadges` sonst nichts
  * rendert: zwei getrennt gepflegte Bedingungen ließen Folgeaufträge ohne Rückverweis still
  * aus der Zeitachse fallen.
@@ -422,6 +422,7 @@ export function hatVerknuepfung(
     | 'folgeauftraege'
     | 'meldung_id'
     | 'nachforderung_id'
+    | 'einheiten'
   >,
 ): boolean {
   return (
@@ -430,7 +431,9 @@ export function hatVerknuepfung(
     e.auftrag_id != null ||
     e.meldung_id != null ||
     e.nachforderung_id != null ||
-    e.folgeauftraege.length > 0
+    e.folgeauftraege.length > 0 ||
+    // Ein Stand von vor LLH-1266 (Offline-Spiegel) trägt die Liste noch nicht.
+    (e.einheiten ?? []).length > 0
   );
 }
 

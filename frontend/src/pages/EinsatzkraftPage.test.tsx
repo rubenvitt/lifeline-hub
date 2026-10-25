@@ -469,7 +469,14 @@ describe('EinsatzkraftPage – entlassene Person (3.5)', () => {
     expect(aus).toHaveTextContent(/entlassen 14:?00/);
     expect(within(aus).getByRole('button', { name: 'Erneut disponieren' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /bearbeiten$|eintragen$/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeDisabled();
+  });
+
+  it('lässt die Zeitachse berichtigen, alles andere bleibt gesperrt (LLH-1263)', async () => {
+    renderAnsicht('/einsaetze/7/personal/10', { aktiv: [], entlassene: [entlassen()] });
+    const zeitachse = await screen.findByRole('region', { name: 'Zeitachse' });
+    expect(within(zeitachse).getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
+    expect(within(zeitachse).queryByText('entlassen')).toBeNull();
+    expect(screen.queryByRole('button', { name: /bearbeiten$|eintragen$/ })).toBeNull();
   });
 
   it('macht die Angaben nach „Erneut disponieren“ wieder änderbar', async () => {

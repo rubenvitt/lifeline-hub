@@ -5,7 +5,13 @@ import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { leseAnteil, verteile } from '../scripts/e2e-anteile.mjs';
-import { backendBinaer, freiePorts, umgebungRaeumen, viteServer } from './e2e/lauf-kern';
+import {
+  backendBinaer,
+  fallbackChromiumPath,
+  freiePorts,
+  umgebungRaeumen,
+  viteServer,
+} from './e2e/lauf-kern';
 
 // Die Suite ist selbsttragend: `pnpm e2e` startet Backend UND Vite selbst.
 
@@ -13,6 +19,8 @@ const frontendVerzeichnis = fileURLToPath(new URL('.', import.meta.url));
 // Binary aus `PW_BINAER` oder `cargo metadata`, geprüft auf Dasein und Ausführbarkeit; Herleitung
 // in `e2e/lauf-kern.ts` (geteilt mit dem Bildlauf der Anwenderdoku, `playwright.doku.config.ts`).
 const binaer = backendBinaer(frontendVerzeichnis);
+// Ersatz-Chromium nur, wenn Playwrights eigener fehlt (Cloud-Sitzung, LLH-1439, `e2e/lauf-kern.ts`).
+const fallbackChromium = fallbackChromiumPath();
 
 // Playwright lädt diese Config in JEDEM Worker-Prozess erneut; ohne Stabilisierung zöge
 // jeder Worker eigene Ports und ein eigenes Temp-Verzeichnis und liefe gegen Ports ohne
@@ -35,6 +43,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
       // Einmal im Hauptprozess, nicht je Worker: welches Backend der Lauf startet, steht damit im
       // Log. Dieselbe Zeile gibt Schritt 7 des Sammel-Gates aus (LFH-520).
       console.log(`Backend-Binary: ${binaer}`);
+      if (fallbackChromium) console.log(`Chromium (Ersatz, LLH-1439): ${fallbackChromium}`);
       return neu;
     })();
 
@@ -186,7 +195,14 @@ export default defineConfig({
     : 'list',
   use: { baseURL, trace: 'on-first-retry' },
   projects: [
-    { name: 'chromium', testMatch: testMatch('chromium'), use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      testMatch: testMatch('chromium'),
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(fallbackChromium ? { launchOptions: { executablePath: fallbackChromium } } : {}),
+      },
+    },
     { name: 'firefox', testMatch: testMatch('firefox'), use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', testMatch: testMatch('webkit'), use: { ...devices['Desktop Safari'] } },
   ],

@@ -22,7 +22,10 @@ interface Props {
  * Wechsel auf einen ANDEREN Pfad an (Seitenmenü, Segmentleiste, Brotkrume); Suchparameter und
  * Hash bleiben frei. Braucht einen Data Router (`useBlocker`) — in Tests
  * `renderMitProviders(…, { datenRouter: true })`. Die Warnung beim Schließen des Tabs trägt der
- * Merker (`useFormularVerlassenSchutz`, `useEntwurfVerlustschutz`), nicht dieser Dialog.
+ * Merker (`useFormularVerlassenSchutz`, `useEntwurfVerlustschutz`), nicht dieser Dialog. Ein
+ * Wechsel IN der Seite (Segmentleiste ohne Pfad, Reiter) fragt über
+ * `useWechselNachRueckfrage` (`components/offeneBearbeitung.tsx`, LLH-1415) mit demselben
+ * `VerlassenDialog`.
  *
  * Der Grund eines gescheiterten Speicherns steht IM Dialog: der Modal trägt
  * `mask={{ closable: false }}`, ein Seiten-Alert dahinter wäre unsichtbar.
@@ -33,7 +36,6 @@ export default function VerlassenRueckfrage({
   speichert = false,
   speicherFehler,
 }: Props) {
-  const { token } = theme.useToken();
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       ungespeichert && currentLocation.pathname !== nextLocation.pathname,
@@ -45,28 +47,52 @@ export default function VerlassenRueckfrage({
     if (blocker.state === 'blocked' && !ungespeichert) blocker.proceed();
   }, [blocker, ungespeichert]);
 
-  const bleiben = () => {
-    if (blocker.state === 'blocked') blocker.reset();
-  };
+  return (
+    <VerlassenDialog
+      offen={blocker.state === 'blocked' && ungespeichert}
+      onBleiben={() => {
+        if (blocker.state === 'blocked') blocker.reset();
+      }}
+      onVerwerfen={() => {
+        if (blocker.state === 'blocked') blocker.proceed();
+      }}
+      speichern={speichern}
+      speichert={speichert}
+      speicherFehler={speicherFehler}
+    />
+  );
+}
 
+/**
+ * Der Dialog der Rückfrage ohne Router: „Bleiben“/„Verwerfen“, Wortlaut für jeden Wechsel gleich,
+ * ob Pfad (`VerlassenRueckfrage`) oder Segment in der Seite (`useWechselNachRueckfrage`).
+ */
+export function VerlassenDialog({
+  offen,
+  onBleiben,
+  onVerwerfen,
+  speichern,
+  speichert = false,
+  speicherFehler,
+}: Omit<Props, 'ungespeichert'> & {
+  offen: boolean;
+  onBleiben: () => void;
+  onVerwerfen: () => void;
+}) {
+  const { token } = theme.useToken();
   return (
     <Modal
       title="Ungespeicherte Änderungen"
-      open={blocker.state === 'blocked' && ungespeichert}
-      onCancel={bleiben}
+      open={offen}
+      onCancel={onBleiben}
       mask={{ closable: false }}
       footer={
         <Flex gap={token.margin} wrap justify="space-between">
-          <Button
-            danger
-            onClick={() => {
-              if (blocker.state === 'blocked') blocker.proceed();
-            }}
-          >
+          <Button danger onClick={onVerwerfen}>
             Verwerfen
           </Button>
           <Flex gap={token.marginSM} wrap>
-            <Button type={speichern ? 'default' : 'primary'} onClick={bleiben}>
+            <Button type={speichern ? 'default' : 'primary'} onClick={onBleiben}>
               Bleiben
             </Button>
             {speichern && (

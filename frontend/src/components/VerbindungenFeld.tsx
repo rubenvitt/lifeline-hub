@@ -4,6 +4,7 @@ import type { KommunikationsVerbindung, NeueVerbindung, Verbindungsmittel } from
 import { IconMuelleimer, IconPlus } from '../icons';
 import { InlineAngabe, type InlineEingabe } from './InlineAngabe';
 import { monoStil, useRollen } from './instrument';
+import { kennungsLinkStil } from './kennungsLink';
 import { Select } from './Select';
 import {
   VERBINDUNGSMITTEL_LABEL,
@@ -22,11 +23,14 @@ import {
  *
  * - **Lesen** ({@link VerbindungenListe}): je Verbindung das Mittel gedämpft, der Wert in Mono,
  *   `tel:` nur für Festnetz und Mobil, `mailto:` nur mit `@` (`verbindungen.ts`), der Hinweis
- *   gedämpft dahinter.
- * - **Bearbeiten** ({@link VerbindungenAngabe}): eine `InlineAngabe` über die ganze Liste; der
- *   Server ersetzt sie vollständig (`verbindungen`). Leere Zeilen fallen beim Speichern weg, ein
- *   Hinweis ohne Nummer wird nicht gesendet. Höchstens `VERBINDUNGEN_MAX` Einträge, Wert und
- *   Hinweis je höchstens `VERBINDUNG_TEXT_MAX` Zeichen (Spiegel der Servergrenzen).
+ *   gedämpft dahinter. Der Verweis ist ein Bedienziel und trägt den Boden der Dichte-Staffel
+ *   (`kennungsLinkStil`, ein `<a>` erbt keine Steuerhöhe).
+ * - **Bearbeiten** ({@link VerbindungenAngabe}): eine `InlineAngabe` über die ganze Liste, mit
+ *   `bearbeitenDaneben` — die Verweise stehen nicht im Wertknopf, „Bearbeiten“ steht daneben
+ *   (LLH-1426: der Klick auf die Nummer wählt). Der Server ersetzt die Liste vollständig
+ *   (`verbindungen`). Leere Zeilen fallen beim Speichern weg, ein Hinweis ohne Nummer wird nicht
+ *   gesendet. Höchstens `VERBINDUNGEN_MAX` Einträge, Wert und Hinweis je höchstens
+ *   `VERBINDUNG_TEXT_MAX` Zeichen (Spiegel der Servergrenzen).
  */
 
 export function VerbindungenListe({
@@ -38,14 +42,22 @@ export function VerbindungenListe({
   if (verbindungen.length === 0) return <>—</>;
   const gedaempft = { color: rollen.text2 };
   return (
-    <Flex vertical gap={token.marginXXS}>
+    // Die Verweise sind Bedienziele: Zeile über Zeile ≥ 8 / ≥ 16 px auseinander (LFH-630,
+    // `paddingSM` 7/11/16), nicht nur der Zeilenabstand des Fließtexts.
+    <Flex vertical gap={token.paddingSM}>
       {verbindungen.map((v, i) => {
         const verweis = verbindungsVerweis(v.mittel, v.wert);
         const wert = <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>{v.wert}</span>;
         return (
           <Flex key={`${i}-${v.mittel}-${v.wert}`} wrap align="baseline" gap={token.marginXS}>
             <span style={gedaempft}>{VERBINDUNGSMITTEL_LABEL[v.mittel]}</span>
-            {verweis ? <a href={verweis}>{wert}</a> : wert}
+            {verweis ? (
+              <a href={verweis} style={kennungsLinkStil(token)}>
+                {wert}
+              </a>
+            ) : (
+              wert
+            )}
             {v.hinweis && <span style={gedaempft}>{v.hinweis}</span>}
           </Flex>
         );
@@ -164,6 +176,7 @@ export function VerbindungenAngabe({
       gleich={(a, b) => gleicheVerbindungen(bereinigeVerbindungen(a), bereinigeVerbindungen(b))}
       darfSchreiben={darfSchreiben}
       gesperrt={gesperrt}
+      bearbeitenDaneben
       pruefe={pruefeVerbindungen}
       onSpeichern={(l) => onSpeichern(bereinigeVerbindungen(l))}
       eingabe={(p) => <VerbindungenEingabe {...p} />}

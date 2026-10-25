@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { waehleStehend, zeigtWahl } from './auswahl-kern';
 import { anmelden } from './meldebild-kern';
-import { seedeVorlage } from './vorlage-kern';
+import { seedeVorlage, seedeVorlagenMaterial } from './vorlage-kern';
 
 /**
  * Einheit aus Vorlage bilden (LLH-1049), der ganze Weg über die Oberfläche: Dialog „Einheit
@@ -65,4 +65,59 @@ test('Einheit aus Vorlage bilden: Dialog → Vorschau → Meldebild (LLH-1049)',
   // Fahrzeuge und Gruppen bleiben zu: Anna (auf RTW 1) und Dirk sind nicht zu sehen.
   await expect(meldebild.getByText(v.personen.anna, { exact: true })).toHaveCount(0);
   await expect(meldebild.getByText(v.personen.dirk, { exact: true })).toHaveCount(0);
+});
+
+/**
+ * LLH-1261: Material der Vorlage kommt beim Bilden mit. Die Staffel trägt 50 Wolldecken an der
+ * Einheit und einen Rucksack auf RTW 1; beide sind vorgehakt, liegen danach am richtigen Ort, und
+ * der eine ETB-Eintrag nennt sie.
+ */
+test('Einheit aus Vorlage bilden: Material am richtigen Ort, ein ETB-Eintrag (LLH-1261)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const neu = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Vorlagen-Material ${Date.now()}` },
+  });
+  expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+  const einsatzId = ((await neu.json()) as { id: number }).id;
+  const v = await seedeVorlage(page, 'm');
+  const m = await seedeVorlagenMaterial(page, v);
+
+  await page.goto(`/einsaetze/${einsatzId}/einheiten/aus-vorlage/${v.vorlageId}`);
+  const main = page.getByRole('main');
+  const decken = main.getByRole('checkbox', { name: new RegExp(`50× ${m.decken}`) });
+  const rucksack = main.getByRole('checkbox', { name: new RegExp(`1× ${m.rucksack}`) });
+  await expect(decken).toBeChecked();
+  await expect(rucksack).toBeChecked();
+  await expect(main.getByText('1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte, 2 Material')).toBeVisible();
+  await main.getByRole('button', { name: 'Einheit bilden' }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/kraefteuebersicht$`));
+
+  const einheiten = (await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`)
+  ).json()) as { id: number; name: string }[];
+  const staffel = einheiten.find((e) => e.name === v.staffel);
+  expect(staffel, 'Staffel gebildet').toBeTruthy();
+  const fahrzeuge = (await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/fahrzeuge`)
+  ).json()) as { id: number; funkrufname: string }[];
+  const rtw1 = fahrzeuge.find((f) => f.funkrufname === v.fahrzeuge.rtw1);
+  const posten = (await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/material`)
+  ).json()) as {
+    bezeichnung: string;
+    menge: number;
+    einheit_id?: number | null;
+    einsatz_fahrzeug_id?: number | null;
+  }[];
+  const p = (name: string) => posten.find((x) => x.bezeichnung === name);
+  expect(p(m.decken)).toMatchObject({ menge: 50, einheit_id: staffel!.id });
+  expect(p(m.rucksack)).toMatchObject({ menge: 1, einsatz_fahrzeug_id: rtw1!.id });
+
+  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const inhalte = ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
+  const gebildet = inhalte.filter((i) => i.includes('aus Vorlage'));
+  expect(gebildet).toHaveLength(1);
+  expect(gebildet[0]).toContain(`Material: 50× ${m.decken}, 1× ${m.rucksack}`);
 });

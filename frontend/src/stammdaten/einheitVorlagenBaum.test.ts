@@ -15,6 +15,7 @@ function vorlage(id: number, name: string, ueber?: number): EinheitVorlage {
     ist_demo: false,
     fahrzeuge: [],
     personal: [],
+    material: [],
   };
 }
 

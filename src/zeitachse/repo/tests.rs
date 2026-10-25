@@ -667,6 +667,7 @@ fn etb_texte_in_der_org_zone_und_voller_dtg() {
         Eintreffen,
         "2026-09-30 04:40:00",
         tz,
+        false,
     );
     assert_eq!(
         s,
@@ -679,10 +680,46 @@ fn etb_texte_in_der_org_zone_und_voller_dtg() {
         "2026-09-30 04:10:00",
         "Zeit verwechselt",
         tz,
+        false,
     );
     assert_eq!(
         s,
         "Zeitachse: Person «Anna» alarmiert 300610sep26 gestrichen — Grund: Zeit verwechselt"
+    );
+}
+
+/// LLH-1263, design.md D4: an einer entlassenen Person nennt der Text, warum an einer beendeten
+/// Kraft geschrieben wurde.
+#[test]
+fn etb_texte_vermerken_die_berichtigung_nach_entlassung() {
+    let tz = crate::zeitdarstellung::Zeitstil::new(
+        chrono_tz::Europe::Berlin,
+        crate::zeitdarstellung::Zeitdarstellung::Taktisch,
+    );
+    let s = etb_text_nachtrag(
+        Kraft::Person(1),
+        "Anna",
+        Eintreffen,
+        "2026-09-30 04:30:00",
+        tz,
+        true,
+    );
+    assert_eq!(
+        s,
+        "Zeitachse: Person «Anna» eingetroffen 300630sep26 (nachgetragen, berichtigt nach Entlassung)"
+    );
+    let s = etb_text_streichung(
+        Kraft::Person(1),
+        "Anna",
+        Eintreffen,
+        "2026-09-30 04:40:00",
+        "Zeit verwechselt",
+        tz,
+        true,
+    );
+    assert_eq!(
+        s,
+        "Zeitachse: Person «Anna» eingetroffen 300640sep26 gestrichen (berichtigt nach Entlassung) — Grund: Zeit verwechselt"
     );
 }
 

@@ -40,6 +40,7 @@ function eintrag(n: number, stunde = 10): EtbEintragAnzeige {
     befehl_id: null,
     folgeauftraege: [],
     berichtigt_durch: [],
+    einheiten: [],
     anhaenge: [],
   };
 }

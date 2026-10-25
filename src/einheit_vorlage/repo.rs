@@ -2,14 +2,18 @@
 //! begrenzt; jede Schreibfunktion gibt es als `…_tx` auf der Verbindung des Aufrufers (Demo-Import,
 //! LLH-1049) und als Pool-Fassung in `write_retry!`.
 //!
-//! Lesen kostet unabhängig von der Zahl der Vorlagen vier Abfragen (Köpfe, Fahrzeuge,
-//! Stammbesetzung, Kanten des Baums). `auch_in` leitet sich dabei aus allen Zuordnungen der
+//! Lesen kostet unabhängig von der Zahl der Vorlagen fünf Abfragen (Köpfe, Fahrzeuge,
+//! Stammbesetzung, Material, Kanten des Baums). `auch_in` leitet sich dabei aus allen Zuordnungen der
 //! Organisation ab, nie aus einem gespeicherten Flag (Spec `openspec/specs/einheit-vorlagen`,
 //! „Fahrzeuge und Stammbesetzung der Vorlage“).
 
-use super::{EinheitVorlage, EinheitVorlageFahrzeug, EinheitVorlagePersonal, PersonalEntry};
+use super::{
+    EinheitVorlage, EinheitVorlageFahrzeug, EinheitVorlageMaterial, EinheitVorlagePersonal,
+    MaterialEntry, PersonalEntry, GERAET_JE_POSITION_MAX,
+};
 use crate::error::AppError;
 use crate::katalog::DIENSTSTATUS_IN_DIENST;
+use crate::material::MaterialArt;
 use crate::staerke::{Staerke, StaerkePosition};
 use crate::write_retry;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -197,6 +201,21 @@ struct PersonalRow {
     ist_demo: bool,
 }
 
+#[derive(Debug, sqlx::FromRow)]
+struct MaterialRow {
+    id: i64,
+    vorlage_id: i64,
+    material_id: i64,
+    bezeichnung: String,
+    #[sqlx(try_from = "String")]
+    art: MaterialArt,
+    bestandsnummer: Option<String>,
+    menge: i64,
+    fahrzeug_id: Option<i64>,
+    dienststatus: String,
+    ist_demo: bool,
+}
+
 /// Soll aus drei Spalten; nur ein vollständiges Trio gilt.
 fn trio(f: Option<i64>, u: Option<i64>, m: Option<i64>) -> Option<Staerke> {
     Staerke::from_options(f, u, m).ok().flatten()
@@ -294,6 +313,20 @@ async fn load_where(
     .bind(org_id)
     .fetch_all(&mut *conn)
     .await?;
+    let material: Vec<MaterialRow> = sqlx::query_as(
+        "SELECT x.id, x.vorlage_id, x.material_id, m.bezeichnung, m.art, m.bestandsnummer, \
+                x.menge, x.fahrzeug_id, m.dienststatus, \
+                EXISTS(SELECT 1 FROM demo_herkunft dh \
+                       WHERE dh.tabelle = 'material' AND dh.datensatz_id = m.id) AS ist_demo \
+         FROM einheit_vorlage_material x \
+         JOIN einheit_vorlage v ON v.id = x.vorlage_id \
+         JOIN material m ON m.id = x.material_id \
+         WHERE v.org_id = ? \
+         ORDER BY x.vorlage_id, x.sortier, x.id",
+    )
+    .bind(org_id)
+    .fetch_all(&mut *conn)
+    .await?;
 
     let fahrzeug_in = auch_in_index(
         fahrzeuge
@@ -337,6 +370,23 @@ async fn load_where(
                 ist_demo: z.ist_demo,
             });
     }
+    let mut material_je: HashMap<i64, Vec<EinheitVorlageMaterial>> = HashMap::new();
+    for z in material {
+        material_je
+            .entry(z.vorlage_id)
+            .or_default()
+            .push(EinheitVorlageMaterial {
+                id: z.id,
+                material_id: z.material_id,
+                bezeichnung: z.bezeichnung,
+                art: z.art,
+                bestandsnummer: z.bestandsnummer,
+                menge: z.menge,
+                fahrzeug_id: z.fahrzeug_id,
+                dienststatus: z.dienststatus,
+                ist_demo: z.ist_demo,
+            });
+    }
 
     let mut vorlagen: Vec<EinheitVorlage> = heads
         .into_iter()
@@ -345,6 +395,7 @@ async fn load_where(
             EinheitVorlage {
                 fahrzeuge: fahrzeuge_je.remove(&k.id).unwrap_or_default(),
                 personal: personal_je.remove(&k.id).unwrap_or_default(),
+                material: material_je.remove(&k.id).unwrap_or_default(),
                 soll_eigen: eigen.is_some(),
                 soll: eigen.or_else(|| {
                     trio(
@@ -508,8 +559,8 @@ pub async fn create(
     })
 }
 
-/// Erste Kennung (Funkrufname bzw. Name), die in beiden Vorlagen-Mengen zugleich steht. Die
-/// Mengen sind JSON-Arrays von Vorlagen-ids.
+/// Erste Kennung (Funkrufname, Name bzw. Gerät mit Bestandsnummer), die in beiden
+/// Vorlagen-Mengen zugleich steht. Die Mengen sind JSON-Arrays von Vorlagen-ids.
 async fn first_overlap(
     conn: &mut SqliteConnection,
     links: &str,
@@ -530,6 +581,22 @@ async fn first_overlap(
     if fahrzeug.is_some() {
         return Ok(fahrzeug);
     }
+    let geraet: Option<String> = sqlx::query_scalar(
+        "SELECT 'Gerät «' || m.bezeichnung || '» (' || m.bestandsnummer || ')' \
+         FROM einheit_vorlage_material a JOIN material m ON m.id = a.material_id \
+         WHERE a.vorlage_id IN (SELECT value FROM json_each(?1)) \
+           AND m.art = 'geraet' AND m.bestandsnummer IS NOT NULL \
+           AND a.material_id IN (SELECT b.material_id FROM einheit_vorlage_material b \
+                                 WHERE b.vorlage_id IN (SELECT value FROM json_each(?2))) \
+         ORDER BY m.bezeichnung LIMIT 1",
+    )
+    .bind(links)
+    .bind(rechts)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if geraet.is_some() {
+        return Ok(geraet);
+    }
     sqlx::query_scalar(
         "SELECT '«' || p.name || '»' \
          FROM einheit_vorlage_personal a JOIN personal p ON p.id = a.personal_id \
@@ -547,8 +614,8 @@ async fn first_overlap(
 
 /// Teil-Patch einer Vorlage auf der Verbindung des Aufrufers. `NotFound` bei fremder oder
 /// unbekannter id; Soll nach dem Patch unvollständig → 400; fremder Typ, fremde oder zyklische
-/// Unterstellung → 422; eine Unterstellung, nach der ein Fahrzeug oder eine Person zweimal im
-/// selben Baum stünde → 422; Name doppelt unter den aktiven → `Conflict`.
+/// Unterstellung → 422; eine Unterstellung, nach der ein Fahrzeug, eine Person oder ein Gerät mit
+/// Bestandsnummer zweimal im selben Baum stünde → 422; Name doppelt unter den aktiven → `Conflict`.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -717,8 +784,9 @@ fn check_zuordenbar(
 /// [`super::normalize_fahrzeug_ids`]); die Reihenfolge ist die Anzeigereihenfolge.
 ///
 /// Fremd oder unbekannt → 422; neu und außer Dienst → 422 (ein schon zugeordnetes darf bleiben);
-/// schon in einer anderen Vorlage desselben Baums → 422. Personen auf einem entfernten Fahrzeug
-/// verlieren ihre Bindung in derselben Transaktion. Prüfen und Schreiben brauchen unabhängig von
+/// schon in einer anderen Vorlage desselben Baums → 422. Personen und Material auf einem
+/// entfernten Fahrzeug verlieren ihre Bindung in derselben Transaktion (Material liegt dann an der
+/// Einheit, LLH-1261). Prüfen und Schreiben brauchen unabhängig von
 /// der Länge der Liste gleich viele Anweisungen (`json_each`).
 pub async fn replace_fahrzeuge_tx(
     conn: &mut SqliteConnection,
@@ -778,15 +846,17 @@ pub async fn replace_fahrzeuge_tx(
     .bind(&ids_json)
     .execute(&mut *conn)
     .await?;
-    sqlx::query(
-        "UPDATE einheit_vorlage_personal SET fahrzeug_id = NULL \
-         WHERE vorlage_id = ?1 AND fahrzeug_id IS NOT NULL \
-           AND fahrzeug_id NOT IN (SELECT value FROM json_each(?2))",
-    )
-    .bind(vorlage_id)
-    .bind(&ids_json)
-    .execute(&mut *conn)
-    .await?;
+    for tabelle in ["einheit_vorlage_personal", "einheit_vorlage_material"] {
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {tabelle} SET fahrzeug_id = NULL \
+             WHERE vorlage_id = ?1 AND fahrzeug_id IS NOT NULL \
+               AND fahrzeug_id NOT IN (SELECT value FROM json_each(?2))"
+        )))
+        .bind(vorlage_id)
+        .bind(&ids_json)
+        .execute(&mut *conn)
+        .await?;
+    }
     Ok(())
 }
 
@@ -912,6 +982,159 @@ pub async fn replace_personal(
 ) -> Result<EinheitVorlage, AppError> {
     write_retry!(pool, |conn| {
         replace_personal_tx(conn, org_id, vorlage_id, entries).await?;
+        load_tx(conn, org_id, vorlage_id).await
+    })
+}
+
+/// Stammzeile eines Materials für das Ersetzen der Liste: Dienststatus, ob es schon in dieser
+/// Vorlage steht, Art und Bestandsnummer.
+#[derive(Debug, sqlx::FromRow)]
+struct MaterialStamm {
+    id: i64,
+    bezeichnung: String,
+    dienststatus: String,
+    schon: bool,
+    #[sqlx(try_from = "String")]
+    art: MaterialArt,
+    bestandsnummer: Option<String>,
+}
+
+impl MaterialStamm {
+    /// Ein bestimmtes Stück: Gerät mit Bestandsnummer (Spec `material-modell`).
+    fn ist_stueck(&self) -> bool {
+        self.art == MaterialArt::Geraet && self.bestandsnummer.is_some()
+    }
+}
+
+/// Ersetzt die Material-Positionen der Vorlage durch genau `entries` (schon gedeckelt und mit
+/// Menge ab 1, [`super::normalize_material`]); die Reihenfolge ist die Anzeigereihenfolge
+/// (LLH-1261, design.md D2).
+///
+/// Fremd oder unbekannt → 422; neu und außer Dienst → 422 (ein schon zugeordnetes darf bleiben);
+/// ein Fahrzeug, das nicht zur Vorlage gehört → 422; ein Gerät über
+/// [`GERAET_JE_POSITION_MAX`] oder mit Bestandsnummer und Menge über 1 → 422; ein Gerät mit
+/// Bestandsnummer zweimal in der Liste oder schon in einer anderen Vorlage desselben Baums → 422.
+/// Art und Bestandsnummer gelten aus dem Stamm von jetzt.
+pub async fn replace_material_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    vorlage_id: i64,
+    entries: &[MaterialEntry],
+) -> Result<(), AppError> {
+    let baum = other_tree_members(conn, org_id, vorlage_id).await?;
+    let ids_json = json_ids(entries.iter().map(|e| e.material_id))?;
+    let stamm: Vec<MaterialStamm> = sqlx::query_as(
+        "SELECT m.id, m.bezeichnung, m.dienststatus, \
+                EXISTS(SELECT 1 FROM einheit_vorlage_material x \
+                       WHERE x.vorlage_id = ?1 AND x.material_id = m.id) AS schon, \
+                m.art, m.bestandsnummer \
+         FROM material m \
+         WHERE m.id IN (SELECT value FROM json_each(?2)) AND m.org_id = ?3",
+    )
+    .bind(vorlage_id)
+    .bind(&ids_json)
+    .bind(org_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let bekannt: Vec<(i64, String, bool)> = stamm
+        .iter()
+        .map(|m| (m.id, m.dienststatus.clone(), m.schon))
+        .collect();
+    check_zuordenbar(entries.iter().map(|e| e.material_id), &bekannt, "Material")?;
+    let index: HashMap<i64, &MaterialStamm> = stamm.iter().map(|m| (m.id, m)).collect();
+
+    let fahrzeuge: HashSet<i64> =
+        sqlx::query_scalar("SELECT fahrzeug_id FROM einheit_vorlage_fahrzeug WHERE vorlage_id = ?")
+            .bind(vorlage_id)
+            .fetch_all(&mut *conn)
+            .await?
+            .into_iter()
+            .collect();
+    if let Some(fremd) = entries
+        .iter()
+        .filter_map(|e| e.fahrzeug_id)
+        .find(|f| !fahrzeuge.contains(f))
+    {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Fahrzeug {fremd} gehört nicht zu dieser Vorlage"
+        )));
+    }
+
+    let mut stuecke = HashSet::new();
+    for e in entries {
+        let m = index[&e.material_id];
+        if m.art == MaterialArt::Geraet && e.menge > GERAET_JE_POSITION_MAX {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Gerät «{}»: höchstens {GERAET_JE_POSITION_MAX} Stück je Position",
+                m.bezeichnung
+            )));
+        }
+        if m.ist_stueck() && e.menge > 1 {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Gerät «{}» mit Bestandsnummer steht mit Menge 1 in der Vorlage",
+                m.bezeichnung
+            )));
+        }
+        if m.ist_stueck() && !stuecke.insert(m.id) {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Gerät «{}» mit Bestandsnummer steht nur einmal in der Vorlage",
+                m.bezeichnung
+            )));
+        }
+    }
+    let doppelt: Option<(String, String)> = sqlx::query_as(
+        "SELECT m.bezeichnung, v.name \
+         FROM einheit_vorlage_material x \
+         JOIN material m ON m.id = x.material_id \
+         JOIN einheit_vorlage v ON v.id = x.vorlage_id \
+         WHERE x.vorlage_id IN (SELECT value FROM json_each(?1)) \
+           AND x.material_id IN (SELECT value FROM json_each(?2)) \
+           AND m.art = 'geraet' AND m.bestandsnummer IS NOT NULL \
+         ORDER BY m.bezeichnung LIMIT 1",
+    )
+    .bind(json_ids(baum)?)
+    .bind(json_ids(stuecke.iter().copied())?)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some((geraet, vorlage)) = doppelt {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Gerät «{geraet}» steht schon in «{vorlage}» im selben Vorlagen-Baum"
+        )));
+    }
+
+    let rows = serde_json::to_string(
+        &entries
+            .iter()
+            .map(|e| serde_json::json!({ "m": e.material_id, "n": e.menge, "f": e.fahrzeug_id }))
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|e| AppError::Internal(format!("Material serialisieren: {e}")))?;
+    sqlx::query("DELETE FROM einheit_vorlage_material WHERE vorlage_id = ?")
+        .bind(vorlage_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "INSERT INTO einheit_vorlage_material (vorlage_id, material_id, menge, fahrzeug_id, sortier) \
+         SELECT ?1, json_extract(value, '$.m'), json_extract(value, '$.n'), \
+                json_extract(value, '$.f'), key \
+         FROM json_each(?2)",
+    )
+    .bind(vorlage_id)
+    .bind(&rows)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// [`replace_material_tx`] in einer eigenen Transaktion; liefert die Vorlage danach.
+pub async fn replace_material(
+    pool: &SqlitePool,
+    org_id: i64,
+    vorlage_id: i64,
+    entries: &[MaterialEntry],
+) -> Result<EinheitVorlage, AppError> {
+    write_retry!(pool, |conn| {
+        replace_material_tx(conn, org_id, vorlage_id, entries).await?;
         load_tx(conn, org_id, vorlage_id).await
     })
 }

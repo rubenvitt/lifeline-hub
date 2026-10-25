@@ -72,6 +72,11 @@ interface ErinnerungKarteProps {
   onQuittieren?: (id: number) => void;
   /** Grund der zuletzt abgelehnten Aktion an dieser Karte (`components/useZeilenFehler.ts`). */
   fehlerGrund?: ZeilenGrund | null;
+  /**
+   * Deeplink-Hervorhebung (`?erinnerung=`, LLH-1429, Spec `deeplink-hervorhebung`): die Form
+   * trägt `KommKarte`; eine fällige behält ihre Alarmfläche und trägt nur die Linien.
+   */
+  hervorgehoben?: boolean;
 }
 
 /**
@@ -87,6 +92,7 @@ export default function ErinnerungKarte({
   onErledigen,
   onQuittieren,
   fehlerGrund,
+  hervorgehoben = false,
 }: ErinnerungKarteProps) {
   const { id: einsatzId } = useParams();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
@@ -114,6 +120,8 @@ export default function ErinnerungKarte({
     // Die Fälligkeit führt links in Mono; eine fällige Erinnerung trägt den Alarmrand.
     <KommKarte
       alarm={faellig}
+      hervorgehoben={hervorgehoben}
+      data-erinnerung-id={e.id}
       zeit={e.faellig_at ? <ZeitAnzeige wert={e.faellig_at} rolle="kurz" /> : undefined}
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>

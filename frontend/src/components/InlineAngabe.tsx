@@ -65,7 +65,21 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  *   „Eine offene Bearbeitung zur Zeit“).
  * - Erfüllt `onSpeichern` mit {@link OFFEN_LASSEN}, bleibt die Eingabe mit dem Entwurf offen, ohne
  *   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
+ *
+ * ── ANZEIGE MIT EIGENEN BEDIENZIELEN (LLH-1426) ───────────────────────────────────────
+ *
+ * Der Wertknopf umschließt die Anzeige. Trägt sie selbst Ziele (`tel:`/`mailto:` der
+ * Verbindungen), stünde ein Link in einem Button: der Klick auf die Nummer öffnete die Bearbeitung
+ * statt zu wählen, und ein Screenreader fände verschachtelte Ziele (axe `nested-interactive`). Mit
+ * `bearbeitenDaneben` ist die Anzeige Inhalt, und daneben steht ein eigener Knopf „Bearbeiten“ —
+ * die Sprache von `BearbeitbaresPaneel` (Knopf mit dem Wort, Name „… bearbeiten“, Fokus kehrt
+ * dorthin zurück). Name und Beschreibung bleiben die des Wertknopfs, die leere Angabe behält ihre
+ * Aufforderung „… eintragen“. Steckt ohne den Modus ein Ziel im Wertknopf, warnt die Entwicklung.
  */
+
+/** Bedienziele, die nicht im Wertknopf stehen dürfen (ein Knopf ist nie Hülle eines Ziels). */
+const ZIEL_IN_ANZEIGE =
+  'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]), [role="button"], [role="link"]';
 
 /** Rückgabe von `onSpeichern`: nichts gespeichert, nichts gescheitert — die Eingabe bleibt offen. */
 export const OFFEN_LASSEN = Symbol('offen lassen');
@@ -148,6 +162,12 @@ export interface InlineAngabeProps<T> {
   onEntwurf?: (geaendert: boolean) => void;
   /** Jedes Schließen einer offenen Bearbeitung, auch durch Sperre oder Aushängen. */
   onSchliessen?: () => void;
+  /**
+   * Die Anzeige trägt eigene Bedienziele, etwa `tel:`-Links (LLH-1426): sie steht als Inhalt, nicht
+   * im Wertknopf, und daneben ein eigener Knopf „Bearbeiten“ (Dateikopf, „Anzeige mit eigenen
+   * Bedienzielen“).
+   */
+  bearbeitenDaneben?: boolean;
 }
 
 /**
@@ -175,6 +195,30 @@ export function leerKnopfStil(
   };
 }
 
+/**
+ * Stil des gefüllten Wertknopfs — rein und exportiert (Muster `wertKnopfStil`). Der Knopf rückt
+ * NUR am Anfang um `paddingSM` vor, damit sein Text bündig unter dem Etikett steht; die leere
+ * Aufforderung (`leerKnopfStil`) rückt nicht vor. Ein Vorrücken am Ende zöge in einer Flex-Reihe
+ * das nächste Ziel heran. Den Vorsprung am Anfang gleicht die Kartenfuge aus (`kartenFelderStil`
+ * in `Datensicht.tsx`): hinter einer Aufforderung lag der Wert sonst 7 / 10 px statt ≥ 8 / ≥ 16
+ * vor ihr (LLH-1271).
+ */
+export function wertAngabeStil(token: {
+  controlHeight: number;
+  paddingXS: number;
+  paddingSM: number;
+}): CSSProperties {
+  return {
+    ...wertKnopfStil(token),
+    color: 'inherit',
+    font: 'inherit',
+    marginInlineStart: -token.paddingSM,
+    // Um den Vorsprung breiter als der Behälter: sonst endete der Knopf `paddingSM` vor dessen
+    // Rand, und im Kartenfeld, das sich nach dem Inhalt bemisst, bräche der Wert um.
+    maxWidth: `calc(100% + ${token.paddingSM}px)`,
+  };
+}
+
 export function InlineAngabe<T>({
   etikett,
   kennung,
@@ -194,6 +238,7 @@ export function InlineAngabe<T>({
   onEntwurf,
   onOeffnen,
   onSchliessen,
+  bearbeitenDaneben = false,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
   const [entwurf, setEntwurfZustand] = useState<T>(wert);
@@ -286,6 +331,19 @@ export function InlineAngabe<T>({
     },
     [],
   );
+
+  // Ein Ziel im Wertknopf ist verschachteltes Markup; der Aufrufer braucht `bearbeitenDaneben`.
+  // Gelesen am DOM, weil die Anzeige ein beliebiger Knoten ist; je Instanz nur einmal.
+  const zielGewarntRef = useRef(false);
+  useEffect(() => {
+    if (!import.meta.env.DEV || zielGewarntRef.current || bearbeitenDaneben) return;
+    if (!document.getElementById(wertId)?.querySelector(ZIEL_IN_ANZEIGE)) return;
+    zielGewarntRef.current = true;
+    console.warn(
+      `[InlineAngabe] „${name}“: die Anzeige trägt ein eigenes Bedienziel im Wertknopf — ` +
+        'mit bearbeitenDaneben steht sie als Inhalt und „Bearbeiten“ daneben (LLH-1426).',
+    );
+  });
 
   if (!darfSchreiben) return ausloeser ? null : <>{leer(wert) ? '—' : anzeige}</>;
 
@@ -458,6 +516,40 @@ export function InlineAngabe<T>({
     );
   }
 
+  const wertBeschreibung = isGesperrt ? `${wertId} ${sperrBeschreibung}` : wertId;
+
+  if (bearbeitenDaneben) {
+    return (
+      <>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            // Ziele stehen ≥ 8 / ≥ 16 px auseinander, auch umgebrochen (LFH-630): `padding` 11/18/26.
+            gap: token.padding,
+            minWidth: 0,
+          }}
+        >
+          <div id={wertId} style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+            {anzeige}
+          </div>
+          <Button
+            ref={knopfRef}
+            disabled={isGesperrt}
+            aria-label={`${name} bearbeiten`}
+            aria-describedby={wertBeschreibung}
+            onClick={oeffnen}
+          >
+            Bearbeiten
+          </Button>
+        </div>
+        {sperrHinweis}
+        {hinweis}
+      </>
+    );
+  }
+
   return (
     <>
       <Button
@@ -465,13 +557,8 @@ export function InlineAngabe<T>({
         type="text"
         disabled={isGesperrt}
         aria-label={`${name} bearbeiten`}
-        aria-describedby={isGesperrt ? `${wertId} ${sperrBeschreibung}` : wertId}
-        style={{
-          ...wertKnopfStil(token),
-          color: 'inherit',
-          font: 'inherit',
-          marginInline: -token.paddingSM,
-        }}
+        aria-describedby={wertBeschreibung}
+        style={wertAngabeStil(token)}
         onClick={oeffnen}
       >
         <span id={wertId}>{anzeige}</span>

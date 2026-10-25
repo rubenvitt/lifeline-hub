@@ -5,7 +5,12 @@ import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { kopfFilterWaehlen, kopfFilterWerte } from '../test/kopfFilter';
+import {
+  angehakteWerte,
+  kopfFilterWaehlen,
+  kopfFilterWerte,
+  openKopfFilter,
+} from '../test/kopfFilter';
 import Datensicht, {
   SERVER_SUCHE_ENTPRELLUNG_MS,
   spaltenFuer,
@@ -183,6 +188,94 @@ describe('Datensicht · Filter im Spaltenkopf (LLH-1086)', () => {
     rendere();
     expect(screen.queryByRole('group', { name: 'Aktive Filter' })).toBeNull();
     expect(hinweis()).toBeNull();
+  });
+});
+
+describe('Datensicht · offenes Filtermenü behält seinen Entwurf (LLH-1427)', () => {
+  /**
+   * antds FilterDropdown setzt bei offenem Menü den Entwurf auf `filteredKeys` zurück, sobald es
+   * eine neue Spaltenliste bekommt (es bildet `filteredValue` dabei jedes Mal neu ab). Die Sicht
+   * baut ihre Spalten bei jedem Render neu: Live-Daten oder das Schreiben der Adresse verwarfen so
+   * die frisch angehakten Werte einer schon gefilterten Spalte.
+   */
+  const element = (daten: Schaden[]) => (
+    <Datensicht<Schaden, Key>
+      bezeichnung="Schäden"
+      spalten={spalten}
+      daten={daten}
+      zeilenSchluessel="id"
+      karte={karte}
+      mehrzahl="Schäden"
+    />
+  );
+
+  it('ein Neuaufbau mit gleichen Daten lässt die Häkchen stehen', async () => {
+    setzeViewportBreite(1366);
+    const { rerender } = renderMitProviders(element(DATEN));
+    await kopfFilterWaehlen('Ausmaß', ['Groß (2)']);
+    await waitFor(() => expect(zeilen()).toEqual(['1', '3']));
+
+    const menue = await openKopfFilter('Ausmaß');
+    await userEvent.click(within(menue).getByText('Gering (1)'));
+    expect(angehakteWerte(menue)).toEqual(['Gering (1)', 'Groß (2)']);
+
+    rerender(element([...DATEN]));
+    expect(angehakteWerte(menue)).toEqual(['Gering (1)', 'Groß (2)']);
+  });
+
+  it('neue Daten mit neuen Zählern lassen die Häkchen stehen, Bestätigen wirkt beide', async () => {
+    setzeViewportBreite(1366);
+    const { rerender } = renderMitProviders(element(DATEN));
+    await kopfFilterWaehlen('Ausmaß', ['Groß (2)']);
+    await waitFor(() => expect(zeilen()).toEqual(['1', '3']));
+
+    const menue = await openKopfFilter('Ausmaß');
+    await userEvent.click(within(menue).getByText('Gering (1)'));
+
+    rerender(element([...DATEN, S(4, 'Hafen', 'gering', 'sturm')]));
+    expect(angehakteWerte(menue)).toHaveLength(2);
+
+    await userEvent.click(
+      menue.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
+    );
+    await waitFor(() => expect(zeilen()).toEqual(['1', '2', '3', '4']));
+    // Geschlossen zählt das Menü wieder den neuen Stand.
+    expect(await kopfFilterWerte('Ausmaß')).toEqual(['Gering (2)', 'Groß (2)']);
+  });
+
+  it('nach dem Schließen zeichnen die Zellen eine Garnitur, die bei offenem Menü kam', async () => {
+    // Die Tabelle hält ihre Spalten, solange das Menü offen ist: die neue Garnitur kommt erst beim
+    // Schließen an. Der zweite Neuaufbau zeigt keinen Garniturwechsel mehr; ohne das einmalige
+    // Neuzeichnen beim Loslassen bliebe die Zelle beim alten `render`.
+    setzeViewportBreite(1366);
+    const mitEinheit = (einheit: string) =>
+      spalten.map((s) =>
+        s.key === 'ort' ? { ...s, render: (_: unknown, z: Schaden) => `${z.ort} ${einheit}` } : s,
+      );
+    const mit = (garnitur: typeof spalten) => (
+      <Datensicht<Schaden, Key>
+        bezeichnung="Schäden"
+        spalten={garnitur}
+        daten={DATEN}
+        zeilenSchluessel="id"
+        karte={karte}
+        mehrzahl="Schäden"
+      />
+    );
+    const ortZelle = () => document.querySelector('tbody tr[data-row-key="1"] td')!.textContent;
+    const { rerender } = renderMitProviders(mit(mitEinheit('alt')));
+    expect(ortZelle()).toBe('Deich alt');
+
+    const menue = await openKopfFilter('Ausmaß');
+    const neu = mitEinheit('neu');
+    rerender(mit(neu));
+    rerender(mit(neu));
+    expect(ortZelle()).toBe('Deich alt');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(menue.closest('.ant-dropdown')).toHaveStyle({ pointerEvents: 'none' }),
+    );
+    await waitFor(() => expect(ortZelle()).toBe('Deich neu'));
   });
 });
 

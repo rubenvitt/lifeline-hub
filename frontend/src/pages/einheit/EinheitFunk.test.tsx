@@ -6,11 +6,12 @@ import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import type { Einheit } from '../../api/types';
 import type { EinheitPatchHandler } from './EinheitKopf';
-import EinheitFunk from './EinheitFunk';
+import EinheitFunk, { type EinheitSprechgruppenHandler } from './EinheitFunk';
 
 /**
  * Paneele „Funk“ und „Telefon und weitere Verbindungen“ (LLH-1036 D2, LLH-1134): Funk und
- * Telefon getrennt, je Zeile genau ein Feld.
+ * Telefon getrennt, je Zeile genau ein Feld. Die Sprechgruppen gehen einzeln, als Differenz zum
+ * Stand beim Öffnen (LLH-1265, Change `pcrn0wn1-einheit-sprechgruppen-einzelwege`, D1).
  */
 
 const sprechgruppe = (id: number, bezeichnung: string, betriebsart: 'TMO' | 'DMO') => ({
@@ -39,8 +40,25 @@ function einheit(o: Partial<Einheit> = {}): Einheit {
 function renderFunk(e: Einheit = einheit(), canEdit = true) {
   server.use(http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json([tmo, dmo])));
   const onPatch = vi.fn<EinheitPatchHandler>().mockResolvedValue(undefined);
-  renderMitProviders(<EinheitFunk einheit={e} einsatzId={1} canEdit={canEdit} onPatch={onPatch} />);
-  return { onPatch };
+  const onSprechgruppen = vi.fn<EinheitSprechgruppenHandler>().mockResolvedValue(undefined);
+  const ansicht = (x: Einheit) => (
+    <EinheitFunk
+      einheit={x}
+      einsatzId={1}
+      canEdit={canEdit}
+      onPatch={onPatch}
+      onSprechgruppen={onSprechgruppen}
+    />
+  );
+  const { rerender } = renderMitProviders(ansicht(e));
+  return { onPatch, onSprechgruppen, rerender: (x: Einheit) => rerender(ansicht(x)) };
+}
+
+/** Die Auswahl der offenen Zeile „Sprechgruppen“, sobald ihre `n` Einträge stehen. */
+async function sprechgruppenAuswahl(n: number) {
+  const feld = screen.getByRole('combobox', { name: 'Sprechgruppen' }).closest('.ant-select')!;
+  await waitFor(() => expect(feld.querySelectorAll('.ant-select-selection-item')).toHaveLength(n));
+  return feld;
 }
 
 const paneel = () => screen.getByRole('region', { name: 'Funk' });
@@ -55,29 +73,76 @@ describe('EinheitFunk', () => {
     expect(within(paneel()).queryAllByRole('textbox')).toHaveLength(0);
   });
 
-  it('Sprechgruppen geleert: `sprechgruppe_ids: []`', async () => {
+  it('Sprechgruppe hinzugefügt: nur dieser eine Eintrag, kein PATCH', async () => {
     const user = userEvent.setup();
-    const { onPatch } = renderFunk();
+    const { onPatch, onSprechgruppen } = renderFunk(einheit({ sprechgruppen: [tmo] }));
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
-    const feld = screen.getByRole('combobox', { name: 'Sprechgruppen' }).closest('.ant-select')!;
+    await sprechgruppenAuswahl(1);
+    await user.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await user.click(await screen.findByTitle('314_F_DMO'));
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
     await waitFor(() =>
-      expect(feld.querySelectorAll('.ant-select-selection-item')).toHaveLength(2),
+      expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [8], weg: [] }, expect.any(Function)),
     );
+    expect(onSprechgruppen).toHaveBeenCalledTimes(1);
+    expect(onPatch).not.toHaveBeenCalled();
+  });
+
+  it('Sprechgruppen geleert: jede einzeln entfernt', async () => {
+    const user = userEvent.setup();
+    const { onPatch, onSprechgruppen } = renderFunk();
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    const feld = await sprechgruppenAuswahl(2);
     await user.click(feld.querySelector('.ant-select-clear')!);
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
     await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Sprechgruppen', { sprechgruppe_ids: [] }),
+      expect(onSprechgruppen).toHaveBeenCalledWith(
+        { hinzu: [], weg: [7, 8] },
+        expect.any(Function),
+      ),
     );
-    expect(onPatch).toHaveBeenCalledTimes(1);
+    expect(onPatch).not.toHaveBeenCalled();
+  });
+
+  it('eine während der Bearbeitung fremd zugeordnete Sprechgruppe bleibt stehen', async () => {
+    const user = userEvent.setup();
+    const { onSprechgruppen, rerender } = renderFunk(einheit({ sprechgruppen: [tmo] }));
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    const feld = await sprechgruppenAuswahl(1);
+    // Ein anderer Arbeitsplatz ordnet 314_F_DMO zu; der Stand kommt live, der Entwurf bleibt.
+    rerender(einheit({ sprechgruppen: [tmo, dmo] }));
+    await user.click(feld.querySelector('.ant-select-clear')!);
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() =>
+      expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [], weg: [7] }, expect.any(Function)),
+    );
+  });
+
+  it('der Stand beim Öffnen gilt, nicht der beim Einhängen', async () => {
+    const user = userEvent.setup();
+    const { onSprechgruppen, rerender } = renderFunk(einheit({ sprechgruppen: [tmo] }));
+    // 314_F_DMO kommt dazu, bevor die Zeile geöffnet wird; das Entfernen muss es lösen.
+    rerender(einheit({ sprechgruppen: [tmo, dmo] }));
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    const feld = await sprechgruppenAuswahl(2);
+    await user.click(feld.querySelector('.ant-select-clear')!);
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() =>
+      expect(onSprechgruppen).toHaveBeenCalledWith(
+        { hinzu: [], weg: [7, 8] },
+        expect.any(Function),
+      ),
+    );
   });
 
   it('Sprechgruppen unverändert: keine Anfrage', async () => {
     const user = userEvent.setup();
-    const { onPatch } = renderFunk();
+    const { onPatch, onSprechgruppen } = renderFunk();
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
     expect(await screen.findByRole('button', { name: 'Sprechgruppen bearbeiten' })).toBeVisible();
     expect(onPatch).not.toHaveBeenCalled();
+    expect(onSprechgruppen).not.toHaveBeenCalled();
   });
 
   it('Funk und Telefon stehen getrennt: die Nummer nur unter „Telefon und weitere Verbindungen“', () => {

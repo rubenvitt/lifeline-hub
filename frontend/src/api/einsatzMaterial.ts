@@ -181,4 +181,5 @@ export function reaktiviereDisposition(einsatzId: number, emId: number): Promise
 }
 
 // Den Ort eines Postens schreibt nur der Material-PATCH (`updateDisposition`, LLH-1225 D2). Die
-// Einheiten-Routen `PUT/DELETE …/einheiten/{eid}/material/{em_id}` haben im Client keinen Aufrufer.
+// früheren Einheiten-Routen `PUT/DELETE …/einheiten/{eid}/material/{em_id}` gibt es seit LLH-1253
+// nicht mehr (Spec `material-modell`, „Ein Schreibweg für den Ort“).

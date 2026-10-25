@@ -28,7 +28,8 @@ import {
  *   zeichen.png         frontend/src/pages/einheit/EinheitZeichenPaneel.tsx (Paneel „Taktisches
  *                       Zeichen“ mit offener Zeile „Organisation“)
  *   besatzung.png       frontend/src/pages/einheit/FahrzeugeBesatzung.tsx (Paneel „Fahrzeuge und
- *                       Besatzung“: Fahrzeugzeilen mit FMS-Status und Besatzung, Personen mit
+ *                       Besatzung“: Fahrzeugzeilen mit FMS-Status, Besatzung und „Personal der
+ *                       Einheit übernehmen“, Personen mit
  *                       Marken und Menü, „Ohne Fahrzeug“; frontend/src/kraefte/KraeftebaumZelle.tsx,
  *                       frontend/src/pages/einheit/ZuordnenAuswahl.tsx)
  *   aufgeloest.png      frontend/src/kraefte/EntlassenBlock.tsx (Block unter der Gliederung)

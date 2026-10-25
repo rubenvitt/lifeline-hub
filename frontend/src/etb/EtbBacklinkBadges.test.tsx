@@ -25,6 +25,7 @@ function eintrag(over: Partial<EtbEintragAnzeige>): EtbEintragAnzeige {
     befehl_id: null,
     folgeauftraege: [],
     berichtigt_durch: [],
+    einheiten: [],
     anhaenge: [],
     ...over,
   };
@@ -66,6 +67,27 @@ describe('EtbBacklinkBadges (LFH-25)', () => {
   it('rendert nichts, wenn kein Backlink gesetzt ist', () => {
     const { container } = renderBadges(eintrag({}));
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('EtbBacklinkBadges — Einheiten (LLH-1266)', () => {
+  it('verlinkt je genannte Einheit auf ihre Ansicht, das ↗ außerhalb des Namens', () => {
+    renderBadges(
+      eintrag({
+        typ: 'system',
+        einheiten: [
+          { id: 20, name: 'Florian 1' },
+          { id: 21, name: 'Florian 2' },
+        ],
+      }),
+    );
+    const link = screen.getByRole('link', { name: 'Einheit «Florian 1»' });
+    expect(link).toHaveAttribute('href', '/einsaetze/3/einheiten/20');
+    expect(link.textContent).toContain('↗');
+    expect(screen.getByRole('link', { name: 'Einheit «Florian 2»' })).toHaveAttribute(
+      'href',
+      '/einsaetze/3/einheiten/21',
+    );
   });
 });
 

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { VERBINDUNGEN_MAX, VERBINDUNG_TEXT_MAX } from '../api/eingabegrenzen';
 import type { KommunikationsVerbindung } from '../api/types';
 import { renderMitProviders } from '../test/utils';
+import { verschachtelteZiele } from '../test/verschachtelteZiele';
 import { VerbindungenAngabe } from './VerbindungenFeld';
 
 const vb = (
@@ -36,8 +37,46 @@ describe('VerbindungenAngabe (LLH-1134)', () => {
       'tel:+491701234',
     );
     expect(screen.getByRole('link', { name: 'a@b.de' })).toHaveAttribute('href', 'mailto:a@b.de');
+    // Ein `<a>` erbt keine Steuerhöhe: der Verweis trägt den Boden der Staffel (LLH-1426).
+    for (const link of screen.getAllByRole('link')) {
+      expect(link).toHaveStyle({ display: 'inline-flex' });
+      expect(link.style.minHeight).toMatch(/^\d+px$/);
+    }
     expect(screen.getByText('nur tagsüber')).toBeInTheDocument();
     expect(screen.getByText('Mobil')).toBeInTheDocument();
+  });
+
+  // LLH-1426: die Nummer stand als Link im Wertknopf der Angabe. Ein Klick darauf öffnete die
+  // Bearbeitung, und ein Screenreader fand einen Link in einem Button.
+  it('mit Schreibrecht: ein Klick auf die Nummer wählt, die Bearbeitung öffnet „Bearbeiten“ daneben', async () => {
+    const { container } = renderMitProviders(
+      <VerbindungenAngabe
+        etikett={ETIKETT}
+        verbindungen={[vb(1, 'mobil', '+49 170 1234'), vb(2, 'email', 'a@b.de')]}
+        darfSchreiben
+        onSpeichern={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    expect(verschachtelteZiele(container)).toEqual([]);
+
+    const verhindert: boolean[] = [];
+    const lauscher = (e: MouseEvent) => {
+      verhindert.push(e.defaultPrevented);
+      // jsdom navigiert nicht; ohne das meldete es „Not implemented: navigation“.
+      e.preventDefault();
+    };
+    window.addEventListener('click', lauscher);
+    try {
+      await userEvent.click(screen.getByRole('link', { name: '+49 170 1234' }));
+      await userEvent.click(screen.getByRole('link', { name: 'a@b.de' }));
+    } finally {
+      window.removeEventListener('click', lauscher);
+    }
+    expect(verhindert).toEqual([false, false]);
+    expect(screen.queryByRole('group', { name: ETIKETT })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: `${ETIKETT} bearbeiten` }));
+    expect(screen.getByRole('group', { name: ETIKETT })).toBeInTheDocument();
   });
 
   it('ohne Schreibrecht und leer: „—“', () => {

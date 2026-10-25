@@ -273,6 +273,22 @@ pub struct EtbEintragAnzeige {
     /// die Liste je Seite mit einer gebündelten Abfrage nach, wie `folgeauftraege`.
     #[sqlx(skip)]
     pub berichtigt_durch: Vec<BerichtigungVerweis>,
+    /// Die Einheiten, die dieser Eintrag festhält (LLH-1266, Spec `etb-vorgaenge`, „Verweis auf
+    /// genannte Einheiten“; Tabelle `etb_eintrag_einheit`): die Empfänger eines Auftrags beim
+    /// Schreiben (LLH-1175) und die Einheit des Systemeintrags ihrer Auflösung. Nach `id`, leer
+    /// statt fehlend; der Name ist der aktuelle der Einheit, auch einer aufgelösten. Nicht Teil
+    /// des SELECT: `repo::laden`/`repo::abfrage` füllen die Liste je Seite nach, wie
+    /// `folgeauftraege`.
+    #[sqlx(skip)]
+    pub einheiten: Vec<EinheitVerweis>,
+}
+
+/// Verweis eines ETB-Eintrags auf eine Einheit (LLH-1266): `id` für den Deeplink auf ihre
+/// Ansicht, `name` für den Verweis „Einheit «Name»“.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct EinheitVerweis {
+    pub id: i64,
+    pub name: String,
 }
 
 /// Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`

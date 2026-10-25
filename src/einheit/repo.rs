@@ -406,6 +406,7 @@ async fn zu_anzeige_batch(
             nicht_uebernommen_seit: row.nicht_uebernommen_seit,
             unangemeldet: row.unangemeldet,
             nachforderung_id: row.nachforderung_id,
+            letzte_besetzung: None,
         });
     }
     Ok(out)
@@ -426,6 +427,7 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinheitAnze
 
 /// Aufgelöste Einheiten eines Einsatzes, zuletzt aufgelöste zuerst — der Nachweis hinter
 /// `GET …/einheiten?aufgeloeste=1` (LLH-1079). Ohne Mitglieder: die Auflösung hat sie gelöst.
+/// Wer und was zuletzt dazugehörte, steht in `letzte_besetzung` (LLH-1266, design.md D2).
 pub async fn list_aufgeloeste(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -437,7 +439,171 @@ pub async fn list_aufgeloeste(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    zu_anzeige_batch(pool, einsatz_id, rows).await
+    let mut liste = zu_anzeige_batch(pool, einsatz_id, rows).await?;
+    let mut besetzungen = load_letzte_besetzung_map(pool, einsatz_id).await?;
+    for e in &mut liste {
+        e.letzte_besetzung = besetzungen.remove(&e.id);
+    }
+    Ok(liste)
+}
+
+#[derive(sqlx::FromRow)]
+struct LetztePersonZeile {
+    einheit_id: i64,
+    ep_id: i64,
+    name: String,
+    funktion: Option<String>,
+    einsatzfunktion: Option<String>,
+    ist_fuehrer: bool,
+    auf_fahrzeug_id: Option<i64>,
+}
+
+#[derive(sqlx::FromRow)]
+struct LetztesFahrzeugZeile {
+    einheit_id: i64,
+    ef_id: i64,
+    funkrufname: String,
+    fahrzeugtyp: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct LetztesMaterialZeile {
+    einheit_id: i64,
+    em_id: i64,
+    bezeichnung: String,
+    menge: i64,
+}
+
+/// Die festgehaltene letzte Besetzung je aufgelöster Einheit eines Einsatzes (LLH-1266, design.md
+/// D2), in vier Abfragen gleich wie viele Einheiten. Ein Eintrag steht nur für Einheiten, deren
+/// Besetzung festgehalten wurde (sonst fehlt er, statt leer zu sein). Namen kommen aus den
+/// Dispositionszeilen; eine später stornierte Kraft fehlt (Spec `kraefte-entlassung`: stornierte
+/// Kräfte in keinem Nachweis). Führer zuerst, sonst in der Reihenfolge des Festhaltens.
+async fn load_letzte_besetzung_map(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, super::LetzteBesetzung>, AppError> {
+    let festgehalten: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND aufgeloest_at IS NOT NULL AND besetzung_festgehalten = 1",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut map: HashMap<i64, super::LetzteBesetzung> = festgehalten
+        .into_iter()
+        .map(|id| (id, super::LetzteBesetzung::default()))
+        .collect();
+    if map.is_empty() {
+        return Ok(map);
+    }
+    let personen = sqlx::query_as::<_, LetztePersonZeile>(
+        "SELECT lb.einheit_id, ep.id AS ep_id, ep.snap_name AS name, ep.snap_funktion AS funktion, \
+                ep.einsatzfunktion, lb.ist_fuehrer, lb.auf_fahrzeug_id \
+         FROM einsatz_einheit_letzte_besetzung lb \
+         JOIN einsatz_einheit e ON e.id = lb.einheit_id \
+         JOIN einsatz_personal ep ON ep.id = lb.personal_id \
+         WHERE e.einsatz_id = ? AND lb.art = 'personal' \
+           AND ep.beendet_als IS NOT 'storniert' \
+         ORDER BY lb.ist_fuehrer DESC, lb.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    for z in personen {
+        if let Some(b) = map.get_mut(&z.einheit_id) {
+            b.personal.push(super::LetztePerson {
+                ep_id: z.ep_id,
+                name: z.name,
+                funktion: z.funktion,
+                einsatzfunktion: z.einsatzfunktion,
+                ist_fuehrer: z.ist_fuehrer,
+                auf_fahrzeug_id: z.auf_fahrzeug_id,
+            });
+        }
+    }
+    let fahrzeuge = sqlx::query_as::<_, LetztesFahrzeugZeile>(
+        "SELECT lb.einheit_id, ef.id AS ef_id, ef.snap_funkrufname AS funkrufname, \
+                ef.snap_fahrzeugtyp AS fahrzeugtyp \
+         FROM einsatz_einheit_letzte_besetzung lb \
+         JOIN einsatz_einheit e ON e.id = lb.einheit_id \
+         JOIN einsatz_fahrzeug ef ON ef.id = lb.fahrzeug_id \
+         WHERE e.einsatz_id = ? AND lb.art = 'fahrzeug' \
+           AND ef.beendet_als IS NOT 'storniert' \
+         ORDER BY lb.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    for z in fahrzeuge {
+        if let Some(b) = map.get_mut(&z.einheit_id) {
+            b.fahrzeuge.push(super::LetztesFahrzeug {
+                ef_id: z.ef_id,
+                funkrufname: z.funkrufname,
+                fahrzeugtyp: z.fahrzeugtyp,
+            });
+        }
+    }
+    let material = sqlx::query_as::<_, LetztesMaterialZeile>(
+        "SELECT lb.einheit_id, em.id AS em_id, em.snap_bezeichnung AS bezeichnung, \
+                COALESCE(lb.menge, em.menge) AS menge \
+         FROM einsatz_einheit_letzte_besetzung lb \
+         JOIN einsatz_einheit e ON e.id = lb.einheit_id \
+         JOIN einsatz_material em ON em.id = lb.material_id \
+         WHERE e.einsatz_id = ? AND lb.art = 'material' \
+           AND em.beendet_als IS NOT 'storniert' \
+         ORDER BY lb.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    for z in material {
+        if let Some(b) = map.get_mut(&z.einheit_id) {
+            b.material.push(super::LetztesMaterial {
+                em_id: z.em_id,
+                bezeichnung: z.bezeichnung,
+                menge: z.menge,
+            });
+        }
+    }
+    Ok(map)
+}
+
+/// Hält die letzte Besetzung einer Einheit fest, bevor [`aufloesen_tx`] ihre Kräfte löst
+/// (LLH-1266, design.md D1): je aktive Person mit Führer-Kennzeichen und Sitz, je aktives
+/// Fahrzeug und je aktiver Materialposten mit Menge. Das Kennzeichen
+/// `besetzung_festgehalten` setzt `aufloesen_tx` mit dem Endzustand.
+async fn festhalten_letzte_besetzung_tx(
+    conn: &mut SqliteConnection,
+    id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO einsatz_einheit_letzte_besetzung \
+             (einheit_id, art, personal_id, ist_fuehrer, auf_fahrzeug_id) \
+         SELECT ?1, 'personal', ep.id, COALESCE(ep.id = e.fuehrer_id, 0), ep.fahrzeug_id \
+         FROM einsatz_personal ep JOIN einsatz_einheit e ON e.id = ep.einheit_id \
+         WHERE ep.einheit_id = ?1 AND ep.beendet_at IS NULL ORDER BY ep.id",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "INSERT INTO einsatz_einheit_letzte_besetzung (einheit_id, art, fahrzeug_id) \
+         SELECT ?1, 'fahrzeug', id FROM einsatz_fahrzeug \
+         WHERE einheit_id = ?1 AND beendet_at IS NULL ORDER BY id",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "INSERT INTO einsatz_einheit_letzte_besetzung (einheit_id, art, material_id, menge) \
+         SELECT ?1, 'material', id, menge FROM einsatz_material \
+         WHERE einheit_id = ?1 AND beendet_at IS NULL ORDER BY id",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Lädt eine Einheit (aufgelöst); `NotFound`, falls nicht zum Einsatz.
@@ -1277,7 +1443,8 @@ pub struct Aufgeloest {
 /// Skizzenbezüge lösen, laufende Schicht beenden (Grund `aufloesung`, LLH-1128), einen
 /// Bereitstellungsraum verlassen. Mit Spur ([`find_spur_tx`]) bleibt die Zeile als aufgelöst stehen und bekommt die
 /// Entlassung in die Zeitachse (der Fan-out erreicht niemanden mehr); ohne Spur wird sie gelöscht.
-/// [`Aufloesung::Stornieren`] lehnt eine Spur mit 422 ab. `NotFound`/`Conflict` wie
+/// Bleibt sie stehen, hält es vor dem Freigeben ihre letzte Besetzung fest (LLH-1266,
+/// [`festhalten_letzte_besetzung_tx`]). [`Aufloesung::Stornieren`] lehnt eine Spur mit 422 ab. `NotFound`/`Conflict` wie
 /// [`require_aktiv_tx`].
 pub async fn aufloesen_tx(
     conn: &mut SqliteConnection,
@@ -1306,6 +1473,10 @@ pub async fn aufloesen_tx(
         geloescht: spur.is_none(),
         ..Aufgeloest::default()
     };
+    // Vor dem Lösen, nur wenn die Einheit stehen bleibt (LLH-1266, design.md D1).
+    if !ergebnis.geloescht {
+        festhalten_letzte_besetzung_tx(conn, id).await?;
+    }
     for (tabelle, ziel) in [
         ("einsatz_personal", &mut ergebnis.personal),
         ("einsatz_fahrzeug", &mut ergebnis.fahrzeuge),
@@ -1374,7 +1545,8 @@ pub async fn aufloesen_tx(
     )
     .await?;
     sqlx::query(
-        "UPDATE einsatz_einheit SET aufgeloest_at = ?, aufgeloest_von = ?, fuehrer_id = NULL \
+        "UPDATE einsatz_einheit SET aufgeloest_at = ?, aufgeloest_von = ?, fuehrer_id = NULL, \
+                besetzung_festgehalten = 1 \
          WHERE id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
     )
     .bind(jetzt)
@@ -2298,6 +2470,242 @@ mod tests {
         assert_eq!(einheit_id, None, "Material muss beim Auflösen frei werden");
     }
 
+    // ── Letzte Besetzung (LLH-1266) ──────────────────────────────────────────────────
+
+    /// „Florian 1“ mit Führerin Anna Beck und Ben Kurz auf dem Fahrzeug „Florian 1-83-1“, dazu
+    /// 20 Wolldecken; liefert (einheit, anna, ben, fahrzeug, wolldecken).
+    async fn florian_mit_besetzung(pool: &SqlitePool, einsatz: i64, b: i64) -> [i64; 5] {
+        let e = anlegen(
+            pool,
+            einsatz,
+            1,
+            daten("Florian 1", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        let fz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, einheit_id, snap_funkrufname, \
+                snap_fahrzeugtyp) VALUES (?, ?, 'Florian 1-83-1', 'RTW') RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(e.id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let anna = ad_hoc_person(pool, einsatz, "Anna Beck", "fuehrer").await;
+        let ben = ad_hoc_person(pool, einsatz, "Ben Kurz", "mannschaft").await;
+        for ep in [anna, ben] {
+            mitglied_repo::zuordnen_personal(pool, einsatz, e.id, ep)
+                .await
+                .unwrap();
+            sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = ? WHERE id = ?")
+                .bind(fz)
+                .bind(ep)
+                .execute(pool)
+                .await
+                .unwrap();
+        }
+        setze_fuehrer(pool, einsatz, e.id, Some(anna))
+            .await
+            .unwrap();
+        let decken: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, einheit_id, snap_bezeichnung, menge, art) \
+             VALUES (?, ?, 'Wolldecke', 20, 'verbrauchsgut') RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(e.id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        [e.id, anna, ben, fz, decken]
+    }
+
+    async fn aufgeloeste_von(pool: &SqlitePool, einsatz: i64, id: i64) -> EinheitAnzeige {
+        list_aufgeloeste(pool, einsatz)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|e| e.id == id)
+            .expect("aufgelöst gelistet")
+    }
+
+    /// Spec `kraefte-entlassung`, „Letzte Besetzung festgehalten“.
+    #[tokio::test]
+    async fn aufloesen_haelt_die_letzte_besetzung_fest() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let [e, anna, ben, fz, decken] = florian_mit_besetzung(&pool, einsatz, b).await;
+
+        aufloesen_als(&pool, einsatz, e, b, Aufloesung::Aufloesen)
+            .await
+            .unwrap();
+
+        let besetzung = aufgeloeste_von(&pool, einsatz, e)
+            .await
+            .letzte_besetzung
+            .expect("festgehalten");
+        assert_eq!(
+            besetzung.personal,
+            [
+                super::super::LetztePerson {
+                    ep_id: anna,
+                    name: "Anna Beck".into(),
+                    funktion: None,
+                    einsatzfunktion: None,
+                    ist_fuehrer: true,
+                    auf_fahrzeug_id: Some(fz),
+                },
+                super::super::LetztePerson {
+                    ep_id: ben,
+                    name: "Ben Kurz".into(),
+                    funktion: None,
+                    einsatzfunktion: None,
+                    ist_fuehrer: false,
+                    auf_fahrzeug_id: Some(fz),
+                },
+            ]
+        );
+        assert_eq!(
+            besetzung.fahrzeuge,
+            [super::super::LetztesFahrzeug {
+                ef_id: fz,
+                funkrufname: "Florian 1-83-1".into(),
+                fahrzeugtyp: Some("RTW".into()),
+            }]
+        );
+        assert_eq!(
+            besetzung.material,
+            [super::super::LetztesMaterial {
+                em_id: decken,
+                bezeichnung: "Wolldecke".into(),
+                menge: 20,
+            }]
+        );
+        // Die Kräfte gehören der Einheit trotzdem nicht mehr an.
+        let frei: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM einsatz_personal WHERE einheit_id = ?1) \
+                  + (SELECT COUNT(*) FROM einsatz_fahrzeug WHERE einheit_id = ?1) \
+                  + (SELECT COUNT(*) FROM einsatz_material WHERE einheit_id = ?1)",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(frei, 0);
+        // Die Menge bleibt die beim Auflösen, auch wenn der Posten danach schrumpft.
+        sqlx::query("UPDATE einsatz_material SET menge = 15 WHERE id = ?")
+            .bind(decken)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let spaeter = aufgeloeste_von(&pool, einsatz, e).await;
+        assert_eq!(spaeter.letzte_besetzung.unwrap().material[0].menge, 20);
+        // Stärke und Mitgliederlisten zählen die letzte Besetzung nicht.
+        assert!(spaeter.personal_mitglieder.is_empty());
+        assert_eq!(spaeter.ist, Staerke::neu(0, 0, 0));
+    }
+
+    /// Spec `kraefte-entlassung`, „Festgehaltene Kraft wird später storniert“.
+    #[tokio::test]
+    async fn spaeter_stornierte_kraft_fehlt_in_der_letzten_besetzung() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let [e, anna, ben, _, _] = florian_mit_besetzung(&pool, einsatz, b).await;
+        aufloesen_als(&pool, einsatz, e, b, Aufloesung::Aufloesen)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_personal SET beendet_at = '2026-10-13 15:05:00', \
+                beendet_als = 'storniert' WHERE id = ?",
+        )
+        .bind(ben)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let personal = aufgeloeste_von(&pool, einsatz, e)
+            .await
+            .letzte_besetzung
+            .unwrap()
+            .personal;
+        assert_eq!(personal.iter().map(|p| p.ep_id).collect::<Vec<_>>(), [anna]);
+    }
+
+    /// Spec `kraefte-entlassung`, „Vor der Änderung aufgelöst“: ohne Kennzeichen kein Feld; eine
+    /// ohne aktive Kräfte festgehaltene Einheit trägt drei leere Listen; aktive Einheiten nie.
+    #[tokio::test]
+    async fn letzte_besetzung_fehlt_ohne_kennzeichen_und_an_aktiven() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        // Spur nur durch eine beendete Kraft mit Verweis: es bleibt nichts Aktives festzuhalten.
+        let leer = anlegen(&pool, einsatz, 1, daten("Leer", None, None, None, None), b)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id, beendet_at, \
+                beendet_als) VALUES (?, 'Alt', ?, '2026-10-13 14:00:00', 'entlassen')",
+        )
+        .bind(einsatz)
+        .bind(leer.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        aufloesen_als(&pool, einsatz, leer.id, b, Aufloesung::Aufloesen)
+            .await
+            .unwrap();
+        assert_eq!(
+            aufgeloeste_von(&pool, einsatz, leer.id)
+                .await
+                .letzte_besetzung,
+            Some(super::super::LetzteBesetzung::default())
+        );
+        // Vor der Migration aufgelöst: kein Kennzeichen.
+        let alt = anlegen(&pool, einsatz, 1, daten("Alt", None, None, None, None), b)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_einheit SET aufgeloest_at = '2026-10-01 10:00:00' WHERE id = ?",
+        )
+        .bind(alt.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let anzeige = aufgeloeste_von(&pool, einsatz, alt.id).await;
+        assert_eq!(anzeige.letzte_besetzung, None);
+        assert!(!serde_json::to_value(&anzeige)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .contains_key("letzte_besetzung"));
+        // Aktive Einheiten tragen das Feld nie.
+        let [_aktiv, ..] = florian_mit_besetzung(&pool, einsatz, b).await;
+        assert!(liste(&pool, einsatz)
+            .await
+            .unwrap()
+            .iter()
+            .all(|e| e.letzte_besetzung.is_none()));
+    }
+
+    /// Eine gelöschte (ohne Spur) oder stornierte Einheit hält nichts fest.
+    #[tokio::test]
+    async fn geloeschte_und_stornierte_einheit_halten_nichts_fest() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        for art in [Aufloesung::Aufloesen, Aufloesung::Stornieren] {
+            let e = anlegen(&pool, einsatz, 1, daten("Fehl", None, None, None, None), b)
+                .await
+                .unwrap();
+            let r = aufloesen_als(&pool, einsatz, e.id, b, art).await.unwrap();
+            assert!(r.geloescht);
+        }
+        let zeilen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit_letzte_besetzung")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(zeilen, 0);
+    }
+
     // ── Auflösen und Stornieren (LLH-1079) ───────────────────────────────────────────
 
     async fn aufloesen_als(
@@ -2658,11 +3066,14 @@ mod tests {
     /// Jeder Fremdschlüssel auf `einsatz_einheit` ist eine Spur (Review LLH-1079, O1, wie D4 bei
     /// Personen): eine Einheit, auf die etwas verweist, wird aufgelöst statt gelöscht. Ausgenommen
     /// sind nur die Unterstellung (rückt beim Auflösen hoch), die Sprechgruppen und die
-    /// Verbindungen (LLH-1134; beide Angaben der Einheit selbst, sie gehen per Kaskade mit).
+    /// Verbindungen (LLH-1134; beide Angaben der Einheit selbst, sie gehen per Kaskade mit) und
+    /// die letzte Besetzung (LLH-1266): sie entsteht erst beim Auflösen einer Einheit, die
+    /// ohnehin stehen bleibt, und geht per Kaskade mit ihr.
     #[tokio::test]
     async fn jeder_verweis_auf_eine_einheit_ist_spur() {
         const KEINE_SPUR: &[(&str, &str)] = &[
             ("einsatz_einheit", "ueber_einheit_id"),
+            ("einsatz_einheit_letzte_besetzung", "einheit_id"),
             ("einsatz_einheit_sprechgruppe", "einheit_id"),
             ("einsatz_verbindung", "einheit_id"),
         ];

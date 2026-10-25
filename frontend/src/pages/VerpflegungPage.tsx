@@ -40,9 +40,18 @@ import { useAuth } from '../auth/AuthContext';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
-import { OffeneBearbeitungProvider } from '../components/offeneBearbeitung';
+import {
+  OffeneBearbeitungProvider,
+  useWechselNachRueckfrage,
+} from '../components/offeneBearbeitung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import { Sammelbanner, sammelbannerKurz, Segmentleiste, useRollen } from '../components/instrument';
+import {
+  Sammelbanner,
+  sammelbannerKurz,
+  Segmentleiste,
+  useRollen,
+  type SegmentOption,
+} from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -107,6 +116,33 @@ function zuflussText(
 
 /** Zwei Zeitfenster-Ansichten und die Stellen (LLH-1040, D13 Punkt 1): EINE Leiste. */
 type Ansicht = 'laufend' | 'vergangen' | 'stellen';
+
+/**
+ * Die Leiste der Ansichten. Ein Wechsel hängt die Karten der bisherigen Ansicht aus; mit geänderter
+ * Karte in Bearbeitung kommt deshalb erst die Rückfrage des Pfadwechsels (LLH-1415,
+ * `useWechselNachRueckfrage`). Eigene Komponente, weil der Hook unter dem Merker der Seite liegen
+ * muss.
+ */
+function AnsichtLeiste({
+  wert,
+  optionen,
+  onWechsel,
+}: {
+  wert: Ansicht;
+  optionen: SegmentOption<Ansicht>[];
+  onWechsel: (wert: Ansicht) => void;
+}) {
+  const nachRueckfrage = useWechselNachRueckfrage();
+  return (
+    <Segmentleiste
+      beschriftung="Ansicht"
+      wert={wert}
+      onWechsel={(w) => nachRueckfrage(() => onWechsel(w))}
+      optionen={optionen}
+      style={{ flex: 'none' }}
+    />
+  );
+}
 
 /** Erfolgswort je Zielstatus einer Stelle. */
 const STELLE_STATUS_ERFOLG: Record<VerpflegungsstelleStatus, string> = {
@@ -448,112 +484,112 @@ export default function VerpflegungPage() {
         )
       }
     >
-      {/* Werkzeugzeile: immer gerendert, `nowrap`, Mindesthöhe = Steuerhöhe + 2 px Rahmen. Das
-          Banner ändert ihre Höhe nicht, also verschiebt es keine Karte. Schmal steht nur `marginXS`
-          zwischen Leiste und Banner: drei Segmente à 72 px und „1 neu“ ließen im Handschuh-Betrieb
-          sonst 2 px Luft, zu wenig für abweichende Schriftmetrik (LLH-1040,
-          `e2e/gate1-ueberlauf.spec.ts`). Das Banner trägt eigenen Grund und eigene Kante. */}
-      <Flex
-        gap={istSchmal ? token.marginXS : token.marginSM}
-        align="center"
-        data-lfh="verpflegung-werkzeugzeile"
-        style={{ marginBottom: token.margin, minHeight: token.controlHeight + 2 }}
-      >
-        <Segmentleiste
-          beschriftung="Ansicht"
-          wert={ansicht}
-          onWechsel={(w) => {
-            // Ein Ansichtswechsel ist die Bitte, den aktuellen Stand zu sehen.
-            gibFrei();
-            setAnsicht(w);
-          }}
-          optionen={[
-            {
-              wert: 'laufend',
-              label: `${istSchmal ? 'aktuell' : 'laufend & anstehend'} (${alle.length - vergangen.length})`,
-            },
-            // Schmal ohne Zahl: mit drei Werten und dem Banner „1 neu“ trägt die Zeile bei 390 px im
-            // Handschuh-Betrieb die Zahlen nicht (5 px Überlauf; design.md, Risiken;
-            // `e2e/gate1-ueberlauf.spec.ts`). „aktuell (n)“ behält ihre, sie ist die Lage.
-            {
-              wert: 'vergangen',
-              label: istSchmal ? 'vergangen' : `vergangen (${vergangen.length})`,
-            },
-            {
-              wert: 'stellen',
-              label: istSchmal ? 'Stellen' : `Stellen (${offeneStellenCount(stellen)})`,
-            },
-          ]}
-          style={{ flex: 'none' }}
-        />
-        {(zurueckgehalten.length > 0 || umgeordnet) && (
-          <Sammelbanner
-            aktion={{ label: 'anzeigen', onKlick: gibFrei }}
-            kurz={istSchmal ? sammelbannerKurz(zurueckgehalten.length, umgeordnet) : undefined}
-            style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
-          >
-            <span
-              title={zuflussText(zurueckgehalten, jetzt, umgeordnet)}
-              style={{
-                display: 'block',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
+      {/* Höchstens eine Karte im Bearbeiten-Zustand, Rückfrage vor dem Verlassen mit Änderung
+          (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten in der Ansicht“). Der Merker umfasst auch
+          die Leiste: ein Ansichtswechsel hängt die Karte aus und fragt wie ein Pfadwechsel
+          (LLH-1415). */}
+      <OffeneBearbeitungProvider aktiv={darfSchreiben}>
+        {/* Werkzeugzeile: immer gerendert, `nowrap`, Mindesthöhe = Steuerhöhe + 2 px Rahmen. Das
+            Banner ändert ihre Höhe nicht, also verschiebt es keine Karte. Schmal steht nur
+            `marginXS` zwischen Leiste und Banner: drei Segmente à 72 px und „1 neu“ ließen im
+            Handschuh-Betrieb sonst 2 px Luft, zu wenig für abweichende Schriftmetrik (LLH-1040,
+            `e2e/gate1-ueberlauf.spec.ts`). Das Banner trägt eigenen Grund und eigene Kante. */}
+        <Flex
+          gap={istSchmal ? token.marginXS : token.marginSM}
+          align="center"
+          data-lfh="verpflegung-werkzeugzeile"
+          style={{ marginBottom: token.margin, minHeight: token.controlHeight + 2 }}
+        >
+          <AnsichtLeiste
+            wert={ansicht}
+            onWechsel={(w) => {
+              // Ein Ansichtswechsel ist die Bitte, den aktuellen Stand zu sehen.
+              gibFrei();
+              setAnsicht(w);
+            }}
+            optionen={[
+              {
+                wert: 'laufend',
+                label: `${istSchmal ? 'aktuell' : 'laufend & anstehend'} (${alle.length - vergangen.length})`,
+              },
+              // Schmal ohne Zahl: mit drei Werten und dem Banner „1 neu“ trägt die Zeile bei 390 px
+              // im Handschuh-Betrieb die Zahlen nicht (5 px Überlauf; design.md, Risiken;
+              // `e2e/gate1-ueberlauf.spec.ts`). „aktuell (n)“ behält ihre, sie ist die Lage.
+              {
+                wert: 'vergangen',
+                label: istSchmal ? 'vergangen' : `vergangen (${vergangen.length})`,
+              },
+              {
+                wert: 'stellen',
+                label: istSchmal ? 'Stellen' : `Stellen (${offeneStellenCount(stellen)})`,
+              },
+            ]}
+          />
+          {(zurueckgehalten.length > 0 || umgeordnet) && (
+            <Sammelbanner
+              aktion={{ label: 'anzeigen', onKlick: gibFrei }}
+              kurz={istSchmal ? sammelbannerKurz(zurueckgehalten.length, umgeordnet) : undefined}
+              style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
             >
-              {zuflussText(zurueckgehalten, jetzt, umgeordnet)}
-            </span>
-          </Sammelbanner>
-        )}
-      </Flex>
+              <span
+                title={zuflussText(zurueckgehalten, jetzt, umgeordnet)}
+                style={{
+                  display: 'block',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {zuflussText(zurueckgehalten, jetzt, umgeordnet)}
+              </span>
+            </Sammelbanner>
+          )}
+        </Flex>
 
-      {verpflegungQuery.isError && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: token.marginSM }}
-          title="Verpflegung konnte nicht geladen werden"
-        />
-      )}
-      {verpflegungQuery.isLoading ? (
-        <Spin />
-      ) : stellenAnsicht ? (
-        <StellenListe
-          einsatzId={einsatzId}
-          stellen={stellen}
-          zeitfenster={alle}
-          jetzt={jetzt}
-          darfPlanen={darfSchreiben && planen}
-          mitOrt={darf('fremde-module')}
-          onAnlegen={oeffneStelleAnlegen}
-          onBearbeiten={(s) => {
-            stelleAendernMut.reset();
-            setDialog({ art: 'stelle-bearbeiten', stelle: s });
-          }}
-          onStatus={(s, status) => stelleStatusMut.mutateAsync({ s, status })}
-          onStornieren={(s) => stelleStornoMut.mutateAsync(s)}
-        />
-      ) : alle.length === 0 ? (
-        <SeitenLeer
-          titel="Noch kein Zeitfenster"
-          aktion={
-            darfSchreiben && planen
-              ? { label: 'Zeitfenster anlegen', onClick: oeffneZeitfensterAnlegen }
-              : undefined
-          }
-        />
-      ) : liste.length === 0 ? (
-        <SeitenLeer
-          titel={
-            ansicht === 'laufend'
-              ? 'Kein laufendes oder anstehendes Zeitfenster'
-              : 'Noch kein Zeitfenster vorbei'
-          }
-        />
-      ) : (
-        // Höchstens eine Karte im Bearbeiten-Zustand, Rückfrage vor dem Verlassen mit Änderung
-        // (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten in der Ansicht“).
-        <OffeneBearbeitungProvider aktiv={darfSchreiben}>
+        {verpflegungQuery.isError && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: token.marginSM }}
+            title="Verpflegung konnte nicht geladen werden"
+          />
+        )}
+        {verpflegungQuery.isLoading ? (
+          <Spin />
+        ) : stellenAnsicht ? (
+          <StellenListe
+            einsatzId={einsatzId}
+            stellen={stellen}
+            zeitfenster={alle}
+            jetzt={jetzt}
+            darfPlanen={darfSchreiben && planen}
+            mitOrt={darf('fremde-module')}
+            onAnlegen={oeffneStelleAnlegen}
+            onBearbeiten={(s) => {
+              stelleAendernMut.reset();
+              setDialog({ art: 'stelle-bearbeiten', stelle: s });
+            }}
+            onStatus={(s, status) => stelleStatusMut.mutateAsync({ s, status })}
+            onStornieren={(s) => stelleStornoMut.mutateAsync(s)}
+          />
+        ) : alle.length === 0 ? (
+          <SeitenLeer
+            titel="Noch kein Zeitfenster"
+            aktion={
+              darfSchreiben && planen
+                ? { label: 'Zeitfenster anlegen', onClick: oeffneZeitfensterAnlegen }
+                : undefined
+            }
+          />
+        ) : liste.length === 0 ? (
+          <SeitenLeer
+            titel={
+              ansicht === 'laufend'
+                ? 'Kein laufendes oder anstehendes Zeitfenster'
+                : 'Noch kein Zeitfenster vorbei'
+            }
+          />
+        ) : (
           <section
             aria-label={
               ansicht === 'laufend'
@@ -597,8 +633,8 @@ export default function VerpflegungPage() {
               />
             ))}
           </section>
-        </OffeneBearbeitungProvider>
-      )}
+        )}
+      </OffeneBearbeitungProvider>
 
       {/* Dialoge je Ziel frisch montiert und außerhalb der Karten: `initialValues` greift nur
           beim Einhängen, und der Speicher von rc-field-form überlebt sonst ein Schließen. */}
