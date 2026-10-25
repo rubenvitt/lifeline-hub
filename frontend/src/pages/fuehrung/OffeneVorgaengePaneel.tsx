@@ -78,7 +78,7 @@ const NICHT_FREIGEGEBEN = 'nicht freigegeben';
  * und „alle ↗“ ins Modul. Welche Einträge und in welcher Folge, steht in `offeneVorgaenge.ts`.
  *
  * - Ein Eintrag springt per Deeplink auf sein Objekt, das das Ziel hervorhebt (Spec
- *   `deeplink-hervorhebung`); Erinnerungen haben keinen Einzeldeeplink und springen ins Modul.
+ *   `deeplink-hervorhebung`), eine Erinnerung per `?erinnerung=` (LLH-1429).
  * - Ein Eintrag mit Alarm (Bestätigung überfällig, Auftrag oder Ablösung überfällig) trägt die
  *   Alarmkante links UND das Wort; eine überfällige Nachforderung tönt nur `achtung` (Board-Regel,
  *   LLH-1097 D7: kein Alarm).
@@ -401,8 +401,11 @@ export default function OffeneVorgaengePaneel({
           sprung: { ziel: erinnerungenPfad(einsatzId), name: 'Erinnerungen' },
           onNeuladen: neuladen(erinnerungen),
           zeile: (e) => (
-            // Kein Einzeldeeplink: die Erinnerungsseite kennt keinen `?erinnerung=` (design.md D6).
-            <Link to={erinnerungenPfad(einsatzId)} data-lfh="vorgang-erinnerung" style={zeile}>
+            <Link
+              to={erinnerungenPfad(einsatzId, { erinnerung: e.id })}
+              data-lfh="vorgang-erinnerung"
+              style={zeile}
+            >
               {zeit(kurz(e.faellig_at))}
               {text(e.titel, e.empfaenger_anzeige ? `an ${e.empfaenger_anzeige}` : null)}
               {e.ist_faellig ? wort('fällig', 'achtung') : wort('bald', null)}

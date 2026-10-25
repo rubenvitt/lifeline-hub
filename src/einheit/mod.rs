@@ -349,9 +349,30 @@ pub fn etb_text_mit_besatzung(text: String, besatzung: &[String]) -> String {
 }
 
 /// System-ETB, wenn eine disponierte Kraft einer Einheit zugeordnet wird. `person` ist der
-/// Snapshot-Name der Disposition (Rückgabe von `mitglied_repo::zuordnen_personal_tx`).
+/// Snapshot-Name der Disposition (`name` aus `mitglied_repo::zuordnen_personal_tx`).
 pub fn etb_text_personal_zugeordnet(einheit: &str, person: &str) -> String {
     format!("Einheit «{}»: «{}» zugeordnet", einheit, person)
+}
+
+/// System-ETB, wenn eine Person einer Einheit zugeordnet wird oder in sie wechselt (LLH-1262,
+/// Gegenstück zu [`etb_text_fahrzeug_umgehaengt`]): das erste Zuordnen schreibt
+/// [`etb_text_personal_zugeordnet`], ein Wechsel „Person «Anna»: Einheit «Zug 1» → «Zug 2»“, und
+/// jede Einheit, deren Führung die Person dabei abgibt, steht dahinter („…, Einheitsführer von
+/// «Zug 1» endet“).
+pub fn etb_text_personal_eingeteilt(
+    einheit: &str,
+    person: &str,
+    vorher: Option<&str>,
+    fuehrung_endet: &[&str],
+) -> String {
+    let mut text = match vorher {
+        Some(vorher) => format!("Person «{person}»: Einheit «{vorher}» → «{einheit}»"),
+        None => etb_text_personal_zugeordnet(einheit, person),
+    };
+    for f in fuehrung_endet {
+        text.push_str(&format!(", Einheitsführer von «{f}» endet"));
+    }
+    text
 }
 
 /// Der eine System-ETB für mehrere Kräfte, die einer Einheit auf einmal zugeordnet werden
@@ -513,6 +534,22 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_personal_zugeordnet("1. Zug", "Erika Muster"),
             "Einheit «1. Zug»: «Erika Muster» zugeordnet"
+        );
+    }
+
+    #[test]
+    fn personal_eingeteilt_nennt_vorige_einheit_und_endende_fuehrung() {
+        assert_eq!(
+            etb_text_personal_eingeteilt("Zug 2", "Anna", None, &[]),
+            "Einheit «Zug 2»: «Anna» zugeordnet"
+        );
+        assert_eq!(
+            etb_text_personal_eingeteilt("Zug 2", "Anna", Some("Zug 1"), &[]),
+            "Person «Anna»: Einheit «Zug 1» → «Zug 2»"
+        );
+        assert_eq!(
+            etb_text_personal_eingeteilt("Zug 2", "Anna", Some("Zug 1"), &["Zug 1"]),
+            "Person «Anna»: Einheit «Zug 1» → «Zug 2», Einheitsführer von «Zug 1» endet"
         );
     }
 

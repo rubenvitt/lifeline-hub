@@ -61,8 +61,9 @@ Für Einsatzleitung und Führungspersonal:
 
 Funk und Telefon stehen getrennt: „Rufname“ ist der Funkrufname der Abschnittsleitung, etwa
 „Rotkreuz Musterstadt 1/10-1“ (höchstens 200 Zeichen), dazu die „Sprechgruppen“. Unter „Telefon
-und weitere Verbindungen“ fügt „Verbindung hinzufügen“ eine Zeile mit Mittel, Nummer oder Adresse
-und Hinweis an; „Speichern“ übernimmt die ganze Liste, höchstens zehn Verbindungen. Der Funkplan
+und weitere Verbindungen“ wählt ein Tipp auf eine Nummer sie; geändert wird über „Bearbeiten“
+neben der Liste. Dort fügt „Verbindung hinzufügen“ eine Zeile mit Mittel, Nummer oder Adresse und
+Hinweis an; „Speichern“ übernimmt die ganze Liste, höchstens zehn Verbindungen. Der Funkplan
 nimmt den Rufnamen vor der Kurzbezeichnung.
 
 Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie für diesen Einsatz an
