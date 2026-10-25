@@ -768,9 +768,50 @@ pub async fn update(
     Ok(Json(final_anzeige))
 }
 
+/// System-Eintrag zu einer wirksamen Sprechgruppen-Änderung an der Einheit (LLH-1265, Change
+/// `pcrn0wn1-einheit-sprechgruppen-einzelwege`, design.md D3). Nach dem Schreiben und degradiert
+/// wie der Eintrag zum Führerwechsel: scheitert das Laden der Namen, bleibt die Zuordnung, und
+/// nur der Eintrag fehlt.
+async fn etb_sprechgruppe(
+    state: &AppState,
+    ctx: &EinsatzSchreibzugriff<Einheiten>,
+    eid: i64,
+    sg: i64,
+    wirkung: &str,
+) {
+    let einsatz_id = ctx.einsatz.id;
+    let name = sqlx::query_scalar::<_, String>(
+        "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(eid)
+    .bind(einsatz_id)
+    .fetch_one(&state.pool)
+    .await;
+    let gruppe = crate::sprechgruppe::repo::laden(&state.pool, ctx.einsatz.org_id, sg).await;
+    match (name, gruppe) {
+        (Ok(name), Ok(gruppe)) => {
+            let inhalt = format!(
+                "Einheit «{name}»: Sprechgruppe «{}» ({}) {wirkung}",
+                gruppe.bezeichnung,
+                gruppe.betriebsart.as_str()
+            );
+            super::etb_system_degradiert(state, einsatz_id, ctx.benutzer.id, &inhalt).await;
+        }
+        (name, gruppe) => tracing::error!(
+            einsatz_id,
+            einheit_id = eid,
+            sprechgruppe_id = sg,
+            name_fehler = ?name.err(),
+            sprechgruppe_fehler = ?gruppe.err(),
+            "ETB-Eintrag zur Sprechgruppe fehlgeschlagen (degradiert, nicht fatal)"
+        ),
+    }
+}
+
 /// PUT /api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg} — eine Sprechgruppe zuordnen
 /// (LFH-893, design.md D5). Idempotent; dieselbe Prüfung, Zuordnung und Live-Wirkung wie der
-/// PATCH mit `sprechgruppe_ids`, kein ETB (auch der PATCH schreibt dafür keinen).
+/// PATCH mit `sprechgruppe_ids`. Anders als der PATCH schreibt eine wirksame Zuordnung einen
+/// System-Eintrag ins ETB (LLH-1265, D3), eine wiederholte keinen.
 pub async fn sprechgruppe_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -789,11 +830,13 @@ pub async fn sprechgruppe_zuordnen(
     .await?
     {
         sse_einheit(&state, einsatz_id, eid);
+        etb_sprechgruppe(&state, &ctx, eid, sg, "zugeordnet").await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg} — Zuordnung lösen, idempotent.
+/// DELETE /api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg} — Zuordnung lösen, idempotent;
+/// eine wirksame Lösung schreibt einen System-Eintrag ins ETB (LLH-1265, D3).
 pub async fn sprechgruppe_loesen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -803,6 +846,7 @@ pub async fn sprechgruppe_loesen(
     let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Einheit(eid);
     if crate::sprechgruppe::repo::einzeln_loesen(&state.pool, einsatz_id, ziel, sg).await? {
         sse_einheit(&state, einsatz_id, eid);
+        etb_sprechgruppe(&state, &ctx, eid, sg, "entfernt").await;
     }
     Ok(StatusCode::NO_CONTENT)
 }

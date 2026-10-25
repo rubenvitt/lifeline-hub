@@ -86,7 +86,9 @@ Für Einsatzleitung und Führungspersonal:
    daneben „unterbesetzt“ oder „Soll erfüllt“.
 5. Hat die Einheit kein Fahrzeug, unter „Status“ den Status wählen; „kein Status“ nimmt ihn
    zurück.
-6. Im Paneel „Funk“ ebenso die „Sprechgruppen“ ändern; den Funkrufnamen trägt der Kopf.
+6. Im Paneel „Funk“ ebenso die „Sprechgruppen“ ändern; den Funkrufnamen trägt der Kopf. Jede
+   hinzugefügte oder entfernte Sprechgruppe steht danach im Einsatztagebuch. Was ein anderer
+   Arbeitsplatz währenddessen an den Sprechgruppen ändert, bleibt erhalten.
 7. Im Paneel „Telefon und weitere Verbindungen“ „Bearbeiten“ neben der Liste wählen, bei leerer
    Liste „Telefon und weitere Verbindungen eintragen“. „Verbindung hinzufügen“ legt eine Zeile
    an: das Mittel wählen (Festnetz, Mobil, Fax, E-Mail, Messenger, Melder oder Sonstiges),
