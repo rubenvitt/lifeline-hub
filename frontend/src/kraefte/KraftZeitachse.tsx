@@ -75,6 +75,11 @@ export interface KraftZeitachseProps {
   darfSchreiben: boolean;
   /** Grund, wenn nicht geschrieben werden darf. */
   rechteText?: string;
+  /**
+   * Nur lesen (aufgelöste Einheit, LLH-1266): ohne „Nachtragen“, ohne Streichen und ohne
+   * Rechte-Hinweis, statt sie gesperrt zu zeigen. Die Ereignisse stehen wie sonst.
+   */
+  lesend?: boolean;
   /** Die Kraft ist entlassen (LLH-1263): die abschließende Entlassung steht gesperrt. */
   isBeendet?: boolean;
 }
@@ -105,6 +110,7 @@ export default function KraftZeitachse({
   kennung,
   darfSchreiben,
   rechteText = ZEITACHSE_RECHTE_TEXT,
+  lesend = false,
   isBeendet = false,
 }: KraftZeitachseProps) {
   const qc = useQueryClient();
@@ -236,7 +242,7 @@ export default function KraftZeitachse({
       data-lfh="kraft-zeitachse"
       style={{ display: 'flex', flexDirection: 'column', gap: token.paddingSM }}
     >
-      <RechteHinweis text={rechteText} sichtbar={!darfSchreiben} />
+      <RechteHinweis text={rechteText} sichtbar={!darfSchreiben && !lesend} />
       <div
         style={{
           display: 'flex',
@@ -247,7 +253,7 @@ export default function KraftZeitachse({
         }}
       >
         <DauerZeile dauern={dauern} zeit={zeit} />
-        {nachtragKnopf}
+        {!lesend && nachtragKnopf}
       </div>
       <PaneelZustand
         zustand={zustand}
@@ -290,7 +296,7 @@ export default function KraftZeitachse({
                   hinweis={gestrichen ? `gestrichen: ${e.streichgrund ?? ''}` : undefined}
                   aktionen={
                     // Nach der Art: auch die Kopie an einer Person streicht nur die Rücknahme der Ablösung.
-                    !gestrichen && e.art !== 'abloesung' ? (
+                    !lesend && !gestrichen && e.art !== 'abloesung' ? (
                       e.id === gesperrtId ? (
                         <span
                           style={{

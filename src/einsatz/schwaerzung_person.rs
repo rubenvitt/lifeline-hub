@@ -363,6 +363,14 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         bezug: Bezug::Spalte("personal_id"),
         spalten: &[],
     },
+    // Letzte Besetzung einer aufgelösten Einheit (LLH-1266): nur Verweise, nichts zu entfernen;
+    // der Name geht mit `einsatz_personal`.
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "einsatz_einheit_letzte_besetzung",
+        bezug: Bezug::Spalte("personal_id"),
+        spalten: &[],
+    },
     PersonenBezug {
         art: PersonenArt::ExterneKraft,
         tabelle: "einsatz_schaden",

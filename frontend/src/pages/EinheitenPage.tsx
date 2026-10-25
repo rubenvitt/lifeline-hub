@@ -377,6 +377,8 @@ export default function EinheitenPage() {
           zusatz: e.typ_label,
           beendetAt: e.aufgeloest_at,
         }))}
+        // Die lesende Ansicht der aufgelösten Einheit (LLH-1266).
+        ziel={(id) => einheitDetailPfad(einsatzId, id)}
       />
 
       {/* Zwei Felder; der Rest der Kopfdaten lebt auf der Detailansicht. Der Dialog setzt auf
