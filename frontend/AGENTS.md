@@ -958,7 +958,10 @@ und `pages/personen/`.
   übrigen Felder sind gesperrt mit „Erst „Name“ speichern oder abbrechen“
   (`useOffeneBearbeitungGrund` liefert den Grund der Seite; wo er steht, sagt die Bereichsdatei,
   für Personendaten `frontend/src/personen/AGENTS.md`). Ein offenes Feld ohne Änderung meldet sich
-  nicht an.
+  nicht an. **Ein Wechsel in der Seite, der die offene Bearbeitung aushängt** (Segmentleiste oder
+  Reiter ohne Pfadwechsel), geht über `useWechselNachRueckfrage` desselben Merkers: mit Änderung
+  dieselbe Rückfrage (`VerlassenDialog`), ohne still; der Provider umfasst dafür auch die Leiste
+  (LLH-1415, Vorbild `pages/VerpflegungPage.tsx`).
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;
