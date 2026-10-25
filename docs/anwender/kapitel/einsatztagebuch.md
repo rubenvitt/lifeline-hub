@@ -239,7 +239,9 @@ Einsatzes unter „Verhalten & Automatik“ das Feld „Automatische ETB-Einträ
 der Organisation, sonst „An“ ([Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Ein
 automatischer Eintrag zeigt einen Verweis auf seinen Ursprung, etwa „Auftrag ↗“, „Befehl ↗“,
 „Meldung #12 ↗“ oder „Nachforderung ↗“. Der Verweis auf eine Meldung oder Nachforderung öffnet
-deren Seite mit der Karte hervorgehoben.
+deren Seite mit der Karte hervorgehoben. Ein Auftrag und die Auflösung einer Einheit tragen je
+genannte Einheit „Einheit «Name» ↗“; er öffnet die Seite der Einheit, bei einer aufgelösten die
+lesende ([Einheiten](einheiten.md)).
 
 Nennt ein automatischer Eintrag eine Zeit, etwa „benötigt bis 211530okt26“ oder den Zeitraum einer
 Verpflegung „241200sep26–1330“, steht sie in der Zeitdarstellung des Einsatzes bzw. der

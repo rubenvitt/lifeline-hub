@@ -9,6 +9,7 @@ import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
 import { tippeZeit } from '../test/zeitEingabe';
+import { verschachtelteZiele } from '../test/verschachtelteZiele';
 import { ApiError } from '../api/client';
 import { InlineAngabe, OFFEN_LASSEN, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
 
@@ -336,6 +337,117 @@ describe('InlineAngabe · eigener Auslöser', () => {
 
   it('ohne Schreibrecht kein Auslöser', () => {
     renderMitProviders(<TextAngabe wert="ILS-1" darfSchreiben={false} ausloeser={umbenennen} />);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
+/**
+ * Eine Anzeige mit eigenen Bedienzielen (LLH-1426): ein `tel:`-Link im Wertknopf ist ein Link in
+ * einem Button — der Klick auf die Nummer öffnete die Bearbeitung statt zu wählen, und ein
+ * Screenreader bekäme verschachtelte Ziele. Mit `bearbeitenDaneben` ist die Anzeige Inhalt, und
+ * „Bearbeiten“ steht als eigener Knopf daneben (Sprache von `BearbeitbaresPaneel`).
+ */
+describe('InlineAngabe · Bearbeiten daneben (bearbeitenDaneben)', () => {
+  const NUMMER = '+49 170 1234';
+  const mitLink = <a href="tel:+491701234">{NUMMER}</a>;
+
+  /** Hält fest, ob die App den Klick verhindert hat, und unterdrückt danach jsdoms Navigation. */
+  function beobachteLinkKlick() {
+    const verhindert: boolean[] = [];
+    const lauscher = (e: MouseEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest('a[href]')) return;
+      verhindert.push(e.defaultPrevented);
+      e.preventDefault();
+    };
+    window.addEventListener('click', lauscher);
+    return { verhindert, ende: () => window.removeEventListener('click', lauscher) };
+  }
+
+  it('kein Bedienziel im anderen: der Link steht neben dem Knopf, nicht darin', () => {
+    const { container } = renderMitProviders(
+      <TextAngabe wert={NUMMER} anzeige={mitLink} bearbeitenDaneben />,
+    );
+    expect(verschachtelteZiele(container)).toEqual([]);
+    expect(screen.getByRole('link', { name: NUMMER }).closest('button')).toBeNull();
+  });
+
+  it('Gegenprobe: ohne den Modus steckt der Link im Wertknopf, und die Entwicklung warnt', () => {
+    const warnung = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { container } = renderMitProviders(<TextAngabe wert={NUMMER} anzeige={mitLink} />);
+      expect(verschachtelteZiele(container)).not.toEqual([]);
+      expect(warnung).toHaveBeenCalledWith(expect.stringContaining('bearbeitenDaneben'));
+    } finally {
+      warnung.mockRestore();
+    }
+  });
+
+  it('ein Klick auf die Nummer wählt und öffnet nicht die Bearbeitung', async () => {
+    renderMitProviders(<TextAngabe wert={NUMMER} anzeige={mitLink} bearbeitenDaneben />);
+    const klick = beobachteLinkKlick();
+    try {
+      await userEvent.click(screen.getByRole('link', { name: NUMMER }));
+    } finally {
+      klick.ende();
+    }
+    expect(klick.verhindert).toEqual([false]);
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('„Bearbeiten“ nennt die Angabe, beschreibt sich mit dem Wert und öffnet die Eingabe', async () => {
+    renderMitProviders(<TextAngabe wert={NUMMER} anzeige={mitLink} bearbeitenDaneben />);
+    const knopf = screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' });
+    expect(knopf).toHaveTextContent(/^Bearbeiten$/);
+    expect(knopf).toHaveAccessibleDescription(NUMMER);
+    await userEvent.click(knopf);
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveFocus();
+  });
+
+  it('Tastaturweg: erst der Link, dann „Bearbeiten“; Enter öffnet, Escape gibt den Fokus zurück', async () => {
+    renderMitProviders(<TextAngabe wert={NUMMER} anzeige={mitLink} bearbeitenDaneben />);
+    const user = userEvent.setup();
+    await user.tab();
+    expect(screen.getByRole('link', { name: NUMMER })).toHaveFocus();
+    await user.tab();
+    const knopf = screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' });
+    expect(knopf).toHaveFocus();
+    await user.keyboard('{Enter}');
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    fireEvent.keyDown(feld, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' })).toHaveFocus();
+  });
+
+  it('mit Kennung nennt der Knopf die Zeile', () => {
+    renderMitProviders(
+      <TextAngabe wert={NUMMER} anzeige={mitLink} kennung="Anna" bearbeitenDaneben />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    ).toBeVisible();
+  });
+
+  it('gesperrt: „Bearbeiten“ nicht bedienbar, der Link bleibt bedienbar', () => {
+    const GRUND = 'Ohne Verbindung nicht änderbar';
+    renderMitProviders(
+      <TextAngabe wert={NUMMER} anzeige={mitLink} gesperrt={GRUND} bearbeitenDaneben />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription(`${NUMMER} ${GRUND}`);
+    expect(screen.getByRole('link', { name: NUMMER })).toHaveAttribute('href', 'tel:+491701234');
+  });
+
+  it('leer: die Aufforderung „… eintragen“ bleibt der eine Auslöser', () => {
+    renderMitProviders(<TextAngabe wert="" anzeige={mitLink} bearbeitenDaneben />);
+    expect(screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' })).toBeVisible();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('ohne Schreibrecht: nur die Anzeige, kein Knopf', () => {
+    renderMitProviders(
+      <TextAngabe wert={NUMMER} anzeige={mitLink} darfSchreiben={false} bearbeitenDaneben />,
+    );
+    expect(screen.getByRole('link', { name: NUMMER })).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
   });
 });

@@ -60,6 +60,10 @@ Verpflegungsausgaben an die Einheit MUST erhalten bleiben. Eine Einheit ohne Zei
 ETB-Verknüpfung, Belegung eines Bereitstellungsraums, ohne Auftrag, Meldung, Dokument, Verteiler
 und Verpflegungsausgabe (auch eine zurückgenommene) mit Verweis auf sie und ohne jede (auch
 beendete) Kraft mit Verweis auf sie MAY stattdessen gelöscht werden.
+Bleibt die Einheit als aufgelöst stehen, MUST das Auflösen in derselben Transaktion ihre letzte
+Besetzung festhalten, wie sie vor dem Lösen war: jede Person mit Führer-Kennzeichen und dem
+Fahrzeug, auf dem sie saß, jedes Fahrzeug und jeden Materialposten mit seiner Menge. Eine
+gelöschte oder stornierte Einheit MUST nichts festhalten.
 
 #### Scenario: Aufgelöste Einheit bleibt im Nachweis
 - **WHEN** die Einheit „Florian 1“ mit Eintreffen 06:40 um 15:00 aufgelöst wird
@@ -76,6 +80,22 @@ beendete) Kraft mit Verweis auf sie MAY stattdessen gelöscht werden.
 #### Scenario: Verpflegte Einheit stornieren
 - **WHEN** eine Einheit ohne andere Spur, an die eine Verpflegungsausgabe ging, als Fehldisposition storniert werden soll
 - **THEN** antwortet das System mit 422 und dem Grund, dass eine Verpflegungsausgabe die Einheit nennt
+
+#### Scenario: Letzte Besetzung festgehalten
+- **WHEN** die Einheit „Florian 1“ mit Führerin Anna Beck und Ben Kurz auf dem Fahrzeug
+  „Florian 1-83-1“ und dem Materialposten „Wolldecke“ mit Menge 20 aufgelöst wird
+- **THEN** liefert die Liste der aufgelösten Einheiten für „Florian 1“ als letzte Besetzung beide
+  Personen, Anna Beck als Führerin, beide auf „Florian 1-83-1“, das Fahrzeug und „Wolldecke“ mit
+  Menge 20, obwohl keine dieser Kräfte der Einheit noch angehört
+
+#### Scenario: Festgehaltene Kraft wird später storniert
+- **WHEN** eine Person nach dem Auflösen ihrer Einheit als Fehldisposition storniert wird
+- **THEN** fehlt sie in der letzten Besetzung der aufgelösten Einheit
+
+#### Scenario: Vor der Änderung aufgelöst
+- **WHEN** eine Einheit abgefragt wird, die aufgelöst wurde, bevor das System die letzte
+  Besetzung festhielt
+- **THEN** trägt sie keine letzte Besetzung, statt einer leeren
 
 ### Requirement: Fehldisposition stornieren
 
@@ -143,8 +163,10 @@ Auswahl, Karte, Stärke, Statusverteilung und jedem Zähler herauslassen. Entlas
 aufgelöste Einheiten MUST auf Anfrage getrennt abrufbar sein. Personal- und Fahrzeugliste MUST
 sie als eingeklappten Block „Entlassen“ mit der Aktion „Erneut disponieren“ zeigen, die
 Materialliste als Block „Aus dem Einsatz genommen“, die Einheitenliste aufgelöste Einheiten als
-eingeklappten Block „Aufgelöst“. Jeder Schreibweg an einer beendeten Kraft außer dem erneuten
-Disponieren MUST mit 409 antworten. Ein Test MUST fehlschlagen, wenn eine Abfrage der vier
+eingeklappten Block „Aufgelöst“, in dem jeder Name auf die Ansicht der Einheit führt. Jeder
+Schreibweg an einer beendeten Kraft außer dem erneuten Disponieren und der Berichtigung der
+Zeitachse einer entlassenen Person MUST mit 409 antworten.
+Ein Test MUST fehlschlagen, wenn eine Abfrage der vier
 Kräftetabellen (Personal, Einheiten, Fahrzeuge, Material) außerhalb einer Ausnahmeliste den
 Zustand nicht prüft.
 
@@ -163,6 +185,50 @@ Zustand nicht prüft.
 #### Scenario: Besatzung an entlassenem Fahrzeug
 - **WHEN** einem entlassenen Fahrzeug eine Person als Besatzung zugeordnet werden soll
 - **THEN** antwortet das System mit 409
+
+#### Scenario: Aufgelöste Einheit aus dem Block öffnen
+- **WHEN** jemand im aufgeklappten Block „Aufgelöst“ den Namen „Florian 1“ wählt
+- **THEN** öffnet die Ansicht der aufgelösten Einheit „Florian 1“
+
+### Requirement: Zeitachse einer entlassenen Person berichtigen
+
+Das System SHALL an einer entlassenen Person Nachtrag und Streichung an ihrer Zeitachse annehmen,
+mit denselben Regeln wie an einer aktiven Kraft. Danach MUST die Person ohne offene
+Einsatzperiode sein, sonst MUST das System mit 422 antworten, nichts schreiben und auf das erneute
+Disponieren verweisen. Der ETB-Eintrag MUST „berichtigt nach Entlassung“ vermerken. An einer
+stornierten Person und an einer aufgelösten Einheit MUST beides weiter mit 409 scheitern.
+
+#### Scenario: Eintreffzeit nach dem Entlassen berichtigen
+- **WHEN** an einer um 14:00 entlassenen Person das Eintreffen 06:40 mit Grund „Zeit verwechselt“ gestrichen und ein Eintreffen 06:30 nachgetragen wird, während ihre Periode mit der Alarmierung 06:10 beginnt
+- **THEN** gelingen beide, die Periode reicht von 06:10 bis 14:00 mit Eintreffen 06:30, und beide ETB-Einträge vermerken „berichtigt nach Entlassung“
+
+#### Scenario: Fehleintrag einer früheren Periode streichen
+- **WHEN** an einer entlassenen Person mit zwei abgeschlossenen Perioden das Eintreffen der ersten mit Grund gestrichen wird, die mit einer Alarmierung beginnt
+- **THEN** antwortet das System mit 200, und die Person bleibt entlassen
+
+#### Scenario: Nachtrag öffnet eine Periode
+- **WHEN** an einer um 14:00 entlassenen Person ein Eintreffen um 15:00 nachgetragen werden soll
+- **THEN** antwortet das System mit 422 und dem Hinweis, die Person erst erneut zu disponieren, und die Zeitachse bleibt unverändert
+
+#### Scenario: Abschließende Entlassung streichen
+- **WHEN** an einer entlassenen Person die Entlassung gestrichen werden soll, die ihre letzte Periode schließt
+- **THEN** antwortet das System mit 422, und die Oberfläche zeigt den Streichen-Knopf dieser Entlassung gesperrt mit Kurzgrund
+
+#### Scenario: Andere Schreibwege bleiben gesperrt
+- **WHEN** an einer entlassenen Person nach einer Berichtigung der Zeitachse der Status gesetzt werden soll
+- **THEN** antwortet das System mit 409
+
+#### Scenario: Stornierte Person
+- **WHEN** an einer stornierten Person ein Ereignis nachgetragen oder gestrichen werden soll
+- **THEN** antwortet das System mit 409
+
+#### Scenario: Aufgelöste Einheit
+- **WHEN** an einer aufgelösten Einheit ein Ereignis nachgetragen oder gestrichen werden soll
+- **THEN** antwortet das System mit 409
+
+#### Scenario: Oberfläche einer entlassenen Person
+- **WHEN** eine Person mit Schreibrecht im aktiven Einsatz die Ansicht einer entlassenen Person öffnet
+- **THEN** bietet das Paneel „Zeitachse“ „Nachtragen“ und „Streichen“, und Einteilung und Angaben bleiben nur lesbar
 
 ### Requirement: Entlassene im Nachweis
 

@@ -14,6 +14,7 @@ import type {
   VorlageVorschau,
   VorschauFahrzeug,
   VorschauKnoten,
+  VorschauMaterial,
   VorschauPersonal,
   ZeilenArt,
 } from '../api/types';
@@ -29,14 +30,20 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
   LEERE_WAHL,
   reconcileWahl,
+  alleMaterial,
   allePersonen,
+  anDerEinheit,
   buildAnfrage,
   deckelGrund,
   gruendeJeZeile,
   isGesperrt,
+  isMaterialGesperrt,
   isNameVergeben,
+  kommtMit,
+  materialZustandWort,
   offersUmhaengen,
   ohneFahrzeug,
+  setMaterialWahl,
   setWahl,
   umhaengenText,
   verlaesstFahrzeug,
@@ -61,7 +68,8 @@ import {
  * Vorlage“ und „Rückmeldung der Seite“; Change `h997wi4l-einheit-aus-vorlage` D1, D4, D12, D14,
  * D15). Kopf: Name der obersten Einheit (vorbelegt, änderbar, Warnung bei gleichem Namen) und
  * Abschnitt. Darunter der Baum der Vorlage mit einem Häkchen je Fahrzeug (Vorgabe an) und je
- * Person (Vorgabe aus); jede Zeile nennt ihren Zustand als Wort. Ein Absenden bildet alles oder
+ * Person (Vorgabe aus), dazu je Material-Position (Vorgabe an, LLH-1261); jede Zeile nennt ihren
+ * Zustand als Wort. Ein Absenden bildet alles oder
  * nichts; Gründe einer Ablehnung stehen an der Zeile, nie im Toast. Danach öffnet das Meldebild
  * mit der neuen Einheit, ohne dessen Freigabe die Ansicht der Einheit.
  *
@@ -165,6 +173,7 @@ function EinheitAusVorlage({
         einsatzKeys.einheiten(einsatzId),
         einsatzKeys.personal(einsatzId),
         einsatzKeys.fahrzeuge(einsatzId),
+        einsatzKeys.material(einsatzId),
         einsatzKeys.etb(einsatzId),
         einsatzKeys.kraefteZeitachse(einsatzId),
       ])
@@ -223,6 +232,7 @@ function EinheitAusVorlage({
       k.fahrzeuge.map((f) => zeilenSchluessel('fahrzeug', f.fahrzeug_id)),
     ),
     ...allePersonen(vorschau).map((p) => zeilenSchluessel('personal', p.personal_id)),
+    ...alleMaterial(vorschau).map((m) => zeilenSchluessel('material', m.vorlage_material_id)),
   ]);
   // Gründe ohne Zeile (aus der Vorlage gefallen) stehen über der Aktion, mit Kennung.
   const verwaisteGruende = zeilen.gemeldet().filter((k) => !zeilenSchluesselJetzt.has(k));
@@ -293,6 +303,9 @@ function EinheitAusVorlage({
           onWahl={(art, zeile, an) =>
             setRohWahl((w) => setWahl(reconcileWahl(w, vorschau), art, zeile, an))
           }
+          onMaterialWahl={(m, an) =>
+            setRohWahl((w) => setMaterialWahl(reconcileWahl(w, vorschau), m, an))
+          }
         />
         {verwaisteGruende.map((k) => (
           <div key={k}>
@@ -304,12 +317,15 @@ function EinheitAusVorlage({
   );
 }
 
-/** Namen aller Zeilen beim Absenden (Funkrufname bzw. Name). */
+/** Namen aller Zeilen beim Absenden (Funkrufname, Name bzw. Bezeichnung). */
 function zeilenNamen(v: VorlageVorschau): Map<string, string> {
   const m = new Map<string, string>();
   for (const k of v.knoten) {
     for (const f of k.fahrzeuge) m.set(zeilenSchluessel('fahrzeug', f.fahrzeug_id), f.funkrufname);
     for (const p of k.personal) m.set(zeilenSchluessel('personal', p.personal_id), p.name);
+    for (const x of k.material) {
+      m.set(zeilenSchluessel('material', x.vorlage_material_id), x.bezeichnung);
+    }
   }
   return m;
 }
@@ -359,6 +375,7 @@ interface BaumProps {
   gesperrt: boolean;
   grund: (schluessel: string) => unknown;
   onWahl: (art: ZeilenArt, zeile: VorschauFahrzeug | VorschauPersonal, an: boolean) => void;
+  onMaterialWahl: (m: VorschauMaterial, an: boolean) => void;
 }
 
 /** Tiefe eines Knotens im Baum der Vorlage (Wurzel 0). */
@@ -373,16 +390,28 @@ function tiefen(knoten: readonly VorschauKnoten[]): Map<number, number> {
 const UEBERSCHRIFTEN: PaneelUeberschrift[] = ['h2', 'h3', 'h4', 'h5', 'h6'];
 
 /** Der Baum der Vorlage: je Einheit ein Paneel, Fahrzeuge mit ihrer Besatzung, dann der Rest. */
-function Baum({ vorschau, wahl, wurzelName, einheiten, gesperrt, grund, onWahl }: BaumProps) {
+function Baum({
+  vorschau,
+  wahl,
+  wurzelName,
+  einheiten,
+  gesperrt,
+  grund,
+  onWahl,
+  onMaterialWahl,
+}: BaumProps) {
   const { token } = useRollen();
   const tiefe = tiefen(vorschau.knoten);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
-      {(vorschau.fahrzeuge_gesperrt || vorschau.personal_gesperrt) && (
+      {(vorschau.fahrzeuge_gesperrt ||
+        vorschau.personal_gesperrt ||
+        vorschau.material_gesperrt) && (
         <Typography.Text type="secondary" data-lfh="vorlage-gesperrt">
           {[
             vorschau.fahrzeuge_gesperrt ? 'Fahrzeuge gesperrt' : null,
             vorschau.personal_gesperrt ? 'Personal gesperrt' : null,
+            vorschau.material_gesperrt ? 'Material gesperrt' : null,
           ]
             .filter(Boolean)
             .join(' · ')}
@@ -467,6 +496,22 @@ function Baum({ vorschau, wahl, wurzelName, einheiten, gesperrt, grund, onWahl }
                 ))}
               </div>
             )}
+            {k.material.length > 0 && (
+              <div>
+                <Typography.Text type="secondary">Material</Typography.Text>
+                {k.material.map((m) => (
+                  <MaterialZeile
+                    key={m.vorlage_material_id}
+                    position={m}
+                    vorschau={vorschau}
+                    wahl={wahl}
+                    gesperrt={gesperrt}
+                    grund={grund(zeilenSchluessel('material', m.vorlage_material_id))}
+                    onWahl={onMaterialWahl}
+                  />
+                ))}
+              </div>
+            )}
           </Paneel>
         );
       })}
@@ -517,6 +562,78 @@ function PersonZeile({
         </>
       }
     />
+  );
+}
+
+/**
+ * Eine Material-Position (LLH-1261): Kästchen mit Menge und Bezeichnung, daneben der Zustand als
+ * Wort, darunter der Ort und der Grund einer Ablehnung. Ort ist das Fahrzeug der Vorlage, wenn es
+ * mitkommt, sonst „an der Einheit“ (D3). Gesperrt (außer Dienst, schon im Einsatz) nur, solange
+ * nicht angehakt; kein „umhängen“.
+ */
+function MaterialZeile({
+  position,
+  vorschau,
+  wahl,
+  gesperrt,
+  grund,
+  onWahl,
+}: {
+  position: VorschauMaterial;
+  vorschau: VorlageVorschau;
+  wahl: Wahl;
+  gesperrt: boolean;
+  grund: unknown;
+  onWahl: BaumProps['onMaterialWahl'];
+}) {
+  const { token } = useRollen();
+  const an = wahl.material.get(position.vorlage_material_id) === true;
+  const fahrzeug =
+    position.fahrzeug_id == null
+      ? undefined
+      : vorschau.knoten
+          .flatMap((k) => k.fahrzeuge)
+          .find((f) => f.fahrzeug_id === position.fahrzeug_id && kommtMit(f, wahl));
+  const ort = anDerEinheit(position, vorschau, wahl)
+    ? 'an der Einheit'
+    : fahrzeug
+      ? `auf «${fahrzeug.funkrufname}»`
+      : null;
+  return (
+    <div
+      data-lfh="vorlage-zeile"
+      data-zeile={zeilenSchluessel('material', position.vorlage_material_id)}
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        columnGap: token.marginSM,
+        paddingBlock: zielEinzug(token),
+      }}
+    >
+      <Checkbox
+        checked={an}
+        disabled={gesperrt || (isMaterialGesperrt(position.zustand) && !an)}
+        onChange={(e) => onWahl(position, e.target.checked)}
+        style={{ flex: '1 1 auto', minWidth: 0 }}
+      >
+        {position.menge}× {position.bezeichnung}
+        {position.bestandsnummer && <span style={monoStil(13)}> {position.bestandsnummer}</span>}
+      </Checkbox>
+      <Typography.Text type="secondary" data-lfh="vorlage-zustand" style={{ whiteSpace: 'nowrap' }}>
+        {materialZustandWort(position)}
+      </Typography.Text>
+      {((an && ort != null) || grund != null) && (
+        <div style={{ flexBasis: '100%', paddingInlineStart: token.marginLG }}>
+          {an && ort != null && (
+            <Typography.Text type="secondary" style={{ display: 'block' }}>
+              {ort}
+            </Typography.Text>
+          )}
+          <ZeilenFehler fehler={grund} />
+        </div>
+      )}
+    </div>
   );
 }
 

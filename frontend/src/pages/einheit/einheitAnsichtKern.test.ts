@@ -20,6 +20,7 @@ import {
   parseZuordnenWert,
   visibleBesatzungRows,
   type EinheitRechte,
+  groupLetzteBesetzung,
 } from './einheitAnsichtKern';
 
 const einheit = (id: number, ueber: number | null) =>
@@ -371,6 +372,25 @@ describe('toKraftError (D7)', () => {
     expect(toKraftError(fehler, 'personal', 53)).toBe(fehler);
     const fremd = new Error('weg');
     expect(toKraftError(fremd, 'personal', 52)).toBe(fremd);
+  });
+});
+
+describe('groupLetzteBesetzung (LLH-1266)', () => {
+  it('stellt jede Person unter ihr festgehaltenes Fahrzeug, sonst unter „Ohne Fahrzeug“', () => {
+    const { fahrzeuge, ohneFahrzeug } = groupLetzteBesetzung({
+      personal: [
+        { ep_id: 1, name: 'Anna', ist_fuehrer: true, auf_fahrzeug_id: 30 },
+        { ep_id: 2, name: 'Ben', ist_fuehrer: false },
+        // Saß auf einem Fahrzeug einer anderen Einheit: kein festgehaltenes Ziel.
+        { ep_id: 3, name: 'Cem', ist_fuehrer: false, auf_fahrzeug_id: 99 },
+      ],
+      fahrzeuge: [{ ef_id: 30, funkrufname: 'Florian 1-83-1' }],
+      material: [],
+    });
+    expect(fahrzeuge.map((f) => [f.fahrzeug.ef_id, f.besatzung.map((p) => p.ep_id)])).toEqual([
+      [30, [1]],
+    ]);
+    expect(ohneFahrzeug.map((p) => p.ep_id)).toEqual([2, 3]);
   });
 });
 

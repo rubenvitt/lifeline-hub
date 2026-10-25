@@ -2090,7 +2090,8 @@ export default function Datensicht<T extends object, const K extends string>(
   ]);
   const garniturNeu = tabellenGarnitur.neu;
   // Je Render neu gebaut wie `tabellenSpalten`: ein neues Spaltenobjekt rendert keine Zelle, das
-  // entscheidet allein `shouldCellUpdate`.
+  // entscheidet allein `shouldCellUpdate`. Ein offenes Kopfmenü verliert dadurch seinen Entwurf
+  // nicht: `KatalogTabelle` hält die Spalten, solange es offen ist (LLH-1427).
   // Die erste Spalte trägt den Zeilenfehler: auch ein eigenes `shouldCellUpdate` lässt dort einen
   // neuen oder geräumten Grund durch.
   const gemerkteSpalten = spaltenMitFehler.map((s, i): KatalogSpalte<T> => {

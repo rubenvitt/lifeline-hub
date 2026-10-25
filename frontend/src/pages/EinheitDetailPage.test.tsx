@@ -5,7 +5,8 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useNavigate, useSearchParams } from 'react-router';
 import { server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { einsatzKeys } from '../api/queryKeys';
 import EinheitDetailPage from './EinheitDetailPage';
 import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 
@@ -353,6 +354,136 @@ describe('EinheitDetailPage · die Route selbst', () => {
       expect(screen.getByRole('heading', { name: titel, level: 2 })).toBeInTheDocument();
     }
     expect(screen.queryByText(/wirken sofort|nichts zu speichern/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Aufgelöste Einheit (LLH-1266, Spec `einheit-ansicht`, „Aufgelöste Einheit nur lesend“): steht sie
+ * nicht unter den aktiven, fragt die Seite die aufgelösten und zeigt sie lesend.
+ */
+describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
+  const aufgeloest = {
+    ...einheiten[0],
+    id: 20,
+    name: 'Florian 1',
+    typ_label: 'Gruppe',
+    sprechgruppen: [],
+    soll: null,
+    ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    aufgeloest_at: '2026-10-13 13:00:00',
+    aufgeloest_von: 1,
+    letzte_besetzung: {
+      personal: [
+        { ep_id: 1, name: 'Anna Beck', ist_fuehrer: true, auf_fahrzeug_id: 30 },
+        { ep_id: 2, name: 'Ben Kurz', ist_fuehrer: false },
+      ],
+      fahrzeuge: [{ ef_id: 30, funkrufname: 'Florian 1-83-1', fahrzeugtyp: 'RTW' }],
+      material: [{ em_id: 40, bezeichnung: 'Wolldecke', menge: 20 }],
+    },
+  };
+
+  /** Liefert unter `?aufgeloeste=1` die aufgelösten und zählt die Abrufe. */
+  function mitAufgeloesten(liste: unknown[]) {
+    const abrufe = { anzahl: 0 };
+    const handler = http.get('/api/einsaetze/1/einheiten', ({ request }) => {
+      if (new URL(request.url).searchParams.get('aufgeloeste') !== '1') return undefined;
+      abrufe.anzahl += 1;
+      return HttpResponse.json(liste);
+    });
+    return { handler, abrufe };
+  }
+
+  it('öffnet die aufgelöste Einheit lesend: Kopf „aufgelöst“, Besatzung, Material, kein Bedienelement', async () => {
+    const { handler } = mitAufgeloesten([aufgeloest]);
+    server.use(handler, ...handlers());
+    rendere('/einsaetze/1/einheiten/20');
+    expect(await screen.findByRole('heading', { name: 'Florian 1', level: 1 })).toBeInTheDocument();
+    expect(screen.getAllByText(/aufgelöst/).length).toBeGreaterThan(0);
+    expect(await screen.findByRole('link', { name: 'Anna Beck' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Florian 1-83-1' })).toBeInTheDocument();
+    expect(screen.getByText('Wolldecke')).toBeInTheDocument();
+    // Mit Schreibrecht, und doch nur Links: kein Knopf, keine Eingabe, kein Auflösen.
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kraft-zeitachse"]')).not.toBeNull(),
+    );
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Einheit auflösen' })).toBeNull();
+  });
+
+  it('vor dem Festhalten aufgelöst: der Satz „nicht festgehalten“ statt Besatzung und Material', async () => {
+    const { handler } = mitAufgeloesten([{ ...aufgeloest, letzte_besetzung: undefined }]);
+    server.use(handler, ...handlers());
+    rendere('/einsaetze/1/einheiten/20');
+    expect(await screen.findByText(/Letzte Besetzung nicht festgehalten/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Material' })).toBeNull();
+    expect(screen.queryByText('Anna Beck')).toBeNull();
+  });
+
+  it('ohne Freigabe Personal und Fahrzeuge stehen die Namen als Text', async () => {
+    const { handler } = mitAufgeloesten([aufgeloest]);
+    server.use(
+      handler,
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture({ personal: { zugriff: false }, fahrzeuge: { zugriff: false } }),
+        ),
+      ),
+      ...handlers(),
+    );
+    rendere('/einsaetze/1/einheiten/20');
+    expect(await screen.findByText('Anna Beck')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Anna Beck' })).toBeNull());
+    expect(screen.queryByRole('link', { name: 'Florian 1-83-1' })).toBeNull();
+    expect(screen.getByText('Florian 1-83-1')).toBeInTheDocument();
+  });
+
+  it('eine veraltete Liste der aufgelösten im Cache zeigt nie „gibt es nicht (mehr)“', async () => {
+    // Die Gliederung hat die aufgelösten geladen, als die Einheit noch aktiv war (Review LLH-1266).
+    const client = neuerQueryClient();
+    client.setQueryDefaults(einsatzKeys.einheitenAufgeloeste(1), { gcTime: Infinity });
+    client.setQueryData(einsatzKeys.einheitenAufgeloeste(1), []);
+    let aktivGeladen = false;
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('aufgeloeste') !== '1') {
+          aktivGeladen = true;
+          return HttpResponse.json(einheiten);
+        }
+        await delay(200);
+        return HttpResponse.json([aufgeloest]);
+      }),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten/20', client },
+    );
+    await waitFor(() => expect(aktivGeladen).toBe(true));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Florian 1', level: 1 })).toBeInTheDocument();
+  });
+
+  it('eine aktive Einheit fragt die aufgelösten nicht ab', async () => {
+    const { handler, abrufe } = mitAufgeloesten([aufgeloest]);
+    server.use(handler, ...handlers());
+    rendere('/einsaetze/1/einheiten/10');
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    expect(abrufe.anzahl).toBe(0);
+  });
+
+  it('weder aktiv noch aufgelöst: „gibt es nicht (mehr)“ mit Weg zur Gliederung', async () => {
+    const { handler, abrufe } = mitAufgeloesten([aufgeloest]);
+    server.use(handler, ...handlers());
+    rendere('/einsaetze/1/einheiten/999');
+    expect(await screen.findByText(/gibt es nicht \(mehr\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zur Gliederung' })).toBeInTheDocument();
+    expect(abrufe.anzahl).toBe(1);
   });
 });
 

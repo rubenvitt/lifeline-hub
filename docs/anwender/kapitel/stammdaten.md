@@ -137,10 +137,14 @@ Zum Ändern in der Zeile „Bearbeiten“ wählen. „Löschen“ fragt mit „�
 
    ![Paneel „Stammbesetzung“ der Vorlage „Rettungsstaffel“ mit vier Personen, je Zeile Position, Fahrzeug und „Entfernen“, darunter „Person wählen“ und „Person hinzufügen“](../bilder/stammdaten/vorlage-stammbesetzung.png)
 
-7. Nach Bedarf im Kopf „Funkrufname“, „Fachaufgabe“ und „Organisation“ des taktischen Zeichens,
+7. Unter „Material“ ein Material wählen und „Material hinzufügen“ wählen. In seiner Zeile lassen
+   sich die Menge und der Ort wählen: leer heißt „an der Einheit“, sonst eines der Fahrzeuge der
+   Vorlage. Die Menge gilt nach Enter oder beim Verlassen des Felds.
+8. Nach Bedarf im Kopf „Funkrufname“, „Fachaufgabe“ und „Organisation“ des taktischen Zeichens,
    die „Soll-Stärke“ und eine „Bemerkung“ eintragen und „Speichern“ wählen.
 
-Fahrzeuge und Stammbesetzung gelten sofort; „Speichern“ betrifft nur die Felder des Kopfes.
+Fahrzeuge, Stammbesetzung und Material gelten sofort; „Speichern“ betrifft nur die Felder des
+Kopfes.
 Eine weitere Untereinheit entsteht auf der Seite der Vorlage mit „Untereinheit anlegen“.
 
 ### Ein Schichtmodell anlegen
@@ -280,7 +284,13 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
   Vorlage nennt das am Eintrag als „auch in …“.
 - Neu zuordnen lässt sich nur, was in Dienst ist. Wird ein Fahrzeug oder eine Person später
   außer Dienst genommen, bleibt der Eintrag in der Vorlage und trägt „außer Dienst“.
-- Wird ein Fahrzeug aus der Vorlage entfernt, verlieren die Personen darauf ihre Fahrzeugbindung.
+- Wird ein Fahrzeug aus der Vorlage entfernt, verlieren die Personen darauf ihre Fahrzeugbindung,
+  und sein Material liegt danach an der Einheit.
+- Material kommt aus den Stammdaten, je Zeile mit Menge und Ort. Dasselbe Material darf mehrfach
+  stehen, etwa ein Rucksack auf jedem RTW. Ein Gerät steht mit höchstens 10 Stück in einer Zeile;
+  ein Gerät mit Bestandsnummer ist ein bestimmtes Stück, steht mit Menge 1 und im ganzen Baum nur
+  einmal. Neu hinzufügen lässt sich nur Material in Dienst; später außer Dienst genommenes bleibt
+  und trägt „außer Dienst“. Höchstens 50 Zeilen je Vorlage.
 - Ohne eigene Soll-Stärke gilt die des Einheitstyps. Sie steht als „Vorgabe des Einheitstyps“
   unter dem Feld und in der Liste mit „(Vorgabe)“. Ohne Position einer Person gilt die Position
   aus ihren Stammdaten.

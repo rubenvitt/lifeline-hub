@@ -1183,8 +1183,8 @@ async fn einmal_entlassene_kraft_laesst_sich_nicht_stornieren() {
 
 /// Spec „Status an Entlassener“ und design.md D6: jeder Schreibweg an einer entlassenen Kraft
 /// außer dem erneuten Disponieren antwortet 409 — auch die Wege anderer Module, die eine Person
-/// binden (Einheit, Besatzung, UHS, Stab, Einsatzleitung, Abschnittsleitung, Schaden) und ihre
-/// Zeitachse.
+/// binden (Einheit, Besatzung, UHS, Stab, Einsatzleitung, Abschnittsleitung, Schaden). Ihre
+/// Zeitachse lässt sich berichtigen (LLH-1263, `tests/kraefte_zeitachse.rs`).
 #[tokio::test]
 async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
     let app = setup().await;
@@ -1215,7 +1215,6 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
     let schaden = format!(
         r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{anna}}}"#
     );
-    let nachtrag = r#"{"art":"eintreffen","zeitpunkt_at":"2026-10-13T08:00:00Z"}"#.to_string();
     for (methode, pfad, body) in [
         ("PUT", format!("einheiten/{einheit}/personal/{anna}"), None),
         (
@@ -1228,7 +1227,6 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
         ("PATCH", "fuehrungsstelle".to_string(), Some(einsatzleiter)),
         ("POST", "abschnitte".to_string(), Some(leiter)),
         ("POST", "schaeden".to_string(), Some(schaden)),
-        ("POST", format!("personal/{anna}/zeitachse"), Some(nachtrag)),
     ] {
         let (s, json) = anfrage(
             &app,

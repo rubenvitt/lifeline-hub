@@ -111,7 +111,7 @@ Vier Abschnitte, genau diese `##`, in dieser Reihenfolge, keine weiteren:
 treffen, nur GFM; die vier Abschnitte in Reihenfolge, je Ablauf nummerierte Schritte und
 höchstens ein Bild; Bilder nur `../bilder/<eigenes-kapitel>/<name>.png`, Alt-Text da, Datei und
 dunkle Fassung da, beide höchstens 300 KB; nichts unter `bilder/`, das kein Kapitel zeigt. Allein fahren:
-`TZ=Europe/Berlin mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` in
+`mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` in
 `frontend/`. Er prüft nicht, ob ein Kapitel oder Bild noch stimmt; das trägt die
 Mitänderungsregel im Review.
 

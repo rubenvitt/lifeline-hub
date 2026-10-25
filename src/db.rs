@@ -7035,6 +7035,100 @@ mod tests {
         assert_eq!(kinder, 0, "Kindzeilen kaskadieren an der Vorlage");
     }
 
+    // --- Migration 0251: Material-Positionen der Einheiten-Vorlage (LLH-1261) ---
+
+    /// Positionen fallen mit ihrer Vorlage, halten aber Material und Fahrzeug fest (NO ACTION,
+    /// Demo-Löschweg); die Menge ist mindestens 1, dasselbe Material darf zweimal stehen.
+    #[tokio::test]
+    async fn migration_0251_legt_material_positionen_mit_ihren_regeln_an() {
+        let pool = test_pool().await;
+        let id = |sql: &'static str| sqlx::query_scalar::<_, i64>(sql);
+        let org = id("INSERT INTO organisation (name) VALUES ('A') RETURNING id")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let typ = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO einheit_typ (org_id, label) VALUES (?, 'Staffel') RETURNING id",
+        )
+        .bind(org)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let vorlage = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO einheit_vorlage (org_id, name, typ_id) VALUES (?, 'Staffel', ?) \
+             RETURNING id",
+        )
+        .bind(org)
+        .bind(typ)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let material = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO material (org_id, bezeichnung) VALUES (?, 'Rucksack') RETURNING id",
+        )
+        .bind(org)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fahrzeug = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (?, 'RTW 1') RETURNING id",
+        )
+        .bind(org)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let position = |menge: i64, fz: Option<i64>| {
+            sqlx::query(
+                "INSERT INTO einheit_vorlage_material (vorlage_id, material_id, menge, fahrzeug_id) \
+                 VALUES (?, ?, ?, ?)",
+            )
+            .bind(vorlage)
+            .bind(material)
+            .bind(menge)
+            .bind(fz)
+        };
+        position(1, Some(fahrzeug)).execute(&pool).await.unwrap();
+        position(2, None)
+            .execute(&pool)
+            .await
+            .expect("dasselbe Material ein zweites Mal");
+        assert!(
+            position(0, None).execute(&pool).await.is_err(),
+            "Menge unter 1"
+        );
+
+        for sql in [
+            "DELETE FROM material WHERE id = ?",
+            "DELETE FROM fahrzeug WHERE id = ?",
+        ] {
+            let ziel = if sql.contains("material") {
+                material
+            } else {
+                fahrzeug
+            };
+            let fehler = sqlx::query(sqlx::AssertSqlSafe(sql))
+                .bind(ziel)
+                .execute(&pool)
+                .await
+                .expect_err(sql);
+            assert!(
+                matches!(&fehler, sqlx::Error::Database(e) if e.is_foreign_key_violation()),
+                "{sql}: {fehler:?}"
+            );
+        }
+
+        sqlx::query("DELETE FROM einheit_vorlage WHERE id = ?")
+            .bind(vorlage)
+            .execute(&pool)
+            .await
+            .expect("die Vorlage fällt samt Positionen");
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einheit_vorlage_material")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0);
+    }
+
     // --- Migration 0191: Zugangsprotokoll je Organisation (LLH-1151) ---
 
     /// Der Bestand bekommt die Org wie beim Schreiben: Anmeldespur über das Konto, sonst über den

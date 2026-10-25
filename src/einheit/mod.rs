@@ -240,6 +240,59 @@ pub struct EinheitAnzeige {
     /// den Kurznamen liest die Oberfläche aus dem Modul Nachforderungen. Fehlt ohne Herkunft.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nachforderung_id: Option<i64>,
+    /// Wer und was beim Auflösen dazugehörte (LLH-1266, Change
+    /// `oq1yp0k5-aufgeloeste-einheit-lesend`, design.md D2). Nur `GET …/einheiten?aufgeloeste=1`
+    /// füllt es; es fehlt an aktiven Einheiten und an solchen, die aufgelöst wurden, bevor das
+    /// System die Besetzung festhielt. Stärke und Mitgliederlisten zählen es nie mit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letzte_besetzung: Option<LetzteBesetzung>,
+}
+
+/// Die beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266, design.md D1/D2). Namen
+/// kommen beim Lesen aus den Dispositionszeilen; eine später stornierte Kraft fehlt.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LetzteBesetzung {
+    pub personal: Vec<LetztePerson>,
+    pub fahrzeuge: Vec<LetztesFahrzeug>,
+    pub material: Vec<LetztesMaterial>,
+}
+
+/// Eine Person der letzten Besetzung.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LetztePerson {
+    /// `einsatz_personal.id` der Dispozeile.
+    pub ep_id: i64,
+    pub name: String,
+    /// Qualifikation (Snapshot), wie [`EinheitMitgliedPerson::funktion`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub funktion: Option<String>,
+    /// Einsatzfunktion (LLH-1067).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatzfunktion: Option<String>,
+    /// Sie führte die Einheit.
+    pub ist_fuehrer: bool,
+    /// `einsatz_fahrzeug.id` des Fahrzeugs, auf dem sie saß; fehlt ohne Fahrzeug.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auf_fahrzeug_id: Option<i64>,
+}
+
+/// Ein Fahrzeug der letzten Besetzung.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LetztesFahrzeug {
+    /// `einsatz_fahrzeug.id` der Dispozeile.
+    pub ef_id: i64,
+    pub funkrufname: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fahrzeugtyp: Option<String>,
+}
+
+/// Ein Materialposten der letzten Besetzung, mit seiner Menge beim Auflösen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LetztesMaterial {
+    /// `einsatz_material.id` der Dispozeile.
+    pub em_id: i64,
+    pub bezeichnung: String,
+    pub menge: i64,
 }
 
 #[cfg(test)]
@@ -296,9 +349,30 @@ pub fn etb_text_mit_besatzung(text: String, besatzung: &[String]) -> String {
 }
 
 /// System-ETB, wenn eine disponierte Kraft einer Einheit zugeordnet wird. `person` ist der
-/// Snapshot-Name der Disposition (Rückgabe von `mitglied_repo::zuordnen_personal_tx`).
+/// Snapshot-Name der Disposition (`name` aus `mitglied_repo::zuordnen_personal_tx`).
 pub fn etb_text_personal_zugeordnet(einheit: &str, person: &str) -> String {
     format!("Einheit «{}»: «{}» zugeordnet", einheit, person)
+}
+
+/// System-ETB, wenn eine Person einer Einheit zugeordnet wird oder in sie wechselt (LLH-1262,
+/// Gegenstück zu [`etb_text_fahrzeug_umgehaengt`]): das erste Zuordnen schreibt
+/// [`etb_text_personal_zugeordnet`], ein Wechsel „Person «Anna»: Einheit «Zug 1» → «Zug 2»“, und
+/// jede Einheit, deren Führung die Person dabei abgibt, steht dahinter („…, Einheitsführer von
+/// «Zug 1» endet“).
+pub fn etb_text_personal_eingeteilt(
+    einheit: &str,
+    person: &str,
+    vorher: Option<&str>,
+    fuehrung_endet: &[&str],
+) -> String {
+    let mut text = match vorher {
+        Some(vorher) => format!("Person «{person}»: Einheit «{vorher}» → «{einheit}»"),
+        None => etb_text_personal_zugeordnet(einheit, person),
+    };
+    for f in fuehrung_endet {
+        text.push_str(&format!(", Einheitsführer von «{f}» endet"));
+    }
+    text
 }
 
 /// Der eine System-ETB für mehrere Kräfte, die einer Einheit auf einmal zugeordnet werden
@@ -327,14 +401,17 @@ pub fn etb_text_storniert(name: &str) -> String {
 
 /// Der eine System-ETB beim Bilden aus einer Vorlage (LLH-1049, design.md D11): „Einheit «1. Zug»
 /// aus Vorlage «Sanitätszug Musterstadt» gebildet; Untereinheiten: «Rettungsstaffel»;
-/// 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Name A, Name B; umgehängt: RTW 2 aus «2. Zug»“.
-/// Leere Teile entfallen. Systemtext: keine Grenze am Eingang (`src/AGENTS.md`, „Eingabegrenzen“).
+/// 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Name A, Name B; Material: 50× Wolldecke;
+/// umgehängt: RTW 2 aus «2. Zug»“. Leere Teile entfallen. Systemtext: keine Grenze am Eingang
+/// (`src/AGENTS.md`, „Eingabegrenzen“). Das Material (LLH-1261) bekommt, was bis
+/// `etb::INHALT_MAX` übrig bleibt; der Rest erscheint als Zahl (design.md D6).
 pub fn etb_text_aus_vorlage(
     einheit: &str,
     vorlage: &str,
     untereinheiten: &[String],
     fahrzeuge: &[String],
     kraefte: &[String],
+    material: &[String],
     umgehaengt: &[String],
 ) -> String {
     let mut teile = vec![format!(
@@ -369,10 +446,53 @@ pub fn etb_text_aus_vorlage(
         };
         teile.push(format!("{} {wort}: {}", kraefte.len(), kraefte.join(", ")));
     }
-    if !umgehaengt.is_empty() {
-        teile.push(format!("umgehängt: {}", umgehaengt.join(", ")));
+    let umgehaengt =
+        (!umgehaengt.is_empty()).then(|| format!("umgehängt: {}", umgehaengt.join(", ")));
+    if !material.is_empty() {
+        let fest: usize = teile
+            .iter()
+            .chain(umgehaengt.iter())
+            .map(|t| t.chars().count() + 2)
+            .sum();
+        teile.push(material_teil(
+            material,
+            crate::etb::INHALT_MAX.saturating_sub(fest + 2),
+        ));
     }
+    teile.extend(umgehaengt);
     teile.join("; ")
+}
+
+/// „Material: 50× Wolldecke, 1× Rucksack“, höchstens `budget` Zeichen; passt nicht alles, endet
+/// die Liste mit „ und N weitere“ (Platz dafür ist reserviert), passt keine, steht nur die Zahl.
+fn material_teil(material: &[String], budget: usize) -> String {
+    let ganz = format!("Material: {}", material.join(", "));
+    if ganz.chars().count() <= budget {
+        return ganz;
+    }
+    let schluss = |rest: usize| format!(" und {rest} weitere");
+    let reserve = schluss(material.len()).chars().count();
+    let mut text = String::from("Material: ");
+    let mut laenge = text.chars().count();
+    for (i, m) in material.iter().enumerate() {
+        let trenner = if i == 0 { 0 } else { 2 };
+        let noetig = laenge + trenner + m.chars().count();
+        if noetig + reserve > budget {
+            let rest = material.len() - i;
+            if i == 0 {
+                text.push_str(&format!("{rest} Positionen"));
+            } else {
+                text.push_str(&schluss(rest));
+            }
+            return text;
+        }
+        if i > 0 {
+            text.push_str(", ");
+        }
+        text.push_str(m);
+        laenge = noetig;
+    }
+    text
 }
 
 /// System-ETB beim Übernehmen einer unangemeldeten Einheit (LLH-1075, design.md D10): nennt die
@@ -464,6 +584,22 @@ mod etb_text_tests {
     }
 
     #[test]
+    fn personal_eingeteilt_nennt_vorige_einheit_und_endende_fuehrung() {
+        assert_eq!(
+            etb_text_personal_eingeteilt("Zug 2", "Anna", None, &[]),
+            "Einheit «Zug 2»: «Anna» zugeordnet"
+        );
+        assert_eq!(
+            etb_text_personal_eingeteilt("Zug 2", "Anna", Some("Zug 1"), &[]),
+            "Person «Anna»: Einheit «Zug 1» → «Zug 2»"
+        );
+        assert_eq!(
+            etb_text_personal_eingeteilt("Zug 2", "Anna", Some("Zug 1"), &["Zug 1"]),
+            "Person «Anna»: Einheit «Zug 1» → «Zug 2», Einheitsführer von «Zug 1» endet"
+        );
+    }
+
+    #[test]
     fn aus_vorlage_nennt_alle_teile_und_laesst_leere_weg() {
         let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
         assert_eq!(
@@ -473,25 +609,28 @@ mod etb_text_tests {
                 &s(&["Rettungsstaffel", "Trupp"]),
                 &s(&["ELW 1", "RTW 1", "RTW 2"]),
                 &s(&["Name A", "Name B"]),
+                &s(&["50× Wolldecke", "1× Sanitätsrucksack"]),
                 &s(&["RTW 2 aus «2. Zug»", "Name B von «83-4»"]),
             ),
             "Einheit «1. Zug» aus Vorlage «Sanitätszug Musterstadt» gebildet; Untereinheiten: \
              «Rettungsstaffel», «Trupp»; 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Name A, \
-             Name B; umgehängt: RTW 2 aus «2. Zug», Name B von «83-4»"
+             Name B; Material: 50× Wolldecke, 1× Sanitätsrucksack; umgehängt: RTW 2 aus «2. Zug», \
+             Name B von «83-4»"
         );
         assert_eq!(
-            etb_text_aus_vorlage("Staffel", "Staffel", &[], &[], &[], &[]),
+            etb_text_aus_vorlage("Staffel", "Staffel", &[], &[], &[], &[], &[]),
             "Einheit «Staffel» aus Vorlage «Staffel» gebildet"
         );
         assert_eq!(
-            etb_text_aus_vorlage("A", "V", &[], &s(&["ELW"]), &s(&["Anna"]), &[]),
+            etb_text_aus_vorlage("A", "V", &[], &s(&["ELW"]), &s(&["Anna"]), &[], &[]),
             "Einheit «A» aus Vorlage «V» gebildet; 1 Fahrzeug: ELW; 1 Kraft: Anna"
         );
     }
 
     /// Höchstfall (design.md D11): 20 Einheiten mit Namen à `NAME_MAX`, 50 Fahrzeuge
     /// (Funkrufname à 40), 50 Personen (Name à 80), zehn davon aus Einheiten mit Namen à
-    /// `NAME_MAX` umgehängt — der Systemtext bleibt unter `etb::INHALT_MAX`.
+    /// `NAME_MAX` umgehängt, dazu 50 Material-Positionen mit Bezeichnung à `STAMM_TEXT_MAX`
+    /// (LLH-1261) — der Systemtext bleibt unter `etb::INHALT_MAX`, das Material endet als Zahl.
     #[test]
     fn aus_vorlage_hoechstfall_bleibt_unter_der_etb_grenze() {
         let lang = |c: char, n: usize| std::iter::repeat_n(c, n).collect::<String>();
@@ -502,17 +641,48 @@ mod etb_text_tests {
         let umgehaengt: Vec<String> = (0..10)
             .map(|_| format!("{} aus «{}»", lang('P', 80), lang('A', NAME_MAX)))
             .collect();
+        let material: Vec<String> = (0..50)
+            .map(|_| format!("10× {}", lang('M', crate::material::STAMM_TEXT_MAX)))
+            .collect();
         let text = etb_text_aus_vorlage(
             &einheit,
             &lang('V', crate::einheit_vorlage::NAME_MAX),
             &unter,
             &fahrzeuge,
             &kraefte,
+            &material,
             &umgehaengt,
         );
         let zeichen = text.chars().count();
-        assert!(zeichen > 12_000, "{zeichen}");
-        assert!(zeichen < crate::etb::INHALT_MAX, "{zeichen}");
+        assert!(zeichen > 19_000, "{zeichen}");
+        assert!(zeichen <= crate::etb::INHALT_MAX, "{zeichen}");
+        assert!(text.contains(" weitere; umgehängt: "), "Rest als Zahl");
+        assert!(text.ends_with(&format!("aus «{}»", lang('A', NAME_MAX))));
+    }
+
+    #[test]
+    fn material_teil_endet_als_zahl_wenn_das_budget_nicht_reicht() {
+        let m = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let liste = m(&["50× Wolldecke", "1× Rucksack", "2× Trage"]);
+        assert_eq!(
+            material_teil(&liste, 1_000),
+            "Material: 50× Wolldecke, 1× Rucksack, 2× Trage"
+        );
+        // „Material: 50× Wolldecke“ (23) + Reserve „ und 3 weitere“ (14) passt in 40, der Rucksack
+        // nicht mehr.
+        assert_eq!(
+            material_teil(&liste, 40),
+            "Material: 50× Wolldecke und 2 weitere"
+        );
+        assert_eq!(material_teil(&liste, 5), "Material: 3 Positionen");
+        let genau = "Material: 50× Wolldecke, 1× Rucksack, 2× Trage"
+            .chars()
+            .count();
+        assert_eq!(
+            material_teil(&liste, genau),
+            "Material: 50× Wolldecke, 1× Rucksack, 2× Trage",
+            "passt alles genau, braucht es keine Reserve"
+        );
     }
 
     #[test]

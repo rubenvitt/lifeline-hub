@@ -810,7 +810,8 @@ describe('UeberblickPage', () => {
     await waitFor(() => vorgaenge());
     const e = abschnitt('Erinnerungen');
     const erinnerung = await within(e).findByRole('link', { name: /Lagebericht an Kreisstab/ });
-    expect(erinnerung).toHaveAttribute('href', '/einsaetze/1/erinnerungen');
+    // Jede Erinnerung einzeln, wie die übrigen Abschnitte (LLH-1429).
+    expect(erinnerung).toHaveAttribute('href', '/einsaetze/1/erinnerungen?erinnerung=3');
     expect(erinnerung).toHaveTextContent('bald');
     expect(abschnittZahl('Erinnerungen')).toHaveTextContent(/^0$/);
 
@@ -939,7 +940,7 @@ describe('UeberblickPage', () => {
     expect(marken[0]).toHaveTextContent('überfällig');
     expect(marken[0]).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=22');
     expect(marken[1]).toHaveTextContent('Lagebericht an Kreisstab');
-    expect(marken[1]).toHaveAttribute('href', '/einsaetze/1/erinnerungen');
+    expect(marken[1]).toHaveAttribute('href', '/einsaetze/1/erinnerungen?erinnerung=3');
     expect(marken[3]).toHaveAttribute('href', '/einsaetze/1/lagebesprechung');
   });
 

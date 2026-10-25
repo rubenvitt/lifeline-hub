@@ -935,3 +935,215 @@ async fn grenzen_sind_400_vor_jeder_abfrage() {
     assert_eq!(s, StatusCode::CREATED, "{json}");
     assert_eq!(json["fahrzeuge"].as_array().unwrap().len(), 1);
 }
+
+/// LLH-1261: Material der Vorlage. Die Staffel trägt 50 Wolldecken an der Einheit und einen
+/// Sanitätsrucksack auf RTW 1; liefert die beiden Positionen.
+async fn material_der_staffel(pool: &SqlitePool, org: i64, v: &Vorlage) -> (i64, i64) {
+    let material = |bezeichnung: &'static str, art: &'static str| {
+        sqlx::query_scalar::<_, i64>(
+            "INSERT INTO material (org_id, bezeichnung, art) VALUES (?, ?, ?) RETURNING id",
+        )
+        .bind(org)
+        .bind(bezeichnung)
+        .bind(art)
+    };
+    let decke = material("Wolldecke", "verbrauchsgut")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let rucksack = material("Sanitätsrucksack", "geraet")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let posten = |material_id, menge, fahrzeug_id| lifeline_hub::einheit_vorlage::MaterialEntry {
+        material_id,
+        menge,
+        fahrzeug_id,
+    };
+    let s = vrepo::replace_material(
+        pool,
+        org,
+        v.staffel,
+        &[posten(decke, 50, None), posten(rucksack, 1, Some(v.rtw1))],
+    )
+    .await
+    .unwrap();
+    (s.material[0].id, s.material[1].id)
+}
+
+fn mat(ids: &[i64]) -> Value {
+    Value::Array(
+        ids.iter()
+            .map(|id| json!({"vorlage_material_id": id}))
+            .collect(),
+    )
+}
+
+#[tokio::test]
+async fn material_aus_der_vorlage_am_richtigen_ort_mit_einem_etb_eintrag() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+    let v = vorlage(&pool, org).await;
+    let (decken, rucksack) = material_der_staffel(&pool, org, &v).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (s, json) = vorschau(&app, &admin, einsatz, v.zug).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["material_gesperrt"], false);
+    assert_eq!(
+        json["knoten"][1]["material"][0]["vorlage_material_id"],
+        decken
+    );
+    assert_eq!(json["knoten"][1]["material"][0]["zustand"], "neu");
+    assert_eq!(json["knoten"][1]["material"][1]["fahrzeug_id"], v.rtw1);
+
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = bilden(
+        &app,
+        &admin,
+        einsatz,
+        &json!({
+            "vorlage_id": v.staffel,
+            "fahrzeuge": fz(&[v.rtw1, v.rtw2]),
+            "material": mat(&[decken, rucksack]),
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let staffel = json["einheit_id"].clone();
+    let material_ids: Vec<i64> = json["material"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m.as_i64().unwrap())
+        .collect();
+    assert_eq!(material_ids.len(), 2);
+
+    let fahrzeuge = liste(&app, &admin, einsatz, "fahrzeuge").await;
+    let ef_rtw1 = fahrzeuge
+        .iter()
+        .find(|f| f["funkrufname"] == "RTW 1")
+        .unwrap()["id"]
+        .clone();
+    let posten = liste(&app, &admin, einsatz, "material").await;
+    let p = |name: &str| {
+        posten
+            .iter()
+            .find(|p| p["bezeichnung"] == name)
+            .unwrap_or_else(|| panic!("{name} fehlt: {posten:?}"))
+            .clone()
+    };
+    assert_eq!(p("Wolldecke")["menge"], 50);
+    assert_eq!(p("Wolldecke")["einheit_id"], staffel);
+    assert_eq!(p("Sanitätsrucksack")["einsatz_fahrzeug_id"], ef_rtw1);
+    assert!(p("Sanitätsrucksack")
+        .get("einheit_id")
+        .is_none_or(Value::is_null));
+
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        etb_vorher + 1,
+        "ein ETB-Eintrag, keiner je Posten"
+    );
+    let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        inhalte
+            .iter()
+            .any(|i| i.contains("Material: 50× Wolldecke, 1× Sanitätsrucksack")),
+        "{inhalte:?}"
+    );
+    let ereignisse = objekt_ereignisse(&mut rx, &[("material", "material_id")]);
+    let mut gesehen: Vec<i64> = ereignisse.iter().map(|(_, id)| *id).collect();
+    gesehen.sort_unstable();
+    let mut erwartet = material_ids.clone();
+    erwartet.sort_unstable();
+    assert_eq!(gesehen, erwartet, "ein Ereignis je Posten nach dem Commit");
+}
+
+#[tokio::test]
+async fn material_gesperrt_und_schon_im_einsatz() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+    let v = vorlage(&pool, org).await;
+    let (decken, _) = material_der_staffel(&pool, org, &v).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, frieda_id, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    nur_fuer_admins(&app, &admin, einsatz, "material").await;
+
+    let (s, json) = vorschau(&app, &frieda, einsatz, v.zug).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["material_gesperrt"], true);
+    assert_eq!(json["knoten"][1]["material"], json!([]));
+    let (s, json) = bilden(
+        &app,
+        &frieda,
+        einsatz,
+        &json!({"vorlage_id": v.staffel, "material": mat(&[decken])}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{json}");
+    assert_eq!(bestand(&app, &admin, einsatz).await, (0, 0, 0));
+
+    // 51 Positionen sind 400, vor jeder Abfrage.
+    let (s, json) = bilden(
+        &app,
+        &admin,
+        einsatz,
+        &json!({"vorlage_id": 987_654, "material": mat(&[decken; 51])}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+
+    // Ein Gerät mit Bestandsnummer, das schon im Einsatz steht: 422 an der Position.
+    let se: i64 = sqlx::query_scalar(
+        "INSERT INTO material (org_id, bezeichnung, art, bestandsnummer) \
+         VALUES (?, 'Stromerzeuger', 'geraet', 'SE-1') RETURNING id",
+    )
+    .bind(org)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let stand = vrepo::replace_material(
+        &pool,
+        org,
+        v.zug,
+        &[lifeline_hub::einheit_vorlage::MaterialEntry {
+            material_id: se,
+            menge: 1,
+            fahrzeug_id: None,
+        }],
+    )
+    .await
+    .unwrap();
+    let position = stand.material[0].id;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{se}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let (s, json) = vorschau(&app, &admin, einsatz, v.zug).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["knoten"][0]["material"][0]["zustand"], "im_einsatz");
+    let (s, json) = bilden(
+        &app,
+        &admin,
+        einsatz,
+        &json!({"vorlage_id": v.zug, "material": mat(&[position])}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["zeilen"],
+        json!([{"art": "material", "id": position, "grund": "schon im Einsatz"}])
+    );
+    assert_eq!(liste(&app, &admin, einsatz, "einheiten").await.len(), 0);
+}

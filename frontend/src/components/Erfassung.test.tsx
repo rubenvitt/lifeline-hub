@@ -1,4 +1,4 @@
-import { Form, Input } from 'antd';
+import { Form, Input, theme } from 'antd';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
@@ -9,7 +9,9 @@ import {
   ErfassungsFormular,
   ErfassungsModal,
   SERIEN_KUERZEL_KLASSE,
+  kopfBoden,
   serienKuerzel,
+  titelzeilenHoehe,
   type ErfassungsFormularSteuerung,
 } from './Erfassung';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
@@ -18,6 +20,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import type { Dayjs } from 'dayjs';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { antdThema } from '../theme/tokens';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -807,6 +810,28 @@ describe('ErfassungsModal', () => {
     );
   }
 
+  it('der Fuß klebt im Dialog unten und meldet seinen Fokusabstand, inline nicht (LLH-1274)', () => {
+    const { unmount } = renderMitProviders(
+      <ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+    );
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="erfassung-fuss"]');
+    expect(fuss).not.toBeNull();
+    expect(fuss!.contains(screen.getByRole('button', { name: 'Erfassen' }))).toBe(true);
+    expect(fuss!.style.position).toBe('sticky');
+    expect(fuss!.style.bottom).toBe('0px');
+    expect(
+      document.documentElement.style.getPropertyValue('--lfh-erfassung-fokusabstand'),
+    ).not.toBe('');
+    unmount();
+    // Beim Schließen räumt der Fuß die Variable, sonst rollte jeder spätere Dialog zu weit.
+    expect(document.documentElement.style.getPropertyValue('--lfh-erfassung-fokusabstand')).toBe(
+      '',
+    );
+
+    renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
+    expect(document.querySelector('[data-lfh="erfassung-fuss"]')).toBeNull();
+  });
+
   it('fokussiert beim Öffnen das erste Feld und sendet per Enter', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(<ModalHarness offen onErfassen={onErfassen} />);
@@ -997,5 +1022,28 @@ describe('ErfassungsFormular — mit Zeiteingabe', () => {
     await nutzer.keyboard('{Escape}');
     expect(screen.getByLabelText('Zeit')).toHaveValue('');
     expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+});
+
+describe('kopfBoden — Abstand des Schließkreuzes zum ersten Feld (LLH-1274)', () => {
+  // Leitlinie zwischen zwei Zielen als Literale (`e2e/trefflaeche-kern.ts`, `ZIELABSTAND`);
+  // `kompakt` ist die Spacing-Ausnahme und darf seinen Kopf nicht wachsen sehen.
+  const LEITLINIE = { kompakt: 0, komfortabel: 8, handschuh: 16 } as const;
+
+  for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+    it(`hält das Kreuz in ${dichte} ≥ ${LEITLINIE[dichte]} px über dem Körper`, () => {
+      const t = theme.getDesignToken(antdThema(true, dichte));
+      const titelzeile = titelzeilenHoehe(t);
+      // antds Lage des Kreuzes (`antd/es/modal/style`): mittig auf Titelzeile + 2 × `padding`.
+      const kreuzUnten = (titelzeile + 2 * t.padding + t.controlHeight) / 2;
+      const kopf = Math.max(titelzeile, kopfBoden(t));
+      const koerperOben = t.paddingMD + kopf + t.marginXS;
+      expect(koerperOben - kreuzUnten).toBeGreaterThanOrEqual(LEITLINIE[dichte]);
+    });
+  }
+
+  it('lässt den Kopf in kompakt bei der Titelzeile', () => {
+    const t = theme.getDesignToken(antdThema(true, 'kompakt'));
+    expect(kopfBoden(t)).toBeLessThanOrEqual(titelzeilenHoehe(t));
   });
 });

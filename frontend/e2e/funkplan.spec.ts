@@ -291,9 +291,9 @@ test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck m
   const nummer = paneel.getByRole('textbox', { name: 'Nummer oder Adresse 1', exact: true });
   await nummer.fill(FS_TELEFON);
   await nummer.press('Enter');
-  await expect(paneel.getByRole('button', { name: `${verbindungen} bearbeiten` })).toContainText(
-    FS_TELEFON,
-  );
+  // Die Nummer ist ein eigener Link, „Bearbeiten“ steht daneben (LLH-1426: kein Link im Knopf).
+  await expect(paneel.getByRole('link', { name: FS_TELEFON })).toHaveAttribute('href', /^tel:/);
+  await expect(paneel.getByRole('button', { name: `${verbindungen} bearbeiten` })).toBeVisible();
 
   await oeffne(page, einsatzId);
   const ersteZeile = tabelle(page).locator('tr[data-row-key]').first();

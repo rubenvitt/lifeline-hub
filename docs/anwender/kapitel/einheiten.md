@@ -57,12 +57,13 @@ Für Einsatzleitung und Führungspersonal:
 3. Auf der Seite „Einheit aus Vorlage bilden“ den „Name“ der obersten Einheit prüfen und bei Bedarf
    einen „Abschnitt“ wählen.
 4. Im Baum der Vorlage anhaken, was mitkommt. Fahrzeuge, die neu oder im Einsatz frei sind, sind
-   angehakt, Personen nicht; jede Zeile nennt rechts ihren Zustand im Einsatz.
+   angehakt, Personen nicht, Material ist angehakt; jede Zeile nennt rechts ihren Zustand im
+   Einsatz.
 
    ![Seite „Einheit aus Vorlage bilden“ mit Name und Abschnitt, darunter Sanitätszug und Rettungsstaffel mit ihren Fahrzeugen, der Besatzung und dem Zustand je Zeile](../bilder/einheiten/vorlage-bilden.png)
 
 5. „Einheit bilden“ wählen. Neben dem Knopf steht, was entsteht, etwa „1 Zug, 1 Staffel,
-   3 Fahrzeuge, 2 Kräfte“. Die App öffnet das Meldebild mit der neuen Einheit markiert, ihre
+   3 Fahrzeuge, 2 Kräfte“, mit Material der Vorlage auch „2 Material“. Die App öffnet das Meldebild mit der neuen Einheit markiert, ihre
    Untereinheiten und Fahrzeuge aufgeklappt.
 
 ### Angaben einer Einheit ändern
@@ -86,9 +87,10 @@ Für Einsatzleitung und Führungspersonal:
 5. Hat die Einheit kein Fahrzeug, unter „Status“ den Status wählen; „kein Status“ nimmt ihn
    zurück.
 6. Im Paneel „Funk“ ebenso die „Sprechgruppen“ ändern; den Funkrufnamen trägt der Kopf.
-7. Im Paneel „Telefon und weitere Verbindungen“ auf die Liste tippen. „Verbindung hinzufügen“
-   legt eine Zeile an: das Mittel wählen (Festnetz, Mobil, Fax, E-Mail, Messenger, Melder oder
-   Sonstiges), Nummer oder Adresse eintragen und bei Bedarf einen Hinweis wie „nur tagsüber“.
+7. Im Paneel „Telefon und weitere Verbindungen“ „Bearbeiten“ neben der Liste wählen, bei leerer
+   Liste „Telefon und weitere Verbindungen eintragen“. „Verbindung hinzufügen“ legt eine Zeile
+   an: das Mittel wählen (Festnetz, Mobil, Fax, E-Mail, Messenger, Melder oder Sonstiges),
+   Nummer oder Adresse eintragen und bei Bedarf einen Hinweis wie „nur tagsüber“.
    „Verbindung … entfernen“ nimmt eine Zeile heraus; „Speichern“ übernimmt die ganze Liste.
    Höchstens zehn Verbindungen, Nummer und Hinweis je höchstens 200 Zeichen. Festnetz- und
    Mobilnummern lassen sich danach antippen und wählen, E-Mail-Adressen öffnen das Mailprogramm.
@@ -129,12 +131,18 @@ Für Einsatzleitung und Führungspersonal:
    Soll, mit „unterbesetzt“ oder „Soll erfüllt“, und wer davon aus einer anderen Einheit oder
    ohne Einheit mitfährt.
 
-   ![Paneel „Fahrzeuge und Besatzung“ der Rettungsstaffel mit zwei RTW, je mit FMS-Status, Besatzung Ist und Soll und den Personen darauf, Anna Probe als Einheitsführerin, einer Kraft unter „Ohne Fahrzeug“ und den Auswahlfeldern „Person zuordnen …“ und „Fahrzeug zuordnen …“](../bilder/einheiten/besatzung.png)
+   ![Paneel „Fahrzeuge und Besatzung“ der Rettungsstaffel mit zwei RTW, je mit FMS-Status, Besatzung Ist und Soll, „Personal der Einheit übernehmen“ und den Personen darauf, Anna Probe als Einheitsführerin, einer Kraft unter „Ohne Fahrzeug“ und den Auswahlfeldern „Person zuordnen …“ und „Fahrzeug zuordnen …“](../bilder/einheiten/besatzung.png)
 
 5. Im selben Menü setzt „Als Einheitsführer“ die Person als Einheitsführer, „Vom Fahrzeug
    lösen“ nimmt sie vom Fahrzeug und lässt sie in der Einheit, „Aus Einheit lösen“ löst sie aus
    der Einheit.
-6. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
+6. Mehrere Personen auf einmal setzt „Personal der Einheit übernehmen“ in der Zeile des
+   Fahrzeugs: derselbe Dialog wie in der [Fahrzeugliste](fahrzeuge.md), mit den Kräften der
+   Einheit, die auf keinem Fahrzeug sitzen, angehakt bis zur Soll-Stärke, ohne Soll alle.
+   „Übernehmen“ setzt alle gewählten in einem Schritt auf das Fahrzeug. Ist der Knopf gesperrt,
+   steht daneben „keine freien Kräfte der Einheit“; wer unter „Ohne Fahrzeug“ mit „fährt auf …“
+   steht, sitzt schon auf einem Fahrzeug einer anderen Einheit.
+7. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
    löst das Fahrzeug aus der Einheit. Gelöste Kräfte bleiben im Einsatz, nur ohne Einheit.
 
 ### Material zuordnen, lösen und ausgeben
@@ -167,6 +175,23 @@ Für Einsatzleitung und Führungspersonal:
    „Aufgelöst“ mit dem Zeitpunkt.
 
    ![Aufgeklappter Block „Aufgelöst (1)“ unter der Gliederung mit einer Einheit und dem Zeitpunkt der Auflösung](../bilder/einheiten/aufgeloest.png)
+
+### Eine aufgelöste Einheit nachlesen
+
+Für alle, die das Modul Einheiten sehen:
+
+1. Auf der Seite „Einheiten“ den Block „Aufgelöst“ unter der Gliederung aufklappen und den Namen
+   der Einheit wählen. Im Einsatztagebuch führt der Eintrag „Einheit «…» aufgelöst“ mit dem
+   Verweis „Einheit «Name»“ ebenfalls dorthin.
+2. Die Seite zeigt im Kopf „aufgelöst“ mit dem Zeitpunkt, darunter die Kopfdaten, im Paneel
+   „Letzte Besatzung“ die Fahrzeuge mit den Personen, die darauf saßen, und wer ohne Fahrzeug dazu
+   gehörte (der Einheitsführer mit „EF“), das Material mit seiner Menge beim Auflösen und die
+   Zeitachse.
+3. Die Seite lässt sich nur lesen: kein Feld, kein Menü, kein Knopf. Namen von Personen und
+   Fahrzeugen führen zu deren Seiten, wenn ihr Modul freigegeben ist.
+
+Für eine Einheit, die aufgelöst wurde, bevor die App die Besetzung festhielt, steht statt Besatzung
+und Material „Letzte Besetzung nicht festgehalten“.
 
 ### Eine unangemeldete Einheit übernehmen oder abweisen
 
@@ -242,8 +267,8 @@ Fahrzeug“ mit „fährt auf …“.
 
 Die Besatzung zeigt die Seite nur, wenn die Module Personal und Fahrzeuge beide freigegeben
 sind. Fehlt eine Freigabe, stehen Fahrzeuge und Personen ohne Besatzung untereinander, darüber
-„Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“ und die FMS-Wahl fehlen
-dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
+„Ohne Besatzung“ mit den gesperrten Modulen; „Auf …“, „Vom Fahrzeug lösen“, „Personal der
+Einheit übernehmen“ und die FMS-Wahl fehlen dann, und Namen führen nicht ins gesperrte Modul. Ohne Freigabe Personal bzw. Fahrzeuge bietet
 „Person zuordnen …“ bzw. „Fahrzeug zuordnen …“ nichts an und nennt den Grund. Ohne Freigabe Material
 stehen die Posten der Einheit weiter im Paneel „Material“, „Material zuordnen …“ steht gesperrt mit
 „Modul Material gesperrt“, und „Aus Einheit lösen“ und „Ausgeben“ fehlen.
@@ -289,7 +314,9 @@ Eine aufgelöste Einheit verschwindet aus Gliederung, Stärke, Statusband, Lagem
 Auswahllisten. Ihre Mitglieder bleiben im Einsatz, nur ohne Einheit; eine laufende Ablösung endet,
 ein Bereitstellungsraum trägt ihren Austritt ein. Mit Zeitachse und Einsatztagebuch bleibt sie im
 Nachweis: im Block „Aufgelöst“, in „insgesamt eingesetzt“ und in der Anlage „Einheiten mit
-Einsatzzeiten“ des Einsatzberichts. Eine Einheit ohne jede Spur (keine Mitglieder, keine
+Einsatzzeiten“ des Einsatzberichts. Wer und was beim Auflösen zur Einheit gehörte, hält die App
+fest; die Seite der aufgelösten Einheit zeigt es nur lesend („Eine aufgelöste Einheit nachlesen“).
+Eine Person, die danach als Fehldisposition storniert wird, fehlt dort. Eine Einheit ohne jede Spur (keine Mitglieder, keine
 Ereignisse, kein Eintrag im Tagebuch, keine Ablösung, kein Bereitstellungsraum, kein Auftrag, keine
 Meldung, kein Dokument, kein Verteiler, keine Verpflegungsausgabe) wird beim Auflösen ganz
 gelöscht. Eine Einheit, an die Verpflegung ausgegeben wurde, bleibt als aufgelöst stehen, auch wenn
@@ -298,7 +325,9 @@ sich nichts mehr ändern.
 
 ### Einsatztagebuch
 
-Ins Einsatztagebuch schreibt die App selbst: das Bilden und Auflösen einer Einheit, eine neue
+Ins Einsatztagebuch schreibt die App selbst: das Bilden und Auflösen einer Einheit (der Eintrag
+der Auflösung verweist mit „Einheit «Name»“ auf ihre Seite, ebenso ein Auftrag auf jede Einheit,
+an die er geht), eine neue
 Abschnittszuordnung, einen Wechsel des Einheitsführers, einen Statuswechsel von Hand und jedes
 Zuordnen und Lösen von Personal, Fahrzeugen und Material. Eine Kraft aus dem Stamm bekommt einen
 Eintrag für Disposition und Einheit zusammen, wie im Modul Personal bzw. Fahrzeuge. Das Setzen
@@ -330,19 +359,26 @@ Eine gewählte Person, deren Fahrzeug nicht mitkommt, steht mit „ohne Fahrzeug
 Fahrzeug in die Einheit. Sitzt eine Person ohne Einheit schon auf ihrem Fahrzeug aus der Vorlage und wird dieses
 abgewählt, steht an ihr „verlässt «…»“: sie steigt beim Bilden aus.
 
+Material der Vorlage steht je Einheit unter „Material“, mit Menge und Bezeichnung. Beim Bilden
+kommt es in den Einsatz: ein Gerät als ein Posten je Stück, ein Verbrauchsgut als ein Posten mit
+seiner Menge. Es liegt auf seinem Fahrzeug, wenn das mitkommt, sonst an der Einheit; eine angehakte
+Zeile nennt den Ort („auf «RTW 1»“ bzw. „an der Einheit“). Gesperrt ist Material, das „außer Dienst“
+steht, und ein Gerät mit Bestandsnummer, das „schon im Einsatz“ steht. Verbrauchsgut und Geräte
+ohne Bestandsnummer lassen sich mehrfach in den Einsatz holen und stehen immer als „neu“.
+
 Das Bilden gelingt ganz oder gar nicht. Hat sich seit dem Öffnen der Seite etwas geändert, etwa
 ein Fahrzeug ist inzwischen einem anderen Zug zugeordnet, entsteht nichts; der Grund steht an der
 Zeile, und die Zeilen zeigen den neuen Stand. Ein gesetztes Häkchen bleibt dabei stehen, die Kraft
 wird nicht still umgehängt; unter ihr steht „umhängen aus «2. Zug»“ bzw. „umhängen von «RTW 3»“, und
-ein Klick darauf übernimmt sie beim nächsten Bilden. Je Bildung sind höchstens 50 Fahrzeuge und
-50 Personen möglich; darüber bleibt „Einheit bilden“ gesperrt und nennt die Grenze. Eine Vorlage
+ein Klick darauf übernimmt sie beim nächsten Bilden. Je Bildung sind höchstens 50 Fahrzeuge,
+50 Personen und 50 Zeilen Material möglich; darüber bleibt „Einheit bilden“ gesperrt und nennt die Grenze. Eine Vorlage
 mit mehr als 20 Einheiten lässt sich nicht bilden.
 
-Ohne Freigabe des Moduls Fahrzeuge oder Personal fehlen dessen Zeilen; über dem Baum steht
-„Fahrzeuge gesperrt“ bzw. „Personal gesperrt“, und gebildet werden nur die Einheiten mit dem, was
-freigegeben ist. Ohne Freigabe des Meldebilds öffnet die App nach dem Bilden die Seite der neuen
+Ohne Freigabe des Moduls Fahrzeuge, Personal oder Material fehlen dessen Zeilen; über dem Baum
+steht „Fahrzeuge gesperrt“, „Personal gesperrt“ bzw. „Material gesperrt“, und gebildet werden nur
+die Einheiten mit dem, was freigegeben ist. Ohne Freigabe des Meldebilds öffnet die App nach dem Bilden die Seite der neuen
 Einheit. Ins Einsatztagebuch schreibt die App einen Eintrag für die ganze Bildung, mit Untereinheiten,
-Fahrzeugen, Kräften und wer woher umgehängt wurde.
+Fahrzeugen, Kräften, Material und wer woher umgehängt wurde.
 
 ### Aus einer Nachforderung
 

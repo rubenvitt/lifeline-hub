@@ -81,9 +81,10 @@ const MARKIERBAR: [&str; 4] = ["fahrzeug", "personal", "material", "einheit_vorl
 /// einer Einheiten-Vorlage (LLH-1042, Spec `demo-daten`, „Demo-Vorlagen vor den Fahrzeugen
 /// entfernen“) gehören ihr allein und fallen mit ihr. Jeder andere Verweis auf eine Vorlage, auch
 /// der der Untereinheit, hält fest.
-const ERLAUBTE_KASKADEN: [(&str, &str, &str); 2] = [
+const ERLAUBTE_KASKADEN: [(&str, &str, &str); 3] = [
     ("einheit_vorlage_fahrzeug", "vorlage_id", "einheit_vorlage"),
     ("einheit_vorlage_personal", "vorlage_id", "einheit_vorlage"),
+    ("einheit_vorlage_material", "vorlage_id", "einheit_vorlage"),
 ];
 
 /// Alle Fremdschlüssel aller Tabellen, die auf eine markierbare Stammdatentabelle zeigen.

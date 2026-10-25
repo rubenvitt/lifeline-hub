@@ -4,6 +4,7 @@ import type { EtbEintragAnzeige } from '../api/types';
 import {
   auftraegePfad,
   befehlDetailPfad,
+  einheitDetailPfad,
   lageberichtDetailPfad,
   meldungenPfad,
   nachforderungenPfad,
@@ -24,6 +25,10 @@ import { hatVerknuepfung, verweisStil } from './zeitachseModell';
  * Query-Param auf ihrer Seite (`?meldung=`, `?nachforderung=`), die die Karte hervorhebt. Die
  * Meldung heißt nach ihrer Nummer („Meldung #12“), die Nachforderung schlicht „Nachforderung“:
  * ihr Inhalt steht schon im Eintrag.
+ *
+ * **Einheiten (LLH-1266, Spec `etb-vorgaenge`, „Verweis auf genannte Einheiten“):** je Einheit,
+ * die der Eintrag festhält (Empfänger eines Auftrags, die Einheit des Eintrags ihrer Auflösung),
+ * ein Verweis „Einheit «Name»“ auf ihre Ansicht — bei einer aufgelösten die lesende.
  *
  * **Vorwärtsrichtung (LFH-636):** je Folgeauftrag — ein Auftrag, der AUS diesem Eintrag
  * erteilt wurde — ein eigener Verweis „Folgeauftrag Nr. 12", mit eindeutigem Ziel und Namen.
@@ -47,6 +52,7 @@ export default function EtbBacklinkBadges({
     meldung_id,
     meldung_lfd_nr,
     nachforderung_id,
+    einheiten,
   } = eintrag;
   if (!hatVerknuepfung(eintrag)) return null;
   const pfeil = <span aria-hidden="true"> ↗</span>;
@@ -79,6 +85,11 @@ export default function EtbBacklinkBadges({
           Nachforderung{pfeil}
         </Link>
       )}
+      {(einheiten ?? []).map((e) => (
+        <Link key={`einheit-${e.id}`} to={einheitDetailPfad(einsatzId, e.id)} style={stil}>
+          Einheit «{e.name}»{pfeil}
+        </Link>
+      ))}
       {folgeauftraege.map((f) => (
         <Link key={f.id} to={auftraegePfad(einsatzId, { auftrag: f.id })} style={stil}>
           {f.lfd_nr != null ? `Folgeauftrag Nr. ${f.lfd_nr}` : 'Folgeauftrag'}

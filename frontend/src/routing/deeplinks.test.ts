@@ -185,6 +185,13 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   it('erinnerungenPfad zeigt auf die Erinnerungen-Liste', () => {
     expect(erinnerungenPfad(7)).toBe('/einsaetze/7/erinnerungen');
   });
+  it('?erinnerung= steuert eine Erinnerung an und übersteht den Round-Trip (LLH-1429)', () => {
+    const pfad = erinnerungenPfad(E, { erinnerung: 12 });
+    expect(pfad).toBe('/einsaetze/5/erinnerungen?erinnerung=12');
+    const params = new URLSearchParams(pfad.split('?')[1]);
+    expect(parseRouteId(params.get('erinnerung') ?? undefined)).toBe(12);
+    expect(erinnerungenPfad(E, {})).toBe('/einsaetze/5/erinnerungen');
+  });
   /** Die aggregierende Kräfteübersicht. */
   it('materialPfad', () => {
     expect(materialPfad(7)).toBe('/einsaetze/7/material');

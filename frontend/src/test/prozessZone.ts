@@ -3,7 +3,7 @@ import { afterEach, beforeEach } from 'vitest';
 /**
  * Stellt die Prozesszone (= „Browserzone“ im Test) für den umgebenden `describe` um.
  *
- * Die Suite läuft unter `TZ=Europe/Berlin` (`scripts/check-all.sh`). Ein Zonentest mit
+ * Die Suite läuft unter `TZ=Europe/Berlin` (`./suitenZone.ts`). Ein Zonentest mit
  * Anzeigezone Berlin wäre damit blind grün: Browser- und Anzeigezone fielen zusammen. Node
  * übernimmt `process.env.TZ` zur Laufzeit, deshalb lässt sich die Zone je Block umstellen
  * (`openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`, D8).

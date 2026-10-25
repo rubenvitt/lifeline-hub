@@ -47,6 +47,11 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   eigene Temp-DB); `playwright.config.ts` schließt den Ordner aus. Regeln:
   `docs/anwender/AGENTS.md`, „Bilder“. Backend-Binary, Ports, Env-Hygiene und Vite-Start teilen
   beide Konfigurationen über `e2e/lauf-kern.ts`.
+- **In der Cloud-Sitzung startet ein Ersatz-Chromium aus `/opt/pw-browsers`** (LLH-1439): fehlt
+  der Build, den das Playwright des Repos erwartet, nehmen beide Konfigurationen und Schritt 7 des
+  Gates den dort vorinstallierten (`fallbackChromiumPath` in `e2e/lauf-kern.ts`);
+  `playwright install` ist dort gesperrt. Mit installiertem Browser ändert sich nichts. Firefox
+  und WebKit bringt das Abbild nicht mit: dort `PW_PROJEKTE=chromium`.
 - **Wer sich mit einem per API angelegten Konto anmeldet, legt es über `e2e/konto-anlegen.ts` an**
   (LFH-1121): die Anlage stellt jedes Konto unter Änderungszwang, der erste Passwort-Login endete
   sonst in „Neues Passwort festlegen“ statt auf `/einsaetze`. Der Helfer erledigt den Erstwechsel

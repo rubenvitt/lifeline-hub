@@ -367,7 +367,11 @@ describe('EinheitenPage', () => {
     expect(screen.getByText(`${einheiten.length} Einheiten`)).toBeInTheDocument();
     await userEvent.click(kopf);
     const liste = await screen.findByRole('list', { name: 'Aufgelöst' });
-    expect(within(liste).getByText('Alter Zug')).toBeInTheDocument();
+    // Der Name führt in die lesende Ansicht der aufgelösten Einheit (LLH-1266).
+    expect(within(liste).getByRole('link', { name: 'Alter Zug' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten/99',
+    );
     expect(within(liste).queryByRole('button')).toBeNull();
   });
 

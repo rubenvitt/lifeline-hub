@@ -1877,6 +1877,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einheit-vorlagen/{id}/personal",
             put(routes::einheit_vorlage::replace_personal),
         )
+        .route(
+            "/api/einheit-vorlagen/{id}/material",
+            put(routes::einheit_vorlage::replace_material),
+        )
         // Verpflegungsplan (LLH-1058): Lesen für alle der Org, Schreiben Admin.
         .route(
             "/api/verpflegung-vorlagen",
@@ -2014,14 +2018,6 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}",
             delete(routes::einsatz_einheit::fahrzeug_freigeben),
-        )
-        .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/material/{em_id}",
-            put(routes::einsatz_einheit::material_zuordnen),
-        )
-        .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/material/{em_id}",
-            delete(routes::einsatz_einheit::material_freigeben),
         );
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.

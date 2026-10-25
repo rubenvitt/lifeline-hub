@@ -45,7 +45,7 @@ pub(super) fn sse_ort(state: &AppState, einsatz_id: i64, ort: MaterialOrt) {
 }
 
 /// Nach einem Ortswechsel: alter und neuer Ort melden.
-pub(super) fn sse_ortswechsel(state: &AppState, einsatz_id: i64, wechsel: ort::OrtWechsel) {
+fn sse_ortswechsel(state: &AppState, einsatz_id: i64, wechsel: ort::OrtWechsel) {
     if wechsel.is_changed() {
         for o in [wechsel.vorher, wechsel.nachher].into_iter().flatten() {
             sse_ort(state, einsatz_id, o);

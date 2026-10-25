@@ -5,11 +5,12 @@ import {
   createEinheitVorlage,
   loadEinheitVorlagen,
   replaceVorlageFahrzeuge,
+  replaceVorlageMaterial,
   replaceVorlagePersonal,
   updateEinheitVorlage,
 } from './einheitVorlagen';
 
-describe('api/einheitVorlagen (LLH-1042)', () => {
+describe('api/einheitVorlagen (LLH-1042, LLH-1261)', () => {
   it('trifft Methode, Pfad und Body jedes Wegs', async () => {
     const seen: string[] = [];
     const record = async ({ request }: { request: Request }) => {
@@ -24,6 +25,7 @@ describe('api/einheitVorlagen (LLH-1042)', () => {
       http.patch('/api/einheit-vorlagen/:id', record),
       http.put('/api/einheit-vorlagen/:id/fahrzeuge', record),
       http.put('/api/einheit-vorlagen/:id/personal', record),
+      http.put('/api/einheit-vorlagen/:id/material', record),
     );
 
     await loadEinheitVorlagen('aktiv');
@@ -34,6 +36,10 @@ describe('api/einheitVorlagen (LLH-1042)', () => {
     await replaceVorlagePersonal(7, [
       { personal_id: 9, fahrzeug_id: 4, staerke_position: 'fuehrer' },
     ]);
+    await replaceVorlageMaterial(7, [
+      { material_id: 5, menge: 50, fahrzeug_id: null },
+      { material_id: 6, menge: 1, fahrzeug_id: 4 },
+    ]);
 
     expect(seen).toEqual([
       'GET /api/einheit-vorlagen',
@@ -43,6 +49,8 @@ describe('api/einheitVorlagen (LLH-1042)', () => {
       'PATCH /api/einheit-vorlagen/7 {"ueber_vorlage_id":null,"aktiv":false}',
       'PUT /api/einheit-vorlagen/7/fahrzeuge {"fahrzeug_ids":[4,2]}',
       'PUT /api/einheit-vorlagen/7/personal {"personal":[{"personal_id":9,"fahrzeug_id":4,"staerke_position":"fuehrer"}]}',
+      // LLH-1261: `null` heißt „an der Einheit“.
+      'PUT /api/einheit-vorlagen/7/material {"material":[{"material_id":5,"menge":50,"fahrzeug_id":null},{"material_id":6,"menge":1,"fahrzeug_id":4}]}',
     ]);
   });
 });
