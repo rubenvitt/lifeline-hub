@@ -1112,7 +1112,8 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
 
 - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` bei Vollseiten-Detail (uhs, br, lagebericht,
   befehl, person, tier, schaden, einheiten, personal), sonst **Query-Param** `?<modul>=<id>`
-  (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB `?eintrag=`);
+  (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?erinnerung=`, `?gefahrengebiet=`, ETB
+  `?eintrag=`);
   `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
 - **Jede Detailansicht, die bearbeitet werden kann, hat eine Item-Route** (LLH-1139, „Bearbeiten
   in der Ansicht“): eine offene Bearbeitung braucht eine Adresse, auf die Verlassen-Schutz,

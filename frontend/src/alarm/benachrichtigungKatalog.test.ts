@@ -71,6 +71,10 @@ describe('Katalog der Benachrichtigungsarten', () => {
     expect(
       ersatzPfad({ art: 'sofortmeldung', bezug_typ: 'meldung', bezug_id: 7, einsatz_id: 4 }),
     ).toBe('/einsaetze/4/meldungen?meldung=7');
+    // Eine fällige Erinnerung springt zu ihrer Karte (LLH-1467), wie der Server-Pfad.
+    expect(
+      ersatzPfad({ art: 'erinnerung_faellig', bezug_typ: 'erinnerung', bezug_id: 5, einsatz_id: 4 }),
+    ).toBe('/einsaetze/4/erinnerungen?erinnerung=5');
     // Die Übernahme in die Lage springt in die Lage-Sicht (LLH-1062), wie der Server-Pfad.
     expect(
       ersatzPfad({ art: 'meldung', bezug_typ: 'lage_uebernahme', bezug_id: 7, einsatz_id: 4 }),
