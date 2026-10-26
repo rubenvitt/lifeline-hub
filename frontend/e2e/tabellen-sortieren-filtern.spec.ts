@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kopfFilterAusloeser, kopfFilterWaehlen } from './kopffilter-kern';
-import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import {
+  anmeldenAls,
+  anmeldenAlsAdmin,
+  benachrichtigungenQuittieren,
+  benutzerAnlegen,
+  mitgliedEintragen,
+  wechsleZuRolle,
+} from './rollen-kern';
 
 /**
  * Sortieren und Filtern im Spaltenkopf, Zustand in der Adresse (LLH-1086, Spec
@@ -9,6 +16,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * Parameter kommt aus der Sitzung, „Filter zurücksetzen“ leert Filter und Suche. Der Kartenzweig
  * auf 390 px zeigt dieselbe Menge und sortiert über „Sortieren“. Als Admin und als Beobachter
  * (`e2e/AGENTS.md`, Rollen): die Liste ist ein Lesepfad beider; ein geteilter Link trägt die Sicht.
+ * Den Stand der Sitzung räumt jeder Kontowechsel, auch einer aus einem anderen Tab (LLH-1428).
  */
 
 async function einsatzMitSchaeden(page: Page): Promise<string> {
@@ -110,11 +118,54 @@ test.describe('Schäden: Sortieren und Filtern im Spaltenkopf', () => {
     await expect(page).toHaveURL(/sort=ort/);
     await expect(page.locator('[data-lfh="filterchips"]')).toHaveCount(0);
 
-    // Beobachter: der geteilte Link trägt die Sicht (die Sitzung räumt der Kontowechsel).
+    // Beobachter: den Stand der Sitzung (hier noch die Sortierung) räumt der Kontowechsel. Das
+    // Abmelden über die API sieht die App nicht; es räumen der Start der Anmeldeseite ohne Sitzung
+    // (401 beim Start) und sicher die Bindung an den Benutzer bei der Anmeldung (LLH-1428). Ohne
+    // Parameter beginnt die Liste daher ohne die Sicht des Admins.
     await wechsleZuRolle(page, 'beobachter', einsatzId);
+    await page.goto(liste);
+    await expect(page.getByText('Zollhof 4')).toBeVisible();
+    await expect(page.locator('[data-lfh="filterhinweis"]')).toHaveCount(0);
+    expect(new URL(page.url()).search).toBe('');
+
+    // Der geteilte Link trägt die Sicht.
     await page.goto(geteilt);
     await erwarteGrosseSicht(page);
     await expect(ersteZeile(page)).toContainText('Am Anger 3');
     await expect(page.getByRole('button', { name: 'Schaden erfassen' })).toHaveCount(0);
+  });
+
+  test('Kontowechsel in einem anderen Tab: nach dem Neuladen keine Sicht der vorigen Person (LLH-1428)', async ({
+    page,
+  }) => {
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzMitSchaeden(page);
+    const liste = `/einsaetze/${einsatzId}/schaeden`;
+    const beobachter = await benutzerAnlegen(page, 'beobachter');
+    await mitgliedEintragen(page, einsatzId, beobachter.id, 'beobachter');
+    await benachrichtigungenQuittieren(beobachter);
+
+    await page.goto(liste);
+    await kopfFilterWaehlen(page, 'Ausmaß', ['groß']);
+    await expect(page).toHaveURL(/[?&]f\.ausmass=gross(&|$)/);
+    // Vorbedingung: der Stand liegt in der Sitzung, der Rückweg ohne Parameter bringt ihn.
+    await page.goto(liste);
+    await erwarteGrosseSicht(page);
+
+    // Ein zweiter Tab meldet über die Anmeldeseite den Beobachter an, ohne vorher abzumelden
+    // (`auth/AGENTS.md`); dieser Tab lädt über den Konfliktdialog neu, die Sitzung überlebt das.
+    const tab2 = await page.context().newPage();
+    await anmeldenAls(tab2, beobachter.benutzername, beobachter.passwort);
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Anderer Benutzer angemeldet' });
+    await dialog.getByRole('button', { name: /weiterarbeiten$/ }).click();
+    await expect(page).toHaveURL(/\/einsaetze$/);
+    await tab2.close();
+
+    // Rückweg ohne Parameter: kein Filter der vorigen Person.
+    await page.goto(liste);
+    await expect(page.getByText('Zollhof 4')).toBeVisible();
+    await expect(page.getByText('Bachstraße 1')).toBeVisible();
+    await expect(page.locator('[data-lfh="filterhinweis"]')).toHaveCount(0);
+    expect(new URL(page.url()).search).toBe('');
   });
 });
