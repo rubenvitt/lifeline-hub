@@ -33,4 +33,21 @@ describe('useZeichenTheme (LLH-1409)', () => {
     });
     expect(result.current).toBe(ZEICHEN_THEME_DUNKEL);
   });
+
+  // Das Meldebild baut seine Tabelle für das Druckbild neu auf: ein Zeichen, das erst im Druck
+  // entsteht, kennt den Druck trotzdem.
+  it('nimmt auch für ein erst im Druck entstandenes Zeichen kein Theme', () => {
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    try {
+      expect(
+        renderHook(() => useZeichenTheme(), { wrapper: nacht }).result.current,
+      ).toBeUndefined();
+    } finally {
+      act(() => {
+        window.dispatchEvent(new Event('afterprint'));
+      });
+    }
+  });
 });
