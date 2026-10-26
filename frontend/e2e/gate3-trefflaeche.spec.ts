@@ -3675,7 +3675,7 @@ async function modalRuht(page: Page) {
   });
 }
 
-test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der Staffel (Route und Modal)', async ({
+test('Betroffene Aufnahme: Zustand, Fundort und „vermisst seit" folgen der Staffel (Route und Modal)', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -3696,7 +3696,7 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    // Route (Modus betroffen): Zustand + Koordinate.
+    // Route (Modus betroffen): Zustand + Fundort (Ortsfeld; die Koordinate steht darin, LLH-1407).
     await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
     await stelleDichte(page, dichte);
     await page.getByRole('button', { name: /Weitere Angaben/ }).click();
@@ -3705,10 +3705,10 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
       soll,
       `Route Zustand (${dichte})`,
     );
-    const koordinate = await haeltStufe(
-      huelle(page.getByLabel('Koordinate', { exact: true })),
+    const fundort = await haeltStufe(
+      huelle(page.getByLabel('Fundort', { exact: true })),
       soll,
-      `Route Koordinate (${dichte})`,
+      `Route Fundort (${dichte})`,
     );
 
     // Modal „Betroffene erfassen": dieselben zwei Felder im zweiten Mount von `AufnahmeFelder`.
@@ -3723,9 +3723,9 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
       `Modal Zustand (${dichte})`,
     );
     await haeltStufe(
-      huelle(schnell.getByLabel('Koordinate', { exact: true })),
+      huelle(schnell.getByLabel('Fundort', { exact: true })),
       soll,
-      `Modal Koordinate (${dichte})`,
+      `Modal Fundort (${dichte})`,
     );
     await page.keyboard.press('Escape');
     await expect(schnell).toBeHidden();
@@ -3743,7 +3743,7 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
     );
     await page.keyboard.press('Escape');
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Zustand ${zustand}, Koordinate ${koordinate}, Modal Zustand ${modalZustand}, vermisst seit ${seit}`,
+      `${dichte} (Soll ≥ ${soll}): Zustand ${zustand}, Fundort ${fundort}, Modal Zustand ${modalZustand}, vermisst seit ${seit}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

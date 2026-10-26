@@ -195,8 +195,12 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /Aufnahme/ })).toBeVisible();
     expect(screen.queryByRole('radiogroup', { name: 'Sichtungskategorie' })).toBeNull();
     const user = userEvent.setup();
+    // Am Gerät gibt es keine Ortssuche (Routenliste): der Fundort ist Text, Enter sendet ab
+    // (LLH-1407).
+    expect(screen.queryByRole('button', { name: 'Ort suchen' })).toBeNull();
     await user.type(screen.getByLabelText('Fundort'), 'Sammelstelle{Enter}');
     await waitFor(() => expect(aufnahmeBody).not.toBeNull());
+    expect(aufnahmeBody).toMatchObject({ antreff_ort: 'Sammelstelle' });
     expect(aufnahmeBody).not.toHaveProperty('uhs_id');
     expect(aufnahmeBody).not.toHaveProperty('sichtung');
     expect(await screen.findByText(/Erfasst als R-003 · untergebracht/)).toBeVisible();

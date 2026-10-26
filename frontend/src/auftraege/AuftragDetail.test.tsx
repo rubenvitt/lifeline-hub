@@ -1,10 +1,30 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
+import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { Auftrag } from '../api/types';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { freigabenFixture } from '../test/fixtures';
+import { server } from '../test/server';
+import { neuerQueryClient } from '../test/utils';
 import AuftragDetail, { type AuftragDetailProps } from './AuftragDetail';
+
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div data-testid="kartenausschnitt">
+      {etikett}: {punkt ? `${punkt.lat}, ${punkt.lon}` : 'Nicht verortet'}
+    </div>
+  ),
+}));
 
 const empfaenger = (id: number, name: string, quittiert_at: string | null) => ({
   id,
@@ -57,13 +77,15 @@ const auftrag = (over: Partial<Auftrag> = {}): Auftrag =>
 
 function renderDetail(props: Partial<AuftragDetailProps> & { auftrag: Auftrag }) {
   return render(
-    <AntApp>
-      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
-        <MemoryRouter>
-          <AuftragDetail einsatzId={5} darfSchreiben {...props} />
-        </MemoryRouter>
-      </AnzeigeKonventionenProvider>
-    </AntApp>,
+    <QueryClientProvider client={neuerQueryClient()}>
+      <AntApp>
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <MemoryRouter>
+            <AuftragDetail einsatzId={5} darfSchreiben {...props} />
+          </MemoryRouter>
+        </AnzeigeKonventionenProvider>
+      </AntApp>
+    </QueryClientProvider>,
   );
 }
 
@@ -165,5 +187,57 @@ describe('AuftragDetail (Spec `auftraege-befehle`)', () => {
   it('entfallen sagt das Detail, dass der Auftrag nicht mehr in der Ansicht steht', () => {
     renderDetail({ auftrag: auftrag({ bearbeitungsstatus: 'abgenommen' }), entfallen: true });
     expect(screen.getByText('Nicht mehr in dieser Ansicht')).toBeInTheDocument();
+  });
+
+  describe('Ziel auf der Karte (LLH-1407)', () => {
+    const verortet = () =>
+      auftrag({ ort: 'Hydrant H12, Deichstraße', ort_lat: 53.54321, ort_lon: 9.98765 });
+
+    it('ein verortetes Ziel steht als Ausschnitt unter dem Schema, mit Sprung zur Lagekarte am Punkt', async () => {
+      renderDetail({ auftrag: verortet() });
+      const ausschnitt = screen.getByTestId('kartenausschnitt');
+      expect(ausschnitt).toHaveTextContent('Ziel: 53.54321, 9.98765');
+      // Im Abschnitt „Schema“, nach dem Zieltext und vor dem Verlauf.
+      expect(
+        screen.getByText('Hydrant H12, Deichstraße').compareDocumentPosition(ausschnitt) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        ausschnitt.compareDocumentPosition(screen.getByRole('heading', { name: 'Verlauf' })) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      const sprung = await screen.findByRole('link', { name: /Auf Lagekarte zeigen/ });
+      expect(sprung).toHaveAttribute(
+        'href',
+        `/einsaetze/5/lagekarte?zentrum=${encodeURIComponent('53.54321,9.98765')}`,
+      );
+    });
+
+    it('ohne Koordinate weder Ausschnitt noch Sprung, der Zieltext steht im Schema', async () => {
+      renderDetail({ auftrag: auftrag({ ort: 'Hydrant H12, Deichstraße' }) });
+      expect(screen.getByText('Hydrant H12, Deichstraße')).toBeInTheDocument();
+      expect(screen.queryByTestId('kartenausschnitt')).toBeNull();
+      expect(screen.queryByText('Nicht verortet')).toBeNull();
+      // Die Freigaben hätten Zeit zu laden; ein Sprung erscheint trotzdem nicht.
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole('link', { name: /Auf Lagekarte zeigen/ })).toBeNull();
+    });
+
+    it('ohne Lagekarten-Freigabe steht der Ausschnitt, aber kein Sprung', async () => {
+      let abgefragt = false;
+      server.use(
+        http.get('/api/einsaetze/5/modul-freigaben', () => {
+          abgefragt = true;
+          return HttpResponse.json(
+            freigabenFixture({ lagekarte: { zugriff: false, sichtbar: false } }),
+          );
+        }),
+      );
+      renderDetail({ auftrag: verortet() });
+      expect(screen.getByTestId('kartenausschnitt')).toBeInTheDocument();
+      await vi.waitFor(() => expect(abgefragt).toBe(true));
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole('link', { name: /Auf Lagekarte zeigen/ })).toBeNull();
+    });
   });
 });

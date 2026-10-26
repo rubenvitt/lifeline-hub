@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/UhsBearbeitenModal.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
 ---
 
 ## Überblick
@@ -36,6 +36,16 @@ Die Patienten selbst sind Betroffene; ihre Sichtung und ihren Verbleib führt da
 Ein Lageplan als Hintergrund des Grundrisses lässt sich über „Plan“ hochladen oder aus den Dateien
 der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und „Plätze anlegen“ hinter
 „Plätze bearbeiten“; dort lassen sich Plätze auch verschieben und löschen.
+
+### Bezeichnung, Standort und Notiz ändern
+
+1. Die Stelle öffnen und oben „Bearbeiten“ wählen.
+2. „Bezeichnung“, „Standort (optional)“ oder „Notiz (optional)“ ändern. Den Standort mit Enter
+   oder „Ort suchen“ suchen und einen Treffer wählen, eine Koordinate eintippen oder den Punkt über
+   „Auf Karte wählen“ setzen; ein geleerter Standort löscht auch die Koordinate.
+3. „Speichern“ wählen. Gespeichert wird nur, was sich geändert hat.
+
+Eine aufgelöste oder stornierte Stelle lässt sich nicht mehr bearbeiten.
 
 ### Die Liste der Unfallhilfsstellen sortieren und filtern
 
@@ -157,7 +167,8 @@ dann wieder unter „Noch nicht aufgenommen“.
    Stelle ist, steht der Knopf als „Auflösen (noch … Personen)“ gesperrt.
 2. „Auflösen“ wählen und die Rückfrage „Unfallhilfsstelle auflösen?“ bestätigen.
 
-Eine Stelle, die noch „geplant“ ist, wird stattdessen mit „Stornieren“ verworfen. Liegt dort noch
+Eine Stelle, die noch „geplant“ ist, wird stattdessen verworfen: im Menü neben „Bearbeiten“ (drei
+Punkte) „Stornieren“ wählen und die Rückfrage bestätigen. Liegt dort noch
 Material, lehnt die App den Storno ab und nennt den Grund über der Seite; erst die Posten unter
 „Material“ mit „Lösen“ von der Stelle nehmen.
 

@@ -19,6 +19,7 @@ import { einsatzRechteGrund } from '../../components/nurAnsicht';
 import { SK_META } from '../../personen/personMeta';
 import AufnahmeFelder, {
   aufnahmeZuEingabe,
+  fundortAusText,
   type AufnahmeEingabe,
   type AufnahmeWerte,
 } from '../../personen/AufnahmeFelder';
@@ -76,7 +77,7 @@ export default function AufnahmePage() {
     if (sitzungsortGeladen.current === einsatzId) return;
     sitzungsortGeladen.current = einsatzId;
     const ort = liesErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort');
-    if (ort !== undefined) form.setFieldValue('antreff_ort', ort);
+    if (ort !== undefined) form.setFieldValue('antreff_ort', fundortAusText(ort));
   }, [einsatzId, form]);
 
   const einsatzQuery = useQuery({
@@ -217,8 +218,13 @@ export default function AufnahmePage() {
           // Erst die Post-Acceptance-Stufe darf den Sitzungswert ändern: ein Abbruch während des
           // POST besteht die Generation davor nicht.
           onErfasst={(daten) => {
-            if (typeof daten.antreff_ort === 'string') {
-              schreibeErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort', daten.antreff_ort);
+            if (typeof daten.antreff_ort?.text === 'string') {
+              schreibeErfassungsSitzungswert(
+                einsatzId,
+                'person',
+                'antreff_ort',
+                daten.antreff_ort.text,
+              );
             }
           }}
           /**

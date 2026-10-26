@@ -31,6 +31,13 @@ describe('erkenneKoordinate — an der FORM, nicht am eingestellten Format', () 
     nahe(erkenneKoordinate('52,52194 13,41321'), BERLIN, 5);
   });
 
+  it('Schrägstrich als Trenner, wie die Fundort-Koordinate geschrieben wird (LLH-1407)', () => {
+    nahe(erkenneKoordinate('52.52194/13.41321'), BERLIN, 5);
+    nahe(erkenneKoordinate('52,52194/13,41321'), BERLIN, 5);
+    nahe(erkenneKoordinate('52.52194 / 13.41321'), BERLIN, 5);
+    expect(erkenneKoordinate('12/34')).toBeNull();
+  });
+
   it('MGRS in beiden Schreibweisen — so, wie der Koordinatenwechsel sie ausgibt', () => {
     const mgrs = formatiere(BERLIN.lat, BERLIN.lon, 'mgrs'); // „33U UU 91… 20…"
     nahe(erkenneKoordinate(mgrs), BERLIN);
