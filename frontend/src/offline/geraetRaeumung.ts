@@ -188,6 +188,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Geräte-Einstellung der Alarmtöne, ohne Personenbezug.',
   },
   {
+    ort: 'localStorage lfh:eingaenge:stumm',
+    datei: 'alarm/eingaengeStumm.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Geräte-Einstellung „Stumm auf diesem Gerät“ (LLH-1421): nur Namen von Eingangsarten, ohne Personenbezug, wie der Alarmton.',
+  },
+  {
     ort: 'localStorage lfh:web-push:<benutzer>',
     datei: 'alarm/webPush.ts',
     entscheidung: 'bleibt',

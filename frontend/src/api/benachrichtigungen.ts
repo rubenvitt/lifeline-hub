@@ -1,5 +1,12 @@
 import { apiGet, apiSend, mitParametern } from './client';
-import type { BenachrichtigungAnzeige, BenachrichtigungVerlauf } from './types';
+import type {
+  BenachrichtigungAnzeige,
+  BenachrichtigungArt,
+  BenachrichtigungVerlauf,
+  BenachrichtigungVorgabeArt,
+  BenachrichtigungVorgaben,
+  VorgabeFunktion,
+} from './types';
 
 /**
  * Eine eigene Benachrichtigung mit Text (`GET /api/benachrichtigungen/{id}`). Eine fremde oder
@@ -41,4 +48,25 @@ export function markiereBenachrichtigungenGelesen(einsatzId: number, bisId: numb
   return apiSend<void>(`/api/einsaetze/${einsatzId}/benachrichtigungen/gelesen`, 'POST', {
     bis_id: bisId,
   });
+}
+
+/**
+ * Die Vorgabe je Funktion am Einsatz (LLH-1421, design.md D4): für jede einstellbare Art die
+ * Funktionen, für die sie still ist (gespeichert oder Katalog).
+ */
+export function ladeBenachrichtigungVorgaben(einsatzId: number): Promise<BenachrichtigungVorgaben> {
+  return apiGet<BenachrichtigungVorgaben>(`/api/einsaetze/${einsatzId}/benachrichtigung-vorgaben`);
+}
+
+/** Setzt die Vorgabe einer Art (ersetzt ihren Stand); liefert den neuen Stand der Art. */
+export function setzeBenachrichtigungVorgabe(
+  einsatzId: number,
+  art: BenachrichtigungArt,
+  still: VorgabeFunktion[],
+): Promise<BenachrichtigungVorgabeArt> {
+  return apiSend<BenachrichtigungVorgabeArt>(
+    `/api/einsaetze/${einsatzId}/benachrichtigung-vorgaben/${art}`,
+    'PUT',
+    { still },
+  );
 }

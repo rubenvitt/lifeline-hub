@@ -1268,6 +1268,7 @@ export type EinstellungenSektion =
   | 'pegel'
   | 'kennzahlen'
   | 'abloesung'
+  | 'benachrichtigungen'
   | 'geraete'
   | 'zugriff';
 
@@ -1289,6 +1290,9 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   // Vorgabe des Einsatzes für die Ablösung (LLH-1122): Schichtmodell, Rechte wie die
   // Abschnittsvorgabe.
   { key: 'abloesung', label: 'Ablösung' },
+  // Vorgabe je Funktion (LLH-1421): wer welche Eingänge still bekommt; Rechte wie die übrigen
+  // Einstellungen.
+  { key: 'benachrichtigungen', label: 'Benachrichtigungen' },
   // Gerätekopplung (LFH-892): nur die Einsatzleitung koppelt, die Sektion erklärt das selbst.
   { key: 'geraete', label: 'Geräte' },
   // Mitglieder und Rollen (LFH-1170): von den Einsatzdaten hierher, dieselbe Rechtegrenze wie

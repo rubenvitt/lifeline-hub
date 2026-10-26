@@ -17,6 +17,7 @@ import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import { spieleAlarmTon } from './alarmTon';
 import { schliesseAlleDesktopAlarme } from './desktopAlarm';
 import { EINGAENGE_OEFFNEN_EVENT } from './eingaenge';
+import { setzeStumm, vergesseStummStand } from './eingaengeStumm';
 import { EINGANG_TON_ABSTAND_MS, setzeEingangTonZurueck } from './useEingangshinweis';
 
 /**
@@ -453,5 +454,41 @@ describe('Eingangshinweis (LLH-1062)', () => {
     const schmal = await waitFor(() => hinweis('Neuer Auftrag'));
     expect(schmal.style.insetInlineStart).not.toBe('auto');
     expect(schmal.style.position).toBe('fixed');
+  });
+});
+
+describe('Stumm auf diesem Gerät (LLH-1421)', () => {
+  afterEach(() => {
+    setzeStumm('auftrag_erteilt', false);
+    vergesseStummStand();
+  });
+
+  it('eine stumme Art bringt kein Band und keinen Ton; eine laute Meldung danach schon', async () => {
+    setzeStumm('auftrag_erteilt', true);
+    const a = auftragEingang(2301, 41);
+    const b = eingang(2302, 161);
+    serverMit([a, b], { 161: { absender: 'EA Süd', inhalt: 'Lage ruhig' } });
+    renderZentrale();
+    live(a);
+    live(b);
+
+    await screen.findByText('Neue Meldung · EA Süd');
+    // Nur die Meldung steht im Band; der Auftrag zählt, ist aber leise.
+    expect(screen.queryByText('Neuer Auftrag')).not.toBeInTheDocument();
+    expect(screen.queryByText(/neue Eingänge/)).not.toBeInTheDocument();
+    expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
+  });
+
+  it('nur stumme Eingänge: kein Band, kein Ton', async () => {
+    setzeStumm('auftrag_erteilt', true);
+    const a = auftragEingang(2401, 42);
+    serverMit([a], {});
+    renderZentrale();
+    live(a);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(document.querySelector('[data-lfh="eingangsband"]')).toBeNull();
+    expect(ton).not.toHaveBeenCalled();
   });
 });

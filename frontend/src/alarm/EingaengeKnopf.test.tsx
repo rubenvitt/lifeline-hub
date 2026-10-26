@@ -12,6 +12,7 @@ import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import EingaengeKnopf from './EingaengeKnopf';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeZahlText } from './eingaenge';
+import { istStumm, setzeStumm, vergesseStummStand } from './eingaengeStumm';
 
 /**
  * Knopf „Eingänge“ mit Verlauf (LLH-1143, design.md D6): Zahl der ungelesenen Eingänge, Gruppen
@@ -76,7 +77,11 @@ function rendern() {
   );
 }
 
-beforeEach(() => setzeViewportBreite(1366));
+beforeEach(() => {
+  setzeViewportBreite(1366);
+  setzeStumm('meldung', false);
+  setzeStumm('gefahr', false);
+});
 afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
 
 describe('Knopf „Eingänge“ (LLH-1143)', () => {
@@ -173,6 +178,34 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     expect(zaehler.abrufe).toBe(vorher);
     senden(1);
     await waitFor(() => expect(zaehler.abrufe).toBe(vorher + 1));
+  });
+
+  it('„Stumm“ klappt die Schalter dieses Geräts auf: nur Eingänge, kein Alarm (LLH-1421)', async () => {
+    serverMit({ eintraege: [eintrag(1)], ungelesen: 1 });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eingänge, 1 ungelesen' }));
+    const paneel = await screen.findByRole('region', { name: 'Eingänge' });
+    const knopf = within(paneel).getByRole('button', { name: 'Stumm' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(knopf);
+    const liste = within(paneel).getByRole('region', { name: 'Stumm auf diesem Gerät' });
+    expect(within(liste).queryByRole('switch', { name: /Sofortmeldung/ })).toBeNull();
+    expect(within(liste).queryByRole('switch', { name: /Neuer Einsatz/ })).toBeNull();
+    expect(within(liste).queryByRole('switch', { name: /Unwetter/ })).toBeNull();
+
+    const meldung = within(liste).getByRole('switch', {
+      name: 'Stumm: Neue Meldung und Lagemeldung',
+    });
+    expect(meldung).not.toBeChecked();
+    await userEvent.click(meldung);
+    expect(meldung).toBeChecked();
+    expect(istStumm('meldung')).toBe(true);
+    // Der Stand liegt im Gerät und überlebt ein Neuladen.
+    vergesseStummStand();
+    expect(istStumm('meldung')).toBe(true);
+    // Der Kopf nennt, wie viele Arten stumm sind; die Zahl der Eingänge bleibt.
+    expect(within(paneel).getByRole('button', { name: 'Stumm · 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eingänge, 1 ungelesen' })).toBeInTheDocument();
   });
 
   it('öffnet sich auf Bitte des Eingangsbands', async () => {
