@@ -17,6 +17,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client", "@testing-library/jest-dom", "node"]
   },
-  "include": ["src", "e2e"],
+  "include": ["src", "e2e", "playwright.config.ts", "playwright.doku.config.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
