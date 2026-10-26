@@ -92,7 +92,7 @@ function render(
         />
       </Routes>
     </>,
-    { route },
+    { route, datenRouter: true },
   );
 }
 
@@ -726,7 +726,7 @@ describe('MaterialPage · Datenzustände', () => {
       <Routes>
         <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
       </Routes>,
-      { route: '/einsaetze/1/material' },
+      { route: '/einsaetze/1/material', datenRouter: true },
     );
   }
 
@@ -1068,7 +1068,7 @@ describe('MaterialPage · Demo-Marke', () => {
       <Routes>
         <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
       </Routes>,
-      { route: '/einsaetze/1/material' },
+      { route: '/einsaetze/1/material', datenRouter: true },
     );
   }
 
@@ -1169,7 +1169,7 @@ describe('MaterialPage · Disponieren im Dialog (LFH-983)', () => {
       <Routes>
         <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
       </Routes>,
-      { route: '/einsaetze/1/material' },
+      { route: '/einsaetze/1/material', datenRouter: true },
     );
     return { ...ergebnis, gesendet };
   }
@@ -2108,5 +2108,93 @@ describe('MaterialPage · Sortieren und Filtern (LLH-1096)', () => {
     expect(
       screen.getByRole('button', { name: 'Filter Träger: ASB entfernen' }),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * Verlassen-Schutz der Liste (LLH-1468, `frontend/AGENTS.md`, „Ein offenes, geändertes Einzelfeld
+ * in einer Ansicht …“): ein geänderter Ort meldet sich beim Merker der Seite an und fragt vor dem
+ * Pfadwechsel nach, ohne Änderung still. Die Gruppierung hängt die offene Angabe nicht aus (die
+ * Zeile behält ihren Schlüssel, die Sicht ordnet nur um): sie wechselt ohne Rückfrage, der Entwurf
+ * bleibt (`useWechselNachRueckfrage` gilt nur für Wechsel, die aushängen).
+ */
+describe('MaterialPage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)', () => {
+  const FELD = 'Ort zu Wolldecke';
+  const RUECKFRAGE = 'Ungespeicherte Änderungen';
+  const gruppierung = (name: string) => screen.getByRole('radio', { name });
+
+  /** Einsatz 2 als Ziel des Routenwechsels. */
+  function zielEinsatz2() {
+    server.use(
+      http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
+      http.get('/api/einsaetze/2/material', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/uhs', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/bereitstellungsraeume', () => HttpResponse.json([])),
+    );
+  }
+
+  /** Öffnet den Ort der Wolldecke; mit `wahl` steht danach ein geänderter Entwurf. */
+  async function oeffneOrt(wahl?: string) {
+    await screen.findByText('Wolldecke');
+    await userEvent.click(await screen.findByRole('button', { name: `${FELD} bearbeiten` }));
+    if (wahl) await waehle(FELD, wahl);
+  }
+
+  it('die Gruppierung ordnet nur um: der Entwurf bleibt stehen, ohne Rückfrage', async () => {
+    render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
+    await oeffneOrt('UHS Turnhalle');
+
+    await userEvent.click(gruppierung('Nach Status'));
+    expect(gruppierung('Nach Status')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('dialog', { name: RUECKFRAGE })).toBeNull();
+    const feld = screen.getByRole('combobox', { name: FELD }).closest('.ant-select')!;
+    expect(feld).toHaveTextContent('UHS Turnhalle');
+    expect(screen.getByRole('button', { name: `${FELD} speichern` })).toBeInTheDocument();
+  });
+
+  it('dieselbe Angabe ist nach dem Umgruppieren weiter geschützt', async () => {
+    zielEinsatz2();
+    render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
+    await oeffneOrt('UHS Turnhalle');
+    await userEvent.click(gruppierung('Nach Status'));
+
+    await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
+    expect(await screen.findByRole('dialog', { name: RUECKFRAGE })).toBeInTheDocument();
+    expect(ort.aktuell).toBe('/einsaetze/1/material');
+  });
+
+  it('Routenwechsel mit Änderung fragt nach; „Verwerfen“ verlässt die Seite', async () => {
+    zielEinsatz2();
+    render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
+    await oeffneOrt('UHS Turnhalle');
+
+    await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
+    const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+    expect(ort.aktuell).toBe('/einsaetze/1/material');
+    expect(screen.getByRole('combobox', { name: FELD })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: RUECKFRAGE })).getByRole('button', {
+        name: 'Verwerfen',
+      }),
+    );
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/2/material'));
+    expect(await screen.findByText('Noch kein Material disponiert')).toBeInTheDocument();
+  });
+
+  it('ohne Änderung wechselt die Route still', async () => {
+    zielEinsatz2();
+    render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
+    await oeffneOrt();
+    expect(screen.getByRole('combobox', { name: FELD })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/2/material'));
+    expect(await screen.findByText('Noch kein Material disponiert')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: RUECKFRAGE })).toBeNull();
   });
 });

@@ -76,6 +76,7 @@ import { materialStatus } from '../theme/statusFarben';
 import DemoMarke from '../components/DemoMarke';
 import { demoGroupedOptions, type AuswahlOption } from '../stammdaten/demoAuswahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
+import { OffeneBearbeitungProvider } from '../components/offeneBearbeitung';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -199,7 +200,23 @@ const GRUPPIERUNG_OPTIONEN = [
   { wert: 'status', label: 'Nach Status' },
 ] as const satisfies readonly { wert: Gruppierung; label: string }[];
 
+/**
+ * Merker der Seite (LLH-1468, `frontend/AGENTS.md`, „Ein offenes, geändertes Einzelfeld in einer
+ * Ansicht …“): eine geänderte Inline-Angabe (Ort) meldet sich selbst an und fragt vor dem Verlassen
+ * nach. Die Gruppierung im Kopf fragt nicht: die Zeile behält ihren Schlüssel, die Sicht ordnet nur
+ * um, und die offene Angabe bleibt samt Entwurf stehen (`useWechselNachRueckfrage` gilt nur für
+ * einen Wechsel, der sie aushängt). Ohne `aktiv`, weil die Seite erst darunter weiß, ob sie
+ * schreiben darf; ohne Schreibrecht meldet keine Angabe einen Entwurf.
+ */
 export default function MaterialPage() {
+  return (
+    <OffeneBearbeitungProvider>
+      <MaterialInhalt />
+    </OffeneBearbeitungProvider>
+  );
+}
+
+function MaterialInhalt() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { token } = theme.useToken();

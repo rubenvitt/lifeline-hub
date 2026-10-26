@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router';
+import { Link, Route, Routes, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
@@ -86,6 +86,8 @@ function render(
     weitereRouten?: ReactNode;
     material?: unknown[];
     route?: string;
+    /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
+    daneben?: ReactNode;
   } = {},
 ) {
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
@@ -111,12 +113,13 @@ function render(
   return renderMitProviders(
     <>
       <Ortsfuehler />
+      {optionen.daneben}
       <Routes>
         <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
         {optionen.weitereRouten}
       </Routes>
     </>,
-    { route: optionen.route ?? '/einsaetze/7/fahrzeuge' },
+    { route: optionen.route ?? '/einsaetze/7/fahrzeuge', datenRouter: true },
   );
 }
 
@@ -276,7 +279,7 @@ describe('FahrzeugePage', () => {
       <Routes>
         <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
       </Routes>,
-      { route: '/einsaetze/7/fahrzeuge?fahrzeug=10' },
+      { route: '/einsaetze/7/fahrzeuge?fahrzeug=10', datenRouter: true },
     );
     await screen.findByText('Florian 1');
     await waitFor(() =>
@@ -1322,7 +1325,7 @@ describe('FahrzeugePage · Datenzustände', () => {
       <Routes>
         <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
       </Routes>,
-      { route: '/einsaetze/7/fahrzeuge' },
+      { route: '/einsaetze/7/fahrzeuge', datenRouter: true },
     );
   }
 
@@ -1621,7 +1624,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
           }
         />
       </Routes>,
-      { route },
+      { route, datenRouter: true },
     );
     return { patches };
   }
@@ -1799,7 +1802,7 @@ describe('FahrzeugePage · Demo-Marke', () => {
       <Routes>
         <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
       </Routes>,
-      { route: '/einsaetze/7/fahrzeuge' },
+      { route: '/einsaetze/7/fahrzeuge', datenRouter: true },
     );
   }
 
@@ -2127,5 +2130,123 @@ describe('FahrzeugePage · Sortieren und Filtern (LLH-1096)', () => {
     await screen.findByText('Florian 1');
     expect(screen.queryByText('Florian 2')).toBeNull();
     expect(screen.getByRole('button', { name: 'Filter Typ: LF 20 entfernen' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Verlassen-Schutz der Liste (LLH-1468, `frontend/AGENTS.md`, „Ein offenes, geändertes Einzelfeld
+ * in einer Ansicht …“): eine geänderte Einheit meldet sich beim Merker der Seite an. Der Wechsel
+ * aufs Tableau hängt die Liste aus und fragt deshalb wie ein Pfadwechsel; ohne Änderung still.
+ */
+describe('FahrzeugePage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)', () => {
+  const EINHEITEN = [
+    { id: 1, name: 'Zug 1', abschnitt_id: null, abschnitt_name: null, ueber_einheit_id: null },
+  ];
+  const FELD = 'Einheit zu Florian 1';
+  const RUECKFRAGE = 'Ungespeicherte Änderungen';
+  const segment = (name: string) =>
+    within(screen.getByRole('radiogroup', { name: 'Ansicht' })).getByRole('radio', { name });
+
+  function renderMitZiel() {
+    return render(einsatz(), [], ef, [], EINHEITEN, {
+      weitereRouten: <Route path="/einsaetze" element={<div>Einsatzliste</div>} />,
+      // Die Sprungmarke „FMS-Tableau“ bleibt auf dem Pfad (`?ansicht=tableau`).
+      daneben: <Link to="/einsaetze/7/fahrzeuge?ansicht=tableau">Sprungmarke</Link>,
+    });
+  }
+
+  /** Öffnet die Einheit der Zeile; mit `wahl` steht danach ein geänderter Entwurf. */
+  async function oeffneEinheit(container: HTMLElement, wahl?: string) {
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await userEvent.click(await within(zeile).findByRole('button', { name: `${FELD} eintragen` }));
+    if (wahl) await waehle(FELD, wahl);
+  }
+
+  it('Segmentwechsel mit Änderung fragt nach; „Bleiben“ lässt Liste und Entwurf stehen', async () => {
+    const { container } = renderMitZiel();
+    await oeffneEinheit(container, 'Zug 1');
+
+    await userEvent.click(segment('FMS-Tableau'));
+    const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+
+    expect(segment('Liste')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('combobox', { name: FELD })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `${FELD} speichern` })).toBeInTheDocument();
+  });
+
+  it('Segmentwechsel mit Änderung: „Verwerfen“ wechselt aufs Tableau, der Entwurf ist weg', async () => {
+    const { container } = renderMitZiel();
+    await oeffneEinheit(container, 'Zug 1');
+
+    await userEvent.click(segment('FMS-Tableau'));
+    const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Verwerfen' }));
+
+    expect(segment('FMS-Tableau')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('combobox', { name: FELD })).toBeNull();
+    // Zurück auf der Liste steht der gespeicherte Stand, keine zweite Rückfrage.
+    await userEvent.click(segment('Liste'));
+    expect(await screen.findByRole('button', { name: `${FELD} eintragen` })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: RUECKFRAGE })).toBeNull();
+  });
+
+  it('Routenwechsel mit Änderung fragt nach; „Verwerfen“ verlässt die Seite', async () => {
+    const { container } = renderMitZiel();
+    await oeffneEinheit(container, 'Zug 1');
+
+    await userEvent.click(screen.getByRole('link', { name: 'Einsätze' }));
+    const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
+    expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+    expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge');
+    expect(screen.getByRole('combobox', { name: FELD })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Einsätze' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: RUECKFRAGE })).getByRole('button', {
+        name: 'Verwerfen',
+      }),
+    );
+    expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+    expect(ort.aktuell).toBe('/einsaetze');
+  });
+
+  it('die Sprungmarke aufs Tableau fragt mit Änderung ebenso', async () => {
+    const { container } = renderMitZiel();
+    await oeffneEinheit(container, 'Zug 1');
+
+    await userEvent.click(screen.getByRole('link', { name: 'Sprungmarke' }));
+    const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+    expect(segment('Liste')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('combobox', { name: FELD })).toBeInTheDocument();
+    // Die Vorgabe ist geräumt, auch wenn die Ansicht bleibt.
+    expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge');
+
+    await userEvent.click(screen.getByRole('link', { name: 'Sprungmarke' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: RUECKFRAGE })).getByRole('button', {
+        name: 'Verwerfen',
+      }),
+    );
+    expect(segment('FMS-Tableau')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('ohne Änderung wechseln Segment und Route still', async () => {
+    const { container } = renderMitZiel();
+    await oeffneEinheit(container);
+    expect(screen.getByRole('combobox', { name: FELD })).toBeInTheDocument();
+
+    await userEvent.click(segment('FMS-Tableau'));
+    expect(segment('FMS-Tableau')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('dialog', { name: RUECKFRAGE })).toBeNull();
+
+    await userEvent.click(segment('Liste'));
+    await oeffneEinheit(container);
+    await userEvent.click(screen.getByRole('link', { name: 'Einsätze' }));
+    expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: RUECKFRAGE })).toBeNull();
   });
 });
