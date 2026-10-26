@@ -775,7 +775,7 @@ Ist-Stärke und dem Zeitpunkt des Eintreffens, dazu die aufgelösten Einheiten, 
 verweist, und alle Abschnitte mit Name und Über-Abschnitt. Die Stärken MUST aus derselben Rechnung
 stammen wie in der Einheitenliste. Das Eintreffen MUST das nicht gestrichene Eintreffen der
 jüngsten Einsatzperiode sein und fehlen, wenn es keins gibt. Die Liste MUST NOT Einheitsführer,
-Erreichbarkeit, Kommunikationsmittel, Bemerkung, Mitglieder, Fahrzeuge oder Material enthalten.
+Verbindungen, Bemerkung, Mitglieder, Fahrzeuge oder Material enthalten.
 Jeder, der die Verpflegung lesen darf, MUST die Liste erhalten, auch ohne Zugriff auf das Modul
 Einheiten; Einheiten- und Abschnittsnamen, Gliederung, Stärke und Eintreffen sind
 Lagebezeichnungen ohne Personenbezug und hier eine bewusste Ausnahme von der Regel, dass das
@@ -794,8 +794,8 @@ Verpflegungsmodul nichts aus anderen Modulen hineinzieht.
 - **THEN** steht sie weiter in der Empfängerliste mit dem Eintreffen dieser Periode
 
 #### Scenario: Keine Personenangaben
-- **WHEN** eine Einheit mit Einheitsführer, Erreichbarkeit und Personal in der Empfängerliste steht
-- **THEN** enthält die Antwort weder den Namen des Einheitsführers noch die Erreichbarkeit noch Namen von Mitgliedern
+- **WHEN** eine Einheit mit Einheitsführer, Telefonverbindung und Personal in der Empfängerliste steht
+- **THEN** enthält die Antwort weder den Namen des Einheitsführers noch die Verbindung noch Namen von Mitgliedern
 
 #### Scenario: Leser ohne Modul Einheiten
 - **WHEN** eine Person die Verpflegung lesen darf, das Modul Einheiten für sie aber ausgeblendet ist

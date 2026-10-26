@@ -124,13 +124,10 @@ const EINHEITEN = [
     name: 'ELW 1',
     sortier: 1,
     sprechgruppen: [],
-    erreichbarkeit: '0171 1',
   },
 ] as unknown as Einheit[];
 const FUEHRUNGSSTELLE = {
   rufname: 'Florian Kreis 1',
-  kommunikationsmittel: null,
-  erreichbarkeit: null,
   sprechgruppen: [],
 } as unknown as Fuehrungsstelle;
 

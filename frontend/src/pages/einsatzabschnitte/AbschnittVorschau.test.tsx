@@ -21,8 +21,6 @@ const abschnitt = (o: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt =>
     abschnittsauftrag: 'Deich an der Mühle halten',
     bemerkung: 'Zufahrt nur über Norden',
     sprechgruppen: [],
-    kommunikationsmittel: null,
-    erreichbarkeit: null,
     sortier: 0,
     ...o,
   }) as Einsatzabschnitt;

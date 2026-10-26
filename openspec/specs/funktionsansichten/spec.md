@@ -468,7 +468,7 @@ Lagemonitor).
 #### Scenario: Empfängerliste ohne Führernamen
 
 - **WHEN** das Verpflegungsgerät die Verpflegung abruft und die Einheit „2. Gruppe“ einen Einheitsführer und Personal hat
-- **THEN** enthält die Antwort den Namen „2. Gruppe“ und ihre Stärke, aber weder den Namen des Einheitsführers noch die Erreichbarkeit noch Namen von Mitgliedern
+- **THEN** enthält die Antwort den Namen „2. Gruppe“ und ihre Stärke, aber weder den Namen des Einheitsführers noch ihre Verbindungen noch Namen von Mitgliedern
 
 #### Scenario: Keine Einheitenliste
 

@@ -63,8 +63,6 @@ const einheiten = [
     fahrzeug_mitglieder: [],
     material_mitglieder: [],
     sprechgruppen: [tmoSprechgruppe],
-    kommunikationsmittel: null,
-    erreichbarkeit: null,
     tz_fachaufgabe: null,
     tz_organisation: null,
   },

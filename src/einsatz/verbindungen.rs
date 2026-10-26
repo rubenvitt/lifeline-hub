@@ -3,15 +3,15 @@
 //! (`stab::kommunikation`, Mittel festnetz | mobil | fax | email | messenger | melder |
 //! sonstiges, Wert, Hinweis). Funk zeigt sich am Datensatz über Rufname und Sprechgruppen.
 //!
-//! Eine Tabelle `einsatz_verbindung` (Migration 0244) mit typisiertem Bezug und echten
+//! Eine Tabelle `einsatz_verbindung` (Migration 0248) mit typisiertem Bezug und echten
 //! Fremdschlüsseln: das Löschen eines Abschnitts oder einer Einheit räumt per Kaskade mit. Der
 //! Schreibweg ist eine Ersatzliste im PATCH bzw. POST des Datensatzes (`verbindungen`, wie
 //! `sprechgruppe_ids`); Live-Ereignis und Rechte folgen dem Datensatz.
 //!
 //! Die Werte sind personenbezogen: Schwärzung (`schwaerzung_registry`, Personen-Scrub über die
 //! führende Person in `schwaerzung_person`) und Personensuche (`aufbewahrung::suche`) kennen sie.
-//! Die alten Spalten `kommunikationsmittel`/`erreichbarkeit` bleiben stehen und werden nicht mehr
-//! geschrieben; ein Body, der sie noch trägt, ist 400 ([`lehne_altfelder_ab`]).
+//! Die alten Spalten `kommunikationsmittel`/`erreichbarkeit` sind entfernt (LLH-1418); ein Body,
+//! der die Felder noch trägt, ist 400 ([`lehne_altfelder_ab`]).
 
 use std::collections::HashMap;
 

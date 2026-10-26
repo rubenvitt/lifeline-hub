@@ -299,13 +299,13 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
     .await;
     let ea_nord = id(
         pool,
-        "INSERT INTO einsatzabschnitt (einsatz_id, name, leiter_id, erreichbarkeit, bemerkung) \
-         VALUES (?, 'EA Nord', ?, 'Hans Funk 0172', 'Deich halten') RETURNING id",
+        "INSERT INTO einsatzabschnitt (einsatz_id, name, leiter_id, bemerkung) \
+         VALUES (?, 'EA Nord', ?, 'Deich halten') RETURNING id",
         &[e1, k1],
     )
     .await;
-    // LLH-1134: Verbindungen an Abschnitt und Einheit hängen an der führenden Person, wie früher
-    // die Erreichbarkeit; die des Abschnitts einer anderen Leitung bleiben.
+    // LLH-1134: Verbindungen an Abschnitt und Einheit hängen an der führenden Person; die des
+    // Abschnitts einer anderen Leitung bleiben.
     let zug_hans = id(
         pool,
         "INSERT INTO einsatz_einheit (einsatz_id, name, fuehrer_id) \
