@@ -66,10 +66,13 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
       'Sofortmeldung unbestätigt',
       'Auftrag überfällig',
       'Ablösung fällig',
+      // Katalog LLH-1142 E1 (LLH-1425): dazu Vermisstenmeldung und Unwetter (Warnstufe rot).
+      'Vermisstenmeldung',
+      'Unwetterwarnung',
     ]) {
       expect(within(alarme).getByText(name)).toBeInTheDocument();
     }
-    expect(within(alarme).getAllByText(IMMER_AN)).toHaveLength(4);
+    expect(within(alarme).getAllByText(IMMER_AN)).toHaveLength(6);
     expect(within(alarme).queryByRole('switch')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'Sofortmeldung' })).not.toBeInTheDocument();
   });
@@ -87,8 +90,13 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     ).toBeInTheDocument();
     expect(within(hinweise).getByRole('switch', { name: 'Ablösende Einheit' })).toBeInTheDocument();
     expect(within(hinweise).getByRole('switch', { name: 'Neuer Einsatz' })).toBeInTheDocument();
-    // Unwetter erkennt der Browser selbst und prüft diesen Schalter dort (LLH-1209).
-    expect(within(hinweise).getByRole('switch', { name: 'Unwetterwarnung' })).toBeInTheDocument();
+    // Rückmeldung überfällig ist ein Eingang (LLH-1425); Unwetter ist seither ein Alarm.
+    expect(
+      within(hinweise).getByRole('switch', { name: 'Rückmeldung überfällig' }),
+    ).toBeInTheDocument();
+    expect(
+      within(hinweise).queryByRole('switch', { name: 'Unwetterwarnung' }),
+    ).not.toBeInTheDocument();
   });
 
   it('zeigt die gespeicherten abgeschalteten Arten aus', async () => {

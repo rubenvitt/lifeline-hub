@@ -278,6 +278,11 @@ Registriernummer und dem Sprung zur Person; Name und Befund stehen nicht darin. 
 bekommt keinen Hinweis, gekoppelte Geräte ebenso wenig. Eine erneute Sichtung mit SK I, eine
 Herabstufung, eine nachgereichte ältere Sichtung und das Bearbeiten der Angaben bleiben still.
 
+Wird eine Person als vermisst erfasst oder auf „vermisst“ gesetzt, bekommen dieselben Leser den
+Alarm „Vermisstenmeldung“ mit der Registriernummer und dem Sprung zur Person, mit Alarmton und
+nicht abschaltbar. Je Wechsel kommt er einmal; wird die Person gefunden und später erneut
+vermisst, kommt er wieder.
+
 „Stornieren“ nimmt eine Fehlerfassung aus den Arbeitssichten; der Datensatz bleibt erhalten.
 
 ### Erfassungszeit und Verlauf

@@ -187,6 +187,10 @@ pub async fn importieren_tx(
         letzte_etb_id = uhr_stellen(conn, einsatz_id, letzte_etb_id, &zeit).await?;
     }
 
+    // 6a. Rückmeldungen des Drehbuchs, die schon beim Import überfällig sind, gelten als gemeldet
+    //     (LLH-1425, D10): der erste Takt danach meldet nicht jede Einheit auf Vorrat.
+    crate::meldung::rueckmeldung::vormerken_tx(conn, einsatz_id, org_id, jetzt.and_utc()).await?;
+
     // 7. Bericht in den Kopf.
     let bericht = DemoBericht {
         vorgang: DemoVorgang::Importiert,

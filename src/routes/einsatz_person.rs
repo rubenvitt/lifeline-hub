@@ -94,6 +94,25 @@ async fn melde_sichtung_eins(state: &AppState, einsatz_id: i64, person_id: i64, 
     .await;
 }
 
+/// Meldet nach dem Commit den Alarm `vermisstenmeldung` (LLH-1425, Katalog LLH-1142 E1) an die
+/// Leser des Moduls Personen, ohne den Auslöser: eine Person ist als vermisst erfasst oder auf
+/// vermisst gesetzt. Je Wechsel genau einer; Bezug ist die Person, der Text nennt nur ihre
+/// Registriernummer.
+async fn melde_vermisst(state: &AppState, einsatz_id: i64, person_id: i64, von: i64) {
+    benachrichtigung::melden(
+        &state.pool,
+        &state.live,
+        Anlass::neu(
+            einsatz_id,
+            BenachrichtigungArt::Vermisstenmeldung,
+            Bezug::neu(BenachrichtigungBezugTyp::Person, person_id),
+        )
+        .von(von)
+        .an(Adressat::ModulLeser("personen")),
+    )
+    .await;
+}
+
 /// Emittiert die SSE-Events eines UHS-Auto-Austritts (LFH-124): der pool-basierte
 /// `uhs::auto_austritt` erledigt die DB-Writes, der Transport (ETB-Live-Eintrag +
 /// uhs/person-Board) bleibt hier im Route-Handler. Nur bei tatsächlichem Austritt
@@ -587,6 +606,9 @@ pub async fn anlegen(
         if kategorie.is_some_and(|k| wird_sk1(None, k)) {
             melde_sichtung_eins(&state, einsatz_id, person.id, ctx.benutzer.id).await;
         }
+        if status_enum == PersonStatus::Vermisst {
+            melde_vermisst(&state, einsatz_id, person.id, ctx.benutzer.id).await;
+        }
     }
     Ok((StatusCode::CREATED, Json(person)))
 }
@@ -1020,8 +1042,9 @@ pub struct StatusBody {
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/status — validierter Status-Wechsel.
-/// Unbekannter Zielstatus → 400; nicht erlaubter Übergang → 422. Schreibt
-/// pseudonyme ETB-Spur + SSE.
+/// Unbekannter Zielstatus → 400; nicht erlaubter Übergang → 422; inzwischen von anderer Seite
+/// geändert → 409. Schreibt pseudonyme ETB-Spur + SSE; der Wechsel auf vermisst alarmiert
+/// (`vermisstenmeldung`, LLH-1425).
 pub async fn status_wechsel(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personen>,
@@ -1043,10 +1066,13 @@ pub async fn status_wechsel(
             body.status
         )));
     }
-    repo::setze_status(
+    // Nur aus dem gelesenen Status (409 bei einem parallelen Wechsel): sonst alarmierten zwei
+    // gleichzeitige Wechsel auf vermisst doppelt.
+    repo::wechsle_status(
         &state.pool,
         einsatz_id,
         person_id,
+        vorher.status.as_str(),
         &body.status,
         ctx.benutzer.id,
     )
@@ -1076,6 +1102,9 @@ pub async fn status_wechsel(
     )
     .await;
     sse_person(&state, einsatz_id, person_id);
+    if body.status == PersonStatus::Vermisst.as_str() {
+        melde_vermisst(&state, einsatz_id, person_id, ctx.benutzer.id).await;
+    }
     Ok(Json(repo::laden(&state.pool, einsatz_id, person_id).await?))
 }
 

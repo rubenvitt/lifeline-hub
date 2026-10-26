@@ -5,6 +5,7 @@
 pub mod benachrichtigung;
 pub mod korrektur;
 pub mod repo;
+pub mod rueckmeldung;
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;

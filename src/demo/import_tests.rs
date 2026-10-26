@@ -1628,6 +1628,18 @@ async fn scheduler_takt_nach_import_loest_nichts_aus() {
     .unwrap();
     assert_eq!(abloesungsfristen, 0, "keine Ablösungsfrist im Szenario");
 
+    // Rückmeldung überfällig (LLH-1425): das Drehbuch hat beim Import schon überfällige
+    // Rückmeldungen; der Import merkt sie als gemeldet vor, sonst meldete dieser Takt sie alle.
+    let vorgemerkt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND rueckmeldung_ueberfaellig_meldung_id IS NOT NULL",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(vorgemerkt > 0, "überfällige Rückmeldungen vorgemerkt");
+
     // Kein empfangenes Live-Ereignis, gleich welchen Tags.
     let mut empfangen = Vec::new();
     while let Ok(n) = rx.try_recv() {
@@ -1644,16 +1656,22 @@ async fn scheduler_takt_nach_import_loest_nichts_aus() {
     let ausgeloest =
         crate::erinnerung::scheduler::tick_einmal(&pool, &live, spaeter.and_utc()).await;
     assert_eq!(ausgeloest, 1, "die eine künftige Erinnerung (T+20)");
-    let n = rx.recv().await.unwrap();
-    assert_eq!(n.event.as_str(), "erinnerung");
-    // Daneben nur die Benachrichtigung „Erinnerung fällig“ an ihre Empfänger (LLH-1209).
-    let mut rest = Vec::new();
+    let mut alle = Vec::new();
     while let Ok(n) = rx.try_recv() {
-        rest.push(n.event.as_str().to_string());
+        alle.push(n.event.as_str().to_string());
     }
+    assert_eq!(
+        alle.iter().filter(|e| *e == "erinnerung").count(),
+        1,
+        "genau die eine Erinnerung: {alle:?}"
+    );
+    // Daneben nur Benachrichtigungen: „Erinnerung fällig“ an ihre Empfänger (LLH-1209) und
+    // „Rückmeldung überfällig“ für Rückmeldungen, deren Frist erst nach dem Import ablief
+    // (LLH-1425).
     assert!(
-        rest.iter().all(|e| e == "benachrichtigung"),
-        "kein zweites Ereignis auf demselben Takt: {rest:?}"
+        alle.iter()
+            .all(|e| e == "erinnerung" || e == "benachrichtigung"),
+        "kein anderes Ereignis auf demselben Takt: {alle:?}"
     );
 }
 
