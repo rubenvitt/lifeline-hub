@@ -16,7 +16,7 @@
 --    ohne REFERENCES: eine Meldung zu löschen soll nicht an einem Merker hängen bleiben.
 --    Aufbewahrung: Verweis ohne Personenbezug, retain (`einsatz::schwaerzung_registry`).
 --
--- Abgesichert von db::tests::migration_0254_baut_benachrichtigung_mit_den_neuen_arten_neu.
+-- Abgesichert von db::tests::migration_0255_baut_benachrichtigung_mit_den_neuen_arten_neu.
 CREATE TABLE benachrichtigung_neu (
     id           INTEGER PRIMARY KEY,
     einsatz_id   INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,

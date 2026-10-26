@@ -1109,7 +1109,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("nachforderung_am_raum", G_ENUM),
             // Kennzeichen „letzte Besetzung festgehalten“ (LLH-1266, Mig 0252).
             retain("besetzung_festgehalten", G_ENUM),
-            // Merker „Überfälligkeit dieser Rückmeldung gemeldet“ (LLH-1425, Mig 0254): Verweis
+            // Merker „Überfälligkeit dieser Rückmeldung gemeldet“ (LLH-1425, Mig 0255): Verweis
             // auf die Meldung, kein Personenbezug.
             retain("rueckmeldung_ueberfaellig_meldung_id", G_FK),
         ],

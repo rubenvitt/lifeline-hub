@@ -11317,13 +11317,13 @@ mod tests {
             .expect_err("nur 0 oder 1");
     }
 
-    /// LLH-1425 (Migration 0254): `benachrichtigung` bekommt die Arten `rueckmeldung_ueberfaellig` und
+    /// LLH-1425 (Migration 0255): `benachrichtigung` bekommt die Arten `rueckmeldung_ueberfaellig` und
     /// `vermisstenmeldung`, die Einheit den Merker der gemeldeten Überfälligkeit. Zeilen samt ids,
     /// Spalten, Schlüssel und Indizes bleiben; die DDL unterscheidet sich nur in der `art`-Liste,
     /// die neuen Arten gehen durch, eine unbekannte nicht, und die Kaskade hält.
     #[tokio::test]
-    async fn migration_0254_baut_benachrichtigung_mit_den_neuen_arten_neu() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 253).await;
+    async fn migration_0255_baut_benachrichtigung_mit_den_neuen_arten_neu() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 254).await;
         let (e, b) = bild_grundlage(&pool).await;
         sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
             "INSERT INTO benachrichtigung (id, einsatz_id, benutzer_id, art, stufe, bezug_typ, \
@@ -11374,11 +11374,11 @@ mod tests {
                     .execute(&pool)
                     .await
                     .is_err(),
-                "vor 0254 kennt der CHECK {art} nicht"
+                "vor 0255 kennt der CHECK {art} nicht"
             );
         }
 
-        migriere_bis(&pool, 254).await;
+        migriere_bis(&pool, 255).await;
 
         let nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
         assert_eq!(
