@@ -33,6 +33,10 @@ kein Zustand ist.
 - **WHEN** eine nicht überfällige Schicht per `?schicht=` angesprungen wird (LLH-1131 Teil II)
 - **THEN** trägt ihre Karte die Fläche und die Linie der Bedienrollen wie die Kommunikationskarte; eine überfällige behält ihre Alarmfläche und Alarmkante und trägt nur die Linie
 
+#### Scenario: Erinnerung
+- **WHEN** eine Erinnerung per `?erinnerung=` angesprungen wird, aus dem Überblick oder aus der Benachrichtigung „Erinnerung fällig“ (LLH-1429, LLH-1467)
+- **THEN** trägt eine nicht fällige Karte die Fläche und die Linie der Bedienrollen wie die Kommunikationskarte; eine fällige behält ihre Alarmfläche und trägt nur die Linie
+
 ### Requirement: Zwei Kanäle, in beiden Modi sichtbar
 
 Die Markierung MUST neben einer getönten Fläche einen zweiten Kanal tragen, eine Linie oben und

@@ -258,8 +258,8 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
  * Sprung einer Benachrichtigung, deren Text nicht zu holen war (`alarm/useBenachrichtigungen.ts`):
  * das Modul ihres Bezugs, eine Org-Art in ihren Einsatz. Eine Benachrichtigung der Ablösung
  * springt wie der Server-Pfad zu ihrer Schicht (`?schicht=`, LLH-1131 Teil II): ihr Bezug ist
- * immer die Schicht. Eine zur Meldung springt zu ihr (`?meldung=`, LLH-1052), auch hier wie der
- * Server-Pfad.
+ * immer die Schicht. Eine zur Meldung springt zu ihr (`?meldung=`, LLH-1052), eine zur Erinnerung
+ * zu deren Karte (`?erinnerung=`, LLH-1467), auch hier wie der Server-Pfad.
  */
 export function ersatzPfad(
   e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ' | 'bezug_id' | 'einsatz_id'>,
@@ -268,6 +268,9 @@ export function ersatzPfad(
   const ziel = zielVon(e);
   if (ziel === 'abloesung') return abloesungPfad(e.einsatz_id, { schicht: e.bezug_id });
   if (e.bezug_typ === 'meldung') return meldungenPfad(e.einsatz_id, { meldung: e.bezug_id });
+  if (e.bezug_typ === 'erinnerung') {
+    return erinnerungenPfad(e.einsatz_id, { erinnerung: e.bezug_id });
+  }
   return zielPfad(ziel, e.einsatz_id);
 }
 
