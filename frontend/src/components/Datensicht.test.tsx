@@ -9,6 +9,7 @@ import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import { dichten } from '../theme/tokens';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { wertAngabeStil } from './InlineAngabe';
 import Datensicht, {
   MAX_SEKUNDAER,
   TIEFE_DECKEL,
@@ -16,6 +17,7 @@ import Datensicht, {
   effektiveDaten,
   etikettVon,
   gruppiere,
+  kartenFelderStil,
   pruefeKartenplan,
   sichtbareSpalten,
   spaltenFuer,
@@ -2611,5 +2613,48 @@ describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
       />,
     );
     expect(zeilenZahl(container)).toBe(4);
+  });
+});
+
+/**
+ * Kartenfuge neben dem Vorsprung des Wertknopfs (LLH-1271). Der gefüllte Wert einer `InlineAngabe`
+ * rückt am Anfang um `paddingSM` in die Fuge vor; zwischen zwei Zielen nebeneinander bleibt also
+ * `columnGap − Vorsprung`. Die Böden stehen als Literale (Kriterium 2: komfortabel ≥ 8, handschuh
+ * ≥ 16, kompakt Spacing-Ausnahme), die Werte kommen aus `theme/tokens.ts`. Den Browser-Beleg
+ * führt `e2e/inline-angabe-dichte.spec.ts`.
+ *
+ * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
+ * - `columnGap: token.padding` (alte Fuge): rot in „Zielabstand“ (komfortabel 7, handschuh 10).
+ * - `marginInline` statt `marginInlineStart` im Wertknopf: rot in „rückt nur am Anfang vor“.
+ * - `maxWidth: '100%'` im Wertknopf: rot in „rückt nur am Anfang vor“.
+ */
+describe('Datensicht · Kartenfuge neben einer InlineAngabe', () => {
+  const tokenVon = (stufe: keyof typeof dichten) => ({
+    padding: dichten[stufe].abstand.md,
+    paddingSM: dichten[stufe].abstand.sm,
+    paddingXS: dichten[stufe].abstand.xs,
+    controlHeight: dichten[stufe].zeilenhoehe,
+  });
+
+  it('der Wertknopf rückt nur am Anfang vor, am Ende nicht', () => {
+    for (const stufe of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const stil = wertAngabeStil(tokenVon(stufe));
+      expect(stil.marginInlineStart).toBe(-dichten[stufe].abstand.sm);
+      expect(stil.marginInline).toBeUndefined();
+      expect(stil.marginInlineEnd).toBeUndefined();
+      // Der Knopf darf um den Vorsprung über den Behälter hinaus, sonst bricht der Wert um.
+      expect(stil.maxWidth).toBe(`calc(100% + ${dichten[stufe].abstand.sm}px)`);
+    }
+  });
+
+  it('Zielabstand quer: Fuge minus Vorsprung hält 0 / 8 / 16 px', () => {
+    const luecke = (stufe: keyof typeof dichten) => {
+      const token = tokenVon(stufe);
+      const vorsprung = -Number(wertAngabeStil(token).marginInlineStart);
+      return Number(kartenFelderStil(token).columnGap) - vorsprung;
+    };
+    expect(luecke('kompakt')).toBeGreaterThanOrEqual(0);
+    expect(luecke('komfortabel')).toBeGreaterThanOrEqual(8);
+    expect(luecke('handschuh')).toBeGreaterThanOrEqual(16);
   });
 });

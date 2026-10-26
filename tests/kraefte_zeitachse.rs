@@ -1032,3 +1032,293 @@ async fn fahrzeugstatus_beginnt_die_schicht_der_einheit() {
     assert_eq!(laufend.len(), 1, "{laufend:?}");
     assert_eq!(laufend[0]["einheit_id"], w.einheit);
 }
+
+// ── Berichtigung nach dem Entlassen (LLH-1263, Spec `kraefte-entlassung`) ───────────────────
+
+/// Id des nicht gestrichenen Ereignisses `art` in einer Zeitachse.
+fn ereignis_id(z: &Value, art: &str) -> i64 {
+    z["ereignisse"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["art"] == art && e.get("gestrichen_at").is_none())
+        .unwrap_or_else(|| panic!("kein {art}: {z:?}"))["id"]
+        .as_i64()
+        .unwrap()
+}
+
+/// Anna mit Alarmierung vor 5 h und Eintreffen vor 4 h, entlassen vor 1 h.
+async fn entlassene_anna() -> (Welt, sqlx::SqlitePool) {
+    let (app, pool) = setup_mit_pool().await;
+    let w = welt_in(app).await;
+    sqlx::query("UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? WHERE personal_id = ?")
+        .bind(vor(5, 0))
+        .bind(w.ep)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, json) = w
+        .nachtrag(
+            &w.person_pfad(),
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(4, 0)),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{}/entlassen", w.person_pfad()),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+    sqlx::query(
+        "UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? \
+         WHERE personal_id = ? AND art = 'entlassung'",
+    )
+    .bind(vor(1, 0))
+    .bind(w.ep)
+    .execute(&pool)
+    .await
+    .unwrap();
+    (w, pool)
+}
+
+/// Spec „Eintreffzeit nach dem Entlassen berichtigen“ und „Andere Schreibwege bleiben gesperrt“.
+#[tokio::test]
+async fn entlassene_person_berichtigt_ihre_zeitachse() {
+    let (w, _pool) = entlassene_anna().await;
+    let pfad = w.person_pfad();
+    let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let eintreffen = ereignis_id(&z, "eintreffen");
+
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/zeitachse/{eintreffen}/streichen"),
+        &w.admin,
+        Some(r#"{"grund":"Zeit verwechselt"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+    let richtig = vor(4, 10);
+    let (s, z) = w
+        .nachtrag(
+            &pfad,
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{richtig}"}}"#),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    let perioden = z["perioden"].as_array().unwrap();
+    assert_eq!(perioden.len(), 1, "{z:?}");
+    assert!(perioden[0]["ende_at"].is_string(), "{z:?}");
+    assert_eq!(perioden[0]["eintreffen_at"], richtig.as_str());
+
+    let etb = system_etb_inhalte(&w.app, &w.admin, w.e).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("gestrichen (berichtigt nach Entlassung)")
+                && t.contains("Zeit verwechselt")),
+        "{etb:?}"
+    );
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("(nachgetragen, berichtigt nach Entlassung)")),
+        "{etb:?}"
+    );
+
+    // Alle anderen Schreibwege an der Entlassenen bleiben 409.
+    let (s, _) = anfrage(
+        &w.app,
+        "PATCH",
+        &pfad,
+        &w.admin,
+        Some(r#"{"bemerkung":"x"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, json) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personal?entlassene=1", w.e),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        json[0]["beendet_als"], "entlassen",
+        "die Person bleibt entlassen"
+    );
+}
+
+/// Spec „Nachtrag öffnet eine Periode“ und „Abschließende Entlassung streichen“: 422, und weder
+/// Zeitachse noch ETB ändern sich.
+#[tokio::test]
+async fn berichtigung_laesst_keine_offene_periode_zu() {
+    let (w, _pool) = entlassene_anna().await;
+    let pfad = w.person_pfad();
+    let (_, vorher) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let etb_vorher = system_etb_anzahl(&w.app, &w.admin, w.e).await;
+
+    let (s, json) = w
+        .nachtrag(
+            &pfad,
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(0, -30)),
+        )
+        .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    assert!(
+        json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Erneut disponieren"),
+        "{json:?}"
+    );
+    let entlassung = ereignis_id(&vorher, "entlassung");
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/zeitachse/{entlassung}/streichen"),
+        &w.admin,
+        Some(r#"{"grund":"zu früh"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    assert!(
+        json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Erneut disponieren"),
+        "der 422 kommt aus der Prüfung auf eine offene Periode: {json:?}"
+    );
+
+    let (_, nachher) = zeitachse(&w.app, &w.admin, &pfad).await;
+    assert_eq!(vorher, nachher);
+    assert_eq!(system_etb_anzahl(&w.app, &w.admin, w.e).await, etb_vorher);
+}
+
+/// Spec „Fehleintrag einer früheren Periode streichen“: zwei abgeschlossene Perioden, das
+/// Eintreffen der ersten fällt weg, beide bleiben geschlossen, die Person bleibt entlassen.
+#[tokio::test]
+async fn fehleintrag_einer_frueheren_periode_streichen() {
+    let (app, pool) = setup_mit_pool().await;
+    let w = welt_in(app).await;
+    sqlx::query("UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? WHERE personal_id = ?")
+        .bind(vor(8, 0))
+        .bind(w.ep)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let pfad = w.person_pfad();
+    let falsch = vor(7, 30);
+    for (art, zeitpunkt) in [
+        ("eintreffen", falsch.clone()),
+        ("entlassung", vor(6, 0)),
+        ("alarmierung", vor(5, 0)),
+        ("eintreffen", vor(4, 0)),
+    ] {
+        let (s, json) = w
+            .nachtrag(
+                &pfad,
+                &format!(r#"{{"art":"{art}","zeitpunkt_at":"{zeitpunkt}"}}"#),
+            )
+            .await;
+        assert_eq!(s, StatusCode::CREATED, "{art}: {json:?}");
+    }
+    let (s, json) = anfrage(&w.app, "POST", &format!("{pfad}/entlassen"), &w.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+
+    let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let erstes = z["ereignisse"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["art"] == "eintreffen" && e["zeitpunkt_at"] == falsch.as_str())
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, z) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/zeitachse/{erstes}/streichen"),
+        &w.admin,
+        Some(r#"{"grund":"falsche Person"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    let perioden = z["perioden"].as_array().unwrap();
+    assert_eq!(perioden.len(), 2, "{z:?}");
+    assert!(perioden.iter().all(|p| p["ende_at"].is_string()), "{z:?}");
+    assert!(
+        perioden[0].get("eintreffen_at").is_none_or(|v| v.is_null()),
+        "{z:?}"
+    );
+    let (_, json) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personal?entlassene=1", w.e),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(json[0]["beendet_als"], "entlassen");
+}
+
+/// Spec „Stornierte Person“ und „Aufgelöste Einheit“: dort bleiben Nachtrag und Streichung 409.
+#[tokio::test]
+async fn storno_und_aufgeloeste_einheit_bleiben_gesperrt() {
+    let w = welt().await;
+    let nachtrag = format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(1, 0));
+
+    let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
+    let bert_pfad = format!("/api/einsaetze/{}/personal/{bert}", w.e);
+    let (_, z) = zeitachse(&w.app, &w.admin, &bert_pfad).await;
+    let alarmierung = ereignis_id(&z, "alarmierung");
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{bert_pfad}/stornieren"),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json:?}");
+    let (s, _) = w.nachtrag(&bert_pfad, &nachtrag).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, _) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{bert_pfad}/zeitachse/{alarmierung}/streichen"),
+        &w.admin,
+        Some(r#"{"grund":"x"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+
+    // Eine Einheit ohne Personal, aber mit Zeitachse, wird aufgelöst statt gelöscht.
+    let leer = einheit_bilden(&w.app, &w.admin, w.e, "Florian 2").await;
+    let leer_pfad = format!("/api/einsaetze/{}/einheiten/{leer}", w.e);
+    let (s, z) = w
+        .nachtrag(
+            &leer_pfad,
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(2, 0)),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    let eintreffen = ereignis_id(&z, "eintreffen");
+    let (s, _) = anfrage(&w.app, "DELETE", &leer_pfad, &w.admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = w.nachtrag(&leer_pfad, &nachtrag).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, _) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{leer_pfad}/zeitachse/{eintreffen}/streichen"),
+        &w.admin,
+        Some(r#"{"grund":"x"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}

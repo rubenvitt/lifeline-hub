@@ -32,8 +32,8 @@ export interface EntlassenBlockProps {
     laeuft: (id: number) => boolean;
   };
   /**
-   * Ansicht eines Eintrags: macht den Namen zum Link (LLH-1060 D8, Personenansicht). Fehlt es,
-   * steht der Name als Text.
+   * Ansicht eines Eintrags: macht den Namen zum Link (LLH-1060 D8, Personenansicht; LLH-1266,
+   * lesende Ansicht einer aufgelösten Einheit). Fehlt es, steht der Name als Text.
    */
   ziel?: (id: number) => string;
   /** Grund einer Ablehnung am Eintrag (`useZeilenFehler`). */

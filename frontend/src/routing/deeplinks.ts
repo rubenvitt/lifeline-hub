@@ -204,9 +204,13 @@ export function einsatzdatenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'einsatzdaten');
 }
 
-/** Material des Einsatzes (`MaterialPage`); Sprungziel des Sperrgrunds im UHS-Materialreiter. */
-export function materialPfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'material');
+/**
+ * Material des Einsatzes (`MaterialPage`); Sprungziel des Sperrgrunds im UHS-Materialreiter.
+ * `?material=<id>` ist Zeilenmarke (LLH-1260, Sprung aus der Nachforderung): die Seite hebt den
+ * Posten hervor, rollt ihn ins Bild und räumt den Parameter.
+ */
+export function materialPfad(einsatzId: number, opts: { material?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'material'), { material: opts.material });
 }
 
 /**
@@ -225,8 +229,13 @@ export function einsatzberichtPfad(
 /** Umkehr von {@link einsatzberichtPfad}: unbekannte Schlüssel fallen weg, leer = Standardumfang. */
 export { parseBerichtAuswahl };
 
-export function erinnerungenPfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'erinnerungen');
+/**
+ * Erinnerungsseite. `?erinnerung=<id>` steuert eine Erinnerung an (LLH-1429): die Seite wählt
+ * ihre Ansicht (offen oder abgeschlossen), rollt die Karte ins Bild und hebt sie hervor (Spec
+ * `deeplink-hervorhebung`); der Parameter wird nach dem Lesen geräumt.
+ */
+export function erinnerungenPfad(einsatzId: number, opts: { erinnerung?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'erinnerungen'), { erinnerung: opts.erinnerung });
 }
 
 // ── Listen mit Query-Selektion / Schnellerfassung ────────────────────────────

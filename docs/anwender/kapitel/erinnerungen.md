@@ -52,10 +52,14 @@ Häkchen „Werte behalten“ bleiben Empfänger und Intervall stehen.
 Beide Knöpfe wirken mit einem Klick; ein Hinweis bietet sechs Sekunden lang „Rückgängig“. Die
 Ansicht „Abgeschlossen“ zeigt, wann eine Erinnerung erledigt oder erübrigt wurde.
 
+Aus dem Überblick (Kapitel [Überblick](ueberblick.md)) springt ein Klick auf eine
+Erinnerung direkt zu ihr: Die Seite zeigt sie in ihrer Ansicht, rollt zu ihr und hebt sie mit einer
+Linie oben und unten hervor.
+
 ### Auf eine fällige Erinnerung reagieren
 
 1. Zur fälligen Zeit erscheint der Hinweis „Erinnerung fällig“ mit einem dezenten Ton.
-2. „Öffnen“ führt zu den Erinnerungen; die fällige Karte trägt „fällig“.
+2. „Öffnen“ führt zu den Erinnerungen und hebt die fällige Karte hervor; sie trägt „fällig“.
 3. Die Erinnerung wie oben erledigen oder erübrigen.
 
 ## Hintergrund

@@ -1,3 +1,74 @@
+## [1.0.0-alpha.154](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.153...v1.0.0-alpha.154) (2026-10-26)
+
+### Bedienoberfläche
+
+- **Ruhiger Seitenaufbau beim Öffnen eines Einsatzes:** Beim Laden einer Einsatzseite sprang bisher der ganze Rahmen mit Seitenleiste, Bereichsleiste und Inhalt um etwa eine Zeilenhöhe nach unten. Der Grund: Der Kopf wechselte während des Ladens von einer auf zwei Zeilen. Der Rahmen bleibt jetzt stehen, in allen Darstellungsdichten.
+- **Benutzermenü mit fester Breite:** Im Einsatz hat das Benutzermenü oben rechts jetzt immer dieselbe Breite. Es wird also nicht mehr breiter, wenn nach dem Laden die Funktion statt des Namens erscheint (z. B. „Einsatzleitung“ statt „Administrator“). Ein längerer Name oder eine längere Funktion wird mit „…“ gekürzt. Der volle Text steht im Tooltip und im Menü selbst.
+- **Mehr Platz auf kleineren Bildschirmen:** Der Kopf bleibt in der kompakten Darstellung bis 1280 px Breite einzeilig. Auf einem typischen Laptop-Bildschirm im Führungsfahrzeug mit 1366 px gibt es daher keinen Umbruch mehr.
+- **Schriften schon beim ersten Bild:** Die App zeigt die erste Ansicht jetzt in den richtigen Schriften. Bisher erschien kurz eine Ersatzschrift, und der Seitenkopf rutschte danach zurecht. Beim Start wartet die App dafür höchstens 0,3 Sekunden auf die Schriften. Laden die Schriften nicht, startet die App trotzdem ohne Verzögerung.
+
+### Dokumentation
+
+- Die Bilder in den Kapiteln „Einsatz-Oberfläche“ und „Anmelden und abmelden“ der Anwenderdokumentation zeigen jetzt den neuen Seitenkopf.
+
+## [1.0.0-alpha.153](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.152...v1.0.0-alpha.153) (2026-10-25)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Drei neue Migrationen werden beim Start automatisch eingespielt. Sie halten die Herkunft „am Raum“ an Einheiten aus einer Nachforderung fest, speichern Material-Positionen an Einheiten-Vorlagen und sichern die letzte Besetzung beim Auflösen einer Einheit.
+- **Schnittstelle entfernt:** Die Routen `PUT` und `DELETE /api/einsaetze/{id}/einheiten/{eid}/material/{em_id}` gibt es nicht mehr. Den Ort von Material setzt und löst nur noch die Material-Disposition (Disponieren, Aufteilen, Ändern eines Postens). Dafür ist die Freigabe für das Modul Material nötig.
+- **Neue Schnittstellen und Parameter:**
+  - `PUT /api/einheit-vorlagen/{id}/material` pflegt das Material einer Vorlage.
+  - Mit `?aufgeloeste=1` liefert die Einheitenabfrage auch die letzte Besetzung.
+  - Die Nachforderung liefert zusätzlich die Einheiten, die am Bereitstellungsraum eingetroffen sind.
+- **Sprechgruppen einer Einheit:** Die Anwendung ordnet Sprechgruppen jetzt einzeln zu und löst sie einzeln, statt die ganze Liste zu überschreiben. Die bisherige Sammeländerung am Server bleibt erhalten.
+
+### Kräfte und Mittel
+
+- **Aufgelöste Einheiten lesend öffnen:** Eine aufgelöste Einheit lässt sich ohne Bedienelemente ansehen, mit ihrer letzten Besetzung (Personen mit Führer und Sitz, Fahrzeuge, Material mit Menge). Sie öffnet sich aus dem Block „Aufgelöst“ der Einheitenliste oder aus dem ETB-Eintrag der Auflösung.
+- **Material in Einheiten-Vorlagen:** Vorlagen haben eine Sektion „Material“. Dort stehen Material aus dem Stamm, die Menge und der Ort (an der Einheit oder auf einem Fahrzeug der Vorlage).
+  - Beim Bilden einer Einheit wird das Material gleich mit disponiert.
+  - Die Vorschau zeigt je Position den Zustand und sperrt Material, das außer Dienst oder schon im Einsatz ist. Der Grund steht an der Zeile.
+  - Das ETB vermerkt das Material im Sammeleintrag.
+- **Besatzung im Paneel „Fahrzeuge und Besatzung“:**
+  - Je Fahrzeug übernimmt „Personal der Einheit übernehmen“ freie Kräfte der Einheit bis zum Soll.
+  - Lehnt der Server eine Zuordnung ab, steht der Grund an der Zeile.
+  - Ist die Zeile inzwischen live verschwunden, erscheint der Grund als schließbarer Hinweis auf der Seite, statt verloren zu gehen.
+- **Einheitswechsel einer Person:** Das ETB nennt die alte und die neue Einheit und gegebenenfalls „Einheitsführer von … endet“. Wer dieselbe Einheit erneut wählt, verliert die Führung nicht mehr still.
+- **Aktueller Funkrufname:** Mitgliederlisten von Einheiten und das Freigeben eines Fahrzeugs zeigen nach einer Umbenennung im Stamm den aktuellen Funkrufnamen statt des alten.
+- **Zeitachse entlassener Personen berichtigen:** An der Zeitachse einer entlassenen Person gehen „Nachtragen“ und „Streichen“ wieder. Danach darf keine Einsatzperiode offen bleiben. Das ETB vermerkt „berichtigt nach Entlassung“.
+- **Nachforderung:**
+  - Die Karte trennt Einheiten, die „am Raum eingetroffen“ sind, von denen, die „als Einheit übernommen“ wurden.
+  - „Als Einheit übernehmen“ macht ein gleichnamiges aktives Fahrzeug ohne Einheit zur Einheit, samt Besatzung und Raum, statt die Übernahme abzulehnen.
+  - Ein Storno nach der Verknüpfung am Raum bucht nicht aus.
+- **Sprung zum Material:** „Material ↗“ an der Nachforderungskarte springt direkt auf den Posten und hebt ihn in der Materialliste hervor, wenn genau ein Posten im Einsatz steht.
+
+### Kommunikation
+
+- **Sprechgruppen einer Einheit:** Änderungen gehen einzeln an den Server. So überschreibt ein Arbeitsplatz nicht mehr, was ein anderer oder die Fernmeldeskizze inzwischen zugeordnet hat. Jede wirksame Zuordnung oder Lösung erhält einen eigenen ETB-Eintrag.
+- **Verbindungen:** Ein Klick auf eine Nummer oder Mailadresse wählt bzw. schreibt direkt. „Bearbeiten“ ist ein eigener Knopf daneben.
+- **Erinnerungen:** Ein Link kann jetzt auf eine einzelne Erinnerung zeigen. Sie wird hervorgehoben und ins Bild gerollt, offen oder abgeschlossen. „Offene Vorgänge“ und „Nächste Marken“ im Führungsüberblick verlinken jede Erinnerung einzeln.
+
+### Einsatztagebuch
+
+- ETB-Einträge zeigen die genannten Einheiten als Verweis „Einheit «Name»“, auch bei Auftragseinträgen.
+
+### Betreuung und Verpflegung
+
+- Wer in der Verpflegung das Segment wechselt (laufend, vergangen, Stellen), während eine Bearbeitung ungespeichert ist, wird jetzt gefragt („Bleiben“/„Verwerfen“). Bisher ging die Eingabe ohne Rückfrage verloren.
+
+### Bedienung und Darstellung
+
+- **Erfassungsdialog im Handschuh-Modus:**
+  - Das Schließkreuz überlappt das erste Feld nicht mehr.
+  - Auf schmalen Bildschirmen bleibt die Knopfleiste mit „Übernehmen“ am unteren Rand sichtbar.
+- **Seitenleiste:** Der Fuß der Navigationsleiste klebt nicht mehr. Bei geringer Bildschirmhöhe verdeckt er keine Kategorien mehr.
+- **Abstände:** Kopfaktionen in Personal, Material, Fahrzeuge, Einsatzabschnitte, Kräfteübersicht, Presse, Lagemeldungen und Schaden-Detail halten den vorgesehenen Abstand. Im Handschuh-Modus sind das 16 statt 7 px.
+- **Tabellen:**
+  - Sortierbare Spaltenköpfe reagieren nur auf ihren Inhalt, nicht auf die Polsterung. Benachbarte Köpfe lassen sich so nicht mehr versehentlich treffen.
+  - Ein offenes Filtermenü behält seine angehakten Werte, auch wenn sich die Tabelle im Hintergrund aktualisiert.
+- **Datensicht-Karten:** Längere Werte brechen nicht mehr unnötig um. Felder halten in allen Dichtestufen den Zielabstand zueinander.
+
 ## [1.0.0-alpha.152](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.151...v1.0.0-alpha.152) (2026-10-23)
 
 ### Lagekarte

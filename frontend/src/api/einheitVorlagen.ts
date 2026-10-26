@@ -1,5 +1,6 @@
 import type {
   EinheitVorlage,
+  EinheitVorlageMaterialEingabe,
   EinheitVorlagePersonalEingabe,
   NeueEinheitVorlage,
   PatchEinheitVorlage,
@@ -7,9 +8,9 @@ import type {
 import { apiGet, apiSend } from './client';
 
 /**
- * Katalog „Einheiten-Vorlagen“ (LLH-1042). Die Liste trägt Kopf, Fahrzeuge und Stammbesetzung;
- * die Detailseite liest dieselbe Liste und braucht keinen Einzel-GET. Fahrzeuge und
- * Stammbesetzung werden je als ganze Liste ersetzt (PUT).
+ * Katalog „Einheiten-Vorlagen“ (LLH-1042). Die Liste trägt Kopf, Fahrzeuge, Stammbesetzung und
+ * Material (LLH-1261); die Detailseite liest dieselbe Liste und braucht keinen Einzel-GET.
+ * Fahrzeuge, Stammbesetzung und Material werden je als ganze Liste ersetzt (PUT).
  */
 const BASE_PATH = '/api/einheit-vorlagen';
 
@@ -46,4 +47,12 @@ export function replaceVorlagePersonal(
   personal: EinheitVorlagePersonalEingabe[],
 ): Promise<EinheitVorlage> {
   return apiSend<EinheitVorlage>(`${BASE_PATH}/${id}/personal`, 'PUT', { personal });
+}
+
+/** Ersetzt die Material-Positionen (LLH-1261); die Reihenfolge ist die Anzeigereihenfolge. */
+export function replaceVorlageMaterial(
+  id: number,
+  material: EinheitVorlageMaterialEingabe[],
+): Promise<EinheitVorlage> {
+  return apiSend<EinheitVorlage>(`${BASE_PATH}/${id}/material`, 'PUT', { material });
 }

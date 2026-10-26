@@ -518,7 +518,7 @@ export default function UeberblickPage() {
     m.art === 'auftrag'
       ? auftraegePfad(einsatzId, { auftrag: m.id ?? undefined })
       : m.art === 'erinnerung'
-        ? erinnerungenPfad(einsatzId)
+        ? erinnerungenPfad(einsatzId, { erinnerung: m.id ?? undefined })
         : m.art === 'pegelprognose'
           ? pegelZielPfad(einsatzId, wetterPegelFrei)
           : m.art === 'abloesung'

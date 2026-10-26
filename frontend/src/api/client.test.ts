@@ -331,7 +331,10 @@ describe('ApiError.zeilen — Gründe je Zeile (LLH-1100)', () => {
         HttpResponse.json(
           {
             error: 'Nicht alle Kräfte lassen sich disponieren',
-            zeilen: [{ art: 'personal', id: 7, grund: 'außer Dienst' }],
+            zeilen: [
+              { art: 'personal', id: 7, grund: 'außer Dienst' },
+              { art: 'material', id: 8, grund: 'schon im Einsatz' },
+            ],
           },
           { status: 422 },
         ),
@@ -341,7 +344,11 @@ describe('ApiError.zeilen — Gründe je Zeile (LLH-1100)', () => {
     expect(e).toBeInstanceOf(ApiError);
     expect((e as ApiError).status).toBe(422);
     expect((e as ApiError).message).toBe('Nicht alle Kräfte lassen sich disponieren');
-    expect((e as ApiError).zeilen).toEqual([{ art: 'personal', id: 7, grund: 'außer Dienst' }]);
+    // LLH-1261: auch eine Material-Position der Einheiten-Vorlage trägt einen Grund.
+    expect((e as ApiError).zeilen).toEqual([
+      { art: 'personal', id: 7, grund: 'außer Dienst' },
+      { art: 'material', id: 8, grund: 'schon im Einsatz' },
+    ]);
   });
 
   it('lässt zeilen ohne Feld leer und verwirft unbrauchbare Einträge', async () => {

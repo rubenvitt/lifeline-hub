@@ -141,9 +141,11 @@ export function createEinheitAusVorlage(
 /**
  * Teiländerung einer Einheit (LFH-306, Tri-State): nur die übergebenen Schlüssel gehen hinaus,
  * `null` leert. Für Einzelfelder ohne Formular, etwa der Funkrufname aus der
- * Fernmeldeskizze (LFH-893).
+ * Fernmeldeskizze (LFH-893). Ohne `sprechgruppe_ids`: die Sprechgruppen gehen einzeln
+ * (`ordneEinheitSprechgruppeZu`/`loeseEinheitSprechgruppe`, LLH-1265 D4), damit kein Speichern
+ * die Zuordnung eines anderen Arbeitsplatzes überschreibt.
  */
-export type EinheitPatch = Partial<EinheitEingabe>;
+export type EinheitPatch = Partial<Omit<EinheitEingabe, 'sprechgruppe_ids'>>;
 
 export function patcheEinheit(
   einsatzId: number,
@@ -151,6 +153,33 @@ export function patcheEinheit(
   patch: EinheitPatch,
 ): Promise<Einheit> {
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'PATCH', patch);
+}
+
+/**
+ * Eine Sprechgruppe der Einheit zuordnen (LLH-1265): idempotent, `204`; eine wirksame Zuordnung
+ * schreibt der Server als System-Eintrag ins ETB.
+ */
+export function ordneEinheitSprechgruppeZu(
+  einsatzId: number,
+  eid: number,
+  sprechgruppeId: number,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/sprechgruppen/${sprechgruppeId}`,
+    'PUT',
+  );
+}
+
+/** Die Zuordnung einer Sprechgruppe lösen (LLH-1265): idempotent, `204`, ETB wie beim Zuordnen. */
+export function loeseEinheitSprechgruppe(
+  einsatzId: number,
+  eid: number,
+  sprechgruppeId: number,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/sprechgruppen/${sprechgruppeId}`,
+    'DELETE',
+  );
 }
 
 /**

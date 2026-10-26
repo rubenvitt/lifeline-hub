@@ -89,7 +89,9 @@ import '../theme/sprache.css';
  * zurücksetzen“ leert beides.
  * Was man nicht sieht, wirkt nicht und steht nicht als Chip da. Eine Spalte mit EIGENEM
  * `filteredValue`/`sortOrder` bleibt beim Aufrufer — so `Datensicht`, die Hinweis und Chips selbst
- * zeigt. `onChange` des Aufrufers hört weiter mit.
+ * zeigt. `onChange` des Aufrufers hört weiter mit. Solange ein Filtermenü offen ist, bekommt antd
+ * die Spaltenliste vom Öffnen, damit der angehakte Entwurf einen Neuaufbau übersteht (LLH-1427,
+ * „EIN OFFENES FILTERMENÜ BEHÄLT SEINEN ENTWURF“ unten).
  *
  * ── DREI ZUSTÄNDE, DIE LADEUNTERDRÜCKUNG LEBT HIER ──
  *
@@ -633,6 +635,92 @@ function sortierungIntern<T>(spalte: KatalogSpalte<T>): boolean {
   );
 }
 
+/** Trägt die Spalte ein Filtermenü von antd? */
+function hasFilterMenue<T>(spalte: KatalogSpalte<T>): boolean {
+  return !('children' in spalte) && (spalte.filters != null || spalte.filterDropdown != null);
+}
+
+/** Schlüssel des Filtermenüs einer Spalte: ihr Zustandsschlüssel, sonst ihr Ort in der Garnitur. */
+function filterMenueKey<T>(spalte: KatalogSpalte<T>, pos: string): string {
+  return zustandsSchluessel(spalte) ?? `#${pos}`;
+}
+
+const childPos = (pos: string, i: number) => (pos === '' ? String(i) : `${pos}-${i}`);
+
+/**
+ * Hängt an jedes Filtermenü die Meldung „offen/zu“ (LLH-1427); ein eigenes `onOpenChange` der
+ * Spalte hört weiter mit. antd ruft es bei jedem Öffnen und Schließen, auch über Bestätigen,
+ * Zurücksetzen und Schließen sowie Escape.
+ */
+function trackFilterMenues<T>(
+  spalten: readonly KatalogSpalte<T>[],
+  report: (key: string, open: boolean) => void,
+  pos = '',
+): KatalogSpalte<T>[] {
+  return spalten.map((spalte, i) => {
+    const path = childPos(pos, i);
+    if ('children' in spalte && spalte.children) {
+      return {
+        ...spalte,
+        children: trackFilterMenues(spalte.children as KatalogSpalte<T>[], report, path),
+      } as KatalogSpalte<T>;
+    }
+    if (!hasFilterMenue(spalte)) return spalte;
+    const key = filterMenueKey(spalte, path);
+    const own = spalte.filterDropdownProps;
+    return {
+      ...spalte,
+      filterDropdownProps: {
+        ...own,
+        onOpenChange: (open: boolean) => {
+          own?.onOpenChange?.(open);
+          report(key, open);
+        },
+      },
+    };
+  });
+}
+
+/**
+ * Was antds Filter- und Sortierzustand aus den Spalten liest, als Zeichenkette, dazu die
+ * Schlüssel der Filtermenüs (LLH-1427). Ändert sich die Zeichenkette, darf eine gehaltene
+ * Spaltenliste nicht stehen bleiben: antd rechnete sonst mit einem überholten Stand weiter.
+ */
+function buildFilterSignature<T>(
+  spalten: readonly KatalogSpalte<T>[],
+  pos = '',
+): { signature: string[]; menueKeys: string[] } {
+  const signature: string[] = [];
+  const menueKeys: string[] = [];
+  spalten.forEach((spalte, i) => {
+    const path = childPos(pos, i);
+    if ('children' in spalte && spalte.children) {
+      const inner = buildFilterSignature(spalte.children as KatalogSpalte<T>[], path);
+      signature.push(...inner.signature);
+      menueKeys.push(...inner.menueKeys);
+      return;
+    }
+    const key = filterMenueKey(spalte, path);
+    if (hasFilterMenue(spalte)) menueKeys.push(key);
+    const filter = 'filteredValue' in spalte ? JSON.stringify(spalte.filteredValue ?? null) : '-';
+    const sortierung = 'sortOrder' in spalte ? String(spalte.sortOrder ?? null) : '-';
+    signature.push(`${key}=${filter}|${String(spalte.filtered ?? '')}|${sortierung}`);
+  });
+  return { signature, menueKeys };
+}
+
+/** Jede Zelle zeichnet neu: einmal nach dem Loslassen einer gehaltenen Spaltenliste (LLH-1427). */
+function forceCellUpdate<T>(spalten: readonly KatalogSpalte<T>[]): KatalogSpalte<T>[] {
+  return spalten.map((spalte) =>
+    'children' in spalte && spalte.children
+      ? ({
+          ...spalte,
+          children: forceCellUpdate(spalte.children as KatalogSpalte<T>[]),
+        } as KatalogSpalte<T>)
+      : { ...spalte, shouldCellUpdate: () => true },
+  );
+}
+
 function vorbelegteFilter<T>(
   spalten: readonly KatalogSpalte<T>[],
 ): Readonly<Record<string, readonly string[]>> {
@@ -1030,6 +1118,77 @@ export default function KatalogTabelle<T extends object>({
     console.warn(`[KatalogTabelle] ${breitenWarnung}`);
   }, [breitenWarnung]);
 
+  /**
+   * EIN OFFENES FILTERMENÜ BEHÄLT SEINEN ENTWURF (LLH-1427). antds `FilterDropdown` setzt die
+   * angehakten, noch nicht bestätigten Werte eines offenen Menüs auf `filteredKeys` zurück, sobald
+   * deren Referenz wechselt (Effekt auf `[propFilteredKeys, mergedVisible]`), und `useFilter`
+   * bildet `filteredValue` für jede neue Spaltenliste neu ab (`map(String)`). Jede neue Liste
+   * verwarf so den Entwurf einer schon gefilterten Spalte: neue Zeilen (die Zähler ändern die
+   * Spalten), ein Neuaufbau der `Datensicht` (sie baut ihre Spalten je Render), das Schreiben der
+   * Adresse. Memoisieren allein reicht nicht, weil ein neuer Zähler die Spalte ändern MUSS.
+   *
+   * Deshalb bekommt antd, solange ein Filtermenü offen ist, die Spaltenliste vom Öffnen: Zähler und
+   * Zellen-Closures stehen bis zum Schließen, Zeilen fließen weiter. Ändert sich ein Filter- oder
+   * Sortierstand, gilt sofort die neue Liste (`signature`), sonst rechnete antd mit einem alten
+   * Stand. Beim Loslassen zeichnet die Tabelle einmal alle Zellen, damit nichts aus der gehaltenen
+   * Garnitur stehen bleibt (die `Datensicht` hat ihren Garniturwechsel dann schon gezeigt).
+   */
+  const [offeneFilterMenues, setOffeneFilterMenues] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const reportFilterMenue = useCallback((key: string, open: boolean) => {
+    setOffeneFilterMenues((vorher) => {
+      if (vorher.has(key) === open) return vorher;
+      const neu = new Set(vorher);
+      if (open) neu.add(key);
+      else neu.delete(key);
+      return neu;
+    });
+  }, []);
+  const meldendeSpalten = useMemo(
+    () => fixierteSpalten && trackFilterMenues(fixierteSpalten, reportFilterMenue),
+    [fixierteSpalten, reportFilterMenue],
+  );
+  const { signature, menueKeys, menueKeyText } = useMemo(() => {
+    const fassung = buildFilterSignature(meldendeSpalten ?? []);
+    return {
+      signature: fassung.signature.join('\n'),
+      menueKeys: new Set(fassung.menueKeys),
+      menueKeyText: fassung.menueKeys.join('\n'),
+    };
+  }, [meldendeSpalten]);
+  // Ein Menü, dessen Spalte verschwunden ist, meldet sein Schließen nie: es hält nicht und fällt aus
+  // der Menge, damit es nach seiner Rückkehr nicht als offen gilt.
+  useEffect(() => {
+    const da = new Set(menueKeyText.split('\n'));
+    setOffeneFilterMenues((vorher) =>
+      [...vorher].every((k) => da.has(k)) ? vorher : new Set([...vorher].filter((k) => da.has(k))),
+    );
+  }, [menueKeyText]);
+  const isHolding =
+    meldendeSpalten != null && [...offeneFilterMenues].some((k) => menueKeys.has(k));
+  const [gehalten, setGehalten] = useState<
+    { spalten: KatalogSpalte<T>[]; signature: string } | 'loslassen' | null
+  >(null);
+  // Abgeleiteter Zustand im Render (Reacts Muster für „Stand vom vorigen Render“): nur beim
+  // Öffnen, bei neuem Filter- oder Sortierstand und beim Schließen, also ohne Schleife.
+  if (isHolding) {
+    if (gehalten == null || gehalten === 'loslassen' || gehalten.signature !== signature) {
+      setGehalten({ spalten: meldendeSpalten!, signature });
+    }
+  } else if (gehalten != null && gehalten !== 'loslassen') {
+    setGehalten('loslassen');
+  }
+  useEffect(() => {
+    if (gehalten === 'loslassen') setGehalten(null);
+  }, [gehalten]);
+  const antdSpalten =
+    isHolding && gehalten != null && gehalten !== 'loslassen' && gehalten.signature === signature
+      ? gehalten.spalten
+      : gehalten === 'loslassen' && meldendeSpalten
+        ? forceCellUpdate(meldendeSpalten)
+        : meldendeSpalten;
+
   const identifier = bezugsSchluessel(columns?.[0]);
   useEffect(() => {
     if (!import.meta.env.DEV || identifier !== 'id') return;
@@ -1132,7 +1291,7 @@ export default function KatalogTabelle<T extends object>({
           ref={tabelleRef}
           className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
           style={{ ...filterKopfStil(token), ...sortierKopfStyle(token), ...rest.style }}
-          columns={fixierteSpalten}
+          columns={antdSpalten}
           dataSource={sichtbareZeilen}
           loading={loading}
           locale={wirkendesLocale}

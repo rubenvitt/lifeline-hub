@@ -6,7 +6,13 @@ import { fileURLToPath } from 'node:url';
 
 import { KONTEXTE } from './e2e/doku-bilder/kontexte';
 import { ADMIN_PW } from './e2e/rollen-kern';
-import { backendBinaer, freiePorts, umgebungRaeumen, viteServer } from './e2e/lauf-kern';
+import {
+  backendBinaer,
+  fallbackChromiumPath,
+  freiePorts,
+  umgebungRaeumen,
+  viteServer,
+} from './e2e/lauf-kern';
 
 /**
  * Bildlauf der Anwenderdokumentation (LFH-1128, `docs/anwender/AGENTS.md`, „Bilder“): fotografiert
@@ -34,6 +40,8 @@ import { backendBinaer, freiePorts, umgebungRaeumen, viteServer } from './e2e/la
 
 const frontendVerzeichnis = fileURLToPath(new URL('.', import.meta.url));
 const binaer = backendBinaer(frontendVerzeichnis);
+// Ersatz-Chromium nur, wenn Playwrights eigener fehlt (Cloud-Sitzung, LLH-1439, `e2e/lauf-kern.ts`).
+const fallbackChromium = fallbackChromiumPath();
 
 // Wie im e2e-Lauf: der Hauptprozess entscheidet Ports und Temp-DB einmal und vererbt sie über die
 // Umgebung an die Worker, die diese Config erneut laden. Eigener Schlüssel, damit ein e2e-Lauf
@@ -50,6 +58,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);
       console.log(`Backend-Binary: ${binaer}`);
+      if (fallbackChromium) console.log(`Chromium (Ersatz, LLH-1439): ${fallbackChromium}`);
       return neu;
     })();
 
@@ -71,12 +80,15 @@ export default defineConfig({
   reporter: 'list',
   use: {
     ...devices['Desktop Chrome'],
+    ...(fallbackChromium ? { launchOptions: { executablePath: fallbackChromium } } : {}),
     baseURL,
     viewport: KONTEXTE.fuekw,
     deviceScaleFactor: 1,
     locale: 'de-DE',
     timezoneId: 'Europe/Berlin',
-    reducedMotion: 'reduce',
+    // Keine Fixture-Option in `use`, nur als Kontextoption (LLH-1458): unter `use` übersah
+    // Playwright den Schlüssel still. Gilt auch für `browser.newContext()` in den Specs.
+    contextOptions: { reducedMotion: 'reduce' },
     colorScheme: 'light',
     // Darstellung „System“ und Dichte `kompakt` (Design LFH-1127, F1/F2): als gespeicherte Wahl
     // des Geräts. „System“, damit `fotografiere` jedes Motiv hell (colorScheme `light`) und gleich

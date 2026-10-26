@@ -9,6 +9,9 @@ import { expect, type Page } from '@playwright/test';
  */
 export interface GesaeteVorlage {
   vorlageId: number;
+  staffelId: number;
+  /** Stamm-IDs der Fahrzeuge, für weitere Zuordnungen (LLH-1261). */
+  fahrzeugIds: { elw: number; rtw1: number; rtw2: number };
   zug: string;
   staffel: string;
   fahrzeuge: { elw: string; rtw1: string; rtw2: string };
@@ -83,5 +86,44 @@ export async function seedeVorlage(page: Page, kennung = ''): Promise<GesaeteVor
       { personal_id: ps.dirk },
     ],
   });
-  return { vorlageId: zugId, zug, staffel, fahrzeuge, personen };
+  return {
+    vorlageId: zugId,
+    staffelId,
+    fahrzeugIds: fz,
+    zug,
+    staffel,
+    fahrzeuge,
+    personen,
+  };
+}
+
+/** Material der gesäten Staffel (LLH-1261): Wolldecken an der Einheit, ein Rucksack auf RTW 1. */
+export interface GesaetesMaterial {
+  decken: string;
+  rucksack: string;
+}
+
+export async function seedeVorlagenMaterial(
+  page: Page,
+  v: GesaeteVorlage,
+): Promise<GesaetesMaterial> {
+  const marke = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+  const material = { decken: `Wolldecke ${marke}`, rucksack: `Sanitätsrucksack ${marke}` };
+  const anlegen = async (bezeichnung: string, art: string) => {
+    const antwort = await page.request.post('/api/material', { data: { bezeichnung, art } });
+    expect(antwort.ok(), `Seeding Material: ${antwort.status()}`).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const decken = await anlegen(material.decken, 'verbrauchsgut');
+  const rucksack = await anlegen(material.rucksack, 'geraet');
+  const antwort = await page.request.put(`/api/einheit-vorlagen/${v.staffelId}/material`, {
+    data: {
+      material: [
+        { material_id: decken, menge: 50 },
+        { material_id: rucksack, menge: 1, fahrzeug_id: v.fahrzeugIds.rtw1 },
+      ],
+    },
+  });
+  expect(antwort.ok(), `Seeding Vorlagen-Material: ${antwort.status()}`).toBeTruthy();
+  return material;
 }

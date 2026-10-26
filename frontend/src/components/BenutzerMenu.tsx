@@ -46,6 +46,17 @@ const HELLIGKEIT_PRAEFIX = 'helligkeit:';
 /** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`). */
 const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
 
+/** Deckel des Etiketts am Trigger: längere Funktionen und Namen enden mit „…“. */
+const ETIKETT_DECKEL = 180;
+
+/**
+ * Feste Breite des Etiketts mit `hasFixedWidth` (LLH-1272): „Einsatzleitung“ und gängige Namen
+ * passen (75 px), Längeres endet mit „…“ und steht ganz im `title` und im Menükopf. Nicht der
+ * Deckel: 180 px schoben die Umbruchkante des Kopfs in `komfortabel` über den Fükw (1366 px) und in
+ * `kompakt` auf 1280 px; mit 120 px liegen sie bei ~1340 bzw. ~1220 px.
+ */
+const ETIKETT_PLATZ = 120;
+
 /**
  * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im TEXT — zweiter
  * Kanal nach WCAG 1.4.1 und über den zugänglichen Namen prüfbar.
@@ -76,8 +87,17 @@ function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Ico
  *
  * Angebunden über `useThemeMode`/`useDichte`, NICHT über die Kommandopalette: deren Hook wirft
  * außerhalb seines Providers, und der Test-Wrapper rendert keinen.
+ *
+ * `hasFixedWidth` (im Einsatz-Kopf, LLH-1272): das Etikett hält die Breite {@link ETIKETT_PLATZ},
+ * statt sich nach dem Text zu richten. Die Funktion kommt erst mit dem Einsatz, davor steht der
+ * Name, und an der Umbruchkante des Kopfs reichten 4 px Unterschied für eine zweite Kopfzeile:
+ * Rail, Panel und Inhalt sprangen 52 px (CLS 0,556). Vorbild ist `WortPlatz` in `Kopfleiste.tsx`;
+ * hier ist der längste Wortlaut nicht bekannt, deshalb eine feste Breite.
  */
-export default function BenutzerMenu({ funktion }: { funktion?: string | null } = {}) {
+export default function BenutzerMenu({
+  funktion,
+  hasFixedWidth = false,
+}: { funktion?: string | null; hasFixedWidth?: boolean } = {}) {
   const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
   const { data: versionsstand } = useVersionsstand();
@@ -322,8 +342,16 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         {breit && (
           <>
             <span
+              title={hasFixedWidth ? (funktion ?? benutzer.anzeigename) : undefined}
               style={{
-                maxWidth: 180,
+                // `inline-block`: antd hüllt die Kinder des Knopfs in ein Inline-`span`, eine
+                // Breite griffe sonst nicht. Mit `overflow: hidden` läge seine Grundlinie an der
+                // Unterkante; `middle` hält den Text auf der Höhe des Pfeils.
+                display: 'inline-block',
+                verticalAlign: 'middle',
+                width: hasFixedWidth ? ETIKETT_PLATZ : undefined,
+                maxWidth: hasFixedWidth ? ETIKETT_PLATZ : ETIKETT_DECKEL,
+                textAlign: 'start',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',

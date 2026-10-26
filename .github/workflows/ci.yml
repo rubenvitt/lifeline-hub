@@ -126,7 +126,7 @@ jobs:
         run: ./scripts/apt-pakete.sh nasm
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # shared-key statt key: sonst hängt rust-cache die Job-ID an, jeder Job hätte einen
           # eigenen mehrere GB großen Eintrag (GitHub deckelt bei 10 GB je Repository).
@@ -134,7 +134,7 @@ jobs:
           shared-key: rust-openssl-vendored
           save-if: false
           cache-on-failure: true
-      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
           version: 2026.9.1
           cache: true
@@ -194,11 +194,11 @@ jobs:
           librsvg2-dev libayatana-appindicator3-dev
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: rust-openssl-vendored
           cache-on-failure: true
-      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
           version: 2026.9.1
           cache: true
@@ -232,7 +232,7 @@ jobs:
         run: ./scripts/apt-pakete.sh nasm
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: rust-openssl-vendored
           save-if: false
@@ -268,7 +268,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.FRONTEND != 'false'
       # Kein Rust, kein Chromium, kein Plattenplatz-Schritt — dieser Job braucht nur Node.
-      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         if: env.FRONTEND != 'false'
         with:
           version: 2026.9.1
@@ -323,7 +323,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.E2E != 'false'
-      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         if: env.E2E != 'false'
         with:
           version: 2026.9.1
@@ -436,7 +436,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
           version: 2026.9.1
           cache: true

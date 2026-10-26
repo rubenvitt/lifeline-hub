@@ -5,11 +5,17 @@ import type {
   VorlageVorschau,
   VorschauFahrzeug,
   VorschauKnoten,
+  VorschauMaterial,
   VorschauPersonal,
 } from '../api/types';
 import {
   LEERE_WAHL,
+  alleMaterial,
+  anDerEinheit,
+  isMaterialGesperrt,
+  materialZustandWort,
   reconcileWahl,
+  setMaterialWahl,
   buildAnfrage,
   deckelGrund,
   gruendeJeZeile,
@@ -39,6 +45,7 @@ const knoten = (
   fahrzeuge: VorschauFahrzeug[],
   personal: VorschauPersonal[],
   ueber_vorlage_id?: number,
+  material: VorschauMaterial[] = [],
 ) =>
   ({
     vorlage_id,
@@ -49,7 +56,21 @@ const knoten = (
     soll_eigen: false,
     fahrzeuge,
     personal,
+    material,
   }) as VorschauKnoten;
+const mat = (
+  vorlage_material_id: number,
+  bezeichnung: string,
+  extra: Partial<VorschauMaterial> = {},
+): VorschauMaterial => ({
+  vorlage_material_id,
+  material_id: vorlage_material_id + 1000,
+  bezeichnung,
+  art: 'geraet',
+  menge: 1,
+  zustand: 'neu',
+  ...extra,
+});
 
 /** Der Demo-„Sanitätszug Musterstadt“ ohne Kräfte im Einsatz (Spec, „Vorgaben der Häkchen“). */
 function sanitaetszug(
@@ -60,6 +81,7 @@ function sanitaetszug(
     vorlage_id: 1,
     fahrzeuge_gesperrt: false,
     personal_gesperrt: false,
+    material_gesperrt: false,
     knoten: [
       knoten(
         1,
@@ -283,6 +305,7 @@ describe('Deckel (D7)', () => {
       vorlage_id: 1,
       fahrzeuge_gesperrt: false,
       personal_gesperrt: false,
+      material_gesperrt: false,
       knoten: [knoten(1, 'Bereitschaft', 'Bereitschaft', [], viele)],
     };
     let wahl = reconcileWahl(LEERE_WAHL, v);
@@ -325,6 +348,7 @@ describe('Anfrage und Gründe (D3, D6)', () => {
         { fahrzeug_id: 21, umhaengen: true },
       ],
       personal: [{ personal_id: 203, umhaengen: false }],
+      material: [],
     });
     const ohnePersonal = { ...v, personal_gesperrt: true };
     expect(
@@ -347,5 +371,125 @@ describe('Anfrage und Gründe (D3, D6)', () => {
       ]),
     );
     expect(gruendeJeZeile(new Error('x')).size).toBe(0);
+  });
+});
+
+describe('Material der Vorlage (LLH-1261, D3, D4, D8)', () => {
+  /** Die Staffel mit Decken an der Einheit, einem Rucksack auf RTW 1 und SE-1 im Einsatz. */
+  function mitMaterial(material: VorschauMaterial[] = []): VorlageVorschau {
+    const v = sanitaetszug();
+    const staffel = v.knoten[1];
+    return {
+      ...v,
+      knoten: [
+        v.knoten[0],
+        {
+          ...staffel,
+          material: material.length
+            ? material
+            : [
+                mat(1, 'Wolldecke', { art: 'verbrauchsgut', menge: 50 }),
+                mat(2, 'Sanitätsrucksack', { fahrzeug_id: 20 }),
+                mat(3, 'Stromerzeuger', { bestandsnummer: 'SE-1', zustand: 'im_einsatz' }),
+                mat(4, 'Absaugpumpe', { zustand: 'ausser_dienst' }),
+              ],
+        },
+      ],
+    };
+  }
+
+  it('hakt Material vor, außer gesperrtes; die Zusammenfassung zählt es nur mit Material', () => {
+    const v = mitMaterial();
+    const wahl = reconcileWahl(LEERE_WAHL, v);
+    expect([...wahl.material]).toEqual([
+      [1, true],
+      [2, true],
+      [3, false],
+      [4, false],
+    ]);
+    expect(isMaterialGesperrt('neu')).toBe(false);
+    expect(isMaterialGesperrt('im_einsatz')).toBe(true);
+    expect(zusammenfassung(v, wahl)).toBe('1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte, 2 Material');
+    const ohne = sanitaetszug();
+    expect(zusammenfassung(ohne, reconcileWahl(LEERE_WAHL, ohne))).toBe(
+      '1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte',
+    );
+    expect(zusammenfassung({ ...v, material_gesperrt: true }, wahl)).toBe(
+      '1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte',
+    );
+  });
+
+  it('behält die Wahl über Abgleiche und nennt den Zustand als Wort', () => {
+    const v = mitMaterial();
+    let wahl = setMaterialWahl(reconcileWahl(LEERE_WAHL, v), alleMaterial(v)[0], false);
+    // Inzwischen steht SE-1 nicht mehr im Einsatz: die getroffene Wahl (aus) bleibt.
+    const neu = mitMaterial([
+      mat(1, 'Wolldecke', { art: 'verbrauchsgut', menge: 50 }),
+      mat(3, 'Stromerzeuger', { bestandsnummer: 'SE-1' }),
+      mat(5, 'Trage'),
+    ]);
+    wahl = reconcileWahl(wahl, neu);
+    expect(wahl.material.get(1)).toBe(false);
+    expect(wahl.material.get(3)).toBe(false);
+    expect(wahl.material.get(5)).toBe(true);
+    expect(alleMaterial(v).map(materialZustandWort)).toEqual([
+      'neu',
+      'neu',
+      'schon im Einsatz',
+      'außer Dienst',
+    ]);
+  });
+
+  it('eine Position auf einem abgewählten Fahrzeug liegt an der Einheit', () => {
+    const v = mitMaterial();
+    const [decken, rucksack] = alleMaterial(v);
+    let wahl = reconcileWahl(LEERE_WAHL, v);
+    expect(anDerEinheit(rucksack, v, wahl)).toBe(false);
+    expect(anDerEinheit(decken, v, wahl)).toBe(false);
+    wahl = setWahl(wahl, 'fahrzeug', v.knoten[1].fahrzeuge[0], false);
+    expect(anDerEinheit(rucksack, v, wahl)).toBe(true);
+    // Fahrzeuge gesperrt: kein Fahrzeug kommt mit.
+    const ohneFahrzeuge = {
+      ...v,
+      fahrzeuge_gesperrt: true,
+      knoten: v.knoten.map((k) => ({ ...k, fahrzeuge: [] })),
+    };
+    expect(anDerEinheit(rucksack, ohneFahrzeuge, reconcileWahl(LEERE_WAHL, ohneFahrzeuge))).toBe(
+      true,
+    );
+  });
+
+  it('schickt gewählte Positionen ohne „umhängen“, nichts bei gesperrtem Modul, Deckel 50', () => {
+    const v = mitMaterial();
+    const wahl = reconcileWahl(LEERE_WAHL, v);
+    expect(
+      buildAnfrage({ vorlageId: 1, name: 'Staffel', abschnittId: null, vorschau: v, wahl })
+        .material,
+    ).toEqual([{ vorlage_material_id: 1 }, { vorlage_material_id: 2 }]);
+    expect(
+      buildAnfrage({
+        vorlageId: 1,
+        name: 'Staffel',
+        abschnittId: null,
+        vorschau: { ...v, material_gesperrt: true },
+        wahl,
+      }).material,
+    ).toEqual([]);
+    const viele = mitMaterial(
+      Array.from({ length: 51 }, (_, i) => mat(100 + i, `M${i}`, { art: 'verbrauchsgut' })),
+    );
+    expect(deckelGrund(viele, reconcileWahl(LEERE_WAHL, viele))).toBe(
+      'Höchstens 50 Material-Positionen je Bildung',
+    );
+  });
+
+  it('liest Gründe an Material-Positionen getrennt von Kräften gleicher ID', () => {
+    const fehler = new ApiError(422, 'Nicht alle Kräfte lassen sich übernehmen', {
+      zeilen: [
+        { art: 'material', id: 21, grund: 'schon im Einsatz' },
+        { art: 'fahrzeug', id: 21, grund: 'in «2. Zug»' },
+      ],
+    });
+    expect(gruendeJeZeile(fehler).get(zeilenSchluessel('material', 21))).toBe('schon im Einsatz');
   });
 });

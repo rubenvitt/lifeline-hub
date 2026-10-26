@@ -14,7 +14,8 @@ import { useBesatzungErrors } from './useBesatzungErrors';
 /**
  * Paneel „Fahrzeuge und Besatzung“ (LLH-1036 Teil II, design.md D5, D9, D10): die Rechnung des
  * Kräftebaums (`mittelDerEinheit`), ein Menü je Person, „Aus Einheit lösen“ je Fahrzeug, ohne
- * Freigabe Personal oder Fahrzeuge die Mitglieder flach mit Hinweis.
+ * Freigabe Personal oder Fahrzeuge die Mitglieder flach mit Hinweis. Zugeordnet wird über die
+ * Sammelroute, je Fahrzeug auch „Personal der Einheit übernehmen“ (LLH-1267).
  */
 
 const person = (id: number, name: string, teil: Partial<EinsatzPersonal> = {}): EinsatzPersonal =>
@@ -151,6 +152,7 @@ function zeige({
         listState === 'daten' ? fahrzeuge : undefined,
         rechte,
       )}
+      personal={rechte.hasBesatzung && listState === 'daten' ? personal : undefined}
       rechte={rechte}
       listState={listState}
       onReload={onReload}
@@ -333,9 +335,13 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
     ]);
   });
 
-  it('„Auf 83-2“ setzt die Besatzung, „Vom Fahrzeug lösen“ löst sie', async () => {
+  it('„Auf 83-2“ geht über die Sammelroute mit genau dieser Kraft, „Vom Fahrzeug lösen“ löst sie', async () => {
     const aufrufe: string[] = [];
     server.use(
+      http.post('/api/einsaetze/1/fahrzeuge/:efId/besatzung', async ({ params, request }) => {
+        aufrufe.push(`POST ${params.efId} ${JSON.stringify(await request.json())}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
       http.put('/api/einsaetze/1/fahrzeuge/:efId/besatzung/:epId', ({ params }) => {
         aufrufe.push(`PUT ${params.efId}/${params.epId}`);
         return new HttpResponse(null, { status: 204 });
@@ -348,7 +354,7 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
     zeige();
     await userEvent.click(within(await oeffneMenue('Dora Ohne')).getByText('Auf 83-2'));
     await userEvent.click(within(await oeffneMenue('Clara Unter')).getByText('Vom Fahrzeug lösen'));
-    await waitFor(() => expect(aufrufe).toEqual(['PUT 31/4', 'DELETE 30/3']));
+    await waitFor(() => expect(aufrufe).toEqual(['POST 31 {"ep_ids":[4]}', 'DELETE 30/3']));
   });
 
   it('„Als Einheitsführer“ geht über den Kopfweg, „Aus Einheit lösen“ über die Einheit', async () => {
@@ -370,8 +376,8 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
     let lehneAb: () => void = () => {};
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
     server.use(
-      http.put('/api/einsaetze/1/fahrzeuge/:efId/besatzung/:epId', async ({ params }) => {
-        if (params.epId === '4') {
+      http.post('/api/einsaetze/1/fahrzeuge/:efId/besatzung', async ({ params }) => {
+        if (params.efId === '30') {
           await ersteAblehnung;
           return HttpResponse.json({ error: 'Fahrzeug ist voll' }, { status: 409 });
         }
@@ -389,9 +395,30 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
     expect(personZeile('Emil Fremdfahrer').querySelector('[data-fehler]')).toBeNull();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
+  it('abgelehnte Kraft: der Grund je Person aus der Antwort steht an ihrer Zeile', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/fahrzeuge/31/besatzung', () =>
+        HttpResponse.json(
+          {
+            error: 'Nicht alle Personen lassen sich zuordnen',
+            zeilen: [{ art: 'personal', id: 4, grund: 'entlassen' }],
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige();
+    await userEvent.click(within(await oeffneMenue('Dora Ohne')).getByText('Auf 83-2'));
+    expect(
+      await within(personZeile('Dora Ohne')).findByText(
+        'Nicht auf das Fahrzeug gesetzt: entlassen',
+      ),
+    ).toHaveAttribute('data-fehler');
+  });
+
   it('Rückmeldung vor der Antwort: der Auslöser der Person lädt, der einer anderen nicht', async () => {
     server.use(
-      http.put('/api/einsaetze/1/fahrzeuge/:efId/besatzung/:epId', async () => {
+      http.post('/api/einsaetze/1/fahrzeuge/:efId/besatzung', async () => {
         await delay('infinite');
         return new HttpResponse(null, { status: 204 });
       }),
@@ -500,6 +527,103 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
   });
 });
 
+describe('FahrzeugeBesatzung · Personal der Einheit übernehmen (LLH-1267)', () => {
+  const uebernehmenKnopf = (funkrufname: string) =>
+    within(fahrzeugZeile(funkrufname)).getByRole('button', {
+      name: 'Personal der Einheit übernehmen',
+    });
+
+  it('je Fahrzeug: der Dialog schlägt die freien Kräfte der Einheit vor, Übernehmen schickt sie in einem Schritt', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/fahrzeuge/31/besatzung', async ({ request }) => {
+        bodies.push(await request.json());
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    zeige({
+      personal: [...PERSONAL, person(7, 'Gerd Unter', { staerke_position: 'unterfuehrer' })],
+    });
+    expect(uebernehmenKnopf('83-1')).toBeEnabled();
+    await userEvent.click(uebernehmenKnopf('83-2'));
+    const dialog = await screen.findByRole('dialog', { name: 'Personal der Einheit auf 83-2' });
+    // Nur die freien Kräfte der Einheit: nicht wer sitzt, nicht wer auf fremdem Fahrzeug fährt.
+    expect(
+      within(dialog)
+        .getAllByRole('checkbox')
+        .map((c) => c.closest('label')?.textContent),
+    ).toEqual(['Gerd UnterUnterführer', 'Dora Ohne']);
+    expect(within(dialog).getByRole('checkbox', { name: /Gerd Unter/ })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Dora Ohne/ })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(bodies).toEqual([{ ep_ids: [7, 4] }]));
+  });
+
+  it('die Vorwahl zählt die sitzende Besatzung gegen das Soll, der Einheitsführer steht vorn', async () => {
+    // 83-1: Soll 1/1/4, es sitzen F, UF, M. Frei sind ein Unterführer, Dora und der Führer der
+    // Einheit (ohne Position, als Mannschaft); drei Mannschaftsplätze sind offen, der UF-Platz nicht.
+    zeige({
+      e: einheit({ fuehrer_id: 8 }),
+      personal: [
+        ...PERSONAL,
+        person(7, 'Gerd Unter', { staerke_position: 'unterfuehrer' }),
+        person(8, 'Zora Leitung'),
+      ],
+    });
+    await userEvent.click(uebernehmenKnopf('83-1'));
+    const dialog = await screen.findByRole('dialog', { name: 'Personal der Einheit auf 83-1' });
+    expect(
+      within(dialog)
+        .getAllByRole('checkbox')
+        .map((c) => c.closest('label')?.textContent),
+    ).toEqual(['Zora Leitung', 'Gerd UnterUnterführer', 'Dora Ohne']);
+    expect(within(dialog).getByRole('checkbox', { name: /Zora Leitung/ })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Gerd Unter/ })).not.toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Dora Ohne/ })).toBeChecked();
+  });
+
+  it('nach dem Übernehmen ist ein alter Grund an der Person geräumt', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/fahrzeuge/31/besatzung', () =>
+        HttpResponse.json({ error: 'Fahrzeug ist storniert' }, { status: 409 }),
+      ),
+      http.post(
+        '/api/einsaetze/1/fahrzeuge/30/besatzung',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+    );
+    zeige();
+    await userEvent.click(within(await oeffneMenue('Dora Ohne')).getByText('Auf 83-2'));
+    expect(
+      await within(personZeile('Dora Ohne')).findByText('Fahrzeug ist storniert'),
+    ).toBeVisible();
+    await userEvent.click(uebernehmenKnopf('83-1'));
+    const dialog = await screen.findByRole('dialog', { name: 'Personal der Einheit auf 83-1' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(within(paneel()).queryByText('Fahrzeug ist storniert')).toBeNull());
+  });
+
+  it('ohne freie Kräfte der Einheit gesperrt, der Grund steht daneben', () => {
+    zeige({
+      personal: PERSONAL.map((p) => (p.id === 4 ? { ...p, fahrzeug_id: 31 } : p)),
+    });
+    expect(uebernehmenKnopf('83-1')).toBeDisabled();
+    expect(fahrzeugZeile('83-1')).toHaveTextContent('keine freien Kräfte der Einheit');
+  });
+
+  it('ohne Freigabe Fahrzeuge oder Personal (keine Besatzung) fehlt der Knopf', () => {
+    const { unmount } = zeige({ freigaben: freigabenFixture({ fahrzeuge: { zugriff: false } }) });
+    expect(
+      within(paneel()).queryByRole('button', { name: 'Personal der Einheit übernehmen' }),
+    ).toBeNull();
+    unmount();
+    zeige({ freigaben: freigabenFixture({ personal: { zugriff: false } }) });
+    expect(
+      within(paneel()).queryByRole('button', { name: 'Personal der Einheit übernehmen' }),
+    ).toBeNull();
+  });
+});
+
 describe('FahrzeugeBesatzung · Listen laden oder fehlen', () => {
   it('Ladezustand: benannt, ohne Zeilen und ohne Menüs', () => {
     zeige({ listState: 'laden' });
@@ -538,6 +662,9 @@ describe('FahrzeugeBesatzung · ohne Schreibrecht (D14)', () => {
       0,
     );
     expect(within(paneel()).queryByRole('button', { name: 'Aus Einheit lösen' })).toBeNull();
+    expect(
+      within(paneel()).queryByRole('button', { name: 'Personal der Einheit übernehmen' }),
+    ).toBeNull();
     expect(within(paneel()).queryByRole('button', { name: /^Status von/ })).toBeNull();
     expect(fahrzeugZeile('83-1')).toHaveTextContent('Frei auf Wache');
     expect(within(paneel()).getByRole('link', { name: 'Anna Führer' })).toBeInTheDocument();

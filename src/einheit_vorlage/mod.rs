@@ -12,9 +12,13 @@
 //!   meldet seinen `dienststatus`.
 //! - Fahrzeuge und Stammbesetzung werden je als ganze Liste ersetzt (diese drei: Requirement
 //!   „Fahrzeuge und Stammbesetzung der Vorlage“).
+//! - Material-Positionen (LLH-1261, Requirement „Material der Vorlage“): Stamm-Material mit Menge,
+//!   an der Einheit oder auf einem Fahrzeug der Vorlage, als ganze Liste ersetzt. Ein Gerät mit
+//!   Bestandsnummer steht einmal im Baum und mit Menge 1.
 
 pub mod repo;
 
+use crate::material::MaterialArt;
 use crate::staerke::{Staerke, StaerkePosition};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -39,6 +43,17 @@ pub const FAHRZEUGE_JE_VORLAGE_MAX: usize = 50;
 
 /// Höchstzahl Personen der Stammbesetzung je Vorlage im Request (nach dem Entdoppeln), sonst 400.
 pub const PERSONAL_JE_VORLAGE_MAX: usize = 200;
+
+/// Höchstzahl Material-Positionen je Vorlage im Request, sonst 400 (LLH-1261).
+pub const MATERIAL_JE_VORLAGE_MAX: usize = 50;
+
+/// Höchstmenge eines Geräts je Position (LLH-1261, design.md D2): beim Bilden wird daraus ein
+/// Posten je Stück. Darüber 422, ein Zustand der Art.
+pub const GERAET_JE_POSITION_MAX: i64 = 10;
+
+/// Höchstmenge einer Material-Position (LLH-1261, `src/AGENTS.md`, „Eingabegrenzen“): darüber
+/// 400. Der Deckel für Geräte ist [`GERAET_JE_POSITION_MAX`] (422, eine Frage der Art).
+pub const MENGE_JE_POSITION_MAX: i64 = 100_000;
 
 /// Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;
 /// die Detailseite braucht keinen Einzel-GET (Spec `einheit-vorlagen`, „Pflege in der
@@ -73,6 +88,8 @@ pub struct EinheitVorlage {
     pub ist_demo: bool,
     pub fahrzeuge: Vec<EinheitVorlageFahrzeug>,
     pub personal: Vec<EinheitVorlagePersonal>,
+    /// Material-Positionen in der Reihenfolge der Pflege (LLH-1261).
+    pub material: Vec<EinheitVorlageMaterial>,
 }
 
 /// Ein Stamm-Fahrzeug einer Vorlage.
@@ -106,6 +123,26 @@ pub struct EinheitVorlagePersonal {
     pub ist_demo: bool,
     /// Andere aktive Vorlagen, in denen die Person ebenfalls steht.
     pub auch_in: Vec<i64>,
+}
+
+/// Eine Material-Position einer Vorlage (LLH-1261). Bezeichnung, Art, Bestandsnummer und
+/// Dienststatus kommen live aus dem Stamm.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct EinheitVorlageMaterial {
+    /// Die Position (`einheit_vorlage_material.id`); das Bilden wählt sie hierüber.
+    pub id: i64,
+    pub material_id: i64,
+    pub bezeichnung: String,
+    pub art: MaterialArt,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bestandsnummer: Option<String>,
+    pub menge: i64,
+    /// Fahrzeug der Vorlage, auf dem die Position liegt; fehlt an der Einheit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fahrzeug_id: Option<i64>,
+    #[schema(value_type = crate::katalog::Dienststatus)]
+    pub dienststatus: String,
+    pub ist_demo: bool,
 }
 
 /// Fahrzeug-Liste von außen: entdoppelt in der Reihenfolge des ersten Vorkommens, höchstens
@@ -142,6 +179,37 @@ pub fn normalize_personal(
     if entries.len() > PERSONAL_JE_VORLAGE_MAX {
         return Err(crate::error::AppError::Validation(format!(
             "Höchstens {PERSONAL_JE_VORLAGE_MAX} Personen je Vorlage"
+        )));
+    }
+    Ok(entries)
+}
+
+/// Eine Material-Position im Request, schon geparst.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MaterialEntry {
+    pub material_id: i64,
+    pub menge: i64,
+    pub fahrzeug_id: Option<i64>,
+}
+
+/// Material-Liste von außen: höchstens [`MATERIAL_JE_VORLAGE_MAX`] Positionen, jede mit Menge von
+/// 1 bis [`MENGE_JE_POSITION_MAX`] (sonst 400). Nicht entdoppelt: dasselbe Material darf mehrfach stehen.
+pub fn normalize_material(
+    entries: Vec<MaterialEntry>,
+) -> Result<Vec<MaterialEntry>, crate::error::AppError> {
+    if entries.len() > MATERIAL_JE_VORLAGE_MAX {
+        return Err(crate::error::AppError::Validation(format!(
+            "Höchstens {MATERIAL_JE_VORLAGE_MAX} Material-Positionen je Vorlage"
+        )));
+    }
+    if entries.iter().any(|e| e.menge < 1) {
+        return Err(crate::error::AppError::Validation(
+            "Menge muss mindestens 1 sein".into(),
+        ));
+    }
+    if entries.iter().any(|e| e.menge > MENGE_JE_POSITION_MAX) {
+        return Err(crate::error::AppError::Validation(format!(
+            "Menge höchstens {MENGE_JE_POSITION_MAX} je Position"
         )));
     }
     Ok(entries)

@@ -13,13 +13,14 @@ import { registerSW } from 'virtual:pwa-register';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { appRouten } from './App';
-import { meldeSchriftenAn } from './theme/schriften';
+import { registerSchriften } from './theme/schriften';
 import { ThemeModeProvider } from './theme/ThemeModeProvider';
 import { erzeugeQueryClient } from './api/queryClient';
 import { meldeAppAktualisierungVerfuegbar, setzeAppAktualisierer } from './pwa/appAktualisierung';
 
 dayjs.extend(utc);
-meldeSchriftenAn();
+// Das erste Bild wartet auf die Bildschirm-Schriften, höchstens `SCHRIFT_FRIST_MS` (LLH-1272).
+const schriften = registerSchriften();
 
 const updateSW = registerSW({
   immediate: true,
@@ -30,15 +31,17 @@ setzeAppAktualisierer(updateSW);
 const queryClient = erzeugeQueryClient();
 const router = createBrowserRouter(appRouten);
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ThemeModeProvider>
-        <AntApp notification={{ maxCount: 3 }}>
-          <RouterProvider router={router} />
-        </AntApp>
-      </ThemeModeProvider>
-      <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
-  </React.StrictMode>,
-);
+void schriften.then(() => {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <ThemeModeProvider>
+          <AntApp notification={{ maxCount: 3 }}>
+            <RouterProvider router={router} />
+          </AntApp>
+        </ThemeModeProvider>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
+    </React.StrictMode>,
+  );
+});

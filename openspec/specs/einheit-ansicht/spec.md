@@ -31,7 +31,8 @@ Eingabefeld einer Angabe im Dokument stehen; ein Klick MUST genau eine Angabe ö
 Das Speichern einer Angabe SHALL genau dieses eine Feld an
 `PATCH /api/einsaetze/{id}/einheiten/{eid}` senden; die Soll-Stärke MUST als ihre drei Felder in
 einer Anfrage gehen. Ist der Wert unverändert, MUST keine Anfrage entstehen. Leert jemand eine
-optionale Angabe, MUST das Feld als `null` gesendet werden, die Sprechgruppen als leere Liste.
+optionale Angabe, MUST das Feld als `null` gesendet werden. Die Sprechgruppen gehen nicht über
+diesen Weg, sondern einzeln (Anforderung „Sprechgruppen einzeln zuordnen und lösen“).
 Eine Änderung, die ein anderer Arbeitsplatz an einer anderen Angabe gemacht hat, MUST dabei
 erhalten bleiben.
 
@@ -274,3 +275,68 @@ nur ein Verweis auf die Einheit stehen.
 #### Scenario: Ohne Recht an Einheiten
 - **WHEN** eine Person ohne Recht an Einheiten dieselbe Meldung sieht
 - **THEN** trägt die Meldung nur den Verweis „↗ FL-MUS 1-44-1“
+
+### Requirement: Sprechgruppen einzeln zuordnen und lösen
+Das Speichern der Sprechgruppen SHALL je hinzugefügter Sprechgruppe eine Zuordnung
+(`PUT …/einheiten/{eid}/sprechgruppen/{sg}`) und je entfernter eine Lösung (`DELETE`, derselbe
+Pfad) senden, berechnet gegen den Stand beim Öffnen der Zeile. Die ganze Menge MUST nicht
+gesendet werden. Sprechgruppen, die hier nicht geändert wurden, MUST unberührt bleiben, auch
+wenn ein anderer Arbeitsplatz sie inzwischen zugeordnet oder gelöst hat.
+
+#### Scenario: Eine Sprechgruppe hinzufügen
+- **WHEN** die Einheit die Sprechgruppe „311“ hat und jemand „505“ hinzufügt und speichert
+- **THEN** geht genau eine Zuordnung für „505“ hinaus, keine Anfrage für „311“ und kein PATCH
+
+#### Scenario: Zwei Arbeitsplätze zugleich
+- **WHEN** zwei Arbeitsplätze dieselbe Einheit ohne Sprechgruppe öffnen, der eine „311“ und der
+  andere danach „505“ hinzufügt und beide speichern
+- **THEN** hat die Einheit beide Sprechgruppen „311“ und „505“
+
+#### Scenario: Entfernen lässt fremde Zuordnung stehen
+- **WHEN** die Ansicht die Zeile mit „311“ öffnet, ein anderer Arbeitsplatz danach „505“ zuordnet
+  und hier „311“ entfernt und gespeichert wird
+- **THEN** geht genau eine Lösung für „311“ hinaus, und die Einheit behält „505“
+
+#### Scenario: Teilweise abgelehnt
+- **WHEN** von zwei Änderungen die zweite abgelehnt wird
+- **THEN** bleibt die Zeile mit dem Entwurf offen, der Grund steht darunter, und die Ansicht zeigt
+  den gespeicherten Stand mit der ersten Änderung
+
+### Requirement: ETB-Eintrag je Sprechgruppen-Änderung
+Jede wirksame Zuordnung oder Lösung einer Sprechgruppe an einer Einheit über die Einzelwege
+SHALL einen System-Eintrag im ETB erzeugen, der Einheit und Sprechgruppe mit Betriebsart nennt.
+Eine wiederholte Anfrage ohne Wirkung MUST keinen Eintrag erzeugen. Das gilt für jede Quelle
+dieser Wege, auch die Fernmeldeskizze.
+
+#### Scenario: Zuordnen und Lösen
+- **WHEN** jemand der Einheit „1. Zug“ die Sprechgruppe „311“ (TMO) zuordnet und sie danach löst
+- **THEN** erhält das ETB zwei System-Einträge: „Einheit «1. Zug»: Sprechgruppe «311» (TMO)
+  zugeordnet“ und „Einheit «1. Zug»: Sprechgruppe «311» (TMO) entfernt“
+
+#### Scenario: Wiederholte Zuordnung
+- **WHEN** dieselbe Sprechgruppe der Einheit ein zweites Mal zugeordnet wird
+- **THEN** entsteht kein weiterer ETB-Eintrag
+
+### Requirement: Aufgelöste Einheit nur lesend
+Eine aufgelöste Einheit SHALL unter derselben Adresse wie eine aktive öffnen und nur lesend
+erscheinen: Kopf mit „aufgelöst“ und Zeitpunkt der Auflösung, Kopfdaten als Werte, letzte
+Besatzung nach Fahrzeugen gegliedert mit Führer-Kennzeichen, Fahrzeuge, Material mit Menge und
+die Zeitachse. Sie MUST, auch mit Schreibrecht, weder Bearbeiten- oder Eintragen-Aufforderung
+noch Menü, Lösen-Knopf, Zuordnen-Auswahl, Nachtrag noch den Abschnitt „Einheit auflösen“ tragen;
+Links bleiben.
+
+#### Scenario: Aufgelöste Einheit öffnen
+- **WHEN** eine Person mit Schreibrecht die Ansicht der um 15:00 aufgelösten Einheit „Florian 1“
+  öffnet
+- **THEN** zeigt der Kopf „aufgelöst“ mit 15:00, die letzte Besatzung, Fahrzeuge, Material und
+  Zeitachse stehen da, und die Seite trägt kein Bedienelement außer Links
+
+#### Scenario: Letzte Besatzung nicht festgehalten
+- **WHEN** eine Einheit geöffnet wird, die aufgelöst wurde, bevor das System die letzte Besetzung
+  festhielt
+- **THEN** sagt die Ansicht an Stelle von Besatzung, Fahrzeugen und Material, dass die letzte
+  Besetzung nicht festgehalten wurde
+
+#### Scenario: Unbekannte Einheit
+- **WHEN** eine Adresse mit einer Einheit geöffnet wird, die weder aktiv noch aufgelöst ist
+- **THEN** zeigt die App „Diese Einheit gibt es nicht (mehr)“ mit dem Weg zur Gliederung

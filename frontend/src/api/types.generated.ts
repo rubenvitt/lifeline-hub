@@ -710,6 +710,8 @@ export interface components {
             einheit_ids: number[];
             /** @description Die übernommenen Fahrzeuge (`einsatz_fahrzeug.id`). */
             fahrzeuge: number[];
+            /** @description Die neuen Material-Posten (`einsatz_material.id`), LLH-1261. */
+            material: number[];
             /** @description Die übernommenen Personen (`einsatz_personal.id`). */
             personal: number[];
         };
@@ -1834,6 +1836,7 @@ export interface components {
             ist_kumuliert: components["schemas"]["Staerke"];
             /** Format: double */
             lat?: number | null;
+            letzte_besetzung?: components["schemas"]["LetzteBesetzung"] | null;
             /** Format: double */
             lon?: number | null;
             material_mitglieder: components["schemas"]["EinheitMitgliedMaterial"][];
@@ -1966,6 +1969,15 @@ export interface components {
             sortier: number;
         };
         /**
+         * @description Verweis eines ETB-Eintrags auf eine Einheit (LLH-1266): `id` für den Deeplink auf ihre
+         *     Ansicht, `name` für den Verweis „Einheit «Name»“.
+         */
+        EinheitVerweis: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        /**
          * @description Eine Einheiten-Vorlage mit ihren Fahrzeugen und ihrer Stammbesetzung. Die Liste trägt alles;
          *     die Detailseite braucht keinen Einzel-GET (Spec `einheit-vorlagen`, „Pflege in der
          *     Verwaltung“).
@@ -1979,6 +1991,8 @@ export interface components {
             id: number;
             /** @description Trägt die Zeile eine Demo-Marke (Spec `demo-daten`)? Live aus `demo_herkunft`. */
             ist_demo: boolean;
+            /** @description Material-Positionen in der Reihenfolge der Pflege (LLH-1261). */
+            material: components["schemas"]["EinheitVorlageMaterial"][];
             name: string;
             personal: components["schemas"]["EinheitVorlagePersonal"][];
             soll?: components["schemas"]["Staerke"] | null;
@@ -2010,6 +2024,31 @@ export interface components {
             fahrzeugtyp?: string | null;
             funkrufname: string;
             ist_demo: boolean;
+        };
+        /**
+         * @description Eine Material-Position einer Vorlage (LLH-1261). Bezeichnung, Art, Bestandsnummer und
+         *     Dienststatus kommen live aus dem Stamm.
+         */
+        EinheitVorlageMaterial: {
+            art: components["schemas"]["MaterialArt"];
+            bestandsnummer?: string | null;
+            bezeichnung: string;
+            dienststatus: components["schemas"]["Dienststatus"];
+            /**
+             * Format: int64
+             * @description Fahrzeug der Vorlage, auf dem die Position liegt; fehlt an der Einheit.
+             */
+            fahrzeug_id?: number | null;
+            /**
+             * Format: int64
+             * @description Die Position (`einheit_vorlage_material.id`); das Bilden wählt sie hierüber.
+             */
+            id: number;
+            ist_demo: boolean;
+            /** Format: int64 */
+            material_id: number;
+            /** Format: int64 */
+            menge: number;
         };
         /** @description Eine Person der Stammbesetzung. */
         EinheitVorlagePersonal: {
@@ -2793,6 +2832,15 @@ export interface components {
             berichtigt_durch: components["schemas"]["BerichtigungVerweis"][];
             /** Format: int64 */
             berichtigt_eintrag_id?: number | null;
+            /**
+             * @description Die Einheiten, die dieser Eintrag festhält (LLH-1266, Spec `etb-vorgaenge`, „Verweis auf
+             *     genannte Einheiten“; Tabelle `etb_eintrag_einheit`): die Empfänger eines Auftrags beim
+             *     Schreiben (LLH-1175) und die Einheit des Systemeintrags ihrer Auflösung. Nach `id`, leer
+             *     statt fehlend; der Name ist der aktuelle der Einheit, auch einer aufgelösten. Nicht Teil
+             *     des SELECT: `repo::laden`/`repo::abfrage` füllen die Liste je Seite nach, wie
+             *     `folgeauftraege`.
+             */
+            einheiten: components["schemas"]["EinheitVerweis"][];
             ereigniszeit: string;
             /**
              * @description Funktion des Erfassers beim Anlegen („S2", „S2/S3", „EL"; LFH-615) — Snapshot, keine
@@ -4070,6 +4118,35 @@ export interface components {
             typ: components["schemas"]["LageZoneTyp"];
         };
         /**
+         * @description Die beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266, design.md D1/D2). Namen
+         *     kommen beim Lesen aus den Dispositionszeilen; eine später stornierte Kraft fehlt.
+         */
+        LetzteBesetzung: {
+            fahrzeuge: components["schemas"]["LetztesFahrzeug"][];
+            material: components["schemas"]["LetztesMaterial"][];
+            personal: components["schemas"]["LetztePerson"][];
+        };
+        /** @description Eine Person der letzten Besetzung. */
+        LetztePerson: {
+            /**
+             * Format: int64
+             * @description `einsatz_fahrzeug.id` des Fahrzeugs, auf dem sie saß; fehlt ohne Fahrzeug.
+             */
+            auf_fahrzeug_id?: number | null;
+            /** @description Einsatzfunktion (LLH-1067). */
+            einsatzfunktion?: string | null;
+            /**
+             * Format: int64
+             * @description `einsatz_personal.id` der Dispozeile.
+             */
+            ep_id: number;
+            /** @description Qualifikation (Snapshot), wie [`EinheitMitgliedPerson::funktion`]. */
+            funktion?: string | null;
+            /** @description Sie führte die Einheit. */
+            ist_fuehrer: boolean;
+            name: string;
+        };
+        /**
          * @description Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).
          *     Als Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher
          *     Meldungsart; maßgeblich ist die jüngste `ereigniszeit`.
@@ -4094,6 +4171,27 @@ export interface components {
             meldeweg: components["schemas"]["MeldeWeg"];
             /** Format: int64 */
             meldung_id: number;
+        };
+        /** @description Ein Fahrzeug der letzten Besetzung. */
+        LetztesFahrzeug: {
+            /**
+             * Format: int64
+             * @description `einsatz_fahrzeug.id` der Dispozeile.
+             */
+            ef_id: number;
+            fahrzeugtyp?: string | null;
+            funkrufname: string;
+        };
+        /** @description Ein Materialposten der letzten Besetzung, mit seiner Menge beim Auflösen. */
+        LetztesMaterial: {
+            bezeichnung: string;
+            /**
+             * Format: int64
+             * @description `einsatz_material.id` der Dispozeile.
+             */
+            em_id: number;
+            /** Format: int64 */
+            menge: number;
         };
         /**
          * @description SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
@@ -6566,6 +6664,8 @@ export interface components {
             fahrzeuge_gesperrt: boolean;
             /** @description Die Einheiten des Baums, die Wurzel vorn, Eltern vor ihren Kindern. */
             knoten: components["schemas"]["VorschauKnoten"][];
+            /** @description Das Modul Material ist für die Rolle nicht freigegeben: keine Materialzeilen (LLH-1261). */
+            material_gesperrt: boolean;
             /** @description Das Modul Personal ist für die Rolle nicht freigegeben: keine Personenzeilen. */
             personal_gesperrt: boolean;
             /** Format: int64 */
@@ -6594,6 +6694,7 @@ export interface components {
         VorschauKnoten: {
             fahrzeuge: components["schemas"]["VorschauFahrzeug"][];
             funkrufname?: string | null;
+            material: components["schemas"]["VorschauMaterial"][];
             name: string;
             personal: components["schemas"]["VorschauPersonal"][];
             soll?: components["schemas"]["Staerke"] | null;
@@ -6611,6 +6712,36 @@ export interface components {
             /** Format: int64 */
             vorlage_id: number;
         };
+        /**
+         * @description Eine Material-Position der Vorlage und ihr Zustand im Einsatz (LLH-1261). Art und
+         *     Bestandsnummer aus dem Stamm von jetzt; ein Gerät mit Bestandsnummer meldet Menge 1.
+         */
+        VorschauMaterial: {
+            art: components["schemas"]["MaterialArt"];
+            bestandsnummer?: string | null;
+            bezeichnung: string;
+            /**
+             * Format: int64
+             * @description Fahrzeug der Vorlage (Stamm-ID), auf dem die Position liegt; fehlt an der Einheit.
+             */
+            fahrzeug_id?: number | null;
+            /** Format: int64 */
+            material_id: number;
+            /** Format: int64 */
+            menge: number;
+            /**
+             * Format: int64
+             * @description Die Position (`einheit_vorlage_material.id`); das Bilden wählt sie hierüber.
+             */
+            vorlage_material_id: number;
+            zustand: components["schemas"]["VorschauMaterialZustand"];
+        };
+        /**
+         * @description Zustand einer Material-Position der Vorlage im Einsatz (LLH-1261, design.md D4). Jedes
+         *     Bilden legt neue Posten an; „frei“, „gebunden“ und „entlassen“ gibt es deshalb nicht.
+         * @enum {string}
+         */
+        VorschauMaterialZustand: "neu" | "ausser_dienst" | "im_einsatz";
         /** @description Eine Person der Stammbesetzung und ihr Zustand im Einsatz. */
         VorschauPersonal: {
             /**
@@ -6897,7 +7028,7 @@ export interface components {
          *     Einsatz die der Disposition (LLH-1073). Wire == `as_str()`.
          * @enum {string}
          */
-        ZeilenArt: "personal" | "fahrzeug";
+        ZeilenArt: "personal" | "fahrzeug" | "material";
         /**
          * @description Antwort einer an einzelnen Zeilen abgelehnten Mengen-Anfrage (422, LLH-1100): der Umschlag
          *     `{error}` und je abgelehnter Zeile ein [`ZeilenGrund`].

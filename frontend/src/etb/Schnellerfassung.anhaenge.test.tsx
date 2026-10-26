@@ -459,6 +459,7 @@ describe('Schnellerfassung – Absenden mit Anhängen (LFH-117)', () => {
         befehl_id: null,
         folgeauftraege: [],
         berichtigt_durch: [],
+        einheiten: [],
         anhaenge: [],
       },
     });
@@ -720,6 +721,7 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
         befehl_id: null,
         folgeauftraege: [],
         berichtigt_durch: [],
+        einheiten: [],
         anhaenge: [],
       },
     });

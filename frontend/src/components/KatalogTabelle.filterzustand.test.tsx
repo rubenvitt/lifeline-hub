@@ -1,11 +1,16 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { kopfFilterWaehlen, kopfFilterWerte } from '../test/kopfFilter';
+import {
+  angehakteWerte,
+  kopfFilterWaehlen,
+  kopfFilterWerte,
+  openKopfFilter,
+} from '../test/kopfFilter';
 import KatalogTabelle, { type KatalogSpalte } from './KatalogTabelle';
 import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGedaechtnis';
 
@@ -191,5 +196,64 @@ describe('KatalogTabelle · Filterzustand (LLH-1086)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('KatalogTabelle · offenes Filtermenü behält seinen Entwurf (LLH-1427)', () => {
+  // Die Zähler im Kopfmenü hängen an den Zeilen: jeder neue Datenstand baut die Spalten neu, und
+  // antd setzte dabei den Entwurf eines offenen, schon gefilterten Menüs zurück.
+  const element = (zeilen: Quelle[]) => (
+    <CommandPaletteProvider>
+      <KatalogTabelle<Quelle>
+        rowKey="id"
+        columns={spalten()}
+        dataSource={zeilen}
+        mehrzahl="Quellen"
+      />
+    </CommandPaletteProvider>
+  );
+
+  it('neue Zeilen lassen die Häkchen stehen, Bestätigen wirkt beide', async () => {
+    setzeViewportBreite(1366);
+    const { rerender } = renderMitBasisProviders(element(ZEILEN));
+    await kopfFilterWaehlen('Aktiv', [/^aktiv/]);
+    await waitFor(() => expect(namen()).toEqual(['Basemap', 'Topo']));
+
+    const menue = await openKopfFilter('Aktiv');
+    await userEvent.click(within(menue).getByText('inaktiv (1)'));
+    expect(angehakteWerte(menue)).toEqual(['aktiv (2)', 'inaktiv (1)']);
+
+    rerender(element([...ZEILEN, { id: 4, name: 'Luftbild', aktiv: false }]));
+    expect(angehakteWerte(menue)).toHaveLength(2);
+
+    await userEvent.click(
+      menue.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
+    );
+    await waitFor(() => expect(namen()).toEqual(['Basemap', 'OSM', 'Topo', 'Luftbild']));
+    expect(await kopfFilterWerte('Aktiv')).toEqual(['aktiv (2)', 'inaktiv (2)']);
+  });
+
+  it('ein neuer Filterstand des Aufrufers gilt auch bei offenem Menü', async () => {
+    // Gehalten wird nur die Garnitur, nie ein überholter Filterstand: antd rechnete sonst beim
+    // Bestätigen mit dem alten weiter.
+    setzeViewportBreite(1366);
+    const kontrolliert = (gewaehlt: string[] | null) => (
+      <CommandPaletteProvider>
+        <KatalogTabelle<Quelle>
+          rowKey="id"
+          columns={spalten().map((s) =>
+            s.key === 'aktiv' ? { ...s, filteredValue: gewaehlt } : s,
+          )}
+          dataSource={ZEILEN}
+          mehrzahl="Quellen"
+        />
+      </CommandPaletteProvider>
+    );
+    const { rerender } = renderMitBasisProviders(kontrolliert(['ja']));
+    const menue = await openKopfFilter('Aktiv');
+    expect(angehakteWerte(menue)).toEqual(['aktiv']);
+
+    rerender(kontrolliert(['nein']));
+    await waitFor(() => expect(angehakteWerte(menue)).toEqual(['inaktiv']));
   });
 });
