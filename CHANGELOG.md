@@ -1,3 +1,16 @@
+## [1.0.0-alpha.154](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.153...v1.0.0-alpha.154) (2026-10-26)
+
+### Bedienoberfläche
+
+- **Ruhiger Seitenaufbau beim Öffnen eines Einsatzes:** Beim Laden einer Einsatzseite sprang bisher der ganze Rahmen mit Seitenleiste, Bereichsleiste und Inhalt um etwa eine Zeilenhöhe nach unten. Der Grund: Der Kopf wechselte während des Ladens von einer auf zwei Zeilen. Der Rahmen bleibt jetzt stehen, in allen Darstellungsdichten.
+- **Benutzermenü mit fester Breite:** Im Einsatz hat das Benutzermenü oben rechts jetzt immer dieselbe Breite. Es wird also nicht mehr breiter, wenn nach dem Laden die Funktion statt des Namens erscheint (z. B. „Einsatzleitung“ statt „Administrator“). Ein längerer Name oder eine längere Funktion wird mit „…“ gekürzt. Der volle Text steht im Tooltip und im Menü selbst.
+- **Mehr Platz auf kleineren Bildschirmen:** Der Kopf bleibt in der kompakten Darstellung bis 1280 px Breite einzeilig. Auf einem typischen Laptop-Bildschirm im Führungsfahrzeug mit 1366 px gibt es daher keinen Umbruch mehr.
+- **Schriften schon beim ersten Bild:** Die App zeigt die erste Ansicht jetzt in den richtigen Schriften. Bisher erschien kurz eine Ersatzschrift, und der Seitenkopf rutschte danach zurecht. Beim Start wartet die App dafür höchstens 0,3 Sekunden auf die Schriften. Laden die Schriften nicht, startet die App trotzdem ohne Verzögerung.
+
+### Dokumentation
+
+- Die Bilder in den Kapiteln „Einsatz-Oberfläche“ und „Anmelden und abmelden“ der Anwenderdokumentation zeigen jetzt den neuen Seitenkopf.
+
 ## [1.0.0-alpha.153](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.152...v1.0.0-alpha.153) (2026-10-25)
 
 ### Wichtige Änderungen
