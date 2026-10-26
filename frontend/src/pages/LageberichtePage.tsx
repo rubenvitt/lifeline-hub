@@ -57,7 +57,9 @@ export default function LageberichtePage() {
   const einsatzId = Number(id);
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { konventionen } = useAnzeigeKonventionen();
+  // Titel und Startinhalt werden gespeichert: Darstellung von Einsatz und Organisation, ohne die
+  // Gerätewahl (LLH-1437), damit jeder Bearbeiter denselben Vorschlag sieht.
+  const { konventionenOhneGeraet: konventionen } = useAnzeigeKonventionen();
 
   // Der Einsatz, in dem die Seite gerade steht: eine Antwort aus einem verlassenen Einsatz
   // navigiert nicht und meldet nicht am neuen Ort (`frontend/AGENTS.md`, „Rückwege und Fehler“).

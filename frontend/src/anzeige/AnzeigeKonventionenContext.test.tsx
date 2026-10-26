@@ -35,6 +35,18 @@ function Sonde() {
   );
 }
 
+/** Darstellung mit und ohne Gerätewahl (LLH-1437). */
+function DarstellungsSonde() {
+  const { konventionen, konventionenOhneGeraet } = useAnzeigeKonventionen();
+  return (
+    <div>
+      <span data-testid="mit">{konventionen.zeitdarstellung ?? 'null'}</span>
+      <span data-testid="ohne">{konventionenOhneGeraet.zeitdarstellung ?? 'null'}</span>
+      <span data-testid="ohne-zone">{konventionenOhneGeraet.zeitzone ?? 'browser'}</span>
+    </div>
+  );
+}
+
 /** Vollständiges EinsatzEinstellungen-Mock; `partial` überschreibt gezielt einzelne Felder. */
 function einstellungenMock(partial: Partial<EinsatzEinstellungen> = {}): EinsatzEinstellungen {
   return {
@@ -439,5 +451,53 @@ describe('Zeitdarstellung: Gerät vor Einsatz vor Organisation, Druck ohne Gerä
     act(() => {
       window.dispatchEvent(new Event('afterprint'));
     });
+  });
+});
+
+describe('Konventionen ohne Gerätewahl für gespeicherte Vorschläge (LLH-1437)', () => {
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => {
+    act(() => setzeZeitdarstellung(null));
+    localStorage.clear();
+    zeitdarstellungVergessenFuerTests();
+  });
+
+  it('im Einsatz: Einsatz vor Organisation, die Gerätewahl zählt nicht', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue(
+      orgDefaultsMock({ zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' }),
+    );
+    vi.mocked(ladeEinstellungen).mockResolvedValue(
+      einstellungenMock({ zeitzone: 'Europe/Vienna', zeitdarstellung: 'taktisch' }),
+    );
+    act(() => setzeZeitdarstellung('datum_uhrzeit'));
+    renderMitProviders(
+      <OrgAnzeigeProvider>
+        <EinsatzAnzeigeProvider einsatzId={1}>
+          <DarstellungsSonde />
+        </EinsatzAnzeigeProvider>
+      </OrgAnzeigeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('ohne-zone').textContent).toBe('Europe/Vienna'));
+    expect(screen.getByTestId('mit').textContent).toBe('datum_uhrzeit');
+    expect(screen.getByTestId('ohne').textContent).toBe('taktisch');
+  });
+
+  it('gibt der Einsatz nichts vor, gilt die Organisation, nicht das Gerät', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue(
+      orgDefaultsMock({ zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' }),
+    );
+    vi.mocked(ladeEinstellungen).mockResolvedValue(
+      einstellungenMock({ zeitzone: 'Europe/Berlin' }),
+    );
+    act(() => setzeZeitdarstellung('taktisch'));
+    renderMitProviders(
+      <OrgAnzeigeProvider>
+        <EinsatzAnzeigeProvider einsatzId={1}>
+          <DarstellungsSonde />
+        </EinsatzAnzeigeProvider>
+      </OrgAnzeigeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('ohne').textContent).toBe('datum_uhrzeit'));
+    expect(screen.getByTestId('mit').textContent).toBe('taktisch');
   });
 });

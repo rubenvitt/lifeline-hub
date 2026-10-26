@@ -326,8 +326,8 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
 ### Verpflegungsplan
 
 - Uhrzeiten lassen sich als „0630“, „06:30“, „630“ oder „6:30“ eintragen; die Tabelle zeigt sie
-  als „0630–0800“, bei „Datum und Uhrzeit“ als „06:30–08:00“. Ein Ende vor dem Beginn heißt: die Mahlzeit endet am nächsten Tag, die Tabelle
-  zeigt dann „+1 Tag“. Ende und Beginn dürfen nicht gleich sein.
+  als „0630–0800“, bei „Datum und Uhrzeit“ als „06:30–08:00“. Ein Ende vor dem Beginn heißt: die
+  Mahlzeit endet am nächsten Tag, die Tabelle zeigt dann „+1 Tag“. Ende und Beginn dürfen nicht gleich sein.
 - Unter den aktiven Mahlzeiten ist jede Bezeichnung nur einmal erlaubt, ohne Unterschied von
   Groß- und Kleinschreibung. Eine Mahlzeit lässt sich nicht löschen, nur deaktivieren; das fragt
   nicht nach, weil es umkehrbar ist. Wer eine deaktivierte Mahlzeit aktiviert, deren Name inzwischen

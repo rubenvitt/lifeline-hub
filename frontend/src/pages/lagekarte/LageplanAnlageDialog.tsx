@@ -90,7 +90,8 @@ export default function LageplanAnlageDialog({
   const { token } = theme.useToken();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { konventionen } = useAnzeigeKonventionen();
+  // Der Titel wird gespeichert: ohne die Gerätewahl (LLH-1437, wie `LageberichtePage`).
+  const { konventionenOhneGeraet } = useAnzeigeKonventionen();
   const [wahl, setWahl] = useState<string | null>(null);
 
   const berichte = useQuery({
@@ -137,7 +138,7 @@ export default function LageplanAnlageDialog({
       if (ziel.art === 'neu') {
         const neu = await legeLageberichtAn(einsatzId, {
           vorlage: 'lagebericht',
-          titel: titelVorschlag('lagebericht', dayjs(), konventionen),
+          titel: titelVorschlag('lagebericht', dayjs(), konventionenOhneGeraet),
         });
         dokument = 'lageberichte';
         id = neu.id;

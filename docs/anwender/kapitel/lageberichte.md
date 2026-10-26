@@ -38,8 +38,9 @@ sie.
    Lagevortrag“ wählen; für eine andere Vorlage dort „Lagevortrag zur Entscheidung“ oder „Freier
    Bericht“.
 3. Im Entwurf den vorgeschlagenen „Titel“ übernehmen oder ändern; er nennt die Uhrzeit, etwa
-   „Lageüberblick 1410“ (bei „Datum und Uhrzeit“ „Lageüberblick 14:10“). Der „Zeitstand“ ist der Zeitpunkt des Anlegens und lässt sich dort
-   ebenfalls ändern.
+   „Lageüberblick 1410“. Stellt der Einsatz (oder die Organisation) „Datum und Uhrzeit“ ein, heißt
+   er „Lageüberblick 14:10“; die Darstellung auf dem eigenen Gerät ändert den Vorschlag nicht.
+   Der „Zeitstand“ ist der Zeitpunkt des Anlegens und lässt sich dort ebenfalls ändern.
 
 ### Einen Entwurf schreiben
 

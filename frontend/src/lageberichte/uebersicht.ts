@@ -107,11 +107,10 @@ const TITEL: Record<LageberichtVorlageKey, string> = {
 /**
  * Titelvorschlag aus der Uhrzeit („Lageüberblick 1410“ bzw. „Lageüberblick 14:10“), in der
  * Anzeigezone, nicht in der des Browsers (LFH-692, Spec `zeiteingabe`), und in der wirksamen
- * Zeitdarstellung (Rolle `uhrzeit`, LLH-1437): der Tag steht im Zeitstand daneben. Wie die
- * Platzhalter eines ETB-Bausteins (`etb/BausteinPlatzhalterModal.tsx`, LLH-1061) ist er ein Text,
- * den die Oberfläche vorschlägt und der Mensch vor dem Speichern sieht und ändern kann; deshalb
- * nimmt er dieselbe Darstellung wie die Anzeige, die Gerätewahl eingeschlossen. Geändert wird er
- * im Entwurf. Auch die Anlage aus der Lagekarte nimmt ihn (`LageplanAnlageDialog`).
+ * Zeitdarstellung (Rolle `uhrzeit`, LLH-1437): der Tag steht im Zeitstand daneben. Er wird
+ * gespeichert und folgt deshalb nur Einsatz und Organisation, nicht der Gerätewahl (wie Druck und
+ * Servertexte): Die Aufrufer reichen `konventionenOhneGeraet` herein. Geändert wird er im Entwurf.
+ * Auch die Anlage aus der Lagekarte nimmt ihn (`LageplanAnlageDialog`).
  */
 export function titelVorschlag(
   vorlage: LageberichtVorlageKey,
