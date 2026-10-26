@@ -154,6 +154,15 @@ Tabs und auf anderen Geräten derselben Person. „Ansehen“ quittiert nichts.
 Steht nach „Alle gelesen“ „Nicht gespeichert, bitte noch einmal.“, hat der Server die Änderung
 nicht angenommen; ohne Netz geht „Alle gelesen“ nicht.
 
+### Eingänge auf diesem Gerät stumm schalten
+
+1. In der Kopfzeile „Eingänge“ wählen.
+2. Oben in der Liste „Stumm“ wählen. Unter „Stumm auf diesem Gerät“ steht je Eingang ein Schalter,
+   etwa „Neuer Auftrag“.
+3. Den Schalter eines Eingangs einschalten, der auf diesem Gerät leise bleiben soll, oder
+   ausschalten, um ihn wieder zu hören. Die Änderung gilt sofort; der Knopf zeigt danach, wie
+   viele stumm sind, etwa „Stumm · 2“.
+
 ### Benachrichtigungen einstellen
 
 1. Oben rechts das „Benutzermenü“ öffnen und „Benachrichtigungen“ wählen.
@@ -282,10 +291,21 @@ eine von drei Stufen:
   tieferer Ton, höchstens alle zwei Minuten. Jede Art lässt sich unter „Benachrichtigungen“
   abschalten.
 - **Still**: Was eine abgeschaltete Art meldet, steht nur unter „Eingänge“ bei „Früher“, ohne
-  Band, Ton und Zahl. In den Zählern und Listen der Module bleibt es sichtbar.
+  Band, Ton und Zahl. In den Zählern und Listen der Module bleibt es sichtbar. Ebenso still kommt
+  ein Eingang, den die Einstellungen des Einsatzes für alle Funktionen der Person still stellen;
+  „Neuer Lagebericht“ ist das ohne eigene Einstellung (Kapitel
+  [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)).
 
 Die Schalter gehören zur **Person**, nicht zum Gerät: Sie gelten auf jedem Gerät, an dem sie sich
 anmeldet. Stummschalten in der Alarmzentrale gehört dagegen zum Gerät und gilt für alle Töne.
+
+Auch „Stumm auf diesem Gerät“ unter „Eingänge“ gehört zum **Gerät**, gilt aber je Art: Ein stummer
+Eingang bringt auf diesem Gerät kein Band, keinen Ton und keine Meldung des Betriebssystems. Er
+bleibt ungelesen, zählt über „Eingänge“, im Titel des Tabs und am Symbol der App und steht unter
+„Neu“. Andere Geräte derselben Person melden ihn wie sonst; so bleibt etwa das Tablet leise, während
+der Rechner im Stab klingelt. Alarme lassen sich nicht stumm schalten. Die Einstellung bleibt beim
+Abmelden auf dem Gerät, wie „Ton stumm“. Ist „Auch bei geschlossener App“ eingeschaltet, zeigt
+das Betriebssystem auch eine stumme Art, solange kein Tab der App vorn ist.
 
 Toasts tragen nur Alarme (dazu die Unwetterwarnung und, außerhalb eines Einsatzes, „Neuer
 Einsatz“ und „Aufnahme in einen Einsatz“). Sie bleiben stehen, bis sie geöffnet oder geschlossen

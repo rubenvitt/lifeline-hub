@@ -367,6 +367,12 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   `still` (`Aufgeloest::still_ids`), die `repo::anlegen` mit `quittiert_at = erstellt_at`
   schreibt: im Verlauf, nie gezählt, nie nachgereicht, kein Push; `melden` liefert nur die
   Lauten. Die Tabelle ist zugleich Protokoll und Gelesen-Stand je Person; es gibt keine zweite.
+- **Vorgabe je Funktion nur in der Auflösung** (LLH-1421, Entwurf
+  `/mnt/project-files/llh-1421/design.md`, D1–D4): `aufloesung::empfaenger` stellt einen
+  Hinweis auch still, wenn `benachrichtigung_vorgabe` ihn für JEDE Funktion des Empfängers still
+  stellt (Stab-Besetzung ∪ Funktion der Mitgliedschaft, leer = `ohne`); lauter gewinnt. Ohne
+  Zeile gilt `BenachrichtigungArt::vorgabe_still()`, einstellbar ist nur
+  `vorgabe_einstellbar()`. Lesen und Schreiben nur über `benachrichtigung::vorgabe`.
   Verlauf `GET …/einsaetze/{id}/benachrichtigungen` (≤ 200, `ungelesen` = unquittierte Eingänge
   nach der Rechteprüfung), „alle gelesen“ `POST …/benachrichtigungen/gelesen` nur über
   `benachrichtigung::gelesen_bis`: nie Alarme, EIN Quittier-Ereignis mit `gelesen_bis`, nie eines

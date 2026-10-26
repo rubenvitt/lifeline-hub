@@ -13,7 +13,8 @@ Jede Benachrichtigung SHALL genau eine Stufe tragen. *Alarm*: lauter Ton, Toast,
 verdecktem Tab. *Hinweis* (Eingang): dezenter Ton, OS-Meldung bei verdecktem Tab, zählt als
 ungelesener Eingang. *Still*: kein Ton, kein Toast, keine OS-Meldung; die Benachrichtigung steht
 nur im Verlauf, schon gelesen, und zählt nie. Still wird eine Benachrichtigung für einen
-Empfänger, der ihre Art abgeschaltet hat.
+Empfänger, der ihre Art abgeschaltet hat, oder für den die Vorgabe des Einsatzes sie still stellt
+(„Vorgabe je Funktion am Einsatz“).
 Toasts beider lauten Stufen MUST stehen bleiben, bis sie geschlossen oder geöffnet werden.
 Hat der Nutzer Push auf einem Gerät eingeschaltet, SHALL eine Benachrichtigung beider lauten
 Stufen dort auch bei geschlossener App als OS-Meldung erscheinen (Spec `web-push`).
@@ -260,8 +261,9 @@ Hinweis erhalten.
 ### Requirement: Befehl oder Lagebericht im Verteiler
 
 Wird ein Befehl oder ein Lagebericht freigegeben, SHALL jeder Nutzer einer Funktion in seinem
-Verteiler einen Hinweis erhalten. Verteiler vom Typ Einheit, Abschnitt oder extern MUST NOT Nutzer
-benachrichtigen.
+Verteiler eine Benachrichtigung erhalten, als Hinweis oder still nach der Vorgabe des Einsatzes
+(„Vorgabe je Funktion am Einsatz“; ohne Festlegung ist der Lagebericht still). Verteiler vom Typ
+Einheit, Abschnitt oder extern MUST NOT Nutzer benachrichtigen.
 
 #### Scenario: Befehl an S3 und S4
 - **WHEN** ein Befehl mit Verteiler S3 und S4 freigegeben wird
@@ -546,6 +548,51 @@ Stufe Alarm MUST NOT abschaltbar sein. Eine abgeschaltete Art bleibt in Zählern
 #### Scenario: Alarm nicht abschaltbar
 - **WHEN** Person A ihre Benachrichtigungs-Einstellungen öffnet
 - **THEN** stehen Sofortmeldung, überfälliger Auftrag und fällige Ablösung als immer an, ohne Schalter
+
+### Requirement: Vorgabe je Funktion am Einsatz
+
+Wer den Einsatz verwalten darf (Einsatzleitung, Führungspersonal, Admin der Organisation des
+Einsatzes), SHALL je Einsatz für jede Benachrichtigungsart der Stufe Hinweis festlegen können, für
+welche Führungsfunktionen (EL, S1–S7, Führungshilfspersonal, Fachberater) und für Mitglieder ohne
+Funktion sie still ist; Org-Arten und die Unwetterwarnung sind ausgenommen. Ohne Festlegung gilt
+die Vorgabe des Katalogs: „Neuer Lagebericht“ still, alle übrigen Eingang. Die Funktionen eines
+Empfängers sind seine Stab-Besetzung (EL über die Führungsstelle, ein Sachgebiet „bei der
+Einsatzleitung“ zählt für den Einsatzleiter) und die Funktion seiner Mitgliedschaft; hat er keine,
+gilt „ohne Funktion“. Ein Empfänger MUST eine Art still erhalten, wenn die Vorgabe sie für jede
+seiner Funktionen still stellt; hat er eine Funktion, für die sie Eingang ist, MUST er sie als
+Eingang erhalten (lauter gewinnt; die eigene Abschaltung bleibt davon unberührt). Arten der Stufe
+Alarm MUST NOT per Vorgabe einstellbar sein (422). Eine Änderung MUST live bei allen erscheinen,
+die die Einstellungen offen haben; ein abgeschlossener Einsatz MUST sie ablehnen (409).
+
+#### Scenario: Still für S2
+- **WHEN** die Vorgabe „Neuer Auftrag“ für S2 still stellt und ein Auftrag an S2 erteilt wird
+- **THEN** steht er im Verlauf der S2 als gelesen und erhöht ihre Zahl ungelesener Eingänge nicht
+
+#### Scenario: Zwei Funktionen
+- **WHEN** Person A ist S2 und S4, die Vorgabe stellt „Neuer Auftrag“ nur für S2 still, und ein Auftrag geht an S2 und S4
+- **THEN** erhält A den Auftrag als Eingang
+
+#### Scenario: Lagebericht ohne Festlegung
+- **WHEN** an einem Einsatz ohne Festlegung ein Lagebericht freigegeben wird
+- **THEN** steht er bei allen Empfängern still im Verlauf
+
+#### Scenario: Alarm nicht einstellbar
+- **WHEN** jemand die Vorgabe für „Sofortmeldung“ setzen will
+- **THEN** lehnt der Server mit 422 ab, und die Sektion „Benachrichtigungen“ bietet die Art nicht an
+
+### Requirement: Stumm auf diesem Gerät
+
+Eine Person SHALL Eingangsarten auf einem Gerät stumm schalten können (Knopf „Stumm“ im Verlauf am
+Knopf „Eingänge“). Auf diesem Gerät MUST eine stumme Art keinen Ton, keinen Eintrag im
+Eingangsband und keine OS-Meldung des offenen Tabs auslösen; Zahl, Tab-Titel, App-Badge und
+Verlauf MUST unverändert bleiben. Die Einstellung liegt im Browserspeicher des Geräts, ohne
+Personenbezug, und bleibt beim Abmelden. Andere Geräte und andere Personen MUST NOT betroffen
+sein. Alarme MUST NOT stumm schaltbar sein. Push bei geschlossener App (Spec `web-push`) folgt
+der Einstellung nicht.
+
+#### Scenario: Tablet stumm, Rechner laut
+- **WHEN** Person A „Neue Meldung“ auf dem Tablet stumm schaltet und eine Meldung eingeht
+- **THEN** zeigt das Tablet nur die höhere Zahl am Knopf „Eingänge“, der Rechner von A spielt den Ton und zeigt das Band
 
 ### Requirement: Native Meldung in der Desktop-App
 
