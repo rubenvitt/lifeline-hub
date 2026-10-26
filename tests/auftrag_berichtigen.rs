@@ -732,3 +732,45 @@ async fn admin_id(pool: &sqlx::SqlitePool) -> i64 {
         .await
         .unwrap()
 }
+
+/// LLH-1443, Spec „Berichtigen steht im Einsatztagebuch“: die Frist steht in der Zone des
+/// Einsatzes, auch wenn die Organisation eine andere führt. 13:00/14:00 UTC sind in Tokio
+/// 22:00/23:00, in New York 09:00/10:00.
+#[tokio::test]
+async fn frist_steht_in_der_zone_des_einsatzes_nicht_der_organisation() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'America/New_York') \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'Asia/Tokyo') \
+         ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .bind(e)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+
+    let (s, j) = patch(
+        &app,
+        &admin,
+        e,
+        aid,
+        json!({ "frist_at": "2099-10-12 14:00:00" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert!(
+        inhalte(&anordnungen(&app, &admin, e).await)
+            .contains(&"Auftrag #1 geändert: Frist 122300okt99 (vorher 122200okt99).".to_string()),
+        "{:?}",
+        inhalte(&anordnungen(&app, &admin, e).await)
+    );
+}

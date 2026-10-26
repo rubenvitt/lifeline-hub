@@ -1405,7 +1405,7 @@ async fn ungueltige_einsatzzone_verdraengt_die_org_zone_nicht() {
     let w = welt().await;
     let zone = |pool: SqlitePool, e: i64| async move {
         let mut conn = pool.acquire().await.unwrap();
-        zone_tx(&mut conn, e).await.unwrap()
+        load_einsatz_vorgabe_tx(&mut conn, e).await.unwrap().zone
     };
     let setze = |pool: SqlitePool, sql: &'static str, wert: Option<&'static str>, id: i64| async move {
         sqlx::query(sql)

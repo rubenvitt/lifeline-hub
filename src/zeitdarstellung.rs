@@ -4,6 +4,10 @@
 //! kennt kein Gerät, und ein ETB-Eintrag ist ein Dokument der Führungsstelle wie ein Ausdruck.
 //! Geschriebene Einträge bleiben, wie sie sind (Alteinträge, E4).
 //!
+//! Zone und Darstellung eines Einsatzes lädt nur [`zeitstil_laden`] (LLH-1443): beide Einsatz vor
+//! Organisation vor Vorgabe, so dass Verpflegung, Zeitachse, Auftragsfrist, Nachforderung,
+//! Ablösung und Hinweise dieselbe Ortszeit nennen, die die Oberfläche des Einsatzes zeigt.
+//!
 //! Das Gegenstück im Client ist `frontend/src/anzeige/zeitDarstellung.ts`; beide schreiben die
 //! Rolle „Zeitpunkt“ gleich (`101430okt26` bzw. `10.10.26 14:30`) und die Rolle „Uhrzeit“
 //! (`1430` bzw. `14:30`). Die Rolle „kurz“ gibt es hier nicht: ein gespeicherter Text weiß nicht,
@@ -13,6 +17,7 @@ use chrono::{DateTime, Datelike, Utc};
 use chrono_tz::Tz;
 use sqlx::{Executor, Sqlite};
 
+use crate::einsatz::nummer::ZEITZONE_VORGABE;
 use crate::error::AppError;
 
 pub use crate::einsatz::einstellungen::Zeitdarstellung;
@@ -35,14 +40,44 @@ pub fn wirksame_darstellung(einsatz: Option<&str>, org: Option<&str>) -> Zeitdar
         .unwrap_or(ZEITDARSTELLUNG_VORGABE)
 }
 
-/// Lädt die wirksame Darstellung eines Einsatzes (Einsatz vor Organisation vor Vorgabe). Wie
-/// die Zone vor bzw. in der Transaktion zu laden, die den Text schreibt.
-pub async fn darstellung_laden<'c, E>(exec: E, einsatz_id: i64) -> Result<Zeitdarstellung, AppError>
+/// Wirksame Zone der Servertexte: die erste gültige aus der Zone des Einsatzes und der der
+/// Organisation, sonst [`ZEITZONE_VORGABE`] — dieselbe Folge wie die Anzeigezone im Client
+/// (Einsatz vor Organisation) und die Wechselzeiten der Ablösung (Spec `kraefte-abloesung`).
+/// Jeder Name wird für sich gelesen: eine ungültige Einsatzzone („MEZ“) verdrängt keine gültige
+/// der Organisation; ein leerer Name zählt als nicht gesetzt (LLH-1443).
+pub fn wirksame_zone(einsatz: Option<&str>, org: Option<&str>) -> Tz {
+    [einsatz, org]
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .find_map(|name| {
+            let zone = name.parse::<Tz>().ok();
+            if zone.is_none() {
+                tracing::warn!(zeitzone = name, "Unbekannte Zeitzone übergangen");
+            }
+            zone
+        })
+        .unwrap_or(ZEITZONE_VORGABE)
+}
+
+/// Die eine Quelle für Zone und Darstellung der Servertexte eines Einsatzes (LLH-1443): Zone
+/// nach [`wirksame_zone`], Darstellung nach [`wirksame_darstellung`], beide Einsatz vor
+/// Organisation vor Vorgabe. Nimmt den Pool (vor der Transaktion zu laden, wie der
+/// ETB-`startwert`) oder die Verbindung der Transaktion, die den Text schreibt. Ein unbekannter
+/// Einsatz bekommt die Vorgaben; die Prüfung, ob es ihn gibt, liegt beim Aufrufer.
+pub async fn zeitstil_laden<'c, E>(exec: E, einsatz_id: i64) -> Result<Zeitstil, AppError>
 where
     E: Executor<'c, Database = Sqlite>,
 {
-    let zeile: Option<(Option<String>, Option<String>)> = sqlx::query_as(
-        "SELECT es.zeitdarstellung, oe.zeitdarstellung \
+    type Zeile = (
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    );
+    let zeile: Option<Zeile> = sqlx::query_as(
+        "SELECT es.zeitzone, oe.zeitzone, es.zeitdarstellung, oe.zeitdarstellung \
          FROM einsatz e \
          LEFT JOIN einsatz_einstellungen es ON es.einsatz_id = e.id \
          LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id \
@@ -51,8 +86,11 @@ where
     .bind(einsatz_id)
     .fetch_optional(exec)
     .await?;
-    let (einsatz, org) = zeile.unwrap_or_default();
-    Ok(wirksame_darstellung(einsatz.as_deref(), org.as_deref()))
+    let (zone_einsatz, zone_org, darstellung_einsatz, darstellung_org) = zeile.unwrap_or_default();
+    Ok(Zeitstil::new(
+        wirksame_zone(zone_einsatz.as_deref(), zone_org.as_deref()),
+        wirksame_darstellung(darstellung_einsatz.as_deref(), darstellung_org.as_deref()),
+    ))
 }
 
 /// Zone und Darstellung, in denen ein Servertext Zeitpunkte nennt.
@@ -116,7 +154,6 @@ impl Zeitstil {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::einsatz::nummer::ZEITZONE_VORGABE;
 
     const TAKTISCH: Zeitstil = Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::Taktisch);
     const DATUM: Zeitstil = Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::DatumUhrzeit);
@@ -234,5 +271,95 @@ mod tests {
             Taktisch,
             "Altwerte zählen nicht"
         );
+    }
+
+    #[test]
+    fn zone_einsatz_vor_organisation_vor_vorgabe() {
+        use chrono_tz::{America::New_York, Asia::Tokyo};
+        assert_eq!(wirksame_zone(None, None), ZEITZONE_VORGABE);
+        assert_eq!(wirksame_zone(None, Some("America/New_York")), New_York);
+        assert_eq!(
+            wirksame_zone(Some("Asia/Tokyo"), Some("America/New_York")),
+            Tokyo
+        );
+        assert_eq!(
+            wirksame_zone(Some("  "), Some("America/New_York")),
+            New_York,
+            "leer am Einsatz heißt Zone der Organisation"
+        );
+        assert_eq!(
+            wirksame_zone(Some("MEZ"), Some("America/New_York")),
+            New_York,
+            "eine ungültige Einsatzzone verdrängt keine gültige der Organisation"
+        );
+        assert_eq!(
+            wirksame_zone(Some("MEZ"), Some("Kein/Ort")),
+            ZEITZONE_VORGABE
+        );
+        assert_eq!(wirksame_zone(Some(" Asia/Tokyo "), None), Tokyo);
+    }
+
+    async fn einsatz(pool: &sqlx::SqlitePool) -> i64 {
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'E') RETURNING id")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// LLH-1443: Zone und Darstellung aller Servertexte kommen aus einer Abfrage, beide Einsatz
+    /// vor Organisation vor Vorgabe — auch über die Verbindung einer Transaktion.
+    #[tokio::test]
+    async fn zeitstil_laden_nimmt_den_einsatz_vor_der_organisation() {
+        use chrono_tz::{America::New_York, Asia::Tokyo};
+        let pool = crate::db::test_pool().await;
+        let e = einsatz(&pool).await;
+        let stil = |pool: sqlx::SqlitePool| async move { zeitstil_laden(&pool, e).await.unwrap() };
+
+        assert_eq!(
+            stil(pool.clone()).await,
+            Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::Taktisch)
+        );
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+             VALUES (1, 'America/New_York', 'datum_uhrzeit')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            stil(pool.clone()).await,
+            Zeitstil::new(New_York, Zeitdarstellung::DatumUhrzeit)
+        );
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+             VALUES (?, 'Asia/Tokyo', 'taktisch')",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            stil(pool.clone()).await,
+            Zeitstil::new(Tokyo, Zeitdarstellung::Taktisch)
+        );
+
+        let mut tx = pool.begin().await.unwrap();
+        assert_eq!(
+            zeitstil_laden(&mut *tx, e).await.unwrap(),
+            Zeitstil::new(Tokyo, Zeitdarstellung::Taktisch),
+            "in der Transaktion dieselbe Quelle"
+        );
+        tx.rollback().await.unwrap();
+
+        sqlx::query("UPDATE einsatz_einstellungen SET zeitzone = 'MEZ' WHERE einsatz_id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(stil(pool.clone()).await.zone, New_York);
     }
 }

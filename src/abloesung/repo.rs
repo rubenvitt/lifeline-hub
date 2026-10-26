@@ -790,36 +790,6 @@ impl EinsatzVorgabe {
     }
 }
 
-/// Die wirksame Zone eines Einsatzes: die erste gültige aus seiner Einstellung und der der
-/// Organisation, sonst Europe/Berlin (`einsatz::nummer::ZEITZONE_VORGABE`). Jeder Name wird
-/// für sich gelesen: eine ungültige Einsatzzone („MEZ“) verdrängt keine gültige der
-/// Organisation (Review PR #833).
-async fn zone_tx(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Tz, AppError> {
-    let namen: Option<(Option<String>, Option<String>)> = sqlx::query_as(
-        "SELECT ee.zeitzone, oe.zeitzone FROM einsatz e \
-         LEFT JOIN einsatz_einstellungen ee ON ee.einsatz_id = e.id \
-         LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id WHERE e.id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let (einsatz, org) = namen.unwrap_or_default();
-    Ok([einsatz, org]
-        .into_iter()
-        .flatten()
-        .find_map(|name| {
-            let zone = name.trim().parse::<Tz>().ok();
-            if zone.is_none() && !name.trim().is_empty() {
-                tracing::warn!(
-                    zeitzone = name,
-                    "Unbekannte Zeitzone für die Ablösung übergangen"
-                );
-            }
-            zone
-        })
-        .unwrap_or(crate::einsatz::nummer::ZEITZONE_VORGABE))
-}
-
 pub(crate) async fn load_einsatz_vorgabe_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -828,7 +798,9 @@ pub(crate) async fn load_einsatz_vorgabe_tx(
         werte: schichtmodell_repo::load_einsatz_tx(conn, einsatz_id)
             .await?
             .map(|(w, _)| w),
-        zone: zone_tx(conn, einsatz_id).await?,
+        zone: crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id)
+            .await?
+            .zone,
     })
 }
 

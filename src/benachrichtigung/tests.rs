@@ -546,9 +546,12 @@ async fn detail_der_abloesung_nennt_einheit_und_uhrzeit_in_der_anzeigezone() {
         detail(BenachrichtigungArt::AbloesungFaellig).await,
         "Florian 1, 1330"
     );
-    // Die Organisation wählt „Datum und Uhrzeit“, der Einsatz lässt die Vorgabe.
+    // Die Organisation wählt „Datum und Uhrzeit“, der Einsatz lässt die Vorgabe. Ihre Zone
+    // New York verdrängt die des Einsatzes nicht (LLH-1443): die Uhrzeit bleibt die Ortszeit
+    // des Einsatzes.
     sqlx::query(
-        "INSERT INTO org_einstellungen (org_id, zeitdarstellung) VALUES (1, 'datum_uhrzeit')",
+        "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+         VALUES (1, 'America/New_York', 'datum_uhrzeit')",
     )
     .execute(&pool)
     .await

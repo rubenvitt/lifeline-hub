@@ -90,8 +90,9 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge
   der EP; Ausgabe verweist nur per Kennung (`nachforderung_id`, `verpflegungsstelle_id`, Empfänger
   `einheit_id` oder `abschnitt_id`); Einstufung im Client (`verpflegung/deckung.ts`); ins ETB nur
-  Zeitfenster und Bedarf (Org-Zeitzone), dazu Art und Stellen des Zeitfensters und
-  Inbetriebnahme/Auflösung einer Stelle; kein Modulzähler. Ein Zeitfenster wird in seiner Karte
+  Zeitfenster und Bedarf (Zone des Einsatzes vor der Organisation, `zeitdarstellung::zeitstil_laden`,
+  LLH-1443), dazu Art und Stellen des Zeitfensters und Inbetriebnahme/Auflösung einer Stelle; kein
+  Modulzähler. Ein Zeitfenster wird in seiner Karte
   bearbeitet (LLH-1139, `verpflegung/ZeitfensterBearbeiten.tsx`, `frontend/AGENTS.md`, „Bearbeiten
   in der Ansicht“): „Bedarf bearbeiten“ ohne Modal, dieselben Felder wie beim Anlegen, nur
   geänderte Schlüssel über `zeitfensterPatch` gegen den Stand beim Öffnen, eine offene Karte je
