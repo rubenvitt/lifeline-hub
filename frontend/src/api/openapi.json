@@ -2989,13 +2989,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "erreichbarkeit": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe."
-          },
           "geaendert_at": {
             "type": [
               "string",
@@ -3013,6 +3006,13 @@
             ],
             "format": "int64",
             "description": "Fehlt bei unbekannter Kapazität; dann gibt es auch keine Zahl freier Plätze."
+          },
+          "kontaktweg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe."
           },
           "lat": {
             "type": [
@@ -10711,13 +10711,13 @@
             "type": "integer",
             "format": "int64"
           },
-          "kontakt_erreichbarkeit": {
+          "kontakt_name": {
             "type": [
               "string",
               "null"
             ]
           },
-          "kontakt_name": {
+          "kontaktweg": {
             "type": [
               "string",
               "null"

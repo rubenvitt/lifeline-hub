@@ -26,7 +26,7 @@ import {
  * Kontakte kommen seit LFH-1075 als Kennzahlen vom Server, über den ganzen Bestand, auch wenn
  * die Presseseite die erledigten nur seitenweise lädt; die Anrufe seit LLH-732 ebenso aus
  * `…/infotelefon/zaehler`, auch wenn das Protokoll nur ein Fenster lädt. Ansprechperson,
- * Erreichbarkeit, Anrufername, Rückrufnummer, Notiz und Thema erreichen die Ableitung nie — auch
+ * Kontaktweg, Anrufername, Rückrufnummer, Notiz und Thema erreichen die Ableitung nie — auch
  * dann nicht, wenn der Aufrufer das volle DTO übergibt. Der Test pinnt ihre Abwesenheit.
  *
  * Eine Quelle ohne Daten liefert keine Zahl: ihr Teil trägt den Zustand, und die Anzeige sagt

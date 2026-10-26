@@ -292,7 +292,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
       medium: PRESSE_MEDIUM,
       thema: PRESSE_THEMA,
       kontakt_name: 'Redaktion Landespolitik, Maximiliane Kirchgassner-Wohlfahrt',
-      kontakt_erreichbarkeit: 'landespolitik.redaktion@rundfunkanstalt-musterstadt.example',
+      kontaktweg: 'landespolitik.redaktion@rundfunkanstalt-musterstadt.example',
     },
     'Medienkontakt',
   );

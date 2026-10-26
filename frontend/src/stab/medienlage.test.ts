@@ -16,7 +16,7 @@ const KENNZAHLEN = {
   medien: ['NDR 1', 'RTL'],
   thema: 'Familie Meyer evakuiert?',
   kontakt_name: 'Maria Beispiel',
-  kontakt_erreichbarkeit: '+49 511 1234567',
+  kontaktweg: '+49 511 1234567',
 } as MedienkontaktKennzahlen;
 
 /**

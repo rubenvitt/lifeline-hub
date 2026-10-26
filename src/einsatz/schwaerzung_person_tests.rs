@@ -332,7 +332,7 @@ fn guard_markierungen_erkennt_luecke_retain_und_ohne_an_der_wurzel() {
         ("medium", Mit),
         ("thema", Mit),
         ("kontakt_name", Mit),
-        ("kontakt_erreichbarkeit", Ohne("x")),
+        ("kontaktweg", Ohne("x")),
         ("antwort", Mit),
         ("freigabe_durch", Mit),
     ];

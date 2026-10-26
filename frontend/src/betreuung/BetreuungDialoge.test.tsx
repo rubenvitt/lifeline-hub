@@ -215,19 +215,19 @@ describe('PATCH nur mit geänderten Schlüsseln', () => {
     ).toStrictEqual({ status: 'geschlossen' });
   });
 
-  it('LLH-1044: Leitung und Erreichbarkeit getrimmt, geleert → null nur mit Vorwert, fehlend unberührt', () => {
+  it('LLH-1044: Leitung und Kontaktweg getrimmt, geleert → null nur mit Vorwert, fehlend unberührt', () => {
     const basis = {
       art: 'notunterkunft' as const,
       bezeichnung: 'Turnhalle Ost',
       kapazitaet_personen: 150,
     };
-    const mitLeitung = stelle({ leitung: 'Frau Schulz', erreichbarkeit: 'Kanal 3' });
-    expect(stellePatch(stelle(), { ...basis, leitung: ' Herr Ott ', erreichbarkeit: '' })).toEqual({
+    const mitLeitung = stelle({ leitung: 'Frau Schulz', kontaktweg: 'Kanal 3' });
+    expect(stellePatch(stelle(), { ...basis, leitung: ' Herr Ott ', kontaktweg: '' })).toEqual({
       leitung: 'Herr Ott',
     });
-    expect(stellePatch(mitLeitung, { ...basis, leitung: '  ', erreichbarkeit: 'Kanal 3' })).toEqual(
-      { leitung: null },
-    );
+    expect(stellePatch(mitLeitung, { ...basis, leitung: '  ', kontaktweg: 'Kanal 3' })).toEqual({
+      leitung: null,
+    });
     // Ein Formular ohne die Felder (Schlüssel fehlt) lässt sie stehen.
     expect(stellePatch(mitLeitung, basis)).toEqual({});
   });
@@ -663,7 +663,7 @@ describe('StelleAnlegenDialog', () => {
         bezeichnung: 'Turnhalle Ost',
         art: 'betreuungsstelle',
         leitung: 'Frau Schulz',
-        erreichbarkeit: 'Kanal 3',
+        kontaktweg: 'Kanal 3',
       }),
     );
   });

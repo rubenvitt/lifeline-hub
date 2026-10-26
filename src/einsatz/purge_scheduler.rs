@@ -1238,7 +1238,7 @@ mod tests {
                     notiz: Some("Ansprechpartner Herr Meier 0170".into()),
                     // LLH-1044: Name und Rufnummer der Leitung gehen mit dem Einsatz.
                     leitung: Some("Frau Schulz".into()),
-                    erreichbarkeit: Some("0171 2345678".into()),
+                    kontaktweg: Some("0171 2345678".into()),
                     lat: None,
                     lon: None,
                 },
@@ -1347,7 +1347,7 @@ mod tests {
             assert_eq!(status, "in_betrieb");
         }
         let leitungen: Vec<(Option<String>, Option<String>)> = sqlx::query_as(
-            "SELECT leitung, erreichbarkeit FROM betreuungsstelle WHERE einsatz_id = ? ORDER BY id",
+            "SELECT leitung, kontaktweg FROM betreuungsstelle WHERE einsatz_id = ? ORDER BY id",
         )
         .bind(e)
         .fetch_all(&pool)
@@ -1356,7 +1356,7 @@ mod tests {
         assert_eq!(
             leitungen,
             vec![(None, None), (None, None)],
-            "Leitung und Erreichbarkeit leer (LLH-1044)"
+            "Leitung und Kontaktweg leer (LLH-1044)"
         );
         assert_eq!(bezirk_zeilen.len(), 2);
         assert_eq!(stellen_zeilen.len(), 2);
@@ -1727,7 +1727,7 @@ mod tests {
     }
 
     /// LFH-554/LFH-901, Spec-Szenarien „Schwärzung“ von Presse-Log und Informationstelefon:
-    /// Ansprechperson, Erreichbarkeit, Freigabeangabe, Anrufername und Notiz leer; Medium, Thema
+    /// Ansprechperson, Kontaktweg, Freigabeangabe, Anrufername und Notiz leer; Medium, Thema
     /// und eine gesetzte Antwort tragen den Platzhalter (Linie A, LFH-901 design.md D1/D2), eine
     /// gesetzte Rückrufnummer auch (ein CHECK verlangt sie bei offenem Rückruf). Art, Status,
     /// Eingang und Anliegen bleiben. Eine fehlende Antwort und ein offener Rückruf brechen die
@@ -1772,7 +1772,7 @@ mod tests {
                 medium: "NDR 1".into(),
                 thema: "Anfrage zu Fam. Yilmaz".into(),
                 kontakt_name: Some("Maria Beispiel".into()),
-                kontakt_erreichbarkeit: Some("+49 511 1234567".into()),
+                kontaktweg: Some("+49 511 1234567".into()),
                 eingang_at: "2026-01-01 10:00:00".into(),
             },
         )
@@ -1802,7 +1802,7 @@ mod tests {
                 medium: "Freie Journalistin Petra Feder".into(),
                 thema: "Drehtermin am Deich".into(),
                 kontakt_name: None,
-                kontakt_erreichbarkeit: None,
+                kontaktweg: None,
                 eingang_at: "2026-01-01 10:30:00".into(),
             },
         )
@@ -1839,7 +1839,7 @@ mod tests {
         let p = super::repo::SCHWAERZUNG_PLATZHALTER;
         let k = presse::laden(&pool, e, kontakt).await.unwrap();
         assert_eq!(
-            (k.kontakt_name, k.kontakt_erreichbarkeit, k.freigabe_durch),
+            (k.kontakt_name, k.kontaktweg, k.freigabe_durch),
             (None, None, None)
         );
         assert_eq!(

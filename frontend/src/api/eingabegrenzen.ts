@@ -174,5 +174,5 @@ export const ABLOESUNG_ABLOESER_MAX = 8;
 export const ABLOESUNG_BESATZUNG_MAX = 50;
 /** Leitung einer Betreuungsstelle (LLH-1044). */
 export const BETREUUNG_LEITUNG_MAX = 200;
-/** Kontakt der Leitung einer Betreuungsstelle (LLH-1044, Spalte `erreichbarkeit`). */
-export const BETREUUNG_ERREICHBARKEIT_MAX = 200;
+/** Kontakt der Leitung einer Betreuungsstelle (LLH-1044, Spalte `kontaktweg`). */
+export const BETREUUNG_KONTAKTWEG_MAX = 200;

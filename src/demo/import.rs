@@ -1076,7 +1076,7 @@ impl Ablauf<'_> {
                         standort: Some(v.standort.to_string()),
                         notiz: None,
                         leitung: None,
-                        erreichbarkeit: None,
+                        kontaktweg: None,
                         // Verortet wird die Stelle mit der Inbetriebnahme (`StelleInBetrieb`).
                         lat: None,
                         lon: None,
