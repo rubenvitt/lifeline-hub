@@ -78,6 +78,7 @@ import type { StatusKategorie } from '../api/types';
 import StatusWahl from '../components/StatusWahl';
 import { statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
+import { SpaltenSchalter, useSpaltenSchalterZustand } from '../components/SpaltenSchalter';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
@@ -102,7 +103,7 @@ import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
  *
  * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Paneele
  * Einheiten nach FMS-Status und Personal nach Status, „keine Rückmeldung"; LLH-1140) → Werkzeugzeile außerhalb des
- * Primitivs, einzeilig (Auswahlzeile, Suche, „Filter (n)“, Stufe, Lagebericht, Druck) → Raster als
+ * Primitivs, einzeilig (Auswahlzeile, Suche, „Filter (n)“, Stufe, Spalten, Lagebericht, Druck) → Raster als
  * Baum: Einheit → Untereinheiten, darunter ihre Fahrzeuge mit Besatzung, „Ohne Fahrzeug“ und das
  * Material als Gruppe. Die Elternzeile zeigt die kumulierte Stärke, Verteilung und Tönung bleiben
  * eigen. Die Baumlogik steht in `kraefte/kraeftebaumKern.ts`, die Zeilen in
@@ -961,6 +962,9 @@ export default function KraefteuebersichtPage() {
       sprungGesperrt,
     ],
   );
+  // Der Spaltenschalter steht in der eigenen Werkzeugzeile, nicht in der des Primitivs (LLH-1417):
+  // nur so bleibt sie einzeilig, und sein Fokus hält die Zeilenschleuse nicht.
+  const spaltenSchalter = useSpaltenSchalterZustand<(typeof spalten)[number]['key']>();
 
   const uebernehmen = useMutation({
     mutationFn: async () => {
@@ -1203,8 +1207,8 @@ export default function KraefteuebersichtPage() {
 
         {/* ── Werkzeugzeile, außerhalb des Primitivs ── Die Auswahlzeile sagt immer, wie viel
             von wie viel gezeigt wird — auch ungefiltert, sonst wäre ihr Erscheinen selbst das
-            Signal. Druck und Lagebericht stehen hier und nicht in der Werkzeugzeile von
-            `Datensicht`: nur hier trägt `.kraefte-no-print`. */}
+            Signal. Druck, Lagebericht und Spalten stehen hier und nicht in der Werkzeugzeile von
+            `Datensicht`: nur hier trägt `.kraefte-no-print`, und Fokus dort hielte die Zeilen. */}
         <div
           className="kraefte-no-print"
           data-lfh="meldebild-werkzeuge"
@@ -1236,12 +1240,13 @@ export default function KraefteuebersichtPage() {
             </Button>
           )}
           {/* Ein schlichtes Feld: `Input.Search` brächte einen Lupenknopf mit dem englischen
-              Namen „search“ mit, und die Suche wirkt ohnehin bei jeder Eingabe. */}
+              Namen „search“ mit, und die Suche wirkt ohnehin bei jeder Eingabe. Die Basis von
+              100 px hält die Zeile mit „Spalten“ bei 1366 px einzeilig; breiter wächst das Feld. */}
           <Input
             placeholder="Suche..."
             aria-label="Einheiten und Kräfte durchsuchen"
             allowClear
-            style={{ flex: '1 1 180px', minWidth: 0, maxWidth: 280 }}
+            style={{ flex: '1 1 100px', minWidth: 0, maxWidth: 280 }}
             value={filter.suche}
             onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
           />
@@ -1311,6 +1316,7 @@ export default function KraefteuebersichtPage() {
               { wert: 'alles', label: 'alles' },
             ]}
           />
+          <SpaltenSchalter bezeichnung="Meldebild" spalten={spalten} {...spaltenSchalter} />
           {darfSchreiben && (
             <Button
               loading={uebernehmen.isPending}
@@ -1361,6 +1367,7 @@ export default function KraefteuebersichtPage() {
           bezeichnung="Meldebild"
           form="tabelle"
           spalten={spalten}
+          spaltenSchalterAussen={spaltenSchalter}
           daten={raster}
           zeilenSchluessel="key"
           ladend={einheitenQuery.isLoading}
