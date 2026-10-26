@@ -252,6 +252,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Berechtigung ist die eigene Empfängerzeile; das Modulrecht am Bezug prüft der Handler je
     // Eintrag (`benachrichtigung::aufloesung::Leserecht`).
     ("/api/einsaetze/{id}/benachrichtigungen", None),
+    // Vorgabe je Funktion (LLH-1421): Einstellung des Einsatzes, modul-los wie die übrigen
+    // Einstellungen.
+    ("/api/einsaetze/{id}/benachrichtigung-vorgaben", None),
     // Kopfdaten, Abschluss, Frist, Einstellungen, Modul-Overrides und Mitglieder
     // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
     // [`EINSATZ_WURZEL`].

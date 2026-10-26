@@ -2728,7 +2728,7 @@
       },
       "BenachrichtigungStufe": {
         "type": "string",
-        "description": "Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“; LLH-1143, Entscheidung zu LLH-1142\nE1: Alarm, Eingang, Still). Die Stufe einer Art ist fest ([`BenachrichtigungArt::stufe`]);\n*still* entsteht erst beim Empfänger, wenn er die Art abgeschaltet hat oder die Vorgabe\nseiner Rolle sie still stellt ([`aufloesung`]).",
+        "description": "Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“; LLH-1143, Entscheidung zu LLH-1142\nE1: Alarm, Eingang, Still). Die Stufe einer Art ist fest ([`BenachrichtigungArt::stufe`]);\n*still* entsteht erst beim Empfänger, wenn er die Art abgeschaltet hat oder die Vorgabe\ndes Einsatzes sie für jede seiner Funktionen still stellt ([`aufloesung`], [`vorgabe`]).",
         "enum": [
           "alarm",
           "hinweis",
@@ -2754,6 +2754,50 @@
             "type": "integer",
             "format": "int64",
             "description": "Ungelesene Eingänge (Stufe `hinweis`, unquittiert) unter `eintraege`; Alarme und Stilles\nzählen nie."
+          }
+        }
+      },
+      "BenachrichtigungVorgabeArt": {
+        "type": "object",
+        "description": "Die wirksame Vorgabe einer Art: für welche Funktionen sie still ist (Zeile oder Katalog).",
+        "required": [
+          "art",
+          "still"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/BenachrichtigungArt"
+          },
+          "still": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorgabeFunktion"
+            },
+            "description": "In der Reihenfolge von [`BenachrichtigungVorgaben::funktionen`]."
+          }
+        }
+      },
+      "BenachrichtigungVorgaben": {
+        "type": "object",
+        "description": "`GET /api/einsaetze/{id}/benachrichtigung-vorgaben` (design.md D4).",
+        "required": [
+          "funktionen",
+          "arten"
+        ],
+        "properties": {
+          "arten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenachrichtigungVorgabeArt"
+            },
+            "description": "Jede einstellbare Art in Katalogreihenfolge."
+          },
+          "funktionen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorgabeFunktionAnzeige"
+            },
+            "description": "Die Spalten in Katalogreihenfolge, `ohne` zuletzt; S7 nur, wenn die Organisation es\neingeschaltet hat."
           }
         }
       },
@@ -16673,6 +16717,57 @@
           "snap_anzeige": {
             "type": "string",
             "description": "Anzeigename zum Zeitpunkt des Speicherns, nie mit dem Namen einer besetzenden Person."
+          }
+        }
+      },
+      "VorgabeEingabe": {
+        "type": "object",
+        "description": "Body von `PUT …/benachrichtigung-vorgaben/{art}`.",
+        "required": [
+          "still"
+        ],
+        "properties": {
+          "still": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Die Funktionen, für die die Art still ist (Wire-Werte von `VorgabeFunktion`); alle\nübrigen bekommen sie als Eingang. Leer = für niemanden still."
+          }
+        },
+        "additionalProperties": false
+      },
+      "VorgabeFunktion": {
+        "type": "string",
+        "description": "Eine Spalte der Vorgabe (design.md D1): die Führungsfunktionen des Katalogs\n([`Fuehrungsfunktion`], gleiche Wire-Werte) und `ohne` für Mitglieder ohne Funktion. Die\nEinsatzrolle ist keine Spalte: sie regelt Rechte, nicht Zuständigkeit.",
+        "enum": [
+          "el",
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7",
+          "fuehrungshilfspersonal",
+          "fachberater",
+          "ohne"
+        ]
+      },
+      "VorgabeFunktionAnzeige": {
+        "type": "object",
+        "description": "Eine Spalte der Sektion mit ihrem Kurznamen.",
+        "required": [
+          "funktion",
+          "name"
+        ],
+        "properties": {
+          "funktion": {
+            "$ref": "#/components/schemas/VorgabeFunktion"
+          },
+          "name": {
+            "type": "string",
+            "description": "„EL“, „S2“, „Fachberater“, „ohne Funktion“."
           }
         }
       },

@@ -1053,7 +1053,7 @@ export interface components {
          * @description Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“; LLH-1143, Entscheidung zu LLH-1142
          *     E1: Alarm, Eingang, Still). Die Stufe einer Art ist fest ([`BenachrichtigungArt::stufe`]);
          *     *still* entsteht erst beim Empfänger, wenn er die Art abgeschaltet hat oder die Vorgabe
-         *     seiner Rolle sie still stellt ([`aufloesung`]).
+         *     des Einsatzes sie für jede seiner Funktionen still stellt ([`aufloesung`], [`vorgabe`]).
          * @enum {string}
          */
         BenachrichtigungStufe: "alarm" | "hinweis" | "still";
@@ -1073,6 +1073,22 @@ export interface components {
              *     zählen nie.
              */
             ungelesen: number;
+        };
+        /** @description Die wirksame Vorgabe einer Art: für welche Funktionen sie still ist (Zeile oder Katalog). */
+        BenachrichtigungVorgabeArt: {
+            art: components["schemas"]["BenachrichtigungArt"];
+            /** @description In der Reihenfolge von [`BenachrichtigungVorgaben::funktionen`]. */
+            still: components["schemas"]["VorgabeFunktion"][];
+        };
+        /** @description `GET /api/einsaetze/{id}/benachrichtigung-vorgaben` (design.md D4). */
+        BenachrichtigungVorgaben: {
+            /** @description Jede einstellbare Art in Katalogreihenfolge. */
+            arten: components["schemas"]["BenachrichtigungVorgabeArt"][];
+            /**
+             * @description Die Spalten in Katalogreihenfolge, `ohne` zuletzt; S7 nur, wenn die Organisation es
+             *     eingeschaltet hat.
+             */
+            funktionen: components["schemas"]["VorgabeFunktionAnzeige"][];
         };
         /** @description Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten. */
         BenutzerAnzeige: {
@@ -6648,6 +6664,27 @@ export interface components {
             quittiert_von_id?: number | null;
             /** @description Anzeigename zum Zeitpunkt des Speicherns, nie mit dem Namen einer besetzenden Person. */
             snap_anzeige: string;
+        };
+        /** @description Body von `PUT …/benachrichtigung-vorgaben/{art}`. */
+        VorgabeEingabe: {
+            /**
+             * @description Die Funktionen, für die die Art still ist (Wire-Werte von `VorgabeFunktion`); alle
+             *     übrigen bekommen sie als Eingang. Leer = für niemanden still.
+             */
+            still: string[];
+        };
+        /**
+         * @description Eine Spalte der Vorgabe (design.md D1): die Führungsfunktionen des Katalogs
+         *     ([`Fuehrungsfunktion`], gleiche Wire-Werte) und `ohne` für Mitglieder ohne Funktion. Die
+         *     Einsatzrolle ist keine Spalte: sie regelt Rechte, nicht Zuständigkeit.
+         * @enum {string}
+         */
+        VorgabeFunktion: "el" | "s1" | "s2" | "s3" | "s4" | "s5" | "s6" | "s7" | "fuehrungshilfspersonal" | "fachberater" | "ohne";
+        /** @description Eine Spalte der Sektion mit ihrem Kurznamen. */
+        VorgabeFunktionAnzeige: {
+            funktion: components["schemas"]["VorgabeFunktion"];
+            /** @description „EL“, „S2“, „Fachberater“, „ohne Funktion“. */
+            name: string;
         };
         /**
          * @description Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den

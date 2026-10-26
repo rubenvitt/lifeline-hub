@@ -1319,6 +1319,26 @@ fn org_live_event_wire() {
     } in lifeline_hub::live::org::OrgLiveEvent::ALLE);
 }
 
+/// Spalten der Vorgabe je Funktion (LLH-1421): die Führungsfunktionen mit ihren Wire-Werten und
+/// `ohne`. Dass es genau der Katalog ist, pinnt
+/// `benachrichtigung::vorgabe::tests::spalten_sind_der_funktionskatalog_und_ohne`.
+#[test]
+fn benachrichtigung_vorgabe_funktion_wire() {
+    enum_wire!(lifeline_hub::benachrichtigung::vorgabe::VorgabeFunktion {
+        El => "el",
+        S1 => "s1",
+        S2 => "s2",
+        S3 => "s3",
+        S4 => "s4",
+        S5 => "s5",
+        S6 => "s6",
+        S7 => "s7",
+        Fuehrungshilfspersonal => "fuehrungshilfspersonal",
+        Fachberater => "fachberater",
+        Ohne => "ohne",
+    } in lifeline_hub::benachrichtigung::vorgabe::VorgabeFunktion::ALLE);
+}
+
 /// Benachrichtigungen (LLH-1207): Katalog, Stufe und Bezug. Die CHECK-Listen der Migration
 /// pinnt `benachrichtigung::tests::check_listen_entsprechen_dem_katalog`.
 #[test]

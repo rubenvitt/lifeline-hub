@@ -11,9 +11,14 @@
 //! 4. Danach entfallen: der Auslöser, Gerätekonten, inaktive Konten, wer den Einsatz nicht lesen
 //!    darf und wer das Modul des Bezugs nicht lesen darf. Wer bei Stufe Hinweis die Art
 //!    abgeschaltet hat (D6), bekommt sie still: nur im Verlauf (LLH-1143, design.md D2).
+//! 5. Ebenso still wird sie, wenn die Vorgabe des Einsatzes ([`super::vorgabe`], LLH-1421,
+//!    design.md D3) sie für JEDE Funktion des Empfängers still stellt: lauter gewinnt. Seine
+//!    Funktionen sind die Stab-Besetzung (wie 1.) und die Funktion seiner Mitgliedschaft; hat er
+//!    keine, zählt er als „ohne Funktion“.
 //!
 //! Dieselbe Rechteprüfung ([`Leserecht`]) gilt erneut beim Lesen einer Benachrichtigung.
 
+use super::vorgabe::{self, VorgabeFunktion};
 use super::{Adressat, Anlass, BenachrichtigungArt, BenachrichtigungStufe};
 use crate::auth::Benutzer;
 use crate::einsatz::berechtigung::{darf_lesen, lade_modul_regeln, modul_freigabe};
@@ -27,8 +32,9 @@ use sqlx::SqlitePool;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// Ergebnis der Auflösung: die Organisation des Einsatzes (für den Org-Kanal), die Empfänger,
-/// die benachrichtigt werden, und die, für die die Benachrichtigung still ist (Art abgeschaltet;
-/// LLH-1143, design.md D2), je aufsteigend und disjunkt.
+/// die benachrichtigt werden, und die, für die die Benachrichtigung still ist (Art abgeschaltet,
+/// LLH-1143, design.md D2; oder still per Vorgabe des Einsatzes, LLH-1421), je aufsteigend und
+/// disjunkt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Aufgeloest {
     pub org_id: i64,
@@ -154,7 +160,9 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
     let kandidaten: Vec<i64> = wege.keys().copied().collect();
     let benutzer = personen_konten(pool, &kandidaten).await?;
     let abgeschaltet = if anlass.art.stufe() == BenachrichtigungStufe::Hinweis {
-        abgeschaltet_fuer(pool, &kandidaten, anlass.art).await?
+        let mut still = abgeschaltet_fuer(pool, &kandidaten, anlass.art).await?;
+        still.extend(still_per_vorgabe(pool, einsatz_id, anlass.art, &kandidaten).await?);
+        still
     } else {
         BTreeSet::new()
     };
@@ -241,6 +249,79 @@ async fn besetzung_nutzer(
         .await?),
         _ => Ok(Vec::new()),
     }
+}
+
+/// Wer von `ids` die Art nach der Vorgabe des Einsatzes still bekommt (LLH-1421, design.md D3):
+/// jede seiner Funktionen ist für die Art still. Hat er eine Funktion, für die sie Eingang ist,
+/// bekommt er sie als Eingang; lieber ein Eingang zu viel als ein verlorener.
+async fn still_per_vorgabe(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    ids: &[i64],
+) -> Result<BTreeSet<i64>, AppError> {
+    let still = vorgabe::still_fuer(pool, einsatz_id, art).await?;
+    if still.is_empty() {
+        return Ok(BTreeSet::new());
+    }
+    let funktionen = funktionen_der_nutzer(pool, einsatz_id).await?;
+    Ok(ids
+        .iter()
+        .copied()
+        .filter(|id| match funktionen.get(id) {
+            Some(fs) if !fs.is_empty() => fs.iter().all(|f| still.contains(f)),
+            _ => still.contains(&VorgabeFunktion::Ohne),
+        })
+        .collect())
+}
+
+/// Die Funktionen der Nutzer im Einsatz (LLH-1421, design.md D1): Stab-Besetzung (EL über die
+/// Führungsstelle, S1–S6 über `einsatz_stabsfunktion`, ein Sachgebiet „bei der Einsatzleitung“
+/// zählt für den Einsatzleiter) und die Funktion der Mitgliedschaft. Wer fehlt, hat keine.
+async fn funktionen_der_nutzer(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, BTreeSet<VorgabeFunktion>>, AppError> {
+    let mut aus: HashMap<i64, BTreeSet<VorgabeFunktion>> = HashMap::new();
+    let einsatzleiter = besetzung_nutzer(pool, einsatz_id, Fuehrungsfunktion::El).await?;
+    for id in &einsatzleiter {
+        aus.entry(*id).or_default().insert(VorgabeFunktion::El);
+    }
+    let stab = sqlx::query_as::<_, (String, String, Option<i64>)>(
+        "SELECT s.sachgebiet, s.besetzung_art, p.benutzer_id FROM einsatz_stabsfunktion s \
+         LEFT JOIN einsatz_personal ep ON ep.id = s.personal_id \
+         LEFT JOIN personal p ON p.id = ep.personal_id \
+         WHERE s.einsatz_id = ?",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    for (sachgebiet, besetzung, benutzer) in stab {
+        let Some(f) = Fuehrungsfunktion::parse(&sachgebiet).map(VorgabeFunktion::aus) else {
+            continue;
+        };
+        let nutzer: Vec<i64> = match (besetzung.as_str(), benutzer) {
+            ("einsatzleitung", _) => einsatzleiter.clone(),
+            ("personal", Some(id)) => vec![id],
+            _ => Vec::new(),
+        };
+        for id in nutzer {
+            aus.entry(id).or_default().insert(f);
+        }
+    }
+    let mitglieder = sqlx::query_as::<_, (i64, String)>(
+        "SELECT benutzer_id, fuehrungsfunktion FROM einsatz_mitgliedschaft \
+         WHERE einsatz_id = ? AND fuehrungsfunktion IS NOT NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    for (id, funktion) in mitglieder {
+        if let Some(f) = Fuehrungsfunktion::parse(&funktion) {
+            aus.entry(id).or_default().insert(VorgabeFunktion::aus(f));
+        }
+    }
+    Ok(aus)
 }
 
 /// Der mit einem Einsatzpersonal verknüpfte Nutzer; fremder Einsatz oder ohne Verknüpfung: keiner.

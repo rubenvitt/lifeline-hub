@@ -2847,6 +2847,22 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("quittiert_at", G_ZEIT),
         ],
     },
+    // Vorgabe je Funktion (LLH-1421, design.md D2): Einsatz-Konfiguration, keine Person; fällt mit
+    // dem Einsatz (CASCADE).
+    TabellenRegel {
+        tabelle: "benachrichtigung_vorgabe",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_KONFIG),
+            retain("funktion", G_KONFIG),
+            retain("stufe", G_KONFIG),
+            retain("geaendert_at", G_ZEIT),
+            retain("geaendert_von", G_FK),
+        ],
+    },
     TabellenRegel {
         // Nur Gerätesitzungen sind einsatz-scoped (kopplung_id gesetzt); Personensitzungen nicht.
         tabelle: "session",

@@ -285,23 +285,22 @@ async fn text_nennt_art_und_version_ohne_dokumenttitel() {
         let id = w.entwurf(&w.admin, art, json!([funktion("s3")])).await;
         let (s, _) = w.freigeben(&w.admin, art, id).await;
         assert_eq!(s, StatusCode::OK);
-        let (s, offen) = anfrage(
-            &w.app,
-            "GET",
-            "/api/benachrichtigungen?offen=true",
-            &anna,
-            None,
-        )
-        .await;
+        // Ohne `offen`: den Lagebericht stellt der Katalog still (LLH-1421), er ist schon gelesen.
+        let (s, offen) = anfrage(&w.app, "GET", "/api/benachrichtigungen", &anna, None).await;
         assert_eq!(s, StatusCode::OK, "{offen}");
         let eintrag = offen
             .as_array()
             .unwrap()
             .iter()
             .find(|b| b["art"] == art.art)
-            .unwrap_or_else(|| panic!("{}: keine offene Benachrichtigung in {offen}", art.art))
+            .unwrap_or_else(|| panic!("{}: keine Benachrichtigung in {offen}", art.art))
             .clone();
-        assert_eq!(eintrag["stufe"], "hinweis");
+        let stufe = if art.art == "lagebericht" {
+            "still"
+        } else {
+            "hinweis"
+        };
+        assert_eq!(eintrag["stufe"], stufe);
         assert_eq!(eintrag["bezug_typ"], art.art);
         assert_eq!(eintrag["bezug_id"], id);
         assert_eq!(eintrag["titel"], art.titel);
