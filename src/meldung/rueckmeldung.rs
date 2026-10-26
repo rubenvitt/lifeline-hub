@@ -141,10 +141,11 @@ async fn melden_fuer(
     }
     let frist = frist_min(pool, einsatz_id, org_id).await?;
     // Die schon gemeldeten Überfälligkeiten in einem Zug: ein Takt ohne neue Überfälligkeit
-    // schreibt nichts.
+    // schreibt nichts. Aufgelöste Einheiten stehen nicht in `letzte`.
     let gemeldet: HashMap<i64, i64> = sqlx::query_as::<_, (i64, i64)>(
         "SELECT id, rueckmeldung_ueberfaellig_meldung_id FROM einsatz_einheit \
-         WHERE einsatz_id = ? AND rueckmeldung_ueberfaellig_meldung_id IS NOT NULL",
+         WHERE einsatz_id = ? AND aufgeloest_at IS NULL \
+           AND rueckmeldung_ueberfaellig_meldung_id IS NOT NULL",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
