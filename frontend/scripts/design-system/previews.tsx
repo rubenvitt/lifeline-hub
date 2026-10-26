@@ -640,7 +640,12 @@ const VERLETZUNGEN: Verletzung[] = (
 function KoerperschemaBeispiel() {
   return (
     <AnzeigeKonventionenProvider konventionen={KONVENTIONEN_TAKTISCH}>
-      <Koerperschema einsatzId={1} verletzungen={VERLETZUNGEN} geschlecht="m" modus="lesen" />
+      <Koerperschema
+        einsatzId={1}
+        verletzungen={VERLETZUNGEN}
+        geschlecht="maennlich"
+        modus="lesen"
+      />
     </AnzeigeKonventionenProvider>
   );
 }
