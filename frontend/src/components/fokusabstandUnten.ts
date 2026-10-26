@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { entferneUntereLeiste, meldeUntereLeiste } from './untereLeiste';
 
 /**
  * Fokusabstand zu einer am Seitenfuß angepinnten Leiste (WCAG 2.4.11 „Focus Not Obscured"):
@@ -20,6 +21,10 @@ import { useCallback } from 'react';
  *
  * Die Höhe wird GEMESSEN und folgt per ResizeObserver: Dichtestufe und Umbruch verändern sie
  * um mehr als das Doppelte, ein Festwert wäre in einer der Stufen daneben.
+ *
+ * Dieselbe Messung meldet die Leiste an `components/untereLeiste.ts` (LLH-1424): dort liest das
+ * Eingangsband ihre Lage und rückt darüber. Eine neue Fußleiste, die hier misst, ist damit auch
+ * dort angeschlossen.
  */
 export const FOKUSABSTAND_BEFEHL = '--lfh-befehl-fokusabstand';
 export const FOKUSABSTAND_ETB = '--lfh-etb-fokusabstand';
@@ -46,11 +51,15 @@ export function beobachteFussleiste(
   const aktualisiere = () =>
     wurzel.style.setProperty(variable, `${leiste.getBoundingClientRect().height + abstand}px`);
   aktualisiere();
+  // Dieselbe Leiste meldet sich als untere Leiste, der das Eingangsband ausweicht (LLH-1424,
+  // `components/untereLeiste.ts`).
+  meldeUntereLeiste(leiste);
   const beobachter = new ResizeObserver(aktualisiere);
   beobachter.observe(leiste);
   return () => {
     beobachter.disconnect();
     wurzel.style.removeProperty(variable);
+    entferneUntereLeiste(leiste);
   };
 }
 

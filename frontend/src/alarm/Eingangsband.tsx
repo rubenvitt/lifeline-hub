@@ -1,6 +1,7 @@
 import { Button, theme } from 'antd';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useBandAbstand } from '../components/untereLeiste';
 import { useViewport } from '../components/useViewport';
 import { IconKreuz } from '../icons';
 
@@ -13,7 +14,17 @@ import { IconKreuz } from '../icons';
  *
  * Als Portal an `document.body`: der Kopf, in dem die Zentrale montiert ist, vererbte sonst seine
  * Zeilenhöhe und Farben.
+ *
+ * **Es weicht unteren Leisten aus** (LLH-1424): schnitte es eine angemeldete Fußleiste
+ * (ETB-Erfassung, Aktionsleiste des Befehlsentwurfs, Speicherleiste …), steht es über deren
+ * Oberkante (`components/untereLeiste.ts`), schmal wie breit. Vorher lag es über „Erfassen“ und
+ * „Freigeben“, bis man es schloss. Nachweis `e2e/eingangsband-ausweichen.spec.ts`.
  */
+export function bandUnten(rand: number, abstand: number) {
+  // Am Rand gilt weiter die sichere Fläche; über einer Leiste ist sie in deren Lage schon drin.
+  return `max(${abstand}px, calc(${rand}px + env(safe-area-inset-bottom, 0px)))`;
+}
+
 export default function Eingangsband({
   titel,
   children,
@@ -28,15 +39,19 @@ export default function Eingangsband({
   const { token } = theme.useToken();
   const { istSchmal } = useViewport();
   const rand = token.margin;
+  const ref = useRef<HTMLElement>(null);
+  const abstand = useBandAbstand(ref, rand);
   return createPortal(
     <section
+      ref={ref}
       aria-label="Neue Eingänge"
       data-lfh="eingangsband"
+      data-abstand-unten={abstand}
       style={{
         position: 'fixed',
         insetInlineEnd: rand,
         insetInlineStart: istSchmal ? rand : 'auto',
-        bottom: `calc(${rand}px + env(safe-area-inset-bottom, 0px))`,
+        bottom: bandUnten(rand, abstand),
         width: istSchmal ? 'auto' : `min(400px, calc(100vw - ${2 * rand}px))`,
         // Unter Dialogen und Klappflächen (`zIndexPopupBase` 1000), über dem Inhalt.
         zIndex: token.zIndexPopupBase - 1,
