@@ -232,7 +232,10 @@ fn pfade_folgen_den_deeplinks() {
     assert_eq!(p(B::Befehl, 5), "/einsaetze/7/auftraege/befehle/5");
     assert_eq!(p(B::Lagebericht, 6), "/einsaetze/7/lageberichte/6");
     // Eine fällige Erinnerung springt zu ihrer Karte (LLH-1467).
-    assert_eq!(p(B::Erinnerung, 9), "/einsaetze/7/erinnerungen?erinnerung=9");
+    assert_eq!(
+        p(B::Erinnerung, 9),
+        "/einsaetze/7/erinnerungen?erinnerung=9"
+    );
     assert_eq!(
         p(B::Gefahrengebiet, 8),
         "/einsaetze/7/lagekarte?gefahrengebiet=8"
