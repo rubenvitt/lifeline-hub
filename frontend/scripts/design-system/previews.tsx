@@ -493,10 +493,7 @@ const ORT_VORSCHAU: OrtVorschau = {
 function OrtsfeldBeispiel() {
   const [client] = useState(() =>
     stillerQueryClient([
-      [
-        einsatzKeys.ortVorschau(1, ORT_PUNKT.lat, ORT_PUNKT.lon, 'schaden:7'),
-        ORT_VORSCHAU,
-      ],
+      [einsatzKeys.ortVorschau(1, ORT_PUNKT.lat, ORT_PUNKT.lon, 'schaden:7'), ORT_VORSCHAU],
     ]),
   );
   const name = useId();
@@ -670,7 +667,11 @@ const SCHAEDEN: Quelle[] = [
 
 /** Ein gemerkter Stand: nach Ort sortiert, Ausmaß „Groß“ gefiltert. */
 const SCHAEDEN_GEDAECHTNIS: ListenGedaechtnis = {
-  start: { sortierung: { spalte: 'ort', richtung: 'auf' }, filter: { ausmass: ['gross'] }, suche: '' },
+  start: {
+    sortierung: { spalte: 'ort', richtung: 'auf' },
+    filter: { ausmass: ['gross'] },
+    suche: '',
+  },
   spaltenStart: null,
   melde: nichts,
   meldeSpalten: nichts,
