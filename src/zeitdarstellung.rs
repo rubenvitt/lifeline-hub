@@ -10,7 +10,7 @@
 //!
 //! Das Gegenstück im Client ist `frontend/src/anzeige/zeitDarstellung.ts`; beide schreiben die
 //! Rolle „Zeitpunkt“ gleich (`101430okt26` bzw. `10.10.26 14:30`) und die Rolle „Uhrzeit“
-//! (`1430` bzw. `14:30`). Die Rolle „kurz“ gibt es hier nicht: ein gespeicherter Text weiß nicht,
+//! (`1430` bzw. `14:30`, auch für eine Wanduhrzeit ohne Datum: [`wanduhrzeit`]). Die Rolle „kurz“ gibt es hier nicht: ein gespeicherter Text weiß nicht,
 //! an welchem Tag er gelesen wird.
 
 use chrono::{DateTime, Datelike, Utc};
@@ -19,6 +19,7 @@ use sqlx::{Executor, Sqlite};
 
 use crate::einsatz::nummer::ZEITZONE_VORGABE;
 use crate::error::AppError;
+use crate::uhrzeit::Uhrzeit;
 
 pub use crate::einsatz::einstellungen::Zeitdarstellung;
 
@@ -91,6 +92,16 @@ where
         wirksame_zone(zone_einsatz.as_deref(), zone_org.as_deref()),
         wirksame_darstellung(darstellung_einsatz.as_deref(), darstellung_org.as_deref()),
     ))
+}
+
+/// Rolle „Uhrzeit“ für eine Wanduhrzeit ohne Datum (Wechselzeit eines Schichtmodells,
+/// LLH-1469): `0600` bzw. `06:00`. Sie ist kein Zeitpunkt (`src/uhrzeit.rs`) und braucht daher
+/// keine Zone, nur die Darstellung.
+pub fn wanduhrzeit(darstellung: Zeitdarstellung, u: Uhrzeit) -> String {
+    match darstellung {
+        Zeitdarstellung::Taktisch => format!("{:02}{:02}", u.stunde(), u.minute()),
+        Zeitdarstellung::DatumUhrzeit => format!("{:02}:{:02}", u.stunde(), u.minute()),
+    }
 }
 
 /// Zone und Darstellung, in denen ein Servertext Zeitpunkte nennt.
@@ -170,6 +181,22 @@ mod tests {
         assert_eq!(DATUM.zeitpunkt(t), "10.10.26 14:30");
         assert_eq!(TAKTISCH.uhrzeit(t), "1430");
         assert_eq!(DATUM.uhrzeit(t), "14:30");
+    }
+
+    /// LLH-1469: eine Wanduhrzeit ohne Datum in beiden Darstellungen, ohne Zone.
+    #[test]
+    fn wanduhrzeit_in_beiden_darstellungen() {
+        let u = |s| Uhrzeit::parse("t", s).unwrap();
+        assert_eq!(wanduhrzeit(Zeitdarstellung::Taktisch, u("06:00")), "0600");
+        assert_eq!(
+            wanduhrzeit(Zeitdarstellung::DatumUhrzeit, u("06:00")),
+            "06:00"
+        );
+        assert_eq!(wanduhrzeit(Zeitdarstellung::Taktisch, u("23:59")), "2359");
+        assert_eq!(
+            wanduhrzeit(Zeitdarstellung::DatumUhrzeit, u("0005")),
+            "00:05"
+        );
     }
 
     /// Spec „Monatswechsel“ und „Jahreswechsel“: die Zone entscheidet über Tag, Monat und Jahr.
