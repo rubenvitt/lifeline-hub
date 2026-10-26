@@ -2,22 +2,7 @@
 titel: Erinnerungen
 gruppen: [fuehrung]
 reihenfolge: 130
-quellen:
-  [
-    frontend/src/pages/ErinnerungenPage.tsx,
-    frontend/src/erinnerung/ErinnerungFormular.tsx,
-    frontend/src/erinnerung/ErinnerungKarte.tsx,
-    frontend/src/etb/WiedervorlageModal.tsx,
-    frontend/src/kommunikation/gruppierung.ts,
-    frontend/src/kommunikation/rueckgaengig.tsx,
-    frontend/src/einsatz/AlarmZentrale.tsx,
-    src/routes/erinnerung.rs,
-    src/erinnerung/repo.rs,
-    src/erinnerung/scheduler.rs,
-    src/erinnerung/faelligkeit.rs,
-    src/erinnerung/mod.rs,
-    src/erinnerung/benachrichtigung.rs,
-  ]
+quellen: [frontend/src/pages/ErinnerungenPage.tsx, frontend/src/erinnerung/ErinnerungFormular.tsx, frontend/src/erinnerung/ErinnerungKarte.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, src/routes/erinnerung.rs, src/erinnerung/repo.rs, src/erinnerung/scheduler.rs, src/erinnerung/faelligkeit.rs, src/erinnerung/mod.rs, src/erinnerung/benachrichtigung.rs]
 ---
 
 ## Überblick
