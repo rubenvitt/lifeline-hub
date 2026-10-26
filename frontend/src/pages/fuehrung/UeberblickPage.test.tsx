@@ -1313,6 +1313,85 @@ describe('UeberblickPage', () => {
     expect(vorgaenge().querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
   });
 
+  /*
+   * LLH-1430: laden die Listen der „Offenen Vorgänge“, hält jeder Abschnitt so viele Zeilen, wie
+   * der Modulzähler Einträge erwarten lässt (höchstens drei). Erinnerungen kennen nur die fälligen,
+   * Ablösungen keinen Serverzähler; „meine Stelle“ zählt der Zähler nicht. Die Seiten-CLS misst
+   * `e2e/ueberblick-vorgaenge-cls.spec.ts`.
+   */
+  describe('Offene Vorgänge · Ladezustand hält den Platz der erwarteten Einträge (LLH-1430)', () => {
+    const haengt = async () => {
+      await delay('infinite');
+      return HttpResponse.json([]);
+    };
+    const listenHaengen = () =>
+      stelleBereit(
+        {
+          ...volleDaten,
+          zaehler: {
+            auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 0 },
+            meldungen: { offen: 5, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+            nachforderungen: {
+              offen: 0,
+              angefordert: 0,
+              zugesagt: 0,
+              unterwegs: 0,
+              ueberfaellig: 0,
+            },
+            erinnerungen: { faellig: 1 },
+            lagemeldungen: { neu: 0 },
+          },
+        },
+        [
+          http.get('/api/einsaetze/1/meldungen', haengt),
+          http.get('/api/einsaetze/1/auftraege', haengt),
+          http.get('/api/einsaetze/1/nachforderungen', haengt),
+          http.get('/api/einsaetze/1/erinnerungen', haengt),
+          http.get('/api/einsaetze/1/abloesungen', haengt),
+        ],
+      );
+    const platzhalter = (name: string) =>
+      abschnitt(name).querySelectorAll('[data-lfh="abschnitt-platzhalter"]').length;
+
+    it('„alle“: Zeilen nach dem Zähler, 0 und unbekannt bleiben eine Zeile', async () => {
+      listenHaengen();
+      rendern();
+      await waitFor(() => vorgaenge());
+      // Der Zähler steht, die Listen laden noch.
+      await waitFor(() => expect(abschnittZahl('Aufträge')).toHaveTextContent(/^2$/));
+      for (const name of [
+        'Meldungen',
+        'Aufträge',
+        'Nachforderungen',
+        'Erinnerungen',
+        'Ablösungen',
+      ]) {
+        expect(abschnitt(name).querySelector('[aria-busy="true"]')).not.toBeNull();
+      }
+      expect(platzhalter('Meldungen')).toBe(3);
+      expect(platzhalter('Aufträge')).toBe(2);
+      expect(platzhalter('Nachforderungen')).toBe(0);
+      expect(platzhalter('Erinnerungen')).toBe(1);
+      expect(platzhalter('Ablösungen')).toBe(0);
+      expect(within(abschnitt('Nachforderungen')).getByText('wird abgerufen')).toBeInTheDocument();
+    });
+
+    it('„meine Stelle“: der Zähler zählt die Stelle nicht, also eine Zeile', async () => {
+      listenHaengen();
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/ueberblick" element={<UeberblickPage />} />
+        </Routes>,
+        { route: '/einsaetze/1/ueberblick?vorgaenge=meine' },
+      );
+      await waitFor(() => vorgaenge());
+      await waitFor(() => expect(abschnittZahl('Aufträge')).toHaveTextContent(/^2/));
+      for (const name of ['Meldungen', 'Aufträge', 'Erinnerungen']) {
+        expect(platzhalter(name)).toBe(0);
+      }
+    });
+  });
+
   it('Körper erst mit dem Einsatz: davor weder Band noch Paneele noch Rechtehinweis (LFH-629)', async () => {
     let freigeben!: () => void;
     const tor = new Promise<void>((f) => (freigeben = f));
@@ -1334,6 +1413,42 @@ describe('UeberblickPage', () => {
     // Mit dem Einsatz kommen Hinweis und Körper im selben Zug.
     expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(await bandDa()).toBeInTheDocument();
+  });
+
+  it('Körper erst mit dem Modulzähler: die Platzhalter der Vorgänge kennen ihre Zahl (LLH-1430)', async () => {
+    let freigeben!: () => void;
+    const tor = new Promise<void>((f) => (freigeben = f));
+    stelleBereit(leereDaten, [
+      http.get('/api/einsaetze/1/modul-zaehler', async () => {
+        await tor;
+        return HttpResponse.json({
+          auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
+          meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+        });
+      }),
+    ]);
+    rendern();
+    expect(await screen.findByRole('heading', { name: 'Überblick' })).toBeInTheDocument();
+    // Der Einsatz ist da (Ortspfad mit Namen), der Zähler nicht: der Inhalt bleibt leer.
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent(
+        einsatz.bezeichnung,
+      ),
+    );
+    expect(document.querySelector('[data-lfh="seiten-inhalt"]')).toBeEmptyDOMElement();
+    act(() => freigeben());
+    expect(await bandDa()).toBeInTheDocument();
+  });
+
+  it('ein gescheiterter Modulzähler hält den Körper nicht auf', async () => {
+    stelleBereit(leereDaten, [
+      http.get('/api/einsaetze/1/modul-zaehler', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    rendern();
+    expect(await bandDa()).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Offene Vorgänge' })).toBeInTheDocument();
   });
 
   /**
