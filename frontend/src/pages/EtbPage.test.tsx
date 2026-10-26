@@ -456,7 +456,11 @@ describe('EtbPage', () => {
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent('412 Einträge'),
     );
-    expect(document.querySelector('[data-lfh="seitenkopf"]')).not.toHaveTextContent('101');
+    // Nur die Zahl vor „Einträge“: der Kopf trägt auch den Stand („Stand 2101“), der um 21:01 die
+    // Ziffern 101 enthält.
+    expect(document.querySelector('[data-lfh="seitenkopf"]')).not.toHaveTextContent(
+      /\b101 Einträge/,
+    );
   });
 
   it('räumt ?eintrag= ohne Highlight, wenn der Eintrag nicht existiert (Pagination erschöpft, kein Endlos-Fetch)', async () => {
