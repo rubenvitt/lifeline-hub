@@ -143,4 +143,12 @@ describe('api/verpflegung — Verpflegungsstellen (LLH-1040)', () => {
     expect(a[0].body).toEqual({ verpflegungsart: null, stelle_ids: [] });
     expect(a[1].body).toEqual({ menge: 40, verpflegungsstelle_id: 4 });
   });
+
+  it('Zeitfenster ändern trägt die Basis nur, wenn es eine gibt (LLH-1414)', async () => {
+    const a = faengeAnfragen();
+    await aendereZeitfenster(7, 5, { bedarf_kraefte: 200 }, '2026-09-24 08:15:00');
+    await aendereZeitfenster(7, 5, { bedarf_kraefte: 200 });
+    expect(a[0].body).toEqual({ bedarf_kraefte: 200, basis_geaendert_at: '2026-09-24 08:15:00' });
+    expect(a[1].body).toEqual({ bedarf_kraefte: 200 });
+  });
 });
