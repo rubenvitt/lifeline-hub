@@ -95,7 +95,7 @@ export function bandAbstand({
 
 /**
  * Hook des Bands: misst Band und angemeldete Leisten und liefert {@link bandAbstand}. Neu
- * gerechnet bei Rollen, Fenstergröße, Größenänderung von Band, Leisten oder Seite (die Lage einer
+ * gerechnet bei Rollen (auch in inneren Rollbereichen), Fenstergröße, Größenänderung von Band, Leisten oder Seite (die Lage einer
  * Leiste ändert sich, wenn Inhalt darüber wächst), höchstens einmal je Bild.
  */
 export function useBandAbstand(band: RefObject<HTMLElement | null>, rand: number) {
@@ -127,12 +127,13 @@ export function useBandAbstand(band: RefObject<HTMLElement | null>, rand: number
     beobachter.observe(el);
     beobachter.observe(document.body);
     for (const l of angemeldet) beobachter.observe(l);
-    window.addEventListener('scroll', vormerken, { passive: true });
+    // Im Einfangen: auch ein innerer Rollbereich (Inhalt des Rahmens) verschiebt eine Leiste.
+    document.addEventListener('scroll', vormerken, { capture: true, passive: true });
     window.addEventListener('resize', vormerken);
     return () => {
       if (bild !== 0) cancelAnimationFrame(bild);
       beobachter.disconnect();
-      window.removeEventListener('scroll', vormerken);
+      document.removeEventListener('scroll', vormerken, { capture: true });
       window.removeEventListener('resize', vormerken);
     };
   }, [band, rand, angemeldet]);
