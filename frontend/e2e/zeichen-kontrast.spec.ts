@@ -1,24 +1,32 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { einsatzAnlegen } from './fernmeldeskizze-kern';
 import { FUEKW, anmelden, post } from './fuehrungsorganisation-kern';
+import {
+  hinterlegteZeichen,
+  messzeile,
+  mitHinterlegung,
+  unterDrei,
+  zeichenKontraste,
+} from './zeichen-kontrast-kern';
 
 /**
- * Zeichenkontrast in Meldebild und Organigramm (LFH-1120): jedes taktische Zeichen hält am Schirm
- * in beiden Modi 3 : 1 gegen seinen Grund, im Druck steht es ohne Unterlage auf dem Papier.
- * Muster: „Zeichenkontrast“ der Fernmeldeskizze (`fernmeldeskizze-ausstattung.spec.ts`), dort im
- * SVG, hier in HTML. jsdom rechnet keine Farben und kennt kein `@media print`. Der Einsatz entsteht
- * über die API: der Test prüft den Anlegedialog nicht (`e2e/AGENTS.md`, LFH-1114).
+ * Zeichenkontrast in Meldebild und Organigramm (LFH-1120, LLH-1409): jedes taktische Zeichen hält
+ * am Schirm in beiden Modi 3 : 1. Nachts zeichnet die Bibliothek es mit dem Render-Theme `dark`
+ * selbst hell (`zeichen/zeichenTheme.ts`): die Kontur hält gegen ihre Hinterlegung, die
+ * Hinterlegung gegen den Grund, ein helles Quadrat dahinter gibt es nicht. Am Tag und im Druck
+ * bleibt die Referenzpalette. Messkern: `zeichen-kontrast-kern.ts`, geteilt mit „Zeichenkontrast“
+ * der Fernmeldeskizze. jsdom rechnet keine Farben. Der Einsatz entsteht über die API: der Test
+ * prüft den Anlegedialog nicht (`e2e/AGENTS.md`, LFH-1114).
  *
- * Mutationsprobe: ohne `unterlage` an `EinheitZeichen` bzw. im Organigramm hält der schwarze
- * Umriss eines Zeichens ohne Organisation im Nachtbetrieb 1,10 : 1, der Test wird rot (mit
- * Unterlage 21 : 1 in beiden Modi). Den Druck trägt keine eigene Regel des Zeichens, sondern
- * `druck/druck.css` (kein Hintergrund in der Druckwurzel); die Druckprobe belegt, dass beide
- * Seiten darunter fallen.
+ * Mutationsprobe: ohne Theme an `EinheitZeichen` bzw. im Organigramm hält der schwarze Umriss
+ * eines Zeichens ohne Organisation im Nachtbetrieb 1,10 : 1, und die Vorbedingung „hinterlegt“
+ * fällt, der Test wird rot. Bleibt das Theme im Druck stehen (ohne `useDruckModus` in
+ * `useZeichenTheme`), wird die Druckprobe rot.
  */
 
 /**
  * Ein Abschnitt mit zwei Einheiten: eine ohne Organisation (der schwarze Umriss, um den es geht)
- * und eine der Feuerwehr (Farbe nach DV 102 auf der Unterlage).
+ * und eine der Feuerwehr (Farbe nach DV 102).
  */
 async function seede(page: Page, einsatzId: string) {
   const abschnitt = await post(page, einsatzId, 'abschnitte', { name: 'Deich Nord' });
@@ -37,88 +45,19 @@ async function seede(page: Page, einsatzId: string) {
 }
 
 /**
- * Je Zeichen der schwächste Umriss gegen den Grund, auf dem es steht. Umriss sind alle Striche
- * des Zeichens (`stroke`), Füllungen und Schrift im Körper stehen auf dem Körper und zählen nicht.
- * Grund ist der Hintergrund des Zeichens selbst (die Unterlage), darunter die Hintergründe der
- * Vorfahren bis zur ersten opaken Fläche. Deckkraft und Verläufe sind nicht modelliert und ein
- * Fehler.
+ * Im Druck steht jedes Zeichen ohne Theme und ohne eigenen Hintergrund auf dem Papier. Der Druck
+ * schaltet über `beforeprint` um (`useDruckModus`), wie Strg+P und der Druckknopf.
  */
-async function zeichenUmrisse(zeichen: Locator) {
-  await expect(zeichen.first()).toBeVisible();
-  // Eingeschwungen messen (`e2e/AGENTS.md`, „Kontrast misst eingeschwungen“): ein abklingender
-  // Zeilen-Hover ergäbe sonst einen Zwischenwert.
-  await zeichen.first().evaluate(() =>
-    Promise.all(
-      document
-        .getAnimations()
-        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
-        .map((a) => a.finished.catch(() => undefined)),
-    ),
-  );
-  return zeichen.evaluateAll((alle) => {
-    type F = [number, number, number, number];
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 1;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-    function farbe(css: string): F {
-      if (!CSS.supports('color', css)) throw new Error(`Nicht auflösbare Farbe: ${css}`);
-      ctx.clearRect(0, 0, 1, 1);
-      ctx.fillStyle = css;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-      return [r, g, b, a / 255];
-    }
-    function darueber(vorne: F, hinten: F): F {
-      const a = vorne[3] + hinten[3] * (1 - vorne[3]);
-      if (a === 0) return [0, 0, 0, 0];
-      return [0, 1, 2]
-        .map((i) => (vorne[i] * vorne[3] + hinten[i] * hinten[3] * (1 - vorne[3])) / a)
-        .concat(a) as F;
-    }
-    function luminanz(f: F) {
-      const l = f.slice(0, 3).map((n) => {
-        const s = n / 255;
-        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      });
-      return l[0] * 0.2126 + l[1] * 0.7152 + l[2] * 0.0722;
-    }
-    const verhaeltnis = (a: F, b: F) => {
-      const [x, y] = [luminanz(a), luminanz(b)].sort((p, q) => p - q);
-      return (y + 0.05) / (x + 0.05);
-    };
-    return alle.map((svg) => {
-      const lagen: F[] = [];
-      for (let e: Element | null = svg; e; e = e.parentElement) {
-        const stil = getComputedStyle(e);
-        if (stil.backgroundImage !== 'none' || Number(stil.opacity) !== 1)
-          throw new Error(`Nicht unterstützte Komposition an ${e.tagName}`);
-        const f = farbe(stil.backgroundColor);
-        lagen.push(f);
-        if (f[3] === 1) break;
-      }
-      const grund = lagen.reverse().reduce((h, v) => darueber(v, h), [0, 0, 0, 0] as F);
-      if (grund[3] !== 1) throw new Error('Kein opaker Grund belegt');
-      const striche = Array.from(svg.querySelectorAll('*'))
-        .map((e) => getComputedStyle(e))
-        .filter((s) => s.stroke !== 'none' && parseFloat(s.strokeWidth) > 0)
-        .map((s) => darueber(farbe(s.stroke), grund));
-      if (striche.length === 0) throw new Error('Zeichen ohne Umriss');
-      return {
-        name: svg.querySelector('desc')?.textContent ?? '?',
-        verhaeltnis: Math.min(...striche.map((f) => verhaeltnis(f, grund))),
-      };
-    });
-  });
-}
-
-/** Im Druck steht kein Zeichen auf einer Unterlage: jedes Zeichen ohne eigenen Hintergrund. */
-async function hintergruendeImDruck(page: Page, zeichen: Locator) {
+async function imDruck(page: Page, zeichen: Locator) {
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
   await page.emulateMedia({ media: 'print' });
-  const werte = await zeichen.evaluateAll((alle) =>
+  const hinterlegt = await hinterlegteZeichen(zeichen);
+  const hintergruende = await zeichen.evaluateAll((alle) =>
     alle.map((svg) => getComputedStyle(svg).backgroundColor),
   );
   await page.emulateMedia({ media: null });
-  return werte;
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  return { hinterlegt, hintergruende };
 }
 
 const SEITEN = [
@@ -139,7 +78,7 @@ const SEITEN = [
 ] as const;
 
 for (const modus of ['dark', 'light'] as const) {
-  test(`Zeichenkontrast: jedes taktische Zeichen in Meldebild und Organigramm hält am Schirm im Modus ${modus} 3 : 1 gegen seinen Grund, im Druck ohne Unterlage`, async ({
+  test(`Zeichenkontrast: jedes taktische Zeichen in Meldebild und Organigramm hält am Schirm im Modus ${modus} 3 : 1, nachts über das Theme \`dark\`, im Druck ohne`, async ({
     page,
   }) => {
     await page.setViewportSize(FUEKW);
@@ -158,26 +97,28 @@ for (const modus of ['dark', 'light'] as const) {
       // Zeichen des Abschnitts steht vor denen der Einheiten.
       await expect(zeichen, `${seite.name}: Zeichen`).toHaveCount(seite.anzahl);
 
-      const umrisse = await zeichenUmrisse(zeichen);
+      const werte = await zeichenKontraste(zeichen);
       test.info().annotations.push({
         type: 'messwert',
-        description: `${seite.name} ${modus}: ${umrisse.map((u) => `${u.name} ${u.verhaeltnis.toFixed(2)}`).join(' · ')}`,
+        description: `${seite.name} ${modus}: ${messzeile(werte)}`,
       });
       // Vorbedingung: ein Zeichen ohne Organisation steht da, sonst misst der Test nichts.
       expect(
-        umrisse.some((u) => !u.name.includes('Organisation:')),
+        werte.some((w) => !w.beschreibung.includes('Organisation:')),
         `${seite.name}: Zeichen ohne Organisation`,
       ).toBe(true);
+      // Vorbedingung: nachts trägt jedes Zeichen das Theme `dark`, am Tag keins.
       expect(
-        umrisse
-          .filter((u) => u.verhaeltnis < 3)
-          .map((u) => `${u.name}: ${u.verhaeltnis.toFixed(2)}`),
-        `${seite.name}: Umriss unter 3 : 1 (${modus})`,
+        mitHinterlegung(werte, modus !== 'dark'),
+        `${seite.name}: Theme ${modus === 'dark' ? 'fehlt' : 'am Tag'}`,
       ).toEqual([]);
+      expect(unterDrei(werte), `${seite.name}: unter 3 : 1 (${modus})`).toEqual([]);
 
+      const druck = await imDruck(page, zeichen);
+      expect(druck.hinterlegt, `${seite.name}: Zeichen mit Theme im Druck`).toBe(0);
       expect(
-        (await hintergruendeImDruck(page, zeichen)).filter((f) => f !== 'rgba(0, 0, 0, 0)'),
-        `${seite.name}: Unterlage im Druck`,
+        druck.hintergruende.filter((f) => f !== 'rgba(0, 0, 0, 0)'),
+        `${seite.name}: Fläche hinter dem Zeichen im Druck`,
       ).toEqual([]);
     }
   });

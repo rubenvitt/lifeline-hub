@@ -3,6 +3,7 @@ import { Form, Space } from 'antd';
 import type { Ausmass, Gefahrentyp, Schadensgrad } from '../../api/types';
 import { Select } from '../../components/Select';
 import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
+import { useZeichenTheme } from '../../zeichen/useZeichenTheme';
 import { schadenTz } from '../lagekarte/taktischesZeichen';
 import { GEFAHR_LABEL, GEFAHRENARTEN, SCHADENSGRAD_LABEL } from './schadenHelfer';
 
@@ -11,8 +12,8 @@ const VORSCHAU_PX = 20;
 
 /**
  * Auswahl der Gefahr eines Schadens (LLH-1115, design.md D4): neben jedem Wort das Kartenzeichen,
- * das der Schaden damit bekommt, in der Farbe des gewählten Ausmaßes. Die Vorschau steht auf der
- * hellen Unterlage (`EinsatzZeichen`), damit sie im Nachtbetrieb lesbar bleibt. Leeren heißt
+ * das der Schaden damit bekommt, in der Farbe des gewählten Ausmaßes. Nachts zeichnet die
+ * Bibliothek die Vorschau selbst hell (Render-Theme `dark`, `useZeichenTheme`, LLH-1409). Leeren heißt
  * „keine Angabe“ (`null`). Für `Form.Item`: `value`/`onChange` kommen von dort.
  */
 export function GefahrAuswahl({
@@ -28,6 +29,7 @@ export function GefahrAuswahl({
   onChange?: (wert: Gefahrentyp | null) => void;
   id?: string;
 }) {
+  const theme = useZeichenTheme();
   return (
     <Select<
       Gefahrentyp | null,
@@ -49,7 +51,7 @@ export function GefahrAuswahl({
             <EinsatzZeichen
               tz={schadenTz(ausmass, g, schadensgrad)}
               size={VORSCHAU_PX}
-              unterlage
+              theme={theme}
               style={{ display: 'block' }}
             />
             {GEFAHR_LABEL[g]}

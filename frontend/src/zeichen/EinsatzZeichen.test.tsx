@@ -1,8 +1,12 @@
 import { render } from '@testing-library/react';
+import { contrastSurface } from '@einsatzzeichen/core';
 import { describe, expect, it } from 'vitest';
-import { farbenHell } from '../theme/tokens';
-import EinsatzZeichen from './EinsatzZeichen';
-import { ZEICHEN_UNTERLAGE } from './unterlage';
+import EinsatzZeichen, { FunktionsZeichen } from './EinsatzZeichen';
+import { ZEICHEN_THEME_DUNKEL } from './zeichenTheme';
+
+/** Striche in der Farbe der Hinterlegung des Themes `dark`: die Hinterlegung entlang der Kontur. */
+const hinterlegung = (svg: Element) =>
+  svg.querySelectorAll(`[stroke="${contrastSurface(ZEICHEN_THEME_DUNKEL)}"]`).length;
 
 describe('EinsatzZeichen', () => {
   it('rendert für ein darstellbares Fachobjekt genau ein svg in der verlangten Größe', () => {
@@ -37,23 +41,36 @@ describe('EinsatzZeichen', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // LFH-1120: Zeichen ohne Organisation zeichnet die Bibliothek mit schwarzem Umriss ohne Fläche;
-  // die Unterlage hebt sie im Nachtbetrieb vom Grund ab (Messung im e2e „Zeichenkontrast“).
-  it('legt auf Wunsch die helle Unterlage unter das Zeichen, ohne die Größe zu ändern', () => {
+  // LLH-1409: Zeichen ohne Organisation zeichnet die Bibliothek mit schwarzem Umriss ohne Fläche;
+  // nachts hinterlegt das Theme `dark` die Kontur selbst hell, statt eines hellen Quadrats dahinter
+  // (Messung im e2e „Zeichenkontrast“).
+  it('zeichnet mit dem Theme `dark` die Hinterlegung entlang der Kontur, ohne Fläche dahinter', () => {
     const { container } = render(
-      <EinsatzZeichen tz={{ grundzeichen: 'taktische-formation' }} size={22} unterlage />,
+      <EinsatzZeichen
+        tz={{ grundzeichen: 'taktische-formation' }}
+        size={22}
+        theme={ZEICHEN_THEME_DUNKEL}
+      />,
     );
     const svg = container.querySelector('svg')!;
-    expect(ZEICHEN_UNTERLAGE).toBe(farbenHell.flaeche);
-    expect(svg).toHaveStyle({ backgroundColor: farbenHell.flaeche });
+    expect(hinterlegung(svg)).toBeGreaterThan(0);
+    expect(svg.style.backgroundColor).toBe('');
     expect(svg.getAttribute('width')).toBe('22');
   });
 
-  it('trägt ohne Wunsch keine Unterlage', () => {
+  it('zeichnet ohne Theme mit der Referenzpalette, ohne Hinterlegung und ohne Fläche', () => {
     const { container } = render(
       <EinsatzZeichen tz={{ grundzeichen: 'taktische-formation' }} size={22} />,
     );
     const svg = container.querySelector('svg')!;
+    expect(hinterlegung(svg)).toBe(0);
     expect(svg.style.backgroundColor).toBe('');
+  });
+
+  it('reicht das Theme auch an ein Funktionszeichen durch', () => {
+    const { container } = render(
+      <FunktionsZeichen funktion={{ kuerzel: 'S2' }} size={22} theme={ZEICHEN_THEME_DUNKEL} />,
+    );
+    expect(hinterlegung(container.querySelector('svg')!)).toBeGreaterThan(0);
   });
 });

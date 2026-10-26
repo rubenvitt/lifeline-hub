@@ -32,6 +32,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useRollen } from '../../components/instrument';
+import { zeichenTheme } from '../../zeichen/zeichenTheme';
 import type { Fernmeldenetz, NetzStelle } from '../fernmeldeskizze';
 import type { Platz, SkizzenLayout } from '../fernmeldeskizzeLayout';
 import { schienenLinieY } from '../fernmeldeskizzeLayout';
@@ -378,7 +379,10 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
     onHalten,
     api,
   } = props;
-  const { token, rollen } = useRollen();
+  const { token, rollen, dunkel } = useRollen();
+  // Nachts zeichnet die Bibliothek die Zeichen selbst hell (LLH-1409); Druck und Anlage stehen auf
+  // Papier und bleiben ohne Theme.
+  const tzTheme = druck ? undefined : zeichenTheme(dunkel);
   const huelle = useRef<HTMLDivElement | null>(null);
 
   // ── Mindestmaßstab und Übersicht (LFH-1038 D1–D3) ─────────────────────────────────────────
@@ -746,7 +750,7 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
             platz={p}
             zustand={zustand(st.key)}
             meldung={meldung(st.key)}
-            unterlage={!druck}
+            zeichenTheme={tzTheme}
           />
           {p.neu && !druck ? <NeuMarke platz={p} zustand={zustand(st.key)} /> : null}
         </>,
