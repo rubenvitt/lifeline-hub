@@ -11,7 +11,7 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   `main`); die lokale Anzeige „nicht erreichbar“ (`capabilities/nicht-erreichbar.json`, jedes
   Fenster) darf nur prüfen, neu laden und zur Maske führen; die Serverseite
   bekommt zur Laufzeit genau für ihre Origin nur `SERVER_RECHTE` (`drucken`,
-  `anmeldung_im_browser`, `benachrichtigung_zeigen`; `server_freigeben`). Jeder neue Command steht
+  `anmeldung_im_browser`, `benachrichtigung_zeigen`, `set_app_badge`; `server_freigeben`). Jeder neue Command steht
   im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen. Commands eines Plugins
   (`notification:…`) gibt keine Capability frei.
 - **Native Meldung** (Benachrichtigungskonzept D7): `benachrichtigung_zeigen` reicht Titel und
@@ -21,6 +21,11 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   `window.Notification` durch einen Weg ohne Freigabe; die Seite darf ihn nicht nehmen. Ein Klick
   (`on_action`, `tap`) holt das Fenster der Meldung nach vorn (`klick_fenster`, `nach_vorn`), den
   Sprung trägt der Toast. Schließen kann die Hülle eine Meldung auf macOS und Windows nicht.
+- **App-Badge** (LLH-1423): `set_app_badge { count }` setzt die Zahl, die das Frontend nennt
+  (`frontend/src/alarm/appBadge.ts`, über `benachrichtigung.js`). Die Hülle merkt sich je Fenster
+  eine Zahl (`update_badge`), das Symbol trägt die größte (`badge_count`); ein neues Laden im
+  Fenster und sein Schließen nehmen dessen Zahl weg. Tauri setzt sie über `set_badge_count`
+  (macOS Dock, app-weit); unter Windows tut der Aufruf nichts, ein Overlay-Symbol gibt es nicht.
 - **Im Browser anmelden** (LFH-818, `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`):
   `ASWebAuthenticationSession` (`aswas.rs`), PKCE-`verifier` bleibt in der Hülle, Rücksprung nur
   aus der Sitzung (`anmeldung::folge`); eingelöst per `eval` im startenden Fenster mit doppelter
