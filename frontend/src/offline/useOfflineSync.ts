@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { meldeBelegung } from '../api/betreuung';
 import { meldeStand } from '../api/evakuierung';
+import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
 import { ApiError, fehlerText } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
@@ -203,6 +204,19 @@ export function useOfflineSync(benutzerId?: number): void {
             await qc.invalidateQueries({ queryKey: detail });
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
             for (const queryKey of weitere) void qc.invalidateQueries({ queryKey });
+          } else if (aktion.art === 'eingaenge_gelesen') {
+            // LLH-1422: „Alle gelesen“ ist idempotent (nur offene Zeilen bis `bis_id`). Eine
+            // Ablehnung (Einsatz nicht mehr lesbar, 403/404) geht unten in den
+            // Wiederherstellungsbereich.
+            const einsatzId = element.wert.einsatz_id;
+            await markiereBenachrichtigungenGelesen(einsatzId, aktion.daten.bis_id);
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            // Der Verlauf trägt den Serverstand, BEVOR die Zeile verschwindet: bis dahin legt
+            // `useBenachrichtigungVerlauf` das Vorgemerkte über jeden Abruf. Der Abruf wirft nicht.
+            await qc.invalidateQueries({
+              queryKey: einsatzKeys.benachrichtigungVerlauf(einsatzId),
+            });
+            await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
           } else if (isPersonEintrag(aktion)) {
             // LLH-1138, design.md D8: Sichtung, Verbleib, Notiz, Transport, Maßnahme, Verletzung.
             // Dieselbe `client_id` wie beim ersten Versuch: nach einer abgerissenen Antwort liefert

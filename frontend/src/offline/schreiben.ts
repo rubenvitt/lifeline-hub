@@ -1,5 +1,6 @@
 import { meldeBelegung } from '../api/betreuung';
 import { meldeStand } from '../api/evakuierung';
+import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
 import { ApiError } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { legePersonAn, type PersonAnlegenEingabe } from '../api/einsatzPerson';
@@ -298,4 +299,35 @@ export function savePersonEintragOfflineCapable<A extends PersonEintragArt>(
       }) as Promise<PersonEintragAntwort[A]>,
     aktion,
   );
+}
+
+/**
+ * „Alle gelesen“ der Eingänge eines Einsatzes senden oder vormerken (LLH-1422). Ohne `client_id`
+ * und ohne Erfassungszeit: der Server setzt nur die noch offenen Zeilen bis `bisId` auf gelesen,
+ * nie einen Alarm (Spec `benachrichtigungen`, „Alle gelesen“); ein wiederholtes Senden nach einer
+ * abgerissenen Antwort ändert nichts. Was danach eingeht, trägt eine höhere Kennung und bleibt
+ * ungelesen. Den Benutzer bindet der Kopf des erwarteten Benutzers (LFH-387), wie bei jedem
+ * Schreibweg.
+ */
+export async function saveEingaengeGelesenOfflineCapable(
+  benutzerId: number,
+  einsatzId: number,
+  bisId: number,
+): Promise<'gesendet' | 'vorgemerkt'> {
+  const vormerkenGelesen = async () => {
+    await schreibaktionEinreihen(benutzerId, einsatzId, {
+      art: 'eingaenge_gelesen',
+      daten: { bis_id: bisId },
+    });
+    return 'vorgemerkt' as const;
+  };
+  if (!navigator.onLine) return vormerkenGelesen();
+  try {
+    await markiereBenachrichtigungenGelesen(einsatzId, bisId);
+    return 'gesendet';
+  } catch (e) {
+    if (!istOfflineTransient(e)) throw e;
+    if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
+    return vormerkenGelesen();
+  }
 }

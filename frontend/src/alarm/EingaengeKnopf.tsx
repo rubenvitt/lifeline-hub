@@ -2,18 +2,26 @@ import { Button, Drawer, Popover, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BenachrichtigungAnzeige } from '../api/types';
+import type { BenachrichtigungAnzeige, BenachrichtigungVerlauf } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { useAuthOptional } from '../auth/AuthContext';
+import Datenstand from '../components/Datenstand';
 import { Augenbraue } from '../components/instrument';
 import { IconPosteingang } from '../icons';
+import { saveEingaengeGelesenOfflineCapable } from '../offline/schreiben';
+import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
+import { useOhneVerbindung } from '../offline/verbindung';
 import { rahmenFarben, schrift } from '../theme/tokens';
 import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeName, useKopfBuendelt } from './eingaenge';
 import EingaengeZahl from './EingaengeZahl';
 import { quittiereNachNutzer } from './useBenachrichtigungen';
-import { useBenachrichtigungVerlauf, useVerlaufAbgleich } from './useBenachrichtigungVerlauf';
+import {
+  markVerlaufGelesen,
+  useBenachrichtigungVerlauf,
+  useVerlaufAbgleich,
+} from './useBenachrichtigungVerlauf';
 
 /** Ungelesen: unquittiert und nicht still. Ein offener Alarm steht unter „Neu“, zählt aber nicht. */
 function istNeu(a: BenachrichtigungAnzeige): boolean {
@@ -98,13 +106,19 @@ function Gruppe({
 }
 
 /**
- * Der Verlauf (design.md D6): Kopf mit „Alle gelesen“, Gruppen „Neu“ und „Früher“. Lesbar auch
- * ohne Netz, solange der Verlauf im Speicher liegt; „Alle gelesen“ braucht den Server.
+ * Der Verlauf (design.md D6): Kopf mit „Alle gelesen“, Gruppen „Neu“ und „Früher“. Ohne Netz
+ * (LLH-1422) lesbar aus dem Speicher, auch nach einem Neuladen (`LAGEBILD_OFFLINE`), mit „Stand …
+ * · offline“; „Alle gelesen“ wird dann vorgemerkt (`frontend/src/offline/AGENTS.md`, „Schreiben
+ * ohne Netz“), die Zahl fällt sofort.
  */
 function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliessen: () => void }) {
   const { token } = theme.useToken();
   const qc = useQueryClient();
-  const { data, isPending, isError } = useBenachrichtigungVerlauf(einsatzId);
+  const { data, dataUpdatedAt, isPending, isError } = useBenachrichtigungVerlauf(einsatzId);
+  const benutzerId = useAuthOptional()?.benutzer?.id;
+  const ohneVerbindung = useOhneVerbindung();
+  const vorgemerkt =
+    useVorgemerkteSchreibaktionen(benutzerId, einsatzId, 'eingaenge_gelesen').length > 0;
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState(false);
   const eintraege = data?.eintraege ?? [];
@@ -114,12 +128,18 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
 
   const alleGelesen = () => {
     const bis = Math.max(...eintraege.map((a) => a.id));
-    if (!Number.isFinite(bis)) return;
+    if (!Number.isFinite(bis) || benutzerId == null) return;
+    const key = einsatzKeys.benachrichtigungVerlauf(einsatzId);
     setLaeuft(true);
     setFehler(false);
-    markiereBenachrichtigungenGelesen(einsatzId, bis)
+    saveEingaengeGelesenOfflineCapable(benutzerId, einsatzId, bis)
       .then(
-        () => qc.invalidateQueries({ queryKey: einsatzKeys.benachrichtigungVerlauf(einsatzId) }),
+        (zustand) => {
+          if (zustand === 'gesendet') return qc.invalidateQueries({ queryKey: key });
+          qc.setQueryData<BenachrichtigungVerlauf>(key, (alt) =>
+            alt ? markVerlaufGelesen(alt, bis) : alt,
+          );
+        },
         () => setFehler(true),
       )
       .finally(() => setLaeuft(false));
@@ -139,10 +159,19 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
         }}
       >
         <Augenbraue als="h2">Eingänge</Augenbraue>
+        {ohneVerbindung && <Datenstand dataUpdatedAt={dataUpdatedAt} />}
         <Button onClick={alleGelesen} disabled={ungelesen === 0 || laeuft} loading={laeuft}>
           Alle gelesen
         </Button>
       </div>
+      {vorgemerkt && (
+        <div
+          data-lfh="eingaenge-vorgemerkt"
+          style={{ fontSize: token.fontSizeSM, color: token.colorTextSecondary }}
+        >
+          Offline vorgemerkt
+        </div>
+      )}
       {fehler && (
         <div role="alert" style={{ color: token.colorWarningText, marginBlockStart: 4 }}>
           Nicht gespeichert, bitte noch einmal.

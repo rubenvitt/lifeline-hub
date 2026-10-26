@@ -588,6 +588,7 @@ describe('PersonenPage', () => {
 
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);
     if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
+    const clientId = vorgemerkt.aktion.daten.client_id;
     await act(async () => {
       client.setQueryData(einsatzKeys.personen(1), [vermisst]);
       window.dispatchEvent(
@@ -596,7 +597,7 @@ describe('PersonenPage', () => {
             art: 'person',
             benutzerId: 1,
             einsatzId: 1,
-            clientId: vorgemerkt.aktion.daten.client_id,
+            clientId,
             daten: vermisst,
           },
         }),
@@ -846,6 +847,7 @@ describe('PersonenPage', () => {
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);
     if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
+    const clientId = vorgemerkt.aktion.daten.client_id;
 
     // Das Netz ist zurück, bevor Einsatz B geladen wird.
     setzeOnline(true);
@@ -858,7 +860,7 @@ describe('PersonenPage', () => {
             art: 'person',
             benutzerId: 1,
             einsatzId: 1,
-            clientId: vorgemerkt.aktion.daten.client_id,
+            clientId,
             daten: personA,
           },
         }),
