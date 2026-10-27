@@ -5,6 +5,7 @@ import { koerperschemaFarben, schrift } from '../../theme/tokens';
 import {
   RAHMEN,
   ZONEN,
+  binnenPfad,
   inEinheiten,
   umrissPfad,
   zoneVon,
@@ -16,8 +17,9 @@ import { VERLETZUNG_ART_WORT } from '../personMeta';
 import { regionName, type NummerierteVerletzung } from './koerperschemaKern';
 
 /**
- * Eine Ansicht des Körperschemas als Zeichnung (LLH-1120, design.md D13): Silhouette, darüber die
- * Trefferzonen (nur beim Markieren), darüber die Sternchen. Eine Zeichnung, kein Icon (Spec
+ * Eine Ansicht des Körperschemas als Zeichnung (LLH-1120, design.md D13): Silhouette mit
+ * Binnenlinien (LLH-1485, nicht in der kleinen Figur), darüber die Trefferzonen (nur beim
+ * Markieren), darüber die Sternchen. Eine Zeichnung, kein Icon (Spec
  * `iconsatz`): Striche und Schrift aus Rollen, im Druck `currentColor` ohne Fläche.
  *
  * STERNCHEN: sechsstrahlig in der Textfarbe, die Nummer daneben in Mono — Teil der Zeichnung, nicht
@@ -62,6 +64,9 @@ export interface KoerperZiel {
 /** Größe von Sternchen und Nummer in Pixeln, unabhängig vom Maßstab. */
 const STERN_PX: Record<FigurModus, number> = { lesen: 9, markieren: 10, druck: 9, mini: 5 };
 const NUMMER_PX: Record<FigurModus, number> = { lesen: 13, markieren: 14, druck: 12, mini: 9 };
+
+/** Deckkraft der Binnenlinien gegen die Kontur. */
+const BINNEN_DECKKRAFT = 0.6;
 
 /** Boden der Trefferfläche eines Sternchens in px (vier Sternradien beim Markieren). */
 export const STERN_TREFFER_BODEN = 40;
@@ -173,11 +178,25 @@ export default function KoerperFigur({
     >
       <path
         d={umrissPfad(figur)}
+        data-lfh="umriss"
         fill={druck ? 'none' : farben.silhouette}
         stroke={druck ? 'currentColor' : farben.kontur}
         strokeWidth={1.5 * einheit}
-        strokeLinejoin="miter"
+        strokeLinejoin="round"
       />
+      {modus !== 'mini' && (
+        // Binnenlinien leiser als die Kontur: sie zeigen vorn und hinten, sie grenzen nichts ab.
+        <path
+          d={binnenPfad(ansicht)}
+          data-lfh="binnenlinien"
+          fill="none"
+          stroke={druck ? 'currentColor' : farben.kontur}
+          strokeOpacity={BINNEN_DECKKRAFT}
+          strokeWidth={einheit}
+          strokeLinecap="round"
+          pointerEvents="none"
+        />
+      )}
 
       {bedienbar &&
         zonen.map((zone, index) => {

@@ -17,8 +17,10 @@ import type { KoerperRegion, VerletzungAnsicht } from '../../api/types';
  * Männlich, weiblich und neutral (divers, unbekannt, ohne Angabe) unterscheiden sich nur in
  * Schultern, Taille und Hüfte. Die Trefferzonen und Mittelpunkte sind für alle gleich; der Guard
  * prüft, dass jeder Mittelpunkt in jedem Umriss liegt. Ein nachgetragenes Geschlecht verschiebt
- * so keine Markierung. Die Figur ist ein Polygon mit harten Ecken (Radius 0 der
- * Gestaltungssprache), eine Zeichnung und kein Icon (Spec `iconsatz`).
+ * so keine Markierung. Die Figur ist eine Zeichnung und kein Icon (Spec `iconsatz`): eine weiche
+ * Kontur durch Stützpunkte (Catmull-Rom), die nur an Hals, Achsel und Schritt knickt, die Arme
+ * frei neben dem Rumpf (LLH-1485, vorher ein Polygon mit harten Ecken). Binnenlinien
+ * unterscheiden vorn und hinten. Guard und Tippstelle rechnen mit dem abgetasteten Polygon.
  *
  * ── TREFFERZONEN ─────────────────────────────────────────────────────────────────────────
  *
@@ -80,137 +82,214 @@ function spiegleRechteck(r: Rechteck): Rechteck {
   return { ...r, x: RAHMEN.breite - r.x - r.b };
 }
 
+/** Ein Stützpunkt des Umrisses; `ecke` knickt die Kontur (Hals, Achsel, Schritt). */
+interface Stuetze {
+  p: Punkt;
+  ecke?: boolean;
+}
+
+/** Was die drei Figuren unterscheidet, als Versatz in Einheiten gegen die neutrale. */
+interface Gestalt {
+  schulter: number;
+  brust: number;
+  taille: number;
+  huefte: number;
+}
+
+const GESTALT: Record<Figur, Gestalt> = {
+  /** Schultern breiter, Arme weiter außen, Hüfte schmaler. */
+  maennlich: { schulter: 4, brust: 1, taille: 1, huefte: -3 },
+  /** Schultern schmaler, Taille enger, Hüfte breiter. */
+  weiblich: { schulter: -4, brust: 1, taille: -3, huefte: 4 },
+  neutral: { schulter: 0, brust: 0, taille: 0, huefte: 0 },
+};
+
 /**
- * Der Umriss aus seiner rechten Hälfte (von der Scheitelmitte im Uhrzeigersinn bis zum Schritt):
- * die linke Hälfte ist das Spiegelbild in umgekehrter Folge. Beide Ansichten tragen denselben
- * Umriss; was vorn und hinten unterscheidet, sind die Regionen.
+ * Die rechte Bildhälfte von der Scheitelmitte im Uhrzeigersinn bis zum Schritt: Kopf, Hals,
+ * Schulter, Arm außen hinab, Hand mit Daumenansatz, Arm innen hinauf bis zur Achsel, Rumpf, Bein
+ * außen hinab, Fuß, Bein innen hinauf. Der Arm steht frei neben dem Rumpf.
  */
-function umrissAusHaelfte(rechts: readonly Punkt[]): readonly Punkt[] {
+function haelfte({ schulter: s, brust: b, taille: t, huefte: h }: Gestalt): readonly Stuetze[] {
+  const p = (x: number, y: number, ecke = false): Stuetze => ({ p: [x, y], ecke });
+  return [
+    // Kopf und Hals
+    p(150, 6),
+    p(163, 8),
+    p(171, 17),
+    p(174, 32),
+    p(172, 46),
+    p(167, 56),
+    p(160, 63, true),
+    p(162, 72),
+    p(164, 80, true),
+    // Schulter und Arm außen
+    p(178 + s / 2, 86),
+    p(196 + s, 93),
+    p(207 + s, 101),
+    p(212 + s, 114),
+    p(214 + s, 136),
+    p(216 + s, 168),
+    p(219 + s, 200),
+    p(222 + s, 232),
+    // Hand
+    p(226 + s, 244),
+    p(229 + s, 260),
+    p(228 + s, 276),
+    p(222 + s, 288),
+    p(215 + s, 288),
+    p(211 + s, 278),
+    p(207 + s, 268),
+    p(205 + s, 256),
+    p(206 + s, 244),
+    // Arm innen bis zur Achsel
+    p(203 + s, 232),
+    p(200 + s, 204),
+    p(198 + s, 172),
+    p(196 + s, 140),
+    p(194 + s, 120, true),
+    // Rumpf
+    p(189 + b / 3, 128),
+    p(187 + b, 150),
+    p(183 + t, 176),
+    p(181 + t, 196),
+    p(186 + h, 222),
+    p(190 + h, 246),
+    p(191 + h * 0.6, 270),
+    // Bein außen, Fuß, Bein innen
+    p(188, 300),
+    p(185, 326),
+    p(183, 336),
+    p(186, 356),
+    p(183, 376),
+    p(178, 388),
+    p(183, 397),
+    p(188, 406),
+    p(184, 413),
+    p(162, 413),
+    p(158, 404),
+    p(160, 392),
+    p(158, 368),
+    p(157, 340),
+    p(156, 312),
+    p(154, 284),
+    p(150, 268, true),
+  ];
+}
+
+/**
+ * Der geschlossene Umriss aus seiner rechten Hälfte: die linke ist das Spiegelbild in umgekehrter
+ * Folge. Beide Ansichten tragen denselben Umriss; was vorn und hinten unterscheidet, sind die
+ * Regionen und die Binnenlinien.
+ */
+function stuetzen(figur: Figur): readonly Stuetze[] {
+  const rechts = haelfte(GESTALT[figur]);
   const links = rechts
-    .filter(([x]) => x !== MITTE_X)
-    .map(([x, y]) => [RAHMEN.breite - x, y] as const)
+    .filter(({ p: [x] }) => x !== MITTE_X)
+    .map(({ p: [x, y], ecke }) => ({ p: [RAHMEN.breite - x, y] as const, ecke }))
     .reverse();
   return [...rechts, ...links];
 }
 
-const HAELFTE_NEUTRAL: readonly Punkt[] = [
-  [150, 6],
-  [162, 6],
-  [174, 18],
-  [176, 46],
-  [168, 66],
-  [160, 76],
-  [161, 90],
-  [192, 96],
-  [210, 104],
-  [216, 170],
-  [220, 234],
-  [226, 244],
-  [224, 280],
-  [212, 286],
-  [204, 278],
-  [200, 244],
-  [198, 236],
-  [196, 172],
-  [194, 120],
-  [188, 124],
-  [182, 190],
-  [190, 240],
-  [192, 262],
-  [188, 330],
-  [184, 388],
-  [196, 398],
-  [196, 410],
-  [158, 410],
-  [158, 388],
-  [156, 330],
-  [154, 266],
-  [150, 262],
-];
+/** Ein kubisches Stück der Kontur: Anfang, zwei Kontrollpunkte, Ende. */
+type Stueck = readonly [Punkt, Punkt, Punkt, Punkt];
 
-/** Männlich: Schultern breiter, Arme weiter außen, Hüfte schmaler. */
-const HAELFTE_MAENNLICH: readonly Punkt[] = [
-  [150, 6],
-  [162, 6],
-  [174, 18],
-  [176, 46],
-  [168, 66],
-  [160, 76],
-  [161, 90],
-  [196, 96],
-  [214, 104],
-  [219, 170],
-  [223, 234],
-  [229, 244],
-  [227, 280],
-  [215, 286],
-  [206, 278],
-  [202, 244],
-  [200, 236],
-  [198, 172],
-  [196, 120],
-  [190, 124],
-  [184, 190],
-  [188, 240],
-  [190, 262],
-  [188, 330],
-  [184, 388],
-  [196, 398],
-  [196, 410],
-  [158, 410],
-  [158, 388],
-  [156, 330],
-  [154, 266],
-  [150, 262],
-];
+/**
+ * Die Kontur als Catmull-Rom-Spline durch die Stützpunkte, als kubische Stücke. An einer Ecke
+ * fällt der Kontrollpunkt auf den Stützpunkt, die Kontur knickt dort.
+ */
+function stuecke(punkte: readonly Stuetze[]): readonly Stueck[] {
+  const n = punkte.length;
+  return punkte.map((_, i) => {
+    const [p0, p1, p2, p3] = [-1, 0, 1, 2].map((d) => punkte[(i + d + n) % n]);
+    const k1 = p1.ecke ? 0 : 1 / 6;
+    const k2 = p2.ecke ? 0 : 1 / 6;
+    return [
+      p1.p,
+      [p1.p[0] + (p2.p[0] - p0.p[0]) * k1, p1.p[1] + (p2.p[1] - p0.p[1]) * k1],
+      [p2.p[0] - (p3.p[0] - p1.p[0]) * k2, p2.p[1] - (p3.p[1] - p1.p[1]) * k2],
+      p2.p,
+    ] as const;
+  });
+}
 
-/** Weiblich: Schultern schmaler, Taille enger, Hüfte breiter. */
-const HAELFTE_WEIBLICH: readonly Punkt[] = [
-  [150, 6],
-  [162, 6],
-  [174, 18],
-  [176, 46],
-  [168, 66],
-  [160, 76],
-  [161, 90],
-  [188, 96],
-  [206, 104],
-  [214, 170],
-  [218, 234],
-  [224, 244],
-  [222, 280],
-  [210, 286],
-  [202, 278],
-  [198, 244],
-  [196, 236],
-  [194, 172],
-  [192, 120],
-  [186, 124],
-  [178, 190],
-  [194, 240],
-  [196, 262],
-  [190, 330],
-  [184, 388],
-  [196, 398],
-  [196, 410],
-  [158, 410],
-  [158, 388],
-  [156, 330],
-  [154, 266],
-  [150, 262],
-];
+/** Abtastungen je Stück für das Polygon des Guards und der Tippstelle. */
+const ABTASTUNG = 6;
 
-/** Die drei Umrisse als geschlossene Polygone (Einheiten). */
-export const UMRISSE: Record<Figur, readonly Punkt[]> = {
-  maennlich: umrissAusHaelfte(HAELFTE_MAENNLICH),
-  weiblich: umrissAusHaelfte(HAELFTE_WEIBLICH),
-  neutral: umrissAusHaelfte(HAELFTE_NEUTRAL),
+function abgetastet(teile: readonly Stueck[]): readonly Punkt[] {
+  return teile.flatMap(([a, b, c, d]) =>
+    Array.from({ length: ABTASTUNG }, (_, i) => {
+      const t = i / ABTASTUNG;
+      const u = 1 - t;
+      const f = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+      return [
+        f[0] * a[0] + f[1] * b[0] + f[2] * c[0] + f[3] * d[0],
+        f[0] * a[1] + f[1] * b[1] + f[2] * c[1] + f[3] * d[1],
+      ] as const;
+    }),
+  );
+}
+
+const STUECKE: Record<Figur, readonly Stueck[]> = {
+  maennlich: stuecke(stuetzen('maennlich')),
+  weiblich: stuecke(stuetzen('weiblich')),
+  neutral: stuecke(stuetzen('neutral')),
 };
 
-/** SVG-Pfad eines Umrisses (`M … L … Z`), harte Ecken. */
+/**
+ * Die drei Umrisse als dicht abgetastete Polygone (Einheiten): Grundlage von {@link imUmriss}
+ * für Guard und Tippstelle. Gezeichnet wird die Kurve ({@link umrissPfad}).
+ */
+export const UMRISSE: Record<Figur, readonly Punkt[]> = {
+  maennlich: abgetastet(STUECKE.maennlich),
+  weiblich: abgetastet(STUECKE.weiblich),
+  neutral: abgetastet(STUECKE.neutral),
+};
+
+const zahl = (v: number) => String(Math.round(v * 10) / 10);
+
+/** SVG-Pfad eines Umrisses (`M … C … Z`), weiche Kontur mit Knicken an Hals, Achsel und Schritt. */
 export function umrissPfad(figur: Figur): string {
-  const [erster, ...rest] = UMRISSE[figur];
-  return `M${erster[0]} ${erster[1]}${rest.map(([x, y]) => `L${x} ${y}`).join('')}Z`;
+  const teile = STUECKE[figur];
+  const [x0, y0] = teile[0][0];
+  const kurven = teile
+    .map(([, b, c, d]) => `C${[b, c, d].map(([x, y]) => `${zahl(x)} ${zahl(y)}`).join(' ')}`)
+    .join('');
+  return `M${x0} ${y0}${kurven}Z`;
+}
+
+/** Eine Binnenlinie: quadratische Kurve von `von` über `ueber` nach `nach` (Einheiten). */
+export interface Binnenlinie {
+  von: Punkt;
+  ueber: Punkt;
+  nach: Punkt;
+}
+
+/**
+ * Binnenlinien je Ansicht: vorn Schlüsselbeine und Knie, hinten Wirbelsäule, Schulterblätter und
+ * Gesäßfalte. Sie unterscheiden vorn und hinten auf einen Blick und tragen keine Bedienung; für
+ * alle Figuren gleich, der Guard prüft, dass jede in jedem Umriss liegt.
+ */
+export const BINNENLINIEN: Record<VerletzungAnsicht, readonly Binnenlinie[]> = {
+  vorn: [
+    { von: [136, 92], ueber: [144, 97], nach: [150, 95] },
+    { von: [150, 95], ueber: [156, 97], nach: [164, 92] },
+    { von: [125, 334], ueber: [131, 337], nach: [137, 334] },
+    { von: [163, 334], ueber: [169, 337], nach: [175, 334] },
+  ],
+  hinten: [
+    { von: [150, 84], ueber: [150, 167], nach: [150, 250] },
+    { von: [126, 112], ueber: [130, 130], nach: [138, 134] },
+    { von: [174, 112], ueber: [170, 130], nach: [162, 134] },
+    { von: [150, 250], ueber: [136, 256], nach: [126, 254] },
+    { von: [150, 250], ueber: [164, 256], nach: [174, 254] },
+  ],
+};
+
+/** SVG-Pfad der Binnenlinien einer Ansicht. */
+export function binnenPfad(ansicht: VerletzungAnsicht): string {
+  return BINNENLINIEN[ansicht]
+    .map(({ von, ueber, nach }) => `M${von.join(' ')}Q${ueber.join(' ')} ${nach.join(' ')}`)
+    .join('');
 }
 
 /**

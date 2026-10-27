@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { KoerperRegion, VerletzungAnsicht } from '../../api/types';
 import { REGION_WORT } from './koerperschemaKern';
 import {
+  BINNENLINIEN,
   RAHMEN,
   UMRISSE,
   ZONEN,
@@ -90,6 +91,22 @@ describe('Körperschema-Geometrie — eine Lage für jede Figur', () => {
 
   it('die Umrisse unterscheiden sich wirklich', () => {
     expect(new Set(FIGUREN.map(umrissPfad)).size).toBe(3);
+  });
+
+  it.each(ANSICHTEN)('%s: jede Binnenlinie liegt in jedem Umriss', (ansicht) => {
+    for (const f of FIGUREN) {
+      for (const { von, ueber, nach } of BINNENLINIEN[ansicht]) {
+        // Anfang, Ende und Kurvenmitte; auf der Mittelachse eine Einheit daneben (Kante meiden).
+        const mitte: Punkt = [
+          (von[0] + 2 * ueber[0] + nach[0]) / 4,
+          (von[1] + 2 * ueber[1] + nach[1]) / 4,
+        ];
+        for (const [x, y] of [von, mitte, nach]) {
+          const p: Punkt = [x === RAHMEN.breite / 2 ? x + 1 : x, y];
+          expect(imUmriss(p, UMRISSE[f]), `${f} ${ansicht} ${p}`).toBe(true);
+        }
+      }
+    }
   });
 
   it('jeder Umriss liegt im Rahmen', () => {

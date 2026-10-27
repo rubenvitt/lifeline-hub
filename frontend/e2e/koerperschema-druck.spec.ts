@@ -88,11 +88,16 @@ test('Beobachter druckt eine Person mit drei Verletzungen schwarz-weiß; das Öf
   const blatt = await schema.evaluate((el) => {
     const farbe = (e: Element, eigenschaft: 'stroke' | 'fill' | 'color') =>
       getComputedStyle(e)[eigenschaft];
-    const umrisse = [...el.querySelectorAll('[data-lfh="koerperfigur"] > path')];
+    const umrisse = [...el.querySelectorAll('[data-lfh="koerperfigur"] > [data-lfh="umriss"]')];
+    const binnen = [
+      ...el.querySelectorAll('[data-lfh="koerperfigur"] > [data-lfh="binnenlinien"]'),
+    ];
     const sterne = [...el.querySelectorAll('[data-lfh="stern"]')];
     return {
       umrissFuellung: umrisse.map((u) => u.getAttribute('fill')),
       umrissStrich: umrisse.map((u) => farbe(u, 'stroke')),
+      binnenFuellung: binnen.map((b) => b.getAttribute('fill')),
+      binnenStrich: binnen.map((b) => farbe(b, 'stroke')),
       sternFarben: sterne.map((s) => farbe(s.querySelector('path')!, 'stroke')),
       nummernFarben: sterne.map((s) => farbe(s.querySelector('text')!, 'fill')),
       sternNummern: sterne.map((s) => s.getAttribute('data-nummer')),
@@ -103,6 +108,9 @@ test('Beobachter druckt eine Person mit drei Verletzungen schwarz-weiß; das Öf
   });
   expect(blatt.umrissFuellung).toEqual(['none', 'none']);
   expect(blatt.umrissStrich).toEqual([SCHWARZ, SCHWARZ]);
+  // Binnenlinien (LLH-1485) zeichnen im Druck wie die Kontur, ohne Fläche.
+  expect(blatt.binnenFuellung).toEqual(['none', 'none']);
+  expect(blatt.binnenStrich).toEqual([SCHWARZ, SCHWARZ]);
   expect(blatt.sternFarben).toEqual([SCHWARZ, SCHWARZ, SCHWARZ]);
   expect(blatt.nummernFarben).toEqual([SCHWARZ, SCHWARZ, SCHWARZ]);
   expect([...blatt.sternNummern].sort()).toEqual(['1', '2', '3']);
