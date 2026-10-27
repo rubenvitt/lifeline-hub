@@ -45,8 +45,15 @@ test.describe(KAPITEL, () => {
     // Die Kachel öffnet den Einsatz, der Wechsler führt zurück zur Liste.
     await kachel.getByRole('link', { name: demo.bezeichnung }).click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${demo.id}/`));
+    // Erst klicken, wenn das Menü steht: während es einblendet (`ant-slide-up-appear`), nimmt es
+    // keine Zeigerereignisse an, und unter Last ging der Klick ins Leere (LLH-1487, wie die
+    // Auswahllisten in `e2e/auswahl-kern.ts`).
+    await expect(page.getByRole('heading', { level: 1, name: 'Überblick' })).toBeVisible();
     await page.locator('[data-lfh="kopf-einsatzname"]').getByRole('button').click();
-    await page.getByRole('menuitem', { name: 'Alle Einsätze …' }).click();
+    const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
+    await expect(menue).toBeVisible();
+    await expect(menue).not.toHaveClass(/ant-slide-(up|down)-(appear|enter)/);
+    await menue.getByRole('menuitem', { name: 'Alle Einsätze …' }).click();
     await expect(page).toHaveURL(/\/einsaetze$/);
   });
 

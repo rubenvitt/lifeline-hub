@@ -25,7 +25,7 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
 2. Die Zeile über der Liste zählt die Posten: „einsatzbereit“, „im Einsatz“ und „Ausfall“.
    „Meldebild“ führt ins Meldebild.
 
-   ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
+   ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 Betreuungsgruppe · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
 
 3. Die Liste ist nach Ort gruppiert: erst die Einheiten in der Folge des Kräftebaums, dann
    Fahrzeuge, Unfallhilfsstellen und Bereitstellungsräume, „ohne Ort“ zuletzt. Über der Tabelle
@@ -57,7 +57,7 @@ Für Einsatzleitung und Führungspersonal:
 3. Unter „Ort“ eine Einheit, ein Fahrzeug, eine UHS oder einen Bereitstellungsraum wählen, oder
    „ohne Ort“ stehen lassen.
 
-   ![Dialog „Material disponieren“ mit dem Feldbettensatz, einem Gerät: die Menge steht gesperrt auf 1, darunter „Ein Gerät steht je Stück im Einsatz“, im Feld „Ort“ eine Einheit](../bilder/material/material-disponieren.png)
+   ![Dialog „Material disponieren“ mit der Zeltheizung, einem Gerät: die Menge steht gesperrt auf 1, darunter „Ein Gerät steht je Stück im Einsatz“, im Feld „Ort“ eine Einheit](../bilder/material/material-disponieren.png)
 
 4. „Disponieren“ wählen, oder „Speichern und nächste“ für den nächsten Posten. Der Ort bleibt
    dabei stehen, weil eine Anlieferung meist an einen Ort geht.
