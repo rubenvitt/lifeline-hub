@@ -1,3 +1,26 @@
+## [1.0.0-alpha.158](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.157...v1.0.0-alpha.158) (2026-10-27)
+
+### Lagekarte
+
+- Wird die Lagekarte ohne Netz neu aufgebaut, zeigt sie wieder alle Marker. Bisher konnte eine ohne Internetverbindung neu geöffnete Karte keine Marker zeichnen.
+
+### Kräfte und Mittel
+
+- **Materialliste:** Auf schmaleren Bildschirmen wird die Spalte „Kategorie“ ausgeblendet. Ihr Filter bleibt dann als Auswahlfeld „Kategorie“ über der Tabelle erreichbar. Er wirkt wie gewohnt und erscheint als Filter-Chip.
+- **Seitenkopf:** Der Seitentitel steht auf Fahrzeuge und Material jetzt genauso hoch wie auf Personal. Bisher rutschte er dort durch die Segmentleiste in den Bedienmodi „komfortabel“ und „Handschuh“ einige Pixel nach unten. Im kompakten Modus behält der Kopf seine vorgesehene Höhe.
+- **Unfallhilfsstellen:** Im Kopf einer Unfallhilfsstelle stand vor der Materialzahl ein Stück Entwicklertext. Er wird nicht mehr angezeigt.
+
+### Betrieb und Installation
+
+- Die Anwendung lädt beim Start deutlich weniger Code vorab: Der Hauptteil ist von etwa 3,2 MB auf etwa 2,1 MB geschrumpft. Die Kartenbibliothek wird separat geladen.
+- Die Bibliothek der taktischen Zeichen und weitere Bausteine der Oberfläche sind aktualisiert.
+
+### Anwenderdokumentation
+
+- In den Bildern der Dokumentation stehen Zeitangaben jetzt in taktischer Zeit.
+- Neue Bilder zeigen die aktuelle Oberfläche: Zeiteingabe, Lagekarte im Nachtbetrieb, Ortsfeld mit „Ort suchen“ und das Feld „Kategorie“ in der Materialliste. Auch die Listen von Tieren, Betroffenen, Evakuierung und Bereitstellungsräumen sind neu abgebildet, jetzt mit Sortieren und Filtern im Spaltenkopf.
+- Das Kapitel Unfallhilfsstellen hat einen neuen Ablauf mit Bild: „Die Liste der Unfallhilfsstellen sortieren und filtern“.
+
 ## [1.0.0-alpha.157](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.156...v1.0.0-alpha.157) (2026-10-27)
 
 ### Betroffene
