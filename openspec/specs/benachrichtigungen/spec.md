@@ -390,6 +390,22 @@ zeigen, auf der Seite Lagemeldungen keine Übernahmen; dort trägt das Sammelban
 - **WHEN** eine dringende Meldung eingeht, während Person A die Seite Meldungen offen hat
 - **THEN** erscheint kein Hinweis und kein Ton; das Sammelbanner der Seite trägt die Meldung
 
+### Requirement: Das Eingangsband verdeckt keine untere Leiste
+
+Steht am unteren Rand eine angepinnte Leiste (Erfassung des Einsatztagebuchs, Aktionsleiste des
+Befehlsentwurfs, Speicherleiste einer Formularseite und jede weitere Fußleiste mit gemessenem
+Fokusabstand), SHALL das Eingangsband über ihrer Oberkante stehen, sobald es sie sonst schnitte,
+auf schmalen Schirmen wie ab dem Tablet-Querformat. Es MUST NOT ein Bedienelement einer solchen
+Leiste verdecken; geht die Leiste, rückt es zurück an den Rand.
+
+#### Scenario: Eingang während der Erfassung im ETB
+- **WHEN** eine Meldung eingeht, während Person A das Einsatztagebuch offen hat
+- **THEN** steht das Band über der Erfassung, und „Erfassen“ bleibt sichtbar und klickbar
+
+#### Scenario: Eingang am Befehlsentwurf auf dem Handschirm
+- **WHEN** eine Meldung eingeht, während Person A einen Befehl auf dem Handschirm bearbeitet
+- **THEN** steht das Band über der Aktionsleiste, „Entwurf speichern“ und „Freigeben“ bleiben frei
+
 ### Requirement: Ungelesene Eingänge im Tab-Titel
 
 Der Tab-Titel eines Einsatzes SHALL die Zahl der ungelesenen Eingänge der angemeldeten Person
