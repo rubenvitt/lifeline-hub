@@ -2163,10 +2163,10 @@ async fn verlauf_statuscodes_und_rechte() {
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
-// ── Leitung und Erreichbarkeit (LLH-1044) ───────────────────────────────────────────────────
+// ── Leitung und Kontaktweg (LLH-1044) ───────────────────────────────────────────────────
 
 #[tokio::test]
-async fn leitung_und_erreichbarkeit_anlegen_aendern_leeren_und_grenze() {
+async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -2176,13 +2176,13 @@ async fn leitung_und_erreichbarkeit_anlegen_aendern_leeren_und_grenze() {
         &format!("{}/stellen", pfad(e)),
         &admin,
         Some(
-            r#"{"bezeichnung":"Gesamtschule","art":"notunterkunft","leitung":" Frau Schulz ","erreichbarkeit":"Kanal 42"}"#,
+            r#"{"bezeichnung":"Gesamtschule","art":"notunterkunft","leitung":" Frau Schulz ","kontaktweg":"Kanal 42"}"#,
         ),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{st:?}");
     assert_eq!(st["leitung"], "Frau Schulz", "getrimmt");
-    assert_eq!(st["erreichbarkeit"], "Kanal 42");
+    assert_eq!(st["kontaktweg"], "Kanal 42");
     let sid = st["id"].as_i64().unwrap();
 
     // Die Übersicht trägt beide Felder.
@@ -2214,11 +2214,11 @@ async fn leitung_und_erreichbarkeit_anlegen_aendern_leeren_und_grenze() {
         "PATCH",
         &format!("{}/stellen/{sid}", pfad(e)),
         &admin,
-        Some(r#"{"erreichbarkeit":null}"#),
+        Some(r#"{"kontaktweg":null}"#),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{st:?}");
-    assert!(!st.as_object().unwrap().contains_key("erreichbarkeit"));
+    assert!(!st.as_object().unwrap().contains_key("kontaktweg"));
     assert_eq!(st["leitung"], "Herr Brandt", "unberührt");
 
     // Grenze: 200 Zeichen gehen, 201 sind 400 — beim Anlegen und beim Ändern.
@@ -2236,13 +2236,12 @@ async fn leitung_und_erreichbarkeit_anlegen_aendern_leeren_und_grenze() {
         "PATCH",
         &format!("{}/stellen/{sid}", pfad(e)),
         &admin,
-        Some(&format!(r#"{{"erreichbarkeit":"{}"}}"#, "x".repeat(201))),
+        Some(&format!(r#"{{"kontaktweg":"{}"}}"#, "x".repeat(201))),
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
     assert!(
-        j.to_string()
-            .contains("Erreichbarkeit darf höchstens 200 Zeichen"),
+        j.to_string().contains("Kontakt darf höchstens 200 Zeichen"),
         "{j}"
     );
     let (s, _) = anfrage(
@@ -2257,4 +2256,22 @@ async fn leitung_und_erreichbarkeit_anlegen_aendern_leeren_und_grenze() {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // Der alte Feldname (bis LLH-1419) ist 400 statt still verworfen, auch mit `null`.
+    for (methode, ziel, body) in [
+        (
+            "POST",
+            format!("{}/stellen", pfad(e)),
+            r#"{"bezeichnung":"Dritte","art":"anlaufstelle","erreichbarkeit":"Kanal 1"}"#,
+        ),
+        (
+            "PATCH",
+            format!("{}/stellen/{sid}", pfad(e)),
+            r#"{"erreichbarkeit":null}"#,
+        ),
+    ] {
+        let (s, j) = anfrage(&app, methode, &ziel, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{methode} {body}");
+        assert!(j.to_string().contains("Seite neu laden"), "{j}");
+    }
 }

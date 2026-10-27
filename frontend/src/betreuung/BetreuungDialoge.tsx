@@ -28,7 +28,7 @@ import { sprungGesperrtText } from '../components/Sprung';
 import { Segmentleiste, type SegmentOption } from '../components/instrument';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { BETREUUNG_ERREICHBARKEIT_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
+import { BETREUUNG_KONTAKTWEG_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { raeumungszustand } from '../theme/statusFarben';
 import {
@@ -190,7 +190,7 @@ export interface StelleWerte {
   standort?: OrtsfeldWert | null;
   notiz?: string | null;
   leitung?: string | null;
-  erreichbarkeit?: string | null;
+  kontaktweg?: string | null;
 }
 
 function stelleAnlegenBody(w: StelleWerte): BetreuungsstelleEingabe {
@@ -205,7 +205,7 @@ function stelleAnlegenBody(w: StelleWerte): BetreuungsstelleEingabe {
       standort: ort.text,
       notiz: w.notiz,
       leitung: w.leitung,
-      erreichbarkeit: w.erreichbarkeit,
+      kontaktweg: w.kontaktweg,
     }),
   };
 }
@@ -228,8 +228,8 @@ export function stellePatch(vorher: Betreuungsstelle, w: StelleWerte): Betreuung
   wennGeaendert(patch, 'notiz', vorher.notiz, text(w.notiz));
   // Nur Felder, die das Formular trägt: fehlt der Schlüssel in den Werten, bleibt er unberührt.
   if ('leitung' in w) wennGeaendert(patch, 'leitung', vorher.leitung, text(w.leitung));
-  if ('erreichbarkeit' in w) {
-    wennGeaendert(patch, 'erreichbarkeit', vorher.erreichbarkeit, text(w.erreichbarkeit));
+  if ('kontaktweg' in w) {
+    wennGeaendert(patch, 'kontaktweg', vorher.kontaktweg, text(w.kontaktweg));
   }
   return patch;
 }
@@ -620,11 +620,11 @@ export function StelleAnlegenDialog({
             <Input count={zeichenGrenze(BETREUUNG_LEITUNG_MAX)} />
           </Form.Item>
           <Form.Item
-            name="erreichbarkeit"
+            name="kontaktweg"
             label="Kontakt"
-            rules={[zeichenRegel(BETREUUNG_ERREICHBARKEIT_MAX, 'Kontakt')]}
+            rules={[zeichenRegel(BETREUUNG_KONTAKTWEG_MAX, 'Kontakt')]}
           >
-            <Input count={zeichenGrenze(BETREUUNG_ERREICHBARKEIT_MAX)} />
+            <Input count={zeichenGrenze(BETREUUNG_KONTAKTWEG_MAX)} />
           </Form.Item>
           <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
             <Input.TextArea autoSize={{ minRows: 2 }} />

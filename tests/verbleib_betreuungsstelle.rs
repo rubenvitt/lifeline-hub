@@ -596,9 +596,9 @@ async fn filter_nach_stelle_ohne_personenrecht_ist_403() {
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
-/// Leitung und Erreichbarkeit (LLH-1044) friert der gesicherte Lagestand nicht ein.
+/// Leitung und Kontaktweg (LLH-1044) friert der gesicherte Lagestand nicht ein.
 #[tokio::test]
-async fn gesicherter_lagestand_enthaelt_keine_leitung_und_erreichbarkeit() {
+async fn gesicherter_lagestand_enthaelt_keine_leitung_und_keinen_kontaktweg() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (e, sid) = lage_mit_zwei_namentlichen(&app, &admin).await;
@@ -607,7 +607,7 @@ async fn gesicherter_lagestand_enthaelt_keine_leitung_und_erreichbarkeit() {
         "PATCH",
         &format!("{}/stellen/{sid}", betreuung(e)),
         &admin,
-        Some(r#"{"leitung":"Frau Schulz","erreichbarkeit":"0171 2345678"}"#),
+        Some(r#"{"leitung":"Frau Schulz","kontaktweg":"0171 2345678"}"#),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{j:?}");

@@ -37,14 +37,14 @@ use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use chrono::Utc;
+use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 use crate::app::AppState;
 use crate::betreuung::repo::{self, BelegungEingabe, StelleAenderung, StelleEingabe};
 use crate::betreuung::{
     enum_wert, BelegungKopfzahl, BelegungVerlaufEintrag, BetreuungUebersicht,
-    BetreuungsstelleAnzeige, StelleMeldungAnzeige, StelleNamentlich, ERREICHBARKEIT_MAX,
-    LEITUNG_MAX,
+    BetreuungsstelleAnzeige, StelleMeldungAnzeige, StelleNamentlich, KONTAKTWEG_MAX, LEITUNG_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
@@ -183,12 +183,15 @@ pub struct StelleAnlegen {
     standort: Option<String>,
     #[serde(default)]
     notiz: Option<String>,
-    /// Leitung und Erreichbarkeit (LLH-1044), Freitext bis [`LEITUNG_MAX`] bzw.
-    /// [`ERREICHBARKEIT_MAX`] Zeichen.
+    /// Leitung und Kontaktweg (LLH-1044), Freitext bis [`LEITUNG_MAX`] bzw.
+    /// [`KONTAKTWEG_MAX`] Zeichen.
     #[serde(default)]
     leitung: Option<String>,
     #[serde(default)]
-    erreichbarkeit: Option<String>,
+    kontaktweg: Option<String>,
+    /// Alter Name von `kontaktweg` (bis LLH-1419): im Body (auch `null`) → 400.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    erreichbarkeit: Option<Option<IgnoredAny>>,
     /// Koordinate aus dem Ortsfeld des Standorts (LLH-1121). Halbes Paar oder Wert außerhalb
     /// des Bereichs → **422**, wie beim Ändern ([`StelleAendern::lat`]).
     #[serde(default)]
@@ -204,6 +207,11 @@ pub async fn stelle_anlegen(
     JsonBody(req): JsonBody<StelleAnlegen>,
 ) -> Result<(StatusCode, Json<BetreuungsstelleAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    support::lehne_alten_feldnamen_ab(
+        req.erreichbarkeit.is_some(),
+        "erreichbarkeit",
+        "kontaktweg",
+    )?;
     let eingabe = StelleEingabe {
         bezeichnung: req.bezeichnung,
         art: enum_wert(&req.art)?,
@@ -212,7 +220,7 @@ pub async fn stelle_anlegen(
         standort: req.standort,
         notiz: req.notiz,
         leitung: optional_max(req.leitung, "Leitung", LEITUNG_MAX)?,
-        erreichbarkeit: optional_max(req.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
+        kontaktweg: optional_max(req.kontaktweg, "Kontakt", KONTAKTWEG_MAX)?,
         lat: req.lat,
         lon: req.lon,
     };
@@ -250,7 +258,10 @@ pub struct StelleAendern {
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     leitung: Option<Option<String>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    erreichbarkeit: Option<Option<String>>,
+    kontaktweg: Option<Option<String>>,
+    /// Alter Name von `kontaktweg` (bis LLH-1419): im Body (auch `null`) → 400.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    erreichbarkeit: Option<Option<IgnoredAny>>,
     /// Koordinate auf der Lagekarte (LFH-673), tri-state je Wert: fehlt = unverändert,
     /// `null` = entfernen. Halbes Paar oder Wert außerhalb des Bereichs → **422**, wie an der
     /// UHS (`einsatz_uhs.rs`, von src/AGENTS.md als legitimes 422 geführt): das Paar ist ein
@@ -270,6 +281,11 @@ pub async fn stelle_aendern(
     JsonBody(req): JsonBody<StelleAendern>,
 ) -> Result<Json<BetreuungsstelleAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    support::lehne_alten_feldnamen_ab(
+        req.erreichbarkeit.is_some(),
+        "erreichbarkeit",
+        "kontaktweg",
+    )?;
     let eingabe = StelleAenderung {
         bezeichnung: req.bezeichnung,
         art: enum_opt(req.art)?,
@@ -280,7 +296,7 @@ pub async fn stelle_aendern(
         notiz: req.notiz,
         // Feldgrenze vor jedem 422 des Zusammenhangs (src/AGENTS.md, Eingabegrenzen).
         leitung: optional_max_tri(req.leitung, "Leitung", LEITUNG_MAX)?,
-        erreichbarkeit: optional_max_tri(req.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
+        kontaktweg: optional_max_tri(req.kontaktweg, "Kontakt", KONTAKTWEG_MAX)?,
         lat: req.lat,
         lon: req.lon,
     };

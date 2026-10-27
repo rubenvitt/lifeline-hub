@@ -252,7 +252,7 @@ pub async fn erzeuge(
 
     // Eine Abfrage für beide Betreuungsfelder, wie die Modulseite: nur nicht stornierte Stellen und
     // Bezirke.
-    // Leitung und Erreichbarkeit (LLH-1044) friert der Stand nicht ein: das Lagebild braucht sie
+    // Leitung und Kontaktweg (LLH-1044) friert der Stand nicht ein: das Lagebild braucht sie
     // nicht, und ein Name im Dokument bräuchte einen eigenen Schwärzungspfad (wie der
     // Einsatzleiter unten, LLH-1168).
     let betreuungsstellen = crate::betreuung::repo::stellen(pool, einsatz_id)
@@ -260,7 +260,7 @@ pub async fn erzeuge(
         .into_iter()
         .map(|s| crate::betreuung::BetreuungsstelleAnzeige {
             leitung: None,
-            erreichbarkeit: None,
+            kontaktweg: None,
             ..s
         })
         .collect();
@@ -294,7 +294,7 @@ pub async fn erzeuge(
         )
         .await?,
         // Telefon und weitere Verbindungen (LLH-1134) friert der Stand nicht ein, wie Leitung und
-        // Erreichbarkeit der Betreuungsstelle: die Karte braucht sie nicht, und eine Rufnummer
+        // Kontaktweg der Betreuungsstelle: die Karte braucht sie nicht, und eine Rufnummer
         // im Dokument bräuchte einen eigenen Schwärzungspfad.
         einheiten: crate::einheit::repo::liste(pool, einsatz_id)
             .await?

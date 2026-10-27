@@ -47,7 +47,7 @@ test.describe(KAPITEL, () => {
         medium: 'Radio Musterstadt',
         thema: 'Zahl der Evakuierten',
         kontakt_name: 'Redaktion Frühdienst',
-        kontakt_erreichbarkeit: '0561 400 100',
+        kontaktweg: '0561 400 100',
         eingang_at: new Date(Date.now() - 25 * 60_000).toISOString(),
       });
     }

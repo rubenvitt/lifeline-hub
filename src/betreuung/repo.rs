@@ -65,9 +65,9 @@ pub struct StelleEingabe {
     pub kapazitaet_personen: Option<i64>,
     pub standort: Option<String>,
     pub notiz: Option<String>,
-    /// Leitung und Erreichbarkeit (LLH-1044); die Route hat getrimmt und die Grenze geprüft.
+    /// Leitung und Kontaktweg (LLH-1044); die Route hat getrimmt und die Grenze geprüft.
     pub leitung: Option<String>,
-    pub erreichbarkeit: Option<String>,
+    pub kontaktweg: Option<String>,
     /// Koordinate (LLH-1121: schon beim Anlegen, aus dem Ortsfeld des Standorts); als Paar
     /// gegen den Bereich geprüft (422) wie beim Ändern.
     pub lat: Option<f64>,
@@ -84,9 +84,9 @@ pub struct StelleAenderung {
     pub status: Option<BetreuungsstelleStatus>,
     pub standort: Option<Option<String>>,
     pub notiz: Option<Option<String>>,
-    /// Leitung und Erreichbarkeit (LLH-1044), tri-state; die Route hat die Grenze geprüft.
+    /// Leitung und Kontaktweg (LLH-1044), tri-state; die Route hat die Grenze geprüft.
     pub leitung: Option<Option<String>>,
-    pub erreichbarkeit: Option<Option<String>>,
+    pub kontaktweg: Option<Option<String>>,
     /// Koordinate (LFH-673), tri-state je Wert; gegen den Bestand als Paar geprüft.
     pub lat: Option<Option<f64>>,
     pub lon: Option<Option<f64>>,
@@ -181,7 +181,7 @@ macro_rules! stelle_select {
     () => {
         "SELECT s.id, s.einsatz_id, s.abschnitt_id, a.name AS abschnitt_name, s.bezeichnung, \
                 s.art, s.kapazitaet_personen, s.status, s.standort, s.notiz, s.leitung, \
-                s.erreichbarkeit, s.lat, s.lon, m.id AS belegung_id, m.belegt AS belegung_belegt, \
+                s.kontaktweg, s.lat, s.lon, m.id AS belegung_id, m.belegt AS belegung_belegt, \
                 m.zeitpunkt_at AS belegung_zeitpunkt_at, \
                 s.storniert_at, s.angelegt_at, s.geaendert_at \
          FROM betreuungsstelle s \
@@ -273,7 +273,7 @@ struct StelleZeile {
     standort: Option<String>,
     notiz: Option<String>,
     leitung: Option<String>,
-    erreichbarkeit: Option<String>,
+    kontaktweg: Option<String>,
     lat: Option<f64>,
     lon: Option<f64>,
     belegung_id: Option<i64>,
@@ -308,7 +308,7 @@ impl TryFrom<StelleZeile> for BetreuungsstelleAnzeige {
             standort: z.standort,
             notiz: z.notiz,
             leitung: z.leitung,
-            erreichbarkeit: z.erreichbarkeit,
+            kontaktweg: z.kontaktweg,
             lat: z.lat,
             lon: z.lon,
             belegung,
@@ -803,7 +803,7 @@ struct StelleRoh {
     standort: Option<String>,
     notiz: Option<String>,
     leitung: Option<String>,
-    erreichbarkeit: Option<String>,
+    kontaktweg: Option<String>,
     lat: Option<f64>,
     lon: Option<f64>,
     /// Zeiger, Anzahl und Zeitpunkt der aktuellen Belegungsmeldung, wie bei [`BezirkRoh`].
@@ -820,7 +820,7 @@ async fn stelle_roh_tx(
 ) -> Result<StelleRoh, AppError> {
     sqlx::query_as(
         "SELECT s.bezeichnung, s.art, s.abschnitt_id, s.kapazitaet_personen, s.status, \
-                s.standort, s.notiz, s.leitung, s.erreichbarkeit, s.lat, s.lon, s.belegung_id, m.belegt AS belegung_belegt, \
+                s.standort, s.notiz, s.leitung, s.kontaktweg, s.lat, s.lon, s.belegung_id, m.belegt AS belegung_belegt, \
                 m.zeitpunkt_at AS belegung_zeitpunkt_at, s.storniert_at \
          FROM betreuungsstelle s LEFT JOIN betreuungsstelle_belegung m ON m.id = s.belegung_id \
          WHERE s.id = ? AND s.einsatz_id = ?",
@@ -1354,7 +1354,7 @@ pub async fn stelle_anlegen_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO betreuungsstelle \
             (einsatz_id, abschnitt_id, bezeichnung, art, kapazitaet_personen, standort, notiz, \
-             leitung, erreichbarkeit, lat, lon, angelegt_von_id) \
+             leitung, kontaktweg, lat, lon, angelegt_von_id) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
@@ -1365,7 +1365,7 @@ pub async fn stelle_anlegen_tx(
     .bind(text_opt(eingabe.standort.as_deref()))
     .bind(text_opt(eingabe.notiz.as_deref()))
     .bind(text_opt(eingabe.leitung.as_deref()))
-    .bind(text_opt(eingabe.erreichbarkeit.as_deref()))
+    .bind(text_opt(eingabe.kontaktweg.as_deref()))
     .bind(eingabe.lat)
     .bind(eingabe.lon)
     .bind(benutzer_id)
@@ -1423,9 +1423,9 @@ pub async fn stelle_aendern_tx(
         Some(v) => text_opt(v.as_deref()),
         None => roh.leitung.clone(),
     };
-    let erreichbarkeit = match &eingabe.erreichbarkeit {
+    let kontaktweg = match &eingabe.kontaktweg {
         Some(v) => text_opt(v.as_deref()),
-        None => roh.erreichbarkeit.clone(),
+        None => roh.kontaktweg.clone(),
     };
     // Koordinate (LFH-673): Effektivzustand gegen den Rohstand DIESER Transaktion — ein im
     // Handler vorab gelesener Stand könnte zwischen Prüfung und UPDATE veralten und das Paar
@@ -1441,12 +1441,12 @@ pub async fn stelle_aendern_tx(
         kapazitaet: (kapazitaet != roh.kapazitaet_personen)
             .then_some((roh.kapazitaet_personen, kapazitaet)),
         abschnitt: abschnitt_id != roh.abschnitt_id,
-        // Leitung und Erreichbarkeit (LLH-1044) wie Standort und Notiz: personenbezogen, deshalb
+        // Leitung und Kontaktweg (LLH-1044) wie Standort und Notiz: personenbezogen, deshalb
         // nur als „weitere Angaben“ im ETB, nie mit Wert (LFH-752).
         weitere_angaben: standort != roh.standort
             || notiz != roh.notiz
             || leitung != roh.leitung
-            || erreichbarkeit != roh.erreichbarkeit,
+            || kontaktweg != roh.kontaktweg,
     };
     let status_neu = status != roh.status;
     // Die Verortung ist eine EIGENE Achse, nicht Teil von `StelleStammdaten`: die erzeugt den
@@ -1480,7 +1480,7 @@ pub async fn stelle_aendern_tx(
     sqlx::query(
         "UPDATE betreuungsstelle SET bezeichnung = ?, art = ?, abschnitt_id = ?, \
             kapazitaet_personen = ?, status = ?, standort = ?, notiz = ?, leitung = ?, \
-            erreichbarkeit = ?, lat = ?, lon = ?, geaendert_at = datetime('now') \
+            kontaktweg = ?, lat = ?, lon = ?, geaendert_at = datetime('now') \
          WHERE id = ?",
     )
     .bind(&bezeichnung)
@@ -1491,7 +1491,7 @@ pub async fn stelle_aendern_tx(
     .bind(&standort)
     .bind(&notiz)
     .bind(&leitung)
-    .bind(&erreichbarkeit)
+    .bind(&kontaktweg)
     .bind(lat)
     .bind(lon)
     .bind(id)

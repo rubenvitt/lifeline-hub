@@ -48,8 +48,8 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   gibt es nur in `betreuungText.ts`, nie negativ. „Betroffene hier“ fragt die Personenliste mit
   `?betreuungsstelle_id=` (Serverfilter, Key `einsatzKeys.personenDerStelle`) und nur, wenn die
   Übersicht `namentlich` liefert (Personenrecht); sonst steht der Grund als Zeile.
-  Leitung und `erreichbarkeit` (Migration 0226, je 200 Zeichen; in der Oberfläche „Kontakt“,
-  LLH-1134) sind personenbezogen: im ETB nur
+  Leitung und `kontaktweg` (Migrationen 0226/0256, je 200 Zeichen; in der Oberfläche „Kontakt“,
+  LLH-1134/LLH-1419) sind personenbezogen: im ETB nur
   „weitere Angaben“, Schwärzung leert sie, der gesicherte Lagestand friert sie nicht ein.
 - **Bedarf einer Stelle** (LLH-1082, Spec `nachforderung-betreuungsstelle`): nur als
   Nachforderung mit `nachforderung.betreuungsstelle_id` (Migration 0231, nur die Kennung im DTO),

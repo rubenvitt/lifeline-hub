@@ -44,7 +44,7 @@ fn eingabe(art: MedienkontaktArt) -> KontaktEingabe {
         medium: "NDR 1 Niedersachsen".into(),
         thema: "Zahl der Evakuierten".into(),
         kontakt_name: Some("M. Beispiel".into()),
-        kontakt_erreichbarkeit: Some("+49 511 000000".into()),
+        kontaktweg: Some("+49 511 000000".into()),
         eingang_at: "2026-09-30 12:00:00".into(),
     }
 }
@@ -308,7 +308,7 @@ async fn aendern_leert_kontaktangaben_und_prueft_pflicht() {
     let k = laden(&w.pool, w.e, id).await.unwrap();
     assert_eq!(k.thema, "Sperrung B 3");
     assert_eq!(k.kontakt_name, None);
-    assert_eq!(k.kontakt_erreichbarkeit.as_deref(), Some("+49 511 000000"));
+    assert_eq!(k.kontaktweg.as_deref(), Some("+49 511 000000"));
     let leer = KontaktAenderung {
         medium: Some(" ".into()),
         ..KontaktAenderung::default()
