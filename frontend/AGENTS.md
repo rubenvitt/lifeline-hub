@@ -964,14 +964,17 @@ und `pages/personen/`.
   `formularseiten`, „Rückfrage vor dem Verlassen“): über den Merker
   `components/offeneBearbeitung.tsx` (`OffeneBearbeitungProvider` speist
   `useFormularVerlassenSchutz` und rendert `VerlassenRueckfrage`; ein Feld meldet sich mit
-  `useOffeneBearbeitung(etikett)` über `onEntwurf` an). Höchstens ein Entwurf je Seite: die
+  `useOffeneBearbeitung(etikett)` über `onEntwurf` an, eine `InlineAngabe` ohne eigenes
+  `onEntwurf` selbst, dann ohne Sperre der übrigen, LLH-1468). Höchstens ein Entwurf je Seite: die
   übrigen Felder sind gesperrt mit „Erst „Name“ speichern oder abbrechen“
   (`useOffeneBearbeitungGrund` liefert den Grund der Seite; wo er steht, sagt die Bereichsdatei,
   für Personendaten `frontend/src/personen/AGENTS.md`). Ein offenes Feld ohne Änderung meldet sich
   nicht an. **Ein Wechsel in der Seite, der die offene Bearbeitung aushängt** (Segmentleiste oder
   Reiter ohne Pfadwechsel), geht über `useWechselNachRueckfrage` desselben Merkers: mit Änderung
   dieselbe Rückfrage (`VerlassenDialog`), ohne still; der Provider umfasst dafür auch die Leiste
-  (LLH-1415, Vorbild `pages/VerpflegungPage.tsx`).
+  (LLH-1415, Vorbild `pages/VerpflegungPage.tsx`; ebenso Fahrzeuge, Liste ↔ Tableau, LLH-1468). Ein
+  Wechsel, der sie stehen lässt, fragt nicht (Gruppierung der Materialliste: die Zeile behält ihren
+  Schlüssel).
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;

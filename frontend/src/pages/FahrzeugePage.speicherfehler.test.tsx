@@ -95,7 +95,7 @@ function render({
     <Routes>
       <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
     </Routes>,
-    { route },
+    { route, datenRouter: true },
   );
 }
 

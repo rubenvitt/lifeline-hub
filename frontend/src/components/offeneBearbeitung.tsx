@@ -50,6 +50,10 @@ import VerlassenRueckfrage, { VerlassenDialog } from './VerlassenRueckfrage';
  * - **Wechsel in der Seite** (LLH-1415): eine Segmentleiste oder ein Reiter ohne Pfadwechsel, der
  *   die offene Bearbeitung aushängt, geht über `useWechselNachRueckfrage` — dieselbe Rückfrage
  *   (`VerlassenDialog`), ohne Änderung still. Der Provider muss dafür auch die Leiste umfassen.
+ * - **Eine `InlineAngabe` ohne eigenes `onEntwurf` meldet sich selbst an** (LLH-1468): ein Provider
+ *   um die Seite genügt für die Rückfrage (Fahrzeuge, Material). Die übrigen Felder sperrt sie dabei
+ *   nicht; wer das will, verdrahtet `useOffeneBearbeitung` selbst und zeigt den Grund an EINER
+ *   Stelle (Personendaten).
  */
 
 /** Sperrgrund für die übrigen Felder; wenige Wörter (`frontend/AGENTS.md`, „Texte“). */
