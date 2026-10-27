@@ -389,3 +389,73 @@ describe('Datensicht · Gedächtnis (LLH-1086)', () => {
     expect(g.meldeSpalten).toHaveBeenLastCalledWith({ aus: ['typ'], an: [] });
   });
 });
+
+/**
+ * Filter einer weichenden Spalte (LLH-1276, Spec `tabellen-sortieren-filtern`): weicht eine Spalte
+ * mit `filter.feldOhneSpalte` in der Tabelle der Breite, steht ihr Filter als Auswahlfeld in der
+ * Werkzeugzeile, wirkt und steht als Chip da. Von Hand ausgeblendet gilt „was man nicht sieht,
+ * wirkt nicht“ ohne Ausnahme.
+ */
+describe('Datensicht · Feld ohne Spalte (LLH-1276)', () => {
+  const weichend = (feldOhneSpalte: boolean) =>
+    spalten.map((s) =>
+      s.key === 'typ' && s.filter
+        ? { ...s, abBreite: 'xxl' as const, filter: { ...s.filter, feldOhneSpalte } }
+        : s,
+    );
+  const mitTypSturm = (spaltenAus: Key[] = []): ListenGedaechtnis<Key> => ({
+    start: { sortierung: null, filter: { typ: ['sturm'] }, suche: '' },
+    spaltenStart: { aus: spaltenAus, an: [] },
+    melde: vi.fn(),
+    meldeSpalten: vi.fn(),
+  });
+
+  it('weicht die Spalte der Breite, steht ihr Filter als Feld über der Tabelle und wirkt', async () => {
+    setzeViewportBreite(1366);
+    rendere({ spalten: weichend(true) });
+    expect(screen.queryByRole('columnheader', { name: /^Typ/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Typ filtern/ })).toBeNull();
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Typ' }));
+    await userEvent.click(await screen.findByTitle('Sturm'));
+    await waitFor(() => expect(zeilen()).toEqual(['3']));
+    expect(screen.getByRole('button', { name: 'Filter Typ: Sturm entfernen' })).toBeInTheDocument();
+    expect(hinweis()).toHaveTextContent('1 von 3 Schäden sichtbar');
+  });
+
+  it('ein Wert aus Adresse oder Sitzung wirkt auch, solange die Spalte weicht', () => {
+    setzeViewportBreite(1366);
+    rendere({ spalten: weichend(true), gedaechtnis: mitTypSturm() });
+    expect(zeilen()).toEqual(['3']);
+    expect(screen.getByRole('button', { name: 'Filter Typ: Sturm entfernen' })).toBeInTheDocument();
+  });
+
+  it('steht die Spalte, filtert der Kopf, und das Feld fehlt', () => {
+    setzeViewportBreite(1600);
+    rendere({ spalten: weichend(true) });
+    expect(screen.getByRole('button', { name: 'Typ filtern' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Typ' })).toBeNull();
+  });
+
+  it('von Hand ausgeblendet: kein Feld, keine Wirkung, kein Chip', () => {
+    setzeViewportBreite(1600);
+    rendere({ spalten: weichend(true), gedaechtnis: mitTypSturm(['typ']) });
+    expect(screen.queryByRole('combobox', { name: 'Typ' })).toBeNull();
+    expect(zeilen()).toEqual(['1', '2', '3']);
+    expect(screen.queryByRole('button', { name: 'Filter Typ: Sturm entfernen' })).toBeNull();
+  });
+
+  it('ohne Kennzeichnung bleibt es bei der Regel: weichende Spalte, kein Feld, keine Wirkung', () => {
+    setzeViewportBreite(1366);
+    rendere({ spalten: weichend(false), gedaechtnis: mitTypSturm() });
+    expect(screen.queryByRole('combobox', { name: 'Typ' })).toBeNull();
+    expect(zeilen()).toEqual(['1', '2', '3']);
+  });
+
+  it('im Kartenzweig ändert die Kennzeichnung nichts', () => {
+    setzeViewportBreite(390);
+    rendere({ spalten: weichend(true) });
+    expect(screen.queryByRole('combobox', { name: 'Typ' })).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Ausmaß' })).toBeInTheDocument();
+  });
+});

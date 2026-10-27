@@ -105,7 +105,9 @@ import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGeda
  *    Wirkt eine Suche oder ein Filter, steht der `Filterhinweis` (Treffer von Gesamt, im Servermodus
  *    nur aus der Serverzählung) und je Wert ein Chip; „Filter zurücksetzen“ leert Suche und Filter,
  *    nicht die Sortierung. Was man nicht sieht, wirkt nicht: der Filter einer ausgeblendeten Spalte
- *    bleibt im Zustand, schneidet nichts und steht deshalb auch nicht als Chip da. Mit `gedaechtnis`
+ *    bleibt im Zustand, schneidet nichts und steht deshalb auch nicht als Chip da. Ausnahme
+ *    `filter.feldOhneSpalte` (LLH-1276): weicht die Spalte nur der Breite, steht ihr Filter als
+ *    Feld in der Werkzeugzeile, man sieht ihn also, und er wirkt. Mit `gedaechtnis`
  *    beginnen Sortierung, Filter, Suche und Spaltenwahl beim gemerkten Stand und gehen entprellt
  *    zurück (`components/listenGedaechtnis.ts`); Hinweis und Chips erscheinen nur bei
  *    Einschränkung, als Antwort auf die eigene Wahl.
@@ -253,6 +255,13 @@ export type DatensichtSpalte<T, K extends string = string> = AntdErbe<T> & {
      * oder Tabelle) schneidet weiter und steht als Chip da; die Menge bleibt dieselbe.
      */
     ohneKartenfeld?: boolean;
+    /**
+     * Feld ohne Spalte (LLH-1276): weicht die Spalte in der TABELLE der Breite (`abBreite`), steht
+     * der Filter als Auswahlfeld in der Werkzeugzeile, wirkt und steht als Chip da. Ohne die
+     * Kennzeichnung ginge er mit der Spalte verloren (Materialliste: Kategorie am Fükw). Von Hand
+     * ausgeblendet gilt die Regel ohne Ausnahme; im Kartenzweig wirkungslos.
+     */
+    feldOhneSpalte?: boolean;
   };
   /** Erst ab dieser Breite in der TABELLE sichtbar (Ersatz für antds Breiten-Prop). */
   abBreite?: AbBreitePunkt;
@@ -1272,10 +1281,27 @@ export default function Datensicht<T extends object, const K extends string>(
    * die `abBreite` verbirgt: beim Verkleinern ändert sich die Zeilenzahl, bewusst, denn ein
    * unsichtbar wirkender Filter ist schlechter. Zähler und Filter folgen derselben Wahrheit.
    */
+  /**
+   * Filter ohne Spalte (LLH-1276): Spalten, die in der Tabelle NUR der Breite weichen und deren
+   * Filter `feldOhneSpalte` trägt. Ihr Filter steht als Feld in der Werkzeugzeile, ist also zu
+   * sehen und wirkt. Von Hand ausgeblendet (`verborgen`) gehört keine dazu.
+   */
+  const feldSpalten = useMemo(
+    () =>
+      alsTabelle && baum == null
+        ? spalten.filter(
+            (s) =>
+              s.filter?.feldOhneSpalte === true &&
+              !gezeigteSpaltenSchluessel.has(s.key) &&
+              !verborgen.has(s.key),
+          )
+        : [],
+    [alsTabelle, baum, spalten, gezeigteSpaltenSchluessel, verborgen],
+  );
   const wirksameFilterWerte = useMemo(() => {
-    const sichtbar = new Set(gezeigteSpalten.map((s) => s.key as string));
+    const sichtbar = new Set([...gezeigteSpalten, ...feldSpalten].map((s) => s.key as string));
     return Object.fromEntries(Object.entries(filterWerte).filter(([k]) => sichtbar.has(k)));
-  }, [filterWerte, gezeigteSpalten]);
+  }, [filterWerte, gezeigteSpalten, feldSpalten]);
 
   // ── Servermodus: Werte melden statt anwenden (LFH-1075) ─────────────────────────────
   const server = useRef(serverseitig);
@@ -1507,7 +1533,7 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [befundSchluessel, bezeichnung]);
 
   // ── Werkzeugzeile ─────────────────────────────────────────────────────────────────
-  const filterSpalten = gezeigteSpalten.filter((s) => s.filter != null);
+  const filterSpalten = [...gezeigteSpalten.filter((s) => s.filter != null), ...feldSpalten];
   /** „Ort, aufsteigend“ / „Ort, absteigend“ je sortierbarer Spalte, für den Kartenzweig. */
   const sortierOptionen = spalten.flatMap((s) => {
     if (!s.sortWert || 'children' in s) return [];
@@ -1673,35 +1699,39 @@ export default function Datensicht<T extends object, const K extends string>(
           />
         )}
         {/* Im Tabellenzweig sitzt der Filter im Spaltenkopf (LLH-1086); die Karte hat keinen Kopf
-            und behält das Auswahlfeld je Filterspalte. */}
+            und behält das Auswahlfeld je Filterspalte. In der Tabelle bekommt nur eine Spalte,
+            die mit `feldOhneSpalte` der Breite weicht, das Feld (LLH-1276). */}
         {baum == null &&
-          !alsTabelle &&
-          filterSpalten
-            .filter((spalte) => !spalte.filter!.ohneKartenfeld)
-            .map((spalte) => (
-              <Select
-                key={spalte.key}
-                mode="multiple"
-                allowClear
-                maxTagCount="responsive"
-                aria-label={etikettVon(spalte) ?? spalte.key}
-                /*
-                 * Das Etikett steht als PRÄFIX im Feld (LFH-967): nach der Wahl verschwindet der
-                 * Platzhalter, und „Anlaufstelle ×“ allein sagt nicht, zu welcher Achse der Wert
-                 * gehört. Der zugängliche Name trägt es schon, deshalb `aria-hidden`.
-                 */
-                prefix={
-                  <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
-                    {etikettVon(spalte) ?? spalte.key}:
-                  </span>
-                }
-                placeholder="alle"
-                value={[...(filterWerte[spalte.key] ?? [])]}
-                onChange={(werte: string[]) => setzeFilter(spalte.key, werte)}
-                options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
-                style={{ minWidth: 160 }}
-              />
-            ))}
+          (alsTabelle
+            ? feldSpalten
+            : filterSpalten.filter((spalte) => !spalte.filter!.ohneKartenfeld)
+          ).map((spalte) => (
+            <Select
+              key={spalte.key}
+              mode="multiple"
+              allowClear
+              maxTagCount="responsive"
+              // Eigene Kennung: ohne sie vergibt antd im Test eine feste (`test-id`), die mit der
+              // Titelkennung eines Dialogs auf derselben Seite kollidiert.
+              id={`${idPraefix}-filter-${idTeil(spalte.key)}`}
+              aria-label={etikettVon(spalte) ?? spalte.key}
+              /*
+               * Das Etikett steht als PRÄFIX im Feld (LFH-967): nach der Wahl verschwindet der
+               * Platzhalter, und „Anlaufstelle ×“ allein sagt nicht, zu welcher Achse der Wert
+               * gehört. Der zugängliche Name trägt es schon, deshalb `aria-hidden`.
+               */
+              prefix={
+                <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
+                  {etikettVon(spalte) ?? spalte.key}:
+                </span>
+              }
+              placeholder="alle"
+              value={[...(filterWerte[spalte.key] ?? [])]}
+              onChange={(werte: string[]) => setzeFilter(spalte.key, werte)}
+              options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
+              style={{ minWidth: 160 }}
+            />
+          ))}
         {/* Steht der Schalter bei der Seite (`spaltenSchalterAussen`), zeichnet ihn nur sie. */}
         {alsTabelle && !aussen && (
           <SpaltenSchalter

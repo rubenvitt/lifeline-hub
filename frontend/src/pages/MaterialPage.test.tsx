@@ -2100,6 +2100,32 @@ describe('MaterialPage · Sortieren und Filtern (LLH-1096)', () => {
     await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?sort=menge%3Aab'));
   });
 
+  it('am Fükw filtert die Kategorie über ein Feld über der Tabelle (LLH-1276)', async () => {
+    // Die Spalte weicht unter `xxl` (LLH-1093); ihr Filter bleibt als Feld „Kategorie“ stehen.
+    setzeViewportBreite(1280);
+    render(einsatzAktiv, [erstes, { ...zweites, kategorie: 'Unterkunft' }]);
+    await screen.findByText('Wolldecke');
+    expect(screen.queryByRole('columnheader', { name: /^Kategorie/ })).toBeNull();
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Kategorie' }));
+    await userEvent.click(await screen.findByTitle('Unterkunft'));
+    await waitFor(() => expect(folge()).toEqual(['11']));
+    expect(
+      screen.getByRole('button', { name: 'Filter Kategorie: Unterkunft entfernen' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?f.kategorie=Unterkunft'));
+    // Der Träger weicht ebenfalls, bekommt aber kein Feld (LLH-1276, nur Kategorie).
+    expect(screen.queryByRole('combobox', { name: 'Träger' })).toBeNull();
+  });
+
+  it('ab `xxl` filtert die Kategorie im Kopf, ein Feld steht nicht da (LLH-1276)', async () => {
+    setzeViewportBreite(1600);
+    render(einsatzAktiv, [erstes, zweites]);
+    await screen.findByText('Wolldecke');
+    expect(screen.getByRole('button', { name: 'Kategorie filtern' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Kategorie' })).toBeNull();
+  });
+
   it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
     setzeViewportBreite(1600);
     render(einsatzAktiv, [erstes, zweites], [], {}, '/einsaetze/1/material?f.traeger=ASB');
