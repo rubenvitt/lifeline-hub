@@ -245,8 +245,9 @@ export default function UhsDetailPage() {
   // der Kopf bei 390 px über den Rand. Die Teile selbst bleiben ganz.
   const meta = showMaterialzahl ? (
     <span style={{ whiteSpace: 'normal' }}>
-      <span style={{ whiteSpace: 'nowrap' }}>{metaText} ·</span> // Ersetzen wie die Bereichsleiste:
-      „Zurück“ verlässt die Seite, statt den Bereich zurückzunehmen.
+      <span style={{ whiteSpace: 'nowrap' }}>{metaText} ·</span>{' '}
+      {/* Ersetzen wie die Bereichsleiste: „Zurück“ verlässt die Seite, statt den Bereich
+          zurückzunehmen. */}
       <KennungsLink to={{ search: uhsBereichSuche('material') }} replace>
         {materialKopfzahl(uhs.material)}
       </KennungsLink>

@@ -31,6 +31,9 @@ export interface EinheitAngabeProps {
   onSpeichern: (neu: number | null, alt: number | null) => Promise<unknown>;
 }
 
+/** Wortgrenzen statt `anywhere`; `hyphens` braucht die Sprache am Element oder darüber. */
+const NAME_STIL = { overflowWrap: 'break-word', hyphens: 'auto' } as const;
+
 /**
  * Einheit als Inline-Angabe (LLH-1073 D3, geteilt mit LLH-1060/1093): wählen, dann „Speichern“;
  * kein Speichern beim Verlassen, denn ein Fehlgriff schriebe sofort einen ETB-Eintrag. Unverändert
@@ -40,9 +43,6 @@ export interface EinheitAngabeProps {
  *
  * Eine Einheit, die nicht in `optionen` steht (Liste noch alt), zeigt kein erfundenes Etikett.
  */
-/** Wortgrenzen statt `anywhere`; `hyphens` braucht die Sprache am Element oder darüber. */
-const NAME_STIL = { overflowWrap: 'break-word', hyphens: 'auto' } as const;
-
 export default function EinheitAngabe({
   kennung,
   wert,

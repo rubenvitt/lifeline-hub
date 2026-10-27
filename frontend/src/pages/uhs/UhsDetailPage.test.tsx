@@ -235,6 +235,8 @@ describe('UhsDetailPage — Materialzahl im Kopf (LLH-1133)', () => {
 
     await screen.findByText('GRUNDRISS');
     const link = await within(kopf()).findByRole('link', { name: '3 Posten · 1 Ausfall' });
+    // Kein Quelltext im Kopf: ein Kommentar stand als JSX-Text vor der Zahl (LLH-1406).
+    expect(kopf()).not.toHaveTextContent('//');
     await userEvent.click(link);
     await waitFor(() =>
       expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=material'),

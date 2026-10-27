@@ -153,7 +153,8 @@ test.describe(KAPITEL, () => {
     const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
     await region.getByRole('button', { name: `Einheit zu ${OHNE_EINHEIT} eintragen` }).click();
     await region.getByRole('combobox', { name: `Einheit zu ${OHNE_EINHEIT}` }).click();
-    await waehleStehend(page, 'Rettungsstaffel');
+    // Die Auswahl zeigt den Pfad der Einheit (`kraefte/EinheitAngabe.tsx`).
+    await waehleStehend(page, 'Sanitätszug Musterstadt › Rettungsstaffel');
     await expect(offeneAuswahl(page)).toHaveCount(0);
     const zeile = region.locator('tr.ant-table-row').filter({ hasText: OHNE_EINHEIT });
     await expect(
