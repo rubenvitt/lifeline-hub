@@ -39,8 +39,10 @@ import { KOSTFORM_LABEL, KOSTFORMEN } from './verpflegungText';
  * - **Nur Geändertes** über `zeitfensterPatch` gegen den Stand beim Öffnen (Sonderkost je Kostform,
  *   `verpflegungsart: null` leert, `stelle_ids` ersetzt). Der PATCH des Servers trägt das: ein
  *   fehlender Schlüssel bleibt, wie er ist.
- * - **Kein CAS:** der Verpflegungs-PATCH kennt keinen Basisstand, die Basis geht nicht hinaus und
- *   ein 409 kommt hier nicht vor. Feldweise gesendet, überschreibt eine Änderung nur ihre Felder.
+ * - **CAS** (LLH-1414, Muster Tier/Schaden): der Stand beim Öffnen geht als `basis_geaendert_at`
+ *   hinaus; hat ein anderer das Zeitfenster inzwischen geändert, antwortet der Server 409 und der
+ *   Baustein fragt „Zwischenzeitlich geändert“ (verwerfen und neu laden, oder übernehmen ohne
+ *   Basis).
  * - **Vorschläge** wie früher im Dialog: der gespeicherte Bedarf bleibt stehen, die Hilfe nennt
  *   „Aktuell n — Herkunft“ (Spec „Bedarfsvorschläge aus Personal und Betreuung“).
  */
@@ -95,8 +97,10 @@ export interface ZeitfensterBearbeitenProps {
   freigaben: ModulFreigaben | undefined;
   jetzt: Dayjs;
   stellen: readonly Verpflegungsstelle[];
-  /** Lehnt bei Ablehnung ab (`mutateAsync`); der Grund steht an der Karte. */
-  onSpeichern: (patch: ZeitfensterPatch) => Promise<unknown>;
+  /** Lehnt bei Ablehnung ab (`mutateAsync`); der Grund steht an der Karte, ein 409 fragt nach. */
+  onSpeichern: (patch: ZeitfensterPatch, basis: string | undefined) => Promise<unknown>;
+  /** „Verwerfen und neu laden“ nach einem 409. */
+  onNeuLaden?: () => void;
   /** Gespeichert, abgebrochen oder verworfen: die Karte zeigt wieder ihre Ansicht. */
   onSchliessen: () => void;
   /** Wohin der Fokus nach dem Schließen geht („Bedarf bearbeiten“ bzw. das Aktionsmenü). */
@@ -109,6 +113,7 @@ export default function ZeitfensterBearbeiten({
   jetzt,
   stellen,
   onSpeichern,
+  onNeuLaden,
   onSchliessen,
   ausloeserRef,
 }: ZeitfensterBearbeitenProps) {
@@ -225,7 +230,8 @@ export default function ZeitfensterBearbeiten({
       felder={felder}
       form={form}
       patch={(_, nachher) => zeitfensterPatch(vorher, zuWerte(nachher))}
-      onSpeichern={(patch) => onSpeichern(patch)}
+      onSpeichern={(patch, basis) => onSpeichern(patch, basis)}
+      onNeuLaden={onNeuLaden}
       darfSchreiben
       ausloeserRef={ausloeserRef}
       spalten={4}

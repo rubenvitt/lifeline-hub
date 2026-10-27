@@ -95,7 +95,9 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   bearbeitet (LLH-1139, `verpflegung/ZeitfensterBearbeiten.tsx`, `frontend/AGENTS.md`, „Bearbeiten
   in der Ansicht“): „Bedarf bearbeiten“ ohne Modal, dieselben Felder wie beim Anlegen, nur
   geänderte Schlüssel über `zeitfensterPatch` gegen den Stand beim Öffnen, eine offene Karte je
-  Seite; `ZeitfensterDialog` legt nur an. Der PATCH hat keinen CAS (kein 409).
+  Seite; `ZeitfensterDialog` legt nur an. Der PATCH hat Zeilen-CAS (LLH-1414): `basis_geaendert_at`
+  ist der Stand beim Öffnen (`geaendert_at`, ohne Änderung `angelegt_at`), veraltet → 409 und
+  Rückfrage „Zwischenzeitlich geändert“; ohne Basis wird ohne Vergleich geschrieben.
   **Verpflegungsstellen** (LLH-1040, `src/verpflegung/stelle.rs`): Status wie BR
   (`geplant → aktiv → aufgeloest`, Storno nur geplant ohne Ausgabe und ohne laufende
   Gerätekopplung, sonst 409 „Gerät gekoppelt“ und „Stornieren“ gesperrt mit Grund, LLH-1048), Zuordnung zum Zeitfenster

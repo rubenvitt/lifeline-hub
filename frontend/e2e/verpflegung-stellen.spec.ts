@@ -154,9 +154,14 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     await bedarf.getByRole('button', { name: 'Speichern' }).click();
     const antwort = await patch;
     expect(antwort.ok()).toBeTruthy();
-    // Nur die geänderten Felder gehen hinaus (Spec `formularseiten`, „PATCH nur geänderter Felder“).
+    // Nur die geänderten Felder gehen hinaus (Spec `formularseiten`, „PATCH nur geänderter Felder“),
+    // dazu der Stand beim Öffnen als Steuerfeld (LLH-1414).
     const body = antwort.request().postDataJSON() as Record<string, unknown>;
-    expect(Object.keys(body).sort()).toEqual(['stelle_ids', 'verpflegungsart']);
+    expect(Object.keys(body).sort()).toEqual([
+      'basis_geaendert_at',
+      'stelle_ids',
+      'verpflegungsart',
+    ]);
     expect(body.verpflegungsart).toBe('warm');
     await expect(bedarf).toHaveCount(0);
     await expect(m.locator('[data-lfh="verpflegungsart"]')).toHaveText('warm');

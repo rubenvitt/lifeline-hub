@@ -20,7 +20,8 @@
 //!   eine Ausgabe, die nicht an seiner Stelle gebucht ist.
 //! - **403** — ein Gerät bucht auf eine Nachforderung (LFH-1044); ein an eine Stelle gebundenes
 //!   Gerät nennt eine andere Verpflegungsstelle (LLH-1048, ohne Angabe setzt der Server seine).
-//! - **409** — stornierte Verpflegungsstelle im Pfad (Ändern, Status, Storno), Storno einer
+//! - **409** — Zeitfenster zwischenzeitlich geändert (`basis_geaendert_at` veraltet, LLH-1414),
+//!   stornierte Verpflegungsstelle im Pfad (Ändern, Status, Storno), Storno einer
 //!   Stelle mit laufender Gerätekopplung („Gerät gekoppelt“, LLH-1048), Bezeichnung einer
 //!   Stelle schon vergeben, Ausgabe an einer aufgelösten Stelle (LLH-1040 D3) oder an eine
 //!   aufgelöste Einheit (LLH-1055 D2) mit einem Zeitpunkt nicht vor der Auflösung.
@@ -350,6 +351,11 @@ pub struct ZeitfensterAendern {
     /// Fehlt = unverändert; eine Liste ersetzt die Zuordnung, `[]` leert sie.
     #[serde(default)]
     stelle_ids: Option<Vec<i64>>,
+    /// Optimistisches Lock (LLH-1414, Muster Tier/Schaden): der Stand beim Öffnen,
+    /// `geaendert_at` oder ohne Änderung `angelegt_at`. Weicht er ab → 409. Fehlt er
+    /// („Meine Änderung übernehmen“ nach der Rückfrage), wird ohne Vergleich geschrieben.
+    #[serde(default)]
+    basis_geaendert_at: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id}/verpflegung/zeitfenster/{zid}
@@ -380,6 +386,7 @@ pub async fn zeitfenster_aendern(
         sonderkost: req.sonderkost.unwrap_or_default(),
         verpflegungsart,
         stelle_ids,
+        basis_geaendert_at: req.basis_geaendert_at,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let stil = repo::zeitstil(&state.pool, einsatz_id).await?;

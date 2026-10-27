@@ -200,7 +200,9 @@ Für Einsatzleitung und Führungspersonal:
    Zeitfenster …“ (drei Punkte). Die Karte zeigt jetzt statt der Zahlen die Felder: Bezeichnung,
    Zeitraum, Bedarf und Sonderkost ändern und „Speichern“ wählen (oder die Eingabetaste drücken).
    „Abbrechen“ oder die Escape-Taste verwirft die Änderung. Solange eine Karte in Bearbeitung ist,
-   ist „Bedarf bearbeiten“ an den anderen Karten gesperrt.
+   ist „Bedarf bearbeiten“ an den anderen Karten gesperrt. Hat jemand anderes das Zeitfenster seit
+   dem Öffnen geändert, fragt die App „Zwischenzeitlich geändert“: „Meine Änderung übernehmen“
+   speichert die eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand.
 2. Fehlt etwas, „Nachfordern“ wählen. Die App öffnet die Erfassung einer Nachforderung mit Art
    „Verpflegung“, der Fehlmenge als Anzahl und einer Begründung, die das Zeitfenster nennt.
 3. Ein Zeitfenster ohne gültige Ausgabe mit „Löschen“ entfernen und die Rückfrage mit „Löschen“
