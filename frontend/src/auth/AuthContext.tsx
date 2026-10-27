@@ -19,6 +19,7 @@ import {
   sitzungsMeldungZuruecksetzen,
 } from './sitzungsEvent';
 import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
+import { listenGedaechtnisBinden } from '../components/listenGedaechtnis';
 import {
   lagebildAnmelden,
   lagebildBeenden,
@@ -138,7 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  (`api/client.ts`) synchron mit dem Zustand — ein Effekt ließe ein Render-Fenster offen,
    *  in dem der Tab schon B zeigt, aber noch als A schreibt (oder umgekehrt). Aus demselben
    *  Grund hier gebunden: die behaltenen Erfassungswerte (LFH-785), die eine Maske von B sonst
-   *  mit denen von A vorbelegte. */
+   *  mit denen von A vorbelegte, und die Listenstände der Sitzung (LLH-1428), mit denen eine
+   *  Liste von B sonst Suche und Filter von A zeigte. */
   const uebernimm = useCallback((b: MeAntwort | null) => {
     generation.current++;
     // Nur ein bestätigter Benutzer setzt die Gerätemarke (LFH-892); ein Abmelden lässt sie
@@ -147,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     benutzerRef.current = b;
     setzeErwartetenBenutzer(b?.id ?? null);
     erfassungsSitzungBinden(b?.id ?? null);
+    listenGedaechtnisBinden(b?.id ?? null);
     setBenutzer(b);
   }, []);
 

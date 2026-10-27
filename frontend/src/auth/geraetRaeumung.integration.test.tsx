@@ -70,6 +70,9 @@ function entwurf(benutzerId: number, id: string): EtbEntwurf {
   };
 }
 
+/** Der Stand einer Liste in der Sitzung (`components/listenGedaechtnis.ts`), mit Suchbegriff. */
+const LISTENSTAND = 'lfh:liste:schaeden:7';
+
 /** Was Person A auf dem Gerät hinterlässt, dazu ein vorgemerkter Queue-Eintrag. */
 async function geraetVonABefuellen(): Promise<void> {
   await entwurfSpeichern(entwurf(a.id, 'e-a'));
@@ -81,6 +84,7 @@ async function geraetVonABefuellen(): Promise<void> {
   await schreibaktionPersonAbschliessen(a.id, zeile, { id: 1, name: 'Muster' } as Person);
   await setzeOrt(ortKeyVon(51.16, 10.45), 'Hauptstr. 5, Musterstadt');
   schreibeErfassungsSitzungswert(7, 'person', 'antreff_ort', 'Sammelstelle Süd');
+  sessionStorage.setItem(LISTENSTAND, 'f.ausmass=gross&q=Meier');
   await queueEinreihen(a.id, 7, { typ: 'meldung', inhalt: 'offline', client_id: 'etb-a' });
 }
 
@@ -116,6 +120,7 @@ describe('Gerät räumen beim Ausgang (LFH-767)', () => {
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
     expect(await rohLesen('lifeline-lagebild', 'stand')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
+    expect(sessionStorage.getItem(LISTENSTAND)).toBeNull();
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 
@@ -154,6 +159,7 @@ describe('Gerät räumen beim Ausgang (LFH-767)', () => {
     );
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
+    expect(sessionStorage.getItem(LISTENSTAND)).toBeNull();
     expect(await rohLesen('lifeline-etb-entwuerfe', 'entwuerfe')).toHaveLength(1);
   });
 
@@ -257,6 +263,34 @@ describe('Gerät räumen beim Ausgang (LFH-767)', () => {
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(b.anzeigename));
 
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
+  });
+
+  it('Neuladen als B (Benutzerkonflikt, LLH-1428): kein Listenstand von A ist vorbelegt', async () => {
+    server.use(meHandler(a));
+    const { unmount } = rendern();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(a.anzeigename));
+    sessionStorage.setItem(LISTENSTAND, 'f.ausmass=gross&q=Meier');
+    unmount();
+
+    // Ein anderer Tab hat B angemeldet; dieser Tab lädt neu, der sessionStorage überlebt das.
+    server.use(meHandler(b));
+    rendern();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(b.anzeigename));
+
+    expect(sessionStorage.getItem(LISTENSTAND)).toBeNull();
+  });
+
+  it('Neuladen als derselbe Benutzer (LLH-1428): der Listenstand bleibt', async () => {
+    server.use(meHandler(a));
+    const { unmount } = rendern();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(a.anzeigename));
+    sessionStorage.setItem(LISTENSTAND, 'f.ausmass=gross&q=Meier');
+    unmount();
+
+    rendern();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(a.anzeigename));
+
+    expect(sessionStorage.getItem(LISTENSTAND)).toBe('f.ausmass=gross&q=Meier');
   });
 
   it('Neuladen als derselbe Benutzer (LFH-785): der behaltene Erfassungswert bleibt', async () => {
