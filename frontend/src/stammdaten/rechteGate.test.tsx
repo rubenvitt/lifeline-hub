@@ -38,7 +38,7 @@ const nichtAdmin = benutzerFixture({
 const admin = adminFixture({ org_rolle: 'fuehrungskraft' });
 
 /**
- * Alle Abrufe der dreizehn Tabs mit leeren Katalogen. `onUnhandledRequest: 'error'`
+ * Alle Abrufe der dreizehn Tabs mit leeren Katalogen. `onUnhandledFrame: 'error'`
  * (test/setup.ts) macht eine fehlende Route zum Fehler statt zum stillen Leerlauf.
  * Leere Kataloge genügen: der Hinweis hängt am Recht, nicht an den Daten.
  */
@@ -137,10 +137,12 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
       // Erst auf den gerenderten Seitenkopf warten — ein `queryBy` vor dem ersten Anstrich
       // wäre trivial `null` und belegte nichts.
       expect(await screen.findByRole('heading', { level: 1, name })).toBeInTheDocument();
-      expect(screen.queryByText(STAMMDATEN_RECHTE_TEXT)).not.toBeInTheDocument();
       // Die Gegenaussage zur Sperre. Ohne sie bliebe eine fest verdrahtete `disabled`-Angabe
       // unentdeckt: dreizehn `toBeDisabled` wären dann grün, und die Seite unbedienbar.
       await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeEnabled());
+      // Erst jetzt ist der Benutzer bekannt: der Kopf steht schon, solange `/api/auth/me` noch
+      // unterwegs ist, und bis dahin gilt niemand als berechtigt.
+      expect(screen.queryByText(STAMMDATEN_RECHTE_TEXT)).not.toBeInTheDocument();
     },
   );
 });

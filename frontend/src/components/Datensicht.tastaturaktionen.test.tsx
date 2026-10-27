@@ -17,7 +17,7 @@ import Datensicht, {
  * Was die Werkzeugzeile der {@link Datensicht} an die Kommandopalette meldet (LFH-391 · B4).
  *
  * EIGENE DATEI: `vi.mock` hoistet dateiweit, und `src/test/setup.ts` fährt MSW mit
- * `onUnhandledRequest: 'error'` — das echte `useBefehle` fordert `/api/einsaetze` an. Ein
+ * `onUnhandledFrame: 'error'` — das echte `useBefehle` fordert `/api/einsaetze` an. Ein
  * dateiweiter Mock in `Datensicht.test.tsx` wäre dort ein Nebeneffekt ohne Anlass.
  *
  * Die Attrappe beschriftet mit der Id selbst, gegriffen wird auf `#cmd-tastatur:<id>`: der

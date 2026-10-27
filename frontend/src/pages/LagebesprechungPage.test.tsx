@@ -16,7 +16,7 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
 /**
  * Seite „Lagebesprechung“ (LLH-1111): Termin, Vorbereitung (LFH-550), Abschluss und Verlauf — aus
  * der Stab-Seite herausgelöst. Die Seite fragt den Stab nie an: es gibt hier keinen Handler für
- * `/api/einsaetze/1/stab`, ein Abruf scheiterte an `onUnhandledRequest: 'error'`.
+ * `/api/einsaetze/1/stab`, ein Abruf scheiterte an `onUnhandledFrame: 'error'`.
  */
 
 beforeEach(() => {

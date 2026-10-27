@@ -17,7 +17,7 @@ import { freigabenFixture } from '../test/fixtures';
  * steht in `datensaetze.test.ts`). Jede Query hier feuert im Moment des Tastendrucks.
  *
  * MSW-Handler statt `vi.mock`s: nur der Handler belegt die URL, und die Zähler stellen „kein
- * Request“ und „doch ein Request“ im selben Lauf nebeneinander. `onUnhandledRequest: 'error'`
+ * Request“ und „doch ein Request“ im selben Lauf nebeneinander. `onUnhandledFrame: 'error'`
  * bricht bei einem zu früh feuernden Request.
  *
  * Die Rechteachse fährt über die Modulfreigaben des Servers (LFH-669); der Hook kennt den

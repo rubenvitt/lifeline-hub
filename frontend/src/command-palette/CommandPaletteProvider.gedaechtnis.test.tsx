@@ -142,10 +142,15 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
       ),
     );
     const u = userEvent.setup();
-    renderMitProviders(
+    const { client } = renderMitProviders(
       <CommandPaletteProvider>
         <div />
       </CommandPaletteProvider>,
+    );
+    // Erst öffnen, wenn der Serverstand da ist: die Palette hält beim Öffnen ein Standbild, eine
+    // spätere Antwort käme erst beim nächsten Öffnen an (Test oben).
+    await waitFor(() =>
+      expect(client.getQueryData(globalKeys.benutzerEinstellungenVon(nutzer.id))).toBeDefined(),
     );
 
     await oeffne(u);

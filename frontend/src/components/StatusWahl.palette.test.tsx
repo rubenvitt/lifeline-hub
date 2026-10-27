@@ -18,7 +18,7 @@ import StatusWahl, { type StatusOption } from './StatusWahl';
  * `openspec/changes/archive/2026-09-30-lfh-507-palette-status-setzen/`).
  *
  * EIGENE DATEI: `vi.mock` hoistet dateiweit, und das echte `useBefehle` fordert `/api/einsaetze`
- * an (MSW mit `onUnhandledRequest: 'error'`). Die Attrappe beschriftet mit der Id, gegriffen wird
+ * an (MSW mit `onUnhandledFrame: 'error'`). Die Attrappe beschriftet mit der Id, gegriffen wird
  * auf `#cmd-tastatur:<id>`; der Wortlaut ist in `befehle.test.ts` gepinnt.
  */
 vi.mock('../command-palette/useBefehle', () => ({

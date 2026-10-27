@@ -22,7 +22,7 @@ import { theme } from 'antd';
 import { etbTypFarbe } from '../theme/statusFarben';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
-// onUnhandledRequest: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
+// onUnhandledFrame: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
 // damit die Bestandstests (Freitext-Fallback) nicht an ungemockten Requests scheitern.
 // Test-spezifische server.use(...) überschreiben diese Defaults.
 beforeEach(() => {

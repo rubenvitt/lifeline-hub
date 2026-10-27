@@ -27,7 +27,7 @@ import {
   schreibaktionenLaden,
 } from '../../offline/queue';
 
-// `BrSwitcher` feuert eine eigene `listeBr`-Query ohne MSW-Handler (`onUnhandledRequest: 'error'`);
+// `BrSwitcher` feuert eine eigene `listeBr`-Query ohne MSW-Handler (`onUnhandledFrame: 'error'`);
 // diese Datei testet die Seiten-Komposition, nicht den Switcher.
 vi.mock('./BrSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
 

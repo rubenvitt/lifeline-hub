@@ -41,6 +41,8 @@ export const EINGANG_ZEILEN = 2;
 /** Ein Eintrag: ein Eingang (Benachrichtigung der Stufe `hinweis`). */
 export type EingangEintrag = {
   benachrichtigungId: number;
+  /** Anlagezeit des Servers (RFC 3339); danach ordnet das Band wie der Verlauf. */
+  erstelltAt?: string;
   einsatzId: number;
   /** Art der Benachrichtigung; eine auf diesem Gerät stumme Art bleibt draußen. */
   art: BenachrichtigungArt;
@@ -239,8 +241,15 @@ export function useEingangshinweis(
       return;
     }
 
-    // Jüngste zuerst: der neue Eingang steht oben.
-    const zeilen = [...sichtbar].reverse();
+    // Jüngste zuerst: der neue Eingang steht oben. Wie der Server ordnet (Anlagezeit, dann
+    // Kennung), nicht nach der Reihenfolge des Eintragens: der Wortlaut einer Meldung kommt mit
+    // einem eigenen Abruf, und die Antworten mehrerer Eingänge kommen nicht zwingend in ihrer
+    // Reihenfolge an.
+    const zeilen = [...sichtbar].sort(
+      (a, b) =>
+        (b.erstelltAt ?? '').localeCompare(a.erstelltAt ?? '') ||
+        b.benachrichtigungId - a.benachrichtigungId,
+    );
     const einzeln = zeilen.length === 1 ? zeilen[0] : null;
     const ziele = new Set(zeilen.map((e) => e.ziel));
     const einZiel = ziele.size === 1 ? [...ziele][0] : null;

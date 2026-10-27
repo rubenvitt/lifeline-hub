@@ -125,7 +125,7 @@ describe('ladeMeldungInhalt', () => {
   });
 
   it('fragt bei einer anderen Art oder einem anderen Bezug gar nicht', async () => {
-    // Ohne Handler schlüge jeder Abruf fehl (`onUnhandledRequest: 'error'`).
+    // Ohne Handler schlüge jeder Abruf fehl (`onUnhandledFrame: 'error'`).
     expect(await ladeMeldungInhalt({ ...ereignis, art: 'auftrag_erteilt' })).toBeNull();
     expect(await ladeMeldungInhalt({ ...ereignis, bezug_typ: 'auftrag' })).toBeNull();
   });

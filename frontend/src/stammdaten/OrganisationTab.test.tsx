@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { Link, Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -388,31 +388,43 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   });
 
   it('lädt ein PNG als Multipart-Feld `datei` hoch und invalidiert die Organisation', async () => {
-    // Roh gelesen statt über `request.formData()`: undicis Multipart-Parser lehnt die jsdom-`File`
-    // ab und serialisiert sie ohne Dateinamen. Geprüft werden deshalb nur Feldname und
-    // Multipart-Form; die Datei im Feld `datei` belegt `api/organisation.test.ts` am `FormData`.
-    let koerper = '';
-    let typ = '';
+    // Der Upload wird am `fetch` abgegriffen, nicht im MSW-Handler: MSW schickt `fetch` durch
+    // undici, und undici scheitert an `FormData` und `File` aus jsdom (die Länge des Körpers passt
+    // nicht zu `content-length`). Im Browser gibt es nur eine Sorte. So bleibt die Datei selbst
+    // prüfbar statt nur des Feldnamens.
     server.use(
       meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.post('/api/organisation/logo', async ({ request }) => {
-        typ = request.headers.get('content-type') ?? '';
-        koerper = await request.text();
-        return HttpResponse.json(MIT_LOGO);
-      }),
     );
+    const echt = globalThis.fetch;
+    const hochgeladen: RequestInit[] = [];
+    globalThis.fetch = async (eingabe, init) => {
+      if (String(eingabe) !== '/api/organisation/logo') return echt(eingabe, init);
+      hochgeladen.push(init!);
+      return HttpResponse.json(MIT_LOGO);
+    };
+    onTestFinished(() => {
+      globalThis.fetch = echt;
+    });
     const { client } = renderTab();
     const invalidiert = vi.spyOn(client, 'invalidateQueries');
-    await screen.findByRole('button', { name: 'Logo hochladen' });
+    // Gesperrt, bis `/api/auth/me` den Admin bestätigt; ein gesperrtes Feld nimmt keine Datei.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Logo hochladen' })).toBeEnabled(),
+    );
     const datei = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'logo.png', {
       type: 'image/png',
     });
     await userEvent.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, datei);
-    await waitFor(() => expect(koerper).toContain('name="datei"'));
-    expect(typ).toMatch(/^multipart\/form-data; boundary=/);
+    await waitFor(() => expect(hochgeladen).toHaveLength(1));
+    expect(hochgeladen[0].method).toBe('POST');
+    const koerper = hochgeladen[0].body as FormData;
+    expect(koerper).toBeInstanceOf(FormData);
+    expect((koerper.get('datei') as File).name).toBe('logo.png');
+    // Den Content-Type samt Multipart-Grenze setzt der Browser; ein eigener verlöre die Grenze.
+    expect(new Headers(hochgeladen[0].headers).has('Content-Type')).toBe(false);
     await waitFor(() => expect(invalidiert).toHaveBeenCalledWith({ queryKey: ['organisation'] }));
   });
 
@@ -674,7 +686,10 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
       }),
     );
     renderTab();
-    await screen.findByRole('button', { name: 'Logo hochladen' });
+    // Gesperrt, bis `/api/auth/me` den Admin bestätigt; ein gesperrtes Feld nimmt keine Datei.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Logo hochladen' })).toBeEnabled(),
+    );
     const datei = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'logo.png', {
       type: 'image/png',
     });

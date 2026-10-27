@@ -135,6 +135,18 @@ async function bereit(name = 'Thomas Müller') {
   await screen.findByRole('button', { name: `Einheit zu ${name} bearbeiten` });
 }
 
+/**
+ * Wartet, bis die Liste nach Einheiten gruppiert steht. Die Einheiten kommen mit einem eigenen
+ * Abruf: die Zeilen stehen womöglich schon, bevor ihre Gruppen bekannt sind.
+ */
+async function gruppiert(container: HTMLElement) {
+  return waitFor(() => {
+    const s = container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]');
+    expect(s).toHaveTextContent('Zugtrupp');
+    return within(s!);
+  });
+}
+
 describe('PersonalPage', () => {
   it('bedient Status und Einteilung über benannte Auslöser, kein Auswahlfeld ruht in der Zeile', async () => {
     /**
@@ -736,9 +748,7 @@ describe('PersonalPage', () => {
     const { container } = render(einsatz(), [epGebunden, epOhne]);
     await bereit();
     // Im Streifen gesucht: die Verdichtungszeile darüber schreibt Statuswörter (LFH-973).
-    const streifen = within(
-      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
-    );
+    const streifen = await gruppiert(container);
     expect(streifen.getByText('1 nicht eingeteilt')).toBeInTheDocument();
     expect(streifen.getByText('1 Zugtrupp')).toBeInTheDocument();
     // „nicht eingeteilt“ (Zora) vor „Zugtrupp“ (Thomas) — weder Server- noch Namensordnung.
@@ -784,6 +794,7 @@ describe('PersonalPage', () => {
      */
     const { container, client } = render(einsatz(), [epGebunden, epOhne]);
     await bereit();
+    await gruppiert(container);
     const vorher = zeilenFolge(container);
     expect(vorher).toEqual(['12', '10']);
 
@@ -808,6 +819,7 @@ describe('PersonalPage', () => {
   it('Gegenprobe: OHNE Fokus in der Sicht ordnet sich die Liste sofort neu', async () => {
     const { container, client } = render(einsatz(), [epGebunden, epOhne]);
     await bereit();
+    await gruppiert(container);
     expect(zeilenFolge(container)).toEqual(['12', '10']);
 
     act(() => {
