@@ -162,6 +162,12 @@ Ob und wie Mitteilungen erscheinen, regelt das Betriebssystem je App:
   Eintrag „Lifeline Hub“ an. „Nicht stören“ bzw. der Fokus-Assistent unterdrückt sie. Mitteilungen
   gibt es nur von der installierten App, nicht von einem Entwicklungsbau aus `target/`.
 
+**Zahl am App-Symbol (LLH-1423):** Unter macOS trägt das Symbol im Dock die Zahl der ungelesenen
+Eingänge, dieselbe wie am Knopf „Eingänge“ und im Fenstertitel; ohne ungelesene Eingänge entfällt
+sie. Zeigen mehrere Fenster Einsätze, steht dort die größte ihrer Zahlen. Die Zahl erscheint nur,
+wenn unter Systemeinstellungen → Mitteilungen → „Lifeline Hub“ „Kennzeichen für App-Symbol“ an ist.
+Windows kennt keine Zahl am Symbol in der Taskleiste; dort bleibt es bei der Zahl im Fenstertitel.
+
 Herleitung: `openspec/changes/archive/2026-10-15-kcjecn9e-benachrichtigungskonzept/design.md`, D7.
 
 ## Update

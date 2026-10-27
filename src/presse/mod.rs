@@ -24,7 +24,7 @@ pub mod repo;
 /// Höchstlänge von Medium, Kontaktname und Freigabe eines Medienkontakts (LFH-937, design.md
 /// D6). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
 pub const KURZ_MAX: usize = 200;
-/// Höchstlänge von Thema und Erreichbarkeit eines Medienkontakts (LFH-937).
+/// Höchstlänge von Thema und Kontaktweg eines Medienkontakts (LFH-937).
 pub const THEMA_MAX: usize = 500;
 /// Höchstlänge der gegebenen Antwort (LFH-937).
 pub const ANTWORT_MAX: usize = 8_000;
@@ -83,7 +83,7 @@ pub struct MedienkontaktAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kontakt_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub kontakt_erreichbarkeit: Option<String>,
+    pub kontaktweg: Option<String>,
     pub eingang_at: String,
     pub status: MedienkontaktStatus,
     /// Die gegebene Antwort. Bleibt bei einer Rücknahme nach `offen` stehen.

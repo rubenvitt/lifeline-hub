@@ -74,6 +74,10 @@ import { fmsEtikett } from '../kraefte/meldebildRaster';
 import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import {
+  OffeneBearbeitungProvider,
+  useWechselNachRueckfrage,
+} from '../components/offeneBearbeitung';
+import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
@@ -300,7 +304,22 @@ const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
   'traeger',
 ];
 
+/**
+ * Merker der Seite (LLH-1468, `frontend/AGENTS.md`, „Ein offenes, geändertes Einzelfeld in einer
+ * Ansicht …“): eine geänderte Inline-Angabe der Liste (Einheit) meldet sich selbst an und fragt vor
+ * dem Verlassen nach. Er umfasst auch die Segmentleiste im Seitenkopf: der Wechsel aufs Tableau
+ * hängt die Liste aus. Ohne `aktiv`, weil die Seite erst darunter weiß, ob sie schreiben darf;
+ * ohne Schreibrecht meldet keine Angabe einen Entwurf.
+ */
 export default function FahrzeugePage() {
+  return (
+    <OffeneBearbeitungProvider>
+      <FahrzeugeInhalt />
+    </OffeneBearbeitungProvider>
+  );
+}
+
+function FahrzeugeInhalt() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { token } = theme.useToken();
@@ -340,8 +359,10 @@ export default function FahrzeugePage() {
     {},
   );
   const ansicht = ansichtNachEinsatz[einsatzId] ?? 'liste';
+  /** Ein Wechsel hängt die Liste samt offener Angabe aus: mit Änderung erst die Rückfrage. */
+  const nachRueckfrage = useWechselNachRueckfrage();
   const setzeAnsicht = (a: FahrzeugeAnsicht) =>
-    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a }));
+    nachRueckfrage(() => setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a })));
 
   // Sichtvorgabe ?ansicht= (Sprungmarke „FMS-Tableau"), apply-then-clean. Geräumt wird auch ein
   // unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag. Über den Setter
@@ -361,11 +382,13 @@ export default function FahrzeugePage() {
   useEffect(() => {
     if (!searchParams.has('ansicht')) return;
     const vorgabe = parseFahrzeugeAnsicht(searchParams);
-    if (vorgabe) setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe }));
+    // Die Sprungmarke bleibt auf dem Pfad, `useBlocker` hält sie nicht an: wie die Leiste fragen.
+    if (vorgabe && vorgabe !== ansicht)
+      nachRueckfrage(() => setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe })));
     const rest = new URLSearchParams(searchParams);
     rest.delete('ansicht');
     setSearchParams(rest, { replace: true });
-  }, [searchParams, setSearchParams, einsatzId]);
+  }, [searchParams, setSearchParams, einsatzId, ansicht, nachRueckfrage]);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),

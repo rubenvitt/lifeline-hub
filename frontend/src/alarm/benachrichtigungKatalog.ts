@@ -29,8 +29,9 @@ import {
  *
  * - `name`: kurzer Name für die Einstellungsseite und die Zählzeilen des Sammeltoasts.
  * - `org`: Org-Art (Org-Kanal), gezeigt auch außerhalb eines Einsatzes.
- * - `einstellbar`: steht auf der Einstellungsseite. `unwetter` erkennt der Browser selbst und
- *   prüft den Schalter dort (`wetter/useUnwetterHinweis.ts`).
+ * - `einstellbar`: steht auf der Einstellungsseite; ein Schalter nur bei Hinweis-Arten, Alarme
+ *   stehen dort als nicht abschaltbar. `unwetter` erkennt der Browser selbst
+ *   (`wetter/useUnwetterHinweis.ts`); seit LLH-1425 ein Alarm (Warnstufe rot).
  *
  * Titel, Detailzeile und Sprungziel einer einzelnen Benachrichtigung bildet der Server
  * (`src/benachrichtigung/text.rs`); hier steht nur, was der Client ohne Text braucht.
@@ -95,6 +96,13 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
     org: false,
     einstellbar: true,
   },
+  // Die letzte Rückmeldung einer Einheit ist älter als die Rückmeldefrist (LLH-1425).
+  rueckmeldung_ueberfaellig: {
+    name: 'Rückmeldung überfällig',
+    stufe: 'hinweis',
+    org: false,
+    einstellbar: true,
+  },
   lagebesprechung_vorher: {
     name: 'Lagebesprechung in 10 Minuten',
     stufe: 'hinweis',
@@ -115,6 +123,8 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
   },
   gefahr: { name: 'Neue Gefahr', stufe: 'hinweis', org: false, einstellbar: true },
   sichtung_eins: { name: 'Sichtung I', stufe: 'hinweis', org: false, einstellbar: true },
+  // Eine Person ist als vermisst erfasst oder auf vermisst gesetzt (LLH-1425).
+  vermisstenmeldung: { name: 'Vermisstenmeldung', stufe: 'alarm', org: false, einstellbar: true },
   wieder_verfuegbar: {
     name: 'Wieder verfügbar',
     stufe: 'hinweis',
@@ -129,7 +139,8 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
     einstellbar: true,
   },
   einsatz_neu: { name: 'Neuer Einsatz', stufe: 'hinweis', org: true, einstellbar: true },
-  unwetter: { name: 'Unwetterwarnung', stufe: 'hinweis', org: false, einstellbar: true },
+  // Warnstufe rot und darüber (LLH-1425, Katalog LLH-1142 E1).
+  unwetter: { name: 'Unwetterwarnung', stufe: 'alarm', org: false, einstellbar: true },
 };
 
 /** Alle Arten in Katalogreihenfolge. */
@@ -241,6 +252,9 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
   abloeser_br_eingetroffen: 'abloesung',
   abloeser_abgerufen: 'abloesung',
   abloeser_entfallen: 'abloesung',
+  // Gestrichene Alarmierung bzw. gestrichenes Eintreffen in der Kräfte-Zeitachse (LLH-1425).
+  abloeser_alarmierung_gestrichen: 'abloesung',
+  abloeser_eintreffen_gestrichen: 'abloesung',
   lagebesprechung: 'lagebesprechung',
   nachforderung: 'nachforderungen',
   nachforderung_zugesagt: 'nachforderungen',
@@ -258,8 +272,8 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
  * Sprung einer Benachrichtigung, deren Text nicht zu holen war (`alarm/useBenachrichtigungen.ts`):
  * das Modul ihres Bezugs, eine Org-Art in ihren Einsatz. Eine Benachrichtigung der Ablösung
  * springt wie der Server-Pfad zu ihrer Schicht (`?schicht=`, LLH-1131 Teil II): ihr Bezug ist
- * immer die Schicht. Eine zur Meldung springt zu ihr (`?meldung=`, LLH-1052), auch hier wie der
- * Server-Pfad.
+ * immer die Schicht. Eine zur Meldung springt zu ihr (`?meldung=`, LLH-1052), eine zur Erinnerung
+ * zu deren Karte (`?erinnerung=`, LLH-1467), auch hier wie der Server-Pfad.
  */
 export function ersatzPfad(
   e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ' | 'bezug_id' | 'einsatz_id'>,
@@ -268,6 +282,9 @@ export function ersatzPfad(
   const ziel = zielVon(e);
   if (ziel === 'abloesung') return abloesungPfad(e.einsatz_id, { schicht: e.bezug_id });
   if (e.bezug_typ === 'meldung') return meldungenPfad(e.einsatz_id, { meldung: e.bezug_id });
+  if (e.bezug_typ === 'erinnerung') {
+    return erinnerungenPfad(e.einsatz_id, { erinnerung: e.bezug_id });
+  }
   return zielPfad(ziel, e.einsatz_id);
 }
 

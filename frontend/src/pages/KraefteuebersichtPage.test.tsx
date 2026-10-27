@@ -1369,15 +1369,21 @@ describe('KraefteuebersichtPage — Druck', () => {
     await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
   });
 
-  it('„Drucken" bleibt AUSSERHALB der Werkzeugzeile des Primitivs', async () => {
-    // `.kraefte-no-print` ist innerhalb von `Datensicht` nicht setzbar (kein `className`).
+  it('„Drucken" und „Spalten" stehen in der Werkzeugzeile der Seite, nicht in der des Primitivs', async () => {
+    // `.kraefte-no-print` ist innerhalb von `Datensicht` nicht setzbar (kein `className`), und
+    // Fokus in der Sicht hielte die Zeilen (LLH-1417). Die Zeile des Primitivs bleibt als
+    // Standzeile des Sammelbanners.
     mitEinheit();
     const { container } = setup();
     await screen.findByText('1. Zug');
-    const werkzeuge = container.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
-    expect(werkzeuge).not.toBeNull();
-    expect(within(werkzeuge).queryByRole('button', { name: /Drucken/i })).toBeNull();
-    expect(within(werkzeuge).getByRole('button', { name: /Spalten/ })).toBeInTheDocument();
+    const seite = container.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
+    const primitiv = container.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
+    expect(primitiv).not.toBeNull();
+    expect(within(primitiv).queryByRole('button', { name: /Drucken/i })).toBeNull();
+    expect(within(primitiv).queryByRole('button', { name: /Spalten/ })).toBeNull();
+    expect(within(seite).getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
+    expect(within(seite).getByRole('button', { name: /^Spalten/ })).toBeInTheDocument();
+    expect(seite).toHaveClass('kraefte-no-print');
   });
 
   it('der Druck neutralisiert Bildlaufcontainer, Sticky-Kopf, fixierte Spalte und Werkzeugzeile', () => {
@@ -1817,5 +1823,46 @@ describe('KraefteuebersichtPage — Sprung auf eine Einheit (LLH-1049)', () => {
     const { container } = setupMitSprung('?einheit=20', client);
     await waitFor(() => expect(zeile(container, 'ep-3')).not.toBeNull());
     expect(markiert(zeile(container, 'eh-20'))).toBe(true);
+  });
+});
+
+describe('KraefteuebersichtPage — Spalten in der Werkzeugzeile (LLH-1417)', () => {
+  /** Startet mit dem Zug aus {@link mitEinheit}; danach liefert der Server einen zweiten Zug. */
+  async function mitNeuemZug(fokus: (container: HTMLElement) => HTMLElement) {
+    mitEinheit();
+    const client = neuerQueryClient();
+    const { container } = renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/kraefteuebersicht" element={<KraefteuebersichtPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/kraefteuebersicht', client },
+    );
+    await waitFor(() => expect(zeile(container, 'eh-20')).not.toBeNull());
+    const ziel = fokus(container);
+    ziel.focus();
+    expect(document.activeElement).toBe(ziel);
+    vi.mocked(listeEinheiten).mockResolvedValue([
+      { ...EINHEIT_E10, status: STATUS_S4 },
+      { ...EINHEIT_E10, id: 40, name: '2. Zug', sortier: 2 },
+    ]);
+    await client.invalidateQueries({ queryKey: einsatzKeys.einheiten(1) });
+    return container;
+  }
+
+  it('der Fokus auf „Spalten“ friert das Raster nicht ein', async () => {
+    const container = await mitNeuemZug((c) =>
+      within(c.querySelector<HTMLElement>('[data-lfh="meldebild-werkzeuge"]')!).getByRole(
+        'button',
+        { name: /^Spalten/ },
+      ),
+    );
+    await waitFor(() => expect(zeile(container, 'eh-40')).not.toBeNull());
+    expect(screen.queryByRole('button', { name: /neuer Eintrag/ })).toBeNull();
+  });
+
+  it('Gegenprobe: der Fokus in einer Zeile hält das Raster', async () => {
+    const container = await mitNeuemZug((c) => zeile(c, 'eh-20')!.querySelector('a')!);
+    expect(await screen.findByRole('button', { name: /1 neuer Eintrag/ })).toBeInTheDocument();
+    expect(zeile(container, 'eh-40')).toBeNull();
   });
 });

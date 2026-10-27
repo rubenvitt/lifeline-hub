@@ -35,6 +35,13 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
         crate::lagebesprechung::ankuendigung::ankuendigen(pool, live, jetzt),
     )
     .await;
+    // Rückmeldung überfällig (LLH-1425): je Überfälligkeit einer Einheit einmal an die, die
+    // Meldungen bearbeiten. Eigene Fehler und Panics halten die Erinnerungen nicht auf.
+    isoliert(
+        "Rückmeldung",
+        crate::meldung::rueckmeldung::ueberfaellige_melden(pool, live, jetzt),
+    )
+    .await;
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let faellige = match repo::faellige_zum_ausloesen(pool, &jetzt_s).await {
         Ok(v) => v,

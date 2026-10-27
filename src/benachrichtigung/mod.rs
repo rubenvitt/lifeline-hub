@@ -56,7 +56,8 @@ wire_enum! {
 wire_enum! {
     /// Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
     /// fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-    /// CHECK-Liste in `migrations/0196_benachrichtigung.sql` spiegelt `ALLE`.
+    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0255_benachrichtigung_quellen.sql`)
+    /// spiegelt `ALLE`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, ToSchema)]
     pub enum BenachrichtigungArt {
         Sofortmeldung => "sofortmeldung",
@@ -77,32 +78,41 @@ wire_enum! {
         Befehl => "befehl",
         Lagebericht => "lagebericht",
         Meldung => "meldung",
+        /// Die letzte Rückmeldung einer Einheit ist älter als die Rückmeldefrist (LLH-1425):
+        /// einmal je Überfälligkeit, vom Scheduler (`meldung::rueckmeldung`).
+        RueckmeldungUeberfaellig => "rueckmeldung_ueberfaellig",
         LagebesprechungVorher => "lagebesprechung_vorher",
         LagebesprechungFaellig => "lagebesprechung_faellig",
         NachforderungStatus => "nachforderung_status",
         Gefahr => "gefahr",
         SichtungEins => "sichtung_eins",
+        /// Eine Person ist als vermisst gemeldet oder auf vermisst gesetzt (LLH-1425).
+        Vermisstenmeldung => "vermisstenmeldung",
         WiederVerfuegbar => "wieder_verfuegbar",
         ChatErwaehnung => "chat_erwaehnung",
         /// Org-Art: erreicht den Aufgenommenen auch außerhalb eines Einsatzes.
         EinsatzAufnahme => "einsatz_aufnahme",
         /// Org-Art: erreicht Führungskräfte, die den neuen Einsatz lesen dürfen.
         EinsatzNeu => "einsatz_neu",
-        /// Nur für die Einstellungen: Unwetter erkennt der Browser selbst (design.md D4).
+        /// Nur für die Einstellungen: Unwetter erkennt der Browser selbst (design.md D4). Seit
+        /// LLH-1425 ein Alarm (Warnstufe rot), also ohne Schalter.
         Unwetter => "unwetter",
     }
     try_from = |s| format!("Ungültige Benachrichtigungsart: {s}");
 }
 
 impl BenachrichtigungArt {
-    /// Die feste Stufe der Art (design.md D4, Matrix der Spec). Alarm sind genau Sofortmeldung,
-    /// ihre Eskalation, überfälliger Auftrag und fällige Ablösung.
+    /// Die feste Stufe der Art (design.md D4, Matrix der Spec; Katalog LLH-1142 E1). Alarm sind
+    /// genau Sofortmeldung, ihre Eskalation, überfälliger Auftrag, fällige Ablösung,
+    /// Vermisstenmeldung und Unwetter (Warnstufe rot, erkannt im Browser, LLH-1425).
     pub const fn stufe(self) -> BenachrichtigungStufe {
         match self {
             BenachrichtigungArt::Sofortmeldung
             | BenachrichtigungArt::SofortmeldungEskaliert
             | BenachrichtigungArt::AuftragUeberfaellig
-            | BenachrichtigungArt::AbloesungFaellig => BenachrichtigungStufe::Alarm,
+            | BenachrichtigungArt::AbloesungFaellig
+            | BenachrichtigungArt::Vermisstenmeldung
+            | BenachrichtigungArt::Unwetter => BenachrichtigungStufe::Alarm,
             BenachrichtigungArt::ErinnerungFaellig
             | BenachrichtigungArt::AbloesungVorwarnung
             | BenachrichtigungArt::AbloesungPlanung
@@ -113,6 +123,7 @@ impl BenachrichtigungArt {
             | BenachrichtigungArt::Befehl
             | BenachrichtigungArt::Lagebericht
             | BenachrichtigungArt::Meldung
+            | BenachrichtigungArt::RueckmeldungUeberfaellig
             | BenachrichtigungArt::LagebesprechungVorher
             | BenachrichtigungArt::LagebesprechungFaellig
             | BenachrichtigungArt::NachforderungStatus
@@ -121,8 +132,7 @@ impl BenachrichtigungArt {
             | BenachrichtigungArt::WiederVerfuegbar
             | BenachrichtigungArt::ChatErwaehnung
             | BenachrichtigungArt::EinsatzAufnahme
-            | BenachrichtigungArt::EinsatzNeu
-            | BenachrichtigungArt::Unwetter => BenachrichtigungStufe::Hinweis,
+            | BenachrichtigungArt::EinsatzNeu => BenachrichtigungStufe::Hinweis,
         }
     }
 
@@ -172,6 +182,11 @@ wire_enum! {
         AbloeserBrEingetroffen => "abloeser_br_eingetroffen",
         AbloeserAbgerufen => "abloeser_abgerufen",
         AbloeserEntfallen => "abloeser_entfallen",
+        /// Die Alarmierung bzw. das Eintreffen, mit dem die offene Periode der geplanten
+        /// ablösenden Einheit begann, ist in der Kräfte-Zeitachse gestrichen (LLH-1425): der
+        /// Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht mehr.
+        AbloeserAlarmierungGestrichen => "abloeser_alarmierung_gestrichen",
+        AbloeserEintreffenGestrichen => "abloeser_eintreffen_gestrichen",
         /// Der Termin der Lagebesprechung am Einsatz; `bezug_id` ist die Einsatzkennung.
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
@@ -218,7 +233,9 @@ impl BenachrichtigungBezugTyp {
             | BenachrichtigungBezugTyp::AbloeserEingetroffen
             | BenachrichtigungBezugTyp::AbloeserBrEingetroffen
             | BenachrichtigungBezugTyp::AbloeserAbgerufen
-            | BenachrichtigungBezugTyp::AbloeserEntfallen => Some("abloesung"),
+            | BenachrichtigungBezugTyp::AbloeserEntfallen
+            | BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen
+            | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen => Some("abloesung"),
             BenachrichtigungBezugTyp::Lagebesprechung => Some("lagebesprechung"),
             BenachrichtigungBezugTyp::Nachforderung
             | BenachrichtigungBezugTyp::NachforderungZugesagt

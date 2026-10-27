@@ -8,7 +8,6 @@
 //! `abloesung_vorwarnung` / `abloesung_planung`, `bezug_id` = Schicht-ID) — ohne FK, wie alle
 //! Auto-Fristen.
 
-use chrono_tz::Tz;
 use sqlx::{SqliteConnection, SqlitePool};
 
 use std::collections::{HashMap, HashSet};
@@ -34,6 +33,7 @@ use crate::schichtmodell::repo as schichtmodell_repo;
 use crate::schichtmodell::{Regel, Werte};
 use crate::write_retry;
 use crate::zeitachse::repo::Beruehrt;
+use crate::zeitdarstellung::{Zeitdarstellung, Zeitstil};
 
 /// Was Vollzug oder Rücknahme außerhalb der Ablösung geändert haben; die Route meldet danach
 /// `einheit` und `personal` (LLH-1189).
@@ -764,11 +764,12 @@ fn faellig_oder_400(beginn_at: &str, rhythmus: i64) -> Result<String, AppError> 
         .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{beginn_at}'")))
 }
 
-/// Was eine Schicht vom Einsatz liest (LLH-1122): die Kopie des Schichtmodells und die
-/// wirksame Zone (Einsatz → Org → Europe/Berlin), in der Wechselzeiten gelten.
+/// Was eine Schicht vom Einsatz liest (LLH-1122): die Kopie des Schichtmodells und Zone und
+/// Darstellung des Einsatzes (`zeitdarstellung::zeitstil_laden`, Einsatz → Org → Vorgabe). In
+/// der Zone gelten die Wechselzeiten, in der Darstellung stehen sie im ETB (LLH-1469).
 pub(crate) struct EinsatzVorgabe {
     pub werte: Option<Werte>,
-    pub zone: Tz,
+    pub stil: Zeitstil,
 }
 
 impl EinsatzVorgabe {
@@ -790,36 +791,6 @@ impl EinsatzVorgabe {
     }
 }
 
-/// Die wirksame Zone eines Einsatzes: die erste gültige aus seiner Einstellung und der der
-/// Organisation, sonst Europe/Berlin (`einsatz::nummer::ZEITZONE_VORGABE`). Jeder Name wird
-/// für sich gelesen: eine ungültige Einsatzzone („MEZ“) verdrängt keine gültige der
-/// Organisation (Review PR #833).
-async fn zone_tx(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Tz, AppError> {
-    let namen: Option<(Option<String>, Option<String>)> = sqlx::query_as(
-        "SELECT ee.zeitzone, oe.zeitzone FROM einsatz e \
-         LEFT JOIN einsatz_einstellungen ee ON ee.einsatz_id = e.id \
-         LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id WHERE e.id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let (einsatz, org) = namen.unwrap_or_default();
-    Ok([einsatz, org]
-        .into_iter()
-        .flatten()
-        .find_map(|name| {
-            let zone = name.trim().parse::<Tz>().ok();
-            if zone.is_none() && !name.trim().is_empty() {
-                tracing::warn!(
-                    zeitzone = name,
-                    "Unbekannte Zeitzone für die Ablösung übergangen"
-                );
-            }
-            zone
-        })
-        .unwrap_or(crate::einsatz::nummer::ZEITZONE_VORGABE))
-}
-
 pub(crate) async fn load_einsatz_vorgabe_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -828,7 +799,7 @@ pub(crate) async fn load_einsatz_vorgabe_tx(
         werte: schichtmodell_repo::load_einsatz_tx(conn, einsatz_id)
             .await?
             .map(|(w, _)| w),
-        zone: zone_tx(conn, einsatz_id).await?,
+        stil: crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?,
     })
 }
 
@@ -844,18 +815,19 @@ fn compute_faellig(
     match (quelle, &vorgabe.werte) {
         (RhythmusQuelle::Einsatz, Some(w)) => w
             .regel
-            .faelligkeit(beginn_at, vorgabe.zone)
+            .faelligkeit(beginn_at, vorgabe.stil.zone)
             .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{beginn_at}'"))),
         _ => Ok((faellig_oder_400(beginn_at, rhythmus)?, rhythmus)),
     }
 }
 
 /// Wie der Rhythmus einer Schicht im ETB heißt: bei Wechselzeiten aus der Einsatzvorgabe deren
-/// Regel („Wechsel 06:00/18:00, Mindestdauer 4 h“), sonst die Dauer („6 h“).
+/// Regel in der Darstellung des Einsatzes („Wechsel 0600/1800, Mindestdauer 4 h“), sonst die
+/// Dauer („6 h“).
 fn rhythmus_label(rhythmus: i64, quelle: RhythmusQuelle, vorgabe: &EinsatzVorgabe) -> String {
     match (quelle, &vorgabe.werte) {
         (RhythmusQuelle::Einsatz, Some(w)) if matches!(w.regel, Regel::Wechselzeiten { .. }) => {
-            w.regel.text()
+            w.regel.text(vorgabe.stil.darstellung)
         }
         _ => rhythmus_text(rhythmus),
     }
@@ -1729,7 +1701,7 @@ pub async fn set_einsatz_vorgabe(
         schichtmodell_repo::set_einsatz_tx(conn, einsatz_id, neu.as_ref(), benutzer_id).await?;
         let vorgabe = EinsatzVorgabe {
             werte: neu.clone(),
-            zone: vorher.zone,
+            stil: vorher.stil,
         };
         let vorwarnung_geaendert = vorgabe.vorwarnung() != vorher.vorwarnung();
         let planungsvorlauf_geaendert = vorgabe.planungsvorlauf() != vorher.planungsvorlauf();
@@ -1821,7 +1793,9 @@ pub async fn set_einsatz_vorgabe(
             }
         }
 
-        let beschreibung = |w: &Werte| format!("«{}», {}", w.bezeichnung, modell_text(w));
+        let darstellung = vorher.stil.darstellung;
+        let beschreibung =
+            |w: &Werte| format!("«{}», {}", w.bezeichnung, modell_text(w, darstellung));
         let inhalt = match (&neu, &vorher.werte) {
             (Some(n), Some(v)) => format!(
                 "Ablösung Einsatz: Schichtmodell {} gesetzt (vorher {}).",
@@ -1860,11 +1834,12 @@ pub async fn set_einsatz_vorgabe(
     })
 }
 
-/// Ein Schichtmodell im ETB: Regel und Vorwarnung („Rhythmus 12 h, Vorwarnung 30 min“).
-fn modell_text(w: &Werte) -> String {
+/// Ein Schichtmodell im ETB: Regel und Vorwarnung („Rhythmus 12 h, Vorwarnung 30 min“), die
+/// Wechselzeiten in der Darstellung des Einsatzes.
+fn modell_text(w: &Werte, darstellung: Zeitdarstellung) -> String {
     format!(
         "{}, Vorwarnung {}",
-        w.regel.text(),
+        w.regel.text(darstellung),
         rhythmus_text(w.vorwarnung_minuten)
     )
 }

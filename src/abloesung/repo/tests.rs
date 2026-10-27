@@ -1334,6 +1334,110 @@ async fn reine_vorwarnungsaenderung_loest_die_faelligkeit_nicht_erneut_aus() {
     );
 }
 
+/// LLH-1469: das ETB schreibt die Wechselzeiten eines Schichtmodells in der Darstellung des
+/// Einsatzes, beim Setzen der Vorgabe und beim Beginn einer Schicht, die ihr folgt: taktisch
+/// (Vorgabe) „Wechsel 0600/1800“, „Datum und Uhrzeit“ „Wechsel 06:00/18:00“.
+#[tokio::test]
+async fn wechselzeiten_im_etb_folgen_der_darstellung_des_einsatzes() {
+    let w = welt().await;
+    let werte = |bezeichnung: &str| crate::schichtmodell::Werte {
+        bezeichnung: bezeichnung.into(),
+        regel: crate::schichtmodell::Regel::Wechselzeiten {
+            zeiten: vec![
+                crate::uhrzeit::Uhrzeit::parse("t", "06:00").unwrap(),
+                crate::uhrzeit::Uhrzeit::parse("t", "18:00").unwrap(),
+            ],
+            mindestdauer_minuten: 240,
+        },
+        vorwarnung_minuten: 30,
+        planungsvorlauf_minuten: 120,
+    };
+    let setzen = |bezeichnung: &'static str| {
+        let pool = w.pool.clone();
+        let (e, b) = (w.e, w.b);
+        async move {
+            set_einsatz_vorgabe(
+                &pool,
+                e,
+                b,
+                &EinsatzVorgabeInput::Werte(werte(bezeichnung)),
+                T0,
+            )
+            .await
+            .unwrap();
+            etb(&pool, e).await.pop().unwrap().1
+        }
+    };
+    let beginn_text = |einheit_id: i64| {
+        let pool = w.pool.clone();
+        let (e, b) = (w.e, w.b);
+        async move {
+            beginnen(
+                &pool,
+                e,
+                b,
+                &BeginnEingabe {
+                    einheit_id,
+                    beginn_at: Some("2026-09-22 11:42:00".into()),
+                    rhythmus_minuten: None,
+                },
+                T0,
+            )
+            .await
+            .unwrap();
+            etb(&pool, e).await.pop().unwrap().1
+        }
+    };
+
+    assert_eq!(
+        setzen("Hochwasser").await,
+        "Ablösung Einsatz: Schichtmodell «Hochwasser», Wechsel 0600/1800, Mindestdauer 4 h, \
+         Vorwarnung 30 min gesetzt."
+    );
+    let t = beginn_text(w.f2).await;
+    assert!(
+        t.contains("Rhythmus Wechsel 0600/1800, Mindestdauer 4 h"),
+        "{t}"
+    );
+
+    // Die Organisation wählt „Datum und Uhrzeit“, der Einsatz taktisch: der Einsatz geht vor.
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitdarstellung) VALUES (1, 'datum_uhrzeit')",
+    )
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitdarstellung) VALUES (?, 'taktisch')",
+    )
+    .bind(w.e)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    assert!(setzen("Hochwasser 2").await.contains("Wechsel 0600/1800"));
+
+    // Der Einsatz stellt „Datum und Uhrzeit“ ein.
+    sqlx::query(
+        "UPDATE einsatz_einstellungen SET zeitdarstellung = 'datum_uhrzeit' WHERE einsatz_id = ?",
+    )
+    .bind(w.e)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        setzen("Hochwasser 3").await,
+        "Ablösung Einsatz: Schichtmodell «Hochwasser 3», Wechsel 06:00/18:00, Mindestdauer 4 h, \
+         Vorwarnung 30 min gesetzt (vorher «Hochwasser 2», Wechsel 06:00/18:00, Mindestdauer 4 h, \
+         Vorwarnung 30 min)."
+    );
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let t = beginn_text(f3).await;
+    assert!(
+        t.contains("Rhythmus Wechsel 06:00/18:00, Mindestdauer 4 h"),
+        "{t}"
+    );
+}
+
 /// Wird eine Einsatzvorgabe mit Wechselzeiten entfernt, bleibt die Fälligkeit sekundengenau
 /// stehen — beim Entfernen und bei einer späteren Änderung ohne neuen Beginn oder Rhythmus.
 #[tokio::test]
@@ -1405,7 +1509,11 @@ async fn ungueltige_einsatzzone_verdraengt_die_org_zone_nicht() {
     let w = welt().await;
     let zone = |pool: SqlitePool, e: i64| async move {
         let mut conn = pool.acquire().await.unwrap();
-        zone_tx(&mut conn, e).await.unwrap()
+        load_einsatz_vorgabe_tx(&mut conn, e)
+            .await
+            .unwrap()
+            .stil
+            .zone
     };
     let setze = |pool: SqlitePool, sql: &'static str, wert: Option<&'static str>, id: i64| async move {
         sqlx::query(sql)

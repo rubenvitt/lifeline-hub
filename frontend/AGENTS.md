@@ -28,7 +28,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Regelabschnitt, den die README trägt, oder `theme/gesperrtZeichen.guard.test.ts` (README
     „Gesperrt“), oder hebt er antd oder eine Schrift, läuft
     `mise exec -- pnpm -C frontend design-system`, und das Erzeugte kommt mit in den PR. Ein roter
-    Wächter heißt dasselbe.
+    Wächter heißt dasselbe. Ein neuer Baustein bekommt eine Karte in `PREVIEWS`
+    (`frontend/scripts/design-system/previews.tsx`), aus dem echten Baustein, Nacht und Tag.
   - **Nach dem Merge veröffentlicht der Agent, der den PR abschließt, neu**: aus dem Stand von
     `alpha` auf die Adresse in `ARTIFACT.md`, nur die geänderten Dateien unter `project/`. Den
     Index `design-system.json` gibt es nur im Artifact: zuletzt und einzeln senden, unmittelbar
@@ -64,6 +65,15 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
   Dashboard-Baukasten (unten).
+- **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
+  `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
+  `anzeige/Ortsfeld.tsx`, im Einsatz `anzeige/EinsatzOrtsfeld.tsx` (Ortsfeld) ·
+  `components/StammdatenFeld.tsx` (aus Stammdaten oder frei) · `components/VerbindungenFeld.tsx`
+  und `components/FunkUndTelefon.tsx` (Verbindungen) · `components/InlineAngabe.tsx` ·
+  `components/tabellenFilter.tsx` (Filterchips und Kopfmarke; Träger `KatalogTabelle`,
+  `Datensicht`; Sortieren und Filtern in der Bedien-Leitlinie) · `alarm/EingaengeKnopf.tsx` und
+  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `personen/SichtungsWahl.tsx` ·
+  `personen/koerperschema/Koerperschema.tsx`. Jeder hat eine Karte im Design System.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
@@ -484,7 +494,10 @@ anwendbar), „nicht geprüft" ist keins.
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt
-  die wirkliche Sichtbarkeit.
+  die wirkliche Sichtbarkeit. Eine Seite mit eigener Werkzeugzeile (Meldebild) hängt ihn dort ein:
+  Zustand aus `useSpaltenSchalterZustand`, an die Sicht als `spaltenSchalterAussen` (LLH-1417);
+  sein Fokus hält die Zeilenschleuse nicht, die Werkzeugzeile der Sicht bleibt Standzeile des
+  Sammelbanners. Sonst bleibt der eingebaute Schalter.
 - **Eine Vergleichstabelle ist sortier- und filterbar, im Spaltenkopf** (LLH-1086, Spec
   `tabellen-sortieren-filtern`): Sortieren per Klick auf den Kopf, Filter über antds
   Spaltenfilter (kontrolliert, im Clientmodus mit Zähler „Groß (3)“), je aktivem Wert ein Chip
@@ -704,8 +717,12 @@ anwendbar), „nicht geprüft" ist keins.
   steht eine gespeicherte Koordinate als `quelle: 'karte'`, eine Textkorrektur behält sie),
   `ortRegeln` (Pflicht und Länge am Text), `ortEingabe` (für einen POST: ohne Angabe fehlt das Feld).
   Eingebaut in Einsatzort, Schaden, Standort der Betreuungs- und Verpflegungsstelle, Sammelstelle
-  des Bezirks, Standort von UHS (Anlegen) und Bereitstellungsraum, Fundort eines Tiers und Ziel
-  eines Auftrags (LLH-1114).
+  des Bezirks, Standort von UHS und Bereitstellungsraum, Fundort eines Tiers und Ziel eines
+  Auftrags (LLH-1114), Fundort der Personen-Aufnahme und Ort der nachgetragenen Verpflegungsausgabe
+  (nur Suche, Formularwert bleibt Text; LLH-1407). **Gekoppelte Geräte erreichen die Ortssuche
+  nicht** (Routenliste in `src/geraet/mod.rs`): Masken, die dort laufen, prüfen
+  `useAuthOptional()?.geraet` und fallen auf ein Textfeld zurück. Strg/⌘ + Enter im Ortsfeld sucht
+  nicht, es gehört der Erfassungshülle („Speichern und nächste“).
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
@@ -722,7 +739,7 @@ anwendbar), „nicht geprüft" ist keins.
   oder `TimePicker`;
   der Formularwert ist ein **Zeitpunkt** (hin `alsZeitpunkt`, zurück `alsBackendZeit`, Kern
   `anzeige/zeitEingabe.ts`), in die Wanduhr der Anzeigezone wandelt nur das Feld. Tagesgrenzen
-  über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über `useZeitEingabe().formatiere`;
+  über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über die Rollen der Zeitdarstellung;
   `.local()` steht nur in `anzeige/` (Guard `anzeige/zeitEingabe.guard.test.ts`). Außerhalb eines
   Einsatzes `OrgAnzeigeProvider`. „Jetzt“ beim Erfassen: `frontend/src/offline/AGENTS.md`,
   „Schreiben ohne Netz“. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Die Suiten-Zone
@@ -763,13 +780,16 @@ anwendbar), „nicht geprüft" ist keins.
   `anzeige/zeitDarstellungStore.ts` (Profil „Darstellung auf diesem Gerät“, Sprungpalette).
   **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
   sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
-  `.format('…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/` (Maschinenformate ab
-  `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`, Schuldmenge `OFFEN`
-  seit LLH-1061 leer. Nebenformen im Kern: `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26`
-  bzw. `10.10.26`), `tagUndUhrzeit` (Anfang eines Zeitraums), `leereUhrzeit` (Lücke in
-  Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe, Zeitraumende) über das `jetzt` von
-  `zeitKurz`. Der Datenstand rechnet in Gerätezeit (`components/Datenstand.tsx`), die Uhr des
-  Lagemonitors nimmt `formatiereUhr` der Kopfleiste.
+  `.format('…')` und kein `formatiere(…, '…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/`
+  (Maschinenformate ab `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`,
+  Schuldmenge `OFFEN` seit LLH-1061 leer. Titelvorschlag und Startinhalt eines Lagevortrags werden
+  gespeichert und nehmen `konventionenOhneGeraet` (Einsatz vor Organisation, ohne Gerätewahl, wie
+  Druck und Servertexte; LLH-1437); ein Eingabefeld zeigt seinen Wert taktisch. Nebenformen im Kern:
+  `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26` bzw. `10.10.26`), `uhrzeitOhneDatum`
+  (Wanduhrzeit `HH:MM` ohne Tag: Verpflegungsplan, Wechselzeiten), `tagUndUhrzeit` (Anfang eines
+  Zeitraums), `leereUhrzeit` (Lücke in Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe,
+  Zeitraumende) über das `jetzt` von `zeitKurz`. Der Datenstand rechnet in Gerätezeit
+  (`components/Datenstand.tsx`), die Uhr des Lagemonitors nimmt `formatiereUhr` der Kopfleiste.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
@@ -954,14 +974,17 @@ und `pages/personen/`.
   `formularseiten`, „Rückfrage vor dem Verlassen“): über den Merker
   `components/offeneBearbeitung.tsx` (`OffeneBearbeitungProvider` speist
   `useFormularVerlassenSchutz` und rendert `VerlassenRueckfrage`; ein Feld meldet sich mit
-  `useOffeneBearbeitung(etikett)` über `onEntwurf` an). Höchstens ein Entwurf je Seite: die
+  `useOffeneBearbeitung(etikett)` über `onEntwurf` an, eine `InlineAngabe` ohne eigenes
+  `onEntwurf` selbst, dann ohne Sperre der übrigen, LLH-1468). Höchstens ein Entwurf je Seite: die
   übrigen Felder sind gesperrt mit „Erst „Name“ speichern oder abbrechen“
   (`useOffeneBearbeitungGrund` liefert den Grund der Seite; wo er steht, sagt die Bereichsdatei,
   für Personendaten `frontend/src/personen/AGENTS.md`). Ein offenes Feld ohne Änderung meldet sich
   nicht an. **Ein Wechsel in der Seite, der die offene Bearbeitung aushängt** (Segmentleiste oder
   Reiter ohne Pfadwechsel), geht über `useWechselNachRueckfrage` desselben Merkers: mit Änderung
   dieselbe Rückfrage (`VerlassenDialog`), ohne still; der Provider umfasst dafür auch die Leiste
-  (LLH-1415, Vorbild `pages/VerpflegungPage.tsx`).
+  (LLH-1415, Vorbild `pages/VerpflegungPage.tsx`; ebenso Fahrzeuge, Liste ↔ Tableau, LLH-1468). Ein
+  Wechsel, der sie stehen lässt, fragt nicht (Gruppierung der Materialliste: die Zeile behält ihren
+  Schlüssel).
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;
@@ -1112,7 +1135,8 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
 
 - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` bei Vollseiten-Detail (uhs, br, lagebericht,
   befehl, person, tier, schaden, einheiten, personal), sonst **Query-Param** `?<modul>=<id>`
-  (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?gefahrengebiet=`, ETB `?eintrag=`);
+  (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?erinnerung=`, `?gefahrengebiet=`, ETB
+  `?eintrag=`);
   `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
 - **Jede Detailansicht, die bearbeitet werden kann, hat eine Item-Route** (LLH-1139, „Bearbeiten
   in der Ansicht“): eine offene Bearbeitung braucht eine Adresse, auf die Verlassen-Schutz,

@@ -157,7 +157,7 @@ describe('PressePage (LFH-554)', () => {
         medium: 'dpa',
         thema: 'Sperrung B 3',
         kontakt_name: undefined,
-        kontakt_erreichbarkeit: undefined,
+        kontaktweg: undefined,
       }),
     );
   });

@@ -13,6 +13,7 @@ import { Button, Space } from 'antd';
 import { FeldFehler } from './instrument';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
+import { useOffeneBearbeitung } from './offeneBearbeitung';
 import { SpeicherFehler } from './SpeicherHinweis';
 import { useFokusRueckgabe } from './useFokusRueckgabe';
 
@@ -57,7 +58,12 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  *   Änderung schließt; ein Entwurf bleibt stehen, damit nichts still verloren geht, sendet aber
  *   nicht, bis die Sperre fällt.
  * - `onEntwurf`: meldet nur die Wechsel zwischen „unverändert“ und „geändert“ (auch beim
- *   Aushängen), für den Merker `components/offeneBearbeitung.tsx`.
+ *   Aushängen), für den Merker `components/offeneBearbeitung.tsx`. Ohne `onEntwurf` meldet sich
+ *   die Angabe selbst beim Merker der Seite an (LLH-1468): unter einem `OffeneBearbeitungProvider`
+ *   fragt ein geänderter Entwurf vor dem Verlassen und vor einem Wechsel in der Seite nach, ohne
+ *   Provider bleibt es still. Die Sperre der übrigen Felder übernimmt sie dabei nicht: den Grund
+ *   zeigt die Seite an EINER Stelle, also verdrahtet sie Anmeldung und `gesperrt` selbst
+ *   (`useOffeneBearbeitung`, Vorbild Personendaten).
  * - `onOeffnen`: jedes Öffnen; der Aufrufer hält dort den Serverstand für den Feld-CAS fest.
  * - `onSchliessen`: jedes Schließen einer offenen Bearbeitung (gespeichert, abgebrochen, von der
  *   Sperre geschlossen, ausgehängt). Mit `onOeffnen` hält der Aufrufer ein offenes Feld an seinem
@@ -272,6 +278,9 @@ export function InlineAngabe<T>({
   const sperrId = useId();
   /** Zugänglicher Name der Angabe, in einer Liste mit der Zeile. */
   const name = kennung ? `${etikett} zu ${kennung}` : etikett;
+  // Wer `onEntwurf` reicht, meldet selbst an; sonst die Angabe beim Merker der Seite (LLH-1468).
+  const merker = useOffeneBearbeitung(name);
+  const meldeEntwurf = onEntwurf ?? merker.onEntwurf;
   /** Ein leerer Grund sperrt nicht: gesperrt heißt immer mit sichtbarem Grund. */
   const isGesperrt = Boolean(gesperrt);
   /** Der Grund steht hier (Text) oder an anderer Stelle (Kennung seines Elements). */
@@ -289,21 +298,21 @@ export function InlineAngabe<T>({
   }
 
   // Entwurfsmeldung nur an den Flanken; der Aufrufer bekommt seinen jüngsten Rückruf.
-  const onEntwurfRef = useRef(onEntwurf);
+  const onEntwurfRef = useRef(meldeEntwurf);
   const gemeldetRef = useRef(false);
   useEffect(() => {
-    onEntwurfRef.current = onEntwurf;
+    onEntwurfRef.current = meldeEntwurf;
   });
   useEffect(() => {
     if (gemeldetRef.current === geaendert) return;
     gemeldetRef.current = geaendert;
-    onEntwurfRef.current?.(geaendert);
+    onEntwurfRef.current(geaendert);
   }, [geaendert]);
   useEffect(
     () => () => {
       if (!gemeldetRef.current) return;
       gemeldetRef.current = false;
-      onEntwurfRef.current?.(false);
+      onEntwurfRef.current(false);
     },
     [],
   );

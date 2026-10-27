@@ -3,7 +3,10 @@ import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/
 import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
 import { DetailSprung } from '../components/ListeDetail';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { auftragDruckPfad, etbPfad } from '../routing/deeplinks';
+import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
+import type { LatLon } from '../anzeige/koordinaten';
+import { useModulFreigabe } from '../einsatz/useModulFreigabe';
+import { auftragDruckPfad, etbPfad, lagekartePfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import {
@@ -70,11 +73,38 @@ export function auftragVerlauf(a: Auftrag): VerlaufEintrag[] {
     .sort((x, y) => x.zeit.localeCompare(y.zeit));
 }
 
+/** Höhe des Zielausschnitts: wie die Vorschau im Ortsfeld des Formulars (`anzeige/Ortsfeld.tsx`). */
+const ZIEL_KARTE_HOEHE = 160;
+
+/**
+ * Das verortete Ziel (LLH-1407, Koordinate seit LLH-1114): Kartenausschnitt mit der Nadel, darunter
+ * der Sprung zur Lagekarte am Punkt — Muster „Einsatzort“ der Einsatzdaten. Der Text steht schon
+ * im Schema darüber („Ziel / Ort“), der Ausschnitt trägt keinen eigenen Kopf. Den Sprung gibt es
+ * nur bei freier Lagekarte, fail-closed über `useModulFreigabe`: solange die Freigabe lädt oder
+ * scheitert, steht er nicht. Er ist ein `DetailSprung` wie „ETB-Eintrag“ und „Druckansicht“ im
+ * selben Paneel: Link mit Steuerhöhe, Strg/⌘+Klick öffnet einen Tab.
+ */
+function AuftragZiel({ einsatzId, punkt }: { einsatzId: number; punkt: LatLon }) {
+  const { token } = useRollen();
+  const lagekarte = useModulFreigabe(einsatzId, 'lagekarte');
+  return (
+    <div style={{ marginTop: token.marginXS }}>
+      <Kartenausschnitt punkt={punkt} etikett="Ziel" hoehe={ZIEL_KARTE_HOEHE} />
+      {lagekarte.zustand === 'frei' && (
+        <DetailSprung ziel={lagekartePfad(einsatzId, { zentrum: punkt })}>
+          Auf Lagekarte zeigen
+        </DetailSprung>
+      )}
+    </div>
+  );
+}
+
 /**
  * Detail eines Einzelauftrags im Muster „Liste + Detailpaneel“ (Spec `auftraege-befehle`,
  * „Handlungen eines Auftrags im Detail“, „Lesefassung eines Auftrags im Detail“; design.md D3/D4).
  * Die Handlungen stehen direkt unter dem Text, damit sie auf dem Handschirm ohne Scrollen
- * erreichbar sind; Empfänger, Schema und Verlauf folgen, am Ende der Sprung zur Druckansicht.
+ * erreichbar sind; Empfänger, Schema (mit dem verorteten Ziel) und Verlauf folgen, am Ende der
+ * Sprung zur Druckansicht.
  */
 export default function AuftragDetail({
   auftrag: a,
@@ -98,6 +128,9 @@ export default function AuftragDetail({
   const kennung = auftragKennung(a);
   const hasSchema = gefuellteFelder(a, zeitpunkt).length > 0;
   const verlauf = auftragVerlauf(a);
+  // Ohne Punkt ändert sich nichts: der Text steht im Schema, ein „Nicht verortet“ sagte nichts dazu.
+  const zielPunkt =
+    a.ort_lat != null && a.ort_lon != null ? { lat: a.ort_lat, lon: a.ort_lon } : null;
   const abschnitt = { marginTop: token.marginLG } as const;
   return (
     <Paneel
@@ -158,6 +191,7 @@ export default function AuftragDetail({
             Schema
           </Augenbraue>
           <AuftragSchema auftrag={a} />
+          {zielPunkt && <AuftragZiel einsatzId={einsatzId} punkt={zielPunkt} />}
         </div>
       )}
 

@@ -364,7 +364,7 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
     let medien1 = id(
         pool,
         "INSERT INTO medienkontakt (einsatz_id, art, medium, thema, kontakt_name, \
-            kontakt_erreichbarkeit, eingang_at, status, antwort, freigabe_durch, \
+            kontaktweg, eingang_at, status, antwort, freigabe_durch, \
             angelegt_von_id) \
          VALUES (?, 'anfrage', 'NDR 1', 'Pegelstand Deichstraße', 'Maria Beispiel', \
             '+49 511 1234567', '2026-01-01 00:00:00', 'beantwortet', \

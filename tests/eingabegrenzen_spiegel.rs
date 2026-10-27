@@ -16,10 +16,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
     BTreeMap::from([
         ("ETB_INHALT_MAX", etb::INHALT_MAX),
         ("BETREUUNG_LEITUNG_MAX", betreuung::LEITUNG_MAX),
-        (
-            "BETREUUNG_ERREICHBARKEIT_MAX",
-            betreuung::ERREICHBARKEIT_MAX,
-        ),
+        ("BETREUUNG_KONTAKTWEG_MAX", betreuung::KONTAKTWEG_MAX),
         ("ETB_PARTEI_MAX", etb::PARTEI_MAX),
         ("AUFTRAG_TEXT_MAX", auftrag::AUFTRAG_TEXT_MAX),
         ("AUFTRAG_BEFEHLSFELD_MAX", auftrag::BEFEHLSFELD_MAX),

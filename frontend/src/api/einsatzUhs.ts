@@ -96,7 +96,7 @@ export function legeUhsAn(einsatzId: number, daten: UhsEingabe): Promise<Uhs> {
   return apiSend<Uhs>(`/api/einsaetze/${einsatzId}/uhs`, 'POST', daten);
 }
 
-interface UhsPatch {
+export interface UhsPatch {
   bezeichnung?: string;
   /** `null` = explizit löschen, undefined = unverändert. */
   abschnitt_id?: number | null;

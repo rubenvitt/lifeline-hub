@@ -52,7 +52,7 @@ async function grundrissMitZweiPlaetzen(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
   await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await page.getByRole('button', { name: uhsName }).click();
+  await page.getByRole('button', { name: uhsName, exact: true }).click();
 
   await page.getByRole('button', { name: 'Plätze anlegen' }).click();
   await page.getByRole('combobox', { name: 'Platz-Typ' }).click({ force: true });

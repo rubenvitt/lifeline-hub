@@ -70,7 +70,8 @@ Priorität und Richtung stehen.
 Offene Aufträge stehen in den Gruppen „Überfällig“, „Heute fällig“, „Später“ und „Ohne Frist“.
 Auf breitem Bildschirm ist der oberste Auftrag schon gewählt. Der gewählte Auftrag zeigt den
 ganzen Text, alle Empfänger, die Felder des Befehlsschemas unter „Schema“ in derselben Reihenfolge
-wie im Formular (leere Felder fehlen) und unter „Verlauf“ die Zeitpunkte von Erteilung,
+wie im Formular (leere Felder fehlen), bei verortetem Ziel darunter einen Kartenausschnitt mit
+„Auf Lagekarte zeigen“, und unter „Verlauf“ die Zeitpunkte von Erteilung,
 Quittungen, Bearbeitung, Vollzug, Abnahme und Aufhebung. Die Suche findet auch ältere
 abgeschlossene Aufträge, die noch nicht geladen sind.
 

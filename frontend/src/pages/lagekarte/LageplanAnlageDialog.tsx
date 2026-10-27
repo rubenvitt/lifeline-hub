@@ -20,8 +20,9 @@ import { legeDokumentAnlageAb, type AnlagenDokument } from '../../api/dokumentAn
 import { legeLageberichtAn, listeLageberichte } from '../../api/lageberichte';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { EinsatzStatus } from '../../api/types';
-import { useZeitEingabe } from '../../anzeige/ZeitpunktEingabe';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { titelVorschlag } from '../../lageberichte/uebersicht';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
 import { lageberichtDetailPfad } from '../../routing/deeplinks';
 import { KeinKartenbild, type LageplanAnlage } from './useLageplan';
@@ -89,7 +90,8 @@ export default function LageplanAnlageDialog({
   const { token } = theme.useToken();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { formatiere } = useZeitEingabe();
+  // Der Titel wird gespeichert: ohne die Gerätewahl (LLH-1437, wie `LageberichtePage`).
+  const { konventionenOhneGeraet } = useAnzeigeKonventionen();
   const [wahl, setWahl] = useState<string | null>(null);
 
   const berichte = useQuery({
@@ -136,7 +138,7 @@ export default function LageplanAnlageDialog({
       if (ziel.art === 'neu') {
         const neu = await legeLageberichtAn(einsatzId, {
           vorlage: 'lagebericht',
-          titel: `Lageüberblick ${formatiere(dayjs(), 'HHmm')}`,
+          titel: titelVorschlag('lagebericht', dayjs(), konventionenOhneGeraet),
         });
         dokument = 'lageberichte';
         id = neu.id;

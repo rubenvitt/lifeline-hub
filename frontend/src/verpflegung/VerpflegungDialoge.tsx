@@ -3,6 +3,10 @@ import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { sucheOrtImEinsatz } from '../api/ortSuche';
+import { einsatzKeys } from '../api/queryKeys';
+import { useAuthOptional } from '../auth/AuthContext';
 import { VERPFLEGUNG_EP_MAX } from '../api/eingabegrenzen';
 import type {
   AusgabeEingabe,
@@ -490,6 +494,8 @@ export interface NachforderungOption {
 }
 
 interface AusgabeDialogProps extends DialogBasis {
+  /** Für die Ortssuche am Ort (LLH-1407); ohne ist der Ort reiner Text. */
+  einsatzId?: number;
   zeitfenster: VerpflegungZeitfenster;
   /**
    * Nachforderungen zur Auswahl. `null` = Modul für die Person nicht bedienbar, dann gibt es das
@@ -534,6 +540,7 @@ function nachtragStellenOptionen(
  * Bemerkung. Die Menge lässt nicht mehr zu als der Server (`VERPFLEGUNG_EP_MAX`).
  */
 export function AusgabeDialog({
+  einsatzId,
   zeitfenster: zf,
   nachforderungen,
   stellen = [],
@@ -545,6 +552,9 @@ export function AusgabeDialog({
   onSchliessen,
 }: AusgabeDialogProps) {
   const [form] = Form.useForm<AusgabeWerte>();
+  // Am gekoppelten Gerät gibt es keine Ortssuche (seine Routenliste, `src/geraet/mod.rs`).
+  const geraet = useAuthOptional()?.geraet ?? null;
+  const sucheIn = geraet == null ? (einsatzId ?? null) : null;
   // Die Bemerkung kann an ihrer Grenze scheitern: der Klappteil geht dann selbst auf, und sein
   // Kopf nennt jede Abweichung von der Vorgabe (`frontend/AGENTS.md`, „Ein Pflichtfeld gehört nie
   // hinter den Collapse“, LFH-974).
@@ -650,8 +660,24 @@ export function AusgabeDialog({
               name="ort"
               label={ortLabel}
               rules={[zeichenRegel(VERPFLEGUNG_ORT_MAX, ortLabel)]}
+              // Nur Suche (LLH-1114, Vorschlag 3): ein Treffer setzt den Text, die Ausgabe
+              // speichert keine Koordinate. Der Formularwert bleibt deshalb Text.
+              {...(sucheIn != null && {
+                getValueProps: (t?: string | null) => ({
+                  value: { text: t ?? '', koordinate: null },
+                }),
+                normalize: (w: OrtsfeldWert) => w.text,
+              })}
             >
-              <Input count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)} />
+              {sucheIn != null ? (
+                <Ortsfeld
+                  suchen={(begriff) => sucheOrtImEinsatz(sucheIn, begriff)}
+                  suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(sucheIn, begriff)}
+                  count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)}
+                />
+              ) : (
+                <Input count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)} />
+              )}
             </Form.Item>
           )}
           {sonderkostFelder()}

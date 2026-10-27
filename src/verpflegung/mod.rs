@@ -462,8 +462,8 @@ pub fn draht_lesen(feld: &str, s: &str) -> Result<DateTime<Utc>, AppError> {
     }
 }
 
-/// Zeitraum für den ETB-Text in der Zeitzone der Organisation (design.md D5) und der
-/// Darstellung des Einsatzes (LLH-1061): `241200sep26–1330` bzw. `24.09.26 12:00–13:30`, über
+/// Zeitraum für den ETB-Text in Zone und Darstellung des Einsatzes, sonst der Organisation
+/// (LLH-1061, LLH-1443; `zeitdarstellung::zeitstil_laden`): `241200sep26–1330` bzw. `24.09.26 12:00–13:30`, über
 /// Mitternacht (nach ORTSdatum) mit beiden Tagen. Der Server rechnet sonst in UTC, und eine
 /// beweissichernde Unterlage nennte still die falsche Uhrzeit.
 pub fn zeitraum_text(von: DateTime<Utc>, bis: DateTime<Utc>, stil: Zeitstil) -> String {

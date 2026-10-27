@@ -179,7 +179,7 @@ fn stelle_eingabe(bezeichnung: &str, art: Art, kapazitaet: Option<i64>) -> Stell
         standort: None,
         notiz: None,
         leitung: None,
-        erreichbarkeit: None,
+        kontaktweg: None,
         lat: None,
         lon: None,
     }
@@ -2088,25 +2088,25 @@ async fn kopfzahl_mit_unlesbarem_zeitpunkt_ist_400() {
     }
 }
 
-// ── LLH-1044: Leitung und Erreichbarkeit ────────────────────────────────────────────────────
+// ── LLH-1044: Leitung und Kontaktweg ────────────────────────────────────────────────────
 
 #[tokio::test]
-async fn leitung_und_erreichbarkeit_aendern_leeren_und_als_weitere_angaben_ins_etb() {
+async fn leitung_und_kontaktweg_aendern_leeren_und_als_weitere_angaben_ins_etb() {
     let w = welt().await;
     let mut se = stelle_eingabe("Gesamtschule", Art::Notunterkunft, Some(80));
     se.leitung = Some("  Frau Schulz ".into());
-    se.erreichbarkeit = Some("".into());
+    se.kontaktweg = Some("".into());
     let id = stelle_anlegen(&w, se).await.unwrap().id;
     let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
     assert_eq!(s.leitung.as_deref(), Some("Frau Schulz"), "getrimmt");
-    assert_eq!(s.erreichbarkeit, None, "leer heißt keine Angabe");
+    assert_eq!(s.kontaktweg, None, "leer heißt keine Angabe");
 
     let n = etb(&w.pool, w.e).await.len();
     let g = stelle_aendern(
         &w,
         id,
         StelleAenderung {
-            erreichbarkeit: Some(Some("Kanal 42".into())),
+            kontaktweg: Some(Some("Kanal 42".into())),
             ..Default::default()
         },
     )
@@ -2125,7 +2125,7 @@ async fn leitung_und_erreichbarkeit_aendern_leeren_und_als_weitere_angaben_ins_e
         id,
         StelleAenderung {
             leitung: Some(Some("Frau Schulz".into())),
-            erreichbarkeit: Some(Some("Kanal 42".into())),
+            kontaktweg: Some(Some("Kanal 42".into())),
             ..Default::default()
         },
     )
@@ -2146,7 +2146,7 @@ async fn leitung_und_erreichbarkeit_aendern_leeren_und_als_weitere_angaben_ins_e
     .unwrap();
     let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
     assert_eq!(s.leitung, None);
-    assert_eq!(s.erreichbarkeit.as_deref(), Some("Kanal 42"), "unberührt");
+    assert_eq!(s.kontaktweg.as_deref(), Some("Kanal 42"), "unberührt");
 }
 
 // ── D5: kein ETB-Text trägt Sammelstelle, Standort oder Notiz ──────────────────────────────
@@ -2159,7 +2159,7 @@ async fn etb_nennt_keine_freitexte() {
         "Ostring 5",
         "Schlüssel beim Hausmeister",
         "Rollstuhl Frau M.",
-        // LLH-1044: Leitung und Erreichbarkeit.
+        // LLH-1044: Leitung und Kontaktweg.
         "Frau Schulz",
         "0171 2345678",
         "Herr Brandt",
@@ -2191,7 +2191,7 @@ async fn etb_nennt_keine_freitexte() {
     se.standort = Some(geheim[1].into());
     se.notiz = Some(geheim[2].into());
     se.leitung = Some(geheim[4].into());
-    se.erreichbarkeit = Some(geheim[5].into());
+    se.kontaktweg = Some(geheim[5].into());
     let sid = stelle_anlegen(&w, se).await.unwrap().id;
     stelle_aendern(
         &w,
@@ -2200,7 +2200,7 @@ async fn etb_nennt_keine_freitexte() {
             standort: Some(Some(geheim[0].into())),
             notiz: Some(Some(geheim[3].into())),
             leitung: Some(Some(geheim[6].into())),
-            erreichbarkeit: Some(Some(geheim[7].into())),
+            kontaktweg: Some(Some(geheim[7].into())),
             status: Some(Status::InBetrieb),
             ..Default::default()
         },

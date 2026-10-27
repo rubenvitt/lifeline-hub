@@ -6,8 +6,9 @@
 //! RECHTE: Die lokale Erststart-Maske darf die Adresse setzen (Capability `lokal`), die lokale
 //! Anzeige „nicht erreichbar“ nur prüfen, neu laden und zur Maske führen (`nicht-erreichbar`). Die
 //! Serverseite bekommt zur Laufzeit genau für ihre Origin nur `drucken`,
-//! `anmeldung_im_browser` (LFH-818) und `benachrichtigung_zeigen` (D7 des
-//! Benachrichtigungskonzepts) — sie kann die Hülle nicht auf einen anderen Server umlenken.
+//! `anmeldung_im_browser` (LFH-818), `benachrichtigung_zeigen` (D7 des
+//! Benachrichtigungskonzepts) und `set_app_badge` (LLH-1423) — sie kann die Hülle nicht auf einen
+//! anderen Server umlenken.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod adresse;
@@ -152,6 +153,8 @@ struct Zustand {
     /// Zuletzt gezeigte native Meldungen: mehrere Fenster desselben Einsatzes melden dasselbe
     /// Ereignis je einmal (LLH-1281).
     meldungen: Mutex<Vec<(String, Instant)>>,
+    /// Je Fenster die Zahl fürs App-Symbol (LLH-1423); ein Fenster ohne Zahl fehlt.
+    badges: Mutex<HashMap<String, u32>>,
 }
 
 /// Ein gestarteter Vorgang „Im Browser anmelden“. Der `verifier` verlässt die Hülle nur im
@@ -194,12 +197,14 @@ fn freigabe(server: &Url) -> (String, String) {
     (kennung, format!("{origin}/*"))
 }
 
-/// Was die Serverseite aufrufen darf: den Druck, „Im Browser anmelden“ (LFH-818) und die native
-/// Meldung (D7 des Benachrichtigungskonzepts). Die Commands des Notification-Plugins nicht.
-const SERVER_RECHTE: [&str; 3] = [
+/// Was die Serverseite aufrufen darf: den Druck, „Im Browser anmelden“ (LFH-818), die native
+/// Meldung (D7 des Benachrichtigungskonzepts) und die Zahl am App-Symbol (LLH-1423). Die Commands
+/// des Notification-Plugins nicht.
+const SERVER_RECHTE: [&str; 4] = [
     "allow-drucken",
     "allow-anmeldung-im-browser",
     "allow-benachrichtigung-zeigen",
+    "allow-set-app-badge",
 ];
 
 /// Gibt der Serverseite zur Laufzeit genau ihre Origin frei — und dort nur [`SERVER_RECHTE`].
@@ -419,6 +424,11 @@ fn baue_fenster(
             // Jede nicht-lokale Seite beendet die Wache (LLH-1283): auch eine aus dem Service
             // Worker, auch die eines Identitätsanbieters.
             seite_angekommen(fenster.app_handle(), fenster.label(), seite.url());
+            // Eine neu geladene Seite hat noch keine Zahl gemeldet (LLH-1423): Maske, Anzeige
+            // „nicht erreichbar“ und ein anderer Server tragen keine.
+            if matches!(seite.event(), tauri::webview::PageLoadEvent::Started) {
+                apply_badge(fenster.app_handle(), fenster.label(), 0);
+            }
             // Im Protokoll steht, welche Seite geladen wurde — beim Support die erste Frage
             // („Maske oder Server? Welcher?“).
             if matches!(seite.event(), tauri::webview::PageLoadEvent::Finished) {
@@ -719,6 +729,52 @@ fn benachrichtigung_zeigen(
     meldung.show().map_err(|e| e.to_string())
 }
 
+/// Serverseite (LLH-1423): die Zahl der ungelesenen Eingänge dieses Fensters am App-Symbol; 0
+/// nimmt sie weg. Welche Zahl, entscheidet das Frontend (`frontend/src/alarm/appBadge.ts`).
+#[tauri::command]
+fn set_app_badge(app: AppHandle, fenster: WebviewWindow, count: u32) {
+    apply_badge(&app, fenster.label(), count);
+}
+
+/// Trägt die Zahl des Fensters `label` ein und setzt das App-Symbol neu, wenn sich dessen Zahl
+/// ändert. Das Badge gilt für die ganze App (macOS: Dock), gesetzt wird es über ein anderes
+/// Fenster als `label`, wenn es eins gibt: `label` kann gerade schließen. Wo das System keine Zahl
+/// am Symbol kennt (Windows), tut Tauri nichts; ein Fehler kommt nur ins Protokoll.
+fn apply_badge(app: &AppHandle, label: &str, count: u32) {
+    let zustand = app.state::<Zustand>();
+    let zahl = {
+        let mut badges = zustand.badges.lock().unwrap();
+        let vorher = badge_count(&badges);
+        if !update_badge(&mut badges, label, count) || badge_count(&badges) == vorher {
+            return;
+        }
+        badge_count(&badges)
+    };
+    let alle = app.webview_windows();
+    let ziel = alle
+        .iter()
+        .find(|(kennung, _)| kennung.as_str() != label)
+        .or_else(|| alle.get_key_value(label))
+        .map(|(_, fenster)| fenster);
+    if let Some(Err(fehler)) = ziel.map(|fenster| fenster.set_badge_count(zahl)) {
+        log::warn!("App-Badge nicht gesetzt: {fehler}");
+    }
+}
+
+/// Setzt die Zahl des Fensters `label`; 0 nimmt sie heraus. Hat sich etwas geändert?
+fn update_badge(badges: &mut HashMap<String, u32>, label: &str, count: u32) -> bool {
+    if count == 0 {
+        return badges.remove(label).is_some();
+    }
+    badges.insert(label.to_string(), count) != Some(count)
+}
+
+/// Die eine Zahl der App: die größte der Fenster. Mehrere Fenster desselben Einsatzes melden
+/// dieselbe Zahl, eine Summe zählte sie doppelt. Ohne Zahl kein Badge (`None` nimmt es weg).
+fn badge_count(badges: &HashMap<String, u32>) -> Option<i64> {
+    badges.values().max().map(|&zahl| i64::from(zahl))
+}
+
 /// So lange gilt eine gleiche Meldung aus einem weiteren Fenster als dieselbe (LLH-1281).
 const DOPPEL_FRIST: Duration = Duration::from_secs(3);
 
@@ -952,7 +1008,8 @@ fn main() {
             server_wechseln,
             drucken,
             anmeldung_im_browser,
-            benachrichtigung_zeigen
+            benachrichtigung_zeigen,
+            set_app_badge
         ])
         .menu(menue::bauen)
         .on_menu_event(menue::behandeln)
@@ -964,6 +1021,7 @@ fn main() {
                 let zustand = fenster.app_handle().state::<Zustand>();
                 zustand.watches.lock().unwrap().remove(fenster.label());
                 zustand.ausfaelle.lock().unwrap().remove(fenster.label());
+                apply_badge(fenster.app_handle(), fenster.label(), 0);
             }
         })
         .setup(|app| {
@@ -1076,9 +1134,9 @@ mod tests {
         );
     }
 
-    /// Die Serverseite bekommt genau Druck, „Im Browser anmelden“ und die native Meldung; die
-    /// Maske (`lokal`) weder die Anmeldung noch die Meldung, und niemand die Commands des
-    /// Notification-Plugins. Die Permissions entstehen aus dem Manifest in `build.rs`.
+    /// Die Serverseite bekommt genau Druck, „Im Browser anmelden“, die native Meldung und das
+    /// App-Badge; die Maske (`lokal`) weder die Anmeldung noch Meldung oder Badge, und niemand die
+    /// Commands des Notification-Plugins. Die Permissions entstehen aus dem Manifest in `build.rs`.
     #[test]
     fn serverseite_darf_anmelden_und_melden_die_maske_nicht() {
         assert_eq!(
@@ -1086,7 +1144,8 @@ mod tests {
             [
                 "allow-drucken",
                 "allow-anmeldung-im-browser",
-                "allow-benachrichtigung-zeigen"
+                "allow-benachrichtigung-zeigen",
+                "allow-set-app-badge"
             ]
         );
         // Ein Plugin-Recht trüge ein Präfix (`notification:…`).
@@ -1096,9 +1155,13 @@ mod tests {
         let erzeugt = include_str!("../permissions/autogenerated/benachrichtigung_zeigen.toml");
         assert!(erzeugt.contains(r#"identifier = "allow-benachrichtigung-zeigen""#));
         assert!(erzeugt.contains(r#"commands.allow = ["benachrichtigung_zeigen"]"#));
+        let erzeugt = include_str!("../permissions/autogenerated/set_app_badge.toml");
+        assert!(erzeugt.contains(r#"identifier = "allow-set-app-badge""#));
+        assert!(erzeugt.contains(r#"commands.allow = ["set_app_badge"]"#));
         let lokal = include_str!("../capabilities/lokal.json");
         assert!(!lokal.contains("anmeldung"), "{lokal}");
         assert!(!lokal.contains("benachrichtigung"), "{lokal}");
+        assert!(!lokal.contains("badge"), "{lokal}");
         assert!(!lokal.contains("notification"), "{lokal}");
     }
 
@@ -1143,6 +1206,29 @@ mod tests {
             );
         }
         assert!(BENACHRICHTIGUNG_SKRIPT.contains("ipc.invoke('benachrichtigung_zeigen'"));
+        assert!(BENACHRICHTIGUNG_SKRIPT.contains("ipc.invoke('set_app_badge', { count })"));
+    }
+
+    /// Jedes Fenster meldet seine Zahl (LLH-1423); das App-Symbol trägt eine Zahl für die ganze
+    /// App, die größte. 0 nimmt die Zahl des Fensters weg, ohne Zahl steht kein Badge.
+    #[test]
+    fn app_badge_traegt_die_groesste_zahl_der_fenster() {
+        let mut badges = HashMap::new();
+        assert_eq!(badge_count(&badges), None);
+        assert!(update_badge(&mut badges, "main", 3));
+        assert!(!update_badge(&mut badges, "main", 3), "unverändert");
+        assert_eq!(badge_count(&badges), Some(3));
+        // Zwei Fenster desselben Einsatzes melden dieselbe Zahl: sie zählt einmal.
+        assert!(update_badge(&mut badges, "neben-1", 3));
+        assert_eq!(badge_count(&badges), Some(3));
+        assert!(update_badge(&mut badges, "neben-1", 5));
+        assert_eq!(badge_count(&badges), Some(5));
+        assert!(update_badge(&mut badges, "neben-1", 0));
+        assert!(!badges.contains_key("neben-1"));
+        assert_eq!(badge_count(&badges), Some(3));
+        assert!(update_badge(&mut badges, "main", 0));
+        assert_eq!(badge_count(&badges), None);
+        assert!(!update_badge(&mut badges, "main", 0), "nichts zu nehmen");
     }
 
     #[test]

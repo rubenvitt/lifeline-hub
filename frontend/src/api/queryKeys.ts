@@ -1288,8 +1288,9 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * und ohne Benutzerbindung. Gelistet sind die fünf Ansichten ETB, Meldebild, Betroffene,
  * Aufträge und Lagekarte sowie die Rahmendaten, ohne die sie nicht rendern (Einsatzkopf,
  * Freigaben, Einstellungen, Zähler, Einsatzliste, Kartenkonfiguration, Organisation,
- * Fahrzeugstatus-Katalog) und die Präferenzen der Person (Standard-Rufname, LFH-894). Von den
- * Meldungen nur die Rückmeldungen, nicht die Liste.
+ * Fahrzeugstatus-Katalog), die Präferenzen der Person (Standard-Rufname, LFH-894) und der
+ * Verlauf ihrer Benachrichtigungen (LLH-1422). Von den Meldungen nur die Rückmeldungen, nicht die
+ * Liste.
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit samt Listenzugriffen der
  * Personenliste (LFH-916, nur für die Einsatzleitung), die Auswahl „Bestätigt von“ am Gerät
@@ -1309,8 +1310,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“), die Bild-Anlagen an
  * Lagebericht und Befehl (LFH-1028: ohne Netz lädt kein Bild), die Tierliste und mit ihr die
  * Kartenebene „Tiere" (LLH-1123: sie trägt Halterkontakt und Kennzeichnung; ohne Netz zeigt die
- * Karte keine Tiere, wie keine Bereitstellungsräume), der Verlauf der Benachrichtigungen
- * (LLH-1143: Lesestand und Text nur vom Server; Offline-Lesen ist ein eigener Schritt).
+ * Karte keine Tiere, wie keine Bereitstellungsräume).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {
@@ -1356,6 +1356,10 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.kartenAnsicht,
     EINSATZ_KEYS.kartenbilder,
     EINSATZ_KEYS.lageSnapshot,
+    // Verlauf der eigenen Benachrichtigungen (LLH-1422): ohne Netz lesbar, „Alle gelesen“ wird
+    // vorgemerkt (`offline/schreiben.ts`). Die Detailzeile liest der Server nur aus Retain-Spalten
+    // (Nummern, Labels; `src/benachrichtigung/text.rs`), Freitexte stehen nicht darin.
+    EINSATZ_KEYS.benachrichtigungVerlauf,
   ],
   /** Einzelne Sub-Keys eines sonst ungelisteten Prefix: `[prefix, einsatzId, sub]`. */
   einsatzUnterKeys: [

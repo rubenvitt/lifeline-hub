@@ -185,13 +185,17 @@ einen Hinweis mit dezentem Ton, wenn diese Einheit
 - alarmiert wird („Ablösende Einheit alarmiert“),
 - eintrifft („Ablösende Einheit eingetroffen“),
 - am Bereitstellungsraum eingebucht wird („Ablösende Einheit im Bereitstellungsraum
-  eingetroffen“) oder
-- dort abgerufen wird („Ablösende Einheit abgerufen“).
+  eingetroffen“),
+- dort abgerufen wird („Ablösende Einheit abgerufen“) oder
+- ihre Alarmierung oder ihr Eintreffen in der Kräfte-Zeitachse gestrichen wird („Alarmierung der
+  ablösenden Einheit gestrichen“, „Eintreffen der ablösenden Einheit gestrichen“); der frühere
+  Hinweis gilt dann nicht mehr.
 
 Die Zeile darunter nennt beide Einheiten, etwa „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“;
 „Öffnen“ führt zur Schicht. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
 Alarmiert und eingetroffen zählen nur am Anfang ihres Einsatzabschnitts in der
-Kräfte-Zeitachse, ein Nachtrag in einen abgeschlossenen Abschnitt meldet nichts. Bei einem
+Kräfte-Zeitachse, auch als Nachtrag; ein Nachtrag in einen abgeschlossenen Abschnitt und seine
+Streichung melden nichts. Bei einem
 Verband zählt nur die geplante Einheit, nicht ihre Untereinheiten.
 
 Wird die geplante Einheit aufgelöst oder entlassen, entfällt die Planung: die Karte zeigt keine

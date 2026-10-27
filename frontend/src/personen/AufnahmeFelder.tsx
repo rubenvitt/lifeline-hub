@@ -9,6 +9,10 @@ import {
 } from '../api/eingabegrenzen';
 import type { PersonEingabe } from '../api/einsatzPerson';
 import type { Sichtungskategorie } from '../api/types';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { ortFelder, ortRegeln } from '../anzeige/ortsfeldFormular';
+import { useAuthOptional } from '../auth/AuthContext';
 import { parseKoordinate } from './koordinate';
 import { KoordinateFeld, VermisstSeitFeld } from './LagedatenFelder';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
@@ -26,30 +30,50 @@ export type AufnahmeEingabe = PersonEingabe & {
 };
 
 /**
- * Die FORMULARwerte: `AufnahmeEingabe` bis auf die Koordinate, die als EIN Textfeld
- * (`52.2691/9.1342`) steht und erst in {@link aufnahmeZuEingabe} zerlegt wird. „vermisst seit"
- * liegt schon als Wire-String (UTC) im Formular.
+ * Die FORMULARwerte: `AufnahmeEingabe` bis auf den Fundort und die Koordinate. Der Fundort ist ein
+ * Ortsfeld-Wert (Text und Koordinate, LLH-1407); am gekoppelten Gerät steht die Koordinate als EIN
+ * Textfeld (`52.2691/9.1342`) daneben. Zerlegt wird erst in {@link aufnahmeZuEingabe}. „vermisst
+ * seit" liegt schon als Wire-String (UTC) im Formular.
  */
-export type AufnahmeWerte = Omit<AufnahmeEingabe, 'antreff_lat' | 'antreff_lon' | 'sichtung'> & {
+export type AufnahmeWerte = Omit<
+  AufnahmeEingabe,
+  'antreff_ort' | 'antreff_lat' | 'antreff_lon' | 'sichtung'
+> & {
+  antreff_ort?: OrtsfeldWert;
   koordinate?: string;
   sichtung?: Sichtungskategorie | null;
 };
 
+/** Ein gemerkter Fundort (nur Text, `components/erfassungsSitzung.ts`) als Wert des Felds. */
+export function fundortAusText(text: string): OrtsfeldWert {
+  return { text, koordinate: null };
+}
+
 /**
  * Formularwerte → Anlage; beide Mounts rufen sie. Nur GESETZTE Werte gehen mit
- * (`vermisst_seit` ohne Angabe fehlt, dann setzt der Server die Meldezeit). Ein unbrauchbarer
- * Koordinatentext erreicht diese Funktion nicht — die Feldprüfung hält vorher an.
+ * (`vermisst_seit` ohne Angabe fehlt, dann setzt der Server die Meldezeit). Die Koordinate kommt
+ * aus dem Ortsfeld, am Gerät aus dem Koordinatenfeld. Ein unbrauchbarer Koordinatentext erreicht
+ * diese Funktion nicht — die Feldprüfung hält vorher an.
  */
 export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
-  const { koordinate, vermisst_seit, bestaetigt_personal_id, sichtung, ...rest } = werte;
-  const k = koordinate && koordinate.trim() !== '' ? parseKoordinate(koordinate) : null;
+  const { antreff_ort, koordinate, vermisst_seit, bestaetigt_personal_id, sichtung, ...rest } =
+    werte;
+  const ort = ortFelder(antreff_ort);
+  const getippt = koordinate && koordinate.trim() !== '' ? parseKoordinate(koordinate) : null;
+  const k =
+    ort.lat != null && ort.lon != null
+      ? { lat: ort.lat, lon: ort.lon }
+      : getippt?.ok
+        ? { lat: getippt.lat, lon: getippt.lon }
+        : null;
   return {
     ...rest,
+    ...(ort.text != null ? { antreff_ort: ort.text } : {}),
     // Eine zurückgenommene Wahl (`SichtungsWahl abwaehlbar` meldet `null`) heißt: ohne Sichtung.
     ...(sichtung ? { sichtung } : {}),
     // Ohne Erst-Sichtung gibt es nichts zu bestätigen (sonst 422).
     ...(sichtung && bestaetigt_personal_id != null ? { bestaetigt_personal_id } : {}),
-    ...(k?.ok ? { antreff_lat: k.lat, antreff_lon: k.lon } : {}),
+    ...(k ? { antreff_lat: k.lat, antreff_lon: k.lon } : {}),
     ...(vermisst_seit ? { vermisst_seit } : {}),
   };
 }
@@ -73,8 +97,14 @@ export const FOLGESTATUS_HINWEIS = 'Status: erfasst · mit Sichtung → betroffe
  * an der Aufnahme wird zuerst die Kategorie vergeben, der Name ist meist unbekannt.
  * Pflichtfelder gibt es keine.
  *
- * Unter „Weitere Angaben" liegen außerdem Zustand und Koordinate (geprüft über
- * `personen/koordinate.ts`), im Vermisst-Modus statt ihrer „vermisst seit". Der Collapse bleibt
+ * Der Fundort ist ein Ortsfeld mit Suche im Einsatz und Kartenvorschau (LLH-1407): ein Treffer,
+ * eine getippte Koordinate oder die Nadel liefern die Koordinate. Enter im Fundort sucht und sendet
+ * nicht ab; gespeichert wird über den Knopf. Am gekoppelten Gerät gibt es keine Ortssuche (seine
+ * Routenliste, `src/geraet/mod.rs`): dort ist der Fundort Text, und die Koordinate steht als
+ * eigenes Feld unter „Weitere Angaben" (geprüft über `personen/koordinate.ts`).
+ *
+ * Unter „Weitere Angaben" liegt außerdem der Zustand, im Vermisst-Modus statt seiner „vermisst
+ * seit". Der Collapse bleibt
  * OHNE `forceRender` (Beleg in `PersonErfassungModal.test.tsx`): ein Wert entsteht nur
  * aufgeklappt, und einmal aufgeklappt bleibt der Bereich eingehängt.
  *
@@ -94,11 +124,16 @@ export default function AufnahmeFelder({
   ohneSichtung = false,
 }: {
   modus: AufnahmeModus;
-  /** Für „Bestätigt von“ am UHS-Gerät (LFH-1046); ohne Kennung kein Feld. */
+  /**
+   * Für „Bestätigt von“ am UHS-Gerät (LFH-1046) und die Ortssuche des Fundorts (LLH-1407); ohne
+   * Kennung beides nicht.
+   */
   einsatzId?: number;
   /** Ohne Sichtung und ohne ihren Folgestatus, etwa am Gerät einer Betreuungsstelle (LFH-1041). */
   ohneSichtung?: boolean;
 }) {
+  const geraet = useAuthOptional()?.geraet ?? null;
+  const ortssuche = einsatzId != null && geraet == null;
   const weitereAngaben = (
     <>
       <Form.Item label="Name" name="name" rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}>
@@ -135,7 +170,7 @@ export default function AufnahmeFelder({
               count={zeichenGrenze(PERSON_ZUSTAND_MAX)}
             />
           </Form.Item>
-          <KoordinateFeld />
+          {!ortssuche && <KoordinateFeld />}
         </>
       )}
       <Form.Item label="Notiz" name="notiz" rules={[zeichenRegel(PERSON_NOTIZ_MAX, 'Notiz')]}>
@@ -176,15 +211,35 @@ export default function AufnahmeFelder({
       <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
         <InputNumber min={0} max={120} style={{ width: 140 }} />
       </Form.Item>
-      {/* „Fundort" ist bewusst das LETZTE sichtbare Eingabefeld: Enter darin sendet ab, und der Ort
-         steht am Ende eines Aufnahmegesprächs. */}
-      <Form.Item
-        label="Fundort"
-        name="antreff_ort"
-        rules={[zeichenRegel(PERSON_ANGABE_MAX, 'Fundort')]}
-      >
-        <Input placeholder="z. B. Brücke, Sammelstelle" count={zeichenGrenze(PERSON_ANGABE_MAX)} />
-      </Form.Item>
+      {/* „Fundort" ist das LETZTE sichtbare Eingabefeld: der Ort steht am Ende eines
+         Aufnahmegesprächs. */}
+      {ortssuche ? (
+        <Form.Item
+          label="Fundort"
+          name="antreff_ort"
+          rules={ortRegeln(PERSON_ANGABE_MAX, 'Fundort')}
+        >
+          <EinsatzOrtsfeld
+            einsatzId={einsatzId}
+            etikett="Fundort"
+            count={zeichenGrenze(PERSON_ANGABE_MAX)}
+          />
+        </Form.Item>
+      ) : (
+        // Am Gerät nur Text; der Wert bleibt ein Ortsfeld-Wert, damit beide Wege gleich zerlegen.
+        <Form.Item
+          label="Fundort"
+          name="antreff_ort"
+          rules={ortRegeln(PERSON_ANGABE_MAX, 'Fundort')}
+          getValueProps={(w?: OrtsfeldWert) => ({ value: w?.text ?? '' })}
+          normalize={(text: string) => fundortAusText(text)}
+        >
+          <Input
+            placeholder="z. B. Brücke, Sammelstelle"
+            count={zeichenGrenze(PERSON_ANGABE_MAX)}
+          />
+        </Form.Item>
+      )}
       <Collapse
         ghost
         items={[{ key: 'weitere', label: 'Weitere Angaben', children: weitereAngaben }]}

@@ -1092,6 +1092,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("nachforderung_am_raum", G_ENUM),
             // Kennzeichen „letzte Besetzung festgehalten“ (LLH-1266, Mig 0252).
             retain("besetzung_festgehalten", G_ENUM),
+            // Merker „Überfälligkeit dieser Rückmeldung gemeldet“ (LLH-1425, Mig 0255): Verweis
+            // auf die Meldung, kein Personenbezug.
+            retain("rueckmeldung_ueberfaellig_meldung_id", G_FK),
         ],
     },
     // Letzte Besetzung einer aufgelösten Einheit (LLH-1266, Mig 0252): wer und was beim Auflösen
@@ -1412,10 +1415,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             scrub("standort", Strategie::NullSetzen, Z_EINSATZ),
             scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
-            // Leitung (ein Name) und Erreichbarkeit (eine Rufnummer) der Stelle (LLH-1044), wie
-            // `medienkontakt.kontakt_name`/`kontakt_erreichbarkeit`.
+            // Leitung (ein Name) und Kontaktweg (eine Rufnummer) der Stelle (LLH-1044), wie
+            // `medienkontakt.kontakt_name`/`kontaktweg`.
             scrub("leitung", Strategie::NullSetzen, Z_EINSATZ),
-            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("kontaktweg", Strategie::NullSetzen, Z_EINSATZ),
             // Koordinate auf der Lagekarte — Geo-Skelett wie `uhs.lat/lon`.
             retain("lat", G_GEO),
             retain("lon", G_GEO),
@@ -2377,7 +2380,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("medium", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             scrub("thema", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             scrub("kontakt_name", Strategie::NullSetzen, Z_EINSATZ),
-            scrub("kontakt_erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("kontaktweg", Strategie::NullSetzen, Z_EINSATZ),
             retain("eingang_at", G_ZEIT),
             retain("status", G_ENUM),
             scrub("antwort", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),

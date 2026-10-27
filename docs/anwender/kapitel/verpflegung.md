@@ -178,7 +178,9 @@ einem anderen Ort stattfand:
    ![Dialog „Ausgabe nachtragen: Mittag“ mit „Bedarf 200 · ausgegeben 180 · fehlt 20 EP“, Menge 10, dem Empfänger „Rettungsstaffel“ und der Stelle „Ausgabe Turnhalle Nord“](../bilder/verpflegung/ausgabe-nachtragen.png)
 
 6. Für einen Ort, Sonderkost, eine zugehörige Nachforderung oder eine Bemerkung „Weitere Angaben“
-   aufklappen. Ohne Stelle steht dort „Ort“, im Einsatz mit Stellen „Zuführungsziel“.
+   aufklappen. Ohne Stelle steht dort „Ort“, im Einsatz mit Stellen „Zuführungsziel“. Mit Enter
+   oder „Ort suchen“ lässt sich der Ort suchen; ein Treffer übernimmt die Adresse als Text, eine
+   Koordinate speichert die Ausgabe nicht.
 7. „Nachtragen“ wählen. War es das falsche Zeitfenster, in der Meldung „Rückgängig“ wählen.
 
 ### Eine Ausgabe zurücknehmen
@@ -198,7 +200,9 @@ Für Einsatzleitung und Führungspersonal:
    Zeitfenster …“ (drei Punkte). Die Karte zeigt jetzt statt der Zahlen die Felder: Bezeichnung,
    Zeitraum, Bedarf und Sonderkost ändern und „Speichern“ wählen (oder die Eingabetaste drücken).
    „Abbrechen“ oder die Escape-Taste verwirft die Änderung. Solange eine Karte in Bearbeitung ist,
-   ist „Bedarf bearbeiten“ an den anderen Karten gesperrt.
+   ist „Bedarf bearbeiten“ an den anderen Karten gesperrt. Hat jemand anderes das Zeitfenster seit
+   dem Öffnen geändert, fragt die App „Zwischenzeitlich geändert“: „Meine Änderung übernehmen“
+   speichert die eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand.
 2. Fehlt etwas, „Nachfordern“ wählen. Die App öffnet die Erfassung einer Nachforderung mit Art
    „Verpflegung“, der Fehlmenge als Anzahl und einer Begründung, die das Zeitfenster nennt.
 3. Ein Zeitfenster ohne gültige Ausgabe mit „Löschen“ entfernen und die Rückfrage mit „Löschen“

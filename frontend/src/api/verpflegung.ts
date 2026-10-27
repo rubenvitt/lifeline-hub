@@ -49,12 +49,18 @@ export function createTagAusVorlage(
   );
 }
 
-/** Teiländerung; geprüft wird serverseitig gegen den Effektivzustand (Bestand + Patch). */
+/**
+ * Teiländerung; geprüft wird serverseitig gegen den Effektivzustand (Bestand + Patch).
+ * Optimistisches Lock (LLH-1414): `basisGeaendertAt` ist der Stand beim Öffnen, veraltet → 409.
+ * Ohne („Meine Änderung übernehmen“) wird ohne Vergleich geschrieben; dann fehlt das Feld ganz.
+ */
 export function aendereZeitfenster(
   einsatzId: number,
   zeitfensterId: number,
-  body: ZeitfensterPatch,
+  patch: ZeitfensterPatch,
+  basisGeaendertAt?: string,
 ): Promise<VerpflegungZeitfenster> {
+  const body = basisGeaendertAt ? { ...patch, basis_geaendert_at: basisGeaendertAt } : patch;
   return apiSend<VerpflegungZeitfenster>(
     `${basis(einsatzId)}/zeitfenster/${zeitfensterId}`,
     'PATCH',

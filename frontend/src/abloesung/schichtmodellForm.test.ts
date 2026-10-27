@@ -85,10 +85,21 @@ describe('Schichtmodell-Formular (LLH-1122)', () => {
   });
 
   it('beschreibt die Regel lesbar, Wechselzeiten taktisch', () => {
-    expect(formatRegel(hochwasser)).toBe('Wechsel 0600/1800 · Mindestdauer 4 h');
-    expect(formatRegel({ ...hochwasser, mindestdauer_minuten: 0 })).toBe('Wechsel 0600/1800');
-    expect(formatRegel({ typ: 'rhythmus', rhythmus_minuten: 720 })).toBe('Rhythmus 12 h');
-    expect(formatRegelKurz(hochwasser)).toBe('Wechsel 0600/1800');
-    expect(formatRegelKurz({ typ: 'rhythmus', rhythmus_minuten: 450 })).toBe('7:30 h');
+    const taktisch = { zeitdarstellung: 'taktisch' } as const;
+    expect(formatRegel(hochwasser, taktisch)).toBe('Wechsel 0600/1800 · Mindestdauer 4 h');
+    expect(formatRegel({ ...hochwasser, mindestdauer_minuten: 0 }, taktisch)).toBe(
+      'Wechsel 0600/1800',
+    );
+    expect(formatRegel({ typ: 'rhythmus', rhythmus_minuten: 720 }, taktisch)).toBe('Rhythmus 12 h');
+    expect(formatRegelKurz(hochwasser, taktisch)).toBe('Wechsel 0600/1800');
+    expect(formatRegelKurz({ typ: 'rhythmus', rhythmus_minuten: 450 }, taktisch)).toBe('7:30 h');
+  });
+
+  it('nennt die Wechselzeiten bei „Datum und Uhrzeit“ mit Doppelpunkt (LLH-1437)', () => {
+    const datumUhrzeit = { zeitdarstellung: 'datum_uhrzeit' } as const;
+    expect(formatRegel(hochwasser, datumUhrzeit)).toBe('Wechsel 06:00/18:00 · Mindestdauer 4 h');
+    expect(formatRegelKurz(hochwasser, datumUhrzeit)).toBe('Wechsel 06:00/18:00');
+    // Das Feld bleibt taktisch: so tippt man sie, und so liest die Maske sie zurück.
+    expect(toFormWerte(hochwasser).wechselzeiten).toBe('0600/1800');
   });
 });

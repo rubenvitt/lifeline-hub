@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   bereinigeListenZustand,
+  listenGedaechtnisBinden,
   listenGedaechtnisRaeumen,
   useListenGedaechtnis,
   type GedaechtnisSpalte,
@@ -189,6 +190,91 @@ describe('useListenGedaechtnis (LLH-1086)', () => {
     listenGedaechtnisRaeumen();
     expect(sessionStorage.getItem('lfh:liste:schaeden:7')).toBeNull();
     expect(sessionStorage.getItem('lfh:erfassung:7:person:ort')).toBe('x');
+  });
+});
+
+/**
+ * Kontowechsel ohne Abmelden in diesem Tab (LLH-1428, wie LFH-785 bei den Erfassungswerten): der
+ * Konfliktdialog lädt die Seite als B neu, der sessionStorage überlebt das. Ein Suchbegriff von A
+ * kann einen Namen tragen und stünde sonst in der Liste von B.
+ */
+describe('listenGedaechtnisBinden (LLH-1428)', () => {
+  const A = 11;
+  const B = 12;
+  const LISTE = 'lfh:liste:schaeden:7';
+
+  it('Wechsel von A zu B: die Listenstände von A sind weg', () => {
+    listenGedaechtnisBinden(A);
+    sessionStorage.setItem(LISTE, 'f.ausmass=gross&q=Meier');
+    sessionStorage.setItem('lfh:liste:stammdaten-personal', 'q=Schulz');
+
+    listenGedaechtnisBinden(B);
+
+    expect(sessionStorage.getItem(LISTE)).toBeNull();
+    expect(sessionStorage.getItem('lfh:liste:stammdaten-personal')).toBeNull();
+  });
+
+  it('derselbe Benutzer erneut (Neuladen als A): der Stand bleibt', () => {
+    listenGedaechtnisBinden(A);
+    sessionStorage.setItem(LISTE, 'f.ausmass=gross');
+
+    listenGedaechtnisBinden(A);
+
+    expect(sessionStorage.getItem(LISTE)).toBe('f.ausmass=gross');
+  });
+
+  it('verwirft einen Stand aus der Zeit vor der Bindung, statt ihn zu übernehmen', () => {
+    sessionStorage.setItem(LISTE, 'q=ohne Besitzer');
+
+    listenGedaechtnisBinden(A);
+
+    expect(sessionStorage.getItem(LISTE)).toBeNull();
+  });
+
+  it('ohne Benutzer räumt es nichts — das tun Abmelden und Sitzungsende', () => {
+    listenGedaechtnisBinden(A);
+    sessionStorage.setItem(LISTE, 'f.ausmass=gross');
+
+    listenGedaechtnisBinden(null);
+
+    expect(sessionStorage.getItem(LISTE)).toBe('f.ausmass=gross');
+  });
+
+  it('lässt fremde Sitzungswerte stehen', () => {
+    listenGedaechtnisBinden(A);
+    sessionStorage.setItem('lfh:erfassung:7:person:ort', 'x');
+
+    listenGedaechtnisBinden(B);
+
+    expect(sessionStorage.getItem('lfh:erfassung:7:person:ort')).toBe('x');
+  });
+
+  it('nach dem Räumen beim Abmelden bindet sich der nächste Benutzer neu', () => {
+    listenGedaechtnisBinden(A);
+    listenGedaechtnisRaeumen();
+    listenGedaechtnisBinden(B);
+    sessionStorage.setItem(LISTE, 'f.ausmass=gering');
+
+    listenGedaechtnisBinden(B);
+
+    expect(sessionStorage.getItem(LISTE)).toBe('f.ausmass=gering');
+  });
+
+  it('die Bindung ist kein Listenstand: eine Seite liest sie nicht als Sicht', () => {
+    listenGedaechtnisBinden(A);
+    const { hook, ort } = aufbauen('/s');
+    expect(hook.result.current.start).toEqual({ sortierung: VORGABE, filter: {}, suche: '' });
+    expect(ort.aktuell).toBe('/s');
+  });
+
+  it('wirft nicht ohne sessionStorage', () => {
+    const vorher = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+    Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: undefined });
+    try {
+      expect(() => listenGedaechtnisBinden(A)).not.toThrow();
+    } finally {
+      if (vorher) Object.defineProperty(globalThis, 'sessionStorage', vorher);
+    }
   });
 });
 

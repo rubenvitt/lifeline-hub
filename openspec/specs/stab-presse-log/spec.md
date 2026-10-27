@@ -16,8 +16,9 @@ Das System SHALL je Einsatz Medienkontakte führen. Ein Medienkontakt MUST diese
 - **Thema:** Pflicht, Freitext
 - **Eingang:** Zeitpunkt. Fehlt er, gilt der Zeitpunkt der Erfassung.
 
-Optional sind die Ansprechperson und ihre Erreichbarkeit. Ein fehlendes oder leeres Pflichtfeld
-MUST mit 400 abgelehnt werden, ebenso eine unbekannte Art. Ein neuer Kontakt MUST im Status `offen`
+Optional sind die Ansprechperson und ihr Kontaktweg (`kontaktweg`). Ein fehlendes oder leeres
+Pflichtfeld MUST mit 400 abgelehnt werden, ebenso eine unbekannte Art und ein Schreiben mit dem
+alten Feldnamen `kontakt_erreichbarkeit`. Ein neuer Kontakt MUST im Status `offen`
 beginnen.
 
 #### Scenario: Anfrage erfassen
@@ -68,7 +69,7 @@ Pressemitteilung.
   dafür keine Rückfrage
 
 ### Requirement: Presse-Log bearbeiten, nicht löschen
-Medium, Thema, Ansprechperson, Erreichbarkeit und Eingang eines Medienkontakts SHALL sich
+Medium, Thema, Ansprechperson, Kontaktweg und Eingang eines Medienkontakts SHALL sich
 bearbeiten lassen. Ein Medienkontakt MUST NOT gelöscht werden können. Während des Einsatzes ist
 das Log der Arbeitsstand der Pressearbeit; über die Schwärzung hinaus bleibt als Nachweis nur die
 freigegebene Pressemitteilung im ETB.
@@ -114,7 +115,7 @@ erklärt, nicht still weggeschaltet.
   erreichbar
 
 ### Requirement: Datenschutz der Kontaktdaten
-Ansprechperson und Erreichbarkeit MUST als personenbezogen gelten. Die Schwärzung eines Einsatzes
+Ansprechperson und Kontaktweg MUST als personenbezogen gelten. Die Schwärzung eines Einsatzes
 MUST beide entfernen, ebenso die Freitexte des Presse-Logs: Medium, Thema, Antwort und
 Freigabeangabe. Erhalten bleiben MUST Art, Status, Eingang, Bearbeitungs- und Änderungszeitpunkte
 sowie die Verweise auf Benutzer und auf die Pressemitteilung. Der System-Eintrag der Schwärzung MUST
@@ -124,7 +125,7 @@ dem Gerät gespeichert werden.
 #### Scenario: Schwärzung
 - **WHEN** ein Einsatz mit einer beantworteten Anfrage „Anfrage zu Fam. Yilmaz“ von „NDR 1“ mit
   Ansprechperson, Antwort und Freigabeangabe geschwärzt wird
-- **THEN** sind Ansprechperson, Erreichbarkeit und Freigabeangabe leer
+- **THEN** sind Ansprechperson, Kontaktweg und Freigabeangabe leer
 - **AND** tragen Medium, Thema und Antwort den Platzhalter
 - **AND** stehen Art, Status und Eingang unverändert da
 

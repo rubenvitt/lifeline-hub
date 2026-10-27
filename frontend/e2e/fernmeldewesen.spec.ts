@@ -73,9 +73,9 @@ test.describe('Fernmeldewesen (LLH-1180)', () => {
     await wechsleZuRolle(page, 'fuehrungspersonal', id);
     await vorbedingungStabAus(page, id);
 
-    // Altadresse mit Sichtvorgabe: landet in der Skizze des Moduls, die Sichtvorgabe ist geräumt.
+    // Altadresse mit Darstellung: landet in der Skizze des Moduls, `?ansicht=` bleibt (LLH-1432).
     await page.goto(`/einsaetze/${id}/stab/funkplan?ansicht=skizze`);
-    await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/fernmeldewesen$`));
+    await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/fernmeldewesen\\?ansicht=skizze$`));
     await expect(page.getByRole('heading', { level: 1, name: 'Fernmeldewesen' })).toBeVisible();
     await expect(reiter(page, 'Fernmeldeskizze')).toHaveAttribute('aria-selected', 'true');
     await expect(flaeche(page)).toBeVisible();

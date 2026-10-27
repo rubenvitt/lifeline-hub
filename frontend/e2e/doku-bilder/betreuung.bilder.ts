@@ -35,7 +35,7 @@ async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
       kapazitaet_personen: 80,
       standort: 'Nordring 4',
       leitung: 'Hallenwart Meyer',
-      erreichbarkeit: 'Kanal 3',
+      kontaktweg: 'Kanal 3',
     });
     await fuelle(page, 'patch', `${basis}/stellen/${stelle.id}`, { status: 'in_betrieb' });
     await fuelle(page, 'post', `${basis}/stellen/${stelle.id}/belegungen`, { belegt: 74 });

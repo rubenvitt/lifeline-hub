@@ -490,7 +490,10 @@ async fn einstellung_lehnt_alarm_mit_422_und_unbekanntes_mit_400_ab() {
         (r#"["gibt_es_nicht"]"#, StatusCode::BAD_REQUEST),
         (r#"{"meldung":true}"#, StatusCode::BAD_REQUEST),
         ("[]", StatusCode::OK),
-        (r#"["unwetter"]"#, StatusCode::OK),
+        // Seit LLH-1425 Alarme (Katalog LLH-1142 E1): nicht abschaltbar.
+        (r#"["unwetter"]"#, StatusCode::UNPROCESSABLE_ENTITY),
+        (r#"["vermisstenmeldung"]"#, StatusCode::UNPROCESSABLE_ENTITY),
+        (r#"["rueckmeldung_ueberfaellig"]"#, StatusCode::OK),
     ] {
         let (s, v) = anfrage(
             &w.app,

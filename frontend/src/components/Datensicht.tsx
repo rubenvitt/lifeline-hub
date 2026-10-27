@@ -36,6 +36,7 @@ import {
   hatWaehlbareSpalten,
   sichtbareSpalten,
   SpaltenSchalter,
+  type SpaltenSchalterZustand,
 } from './SpaltenSchalter';
 
 // Zählung und Schalter wohnen in `SpaltenSchalter.tsx` (zweiter Träger: `KatalogTabelle`). Der
@@ -545,6 +546,15 @@ interface DatensichtProps<T extends object, K extends string> {
   spaltenAusVoreinstellung?: readonly NoInfer<K>[];
   spaltenAus?: readonly NoInfer<K>[];
   onSpaltenAus?: (schluessel: NoInfer<K>[]) => void;
+  /**
+   * Der Spaltenschalter steht bei der Seite, in ihrer eigenen Werkzeugzeile (LLH-1417, Vorbild
+   * Meldebild): Zustand aus `useSpaltenSchalterZustand` (`components/SpaltenSchalter.tsx`), die Seite
+   * rendert `SpaltenSchalter` damit selbst. Die Sicht liest Spaltenwahl und Offen-Achse von dort,
+   * zeichnet keinen eigenen Schalter, und der Fokus auf dem Schalter hält die Zeilenschleuse nicht.
+   * Die Werkzeugzeile der Sicht bleibt als Standzeile des Sammelbanners. Schließt
+   * `spaltenAus`/`spaltenAusVoreinstellung` und die Spaltenwahl aus `gedaechtnis` aus.
+   */
+  spaltenSchalterAussen?: SpaltenSchalterZustand<NoInfer<K>>;
 
   /** EINE Klasse für BEIDE Zweige: `rowClassName` bzw. `ListenEintrag className`. */
   zeilenKlasse?: (zeile: T) => string | undefined;
@@ -1071,6 +1081,7 @@ export default function Datensicht<T extends object, const K extends string>(
     spaltenAusVoreinstellung,
     spaltenAus,
     onSpaltenAus,
+    spaltenSchalterAussen: aussen,
     zeilenKlasse,
     onZeileKlick,
     werkzeuge,
@@ -1121,12 +1132,26 @@ export default function Datensicht<T extends object, const K extends string>(
       spaltenAusVoreinstellung ??
       [],
   );
-  const aktiveSpaltenAus = spaltenAus ?? eigeneSpaltenAus;
-  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Bewusst unkontrolliert, weil kein
-  // Konsument diese Hälfte braucht.
-  const [spaltenAn, setSpaltenAn] = useState<readonly K[]>(
+  const aktiveSpaltenAus = aussen?.aus ?? spaltenAus ?? eigeneSpaltenAus;
+  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Ohne Schalter bei der Seite bewusst
+  // unkontrolliert, weil kein Konsument diese Hälfte braucht.
+  const [eigeneSpaltenAn, setSpaltenAn] = useState<readonly K[]>(
     () => (gedaechtnis?.spaltenStart?.an as readonly K[] | undefined) ?? [],
   );
+  const spaltenAn = aussen?.an ?? eigeneSpaltenAn;
+  /*
+   * Schaltet die Seite die Spalten (`spaltenSchalterAussen`), ist das dieselbe Benutzeraktion wie
+   * am eingebauten Schalter (siehe `setzeSpaltenAus`): die freigegebenen Zeilen sind die Antwort
+   * auf den Klick. Der Anfangsstand zählt nicht.
+   */
+  const gezeigteWahl = useRef(aussen ? { aus: aussen.aus, an: aussen.an } : null);
+  useLayoutEffect(() => {
+    if (!aussen) return;
+    const alt = gezeigteWahl.current;
+    gezeigteWahl.current = { aus: aussen.aus, an: aussen.an };
+    if (alt == null || (alt.aus === aussen.aus && alt.an === aussen.an)) return;
+    nachBenutzeraktion();
+  }, [aussen, nachBenutzeraktion]);
   const meldeSpalten = gedaechtnis?.meldeSpalten;
   const setzeSpaltenAus = useCallback(
     (k: K[]) => {
@@ -1199,7 +1224,9 @@ export default function Datensicht<T extends object, const K extends string>(
   // nur im Tabellenzweig.
   const alsTabelle = form === 'tabelle' || (form === 'auto' && abBreite('md'));
 
-  const [spaltenOffen, setSpaltenOffen] = useState(false);
+  const [eigenesSpaltenOffen, setEigenesSpaltenOffen] = useState(false);
+  const spaltenOffen = aussen ? aussen.offen : eigenesSpaltenOffen;
+  const setSpaltenOffen = aussen ? aussen.onOffen : setEigenesSpaltenOffen;
 
   // Steht der Schalter überhaupt? EINE Wahrheit für Palettenmeldung, Rücksetzer und Schalter.
   const spaltenSchalterDa = alsTabelle && hatWaehlbareSpalten(spalten);
@@ -1211,7 +1238,7 @@ export default function Datensicht<T extends object, const K extends string>(
    */
   useEffect(() => {
     if (!spaltenSchalterDa) setSpaltenOffen(false);
-  }, [spaltenSchalterDa]);
+  }, [spaltenSchalterDa, setSpaltenOffen]);
 
   useTastaturEbene({
     name: `Datensicht-Filter: ${bezeichnung}`,
@@ -1675,7 +1702,8 @@ export default function Datensicht<T extends object, const K extends string>(
                 style={{ minWidth: 160 }}
               />
             ))}
-        {alsTabelle && (
+        {/* Steht der Schalter bei der Seite (`spaltenSchalterAussen`), zeichnet ihn nur sie. */}
+        {alsTabelle && !aussen && (
           <SpaltenSchalter
             bezeichnung={bezeichnung}
             spalten={spalten}

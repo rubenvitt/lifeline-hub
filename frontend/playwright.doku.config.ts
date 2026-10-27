@@ -86,7 +86,9 @@ export default defineConfig({
     deviceScaleFactor: 1,
     locale: 'de-DE',
     timezoneId: 'Europe/Berlin',
-    reducedMotion: 'reduce',
+    // Keine Fixture-Option in `use`, nur als Kontextoption (LLH-1458): unter `use` übersah
+    // Playwright den Schlüssel still. Gilt auch für `browser.newContext()` in den Specs.
+    contextOptions: { reducedMotion: 'reduce' },
     colorScheme: 'light',
     // Darstellung „System“ und Dichte `kompakt` (Design LFH-1127, F1/F2): als gespeicherte Wahl
     // des Geräts. „System“, damit `fotografiere` jedes Motiv hell (colorScheme `light`) und gleich

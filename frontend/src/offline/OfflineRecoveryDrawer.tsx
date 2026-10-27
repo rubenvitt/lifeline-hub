@@ -57,6 +57,9 @@ function aktionsTitel(aktion: OfflineSchreibaktion): string {
       // LLH-1075 Teil III: Kraft und Raum; der Grund (Raum aufgelöst, schon in einem Raum,
       // schon im Einsatz) steht darunter.
       return `Abgelehntes Eintreffen: ${aktion.name} · ${aktion.bezeichnung}`;
+    case 'eingaenge_gelesen':
+      // LLH-1422: der Grund (Einsatz nicht mehr lesbar) steht darunter.
+      return 'Abgelehnt: Eingänge „Alle gelesen“';
     case 'sichtung':
     case 'verbleib':
     case 'notiz':

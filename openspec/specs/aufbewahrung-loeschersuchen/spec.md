@@ -179,7 +179,7 @@ abgelegt sind, MUST samt gespeicherter Datei gelöscht werden, auch bereits entf
 
 #### Scenario: Anrufende Person und Ansprechperson
 - **WHEN** je ein Antrag für einen Anruf am Informationstelefon und für einen Medienkontakt vollzogen wird
-- **THEN** fehlen Name, Rückrufnummer und Notiz des Anrufs sowie Name und Erreichbarkeit der Ansprechperson
+- **THEN** fehlen Name, Rückrufnummer und Notiz des Anrufs sowie Name und Kontaktweg der Ansprechperson
 - **AND** fehlen Medium, Thema, Antwort und Freigabeangabe des Medienkontakts
 - **AND** bleiben Anliegen, Art, Status und Zeitpunkte erhalten
 

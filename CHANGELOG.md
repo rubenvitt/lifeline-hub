@@ -1,3 +1,25 @@
+## [1.0.0-alpha.155](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.154...v1.0.0-alpha.155) (2026-10-27)
+
+### Lageüberblick
+
+- **Kein Springen mehr beim Laden der „Offenen Vorgänge“:** Während die Abschnitte laden, halten sie schon so viele Platzhalterzeilen, wie Einträge zu erwarten sind (höchstens drei). Die Bereiche darunter verrutschen nicht mehr, wenn die Listen erscheinen. Das macht sich vor allem auf breiten Bildschirmen bemerkbar.
+
+### Meldungen
+
+- **Spaltenauswahl im Meldebild in der Werkzeugzeile:** Der Schalter „Spalten“ steht jetzt in derselben Zeile wie Druck, Lagebericht und Ausklappstufe statt in einer eigenen zweiten Zeile. Damit die Zeile auch bei 1366 px Breite einzeilig bleibt, startet das Suchfeld schmaler. Im Ausdruck erscheint die Zeile weiterhin nicht.
+
+### Kommunikation
+
+- **Funkplan merkt sich die gewählte Darstellung:** Der gewählte Reiter, zum Beispiel „Sprechgruppen“, bleibt in der Adresse stehen. Wer von dort einem Teilnehmer folgt und dann „Zurück“ wählt, landet wieder in derselben Darstellung mit Filter und Sortierung und nicht mehr in der Tabelle. Ein Reiterwechsel legt keinen eigenen Schritt im Browserverlauf an. Links aus Sprungmarken, Sprungpalette, Stab-Seite und Kommunikationsplan funktionieren wie bisher.
+
+### Benachrichtigungen
+
+- **„Erinnerung fällig“ führt direkt zur Erinnerung:** Ein Klick auf die Benachrichtigung öffnet die Erinnerungsseite und hebt die betroffene Erinnerung hervor. Eine fällige Erinnerung bleibt dabei als Alarm markiert. Die Anwenderdokumentation ist entsprechend ergänzt.
+
+### Verwaltung und Datenschutz
+
+- **Listeneinstellungen gehören zum angemeldeten Benutzer:** Sortierung, Filter und Suchbegriffe einer Liste gelten jetzt nur noch für den Benutzer, der sie gesetzt hat. Bisher konnte eine andere Person nach einem Kontowechsel im selben Browser, etwa über einen zweiten Tab, die Listen mit den Suchbegriffen und Filtern der vorigen Person sehen. Ein Suchbegriff kann dabei einen Namen enthalten. Wer die Seite nur neu lädt, behält seine Einstellungen.
+
 ## [1.0.0-alpha.154](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.153...v1.0.0-alpha.154) (2026-10-26)
 
 ### Bedienoberfläche

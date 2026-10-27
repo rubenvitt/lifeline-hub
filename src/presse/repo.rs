@@ -34,7 +34,7 @@ pub struct KontaktEingabe {
     pub medium: String,
     pub thema: String,
     pub kontakt_name: Option<String>,
-    pub kontakt_erreichbarkeit: Option<String>,
+    pub kontaktweg: Option<String>,
     pub eingang_at: String,
 }
 
@@ -44,7 +44,7 @@ pub struct KontaktAenderung {
     pub medium: Option<String>,
     pub thema: Option<String>,
     pub kontakt_name: Option<Option<String>>,
-    pub kontakt_erreichbarkeit: Option<Option<String>>,
+    pub kontaktweg: Option<Option<String>>,
     pub eingang_at: Option<String>,
 }
 
@@ -65,7 +65,7 @@ struct Zeile {
     medium: String,
     thema: String,
     kontakt_name: Option<String>,
-    kontakt_erreichbarkeit: Option<String>,
+    kontaktweg: Option<String>,
     eingang_at: String,
     status: String,
     antwort: Option<String>,
@@ -89,7 +89,7 @@ impl TryFrom<Zeile> for MedienkontaktAnzeige {
             medium: z.medium,
             thema: z.thema,
             kontakt_name: z.kontakt_name,
-            kontakt_erreichbarkeit: z.kontakt_erreichbarkeit,
+            kontaktweg: z.kontaktweg,
             eingang_at: z.eingang_at,
             status: MedienkontaktStatus::parse(&z.status)
                 .ok_or_else(|| AppError::Internal(format!("Unbekannter Status: {}", z.status)))?,
@@ -108,7 +108,7 @@ impl TryFrom<Zeile> for MedienkontaktAnzeige {
 macro_rules! kontakt_select {
     () => {
         "SELECT m.id, m.einsatz_id, m.art, m.medium, m.thema, m.kontakt_name, \
-                m.kontakt_erreichbarkeit, m.eingang_at, m.status, m.antwort, m.freigabe_durch, \
+                m.kontaktweg, m.eingang_at, m.status, m.antwort, m.freigabe_durch, \
                 m.pressemitteilung_id, m.bearbeitet_von_id, b.anzeigename AS bearbeitet_von_name, \
                 m.bearbeitet_at, m.angelegt_von_id, m.angelegt_at \
          FROM medienkontakt m LEFT JOIN benutzer b ON b.id = m.bearbeitet_von_id "
@@ -264,14 +264,10 @@ pub async fn anlegen_tx(
     let medium = pflicht_max(&e.medium, "medium", super::KURZ_MAX)?;
     let thema = pflicht_max(&e.thema, "thema", super::THEMA_MAX)?;
     let kontakt_name = text_max(e.kontakt_name.as_deref(), "kontakt_name", super::KURZ_MAX)?;
-    let kontakt_erreichbarkeit = text_max(
-        e.kontakt_erreichbarkeit.as_deref(),
-        "kontakt_erreichbarkeit",
-        super::THEMA_MAX,
-    )?;
+    let kontaktweg = text_max(e.kontaktweg.as_deref(), "kontaktweg", super::THEMA_MAX)?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO medienkontakt \
-            (einsatz_id, art, medium, thema, kontakt_name, kontakt_erreichbarkeit, eingang_at, \
+            (einsatz_id, art, medium, thema, kontakt_name, kontaktweg, eingang_at, \
              status, angelegt_von_id) \
          VALUES (?, ?, ?, ?, ?, ?, ?, 'offen', ?) RETURNING id",
     )
@@ -280,7 +276,7 @@ pub async fn anlegen_tx(
     .bind(medium)
     .bind(thema)
     .bind(kontakt_name)
-    .bind(kontakt_erreichbarkeit)
+    .bind(kontaktweg)
     .bind(&e.eingang_at)
     .bind(benutzer_id)
     .fetch_one(&mut *conn)
@@ -308,29 +304,25 @@ pub async fn aendern_tx(
         Some(n) => Some(text_max(n.as_deref(), "kontakt_name", super::KURZ_MAX)?),
         None => None,
     };
-    let kontakt_erreichbarkeit = match &a.kontakt_erreichbarkeit {
-        Some(n) => Some(text_max(
-            n.as_deref(),
-            "kontakt_erreichbarkeit",
-            super::THEMA_MAX,
-        )?),
+    let kontaktweg = match &a.kontaktweg {
+        Some(n) => Some(text_max(n.as_deref(), "kontaktweg", super::THEMA_MAX)?),
         None => None,
     };
     let alt = laden(&mut *conn, einsatz_id, id).await?;
     let medium = medium.unwrap_or(alt.medium);
     let thema = thema.unwrap_or(alt.thema);
     let kontakt_name = kontakt_name.unwrap_or(alt.kontakt_name);
-    let kontakt_erreichbarkeit = kontakt_erreichbarkeit.unwrap_or(alt.kontakt_erreichbarkeit);
+    let kontaktweg = kontaktweg.unwrap_or(alt.kontaktweg);
     let eingang_at = a.eingang_at.clone().unwrap_or(alt.eingang_at);
     sqlx::query(
         "UPDATE medienkontakt SET medium = ?, thema = ?, kontakt_name = ?, \
-            kontakt_erreichbarkeit = ?, eingang_at = ?, geaendert_at = datetime('now') \
+            kontaktweg = ?, eingang_at = ?, geaendert_at = datetime('now') \
          WHERE einsatz_id = ? AND id = ?",
     )
     .bind(medium)
     .bind(thema)
     .bind(kontakt_name)
-    .bind(kontakt_erreichbarkeit)
+    .bind(kontaktweg)
     .bind(eingang_at)
     .bind(einsatz_id)
     .bind(id)

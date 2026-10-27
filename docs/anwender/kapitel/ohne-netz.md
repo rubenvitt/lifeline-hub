@@ -2,7 +2,7 @@
 titel: Arbeiten ohne Netz
 gruppen: [alle, fuehrung]
 reihenfolge: 20
-quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx]
+quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/alarm/EingaengeKnopf.tsx, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx]
 ---
 
 ## Überblick
@@ -56,6 +56,7 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 - Betroffene, Unfallhilfsstellen, Betreuung
 - Lagekarte mit Zonen, Zeichen, Gefahrengebieten und Schäden
 - Rückmeldungen und der Kommunikationsplan des Fernmeldewesens
+- „Eingänge“, der Verlauf der eigenen Benachrichtigungen
 
 Nicht vorgehalten werden unter anderem die übrigen Meldungen, die Besetzung des Stabs und die
 Lagebesprechungen.
@@ -77,6 +78,8 @@ ist.
 - Eintreffen am Bereitstellungsraum, auf einer mit Netz geöffneten Seite des Raums; die Kraft
   steht dort bis zum Senden unter „Vorgemerkt“
 - Einträge im Einsatztagebuch
+- „Alle gelesen“ unter „Eingänge“; dort steht dann „Offline vorgemerkt“, die Zahl der ungelesenen
+  Eingänge verschwindet sofort
 
 Anhänge brauchen Netz: Im Einsatztagebuch ist „Anhang“ ohne Netz gesperrt und trägt „offline“.
 Bei Personen brauchen das Aufheben einer Maßnahme oder Verletzung, das Eintragen von PAT-Nummer

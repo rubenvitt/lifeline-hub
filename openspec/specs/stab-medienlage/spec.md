@@ -41,7 +41,7 @@ ableiten:
 - Anrufe am Informationstelefon gesamt, nach Anliegen, und offene Rückrufe
 
 Die Anrufzahlen MUST aus der Zählung des Informationstelefons über den ganzen Bestand stammen,
-nicht aus einer geladenen Anrufliste. Die Medienlage MUST NOT Ansprechpersonen, Erreichbarkeiten,
+nicht aus einer geladenen Anrufliste. Die Medienlage MUST NOT Ansprechpersonen, Kontaktwege,
 Anrufernamen, Rückrufnummern, Notizen oder Themen enthalten. Ist eine Quelle nicht geladen oder
 gesperrt, MUST ihr Teil mit „—“ und Grund erscheinen, nie mit 0.
 

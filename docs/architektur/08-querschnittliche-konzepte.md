@@ -96,7 +96,10 @@ Organisation vor Gerätezeit (`frontend/src/anzeige/AnzeigeKonventionenContext.t
 `frontend/src/anzeige/zeitEingabe.ts`). Die Schreibweise (taktische DTG oder Datum und Uhrzeit)
 legt Spec [`zeitdarstellung`](../../openspec/specs/zeitdarstellung/spec.md) fest, die Eingabe
 Spec [`zeiteingabe`](../../openspec/specs/zeiteingabe/spec.md); dass Zeiten nur im Formatkern
-`frontend/src/anzeige/` formatiert werden, prüft `anzeige/zeitDarstellung.guard.test.ts`.
+`frontend/src/anzeige/` formatiert werden, prüft `anzeige/zeitDarstellung.guard.test.ts`. Texte,
+die der Server fertig schreibt (ETB-Einträge, Detailzeile eines Hinweises), nennen Zeiten in Zone
+und Darstellung des Einsatzes, sonst der Organisation, sonst Europe/Berlin und taktisch; beides
+lädt nur `zeitstil_laden` in `src/zeitdarstellung.rs`.
 
 ## 8.10 Offline-Fähigkeit
 

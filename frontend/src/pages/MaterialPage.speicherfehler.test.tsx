@@ -77,7 +77,7 @@ function render(liste = [em, zweites]) {
     <Routes>
       <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
     </Routes>,
-    { route: '/einsaetze/1/material' },
+    { route: '/einsaetze/1/material', datenRouter: true },
   );
 }
 

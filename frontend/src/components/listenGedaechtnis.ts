@@ -85,6 +85,9 @@ export interface GedaechtnisSpalte {
 export const GEDAECHTNIS_ENTPRELLUNG_MS = 300;
 
 const LISTE_PRAEFIX = 'lfh:liste:';
+/** Wem die Listenstände gehören ({@link listenGedaechtnisBinden}). Liegt unter dem Präfix, damit
+ *  `listenGedaechtnisRaeumen` es mitnimmt; das `@` kommt in keinem Seitennamen vor. */
+const BESITZER = `${LISTE_PRAEFIX}@besitzer`;
 const SPALTEN_PRAEFIX = 'lfh:spalten:';
 
 function gleicheSortierung(a: ListenSortierung, b: ListenSortierung): boolean {
@@ -174,6 +177,28 @@ export function listenGedaechtnisRaeumen(): void {
       if (k?.startsWith(LISTE_PRAEFIX)) weg.push(k);
     }
     for (const k of weg) speicher.removeItem(k);
+  } catch {
+    /* sessionStorage gesperrt — dann liegt dort auch nichts */
+  }
+}
+
+/**
+ * Kontowechsel ohne Abmelden in diesem Tab (LLH-1428, wie LFH-785 bei den Erfassungswerten): Der
+ * Konfliktdialog aus LFH-387 lädt die Seite als B neu, der sessionStorage überlebt das. Gehören die
+ * Stände nicht `benutzerId` — oder niemandem, weil sie vor der Bindung entstanden —, gehen sie,
+ * statt die Liste von B mit Suche und Filtern von A zu öffnen. Derselbe Benutzer behält sie. Ohne
+ * Benutzer (`null`) räumt es nichts, das tun Abmelden und Sitzungsende. Aufgerufen synchron mit
+ * jedem Benutzerwechsel im `AuthProvider`, also bevor eine Seite ihren Stand liest.
+ */
+export function listenGedaechtnisBinden(benutzerId: number | null): void {
+  if (benutzerId == null) return;
+  try {
+    const speicher = globalThis.sessionStorage;
+    if (!speicher) return;
+    const eigen = String(benutzerId);
+    if (speicher.getItem(BESITZER) === eigen) return;
+    listenGedaechtnisRaeumen();
+    speicher.setItem(BESITZER, eigen);
   } catch {
     /* sessionStorage gesperrt — dann liegt dort auch nichts */
   }

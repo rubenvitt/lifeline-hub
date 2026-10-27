@@ -18,7 +18,9 @@
 //! als ablösende geplant, wird ihre Alarmierung und ihr Eintreffen (beide nur als Beginn der
 //! offenen Periode) je geplanter Schicht ein Anlass; das Eintreffen am Bereitstellungsraum meldet
 //! dessen Buchung selbst. Ihre Entlassung ohne offene Periode danach hebt die Planung auf
-//! (Hinweis und ETB „Planung der ablösenden Einheit entfallen“).
+//! (Hinweis und ETB „Planung der ablösenden Einheit entfallen“). Wird die Alarmierung oder das
+//! Eintreffen gestrichen, mit dem ihre offene Periode begann, folgt der Hinweis „… gestrichen“
+//! (LLH-1425, [`vor_streichung_tx`]).
 //!
 //! **Ein Fehler hier bricht nie den Anlass** (gleiche Regel wie ein Perioden-Verstoß beim
 //! Statuswechsel): die Kopplung läuft in einem eigenen `SAVEPOINT`, ein Fehler rollt nur sie
@@ -73,7 +75,43 @@ pub async fn nach_ereignis_tx(
     .await
 }
 
-/// Nach einer gestrichenen Entlassung an einer Einheit: öffnet die mit ihr beendete Schicht.
+/// VOR dem Streichen eines Ereignisses an einer Einheit: war es die Alarmierung oder das
+/// Eintreffen, mit dem ihre offene Periode beginnt, also genau das, was der Hinweis „alarmiert“
+/// bzw. „eingetroffen“ gemeldet hat ([`alarmierung_tx`], [`eintreffen_tx`]), der Bezugstyp des
+/// Hinweises „… gestrichen“ (LLH-1425); sonst `None`. Ein Nachtrag in eine abgeschlossene Periode
+/// hat nichts gemeldet und streicht still. Nur lesend; ein Lesefehler lässt den Hinweis aus und
+/// bricht nie die Streichung.
+pub async fn vor_streichung_tx(
+    conn: &mut SqliteConnection,
+    einheit_id: i64,
+    art: ZeitachseArt,
+    zeitpunkt_at: &str,
+) -> Option<BenachrichtigungBezugTyp> {
+    let (offen, typ) = match art {
+        ZeitachseArt::Alarmierung => (
+            crate::zeitachse::repo::offene_alarmierung_tx(conn, einheit_id).await,
+            BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen,
+        ),
+        ZeitachseArt::Eintreffen => (
+            crate::zeitachse::repo::offenes_eintreffen_tx(conn, einheit_id).await,
+            BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen,
+        ),
+        ZeitachseArt::Abloesung | ZeitachseArt::Entlassung => return None,
+    };
+    match offen {
+        Ok(offen) => (offen.as_deref() == Some(zeitpunkt_at)).then_some(typ),
+        Err(e) => {
+            tracing::warn!(einheit_id, "Hinweis zur Streichung ausgelassen: {e}");
+            None
+        }
+    }
+}
+
+/// Nach einem gestrichenen Ereignis an einer Einheit. Eine gestrichene Entlassung öffnet die mit
+/// ihr beendete Schicht. War es der Beginn der offenen Periode (`hinweis` aus
+/// [`vor_streichung_tx`]), geht je Schicht, die die Einheit als ablösende plant, der Hinweis
+/// „Alarmierung/Eintreffen der ablösenden Einheit gestrichen“ hinaus (LLH-1425): der frühere
+/// Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht mehr.
 pub async fn nach_streichung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -81,16 +119,19 @@ pub async fn nach_streichung_tx(
     einheit_id: i64,
     art: ZeitachseArt,
     zeitpunkt_at: &str,
+    hinweis: Option<BenachrichtigungBezugTyp>,
 ) -> Result<Wirkung, AppError> {
-    if art != ZeitachseArt::Entlassung {
-        return Ok(Wirkung::default());
-    }
+    let schritt = match (art, hinweis) {
+        (ZeitachseArt::Entlassung, _) => Schritt::Wiederaufnahme,
+        (_, Some(typ)) => Schritt::Gestrichen(typ),
+        (_, None) => return Ok(Wirkung::default()),
+    };
     isoliert(
         conn,
         einsatz_id,
         benutzer_id,
         einheit_id,
-        Schritt::Wiederaufnahme,
+        schritt,
         zeitpunkt_at,
     )
     .await
@@ -107,6 +148,8 @@ enum Schritt {
     },
     Ende,
     Wiederaufnahme,
+    /// Nur der Hinweis „… gestrichen“ mit diesem Bezugstyp, keine Schicht.
+    Gestrichen(BenachrichtigungBezugTyp),
 }
 
 /// Führt den Schritt in einem Savepoint aus. Ein Fehler darin rollt nur den Savepoint zurück und
@@ -141,6 +184,14 @@ async fn isoliert(
         Schritt::Ende => end_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await,
         Schritt::Wiederaufnahme => {
             reopen_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await
+        }
+        Schritt::Gestrichen(typ) => {
+            hinweis::anlaesse_tx(conn, einsatz_id, einheit_id, typ, benutzer_id)
+                .await
+                .map(|anlaesse| Wirkung {
+                    etb: Vec::new(),
+                    anlaesse,
+                })
         }
     };
     match r {

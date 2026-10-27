@@ -624,6 +624,19 @@ where
     Option::<T>::deserialize(deserializer).map(Some)
 }
 
+/// Ein Body trägt noch einen umbenannten Feldnamen (LLH-1419; Muster LLH-1134,
+/// `einsatz::verbindungen::lehne_altfelder_ab`): 400 statt stillem Verwerfen, damit ein Tab mit
+/// altem Stand die Eingabe nicht verliert. `vorhanden` ist, ob der Body den Schlüssel trug (auch
+/// `null`, deshalb als [`deserialize_optional_field`] mit `serde::de::IgnoredAny` lesen).
+pub fn lehne_alten_feldnamen_ab(vorhanden: bool, alt: &str, neu: &str) -> Result<(), AppError> {
+    if vorhanden {
+        return Err(AppError::Validation(format!(
+            "Das Feld „{alt}“ heißt jetzt „{neu}“ (Seite neu laden)"
+        )));
+    }
+    Ok(())
+}
+
 /// Query-Filter `?ansicht=<id>` der ansichtsgebundenen Karten-Objekt-Listen (LFH-320):
 /// die drei entitätslosen Layer (freies Zeichen, Zone, Hintergrundbild) filtern auf die
 /// Objekte der Ansicht PLUS die ansichtslosen. Ohne Parameter (`None`) bleibt es bei „alles"
