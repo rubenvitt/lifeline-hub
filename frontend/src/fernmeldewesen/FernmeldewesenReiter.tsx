@@ -16,9 +16,9 @@ export const FERNMELDEWESEN_REITER: readonly { key: FernmeldewesenReiterKey; lab
 /**
  * Reiterleiste des Moduls Fernmeldewesen (LLH-1180, design.md D5) unter dem h1 „Fernmeldewesen“.
  * Funkplan, Fernmeldeskizze und Sprechgruppen sind Darstellungen EINER Seite: dort setzt ein Reiter
- * nur die Darstellung (`onDarstellung`), die Adresse bleibt, wie sie ist (`?ansicht=` ist eine
- * einmalige Sichtvorgabe). Der Kommunikationsplan ist eine eigene Route; von dort führt ein
- * Darstellungsreiter mit Sichtvorgabe auf den Funkplan.
+ * nur die Darstellung (`onDarstellung`); die Seite hält sie als `?ansicht=` in der Adresse, ohne
+ * Verlaufsschritt (LLH-1432). Der Kommunikationsplan ist eine eigene Route; von dort führt ein
+ * Darstellungsreiter mit `?ansicht=` auf den Funkplan.
  *
  * Nur die Leiste: der Inhalt steht darunter in der Seite, damit Druckwurzel und Seitenkopf bei der
  * Seite bleiben. `className` nimmt die Leiste aus dem Druck (`funkplan-no-print` …).

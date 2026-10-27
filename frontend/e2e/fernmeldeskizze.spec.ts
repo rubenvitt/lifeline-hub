@@ -759,7 +759,7 @@ test('Lage: zweimal Pfeil rechts bleibt über Neuladen; „Neu anordnen“ stell
   }
   await expect.poll(() => lage(ea1)).toEqual({ x: auto.x + 16, y: auto.y });
 
-  // Neu geladen über den Pfad mit Sichtvorgabe (`?ansicht=skizze` ist nach dem Öffnen verbraucht).
+  // Neu geladen über den Pfad mit `?ansicht=skizze`.
   await oeffneSkizze(page, einsatzId, ea1);
   await expect
     .poll(() => lage(ea1), { message: 'Lage nach Neuladen' })

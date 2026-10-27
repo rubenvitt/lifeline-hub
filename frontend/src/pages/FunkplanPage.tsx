@@ -727,28 +727,37 @@ export default function FunkplanPage() {
   const spalten = useMemo(() => funkplanSpalten(druckt), [druckt]);
   const sgSpalten = useMemo(() => sprechgruppenSpalten(), []);
 
-  // ── Darstellung (LFH-625 D1, D6) ────────────────────────────────────────────────────────────
-  // Sichtvorgabe ?ansicht= apply-then-clean wie auf der Abschnittsseite. Schon der erste Zustand
-  // liest sie, sonst stünde mit warmem Cache für ein Bild die Tabelle da (Review LFH-625). Geräumt
-  // wird auch ein unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
+  // ── Darstellung (LFH-625 D1, D6; LLH-1432) ──────────────────────────────────────────────────
+  // Die Darstellung ist ZUSTAND der Adresse (`?ansicht=`, wie `?reiter=` der Aufträge): Zurück aus
+  // einem Teilnehmer oder einer Lücke landet im selben Reiter, die Sprechgruppen samt Sortierung
+  // und Filter ihres Gedächtnisses, und ein geteilter Link zeigt dieselbe Darstellung. Aus der
+  // Adresse gelesen steht sie schon im ersten Bild (Review LFH-625). Der Reiterwechsel schreibt per
+  // `replace`: Zurück führt aus der Seite, nicht durch die Reiter. Die Vorgabe „Funkplan“ steht
+  // ohne Parameter; ein unbrauchbarer Wert wird geräumt, sonst stünde er im geteilten Link wieder.
   const [searchParams, setSearchParams] = useSearchParams();
-  const [ansichtNachEinsatz, setAnsichtNachEinsatz] = useState<Record<number, FunkplanAnsicht>>(
-    () => {
-      const vorgabe = parseFunkplanAnsicht(searchParams);
-      return vorgabe ? { [einsatzId]: vorgabe } : {};
-    },
-  );
-  const ansicht = ansichtNachEinsatz[einsatzId] ?? 'tabelle';
+  const ansicht = parseFunkplanAnsicht(searchParams) ?? 'tabelle';
   const setzeAnsicht = (a: FunkplanAnsicht) =>
-    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a }));
+    setSearchParams(
+      (alt) => {
+        const naechste = new URLSearchParams(alt);
+        if (a === 'tabelle') naechste.delete('ansicht');
+        else naechste.set('ansicht', a);
+        return naechste;
+      },
+      { replace: true },
+    );
+  const ansichtRaeumen = searchParams.has('ansicht') && ansicht === 'tabelle';
   useEffect(() => {
-    if (!searchParams.has('ansicht')) return;
-    const vorgabe = parseFunkplanAnsicht(searchParams);
-    if (vorgabe) setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe }));
-    const rest = new URLSearchParams(searchParams);
-    rest.delete('ansicht');
-    setSearchParams(rest, { replace: true });
-  }, [searchParams, setSearchParams, einsatzId]);
+    if (!ansichtRaeumen) return;
+    setSearchParams(
+      (alt) => {
+        const rest = new URLSearchParams(alt);
+        rest.delete('ansicht');
+        return rest;
+      },
+      { replace: true },
+    );
+  }, [ansichtRaeumen, setSearchParams]);
 
   // Kanalbelegung (LFH-848 D8): nur gebaut, solange sie gezeigt wird. Teilnehmer sind auch
   // externe Stellen und Komponenten (LFH-893).
