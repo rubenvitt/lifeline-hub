@@ -18,9 +18,13 @@ import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
 import type { EinsatzAnzeige } from '../api/types';
 
-/** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — Aktionen in
- *  `komfortabel`/`handschuh` (48/72) lassen sie wachsen. */
+/** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — in
+ *  `komfortabel`/`handschuh` wächst sie mit der Staffel (48/72, {@link titelblockStil}), eine
+ *  höhere Aktion (Segmentleiste) lässt sie nach unten weiter wachsen. */
 const SEITENKOPF_HOEHE = 44;
+
+/** Haarlinie unter der Seitenkopfleiste; sie zählt zur Höhe (`boxSizing: 'border-box'`). */
+const SEITENKOPF_LINIE = 1;
 
 /**
  * Stil der Seitenkopfleiste — rein und exportiert.
@@ -44,7 +48,7 @@ export function seitenkopfStil(
     rowGap: token.paddingXS,
     minHeight: SEITENKOPF_HOEHE,
     paddingBlock: token.paddingXS,
-    borderBottom: `1px solid ${farben.linie}`,
+    borderBottom: `${SEITENKOPF_LINIE}px solid ${farben.linie}`,
     marginBottom: token.marginLG,
     boxSizing: 'border-box',
     ...(vollbreit
@@ -54,6 +58,41 @@ export function seitenkopfStil(
           paddingInline: 'var(--lfh-seiten-polsterung)',
         }
       : {}),
+  };
+}
+
+/**
+ * Titelblock im Seitenkopf — rein und exportiert (LLH-1278). Der Block hängt OBEN in der Leiste
+ * und ist mindestens eine Zeile der Stufe hoch: der Boden der Leiste ohne Polster und Haarlinie
+ * (44 − 2 · 3 − 1 = 37 px in `kompakt`) bzw. der `controlHeight` der Stufe (30 / 48 / 72), was
+ * größer ist. Darin steht der Titel mittig.
+ *
+ * Vorher mittete die Leiste beide Seiten gegeneinander. Eine Segmentleiste im Aktionen-Slot ist
+ * um zwei Zielabstände und ihren Rahmen höher als ein Knopf (Material, Fahrzeuge); die Leiste
+ * wuchs, und der Titel rutschte gegenüber Personal um die halbe Differenz nach unten. Jetzt
+ * wächst die Leiste nach unten, der Titel bleibt stehen, auf jeder Seite und in jeder Rolle
+ * (ohne Aktionen hält derselbe Boden ihn auf der Höhe der Seiten mit Knöpfen).
+ */
+export function titelblockStil(token: {
+  controlHeight: number;
+  paddingXS: number;
+  marginXS: number;
+}): CSSProperties {
+  return {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    // Mehrzeilig (Ortspfad, Titel, Meta unter `md`) stehen die Zeilen beisammen in der Mitte,
+    // statt sich über den Boden zu verteilen.
+    alignContent: 'center',
+    alignSelf: 'flex-start',
+    minHeight: Math.max(
+      token.controlHeight,
+      SEITENKOPF_HOEHE - 2 * token.paddingXS - SEITENKOPF_LINIE,
+    ),
+    columnGap: token.marginXS * 3,
+    rowGap: 2,
+    minWidth: 0,
   };
 }
 
@@ -460,17 +499,7 @@ export default function EinsatzSeite({
        * seine Inhaltsbreite schrumpft.
        */}
       <div ref={alarmKante} data-lfh="seitenkopf" style={seitenkopfStil(token, farben, true)}>
-        <div
-          className="lfh-seitenkopf__titelblock"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            columnGap: token.marginXS * 3,
-            rowGap: 2,
-            minWidth: 0,
-          }}
-        >
+        <div className="lfh-seitenkopf__titelblock" style={titelblockStil(token)}>
           {breadcrumb && (
             <Ortspfad farben={farben} className={ortspfadAbMd ? 'lfh-ortspfad--ab-md' : undefined}>
               {breadcrumb}
