@@ -43,7 +43,9 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
    Liste.
 5. Auf schmaleren Schirmen, auch am Fükw, sind die Spalten „Kategorie“ und „Träger“ ausgeblendet;
    die Kategorie steht dann gedämpft unter der Bezeichnung. „Spalten“ zeigt, wie viele Spalten
-   fehlen, und blendet sie wieder ein. Gefiltert wird nur nach Spalten, die in der Liste stehen.
+   fehlen, und blendet sie wieder ein. Nach Kategorie filtert dann das Feld „Kategorie“ über der
+   Tabelle, nach dem Träger nur, solange seine Spalte in der Liste steht. Eine von Hand
+   ausgeblendete Spalte filtert nicht.
 
 ### Material aus dem Stamm disponieren
 

@@ -14,3 +14,9 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 if (!workerUrl)
   throw new Error('maplibre-Worker-URL ist leer — `?worker&url` hat nichts geliefert');
 maplibregl.setWorkerUrl(workerUrl);
+
+// Die Worker leben über die einzelne Karte hinaus. maplibre beendet sie sonst mit der letzten
+// Karte und lädt sie für die nächste neu; ohne Netz scheitert dieser Abruf („Worker failed to
+// load“), und eine neu aufgebaute Karte zeichnet nichts (`e2e/lagekarte-offline-zeichnen.spec.ts`).
+// jsdom kennt keinen Worker.
+if (typeof Worker !== 'undefined') maplibregl.prewarm();
