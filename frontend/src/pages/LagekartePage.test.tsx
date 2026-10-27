@@ -2701,7 +2701,9 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     renderSeite();
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
     // Ein Schaden ist verortet, die UHS nicht — die Person darf die „1" nicht zur „2" machen.
-    // Schäden und UHS kommen mit eigenen Abrufen, womöglich nach der Person.
+    // Schäden und UHS kommen mit eigenen Abrufen, womöglich nach der Person. Erst der Schaden:
+    // stünde er noch aus, zeigte eine mitgezählte Person dieselbe „1".
+    expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
     expect(await screen.findByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
   });
 

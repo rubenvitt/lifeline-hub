@@ -423,6 +423,8 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     const koerper = hochgeladen[0].body as FormData;
     expect(koerper).toBeInstanceOf(FormData);
     expect((koerper.get('datei') as File).name).toBe('logo.png');
+    // Den Content-Type samt Multipart-Grenze setzt der Browser; ein eigener verlöre die Grenze.
+    expect(new Headers(hochgeladen[0].headers).has('Content-Type')).toBe(false);
     await waitFor(() => expect(invalidiert).toHaveBeenCalledWith({ queryKey: ['organisation'] }));
   });
 
