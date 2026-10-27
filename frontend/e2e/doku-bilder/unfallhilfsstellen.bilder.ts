@@ -10,9 +10,12 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   grundriss.png         frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx
  *   patient-zuweisen.png  frontend/src/pages/uhs/Grundriss.tsx
  *   anlegen.png           frontend/src/pages/uhs/UhsAnlegenDrawer.tsx
+ *   liste.png             frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx
  *
  * Daten: die UHS Turnhalle des Demo-Einsatzes. Die Demo-Daten stellen alle Aufgenommenen in den
  * Wartebereich; zwei davon kommen per API auf Behandlungsplätze (D3), damit der Grundriss belegt ist.
+ * Für die Liste kommen zwei weitere Stellen dazu (eine geplant, eine aktiv); der Test steht zuletzt,
+ * damit die Bilder davor nur die Turnhalle sehen.
  */
 
 const KAPITEL = 'unfallhilfsstellen';
@@ -58,6 +61,24 @@ async function grundrissBelegen(page: Page, einsatzId: number): Promise<UhsDetai
     });
   }
   return uhs;
+}
+
+/** Zwei Stellen neben der Turnhalle, damit die Liste Typ und Status unterscheidet; einmal je Lauf. */
+async function weitereStellenAnlegen(page: Page, einsatzId: number): Promise<void> {
+  const basis = `/api/einsaetze/${einsatzId}/uhs`;
+  const vorhanden = (await (await page.request.get(basis)).json()) as { bezeichnung: string }[];
+  if (vorhanden.some((u) => u.bezeichnung === 'Patientenablage Mühlbachweg')) return;
+  await fuelle(page, 'post', basis, {
+    typ: 'patientenablage',
+    bezeichnung: 'Patientenablage Mühlbachweg',
+    standort: 'Wendeplatz Mühlbachweg',
+  });
+  const vss = await fuelle<{ id: number }>(page, 'post', basis, {
+    typ: 'verletztensammelstelle',
+    bezeichnung: 'Verletztensammelstelle Bahnhof',
+    standort: 'Bahnhofsvorplatz',
+  });
+  await fuelle(page, 'post', `${basis}/${vss.id}/status`, { status: 'aktiv' });
 }
 
 test.describe(KAPITEL, () => {
@@ -106,5 +127,21 @@ test.describe(KAPITEL, () => {
     await drawer.getByLabel('Standort (optional)').fill('Wendeplatz Mühlbachweg');
     await drawer.getByLabel('Standort (optional)').blur();
     await fotografiere(drawer, KAPITEL, 'anlegen');
+  });
+
+  test('Liste der Unfallhilfsstellen', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await weitereStellenAnlegen(page, demo.id);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/unfallhilfsstellen/liste`);
+    const tabelle = page.locator('.ant-table-wrapper').first();
+    await expect(tabelle.getByRole('cell', { name: /Turnhalle Musterstadt/ })).toBeVisible();
+    await expect(tabelle.getByRole('cell', { name: /Patientenablage Mühlbachweg/ })).toBeVisible();
+    await expect(
+      tabelle.getByRole('cell', { name: /Verletztensammelstelle Bahnhof/ }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(tabelle, KAPITEL, 'liste');
   });
 });

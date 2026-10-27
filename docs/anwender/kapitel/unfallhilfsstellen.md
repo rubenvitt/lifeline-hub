@@ -51,6 +51,9 @@ Eine aufgelöste oder stornierte Stelle lässt sich nicht mehr bearbeiten.
 
 1. In der Brotkrumenleiste „Unfallhilfsstellen“ wählen. Die Liste zeigt je Stelle Bezeichnung,
    Typ, Status und Standort.
+
+   ![Liste der Unfallhilfsstellen mit drei Stellen, im Spaltenkopf Sortierpfeile und Trichter für Typ und Status](../bilder/unfallhilfsstellen/liste.png)
+
 2. Im Kopf der Spalten „Typ“ und „Status“ filtern: das Trichterzeichen öffnet die Werte zum
    Ankreuzen, „OK“ übernimmt sie. Ist die Liste eingeschränkt, steht darüber die Zahl der Treffer
    und je Wert ein Knopf, etwa „Status: aktiv“, der genau diesen Filter entfernt; „Filter
