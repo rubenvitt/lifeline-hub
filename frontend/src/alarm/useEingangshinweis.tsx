@@ -239,8 +239,10 @@ export function useEingangshinweis(
       return;
     }
 
-    // Jüngste zuerst: der neue Eingang steht oben.
-    const zeilen = [...sichtbar].reverse();
+    // Jüngste zuerst: der neue Eingang steht oben. Nach der Kennung des Servers, nicht nach der
+    // Reihenfolge des Eintragens: der Wortlaut einer Meldung kommt mit einem eigenen Abruf, und
+    // die Antworten mehrerer Eingänge kommen nicht zwingend in ihrer Reihenfolge an.
+    const zeilen = [...sichtbar].sort((a, b) => b.benachrichtigungId - a.benachrichtigungId);
     const einzeln = zeilen.length === 1 ? zeilen[0] : null;
     const ziele = new Set(zeilen.map((e) => e.ziel));
     const einZiel = ziele.size === 1 ? [...ziele][0] : null;
