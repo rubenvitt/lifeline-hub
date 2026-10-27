@@ -31,6 +31,36 @@ const ADMIN_PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 /** Wegwerf-Passwort des zweiten Benutzers, aus seinem Namen abgeleitet (wie `aufbewahrung.spec.ts`). */
 const passwortVon = (name: string) => `${name}-pw`;
 
+/**
+ * Beobachtet die API-Abfragen eines Tabs (ohne die Live-Ströme `…/live`). `ruhig()` wartet, bis
+ * `ms` lang keine Abfrage beginnt oder endet. Offene Abfragen werden bewusst nicht gezählt: eine
+ * Abfrage der vorigen Seite, die `page.goto` abbricht, meldet Playwright weder als beendet noch
+ * als gescheitert.
+ *
+ * Gebraucht in Fall (b): Nach dem ersten Öffnen des Einsatzstroms gleicht der Tab die Org-Listen
+ * nach (`useEinsatzLiveStream`, Erst-Open), in ein bis zwei Wellen einige hundert ms nach dem
+ * sichtbaren Eingabefeld. Meldet sich B an, bevor diese Wellen durch sind, laufen sie schon unter
+ * B: die Einsatzliste ohne den Einsatz holt den Einsatzkopf neu, der antwortet 403, und der Tab
+ * steht auf „Nicht verfügbar“ statt auf der ETB, von der er senden soll. Einen Inhaltsanker für
+ * „Abgleich fertig“ gibt es nicht, `networkidle` hält der SSE-Strom offen.
+ */
+function apiBeobachter(page: Page) {
+  let zuletzt = Date.now();
+  const merken = (r: Request) => {
+    const pfad = new URL(r.url()).pathname;
+    if (pfad.startsWith('/api/') && !pfad.endsWith('/live')) zuletzt = Date.now();
+  };
+  page.on('request', merken);
+  page.on('requestfinished', merken);
+  page.on('requestfailed', merken);
+  return {
+    ruhig: (ms = 1500) =>
+      expect
+        .poll(() => Date.now() - zuletzt >= ms, { timeout: 20_000, intervals: [100] })
+        .toBe(true),
+  };
+}
+
 async function anmelden(page: Page, benutzername: string, passwort: string) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(benutzername);
@@ -168,12 +198,15 @@ test('(b) gleichzeitige Mutation aus dem veralteten Tab: 412, kein Eintrag, B bl
 }) => {
   const ctx = await browser.newContext();
   const tab1 = await ctx.newPage();
+  const api = apiBeobachter(tab1);
 
   await anmelden(tab1, ADMIN, ADMIN_PW);
   const b = await zweitenBenutzerAnlegen(ctx);
   const einsatzId = await einsatzAnlegen(ctx);
   await tab1.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(tab1.getByPlaceholder('Inhalt …')).toBeVisible();
+  // Erst wenn der Tab fertig nachgeladen hat, als Admin (siehe `apiBeobachter`).
+  await api.ruhig();
 
   // B meldet sich an der App vorbei an: das Cookie des Kontexts gehört jetzt B, aber kein
   // App-Code lief — Tab 1 hat keine Meldung bekommen und zeigt weiter den Admin.
