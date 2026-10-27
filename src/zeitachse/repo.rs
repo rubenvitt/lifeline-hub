@@ -300,6 +300,16 @@ pub async fn streiche_tx(
         }
     }
 
+    // Vor dem Schreiben: war es der Beginn der offenen Periode einer geplanten ablösenden
+    // Einheit, meldet die Kopplung die Streichung (LLH-1425).
+    let hinweis = match kraft {
+        Kraft::Einheit(einheit_id) => {
+            crate::abloesung::kopplung::vor_streichung_tx(conn, einheit_id, art, &zeitpunkt_at)
+                .await
+        }
+        Kraft::Person(_) => None,
+    };
+
     let mut ids = vec![id];
     ids.extend(kopien.iter().map(|(k, _)| *k));
     for i in &ids {
@@ -323,6 +333,7 @@ pub async fn streiche_tx(
                 einheit_id,
                 art,
                 &zeitpunkt_at,
+                hinweis,
             )
             .await?
         }

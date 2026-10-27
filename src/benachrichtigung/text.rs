@@ -39,11 +39,13 @@ pub const fn titel(art: BenachrichtigungArt) -> &'static str {
         BenachrichtigungArt::Befehl => "Neuer Befehl",
         BenachrichtigungArt::Lagebericht => "Neuer Lagebericht",
         BenachrichtigungArt::Meldung => "Neue Meldung",
+        BenachrichtigungArt::RueckmeldungUeberfaellig => "Rückmeldung überfällig",
         BenachrichtigungArt::LagebesprechungVorher => "Lagebesprechung in 10 Minuten",
         BenachrichtigungArt::LagebesprechungFaellig => "Lagebesprechung jetzt fällig",
         BenachrichtigungArt::NachforderungStatus => "Status einer Nachforderung",
         BenachrichtigungArt::Gefahr => "Neue Gefahr",
         BenachrichtigungArt::SichtungEins => "Sichtung I",
+        BenachrichtigungArt::Vermisstenmeldung => "Vermisstenmeldung",
         BenachrichtigungArt::WiederVerfuegbar => "Wieder verfügbar",
         BenachrichtigungArt::ChatErwaehnung => "Erwähnt im Chat",
         BenachrichtigungArt::EinsatzAufnahme => "Aufgenommen in einen Einsatz",
@@ -73,7 +75,9 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         | BenachrichtigungBezugTyp::AbloeserEingetroffen
         | BenachrichtigungBezugTyp::AbloeserBrEingetroffen
         | BenachrichtigungBezugTyp::AbloeserAbgerufen
-        | BenachrichtigungBezugTyp::AbloeserEntfallen => None,
+        | BenachrichtigungBezugTyp::AbloeserEntfallen
+        | BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen
+        | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen => None,
         // Der Dokumenttitel ist ein Scrub-Wert; die Version unterscheidet die Fortschreibungen.
         BenachrichtigungBezugTyp::Befehl => Some(("befehl", "version")),
         BenachrichtigungBezugTyp::Lagebericht => Some(("lagebericht", "version")),
@@ -155,6 +159,12 @@ pub const fn abloeser_titel(typ: BenachrichtigungBezugTyp) -> Option<&'static st
         BenachrichtigungBezugTyp::AbloeserAbgerufen => Some("Ablösende Einheit abgerufen"),
         BenachrichtigungBezugTyp::AbloeserEntfallen => {
             Some("Planung der ablösenden Einheit entfallen")
+        }
+        BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen => {
+            Some("Alarmierung der ablösenden Einheit gestrichen")
+        }
+        BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen => {
+            Some("Eintreffen der ablösenden Einheit gestrichen")
         }
         _ => None,
     }
@@ -255,7 +265,11 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
         | BenachrichtigungBezugTyp::AbloeserEingetroffen
         | BenachrichtigungBezugTyp::AbloeserBrEingetroffen
         | BenachrichtigungBezugTyp::AbloeserAbgerufen
-        | BenachrichtigungBezugTyp::AbloeserEntfallen => format!("{basis}/abloesung?schicht={id}"),
+        | BenachrichtigungBezugTyp::AbloeserEntfallen
+        | BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen
+        | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen => {
+            format!("{basis}/abloesung?schicht={id}")
+        }
         BenachrichtigungBezugTyp::Lagebesprechung => format!("{basis}/lagebesprechung"),
         BenachrichtigungBezugTyp::Nachforderung
         | BenachrichtigungBezugTyp::NachforderungZugesagt

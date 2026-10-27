@@ -11,7 +11,7 @@ quellen: [frontend/src/pages/WetterPegelPage.tsx, frontend/src/wetter/PegelPanee
 Deutschen Wetterdienstes, die aktuellen Wetterbedingungen am Einsatzort, die Vorhersage für 24
 Stunden und, in einer Hochwasserlage, die Wasserstände der maßgeblichen Pegel mit Verlauf und
 Prognose. Welche Pegel maßgeblich sind, legt die Führung in den Einstellungen des Einsatzes fest.
-Eine neue Unwetterwarnung meldet die App von selbst.
+Eine neue Unwetterwarnung meldet die App von selbst als Alarm.
 
 ## Abläufe
 
@@ -42,9 +42,9 @@ Eine neue Unwetterwarnung meldet die App von selbst.
 
 3. Zum Schließen „Beschreibung ausblenden“ wählen.
 
-### Auf einen Unwetterhinweis reagieren
+### Auf eine Unwetterwarnung reagieren
 
-1. Erscheint rechts oben der Hinweis „Unwetterwarnung“ mit Ereignis und Zeitraum, „Öffnen“ wählen.
+1. Erscheint rechts oben der Alarm „Unwetterwarnung“ mit Ereignis und Zeitraum, „Öffnen“ wählen.
 
    ![Hinweis „Unwetterwarnung“ zu Heftigem Starkregen mit dem Knopf „Öffnen“](../bilder/wetter-pegel/unwetter-hinweis.png)
 
@@ -112,16 +112,16 @@ Pegel erscheint ganz unten; beim nächsten Öffnen steht er oben.
 - Jeder Teil nennt seinen Stand. Ein veralteter Stand bleibt mit seiner Zeit sichtbar; ist eine
   Quelle ausgefallen, steht „Stand unbekannt“ statt einer Liste.
 
-### Der Unwetterhinweis
+### Der Unwetteralarm
 
-Der Hinweis „Unwetterwarnung“ erscheint bei einer neuen, gültigen Warnung der amtlichen Stufe
-schwer oder extrem am Einsatzort, mit einem dezenten Ton, auf jeder Seite des Einsatzes und, wenn
-Benachrichtigungen erlaubt sind, auch im verdeckten Tab. Je Person und Einsatz meldet die App
-dieselbe Warnung nur einmal. Wer unter „Benachrichtigungen“ den Schalter „Unwetterwarnung“
-ausschaltet, bekommt den Hinweis nicht mehr (Kapitel
-[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)); die Warnung steht weiter auf der
-Seite. Kommen viele Hinweise zugleich, fasst die App sie wie alle Benachrichtigungen zu einem
-Sammelhinweis zusammen. Warnungen geringer und mäßiger Stufe lösen keinen Hinweis aus. Der
+Der Alarm „Unwetterwarnung“ erscheint bei einer neuen, gültigen Warnung der amtlichen Stufe
+schwer oder extrem (rot und darüber) am Einsatzort, mit dem Alarmton, auf jeder Seite des
+Einsatzes und, wenn Benachrichtigungen erlaubt sind, auch im verdeckten Tab. Je Person und Einsatz
+meldet die App dieselbe Warnung nur einmal. Wie jeder Alarm lässt er sich unter
+„Benachrichtigungen“ nicht abschalten (Kapitel
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Kommen viele Alarme zugleich, fasst
+die App sie wie alle Benachrichtigungen zu einem Sammeltoast zusammen. Warnungen geringer und
+mäßiger Stufe lösen nichts aus. Der
 Beginn einer angekündigten Unwetterwarnung steht zudem im Überblick unter „Nächste Marken“. Jede
 geltende oder angekündigte Warnung, gleich welcher Stufe, steht außerdem still als Marke im
 Seitenkopf des Lagebilds (Kapitel [Lagebild](lagebild.md)).

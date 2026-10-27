@@ -9,8 +9,10 @@ fn t(s: &str) -> DateTime<Utc> {
     crate::zeit::parse_utc(s).unwrap()
 }
 
+/// Katalog LLH-1142 E1 (Entscheidung 22.10.2026): dazu Vermisstenmeldung und Unwetter, das der
+/// Browser erkennt und nur bei Warnstufe rot meldet (LLH-1425).
 #[test]
-fn alarm_sind_genau_sofortmeldung_eskalation_ueberfaelliger_auftrag_und_faellige_abloesung() {
+fn alarm_sind_genau_die_alarme_des_katalogs() {
     let alarm: Vec<BenachrichtigungArt> = BenachrichtigungArt::ALLE
         .iter()
         .copied()
@@ -23,7 +25,14 @@ fn alarm_sind_genau_sofortmeldung_eskalation_ueberfaelliger_auftrag_und_faellige
             BenachrichtigungArt::SofortmeldungEskaliert,
             BenachrichtigungArt::AuftragUeberfaellig,
             BenachrichtigungArt::AbloesungFaellig,
+            BenachrichtigungArt::Vermisstenmeldung,
+            BenachrichtigungArt::Unwetter,
         ]
+    );
+    // Die übrigen neuen Quellen aus LLH-1425 sind Eingänge.
+    assert_eq!(
+        BenachrichtigungArt::RueckmeldungUeberfaellig.stufe(),
+        BenachrichtigungStufe::Hinweis
     );
 }
 
@@ -250,6 +259,8 @@ fn pfade_folgen_den_deeplinks() {
         B::AbloeserBrEingetroffen,
         B::AbloeserAbgerufen,
         B::AbloeserEntfallen,
+        B::AbloeserAlarmierungGestrichen,
+        B::AbloeserEintreffenGestrichen,
     ] {
         assert_eq!(
             p(typ, 3),
@@ -629,6 +640,15 @@ async fn hinweis_zur_abloesenden_einheit_nennt_titel_aus_dem_bezug_und_beide_ein
         (
             BenachrichtigungBezugTyp::AbloeserAbgerufen,
             "Ablösende Einheit abgerufen",
+        ),
+        // Gestrichene Alarmierung bzw. gestrichenes Eintreffen (LLH-1425).
+        (
+            BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen,
+            "Alarmierung der ablösenden Einheit gestrichen",
+        ),
+        (
+            BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen,
+            "Eintreffen der ablösenden Einheit gestrichen",
         ),
     ] {
         let t = text::bilden(&pool, e, art, Bezug::neu(typ, schicht))

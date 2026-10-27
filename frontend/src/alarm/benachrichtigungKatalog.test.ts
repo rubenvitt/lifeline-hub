@@ -13,13 +13,24 @@ import {
 } from './benachrichtigungKatalog';
 
 describe('Katalog der Benachrichtigungsarten', () => {
-  it('Alarm-Arten sind genau die vier aus design.md D4', () => {
+  it('Alarm-Arten sind genau die des Katalogs (design.md D4, LLH-1142 E1, LLH-1425)', () => {
     expect(ALLE_ARTEN.filter((a) => BENACHRICHTIGUNG_ARTEN[a].stufe === 'alarm')).toEqual([
       'sofortmeldung',
       'sofortmeldung_eskaliert',
       'auftrag_ueberfaellig',
       'abloesung_faellig',
+      'vermisstenmeldung',
+      'unwetter',
     ]);
+  });
+
+  it('Rückmeldung überfällig ist ein abschaltbarer Eingang mit Sprung zur Einheit (LLH-1425)', () => {
+    expect(BENACHRICHTIGUNG_ARTEN.rueckmeldung_ueberfaellig).toMatchObject({
+      stufe: 'hinweis',
+      einstellbar: true,
+    });
+    expect(zielVon({ art: 'rueckmeldung_ueberfaellig', bezug_typ: 'einheit' })).toBe('einheiten');
+    expect(zielVon({ art: 'vermisstenmeldung', bezug_typ: 'person' })).toBe('personen');
   });
 
   it('Org-Arten sind Aufnahme und neuer Einsatz', () => {
@@ -39,8 +50,8 @@ describe('Katalog der Benachrichtigungsarten', () => {
     expect(toastSchluessel({ benachrichtigung_id: 41 })).toBe('b-41');
   });
 
-  it('auch Unwetter steht als Schalter in den Einstellungen', () => {
-    expect(BENACHRICHTIGUNG_ARTEN.unwetter).toMatchObject({ stufe: 'hinweis', einstellbar: true });
+  it('Unwetter (Warnstufe rot) ist seit LLH-1425 ein Alarm: in den Einstellungen ohne Schalter', () => {
+    expect(BENACHRICHTIGUNG_ARTEN.unwetter).toMatchObject({ stufe: 'alarm', einstellbar: true });
   });
 
   it('Hinweise der Ablösung (LLH-1131): leise, abschaltbar, Sprung in die Ablösung', () => {
@@ -53,6 +64,8 @@ describe('Katalog der Benachrichtigungsarten', () => {
       'abloeser_br_eingetroffen',
       'abloeser_abgerufen',
       'abloeser_entfallen',
+      'abloeser_alarmierung_gestrichen',
+      'abloeser_eintreffen_gestrichen',
     ] as const) {
       expect(zielVon({ art: 'abloesung_abloeser', bezug_typ })).toBe('abloesung');
     }

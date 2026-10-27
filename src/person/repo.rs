@@ -473,24 +473,75 @@ pub async fn setze_status(
     neuer_status: &str,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    let betroffen = sqlx::query(
+    if update_status(
+        pool,
+        einsatz_id,
+        person_id,
+        None,
+        neuer_status,
+        geaendert_von,
+    )
+    .await?
+        == 0
+    {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// Wie [`setze_status`], aber nur aus dem gelesenen Status `vorher` (CAS, LLH-1425): hat ein
+/// paralleler Wechsel ihn inzwischen geändert, ist das 409 und es wird nichts geschrieben. So
+/// meldet derselbe Wechsel, etwa auf vermisst, nie zweimal.
+pub async fn wechsle_status(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    person_id: i64,
+    vorher: &str,
+    neuer_status: &str,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let betroffen = update_status(
+        pool,
+        einsatz_id,
+        person_id,
+        Some(vorher),
+        neuer_status,
+        geaendert_von,
+    )
+    .await?;
+    if betroffen == 0 {
+        // Gibt es die Person, hat sich nur ihr Status inzwischen geändert.
+        laden(pool, einsatz_id, person_id).await?;
+        return Err(AppError::Conflict(
+            "Der Status der Person wurde zwischenzeitlich geändert".into(),
+        ));
+    }
+    Ok(())
+}
+
+async fn update_status(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    person_id: i64,
+    vorher: Option<&str>,
+    neuer_status: &str,
+    geaendert_von: i64,
+) -> Result<u64, AppError> {
+    Ok(sqlx::query(
         "UPDATE einsatz_person SET status = ?1, \
             vermisst_seit = CASE WHEN ?1 = 'vermisst' \
                 THEN strftime('%Y-%m-%d %H:%M:%S','now') ELSE vermisst_seit END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ?2 \
-         WHERE id = ?3 AND einsatz_id = ?4",
+         WHERE id = ?3 AND einsatz_id = ?4 AND (?5 IS NULL OR status = ?5)",
     )
     .bind(neuer_status)
     .bind(geaendert_von)
     .bind(person_id)
     .bind(einsatz_id)
+    .bind(vorher)
     .execute(pool)
     .await?
-    .rows_affected();
-    if betroffen == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
+    .rows_affected())
 }
 
 /// Soft-Delete (Fehleingabe): setzt `storniert_at`. Bleibt referenzierbar (Audit).
@@ -687,6 +738,31 @@ mod tests {
         assert_eq!(vermisste[0].status, PersonStatus::Vermisst);
         let erfasste = liste(&pool, e, Some("erfasst")).await.unwrap();
         assert_eq!(erfasste.len(), 1);
+    }
+
+    /// LLH-1425: der Wechsel gelingt nur aus dem gelesenen Status. Zwei gleichzeitige Wechsel
+    /// auf vermisst lesen beide `erfasst`; der zweite trifft keine Zeile mehr und ist 409, also
+    /// meldet nur einer. Unbekannte Person bleibt 404.
+    #[tokio::test]
+    async fn wechsle_status_nur_aus_dem_gelesenen_status() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+        wechsle_status(&pool, e, p.id, "erfasst", "vermisst", b)
+            .await
+            .unwrap();
+        let err = wechsle_status(&pool, e, p.id, "erfasst", "vermisst", b)
+            .await
+            .expect_err("Status inzwischen geändert");
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+        assert_eq!(
+            laden(&pool, e, p.id).await.unwrap().status,
+            PersonStatus::Vermisst
+        );
+        let err = wechsle_status(&pool, e, p.id + 99, "erfasst", "vermisst", b)
+            .await
+            .expect_err("unbekannt");
+        assert!(matches!(err, AppError::NotFound), "{err:?}");
     }
 
     #[tokio::test]

@@ -277,7 +277,8 @@ Eine Benachrichtigung geht an die Personen, die sie betrifft, nicht an alle im E
 eine von drei Stufen:
 
 - **Alarm** („Sofortmeldung“, „Sofortmeldung unbestätigt“, „Auftrag überfällig“, „Ablösung
-  fällig“): Toast oben rechts in Warnfarbe und Alarmton. Alarme lassen sich nicht abschalten.
+  fällig“, „Vermisstenmeldung“, „Unwetterwarnung“): Toast oben rechts in Warnfarbe und Alarmton.
+  Alarme lassen sich nicht abschalten.
 - **Eingang** (unter „Benachrichtigungen“ als „Hinweise“): Eingangsband unten und ein kurzer,
   tieferer Ton, höchstens alle zwei Minuten. Jede Art lässt sich unter „Benachrichtigungen“
   abschalten.
@@ -287,7 +288,7 @@ eine von drei Stufen:
 Die Schalter gehören zur **Person**, nicht zum Gerät: Sie gelten auf jedem Gerät, an dem sie sich
 anmeldet. Stummschalten in der Alarmzentrale gehört dagegen zum Gerät und gilt für alle Töne.
 
-Toasts tragen nur Alarme (dazu die Unwetterwarnung und, außerhalb eines Einsatzes, „Neuer
+Toasts tragen nur Alarme (dazu, außerhalb eines Einsatzes, „Neuer
 Einsatz“ und „Aufnahme in einen Einsatz“). Sie bleiben stehen, bis sie geöffnet oder geschlossen
 werden. Höchstens drei stehen einzeln da; ab dem vierten fasst ein Sammeltoast die älteren
 zusammen. Er nennt ihre Zahl, bei mehreren Arten je Art eine Zeile wie „2 × Auftrag überfällig“,

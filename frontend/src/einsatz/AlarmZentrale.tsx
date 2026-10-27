@@ -199,8 +199,8 @@ export default function AlarmZentrale({
 
   // Neue Unwetterwarnung am Einsatzort (LFH-663,
   // `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
-  // der Rahmen erkennt „neu" selbst, prüft die Einstellung `unwetter` und meldet es hierher, der
-  // Ton spielt dort. Die Stufe ist Hinweis (design.md D4). Ein neuer Hinweis
+  // der Rahmen erkennt „neu" selbst und meldet es hierher, der Ton spielt dort. Die Stufe ist
+  // Alarm (Warnstufe rot, LLH-1425, Katalog LLH-1142 E1). Ein neuer Hinweis
   // ERSETZT einen noch einzeln sichtbaren älteren — das Wetter belegt nie mehr als einen der drei
   // Plätze. Eigener Schlüssel je Auslösung, damit „schon gebündelt" ihn nie verschluckt.
   useEffect(() => {
@@ -224,7 +224,7 @@ export default function AlarmZentrale({
         ziel: 'wetter-pegel',
         gruppe: 'unwetter',
         name: 'Unwetterwarnung',
-        stufe: 'hinweis',
+        stufe: 'alarm',
         desktop: { tag },
       });
     };
