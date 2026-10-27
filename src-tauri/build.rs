@@ -15,6 +15,7 @@ fn main() {
             "drucken",
             "anmeldung_im_browser",
             "benachrichtigung_zeigen",
+            "set_app_badge",
         ]),
     ))
     .expect("tauri-build");
