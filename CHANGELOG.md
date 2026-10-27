@@ -1,3 +1,58 @@
+## [1.0.0-alpha.156](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.155...v1.0.0-alpha.156) (2026-10-27)
+
+### Wichtige Änderungen
+
+- **Datenbankmigrationen:** Dieses Release spielt beim Start vier neue Migrationen ein. Sie legen die Benachrichtigungs-Vorgaben je Funktion an, erweitern die Benachrichtigungsquellen, benennen Felder um und entfernen Altspalten.
+- **Altspalten endgültig entfernt:** Abschnitte, Einheiten und die eigene Führungsstelle haben die alten Felder „Kommunikationsmittel“ und „Erreichbarkeit“ nicht mehr. Telefon und weitere Wege stehen schon seit einem früheren Release als typisierte Verbindungen bereit. Einen Rückweg zu den alten Spalten gibt es nicht. Veraltete Clients, die die Felder noch senden, bekommen weiterhin einen Fehler.
+- **Schnittstelle: Feld umbenannt.** Im Presse-Log und an der Betreuungsstelle heißt das Feld „erreichbarkeit“ jetzt „kontaktweg“. Die gespeicherten Werte bleiben erhalten, die Oberfläche ändert sich nicht. Eine Anfrage mit dem alten Feldnamen wird abgelehnt und fordert dazu auf, die Seite neu zu laden. Sie wird nicht mehr still verworfen.
+- **Neue Schnittstelle:** Die Benachrichtigungs-Vorgaben je Einsatz lassen sich jetzt lesen und setzen. Setzen dürfen nur Nutzer mit Verwaltungsrecht.
+
+### Benachrichtigungen und Eingänge
+
+- **Vorgabe je Funktion am Einsatz:** In den Einsatz-Einstellungen legt die Einsatzleitung unter dem neuen Reiter „Benachrichtigungen“ je Eingangsart fest, für welche Führungsfunktionen sie still ist. Das gilt auch für Mitglieder ohne Funktion. Hat jemand mehrere Funktionen, gewinnt die lauteste Einstellung. Ohne eigene Festlegung ist der Lagebericht standardmäßig still. Wer kein Verwaltungsrecht hat, sieht die Vorgaben nur.
+- **„Stumm auf diesem Gerät“:** Im Verlauf am Knopf „Eingänge“ lässt sich jede Eingangsart für das eigene Gerät stumm schalten. Eine stumme Art zeigt dann kein Band, spielt keinen Ton und erzeugt keine Systemmeldung. Die Zahl der Eingänge und der Verlauf bleiben erhalten.
+- **Neue Anlässe für Benachrichtigungen:**
+  - Wenn die letzte Rückmeldung einer Einheit überfällig ist, bekommen alle, die Meldungen bearbeiten, je Überfälligkeit einen Eingang.
+  - Wird eine Person als vermisst angelegt oder auf „vermisst“ gesetzt, geht ein **Alarm** an alle, die das Modul Personen lesen.
+  - Streicht jemand die Alarmierung oder das Eintreffen der geplanten ablösenden Einheit in der Kräfte-Zeitachse, wird das gemeldet.
+  - Unwetterwarnungen ab Warnstufe Rot sind jetzt ein Alarm mit lautem Ton, der sich nicht abschalten lässt.
+- **Eingänge ohne Netz:** Der Verlauf der eigenen Benachrichtigungen ist ohne Verbindung lesbar, auch nach einem Neuladen. Das Paneel zeigt dann den Datenstand mit dem Zusatz „offline“. „Alle gelesen“ wird ohne Netz vorgemerkt und nach der Rückkehr gesendet. Die Zahl fällt sofort und springt danach nicht zurück.
+- **Eingangsband verdeckt keine Leisten mehr:** Das Band rückt jetzt über angepinnte Fußleisten, etwa „Erfassen“ im Einsatztagebuch oder „Freigeben“ am Befehlsentwurf. Das gilt auf schmalen wie breiten Bildschirmen und auch beim Rollen innerer Bereiche.
+
+### Betroffene
+
+- Der Fundort bei der Personen-Aufnahme ist jetzt ein Ortsfeld mit Ortssuche und Kartenvorschau. Auf gekoppelten Geräten bleibt er ein Textfeld mit Koordinaten.
+- Koordinaten dürfen auch mit „/“ als Trenner eingegeben werden.
+- Eine Unfallhilfsstelle (UHS) lässt sich nachträglich bearbeiten: Bezeichnung, Standort und Notiz. „Stornieren“ und weitere Kopfaktionen liegen jetzt in einem Aktionsmenü.
+
+### Aufträge und Befehle
+
+- Das Auftragsdetail zeigt bei einem verorteten Ziel einen Kartenausschnitt und bietet „Auf Lagekarte zeigen“ an.
+
+### Kräfte und Mittel
+
+- Bei Fahrzeugen und Material fragt die Anwendung jetzt nach, bevor eine geänderte, noch nicht gespeicherte Angabe verloren geht. Das gilt auch beim Wechsel zwischen Liste und Tableau.
+- Die Wechselzeiten von Schichtmodellen im Einsatztagebuch folgen der Zeitdarstellung des Einsatzes: taktisch „0600/1800“, bei „Datum und Uhrzeit“ „06:00/18:00“.
+
+### Betreuung und Verpflegung
+
+- Wenn zwei Personen gleichzeitig ein Verpflegungszeitfenster ändern, kommt jetzt die Rückfrage „Zwischenzeitlich geändert“. Zur Wahl stehen „Verwerfen und neu laden“ und „Meine Änderung übernehmen“.
+- Beim Nachtragen einer Ausgabe hat das Ortsfeld eine Ortssuche. Gespeichert wird nur der Text.
+
+### Zeitdarstellung
+
+- Vorbelegte Titel von Lagevorträgen, die Ereigniszeit beim Erfassen, die Uhrzeiten im Verpflegungsplan und die Wechselzeiten der Schichtmodelle folgen jetzt der gewählten Zeitdarstellung. Bisher waren sie immer taktisch.
+- Gespeicherte Titelvorschläge richten sich nur nach den Einstellungen von Einsatz und Organisation, nicht nach der Wahl am einzelnen Gerät.
+- Vom Server erzeugte Texte, etwa zu Verpflegung, Zeitachse, Auftragsfrist, Nachforderung und Ablösung, nutzen einheitlich die Zeitzone und Darstellung des Einsatzes. Fehlt dort eine Einstellung, gilt die der Organisation, sonst Europe/Berlin. Eine ungültige Zeitzone am Einsatz verdrängt keine gültige der Organisation mehr.
+
+### Darstellung
+
+- Im Nachtbetrieb werden taktische Zeichen auch außerhalb der Lagekarte richtig hell dargestellt: im Meldebild, im Organigramm, in der Gefahrauswahl und in der Skizze. Das helle Quadrat hinter dem Zeichen entfällt. Am Tag und im Druck bleibt die gewohnte Farbgebung, auch bei Zeichen, die erst für den Druck aufgebaut werden.
+
+### Betrieb und Installation
+
+- Die Desktop-App zeigt die Zahl ungelesener Eingänge am App-Symbol, unter macOS im Dock. Wo das System das nicht kennt, etwa unter Windows, entfällt die Anzeige ohne Fehlermeldung. Sind mehrere Fenster offen, zeigt das Symbol die größte Zahl.
+
 ## [1.0.0-alpha.155](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.154...v1.0.0-alpha.155) (2026-10-27)
 
 ### Lageüberblick
