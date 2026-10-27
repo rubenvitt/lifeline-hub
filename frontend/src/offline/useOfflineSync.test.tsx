@@ -6,6 +6,7 @@ import { meldeBelegung } from '../api/betreuung';
 import { meldeStand } from '../api/evakuierung';
 import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
+import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
 import { erfasseEtb } from '../api/etb';
 import {
   createMassnahme,
@@ -56,6 +57,7 @@ vi.mock('../api/betreuung', () => ({ meldeBelegung: vi.fn() }));
 vi.mock('../api/evakuierung', () => ({ meldeStand: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
+vi.mock('../api/benachrichtigungen', () => ({ markiereBenachrichtigungenGelesen: vi.fn() }));
 
 const BENUTZER_A = 11;
 const BENUTZER_B = 22;
@@ -939,6 +941,66 @@ describe('Einträge einer Person in der Offline-Queue (LLH-1138, design.md D8)',
 
 /** LFH-387: während eines Benutzerkonflikts scheitert jeder Abgleich am Server (412) und stieße
  *  jedes Mal eine Prüfung an — also pausieren, statt alle 30 s gegen die Wand zu laufen. */
+describe('„Alle gelesen“ der Eingänge in der Offline-Queue (LLH-1422)', () => {
+  const gelesen = { art: 'eingaenge_gelesen' as const, daten: { bis_id: 42 } };
+
+  it('sendet nach der Rückkehr und lädt den Verlauf neu, bevor die Zeile verschwindet', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    const key = einsatzKeys.benachrichtigungVerlauf(7);
+    client.setQueryData(key, { eintraege: [], ungelesen: 0 });
+    vi.mocked(markiereBenachrichtigungenGelesen).mockResolvedValue(undefined);
+    await schreibaktionEinreihen(BENUTZER_A, 7, gelesen);
+    const beimEntfernen: (boolean | undefined)[] = [];
+    const merke = () => beimEntfernen.push(client.getQueryState(key)?.isInvalidated);
+    window.addEventListener(OFFLINE_QUEUE_EVENT, merke);
+    try {
+      renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+      await waitFor(async () =>
+        expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
+          ausstehend: 0,
+          abgelehnt: 0,
+        }),
+      );
+    } finally {
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
+    }
+    expect(markiereBenachrichtigungenGelesen).toHaveBeenCalledExactlyOnceWith(7, 42);
+    expect(beimEntfernen[0]).toBe(true);
+  });
+
+  it('bleibt bei einem Leitungsfehler stehen und geht beim nächsten Versuch genau einmal', async () => {
+    vi.mocked(markiereBenachrichtigungenGelesen)
+      .mockRejectedValueOnce(new NetzFehler())
+      .mockResolvedValueOnce(undefined);
+    await schreibaktionEinreihen(BENUTZER_A, 7, gelesen);
+    const { unmount } = renderHook(() => useOfflineSync(BENUTZER_A), {
+      wrapper: wrapperFuer().Wrapper,
+    });
+    await waitFor(() => expect(markiereBenachrichtigungenGelesen).toHaveBeenCalledTimes(1));
+    expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
+    window.dispatchEvent(new Event('online'));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 0 }),
+    );
+    expect(markiereBenachrichtigungenGelesen).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it('legt eine Ablehnung (Einsatz nicht mehr lesbar) unter „abgelehnt“ ab', async () => {
+    vi.mocked(markiereBenachrichtigungenGelesen).mockRejectedValue(
+      new ApiError(403, 'Keine Berechtigung'),
+    );
+    await schreibaktionEinreihen(BENUTZER_A, 7, gelesen);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 1 }),
+    );
+    expect(await schreibaktionenAbgelehntLaden(BENUTZER_A, 7)).toEqual([
+      expect.objectContaining({ aktion: gelesen, grund: 'Keine Berechtigung' }),
+    ]);
+  });
+});
+
 describe('abgleichFuer (LFH-387)', () => {
   const anna = { id: 1 } as Parameters<typeof abgleichFuer>[0];
   it('gleicht für den angemeldeten Benutzer ab', () => {

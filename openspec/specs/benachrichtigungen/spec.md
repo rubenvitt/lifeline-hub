@@ -69,6 +69,30 @@ Verbindungen mit genau einem Ereignis melden, gleich wie viele Benachrichtigunge
 - **WHEN** Person A ihre Eingänge am Tablet gelesen hat und danach am Laptop den Einsatz öffnet
 - **THEN** sind sie auch dort gelesen
 
+### Requirement: Verlauf ohne Netz
+
+Der Verlauf SHALL ohne Netz aus dem zuletzt geladenen Stand lesbar bleiben, auch nach einem
+Neuladen, und dabei seinen Stand als offline kennzeichnen. „Alle gelesen“ SHALL ohne Netz auf dem
+Gerät vorgemerkt werden: Die Zahl der ungelesenen Eingänge MUST sofort fallen und bis zum Senden
+nicht zurückspringen, der Verlauf MUST „Offline vorgemerkt“ zeigen, und nach der Rückkehr des Netzes
+MUST das System die Markierung ohne weiteres Zutun senden. Alarme MUST auch dabei unberührt
+bleiben.
+
+#### Scenario: Verlauf nach dem Neuladen ohne Netz
+- **WHEN** Person A „Eingänge“ mit Netz geöffnet hat, das Netz wegfällt und sie neu lädt
+- **THEN** zeigt „Eingänge“ die zuvor geladenen Einträge mit „Stand … · offline“
+
+#### Scenario: Alle gelesen ohne Netz
+- **WHEN** Person A ohne Netz „Alle gelesen“ wählt
+- **THEN** zeigt der Knopf keine ungelesenen Eingänge mehr, der Verlauf zeigt „Offline vorgemerkt“,
+  und ein offener Alarm bleibt unter „Neu“
+
+#### Scenario: Rückkehr des Netzes
+- **WHEN** Person A ohne Netz „Alle gelesen“ gewählt hat und das Netz zurückkehrt
+- **THEN** sendet das System „Alle gelesen“ bis zur damals jüngsten Kennung, die Zahl springt
+  dazwischen nicht zurück, und ihre anderen Geräte zeigen die Eingänge als gelesen
+- **AND** was inzwischen eingegangen ist, bleibt ungelesen
+
 ### Requirement: Der Server bestimmt die Empfänger
 
 Der Server SHALL für jede Benachrichtigung die Empfänger als Menge von Nutzern bestimmen und sie

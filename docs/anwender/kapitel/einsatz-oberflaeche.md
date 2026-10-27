@@ -152,7 +152,11 @@ Tabs und auf anderen Geräten derselben Person. „Ansehen“ quittiert nichts.
    der Person. Alarme bleiben, bis jemand sie selbst öffnet oder schließt.
 
 Steht nach „Alle gelesen“ „Nicht gespeichert, bitte noch einmal.“, hat der Server die Änderung
-nicht angenommen; ohne Netz geht „Alle gelesen“ nicht.
+nicht angenommen. Ohne Netz zeigt „Eingänge“ den Stand der letzten Verbindung („Stand HH:MM ·
+offline“), auch nach einem Neuladen; „Alle gelesen“ merkt die App dann vor („Offline vorgemerkt“),
+die Zahl verschwindet sofort, und die Markierung geht hinaus, sobald wieder Netz da ist. Was bis
+dahin neu eingeht, bleibt ungelesen. Einen einzelnen Eintrag ohne Netz zu öffnen, markiert ihn
+nicht als gelesen.
 
 ### Benachrichtigungen einstellen
 

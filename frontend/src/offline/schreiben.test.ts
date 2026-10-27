@@ -14,6 +14,7 @@ import {
 import { legeMeldungAn } from '../api/meldungen';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
+import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
 import { OFFLINE_QUEUE_EVENT, queueLeerenFuerTests, schreibaktionenLaden } from './queue';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from './serveruhr';
 import {
@@ -24,6 +25,7 @@ import {
   erfasseStandOfflineFaehig,
   erfasseVerpflegungsausgabeOfflineFaehig,
   merkeVerpflegungsausgabeVor,
+  saveEingaengeGelesenOfflineCapable,
   savePersonEintragOfflineCapable,
 } from './schreiben';
 
@@ -45,6 +47,7 @@ vi.mock('../api/betreuung', () => ({ meldeBelegung: vi.fn() }));
 vi.mock('../api/evakuierung', () => ({ meldeStand: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
+vi.mock('../api/benachrichtigungen', () => ({ markiereBenachrichtigungenGelesen: vi.fn() }));
 
 function online(wert: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: wert });
@@ -638,5 +641,37 @@ describe('offlinefähige Einträge einer Person (LLH-1138, design.md D8)', () =>
       art: 'massnahme',
       daten: { art: 'zugang', zeitpunkt_at: '2026-10-18 13:55:00' },
     });
+  });
+});
+
+describe('„Alle gelesen“ der Eingänge ohne Netz (LLH-1422)', () => {
+  it('merkt offline die jüngste Kennung vor, ohne zu senden', async () => {
+    online(false);
+    expect(await saveEingaengeGelesenOfflineCapable(11, 7, 42)).toBe('vorgemerkt');
+    expect(markiereBenachrichtigungenGelesen).not.toHaveBeenCalled();
+    expect(await schreibaktionenLaden(11, 7)).toEqual([
+      expect.objectContaining({ aktion: { art: 'eingaenge_gelesen', daten: { bis_id: 42 } } }),
+    ]);
+  });
+
+  it('sendet online und merkt nichts vor', async () => {
+    vi.mocked(markiereBenachrichtigungenGelesen).mockResolvedValue(undefined);
+    expect(await saveEingaengeGelesenOfflineCapable(11, 7, 42)).toBe('gesendet');
+    expect(markiereBenachrichtigungenGelesen).toHaveBeenCalledExactlyOnceWith(7, 42);
+    expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
+  });
+
+  it('merkt nach einem Leitungsfehler vor, eine fachliche Ablehnung wirft', async () => {
+    vi.mocked(markiereBenachrichtigungenGelesen).mockRejectedValueOnce(new NetzFehler());
+    expect(await saveEingaengeGelesenOfflineCapable(11, 7, 42)).toBe('vorgemerkt');
+    vi.mocked(markiereBenachrichtigungenGelesen).mockRejectedValueOnce(
+      new ApiError(403, 'Keine Berechtigung'),
+    );
+    await expect(saveEingaengeGelesenOfflineCapable(11, 7, 43)).rejects.toMatchObject({
+      status: 403,
+    });
+    expect((await schreibaktionenLaden(11, 7)).map((z) => z.aktion)).toEqual([
+      { art: 'eingaenge_gelesen', daten: { bis_id: 42 } },
+    ]);
   });
 });

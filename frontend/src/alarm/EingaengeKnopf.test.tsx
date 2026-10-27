@@ -6,9 +6,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { BenachrichtigungAnzeige, BenachrichtigungEreignis } from '../api/types';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { useAuth } from '../auth/AuthContext';
 import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener';
-import { server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import {
+  queueLeerenFuerTests,
+  schreibaktionEinreihen,
+  schreibaktionenLaden,
+} from '../offline/queue';
+import { useOfflineSync } from '../offline/useOfflineSync';
+import { benutzerFixture } from '../test/fixtures';
+import { meHandler, server } from '../test/server';
+import { renderMitProviders, setzeOnline } from '../test/utils';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import EingaengeKnopf from './EingaengeKnopf';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeZahlText } from './eingaenge';
@@ -59,6 +67,15 @@ function Ort() {
   return <output data-testid="route">{`${l.pathname}${l.search}`}</output>;
 }
 
+const BENUTZER = 31;
+
+/** Der globale Abgleich der Offline-Queue, wie ihn der Rahmen der App für die Person hält. */
+function Abgleich() {
+  const { benutzer } = useAuth();
+  useOfflineSync(benutzer?.id);
+  return benutzer ? <output data-testid="angemeldet" /> : null;
+}
+
 function rendern() {
   return renderMitProviders(
     <Routes>
@@ -68,6 +85,7 @@ function rendern() {
           <>
             <EingaengeKnopf einsatzId={1} />
             <Ort />
+            <Abgleich />
           </>
         }
       />
@@ -76,8 +94,15 @@ function rendern() {
   );
 }
 
-beforeEach(() => setzeViewportBreite(1366));
-afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
+beforeEach(async () => {
+  setzeViewportBreite(1366);
+  server.use(meHandler(benutzerFixture({ id: BENUTZER })));
+  await queueLeerenFuerTests();
+});
+afterEach(() => {
+  setzeViewportBreite(VIEWPORT_STANDARD);
+  setzeOnline(true);
+});
 
 describe('Knopf „Eingänge“ (LLH-1143)', () => {
   it('nennt die Zahl der ungelesenen Eingänge sichtbar und im Namen', async () => {
@@ -197,5 +222,95 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     });
     const blatt = await screen.findByRole('dialog');
     expect(within(blatt).getByRole('region', { name: 'Eingänge' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Ohne Netz (LLH-1422, Spec `benachrichtigungen`, „Verlauf ohne Netz“): der Verlauf bleibt aus dem
+ * Speicher lesbar, der Stand trägt „offline“; „Alle gelesen“ wird vorgemerkt, die Zahl fällt
+ * sofort, gesendet wird nach der Rückkehr. Geladen wird online, dann fällt das Netz weg.
+ */
+describe('Eingänge ohne Netz (LLH-1422)', () => {
+  async function oeffnenOhneNetz(name: string) {
+    await screen.findByTestId('angemeldet');
+    await userEvent.click(await screen.findByRole('button', { name }));
+    const paneel = await screen.findByRole('region', { name: 'Eingänge' });
+    setzeOnline(false);
+    return paneel;
+  }
+
+  it('der Verlauf bleibt lesbar, der Stand trägt „offline“', async () => {
+    serverMit({ eintraege: [eintrag(9), eintrag(4, { quittiert_at: 'x' })], ungelesen: 1 });
+    rendern();
+    const paneel = await oeffnenOhneNetz('Eingänge, 1 ungelesen');
+    expect(await within(paneel).findByText(/^Stand \d{4} · offline$/)).toBeInTheDocument();
+    expect(within(paneel).getByRole('list', { name: 'Neu' })).toHaveTextContent('Auftrag #9');
+    expect(within(paneel).getByRole('list', { name: 'Früher' })).toHaveTextContent('Auftrag #4');
+  });
+
+  it('mit Netz steht kein Stand im Paneel', async () => {
+    serverMit({ eintraege: [eintrag(9)], ungelesen: 1 });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eingänge, 1 ungelesen' }));
+    const paneel = await screen.findByRole('region', { name: 'Eingänge' });
+    expect(within(paneel).queryByText(/^Stand /)).toBeNull();
+  });
+
+  it('„Alle gelesen“: vorgemerkt, Zahl sofort weg, nach der Rückkehr genau einmal gesendet', async () => {
+    const zaehler = serverMit({
+      eintraege: [eintrag(9), eintrag(5, { stufe: 'alarm' }), eintrag(4)],
+      ungelesen: 2,
+    });
+    rendern();
+    const paneel = await oeffnenOhneNetz('Eingänge, 2 ungelesen');
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Alle gelesen' }));
+
+    expect(await within(paneel).findByText('Offline vorgemerkt')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eingänge, keine ungelesen' })).toBeInTheDocument();
+    // Der Alarm bleibt unter „Neu“, wie online.
+    const neu = within(paneel).getByRole('list', { name: 'Neu' });
+    expect(within(neu).getAllByRole('listitem')).toHaveLength(1);
+    // Das Ladezeichen klingt in jsdom nicht aus, es bleibt im Namen.
+    expect(within(paneel).getByRole('button', { name: /Alle gelesen$/ })).toBeDisabled();
+    expect(zaehler.gelesen).toEqual([]);
+    expect((await schreibaktionenLaden(BENUTZER, 1)).map((z) => z.aktion)).toEqual([
+      { art: 'eingaenge_gelesen', daten: { bis_id: 9 } },
+    ]);
+
+    setzeOnline(true);
+    await waitFor(() => expect(zaehler.gelesen).toEqual([9]));
+    await waitFor(() => expect(within(paneel).queryByText('Offline vorgemerkt')).toBeNull());
+    expect(await schreibaktionenLaden(BENUTZER, 1)).toEqual([]);
+  });
+
+  it('ein Abruf vor dem Senden zeigt das Vorgemerkte weiter als gelesen', async () => {
+    // Die Rückkehr des Netzes ruft den Verlauf ab, bevor der Abgleich gesendet hat: die Zahl
+    // springt nicht zurück. Das Senden scheitert hier an der Leitung, die Zeile bleibt stehen.
+    await schreibaktionEinreihen(BENUTZER, 1, {
+      art: 'eingaenge_gelesen',
+      daten: { bis_id: 9 },
+    });
+    serverMit({ eintraege: [eintrag(10), eintrag(9), eintrag(4)], ungelesen: 3 });
+    server.use(
+      http.post('/api/einsaetze/:id/benachrichtigungen/gelesen', () => HttpResponse.error()),
+    );
+    rendern();
+    await screen.findByTestId('angemeldet');
+    act(() => {
+      const detail: BenachrichtigungEreignis = {
+        einsatz_id: 1,
+        benachrichtigung_id: 10,
+        art: 'auftrag_erteilt',
+        stufe: 'hinweis',
+        bezug_typ: 'auftrag',
+        bezug_id: 10,
+        quittiert: false,
+      };
+      window.dispatchEvent(new CustomEvent(BENACHRICHTIGUNG_WINDOW_EVENT, { detail }));
+    });
+    // Nur der jüngere Eingang ist ungelesen; 9 und 4 sind vorgemerkt gelesen.
+    expect(
+      await screen.findByRole('button', { name: 'Eingänge, 1 ungelesen' }),
+    ).toBeInTheDocument();
   });
 });
