@@ -1,3 +1,12 @@
+## [1.0.0-alpha.157](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.156...v1.0.0-alpha.157) (2026-10-27)
+
+### Betroffene
+
+- **Körperschema mit neu gezeichneten Figuren:** Die drei Umrisse (männlich, weiblich, neutral) haben jetzt eine weiche, natürliche Kontur statt der bisherigen kantigen Formen. Die Arme stehen frei vom Rumpf, Kopf und Füße sind realistischer geformt.
+- **Vorder- und Rückansicht leichter zu unterscheiden:** Feine Binnenlinien zeigen, welche Seite zu sehen ist. Vorn sind es Schlüsselbeine und Knie, hinten Wirbelsäule, Schulterblätter und Gesäßfalte. Die Linien sind zurückhaltender als die Kontur, fehlen in der kleinen Figur und erscheinen im Druck schwarz ohne Füllung.
+- **Bestehende Einträge bleiben gültig:** Die antippbaren Körperbereiche sind gleich geblieben. Bereits gesetzte Markierungen stehen weiterhin am selben Körperteil.
+- **Anwenderdokumentation:** Die Abbildung zum Körperschema zeigt die neuen Figuren.
+
 ## [1.0.0-alpha.156](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.155...v1.0.0-alpha.156) (2026-10-27)
 
 ### Wichtige Änderungen
