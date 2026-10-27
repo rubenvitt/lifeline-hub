@@ -468,3 +468,129 @@ describe('offene Bearbeitung · Wechsel in der Seite (LLH-1415)', () => {
     expect(screen.getByText('SEGMENT B')).toBeInTheDocument();
   });
 });
+
+/**
+ * Selbstanmeldung einer `InlineAngabe` ohne eigenes `onEntwurf` (LLH-1468): unter einem Provider
+ * meldet sie einen geänderten Entwurf selbst an (Rückfrage vor dem Verlassen), ohne Provider bleibt
+ * sie still. Wer `onEntwurf` reicht, meldet selbst an; die Angabe meldet dann nicht ein zweites Mal.
+ *
+ * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
+ * - Selbstanmeldung entfernt (`onEntwurf ?? merker.onEntwurf` → nur `onEntwurf`): rot in „unter
+ *   dem Provider fragt …“ und in den Seitentests von Fahrzeugen und Material.
+ * - Selbstanmeldung auch neben einem eigenen `onEntwurf`: rot in „ein eigenes `onEntwurf` …“.
+ */
+function SelbstAngabe({
+  etikett,
+  onEntwurf,
+}: {
+  etikett: string;
+  onEntwurf?: (geaendert: boolean) => void;
+}) {
+  const [wert, setWert] = useState('');
+  return (
+    <InlineAngabe<string>
+      etikett={etikett}
+      wert={wert}
+      anzeige={wert}
+      leer={(w) => w.trim() === ''}
+      darfSchreiben
+      onSpeichern={async (w) => setWert(w)}
+      onEntwurf={onEntwurf}
+      eingabe={({ feld, value, onChange }) => (
+        <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    />
+  );
+}
+
+function SelbstKopf() {
+  return <div data-testid="kopf">{useOffeneBearbeitungGrund() ?? 'frei'}</div>;
+}
+
+function SelbstSeite({ onEntwurf }: { onEntwurf?: (geaendert: boolean) => void }) {
+  return (
+    <Routes>
+      <Route
+        path="/liste"
+        element={
+          <OffeneBearbeitungProvider>
+            <SelbstKopf />
+            <SelbstAngabe etikett="Ort" onEntwurf={onEntwurf} />
+            <SelbstAngabe etikett="Einheit" />
+            <Link to="/anderswo">Anderswo</Link>
+          </OffeneBearbeitungProvider>
+        }
+      />
+      <Route path="/anderswo" element={<div>ANDERSWO</div>} />
+    </Routes>
+  );
+}
+
+describe('offene Bearbeitung · Selbstanmeldung einer Inline-Angabe (LLH-1468)', () => {
+  it('unter dem Provider fragt ein Entwurf vor dem Verlassen; gespeichert gibt er frei', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<SelbstSeite />, { route: '/liste', datenRouter: true });
+    await user.click(screen.getByRole('button', { name: 'Ort eintragen' }));
+    expect(screen.getByTestId('kopf')).toHaveTextContent('frei');
+    await user.type(screen.getByRole('textbox', { name: 'Ort' }), 'Halle');
+    expect(screen.getByTestId('kopf')).toHaveTextContent('Erst „Ort“ speichern oder abbrechen');
+
+    await user.click(screen.getByRole('link', { name: 'Anderswo' }));
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await user.click(screen.getByRole('button', { name: 'Bleiben' }));
+    await user.click(screen.getByRole('button', { name: 'Ort speichern' }));
+    await waitFor(() => expect(screen.getByTestId('kopf')).toHaveTextContent('frei'));
+    await user.click(screen.getByRole('link', { name: 'Anderswo' }));
+    expect(await screen.findByText('ANDERSWO')).toBeInTheDocument();
+  });
+
+  it('die übrigen Angaben sperrt sie nicht: das verdrahtet der Aufrufer mit `gesperrt`', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<SelbstSeite />, { route: '/liste', datenRouter: true });
+    await user.click(screen.getByRole('button', { name: 'Ort eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Ort' }), 'Halle');
+    expect(screen.getByRole('button', { name: 'Einheit eintragen' })).toBeEnabled();
+    // Der Grund steht nur am Kopf, nicht am zweiten Feld.
+    expect(screen.getAllByText('Erst „Ort“ speichern oder abbrechen')).toHaveLength(1);
+  });
+
+  it('ein eigenes `onEntwurf` ersetzt die Selbstanmeldung', async () => {
+    const user = userEvent.setup();
+    const gemeldet: boolean[] = [];
+    renderMitProviders(<SelbstSeite onEntwurf={(g) => gemeldet.push(g)} />, {
+      route: '/liste',
+      datenRouter: true,
+    });
+    await user.click(screen.getByRole('button', { name: 'Ort eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Ort' }), 'Halle');
+    expect(gemeldet).toEqual([true]);
+    expect(screen.getByTestId('kopf')).toHaveTextContent('frei');
+    await user.click(screen.getByRole('link', { name: 'Anderswo' }));
+    expect(await screen.findByText('ANDERSWO')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('ohne Provider bleibt sie still, auch ohne Data Router', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/liste"
+          element={
+            <>
+              <SelbstAngabe etikett="Ort" />
+              <Link to="/anderswo">Anderswo</Link>
+            </>
+          }
+        />
+        <Route path="/anderswo" element={<div>ANDERSWO</div>} />
+      </Routes>,
+      { route: '/liste' },
+    );
+    await user.click(screen.getByRole('button', { name: 'Ort eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Ort' }), 'Halle');
+    await user.click(screen.getByRole('link', { name: 'Anderswo' }));
+    expect(await screen.findByText('ANDERSWO')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});

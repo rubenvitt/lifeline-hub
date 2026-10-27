@@ -18,6 +18,7 @@
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
+use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 use crate::app::AppState;
@@ -154,7 +155,10 @@ pub struct KontaktAnlegen {
     #[serde(default)]
     kontakt_name: Option<String>,
     #[serde(default)]
-    kontakt_erreichbarkeit: Option<String>,
+    kontaktweg: Option<String>,
+    /// Alter Name von `kontaktweg` (bis LLH-1419): im Body (auch `null`) → 400.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    kontakt_erreichbarkeit: Option<Option<IgnoredAny>>,
     /// Fehlt = jetzt.
     #[serde(default)]
     eingang_at: Option<String>,
@@ -167,12 +171,17 @@ pub async fn medienkontakt_anlegen(
     JsonBody(req): JsonBody<KontaktAnlegen>,
 ) -> Result<(StatusCode, Json<MedienkontaktAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    support::lehne_alten_feldnamen_ab(
+        req.kontakt_erreichbarkeit.is_some(),
+        "kontakt_erreichbarkeit",
+        "kontaktweg",
+    )?;
     let eingabe = KontaktEingabe {
         art: art(&req.art)?,
         medium: req.medium,
         thema: req.thema,
         kontakt_name: req.kontakt_name,
-        kontakt_erreichbarkeit: req.kontakt_erreichbarkeit,
+        kontaktweg: req.kontaktweg,
         eingang_at: zeit_oder_jetzt(req.eingang_at.as_deref())?,
     };
     let benutzer_id = ctx.benutzer.id;
@@ -196,7 +205,10 @@ pub struct KontaktAendern {
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     kontakt_name: Option<Option<String>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    kontakt_erreichbarkeit: Option<Option<String>>,
+    kontaktweg: Option<Option<String>>,
+    /// Alter Name von `kontaktweg` (bis LLH-1419): im Body (auch `null`) → 400.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    kontakt_erreichbarkeit: Option<Option<IgnoredAny>>,
     #[serde(default)]
     eingang_at: Option<String>,
 }
@@ -209,11 +221,16 @@ pub async fn medienkontakt_aendern(
     JsonBody(req): JsonBody<KontaktAendern>,
 ) -> Result<Json<MedienkontaktAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    support::lehne_alten_feldnamen_ab(
+        req.kontakt_erreichbarkeit.is_some(),
+        "kontakt_erreichbarkeit",
+        "kontaktweg",
+    )?;
     let aenderung = KontaktAenderung {
         medium: req.medium,
         thema: req.thema,
         kontakt_name: req.kontakt_name,
-        kontakt_erreichbarkeit: req.kontakt_erreichbarkeit,
+        kontaktweg: req.kontaktweg,
         eingang_at: req
             .eingang_at
             .as_deref()

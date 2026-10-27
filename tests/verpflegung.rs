@@ -79,6 +79,37 @@ async fn verpflegungs_etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec
         .collect()
 }
 
+// ── Zeitzone (LLH-1443) ─────────────────────────────────────────────────────────────────────
+
+/// Der Zeitraum im ETB steht in der Zone des Einsatzes, nicht in der der Organisation: 10:00
+/// bis 11:30 UTC sind in Tokio 19:00–20:30, in New York 06:00–07:30.
+#[tokio::test]
+async fn zeitraum_steht_in_der_zone_des_einsatzes_nicht_der_organisation() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'America/New_York') \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'Asia/Tokyo') \
+         ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .bind(e)
+    .execute(&pool)
+    .await
+    .unwrap();
+    zeitfenster(&app, &admin, e, MITTAG).await;
+    assert_eq!(
+        verpflegungs_etb(&app, &admin, e).await,
+        vec!["Verpflegung ‚Mittag‘ 241900sep26–2030 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute)."]
+    );
+}
+
 // ── Durchstich ──────────────────────────────────────────────────────────────────────────────
 
 /// Anlegen → Ausgabe → Rücknahme → Löschen. Nur Anlegen und Löschen schreiben ETB (D5), der
@@ -218,6 +249,64 @@ async fn patch_aendert_bedarf_und_leerlauf_schreibt_nichts() {
         2,
         "Leerlauf schreibt keinen ETB-Eintrag"
     );
+}
+
+/// LLH-1414: zwei Bearbeitungen vom selben Stand. Die erste schreibt, die zweite trägt einen
+/// veralteten `basis_geaendert_at` und bekommt 409, ohne etwas zu ändern; ohne Basis („Meine
+/// Änderung übernehmen“) schreibt sie. Der Anlagezeitpunkt liegt in der Vergangenheit, sonst
+/// fiele die erste Änderung in dieselbe Sekunde wie die Anlage.
+#[tokio::test]
+async fn patch_auf_veraltetem_stand_ist_409() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    sqlx::query(
+        "UPDATE verpflegung_zeitfenster SET angelegt_at = '2000-01-01 00:00:00' WHERE id = ?",
+    )
+    .bind(zid)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let uri = format!("{}/zeitfenster/{zid}", pfad(e));
+    let (_, liste) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    let zf = liste["zeitfenster"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|z| z["id"] == zid)
+        .unwrap();
+    assert!(zf["geaendert_at"].is_null(), "noch nie geändert: {zf:?}");
+    let basis = zf["angelegt_at"].as_str().unwrap().to_owned();
+
+    let erste = serde_json::json!({ "bedarf_betreute": 90, "basis_geaendert_at": basis });
+    let (s, nach_erster) = anfrage(&app, "PATCH", &uri, &admin, Some(&erste.to_string())).await;
+    assert_eq!(s, StatusCode::OK, "{nach_erster:?}");
+
+    let zweite = serde_json::json!({ "bedarf_kraefte": 200, "basis_geaendert_at": basis });
+    let (s, json) = anfrage(&app, "PATCH", &uri, &admin, Some(&zweite.to_string())).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json:?}");
+    let etb = verpflegungs_etb(&app, &admin, e).await;
+    assert_eq!(etb.len(), 2, "der 409 schreibt kein ETB: {etb:?}");
+
+    // Der neue Stand gilt als Basis.
+    let neu = nach_erster["geaendert_at"].as_str().unwrap();
+    let dritte = serde_json::json!({ "bedarf_weitere": 5, "basis_geaendert_at": neu });
+    let (s, json) = anfrage(&app, "PATCH", &uri, &admin, Some(&dritte.to_string())).await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+
+    // Ohne Basis wird ohne Vergleich geschrieben.
+    let (s, zf) = anfrage(
+        &app,
+        "PATCH",
+        &uri,
+        &admin,
+        Some(r#"{"bedarf_kraefte":200}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{zf:?}");
+    assert_eq!(zf["bedarf"]["kraefte"], 200);
+    assert_eq!(zf["bedarf"]["betreute"], 90, "die erste Änderung bleibt");
 }
 
 // ── Statuscodes ─────────────────────────────────────────────────────────────────────────────

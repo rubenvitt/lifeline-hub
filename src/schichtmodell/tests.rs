@@ -142,14 +142,29 @@ fn rhythmus_ist_beginn_plus_minuten() {
     );
 }
 
+/// LLH-1469: die Wechselzeiten folgen der Darstellung des Einsatzes (Rolle „Uhrzeit“), taktisch
+/// `0600/1800`, „Datum und Uhrzeit“ `06:00/18:00`; der Rhythmus kennt keine Uhrzeit.
 #[test]
 fn text_liest_sich() {
-    assert_eq!(Regel::Rhythmus { minuten: 720 }.text(), "Rhythmus 12 h");
+    use crate::zeitdarstellung::Zeitdarstellung::{DatumUhrzeit, Taktisch};
     assert_eq!(
-        zwoelf_stunden(240).text(),
+        Regel::Rhythmus { minuten: 720 }.text(Taktisch),
+        "Rhythmus 12 h"
+    );
+    assert_eq!(
+        Regel::Rhythmus { minuten: 720 }.text(DatumUhrzeit),
+        "Rhythmus 12 h"
+    );
+    assert_eq!(
+        zwoelf_stunden(240).text(Taktisch),
+        "Wechsel 0600/1800, Mindestdauer 4 h"
+    );
+    assert_eq!(zwoelf_stunden(0).text(Taktisch), "Wechsel 0600/1800");
+    assert_eq!(
+        zwoelf_stunden(240).text(DatumUhrzeit),
         "Wechsel 06:00/18:00, Mindestdauer 4 h"
     );
-    assert_eq!(zwoelf_stunden(0).text(), "Wechsel 06:00/18:00");
+    assert_eq!(zwoelf_stunden(0).text(DatumUhrzeit), "Wechsel 06:00/18:00");
 }
 
 fn body(typ: &str) -> WerteBody {

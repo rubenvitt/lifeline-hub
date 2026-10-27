@@ -21,7 +21,7 @@ import {
 } from '../api/betreuung';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { BETREUUNG_ERREICHBARKEIT_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
+import { BETREUUNG_KONTAKTWEG_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
   BelegungsmeldungEingabe,
@@ -103,7 +103,7 @@ function sitzungsWerte(s: Betreuungsstelle): StelleWerte {
     // (LLH-1121, design.md D3).
     standort: ortsfeldAusGespeichert(s.standort, s.lat, s.lon),
     leitung: s.leitung ?? undefined,
-    erreichbarkeit: s.erreichbarkeit ?? undefined,
+    kontaktweg: s.kontaktweg ?? undefined,
     notiz: s.notiz ?? undefined,
   };
 }
@@ -446,11 +446,11 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
         { rules: [zeichenRegel(BETREUUNG_LEITUNG_MAX, 'Leitung')] },
       )}
       {zelle(
-        'erreichbarkeit',
+        'kontaktweg',
         'Kontakt',
-        <Input count={zeichenGrenze(BETREUUNG_ERREICHBARKEIT_MAX)} />,
-        s.erreichbarkeit ?? leer,
-        { mono: true, rules: [zeichenRegel(BETREUUNG_ERREICHBARKEIT_MAX, 'Kontakt')] },
+        <Input count={zeichenGrenze(BETREUUNG_KONTAKTWEG_MAX)} />,
+        s.kontaktweg ?? leer,
+        { mono: true, rules: [zeichenRegel(BETREUUNG_KONTAKTWEG_MAX, 'Kontakt')] },
       )}
       {zelle('notiz', 'Notiz', <Input.TextArea autoSize={{ minRows: 2 }} />, s.notiz ?? leer, {
         breit: true,

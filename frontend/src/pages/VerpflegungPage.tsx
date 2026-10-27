@@ -329,8 +329,15 @@ export default function VerpflegungPage() {
     },
   });
   const aendernMut = useMutation({
-    mutationFn: ({ zfId, patch }: { zfId: number; patch: ZeitfensterPatch }) =>
-      aendereZeitfenster(einsatzId, zfId, patch),
+    mutationFn: ({
+      zfId,
+      patch,
+      basis,
+    }: {
+      zfId: number;
+      patch: ZeitfensterPatch;
+      basis?: string;
+    }) => aendereZeitfenster(einsatzId, zfId, patch, basis),
     onSuccess: (zf) => {
       invalidiere(true);
       message.success(`Bedarf ${zitat(zf.bezeichnung)} gespeichert`);
@@ -610,8 +617,11 @@ export default function VerpflegungPage() {
                   setDialog({ art: 'ausgabe', zf: x });
                 }}
                 onBedarfSpeichern={
-                  planen ? (x, patch) => aendernMut.mutateAsync({ zfId: x.id, patch }) : undefined
+                  planen
+                    ? (x, patch, basis) => aendernMut.mutateAsync({ zfId: x.id, patch, basis })
+                    : undefined
                 }
+                onBedarfNeuLaden={() => invalidiere(false)}
                 freigaben={freigaben}
                 onNachfordern={nachfordern}
                 nachschub={geraet ? 'melden' : 'nachfordern'}

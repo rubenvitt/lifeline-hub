@@ -413,7 +413,7 @@ function componentReadme(spec: PreviewSpec, agents: string): string {
         .replace(/\n {2}/g, '\n')
     : docBefore(source, spec.docAnchor);
   const rendered = spec.interact
-    ? 'dem echten Baustein gerendert (der Zustand nach einem Klick im jsdom), mit dem'
+    ? 'dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem'
     : 'dem echten Baustein gerendert, mit dem';
   const more = spec.moreDoc
     ? [

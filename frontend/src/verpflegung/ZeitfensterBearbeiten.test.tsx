@@ -55,6 +55,8 @@ const { default: ZeitfensterKarte } = await import('./ZeitfensterKarte');
 const LAUFEND = dayjs('2026-09-24T10:30:00Z');
 const FREIGABEN = freigabenFixture();
 const K_HINWEIS = 'Vorschlag: Personal im Einsatz, Stand 09:58';
+/** Stand eines nie geänderten Zeitfensters: die Anlage (CAS-Basis, LLH-1414). */
+const ANLAGE = zeitfenster().angelegt_at;
 
 beforeEach(() => {
   vorschlag.aufrufe = [];
@@ -75,11 +77,12 @@ function gedeckt(over: Partial<VerpflegungZeitfenster> = {}) {
 
 function zeigeKarte(
   zf: VerpflegungZeitfenster = gedeckt(),
-  onBedarfSpeichern = vi.fn<(z: VerpflegungZeitfenster, p: ZeitfensterPatch) => Promise<unknown>>(
-    async () => undefined,
-  ),
+  onBedarfSpeichern = vi.fn<
+    (z: VerpflegungZeitfenster, p: ZeitfensterPatch, b: string | undefined) => Promise<unknown>
+  >(async () => undefined),
   stellen = [] as ReturnType<typeof stelle>[],
 ) {
+  const onBedarfNeuLaden = vi.fn();
   const karte = (z: VerpflegungZeitfenster) => (
     <ZeitfensterKarte
       zeitfenster={z}
@@ -88,12 +91,17 @@ function zeigeKarte(
       nachforderungenFrei
       onAusgabeNachtragen={vi.fn()}
       onBedarfSpeichern={onBedarfSpeichern}
+      onBedarfNeuLaden={onBedarfNeuLaden}
       freigaben={FREIGABEN}
       stellen={stellen}
     />
   );
   const r = renderMitProviders(karte(zf), { datenRouter: true });
-  return { onBedarfSpeichern, neu: (z: VerpflegungZeitfenster) => r.rerender(karte(z)) };
+  return {
+    onBedarfSpeichern,
+    onBedarfNeuLaden,
+    neu: (z: VerpflegungZeitfenster) => r.rerender(karte(z)),
+  };
 }
 
 const kennung = zeitfensterKennung(zeitfenster());
@@ -127,7 +135,11 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
     await userEvent.type(betreute, '90');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
-      expect(onBedarfSpeichern).toHaveBeenCalledWith(expect.anything(), { bedarf_betreute: 90 }),
+      expect(onBedarfSpeichern).toHaveBeenCalledWith(
+        expect.anything(),
+        { bedarf_betreute: 90 },
+        ANLAGE,
+      ),
     );
     expect(
       await screen.findByRole('button', { name: `Bedarf bearbeiten zu ${kennung}` }),
@@ -170,9 +182,11 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
       expect(screen.getByText('Sonderkost übersteigt den Gesamtbedarf')).toBeVisible(),
     );
     expect(screen.getByLabelText('davon vegan')).toHaveValue('400');
-    expect(onBedarfSpeichern).toHaveBeenCalledWith(expect.anything(), {
-      sonderkost: { vegan: 400 },
-    });
+    expect(onBedarfSpeichern).toHaveBeenCalledWith(
+      expect.anything(),
+      { sonderkost: { vegan: 400 } },
+      ANLAGE,
+    );
   });
 
   it('ein leeres Pflichtfeld zeigt den Grund unter der Zelle und sendet nichts', async () => {
@@ -214,8 +228,60 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     // Nur die eigene Änderung: die fremden 200 Kräfte werden nicht mit 180 überschrieben.
     await waitFor(() =>
-      expect(onBedarfSpeichern).toHaveBeenCalledWith(expect.anything(), { bedarf_betreute: 90 }),
+      expect(onBedarfSpeichern).toHaveBeenCalledWith(
+        expect.anything(),
+        { bedarf_betreute: 90 },
+        ANLAGE,
+      ),
     );
+  });
+  it('ein zwischenzeitlich geändertes Zeitfenster fragt nach; übernehmen schickt ohne Basis', async () => {
+    // LLH-1414: die Basis ist der Stand beim Öffnen, hier eine frühere Änderung.
+    const stand = '2026-09-24 08:15:00';
+    const { onBedarfSpeichern } = zeigeKarte(gedeckt({ geaendert_at: stand }));
+    onBedarfSpeichern.mockRejectedValueOnce(
+      new ApiError(409, 'Das Zeitfenster wurde zwischenzeitlich geändert. Bitte neu laden.'),
+    );
+    await oeffneBearbeiten();
+    const betreute = await screen.findByLabelText('Betreute (EP)');
+    await userEvent.clear(betreute);
+    await userEvent.type(betreute, '90');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const rueckfrage = await screen.findByRole('dialog', { name: 'Zwischenzeitlich geändert' });
+    expect(onBedarfSpeichern).toHaveBeenLastCalledWith(
+      expect.anything(),
+      { bedarf_betreute: 90 },
+      stand,
+    );
+    await userEvent.click(
+      within(rueckfrage).getByRole('button', { name: 'Meine Änderung übernehmen' }),
+    );
+    await waitFor(() =>
+      expect(onBedarfSpeichern).toHaveBeenLastCalledWith(
+        expect.anything(),
+        { bedarf_betreute: 90 },
+        undefined,
+      ),
+    );
+    expect(onBedarfSpeichern).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
+  });
+
+  it('„Verwerfen und neu laden“ nach dem 409 lädt neu und schließt die Bearbeitung', async () => {
+    const { onBedarfSpeichern, onBedarfNeuLaden } = zeigeKarte();
+    onBedarfSpeichern.mockRejectedValueOnce(new ApiError(409, 'zwischenzeitlich geändert'));
+    await oeffneBearbeiten();
+    const betreute = await screen.findByLabelText('Betreute (EP)');
+    await userEvent.clear(betreute);
+    await userEvent.type(betreute, '90');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const rueckfrage = await screen.findByRole('dialog', { name: 'Zwischenzeitlich geändert' });
+    await userEvent.click(
+      within(rueckfrage).getByRole('button', { name: 'Verwerfen und neu laden' }),
+    );
+    expect(onBedarfNeuLaden).toHaveBeenCalledTimes(1);
+    expect(onBedarfSpeichern).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
   });
 });
 
@@ -330,7 +396,11 @@ describe('Zeitfensterkarte · Zeitzone beim Bearbeiten (LFH-692)', () => {
     await userEvent.type(betreute, '90');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
-      expect(onBedarfSpeichern).toHaveBeenCalledWith(expect.anything(), { bedarf_betreute: 90 }),
+      expect(onBedarfSpeichern).toHaveBeenCalledWith(
+        expect.anything(),
+        { bedarf_betreute: 90 },
+        ANLAGE,
+      ),
     );
   });
 });
@@ -379,10 +449,11 @@ describe('Zeitfensterkarte · Stellen und Art beim Bearbeiten (LLH-1040, D13)', 
     await waehle('Stellen', 'Feldküche BR Sportplatz');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
-      expect(onBedarfSpeichern).toHaveBeenCalledWith(expect.anything(), {
-        verpflegungsart: null,
-        stelle_ids: [TURNHALLE],
-      }),
+      expect(onBedarfSpeichern).toHaveBeenCalledWith(
+        expect.anything(),
+        { verpflegungsart: null, stelle_ids: [TURNHALLE] },
+        ANLAGE,
+      ),
     );
   });
 

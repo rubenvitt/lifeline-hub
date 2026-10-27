@@ -98,7 +98,7 @@ interface KontaktWerte {
   medium: string;
   thema: string;
   kontakt_name?: string;
-  kontakt_erreichbarkeit?: string;
+  kontaktweg?: string;
   eingang?: Dayjs;
 }
 
@@ -154,7 +154,7 @@ function kontaktSpalten() {
       key: 'kontakt',
       title: 'Ansprechperson',
       render: (_t, k) =>
-        [k.kontakt_name, k.kontakt_erreichbarkeit].filter(Boolean).join(' · ') ||
+        [k.kontakt_name, k.kontaktweg].filter(Boolean).join(' · ') ||
         (k.antwort ? `Antwort: ${k.antwort}` : '—'),
     },
   ]);
@@ -271,7 +271,7 @@ export default function PressePage() {
         medium: w.medium,
         thema: w.thema,
         kontakt_name: w.kontakt_name,
-        kontakt_erreichbarkeit: w.kontakt_erreichbarkeit,
+        kontaktweg: w.kontaktweg,
         ...(w.eingang ? { eingang_at: alsBackendZeit(w.eingang) } : {}),
       }),
     onSuccess: invalidate,
@@ -606,7 +606,7 @@ export default function PressePage() {
                   <Form.Item label="Ansprechperson" name="kontakt_name">
                     <Input maxLength={PRESSE_KURZ_MAX} />
                   </Form.Item>
-                  <Form.Item label="Telefon / E-Mail" name="kontakt_erreichbarkeit">
+                  <Form.Item label="Telefon / E-Mail" name="kontaktweg">
                     <Input placeholder="Telefon oder E-Mail" maxLength={PRESSE_THEMA_MAX} />
                   </Form.Item>
                   {/* Leer setzt der Server jetzt (`routes/presse.rs`, `zeit_oder_jetzt`). */}

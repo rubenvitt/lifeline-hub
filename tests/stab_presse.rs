@@ -20,7 +20,7 @@ fn mitteilungen(e: i64) -> String {
     format!("/api/einsaetze/{e}/stab/pressemitteilungen")
 }
 
-const ANFRAGE: &str = r#"{"art":"anfrage","medium":"NDR 1","thema":"Zahl der Evakuierten","kontakt_name":"M. Beispiel","kontakt_erreichbarkeit":"+49 511 000000"}"#;
+const ANFRAGE: &str = r#"{"art":"anfrage","medium":"NDR 1","thema":"Zahl der Evakuierten","kontakt_name":"M. Beispiel","kontaktweg":"+49 511 000000"}"#;
 
 async fn kontakt(app: &axum::Router, cookie: &str, e: i64, body: &str) -> i64 {
     let (s, j) = anfrage(app, "POST", &kontakte(e), cookie, Some(body)).await;
@@ -138,6 +138,11 @@ async fn statuscodes_des_presse_logs() {
             StatusCode::BAD_REQUEST,
             "Thema fehlt",
         ),
+        (
+            r#"{"art":"anfrage","medium":"X","thema":"Y","kontakt_erreichbarkeit":"0511 1"}"#,
+            StatusCode::BAD_REQUEST,
+            "alter Feldname (LLH-1419)",
+        ),
     ] {
         let (s, _) = anfrage(&app, "POST", &kontakte(e), &admin, Some(body)).await;
         assert_eq!(s, erwartet, "{fall}");
@@ -218,7 +223,27 @@ async fn statuscodes_des_presse_logs() {
     .await;
     assert_eq!(s, StatusCode::OK, "{k:?}");
     assert!(!k.as_object().unwrap().contains_key("kontakt_name"));
-    assert_eq!(k["kontakt_erreichbarkeit"], "+49 511 000000");
+    assert_eq!(k["kontaktweg"], "+49 511 000000");
+
+    // Ein Tab mit altem Stand schreibt noch den alten Feldnamen (LLH-1419): 400, auch mit `null`,
+    // und der Kontaktweg bleibt stehen.
+    for body in [
+        r#"{"kontakt_erreichbarkeit":"0511 2"}"#,
+        r#"{"kontakt_erreichbarkeit":null}"#,
+    ] {
+        let (s, j) = anfrage(
+            &app,
+            "PATCH",
+            &format!("{}/{id}", kontakte(e)),
+            &admin,
+            Some(body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}");
+        assert!(j.to_string().contains("Seite neu laden"), "{j}");
+    }
+    let (_, k) = anfrage(&app, "GET", &format!("{}/{id}", kontakte(e)), &admin, None).await;
+    assert_eq!(k["kontaktweg"], "+49 511 000000");
 
     // Kein Endpunkt zum Löschen.
     let (s, _) = anfrage(

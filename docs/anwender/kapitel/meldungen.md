@@ -210,7 +210,7 @@ Eine neue Meldung meldet sich in drei Stufen:
 |---|---|
 | Sofortmeldung | Alarm mit Ton (siehe oben) |
 | dringend, Lagemeldung oder von einem gekoppelten Gerät | Eingang **„Neue Meldung“** mit dezentem Ton |
-| normal, von Hand erfasst | ebenfalls Eingang **„Neue Meldung“**; er zählt wie jeder Eingang vorn im Tab-Titel, etwa „(3) Lagekarte · …“, und am Symbol der installierten App |
+| normal, von Hand erfasst | ebenfalls Eingang **„Neue Meldung“**; er zählt wie jeder Eingang vorn im Tab-Titel, etwa „(3) Lagekarte · …“, und am Symbol der installierten App, in der Desktop-App unter macOS im Dock |
 
 Den Hinweis bekommen alle, die im Einsatz Meldungen bearbeiten dürfen (Einsatzleitung und
 Führungspersonal), nicht Beobachter, nicht gekoppelte Geräte und nicht die Person, die die

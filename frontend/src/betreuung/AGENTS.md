@@ -48,8 +48,8 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   gibt es nur in `betreuungText.ts`, nie negativ. „Betroffene hier“ fragt die Personenliste mit
   `?betreuungsstelle_id=` (Serverfilter, Key `einsatzKeys.personenDerStelle`) und nur, wenn die
   Übersicht `namentlich` liefert (Personenrecht); sonst steht der Grund als Zeile.
-  Leitung und `erreichbarkeit` (Migration 0226, je 200 Zeichen; in der Oberfläche „Kontakt“,
-  LLH-1134) sind personenbezogen: im ETB nur
+  Leitung und `kontaktweg` (Migrationen 0226/0256, je 200 Zeichen; in der Oberfläche „Kontakt“,
+  LLH-1134/LLH-1419) sind personenbezogen: im ETB nur
   „weitere Angaben“, Schwärzung leert sie, der gesicherte Lagestand friert sie nicht ein.
 - **Bedarf einer Stelle** (LLH-1082, Spec `nachforderung-betreuungsstelle`): nur als
   Nachforderung mit `nachforderung.betreuungsstelle_id` (Migration 0231, nur die Kennung im DTO),
@@ -90,12 +90,15 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge
   der EP; Ausgabe verweist nur per Kennung (`nachforderung_id`, `verpflegungsstelle_id`, Empfänger
   `einheit_id` oder `abschnitt_id`); Einstufung im Client (`verpflegung/deckung.ts`); ins ETB nur
-  Zeitfenster und Bedarf (Org-Zeitzone), dazu Art und Stellen des Zeitfensters und
-  Inbetriebnahme/Auflösung einer Stelle; kein Modulzähler. Ein Zeitfenster wird in seiner Karte
+  Zeitfenster und Bedarf (Zone des Einsatzes vor der Organisation, `zeitdarstellung::zeitstil_laden`,
+  LLH-1443), dazu Art und Stellen des Zeitfensters und Inbetriebnahme/Auflösung einer Stelle; kein
+  Modulzähler. Ein Zeitfenster wird in seiner Karte
   bearbeitet (LLH-1139, `verpflegung/ZeitfensterBearbeiten.tsx`, `frontend/AGENTS.md`, „Bearbeiten
   in der Ansicht“): „Bedarf bearbeiten“ ohne Modal, dieselben Felder wie beim Anlegen, nur
   geänderte Schlüssel über `zeitfensterPatch` gegen den Stand beim Öffnen, eine offene Karte je
-  Seite; `ZeitfensterDialog` legt nur an. Der PATCH hat keinen CAS (kein 409).
+  Seite; `ZeitfensterDialog` legt nur an. Der PATCH hat Zeilen-CAS (LLH-1414): `basis_geaendert_at`
+  ist der Stand beim Öffnen (`geaendert_at`, ohne Änderung `angelegt_at`), veraltet → 409 und
+  Rückfrage „Zwischenzeitlich geändert“; ohne Basis wird ohne Vergleich geschrieben.
   **Verpflegungsstellen** (LLH-1040, `src/verpflegung/stelle.rs`): Status wie BR
   (`geplant → aktiv → aufgeloest`, Storno nur geplant ohne Ausgabe und ohne laufende
   Gerätekopplung, sonst 409 „Gerät gekoppelt“ und „Stornieren“ gesperrt mit Grund, LLH-1048), Zuordnung zum Zeitfenster

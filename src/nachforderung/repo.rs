@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::zeitdarstellung::Zeitstil;
+use crate::zeitdarstellung::zeitstil_laden;
 use sqlx::SqlitePool;
 
 use super::{adressat_kategorie_gueltig, prioritaet_gueltig, NachforderungAnzeige};
@@ -171,28 +171,6 @@ async fn ziel_name_tx(
         .ok_or(AppError::NotFound)
 }
 
-/// Zone und Darstellung des Einsatzes für ETB-Texte: Anzeigezone Einsatz, sonst Organisation,
-/// sonst `einsatz::nummer::ZEITZONE_VORGABE` (dieselbe Folge wie `benachrichtigung::text`);
-/// Zeitdarstellung Einsatz vor Organisation vor Vorgabe (LLH-1061).
-async fn zeitstil_tx(
-    conn: &mut sqlx::SqliteConnection,
-    einsatz_id: i64,
-) -> Result<Zeitstil, AppError> {
-    let zone: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT COALESCE(NULLIF(TRIM(es.zeitzone), ''), oe.zeitzone) \
-         FROM einsatz e \
-         LEFT JOIN einsatz_einstellungen es ON es.einsatz_id = e.id \
-         LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id \
-         WHERE e.id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let zone = crate::einsatz::nummer::zone_oder_vorgabe(zone.flatten().as_deref());
-    let darstellung = crate::zeitdarstellung::darstellung_laden(&mut *conn, einsatz_id).await?;
-    Ok(Zeitstil::new(zone, darstellung))
-}
-
 /// SELECT-Projektion inkl. Ersteller-Name (LEFT JOIN benutzer), abgeleitetem `ist_offen` und den
 /// übernommenen Materialposten (LLH-1226: nicht stornierte, also auch aus dem Einsatz genommene,
 /// design.md D3). Reihenfolge der Spalten = Struct (FromRow positional). Keine
@@ -281,7 +259,11 @@ pub async fn create_tx(
     )
     .await?;
     let bis = match daten.benoetigt_bis {
-        Some(b) => Some(zeitstil_tx(&mut *tx, einsatz_id).await?.zeitpunkt_text(b)),
+        Some(b) => Some(
+            zeitstil_laden(&mut *tx, einsatz_id)
+                .await?
+                .zeitpunkt_text(b),
+        ),
         None => None,
     };
     let inhalt = anlage_text(
@@ -778,7 +760,11 @@ pub async fn sage_zu(
             None => None,
         };
         let eta = match daten.eintreffen_erwartet_at {
-            Some(e) => Some(zeitstil_tx(&mut *conn, einsatz_id).await?.zeitpunkt_text(e)),
+            Some(e) => Some(
+                zeitstil_laden(&mut *conn, einsatz_id)
+                    .await?
+                    .zeitpunkt_text(e),
+            ),
             None => None,
         };
         let inhalt = zusage_text(
@@ -993,7 +979,9 @@ pub async fn aktualisiere(
             teile.push(match eta {
                 Some(e) => format!(
                     "Eintreffen erwartet {}",
-                    zeitstil_tx(&mut *conn, einsatz_id).await?.zeitpunkt_text(e)
+                    zeitstil_laden(&mut *conn, einsatz_id)
+                        .await?
+                        .zeitpunkt_text(e)
                 ),
                 None => "ohne erwartetes Eintreffen".into(),
             });
@@ -1236,7 +1224,7 @@ mod tests {
         );
     }
 
-    /// Die Zeit folgt der Anzeigezone der Organisation, eine des Einsatzes geht vor.
+    /// Die Zeit folgt der Zone des Einsatzes vor der der Organisation (LLH-1443).
     #[tokio::test]
     async fn bedarfszeit_steht_in_der_anzeigezone_des_einsatzes() {
         let pool = crate::db::test_pool().await;

@@ -959,14 +959,14 @@ export interface BetreuungsstelleEingabe {
   notiz?: string;
   /** Wer die Stelle leitet (LLH-1044), höchstens `BETREUUNG_LEITUNG_MAX` Zeichen. */
   leitung?: string;
-  /** Wie die Stelle erreichbar ist, höchstens `BETREUUNG_ERREICHBARKEIT_MAX` Zeichen. */
-  erreichbarkeit?: string;
+  /** Wie die Stelle erreichbar ist, höchstens `BETREUUNG_KONTAKTWEG_MAX` Zeichen. */
+  kontaktweg?: string;
 }
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `PATCH …/betreuung/stellen/{id}` (`StelleAendern`).
  * DREIWERTIG bei `abschnitt_id`/`kapazitaet_personen`/`standort`/`notiz`/`leitung`/
- * `erreichbarkeit`: Schlüssel fehlt = unverändert · `null` = lösen bzw. „keine Kapazität“ bzw.
+ * `kontaktweg`: Schlüssel fehlt = unverändert · `null` = lösen bzw. „keine Kapazität“ bzw.
  * leeren. `status: 'geschlossen'` bei
  * Belegung > 0 ist 422.
  */
@@ -979,7 +979,7 @@ export interface BetreuungsstellePatch {
   standort?: string | null;
   notiz?: string | null;
   leitung?: string | null;
-  erreichbarkeit?: string | null;
+  kontaktweg?: string | null;
   /** Koordinate: als Paar senden; `null`/`null` entfernt die Verortung. */
   lat?: number | null;
   lon?: number | null;

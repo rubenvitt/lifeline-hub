@@ -437,7 +437,7 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("medium", Mit),
             ("thema", Mit),
             ("kontakt_name", Mit),
-            ("kontakt_erreichbarkeit", Mit),
+            ("kontaktweg", Mit),
             ("antwort", Mit),
             ("freigabe_durch", Mit),
         ],

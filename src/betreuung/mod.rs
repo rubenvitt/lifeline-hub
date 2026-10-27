@@ -152,9 +152,9 @@ pub const MAX_PERSONEN: i64 = 1_000_000;
 /// Einsatz.
 pub const LEITUNG_MAX: usize = 200;
 
-/// Erreichbarkeit einer Betreuungsstelle (LLH-1044, Begriff wie `einheit::ERREICHBARKEIT_MAX`):
-/// Rufnummer, Funkrufname oder Kanal, Freitext. Personenbezogen wie [`LEITUNG_MAX`].
-pub const ERREICHBARKEIT_MAX: usize = 200;
+/// Kontaktweg einer Betreuungsstelle (LLH-1044, Name seit LLH-1419): Rufnummer, Funkrufname oder
+/// Kanal, Freitext; in der Oberfläche „Kontakt“. Personenbezogen wie [`LEITUNG_MAX`].
+pub const KONTAKTWEG_MAX: usize = 200;
 
 /// Liest einen Enum-Wert aus einer Eingabe. Ein unbekannter Wert scheitert am Feld für sich
 /// und ist deshalb **400** (src/AGENTS.md „Statuscode-Konvention“, `src/error.rs`), nicht 422.
@@ -245,7 +245,7 @@ pub struct BetreuungsstelleAnzeige {
     pub leitung: Option<String>,
     /// Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub erreichbarkeit: Option<String>,
+    pub kontaktweg: Option<String>,
     /// Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält
     /// sie als Paar.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -422,7 +422,7 @@ pub mod etb_text {
         /// `(vorher, neu)`
         pub kapazitaet: Option<(Option<i64>, Option<i64>)>,
         pub abschnitt: bool,
-        /// Standort, Notiz, Leitung und/oder Erreichbarkeit (LLH-1044) — ohne Wert im Text.
+        /// Standort, Notiz, Leitung und/oder Kontaktweg (LLH-1044) — ohne Wert im Text.
         pub weitere_angaben: bool,
     }
 

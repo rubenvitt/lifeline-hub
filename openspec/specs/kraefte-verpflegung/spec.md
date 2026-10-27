@@ -56,7 +56,9 @@ Die Oberfläche MUST ein Zeitfenster in seiner Karte bearbeiten, nicht in einem 
 „Bedarf bearbeiten“ macht die Karte zur Eingabe mit Bezeichnung, Zeitraum, Bedarf, Sonderkost,
 Art und Stellen, Speichern MUST nur die geänderten Felder senden, und höchstens eine Karte der
 Seite MUST zugleich bearbeitet werden (Spec `formularseiten`, „Eine offene Bearbeitung je
-Ansicht“).
+Ansicht“). Speichern MUST den Stand beim Öffnen mitsenden; hat ein anderer das Zeitfenster
+inzwischen geändert, MUST das System mit 409 antworten und nichts ändern, und die Oberfläche MUST
+„Zwischenzeitlich geändert“ fragen (LLH-1414).
 
 #### Scenario: Bedarf erhöhen
 - **WHEN** der Bedarf Betreute eines Zeitfensters von 70 auf 90 geändert wird
@@ -65,6 +67,10 @@ Ansicht“).
 #### Scenario: Bedarf in der Karte bearbeiten
 - **WHEN** eine Person mit Planungsrecht an der Karte „Mittag“ „Bedarf bearbeiten“ wählt, die Betreuten von 70 auf 90 ändert und speichert
 - **THEN** öffnet sich kein Dialog, die Änderung geht als einziges Feld hinaus, und die Karte zeigt danach wieder Bedarf, Ausgaben und Aktionen
+
+#### Scenario: Zwischenzeitlich geändert
+- **WHEN** zwei Personen die Karte „Mittag“ vom selben Stand aus bearbeiten und die erste speichert
+- **THEN** antwortet das System auf das Speichern der zweiten mit 409, ohne etwas zu ändern, und an ihrer Karte steht die Rückfrage „Zwischenzeitlich geändert“ mit „Verwerfen und neu laden“ und „Meine Änderung übernehmen“
 
 #### Scenario: Eine Karte zur Zeit
 - **WHEN** die Karte „Mittag“ bearbeitet wird

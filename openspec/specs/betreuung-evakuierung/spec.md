@@ -386,12 +386,12 @@ Das System SHALL je Einsatz Betreuungsstellen führen. Eine Stelle trägt eine B
 (Pflicht, eindeutig unter den nicht stornierten Stellen des Einsatzes), eine Art
 (`anlaufstelle`, `betreuungsstelle`, `betreuungsplatz`, `notunterkunft`), optional einen
 Einsatzabschnitt desselben Einsatzes, optional eine Kapazität in Personen (ganzzahlig ≥ 1),
-optional Standort und Notiz, optional Leitung und Erreichbarkeit (Freitext, je höchstens 200
-Zeichen nach dem Trimmen, darüber 400) sowie einen Status (`vorbereitet`, `in_betrieb`,
+optional Standort und Notiz, optional Leitung und Kontaktweg (`kontaktweg`; Freitext, je höchstens
+200 Zeichen nach dem Trimmen, darüber 400; der alte Feldname `erreichbarkeit` ergibt 400) sowie einen Status (`vorbereitet`, `in_betrieb`,
 `geschlossen`; Vorgabe `vorbereitet`). Anlage, Änderung, Statuswechsel und Stornierung
 MUST je einen ETB-Eintrag schreiben, sofern sich ein Wert tatsächlich ändert. Eine Änderung
-von Leitung oder Erreichbarkeit MUST im ETB nur als „weitere Angaben“ erscheinen, nie mit
-ihrem Wert. Ein gesicherter Lagestand MUST Leitung und Erreichbarkeit nicht einfrieren. Eine
+von Leitung oder Kontaktweg MUST im ETB nur als „weitere Angaben“ erscheinen, nie mit
+ihrem Wert. Ein gesicherter Lagestand MUST Leitung und Kontaktweg nicht einfrieren. Eine
 Stelle MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre aktuelle Belegung
 0 ist oder sie keine Belegungsmeldung hat.
 
@@ -423,8 +423,8 @@ Stelle MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre akt
 - **WHEN** eine geschlossene Stelle auf `in_betrieb` gesetzt wird
 - **THEN** ist sie wieder in Betrieb und nimmt Belegungsmeldungen an
 
-#### Scenario: Leitung und Erreichbarkeit
-- **WHEN** an der Stelle „Turnhalle Ost“ die Leitung „Frau Schulz“ und die Erreichbarkeit „0171 2345678“ gesetzt werden
+#### Scenario: Leitung und Kontaktweg
+- **WHEN** an der Stelle „Turnhalle Ost“ die Leitung „Frau Schulz“ und der Kontaktweg „0171 2345678“ gesetzt werden
 - **THEN** trägt die Übersicht beide Werte
 - **AND** der ETB-Eintrag der Änderung nennt „weitere Angaben“, aber weder den Namen noch die Nummer
 
@@ -433,8 +433,8 @@ Stelle MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre akt
 - **THEN** antwortet das System mit 400 „Leitung darf höchstens 200 Zeichen lang sein“ und ändert nichts
 
 #### Scenario: Lagestand ohne Leitung
-- **WHEN** ein Lagestand gesichert wird, während eine Stelle Leitung und Erreichbarkeit trägt
-- **THEN** enthält der gesicherte Stand die Stelle ohne Leitung und Erreichbarkeit
+- **WHEN** ein Lagestand gesichert wird, während eine Stelle Leitung und Kontaktweg trägt
+- **THEN** enthält der gesicherte Stand die Stelle ohne Leitung und Kontaktweg
 
 ### Requirement: Detailseite einer Betreuungsstelle
 
@@ -638,13 +638,13 @@ Primäraktion gesperrt stehen lassen.
 
 Beim Schwärzen eines Einsatzes MUST das System Freitexte mit möglichem Personen- oder
 Adressbezug entfernen: Bezeichnungen von Bezirken und Stellen durch Platzhalter ersetzen,
-Sammelstelle, Standort, Notiz sowie Leitung und Erreichbarkeit einer Stelle leeren. Anzahlen, Plangrößen, Kapazitäten, Zustände,
+Sammelstelle, Standort, Notiz sowie Leitung und Kontaktweg einer Stelle leeren. Anzahlen, Plangrößen, Kapazitäten, Zustände,
 Arten und Zeitpunkte MUST erhalten bleiben, ebenso die Koordinaten von Stellen und Sammelstellen
 (operatives Geo-Skelett ohne Personenbezug).
 
 #### Scenario: Einsatz schwärzen
 - **WHEN** ein Einsatz mit Bezirk „Uferstraße 12–40“ und Stelle „Turnhalle Ost, Ostring 5“ geschwärzt wird
-- **THEN** tragen Bezirk und Stelle Platzhalter-Bezeichnungen, Sammelstelle, Standort, Notiz, Leitung und Erreichbarkeit sind leer
+- **THEN** tragen Bezirk und Stelle Platzhalter-Bezeichnungen, Sammelstelle, Standort, Notiz, Leitung und Kontaktweg sind leer
 - **AND** Plangröße, Stände, Kapazität und Belegungen sind unverändert
 - **AND** die Koordinate der Sammelstelle bleibt erhalten
 

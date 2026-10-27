@@ -65,7 +65,7 @@ async fn presse_anlegen_aendern_und_status() {
     let uri = format!("/api/einsaetze/{e}/stab/medienkontakte");
     let kontakt = |medium: String, thema: String, name: String, erreichbar: String| {
         json!({ "art": "anfrage", "medium": medium, "thema": thema, "kontakt_name": name,
-                "kontakt_erreichbarkeit": erreichbar })
+                "kontaktweg": erreichbar })
     };
 
     let (s, k) = post(&app, &admin, &uri, kontakt(x(200), x(500), x(200), x(500))).await;
@@ -83,7 +83,7 @@ async fn presse_anlegen_aendern_und_status() {
         ),
         (
             kontakt("M".into(), "T".into(), "N".into(), x(501)),
-            "kontakt_erreichbarkeit",
+            "kontaktweg",
         ),
     ] {
         let (s, j) = post(&app, &admin, &uri, body).await;
@@ -96,10 +96,7 @@ async fn presse_anlegen_aendern_und_status() {
         (json!({ "thema": x(501) }), "thema"),
         (json!({ "medium": x(201) }), "medium"),
         (json!({ "kontakt_name": x(201) }), "kontakt_name"),
-        (
-            json!({ "kontakt_erreichbarkeit": x(501) }),
-            "kontakt_erreichbarkeit",
-        ),
+        (json!({ "kontaktweg": x(501) }), "kontaktweg"),
     ] {
         let (s, j) = patch(&app, &admin, &kid_uri, body).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}");

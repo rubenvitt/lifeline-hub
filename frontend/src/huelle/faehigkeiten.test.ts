@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { beendeHuelle, starteMacHuelle, starteWindowsHuelle } from '../test/huelle';
 import {
   huelleAnmeldungImBrowser,
+  huelleAppBadge,
   huelleBenachrichtigung,
   huelleSperrtPasskey,
 } from './faehigkeiten';
@@ -109,5 +110,33 @@ describe('huelleBenachrichtigung (Benachrichtigungskonzept D7)', () => {
   it('liefert nichts ohne IPC-Brücke', () => {
     starteMacHuelle();
     expect(huelleBenachrichtigung()).toBeNull();
+  });
+});
+
+describe('huelleAppBadge (LLH-1423)', () => {
+  afterEach(beendeHuelle);
+
+  it('liefert im Browser nichts', () => {
+    expect(huelleAppBadge()).toBeNull();
+  });
+
+  it('ruft in jeder Hülle den Command mit der Zahl (ausgelieferte Init-Skripte)', async () => {
+    for (const starte of [starteMacHuelle, starteWindowsHuelle]) {
+      const invoke = vi.fn().mockResolvedValue(undefined);
+      starte({ invoke });
+      await huelleAppBadge()!(4);
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('set_app_badge', { count: 4 });
+      beendeHuelle();
+    }
+  });
+
+  it('reicht eine Ablehnung der Hülle weiter', async () => {
+    starteWindowsHuelle({ invoke: vi.fn().mockRejectedValue('nicht erlaubt') });
+    await expect(huelleAppBadge()!(1)).rejects.toBe('nicht erlaubt');
+  });
+
+  it('liefert nichts ohne IPC-Brücke', () => {
+    starteMacHuelle();
+    expect(huelleAppBadge()).toBeNull();
   });
 });

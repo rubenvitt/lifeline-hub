@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { setzeZeitdarstellung } from '../anzeige/zeitDarstellungStore';
 import type { VerpflegungVorlage } from '../api/types';
 import { VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import { adminFixture } from '../test/fixtures';
@@ -72,6 +73,28 @@ describe('VerpflegungsplanTab (LLH-1058)', () => {
     expect(within(fruehstueck).queryByText('+1 Tag')).toBeNull();
     expect(within(await zeile('Kaffee')).getByText('Inaktiv')).toBeInTheDocument();
     expect(lesen).toContain('?nur_aktive=false');
+  });
+
+  describe('Zeitdarstellung (LLH-1437)', () => {
+    afterEach(() => setzeZeitdarstellung(null));
+
+    it('zeigt die Zeiten als „06:30–08:00“, wenn das Gerät „Datum und Uhrzeit“ gewählt hat', async () => {
+      setzeZeitdarstellung('datum_uhrzeit');
+      render(admin);
+      const fruehstueck = await zeile('Frühstück');
+      expect(within(fruehstueck).getByText('06:30–08:00')).toBeInTheDocument();
+      expect(within(await zeile('Nachtverpflegung')).getByText('23:00–01:00')).toBeInTheDocument();
+    });
+
+    it('folgt der Darstellung der Organisation, wenn das Gerät nichts wählt', async () => {
+      server.use(
+        http.get('/api/org-einstellungen', () =>
+          HttpResponse.json({ zeitdarstellung: 'datum_uhrzeit' }),
+        ),
+      );
+      render(admin);
+      expect(await within(await zeile('Frühstück')).findByText('06:30–08:00')).toBeInTheDocument();
+    });
   });
 
   it('legt eine Mahlzeit an: die Maske liest 630 und 0800 als 06:30 und 08:00', async () => {

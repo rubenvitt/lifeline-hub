@@ -159,7 +159,7 @@ async fn nachtragen(
     let zeitpunkt = nachtrag_zeit(&body.zeitpunkt_at, &jetzt)?;
     let notiz = notiz(body.notiz);
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let stil = crate::verpflegung::repo::zeitstil(&state.pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
         let is_berichtigung = require_berichtigbar_tx(conn, einsatz_id, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
@@ -209,7 +209,7 @@ async fn streichen(
         return Err(AppError::Validation("Grund fehlt".into()));
     }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let stil = crate::verpflegung::repo::zeitstil(&state.pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
         let is_berichtigung = require_berichtigbar_tx(conn, einsatz_id, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;

@@ -28,4 +28,4 @@ für paneel- und ansichtsweises Speichern; Fach-Seiten bauen keinen eigenen.
   am Paneel, der 409 als Rückfrage „Zwischenzeitlich geändert“. Kein Toast.
 
 Quelle: `frontend/src/components/instrument/BearbeitbaresPaneel.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert (der Zustand nach einem Klick im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
+dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

@@ -208,7 +208,7 @@ pub async fn personensuche(
         ),
         (
             PersonenArt::Medienkontakt,
-            "SELECT id, kontakt_name, kontakt_erreichbarkeit, eingang_at FROM medienkontakt \
+            "SELECT id, kontakt_name, kontaktweg, eingang_at FROM medienkontakt \
              WHERE einsatz_id = ? ORDER BY id",
         ),
     ] {

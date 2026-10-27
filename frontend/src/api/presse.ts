@@ -97,7 +97,7 @@ export interface MedienkontaktEingabe {
   medium: string;
   thema: string;
   kontakt_name?: string;
-  kontakt_erreichbarkeit?: string;
+  kontaktweg?: string;
   /** Fehlt = jetzt. */
   eingang_at?: string;
 }
@@ -114,7 +114,7 @@ export interface MedienkontaktPatch {
   medium?: string;
   thema?: string;
   kontakt_name?: string | null;
-  kontakt_erreichbarkeit?: string | null;
+  kontaktweg?: string | null;
   eingang_at?: string;
 }
 

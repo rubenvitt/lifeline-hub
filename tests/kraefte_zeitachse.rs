@@ -337,6 +337,50 @@ async fn nachtrag_an_der_einheit() {
     );
 }
 
+/// LLH-1443: der Nachtrag nennt den Zeitpunkt in der Zone des Einsatzes, nicht in der der
+/// Organisation (Tokio statt New York).
+#[tokio::test]
+async fn nachtrag_nennt_die_ortszeit_des_einsatzes_nicht_der_organisation() {
+    use lifeline_hub::zeitdarstellung::{Zeitdarstellung, Zeitstil};
+    let (app, pool) = setup_mit_pool().await;
+    let w = welt_in(app).await;
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'America/New_York') \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'Asia/Tokyo') \
+         ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .bind(w.e)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let zeit = chrono::Utc::now() - chrono::Duration::hours(8);
+    let (s, z) = w
+        .nachtrag(
+            &w.einheit_pfad(),
+            &format!(
+                r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#,
+                zeit.format("%Y-%m-%dT%H:%M:%SZ")
+            ),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    let dtg = |zone| Zeitstil::new(zone, Zeitdarstellung::Taktisch).zeitpunkt(zeit);
+    let tokio = dtg(chrono_tz::Asia::Tokyo);
+    assert_ne!(tokio, dtg(chrono_tz::America::New_York));
+    let etb = system_etb_inhalte(&w.app, &w.admin, w.e).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("Einheit «Florian 1» eingetroffen") && t.contains(&tokio)),
+        "{tokio} in {etb:?}"
+    );
+}
+
 #[tokio::test]
 async fn nachtrag_statuscodes() {
     let w = welt().await;

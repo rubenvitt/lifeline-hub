@@ -19,8 +19,9 @@ Handler (`JsonBody`, LFH-1074).
   Reine 400er-Referenz: `tests/freies_zeichen.rs` (`ohne_zeichenform_ist_400`,
   `leere_zeichenform_ist_400`, `altes_format_ist_400`; seit LLH-1160 gibt es dort keinen 422 mehr).
 - **409 hat zwei Quellen:** CAS (Zeilen-CAS `basis_geaendert_at` in `schaden/repo.rs`,
-  `tier/repo.rs`; Feld-CAS `erwartet` in `person/repo.rs`; Rückfrage „Zwischenzeitlich
-  geändert“ mit Überschreiben) und Lebenszyklus (kein Dialog). Das Frontend trennt nur
+  `tier/repo.rs`, `verpflegung/repo.rs` für Zeitfenster; Feld-CAS `erwartet` in
+  `person/repo.rs`; Rückfrage „Zwischenzeitlich geändert“ mit Überschreiben) und Lebenszyklus
+  (kein Dialog). Das Frontend trennt nur
   heuristisch (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
   `SchaedenDetailPage.tsx`/`TiereDetailPage.tsx`) — ein neuer 409 in einer
   CAS-Route zieht den Zweig mit.

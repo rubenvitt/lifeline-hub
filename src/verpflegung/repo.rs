@@ -2,7 +2,7 @@
 //!
 //! **Die Schreibpfade laufen auf einer offenen Transaktion** (`_tx`, `&mut SqliteConnection`).
 //! Der Aufrufer (Route) öffnet sie mit `write_retry!` (BEGIN IMMEDIATE), lädt ETB-`startwert`
-//! und Org-Zeitzone vorher und publiziert nach dem Commit — die Rückgabe trägt dafür die
+//! und Zeitstil des Einsatzes (`zeitdarstellung::zeitstil_laden`) vorher und publiziert nach dem Commit — die Rückgabe trägt dafür die
 //! Kennungen und die ETB-Einträge. Zeitfenster und ETB-Eintrag entstehen damit in EINER
 //! Transaktion; ein Fehler mitten im Ablauf lässt nichts zurück.
 //!
@@ -75,6 +75,8 @@ pub struct ZeitfensterAenderung {
     pub verpflegungsart: Option<Option<Verpflegungsart>>,
     /// Fehlt = unverändert; eine Liste ersetzt die Menge, `[]` leert sie (D5).
     pub stelle_ids: Option<Vec<i64>>,
+    /// Stand beim Öffnen (LLH-1414); `None` schreibt ohne Vergleich.
+    pub basis_geaendert_at: Option<String>,
 }
 
 /// Eingabe „Ausgabe erfassen“. `zeitpunkt_at` hat die Route normalisiert (fehlt = jetzt), die
@@ -542,23 +544,6 @@ pub async fn zeitfenster_laden(
     Ok(zeile.anzeige(ausgaben, stelle_ids))
 }
 
-/// Zone und Darstellung der ETB-Texte eines Einsatzes: die Zeitzone der Organisation (design.md
-/// D5; fehlt sie oder ist sie ungültig, gilt `einsatz::nummer::ZEITZONE_VORGABE`) und die
-/// Zeitdarstellung von Einsatz vor Organisation vor Vorgabe (LLH-1061). Vor der Transaktion zu
-/// laden, wie der ETB-`startwert`.
-pub async fn zeitstil(pool: &SqlitePool, einsatz_id: i64) -> Result<Zeitstil, AppError> {
-    let name: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT oe.zeitzone FROM einsatz e \
-         LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id WHERE e.id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_optional(pool)
-    .await?;
-    let zone = crate::einsatz::nummer::zone_oder_vorgabe(name.flatten().as_deref());
-    let darstellung = crate::zeitdarstellung::darstellung_laden(pool, einsatz_id).await?;
-    Ok(Zeitstil::new(zone, darstellung))
-}
-
 // ── Feldprüfungen (400) ─────────────────────────────────────────────────────────────────────
 
 /// Optionaler Freitext: getrimmt, leer = nicht gesetzt.
@@ -624,7 +609,7 @@ async fn zeitfenster_roh_tx(
     .ok_or(AppError::NotFound)
 }
 
-/// Zeitraum eines Zeitfensters als ETB-Text (Org-Zone, Darstellung des Einsatzes). Die
+/// Zeitraum eines Zeitfensters als ETB-Text (Zone und Darstellung des Einsatzes). Die
 /// Zeitpunkte liegen geprüft im Drahtformat vor.
 fn zeitraum(von: &str, bis: &str, stil: Zeitstil) -> Result<String, AppError> {
     Ok(zeitraum_text(
@@ -1021,6 +1006,12 @@ pub async fn zeitfenster_aus_vorlage_tx(
 /// Änderung — sonst unterliefe eine Teiländerung (nur der Bedarf, nur das Ende) die
 /// Teilmengen- bzw. Zeitregel. Ändert sich kein Wert, läuft weder UPDATE noch ETB
 /// (Leerlauf-Riegel) und `etb_ids` bleibt leer.
+///
+/// Optimistisches Lock (LLH-1414, Muster `tier::repo::aktualisiere`): trägt die Änderung
+/// `basis_geaendert_at`, muss er dem Stand der Zeile gleichen (`geaendert_at`, ohne Änderung
+/// `angelegt_at`), sonst 409 nach den 400ern und vor jedem 422 — die Regeln des Zusammenhangs
+/// prüfen gegen einen Stand, den der Aufrufer nicht gesehen hat. Gelesen und geschrieben wird in
+/// derselben Schreibtransaktion.
 pub async fn update_zeitfenster_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -1053,6 +1044,16 @@ pub async fn update_zeitfenster_tx(
     let sonderkost = a.sonderkost.ueber(&vorher.sonderkost);
     sonderkost.pruefen()?;
     let neu = bedarf(kraefte, betreute, weitere, sonderkost);
+
+    // 409 — veralteter Stand (LLH-1414)
+    if let Some(basis) = &a.basis_geaendert_at {
+        let stand = roh.geaendert_at.as_deref().unwrap_or(&roh.angelegt_at);
+        if basis != stand {
+            return Err(AppError::Conflict(
+                "Das Zeitfenster wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
+            ));
+        }
+    }
 
     // 422 — der Zusammenhang im Effektivzustand
     zeitregel(&von_at, &bis_at)?;

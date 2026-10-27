@@ -61,9 +61,16 @@ export interface ZeitfensterKarteProps {
   /**
    * „Bedarf bearbeiten“ an der Karte (LLH-1139): schaltet die Karte in den Bearbeiten-Zustand und
    * speichert nur die geänderten Felder. Lehnt bei Ablehnung ab (`mutateAsync`), der Grund steht
-   * an der Karte. Ohne: keine Aktion „Bedarf bearbeiten“ (Gerät, ohne Planungsrecht).
+   * an der Karte. Ohne: keine Aktion „Bedarf bearbeiten“ (Gerät, ohne Planungsrecht). `basis` ist
+   * der Stand beim Öffnen (LLH-1414), `undefined` nach „Meine Änderung übernehmen“.
    */
-  onBedarfSpeichern?: (zf: VerpflegungZeitfenster, patch: ZeitfensterPatch) => Promise<unknown>;
+  onBedarfSpeichern?: (
+    zf: VerpflegungZeitfenster,
+    patch: ZeitfensterPatch,
+    basis: string | undefined,
+  ) => Promise<unknown>;
+  /** „Verwerfen und neu laden“ nach einem 409 beim Speichern des Bedarfs. */
+  onBedarfNeuLaden?: () => void;
   /** `freigabenQuery.data` für die Bedarfsvorschläge beim Bearbeiten. */
   freigaben?: ModulFreigaben;
   onNachfordern?: (zf: VerpflegungZeitfenster) => void;
@@ -147,6 +154,7 @@ export default function ZeitfensterKarte({
   nachforderungName,
   onAusgabeNachtragen,
   onBedarfSpeichern,
+  onBedarfNeuLaden,
   freigaben,
   onNachfordern,
   nachschub = 'nachfordern',
@@ -283,7 +291,8 @@ export default function ZeitfensterKarte({
             freigaben={freigaben}
             jetzt={jetzt}
             stellen={stellen}
-            onSpeichern={(patch) => onBedarfSpeichern(zf, patch)}
+            onSpeichern={(patch, basis) => onBedarfSpeichern(zf, patch, basis)}
+            onNeuLaden={onBedarfNeuLaden}
             onSchliessen={() => setBearbeiten(false)}
             ausloeserRef={ausloeserRef}
           />

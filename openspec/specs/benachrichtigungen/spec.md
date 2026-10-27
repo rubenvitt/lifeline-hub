@@ -455,7 +455,10 @@ Leiste verdecken; geht die Leiste, rückt es zurück an den Rand.
 Der Tab-Titel eines Einsatzes SHALL die Zahl der ungelesenen Eingänge der angemeldeten Person
 voranstellen, „(3) Lagekarte · Einsatz · lifeline-hub“: dieselbe Zahl wie am Knopf „Eingänge“
 (Stufe Hinweis, nicht quittiert; Alarme und Stilles zählen nicht). Wo der Browser es kann, MUST
-dieselbe Zahl am Symbol der installierten App stehen. Ohne ungelesene Eingänge entfällt die Zahl.
+dieselbe Zahl am Symbol der installierten App stehen; in der Desktop-App MUST sie am App-Symbol
+stehen, wo das Betriebssystem eine Zahl dort kennt (macOS: Dock), sonst entfällt sie still. Zeigen
+mehrere Fenster der Desktop-App Einsätze, trägt das Symbol die größte ihrer Zahlen. Ohne
+ungelesene Eingänge entfällt die Zahl.
 Der Knopf „Eingänge“ MUST die Zahl auch im zugänglichen Namen tragen („Eingänge, 3 ungelesen“),
 nie nur als Ziffer. Bündelt der Kopf die Alarmzentrale zu einem Ziel (Handschirm, Tablet mit
 Finger), SHALL dieses Ziel die Zahl und einen Eintrag „Eingänge“ tragen statt eines eigenen
@@ -468,6 +471,10 @@ Knopfs; der Kopf MUST dadurch nicht umbrechen.
 #### Scenario: Gelesen auf einem anderen Gerät
 - **WHEN** Person B auf dem Telefon „Alle gelesen“ wählt
 - **THEN** entfällt die Zahl auch im Tab-Titel ihres Laptops, ohne Neuladen
+
+#### Scenario: Desktop-App im Dock
+- **WHEN** Person B den Einsatz in der Desktop-App unter macOS offen hat und drei Eingänge ungelesen sind
+- **THEN** trägt das Symbol im Dock die Zahl 3, und mit „Alle gelesen“ entfällt sie dort
 
 ### Requirement: Lagemeldung schlägt S2 vor
 

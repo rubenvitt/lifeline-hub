@@ -1205,8 +1205,6 @@ export interface components {
             bezeichnung: string;
             /** Format: int64 */
             einsatz_id: number;
-            /** @description Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe. */
-            erreichbarkeit?: string | null;
             geaendert_at?: string | null;
             /** Format: int64 */
             id: number;
@@ -1215,6 +1213,8 @@ export interface components {
              * @description Fehlt bei unbekannter Kapazität; dann gibt es auch keine Zahl freier Plätze.
              */
             kapazitaet_personen?: number | null;
+            /** @description Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe. */
+            kontaktweg?: string | null;
             /**
              * Format: double
              * @description Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält
@@ -4303,8 +4303,8 @@ export interface components {
             freigabe_durch?: string | null;
             /** Format: int64 */
             id: number;
-            kontakt_erreichbarkeit?: string | null;
             kontakt_name?: string | null;
+            kontaktweg?: string | null;
             medium: string;
             /**
              * Format: int64

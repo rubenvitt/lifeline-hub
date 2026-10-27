@@ -6,8 +6,8 @@
  * der Seite `window.__LIFELINE_HUELLE__ = { passkey: false }`. Die Kennung geht der
  * Feature-Erkennung vor: WKWebView meldet über `getClientCapabilities()` einen Passkey, den es in
  * der Hülle nicht einlöst. Jede Hülle, auch die unter Windows, trägt dort zudem die native Meldung
- * ein (`src-tauri/src/benachrichtigung.js`, Benachrichtigungskonzept D7). Ohne Kennung (Browser)
- * oder ohne Feld bleibt alles wie bisher.
+ * ein (`src-tauri/src/benachrichtigung.js`, Benachrichtigungskonzept D7), dazu das App-Badge
+ * (LLH-1423). Ohne Kennung (Browser) oder ohne Feld bleibt alles wie bisher.
  */
 
 declare global {
@@ -16,6 +16,7 @@ declare global {
       readonly passkey?: boolean;
       readonly anmeldungImBrowser?: () => Promise<unknown>;
       readonly benachrichtigungZeigen?: (titel: string, text?: string) => Promise<unknown>;
+      readonly setAppBadge?: (count: number) => Promise<unknown>;
     };
   }
 }
@@ -55,6 +56,18 @@ export function huelleBenachrichtigung(): ((titel: string, text?: string) => Pro
   if (typeof zeigen !== 'function') return null;
   return async (titel, text) => {
     await zeigen(titel, text);
+  };
+}
+
+/**
+ * Zahl am Symbol der Desktop-App (LLH-1423): in der Hülle der Weg statt der Badging API; 0 nimmt
+ * sie weg. `null` außerhalb der Hülle.
+ */
+export function huelleAppBadge(): ((count: number) => Promise<void>) | null {
+  const setzen = window.__LIFELINE_HUELLE__?.setAppBadge;
+  if (typeof setzen !== 'function') return null;
+  return async (count) => {
+    await setzen(count);
   };
 }
 

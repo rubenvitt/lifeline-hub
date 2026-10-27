@@ -787,53 +787,8 @@ async fn lookup_nach_client_id_ist_einsatzgebunden() {
 
 // ── Zeitzone ────────────────────────────────────────────────────────────────────────────────
 
-#[tokio::test]
-async fn zeitzone_kommt_aus_der_org_sonst_berlin() {
-    let w = welt().await;
-    let zone = |w: &Welt| {
-        let pool = w.pool.clone();
-        let e = w.e;
-        async move { zeitstil(&pool, e).await.unwrap().zone }
-    };
-    assert_eq!(zone(&w).await, ZEITZONE_VORGABE);
-    sqlx::query("INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'America/New_York')")
-        .execute(&w.pool)
-        .await
-        .unwrap();
-    assert_eq!(zone(&w).await, chrono_tz::America::New_York);
-    sqlx::query("UPDATE org_einstellungen SET zeitzone = 'Kein/Ort' WHERE org_id = 1")
-        .execute(&w.pool)
-        .await
-        .unwrap();
-    assert_eq!(zone(&w).await, ZEITZONE_VORGABE);
-}
-
-/// LLH-1061: die Darstellung der ETB-Texte folgt Einsatz vor Organisation, Vorgabe taktisch.
-#[tokio::test]
-async fn darstellung_kommt_aus_einsatz_sonst_org_sonst_taktisch() {
-    let w = welt().await;
-    let darstellung = |w: &Welt| {
-        let pool = w.pool.clone();
-        let e = w.e;
-        async move { zeitstil(&pool, e).await.unwrap().darstellung }
-    };
-    assert_eq!(darstellung(&w).await, Zeitdarstellung::Taktisch);
-    sqlx::query(
-        "INSERT INTO org_einstellungen (org_id, zeitdarstellung) VALUES (1, 'datum_uhrzeit')",
-    )
-    .execute(&w.pool)
-    .await
-    .unwrap();
-    assert_eq!(darstellung(&w).await, Zeitdarstellung::DatumUhrzeit);
-    sqlx::query(
-        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitdarstellung) VALUES (?, 'taktisch')",
-    )
-    .bind(w.e)
-    .execute(&w.pool)
-    .await
-    .unwrap();
-    assert_eq!(darstellung(&w).await, Zeitdarstellung::Taktisch);
-}
+// Woher Zone und Darstellung kommen, prüft `zeitdarstellung::tests` (`zeitstil_laden`, LLH-1443);
+// den Weg über die Route `tests/verpflegung.rs`.
 
 /// LLH-1061: stellt der Einsatz „Datum und Uhrzeit“ ein, schreibt das ETB den Zeitraum so.
 #[tokio::test]
