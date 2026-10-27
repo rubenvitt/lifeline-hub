@@ -704,14 +704,19 @@ function MaterialInhalt() {
   /**
    * Kategoriefilter aus den eigenen Daten; `undefined` ohne Werte. Das Feld erscheint erst mit dem
    * ersten gepflegten Wert — ein dauerhaft leeres Filterfeld sieht wie ein Werkzeug aus und ist
-   * keins.
+   * keins. Weicht die Spalte unter `xxl`, steht der Filter als Feld über der Tabelle
+   * (`feldOhneSpalte`, LLH-1276): am Fükw ließe sich sonst nicht nach Kategorie filtern.
    */
   const kategorieWerte = [...new Set(ems.map((m) => m.kategorie).filter((k): k is string => !!k))]
     .sort()
     .map((k) => ({ text: k, value: k }));
   const kategorieFilter =
     kategorieWerte.length > 0
-      ? { werte: kategorieWerte, trifft: (m: EinsatzMaterial, w: string) => m.kategorie === w }
+      ? {
+          werte: kategorieWerte,
+          trifft: (m: EinsatzMaterial, w: string) => m.kategorie === w,
+          feldOhneSpalte: true,
+        }
       : undefined;
   // Trägerfilter nach demselben Muster (LLH-1096): ohne gepflegten Träger kein Filterfeld.
   const traegerWerte = [
@@ -758,7 +763,7 @@ function MaterialInhalt() {
       key: 'kategorie',
       width: 100,
       // Lesend, darf weichen: unter `xxl` als zweite Zeile der Bezeichnung (`BezeichnungZelle`),
-      // über den Spaltenschalter, im Zähler und in der Suche.
+      // über den Spaltenschalter, im Zähler, in der Suche und mit Filterfeld (LLH-1276).
       abBreite: 'xxl',
       sortWert: (m) => m.kategorie,
       filter: kategorieFilter,
