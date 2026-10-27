@@ -73,7 +73,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `components/tabellenFilter.tsx` (Filterchips und Kopfmarke; Träger `KatalogTabelle`,
   `Datensicht`; Sortieren und Filtern in der Bedien-Leitlinie) · `alarm/EingaengeKnopf.tsx` und
   `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `personen/SichtungsWahl.tsx` ·
-  `personen/koerperschema/Koerperschema.tsx`. Jeder hat eine Karte im Design System.
+  `personen/koerperschema/Koerperschema.tsx` · `zeichen/EinsatzZeichen.tsx` (taktische Zeichen,
+  am Schirm mit `useZeichenTheme`, LLH-1409). Jeder hat eine Karte im Design System.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
