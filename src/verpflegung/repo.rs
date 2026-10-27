@@ -2,7 +2,7 @@
 //!
 //! **Die Schreibpfade laufen auf einer offenen Transaktion** (`_tx`, `&mut SqliteConnection`).
 //! Der Aufrufer (Route) öffnet sie mit `write_retry!` (BEGIN IMMEDIATE), lädt ETB-`startwert`
-//! und Org-Zeitzone vorher und publiziert nach dem Commit — die Rückgabe trägt dafür die
+//! und Zeitstil des Einsatzes (`zeitdarstellung::zeitstil_laden`) vorher und publiziert nach dem Commit — die Rückgabe trägt dafür die
 //! Kennungen und die ETB-Einträge. Zeitfenster und ETB-Eintrag entstehen damit in EINER
 //! Transaktion; ein Fehler mitten im Ablauf lässt nichts zurück.
 //!
@@ -544,23 +544,6 @@ pub async fn zeitfenster_laden(
     Ok(zeile.anzeige(ausgaben, stelle_ids))
 }
 
-/// Zone und Darstellung der ETB-Texte eines Einsatzes: die Zeitzone der Organisation (design.md
-/// D5; fehlt sie oder ist sie ungültig, gilt `einsatz::nummer::ZEITZONE_VORGABE`) und die
-/// Zeitdarstellung von Einsatz vor Organisation vor Vorgabe (LLH-1061). Vor der Transaktion zu
-/// laden, wie der ETB-`startwert`.
-pub async fn zeitstil(pool: &SqlitePool, einsatz_id: i64) -> Result<Zeitstil, AppError> {
-    let name: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT oe.zeitzone FROM einsatz e \
-         LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id WHERE e.id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_optional(pool)
-    .await?;
-    let zone = crate::einsatz::nummer::zone_oder_vorgabe(name.flatten().as_deref());
-    let darstellung = crate::zeitdarstellung::darstellung_laden(pool, einsatz_id).await?;
-    Ok(Zeitstil::new(zone, darstellung))
-}
-
 // ── Feldprüfungen (400) ─────────────────────────────────────────────────────────────────────
 
 /// Optionaler Freitext: getrimmt, leer = nicht gesetzt.
@@ -626,7 +609,7 @@ async fn zeitfenster_roh_tx(
     .ok_or(AppError::NotFound)
 }
 
-/// Zeitraum eines Zeitfensters als ETB-Text (Org-Zone, Darstellung des Einsatzes). Die
+/// Zeitraum eines Zeitfensters als ETB-Text (Zone und Darstellung des Einsatzes). Die
 /// Zeitpunkte liegen geprüft im Drahtformat vor.
 fn zeitraum(von: &str, bis: &str, stil: Zeitstil) -> Result<String, AppError> {
     Ok(zeitraum_text(

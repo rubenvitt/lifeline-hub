@@ -105,45 +105,30 @@ pub const DETAIL_ABLOESUNG_SPALTEN: [(&str, &str); 2] = [
 ];
 
 /// Detailzeile einer Ablösungsschicht: Einheit und Uhrzeit der Fälligkeit (auch bei der
-/// Vorwarnung) in der Anzeigezone des Einsatzes, wie die Oberfläche sie zeigt (Einsatz, sonst
-/// Organisation, sonst `einsatz::nummer::ZEITZONE_VORGABE`), und in der Zeitdarstellung von
-/// Einsatz bzw. Organisation (LLH-1061, Rolle „Uhrzeit“: `1530` bzw. `15:30`).
+/// Vorwarnung) in Zone und Zeitdarstellung des Einsatzes, sonst der Organisation
+/// (`zeitdarstellung::zeitstil_laden`, LLH-1443; Rolle „Uhrzeit“: `1530` bzw. `15:30`).
 async fn detail_abloesung(
     pool: &SqlitePool,
     einsatz_id: i64,
     abloesung_id: i64,
 ) -> Result<Option<String>, AppError> {
-    type Zeile = (
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    );
-    let zeile = sqlx::query_as::<_, Zeile>(
-        "SELECT ee.name, a.faellig_at, \
-                COALESCE(NULLIF(TRIM(es.zeitzone), ''), oe.zeitzone), \
-                es.zeitdarstellung, oe.zeitdarstellung \
+    let zeile = sqlx::query_as::<_, (String, String)>(
+        "SELECT ee.name, a.faellig_at \
          FROM einsatz_abloesung a \
          JOIN einsatz_einheit ee ON ee.id = a.einheit_id \
-         JOIN einsatz e ON e.id = a.einsatz_id \
-         LEFT JOIN einsatz_einstellungen es ON es.einsatz_id = e.id \
-         LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id \
          WHERE a.id = ? AND a.einsatz_id = ?",
     )
     .bind(abloesung_id)
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?;
-    Ok(zeile.map(|(einheit, faellig_at, zone, d_einsatz, d_org)| {
-        let stil = crate::zeitdarstellung::Zeitstil::new(
-            crate::einsatz::nummer::zone_oder_vorgabe(zone.as_deref()),
-            crate::zeitdarstellung::wirksame_darstellung(d_einsatz.as_deref(), d_org.as_deref()),
-        );
-        match crate::zeit::parse_utc(&faellig_at) {
-            Some(t) => format!("{einheit}, {}", stil.uhrzeit(t)),
-            None => einheit,
-        }
+    let Some((einheit, faellig_at)) = zeile else {
+        return Ok(None);
+    };
+    let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
+    Ok(Some(match crate::zeit::parse_utc(&faellig_at) {
+        Some(t) => format!("{einheit}, {}", stil.uhrzeit(t)),
+        None => einheit,
     }))
 }
 

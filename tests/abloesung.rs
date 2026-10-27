@@ -786,7 +786,7 @@ async fn einsatzvorgabe_rangfolge_und_weitergabe() {
 
 /// Spec „Fälligkeit nach Wechselzeiten“: Beginn 13:42, Wechsel 06:00/18:00, Mindestdauer 4 h
 /// → 18:00 in der wirksamen Zone Einsatz → Org → Berlin; die Folgeschicht rechnet ab dem
-/// Vollzug neu.
+/// Vollzug neu. Das ETB nennt die Wechselzeiten taktisch (Vorgabe, LLH-1469).
 #[tokio::test]
 async fn wechselzeiten_in_der_wirksamen_zone() {
     let (app, pool) = setup_mit_pool().await;
@@ -833,7 +833,7 @@ async fn wechselzeiten_in_der_wirksamen_zone() {
         treffer(
             &etb,
             "system",
-            "Rhythmus Wechsel 06:00/18:00, Mindestdauer 4 h (Vorgabe Einsatz «12-h-Schicht»)"
+            "Rhythmus Wechsel 0600/1800, Mindestdauer 4 h (Vorgabe Einsatz «12-h-Schicht»)"
         )
         .len(),
         1

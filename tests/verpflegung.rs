@@ -79,6 +79,37 @@ async fn verpflegungs_etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec
         .collect()
 }
 
+// ── Zeitzone (LLH-1443) ─────────────────────────────────────────────────────────────────────
+
+/// Der Zeitraum im ETB steht in der Zone des Einsatzes, nicht in der der Organisation: 10:00
+/// bis 11:30 UTC sind in Tokio 19:00–20:30, in New York 06:00–07:30.
+#[tokio::test]
+async fn zeitraum_steht_in_der_zone_des_einsatzes_nicht_der_organisation() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'America/New_York') \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'Asia/Tokyo') \
+         ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .bind(e)
+    .execute(&pool)
+    .await
+    .unwrap();
+    zeitfenster(&app, &admin, e, MITTAG).await;
+    assert_eq!(
+        verpflegungs_etb(&app, &admin, e).await,
+        vec!["Verpflegung ‚Mittag‘ 241900sep26–2030 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute)."]
+    );
+}
+
 // ── Durchstich ──────────────────────────────────────────────────────────────────────────────
 
 /// Anlegen → Ausgabe → Rücknahme → Löschen. Nur Anlegen und Löschen schreiben ETB (D5), der

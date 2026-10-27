@@ -3,7 +3,8 @@
 //! Fehler, der beide Richtungen um denselben Betrag verschiebt, bliebe sonst grün.
 
 use super::*;
-use crate::einsatz::nummer::{zone_oder_vorgabe, ZEITZONE_VORGABE};
+use crate::einsatz::nummer::ZEITZONE_VORGABE;
+use crate::zeitdarstellung::wirksame_zone;
 use crate::zeitdarstellung::{Zeitdarstellung, Zeitstil};
 use axum::http::StatusCode;
 
@@ -90,8 +91,8 @@ fn ueber_mitternacht_nach_ortsdatum() {
 }
 
 #[test]
-fn andere_org_zeitzone_und_rueckfall() {
-    let ny = zone_oder_vorgabe(Some("America/New_York"));
+fn andere_zeitzone_und_rueckfall() {
+    let ny = wirksame_zone(Some("America/New_York"), None);
     assert_eq!(
         zeitraum_text(
             utc("2026-09-24 16:00:00"),
@@ -100,9 +101,9 @@ fn andere_org_zeitzone_und_rueckfall() {
         ),
         "24.09.26 12:00–13:30"
     );
-    assert_eq!(zone_oder_vorgabe(None), ZEITZONE_VORGABE);
+    assert_eq!(wirksame_zone(None, None), ZEITZONE_VORGABE);
     assert_eq!(
-        zone_oder_vorgabe(Some("Mars/Olympus")),
+        wirksame_zone(Some("Mars/Olympus"), None),
         ZEITZONE_VORGABE,
         "unbekannte Zone fällt auf Berlin"
     );

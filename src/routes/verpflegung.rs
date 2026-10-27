@@ -42,7 +42,7 @@
 //! Zeitfenster sind keiner Stelle zugeordnet, der Body kennt keine.
 //!
 //! Die fachlichen Prüfungen liegen im Repo; die Route liest JSON, normalisiert die Zeitpunkte
-//! (`etb::normalisiere_zeit`), lädt ETB-Startwert und Org-Zeitzone und öffnet die Transaktion —
+//! (`etb::normalisiere_zeit`), lädt ETB-Startwert und Zeitstil des Einsatzes und öffnet die Transaktion —
 //! dieselbe Arbeitsteilung wie in `routes/betreuung.rs`.
 //!
 //! **Live** nach dem Commit (design.md D5/D6): zuerst der ETB-Kurzruf je Eintrag, dann
@@ -195,7 +195,7 @@ pub async fn zeitfenster_anlegen(
         stelle_ids,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let stil = repo::zeitstil(&state.pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::create_zeitfenster_tx(conn, einsatz_id, benutzer_id, startwert, stil, &eingabe).await
@@ -282,7 +282,7 @@ pub async fn zeitfenster_aus_vorlage(
         })
         .collect::<Result<Vec<_>, _>>()?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let stil = repo::zeitstil(&state.pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::zeitfenster_aus_vorlage_tx(
@@ -389,7 +389,7 @@ pub async fn zeitfenster_aendern(
         basis_geaendert_at: req.basis_geaendert_at,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let stil = repo::zeitstil(&state.pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::update_zeitfenster_tx(
@@ -421,7 +421,7 @@ pub async fn zeitfenster_loeschen(
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let stil = repo::zeitstil(&state.pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::delete_zeitfenster_tx(conn, einsatz_id, zid, benutzer_id, startwert, stil).await

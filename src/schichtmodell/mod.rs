@@ -25,6 +25,7 @@ use utoipa::ToSchema;
 use crate::error::AppError;
 use crate::uhrzeit::Uhrzeit;
 use crate::wire_enum::wire_enum;
+use crate::zeitdarstellung::Zeitdarstellung;
 
 pub mod repo;
 
@@ -105,8 +106,10 @@ impl Regel {
         }
     }
 
-    /// Lesbar für ETB und Meldungen: „Rhythmus 12 h“, „Wechsel 06:00/18:00, Mindestdauer 4 h“.
-    pub fn text(&self) -> String {
+    /// Lesbar für ETB und Meldungen: „Rhythmus 12 h“, „Wechsel 0600/1800, Mindestdauer 4 h“. Die
+    /// Wechselzeiten stehen in der Rolle „Uhrzeit“ der Darstellung des Einsatzes (LLH-1469,
+    /// [`crate::zeitdarstellung::wanduhrzeit`]): taktisch `0600`, „Datum und Uhrzeit“ `06:00`.
+    pub fn text(&self, darstellung: Zeitdarstellung) -> String {
         match self {
             Regel::Rhythmus { minuten } => {
                 format!("Rhythmus {}", crate::abloesung::rhythmus_text(*minuten))
@@ -117,7 +120,7 @@ impl Regel {
             } => {
                 let liste = zeiten
                     .iter()
-                    .map(Uhrzeit::to_string)
+                    .map(|u| crate::zeitdarstellung::wanduhrzeit(darstellung, *u))
                     .collect::<Vec<_>>()
                     .join("/");
                 match mindestdauer_minuten {

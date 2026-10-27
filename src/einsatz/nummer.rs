@@ -30,8 +30,8 @@ pub fn jahr_in_zone(jetzt: DateTime<Utc>, zeitzone: Option<&str>) -> i32 {
 
 /// Die Org-Zeitzone als [`Tz`] (IANA-Name). Fehlt sie oder ist sie unbekannt, gilt
 /// [`ZEITZONE_VORGABE`] — Letzteres mit Warnung, weil ein Tippfehler in der Einstellung
-/// sonst still auf Berlin fiele. Geteilt von der Einsatznummer und den ETB-Texten der
-/// Verpflegung (LFH-634), damit beide dieselbe Rückfallregel haben.
+/// sonst still auf Berlin fiele. Nur für die Einsatznummer; die Zone der Servertexte (Einsatz vor
+/// Organisation) wählt `zeitdarstellung::wirksame_zone`.
 pub fn zone_oder_vorgabe(zeitzone: Option<&str>) -> Tz {
     match zeitzone {
         None => ZEITZONE_VORGABE,
