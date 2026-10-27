@@ -562,7 +562,7 @@ function renderSeiteMitSonde(route: string) {
  *
  * Das Paar „ist da" / „ist nicht da" belegt zugleich, dass die Handler für gefahrengebiete,
  * einstellungen und lage-snapshots nötig sind: ohne sie stünden drei Quellen in jedem Test auf
- * Fehler (`onUnhandledRequest: 'error'` + `retry: false`), und der Negativfall wäre unerreichbar.
+ * Fehler (`onUnhandledFrame: 'error'` + `retry: false`), und der Negativfall wäre unerreichbar.
  */
 describe('quellenMeldung', () => {
   it('zählt bis drei Namen auf', () => {
@@ -626,8 +626,11 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
     );
     renderSeite();
     const overlay = await screen.findByTestId('lagebild-unvollstaendig');
-    expect(overlay).toHaveTextContent(
-      'Lagebild unvollständig: Einsatzdaten, Unfallhilfsstellen, Schäden und 8 weitere',
+    // Der Hinweis steht mit dem ersten Ausfall; die übrigen Quellen scheitern je für sich danach.
+    await waitFor(() =>
+      expect(overlay).toHaveTextContent(
+        'Lagebild unvollständig: Einsatzdaten, Unfallhilfsstellen, Schäden und 8 weitere',
+      ),
     );
   });
 
@@ -2666,8 +2669,8 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     const overlay = await screen.findByTestId('lagebild-unvollstaendig');
     expect(overlay).toHaveTextContent('Lagebild unvollständig: Betroffene');
     // Personen stehen weder in der Kopfzahl noch in „Nicht verortet" — ihr Ausfall darf dort keine
-    // Zahl zu „—" machen.
-    expect(screen.getByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
+    // Zahl zu „—" machen. Die übrigen Quellen kommen je mit eigenem Abruf, auch nach dem Hinweis.
+    expect(await screen.findByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Schäden' })).toHaveTextContent('Schäden1');
     expect(screen.getByRole('switch', { name: 'Betroffene' })).toHaveTextContent('Betroffene—');
     // Die Objektliste führt Betroffene bei eingeschalteter Ebene — ohne ihre Liste ist sie
@@ -2698,7 +2701,8 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     renderSeite();
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
     // Ein Schaden ist verortet, die UHS nicht — die Person darf die „1" nicht zur „2" machen.
-    expect(screen.getByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
+    // Schäden und UHS kommen mit eigenen Abrufen, womöglich nach der Person.
+    expect(await screen.findByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
   });
 
   it('ein Klick auf den Personen-Marker füllt „Ausgewählt" mit Registriernummer und Sichtung', async () => {

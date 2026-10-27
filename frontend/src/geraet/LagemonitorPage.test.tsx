@@ -165,7 +165,8 @@ describe('Lagemonitor — Großbild', () => {
     expect(screen.queryByRole('navigation', { name: 'Gerätenavigation' })).toBeNull();
     // Kacheln ohne Bedienung.
     expect(betroffene.closest('main')!.style.pointerEvents).toBe('none');
-    expect(screen.getByText('Stadtfest')).toBeInTheDocument();
+    // Der Einsatz kommt mit einem eigenen Abruf, unabhängig vom Lagebild.
+    expect(await screen.findByText('Stadtfest')).toBeInTheDocument();
   });
 
   it('Kennzahlen sind mindestens 72 px, jeder Text mindestens 28 px', async () => {
@@ -223,8 +224,11 @@ describe('Lagemonitor — Aktualität und Gerätemenü', () => {
     const stand = () => document.querySelector<HTMLElement>('[data-lfh="monitor-datenstand"]')!;
     expect(stand().getAttribute('data-veraltet')).toBe('nein');
     lagebildAntwort = () => HttpResponse.json({ fehler: 'weg' }, { status: 503 });
+    // Mit `shouldAdvanceTime` läuft die Uhr auch, solange die erste Antwort unterwegs ist: der
+    // Stand liegt etwas nach dem ersten Takt der Anzeige (10 s). Nach genau 3 min zeigte sie noch
+    // „vor 2 min“, erst ihr nächster Takt sieht volle 3 min.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3 * 60_000);
+      await vi.advanceTimersByTimeAsync(3 * 60_000 + 10_000);
     });
     expect(stand().getAttribute('data-veraltet')).toBe('ja');
     expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 min/);

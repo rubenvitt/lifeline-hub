@@ -43,7 +43,7 @@ const label = (key: string) => modulRegistry.find((m) => m.key === key)!.label;
  * Die Stab-Seite trägt seit LLH-1111 weder Vorbereitung noch Abschluss der Lagebesprechung — die
  * liegen auf der eigenen Seite (`LagebesprechungPage.test.tsx`). Deshalb hier keine Handler für
  * `…/lagebesprechung*` und keine Quellen der Vorbereitung: fragte die Seite sie doch an, scheiterte
- * der Abruf an `onUnhandledRequest: 'error'`.
+ * der Abruf an `onUnhandledFrame: 'error'`.
  */
 const LEER_SKIZZE = {
   lage: [],

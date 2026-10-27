@@ -75,7 +75,7 @@ describe('SchadenVorschau (LFH-664)', () => {
 
   /**
    * Warmes Fach → kein Abruf. Die Koordinate löste auf der Seite die Ort-Zeile mit eigenem Abruf
-   * aus; die Vorschau lässt sie weg, sonst liefe der Abruf hier in `onUnhandledRequest: 'error'`.
+   * aus; die Vorschau lässt sie weg, sonst liefe der Abruf hier in `onUnhandledFrame: 'error'`.
    */
   it('liest den geladenen Stand ohne Abruf, auch mit Koordinate', async () => {
     const abrufe = liefereListe([]);

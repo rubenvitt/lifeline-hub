@@ -19,7 +19,7 @@ import EinsatzSeite, { ortspfadStil, seitenBreiteMax, seitenkopfStil } from './E
 
 /**
  * Attrappe für die Palettenbefehle (LFH-391 · B5): `src/test/setup.ts` fährt MSW mit
- * `onUnhandledRequest: 'error'`, und das echte `useBefehle` forderte `/api/einsaetze` an.
+ * `onUnhandledFrame: 'error'`, und das echte `useBefehle` forderte `/api/einsaetze` an.
  *
  * Gegriffen wird über `#cmd-tastatur:<id>`, nicht über den Wortlaut (der ist in
  * `befehle.test.ts` gepinnt). `modul:etb` steht fest darin, damit „die Option fehlt" von „die

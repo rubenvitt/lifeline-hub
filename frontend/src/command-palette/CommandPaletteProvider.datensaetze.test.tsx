@@ -15,7 +15,7 @@ import type { ModulFreigaben } from '../api/types';
  * beide grün sein, während die Hälften nicht verbunden sind.
  *
  * `useBefehle` ist gestubbt: das echte fordert `/api/einsaetze` an und brächte mit
- * `onUnhandledRequest: 'error'` den Lauf zu Fall. Der Datensatz-Weg läuft ECHT (MSW, react-query,
+ * `onUnhandledFrame: 'error'` den Lauf zu Fall. Der Datensatz-Weg läuft ECHT (MSW, react-query,
  * echte Entprellung).
  */
 vi.mock('./useBefehle', () => ({ useBefehle: () => [] }));

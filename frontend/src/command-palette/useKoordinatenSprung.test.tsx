@@ -14,7 +14,7 @@ import { freigabenFixture } from '../test/fixtures';
 /**
  * Die Beschaffungs-Hälfte des Koordinatensprungs: WANN angefragt wird und dass Rechte und Format
  * ankommen (der reine Kern steht in `koordinatenSprung.test.ts`). „Kein Request ohne Koordinate“
- * hält die Palettentests mit `onUnhandledRequest: 'error'` grün. Die Rechte sind die
+ * hält die Palettentests mit `onUnhandledFrame: 'error'` grün. Die Rechte sind die
  * Modulfreigaben des Servers (LFH-669).
  */
 

@@ -71,7 +71,7 @@ function render(
     ),
     http.get('/api/material', () => HttpResponse.json([])),
     // Die Spalte „Ort“ löst Namen über Einheiten und UHS auf. Ohne diese Handler fiele ihre Query
-    // auf `isError` (`onUnhandledRequest: 'error'`), und der Ort hieße nur „zugeordnet“.
+    // auf `isError` (`onUnhandledFrame: 'error'`), und der Ort hieße nur „zugeordnet“.
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(orte.einheiten ?? EINHEITEN)),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json(orte.fahrzeuge ?? FAHRZEUGE)),

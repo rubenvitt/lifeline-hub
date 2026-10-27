@@ -27,7 +27,7 @@ vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([
  * Befehlsliste als Kartensicht.
  *
  * Rohes `render` statt `renderMitProviders`: die Datei mockt `../api/befehle` und will keinen
- * Netzverkehr (MSW mit `onUnhandledRequest: 'error'`). Die Breite stellt `setzeViewportBreite`.
+ * Netzverkehr (MSW mit `onUnhandledFrame: 'error'`). Die Breite stellt `setzeViewportBreite`.
  * Ausnahme `renderMitZone`: die Fassungszeile braucht die Zone aus dem
  * `EinsatzAnzeigeProvider` und dafür genau einen MSW-Handler.
  */

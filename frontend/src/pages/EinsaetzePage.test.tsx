@@ -43,9 +43,13 @@ function einsatz(over: Partial<Record<string, unknown>> = {}) {
 }
 
 // `renderMitProviders` rendert den `AuthProvider` selbst — ein zweiter wäre ein doppelter
-// `/api/auth/me`-Abruf.
+// `/api/auth/me`-Abruf. Die Stichwort-Vorschläge ruft die Seite beim Mount ab; ohne Handler
+// scheitert der Abruf an der Leitung, und der Datenstand stünde auf „offline“.
 function setup() {
-  server.use(meHandler(admin));
+  server.use(
+    meHandler(admin),
+    http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+  );
   return renderMitProviders(<EinsaetzePage />);
 }
 
@@ -399,7 +403,7 @@ describe('EinsaetzePage', () => {
 describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () => {
   // Eigene Fixture/Hilfen statt `einsatz()`/`setup()`: die decken weder
   // `einsatzort`/`org_id`/`org_name`/`angelegt_at` noch das `/api/stichwort-vorschlaege`-Mock ab,
-  // das der Anlegedialog bei jedem Mount abruft (`onUnhandledRequest: 'error'`).
+  // das der Anlegedialog bei jedem Mount abruft (`onUnhandledFrame: 'error'`).
   function mockEinsaetze(liste: EinsatzAnzeige[]) {
     server.use(
       meHandler(admin),
