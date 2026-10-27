@@ -56,11 +56,15 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
 1. „Betroffene erfassen“ wählen.
 2. Unter „Sichtungskategorie“ die Fläche der Kategorie antippen, dazu „Geschlecht“, „Geschätztes
    Alter (Jahre)“ und „Fundort“, soweit bekannt. Ein zweiter Tipp auf die gewählte Fläche nimmt
-   die Wahl zurück; die Person wird dann ohne Sichtung erfasst.
+   die Wahl zurück; die Person wird dann ohne Sichtung erfasst. Im „Fundort“ mit Enter oder „Ort
+   suchen“ suchen und einen Treffer wählen, eine Koordinate eintippen (etwa „52.2691/9.1342“) oder
+   den Punkt über „Auf Karte wählen“ setzen: dann ist der Fundort gleich verortet, der
+   Kartenausschnitt unter dem Feld zeigt ihn. Enter im Fundort erfasst die Person nicht. Ohne
+   Treffer bleibt der Fundort freier Text.
 
    ![Maske „Betroffene erfassen“ mit gewählter Sichtungskategorie SK II, Geschlecht, Alter und Fundort](../bilder/betroffene/erfassen.png)
 
-3. Name, Vorname, Zustand, Koordinate und Notiz stehen unter „Weitere Angaben“.
+3. Name, Vorname, Zustand und Notiz stehen unter „Weitere Angaben“.
 4. „Erfassen“ wählen. Die Quittung nennt die neue Registriernummer („Erfasst als R-…“).
 
 Kommen mehrere Personen nacheinander, speichert „Speichern und nächste“ (Strg + Enter) und hält

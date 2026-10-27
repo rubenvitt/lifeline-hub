@@ -878,6 +878,7 @@ export default function AusgabeAnsicht() {
       )}
       {dialog?.art === 'nachtragen' && (
         <AusgabeDialog
+          einsatzId={einsatzId}
           zeitfenster={zf}
           nachforderungen={nachforderung.optionen}
           stellen={stellen}

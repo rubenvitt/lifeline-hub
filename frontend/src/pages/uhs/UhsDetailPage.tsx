@@ -2,10 +2,10 @@ import { IconPersonPlus } from '../../icons';
 import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperre';
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
-import { Alert, App, Breadcrumb, Button, Flex, Popconfirm, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Modal, Popconfirm, Space, Spin } from 'antd';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -42,6 +42,8 @@ import { staerkeText } from '../../anzeige/staerke';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { KennungsLink } from '../../components/kennungsLink';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
+import { MenueAusloeser } from '../../components/MenueAusloeser';
+import UhsBearbeitenModal from './UhsBearbeitenModal';
 
 /**
  * Die Bereiche der Seite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
@@ -182,6 +184,10 @@ export default function UhsDetailPage() {
     raeume(statusMut);
     stornoMut.mutate();
   };
+  const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
+  // Die Rückfrage vor dem Stornieren: aus dem Menü heraus ein `<Modal>`, keine `Popconfirm`
+  // (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“).
+  const [stornoFrage, setStornoFrage] = useState(false);
 
   // Die Route hat keinen `key`: der Umschalter behält diese Seite. Der Grund der vorigen UHS
   // gehört nicht an die nächste. `reset` ist stabil, der Effekt läuft nur mit `uhsId`.
@@ -190,6 +196,8 @@ export default function UhsDetailPage() {
   useEffect(() => {
     statusReset();
     stornoReset();
+    setBearbeitenOffen(false);
+    setStornoFrage(false);
   }, [uhsId, statusReset, stornoReset]);
 
   // Ungültige UHS-ID → zurück zur Liste (nach allen Hooks).
@@ -214,6 +222,12 @@ export default function UhsDetailPage() {
   const uhs = detailQuery.data;
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz);
   const verwalten = !schreibgeschuetzt && darf('uhs-verwalten');
+  // Stammdaten ändern (LLH-1407): geplant und aktiv, nicht mehr nach dem Auflösen (Muster BR). Der
+  // Server lehnt nur eine stornierte UHS ab (409).
+  const bearbeitbar = verwalten && uhs.status !== 'aufgeloest' && !uhs.storniert_at;
+  const bearbeitenKnopf = bearbeitbar && (
+    <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>
+  );
 
   // Typ und Standort sind Kopf-Meta; der Typ ist eine Kategorie (im Vertrag `neutral`), es zählt
   // nur seine Beschriftung aus `uhsTyp`. Die Notiz ist Freitext und bleibt Beschreibungszeile.
@@ -314,16 +328,19 @@ export default function UhsDetailPage() {
               >
                 In Betrieb nehmen
               </Button>
-              <Popconfirm
-                title="Unfallhilfsstelle stornieren?"
-                okText="Unfallhilfsstelle stornieren"
-                onConfirm={storniere}
-                okButtonProps={{ danger: true }}
-              >
-                <Button danger>Stornieren</Button>
-              </Popconfirm>
+              {bearbeitenKnopf}
+              {/* Mit „Bearbeiten“ sind es drei Datensatz-Aktionen: das Stornieren geht ins Menü
+                  (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“). */}
+              <MenueAusloeser
+                eintraege={[{ key: 'stornieren', label: 'Stornieren', gefahr: true }]}
+                zugaenglicherName={`Weitere Aktionen zu ${uhs.bezeichnung}`}
+                laeuft={stornoMut.isPending}
+                onWahl={() => setStornoFrage(true)}
+              />
             </>
           )}
+          {/* Aktiv zählt „Patient aufnehmen“ als Sprung nicht mit (LFH-616): zwei Handlungen. */}
+          {uhs.status === 'aktiv' && bearbeitenKnopf}
           {verwalten && uhs.status === 'aktiv' && (
             <Popconfirm
               title="Unfallhilfsstelle auflösen?"
@@ -421,6 +438,29 @@ export default function UhsDetailPage() {
                 uhs={uhs}
                 darfSchreiben={!schreibgeschuetzt}
                 zeigeZugriffe={istEinsatzLeitung(einsatz)}
+              />
+            )}
+            {/* Die Dialoge hängen sich in den `body`; sie stehen hier, weil ein Kind der Seite
+                unter der Arbeitsfläche einen Inhaltsbereich öffnete. Die Ablehnung des
+                Stornierens steht wie bisher im Seitenhinweis: die Rückfrage schließt beim
+                Bestätigen. */}
+            <Modal
+              open={stornoFrage}
+              title="Unfallhilfsstelle stornieren?"
+              okText="Unfallhilfsstelle stornieren"
+              okButtonProps={{ danger: true }}
+              onOk={() => {
+                setStornoFrage(false);
+                storniere();
+              }}
+              onCancel={() => setStornoFrage(false)}
+            />
+            {verwalten && (
+              <UhsBearbeitenModal
+                einsatzId={einsatzId}
+                uhs={uhs}
+                offen={bearbeitenOffen}
+                onClose={() => setBearbeitenOffen(false)}
               />
             )}
           </div>

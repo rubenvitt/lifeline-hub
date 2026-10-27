@@ -19,10 +19,13 @@ import type { Koordinatenformat } from '../api/types';
  * dieselbe Zeichenkette, eine erfundene nicht.
  */
 
-/** Dezimalgrad mit Punkt: Trenner Komma, Semikolon oder Leerraum. */
-const DEZ_PUNKT = /^(-?\d{1,2}\.\d{3,})\s*[,;\s]\s*(-?\d{1,3}\.\d{3,})$/;
-/** Dezimalgrad mit Komma: das Komma ist schon vergeben, Trenner nur Semikolon oder Leerraum. */
-const DEZ_KOMMA = /^(-?\d{1,2},\d{3,})\s*(?:;|\s)\s*(-?\d{1,3},\d{3,})$/;
+/**
+ * Dezimalgrad mit Punkt: Trenner Komma, Semikolon, Leerraum oder `/` (die Schreibweise der
+ * Fundort-Koordinate, `personen/koordinate.ts`, LLH-1407).
+ */
+const DEZ_PUNKT = /^(-?\d{1,2}\.\d{3,})\s*[,;/\s]\s*(-?\d{1,3}\.\d{3,})$/;
+/** Dezimalgrad mit Komma: das Komma ist schon vergeben, Trenner nur Semikolon, Leerraum oder `/`. */
+const DEZ_KOMMA = /^(-?\d{1,2},\d{3,})\s*(?:;|\s|\/)\s*(-?\d{1,3},\d{3,})$/;
 /** MGRS: Zone, Band, 100-km-Quadrat, dann eine gerade Zahl von Ziffern (2–10). */
 const MGRS = /^(\d{1,2})\s*([C-HJ-NP-X])\s*([A-HJ-NP-Z]{2})\s*(\d+)(?:\s+(\d+))?$/i;
 /** UTM: Zone, Band, Rechtswert, Hochwert — anders als MGRS ohne 100-km-Quadrat. */

@@ -1,6 +1,8 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { tippeZeit } from '../test/zeitEingabe';
 import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungModal';
@@ -28,7 +30,45 @@ function zeige(opts: { modus?: ErfassungsModus; onErfassen?: Mock; einsatzId?: n
   return { ...ansicht, onErfassen, onFertig, onCancel };
 }
 
-beforeEach(() => sessionStorage.clear());
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div role="group" aria-label={`Karte: ${etikett}`}>
+      {punkt && `${punkt.lat},${punkt.lon}`}
+    </div>
+  ),
+}));
+
+/** Suchanfragen an den Geocoder-Einstieg des Einsatzes, je Test neu. */
+let suchen: string[] = [];
+
+beforeEach(() => {
+  sessionStorage.clear();
+  suchen = [];
+  server.use(
+    http.get('/api/einsaetze/:eid', ({ params }) =>
+      HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
+    ),
+    http.get('/api/einsaetze/:eid/ort-vorschau', () =>
+      HttpResponse.json({ ortsname: null, peilung: null }),
+    ),
+    http.get('/api/einsaetze/:eid/ort-suche', ({ request }) => {
+      suchen.push(new URL(request.url).searchParams.get('q') ?? '');
+      return HttpResponse.json({
+        zustand: 'ok',
+        treffer: [
+          { lat: 52.2691, lon: 9.1342, name: 'Deichweg 3, Musterstadt', kurz: 'Deichweg 3' },
+        ],
+      });
+    }),
+  );
+});
 
 /**
  * Anzahl der Formularfelder IM BAUM — über `.ant-form-item`, nicht über gerechnete
@@ -50,15 +90,45 @@ describe('PersonErfassungModal — Tastaturweg', () => {
     await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
   });
 
-  it('Enter im letzten sichtbaren Eingabefeld sendet ab', async () => {
+  it('Enter im letzten sichtbaren Zahlfeld sendet ab', async () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
-    // Letztes SICHTBARES Eingabefeld ist der Fundort.
-    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd{Enter}');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
+    await nutzer.type(screen.getByLabelText('Geschätztes Alter (Jahre)'), '40{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
-    expect(onErfassen.mock.calls[0][0]).toMatchObject({ antreff_ort: 'Sammelstelle Süd' });
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({
+      antreff_ort: 'Sammelstelle Süd',
+      alter_geschaetzt: 40,
+    });
+  });
+
+  /**
+   * Der Fundort ist ein Ortsfeld (LLH-1407): Enter sucht dort und sendet nicht ab. Mutationsprobe:
+   * das Ortsfeld durch ein Textfeld ersetzt → Enter sendet ab, `onErfassen` ist gerufen.
+   */
+  it('Enter im Fundort sucht und sendet nicht ab', async () => {
+    const { onErfassen } = zeige();
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Deichweg{Enter}');
+
+    expect(await screen.findByRole('button', { name: /Deichweg 3/ })).toBeInTheDocument();
+    expect(suchen).toEqual(['Deichweg']);
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('Strg + Enter im Fundort speichert und hält offen, ohne zu suchen', async () => {
+    const { onErfassen, onFertig } = zeige();
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Deich');
+    await nutzer.keyboard('{Control>}{Enter}{/Control}');
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onFertig).not.toHaveBeenCalled();
+    expect(suchen).toEqual([]);
   });
 
   it('schickt die gewählte Sichtungskategorie mit', async () => {
@@ -182,7 +252,8 @@ describe('PersonErfassungModal — Feldbudget', () => {
     // Bereich offen und „der Wert geht mit" wäre trivial.
     await waitFor(() => expect(kopf).toHaveAttribute('aria-expanded', 'false'));
 
-    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd{Enter}');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onErfassen.mock.calls[0][0]).toMatchObject({ name: 'Mustermann', vorname: 'Max' });
@@ -190,35 +261,46 @@ describe('PersonErfassungModal — Feldbudget', () => {
 });
 
 describe('PersonErfassungModal — Zustand, Koordinate, vermisst seit (LFH-613)', () => {
-  it('schickt Zustand und die zerlegte Koordinate mit — den Koordinatentext nicht', async () => {
+  /**
+   * Text und Koordinate im POST (LLH-1407): ein Treffer der Ortssuche setzt beide. Ein eigenes
+   * Koordinatenfeld gibt es neben dem Ortsfeld nicht mehr.
+   */
+  it('schickt Zustand, Fundort und die Koordinate des Treffers mit', async () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await nutzer.type(await screen.findByLabelText('Zustand / Verdacht'), 'gehfähig, unterkühlt');
-    await nutzer.type(screen.getByLabelText('Koordinate'), '52,2691/9,1342');
-    await nutzer.type(screen.getByLabelText('Fundort'), 'Deich{Enter}');
+    expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Deichweg{Enter}');
+    await nutzer.click(await screen.findByRole('button', { name: /Deichweg 3/ }));
+    expect(screen.getByRole('group', { name: 'Karte: Fundort' })).toHaveTextContent(
+      '52.2691,9.1342',
+    );
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     const daten = onErfassen.mock.calls[0][0];
-    expect(daten).toMatchObject({
+    expect(daten).toEqual({
       zustand: 'gehfähig, unterkühlt',
+      antreff_ort: 'Deichweg 3',
       antreff_lat: 52.2691,
       antreff_lon: 9.1342,
-      antreff_ort: 'Deich',
     });
-    expect(daten).not.toHaveProperty('koordinate');
-    expect(daten).not.toHaveProperty('vermisst_seit');
   });
 
-  it('sendet eine unbrauchbare Koordinate NICHT und sagt warum', async () => {
+  it('erkennt eine getippte Koordinate im Fundort, ohne zu suchen', async () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
-    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
-    await nutzer.type(await screen.findByLabelText('Koordinate'), '95/9');
-    await nutzer.type(screen.getByLabelText('Fundort'), 'Deich{Enter}');
+    await nutzer.type(screen.getByLabelText('Fundort'), '52,2691/9,1342');
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
 
-    expect(await screen.findByText('Breite außerhalb ±90')).toBeInTheDocument();
-    expect(onErfassen).not.toHaveBeenCalled();
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({
+      antreff_ort: '52,2691/9,1342',
+      antreff_lat: 52.2691,
+      antreff_lon: 9.1342,
+    });
+    expect(suchen).toEqual([]);
   });
 
   it('Vermisst-Modus: „vermisst seit" geht als UTC-Wire-String mit', async () => {
@@ -243,7 +325,8 @@ describe('PersonErfassungModal — Ablehnung', () => {
     const { onFertig } = zeige({ onErfassen });
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd{Enter}');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onFertig).not.toHaveBeenCalled();

@@ -146,6 +146,18 @@ describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () =
 });
 
 describe('aufnahmeZuEingabe', () => {
+  it('nimmt Text und Koordinate aus dem Ortsfeld des Fundorts (LLH-1407)', () => {
+    expect(
+      aufnahmeZuEingabe({
+        antreff_ort: {
+          text: ' Deichweg 3 ',
+          koordinate: { lat: 52.2691, lon: 9.1342 },
+          quelle: 'adresse',
+        },
+      }),
+    ).toEqual({ antreff_ort: 'Deichweg 3', antreff_lat: 52.2691, antreff_lon: 9.1342 });
+  });
+
   it('zerlegt die Koordinate in antreff_lat/antreff_lon und lässt den Text weg', () => {
     expect(aufnahmeZuEingabe({ zustand: 'gehfähig', koordinate: '52,2691/9,1342' })).toEqual({
       zustand: 'gehfähig',
@@ -156,7 +168,7 @@ describe('aufnahmeZuEingabe', () => {
 
   it('schickt ohne Angabe weder Koordinate noch „vermisst seit" — auch nicht als null', () => {
     const e = aufnahmeZuEingabe({
-      antreff_ort: 'Brücke',
+      antreff_ort: { text: 'Brücke', koordinate: null },
       koordinate: '  ',
       vermisst_seit: undefined,
     });

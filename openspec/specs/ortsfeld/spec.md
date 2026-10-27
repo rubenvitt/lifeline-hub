@@ -312,8 +312,7 @@ getippte Koordinate erfassbar bleiben.
 - **THEN** trägt die Stelle Standort und Koordinate und erscheint als Marker auf der Lagekarte
 
 ### Requirement: Orte an UHS, Bereitstellungsraum, Tier und Auftrag
-Der Standort einer UHS und eines Bereitstellungsraums beim Anlegen, der Standort eines
-Bereitstellungsraums beim Bearbeiten, der Fundort eines Tiers beim Erfassen und Bearbeiten und das
+Der Standort einer UHS und eines Bereitstellungsraums beim Anlegen und Bearbeiten, der Fundort eines Tiers beim Erfassen und Bearbeiten und das
 Ziel eines Auftrags beim Erteilen und Berichtigen SHALL das Ortsfeld mit Kartenvorschau und
 Ortssuche im Einsatz nehmen. Es gelten dieselben Regeln wie für die Orte in Schäden und Betreuung:
 Text und Koordinate gemeinsam aus Treffer, getippter Koordinate oder Kartenpunkt, sonst nur Text;
@@ -337,3 +336,53 @@ erteilen.
 #### Scenario: Ziel eines Auftrags berichtigen
 - **WHEN** am Ziel „Deich km 3“ eines verorteten Auftrags nur der Text auf „Deich km 3,5“ berichtigt wird
 - **THEN** geht nur der Text hinaus, und der Auftrag behält seine Koordinate
+
+#### Scenario: Standort einer UHS bearbeiten
+- **WHEN** die Person an einer UHS „Bearbeiten“ wählt, als Standort nach „Turnhalle“ sucht, den Treffer „Turnhalle Nord“ wählt und speichert
+- **THEN** geht ein PATCH mit diesem Standort und der Koordinate des Treffers hinaus, und die übrigen Angaben gehen nicht mit
+
+### Requirement: Fundort einer Person bei der Aufnahme
+Der Fundort in der Aufnahme einer Person (Maske „Betroffene erfassen“ und Vollseite „Aufnahme“)
+SHALL das Ortsfeld mit Kartenvorschau und Ortssuche im Einsatz nehmen, mit denselben Regeln wie
+die Orte an UHS, Tier und Auftrag. Das getrennte Koordinatenfeld unter „Weitere Angaben“ MUST
+dort entfallen. Enter im Fundort MUST suchen und die Person nicht erfassen; Strg/⌘ + Enter MUST
+weiter „Speichern und nächste“ auslösen und nicht suchen. „Werte behalten“ und der sitzungsweite
+Fundort übernehmen den Text. Am gekoppelten Gerät, das die Ortssuche nicht erreicht, MUST der
+Fundort Text bleiben, Enter darin sendet ab, und die Koordinate steht weiter als eigenes Feld.
+Herkunft / Adresse bleibt ein Ortsfeld ohne Suche.
+
+#### Scenario: Fundort mit Treffer
+- **WHEN** die Person in „Betroffene erfassen“ im Fundort nach „Deichweg“ sucht, den Treffer „Deichweg 3“ wählt und „Erfassen“ wählt
+- **THEN** trägt der POST `antreff_ort` „Deichweg 3“ und `antreff_lat`/`antreff_lon` des Treffers
+
+#### Scenario: Enter im Fundort
+- **WHEN** die Person „Deichweg“ in den Fundort tippt und Enter drückt
+- **THEN** stehen die Treffer unter dem Feld, und es ist keine Person erfasst
+
+#### Scenario: Am gekoppelten Gerät
+- **WHEN** an einem gekoppelten Gerät der Betreuungsstelle „Sammelstelle“ als Fundort getippt und Enter gedrückt wird
+- **THEN** gibt es kein „Ort suchen“, und die Person ist mit dem Fundort „Sammelstelle“ erfasst
+
+### Requirement: Ort einer nachgetragenen Verpflegungsausgabe
+Der Ort (mit Stellen „Zuführungsziel“) im Dialog „Ausgabe nachtragen“ SHALL das Ortsfeld mit
+Ortssuche im Einsatz und ohne Kartenvorschau nehmen. Ein Treffer MUST nur seinen Text setzen; die
+Ausgabe MUST keine Koordinate speichern. Enter im Ort MUST suchen und nicht nachtragen. Am
+gekoppelten Gerät MUST der Ort Text bleiben.
+
+#### Scenario: Ort mit Treffer
+- **WHEN** die Person im Ort nach „Turnhalle“ sucht, den Treffer „Turnhalle Nord“ wählt und „Nachtragen“ wählt
+- **THEN** trägt die Ausgabe den Ort „Turnhalle Nord“, und der Rumpf hat keine Koordinate
+
+### Requirement: Ziel im Auftragsdetail
+Ist das Ziel eines Auftrags verortet, SHALL das Detail des Auftrags unter dem Schema einen
+Kartenausschnitt mit Nadel „Ziel“ zeigen und, wenn die Lagekarte freigegeben ist, „Auf Lagekarte
+zeigen“, das die Lagekarte an diesem Punkt öffnet. Ohne Koordinate MUST das Detail keinen
+Ausschnitt und kein „Nicht verortet“ zeigen.
+
+#### Scenario: Verortetes Ziel
+- **WHEN** ein Auftrag das Ziel „Deich km 3“ mit Koordinate trägt und die Lagekarte freigegeben ist
+- **THEN** zeigt sein Detail den Ausschnitt mit der Nadel und „Auf Lagekarte zeigen“ mit dem Punkt als Mitte
+
+#### Scenario: Ohne Lagekarte
+- **WHEN** die Lagekarte für die Person nicht freigegeben ist
+- **THEN** steht der Ausschnitt, aber kein „Auf Lagekarte zeigen“

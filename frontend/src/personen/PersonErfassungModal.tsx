@@ -9,6 +9,7 @@ import {
 } from '../components/erfassungsSitzung';
 import AufnahmeFelder, {
   aufnahmeZuEingabe,
+  fundortAusText,
   type AufnahmeEingabe,
   type AufnahmeModus,
   type AufnahmeWerte,
@@ -84,12 +85,13 @@ export default function PersonErfassungModal({
     if (geladeneOeffnung.current === oeffnung) return;
     geladeneOeffnung.current = oeffnung;
     const ort = liesErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort');
-    if (ort !== undefined) form.setFieldValue('antreff_ort', ort);
+    if (ort !== undefined) form.setFieldValue('antreff_ort', fundortAusText(ort));
   }, [einsatzId, form, formular.da, modus]);
 
+  // Gemerkt wird nur der Text: der Sitzungsspeicher hält rohe Strings.
   const ortMerken = (daten: AufnahmeWerte) => {
-    if (typeof daten.antreff_ort === 'string') {
-      schreibeErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort', daten.antreff_ort);
+    if (typeof daten.antreff_ort?.text === 'string') {
+      schreibeErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort', daten.antreff_ort.text);
     }
   };
 
@@ -111,7 +113,7 @@ export default function PersonErfassungModal({
       uebernahme={['antreff_ort']}
     >
       <FormularEingehaengt onWechsel={formular.melde} />
-      <AufnahmeFelder modus={modus ?? 'erfassen'} />
+      <AufnahmeFelder modus={modus ?? 'erfassen'} einsatzId={einsatzId} />
     </ErfassungsModal>
   );
 }
