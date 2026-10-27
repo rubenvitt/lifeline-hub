@@ -32,7 +32,12 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
  * Server dann nimmt, und nur, wenn er bekannt ist.
  */
 
-export interface EinheitOption {
+/**
+ * Ein Eintrag der Einheit-Auswahl in den Ablösungsmasken: `value` ist die Einheit-ID, `label` der
+ * angezeigte Name. Nicht zu verwechseln mit `EinheitOption` aus `kraefte/kraeftebaumKern` (Pfad und
+ * Abschnitt für die gemeinsame Einheit-Angabe).
+ */
+export interface EinheitAuswahl {
   value: number;
   label: string;
 }
@@ -73,7 +78,7 @@ interface BeginnWerte {
 interface SchichtBeginnenProps {
   offen: boolean;
   /** Einheiten OHNE laufende Schicht. */
-  einheiten: EinheitOption[];
+  einheiten: EinheitAuswahl[];
   /** Vorbelegte Einheit — aus einer Zeile „Ohne Schicht“ (LLH-1128); wählbar bleibt jede. */
   vorbelegt?: number;
   /** Einheit → Vorgabe ihres Abschnitts in Minuten (fehlt = keine Vorgabe). */
@@ -195,7 +200,7 @@ const ART_OPTIONEN: { value: AbloesungArt; label: string }[] = [
 interface VollzugProps {
   schicht: Abloesung | null;
   /** Mögliche Ablöser (`abloesung/abloeser.ts:abloeserOptionen`). */
-  einheiten: EinheitOption[];
+  einheiten: EinheitAuswahl[];
   /**
    * Abschnitt der abgelösten Einheit, den „Abschnitt übergeben“ an die Ablöser gäbe (LLH-1132);
    * fehlt, wenn sie keinen hat — dann gibt es nichts zu übergeben und keine Option.
@@ -374,7 +379,7 @@ interface AbloeserWerte {
 
 interface AbloeserProps {
   schicht: Abloesung | null;
-  einheiten: EinheitOption[];
+  einheiten: EinheitAuswahl[];
   laeuft: boolean;
   fehler: unknown;
   /** Die geplanten Ablöser in ihrer Reihenfolge; leer = Planung aufheben. */

@@ -30,7 +30,7 @@ import {
   RhythmusDialog,
   SchichtBeginnenDialog,
   VollzugDialog,
-  type EinheitOption,
+  type EinheitAuswahl,
 } from '../abloesung/AbloesungDialoge';
 import { formatDauer } from '../abloesung/dauer';
 import { planungWarnungText } from '../abloesung/planungWarnung';
@@ -439,7 +439,7 @@ export default function AbloesungPage() {
   }, [hervorhebung]);
 
   // Einheiten ohne laufende Schicht — nur sie können beginnen oder ablösen.
-  const freieEinheiten: EinheitOption[] = useMemo(() => {
+  const freieEinheiten: EinheitAuswahl[] = useMemo(() => {
     const belegt = new Set(laufende.map((a) => a.einheit_id));
     return (einheitenQuery.data ?? [])
       .filter((e) => !belegt.has(e.id))
