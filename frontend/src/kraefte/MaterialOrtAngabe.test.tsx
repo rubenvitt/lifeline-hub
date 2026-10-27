@@ -1,11 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
+import { freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import { listeVon, oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import { ApiError } from '../api/client';
-import type { Einheit, ModulFreigaben } from '../api/types';
-import MaterialOrtAngabe, { type MaterialOrtKontext } from './MaterialOrtAngabe';
+import type { Einheit, Einsatzabschnitt, ModulFreigaben } from '../api/types';
+import MaterialOrtAngabe, {
+  type MaterialOrtKontext,
+  useMaterialOrtKontext,
+} from './MaterialOrtAngabe';
 import { buildEinheitOptions } from './kraeftebaumKern';
 import type { MaterialOrtRef } from './materialPosten';
 
@@ -165,5 +171,78 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
     await waehle(NAME, 'UHS Turnhalle');
     await userEvent.click(screen.getByRole('button', { name: `${NAME} speichern` }));
     expect(await screen.findByText(/UHS ist aufgelöst/)).toBeInTheDocument();
+  });
+});
+
+/** Die Ort-Zelle mit dem Kontext, den die Seite lädt (wie `MaterialPage`). */
+function GeladeneAngabe() {
+  const { kontext } = useMaterialOrtKontext(1, true);
+  return (
+    <MaterialOrtAngabe
+      kennung="Wolldecke"
+      ort={null}
+      kontext={kontext}
+      darfSchreiben
+      onSpeichern={vi.fn()}
+    />
+  );
+}
+
+describe('Einheiten der Ort-Auswahl nach Abschnittsrang (LLH-1277)', () => {
+  // Anlagefolge der Einheiten: Nord vor ohne Abschnitt vor Süd; der Rang der Abschnitte: Süd vor Nord.
+  const geladeneEinheiten = [
+    { id: 1, name: 'Zug Nord', ueber_einheit_id: null, abschnitt_id: 5, abschnitt_name: 'EA Nord' },
+    { id: 2, name: 'Reserve', ueber_einheit_id: null, abschnitt_id: null },
+    { id: 3, name: 'Zug Süd', ueber_einheit_id: null, abschnitt_id: 7, abschnitt_name: 'EA Süd' },
+    { id: 4, name: 'Staffel S1', ueber_einheit_id: 3, abschnitt_id: null },
+  ] as Einheit[];
+  const abschnitte = [
+    { id: 7, einsatz_id: 1, ueber_abschnitt_id: null, name: 'EA Süd' },
+    { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'EA Nord' },
+  ] as Einsatzabschnitt[];
+  const einheitenIn = (optionen: string[]) =>
+    optionen.filter((o) => geladeneEinheiten.some((e) => o.endsWith(e.name)));
+
+  function routen(freigaben: ModulFreigaben) {
+    const abschnittAbrufe: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(geladeneEinheiten)),
+      http.get('/api/einsaetze/1/abschnitte', ({ request }) => {
+        abschnittAbrufe.push(request.url);
+        return HttpResponse.json(abschnitte);
+      }),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+    );
+    return { abschnittAbrufe };
+  }
+
+  it('lädt die Abschnitte und ordnet wie die Fahrzeugseite', async () => {
+    routen(freigabenFixture());
+    renderMitProviders(<GeladeneAngabe />);
+    await userEvent.click(screen.getByRole('button', { name: `${NAME} bearbeiten` }));
+    await oeffne(NAME);
+    const erwartet = ['Zug Süd', 'Zug Süd › Staffel S1', 'Zug Nord', 'Reserve'];
+    await waitFor(() => expect(einheitenIn(optionenVon(NAME))).toEqual(erwartet));
+    // Dieselbe Folge wie die Einheit-Auswahl der Fahrzeugseite (`FahrzeugePage.tsx`).
+    expect(buildEinheitOptions(geladeneEinheiten, abschnitte).map((o) => o.pfad)).toEqual(erwartet);
+  });
+
+  it('ohne Leserecht auf die Abschnitte: kein Abruf, die Anlagefolge bleibt', async () => {
+    const { abschnittAbrufe } = routen(freigabenFixture({ einsatzabschnitte: { zugriff: false } }));
+    renderMitProviders(<GeladeneAngabe />);
+    await userEvent.click(screen.getByRole('button', { name: `${NAME} bearbeiten` }));
+    await oeffne(NAME);
+    await waitFor(() =>
+      expect(einheitenIn(optionenVon(NAME))).toEqual([
+        'Zug Nord',
+        'Reserve',
+        'Zug Süd',
+        'Zug Süd › Staffel S1',
+      ]),
+    );
+    expect(abschnittAbrufe).toEqual([]);
   });
 });
