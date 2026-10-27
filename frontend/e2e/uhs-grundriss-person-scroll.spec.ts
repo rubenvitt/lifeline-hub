@@ -53,7 +53,7 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
   await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await page.getByRole('button', { name: uhsName }).click();
+  await page.getByRole('button', { name: uhsName, exact: true }).click();
 
   await page.getByRole('button', { name: 'Plätze anlegen' }).click();
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
@@ -157,7 +157,7 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
   await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await page.getByRole('button', { name: uhsName }).click();
+  await page.getByRole('button', { name: uhsName, exact: true }).click();
 
   // Lange (2-zeilige) Titel: Behandlungsplatz; kurze: Bett.
   await page.getByRole('button', { name: 'Plätze anlegen' }).click();
@@ -257,10 +257,10 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
   await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page.getByRole('button', { name: uhsName })).toBeVisible();
+  await expect(page.getByRole('button', { name: uhsName, exact: true })).toBeVisible();
 
   // Detail öffnen — der Grundriss wird direkt angezeigt (Personen-Spalten + Fläche).
-  await page.getByRole('button', { name: uhsName }).click();
+  await page.getByRole('button', { name: uhsName, exact: true }).click();
 
   // Personenkarte in der linken Spalte finden (Marke mit Reg.-Nr. · Name).
   const karte = page.getByText(personName).first();
@@ -316,8 +316,8 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
   await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page.getByRole('button', { name: uhsName })).toBeVisible();
-  await page.getByRole('button', { name: uhsName }).click();
+  await expect(page.getByRole('button', { name: uhsName, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: uhsName, exact: true }).click();
 
   // 6 Plätze (geplant) → Raster legt Bett 6 genau eine Zeile (120px) UNTER Bett 1.
   await page.getByRole('button', { name: 'Plätze anlegen' }).click();
@@ -386,8 +386,8 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
   await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page.getByRole('button', { name: uhsName })).toBeVisible();
-  await page.getByRole('button', { name: uhsName }).click();
+  await expect(page.getByRole('button', { name: uhsName, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: uhsName, exact: true }).click();
 
   // Einen Platz anlegen (Default: Bett ×1) — erscheint als Drop-Ziel in der Mittelfläche.
   await page.getByRole('button', { name: 'Plätze anlegen' }).click();
