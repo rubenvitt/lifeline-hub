@@ -15,7 +15,12 @@ import {
 import type { TastaturAktionen } from '../command-palette/typen';
 import { renderMitProviders } from '../test/utils';
 import { dichten } from '../theme/tokens';
-import EinsatzSeite, { ortspfadStil, seitenBreiteMax, seitenkopfStil } from './EinsatzSeite';
+import EinsatzSeite, {
+  ortspfadStil,
+  seitenBreiteMax,
+  seitenkopfStil,
+  titelblockStil,
+} from './EinsatzSeite';
 
 /**
  * Attrappe für die Palettenbefehle (LFH-391 · B5): `src/test/setup.ts` fährt MSW mit
@@ -251,6 +256,29 @@ describe('EinsatzSeite', () => {
     expect(ziel('kompakt')).toBe('30px');
     expect(ziel('komfortabel')).toBe('48px');
     expect(ziel('handschuh')).toBe('72px');
+  });
+
+  /**
+   * LLH-1278: der Titelblock hängt oben und hat die Höhe einer Zeile der Stufe. Eine höhere
+   * Aktion (Segmentleiste) lässt die Leiste nach unten wachsen, ohne den Titel zu verschieben.
+   * Böden als Literale: kompakt der 44-px-Boden ohne Polster (44 − 2 · 3), sonst die Treffhöhe.
+   * Ob der Titel im Layout stehen bleibt, misst `e2e/kraefte-seitenkopf.spec.ts`.
+   */
+  it('hängt den Titelblock oben ein, eine Zeile der Stufe hoch (38 / 48 / 72 px)', () => {
+    const tokenFuer = (s: keyof typeof dichten) => ({
+      controlHeight: dichten[s].zeilenhoehe,
+      paddingXS: dichten[s].abstand.xs,
+      marginXS: dichten[s].abstand.xs,
+    });
+    for (const [stufe, boden] of [
+      ['kompakt', 38],
+      ['komfortabel', 48],
+      ['handschuh', 72],
+    ] as const) {
+      const stil = titelblockStil(tokenFuer(stufe));
+      expect(stil.alignSelf, stufe).toBe('flex-start');
+      expect(stil.minHeight, stufe).toBe(boden);
+    }
   });
 
   it('setzt den Boden am Wrapper des Ortspfads', () => {
