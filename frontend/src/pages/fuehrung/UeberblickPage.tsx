@@ -634,8 +634,12 @@ export default function UeberblickPage() {
             aufgebaut, rückte der Hinweis für Beobachter alles um 79 px (CLS 0,156 auf 390 px).
             Ein erscheinender Körper verschiebt nichts; ein verschobener schon. Bis dahin steht
             NICHTS im Inhalt, auch kein „wird abgerufen“: jeder sichtbare Platzhalter rückte mit dem
-            Hinweis nach unten. Das Laden zeigt der Spinner am Einsatznamen der Kopfleiste. */}
-        {einsatzQ.isLoading ? null : (
+            Hinweis nach unten. Das Laden zeigt der Spinner am Einsatznamen der Kopfleiste.
+            Ebenso auf den Modulzähler (LLH-1430): aus ihm wissen die „Offenen Vorgänge“, wie viele
+            Platzhalterzeilen sie beim Laden halten. Kam er nach dem Körper, wuchsen die Abschnitte
+            von einer Zeile auf ihre Platzhalter, derselbe Sprung wie ohne sie. Der Rahmen ruft ihn
+            ohnehin (Rail); ein Fehler oder „ohne Netz“ hält den Körper nicht auf (`isLoading`). */}
+        {einsatzQ.isLoading || zaehlerQ.isLoading ? null : (
           <DashboardFlaeche kennung="ueberblick">
             {/* Sechs Plätze wie im Lagebild (Kennzahlenband, LFH-640; Belegung LLH-1140 E1).
               Notizplatz wie dort: unter `md` Boden (LFH-629), ab `md` drei Zeilen Boden und
