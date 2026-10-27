@@ -11283,6 +11283,89 @@ mod tests {
         assert_eq!(rest, 0, "die Zeilen fallen weiter mit dem Einsatz");
     }
 
+    /// LLH-1421 (design.md D2): `benachrichtigung_vorgabe` entsteht leer, nimmt je Einsatz, Art
+    /// und Funktion eine Zeile mit der Stufe Eingang oder still, nie einen Alarm, und fällt mit dem
+    /// Einsatz; das Löschen des Kontos lässt die Zeile ohne Bearbeiter stehen.
+    #[tokio::test]
+    async fn migration_0258_legt_die_vorgabe_je_funktion_an() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 258;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        migriere_bis(&pool, VERSION).await;
+
+        let leer: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung_vorgabe")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(leer, 0);
+        let setzen = "INSERT INTO benachrichtigung_vorgabe \
+                          (einsatz_id, art, funktion, stufe, geaendert_von) VALUES (?, ?, ?, ?, ?)";
+        for (funktion, stufe) in [("s2", "still"), ("ohne", "hinweis")] {
+            sqlx::query(setzen)
+                .bind(e)
+                .bind("auftrag_erteilt")
+                .bind(funktion)
+                .bind(stufe)
+                .bind(b)
+                .execute(&pool)
+                .await
+                .expect("Eingang und still gehen durch");
+        }
+        sqlx::query(setzen)
+            .bind(e)
+            .bind("auftrag_erteilt")
+            .bind("s4")
+            .bind("alarm")
+            .bind(b)
+            .execute(&pool)
+            .await
+            .expect_err("ein Alarm ist keine Stufe der Vorgabe");
+        sqlx::query(setzen)
+            .bind(e)
+            .bind("auftrag_erteilt")
+            .bind("s2")
+            .bind("hinweis")
+            .bind(b)
+            .execute(&pool)
+            .await
+            .expect_err("je Einsatz, Art und Funktion eine Zeile");
+        let gesetzt_am: String = sqlx::query_scalar(
+            "SELECT geaendert_at FROM benachrichtigung_vorgabe WHERE funktion = 's2'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(!gesetzt_am.is_empty(), "geaendert_at hat eine Vorgabe");
+
+        sqlx::query("DELETE FROM benutzer WHERE id = ?")
+            .bind(b)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let ohne_bearbeiter: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM benachrichtigung_vorgabe WHERE geaendert_von IS NULL",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(ohne_bearbeiter, 2);
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung_vorgabe")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "die Vorgabe fällt mit dem Einsatz");
+    }
+
     /// LLH-1445 (Change `o659va5r-nachforderung-herkunft`, design.md D1): der Bestand gilt als
     /// nicht am Raum verknüpft (0), der Schalter nimmt nur 0 und 1.
     #[tokio::test]

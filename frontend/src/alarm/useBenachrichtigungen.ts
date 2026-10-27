@@ -121,6 +121,7 @@ function eingangVon(
   return {
     benachrichtigungId: a.id,
     einsatzId: a.einsatz_id,
+    art: a.art,
     bezug: a.bezug_typ,
     bezugId: a.bezug_id,
     ziel: zielVon(a),

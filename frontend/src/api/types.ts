@@ -65,6 +65,11 @@ export type BenachrichtigungAnzeige = S['BenachrichtigungAnzeige'];
 export type BenachrichtigungEreignis = S['BenachrichtigungEreignis'];
 /** Verlauf eines Einsatzes samt Zahl der ungelesenen Eingänge (LLH-1143, design.md D3). */
 export type BenachrichtigungVerlauf = S['BenachrichtigungVerlauf'];
+/** Vorgabe je Funktion am Einsatz (LLH-1421, design.md D4). */
+export type BenachrichtigungVorgaben = S['BenachrichtigungVorgaben'];
+export type BenachrichtigungVorgabeArt = S['BenachrichtigungVorgabeArt'];
+/** Spalte der Vorgabe: Führungsfunktion oder `ohne`. */
+export type VorgabeFunktion = S['VorgabeFunktion'];
 /** Antwort von `GET /api/web-push` (LLH-1223): Schlüssel der Instanz, Abo dieser Sitzung. */
 export type WebPushStand = S['WebPushStand'];
 

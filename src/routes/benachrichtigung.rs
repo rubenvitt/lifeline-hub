@@ -7,6 +7,8 @@
 //! GET  /api/einsaetze/{id}/benachrichtigungen     — Verlauf samt Zahl der ungelesenen Eingänge
 //!                                                    (LLH-1143, design.md D3)
 //! POST /api/einsaetze/{id}/benachrichtigungen/gelesen — „alle gelesen“ bis `bis_id` (D4)
+//! GET  /api/einsaetze/{id}/benachrichtigung-vorgaben — Vorgabe je Funktion (LLH-1421, D4)
+//! PUT  /api/einsaetze/{id}/benachrichtigung-vorgaben/{art} — Vorgabe einer Art setzen
 //!
 //! **Berechtigung ist die Empfängerzeile:** die `benutzer_id` stammt aus der Sitzung; eine
 //! fremde oder unbekannte Benachrichtigung ist 404, nie 403 (kein Hinweis, dass es sie gibt).
@@ -19,11 +21,14 @@ use crate::auth::session::CurrentUser;
 use crate::auth::Benutzer;
 use crate::benachrichtigung::aufloesung::Leserecht;
 use crate::benachrichtigung::repo::{self, Zeile};
-use crate::benachrichtigung::{
-    text, BenachrichtigungAnzeige, BenachrichtigungEreignis, BenachrichtigungStufe,
-    BenachrichtigungVerlauf, Bezug,
+use crate::benachrichtigung::vorgabe::{
+    self, BenachrichtigungVorgabeArt, BenachrichtigungVorgaben, VorgabeFunktion,
 };
-use crate::einsatz::kontext::EinsatzLesezugriff;
+use crate::benachrichtigung::{
+    text, BenachrichtigungAnzeige, BenachrichtigungArt, BenachrichtigungEreignis,
+    BenachrichtigungStufe, BenachrichtigungVerlauf, Bezug,
+};
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use axum::extract::{Query, State};
@@ -31,7 +36,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use sqlx::SqlitePool;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use utoipa::ToSchema;
 
 /// Filter der Liste.
@@ -236,4 +241,85 @@ pub async fn gelesen(
     )
     .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/einsaetze/{id}/benachrichtigung-vorgaben — die wirksame Vorgabe je Funktion für jede
+/// einstellbare Art (LLH-1421, design.md D4): gespeicherte Zeile, sonst Katalog. Lesen darf, wer
+/// den Einsatz lesen darf, auch am abgeschlossenen Einsatz.
+pub async fn vorgaben_laden(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff,
+) -> Result<Json<BenachrichtigungVorgaben>, AppError> {
+    let ctx = ctx.0;
+    let karte = labelkarte(&state.pool, ctx.einsatz.org_id).await?;
+    Ok(Json(
+        vorgabe::laden(&state.pool, ctx.einsatz.id, &karte).await?,
+    ))
+}
+
+/// Body von `PUT …/benachrichtigung-vorgaben/{art}`.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VorgabeEingabe {
+    /// Die Funktionen, für die die Art still ist (Wire-Werte von `VorgabeFunktion`); alle
+    /// übrigen bekommen sie als Eingang. Leer = für niemanden still.
+    pub still: Vec<String>,
+}
+
+/// PUT /api/einsaetze/{id}/benachrichtigung-vorgaben/{art} — setzt die Vorgabe einer Art: eine
+/// Zeile je Funktion, ersetzt den Stand der Art; 200 mit dem neuen Stand (LLH-1421, design.md
+/// D4). Recht wie die übrigen Einstellungen (`EinsatzVerwaltungszugriff`: Schreibrolle oder
+/// System-Admin der Einsatz-Org, abgeschlossen 409). Unbekannte Art oder Funktion, mehr Einträge
+/// als Funktionen: 400 (das Feld für sich, `src/AGENTS.md`, Statuscode-Konvention); Alarm,
+/// Org-Art und Unwetter: 422 (gültige Art, hier nicht einstellbar).
+pub async fn vorgabe_setzen(
+    State(state): State<AppState>,
+    ctx: EinsatzVerwaltungszugriff,
+    PfadParam((_eid, art)): PfadParam<(i64, String)>,
+    JsonBody(eingabe): JsonBody<VorgabeEingabe>,
+) -> Result<Json<BenachrichtigungVorgabeArt>, AppError> {
+    let art = BenachrichtigungArt::parse(&art)
+        .ok_or_else(|| AppError::Validation(format!("Unbekannte Benachrichtigungsart '{art}'")))?;
+    if eingabe.still.len() > vorgabe::STILL_MAX {
+        return Err(AppError::Validation(format!(
+            "still darf höchstens {} Funktionen nennen",
+            vorgabe::STILL_MAX
+        )));
+    }
+    let still = eingabe
+        .still
+        .iter()
+        .map(|f| {
+            VorgabeFunktion::parse(f)
+                .ok_or_else(|| AppError::Validation(format!("Unbekannte Funktion '{f}'")))
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    if !art.vorgabe_einstellbar() {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Die Benachrichtigungsart '{}' ist am Einsatz nicht einstellbar",
+            art.as_str()
+        )));
+    }
+    let karte = labelkarte(&state.pool, ctx.einsatz.org_id).await?;
+    let stand = vorgabe::setzen(
+        &state.pool,
+        ctx.einsatz.id,
+        art,
+        &still,
+        ctx.benutzer.id,
+        &karte,
+    )
+    .await?;
+    // Live wie der Kopf (design.md D4): das `einsatz`-Ereignis frischt die Sektion bei allen auf.
+    crate::routes::einsatz::kopf_geaendert(&state, ctx.einsatz.id).await;
+    Ok(Json(stand))
+}
+
+/// Labels und S7-Schalter der Organisation des Einsatzes.
+async fn labelkarte(
+    pool: &SqlitePool,
+    org_id: i64,
+) -> Result<crate::fuehrung::Labelkarte, AppError> {
+    let mut conn = pool.acquire().await?;
+    crate::fuehrung::repo::labelkarte(&mut conn, org_id).await
 }

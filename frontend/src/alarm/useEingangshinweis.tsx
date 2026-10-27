@@ -2,12 +2,13 @@ import { Button } from 'antd';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { setzeMeldungStatus } from '../api/meldungen';
-import type { BenachrichtigungBezugTyp } from '../api/types';
+import type { BenachrichtigungArt, BenachrichtigungBezugTyp } from '../api/types';
 import { einsatzModulPfad, meldungenPfad } from '../routing/deeplinks';
 import { spieleAlarmTon } from './alarmTon';
 import { type AlarmZiel, ZIEL_SPRUENGE, zielPfad } from './benachrichtigungKatalog';
 import { type DesktopMeldung, schliesseDesktopMeldung, zeigeDesktopAlarm } from './desktopAlarm';
 import { oeffneEingaenge } from './eingaenge';
+import { istStumm } from './eingaengeStumm';
 import Eingangsband from './Eingangsband';
 
 /**
@@ -27,6 +28,8 @@ import Eingangsband from './Eingangsband';
  * - Sammelt er Eingänge verschiedener Module, öffnet „Ansehen“ den Verlauf am Knopf „Eingänge“
  *   (`EingaengeKnopf.tsx`) und quittiert nichts: gelesen ist erst, was jemand öffnet.
  * - „Alle gelesen“ auf einem anderen Gerät (`entferneBis`) räumt alles bis zur gemeldeten Kennung.
+ * - Eine Art, die auf diesem Gerät stumm ist (`eingaengeStumm.ts`, LLH-1421 D6), kommt nicht ins
+ *   Band: kein Ton, keine OS-Meldung. Zahl und Verlauf zeigen sie weiter als ungelesen.
  */
 
 /** Höchstens ein Ton je zwei Minuten, gleich wie viele Meldungen eingehen. */
@@ -39,6 +42,8 @@ export const EINGANG_ZEILEN = 2;
 export type EingangEintrag = {
   benachrichtigungId: number;
   einsatzId: number;
+  /** Art der Benachrichtigung; eine auf diesem Gerät stumme Art bleibt draußen. */
+  art: BenachrichtigungArt;
   /** Bezug des Servers; `meldung` und `lage_uebernahme` haben eigene Regeln (Sichten, Seite). */
   bezug: BenachrichtigungBezugTyp;
   /** Kennung des Bezugs (bei `meldung` die Meldung, die „Sichten“ setzt). */
@@ -62,7 +67,8 @@ export type EingangEintrag = {
   neu: boolean;
 };
 
-export type EingangErgebnis = 'neu' | 'vorhanden' | 'inaktiv';
+/** `stumm`: die Art ist auf diesem Gerät stumm, der Eintrag bleibt draußen (LLH-1421 D6). */
+export type EingangErgebnis = 'neu' | 'vorhanden' | 'inaktiv' | 'stumm';
 
 export interface Eingangshinweis {
   /** `ton`: ein neuer Eintrag darf den (gedrosselten) Ton spielen; `desktop`: OS-Meldung. */
@@ -391,6 +397,7 @@ export function useEingangshinweis(
     (eintrag: EingangEintrag, opts: { ton: boolean; desktop: boolean }): EingangErgebnis => {
       if (!zustand.aktiv) return 'inaktiv';
       if (zustand.eintraege.has(eintrag.benachrichtigungId)) return 'vorhanden';
+      if (istStumm(eintrag.art)) return 'stumm';
       zustand.eintraege.set(eintrag.benachrichtigungId, eintrag);
       if (istEingabefeld(document.activeElement)) zustand.zurueck.add(eintrag.benachrichtigungId);
       if (!aufEigenerSeite(eintrag)) {

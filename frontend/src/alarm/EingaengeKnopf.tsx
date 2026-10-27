@@ -1,4 +1,4 @@
-import { Button, Drawer, Popover, theme } from 'antd';
+import { Button, Drawer, Popover, Switch, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import { useOhneVerbindung } from '../offline/verbindung';
 import { rahmenFarben, schrift } from '../theme/tokens';
 import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeName, useKopfBuendelt } from './eingaenge';
+import { EINGANG_ARTEN, setzeStumm, useStummeArten } from './eingaengeStumm';
 import EingaengeZahl from './EingaengeZahl';
 import { quittiereNachNutzer } from './useBenachrichtigungen';
 import {
@@ -106,10 +107,55 @@ function Gruppe({
 }
 
 /**
- * Der Verlauf (design.md D6): Kopf mit „Alle gelesen“, Gruppen „Neu“ und „Früher“. Ohne Netz
- * (LLH-1422) lesbar aus dem Speicher, auch nach einem Neuladen (`LAGEBILD_OFFLINE`), mit „Stand …
- * · offline“; „Alle gelesen“ wird dann vorgemerkt (`frontend/src/offline/AGENTS.md`, „Schreiben
- * ohne Netz“), die Zahl fällt sofort.
+ * „Stumm auf diesem Gerät“ (LLH-1421, design.md D6): je Eingangsart ein Schalter. Wirkt nur auf
+ * Ton, Eingangsband und OS-Meldung dieses Geräts (`eingaengeStumm.ts`); Alarme stehen nicht da.
+ */
+function StummListe() {
+  const { token } = theme.useToken();
+  const stumm = useStummeArten();
+  return (
+    <section aria-label="Stumm auf diesem Gerät" style={{ marginBlockStart: token.marginXS }}>
+      <Augenbraue als="h3">Stumm auf diesem Gerät</Augenbraue>
+      <ul style={{ margin: 0, padding: 0 }}>
+        {EINGANG_ARTEN.map((art) => {
+          const name = BENACHRICHTIGUNG_ARTEN[art].name;
+          const feldId = `eingang-stumm-${art}`;
+          return (
+            <li
+              key={art}
+              style={{
+                listStyle: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: token.paddingXS,
+                minHeight: token.controlHeight,
+                paddingInline: token.paddingXS,
+              }}
+            >
+              <label htmlFor={feldId} style={{ minWidth: 0 }}>
+                {name}
+              </label>
+              <Switch
+                id={feldId}
+                aria-label={`Stumm: ${name}`}
+                checked={stumm.includes(art)}
+                onChange={(an) => setzeStumm(art, an)}
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Der Verlauf (design.md D6): Kopf mit „Stumm“ und „Alle gelesen“, Gruppen „Neu“ und „Früher“.
+ * Ohne Netz (LLH-1422) lesbar aus dem Speicher, auch nach einem Neuladen (`LAGEBILD_OFFLINE`), mit
+ * „Stand … · offline“; „Alle gelesen“ wird dann vorgemerkt (`frontend/src/offline/AGENTS.md`,
+ * „Schreiben ohne Netz“), die Zahl fällt sofort. „Stumm“ klappt die Schalter für dieses Gerät auf
+ * ({@link StummListe}, LLH-1421).
  */
 function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliessen: () => void }) {
   const { token } = theme.useToken();
@@ -121,6 +167,8 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
     useVorgemerkteSchreibaktionen(benutzerId, einsatzId, 'eingaenge_gelesen').length > 0;
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState(false);
+  const [stummOffen, setStummOffen] = useState(false);
+  const stummZahl = useStummeArten().length;
   const eintraege = data?.eintraege ?? [];
   const neu = eintraege.filter(istNeu);
   const frueher = eintraege.filter((a) => !istNeu(a));
@@ -160,9 +208,14 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
       >
         <Augenbraue als="h2">Eingänge</Augenbraue>
         {ohneVerbindung && <Datenstand dataUpdatedAt={dataUpdatedAt} />}
-        <Button onClick={alleGelesen} disabled={ungelesen === 0 || laeuft} loading={laeuft}>
-          Alle gelesen
-        </Button>
+        <span style={{ display: 'flex', gap: token.paddingXS }}>
+          <Button aria-expanded={stummOffen} onClick={() => setStummOffen((o) => !o)}>
+            {stummZahl > 0 ? `Stumm · ${stummZahl}` : 'Stumm'}
+          </Button>
+          <Button onClick={alleGelesen} disabled={ungelesen === 0 || laeuft} loading={laeuft}>
+            Alle gelesen
+          </Button>
+        </span>
       </div>
       {vorgemerkt && (
         <div
@@ -172,6 +225,7 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
           Offline vorgemerkt
         </div>
       )}
+      {stummOffen && <StummListe />}
       {fehler && (
         <div role="alert" style={{ color: token.colorWarningText, marginBlockStart: 4 }}>
           Nicht gespeichert, bitte noch einmal.

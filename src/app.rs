@@ -278,6 +278,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/benachrichtigungen/gelesen",
             post(routes::benachrichtigung::gelesen),
         )
+        // Vorgabe je Funktion am Einsatz (LLH-1421, design.md D4).
+        .route(
+            "/api/einsaetze/{id}/benachrichtigung-vorgaben",
+            get(routes::benachrichtigung::vorgaben_laden),
+        )
+        .route(
+            "/api/einsaetze/{id}/benachrichtigung-vorgaben/{art}",
+            put(routes::benachrichtigung::vorgabe_setzen),
+        )
         // Web Push (LLH-1223): ohne `--web-push` 404 aus dem Handler.
         .route("/api/web-push", get(routes::web_push::stand))
         .route(

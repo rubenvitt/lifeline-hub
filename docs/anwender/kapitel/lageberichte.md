@@ -2,7 +2,7 @@
 titel: Lageberichte
 gruppen: [fuehrung]
 reihenfolge: 260
-quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/benachrichtigung/vorgabe.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -164,8 +164,11 @@ bleibt „System“ der Empfänger. Auf dem Papier steht er im Kopf des Blatts.
 ### Benachrichtigung bei der Freigabe
 
 Mit der Freigabe erhält jede Person, die eine Funktion aus dem Verteiler besetzt (laut
-Stab-Besetzung, sonst laut Funktion in der Mitgliedschaft), den Hinweis „Neuer Lagebericht“ mit
-der Fassung, etwa „Version 2“, und dem Sprung zum Bericht. Einsatzabschnitte, Einheiten, externe
+Stab-Besetzung, sonst laut Funktion in der Mitgliedschaft), die Benachrichtigung „Neuer
+Lagebericht“ mit der Fassung, etwa „Version 2“, und dem Sprung zum Bericht. Sie ist still: Sie
+steht unter „Eingänge“ bei „Früher“, ohne Band, Ton und Zahl. Für welche Funktionen sie als Eingang
+kommt, legt der Reiter „Benachrichtigungen“ der Einstellungen fest (Kapitel
+[Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Einsatzabschnitte, Einheiten, externe
 Stellen und eigener Text im Verteiler erreichen niemanden, ebenso wer die Lageberichte nicht
 sehen darf. Wer freigibt, bekommt nichts, auch wenn die eigene Funktion im Verteiler steht.
 Entwürfe melden nichts; eine Fortschreibung meldet sich erst mit ihrer eigenen Freigabe, und jede

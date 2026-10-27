@@ -124,6 +124,8 @@ export const EINSATZ_KEYS = {
   // Verlauf der eigenen Benachrichtigungen samt ungelesenen Eingängen (LLH-1143): Knopf
   // „Eingänge“, Tab-Titel und App-Badge lesen denselben Key.
   benachrichtigungVerlauf: 'einsatz-benachrichtigung-verlauf',
+  // Vorgabe je Funktion am Einsatz (LLH-1421), live über das `einsatz`-Ereignis.
+  benachrichtigungVorgaben: 'einsatz-benachrichtigung-vorgaben',
   ortVorschau: 'ort-vorschau',
   // Auf dem Gerät dekodierte HEIC-Vorschau eines Anhangs (LFH-759): Object-URLs, die
   // `erzeugeQueryClient` beim Verlassen des Caches freigibt.
@@ -360,7 +362,13 @@ export const EINSATZ_STREAM_EVENTS = {
   // Kennzahl, nicht bei jeder Pegel- oder Bezirksänderung (LFH-855). Die Stab-Besetzung
   // (`meine_sachgebiete`) löst es nicht aus; sie wird beim nächsten Abruf frisch. Die eigene
   // Führungsstelle (LFH-849) meldet ihre Änderung über dasselbe Ereignis.
-  einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.lagebesprechung, EINSATZ_KEYS.fuehrungsstelle],
+  // Die Vorgabe je Funktion (LLH-1421, design.md D4) meldet ihr Setzen über dasselbe Ereignis.
+  einsatz: [
+    EINSATZ_KEYS.einsatz,
+    EINSATZ_KEYS.lagebesprechung,
+    EINSATZ_KEYS.fuehrungsstelle,
+    EINSATZ_KEYS.benachrichtigungVorgaben,
+  ],
   // Medienkontakte, Pressemitteilungen und ihre Details unter EINEM Prefix. Die Freigabe schreibt
   // den ETB-Snapshot; der kommt über das eigene `etb`-Ereignis.
   presse: [EINSATZ_KEYS.presse],
@@ -610,6 +618,9 @@ export const einsatzKeys = {
   modulFreigabenAlle: () => [EINSATZ_KEYS.modulFreigaben] as const,
   benachrichtigungVerlauf: (einsatzId: number) =>
     [EINSATZ_KEYS.benachrichtigungVerlauf, einsatzId] as const,
+  /** Vorgabe je Funktion am Einsatz (LLH-1421), Sektion „Benachrichtigungen“. */
+  benachrichtigungVorgaben: (einsatzId: number) =>
+    [EINSATZ_KEYS.benachrichtigungVorgaben, einsatzId] as const,
 
   // Personen / Personal
   personen: (einsatzId: number) => [EINSATZ_KEYS.personen, einsatzId] as const,
@@ -1310,7 +1321,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“), die Bild-Anlagen an
  * Lagebericht und Befehl (LFH-1028: ohne Netz lädt kein Bild), die Tierliste und mit ihr die
  * Kartenebene „Tiere" (LLH-1123: sie trägt Halterkontakt und Kennzeichnung; ohne Netz zeigt die
- * Karte keine Tiere, wie keine Bereitstellungsräume).
+ * Karte keine Tiere, wie keine Bereitstellungsräume) und die Vorgabe je Funktion (LLH-1421: nur
+ * die Einstellungsseite liest sie, geschrieben wird mit Netz).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {

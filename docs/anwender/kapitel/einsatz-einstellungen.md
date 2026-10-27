@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, frontend/src/pages/einstellungen/EinsatzBenachrichtigungen.tsx, src/benachrichtigung/vorgabe.rs, src/benachrichtigung/aufloesung.rs, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -16,7 +16,8 @@ fehlt auch die, die Vorgabe des Systems.
 Bedient wird das Modul von der Einsatzleitung und dem Führungspersonal, die Reiter „Module“ und
 „Zugriff“ nur von der Einsatzleitung. Der Reiter „Ablösung“ legt das Schichtmodell fest, nach dem
 die Ablösung des Einsatzes rechnet (Kapitel [Ablösung](abloesung.md)). Der Reiter „Kennzahlen“
-wählt, was Platz 3 der Kennzahlen im Lagebild zeigt. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
+wählt, was Platz 3 der Kennzahlen im Lagebild zeigt. Der Reiter „Benachrichtigungen“ legt fest,
+welche Eingänge für welche Funktion still bleiben. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
 [Aufbewahrung](aufbewahrung.md), die Reiter „Pegel“ und „Geräte“ die Kapitel zu Wetter und
 Pegeln und zu gekoppelten Geräten, den Reiter „Zugriff“ (wer im Einsatz mit welcher Rolle
 arbeitet) das Kapitel [Rechte im Einsatz](rechte-im-einsatz.md).
@@ -81,6 +82,20 @@ Für Einsatzleitung und Führungspersonal:
 3. Zum Zurücknehmen den Schalter ausschalten.
 
 Jede Änderung gilt sofort, ohne „Speichern“.
+
+### Eingänge für Funktionen still stellen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Den Reiter „Benachrichtigungen“ öffnen. Unter „Still je Funktion“ steht je Eingang eine Zeile,
+   etwa „Neuer Auftrag“ oder „Neuer Lagebericht“.
+2. In der Zeile unter „Still für“ die Funktionen wählen, für die der Eingang still sein soll, etwa
+   „S2“ oder „ohne Funktion“. „niemand“ heißt: für alle ein Eingang.
+3. Um eine Funktion herauszunehmen, ✕ an ihrem Namen wählen.
+
+Jede Änderung gilt sofort, ohne „Speichern“. Ist die Zeile danach links rot markiert und steht
+über der Liste ein Fehler, hat der Server die Änderung nicht angenommen; die Zeile steht wieder wie
+vorher.
 
 ### Module ausblenden oder auf eine Rolle beschränken
 
@@ -147,6 +162,27 @@ aufgehoben ist. Wer das Modul Nachforderungen nicht sehen darf, sieht auf Platz 
 offen“ mit „—“ und „nicht freigegeben“, nie eine Zahl. Lagebilder, die gerade offen sind, bieten
 den neuen Zuschnitt über den Hinweis „Kennzahlreihe geändert: …“ an.
 
+### Still je Funktion
+
+Still heißt: Die Benachrichtigung steht nur unter „Eingänge“ bei „Früher“, ohne Band, Ton und
+Zahl, wie eine Art, die jemand für sich abgeschaltet hat (Kapitel
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Sie geht an dieselben Personen wie sonst; die
+Einstellung ändert nur, wie laut sie bei ihnen ankommt.
+
+Die Funktionen einer Person sind ihre Besetzung im Stab (EL über die Führungsstelle, S1 bis S6
+über die Sachgebiete; ein Sachgebiet „bei der Einsatzleitung“ zählt für die Einsatzleitung) und die
+Funktion ihrer Mitgliedschaft im Einsatz. Hat sie keine, gilt „ohne Funktion“. Still wird ein
+Eingang nur, wenn er für jede ihrer Funktionen still steht: Wer S2 und S4 ist, bekommt einen
+Auftrag als Eingang, solange nur S2 still steht. Wer eine Art unter „Benachrichtigungen“ im
+Benutzermenü selbst abgeschaltet hat, bekommt sie weiter still, gleich was hier steht.
+
+Ohne Einstellung ist „Neuer Lagebericht“ still, alle anderen Eingänge sind laut. Alarme, die
+Unwetterwarnung, „Neuer Einsatz“ und „Aufnahme in einen Einsatz“ stehen nicht in der Liste; sie
+lassen sich hier nicht still stellen. Die Einstellung gilt für Benachrichtigungen, die danach
+entstehen; was schon im Verlauf steht, bleibt, wie es ist. Welche Namen die Funktionen tragen,
+folgt den Bezeichnungen der Organisation; S7 steht nur in der Liste, wenn die Organisation es
+führt.
+
 ### Was „Sichtbar“ und „Benötigte Rolle“ bewirken
 
 - **Ausgeblendet** fehlt ein Modul in der Navigation aller Personen und ist für sie gesperrt.
@@ -189,6 +225,9 @@ die Organisation selbst ausblendet, bleibt auch mit Vorlage ausgeblendet.
   die Rhythmus-Vorgabe eines Abschnitts; ein System-Admin ohne Rolle im Einsatz sieht sie nur.
 - „Kennzahlen“ ändern die Einsatzleitung und das Führungspersonal eines laufenden Einsatzes, wie
   die Pegel; ein System-Admin ohne Rolle im Einsatz sieht den Schalter nur.
+- „Benachrichtigungen“ ändern die Einsatzleitung, das Führungspersonal und System-Admins der
+  Organisation des Einsatzes, solange er läuft. Wer den Einsatz sieht, sieht die Liste; an den
+  Zeilen steht dann „nur lesen“ bzw. nach dem Abschluss „Einsatz abgeschlossen“.
 - Alle anderen sehen die Einstellungen als „Nur Ansicht“.
 
 Nach dem Abschluss ist der Einsatz eingefroren; nur die Aufbewahrungsfrist lässt sich noch

@@ -24,6 +24,7 @@
 pub mod aufloesung;
 pub mod repo;
 pub mod text;
+pub mod vorgabe;
 
 #[cfg(test)]
 mod tests;
@@ -39,7 +40,7 @@ wire_enum! {
     /// Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“; LLH-1143, Entscheidung zu LLH-1142
     /// E1: Alarm, Eingang, Still). Die Stufe einer Art ist fest ([`BenachrichtigungArt::stufe`]);
     /// *still* entsteht erst beim Empfänger, wenn er die Art abgeschaltet hat oder die Vorgabe
-    /// seiner Rolle sie still stellt ([`aufloesung`]).
+    /// des Einsatzes sie für jede seiner Funktionen still stellt ([`aufloesung`], [`vorgabe`]).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum BenachrichtigungStufe {
         /// Lauter Ton, Toast, OS-Meldung bei verdecktem Tab; nicht abschaltbar.
@@ -148,6 +149,22 @@ impl BenachrichtigungArt {
     /// Arten, die nur als Schalter in den Einstellungen bestehen und nie gemeldet werden.
     pub const fn nur_einstellung(self) -> bool {
         matches!(self, BenachrichtigungArt::Unwetter)
+    }
+
+    /// Ob die Art am Einsatz je Funktion still gestellt werden kann (LLH-1421, design.md D2):
+    /// nur Arten der Stufe Eingang, keine Org-Art (die erreicht den Empfänger außerhalb des
+    /// Einsatzes) und nicht `unwetter` (erkennt der Browser selbst). Alarme nie.
+    pub const fn vorgabe_einstellbar(self) -> bool {
+        matches!(self.stufe(), BenachrichtigungStufe::Hinweis)
+            && !self.ist_org()
+            && !self.nur_einstellung()
+    }
+
+    /// Die Vorgabe des Katalogs, solange die Einsatzleitung für die Art nichts festgelegt hat
+    /// (LLH-1421, design.md D2; Entscheidung zu LLH-1142 E2): `true` = für jede Funktion still.
+    /// Heute nur „Lagebericht freigegeben“; er steht im Verlauf, ohne zu zählen.
+    pub const fn vorgabe_still(self) -> bool {
+        matches!(self, BenachrichtigungArt::Lagebericht)
     }
 }
 
