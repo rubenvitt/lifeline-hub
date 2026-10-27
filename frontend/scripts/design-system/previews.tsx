@@ -21,6 +21,8 @@ import { act, useId, useState, type ReactElement, type ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { createRoot } from 'react-dom/client';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
+import { QueryClient, QueryClientProvider, type QueryKey } from '@tanstack/react-query';
+import dayjs from 'dayjs';
 import { Button, ConfigProvider, Form, Input, Segmented } from 'antd';
 import deDE from 'antd/locale/de_DE';
 import {
@@ -29,21 +31,26 @@ import {
   antdKnopf,
   antdOptionsknopf,
   antdThema,
+  rahmenFarben,
   type Dichte,
 } from '../../src/theme/tokens';
 import { rollenFarbe, statusKategorie, warnstufeBalkenFarbe } from '../../src/theme/statusFarben';
-import type { Sichtungskategorie } from '../../src/api/types';
-import { createMemoryRouter, RouterProvider } from 'react-router';
+import type { Sichtungskategorie, Verletzung } from '../../src/api/types';
+import { createMemoryRouter, Link, MemoryRouter, RouterProvider } from 'react-router';
 import {
   Augenbraue,
   BearbeitbaresPaneel,
   DashboardFlaeche,
+  DashboardPaneel,
   Datenfeld,
   DatenfeldEingabe,
   Datenraster,
   FeldFehler,
+  GliederungsPaneel,
   Kennzahl,
   Kennzahlenband,
+  ListenAbschnitt,
+  listenZeileStil,
   MatrixPaneel,
   Paneel,
   PaneelZeile,
@@ -51,7 +58,9 @@ import {
   Segmentleiste,
   StatusChip,
   StatusZelle,
+  StromPaneel,
   VerteilungsPaneel,
+  Zeitachseneintrag,
   useRollen,
 } from '../../src/components/instrument';
 import StatusTag from '../../src/components/StatusTag';
@@ -65,6 +74,19 @@ import { useSpeicherLeiste } from '../../src/components/speicherLeiste';
 import DokumentEntwurf from '../../src/entwurf/DokumentEntwurf';
 import { VORLAGEN } from '../../src/befehle/vorlagen';
 import StammdatenFeld, { type Vorschlagsquelle } from '../../src/components/StammdatenFeld';
+import KatalogTabelle from '../../src/components/KatalogTabelle';
+import type { ListenGedaechtnis } from '../../src/components/listenGedaechtnis';
+import { AnzeigeKonventionenProvider } from '../../src/anzeige/AnzeigeKonventionenContext';
+import ZeitAnzeige from '../../src/anzeige/ZeitAnzeige';
+import { ZeitpunktEingabe } from '../../src/anzeige/ZeitpunktEingabe';
+import { Ortsfeld } from '../../src/anzeige/Ortsfeld';
+import type { OrtSucheAntwort } from '../../src/api/karteOrtSuche';
+import type { OrtVorschau } from '../../src/api/ortVorschau';
+import { einsatzKeys } from '../../src/api/queryKeys';
+import EingaengeKnopf from '../../src/alarm/EingaengeKnopf';
+import Eingangsband from '../../src/alarm/Eingangsband';
+import SichtungsWahl from '../../src/personen/SichtungsWahl';
+import Koerperschema from '../../src/personen/koerperschema/Koerperschema';
 
 /** Die Vorschauen zeigen die Stufe des Fükw, des primären Kontexts. */
 const DICHTE: Dichte = 'kompakt';
@@ -96,6 +118,11 @@ export interface PreviewSpec {
   content: () => ReactNode;
   /** Bedienung nach dem Render; macht die Vorschau zu einem Client-Render im jsdom. */
   interact?: (container: HTMLElement) => Promise<void>;
+  /**
+   * Client-Render im jsdom ohne Bedienung: für Bausteine, die den Viewport lesen
+   * (`useViewport` hat keinen Server-Stand, `renderToString` bräche ab) oder ein Portal öffnen.
+   */
+  client?: true;
 }
 
 const nichts = () => undefined;
@@ -354,6 +381,457 @@ function StammdatenFeldBeispiel() {
 }
 
 const SICHTUNGEN: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot', 'unverletzt'];
+
+/**
+ * Konventionen der Vorschauen mit Zeiten: feste Zone, damit die Ausgabe nicht an der Zone des
+ * Rechners hängt; Darstellung je Aufruf.
+ */
+const KONVENTIONEN_TAKTISCH = { zeitzone: 'Europe/Berlin', zeitdarstellung: 'taktisch' } as const;
+const KONVENTIONEN_DATUM = { zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' } as const;
+
+/**
+ * Ein QueryClient ohne Abruf: jede Abfrage ohne eigenes `enabled` steht still, eine mit eigenem
+ * `enabled` findet ihre Daten frisch im Cache. Die Vorschau fragt so nie einen Server.
+ */
+function stillerQueryClient(daten: readonly (readonly [QueryKey, unknown])[] = []): QueryClient {
+  const client = new QueryClient({
+    defaultOptions: { queries: { enabled: false, retry: false, staleTime: Infinity } },
+  });
+  for (const [key, wert] of daten) client.setQueryData(key, wert);
+  return client;
+}
+
+/** Zwei Zeitpunkte aus der Vergangenheit: „heute“ träfe je nach Lauf eine andere Form. */
+const ZEIT_ALARM = '2026-10-10T12:30:00Z';
+const ZEIT_LAGE = '2026-10-09T07:05:00Z';
+
+/**
+ * Die drei Rollen der Zeitdarstellung in beiden Darstellungen, je Zeile eine Rolle. Die Form
+ * „heute“ von `kurz` fehlt: sie hinge am Tag des Laufs.
+ */
+function ZeitdarstellungBeispiel() {
+  const rollen = [
+    ['Zeitpunkt', 'zeitpunkt'],
+    ['Kurz (nicht heute)', 'kurz'],
+    ['Uhrzeit', 'uhrzeit'],
+  ] as const;
+  return (
+    <Datenraster spalten={3} beschriftung="Zeitdarstellung">
+      {(
+        [
+          ['taktisch', KONVENTIONEN_TAKTISCH],
+          ['Datum und Uhrzeit', KONVENTIONEN_DATUM],
+        ] as const
+      ).flatMap(([darstellung, konventionen]) =>
+        rollen.map(([etikett, rolle]) => (
+          <AnzeigeKonventionenProvider key={`${darstellung}-${rolle}`} konventionen={konventionen}>
+            <Datenfeld label={`${etikett} · ${darstellung}`} mono>
+              <ZeitAnzeige wert={ZEIT_ALARM} rolle={rolle} />
+            </Datenfeld>
+          </AnzeigeKonventionenProvider>
+        )),
+      )}
+    </Datenraster>
+  );
+}
+
+/**
+ * Drei Zeitfelder: eine Ereigniszeit mit Wert und Schnellwahl, eine leere Frist und eine
+ * unlesbare Eingabe nach dem Verlassen (in `interact` getippt): der geltende Wert steht wieder da,
+ * daneben der Grund. Die Deutung beim Tippen zeigt nur das fokussierte Feld, also je Seite eines.
+ */
+function ZeiteingabeBeispiel() {
+  const name = useId();
+  return (
+    <AnzeigeKonventionenProvider konventionen={KONVENTIONEN_TAKTISCH}>
+      <Form
+        name={name}
+        layout="vertical"
+        initialValues={{ alarmiert: dayjs(ZEIT_ALARM), frist: null, lage: dayjs(ZEIT_LAGE) }}
+      >
+        <Form.Item label="Alarmiert" name="alarmiert">
+          <ZeitpunktEingabe art="ereignis" schnellwahl />
+        </Form.Item>
+        <Form.Item label="Frist" name="frist">
+          <ZeitpunktEingabe art="frist" />
+        </Form.Item>
+        <Form.Item label="Lage gemeldet" name="lage">
+          <ZeitpunktEingabe art="ereignis" data-ds-tippen="14:3x" />
+        </Form.Item>
+      </Form>
+    </AnzeigeKonventionenProvider>
+  );
+}
+
+/** Tippt in jedes Zeitfeld mit `data-ds-tippen` dessen Text und verlässt es wieder. */
+async function tippeInZeitfelder(container: HTMLElement): Promise<void> {
+  const felder = container.querySelectorAll<HTMLInputElement>('input[data-ds-tippen]');
+  if (felder.length !== 2) throw new Error('Design System: Zeitfelder zum Tippen nicht gefunden');
+  const setzeWert = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  for (const feld of felder) {
+    await act(async () => {
+      feld.focus();
+      setzeWert.call(feld, feld.dataset.dsTippen);
+      feld.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => feld.blur());
+  }
+}
+
+/** Ein Ort mit Ortsname und Peilung aus dem Cache; auf 3 Stellen, wie der Schlüssel der Vorschau rundet. */
+const ORT_PUNKT = { lat: 52.625, lon: 10.082 };
+const ORT_VORSCHAU: OrtVorschau = {
+  ortsname: 'Celle, Altstadt',
+  peilung: { bezug_label: 'Einsatzort', distanz_m: 420, richtung: 'NO' },
+};
+
+/**
+ * Drei Ortsfelder: leer mit Suche und „Auf Karte wählen“, auf der Karte gesetzt (Rahmen der
+ * Kartenvorschau, Ort-Zeile, „Als Adresse übernehmen“) und eine personenbezogene Adresse als reiner
+ * Text. Das Kartenbild selbst zeichnet MapLibre erst im Browser; die Vorschau zeigt seinen Rahmen.
+ */
+function OrtsfeldBeispiel() {
+  const [client] = useState(() =>
+    stillerQueryClient([
+      [einsatzKeys.ortVorschau(1, ORT_PUNKT.lat, ORT_PUNKT.lon, 'schaden:7'), ORT_VORSCHAU],
+    ]),
+  );
+  const name = useId();
+  const suche = {
+    suchen: async (): Promise<OrtSucheAntwort> => ({ zustand: 'ok', treffer: [] }),
+    suchSchluessel: (begriff: string) => einsatzKeys.einsatzortSuche(1, begriff),
+  };
+  return (
+    <QueryClientProvider client={client}>
+      <AnzeigeKonventionenProvider konventionen={KONVENTIONEN_TAKTISCH}>
+        <Form
+          name={name}
+          layout="vertical"
+          initialValues={{
+            leer: { text: '', koordinate: null },
+            gesetzt: { text: 'Hinter der Scheune', koordinate: ORT_PUNKT, quelle: 'karte' },
+            herkunft: { text: 'Musterweg 3, 29221 Celle', koordinate: null },
+          }}
+        >
+          <Form.Item label="Standort" name="leer">
+            <Ortsfeld {...suche} karte={{ etikett: 'Standort', einsatzId: 1 }} />
+          </Form.Item>
+          <Form.Item label="Schadenort" name="gesetzt">
+            <Ortsfeld
+              {...suche}
+              karte={{ etikett: 'Schadenort', einsatzId: 1, exclude: 'schaden:7' }}
+            />
+          </Form.Item>
+          <Form.Item label="Herkunft / Adresse" name="herkunft">
+            <Ortsfeld ohneSuche="personenbezogen" />
+          </Form.Item>
+        </Form>
+      </AnzeigeKonventionenProvider>
+    </QueryClientProvider>
+  );
+}
+
+/** Wartet die Entprellung der Ort-Vorschau ab (`useOrtVorschau`, 700 ms). */
+async function warteAufOrtVorschau(container: HTMLElement): Promise<void> {
+  await act(() => new Promise((fertig) => setTimeout(fertig, 800)));
+  const vorschlaege = [...container.querySelectorAll('button')].filter(
+    (knopf) => knopf.textContent === 'Als Adresse übernehmen',
+  );
+  if (vorschlaege.length !== 2) {
+    throw new Error('Design System: Vorschlag „Als Adresse übernehmen“ fehlt');
+  }
+}
+
+/** Der Knopf „Eingänge“ ohne und mit ungelesenen Eingängen, auf dem dauerdunklen Rahmengrund. */
+function EingaengeKnopfBeispiel({ ungelesen }: { ungelesen: number }) {
+  const [client] = useState(() =>
+    stillerQueryClient([
+      [einsatzKeys.benachrichtigungVerlauf(ungelesen), { eintraege: [], ungelesen }],
+    ]),
+  );
+  return (
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <EingaengeKnopf einsatzId={ungelesen} />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+/**
+ * Knopf und Eingangsband. Das Band hängt in der App als Portal fest am unteren Rand; `interact`
+ * setzt eine Kopie an seinen Platz unter dem Kopf (`data-ds-band`) und löst sie aus der festen
+ * Lage, sonst stünde es außerhalb der Karte.
+ */
+function EingaengeBeispiel() {
+  return (
+    <div className="ds-stapel">
+      <div className="ds-reihe" style={{ background: rahmenFarben.grund, padding: 8 }}>
+        <EingaengeKnopfBeispiel ungelesen={0} />
+        <EingaengeKnopfBeispiel ungelesen={3} />
+      </div>
+      <div data-ds-band="" />
+      <Eingangsband
+        titel="3 neue Eingänge"
+        aktion={{ text: 'Ansehen', beiKlick: nichts }}
+        beiSchliessen={nichts}
+      >
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBlockStart: 4 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <strong>Meldung von Florian Celle 1-46-1</strong>: Wasserversorgung steht · 1430
+          </span>
+          <Button>Sichten</Button>
+        </div>
+        <div style={{ marginBlockStart: 4 }}>
+          <strong>Lagemeldung EA 2</strong>: Lage unverändert · 1426
+        </div>
+        <div style={{ marginBlockStart: 4 }}>+ 1 weitere</div>
+      </Eingangsband>
+    </div>
+  );
+}
+
+async function holeEingangsband(container: HTMLElement): Promise<void> {
+  const baender = [...document.body.querySelectorAll<HTMLElement>('[data-lfh="eingangsband"]')];
+  const plaetze = container.querySelectorAll('[data-ds-band]');
+  if (baender.length !== 2 || plaetze.length !== 2) {
+    throw new Error('Design System: Eingangsband nicht gefunden');
+  }
+  // Eine Kopie: das Original gehört React und hängt beim Aushängen aus `document.body` aus.
+  baender.forEach((band, i) => {
+    const kopie = band.cloneNode(true) as HTMLElement;
+    kopie.style.position = 'static';
+    kopie.style.width = 'auto';
+    plaetze[i].replaceWith(kopie);
+  });
+}
+
+/** Die Sichtungswahl ohne Wahl und mit gewählter SK II. */
+function SichtungsWahlBeispiel() {
+  const [wahl, setWahl] = useState<Sichtungskategorie | null>('sk2');
+  return (
+    <div className="ds-stapel">
+      <SichtungsWahl aria-label="Sichtung (ohne Wahl)" value={null} onChange={nichts} />
+      <SichtungsWahl aria-label="Sichtung" value={wahl} onChange={setWahl} />
+    </div>
+  );
+}
+
+/** Drei Verletzungen, vorn und hinten, eine ohne Schwere; ohne Lage, also mittig in der Region. */
+const VERLETZUNGEN: Verletzung[] = (
+  [
+    [1, 'vorn', 'unterarm_l', 'fraktur_verdacht', 'schwer'],
+    [2, 'vorn', 'kopf', 'wunde_blutung', null],
+    [3, 'hinten', 'ruecken', 'schmerz', 'mittel'],
+  ] as const
+).map(([id, ansicht, region, art, schwere]) => ({
+  id,
+  einsatz_id: 1,
+  person_id: 1,
+  ansicht,
+  region,
+  art,
+  schwere,
+  erfasst_at: ZEIT_LAGE,
+  erfasst_von: 1,
+  zeitpunkt_at: ZEIT_LAGE,
+}));
+
+function KoerperschemaBeispiel() {
+  return (
+    <AnzeigeKonventionenProvider konventionen={KONVENTIONEN_TAKTISCH}>
+      <Koerperschema
+        einsatzId={1}
+        verletzungen={VERLETZUNGEN}
+        geschlecht="maennlich"
+        modus="lesen"
+      />
+    </AnzeigeKonventionenProvider>
+  );
+}
+
+interface Quelle {
+  kennung: string;
+  ort: string;
+  ausmass: 'gross' | 'mittel' | 'klein';
+}
+
+const AUSMASS = [
+  { text: 'Groß', value: 'gross' },
+  { text: 'Mittel', value: 'mittel' },
+  { text: 'Klein', value: 'klein' },
+] as const;
+
+const SCHAEDEN: Quelle[] = [
+  { kennung: 'S-01', ort: 'Scheune Hof Meyer', ausmass: 'gross' },
+  { kennung: 'S-02', ort: 'Wohnhaus Nord', ausmass: 'klein' },
+  { kennung: 'S-03', ort: 'Stallung', ausmass: 'mittel' },
+  { kennung: 'S-04', ort: 'Lagerhalle', ausmass: 'gross' },
+  { kennung: 'S-05', ort: 'Garage', ausmass: 'klein' },
+];
+
+/** Ein gemerkter Stand: nach Ort sortiert, Ausmaß „Groß“ gefiltert. */
+const SCHAEDEN_GEDAECHTNIS: ListenGedaechtnis = {
+  start: {
+    sortierung: { spalte: 'ort', richtung: 'auf' },
+    filter: { ausmass: ['gross'] },
+    suche: '',
+  },
+  spaltenStart: null,
+  melde: nichts,
+  meldeSpalten: nichts,
+};
+
+/**
+ * Eine Vergleichstabelle mit Sortieren und Filtern im Kopf: sortiert nach Ort, gefiltert nach
+ * Ausmaß, darüber Chip und Filterhinweis.
+ */
+function TabelleBeispiel() {
+  return (
+    <KatalogTabelle<Quelle>
+      rowKey="kennung"
+      dataSource={SCHAEDEN}
+      gedaechtnis={SCHAEDEN_GEDAECHTNIS}
+      mehrzahl="Schäden"
+      pagination={false}
+      columns={[
+        {
+          title: 'Kennung',
+          dataIndex: 'kennung',
+          key: 'kennung',
+          zahl: true,
+          sorter: (a, b) => a.kennung.localeCompare(b.kennung),
+        },
+        {
+          title: 'Ort',
+          dataIndex: 'ort',
+          key: 'ort',
+          sorter: (a, b) => a.ort.localeCompare(b.ort),
+        },
+        {
+          title: 'Ausmaß',
+          key: 'ausmass',
+          render: (_, s) => AUSMASS.find((a) => a.value === s.ausmass)!.text,
+          filters: [...AUSMASS],
+          onFilter: (wert, s) => s.ausmass === wert,
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * Die übrigen Paneeltypen des Dashboard-Baukastens: Abschnitte einer Liste („Offene Vorgänge“,
+ * einer leer, einer gesperrt), eine Gliederung mit Lagekante und ein Strom mit Sammelbanner.
+ */
+function DashboardListenBeispiel() {
+  const { token, rollen } = useRollen();
+  const auftraege = [
+    ['A-12', 'Riegelstellung Wohnhaus', 'EA 1'],
+    ['A-13', 'Wasserversorgung vom Löschteich', 'EA 2'],
+  ] as const;
+  return (
+    <MemoryRouter>
+      <DashboardFlaeche>
+        <DashboardPaneel
+          titel="Offene Vorgänge"
+          ueberschrift="h3"
+          zustand="daten"
+          leerText="Keine offenen Vorgänge."
+          gesperrtText="Nicht freigegeben."
+          onNeuladen={nichts}
+        >
+          <ListenAbschnitt<(typeof auftraege)[number]>
+            titel="Aufträge"
+            ueberschrift="h4"
+            zahl={2}
+            zahlWort="offen"
+            notiz="davon 1 überfällig"
+            zustand="daten"
+            eintraege={auftraege}
+            schluessel={(a) => a[0]}
+            zeile={(a) => (
+              <Link to={`/auftraege/${a[0]}`} style={listenZeileStil(rollen, token)}>
+                {`${a[0]} ${a[1]} · ${a[2]}`}
+              </Link>
+            )}
+            sprung={{ ziel: '/auftraege', name: 'Aufträge' }}
+            gesperrtText="nicht freigegeben"
+            onNeuladen={nichts}
+          />
+          <ListenAbschnitt<string>
+            titel="Nachforderungen"
+            ueberschrift="h4"
+            zahl={0}
+            zustand="daten"
+            eintraege={[]}
+            schluessel={(e) => e}
+            zeile={(e) => e}
+            gesperrtText="nicht freigegeben"
+            onNeuladen={nichts}
+          />
+          <ListenAbschnitt<string>
+            titel="Erinnerungen"
+            ueberschrift="h4"
+            zahl={null}
+            zustand="gesperrt"
+            eintraege={[]}
+            schluessel={(e) => e}
+            zeile={(e) => e}
+            gesperrtText="Modul Erinnerungen nicht freigegeben"
+            onNeuladen={nichts}
+          />
+        </DashboardPaneel>
+        <GliederungsPaneel
+          titel="Einsatzabschnitte"
+          ueberschrift="h3"
+          zustand="daten"
+          meta="2 Abschnitte"
+          leerText="Keine Abschnitte."
+          gesperrtText="Nicht freigegeben."
+          onNeuladen={nichts}
+          zeilen={[
+            {
+              schluessel: 1,
+              ziel: '/abschnitte/1',
+              kante: { farbe: rollen.alarm, rolle: 'alarm' },
+              kopf: 'EA 1 Brandbekämpfung · kritisch',
+              inhalt: 'Riegelstellung zum Wohnhaus',
+              zahl: '1/4/18',
+            },
+            {
+              schluessel: 2,
+              ziel: '/abschnitte/2',
+              kante: null,
+              kopf: 'EA 2 Wasserversorgung',
+              inhalt: 'Löschteich, 2 B-Leitungen',
+              zahl: '0/2/9',
+            },
+          ]}
+        />
+        <StromPaneel
+          titel="Jüngste Einträge"
+          ueberschrift="h3"
+          zustand="daten"
+          leerText="Keine Einträge."
+          gesperrtText="Nicht freigegeben."
+          onNeuladen={nichts}
+          neu={2}
+          bannerText="2 neue Einträge"
+          onAnzeigen={nichts}
+          listeName="Jüngste Einträge"
+        >
+          <Zeitachseneintrag als="li" zeit="1430" nr="Nr. 42" typ="meldung" typwort="Meldung">
+            Wasserversorgung vom Löschteich steht
+          </Zeitachseneintrag>
+          <Zeitachseneintrag als="li" zeit="1426" nr="Nr. 41" typ="lage" typwort="Lage">
+            Lage unverändert, Riegelstellung hält
+          </Zeitachseneintrag>
+        </StromPaneel>
+      </DashboardFlaeche>
+    </MemoryRouter>
+  );
+}
 
 /** Die feste Liste der vorgestellten Bausteine (design.md D4), in Kartenreihenfolge. */
 export const PREVIEWS: readonly PreviewSpec[] = [
@@ -693,6 +1171,88 @@ export const PREVIEWS: readonly PreviewSpec[] = [
       </div>
     ),
   },
+  {
+    name: 'DashboardListen',
+    title: 'Dashboard-Baukasten (Abschnitte, Gliederung, Strom)',
+    group: 'Flächen',
+    height: 1305,
+    source: 'components/instrument/ListenPaneel.tsx',
+    docAnchor: 'export function ListenAbschnitt',
+    moreDoc: 'components/instrument/StromPaneel.tsx',
+    styles: ['components/instrument/gliederungsPaneel.css'],
+    client: true,
+    content: () => <DashboardListenBeispiel />,
+  },
+  {
+    name: 'Tabelle',
+    title: 'Tabellenkopf mit Sortieren und Filtern, Filterhinweis',
+    group: 'Daten',
+    height: 515,
+    source: 'components/tabellenFilter.tsx',
+    moreDoc: 'components/instrument/Filterhinweis.tsx',
+    client: true,
+    content: () => <TabelleBeispiel />,
+  },
+  {
+    name: 'Zeitdarstellung',
+    title: 'Zeitdarstellung (taktisch und Datum mit Uhrzeit)',
+    group: 'Daten',
+    height: 355,
+    source: 'anzeige/zeitDarstellung.ts',
+    ruleHead: 'Zeitdarstellung',
+    content: () => <ZeitdarstellungBeispiel />,
+  },
+  {
+    name: 'Zeiteingabe',
+    title: 'Zeiteingabe (Wert mit Schnellwahl, leer, unlesbar)',
+    group: 'Formular',
+    height: 640,
+    source: 'anzeige/ZeitpunktEingabe.tsx',
+    styles: ['anzeige/ZeitpunktEingabe.css'],
+    content: () => <ZeiteingabeBeispiel />,
+    interact: tippeInZeitfelder,
+  },
+  {
+    name: 'Ortsfeld',
+    title: 'Ortsfeld (leer, verortet, nur Text; Kartenbild nur in der App)',
+    group: 'Formular',
+    height: 1140,
+    source: 'anzeige/Ortsfeld.tsx',
+    docAnchor: 'export function Ortsfeld',
+    content: () => <OrtsfeldBeispiel />,
+    interact: warteAufOrtVorschau,
+  },
+  {
+    name: 'Eingaenge',
+    title: 'Eingänge (Knopf im Kopf und Eingangsband)',
+    group: 'Rückmeldung',
+    height: 590,
+    source: 'alarm/EingaengeKnopf.tsx',
+    docAnchor: 'export default function EingaengeKnopf',
+    moreDoc: 'alarm/Eingangsband.tsx',
+    content: () => <EingaengeBeispiel />,
+    interact: holeEingangsband,
+  },
+  {
+    name: 'SichtungsWahl',
+    title: 'SichtungsWahl (BBK-Flächen, ohne und mit Wahl)',
+    group: 'Fach',
+    height: 445,
+    source: 'personen/SichtungsWahl.tsx',
+    docAnchor: 'export interface SichtungsWahlProps',
+    client: true,
+    content: () => <SichtungsWahlBeispiel />,
+  },
+  {
+    name: 'Koerperschema',
+    title: 'Körperschema (Lesen)',
+    group: 'Fach',
+    height: 870,
+    source: 'personen/koerperschema/Koerperschema.tsx',
+    docAnchor: 'export interface KoerperschemaProps',
+    client: true,
+    content: () => <KoerperschemaBeispiel />,
+  },
 ];
 
 function ThemaAbschnitt({ dunkel, children }: { dunkel: boolean; children: ReactNode }) {
@@ -734,7 +1294,7 @@ function tree(spec: PreviewSpec, cache: ReturnType<typeof createCache>): ReactEl
 /** Markup und antd-CSS einer Vorschau. */
 export async function renderPreview(spec: PreviewSpec): Promise<{ html: string; css: string }> {
   const cache = createCache();
-  if (!spec.interact) {
+  if (!spec.interact && !spec.client) {
     const html = renderToString(tree(spec, cache));
     return { html, css: extractStyle(cache, { plain: true }) };
   }
@@ -742,7 +1302,7 @@ export async function renderPreview(spec: PreviewSpec): Promise<{ html: string; 
   document.body.appendChild(container);
   const root = createRoot(container);
   await act(async () => root.render(tree(spec, cache)));
-  await spec.interact(container);
+  await spec.interact?.(container);
   // Vor dem Aushängen: danach ist der Cache leer (Kopf dieser Datei).
   const result = { html: container.innerHTML, css: extractStyle(cache, { plain: true }) };
   await act(async () => root.unmount());

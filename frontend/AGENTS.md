@@ -28,7 +28,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Regelabschnitt, den die README trägt, oder `theme/gesperrtZeichen.guard.test.ts` (README
     „Gesperrt“), oder hebt er antd oder eine Schrift, läuft
     `mise exec -- pnpm -C frontend design-system`, und das Erzeugte kommt mit in den PR. Ein roter
-    Wächter heißt dasselbe.
+    Wächter heißt dasselbe. Ein neuer Baustein bekommt eine Karte in `PREVIEWS`
+    (`frontend/scripts/design-system/previews.tsx`), aus dem echten Baustein, Nacht und Tag.
   - **Nach dem Merge veröffentlicht der Agent, der den PR abschließt, neu**: aus dem Stand von
     `alpha` auf die Adresse in `ARTIFACT.md`, nur die geänderten Dateien unter `project/`. Den
     Index `design-system.json` gibt es nur im Artifact: zuletzt und einzeln senden, unmittelbar
@@ -64,6 +65,15 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
   Dashboard-Baukasten (unten).
+- **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
+  `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
+  `anzeige/Ortsfeld.tsx`, im Einsatz `anzeige/EinsatzOrtsfeld.tsx` (Ortsfeld) ·
+  `components/StammdatenFeld.tsx` (aus Stammdaten oder frei) · `components/VerbindungenFeld.tsx`
+  und `components/FunkUndTelefon.tsx` (Verbindungen) · `components/InlineAngabe.tsx` ·
+  `components/tabellenFilter.tsx` (Filterchips und Kopfmarke; Träger `KatalogTabelle`,
+  `Datensicht`; Sortieren und Filtern in der Bedien-Leitlinie) · `alarm/EingaengeKnopf.tsx` und
+  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `personen/SichtungsWahl.tsx` ·
+  `personen/koerperschema/Koerperschema.tsx`. Jeder hat eine Karte im Design System.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab

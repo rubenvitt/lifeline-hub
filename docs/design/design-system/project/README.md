@@ -29,6 +29,14 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **StammdatenFeld (aus Stammdaten oder frei)** (`components/StammdatenFeld/`, Gruppe Formular)
 - **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
 - **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)
+- **Dashboard-Baukasten (Abschnitte, Gliederung, Strom)** (`components/DashboardListen/`, Gruppe Flächen)
+- **Tabellenkopf mit Sortieren und Filtern, Filterhinweis** (`components/Tabelle/`, Gruppe Daten)
+- **Zeitdarstellung (taktisch und Datum mit Uhrzeit)** (`components/Zeitdarstellung/`, Gruppe Daten)
+- **Zeiteingabe (Wert mit Schnellwahl, leer, unlesbar)** (`components/Zeiteingabe/`, Gruppe Formular)
+- **Ortsfeld (leer, verortet, nur Text; Kartenbild nur in der App)** (`components/Ortsfeld/`, Gruppe Formular)
+- **Eingänge (Knopf im Kopf und Eingangsband)** (`components/Eingaenge/`, Gruppe Rückmeldung)
+- **SichtungsWahl (BBK-Flächen, ohne und mit Wahl)** (`components/SichtungsWahl/`, Gruppe Fach)
+- **Körperschema (Lesen)** (`components/Koerperschema/`, Gruppe Fach)
 
 ## Nur im Code
 
@@ -78,6 +86,15 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
   Dashboard-Baukasten (unten).
+- **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
+  `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
+  `anzeige/Ortsfeld.tsx`, im Einsatz `anzeige/EinsatzOrtsfeld.tsx` (Ortsfeld) ·
+  `components/StammdatenFeld.tsx` (aus Stammdaten oder frei) · `components/VerbindungenFeld.tsx`
+  und `components/FunkUndTelefon.tsx` (Verbindungen) · `components/InlineAngabe.tsx` ·
+  `components/tabellenFilter.tsx` (Filterchips und Kopfmarke; Träger `KatalogTabelle`,
+  `Datensicht`; Sortieren und Filtern in der Bedien-Leitlinie) · `alarm/EingaengeKnopf.tsx` und
+  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `personen/SichtungsWahl.tsx` ·
+  `personen/koerperschema/Koerperschema.tsx`. Jeder hat eine Karte im Design System.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab

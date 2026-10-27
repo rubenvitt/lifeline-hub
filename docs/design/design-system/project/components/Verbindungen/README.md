@@ -22,4 +22,4 @@ Funk und Telefon getrennt (LLH-1134, Entscheidung LLH-1126 Option B): Lesezeilen
 und Einheit in einem `Datenraster`.
 
 Quelle: `frontend/src/components/VerbindungenFeld.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert (der Zustand nach einem Klick im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
+dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

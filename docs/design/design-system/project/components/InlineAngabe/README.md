@@ -65,4 +65,4 @@ dorthin zurück). Name und Beschreibung bleiben die des Wertknopfs, die leere An
 Aufforderung „… eintragen“. Steckt ohne den Modus ein Ziel im Wertknopf, warnt die Entwicklung.
 
 Quelle: `frontend/src/components/InlineAngabe.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert (der Zustand nach einem Klick im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
+dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
