@@ -87,6 +87,10 @@ import EingaengeKnopf from '../../src/alarm/EingaengeKnopf';
 import Eingangsband from '../../src/alarm/Eingangsband';
 import SichtungsWahl from '../../src/personen/SichtungsWahl';
 import Koerperschema from '../../src/personen/koerperschema/Koerperschema';
+import EinsatzZeichen from '../../src/zeichen/EinsatzZeichen';
+import { useZeichenTheme } from '../../src/zeichen/useZeichenTheme';
+import EinheitZeichen, { FahrzeugZeichen } from '../../src/kraefte/EinheitZeichen';
+import { baueTzProps, schadenTz, type TzProps } from '../../src/pages/lagekarte/taktischesZeichen';
 
 /** Die Vorschauen zeigen die Stufe des Fükw, des primären Kontexts. */
 const DICHTE: Dichte = 'kompakt';
@@ -833,6 +837,75 @@ function DashboardListenBeispiel() {
   );
 }
 
+/**
+ * Zeichen der Fachobjekte (LLH-1475): Einheit und Fahrzeug mit und ohne Organisation, Gefahr mit
+ * und ohne Ausmaß. Ohne Organisation zeichnet die Bibliothek nur einen Umriss, nachts der Fall,
+ * den das Render-Theme `dark` trägt.
+ */
+const ZEICHEN_BEISPIELE: readonly { wort: string; tz: TzProps }[] = [
+  { wort: 'Zug', tz: baueTzProps({ objekttyp: 'einheit', einheitTypLabel: 'Zug' }) },
+  {
+    wort: 'Gruppe Feuerwehr',
+    tz: baueTzProps({
+      objekttyp: 'einheit',
+      einheitTypLabel: 'Gruppe',
+      organisation: 'feuerwehr',
+      fachaufgabe: 'brandbekaempfung',
+    }),
+  },
+  { wort: 'Fahrzeug', tz: baueTzProps({ objekttyp: 'fahrzeug' }) },
+  {
+    wort: 'Fahrzeug THW',
+    tz: baueTzProps({ objekttyp: 'fahrzeug', traegerorganisation: 'THW', fachaufgabe: 'bergung' }),
+  },
+  { wort: 'Brand, groß', tz: schadenTz('gross', 'brand') },
+  { wort: 'Einsturz, ohne Ausmaß', tz: schadenTz(null, 'einsturz') },
+];
+
+function TaktischeZeichenBeispiel() {
+  const theme = useZeichenTheme();
+  const { rollen } = useRollen();
+  return (
+    <div className="ds-stapel">
+      <div className="ds-reihe" style={{ gap: 16, alignItems: 'flex-start' }}>
+        {ZEICHEN_BEISPIELE.map(({ wort, tz }) => (
+          <figure
+            key={wort}
+            style={{
+              margin: 0,
+              width: 96,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <EinsatzZeichen tz={tz} size={48} theme={theme} />
+            <figcaption style={{ color: rollen.text2, fontSize: 12, textAlign: 'center' }}>
+              {wort}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+      {/* Die Zeilen des Meldebilds: Einheit 26 px, Fahrzeug 22 px, je im Rahmen. */}
+      <div className="ds-reihe">
+        <EinheitZeichen tz={{ typLabel: 'Gruppe', fachaufgabe: null, organisation: null }} />
+        <span>1. Gruppe</span>
+        <FahrzeugZeichen
+          tz={{
+            fahrzeugtyp: 'LF 20',
+            traegerorganisation: 'Feuerwehr',
+            opta: null,
+            fachaufgabe: null,
+            organisation: null,
+          }}
+        />
+        <span>Florian Celle 1-46-1</span>
+      </div>
+    </div>
+  );
+}
+
 /** Die feste Liste der vorgestellten Bausteine (design.md D4), in Kartenreihenfolge. */
 export const PREVIEWS: readonly PreviewSpec[] = [
   {
@@ -1252,6 +1325,15 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     docAnchor: 'export interface KoerperschemaProps',
     client: true,
     content: () => <KoerperschemaBeispiel />,
+  },
+  {
+    name: 'TaktischeZeichen',
+    title: 'Taktische Zeichen (Einheit, Fahrzeug, Gefahr; Meldebildzeile)',
+    group: 'Fach',
+    height: 375,
+    source: 'zeichen/EinsatzZeichen.tsx',
+    moreDoc: 'zeichen/zeichenTheme.ts',
+    content: () => <TaktischeZeichenBeispiel />,
   },
 ];
 
