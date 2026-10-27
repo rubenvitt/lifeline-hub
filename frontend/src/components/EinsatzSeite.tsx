@@ -23,6 +23,9 @@ import type { EinsatzAnzeige } from '../api/types';
  *  höhere Aktion (Segmentleiste) lässt sie nach unten weiter wachsen. */
 const SEITENKOPF_HOEHE = 44;
 
+/** Haarlinie unter der Seitenkopfleiste; sie zählt zur Höhe (`boxSizing: 'border-box'`). */
+const SEITENKOPF_LINIE = 1;
+
 /**
  * Stil der Seitenkopfleiste — rein und exportiert.
  *
@@ -45,7 +48,7 @@ export function seitenkopfStil(
     rowGap: token.paddingXS,
     minHeight: SEITENKOPF_HOEHE,
     paddingBlock: token.paddingXS,
-    borderBottom: `1px solid ${farben.linie}`,
+    borderBottom: `${SEITENKOPF_LINIE}px solid ${farben.linie}`,
     marginBottom: token.marginLG,
     boxSizing: 'border-box',
     ...(vollbreit
@@ -60,8 +63,9 @@ export function seitenkopfStil(
 
 /**
  * Titelblock im Seitenkopf — rein und exportiert (LLH-1278). Der Block hängt OBEN in der Leiste
- * und ist mindestens eine Zeile der Stufe hoch: der Boden der Leiste ohne Polster (44 px) bzw.
- * der `controlHeight` der Stufe (30 / 48 / 72), was größer ist. Darin steht der Titel mittig.
+ * und ist mindestens eine Zeile der Stufe hoch: der Boden der Leiste ohne Polster und Haarlinie
+ * (44 − 2 · 3 − 1 = 37 px in `kompakt`) bzw. der `controlHeight` der Stufe (30 / 48 / 72), was
+ * größer ist. Darin steht der Titel mittig.
  *
  * Vorher mittete die Leiste beide Seiten gegeneinander. Eine Segmentleiste im Aktionen-Slot ist
  * um zwei Zielabstände und ihren Rahmen höher als ein Knopf (Material, Fahrzeuge); die Leiste
@@ -82,7 +86,10 @@ export function titelblockStil(token: {
     // statt sich über den Boden zu verteilen.
     alignContent: 'center',
     alignSelf: 'flex-start',
-    minHeight: Math.max(token.controlHeight, SEITENKOPF_HOEHE - 2 * token.paddingXS),
+    minHeight: Math.max(
+      token.controlHeight,
+      SEITENKOPF_HOEHE - 2 * token.paddingXS - SEITENKOPF_LINIE,
+    ),
     columnGap: token.marginXS * 3,
     rowGap: 2,
     minWidth: 0,
