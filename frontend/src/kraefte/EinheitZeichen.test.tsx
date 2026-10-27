@@ -1,6 +1,10 @@
+import { act } from '@testing-library/react';
+import { contrastSurface } from '@einsatzzeichen/core';
+import { ConfigProvider, theme } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { ZEICHEN_UNTERLAGE } from '../zeichen/unterlage';
+import { antdToken, farbenDunkel } from '../theme/tokens';
+import { ZEICHEN_THEME_DUNKEL } from '../zeichen/zeichenTheme';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 
 // Die Spalte „TZ“ im Meldebild (LFH-835): @einsatzzeichen, und ein gespeicherter Unsinnswert
@@ -40,16 +44,42 @@ describe('EinheitZeichen', () => {
     expect(document.querySelector('[data-lfh="einheit-zeichen"] svg')).toBeNull();
   });
 
-  // LFH-1120: die Organisations-Vorgabe der Karte fehlt hier bewusst, also zeichnet die Bibliothek
-  // jede Einheit ohne eigene Organisation mit schwarzem Umriss ohne Fläche — im Nachtbetrieb ohne
-  // Unterlage schwarz auf schwarz.
-  it('legt das Zeichen auf die helle Unterlage', () => {
+  // LLH-1409: die Organisations-Vorgabe der Karte fehlt hier bewusst, also zeichnet die Bibliothek
+  // jede Einheit ohne eigene Organisation mit schwarzem Umriss ohne Fläche — nachts sonst schwarz
+  // auf schwarz. Nachts hinterlegt das Render-Theme `dark` die Kontur hell, am Tag und im Druck
+  // bleibt die Referenzpalette; ein helles Quadrat dahinter gibt es nicht mehr.
+  const hinterlegt = () =>
+    document
+      .querySelector('[data-lfh="einheit-zeichen"] svg')!
+      .querySelector(`[stroke="${contrastSurface(ZEICHEN_THEME_DUNKEL)}"]`) != null;
+  const ohneOrganisation = { typLabel: 'Zug', fachaufgabe: null, organisation: null };
+
+  it('zeichnet nachts mit dem Theme `dark`, im Druck ohne', () => {
     renderMitProviders(
-      <EinheitZeichen tz={{ typLabel: 'Zug', fachaufgabe: null, organisation: null }} />,
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }}>
+        <EinheitZeichen tz={ohneOrganisation} />
+      </ConfigProvider>,
     );
-    expect(document.querySelector('[data-lfh="einheit-zeichen"] svg')).toHaveStyle({
-      backgroundColor: ZEICHEN_UNTERLAGE,
+    expect(hinterlegt()).toBe(true);
+    expect(
+      document.querySelector<SVGElement>('[data-lfh="einheit-zeichen"] svg')!.style.backgroundColor,
+    ).toBe('');
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
     });
+    expect(hinterlegt()).toBe(false);
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
+    expect(hinterlegt()).toBe(true);
+  });
+
+  it('zeichnet am Tag ohne Theme und ohne Fläche dahinter', () => {
+    renderMitProviders(<EinheitZeichen tz={ohneOrganisation} />);
+    expect(hinterlegt()).toBe(false);
+    expect(
+      document.querySelector<SVGElement>('[data-lfh="einheit-zeichen"] svg')!.style.backgroundColor,
+    ).toBe('');
   });
 });
 

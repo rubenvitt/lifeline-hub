@@ -13,10 +13,10 @@
  * und Meldungszeile außerhalb davon stehen können (Prüfliste O1); die Gruppe des Elements in
  * `SkizzenFlaeche.tsx` trägt nur die Marke `data-zurueck`.
  */
+import type { RenderTheme } from '@einsatzzeichen/core';
 import type { CSSProperties, ReactNode } from 'react';
 import { useRollen } from '../../components/instrument';
 import EinsatzZeichen, { FunktionsZeichen } from '../../zeichen/EinsatzZeichen';
-import { ZEICHEN_UNTERLAGE } from '../../zeichen/unterlage';
 import type {
   AusstattungsZeichen,
   NetzBereich,
@@ -67,29 +67,6 @@ const MARKE = 10;
 
 /** Kantenlänge des taktischen Zeichens in px (ganzzahlig, die Bibliothek verlangt es). */
 const TZ_PX = TZ_HOEHE;
-
-/**
- * Helle Unterlage hinter jedem taktischen Zeichen am Schirm (LFH-1107): dieselbe Farbe wie der
- * Baustein `ZEICHEN_UNTERLAGE` (`zeichen/unterlage.ts`, Begründung dort). In der Skizze
- * steht das Zeichen als inneres `svg` im SVG der Fläche, das keinen Hintergrund malt; deshalb
- * trägt hier ein `rect` die Unterlage. Im Druck und in der Anlage steht keine (`unterlage` aus
- * der Fläche, dazu `skizzeDruck.css`). Gemessen in beiden Modi im e2e „Zeichenkontrast“
- * (`fernmeldeskizze-ausstattung.spec.ts`).
- *
- * Die Unterlage deckt genau das Quadrat des Zeichens: die Bibliothek lässt darin rund 3 % Rand um
- * den Umriss, und das Element wird nicht größer (Plätze, Treffläche und Abstände bleiben).
- */
-function ZeichenUnterlage({ groesse }: { groesse: number }) {
-  return (
-    <rect
-      width={groesse}
-      height={groesse}
-      rx={1}
-      fill={ZEICHEN_UNTERLAGE}
-      data-teil="zeichen-grund"
-    />
-  );
-}
 
 /** Darstellungszustand eines Elements. */
 export interface Zustand {
@@ -223,17 +200,21 @@ function zeilenHoehe(text: string, schrift: number, zeile: number, breite: numbe
   return umbrich(text, schrift, breite).length * zeile;
 }
 
-/** Das taktische Zeichen auf einem Platz (verschachteltes SVG der Bibliothek). */
+/**
+ * Das taktische Zeichen auf einem Platz (verschachteltes SVG der Bibliothek). Am Schirm im
+ * Nachtbetrieb mit dem Render-Theme `dark` (LLH-1409): das Zeichen selbst hell hinterlegt, kein
+ * Quadrat dahinter; Plätze, Treffläche und Abstände bleiben.
+ */
 function Taktisch({
   stelle,
   x,
   y,
-  unterlage,
+  theme,
 }: {
   stelle: NetzStelle;
   x: number;
   y: number;
-  unterlage: boolean;
+  theme: RenderTheme | undefined;
 }) {
   if (stelle.art === 'komponente') return null;
   const tz =
@@ -243,21 +224,36 @@ function Taktisch({
       : stelle.tz;
   return (
     <g transform={`translate(${x - TZ_PX / 2} ${y})`} aria-hidden="true" data-teil="tz">
-      {unterlage ? <ZeichenUnterlage groesse={TZ_PX} /> : null}
-      <EinsatzZeichen tz={tz} size={TZ_PX} />
+      <EinsatzZeichen tz={tz} size={TZ_PX} theme={theme} />
     </g>
   );
 }
 
-function AusstattungsZeichenBild({ zeichen }: { zeichen: AusstattungsZeichen }) {
+function AusstattungsZeichenBild({
+  zeichen,
+  theme,
+}: {
+  zeichen: AusstattungsZeichen;
+  theme: RenderTheme | undefined;
+}) {
   switch (zeichen.art) {
     case 'tz':
-      return <EinsatzZeichen tz={zeichen.tz} size={AUSSTATTUNG_ZEICHEN} />;
+      return <EinsatzZeichen tz={zeichen.tz} size={AUSSTATTUNG_ZEICHEN} theme={theme} />;
     case 'rolle':
-      return <FunktionsZeichen funktion={{ rolle: zeichen.rolle }} size={AUSSTATTUNG_ZEICHEN} />;
+      return (
+        <FunktionsZeichen
+          funktion={{ rolle: zeichen.rolle }}
+          size={AUSSTATTUNG_ZEICHEN}
+          theme={theme}
+        />
+      );
     case 'kuerzel':
       return (
-        <FunktionsZeichen funktion={{ kuerzel: zeichen.kuerzel }} size={AUSSTATTUNG_ZEICHEN} />
+        <FunktionsZeichen
+          funktion={{ kuerzel: zeichen.kuerzel }}
+          size={AUSSTATTUNG_ZEICHEN}
+          theme={theme}
+        />
       );
   }
 }
@@ -272,13 +268,13 @@ function Ausstattung({
   x,
   y,
   innen,
-  unterlage,
+  theme,
 }: {
   stelle: NetzStelle;
   x: number;
   y: number;
   innen: number;
-  unterlage: boolean;
+  theme: RenderTheme | undefined;
 }) {
   if (stelle.art !== 'fuehrungsstelle' && stelle.art !== 'abschnitt') return null;
   const { plaetze } = ausstattungsZeilen(stelle.ausstattung, innen);
@@ -298,8 +294,7 @@ function Ausstattung({
           >
             <title>{p.ausstattung.titel}</title>
             <g transform={`translate(${cx - AUSSTATTUNG_ZEICHEN / 2} ${oben})`} aria-hidden="true">
-              {unterlage ? <ZeichenUnterlage groesse={AUSSTATTUNG_ZEICHEN} /> : null}
-              <AusstattungsZeichenBild zeichen={p.ausstattung.zeichen} />
+              <AusstattungsZeichenBild zeichen={p.ausstattung.zeichen} theme={theme} />
             </g>
             <text
               x={cx}
@@ -343,14 +338,17 @@ export function StelleBild({
   platz,
   zustand,
   meldung,
-  unterlage = false,
+  zeichenTheme,
 }: {
   stelle: NetzStelle;
   platz: Platz;
   zustand: Zustand;
   meldung?: string | null;
-  /** Helle Unterlage hinter den Zeichen (`ZEICHEN_UNTERLAGE`): nur am Schirm, nie im Druck. */
-  unterlage?: boolean;
+  /**
+   * Render-Theme der Zeichen: nachts am Schirm das Theme `dark` (`zeichen/zeichenTheme.ts`,
+   * LLH-1409), im Druck und in der Anlage keins.
+   */
+  zeichenTheme?: RenderTheme;
 }) {
   const strich = zustand.hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
   const deckkraft = zurueckDeckkraft(zustand.zurueck, 'bild');
@@ -431,7 +429,7 @@ export function StelleBild({
             strokeWidth={STRICH_HERVORGEHOBEN}
           />
         ) : null}
-        <Taktisch stelle={stelle} x={cx} y={tzY} unterlage={unterlage} />
+        <Taktisch stelle={stelle} x={cx} y={tzY} theme={zeichenTheme} />
         <Zeilen
           x={cx}
           y={nameY}
@@ -480,7 +478,7 @@ export function StelleBild({
             x={platz.x + KASTEN_POLSTER}
             y={ausstattungY}
             innen={innen}
-            unterlage={unterlage}
+            theme={zeichenTheme}
           />
         ) : null}
       </g>

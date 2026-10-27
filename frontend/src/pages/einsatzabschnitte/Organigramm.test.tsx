@@ -19,9 +19,11 @@ import type { EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
-import { dichten } from '../../theme/tokens';
+import { antdToken, dichten, farbenDunkel } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
-import { ZEICHEN_UNTERLAGE } from '../../zeichen/unterlage';
+import { contrastSurface } from '@einsatzzeichen/core';
+import { ConfigProvider, theme } from 'antd';
+import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
 
 vi.mock('../../api/einsaetze', () => ({
   ladeModulFreigaben: vi.fn(),
@@ -245,12 +247,39 @@ describe('OrganigrammBild — Knoten', () => {
     zeichen.forEach((z) => expect(z).toHaveAttribute('aria-hidden', 'true'));
   });
 
-  // LFH-1120: Zeichen ohne Organisation hätten im Nachtbetrieb keinen Grund, der sie trägt.
-  it('legt jedes Zeichen auf die helle Unterlage', () => {
-    const { container } = bild();
-    const zeichen = container.querySelectorAll('[data-lfh="org-zeichen"] svg');
-    expect(zeichen.length).toBeGreaterThan(0);
-    zeichen.forEach((z) => expect(z).toHaveStyle({ backgroundColor: ZEICHEN_UNTERLAGE }));
+  // LLH-1409: Zeichen ohne Organisation hätten im Nachtbetrieb keinen Grund, der sie trägt. Nachts
+  // hinterlegt das Render-Theme `dark` jede Kontur hell, ohne Fläche dahinter; am Tag keins.
+  it('zeichnet nachts jedes Zeichen mit dem Theme `dark`, am Tag ohne, nie mit Fläche dahinter', () => {
+    const hinterlegung = `[stroke="${contrastSurface(ZEICHEN_THEME_DUNKEL)}"]`;
+    const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
+    const { container, unmount } = renderMitProviders(
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }}>
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <OrganigrammBild
+            einsatzId={1}
+            org={org}
+            einsatzleiter={{ art: 'nicht-erfasst' }}
+            stab={{ zustand: 'aus' }}
+            zugeklappt={new Set()}
+            onUmschalten={vi.fn()}
+          />
+        </AnzeigeKonventionenProvider>
+      </ConfigProvider>,
+    );
+    const nachts = container.querySelectorAll<SVGElement>('[data-lfh="org-zeichen"] svg');
+    expect(nachts.length).toBeGreaterThan(0);
+    nachts.forEach((z) => {
+      expect(z.querySelector(hinterlegung)).not.toBeNull();
+      expect(z.style.backgroundColor).toBe('');
+    });
+    unmount();
+
+    const tags = bild().container.querySelectorAll<SVGElement>('[data-lfh="org-zeichen"] svg');
+    expect(tags.length).toBeGreaterThan(0);
+    tags.forEach((z) => {
+      expect(z.querySelector(hinterlegung)).toBeNull();
+      expect(z.style.backgroundColor).toBe('');
+    });
   });
 
   it('stellt Einheiten ohne Abschnitt unter „Ohne Abschnitt“', () => {

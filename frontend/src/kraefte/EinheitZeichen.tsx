@@ -1,15 +1,16 @@
 import { baueTzProps } from '../pages/lagekarte/taktischesZeichen';
 import { useRollen } from '../components/instrument';
 import EinsatzZeichen from '../zeichen/EinsatzZeichen';
+import { useZeichenTheme } from '../zeichen/useZeichenTheme';
 import type { TzEinheit, TzFahrzeug } from './meldebildRaster';
 
 /**
  * Der Symbolplatz „TZ" der Einheitenzeile: das taktische Zeichen der Einheit, 26 × 26 px.
  * Dieselbe Ableitung wie auf der Lagekarte (`baueTzProps`) und dieselbe Zeichnung
  * (`EinsatzZeichen`, @einsatzzeichen, LFH-835). Der Organisations-Vorgabewert der Karte fehlt
- * bewusst — eine weitere Query für einen Zierrahmen wäre zu teuer. Deshalb steht das Zeichen auf
- * der hellen Unterlage (LFH-1120): ohne eigene Organisation zeichnet die Bibliothek nur einen
- * schwarzen Umriss, im Nachtbetrieb sonst schwarz auf schwarz.
+ * bewusst — eine weitere Query für einen Zierrahmen wäre zu teuer. Ohne eigene Organisation
+ * zeichnet die Bibliothek nur einen schwarzen Umriss, im Nachtbetrieb sonst schwarz auf schwarz;
+ * deshalb zeichnet sie es nachts selbst hell (Render-Theme `dark`, `useZeichenTheme`, LLH-1409).
  * Reine Zierde, `aria-hidden`: die Bezeichnung daneben benennt die Einheit.
  *
  * Die Einheit-Ansicht (LLH-1036, design.md D4) zeigt dasselbe Zeichen groß im Kopf (`groesse`)
@@ -28,6 +29,7 @@ export default function EinheitZeichen({
   orgDefault?: string | null;
 }) {
   const { rollen } = useRollen();
+  const theme = useZeichenTheme();
   return (
     <span
       aria-hidden
@@ -52,7 +54,7 @@ export default function EinheitZeichen({
             orgDefault,
           })}
           size={groesse - 4}
-          unterlage
+          theme={theme}
         />
       )}
     </span>
@@ -68,6 +70,7 @@ export default function EinheitZeichen({
  */
 export function FahrzeugZeichen({ tz }: { tz: TzFahrzeug }) {
   const { rollen } = useRollen();
+  const theme = useZeichenTheme();
   return (
     <span
       aria-hidden
@@ -92,7 +95,7 @@ export function FahrzeugZeichen({ tz }: { tz: TzFahrzeug }) {
           organisation: tz.organisation,
         })}
         size={18}
-        unterlage
+        theme={theme}
       />
     </span>
   );

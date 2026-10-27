@@ -30,7 +30,9 @@ import { ZUSTAND_GRUND } from '../../stab/funkplan';
 import { einsatzleiterDarstellung, type EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
 import type { Quelle } from '../../stab/luecken';
 import { useStabFreigabe } from '../../stab/useStabFreigabe';
+import type { RenderTheme } from '@einsatzzeichen/core';
 import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
+import { useZeichenTheme } from '../../zeichen/useZeichenTheme';
 import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import {
   baueFuehrungsorganisation,
@@ -178,6 +180,8 @@ export function OrganigrammBild({
   onUmschalten,
 }: BildProps) {
   const { token } = useRollen();
+  // Einmal für den Baum, nicht je Knoten: `useDruckModus` hängt je Aufruf eigene Druck-Hörer an.
+  const zeichenTheme = useZeichenTheme();
 
   return (
     <HaengenderBaum<OrgKnoten>
@@ -200,7 +204,7 @@ export function OrganigrammBild({
         k.art === 'sammel' ? (
           <div style={{ fontWeight: 600, paddingBlock: token.paddingXXS }}>Ohne Abschnitt</div>
         ) : (
-          <KnotenInhalt knoten={k} einsatzId={einsatzId} />
+          <KnotenInhalt knoten={k} einsatzId={einsatzId} zeichenTheme={zeichenTheme} />
         )
       }
     />
@@ -240,9 +244,11 @@ function Stabsstelle({ stab, stil }: { stab: StabsstelleZustand; stil: CSSProper
 function KnotenInhalt({
   knoten,
   einsatzId,
+  zeichenTheme,
 }: {
   knoten: Exclude<OrgKnoten, { art: 'sammel' }>;
   einsatzId: number;
+  zeichenTheme: RenderTheme | undefined;
 }) {
   const { token, rollen } = useRollen();
   const ziel =
@@ -269,9 +275,9 @@ function KnotenInhalt({
             marginBlockStart: token.paddingXXS,
           }}
         >
-          {/* Helle Unterlage am Schirm (LFH-1120): Zeichen ohne Organisation trügen im
-              Nachtbetrieb nur einen schwarzen Umriss auf dunklem Grund. */}
-          <EinsatzZeichen tz={knoten.tz} size={ZEICHEN_PX} unterlage />
+          {/* Nachts selbst hell (Render-Theme `dark`, LLH-1409): Zeichen ohne Organisation
+              trügen sonst nur einen schwarzen Umriss auf dunklem Grund. */}
+          <EinsatzZeichen tz={knoten.tz} size={ZEICHEN_PX} theme={zeichenTheme} />
         </span>
       )}
       <div style={{ minWidth: 0, flex: 1 }}>
