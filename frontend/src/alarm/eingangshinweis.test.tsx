@@ -163,7 +163,11 @@ async function warteBisWeg(titel: string | RegExp) {
 }
 
 /** Ein anderer Eingang als eine Meldung, wie der Server ihn liest. */
-function auftragEingang(id: number, auftrag: number): BenachrichtigungAnzeige {
+function auftragEingang(
+  id: number,
+  auftrag: number,
+  erstellt_at = '2026-10-21 12:05:00',
+): BenachrichtigungAnzeige {
   return {
     id,
     einsatz_id: 1,
@@ -171,7 +175,7 @@ function auftragEingang(id: number, auftrag: number): BenachrichtigungAnzeige {
     stufe: 'hinweis',
     bezug_typ: 'auftrag',
     bezug_id: auftrag,
-    erstellt_at: '2026-10-21 12:00:00',
+    erstellt_at,
     titel: 'Neuer Auftrag',
     detail: `Auftrag #${auftrag}`,
     pfad: `/einsaetze/1/auftraege?auftrag=${auftrag}`,
@@ -402,6 +406,21 @@ describe('Eingangshinweis (LLH-1062)', () => {
     await userEvent.click(within(n).getByRole('button', { name: 'Öffnen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege?auftrag=12');
     await waitFor(() => expect(s.quittiert).toEqual([1901]));
+  });
+
+  it('das Band ordnet wie der Server: jüngste Anlagezeit oben, die Kennung nur bei Gleichstand', async () => {
+    const liste = [
+      auftragEingang(2102, 21, '2026-10-21 12:01:00'),
+      auftragEingang(2101, 22, '2026-10-21 12:02:00'),
+    ];
+    serverMit(liste, {});
+    renderZentrale();
+    for (const b of liste) live(b);
+    const n = await waitFor(() => hinweis('2 neue Eingänge'));
+    const auftraege = within(n)
+      .getAllByText(/^Auftrag #\d+$/)
+      .map((el) => el.textContent);
+    expect(auftraege).toEqual(['Auftrag #22', 'Auftrag #21']);
   });
 
   it('gemischte Eingänge: „3 neue Eingänge“, „Ansehen“ öffnet den Verlauf, ohne zu quittieren', async () => {

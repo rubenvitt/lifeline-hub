@@ -120,6 +120,7 @@ function eingangVon(
   const meldung = a.art === 'meldung';
   return {
     benachrichtigungId: a.id,
+    erstelltAt: a.erstellt_at,
     einsatzId: a.einsatz_id,
     art: a.art,
     bezug: a.bezug_typ,
