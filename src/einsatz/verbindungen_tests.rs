@@ -191,9 +191,10 @@ async fn bezug_und_spalte_passen_zusammen() {
     }
 }
 
-/// Akzeptanzkriterium LLH-1134: die Migration 0244 überführt `erreichbarkeit` verlustfrei — je
+/// Akzeptanzkriterium LLH-1134: die Migration 0248 überführt `erreichbarkeit` verlustfrei — je
 /// nach `kommunikationsmittel` zu Mobil bzw. Festnetz, sonst (Digitalfunk, leer, Altwert) zu
 /// Sonstiges; Digitalfunk ohne Nummer und eine leere Erreichbarkeit ergeben keine Verbindung.
+/// Danach entfernt LLH-1418 die Altspalten; die überführten Verbindungen bleiben.
 #[tokio::test]
 async fn ueberfuehrung_erreichbarkeit_zu_verbindungen() {
     use sqlx::migrate::Migrator;
@@ -210,11 +211,16 @@ async fn ueberfuehrung_erreichbarkeit_zu_verbindungen() {
         .await
         .unwrap();
     let alle = sqlx::migrate!("./migrations");
-    let vorher = Migrator {
-        migrations: Cow::Owned(alle.iter().filter(|m| m.version < 244).cloned().collect()),
+    let bis = |hoechste: i64| Migrator {
+        migrations: Cow::Owned(
+            alle.iter()
+                .filter(|m| m.version <= hoechste)
+                .cloned()
+                .collect(),
+        ),
         ..Migrator::DEFAULT
     };
-    vorher.run(&pool).await.unwrap();
+    bis(247).run(&pool).await.unwrap();
     sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Bestand')")
         .execute(&pool)
         .await
@@ -258,6 +264,15 @@ async fn ueberfuehrung_erreichbarkeit_zu_verbindungen() {
     .await
     .unwrap();
 
+    bis(248).run(&pool).await.unwrap();
+    // Nach der Überführung stehen die alten Spalten noch (nicht mehr geschrieben).
+    let alt: Option<String> =
+        sqlx::query_scalar("SELECT erreichbarkeit FROM einsatz_einheit WHERE name = 'Mobil'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(alt.as_deref(), Some(" 0170 1111111 "));
+
     alle.run(&pool).await.unwrap();
 
     let erwartet = [
@@ -295,13 +310,25 @@ async fn ueberfuehrung_erreichbarkeit_zu_verbindungen() {
     .await
     .unwrap();
     assert_eq!(fs, [("festnetz".into(), "0511 999".into(), None, None)]);
-    // Die alten Spalten bleiben stehen (nicht mehr geschrieben, aber nicht gelöscht).
-    let alt: Option<String> =
-        sqlx::query_scalar("SELECT erreichbarkeit FROM einsatz_einheit WHERE name = 'Mobil'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(alt.as_deref(), Some(" 0170 1111111 "));
+    // LLH-1418: die alten Spalten sind an allen drei Tabellen entfernt.
+    for tabelle in [
+        "einsatzabschnitt",
+        "einsatz_einheit",
+        "einsatz_fuehrungsstelle",
+    ] {
+        let spalten: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT name FROM pragma_table_info('{tabelle}')"
+        )))
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert!(
+            !spalten
+                .iter()
+                .any(|s| s == "kommunikationsmittel" || s == "erreichbarkeit"),
+            "{tabelle}: {spalten:?}"
+        );
+    }
     // Der Abschnitt hat jetzt einen Rufnamen, leer für den Bestand.
     let rufnamen: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM einsatzabschnitt WHERE rufname IS NOT NULL")

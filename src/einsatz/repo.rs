@@ -1232,9 +1232,7 @@ pub(crate) async fn schwaerze_einsatz_atomar(
     // scoped Spalte ist in `schwaerzung_registry::TABELLEN` als Scrub|Retain getaggt; ein
     // Guard-Test bricht ROT, sobald eine neue Spalte/Tabelle unklassifiziert bleibt. Die
     // UPDATE/DELETE-Statements entstehen aus denselben Registry-Konstanten → kein Drift
-    // zwischen Guard und tatsächlichem Scrub (siehe schwaerzung_registry). Die LFH-108-
-    // Funk-Erreichbarkeit (einsatz_einheit/einsatzabschnitt.erreichbarkeit) ist dort als
-    // Scrub klassifiziert; die handgepflegten UPDATEs von LFH-108 sind damit obsolet.
+    // zwischen Guard und tatsächlichem Scrub (siehe schwaerzung_registry).
     scrubbe_einsatz_ganz_tx(&mut tx, einsatz_id, jetzt).await?;
 
     system_audit_tx(
@@ -2740,70 +2738,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn schwaerzung_nullt_funk_erreichbarkeit_an_einheit_und_abschnitt() {
-        // LFH-108: erreichbarkeit (mögliche Rufnummer der Führung) ist PII und MUSS an Einheit
-        // UND Abschnitt genullt werden (Abschnitt-Lücke seit LFH-86 symmetrisch geschlossen).
-        // kommunikationsmittel (Schlüssel digitalfunk/mobil/…) ist kein PII und bleibt.
-        let pool = crate::db::test_pool().await;
-        let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
-        abschliessen(&pool, einsatz.id, leit).await.unwrap();
-        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
-            .bind("2026-01-01 00:00:00")
-            .bind(einsatz.id)
-            .execute(&pool)
-            .await
-            .unwrap();
-        sqlx::query(
-            "INSERT INTO einsatz_einheit (einsatz_id, name, kommunikationsmittel, erreichbarkeit) \
-             VALUES (?, 'Zug 1', 'digitalfunk', '0151 23456')",
-        )
-        .bind(einsatz.id)
-        .execute(&pool)
-        .await
-        .unwrap();
-        sqlx::query(
-            "INSERT INTO einsatzabschnitt (einsatz_id, name, kommunikationsmittel, erreichbarkeit) \
-             VALUES (?, 'Nord', 'mobil', '0170 98765')",
-        )
-        .bind(einsatz.id)
-        .execute(&pool)
-        .await
-        .unwrap();
-
-        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
-            .await
-            .unwrap());
-
-        let (eh_err, eh_komm): (Option<String>, Option<String>) = sqlx::query_as(
-            "SELECT erreichbarkeit, kommunikationsmittel FROM einsatz_einheit WHERE einsatz_id = ?",
-        )
-        .bind(einsatz.id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-        assert_eq!(eh_err, None, "Einheit-Erreichbarkeit (PII) muss NULL sein");
-        assert_eq!(
-            eh_komm.as_deref(),
-            Some("digitalfunk"),
-            "Kommunikationsmittel (kein PII) bleibt erhalten"
-        );
-
-        let ab_err: Option<String> =
-            sqlx::query_scalar("SELECT erreichbarkeit FROM einsatzabschnitt WHERE einsatz_id = ?")
-                .bind(einsatz.id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(
-            ab_err, None,
-            "Abschnitt-Erreichbarkeit (PII) muss NULL sein — bestehende Lücke geschlossen"
-        );
-    }
-
-    /// LLH-1134: die Verbindungen an Abschnitt, Einheit und Führungsstelle sind PII — der Wert
-    /// wird Platzhalter, der Hinweis NULL; das Mittel (kein PII) bleibt.
-    #[tokio::test]
     async fn schwaerzung_trifft_die_verbindungen() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
@@ -3415,18 +3349,16 @@ mod tests {
 
     #[tokio::test]
     async fn schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels() {
-        // LFH-140, AK „kein Freitext überlebt“: bemerkung, erreichbarkeit und (LFH-608)
-        // abschnittsauftrag werden NULL. Retain bleiben name, kurzbezeichnung, der
-        // Kommunikationsmittel-Schlüssel und die eingefrorenen Alt-Spalten
+        // LFH-140, AK „kein Freitext überlebt“: bemerkung und (LFH-608) abschnittsauftrag
+        // werden NULL. Retain bleiben name, kurzbezeichnung und die eingefrorenen Alt-Spalten
         // sprechgruppe_tmo/_dmo — Letzteres ist die Entscheidung des Auftraggebers
         // (Funkgruppen-Label, konsistent mit `sprechgruppe.bezeichnung`).
         let pool = crate::db::test_pool().await;
         let (eid, _) = schwaerzbarer_einsatz(&pool).await;
         let aid: i64 = sqlx::query_scalar(
             "INSERT INTO einsatzabschnitt (einsatz_id, name, kurzbezeichnung, bemerkung, \
-                kommunikationsmittel, erreichbarkeit, abschnittsauftrag, \
-                sprechgruppe_tmo, sprechgruppe_dmo) \
-             VALUES (?, 'Nord', 'EA-N', 'Fam. Weber evakuiert', 'festnetz', '0170 98765', \
+                abschnittsauftrag, sprechgruppe_tmo, sprechgruppe_dmo) \
+             VALUES (?, 'Nord', 'EA-N', 'Fam. Weber evakuiert', \
                 'Evakuierung Uferstraße 3, Familie Schulz', 'TMO_NORD', 'DMO_NORD') \
              RETURNING id",
         )
@@ -3443,15 +3375,13 @@ mod tests {
         let zeile: (
             Option<String>,
             Option<String>,
-            Option<String>,
             String,
             Option<String>,
             Option<String>,
             Option<String>,
-            Option<String>,
         ) = sqlx::query_as(
-            "SELECT bemerkung, erreichbarkeit, abschnittsauftrag, \
-                    name, kurzbezeichnung, kommunikationsmittel, sprechgruppe_tmo, sprechgruppe_dmo \
+            "SELECT bemerkung, abschnittsauftrag, \
+                    name, kurzbezeichnung, sprechgruppe_tmo, sprechgruppe_dmo \
              FROM einsatzabschnitt WHERE id = ?",
         )
         .bind(aid)
@@ -3463,14 +3393,12 @@ mod tests {
             (
                 None,
                 None,
-                None,
                 "Nord".to_string(),
                 Some("EA-N".to_string()),
-                Some("festnetz".to_string()),
                 Some("TMO_NORD".to_string()),
                 Some("DMO_NORD".to_string()),
             ),
-            "Freitexte NULL; Name, Kürzel, Kommunikationsmittel und TMO/DMO bleiben"
+            "Freitexte NULL; Name, Kürzel und TMO/DMO bleiben"
         );
     }
 

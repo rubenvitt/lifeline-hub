@@ -1006,9 +1006,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     // ---------- Operative Struktur: Abschnitte / Einheiten / Räume / UHS / Funk ----------
     // Bezeichnungen operativer Objekte sind Skelett (RETAIN). Nullable Freitext-Zettel
-    // (notiz/bemerkung/hinweis/standort/erreichbarkeit/abschnittsauftrag) können Betroffenen-PII
-    // enthalten → konservativ NULL + REVIEW-Tag. `kommunikationsmittel` ist kein Freitext
-    // (RETAIN).
+    // (notiz/bemerkung/hinweis/standort/abschnittsauftrag) können Betroffenen-PII enthalten →
+    // konservativ NULL + REVIEW-Tag. Telefon und weitere Verbindungen stehen in
+    // `einsatz_verbindung` (LLH-1134).
     TabellenRegel {
         tabelle: "einsatzabschnitt",
         scoping: Scoping::EinsatzId,
@@ -1031,15 +1031,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // `repo::tests::schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels`.
             retain("sprechgruppe_tmo", G_OP_LABEL),
             retain("sprechgruppe_dmo", G_OP_LABEL),
-            // Kommunikationsart-Schlüssel (digitalfunk/mobil/festnetz), kein Personenbezug. Seit
-            // LLH-1134 ohne Schreibweg; der Altbestand trägt nur die drei Schlüssel.
-            retain(
-                "kommunikationsmittel",
-                "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
-            ),
-            // Mögliche Rufnummer der Führung → PII. Seit LLH-1134 ohne Schreibweg (Altbestand,
-            // überführt nach `einsatz_verbindung`).
-            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             // Kürzel, Beurteilung und Einschätzung sind Führungsskelett (RETAIN). Der
             // Abschnittsauftrag
             // ist nullabler Freitext und wird, anders als `auftrag.auftrag_text`, nicht ins ETB
@@ -1080,14 +1071,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("soll_unterfuehrer", G_ZAEHLER),
             retain("soll_mannschaft", G_ZAEHLER),
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
-            // Funk-Felder: kommunikationsmittel ist Kategorie-Schlüssel (RETAIN), erreichbarkeit
-            // eine
-            // mögliche Rufnummer (Scrub).
-            retain(
-                "kommunikationsmittel",
-                "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
-            ),
-            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             // Der Rufname benennt ein operatives Objekt, keine Person (wie fahrzeug.funkrufname).
             retain("funkrufname", G_OP_LABEL),
             retain("sortier", G_KONFIG),
@@ -1645,8 +1628,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     // Verbindungen an Abschnitt, Einheit und eigener Führungsstelle (LLH-1134): wie die
     // Verbindungen des Kommunikationsplans. Der Wert ist eine Rufnummer oder Adresse (NOT NULL →
-    // Platzhalter), der Hinweis Freitext; Bezug, Mittel und Reihenfolge sind Skelett. Die alten
-    // Spalten `erreichbarkeit` an den drei Tabellen bleiben Scrub (Altbestand vor 0244).
+    // Platzhalter), der Hinweis Freitext; Bezug, Mittel und Reihenfolge sind Skelett.
     TabellenRegel {
         tabelle: "einsatz_verbindung",
         scoping: Scoping::EinsatzId,
@@ -2051,8 +2033,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("sprechgruppe_id", G_FK),
         ],
     },
-    // Eigene Führungsstelle (LFH-849): Rufname und Kommunikationsmittel sind Führungsstruktur wie
-    // an Abschnitt und Einheit, die Erreichbarkeit eine mögliche Rufnummer (Scrub). Art und
+    // Eigene Führungsstelle (LFH-849): der Rufname ist Führungsstruktur wie an Abschnitt und
+    // Einheit; Telefon und weitere Verbindungen stehen in `einsatz_verbindung` (LLH-1134). Art und
     // Bezeichnung (LFH-1181) sind Struktur wie an UHS und Bereitstellungsraum; der Standort kann
     // eine Privatadresse sein („wie Einsatzort“), GPS mit-nullen wie beim Einsatzort.
     TabellenRegel {
@@ -2063,11 +2045,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("einsatz_id", G_SCOPE),
             retain("rufname", G_OP_LABEL),
-            retain(
-                "kommunikationsmittel",
-                "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
-            ),
-            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             retain("art", G_ENUM),
             retain("bezeichnung", G_OP_LABEL),
             scrub("standort_adresse", Strategie::NullSetzen, Z_EINSATZ),

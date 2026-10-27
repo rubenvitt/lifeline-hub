@@ -127,7 +127,6 @@ const O_UEBERGABE: &str = "Empfängerin der Übergabe, nicht die geschädigte Pe
 const O_OBJEKT: &str = "beschreibt Abschnitt bzw. Einheit, nicht die führende Person";
 const O_BESTAETIGT: &str = "Name der bestätigenden Einsatzkraft, nicht der betroffenen Person";
 const O_BEHANDELT: &str = "beschreibt die betroffene Person, nicht die bestätigende Kraft";
-const O_FUEHRUNGSSTELLE: &str = "Erreichbarkeit der Führungsstelle, nicht des Einsatzleiters";
 const O_FUEHRUNGSSTELLE_ORT: &str =
     "Standort der Führungsstelle (LFH-1181), nicht des Einsatzleiters";
 const KEINE: &[(&str, Markierung)] = &[];
@@ -299,7 +298,6 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         bezug: Bezug::Spalte("einsatzleiter_personal_id"),
         spalten: &[
             ("einsatzleiter_name", Mit),
-            ("erreichbarkeit", Ohne(O_FUEHRUNGSSTELLE)),
             ("standort_adresse", Ohne(O_FUEHRUNGSSTELLE_ORT)),
             ("standort_lat", Ohne(O_FUEHRUNGSSTELLE_ORT)),
             ("standort_lon", Ohne(O_FUEHRUNGSSTELLE_ORT)),
@@ -382,13 +380,11 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("uebergeben_an", Ohne(O_UEBERGABE)),
         ],
     },
-    // Die Funk-Erreichbarkeit ist oft die Rufnummer der führenden Person → personengebunden.
     PersonenBezug {
         art: PersonenArt::ExterneKraft,
         tabelle: "einsatzabschnitt",
         bezug: Bezug::Spalte("leiter_id"),
         spalten: &[
-            ("erreichbarkeit", Mit),
             ("bemerkung", Ohne(O_OBJEKT)),
             ("abschnittsauftrag", Ohne(O_OBJEKT)),
         ],
@@ -397,11 +393,11 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         art: PersonenArt::ExterneKraft,
         tabelle: "einsatz_einheit",
         bezug: Bezug::Spalte("fuehrer_id"),
-        spalten: &[("erreichbarkeit", Mit), ("bemerkung", Ohne(O_OBJEKT))],
+        spalten: &[("bemerkung", Ohne(O_OBJEKT))],
     },
-    // Telefon und weitere Verbindungen (LLH-1134) folgen der Erreichbarkeit: an Abschnitt und
-    // Einheit oft die Nummer der führenden Person. Die der Führungsstelle gehören der Stelle
-    // (wie früher deren Erreichbarkeit) und treffen hier nie (`abschnitt_id`/`einheit_id` leer).
+    // Telefon und weitere Verbindungen (LLH-1134): an Abschnitt und Einheit oft die Nummer der
+    // führenden Person. Die der Führungsstelle gehören der Stelle und treffen hier nie
+    // (`abschnitt_id`/`einheit_id` leer).
     PersonenBezug {
         art: PersonenArt::ExterneKraft,
         tabelle: "einsatz_verbindung",
