@@ -1,6 +1,9 @@
 import { Input, Space, Tag } from 'antd';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
-import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import type { AnzeigeKonventionen } from '../anzeige/format';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import dayjs from 'dayjs';
@@ -76,19 +79,16 @@ function feldDef(feld: MetaFeld) {
 function anzeige(
   feld: MetaFeld,
   wert: Wert,
-  formatiere: (d: dayjs.Dayjs, format: string) => string,
+  konv: AnzeigeKonventionen,
   jetzt: dayjs.Dayjs = serverJetzt(),
 ): string {
   if (wert == null) return '';
   // Uhrzeit in der Anzeigezone, nie im Modus des Objekts: ein wiederhergestellter Entwurf trägt
   // einen UTC-Zeitpunkt (`entwurfModell.zuWerte`) und zeigte sonst die UTC-Uhrzeit (LFH-692).
-  // Liegt sie nicht an diesem Tag, steht der Tag davor (`DDHHmm`, LLH-1088): „2350“ nach
-  // Mitternacht hieße sonst heute Nacht.
-  if (feldDef(feld).editor === 'zeit') {
-    const z = wert as dayjs.Dayjs;
-    const heute = formatiere(z, 'YYYY-MM-DD') === formatiere(jetzt, 'YYYY-MM-DD');
-    return formatiere(z, heute ? 'HHmm' : 'DDHHmm');
-  }
+  // Liegt sie nicht an diesem Tag, steht der Tag davor (LLH-1088): „2350“ nach Mitternacht hieße
+  // sonst heute Nacht. Genau die Rolle „kurz“, „heute“ nach der Serveruhr, in der gewählten
+  // Darstellung (`1430`/`091430` bzw. `14:30`/`09.10. 14:30`, LLH-1437).
+  if (feldDef(feld).editor === 'zeit') return zeitKurz(wert as dayjs.Dayjs, konv, jetzt);
   if (feld === 'meldeweg')
     return MELDEWEG_OPTIONEN.find((o) => o.value === wert)?.label ?? String(wert);
   return String(wert);
@@ -123,7 +123,7 @@ export default function MetaChip({
   const d = feldDef(feld);
   const { rollen } = useRollen();
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
-  const { formatiere } = useZeitEingabe();
+  const { konventionen } = useAnzeigeKonventionen();
 
   if (editing) {
     if (d.editor === 'text') {
@@ -240,7 +240,7 @@ export default function MetaChip({
         onClick={gesperrt ? undefined : () => onEdit(feld)}
         style={{ cursor: gesperrt ? 'default' : 'pointer' }}
       >
-        {d.label}: {anzeige(feld, wert, formatiere)}
+        {d.label}: {anzeige(feld, wert, konventionen)}
       </span>
       {grund && (
         <span role="alert" data-lfh="chip-grund" style={{ color: rollen.alarmText }}>

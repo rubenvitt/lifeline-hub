@@ -22,6 +22,12 @@ import {
 
 interface AnzeigeKonventionenHook {
   konventionen: AnzeigeKonventionen;
+  /**
+   * Dieselben Konventionen ohne die Gerätewahl der Zeitdarstellung: Einsatz vor Organisation,
+   * wie im Druck und in den Servertexten (E4, LLH-1045). Für vorgeschlagene Texte, die gespeichert
+   * werden (Titel eines Lagevortrags, LLH-1437): Sie hängen so nicht am Gerät, auf dem sie entstehen.
+   */
+  konventionenOhneGeraet: AnzeigeKonventionen;
   /** Die drei Rollen aus `zeitDarstellung.ts`, an Zone und wirksame Darstellung gebunden. */
   zeitpunkt: (utcStr?: string | null) => string;
   zeitKurz: (utcStr?: string | null) => string;
@@ -31,9 +37,13 @@ interface AnzeigeKonventionenHook {
 }
 
 /** Konventionen → gebundene Formatter (memoisiert je Konventions-Objekt). */
-function bindeFormatter(konventionen: AnzeigeKonventionen): AnzeigeKonventionenHook {
+function bindeFormatter(
+  konventionen: AnzeigeKonventionen,
+  konventionenOhneGeraet: AnzeigeKonventionen = konventionen,
+): AnzeigeKonventionenHook {
   return {
     konventionen,
+    konventionenOhneGeraet,
     zeitpunkt: (s) => zeitpunkt(s, konventionen),
     zeitKurz: (s) => zeitKurz(s, konventionen),
     uhrzeit: (s) => uhrzeit(s, konventionen),
@@ -93,7 +103,9 @@ export function EinsatzAnzeigeProvider({
   // Umgebender Provider (z. B. `OrgAnzeigeProvider` über der Archivakte): greift, wenn die
   // Einsatz-Einstellungen nicht lesbar sind (LFH-692, Spec `zeiteingabe`, „Zone außerhalb eines
   // Einsatzes“). Ohne umgebenden Provider sind das die Defaults — Alt-Verhalten.
-  const aussen = useContext(AnzeigeKonventionenContext).konventionen;
+  const umgebend = useContext(AnzeigeKonventionenContext);
+  const aussen = umgebend.konventionen;
+  const aussenOhneGeraet = umgebend.konventionenOhneGeraet;
 
   const wert = useMemo<AnzeigeKonventionenHook>(() => {
     // Effektivwert je Konvention: Einsatz-Override vor Org-Default vor Fallback (null) — wie der
@@ -115,7 +127,13 @@ export function EinsatzAnzeigeProvider({
         data?.org_defaults?.koordinatenformat,
       ),
     };
-    return bindeFormatter(konventionen);
+    return bindeFormatter(konventionen, {
+      ...konventionen,
+      zeitdarstellung: wirksameZeitdarstellung({
+        einsatz: data?.zeitdarstellung,
+        org: data?.org_defaults?.zeitdarstellung ?? aussenOhneGeraet.zeitdarstellung,
+      }),
+    });
   }, [
     data?.zeitzone,
     data?.zeitdarstellung,
@@ -128,6 +146,7 @@ export function EinsatzAnzeigeProvider({
     aussen.zeitzone,
     aussen.zeitdarstellung,
     aussen.einheiten,
+    aussenOhneGeraet.zeitdarstellung,
     override,
     zeitGeraet,
     druckt,
@@ -156,28 +175,30 @@ export function OrgAnzeigeProvider({ children }: { children: ReactNode }) {
   const zeitGeraet = useZeitdarstellungGeraet();
   const druckt = useDruckModus();
 
-  const wert = useMemo<AnzeigeKonventionenHook>(
-    () =>
-      bindeFormatter({
-        zeitzone: data?.zeitzone ?? null,
-        zeitdarstellung: wirksameZeitdarstellung({
-          geraet: zeitGeraet,
-          org: data?.zeitdarstellung,
-          druck: druckt,
-        }),
-        einheiten: data?.einheiten ?? null,
-        koordinatenformat: effektivesKoordinatenformat(override, null, data?.koordinatenformat),
+  const wert = useMemo<AnzeigeKonventionenHook>(() => {
+    const konventionen: AnzeigeKonventionen = {
+      zeitzone: data?.zeitzone ?? null,
+      zeitdarstellung: wirksameZeitdarstellung({
+        geraet: zeitGeraet,
+        org: data?.zeitdarstellung,
+        druck: druckt,
       }),
-    [
-      data?.zeitzone,
-      data?.zeitdarstellung,
-      data?.einheiten,
-      data?.koordinatenformat,
-      override,
-      zeitGeraet,
-      druckt,
-    ],
-  );
+      einheiten: data?.einheiten ?? null,
+      koordinatenformat: effektivesKoordinatenformat(override, null, data?.koordinatenformat),
+    };
+    return bindeFormatter(konventionen, {
+      ...konventionen,
+      zeitdarstellung: wirksameZeitdarstellung({ org: data?.zeitdarstellung }),
+    });
+  }, [
+    data?.zeitzone,
+    data?.zeitdarstellung,
+    data?.einheiten,
+    data?.koordinatenformat,
+    override,
+    zeitGeraet,
+    druckt,
+  ]);
 
   return (
     <AnzeigeKonventionenContext.Provider value={wert}>

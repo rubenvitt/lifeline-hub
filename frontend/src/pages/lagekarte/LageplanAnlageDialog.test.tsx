@@ -1,10 +1,20 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  AnzeigeKonventionenProvider,
+  OrgAnzeigeProvider,
+} from '../../anzeige/AnzeigeKonventionenContext';
+import {
+  setzeZeitdarstellung,
+  zeitdarstellungVergessenFuerTests,
+} from '../../anzeige/zeitDarstellungStore';
+import type { AnzeigeKonventionen } from '../../anzeige/format';
 import { ApiError } from '../../api/client';
 import * as anlagenApi from '../../api/dokumentAnlagen';
 import * as befehleApi from '../../api/befehle';
+import * as orgApi from '../../api/orgEinstellungen';
 import * as berichteApi from '../../api/lageberichte';
 import type { BefehlKopf, LageberichtKopf } from '../../api/types';
 import { renderMitProviders } from '../../test/utils';
@@ -21,6 +31,7 @@ vi.mock('../../api/lageberichte', async (original) => ({
   listeLageberichte: vi.fn(),
   legeLageberichtAn: vi.fn(),
 }));
+vi.mock('../../api/orgEinstellungen', () => ({ ladeOrgEinstellungen: vi.fn() }));
 vi.mock('../../api/befehle', async (original) => ({
   ...(await original<typeof import('../../api/befehle')>()),
   listeBefehle: vi.fn(),
@@ -45,9 +56,10 @@ function zeige({
     Promise.resolve({ datei: BILD, standAt: STAND }),
   ),
   onSchliessen = vi.fn(),
+  konventionen = {} as AnzeigeKonventionen,
 } = {}) {
   renderMitProviders(
-    <>
+    <AnzeigeKonventionenProvider konventionen={konventionen}>
       <LageplanAnlageDialog
         offen
         einsatzId={3}
@@ -57,7 +69,7 @@ function zeige({
         onSchliessen={onSchliessen}
       />
       <Ort />
-    </>,
+    </AnzeigeKonventionenProvider>,
     { route: '/einsaetze/3/lagekarte' },
   );
   return { erstelleAnlage, onSchliessen };
@@ -78,6 +90,69 @@ beforeEach(() => {
 });
 
 describe('LageplanAnlageDialog', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('der Titel des neuen Lagevortrags folgt der Darstellung „Datum und Uhrzeit“ (LLH-1437)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 12:30 UTC = 14:30 Sommerzeit in Berlin.
+    vi.setSystemTime(new Date('2026-10-10T12:30:00Z'));
+    vi.mocked(berichteApi.legeLageberichtAn).mockResolvedValue({
+      id: 12,
+      titel: 'Lageüberblick 14:30',
+    } as never);
+    zeige({ konventionen: { zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' } });
+    await userEvent.click(await screen.findByRole('radio', { name: 'Neuer Lagevortrag' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anfügen' }));
+    await waitFor(() => expect(berichteApi.legeLageberichtAn).toHaveBeenCalled());
+    expect(berichteApi.legeLageberichtAn).toHaveBeenCalledWith(3, {
+      vorlage: 'lagebericht',
+      titel: 'Lageüberblick 14:30',
+    });
+  });
+
+  it('der Titel folgt nicht der Gerätewahl, sondern Einsatz und Organisation (LLH-1437)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-10-10T12:30:00Z'));
+    vi.mocked(orgApi.ladeOrgEinstellungen).mockResolvedValue({
+      zeitzone: 'Europe/Berlin',
+      zeitdarstellung: 'taktisch',
+    } as never);
+    vi.mocked(berichteApi.legeLageberichtAn).mockResolvedValue({
+      id: 12,
+      titel: 'Lageüberblick 1430',
+    } as never);
+    act(() => setzeZeitdarstellung('datum_uhrzeit'));
+    try {
+      renderMitProviders(
+        <OrgAnzeigeProvider>
+          <LageplanAnlageDialog
+            offen
+            einsatzId={3}
+            lageberichteFrei
+            befehleFrei
+            erstelleAnlage={() => Promise.resolve({ datei: BILD, standAt: STAND })}
+            onSchliessen={vi.fn()}
+          />
+        </OrgAnzeigeProvider>,
+        { route: '/einsaetze/3/lagekarte' },
+      );
+      await waitFor(() => expect(orgApi.ladeOrgEinstellungen).toHaveBeenCalled());
+      await userEvent.click(await screen.findByRole('radio', { name: 'Neuer Lagevortrag' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Anfügen' }));
+      await waitFor(() => expect(berichteApi.legeLageberichtAn).toHaveBeenCalled());
+      expect(berichteApi.legeLageberichtAn).toHaveBeenCalledWith(3, {
+        vorlage: 'lagebericht',
+        titel: 'Lageüberblick 1430',
+      });
+    } finally {
+      act(() => setzeZeitdarstellung(null));
+      localStorage.clear();
+      zeitdarstellungVergessenFuerTests();
+    }
+  });
+
   it('bietet offene Entwürfe beider Dokumente und einen neuen Lagevortrag, nie Freigegebenes', async () => {
     zeige();
     expect(

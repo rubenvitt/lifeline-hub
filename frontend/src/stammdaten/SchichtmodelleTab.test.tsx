@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { setzeZeitdarstellung } from '../anzeige/zeitDarstellungStore';
 import { meHandler, server } from '../test/server';
 import { adminFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
@@ -80,6 +81,18 @@ describe('SchichtmodelleTab (LLH-1122)', () => {
     const vorgabe = screen.getByText('Sanitätsdienst').closest('tr')!;
     expect(vorgabe).toHaveTextContent('Vorgabe der Organisation');
     expect(vorgabe).toHaveTextContent('Rhythmus 6 h');
+  });
+
+  describe('Zeitdarstellung (LLH-1437)', () => {
+    afterEach(() => setzeZeitdarstellung(null));
+
+    it('nennt die Wechselzeiten mit Doppelpunkt, wenn das Gerät „Datum und Uhrzeit“ gewählt hat', async () => {
+      setzeZeitdarstellung('datum_uhrzeit');
+      stelleBereit();
+      renderMitProviders(<SchichtmodelleTab />);
+      const zeile = (await screen.findByText('12-h-Schicht Hochwasser')).closest('tr')!;
+      expect(zeile).toHaveTextContent('Wechsel 06:00/18:00 · Mindestdauer 4 h');
+    });
   });
 
   it('legt ein Modell mit Wechselzeiten an: taktisch eingegeben, als HH:MM gesendet', async () => {

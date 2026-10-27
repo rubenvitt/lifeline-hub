@@ -9,6 +9,7 @@ import {
   leereUhrzeit,
   MONATE_DTG,
   uhrzeit,
+  uhrzeitOhneDatum,
   wirksameZeitdarstellung,
   zeitKurz,
   zeitpunkt,
@@ -148,6 +149,18 @@ describe('Zeitdarstellung — drei Rollen (LLH-1053, Spec `zeitdarstellung`)', (
     expect(kalendertag('2026-03-29', { zeitzone: 'Pacific/Kiritimati' })).toBe('29mrz26');
     expect(kalendertag('', taktisch)).toBe('');
     expect(kalendertag('Unsinn', taktisch)).toBe('');
+  });
+
+  it('Uhrzeit ohne Datum (LLH-1437): die Rolle „Uhrzeit“ ohne Zone, `HH:MM` vom Server', () => {
+    expect(uhrzeitOhneDatum('14:30', taktisch)).toBe('1430');
+    expect(uhrzeitOhneDatum('14:30', datumUhrzeit)).toBe('14:30');
+    expect(uhrzeitOhneDatum('06:30', {})).toBe('0630');
+    // Keine Zonenrechnung: die Wanduhrzeit IST schon die Uhrzeit.
+    expect(uhrzeitOhneDatum('06:30', { zeitzone: 'Pacific/Kiritimati' })).toBe('0630');
+    expect(uhrzeitOhneDatum('', datumUhrzeit)).toBe('');
+    expect(uhrzeitOhneDatum(null, taktisch)).toBe('');
+    // Unlesbares wird nicht umgedeutet, sondern steht, wie es kam.
+    expect(uhrzeitOhneDatum('abends', datumUhrzeit)).toBe('abends');
   });
 
   it('der Leerwert einer Zeitspalte hat die Ziffernbreite der Darstellung', () => {

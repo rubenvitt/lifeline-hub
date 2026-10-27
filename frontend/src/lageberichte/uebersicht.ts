@@ -1,4 +1,6 @@
 import type { Dayjs } from 'dayjs';
+import type { AnzeigeKonventionen } from '../anzeige/format';
+import { uhrzeit } from '../anzeige/zeitDarstellung';
 import type { LageberichtAbschnitt, LageberichtKopf, LageberichtVorlageKey } from '../api/types';
 import { VORLAGEN, type AbschnittDef } from './vorlagen';
 
@@ -103,13 +105,17 @@ const TITEL: Record<LageberichtVorlageKey, string> = {
 };
 
 /**
- * Titelvorschlag aus der Uhrzeit in taktischer Schreibweise („Lageüberblick 1410“), in der
- * Anzeigezone, nicht in der des Geräts (LFH-692, Spec `zeiteingabe`). Geändert wird er im Entwurf.
+ * Titelvorschlag aus der Uhrzeit („Lageüberblick 1410“ bzw. „Lageüberblick 14:10“), in der
+ * Anzeigezone, nicht in der des Browsers (LFH-692, Spec `zeiteingabe`), und in der wirksamen
+ * Zeitdarstellung (Rolle `uhrzeit`, LLH-1437): der Tag steht im Zeitstand daneben. Er wird
+ * gespeichert und folgt deshalb nur Einsatz und Organisation, nicht der Gerätewahl (wie Druck und
+ * Servertexte): Die Aufrufer reichen `konventionenOhneGeraet` herein. Geändert wird er im Entwurf.
+ * Auch die Anlage aus der Lagekarte nimmt ihn (`LageplanAnlageDialog`).
  */
 export function titelVorschlag(
   vorlage: LageberichtVorlageKey,
   jetzt: Dayjs,
-  formatiere: (d: Dayjs, format: string) => string,
+  konv: AnzeigeKonventionen,
 ): string {
-  return `${TITEL[vorlage]} ${formatiere(jetzt, 'HHmm')}`;
+  return `${TITEL[vorlage]} ${uhrzeit(jetzt, konv)}`;
 }

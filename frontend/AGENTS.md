@@ -729,7 +729,7 @@ anwendbar), „nicht geprüft" ist keins.
   oder `TimePicker`;
   der Formularwert ist ein **Zeitpunkt** (hin `alsZeitpunkt`, zurück `alsBackendZeit`, Kern
   `anzeige/zeitEingabe.ts`), in die Wanduhr der Anzeigezone wandelt nur das Feld. Tagesgrenzen
-  über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über `useZeitEingabe().formatiere`;
+  über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über die Rollen der Zeitdarstellung;
   `.local()` steht nur in `anzeige/` (Guard `anzeige/zeitEingabe.guard.test.ts`). Außerhalb eines
   Einsatzes `OrgAnzeigeProvider`. „Jetzt“ beim Erfassen: `frontend/src/offline/AGENTS.md`,
   „Schreiben ohne Netz“. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Die Suiten-Zone
@@ -770,13 +770,16 @@ anwendbar), „nicht geprüft" ist keins.
   `anzeige/zeitDarstellungStore.ts` (Profil „Darstellung auf diesem Gerät“, Sprungpalette).
   **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
   sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
-  `.format('…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/` (Maschinenformate ab
-  `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`, Schuldmenge `OFFEN`
-  seit LLH-1061 leer. Nebenformen im Kern: `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26`
-  bzw. `10.10.26`), `tagUndUhrzeit` (Anfang eines Zeitraums), `leereUhrzeit` (Lücke in
-  Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe, Zeitraumende) über das `jetzt` von
-  `zeitKurz`. Der Datenstand rechnet in Gerätezeit (`components/Datenstand.tsx`), die Uhr des
-  Lagemonitors nimmt `formatiereUhr` der Kopfleiste.
+  `.format('…')` und kein `formatiere(…, '…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/`
+  (Maschinenformate ab `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`,
+  Schuldmenge `OFFEN` seit LLH-1061 leer. Titelvorschlag und Startinhalt eines Lagevortrags werden
+  gespeichert und nehmen `konventionenOhneGeraet` (Einsatz vor Organisation, ohne Gerätewahl, wie
+  Druck und Servertexte; LLH-1437); ein Eingabefeld zeigt seinen Wert taktisch. Nebenformen im Kern:
+  `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26` bzw. `10.10.26`), `uhrzeitOhneDatum`
+  (Wanduhrzeit `HH:MM` ohne Tag: Verpflegungsplan, Wechselzeiten), `tagUndUhrzeit` (Anfang eines
+  Zeitraums), `leereUhrzeit` (Lücke in Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe,
+  Zeitraumende) über das `jetzt` von `zeitKurz`. Der Datenstand rechnet in Gerätezeit
+  (`components/Datenstand.tsx`), die Uhr des Lagemonitors nimmt `formatiereUhr` der Kopfleiste.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).

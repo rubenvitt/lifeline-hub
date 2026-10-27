@@ -221,7 +221,9 @@ export default function AbloesungPage() {
     queryFn: () => fetchEinsatzSchichtmodell(einsatzId),
   });
   const einsatzModell = einsatzVorgabeQuery.data?.schichtmodell ?? null;
-  const einsatzVorgabeKurz = einsatzModell ? formatRegelKurz(einsatzModell) : undefined;
+  const einsatzVorgabeKurz = einsatzModell
+    ? formatRegelKurz(einsatzModell, konventionen)
+    : undefined;
   const einsatzVorgabePfad = einsatzEinstellungenPfad(einsatzId, 'abloesung');
   const zurEinsatzVorgabe = useLinkClickHandler<HTMLElement>(einsatzVorgabePfad);
   const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
@@ -888,7 +890,7 @@ export default function AbloesungPage() {
               <span>
                 <Text strong>{einsatzModell.bezeichnung}</Text>{' '}
                 <Text type="secondary">
-                  {formatRegel(einsatzModell)} · Vorwarnung{' '}
+                  {formatRegel(einsatzModell, konventionen)} · Vorwarnung{' '}
                   {formatDauer(einsatzModell.vorwarnung_minuten)}
                   {einsatzVorgabeQuery.data && einsatzVorgabeQuery.data.laufende_schichten > 0
                     ? ` · ${einsatzVorgabeQuery.data.laufende_schichten} laufend`

@@ -8,6 +8,7 @@ import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { fetchSchichtmodelle, werteBodyOf } from '../../api/schichtmodelle';
 import type { AbloesungEinsatzVorgabe, EinsatzSchichtmodellBody } from '../../api/types';
 import { formatDauer } from '../../abloesung/dauer';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import SchichtmodellModal from '../../abloesung/SchichtmodellModal';
 import { formatRegel } from '../../abloesung/schichtmodellText';
 import { Datenfeld, Datenraster, Formularpaneel, useRollen } from '../../components/instrument';
@@ -44,6 +45,7 @@ export default function EinsatzAbloesung() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
   const daten = useEinstellungenDaten(einsatzId);
   const darf = darfImEinsatzSchreiben(daten.einsatz);
   const auswahlId = useId();
@@ -165,7 +167,7 @@ export default function EinsatzAbloesung() {
         {modell ? (
           <Datenraster beschriftung="Schichtmodell des Einsatzes">
             <Datenfeld label="Bezeichnung">{modell.bezeichnung}</Datenfeld>
-            <Datenfeld label="Regel">{formatRegel(modell)}</Datenfeld>
+            <Datenfeld label="Regel">{formatRegel(modell, konventionen)}</Datenfeld>
             <Datenfeld label="Vorwarnung" mono>
               {formatDauer(modell.vorwarnung_minuten)}
             </Datenfeld>

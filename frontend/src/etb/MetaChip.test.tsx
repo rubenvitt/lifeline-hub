@@ -350,6 +350,27 @@ describe('MetaChip — Ereigniszeit in der Anzeigezone (LFH-692)', () => {
     expect(screen.queryByText(/1000/)).not.toBeInTheDocument();
   });
 
+  it('folgt der Darstellung „Datum und Uhrzeit“: 12:00 statt 1200 (LLH-1437)', () => {
+    const wert = zuWerte({ ...ENTWURF_LEER, ereigniszeit: '2026-07-14T10:00:00.000Z' }).metadaten
+      .ereigniszeit;
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ ...BERLIN, zeitdarstellung: 'datum_uhrzeit' }}>
+        <MetaChip
+          feld="ereigniszeit"
+          editing={false}
+          wert={wert}
+          onCommit={vi.fn()}
+          onCancel={vi.fn()}
+          onRemove={vi.fn()}
+          onEdit={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    // Nicht heute: der Tag steht davor, wie taktisch „141200“.
+    expect(screen.getByText(/14\.07\. 12:00/)).toBeInTheDocument();
+    expect(screen.queryByText(/141200/)).not.toBeInTheDocument();
+  });
+
   it('der Editor zeigt die Berliner Uhrzeit und übernimmt mit Enter den Zeitpunkt', async () => {
     const onCommit = vi.fn();
     renderMitProviders(
