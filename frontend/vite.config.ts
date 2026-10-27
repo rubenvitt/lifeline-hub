@@ -174,7 +174,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'prompt',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
         workbox: {
-          // Der Haupt-Chunk überschreitet das 2-MiB-Precache-Limit, solange es kein Code-Splitting gibt.
+          // Der Haupt-Chunk liegt auch ohne maplibre (eigener Chunk, `codeSplitting` unten) an der
+          // 2-MiB-Vorgabe von Workbox. Liegt eine Datei über dieser Grenze, bricht der Build ab.
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
           // Der HEIC-Decoder (LFH-759, 1,5 MB) kommt nicht in den Vorrat: ohne Netz gibt es auch
           // keine HEIC-Bytes zu dekodieren, und jeder Client lüde ihn sonst bei jedem Update vor.
@@ -217,6 +218,13 @@ export default defineConfig(({ mode }) => {
             )
               ? `${DOKU_BILDER_ORDNER}/[name]-[hash][extname]`
               : 'assets/[name]-[hash][extname]',
+          // maplibre-gl (rund 0,8 MB) in einen eigenen Chunk: Kartenausschnitte außerhalb der
+          // Lagekarte binden es statisch ein, es landete sonst im Haupt-Chunk und schob ihn über
+          // die Precache-Grenze (`maximumFileSizeToCacheInBytes`). Geladen wird es weiter beim Start;
+          // der Chunk bleibt über Releases gleich und kommt dann aus dem Cache.
+          codeSplitting: {
+            groups: [{ name: 'maplibre', test: /[\\/]node_modules[\\/]maplibre-gl[\\/]/ }],
+          },
         },
       },
     },
