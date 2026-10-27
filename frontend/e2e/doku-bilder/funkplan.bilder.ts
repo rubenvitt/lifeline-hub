@@ -190,7 +190,7 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/fernmeldewesen/kommunikationsplan`);
     await expect(page.getByText('0561 7000 112')).toBeVisible();
     await expect(page.getByText('presse@musterstadt.example')).toBeVisible();
-    await expect(page.getByText('Sanitätsdienst · EA 1')).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Sanitätsdienst · / })).toBeVisible();
     // Die eigene Führungsstelle (LFH-1148) lädt getrennt; ohne Anker fehlte die Zeile mal.
     await expect(page.getByText('0561 123 4567')).toBeVisible();
     await fotografiere(page, KAPITEL, 'kommunikationsplan');
