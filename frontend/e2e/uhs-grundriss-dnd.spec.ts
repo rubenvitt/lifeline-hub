@@ -37,7 +37,7 @@ test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH au
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
 
   // Detail öffnen — der Grundriss wird direkt angezeigt.
-  await page.getByRole('button', { name: uhsName }).click();
+  await page.getByRole('button', { name: uhsName, exact: true }).click();
 
   // Einen Platz anlegen (Vorgabe „Bett", Menge 1 → „Bett 1"); die Bezeichnung vergibt der Server.
   await page.getByRole('button', { name: 'Plätze anlegen' }).click();

@@ -221,6 +221,8 @@ function OrtsfeldMitSuche({
 
   function tasten(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+    // Strg/⌘ + Enter gehört der Erfassungshülle („speichern und nächste“, LLH-1407), sucht nicht.
+    if (e.metaKey || e.ctrlKey) return;
     // Kein implizites Absenden des umgebenden Formulars: Enter sucht.
     e.preventDefault();
     sucheStarten();

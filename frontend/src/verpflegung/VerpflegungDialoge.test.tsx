@@ -4,7 +4,9 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
+import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { server } from '../test/server';
 import { ApiError } from '../api/client';
 import type { ModulFreigaben } from '../api/types';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
@@ -593,6 +595,51 @@ describe('Zeichengrenzen der Freitexte (LLH-1040, design.md D10)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ menge: 5, ort: 'o'.repeat(500) }),
+    );
+  });
+
+  /**
+   * Ort mit Ortssuche (LLH-1407): Enter sucht und trägt nicht nach, ein Treffer setzt den Text; die
+   * Ausgabe speichert keine Koordinate. Mutationsprobe: `normalize` weg → `ort` ist ein Objekt.
+   */
+  it('Ort der Ausgabe: Enter sucht im Einsatz, der Treffer geht nur als Text hinaus', async () => {
+    const suchen: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/:eid/ort-suche', ({ params, request }) => {
+        suchen.push(`${params.eid}:${new URL(request.url).searchParams.get('q')}`);
+        return HttpResponse.json({
+          zustand: 'ok',
+          treffer: [
+            { lat: 52.3, lon: 9.7, name: 'Turnhalle Nord, Musterstadt', kurz: 'Turnhalle Nord' },
+          ],
+        });
+      }),
+    );
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <AusgabeDialog
+        einsatzId={7}
+        zeitfenster={zeitfenster()}
+        nachforderungen={null}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '5');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(within(dialog).getByLabelText('Ort'), 'Turnhalle{Enter}');
+    await userEvent.click(await within(dialog).findByRole('button', { name: /Turnhalle Nord/ }));
+    expect(suchen).toEqual(['7:Turnhalle']);
+    expect(onErfassen).not.toHaveBeenCalled();
+    expect(within(dialog).getByLabelText('Ort')).toHaveValue('Turnhalle Nord');
+    // Ohne Karte: die Ausgabe hat keinen Punkt.
+    expect(within(dialog).queryByRole('button', { name: 'Auf Karte wählen' })).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({ menge: 5, ort: 'Turnhalle Nord' }),
     );
   });
 

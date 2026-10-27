@@ -70,6 +70,30 @@ Verbindungen mit genau einem Ereignis melden, gleich wie viele Benachrichtigunge
 - **WHEN** Person A ihre Eingänge am Tablet gelesen hat und danach am Laptop den Einsatz öffnet
 - **THEN** sind sie auch dort gelesen
 
+### Requirement: Verlauf ohne Netz
+
+Der Verlauf SHALL ohne Netz aus dem zuletzt geladenen Stand lesbar bleiben, auch nach einem
+Neuladen, und dabei seinen Stand als offline kennzeichnen. „Alle gelesen“ SHALL ohne Netz auf dem
+Gerät vorgemerkt werden: Die Zahl der ungelesenen Eingänge MUST sofort fallen und bis zum Senden
+nicht zurückspringen, der Verlauf MUST „Offline vorgemerkt“ zeigen, und nach der Rückkehr des Netzes
+MUST das System die Markierung ohne weiteres Zutun senden. Alarme MUST auch dabei unberührt
+bleiben.
+
+#### Scenario: Verlauf nach dem Neuladen ohne Netz
+- **WHEN** Person A „Eingänge“ mit Netz geöffnet hat, das Netz wegfällt und sie neu lädt
+- **THEN** zeigt „Eingänge“ die zuvor geladenen Einträge mit „Stand … · offline“
+
+#### Scenario: Alle gelesen ohne Netz
+- **WHEN** Person A ohne Netz „Alle gelesen“ wählt
+- **THEN** zeigt der Knopf keine ungelesenen Eingänge mehr, der Verlauf zeigt „Offline vorgemerkt“,
+  und ein offener Alarm bleibt unter „Neu“
+
+#### Scenario: Rückkehr des Netzes
+- **WHEN** Person A ohne Netz „Alle gelesen“ gewählt hat und das Netz zurückkehrt
+- **THEN** sendet das System „Alle gelesen“ bis zur damals jüngsten Kennung, die Zahl springt
+  dazwischen nicht zurück, und ihre anderen Geräte zeigen die Eingänge als gelesen
+- **AND** was inzwischen eingegangen ist, bleibt ungelesen
+
 ### Requirement: Der Server bestimmt die Empfänger
 
 Der Server SHALL für jede Benachrichtigung die Empfänger als Menge von Nutzern bestimmen und sie
@@ -209,20 +233,34 @@ Ablösung MUST weiter nicht als eigene Erinnerung benachrichtigen.
 
 ### Requirement: Ablösung und Unwetter bleiben, wie sie sind
 
-Ablösung (Vorwarnung als Hinweis, Fälligkeit als Alarm, an alle mit dem Modul Ablösung) und
-Unwetter (Hinweis, an alle im Einsatz, im Browser erkannt) SHALL ihr bisheriges Verhalten behalten
-und dem gemeinsamen Budget der Benachrichtigungen unterliegen.
+Ablösung (Vorwarnung als Hinweis, Fälligkeit als Alarm, an alle mit dem Modul Ablösung) SHALL ihr
+bisheriges Verhalten behalten. Unwetter (an alle im Einsatz mit dem Modul Wetter & Pegel, im
+Browser erkannt) SHALL ab der amtlichen Warnstufe rot (Unwetter, auch extremes Unwetter) ein Alarm
+sein: lauter Ton, Toast, OS-Meldung bei verdecktem Tab, nicht abschaltbar (Katalog LLH-1142 E1,
+LLH-1425). Geringere Warnstufen MUST NOT benachrichtigen. Beide unterliegen dem gemeinsamen Budget
+der Benachrichtigungen.
 
 #### Scenario: Ablösung fällig
 - **WHEN** eine Schicht fällig wird
 - **THEN** erhalten alle mit dem Modul Ablösung einen Alarm „Ablösung fällig“ wie bisher
+
+#### Scenario: Unwetterwarnung rot
+- **WHEN** für den Einsatzort eine neue amtliche Unwetterwarnung (Stufe rot) gilt und Person A die Unwetterwarnung früher abgeschaltet hatte
+- **THEN** spielt bei A der laute Ton und ein Alarm „Unwetterwarnung“ erscheint mit Sprung zu Wetter & Pegel
+
+#### Scenario: Markantes Wetter
+- **WHEN** für den Einsatzort nur eine Warnung vor markantem Wetter (orange) gilt
+- **THEN** erhält niemand eine Benachrichtigung; die Warnung steht auf der Seite Wetter & Pegel
 
 ### Requirement: Hinweise der Ablösung
 
 Zwei weitere Arten der Ablösung (LLH-1131, Spec `kraefte-abloesung`) SHALL als Hinweis an alle
 mit dem Modul Ablösung gehen: `abloesung_planung` („Keine ablösende Einheit geplant“, vom
 Scheduler) und `abloesung_abloeser` (die geplante ablösende Einheit ist alarmiert, eingetroffen,
-am Bereitstellungsraum eingetroffen oder abgerufen, oder ihre Planung ist entfallen). Bei
+am Bereitstellungsraum eingetroffen oder abgerufen, ihre Planung ist entfallen, oder in der
+Kräfte-Zeitachse ist die Alarmierung bzw. das Eintreffen gestrichen, mit dem ihre offene Periode
+begann, LLH-1425). Das gilt für Statuswechsel wie für Nachträge in die Kräfte-Zeitachse; die
+Streichung eines Ereignisses, zu dem es keinen Hinweis gab, MUST still bleiben. Bei
 `abloesung_abloeser` MUST der Bezugstyp das Ereignis tragen und der Titel aus ihm folgen; der
 Bezug ist die Schicht, der Sprung führt zur Seite Ablösung. Beide sind je Art abschaltbar und
 MUST NOT eine weitere Stufe oder Einstufung bilden.
@@ -230,6 +268,10 @@ MUST NOT eine weitere Stufe oder Einstufung bilden.
 #### Scenario: Ablösende Einheit eingetroffen
 - **WHEN** die geplante ablösende Einheit einer Schicht eintrifft und Person A den Status setzt
 - **THEN** erhalten alle anderen mit dem Modul Ablösung einen Hinweis „Ablösende Einheit eingetroffen“, A und Personen ohne das Modul nicht
+
+#### Scenario: Alarmierung gestrichen
+- **WHEN** Person A die Alarmierung der geplanten ablösenden Einheit, mit der ihre offene Periode begann, in der Kräfte-Zeitachse streicht
+- **THEN** erhalten alle anderen mit dem Modul Ablösung genau einen Hinweis „Alarmierung der ablösenden Einheit gestrichen“ mit Sprung zur Schicht
 
 #### Scenario: Abgeschaltet
 - **WHEN** Person B den Hinweis „Ablösende Einheit“ abgeschaltet hat
@@ -392,6 +434,22 @@ zeigen, auf der Seite Lagemeldungen keine Übernahmen; dort trägt das Sammelban
 - **WHEN** eine dringende Meldung eingeht, während Person A die Seite Meldungen offen hat
 - **THEN** erscheint kein Hinweis und kein Ton; das Sammelbanner der Seite trägt die Meldung
 
+### Requirement: Das Eingangsband verdeckt keine untere Leiste
+
+Steht am unteren Rand eine angepinnte Leiste (Erfassung des Einsatztagebuchs, Aktionsleiste des
+Befehlsentwurfs, Speicherleiste einer Formularseite und jede weitere Fußleiste mit gemessenem
+Fokusabstand), SHALL das Eingangsband über ihrer Oberkante stehen, sobald es sie sonst schnitte,
+auf schmalen Schirmen wie ab dem Tablet-Querformat. Es MUST NOT ein Bedienelement einer solchen
+Leiste verdecken; geht die Leiste, rückt es zurück an den Rand.
+
+#### Scenario: Eingang während der Erfassung im ETB
+- **WHEN** eine Meldung eingeht, während Person A das Einsatztagebuch offen hat
+- **THEN** steht das Band über der Erfassung, und „Erfassen“ bleibt sichtbar und klickbar
+
+#### Scenario: Eingang am Befehlsentwurf auf dem Handschirm
+- **WHEN** eine Meldung eingeht, während Person A einen Befehl auf dem Handschirm bearbeitet
+- **THEN** steht das Band über der Aktionsleiste, „Entwurf speichern“ und „Freigeben“ bleiben frei
+
 ### Requirement: Ungelesene Eingänge im Tab-Titel
 
 Der Tab-Titel eines Einsatzes SHALL die Zahl der ungelesenen Eingänge der angemeldeten Person
@@ -467,6 +525,49 @@ wird, und die zweite Übertragung eines schon gespeicherten Eintrags MUST keinen
 #### Scenario: Ältere Sichtung I kommt nach
 - **WHEN** eine offline vorgemerkte SK I ankommt, die älter ist als die aktuelle SK II der Person
 - **THEN** entsteht kein Hinweis „Sichtung I“
+
+### Requirement: Vermisstenmeldung
+
+Wird eine Person mit Status vermisst erfasst oder wechselt ihr Status auf vermisst, SHALL jeder mit
+dem Modul Personen außer dem Auslöser einen Alarm „Vermisstenmeldung“ erhalten (Katalog LLH-1142
+E1, LLH-1425). Bezug ist die Person, der Text nennt nur ihre Registriernummer. Je Wechsel MUST
+genau ein Alarm entstehen: die zweite Übertragung einer schon gespeicherten Anlage und ein
+gleichzeitiger zweiter Wechsel (409) lösen keinen aus.
+
+#### Scenario: Person auf vermisst gesetzt
+- **WHEN** Person A eine erfasste Person auf vermisst setzt
+- **THEN** erhalten alle anderen mit dem Modul Personen einen Alarm „Vermisstenmeldung“ mit „Person R-001“ und Sprung zur Person
+
+#### Scenario: Person als vermisst erfasst
+- **WHEN** eine Person offline mit Status vermisst erfasst und die Anlage zweimal übertragen wird
+- **THEN** entsteht genau ein Alarm
+
+#### Scenario: Wiedergefunden und erneut vermisst
+- **WHEN** eine vermisste Person auf betroffen und später wieder auf vermisst wechselt
+- **THEN** entsteht beim zweiten Wechsel auf vermisst ein neuer Alarm, beim Wechsel auf betroffen keiner
+
+### Requirement: Rückmeldung überfällig
+
+Ist die letzte Rückmeldung einer Einheit (die jüngste an sie gebundene Meldung) älter als die
+wirksame Rückmeldefrist (Einsatz vor Organisation vor 60 Minuten), SHALL jeder, der im Einsatz
+Meldungen bearbeiten darf, einen Hinweis „Rückmeldung überfällig“ mit der Einheit erhalten (Katalog
+LLH-1142 E1, LLH-1425). Die Prüfung macht der Erinnerungs-Scheduler. Je Überfälligkeit MUST genau
+ein Hinweis entstehen, nicht einer je Takt; erst eine neue Rückmeldung, die ihrerseits überfällig
+wird, löst den nächsten aus. Einheiten ohne jede Rückmeldung, aufgelöste Einheiten und
+abgeschlossene Einsätze MUST still bleiben. Beim Import der Demo-Daten gelten schon überfällige
+Rückmeldungen als gemeldet.
+
+#### Scenario: Frist überschritten
+- **WHEN** der 1. Zug sich um 08:00 zurückgemeldet hat, die Frist 60 Minuten beträgt und es 09:00 wird
+- **THEN** erhalten alle, die Meldungen bearbeiten, einen Hinweis „Rückmeldung überfällig“ mit „1. Zug“ und Sprung zur Einheit
+
+#### Scenario: Weitere Takte
+- **WHEN** der Scheduler danach weiter läuft und keine neue Rückmeldung kommt
+- **THEN** entsteht kein weiterer Hinweis
+
+#### Scenario: Neue Rückmeldung
+- **WHEN** der 1. Zug sich um 10:00 erneut zurückmeldet und bis 11:00 nichts mehr kommt
+- **THEN** entsteht um 11:00 genau ein neuer Hinweis
 
 ### Requirement: Einheit oder Fahrzeug wieder verfügbar
 
@@ -547,7 +648,7 @@ Stufe Alarm MUST NOT abschaltbar sein. Eine abgeschaltete Art bleibt in Zählern
 
 #### Scenario: Alarm nicht abschaltbar
 - **WHEN** Person A ihre Benachrichtigungs-Einstellungen öffnet
-- **THEN** stehen Sofortmeldung, überfälliger Auftrag und fällige Ablösung als immer an, ohne Schalter
+- **THEN** stehen Sofortmeldung, überfälliger Auftrag, fällige Ablösung, Vermisstenmeldung und Unwetterwarnung als immer an, ohne Schalter
 
 ### Requirement: Vorgabe je Funktion am Einsatz
 

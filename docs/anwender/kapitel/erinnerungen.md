@@ -59,7 +59,7 @@ Linie oben und unten hervor.
 ### Auf eine fällige Erinnerung reagieren
 
 1. Zur fälligen Zeit erscheint der Hinweis „Erinnerung fällig“ mit einem dezenten Ton.
-2. „Öffnen“ führt zu den Erinnerungen; die fällige Karte trägt „fällig“.
+2. „Öffnen“ führt zu den Erinnerungen und hebt die fällige Karte hervor; sie trägt „fällig“.
 3. Die Erinnerung wie oben erledigen oder erübrigen.
 
 ## Hintergrund

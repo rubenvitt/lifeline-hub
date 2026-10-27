@@ -1215,23 +1215,23 @@ pub async fn count_sofort_offen(pool: &SqlitePool, einsatz_id: i64) -> Result<i6
 /// Gleichstand in `ereigniszeit` entscheidet die höhere id (später erfasst).
 /// `faellig_at` bleibt leer; der Handler setzt es aus der effektiven Frist.
 pub async fn letzte_je_einheit(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
 ) -> Result<Vec<super::LetzteRueckmeldung>, AppError> {
-    letzte_je_bezug(pool, einsatz_id, "einheit_id").await
+    letzte_je_bezug(executor, einsatz_id, "einheit_id").await
 }
 
 /// Jüngste DIREKT an einen Abschnitt gebundene Meldung je Abschnitt (LFH-610).
 pub async fn letzte_je_abschnitt(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
 ) -> Result<Vec<super::LetzteRueckmeldung>, AppError> {
-    letzte_je_bezug(pool, einsatz_id, "abschnitt_id").await
+    letzte_je_bezug(executor, einsatz_id, "abschnitt_id").await
 }
 
 /// `spalte` ist eine der zwei festen Konstanten oben, kein Nutzereingang.
 async fn letzte_je_bezug(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     spalte: &'static str,
 ) -> Result<Vec<super::LetzteRueckmeldung>, AppError> {
@@ -1256,7 +1256,7 @@ async fn letzte_je_bezug(
              ORDER BY m.{spalte}"
         )))
         .bind(einsatz_id)
-        .fetch_all(pool)
+        .fetch_all(executor)
         .await?,
     )
 }

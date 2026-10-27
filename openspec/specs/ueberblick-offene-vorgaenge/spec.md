@@ -37,7 +37,7 @@ eines Abschnitts MUST NOT gezählt werden, um eine Zahl zu zeigen.
 Jeder Abschnitt SHALL höchstens drei Einträge zeigen, das Überfällige zuerst, dann nach der
 nächsten Frist, dann das Älteste; die Kennung ordnet als letzte Stufe. Ein Eintrag MUST per
 Deeplink auf sein Objekt führen, das das Ziel hervorhebt (`?meldung=`, `?auftrag=`,
-`?nachforderung=`, `?schicht=`); Erinnerungen führen in ihr Modul. Ein Eintrag mit Alarm
+`?nachforderung=`, `?schicht=`, `?erinnerung=`). Ein Eintrag mit Alarm
 (Bestätigung überfällig, Auftrag überfällig, Ablösung überfällig) MUST die Alarmkante links und
 das Wort tragen; eine überfällige Nachforderung trägt nur das Wort im Ton „achtung“.
 Erinnerungen zeigen die fälligen und die in den nächsten 30 Minuten fälligen offenen; Ablösungen

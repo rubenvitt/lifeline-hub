@@ -302,19 +302,18 @@ for (const modus of ['light', 'dark'] as const) {
       werte,
     );
 
-    // ── Aufnahme-Route: Koordinatengrund ──
+    // ── Aufnahme-Route: Feldgrund am Fundort (das Koordinatenfeld ging im Ortsfeld auf, LLH-1407) ──
     await page.goto(`${basis}/personen/aufnahme`);
-    await page.getByRole('button', { name: /Weitere Angaben/ }).click();
-    const koordinate = page.getByLabel('Koordinate', { exact: true });
-    await koordinate.fill('abc');
-    await koordinate.blur();
+    const fundort = page.getByLabel('Fundort', { exact: true });
+    await fundort.fill('x'.repeat(501));
+    await fundort.blur();
     const grund = page
       .locator('.ant-form-item')
-      .filter({ has: koordinate })
+      .filter({ has: fundort })
       .locator('.ant-form-item-explain-error');
     await expect(grund).toHaveCount(1);
     // Feldmeldungen lesen am Formular `colorError` = `alarmText` (LFH-667, `antdKomponenten`).
-    await misst(grund, minimum, `${modus}/Koordinatengrund`, werte);
+    await misst(grund, minimum, `${modus}/Fundortgrund`, werte);
 
     // ── Modal „Vermisst melden": Zukunftsgrenze ──
     // Der frühere `extra`-Hinweis unter „vermisst seit" ist ein Platzhalter geworden (LFH-1078).

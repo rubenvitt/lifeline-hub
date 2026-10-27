@@ -37,6 +37,9 @@ export type OfflineSchreibaktion =
       name: string;
       daten: EintreffenEingabe;
     }
+  /** „Alle gelesen“ der Eingänge eines Einsatzes (LLH-1422): ohne `client_id`, der Server setzt
+   *  nur offene Zeilen bis `bis_id` auf gelesen, ein zweites Senden ändert nichts. */
+  | { art: 'eingaenge_gelesen'; daten: { bis_id: number } }
   | PersonEintragAktion;
 
 export interface AusstehendeSchreibaktion {

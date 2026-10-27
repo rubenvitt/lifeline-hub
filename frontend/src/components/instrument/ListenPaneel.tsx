@@ -98,6 +98,29 @@ export default function ListenPaneel<T>({
   );
 }
 
+/**
+ * Eine Platzhalterzeile im Ladezustand: dieselbe Hülle wie ein Eintrag ({@link listenZeileStil})
+ * und darin die Zeilenhöhen eines Eintrags mit Unterzeile (Text 12 px · 1,45, Abstand 2, Mono
+ * 10 px) — so hoch wie die Zeile, die kommt, in jeder Dichte. Die erste trägt „wird abgerufen“.
+ */
+export function LadePlatzhalterZeile({ stil, text }: { stil: CSSProperties; text: boolean }) {
+  const { rollen } = useRollen();
+  return (
+    <div data-lfh="abschnitt-platzhalter" style={stil}>
+      <span
+        style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}
+      >
+        <span style={{ fontSize: 12, lineHeight: 1.45, color: rollen.gedaempft }}>
+          {text ? PANEEL_LADEN_TEXT : '\u00a0'}
+        </span>
+        <span aria-hidden="true" style={monoStil(10)}>
+          {'\u00a0'}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /** Zustand eines Abschnitts. `offline`: die Liste ist ohne Netz nicht geladen (pausierte Abfrage). */
 export type ListenAbschnittZustand = 'daten' | 'laden' | 'fehler' | 'offline' | 'gesperrt';
 
@@ -120,6 +143,13 @@ export const ABSCHNITT_FEHLER = 'Stand unbekannt, Liste nicht abrufbar';
  * Laden, Fehler und „ohne Netz“ sind kein „keine“. GESPERRT (Modul nicht freigegeben, LFH-888):
  * Zahl „—“, der Grund als Zeile, kein Sprung, keine Liste.
  *
+ * LADEN hält den Platz der kommenden Liste (LLH-1430): weiß der Aufrufer aus seiner Zählquelle,
+ * wie viele Einträge kommen (`ladeZeilen`), stehen so viele Platzhalterzeilen in fester Höhe da
+ * (höchstens `max`), jede so hoch wie ein Eintrag mit Unterzeile ({@link LadePlatzhalterZeile}).
+ * Ohne Angabe oder bei 0 bleibt es eine Zeile in der Höhe von „keine“. Sonst wuchs ein Abschnitt
+ * beim Eintreffen der Liste von einer Zeile auf drei und schob alles darunter (Seiten-CLS des
+ * Überblicks 0,05–0,07 bei 1440 px, `e2e/ueberblick-vorgaenge-cls.spec.ts`).
+ *
  * Zeilen mit Ziel nehmen {@link listenZeileStil}; der Sprung trägt den Boden `controlHeight`.
  */
 export function ListenAbschnitt<T>({
@@ -132,6 +162,7 @@ export function ListenAbschnitt<T>({
   zustand,
   eintraege,
   max = 3,
+  ladeZeilen,
   schluessel,
   zeile,
   sprung,
@@ -151,6 +182,11 @@ export function ListenAbschnitt<T>({
   zustand: ListenAbschnittZustand;
   eintraege: readonly T[];
   max?: number;
+  /**
+   * Wie viele Einträge beim Laden erwartet werden, aus der Zählquelle des Aufrufers; `null` oder
+   * fehlend: unbekannt. Bestimmt die Zahl der Platzhalterzeilen (siehe Dateikopf).
+   */
+  ladeZeilen?: number | null;
   schluessel: (eintrag: T) => Key;
   /** Inhalt eines `<li>`. */
   zeile: (eintrag: T) => ReactNode;
@@ -180,11 +216,19 @@ export function ListenAbschnitt<T>({
       </div>
     );
   } else if (zustand === 'laden') {
-    koerper = (
-      <div aria-busy="true" aria-label={`${titel} wird geladen`} style={hinweisStil}>
-        {PANEEL_LADEN_TEXT}
-      </div>
-    );
+    const platzhalter = Math.min(Math.max(ladeZeilen ?? 0, 0), max);
+    koerper =
+      platzhalter === 0 ? (
+        <div aria-busy="true" aria-label={`${titel} wird geladen`} style={hinweisStil}>
+          {PANEEL_LADEN_TEXT}
+        </div>
+      ) : (
+        <div aria-busy="true" aria-label={`${titel} wird geladen`}>
+          {Array.from({ length: platzhalter }, (_, i) => (
+            <LadePlatzhalterZeile key={i} stil={zeilenStil} text={i === 0} />
+          ))}
+        </div>
+      );
   } else if (zustand === 'offline') {
     koerper = (
       <div data-lfh="abschnitt-offline" style={hinweisStil}>

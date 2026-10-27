@@ -56,11 +56,15 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
 1. „Betroffene erfassen“ wählen.
 2. Unter „Sichtungskategorie“ die Fläche der Kategorie antippen, dazu „Geschlecht“, „Geschätztes
    Alter (Jahre)“ und „Fundort“, soweit bekannt. Ein zweiter Tipp auf die gewählte Fläche nimmt
-   die Wahl zurück; die Person wird dann ohne Sichtung erfasst.
+   die Wahl zurück; die Person wird dann ohne Sichtung erfasst. Im „Fundort“ mit Enter oder „Ort
+   suchen“ suchen und einen Treffer wählen, eine Koordinate eintippen (etwa „52.2691/9.1342“) oder
+   den Punkt über „Auf Karte wählen“ setzen: dann ist der Fundort gleich verortet, der
+   Kartenausschnitt unter dem Feld zeigt ihn. Enter im Fundort erfasst die Person nicht. Ohne
+   Treffer bleibt der Fundort freier Text.
 
    ![Maske „Betroffene erfassen“ mit gewählter Sichtungskategorie SK II, Geschlecht, Alter und Fundort](../bilder/betroffene/erfassen.png)
 
-3. Name, Vorname, Zustand, Koordinate und Notiz stehen unter „Weitere Angaben“.
+3. Name, Vorname, Zustand und Notiz stehen unter „Weitere Angaben“.
 4. „Erfassen“ wählen. Die Quittung nennt die neue Registriernummer („Erfasst als R-…“).
 
 Kommen mehrere Personen nacheinander, speichert „Speichern und nächste“ (Strg + Enter) und hält
@@ -277,6 +281,11 @@ bekommen alle im Einsatz, die das Modul „Betroffene“ lesen, den Hinweis „S
 Registriernummer und dem Sprung zur Person; Name und Befund stehen nicht darin. Wer sichtet,
 bekommt keinen Hinweis, gekoppelte Geräte ebenso wenig. Eine erneute Sichtung mit SK I, eine
 Herabstufung, eine nachgereichte ältere Sichtung und das Bearbeiten der Angaben bleiben still.
+
+Wird eine Person als vermisst erfasst oder auf „vermisst“ gesetzt, bekommen dieselben Leser den
+Alarm „Vermisstenmeldung“ mit der Registriernummer und dem Sprung zur Person, mit Alarmton und
+nicht abschaltbar. Je Wechsel kommt er einmal; wird die Person gefunden und später erneut
+vermisst, kommt er wieder.
 
 „Stornieren“ nimmt eine Fehlerfassung aus den Arbeitssichten; der Datensatz bleibt erhalten.
 

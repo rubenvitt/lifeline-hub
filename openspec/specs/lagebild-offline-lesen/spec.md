@@ -21,6 +21,8 @@ geräteseitig vorhalten und nach einem Neuladen ohne Netz anzeigen:
 - **Aufträge** mit Aufträgen und Befehlen
 - **Lagekarte** mit den Datenebenen des Einsatzes
 - **Kommunikationsplan** mit den gepflegten Stellen und Verbindungen des Fernmeldewesens
+- **Eingänge** mit dem Verlauf der eigenen Benachrichtigungen (Spec `benachrichtigungen`,
+  „Verlauf ohne Netz“)
 
 Dazu SHALL das System die Rahmendaten vorhalten, ohne die diese Ansichten nicht darstellbar
 sind: Einsatzkopf, Modulfreigaben, Einsatzeinstellungen, Modulzähler, Einsatzliste,

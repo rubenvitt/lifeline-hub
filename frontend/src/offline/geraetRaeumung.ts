@@ -87,11 +87,11 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Letzter Antreff- bzw. Schadensort; ein zweiter Benutzer im selben Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LFH-785).',
   },
   {
-    ort: 'sessionStorage lfh:liste:<seite>:<einsatz>',
+    ort: 'sessionStorage lfh:liste:<seite>:<einsatz>, lfh:liste:@besitzer',
     datei: 'components/listenGedaechtnis.ts',
     entscheidung: 'jeder-ausgang',
     grund:
-      'Sortierung, Spaltenfilter und Suchbegriff einer Liste für den Rückweg ohne Adressparameter (LLH-1086); ein Suchbegriff kann einen Namen tragen, die nächste Person im Tab bekäme ihn sonst vorbelegt.',
+      'Sortierung, Spaltenfilter und Suchbegriff einer Liste für den Rückweg ohne Adressparameter (LLH-1086); ein Suchbegriff kann einen Namen tragen, die nächste Person im Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LLH-1428).',
   },
   {
     ort: 'localStorage lfh:spalten:<seite>',

@@ -14,7 +14,8 @@ Aufträge und Lagekarte samt Rahmendaten (Einsatzkopf, Modulfreigaben `modulFrei
 LFH-669 statt der Overrides —, Einstellungen, Zähler,
 Einsatzliste, Kartenkonfiguration, Organisation, Fahrzeugstatus) und die Präferenzen der Person:
 ohne den Standard-Rufnamen hielte die Von/An-Pflicht jede Erfassung nach einem Kaltstart auf
-(LFH-894). Von den Meldungen zählen nur die Rückmeldungen, vom Fernmeldewesen nur der
+(LFH-894). Dazu der Verlauf ihrer Benachrichtigungen (LLH-1422; die Detailzeile trägt nur
+Retain-Spalten, keine Freitexte). Von den Meldungen zählen nur die Rückmeldungen, vom Fernmeldewesen nur der
 Kommunikationsplan (LFH-848; seit LLH-1180 unter dem Prefix des Fernmeldewesens, nicht des Stabs). Gespeichert wird in einer eigenen IndexedDB `lifeline-lagebild`
 (`offline/lagebildSpeicher.ts`, genau ein Datensatz je Gerät), nie über Workbox auf URL-Ebene.
 `lagebildOffline.guard.test.ts` vergleicht die Liste mit **jedem** verwalteten Prefix. Ein neuer
@@ -206,6 +207,15 @@ draußen gelassen werden.
   lädt die Fachansicht neu (`await invalidateQueries`), bevor er die Zeile entfernt, wie bei der
   Ausgabe. Ablehnungen nennen im Wiederherstellungsbereich das Objekt (`bezeichnung`, beim
   Eintreffen dazu `name`), nie nur Kennungen.
+- **„Alle gelesen“ der Eingänge wird vorgemerkt, nicht gesperrt** (LLH-1422,
+  `saveEingaengeGelesenOfflineCapable`, Spec `benachrichtigungen`, „Verlauf ohne Netz“): Aktion
+  `eingaenge_gelesen` mit `bis_id`, ohne `client_id` und Erfassungszeit, weil der Server nur
+  offene Zeilen bis `bis_id` setzt (idempotent, nie ein Wert überschrieben; Ausnahme in ADR-0008).
+  Der Lesestand ist ein Zustand der Person, keine Kennzahl: die Zahl fällt sofort
+  (`setQueryData`), und bis zum Senden legt `useBenachrichtigungVerlauf` das Vorgemerkte über
+  jeden Abruf, sonst spränge sie bei der Rückkehr des Netzes zurück, weil der Rahmen den Verlauf
+  vor dem Abgleich abruft. Das Paneel zeigt „Offline vorgemerkt“. Das Quittieren eines einzelnen Eintrags (Sprung aus dem Verlauf,
+  Toast) bleibt online: scheitert es, zeigt das Nachreichen die Benachrichtigung wieder.
 - **Seitentests schalten offline über `setzeOnline` (`test/utils.tsx`)**, nicht nur über
   `navigator.onLine`. Ein Browser führt beim Ereignis `offline` auch TanStacks `onlineManager`
   nach. Der alte Testaufbau blieb gegen den Fehler grün. Geladen wird dabei online, dann fällt

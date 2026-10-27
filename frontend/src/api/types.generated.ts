@@ -1010,16 +1010,17 @@ export interface components {
         /**
          * @description Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
          *     fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-         *     CHECK-Liste in `migrations/0196_benachrichtigung.sql` spiegelt `ALLE`.
+         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0255_benachrichtigung_quellen.sql`)
+         *     spiegelt `ALLE`.
          * @enum {string}
          */
-        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter";
+        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter";
         /**
          * @description Wozu eine Benachrichtigung gehört. Der Bezug bestimmt das Modul, das ein Empfänger sehen
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
          * @enum {string}
          */
-        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
+        BenachrichtigungBezugTyp: "einsatz" | "meldung" | "lage_uebernahme" | "auftrag" | "auftrag_empfaenger" | "befehl" | "lagebericht" | "erinnerung" | "abloesung" | "abloeser_alarmiert" | "abloeser_eingetroffen" | "abloeser_br_eingetroffen" | "abloeser_abgerufen" | "abloeser_entfallen" | "abloeser_alarmierung_gestrichen" | "abloeser_eintreffen_gestrichen" | "lagebesprechung" | "nachforderung" | "nachforderung_zugesagt" | "nachforderung_unterwegs" | "nachforderung_eingetroffen" | "nachforderung_abgelehnt" | "gefahrengebiet" | "person" | "einheit" | "fahrzeug" | "chat_nachricht";
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der

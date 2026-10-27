@@ -15,7 +15,8 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * eintreffen. Die erste Messung zu LFH-606 lag bei 0,157–0,168, als nur der Pegel zurückgehalten
  * wurde; ohne Eingriff fiel derselbe Stand unter 0,1. Eine einzelne Folge wäre grün durch Glück.
  *  - `Einsatz zuerst`: der Einsatz kommt sofort, jede andere GET-Abfrage des Einsatzes wartet,
- *    bis die Seite im Ladezustand ruht. Misst Platzhalter → Endzustand jedes Blocks.
+ *    bis die Seite im Ladezustand ruht (der Überblick bekommt auch den Modulzähler sofort, sein
+ *    Körper wartet auf ihn). Misst Platzhalter → Endzustand jedes Blocks.
  *  - `Einsatz zuletzt`: nur der Einsatz wartet. Misst Ortspfad, Rechtehinweis und alles, was am
  *    Einsatz hängt (Kennzahlreihe, Schreibrecht).
  *  - `natürlich`: ohne Eingriff, wie im Betrieb.
@@ -109,18 +110,26 @@ async function einsatzAnlegen(page: Page): Promise<string> {
 type Folge = 'Einsatz zuerst' | 'Einsatz zuletzt' | 'natürlich';
 const FOLGEN: Folge[] = ['Einsatz zuerst', 'Einsatz zuletzt', 'natürlich'];
 
+/** Die gemessene Seite; sie bestimmt, worauf ihr Körper wartet. */
+type Seite = 'ueberblick' | 'lage-dashboard';
+
 /**
  * Stellt die GET-Abfragen unter `/api/einsaetze/<id>` nach der Folge; der Live-Strom (`/live`)
  * läuft immer durch, er ist kein Datenabruf. Die gehaltenen warten auf `freigeben()`.
  */
-async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge) {
+async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge, seite: Seite) {
   await page.unrouteAll({ behavior: 'ignoreErrors' });
   let loslassen!: () => void;
   const tor = new Promise<void>((f) => (loslassen = f));
   const kopf = `/api/einsaetze/${einsatzId}`;
   // Die Modulfreigaben gehören wie der Kopf zum Rahmen: bis sie antworten, wartet der Modulwächter
   // (LFH-888) und die Seite rendert noch nicht. Gehalten werden die Abfragen der Seite.
-  const rahmen = (pfad: string) => pfad === kopf || pfad === `${kopf}/modul-freigaben`;
+  // Der Überblick wartet mit seinem Körper außerdem auf den Modulzähler (LLH-1430, die
+  // Platzhalter der „Offenen Vorgänge“): gehalten zeigte er keinen Ladezustand, den man messen kann.
+  const rahmen = (pfad: string) =>
+    pfad === kopf ||
+    pfad === `${kopf}/modul-freigaben` ||
+    (seite === 'ueberblick' && pfad === `${kopf}/modul-zaehler`);
   const haelt = (pfad: string) =>
     folge === 'Einsatz zuerst' ? !rahmen(pfad) : folge === 'Einsatz zuletzt' && pfad === kopf;
   let gehalten = 0;
@@ -154,9 +163,9 @@ async function endzustand(page: Page) {
   await expect(inhalt(page).locator('[aria-busy="true"]')).toHaveCount(0);
 }
 
-async function messe(page: Page, pfad: string, einsatzId: string, folge: Folge, dichte: Dichte) {
-  const abfragen = await stelleAbfragen(page, einsatzId, folge);
-  await page.goto(pfad);
+async function messe(page: Page, seite: Seite, einsatzId: string, folge: Folge, dichte: Dichte) {
+  const abfragen = await stelleAbfragen(page, einsatzId, folge, seite);
+  await page.goto(`/einsaetze/${einsatzId}/${seite}`);
   // Vorbedingung der Zahl: gemessen wird die Stufe, die der Test nennt.
   await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
   if (folge !== 'natürlich') {
@@ -186,11 +195,10 @@ for (const route of ['ueberblick', 'lage-dashboard'] as const) {
         await stelleDichte(page, dichte);
         await beobachteShifts(page);
         await page.setViewportSize(HANDSCHIRM);
-        const pfad = `/einsaetze/${einsatzId}/${route}`;
 
         const werte: string[] = [];
         for (const folge of FOLGEN) {
-          const m: Messung = await messe(page, pfad, einsatzId, folge, dichte);
+          const m: Messung = await messe(page, route, einsatzId, folge, dichte);
           // Der Rollenzweig ist Vorbedingung der Zahl (LFH-435): ohne ihn mäße der
           // Beobachter-Fall den Admin-Zustand.
           if (route === 'ueberblick') {
@@ -241,7 +249,7 @@ test('Meldungsstrom: der Paneelkopf hält seine Höhe über die Verbindungszust�
     return k!.height;
   };
 
-  await stelleAbfragen(page, einsatzId, 'natürlich');
+  await stelleAbfragen(page, einsatzId, 'natürlich', 'lage-dashboard');
   await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
   const offen = await messeKopf(/^live$/);
   // Ohne Leitung: der Strom wird abgewiesen, das Wort bleibt beim Aufbau bzw. „unterbrochen".
@@ -272,7 +280,7 @@ for (const dichte of DICHTEN) {
 
     const hoehen: string[] = [];
     for (const folge of ['Einsatz zuletzt', 'Einsatz zuerst'] as const) {
-      const abfragen = await stelleAbfragen(page, einsatzId, folge);
+      const abfragen = await stelleAbfragen(page, einsatzId, folge, 'lage-dashboard');
       await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
       await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
       // Vorbedingung: das Band steht im Ladezustand, mit geladener Schrift.
@@ -306,7 +314,7 @@ for (const dichte of DICHTEN) {
     await stelleDichte(page, dichte);
     await page.setViewportSize(HANDSCHIRM);
 
-    const abfragen = await stelleAbfragen(page, einsatzId, 'Einsatz zuerst');
+    const abfragen = await stelleAbfragen(page, einsatzId, 'Einsatz zuerst', 'ueberblick');
     await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
     const paneel = page
@@ -343,7 +351,7 @@ for (const dichte of DICHTEN) {
     await stelleDichte(page, dichte);
     await page.setViewportSize(HANDSCHIRM);
 
-    const abfragen = await stelleAbfragen(page, einsatzId, 'Einsatz zuletzt');
+    const abfragen = await stelleAbfragen(page, einsatzId, 'Einsatz zuletzt', 'lage-dashboard');
     await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
     const zelle = page.locator('[data-lfh="kopf-einsatzname"]');

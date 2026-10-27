@@ -453,8 +453,10 @@ export function funkplanPfad(einsatzId: number, opts: { ansicht?: FunkplanAnsich
 
 /**
  * Darstellung des Funkplans: Tabelle, Fernmeldeskizze (LFH-625) oder Kanalbelegung je
- * Sprechgruppe (LFH-848 D8). `ansicht` ist ein AUFTRAG wie bei {@link einsatzabschnittePfad}
- * (apply-then-clean); als Lesezeichen taugt die Adresse ohne.
+ * Sprechgruppe (LFH-848 D8). Anders als bei {@link einsatzabschnittePfad} ist `ansicht` hier
+ * ZUSTAND wie der Reiter bei {@link auftraegePfad} (LLH-1432): er bleibt in der Adresse, damit
+ * Browser-Zurück aus einem Teilnehmer im selben Reiter landet und die Sortierung und Filter der
+ * Sprechgruppen dort wieder wirken. Die Vorgabe „tabelle“ steht ohne Parameter.
  */
 export type FunkplanAnsicht = 'tabelle' | 'skizze' | 'sprechgruppen';
 

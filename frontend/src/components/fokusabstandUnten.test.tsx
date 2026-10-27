@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FOKUSABSTAND_ETB, beobachteFussleiste, useFokusabstandUnten } from './fokusabstandUnten';
+import { untereLeisten } from './untereLeiste';
 
 /**
  * Die gemeinsame Fokusabstand-MESSUNG (LFH-373, aus LFH-465 gehoben; die Regel bleibt je Seite). jsdom rechnet kein
@@ -46,12 +47,13 @@ const wert = () => document.documentElement.style.getPropertyValue(FOKUSABSTAND_
 describe('beobachteFussleiste', () => {
   it('schreibt Höhe plus Abstand an die Wurzel und folgt einer Größenänderung', () => {
     const hoehe = { wert: 78 };
-    beobachteFussleiste(leisteMitHoehe(hoehe), 8, FOKUSABSTAND_ETB);
+    const aufraeumen = beobachteFussleiste(leisteMitHoehe(hoehe), 8, FOKUSABSTAND_ETB);
     expect(wert()).toBe('86px');
 
     hoehe.wert = 184;
     beobachterRueckruf!();
     expect(wert()).toBe('192px');
+    aufraeumen!();
   });
 
   it('räumt Variable und Beobachter beim Aushängen weg', () => {
@@ -60,6 +62,14 @@ describe('beobachteFussleiste', () => {
     aufraeumen!();
     expect(wert()).toBe('');
     expect(trennen).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet die Leiste als untere Leiste an und beim Aushängen ab (LLH-1424)', () => {
+    const leiste = leisteMitHoehe({ wert: 78 });
+    const aufraeumen = beobachteFussleiste(leiste, 8, FOKUSABSTAND_ETB);
+    expect(untereLeisten()).toEqual([leiste]);
+    aufraeumen!();
+    expect(untereLeisten()).toEqual([]);
   });
 
   it('ohne Leiste passiert nichts', () => {

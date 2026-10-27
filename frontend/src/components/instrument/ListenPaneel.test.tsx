@@ -147,4 +147,51 @@ describe('ListenAbschnitt', () => {
     screen.getByRole('button', { name: 'Erneut abrufen' }).click();
     expect(onNeuladen).toHaveBeenCalled();
   });
+
+  /*
+   * LLH-1430: beim Laden hält der Abschnitt den Platz der erwarteten Einträge — so viele
+   * Platzhalterzeilen, wie der Aufrufer aus seiner Zählquelle kennt, höchstens `max`, jede in der
+   * Hülle einer Eintragszeile. Höhen misst jsdom nicht; die Seiten-CLS misst
+   * `e2e/ueberblick-vorgaenge-cls.spec.ts`.
+   */
+  const platzhalter = () => document.querySelectorAll('[data-lfh="abschnitt-platzhalter"]');
+
+  it('Laden mit erwarteten Einträgen: so viele Platzhalterzeilen, höchstens `max`', () => {
+    const { unmount } = abschnitt({ zustand: 'laden', eintraege: [], ladeZeilen: 2 });
+    const busy = screen.getByLabelText('Aufträge wird geladen');
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    expect(platzhalter()).toHaveLength(2);
+    platzhalter().forEach((z) => expect(busy).toContainElement(z as HTMLElement));
+    // Der Satz steht einmal, in der ersten Zeile; die Zeilen tragen die Hülle eines Eintrags.
+    expect(screen.getAllByText('wird abgerufen')).toHaveLength(1);
+    expect(platzhalter()[0]).toHaveTextContent('wird abgerufen');
+    unmount();
+    abschnitt({ zustand: 'laden', eintraege: [], ladeZeilen: 12 });
+    expect(platzhalter()).toHaveLength(3);
+  });
+
+  it('eine Platzhalterzeile trägt den Boden einer Eintragszeile', () => {
+    const { unmount } = abschnitt({ eintraege: [] });
+    const zeilenBoden = document.querySelector<HTMLElement>('[data-lfh="abschnitt-keine"]')!.style
+      .minHeight;
+    unmount();
+    abschnitt({ zustand: 'laden', eintraege: [], ladeZeilen: 1 });
+    expect(zeilenBoden).toMatch(/^\d+px$/);
+    expect(platzhalter()[0]).toHaveStyle({ minHeight: zeilenBoden });
+  });
+
+  it('Laden ohne bekannte Zahl oder mit 0: eine Zeile in der Form von „keine“', () => {
+    for (const ladeZeilen of [undefined, null, 0]) {
+      const { unmount } = abschnitt({ zustand: 'laden', eintraege: [], ladeZeilen });
+      expect(platzhalter()).toHaveLength(0);
+      expect(screen.getByLabelText('Aufträge wird geladen')).toHaveTextContent(/^wird abgerufen$/);
+      unmount();
+    }
+  });
+
+  it('mit Daten keine Platzhalter mehr, auch wenn `ladeZeilen` gesetzt bleibt', () => {
+    abschnitt({ ladeZeilen: 3 });
+    expect(platzhalter()).toHaveLength(0);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
 });

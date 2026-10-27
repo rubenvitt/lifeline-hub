@@ -16,6 +16,13 @@ import { FakeEventSource } from '../../test/eventSource';
  * das, was nur die Route kann: Serie ohne Ortswechsel, stehende Quittung, UHS-Auftrag im
  * Anlege-Request. Alle Schreibrequests werden über MSW gezählt, auch versehentliche Folge-Requests.
  */
+// MapLibre läuft in jsdom nicht; die Vorschau des Fundorts (LLH-1407) zeigt nur den Punkt.
+vi.mock('../../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({ punkt }: { punkt: { lat: number; lon: number } | null }) => (
+    <div>{punkt && `${punkt.lat},${punkt.lon}`}</div>
+  ),
+}));
+
 const schreibrequests: string[] = [];
 function merkeRequest({ request }: { request: Request }) {
   if (request.method === 'POST') schreibrequests.push(new URL(request.url).pathname);
@@ -142,7 +149,7 @@ describe('AufnahmePage', () => {
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
   });
 
-  it('schickt Zustand und Koordinate aus „Weitere Angaben" im selben POST (LFH-613)', async () => {
+  it('schickt Zustand und die Koordinate des Fundorts im selben POST (LFH-613, LLH-1407)', async () => {
     let gesendet: Record<string, unknown> = {};
     render(einsatzAktiv, [
       http.post('/api/einsaetze/1/personen', async ({ request }) => {
@@ -153,12 +160,15 @@ describe('AufnahmePage', () => {
     await screen.findByRole('radiogroup');
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.type(await screen.findByLabelText('Zustand / Verdacht'), 'Beinfraktur');
-    await userEvent.type(screen.getByLabelText('Koordinate'), '#52.2691/9.1342');
+    // Kein eigenes Koordinatenfeld mehr: die Koordinate steht im Fundort.
+    expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Fundort'), '52.2691/9.1342');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
     await screen.findByText(/Erfasst als R-047/);
     expect(gesendet).toMatchObject({
       zustand: 'Beinfraktur',
+      antreff_ort: '52.2691/9.1342',
       antreff_lat: 52.2691,
       antreff_lon: 9.1342,
     });

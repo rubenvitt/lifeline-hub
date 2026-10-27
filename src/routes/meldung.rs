@@ -650,14 +650,13 @@ pub async fn rueckmeldungen(
     ctx: EinsatzLesezugriff<Meldungen>,
 ) -> Result<Json<crate::meldung::RueckmeldungenAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let einst = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
-    let org_einst =
-        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
-    let frist_min = crate::einsatz::effektiv::effektive_rueckmeldung_frist_min(&einst, &org_einst)
-        .unwrap_or(crate::meldung::RUECKMELDUNG_FRIST_DEFAULT_MIN);
+    // Dieselbe Frist und Fälligkeit wie der Hinweis „Rückmeldung überfällig“ (LLH-1425).
+    let frist_min =
+        crate::meldung::rueckmeldung::frist_min(&state.pool, einsatz_id, ctx.einsatz.org_id)
+            .await?;
     let mit_faelligkeit = |mut liste: Vec<crate::meldung::LetzteRueckmeldung>| {
         for r in &mut liste {
-            r.faellig_at = faellig_at(&r.ereigniszeit, frist_min);
+            r.faellig_at = crate::meldung::rueckmeldung::faellig_at(&r.ereigniszeit, frist_min);
         }
         liste
     };
@@ -666,13 +665,6 @@ pub async fn rueckmeldungen(
         einheiten: mit_faelligkeit(repo::letzte_je_einheit(&state.pool, einsatz_id).await?),
         abschnitte: mit_faelligkeit(repo::letzte_je_abschnitt(&state.pool, einsatz_id).await?),
     }))
-}
-
-/// `ereigniszeit` (SQLite-Format, vom Anlegen normalisiert) + `frist_min`. Ein nicht
-/// parsebarer Altwert fällt auf die Ereigniszeit selbst zurück — die Einheit gilt dann
-/// sofort als überfällig, was auffällt, statt still als rechtzeitig durchzugehen.
-fn faellig_at(ereigniszeit: &str, frist_min: i64) -> String {
-    crate::zeit::plus_minuten(ereigniszeit, frist_min).unwrap_or_else(|| ereigniszeit.to_string())
 }
 
 /// GET /api/einsaetze/{id}/lage/meldungen — die Lagemeldungen: alle lagerelevanten Meldungen
@@ -766,11 +758,6 @@ mod tests {
         EinsatzEinstellungen::leer(1)
     }
 
-    #[test]
-    fn faellig_at_addiert_frist_ueber_die_tagesgrenze() {
-        assert_eq!(faellig_at("2026-09-22 23:30:00", 60), "2026-09-23 00:30:00");
-        assert_eq!(faellig_at("kaputt", 60), "kaputt");
-    }
     fn o() -> OrgEinstellungen {
         OrgEinstellungen::leer(1)
     }

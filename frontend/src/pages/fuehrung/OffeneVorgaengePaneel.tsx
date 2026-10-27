@@ -162,6 +162,13 @@ export default function OffeneVorgaengePaneel({
   );
   const abListe = vorgangsAbloesungen(abloesungDaten ?? [], jetzt);
 
+  // ── Platzhalter beim Laden (LLH-1430): so viele Zeilen, wie der Zähler Einträge erwarten lässt.
+  // Nur in „alle“: für „meine Stelle“ zählt der Zähler nicht. Erinnerungen: der Zähler kennt nur
+  // die fälligen, die Liste nimmt die bald fälligen dazu — eine Untergrenze. Ablösungen haben keinen
+  // Serverzähler (die Rail lädt dieselbe Liste, sie liegt meist schon vor).
+  const erwartet = <T,>(s: Zaehlstand<T>, wert: (z: T) => number) =>
+    meine ? null : zahlVon(s, wert);
+
   const ton = (t: 'alarm' | 'achtung' | null) =>
     t === 'alarm' ? rollen.alarmText : t === 'achtung' ? rollen.achtungText : rollen.gedaempft;
   /** Alarmkante links, das Wort steht immer daneben (nie nur Farbe). */
@@ -210,6 +217,8 @@ export default function OffeneVorgaengePaneel({
     kennung: string;
     zahl: number | null;
     zustand: ListenAbschnittZustand;
+    /** Erwartete Einträge beim Laden, aus dem Zähler; `null`: unbekannt. */
+    ladeZeilen: number | null;
     notiz?: ReactNode;
     zahlWort?: string;
     leer?: string;
@@ -228,6 +237,7 @@ export default function OffeneVorgaengePaneel({
       zustand={p.zustand}
       eintraege={p.eintraege}
       max={VORGAENGE_JE_ABSCHNITT}
+      ladeZeilen={p.ladeZeilen}
       schluessel={p.schluessel}
       zeile={p.zeile}
       sprung={p.sprung}
@@ -259,6 +269,7 @@ export default function OffeneVorgaengePaneel({
           kennung: 'vorgaenge-meldungen',
           zahl: zahlVon(zMeldungen, (z) => z.offen),
           zustand: stand(meldungen, zMeldungen),
+          ladeZeilen: erwartet(zMeldungen, (z) => z.offen),
           notiz:
             zMeldungen.zustand === 'daten'
               ? notiz([
@@ -311,6 +322,7 @@ export default function OffeneVorgaengePaneel({
           kennung: 'vorgaenge-auftraege',
           zahl: zahlVon(zAuftraege, (z) => z.offen),
           zustand: stand(auftraege, zAuftraege),
+          ladeZeilen: erwartet(zAuftraege, (z) => z.offen),
           notiz:
             zAuftraege.zustand === 'daten'
               ? notiz([
@@ -350,6 +362,7 @@ export default function OffeneVorgaengePaneel({
           kennung: 'vorgaenge-nachforderungen',
           zahl: zahlVon(zNachforderungen, (z) => z.offen),
           zustand: stand(nachforderungen, zNachforderungen),
+          ladeZeilen: erwartet(zNachforderungen, (z) => z.offen),
           notiz:
             zNachforderungen.zustand === 'daten'
               ? notiz([
@@ -395,6 +408,7 @@ export default function OffeneVorgaengePaneel({
           kennung: 'vorgaenge-erinnerungen',
           zahl: zahlVon(zErinnerungen, (z) => z.faellig),
           zustand: stand(erinnerungen, zErinnerungen),
+          ladeZeilen: erwartet(zErinnerungen, (z) => z.faellig),
           notiz: zErinnerungen.zustand === 'daten' ? 'fällig' : undefined,
           eintraege: eListe,
           schluessel: (e) => e.id,
@@ -417,6 +431,7 @@ export default function OffeneVorgaengePaneel({
           kennung: 'vorgaenge-abloesungen',
           zahl: abloesungZahl,
           zustand: stand(abloesungen),
+          ladeZeilen: null,
           notiz: meine ? 'alle Stellen' : 'fällig oder bald',
           zahlWort: undefined,
           leer: 'keine',

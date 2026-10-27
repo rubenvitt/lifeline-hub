@@ -51,6 +51,9 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-karten-ansicht',
   'einsatz-kartenbilder',
   'einsatz-lage-snapshot',
+  // Verlauf der eigenen Benachrichtigungen (LLH-1422): lesbar ohne Netz, „Alle gelesen“ wird
+  // vorgemerkt. Die Detailzeile trägt nur Retain-Spalten (Nummern, Labels), keine Freitexte.
+  'einsatz-benachrichtigung-verlauf',
 ]);
 const ERWARTET_GLOBAL = new Set([
   'einsaetze',
@@ -114,6 +117,10 @@ describe('istLagebildOfflineKey', () => {
     expect(istLagebildOfflineKey(['einsatz-stab', 7, 'kommunikationsplan'])).toBe(false);
     expect(istLagebildOfflineKey(einsatzKeys.stab(7))).toBe(false);
     expect(istLagebildOfflineKey(einsatzKeys.stabCheckliste(7))).toBe(false);
+  });
+
+  it('nimmt den Verlauf der Benachrichtigungen offline (LLH-1422)', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.benachrichtigungVerlauf(7))).toBe(true);
   });
 
   it('nimmt die Lagebesprechung nicht offline (LLH-1111)', () => {

@@ -61,6 +61,17 @@ function aktuellerPfad() {
   return screen.getByTestId('pfad').textContent;
 }
 
+/** Stornieren steht im Menü des Kopfs (drei Datensatz-Aktionen, LLH-1407); öffnet die Rückfrage. */
+async function stornierenWaehlen(bezeichnung = 'UHS Nord') {
+  await userEvent.click(
+    await screen.findByRole('button', { name: `Weitere Aktionen zu ${bezeichnung}` }),
+  );
+  const menu = document.querySelector<HTMLElement>(
+    '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+  )!;
+  await userEvent.click(within(menu).getByRole('menuitem', { name: 'Stornieren' }));
+}
+
 function renderBei(route: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -503,6 +514,52 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
   });
 });
 
+describe('UhsDetailPage — „Bearbeiten“ im Kopf (LLH-1407)', () => {
+  const uhsBasis = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'UHS Nord',
+    typ: 'patientenablage',
+    standort: 'Halle 1',
+    notiz: null,
+    material: [],
+    plaetze: [],
+    belegungen: [],
+  };
+  function zeige(status: string, meine_rolle = 'einsatzleitung') {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle,
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status } as unknown as Awaited<
+      ReturnType<typeof ladeUhs>
+    >);
+    return renderBei('/einsaetze/1/unfallhilfsstellen/9');
+  }
+
+  it.each(['geplant', 'aktiv'])('%s: „Bearbeiten“ öffnet die Stammdaten', async (status) => {
+    zeige(status);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Unfallhilfsstelle bearbeiten' }),
+    ).toBeInTheDocument();
+  });
+
+  it('aufgelöst: kein „Bearbeiten“', async () => {
+    zeige('aufgeloest');
+    await screen.findByText('GRUNDRISS');
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht: kein „Bearbeiten“', async () => {
+    zeige('aktiv', 'beobachter');
+    await screen.findByText('GRUNDRISS');
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+});
+
 describe('UhsDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
   const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
   const uhsBasis = {
@@ -542,7 +599,7 @@ describe('UhsDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     vi.mocked(storniereUhs).mockClear();
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    await stornierenWaehlen();
     expect(await screen.findByText('Unfallhilfsstelle stornieren?')).toBeInTheDocument();
     const ok = screen.getByRole('button', { name: 'Unfallhilfsstelle stornieren' });
     expect(ok).toHaveClass('ant-btn-dangerous');
@@ -613,7 +670,7 @@ describe('UhsDetailPage — Ablehnung im Seitenhinweis (LFH-1077)', () => {
     vi.mocked(setzeUhsStatus).mockImplementationOnce(() => new Promise(() => {}));
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    await stornierenWaehlen();
     await userEvent.click(
       await screen.findByRole('button', { name: 'Unfallhilfsstelle stornieren' }),
     );

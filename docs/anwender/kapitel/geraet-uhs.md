@@ -39,7 +39,8 @@ mit „Bestätigt von“ oder Kurzbegründung geht über den Patientenkopf (unte
 
 1. „Patient aufnehmen“ oder unten „Aufnahme“ wählen.
 2. Die Fläche der Sichtungskategorie antippen und, soweit bekannt, Geschlecht, geschätztes Alter und
-   Fundort angeben. Name und weitere Angaben stehen unter „Weitere Angaben“.
+   Fundort angeben. Name und weitere Angaben, auch die Koordinate des Fundorts, stehen unter
+   „Weitere Angaben“. Eine Ortssuche gibt es am Gerät nicht; der Fundort ist freier Text.
 
    ![Aufnahme am UHS-Tablet mit gewählter Sichtungskategorie SK II](../bilder/geraet-uhs/aufnahme.png)
 

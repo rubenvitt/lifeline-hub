@@ -89,7 +89,7 @@ afterEach(() => {
 const warteTakt = () => new Promise((r) => setTimeout(r, 30));
 
 describe('useUnwetterHinweis', () => {
-  it('meldet eine neue Unwetterwarnung genau einmal, mit dezentem Ton, ohne „mäßig"', async () => {
+  it('meldet eine neue Unwetterwarnung genau einmal als Alarm mit lautem Ton, ohne „mäßig"', async () => {
     const abrufe = liefere();
     renderHook(
       () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
@@ -101,7 +101,9 @@ describe('useUnwetterHinweis', () => {
       titel: 'Unwetterwarnung',
     });
     expect(ereignisse[0].detail.beschreibung).toMatch(/^Schweres Gewitter, seit /);
-    expect(ton).toHaveBeenCalledWith('dezent');
+    // Warnstufe rot ist ein Alarm (LLH-1425, Katalog LLH-1142 E1): lauter Ton, nicht dezent.
+    expect(ton).toHaveBeenCalledWith('alarm');
+    expect(ton).not.toHaveBeenCalledWith('dezent');
     expect(abrufe.anzahl).toBe(1);
   });
 
@@ -176,14 +178,45 @@ describe('useUnwetterHinweis', () => {
     expect(abrufe.anzahl).toBe(0);
   });
 
-  it('„Unwetterwarnung“ in den Benachrichtigungen abgeschaltet: kein Hinweis, kein Ton', async () => {
-    const abrufe = liefere();
-    let einstellungen = 0;
+  it('ein gespeichertes „Unwetterwarnung aus“ hält den Alarm nicht auf (Alarme sind nicht abschaltbar)', async () => {
+    liefere();
     server.use(
-      http.get('/api/benutzer-einstellungen', () => {
-        einstellungen += 1;
+      http.get('/api/benutzer-einstellungen', () =>
+        HttpResponse.json({
+          eintraege: { benachrichtigungen_aus: JSON.stringify(['unwetter', 'gefahr']) },
+        }),
+      ),
+    );
+    renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      { wrapper },
+    );
+    await waitFor(() => expect(ereignisse).toHaveLength(1));
+    expect(ton).toHaveBeenCalledWith('alarm');
+  });
+
+  it('nur „mäßig“: kein Alarm, kein Ton (nur Warnstufe rot und darüber)', async () => {
+    const jetzt = Date.now();
+    const um = (ms: number) => new Date(jetzt + ms).toISOString();
+    const abrufe = { anzahl: 0 };
+    server.use(
+      http.get(PFAD, () => {
+        abrufe.anzahl += 1;
+        const a = antwort(60_000);
         return HttpResponse.json({
-          eintraege: { benachrichtigungen_aus: JSON.stringify(['unwetter']) },
+          ...a,
+          warnungen: {
+            ...a.warnungen,
+            daten: [
+              {
+                stufe: 'maessig',
+                ereignis: 'STURMBÖEN',
+                ueberschrift: 'Amtliche WARNUNG vor STURMBÖEN',
+                beginn: um(-STUNDE),
+                ende: um(2 * STUNDE),
+              },
+            ],
+          },
         });
       }),
     );
@@ -192,25 +225,9 @@ describe('useUnwetterHinweis', () => {
       { wrapper },
     );
     await waitFor(() => expect(abrufe.anzahl).toBe(1));
-    await waitFor(() => expect(einstellungen).toBe(1));
     await warteTakt();
     expect(ereignisse).toHaveLength(0);
     expect(ton).not.toHaveBeenCalled();
-  });
-
-  it('eine andere abgeschaltete Art hält den Unwetterhinweis nicht auf', async () => {
-    liefere();
-    server.use(
-      http.get('/api/benutzer-einstellungen', () =>
-        HttpResponse.json({ eintraege: { benachrichtigungen_aus: JSON.stringify(['gefahr']) } }),
-      ),
-    );
-    renderHook(
-      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
-      { wrapper },
-    );
-    await waitFor(() => expect(ereignisse).toHaveLength(1));
-    expect(ton).toHaveBeenCalledWith('dezent');
   });
 
   it('fragt auch im Hintergrund-Tab nach — sonst griffe die Desktop-Meldung nie', async () => {

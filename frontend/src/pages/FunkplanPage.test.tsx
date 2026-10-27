@@ -712,7 +712,7 @@ describe('FunkplanPage — Modulgrenze der Quellen (LFH-669)', () => {
 
 /**
  * Darstellung „Skizze“ (LFH-625, LFH-893): die Fernmeldeskizze als zweite Darstellung derselben
- * Seite. Umschalter im Kopf, Sichtvorgabe `?ansicht=` apply-then-clean, Druckkopf je Darstellung,
+ * Seite. Umschalter im Kopf, Darstellung als Zustand der Adresse `?ansicht=` (LLH-1432), Druckkopf je Darstellung,
  * dieselbe Übernahme und dasselbe Lücken-Paneel.
  */
 describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
@@ -751,10 +751,10 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
     expect(screen.getByRole('region', { name: 'Lücken' })).toBeInTheDocument();
   });
 
-  it('?ansicht=skizze öffnet die Skizze und räumt den Parameter', async () => {
+  it('?ansicht=skizze öffnet die Skizze, der Parameter bleibt in der Adresse (LLH-1432)', async () => {
     rendereMit('/einsaetze/1/fernmeldewesen?ansicht=skizze');
     expect(await screen.findByRole('region', { name: 'Fernmeldeskizze' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.getByTestId('suche')).toHaveTextContent(/^\?ansicht=skizze$/);
     expect(
       within(screen.getByRole('tablist')).getByRole('tab', {
         name: 'Fernmeldeskizze',
@@ -910,7 +910,7 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
 
 /**
  * Darstellung „Sprechgruppen“ (LFH-848 D8): die Kanalbelegung als dritte Darstellung derselben
- * Seite. Umschalter dreistellig, Sichtvorgabe `?ansicht=sprechgruppen` apply-then-clean, Druckkopf
+ * Seite. Umschalter dreistellig, Darstellung `?ansicht=sprechgruppen` in der Adresse (LLH-1432), Druckkopf
  * nennt die Darstellung, Lücken-Paneel und Übernahme bleiben die der Seite.
  */
 describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
@@ -1014,7 +1014,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     expect(within(zeile(container, 9)).getByText('einsatzlokal')).toBeInTheDocument();
   });
 
-  it('?ansicht=sprechgruppen öffnet die Darstellung, räumt den Parameter, nie zuerst die Tabelle', async () => {
+  it('?ansicht=sprechgruppen öffnet die Darstellung, behält den Parameter, nie zuerst die Tabelle', async () => {
     const { container } = rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
     const tabellen: number[] = [];
     const beobachter = new MutationObserver(() =>
@@ -1024,7 +1024,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     expect(await screen.findByRole('region', { name: 'Sprechgruppen' })).toBeInTheDocument();
     beobachter.disconnect();
     expect(Math.max(0, ...tabellen)).toBe(0);
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.getByTestId('suche')).toHaveTextContent(/^\?ansicht=sprechgruppen$/);
     expect(screen.getByRole('tab', { name: 'Sprechgruppen' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -1110,7 +1110,11 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
 
     await kopfFilterWaehlen('Bedingung', ['DMO (2)']);
     await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9']));
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?f.bedingung=DMO'));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche')).toHaveTextContent(
+        '?ansicht=sprechgruppen&f.bedingung=DMO',
+      ),
+    );
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     await waitFor(() => expect(folge()).toHaveLength(3));
@@ -1120,8 +1124,86 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     );
     await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9', 'sg-1']));
     await waitFor(() =>
-      expect(screen.getByTestId('suche')).toHaveTextContent('?sort=sprechgruppe%3Aauf'),
+      expect(screen.getByTestId('suche')).toHaveTextContent(
+        '?ansicht=sprechgruppen&sort=sprechgruppe%3Aauf',
+      ),
     );
+  });
+
+  /**
+   * Der Reiter ist Zustand der Adresse (LLH-1432): wer in „Sprechgruppen“ filtert, einem Teilnehmer
+   * folgt und Zurück wählt, steht wieder in „Sprechgruppen“ mit demselben Filter. Der Reiterwechsel
+   * ist kein Verlaufsschritt (`replace`), wie der Reiter der Aufträge.
+   */
+  it('Zurück aus einem Teilnehmer zeigt denselben Reiter mit demselben Filter (LLH-1432)', async () => {
+    const { useNavigate: echtesNavigate, useNavigationType } =
+      await vi.importActual<typeof import('react-router')>('react-router');
+    function ZurueckKnopf() {
+      const navigate = echtesNavigate();
+      return (
+        <button type="button" onClick={() => navigate(-1)}>
+          Zurück
+        </button>
+      );
+    }
+    function ArtAnzeige() {
+      return <span data-testid="art">{useNavigationType()}</span>;
+    }
+    const { container } = renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/fernmeldewesen" element={<FunkplanPage />} />
+          <Route path="/einsaetze/:id/einsatzabschnitte" element={<ZurueckKnopf />} />
+        </Routes>
+        <SuchAnzeige />
+        <ArtAnzeige />
+      </>,
+      { route: '/einsaetze/1/fernmeldewesen' },
+    );
+    const folge = () =>
+      [...plan().querySelectorAll('tr[data-row-key^="sg-"]')].map((z) =>
+        z.getAttribute('data-row-key'),
+      );
+    await screen.findByText('Florian 1/42-1');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Sprechgruppen' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche')).toHaveTextContent('?ansicht=sprechgruppen'),
+    );
+    expect(screen.getByTestId('art')).toHaveTextContent('REPLACE');
+    await waitFor(() => expect(folge()).toEqual(['sg-1', 'sg-2', 'sg-9']));
+    await kopfFilterWaehlen('Bedingung', ['DMO (2)']);
+    await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9']));
+    // Das Gedächtnis meldet entprellt; erst danach steht der Filter in der Adresse.
+    await waitFor(() =>
+      expect(screen.getByTestId('suche')).toHaveTextContent(
+        '?ansicht=sprechgruppen&f.bedingung=DMO',
+      ),
+    );
+
+    await userEvent.click(
+      within(zeile(container, 2)).getByRole('link', { name: 'Abschnitt Nord' }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Zurück' }));
+
+    expect(await screen.findByRole('region', { name: 'Sprechgruppen' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Sprechgruppen' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9']));
+    const suche = new URLSearchParams(screen.getByTestId('suche').textContent ?? '');
+    expect(suche.get('ansicht')).toBe('sprechgruppen');
+    expect(suche.get('f.bedingung')).toBe('DMO');
+
+    // Zurück auf „Funkplan“: der Parameter fällt weg, die Vorgabe steht ohne ihn.
+    await userEvent.click(screen.getByRole('tab', { name: 'Funkplan' }));
+    await waitFor(() =>
+      expect(
+        new URLSearchParams(screen.getByTestId('suche').textContent ?? '').has('ansicht'),
+      ).toBe(false),
+    );
+    expect(screen.getByTestId('art')).toHaveTextContent('REPLACE');
   });
 });
 
