@@ -11287,9 +11287,9 @@ mod tests {
     /// und Funktion eine Zeile mit der Stufe Eingang oder still, nie einen Alarm, und fällt mit dem
     /// Einsatz; das Löschen des Kontos lässt die Zeile ohne Bearbeiter stehen.
     #[tokio::test]
-    async fn migration_0257_legt_die_vorgabe_je_funktion_an() {
+    async fn migration_0258_legt_die_vorgabe_je_funktion_an() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 257;
+        const VERSION: i64 = 258;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
