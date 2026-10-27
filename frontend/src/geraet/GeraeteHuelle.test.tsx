@@ -141,6 +141,10 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
         verletzungen: [],
       } as PersonDetail),
     ),
+    // Die Bestätiger-Liste („Bestätigt von“) holt das UHS-Tablet vorab, damit sie ohne Netz da
+    // ist; ohne Handler scheiterte der Abruf an der Leitung, und die Personendaten stünden auf
+    // „ohne Verbindung“ gesperrt.
+    http.get('/api/einsaetze/7/personen/bestaetiger', () => HttpResponse.json([])),
   );
 }
 
