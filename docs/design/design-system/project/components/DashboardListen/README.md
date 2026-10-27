@@ -13,6 +13,13 @@ KÖRPER: höchstens `max` Einträge (Vorgabe 3). Leer ist EINE Zeile „keine“
 Laden, Fehler und „ohne Netz“ sind kein „keine“. GESPERRT (Modul nicht freigegeben, LFH-888):
 Zahl „—“, der Grund als Zeile, kein Sprung, keine Liste.
 
+LADEN hält den Platz der kommenden Liste (LLH-1430): weiß der Aufrufer aus seiner Zählquelle,
+wie viele Einträge kommen (`ladeZeilen`), stehen so viele Platzhalterzeilen in fester Höhe da
+(höchstens `max`), jede so hoch wie ein Eintrag mit Unterzeile (`LadePlatzhalterZeile`).
+Ohne Angabe oder bei 0 bleibt es eine Zeile in der Höhe von „keine“. Sonst wuchs ein Abschnitt
+beim Eintreffen der Liste von einer Zeile auf drei und schob alles darunter (Seiten-CLS des
+Überblicks 0,05–0,07 bei 1440 px, `e2e/ueberblick-vorgaenge-cls.spec.ts`).
+
 Zeilen mit Ziel nehmen `listenZeileStil`; der Sprung trägt den Boden `controlHeight`.
 
 Aus `frontend/src/components/instrument/StromPaneel.tsx`:
