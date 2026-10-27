@@ -1,5 +1,6 @@
 import { Button, Checkbox, Dropdown } from 'antd';
 import type { ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 
 /**
@@ -94,6 +95,45 @@ export function hatWaehlbareSpalten<K extends string>(
   spalten: readonly SchaltbareSpalte<K>[],
 ): boolean {
   return waehlbareSpalten(spalten).length > 0;
+}
+
+/**
+ * Der Zustand eines Spaltenschalters, den die SEITE in ihre eigene Werkzeugzeile hängt (LLH-1417).
+ * Die Felder heißen wie die Props von {@link SpaltenSchalter}, die Seite rendert ihn also mit
+ * `<SpaltenSchalter bezeichnung={…} spalten={spalten} {...zustand} />` und reicht DIESELBE Instanz
+ * als `spaltenSchalterAussen` an die `Datensicht`. Die Sicht liest daraus ihre Spaltenwahl und
+ * zeichnet keinen eigenen Schalter.
+ *
+ * Warum nicht als Knoten in die Werkzeugzeile der Sicht: Fokus und Zeiger darin halten die
+ * Zeilenschleuse (Spec `datensicht-zufluss`), und ein Portal hülfe nicht, weil Reacts
+ * Fokusereignisse dem React-Baum folgen. Der Schalter muss deshalb auch im React-Baum außerhalb
+ * der Sicht stehen; dann friert sein Fokus die Tabelle nicht ein.
+ */
+export interface SpaltenSchalterZustand<K extends string = string> {
+  aus: readonly K[];
+  onAus: (schluessel: K[]) => void;
+  an: readonly K[];
+  onAn: (schluessel: K[]) => void;
+  offen: boolean;
+  onOffen: (offen: boolean) => void;
+}
+
+/**
+ * Hält den Zustand für {@link SpaltenSchalterZustand}. `voreinstellung` gilt wie
+ * `spaltenAusVoreinstellung` der `Datensicht` nur beim ersten Rendern. Ein Spaltengedächtnis
+ * (`useListenGedaechtnis`) trägt dieser Weg nicht; eine Seite mit Gedächtnis behält den
+ * eingebauten Schalter.
+ */
+export function useSpaltenSchalterZustand<K extends string>(
+  voreinstellung: readonly K[] = [],
+): SpaltenSchalterZustand<K> {
+  const [aus, setAus] = useState<readonly K[]>(voreinstellung);
+  const [an, setAn] = useState<readonly K[]>([]);
+  const [offen, setOffen] = useState(false);
+  return useMemo(
+    () => ({ aus, onAus: setAus, an, onAn: setAn, offen, onOffen: setOffen }),
+    [aus, an, offen],
+  );
 }
 
 /** Der Schalter für Seiten, die ihn EINMAL über mehreren Sichten zeigen. */

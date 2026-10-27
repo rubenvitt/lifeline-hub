@@ -484,7 +484,10 @@ anwendbar), „nicht geprüft" ist keins.
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt
-  die wirkliche Sichtbarkeit.
+  die wirkliche Sichtbarkeit. Eine Seite mit eigener Werkzeugzeile (Meldebild) hängt ihn dort ein:
+  Zustand aus `useSpaltenSchalterZustand`, an die Sicht als `spaltenSchalterAussen` (LLH-1417);
+  sein Fokus hält die Zeilenschleuse nicht, die Werkzeugzeile der Sicht bleibt Standzeile des
+  Sammelbanners. Sonst bleibt der eingebaute Schalter.
 - **Eine Vergleichstabelle ist sortier- und filterbar, im Spaltenkopf** (LLH-1086, Spec
   `tabellen-sortieren-filtern`): Sortieren per Klick auf den Kopf, Filter über antds
   Spaltenfilter (kontrolliert, im Clientmodus mit Zähler „Groß (3)“), je aktivem Wert ein Chip
