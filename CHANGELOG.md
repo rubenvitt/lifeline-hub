@@ -1,3 +1,10 @@
+## [1.0.0-alpha.160](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.159...v1.0.0-alpha.160) (2026-10-28)
+
+### Dokumentation
+
+- Die Bilder in den Kapiteln **Material** und **Einsatzoberfläche** der Anwenderdokumentation sind neu erstellt und zeigen wieder den aktuellen Stand der Oberfläche.
+- Die Bildbeschreibungen im Kapitel **Material** passen jetzt zu den neuen Bildern. Das Beispiel zum Dialog „Material disponieren“ nimmt dafür ein freies Gerät, das noch keinem Einsatz zugewiesen ist.
+
 ## [1.0.0-alpha.159](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.158...v1.0.0-alpha.159) (2026-10-28)
 
 ### Kommunikation
