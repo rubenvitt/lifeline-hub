@@ -250,7 +250,9 @@ describe('EinheitVorlageDetailPage', () => {
     expect(screen.queryByTitle('Rotkreuz Musterstadt 83-1 (RTW)')).toBeNull();
     expect(screen.queryByTitle('Rotkreuz Musterstadt 83-3 (RTW)')).toBeNull();
     await user.click(screen.getByTitle('Rotkreuz Musterstadt 83-2 (RTW)'));
-    await user.click(within(fahrzeuge).getByRole('button', { name: 'Fahrzeug hinzufügen' }));
+    // Der Knopf lud während der vorigen Änderung; das Ladesymbol („loading“) bleibt in jsdom
+    // mitten in seiner Ausblendung stehen und hängt sich vor den Namen.
+    await user.click(within(fahrzeuge).getByRole('button', { name: /Fahrzeug hinzufügen$/ }));
     await waitFor(() => expect(calls.fahrzeuge[1]).toEqual({ fahrzeug_ids: [31, 33] }));
   });
 
@@ -274,7 +276,9 @@ describe('EinheitVorlageDetailPage', () => {
     expect(await screen.findByTitle('Ben Sani')).toBeInTheDocument();
     expect(screen.queryByTitle('Cora Urlaub')).toBeNull();
     await user.click(screen.getByTitle('Ben Sani'));
-    await user.click(within(besetzung).getByRole('button', { name: 'Person hinzufügen' }));
+    // Der Knopf lud während der vorigen Änderung; das Ladesymbol („loading“) bleibt in jsdom
+    // mitten in seiner Ausblendung stehen und hängt sich vor den Namen.
+    await user.click(within(besetzung).getByRole('button', { name: /Person hinzufügen$/ }));
     await waitFor(() =>
       expect(calls.personal[1]).toEqual({
         personal: [

@@ -13,7 +13,7 @@ import KatalogTabelle, { type KatalogSpalte, type KatalogTabelleProps } from './
  *
  * EIGENE DATEI aus demselben Grund wie `Datensicht.tastaturaktionen.test.tsx`: `vi.mock`
  * hoistet dateiweit, und das echte `useBefehle` forderte beim Öffnen der Palette
- * `/api/einsaetze` an — MSW bräche den Lauf mit `onUnhandledRequest: 'error'`. Die Attrappe
+ * `/api/einsaetze` an — MSW bräche den Lauf mit `onUnhandledFrame: 'error'`. Die Attrappe
  * reicht die REGISTRIERTEN Ids durch; gegriffen wird auf `#cmd-tastatur:<id>`.
  *
  * Die Breite kommt über den matchMedia-Stub durch den ECHTEN `useViewport` — ein Mock des

@@ -206,6 +206,12 @@ export const server = setupServer(
    */
   http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([])),
   /**
+   * Mitglieder eines Einsatzes — leer als Default. Die Erwähnungsvorschläge im Chat-Eingabefeld
+   * fragen sie beim Mount ab; ohne Handler scheitert der Abruf an der Leitung, und die Seite
+   * steht auf „offline“. Tests mit Mitgliedern überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/mitglieder', () => HttpResponse.json([])),
+  /**
    * Stab eines Einsatzes — 403 als Default: der echte Zustand ohne Stab-Freigabe, aus dem die
    * Vorschläge „keine Besetzung lesbar“ machen. Tests des Stabs überschreiben per `server.use()`.
    */

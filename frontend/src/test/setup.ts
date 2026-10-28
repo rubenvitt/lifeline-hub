@@ -113,7 +113,7 @@ if (globalThis.localStorage == null) {
 // Hatte die Datei je einen Upload-Listeneintrag im DOM? Steuert die Länge des Drains unten.
 let uploadListeGemountet = false;
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => {
   // VOR `cleanup()` prüfen, danach ist der Eintrag ausgehängt — sein Timer läuft aber weiter.
   uploadListeGemountet ||= document.querySelector('.ant-upload-list-item') !== null;

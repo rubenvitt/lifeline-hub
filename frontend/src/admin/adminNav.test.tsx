@@ -93,7 +93,7 @@ describe('adminNav — Registry', () => {
 const admin = adminFixture();
 
 /**
- * Alle Abrufe der Stammdaten-Tabs — Pflicht, weil `onUnhandledRequest: 'error'` eine fehlende Route
+ * Alle Abrufe der Stammdaten-Tabs — Pflicht, weil `onUnhandledFrame: 'error'` eine fehlende Route
  * zum Fehler macht. Leere Kataloge reichen: geprüft wird der Seitenkopf.
  */
 function stammdatenHandler() {

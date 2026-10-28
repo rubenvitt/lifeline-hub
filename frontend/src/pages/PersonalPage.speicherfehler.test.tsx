@@ -295,6 +295,9 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     render();
     await screen.findByText('Thomas Müller');
+    // Die Einheiten kommen mit einem eigenen Abruf; erst mit ihnen gruppieren sich die Karten,
+    // und die Gruppen bauen die Karten neu auf. Vorher gegriffene Karten hingen dann lose.
+    await screen.findByText('2 nicht eingeteilt');
     const karte = (name: string) =>
       screen.getByText(name).closest<HTMLElement>('[data-lfh="datensicht-karte"]')!;
     await waehleStatus(karte('Thomas Müller'), 'Thomas Müller', /einsatzbereit/);
