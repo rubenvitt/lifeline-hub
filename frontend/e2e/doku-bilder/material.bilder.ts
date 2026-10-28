@@ -1,4 +1,4 @@
-import { stehendeAuswahl } from '../auswahl-kern';
+import { stehendeAuswahl, waehleIn } from '../auswahl-kern';
 import {
   anmelden,
   apiAlsAdmin,
@@ -35,7 +35,9 @@ import {
  *
  * Die Demo-Daten tragen zwei Posten im Einsatz (LLH-1230): den Sanitätsrucksack der
  * Rettungsstaffel und den Feldbettensatz der Betreuungsgruppe. Die Spec disponiert zwei weitere
- * Stammposten und einen Ad-hoc-Posten und setzt zwei Status. Für den Block „Aus
+ * Stammposten und einen Ad-hoc-Posten und setzt zwei Status. Damit steht jedes Demo-Gerät im
+ * Einsatz; für den Dialog „Material disponieren“ legt sie deshalb ein freies Stamm-Gerät an, die
+ * Zeltheizung (LLH-1487). Für den Block „Aus
  * dem Einsatz genommen“ disponiert sie einen weiteren Ad-hoc-Posten und nimmt ihn wieder heraus
  * (LLH-1079 Teil II). Für die Gruppierung „Nach Ort“ (LLH-1225) liegt der Sanitätsrucksack an der
  * ersten geplanten oder aktiven UHS und die Spende-Decken bei der ersten Einheit des
@@ -43,6 +45,7 @@ import {
  */
 
 const KAPITEL = 'material';
+const ZELTHEIZUNG = 'Zeltheizung';
 
 interface Stammmaterial {
   id: number;
@@ -118,6 +121,14 @@ test.describe(KAPITEL, () => {
         menge: 2,
       });
       await fuelle(api, 'post', `${pfad}/${pavillon.id}/entlassen`);
+      // Ein freies Gerät für den Dialog „Material disponieren“: die Demo-Geräte stehen alle im
+      // Einsatz, ihre Optionen sind gesperrt (LLH-1487).
+      await fuelle(api, 'post', '/api/material', {
+        bezeichnung: ZELTHEIZUNG,
+        kategorie: 'Betreuung',
+        bestandsnummer: 'M-017',
+        art: 'geraet',
+      });
     } finally {
       await api.dispose();
     }
@@ -140,13 +151,12 @@ test.describe(KAPITEL, () => {
     await expect(page.getByRole('radio', { name: 'Nach Ort' })).toBeChecked();
     await page.getByRole('button', { name: 'Material disponieren' }).click();
     const dialog = page.getByRole('dialog', { name: 'Material disponieren' });
-    // Demo-Stammdaten stehen mit Marke in eigener Gruppe; ihre Option trägt keinen Titel, der
-    // Klick geht deshalb über den Text der Option (`stammdaten/demoAuswahl.tsx`).
-    const feld = dialog.getByRole('combobox', { name: 'Material' });
-    await feld.click();
-    const liste = await stehendeAuswahl(page);
-    await liste.locator('.ant-select-item-option', { hasText: 'Feldbettensatz' }).click();
-    await expect(dialog.getByText(/^Feldbettensatz/)).toBeVisible();
+    // Die Zeltheizung ist kein Demo-Stammdatum: ihre Option trägt einen Titel, Bezeichnung und
+    // Kategorie (`stammdaten/demoAuswahl.tsx`).
+    await waehleIn(
+      dialog.getByRole('combobox', { name: 'Material' }),
+      `${ZELTHEIZUNG} (Betreuung)`,
+    );
     // Ein Gerät steht je Stück im Einsatz (LLH-1224 D2): die Menge bleibt 1 und gesperrt.
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toBeDisabled();
     await expect(dialog.getByText('Ein Gerät steht je Stück im Einsatz')).toBeVisible();

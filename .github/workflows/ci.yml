@@ -311,10 +311,14 @@ jobs:
     env:
       E2E: ${{ needs.aenderungen.outputs.e2e }}
     runs-on: ubuntu-latest
-    # 60 statt 40 min: die Tests brauchen je Shard rund 11 min. Den Rest der Frist frisst im
-    # schlechtesten Fall die Installation der Firefox/WebKit-Systempakete, solange der apt-Cache
-    # (unten) leer ist — gemessen 34 min bei einem langsamen Ubuntu-Mirror (PR #338).
-    timeout-minutes: 60
+    # 75 min (LLH-1488): gemessen am 27.10.2026 (Lauf 40581848993) brauchten die Tests je Shard
+    # 33, 58, 47 und 49 min; Shard 2 lief zweimal in die alte Frist von 60 min, ohne roten Test.
+    # Die Suite hat sich seit der Laufzeittabelle von LFH-1117 verdoppelt (180 → 267 Dateien,
+    # 173 → 337 Testminuten); nach der aufgefrischten `frontend/e2e/laufzeiten.json` sind es
+    # rechnerisch 45 min je Shard, `gate3-trefflaeche` allein 35 min. 45 von 75 min lässt Luft
+    # für langsame Runner und die Firefox/WebKit-Systempakete bei leerem apt-Cache (34 min bei
+    # einem langsamen Ubuntu-Mirror, PR #338).
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       # DIE SHARD-ZAHL IST EIN PIN (s. Frontend-Suite).
