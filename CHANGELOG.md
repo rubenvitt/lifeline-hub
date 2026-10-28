@@ -1,3 +1,9 @@
+## [1.0.0-alpha.159](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.158...v1.0.0-alpha.159) (2026-10-28)
+
+### Kommunikation
+
+- **Eingangshinweis für Alarmierungen in richtiger Reihenfolge:** Kommen mehrere Meldungen kurz hintereinander an, zeigt der Hinweis sie jetzt in derselben Reihenfolge wie der Verlauf auf dem Server: geordnet nach dem Eingangszeitpunkt, die neueste oben. Bisher konnte ein älterer Eingang oben stehen, wenn sein Meldungstext erst nach dem eines neueren Eingangs geladen war.
+
 ## [1.0.0-alpha.158](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.157...v1.0.0-alpha.158) (2026-10-27)
 
 ### Lagekarte
