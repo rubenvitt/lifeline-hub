@@ -724,7 +724,14 @@ pub async fn fahrzeug_zur_einheit_tx(
         benutzer_id,
     )
     .await?;
-    mitglied_repo::zuordnen_fahrzeug_menge_tx(&mut *conn, einsatz_id, einheit_id, &[ef_id]).await?;
+    mitglied_repo::zuordnen_fahrzeug_menge_tx(
+        &mut *conn,
+        einsatz_id,
+        einheit_id,
+        &[ef_id],
+        benutzer_id,
+    )
+    .await?;
     let besatzung =
         mitglied_repo::mitnehmen_besatzung_tx(&mut *conn, einsatz_id, einheit_id, &[ef_id]).await?;
     Ok((einheit_id, name, besatzung))
@@ -948,6 +955,7 @@ async fn unangemeldet_tx(
         r.einsatz_id,
         einheit_id,
         &fahrzeug_ids,
+        r.benutzer_id,
     )
     .await?;
     if let Some(h) = herkunft {

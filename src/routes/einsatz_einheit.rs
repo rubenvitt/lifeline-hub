@@ -185,7 +185,7 @@ pub async fn bilden(
         tz_organisation: None,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (id, fahrzeuge, besatzung, etb_ids) = crate::write_retry!(&state.pool, |conn| {
+    let (id, fahrzeuge, besatzung, raeume, etb_ids) = crate::write_retry!(&state.pool, |conn| {
         let fahrzeuge = if fahrzeug_ids.is_empty() {
             Vec::new()
         } else {
@@ -206,8 +206,16 @@ pub async fn bilden(
                 .await?;
         }
         let mut besatzung = Vec::new();
+        let mut raeume = Vec::new();
         if !fahrzeuge.is_empty() {
-            mitglied_repo::zuordnen_fahrzeug_menge_tx(conn, einsatz_id, id, &fahrzeug_ids).await?;
+            raeume = mitglied_repo::zuordnen_fahrzeug_menge_tx(
+                conn,
+                einsatz_id,
+                id,
+                &fahrzeug_ids,
+                ctx.benutzer.id,
+            )
+            .await?;
             besatzung =
                 mitglied_repo::mitnehmen_besatzung_tx(conn, einsatz_id, id, &fahrzeug_ids).await?;
         }
@@ -228,7 +236,7 @@ pub async fn bilden(
                     .await?,
             );
         }
-        Ok((id, fahrzeuge, besatzung, etb_ids))
+        Ok((id, fahrzeuge, besatzung, raeume, etb_ids))
     })?;
     // Das ETB-Ereignis gehört dazu: die Modul-Ereignisse frischen das Einsatztagebuch nicht auf.
     for etb_id in etb_ids {
@@ -240,6 +248,10 @@ pub async fn bilden(
     }
     for (ep_id, _) in &besatzung {
         sse_personal(&state, einsatz_id, *ep_id);
+    }
+    // Ein Fahrzeug ohne Einheit verlässt beim Bilden seinen Raum (LLH-1288).
+    for br_id in raeume {
+        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
     }
     let anzeige = einheit_repo::laden(&state.pool, einsatz_id, id).await?;
     Ok((StatusCode::CREATED, Json(anzeige)))
@@ -553,11 +565,12 @@ pub async fn aus_vorlage_bilden(
     for alt in &gebildet.alte_einheiten {
         sse_einheit(&state, einsatz_id, *alt);
     }
-    // Ein umgehängtes Fahrzeug verlässt die Zeile seiner alten Einheit im Raum (LLH-1095, D7).
+    // Ein umgehängtes Fahrzeug verlässt die Zeile seiner alten Einheit im Raum (LLH-1095, D7),
+    // ein Fahrzeug ohne Einheit seinen Raum (LLH-1288).
     super::einsatz_bereitstellungsraum::sse_br_fuer(
         &state,
         einsatz_id,
-        &[],
+        &gebildet.raeume,
         &gebildet.alte_einheiten,
     )
     .await;
@@ -1148,7 +1161,8 @@ pub async fn fahrzeug_zuordnen(
     // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let zuordnung = crate::write_retry!(&state.pool, |conn| {
-        let z = mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id).await?;
+        let z = mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id, ctx.benutzer.id)
+            .await?;
         if z.is_changed {
             let text = match &z.vorher {
                 Some((_, vorher)) => {
@@ -1173,10 +1187,17 @@ pub async fn fahrzeug_zuordnen(
             sse_personal(&state, einsatz_id, *ep_id);
         }
         // Das Detail eines Bereitstellungsraums zeigt die Fahrzeuge seiner Einheiten: der Raum
-        // der neuen und der vorigen Einheit (LLH-1095, D7).
+        // der neuen und der vorigen Einheit (LLH-1095, D7), dazu der Raum, aus dem das Fahrzeug
+        // ausgetreten ist (LLH-1288).
         let mut einheiten = vec![eid];
         einheiten.extend(zuordnung.vorher.as_ref().map(|(alt, _)| *alt));
-        super::einsatz_bereitstellungsraum::sse_br_fuer(&state, einsatz_id, &[], &einheiten).await;
+        super::einsatz_bereitstellungsraum::sse_br_fuer(
+            &state,
+            einsatz_id,
+            zuordnung.br_verlassen.as_slice(),
+            &einheiten,
+        )
+        .await;
     }
     Ok(StatusCode::NO_CONTENT)
 }

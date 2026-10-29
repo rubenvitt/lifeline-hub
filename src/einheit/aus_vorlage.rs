@@ -763,6 +763,9 @@ pub struct Gebildet {
     pub alte_einheiten: Vec<i64>,
     /// Fahrzeuge, von denen eine Person gelöst wurde (Ereignis `fahrzeug`).
     pub alte_fahrzeuge: Vec<i64>,
+    /// Bereitstellungsräume, aus denen ein Fahrzeug beim Zuordnen ausgetreten ist (Ereignis
+    /// `bereitstellungsraum`, LLH-1288).
+    pub raeume: Vec<i64>,
     /// Neue Material-Posten (`einsatz_material.id`) in Vorlagenreihenfolge (LLH-1261).
     pub material: Vec<i64>,
     /// Je gewählter Position „Menge× Bezeichnung“ für den ETB-Text.
@@ -924,8 +927,17 @@ pub async fn bilde_tx(
                     let ef_id = lage.ef_id.ok_or_else(|| {
                         AppError::Internal("Fahrzeug im Einsatz ohne Zeile".into())
                     })?;
-                    let z =
-                        mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id).await?;
+                    let z = mitglied_repo::zuordnen_fahrzeug_tx(
+                        conn,
+                        einsatz_id,
+                        eid,
+                        ef_id,
+                        kontext.benutzer_id,
+                    )
+                    .await?;
+                    if let Some(raum) = z.br_verlassen {
+                        push_unique(&mut gebildet.raeume, raum);
+                    }
                     mitgekommen
                         .extend(z.besatzung.into_iter().map(|(id, name)| Bezug { id, name }));
                     let name = z.funkrufname;

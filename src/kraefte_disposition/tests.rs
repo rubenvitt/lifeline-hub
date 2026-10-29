@@ -99,7 +99,7 @@ async fn einsatz_fahrzeug(pool: &SqlitePool, k: Kontext, fid: i64, einheit: Opti
     .unwrap()
     .id;
     if let Some(e) = einheit {
-        mitglied_repo::zuordnen_fahrzeug_tx(&mut conn, k.einsatz_id, e, ef)
+        mitglied_repo::zuordnen_fahrzeug_tx(&mut conn, k.einsatz_id, e, ef, k.benutzer_id)
             .await
             .unwrap();
     }

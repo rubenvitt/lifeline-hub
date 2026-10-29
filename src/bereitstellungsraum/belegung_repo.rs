@@ -545,6 +545,51 @@ pub async fn austritt_fahrzeug_tx(
     Ok(Some(br_id))
 }
 
+/// Notiz des Austritts, wenn ein Fahrzeug aus dem Raum einer Einheit zugeordnet wird (LLH-1288).
+pub const NOTIZ_EINHEIT_ZUGEORDNET: &str = "Einheit zugeordnet";
+
+/// Ein Fahrzeug, das ohne Einheit in einem Raum steht und einer Einheit zugeordnet wird, tritt
+/// aus (Notiz [`NOTIZ_EINHEIT_ZUGEORDNET`], Cache geleert, LLH-1288): danach steht es nur noch
+/// unter seiner Einheit, statt die Belegung verwaisen zu lassen. In der Transaktion des Aufrufers;
+/// `None`, wenn es in keinem Raum steht. Ein abgerufenes Fahrzeug → `Conflict` (der Abruf stünde
+/// sonst ohne Kraft, wie bei der Übernahme aus einer Nachforderung, LLH-1448).
+pub async fn austritt_fahrzeug_bei_zuordnung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+) -> Result<Option<i64>, AppError> {
+    let br_id: Option<i64> = sqlx::query_scalar(
+        "SELECT aktueller_br_id FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .flatten();
+    let Some(br_id) = br_id else {
+        return Ok(None);
+    };
+    if offener_abruf_tx(&mut *conn, einsatz_id, ObjektTyp::Fahrzeug, ef_id, br_id)
+        .await?
+        .is_some()
+    {
+        return Err(AppError::Conflict(
+            "Das Fahrzeug ist abgerufen; erst nach dem Ausrücken oder dem Zurücknehmen des \
+             Abrufs einer Einheit zuordnen"
+                .into(),
+        ));
+    }
+    austritt_fahrzeug_tx(
+        conn,
+        einsatz_id,
+        ef_id,
+        benutzer_id,
+        NOTIZ_EINHEIT_ZUGEORDNET,
+    )
+    .await
+}
+
 // ─── Lesen: Wartezeit, Kennzahlen, Verlauf (LLH-1095) ───────────────────────
 
 /// Jüngstes Belegungsereignis eines Objekts, das gerade in einem Raum steht (LLH-1095,
@@ -1408,8 +1453,8 @@ mod tests {
         assert_eq!(alle.get(&br), Some(&k));
     }
 
-    /// Ein BR-Fahrzeug, das danach einer Einheit im Raum zugeordnet wurde, behält
-    /// `aktueller_br_id` (Scope-Frage 6) und zählt trotzdem einmal.
+    /// Ein BR-Fahrzeug mit Einheit und `aktueller_br_id` (Altbestand aus der Zeit vor LLH-1288:
+    /// das Zuordnen beendet die Belegung jetzt) zählt trotzdem einmal (Scope-Frage 6).
     #[tokio::test]
     async fn doppelt_gefuehrtes_fahrzeug_zaehlt_einmal() {
         let pool = test_pool().await;

@@ -184,7 +184,7 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
 2. Die Liste nennt, neueste zuerst, je Ereignis die Uhrzeit, was geschah („Eintritt“, „Austritt“,
    „Austritt nach …“, „Abruf nach … (Auftrag Nr. …)“, „Abruf zurückgenommen“, „Wechsel von …“,
    „Wechsel nach …“), die Einheit oder das Fahrzeug und, falls erfasst, eine Notiz wie „Einheit
-   aufgelöst“ oder „Fahrzeug entlassen“. Der Abruf einer mitgenommenen Untereinheit lautet „Abruf
+   aufgelöst“, „Fahrzeug entlassen“ oder „Einheit zugeordnet“. Der Abruf einer mitgenommenen Untereinheit lautet „Abruf
    mit … nach …“.
 
    ![Aufgeklappter Verlauf des Raums „Parkplatz Stadion Nord“ mit dem Abruf der Betreuungsgruppe nach Betreuung, drei Eintritten und dem Austritt des Sanitätszugs](../bilder/bereitstellungsraeume/verlauf.png)
@@ -237,8 +237,10 @@ ist; ein aufgelöster Raum ist nur zu lesen.
 ### Wer zugewiesen werden kann
 
 „Kräfte ohne BR“ bietet Einheiten an und Fahrzeuge ohne Einheit, sofern sie in keinem Raum stehen.
-Fahrzeuge einer Einheit werden nicht einzeln zugewiesen, sondern über ihre Einheit. Eine Kraft steht
-höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten ausgetragen. Die Stärke
+Fahrzeuge einer Einheit werden nicht einzeln zugewiesen, sondern über ihre Einheit. Wird ein
+Fahrzeug, das ohne Einheit im Raum steht, einer Einheit zugeordnet, tritt es aus dem Raum aus und
+steht danach nur noch bei seiner Einheit; ein abgerufenes Fahrzeug erst nach dem Ausrücken oder
+dem Zurücknehmen des Abrufs. Eine Kraft steht höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten ausgetragen. Die Stärke
 rechnet unterstellte Einheiten mit ein und zählt keine doppelt.
 
 „Erwartet“ und „Im Einsatz“ trennen nach dem Abschnitt: eine Einheit ohne eigenen Abschnitt zählt
@@ -342,7 +344,7 @@ dem Zeiger springt; eigene Zuweisungen und Abrufe erscheinen sofort.
 ### Verlauf
 
 Der Verlauf führt jedes Ereignis des Raums vollständig und ungeblättert, auch Austritte durch
-Auflösen einer Einheit oder Entlassen eines Fahrzeugs. Ein Wechsel steht in beiden Räumen: im
+Auflösen einer Einheit, Entlassen eines Fahrzeugs oder Zuordnen eines Fahrzeugs zu einer Einheit. Ein Wechsel steht in beiden Räumen: im
 verlassenen als „Wechsel nach …“, im neuen als „Wechsel von …“. Aufgelöste Einheiten und
 entlassene Fahrzeuge stehen mit ihrem Namen. Auch ein aufgelöster Raum zeigt seinen Verlauf. Der
 Verlauf lädt erst beim Aufklappen; beim Wechsel in einen anderen Raum klappt er zu. Wer den Raum
