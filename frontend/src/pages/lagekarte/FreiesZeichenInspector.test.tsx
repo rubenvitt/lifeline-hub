@@ -470,14 +470,27 @@ describe('FreiesZeichenInspector — Altzeichen (LFH-836)', () => {
         organisation: null,
         fachaufgabe: null,
         einheit: null,
-        funktion: 'fuehrungskraft',
+        funktion: 'sonderfunktion',
         farbe: null,
       },
       darfSchreiben: false,
     });
     const hinweis = document.querySelector('[data-lfh="zeichen-vereinfacht"]');
     expect(hinweis).toHaveTextContent('vereinfacht dargestellt');
-    expect(hinweis).toHaveTextContent('person · fuehrungskraft');
+    expect(hinweis).toHaveTextContent('person · sonderfunktion');
+  });
+
+  // LLH-1285: die Führungskraft trägt den Indikator, ihr Altzeichen ist vollständig.
+  it('zeigt keinen Hinweis beim Altzeichen Person mit Führungskraft', () => {
+    renderInspector({
+      zeichen: {
+        ...basis,
+        ...OHNE_ALTFELDER,
+        zeichen_spec: '{"v":1,"alt":{"grundzeichen":"person","funktion":"fuehrungskraft"}}',
+      },
+      darfSchreiben: false,
+    });
+    expect(document.querySelector('[data-lfh="zeichen-vereinfacht"]')).toBeNull();
   });
 
   it('zeigt den Platzhalter für ein unbekanntes Altsymbol, mit Hinweis', () => {
@@ -497,12 +510,12 @@ describe('FreiesZeichenInspector — Altzeichen (LFH-836)', () => {
       zeichen: {
         ...basis,
         ...OHNE_ALTFELDER,
-        zeichen_spec: '{"v":1,"alt":{"grundzeichen":"person","funktion":"fuehrungskraft"}}',
+        zeichen_spec: '{"v":1,"alt":{"grundzeichen":"person","funktion":"sonderfunktion"}}',
       },
       darfSchreiben: false,
     });
     expect(document.querySelector('[data-lfh="zeichen-vereinfacht"]')).toHaveTextContent(
-      'vereinfacht dargestellt · person · fuehrungskraft',
+      'vereinfacht dargestellt · person · sonderfunktion',
     );
   });
 
