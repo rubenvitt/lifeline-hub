@@ -207,13 +207,14 @@ pub async fn zuordnen_fahrzeug_tx(
     let mut br_verlassen = None;
     if is_changed {
         br_verlassen =
-            crate::bereitstellungsraum::belegung_repo::austritt_fahrzeug_bei_zuordnung_tx(
+            crate::bereitstellungsraum::belegung_repo::austritt_fahrzeuge_bei_zuordnung_tx(
                 &mut *conn,
                 einsatz_id,
-                ef_id,
+                &[ef_id],
                 benutzer_id,
             )
-            .await?;
+            .await?
+            .pop();
         sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
             .bind(einheit_id)
             .bind(ef_id)
@@ -387,19 +388,13 @@ pub async fn zuordnen_fahrzeug_menge_tx(
     ef_ids: &[i64],
     benutzer_id: i64,
 ) -> Result<Vec<i64>, AppError> {
-    let mut raeume = Vec::new();
-    for &ef_id in ef_ids {
-        let raum = crate::bereitstellungsraum::belegung_repo::austritt_fahrzeug_bei_zuordnung_tx(
-            &mut *conn,
-            einsatz_id,
-            ef_id,
-            benutzer_id,
-        )
-        .await?;
-        raeume.extend(raum);
-    }
-    raeume.sort_unstable();
-    raeume.dedup();
+    let raeume = crate::bereitstellungsraum::belegung_repo::austritt_fahrzeuge_bei_zuordnung_tx(
+        &mut *conn,
+        einsatz_id,
+        ef_ids,
+        benutzer_id,
+    )
+    .await?;
     sqlx::query(
         "UPDATE einsatz_fahrzeug SET einheit_id = ?1 \
          WHERE einsatz_id = ?2 AND beendet_at IS NULL \

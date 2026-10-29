@@ -548,46 +548,76 @@ pub async fn austritt_fahrzeug_tx(
 /// Notiz des Austritts, wenn ein Fahrzeug aus dem Raum einer Einheit zugeordnet wird (LLH-1288).
 pub const NOTIZ_EINHEIT_ZUGEORDNET: &str = "Einheit zugeordnet";
 
-/// Ein Fahrzeug, das ohne Einheit in einem Raum steht und einer Einheit zugeordnet wird, tritt
-/// aus (Notiz [`NOTIZ_EINHEIT_ZUGEORDNET`], Cache geleert, LLH-1288): danach steht es nur noch
-/// unter seiner Einheit, statt die Belegung verwaisen zu lassen. In der Transaktion des Aufrufers;
-/// `None`, wenn es in keinem Raum steht. Ein abgerufenes Fahrzeug → `Conflict` (der Abruf stünde
-/// sonst ohne Kraft, wie bei der Übernahme aus einer Nachforderung, LLH-1448).
-pub async fn austritt_fahrzeug_bei_zuordnung_tx(
+/// Fahrzeuge, die ohne Einheit in einem Raum stehen und einer Einheit zugeordnet werden, treten
+/// aus (Notiz [`NOTIZ_EINHEIT_ZUGEORDNET`], Cache geleert, LLH-1288): danach stehen sie nur noch
+/// unter ihrer Einheit, statt die Belegung verwaisen zu lassen. In der Transaktion des Aufrufers,
+/// mit einer von der Zahl der Fahrzeuge unabhängigen Zahl von Anweisungen (`src/AGENTS.md`,
+/// „ID-Listen“). Liefert die verlassenen Räume, je Raum einmal. Ein abgerufenes Fahrzeug →
+/// `Conflict`, nichts geschrieben (der Abruf stünde sonst ohne Kraft, wie bei der Übernahme aus
+/// einer Nachforderung, LLH-1448).
+pub async fn austritt_fahrzeuge_bei_zuordnung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
-    ef_id: i64,
+    ef_ids: &[i64],
     benutzer_id: i64,
-) -> Result<Option<i64>, AppError> {
-    let br_id: Option<i64> = sqlx::query_scalar(
-        "SELECT aktueller_br_id FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+) -> Result<Vec<i64>, AppError> {
+    let ids = crate::kraefte_disposition::ids_json(ef_ids);
+    // „Abgerufen“ wie in [`offener_abruf_tx`]: das jüngste Ereignis ist ein Abruf im Raum, in
+    // dem das Fahrzeug steht.
+    let abgerufen: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM einsatz_fahrzeug ef \
+           WHERE ef.einsatz_id = ?1 AND ef.aktueller_br_id IS NOT NULL \
+             AND ef.id IN (SELECT value FROM json_each(?2)) \
+             AND EXISTS (SELECT 1 FROM br_belegung b \
+                 WHERE b.id = (SELECT MAX(x.id) FROM br_belegung x \
+                               WHERE x.einsatz_id = ef.einsatz_id AND x.objekt_typ = ?3 \
+                                 AND x.objekt_id = ef.id) \
+                   AND b.art = ?4 AND b.br_id = ef.aktueller_br_id))",
     )
-    .bind(ef_id)
     .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .flatten();
-    let Some(br_id) = br_id else {
-        return Ok(None);
-    };
-    if offener_abruf_tx(&mut *conn, einsatz_id, ObjektTyp::Fahrzeug, ef_id, br_id)
-        .await?
-        .is_some()
-    {
+    .bind(&ids)
+    .bind(ObjektTyp::Fahrzeug.as_str())
+    .bind(BrBelegungsArt::Abruf.as_str())
+    .fetch_one(&mut *conn)
+    .await?;
+    if abgerufen {
         return Err(AppError::Conflict(
             "Das Fahrzeug ist abgerufen; erst nach dem Ausrücken oder dem Zurücknehmen des \
              Abrufs einer Einheit zuordnen"
                 .into(),
         ));
     }
-    austritt_fahrzeug_tx(
-        conn,
-        einsatz_id,
-        ef_id,
-        benutzer_id,
-        NOTIZ_EINHEIT_ZUGEORDNET,
+    let mut raeume: Vec<i64> = sqlx::query_scalar(
+        "INSERT INTO br_belegung \
+            (einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, erfasst_von) \
+         SELECT einsatz_id, aktueller_br_id, ?3, id, ?4, ?5, ?6 FROM einsatz_fahrzeug \
+         WHERE einsatz_id = ?1 AND aktueller_br_id IS NOT NULL \
+           AND id IN (SELECT value FROM json_each(?2)) \
+         ORDER BY id \
+         RETURNING br_id",
     )
-    .await
+    .bind(einsatz_id)
+    .bind(&ids)
+    .bind(ObjektTyp::Fahrzeug.as_str())
+    .bind(BrBelegungsArt::Austritt.as_str())
+    .bind(NOTIZ_EINHEIT_ZUGEORDNET)
+    .bind(benutzer_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    if raeume.is_empty() {
+        return Ok(raeume);
+    }
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET aktueller_br_id = NULL \
+         WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2))",
+    )
+    .bind(einsatz_id)
+    .bind(&ids)
+    .execute(&mut *conn)
+    .await?;
+    raeume.sort_unstable();
+    raeume.dedup();
+    Ok(raeume)
 }
 
 // ─── Lesen: Wartezeit, Kennzahlen, Verlauf (LLH-1095) ───────────────────────
