@@ -1,3 +1,11 @@
+## [1.0.0-alpha.161](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.160...v1.0.0-alpha.161) (2026-10-29)
+
+### Lagekarte
+
+- **Freie Zeichen „Person, Führungskraft“ in Altform werden jetzt vollständig dargestellt.** Sie tragen das Führungskraft-Kennzeichen (Raute mit Kappe), so wie es Fachobjekte schon haben. Im Inspector erscheint bei diesen Zeichen kein Hinweis „vereinfacht“ mehr.
+- Lässt sich das Führungskraft-Kennzeichen in einem Einzelfall nicht zeichnen, erscheint das Zeichen trotzdem, nur ohne das Kennzeichen.
+- Für die Angabe „Sonderfunktion“ an Altzeichen gibt es weiterhin kein Gegenstück. Sie wird nicht dargestellt, und der Inspector markiert solche Zeichen weiter als „vereinfacht“.
+
 ## [1.0.0-alpha.160](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.159...v1.0.0-alpha.160) (2026-10-28)
 
 ### Dokumentation
