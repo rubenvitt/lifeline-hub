@@ -146,7 +146,7 @@ const VERSORGUNG: Record<string, Teil> = {
 // Hub-Funktion → Funktionsrolle. Die Führungskraft (Einheitsführer, Abschnittsleiter) trägt Raute
 // und schwarze Kappe der Leitungsrollen ohne Kürzel (`leader`, ESZ-116). Die Rolle hat kein eigenes
 // Original, der Motor zeichnet sie stets abgeleitet (LLH-1231).
-const FUNKTIONSROLLE: Record<string, Teil> = {
+export const FUNKTIONSROLLE: Record<string, Teil> = {
   fuehrungskraft: { functionRole: 'leader' },
 };
 

@@ -121,7 +121,10 @@ Fachobjekt ohne Zeichen bleibt, sofern sein Körper darstellbar ist.
 Für freie Zeichen gilt dieselbe Kaskade; vor der Fachaufgabe entfällt das Symbol, nach der
 Organisation die Farbe. Lässt sich bei einem freien Zeichen nicht einmal ein Körper oder ein
 Piktogramm darstellen, MUST die Karte einen neutralen Platzhalter zeigen, damit das Zeichen
-auswählbar und löschbar bleibt.
+auswählbar und löschbar bleibt. Trägt ein freies Altzeichen an der Person die Funktion
+„Führungskraft“, MUST es den Führungskraft-Indikator wie eine Führungskraft tragen; lässt er
+sich nicht zeichnen, MUST die Person ohne ihn erscheinen. Die Funktion „Sonderfunktion“ hat
+keinen Nachfolger und entfällt.
 
 Bei einem Schaden entfällt zuerst der Schadensgrad, dann der Gefahrenhinweis; ein unbekannter
 gespeicherter Wert gilt als nicht gesetzt.
@@ -137,6 +140,10 @@ gespeicherter Wert gilt als nicht gesetzt.
 #### Scenario: Altzeichen mit gesperrter Kombination
 - **WHEN** ein freies Altzeichen ein Kraftfahrzeug mit der Einheitsgröße „Zug“ trägt
 - **THEN** zeigt die Karte das Kraftfahrzeug ohne Einheitsgröße
+
+#### Scenario: Altzeichen Person mit Führungskraft
+- **WHEN** ein freies Altzeichen eine Person der Feuerwehr mit der Funktion „Führungskraft“ trägt
+- **THEN** zeigt die Karte die Person in der Farbe der Feuerwehr mit dem Führungskraft-Indikator, und der Inspector nennt das Zeichen nicht als vereinfacht
 
 #### Scenario: Altzeichen ohne Nachfolger
 - **WHEN** ein freies Altzeichen nur das Symbol „Fernschreiben“ ohne Grundzeichen trägt
