@@ -49,6 +49,7 @@ import {
 } from '@einsatzzeichen/schema';
 import {
   eigen,
+  FUNKTIONSROLLE,
   KOERPER,
   STAERKE,
   fassungen,
@@ -506,13 +507,15 @@ function ausAltspalten(e: FreiesZeichenEingabe, verloren: boolean): FreiesZeiche
   const fach = fassungen(fachaufgabe, koerper);
   const symbol = nutzlast ? symbolImKoerper(nutzlast) : null;
   const farbe = farbTeil(nimm('farbe', e.farbe), koerper);
+  const funktionId = nimm('funktion', e.funktion);
+  const rolle = eigen(FUNKTIONSROLLE, funktionId);
 
   const ohneNachfolger =
     (orgId !== undefined && org.organization === undefined) ||
     (einheitId !== undefined && !staerke) ||
     (fachaufgabe !== undefined && fach.length === 0) ||
     (symbolId !== undefined && !symbol) ||
-    nimm('funktion', e.funktion) !== undefined ||
+    (funktionId !== undefined && !rolle) ||
     farbe.verloren;
 
   const basis = [koerper, org, farbe.teil, staerke];
@@ -529,7 +532,12 @@ function ausAltspalten(e: FreiesZeichenEingabe, verloren: boolean): FreiesZeiche
   // und „ohne Farbe“ fallen deshalb in eine Stufe (der Spec-Pfad trennt sie, `FELDSTUFEN`).
   stufen.push([vereinige(koerper, { organization: undefined })]);
   stufen.push([{ kind: koerper.kind } as SymbolSpec]);
-  return kaskade(stufen, verloren || ohneNachfolger);
+  // Der Funktionsindikator geht allem anderen vor: erst die ganze Kaskade mit Indikator, dann
+  // dieselbe ohne ihn, wie bei den Fachobjekten (LLH-1285).
+  const mitRolle = rolle
+    ? [...stufen.map((stufe) => stufe.map((spec) => vereinige(spec as Teil, rolle))), ...stufen]
+    : stufen;
+  return kaskade(mitRolle, verloren || ohneNachfolger);
 }
 
 // Die Felder einer `SymbolSpec` je Stufe der Kaskade, von „alles außer Symbol“ bis „Körper“.

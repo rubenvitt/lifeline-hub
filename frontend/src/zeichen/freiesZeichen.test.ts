@@ -6,6 +6,8 @@ import {
   type TechnicalFillToken,
 } from '@einsatzzeichen/schema';
 import { describe, expect, it } from 'vitest';
+import { baueTzProps } from '../pages/lagekarte/taktischesZeichen';
+import { fachobjektZeichen } from './fachobjektZeichen';
 import {
   altform,
   freiesZeichen,
@@ -625,12 +627,67 @@ describe('freiesZeichen — Einheiten (D5)', () => {
   });
 });
 
-describe('freiesZeichen — Funktionen entfallen (D5)', () => {
-  it.each(['fuehrungskraft', 'sonderfunktion'])('%s an der Person', (funktion) => {
+// D5 ließ beide Funktionen entfallen; seit @einsatzzeichen 6.1 (ESZ-116) trägt die Führungskraft
+// die Funktionsrolle `leader` wie das Fachobjekt (LLH-1285). Die Sonderfunktion hat weiter
+// keinen Nachfolger.
+describe('freiesZeichen — Funktionen', () => {
+  it('fuehrungskraft an der Person: Raute mit Kappe (leader)', () => {
     pruefe(
-      { grundzeichen: 'person', organisation: 'feuerwehr', funktion },
+      { grundzeichen: 'person', organisation: 'feuerwehr', funktion: 'fuehrungskraft' },
+      { kind: 'person', organization: 'feuerwehr', functionRole: 'leader' },
+      'exakt',
+    );
+  });
+
+  it('zeichnet die Führungskraft wie das Fachobjekt (gleicher Kartenbildschlüssel)', () => {
+    const frei = freiesZeichen({
+      grundzeichen: 'person',
+      organisation: 'feuerwehr',
+      funktion: 'fuehrungskraft',
+    });
+    const fach = fachobjektZeichen(
+      baueTzProps({ objekttyp: 'fuehrung', organisation: 'feuerwehr', istFuehrungskraft: true }),
+    )!;
+    expect(frei.schluessel).toBe(fach.schluessel);
+  });
+
+  it('fuehrungskraft ohne Organisation', () => {
+    pruefe(
+      { grundzeichen: 'person', funktion: 'fuehrungskraft' },
+      { kind: 'person', functionRole: 'leader' },
+      'exakt',
+    );
+  });
+
+  it('fuehrungskraft mit Fachaufgabe: die Marke steht im Indikator', () => {
+    const z = freiesZeichen({
+      grundzeichen: 'person',
+      organisation: 'hilfsorganisation',
+      fachaufgabe: 'rettungswesen',
+      funktion: 'fuehrungskraft',
+    });
+    expect(z.spec).toMatchObject({
+      kind: 'person',
+      organization: 'hilfsorganisation',
+      functionRole: 'leader',
+    });
+    expect((z.spec as SymbolSpec).bodyMarks ?? []).not.toHaveLength(0);
+    expect(z.vereinfacht).toBe(false);
+  });
+
+  it('sonderfunktion an der Person entfällt (D5)', () => {
+    pruefe(
+      { grundzeichen: 'person', organisation: 'feuerwehr', funktion: 'sonderfunktion' },
       { kind: 'person', organization: 'feuerwehr' },
       'kaskade',
+    );
+  });
+
+  it('ignoriert eine Funktion an einem Grundzeichen, das keine annahm (Altkatalog)', () => {
+    pruefe(
+      { grundzeichen: 'taktische-formation', funktion: 'fuehrungskraft' },
+      { kind: 'formation' },
+      'exakt',
     );
   });
 });
