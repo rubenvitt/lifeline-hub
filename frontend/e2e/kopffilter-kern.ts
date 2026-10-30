@@ -14,6 +14,10 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 const EINBLENDUNG = /ant-slide-(up|down)-(appear|enter)/;
 
+/** Ein Menü im Portal, ohne ein gerade ausblendendes. */
+const OFFEN =
+  '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave):not(.ant-slide-down-leave)';
+
 /** Der Auslöser im Kopf der Spalte `spalte`, gefiltert oder nicht. */
 export function kopfFilterAusloeser(bereich: Page | Locator, spalte: string): Locator {
   return bereich.getByRole('button', { name: new RegExp(`^${spalte} filtern(, gefiltert)?$`) });
@@ -21,9 +25,7 @@ export function kopfFilterAusloeser(bereich: Page | Locator, spalte: string): Lo
 
 /** Das offene Filtermenü. Ein ausblendendes zählt nicht (antd lässt das Portal stehen). */
 export function offenesFiltermenue(page: Page): Locator {
-  return page.locator(
-    '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave) .ant-table-filter-dropdown',
-  );
+  return page.locator(`${OFFEN} .ant-table-filter-dropdown`);
 }
 
 /**
@@ -41,9 +43,7 @@ export async function kopfFilterWaehlen(
   const menue = offenesFiltermenue(page);
   await expect(menue).toBeVisible();
   await expect(
-    page
-      .locator('.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave)')
-      .filter({ has: page.locator('.ant-table-filter-dropdown') }),
+    page.locator(OFFEN).filter({ has: page.locator('.ant-table-filter-dropdown') }),
   ).not.toHaveClass(EINBLENDUNG);
   for (const wert of werte) {
     const eintrag = menue
