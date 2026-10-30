@@ -4052,3 +4052,182 @@ async fn eintreffen_beginnt_die_schicht_der_einheit() {
         "{etb:?}"
     );
 }
+
+// ============================== LLH-1288 ==============================
+// Ein Fahrzeug ohne Einheit im Raum, das einer Einheit zugeordnet wird, tritt aus („Einheit
+// zugeordnet“), statt die Belegung verwaisen zu lassen.
+
+/// Raum, Ort des Fahrzeugs laut Cache und jüngste Belegungszeile (Art, Notiz) eines Fahrzeugs.
+async fn fahrzeug_im_raum(
+    pool: &sqlx::SqlitePool,
+    ef: i64,
+) -> (Option<i64>, String, Option<String>) {
+    let br: Option<i64> =
+        sqlx::query_scalar("SELECT aktueller_br_id FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    let (art, notiz): (String, Option<String>) = sqlx::query_as(
+        "SELECT art, notiz FROM br_belegung WHERE objekt_typ = 'fahrzeug' AND objekt_id = ? \
+         ORDER BY id DESC LIMIT 1",
+    )
+    .bind(ef)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    (br, art, notiz)
+}
+
+/// Akzeptanzkriterien: Nach dem Zuordnen an eine Einheit außerhalb des Raums steht das Fahrzeug
+/// nicht mehr im Raum, „belegt“ zählt es nicht, der Raum lässt sich auflösen, der Verlauf zeigt
+/// den Austritt mit der Notiz, und der Raum wird gemeldet.
+#[tokio::test]
+async fn zuordnen_beendet_die_belegung_des_fahrzeugs() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let fz = adhoc_fahrzeug(&app, &cookie, eid, "Florian 1/83-1", None).await;
+    belegen(&app, &cookie, eid, br, "fahrzeug", fz, "eintritt").await;
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/einheiten/{zug}/fahrzeug/{fz}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![br]);
+
+    assert_eq!(
+        fahrzeug_im_raum(&pool, fz).await,
+        (None, "austritt".into(), Some("Einheit zugeordnet".into()))
+    );
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(d["fahrzeuge"], json!([]), "{d}");
+    assert_eq!(
+        d["belegung"],
+        json!({"einheiten": 0, "fahrzeuge": 0}),
+        "{d}"
+    );
+    let verlauf = fetch_json(&app, &cookie, &format!("{}/verlauf", br_pfad(eid, br))).await;
+    assert_eq!(verlauf[0]["art"], "austritt", "{verlauf}");
+    assert_eq!(verlauf[0]["objekt_name"], "Florian 1/83-1");
+    assert_eq!(verlauf[0]["notiz"], "Einheit zugeordnet");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/status", br_pfad(eid, br)),
+        &cookie,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Steht die Einheit im selben Raum, steht das Fahrzeug danach nur noch unter ihr und zählt
+/// einmal.
+#[tokio::test]
+async fn zuordnen_an_einheit_im_raum_fuehrt_das_fahrzeug_nur_unter_ihr() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    belegen(&app, &cookie, eid, br, "einheit", zug, "eintritt").await;
+    let fz = adhoc_fahrzeug(&app, &cookie, eid, "Florian 1/83-1", None).await;
+    belegen(&app, &cookie, eid, br, "fahrzeug", fz, "eintritt").await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/einheiten/{zug}/fahrzeug/{fz}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+
+    assert_eq!(fahrzeug_im_raum(&pool, fz).await.0, None);
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(d["fahrzeuge"], json!([]), "{d}");
+    assert_eq!(d["einheiten"][0]["fahrzeuge"][0]["id"], fz, "{d}");
+    assert_eq!(d["belegung"]["einheiten"], 1, "{d}");
+    assert_eq!(d["belegung"]["fahrzeuge"], 1, "{d}");
+}
+
+/// Ein abgerufenes Fahrzeug lässt sich keiner Einheit zuordnen (409); der Abruf bleibt stehen.
+#[tokio::test]
+async fn abgerufenes_fahrzeug_zuordnen_ist_409() {
+    let l = abruf_lage().await;
+    let fz = adhoc_fahrzeug(&l.app, &l.admin, l.eid, "Florian 1/83-1", None).await;
+    belegen(&l.app, &l.admin, l.eid, l.br, "fahrzeug", fz, "eintritt").await;
+    let (s, v) = rufe_ab(
+        &l.app,
+        &l.admin,
+        l.eid,
+        l.br,
+        json!({"objekt_typ": "fahrzeug", "objekt_id": fz, "auftrag_text": "Pumpen"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let (s, v) = anfrage_json(
+        &l.app,
+        "PUT",
+        &format!("/api/einsaetze/{}/einheiten/{}/fahrzeug/{fz}", l.eid, l.hlf),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let einheit: Option<i64> =
+        sqlx::query_scalar("SELECT einheit_id FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(fz)
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
+    assert_eq!(einheit, None);
+    let (br, art, _) = fahrzeug_im_raum(&l.pool, fz).await;
+    assert_eq!((br, art.as_str()), (Some(l.br), "abruf"));
+}
+
+/// Eine neue Einheit mit einem Fahrzeug aus dem Raum bilden beendet dessen Belegung ebenso und
+/// meldet den Raum.
+#[tokio::test]
+async fn einheit_bilden_mit_fahrzeug_aus_dem_raum_beendet_die_belegung() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let fz = adhoc_fahrzeug(&app, &cookie, eid, "Florian 1/83-1", None).await;
+    belegen(&app, &cookie, eid, br, "fahrzeug", fz, "eintritt").await;
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/einheiten"),
+        &cookie,
+        Some(&json!({"name": "Florian 1/83-1", "fahrzeug_ids": [fz]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![br]);
+    assert_eq!(
+        fahrzeug_im_raum(&pool, fz).await,
+        (None, "austritt".into(), Some("Einheit zugeordnet".into()))
+    );
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(
+        d["belegung"],
+        json!({"einheiten": 0, "fahrzeuge": 0}),
+        "{d}"
+    );
+}

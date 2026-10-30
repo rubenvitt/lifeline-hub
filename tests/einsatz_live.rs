@@ -942,10 +942,11 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
             "POST",
             format!("bereitstellungsraeume/{br}/belegung"),
             Some(format!(
-                r#"{{"objekt_typ":"fahrzeug","objekt_id":{ef},"art":"eintritt"}}"#
+                r#"{{"objekt_typ":"einheit","objekt_id":{einheit},"art":"eintritt"}}"#
             )),
         ),
-        // Nach der Belegung: ein Fahrzeug einer Einheit tritt nicht einzeln ein.
+        // Das Fahrzeug steht über seine Einheit im Raum (LLH-1288: einzeln eingetreten und dann
+        // zugeordnet, träte es aus).
         ("PUT", format!("einheiten/{einheit}/fahrzeug/{ef}"), None),
         (
             "PATCH",

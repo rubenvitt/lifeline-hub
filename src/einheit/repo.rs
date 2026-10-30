@@ -3012,7 +3012,7 @@ mod tests {
         let ef: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
-        mitglied_repo::zuordnen_fahrzeug(&pool, einsatz, zug.id, ef)
+        mitglied_repo::zuordnen_fahrzeug(&pool, einsatz, zug.id, ef, 1)
             .await
             .unwrap();
         let em: i64 = sqlx::query_scalar(
