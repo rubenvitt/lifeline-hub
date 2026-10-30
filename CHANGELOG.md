@@ -1,3 +1,11 @@
+## [1.0.0-alpha.162](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.161...v1.0.0-alpha.162) (2026-10-30)
+
+### Kräfte und Mittel
+
+- **Bereitstellungsraum: Fahrzeug verlässt beim Zuordnen zu einer Einheit den Raum.** Bisher blieb ein Fahrzeug, das ohne Einheit in einem Bereitstellungsraum stand, nach dem Zuordnen zu einer Einheit dort weiter eingetragen. Es erschien dann doppelt in der Raumansicht, wurde bei „noch n belegt“ weiter mitgezählt, und der Raum ließ sich nicht auflösen. Jetzt verlässt das Fahrzeug beim Zuordnen den Raum. Der Austritt wird mit dem Vermerk „Einheit zugeordnet“ festgehalten, und die Raumansicht aktualisiert sich bei allen Beteiligten sofort.
+- Das gilt für jeden Weg, auf dem ein Fahrzeug einer Einheit zugeordnet wird: Zuordnen und Umhängen, Einheit bilden, Einheit aus einer Vorlage anlegen und der Import von Demo-Daten.
+- **Abgerufene Fahrzeuge erst nach Ausrücken oder Rücknahme zuordnen:** Ein Fahrzeug, das aus dem Bereitstellungsraum abgerufen wurde, lässt sich keiner Einheit mehr zuordnen. Das geht erst wieder, wenn es ausgerückt ist oder der Abruf zurückgenommen wurde.
+
 ## [1.0.0-alpha.161](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.160...v1.0.0-alpha.161) (2026-10-29)
 
 ### Lagekarte
