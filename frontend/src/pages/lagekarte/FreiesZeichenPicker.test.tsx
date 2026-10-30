@@ -79,8 +79,18 @@ function renderGesteuert(start: ZeichenEntwurf) {
   return { onChange, onAbsenden, ...ergebnis };
 }
 
+/**
+ * Felder nur über ihre Rolle oder im Detail-Bereich suchen, nie per `*ByLabelText` im ganzen
+ * Dokument: jedes Kachelbild trägt `aria-labelledby` auf seine `<desc>`, und `*ByLabelText` löst
+ * jeden Verweis per `querySelector('[id=…]')` auf. In jsdom kostet das rund 8 ms je Kachel, nach
+ * „Kein Grundzeichen“ (fast 280 Kacheln) über 2 s je Abfrage, und die Fälle liefen in die Frist
+ * (LLH-1286). Der Detail-Bereich trägt keine Kachel.
+ */
+const suchfeld = (name: string) => screen.getByRole('textbox', { name });
+const details = () => within(document.querySelector<HTMLElement>('[data-lfh="zeichen-details"]')!);
+
 // antd-Selects können bei getByLabelText mehrfach matchen → über die Anzahl testen.
-const sichtbar = (label: string) => screen.queryAllByLabelText(label).length > 0;
+const sichtbar = (label: string) => details().queryAllByLabelText(label).length > 0;
 
 /** Kachel-Abfragen immer innerhalb ihres Rasters: Grundzeichen- und Symbolkatalog teilen Namen. */
 const raster = (name: string) => within(screen.getByRole('radiogroup', { name }));
@@ -102,7 +112,7 @@ function felder() {
 
 /** Öffnet die antd-Auswahl mit diesem Namen und liefert die Namen ihrer (gerenderten) Optionen. */
 async function optionenVon(label: string, suche?: string): Promise<string[]> {
-  const feld = screen.getAllByLabelText(label)[0];
+  const feld = details().getAllByLabelText(label)[0];
   fireEvent.mouseDown(feld.closest('.ant-select')?.querySelector('.ant-select-selector') ?? feld);
   // Tippen filtert (jsdom rendert von der virtuellen Liste nur den Anfang).
   if (suche) {
@@ -178,7 +188,7 @@ describe('FreiesZeichenPicker — Grundzeichen als Bild-Raster', () => {
 
   it('schränkt die Kacheln über das Suchfeld ein, auch über den Alltagsbegriff', () => {
     render(PERSON);
-    fireEvent.change(screen.getByLabelText('Grundzeichen suchen'), {
+    fireEvent.change(suchfeld('Grundzeichen suchen'), {
       target: { value: 'hubschr' },
     });
     expect(raster('Grundzeichen').getByRole('radio', { name: 'Luftfahrzeug' })).toBeInTheDocument();
@@ -188,18 +198,18 @@ describe('FreiesZeichenPicker — Grundzeichen als Bild-Raster', () => {
 
   it('sagt es, wenn die Suche nichts findet', () => {
     render(PERSON);
-    fireEvent.change(screen.getByLabelText('Grundzeichen suchen'), { target: { value: 'xyzzy' } });
+    fireEvent.change(suchfeld('Grundzeichen suchen'), { target: { value: 'xyzzy' } });
     expect(screen.getByText('Kein Treffer')).toBeInTheDocument();
   });
 
   it('setzt den Fokus beim Öffnen ins Grundzeichen-Suchfeld', () => {
     render(PERSON);
-    expect(screen.getByLabelText('Grundzeichen suchen')).toHaveFocus();
+    expect(suchfeld('Grundzeichen suchen')).toHaveFocus();
   });
 
   it('lässt den Fokus in Ruhe, wo der Picker dauerhaft steht (Inspector)', () => {
     renderMitProviders(<FreiesZeichenPicker wert={PERSON} onChange={vi.fn()} autoFokus={false} />);
-    expect(screen.getByLabelText('Grundzeichen suchen')).not.toHaveFocus();
+    expect(suchfeld('Grundzeichen suchen')).not.toHaveFocus();
   });
 
   it('Pfeiltasten tragen den Fokus mit, rückwärts mit Umlauf ans Ende', () => {
@@ -236,7 +246,7 @@ describe('FreiesZeichenPicker — Symbole als Bild-Raster', () => {
     );
     const drehleiter = raster('Symbol').getByRole('radio', { name: /Drehleiter/ });
     expect(drehleiter).toHaveAttribute('aria-checked', 'true');
-    fireEvent.change(screen.getByLabelText('Symbol suchen'), { target: { value: 'drehl' } });
+    fireEvent.change(suchfeld('Symbol suchen'), { target: { value: 'drehl' } });
     expect(raster('Symbol').queryByRole('radio', { name: 'Brandbekämpfung' })).toBeNull();
     // „Kein Symbol" überlebt den Filter.
     fireEvent.click(raster('Symbol').getByRole('radio', { name: 'Kein Symbol' }));
@@ -245,7 +255,7 @@ describe('FreiesZeichenPicker — Symbole als Bild-Raster', () => {
 
   it('setzt einen Zustand an der Person', () => {
     const { onChange } = render(PERSON);
-    fireEvent.change(screen.getByLabelText('Symbol suchen'), { target: { value: 'verletzt' } });
+    fireEvent.change(suchfeld('Symbol suchen'), { target: { value: 'verletzt' } });
     fireEvent.click(raster('Symbol').getByRole('radio', { name: 'Person verletzt' }));
     expect(zuletzt(onChange)).toMatchObject({ kind: 'person', states: ['person-injured'] });
   });
@@ -260,7 +270,7 @@ describe('FreiesZeichenPicker — Piktogramm ohne Grundzeichen', () => {
     expect(
       raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }),
     ).toHaveAttribute('aria-checked', 'true');
-    fireEvent.change(screen.getByLabelText('Symbol suchen'), { target: { value: 'Drehleiter' } });
+    fireEvent.change(suchfeld('Symbol suchen'), { target: { value: 'Drehleiter' } });
     const kachel = raster('Symbol').getByRole('radio', { name: /Drehleiter/ });
     // Ohne Grundzeichen gibt es keine Kachel „Kein Symbol“.
     expect(raster('Symbol').queryByRole('radio', { name: 'Kein Symbol' })).toBeNull();
@@ -296,7 +306,7 @@ describe('FreiesZeichenPicker — Piktogramm ohne Grundzeichen', () => {
 
   it('bietet ohne Grundzeichen keinen Personenzustand freistehend an', () => {
     render(wertAus({ kind: 'state', state: 'damaged' }));
-    fireEvent.change(screen.getByLabelText('Symbol suchen'), {
+    fireEvent.change(suchfeld('Symbol suchen'), {
       target: { value: 'person verletzt' },
     });
     expect(raster('Symbol').queryAllByRole('radio')).toHaveLength(0);
@@ -375,7 +385,7 @@ describe('FreiesZeichenPicker — Feldbudget: Sekundäres hinter „Details"', (
 
   it('meldet Änderungen an der Bezeichnung beim Verlassen mit dem Zeichen', () => {
     const { onChange } = render(FORMATION);
-    const feld = screen.getByLabelText('Bezeichnung');
+    const feld = details().getByLabelText('Bezeichnung');
     fireEvent.change(feld, { target: { value: 'EA Nord' } });
     fireEvent.blur(feld);
     expect(onChange).toHaveBeenCalledWith({ ...FORMATION, label: 'EA Nord' });
@@ -407,7 +417,7 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
 
   it('platziert per Enter im Suchfeld mit dem ersten Treffer, wenn die Auswahl nicht darunter ist', () => {
     const { onAbsenden } = render(PERSON);
-    const suche = screen.getByLabelText('Grundzeichen suchen');
+    const suche = suchfeld('Grundzeichen suchen');
     fireEvent.change(suche, { target: { value: 'hubschr' } });
     fireEvent.keyDown(suche, { key: 'Enter' });
     expect(zuletzt(onAbsenden)).toEqual({ kind: 'vehicle-air' });
@@ -415,7 +425,7 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
 
   it('behält per Enter im Suchfeld die Auswahl, wenn sie unter den Treffern steht', () => {
     const { onAbsenden } = render(PERSON);
-    const suche = screen.getByLabelText('Grundzeichen suchen');
+    const suche = suchfeld('Grundzeichen suchen');
     fireEvent.change(suche, { target: { value: 'pers' } });
     fireEvent.keyDown(suche, { key: 'Enter' });
     expect(zuletzt(onAbsenden)).toEqual({ kind: 'person' });
@@ -424,13 +434,13 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
   it('platziert per Enter im leeren Suchfeld die aktuelle Auswahl', () => {
     const gefahr = wertAus({ kind: 'hazard', technicalFill: 'rot' });
     const { onAbsenden } = render(gefahr);
-    fireEvent.keyDown(screen.getByLabelText('Grundzeichen suchen'), { key: 'Enter' });
+    fireEvent.keyDown(suchfeld('Grundzeichen suchen'), { key: 'Enter' });
     expect(onAbsenden).toHaveBeenCalledWith(gefahr);
   });
 
   it('platziert NICHT per Enter im Suchfeld ohne Treffer', () => {
     const { onAbsenden } = render(PERSON);
-    const suche = screen.getByLabelText('Grundzeichen suchen');
+    const suche = suchfeld('Grundzeichen suchen');
     fireEvent.change(suche, { target: { value: 'xyzzy' } });
     fireEvent.keyDown(suche, { key: 'Enter' });
     expect(onAbsenden).not.toHaveBeenCalled();
@@ -438,7 +448,7 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
 
   it('nimmt im Symbol-Suchfeld den ersten ECHTEN Treffer, nicht „Kein Symbol"', () => {
     const { onAbsenden } = render(FORMATION);
-    const suche = screen.getByLabelText('Symbol suchen');
+    const suche = suchfeld('Symbol suchen');
     fireEvent.change(suche, { target: { value: 'drehl' } });
     fireEvent.keyDown(suche, { key: 'Enter' });
     expect(zuletzt(onAbsenden)).toEqual({
@@ -449,7 +459,7 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
 
   it('platziert mit der GERADE getippten Bezeichnung, nicht mit dem alten Stand', () => {
     const { onAbsenden } = render(FORMATION);
-    const feld = screen.getByLabelText('Bezeichnung');
+    const feld = details().getByLabelText('Bezeichnung');
     fireEvent.change(feld, { target: { value: 'EA Nord' } });
     fireEvent.keyDown(feld, { key: 'Enter' });
     expect(onAbsenden).toHaveBeenCalledWith({ ...FORMATION, label: 'EA Nord' });
@@ -457,7 +467,7 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
 
   it('platziert NICHT beim blossen Verlassen eines Feldes', () => {
     const { onAbsenden } = render(FORMATION);
-    const feld = screen.getByLabelText('Bezeichnung');
+    const feld = details().getByLabelText('Bezeichnung');
     fireEvent.change(feld, { target: { value: 'EA Nord' } });
     fireEvent.blur(feld);
     expect(onAbsenden).not.toHaveBeenCalled();
@@ -483,7 +493,7 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
 });
 
 describe('FreiesZeichenPicker — „Kein Grundzeichen“ ohne Symbol ist noch kein Zeichen', () => {
-  const vorschau = () => screen.getByLabelText('Vorschau');
+  const vorschau = () => document.querySelector<HTMLElement>('[aria-label="Vorschau"]')!;
 
   it('zeigt in der Vorschau kein Zeichen mehr, sondern „Symbol wählen“, und sperrt „Platzieren“', async () => {
     renderGesteuert(FORMATION);
@@ -495,7 +505,7 @@ describe('FreiesZeichenPicker — „Kein Grundzeichen“ ohne Symbol ist noch k
     expect(within(vorschau()).getByText('Symbol wählen')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Platzieren' })).toBeDisabled();
     // Erst ein Symbol macht es zum Zeichen.
-    fireEvent.change(screen.getByLabelText('Symbol suchen'), { target: { value: 'Drehleiter' } });
+    fireEvent.change(suchfeld('Symbol suchen'), { target: { value: 'Drehleiter' } });
     fireEvent.click(raster('Symbol').getByRole('radio', { name: /Drehleiter/ }));
     expect(vorschau().querySelector('svg')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Platzieren' })).toBeEnabled();
@@ -504,11 +514,11 @@ describe('FreiesZeichenPicker — „Kein Grundzeichen“ ohne Symbol ist noch k
   it('platziert per Enter nicht, weder im Suchfeld noch in der Bezeichnung noch auf der Kachel', async () => {
     const { onAbsenden } = renderGesteuert(FORMATION);
     await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }));
-    fireEvent.keyDown(screen.getByLabelText('Grundzeichen suchen'), { key: 'Enter' });
+    fireEvent.keyDown(suchfeld('Grundzeichen suchen'), { key: 'Enter' });
     const kachel = raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' });
     kachel.focus();
     fireEvent.keyDown(kachel, { key: 'Enter' });
-    const bezeichnung = screen.getByLabelText('Bezeichnung');
+    const bezeichnung = details().getByLabelText('Bezeichnung');
     fireEvent.change(bezeichnung, { target: { value: 'EA Nord' } });
     fireEvent.keyDown(bezeichnung, { key: 'Enter' });
     expect(onAbsenden).not.toHaveBeenCalled();
@@ -560,7 +570,7 @@ describe('FreiesZeichenPicker — zweite Darstellungen', () => {
 
   it('findet über „Draht“ die leitergebundenen Formen und nur sie', () => {
     render(SPRACHE);
-    fireEvent.change(screen.getByLabelText('Symbol suchen'), { target: { value: 'Draht' } });
+    fireEvent.change(suchfeld('Symbol suchen'), { target: { value: 'Draht' } });
     expect(raster('Symbol').getByRole('radio', { name: 'Sprache (Draht)' })).toBeInTheDocument();
     expect(
       raster('Symbol').getByRole('radio', { name: 'Datenübertragung (Draht)' }),
