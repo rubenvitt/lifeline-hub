@@ -135,8 +135,8 @@ import { waermeVokabularAuf } from './lagekarte/zeichenWahl';
 
 /**
  * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird. Beim Totalausfall
- * scheitern alle elf, und eine Aufzählung liest im Einsatz niemand; die Zahl trägt „alle", die
- * ersten drei Namen den Einstieg für den häufigeren Einzelfall.
+ * scheitern alle Quellen des Katalogs, und eine Aufzählung liest im Einsatz niemand; die Zahl
+ * trägt „alle", die ersten drei Namen den Einstieg für den häufigeren Einzelfall.
  */
 const QUELLEN_NAMEN_MAX = 3;
 
@@ -291,7 +291,7 @@ export default function LagekartePage() {
     personenZugriff,
     personenVerortet,
     personen,
-    personenFehler,
+    hasPersonenError,
     personenNichtGeladen,
     betreuungZugriff,
     evakuierungZugriff,
@@ -1922,7 +1922,7 @@ export default function LagekartePage() {
         objekte={objekte}
         // Betroffene zählen nicht zum Lagebild-Fehler, gehören aber bei eingeschalteter Ebene zur
         // Liste — ihr Ausfall macht sie unvollständig.
-        objekteUnvollstaendig={lagebildFehler || (personenFehler && layerEffektiv.person)}
+        objekteUnvollstaendig={lagebildFehler || (hasPersonenError && layerEffektiv.person)}
         ortssuche={ortssuche}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
@@ -1957,7 +1957,7 @@ export default function LagekartePage() {
         personen={{
           zugriff: personenZugriff,
           anzahl: personenVerortet.length,
-          fehler: personenFehler,
+          fehler: hasPersonenError,
           nichtGeladen: personenNichtGeladen,
         }}
         betreuung={{ zugriff: betreuungZugriff }}
@@ -2006,9 +2006,9 @@ export default function LagekartePage() {
         ansichtBusy={ansichtBusy}
         ansichtFehler={ansichtGruendeImPaneel}
         auswahl={auswahlInhalt}
-        /* Drei Sektionen, drei Ursachen. Der Slot an der Objektliste hängt an denselben elf
+        /* Drei Sektionen, drei Ursachen. Der Slot an der Objektliste hängt an denselben
            Lagebild-Quellen wie das Overlay; er trägt den erneuten Abruf — die Handlung, die das
-           Overlay nicht anbietet, weil es für elf Quellen zugleich spricht. */
+           Overlay nicht anbietet, weil es für alle Quellen zugleich spricht. */
         sektionFehler={{
           nichtVerortet: lagebildFehler
             ? { text: 'Objektlisten konnten nicht geladen werden', onWiederholen: neuLaden }
@@ -2053,7 +2053,7 @@ export default function LagekartePage() {
         {/* Warn-Overlay: eine Karte ohne Objekt sieht aus wie eine Lage ohne Objekt — der
             Ausfall einer Domänen-Quelle tarnt sich als gültiger Zustand. Deshalb steht er
             dauerhaft und namentlich da: `banner`-Alert, kein `closable`, kein Knopf (ein
-            Wiederhol-Knopf könnte nur eine der elf Quellen meinen). Im Fluss über der Fläche,
+            Wiederhol-Knopf könnte nur eine der vielen Quellen meinen). Im Fluss über der Fläche,
             nicht schwebend: oben auf der Karte liegen die Überlagerungen. */}
         {quellenFehler && (
           <div data-testid="lagebild-unvollstaendig">

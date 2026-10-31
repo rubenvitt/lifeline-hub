@@ -23,7 +23,7 @@ import {
   type GeoJsonPolygon,
 } from '../pages/lagekarte/geo';
 import { zonenPlakette, type ZoneFeature } from '../pages/lagekarte/kartenLayer';
-import { baueAbschnittMarker, baueMarker, baueTaktischeMarker } from '../pages/lagekarte/marker';
+import { buildAbschnittMarker, buildMarker, buildTaktischeMarker } from '../pages/lagekarte/marker';
 import { erzeugeZeigerQuelle } from '../pages/lagekarte/mausPosition';
 import { startAnsicht, type StartAnsicht } from '../pages/lagekarte/startAnsicht';
 import { useBasemap } from '../pages/lagekarte/useBasemap';
@@ -143,7 +143,7 @@ export default function GeraetAbschnittKarte() {
             id: a.id,
             label: a.name,
             polygon: poly,
-            tzMarker: baueAbschnittMarker(a, poly, z, orgDefault, token),
+            tzMarker: buildAbschnittMarker(a, poly, z, orgDefault, token),
           },
         ];
       }),
@@ -151,9 +151,9 @@ export default function GeraetAbschnittKarte() {
   );
   const marker = useMemo(
     () => [
-      ...baueMarker(einsatzQuery.data, [], [], token).verortet,
+      ...buildMarker(einsatzQuery.data, [], [], token).verortet,
       ...flaechen.map((f) => f.tzMarker),
-      ...baueTaktischeMarker(
+      ...buildTaktischeMarker(
         {
           einheiten: einheitenQuery.data ?? [],
           fahrzeuge: [],
