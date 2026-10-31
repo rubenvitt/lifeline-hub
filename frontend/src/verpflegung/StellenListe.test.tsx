@@ -202,6 +202,36 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
 
+    it('In Betrieb nehmen zeigt bis zur Antwort an der Zeile, dass es läuft (LLH-1297)', async () => {
+      let antworte!: () => void;
+      const props = zeige({
+        onStatus: vi.fn(
+          () =>
+            new Promise<void>((resolve) => {
+              antworte = resolve;
+            }),
+        ),
+      });
+      const menue = await oeffneMenue('Zuführung Deich');
+      await userEvent.click(within(menue).getByText('In Betrieb nehmen'));
+      const deich = zeile('Zuführung Deich');
+      const ausloeser = within(deich).getByRole('button', {
+        name: 'Aktionen zu Stelle Zuführung Deich',
+      });
+      expect(deich).toHaveAttribute('aria-busy', 'true');
+      expect(ausloeser).toHaveClass('ant-btn-loading');
+      // Gesperrt: ein zweiter Tipp schickt nichts doppelt.
+      await userEvent.click(ausloeser);
+      expect(props.onStatus).toHaveBeenCalledTimes(1);
+      // Die andere Zeile läuft nicht mit.
+      expect(zeile('Feldküche BR Sportplatz')).not.toHaveAttribute('aria-busy');
+
+      antworte();
+      await waitFor(() => expect(deich).not.toHaveAttribute('aria-busy'));
+      // antd nimmt `loading` erst im Effekt nach dem Render zurück: darauf warten.
+      await waitFor(() => expect(ausloeser).not.toHaveClass('ant-btn-loading'));
+    });
+
     it('Auflösen fragt rot zurück, der Knopf nennt die Handlung; Abbrechen sendet nichts', async () => {
       const props = zeige();
       await userEvent.click(
@@ -249,6 +279,15 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
         await within(deich).findByText('Die Verpflegungsstelle ist storniert'),
       ).toBeInTheDocument();
       expect(document.querySelector('.ant-message-notice')).toBeNull();
+      // Die Zeile steht wieder auf „geplant“, der Auslöser dreht nicht mehr (LLH-1297).
+      await waitFor(() => expect(deich).not.toHaveAttribute('aria-busy'));
+      expect(deich).toHaveAttribute('data-status', 'geplant');
+      expect(within(deich).getByText('geplant')).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          within(deich).getByRole('button', { name: 'Aktionen zu Stelle Zuführung Deich' }),
+        ).not.toHaveClass('ant-btn-loading'),
+      );
       // Die andere Zeile bleibt ohne Grund.
       expect(
         within(zeile('Feldküche BR Sportplatz')).queryByText(
