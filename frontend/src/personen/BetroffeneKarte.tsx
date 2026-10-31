@@ -16,7 +16,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import Kartenflaeche, { type KartenHandle } from '../pages/lagekarte/Kartenflaeche';
 import KartenUeberlagerung from '../pages/lagekarte/KartenUeberlagerung';
-import { baueMarker } from '../pages/lagekarte/marker';
+import { buildMarker } from '../pages/lagekarte/marker';
 import { erzeugeZeigerQuelle } from '../pages/lagekarte/mausPosition';
 import { startAnsicht } from '../pages/lagekarte/startAnsicht';
 import { useBasemap } from '../pages/lagekarte/useBasemap';
@@ -206,9 +206,9 @@ export default function BetroffeneKarte({
     document.addEventListener('pointerdown', druck, true);
     return () => document.removeEventListener('pointerdown', druck, true);
   });
-  // Der Einsatzort steht zur Orientierung mit auf der Karte; `baueMarker` ist die eine Quelle
+  // Der Einsatzort steht zur Orientierung mit auf der Karte; `buildMarker` ist die eine Quelle
   // seiner Signatur.
-  const ort = useMemo(() => baueMarker(einsatz, [], [], token).verortet, [einsatz, token]);
+  const ort = useMemo(() => buildMarker(einsatz, [], [], token).verortet, [einsatz, token]);
   const alleMarker = useMemo(() => [...ort, ...marker], [ort, marker]);
   const start = useMemo(() => startAnsicht(marker.length > 0 ? marker : ort), [marker, ort]);
 

@@ -1312,6 +1312,12 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
+  it('kein „Bearbeiten“ nach dem Stornieren (LLH-1304)', async () => {
+    seite(brDetail({ status: 'geplant', storniert_at: '2026-10-15 08:00:00' }));
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+
   it('kein „Bearbeiten“ für Beobachter', async () => {
     seite(brDetail({ status: 'aktiv' }), { rolle: 'beobachter' });
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
@@ -2615,6 +2621,12 @@ describe('BrDetailPage — Auf Karte verorten (LLH-1107)', () => {
 
   it('nicht nach dem Auflösen', async () => {
     seite(brDetail({ status: 'aufgeloest' }));
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Auf Karte/ })).not.toBeInTheDocument();
+  });
+
+  it('nicht nach dem Stornieren (LLH-1304)', async () => {
+    seite(brDetail({ storniert_at: '2026-10-15 08:00:00', lat: 51.93, lon: 8.87 }));
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Auf Karte/ })).not.toBeInTheDocument();
   });

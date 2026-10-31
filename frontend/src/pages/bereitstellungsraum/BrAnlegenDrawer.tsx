@@ -1,4 +1,6 @@
 import { Form, Input } from 'antd';
+import { BR_BEZEICHNUNG_MAX, BR_NOTIZ_MAX, BR_STANDORT_MAX } from '../../api/eingabegrenzen';
+import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import AnlegenDrawer, { type AnlegenDrawerSlot } from '../../components/AnlegenDrawer';
 import { legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -36,15 +38,30 @@ export default function BrAnlegenDrawer(props: AnlegenDrawerSlot<Bereitstellungs
       <Form.Item
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, message: 'Bezeichnung erforderlich' }]}
+        rules={[
+          { required: true, message: 'Bezeichnung erforderlich' },
+          zeichenRegel(BR_BEZEICHNUNG_MAX, 'Bezeichnung'),
+        ]}
       >
-        <Input placeholder="z. B. BR Ost" />
+        <Input placeholder="z. B. BR Ost" count={zeichenGrenze(BR_BEZEICHNUNG_MAX)} />
       </Form.Item>
-      <Form.Item label="Standort (optional)" name="standort">
-        <EinsatzOrtsfeld einsatzId={props.einsatzId} etikett="Standort" />
+      <Form.Item
+        label="Standort (optional)"
+        name="standort"
+        rules={[ortZeichenRegel(BR_STANDORT_MAX, 'Standort')]}
+      >
+        <EinsatzOrtsfeld
+          einsatzId={props.einsatzId}
+          etikett="Standort"
+          count={zeichenGrenze(BR_STANDORT_MAX)}
+        />
       </Form.Item>
-      <Form.Item label="Notiz (optional)" name="notiz">
-        <Input.TextArea rows={3} />
+      <Form.Item
+        label="Notiz (optional)"
+        name="notiz"
+        rules={[zeichenRegel(BR_NOTIZ_MAX, 'Notiz')]}
+      >
+        <Input.TextArea rows={3} count={zeichenGrenze(BR_NOTIZ_MAX)} />
       </Form.Item>
     </AnlegenDrawer>
   );

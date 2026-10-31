@@ -106,7 +106,7 @@ export function useLagebild(einsatzId: number, { mitPegel }: Optionen) {
   });
   const freigaben = freigabenQuery.data;
   // Ausfall nur ohne verwertbaren Stand: scheitert ein Neuabruf, bleiben die alten Freigaben gültig.
-  const freigabenFehler = freigabenQuery.isError && freigaben === undefined;
+  const hasFreigabenError = freigabenQuery.isError && freigaben === undefined;
   const frei = (quelle: GebundeneQuelle) => quelleFrei(quelle, freigaben);
 
   const einsatz = useQuery({
@@ -233,7 +233,7 @@ export function useLagebild(einsatzId: number, { mitPegel }: Optionen) {
   const gebundenerZustand = (quelle: GebundeneQuelle): AbrufZustand => {
     if (frei(quelle)) return abrufZustand(gebunden[quelle]);
     if (freigaben !== undefined) return 'gesperrt';
-    return freigabenFehler ? 'fehler' : 'laden';
+    return hasFreigabenError ? 'fehler' : 'laden';
   };
 
   /** Abrufzustand je Quelle (`gesperrt` = nicht freigegeben oder 403), für die Rechteweichen. */
@@ -263,7 +263,7 @@ export function useLagebild(einsatzId: number, { mitPegel }: Optionen) {
    */
   const nachladen = (quelle: GebundeneQuelle) => {
     if (frei(quelle)) void gebunden[quelle].refetch();
-    else if (freigabenFehler) void freigabenQuery.refetch();
+    else if (hasFreigabenError) void freigabenQuery.refetch();
   };
 
   return { q, zustand, basis, daten, stand, nachladen };

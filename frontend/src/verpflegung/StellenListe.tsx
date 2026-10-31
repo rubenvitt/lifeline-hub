@@ -72,7 +72,9 @@ function hasAusgabe(stelleId: number, zeitfenster: readonly VerpflegungZeitfenst
  * aufgelöst nur „Bearbeiten …“. „Auflösen …“ und „Stornieren …“ fragen rot zurück; die Rückfrage
  * ist EIN `Modal` außerhalb der Zeilen und bleibt bis zum Erfolg offen, ihr Grund steht darin.
  * „In Betrieb nehmen“ ist umkehrbar genug (Auflösen bleibt möglich) und geht ohne Rückfrage; ihr
- * Grund steht an der Zeile (`useZeilenFehler`, LFH-1077), nie als Toast.
+ * Grund steht an der Zeile (`useZeilenFehler`, LFH-1077), nie als Toast. Bis zur Antwort dreht der
+ * Menüauslöser der Zeile und ist gesperrt, die Zeile ist `aria-busy` (LLH-1297); der Status bleibt
+ * „geplant“, bis der Server „aktiv“ bestätigt, bei Ablehnung also unverändert.
  */
 export default function StellenListe({
   einsatzId,
@@ -90,6 +92,8 @@ export default function StellenListe({
   const { konventionen } = useAnzeigeKonventionen();
   const zeilen = useZeilenFehler<number>();
   const [rueckfrage, setRueckfrage] = useState<Rueckfragestand | null>(null);
+  /** Stellen, deren Inbetriebnahme auf die Serverantwort wartet. */
+  const [inBetriebnahme, setInBetriebnahme] = useState<ReadonlySet<number>>(() => new Set());
 
   if (stellen.length === 0) {
     return (
@@ -106,10 +110,18 @@ export default function StellenListe({
   const aufgeloest = stellen.filter((s) => s.status === 'aufgeloest');
 
   const inBetriebNehmen = (s: Verpflegungsstelle) => {
+    if (inBetriebnahme.has(s.id)) return;
     zeilen.beginne(s.id);
-    onStatus(s, 'aktiv').catch((e: unknown) =>
-      zeilen.melde(s.id, e, 'Inbetriebnahme fehlgeschlagen'),
-    );
+    setInBetriebnahme((alt) => new Set(alt).add(s.id));
+    onStatus(s, 'aktiv')
+      .catch((e: unknown) => zeilen.melde(s.id, e, 'Inbetriebnahme fehlgeschlagen'))
+      .finally(() =>
+        setInBetriebnahme((alt) => {
+          const neu = new Set(alt);
+          neu.delete(s.id);
+          return neu;
+        }),
+      );
   };
 
   const fuehreAus = (s: Verpflegungsstelle, aktion: Aktion) => {
@@ -167,12 +179,14 @@ export default function StellenListe({
             ]
           : [{ key: 'bearbeiten', label: 'Bearbeiten …' }];
     const grund = zeilen.grund(s.id);
+    const laeuft = inBetriebnahme.has(s.id);
     return (
       <article
         key={s.id}
         data-lfh="verpflegungsstelle"
         data-status={s.status}
         aria-label={kennung}
+        aria-busy={laeuft || undefined}
         style={{
           minWidth: 0,
           marginBottom: token.marginXS,
@@ -226,6 +240,8 @@ export default function StellenListe({
                 eintraege={aktionen}
                 zugaenglicherName={`Aktionen zu ${kennung}`}
                 onWahl={(key) => fuehreAus(s, key)}
+                laeuft={laeuft}
+                gesperrt={laeuft}
               />
             ) : (
               aktionen.map((a) => (

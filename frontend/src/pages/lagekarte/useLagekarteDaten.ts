@@ -33,15 +33,15 @@ import { ladeOrganisation } from '../../api/organisation';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import type { Person, Warnstufe } from '../../api/types';
 import {
-  baueFuehrungsstelleMarker,
-  baueMarker,
-  baueTaktischeMarker,
-  baueLageMeldungMarker,
-  baueFreieZeichenMarker,
-  baueBetreuungMarker,
+  buildFuehrungsstelleMarker,
+  buildMarker,
+  buildTaktischeMarker,
+  buildLageMeldungMarker,
+  buildFreieZeichenMarker,
+  buildBetreuungMarker,
   buildBrMarker,
   abschnittOhneFlaeche,
-  baueAbschnittMarker,
+  buildAbschnittMarker,
 } from './marker';
 import { kreisAusZone, parsePolygon, parseGeometry, polygonZentroid } from './geo';
 import {
@@ -146,7 +146,7 @@ export function useLagekarteDaten({
   });
   const freigaben = freigabenQuery.data;
   // Ausfall nur ohne verwertbaren Stand: scheitert ein Neuabruf, bleiben die alten Freigaben gültig.
-  const freigabenFehler = freigabenQuery.isError && freigaben === undefined;
+  const hasFreigabenError = freigabenQuery.isError && freigaben === undefined;
   const uhsFrei = liveAn && istKeyFreigegeben('unfallhilfsstellen', freigaben);
   const schaedenFrei = liveAn && istKeyFreigegeben('schaeden', freigaben);
   const einheitenFrei = liveAn && istKeyFreigegeben('einheiten', freigaben);
@@ -237,7 +237,7 @@ export function useLagekarteDaten({
     abgelehnt: personenQuery.error instanceof ApiError && personenQuery.error.status === 403,
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt" (Zustand der Zeile), kein Ausfall.
-  const personenFehler = personenZugriff === 'frei' && personenQuery.isError;
+  const hasPersonenError = personenZugriff === 'frei' && personenQuery.isError;
   // Ebene „Betreuungsstellen": dieselbe Grenze wie bei „Betroffene"; ein 403 kippt auf „gesperrt",
   // nie auf einen Quellenfehler. Das Fach ist die Übersicht der Modulseite
   // (`einsatzKeys.betreuung`), live invalidiert vom `betreuung`-Event, das nur Leser mit Modulrecht
@@ -258,7 +258,7 @@ export function useLagekarteDaten({
     abgelehnt: betreuungQuery.error instanceof ApiError && betreuungQuery.error.status === 403,
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
-  const betreuungFehler = liveAn && betreuungZugriff === 'frei' && betreuungQuery.isError;
+  const hasBetreuungError = liveAn && betreuungZugriff === 'frei' && betreuungQuery.isError;
   // Evakuierungsbezirke (LLH-1034, eigenes Modul): dieselbe Grenze, eigenes Fach
   // (`einsatzKeys.evakuierung`, live über das `evakuierung`-Event). Keine eigene Ebene: die Bezirke
   // beschriften die Bezirksflächen und füllen den Zonen-Inspector.
@@ -277,7 +277,7 @@ export function useLagekarteDaten({
     freigaben,
     abgelehnt: evakuierungQuery.error instanceof ApiError && evakuierungQuery.error.status === 403,
   });
-  const evakuierungFehler = liveAn && evakuierungZugriff === 'frei' && evakuierungQuery.isError;
+  const hasEvakuierungError = liveAn && evakuierungZugriff === 'frei' && evakuierungQuery.isError;
   // Ebene „Bereitstellungsräume" (LLH-1107): dieselbe Grenze wie bei den Betreuungsstellen. Das
   // Fach ist die Liste der Modulseite (`einsatzKeys.br`, mit Belegung), live invalidiert vom
   // `bereitstellungsraum`-Event, das nur Leser mit Modulrecht bekommen. Im Historien-Modus kommen
@@ -293,7 +293,7 @@ export function useLagekarteDaten({
     abgelehnt: brQuery.error instanceof ApiError && brQuery.error.status === 403,
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
-  const brFehler = liveAn && brZugriff === 'frei' && brQuery.isError;
+  const hasBrError = liveAn && brZugriff === 'frei' && brQuery.isError;
   // Ebene „Tiere" (LLH-1123): dieselbe Grenze. Das Fach ist die Liste der Modulseite
   // (`einsatzKeys.tiere`), live invalidiert vom `tier`-Event, das nur Leser mit Modulrecht
   // bekommen. Im Historien-Modus kommen die Tiere aus dem Dokument.
@@ -308,7 +308,7 @@ export function useLagekarteDaten({
     abgelehnt: tierQuery.error instanceof ApiError && tierQuery.error.status === 403,
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
-  const tierFehler = liveAn && tierZugriff === 'frei' && tierQuery.isError;
+  const hasTierError = liveAn && tierZugriff === 'frei' && tierQuery.isError;
   const orgQuery = useQuery({
     queryKey: globalKeys.organisation(),
     queryFn: ladeOrganisation,
@@ -416,11 +416,11 @@ export function useLagekarteDaten({
   );
 
   const { verortet: basisVerortet, nichtVerortet: basisNichtVerortet } = useMemo(
-    () => baueMarker(einsatz, uhsRoh ?? [], schaedenRoh ?? [], token, orgDefault),
+    () => buildMarker(einsatz, uhsRoh ?? [], schaedenRoh ?? [], token, orgDefault),
     [einsatz, uhsRoh, schaedenRoh, token, orgDefault],
   );
   const stellen = useMemo(
-    () => baueBetreuungMarker(stellenRoh ?? [], token, orgDefault),
+    () => buildBetreuungMarker(stellenRoh ?? [], token, orgDefault),
     [stellenRoh, token, orgDefault],
   );
   // Die Stärke im Raum rechnet über die Einheitenliste; ohne sie (Modul Einheiten gesperrt, noch
@@ -431,7 +431,7 @@ export function useLagekarteDaten({
   );
   const tiere = useMemo(() => buildTierMarker(tiereRoh ?? [], token), [tiereRoh, token]);
   const fuehrungsstelleMarker = useMemo(
-    () => baueFuehrungsstelleMarker(fuehrungsstelleRoh, token),
+    () => buildFuehrungsstelleMarker(fuehrungsstelleRoh, token),
     [fuehrungsstelleRoh, token],
   );
   const verortet = useMemo(
@@ -456,7 +456,7 @@ export function useLagekarteDaten({
 
   const taktisch = useMemo(
     () =>
-      baueTaktischeMarker(
+      buildTaktischeMarker(
         {
           einheiten: einheitenRoh ?? [],
           fahrzeuge: fahrzeugeRoh ?? [],
@@ -480,7 +480,7 @@ export function useLagekarteDaten({
             id: a.id,
             label: a.name,
             polygon: poly,
-            tzMarker: baueAbschnittMarker(a, poly, z, orgDefault, token),
+            tzMarker: buildAbschnittMarker(a, poly, z, orgDefault, token),
           },
         ];
       }),
@@ -567,7 +567,7 @@ export function useLagekarteDaten({
     // modulgebundene Quelle, das nennt „Berechtigungen" (sonst sähe eine leere Karte wie eine
     // ruhige Lage aus).
     const katalog: [string, boolean][] = [
-      ['Berechtigungen', freigabenFehler],
+      ['Berechtigungen', hasFreigabenError],
       ['Einsatzdaten', einsatzQuery.isError],
       // Die eigene Führungsstelle (LFH-1181) steht als Anker auf der Karte; ihr Ausfall ist einer.
       ['Führungsstelle', fuehrungsstelleQuery.isError],
@@ -582,21 +582,21 @@ export function useLagekarteDaten({
       ['Lagemeldungen', lageMeldungenFrei && lageMeldungenQuery.isError],
       ['Personal', fkQuery.isError],
       // Betreuungsstellen stehen in Kopfzahl und „Nicht verortet" wie die UHS, ihr Ausfall ist ein
-      // Ausfall des Lagebilds. Ein 403 ist es nicht (`betreuungFehler`).
-      ['Betreuungsstellen', betreuungFehler],
+      // Ausfall des Lagebilds. Ein 403 ist es nicht (`hasBetreuungError`).
+      ['Betreuungsstellen', hasBetreuungError],
       // Ohne Bezirke stünden die Bezirksflächen ohne Namen und Räumung da (LLH-1034).
-      ['Evakuierungsbezirke', evakuierungFehler],
-      // Räume ebenso (LLH-1107); ein 403 ist kein Ausfall (`brFehler`).
-      ['Bereitstellungsräume', brFehler],
-      // Tiere ebenso (LLH-1123); ein 403 ist kein Ausfall (`tierFehler`).
-      ['Tiere', tierFehler],
-      [QUELLE_BETROFFENE, personenFehler],
+      ['Evakuierungsbezirke', hasEvakuierungError],
+      // Räume ebenso (LLH-1107); ein 403 ist kein Ausfall (`hasBrError`).
+      ['Bereitstellungsräume', hasBrError],
+      // Tiere ebenso (LLH-1123); ein 403 ist kein Ausfall (`hasTierError`).
+      ['Tiere', hasTierError],
+      [QUELLE_BETROFFENE, hasPersonenError],
     ];
     return katalog.filter(([, kaputt]) => kaputt).map(([name]) => name);
   }, [
     istSnapshot,
     snapQuery.isError,
-    freigabenFehler,
+    hasFreigabenError,
     einsatzQuery.isError,
     fuehrungsstelleQuery.isError,
     uhsFrei,
@@ -616,11 +616,11 @@ export function useLagekarteDaten({
     lageMeldungenFrei,
     lageMeldungenQuery.isError,
     fkQuery.isError,
-    betreuungFehler,
-    evakuierungFehler,
-    brFehler,
-    tierFehler,
-    personenFehler,
+    hasBetreuungError,
+    hasEvakuierungError,
+    hasBrError,
+    hasTierError,
+    hasPersonenError,
   ]);
 
   // Erneuter Abruf nur der gescheiterten Quellen. Pauschales Invalidieren träfe die gesunden Listen
@@ -645,20 +645,20 @@ export function useLagekarteDaten({
     }
     // Personen und Betreuung nur bei freiem Modul — ein 403 ist kein Ausfall und wird nicht
     // wiederholt.
-    if (personenFehler) void personenQuery.refetch();
-    if (betreuungFehler) void betreuungQuery.refetch();
-    if (evakuierungFehler) void evakuierungQuery.refetch();
-    if (brFehler) void brQuery.refetch();
-    if (tierFehler) void tierQuery.refetch();
+    if (hasPersonenError) void personenQuery.refetch();
+    if (hasBetreuungError) void betreuungQuery.refetch();
+    if (hasEvakuierungError) void evakuierungQuery.refetch();
+    if (hasBrError) void brQuery.refetch();
+    if (hasTierError) void tierQuery.refetch();
   };
 
   const lageMeldungMarker = useMemo(
-    () => baueLageMeldungMarker(lageMeldungenRoh ?? [], token),
+    () => buildLageMeldungMarker(lageMeldungenRoh ?? [], token),
     [lageMeldungenRoh, token],
   );
 
   const freieZeichenMarker = useMemo(
-    () => baueFreieZeichenMarker(freieZeichen, token),
+    () => buildFreieZeichenMarker(freieZeichen, token),
     [freieZeichen, token],
   );
 
@@ -823,6 +823,6 @@ export function useLagekarteDaten({
      * `QUELLE_BETROFFENE` in `fehlerhafteQuellen`; die Seite trennt beides, weil Personen weder
      * Kopfzahl noch „Nicht verortet" speisen.
      */
-    personenFehler,
+    hasPersonenError,
   };
 }

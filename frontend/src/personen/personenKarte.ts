@@ -21,7 +21,7 @@ import { nichtGeladen as fundortNichtGeladen } from '../offline/lagebildKuerzung
  * - Farbe aus der Sichtungsachse; ohne Sichtung und „unverletzt" neutral. Zweiter Kanal ist die
  *   Beschriftung `R-042 · SK II` — auch „ohne Sichtung" wird gesagt.
  *
- * Der Token kommt wie bei `baueMarker` von der aufrufenden Ebene (MapLibre-Werte, keine
+ * Der Token kommt wie bei `buildMarker` von der aufrufenden Ebene (MapLibre-Werte, keine
  * DOM-Styles).
  */
 /**

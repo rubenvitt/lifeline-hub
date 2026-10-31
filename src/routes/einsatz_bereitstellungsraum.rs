@@ -8,7 +8,7 @@ use crate::bereitstellungsraum::repo::{self as br_repo, NeueDaten, PatchDaten};
 use crate::bereitstellungsraum::{
     BrAbrufAufhebenEingabe, BrAbrufEingabe, BrAbrufErgebnis, BrAbrufKurz, BrAnzeige,
     BrBelegungAnzeige, BrBelegungKennzahlen, BrListenEintrag, BrStatus, BrVerlaufEintrag,
-    ObjektTyp,
+    ObjektTyp, BELEGUNG_NOTIZ_MAX, BEZEICHNUNG_MAX, NOTIZ_MAX, STANDORT_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{
@@ -23,8 +23,8 @@ use crate::extract::PfadParam;
 use crate::geraet::{stelle, Bindungsart};
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    self, deserialize_optional_field, hoechstens, parse_enum, parse_enum_opt, pflicht, pflicht_tri,
-    trimme,
+    self, deserialize_optional_field, hoechstens, optional_max, optional_max_tri, parse_enum,
+    parse_enum_opt, pflicht_max, pflicht_max_tri, trimme,
 };
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -284,9 +284,9 @@ pub async fn create(
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<BrAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
-    let standort = trimme(body.standort);
-    let notiz = trimme(body.notiz);
+    let bezeichnung = pflicht_max(&body.bezeichnung, "Bezeichnung", BEZEICHNUNG_MAX)?;
+    let standort = optional_max(body.standort, "Standort", STANDORT_MAX)?;
+    let notiz = optional_max(body.notiz, "Notiz", NOTIZ_MAX)?;
 
     let br = br_repo::create(
         &state.pool,
@@ -380,13 +380,9 @@ pub async fn update(
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<BrAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let bezeichnung = pflicht_tri(body.bezeichnung.as_deref(), "Bezeichnung")?;
-    let standort = body
-        .standort
-        .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
-    let notiz = body
-        .notiz
-        .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+    let bezeichnung = pflicht_max_tri(body.bezeichnung.as_deref(), "Bezeichnung", BEZEICHNUNG_MAX)?;
+    let standort = optional_max_tri(body.standort, "Standort", STANDORT_MAX)?;
+    let notiz = optional_max_tri(body.notiz, "Notiz", NOTIZ_MAX)?;
 
     let daten = PatchDaten {
         bezeichnung: bezeichnung.as_deref(),
@@ -485,7 +481,7 @@ pub async fn belegung(
     // des Austritts); ein Wechsel hinaus trägt den fremden Raum und ist damit 404 (LFH-1042).
     stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
     let einsatz_id = ctx.einsatz.id;
-    let notiz = trimme(body.notiz);
+    let notiz = optional_max(body.notiz, "Notiz", BELEGUNG_NOTIZ_MAX)?;
 
     let belegt = belegung_repo::belege_mit_folgen(
         &state.pool,
@@ -928,13 +924,17 @@ async fn notify_eintreffen(
 }
 
 /// Meldungsbündel genau einmal (Marker `live_published_at`) und die Auto-Frist-Erinnerung mit
-/// eigenem Titel (design.md D5).
+/// eigenem Titel „Unangemeldete Kraft #n unbestätigt“ (design.md D5).
 async fn notify_meldung(state: &AppState, meldung_id: i64) -> Result<(), AppError> {
     let jetzt = crate::zeit::jetzt();
     let meldung = crate::meldung::repo::laden(&state.pool, meldung_id, &jetzt).await?;
     crate::meldung::live_publikation_sicherstellen(state, &meldung).await?;
-    let titel = format!("Unangemeldete Kraft #{} unbestätigt", meldung.lfd_nr);
-    crate::meldung::auto_frist_erinnerung_sicherstellen(state, &meldung, &titel).await?;
+    crate::meldung::auto_frist_erinnerung_sicherstellen(
+        state,
+        &meldung,
+        crate::meldung::AutoFristHerkunft::UnangemeldeteKraft,
+    )
+    .await?;
     Ok(())
 }
 

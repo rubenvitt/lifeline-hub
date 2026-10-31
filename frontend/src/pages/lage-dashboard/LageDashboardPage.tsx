@@ -211,11 +211,11 @@ export default function LageDashboardPage() {
     freigaben: freigabenQuery.data,
     bereit: freigabenBekannt,
   });
-  const freigabenFehler = freigabenQuery.isError;
+  const hasFreigabenError = freigabenQuery.isError;
   const evakuierung = useMemo(
     (): EvakuierungStand =>
-      freigabenFehler ? { zustand: 'fehler' } : evakuierungStand(evakuierungZustand),
-    [freigabenFehler, evakuierungZustand],
+      hasFreigabenError ? { zustand: 'fehler' } : evakuierungStand(evakuierungZustand),
+    [hasFreigabenError, evakuierungZustand],
   );
   const evakuierungZiel =
     freigabenBekannt && darfZaehlerZeigen('evakuierung', freigabenQuery.data)

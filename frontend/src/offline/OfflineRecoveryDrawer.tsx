@@ -10,8 +10,11 @@ import {
   Space,
   Typography,
 } from 'antd';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { anzahl } from '../anzeige/anzahl';
+import { einsatzKeys } from '../api/queryKeys';
+import { ladeVerpflegung } from '../api/verpflegung';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import {
@@ -75,6 +78,36 @@ function aktionsTitel(aktion: OfflineSchreibaktion): string {
   }
 }
 
+/** Anzeige einer Stelle, die die Verpflegung nicht (mehr) kennt oder nicht laden kann. */
+const UNBEKANNTE_STELLE = 'unbekannte Stelle';
+
+/** Name der Verpflegungsstelle einer abgelehnten Ausgabe (LLH-1298) aus `stellen[]` der
+ *  Verpflegung, die auch aufgelöste Stellen führt; eine stornierte oder fremde Kennung und eine
+ *  Verpflegung, die nicht lädt, heißen `UNBEKANNTE_STELLE`. `undefined`, solange sie lädt. */
+function useStellenName(einsatzId: number, stelleId: number): string | undefined {
+  const { data, isError, fetchStatus } = useQuery({
+    queryKey: einsatzKeys.verpflegung(einsatzId),
+    queryFn: () => ladeVerpflegung(einsatzId),
+  });
+  if (data) return data.stellen.find((s) => s.id === stelleId)?.bezeichnung ?? UNBEKANNTE_STELLE;
+  // Ohne Netz pausiert die Abfrage und käme nie an.
+  return isError || fetchStatus === 'paused' ? UNBEKANNTE_STELLE : undefined;
+}
+
+/** Gibt den Stellennamen an die Karte weiter; nur Ausgaben an einer Stelle fragen die
+ *  Verpflegung ab. */
+function MitStellenName({
+  einsatzId,
+  stelleId,
+  children,
+}: {
+  einsatzId: number;
+  stelleId: number;
+  children: (stelle: string | undefined) => ReactNode;
+}) {
+  return children(useStellenName(einsatzId, stelleId));
+}
+
 function vollstaendigerInhalt(daten: unknown): ReactNode {
   return (
     <Typography.Text
@@ -98,6 +131,7 @@ function RecoveryCard({
   einsatzId,
   zeitpunkt,
   grund,
+  stelle,
   anhaenge = 0,
   daten,
   aktionen,
@@ -107,6 +141,8 @@ function RecoveryCard({
   einsatzId: number;
   zeitpunkt?: string;
   grund: string;
+  /** Verpflegungsstelle einer Ausgabe (LLH-1298), statt nur `verpflegungsstelle_id` im Inhalt. */
+  stelle?: string;
   /** Anzahl der `anhang_ids` eines ETB-Eintrags (LFH-746). */
   anhaenge?: number;
   daten: unknown;
@@ -123,6 +159,7 @@ function RecoveryCard({
         items={[
           { key: 'einsatz', label: 'Einsatz', children: `#${einsatzId}` },
           ...(zeitpunkt ? [{ key: 'zeitpunkt', label: 'Vorgemerkt', children: zeitpunkt }] : []),
+          ...(stelle ? [{ key: 'stelle', label: 'Stelle', children: stelle }] : []),
           {
             key: 'grund',
             label: 'Grund',
@@ -425,27 +462,41 @@ export default function OfflineRecoveryDrawer({
 
         {sichtbareSchreibaktionen.map((eintrag) => {
           if (eintrag.id == null) return null;
-          const zeile = {
-            schluessel: `schreiben:${eintrag.id}`,
-            titel: aktionsTitel(eintrag.aktion),
+          const schluessel = `schreiben:${eintrag.id}`;
+          const karte = (stelle?: string) => {
+            const grundTitel = aktionsTitel(eintrag.aktion);
+            const zeile = { schluessel, titel: stelle ? `${grundTitel} · ${stelle}` : grundTitel };
+            return (
+              <RecoveryCard
+                titel={zeile.titel}
+                einsatzId={eintrag.einsatz_id}
+                zeitpunkt={eintrag.erstellt_at}
+                grund={eintrag.grund}
+                stelle={stelle}
+                daten={eintrag.aktion.daten}
+                fehler={zeilen.grund(zeile.schluessel)}
+                aktionen={knoepfe(
+                  zeile,
+                  () =>
+                    alsAktuellerBenutzer((id) =>
+                      schreibaktionAbgelehntWiederholen(id, eintrag.id!),
+                    ),
+                  () =>
+                    alsAktuellerBenutzer((id) => schreibaktionAbgelehntVerwerfen(id, eintrag.id!)),
+                )}
+              />
+            );
           };
-          return (
-            <RecoveryCard
-              key={zeile.schluessel}
-              titel={zeile.titel}
-              einsatzId={eintrag.einsatz_id}
-              zeitpunkt={eintrag.erstellt_at}
-              grund={eintrag.grund}
-              daten={eintrag.aktion.daten}
-              fehler={zeilen.grund(zeile.schluessel)}
-              aktionen={knoepfe(
-                zeile,
-                () =>
-                  alsAktuellerBenutzer((id) => schreibaktionAbgelehntWiederholen(id, eintrag.id!)),
-                () =>
-                  alsAktuellerBenutzer((id) => schreibaktionAbgelehntVerwerfen(id, eintrag.id!)),
-              )}
-            />
+          const stelleId =
+            eintrag.aktion.art === 'ausgabe'
+              ? eintrag.aktion.daten.verpflegungsstelle_id
+              : undefined;
+          return stelleId != null ? (
+            <MitStellenName key={schluessel} einsatzId={eintrag.einsatz_id} stelleId={stelleId}>
+              {karte}
+            </MitStellenName>
+          ) : (
+            <Fragment key={schluessel}>{karte()}</Fragment>
           );
         })}
 

@@ -16,6 +16,7 @@ import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import type {
+  Verpflegung,
   VerpflegungAusgabe,
   Verpflegungsstelle,
   VerpflegungsstelleEingabe,
@@ -39,7 +40,7 @@ import {
 import { useAuth } from '../auth/AuthContext';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { SeitenLeer } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import {
   OffeneBearbeitungProvider,
   useWechselNachRueckfrage,
@@ -373,6 +374,11 @@ export default function VerpflegungPage() {
     mutationFn: ({ s, status }: { s: Verpflegungsstelle; status: VerpflegungsstelleStatus }) =>
       setStelleStatus(einsatzId, s.id, status),
     onSuccess: (s) => {
+      // Die bestätigte Stelle sofort in den Stand: sonst stünde die Zeile nach der Antwort bis zum
+      // Neuladen noch auf dem alten Status, ohne Ladeanzeige (LLH-1297).
+      qc.setQueryData<Verpflegung>(einsatzKeys.verpflegung(einsatzId), (alt) =>
+        alt ? { ...alt, stellen: alt.stellen.map((x) => (x.id === s.id ? s : x)) } : alt,
+      );
       invalidiere(true);
       message.success(`Stelle ${zitat(s.bezeichnung)} ${STELLE_STATUS_ERFOLG[s.status]}`);
     },
@@ -409,6 +415,15 @@ export default function VerpflegungPage() {
   }
   const einsatz = einsatzQuery.data;
 
+  // Ohne Stand ist „kein Zeitfenster“ keine Aussage (LLH-1293): beim Kaltstart ohne Netz wartet
+  // die Abfrage angehalten (`isLoading` ist dann falsch), nach einem Ladefehler fehlt sie ganz.
+  // Beides zeigt „nicht geladen“ statt des Leerzustands, wie die Ausgabeansicht.
+  const geladen = verpflegungQuery.data != null;
+  const nichtGeladen =
+    !geladen && (verpflegungQuery.isError || verpflegungQuery.fetchStatus === 'paused');
+  /** Anzahl im Segment nur mit Stand: „(0)“ hieße sonst „es gibt keine“. */
+  const anzahl = (n: number) => (geladen ? ` (${n})` : '');
+
   const vergangen = alle.filter((zf) => istVergangen(zf, jetzt));
   const unterdeckung = alle.filter((zf) => deckungEinstufung(zf, jetzt) === 'unterdeckung').length;
   const liste = sichtbar.filter(inAnsicht);
@@ -434,7 +449,7 @@ export default function VerpflegungPage() {
   return (
     <EinsatzSeite
       titel={modulName('verpflegung')}
-      meta={`${alle.length} Zeitfenster · ${unterdeckung} mit Unterdeckung`}
+      meta={geladen ? `${alle.length} Zeitfenster · ${unterdeckung} mit Unterdeckung` : undefined}
       dataUpdatedAt={verpflegungQuery.dataUpdatedAt}
       breadcrumb={
         darf('fremde-module') && (
@@ -517,18 +532,18 @@ export default function VerpflegungPage() {
             optionen={[
               {
                 wert: 'laufend',
-                label: `${istSchmal ? 'aktuell' : 'laufend & anstehend'} (${alle.length - vergangen.length})`,
+                label: `${istSchmal ? 'aktuell' : 'laufend & anstehend'}${anzahl(alle.length - vergangen.length)}`,
               },
               // Schmal ohne Zahl: mit drei Werten und dem Banner „1 neu“ trägt die Zeile bei 390 px
               // im Handschuh-Betrieb die Zahlen nicht (5 px Überlauf; design.md, Risiken;
               // `e2e/gate1-ueberlauf.spec.ts`). „aktuell (n)“ behält ihre, sie ist die Lage.
               {
                 wert: 'vergangen',
-                label: istSchmal ? 'vergangen' : `vergangen (${vergangen.length})`,
+                label: istSchmal ? 'vergangen' : `vergangen${anzahl(vergangen.length)}`,
               },
               {
                 wert: 'stellen',
-                label: istSchmal ? 'Stellen' : `Stellen (${offeneStellenCount(stellen)})`,
+                label: istSchmal ? 'Stellen' : `Stellen${anzahl(offeneStellenCount(stellen))}`,
               },
             ]}
           />
@@ -553,7 +568,8 @@ export default function VerpflegungPage() {
           )}
         </Flex>
 
-        {verpflegungQuery.isError && (
+        {/* Fehler über einem älteren Stand: die Liste darunter bleibt stehen. */}
+        {verpflegungQuery.isError && geladen && (
           <Alert
             type="error"
             showIcon
@@ -561,7 +577,13 @@ export default function VerpflegungPage() {
             title="Verpflegung konnte nicht geladen werden"
           />
         )}
-        {verpflegungQuery.isLoading ? (
+        {nichtGeladen ? (
+          <SeitenFehler
+            text={stellenAnsicht ? 'Stellen nicht geladen' : 'Zeitfenster nicht geladen'}
+            ursache={verpflegungQuery.error}
+            onWiederholen={() => void verpflegungQuery.refetch()}
+          />
+        ) : verpflegungQuery.isLoading ? (
           <Spin />
         ) : stellenAnsicht ? (
           <StellenListe

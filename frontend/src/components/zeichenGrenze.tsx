@@ -108,3 +108,15 @@ export function zeichenRegel(max: number, feld: string) {
         : Promise.resolve(),
   } satisfies FormRule;
 }
+
+/**
+ * {@link zeichenRegel} für ein Ortsfeld (`anzeige/Ortsfeld.tsx`): sein Wert ist ein Objekt, die
+ * Grenze gilt für dessen `text`.
+ */
+export function ortZeichenRegel(max: number, feld: string) {
+  const regel = zeichenRegel(max, feld);
+  return {
+    validator: (r: unknown, wert: { text?: string | null } | null | undefined) =>
+      regel.validator(r, wert?.text),
+  } satisfies FormRule;
+}

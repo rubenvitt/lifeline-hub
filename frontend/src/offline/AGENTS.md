@@ -206,7 +206,8 @@ draußen gelassen werden.
   Prüfung (nicht geladen), meldet der Client nichts, der Server prüft beim Senden. Der Abgleich
   lädt die Fachansicht neu (`await invalidateQueries`), bevor er die Zeile entfernt, wie bei der
   Ausgabe. Ablehnungen nennen im Wiederherstellungsbereich das Objekt (`bezeichnung`, beim
-  Eintreffen dazu `name`), nie nur Kennungen.
+  Eintreffen dazu `name`, bei einer Ausgabe an einer Stelle deren Namen aus `stellen[]` der
+  Verpflegung, LLH-1298), nie nur Kennungen.
 - **„Alle gelesen“ der Eingänge wird vorgemerkt, nicht gesperrt** (LLH-1422,
   `saveEingaengeGelesenOfflineCapable`, Spec `benachrichtigungen`, „Verlauf ohne Netz“): Aktion
   `eingaenge_gelesen` mit `bis_id`, ohne `client_id` und Erfassungszeit, weil der Server nur
