@@ -399,9 +399,11 @@ export default function BrDetailPage() {
   const br = detailQuery.data;
   const schreibgeschuetzt =
     !darfImEinsatzSchreiben(einsatz) || br.status === 'geplant' || br.status === 'aufgeloest';
-  // Raumdaten ändern (LFH-1147): geplant und aktiv, nicht mehr nach dem Auflösen. Ein BR-Gerät
-  // führt seinen Raum, verwaltet ihn aber nicht.
-  const bearbeitbar = verwalten && darfImEinsatzSchreiben(einsatz) && br.status !== 'aufgeloest';
+  // Raumdaten ändern (LFH-1147): geplant und aktiv, nicht mehr nach dem Auflösen oder Stornieren
+  // (der Server lehnt beides mit 409 ab, LLH-1304). Ein BR-Gerät führt seinen Raum, verwaltet ihn
+  // aber nicht.
+  const bearbeitbar =
+    verwalten && darfImEinsatzSchreiben(einsatz) && br.status !== 'aufgeloest' && !br.storniert_at;
   const materialAmBr = (materialQuery.data ?? []).filter((em) => em.br_id === br.id);
   const eintreffen = darf('br-eintreffen') && darfImEinsatzSchreiben(einsatz);
   const inBetrieb = br.status === 'aktiv';
@@ -760,7 +762,7 @@ export default function BrDetailPage() {
           bearbeitbar && (
             <Space wrap>
               {/* Verorten auf der Lagekarte (LLH-1107), Muster Betreuungsstelle (LFH-673). */}
-              {!br.storniert_at && <AufKarteVerorten einsatzId={einsatzId} br={br} />}
+              <AufKarteVerorten einsatzId={einsatzId} br={br} />
               <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>
             </Space>
           )
