@@ -4341,3 +4341,192 @@ async fn einheit_bilden_mit_fahrzeug_aus_dem_raum_beendet_die_belegung() {
         "{d}"
     );
 }
+
+// ============================== Abschnittsname (LLH-1291) ==============================
+
+/// Räumt `abschnitt` an einen Raum.
+async fn raum_im_abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, br: i64, ab: i64) {
+    let (s, v) = anfrage_json(
+        app,
+        "PATCH",
+        &br_pfad(einsatz, br),
+        cookie,
+        Some(&json!({"abschnitt_id": ab})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+fn abschnitt_pfad(einsatz: i64, ab: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/abschnitte/{ab}")
+}
+
+/// `abschnitt_name` des Raums `br` in der Liste (das Detail trägt ihn nicht).
+async fn abschnitt_name_in_liste(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    br: i64,
+) -> serde_json::Value {
+    let l = fetch_json(
+        app,
+        cookie,
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+    )
+    .await;
+    l.as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"].as_i64() == Some(br))
+        .unwrap_or_else(|| panic!("Raum {br} fehlt: {l}"))["abschnitt_name"]
+        .clone()
+}
+
+/// Umbenennen meldet genau die Räume des Abschnitts; ein PATCH ohne neuen Namen (gleicher Name,
+/// anderes Feld) meldet keinen Raum.
+#[tokio::test]
+async fn abschnitt_umbenennen_meldet_seine_raeume() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let nord = abschnitt_anlegen(&app, &cookie, eid, "Nord").await;
+    let sued = abschnitt_anlegen(&app, &cookie, eid, "Süd").await;
+    let a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR A").await;
+    let b = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR B").await;
+    let c = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR C").await;
+    br_anlegen_und_aktivieren(&app, &cookie, eid, "BR ohne").await;
+    raum_im_abschnitt(&app, &cookie, eid, a, nord).await;
+    raum_im_abschnitt(&app, &cookie, eid, b, nord).await;
+    raum_im_abschnitt(&app, &cookie, eid, c, sued).await;
+
+    let mut rx = live.abonniere(eid);
+    for (body, erwartet, fall) in [
+        (json!({"name": "Nordost"}), vec![a, b], "neuer Name"),
+        (json!({"name": "Nordost"}), vec![], "gleicher Name"),
+        (json!({"bemerkung": "Deich"}), vec![], "anderes Feld"),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PATCH",
+            &abschnitt_pfad(eid, nord),
+            &cookie,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{fall}: {v}");
+        assert_eq!(br_ereignisse(&mut rx), erwartet, "{fall}");
+    }
+    assert_eq!(
+        abschnitt_name_in_liste(&app, &cookie, eid, a).await,
+        "Nordost"
+    );
+
+    // Der Name ist gespeichert, bevor die Sprechgruppen-Zuordnung scheitert: gemeldet wird trotzdem.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &abschnitt_pfad(eid, nord),
+        &cookie,
+        Some(&json!({"name": "Nordwest", "sprechgruppe_ids": [999_999]})),
+    )
+    .await;
+    assert!(s.is_client_error(), "unbekannte Sprechgruppe: {s} {v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![a, b], "nach späterem Fehler");
+    assert_eq!(
+        abschnitt_name_in_liste(&app, &cookie, eid, a).await,
+        "Nordwest"
+    );
+}
+
+/// Auflösen meldet die Räume, die danach keinen Abschnitt mehr zeigen.
+#[tokio::test]
+async fn abschnitt_aufloesen_meldet_seine_raeume() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let nord = abschnitt_anlegen(&app, &cookie, eid, "Nord").await;
+    let sued = abschnitt_anlegen(&app, &cookie, eid, "Süd").await;
+    let a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR A").await;
+    let c = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR C").await;
+    raum_im_abschnitt(&app, &cookie, eid, a, nord).await;
+    raum_im_abschnitt(&app, &cookie, eid, c, sued).await;
+
+    let mut rx = live.abonniere(eid);
+    let (s, _) = anfrage_json(&app, "DELETE", &abschnitt_pfad(eid, nord), &cookie, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(br_ereignisse(&mut rx), vec![a]);
+    assert!(abschnitt_name_in_liste(&app, &cookie, eid, a)
+        .await
+        .is_null());
+}
+
+/// Akzeptanzkriterium LLH-1291: eine Person mit BR-Recht, aber ohne Modul Einsatzabschnitte,
+/// bekommt beim Umbenennen `bereitstellungsraum` (und `abschnitt` weiterhin nicht), und ihre
+/// Liste trägt danach den neuen Namen.
+#[tokio::test]
+async fn umbenennen_erreicht_br_leser_ohne_abschnittsrecht() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let a = br_anlegen_und_aktivieren(&app, &admin, eid, "BR A").await;
+    raum_im_abschnitt(&app, &admin, eid, a, nord).await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    // Nur Führungskräfte der Organisation sehen die Module, die `abschnitt` erreicht
+    // (`LiveEvent::modul_keys`): Abschnitte, Lagekarte, Verpflegung.
+    for modul in ["einsatzabschnitte", "lagekarte", "verpflegung"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+            &admin,
+            Some(&json!({"sichtbar": true, "benoetigte_rolle": "fuehrungskraft"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "Override {modul}: {v}");
+    }
+    let liste = format!("/api/einsaetze/{eid}/bereitstellungsraeume");
+    assert_eq!(abschnitt_name_in_liste(&app, &frieda, eid, a).await, "Nord");
+    let (s, _) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{eid}/abschnitte"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Vorbedingung: ohne Abschnittsrecht"
+    );
+    let (s, _) = anfrage_json(&app, "GET", &liste, &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: mit BR-Recht");
+
+    let feed = common::live_oeffnen(&app, &frieda, eid).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &abschnitt_pfad(eid, nord),
+        &admin,
+        Some(&json!({"name": "Nordost"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let gelesen = common::sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        gelesen.contains("event: bereitstellungsraum")
+            && gelesen.contains(&format!(r#""br_id":{a}"#)),
+        "BR-Leser bekommt den Raum: {gelesen:?}"
+    );
+    assert!(
+        !gelesen.contains("event: abschnitt"),
+        "das Abschnitts-Ereignis bleibt gegatet: {gelesen:?}"
+    );
+    assert_eq!(
+        abschnitt_name_in_liste(&app, &frieda, eid, a).await,
+        "Nordost"
+    );
+}

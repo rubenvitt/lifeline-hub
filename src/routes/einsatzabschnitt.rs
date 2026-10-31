@@ -3,7 +3,9 @@ use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Einsatzabschnitte;
 use crate::einsatz::verbindungen::{self, VerbindungBody, ABSCHNITT_RUFNAME_MAX};
-use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, AbschnittPatch};
+use crate::einsatzabschnitt::repo::{
+    self as abschnitt_repo, AbschnittDaten, AbschnittPatch, NamensTraeger,
+};
 use crate::einsatzabschnitt::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -23,6 +25,39 @@ pub(super) fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Abschnitt, "abschnitt_id", aid);
+}
+
+/// Meldet jedes Objekt, das den Abschnittsnamen per Join trägt, mit dem Ereignis seines Moduls
+/// (LLH-1291): `abschnitt` erreicht nur Leser mit Modul `einsatzabschnitte`, wer nur Räume,
+/// Stellen oder Bezirke sieht, behielte den alten Namen bis zum Neuladen. Nach dem Commit.
+fn sse_namens_traeger(state: &AppState, einsatz_id: i64, t: &NamensTraeger) {
+    for &br_id in &t.raeume {
+        super::einsatz_bereitstellungsraum::sse_br(state, einsatz_id, br_id);
+    }
+    for &stelle_id in &t.stellen {
+        super::betreuung::publiziere(state, einsatz_id, &[], stelle_id);
+    }
+    for &bezirk_id in &t.bezirke {
+        super::evakuierung::publiziere(state, einsatz_id, &[], bezirk_id);
+    }
+}
+
+/// [`sse_namens_traeger`] nach einem Umbenennen: liest die Träger nach dem Commit. Scheitert das
+/// Lesen, bleibt es bei einer Warnung (Muster `etb_system_degradiert`); der Name ist gespeichert.
+async fn sse_umbenannt(state: &AppState, einsatz_id: i64, aid: i64) {
+    let gelesen = match state.pool.acquire().await {
+        Ok(mut conn) => abschnitt_repo::namens_traeger(&mut conn, einsatz_id, aid).await,
+        Err(e) => Err(e),
+    };
+    match gelesen {
+        Ok(t) => sse_namens_traeger(state, einsatz_id, &t),
+        Err(e) => tracing::warn!(
+            einsatz_id,
+            abschnitt_id = aid,
+            fehler = %e,
+            "Träger des Abschnittsnamens nicht lesbar, Live-Ereignis entfällt"
+        ),
+    }
 }
 
 /// Längster zulässiger Kurzname — ein Rufname wie „EA-Nord", kein zweiter Name.
@@ -248,6 +283,15 @@ pub async fn update(
         None => None,
     };
     let abschnittsauftrag = trimme_tri(body.abschnittsauftrag);
+    // Nur ein echter Namenswechsel meldet die Träger des Namens (LLH-1291).
+    let name_vorher = match &name {
+        Some(_) => Some(
+            abschnitt_repo::load(&state.pool, einsatz_id, aid)
+                .await?
+                .name,
+        ),
+        None => None,
+    };
     let mut anzeige = abschnitt_repo::update(
         &state.pool,
         einsatz_id,
@@ -264,6 +308,11 @@ pub async fn update(
         },
     )
     .await?;
+    // Der Name ist jetzt gespeichert: sofort melden, auch wenn ein späterer Schritt (Sprechgruppen,
+    // Verbindungen) mit 422 scheitert.
+    if name_vorher.is_some_and(|v| v != anzeige.name) {
+        sse_umbenannt(&state, einsatz_id, aid).await;
+    }
     // Lagewechsel + ETB-Eintrag atomar in EINER Tx, und zwar VOR der Sprechgruppen-
     // Zuordnung: scheitert die mit 422, bleibt der gespeicherte Wechsel trotzdem nicht
     // undokumentiert (LFH-608, Review). Der Eintrag entsteht nur bei echtem Wechsel.
@@ -339,7 +388,10 @@ pub async fn aufloesen(
     let von = ctx.benutzer.id;
     // Ein an den Abschnitt gekoppeltes Gerät (LFH-1040) hätte keine Stelle mehr: es endet mit
     // dem Abschnitt, wie bei einem Widerruf durch die Einsatzleitung.
-    let widerrufen = crate::write_retry!(&state.pool, |conn| {
+    let (widerrufen, traeger) = crate::write_retry!(&state.pool, |conn| {
+        // Vor dem Freigeben der Bezüge: danach zeigen Räume, Stellen und Bezirke keinen
+        // Abschnitt mehr, und ihre Leser erfahren das sonst nicht (LLH-1291).
+        let traeger = abschnitt_repo::namens_traeger(conn, einsatz_id, aid).await?;
         let geraete =
             crate::geraet::repo::widerrufe_am_abschnitt(conn, einsatz_id, aid, von).await?;
         abschnitt_repo::aufloesen_tx(conn, einsatz_id, aid).await?;
@@ -351,12 +403,13 @@ pub async fn aufloesen(
             );
             crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &geraet_text).await?;
         }
-        Ok(geraete)
+        Ok((geraete, traeger))
     })?;
     for (kopplung_id, _) in &widerrufen {
         state.live.melde_kopplung_ende(*kopplung_id);
     }
     sse_abschnitt(&state, einsatz_id, aid);
+    sse_namens_traeger(&state, einsatz_id, &traeger);
     Ok(StatusCode::NO_CONTENT)
 }
 

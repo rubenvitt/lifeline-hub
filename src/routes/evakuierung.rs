@@ -47,7 +47,7 @@ use crate::live::LiveEvent;
 use crate::routes::support;
 
 /// Nach dem Commit: ETB-Kurzruf je Eintrag, dann das Modul-Ereignis mit Kennungen only.
-fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], bezirk_id: i64) {
+pub(super) fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], bezirk_id: i64) {
     for etb_id in etb_ids {
         state.live.publiziere(einsatz_id, *etb_id);
     }
