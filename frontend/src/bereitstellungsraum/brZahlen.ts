@@ -35,11 +35,12 @@ export interface StaerkeImRaum {
 
 const NULL_STAERKE: Staerke = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 };
 
-function plus(a: Staerke, b: Staerke): Staerke {
+/** Fehlt `ist` (etwa in einem älteren eingefrorenen Stand), zählt die Einheit mit 0. */
+function plus(a: Staerke, b: Staerke | undefined): Staerke {
   return {
-    fuehrer: a.fuehrer + (b.fuehrer ?? 0),
-    unterfuehrer: a.unterfuehrer + (b.unterfuehrer ?? 0),
-    mannschaft: a.mannschaft + (b.mannschaft ?? 0),
+    fuehrer: a.fuehrer + (b?.fuehrer ?? 0),
+    unterfuehrer: a.unterfuehrer + (b?.unterfuehrer ?? 0),
+    mannschaft: a.mannschaft + (b?.mannschaft ?? 0),
   };
 }
 
