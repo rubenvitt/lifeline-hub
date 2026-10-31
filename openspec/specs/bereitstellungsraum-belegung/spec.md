@@ -199,10 +199,10 @@ Fahrzeuge zählen, wie die Sperre des Servers beim Auflösen.
 
 ### Requirement: Zeile je Kraft mit Wartezeit
 Die Detailseite SHALL je Einheit im Raum Name, Typ, Stärke, die Funkrufnamen ihrer Fahrzeuge und
-„seit <Uhrzeit> · <Dauer>“ zeigen; die Stärke der Zeile MUST die Einheit samt ihren
-Untereinheiten im selben Raum nennen, nicht die anderswo, je einheitenlosem Fahrzeug Funkrufnamen, Typ und „seit …“. Die
-Dauer MUST ohne neuen Abruf mit der Uhr weiterlaufen (höchstens eine Minute Versatz) und MUST
-nie negativ sein. Ohne „seit“ MUST die Zeile keine Zeitangabe tragen.
+„seit <Uhrzeit> · <Dauer>“ zeigen, je einheitenlosem Fahrzeug Funkrufnamen, Typ und „seit …“.
+Die Stärke der Zeile MUST die Einheit samt ihren Untereinheiten im selben Raum nennen;
+Untereinheiten, die anderswo stehen, MUST NOT zählen. Die Dauer MUST ohne neuen Abruf mit der
+Uhr weiterlaufen (höchstens eine Minute Versatz) und MUST nie negativ sein. Ohne „seit“ MUST die Zeile keine Zeitangabe tragen.
 
 #### Scenario: Wartezeit läuft
 - **WHEN** eine Einheit seit 13:42 im Raum steht und die Seite um 14:30 offen ist
