@@ -1416,10 +1416,19 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
   it('scheitert die Raumliste, steht ein Hinweis statt eines stillen Fehlens', async () => {
     einheiten.wert = [EINHEITEN[0], { ...EINHEITEN[1], aktueller_br_id: 4 }];
     listeBr.mockRejectedValue(new Error('kaputt'));
-    renderPage();
+    const { client } = renderPage();
     expect(
       await screen.findByText('Bereitstellungsräume konnten nicht geladen werden'),
     ).toBeInTheDocument();
+
+    // Rückt der letzte Ablöser aus dem Raum aus, braucht die Seite die Raumliste nicht mehr.
+    einheiten.wert = [EINHEITEN[0], { ...EINHEITEN[1], aktueller_br_id: null }];
+    await client.invalidateQueries();
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Bereitstellungsräume konnten nicht geladen werden'),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it('live: ein neues Ereignis der Zeitachse ändert die Zeile über die bestehende Invalidierung', async () => {

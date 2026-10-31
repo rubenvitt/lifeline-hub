@@ -801,7 +801,7 @@ export default function AbloesungPage() {
           )}
           {/* Ohne Raumliste fehlen Raum und Abruf der Ablöser; das soll nicht wie „nicht
               abgerufen“ aussehen (LLH-1309). */}
-          {wirksam === 'laufend' && brFrei && brQuery.isError && (
+          {wirksam === 'laufend' && brFrei && abloeserImBr && brQuery.isError && (
             <Alert
               type="warning"
               showIcon
