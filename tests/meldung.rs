@@ -895,6 +895,72 @@ async fn sofortmeldung_ist_bestaetigungspflichtig_mit_frist_und_nachfass() {
     assert_eq!(auto[0]["bezug_id"], m["id"]);
 }
 
+/// LLH-1301: Die Auto-Frist-Erinnerung einer pflichtigen Meldung nennt ihre Art, nicht immer
+/// „Sofortmeldung“; eine Meldung mit Priorität sofort bleibt „Sofortmeldung“.
+#[tokio::test]
+async fn auto_frist_erinnerung_nennt_die_meldungsart() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    for (art, prioritaet, erwartet) in [
+        ("lagemeldung", "normal", "Lagemeldung"),
+        ("sofortmeldung", "normal", "Sofortmeldung"),
+        ("rueckmeldung", "normal", "Rückmeldung"),
+        ("vollzugsmeldung", "dringend", "Vollzugsmeldung"),
+        ("anfrage", "normal", "Anfrage"),
+        ("sonstige", "normal", "Meldung"),
+        ("lagemeldung", "sofort", "Sofortmeldung"),
+    ] {
+        let body = serde_json::json!({
+            "absender": "Florian Nord 1",
+            "empfaenger": "ELW 1",
+            "meldeweg": "funk",
+            "inhalt": format!("{art} mit Bestätigung"),
+            "meldungsart": art,
+            "prioritaet": prioritaet,
+            "bestaetigung_pflicht": true,
+            "ereigniszeit": "2026-06-12 09:00:00"
+        })
+        .to_string();
+        let (status, m) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/meldungen"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{art}: {m:?}");
+        assert_eq!(m["bestaetigung_pflicht"], true, "{art}");
+
+        let (_, erinn) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{e}/erinnerungen"),
+            &admin,
+            None,
+        )
+        .await;
+        let titel: Vec<_> = erinn
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|x| {
+                x["quelle"] == "auto_frist"
+                    && x["bezug_typ"] == "meldung"
+                    && x["bezug_id"] == m["id"]
+            })
+            .map(|x| x["titel"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(
+            titel,
+            vec![format!("{erwartet} #{} unbestätigt", m["lfd_nr"])],
+            "{art}/{prioritaet}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn meldungs_replay_nach_abschluss_repariert_fehlende_frist_erinnerung() {
     let (app, pool) = setup_mit_pool().await;

@@ -1893,6 +1893,17 @@ async fn eintreffen_unangemeldet_ein_etb_eintrag_in_beiden_einstellungen() {
             "{letzter}"
         );
         assert!(!letzter.contains("nur intern"), "{letzter}");
+        // Die Auto-Frist-Erinnerung behält ihren eigenen Titel (LLH-1075, LLH-1301).
+        let meldung_id = v["meldung_id"].as_i64().unwrap();
+        let (lfd_nr, titel): (i64, String) = sqlx::query_as(
+            "SELECT m.lfd_nr, r.titel FROM erinnerung r JOIN meldung m ON m.id = r.bezug_id \
+             WHERE r.quelle = 'auto_frist' AND r.bezug_typ = 'meldung' AND r.bezug_id = ?",
+        )
+        .bind(meldung_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(titel, format!("Unangemeldete Kraft #{lfd_nr} unbestätigt"));
     }
 }
 

@@ -919,13 +919,17 @@ async fn notify_eintreffen(
 }
 
 /// Meldungsbündel genau einmal (Marker `live_published_at`) und die Auto-Frist-Erinnerung mit
-/// eigenem Titel (design.md D5).
+/// eigenem Titel „Unangemeldete Kraft #n unbestätigt“ (design.md D5).
 async fn notify_meldung(state: &AppState, meldung_id: i64) -> Result<(), AppError> {
     let jetzt = crate::zeit::jetzt();
     let meldung = crate::meldung::repo::laden(&state.pool, meldung_id, &jetzt).await?;
     crate::meldung::live_publikation_sicherstellen(state, &meldung).await?;
-    let titel = format!("Unangemeldete Kraft #{} unbestätigt", meldung.lfd_nr);
-    crate::meldung::auto_frist_erinnerung_sicherstellen(state, &meldung, &titel).await?;
+    crate::meldung::auto_frist_erinnerung_sicherstellen(
+        state,
+        &meldung,
+        crate::meldung::AutoFristHerkunft::UnangemeldeteKraft,
+    )
+    .await?;
     Ok(())
 }
 

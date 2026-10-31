@@ -96,18 +96,6 @@ impl Stand {
     }
 }
 
-/// Anzeigelabel wie an der Karte (`MELDUNGSART_OPTIONEN` in `frontend/src/meldungen/MeldungFormular.tsx`).
-fn art_label(a: Meldungsart) -> &'static str {
-    match a {
-        Meldungsart::Lagemeldung => "Lagemeldung",
-        Meldungsart::Sofortmeldung => "Sofortmeldung",
-        Meldungsart::Rueckmeldung => "Rückmeldung",
-        Meldungsart::Vollzugsmeldung => "Vollzugsmeldung",
-        Meldungsart::Anfrage => "Anfrage",
-        Meldungsart::Sonstige => "Sonstige",
-    }
-}
-
 fn prioritaet_label(p: Prioritaet) -> &'static str {
     match p {
         Prioritaet::Sofort => "Sofort",
@@ -293,8 +281,8 @@ fn etb_teile(alt: &Stand, neu: &Ziel, von_alt: &str, von_neu: &str) -> Vec<Strin
     if neu.meldungsart != alt.meldungsart {
         teile.push(format!(
             "Art {} → {}",
-            art_label(alt.meldungsart),
-            art_label(neu.meldungsart)
+            alt.meldungsart.label(),
+            neu.meldungsart.label()
         ));
     }
     match (alt.lagerelevant, neu.lagerelevant) {
