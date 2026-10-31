@@ -189,6 +189,31 @@ async fn detail_der_auftrag_empfaenger_zeile_liest_nur_retain_spalten() {
     }
 }
 
+/// Dasselbe für die Detailzeile eines Fahrzeugs (LLH-1290): der Snapshot ist Retain, der Name im
+/// Stamm `fahrzeug` gehört keinem Einsatz und wird nie geschwärzt (Guard 4 der Registry); die
+/// einzige Scrub-Spalte der Disposition, `bemerkung`, liest die Abfrage nicht.
+#[tokio::test]
+async fn detail_eines_fahrzeugs_liest_nur_retain_spalten() {
+    let pool = crate::db::test_pool().await;
+    assert!(matches!(
+        klassifikation_von("einsatz_fahrzeug", "snap_funkrufname"),
+        Some(Klassifikation::Retain(_))
+    ));
+    assert_eq!(klassifikation_von("fahrzeug", "funkrufname"), None);
+    for sql in [text::FAHRZEUG_DETAIL_SQL, text::AUFTRAG_EMPFAENGER_SQL] {
+        assert!(
+            !sql.contains("bemerkung"),
+            "Detailzeile liest bemerkung: {sql}"
+        );
+    }
+    sqlx::query(text::FAHRZEUG_DETAIL_SQL)
+        .bind(0_i64)
+        .bind(0_i64)
+        .fetch_optional(&pool)
+        .await
+        .expect("Abfrage der Detailzeile");
+}
+
 /// Dasselbe für den Sprung zu einer Chat-Nachricht (Erwähnung, LLH-1220): nur der Kanal.
 #[test]
 fn sprung_zur_chat_nachricht_liest_nur_retain_spalten() {
@@ -789,4 +814,53 @@ async fn nachforderung_titel_nennt_den_status_des_wechsels() {
     .await
     .unwrap();
     assert_eq!(fremd.detail, None, "Bezug aus einem fremden Einsatz");
+}
+
+/// LLH-1290: Die Detailzeile eines Fahrzeugs nennt den Funkrufnamen wie die Fahrzeugliste: nach
+/// dem Umbenennen im Stamm den neuen, im abgeschlossenen Einsatz den Namen vom Disponieren.
+#[tokio::test]
+async fn detail_eines_fahrzeugs_folgt_dem_stamm() {
+    let pool = crate::db::test_pool().await;
+    let (_, e) = setup(&pool).await;
+    let fz: i64 = sqlx::query_scalar(
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let ef: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_fahrzeug (einsatz_id, fahrzeug_id, snap_funkrufname) \
+         VALUES (?, ?, 'Florian 1') RETURNING id",
+    )
+    .bind(e)
+    .bind(fz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE fahrzeug SET funkrufname = 'Florian 1 NEU' WHERE id = ?")
+        .bind(fz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let detail = || {
+        let pool = pool.clone();
+        async move {
+            text::bilden(
+                &pool,
+                e,
+                BenachrichtigungArt::WiederVerfuegbar,
+                Bezug::neu(BenachrichtigungBezugTyp::Fahrzeug, ef),
+            )
+            .await
+            .unwrap()
+            .detail
+        }
+    };
+    assert_eq!(detail().await.as_deref(), Some("Florian 1 NEU"));
+    sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(detail().await.as_deref(), Some("Florian 1"));
 }

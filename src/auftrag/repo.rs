@@ -825,10 +825,14 @@ pub(crate) async fn snap_anzeige_fuer(
                 .await?
         }
         "fahrzeug" => {
-            sqlx::query_scalar("SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ?")
-                .bind(e.fahrzeug_id)
-                .fetch_optional(&mut *tx)
-                .await?
+            sqlx::query_scalar(concat!(
+                "SELECT ",
+                crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+                " FROM einsatz_fahrzeug ef WHERE ef.id = ?",
+            ))
+            .bind(e.fahrzeug_id)
+            .fetch_optional(&mut *tx)
+            .await?
         }
         "extern" => e.extern_bezeichnung.clone(),
         _ => e.funktion_text.clone(),

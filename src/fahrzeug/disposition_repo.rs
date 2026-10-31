@@ -222,6 +222,42 @@ pub async fn load_anzeige_tx(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
+/// Eine Disposition eines Stamm-Fahrzeugs in einem aktiven Einsatz (LLH-1290): wer nach einer
+/// Änderung im Stamm Bescheid bekommt. `im_raum`: das Fahrzeug oder seine Einheit steht in einem
+/// Bereitstellungsraum, oder das Fahrzeug steht im Verlauf eines Raums.
+#[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
+pub struct AktiveDisposition {
+    pub einsatz_id: i64,
+    pub ef_id: i64,
+    pub einheit_id: Option<i64>,
+    pub im_raum: bool,
+}
+
+/// Alle Dispositionen des Stamm-Fahrzeugs `fahrzeug_id` von `org_id` in aktiven Einsätzen, auch
+/// entlassene: deren Name folgt in der Liste der Entlassenen ebenfalls dem Stamm
+/// ([`zu_anzeige`]). Abgeschlossene Einsätze zeigen den Snapshot und bleiben außen vor.
+pub async fn aktive_dispositionen(
+    pool: &SqlitePool,
+    org_id: i64,
+    fahrzeug_id: i64,
+) -> Result<Vec<AktiveDisposition>, AppError> {
+    Ok(sqlx::query_as::<_, AktiveDisposition>(
+        "SELECT ef.einsatz_id, ef.id AS ef_id, ef.einheit_id, \
+                (ef.aktueller_br_id IS NOT NULL OR ee.aktueller_br_id IS NOT NULL \
+                 OR EXISTS(SELECT 1 FROM br_belegung b \
+                           WHERE b.objekt_typ = 'fahrzeug' AND b.objekt_id = ef.id)) AS im_raum \
+         FROM einsatz_fahrzeug ef \
+         JOIN einsatz ez ON ez.id = ef.einsatz_id \
+         LEFT JOIN einsatz_einheit ee ON ee.id = ef.einheit_id \
+         WHERE ef.fahrzeug_id = ? AND ez.org_id = ? AND ez.status = 'aktiv' \
+         ORDER BY ef.einsatz_id, ef.id",
+    )
+    .bind(fahrzeug_id)
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 /// Disponiert ein Stamm-Fahrzeug auf einer offenen Verbindung: prüft Org und Dienststatus,
 /// friert den Identitäts-Snapshot ein und setzt den ersten `gebunden`-Status. `NotFound` bei
 /// fremdem/unbekanntem Fahrzeug, `UnprocessableEntity` bei außer Dienst, `Conflict` bei
@@ -1223,6 +1259,169 @@ mod tests {
             nach_ad.funkrufname, "Florian 1",
             "außer Dienst → Snapshot trotz aktivem Einsatz"
         );
+    }
+
+    /// LLH-1290: Der SQL-Ausdruck `funkrufname_anzeige_sql!`, den BR, Karte, Benachrichtigung
+    /// und die übrigen Lesestellen nutzen, liefert in jedem Zustand denselben Namen wie die
+    /// Fahrzeugliste ([`zu_anzeige`]); ein Ad-hoc-Fahrzeug zeigt immer seinen eigenen Namen.
+    #[tokio::test]
+    async fn funkrufname_anzeige_sql_folgt_der_fahrzeugliste() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
+        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
+        let adhoc = disponiere_adhoc(
+            &pool,
+            einsatz,
+            1,
+            AdhocDaten {
+                funkrufname: "Extern 1",
+                fahrzeugtyp: None,
+                kennzeichen: None,
+                opta: None,
+                traegerorganisation: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
+        fz_repo::aktualisiere(&pool, 1, fz.id, fz_daten("Florian 1 NEU"))
+            .await
+            .unwrap();
+
+        let ueber_sql = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, String>(concat!(
+                    "SELECT ",
+                    crate::fahrzeug::funkrufname_anzeige_sql!("x"),
+                    " FROM einsatz_fahrzeug x WHERE x.id = ?"
+                ))
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let pruefe = |erwartet: &'static str, aktiv: bool| {
+            let pool = pool.clone();
+            async move {
+                for (id, name) in [(ef, erwartet), (adhoc, "Extern 1")] {
+                    let liste = load_anzeige(&pool, einsatz, id, aktiv).await.unwrap();
+                    assert_eq!(liste.funkrufname, name, "Fahrzeugliste, aktiv={aktiv}");
+                    assert_eq!(ueber_sql(id).await, name, "SQL-Ausdruck, aktiv={aktiv}");
+                }
+            }
+        };
+
+        // Aktiver Einsatz, Fahrzeug in Dienst → Stamm.
+        pruefe("Florian 1 NEU", true).await;
+        // Außer Dienst → Snapshot.
+        fz_repo::setze_dienststatus(&pool, 1, fz.id, false)
+            .await
+            .unwrap();
+        pruefe("Florian 1", true).await;
+        fz_repo::setze_dienststatus(&pool, 1, fz.id, true)
+            .await
+            .unwrap();
+        // Abgeschlossener Einsatz → Snapshot.
+        sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        pruefe("Florian 1", false).await;
+    }
+
+    /// LLH-1290: Wer nach einer Änderung im Stamm Bescheid bekommt: jede Disposition des
+    /// Fahrzeugs in einem aktiven Einsatz der Org, mit Einheit und Raum; abgeschlossene Einsätze
+    /// und fremde Orgs nicht.
+    #[tokio::test]
+    async fn aktive_dispositionen_nennt_einsatz_einheit_und_raum() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
+        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
+        let zweiter: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Zweite Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let ef2 = disponiere_stamm(&pool, zweiter, 1, fz.id, benutzer)
+            .await
+            .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Zug 1') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            aktive_dispositionen(&pool, 1, fz.id).await.unwrap(),
+            vec![
+                AktiveDisposition {
+                    einsatz_id: einsatz,
+                    ef_id: ef,
+                    einheit_id: Some(einheit),
+                    im_raum: false,
+                },
+                AktiveDisposition {
+                    einsatz_id: zweiter,
+                    ef_id: ef2,
+                    einheit_id: None,
+                    im_raum: false,
+                },
+            ]
+        );
+
+        // Die Einheit steht in einem Raum → `im_raum`.
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, \
+                                              geaendert_von) \
+             VALUES (?, 'BR 1', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_einheit SET aktueller_br_id = ? WHERE id = ?")
+            .bind(br)
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .unwrap();
+        // Der zweite Einsatz ist abgeschlossen; eine fremde Org kennt das Fahrzeug nicht.
+        sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+            .bind(zweiter)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let d = aktive_dispositionen(&pool, 1, fz.id).await.unwrap();
+        assert_eq!(d.len(), 1);
+        assert!(d[0].im_raum);
+        assert!(aktive_dispositionen(&pool, 2, fz.id)
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test]

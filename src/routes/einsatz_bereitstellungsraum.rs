@@ -164,13 +164,16 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
     .fetch_all(&state.pool)
     .await?;
     // Fahrzeuge aller Einheiten im Raum in EINER Abfrage, im Speicher verteilt (D4).
-    let einheit_fahrzeuge: Vec<(i64, i64, String)> = sqlx::query_as(
-        "SELECT f.einheit_id, f.id, f.snap_funkrufname FROM einsatz_fahrzeug f \
+    // Funkrufname wie in der Fahrzeugliste aufgelöst (LLH-1290), auch für die Reihenfolge.
+    let einheit_fahrzeuge: Vec<(i64, i64, String)> = sqlx::query_as(concat!(
+        "SELECT f.einheit_id, f.id, ",
+        crate::fahrzeug::funkrufname_anzeige_sql!("f"),
+        " AS funkrufname FROM einsatz_fahrzeug f \
          WHERE f.einsatz_id = ?2 AND f.beendet_at IS NULL AND f.einheit_id IN ( \
              SELECT e.id FROM einsatz_einheit e \
              WHERE e.aktueller_br_id = ?1 AND e.einsatz_id = ?2 AND e.aufgeloest_at IS NULL) \
-         ORDER BY f.snap_funkrufname, f.id",
-    )
+         ORDER BY funkrufname, f.id",
+    ))
     .bind(br_id)
     .bind(einsatz_id)
     .fetch_all(&state.pool)
@@ -196,10 +199,12 @@ async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<Br
             },
         )
         .collect();
-    let fahrzeuge: Vec<(i64, String)> = sqlx::query_as(
-        "SELECT id, snap_funkrufname FROM einsatz_fahrzeug \
-         WHERE aktueller_br_id = ? AND einsatz_id = ? AND beendet_at IS NULL",
-    )
+    let fahrzeuge: Vec<(i64, String)> = sqlx::query_as(concat!(
+        "SELECT ef.id, ",
+        crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+        " FROM einsatz_fahrzeug ef \
+         WHERE ef.aktueller_br_id = ? AND ef.einsatz_id = ? AND ef.beendet_at IS NULL",
+    ))
     .bind(br_id)
     .bind(einsatz_id)
     .fetch_all(&state.pool)
@@ -997,9 +1002,11 @@ async fn belegungs_etb_text(
         .fetch_optional(pool)
         .await?
         .ok_or(AppError::NotFound)?,
-        "fahrzeug" => sqlx::query_scalar::<_, String>(
-            "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
-        )
+        "fahrzeug" => sqlx::query_scalar::<_, String>(concat!(
+            "SELECT ",
+            crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+            " FROM einsatz_fahrzeug ef WHERE ef.id = ? AND ef.einsatz_id = ?",
+        ))
         .bind(event.objekt_id)
         .bind(einsatz_id)
         .fetch_optional(pool)
