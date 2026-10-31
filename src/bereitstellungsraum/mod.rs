@@ -224,6 +224,19 @@ pub struct BrListenEintrag {
     pub abschnitt_name: Option<String>,
     pub belegung: BrBelegungKennzahlen,
     pub einheit_ids: Vec<i64>,
+    /// Die Einheiten, die abgerufen im Raum stehen, mit dem Zeitpunkt des Abrufs, nach Einheit
+    /// (LLH-1309, Spec `bereitstellungsraum-belegung` „Liste der Räume mit Belegung“): die Karte
+    /// der Ablösung nennt daraus „abgerufen“ beim Ablöser. Abgeleitet wie im Detail
+    /// ([`belegung_repo::abruf_je_objekt`]), nicht gespeichert.
+    pub abrufe: Vec<BrEinheitAbruf>,
+}
+
+/// Eine abgerufen im Raum stehende Einheit in der Liste der Räume (LLH-1309).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BrEinheitAbruf {
+    pub einheit_id: i64,
+    /// Zeitpunkt des Abrufs (UTC ohne Zone), wie [`BrAbrufKurz::seit_at`].
+    pub seit_at: String,
 }
 
 wire_enum! {

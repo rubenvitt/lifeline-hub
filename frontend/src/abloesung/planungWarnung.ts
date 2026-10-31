@@ -1,4 +1,8 @@
-import type { AbloesungPlanungWarnung } from '../api/types';
+import type {
+  AbloesungPlanungEntfallen,
+  AbloesungPlanungWarnung,
+  PlanungEntfallenGrund,
+} from '../api/types';
 import { type AnzeigeKonventionen } from '../anzeige/format';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 
@@ -17,4 +21,18 @@ export function planungWarnungText(w: AbloesungPlanungWarnung, konv: AnzeigeKonv
         ? `${w.einheit_name} steht selbst im Einsatz seit ${zeitKurz(w.seit_at, konv)}`
         : `${w.einheit_name} steht selbst im Einsatz`;
   }
+}
+
+const ENTFALLEN_PARTIZIP: Record<PlanungEntfallenGrund, string> = {
+  aufloesung: 'aufgelöst',
+  entlassung: 'entlassen',
+};
+
+/**
+ * Vermerk einer entfallenen Planung an der Karte (LLH-1309, Spec `kraefte-abloesung` „Planung
+ * entfällt“): „Planung entfallen · 2. Rettungsstaffel aufgelöst“ bzw. „… entlassen“. Ob er gilt
+ * (laufend, kein Ablöser), entscheidet der Server.
+ */
+export function planungEntfallenText(v: AbloesungPlanungEntfallen): string {
+  return `Planung entfallen · ${v.einheit_name} ${ENTFALLEN_PARTIZIP[v.grund]}`;
 }

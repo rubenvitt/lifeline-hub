@@ -1,7 +1,7 @@
 /**
  * Stand der geplanten Ablöser an der Karte einer laufenden Schicht (LLH-1131 Teil II, Spec
  * `kraefte-abloesung`, „Stand der ablösenden Einheit an der Karte“): „Ablösung: 2. Rettungsstaffel ·
- * alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“.
+ * alarmiert 1340 · eingetroffen 1412 · abgerufen 1425 (BR Sportplatz)“.
  *
  * Die Zeitpunkte kommen aus der Kräfte-Zeitachse des Ablösers, aus seiner offenen Einsatzperiode
  * (`EinheitPerioden`, wie `abloesung/ohneSchicht.ts` sie liest): alarmiert, wenn die Periode mit
@@ -9,6 +9,9 @@
  * beendete Periode zählt nicht.
  * Der Raum steht in Klammern, solange die Einheit in einem Bereitstellungsraum steht
  * (`aktueller_br_id` der Einheit, Name aus der Raumliste); ohne Namen fehlt die Klammer.
+ * Abgerufen ist sie, solange die Raumliste sie unter `abrufe` führt (LLH-1309: das Abruf-Ereignis
+ * der BR-Belegung, nach dem Ausrücken nicht mehr) und sie noch in genau diesem Raum steht: eine
+ * zwischengespeicherte Raumliste kennt das Ausrücken nicht. Ohne Raumliste fehlt die Angabe.
  *
  * Welche Einheiten geplant sind, liest `abloeserIds` (Liste, ohne Liste der Spiegel). Der Client
  * rechnet keine Vererbung und kein „geplant“ nach (`frontend/src/kraefte/AGENTS.md`, „Ablösung“).
@@ -24,6 +27,8 @@ export interface AbloeserStand {
   /** Beginn der offenen Periode, wenn sie mit der Alarmierung begann (Wire-String). */
   alarmiert_at: string | null;
   eingetroffen_at: string | null;
+  /** Abruf aus dem Raum, in dem die Einheit gerade steht (Wire-String). */
+  abgerufen_at: string | null;
   /** Name des Bereitstellungsraums, in dem die Einheit gerade steht. */
   br_name: string | null;
 }
@@ -33,11 +38,21 @@ export interface AbloeserStandQuellen {
   perioden: readonly EinheitPerioden[];
   einheiten?: readonly { id: number; aktueller_br_id?: number | null }[];
   brNamen?: ReadonlyMap<number, string>;
+  /** Raum und Zeitpunkt des Abrufs je Einheit, aus `abrufe` der Raumliste. */
+  abrufe?: ReadonlyMap<number, { br_id: number; seit_at: string }>;
 }
 
-/** Hat der Ablöser ein Ereignis der Zeitachse (Alarmierung oder Eintreffen)? */
+/** Hat der Ablöser ein Ereignis (Alarmierung, Eintreffen oder Abruf)? */
 export function hasAbloeserStand(s: AbloeserStand): boolean {
-  return s.alarmiert_at != null || s.eingetroffen_at != null;
+  return s.alarmiert_at != null || s.eingetroffen_at != null || s.abgerufen_at != null;
+}
+
+/** Der Abruf zählt nur im Raum, in dem die Einheit laut `aktueller_br_id` gerade steht. */
+function abrufIm(
+  abruf: { br_id: number; seit_at: string } | undefined,
+  br: number | undefined,
+): string | null {
+  return abruf && br != null && abruf.br_id === br ? abruf.seit_at : null;
 }
 
 /** Name eines Ablösers aus Liste oder Spiegel. */
@@ -78,17 +93,19 @@ export function buildAbloeserStand(
       alarmiert_at: p && p.anker === 'alarmierung' ? p.beginn_at : null,
       // Begann die Periode mit dem Eintreffen, ist ihr Beginn das Eintreffen.
       eingetroffen_at: p?.eintreffen_at ?? (p?.anker === 'eintreffen' ? p.beginn_at : null),
+      abgerufen_at: abrufIm(quellen.abrufe?.get(id), br),
       br_name: br != null ? (quellen.brNamen?.get(br) ?? null) : null,
     };
   });
   return stand.some(hasAbloeserStand) ? stand : null;
 }
 
-/** Ein Ablöser als Text: „2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR …)“. */
+/** Ein Ablöser als Text: „2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 · abgerufen 1425 (BR …)“. */
 export function abloeserEintragText(s: AbloeserStand, konv: AnzeigeKonventionen): string {
   const teile = [s.einheit_name];
   if (s.alarmiert_at) teile.push(`alarmiert ${zeitKurz(s.alarmiert_at, konv)}`);
   if (s.eingetroffen_at) teile.push(`eingetroffen ${zeitKurz(s.eingetroffen_at, konv)}`);
+  if (s.abgerufen_at) teile.push(`abgerufen ${zeitKurz(s.abgerufen_at, konv)}`);
   const text = teile.join(' · ');
   return s.br_name ? `${text} (${s.br_name})` : text;
 }

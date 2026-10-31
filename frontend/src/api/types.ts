@@ -475,6 +475,8 @@ export type UebernahmeBody = S['UebernahmeBody'];
 // LLH-1085: Abruf einer Kraft aus dem Raum (abgeleitet im Detail, Antwort der Route).
 export type BrAbrufKurz = S['BrAbrufKurz'];
 export type BrAbrufErgebnis = S['BrAbrufErgebnis'];
+/** Abgerufen im Raum stehende Einheit in der Raumliste (LLH-1309). */
+export type BrEinheitAbruf = S['BrEinheitAbruf'];
 
 // ============================== Chat / Anhänge ==============================
 export type ChatKanal = S['ChatKanalAnzeige'];
@@ -780,6 +782,9 @@ export type AbloesungAbloeser = S['AbloesungAbloeser'];
 export type AbloesungFolge = S['AbloesungFolge'];
 /** Warnung zur geplanten ablösenden Einheit (LLH-1131): schon geplant oder selbst im Einsatz. */
 export type AbloesungPlanungWarnung = S['AbloesungPlanungWarnung'];
+/** Zuletzt entfallene Planung einer laufenden Schicht ohne Ablöser (LLH-1309). */
+export type AbloesungPlanungEntfallen = S['AbloesungPlanungEntfallen'];
+export type PlanungEntfallenGrund = S['PlanungEntfallenGrund'];
 /** Art des Vollzugs und eine Person beim Besatzungswechsel (LLH-1150). */
 export type AbloesungArt = S['AbloesungArt'];
 export type AbloesungBesatzung = S['AbloesungBesatzung'];

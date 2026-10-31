@@ -1,4 +1,6 @@
-use super::{belegung_repo, darf_uebergehen, BrAnzeige, BrListenEintrag};
+use super::{
+    belegung_repo, darf_uebergehen, BrAnzeige, BrEinheitAbruf, BrListenEintrag, ObjektTyp,
+};
 use crate::error::AppError;
 use crate::routes::support::pruefe_koordinate;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -93,10 +95,24 @@ pub async fn list_eintraege(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
+    // Abrufe aller Räume in EINER Abfrage (LLH-1309); nur Einheiten, nach id wie `einheit_ids`.
+    let abrufe = belegung_repo::abruf_je_objekt(pool, einsatz_id, None).await?;
     Ok(zeilen
         .into_iter()
         .map(|z| BrListenEintrag {
             belegung: kennzahlen.remove(&z.br.id).unwrap_or_default(),
+            abrufe: einheiten
+                .iter()
+                .filter(|(raum, _)| *raum == z.br.id)
+                .filter_map(|(_, id)| {
+                    abrufe
+                        .get(&(ObjektTyp::Einheit, *id))
+                        .map(|a| BrEinheitAbruf {
+                            einheit_id: *id,
+                            seit_at: a.seit_at.clone(),
+                        })
+                })
+                .collect(),
             einheit_ids: einheiten
                 .iter()
                 .filter(|(raum, _)| *raum == z.br.id)
