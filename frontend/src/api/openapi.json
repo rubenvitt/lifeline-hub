@@ -6635,7 +6635,7 @@
       },
       "EintreffenEingabe": {
         "type": "object",
-        "description": "Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von\n`kraft` und `unangemeldet`.",
+        "description": "Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von\n`kraft`, `unangemeldet` und `vorlage` (LLH-1300).",
         "properties": {
           "client_id": {
             "type": [
@@ -6668,6 +6668,17 @@
               {
                 "$ref": "#/components/schemas/UnangemeldetEingabe",
                 "description": "Eine Kraft, die im Einsatz noch nicht geführt wird."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vorlage": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/VorlageAngabe",
+                "description": "Eine Einheit aus einer Einheiten-Vorlage der Organisation (LLH-1300, Stamm-Treffer): sie\nwird beim Buchen gebildet. Nicht zusammen mit `nachforderung_id`."
               },
               {
                 "type": "null"
@@ -15071,6 +15082,52 @@
           "mannschaft"
         ]
       },
+      "StammTreffer": {
+        "type": "object",
+        "description": "Ein Stamm-Treffer am Raum (design.md D2): nur, was der Einweiser zum Erkennen braucht.",
+        "required": [
+          "vorlage_id",
+          "name",
+          "typ_label",
+          "untereinheiten",
+          "fahrzeuge",
+          "ist_demo"
+        ],
+        "properties": {
+          "fahrzeuge": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Funkrufnamen der Stamm-Fahrzeuge, die beim Buchen mitkämen, über den ganzen Baum."
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt die Vorlage eine Demo-Marke (Spec `demo-daten`)?"
+          },
+          "name": {
+            "type": "string"
+          },
+          "typ_label": {
+            "type": "string"
+          },
+          "untereinheiten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der aktiven Untereinheiten, die mit gebildet würden."
+          },
+          "vorlage_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "StandVerlaufEintrag": {
         "type": "object",
         "description": "Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.\n`aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.",
@@ -16854,6 +16911,19 @@
             "type": "string"
           },
           "groesse": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "VorlageAngabe": {
+        "type": "object",
+        "description": "Einheiten-Vorlage, aus der die eintreffende Einheit gebildet wird (LLH-1300).",
+        "required": [
+          "vorlage_id"
+        ],
+        "properties": {
+          "vorlage_id": {
             "type": "integer",
             "format": "int64"
           }

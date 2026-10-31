@@ -97,6 +97,8 @@ use utoipa::OpenApi;
         crate::bereitstellungsraum::eintreffen::KraftAngabe,
         crate::bereitstellungsraum::eintreffen::StaerkeEingabe,
         crate::bereitstellungsraum::eintreffen::UnangemeldetEingabe,
+        crate::bereitstellungsraum::eintreffen::VorlageAngabe,
+        crate::bereitstellungsraum::stamm_treffer::StammTreffer,
         crate::bereitstellungsraum::ObjektTyp,
         crate::chat::BezugTyp,
         crate::chat::ChatKanalAnzeige,

@@ -2627,7 +2627,7 @@ export interface components {
         Einstufung: "planmaessig" | "vorwarnung" | "ueberfaellig";
         /**
          * @description Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von
-         *     `kraft` und `unangemeldet`.
+         *     `kraft`, `unangemeldet` und `vorlage` (LLH-1300).
          */
         EintreffenEingabe: {
             /** @description Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen). */
@@ -2641,6 +2641,7 @@ export interface components {
              */
             nachforderung_id?: number | null;
             unangemeldet?: components["schemas"]["UnangemeldetEingabe"] | null;
+            vorlage?: components["schemas"]["VorlageAngabe"] | null;
             /**
              * @description Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in
              *     der Zukunft. Ohne Angabe gilt „jetzt“.
@@ -6000,6 +6001,23 @@ export interface components {
          * @enum {string}
          */
         StaerkePosition: "fuehrer" | "unterfuehrer" | "mannschaft";
+        /** @description Ein Stamm-Treffer am Raum (design.md D2): nur, was der Einweiser zum Erkennen braucht. */
+        StammTreffer: {
+            /** @description Funkrufnamen der Stamm-Fahrzeuge, die beim Buchen mitkämen, über den ganzen Baum. */
+            fahrzeuge: string[];
+            funkrufname?: string | null;
+            /** @description Trägt die Vorlage eine Demo-Marke (Spec `demo-daten`)? */
+            ist_demo: boolean;
+            name: string;
+            typ_label: string;
+            /**
+             * Format: int64
+             * @description Zahl der aktiven Untereinheiten, die mit gebildet würden.
+             */
+            untereinheiten: number;
+            /** Format: int64 */
+            vorlage_id: number;
+        };
         /**
          * @description Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
          *     `aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.
@@ -6729,6 +6747,11 @@ export interface components {
             dateiname: string;
             /** Format: int64 */
             groesse: number;
+        };
+        /** @description Einheiten-Vorlage, aus der die eintreffende Einheit gebildet wird (LLH-1300). */
+        VorlageAngabe: {
+            /** Format: int64 */
+            vorlage_id: number;
         };
         /** @description Vorschau einer Vorlage im Einsatz (D2): der Baum mit dem Zustand jeder Kraft. Schreibt nichts. */
         VorlageVorschau: {

@@ -469,6 +469,8 @@ export type BrVerlaufEintrag = S['BrVerlaufEintrag'];
 export type EintreffenEingabe = S['EintreffenEingabe'];
 /** Erwartete Kraft aus einer Nachforderung mit Ziel = Raum (LLH-1387). */
 export type ErwarteteKraft = S['ErwarteteKraft'];
+/** Einheiten-Vorlage als Treffer beim Eintreffen am Raum (LLH-1300). */
+export type StammTreffer = S['StammTreffer'];
 export type EintreffenErgebnis = S['EintreffenErgebnis'];
 export type EintreffenZeitachse = S['EintreffenZeitachse'];
 export type UebernahmeBody = S['UebernahmeBody'];

@@ -10,6 +10,7 @@ import type {
   EintreffenErgebnis,
   ErwarteteKraft,
   ObjektTyp,
+  StammTreffer,
   BrBelegungsArt,
 } from './types';
 import { apiGet, apiSend, mitParametern, type ApiSendOptionen } from './client';
@@ -48,6 +49,23 @@ export function loadBrVerlauf(einsatzId: number, brId: number): Promise<BrVerlau
 export function loadBrErwartet(einsatzId: number, brId: number): Promise<ErwarteteKraft[]> {
   return apiGet<ErwarteteKraft[]>(
     `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/erwartet`,
+  );
+}
+
+/**
+ * Einheiten-Vorlagen der Organisation als Treffer für „Eintreffen buchen“ (LLH-1300): ab drei
+ * Zeichen, höchstens zehn, nur Namen und Funkrufnamen. Das Gerät des Raums liest so, ohne den
+ * Stammdaten-Katalog lesen zu dürfen.
+ */
+export function loadBrStammTreffer(
+  einsatzId: number,
+  brId: number,
+  suche: string,
+): Promise<StammTreffer[]> {
+  return apiGet<StammTreffer[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/stamm-treffer`, {
+      suche,
+    }),
   );
 }
 

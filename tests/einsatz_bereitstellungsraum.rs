@@ -2380,6 +2380,16 @@ async fn eintreffen_raum_und_rechte() {
         assert_eq!(s, StatusCode::OK, "{v}");
         let (s, _) = eintreffen(&app, &frieda, eid, br, unangemeldet_body("FL 1")).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "ohne {modul}");
+        // Eine Einheit aus den Stammdaten legt ebenso Einheit und Fahrzeuge an (LLH-1300).
+        let (s, _) = eintreffen(
+            &app,
+            &frieda,
+            eid,
+            br,
+            json!({"vorlage": {"vorlage_id": 1}}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "Vorlage ohne {modul}");
         let (s, v) = anfrage_json(
             &app,
             "PUT",

@@ -1,5 +1,5 @@
 import { Alert, App, Button, Collapse, Flex, Form, Input, Modal, Space, Typography } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../../api/client';
 import {
@@ -7,7 +7,7 @@ import {
   FAHRZEUG_ADHOC_TEXT_MAX,
   SAMMEL_MAX,
 } from '../../api/eingabegrenzen';
-import { loadBrErwartet } from '../../api/einsatzBereitstellungsraum';
+import { loadBrErwartet, loadBrStammTreffer } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheitenPerioden } from '../../api/kraefteZeitachse';
 import { einsatzKeys } from '../../api/queryKeys';
 import type {
@@ -23,6 +23,7 @@ import StaerkeEingabe from '../../anzeige/StaerkeEingabe';
 import { useAuthOptional } from '../../auth/AuthContext';
 import { ErfassungsFormular, type ErfassungsFormularSteuerung } from '../../components/Erfassung';
 import { Liste, ListenEintrag } from '../../components/Liste';
+import DemoMarke from '../../components/DemoMarke';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { monoStil, useRollen } from '../../components/instrument';
@@ -33,14 +34,19 @@ import {
   buildEintreffenEingabe,
   buildEintreffenGruppen,
   buildNachgefordertZeilen,
+  buildStammZeilen,
   findDoppelbuchung,
   kraftEingabe,
   nachgefordertHinweise,
   nachgefordertZiel,
+  stammHinweise,
+  stammSuche,
   trefferHinweise,
+  vorlageEingabe,
   type EintreffenGruppen,
   type EintreffenTreffer,
   type NachgefordertZeile,
+  type StammZeile,
 } from './eintreffenKern';
 
 /** Die Felder von Schritt 2 (unangemeldete Kraft). */
@@ -116,6 +122,11 @@ export interface EintreffenDialogProps {
  * vorbelegt zu Schritt 2; beide Wege senden den Verweis `nachforderung_id`. Ohne Freigabe (403)
  * oder ohne Netz fehlt die Gruppe still.
  *
+ * Unter „Im Einsatz“ steht ab drei Zeichen „Aus den Stammdaten“ (LLH-1300, design.md D6): die
+ * Einheiten-Vorlagen der Organisation aus der Projektion `…/stamm-treffer` (das Gerät liest den
+ * Katalog nicht). „Eintreffen“ bildet die Einheit aus der Vorlage und bucht sie mit einem Tipp. Ohne
+ * Netz oder Freigabe fehlt die Gruppe still.
+ *
  * Ohne Netz (Teil III, `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“) geht die Buchung
  * mit `client_id` in die Offline-Queue: Hinweis „Offline vorgemerkt“, der Dialog schließt, die
  * Seite zeigt sie unter „Vorgemerkt“. Eine Ablehnung beim Nachsenden landet im
@@ -163,6 +174,17 @@ export default function EintreffenDialog({
     retry: false,
   });
 
+  // Stamm-Treffer (LLH-1300): erst ab drei Zeichen; die letzte Antwort bleibt beim Weitertippen
+  // stehen, damit die Liste nicht springt. Ohne Netz oder Freigabe fehlt die Gruppe.
+  const stammText = stammSuche(suche);
+  const stammQuery = useQuery({
+    queryKey: einsatzKeys.brStammTreffer(einsatzId, br.id, stammText ?? ''),
+    queryFn: () => loadBrStammTreffer(einsatzId, br.id, stammText ?? ''),
+    enabled: offen && stammText != null,
+    retry: false,
+    placeholderData: keepPreviousData,
+  });
+
   const imRaum = useMemo(
     () => ({
       einheiten: br.einheiten.map((e) => e.id),
@@ -208,6 +230,13 @@ export default function EintreffenDialog({
           }))
         : [],
     [offen, erwartetQuery.data, suche, einheiten, fahrzeuge, alle, vorgemerkt],
+  );
+  const stammZeilen = useMemo(
+    () =>
+      offen && stammText != null && stammQuery.data
+        ? buildStammZeilen(stammQuery.data, { einheiten, fahrzeuge, kandidaten: alle, vorgemerkt })
+        : [],
+    [offen, stammText, stammQuery.data, einheiten, fahrzeuge, alle, vorgemerkt],
   );
   // Eine Einheit, die eine Zeile „Aus Nachforderungen“ bucht, steht nicht noch einmal darunter.
   const angeboten = useMemo(
@@ -316,6 +345,13 @@ export default function EintreffenDialog({
     }
   }
 
+  function bucheStamm(z: StammZeile) {
+    buchung.mutate(
+      { daten: vorlageEingabe(z.treffer), name: z.treffer.name },
+      { onSuccess: () => close() },
+    );
+  }
+
   // Ein Ausweg (Kreuz, Maske, Escape) während der Buchung bliebe ohne Ort für die Antwort.
   const sperrtAbbruch = buchung.isPending;
   function aufAbbruch() {
@@ -422,6 +458,60 @@ export default function EintreffenDialog({
     );
   };
 
+  const stammZeile = (z: StammZeile) => {
+    const t = z.treffer;
+    const hinweise = stammHinweise(z, zeitKurz);
+    return (
+      <ListenEintrag
+        actions={[
+          <Button
+            key="eintreffen"
+            aria-label={`Eintreffen ${t.name}`}
+            onClick={() => bucheStamm(z)}
+            loading={
+              buchung.isPending && buchung.variables?.daten.vorlage?.vorlage_id === t.vorlage_id
+            }
+            // Ohne Netz schon vorgemerkt: ein zweiter Tipp bildete eine zweite Einheit.
+            disabled={buchung.isPending || z.vorgemerktAt != null}
+          >
+            Eintreffen
+          </Button>,
+        ]}
+      >
+        <Flex vertical gap={2} style={{ minWidth: 0 }}>
+          <Space size={token.marginXS} wrap>
+            <span>{t.name}</span>
+            <Typography.Text type="secondary">{t.typ_label}</Typography.Text>
+            {t.ist_demo && <DemoMarke />}
+          </Space>
+          {t.fahrzeuge.length > 0 && (
+            <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+              {t.fahrzeuge.join(' · ')}
+            </span>
+          )}
+          {hinweise.length > 0 && (
+            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+              {hinweise.join(' · ')}
+            </Typography.Text>
+          )}
+        </Flex>
+      </ListenEintrag>
+    );
+  };
+
+  const gruppeStamm: ReactNode = stammZeilen.length > 0 && (
+    <section aria-label="Aus den Stammdaten" style={{ marginTop: token.marginSM }}>
+      <Typography.Text strong>
+        Aus den Stammdaten <Typography.Text type="secondary">{stammZeilen.length}</Typography.Text>
+      </Typography.Text>
+      <Liste
+        dataSource={stammZeilen}
+        rowKey={(z) => String(z.treffer.vorlage_id)}
+        renderItem={stammZeile}
+      />
+    </section>
+  );
+
   const gruppeNachgefordert: ReactNode = nachgefordert.length > 0 && (
     <section aria-label="Aus Nachforderungen" style={{ marginTop: token.marginSM }}>
       <Typography.Text strong>
@@ -469,9 +559,12 @@ export default function EintreffenDialog({
         {gruppeNachgefordert}
         {gruppe('Erwartet', erwartetTreffer)}
         {gruppe('Im Einsatz', imEinsatzTreffer)}
-        {nachgefordert.length + erwartetTreffer.length + imEinsatzTreffer.length === 0 && (
-          <Typography.Text type="secondary">Keine Treffer</Typography.Text>
-        )}
+        {gruppeStamm}
+        {nachgefordert.length +
+          erwartetTreffer.length +
+          imEinsatzTreffer.length +
+          stammZeilen.length ===
+          0 && <Typography.Text type="secondary">Keine Treffer</Typography.Text>}
       </div>
       <Button block onClick={() => zuSchrittZwei()}>
         Nicht in der Liste
