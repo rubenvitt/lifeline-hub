@@ -325,7 +325,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
     await waitFor(() => expect(result.current.rohdaten.rueckmeldungen).toEqual(RUECKMELDUNGEN));
   });
 
-  it('spiegelt im Historien-Modus die EINE aktive Quelle, nicht die elf abgeschalteten', async () => {
+  it('spiegelt im Historien-Modus die EINE aktive Quelle, nicht die abgeschalteten Live-Quellen', async () => {
     // Dieselbe Weiche wie bei `ladt`: im Snapshot-Modus sind die Live-Queries abgeschaltet und
     // melden nie einen Fehler; die Aussage kann nur das Dokument treffen.
     ladeLageSnapshot.mockRejectedValue(new Error('weg'));
