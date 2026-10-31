@@ -272,3 +272,114 @@ test('4 × „+1“, dann sofort zur Modulseite: genau eine Ausgabe über 4 EP, 
   await expect(page.getByRole('button', { name: 'Rückgängig' })).toHaveCount(0);
   await expect(page.getByText(/^Gebucht:/)).toHaveCount(0);
 });
+
+/**
+ * Höhe der Ansicht (LLH-1294): mit kurzer Liste rollt nichts, Kopf und Tastenfeld stehen ganz im
+ * Bild, und das Tastenfeld schließt unten mit dem Scrollbereich ab (D9). Am Stab rollt das
+ * Dokument, am Gerät das `main` zwischen Kopfzeile und Gerätenavigation. Bedarf 1840 EP: auch
+ * vierstellig stehen Soll, ausgegeben und fehlt in einer Zeile, ohne seitlichen Überlauf.
+ *
+ * Am Stab bei 390 × 700 trägt der Rahmen mehr als am Gerät (Kopfleiste zweizeilig, Ortspfad); dort
+ * rollt die Seite um wenige Pixel. Unter `md` rollt die Kopfleiste mit, geprüft wird deshalb, dass
+ * Kopf und Tasten auch am Ende des Bildlaufs ganz im Bild stehen.
+ *
+ * Mutationsproben: `useRestHoehe` in `AusgabeAnsicht.tsx` durch `minHeight: '100dvh'` ersetzt →
+ * der Scrollbereich rollt um Kopf und Navigation, die strengen Fälle werden rot; `spalten` am
+ * Kennzahlenband entfernt → das Gerät bei 390 × 700 rollt um etwa 60 px.
+ */
+async function pruefeHoehe(
+  page: Page,
+  wo: string,
+  scrollbereich: string | null,
+  { rollen = false }: { rollen?: boolean } = {},
+) {
+  const kopf = page.locator('[data-lfh="ausgabe-kopf"]');
+  const tasten = page.locator('[data-lfh="zaehltasten"]');
+  const messen = () =>
+    page.evaluate((sel) => {
+      const b = sel ? document.querySelector<HTMLElement>(sel)! : document.documentElement;
+      const sicht = sel ? b.clientHeight : window.innerHeight;
+      // Die Kante, an der ein Fuß mit `bottom: 0` klebt: am Gerät über der Polsterung des
+      // `main`, am Stab die Fensterkante.
+      const kante = sel
+        ? b.getBoundingClientRect().top +
+          b.clientTop +
+          b.clientHeight -
+          parseFloat(getComputedStyle(b).paddingBottom)
+        : sicht;
+      const feld = document.querySelector('[data-lfh="zaehltasten"]')!.getBoundingClientRect();
+      return {
+        // Wie weit sich der Scrollbereich rollen lässt.
+        rollt: b.scrollHeight - sicht,
+        // Abstand des Tastenfelds zur Unterkante des Scrollbereichs (es schließt mit ihr ab, D9).
+        // Bis 1 px ist Rundung: die Mindesthöhe wird abgerundet, damit nichts rollt.
+        luecke: Math.abs(kante - feld.bottom) <= 1 ? 0 : Math.round(kante - feld.bottom),
+        seitlich: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    }, scrollbereich);
+  // Die Höhe wird nach einer Größenänderung im nächsten Bild nachgezogen: daher `poll`.
+  if (rollen) {
+    await expect
+      .poll(
+        async () => {
+          const { luecke, seitlich } = await messen();
+          return { luecke, seitlich };
+        },
+        { message: wo },
+      )
+      .toEqual({ luecke: 0, seitlich: 0 });
+  } else {
+    await expect.poll(messen, { message: wo }).toEqual({ rollt: 0, luecke: 0, seitlich: 0 });
+  }
+  await expect(kopf, wo).toBeInViewport({ ratio: 1 });
+  await expect(tasten, wo).toBeInViewport({ ratio: 1 });
+  if (rollen) {
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect(kopf, `${wo}, am Ende des Bildlaufs`).toBeInViewport({ ratio: 1 });
+    await expect(tasten, `${wo}, am Ende des Bildlaufs`).toBeInViewport({ ratio: 1 });
+  }
+}
+
+for (const flaeche of [
+  { width: 390, height: 700 },
+  { width: 1280, height: 800 },
+]) {
+  const groesse = `${flaeche.width}×${flaeche.height}`;
+
+  test(`Höhe am Stab: kurze Liste, Kopf und Tasten im Bild (${groesse})`, async ({ page }) => {
+    await page.setViewportSize(flaeche);
+    const { e, zf } = await saeen(page, -10, 110, { kraefte: 1830 });
+    await oeffne(page, e, zf);
+    await pruefeHoehe(page, 'Stab', null, { rollen: flaeche.width < 768 });
+  });
+
+  test(`Höhe am Gerät: kurze Liste rollt nicht, Kopf und Tasten im Bild (${groesse})`, async ({
+    page,
+    browser,
+  }) => {
+    const { e, zf } = await saeen(page, -10, 110, { kraefte: 1830 });
+    const kopplung = await anlegen<{ code: { code: string } }>(
+      page,
+      `/api/einsaetze/${e}/geraete`,
+      {
+        ansicht: 'verpflegung',
+        bezeichnung: 'Ausgabe Deich',
+      },
+    );
+    const kontext = await browser.newContext({ viewport: flaeche });
+    const geraet = await kontext.newPage();
+    try {
+      await geraet.goto(`/koppeln#${kopplung.code.code}`);
+      await geraet.getByRole('button', { name: 'Gerät koppeln' }).click();
+      await expect(geraet).toHaveURL(new RegExp(`/geraet/${e}/verpflegung$`));
+      await geraet.goto(`/geraet/${e}/verpflegung/${zf}/ausgabe`);
+      await expect(geraet.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+      await expect(geraet.getByRole('navigation', { name: 'Gerätenavigation' })).toBeInViewport({
+        ratio: 1,
+      });
+      await pruefeHoehe(geraet, 'Gerät', '.geraet-huelle > main');
+    } finally {
+      await kontext.close();
+    }
+  });
+}

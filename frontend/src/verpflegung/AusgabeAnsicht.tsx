@@ -18,6 +18,7 @@ import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
 import { FOKUSABSTAND_ZAEHLTASTEN, useFokusabstandUnten } from '../components/fokusabstandUnten';
+import { REST_UNTEN_VAR, useRestHoehe } from '../components/restHoehe';
 import {
   Augenbraue,
   Aufgliederung,
@@ -37,6 +38,7 @@ import { useVorgemerkteAusgaben } from '../offline/useVorgemerkteAusgaben';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { parseVerpflegungStelle } from '../routing/deeplinks';
 import { Select } from '../components/Select';
+import { useDichte } from '../theme/ThemeModeProvider';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
 import { AusgabeDialog, RuecknahmeDialog } from './VerpflegungDialoge';
 import type { Buendel } from './ausgabeSammlung';
@@ -152,6 +154,8 @@ export default function AusgabeAnsicht() {
   const qc = useQueryClient();
   const grundId = useId();
   const tastenRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ZAEHLTASTEN);
+  const restHoehe = useRestHoehe<HTMLDivElement>();
+  const { dichte } = useDichte();
 
   const [dialog, setDialog] = useState<
     | { art: 'nachtragen' }
@@ -396,15 +400,13 @@ export default function AusgabeAnsicht() {
       hinweis={!darfSchreiben && <SeitenHinweise rechteFehlt rechteText={rechteText} />}
     >
       <div
+        ref={restHoehe}
         data-lfh="ausgabe-ansicht"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: token.margin,
-          // Mindestens ein Fenster hoch: das klebende Tastenfeld steht so immer am unteren Rand,
-          // auch bei kurzer Liste (D9, Daumenreichweite).
-          minHeight: '100dvh',
-        }}
+        // Mindestens bis zur Unterkante des Bildlaufs: das klebende Tastenfeld steht so immer am
+        // unteren Rand, auch bei kurzer Liste (D9, Daumenreichweite). Gemessen statt `100dvh`, sonst
+        // rollte die Seite um Kopfleiste und Gerätenavigation, und der Kopf ginge aus dem Bild
+        // (LLH-1294).
+        style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}
       >
         {/* ── Kopf: Deckung ─────────────────────────────────────────────────────────── */}
         <section
@@ -435,7 +437,13 @@ export default function AusgabeAnsicht() {
               {online ? '' : 'Offline vorgemerkt'}
             </span>
           </Flex>
-          <Kennzahlenband beschriftung={`Deckung ${zf.bezeichnung}`}>
+          <Kennzahlenband
+            beschriftung={`Deckung ${zf.bezeichnung}`}
+            // Eine Zeile für Soll, ausgegeben und fehlt: zwei Zeilen kosteten bei 390 × 700 so
+            // viel Höhe, dass die Ansicht rollen müsste und der Kopf aus dem Bild ginge (LLH-1294).
+            // Im Handschuh reicht die Drittelbreite für „1840 EP“ nicht, dort bricht das Band um.
+            spalten={dichte === 'handschuh' ? undefined : 3}
+          >
             <Kennzahl titel="Soll" wert={zf.bedarf.gesamt} einheit="EP" />
             <Kennzahl titel="ausgegeben" wert={zf.ausgegeben.gesamt} einheit="EP" />
             <Kennzahl
@@ -775,7 +783,10 @@ export default function AusgabeAnsicht() {
             display: 'flex',
             flexDirection: 'column',
             gap: token.marginXS,
-            paddingBlock: token.paddingSM,
+            paddingBlockStart: token.paddingSM,
+            // Am Stab reicht die Ansicht über die Seitenpolsterung bis an die Fensterkante
+            // (`useRestHoehe`); die Polsterung kommt hier zurück, die Tasten stehen nicht an der Kante.
+            paddingBlockEnd: `calc(${token.paddingSM}px + var(${REST_UNTEN_VAR}, 0px))`,
             background: rollen.paneel,
             borderBlockStart: `1px solid ${rollen.linie}`,
           }}
