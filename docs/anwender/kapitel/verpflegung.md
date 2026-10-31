@@ -159,7 +159,9 @@ Für Einsatzleitung und Führungspersonal:
    Sammlung. Ohne Sammlung ist „−1“ gesperrt, der Grund „keine Sammlung“ steht über den Tasten.
 7. Die Sammlung bucht sich nach kurzer Ruhe selbst; „Buchen“ bucht sofort. Die Meldung „Gebucht:
    … EP zu ‚…‘“ bietet „Rückgängig“, falls es das falsche Zeitfenster war. Unter „Letzte Buchungen“
-   stehen die jüngsten Ausgaben, je mit ihrem Empfänger, etwa „9 EP · an 2. Gruppe“.
+   stehen die jüngsten Ausgaben, je mit ihrem Empfänger, etwa „9 EP · an 2. Gruppe“. Ausgaben
+   eines anderen Geräts rücken dort nicht unter den Zeiger, sondern warten hinter „1 neue
+   Buchung“ (siehe [Verpflegung am Gerät](geraet-verpflegung.md)).
 
 ### Eine Ausgabe nachtragen
 
