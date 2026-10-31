@@ -21,7 +21,7 @@
  * Die reine Logik ist die der Ablösung (`abloesung/zufluss.ts`, `…Nach`-Varianten), hier mit dem
  * Folgeschlüssel als eingefrorenem Sortierschlüssel. Ohne Halt zeigt die Liste alles.
  */
-import { useMemo, useRef, useState, type FocusEvent, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FocusEvent, type PointerEvent } from 'react';
 import {
   freigegebenNach,
   LEERER_ZUFLUSSSTAND,
@@ -76,12 +76,25 @@ export function zuflussText(
  * Bewegung zählt, nicht `pointerenter` (Chromium meldet das Betreten auch, wenn Inhalt unter
  * einem ruhenden Zeiger auftaucht — Begründung in `Datensicht`). `focusout` zum Nachbarknopf
  * derselben Fläche ist kein Verlassen.
+ *
+ * VERSCHWINDET DER FOKUSSIERTE KNOPF (etwa „Zurücknehmen“ nach der eigenen Rücknahme, LLH-1292),
+ * meldet React kein `blur`: das Ereignis erreicht die Wurzel nicht mehr. Solange der Fokus hält,
+ * beobachtet die Fläche deshalb ihren Inhalt und gibt frei, sobald der Fokus nicht mehr in ihr
+ * steht; sonst hielte sie, bis jemand den Banner bedient.
  */
 export function useHalteFlaeche() {
   const wurzel = useRef<HTMLDivElement>(null);
   const bedingung = useRef({ zeiger: false, fokus: false });
+  const waechter = useRef<MutationObserver | null>(null);
   const [gehalten, setGehalten] = useState(false);
   const pruefe = () => setGehalten(bedingung.current.zeiger || bedingung.current.fokus);
+  const fokusWeg = () => {
+    waechter.current?.disconnect();
+    waechter.current = null;
+    bedingung.current.fokus = false;
+    pruefe();
+  };
+  useEffect(() => () => waechter.current?.disconnect(), []);
   return {
     gehalten,
     flaeche: {
@@ -89,11 +102,16 @@ export function useHalteFlaeche() {
       onFocus: () => {
         bedingung.current.fokus = true;
         pruefe();
+        if (waechter.current != null || wurzel.current == null) return;
+        const w = new MutationObserver(() => {
+          if (!wurzel.current?.contains(document.activeElement)) fokusWeg();
+        });
+        w.observe(wurzel.current, { childList: true, subtree: true });
+        waechter.current = w;
       },
       onBlur: (e: FocusEvent) => {
         if (e.relatedTarget != null && wurzel.current?.contains(e.relatedTarget as Node)) return;
-        bedingung.current.fokus = false;
-        pruefe();
+        fokusWeg();
       },
       onPointerMove: (e: PointerEvent) => {
         if (e.pointerType === 'touch' || bedingung.current.zeiger) return;
