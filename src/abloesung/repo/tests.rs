@@ -2417,6 +2417,43 @@ async fn neue_planung_raeumt_den_vermerk_der_entfallenen() {
     assert_eq!(a.planung_entfallen, None, "Planung von Hand aufgehoben");
 }
 
+/// LLH-1309: die Tabelle nimmt den Vermerk nur ganz oder gar nicht, auch ohne Grund.
+#[tokio::test]
+async fn vermerk_nur_vollstaendig() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    for (at, grund, name) in [
+        (Some(T0), None, Some("Florian 2")),
+        (Some(T0), None, None),
+        (None, None, Some("Florian 2")),
+        (Some(T0), Some("aufloesung"), None),
+        (None, Some("entlassung"), Some("Florian 2")),
+        (Some(T0), Some("verschwunden"), Some("Florian 2")),
+    ] {
+        let r = sqlx::query(
+            "UPDATE einsatz_abloesung SET planung_entfallen_at = ?, \
+             planung_entfallen_grund = ?, planung_entfallen_einheit_name = ? WHERE id = ?",
+        )
+        .bind(at)
+        .bind(grund)
+        .bind(name)
+        .bind(id)
+        .execute(&w.pool)
+        .await;
+        assert!(r.is_err(), "Teilstand {at:?}/{grund:?}/{name:?} angenommen");
+    }
+    sqlx::query(
+        "UPDATE einsatz_abloesung SET planung_entfallen_at = ?, \
+         planung_entfallen_grund = 'aufloesung', planung_entfallen_einheit_name = 'Florian 2' \
+         WHERE id = ?",
+    )
+    .bind(T0)
+    .bind(id)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+}
+
 /// LLH-1309: entfällt einer von zwei Ablösern, zeigt die Schicht keinen Vermerk, solange der
 /// andere geplant bleibt; entfällt auch er, nennt der Vermerk den jüngsten.
 #[tokio::test]

@@ -287,13 +287,13 @@ export default function AbloesungPage() {
   const standJeSchicht = useMemo(() => {
     const m = new Map<number, AbloeserStand[]>();
     if (!periodenQuery.data) return m;
-    const brNamen = brQuery.data
-      ? new Map(brQuery.data.map((b) => [b.id, b.bezeichnung]))
-      : undefined;
+    // Ohne Freigabe des Moduls bleibt auch eine noch im Cache liegende Raumliste außen vor.
+    const raeume = brFrei ? brQuery.data : undefined;
+    const brNamen = raeume ? new Map(raeume.map((b) => [b.id, b.bezeichnung])) : undefined;
     // Abgerufen im Raum (LLH-1309): aus der Raumliste, die schon für den Namen geholt wird.
-    const abrufe = brQuery.data
+    const abrufe = raeume
       ? new Map(
-          brQuery.data.flatMap((b) =>
+          raeume.flatMap((b) =>
             b.abrufe.map((a) => [a.einheit_id, { br_id: b.id, seit_at: a.seit_at }] as const),
           ),
         )
@@ -308,7 +308,7 @@ export default function AbloesungPage() {
       if (stand) m.set(s.id, stand);
     }
     return m;
-  }, [laufende, periodenQuery.data, einheitenQuery.data, brQuery.data]);
+  }, [laufende, periodenQuery.data, einheitenQuery.data, brFrei, brQuery.data]);
   const vorgaben = useMemo(() => vorgabenQuery.data ?? [], [vorgabenQuery.data]);
   // Erst mit allen drei Quellen: ohne die laufenden stünde jede Einheit kurz „ohne Schicht“.
   const ohneSchicht = useMemo(

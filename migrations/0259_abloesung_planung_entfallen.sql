@@ -12,7 +12,8 @@ ALTER TABLE einsatz_abloesung ADD COLUMN planung_entfallen_grund TEXT
         (planung_entfallen_grund IS NULL
             AND planung_entfallen_at IS NULL
             AND planung_entfallen_einheit_name IS NULL)
-        OR (planung_entfallen_grund IN ('aufloesung', 'entlassung')
+        OR (planung_entfallen_grund IS NOT NULL
+            AND planung_entfallen_grund IN ('aufloesung', 'entlassung')
             AND planung_entfallen_at IS NOT NULL
             AND planung_entfallen_einheit_name IS NOT NULL)
     );
