@@ -4310,6 +4310,22 @@ async fn abschnitt_umbenennen_meldet_seine_raeume() {
         abschnitt_name_in_liste(&app, &cookie, eid, a).await,
         "Nordost"
     );
+
+    // Der Name ist gespeichert, bevor die Sprechgruppen-Zuordnung scheitert: gemeldet wird trotzdem.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &abschnitt_pfad(eid, nord),
+        &cookie,
+        Some(&json!({"name": "Nordwest", "sprechgruppe_ids": [999_999]})),
+    )
+    .await;
+    assert!(s.is_client_error(), "unbekannte Sprechgruppe: {s} {v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![a, b], "nach späterem Fehler");
+    assert_eq!(
+        abschnitt_name_in_liste(&app, &cookie, eid, a).await,
+        "Nordwest"
+    );
 }
 
 /// Auflösen meldet die Räume, die danach keinen Abschnitt mehr zeigen.

@@ -308,6 +308,11 @@ pub async fn update(
         },
     )
     .await?;
+    // Der Name ist jetzt gespeichert: sofort melden, auch wenn ein späterer Schritt (Sprechgruppen,
+    // Verbindungen) mit 422 scheitert.
+    if name_vorher.is_some_and(|v| v != anzeige.name) {
+        sse_umbenannt(&state, einsatz_id, aid).await;
+    }
     // Lagewechsel + ETB-Eintrag atomar in EINER Tx, und zwar VOR der Sprechgruppen-
     // Zuordnung: scheitert die mit 422, bleibt der gespeicherte Wechsel trotzdem nicht
     // undokumentiert (LFH-608, Review). Der Eintrag entsteht nur bei echtem Wechsel.
@@ -364,9 +369,6 @@ pub async fn update(
         anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
     }
     sse_abschnitt(&state, einsatz_id, aid);
-    if name_vorher.is_some_and(|v| v != anzeige.name) {
-        sse_umbenannt(&state, einsatz_id, aid).await;
-    }
     Ok(Json(anzeige))
 }
 
