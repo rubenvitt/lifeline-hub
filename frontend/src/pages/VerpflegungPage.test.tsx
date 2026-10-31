@@ -34,6 +34,7 @@ import {
   zeitfenster,
 } from '../test/verpflegungDaten';
 import { zeitfensterKennung } from '../verpflegung/verpflegungText';
+import { einsatzKeys } from '../api/queryKeys';
 import { parseNachforderungVorbelegung } from '../routing/deeplinks';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
@@ -163,9 +164,10 @@ function baum(client: QueryClient) {
  *  Benutzer (LFH-688). */
 const BENUTZER_ID = 1;
 
-function renderPage() {
+function renderPage(vorbereiten?: (client: QueryClient) => void) {
   server.use(meHandler(benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Leitung' })));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vorbereiten?.(client);
   const ergebnis = render(baum(client));
   /** Zeichnet neu, ohne neu zu laden — so tickt die (gemockte) Uhr. */
   const neuZeichnen = () => ergebnis.rerender(baum(client));
@@ -300,6 +302,41 @@ describe('VerpflegungPage (LFH-634)', () => {
     renderPage();
     await screen.findByText('Noch kein Zeitfenster');
     expect(screen.getAllByRole('button', { name: 'Zeitfenster anlegen' })).toHaveLength(1);
+  });
+
+  describe('nicht geladen ist nicht leer (LLH-1293)', () => {
+    afterEach(() => setzeOnline(true));
+
+    it('Kaltstart ohne Netz: „Zeitfenster nicht geladen“ statt Leerzustand, keine Nullen', async () => {
+      setzeOnline(false);
+      // Der Einsatz kommt beim Kaltstart aus dem vorgehaltenen Lagebild, die Verpflegung nicht.
+      renderPage((client) => client.setQueryData(einsatzKeys.einsatz(1), einsatz.wert));
+      expect(await screen.findByText('Zeitfenster nicht geladen')).toBeInTheDocument();
+      expect(screen.queryByText('Noch kein Zeitfenster')).toBeNull();
+      expect(screen.queryByText(/0 Zeitfenster/)).toBeNull();
+      expect(screen.getByRole('radio', { name: 'laufend & anstehend' })).toBeInTheDocument();
+      expect(ladeVerpflegung).not.toHaveBeenCalled();
+
+      await userEvent.click(screen.getByRole('radio', { name: 'Stellen' }));
+      expect(await screen.findByText('Stellen nicht geladen')).toBeInTheDocument();
+      expect(screen.queryByText('Keine Verpflegungsstellen')).toBeNull();
+
+      // Kommt das Netz zurück, lädt die angehaltene Abfrage von selbst.
+      setzeOnline(true);
+      await userEvent.click(screen.getByRole('radio', { name: /^laufend & anstehend/ }));
+      await screen.findAllByRole('article');
+      expect(screen.queryByText('Zeitfenster nicht geladen')).toBeNull();
+    });
+
+    it('Ladefehler ohne Stand: „Zeitfenster nicht geladen“ mit erneutem Abruf', async () => {
+      ladeVerpflegung.mockRejectedValueOnce(new ApiError(500, 'kaputt'));
+      renderPage();
+      expect(await screen.findByText('Zeitfenster nicht geladen')).toBeInTheDocument();
+      expect(screen.queryByText('Noch kein Zeitfenster')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+      await screen.findAllByRole('article');
+      expect(screen.getByText('3 Zeitfenster · 2 mit Unterdeckung')).toBeInTheDocument();
+    });
   });
 
   it('Zeitfenster anlegen invalidiert Verpflegung UND Einsatztagebuch', async () => {
