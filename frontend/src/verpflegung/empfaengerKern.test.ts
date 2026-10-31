@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ABSCHNITT_DEICH,
+  BS_SCHULE,
+  BS_TURNHALLE,
   GRUPPE_1,
   GRUPPE_2,
   KEINE_EMPFAENGER,
@@ -9,10 +11,12 @@ import {
   ausgabe,
   empfaenger,
   empfaengerEinheit,
+  empfaengerMitBetreuung,
   zeitfenster,
 } from '../test/verpflegungDaten';
 import {
   empfaengerFelder,
+  hatWaehlbareEmpfaenger,
   empfaengerOptionen,
   empfaengerSchluessel,
   empfaengerText,
@@ -38,6 +42,7 @@ describe('verpflegungsstand — „Noch nicht verpflegt“ (LLH-1055)', () => {
         empfaengerEinheit({ id: 3, name: 'C', eintreffen_at: '2026-09-24 07:00:00' }),
       ],
       abschnitte: [],
+      betreuungsstellen: [],
     };
     const stand = verpflegungsstand(mittag([ausgabe({ id: 1, menge: 9, einheit_id: 2 })]), e);
     expect(namen(stand.offen)).toEqual(['A', 'C']);
@@ -97,6 +102,7 @@ describe('verpflegungsstand — „Noch nicht verpflegt“ (LLH-1055)', () => {
         empfaengerEinheit({ id: 2, name: 'rechtzeitig', eintreffen_at: '2026-09-24 11:29:00' }),
       ],
       abschnitte: [],
+      betreuungsstellen: [],
     };
     expect(namen(verpflegungsstand(mittag(), e).offen)).toEqual(['rechtzeitig']);
   });
@@ -118,6 +124,7 @@ describe('verpflegungsstand — „Noch nicht verpflegt“ (LLH-1055)', () => {
         }),
       ],
       abschnitte: [],
+      betreuungsstellen: [],
     };
     const stand = verpflegungsstand(mittag([ausgabe({ id: 1, menge: 4, einheit_id: 2 })]), e);
     expect(stand.offen).toEqual([]);
@@ -169,6 +176,7 @@ describe('verpflegungsstand — „Noch nicht verpflegt“ (LLH-1055)', () => {
         { id: 1, name: 'Deich' },
         { id: 2, name: 'Deich Nord', ueber_abschnitt_id: 1 },
       ],
+      betreuungsstellen: [],
     };
     const stand = verpflegungsstand(mittag([ausgabe({ id: 1, menge: 40, abschnitt_id: 1 })]), e);
     expect(stand.offen[0].zufuehrung).toBe('Deich');
@@ -327,5 +335,102 @@ describe('Empfänger — Wahl, Felder, Texte (LLH-1055)', () => {
     expect(mit.map((g) => g.label)).toEqual(['Einheiten', 'Zuführung an Abschnitt', 'aufgelöst']);
     expect(mit[2].options).toEqual([{ value: 'einheit:50', label: 'Alt' }]);
     expect(empfaengerOptionen(KEINE_EMPFAENGER, { aufgeloeste: true })).toEqual([]);
+  });
+});
+
+describe('Empfänger Betreuungsstelle (LLH-1295)', () => {
+  it('Schlüssel, Felder und Rückweg: höchstens einer', () => {
+    const w = { art: 'betreuungsstelle' as const, id: BS_TURNHALLE };
+    expect(empfaengerSchluessel(w)).toBe(`betreuungsstelle:${BS_TURNHALLE}`);
+    expect(parseEmpfaengerSchluessel(`betreuungsstelle:${BS_TURNHALLE}`)).toEqual(w);
+    expect(empfaengerFelder(w)).toEqual({ betreuungsstelle_id: BS_TURNHALLE });
+    expect(empfaengerVon({ betreuungsstelle_id: BS_TURNHALLE })).toEqual(w);
+  });
+
+  it('wählbar beim Zählen nur die offene Stelle; geschlossen oder unbekannt nicht', () => {
+    const e = empfaengerMitBetreuung();
+    expect(isEmpfaengerWaehlbar({ art: 'betreuungsstelle', id: BS_TURNHALLE }, e)).toBe(true);
+    expect(isEmpfaengerWaehlbar({ art: 'betreuungsstelle', id: BS_SCHULE }, e)).toBe(false);
+    expect(isEmpfaengerWaehlbar({ art: 'betreuungsstelle', id: 99 }, e)).toBe(false);
+  });
+
+  it('etwas zu wählen gibt es auch, wenn der Einsatz nur eine offene Stelle hat', () => {
+    const nurStelle = { ...KEINE_EMPFAENGER, betreuungsstellen: empfaengerMitBetreuung().betreuungsstellen };
+    expect(hatWaehlbareEmpfaenger(nurStelle)).toBe(true);
+    const nurGeschlossen = {
+      ...KEINE_EMPFAENGER,
+      betreuungsstellen: [{ id: BS_SCHULE, bezeichnung: 'Schule Süd', geschlossen: true }],
+    };
+    expect(hatWaehlbareEmpfaenger(nurGeschlossen)).toBe(false);
+    expect(hatWaehlbareEmpfaenger(KEINE_EMPFAENGER)).toBe(false);
+  });
+
+  it('Text an einer Ausgabe: „an Turnhalle Nord“; eine unbekannte Stelle bleibt sichtbar', () => {
+    const e = empfaengerMitBetreuung();
+    expect(empfaengerText({ betreuungsstelle_id: BS_TURNHALLE }, e)).toBe('an Turnhalle Nord');
+    expect(empfaengerText({ betreuungsstelle_id: 99 }, e)).toBe('an Betreuungsstelle #99');
+  });
+
+  it('Optionen: Stellen nach den Abschnitten, geschlossene nur im Nachtrag', () => {
+    const e = empfaengerMitBetreuung();
+    const zaehlen = empfaengerOptionen(e, { aufgeloeste: false });
+    expect(zaehlen.map((g) => g.label)).toEqual([
+      'Einheiten',
+      'Zuführung an Abschnitt',
+      'Betreuungsstelle',
+    ]);
+    expect(zaehlen[2].options).toEqual([
+      { value: `betreuungsstelle:${BS_TURNHALLE}`, label: 'Turnhalle Nord' },
+    ]);
+    const nachtrag = empfaengerOptionen(e, { aufgeloeste: true });
+    expect(nachtrag.map((g) => g.label)).toEqual([
+      'Einheiten',
+      'Zuführung an Abschnitt',
+      'Betreuungsstelle',
+      'geschlossen',
+    ]);
+    expect(nachtrag[3].options).toEqual([
+      { value: `betreuungsstelle:${BS_SCHULE}`, label: 'Schule Süd' },
+    ]);
+  });
+
+  it('eine Ausgabe an eine Stelle steht nur unter „verpflegt“ und verpflegt keine Einheit (AK)', () => {
+    const e = empfaengerMitBetreuung();
+    const stand = verpflegungsstand(
+      mittag([
+        ausgabe({ id: 1, menge: 40, zeitpunkt_at: '2026-09-24 10:20:00', betreuungsstelle_id: BS_TURNHALLE }),
+        ausgabe({ id: 2, menge: 12, zeitpunkt_at: '2026-09-24 10:10:00', betreuungsstelle_id: BS_TURNHALLE }),
+        ausgabe({
+          id: 3,
+          menge: 5,
+          betreuungsstelle_id: BS_SCHULE,
+          zurueckgenommen_at: '2026-09-24 10:30:00',
+        }),
+      ]),
+      e,
+    );
+    expect(stand.betreuung).toEqual([
+      {
+        id: BS_TURNHALLE,
+        name: 'Turnhalle Nord',
+        ausgaben: [
+          { menge: 12, zeitpunkt_at: '2026-09-24 10:10:00' },
+          { menge: 40, zeitpunkt_at: '2026-09-24 10:20:00' },
+        ],
+      },
+    ]);
+    expect(stand.verpflegt).toEqual([]);
+    expect(namen(stand.offen)).toEqual(['1. Zug', '1. Gruppe', '2. Gruppe']);
+  });
+
+  it('ein Lagebild ohne Stellenliste (vor LLH-1295) nennt die Stelle mit Kennung', () => {
+    const alt = { einheiten: [], abschnitte: [] } as unknown as Parameters<
+      typeof verpflegungsstand
+    >[1];
+    const stand = verpflegungsstand(
+      mittag([ausgabe({ id: 1, menge: 40, betreuungsstelle_id: BS_TURNHALLE })]),
+      alt,
+    );
+    expect(namen(stand.betreuung)).toEqual([`Betreuungsstelle #${BS_TURNHALLE}`]);
   });
 });

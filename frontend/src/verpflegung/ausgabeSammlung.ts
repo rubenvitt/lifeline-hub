@@ -40,6 +40,8 @@ export interface Buendel {
   /** Empfänger beim ersten Tipp (LLH-1055), höchstens einer; setzt ebenfalls der Hook. */
   einheit_id?: number;
   abschnitt_id?: number;
+  /** Betreuungsstelle als Empfänger (LLH-1295). */
+  betreuungsstelle_id?: number;
 }
 
 /** Ein Abschnitt gleicher Portionen auf dem Stapel (Lauflänge statt je Portion ein Eintrag). */

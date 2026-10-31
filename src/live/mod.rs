@@ -163,7 +163,12 @@ impl LiveEvent {
             // Abschnitts-Ereignis macht die Betreuungs-Übersicht stale, und das invalidiert das
             // Frontend über `EINSATZ_STREAM_EVENTS.abschnitt` (design.md D6), ohne dass ein
             // Abschnitts-Leser von Stellen erführe. Der ETB-Nachweis läuft über `etb`.
-            LiveEvent::Betreuung => &["betreuung"],
+            //
+            // Dazu `verpflegung` (LLH-1295, design.md D4): `GET …/verpflegung` legt in der
+            // Empfängerliste Kennung und Bezeichnung derselben Stellen selbst offen, auch ohne
+            // Modul `betreuung`; ohne den Key fröre die Wahl am Tresen ein, und ein Storno, der
+            // den Bezug von Ausgaben löst, bliebe unsichtbar. Die Nutzlast trägt nur Kennungen.
+            LiveEvent::Betreuung => &["betreuung", "verpflegung"],
             // Nur `evakuierung` (LLH-1034): Bezirke und ihre Standreihen gehören seit der Trennung
             // dem eigenen Modul. NICHT `betreuung`: wer nur die Stellen liest, erführe sonst von
             // jedem Bezirk. Abschnittsnamen wie bei `Betreuung` über das Frontend.
@@ -1006,7 +1011,8 @@ mod tests {
             (LiveEvent::Fernmeldewesen, &["fernmeldewesen"]),
             (LiveEvent::Dokument, &["dokumente"]),
             (LiveEvent::Abloesung, &["abloesung"]),
-            (LiveEvent::Betreuung, &["betreuung"]),
+            // Empfängerliste der Verpflegung (LLH-1295, design.md D4).
+            (LiveEvent::Betreuung, &["betreuung", "verpflegung"]),
             (LiveEvent::Evakuierung, &["evakuierung"]),
             (LiveEvent::Verpflegung, &["verpflegung"]),
             (LiveEvent::Presse, &["stab"]),

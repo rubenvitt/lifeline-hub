@@ -8338,6 +8338,88 @@ mod tests {
         }
     }
 
+    // --- LLH-1295: Betreuungsstelle als Empfänger einer Verpflegungsausgabe (0259) ---
+
+    /// LLH-1295, design.md D1: der Bestand bleibt ohne Empfänger lesbar; die Spalte zeigt mit
+    /// `SET NULL` auf die Betreuungsstelle, der Teilindex ist da.
+    #[tokio::test]
+    async fn migration_0259_verpflegung_ausgabe_betreuungsstelle_bestand() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 258).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let (_, aus) = verpflegung_bestand(&pool, e, b).await;
+
+        migriere_bis(&pool, 259).await;
+
+        let (menge, stelle): (i64, Option<i64>) = sqlx::query_as(
+            "SELECT menge, betreuungsstelle_id FROM verpflegung_ausgabe WHERE id = ?",
+        )
+        .bind(aus)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((menge, stelle), (120, None));
+        let fk: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT \"table\", \"to\", on_delete FROM pragma_foreign_key_list('verpflegung_ausgabe') \
+             WHERE \"from\" = 'betreuungsstelle_id'",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            fk,
+            vec![("betreuungsstelle".into(), "id".into(), "SET NULL".into())]
+        );
+        let index: Option<String> = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' \
+             AND name = 'idx_verpflegung_ausgabe_betreuungsstelle'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        let index = index.expect("Teilindex angelegt");
+        assert!(
+            index.contains("WHERE betreuungsstelle_id IS NOT NULL"),
+            "{index}"
+        );
+    }
+
+    /// Ein Einsatz mit einer Ausgabe an eine Betreuungsstelle lässt sich löschen.
+    #[tokio::test]
+    async fn migration_0259_verpflegung_ausgabe_betreuungsstelle_einsatz_loeschen() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 259).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let (_, aus) = verpflegung_bestand(&pool, e, b).await;
+        let stelle: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'Turnhalle Nord', 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE verpflegung_ausgabe SET betreuungsstelle_id = ? WHERE id = ?")
+            .bind(stelle)
+            .bind(aus)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt Ausgabe und Stelle mit");
+        for tabelle in ["verpflegung_ausgabe", "betreuungsstelle"] {
+            let rest: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT COUNT(*) FROM {tabelle}"
+            )))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(rest, 0, "{tabelle}");
+        }
+    }
+
     // --- LLH-1058: Verpflegungsplan der Organisation (0211) ---
 
     /// Eine Mahlzeit im Verpflegungsplan nach 0211 in Org 1.

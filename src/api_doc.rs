@@ -360,6 +360,7 @@ use utoipa::OpenApi;
         crate::verpflegung::AusgabeErgebnis,
         crate::verpflegung::Bedarf,
         crate::verpflegung::EmpfaengerAbschnitt,
+        crate::verpflegung::EmpfaengerBetreuungsstelle,
         crate::verpflegung::EmpfaengerEinheit,
         crate::verpflegung::Portionen,
         crate::verpflegung::Sonderkost,

@@ -13,6 +13,7 @@ import { renderMitProviders, setzeOnline } from '../test/utils';
 import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
 import {
   ABSCHNITT_DEICH,
+  BS_TURNHALLE,
   DEICH,
   FELDKUECHE,
   GRUPPE_1,
@@ -21,6 +22,7 @@ import {
   TURNHALLE,
   ausgabe,
   empfaenger,
+  empfaengerMitBetreuung,
   stelle,
   verpflegungMitStellen,
   zeitfenster,
@@ -951,8 +953,39 @@ describe('AusgabeAnsicht — Empfänger (LLH-1055 Teil II)', () => {
     );
   });
 
+  it('Betreuungsstelle (LLH-1295): eigene Gruppe ohne geschlossene, keine Stärke-Taste, das Bündel trägt die Stelle', async () => {
+    liefert([mittag()], [], empfaengerMitBetreuung());
+    zeige();
+    await geladen();
+    await oeffne('Empfänger');
+    const optionen = optionenVon('Empfänger');
+    expect(optionen.slice(-2)).toEqual(['Zuführung Deich', 'Turnhalle Nord']);
+    expect(optionen).not.toContain('Schule Süd');
+    await waehle('Empfänger', 'Turnhalle Nord');
+    expect(screen.queryByRole('button', { name: /^Stärke zählen/ })).toBeNull();
+    await userEvent.click(taste('+10'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        menge: 10,
+        betreuungsstelle_id: BS_TURNHALLE,
+      }),
+    );
+  });
+
+  it('nur eine offene Betreuungsstelle: die Empfängerwahl steht', async () => {
+    liefert([mittag()], [], {
+      einheiten: [],
+      abschnitte: [],
+      betreuungsstellen: [{ id: BS_TURNHALLE, bezeichnung: 'Turnhalle Nord', geschlossen: false }],
+    });
+    zeige();
+    await geladen();
+    expect(screen.getByRole('combobox', { name: 'Empfänger' })).toBeVisible();
+  });
+
   it('ohne Einheiten und Abschnitte bleibt der Platz leer und es gibt keine Liste', async () => {
-    liefert([mittag()], [], { einheiten: [], abschnitte: [] });
+    liefert([mittag()], [], { einheiten: [], abschnitte: [], betreuungsstellen: [] });
     zeige();
     await geladen();
     expect(platz().childNodes).toHaveLength(0);

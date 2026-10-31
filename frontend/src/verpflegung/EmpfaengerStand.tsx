@@ -4,6 +4,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AusgabeEingabe, VerpflegungEmpfaenger, VerpflegungZeitfenster } from '../api/types';
 import { Augenbraue, monoStil, useRollen } from '../components/instrument';
 import {
+  betreuungsstellenVon,
   staerkeAnzeige,
   verpflegungsstand,
   type AusgabeKurz,
@@ -62,7 +63,8 @@ function Teile({ teile }: { teile: readonly (ReactNode | null | undefined | fals
  * „Noch nicht verpflegt“ in der Folge des Kräftebaums, Untereinheiten eingerückt, je Zeile
  * Funkrufname, Stärke des Teilbaums (`summiereStaerke`/`staerkeText`, wie die Vorgabe der Menge)
  * und Abschnitt; darunter gesondert „ohne Eintreffen“. „Verpflegt“ nennt die direkten Empfänger
- * mit Menge und Zeit und die mitverpflegten Untereinheiten, dann die Zuführungen an Abschnitte.
+ * mit Menge und Zeit und die mitverpflegten Untereinheiten, dann die Zuführungen an Abschnitte
+ * und die Ausgaben an Betreuungsstellen (LLH-1295); die Zahl „Verpflegt · n“ zählt nur Einheiten.
  * Am gebundenen Gerät steht eine anderswo verpflegte Einheit dort als „anderswo verpflegt · n EP“
  * (LLH-1048, `verpflegt_anderswo` des Servers).
  * Mit `onWaehlen` trägt jede noch nicht verpflegte Zeile „Wählen“ (Handschuh: die Zeile ist der
@@ -81,7 +83,12 @@ export default function EmpfaengerStand({
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const id = useId();
-  if (empfaenger.einheiten.length === 0 && empfaenger.abschnitte.length === 0) return null;
+  if (
+    empfaenger.einheiten.length === 0 &&
+    empfaenger.abschnitte.length === 0 &&
+    betreuungsstellenVon(empfaenger).length === 0
+  )
+    return null;
   const stand = verpflegungsstand(zeitfenster, empfaenger, ausstehend);
   const uhr = (s: string) => uhrzeit(s, konventionen);
   const nebentext = { ...monoStil(12), color: rollen.text2 };
@@ -205,6 +212,24 @@ export default function EmpfaengerStand({
                 <Teile
                   teile={[
                     `Zuführung ${z.name}`,
+                    <span key="m" style={monoStil(13, 500)}>
+                      {ausgabenText(z.ausgaben, uhr)}
+                    </span>,
+                  ]}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {stand.betreuung.length > 0 && (
+        <ul data-lfh="stand-betreuung" style={listeStil}>
+          {stand.betreuung.map((z) => (
+            <li key={z.id} data-betreuungsstelle={z.id} style={zeileStil}>
+              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                <Teile
+                  teile={[
+                    z.name,
                     <span key="m" style={monoStil(13, 500)}>
                       {ausgabenText(z.ausgaben, uhr)}
                     </span>,

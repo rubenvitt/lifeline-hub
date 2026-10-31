@@ -2664,6 +2664,285 @@ async fn live_einheit_erreicht_verpflegungsleser() {
     );
 }
 
+// ── Betreuungsstelle als Empfänger (LLH-1295) ──────────────────────────────────────────────
+
+/// Legt eine Betreuungsstelle an, mit personenbezogenen Angaben, die die Empfängerliste nie
+/// tragen darf.
+async fn betreuungsstelle(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    bezeichnung: &str,
+) -> i64 {
+    let (s, j) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/betreuung/stellen"),
+        cookie,
+        Some(&serde_json::json!({
+            "bezeichnung": bezeichnung,
+            "art": "notunterkunft",
+            "kapazitaet_personen": 150,
+            "standort": "Schulweg Kanarienvogel 3",
+            "notiz": "Notiz Wellensittich",
+            "leitung": "Hildegard Leitung",
+            "kontaktweg": "0171 4711815",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Betreuungsstelle: {j:?}");
+    j["id"].as_i64().unwrap()
+}
+
+async fn betreuungsstelle_status(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    sid: i64,
+    status: &str,
+) {
+    let (s, j) = anfrage_json(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{sid}"),
+        cookie,
+        Some(&serde_json::json!({ "status": status })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Status {status}: {j:?}");
+}
+
+async fn betreuungsstelle_stornieren(app: &axum::Router, cookie: &str, einsatz: i64, sid: i64) {
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{sid}/stornieren"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Stornieren: {j:?}");
+}
+
+/// Spec „Ausgabe an eine Betreuungsstelle“, „Betreuungsstellen ohne Personenangaben“
+/// (LLH-1295, design.md D1/D3): 201, die Ausgabe trägt nur die Kennung der Stelle, zählt in die
+/// ausgegebene Menge, schreibt kein ETB; die Empfängerliste trägt genau Kennung, Bezeichnung und
+/// „geschlossen“.
+#[tokio::test]
+async fn ausgabe_an_betreuungsstelle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let turnhalle = betreuungsstelle(&app, &admin, e, "Turnhalle Nord").await;
+    let etb_vorher = etb_eintraege(&app, &admin, e).await.len();
+
+    let a = ausgabe(
+        &app,
+        &admin,
+        e,
+        zid,
+        &serde_json::json!({ "menge": 40, "betreuungsstelle_id": turnhalle }).to_string(),
+    )
+    .await;
+    assert_eq!(a["zeitfenster"]["ausgegeben"]["gesamt"], 40);
+    let gebucht = &a["zeitfenster"]["ausgaben"][0];
+    assert_eq!(gebucht["betreuungsstelle_id"], turnhalle);
+    let o = gebucht.as_object().unwrap();
+    assert!(!o.contains_key("einheit_id") && !o.contains_key("abschnitt_id"));
+    assert_eq!(
+        etb_eintraege(&app, &admin, e).await.len(),
+        etb_vorher,
+        "eine Ausgabe an eine Stelle schreibt kein ETB"
+    );
+
+    let (s, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    let stellen = u["empfaenger"]["betreuungsstellen"].as_array().unwrap();
+    assert_eq!(stellen.len(), 1);
+    let mut schluessel: Vec<&str> = stellen[0]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    schluessel.sort_unstable();
+    assert_eq!(schluessel, ["bezeichnung", "geschlossen", "id"]);
+    assert_eq!(stellen[0]["bezeichnung"], "Turnhalle Nord");
+    assert_eq!(stellen[0]["geschlossen"], false);
+    let text = u["empfaenger"].to_string();
+    for verboten in [
+        "Hildegard",
+        "4711815",
+        "Kanarienvogel",
+        "Wellensittich",
+        "150",
+    ] {
+        assert!(!text.contains(verboten), "{verboten:?} in {text}");
+    }
+}
+
+/// Spec „Einheit und Betreuungsstelle zugleich“, „Betreuungsstelle eines anderen Einsatzes“,
+/// „Geschlossene Betreuungsstelle“, „Stornierte Betreuungsstelle“ (LLH-1295, design.md D2).
+#[tokio::test]
+async fn ausgabe_an_betreuungsstelle_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen_mit(&app, &admin, "Andere Lage").await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let gruppe = einheit_bilden(&app, &admin, e, "2. Gruppe").await;
+    let deich = abschnitt(&app, &admin, e, "Deich").await;
+    let turnhalle = betreuungsstelle(&app, &admin, e, "Turnhalle Nord").await;
+    let schule = betreuungsstelle(&app, &admin, e, "Schule Süd").await;
+    let fehlanlage = betreuungsstelle(&app, &admin, e, "Fehlanlage").await;
+    let fremd = betreuungsstelle(&app, &admin, e2, "Fremde Halle").await;
+    betreuungsstelle_stornieren(&app, &admin, e, fehlanlage).await;
+    betreuungsstelle_status(&app, &admin, e, schule, "in_betrieb").await;
+    betreuungsstelle_status(&app, &admin, e, schule, "geschlossen").await;
+
+    let post = |body: Value| {
+        let app = app.clone();
+        let admin = admin.clone();
+        let url = url.clone();
+        async move { anfrage_json(&app, "POST", &url, &admin, Some(&body)).await }
+    };
+    for (body, erwartet, was) in [
+        (
+            serde_json::json!({ "menge": 9, "einheit_id": gruppe, "betreuungsstelle_id": turnhalle }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Einheit und Stelle",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "abschnitt_id": deich, "betreuungsstelle_id": turnhalle }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Abschnitt und Stelle",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "betreuungsstelle_id": fremd }),
+            StatusCode::NOT_FOUND,
+            "fremde Stelle",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "betreuungsstelle_id": 999_999 }),
+            StatusCode::NOT_FOUND,
+            "unbekannte Stelle",
+        ),
+        (
+            serde_json::json!({ "menge": 9, "betreuungsstelle_id": fehlanlage }),
+            StatusCode::NOT_FOUND,
+            "stornierte Stelle",
+        ),
+    ] {
+        let (s, j) = post(body).await;
+        assert_eq!(s, erwartet, "{was}: {j:?}");
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(
+        u["zeitfenster"][0]["ausgaben"].as_array().unwrap().len(),
+        0,
+        "nichts angelegt"
+    );
+    let stellen: Vec<(i64, bool)> = u["empfaenger"]["betreuungsstellen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| {
+            (
+                x["id"].as_i64().unwrap(),
+                x["geschlossen"].as_bool().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        stellen,
+        [(schule, true), (turnhalle, false)],
+        "nach Bezeichnung, ohne stornierte, ohne fremde"
+    );
+
+    let (s, j) = post(serde_json::json!({ "menge": 12, "betreuungsstelle_id": schule })).await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "geschlossene Stelle nimmt an: {j:?}"
+    );
+}
+
+/// Spec „Betreuungsstelle storniert“ (LLH-1295, design.md D5): Der Storno löst den Bezug, die
+/// Ausgabe bleibt und zählt weiter.
+#[tokio::test]
+async fn storno_der_betreuungsstelle_loest_den_bezug() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let turnhalle = betreuungsstelle(&app, &admin, e, "Turnhalle Nord").await;
+    ausgabe(
+        &app,
+        &admin,
+        e,
+        zid,
+        &serde_json::json!({ "menge": 40, "betreuungsstelle_id": turnhalle }).to_string(),
+    )
+    .await;
+
+    betreuungsstelle_stornieren(&app, &admin, e, turnhalle).await;
+
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    let zf = &u["zeitfenster"][0];
+    assert_eq!(zf["ausgegeben"]["gesamt"], 40, "zählt weiter");
+    let a = zf["ausgaben"][0].as_object().unwrap();
+    assert_eq!(a["menge"], 40);
+    assert!(!a.contains_key("betreuungsstelle_id"), "{a:?}");
+    assert_eq!(
+        u["empfaenger"]["betreuungsstellen"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
+}
+
+/// Spec „Leser ohne Modul Betreuung“ und „Betreuungsstelle angelegt, Leser nur der Verpflegung“
+/// (LLH-1295, design.md D3/D4): Wer die Verpflegung lesen darf, bekommt die Stellen in der
+/// Empfängerliste und das Ereignis `betreuung`; die Betreuungsübersicht bleibt ihm 403.
+#[tokio::test]
+async fn betreuungsstellen_fuer_verpflegungsleser_ohne_modul_betreuung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    betreuungsstelle(&app, &admin, e, "Turnhalle Nord").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    modul_override(&app, &admin, e, "betreuung", true, Some("fuehrungskraft")).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/betreuung"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Betreuung bleibt verschlossen");
+    let (s, u) = anfrage(&app, "GET", &pfad(e), &frieda, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        u["empfaenger"]["betreuungsstellen"][0]["bezeichnung"],
+        "Turnhalle Nord"
+    );
+
+    let feed = live_oeffnen(&app, &frieda, e).await;
+    betreuungsstelle(&app, &admin, e, "Schule Süd").await;
+    let bei_frieda = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        bei_frieda.contains("event: betreuung"),
+        "Verpflegungsleser bekommt `betreuung`: {bei_frieda:?}"
+    );
+}
+
 // ── Verpflegungsplan der Organisation (LLH-1058) ────────────────────────────────────────────
 
 const PLAN: &str = "/api/verpflegung-vorlagen";

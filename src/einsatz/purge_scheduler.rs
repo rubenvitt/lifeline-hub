@@ -1618,6 +1618,7 @@ mod tests {
                 verpflegungsstelle_id: Some(stelle),
                 einheit_id: None,
                 abschnitt_id: None,
+                betreuungsstelle_id: None,
                 client_id: None,
             },
         )
@@ -1657,6 +1658,7 @@ mod tests {
                     verpflegungsstelle_id: None,
                     einheit_id,
                     abschnitt_id,
+                    betreuungsstelle_id: None,
                     client_id: None,
                 },
             )

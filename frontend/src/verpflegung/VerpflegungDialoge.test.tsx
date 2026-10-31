@@ -1138,6 +1138,7 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
       zeigeNachtrag(STELLEN, verpflegungMitStellen().zeitfenster[0], {
         einheiten: [],
         abschnitte: [],
+        betreuungsstellen: [],
       });
       const dialog = await screen.findByRole('dialog');
       expect(within(dialog).queryByRole('combobox', { name: 'Empfänger' })).toBeNull();

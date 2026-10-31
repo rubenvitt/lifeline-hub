@@ -600,7 +600,7 @@ describe('ZeitfensterKarte — Empfänger (LLH-1055 Teil II)', () => {
   });
 
   it('ohne Einheiten im Einsatz keine Klappe', () => {
-    const { karte } = zeige(mitEmpfaengern(), { empfaenger: { einheiten: [], abschnitte: [] } });
+    const { karte } = zeige(mitEmpfaengern(), { empfaenger: { einheiten: [], abschnitte: [], betreuungsstellen: [] } });
     expect(within(karte).queryByRole('button', { name: /^Einheiten/ })).toBeNull();
   });
 });

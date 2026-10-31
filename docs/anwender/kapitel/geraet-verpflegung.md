@@ -50,7 +50,8 @@ oder „Unterdeckung“ (Fehlmenge, Zeitfenster hat begonnen).
 3. Holt eine Einheit ab, unter „Empfänger“ die Einheit wählen oder weiter unten in der Liste
    „Noch nicht verpflegt“ bei ihr „Wählen“ tippen. Die Taste mit ihrer Stärke, etwa „+9“, zählt so
    viele Portionen auf einmal; „−1“ nimmt einzelne zurück, wenn weniger da sind. Für eine
-   Zuführung „Zuführung …“ mit dem Abschnitt wählen, sonst bleibt es bei „ohne Empfänger“.
+   Zuführung „Zuführung …“ mit dem Abschnitt wählen, für Betroffene in einer Betreuungsstelle die
+   Stelle unter „Betreuungsstelle“, sonst bleibt es bei „ohne Empfänger“.
 4. Je ausgegebene Portion „+1“ tippen, für mehrere „+5“, „+10“ oder „Menge …“. Für Sonderkost die
    Taste der Kostform tippen, etwa „vegetarisch“; sie zählt auch in die Sammlung.
 
@@ -65,8 +66,8 @@ oder „Unterdeckung“ (Fehlmenge, Zeitfenster hat begonnen).
 1. In der Ausgabeansicht unter den Sonderkost-Tasten „Noch nicht verpflegt“ lesen: die
    eingetroffenen Einheiten ohne Ausgabe in diesem Zeitfenster, mit Funkrufname, Stärke und
    Abschnitt. Darunter stehen gesondert die Einheiten „ohne Eintreffen“.
-2. Unter „Verpflegt“ stehen die Einheiten mit Menge und Uhrzeit ihrer Ausgabe und die Zuführungen
-   an Abschnitte. Am an eine Stelle gekoppelten Tablet steht eine Einheit, die an einer anderen
+2. Unter „Verpflegt“ stehen die Einheiten mit Menge und Uhrzeit ihrer Ausgabe, die Zuführungen
+   an Abschnitte und die Ausgaben an Betreuungsstellen. Am an eine Stelle gekoppelten Tablet steht eine Einheit, die an einer anderen
    Stelle oder ohne Stelle Portionen bekam, dort als „anderswo verpflegt · … EP“.
 3. Auf der Liste der Zeitfenster zeigt die Klappe „Einheiten“ jeder Karte dieselben Listen.
 
@@ -75,7 +76,8 @@ oder „Unterdeckung“ (Fehlmenge, Zeitfenster hat begonnen).
 1. Beim Zeitfenster „Ausgabe nachtragen“ wählen, auch bei einem vergangenen. Der Dialog
    „Ausgabe nachtragen: …“ nennt Bedarf, bisher Ausgegebenes und die Fehlmenge.
 2. Unter „Menge (EP)“ die ausgegebenen Portionen eintragen, unter „Empfänger“ bei Bedarf die
-   Einheit oder die Zuführung wählen (bei leerer Menge trägt die Einheit ihre Stärke ein) und
+   Einheit, die Zuführung oder die Betreuungsstelle wählen (bei leerer Menge trägt die Einheit
+   ihre Stärke ein; eine geschlossene Betreuungsstelle steht unter „geschlossen“) und
    unter „Stelle“ die Stelle; an einer Stelle gekoppelt steht dort fest die eigene, und ein
    Zuführungsziel gibt es nicht. „Zeitpunkt“ leer heißt jetzt. Der Ort (im Einsatz mit Stellen
    „Zuführungsziel“), Sonderkost und eine Bemerkung stehen unter „Weitere Angaben“.
@@ -138,7 +140,8 @@ daneben.
 ### Wer als verpflegt gilt
 
 Eine Ausgabe an eine Einheit verpflegt auch ihre Untereinheiten. Eine Zuführung an einen
-Abschnitt verpflegt keine Einheit; die Zeilen der Einheiten im Abschnitt nennen sie nur. Ohne
+Abschnitt verpflegt keine Einheit; die Zeilen der Einheiten im Abschnitt nennen sie nur. Eine
+Ausgabe an eine Betreuungsstelle verpflegt ebenfalls keine Einheit. Ohne
 Eintreffen in der Kräfte-Zeitachse steht eine Einheit gesondert unter „ohne Eintreffen“, wer erst
 nach dem Ende des Zeitfensters eintraf, fehlt für dieses Zeitfenster. Die Einheiten liest das
 Tablet aus der Verpflegung selbst, mit Namen und Stärke, aber ohne Namen von Personen; die

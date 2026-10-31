@@ -2,10 +2,11 @@
  * Empfänger einer Ausgabe — reiner Kern der Anzeige (LLH-1055 Teil II, Entscheidung LLH-1024 F3,
  * Spec `kraefte-verpflegung`, „Empfänger einer Ausgabe“ und „Noch nicht verpflegt“).
  *
- * Empfänger ist höchstens EINER: eine Einheit (Abholung, steht für ihren Teilbaum) oder ein
- * Abschnitt (Zuführung), nie eine Person. Namen, Gliederung, Stärke und Eintreffen kommen allein
- * aus der Projektion `empfaenger` in `GET …/verpflegung`, nie aus `GET …/einheiten` (das Gerät
- * darf es nicht lesen).
+ * Empfänger ist höchstens EINER: eine Einheit (Abholung, steht für ihren Teilbaum), ein
+ * Abschnitt (Zuführung) oder eine Betreuungsstelle (Ausgabe an Betreute, LLH-1295), nie eine
+ * Person. Namen, Gliederung, Stärke und Eintreffen kommen allein aus der Projektion `empfaenger`
+ * in `GET …/verpflegung`, nie aus `GET …/einheiten` oder `GET …/betreuung` (das Gerät darf sie
+ * nicht lesen).
  *
  * {@link verpflegungsstand} leitet je Zeitfenster ab, wer noch nicht verpflegt ist. Der Server
  * liefert keine solche Liste, weil nur der Client die vorgemerkten Ausgaben kennt:
@@ -25,6 +26,8 @@
  *   (`verpflegt_anderswo`). Sie verpflegt die Einheit und ihren Teilbaum wie eine eigene Ausgabe
  *   und steht unter „verpflegt“ als Menge ohne Zeit. Nur, was der Server liefert; am Desktop und
  *   am einsatzweiten Gerät ist die Liste leer.
+ * - Eine Ausgabe an eine **Betreuungsstelle** (LLH-1295) verpflegt keine Einheit; sie steht nur
+ *   unter „verpflegt“, je Stelle mit Menge und Zeit, nie unter „noch nicht verpflegt“.
  * - Eine **vorgemerkte** Ausgabe (ohne Netz, noch nicht bestätigt) steht als „ausstehend“ an
  *   ihrer Einheit und nimmt sie nicht aus der Liste, wie sie nicht in die Deckung zählt.
  *
@@ -36,6 +39,7 @@ import utc from 'dayjs/plugin/utc';
 import type {
   AusgabeEingabe,
   EmpfaengerAbschnitt,
+  EmpfaengerBetreuungsstelle,
   EmpfaengerEinheit,
   VerpflegungAusgabe,
   VerpflegungEmpfaenger,
@@ -48,53 +52,96 @@ dayjs.extend(utc);
 
 /** Der gewählte Empfänger; `null` heißt „ohne Empfänger“ (Vorgabe). */
 export interface EmpfaengerWahl {
-  art: 'einheit' | 'abschnitt';
+  art: 'einheit' | 'abschnitt' | 'betreuungsstelle';
   id: number;
 }
 
-/** Ohne Einheiten und Abschnitte; auch, solange die Verpflegung nicht geladen ist. */
-export const LEERE_EMPFAENGER: VerpflegungEmpfaenger = { einheiten: [], abschnitte: [] };
+/** Ohne Einheiten, Abschnitte und Stellen; auch, solange die Verpflegung nicht geladen ist. */
+export const LEERE_EMPFAENGER: VerpflegungEmpfaenger = {
+  einheiten: [],
+  abschnitte: [],
+  betreuungsstellen: [],
+};
 
-/** Wählbar beim Zählen: eine nicht aufgelöste Einheit oder ein Abschnitt der Liste. */
+/**
+ * Die Betreuungsstellen der Liste. `?? []`: ein Lagebild von der Platte aus der Zeit vor
+ * LLH-1295 trägt das Feld noch nicht.
+ */
+export function betreuungsstellenVon(e: VerpflegungEmpfaenger): EmpfaengerBetreuungsstelle[] {
+  return e.betreuungsstellen ?? [];
+}
+
+/**
+ * Wählbar beim Zählen: eine nicht aufgelöste Einheit, ein Abschnitt oder eine nicht geschlossene
+ * Betreuungsstelle der Liste.
+ */
 export function isEmpfaengerWaehlbar(
   w: EmpfaengerWahl | null,
   e: VerpflegungEmpfaenger,
 ): w is EmpfaengerWahl {
   if (!w) return false;
-  return w.art === 'einheit'
-    ? e.einheiten.some((x) => x.id === w.id && !x.aufgeloest_at)
-    : e.abschnitte.some((x) => x.id === w.id);
+  switch (w.art) {
+    case 'einheit':
+      return e.einheiten.some((x) => x.id === w.id && !x.aufgeloest_at);
+    case 'abschnitt':
+      return e.abschnitte.some((x) => x.id === w.id);
+    case 'betreuungsstelle':
+      return betreuungsstellenVon(e).some((x) => x.id === w.id && !x.geschlossen);
+  }
+}
+
+/** Gibt es beim Zählen etwas zu wählen (Einheit, Abschnitt oder offene Stelle)? */
+export function hatWaehlbareEmpfaenger(e: VerpflegungEmpfaenger): boolean {
+  return (
+    e.einheiten.some((x) => !x.aufgeloest_at) ||
+    e.abschnitte.length > 0 ||
+    betreuungsstellenVon(e).some((x) => !x.geschlossen)
+  );
 }
 
 /** Wert der Option „ohne Empfänger“ in einer Auswahl. */
 export const OHNE_EMPFAENGER = 'ohne';
 
-/** `einheit:31`, `abschnitt:41` — der Wert einer Option (wie die Empfänger eines Auftrags). */
+/**
+ * `einheit:31`, `abschnitt:41`, `betreuungsstelle:51` — der Wert einer Option (wie die Empfänger
+ * eines Auftrags).
+ */
 export function empfaengerSchluessel(w: EmpfaengerWahl | null): string {
   return w ? `${w.art}:${w.id}` : OHNE_EMPFAENGER;
 }
 
 export function parseEmpfaengerSchluessel(s: string | null | undefined): EmpfaengerWahl | null {
-  const m = /^(einheit|abschnitt):(\d+)$/.exec(s ?? '');
+  const m = /^(einheit|abschnitt|betreuungsstelle):(\d+)$/.exec(s ?? '');
   if (!m) return null;
   const id = Number(m[2]);
   return id > 0 ? { art: m[1] as EmpfaengerWahl['art'], id } : null;
 }
 
-/** Die Felder der Eingabe: höchstens einer der beiden, ohne Empfänger keiner. */
+/** Die Felder der Eingabe: höchstens eines, ohne Empfänger keines. */
 export function empfaengerFelder(
   w: EmpfaengerWahl | null,
-): Pick<AusgabeEingabe, 'einheit_id' | 'abschnitt_id'> {
+): Pick<AusgabeEingabe, 'einheit_id' | 'abschnitt_id' | 'betreuungsstelle_id'> {
   if (!w) return {};
-  return w.art === 'einheit' ? { einheit_id: w.id } : { abschnitt_id: w.id };
+  switch (w.art) {
+    case 'einheit':
+      return { einheit_id: w.id };
+    case 'abschnitt':
+      return { abschnitt_id: w.id };
+    case 'betreuungsstelle':
+      return { betreuungsstelle_id: w.id };
+  }
 }
 
-type MitEmpfaenger = Pick<VerpflegungAusgabe, 'einheit_id' | 'abschnitt_id'>;
+type MitEmpfaenger = Pick<
+  VerpflegungAusgabe,
+  'einheit_id' | 'abschnitt_id' | 'betreuungsstelle_id'
+>;
 
 /** Der Empfänger einer Ausgabe (gespeichert oder vorgemerkt). */
 export function empfaengerVon(a: MitEmpfaenger): EmpfaengerWahl | null {
   if (a.einheit_id != null) return { art: 'einheit', id: a.einheit_id };
   if (a.abschnitt_id != null) return { art: 'abschnitt', id: a.abschnitt_id };
+  if (a.betreuungsstelle_id != null) return { art: 'betreuungsstelle', id: a.betreuungsstelle_id };
   return null;
 }
 
@@ -107,11 +154,24 @@ function abschnittName(id: number, e: VerpflegungEmpfaenger): string {
   return e.abschnitte.find((x) => x.id === id)?.name ?? `Abschnitt #${id}`;
 }
 
-/** „an 2. Gruppe“, „Zuführung Deich“; leer ohne Empfänger. */
+function betreuungsstelleName(id: number, e: VerpflegungEmpfaenger): string {
+  return (
+    betreuungsstellenVon(e).find((x) => x.id === id)?.bezeichnung ?? `Betreuungsstelle #${id}`
+  );
+}
+
+/** „an 2. Gruppe“, „Zuführung Deich“, „an Turnhalle Nord“; leer ohne Empfänger. */
 export function empfaengerText(a: MitEmpfaenger, e: VerpflegungEmpfaenger): string {
   const w = empfaengerVon(a);
   if (!w) return '';
-  return w.art === 'einheit' ? `an ${einheitName(w.id, e)}` : `Zuführung ${abschnittName(w.id, e)}`;
+  switch (w.art) {
+    case 'einheit':
+      return `an ${einheitName(w.id, e)}`;
+    case 'abschnitt':
+      return `Zuführung ${abschnittName(w.id, e)}`;
+    case 'betreuungsstelle':
+      return `an ${betreuungsstelleName(w.id, e)}`;
+  }
 }
 
 /**
@@ -144,8 +204,10 @@ export interface EmpfaengerOptionGruppe {
 
 /**
  * Gruppen jeder Empfängerwahl: die Einheiten in der Folge des Kräftebaums (wie der Server sie
- * liefert), dann die Abschnitte als Zuführung. Aufgelöste Einheiten nur für Nachträge vor der
- * Auflösung (der Server prüft den Zeitpunkt, 409), als eigene Gruppe.
+ * liefert), dann die Abschnitte als Zuführung, dann die Betreuungsstellen (LLH-1295) nach
+ * Bezeichnung. Aufgelöste Einheiten und geschlossene Stellen nur für Nachträge (`aufgeloeste`),
+ * je als eigene Gruppe; der Server prüft den Zeitpunkt der Auflösung (409), eine geschlossene
+ * Stelle nimmt an.
  */
 export function empfaengerOptionen(
   e: VerpflegungEmpfaenger,
@@ -155,6 +217,11 @@ export function empfaengerOptionen(
     value: empfaengerSchluessel({ art: 'einheit', id: x.id }),
     label: einheitLabel(x),
   });
+  const stelleOption = (x: EmpfaengerBetreuungsstelle) => ({
+    value: empfaengerSchluessel({ art: 'betreuungsstelle', id: x.id }),
+    label: x.bezeichnung,
+  });
+  const stellen = betreuungsstellenVon(e);
   return [
     { label: 'Einheiten', options: e.einheiten.filter((x) => !x.aufgeloest_at).map(option) },
     {
@@ -165,8 +232,16 @@ export function empfaengerOptionen(
       })),
     },
     {
+      label: 'Betreuungsstelle',
+      options: stellen.filter((x) => !x.geschlossen).map(stelleOption),
+    },
+    {
       label: 'aufgelöst',
       options: aufgeloeste ? e.einheiten.filter((x) => !!x.aufgeloest_at).map(option) : [],
+    },
+    {
+      label: 'geschlossen',
+      options: aufgeloeste ? stellen.filter((x) => x.geschlossen).map(stelleOption) : [],
     },
   ].filter((g) => g.options.length > 0);
 }
@@ -216,11 +291,19 @@ export interface ZufuehrungZeile {
   ausgaben: AusgabeKurz[];
 }
 
+/** Eine Betreuungsstelle mit Ausgabe in diesem Zeitfenster (LLH-1295), nur unter „verpflegt“. */
+export interface BetreuungZeile {
+  id: number;
+  name: string;
+  ausgaben: AusgabeKurz[];
+}
+
 export interface Verpflegungsstand {
   offen: StandZeile[];
   ohneEintreffen: StandZeile[];
   verpflegt: VerpflegtZeile[];
   zufuehrungen: ZufuehrungZeile[];
+  betreuung: BetreuungZeile[];
 }
 
 function gruppiere(
@@ -262,6 +345,7 @@ export function verpflegungsstand(
   const gueltig = zf.ausgaben.filter((a) => a.zurueckgenommen_at == null);
   const anEinheit = gruppiere(gueltig, (a) => a.einheit_id);
   const anAbschnitt = gruppiere(gueltig, (a) => a.abschnitt_id);
+  const anStelle = gruppiere(gueltig, (a) => a.betreuungsstelle_id);
   const anderswo = new Map<number, number>();
   // `?? []`: ein Lagebild von der Platte aus der Zeit vor LLH-1048 trägt das Feld noch nicht.
   for (const a of zf.verpflegt_anderswo ?? []) {
@@ -342,5 +426,22 @@ export function verpflegungsstand(
       .map((id): EmpfaengerAbschnitt => ({ id, name: `Abschnitt #${id}` })),
   ].map((a) => ({ id: a.id, name: a.name, ausgaben: anAbschnitt.get(a.id) ?? [] }));
 
-  return { offen: zeilen(offenRoh), ohneEintreffen: zeilen(ohneRoh), verpflegt, zufuehrungen };
+  const stellen = betreuungsstellenVon(e);
+  const bekannteStellen = new Set(stellen.map((x) => x.id));
+  const betreuung: BetreuungZeile[] = [
+    ...stellen
+      .filter((x) => anStelle.has(x.id))
+      .map((x) => ({ id: x.id, name: x.bezeichnung })),
+    ...[...anStelle.keys()]
+      .filter((id) => !bekannteStellen.has(id))
+      .map((id) => ({ id, name: `Betreuungsstelle #${id}` })),
+  ].map((x) => ({ ...x, ausgaben: anStelle.get(x.id) ?? [] }));
+
+  return {
+    offen: zeilen(offenRoh),
+    ohneEintreffen: zeilen(ohneRoh),
+    verpflegt,
+    zufuehrungen,
+    betreuung,
+  };
 }
