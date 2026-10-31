@@ -1640,9 +1640,21 @@ mod tests {
         .fetch_one(&mut *tx)
         .await
         .unwrap();
-        for (menge, einheit_id, abschnitt_id) in
-            [(9, Some(einheit), None), (40, None, Some(abschnitt))]
-        {
+        // LLH-1295: dazu eine Ausgabe an eine Betreuungsstelle; auch dieser Verweis bleibt.
+        let bstelle: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'Turnhalle Nord', 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(nutzer)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        for (menge, einheit_id, abschnitt_id, betreuungsstelle_id) in [
+            (9, Some(einheit), None, None),
+            (40, None, Some(abschnitt), None),
+            (25, None, None, Some(bstelle)),
+        ] {
             v::ausgabe_erfassen_tx(
                 &mut tx,
                 e,
@@ -1658,7 +1670,7 @@ mod tests {
                     verpflegungsstelle_id: None,
                     einheit_id,
                     abschnitt_id,
-                    betreuungsstelle_id: None,
+                    betreuungsstelle_id,
                     client_id: None,
                 },
             )
@@ -1690,8 +1702,8 @@ mod tests {
             a.bemerkung = None;
         }
         assert_eq!(nachher, erwartet);
-        let empfaenger: Vec<(i64, Option<i64>, Option<i64>)> = sqlx::query_as(
-            "SELECT menge, einheit_id, abschnitt_id FROM verpflegung_ausgabe \
+        let empfaenger: Vec<(i64, Option<i64>, Option<i64>, Option<i64>)> = sqlx::query_as(
+            "SELECT menge, einheit_id, abschnitt_id, betreuungsstelle_id FROM verpflegung_ausgabe \
              WHERE einsatz_id = ? ORDER BY id",
         )
         .bind(e)
@@ -1701,9 +1713,10 @@ mod tests {
         assert_eq!(
             empfaenger,
             [
-                (60, None, None),
-                (9, Some(einheit), None),
-                (40, None, Some(abschnitt))
+                (60, None, None, None),
+                (9, Some(einheit), None, None),
+                (40, None, Some(abschnitt), None),
+                (25, None, None, Some(bstelle))
             ],
             "Empfängerverweise bleiben"
         );

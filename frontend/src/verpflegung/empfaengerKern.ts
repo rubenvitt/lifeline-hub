@@ -155,9 +155,7 @@ function abschnittName(id: number, e: VerpflegungEmpfaenger): string {
 }
 
 function betreuungsstelleName(id: number, e: VerpflegungEmpfaenger): string {
-  return (
-    betreuungsstellenVon(e).find((x) => x.id === id)?.bezeichnung ?? `Betreuungsstelle #${id}`
-  );
+  return betreuungsstellenVon(e).find((x) => x.id === id)?.bezeichnung ?? `Betreuungsstelle #${id}`;
 }
 
 /** „an 2. Gruppe“, „Zuführung Deich“, „an Turnhalle Nord“; leer ohne Empfänger. */
@@ -429,9 +427,7 @@ export function verpflegungsstand(
   const stellen = betreuungsstellenVon(e);
   const bekannteStellen = new Set(stellen.map((x) => x.id));
   const betreuung: BetreuungZeile[] = [
-    ...stellen
-      .filter((x) => anStelle.has(x.id))
-      .map((x) => ({ id: x.id, name: x.bezeichnung })),
+    ...stellen.filter((x) => anStelle.has(x.id)).map((x) => ({ id: x.id, name: x.bezeichnung })),
     ...[...anStelle.keys()]
       .filter((id) => !bekannteStellen.has(id))
       .map((id) => ({ id, name: `Betreuungsstelle #${id}` })),

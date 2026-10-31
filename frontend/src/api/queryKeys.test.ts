@@ -120,6 +120,15 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
+  it('bildet betreuung auf Betreuung und Verpflegung ab (LFH-639, LLH-1295)', () => {
+    // Die Empfängerliste der Verpflegung trägt die Betreuungsstellen, und ein Storno löst den
+    // Bezug von Ausgaben; fehlt `verpflegung`, friert die Empfängerwahl am Tresen ein.
+    expect(EINSATZ_STREAM_EVENTS.betreuung).toEqual([
+      EINSATZ_KEYS.betreuung,
+      EINSATZ_KEYS.verpflegung,
+    ]);
+  });
+
   it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Evakuierung, Lagemonitor, BR-Liste und Verpflegung ab (LFH-612/635/639, LLH-1095, LLH-1055, LLH-1034)', () => {
     // Bezirke, Stellen und die Liste der Bereitstellungsräume tragen den Abschnittsnamen per Join;
     // fehlen sie hier, zeigt die Seite still den alten Namen. Der Lagemonitor zeigt die

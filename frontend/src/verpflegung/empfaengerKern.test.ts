@@ -355,7 +355,10 @@ describe('Empfänger Betreuungsstelle (LLH-1295)', () => {
   });
 
   it('etwas zu wählen gibt es auch, wenn der Einsatz nur eine offene Stelle hat', () => {
-    const nurStelle = { ...KEINE_EMPFAENGER, betreuungsstellen: empfaengerMitBetreuung().betreuungsstellen };
+    const nurStelle = {
+      ...KEINE_EMPFAENGER,
+      betreuungsstellen: empfaengerMitBetreuung().betreuungsstellen,
+    };
     expect(hatWaehlbareEmpfaenger(nurStelle)).toBe(true);
     const nurGeschlossen = {
       ...KEINE_EMPFAENGER,
@@ -398,8 +401,18 @@ describe('Empfänger Betreuungsstelle (LLH-1295)', () => {
     const e = empfaengerMitBetreuung();
     const stand = verpflegungsstand(
       mittag([
-        ausgabe({ id: 1, menge: 40, zeitpunkt_at: '2026-09-24 10:20:00', betreuungsstelle_id: BS_TURNHALLE }),
-        ausgabe({ id: 2, menge: 12, zeitpunkt_at: '2026-09-24 10:10:00', betreuungsstelle_id: BS_TURNHALLE }),
+        ausgabe({
+          id: 1,
+          menge: 40,
+          zeitpunkt_at: '2026-09-24 10:20:00',
+          betreuungsstelle_id: BS_TURNHALLE,
+        }),
+        ausgabe({
+          id: 2,
+          menge: 12,
+          zeitpunkt_at: '2026-09-24 10:10:00',
+          betreuungsstelle_id: BS_TURNHALLE,
+        }),
         ausgabe({
           id: 3,
           menge: 5,

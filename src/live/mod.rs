@@ -168,6 +168,9 @@ impl LiveEvent {
             // Empfängerliste Kennung und Bezeichnung derselben Stellen selbst offen, auch ohne
             // Modul `betreuung`; ohne den Key fröre die Wahl am Tresen ein, und ein Storno, der
             // den Bezug von Ausgaben löst, bliebe unsichtbar. Die Nutzlast trägt nur Kennungen.
+            // Bewusst hingenommen (design.md D4, wie bei `Einheit`): das Ereignis feuert auch bei
+            // Belegungsmeldungen, Leser nur der Verpflegung erfahren so den Zeitpunkt einer
+            // Meldung an einer Stelle, deren Bezeichnung sie ohnehin sehen, nicht ihren Inhalt.
             LiveEvent::Betreuung => &["betreuung", "verpflegung"],
             // Nur `evakuierung` (LLH-1034): Bezirke und ihre Standreihen gehören seit der Trennung
             // dem eigenen Modul. NICHT `betreuung`: wer nur die Stellen liest, erführe sonst von

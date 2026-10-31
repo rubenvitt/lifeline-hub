@@ -175,7 +175,10 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
   (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/verpflegung`, **nie**
   `GET …/einheiten` (bleibt 403); Einheitennamen sind keine Namen von Einsatzkräften, Führer- und
-  Mitgliedernamen bleiben draußen; Lese-Module und Routenliste `VERPFLEGUNG` unverändert. Das
+  Mitgliedernamen bleiben draußen; Lese-Module und Routenliste `VERPFLEGUNG` unverändert. Ebenso
+  Betreuungsstellen als Empfänger (LLH-1295): nur Kennung, Bezeichnung und „geschlossen“ aus
+  `empfaenger.betreuungsstellen`, **nie** `GET …/betreuung` (bleibt 403); das Ereignis `betreuung`
+  erreicht das Gerät über das Lese-Modul `verpflegung`. Das
   Gerät wählt den Empfänger wie der Stab (Ausgabeansicht und Nachtrag) und zeigt daraus „Noch
   nicht verpflegt“; gemerkt wird auch der Empfänger nicht. Den
   Einsatzleiter am Einsatzkopf bekommt keine Gerätesitzung (LLH-1168, `src/routes/einsatz.rs::detail`).

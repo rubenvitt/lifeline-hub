@@ -219,7 +219,9 @@ export default function ZeitfensterKarte({
   const woText = (stelleId: number | null | undefined, ort: string | null | undefined) =>
     stelleId != null ? ` · ${stellenName(stelleId, stellen)}` : ort ? ` · ${ort}` : '';
   /** „ · an 2. Gruppe“; leer ohne Empfänger. */
-  const anText = (a: Pick<VerpflegungAusgabe, 'einheit_id' | 'abschnitt_id'>) => {
+  const anText = (
+    a: Pick<VerpflegungAusgabe, 'einheit_id' | 'abschnitt_id' | 'betreuungsstelle_id'>,
+  ) => {
     const t = empfaengerText(a, empfaenger);
     return t ? ` · ${t}` : '';
   };

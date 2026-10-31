@@ -387,7 +387,7 @@ pub struct EmpfaengerAbschnitt {
 
 /// Eine Betreuungsstelle der Empfängerliste (LLH-1295, design.md D3): Ziel einer Ausgabe an
 /// Betreute. Nur Kennung, Bezeichnung und ob sie geschlossen ist; die Feldmenge ist gepinnt
-/// (`tests/verpflegung.rs`, `betreuungsstellen_der_empfaengerliste_ohne_personenangaben`): keine
+/// (`tests/verpflegung.rs`, `ausgabe_an_betreuungsstelle`): keine
 /// Leitung, kein Kontakt, keine Notiz, kein Standort, keine Kapazität, keine Belegung.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct EmpfaengerBetreuungsstelle {
