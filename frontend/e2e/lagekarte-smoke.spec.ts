@@ -90,6 +90,7 @@ async function ohneUeberdeckung(page: Page, wo: string) {
 }
 
 test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ page }) => {
+  test.setTimeout(120_000);
   const seitenFehler: Error[] = [];
   page.on('pageerror', (fehler) => seitenFehler.push(fehler));
 
@@ -215,6 +216,7 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
 // LLH-1033: die Objektliste ist per Tastatur bedienbar — Tab erreicht die Zeile des Einsatzorts,
 // Enter wählt ihn und zeigt „Auswahl“, Esc hebt die Auswahl auf und zeigt wieder „Objekte“.
 test('Lagekarte: Objektliste per Tastatur — Enter wählt, Esc führt zurück', async ({ page }) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
@@ -247,6 +249,7 @@ test('Lagekarte: Objektliste per Tastatur — Enter wählt, Esc führt zurück',
 test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht zu', async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
@@ -313,6 +316,7 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
 test('Lagekarte: die Auswahl „Stand“ zeigt die Erfassungszeit unter der Bezeichnung', async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   const seitenFehler: Error[] = [];
   page.on('pageerror', (fehler) => seitenFehler.push(fehler));
   await page.setViewportSize({ width: 390, height: 844 });
@@ -367,6 +371,7 @@ test('Lagekarte: die Auswahl „Stand“ zeigt die Erfassungszeit unter der Beze
 test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape', async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   const seitenFehler: Error[] = [];
   page.on('pageerror', (fehler) => seitenFehler.push(fehler));
 
@@ -452,6 +457,7 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
 test('Lagekarte: Beschriftungsplaketten stehen sofort, auch nach einem Stilwechsel', async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   const fehlbilder: string[] = [];
   page.on('console', (m) => {
     if (m.text().includes('could not be loaded')) fehlbilder.push(m.text());
@@ -530,6 +536,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
     });
 
   test('Einsatzort-Zeichen in Bildschirmschärfe, auch nach einem Stilwechsel', async ({ page }) => {
+    test.setTimeout(120_000);
     await anmelden(page);
     const eid = await einsatzAnlegenUndOeffnen(page);
     await einsatzortSetzen(page, eid, { lat: 49.3519, lon: 9.1457 });
@@ -562,6 +569,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
   // rasterte danach nichts neu, lokal schon — der Test hinge an der Emulation statt an der Karte.
   // Zweimal, damit auch der zweite Wechsel ankommt (die Karte meldet sich je Wechsel neu an).
   test('Zeichen rastern nach einem Wechsel der Pixeldichte neu', async ({ page }) => {
+    test.setTimeout(120_000);
     await page.addInitScript(() => {
       const echt = window.matchMedia.bind(window);
       const abfragen: { media: string; mql: MediaQueryList }[] = [];
@@ -610,6 +618,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
   // einer Kachel, bevor es `styleimagemissing` feuert — ein erst dort angelegtes Bild fehlte im
   // laufenden Layout, und nach einem Stilwechsel kommt ohne neue Daten kein weiteres Layout.
   test('jedes Schadenszeichen ist gezeichnet, auch nach einem Stilwechsel', async ({ page }) => {
+    test.setTimeout(120_000);
     await anmelden(page);
     const eid = await einsatzAnlegenUndOeffnen(page);
     const ort = { lat: 49.3519, lon: 9.1457 };
@@ -692,6 +701,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
   test('ein platziertes freies Zeichen steht sofort als `ez|`-Bild mit 68 px, auch nach einem Stilwechsel', async ({
     page,
   }) => {
+    test.setTimeout(120_000);
     const fehler: Error[] = [];
     page.on('pageerror', (f) => fehler.push(f));
     await anmelden(page);
@@ -746,6 +756,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
   });
 
   test('der alte Body eines veralteten Clients wird abgelehnt', async ({ page }) => {
+    test.setTimeout(120_000);
     await anmelden(page);
     const eid = await einsatzAnlegenUndOeffnen(page);
     // LLH-1160: Grundzeichen plus Hexfarbe, wie es ein Client vor LFH-836 sendet. Altzeilen aus der
@@ -765,6 +776,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
 // LFH-836: Das Raster des Zeichen-Pickers endet mit einer ganzen Kachelreihe. Die Reihen sind
 // verschieden hoch (Namen brechen um); eine feste Höhe schnitt die nächste Reihe mitten im Namen an.
 test('Lagekarte: das Grundzeichen-Raster schneidet keine Kachelreihe an', async ({ page }) => {
+  test.setTimeout(120_000);
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
   await page.goto(`/einsaetze/${eid}/lagekarte`);

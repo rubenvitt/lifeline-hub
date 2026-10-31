@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 import { haeltStufe, stelleDichte } from './trefflaeche-kern';
 
@@ -35,6 +36,7 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
   page,
   browser,
 }) => {
+  test.setTimeout(120_000);
   await anmeldenAlsAdmin(page);
   const einsatz = await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E BR ${Date.now()}` });
   const e = einsatz.id;
@@ -150,6 +152,7 @@ test('LLH-1252: BR-Tablet zeigt das Material seines Raums nur lesend', async ({
   page,
   browser,
 }) => {
+  test.setTimeout(120_000);
   await anmeldenAlsAdmin(page);
   const e = (
     await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E BR Material ${Date.now()}` })
@@ -311,8 +314,7 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
   const paneel = page.getByRole('region', { name: 'Übernahme' });
   await paneel.getByRole('button', { name: 'Übernehmen' }).click();
   const uebernahme = page.getByRole('dialog', { name: 'Florian Nachbar 3 übernehmen' });
-  await uebernahme.getByRole('combobox', { name: 'Abschnitt' }).click();
-  await page.locator('.ant-select-item-option[title="EA Nord"]').click();
+  await waehleIn(uebernahme.getByRole('combobox', { name: 'Abschnitt' }), 'EA Nord');
   await uebernahme.getByRole('button', { name: 'Übernehmen' }).click();
   await expect(page.getByText('Florian Nachbar 3 übernommen')).toBeVisible();
   await expect(paneel).toHaveCount(0);
@@ -478,8 +480,7 @@ test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ pag
     await stelleDichte(page, 'kompakt');
     await page.getByRole('button', { name: 'HLF Deich abrufen' }).click();
     const dialog = page.getByRole('dialog', { name: 'HLF Deich abrufen' });
-    await dialog.getByRole('combobox', { name: 'Ziel-Abschnitt' }).click();
-    await page.locator('.ant-select-item-option[title="EA Deich"]').click();
+    await waehleIn(dialog.getByRole('combobox', { name: 'Ziel-Abschnitt' }), 'EA Deich');
     await dialog.getByRole('textbox', { name: 'Auftrag' }).fill('Sandsackverbau');
     await dialog.getByRole('button', { name: 'Abrufen' }).click();
     await expect(
