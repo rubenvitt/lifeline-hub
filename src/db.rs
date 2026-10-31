@@ -8338,17 +8338,17 @@ mod tests {
         }
     }
 
-    // --- LLH-1295: Betreuungsstelle als Empfänger einer Verpflegungsausgabe (0259) ---
+    // --- LLH-1295: Betreuungsstelle als Empfänger einer Verpflegungsausgabe (0260) ---
 
     /// LLH-1295, design.md D1: der Bestand bleibt ohne Empfänger lesbar; die Spalte zeigt mit
     /// `SET NULL` auf die Betreuungsstelle, der Teilindex ist da.
     #[tokio::test]
-    async fn migration_0259_verpflegung_ausgabe_betreuungsstelle_bestand() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 258).await;
+    async fn migration_0260_verpflegung_ausgabe_betreuungsstelle_bestand() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 259).await;
         let (e, b) = bild_grundlage(&pool).await;
         let (_, aus) = verpflegung_bestand(&pool, e, b).await;
 
-        migriere_bis(&pool, 259).await;
+        migriere_bis(&pool, 260).await;
 
         let (menge, stelle): (i64, Option<i64>) = sqlx::query_as(
             "SELECT menge, betreuungsstelle_id FROM verpflegung_ausgabe WHERE id = ?",
@@ -8385,8 +8385,8 @@ mod tests {
 
     /// Ein Einsatz mit einer Ausgabe an eine Betreuungsstelle lässt sich löschen.
     #[tokio::test]
-    async fn migration_0259_verpflegung_ausgabe_betreuungsstelle_einsatz_loeschen() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 259).await;
+    async fn migration_0260_verpflegung_ausgabe_betreuungsstelle_einsatz_loeschen() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 260).await;
         let (e, b) = bild_grundlage(&pool).await;
         let (_, aus) = verpflegung_bestand(&pool, e, b).await;
         let stelle: i64 = sqlx::query_scalar(

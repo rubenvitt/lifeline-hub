@@ -8,7 +8,7 @@
 -- vorhanden (404), geschlossen nimmt an. Der Storno einer Stelle löst den Bezug im Code
 -- (`verpflegung::repo::loese_betreuungsstelle_tx`); `ON DELETE SET NULL` ist nur das Netz für das
 -- Löschen des Einsatzes, wie bei `nachforderung.betreuungsstelle_id` (0231). Nur additiv: der
--- Bestand bleibt ohne Empfänger. Abgesichert von db::tests::migration_0259_*.
+-- Bestand bleibt ohne Empfänger. Abgesichert von db::tests::migration_0260_*.
 ALTER TABLE verpflegung_ausgabe ADD COLUMN betreuungsstelle_id INTEGER
     REFERENCES betreuungsstelle(id) ON DELETE SET NULL;
 

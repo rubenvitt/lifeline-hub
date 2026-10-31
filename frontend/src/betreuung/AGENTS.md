@@ -126,7 +126,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   (`LiveEvent::modul_keys`), `personal` nicht; der Client lädt dann `einsatzKeys.verpflegung` neu.
   Eine Ausgabe an eine Einheit ist eine Spur (`SPUREN_EINHEIT`): auflösen behält sie, stornieren 422.
   **Betreuungsstelle als Empfänger** (LLH-1295, Ausgabe an Betreute): dritte Kennung
-  `betreuungsstelle_id` (Migration 0259), mehr als ein Empfänger 422; fremd, unbekannt oder
+  `betreuungsstelle_id` (Migration 0260), mehr als ein Empfänger 422; fremd, unbekannt oder
   storniert 404, geschlossen nimmt an. In `empfaenger.betreuungsstellen` nur `id`, `bezeichnung`,
   `geschlossen` (Feldmenge in `tests/verpflegung.rs` gepinnt, keine Leitung/Kontakt/Belegung), auch
   ohne Modul `betreuung`; dafür erreicht das Ereignis `betreuung` Leser der Verpflegung. Der Storno
