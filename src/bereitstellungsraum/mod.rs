@@ -7,6 +7,24 @@ use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// Höchstlänge der Bezeichnung eines Bereitstellungsraums nach dem Trimmen (LLH-1302, Spec
+/// `eingabegrenzen`), wie die übrigen Bezeichnungen (`verpflegung::STELLE_BEZEICHNUNG_MAX`).
+/// Steht in ETB-Texten der Inbetriebnahme und der Belegung. Gilt in `POST/PATCH
+/// …/bereitstellungsraeume`. Spiegel: `BR_BEZEICHNUNG_MAX` in `frontend/src/api/eingabegrenzen.ts`.
+pub const BEZEICHNUNG_MAX: usize = 200;
+
+/// Höchstlänge des Standorts (Adresse oder Freitext) nach dem Trimmen (LLH-1302), wie
+/// `verpflegung::STANDORT_MAX`. Spiegel: `BR_STANDORT_MAX`.
+pub const STANDORT_MAX: usize = 500;
+
+/// Höchstlänge der Notiz eines Bereitstellungsraums nach dem Trimmen (LLH-1302). Spiegel:
+/// `BR_NOTIZ_MAX`.
+pub const NOTIZ_MAX: usize = 2_000;
+
+/// Höchstlänge der Notiz eines Belegungs-Events (`POST …/belegung`, LLH-1302). Keine Maske
+/// schreibt sie, deshalb ohne Spiegel.
+pub const BELEGUNG_NOTIZ_MAX: usize = 2_000;
+
 wire_enum! {
     /// Status eines Bereitstellungsraums. String = CHECK-Constraint in
     /// `migrations/0060_bereitstellungsraum.sql`. `aufgeloest` ist terminal.

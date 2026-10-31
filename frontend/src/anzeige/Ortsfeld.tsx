@@ -97,7 +97,7 @@ export interface OrtsfeldGemeinsam {
   onOpenChange?: (offen: boolean) => void;
   /**
    * Zeichengrenze des Textes (`zeichenGrenze(max)` aus `components/zeichenGrenze.tsx`); die
-   * passende `zeichenRegel` prüft der Aufrufer am Text des Werts.
+   * passende Regel (`ortZeichenRegel`) prüft der Aufrufer am Text des Werts.
    */
   count?: InputProps['count'];
 }
