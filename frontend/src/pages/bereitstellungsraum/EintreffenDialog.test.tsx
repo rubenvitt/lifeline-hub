@@ -11,6 +11,7 @@ import type {
   EinsatzFahrzeug,
   EintreffenEingabe,
   EintreffenErgebnis,
+  StammTreffer,
 } from '../../api/types';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
 import { setzeOnline } from '../../test/utils';
@@ -289,6 +290,89 @@ describe('EintreffenDialog — Aus Nachforderungen (LLH-1387, design.md D6)', ()
     ).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Aus Nachforderungen' })).toBeNull();
     expect(within(dialog()).queryByText('Kein Zugriff')).toBeNull();
+  });
+});
+
+describe('EintreffenDialog — Aus den Stammdaten (LLH-1300, design.md D6)', () => {
+  const ZUG: StammTreffer = {
+    vorlage_id: 9,
+    name: 'Florian Musterstadt 1',
+    funkrufname: 'FL MUS 1',
+    typ_label: 'Löschzug',
+    untereinheiten: 1,
+    fahrzeuge: ['1-10-1', '1-44-1'],
+    ist_demo: false,
+  };
+  let suchen: string[];
+  function stammMit(antwort: () => Response) {
+    suchen = [];
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1/stamm-treffer', ({ request }) => {
+        suchen.push(new URL(request.url).searchParams.get('suche') ?? '');
+        return antwort();
+      }),
+    );
+  }
+
+  it('fragt erst ab drei Zeichen und zeigt die Gruppe unter „Im Einsatz“', async () => {
+    stammMit(() => HttpResponse.json([ZUG]));
+    zeige();
+    const feld = await screen.findByRole('searchbox', { name: 'Suche' });
+    await userEvent.type(feld, 'fl');
+    expect(screen.queryByRole('region', { name: 'Aus den Stammdaten' })).toBeNull();
+    expect(suchen).toEqual([]);
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Musterstadt');
+    const gruppe = await screen.findByRole('region', { name: 'Aus den Stammdaten' });
+    expect(within(gruppe).getByText('Löschzug')).toBeInTheDocument();
+    expect(within(gruppe).getByText('1-10-1 · 1-44-1')).toBeInTheDocument();
+    expect(within(gruppe).getByText('FL MUS 1 · mit 1 Untereinheit')).toBeInTheDocument();
+    expect(suchen[suchen.length - 1]).toBe('musterstadt');
+    const text = dialog().textContent ?? '';
+    expect(text.indexOf('Im Einsatz')).toBeLessThan(text.indexOf('Aus den Stammdaten'));
+  });
+
+  it('ein Tipp bucht mit dem Körper `vorlage` und schließt mit Hinweis', async () => {
+    stammMit(() => HttpResponse.json([ZUG]));
+    const { onClose } = zeige();
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Suche' }), 'florian');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Eintreffen Florian Musterstadt 1' }),
+    );
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(koerper).toEqual([{ vorlage: { vorlage_id: 9 } }]);
+    expect(await screen.findByText('Florian Musterstadt 1 gebucht')).toBeInTheDocument();
+  });
+
+  it('ein Treffer, der schon im Einsatz heißt, fehlt', async () => {
+    stammMit(() => HttpResponse.json([ZUG]));
+    zeige({ einheiten: [...EINHEITEN, einheit(40, 'Zug', { funkrufname: 'fl mus 1' })] });
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Suche' }), 'florian');
+    await waitFor(() => expect(suchen).toContain('florian'));
+    expect(screen.queryByRole('region', { name: 'Aus den Stammdaten' })).toBeNull();
+  });
+
+  it('ohne Freigabe (403) fehlt die Gruppe still', async () => {
+    stammMit(() => HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }));
+    zeige();
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Suche' }), 'florian');
+    await waitFor(() => expect(suchen).toContain('florian'));
+    expect(screen.queryByRole('region', { name: 'Aus den Stammdaten' })).toBeNull();
+    expect(within(dialog()).queryByText('Kein Zugriff')).toBeNull();
+    expect(within(dialog()).getByText('Keine Treffer')).toBeInTheDocument();
+  });
+
+  it('eine ohne Netz vorgemerkte Buchung derselben Vorlage sperrt den Treffer', async () => {
+    stammMit(() => HttpResponse.json([ZUG]));
+    zeige({
+      vorgemerkt: [{ vorlage: { vorlage_id: 9 }, zeitpunkt_at: '2026-10-16T12:00:00Z' }],
+    });
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Suche' }), 'florian');
+    const knopf = await screen.findByRole('button', { name: 'Eintreffen Florian Musterstadt 1' });
+    expect(knopf).toBeDisabled();
+    expect(
+      within(screen.getByRole('region', { name: 'Aus den Stammdaten' })).getByText(/vorgemerkt/),
+    ).toBeInTheDocument();
   });
 });
 

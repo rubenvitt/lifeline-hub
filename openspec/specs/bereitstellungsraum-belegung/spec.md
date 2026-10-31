@@ -700,6 +700,66 @@ Nachforderungen MUST die Gruppe ohne Fehlermeldung fehlen.
 - **WHEN** im Einsatz die Einheit „83-1“ ohne Raum geführt wird
 - **THEN** bucht „Eintreffen“ bei „83-1“ unter „Aus Nachforderungen“ diese Einheit mit Verweis, und „83-1“ steht nicht noch einmal unter „Erwartet“
 
+### Requirement: Eintreffen einer Einheit aus den Stammdaten buchen
+Das System SHALL über `POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen` mit
+`vorlage: { vorlage_id }` eine Einheit aus einer aktiven Einheiten-Vorlage der Organisation bilden
+und ihr Eintreffen buchen. In einer Transaktion MUST die Einheit samt Untereinheiten mit den
+Kopfdaten der Vorlage entstehen, MUST jedes Stamm-Fahrzeug der Vorlage, das nicht im Einsatz, frei
+oder entlassen ist, disponiert und zugeordnet werden, MUST jede gebildete Einheit in den Raum
+eintreten und ein Eintreffen mit Quelle `bereitstellungsraum` erhalten, und MUST genau ein
+ETB-Eintrag entstehen, der die Einheit als eingetroffen nennt. Stammbesetzung und Material der
+Vorlage MUST NOT mitkommen. Eine Meldung an die Einsatzleitung und das Kennzeichen „nicht
+übernommen“ MUST NOT entstehen. Ein Fahrzeug in einer anderen Einheit oder außer Dienst MUST
+bleiben, wo es ist. Eine fremde oder unbekannte Vorlage MUST 404 ergeben, eine inaktive 422.
+Trägt eine aktive Kraft des Einsatzes den Namen oder Funkrufnamen der Vorlage, MUST das System
+mit 422 „… ist schon im Einsatz“ ablehnen und nichts schreiben. Zusammen mit `kraft`,
+`unangemeldet` oder `nachforderung_id` MUST die Anfrage mit 422 abgelehnt werden.
+
+#### Scenario: Löschzug aus den Stammdaten trifft ein
+- **WHEN** die Vorlage „Florian Musterstadt 1“ mit Untereinheit „1. Gruppe“ und den Fahrzeugen „1-10-1“ und „1-44-1“ um 1430 am BR Sportplatz gebucht wird und keines davon im Einsatz ist
+- **THEN** gibt es die Einheiten „Florian Musterstadt 1“ und „1. Gruppe“ mit beiden Fahrzeugen, beide stehen im BR Sportplatz mit Eintreffen 1430, das ETB erhält genau einen Eintrag „Florian Musterstadt 1 im BR Sportplatz eingetroffen …“, und es gibt keine Meldung
+
+#### Scenario: Fahrzeug schon in einer anderen Einheit
+- **WHEN** „1-44-1“ im Einsatz zur Einheit „2. Zug“ gehört und die Vorlage gebucht wird
+- **THEN** bleibt „1-44-1“ im „2. Zug“, und die neue Einheit hat nur „1-10-1“
+
+#### Scenario: Schon im Einsatz
+- **WHEN** im Einsatz schon eine aktive Einheit „florian musterstadt 1“ geführt wird
+- **THEN** antwortet das System mit 422 und nennt „Florian Musterstadt 1“, und nichts ist angelegt
+
+#### Scenario: Wiederholt gesendet
+- **WHEN** dieselbe Anfrage mit `client_id` zweimal gesendet wird
+- **THEN** liefern beide dieselbe Einheit, und es gibt genau eine Einheit „Florian Musterstadt 1“ und einen ETB-Eintrag
+
+### Requirement: Stamm-Treffer am Raum suchen
+Das System SHALL unter `GET /api/einsaetze/{id}/bereitstellungsraeume/{bid}/stamm-treffer?suche=…`
+höchstens zehn aktive Einheiten-Vorlagen der Organisation liefern, deren Name, Funkrufname, Typ
+oder Funkrufname eines Fahrzeugs die Suche als Teilwort enthält, ohne Unterschied von Groß- und
+Kleinschreibung. Jeder Treffer MUST nur Vorlage, Name, Funkrufname, Typ, Zahl der Untereinheiten
+und die Funkrufnamen der Fahrzeuge nennen, die beim Buchen mitkämen; Personen, Material und
+Bemerkung MUST NOT enthalten sein. Eine Suche unter drei Zeichen MUST eine leere Liste ergeben.
+Vorlagen, deren Name oder Funkrufname eine aktive Kraft des Einsatzes trägt, MUST fehlen. Das
+Recht ist das Leserecht am Modul Bereitstellungsräume; ein Recht an den Stammdaten MUST NOT nötig
+sein.
+
+#### Scenario: Suche am Gerät
+- **WHEN** das Gerät des BR Sportplatz „musterstadt 1“ sucht
+- **THEN** enthält die Antwort „Florian Musterstadt 1“ mit „1-10-1“ und „1-44-1“, obwohl `GET /api/einheit-vorlagen` für das Gerät gesperrt ist
+
+#### Scenario: Zu kurz
+- **WHEN** die Suche „fl“ lautet
+- **THEN** ist die Antwort leer
+
+### Requirement: Treffer aus den Stammdaten im Dialog
+Der Dialog „Eintreffen buchen“ SHALL ab drei Zeichen unter „Im Einsatz“ die Gruppe „Aus den
+Stammdaten“ zeigen. „Eintreffen“ an einem Treffer MUST ihn mit einem Tipp buchen, der Dialog
+schließt, und ein Hinweis nennt „… gebucht“. Ohne Netz oder ohne Freigabe MUST die Gruppe ohne
+Fehlermeldung fehlen.
+
+#### Scenario: Ein Tipp bucht die Stammdaten-Einheit
+- **WHEN** der Einweiser am Tablet „Florian Musterstadt 1“ sucht und unter „Aus den Stammdaten“ „Eintreffen“ wählt
+- **THEN** ist die Einheit gebucht, der Dialog schließt, und ein Hinweis nennt „Florian Musterstadt 1 gebucht“
+
 ### Requirement: Unangemeldete Kraft in der Oberfläche erfassen
 „Nicht in der Liste“ im Dialog „Eintreffen buchen“ SHALL die Erfassung einer unangemeldeten
 Kraft mit vier sichtbaren Feldern öffnen (Funkrufname, Trägerorganisation, Fahrzeugtyp, Stärke),

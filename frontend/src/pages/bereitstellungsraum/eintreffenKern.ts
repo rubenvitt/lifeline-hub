@@ -6,6 +6,8 @@
  * noch nicht; sie gelten weder als frei buchbar noch als Kraft im Einsatz.
  * LLH-1387: die Gruppe „Aus Nachforderungen“ aus den erwarteten Kräften des
  * Raums (Rufnamen der Zusage) und der Verweis auf die Nachforderung beim Buchen.
+ * LLH-1300: die Gruppe „Aus den Stammdaten“ aus den Stamm-Treffern des Raums
+ * (Einheiten-Vorlagen) und der Körper `vorlage` beim Buchen.
  */
 import type {
   Einheit,
@@ -13,6 +15,7 @@ import type {
   EinsatzFahrzeug,
   EintreffenEingabe,
   ErwarteteKraft,
+  StammTreffer,
   Staerke,
 } from '../../api/types';
 import { abschnittDerEinheit, COLLATOR } from '../../kraefte/kraeftebaumKern';
@@ -334,4 +337,60 @@ export function nachgefordertZiel(
   if (doppel?.vorgemerkt) return { art: 'vorgemerkt' };
   if (doppel?.treffer?.art === 'einheit') return { art: 'buchen', treffer: doppel.treffer };
   return { art: 'neu' };
+}
+
+// ---------- Aus den Stammdaten (LLH-1300, design.md D2/D6) ----------
+
+/** Ab so vielen Zeichen fragt der Dialog die Stamm-Treffer ab; darunter antwortet der Server leer. */
+export const STAMM_SUCHE_MIN = 3;
+
+/** Die Suche, mit der der Dialog Stamm-Treffer abfragt, oder `null` (zu kurz). */
+export function stammSuche(suche: string): string | null {
+  const s = normalizeFunkrufname(suche);
+  return [...s].length >= STAMM_SUCHE_MIN ? s : null;
+}
+
+/** Eine Zeile der Gruppe „Aus den Stammdaten“. */
+export interface StammZeile {
+  treffer: StammTreffer;
+  /** Erfassungszeitpunkt einer ohne Netz vorgemerkten Buchung dieser Vorlage (Teil III). */
+  vorgemerktAt: string | null;
+}
+
+/**
+ * Die Stamm-Treffer ohne die, deren Name oder Funkrufname eine Kraft des Einsatzes oder eine
+ * vorgemerkte unangemeldete Kraft trägt (der Server schließt sie auch aus; die Listen des Clients
+ * können frischer sein). Eine ohne Netz vorgemerkte Buchung derselben Vorlage markiert die Zeile.
+ */
+export function buildStammZeilen(
+  treffer: readonly StammTreffer[],
+  d: Parameters<typeof findDoppelbuchung>[1],
+): StammZeile[] {
+  const vorgemerktJe = new Map<number, string | null>();
+  for (const v of d.vorgemerkt ?? []) {
+    if (v.vorlage) vorgemerktJe.set(v.vorlage.vorlage_id, v.zeitpunkt_at ?? null);
+  }
+  return treffer
+    .filter((t) => [t.name, t.funkrufname].every((n) => n == null || !findDoppelbuchung(n, d)))
+    .map((t) => ({
+      treffer: t,
+      vorgemerktAt: vorgemerktJe.has(t.vorlage_id) ? (vorgemerktJe.get(t.vorlage_id) ?? '') : null,
+    }));
+}
+
+/** Hinweise einer Zeile: Vormerkung ohne Netz, Funkrufname, Untereinheiten. */
+export function stammHinweise(z: StammZeile, zeitpunkt: (wert: string) => string): string[] {
+  const hinweise: string[] = [];
+  if (z.vorgemerktAt != null)
+    hinweise.push(z.vorgemerktAt ? `vorgemerkt ${zeitpunkt(z.vorgemerktAt)}` : 'vorgemerkt');
+  if (z.treffer.funkrufname && z.treffer.funkrufname !== z.treffer.name)
+    hinweise.push(z.treffer.funkrufname);
+  const n = z.treffer.untereinheiten;
+  if (n > 0) hinweise.push(n === 1 ? 'mit 1 Untereinheit' : `mit ${n} Untereinheiten`);
+  return hinweise;
+}
+
+/** Körper für eine Einheit aus den Stammdaten. */
+export function vorlageEingabe(t: StammTreffer): EintreffenEingabe {
+  return { vorlage: { vorlage_id: t.vorlage_id } };
 }

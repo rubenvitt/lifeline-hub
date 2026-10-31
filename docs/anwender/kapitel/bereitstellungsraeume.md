@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/repo.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/repo.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, src/bereitstellungsraum/stamm_treffer.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs]
 ---
 
 ## Überblick
@@ -94,7 +94,9 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist. Im Zustan
    bekannt, „alarmiert …“, dem Abschnitt oder „eingetroffen …“. Darüber stehen unter „Aus
    Nachforderungen“ die Kräfte, die eine Nachforderung mit diesem Raum als Ziel erwartet: je
    Rufname der Zusage eine Zeile mit Art, „Nachforderung 2× RTW“, Stufe und „erwartet …“, ohne
-   genannten Rufnamen eine Zeile „RTW ohne Rufname“.
+   genannten Rufnamen eine Zeile „RTW ohne Rufname“. Ab drei Zeichen stehen unter „Aus den
+   Stammdaten“ die passenden Einheiten-Vorlagen der Organisation, die noch nicht im Einsatz sind,
+   mit Typ und den Funkrufnamen der Fahrzeuge, die mitkommen.
 
    ![Dialog „Eintreffen buchen“ mit leerer Suche und der Gruppe „Im Einsatz“: drei Einheiten mit Typ, den Funkrufnamen ihrer Fahrzeuge und ihrem Abschnitt, je mit dem Knopf „Eintreffen“, darunter „Nicht in der Liste“](../bilder/bereitstellungsraeume/eintreffen.png)
 
@@ -102,7 +104,12 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist. Im Zustan
    in der Belegung des Raums. Unter „Aus Nachforderungen“ bucht „Eintreffen“ die Einheit, die im
    Einsatz schon so heißt; gibt es keine, öffnet sich die Erfassung mit Rufname und Art als
    „Funkrufname“ und „Fahrzeugtyp“, darüber „Aus Nachforderung 2× RTW“, und „Eintreffen buchen“
-   legt sie an. Beide Wege verknüpfen die Einheit mit der Nachforderung.
+   legt sie an. Beide Wege verknüpfen die Einheit mit der Nachforderung. Unter „Aus den
+   Stammdaten“ bildet „Eintreffen“ die Einheit samt Untereinheiten aus der Vorlage und bucht sie
+   in den Raum. Mit kommen die Fahrzeuge der Vorlage, die nicht schon in einer anderen Einheit
+   stehen oder außer Dienst sind; Besatzung und Material trägt die Einsatzleitung danach in der
+   Einheit nach. Die Einheit ist sofort übernommen, eine Meldung an die Einsatzleitung gibt es
+   nicht; das Einsatztagebuch nennt sie „… eingetroffen (aus den Stammdaten …)“.
 4. Steht die Kraft nicht in der Liste, „Nicht in der Liste“ wählen. „Funkrufname“ ist mit der Suche
    vorbelegt; bei Bedarf „Trägerorganisation“, „Fahrzeugtyp“ und „Stärke“ eintragen, unter
    „Bemerkung“ einen freien Text, unter „Weiteres Fahrzeug“ mit „Fahrzeug hinzufügen“ die übrigen

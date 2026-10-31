@@ -1,15 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import type { EinheitPerioden, Einheit, EinsatzFahrzeug, ErwarteteKraft } from '../../api/types';
+import type {
+  EinheitPerioden,
+  Einheit,
+  EinsatzFahrzeug,
+  ErwarteteKraft,
+  StammTreffer,
+} from '../../api/types';
 import {
   buildEintreffenEingabe,
   buildEintreffenGruppen,
   buildNachgefordertZeilen,
+  buildStammZeilen,
   findDoppelbuchung,
   kraftEingabe,
   nachgefordertHinweise,
   nachgefordertZiel,
   normalizeFunkrufname,
+  stammHinweise,
+  stammSuche,
   trefferHinweise,
+  vorlageEingabe,
   type EintreffenTreffer,
 } from './eintreffenKern';
 
@@ -549,5 +559,59 @@ describe('buildEintreffenEingabe mit Nachforderung (LLH-1387)', () => {
       buildEintreffenEingabe({ funkrufname: '83-1' }, { nachforderungId: 4 }).nachforderung_id,
     ).toBe(4);
     expect(buildEintreffenEingabe({ funkrufname: '83-1' })).not.toHaveProperty('nachforderung_id');
+  });
+});
+
+describe('Aus den Stammdaten (LLH-1300, design.md D6)', () => {
+  const zug = (mehr: Partial<StammTreffer> = {}): StammTreffer => ({
+    vorlage_id: 9,
+    name: 'Florian Musterstadt 1',
+    funkrufname: 'FL MUS 1',
+    typ_label: 'Löschzug',
+    untereinheiten: 2,
+    fahrzeuge: ['1-10-1'],
+    ist_demo: false,
+    ...mehr,
+  });
+  const leer = { erwartet: [], imEinsatz: [] };
+
+  it('fragt erst ab drei Zeichen, in Vergleichsform', () => {
+    expect(stammSuche('fl')).toBeNull();
+    expect(stammSuche('  fl   ')).toBeNull();
+    // Wie der Server: Leerzeichen zählen nach dem Vereinheitlichen mit.
+    expect(stammSuche('f  l')).toBe('f l');
+    expect(stammSuche(' Florian  MUS ')).toBe('florian mus');
+  });
+
+  it('lässt Treffer aus, deren Name oder Funkrufname im Einsatz steht', () => {
+    const d = { einheiten: [], fahrzeuge: [], kandidaten: leer };
+    expect(buildStammZeilen([zug()], d)).toHaveLength(1);
+    const mitEinheit = { ...d, einheiten: [einheit(1, 'florian musterstadt 1')] };
+    expect(buildStammZeilen([zug()], mitEinheit)).toEqual([]);
+    const mitFahrzeug = { ...d, fahrzeuge: [fahrzeug(2, 'fl mus 1')] };
+    expect(buildStammZeilen([zug()], mitFahrzeug)).toEqual([]);
+  });
+
+  it('markiert eine ohne Netz vorgemerkte Buchung derselben Vorlage', () => {
+    const zeilen = buildStammZeilen(
+      [zug(), zug({ vorlage_id: 10, name: 'SEG', funkrufname: null })],
+      {
+        einheiten: [],
+        fahrzeuge: [],
+        kandidaten: leer,
+        vorgemerkt: [{ vorlage: { vorlage_id: 9 }, zeitpunkt_at: '2026-10-16T12:00:00Z' }],
+      },
+    );
+    expect(zeilen.map((z) => z.vorgemerktAt)).toEqual(['2026-10-16T12:00:00Z', null]);
+    expect(stammHinweise(zeilen[0], () => '1400')).toEqual([
+      'vorgemerkt 1400',
+      'FL MUS 1',
+      'mit 2 Untereinheiten',
+    ]);
+    expect(stammHinweise(zeilen[1], () => '1400')).toEqual(['mit 2 Untereinheiten']);
+  });
+
+  it('bucht mit dem Körper `vorlage`', () => {
+    expect(vorlageEingabe(zug())).toEqual({ vorlage: { vorlage_id: 9 } });
   });
 });

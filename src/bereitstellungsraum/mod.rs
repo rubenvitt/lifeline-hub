@@ -2,6 +2,7 @@ pub mod abruf;
 pub mod belegung_repo;
 pub mod eintreffen;
 pub mod repo;
+pub mod stamm_treffer;
 
 use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};

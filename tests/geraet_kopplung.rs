@@ -4308,6 +4308,148 @@ async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verwe
     assert_eq!(v[0]["rufnamen"], json!(["83-2"]), "{v}");
 }
 
+/// LLH-1300 (design.md D2/D3): das BR-Gerät findet Einheiten-Vorlagen über `…/stamm-treffer` am
+/// eigenen Raum (fremder Raum 404), ohne den Stammdaten-Katalog lesen zu dürfen (403), und bucht
+/// eine davon: die Einheit wird gebildet und steht im Raum, danach ist sie kein Treffer mehr.
+#[tokio::test]
+async fn br_geraet_findet_stamm_treffer_ohne_katalog_und_bucht_sie() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nord = br_anlegen(&app, &admin, einsatz, "BR Nord", true).await;
+    let sued = br_anlegen(&app, &admin, einsatz, "BR Süd", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, nord).await;
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let typ: i64 = sqlx::query_scalar(
+        "INSERT INTO einheit_typ (org_id, label) VALUES (?, 'Löschzug') RETURNING id",
+    )
+    .bind(org)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let vorlage: i64 = sqlx::query_scalar(
+        "INSERT INTO einheit_vorlage (org_id, name, typ_id, funkrufname, bemerkung) \
+         VALUES (?, 'Florian Musterstadt 1', ?, 'FL MUS 1', 'Schlüssel im Spind') RETURNING id",
+    )
+    .bind(org)
+    .bind(typ)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let fz: i64 = sqlx::query_scalar(
+        "INSERT INTO fahrzeug (org_id, funkrufname, fahrzeugtyp) VALUES (?, '1-44-1', 'HLF') \
+         RETURNING id",
+    )
+    .bind(org)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO einheit_vorlage_fahrzeug (vorlage_id, fahrzeug_id) VALUES (?, ?)")
+        .bind(vorlage)
+        .bind(fz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let pfad = |br: i64, suche: &str| {
+        format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/stamm-treffer?suche={suche}")
+    };
+
+    let (s, v) = anfrage_json(
+        &app,
+        "GET",
+        &pfad(nord, "Florian%20Musterstadt%201"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+    assert_eq!(v[0]["vorlage_id"], vorlage);
+    assert_eq!(v[0]["fahrzeuge"], json!(["1-44-1"]));
+    assert!(
+        !v.to_string().contains("Spind"),
+        "keine Bemerkung am Gerät: {v}"
+    );
+    let (s, v) = anfrage_json(&app, "GET", &pfad(nord, "fl"), &geraet, None).await;
+    assert_eq!((s, v), (StatusCode::OK, json!([])), "zu kurz");
+    let (s, _) = anfrage_json(&app, "GET", &pfad(sued, "florian"), &geraet, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+    for katalog in ["/api/einheit-vorlagen", "/api/fahrzeuge"] {
+        let (s, _) = anfrage_json(&app, "GET", katalog, &geraet, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{katalog}");
+    }
+    let (s, _) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten/aus-vorlage/{vorlage}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Vorschau des Bildens bleibt der Führung"
+    );
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &geraet,
+        Some(&json!({"vorlage": {"vorlage_id": vorlage}, "client_id": "st-1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["unangemeldet"], false);
+    assert!(v.get("meldung_id").is_none(), "keine Meldung: {v}");
+    let einheit = v["einheit_id"].as_i64().unwrap();
+    let (br_id, name): (Option<i64>, String) =
+        sqlx::query_as("SELECT aktueller_br_id, name FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (br_id, name.as_str()),
+        (Some(nord), "Florian Musterstadt 1")
+    );
+    // Wiederholt gesendet: dieselbe Einheit, nichts doppelt.
+    let (s, w) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &geraet,
+        Some(&json!({"vorlage": {"vorlage_id": vorlage}, "client_id": "st-1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{w}");
+    assert_eq!(w["einheit_id"], einheit);
+    let einheiten: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(einheiten, 1);
+    // Jetzt im Einsatz: kein Treffer mehr, ein zweites Buchen ist 422.
+    let (_, v) = anfrage_json(&app, "GET", &pfad(nord, "florian"), &geraet, None).await;
+    assert_eq!(v, json!([]));
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &geraet,
+        Some(&json!({"vorlage": {"vorlage_id": vorlage}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+}
+
 /// Meldungen an die Einsatzleitung wie am UHS-Laptop: anlegen und nur die eigenen lesen.
 #[tokio::test]
 async fn br_geraet_meldet_und_liest_nur_eigene_meldungen() {

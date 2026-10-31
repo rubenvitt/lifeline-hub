@@ -349,6 +349,35 @@ pub async fn erwartet(
     ))
 }
 
+/// Query von `…/stamm-treffer` (LLH-1300).
+#[derive(Debug, Deserialize)]
+pub struct StammTrefferParams {
+    pub suche: Option<String>,
+}
+
+/// GET /api/einsaetze/{id}/bereitstellungsraeume/{bid}/stamm-treffer?suche=… — Einheiten-Vorlagen
+/// der Organisation als Treffer für „Eintreffen buchen“ (LLH-1300, design.md D2): Rechte wie das
+/// Detail, das BR-Gerät nur am eigenen Raum (fremd 404). Kein Recht an den Stammdaten nötig; die
+/// Projektion nennt nur Namen und Funkrufnamen, ab drei Zeichen, höchstens zehn.
+pub async fn stamm_treffer(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
+    Query(params): Query<StammTrefferParams>,
+) -> Result<Json<Vec<crate::bereitstellungsraum::stamm_treffer::StammTreffer>>, AppError> {
+    use crate::bereitstellungsraum::stamm_treffer;
+    let suche = stamm_treffer::check_suche(params.suche.as_deref())?;
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    let einsatz_id = ctx.einsatz.id;
+    br_repo::laden(&state.pool, einsatz_id, br_id).await?;
+    let Some(suche) = suche else {
+        return Ok(Json(Vec::new()));
+    };
+    Ok(Json(
+        stamm_treffer::suchen(&state.pool, einsatz_id, ctx.einsatz.org_id, &suche).await?,
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
     pub bezeichnung: Option<String>,
@@ -807,8 +836,9 @@ pub async fn eintreffen(
     let erfassung = eintreffen::check(&body)?;
     // Fremder Raum am Gerät: 404 vor jedem Schreiben (D7).
     stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
-    // Eine unangemeldete Kraft legt Einheit und Fahrzeuge an: deren Rechte, 403 vor dem Schreiben.
-    if erfassung.is_unangemeldet() {
+    // Eine unangemeldete Kraft oder eine aus den Stammdaten (LLH-1300) legt Einheit und Fahrzeuge
+    // an: deren Rechte, 403 vor dem Schreiben.
+    if erfassung.is_neuanlage() {
         ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
         ctx.fordere_zielmodul::<Fahrzeuge>(&state.pool).await?;
     }
@@ -908,6 +938,19 @@ async fn notify_eintreffen(
     if g.meldung_id.is_some() || g.objekt_typ == ObjektTyp::Fahrzeug || g.als_einheit {
         for ef_id in &g.fahrzeug_ids {
             super::einsatz_fahrzeug::sse_fahrzeug(state, einsatz_id, *ef_id);
+        }
+    }
+    // Aus einer Vorlage gebildet (LLH-1300): Untereinheiten, Fahrzeuge und Räume, aus denen ein
+    // freies Fahrzeug dabei ausgetreten ist (LLH-1288).
+    for einheit_id in &g.gebildet.untereinheiten {
+        super::einsatz_einheit::sse_einheit(state, einsatz_id, *einheit_id);
+    }
+    for ef_id in &g.gebildet.fahrzeuge {
+        super::einsatz_fahrzeug::sse_fahrzeug(state, einsatz_id, *ef_id);
+    }
+    for raum in &g.gebildet.raeume {
+        if *raum != br_id {
+            sse_br(state, einsatz_id, *raum);
         }
     }
     for ep_id in &g.personen {
