@@ -1,7 +1,11 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { App } from 'antd';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ladeVerpflegung } from '../api/verpflegung';
+import { neuerQueryClient } from '../test/utils';
+import { FELDKUECHE, stelle, verpflegungMitStellen } from '../test/verpflegungDaten';
 import OfflineRecoveryDrawer from './OfflineRecoveryDrawer';
 import {
   OFFLINE_QUEUE_EVENT,
@@ -21,6 +25,12 @@ import {
   schreibaktionenLaden,
 } from './queue';
 
+// Nur Ausgaben an einer Stelle lesen die Verpflegung (LLH-1298).
+vi.mock('../api/verpflegung', async (original) => ({
+  ...(await original<typeof import('../api/verpflegung')>()),
+  ladeVerpflegung: vi.fn(),
+}));
+
 // Echte Queue, nur die Aktionen des Drawers lassen sich je Test scheitern lassen.
 vi.mock('./queue', async (original) => {
   const echt = await original<typeof import('./queue')>();
@@ -34,6 +44,7 @@ vi.mock('./queue', async (original) => {
 });
 
 beforeEach(async () => {
+  vi.mocked(ladeVerpflegung).mockReset();
   vi.mocked(abgelehntLaden).mockReset();
   vi.mocked(abgelehntWiederholen).mockReset();
   vi.mocked(queueNichtZugeordnetAlleVerwerfen).mockReset();
@@ -206,15 +217,80 @@ describe('OfflineRecoveryDrawer: abgelehnte Verpflegungsausgaben (LFH-688)', () 
     expect(screen.getByText(/"menge": 120/)).toBeInTheDocument();
   });
 
-  it('eine Ausgabe an einer Stelle zeigt die Stelle im Inhalt (LLH-1040)', async () => {
+  /** Ausgabe an `stelleId`, wegen aufgelöster Stelle abgelehnt; der Drawer mit Query-Client. */
+  async function abgelehnteAusgabeAnStelle(stelleId: number) {
     await schreibaktionEinreihen(11, 7, {
       art: 'ausgabe',
       zeitfenster_id: 9,
       bezeichnung: 'Mittag',
-      daten: { menge: 15, verpflegungsstelle_id: 21, client_id: 'ausgabe-stelle' },
+      daten: { menge: 15, verpflegungsstelle_id: stelleId, client_id: 'ausgabe-stelle' },
     });
     const [ausgabe] = await schreibaktionenLaden(11, 7);
     await schreibaktionAblehnen(11, ausgabe, 'Die Verpflegungsstelle ist aufgelöst');
+    render(
+      <QueryClientProvider client={neuerQueryClient()}>
+        <App>
+          <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+        </App>
+      </QueryClientProvider>,
+    );
+  }
+
+  const stellenZeile = () =>
+    screen.getByText('Stelle', { selector: '.ant-descriptions-item-label' }).closest('tr')!;
+
+  it('nennt die aufgelöste Stelle mit Namen statt Kennung (LLH-1298)', async () => {
+    const verpflegung = verpflegungMitStellen();
+    verpflegung.stellen = verpflegung.stellen.map((s) =>
+      s.id === FELDKUECHE ? { ...s, status: 'aufgeloest' as const } : s,
+    );
+    vi.mocked(ladeVerpflegung).mockResolvedValue(verpflegung);
+
+    await abgelehnteAusgabeAnStelle(FELDKUECHE);
+
+    expect(
+      await screen.findByText('Abgelehnte Verpflegungsausgabe: Mittag · Feldküche BR Sportplatz'),
+    ).toBeInTheDocument();
+    expect(within(stellenZeile()).getByText('Feldküche BR Sportplatz')).toBeInTheDocument();
+    expect(ladeVerpflegung).toHaveBeenCalledWith(7);
+    // Der vollständige Inhalt bleibt, wie er gesendet wird.
+    expect(screen.getByText(/"verpflegungsstelle_id": 21/)).toBeInTheDocument();
+  });
+
+  it('eine Kennung, die die Verpflegung nicht führt, heißt „unbekannte Stelle“', async () => {
+    vi.mocked(ladeVerpflegung).mockResolvedValue({
+      ...verpflegungMitStellen(),
+      stellen: [stelle({ id: 99, bezeichnung: 'Andere Stelle' })],
+    });
+
+    await abgelehnteAusgabeAnStelle(FELDKUECHE);
+
+    expect(
+      await screen.findByText('Abgelehnte Verpflegungsausgabe: Mittag · unbekannte Stelle'),
+    ).toBeInTheDocument();
+    expect(within(stellenZeile()).getByText('unbekannte Stelle')).toBeInTheDocument();
+  });
+
+  it('lädt die Verpflegung nicht, heißt die Stelle „unbekannte Stelle“', async () => {
+    vi.mocked(ladeVerpflegung).mockRejectedValue(new Error('Netzwerkfehler'));
+
+    await abgelehnteAusgabeAnStelle(FELDKUECHE);
+
+    expect(
+      await screen.findByText('Abgelehnte Verpflegungsausgabe: Mittag · unbekannte Stelle'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+  });
+
+  it('eine Ausgabe ohne Stelle liest die Verpflegung nicht', async () => {
+    await schreibaktionEinreihen(11, 7, {
+      art: 'ausgabe',
+      zeitfenster_id: 9,
+      bezeichnung: 'Mittag',
+      daten: { menge: 5, client_id: 'ausgabe-ohne-stelle' },
+    });
+    const [ausgabe] = await schreibaktionenLaden(11, 7);
+    await schreibaktionAblehnen(11, ausgabe, 'Nicht gefunden');
 
     render(
       <App>
@@ -223,7 +299,8 @@ describe('OfflineRecoveryDrawer: abgelehnte Verpflegungsausgaben (LFH-688)', () 
     );
 
     expect(await screen.findByText('Abgelehnte Verpflegungsausgabe: Mittag')).toBeInTheDocument();
-    expect(screen.getByText(/"verpflegungsstelle_id": 21/)).toBeInTheDocument();
+    expect(screen.queryByText('Stelle', { selector: '.ant-descriptions-item-label' })).toBeNull();
+    expect(ladeVerpflegung).not.toHaveBeenCalled();
   });
 });
 

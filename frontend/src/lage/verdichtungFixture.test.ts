@@ -13,6 +13,7 @@ import type {
   Sichtungskategorie,
 } from '../api/types';
 import { summiereStaerke } from '../anzeige/staerke';
+import { staerkeImRaum } from '../bereitstellungsraum/brZahlen';
 import { baueKraeftebild, verdichte, type MeldebildZeile } from '../kraefte/kraeftebild';
 import { istAlarmiert } from '../meldungen/meldungKennzahlen';
 import { istOffen } from '../pages/fuehrung/ueberblickDaten';
@@ -237,9 +238,10 @@ describe('Fixture: Stärke', () => {
   it.each(s.bereitstellungsraeume.map((b) => [b.name, b] as const))(
     'Bereitstellungsraum: %s',
     (_n, b) => {
-      const menge = b.einheiten.map((id) => einheiten.find((e) => e.id === id)!);
-      // Die ganze Einheitenliste liefert die Unterstellung auch über fehlende Zwischenglieder.
-      expect(summiereStaerke(menge, einheiten)).toEqual(b.erwartet && alsStaerke(b.erwartet));
+      // Nur wer im Raum steht, mit seiner eigenen Stärke (LLH-1289, `bereitstellungsraum/brZahlen.ts`).
+      expect(staerkeImRaum(b.einheiten, einheiten).staerke).toEqual(
+        b.erwartet && alsStaerke(b.erwartet),
+      );
     },
   );
 

@@ -498,6 +498,116 @@ async fn patch_stammfelder_kein_etb() {
     );
 }
 
+/// Eingabegrenzen (LLH-1302, Spec `eingabegrenzen`): Bezeichnung, Standort und Notiz des Raums
+/// in POST und PATCH sowie die Notiz der Belegung; genau die Grenze geht, ein Zeichen mehr ist
+/// 400 mit Feldnamen, und nichts wird geschrieben.
+#[tokio::test]
+async fn eingabegrenzen_400_mit_feldnamen() {
+    use lifeline_hub::bereitstellungsraum::{
+        BELEGUNG_NOTIZ_MAX, BEZEICHNUNG_MAX, NOTIZ_MAX, STANDORT_MAX,
+    };
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let basis = format!("/api/einsaetze/{eid}/bereitstellungsraeume");
+    // Gezählt wird in Zeichen, nicht in Bytes.
+    let lang = |n: usize| "ä".repeat(n);
+
+    for (feld, name, max) in [
+        ("bezeichnung", "Bezeichnung", BEZEICHNUNG_MAX),
+        ("standort", "Standort", STANDORT_MAX),
+        ("notiz", "Notiz", NOTIZ_MAX),
+    ] {
+        let mut body = json!({"bezeichnung": format!("BR {feld}")});
+        body[feld] = json!(lang(max + 1));
+        let (s, v) = anfrage_json(&app, "POST", &basis, &cookie, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "POST {feld}: {v}");
+        assert_eq!(
+            v["error"],
+            format!("{name} darf höchstens {max} Zeichen lang sein"),
+            "POST {feld}"
+        );
+    }
+    let (s, v) = anfrage_json(&app, "GET", &basis, &cookie, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v.as_array().map(Vec::len), Some(0), "nichts angelegt: {v}");
+
+    // Genau an der Grenze geht es.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &basis,
+        &cookie,
+        Some(&json!({
+            "bezeichnung": lang(BEZEICHNUNG_MAX),
+            "standort": lang(STANDORT_MAX),
+            "notiz": lang(NOTIZ_MAX),
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "an der Grenze: {v}");
+    let br_id = v["id"].as_i64().unwrap();
+
+    for (feld, name, max) in [
+        ("bezeichnung", "Bezeichnung", BEZEICHNUNG_MAX),
+        ("standort", "Standort", STANDORT_MAX),
+        ("notiz", "Notiz", NOTIZ_MAX),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PATCH",
+            &format!("{basis}/{br_id}"),
+            &cookie,
+            Some(&json!({ (feld): lang(max + 1) })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "PATCH {feld}: {v}");
+        assert_eq!(
+            v["error"],
+            format!("{name} darf höchstens {max} Zeichen lang sein"),
+            "PATCH {feld}"
+        );
+    }
+    let (s, v) = anfrage_json(&app, "GET", &format!("{basis}/{br_id}"), &cookie, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["bezeichnung"], lang(BEZEICHNUNG_MAX), "unverändert: {v}");
+
+    let aktiv = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Belegung").await;
+    let einheit = einheit_bilden(&app, &cookie, eid, "Einheit Grenze").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{aktiv}/belegung"),
+        &cookie,
+        Some(&json!({
+            "objekt_typ": "einheit",
+            "objekt_id": einheit,
+            "art": "eintritt",
+            "notiz": lang(BELEGUNG_NOTIZ_MAX + 1),
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Belegung: {v}");
+    assert_eq!(
+        v["error"],
+        format!("Notiz darf höchstens {BELEGUNG_NOTIZ_MAX} Zeichen lang sein")
+    );
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{aktiv}/belegung"),
+        &cookie,
+        Some(&json!({
+            "objekt_typ": "einheit",
+            "objekt_id": einheit,
+            "art": "eintritt",
+            "notiz": lang(BELEGUNG_NOTIZ_MAX),
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Belegung an der Grenze: {v}");
+}
+
 /// Rechte-Matrix: Beobachter kann nicht schreiben → 403.
 #[tokio::test]
 async fn beobachter_kann_nicht_schreiben_403() {
@@ -1783,6 +1893,17 @@ async fn eintreffen_unangemeldet_ein_etb_eintrag_in_beiden_einstellungen() {
             "{letzter}"
         );
         assert!(!letzter.contains("nur intern"), "{letzter}");
+        // Die Auto-Frist-Erinnerung behält ihren eigenen Titel (LLH-1075, LLH-1301).
+        let meldung_id = v["meldung_id"].as_i64().unwrap();
+        let (lfd_nr, titel): (i64, String) = sqlx::query_as(
+            "SELECT m.lfd_nr, r.titel FROM erinnerung r JOIN meldung m ON m.id = r.bezug_id \
+             WHERE r.quelle = 'auto_frist' AND r.bezug_typ = 'meldung' AND r.bezug_id = ?",
+        )
+        .bind(meldung_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(titel, format!("Unangemeldete Kraft #{lfd_nr} unbestätigt"));
     }
 }
 
@@ -2855,6 +2976,55 @@ async fn abruf_mit_abschnitt_setzt_unterstellung_ereignis_und_etb() {
     assert!(!etb.iter().any(|t| t.contains("zugeordnet")), "{etb:?}");
     let d = fetch_json(&l.app, &l.admin, &br_pfad(l.eid, l.br)).await;
     assert_eq!(d["einheiten"][0]["id"], l.hlf, "bleibt im Raum: {d}");
+}
+
+/// Spec „Liste der Räume mit Belegung“, Szenario „Abgerufene Einheit“ (LLH-1309): die Liste nennt
+/// den Abruf je abgerufener Einheit mit dem Zeitpunkt aus dem Detail, eine nicht abgerufene trägt
+/// keinen; nach dem Ausrücken fällt er weg.
+#[tokio::test]
+async fn liste_nennt_die_abrufe_je_raum() {
+    let l = abruf_lage().await;
+    let rw = einheit_bilden(&l.app, &l.admin, l.eid, "RW 1").await;
+    belegen(&l.app, &l.admin, l.eid, l.br, "einheit", rw, "eintritt").await;
+    let liste_pfad = format!("/api/einsaetze/{}/bereitstellungsraeume", l.eid);
+    let zeile = |liste: serde_json::Value| {
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|z| z["id"] == l.br)
+            .cloned()
+            .unwrap()
+    };
+    let z = zeile(fetch_json(&l.app, &l.admin, &liste_pfad).await);
+    assert_eq!(z["abrufe"], json!([]), "noch keiner abgerufen: {z}");
+
+    let (s, v) = rufe_ab(
+        &l.app,
+        &l.admin,
+        l.eid,
+        l.br,
+        json!({"objekt_typ": "einheit", "objekt_id": l.hlf}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let z = zeile(fetch_json(&l.app, &l.admin, &liste_pfad).await);
+    let d = fetch_json(&l.app, &l.admin, &br_pfad(l.eid, l.br)).await;
+    let hlf_detail = d["einheiten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == l.hlf)
+        .unwrap();
+    assert_eq!(
+        z["abrufe"],
+        json!([{"einheit_id": l.hlf, "seit_at": hlf_detail["abruf"]["seit_at"]}]),
+        "nur HLF 20, mit dem Zeitpunkt des Details: {z}"
+    );
+
+    belegen(&l.app, &l.admin, l.eid, l.br, "einheit", l.hlf, "austritt").await;
+    let z = zeile(fetch_json(&l.app, &l.admin, &liste_pfad).await);
+    assert_eq!(z["abrufe"], json!([]), "ausgerückt: {z}");
 }
 
 /// AK „ohne Abschnitt unverändert“: die bisherige Unterstellung bleibt.
@@ -4229,5 +4399,194 @@ async fn einheit_bilden_mit_fahrzeug_aus_dem_raum_beendet_die_belegung() {
         d["belegung"],
         json!({"einheiten": 0, "fahrzeuge": 0}),
         "{d}"
+    );
+}
+
+// ============================== Abschnittsname (LLH-1291) ==============================
+
+/// Räumt `abschnitt` an einen Raum.
+async fn raum_im_abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, br: i64, ab: i64) {
+    let (s, v) = anfrage_json(
+        app,
+        "PATCH",
+        &br_pfad(einsatz, br),
+        cookie,
+        Some(&json!({"abschnitt_id": ab})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+fn abschnitt_pfad(einsatz: i64, ab: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/abschnitte/{ab}")
+}
+
+/// `abschnitt_name` des Raums `br` in der Liste (das Detail trägt ihn nicht).
+async fn abschnitt_name_in_liste(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    br: i64,
+) -> serde_json::Value {
+    let l = fetch_json(
+        app,
+        cookie,
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+    )
+    .await;
+    l.as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"].as_i64() == Some(br))
+        .unwrap_or_else(|| panic!("Raum {br} fehlt: {l}"))["abschnitt_name"]
+        .clone()
+}
+
+/// Umbenennen meldet genau die Räume des Abschnitts; ein PATCH ohne neuen Namen (gleicher Name,
+/// anderes Feld) meldet keinen Raum.
+#[tokio::test]
+async fn abschnitt_umbenennen_meldet_seine_raeume() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let nord = abschnitt_anlegen(&app, &cookie, eid, "Nord").await;
+    let sued = abschnitt_anlegen(&app, &cookie, eid, "Süd").await;
+    let a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR A").await;
+    let b = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR B").await;
+    let c = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR C").await;
+    br_anlegen_und_aktivieren(&app, &cookie, eid, "BR ohne").await;
+    raum_im_abschnitt(&app, &cookie, eid, a, nord).await;
+    raum_im_abschnitt(&app, &cookie, eid, b, nord).await;
+    raum_im_abschnitt(&app, &cookie, eid, c, sued).await;
+
+    let mut rx = live.abonniere(eid);
+    for (body, erwartet, fall) in [
+        (json!({"name": "Nordost"}), vec![a, b], "neuer Name"),
+        (json!({"name": "Nordost"}), vec![], "gleicher Name"),
+        (json!({"bemerkung": "Deich"}), vec![], "anderes Feld"),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PATCH",
+            &abschnitt_pfad(eid, nord),
+            &cookie,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{fall}: {v}");
+        assert_eq!(br_ereignisse(&mut rx), erwartet, "{fall}");
+    }
+    assert_eq!(
+        abschnitt_name_in_liste(&app, &cookie, eid, a).await,
+        "Nordost"
+    );
+
+    // Der Name ist gespeichert, bevor die Sprechgruppen-Zuordnung scheitert: gemeldet wird trotzdem.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &abschnitt_pfad(eid, nord),
+        &cookie,
+        Some(&json!({"name": "Nordwest", "sprechgruppe_ids": [999_999]})),
+    )
+    .await;
+    assert!(s.is_client_error(), "unbekannte Sprechgruppe: {s} {v}");
+    assert_eq!(br_ereignisse(&mut rx), vec![a, b], "nach späterem Fehler");
+    assert_eq!(
+        abschnitt_name_in_liste(&app, &cookie, eid, a).await,
+        "Nordwest"
+    );
+}
+
+/// Auflösen meldet die Räume, die danach keinen Abschnitt mehr zeigen.
+#[tokio::test]
+async fn abschnitt_aufloesen_meldet_seine_raeume() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let nord = abschnitt_anlegen(&app, &cookie, eid, "Nord").await;
+    let sued = abschnitt_anlegen(&app, &cookie, eid, "Süd").await;
+    let a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR A").await;
+    let c = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR C").await;
+    raum_im_abschnitt(&app, &cookie, eid, a, nord).await;
+    raum_im_abschnitt(&app, &cookie, eid, c, sued).await;
+
+    let mut rx = live.abonniere(eid);
+    let (s, _) = anfrage_json(&app, "DELETE", &abschnitt_pfad(eid, nord), &cookie, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(br_ereignisse(&mut rx), vec![a]);
+    assert!(abschnitt_name_in_liste(&app, &cookie, eid, a)
+        .await
+        .is_null());
+}
+
+/// Akzeptanzkriterium LLH-1291: eine Person mit BR-Recht, aber ohne Modul Einsatzabschnitte,
+/// bekommt beim Umbenennen `bereitstellungsraum` (und `abschnitt` weiterhin nicht), und ihre
+/// Liste trägt danach den neuen Namen.
+#[tokio::test]
+async fn umbenennen_erreicht_br_leser_ohne_abschnittsrecht() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let a = br_anlegen_und_aktivieren(&app, &admin, eid, "BR A").await;
+    raum_im_abschnitt(&app, &admin, eid, a, nord).await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    // Nur Führungskräfte der Organisation sehen die Module, die `abschnitt` erreicht
+    // (`LiveEvent::modul_keys`): Abschnitte, Lagekarte, Verpflegung.
+    for modul in ["einsatzabschnitte", "lagekarte", "verpflegung"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+            &admin,
+            Some(&json!({"sichtbar": true, "benoetigte_rolle": "fuehrungskraft"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "Override {modul}: {v}");
+    }
+    let liste = format!("/api/einsaetze/{eid}/bereitstellungsraeume");
+    assert_eq!(abschnitt_name_in_liste(&app, &frieda, eid, a).await, "Nord");
+    let (s, _) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{eid}/abschnitte"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Vorbedingung: ohne Abschnittsrecht"
+    );
+    let (s, _) = anfrage_json(&app, "GET", &liste, &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: mit BR-Recht");
+
+    let feed = common::live_oeffnen(&app, &frieda, eid).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &abschnitt_pfad(eid, nord),
+        &admin,
+        Some(&json!({"name": "Nordost"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let gelesen = common::sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        gelesen.contains("event: bereitstellungsraum")
+            && gelesen.contains(&format!(r#""br_id":{a}"#)),
+        "BR-Leser bekommt den Raum: {gelesen:?}"
+    );
+    assert!(
+        !gelesen.contains("event: abschnitt"),
+        "das Abschnitts-Ereignis bleibt gegatet: {gelesen:?}"
+    );
+    assert_eq!(
+        abschnitt_name_in_liste(&app, &frieda, eid, a).await,
+        "Nordost"
     );
 }

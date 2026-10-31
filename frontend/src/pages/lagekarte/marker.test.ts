@@ -643,6 +643,7 @@ function raum(partial: Partial<BrListenEintrag>): BrListenEintrag {
     geaendert_von: 1,
     belegung: { einheiten: 0, fahrzeuge: 0 },
     einheit_ids: [],
+    abrufe: [],
     ...partial,
   };
 }
@@ -650,7 +651,7 @@ function raum(partial: Partial<BrListenEintrag>): BrListenEintrag {
 const zug = {
   id: 10,
   ueber_einheit_id: null,
-  ist_kumuliert: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 },
+  ist: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 },
 };
 
 describe('buildBrMarker (LLH-1107)', () => {

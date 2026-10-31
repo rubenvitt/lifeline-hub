@@ -248,6 +248,17 @@
             "type": "integer",
             "format": "int64"
           },
+          "planung_entfallen": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AbloesungPlanungEntfallen",
+                "description": "Die zuletzt entfallene Planung (LLH-1309): nur an einer laufenden Schicht ohne Ablöser;\njede Änderung der Ablöser-Liste räumt den Vermerk."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "planung_warnungen": {
             "type": "array",
             "items": {
@@ -425,6 +436,28 @@
           "uebernommen": {
             "type": "boolean",
             "description": "Übernommen statt neu angelegt (ungeplanter Ablöser mit eigener laufender Schicht)."
+          }
+        }
+      },
+      "AbloesungPlanungEntfallen": {
+        "type": "object",
+        "description": "Die zuletzt entfallene Planung einer laufenden Schicht ohne Ablöser (LLH-1309, Spec\n`kraefte-abloesung` „Planung entfällt“): die Karte zeigt „Planung entfallen · 2. Rettungsstaffel\naufgelöst“.",
+        "required": [
+          "at",
+          "grund",
+          "einheit_name"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "description": "Wann die Planung entfiel (UTC ohne Zone)."
+          },
+          "einheit_name": {
+            "type": "string",
+            "description": "Name der Einheit zum Zeitpunkt, wie im ETB."
+          },
+          "grund": {
+            "$ref": "#/components/schemas/PlanungEntfallenGrund"
           }
         }
       },
@@ -3522,6 +3555,24 @@
         ],
         "description": "Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten (mit ihren Fahrzeugen) +\neinheitenlose Fahrzeuge + Kennzahlen der Belegung (LLH-1095, design.md D4)."
       },
+      "BrEinheitAbruf": {
+        "type": "object",
+        "description": "Eine abgerufen im Raum stehende Einheit in der Liste der Räume (LLH-1309).",
+        "required": [
+          "einheit_id",
+          "seit_at"
+        ],
+        "properties": {
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "seit_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Abrufs (UTC ohne Zone), wie [`BrAbrufKurz::seit_at`]."
+          }
+        }
+      },
       "BrEinheitFahrzeug": {
         "type": "object",
         "description": "Aktives Fahrzeug einer Einheit im Raum.",
@@ -3638,9 +3689,17 @@
             "type": "object",
             "required": [
               "belegung",
-              "einheit_ids"
+              "einheit_ids",
+              "abrufe"
             ],
             "properties": {
+              "abrufe": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BrEinheitAbruf"
+                },
+                "description": "Die Einheiten, die abgerufen im Raum stehen, mit dem Zeitpunkt des Abrufs, nach Einheit\n(LLH-1309, Spec `bereitstellungsraum-belegung` „Liste der Räume mit Belegung“): die Karte\nder Ablösung nennt daraus „abgerufen“ beim Ablöser. Abgeleitet wie im Detail\n([`belegung_repo::abruf_je_objekt`]), nicht gespeichert."
+              },
               "abschnitt_name": {
                 "type": [
                   "string",
@@ -3660,7 +3719,7 @@
             }
           }
         ],
-        "description": "Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die\nEinheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über\n`summiereStaerke`). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,\ndesign.md D10)."
+        "description": "Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die\nEinheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über\n`staerkeImRaum` aus der eigenen Stärke dieser Einheiten, LLH-1289). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,\ndesign.md D10)."
       },
       "BrStatus": {
         "type": "string",
@@ -13406,6 +13465,14 @@
           "externe_kraft",
           "infotelefon_anruf",
           "medienkontakt"
+        ]
+      },
+      "PlanungEntfallenGrund": {
+        "type": "string",
+        "description": "Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab\nLLH-1309: `einsatz_abloesung.planung_entfallen_grund`, CHECK in Migration 0259).\nWire == `as_str()`.",
+        "enum": [
+          "aufloesung",
+          "entlassung"
         ]
       },
       "PlatzAnzeige": {

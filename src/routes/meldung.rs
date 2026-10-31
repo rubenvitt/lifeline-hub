@@ -10,9 +10,9 @@ use crate::extract::PfadParam;
 use crate::fuehrung::Fuehrungsfunktion;
 use crate::live::LiveEvent;
 use crate::meldung::{
-    meldung_bestaetigung_frist_min_ableiten, repo, titel_sofort, MeldungAnzeige, ART_LAGEMELDUNG,
-    ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN, PRIO_NORMAL, PRIO_SOFORT,
-    RICHTUNG_INTERN,
+    meldung_bestaetigung_frist_min_ableiten, repo, AutoFristHerkunft, MeldungAnzeige,
+    ART_LAGEMELDUNG, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN, PRIO_NORMAL,
+    PRIO_SOFORT, RICHTUNG_INTERN,
 };
 use crate::routes::support::{hoechstens, parse_enum, pflicht_max};
 use crate::zeit::jetzt;
@@ -283,7 +283,7 @@ pub async fn anlegen(
             crate::meldung::auto_frist_erinnerung_sicherstellen(
                 &state,
                 &meldung,
-                &titel_sofort(&meldung),
+                AutoFristHerkunft::Meldung,
             )
             .await?;
             let mut meldung = meldung;
@@ -424,7 +424,8 @@ pub async fn anlegen(
     // Schlaegt die nachgelagerte Reminder-Anlage fehl, hat der Sofortalarm den Client bereits
     // erreicht; der idempotente Queue-Replay stellt nur den Reminder nach, ohne Doppelalarm.
     crate::meldung::live_publikation_sicherstellen(&state, &m).await?;
-    crate::meldung::auto_frist_erinnerung_sicherstellen(&state, &m, &titel_sofort(&m)).await?;
+    crate::meldung::auto_frist_erinnerung_sicherstellen(&state, &m, AutoFristHerkunft::Meldung)
+        .await?;
     Ok((StatusCode::CREATED, Json(m)))
 }
 

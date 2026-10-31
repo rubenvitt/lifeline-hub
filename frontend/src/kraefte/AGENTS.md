@@ -74,8 +74,12 @@ der Rolle Achtung, nie als Einstufung. Der Planungshinweis ist eine Frist, keine
 Den Stand eines geplanten Ablösers an der Karte („Ablösung: … · alarmiert … · eingetroffen …
 (BR …)“, LLH-1131 Teil II) liest nur `abloesung/abloeserStand.ts` aus der offenen Periode der
 Zeitachse; der Raum kommt aus `aktueller_br_id` und der Raumliste, die nur mit Freigabe der
-Bereitstellungsräume und nur bei einem Ablöser im Raum abgefragt wird. Kein eigener Abruf, kein
-DTO-Feld: live über die bestehenden Ereignisse. Jede Benachrichtigung der Ablösung springt zu
+Bereitstellungsräume und nur bei einem Ablöser im Raum abgefragt wird, „· abgerufen …“ aus deren
+`abrufe` (LLH-1309: das Abruf-Ereignis der BR-Belegung, kein Zeitachsen-Ereignis, keine Spalte an
+der Einheit; nach dem Ausrücken fällt es weg). Kein eigener Abruf, kein DTO-Feld der Ablösung:
+live über die bestehenden Ereignisse. Den Vermerk „Planung entfallen“ (LLH-1309) schreibt nur
+`drop_planungen_tx`, räumt nur `set_abloeser_tx`; ob er gilt (laufend, kein Ablöser), entscheidet
+der Server (`planung_entfallen`), der Client zeigt ihn nur (`abloesung/planungWarnung.ts`). Jede Benachrichtigung der Ablösung springt zu
 ihrer Schicht (`abloesungPfad(…, { schicht })`, Server `benachrichtigung::text::pfad`, beide
 gleich); die Seite nimmt `?schicht=` nach `useQueryParamSelektion` an.
 

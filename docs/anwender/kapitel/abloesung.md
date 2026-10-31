@@ -31,7 +31,8 @@ Einsatzleitung und Führungspersonal.
    „gilt auch für:“ die Untereinheiten, die in dieser Schicht mitlaufen, und die geplanten
    ablösenden Einheiten („Ablösung geplant durch …“). Ist eine von ihnen alarmiert oder
    eingetroffen, steht dort ihr Stand, etwa „Ablösung: 2. Rettungsstaffel · alarmiert 1340 ·
-   eingetroffen 1412 (BR Sportplatz)“. Ist eine geplante Einheit schon für eine andere Schicht
+   eingetroffen 1412 (BR Sportplatz)“. Wurde sie aus dem Bereitstellungsraum abgerufen, kommt
+   „· abgerufen 1425“ hinzu, bis sie ausrückt. Ist eine geplante Einheit schon für eine andere Schicht
    geplant oder steht sie selbst im Einsatz, nennt die Zeile darunter das, etwa „Sanitätsgruppe UHS
    steht selbst im Einsatz seit 0820“.
 
@@ -205,7 +206,9 @@ Verband zählt nur die geplante Einheit, nicht ihre Untereinheiten.
 Wird die geplante Einheit aufgelöst oder entlassen, entfällt die Planung: die Karte zeigt keine
 geplante Ablösung mehr, das Einsatztagebuch hält „Planung der ablösenden Einheit entfallen“ fest,
 und die Leser bekommen den Hinweis „Planung der ablösenden Einheit entfallen“. Danach steht der
-Hinweis „Keine ablösende Einheit geplant“ wieder an.
+Hinweis „Keine ablösende Einheit geplant“ wieder an. Bleibt kein Ablöser geplant, nennt die Karte
+den Grund, etwa „Planung entfallen · 2. Rettungsstaffel aufgelöst“, bis wieder eine Einheit
+geplant ist.
 
 ### Sprung zur Schicht
 

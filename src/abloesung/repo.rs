@@ -16,10 +16,10 @@ use super::hinweis::{self, Wirkung};
 use super::{
     einstufung, faelligkeit, planung_warnungen, rhythmus_text, vererbung, vorwarnzeit,
     AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung,
-    AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungStatus,
-    AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BeendetGrund,
-    BesatzungRolle, PlanungsStand, RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN,
-    VORWARNUNG_VORGABE_MINUTEN,
+    AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungPlanungEntfallen,
+    AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
+    BeendetGrund, BesatzungRolle, PlanungEntfallenGrund, PlanungsStand, RhythmusQuelle,
+    PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
@@ -134,6 +134,9 @@ struct Zeile {
     uebergebener_abschnitt_name: Option<String>,
     #[sqlx(try_from = "String")]
     art: AbloesungArt,
+    planung_entfallen_at: Option<String>,
+    planung_entfallen_grund: Option<String>,
+    planung_entfallen_einheit_name: Option<String>,
     #[sqlx(try_from = "String")]
     verbleib: AbloesungVerbleib,
     verbleib_br_bezeichnung: Option<String>,
@@ -147,6 +150,26 @@ impl Zeile {
                 Some(einstufung(&self.faellig_at, jetzt, self.vorwarnung_minuten))
             }
             AbloesungStatus::Abgeloest | AbloesungStatus::Beendet => None,
+        };
+        // Der Vermerk zählt nur, solange die Schicht läuft und keinen Ablöser trägt (der Spiegel
+        // ist genau dann leer, LLH-1309).
+        let planung_entfallen = match (
+            self.status,
+            self.abloesende_einheit_id,
+            self.planung_entfallen_at,
+            self.planung_entfallen_grund
+                .as_deref()
+                .and_then(PlanungEntfallenGrund::parse),
+            self.planung_entfallen_einheit_name,
+        ) {
+            (AbloesungStatus::Laufend, None, Some(at), Some(grund), Some(einheit_name)) => {
+                Some(AbloesungPlanungEntfallen {
+                    at,
+                    grund,
+                    einheit_name,
+                })
+            }
+            _ => None,
         };
         let ruecknehmbar = self.status == AbloesungStatus::Abgeloest
             && self.folgen_unberuehrt
@@ -186,6 +209,7 @@ impl Zeile {
             beendet_grund: self.beendet_grund.as_deref().and_then(BeendetGrund::parse),
             erbende_einheiten: Vec::new(),
             planung_warnungen: Vec::new(),
+            planung_entfallen,
             angelegt_at: self.angelegt_at,
         }
     }
@@ -217,7 +241,9 @@ const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS
                AS einheit_laeuft_anderswo, \
             a.beendet_at, a.beendet_von_id, a.beendet_grund, a.uebernommen_bei_vollzug, \
             a.abschnitt_uebergeben, ua.name AS uebergebener_abschnitt_name, a.art, \
-            a.verbleib, vb.bezeichnung AS verbleib_br_bezeichnung, a.angelegt_at \
+            a.planung_entfallen_at, a.planung_entfallen_grund, \
+            a.planung_entfallen_einheit_name, a.verbleib, \
+            vb.bezeichnung AS verbleib_br_bezeichnung, a.angelegt_at \
      FROM einsatz_abloesung a \
      JOIN einsatz_einheit e ON e.id = a.einheit_id \
      LEFT JOIN einsatzabschnitt s ON s.id = a.abschnitt_id \
@@ -674,12 +700,21 @@ async fn load_abloeser_ids_tx(conn: &mut SqliteConnection, id: i64) -> Result<Ve
 
 /// Ersetzt die Liste der Ablöser einer Schicht (Reihenfolge wie übergeben, EINE Anweisung über
 /// `json_each`) und zieht den Spiegel nach. Einziger Schreibweg der Liste und des Spiegels
-/// `abloesende_einheit_id` (= erster Eintrag, Migration 0215) neben [`sync_spiegel_tx`].
+/// `abloesende_einheit_id` (= erster Eintrag, Migration 0215) neben [`sync_spiegel_tx`]. Räumt
+/// den Vermerk einer entfallenen Planung (LLH-1309): jede Planung, Umplanung, Leerung und der
+/// Vollzug machen ihn gegenstandslos.
 async fn set_abloeser_tx(
     conn: &mut SqliteConnection,
     id: i64,
     ids: &[i64],
 ) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_abloesung SET planung_entfallen_at = NULL, \
+            planung_entfallen_grund = NULL, planung_entfallen_einheit_name = NULL WHERE id = ?",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
     sqlx::query("DELETE FROM einsatz_abloesung_abloeser WHERE abloesung_id = ?")
         .bind(id)
         .execute(&mut *conn)
@@ -1093,7 +1128,7 @@ pub async fn release_einheit_tx(
         einsatz_id,
         benutzer_id,
         einheit_id,
-        Entfallen::Aufloesung,
+        PlanungEntfallenGrund::Aufloesung,
         jetzt,
     )
     .await?;
@@ -1120,36 +1155,18 @@ pub async fn release_einheit_tx(
     Ok((geaendert, wirkung))
 }
 
-/// Warum die Planung einer ablösenden Einheit entfällt (LLH-1131).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Entfallen {
-    /// Die geplante Einheit wurde aufgelöst.
-    Aufloesung,
-    /// Die geplante Einheit wurde entlassen (Zeitachse, keine Periode mehr offen).
-    Entlassung,
-}
-
-impl Entfallen {
-    fn partizip(self) -> &'static str {
-        match self {
-            Entfallen::Aufloesung => "aufgelöst",
-            Entfallen::Entlassung => "entlassen",
-        }
-    }
-}
-
 /// Hebt jede Planung auf, mit der eine laufende Schicht `einheit_id` als ablösende Einheit
 /// trägt (Einzelplanung und Ablöser-Liste), weil die Einheit aufgelöst oder entlassen ist
 /// (LLH-1131, Spec `kraefte-abloesung` „Planung entfällt“): je Schicht ein ETB-Eintrag
 /// „Ablösung «…»: Planung der ablösenden Einheit entfallen, «…» aufgelöst“, ein Hinweis
-/// `abloeser_entfallen` und, ohne verbleibende Planung, wieder die Planungs-Frist. Läuft in der
-/// Transaktion des Aufrufers.
+/// `abloeser_entfallen`, der Vermerk an der Schicht (LLH-1309, der jüngste gewinnt) und, ohne
+/// verbleibende Planung, wieder die Planungs-Frist. Läuft in der Transaktion des Aufrufers.
 pub(crate) async fn drop_planungen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
-    grund: Entfallen,
+    grund: PlanungEntfallenGrund,
     jetzt: &str,
 ) -> Result<Wirkung, AppError> {
     let schichten = hinweis::load_geplante_tx(conn, einsatz_id, einheit_id).await?;
@@ -1183,6 +1200,17 @@ pub(crate) async fn drop_planungen_tx(
         .await?;
         // Rückt ein weiterer Ablöser der Liste nach, wird er der Spiegel (LLH-1132).
         sync_spiegel_tx(conn, id).await?;
+        // Vermerk für die Karte (LLH-1309); er zeigt sich nur, solange kein Ablöser bleibt.
+        sqlx::query(
+            "UPDATE einsatz_abloesung SET planung_entfallen_at = ?, planung_entfallen_grund = ?, \
+                planung_entfallen_einheit_name = ? WHERE id = ?",
+        )
+        .bind(jetzt)
+        .bind(grund.as_str())
+        .bind(&abloeser_name)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
         let (name, faellig_at): (String, String) = sqlx::query_as(
             "SELECT e.name, a.faellig_at FROM einsatz_abloesung a \
              JOIN einsatz_einheit e ON e.id = a.einheit_id WHERE a.id = ?",

@@ -91,7 +91,8 @@ Detail MUST dieselben Kennzahlen aus derselben Berechnung liefern.
 
 ### Requirement: Liste der Räume mit Belegung
 Die Liste der Bereitstellungsräume SHALL je Raum neben den Raumdaten den Namen seines Abschnitts,
-die Kennzahlen der Belegung und die Kennungen der Einheiten im Raum tragen. Die Kennzahlen MUST
+die Kennzahlen der Belegung und die Kennungen der Einheiten im Raum tragen, dazu je Einheit, die
+abgerufen im Raum steht, den Zeitpunkt des Abrufs (`abrufe`, LLH-1309). Kennzahlen und Abrufe MUST
 für alle Räume mit einer festen Zahl von Abfragen entstehen, unabhängig von der Zahl der Räume.
 Ein gekoppeltes Gerät eines Bereitstellungsraums MUST weiter nur seinen eigenen Raum erhalten.
 
@@ -99,6 +100,11 @@ Ein gekoppeltes Gerät eines Bereitstellungsraums MUST weiter nur seinen eigenen
 - **WHEN** der BR Sportplatz dem Abschnitt „Nord“ zugeordnet ist und zwei Einheiten trägt
 - **THEN** nennt die Liste beim BR Sportplatz „Nord“, die Kennungen beider Einheiten und ihre
   Kennzahlen
+
+#### Scenario: Abgerufene Einheit
+- **WHEN** von zwei Einheiten im BR Sportplatz eine um 14:25 abgerufen wurde
+- **THEN** nennt die Liste beim BR Sportplatz für diese Einheit den Abruf um 14:25 und für die
+  andere keinen
 
 ### Requirement: Verlauf eines Raums lesen
 Das System SHALL je Bereitstellungsraum die vollständige Reihe seiner Belegungsereignisse liefern,
@@ -180,8 +186,9 @@ Einheit im Raum umbenannt wird. Ohne Änderung MUST kein Ereignis entstehen.
 Die Detailseite eines Bereitstellungsraums SHALL die Kennzahlen „Bereitgestellt“ (Stärke),
 „Fahrzeuge“, „Einheiten“ und „Längste Wartezeit“ zeigen. „Fahrzeuge“, „Einheiten“ und „Längste
 Wartezeit“ MUST aus den Kennzahlen des Servers kommen, nicht aus der Länge der angezeigten
-Listen. Die Stärke MUST über dieselbe Summenfunktion wie die übrige Anwendung entstehen; fehlt
-eine Einheit des Raums in der Einheitenliste, MUST statt einer Zahl „—“ mit Grund stehen. Ohne
+Listen. Die Stärke MUST nur zählen, wer im Raum steht: die eigene Ist-Stärke jeder Einheit im
+Raum, ohne Untereinheiten, die anderswo stehen (wie „Fahrzeuge“); fehlt eine Einheit des Raums in
+der Einheitenliste, MUST statt einer Zahl „—“ mit Grund stehen. Ohne
 frühesten „seit“-Zeitpunkt MUST „Längste Wartezeit“ „—“ zeigen. Die Zahl der Belegungen, die vor
 dem Auflösen genannt wird („noch n belegt“), MUST weiter nur Einheiten und einheitenlose
 Fahrzeuge zählen, wie die Sperre des Servers beim Auflösen.
@@ -191,11 +198,17 @@ Fahrzeuge zählen, wie die Sperre des Servers beim Auflösen.
 - **THEN** zeigt die Kennzahl „Fahrzeuge“ 3 und „Einheiten“ 2
 - **AND** nennt die Seite vor dem Auflösen „noch 3 belegt“
 
+#### Scenario: Gruppe in einem anderen Raum
+- **WHEN** der „1. Zug“ (Zugtrupp 1/1/2) mit „Gruppe 1“ (0/1/8) im BR Sportplatz steht und
+  „Gruppe 2“ (0/1/8) im BR Schule
+- **THEN** zeigt der BR Sportplatz „Bereitgestellt“ 1/2/10//13 und der BR Schule 0/1/8//9
+
 ### Requirement: Zeile je Kraft mit Wartezeit
 Die Detailseite SHALL je Einheit im Raum Name, Typ, Stärke, die Funkrufnamen ihrer Fahrzeuge und
-„seit <Uhrzeit> · <Dauer>“ zeigen, je einheitenlosem Fahrzeug Funkrufnamen, Typ und „seit …“. Die
-Dauer MUST ohne neuen Abruf mit der Uhr weiterlaufen (höchstens eine Minute Versatz) und MUST
-nie negativ sein. Ohne „seit“ MUST die Zeile keine Zeitangabe tragen.
+„seit <Uhrzeit> · <Dauer>“ zeigen, je einheitenlosem Fahrzeug Funkrufnamen, Typ und „seit …“.
+Die Stärke der Zeile MUST die Einheit samt ihren Untereinheiten im selben Raum nennen;
+Untereinheiten, die anderswo stehen, MUST NOT zählen. Die Dauer MUST ohne neuen Abruf mit der
+Uhr weiterlaufen (höchstens eine Minute Versatz) und MUST nie negativ sein. Ohne „seit“ MUST die Zeile keine Zeitangabe tragen.
 
 #### Scenario: Wartezeit läuft
 - **WHEN** eine Einheit seit 13:42 im Raum steht und die Seite um 14:30 offen ist
@@ -234,7 +247,7 @@ nicht aufklappen.
 ### Requirement: Liste zeigt die Belegung
 Die Liste der Bereitstellungsräume SHALL je Raum neben Bezeichnung, Status und Standort die
 Spalten Abschnitt, Stärke, Fahrzeuge, Einheiten und Längste Wartezeit zeigen. Die Werte MUST
-denen der Detailseite desselben Raums gleichen; die Stärke MUST über dieselbe Summenfunktion und
+denen der Detailseite desselben Raums gleichen; die Stärke MUST über dieselbe Rechnung und
 Formatierung wie die Detailseite entstehen. Ist die Einheitenliste nicht verfügbar oder fehlt
 eine Einheit des Raums darin, MUST „Stärke“ „—“ mit dem sichtbaren Grund „unvollständig“ zeigen,
 nicht nur als Tooltip; ein leerer Raum zeigt nur „—“.

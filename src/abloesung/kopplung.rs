@@ -30,7 +30,7 @@ use sqlx::SqliteConnection;
 
 use super::hinweis::{self, Wirkung};
 use super::repo::{self, Start};
-use super::BeendetGrund;
+use super::{BeendetGrund, PlanungEntfallenGrund};
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::error::AppError;
 use crate::zeitachse::{ZeitachseArt, ZeitachseQuelle};
@@ -391,7 +391,7 @@ async fn end_tx(
         einsatz_id,
         benutzer_id,
         einheit_id,
-        repo::Entfallen::Entlassung,
+        PlanungEntfallenGrund::Entlassung,
         &jetzt,
     )
     .await?;

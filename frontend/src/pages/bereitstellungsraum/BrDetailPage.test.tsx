@@ -420,12 +420,14 @@ describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
       id: 10,
       name: 'Zug 1',
       typ_label: 'Zug',
+      ist: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
       ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
     });
     const trupp = einheit({
       id: 11,
       name: 'Trupp 2',
       typ_label: 'Trupp',
+      ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 },
       ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 },
     });
     const br = brDetail({
@@ -455,6 +457,58 @@ describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
     expect(screen.getByText('Zug')).toBeInTheDocument();
     expect(screen.getByText('1/3/18//22')).toBeInTheDocument();
     expect(screen.getByText('LF 20')).toBeInTheDocument();
+  });
+});
+
+describe('BrDetailPage — Stärke zählt nur Anwesende (LLH-1289)', () => {
+  it('zählt eine Gruppe in einem anderen Raum weder im Band noch in der Zeile ihres Zugs', async () => {
+    // „1. Zug“ (Zugtrupp 1/1/2) steht mit „Gruppe 1“ (0/1/8) hier, „Gruppe 2“ (0/1/8) anderswo.
+    const zug = einheit({
+      id: 10,
+      name: '1. Zug',
+      typ_label: 'Zug',
+      ist: { fuehrer: 1, unterfuehrer: 1, mannschaft: 2 },
+      ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
+    });
+    const gruppe1 = einheit({
+      id: 11,
+      name: 'Gruppe 1',
+      ueber_einheit_id: 10,
+      ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+      ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+    });
+    const gruppe2 = einheit({
+      id: 12,
+      name: 'Gruppe 2',
+      ueber_einheit_id: 10,
+      aktueller_br_id: 2,
+      ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+      ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+    });
+    const br = brDetail({
+      einheiten: [
+        { id: 10, name: '1. Zug' },
+        { id: 11, name: 'Gruppe 1' },
+      ],
+      fahrzeuge: [],
+    });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug, gruppe1, gruppe2])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    await screen.findByTestId('br-summe');
+    await waitFor(() => expect(kennzahl('Bereitgestellt')).toHaveTextContent('1/2/10//13'));
+    expect(screen.queryByText('1/3/18//22')).not.toBeInTheDocument();
+    // Zeile des Zugs: er samt Gruppe 1; Gruppe 1 trägt ihre eigene Zeile.
+    const belegung = screen.getByTestId('br-belegung');
+    expect(within(belegung).getByText('1/2/10//13')).toBeInTheDocument();
+    expect(within(belegung).getByText('0/1/8//9')).toBeInTheDocument();
   });
 });
 
@@ -1312,6 +1366,12 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
+  it('kein „Bearbeiten“ nach dem Stornieren (LLH-1304)', async () => {
+    seite(brDetail({ status: 'geplant', storniert_at: '2026-10-15 08:00:00' }));
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+
   it('kein „Bearbeiten“ für Beobachter', async () => {
     seite(brDetail({ status: 'aktiv' }), { rolle: 'beobachter' });
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
@@ -1565,12 +1625,14 @@ const ZUG = einheit({
   id: 10,
   name: '1. Zug',
   typ_label: 'Zug',
+  ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 },
   ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 },
 });
 const TRUPP = einheit({
   id: 11,
   name: 'Trupp 2',
   typ_label: 'Trupp',
+  ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 2 },
   ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 2 },
 });
 const BELEGT = brDetail({
@@ -2615,6 +2677,12 @@ describe('BrDetailPage — Auf Karte verorten (LLH-1107)', () => {
 
   it('nicht nach dem Auflösen', async () => {
     seite(brDetail({ status: 'aufgeloest' }));
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Auf Karte/ })).not.toBeInTheDocument();
+  });
+
+  it('nicht nach dem Stornieren (LLH-1304)', async () => {
+    seite(brDetail({ storniert_at: '2026-10-15 08:00:00', lat: 51.93, lon: 8.87 }));
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Auf Karte/ })).not.toBeInTheDocument();
   });

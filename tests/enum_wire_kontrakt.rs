@@ -1046,6 +1046,16 @@ fn abloesung_beendet_grund_wire() {
     } in lifeline_hub::abloesung::BeendetGrund::ALLE);
 }
 
+/// LLH-1309: Grund der entfallenen Planung, `planung_entfallen_grund` mit CHECK in
+/// `migrations/0259_abloesung_planung_entfallen.sql`.
+#[test]
+fn abloesung_planung_entfallen_grund_wire() {
+    enum_wire!(lifeline_hub::abloesung::PlanungEntfallenGrund {
+        Aufloesung => "aufloesung",
+        Entlassung => "entlassung",
+    } in lifeline_hub::abloesung::PlanungEntfallenGrund::ALLE);
+}
+
 /// LLH-1131: Art einer Warnung beim Planen der ablösenden Einheit (nur im Antwort-DTO).
 #[test]
 fn abloesung_warnung_art_wire() {

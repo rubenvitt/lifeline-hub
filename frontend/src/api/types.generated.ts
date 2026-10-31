@@ -94,6 +94,7 @@ export interface components {
             folgeschichten: components["schemas"]["AbloesungFolge"][];
             /** Format: int64 */
             id: number;
+            planung_entfallen?: components["schemas"]["AbloesungPlanungEntfallen"] | null;
             /**
              * @description Warnungen zur geplanten ablösenden Einheit (LLH-1131): schon für eine andere Schicht
              *     geplant oder selbst im Einsatz. Beim Lesen ermittelt; leer ohne Planung, ohne Auffälliges
@@ -188,6 +189,18 @@ export interface components {
             status: components["schemas"]["AbloesungStatus"];
             /** @description Übernommen statt neu angelegt (ungeplanter Ablöser mit eigener laufender Schicht). */
             uebernommen: boolean;
+        };
+        /**
+         * @description Die zuletzt entfallene Planung einer laufenden Schicht ohne Ablöser (LLH-1309, Spec
+         *     `kraefte-abloesung` „Planung entfällt“): die Karte zeigt „Planung entfallen · 2. Rettungsstaffel
+         *     aufgelöst“.
+         */
+        AbloesungPlanungEntfallen: {
+            /** @description Wann die Planung entfiel (UTC ohne Zone). */
+            at: string;
+            /** @description Name der Einheit zum Zeitpunkt, wie im ETB. */
+            einheit_name: string;
+            grund: components["schemas"]["PlanungEntfallenGrund"];
         };
         /**
          * @description Eine Warnung zur geplanten ablösenden Einheit einer laufenden Schicht (LLH-1131). Gilt für
@@ -1442,6 +1455,13 @@ export interface components {
              */
             fahrzeuge: components["schemas"]["BrFahrzeugKurz"][];
         };
+        /** @description Eine abgerufen im Raum stehende Einheit in der Liste der Räume (LLH-1309). */
+        BrEinheitAbruf: {
+            /** Format: int64 */
+            einheit_id: number;
+            /** @description Zeitpunkt des Abrufs (UTC ohne Zone), wie [`BrAbrufKurz::seit_at`]. */
+            seit_at: string;
+        };
         /** @description Aktives Fahrzeug einer Einheit im Raum. */
         BrEinheitFahrzeug: {
             funkrufname: string;
@@ -1478,10 +1498,17 @@ export interface components {
         /**
          * @description Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
          *     Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
-         *     `summiereStaerke`). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
+         *     `staerkeImRaum` aus der eigenen Stärke dieser Einheiten, LLH-1289). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
          *     design.md D10).
          */
         BrListenEintrag: components["schemas"]["BrAnzeige"] & {
+            /**
+             * @description Die Einheiten, die abgerufen im Raum stehen, mit dem Zeitpunkt des Abrufs, nach Einheit
+             *     (LLH-1309, Spec `bereitstellungsraum-belegung` „Liste der Räume mit Belegung“): die Karte
+             *     der Ablösung nennt daraus „abgerufen“ beim Ablöser. Abgeleitet wie im Detail
+             *     ([`belegung_repo::abruf_je_objekt`]), nicht gespeichert.
+             */
+            abrufe: components["schemas"]["BrEinheitAbruf"][];
             abschnitt_name?: string | null;
             belegung: components["schemas"]["BrBelegungKennzahlen"];
             einheit_ids: number[];
@@ -5383,6 +5410,13 @@ export interface components {
          * @enum {string}
          */
         PersonenArt: "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
+        /**
+         * @description Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab
+         *     LLH-1309: `einsatz_abloesung.planung_entfallen_grund`, CHECK in Migration 0259).
+         *     Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanungEntfallenGrund: "aufloesung" | "entlassung";
         /** @description Serialisierbare Platz-Anzeige (1:1 zur Tabelle). */
         PlatzAnzeige: {
             bezeichnung: string;

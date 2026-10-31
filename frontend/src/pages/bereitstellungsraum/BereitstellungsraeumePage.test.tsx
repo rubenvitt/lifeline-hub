@@ -34,6 +34,7 @@ function br(over: Partial<BrListenEintrag> = {}): BrListenEintrag {
     abschnitt_name: null,
     belegung: { einheiten: 0, fahrzeuge: 0, laengste_seit_at: null },
     einheit_ids: [],
+    abrufe: [],
     ...over,
   };
 }
@@ -436,12 +437,33 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
 
   // Dieselbe Fixture wie die Detailseite (BrDetailPage.test.tsx, „Kennzahlenband der Belegung“):
   // zwei Einheiten (0/1/5//6) mit je einem Fahrzeug und ein Fahrzeug ohne Einheit.
-  const ZUG = einheit({ id: 10, ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 } });
-  const TRUPP = einheit({ id: 11, ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 2 } });
-  const GRUPPE = einheit({
-    id: 12,
-    ueber_einheit_id: 10,
-    ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 },
+  const ZUG = einheit({
+    id: 10,
+    ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 },
+  });
+  const TRUPP = einheit({
+    id: 11,
+    ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 2 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 2 },
+  });
+  // Verband für LLH-1289: „2. Zug“ (Zugtrupp 1/1/2) mit zwei Gruppen zu je 0/1/8.
+  const ZUG2 = einheit({
+    id: 20,
+    ist: { fuehrer: 1, unterfuehrer: 1, mannschaft: 2 },
+    ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
+  });
+  const GRUPPE_A = einheit({
+    id: 21,
+    ueber_einheit_id: 20,
+    ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+  });
+  const GRUPPE_B = einheit({
+    id: 22,
+    ueber_einheit_id: 20,
+    ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
   });
   const SPORTPLATZ = br({
     id: 1,
@@ -473,7 +495,7 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
   }
 
   it('zeigt Abschnitt, Stärke, Fahrzeuge, Einheiten und längste Wartezeit wie die Detailseite', async () => {
-    stelleBereit([SPORTPLATZ], () => HttpResponse.json([ZUG, TRUPP, GRUPPE]));
+    stelleBereit([SPORTPLATZ], () => HttpResponse.json([ZUG, TRUPP]));
     renderPage();
     await waitFor(async () => expect((await zeileVon('BR Sportplatz')).Stärke).toBe('0/1/5//6'));
     expect(await zeileVon('BR Sportplatz')).toMatchObject({
@@ -485,12 +507,18 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
     });
   });
 
-  it('zählt eine Untereinheit nicht doppelt, wenn ihre Obereinheit mit im Raum steht', async () => {
-    stelleBereit([{ ...SPORTPLATZ, einheit_ids: [10, 12] }], () =>
-      HttpResponse.json([ZUG, TRUPP, GRUPPE]),
+  it('zählt nur, wer im Raum steht: eine Gruppe in einem anderen Raum zählt dort (LLH-1289)', async () => {
+    // Gruppe A steht mit dem 2. Zug im BR Sportplatz, Gruppe B im BR Schule.
+    stelleBereit(
+      [
+        { ...SPORTPLATZ, einheit_ids: [20, 21] },
+        br({ id: 2, bezeichnung: 'BR Schule', einheit_ids: [22] }),
+      ],
+      () => HttpResponse.json([ZUG, TRUPP, ZUG2, GRUPPE_A, GRUPPE_B]),
     );
     renderPage();
-    await waitFor(async () => expect((await zeileVon('BR Sportplatz')).Stärke).toBe('0/1/3//4'));
+    await waitFor(async () => expect((await zeileVon('BR Sportplatz')).Stärke).toBe('1/2/10//13'));
+    expect((await zeileVon('BR Schule')).Stärke).toBe('0/1/8//9');
   });
 
   it('ohne Einheitenliste (403) steht in „Stärke“ „—“ mit sichtbarem Grund', async () => {

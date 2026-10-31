@@ -16,7 +16,7 @@ import type {
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { grenzeText, istZuLang, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { STELLE_ART_LABEL } from './verpflegungText';
 
 /**
@@ -99,17 +99,8 @@ const ART_OPTIONEN = (Object.keys(STELLE_ART_LABEL) as VerpflegungsstelleArt[]).
   label: STELLE_ART_LABEL[a],
 }));
 
-/** Längenregel am Text des Ortsfelds (sein Wert ist ein Objekt, `zeichenRegel` prüft Strings). */
-const standortRegel = {
-  validator: (_: unknown, wert: OrtsfeldWert | undefined) =>
-    istZuLang(wert?.text, VERPFLEGUNG_STANDORT_MAX)
-      ? Promise.reject(
-          new Error(
-            `Standort darf höchstens ${grenzeText(VERPFLEGUNG_STANDORT_MAX)} Zeichen lang sein`,
-          ),
-        )
-      : Promise.resolve(),
-};
+/** Längenregel am Text des Ortsfelds. */
+const standortRegel = ortZeichenRegel(VERPFLEGUNG_STANDORT_MAX, 'Standort');
 
 export type StelleModus =
   | { art: 'anlegen'; onErfassen: (body: VerpflegungsstelleEingabe) => Promise<unknown> }

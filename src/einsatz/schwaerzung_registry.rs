@@ -1226,7 +1226,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // Ablösungsschichten: kein Freitext, Namen kommen per Join aus `einsatz_einheit`/
-    // `einsatzabschnitt`. Alles Struktur, Zeit oder Enum → RETAIN.
+    // `einsatzabschnitt`, nur der Vermerk der entfallenen Planung kopiert einen Einheitsnamen.
+    // Alles Struktur, Zeit, Enum oder Einheitsname → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_abloesung",
         scoping: Scoping::EinsatzId,
@@ -1259,7 +1260,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abgeloest_abschnitt_vorher_id", G_FK),
             // LLH-1132 (0215): Marke einer beim Vollzug übernommenen Schicht.
             retain("uebernommen_bei_vollzug", G_KONFIG),
-            // LLH-1308 (0259): Verbleib der abgelösten Einheit beim Vollzug.
+            // LLH-1309 (0259): Vermerk der entfallenen Planung. Der Name ist der einer Einheit
+            // (operatives Objekt wie `einsatz_einheit.name`), keine Person; der Grund ein
+            // Code-Wert mit CHECK. Alle drei bleiben, der CHECK verlangt sie gemeinsam.
+            retain("planung_entfallen_at", G_ZEIT),
+            retain("planung_entfallen_einheit_name", G_OP_LABEL),
+            retain("planung_entfallen_grund", G_ENUM),
+            // LLH-1308 (0260): Verbleib der abgelösten Einheit beim Vollzug.
             retain("verbleib", G_ENUM),
             retain("verbleib_br_id", G_FK),
         ],
@@ -1280,7 +1287,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
         ],
     },
-    // Belegungsbuchungen eines Vollzugs im Bereitstellungsraum (LLH-1308, Mig 0259): nur
+    // Belegungsbuchungen eines Vollzugs im Bereitstellungsraum (LLH-1308, Mig 0260): nur
     // Verweise und Zeit, damit die Rücknahme das Gegenstück buchen kann.
     TabellenRegel {
         tabelle: "einsatz_abloesung_br_buchung",

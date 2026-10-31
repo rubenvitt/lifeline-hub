@@ -26,8 +26,8 @@ import {
 } from './taktischesZeichen';
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import { registrierNummer } from '../../anzeige/registrierNummer';
-import { staerkeText, type StaerkeTraeger } from '../../anzeige/staerke';
-import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
+import { staerkeText } from '../../anzeige/staerke';
+import { staerkeImRaum, type RaumEinheit } from '../../bereitstellungsraum/brZahlen';
 import {
   freiesZeichen as freiesZeichenBild,
   fuellfarbe,
@@ -303,7 +303,7 @@ export function buildBetreuungMarker(
  */
 function brZusatz(
   r: BrListenEintrag,
-  einheiten: readonly StaerkeTraeger[] | undefined,
+  einheiten: readonly RaumEinheit[] | undefined,
 ): string | undefined {
   if (r.status === 'geplant') return 'geplant';
   const teile: string[] = [];
@@ -322,7 +322,7 @@ function brZusatz(
  */
 export function buildBrMarker(
   raeume: readonly BrListenEintrag[],
-  einheiten: readonly StaerkeTraeger[] | undefined,
+  einheiten: readonly RaumEinheit[] | undefined,
   token: GlobalToken,
 ): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
   const verortet: KarteMarker[] = [];

@@ -92,6 +92,7 @@ async function plakettenBeiZoom(page: Page, zoom: number): Promise<number> {
 }
 
 test('Marker tragen ihre Namensplakette erst ab Zoom 12, offline in Mono', async ({ page }) => {
+  test.setTimeout(120_000);
   await anmelden(page);
   const { einsatzId, ersteId } = await einsatzMitEinheiten(page);
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);

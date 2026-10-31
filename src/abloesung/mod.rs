@@ -209,6 +209,42 @@ pub struct AbloesungPlanungWarnung {
     pub seit_at: Option<String>,
 }
 
+wire_enum! {
+    /// Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab
+    /// LLH-1309: `einsatz_abloesung.planung_entfallen_grund`, CHECK in Migration 0259).
+    /// Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum PlanungEntfallenGrund {
+        /// Die geplante Einheit wurde aufgelöst.
+        Aufloesung => "aufloesung",
+        /// Die geplante Einheit wurde entlassen (Zeitachse, keine Periode mehr offen).
+        Entlassung => "entlassung",
+    }
+    try_from = |s| format!("Ungültiger Grund einer entfallenen Planung: {s}");
+}
+
+impl PlanungEntfallenGrund {
+    /// „aufgelöst“ bzw. „entlassen“, für ETB und Karte.
+    pub fn partizip(self) -> &'static str {
+        match self {
+            PlanungEntfallenGrund::Aufloesung => "aufgelöst",
+            PlanungEntfallenGrund::Entlassung => "entlassen",
+        }
+    }
+}
+
+/// Die zuletzt entfallene Planung einer laufenden Schicht ohne Ablöser (LLH-1309, Spec
+/// `kraefte-abloesung` „Planung entfällt“): die Karte zeigt „Planung entfallen · 2. Rettungsstaffel
+/// aufgelöst“.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungPlanungEntfallen {
+    /// Wann die Planung entfiel (UTC ohne Zone).
+    pub at: String,
+    pub grund: PlanungEntfallenGrund,
+    /// Name der Einheit zum Zeitpunkt, wie im ETB.
+    pub einheit_name: String,
+}
+
 /// Eine laufende Schicht, wie die Planungswarnungen sie lesen.
 #[derive(Debug, Clone)]
 pub struct PlanungsStand {
@@ -394,6 +430,10 @@ pub struct AbloesungAnzeige {
     /// geplant oder selbst im Einsatz. Beim Lesen ermittelt; leer ohne Planung, ohne Auffälliges
     /// und bei abgelösten und beendeten Schichten. Die Planung gelingt trotzdem.
     pub planung_warnungen: Vec<AbloesungPlanungWarnung>,
+    /// Die zuletzt entfallene Planung (LLH-1309): nur an einer laufenden Schicht ohne Ablöser;
+    /// jede Änderung der Ablöser-Liste räumt den Vermerk.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub planung_entfallen: Option<AbloesungPlanungEntfallen>,
     pub angelegt_at: String,
 }
 
