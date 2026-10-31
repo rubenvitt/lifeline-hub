@@ -403,10 +403,7 @@ export default function BrDetailPage() {
   // (der Server lehnt beides mit 409 ab, LLH-1304). Ein BR-Gerät führt seinen Raum, verwaltet ihn
   // aber nicht.
   const bearbeitbar =
-    verwalten &&
-    darfImEinsatzSchreiben(einsatz) &&
-    br.status !== 'aufgeloest' &&
-    !br.storniert_at;
+    verwalten && darfImEinsatzSchreiben(einsatz) && br.status !== 'aufgeloest' && !br.storniert_at;
   const materialAmBr = (materialQuery.data ?? []).filter((em) => em.br_id === br.id);
   const eintreffen = darf('br-eintreffen') && darfImEinsatzSchreiben(einsatz);
   const inBetrieb = br.status === 'aktiv';
