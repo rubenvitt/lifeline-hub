@@ -1413,6 +1413,15 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
     );
   });
 
+  it('scheitert die Raumliste, steht ein Hinweis statt eines stillen Fehlens', async () => {
+    einheiten.wert = [EINHEITEN[0], { ...EINHEITEN[1], aktueller_br_id: 4 }];
+    listeBr.mockRejectedValue(new Error('kaputt'));
+    renderPage();
+    expect(
+      await screen.findByText('Bereitstellungsräume konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+  });
+
   it('live: ein neues Ereignis der Zeitachse ändert die Zeile über die bestehende Invalidierung', async () => {
     const { client } = renderPage();
     const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });

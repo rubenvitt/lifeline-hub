@@ -799,6 +799,16 @@ export default function AbloesungPage() {
               title="Ablösungen konnten nicht geladen werden"
             />
           )}
+          {/* Ohne Raumliste fehlen Raum und Abruf der Ablöser; das soll nicht wie „nicht
+              abgerufen“ aussehen (LLH-1309). */}
+          {wirksam === 'laufend' && brFrei && brQuery.isError && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: token.marginSM }}
+              title="Bereitstellungsräume konnten nicht geladen werden"
+            />
+          )}
           {listenQuery.isLoading ? (
             <Spin />
           ) : liste.length === 0 ? (
