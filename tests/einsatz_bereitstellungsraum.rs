@@ -498,6 +498,116 @@ async fn patch_stammfelder_kein_etb() {
     );
 }
 
+/// Eingabegrenzen (LLH-1302, Spec `eingabegrenzen`): Bezeichnung, Standort und Notiz des Raums
+/// in POST und PATCH sowie die Notiz der Belegung; genau die Grenze geht, ein Zeichen mehr ist
+/// 400 mit Feldnamen, und nichts wird geschrieben.
+#[tokio::test]
+async fn eingabegrenzen_400_mit_feldnamen() {
+    use lifeline_hub::bereitstellungsraum::{
+        BELEGUNG_NOTIZ_MAX, BEZEICHNUNG_MAX, NOTIZ_MAX, STANDORT_MAX,
+    };
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let basis = format!("/api/einsaetze/{eid}/bereitstellungsraeume");
+    // Gezählt wird in Zeichen, nicht in Bytes.
+    let lang = |n: usize| "ä".repeat(n);
+
+    for (feld, name, max) in [
+        ("bezeichnung", "Bezeichnung", BEZEICHNUNG_MAX),
+        ("standort", "Standort", STANDORT_MAX),
+        ("notiz", "Notiz", NOTIZ_MAX),
+    ] {
+        let mut body = json!({"bezeichnung": format!("BR {feld}")});
+        body[feld] = json!(lang(max + 1));
+        let (s, v) = anfrage_json(&app, "POST", &basis, &cookie, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "POST {feld}: {v}");
+        assert_eq!(
+            v["error"],
+            format!("{name} darf höchstens {max} Zeichen lang sein"),
+            "POST {feld}"
+        );
+    }
+    let (s, v) = anfrage_json(&app, "GET", &basis, &cookie, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v.as_array().map(Vec::len), Some(0), "nichts angelegt: {v}");
+
+    // Genau an der Grenze geht es.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &basis,
+        &cookie,
+        Some(&json!({
+            "bezeichnung": lang(BEZEICHNUNG_MAX),
+            "standort": lang(STANDORT_MAX),
+            "notiz": lang(NOTIZ_MAX),
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "an der Grenze: {v}");
+    let br_id = v["id"].as_i64().unwrap();
+
+    for (feld, name, max) in [
+        ("bezeichnung", "Bezeichnung", BEZEICHNUNG_MAX),
+        ("standort", "Standort", STANDORT_MAX),
+        ("notiz", "Notiz", NOTIZ_MAX),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PATCH",
+            &format!("{basis}/{br_id}"),
+            &cookie,
+            Some(&json!({ (feld): lang(max + 1) })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "PATCH {feld}: {v}");
+        assert_eq!(
+            v["error"],
+            format!("{name} darf höchstens {max} Zeichen lang sein"),
+            "PATCH {feld}"
+        );
+    }
+    let (s, v) = anfrage_json(&app, "GET", &format!("{basis}/{br_id}"), &cookie, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["bezeichnung"], lang(BEZEICHNUNG_MAX), "unverändert: {v}");
+
+    let aktiv = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Belegung").await;
+    let einheit = einheit_bilden(&app, &cookie, eid, "Einheit Grenze").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{aktiv}/belegung"),
+        &cookie,
+        Some(&json!({
+            "objekt_typ": "einheit",
+            "objekt_id": einheit,
+            "art": "eintritt",
+            "notiz": lang(BELEGUNG_NOTIZ_MAX + 1),
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Belegung: {v}");
+    assert_eq!(
+        v["error"],
+        format!("Notiz darf höchstens {BELEGUNG_NOTIZ_MAX} Zeichen lang sein")
+    );
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{aktiv}/belegung"),
+        &cookie,
+        Some(&json!({
+            "objekt_typ": "einheit",
+            "objekt_id": einheit,
+            "art": "eintritt",
+            "notiz": lang(BELEGUNG_NOTIZ_MAX),
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Belegung an der Grenze: {v}");
+}
+
 /// Rechte-Matrix: Beobachter kann nicht schreiben → 403.
 #[tokio::test]
 async fn beobachter_kann_nicht_schreiben_403() {

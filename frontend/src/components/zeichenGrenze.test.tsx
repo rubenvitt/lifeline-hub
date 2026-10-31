@@ -2,7 +2,14 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { Input } from 'antd';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import { istZuLang, zaehlerText, zeichenGrenze, zeichenRegel, zeichenZahl } from './zeichenGrenze';
+import {
+  istZuLang,
+  ortZeichenRegel,
+  zaehlerText,
+  zeichenGrenze,
+  zeichenRegel,
+  zeichenZahl,
+} from './zeichenGrenze';
 
 /** Kontrolliertes Feld wie unter `Form.Item`: der Zähler sieht immer den aktuellen Wert. */
 function Feld({ max, start = '' }: { max: number; start?: string }) {
@@ -109,6 +116,19 @@ describe('zeichenRegel', () => {
     await expect(pruefe(undefined)).resolves.toBeUndefined();
     await expect(pruefe('a'.repeat(11))).rejects.toThrow(
       'Text darf höchstens 10 Zeichen lang sein',
+    );
+  });
+});
+
+describe('ortZeichenRegel', () => {
+  it('prüft den Text eines Ortsfelds wie zeichenRegel (LLH-1302)', async () => {
+    const regel = ortZeichenRegel(10, 'Standort');
+    const pruefe = (wert: { text?: string | null } | undefined) => regel.validator({}, wert);
+    await expect(pruefe({ text: 'ä'.repeat(10) })).resolves.toBeUndefined();
+    await expect(pruefe(undefined)).resolves.toBeUndefined();
+    await expect(pruefe({ text: null })).resolves.toBeUndefined();
+    await expect(pruefe({ text: 'ä'.repeat(11) })).rejects.toThrow(
+      'Standort darf höchstens 10 Zeichen lang sein',
     );
   });
 });
