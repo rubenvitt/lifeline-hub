@@ -162,7 +162,9 @@ impl LiveEvent {
             // Abschnittsnamen per Join mitliest: die Richtung ist umgekehrt — ein
             // Abschnitts-Ereignis macht die Betreuungs-Übersicht stale, und das invalidiert das
             // Frontend über `EINSATZ_STREAM_EVENTS.abschnitt` (design.md D6), ohne dass ein
-            // Abschnitts-Leser von Stellen erführe. Der ETB-Nachweis läuft über `etb`.
+            // Abschnitts-Leser von Stellen erführe. Für Leser ohne Abschnittsrecht meldet das
+            // Umbenennen und Auflösen die Stellen selbst mit `betreuung` (LLH-1291,
+            // `routes::einsatzabschnitt::sse_namens_traeger`). Der ETB-Nachweis läuft über `etb`.
             //
             // Dazu `verpflegung` (LLH-1295, design.md D4): `GET …/verpflegung` legt in der
             // Empfängerliste Kennung und Bezeichnung derselben Stellen selbst offen, auch ohne
@@ -174,7 +176,7 @@ impl LiveEvent {
             LiveEvent::Betreuung => &["betreuung", "verpflegung"],
             // Nur `evakuierung` (LLH-1034): Bezirke und ihre Standreihen gehören seit der Trennung
             // dem eigenen Modul. NICHT `betreuung`: wer nur die Stellen liest, erführe sonst von
-            // jedem Bezirk. Abschnittsnamen wie bei `Betreuung` über das Frontend.
+            // jedem Bezirk. Abschnittsnamen wie bei `Betreuung` (Frontend und LLH-1291).
             LiveEvent::Evakuierung => &["evakuierung"],
             // Nur `verpflegung`: Zeitfenster und Ausgaben sind Datenobjekte des
             // Verpflegungsmoduls (LFH-634). NICHT `nachforderungen`, obwohl eine Ausgabe auf

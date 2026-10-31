@@ -183,7 +183,7 @@ pub async fn patche_meta(
 
 /// Eingefrorenes Lagebild (`schema_version = 1`). Jedes Feld ist die rohe `*Anzeige`-DTO-Liste
 /// der jeweiligen Lagekarte-Quelle, damit Inspector-Felder erhalten bleiben und das Frontend im
-/// Replay dieselben `baueMarker`-Ableiter nutzt.
+/// Replay dieselben `buildMarker`-Ableiter nutzt.
 #[derive(serde::Serialize)]
 struct SnapshotDaten {
     version: u32,

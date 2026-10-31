@@ -77,7 +77,9 @@ Einige Erinnerungen legt die App selbst an; sie tragen „automatisch“ und ein
 Anlass, etwa „↗ Auftrag #…“ oder „↗ Meldung #…“ mit der laufenden Nummer im Einsatz, bei einer
 Ablösung nur „↗ Ablösung“:
 
-- „Sofortmeldung #… unbestätigt“ zu einer Sofortmeldung (Kapitel [Meldungen](meldungen.md)),
+- „Sofortmeldung #… unbestätigt“ zu einer Sofortmeldung, bei einer anderen Meldung mit
+  Bestätigungspflicht mit ihrer Art, etwa „Rückmeldung #… unbestätigt“ (Kapitel
+  [Meldungen](meldungen.md)),
 - „Auftrag #… Quittierfrist“ zu einem Auftrag mit Frist (Kapitel
   [Aufträge und Befehle](auftraege-befehle.md)),
 - Hinweise zu fälligen Ablösungen und zur noch fehlenden Planung einer ablösenden Einheit

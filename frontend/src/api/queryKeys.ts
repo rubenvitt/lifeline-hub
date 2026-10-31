@@ -245,9 +245,10 @@ export const EINSATZ_STREAM_EVENTS = {
     // Verpflegung.
     EINSATZ_KEYS.verpflegung,
   ],
-  // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke und
-  // Betreuungsstellen tragen den Abschnittsnamen per Join. Umbenennen oder Löschen eines
-  // Abschnitts feuert nur dieses Ereignis.
+  // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke,
+  // Betreuungsstellen und die BR-Liste tragen den Abschnittsnamen per Join. Leser ohne Modul
+  // `einsatzabschnitte` bekommen dieses Ereignis nicht; für sie meldet der Server beim Umbenennen
+  // und Auflösen die betroffenen Räume, Stellen und Bezirke mit deren eigenem Ereignis (LLH-1291).
   abschnitt: [
     EINSATZ_KEYS.abschnitte,
     EINSATZ_KEYS.fuehrungskraefte,

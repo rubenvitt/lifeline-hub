@@ -2275,3 +2275,78 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
         assert!(j.to_string().contains("Seite neu laden"), "{j}");
     }
 }
+
+// ── LLH-1291: Abschnittsname per Join ────────────────────────────────────────────────────────
+
+/// Stellen und Bezirke tragen den Abschnittsnamen per Join, ihre Leser erreicht `abschnitt` aber
+/// nur mit Modul Einsatzabschnitte. Umbenennen und Auflösen melden deshalb die Stellen und Bezirke
+/// des Abschnitts mit ihrem eigenen Ereignis; ein PATCH ohne neuen Namen meldet keine.
+#[tokio::test]
+async fn abschnitt_umbenennen_und_aufloesen_meldet_stellen_und_bezirke() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt(&app, &admin, e, "Nord").await;
+    let sued = abschnitt(&app, &admin, e, "Süd").await;
+    let im_abschnitt = |art: &str, id: i64, ab: i64| {
+        let uri = if art == "stelle" {
+            format!("{}/stellen/{id}", pfad(e))
+        } else {
+            format!("{}/bezirke/{id}", pfad_evak(e))
+        };
+        (uri, format!(r#"{{"abschnitt_id":{ab}}}"#))
+    };
+    let st_nord = stelle(&app, &admin, e, "Turnhalle").await;
+    let st_sued = stelle(&app, &admin, e, "Schule").await;
+    let bz_nord = bezirk(&app, &admin, e, "Uferstraße").await;
+    for (art, id, ab) in [
+        ("stelle", st_nord, nord),
+        ("stelle", st_sued, sued),
+        ("bezirk", bz_nord, nord),
+    ] {
+        let (uri, body) = im_abschnitt(art, id, ab);
+        let (s, j) = anfrage(&app, "PATCH", &uri, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::OK, "{art} {id}: {j:?}");
+    }
+    let gemeldet =
+        |rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>| {
+            let mut t = objekt_ereignisse(
+                rx,
+                &[("betreuung", "stelle_id"), ("evakuierung", "bezirk_id")],
+            );
+            t.sort();
+            t
+        };
+    let abschnitt_uri = format!("/api/einsaetze/{e}/abschnitte/{nord}");
+
+    let mut rx = live.abonniere(e);
+    let erwartet = vec![
+        ("betreuung".to_string(), st_nord),
+        ("evakuierung".to_string(), bz_nord),
+    ];
+    for (body, soll, fall) in [
+        (r#"{"name":"Nordost"}"#, erwartet.clone(), "neuer Name"),
+        (r#"{"name":"Nordost"}"#, vec![], "gleicher Name"),
+        (r#"{"bemerkung":"Deich"}"#, vec![], "anderes Feld"),
+    ] {
+        let (s, j) = anfrage(&app, "PATCH", &abschnitt_uri, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::OK, "{fall}: {j:?}");
+        assert_eq!(gemeldet(&mut rx), soll, "{fall}");
+    }
+    let bz = bezirke_von(&app, &admin, e).await;
+    assert_eq!(bz[0]["abschnitt_name"], "Nordost", "{bz:?}");
+
+    let (s, _) = anfrage(&app, "DELETE", &abschnitt_uri, &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(gemeldet(&mut rx), erwartet, "Auflösen");
+    let (s, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    let turnhalle = u["stellen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"].as_i64() == Some(st_nord))
+        .unwrap()
+        .clone();
+    assert!(turnhalle["abschnitt_name"].is_null(), "{turnhalle:?}");
+}

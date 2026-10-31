@@ -88,25 +88,91 @@ async fn zeitraum_steht_in_der_zone_des_einsatzes_nicht_der_organisation() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    sqlx::query(
-        "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'America/New_York') \
-         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'Asia/Tokyo') \
-         ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone",
-    )
-    .bind(e)
-    .execute(&pool)
-    .await
-    .unwrap();
+    org_zone(&pool, "America/New_York").await;
+    einsatz_zone(&pool, e, "Asia/Tokyo").await;
     zeitfenster(&app, &admin, e, MITTAG).await;
     assert_eq!(
         verpflegungs_etb(&app, &admin, e).await,
         vec!["Verpflegung ‚Mittag‘ 241900sep26–2030 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute)."]
+    );
+}
+
+async fn org_zone(pool: &sqlx::SqlitePool, zone: &str) {
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, ?) \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .bind(zone)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn einsatz_zone(pool: &sqlx::SqlitePool, einsatz: i64, zone: &str) {
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, ?) \
+         ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .bind(einsatz)
+    .bind(zone)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// LLH-1296: auch Ändern und Löschen nennen den Zeitraum in der Zone des Einsatzes, beim
+/// Verschieben vorher und nachher. 10:30 UTC ist in Tokio 19:30.
+#[tokio::test]
+async fn aendern_und_loeschen_nennen_den_zeitraum_in_der_zone_des_einsatzes() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    org_zone(&pool, "America/New_York").await;
+    einsatz_zone(&pool, e, "Asia/Tokyo").await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let (s, zf) = zf_patch(
+        &app,
+        &admin,
+        e,
+        zid,
+        r#"{"von_at":"2026-09-24T10:30:00Z","bedarf_betreute":90}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{zf:?}");
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/zeitfenster/{zid}", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let etb = verpflegungs_etb(&app, &admin, e).await;
+    assert_eq!(etb.len(), 3, "{etb:?}");
+    assert_eq!(
+        etb[1],
+        "Verpflegung ‚Mittag‘ 241930sep26–2030 geändert: Zeitraum (vorher 241900sep26–2030), \
+         Bedarf 270 EP (vorher 250)."
+    );
+    assert_eq!(
+        etb[2],
+        "Verpflegung ‚Mittag‘ 241930sep26–2030 gelöscht (Bedarf 270 EP)."
+    );
+}
+
+/// LLH-1296, AK „Ohne Einsatzzone bleibt der Text unverändert“: es gilt die Zone der
+/// Organisation wie bisher. 10:00–11:30 UTC sind in New York 06:00–07:30.
+#[tokio::test]
+async fn ohne_einsatzzone_gilt_die_zone_der_organisation() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    org_zone(&pool, "America/New_York").await;
+    zeitfenster(&app, &admin, e, MITTAG).await;
+    assert_eq!(
+        verpflegungs_etb(&app, &admin, e).await,
+        vec!["Verpflegung ‚Mittag‘ 240600sep26–0730 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute)."]
     );
 }
 
@@ -3735,4 +3801,31 @@ async fn person_sieht_alles_und_kein_verpflegt_anderswo() {
     for z in u["zeitfenster"].as_array().unwrap() {
         assert_eq!(z["verpflegt_anderswo"], serde_json::json!([]), "{z}");
     }
+}
+
+/// LLH-1296: „Tag aus der Vorlage“ schreibt auch mit eigener Einsatzzone dieselben Texte wie das
+/// Einzelanlegen, in der Zone des Einsatzes. 04:30 UTC ist in Tokio 13:30.
+#[tokio::test]
+async fn tag_aus_vorlage_wie_einzeln_in_der_zone_des_einsatzes() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen(&app, &admin).await;
+    org_zone(&pool, "America/New_York").await;
+    einsatz_zone(&pool, e, "Asia/Tokyo").await;
+    einsatz_zone(&pool, e2, "Asia/Tokyo").await;
+
+    let (s, v) = create_tag(&app, &admin, e, &tag_body(&drei_tag_fenster())).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    for f in drei_tag_fenster() {
+        zeitfenster(&app, &admin, e2, &f.to_string()).await;
+    }
+    let sammel = verpflegungs_etb(&app, &admin, e).await;
+    assert_eq!(sammel, verpflegungs_etb(&app, &admin, e2).await);
+    assert_eq!(sammel.len(), 3);
+    assert_eq!(
+        sammel[0],
+        "Verpflegung ‚Frühstück‘ 111330okt26–1500 angelegt: Bedarf 260 EP (186 Kräfte, \
+         70 Betreute, 4 weitere), davon 12 Sonderkost."
+    );
 }

@@ -1472,7 +1472,7 @@ export interface components {
         /**
          * @description Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
          *     Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
-         *     `summiereStaerke`). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
+         *     `staerkeImRaum` aus der eigenen Stärke dieser Einheiten, LLH-1289). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
          *     design.md D10).
          */
         BrListenEintrag: components["schemas"]["BrAnzeige"] & {
@@ -2664,7 +2664,7 @@ export interface components {
         /**
          * @description Eine Betreuungsstelle der Empfängerliste (LLH-1295, design.md D3): Ziel einer Ausgabe an
          *     Betreute. Nur Kennung, Bezeichnung und ob sie geschlossen ist; die Feldmenge ist gepinnt
-         *     (`tests/verpflegung.rs`, `betreuungsstellen_der_empfaengerliste_ohne_personenangaben`): keine
+         *     (`tests/verpflegung.rs`, `ausgabe_an_betreuungsstelle`): keine
          *     Leitung, kein Kontakt, keine Notiz, kein Standort, keine Kapazität, keine Belegung.
          */
         EmpfaengerBetreuungsstelle: {

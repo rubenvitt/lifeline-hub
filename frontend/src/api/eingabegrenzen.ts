@@ -144,6 +144,12 @@ export const VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX = 200;
 export const VERPFLEGUNG_STELLE_BEZEICHNUNG_MAX = 200;
 /** Standort einer Verpflegungsstelle. */
 export const VERPFLEGUNG_STANDORT_MAX = 500;
+/** Bezeichnung eines Bereitstellungsraums (LLH-1302). */
+export const BR_BEZEICHNUNG_MAX = 200;
+/** Standort eines Bereitstellungsraums (LLH-1302). */
+export const BR_STANDORT_MAX = 500;
+/** Notiz eines Bereitstellungsraums (LLH-1302). */
+export const BR_NOTIZ_MAX = 2_000;
 /** Ort (Zuführungsziel) einer Verpflegungsausgabe. */
 export const VERPFLEGUNG_ORT_MAX = 500;
 /** Bemerkung einer Verpflegungsausgabe. */

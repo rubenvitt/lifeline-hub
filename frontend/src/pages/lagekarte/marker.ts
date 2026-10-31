@@ -26,8 +26,8 @@ import {
 } from './taktischesZeichen';
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import { registrierNummer } from '../../anzeige/registrierNummer';
-import { staerkeText, type StaerkeTraeger } from '../../anzeige/staerke';
-import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
+import { staerkeText } from '../../anzeige/staerke';
+import { staerkeImRaum, type RaumEinheit } from '../../bereitstellungsraum/brZahlen';
 import {
   freiesZeichen as freiesZeichenBild,
   fuellfarbe,
@@ -37,7 +37,7 @@ import {
 export type MarkerTyp =
   | 'einsatzort'
   /**
-   * Eigene Führungsstelle (LFH-1181, `baueFuehrungsstelleMarker`): nur lesend wie der Einsatzort,
+   * Eigene Führungsstelle (LFH-1181, `buildFuehrungsstelleMarker`): nur lesend wie der Einsatzort,
    * in dessen fester Quelle, ohne Cluster, ohne Ziehen und Platzieren.
    */
   | 'fuehrungsstelle'
@@ -50,7 +50,7 @@ export type MarkerTyp =
   | 'lagemeldung'
   | 'freies_zeichen'
   /**
-   * Betreuungsstelle (`baueBetreuungMarker`): läuft wie die UHS in `alleVerortet` und „Nicht
+   * Betreuungsstelle (`buildBetreuungMarker`): läuft wie die UHS in `alleVerortet` und „Nicht
    * verortet", aber nur bei Lesezugriff auf das Modul Betreuung (`betreuungEbene.ts`).
    */
   | 'betreuungsstelle'
@@ -174,7 +174,7 @@ const UHS_ROLLE = 'bedien' as const;
  * beschriftet mit ihrer Bezeichnung, sonst „Führungsstelle“. Farbe wie der Einsatzort (`marke`):
  * ein Ankerpunkt des eigenen Einsatzes. Bearbeitet wird im Paneel der Einsatzdaten.
  */
-export function baueFuehrungsstelleMarker(
+export function buildFuehrungsstelleMarker(
   fs: Fuehrungsstelle | undefined | null,
   token: GlobalToken,
 ): KarteMarker | null {
@@ -193,7 +193,7 @@ export function baueFuehrungsstelleMarker(
 }
 
 /** Leitet verortete Marker + Nicht-verortet-Liste aus den geladenen Objekten ab. */
-export function baueMarker(
+export function buildMarker(
   einsatz: EinsatzAnzeige | undefined,
   uhsListe: Uhs[],
   schaeden: readonly SchadenMarker[],
@@ -267,7 +267,7 @@ export function baueMarker(
  * eine neue Rolle wird nicht erfunden; Zeichen und eigene Ebene unterscheiden die Stelle von der
  * UHS.
  */
-export function baueBetreuungMarker(
+export function buildBetreuungMarker(
   stellen: readonly Betreuungsstelle[],
   token: GlobalToken,
   orgDefault: string | null = null,
@@ -303,7 +303,7 @@ export function baueBetreuungMarker(
  */
 function brZusatz(
   r: BrListenEintrag,
-  einheiten: readonly StaerkeTraeger[] | undefined,
+  einheiten: readonly RaumEinheit[] | undefined,
 ): string | undefined {
   if (r.status === 'geplant') return 'geplant';
   const teile: string[] = [];
@@ -322,7 +322,7 @@ function brZusatz(
  */
 export function buildBrMarker(
   raeume: readonly BrListenEintrag[],
-  einheiten: readonly StaerkeTraeger[] | undefined,
+  einheiten: readonly RaumEinheit[] | undefined,
   token: GlobalToken,
 ): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
   const verortet: KarteMarker[] = [];
@@ -356,7 +356,7 @@ const LAGEMELDUNG_FARBE = '#d48806';
  * Marker für verortete Lagemeldungen. Unverortete bleiben außen vor — verortet wird beim
  * Übernehmen in die Lage oder über die Lage-Angaben (LLH-1066), nicht per Ziehen auf der Karte.
  */
-export function baueLageMeldungMarker(
+export function buildLageMeldungMarker(
   lagemeldungen: LageMeldungStand[],
   token: Pick<GlobalToken, 'controlHeight'>,
 ): KarteMarker[] {
@@ -397,7 +397,7 @@ export const FREIES_ZEICHEN_TINTE = '#333333';
 export const FREIES_ZEICHEN_ERSATZLABEL = '(freies Zeichen)';
 
 /** Karten-Marker für freie taktische Zeichen (immer verortet). */
-export function baueFreieZeichenMarker(
+export function buildFreieZeichenMarker(
   zeichen: FreiesZeichen[],
   token: Pick<GlobalToken, 'controlHeight'>,
 ): KarteMarker[] {
@@ -435,7 +435,7 @@ export interface TaktischeQuelle {
 }
 
 /** Leitet taktische Marker (Einheit/Fahrzeug/Führung) + Nicht-verortet-Liste ab. */
-export function baueTaktischeMarker(
+export function buildTaktischeMarker(
   q: TaktischeQuelle,
   token: Pick<GlobalToken, 'controlHeight'>,
 ): {
@@ -534,7 +534,7 @@ const ABSCHNITT_FARBE = '#722ed1';
  * Kennzahlen in den Inspector. Eigener Builder, damit die Trefferzone hier geprüft wird wie an
  * jedem Marker.
  */
-export function baueAbschnittMarker(
+export function buildAbschnittMarker(
   a: Pick<Einsatzabschnitt, 'id' | 'name' | 'tz_fachaufgabe' | 'tz_organisation'>,
   polygon: GeoJsonPolygon,
   zentroid: [number, number],

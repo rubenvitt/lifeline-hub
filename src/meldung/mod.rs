@@ -64,6 +64,21 @@ wire_enum! {
     try_from = |s| format!("Ungültige Meldungsart: {s}");
 }
 
+impl Meldungsart {
+    /// Anzeigelabel wie an der Karte (`MELDUNGSART_OPTIONEN` in
+    /// `frontend/src/meldungen/MeldungFormular.tsx`).
+    pub const fn label(self) -> &'static str {
+        match self {
+            Meldungsart::Lagemeldung => "Lagemeldung",
+            Meldungsart::Sofortmeldung => "Sofortmeldung",
+            Meldungsart::Rueckmeldung => "Rückmeldung",
+            Meldungsart::Vollzugsmeldung => "Vollzugsmeldung",
+            Meldungsart::Anfrage => "Anfrage",
+            Meldungsart::Sonstige => "Sonstige",
+        }
+    }
+}
+
 /// Triage-Status (linearer Workflow). Bewusst KEIN kommunikation_status:
 /// dessen zwei unabhängige Achsen (Quittung / Vollzug-3-Zustände) bilden einen
 /// linearen 4-Zustands-Fluss nicht ab — „gesichtet" hat dort keinen Slot.
@@ -317,19 +332,63 @@ pub(crate) fn meldung_bestaetigung_frist_min_ableiten(
         .unwrap_or(konstante)
 }
 
+/// Woher eine pflichtige Meldung kam; mit ihrer Art bestimmt das den Titel der
+/// Auto-Frist-Erinnerung ([`auto_frist_titel`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AutoFristHerkunft {
+    /// Erfasst oder korrigiert über die Meldungsroute.
+    Meldung,
+    /// Meldung einer unangemeldeten Kraft beim Eintreffen im Bereitstellungsraum (LLH-1075).
+    UnangemeldeteKraft,
+}
+
+/// Bezeichnung im Titel der Auto-Frist-Erinnerung (LLH-1301): eine Sofortmeldung (Art oder
+/// Priorität sofort, [`MeldungAnzeige::ist_sofort`]) bleibt „Sofortmeldung“, jede andere
+/// pflichtige Meldung nennt ihre Art; „Sonstige“ heißt dort schlicht „Meldung“.
+fn auto_frist_bezeichnung(
+    meldungsart: Meldungsart,
+    prioritaet: Prioritaet,
+    herkunft: AutoFristHerkunft,
+) -> &'static str {
+    if herkunft == AutoFristHerkunft::UnangemeldeteKraft {
+        return "Unangemeldete Kraft";
+    }
+    if prioritaet == Prioritaet::Sofort {
+        return Meldungsart::Sofortmeldung.label();
+    }
+    match meldungsart {
+        Meldungsart::Sonstige => "Meldung",
+        art => art.label(),
+    }
+}
+
+/// Titel der Auto-Frist-Erinnerung einer pflichtigen Meldung, etwa „Sofortmeldung #3
+/// unbestätigt“ (Wortlaut seit LFH-97), „Rückmeldung #4 unbestätigt“ oder „Unangemeldete Kraft
+/// #5 unbestätigt“.
+pub(crate) fn auto_frist_titel(meldung: &MeldungAnzeige, herkunft: AutoFristHerkunft) -> String {
+    format!(
+        "{} #{} unbestätigt",
+        auto_frist_bezeichnung(meldung.meldungsart, meldung.prioritaet, herkunft),
+        meldung.lfd_nr
+    )
+}
+
 /// Stellt die offene Auto-Frist-Erinnerung ausnahmslos aus dem persistierten
 /// Meldungsstand sicher. Dadurch repariert auch ein Replay nach verlorener/fehlgeschlagener
 /// Reminder-Anlage den abgeleiteten Datensatz, ohne geänderte Request-Felder zu übernehmen.
-/// `titel` nennt der Schreibweg (Meldungsroute „Sofortmeldung #n unbestätigt“, Eintreffen
-/// „Unangemeldete Kraft #n unbestätigt“).
+/// Den Titel leitet [`auto_frist_titel`] aus Art und Herkunft der Meldung ab.
 pub(crate) async fn auto_frist_erinnerung_sicherstellen(
     state: &crate::app::AppState,
     meldung: &MeldungAnzeige,
-    titel: &str,
+    herkunft: AutoFristHerkunft,
 ) -> Result<(), crate::error::AppError> {
     if meldung.bestaetigung_pflicht && meldung.bestaetigung_frist_at.is_some() {
-        crate::erinnerung::repo::stelle_meldung_auto_frist_sicher(&state.pool, meldung.id, titel)
-            .await?;
+        crate::erinnerung::repo::stelle_meldung_auto_frist_sicher(
+            &state.pool,
+            meldung.id,
+            &auto_frist_titel(meldung, herkunft),
+        )
+        .await?;
     }
     Ok(())
 }
@@ -398,12 +457,6 @@ async fn sofortalarm_melden(
     .await;
 }
 
-/// Titel der Auto-Frist-Erinnerung einer Sofortmeldung (Wortlaut seit LFH-97; für jede pflichtige
-/// Meldung der Meldungsroute „Sofortmeldung“, Folgeaufgabe aus LLH-1075).
-pub(crate) fn titel_sofort(meldung: &MeldungAnzeige) -> String {
-    format!("Sofortmeldung #{} unbestätigt", meldung.lfd_nr)
-}
-
 /// Nach dem Commit einer Korrektur, die eine Meldung erst zur Sofortmeldung machte und ihren
 /// Sofortalarm auslöst (`korrektur::Ergebnis::sofortalarm`, LLH-1380): Sofort-Highlight mit Ton,
 /// Alarm an die Leser des Moduls und die Auto-Frist-Erinnerung, wie beim Erfassen. Einmal je
@@ -415,12 +468,48 @@ pub(crate) async fn sofortalarm_nach_heraufstufung(
 ) -> Result<(), crate::error::AppError> {
     sse_sofort(state, meldung.einsatz_id, meldung.id);
     sofortalarm_melden(state, meldung, ausloeser_id).await;
-    auto_frist_erinnerung_sicherstellen(state, meldung, &titel_sofort(meldung)).await
+    auto_frist_erinnerung_sicherstellen(state, meldung, AutoFristHerkunft::Meldung).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// LLH-1301: jede pflichtige Art nennt sich selbst; Priorität sofort bleibt Sofortmeldung,
+    /// die unangemeldete Kraft bleibt unverändert.
+    #[test]
+    fn auto_frist_bezeichnung_je_art() {
+        use AutoFristHerkunft::{Meldung, UnangemeldeteKraft};
+        let normal = Prioritaet::Normal;
+        for (art, erwartet) in [
+            (Meldungsart::Lagemeldung, "Lagemeldung"),
+            (Meldungsart::Sofortmeldung, "Sofortmeldung"),
+            (Meldungsart::Rueckmeldung, "Rückmeldung"),
+            (Meldungsart::Vollzugsmeldung, "Vollzugsmeldung"),
+            (Meldungsart::Anfrage, "Anfrage"),
+            (Meldungsart::Sonstige, "Meldung"),
+        ] {
+            assert_eq!(
+                auto_frist_bezeichnung(art, normal, Meldung),
+                erwartet,
+                "{art:?}"
+            );
+            assert_eq!(
+                auto_frist_bezeichnung(art, Prioritaet::Dringend, Meldung),
+                erwartet,
+                "{art:?} dringend"
+            );
+            assert_eq!(
+                auto_frist_bezeichnung(art, Prioritaet::Sofort, Meldung),
+                "Sofortmeldung",
+                "{art:?} mit Priorität sofort"
+            );
+        }
+        assert_eq!(
+            auto_frist_bezeichnung(Meldungsart::Lagemeldung, normal, UnangemeldeteKraft),
+            "Unangemeldete Kraft"
+        );
+    }
 
     #[test]
     fn prioritaet_validierung() {
