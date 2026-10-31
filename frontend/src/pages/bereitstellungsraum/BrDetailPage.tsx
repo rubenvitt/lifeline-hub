@@ -68,7 +68,7 @@ import BrBearbeitenModal from './BrBearbeitenModal';
 import AufKarteVerorten from './AufKarteVerorten';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
-import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
+import { staerkeDerEinheitImRaum, staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useUhr } from '../../abloesung/useUhr';
 import { dauerText } from '../../kraefte/zeitachse';
@@ -443,11 +443,10 @@ export default function BrDetailPage() {
   const einheitVon = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e]));
   const fahrzeugVon = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f]));
   // Stärke nur über `staerkeImRaum` (dieselbe Rechnung wie die Liste, LLH-1095 D1): fehlt eine
-  // Einheit des Raums in der Einheitenliste, „—“ mit Grund statt einer zu kleinen Zahl.
-  const { staerke: summe, unvollstaendig } = staerkeImRaum(
-    br.einheiten.map((e) => e.id),
-    einheitenQuery.data,
-  );
+  // Einheit des Raums in der Einheitenliste, „—“ mit Grund statt einer zu kleinen Zahl. Gezählt
+  // wird nur, wer im Raum steht (LLH-1289), wie bei „Fahrzeuge“.
+  const einheitIdsImRaum = br.einheiten.map((e) => e.id);
+  const { staerke: summe, unvollstaendig } = staerkeImRaum(einheitIdsImRaum, einheitenQuery.data);
   // Fahrzeuge, Einheiten und längste Wartezeit: Serverwerte (Spec `bereitstellungsraum-belegung`,
   // „Kennzahlen auf der Detailseite“), nicht die Länge der Listen.
   const fahrzeugZahl = br.belegung.fahrzeuge;
@@ -600,7 +599,9 @@ export default function BrDetailPage() {
       )}
       {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
       <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
-        <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
+        <StaerkeAnzeige
+          wert={staerkeDerEinheitImRaum(e.id, einheitIdsImRaum, einheitenQuery.data)}
+        />
       </span>
       {e.fahrzeuge.length > 0 && (
         <span data-lfh="br-einheit-fahrzeuge" style={monoStil(12)}>
