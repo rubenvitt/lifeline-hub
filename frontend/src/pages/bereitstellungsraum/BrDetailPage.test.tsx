@@ -2624,4 +2624,10 @@ describe('BrDetailPage — Auf Karte verorten (LLH-1107)', () => {
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Auf Karte/ })).not.toBeInTheDocument();
   });
+
+  it('nicht nach dem Stornieren (LLH-1304)', async () => {
+    seite(brDetail({ storniert_at: '2026-10-15 08:00:00', lat: 51.93, lon: 8.87 }));
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Auf Karte/ })).not.toBeInTheDocument();
+  });
 });
