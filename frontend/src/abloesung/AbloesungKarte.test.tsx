@@ -43,6 +43,7 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   art: 'einheit',
   besatzung: [],
   abschnitt_uebergeben: false,
+  verbleib: 'ruhe',
   planung_warnungen: [],
   angelegt_at: '2026-10-17 06:00:00',
   ...over,
@@ -346,5 +347,34 @@ describe('AbloesungKarte — Deeplink-Hervorhebung (LLH-1131 Teil II, Spec `deep
     renderMitProviders(<AbloesungKarte schicht={schicht()} jetzt={jetzt} darfSchreiben={false} />);
     expect(karte()).not.toHaveAttribute('data-hervorgehoben');
     expect(karte().style.boxShadow).toBe('');
+  });
+});
+
+describe('AbloesungKarte — Verbleib nach dem Vollzug (LLH-1308)', () => {
+  const abgeloest = { status: 'abgeloest' as const, vollzogen_at: '2026-10-17 14:40:00' };
+
+  it('nennt den Raum, in den die abgelöste Einheit trat', () => {
+    zeige(
+      schicht({
+        ...abgeloest,
+        verbleib: 'bereitstellungsraum',
+        verbleib_br_bezeichnung: 'Schule',
+      }),
+    );
+    expect(document.querySelector('[data-lfh="abloesung-verbleib"]')).toHaveTextContent(
+      'danach Bereitstellungsraum Schule',
+    );
+  });
+
+  it('nennt die Entlassung', () => {
+    zeige(schicht({ ...abgeloest, verbleib: 'entlassen' }));
+    expect(document.querySelector('[data-lfh="abloesung-verbleib"]')).toHaveTextContent(
+      'danach entlassen',
+    );
+  });
+
+  it('in Ruhe keine Zeile', () => {
+    zeige(schicht(abgeloest));
+    expect(document.querySelector('[data-lfh="abloesung-verbleib"]')).toBeNull();
   });
 });

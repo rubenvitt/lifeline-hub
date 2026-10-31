@@ -538,13 +538,37 @@ pub async fn abloesung_vollzogen_tx(
     einheit_id: i64,
     vollzogen_at: &str,
 ) -> Result<Option<(i64, Beruehrt)>, AppError> {
+    vollzug_ende_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        einheit_id,
+        ZeitachseArt::Abloesung,
+        vollzogen_at,
+    )
+    .await
+}
+
+/// Das Ende-Ereignis eines Vollzugs (Quelle `abloesung`) an der Einheit samt Fan-out: `abloesung`
+/// oder, mit dem Verbleib „entlassen“ (LLH-1308), `entlassung`. Ohne offene Periode ausgelassen
+/// (`None`). Die Kopplung an die Ablösung (LLH-1128) läuft wie bei jedem Ereignis; der Vollzug
+/// hat die Schicht da schon `abgeloest`, „Ende mit der Entlassung“ findet also keine laufende.
+pub async fn vollzug_ende_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    art: ZeitachseArt,
+    vollzogen_at: &str,
+) -> Result<Option<(i64, Beruehrt)>, AppError> {
+    debug_assert!(art.ist_ende(), "der Vollzug schreibt nur ein Ende");
     let (r, beruehrt) = schreibe_tx(
         conn,
         einsatz_id,
         benutzer_id,
         Kraft::Einheit(einheit_id),
         Neu {
-            art: ZeitachseArt::Abloesung,
+            art,
             zeitpunkt_at: vollzogen_at,
             quelle: ZeitachseQuelle::Abloesung,
             notiz: None,
@@ -571,13 +595,37 @@ pub async fn abloesung_zurueckgenommen_tx(
     einheit_id: i64,
     vollzogen_at: &str,
 ) -> Result<Option<(i64, Beruehrt)>, AppError> {
+    vollzug_ende_zurueck_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        einheit_id,
+        ZeitachseArt::Abloesung,
+        vollzogen_at,
+    )
+    .await
+}
+
+/// Wie [`abloesung_zurueckgenommen_tx`] für das Ende-Ereignis der Art `art` (LLH-1308: die
+/// Entlassung eines Vollzugs mit Verbleib „entlassen“). Die Streichung einer Entlassung läuft
+/// durch die Kopplung; die Rücknahme hat die Schicht da schon wieder `laufend`, „Streichung
+/// dieser Entlassung“ findet also keine mit ihr beendete.
+pub async fn vollzug_ende_zurueck_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    art: ZeitachseArt,
+    vollzogen_at: &str,
+) -> Result<Option<(i64, Beruehrt)>, AppError> {
     let id: Option<i64> = sqlx::query_scalar(
         "SELECT id FROM einsatz_kraft_zeitachse \
-         WHERE einheit_id = ? AND quelle = 'abloesung' AND art = 'abloesung' \
+         WHERE einheit_id = ? AND quelle = 'abloesung' AND art = ? \
            AND zeitpunkt_at = ? AND gestrichen_at IS NULL \
          ORDER BY id DESC LIMIT 1",
     )
     .bind(einheit_id)
+    .bind(art.as_str())
     .bind(vollzogen_at)
     .fetch_optional(&mut *conn)
     .await?;

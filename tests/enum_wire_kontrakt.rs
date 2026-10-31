@@ -1069,6 +1069,17 @@ fn abloesung_art_und_besatzung_rolle_wire() {
     } in lifeline_hub::abloesung::BesatzungRolle::ALLE);
 }
 
+/// LLH-1308: Verbleib der abgelösten Einheit (DB-CHECK `verbleib` in
+/// `migrations/0259_abloesung_verbleib.sql`).
+#[test]
+fn abloesung_verbleib_wire() {
+    enum_wire!(lifeline_hub::abloesung::AbloesungVerbleib {
+        Ruhe => "ruhe",
+        Bereitstellungsraum => "bereitstellungsraum",
+        Entlassen => "entlassen",
+    } in lifeline_hub::abloesung::AbloesungVerbleib::ALLE);
+}
+
 /// `einsatz` seit LLH-1122 (Neubau in `migrations/0212_schichtmodell.sql`).
 #[test]
 fn abloesung_rhythmus_quelle_wire() {

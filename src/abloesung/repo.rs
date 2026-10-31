@@ -17,8 +17,9 @@ use super::{
     einstufung, faelligkeit, planung_warnungen, rhythmus_text, vererbung, vorwarnzeit,
     AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung,
     AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungStatus,
-    AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BeendetGrund, BesatzungRolle, PlanungsStand,
-    RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
+    AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BeendetGrund,
+    BesatzungRolle, PlanungsStand, RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN,
+    VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
@@ -48,6 +49,11 @@ pub struct VollzugWirkung {
     /// Personen, deren Einheit oder Zeitachse der Besatzungswechsel oder seine Rücknahme geändert
     /// hat (LLH-1150).
     pub personen: Vec<i64>,
+    /// Bereitstellungsräume, deren Belegung Vollzug oder Rücknahme geändert haben (LLH-1308).
+    pub raeume: Vec<i64>,
+    /// ETB-Einträge und Hinweise der Kopplung an die Zeitachse (LLH-1128/LLH-1131), etwa eine
+    /// entfallene Planung der entlassenen Einheit; nach dem Commit über `publish_kopplung`.
+    pub kopplung: Wirkung,
 }
 
 /// Eingabe „Schicht beginnen" — von der Route validiert (Zeit normalisiert, Rhythmus im
@@ -88,6 +94,11 @@ pub struct VollzugEingabe {
     /// Beim Besatzungswechsel die neue Besatzung (`einsatz_personal.id`), begrenzt und
     /// entdoppelt; sonst leer.
     pub besatzung: Vec<i64>,
+    /// Was danach mit der abgelösten Einheit geschieht (LLH-1308); beim Besatzungswechsel
+    /// immer `ruhe` (die Route prüft das).
+    pub verbleib: AbloesungVerbleib,
+    /// Der Raum genau beim Verbleib `bereitstellungsraum` (die Route prüft das).
+    pub verbleib_br_id: Option<i64>,
 }
 
 /// Eine Zeile, wie sie die Anzeige-Projektion liefert.
@@ -123,6 +134,9 @@ struct Zeile {
     uebergebener_abschnitt_name: Option<String>,
     #[sqlx(try_from = "String")]
     art: AbloesungArt,
+    #[sqlx(try_from = "String")]
+    verbleib: AbloesungVerbleib,
+    verbleib_br_bezeichnung: Option<String>,
     angelegt_at: String,
 }
 
@@ -164,6 +178,8 @@ impl Zeile {
             uebergebener_abschnitt_name: self.uebergebener_abschnitt_name,
             art: self.art,
             besatzung: Vec::new(),
+            verbleib: self.verbleib,
+            verbleib_br_bezeichnung: self.verbleib_br_bezeichnung,
             ruecknehmbar,
             beendet_at: self.beendet_at,
             beendet_von_id: self.beendet_von_id,
@@ -201,14 +217,15 @@ const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS
                AS einheit_laeuft_anderswo, \
             a.beendet_at, a.beendet_von_id, a.beendet_grund, a.uebernommen_bei_vollzug, \
             a.abschnitt_uebergeben, ua.name AS uebergebener_abschnitt_name, a.art, \
-            a.angelegt_at \
+            a.verbleib, vb.bezeichnung AS verbleib_br_bezeichnung, a.angelegt_at \
      FROM einsatz_abloesung a \
      JOIN einsatz_einheit e ON e.id = a.einheit_id \
      LEFT JOIN einsatzabschnitt s ON s.id = a.abschnitt_id \
      LEFT JOIN einsatz_einheit ae ON ae.id = a.abloesende_einheit_id \
      LEFT JOIN einsatz_schichtmodell m ON m.einsatz_id = a.einsatz_id \
      LEFT JOIN einsatzabschnitt ua ON ua.id = a.abgeloest_abschnitt_vorher_id \
-               AND a.abschnitt_uebergeben = 1";
+               AND a.abschnitt_uebergeben = 1 \
+     LEFT JOIN bereitstellungsraum vb ON vb.id = a.verbleib_br_id";
 
 /// Laufende nach Fälligkeit (die dringendste zuerst), abgelöste nach Vollzug und beendete
 /// nach ihrem Ende, beide absteigend. Laufende tragen ihre erbenden Untereinheiten.
@@ -744,12 +761,14 @@ struct Roh {
     etb_vollzug_id: Option<i64>,
     #[sqlx(try_from = "String")]
     art: AbloesungArt,
+    #[sqlx(try_from = "String")]
+    verbleib: AbloesungVerbleib,
 }
 
 async fn roh_tx(conn: &mut SqliteConnection, einsatz_id: i64, id: i64) -> Result<Roh, AppError> {
     sqlx::query_as(
         "SELECT einheit_id, abschnitt_id, beginn_at, rhythmus_minuten, rhythmus_quelle, \
-                faellig_at, status, vollzogen_at, etb_vollzug_id, art \
+                faellig_at, status, vollzogen_at, etb_vollzug_id, art, verbleib \
          FROM einsatz_abloesung WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
@@ -1995,15 +2014,29 @@ async fn vollziehen_einheit_tx(
     // Übergeben wird nur, was es gibt: ein Abschnitt und mindestens ein Knoten-Ablöser.
     let uebergabe = abschnitt_vorher.filter(|_| eingabe.abschnitt_uebergeben && !knoten.is_empty());
 
+    let verbleib_br_id = match eingabe.verbleib {
+        AbloesungVerbleib::Bereitstellungsraum => eingabe.verbleib_br_id,
+        AbloesungVerbleib::Ruhe | AbloesungVerbleib::Entlassen => None,
+    };
+    // Der Raum des Verbleibs vor jedem Schreiben (LLH-1308, design.md D4).
+    let verbleib_br = match verbleib_br_id {
+        Some(br_id) => Some(check_verbleib_raum_tx(conn, einsatz_id, br_id, roh.einheit_id).await?),
+        None => None,
+    };
+    // Die Schicht ist `abgeloest`, BEVOR die Zeitachse schreibt: so findet die Kopplung „Ende mit
+    // der Entlassung“ (LLH-1128) beim Verbleib „entlassen“ keine laufende Schicht und beendet
+    // nichts ein zweites Mal (LLH-1308, design.md D3).
     sqlx::query(
         "UPDATE einsatz_abloesung SET status = 'abgeloest', vollzogen_at = ?, \
             vollzogen_von_id = ?, abschnitt_uebergeben = ?, \
-            abgeloest_abschnitt_vorher_id = ? WHERE id = ?",
+            abgeloest_abschnitt_vorher_id = ?, verbleib = ?, verbleib_br_id = ? WHERE id = ?",
     )
     .bind(vollzogen_at)
     .bind(benutzer_id)
     .bind(uebergabe.is_some())
     .bind(uebergabe)
+    .bind(eingabe.verbleib.as_str())
+    .bind(verbleib_br_id)
     .bind(id)
     .execute(&mut *conn)
     .await?;
@@ -2012,18 +2045,25 @@ async fn vollziehen_einheit_tx(
 
     // LFH-552/LLH-1132: der Vollzug beendet die Einsatzperiode der abgelösten Einheit und
     // jeder erbenden Untereinheit (je samt Fan-out); ohne offene Periode bleibt die jeweilige
-    // Zeitachse unberührt.
+    // Zeitachse unberührt. Mit dem Verbleib „entlassen“ endet sie mit der Entlassung statt der
+    // Ablösung (LLH-1308, design.md D2).
+    let ende = ende_art(eingabe.verbleib);
     let mut wirkung = VollzugWirkung::default();
     for einheit in std::iter::once(roh.einheit_id).chain(erben.iter().copied()) {
-        if let Some(w) = crate::zeitachse::repo::abloesung_vollzogen_tx(
+        if let Some(w) = crate::zeitachse::repo::vollzug_ende_tx(
             conn,
             einsatz_id,
             benutzer_id,
             einheit,
+            ende,
             vollzogen_at,
         )
         .await?
         {
+            wirkung.kopplung.append(Wirkung {
+                etb: w.1.abloesung.clone(),
+                anlaesse: w.1.hinweise.clone(),
+            });
             wirkung.zeitachse.push(w);
         }
     }
@@ -2109,6 +2149,37 @@ async fn vollziehen_einheit_tx(
         abschnitt_name = abschnitt_tx(conn, abschnitt).await?.map(|(n, _)| n);
     }
 
+    // LLH-1308 (design.md D4/D5): Belegungsbuchungen im Bereitstellungsraum. Alles, was dieser
+    // Vollzug dort bucht, hat eine id über `marke`; die Liste der Schicht hält sie für die
+    // Rücknahme fest.
+    let marke: i64 = sqlx::query_scalar("SELECT COALESCE(MAX(id), 0) FROM br_belegung")
+        .fetch_one(&mut *conn)
+        .await?;
+    let br_saetze =
+        abloeser_ausruecken_tx(conn, einsatz_id, benutzer_id, &abloeser, &mut wirkung).await?;
+    let verbleib_satz = match (eingabe.verbleib, verbleib_br_id.zip(verbleib_br)) {
+        (AbloesungVerbleib::Bereitstellungsraum, Some((br_id, bezeichnung))) => {
+            verbleib_eintritt_tx(conn, einsatz_id, benutzer_id, br_id, roh.einheit_id).await?;
+            wirkung.raeume.push(br_id);
+            wirkung.einheiten.push(roh.einheit_id);
+            Some(format!(
+                " «{name}» danach in Bereitstellungsraum {bezeichnung}."
+            ))
+        }
+        (AbloesungVerbleib::Entlassen, _) => Some(format!(" «{name}» danach entlassen.")),
+        _ => None,
+    };
+    sqlx::query(
+        "INSERT INTO einsatz_abloesung_br_buchung (abloesung_id, belegung_id) \
+         SELECT ?, id FROM br_belegung \
+         WHERE id > ? AND einsatz_id = ? AND art IN ('eintritt', 'austritt') ORDER BY id",
+    )
+    .bind(id)
+    .bind(marke)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+
     let mut inhalt = if abloeser.is_empty() {
         format!("Ablösung vollzogen: «{name}» (ohne ablösende Einheit).")
     } else {
@@ -2130,7 +2201,207 @@ async fn vollziehen_einheit_tx(
             namen_text(&an)
         ));
     }
+    for satz in br_saetze {
+        inhalt.push(' ');
+        inhalt.push_str(&satz);
+        inhalt.push('.');
+    }
+    if let Some(satz) = verbleib_satz {
+        inhalt.push_str(&satz);
+    }
     Ok((folge_ids, inhalt, wirkung))
+}
+
+/// Das Ende-Ereignis der Zeitachse zum Verbleib (LLH-1308, design.md D2): „entlassen“ endet mit
+/// der Entlassung, Ruhe und Bereitstellungsraum mit der Ablösung.
+fn ende_art(verbleib: AbloesungVerbleib) -> crate::zeitachse::ZeitachseArt {
+    match verbleib {
+        AbloesungVerbleib::Entlassen => crate::zeitachse::ZeitachseArt::Entlassung,
+        AbloesungVerbleib::Ruhe | AbloesungVerbleib::Bereitstellungsraum => {
+            crate::zeitachse::ZeitachseArt::Abloesung
+        }
+    }
+}
+
+/// Ablöser, die beim Vollzug in einem Bereitstellungsraum stehen, rücken aus (LLH-1308,
+/// design.md D5, Entscheidung 31.10.2026): nicht abgerufen → Abruf mit Ausrücken über
+/// [`crate::bereitstellungsraum::abruf::abruf_tx`] (ohne Abschnitt, ohne Auftrag, der Verband
+/// geht mit), schon abgerufen → nur der Austritt über `belege_tx` (das Ausrücken samt
+/// Mitgenommenen). In der Reihenfolge der Liste; wer mit einem Vorgänger ausgerückt ist, steht in
+/// keinem Raum mehr und wird übersprungen. Keine eigene Freigabe des Moduls
+/// Bereitstellungsräume: der Abruf ist Folge des Vollzugs. Liefert je Abruf einen Teilsatz für den
+/// einen ETB-Eintrag des Vollzugs (`abruf_tx` schreibt kein ETB).
+async fn abloeser_ausruecken_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    abloeser: &[Abloeser],
+    wirkung: &mut VollzugWirkung,
+) -> Result<Vec<String>, AppError> {
+    use crate::bereitstellungsraum::abruf::{abruf_tx, AbrufDaten, Startwerte};
+    use crate::bereitstellungsraum::belegung_repo::{self, Buchung};
+    use crate::bereitstellungsraum::{BrBelegungsArt, ObjektTyp};
+    let mut saetze = Vec::new();
+    for a in abloeser {
+        let raum: Option<i64> = sqlx::query_scalar(
+            "SELECT aktueller_br_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(a.id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .flatten();
+        let Some(br_id) = raum else {
+            continue;
+        };
+        let bezeichnung: String =
+            sqlx::query_scalar("SELECT bezeichnung FROM bereitstellungsraum WHERE id = ?")
+                .bind(br_id)
+                .fetch_one(&mut *conn)
+                .await?;
+        let abgerufen = belegung_repo::offener_abruf_tx(
+            &mut *conn,
+            einsatz_id,
+            ObjektTyp::Einheit,
+            a.id,
+            br_id,
+        )
+        .await?
+        .is_some();
+        let mitgenommen = if abgerufen {
+            let belegt = belegung_repo::belege_tx(
+                &mut *conn,
+                einsatz_id,
+                br_id,
+                ObjektTyp::Einheit,
+                a.id,
+                &Buchung {
+                    art: BrBelegungsArt::Austritt,
+                    notiz: None,
+                    client_id: None,
+                    zeitpunkt_at: None,
+                },
+                benutzer_id,
+            )
+            .await?;
+            let namen: Vec<String> = belegt
+                .mitgenommen
+                .iter()
+                .map(|(_, n)| format!("«{n}»"))
+                .collect();
+            saetze.push(crate::bereitstellungsraum::etb_text_ausgerueckt(
+                &format!("«{}»", a.name),
+                &namen,
+                &bezeichnung,
+                None,
+            ));
+            belegt.mitgenommen
+        } else {
+            // Ohne Auftrag braucht der Abruf keine Startwerte (`abruf_tx` legt dann nichts an).
+            let startwerte = Startwerte {
+                auftrag: 0,
+                etb: 0,
+                auto_etb: false,
+            };
+            let ergebnis = abruf_tx(
+                &mut *conn,
+                einsatz_id,
+                br_id,
+                &AbrufDaten {
+                    objekt_typ: ObjektTyp::Einheit,
+                    objekt_id: a.id,
+                    abschnitt: None,
+                    auftrag: None,
+                    ausgerueckt: true,
+                },
+                startwerte,
+                benutzer_id,
+            )
+            .await?;
+            let namen: Vec<String> = ergebnis
+                .mitgenommen
+                .iter()
+                .map(|(_, n)| format!("«{n}»"))
+                .collect();
+            saetze.push(crate::bereitstellungsraum::etb_text_abruf(
+                &crate::bereitstellungsraum::AbrufText {
+                    name: &format!("«{}»", a.name),
+                    mitgenommen: &namen,
+                    br_bezeichnung: &bezeichnung,
+                    ziel: None,
+                    auftrag_nr: None,
+                    ausgerueckt: true,
+                },
+            ));
+            ergebnis.mitgenommen
+        };
+        wirkung.raeume.push(br_id);
+        wirkung.einheiten.push(a.id);
+        wirkung
+            .einheiten
+            .extend(mitgenommen.into_iter().map(|(id, _)| id));
+    }
+    Ok(saetze)
+}
+
+/// Prüft den Raum des Verbleibs vor jedem Schreiben (LLH-1308, design.md D4): fremder oder
+/// unbekannter Raum → 404, nicht aktiv oder storniert → 422, die abgelöste Einheit steht schon in
+/// einem Raum → 422. Liefert die Bezeichnung des Raums. `belege_tx` prüft beim Buchen noch
+/// einmal; so bricht jeder Fehler den ganzen Vollzug, nichts bleibt halb geschrieben.
+async fn check_verbleib_raum_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    br_id: i64,
+    einheit_id: i64,
+) -> Result<String, AppError> {
+    let br = crate::bereitstellungsraum::belegung_repo::require_belegbar_tx(
+        &mut *conn, einsatz_id, br_id,
+    )
+    .await?;
+    let schon: Option<String> = sqlx::query_scalar(
+        "SELECT r.bezeichnung FROM einsatz_einheit e \
+         JOIN bereitstellungsraum r ON r.id = e.aktueller_br_id \
+         WHERE e.id = ? AND e.einsatz_id = ?",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(raum) = schon {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Die abgelöste Einheit steht schon im Bereitstellungsraum {raum}"
+        )));
+    }
+    Ok(br.bezeichnung)
+}
+
+/// Eintritt der abgelösten Einheit in den Raum ihres Verbleibs (LLH-1308, design.md D4) über
+/// `belege_tx`, nach [`check_verbleib_raum_tx`].
+async fn verbleib_eintritt_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    br_id: i64,
+    einheit_id: i64,
+) -> Result<(), AppError> {
+    use crate::bereitstellungsraum::belegung_repo::{self, Buchung};
+    use crate::bereitstellungsraum::{BrBelegungsArt, ObjektTyp};
+    belegung_repo::belege_tx(
+        &mut *conn,
+        einsatz_id,
+        br_id,
+        ObjektTyp::Einheit,
+        einheit_id,
+        &Buchung {
+            art: BrBelegungsArt::Eintritt,
+            notiz: None,
+            client_id: None,
+            zeitpunkt_at: None,
+        },
+        benutzer_id,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Eine Person der neuen Besatzung nach der Prüfung.
@@ -2505,7 +2776,8 @@ pub async fn zuruecknehmen(
         sqlx::query(
             "UPDATE einsatz_abloesung SET status = 'laufend', vollzogen_at = NULL, \
                 vollzogen_von_id = NULL, etb_vollzug_id = NULL, abschnitt_uebergeben = 0, \
-                abgeloest_abschnitt_vorher_id = NULL, art = ? WHERE id = ?",
+                abgeloest_abschnitt_vorher_id = NULL, art = ?, verbleib = 'ruhe', \
+                verbleib_br_id = NULL WHERE id = ?",
         )
         .bind(AbloesungArt::Einheit.as_str())
         .bind(id)
@@ -2529,28 +2801,38 @@ pub async fn zuruecknehmen(
                 )
                 .await?;
             }
-            // LFH-552/LLH-1132: das Ablösungsereignis an der Einheit und an ihren Erben
-            // streichen, ihre Perioden sind wieder offen. Die Erben ermittelt die Vererbung
-            // jetzt, da die Schicht wieder läuft.
+            // LFH-552/LLH-1132: das Ablösungsereignis (beim Verbleib „entlassen“ die
+            // Entlassung, LLH-1308) an der Einheit und an ihren Erben streichen, ihre Perioden
+            // sind wieder offen. Die Erben ermittelt die Vererbung jetzt, da die Schicht wieder
+            // läuft — darum findet die Kopplung beim Streichen der Entlassung keine mit ihr
+            // beendete Schicht (design.md D3).
             AbloesungArt::Einheit => {
                 if let Some(vollzogen_at) = &roh.vollzogen_at {
+                    let ende = ende_art(roh.verbleib);
                     let erben = load_erben_tx(conn, einsatz_id, roh.einheit_id).await?;
                     for einheit in std::iter::once(roh.einheit_id).chain(erben) {
-                        if let Some(w) = crate::zeitachse::repo::abloesung_zurueckgenommen_tx(
+                        if let Some(w) = crate::zeitachse::repo::vollzug_ende_zurueck_tx(
                             conn,
                             einsatz_id,
                             benutzer_id,
                             einheit,
+                            ende,
                             vollzogen_at,
                         )
                         .await?
                         {
+                            wirkung.kopplung.append(Wirkung {
+                                etb: w.1.abloesung.clone(),
+                                anlaesse: w.1.hinweise.clone(),
+                            });
                             wirkung.zeitachse.push(w);
                         }
                     }
                 }
             }
         }
+        let br_saetze =
+            buchungen_zuruecknehmen_tx(conn, einsatz_id, benutzer_id, id, &mut wirkung).await?;
 
         let mut zurueck = None;
         if let (true, Some(abschnitt)) = (uebergeben, abschnitt) {
@@ -2596,6 +2878,14 @@ pub async fn zuruecknehmen(
         if roh.art == AbloesungArt::Besatzung {
             inhalt.push_str(" Besatzungswechsel rückgängig.");
         }
+        if roh.verbleib == AbloesungVerbleib::Entlassen {
+            inhalt.push_str(" Entlassung gestrichen.");
+        }
+        for satz in br_saetze {
+            inhalt.push(' ');
+            inhalt.push_str(&satz);
+            inhalt.push('.');
+        }
         let etb_id = crate::etb::repo::anlegen_tx(
             conn,
             einsatz_id,
@@ -2617,6 +2907,78 @@ pub async fn zuruecknehmen(
         Ok((etb_id, wirkung))
     })?;
     Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id, wirkung))
+}
+
+/// Legt die Belegungsbuchungen eines Vollzugs im Bereitstellungsraum zurück (LLH-1308, design.md
+/// D4/D5), je Buchung nur, solange sie noch das jüngste Ereignis ihrer Einheit ist, der Raum aktiv
+/// und die Einheit nicht aufgelöst ist: ein Eintritt bekommt den Austritt, ein Austritt den
+/// Eintritt in denselben Raum (Notiz „Ablösung zurückgenommen“). Hat sich seitdem etwas bewegt,
+/// bleibt der Raum, wie er ist. Die Reihe bleibt angehängt, wie ETB und Zeitachse. Danach fallen
+/// die Zeilen. Liefert je Buchung einen Teilsatz für die Berichtigung.
+async fn buchungen_zuruecknehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    id: i64,
+    wirkung: &mut VollzugWirkung,
+) -> Result<Vec<String>, AppError> {
+    use crate::bereitstellungsraum::belegung_repo::{self, Buchung};
+    use crate::bereitstellungsraum::{BrBelegungsArt, ObjektTyp};
+    /// `(Raum, Einheit, Art, Raum-Bezeichnung, Einheit-Name)` je Buchung, die noch den Stand des
+    /// Vollzugs trägt.
+    type Offen = (i64, i64, String, String, String);
+    let offen: Vec<Offen> = sqlx::query_as(
+        "SELECT b.br_id, b.objekt_id, b.art, r.bezeichnung, e.name \
+         FROM einsatz_abloesung_br_buchung x \
+         JOIN br_belegung b ON b.id = x.belegung_id \
+         JOIN bereitstellungsraum r ON r.id = b.br_id \
+         JOIN einsatz_einheit e ON e.id = b.objekt_id AND e.einsatz_id = b.einsatz_id \
+         WHERE x.abloesung_id = ? AND b.objekt_typ = 'einheit' \
+           AND r.status = 'aktiv' AND r.storniert_at IS NULL AND e.aufgeloest_at IS NULL \
+           AND b.id = (SELECT MAX(y.id) FROM br_belegung y WHERE y.einsatz_id = b.einsatz_id \
+                         AND y.objekt_typ = 'einheit' AND y.objekt_id = b.objekt_id) \
+         ORDER BY b.id",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut saetze = Vec::new();
+    for (br_id, einheit_id, art, bezeichnung, name) in offen {
+        let (gegen, satz) = if art == BrBelegungsArt::Eintritt.as_str() {
+            (
+                BrBelegungsArt::Austritt,
+                format!("«{name}» verlässt Bereitstellungsraum {bezeichnung} wieder"),
+            )
+        } else {
+            (
+                BrBelegungsArt::Eintritt,
+                format!("«{name}» wieder in Bereitstellungsraum {bezeichnung}"),
+            )
+        };
+        belegung_repo::belege_tx(
+            &mut *conn,
+            einsatz_id,
+            br_id,
+            ObjektTyp::Einheit,
+            einheit_id,
+            &Buchung {
+                art: gegen,
+                notiz: Some(crate::zeitachse::repo::GRUND_ABLOESUNG_ZURUECK),
+                client_id: None,
+                zeitpunkt_at: None,
+            },
+            benutzer_id,
+        )
+        .await?;
+        saetze.push(satz);
+        wirkung.raeume.push(br_id);
+        wirkung.einheiten.push(einheit_id);
+    }
+    sqlx::query("DELETE FROM einsatz_abloesung_br_buchung WHERE abloesung_id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(saetze)
 }
 
 /// Nimmt einen Besatzungswechsel zurück (LLH-1150): streicht die Ereignisse der Personen aus dem

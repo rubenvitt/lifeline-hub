@@ -5,6 +5,7 @@ import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenConte
 import type { Abloesung } from '../api/types';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
+import { optionenVon, oeffne as oeffneListe, waehle } from '../test/auswahlListe';
 import { tippeZeit } from '../test/zeitEingabe';
 import {
   AbloeserDialog,
@@ -508,7 +509,8 @@ describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
   it('wechselt die Felder: bisherige Besatzung sichtbar, neue Besatzung statt der Ablöser', async () => {
     const onErfassen = oeffne();
     const dialog = await screen.findByRole('dialog');
-    expect(felder(dialog)).toEqual(['Art', 'Ablösende Einheiten', 'Zeitpunkt']);
+    // „Danach“ (LLH-1308) nur bei der ganzen Einheit, vorbelegt mit „In Ruhe“.
+    expect(felder(dialog)).toEqual(['Art', 'Ablösende Einheiten', 'Zeitpunkt', 'Danach']);
     // Der Knopf der Radiogruppe trägt den Klick am Label, das Eingabefeld liegt darunter.
     await userEvent.click(
       within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
@@ -562,5 +564,90 @@ describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith(expect.objectContaining({ abloeser_ids: [12] })),
     );
+  });
+});
+
+/**
+ * LLH-1308: „Danach“ — was nach dem Vollzug mit der abgelösten Einheit geschieht. Vorgabe „In
+ * Ruhe“ (geht nicht hinaus), je aktivem Raum eine Option, „Entlassen“; ohne Freigabe des Moduls
+ * Bereitstellungsräume fehlen die Räume und der Grund steht unter dem Feld.
+ */
+describe('Ablösung — Vollzug mit Verbleib (LLH-1308)', () => {
+  const schicht = {
+    id: 3,
+    einheit_name: 'Florian 1',
+    abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }],
+  } as unknown as Abloesung;
+  const einheiten = [{ value: 12, label: 'Florian 2' }];
+  const raeume = [
+    { id: 7, bezeichnung: 'Schule' },
+    { id: 8, bezeichnung: 'Sportplatz' },
+  ];
+
+  function zeige(raumGesperrt?: string) {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <VollzugDialog
+        schicht={schicht}
+        einheiten={einheiten}
+        raeume={raeume}
+        raumGesperrt={raumGesperrt}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    return onErfassen;
+  }
+
+  it('wählt einen Raum; Raum und Art gehen hinaus', async () => {
+    const onErfassen = zeige();
+    const dialog = await screen.findByRole('dialog');
+    await oeffneListe('Danach');
+    expect(optionenVon('Danach')).toEqual([
+      'In Ruhe',
+      'Bereitstellungsraum «Schule»',
+      'Bereitstellungsraum «Sportplatz»',
+      'Entlassen',
+    ]);
+    await waehle('Danach', 'Bereitstellungsraum «Schule»');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        vollzogen_at: undefined,
+        abloeser_ids: [12],
+        abschnitt_uebergeben: false,
+        verbleib: 'bereitstellungsraum',
+        verbleib_br_id: 7,
+      }),
+    );
+  });
+
+  it('In Ruhe ist die Vorgabe und geht nicht hinaus', async () => {
+    const onErfassen = zeige();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTitle('In Ruhe')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalled());
+    expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('verbleib');
+  });
+
+  it('ohne Freigabe der Bereitstellungsräume keine Räume, der Grund unter dem Feld', async () => {
+    const onErfassen = zeige('Modul Bereitstellungsräume gesperrt');
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('combobox', { name: 'Danach' })).toHaveAccessibleDescription(
+      'Modul Bereitstellungsräume gesperrt',
+    );
+    await oeffneListe('Danach');
+    expect(optionenVon('Danach')).toEqual(['In Ruhe', 'Entlassen']);
+    await waehle('Danach', 'Entlassen');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(
+        expect.objectContaining({ verbleib: 'entlassen' }),
+      ),
+    );
+    expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('verbleib_br_id');
   });
 });

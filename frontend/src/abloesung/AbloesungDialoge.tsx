@@ -16,13 +16,14 @@ import {
 } from '../api/eingabegrenzen';
 import { abloeserIds } from './abloeser';
 import type { BesatzungOption } from './besatzung';
+import { verbleibBody, verbleibOptionen, type VerbleibRaum, type VerbleibWert } from './verbleib';
 import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**
  * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog
  * (der Vollzug: Art, Ablöser bzw. neue Besatzung, Zeitpunkt; „Abschnitt übergeben“ als Option zu
- * den Ablösern).
+ * den Ablösern; bei der ganzen Einheit dazu „Danach“ mit Vorgabe, LLH-1308 design.md D1).
  * Der Rhythmus wird als DAUER erfasst und angezeigt („8 h“, „7:30 h“, nie „8.0“, LLH-1122,
  * `abloesung/dauer.ts`) und als Minuten gesendet — die Lage spricht in „6-Stunden-Rhythmus",
  * nicht in 360 Minuten. Zeiten stehen in der Anzeigezone (`ZeitpunktEingabe`, LFH-692).
@@ -190,6 +191,7 @@ interface VollzugWerte {
   abloeser_ids?: number[];
   abschnitt_uebergeben?: boolean;
   besatzung_ids?: number[];
+  verbleib?: VerbleibWert;
 }
 
 const ART_OPTIONEN: { value: AbloesungArt; label: string }[] = [
@@ -217,6 +219,10 @@ interface VollzugProps {
   personen?: BesatzungOption[];
   /** Grund in wenigen Wörtern, warum der Besatzungswechsel gesperrt ist (Module Einheiten, Personal). */
   besatzungGesperrt?: string;
+  /** Aktive Bereitstellungsräume für „Danach“ (LLH-1308, `abloesung/verbleib.ts:verbleibRaeume`). */
+  raeume?: VerbleibRaum[];
+  /** Grund in wenigen Wörtern, warum kein Raum wählbar ist (Modul Bereitstellungsräume). */
+  raumGesperrt?: string;
   laeuft: boolean;
   fehler: unknown;
   onErfassen: (body: VollzugBody) => Promise<unknown>;
@@ -232,7 +238,9 @@ interface VollzugProps {
  * zeigt statt der Ablöser die bisherige Besatzung und nimmt die neue als Liste von Personen
  * (Pflicht, höchstens `ABLOESUNG_BESATZUNG_MAX`); ohne Freigabe der Module Einheiten und Personal
  * ist er gesperrt mit Grund. Dazu der Zeitpunkt. Feldbudget eines Modals: Art, Kräfte, Zeitpunkt;
- * „Abschnitt übergeben“ gehört als Option zu den Ablösern.
+ * „Abschnitt übergeben“ gehört als Option zu den Ablösern. Die ganze Einheit fragt zuletzt
+ * „Danach“ (LLH-1308): „In Ruhe“ (Vorgabe), je aktivem Raum, „Entlassen“; ohne Freigabe des Moduls
+ * Bereitstellungsräume fehlen die Räume und der Grund steht unter dem Feld.
  */
 export function VollzugDialog({
   schicht,
@@ -242,6 +250,8 @@ export function VollzugDialog({
   bisherigeBesatzung = null,
   personen = [],
   besatzungGesperrt,
+  raeume = [],
+  raumGesperrt,
   laeuft,
   fehler,
   onErfassen,
@@ -250,6 +260,7 @@ export function VollzugDialog({
   const [form] = Form.useForm<VollzugWerte>();
   const grundId = useId();
   const artGrundId = useId();
+  const raumGrundId = useId();
   const art = Form.useWatch('art', form) ?? 'einheit';
   const uebergabeMoeglich = abschnittName != null && uebergabeGesperrt == null;
   return (
@@ -264,6 +275,7 @@ export function VollzugDialog({
         abloeser_ids: schicht ? abloeserIds(schicht) : [],
         abschnitt_uebergeben: uebergabeMoeglich,
         besatzung_ids: [],
+        verbleib: 'ruhe',
       }}
       onErfassen={(w) => {
         const vollzogen_at = w.zeitpunkt ? alsBackendZeit(w.zeitpunkt) : undefined;
@@ -280,6 +292,7 @@ export function VollzugDialog({
           abloeser_ids: ids,
           // Ohne Ablöser gibt es niemanden, dem der Abschnitt ginge; der Server übergäbe nichts.
           abschnitt_uebergeben: uebergabeMoeglich && ids.length > 0 && w.abschnitt_uebergeben,
+          ...verbleibBody(w.verbleib),
         });
       }}
       onFertig={onSchliessen}
@@ -362,6 +375,17 @@ export function VollzugDialog({
           {abschnittName != null && uebergabeGesperrt != null && (
             <Typography.Text type="secondary" id={grundId} data-lfh="vollzug-uebergabe-gesperrt">
               {uebergabeGesperrt}
+            </Typography.Text>
+          )}
+          <Form.Item<VollzugWerte> name="verbleib" label="Danach">
+            <Select
+              aria-describedby={raumGesperrt != null ? raumGrundId : undefined}
+              options={verbleibOptionen(raeume, raumGesperrt != null)}
+            />
+          </Form.Item>
+          {raumGesperrt != null && (
+            <Typography.Text type="secondary" id={raumGrundId} data-lfh="vollzug-raum-gesperrt">
+              {raumGesperrt}
             </Typography.Text>
           )}
         </>

@@ -414,6 +414,7 @@ use utoipa::OpenApi;
         crate::abloesung::AbloesungErbe,
         crate::abloesung::AbloesungAbloeser,
         crate::abloesung::AbloesungArt,
+        crate::abloesung::AbloesungVerbleib,
         crate::abloesung::AbloesungBesatzung,
         crate::abloesung::BesatzungRolle,
         crate::abloesung::AbloesungFolge,

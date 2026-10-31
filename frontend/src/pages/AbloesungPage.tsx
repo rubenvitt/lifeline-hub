@@ -33,6 +33,7 @@ import {
   type EinheitAuswahl,
 } from '../abloesung/AbloesungDialoge';
 import { formatDauer } from '../abloesung/dauer';
+import { verbleibRaeume } from '../abloesung/verbleib';
 import { planungWarnungText } from '../abloesung/planungWarnung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { countFaellige } from '../abloesung/einstufung';
@@ -74,6 +75,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import {
   einsatzRechteGrund,
+  MODUL_BR_GESPERRT,
   MODUL_EINHEITEN_GESPERRT,
   MODUL_PERSONAL_GESPERRT,
 } from '../components/nurAnsicht';
@@ -272,7 +274,8 @@ export default function AbloesungPage() {
 
   // Stand der geplanten Ablöser (LLH-1131 Teil II): Zeitpunkte aus der Zeitachse, der Raum aus
   // `aktueller_br_id` der Einheit und dem Namen in der Raumliste. Die Liste der Räume gehört dem
-  // Modul Bereitstellungsräume und wird nur geholt, wenn ein Ablöser gerade in einem Raum steht.
+  // Modul Bereitstellungsräume und wird nur geholt, wenn ein Ablöser gerade in einem Raum steht
+  // oder der Vollzug-Dialog offen ist (LLH-1308: „Danach“ bietet die aktiven Räume an).
   const brFrei = istKeyFreigegeben('bereitstellungsraeume', freigabenQuery.data);
   const abloeserImBr = useMemo(() => {
     const ids = new Set(laufende.flatMap(abloeserIds));
@@ -281,8 +284,10 @@ export default function AbloesungPage() {
   const brQuery = useQuery({
     queryKey: einsatzKeys.br(einsatzId),
     queryFn: () => listeBr(einsatzId),
-    enabled: brFrei && abloeserImBr,
+    enabled: brFrei && (abloeserImBr || vollzugSchicht != null),
   });
+  // Gesperrt erst, wenn die Freigaben da sind (wie `besatzungGesperrt`).
+  const raumGesperrt = freigabenQuery.data != null && !brFrei ? MODUL_BR_GESPERRT : undefined;
   const standJeSchicht = useMemo(() => {
     const m = new Map<number, AbloeserStand[]>();
     if (!periodenQuery.data) return m;
@@ -954,6 +959,8 @@ export default function AbloesungPage() {
             vollzugSchicht,
           )}
           besatzungGesperrt={besatzungGesperrt}
+          raeume={verbleibRaeume(brQuery.data)}
+          raumGesperrt={raumGesperrt}
           laeuft={vollzugMut.isPending}
           fehler={vollzugMut.error}
           onErfassen={(body) => vollzugMut.mutateAsync({ abloesungId: vollzugSchicht.id, body })}

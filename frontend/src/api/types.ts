@@ -782,6 +782,8 @@ export type AbloesungFolge = S['AbloesungFolge'];
 export type AbloesungPlanungWarnung = S['AbloesungPlanungWarnung'];
 /** Art des Vollzugs und eine Person beim Besatzungswechsel (LLH-1150). */
 export type AbloesungArt = S['AbloesungArt'];
+/** Verbleib der abgelösten Einheit nach dem Vollzug (LLH-1308). */
+export type AbloesungVerbleib = S['AbloesungVerbleib'];
 export type AbloesungBesatzung = S['AbloesungBesatzung'];
 export type BesatzungRolle = S['BesatzungRolle'];
 
@@ -864,6 +866,8 @@ export interface SchichtAendernBody {
  * `art: 'besatzung'` (LLH-1150) mit `besatzung_ids` (`einsatz_personal.id`, höchstens
  * `ABLOESUNG_BESATZUNG_MAX`, Pflicht) ist der Besatzungswechsel, ohne Ablöser und ohne
  * Abschnittsübergabe (sonst 422); er verlangt ebenfalls die Freigabe des Moduls Einheiten.
+ * `verbleib` (LLH-1308, fehlt = `ruhe`) nur bei `art: 'einheit'`; `bereitstellungsraum` braucht
+ * `verbleib_br_id` (aktiver Raum) und die Freigabe des Moduls Bereitstellungsräume (sonst 403).
  */
 export interface VollzugBody {
   vollzogen_at?: string;
@@ -872,6 +876,8 @@ export interface VollzugBody {
   abschnitt_uebergeben?: boolean;
   art?: AbloesungArt;
   besatzung_ids?: number[];
+  verbleib?: AbloesungVerbleib;
+  verbleib_br_id?: number;
 }
 
 // ============================== LFH-639 Betreuung ==============================

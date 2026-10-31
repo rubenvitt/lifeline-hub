@@ -13,6 +13,7 @@ import { schrift } from '../theme/tokens';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abloeserText } from './abloeser';
 import { besatzungText } from './besatzung';
+import { verbleibText } from './verbleib';
 import { abloeserStandText, type AbloeserStand } from './abloeserStand';
 import { formatDauer } from './dauer';
 import { abloesungZeit, einstufungOf } from './einstufung';
@@ -336,6 +337,11 @@ export default function AbloesungKarte({
           {s.status === 'abgeloest' && s.abschnitt_uebergeben && (
             <Text type="secondary" data-lfh="abloesung-abschnitt-uebergeben">
               Abschnitt {s.uebergebener_abschnitt_name ?? ''} übergeben
+            </Text>
+          )}
+          {s.status === 'abgeloest' && verbleibText(s) != null && (
+            <Text type="secondary" data-lfh="abloesung-verbleib">
+              {verbleibText(s)}
             </Text>
           )}
           {/* Besatzungswechsel (LLH-1150): Einheit und Fahrzeug blieben, die neue Besatzung steht

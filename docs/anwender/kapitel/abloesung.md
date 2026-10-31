@@ -86,12 +86,16 @@ Für Einsatzleitung und Führungspersonal:
 4. „Abschnitt übergeben (…)“ angehakt lassen, wenn die ablösenden Einheiten den Abschnitt der
    abgelösten übernehmen; sonst den Haken entfernen. Die Option steht nur da, wenn die abgelöste
    Einheit einen Abschnitt hat.
+5. Unter „Danach“ wählen, wohin die abgelöste Einheit geht: „In Ruhe“ steht schon dort,
+   „Bereitstellungsraum «…»“ schickt sie in einen aktiven Raum, „Entlassen“ entlässt sie aus dem
+   Einsatz.
 
-   ![Dialog „Ablösung Rettungsstaffel vollziehen“ mit ablösender Einheit „2. Rettungsstaffel“, Zeitpunkt jetzt und angehaktem „Abschnitt übergeben (Sanitätsdienst)“](../bilder/abloesung/vollziehen.png)
+   ![Dialog „Ablösung Rettungsstaffel vollziehen“ mit ablösender Einheit „2. Rettungsstaffel“, Zeitpunkt jetzt, angehaktem „Abschnitt übergeben (Sanitätsdienst)“ und „Danach: Bereitstellungsraum «Parkplatz Stadion Nord»“](../bilder/abloesung/vollziehen.png)
 
-5. „Vollziehen“ wählen. Die abgelöste Schicht wandert nach „Vergangen“, „Abgelöst“; jede ablösende
-   Einheit beginnt eine Folgeschicht mit demselben Rhythmus.
-6. War es die falsche Karte, in der Meldung „Rückgängig“ wählen. Später geht das unter „Vergangen“,
+6. „Vollziehen“ wählen. Die abgelöste Schicht wandert nach „Vergangen“, „Abgelöst“, ihre Karte
+   nennt den Verbleib („danach Bereitstellungsraum …“, „danach entlassen“); jede ablösende Einheit
+   beginnt eine Folgeschicht mit demselben Rhythmus.
+7. War es die falsche Karte, in der Meldung „Rückgängig“ wählen. Später geht das unter „Vergangen“,
    „Abgelöst“ mit „Vollzug zurücknehmen“, solange jede Folgeschicht unberührt ist.
 
 ### Die Besatzung wechseln
@@ -294,6 +298,30 @@ Die Rücknahme gibt jeder Einheit ihren alten Abschnitt zurück, sofern sie inzw
 Hand anders eingeteilt wurde. Die Option braucht das Modul Einheiten; fehlt es der Person, steht
 sie gesperrt mit „Modul Einheiten gesperrt“, und der Vollzug ohne sie geht weiter.
 
+### Verbleib nach dem Vollzug
+
+„Danach“ legt fest, was mit der abgelösten Einheit geschieht; mit ihr gehen die Untereinheiten,
+die in ihrer Schicht mitlaufen.
+
+- **In Ruhe:** Ihr Einsatzabschnitt endet mit der Ablösung, sie bleibt im Einsatz.
+- **Bereitstellungsraum:** Wie „In Ruhe“, dazu tritt sie in den gewählten Raum ein und steht dort
+  bereit, bis sie abgerufen wird. Zur Wahl stehen nur aktive Räume. Ist der Raum inzwischen
+  aufgelöst oder steht die Einheit schon in einem Raum, scheitert der Vollzug mit dem Grund, und
+  nichts ändert sich. Die Wahl braucht das Modul Bereitstellungsräume; fehlt es der Person, steht
+  unter dem Feld „Modul Bereitstellungsräume gesperrt“, und nur „In Ruhe“ und „Entlassen“ sind
+  wählbar.
+- **Entlassen:** Ihr Einsatzabschnitt endet mit der Entlassung statt der Ablösung. Die Schicht
+  zählt als abgelöst, nicht als beendet.
+
+Steht eine ablösende Einheit beim Vollzug in einem Bereitstellungsraum, ruft der Vollzug sie
+dort ab und lässt sie ausrücken; war sie schon abgerufen, tritt sie nur aus. Dafür braucht es das
+Modul Bereitstellungsräume nicht.
+
+Die Rücknahme legt auch das zurück, solange es noch so steht, wie der Vollzug es hinterlassen
+hat: Die abgelöste Einheit verlässt den Raum wieder, die Entlassung wird gestrichen, und eine
+abgerufene ablösende Einheit tritt wieder in ihren Raum ein. Wurde die abgelöste Einheit inzwischen
+aus dem Raum abgerufen, bleibt der Raum, wie er ist.
+
 ### Schicht beginnt mit dem Eintreffen
 
 Hat der Einsatz oder der Abschnitt einer Einheit eine Vorgabe, beginnt ihre Schicht von selbst,
@@ -347,7 +375,9 @@ Der Vollzug schreibt an der abgelösten Einheit das Ereignis „Ablösung“ in 
 dem ihr Einsatzabschnitt endet, ebenso an jeder Untereinheit, die in ihrer Schicht mitläuft, und
 an deren Personen; die Rücknahme streicht alle wieder. Ein Besatzungswechsel schreibt stattdessen
 nur an Personen: die bisherige Besatzung bekommt „Ablösung“, die neue „Eintreffen“; die Einheit
-behält ihren Einsatzabschnitt. Diese Ereignisse lassen sich nicht
+behält ihren Einsatzabschnitt. Mit „Danach: Entlassen“ steht an der abgelösten Einheit, den
+mitlaufenden Untereinheiten und deren Personen „Entlassung“ statt „Ablösung“. Diese Ereignisse
+lassen sich nicht
 von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
 Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben).
 
@@ -355,7 +385,8 @@ Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe ob
 
 Das Einsatztagebuch hält den Beginn einer Schicht (auch mit dem Eintreffen), Änderungen an Rhythmus
 und Planung, eine entfallene Planung, jeden Vollzug mit Einheit, ablösenden Einheiten,
-übernommener Schicht, übergebenem Abschnitt und Zeitpunkt, beim Besatzungswechsel mit alter und neuer Besatzung, jede Rücknahme und das Ende mit der Entlassung fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
+übernommener Schicht, übergebenem Abschnitt, Verbleib, Abruf aus dem Bereitstellungsraum und
+Zeitpunkt, beim Besatzungswechsel mit alter und neuer Besatzung, jede Rücknahme und das Ende mit der Entlassung fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
 dort als Entscheidung.
 
 ### Rechte und ohne Netz

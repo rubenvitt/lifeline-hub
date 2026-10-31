@@ -1259,6 +1259,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abgeloest_abschnitt_vorher_id", G_FK),
             // LLH-1132 (0215): Marke einer beim Vollzug übernommenen Schicht.
             retain("uebernommen_bei_vollzug", G_KONFIG),
+            // LLH-1308 (0259): Verbleib der abgelösten Einheit beim Vollzug.
+            retain("verbleib", G_ENUM),
+            retain("verbleib_br_id", G_FK),
         ],
     },
     // Ablöser einer Schicht (LLH-1122, Mig 0212; Vollzug ab LLH-1132): nur Verweise und Zeit.
@@ -1274,6 +1277,22 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abloesung_id", G_FK),
             retain("einheit_id", G_FK),
             retain("abschnitt_vorher_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+        ],
+    },
+    // Belegungsbuchungen eines Vollzugs im Bereitstellungsraum (LLH-1308, Mig 0259): nur
+    // Verweise und Zeit, damit die Rücknahme das Gegenstück buchen kann.
+    TabellenRegel {
+        tabelle: "einsatz_abloesung_br_buchung",
+        scoping: Scoping::UeberParent {
+            fk: "abloesung_id",
+            parent: "einsatz_abloesung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("abloesung_id", G_FK),
+            retain("belegung_id", G_FK),
             retain("angelegt_at", G_ZEIT),
         ],
     },

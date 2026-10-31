@@ -3301,3 +3301,417 @@ async fn ruecknahme_des_besatzungswechsels_bricht_keine_spaetere_folge() {
     assert_eq!(a.status, AbloesungStatus::Abgeloest);
     assert_eq!(zuordnung(&w, l.frei).await.0, Some(w.f1));
 }
+
+// ── Verbleib der abgelösten Einheit (LLH-1308) ──────────────────────────────────────────────
+
+/// Ein Bereitstellungsraum mit Status `status`.
+async fn raum(w: &Welt, bezeichnung: &str, status: &str) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, geaendert_von, \
+            status) VALUES (?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(w.e)
+    .bind(bezeichnung)
+    .bind(w.b)
+    .bind(w.b)
+    .bind(status)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+/// Bucht eine Einheit über den Schreibweg der Belegung (`eintritt`, `abruf` über `abruf_tx`).
+async fn belege(w: &Welt, br: i64, einheit: i64, art: &str) {
+    use crate::bereitstellungsraum::{abruf, belegung_repo, ObjektTyp};
+    if art == "abruf" {
+        let mut tx = w.pool.begin().await.unwrap();
+        abruf::abruf_tx(
+            &mut tx,
+            w.e,
+            br,
+            &abruf::AbrufDaten {
+                objekt_typ: ObjektTyp::Einheit,
+                objekt_id: einheit,
+                abschnitt: None,
+                auftrag: None,
+                ausgerueckt: false,
+            },
+            abruf::Startwerte {
+                auftrag: 0,
+                etb: 0,
+                auto_etb: false,
+            },
+            w.b,
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        return;
+    }
+    belegung_repo::belege(&w.pool, w.e, br, "einheit", einheit, art, None, w.b)
+        .await
+        .unwrap();
+}
+
+/// Raum, in dem die Einheit steht.
+async fn steht_in(w: &Welt, einheit: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT aktueller_br_id FROM einsatz_einheit WHERE id = ?")
+        .bind(einheit)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+/// Belegungsereignisse der Einheit: `(Raum, Art, Notiz)` in ihrer Reihenfolge.
+async fn belegungen(w: &Welt, einheit: i64) -> Vec<(i64, String, Option<String>)> {
+    sqlx::query_as(
+        "SELECT br_id, art, notiz FROM br_belegung WHERE objekt_typ = 'einheit' AND objekt_id = ? \
+         ORDER BY id",
+    )
+    .bind(einheit)
+    .fetch_all(&w.pool)
+    .await
+    .unwrap()
+}
+
+/// Vollzug mit Ablösern und Verbleib.
+async fn vollzug_mit_verbleib(
+    w: &Welt,
+    id: i64,
+    vollzogen_at: &str,
+    abloeser: &[i64],
+    verbleib: AbloesungVerbleib,
+    br: Option<i64>,
+) -> Result<(AbloesungVollzugAnzeige, i64, VollzugWirkung), AppError> {
+    super::vollziehen(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &VollzugEingabe {
+            vollzogen_at: vollzogen_at.into(),
+            abloeser: abloeser.to_vec(),
+            verbleib,
+            verbleib_br_id: br,
+            ..Default::default()
+        },
+        vollzogen_at,
+    )
+    .await
+}
+
+/// Spec `kraefte-abloesung` „Verbleib der abgelösten Einheit“, Szenario „In den
+/// Bereitstellungsraum“: Periode endet mit der Ablösung, Eintritt in den Raum, ein ETB-Satz; die
+/// Schicht nennt den Raum. Rücknahme: Austritt mit Notiz, Verbleib wieder Ruhe.
+#[tokio::test]
+async fn verbleib_im_bereitstellungsraum_und_ruecknahme() {
+    let w = welt().await;
+    let schule = raum(&w, "Schule", "aktiv").await;
+    eintreffen(&w, w.f1, T0).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let vorher = etb(&w.pool, w.e).await.len();
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, wirkung) = vollzug_mit_verbleib(
+        &w,
+        a.id,
+        jetzt,
+        &[w.f2],
+        AbloesungVerbleib::Bereitstellungsraum,
+        Some(schule),
+    )
+    .await
+    .unwrap();
+    assert_eq!(v.abgeloest.verbleib, AbloesungVerbleib::Bereitstellungsraum);
+    assert_eq!(
+        v.abgeloest.verbleib_br_bezeichnung.as_deref(),
+        Some("Schule")
+    );
+    assert_eq!(steht_in(&w, w.f1).await, Some(schule));
+    let p = perioden(&w, w.f1).await;
+    assert_eq!(p[0].ende_at.as_deref(), Some(jetzt));
+    assert_eq!(
+        p[0].ende_art,
+        Some(crate::zeitachse::ZeitachseArt::Abloesung)
+    );
+    assert_eq!(wirkung.raeume, vec![schule]);
+    let eintraege = etb(&w.pool, w.e).await;
+    assert_eq!(eintraege.len(), vorher + 1, "genau ein ETB-Satz");
+    assert_eq!(
+        eintraege.last().unwrap().1,
+        "Ablösung vollzogen: «Florian 1» durch «Florian 2». \
+         «Florian 1» danach in Bereitstellungsraum Schule."
+    );
+
+    let (r, _, wirkung) = zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    assert_eq!(r.verbleib, AbloesungVerbleib::Ruhe);
+    assert_eq!(r.verbleib_br_bezeichnung, None);
+    assert_eq!(steht_in(&w, w.f1).await, None);
+    assert_eq!(
+        belegungen(&w, w.f1).await,
+        vec![
+            (schule, "eintritt".into(), None),
+            (
+                schule,
+                "austritt".into(),
+                Some("Ablösung zurückgenommen".into())
+            ),
+        ]
+    );
+    assert_eq!(wirkung.raeume, vec![schule]);
+    let text = etb(&w.pool, w.e).await.last().unwrap().1.clone();
+    assert!(
+        text.ends_with("«Florian 1» verlässt Bereitstellungsraum Schule wieder."),
+        "{text}"
+    );
+    let zeilen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_abloesung_br_buchung")
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(zeilen, 0);
+}
+
+/// Akzeptanzkriterium: ein inaktiver Raum lehnt den Vollzug mit Grund ab, und nichts ist halb
+/// geschrieben (Schicht laufend, keine Folgeschicht, keine Belegung, kein ETB, Zeitachse offen).
+#[tokio::test]
+async fn verbleib_in_inaktivem_raum_ist_422_und_schreibt_nichts() {
+    let w = welt().await;
+    let geplant = raum(&w, "Sportplatz", "geplant").await;
+    eintreffen(&w, w.f1, T0).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let vorher = etb(&w.pool, w.e).await.len();
+    let jetzt = "2026-09-22 15:40:00";
+    let err = vollzug_mit_verbleib(
+        &w,
+        a.id,
+        jetzt,
+        &[w.f2],
+        AbloesungVerbleib::Bereitstellungsraum,
+        Some(geplant),
+    )
+    .await
+    .unwrap_err();
+    let text = err.to_string();
+    assert_eq!(status(err), StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(text.contains("Belegung nur bei aktivem BR"), "{text}");
+    let a = laden(&w.pool, w.e, a.id, jetzt).await.unwrap();
+    assert_eq!(a.status, AbloesungStatus::Laufend);
+    assert_eq!(a.verbleib, AbloesungVerbleib::Ruhe);
+    assert!(schichten(&w, w.f2).await.is_empty(), "keine Folgeschicht");
+    assert!(belegungen(&w, w.f1).await.is_empty());
+    assert_eq!(etb(&w.pool, w.e).await.len(), vorher);
+    assert_eq!(perioden(&w, w.f1).await[0].ende_at, None);
+
+    // Fremder Raum: 404, ebenso ohne Spur.
+    let err = vollzug_mit_verbleib(
+        &w,
+        a.id,
+        jetzt,
+        &[],
+        AbloesungVerbleib::Bereitstellungsraum,
+        Some(geplant + 1000),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(status(err), StatusCode::NOT_FOUND);
+
+    // Steht die Einheit schon in einem Raum: 422 mit dem Raum.
+    let schule = raum(&w, "Schule", "aktiv").await;
+    belege(&w, schule, w.f1, "eintritt").await;
+    let err = vollzug_mit_verbleib(
+        &w,
+        a.id,
+        jetzt,
+        &[],
+        AbloesungVerbleib::Bereitstellungsraum,
+        Some(schule),
+    )
+    .await
+    .unwrap_err();
+    let text = err.to_string();
+    assert_eq!(status(err), StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        text.contains("schon im Bereitstellungsraum Schule"),
+        "{text}"
+    );
+}
+
+/// Szenario „Entlassen“ und Akzeptanzkriterium „beendet die Schicht nicht doppelt“ (LLH-1128):
+/// die Entlassung statt der Ablösung an Einheit, Erbe und Person; die Schicht ist abgelöst, nicht
+/// beendet, und das ETB kennt keinen Satz „mit der Entlassung beendet“. Die Rücknahme streicht
+/// die Entlassungen, und die Schicht läuft (auch hier ohne zweiten Satz der Kopplung).
+#[tokio::test]
+async fn verbleib_entlassen_beendet_nicht_doppelt_und_ruecknahme() {
+    let w = welt().await;
+    let gruppe = untereinheit(&w, "Gruppe 1", w.f1).await;
+    let person: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id) \
+         VALUES (?, 'Gruppenführer', ?) RETURNING id",
+    )
+    .bind(w.e)
+    .bind(gruppe)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    for e in [w.f1, gruppe] {
+        eintreffen(&w, e, T0).await;
+    }
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let vorher = etb(&w.pool, w.e).await.len();
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, _) =
+        vollzug_mit_verbleib(&w, a.id, jetzt, &[w.f2], AbloesungVerbleib::Entlassen, None)
+            .await
+            .unwrap();
+    assert_eq!(v.abgeloest.status, AbloesungStatus::Abgeloest);
+    assert_eq!(v.abgeloest.beendet_grund, None);
+    assert_eq!(v.abgeloest.verbleib, AbloesungVerbleib::Entlassen);
+    for e in [w.f1, gruppe] {
+        let p = perioden(&w, e).await;
+        assert_eq!(p[0].ende_at.as_deref(), Some(jetzt), "{e}");
+        assert_eq!(p[0].ende_art, Some(Entlassung), "{e}");
+        assert_eq!(abloesungsereignisse(&w, "einheit_id", e).await, 0, "{e}");
+    }
+    let entlassungen = |spalte: &'static str, id: i64| {
+        let pool = w.pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
+                "SELECT COUNT(*) FROM einsatz_kraft_zeitachse \
+                 WHERE {spalte} = ? AND art = 'entlassung' AND gestrichen_at IS NULL"
+            )))
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    assert_eq!(entlassungen("personal_id", person).await, 1, "Fan-out");
+    let eintraege = etb(&w.pool, w.e).await;
+    assert_eq!(eintraege.len(), vorher + 1, "genau ein ETB-Satz");
+    assert!(
+        eintraege
+            .last()
+            .unwrap()
+            .1
+            .ends_with("«Florian 1» danach entlassen."),
+        "{:?}",
+        eintraege.last()
+    );
+    assert!(
+        !eintraege
+            .iter()
+            .any(|e| e.1.contains("mit der Entlassung beendet")),
+        "keine zweite Beendigung"
+    );
+
+    let vorher = etb(&w.pool, w.e).await.len();
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    assert_eq!(r.status, AbloesungStatus::Laufend);
+    assert_eq!(r.verbleib, AbloesungVerbleib::Ruhe);
+    for e in [w.f1, gruppe] {
+        assert_eq!(perioden(&w, e).await[0].ende_at, None, "wieder offen {e}");
+    }
+    assert_eq!(entlassungen("personal_id", person).await, 0);
+    let eintraege = etb(&w.pool, w.e).await;
+    assert_eq!(eintraege.len(), vorher + 1, "nur die Berichtigung");
+    assert!(
+        eintraege
+            .last()
+            .unwrap()
+            .1
+            .contains("Entlassung gestrichen."),
+        "{:?}",
+        eintraege.last()
+    );
+}
+
+/// Szenario „Ablöser wartet im Raum“ (Entscheidung 31.10.2026: abrufen und austragen): der
+/// Verband geht mit, ein schon abgerufener Ablöser rückt nur aus, der ETB-Satz nennt beides. Die
+/// Rücknahme bucht beide wieder ein; wer sich inzwischen bewegt hat, bleibt.
+#[tokio::test]
+async fn abloeser_im_raum_ruecken_aus_und_kommen_bei_ruecknahme_zurueck() {
+    let w = welt().await;
+    let sport = raum(&w, "Sportplatz", "aktiv").await;
+    let schule = raum(&w, "Schule", "aktiv").await;
+    let trupp = untereinheit(&w, "Trupp 2", w.f2).await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let f4 = einheit(&w.pool, w.e, "Florian 4", None).await;
+    belege(&w, sport, w.f2, "eintritt").await;
+    belege(&w, sport, trupp, "eintritt").await;
+    belege(&w, schule, f3, "eintritt").await;
+    belege(&w, schule, f3, "abruf").await;
+    belege(&w, schule, f4, "eintritt").await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let (_, _, wirkung) = vollzug_mit_verbleib(
+        &w,
+        a.id,
+        jetzt,
+        &[w.f2, f3, f4],
+        AbloesungVerbleib::Ruhe,
+        None,
+    )
+    .await
+    .unwrap();
+    for e in [w.f2, trupp, f3, f4] {
+        assert_eq!(steht_in(&w, e).await, None, "{e} rückt aus");
+    }
+    let arten = |v: Vec<(i64, String, Option<String>)>| -> Vec<String> {
+        v.into_iter().map(|(_, a, _)| a).collect()
+    };
+    assert_eq!(
+        arten(belegungen(&w, w.f2).await),
+        ["eintritt", "abruf", "austritt"]
+    );
+    assert_eq!(
+        arten(belegungen(&w, trupp).await),
+        ["eintritt", "abruf", "austritt"],
+        "der Verband geht mit"
+    );
+    assert_eq!(
+        arten(belegungen(&w, f3).await),
+        ["eintritt", "abruf", "austritt"],
+        "schon abgerufen: nur der Austritt"
+    );
+    let mut raeume = wirkung.raeume.clone();
+    raeume.sort_unstable();
+    assert_eq!(raeume, vec![sport, schule, schule]);
+    let text = etb(&w.pool, w.e).await.last().unwrap().1.clone();
+    assert!(
+        text.contains(
+            "«Florian 2» mit «Trupp 2» aus Bereitstellungsraum Sportplatz abgerufen und \
+             ausgerückt."
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("«Florian 3» rückt aus Bereitstellungsraum Schule aus."),
+        "{text}"
+    );
+
+    // „Florian 4“ ist inzwischen wieder eingetreten: die Rücknahme lässt ihn.
+    belege(&w, schule, f4, "eintritt").await;
+    zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    assert_eq!(steht_in(&w, w.f2).await, Some(sport));
+    assert_eq!(steht_in(&w, trupp).await, Some(sport));
+    assert_eq!(steht_in(&w, f3).await, Some(schule));
+    assert_eq!(steht_in(&w, f4).await, Some(schule));
+    assert_eq!(
+        arten(belegungen(&w, f4).await),
+        ["eintritt", "abruf", "austritt", "eintritt"],
+        "kein zweiter Eintritt"
+    );
+    let text = etb(&w.pool, w.e).await.last().unwrap().1.clone();
+    assert!(
+        text.contains("«Florian 2» wieder in Bereitstellungsraum Sportplatz."),
+        "{text}"
+    );
+    assert!(!text.contains("«Florian 4»"), "{text}");
+}

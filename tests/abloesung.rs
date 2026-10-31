@@ -1609,3 +1609,151 @@ async fn besatzungswechsel_ueber_die_route() {
         1
     );
 }
+
+/// LLH-1308: Bereitstellungsraum anlegen und aktivieren.
+async fn raum(app: &axum::Router, cookie: &str, e: i64, bez: &str) -> i64 {
+    let basis = format!("/api/einsaetze/{e}/bereitstellungsraeume");
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &basis,
+        cookie,
+        Some(&format!(r#"{{"bezeichnung":"{bez}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Raum: {j:?}");
+    let id = j["id"].as_i64().unwrap();
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &format!("{basis}/{id}/status"),
+        cookie,
+        Some(r#"{"status":"aktiv"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Raum aktiv: {j:?}");
+    id
+}
+
+/// LLH-1308: Verbleib der abgelösten Einheit über die Route (400/422/403, Erfolg, Rücknahme).
+#[tokio::test]
+async fn vollzug_mit_verbleib_ueber_die_route() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let f1 = einheit(&app, &admin, e, "Florian 1", None).await;
+    let f2 = einheit(&app, &admin, e, "Florian 2", None).await;
+    let schule = raum(&app, &admin, e, "Schule").await;
+    let (s, schicht) = anfrage(
+        &app,
+        "POST",
+        &pfad(e),
+        &admin,
+        Some(&format!(r#"{{"einheit_id":{f1},"rhythmus_minuten":360}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let aid = schicht["id"].as_i64().unwrap();
+    let vollzug = format!("{}/{aid}/vollzug", pfad(e));
+
+    for (body, erwartet) in [
+        (
+            format!(r#"{{"abloeser_ids":[{f2}],"verbleib":"unterwegs"}}"#),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            format!(r#"{{"abloeser_ids":[{f2}],"verbleib":"bereitstellungsraum"}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            format!(r#"{{"abloeser_ids":[{f2}],"verbleib_br_id":{schule}}}"#),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            format!(
+                r#"{{"abloeser_ids":[{f2}],"verbleib":"entlassen","verbleib_br_id":{schule}}}"#
+            ),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            r#"{"art":"besatzung","besatzung_ids":[1],"verbleib":"entlassen"}"#.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            format!(
+                r#"{{"abloeser_ids":[{f2}],"verbleib":"bereitstellungsraum","verbleib_br_id":999999}}"#
+            ),
+            StatusCode::NOT_FOUND,
+        ),
+    ] {
+        let (s, j) = anfrage(&app, "POST", &vollzug, &admin, Some(&body)).await;
+        assert_eq!(s, erwartet, "{body}: {j:?}");
+    }
+
+    // Ohne Freigabe der Bereitstellungsräume: Raum 403, nichts geschrieben.
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/bereitstellungsraeume"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let mit_raum = format!(
+        r#"{{"abloeser_ids":[{f2}],"verbleib":"bereitstellungsraum","verbleib_br_id":{schule}}}"#
+    );
+    let (s, _) = anfrage(&app, "POST", &vollzug, &frieda, Some(&mit_raum)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (_, liste) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert!(
+        liste.to_string().contains(r#""status":"laufend""#),
+        "nichts geschrieben: {liste:?}"
+    );
+
+    let (s, v) = anfrage(&app, "POST", &vollzug, &admin, Some(&mit_raum)).await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["abgeloest"]["verbleib"], "bereitstellungsraum");
+    assert_eq!(v["abgeloest"]["verbleib_br_bezeichnung"], "Schule");
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(
+        treffer(
+            &etb,
+            "meldung",
+            "«Florian 1» danach in Bereitstellungsraum Schule."
+        )
+        .len(),
+        1,
+        "{etb:?}"
+    );
+
+    let (s, r) = anfrage(
+        &app,
+        "POST",
+        &format!("{vollzug}/zuruecknehmen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r:?}");
+    assert_eq!(r["status"], "laufend");
+    assert_eq!(r["verbleib"], "ruhe");
+    assert!(r.get("verbleib_br_bezeichnung").is_none(), "{r:?}");
+
+    // Entlassen braucht keine Freigabe der Bereitstellungsräume.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &vollzug,
+        &frieda,
+        Some(&format!(
+            r#"{{"abloeser_ids":[{f2}],"verbleib":"entlassen"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["abgeloest"]["verbleib"], "entlassen");
+}
