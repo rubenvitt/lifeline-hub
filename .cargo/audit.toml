@@ -33,31 +33,6 @@ ignore = [
     # Spiel und die Begründung oben fiele weg.
     "RUSTSEC-2023-0071",
 
-    # RUSTSEC-2026-0367, -0368, -0369 (LLH-1307) — drei Lücken in `zip` 4.6.1 beim Entpacken
-    # präparierter Archive: Unix-Rechte über Symlinks (0369, 9.1 critical), erhaltene
-    # SUID/SGID-Bits (0367, 7.3 high), Symlinks aus dem Zielverzeichnis heraus (0368). Gefixt
-    # erst in `zip` >= 9.
-    #
-    # Kein Upgrade möglich: `zip` kommt nur über `tauri-plugin-updater` (Desktop-Hülle,
-    # `src-tauri`). Auch die neueste Version 2.14.0 und 3.0.0-alpha.3 verlangen `zip ^4`
-    # (Stand 17.10.2026). Ohne den Updater bekäme die Desktop-Hülle keine Updates mehr.
-    #
-    # Warum das Risiko hier nicht trägt: Der Server entpackt nie mit `zip`. In der
-    # Desktop-Hülle entpackt nur der Updater, und nur unter Windows (`Update::extract_zip`,
-    # `cfg(windows)`). Vorher prüft `Update::download` die minisign-Signatur gegen den
-    # eingebauten öffentlichen Schlüssel (`plugins.updater.pubkey` in
-    # `src-tauri/tauri.conf.json`). Ein präpariertes Archiv kommt also nur durch, wenn der
-    # Angreifer den privaten Signaturschlüssel des Releases hat – dann liefert er ohnehin
-    # beliebigen Code aus. Zwei der drei Lücken (Unix-Rechte, SUID/SGID) wirken zudem nur auf
-    # Unix-Dateisystemen, nicht auf dem einzigen Pfad, der entpackt.
-    #
-    # Neu bewerten, wenn: (a) `tauri-plugin-updater` auf `zip` >= 9 geht (dann Upgrade und
-    # Ignore streichen), (b) die Desktop-Hülle selbst `zip` nutzt oder der Updater unter
-    # Linux/macOS Zip-Archive entpackt, (c) Updates ohne Signaturprüfung angenommen würden.
-    "RUSTSEC-2026-0367",
-    "RUSTSEC-2026-0368",
-    "RUSTSEC-2026-0369",
-
     # RUSTSEC-2026-0387 (LLH-1275) — Timing-Unterschiede in `crypto-bigint` 0.5.5 bei
     # Operationen, die konstante Laufzeit versprechen. Gefixt erst in `crypto-bigint` >= 0.7.6.
     #
