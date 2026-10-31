@@ -293,7 +293,9 @@ export default function AbloesungPage() {
     // Abgerufen im Raum (LLH-1309): aus der Raumliste, die schon für den Namen geholt wird.
     const abrufe = brQuery.data
       ? new Map(
-          brQuery.data.flatMap((b) => b.abrufe.map((a) => [a.einheit_id, a.seit_at] as const)),
+          brQuery.data.flatMap((b) =>
+            b.abrufe.map((a) => [a.einheit_id, { br_id: b.id, seit_at: a.seit_at }] as const),
+          ),
         )
       : undefined;
     for (const s of laufende) {

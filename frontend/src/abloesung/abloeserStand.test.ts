@@ -176,7 +176,7 @@ describe('buildAbloeserStand (LLH-1131 Teil II)', () => {
       ],
       einheiten: [{ id: 21, aktueller_br_id: 4 }],
       brNamen: new Map([[4, 'BR Sportplatz']]),
-      abrufe: new Map([[21, '2026-01-05 13:25:00']]),
+      abrufe: new Map([[21, { br_id: 4, seit_at: '2026-01-05 13:25:00' }]]),
     });
     expect(stand?.[0].abgerufen_at).toBe('2026-01-05 13:25:00');
     expect(abloeserStandText(stand!, konv)).toBe(
@@ -191,8 +191,26 @@ describe('buildAbloeserStand (LLH-1131 Teil II)', () => {
     expect(stand?.[0].abgerufen_at).toBeNull();
     const fremd = buildAbloeserStand(schicht(), {
       perioden: [perioden(21, { anker: 'alarmierung', beginn_at: '2026-01-05 12:40:00' })],
-      abrufe: new Map([[99, '2026-01-05 13:25:00']]),
+      abrufe: new Map([[99, { br_id: 4, seit_at: '2026-01-05 13:25:00' }]]),
     });
     expect(fremd?.[0].abgerufen_at).toBeNull();
+  });
+
+  it('ein Abruf aus einer zwischengespeicherten Raumliste zählt nicht, wenn die Einheit den Raum verlassen hat', () => {
+    const p = [perioden(21, { anker: 'alarmierung' as const, beginn_at: '2026-01-05 12:40:00' })];
+    const abrufe = new Map([[21, { br_id: 4, seit_at: '2026-01-05 13:25:00' }]]);
+    // Ausgerückt: kein Raum mehr.
+    expect(
+      buildAbloeserStand(schicht(), { perioden: p, einheiten: [{ id: 21 }], abrufe })?.[0]
+        .abgerufen_at,
+    ).toBeNull();
+    // In einen anderen Raum gewechselt.
+    expect(
+      buildAbloeserStand(schicht(), {
+        perioden: p,
+        einheiten: [{ id: 21, aktueller_br_id: 5 }],
+        abrufe,
+      })?.[0].abgerufen_at,
+    ).toBeNull();
   });
 });
