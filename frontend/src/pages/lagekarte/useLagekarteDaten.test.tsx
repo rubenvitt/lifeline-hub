@@ -891,6 +891,7 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
     id: 41,
     name: 'Zug 1',
     typ_label: 'Zug',
+    ist: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 },
     ist_kumuliert: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 },
   };
 

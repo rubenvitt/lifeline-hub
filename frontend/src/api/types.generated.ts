@@ -1464,7 +1464,7 @@ export interface components {
         /**
          * @description Eintrag der Liste: Raumdaten wie bisher (flatten), dazu Abschnittsname, Kennzahlen und die
          *     Einheiten im Raum (LLH-1095, design.md D4; die Stärke rechnet der Client über
-         *     `summiereStaerke`). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
+         *     `staerkeImRaum` aus der eigenen Stärke dieser Einheiten, LLH-1289). Route und Lage-Snapshot lesen ihn aus `repo::list_eintraege` (LLH-1107,
          *     design.md D10).
          */
         BrListenEintrag: components["schemas"]["BrAnzeige"] & {

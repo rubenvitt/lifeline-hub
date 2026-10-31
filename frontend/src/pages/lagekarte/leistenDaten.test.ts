@@ -413,7 +413,12 @@ const RAUM = {
 } as unknown as BrListenEintrag;
 
 describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
-  const einheit = { ...EINHEIT, ist_kumuliert: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 } };
+  // Stärke im Raum aus der eigenen Ist-Stärke der Einheiten im Raum (LLH-1289).
+  const einheit = {
+    ...EINHEIT,
+    ist: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 },
+  };
   const roh: AuswahlRoh = { ...ROH, einheiten: [einheit], bereitstellungsraeume: [RAUM] };
   it('Status, Stärke über die Einheitenliste, Zahlen der Belegung vom Server, Abschnitt', () => {
     const raster = auswahlRaster(marker('bereitstellungsraum', 7), roh, zeit);

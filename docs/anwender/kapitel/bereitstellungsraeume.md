@@ -129,8 +129,10 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
 2. Bei Bedarf in „Kräfte suchen“ einen Namen eingeben.
 3. Bei einer Einheit oder einem Fahrzeug „zuweisen“ wählen. Sie erscheint unter „Bereitgestellte
    Einheiten“ oder „Bereitgestellte Fahrzeuge“; „Bereitgestellt“ zählt die Stärke, „Fahrzeuge“ die
-   Fahrzeuge im Raum, auch die der bereitgestellten Einheiten. Anders als „Eintreffen buchen“
-   trägt „zuweisen“ kein Eintreffen in die Zeitachse ein.
+   Fahrzeuge im Raum, auch die der bereitgestellten Einheiten. Beide zählen nur, was im Raum
+   steht: Steht eine Gruppe des Zugs in einem anderen Raum oder schon im Einsatz, zählt sie dort.
+   Die Stärke an der Zeile einer Einheit nennt die Einheit samt ihren Untereinheiten im selben
+   Raum. Anders als „Eintreffen buchen“ trägt „zuweisen“ kein Eintreffen in die Zeitachse ein.
 
    ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit „Auf Karte verorten“ und „Bearbeiten“ an den Raumdaten: oben unter „Abgerufen“ die Betreuungsgruppe mit „abgerufen … → Betreuung · Auftrag Nr. …“, „Ausrücken buchen“ und „Abruf zurücknehmen“, darunter unter „Bereitgestellte Einheiten“ die Rettungsstaffel mit ihren Fahrzeugen, „seit … · 48 min“ und „Abrufen“; Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und die Seitenleiste „Kräfte ohne BR“ mit aufgeklapptem „Im Einsatz“](../bilder/bereitstellungsraeume/raum.png)
 
