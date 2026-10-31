@@ -187,7 +187,8 @@ Einsatzes unter „Verhalten & Automatik“, Feld „Bestätigungsfrist Meldunge
 Minuten.
 
 Mit der Sofortmeldung legt die App eine automatische Erinnerung „Sofortmeldung #… unbestätigt“
-an. Läuft die Frist ab, ohne dass jemand bestätigt, wird die Meldung eskaliert: Sie rückt
+an. Eine andere Meldung mit Bestätigungspflicht nennt dort ihre Art, etwa „Lagemeldung #…
+unbestätigt“, eine der Art „Sonstige“ heißt „Meldung #… unbestätigt“. Läuft die Frist ab, ohne dass jemand bestätigt, wird die Meldung eskaliert: Sie rückt
 innerhalb ihrer Priorität nach oben und zählt unter „Bestätigung überfällig“, und es erscheint der
 Alarm „Bestätigung ausstehend“, wie beim Eingang mit Absender und Anfang des Wortlauts. Mit
 der Bestätigung schließt die Erinnerung
