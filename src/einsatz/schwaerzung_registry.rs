@@ -1226,7 +1226,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // Ablösungsschichten: kein Freitext, Namen kommen per Join aus `einsatz_einheit`/
-    // `einsatzabschnitt`. Alles Struktur, Zeit oder Enum → RETAIN.
+    // `einsatzabschnitt`, nur der Vermerk der entfallenen Planung kopiert einen Einheitsnamen.
+    // Alles Struktur, Zeit, Enum oder Einheitsname → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_abloesung",
         scoping: Scoping::EinsatzId,
@@ -1259,6 +1260,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abgeloest_abschnitt_vorher_id", G_FK),
             // LLH-1132 (0215): Marke einer beim Vollzug übernommenen Schicht.
             retain("uebernommen_bei_vollzug", G_KONFIG),
+            // LLH-1309 (0259): Vermerk der entfallenen Planung. Der Name ist der einer Einheit
+            // (operatives Objekt wie `einsatz_einheit.name`), keine Person; der Grund ein
+            // Code-Wert mit CHECK. Alle drei bleiben, der CHECK verlangt sie gemeinsam.
+            retain("planung_entfallen_at", G_ZEIT),
+            retain("planung_entfallen_einheit_name", G_OP_LABEL),
+            retain("planung_entfallen_grund", G_ENUM),
         ],
     },
     // Ablöser einer Schicht (LLH-1122, Mig 0212; Vollzug ab LLH-1132): nur Verweise und Zeit.

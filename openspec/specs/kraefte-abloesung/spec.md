@@ -719,11 +719,27 @@ Fremdschlüssel sie still leeren könnte: Einzelplanung leeren und den Eintrag d
 entfernen, je Schicht ein ETB-Eintrag „Ablösung «…»: Planung der ablösenden Einheit entfallen,
 «…» aufgelöst“ bzw. „… entlassen“ und ein Hinweis `abloesung_abloeser` mit Bezugstyp
 `abloeser_entfallen` an die Leser des Moduls. Ohne verbleibende Planung MUST der Planungshinweis
-wieder anstehen.
+wieder anstehen. Die Schicht MUST sich Zeitpunkt, Grund und Namen der Einheit der zuletzt
+entfallenen Planung merken (LLH-1309); jede Änderung der Ablöser-Liste MUST diesen Vermerk
+räumen. Eine laufende Schicht ohne Ablöser MUST ihn als `planung_entfallen` tragen, und ihre
+Karte MUST dezent in der Rolle Achtung „Planung entfallen · 2. Rettungsstaffel aufgelöst“ bzw.
+„… entlassen“ zeigen, ohne Einstufung, Kante oder Fläche zu ändern.
 
 #### Scenario: Geplante Einheit aufgelöst
 - **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und aufgelöst wird
 - **THEN** trägt die Schicht keine Planung mehr, das ETB nennt „Planung der ablösenden Einheit entfallen“, und die Leser erhalten den Hinweis „Planung der ablösenden Einheit entfallen“
+
+#### Scenario: Vermerk an der Karte
+- **WHEN** die Planung von „2. Rettungsstaffel“ für „Rettungsstaffel“ entfallen ist, weil sie aufgelöst wurde
+- **THEN** zeigt die Karte der Rettungsstaffel „Planung entfallen · 2. Rettungsstaffel aufgelöst“, und ihre Einstufung bleibt unverändert
+
+#### Scenario: Neue Planung räumt den Vermerk
+- **WHEN** nach der entfallenen Planung „3. Rettungsstaffel“ geplant wird
+- **THEN** trägt die Schicht keinen Vermerk mehr, und die Karte zeigt „Ablösung geplant durch 3. Rettungsstaffel“
+
+#### Scenario: Weiterer Ablöser bleibt
+- **WHEN** zwei Ablöser geplant sind und einer entlassen wird
+- **THEN** trägt die Schicht keinen sichtbaren Vermerk, und die Karte nennt den verbleibenden Ablöser
 
 ### Requirement: Plausibilität beim Planen
 
@@ -755,17 +771,23 @@ Die Karte einer laufenden Schicht SHALL zu ihren geplanten Ablösern (Ablöser-L
 die Einzelplanung) den Stand aus der Kräfte-Zeitachse zeigen (LLH-1131 Teil II): „Ablösung:
 2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“. Alarmiert MUST der
 Beginn der offenen Periode des Ablösers sein, wenn sie mit der Alarmierung begann, eingetroffen ihr
-Eintreffen; eine beendete Periode MUST NOT zählen. Der Raum MUST in Klammern stehen, solange der
-Ablöser in einem Bereitstellungsraum steht; ohne Freigabe des Moduls Bereitstellungsräume fehlt
-die Klammer, und die Raumliste wird nicht abgefragt. Ohne Freigabe des Moduls Einheiten fehlt der
-Stand. Trägt kein Ablöser ein Ereignis, bleibt die Zeile „Ablösung geplant durch …“. Die Zeile
-MUST einzeilig bleiben, auch bei mehreren Ablösern (mit „; “ getrennt), der ganze Text im Titel,
-und MUST sich über die bestehenden Live-Ereignisse aktualisieren (`einheit`, `fahrzeug`,
-`abloesung`, `bereitstellungsraum`), ohne eigenen Abruf.
+Eintreffen; eine beendete Periode MUST NOT zählen. Steht der Ablöser abgerufen in einem
+Bereitstellungsraum, MUST die Zeile den Zeitpunkt des Abrufs aus der Raumliste nennen
+(„· abgerufen 1405“, LLH-1309); nach dem Ausrücken entfällt er. Der Raum MUST in Klammern stehen,
+solange der Ablöser in einem Bereitstellungsraum steht; ohne Freigabe des Moduls
+Bereitstellungsräume fehlen Klammer und Abruf, und die Raumliste wird nicht abgefragt. Ohne
+Freigabe des Moduls Einheiten fehlt der Stand. Trägt kein Ablöser ein Ereignis, bleibt die Zeile
+„Ablösung geplant durch …“. Die Zeile MUST einzeilig bleiben, auch bei mehreren Ablösern (mit „; “
+getrennt), der ganze Text im Titel, und MUST sich über die bestehenden Live-Ereignisse
+aktualisieren (`einheit`, `fahrzeug`, `abloesung`, `bereitstellungsraum`), ohne eigenen Abruf.
 
 #### Scenario: Alarmiert und eingetroffen
 - **WHEN** „2. Rettungsstaffel“ als Ablöser von „Rettungsstaffel“ geplant ist, um 13:40 alarmiert wurde und um 14:12 am Bereitstellungsraum „BR Sportplatz“ eingetroffen ist
 - **THEN** zeigt die Karte der Rettungsstaffel in einer Zeile „Ablösung: 2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“
+
+#### Scenario: Abgerufen
+- **WHEN** derselbe Ablöser um 14:25 aus dem „BR Sportplatz“ abgerufen wird
+- **THEN** zeigt die Zeile „Ablösung: 2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 · abgerufen 1425 (BR Sportplatz)“
 
 #### Scenario: Noch kein Ereignis
 - **WHEN** der geplante Ablöser weder alarmiert noch eingetroffen ist

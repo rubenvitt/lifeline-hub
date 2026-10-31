@@ -173,6 +173,7 @@ const stand = (over: Partial<AbloeserStand> = {}): AbloeserStand => ({
   einheit_name: '2. Rettungsstaffel',
   alarmiert_at: '2026-10-17 11:40:00',
   eingetroffen_at: '2026-10-17 12:12:00',
+  abgerufen_at: null,
   br_name: 'BR Sportplatz',
   ...over,
 });
@@ -236,6 +237,23 @@ describe('AbloesungKarte — Stand der ablösenden Einheit (LLH-1131 Teil II)', 
     expect(zeile).toHaveTextContent(/^Ablösung: 2\. Rettungsstaffel · alarmiert \d{4}; Florian 3$/);
     expect(zeile.title).toBe(zeile.textContent);
     expect(zeile.style.whiteSpace).toBe('nowrap');
+  });
+
+  it('abgerufen (LLH-1309) steht nach dem Eintreffen und vor dem Raum, Zeit in Mono', () => {
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={geplant}
+        jetzt={jetzt}
+        darfSchreiben={false}
+        abloeserStand={[stand({ abgerufen_at: '2026-10-17 12:25:00' })]}
+      />,
+    );
+    const zeile = abloeserZeile();
+    expect(zeile).toHaveTextContent(
+      /^Ablösung: 2\. Rettungsstaffel · alarmiert \d{4} · eingetroffen \d{4} · abgerufen \d{4} \(BR Sportplatz\)$/,
+    );
+    expect(zeile.title).toBe(zeile.textContent);
+    expect(zeile.querySelectorAll('[data-lfh="abloesung-abloeser-zeit"]')).toHaveLength(3);
   });
 
   it('eine abgelöste Schicht zeigt keinen Stand, sondern „Abgelöst durch …“', () => {
@@ -311,6 +329,52 @@ describe('AbloesungKarte — Warnungen zur Planung (LLH-1131 Teil II)', () => {
       />,
     );
     expect(document.querySelector('[data-lfh="abloesung-planung-warnung"]')).toBeNull();
+  });
+});
+
+describe('AbloesungKarte — Planung entfallen (LLH-1309)', () => {
+  const entfallen = schicht({
+    planung_entfallen: {
+      at: '2026-10-17 11:30:00',
+      grund: 'aufloesung',
+      einheit_name: '2. Rettungsstaffel',
+    },
+  });
+  const zeile = () =>
+    document.querySelector<HTMLElement>('[data-lfh="abloesung-planung-entfallen"]');
+
+  it('nennt Einheit und Grund in einer Zeile in der Rolle Achtung, ohne Einstufung', () => {
+    renderMitProviders(<AbloesungKarte schicht={entfallen} jetzt={jetzt} darfSchreiben={false} />);
+    const z = zeile()!;
+    expect(z).toHaveTextContent(/^Planung entfallen · 2\. Rettungsstaffel aufgelöst$/);
+    expect(z.title).toBe(z.textContent);
+    expect(z.style.whiteSpace).toBe('nowrap');
+    expect(z.style.color).toBe(wieGesetzt('color', farbenHell.achtungText));
+    const karte = screen.getByRole('article', { name: 'Schicht Zug 1' });
+    expect(karte).toHaveAttribute('data-einstufung', 'planmaessig');
+    expect(karte).not.toHaveAttribute('data-alarm');
+  });
+
+  it('entlassen heißt „entlassen“', () => {
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={schicht({
+          planung_entfallen: {
+            at: '2026-10-17 11:30:00',
+            grund: 'entlassung',
+            einheit_name: 'Florian 3',
+          },
+        })}
+        jetzt={jetzt}
+        darfSchreiben={false}
+      />,
+    );
+    expect(zeile()).toHaveTextContent(/^Planung entfallen · Florian 3 entlassen$/);
+  });
+
+  it('ohne Vermerk keine Zeile', () => {
+    renderMitProviders(<AbloesungKarte schicht={geplant} jetzt={jetzt} darfSchreiben={false} />);
+    expect(zeile()).toBeNull();
   });
 });
 

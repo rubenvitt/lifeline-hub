@@ -1361,7 +1361,7 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
     einheiten.wert = undefined;
     laufendLiefert([geplant(), schicht({ id: 2, faellig_at: inMinuten(120) })]);
     listeEinheitenPerioden.mockResolvedValue([]);
-    listeBr.mockResolvedValue([{ id: 4, bezeichnung: 'BR Sportplatz' }]);
+    listeBr.mockResolvedValue([{ id: 4, bezeichnung: 'BR Sportplatz', abrufe: [] }]);
     fetchEinsatzSchichtmodell.mockResolvedValue({ vorwarnung_minuten: 30, laufende_schichten: 0 });
     listeAbloesungVorgaben.mockResolvedValue([]);
     Element.prototype.scrollIntoView = vi.fn();
@@ -1385,6 +1385,50 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
       ),
     );
     expect(listeBr).toHaveBeenCalledWith(1);
+  });
+
+  it('abgerufen (LLH-1309) kommt aus den Abrufen der Raumliste', async () => {
+    einheiten.wert = [EINHEITEN[0], { ...EINHEITEN[1], aktueller_br_id: 4 }];
+    listeEinheitenPerioden.mockResolvedValue([
+      {
+        einheit_id: 12,
+        perioden: [
+          { anker: 'alarmierung', beginn_at: inMinuten(-40), eintreffen_at: inMinuten(-10) },
+        ],
+      },
+    ]);
+    listeBr.mockResolvedValue([
+      {
+        id: 4,
+        bezeichnung: 'BR Sportplatz',
+        abrufe: [{ einheit_id: 12, seit_at: inMinuten(-2) }],
+      },
+    ]);
+    renderPage();
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    await waitFor(() =>
+      expect(zeile(karte)).toHaveTextContent(
+        /^Ablösung: Florian 2 · alarmiert \d{4,6} · eingetroffen \d{4,6} · abgerufen \d{4,6} \(BR Sportplatz\)$/,
+      ),
+    );
+  });
+
+  it('scheitert die Raumliste, steht ein Hinweis statt eines stillen Fehlens', async () => {
+    einheiten.wert = [EINHEITEN[0], { ...EINHEITEN[1], aktueller_br_id: 4 }];
+    listeBr.mockRejectedValue(new Error('kaputt'));
+    const { client } = renderPage();
+    expect(
+      await screen.findByText('Bereitstellungsräume konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+
+    // Rückt der letzte Ablöser aus dem Raum aus, braucht die Seite die Raumliste nicht mehr.
+    einheiten.wert = [EINHEITEN[0], { ...EINHEITEN[1], aktueller_br_id: null }];
+    await client.invalidateQueries();
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Bereitstellungsräume konnten nicht geladen werden'),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it('live: ein neues Ereignis der Zeitachse ändert die Zeile über die bestehende Invalidierung', async () => {

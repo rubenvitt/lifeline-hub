@@ -643,6 +643,7 @@ function raum(partial: Partial<BrListenEintrag>): BrListenEintrag {
     geaendert_von: 1,
     belegung: { einheiten: 0, fahrzeuge: 0 },
     einheit_ids: [],
+    abrufe: [],
     ...partial,
   };
 }
