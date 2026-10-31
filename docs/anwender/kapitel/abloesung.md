@@ -319,8 +319,8 @@ Modul Bereitstellungsräume nicht.
 
 Die Rücknahme legt auch das zurück, solange es noch so steht, wie der Vollzug es hinterlassen
 hat: Die abgelöste Einheit verlässt den Raum wieder, die Entlassung wird gestrichen, und eine
-abgerufene ablösende Einheit tritt wieder in ihren Raum ein. Wurde die abgelöste Einheit inzwischen
-aus dem Raum abgerufen, bleibt der Raum, wie er ist.
+abgerufene ablösende Einheit tritt wieder in ihren Raum ein, sofern der Raum noch aktiv ist.
+Wurde die abgelöste Einheit inzwischen aus dem Raum abgerufen, bleibt der Raum, wie er ist.
 
 ### Schicht beginnt mit dem Eintreffen
 

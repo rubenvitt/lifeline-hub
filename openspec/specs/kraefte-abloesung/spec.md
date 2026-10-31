@@ -343,7 +343,8 @@ zurücklegen, solange sie noch den Stand des Vollzugs tragen: die Entlassung an 
 samt Fan-out streichen (Grund „Ablösung zurückgenommen“), für die abgelöste Einheit einen
 `austritt` buchen, wenn die Eintrittsbuchung des Vollzugs noch ihr jüngstes Ereignis ist, und
 für jeden abgerufenen Ablöser samt Mitgenommenen einen `eintritt` in den Raum buchen, wenn er in
-keinem Raum steht und der Austritt des Vollzugs sein jüngstes Ereignis ist. Die Berichtigung im
+keinem Raum steht, der Austritt des Vollzugs sein jüngstes Ereignis ist, der Raum noch aktiv und
+nicht storniert ist und die Einheit nicht aufgelöst wurde. Die Berichtigung im
 ETB MUST nennen, was zurückgelegt wurde. Danach MUST der Verbleib wieder `ruhe` sein.
 
 #### Scenario: Rücknahme direkt nach Vollzug
