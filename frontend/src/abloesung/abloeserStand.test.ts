@@ -52,6 +52,7 @@ describe('buildAbloeserStand (LLH-1131 Teil II)', () => {
         einheit_name: '2. Rettungsstaffel',
         alarmiert_at: '2026-01-05 12:40:00',
         eingetroffen_at: '2026-01-05 13:12:00',
+        abgerufen_at: null,
         br_name: 'BR Sportplatz',
       },
     ]);
@@ -149,16 +150,49 @@ describe('buildAbloeserStand (LLH-1131 Teil II)', () => {
     expect(stand?.[0].einheit_name).toBe('2. Rettungsstaffel');
   });
 
-  it('hasAbloeserStand: Alarmierung oder Eintreffen zählt', () => {
+  it('hasAbloeserStand: Alarmierung, Eintreffen oder Abruf zählt', () => {
     const leer = {
       einheit_id: 1,
       einheit_name: 'x',
       alarmiert_at: null,
       eingetroffen_at: null,
+      abgerufen_at: null,
       br_name: 'BR 1',
     };
     expect(hasAbloeserStand(leer)).toBe(false);
     expect(hasAbloeserStand({ ...leer, alarmiert_at: '2026-01-05 12:40:00' })).toBe(true);
     expect(hasAbloeserStand({ ...leer, eingetroffen_at: '2026-01-05 12:40:00' })).toBe(true);
+    expect(hasAbloeserStand({ ...leer, abgerufen_at: '2026-01-05 13:25:00' })).toBe(true);
+  });
+
+  it('abgerufen aus dem Raum (LLH-1309): Zeitpunkt aus den Abrufen der Raumliste, nach dem Eintreffen', () => {
+    const stand = buildAbloeserStand(schicht(), {
+      perioden: [
+        perioden(21, {
+          anker: 'alarmierung',
+          beginn_at: '2026-01-05 12:40:00',
+          eintreffen_at: '2026-01-05 13:12:00',
+        }),
+      ],
+      einheiten: [{ id: 21, aktueller_br_id: 4 }],
+      brNamen: new Map([[4, 'BR Sportplatz']]),
+      abrufe: new Map([[21, '2026-01-05 13:25:00']]),
+    });
+    expect(stand?.[0].abgerufen_at).toBe('2026-01-05 13:25:00');
+    expect(abloeserStandText(stand!, konv)).toBe(
+      'Ablösung: 2. Rettungsstaffel · alarmiert 051340 · eingetroffen 051412 · abgerufen 051425 (BR Sportplatz)',
+    );
+  });
+
+  it('ohne Raumliste (Modul gesperrt) fehlt „abgerufen“; ein anderer Ablöser zählt nicht mit', () => {
+    const stand = buildAbloeserStand(schicht(), {
+      perioden: [perioden(21, { anker: 'alarmierung', beginn_at: '2026-01-05 12:40:00' })],
+    });
+    expect(stand?.[0].abgerufen_at).toBeNull();
+    const fremd = buildAbloeserStand(schicht(), {
+      perioden: [perioden(21, { anker: 'alarmierung', beginn_at: '2026-01-05 12:40:00' })],
+      abrufe: new Map([[99, '2026-01-05 13:25:00']]),
+    });
+    expect(fremd?.[0].abgerufen_at).toBeNull();
   });
 });

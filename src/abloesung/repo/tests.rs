@@ -2346,6 +2346,11 @@ async fn entlassung_der_geplanten_einheit_laesst_die_planung_entfallen() {
         Some("2030-06-03 12:00:00"),
         "ohne Planung steht der Planungshinweis wieder an"
     );
+    let v = a
+        .planung_entfallen
+        .expect("Vermerk an der Schicht (LLH-1309)");
+    assert_eq!(v.grund, crate::abloesung::PlanungEntfallenGrund::Entlassung);
+    assert_eq!(v.einheit_name, "Florian 2");
 }
 
 /// Spec „Planung entfällt“: das Auflösen der geplanten Einheit hebt die Planung selbst auf, mit
@@ -2376,6 +2381,81 @@ async fn aufloesen_der_geplanten_einheit_laesst_die_planung_mit_hinweis_entfalle
         etb.iter().any(|(_, i, _, _)| i
             == "Ablösung «Florian 1»: Planung der ablösenden Einheit entfallen, «Florian 2» aufgelöst"),
         "{etb:?}"
+    );
+    assert_eq!(
+        a.planung_entfallen
+            .as_ref()
+            .map(|v| (v.grund, v.einheit_name.as_str())),
+        Some((
+            crate::abloesung::PlanungEntfallenGrund::Aufloesung,
+            "Florian 2"
+        )),
+        "Vermerk an der Schicht (LLH-1309)"
+    );
+}
+
+/// Spec „Planung entfällt“, LLH-1309: eine neue Planung räumt den Vermerk; bleibt danach wieder
+/// keiner, taucht der alte nicht wieder auf.
+#[tokio::test]
+async fn neue_planung_raeumt_den_vermerk_der_entfallenen() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+    crate::einheit::repo::aufloesen(&w.pool, w.e, w.f2, w.b)
+        .await
+        .unwrap();
+    assert!(laden(&w.pool, w.e, id, T0)
+        .await
+        .unwrap()
+        .planung_entfallen
+        .is_some());
+
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let a = plane(&w, id, Some(f3)).await;
+    assert_eq!(a.planung_entfallen, None, "neue Planung");
+    let a = plane(&w, id, None).await;
+    assert_eq!(a.planung_entfallen, None, "Planung von Hand aufgehoben");
+}
+
+/// LLH-1309: entfällt einer von zwei Ablösern, zeigt die Schicht keinen Vermerk, solange der
+/// andere geplant bleibt; entfällt auch er, nennt der Vermerk den jüngsten.
+#[tokio::test]
+async fn vermerk_zeigt_sich_erst_ohne_verbleibenden_abloeser() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    aendern(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &AenderungEingabe {
+            abloeser: Some(vec![w.f2, f3]),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(a.abloesende_einheit_id, Some(f3));
+    assert_eq!(a.planung_entfallen, None, "Florian 3 bleibt geplant");
+
+    crate::einheit::repo::aufloesen(&w.pool, w.e, f3, w.b)
+        .await
+        .unwrap();
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(
+        a.planung_entfallen
+            .as_ref()
+            .map(|v| (v.grund, v.einheit_name.as_str())),
+        Some((
+            crate::abloesung::PlanungEntfallenGrund::Aufloesung,
+            "Florian 3"
+        ))
     );
 }
 

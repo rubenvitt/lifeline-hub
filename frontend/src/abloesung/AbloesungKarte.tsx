@@ -16,7 +16,7 @@ import { besatzungText } from './besatzung';
 import { abloeserStandText, type AbloeserStand } from './abloeserStand';
 import { formatDauer } from './dauer';
 import { abloesungZeit, einstufungOf } from './einstufung';
-import { planungWarnungText } from './planungWarnung';
+import { planungEntfallenText, planungWarnungText } from './planungWarnung';
 
 const { Text } = Typography;
 
@@ -95,7 +95,9 @@ function zeitspalte(s: Abloesung): { zeit: string | null | undefined; wort: stri
  *
  * Hinweise an die Führung (LLH-1131 Teil II): Trägt ein geplanter Ablöser ein Ereignis der
  * Zeitachse, wird aus „Ablösung geplant durch …“ in derselben Zeile „Ablösung: 2. Rettungsstaffel ·
- * alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“. Die Warnungen zur Planung
+ * alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“, abgerufen aus dem Raum mit „· abgerufen …“
+ * (LLH-1309). Ist die Planung entfallen und kein Ablöser geblieben, steht dezent „Planung entfallen
+ * · 2. Rettungsstaffel aufgelöst“ (`planung_entfallen`, LLH-1309). Die Warnungen zur Planung
  * (`planung_warnungen`) stehen dezent in einer Zeile in der Rolle Achtung, im Wortlaut der Meldung
  * beim Planen; sie sind keine Einstufung und färben weder Kante noch Fläche. Angesprungen
  * (`?schicht=`) trägt die Karte die Deeplink-Hervorhebung: Bedienfläche, Linie oben und unten,
@@ -132,6 +134,7 @@ export default function AbloesungKarte({
   const warnungen = laufend
     ? s.planung_warnungen.map((w) => planungWarnungText(w, konventionen)).join(' · ')
     : '';
+  const entfallen = s.planung_entfallen ? planungEntfallenText(s.planung_entfallen) : null;
   const grund =
     stufe === 'ueberfaellig'
       ? rollen.alarmFlaeche
@@ -284,6 +287,14 @@ export default function AbloesungKarte({
                       </span>
                     </>
                   )}
+                  {a.abgerufen_at && (
+                    <>
+                      {' · abgerufen '}
+                      <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
+                        <ZeitAnzeige wert={a.abgerufen_at} rolle="kurz" />
+                      </span>
+                    </>
+                  )}
                   {a.br_name && ` (${a.br_name})`}
                 </span>
               ))}
@@ -306,6 +317,17 @@ export default function AbloesungKarte({
                 {durch}
               </Text>
             )
+          )}
+          {/* Entfallene Planung (LLH-1309): nur an einer laufenden Schicht ohne Ablöser, das
+              entscheidet der Server. Dezent in der Rolle Achtung wie die Warnungen, einzeilig. */}
+          {laufend && entfallen && (
+            <Text
+              data-lfh="abloesung-planung-entfallen"
+              title={entfallen}
+              style={{ ...EINZEILIG, color: rollen.achtungText }}
+            >
+              {entfallen}
+            </Text>
           )}
           {/* Plausibilität beim Planen (LLH-1131): dezent, Rolle Achtung, nie Rot; die Planung
               gilt trotzdem. Einzeilig wie die Ablöser, der ganze Text im Titel. */}

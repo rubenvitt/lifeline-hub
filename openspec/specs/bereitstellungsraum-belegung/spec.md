@@ -91,7 +91,8 @@ Detail MUST dieselben Kennzahlen aus derselben Berechnung liefern.
 
 ### Requirement: Liste der Räume mit Belegung
 Die Liste der Bereitstellungsräume SHALL je Raum neben den Raumdaten den Namen seines Abschnitts,
-die Kennzahlen der Belegung und die Kennungen der Einheiten im Raum tragen. Die Kennzahlen MUST
+die Kennzahlen der Belegung und die Kennungen der Einheiten im Raum tragen, dazu je Einheit, die
+abgerufen im Raum steht, den Zeitpunkt des Abrufs (`abrufe`, LLH-1309). Kennzahlen und Abrufe MUST
 für alle Räume mit einer festen Zahl von Abfragen entstehen, unabhängig von der Zahl der Räume.
 Ein gekoppeltes Gerät eines Bereitstellungsraums MUST weiter nur seinen eigenen Raum erhalten.
 
@@ -99,6 +100,11 @@ Ein gekoppeltes Gerät eines Bereitstellungsraums MUST weiter nur seinen eigenen
 - **WHEN** der BR Sportplatz dem Abschnitt „Nord“ zugeordnet ist und zwei Einheiten trägt
 - **THEN** nennt die Liste beim BR Sportplatz „Nord“, die Kennungen beider Einheiten und ihre
   Kennzahlen
+
+#### Scenario: Abgerufene Einheit
+- **WHEN** von zwei Einheiten im BR Sportplatz eine um 14:25 abgerufen wurde
+- **THEN** nennt die Liste beim BR Sportplatz für diese Einheit den Abruf um 14:25 und für die
+  andere keinen
 
 ### Requirement: Verlauf eines Raums lesen
 Das System SHALL je Bereitstellungsraum die vollständige Reihe seiner Belegungsereignisse liefern,

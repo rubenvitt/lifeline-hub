@@ -2857,6 +2857,55 @@ async fn abruf_mit_abschnitt_setzt_unterstellung_ereignis_und_etb() {
     assert_eq!(d["einheiten"][0]["id"], l.hlf, "bleibt im Raum: {d}");
 }
 
+/// Spec „Liste der Räume mit Belegung“, Szenario „Abgerufene Einheit“ (LLH-1309): die Liste nennt
+/// den Abruf je abgerufener Einheit mit dem Zeitpunkt aus dem Detail, eine nicht abgerufene trägt
+/// keinen; nach dem Ausrücken fällt er weg.
+#[tokio::test]
+async fn liste_nennt_die_abrufe_je_raum() {
+    let l = abruf_lage().await;
+    let rw = einheit_bilden(&l.app, &l.admin, l.eid, "RW 1").await;
+    belegen(&l.app, &l.admin, l.eid, l.br, "einheit", rw, "eintritt").await;
+    let liste_pfad = format!("/api/einsaetze/{}/bereitstellungsraeume", l.eid);
+    let zeile = |liste: serde_json::Value| {
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|z| z["id"] == l.br)
+            .cloned()
+            .unwrap()
+    };
+    let z = zeile(fetch_json(&l.app, &l.admin, &liste_pfad).await);
+    assert_eq!(z["abrufe"], json!([]), "noch keiner abgerufen: {z}");
+
+    let (s, v) = rufe_ab(
+        &l.app,
+        &l.admin,
+        l.eid,
+        l.br,
+        json!({"objekt_typ": "einheit", "objekt_id": l.hlf}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let z = zeile(fetch_json(&l.app, &l.admin, &liste_pfad).await);
+    let d = fetch_json(&l.app, &l.admin, &br_pfad(l.eid, l.br)).await;
+    let hlf_detail = d["einheiten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == l.hlf)
+        .unwrap();
+    assert_eq!(
+        z["abrufe"],
+        json!([{"einheit_id": l.hlf, "seit_at": hlf_detail["abruf"]["seit_at"]}]),
+        "nur HLF 20, mit dem Zeitpunkt des Details: {z}"
+    );
+
+    belegen(&l.app, &l.admin, l.eid, l.br, "einheit", l.hlf, "austritt").await;
+    let z = zeile(fetch_json(&l.app, &l.admin, &liste_pfad).await);
+    assert_eq!(z["abrufe"], json!([]), "ausgerückt: {z}");
+}
+
 /// AK „ohne Abschnitt unverändert“: die bisherige Unterstellung bleibt.
 #[tokio::test]
 async fn abruf_ohne_abschnitt_laesst_unterstellung() {

@@ -271,8 +271,9 @@ export default function AbloesungPage() {
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
 
   // Stand der geplanten Ablöser (LLH-1131 Teil II): Zeitpunkte aus der Zeitachse, der Raum aus
-  // `aktueller_br_id` der Einheit und dem Namen in der Raumliste. Die Liste der Räume gehört dem
-  // Modul Bereitstellungsräume und wird nur geholt, wenn ein Ablöser gerade in einem Raum steht.
+  // `aktueller_br_id` der Einheit und dem Namen in der Raumliste, der Abruf aus deren `abrufe`
+  // (LLH-1309). Die Liste der Räume gehört dem Modul Bereitstellungsräume und wird nur geholt,
+  // wenn ein Ablöser gerade in einem Raum steht; ein abgerufener steht noch im Raum.
   const brFrei = istKeyFreigegeben('bereitstellungsraeume', freigabenQuery.data);
   const abloeserImBr = useMemo(() => {
     const ids = new Set(laufende.flatMap(abloeserIds));
@@ -289,11 +290,18 @@ export default function AbloesungPage() {
     const brNamen = brQuery.data
       ? new Map(brQuery.data.map((b) => [b.id, b.bezeichnung]))
       : undefined;
+    // Abgerufen im Raum (LLH-1309): aus der Raumliste, die schon für den Namen geholt wird.
+    const abrufe = brQuery.data
+      ? new Map(
+          brQuery.data.flatMap((b) => b.abrufe.map((a) => [a.einheit_id, a.seit_at] as const)),
+        )
+      : undefined;
     for (const s of laufende) {
       const stand = buildAbloeserStand(s, {
         perioden: periodenQuery.data,
         einheiten: einheitenQuery.data,
         brNamen,
+        abrufe,
       });
       if (stand) m.set(s.id, stand);
     }

@@ -34,6 +34,7 @@ function br(over: Partial<BrListenEintrag> = {}): BrListenEintrag {
     abschnitt_name: null,
     belegung: { einheiten: 0, fahrzeuge: 0, laengste_seit_at: null },
     einheit_ids: [],
+    abrufe: [],
     ...over,
   };
 }
