@@ -644,9 +644,7 @@ describe('Ablösung — Vollzug mit Verbleib (LLH-1308)', () => {
     await waehle('Danach', 'Entlassen');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
     await waitFor(() =>
-      expect(onErfassen).toHaveBeenCalledWith(
-        expect.objectContaining({ verbleib: 'entlassen' }),
-      ),
+      expect(onErfassen).toHaveBeenCalledWith(expect.objectContaining({ verbleib: 'entlassen' })),
     );
     expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('verbleib_br_id');
   });
