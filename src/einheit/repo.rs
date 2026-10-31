@@ -522,12 +522,20 @@ async fn load_letzte_besetzung_map(
             });
         }
     }
+    // Name und Typ wie in der Fahrzeugliste (LLH-1290, Regel von `disposition_repo::zu_anzeige`).
     let fahrzeuge = sqlx::query_as::<_, LetztesFahrzeugZeile>(
-        "SELECT lb.einheit_id, ef.id AS ef_id, ef.snap_funkrufname AS funkrufname, \
-                ef.snap_fahrzeugtyp AS fahrzeugtyp \
+        "SELECT lb.einheit_id, ef.id AS ef_id, \
+                CASE WHEN fz.id IS NOT NULL AND ez.status = 'aktiv' \
+                          AND fz.dienststatus = 'in_dienst' \
+                     THEN fz.funkrufname ELSE ef.snap_funkrufname END AS funkrufname, \
+                CASE WHEN fz.id IS NOT NULL AND ez.status = 'aktiv' \
+                          AND fz.dienststatus = 'in_dienst' \
+                     THEN fz.fahrzeugtyp ELSE ef.snap_fahrzeugtyp END AS fahrzeugtyp \
          FROM einsatz_einheit_letzte_besetzung lb \
          JOIN einsatz_einheit e ON e.id = lb.einheit_id \
          JOIN einsatz_fahrzeug ef ON ef.id = lb.fahrzeug_id \
+         JOIN einsatz ez ON ez.id = ef.einsatz_id \
+         LEFT JOIN fahrzeug fz ON fz.id = ef.fahrzeug_id \
          WHERE e.einsatz_id = ? AND lb.art = 'fahrzeug' \
            AND ef.beendet_als IS NOT 'storniert' \
          ORDER BY lb.id",

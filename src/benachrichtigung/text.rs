@@ -66,7 +66,9 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         BenachrichtigungBezugTyp::Nachforderung => Some(("nachforderung", "status")),
         BenachrichtigungBezugTyp::Person => Some(("einsatz_person", "registrier_nr")),
         BenachrichtigungBezugTyp::Einheit => Some(("einsatz_einheit", "name")),
-        BenachrichtigungBezugTyp::Fahrzeug => Some(("einsatz_fahrzeug", "snap_funkrufname")),
+        // Der Funkrufname wie in der Fahrzeugliste (LLH-1290): eigener Weg über
+        // [`FAHRZEUG_DETAIL_SQL`].
+        BenachrichtigungBezugTyp::Fahrzeug => None,
         // Die Schicht hat keine eigene Bezeichnung: Einheit und Uhrzeit liest
         // `detail_abloesung` über [`DETAIL_ABLOESUNG_SPALTEN`].
         BenachrichtigungBezugTyp::Abloesung => None,
@@ -95,6 +97,16 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         | BenachrichtigungBezugTyp::ChatNachricht => None,
     }
 }
+
+/// Die Detailzeile eines Fahrzeugs: der Funkrufname nach der Regel der Fahrzeugliste
+/// (`fahrzeug::funkrufname_anzeige_sql`, LLH-1290). Liest den Retain-Snapshot
+/// `einsatz_fahrzeug.snap_funkrufname` und, nur im aktiven Einsatz, den Namen aus dem Stamm
+/// `fahrzeug`, der nie geschwärzt wird (Guard `detail_eines_fahrzeugs_liest_nur_retain_spalten`).
+pub const FAHRZEUG_DETAIL_SQL: &str = concat!(
+    "SELECT ",
+    crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+    " FROM einsatz_fahrzeug ef WHERE ef.id = ? AND ef.einsatz_id = ?"
+);
 
 /// Die Spalten der Detailzeile einer Ablösung, „Florian 1, 1530“ (Spec `kraefte-abloesung`,
 /// „Hinweis in der AlarmZentrale“): Name der Einheit und Fälligkeit der Schicht, beide Retain
@@ -327,15 +339,17 @@ pub const AUFTRAG_EMPFAENGER_SPALTEN: &[(&str, &str)] = &[
     ("einsatz_fahrzeug", "snap_funkrufname"),
 ];
 
-/// Die Abfrage der Detailzeile einer Empfänger-Zeile; liest nur [`AUFTRAG_EMPFAENGER_SPALTEN`].
-pub const AUFTRAG_EMPFAENGER_SQL: &str =
-    "SELECT ae.auftrag_id, a.lfd_nr, ae.empfaenger_typ, ae.funktion, ee.name, ea.name, \
-            ef.snap_funkrufname \
-     FROM auftrag_empfaenger ae JOIN auftrag a ON a.id = ae.auftrag_id \
+/// Die Abfrage der Detailzeile einer Empfänger-Zeile; liest nur [`AUFTRAG_EMPFAENGER_SPALTEN`],
+/// beim Fahrzeug dazu im aktiven Einsatz den Namen aus dem Stamm wie [`FAHRZEUG_DETAIL_SQL`].
+pub const AUFTRAG_EMPFAENGER_SQL: &str = concat!(
+    "SELECT ae.auftrag_id, a.lfd_nr, ae.empfaenger_typ, ae.funktion, ee.name, ea.name, ",
+    crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+    " FROM auftrag_empfaenger ae JOIN auftrag a ON a.id = ae.auftrag_id \
      LEFT JOIN einsatz_einheit ee ON ee.id = ae.einheit_id \
      LEFT JOIN einsatzabschnitt ea ON ea.id = ae.abschnitt_id \
      LEFT JOIN einsatz_fahrzeug ef ON ef.id = ae.fahrzeug_id \
-     WHERE ae.id = ? AND a.einsatz_id = ?";
+     WHERE ae.id = ? AND a.einsatz_id = ?"
+);
 
 type EmpfaengerZeile = (
     i64,
@@ -486,6 +500,14 @@ pub async fn bilden(
     let detail = match detail_quelle(bezug.typ) {
         None if bezug.typ == BenachrichtigungBezugTyp::Abloesung => {
             detail_abloesung(pool, einsatz_id, bezug.id).await?
+        }
+        None if bezug.typ == BenachrichtigungBezugTyp::Fahrzeug => {
+            let wert: Option<String> = sqlx::query_scalar(FAHRZEUG_DETAIL_SQL)
+                .bind(bezug.id)
+                .bind(einsatz_id)
+                .fetch_optional(pool)
+                .await?;
+            wert.filter(|w| !w.trim().is_empty())
         }
         None => None,
         Some((tabelle, spalte)) => {

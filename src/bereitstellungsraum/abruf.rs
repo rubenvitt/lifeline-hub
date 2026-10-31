@@ -317,14 +317,17 @@ async fn load_kraft_tx(
         }
         ObjektTyp::Fahrzeug => {
             crate::fahrzeug::disposition_repo::require_aktiv_tx(&mut *conn, einsatz_id, id).await?;
-            let (name, einheit_id, raum): (String, Option<i64>, Option<i64>) = sqlx::query_as(
-                "SELECT snap_funkrufname, einheit_id, aktueller_br_id FROM einsatz_fahrzeug \
-                 WHERE id = ? AND einsatz_id = ?",
-            )
-            .bind(id)
-            .bind(einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?;
+            let (name, einheit_id, raum): (String, Option<i64>, Option<i64>) =
+                sqlx::query_as(concat!(
+                    "SELECT ",
+                    crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+                    ", ef.einheit_id, ef.aktueller_br_id FROM einsatz_fahrzeug ef \
+                     WHERE ef.id = ? AND ef.einsatz_id = ?",
+                ))
+                .bind(id)
+                .bind(einsatz_id)
+                .fetch_one(&mut *conn)
+                .await?;
             if einheit_id.is_some() {
                 return Err(AppError::UnprocessableEntity(
                     "Fahrzeug gehört einer Einheit und wird mit ihr abgerufen".into(),

@@ -587,10 +587,11 @@ async fn bekannt_tx(
                 )
                 .await?
                 .ereignis;
-                let name: String = sqlx::query_scalar(
-                    "SELECT snap_funkrufname FROM einsatz_fahrzeug \
-                     WHERE id = ? AND einsatz_id = ?",
-                )
+                let name: String = sqlx::query_scalar(concat!(
+                    "SELECT ",
+                    crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+                    " FROM einsatz_fahrzeug ef WHERE ef.id = ? AND ef.einsatz_id = ?",
+                ))
                 .bind(objekt_id)
                 .bind(r.einsatz_id)
                 .fetch_one(&mut *conn)

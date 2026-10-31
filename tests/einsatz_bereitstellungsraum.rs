@@ -4231,3 +4231,126 @@ async fn einheit_bilden_mit_fahrzeug_aus_dem_raum_beendet_die_belegung() {
         "{d}"
     );
 }
+
+/// Legt ein Stamm-Fahrzeug an und disponiert es in den Einsatz; liefert (Stamm-id, ef-id).
+async fn stamm_fahrzeug(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    funkrufname: &str,
+) -> (i64, i64) {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        "/api/fahrzeuge",
+        cookie,
+        Some(&json!({"funkrufname": funkrufname})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let fz = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(&json!({"fahrzeug_id": fz})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    (fz, v["id"].as_i64().unwrap())
+}
+
+/// LLH-1290: Nach dem Umbenennen im Stamm zeigen Detail und Verlauf eines Raums den neuen
+/// Funkrufnamen, wie die Fahrzeugliste, und offene Ansichten bekommen `fahrzeug`, `einheit` und
+/// `bereitstellungsraum`. Außer Dienst gilt wieder der Name vom Disponieren.
+#[tokio::test]
+async fn umbenennen_im_stamm_zeigt_der_raum_live() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let (einzeln_fz, einzeln) = stamm_fahrzeug(&app, &cookie, eid, "Florian 1/83-1").await;
+    belegen(&app, &cookie, eid, br, "fahrzeug", einzeln, "eintritt").await;
+    let zug = einheit_bilden(&app, &cookie, eid, "1. Zug").await;
+    let (zug_fz, im_zug) = stamm_fahrzeug(&app, &cookie, eid, "Florian 1/44-1").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/einheiten/{zug}/fahrzeug/{im_zug}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    belegen(&app, &cookie, eid, br, "einheit", zug, "eintritt").await;
+
+    let mut rx = live.abonniere(eid);
+    for (fz, neu) in [
+        (einzeln_fz, "Florian 1/83-1 NEU"),
+        (zug_fz, "Florian 1/44-1 NEU"),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PATCH",
+            &format!("/api/fahrzeuge/{fz}"),
+            &cookie,
+            Some(&json!({"funkrufname": neu})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+    let mut ereignisse = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        let data: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+        ereignisse.push((n.event.as_str().to_string(), data));
+    }
+    let hat = |event: &str, schluessel: &str, id: i64| {
+        ereignisse
+            .iter()
+            .any(|(e, d)| e == event && d[schluessel] == id)
+    };
+    assert!(hat("fahrzeug", "fahrzeug_id", einzeln), "{ereignisse:?}");
+    assert!(hat("fahrzeug", "fahrzeug_id", im_zug), "{ereignisse:?}");
+    assert!(hat("einheit", "einheit_id", zug), "{ereignisse:?}");
+    assert!(
+        ereignisse.iter().any(|(e, _)| e == "bereitstellungsraum"),
+        "{ereignisse:?}"
+    );
+
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(
+        d["fahrzeuge"][0]["funkrufname"], "Florian 1/83-1 NEU",
+        "{d}"
+    );
+    assert_eq!(
+        d["einheiten"][0]["fahrzeuge"][0]["funkrufname"], "Florian 1/44-1 NEU",
+        "{d}"
+    );
+    let verlauf = fetch_json(&app, &cookie, &format!("{}/verlauf", br_pfad(eid, br))).await;
+    let namen: Vec<&str> = verlauf
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|z| z["objekt_name"].as_str().unwrap())
+        .collect();
+    assert_eq!(namen, vec!["1. Zug", "Florian 1/83-1 NEU"], "{verlauf}");
+
+    // Außer Dienst → wieder der Name vom Disponieren, und die Ansichten erfahren davon.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/fahrzeuge/{einzeln_fz}/ausser-dienst"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut sah_fahrzeug = false;
+    while let Ok(n) = rx.try_recv() {
+        sah_fahrzeug |= n.event.as_str() == "fahrzeug";
+    }
+    assert!(sah_fahrzeug, "außer Dienst meldet das Fahrzeug");
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert_eq!(d["fahrzeuge"][0]["funkrufname"], "Florian 1/83-1", "{d}");
+}

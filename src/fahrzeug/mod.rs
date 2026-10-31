@@ -1,3 +1,26 @@
+/// SQL-Ausdruck des angezeigten Funkrufnamens einer Fahrzeug-Disposition, nach der Regel von
+/// `disposition_repo::zu_anzeige` (LLH-1290): der Name aus dem Stamm, solange der Einsatz aktiv
+/// und das Stamm-Fahrzeug in Dienst ist, sonst der Snapshot vom Disponieren (auch ad hoc). Das
+/// Argument ist der Alias von `einsatz_fahrzeug` in der umgebenden Abfrage; der Ausdruck bringt
+/// seine Joins als Unterabfrage selbst mit. `COALESCE` ist exakt, weil `fahrzeug.funkrufname`
+/// `NOT NULL` ist. Wer neu einen Funkrufnamen liest, nimmt diesen Ausdruck, nie
+/// `snap_funkrufname` allein.
+macro_rules! funkrufname_anzeige_sql {
+    ($ef:literal) => {
+        concat!(
+            "COALESCE((SELECT fz_anz.funkrufname FROM fahrzeug fz_anz \
+               JOIN einsatz ez_anz ON ez_anz.id = ",
+            $ef,
+            ".einsatz_id WHERE fz_anz.id = ",
+            $ef,
+            ".fahrzeug_id AND ez_anz.status = 'aktiv' AND fz_anz.dienststatus = 'in_dienst'), ",
+            $ef,
+            ".snap_funkrufname)"
+        )
+    };
+}
+pub(crate) use funkrufname_anzeige_sql;
+
 pub mod besatzung_repo;
 pub mod disposition_repo;
 pub mod repo;

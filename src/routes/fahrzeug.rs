@@ -3,8 +3,10 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::fahrzeug::disposition_repo;
 use crate::fahrzeug::repo::{self, FahrzeugDaten, FahrzeugPatch};
 use crate::fahrzeug::{FahrzeugAnzeige, FahrzeugVorschlaege};
+use crate::live::LiveEvent;
 use crate::routes::support::{deserialize_optional_field, pflicht, trimme, trimme_tri};
 use crate::staerke::Staerke;
 use axum::extract::{Query, State};
@@ -215,6 +217,41 @@ fn normalisiere_patch(
     })
 }
 
+/// Meldet eine Änderung am Stamm-Fahrzeug `fahrzeug_id` an jeden aktiven Einsatz, in dem es
+/// disponiert ist (LLH-1290): Name, Typ und Dienststatus bestimmen dort die Anzeige
+/// (`disposition_repo::zu_anzeige`), offene Ansichten ziehen sonst erst beim Neuladen nach.
+/// `fahrzeug` an die Fahrzeugliste, `einheit` an die Einheit, deren Mitglied es ist, und
+/// `bereitstellungsraum`, wenn ein Raum es zeigt; jeder dieser GETs nennt das Fahrzeug ohnehin.
+/// Nach dem Schreiben aufrufen; ein Lesefehler kostet nur die Live-Meldung.
+async fn stamm_geaendert_melden(state: &AppState, org_id: i64, fahrzeug_id: i64) {
+    let dispositionen =
+        match disposition_repo::aktive_dispositionen(&state.pool, org_id, fahrzeug_id).await {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::warn!(fahrzeug_id, error = %e, "Stamm-Fahrzeug: Live-Meldung entfällt");
+                return;
+            }
+        };
+    for d in dispositionen {
+        state
+            .live
+            .publiziere_objekt(d.einsatz_id, LiveEvent::Fahrzeug, "fahrzeug_id", d.ef_id);
+        if let Some(einheit_id) = d.einheit_id {
+            state.live.publiziere_objekt(
+                d.einsatz_id,
+                LiveEvent::Einheit,
+                "einheit_id",
+                einheit_id,
+            );
+        }
+        if d.im_raum {
+            state
+                .live
+                .publiziere_einsatz(d.einsatz_id, LiveEvent::Bereitstellungsraum);
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     #[serde(default)]
@@ -264,6 +301,7 @@ pub async fn aktualisieren(
     let bestand = repo::staerke_roh(&state.pool, benutzer.org_id, id).await?;
     let n = normalisiere_patch(body, bestand)?;
     let f = repo::patche(&state.pool, benutzer.org_id, id, n.patch()).await?;
+    stamm_geaendert_melden(&state, benutzer.org_id, id).await;
     Ok(Json(f.anzeige()))
 }
 
@@ -274,6 +312,7 @@ pub async fn ausser_dienst(
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<FahrzeugAnzeige>, AppError> {
     let f = repo::setze_dienststatus(&state.pool, benutzer.org_id, id, false).await?;
+    stamm_geaendert_melden(&state, benutzer.org_id, id).await;
     Ok(Json(f.anzeige()))
 }
 
@@ -284,6 +323,7 @@ pub async fn in_dienst(
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<FahrzeugAnzeige>, AppError> {
     let f = repo::setze_dienststatus(&state.pool, benutzer.org_id, id, true).await?;
+    stamm_geaendert_melden(&state, benutzer.org_id, id).await;
     Ok(Json(f.anzeige()))
 }
 
