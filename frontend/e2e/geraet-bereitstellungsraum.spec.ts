@@ -105,6 +105,10 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     await expect(tablet.getByText('Noch keine Meldungen von dieser Stelle')).toBeVisible();
     await tablet.getByLabel('Inhalt').fill('Raum voll, weitere Kräfte zum BR Schule');
     await tablet.getByRole('button', { name: 'Meldung senden' }).click();
+    // Erst die Quittung des Servers: der Text allein stünde schon im Eingabefeld (ein gesteuertes
+    // `textarea` trägt seinen Wert als Textinhalt), die Abfrage unten liefe dann der Meldung voraus.
+    await expect(tablet.getByText(/Meldung #\d+ gesendet/)).toBeVisible();
+    await expect(tablet.getByLabel('Inhalt')).toHaveValue('');
     await expect(tablet.getByText('Raum voll, weitere Kräfte zum BR Schule')).toBeVisible();
 
     // Die Einsatzleitung sieht den Raum als Status „aktiv“ und die Meldung mit dem Raum als Absender.
