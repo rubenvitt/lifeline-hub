@@ -880,6 +880,35 @@ describe('VerpflegungPage (LFH-634)', () => {
       ).toBeInTheDocument();
     });
 
+    it('In Betrieb nehmen: die Zeile steht nach der Antwort sofort auf „aktiv“, nicht erst nach dem Neuladen (LLH-1297)', async () => {
+      liefert([mittag()], stellen());
+      setStelleStatus.mockResolvedValue(
+        stelle({ id: DEICH, bezeichnung: 'Zuführung Deich', status: 'aktiv' }),
+      );
+      renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('radio', { name: /^Stellen/ }));
+      // Das Neuladen hängt: was die Zeile zeigt, kommt allein aus der Antwort.
+      ladeVerpflegung.mockImplementation(() => new Promise(() => {}));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Aktionen zu Stelle Zuführung Deich' }),
+      );
+      const menue = await waitFor(() => {
+        const m = document.querySelector<HTMLElement>(
+          '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+        );
+        expect(m).not.toBeNull();
+        return m!;
+      });
+      await userEvent.click(within(menue).getByText('In Betrieb nehmen'));
+      const deich = screen.getByRole('article', { name: 'Stelle Zuführung Deich' });
+      await waitFor(() => expect(deich).toHaveAttribute('data-status', 'aktiv'));
+      expect(deich).not.toHaveAttribute('aria-busy');
+      expect(
+        within(deich).getByRole('button', { name: 'Auflösen … zu Stelle Zuführung Deich' }),
+      ).toBeInTheDocument();
+    });
+
     it('Bearbeiten öffnet die Maske vorbelegt und schickt nur Geändertes', async () => {
       liefert([mittag()], stellen());
       listeAbschnitte.mockResolvedValue([]);

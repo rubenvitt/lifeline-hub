@@ -16,6 +16,7 @@ import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import type {
+  Verpflegung,
   VerpflegungAusgabe,
   Verpflegungsstelle,
   VerpflegungsstelleEingabe,
@@ -373,6 +374,11 @@ export default function VerpflegungPage() {
     mutationFn: ({ s, status }: { s: Verpflegungsstelle; status: VerpflegungsstelleStatus }) =>
       setStelleStatus(einsatzId, s.id, status),
     onSuccess: (s) => {
+      // Die bestätigte Stelle sofort in den Stand: sonst stünde die Zeile nach der Antwort bis zum
+      // Neuladen noch auf dem alten Status, ohne Ladeanzeige (LLH-1297).
+      qc.setQueryData<Verpflegung>(einsatzKeys.verpflegung(einsatzId), (alt) =>
+        alt ? { ...alt, stellen: alt.stellen.map((x) => (x.id === s.id ? s : x)) } : alt,
+      );
       invalidiere(true);
       message.success(`Stelle ${zitat(s.bezeichnung)} ${STELLE_STATUS_ERFOLG[s.status]}`);
     },
