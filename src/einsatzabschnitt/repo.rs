@@ -556,6 +556,58 @@ pub async fn aufloesen_tx(
     Ok(())
 }
 
+/// Objekte anderer Module, deren Lesesicht den Abschnittsnamen per Join mitliest (LLH-1291):
+/// Bereitstellungsräume, Betreuungsstellen und Evakuierungsbezirke. Ihre Leser erreicht das
+/// Ereignis `abschnitt` nur mit Modul `einsatzabschnitte` (`LiveEvent::modul_keys`); deshalb
+/// meldet ein Umbenennen oder Auflösen jedes dieser Objekte mit dem Ereignis seines Moduls.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct NamensTraeger {
+    pub raeume: Vec<i64>,
+    pub stellen: Vec<i64>,
+    pub bezirke: Vec<i64>,
+}
+
+impl NamensTraeger {
+    pub fn is_empty(&self) -> bool {
+        self.raeume.is_empty() && self.stellen.is_empty() && self.bezirke.is_empty()
+    }
+}
+
+/// [`NamensTraeger`] des Abschnitts `id`, auch stornierte (die Listen zeigen sie mit Marke).
+/// Beim Auflösen VOR dem Freigeben der Bezüge in derselben Transaktion lesen.
+pub async fn namens_traeger(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<NamensTraeger, sqlx::Error> {
+    let raeume = sqlx::query_scalar(
+        "SELECT id FROM bereitstellungsraum WHERE abschnitt_id = ? AND einsatz_id = ? ORDER BY id",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let stellen = sqlx::query_scalar(
+        "SELECT id FROM betreuungsstelle WHERE abschnitt_id = ? AND einsatz_id = ? ORDER BY id",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let bezirke = sqlx::query_scalar(
+        "SELECT id FROM evakuierungsbezirk WHERE abschnitt_id = ? AND einsatz_id = ? ORDER BY id",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(NamensTraeger {
+        raeume,
+        stellen,
+        bezirke,
+    })
+}
+
 /// Der Teilbaum eines Abschnitts: er selbst und alle Nachfahren über `ueber_abschnitt_id`
 /// (LFH-1043, Bindung der Abschnittsansicht). Bei jeder Anfrage neu berechnet, damit ein
 /// umgehängter Unterabschnitt sofort folgt. Ein fremder oder unbekannter Abschnitt ergibt die
