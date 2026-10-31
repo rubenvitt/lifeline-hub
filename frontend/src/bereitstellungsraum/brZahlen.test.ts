@@ -79,6 +79,8 @@ describe('Stärke einer Einheit im Raum (LLH-1289)', () => {
   it('fehlt die Einheit oder die Liste: keine Zahl', () => {
     expect(staerkeDerEinheitImRaum(99, [99], alle)).toBeNull();
     expect(staerkeDerEinheitImRaum(10, [10], undefined)).toBeNull();
+    // Eine andere Einheit des Raums fehlt: offen, ob sie unterstellt ist, also keine Zahl.
+    expect(staerkeDerEinheitImRaum(10, [10, 99], alle)).toBeNull();
   });
 
   it('bricht bei einem korrupten Zyklus ab', () => {

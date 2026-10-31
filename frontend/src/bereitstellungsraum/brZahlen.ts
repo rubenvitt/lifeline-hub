@@ -67,7 +67,7 @@ export function staerkeImRaum(
 /**
  * Stärke einer Einheit im Raum für ihre Zeile: ihre eigene Ist-Stärke samt der Untereinheiten
  * (auch Enkel über ein abwesendes Zwischenglied), die im selben Raum stehen. Eine Untereinheit
- * anderswo zählt nicht. `null`, wenn die Einheit in der Liste fehlt. Steht eine Untereinheit mit
+ * anderswo zählt nicht. `null`, wenn sie oder eine andere Einheit des Raums in der Liste fehlt. Steht eine Untereinheit mit
  * im Raum, trägt sie ihre Zeile zusätzlich; die Summe des Raums bleibt `staerkeImRaum`.
  */
 export function staerkeDerEinheitImRaum(
@@ -96,7 +96,10 @@ export function staerkeDerEinheitImRaum(
   for (const id of imRaum) {
     if (id === einheitId) continue;
     const e = von.get(id);
-    if (e && !e.aufgeloest_at && unterstellt(id)) summe = plus(summe, e.ist);
+    // Fehlt eine Einheit des Raums in der Liste, ist offen, ob sie hierher gehört: lieber „—“
+    // als eine zu kleine Zahl, die vollständig aussieht (wie `staerkeImRaum`).
+    if (!e) return null;
+    if (!e.aufgeloest_at && unterstellt(id)) summe = plus(summe, e.ist);
   }
   return summe;
 }
