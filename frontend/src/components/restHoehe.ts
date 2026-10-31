@@ -72,8 +72,8 @@ export function restHoeheVon(el: HTMLElement): RestHoehe {
 
 /**
  * Callback-Ref: setzt `min-height`, `margin-bottom` und {@link REST_UNTEN_VAR} des Elements nach
- * {@link restHoeheVon} und hält sie, solange es hängt. Neu gemessen wird, wenn sich ein Vorfahr in der Größe ändert (Kopf bricht um, Hinweis
- * erscheint, Dichtewechsel, Fenster) — im nächsten Bild, nicht im ResizeObserver selbst: die neue
+ * {@link restHoeheVon} und hält sie, solange es hängt. Neu gemessen wird, wenn sich ein Vorfahr
+ * in der Größe ändert (Kopf bricht um, Hinweis erscheint, Dichtewechsel, Fenster) — im nächsten Bild, nicht im ResizeObserver selbst: die neue
  * Höhe ändert sofort die beobachteten Vorfahren (dieselbe Falle wie `FensterRahmen`, LLH-1335).
  */
 export function useRestHoehe<T extends HTMLElement>(): (el: T | null) => (() => void) | undefined {

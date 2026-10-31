@@ -383,3 +383,24 @@ for (const flaeche of [
     }
   });
 }
+
+test('Kennzahlen im Kopf laufen auch vierstellig nicht über (320 bis 390 px, kompakt und komfortabel)', async ({
+  page,
+}) => {
+  const { e, zf } = await saeen(page, -10, 110, { kraefte: 1830 });
+  for (const dichte of ['kompakt', 'komfortabel']) {
+    await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+    for (const breite of [390, 360, 320]) {
+      await page.setViewportSize({ width: breite, height: 700 });
+      await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      await expect(page.getByRole('group', { name: 'Deckung Mittag Deich' })).toContainText('1840');
+      const ueberlauf = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('[data-lfh="kennzahlenband"] > *')].map(
+          (z) => z.scrollWidth - z.clientWidth,
+        ),
+      );
+      expect(ueberlauf, `${breite} px, ${dichte}`).toEqual([0, 0, 0]);
+    }
+  }
+});

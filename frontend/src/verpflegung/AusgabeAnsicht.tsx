@@ -39,6 +39,7 @@ import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { parseVerpflegungStelle } from '../routing/deeplinks';
 import { Select } from '../components/Select';
 import { useDichte } from '../theme/ThemeModeProvider';
+import type { Dichte } from '../theme/tokens';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
 import { AusgabeDialog, RuecknahmeDialog } from './VerpflegungDialoge';
 import type { Buendel } from './ausgabeSammlung';
@@ -138,6 +139,17 @@ function davon(b: Buendel): string {
  * alten Empfänger. Unter den Tasten zeigt `EmpfaengerStand`, wer noch nicht verpflegt ist; „Wählen“
  * an einer Zeile setzt die Einheit als Empfänger (Handschuh: die Zeile statt der Auswahlliste).
  */
+/**
+ * Mindestbreite einer Kennzahl im Kopf je Dichte: was „1840 EP“ samt Innenabstand braucht,
+ * gemessen bei 320 bis 390 px (kompakt 110, komfortabel 122, Handschuh über 126), mit etwas Luft.
+ * Kompakt stehen so bei 390 px alle drei in einer Zeile.
+ */
+const KENNZAHL_ZELLE_MIN: Record<Dichte, number> = {
+  kompakt: 112,
+  komfortabel: 124,
+  handschuh: 160,
+};
+
 export default function AusgabeAnsicht() {
   const { id, zeitfensterId } = useParams();
   const einsatzId = Number(id);
@@ -439,10 +451,13 @@ export default function AusgabeAnsicht() {
           </Flex>
           <Kennzahlenband
             beschriftung={`Deckung ${zf.bezeichnung}`}
-            // Eine Zeile für Soll, ausgegeben und fehlt: zwei Zeilen kosteten bei 390 × 700 so
-            // viel Höhe, dass die Ansicht rollen müsste und der Kopf aus dem Bild ginge (LLH-1294).
-            // Im Handschuh reicht die Drittelbreite für „1840 EP“ nicht, dort bricht das Band um.
-            spalten={dichte === 'handschuh' ? undefined : 3}
+            // Soll, ausgegeben und fehlt möglichst in einer Zeile: zwei Zeilen kosteten bei
+            // 390 × 700 so viel Höhe, dass die Ansicht rollen müsste und der Kopf aus dem Bild
+            // ginge (LLH-1294). Wo die Zelle für eine vierstellige Zahl zu schmal wird, bricht das
+            // Band um, statt überzulaufen.
+            style={{
+              gridTemplateColumns: `repeat(auto-fit, minmax(min(${KENNZAHL_ZELLE_MIN[dichte]}px, 100%), 1fr))`,
+            }}
           >
             <Kennzahl titel="Soll" wert={zf.bedarf.gesamt} einheit="EP" />
             <Kennzahl titel="ausgegeben" wert={zf.ausgegeben.gesamt} einheit="EP" />
