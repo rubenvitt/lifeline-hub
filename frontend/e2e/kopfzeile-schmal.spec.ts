@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu } from './rollen-kern';
 import { einsatzAnlegen } from './einsatz-kern';
+import { oeffneMenue } from './menue-kern';
 
 /**
  * Die Kopfzeile auf dem Handschirm. Ob das Inline-`paddingInline` antds Klassenregel schlägt
@@ -265,12 +266,12 @@ test('Bediendichte bleibt auf 390 px bedienbar — über das Benutzermenü', asy
     24,
   );
 
-  await trigger.click();
-  await page.getByRole('menuitem', { name: /Handschuh/ }).click();
+  // Erst ins stehende Menü klicken: während `ant-slide-up-appear` geht der Klick unter Last
+  // verloren (`menue-kern.ts`, LLH-1487).
+  await (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Handschuh/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
-  await trigger.click();
-  await page.getByRole('menuitem', { name: /Dunkel/ }).click();
+  await (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Dunkel/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
@@ -287,12 +288,12 @@ test('auch ab lg stehen die Umschalter nicht im Kopf — bedienbar bleiben sie',
   await expect(page.locator('header').getByRole('radio')).toHaveCount(0);
 
   const trigger = page.getByRole('button', { name: 'Benutzermenü' });
-  await trigger.click();
-  await page.getByRole('menuitem', { name: /Komfortabel/ }).click();
+  // Erst ins stehende Menü klicken: während `ant-slide-up-appear` geht der Klick unter Last
+  // verloren (`menue-kern.ts`, LLH-1487).
+  await (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Komfortabel/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
 
-  await trigger.click();
-  await page.getByRole('menuitem', { name: /Dunkel/ }).click();
+  await (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Dunkel/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
