@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { oeffneEbenenGruppe } from './leisten-kern';
 
 // Tiere auf der Lagekarte (LLH-1123) — Durchstich im echten Renderer: kommt der Platziermodus aus
-// der Tier-Detailseite an, landet das Tier als Kreis mit „T“ in der Marker-Quelle, schreibt die
+// der Tier-Detailseite an, landet das Tier mit dem Zeichen „Tier ohne Zustand“ (LLH-1343) in der
+// Marker-Quelle, schreibt die
 // Verortung kein ETB, führt „Zurück zu …“ auf die Detailseite, und fehlt die Ebene, sobald das
 // Modul Tiere ausgeblendet ist? Geprüft wird die Quelle (`querySourceFeatures`), nicht die Pixel.
 
@@ -81,7 +82,7 @@ const VERMISST_ORT: [number, number] = [9.366, 52.109];
 
 test.use({ viewport: { width: 1366, height: 768 } });
 
-test('Tier: aus der Detailseite verorten, Kreis mit „T“, ohne ETB, zurück zur Detailseite', async ({
+test('Tier: aus der Detailseite verorten, Tierzeichen, ohne ETB, zurück zur Detailseite', async ({
   page,
 }) => {
   test.setTimeout(180_000);
@@ -123,10 +124,11 @@ test('Tier: aus der Detailseite verorten, Kreis mit „T“, ohne ETB, zurück z
 
   await expect.poll(() => tierFeature(page, hund), { timeout: 30_000 }).toBeDefined();
   const f = await tierFeature(page, hund);
-  expect(f?.kurzzeichen).toBe('T');
   expect(f?.beschriftung).toBe('T-001 (Hund)');
-  // Kein Eigenbau-Zeichen: DV 102 kennt kein Tier ohne Zustand, der Marker bleibt ein Kreis.
-  expect(f?.icon).toBeUndefined();
+  // Das Tier ohne Zustand aus @einsatzzeichen (LLH-1343), kein Kreis mit Kurzzeichen.
+  expect(f?.icon).toBe('ez|{"v":1,"freestanding":{"kind":"animal-state"}}');
+  expect(f?.kurzzeichen).toBeUndefined();
+  expect(f?.statusFarbe).toBeUndefined();
   // Kein ETB-Eintrag für die Verortung.
   expect(await countEtb(page, basis)).toBe(etbVorher);
 
@@ -135,6 +137,8 @@ test('Tier: aus der Detailseite verorten, Kreis mit „T“, ohne ETB, zurück z
   await expect
     .poll(async () => (await tierFeature(page, katze))?.beschriftung, { timeout: 30_000 })
     .toBe('T-002 (Katze) · vermisst');
+  // Dasselbe Zeichen, dahinter die Achtung-Scheibe: auffällig auch ohne Beschriftung.
+  expect((await tierFeature(page, katze))?.statusFarbe).toBeTruthy();
 
   // „Zurück zu …“ führt auf die Detailseite, die nun die Koordinate zeigt.
   await page.getByRole('button', { name: 'Zurück zu T-001 (Hund)' }).first().click();

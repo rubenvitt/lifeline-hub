@@ -91,10 +91,19 @@ Fundort-Freitext wie bisher leeren.
 Die Lagekarte SHALL jedes verortete Tier im Status „aktiv“ (offen) oder „vermisst“ als Marker an
 seiner Koordinate zeigen. Die Marker MUST eine eigene, schaltbare Ebene „Tiere“ bilden, die in
 der Gruppe „Betroffene & Versorgung“ des Ebenenbaums nach den Betreuungsstellen mit der Anzahl
-ihrer Marker steht und ohne gespeicherte Wahl eingeschaltet ist. Da `@einsatzzeichen` nach DV 102 kein Zeichen „Tier“ ohne
-Zustand führt, MUST der Marker ein Kreis mit dem Kurzzeichen „T“ sein, kein eigenes Zeichen. Die
+ihrer Marker steht und ohne gespeicherte Wahl eingeschaltet ist. Der Marker MUST das Zeichen
+„Tier ohne Zustand“ aus `@einsatzzeichen` tragen (`{ kind: 'animal-state' }`): die Tiersilhouette
+der Tierzustände aus DV 102 (5.8.6) ohne Strich und Kreuz. Kein Original zeigt ein Tier ohne
+Zustand; die Bibliothek leitet es aus den drei Tierzuständen ab und kennzeichnet es als abgeleitet,
+so wie die Person ohne Zustand die Raute ohne Verletzungsstrich ist. Zeichnet die Bibliothek das
+Zeichen nicht, MUST der Marker auf einen Kreis mit dem Kurzzeichen „T“ zurückfallen. Die
 Beschriftung MUST Registriernummer und Spezies tragen („T-007 (Hund)“), ohne Rufname. Ein
-vermisstes Tier MUST die Farbrolle „Achtung“ und in der Beschriftung das Wort „vermisst“ tragen.
+vermisstes Tier MUST dasselbe Zeichen, die Farbrolle „Achtung“ und in der Beschriftung das Wort
+„vermisst“ tragen; damit es auch unterhalb des Mindestzooms der Beschriftung unterscheidbar bleibt,
+MUST hinter seinem Zeichen eine Scheibe in der Farbe der Rolle „Achtung“ liegen.
+Zustände eines Tiers nach 5.8.6 (erkrankt, kontaminiert, tot) MUST NOT auf der Karte erscheinen:
+das Tier führt keinen Gesundheitszustand, nur die Status offen, vermisst und abgeschlossen
+(Entscheidung LLH-1343 vom 01.11.2026).
 Abgeschlossene und stornierte Tiere MUST weder als Marker noch in einer Liste der Karte
 erscheinen. Die Auswahl eines Markers MUST Status, Spezies, Rufname und Fundort zeigen und einen
 Sprung zur Detailseite des Tiers anbieten. Jeder Marker MUST eine Trefferzone in der Steuerhöhe
@@ -102,11 +111,15 @@ der aktiven Dichtestufe tragen. Die Ort-Vorschau MUST Tiere nicht als Bezugspunk
 
 #### Scenario: Verortetes offenes Tier
 - **WHEN** der Hund T-007 im Status „aktiv“ verortet ist
-- **THEN** zeigt die Karte an seiner Koordinate einen Kreis mit „T“ und der Beschriftung „T-007 (Hund)“
+- **THEN** zeigt die Karte an seiner Koordinate das Zeichen „Tier ohne Zustand“ mit der Beschriftung „T-007 (Hund)“, ohne Scheibe dahinter
 
 #### Scenario: Vermisstes Tier
 - **WHEN** die Katze T-002 im Status „vermisst“ verortet ist
-- **THEN** trägt ihr Marker die Farbrolle „Achtung“ und die Beschriftung „T-002 (Katze) · vermisst“
+- **THEN** trägt ihr Marker dasselbe Zeichen mit einer Scheibe in der Achtung-Farbe dahinter, die Farbrolle „Achtung“ und die Beschriftung „T-002 (Katze) · vermisst“
+
+#### Scenario: Bibliothek zeichnet das Tier nicht
+- **WHEN** `@einsatzzeichen` das Zeichen „Tier ohne Zustand“ nicht zeichnet
+- **THEN** zeigt die Karte das Tier als Kreis mit dem Kurzzeichen „T“
 
 #### Scenario: Abgeschlossenes Tier
 - **WHEN** für ein verortetes Tier der Verbleib erfasst wird

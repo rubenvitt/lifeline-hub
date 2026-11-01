@@ -125,9 +125,11 @@ will, bekommt die Rückfrage „Ungespeicherte Änderungen“: „Bleiben“ beh
 
 ### Tiere auf der Lagekarte
 
-Die Lagekarte zeigt offene und vermisste Tiere mit Koordinate in der Ebene „Tiere“, als Kreis mit
-„T“ und beschriftet mit Registriernummer und Spezies, etwa „T-003 (Hund)“. Ein vermisstes Tier
-trägt zusätzlich „vermisst“. Den Rufnamen zeigt die Karte erst, wenn das Tier ausgewählt ist.
+Die Lagekarte zeigt offene und vermisste Tiere mit Koordinate in der Ebene „Tiere“, mit dem
+taktischen Zeichen für ein Tier und beschriftet mit Registriernummer und Spezies, etwa „T-003
+(Hund)“. Ein vermisstes Tier liegt auf einer Scheibe in Achtung-Farbe und trägt zusätzlich
+„vermisst“. Zustände wie erkrankt, kontaminiert oder tot zeigt die Karte nicht, das Tier führt sie
+nicht. Den Rufnamen zeigt die Karte erst, wenn das Tier ausgewählt ist.
 Ein abgeschlossenes oder storniertes Tier verschwindet von der Karte; verorten lässt sich nur ein
 offenes oder vermisstes Tier. Der Fundort als Text bleibt neben der Koordinate stehen. Das
 Verorten schreibt keinen Eintrag ins Einsatztagebuch.

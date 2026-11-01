@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
 import { buildTierMarker, tierKartenLabel, type TierKartenEintrag } from './tierMarker';
 import { rollenFarbe } from '../../theme/statusFarben';
+import { markerZeichen } from './markerIcons';
 
 const token = theme.getDesignToken();
 
@@ -18,7 +19,7 @@ function tier(teil: Partial<TierKartenEintrag> = {}): TierKartenEintrag {
 }
 
 describe('buildTierMarker (LLH-1123)', () => {
-  it('ein verortetes offenes Tier wird ein Kreis mit „T“, Bedienrolle und Trefferzone', () => {
+  it('ein verortetes offenes Tier trägt Bedienrolle und Trefferzone, kein Kurzzeichen (LLH-1343)', () => {
     const { verortet, nichtVerortet } = buildTierMarker(
       [tier({ antreff_lat: 51.93, antreff_lon: 8.87 })],
       token,
@@ -33,7 +34,6 @@ describe('buildTierMarker (LLH-1123)', () => {
         lon: 8.87,
         label: 'T-007 (Hund)',
         farbe: rollenFarbe('bedien', token),
-        kurzzeichen: 'T',
         trefferDurchmesser: token.controlHeight,
       },
     ]);
@@ -46,6 +46,8 @@ describe('buildTierMarker (LLH-1123)', () => {
     );
     expect(verortet[0].farbe).toBe(rollenFarbe('achtung', token));
     expect(verortet[0].beschriftungZusatz).toBe('vermisst');
+    // Unter dem Mindestzoom der Beschriftung: die Achtung-Scheibe hinter dem Zeichen (LLH-1343).
+    expect(verortet[0].statusFarbe).toBe(rollenFarbe('achtung', token));
     expect(verortet[0].label).toBe('T-007 (Hund)');
   });
 
@@ -66,6 +68,24 @@ describe('buildTierMarker (LLH-1123)', () => {
     );
     expect(verortet).toEqual([]);
     expect(nichtVerortet).toEqual([]);
+  });
+
+  it('ein offenes Tier hat keine Scheibe hinter dem Zeichen', () => {
+    const { verortet } = buildTierMarker([tier({ antreff_lat: 1, antreff_lon: 2 })], token);
+    expect(verortet[0].statusFarbe).toBeUndefined();
+  });
+
+  it('das Zeichen ist das Tier ohne Zustand aus @einsatzzeichen, für offene und vermisste dasselbe', () => {
+    const { verortet } = buildTierMarker(
+      [
+        tier({ id: 1, antreff_lat: 1, antreff_lon: 2 }),
+        tier({ id: 2, status: 'vermisst', antreff_lat: 1, antreff_lon: 2 }),
+      ],
+      token,
+    );
+    const [offen, vermisst] = verortet.map((mk) => markerZeichen(mk));
+    expect(offen?.schluessel).toBe('ez|{"v":1,"freestanding":{"kind":"animal-state"}}');
+    expect(vermisst?.schluessel).toBe(offen?.schluessel);
   });
 
   it('der Rufname steht nicht auf der Karte', () => {

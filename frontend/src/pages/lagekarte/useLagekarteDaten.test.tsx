@@ -1126,9 +1126,10 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
         schluessel: 'tier-21',
         label: 'T-003 (Katze)',
         beschriftungZusatz: 'vermisst',
-        kurzzeichen: 'T',
       }),
     );
+    // Das Zeichen „Tier ohne Zustand“ statt eines Kreises mit „T“ (LLH-1343).
+    expect(result.current.alleVerortet.find((m) => m.typ === 'tier')?.kurzzeichen).toBeUndefined();
     expect(result.current.tierZugriff).toBe('frei');
     expect(result.current.nichtVerortetAlle).toContainEqual({
       typ: 'tier',

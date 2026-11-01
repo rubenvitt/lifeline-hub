@@ -450,9 +450,9 @@ export function sorgeFuerMarkerLayer(
   if (!map.getSource(MARKER_EINSATZORT_QUELLE)) {
     map.addSource(MARKER_EINSATZORT_QUELLE, { type: 'geojson', data: einsatzort as never });
   }
-  // FMS-Status-Ring (nur Fahrzeuge mit Status): ein Kreis hinter dem Symbol, der über dessen Rand
-  // hinausragt. radius 20 (40 px) > die in Kartenflaeche auf ≤ 34 px normierte Symbolgröße; nur
-  // Fahrzeuge tragen `statusFarbe`, ein fester Radius genügt.
+  // Status-Ring (Fahrzeuge mit FMS-Status, vermisste Tiere, LLH-1343): ein Kreis hinter dem Symbol,
+  // der über dessen Rand hinausragt. radius 20 (40 px) > die in Kartenflaeche auf ≤ 34 px normierte
+  // Symbolgröße; beide tragen ein Zeichen, ein fester Radius genügt.
   if (!map.getLayer('marker-status-ring')) {
     map.addLayer({
       id: 'marker-status-ring',

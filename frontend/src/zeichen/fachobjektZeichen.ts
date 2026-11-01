@@ -33,6 +33,7 @@ import {
   type CapabilityId,
   type ColorToken,
   type Drawing,
+  type AnimalStateSpec,
   type FunctionRoleId,
   type OrganizationId,
   type PictogramSpec,
@@ -440,4 +441,41 @@ export function bereitstellungsraumZeichen(): BereitstellungsraumZeichen | null 
     brZeichenCache = null;
   }
   return brZeichenCache;
+}
+
+/**
+ * Das Zeichen eines Tiers (LLH-1343): das Tier ohne Zustand aus @einsatzzeichen, die Silhouette der
+ * Tierzustände 5.8.6 ohne Strich und Kreuz. Kein Original zeigt es, die Bibliothek leitet es ab und
+ * kennzeichnet es so. Zustände (erkrankt, kontaminiert, tot) führt der Hub am Tier nicht.
+ */
+const TIER_SPEC: AnimalStateSpec = { kind: 'animal-state' };
+
+interface TierZeichen {
+  spec: AnimalStateSpec;
+  drawing: Drawing;
+  /** Karten-Bildschlüssel wie bei `fachobjektZeichen`: `ez|` + kanonische Serialisierung. */
+  schluessel: string;
+}
+
+let tierZeichenCache: TierZeichen | null | undefined;
+
+/**
+ * Wie `bereitstellungsraumZeichen`: gecacht, wirft nie; `null`, wenn die Bibliothek das Zeichen
+ * nicht zeichnet (dann bleibt der Marker ein Kreis mit „T“).
+ */
+export function tierZeichen(): TierZeichen | null {
+  if (tierZeichenCache !== undefined) return tierZeichenCache;
+  try {
+    tierZeichenCache = {
+      spec: TIER_SPEC,
+      drawing: drawAnySpec(TIER_SPEC),
+      schluessel: `ez|${serializeAnySpec(TIER_SPEC)}`,
+    };
+  } catch (e) {
+    if (import.meta.env.DEV) {
+      console.warn('[fachobjektZeichen] Tier nicht gezeichnet', e);
+    }
+    tierZeichenCache = null;
+  }
+  return tierZeichenCache;
 }
