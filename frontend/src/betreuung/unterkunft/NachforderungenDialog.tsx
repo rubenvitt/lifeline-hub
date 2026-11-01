@@ -21,6 +21,8 @@ interface Zeile extends Posten {
   /** Angelegt in einem früheren Lauf dieses Dialogs; nicht mehr wählbar. */
   angelegt: boolean;
   fehler?: string;
+  /** Ausgang des letzten Laufs unbekannt; hält den Dialog offen, bis geklärt. */
+  unbekannt?: boolean;
 }
 
 export interface Lauf {
@@ -69,7 +71,8 @@ export async function legePostenAn(
  * Dialog „Nachforderungen anlegen“ aus dem Ergebnis des Rechners: Posten mit Anzahl, Adressat
  * und Priorität gemeinsam. Nach einem Lauf mit Fehlern bleibt er offen; angelegte Posten stehen
  * als angelegt, gescheiterte bleiben angehakt mit Grund. Bei einem Netzfehler (Ausgang unbekannt) wird
- * der Posten abgehakt, damit ein zweiter Lauf ihn nicht doppelt anlegt.
+ * der Posten abgehakt, damit ein zweiter Lauf ihn nicht doppelt anlegt; solange ein solcher Posten
+ * ungeklärt ist, schließt der Dialog nicht von selbst.
  */
 export default function NachforderungenDialog({
   einsatzId,
@@ -98,7 +101,8 @@ export default function NachforderungenDialog({
   const gewaehlt = zeilen.filter((z) => z.an && !z.angelegt && z.anzahl > 0);
   const n = gewaehlt.length;
   const knopf = n === 1 ? '1 Nachforderung anlegen' : `${n} Nachforderungen anlegen`;
-  const gescheitert = zeilen.filter((z) => z.fehler);
+  const gescheitert = zeilen.filter((z) => z.fehler && !z.unbekannt);
+  const ungeklaert = zeilen.filter((z) => z.unbekannt);
 
   async function anlegen() {
     setLaeuft(true);
@@ -109,21 +113,19 @@ export default function NachforderungenDialog({
     setLaeuft(false);
     const fehlerJe = new Map(lauf.gescheitert.map((g) => [g.art, g]));
     const angelegt = new Set(lauf.angelegt);
-    setZeilen((alt) =>
-      alt.map((z) =>
-        angelegt.has(z.art)
-          ? { ...z, an: false, angelegt: true, fehler: undefined }
-          : fehlerJe.has(z.art)
-            ? // Bei unbekanntem Ausgang abgehakt: ein zweiter Lauf legte sonst doppelt an.
-              {
-                ...z,
-                fehler: fehlerJe.get(z.art)!.fehler,
-                an: z.an && !fehlerJe.get(z.art)!.unbekannt,
-              }
-            : z,
-      ),
-    );
-    const offen = lauf.gescheitert.length > 0;
+    // Während des Laufs ist der Dialog gesperrt, `zeilen` ist also noch aktuell.
+    const naechste = zeilen.map((z): Zeile => {
+      if (angelegt.has(z.art)) {
+        return { ...z, an: false, angelegt: true, fehler: undefined, unbekannt: false };
+      }
+      const g = fehlerJe.get(z.art);
+      if (!g) return z;
+      // Bei unbekanntem Ausgang abgehakt: ein zweiter Lauf legte sonst doppelt an.
+      return { ...z, fehler: g.fehler, unbekannt: !!g.unbekannt, an: z.an && !g.unbekannt };
+    });
+    setZeilen(naechste);
+    // Offen bleibt er auch für ungeklärte Posten früherer Läufe, damit ihr Hinweis nicht verschwindet.
+    const offen = lauf.gescheitert.length > 0 || naechste.some((z) => z.unbekannt);
     if (lauf.angelegt.length > 0) onFertig(lauf, offen);
     if (!offen) onSchliessen();
   }
@@ -233,12 +235,16 @@ export default function NachforderungenDialog({
           <Alert
             type="error"
             showIcon
-            title={
-              gescheitert.length === 1
-                ? '1 Posten nicht angelegt'
-                : `${gescheitert.length} Posten nicht angelegt`
-            }
+            title={`${gescheitert.length} Posten nicht angelegt`}
             description={gescheitert.map((z) => z.art).join(', ')}
+          />
+        )}
+        {ungeklaert.length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            title={`${ungeklaert.length} Posten ungeklärt`}
+            description={ungeklaert.map((z) => z.art).join(', ')}
           />
         )}
       </Space>
