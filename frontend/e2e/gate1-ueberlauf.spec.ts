@@ -1265,9 +1265,20 @@ test.describe('Gate 1', () => {
             );
         }
 
-        await page.goto(`/einsaetze/${einsatzId}/${modul}`);
+        // Das Banner kommt nur über den Live-Strom, und der Server abonniert erst mit der Antwort
+        // auf `/live`: eine Fremdanlage davor ginge verloren, das Banner bliebe aus (LLH-1317).
+        // Gewartet wird je Seitenaufbau, sonst löste die Antwort der ersten Seite das Warten
+        // nach dem Neuladen aus.
+        const mitStrom = async (schritt: () => Promise<unknown>) => {
+          const strom = page.waitForResponse(
+            (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+          );
+          await schritt();
+          await strom;
+        };
+        await mitStrom(() => page.goto(`/einsaetze/${einsatzId}/${modul}`));
         await page.evaluate((d) => window.localStorage.setItem('lifeline-hub.dichte', d), dichte);
-        await page.reload();
+        await mitStrom(() => page.reload());
         await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
         const karten = page.locator(`[data-lfh="${modul}-karte"]`);
         const zeile = page.locator(`[data-lfh="${modul}-werkzeugzeile"]`);

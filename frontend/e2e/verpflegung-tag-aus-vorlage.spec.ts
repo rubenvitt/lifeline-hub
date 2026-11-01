@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ADMIN, ADMIN_PW, anmeldenAlsAdmin, wechsleZu, wechsleZuRolle } from './rollen-kern';
+import { anmeldenAlsAdmin, wechsleZuAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
  * Verpflegungsplan und Tag aus Vorlage (LLH-1058 Teil II; Spec `kraefte-verpflegung`,
@@ -173,7 +173,7 @@ test('390 px im Handschuh-Betrieb: Tag aus Vorlage und Verpflegungsplan ohne waa
     await expect(page.getByRole('button', { name: 'Zeitfenster anlegen' })).toBeDisabled();
     expect(await ueberlauf()).toBeLessThanOrEqual(0);
   } finally {
-    await wechsleZu(page, { benutzername: ADMIN, passwort: ADMIN_PW });
+    await wechsleZuAdmin(page);
     await planRaeumen(page);
   }
 });

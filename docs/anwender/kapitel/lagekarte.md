@@ -389,8 +389,8 @@ in einem früheren Lagestand fehlt sie.
 
 Zonen, Zeichen, Gefahrengebiete, Schäden, Lagemeldungen, Kartenbilder und die übrigen Objekte der
 Karte hält die App für die Arbeit ohne Netz vor (Kapitel [Arbeiten ohne Netz](ohne-netz.md)).
-Ausgenommen sind die Bereitstellungsräume und die Tiere: nach einem Neuladen ohne Netz fehlen
-sie auf der Karte.
+Das gilt auch für die Bereitstellungsräume. Ausgenommen sind die Tiere: nach einem Neuladen ohne
+Netz fehlen sie auf der Karte.
 
 Die Kartengrundlage ist davon getrennt: Eine Online-Karte holt der Server aus dem Internet,
 „Offline“ zeigt eine Karte, die auf dem Server selbst liegt, und kommt ohne Internet aus. Ist eine

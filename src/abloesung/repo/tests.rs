@@ -3139,6 +3139,11 @@ async fn besatzungswechsel_tauscht_das_personal_und_die_einheit_bleibt() {
     let f = &v.folgeschichten[0];
     assert_eq!(f.einheit_id, w.f1, "dieselbe Einheit");
     assert_eq!(f.vorgaenger_id, Some(l.schicht));
+    assert_eq!(
+        f.beginn_quelle,
+        BeginnQuelle::Vollzug,
+        "die Folgeschicht des Besatzungswechsels (LLH-1312)"
+    );
     assert_eq!(f.beginn_at, jetzt);
     assert_eq!(f.faellig_at, "2026-09-22 21:40:00");
     assert_eq!(
@@ -3879,4 +3884,140 @@ fn vollzug_inhalt_bleibt_in_der_grenze() {
             "{kopf} 4 weitere ablösende Einheiten aus Bereitstellungsräumen ausgerückt.{verbleib}"
         )
     );
+}
+
+// ── Herkunft des Beginns (LLH-1312) ─────────────────────────────────────────────────────────
+
+/// Ändert nur den Beginn einer Schicht.
+async fn beginn_aendern(w: &Welt, id: i64, beginn_at: &str) {
+    aendern(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &AenderungEingabe {
+            beginn_at: Some(beginn_at.into()),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+}
+
+/// Spec „Herkunft des Beginns“: von Hand ist `hand`, auch wenn der Beginn das übernommene
+/// Eintreffen ist (begonnen hat sie ein Mensch).
+#[tokio::test]
+async fn von_hand_begonnen_traegt_hand_auch_mit_dem_eintreffen_als_beginn() {
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    assert_eq!(a.beginn_quelle, BeginnQuelle::Hand);
+
+    eintreffen(&w, w.f2, "2026-09-22 06:40:00").await;
+    let (b, _) = beginnen(
+        &w.pool,
+        w.e,
+        w.b,
+        &BeginnEingabe {
+            einheit_id: w.f2,
+            beginn_at: None,
+            rhythmus_minuten: Some(360),
+        },
+        "2026-09-22 09:00:00",
+    )
+    .await
+    .unwrap();
+    assert_eq!(b.beginn_at, "2026-09-22 06:40:00");
+    assert_eq!(b.beginn_quelle, BeginnQuelle::Hand);
+}
+
+/// Spec „Herkunft des Beginns“, Szenarien „Autostart“ und „Beginn korrigiert“: der Autostart
+/// trägt `eintreffen`; der Rhythmus ändert das nicht, ein geänderter Beginn macht `hand` daraus.
+#[tokio::test]
+async fn autostart_traegt_eintreffen_bis_der_beginn_geaendert_wird() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let s = schichten(&w, w.f2).await;
+    assert_eq!(s[0].beginn_quelle, BeginnQuelle::Eintreffen);
+
+    aendern(
+        &w.pool,
+        w.e,
+        s[0].id,
+        w.b,
+        &AenderungEingabe {
+            rhythmus_minuten: Some(Some(480)),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        schichten(&w, w.f2).await[0].beginn_quelle,
+        BeginnQuelle::Eintreffen,
+        "der Rhythmus ändert die Herkunft nicht"
+    );
+
+    beginn_aendern(&w, s[0].id, "2030-06-03 08:30:00").await;
+    assert_eq!(
+        schichten(&w, w.f2).await[0].beginn_quelle,
+        BeginnQuelle::Hand,
+        "ein korrigierter Beginn ist nicht mehr das Eintreffen"
+    );
+}
+
+/// Spec „Herkunft des Beginns“, Szenario „Folgeschicht“: die neue Folgeschicht trägt `vollzug`,
+/// auch mit geändertem Beginn; die Rücknahme räumt sie samt Herkunft.
+#[tokio::test]
+async fn folgeschicht_traegt_vollzug_auch_mit_geaendertem_beginn() {
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, _) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+    let f = v.folgeschicht.expect("Folgeschicht");
+    assert_eq!(f.beginn_quelle, BeginnQuelle::Vollzug);
+    assert_eq!(
+        v.abgeloest.beginn_quelle,
+        BeginnQuelle::Hand,
+        "der Vorgänger bleibt"
+    );
+
+    beginn_aendern(&w, f.id, "2026-09-22 15:50:00").await;
+    let f = laden(&w.pool, w.e, f.id, jetzt).await.unwrap();
+    assert_eq!(f.beginn_quelle, BeginnQuelle::Vollzug);
+}
+
+/// Eine beim Vollzug übernommene Schicht lief schon vorher: sie behält ihre Herkunft, auch über
+/// die Rücknahme.
+#[tokio::test]
+async fn uebernommene_schicht_behaelt_ihre_herkunft() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let eigene = schichten(&w, w.f2).await.remove(0);
+    assert_eq!(eigene.beginn_quelle, BeginnQuelle::Eintreffen);
+
+    let jetzt = "2030-06-03 15:40:00";
+    let (v, _, _) = vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+    let f = v.folgeschicht.expect("übernommen");
+    assert_eq!(f.id, eigene.id);
+    assert!(f.uebernommen_bei_vollzug);
+    assert_eq!(f.beginn_quelle, BeginnQuelle::Eintreffen);
+
+    zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+    let geloest = laden(&w.pool, w.e, eigene.id, jetzt).await.unwrap();
+    assert_eq!(geloest.beginn_quelle, BeginnQuelle::Eintreffen);
 }

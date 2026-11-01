@@ -1496,6 +1496,35 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     expect(within(box).queryByText('Noch keine Einträge im Einsatztagebuch.')).toBeNull();
   });
 
+  it('kennzeichnet einen berichtigten Eintrag und springt auf die jüngste Berichtigung (LLH-1321)', async () => {
+    mockEndpunkte({
+      etb: [
+        etb(1, {
+          von: 'Deichwache Nord',
+          berichtigt_durch: [
+            { id: 1002, lfd_nr: 2 },
+            { id: 1003, lfd_nr: 3 },
+          ],
+        }),
+        etb(2, { typ: 'berichtigung', berichtigt_eintrag_id: 1001 }),
+        etb(3, { typ: 'berichtigung', berichtigt_eintrag_id: 1001 }),
+      ],
+    });
+    render();
+    const box = paneel('Jüngste ETB-Einträge');
+    await waitFor(() => expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(3));
+    const berichtigt = box.querySelector('li[data-lfd-nr="1"]') as HTMLElement;
+    expect(within(berichtigt).getByText('berichtigt')).toBeInTheDocument();
+    expect(berichtigt).toHaveTextContent('Deichwache Nord');
+    const sprung = within(berichtigt).getByRole('link', { name: '→ Nr. 3' });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=1003');
+    // Die Berichtigungen selbst sind nicht überholt.
+    const neu = box.querySelector('li[data-lfd-nr="3"]') as HTMLElement;
+    expect(within(neu).queryByText('berichtigt')).toBeNull();
+    await userEvent.click(sprung);
+    expect(await screen.findByText('ETB-MODUL')).toBeInTheDocument();
+  });
+
   it('„ETB" im Kopf führt ins Einsatztagebuch', async () => {
     mockEndpunkte({ etb: [etb(1)] });
     render();

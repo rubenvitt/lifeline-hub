@@ -1269,6 +1269,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // LLH-1308 (0260): Verbleib der abgelösten Einheit beim Vollzug.
             retain("verbleib", G_ENUM),
             retain("verbleib_br_id", G_FK),
+            // LLH-1312 (0262): wie die Schicht begann.
+            retain("beginn_quelle", G_ENUM),
         ],
     },
     // Ablöser einer Schicht (LLH-1122, Mig 0212; Vollzug ab LLH-1132): nur Verweise und Zeit.

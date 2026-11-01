@@ -1017,6 +1017,16 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
     expect(ausgeblendet.some((b) => b.id === 'ansicht:kommunikationsplan')).toBe(true);
   });
 
+  it('bietet „Ohne Schicht“ nur an, wenn auch die Einheiten frei sind (LLH-1312)', () => {
+    const ohneEinheiten = ansichten(
+      kontext({ freigaben: freigabenFixture({ einheiten: { zugriff: false } }) }),
+    );
+    expect(ohneEinheiten.some((b) => b.id === 'ansicht:ohne-schicht')).toBe(false);
+    // Gegenprobe: die übrigen Marken der Kräfte bleiben.
+    expect(ohneEinheiten.some((b) => b.id === 'ansicht:fms-tableau')).toBe(true);
+    expect(ansichten(kontext()).some((b) => b.id === 'ansicht:ohne-schicht')).toBe(true);
+  });
+
   it('fehlt ohne Einsatz und solange die Freigaben laden', () => {
     expect(ansichten(kontext({ einsatzId: null }))).toEqual([]);
     expect(ansichten(kontext({ freigaben: undefined }))).toEqual([]);

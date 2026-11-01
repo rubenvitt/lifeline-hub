@@ -443,6 +443,52 @@ describe('3.4 Bilanz', () => {
     expect(vermerke(abschnitt(leer, 'bilanz', 'Schäden'))).toEqual([KEINE_EINTRAEGE]);
   });
 
+  it('Schäden nach Gefahr und Schadensgrad nur mit Angabe, in fester Reihenfolge (LLH-1342)', () => {
+    const schaden = (teil: Partial<Schaden>) =>
+      ({ id: 1, status: 'offen', ausmass: 'gross', typ: 'sachschaden', ...teil }) as Schaden;
+    const b = verdichteEinsatzbericht(
+      rohBericht({
+        schaeden: daten([
+          schaden({ gefahrenart: 'elektrizitaet', schadensgrad: 'zerstoert' }),
+          schaden({ gefahrenart: 'brand', schadensgrad: 'zerstoert' }),
+          schaden({ gefahrenart: 'elektrizitaet' }),
+          schaden({ schadensgrad: 'angeschlagen' }),
+          schaden({}),
+        ]),
+      }),
+      konv,
+    );
+    const a = abschnitt(b, 'bilanz', 'Schäden');
+    const gruppe = (titel: string) => {
+      const g = a.inhalt.find((i) => i.art === 'zeilen' && i.titel === titel);
+      if (!g || g.art !== 'zeilen') throw new Error(`Gruppe ${titel} fehlt`);
+      return g.zeilen.map((z) => [z.etikett, z.wert]);
+    };
+    expect(gruppe('Nach Gefahr')).toEqual([
+      ['Brand', '1'],
+      ['Elektrizität', '2'],
+    ]);
+    expect(gruppe('Nach Schadensgrad')).toEqual([
+      ['Angeschlagen', '1'],
+      ['Total zerstört', '2'],
+    ]);
+  });
+
+  it('Schäden ohne Gefahr und Schadensgrad: keine leere Gruppe (LLH-1342)', () => {
+    const b = verdichteEinsatzbericht(
+      rohBericht({
+        schaeden: daten([
+          { id: 1, status: 'offen', ausmass: 'gering', typ: 'sachschaden', gefahrenart: null },
+        ] as unknown as Schaden[]),
+      }),
+      konv,
+    );
+    const titel = abschnitt(b, 'bilanz', 'Schäden').inhalt.flatMap((i) =>
+      i.art === 'zeilen' && i.titel ? [i.titel] : [],
+    );
+    expect(titel).toEqual(['Nach Status', 'Nach Ausmaß']);
+  });
+
   it('Evakuierung aus den Bezirken, Betreuung aus den Stellen; je Modul ein Vermerk (LLH-1034)', () => {
     const b = verdichteEinsatzbericht(
       rohBericht({

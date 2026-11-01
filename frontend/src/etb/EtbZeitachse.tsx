@@ -38,6 +38,8 @@ import { etbPfad } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
 import { IconPfeilHoch } from '../icons';
 import EtbAnhaenge from './EtbAnhaenge';
+import BerichtigtMarke from './BerichtigtMarke';
+import { berichtigtDurch } from './berichtigung';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import EtbDokumente, { type EtbDokument } from './EtbDokumente';
 import { scrollNachOben, useWeitGerollt } from './nachOben';
@@ -176,14 +178,6 @@ function vonAn(von?: string | null, an?: string | null, begriff?: string): React
 function veranlassungGetroffen(veranlassung: string | null | undefined, begriff?: string): boolean {
   if (!begriff || !veranlassung) return false;
   return fundstellenIn(veranlassung, suchphrasen(begriff)).length > 0;
-}
-
-/**
- * Die Berichtigungen eines Eintrags aus dem Wire, jüngste zuerst (LLH-1099). Fehlt das Feld (ein
- * Stand im Gerätespeicher von vor LFH-689), gilt: keine bekannt.
- */
-function berichtigtDurch(e: EtbEintragAnzeige): EtbEintragAnzeige['berichtigt_durch'] {
-  return [...(e.berichtigt_durch ?? [])].sort((a, b) => b.lfd_nr - a.lfd_nr);
 }
 
 /** „1 Anhang" / „n Anhänge" an einer gepufferten Zeile (LFH-117); ohne Anhang nichts. */
@@ -811,31 +805,17 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
 
   /*
    * Kopfzeile eines gesendeten Eintrags: Von → An, bei einem berichtigten Eintrag davor die Marke
-   * „berichtigt“ und der Sprung auf die jüngste Berichtigung (LLH-1099, Spec
+   * „berichtigt“ und der Sprung auf die jüngste Berichtigung (`BerichtigtMarke`, LLH-1099, Spec
    * `etb-zeitachse-darstellung`, „Berichtigt unabhängig vom Fenster“). Gelesen wird das Wire-Feld
    * `berichtigt_durch` — der Server liefert es unabhängig von Seite und Filter (Spec
    * `etb-berichtigung`); aus dem Fenster gebildet fehlte es genau unter dem Typfilter, unter dem
    * man die falsche Meldung liest. Der Text bleibt, wie er ist: der Eintrag ist ein Beleg.
    */
   function kopfMeta(e: EtbEintragAnzeige): ReactNode {
-    const seiten = vonAn(e.von, e.an, fundstellen);
-    const juengste = berichtigtDurch(e)[0];
-    if (!juengste) return seiten;
     return (
-      <span
-        style={{
-          display: 'inline-flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: token.marginXS,
-        }}
-      >
-        <StatusChip ton="achtung" wort="berichtigt" />
-        <Link to={etbPfad(einsatzId, { eintrag: juengste.id })} style={verweisStil(token)}>
-          → Nr. {juengste.lfd_nr}
-        </Link>
-        {seiten}
-      </span>
+      <BerichtigtMarke einsatzId={einsatzId} eintrag={e}>
+        {vonAn(e.von, e.an, fundstellen)}
+      </BerichtigtMarke>
     );
   }
 

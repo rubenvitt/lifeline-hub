@@ -1012,6 +1012,32 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
     );
   });
 
+  it('wiederhergestellter Stand ohne Server (LLH-1318): Räume bleiben, die Quelle steht im Ausfall', async () => {
+    handler({}, () => HttpResponse.error());
+    // Der wiederhergestellte Stand (LFH-723): ein eigener Client, sonst räumt `gcTime: 0` ihn ab.
+    const quelle = new QueryClient();
+    quelle.setQueryData(['einsatz-br', 5], [RAUM, UNVERORTET]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    hydrate(client, dehydrate(quelle));
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await waitFor(() =>
+      expect(result.current.fehlerhafteQuellen).toEqual(['Bereitstellungsräume']),
+    );
+    // „Ein Fehler mit Daten ist ein Stand“ (`offline/AGENTS.md`): der letzte Stand bleibt sichtbar.
+    expect(result.current.alleVerortet.find((m) => m.typ === 'bereitstellungsraum')).toMatchObject({
+      schluessel: 'bereitstellungsraum-31',
+    });
+    expect(result.current.nichtVerortetAlle).toContainEqual({
+      typ: 'bereitstellungsraum',
+      id: 32,
+      label: 'BR Nord',
+    });
+  });
+
   it('Historien-Modus: Räume kommen aus dem Dokument, kein Live-Request', async () => {
     const z = handler({}, () => HttpResponse.json([]));
     const doc = dokument('keine');

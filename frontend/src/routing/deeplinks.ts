@@ -331,9 +331,34 @@ export function dokumentePfad(einsatzId: number, opts: { neu?: boolean } = {}): 
  * Ablösungs-Modul: Schichten und fällige Ablösungen je Einheit. `?schicht=` springt zu einer
  * Schicht (LLH-1131 Teil II): die Seite wählt ihre Ansicht, rollt sie ins Bild und hebt sie kurz
  * hervor. Gebaut wie der Pfad in `src/benachrichtigung/text.rs` (Bezüge der Ablösung).
+ * `?ansicht=` ist ZUSTAND wie bei {@link funkplanPfad} (LLH-1312): er bleibt in der Adresse,
+ * damit Browser-Zurück und Lesezeichen die Ansicht treffen; „laufend“ steht ohne Parameter.
  */
-export function abloesungPfad(einsatzId: number, opts: { schicht?: number } = {}): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'abloesung'), { schicht: opts.schicht });
+export function abloesungPfad(
+  einsatzId: number,
+  opts: { schicht?: number; ansicht?: AbloesungAnsicht } = {},
+): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'abloesung'), {
+    schicht: opts.schicht,
+    ansicht: opts.ansicht === 'laufend' ? undefined : opts.ansicht,
+  });
+}
+
+/** Ansichten der Seite Ablösung (LLH-1128, LLH-1312). */
+export type AbloesungAnsicht = 'laufend' | 'ohne-schicht' | 'vergangen';
+
+const ABLOESUNG_ANSICHT_ERLAUBT: Record<AbloesungAnsicht, true> = {
+  laufend: true,
+  'ohne-schicht': true,
+  vergangen: true,
+};
+
+/** Umkehr von {@link abloesungPfad}: ein unbekannter Wert wird GANZ verworfen. */
+export function parseAbloesungAnsicht(params: URLSearchParams): AbloesungAnsicht | undefined {
+  const ansicht = params.get('ansicht');
+  return ansicht && Object.prototype.hasOwnProperty.call(ABLOESUNG_ANSICHT_ERLAUBT, ansicht)
+    ? (ansicht as AbloesungAnsicht)
+    : undefined;
 }
 
 /** Verpflegungs-Modul: Zeitfenster mit Bedarf, Ausgaben und Deckung. */

@@ -52,6 +52,7 @@ import {
   FUNKTIONSROLLE,
   KOERPER,
   STAERKE,
+  ZUSATZ,
   fassungen,
   organisation,
   verbinde,
@@ -182,7 +183,7 @@ const EINHEIT: Record<string, Teil> = {
 // das freistehende Gegenstück nennen.
 // Mehrdeutige Symbole sind bildtreu übersetzt, also wie das Altpaket sie zeichnete.
 type SymbolNutzlast =
-  | { faehigkeit: CapabilityId }
+  | { faehigkeit: CapabilityId; zusatz?: string }
   | { zustand: StateId }
   | { tendenz: TendencyId }
   | { marke: TechnicalBodyMarkId; frei?: AnySpec }
@@ -269,9 +270,16 @@ const SYMBOL: Record<string, SymbolNutzlast> = {
   // Bildtreu 4.1.1 (ABC-Schutz), auch in der Gefahr.
   abc: { faehigkeit: 'cbrn-protection' },
   dekontamination: { faehigkeit: 'decontamination' },
-  // Näherung: der Zusatz P/G wäre eine Beschriftung, die eine Spec nicht trägt (D3).
-  'dekontamination-personen': { faehigkeit: 'decontamination' },
-  'dekontamination-geraete': { faehigkeit: 'decontamination' },
+  // „P“/„G“ als Lauf an der Marke (`ZUSATZ`, LLH-1338). Näherung freistehend: das Piktogramm 4.1.3
+  // trägt keinen Lauf.
+  'dekontamination-personen': {
+    faehigkeit: 'decontamination',
+    zusatz: ZUSATZ['dekontamination-personen'],
+  },
+  'dekontamination-geraete': {
+    faehigkeit: 'decontamination',
+    zusatz: ZUSATZ['dekontamination-geraete'],
+  },
   // Bildtreu: zwei Wellenlinien wie in 4.7.1.
   wasser: { faehigkeit: 'water-hazard-control' },
   wasserfahrzeug: { koerper: { kind: 'vehicle-water' } },
@@ -463,7 +471,13 @@ function symbolFrei(n: SymbolNutzlast): AnySpec | null {
 
 /** Die gleichwertigen Fassungen eines Symbols im Grundzeichen, oder `null`, wenn es entfällt. */
 function symbolImKoerper(n: SymbolNutzlast): Teil[] | null {
-  if ('faehigkeit' in n) return [{ bodyMarks: [n.faehigkeit] }, { capabilities: [n.faehigkeit] }];
+  if ('faehigkeit' in n) {
+    // Ein Zusatz steht nur an der Marke, nicht in der Box (s. `ZUSATZ`).
+    const randbuendig: Teil = n.zusatz
+      ? { bodyMarks: [n.faehigkeit], labels: { center: n.zusatz } }
+      : { bodyMarks: [n.faehigkeit] };
+    return [randbuendig, { capabilities: [n.faehigkeit] }];
+  }
   if ('zustand' in n) return [{ states: [n.zustand] }];
   if ('tendenz' in n) return [{ tendency: n.tendenz }];
   if ('marke' in n) return [{ bodyMarks: [n.marke] }];
@@ -510,7 +524,14 @@ function ausAltspalten(e: FreiesZeichenEingabe, verloren: boolean): FreiesZeiche
   const funktionId = nimm('funktion', e.funktion);
   const rolle = eigen(FUNKTIONSROLLE, funktionId);
 
+  // Zwei verschiedene Zusätze an derselben Marke (Fachaufgabe „G“, Symbol „P“): es steht nur
+  // einer im Bild, der Lauf des Symbols überstimmt den der Fachaufgabe.
+  const fachZusatz = eigen(ZUSATZ, fachaufgabe);
+  const symbolZusatz = nutzlast && 'zusatz' in nutzlast ? nutzlast.zusatz : undefined;
+  const zusatzKonflikt = !!fachZusatz && !!symbolZusatz && fachZusatz !== symbolZusatz;
+
   const ohneNachfolger =
+    zusatzKonflikt ||
     (orgId !== undefined && org.organization === undefined) ||
     (einheitId !== undefined && !staerke) ||
     (fachaufgabe !== undefined && fach.length === 0) ||

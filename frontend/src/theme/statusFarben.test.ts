@@ -684,11 +684,11 @@ describe('hochwasserKlasse (LFH-77)', () => {
 describe('ETB-Typfarben als Kante + Typwort (Neuentwurf, 21.09.2026)', () => {
   const TYPEN = ['meldung', 'anordnung', 'entscheidung', 'lage', 'berichtigung', 'system'] as const;
 
-  it('pinnt die Entwurfskanten im Nachtmodus als Literale (Entscheidung 2)', () => {
+  it('pinnt die Nachtkanten als Literale (Entwurf, Entscheidung aufgehellt: LLH-1320)', () => {
     expect(TYPEN.map((t) => sf.etbTypFarbe(t, dunkelToken).kante)).toEqual([
       '#1677ff',
       '#d46b08',
-      '#722ed1',
+      '#8f4be3',
       '#13c2c2',
       '#cf1322',
       farbenDunkel.schwach,

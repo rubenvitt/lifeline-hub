@@ -142,9 +142,15 @@ const ROUTEN = [
   { name: 'Betroffene', modul: 'personen', inhalt: 'Offlineprobe' },
   { name: 'Aufträge', modul: 'auftraege', inhalt: 'Offline-Probe Auftrag' },
   { name: 'Lagekarte', modul: 'lagekarte', inhalt: null },
+  // Liste der Bereitstellungsräume (LLH-1318); die Seite eines Raums bleibt draußen.
+  {
+    name: 'Bereitstellungsräume',
+    modul: 'bereitstellungsraeume/liste',
+    inhalt: 'Offline-Probe BR',
+  },
 ] as const;
 
-/** Die Prefixe, die nach dem Besuch aller fünf Seiten mindestens auf der Platte liegen. */
+/** Die Prefixe, die nach dem Besuch aller Seiten mindestens auf der Platte liegen. */
 const ERWARTETE_PREFIXE = [
   'einsatz',
   'etb',
@@ -152,13 +158,14 @@ const ERWARTETE_PREFIXE = [
   'einsatz-personen',
   'einsatz-auftraege',
   'einsatz-zonen',
+  'einsatz-br',
 ];
 
 test.describe('Lagebild ohne Netz (LFH-723)', () => {
   test.skip(bundleFehlt, 'Prod-Bundle fehlt (frontend/dist/sw.js) — vorher `pnpm build`');
   test.skip(!lauf, 'LIFELINE_E2E_LAUF fehlt — Backend-Port unbekannt');
 
-  test('nach dem Neuladen ohne Netz zeigen die fünf Seiten ihren letzten Stand, gekennzeichnet', async ({
+  test('nach dem Neuladen ohne Netz zeigen die Seiten ihren letzten Stand, gekennzeichnet', async ({
     page,
   }) => {
     test.setTimeout(240_000);
@@ -187,6 +194,7 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
       auftrag_text: 'Offline-Probe Auftrag',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'S3' }],
     });
+    await post(page, `${basis}/bereitstellungsraeume`, { bezeichnung: 'Offline-Probe BR' });
 
     // (1) Online: jede Seite einmal wirklich laden und ihren Datenstand merken — per Navigation
     //     INNERHALB der App, wie im Betrieb. Ein `page.goto` je Seite lüde jedes Mal das ganze

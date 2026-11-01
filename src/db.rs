@@ -11569,6 +11569,89 @@ mod tests {
             .expect("der Einsatz fällt samt Raum und Belegung");
     }
 
+    /// LLH-1312 (Change `lki8td7v-schicht-herkunft-ohne-schicht`, design.md D1): der Bestand
+    /// trägt `hand`, nur eine Folgeschicht, die nicht übernommen wurde, wird `vollzug`; die
+    /// Spalte nimmt nur die drei Werte.
+    #[tokio::test]
+    async fn migration_0262_beginn_quelle() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 262;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let mut einheiten = Vec::new();
+        for name in ["Florian 1", "Florian 2", "Florian 3"] {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+            )
+            .bind(e)
+            .bind(name)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            einheiten.push(id);
+        }
+        let schicht =
+            |einheit: i64, status: &'static str, vorgaenger: Option<i64>, uebernommen: bool| {
+                let pool = pool.clone();
+                async move {
+                    sqlx::query_scalar::<_, i64>(
+                        "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, \
+                        rhythmus_minuten, rhythmus_quelle, faellig_at, angelegt_von_id, status, \
+                        vorgaenger_id, uebernommen_bei_vollzug) \
+                     VALUES (?, ?, '2026-11-01 06:00:00', 360, 'einheit', \
+                        '2026-11-01 12:00:00', ?, ?, ?, ?) RETURNING id",
+                    )
+                    .bind(e)
+                    .bind(einheit)
+                    .bind(b)
+                    .bind(status)
+                    .bind(vorgaenger)
+                    .bind(uebernommen)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+                }
+            };
+        let erste = schicht(einheiten[0], "abgeloest", None, false).await;
+        let folge = schicht(einheiten[1], "laufend", Some(erste), false).await;
+        let uebernommen = schicht(einheiten[2], "laufend", Some(erste), true).await;
+        migriere_bis(&pool, VERSION).await;
+
+        let quelle = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, String>(
+                    "SELECT beginn_quelle FROM einsatz_abloesung WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(quelle(erste).await, "hand", "ohne Vorgänger: von Hand");
+        assert_eq!(quelle(folge).await, "vollzug", "die Folgeschicht");
+        assert_eq!(
+            quelle(uebernommen).await,
+            "hand",
+            "eine übernommene Schicht lief schon vorher"
+        );
+        sqlx::query("UPDATE einsatz_abloesung SET beginn_quelle = 'automatisch' WHERE id = ?")
+            .bind(erste)
+            .execute(&pool)
+            .await
+            .expect_err("nur die drei Werte");
+        sqlx::query("UPDATE einsatz_abloesung SET beginn_quelle = 'eintreffen' WHERE id = ?")
+            .bind(erste)
+            .execute(&pool)
+            .await
+            .expect("eintreffen");
+    }
+
     /// LLH-1445 (Change `o659va5r-nachforderung-herkunft`, design.md D1): der Bestand gilt als
     /// nicht am Raum verknüpft (0), der Schalter nimmt nur 0 und 1.
     #[tokio::test]
@@ -11740,15 +11823,15 @@ mod tests {
         assert_eq!(rest, 0, "die Zeilen fallen weiter mit dem Einsatz");
     }
 
-    // --- LLH-1313: Schichtmodell an der Einsatz-Vorlage (0262) ---
+    // --- LLH-1313: Schichtmodell an der Einsatz-Vorlage (0263) ---
 
     /// LLH-1313 (Change `ktc297tx-schichtmodell-je-vorlage`, design.md D2/D3): der Bestand
     /// bleibt ohne Modell; der Verweis hält das Modell fest (kein ON DELETE), damit das Entfernen
     /// der Demo-Daten ein benutztes Modell stehen lässt, und der Teilindex ist da.
     #[tokio::test]
-    async fn migration_0262_einsatz_vorlage_schichtmodell() {
+    async fn migration_0263_einsatz_vorlage_schichtmodell() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 262;
+        const VERSION: i64 = 263;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
