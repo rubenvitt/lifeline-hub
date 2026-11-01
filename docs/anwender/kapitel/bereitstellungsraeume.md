@@ -265,7 +265,7 @@ ist; ein aufgelöster Raum ist nur zu lesen.
 Fahrzeuge einer Einheit werden nicht einzeln zugewiesen, sondern über ihre Einheit. Wird ein
 Fahrzeug, das ohne Einheit im Raum steht, einer Einheit zugeordnet, tritt es aus dem Raum aus und
 steht danach nur noch bei seiner Einheit; ein abgerufenes Fahrzeug erst nach dem Ausrücken oder
-dem Zurücknehmen des Abrufs. Eine Kraft steht höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten ausgetragen. Die Stärke
+dem Zurücknehmen des Abrufs. Eine Kraft steht höchstens in einem Raum; soll sie in einen anderen, wird sie über „In anderen BR verlegen …“ verlegt. Die Stärke
 rechnet unterstellte Einheiten mit ein und zählt keine doppelt.
 
 „Erwartet“ und „Im Einsatz“ trennen nach dem Abschnitt: eine Einheit ohne eigenen Abschnitt zählt

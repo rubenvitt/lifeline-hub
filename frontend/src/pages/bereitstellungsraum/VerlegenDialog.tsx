@@ -15,6 +15,8 @@ export interface VerlegenZiel {
   name: string;
 }
 
+const RAUM_WEG = 'Raum nicht mehr in Betrieb';
+
 interface VerlegenWerte {
   ziel_br_id?: number;
 }
@@ -86,8 +88,14 @@ export default function VerlegenDialog({
       speicherFehlerTitel="Nicht verlegt"
       speicherFehlerFallback="Verlegen fehlgeschlagen"
       onErfassen={async (w) => {
+        if (!ziel) return;
         const raum = raeume.find((r) => r.id === w.ziel_br_id);
-        if (!ziel || !raum) return;
+        // Der gewählte Raum ging während der Wahl außer Betrieb (Live-Liste): nichts senden, der
+        // Dialog bleibt offen und nennt den Grund am Feld.
+        if (!raum) {
+          form.setFields([{ name: 'ziel_br_id', errors: [RAUM_WEG] }]);
+          throw new Error(RAUM_WEG);
+        }
         await mutation.mutateAsync({ kraft: ziel, raum });
       }}
       onFertig={onClose}
