@@ -11370,9 +11370,9 @@ mod tests {
     /// Verbleib `ruhe`, der Raum steht nur beim Verbleib `bereitstellungsraum`, und die Buchungen
     /// eines Vollzugs fallen mit der Schicht und mit dem Einsatz.
     #[tokio::test]
-    async fn migration_0260_verbleib_und_buchungen() {
+    async fn migration_0261_verbleib_und_buchungen() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 260;
+        const VERSION: i64 = 261;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
