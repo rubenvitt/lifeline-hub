@@ -1,16 +1,13 @@
-import { Button, Card, InputNumber, Space, Switch, Typography } from 'antd';
+import { Button, Card, Space, Switch, Typography } from 'antd';
 import { Select } from '../../components/Select';
 import { monoStil, useRollen } from '../../components/instrument';
-import { KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
+import RadiusEingabe from '../../components/RadiusEingabe';
 import type { ZoneTyp } from '../../api/types';
 import EscKappe from './EscKappe';
 import { bandStil } from './KartenFuss';
 import { radiusGueltig, type GeoPunkt } from './geo';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel } from './zonenStil';
 import './lagekarte.css';
-
-/** Schnellwahl des Radius in Metern (LLH-1043): Erstabsperrung bis Evakuierungsradius. */
-export const KREIS_SCHNELLWAHL = [50, 100, 300, 500, 1000] as const;
 
 /** Die Zonenarten, die ein Kreis sein können — jede mit Fläche (nicht die Absperrgrenze). */
 export const KREIS_TYPEN = ZONE_TYPEN.filter((t) => t.geometrie !== 'LineString');
@@ -41,6 +38,11 @@ interface KreisSteuerungProps {
    * Auswahl), „Übernehmen“ braucht eine Änderung, und Esc beendet nur ohne Änderung.
    */
   bearbeiten?: { geaendert: boolean };
+  /**
+   * Der Kreis ist die Fläche dieses Evakuierungsbezirks (LLH-1346, Auftrag mit `bezirk=`): die Art
+   * steht fest, der Kopf nennt den Bezirk wie das Band einer gezeichneten Fläche.
+   */
+  bezirk?: string;
 }
 
 /**
@@ -91,8 +93,10 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
     >
       <Space orientation="vertical" size={8} style={{ width: '100%' }}>
         <div style={zeile}>
-          <Typography.Text strong>Kreis</Typography.Text>
-          {bearbeiten ? (
+          <Typography.Text strong>
+            {props.bezirk != null ? `Bezirk ${props.bezirk} · Kreis` : 'Kreis'}
+          </Typography.Text>
+          {props.bezirk != null ? null : bearbeiten ? (
             <Typography.Text>{zoneTypLabel(props.typ)}</Typography.Text>
           ) : (
             <Select<ZoneTyp>
@@ -124,33 +128,14 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
           )}
         </div>
         <div style={zeile} data-lfh="kreis-radius">
-          <InputNumber<number>
-            aria-label="Radius in Metern"
+          <RadiusEingabe
             value={props.radiusM}
-            min={1}
-            max={KREIS_RADIUS_M_MAX}
-            precision={0}
+            onChange={props.onRadius}
             disabled={sperre}
-            suffix="m"
-            inputMode="numeric"
-            style={{ width: 132, ...monoStil(token.fontSize) }}
-            onChange={(v) => props.onRadius(typeof v === 'number' ? v : null)}
             onPressEnter={() => {
               if (bereit && !sperre) props.onUebernehmen();
             }}
           />
-          {KREIS_SCHNELLWAHL.map((r) => (
-            <Button
-              key={r}
-              disabled={sperre}
-              aria-pressed={props.radiusM === r}
-              type={props.radiusM === r ? 'primary' : 'default'}
-              ghost={props.radiusM === r}
-              onClick={() => props.onRadius(r)}
-            >
-              {r} m
-            </Button>
-          ))}
         </div>
         {props.onSerieWechsel && (
           <Space>
