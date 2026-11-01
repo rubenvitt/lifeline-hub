@@ -405,9 +405,11 @@ export const paletteMaske = 'rgba(5, 6, 8, 0.72)';
  * Zwei Werte je Typ, weil Kante (Dekoration) und Wort (Text) verschiedene Böden haben. Nachts
  * trägt die Kante den Entwurfswert, das Wort ist aufgehellt (auf `flaeche2` ≥ 5,90). Am Tag sind
  * die Wörter ≥ 7 : 1 auf `grund` gerechnet, denn dort steht die Zeitachse, nicht auf Weiß; die
- * Kanten ≥ 3 : 1. Nachts liegt die Entscheidungskante bei 2,87 : 1, das Typwort trägt die
- * Aussage. `system` zeigt auf die Textstufen. Gleiche Hexwerte wie in anderen Paletten sind
- * keine Kopplung.
+ * Kanten ≥ 3 : 1. Nachts gilt dasselbe für jede Kante auf `grund` und `flaeche2`: die
+ * Entscheidungskante ist dafür aufgehellt (`#722ed1` lag bei 2,87 bzw. 2,59 : 1, `#8f4be3` hält
+ * 4,06 bzw. 3,67 : 1) und bleibt mit ΔE ≥ 30 von jeder anderen Typfarbe getrennt (LLH-1320,
+ * `theme/etbTypKanteKontrast.test.ts`). Die Kante ist Zusatzkanal, das Typwort trägt die Aussage.
+ * `system` zeigt auf die Textstufen. Gleiche Hexwerte wie in anderen Paletten sind keine Kopplung.
  */
 export type EtbTypTon =
   'meldung' | 'anordnung' | 'entscheidung' | 'lage' | 'berichtigung' | 'system';
@@ -422,7 +424,7 @@ export interface EtbTypFarbe {
 export const etbTypFarbenDunkel: Record<EtbTypTon, EtbTypFarbe> = {
   meldung: { kante: '#1677ff', wort: '#5c9dff' },
   anordnung: { kante: '#d46b08', wort: '#e8852a' },
-  entscheidung: { kante: '#722ed1', wort: '#a57ff0' },
+  entscheidung: { kante: '#8f4be3', wort: '#a57ff0' },
   lage: { kante: '#13c2c2', wort: '#13c2c2' },
   berichtigung: { kante: '#cf1322', wort: farbenDunkel.alarm },
   system: { kante: farbenDunkel.schwach, wort: farbenDunkel.gedaempft },

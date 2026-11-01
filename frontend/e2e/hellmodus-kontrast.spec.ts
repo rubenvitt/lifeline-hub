@@ -1,10 +1,26 @@
-import { expect, test, type Page } from '@playwright/test';
-import { kontrast, pruefe } from './kontrast-kern';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { flaeche, kontrast, pruefe, randKontrast, verhaeltnis } from './kontrast-kern';
 
-// Browsermessung des Tagmodus: ETB-Typwörter, Zeilentönungen, der leise Systemeintrag, die Lückenmarke der Betroffenen
-// und die Augenbraue (Tertiärtext `schwach`, LFH-643) auf `grund`, `paneel` und `flaeche`.
+// Browsermessung des Tagmodus: ETB-Typwörter und -kanten (LLH-1320), Zeilentönungen, der leise
+// Systemeintrag, die Lückenmarke der Betroffenen und die Augenbraue (Tertiärtext `schwach`,
+// LFH-643) auf `grund`, `paneel` und `flaeche`.
 // Böden aus Kriterium 5 als Literale: Tag ≥ 7, Nacht ≥ 5.
 const ZIEL = { light: 7, dark: 5 } as const;
+// Die Typkante ist ein grafisches Element (WCAG 1.4.11): ≥ 3 : 1 in beiden Modi (LLH-1320).
+const KANTE = 3;
+
+/**
+ * Die 2-px-Typkante der Zeitachse (`data-lfh="typkante"`) ist eine deckende Fläche: ihre Farbe
+ * ist die komponierte Fläche der Kante selbst, ihr Grund die Fläche der Zeile, in der sie steht.
+ */
+async function pruefeKante(kante: Locator, name: string) {
+  await expect(kante, name).toBeVisible();
+  await expect(async () => {
+    const [farbe, grund] = await Promise.all([flaeche(kante), flaeche(kante.locator('..'))]);
+    const v = verhaeltnis(farbe, grund);
+    expect(v, `${name}: ${JSON.stringify({ farbe, grund })}`).toBeGreaterThanOrEqual(KANTE);
+  }).toPass({ timeout: 10_000 });
+}
 
 async function anmelden(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -60,7 +76,31 @@ for (const modus of ['light', 'dark'] as const) {
         .locator(`[data-lfh-eintrag="zeitachse"][data-typ="${typ}"] [data-lfh="typwort"]`)
         .first();
       await pruefe(wort, ZIEL[modus], `${modus}/ETB/${typ}/Typwort`);
+      const kante = page
+        .locator(`[data-lfh-eintrag="zeitachse"][data-typ="${typ}"] [data-lfh="typkante"]`)
+        .first();
+      await pruefeKante(kante, `${modus}/ETB/${typ}/Typkante`);
     }
+    // Die Erfassungszeile trägt die Kante des Typs, den sie gerade schreibt (LLH-1112): vorn
+    // 2 px gegen die Zeile selbst und gegen die Leiste, auf der sie steht (LLH-1320).
+    await page.getByPlaceholder('Inhalt …').fill('/entscheidung Messung Kante');
+    await expect(
+      page.getByRole('button', { name: 'Eintragstyp Entscheidung ändern' }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    const zeile = page.locator('.lfh-schnellerfassung[data-rahmen-farbe]');
+    await expect(zeile).toHaveCount(1);
+    await expect(async () => {
+      const rand = await randKontrast(zeile, 'left');
+      const name = `${modus}/ETB/Erfassungszeile/Kante Entscheidung`;
+      expect(rand.gegenInnen, `${name} innen: ${JSON.stringify(rand)}`).toBeGreaterThanOrEqual(
+        KANTE,
+      );
+      expect(rand.gegenAussen, `${name} außen: ${JSON.stringify(rand)}`).toBeGreaterThanOrEqual(
+        KANTE,
+      );
+    }).toPass({ timeout: 10_000 });
+    await page.getByPlaceholder('Inhalt …').fill('');
     const berichtigung = page.locator(
       '[data-lfh-eintrag="zeitachse"][data-toenung="berichtigung"]',
     );
