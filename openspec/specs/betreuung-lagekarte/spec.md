@@ -236,12 +236,19 @@ Räumungszustand und den Stand „evakuiert N von M“ zeigen und einen Sprung i
 anbieten, der die Detailseite des Bezirks öffnet. Die Beschriftung einer zugeordneten Zone auf der
 Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
-Vom Bezirk zur Fläche (LLH-1069): Der Dialog „Evakuierungsbezirk anlegen“ MUST sichtbar die Wahl
-„Gebiet auf der Lagekarte“ mit „Keins“ und „Fläche zeichnen“ tragen; Vorgabe ist „Fläche zeichnen“,
-wenn die Person die Lagekarte nutzen darf, sonst „Keins“, und „Fläche zeichnen“ MUST dann gesperrt
-mit sichtbarem Grund stehen. Mit „Fläche zeichnen“ MUST die Oberfläche nach erfolgreichem Anlegen die
-Lagekarte mit `zeichnen=evakuierungsbezirk&bezirk=<bezirk-id>` öffnen; mit „Keins“ MUST sie auf der
-Evakuierungsseite bleiben. Die Evakuierungsseite MUST jedem Bezirk für Personen mit Schreibrecht im
+Vom Bezirk zur Fläche (LLH-1069, LLH-1346): Der Dialog „Evakuierungsbezirk anlegen“ MUST sichtbar
+die Wahl „Gebiet auf der Lagekarte“ mit „Keins“, „Fläche zeichnen“ und „Radius“ tragen; Vorgabe ist
+„Fläche zeichnen“, wenn die Person die Lagekarte nutzen darf, sonst „Keins“, und „Fläche zeichnen“
+und „Radius“ MUST dann gesperrt mit sichtbarem Grund stehen. Mit „Fläche zeichnen“ MUST die
+Oberfläche nach erfolgreichem Anlegen die Lagekarte mit `zeichnen=evakuierungsbezirk&bezirk=<bezirk-id>`
+öffnen; mit „Keins“ MUST sie auf der Evakuierungsseite bleiben. „Radius“ MUST einen Radius in Metern
+verlangen, als Zahl und mit der Schnellwahl der Lagekarte (50, 100, 300, 500, 1000 m); nach
+erfolgreichem Anlegen MUST die Oberfläche die Lagekarte mit
+`zeichnen=evakuierungsbezirk:kreis&radius=<m>&mitte=<einsatzort>&bezirk=<bezirk-id>` öffnen. Ist der
+Einsatzort nicht verortet, MUST `mitte` fehlen und die Mitte auf der Karte gesetzt werden. Die Karte
+MUST den Kreis für diesen Bezirk vorbelegen, ohne wählbare Art und mit „Bezirk <Bezeichnung> · Kreis“
+im Kopf; erst „Übernehmen“ MUST die Kreisfläche in EINER Anlage mit Bezeichnung, Zuordnung und Radius
+anlegen, und ihre Beschriftung MUST den Radius nennen („… · r = 500 m“). Die Evakuierungsseite MUST jedem Bezirk für Personen mit Schreibrecht im
 Menü „Gebiet zeichnen“ (ohne Fläche) bzw. „Weitere Teilfläche zeichnen“ (mit Fläche) anbieten, die
 Detailseite dasselbe im Gebiet; beide führen auf dieselbe Adresse. Die Karte MUST für diesen Auftrag
 den Zeichenmodus einer Fläche vom Typ Evakuierungsbezirk betreten und die neue Zone in EINER Anlage
@@ -276,6 +283,18 @@ Kennzahl „Evakuiert“ und die Lagekennzahl MUST davon unberührt bleiben.
 - **WHEN** eine Person mit Schreibrecht den Bezirk „Deichweg 1–9“ mit „Fläche zeichnen“ anlegt, auf der Karte eine Fläche zeichnet und speichert
 - **THEN** trägt die neue Zone die Zuordnung zu „Deichweg 1–9“ und dessen Bezeichnung, der Bezirk hat eine Fläche, und die Karte bietet „Zurück zu Bezirk Deichweg 1–9“ an
 
+#### Scenario: Bezirk mit Radius anlegen
+- **WHEN** eine Person mit Schreibrecht den Bezirk „Deichweg 1–9“ in einem Einsatz mit verortetem Einsatzort mit „Radius“ und „500 m“ anlegt und auf der Karte „Übernehmen“ wählt
+- **THEN** steht eine Kreisfläche mit Radius 500 m um den Einsatzort, sie trägt die Zuordnung zu „Deichweg 1–9“ und dessen Bezeichnung, ihre Beschriftung nennt „r = 500 m“, und die Karte bietet „Zurück zu Bezirk Deichweg 1–9“ an
+
+#### Scenario: Radius ohne verorteten Einsatzort
+- **WHEN** der Bezirk mit „Radius“ angelegt wird und der Einsatzort keine Koordinate hat
+- **THEN** öffnet die Karte den Kreis mit dem gewählten Radius ohne Mitte, und es entsteht keine Zone, bevor die Mitte gesetzt und „Übernehmen“ gewählt ist
+
+#### Scenario: Radius ohne Angabe
+- **WHEN** „Radius“ gewählt und ohne Radius „Anlegen“ gewählt wird
+- **THEN** entsteht kein Bezirk, und das Feld nennt „Bitte einen Radius angeben“
+
 #### Scenario: Bezirk ohne Gebiet anlegen
 - **WHEN** der Bezirk mit „Keins“ angelegt wird
 - **THEN** bleibt die Evakuierungsseite stehen, und es entsteht keine Zone
@@ -298,7 +317,7 @@ Kennzahl „Evakuiert“ und die Lagekennzahl MUST davon unberührt bleiben.
 
 #### Scenario: Lagekarte gesperrt beim Anlegen
 - **WHEN** eine Person die Lagekarte nicht nutzen darf und den Dialog „Evakuierungsbezirk anlegen“ öffnet
-- **THEN** ist „Keins“ gewählt und „Fläche zeichnen“ gesperrt mit Grund
+- **THEN** ist „Keins“ gewählt, und „Fläche zeichnen“ und „Radius“ sind gesperrt mit Grund
 
 ### Requirement: Lage-Snapshot und Schwärzung
 

@@ -548,6 +548,35 @@ describe('EvakuierungPage (LLH-1034)', () => {
     expect(await screen.findByText('Evakuierungsbezirk Deichweg 1–9 angelegt')).toBeInTheDocument();
   });
 
+  it('Bezirk anlegen mit „Radius“ 500 m: danach auf die Karte, Kreis um den Einsatzort mit Bezug (LLH-1346)', async () => {
+    einsatz.wert = {
+      ...einsatz.wert,
+      einsatzort_lat: 54.1,
+      einsatzort_lon: 9.5,
+    } as typeof einsatz.wert;
+    api.legeBezirkAn.mockResolvedValue(bezirk({ id: 11, bezeichnung: 'Deichweg 1–9' }));
+    renderPage();
+    await screen.findByText('Uferstraße 12–40');
+    await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
+    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg 1–9');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Radius' }));
+    await userEvent.click(await within(dialog).findByRole('button', { name: '500 m' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    // Nur die Stammdaten gehen an den Server; der Kreis ist der nächste Schritt auf der Karte.
+    await waitFor(() =>
+      expect(api.legeBezirkAn).toHaveBeenCalledWith(1, {
+        bezeichnung: 'Deichweg 1–9',
+        plan_personen: 120,
+        plan_erhebung: 'geschaetzt',
+      }),
+    );
+    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
+      '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk%3Akreis&radius=500&mitte=54.1%2C9.5&bezirk=11',
+    );
+  });
+
   it('abgelehntes Anlegen mit „Fläche zeichnen“: kein Sprung, der Dialog bleibt mit dem Grund (LLH-1069)', async () => {
     api.legeBezirkAn.mockRejectedValue(new ApiError(409, 'Bezeichnung schon vergeben'));
     renderPage();
