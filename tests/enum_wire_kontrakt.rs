@@ -1080,7 +1080,7 @@ fn abloesung_art_und_besatzung_rolle_wire() {
 }
 
 /// LLH-1308: Verbleib der abgelösten Einheit (DB-CHECK `verbleib` in
-/// `migrations/0260_abloesung_verbleib.sql`).
+/// `migrations/0261_abloesung_verbleib.sql`).
 #[test]
 fn abloesung_verbleib_wire() {
     enum_wire!(lifeline_hub::abloesung::AbloesungVerbleib {
