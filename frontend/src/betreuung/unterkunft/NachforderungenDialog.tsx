@@ -1,6 +1,6 @@
 import { Alert, Checkbox, Modal, Space, Typography } from 'antd';
 import { useState, type CSSProperties } from 'react';
-import { fehlerText } from '../../api/client';
+import { AusgangUnbekannt, fehlerText } from '../../api/client';
 import { legeNachforderungAn } from '../../api/nachforderungen';
 import type {
   AdressatKategorie,
@@ -25,7 +25,8 @@ interface Zeile extends Posten {
 
 export interface Lauf {
   angelegt: string[];
-  gescheitert: { art: string; fehler: string }[];
+  /** `unbekannt`: Anfrage angekommen, Antwort ausgeblieben; die Nachforderung kann schon stehen. */
+  gescheitert: { art: string; fehler: string; unbekannt?: boolean }[];
 }
 
 /**
@@ -52,7 +53,11 @@ export async function legePostenAn(
       });
       lauf.angelegt.push(p.art);
     } catch (e) {
-      lauf.gescheitert.push({ art: p.art, fehler: fehlerText(e, 'nicht angelegt') });
+      lauf.gescheitert.push({
+        art: p.art,
+        fehler: fehlerText(e, 'nicht angelegt'),
+        ...(e instanceof AusgangUnbekannt ? { unbekannt: true } : {}),
+      });
     }
   }
   return lauf;
@@ -61,7 +66,8 @@ export async function legePostenAn(
 /**
  * Dialog „Nachforderungen anlegen“ aus dem Ergebnis des Rechners: Posten mit Anzahl, Adressat
  * und Priorität gemeinsam. Nach einem Lauf mit Fehlern bleibt er offen; angelegte Posten stehen
- * als angelegt, gescheiterte bleiben angehakt mit Grund.
+ * als angelegt, gescheiterte bleiben angehakt mit Grund. Ohne Antwort (Ausgang unbekannt) wird
+ * der Posten abgehakt, damit ein zweiter Lauf ihn nicht doppelt anlegt.
  */
 export default function NachforderungenDialog({
   einsatzId,
@@ -99,14 +105,19 @@ export default function NachforderungenDialog({
       prioritaet,
     });
     setLaeuft(false);
-    const fehlerJe = new Map(lauf.gescheitert.map((g) => [g.art, g.fehler]));
+    const fehlerJe = new Map(lauf.gescheitert.map((g) => [g.art, g]));
     const angelegt = new Set(lauf.angelegt);
     setZeilen((alt) =>
       alt.map((z) =>
         angelegt.has(z.art)
           ? { ...z, an: false, angelegt: true, fehler: undefined }
           : fehlerJe.has(z.art)
-            ? { ...z, fehler: fehlerJe.get(z.art) }
+            ? // Bei unbekanntem Ausgang abgehakt: ein zweiter Lauf legte sonst doppelt an.
+              {
+                ...z,
+                fehler: fehlerJe.get(z.art)!.fehler,
+                an: z.an && !fehlerJe.get(z.art)!.unbekannt,
+              }
             : z,
       ),
     );

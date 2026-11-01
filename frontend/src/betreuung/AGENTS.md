@@ -65,9 +65,9 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Prüfkette 403 (vor dem Lesen) → 404 → 409, geschlossen erlaubt; der Storno der Stelle löst den
   Bezug in seiner Transaktion (`stelle_stornieren_tx`). Kein „Bedarf melden“ auf dem Gerät.
 - **Unterkunftsrechner** (LLH-1520, Spec `unterkunftsrechner`, `pages/UnterkunftPlanenPage.tsx`,
-  `betreuung/unterkunft/`): rechnet im Browser (`rechnerKern.ts`), Rust hat denselben Kern für die
-  API (LLH-1524). **Eine Fallsammlung** `tests/fixtures/unterkunft/faelle.json` prüft beide; wer
-  rechnet, ändert sie mit. **Eine Basis** `src/unterkunft/richtwerte_basis.json` (Wert, Grenzen,
+  `betreuung/unterkunft/`): rechnet nur im Browser (`rechnerKern.ts`); der Rust-Kern der
+  Rechner-API folgt mit LLH-1524. **Eine Fallsammlung** `tests/fixtures/unterkunft/faelle.json`
+  prüft den Kern (ab LLH-1524 beide); wer rechnet, ändert sie mit. **Eine Basis** `src/unterkunft/richtwerte_basis.json` (Wert, Grenzen,
   Herkunft `belegt`/`annahme`, Quelle), Rust per `include_str!`, die Oberfläche per Import;
   `richtwerte.guard.test.ts` hält Kern und Basis deckungsgleich. Wirksam ist Einsatz vor
   Organisation vor Basis (`org_unterkunft_richtwert`, `einsatz_unterkunft_richtwert`, `null`

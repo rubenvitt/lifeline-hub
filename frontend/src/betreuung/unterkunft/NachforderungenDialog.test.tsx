@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../../api/client';
+import { ApiError, AusgangUnbekannt } from '../../api/client';
 import type { NeueNachforderung } from '../../api/types';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
@@ -51,6 +51,20 @@ describe('legePostenAn', () => {
       },
       expect.objectContaining({ art: 'Decken', anzahl: 100 }),
       expect.objectContaining({ art: 'Wasser', anzahl: 1250, bezeichnung: 'Liter je Tag' }),
+    ]);
+  });
+
+  it('merkt einen unbekannten Ausgang gesondert: die Nachforderung kann schon stehen', async () => {
+    const lauf = await legePostenAn(
+      1,
+      8,
+      POSTEN.slice(0, 1),
+      { adressat_kategorie: 'leitstelle', prioritaet: 'normal' },
+      () => Promise.reject(new AusgangUnbekannt()),
+    );
+    expect(lauf.angelegt).toEqual([]);
+    expect(lauf.gescheitert).toEqual([
+      { art: 'Feldbetten', fehler: new AusgangUnbekannt().message, unbekannt: true },
     ]);
   });
 });
