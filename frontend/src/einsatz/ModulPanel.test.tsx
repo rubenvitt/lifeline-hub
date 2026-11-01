@@ -473,7 +473,7 @@ describe('ModulListe — Sprungmarke mit weiterem Modul (LLH-1312)', () => {
     nach: 'abloesung',
     hinweis: 'Ablösung · Ohne Schicht',
     schlagworte: [],
-    braucht: ['einheiten'],
+    braucht: 'einheiten',
     pfad: () => '/einsaetze/1/abloesung?ansicht=ohne-schicht',
   };
   const kraefte: ModulEintrag[] = [
@@ -491,7 +491,7 @@ describe('ModulListe — Sprungmarke mit weiterem Modul (LLH-1312)', () => {
       />,
     );
 
-  it('ist gesperrt, wenn ein Modul aus `braucht` gesperrt ist, auch bei freiem Ziel', () => {
+  it('ist gesperrt, wenn das Modul aus `braucht` gesperrt ist, auch bei freiem Ziel', () => {
     zeige(freigabenFixture({ einheiten: { zugriff: false } }));
     const sprung = screen.getByRole('button', { name: /Ohne Schicht/ });
     expect(sprung).toBeDisabled();

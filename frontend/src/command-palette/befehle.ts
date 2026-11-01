@@ -434,7 +434,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     }
 
     // 3b. Ansichten (LLH-1127): die Sprungmarken des Modulmenüs, dieselbe Tabelle. Angeboten nur,
-    //     wenn das Zielmodul und jedes Modul aus `braucht` frei ist (LESEACHSE wie in 2. und 3.);
+    //     wenn das Zielmodul und das Modul aus `braucht` frei sind (LESEACHSE wie in 2. und 3.);
     //     eine gesperrte Marke steht im
     //     Menü mit Schloss, hier gar nicht. Nicht im Modul-Gedächtnis: eine Marke ist kein Modul.
     for (const marke of sprungmarken) {

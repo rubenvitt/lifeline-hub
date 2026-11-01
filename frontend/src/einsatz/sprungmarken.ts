@@ -56,10 +56,11 @@ export interface Sprungmarke {
   /** Suchworte für die Sprungpalette; das Menü zeigt sie nicht. */
   schlagworte: string[];
   /**
-   * Weitere Module (Registry-Schlüssel), ohne deren Daten die Ansicht nicht steht. Ist eines nicht
-   * frei, ist die Marke gesperrt wie bei gesperrtem Zielmodul (LLH-1312).
+   * Weiteres Modul (Registry-Schlüssel), ohne dessen Daten die Ansicht nicht steht. Ist es nicht
+   * frei, ist die Marke gesperrt wie bei gesperrtem Zielmodul (LLH-1312). Ein einzelner Schlüssel
+   * statt einer Liste: ein String-Array sähe für `queryKeys.guard` wie ein Query-Key aus.
    */
-  braucht?: string[];
+  braucht?: string;
   pfad: (einsatzId: number) => string;
 }
 
@@ -193,7 +194,7 @@ export const sprungmarken: Sprungmarke[] = [
     nach: 'abloesung',
     hinweis: 'Ablösung · Ohne Schicht',
     schlagworte: ['ohne schicht', 'schicht beginnen', 'anlaufphase', 'eingetroffen'],
-    braucht: ['einheiten'],
+    braucht: 'einheiten',
     pfad: (einsatzId) => abloesungPfad(einsatzId, { ansicht: 'ohne-schicht' }),
   },
   ...stabMarken(),
@@ -216,7 +217,7 @@ export function sprungZiel(
 }
 
 /**
- * Sperrt ein Modul aus `braucht` die Marke? Erst mit bekannten Freigaben, wie `istModulGesperrt`:
+ * Sperrt das Modul aus `braucht` die Marke? Erst mit bekannten Freigaben, wie `istModulGesperrt`:
  * beim Laden flackerte das Menü sonst. Die Sprungpalette prüft das Zielmodul ohnehin mit
  * `istModulFreigegeben`, das bei Unbekanntem zu bleibt.
  */
@@ -225,11 +226,9 @@ export function sprungVoraussetzungGesperrt(
   freigaben?: ModulFreigaben,
   register: ModulEintrag[] = modulRegistry,
 ): boolean {
-  if (freigaben == null) return false;
-  return (marke.braucht ?? []).some((key) => {
-    const modul = register.find((m) => m.key === key);
-    return !modul || !istModulFreigegeben(modul, freigaben);
-  });
+  if (freigaben == null || marke.braucht == null) return false;
+  const modul = register.find((m) => m.key === marke.braucht);
+  return !modul || !istModulFreigegeben(modul, freigaben);
 }
 
 type NavZeile = { art: 'modul'; modul: ModulEintrag } | { art: 'sprung'; marke: Sprungmarke };
