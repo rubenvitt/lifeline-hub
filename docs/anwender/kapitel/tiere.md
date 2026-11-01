@@ -134,9 +134,6 @@ Ein abgeschlossenes oder storniertes Tier verschwindet von der Karte; verorten l
 offenes oder vermisstes Tier. Der Fundort als Text bleibt neben der Koordinate stehen. Das
 Verorten schreibt keinen Eintrag ins Einsatztagebuch.
 
-Für ein Tier ohne Zustand kennen die taktischen Zeichen nach DV 102 kein eigenes Zeichen, deshalb
-steht das Tier als Kreis auf der Karte.
-
 ### Einsatztagebuch
 
 Das Einsatztagebuch führt Tiere nur mit Registriernummer und Spezies, ohne Rufname, Kennzeichnung,
