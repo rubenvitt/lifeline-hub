@@ -18,8 +18,8 @@ use super::{
     AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung, AbloesungBesatzungPlan,
     AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungPlanungEntfallen,
     AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
-    BeendetGrund, BeginnQuelle, BesatzungRolle, BesatzungZiel, PlanungEntfallenGrund, PlanungsStand,
-    RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
+    BeendetGrund, BeginnQuelle, BesatzungRolle, BesatzungZiel, PlanungEntfallenGrund,
+    PlanungsStand, RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
