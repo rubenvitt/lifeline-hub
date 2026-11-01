@@ -4,12 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import {
   ABSCHNITT_DEICH,
+  BS_TURNHALLE,
   GRUPPE_1,
   GRUPPE_2,
   KEINE_EMPFAENGER,
   ZUG,
   ausgabe,
   empfaenger,
+  empfaengerMitBetreuung,
   zeitfenster,
 } from '../test/verpflegungDaten';
 import EmpfaengerStand from './EmpfaengerStand';
@@ -175,5 +177,20 @@ describe('EmpfaengerStand (LLH-1055 Teil II)', () => {
       '1. Gruppe · Florian 1-1 · 9 EP 1140 · anderswo verpflegt · 5 EP · Deich',
       '2. Gruppe · Florian 1-2 · anderswo verpflegt · 40 EP · Deich',
     ]);
+  });
+
+  it('Betreuungsstelle (LLH-1295): eigene Zeile unter „verpflegt“, „Noch nicht verpflegt“ bleibt (AK)', () => {
+    renderMitProviders(
+      <EmpfaengerStand
+        zeitfenster={zeitfenster({
+          ausgaben: [ausgabe({ id: 1, menge: 40, betreuungsstelle_id: BS_TURNHALLE })],
+        })}
+        empfaenger={empfaengerMitBetreuung()}
+        ueberschrift="h2"
+      />,
+    );
+    expect(zeilen('stand-betreuung')).toEqual(['Turnhalle Nord · 40 EP 1140']);
+    expect(screen.getByRole('heading', { name: 'Noch nicht verpflegt · 3' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Verpflegt · 0' })).toBeVisible();
   });
 });

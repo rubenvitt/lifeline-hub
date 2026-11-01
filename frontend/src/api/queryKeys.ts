@@ -354,8 +354,9 @@ export const EINSATZ_STREAM_EVENTS = {
   abloesung: [EINSATZ_KEYS.abloesungen, EINSATZ_KEYS.kraefteZeitachse],
   // Stellen und ihre Meldereihen unter EINEM Prefix, damit ein Ereignis Übersicht und Kopfzahl
   // trifft. Nutzlast nur Kennungen. Den Modulzähler rechnet der Client aus der Übersicht
-  // (`ClientZaehlerQuelle`), er hängt am selben Prefix.
-  betreuung: [EINSATZ_KEYS.betreuung],
+  // (`ClientZaehlerQuelle`), er hängt am selben Prefix. Dazu die Verpflegung (LLH-1295): ihre
+  // Empfängerliste trägt die Betreuungsstellen, und ein Storno löst den Bezug von Ausgaben.
+  betreuung: [EINSATZ_KEYS.betreuung, EINSATZ_KEYS.verpflegung],
   // Bezirke und ihre Standreihen (LLH-1034), wie `betreuung`. Die Kennzahl „Evakuiert“ und der
   // Modulzähler lesen dieselbe Übersicht.
   evakuierung: [EINSATZ_KEYS.evakuierung],

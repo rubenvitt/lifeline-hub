@@ -307,8 +307,10 @@ zusätzlich als ETB-Ereignis verteilt werden. Neue Zeitfenster anderer Personen 
 Liste nicht unter dem Cursor verschieben, sondern als Sammelhinweis erscheinen. Die Ereignisse
 `einheit` und `abschnitt` MUST zusätzlich alle verbundenen Clients erreichen, die das Modul
 Verpflegung lesen dürfen, weil die Empfängerliste Einheiten und Abschnitte zeigt; der Client
-MUST darauf die Verpflegung neu laden. Das Ereignis `personal` MUST Leser der Verpflegung nicht
-deswegen erreichen.
+MUST darauf die Verpflegung neu laden. Ebenso MUST das Ereignis `betreuung` alle verbundenen
+Clients erreichen, die das Modul Verpflegung lesen dürfen, weil die Empfängerliste
+Betreuungsstellen zeigt (LLH-1295); der Client MUST darauf die Verpflegung neu laden. Das Ereignis
+`personal` MUST Leser der Verpflegung nicht deswegen erreichen.
 
 #### Scenario: Zweiter Client sieht die Ausgabe
 - **WHEN** Client A eine Ausgabe erfasst, während Client B die Verpflegungsseite desselben Einsatzes geöffnet hat
@@ -325,6 +327,10 @@ deswegen erreichen.
 #### Scenario: Einheit geändert, Leser nur der Verpflegung
 - **WHEN** eine Einheit gebildet, umgehängt oder aufgelöst wird und ein verbundener Benutzer nur die Module Verpflegung, nicht aber Einheiten oder Lagekarte lesen darf
 - **THEN** erhält er das Ereignis `einheit` und lädt die Verpflegung neu
+
+#### Scenario: Betreuungsstelle angelegt, Leser nur der Verpflegung
+- **WHEN** eine Betreuungsstelle angelegt, geändert, geschlossen oder storniert wird und ein verbundener Benutzer nur das Modul Verpflegung, nicht aber Betreuung lesen darf
+- **THEN** erhält er das Ereignis `betreuung` und lädt die Verpflegung neu
 
 #### Scenario: Personal geändert, Leser nur der Verpflegung
 - **WHEN** die Position einer disponierten Person geändert wird und ein verbundener Benutzer nur das Modul Verpflegung lesen darf
@@ -715,18 +721,24 @@ Ein Zeitfenster ohne Art MUST sich wie bisher verhalten.
 ### Requirement: Empfänger einer Ausgabe
 
 Eine Ausgabe SHALL optional genau einen Empfänger tragen: eine Einheit desselben Einsatzes
-(Abholung) oder einen Abschnitt desselben Einsatzes (Zuführung). Personen MUST NOT Empfänger sein.
-Eine Ausgabe MUST vom Empfänger nur die Kennung tragen. Nennt eine Ausgabe Einheit und Abschnitt
-zugleich, MUST das System mit 422 antworten. Eine Einheit oder ein Abschnitt eines anderen
-Einsatzes oder eine unbekannte Kennung MUST mit 404 abgelehnt werden. Ist die Einheit aufgelöst,
+(Abholung), einen Abschnitt desselben Einsatzes (Zuführung) oder eine Betreuungsstelle desselben
+Einsatzes (Ausgabe an Betreute, LLH-1295). Personen MUST NOT Empfänger sein.
+Eine Ausgabe MUST vom Empfänger nur die Kennung tragen. Nennt eine Ausgabe mehr als einen
+Empfänger, MUST das System mit 422 antworten. Eine Einheit, ein Abschnitt oder eine
+Betreuungsstelle eines anderen Einsatzes, eine stornierte Betreuungsstelle oder eine unbekannte
+Kennung MUST mit 404 abgelehnt werden. Ist die Einheit aufgelöst,
 MUST das System die Ausgabe mit 409 ablehnen, wenn ihr Zeitpunkt nicht vor der Auflösung liegt;
-eine Ausgabe mit früherem Zeitpunkt MUST angenommen werden. Die Prüfung des Empfängers MUST nach
+eine Ausgabe mit früherem Zeitpunkt MUST angenommen werden. Eine Betreuungsstelle MUST in jedem
+Status außer storniert angenommen werden, auch geschlossen. Die Prüfung des Empfängers MUST nach
 dem Replay über `client_id` und nach der Prüfung auf einen aktiven Einsatz laufen; ein Replay
 MUST die gespeicherte Ausgabe ohne diese Prüfung liefern. Eine Ausgabe mit Empfänger MUST wie
 jede Ausgabe keinen ETB-Eintrag schreiben. Eine Ausgabe ohne Empfänger MUST weiter angenommen
 werden; so bucht die Ausgabeansicht eine gezählte Sammlung (Requirement „Ausgabe zählen“) und
 das Formular „Ausgabe nachtragen“ eine Ausgabe, solange sie keinen Empfänger nennen. Eine als
 eine Ausgabe gebuchte Sammlung trägt damit höchstens einen Empfänger für alle ihre Portionen.
+Wird eine Betreuungsstelle storniert, MUST das System im selben Vorgang den Bezug ihrer Ausgaben
+lösen; die Ausgaben MUST mit Menge und Zeitpunkt bestehen bleiben und weiter in die ausgegebene
+Menge zählen.
 
 #### Scenario: Abholung durch eine Einheit
 - **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 9 EP an die Einheit „2. Gruppe“ erfasst wird
@@ -773,19 +785,44 @@ eine Ausgabe gebuchte Sammlung trägt damit höchstens einen Empfänger für all
 - **WHEN** in der Ausgabeansicht von „Mittag“ eine Sammlung von 20 Portionen ohne Empfänger gebucht wird
 - **THEN** ist genau eine Ausgabe über 20 EP ohne Empfänger gespeichert und zählt in die ausgegebene Menge des Zeitfensters
 
+#### Scenario: Ausgabe an eine Betreuungsstelle
+- **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 40 EP an die Betreuungsstelle „Turnhalle Nord“ erfasst wird
+- **THEN** trägt die Ausgabe die Kennung der Stelle und zählt in die ausgegebene Menge des Zeitfensters
+- **AND** das ETB erhält keinen neuen Eintrag
+
+#### Scenario: Einheit und Betreuungsstelle zugleich
+- **WHEN** eine Ausgabe die Einheit „2. Gruppe“ und die Betreuungsstelle „Turnhalle Nord“ zugleich nennt
+- **THEN** antwortet das System mit 422 und legt nichts an
+
+#### Scenario: Betreuungsstelle eines anderen Einsatzes
+- **WHEN** eine Ausgabe eine Betreuungsstelle eines anderen Einsatzes, eine stornierte oder eine unbekannte Betreuungsstelle nennt
+- **THEN** antwortet das System mit 404 und legt nichts an
+
+#### Scenario: Geschlossene Betreuungsstelle
+- **WHEN** die Betreuungsstelle „Turnhalle Nord“ geschlossen ist und eine Ausgabe an sie nachgetragen wird
+- **THEN** speichert das System die Ausgabe an die Stelle
+
+#### Scenario: Betreuungsstelle storniert
+- **WHEN** die Betreuungsstelle „Turnhalle Nord“ storniert wird, an die eine Ausgabe von 40 EP ging
+- **THEN** bleibt die Ausgabe mit Menge und Zeitpunkt bestehen und zählt weiter in die ausgegebene Menge, nur ohne Empfänger
+
 ### Requirement: Empfängerliste der Verpflegung
 
 Die Antwort des Verpflegungsmoduls SHALL eine Empfängerliste enthalten: alle nicht aufgelösten
 Einheiten des Einsatzes mit Name, Funkrufname, Über-Einheit, Abschnitt, eigener und kumulierter
 Ist-Stärke und dem Zeitpunkt des Eintreffens, dazu die aufgelösten Einheiten, auf die eine Ausgabe
-verweist, und alle Abschnitte mit Name und Über-Abschnitt. Die Stärken MUST aus derselben Rechnung
-stammen wie in der Einheitenliste. Das Eintreffen MUST das nicht gestrichene Eintreffen der
-jüngsten Einsatzperiode sein und fehlen, wenn es keins gibt. Die Liste MUST NOT Einheitsführer,
-Verbindungen, Bemerkung, Mitglieder, Fahrzeuge oder Material enthalten.
+verweist, alle Abschnitte mit Name und Über-Abschnitt und alle nicht stornierten
+Betreuungsstellen mit Bezeichnung und der Angabe, ob sie geschlossen sind (LLH-1295). Die Stärken
+MUST aus derselben Rechnung stammen wie in der Einheitenliste. Das Eintreffen MUST das nicht
+gestrichene Eintreffen der jüngsten Einsatzperiode sein und fehlen, wenn es keins gibt. Die Liste
+MUST NOT Einheitsführer, Verbindungen, Bemerkung, Mitglieder, Fahrzeuge oder Material enthalten
+und von Betreuungsstellen MUST NOT Leitung, Kontakt, Notiz, Standort, Kapazität oder Belegung
+enthalten.
 Jeder, der die Verpflegung lesen darf, MUST die Liste erhalten, auch ohne Zugriff auf das Modul
-Einheiten; Einheiten- und Abschnittsnamen, Gliederung, Stärke und Eintreffen sind
-Lagebezeichnungen ohne Personenbezug und hier eine bewusste Ausnahme von der Regel, dass das
-Verpflegungsmodul nichts aus anderen Modulen hineinzieht.
+Einheiten oder Betreuung; Einheiten- und Abschnittsnamen, Gliederung, Stärke, Eintreffen und die
+Bezeichnung einer Betreuungsstelle sind Lagebezeichnungen ohne Personenbezug und hier eine
+bewusste Ausnahme von der Regel, dass das Verpflegungsmodul nichts aus anderen Modulen
+hineinzieht.
 
 #### Scenario: Liste mit Gliederung und Stärke
 - **WHEN** der Einsatz den Zug „Florian 1“ (eigene Stärke 1/0/1) mit den Gruppen „1. Gruppe“ (0/1/8) und „2. Gruppe“ (0/1/8) führt und die Verpflegung abgerufen wird
@@ -811,6 +848,19 @@ Verpflegungsmodul nichts aus anderen Modulen hineinzieht.
 #### Scenario: Aufgelöste Einheit mit Ausgabe
 - **WHEN** die Einheit „2. Gruppe“ eine Ausgabe bekommen hat und danach aufgelöst wurde
 - **THEN** steht sie in der Empfängerliste mit ihrem Namen und dem Zeitpunkt der Auflösung
+
+#### Scenario: Betreuungsstellen ohne Personenangaben
+- **WHEN** der Einsatz die Betreuungsstelle „Turnhalle Nord“ mit Leitung, Kontakt und Notiz führt und die Verpflegung abgerufen wird
+- **THEN** enthält die Empfängerliste die Stelle mit Kennung, Bezeichnung und der Angabe, ob sie geschlossen ist, aber weder Leitung noch Kontakt noch Notiz noch Kapazität
+
+#### Scenario: Leser ohne Modul Betreuung
+- **WHEN** eine Person die Verpflegung lesen darf, das Modul Betreuung für sie aber ausgeblendet ist
+- **THEN** erhält sie die Betreuungsstellen in der Empfängerliste
+- **AND** die Betreuungsübersicht des Einsatzes beantwortet das System ihr weiter mit 403
+
+#### Scenario: Stornierte Betreuungsstelle
+- **WHEN** eine Betreuungsstelle storniert ist
+- **THEN** fehlt sie in der Empfängerliste
 
 ### Requirement: Stellen im Modul
 
@@ -1039,21 +1089,25 @@ Empfänger.
 
 ### Requirement: Empfänger wählen
 
-Die Ausgabeansicht SHALL im Kopf eine Empfängerwahl führen, sobald der Einsatz Einheiten oder
-Abschnitte hat: „ohne Empfänger“ als Vorgabe, die nicht aufgelösten Einheiten in der Folge des
-Kräftebaums mit Funkrufname und Ist-Stärke ihres Teilbaums, dann die Abschnitte als
-„Zuführung“. Alle Angaben MUST aus der Empfängerliste der Verpflegung stammen (Requirement
+Die Ausgabeansicht SHALL im Kopf eine Empfängerwahl führen, sobald der Einsatz Einheiten,
+Abschnitte oder nicht geschlossene Betreuungsstellen hat: „ohne Empfänger“ als Vorgabe, die nicht
+aufgelösten Einheiten in der Folge des Kräftebaums mit Funkrufname und Ist-Stärke ihres
+Teilbaums, dann die Abschnitte als „Zuführung“, dann die nicht geschlossenen Betreuungsstellen
+(LLH-1295). Alle Angaben MUST aus der Empfängerliste der Verpflegung stammen (Requirement
 „Empfängerliste der Verpflegung“). Ist eine Einheit mit Stärke gewählt, MUST daneben eine Taste
 „+n“ stehen, die die Ist-Stärke ihres Teilbaums in die Sammlung zählt; „Menge …“ MUST mit
 derselben Zahl vorbelegt sein. Beides MUST überschreibbar sein: „−1“ nimmt Portionen zurück, das
-Feld nimmt eine andere Zahl. Ohne Stärke MUST es weder die Taste noch eine Vorbelegung geben. Die
+Feld nimmt eine andere Zahl. Ohne Stärke und bei einem Abschnitt oder einer Betreuungsstelle MUST
+es weder die Taste noch eine Vorbelegung geben. Die
 Wahl MUST nirgends gemerkt werden; sie gilt bis zum Wechsel des Zeitfensters. Wird die gewählte
-Einheit aufgelöst, MUST die Wahl auf „ohne Empfänger“ fallen. Ohne Schreibrecht und im
-vergangenen Zeitfenster MUST die Wahl gesperrt stehen. Ohne Einheiten und Abschnitte MUST die
-Empfängerwahl fehlen.
+Einheit aufgelöst oder die gewählte Betreuungsstelle geschlossen oder storniert, MUST die Wahl auf
+„ohne Empfänger“ fallen. Ohne Schreibrecht und im
+vergangenen Zeitfenster MUST die Wahl gesperrt stehen. Ohne Einheiten, Abschnitte und nicht
+geschlossene Betreuungsstellen MUST die Empfängerwahl fehlen.
 
 Das Formular „Ausgabe nachtragen“ SHALL dieselbe Wahl als Feld „Empfänger“ führen, dazu die
-aufgelösten Einheiten mit Ausgabe als eigene Gruppe (für Nachträge vor der Auflösung). Wählt
+aufgelösten Einheiten mit Ausgabe als eigene Gruppe (für Nachträge vor der Auflösung) und die
+geschlossenen Betreuungsstellen als Gruppe „geschlossen“. Wählt
 eine Person eine Einheit mit Stärke, MUST das Formular die Menge mit der Ist-Stärke ihres
 Teilbaums vorbelegen, solange die Menge leer ist oder noch die Vorbelegung trägt; eine
 eingetragene Menge MUST stehen bleiben.
@@ -1082,6 +1136,14 @@ eingetragene Menge MUST stehen bleiben.
 - **WHEN** eine Person ohne Schreibrecht die Ausgabeansicht öffnet
 - **THEN** steht die Empfängerwahl gesperrt
 
+#### Scenario: Ausgabe an eine Betreuungsstelle zählen
+- **WHEN** eine Person in der Ausgabeansicht die Betreuungsstelle „Turnhalle Nord“ wählt und 40 Portionen zählt
+- **THEN** wird die Sammlung als Ausgabe über 40 EP an die Stelle gebucht, und neben der Wahl steht keine Stärke-Taste
+
+#### Scenario: Geschlossene Stelle nur im Nachtrag
+- **WHEN** die Betreuungsstelle „Schule Süd“ geschlossen ist
+- **THEN** fehlt sie in der Empfängerwahl der Ausgabeansicht und steht im Formular „Ausgabe nachtragen“ in der Gruppe „geschlossen“
+
 ### Requirement: Noch nicht verpflegt
 
 Die Oberfläche SHALL je Zeitfenster zeigen, welche Einheiten noch nicht verpflegt sind, abgeleitet
@@ -1093,13 +1155,15 @@ eingetroffen. Einheiten ohne Eintreffen MUST die Oberfläche gesondert als „oh
 und MUST NOT sie als im Einsatz oder als abwesend werten. Eine Zuführung an einen Abschnitt MUST
 keine Einheit als verpflegt zählen; die Zeilen der Einheiten in diesem Abschnitt oder darunter
 MUST sie nennen. Eine auf dem Gerät vorgemerkte Ausgabe MUST an ihrer Einheit als „ausstehend“
-stehen und MUST die Einheit nicht aus der Liste nehmen.
+stehen und MUST die Einheit nicht aus der Liste nehmen. Eine Ausgabe an eine Betreuungsstelle
+(LLH-1295) MUST keine Einheit als verpflegt zählen; eine Betreuungsstelle MUST nie unter „Noch
+nicht verpflegt“ stehen.
 
 Die Liste „Noch nicht verpflegt“ MUST je Einheit Name, Funkrufname, Ist-Stärke des Teilbaums
 und Abschnitt (eigener, sonst geerbter) zeigen, in der Folge des Kräftebaums mit eingerückten
 Untereinheiten. Die Liste „Verpflegt“ MUST je Einheit, an die ausgegeben wurde, Menge und Zeit
 jeder Ausgabe zeigen und die Zahl der mitverpflegten Untereinheiten, dazu je Abschnitt die
-Zuführungen mit Menge und Zeit. Die Ausgabeansicht MUST beide Listen zeigen; jede noch nicht
+Zuführungen und je Betreuungsstelle die Ausgaben, jeweils mit Menge und Zeit. Die Ausgabeansicht MUST beide Listen zeigen; jede noch nicht
 verpflegte Zeile MUST dort „Wählen“ tragen, das die Einheit als Empfänger setzt (gesperrt ohne
 Schreibrecht und im vergangenen Zeitfenster). Am Verpflegungsgerät MUST dasselbe gelten, allein
 aus der Empfängerliste. Am an eine Verpflegungsstelle gebundenen Gerät (LLH-1048) MUST eine
@@ -1143,6 +1207,10 @@ Oberfläche nicht ableiten.
 #### Scenario: Einheit wählen
 - **WHEN** eine Person in der Ausgabeansicht an der Zeile der „2. Gruppe“ „Wählen“ tippt
 - **THEN** ist die „2. Gruppe“ als Empfänger gewählt
+
+#### Scenario: Ausgabe an eine Betreuungsstelle
+- **WHEN** zum Zeitfenster „Mittag“ 40 EP an die Betreuungsstelle „Turnhalle Nord“ gingen
+- **THEN** nennt „Verpflegt“ die Stelle mit Menge und Zeit, und „Noch nicht verpflegt“ ist unverändert
 
 ### Requirement: Verpflegungsplan der Organisation
 

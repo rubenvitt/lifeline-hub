@@ -1957,13 +1957,21 @@
               "null"
             ]
           },
+          "betreuungsstelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Empfänger-Betreuungsstelle (LLH-1295, Ausgabe an Betreute) — nur die Kennung; die\nBezeichnung steht in `VerpflegungAnzeige.empfaenger`. Fehlt auch, wenn die Stelle\ninzwischen storniert ist (der Storno löst den Bezug)."
+          },
           "einheit_id": {
             "type": [
               "integer",
               "null"
             ],
             "format": "int64",
-            "description": "Empfänger-Einheit (LLH-1055, Abholung) — nur die Kennung; Name und Gliederung stehen in\n`VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id` und `abschnitt_id`."
+            "description": "Empfänger-Einheit (LLH-1055, Abholung) — nur die Kennung; Name und Gliederung stehen in\n`VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id`, `abschnitt_id` und\n`betreuungsstelle_id`."
           },
           "erfasst_at": {
             "type": "string"
@@ -6770,6 +6778,28 @@
               "integer",
               "null"
             ],
+            "format": "int64"
+          }
+        }
+      },
+      "EmpfaengerBetreuungsstelle": {
+        "type": "object",
+        "description": "Eine Betreuungsstelle der Empfängerliste (LLH-1295, design.md D3): Ziel einer Ausgabe an\nBetreute. Nur Kennung, Bezeichnung und ob sie geschlossen ist; die Feldmenge ist gepinnt\n(`tests/verpflegung.rs`, `ausgabe_an_betreuungsstelle`): keine\nLeitung, kein Kontakt, keine Notiz, kein Standort, keine Kapazität, keine Belegung.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "geschlossen"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "geschlossen": {
+            "type": "boolean",
+            "description": "Geschlossen: nimmt weiter Ausgaben an (Nachtrag), steht aber nicht in der Wahl beim Zählen."
+          },
+          "id": {
+            "type": "integer",
             "format": "int64"
           }
         }
@@ -16521,7 +16551,7 @@
         "properties": {
           "empfaenger": {
             "$ref": "#/components/schemas/VerpflegungEmpfaenger",
-            "description": "Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten und Abschnitte ohne\nPersonenangaben. Keine eigene Leseroute."
+            "description": "Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten, Abschnitte und\nBetreuungsstellen (LLH-1295) ohne Personenangaben. Keine eigene Leseroute."
           },
           "stellen": {
             "type": "array",
@@ -16541,16 +16571,23 @@
       },
       "VerpflegungEmpfaenger": {
         "type": "object",
-        "description": "Empfängerliste der Verpflegung: die nicht aufgelösten Einheiten des Einsatzes (dazu\naufgelöste mit Ausgabe) in der Folge des Kräftebaums und alle Abschnitte.",
+        "description": "Empfängerliste der Verpflegung: die nicht aufgelösten Einheiten des Einsatzes (dazu\naufgelöste mit Ausgabe) in der Folge des Kräftebaums, alle Abschnitte und die nicht\nstornierten Betreuungsstellen nach Bezeichnung.",
         "required": [
           "einheiten",
-          "abschnitte"
+          "abschnitte",
+          "betreuungsstellen"
         ],
         "properties": {
           "abschnitte": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EmpfaengerAbschnitt"
+            }
+          },
+          "betreuungsstellen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmpfaengerBetreuungsstelle"
             }
           },
           "einheiten": {

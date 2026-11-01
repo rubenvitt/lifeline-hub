@@ -739,8 +739,16 @@ export interface components {
             bemerkung?: string | null;
             /**
              * Format: int64
+             * @description Empfänger-Betreuungsstelle (LLH-1295, Ausgabe an Betreute) — nur die Kennung; die
+             *     Bezeichnung steht in `VerpflegungAnzeige.empfaenger`. Fehlt auch, wenn die Stelle
+             *     inzwischen storniert ist (der Storno löst den Bezug).
+             */
+            betreuungsstelle_id?: number | null;
+            /**
+             * Format: int64
              * @description Empfänger-Einheit (LLH-1055, Abholung) — nur die Kennung; Name und Gliederung stehen in
-             *     `VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id` und `abschnitt_id`.
+             *     `VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id`, `abschnitt_id` und
+             *     `betreuungsstelle_id`.
              */
             einheit_id?: number | null;
             erfasst_at: string;
@@ -2680,6 +2688,19 @@ export interface components {
             name: string;
             /** Format: int64 */
             ueber_abschnitt_id?: number | null;
+        };
+        /**
+         * @description Eine Betreuungsstelle der Empfängerliste (LLH-1295, design.md D3): Ziel einer Ausgabe an
+         *     Betreute. Nur Kennung, Bezeichnung und ob sie geschlossen ist; die Feldmenge ist gepinnt
+         *     (`tests/verpflegung.rs`, `ausgabe_an_betreuungsstelle`): keine
+         *     Leitung, kein Kontakt, keine Notiz, kein Standort, keine Kapazität, keine Belegung.
+         */
+        EmpfaengerBetreuungsstelle: {
+            bezeichnung: string;
+            /** @description Geschlossen: nimmt weiter Ausgaben an (Nachtrag), steht aber nicht in der Wahl beim Zählen. */
+            geschlossen: boolean;
+            /** Format: int64 */
+            id: number;
         };
         /** @description Eine Einheit der Empfängerliste. */
         EmpfaengerEinheit: {
@@ -6583,8 +6604,8 @@ export interface components {
         /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
         VerpflegungAnzeige: {
             /**
-             * @description Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten und Abschnitte ohne
-             *     Personenangaben. Keine eigene Leseroute.
+             * @description Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten, Abschnitte und
+             *     Betreuungsstellen (LLH-1295) ohne Personenangaben. Keine eigene Leseroute.
              */
             empfaenger: components["schemas"]["VerpflegungEmpfaenger"];
             /**
@@ -6597,10 +6618,12 @@ export interface components {
         };
         /**
          * @description Empfängerliste der Verpflegung: die nicht aufgelösten Einheiten des Einsatzes (dazu
-         *     aufgelöste mit Ausgabe) in der Folge des Kräftebaums und alle Abschnitte.
+         *     aufgelöste mit Ausgabe) in der Folge des Kräftebaums, alle Abschnitte und die nicht
+         *     stornierten Betreuungsstellen nach Bezeichnung.
          */
         VerpflegungEmpfaenger: {
             abschnitte: components["schemas"]["EmpfaengerAbschnitt"][];
+            betreuungsstellen: components["schemas"]["EmpfaengerBetreuungsstelle"][];
             einheiten: components["schemas"]["EmpfaengerEinheit"][];
         };
         /**

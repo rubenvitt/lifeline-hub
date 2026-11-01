@@ -35,8 +35,9 @@ use super::stelle::{
 };
 use super::{
     deckung, dedupe_stelle_ids, draht_lesen, etb_text, zeitraum_text, AusgabeAnzeige, Bedarf,
-    EmpfaengerAbschnitt, EmpfaengerEinheit, Sonderkost, SonderkostEingabe, VerpflegungAnzeige,
-    VerpflegungEmpfaenger, Verpflegungsart, ZeitfensterAnzeige,
+    EmpfaengerAbschnitt, EmpfaengerBetreuungsstelle, EmpfaengerEinheit, Sonderkost,
+    SonderkostEingabe, VerpflegungAnzeige, VerpflegungEmpfaenger, Verpflegungsart,
+    ZeitfensterAnzeige,
 };
 use crate::error::AppError;
 use crate::routes::support::{
@@ -94,8 +95,11 @@ pub struct AusgabeEingabe {
     pub verpflegungsstelle_id: Option<i64>,
     /// Empfänger-Einheit desselben Einsatzes (LLH-1055 D2); geprüft in der Transaktion.
     pub einheit_id: Option<i64>,
-    /// Empfänger-Abschnitt desselben Einsatzes (LLH-1055 D2); höchstens einer der beiden.
+    /// Empfänger-Abschnitt desselben Einsatzes (LLH-1055 D2).
     pub abschnitt_id: Option<i64>,
+    /// Empfänger-Betreuungsstelle desselben Einsatzes (LLH-1295 D2); von Einheit, Abschnitt und
+    /// Betreuungsstelle höchstens eines.
+    pub betreuungsstelle_id: Option<i64>,
     /// Idempotenzschlüssel der Offline-Queue (LFH-688), von der Route normalisiert.
     pub client_id: Option<String>,
 }
@@ -167,7 +171,7 @@ macro_rules! ausgabe_select {
         "SELECT id, zeitfenster_id, zeitpunkt_at, menge, ort, bemerkung, sk_vegetarisch, \
                 sk_vegan, sk_ohne_schwein, sk_diaet_allergenarm, sk_saeugling_kleinkind, \
                 nachforderung_id, zurueckgenommen_at, erfasst_at, verpflegungsstelle_id, \
-                einheit_id, abschnitt_id \
+                einheit_id, abschnitt_id, betreuungsstelle_id \
          FROM verpflegung_ausgabe "
     };
 }
@@ -320,6 +324,7 @@ struct AusgabeZeile {
     verpflegungsstelle_id: Option<i64>,
     einheit_id: Option<i64>,
     abschnitt_id: Option<i64>,
+    betreuungsstelle_id: Option<i64>,
 }
 
 impl From<AusgabeZeile> for AusgabeAnzeige {
@@ -342,6 +347,7 @@ impl From<AusgabeZeile> for AusgabeAnzeige {
             verpflegungsstelle_id: z.verpflegungsstelle_id,
             einheit_id: z.einheit_id,
             abschnitt_id: z.abschnitt_id,
+            betreuungsstelle_id: z.betreuungsstelle_id,
             zurueckgenommen_at: z.zurueckgenommen_at,
             erfasst_at: z.erfasst_at,
         }
@@ -434,7 +440,8 @@ struct EmpfaengerEinheitZeile {
 
 /// Die Empfängerliste (LLH-1055, design.md D3) in konstant vielen Abfragen: die nicht
 /// aufgelösten Einheiten und die aufgelösten, auf die eine Ausgabe verweist, in der Folge des
-/// Kräftebaums (`sortier`, `id`); alle Abschnitte. Stärken aus
+/// Kräftebaums (`sortier`, `id`); alle Abschnitte; die nicht stornierten Betreuungsstellen nach
+/// Bezeichnung (LLH-1295). Stärken aus
 /// [`crate::einheit::repo::load_staerken_je_einheit`] (dieselbe Rechnung wie `GET …/einheiten`),
 /// Eintreffen aus der juengsten Einsatzperiode der Zeitachse. Liest bewusst keine Spalte mit
 /// Personenbezug (Führer, Erreichbarkeit, Kommunikationsmittel, Bemerkung, Mitglieder).
@@ -469,10 +476,27 @@ pub async fn load_empfaenger(
         ueber_abschnitt_id,
     })
     .collect();
+    // LLH-1295 (design.md D3): nur Kennung, Bezeichnung und Status; Leitung, Kontakt, Notiz,
+    // Standort, Kapazität und Belegung liest die Abfrage bewusst nicht.
+    let betreuungsstellen = sqlx::query_as::<_, (i64, String, String)>(
+        "SELECT id, bezeichnung, status FROM betreuungsstelle \
+         WHERE einsatz_id = ? AND storniert_at IS NULL ORDER BY bezeichnung, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|(id, bezeichnung, status)| EmpfaengerBetreuungsstelle {
+        id,
+        bezeichnung,
+        geschlossen: status == "geschlossen",
+    })
+    .collect();
     if zeilen.is_empty() {
         return Ok(VerpflegungEmpfaenger {
             einheiten: Vec::new(),
             abschnitte,
+            betreuungsstellen,
         });
     }
     let staerken = crate::einheit::repo::load_staerken_je_einheit(pool, einsatz_id).await?;
@@ -503,6 +527,7 @@ pub async fn load_empfaenger(
     Ok(VerpflegungEmpfaenger {
         einheiten,
         abschnitte,
+        betreuungsstellen,
     })
 }
 
@@ -1225,7 +1250,12 @@ pub async fn ausgabe_erfassen_tx(
     sonderkost.pruefen()?;
     // 422 — der Zusammenhang
     teilmenge(&sonderkost, eingabe.menge, "die Menge")?;
-    if eingabe.einheit_id.is_some() && eingabe.abschnitt_id.is_some() {
+    let empfaenger = [
+        eingabe.einheit_id,
+        eingabe.abschnitt_id,
+        eingabe.betreuungsstelle_id,
+    ];
+    if empfaenger.iter().flatten().count() > 1 {
         return Err(AppError::UnprocessableEntity(
             "Eine Ausgabe hat höchstens einen Empfänger".into(),
         ));
@@ -1241,14 +1271,17 @@ pub async fn ausgabe_erfassen_tx(
     if let Some(aid) = eingabe.abschnitt_id {
         crate::einsatzabschnitt::repo::check_im_einsatz(&mut *conn, einsatz_id, aid).await?;
     }
+    if let Some(bid) = eingabe.betreuungsstelle_id {
+        check_betreuungsstelle_fuer_ausgabe_tx(conn, einsatz_id, bid).await?;
+    }
 
     let ausgabe_id: i64 = sqlx::query_scalar(
         "INSERT INTO verpflegung_ausgabe \
             (einsatz_id, zeitfenster_id, zeitpunkt_at, menge, ort, bemerkung, sk_vegetarisch, \
              sk_vegan, sk_ohne_schwein, sk_diaet_allergenarm, sk_saeugling_kleinkind, \
              nachforderung_id, erfasst_von_id, client_id, verpflegungsstelle_id, einheit_id, \
-             abschnitt_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             abschnitt_id, betreuungsstelle_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(zeitfenster_id)
@@ -1267,6 +1300,7 @@ pub async fn ausgabe_erfassen_tx(
     .bind(eingabe.verpflegungsstelle_id)
     .bind(eingabe.einheit_id)
     .bind(eingabe.abschnitt_id)
+    .bind(eingabe.betreuungsstelle_id)
     .fetch_one(&mut *conn)
     .await?;
     Ok(AusgabeGeschrieben {
@@ -1345,6 +1379,48 @@ async fn check_einheit_fuer_ausgabe_tx(
         }
     }
     Ok(())
+}
+
+/// Prüft die Empfänger-Betreuungsstelle einer neuen Ausgabe (LLH-1295, design.md D2) — in der
+/// Transaktion, gegen einen gleichzeitigen Storno. Fremd, unbekannt oder storniert: 404, wie
+/// Einheit und Abschnitt im selben Handler; die stornierte Stelle steht in keiner Liste und gilt
+/// als nicht vorhanden. Jeder andere Status nimmt an, auch geschlossen: es gibt keinen
+/// Schließ-Zeitpunkt zum Vergleich, und ein Nachtrag oder eine offline gezählte Ausgabe darf nicht
+/// am Schließen scheitern.
+async fn check_betreuungsstelle_fuer_ausgabe_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM betreuungsstelle \
+         WHERE id = ? AND einsatz_id = ? AND storniert_at IS NULL",
+    )
+    .bind(stelle_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(())
+}
+
+/// Löst beim Storno einer Betreuungsstelle den Bezug ihrer Ausgaben (LLH-1295, design.md D5), im
+/// Vorgang des Stornos (`betreuung::repo::stelle_stornieren_tx`). Die Ausgaben bleiben mit Menge
+/// und Zeitpunkt stehen und zählen weiter, nur ohne Empfänger. Liefert die Kennungen der
+/// betroffenen Ausgaben.
+pub async fn loese_betreuungsstelle_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    betreuungsstelle_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "UPDATE verpflegung_ausgabe SET betreuungsstelle_id = NULL \
+         WHERE einsatz_id = ? AND betreuungsstelle_id = ? RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(betreuungsstelle_id)
+    .fetch_all(&mut *conn)
+    .await?)
 }
 
 /// Die gespeicherte Ausgabe mit dieser `client_id` im Einsatz, als Replay (`neu: false`).

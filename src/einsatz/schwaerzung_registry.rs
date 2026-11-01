@@ -1553,6 +1553,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Abschnittsnamen folgen ihren eigenen Regeln.
             retain("einheit_id", G_FK),
             retain("abschnitt_id", G_FK),
+            // Empfänger Betreuungsstelle (LLH-1295): nur die Kennung, die Bezeichnung folgt der
+            // Regel von `betreuungsstelle`.
+            retain("betreuungsstelle_id", G_FK),
         ],
     },
     // Abgeschlossene Lagebesprechungen. `entschluss` wird gescrubbt wie

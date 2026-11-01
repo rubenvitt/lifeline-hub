@@ -165,7 +165,15 @@ impl LiveEvent {
             // Abschnitts-Leser von Stellen erführe. Für Leser ohne Abschnittsrecht meldet das
             // Umbenennen und Auflösen die Stellen selbst mit `betreuung` (LLH-1291,
             // `routes::einsatzabschnitt::sse_namens_traeger`). Der ETB-Nachweis läuft über `etb`.
-            LiveEvent::Betreuung => &["betreuung"],
+            //
+            // Dazu `verpflegung` (LLH-1295, design.md D4): `GET …/verpflegung` legt in der
+            // Empfängerliste Kennung und Bezeichnung derselben Stellen selbst offen, auch ohne
+            // Modul `betreuung`; ohne den Key fröre die Wahl am Tresen ein, und ein Storno, der
+            // den Bezug von Ausgaben löst, bliebe unsichtbar. Die Nutzlast trägt nur Kennungen.
+            // Bewusst hingenommen (design.md D4, wie bei `Einheit`): das Ereignis feuert auch bei
+            // Belegungsmeldungen, Leser nur der Verpflegung erfahren so den Zeitpunkt einer
+            // Meldung an einer Stelle, deren Bezeichnung sie ohnehin sehen, nicht ihren Inhalt.
+            LiveEvent::Betreuung => &["betreuung", "verpflegung"],
             // Nur `evakuierung` (LLH-1034): Bezirke und ihre Standreihen gehören seit der Trennung
             // dem eigenen Modul. NICHT `betreuung`: wer nur die Stellen liest, erführe sonst von
             // jedem Bezirk. Abschnittsnamen wie bei `Betreuung` (Frontend und LLH-1291).
@@ -1008,7 +1016,8 @@ mod tests {
             (LiveEvent::Fernmeldewesen, &["fernmeldewesen"]),
             (LiveEvent::Dokument, &["dokumente"]),
             (LiveEvent::Abloesung, &["abloesung"]),
-            (LiveEvent::Betreuung, &["betreuung"]),
+            // Empfängerliste der Verpflegung (LLH-1295, design.md D4).
+            (LiveEvent::Betreuung, &["betreuung", "verpflegung"]),
             (LiveEvent::Evakuierung, &["evakuierung"]),
             (LiveEvent::Verpflegung, &["verpflegung"]),
             (LiveEvent::Presse, &["stab"]),

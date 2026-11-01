@@ -50,6 +50,7 @@ import {
   empfaengerOptionen,
   empfaengerSchluessel,
   empfaengerText,
+  hatWaehlbareEmpfaenger,
   isEmpfaengerWaehlbar,
   parseEmpfaengerSchluessel,
   staerkeVorgabe,
@@ -234,10 +235,9 @@ export default function AusgabeAnsicht() {
   };
   // ── Empfänger (LLH-1055 Teil II) ─────────────────────────────────────────────────────────
   const empfaengerListe = verpflegungQuery.data?.empfaenger ?? LEERE_EMPFAENGER;
-  const hatEmpfaenger =
-    empfaengerListe.einheiten.some((e) => !e.aufgeloest_at) ||
-    empfaengerListe.abschnitte.length > 0;
-  // Die Wahl gilt je Zeitfenster; eine inzwischen aufgelöste Einheit fällt aus ihr.
+  const hatEmpfaenger = hatWaehlbareEmpfaenger(empfaengerListe);
+  // Die Wahl gilt je Zeitfenster; eine inzwischen aufgelöste Einheit oder geschlossene oder
+  // stornierte Betreuungsstelle (LLH-1295) fällt aus ihr.
   const [empfaengerWahl, setEmpfaengerWahl] = useState<{
     zeitfenster: number;
     wahl: EmpfaengerWahl | null;
@@ -594,7 +594,8 @@ export default function AusgabeAnsicht() {
               </Flex>
             )}
           </div>
-          {/* Empfänger (LLH-1055); ohne Einheiten und Abschnitte bleibt der Platz leer. Die Wahl
+          {/* Empfänger (LLH-1055, LLH-1295); ohne Einheiten, Abschnitte und offene
+              Betreuungsstellen bleibt der Platz leer. Die Wahl
               nimmt den Rest der Zeile, „+n“ steht fest daneben. */}
           <div data-lfh="ausgabe-empfaenger">
             {hatEmpfaenger && (
