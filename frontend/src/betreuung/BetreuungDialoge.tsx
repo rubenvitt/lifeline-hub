@@ -2,11 +2,12 @@ import { Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, Rad
 import { Typography } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import { useEinsatzortPunkt } from '../anzeige/useEinsatzortPunkt';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortFelder } from '../anzeige/ortsfeldFormular';
 import { serverJetzt } from '../offline/serveruhr';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import type {
   Betreuungsstelle,
   BetreuungsstelleArt,
@@ -26,6 +27,8 @@ import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { sprungGesperrtText } from '../components/Sprung';
 import { Segmentleiste, type SegmentOption } from '../components/instrument';
+import RadiusEingabe from '../components/RadiusEingabe';
+import type { GebietKreis } from './gebietZeichnen';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { BETREUUNG_KONTAKTWEG_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
@@ -117,10 +120,17 @@ export function belegungBody(w: BelegungWerte): BelegungsmeldungEingabe {
 }
 
 /**
- * Gebiet beim Anlegen (LLH-1069): „Keins“ oder gleich danach eine Fläche auf der Lagekarte zeichnen.
- * „Radius“ kommt dazu, sobald die Karte einen Kreis um einen Punkt zeichnen kann (LLH-1043).
+ * Gebiet beim Anlegen (LLH-1069): „Keins“ oder gleich danach eine Fläche auf der Lagekarte zeichnen;
+ * „Radius“ (LLH-1346) zeichnet einen Kreis um den Einsatzort mit dem gewählten Radius.
  */
-export type GebietWahl = 'keins' | 'flaeche';
+export type GebietWahl = 'keins' | 'flaeche' | 'radius';
+
+/**
+ * Was nach dem Anlegen geschieht (LLH-1069, LLH-1346); der Server sieht es nicht. Beim Radius steht
+ * die Mitte nur, wenn der Einsatzort verortet ist, sonst setzt sie die Person auf der Karte.
+ */
+export type GebietNachAnlegen =
+  { wahl: 'keins' } | { wahl: 'flaeche' } | { wahl: 'radius'; kreis: GebietKreis };
 
 export interface BezirkWerte {
   bezeichnung: string;
@@ -128,6 +138,8 @@ export interface BezirkWerte {
   plan_erhebung: Erhebung;
   /** Nur im Anlegedialog; die Bearbeitung kennt keine Gebietswahl. */
   gebiet?: GebietWahl;
+  /** Nur mit `gebiet: 'radius'` (LLH-1346): Radius des Kreises in Metern. */
+  radius?: number | null;
   abschnitt_id?: number | null;
   sammelstelle?: OrtsfeldWert | null;
   notiz?: string | null;
@@ -384,6 +396,35 @@ interface DialogBasis {
  * gesperrt, steht „Fläche zeichnen“ gesperrt und nennt den Grund im Wortlaut (LFH-888) — ein
  * Tooltip allein erreichte Tablet und Handy nicht.
  */
+function gebietNachAnlegen(
+  w: BezirkWerte,
+  einsatzort: { lat: number; lon: number } | null,
+): GebietNachAnlegen {
+  if (w.gebiet === 'flaeche') return { wahl: 'flaeche' };
+  if (w.gebiet === 'radius' && w.radius != null) {
+    return {
+      wahl: 'radius',
+      kreis: einsatzort ? { radius: w.radius, mitte: einsatzort } : { radius: w.radius },
+    };
+  }
+  return { wahl: 'keins' };
+}
+
+/**
+ * Radius als Formularfeld: Zahl und Schnellwahl in einer umbrechenden Zeile. `Form.Item` reicht
+ * `id`, `value`/`onChange` und die ARIA-Zustände (Pflicht, Fehler, Meldung) hinein.
+ */
+function RadiusFeld(props: ComponentProps<typeof RadiusEingabe>) {
+  return (
+    <div
+      data-lfh="bezirk-radius"
+      style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}
+    >
+      <RadiusEingabe {...props} />
+    </div>
+  );
+}
+
 function GebietFeld({
   value,
   onChange,
@@ -393,15 +434,14 @@ function GebietFeld({
   onChange?: (wahl: GebietWahl) => void;
   karteGesperrt: boolean;
 }) {
+  const aufKarte = (wert: GebietWahl, text: string): SegmentOption<GebietWahl> =>
+    karteGesperrt
+      ? { wert, label: sprungGesperrtText(text), gesperrt: KEINE_BERECHTIGUNG }
+      : { wert, label: text };
   const optionen: SegmentOption<GebietWahl>[] = [
     { wert: 'keins', label: 'Keins' },
-    karteGesperrt
-      ? {
-          wert: 'flaeche',
-          label: sprungGesperrtText('Fläche zeichnen'),
-          gesperrt: KEINE_BERECHTIGUNG,
-        }
-      : { wert: 'flaeche', label: 'Fläche zeichnen' },
+    aufKarte('flaeche', 'Fläche zeichnen'),
+    aufKarte('radius', 'Radius'),
   ];
   return (
     <Segmentleiste<GebietWahl>
@@ -426,10 +466,13 @@ export function BezirkAnlegenDialog({
   abschnitte: readonly AbschnittOption[];
   /** Modul Lagekarte für diese Person gesperrt (`useSprungSperre`): kein Zeichnen danach. */
   karteGesperrt: boolean;
-  /** `gebiet`: was nach dem Anlegen geschieht (LLH-1069); der Server sieht es nicht. */
-  onErfassen: (body: EvakuierungsbezirkEingabe, gebiet: GebietWahl) => Promise<unknown>;
+  /** `gebiet`: was nach dem Anlegen geschieht (LLH-1069, LLH-1346); der Server sieht es nicht. */
+  onErfassen: (body: EvakuierungsbezirkEingabe, gebiet: GebietNachAnlegen) => Promise<unknown>;
 }) {
   const [form] = Form.useForm<BezirkWerte>();
+  const gebiet = Form.useWatch('gebiet', form);
+  // Mitte des Kreises (LLH-1346): der Einsatzort, wenn verortet — derselbe Cache wie der Kopf.
+  const einsatzort = useEinsatzortPunkt(einsatzId);
   return (
     <ErfassungsModal<BezirkWerte>
       offen
@@ -440,7 +483,7 @@ export function BezirkAnlegenDialog({
       // Eine Plangröße ist zu Beginn meist geschätzt; die Erhebung ist sichtbar, der Vorgabewert also
       // nie still. Das Gebiet wird gleich gezeichnet, wenn die Karte frei ist (LLH-1069).
       initialValues={{ plan_erhebung: 'geschaetzt', gebiet: karteGesperrt ? 'keins' : 'flaeche' }}
-      onErfassen={(w) => onErfassen(bezirkAnlegenBody(w), w.gebiet ?? 'keins')}
+      onErfassen={(w) => onErfassen(bezirkAnlegenBody(w), gebietNachAnlegen(w, einsatzort))}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
@@ -458,6 +501,15 @@ export function BezirkAnlegenDialog({
       <Form.Item name="gebiet" label="Gebiet auf der Lagekarte">
         <GebietFeld karteGesperrt={karteGesperrt} />
       </Form.Item>
+      {gebiet === 'radius' && (
+        <Form.Item
+          name="radius"
+          label={einsatzort ? 'Radius um den Einsatzort' : 'Radius'}
+          rules={[{ required: true, message: 'Bitte einen Radius angeben' }]}
+        >
+          <RadiusFeld />
+        </Form.Item>
+      )}
       {weitere(
         <>
           {abschnittFeld(abschnitte)}

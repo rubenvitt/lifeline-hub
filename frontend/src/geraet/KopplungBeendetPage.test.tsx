@@ -2,10 +2,12 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import KopplungBeendetPage from './KopplungBeendetPage';
+import { confirmGeraetKonto } from '../offline/fruehereKopplung';
+import { queueLeerenFuerTests, schreibaktionEinreihen } from '../offline/queue';
 
 const GERAET_ME = {
   id: 9,
@@ -29,6 +31,9 @@ const GERAET_ME = {
 };
 
 afterEach(() => setzeOnline(true));
+beforeEach(async () => {
+  await queueLeerenFuerTests();
+});
 
 function setup() {
   renderMitProviders(
@@ -81,5 +86,37 @@ describe('KopplungBeendetPage (LFH-892)', () => {
     );
     setup();
     expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+  });
+});
+
+describe('KopplungBeendetPage: nicht Übertragenes (LLH-1331)', () => {
+  const notiz = (cid: string) =>
+    ({
+      art: 'notiz',
+      person_id: 10,
+      bezeichnung: 'R-012',
+      daten: { text: 'Infusion läuft', client_id: cid },
+    }) as const;
+
+  it('nennt die Anzahl der Einträge der beendeten Kopplung, ohne Inhalt und ohne Verwerfen', async () => {
+    await confirmGeraetKonto(GERAET_ME.id, {
+      ...GERAET_ME.geraet,
+      ansicht: 'uhs-tablet',
+      stelle_id: 2,
+    });
+    for (const cid of ['n-1', 'n-2', 'n-3']) {
+      await schreibaktionEinreihen(GERAET_ME.id, 7, notiz(cid));
+    }
+    setup();
+    expect(await screen.findByText('3 Einträge nicht übertragen')).toBeInTheDocument();
+    expect(screen.queryByText(/Infusion/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Verwerfen/ })).not.toBeInTheDocument();
+  });
+
+  it('zählt keine Einträge einer Person', async () => {
+    await schreibaktionEinreihen(55, 7, notiz('p-1'));
+    setup();
+    await screen.findByRole('heading', { name: 'Kopplung beendet' });
+    expect(screen.queryByText(/nicht übertragen/)).not.toBeInTheDocument();
   });
 });

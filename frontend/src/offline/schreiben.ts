@@ -51,32 +51,21 @@ async function vormerken(
 }
 
 /** Person atomar mit Initialstatus anlegen oder sicher für den späteren Flush
- * vormerken. Durch die stabile client_id ist auch Timeout-nach-Commit sicher. */
-export async function erfassePersonOfflineFaehig(
+ * vormerken. Durch die stabile client_id ist auch Timeout-nach-Commit sicher. Die vorgemerkte
+ * Aufnahme trägt ihre Erfassungszeit nach der Serveruhr (LLH-1330): sonst stünden Anlage und
+ * Erst-Sichtung zur Ankunft im Verlauf, nicht zur Aufnahme. */
+export function erfassePersonOfflineFaehig(
   benutzerId: number,
   einsatzId: number,
   eingabe: PersonAnlegenEingabe,
 ): Promise<OfflineSchreibErgebnis<Person>> {
-  const daten: PersonAnlegenEingabe = {
-    ...eingabe,
-    status: eingabe.status ?? 'erfasst',
-    client_id: clientId(eingabe.client_id),
-  };
-  if (!navigator.onLine) {
-    return vormerken(benutzerId, einsatzId, { art: 'person', daten }, daten.client_id!);
-  }
-  try {
-    return {
-      zustand: 'gesendet',
-      daten: await legePersonAn(einsatzId, daten, {
-        offlineQueueBenutzerId: benutzerId,
-      }),
-    };
-  } catch (e) {
-    if (!istOfflineTransient(e)) throw e;
-    if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
-    return vormerken(benutzerId, einsatzId, { art: 'person', daten }, daten.client_id!);
-  }
+  return mitErfassungszeitOfflineFaehig(
+    benutzerId,
+    einsatzId,
+    { ...eingabe, status: eingabe.status ?? 'erfasst' },
+    (daten) => legePersonAn(einsatzId, daten, { offlineQueueBenutzerId: benutzerId }),
+    (daten) => ({ art: 'person', daten }),
+  );
 }
 
 /** Meldung senden oder sicher vormerken. Die Form darf nach `vorgemerkt`

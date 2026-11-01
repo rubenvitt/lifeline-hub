@@ -49,7 +49,9 @@
 //! `LiveEvent::Verpflegung` mit `{einsatz_id}` — keine Mengen, Bezeichnungen oder Freitexte.
 //! Ein Ändern ohne wirksame Änderung (leere `etb_ids`) publiziert nichts. Ausgabe und Rücknahme
 //! schreiben keinen ETB-Eintrag und publizieren nur das Modul-Ereignis. Die Stellen (LLH-1040)
-//! publizieren dasselbe Ereignis; nur ihr Statuswechsel schreibt ETB.
+//! publizieren dasselbe Ereignis; nur ihr Statuswechsel schreibt ETB. Auch die Gerätekopplung
+//! an einer Stelle publiziert es (LLH-1316, `geraet_gekoppelt`): Anlegen, Einlösen und Widerruf
+//! in `routes/geraet.rs`, den Ablauf der Takt in `geraet::ablauf`.
 
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};

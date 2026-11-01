@@ -439,7 +439,7 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
         style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}
       >
         <GeraeteKopf geraet={geraet} />
-        <LiveStatusBanner benutzerId={benutzer?.id} />
+        <LiveStatusBanner benutzerId={benutzer?.id} geraet />
         <main
           style={{
             flex: '1 1 0',

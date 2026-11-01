@@ -18,7 +18,9 @@ import {
   queueLaden,
   queueLeerenFuerTests,
   queueLegacyEinreihenFuerTests,
+  schreibaktionEinreihen,
 } from '../offline/queue';
+import { confirmGeraetKonto } from '../offline/fruehereKopplung';
 
 function melde(status: string) {
   act(() => {
@@ -225,5 +227,51 @@ describe('LiveStatusBanner — klebt bei Störung am Handy (LFH-952)', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     renderBanner();
     expect(zeile()!.style.position).toBe('');
+  });
+});
+
+describe('LiveStatusBanner: Einträge früherer Kopplung (LLH-1331)', () => {
+  const geraet = {
+    kopplung_id: 3,
+    einsatz_id: 7,
+    ansicht: 'uhs-tablet' as const,
+    stelle_id: 2,
+    uhs_id: 2,
+    bezeichnung: 'Tablet 1',
+    laeuft_ab_at: '2026-11-01 18:00:00',
+  };
+
+  async function vorbereiten() {
+    await confirmGeraetKonto(41, geraet);
+    await schreibaktionEinreihen(41, 7, {
+      art: 'notiz',
+      person_id: 10,
+      bezeichnung: 'R-012',
+      daten: { text: 'x', client_id: 'n-1' },
+    });
+    await confirmGeraetKonto(11, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
+  }
+
+  it('zeigt in der Gerätehülle die Anzahl und öffnet die Wiederherstellung', async () => {
+    await vorbereiten();
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <LiveStatusBanner benutzerId={11} geraet />
+        </MemoryRouter>
+      </AntApp>,
+    );
+    const knopf = await screen.findByRole('button', { name: 'Aus früherer Kopplung (1 Eintrag)' });
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Offline-Aktionen wiederherstellen')).toBeInTheDocument();
+  });
+
+  it('zeigt sie außerhalb der Gerätehülle nicht', async () => {
+    await vorbereiten();
+    renderBanner();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.queryByText('Aus früherer Kopplung')).not.toBeInTheDocument();
   });
 });

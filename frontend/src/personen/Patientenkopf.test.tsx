@@ -2,9 +2,11 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { einsatzKeys } from '../api/queryKeys';
 import { PERSON_ZUSTAND_MAX, VERLAUFSNOTIZ_MAX } from '../api/eingabegrenzen';
 import type { Massnahme, PersonDetail, Verletzung } from '../api/types';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
+import { EinsatzPfadeProvider, GERAET_BETREUUNG_PFADE } from '../routing/EinsatzPfade';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
@@ -155,6 +157,85 @@ describe('Patientenkopf — lesen (LLH-1094)', () => {
     expect(kopf.querySelector('[data-lfh="aufenthalt"]')?.textContent).toMatch(
       /^Transport → KH Mitte \(RTW 1-83-1\)/,
     );
+  });
+
+  describe('Verbleib „Notunterkunft“ führt auf die Stelle (LLH-1347)', () => {
+    const inStelle = {
+      aufenthalt: null,
+      aktuelle_uhs_id: null,
+      verbleib: [
+        {
+          id: 5,
+          einsatz_id: 1,
+          person_id: 10,
+          art: 'notunterkunft' as const,
+          ziel: 'NU Turnhalle Nord',
+          transportmittel: null,
+          betreuungsstelle_id: 8,
+          zeitpunkt_at: '2026-10-18 10:40:00',
+          erfasst_von: 1,
+        },
+      ],
+    };
+
+    it('mit Stelle ist der Verbleib ein Link auf deren Seite', async () => {
+      const { kopf } = zeige(inStelle);
+      const link = await within(kopf).findByRole('link', {
+        name: 'Notunterkunft → NU Turnhalle Nord',
+      });
+      expect(link).toHaveAttribute('href', '/einsaetze/1/betreuung/8');
+    });
+
+    it('ohne Stelle bleibt der Verbleib Text', () => {
+      const { kopf } = zeige({
+        ...inStelle,
+        verbleib: [{ ...inStelle.verbleib[0], betreuungsstelle_id: null }],
+      });
+      expect(kopf.querySelector('[data-lfh="aufenthalt"]')?.textContent).toMatch(
+        /^Notunterkunft → NU Turnhalle Nord · /,
+      );
+      expect(within(kopf).queryByRole('link')).toBeNull();
+    });
+
+    it('ohne Zugriff auf das Modul Betreuung entfällt der Link, der Text bleibt', async () => {
+      server.use(
+        http.get('/api/einsaetze/1/modul-freigaben', () =>
+          HttpResponse.json(freigabenFixture({ betreuung: { zugriff: false } })),
+        ),
+      );
+      const { client } = renderMitProviders(
+        <Patientenkopf
+          einsatzId={1}
+          person={{ ...basis, ...inStelle } as PersonDetail}
+          darfSchreiben
+        />,
+      );
+      await waitFor(() =>
+        expect(client.getQueryState(einsatzKeys.modulFreigaben(1))?.status).toBe('success'),
+      );
+      const kopf = screen.getByRole('region', { name: 'Patientenkopf' });
+      expect(kopf.querySelector('[data-lfh="aufenthalt"]')?.textContent).toMatch(
+        /^Notunterkunft → NU Turnhalle Nord · /,
+      );
+      expect(within(kopf).queryByRole('link')).toBeNull();
+    });
+
+    it('am Gerät kein Sprung: dort gibt es keine Stellenseite', () => {
+      renderMitProviders(
+        <EinsatzPfadeProvider pfade={GERAET_BETREUUNG_PFADE}>
+          <Patientenkopf
+            einsatzId={1}
+            person={{ ...basis, ...inStelle } as PersonDetail}
+            darfSchreiben
+          />
+        </EinsatzPfadeProvider>,
+      );
+      const kopf = screen.getByRole('region', { name: 'Patientenkopf' });
+      expect(kopf.querySelector('[data-lfh="aufenthalt"]')?.textContent).toMatch(
+        /^Notunterkunft → NU Turnhalle Nord · /,
+      );
+      expect(within(kopf).queryByRole('link')).toBeNull();
+    });
   });
 
   it('nennt eine ungesichtete Person „ungesichtet“', () => {

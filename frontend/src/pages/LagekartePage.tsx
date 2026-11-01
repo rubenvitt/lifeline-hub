@@ -1816,6 +1816,8 @@ export default function LagekartePage() {
           serieAnzahl={ohneSerie ? undefined : zoneSerieAnzahl}
           onFertig={ohneSerie ? undefined : onZoneZeichnenFertig}
           bearbeiten={kreisBearbeitung ? { geaendert: kreisBearbeitungGeaendert } : undefined}
+          // Kreis als Fläche eines Bezirks (LLH-1346): Art fest, der Kopf nennt den Bezirk.
+          bezirk={zoneEntwurf?.bezirk?.bezeichnung}
         />
         {zonenBearbeitung && (
           <BearbeitenSteuerung

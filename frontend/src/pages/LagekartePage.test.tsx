@@ -3432,7 +3432,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     expect(await screen.findByTestId('bezirk-ziel')).toBeInTheDocument();
   });
 
-  it('ein Kreis mit Bezug (LLH-1043) sendet Kreis, Bezeichnung und Zuordnung, ohne Serie', async () => {
+  it('ein Kreis mit Bezug (LLH-1043, LLH-1346) sendet Kreis, Bezeichnung und Zuordnung, ohne Serie', async () => {
     let body: Record<string, unknown> | null = null;
     basisHandler([
       mitBezirken(),
@@ -3451,6 +3451,10 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     await geraeumt();
     expect(ort()).not.toHaveTextContent(/radius|mitte/);
     expect(screen.queryByRole('switch', { name: 'Weitere zeichnen' })).not.toBeInTheDocument();
+    // Der Kopf nennt den Bezirk; die Art steht fest (LLH-1346).
+    const band = document.querySelector<HTMLElement>('[data-lfh="kreis-steuerung"]')!;
+    expect(within(band).getByText('Bezirk Uferstraße 12–40 · Kreis')).toBeInTheDocument();
+    expect(within(band).queryByRole('combobox', { name: 'Art' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(body).not.toBeNull());

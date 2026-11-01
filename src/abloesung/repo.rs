@@ -18,8 +18,8 @@ use super::{
     AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung,
     AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungPlanungEntfallen,
     AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
-    BeendetGrund, BesatzungRolle, PlanungEntfallenGrund, PlanungsStand, RhythmusQuelle,
-    PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
+    BeendetGrund, BeginnQuelle, BesatzungRolle, PlanungEntfallenGrund, PlanungsStand,
+    RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
@@ -111,6 +111,8 @@ struct Zeile {
     abschnitt_id: Option<i64>,
     abschnitt_name: Option<String>,
     beginn_at: String,
+    #[sqlx(try_from = "String")]
+    beginn_quelle: BeginnQuelle,
     rhythmus_minuten: i64,
     #[sqlx(try_from = "String")]
     rhythmus_quelle: RhythmusQuelle,
@@ -182,6 +184,7 @@ impl Zeile {
             abschnitt_id: self.abschnitt_id,
             abschnitt_name: self.abschnitt_name,
             beginn_at: self.beginn_at,
+            beginn_quelle: self.beginn_quelle,
             rhythmus_minuten: self.rhythmus_minuten,
             rhythmus_quelle: self.rhythmus_quelle,
             faellig_at: self.faellig_at,
@@ -226,7 +229,8 @@ impl Zeile {
 /// ([`VORWARNUNG_VORGABE_MINUTEN`], im SQL als Literal; `vorwarnung_vorgabe_im_sql` hält beide
 /// gleich).
 const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS einheit_name, \
-            a.abschnitt_id, s.name AS abschnitt_name, a.beginn_at, a.rhythmus_minuten, \
+            a.abschnitt_id, s.name AS abschnitt_name, a.beginn_at, a.beginn_quelle, \
+            a.rhythmus_minuten, \
             a.rhythmus_quelle, a.faellig_at, \
             COALESCE(m.vorwarnung_minuten, 30) AS vorwarnung_minuten, a.abloesende_einheit_id, \
             ae.name AS abloesende_einheit_name, a.status, a.vollzogen_at, a.vollzogen_von_id, \
@@ -1268,6 +1272,7 @@ async fn create_schicht_tx(
     quelle: RhythmusQuelle,
     vorgabe: &EinsatzVorgabe,
     vorgaenger_id: Option<i64>,
+    beginn_quelle: BeginnQuelle,
     jetzt: &str,
 ) -> Result<(i64, i64), AppError> {
     if has_laufende_tx(conn, einheit_id).await? {
@@ -1279,8 +1284,8 @@ async fn create_schicht_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO einsatz_abloesung \
             (einsatz_id, einheit_id, abschnitt_id, beginn_at, rhythmus_minuten, rhythmus_quelle, \
-             faellig_at, vorgaenger_id, angelegt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             faellig_at, vorgaenger_id, angelegt_von_id, beginn_quelle) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(einheit_id)
@@ -1291,6 +1296,7 @@ async fn create_schicht_tx(
     .bind(&faellig_at)
     .bind(vorgaenger_id)
     .bind(benutzer_id)
+    .bind(beginn_quelle.as_str())
     .fetch_one(&mut *conn)
     .await?;
     set_fristen_tx(
@@ -1337,6 +1343,7 @@ pub async fn beginnen(
                 beginn_at: &beginn_at,
                 rhythmus_minuten: eingabe.rhythmus_minuten,
                 wie: "begonnen",
+                beginn_quelle: BeginnQuelle::Hand,
             },
             jetzt,
         )
@@ -1364,6 +1371,8 @@ pub(crate) struct Start<'a> {
     pub rhythmus_minuten: Option<i64>,
     /// Wie der ETB-Eintrag den Beginn nennt („begonnen“, „mit dem Eintreffen begonnen“).
     pub wie: &'a str,
+    /// Herkunft an der Schicht (LLH-1312): `hand` oder `eintreffen`.
+    pub beginn_quelle: BeginnQuelle,
 }
 
 /// Beginnt eine Schicht in der Transaktion des Aufrufers. Rangfolge (LLH-1122): eigener
@@ -1401,6 +1410,7 @@ pub(crate) async fn start_schicht_tx(
         quelle,
         &vorgabe,
         None,
+        s.beginn_quelle,
         jetzt,
     )
     .await?;
@@ -1520,14 +1530,20 @@ pub async fn aendern(
         if teile.is_empty() {
             return Ok(None);
         }
+        // Ein geänderter Beginn ist nicht mehr das Eintreffen: die Schicht gilt danach als von Hand
+        // begonnen; eine Folgeschicht bleibt Folgeschicht (LLH-1312, design.md D2).
         sqlx::query(
             "UPDATE einsatz_abloesung SET beginn_at = ?, rhythmus_minuten = ?, \
-                rhythmus_quelle = ?, faellig_at = ? WHERE id = ?",
+                rhythmus_quelle = ?, faellig_at = ?, \
+                beginn_quelle = CASE WHEN ? AND beginn_quelle = 'eintreffen' THEN 'hand' \
+                    ELSE beginn_quelle END \
+             WHERE id = ?",
         )
         .bind(&beginn_at)
         .bind(rhythmus)
         .bind(quelle.as_str())
         .bind(&faellig_at)
+        .bind(beginn_at != roh.beginn_at)
         .bind(id)
         .execute(&mut *conn)
         .await?;
@@ -2121,6 +2137,7 @@ async fn vollziehen_einheit_tx(
                     roh.rhythmus_quelle,
                     &vorgabe,
                     Some(id),
+                    BeginnQuelle::Vollzug,
                     jetzt,
                 )
                 .await?;
@@ -2752,6 +2769,7 @@ async fn vollziehen_besatzung_tx(
         roh.rhythmus_quelle,
         &vorgabe,
         Some(id),
+        BeginnQuelle::Vollzug,
         jetzt,
     )
     .await?;

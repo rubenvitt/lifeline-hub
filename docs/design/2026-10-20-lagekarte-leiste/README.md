@@ -5,13 +5,27 @@ Zielgliederung der rechten Leiste der Lagekarte aus LLH-1023. Ruben, UX-Durchgan
 Abschnitte untereinander, „Nicht verortet“ allein hat im Demo-Einsatz 26 Zeilen mit je einem
 Knopf (`docs/anwender/bilder/lagekarte/lagekarte.png`).
 
-**Stand dieses Ordners:** Text und Skizzen, **noch kein Claude-Design-Entwurf**. Die Sitzung, in
-der dieses Ticket entstand, durfte kein Artifact vom Typ „Design“ anlegen (vom
-Berechtigungssystem abgelehnt). Den Entwurf erzeugt ein Agent mit claude.ai-Zugang nach
-`frontend/AGENTS.md` („Größere UI-Entwürfe über das Design System“) aus dem Prompt unten und
-legt ihn hier als `leiste.dc.html` ab (Inline-Styles maßgeblich, wie beim Neuentwurf). Bis dahin
-sind die Skizzen unten die Grundlage. Die Regel steht in `frontend/src/pages/lagekarte/AGENTS.md`,
-Abschnitt „Zielgliederung der Leiste (LLH-1023)“.
+**Stand dieses Ordners:** Text, Skizzen und der Entwurf `leiste.dc.html` (LLH-1340, 01.11.2026):
+zehn Artboards aus dem Prompt unten, im Artifact-Typ „Design“ mit dem Design System „Lifeline
+Hub“, untereinander in einer Datei (Inline-Styles maßgeblich, wie beim Neuentwurf). Canvas zum
+Ansehen: https://claude.ai/artifact/6WNFH6KVgV2jqw5pN9XQK7. Die Leiste ist inzwischen gebaut
+(LLH-1028, LLH-1033, LLH-1038); wo Entwurf und Code auseinandergehen, steht es unter
+„Abweichungen des Entwurfs“, und es gilt die Regel in `frontend/src/pages/lagekarte/AGENTS.md`
+(Abschnitte „Die Kartenleiste hat drei Ansichten“ bis „Werkzeugmenü an der Karte“ und
+„Zielgliederung der Leiste (LLH-1023)“).
+
+| Nr. | Artboard                                                            | Dichte      | Modus |
+| --- | ------------------------------------------------------------------- | ----------- | ----- |
+| L1  | Fükw 1440 × 900, Ebenen                                             | kompakt     | Nacht |
+| L2  | Fükw 1440 × 900, Objekte mit Filter „nicht verortet“                | kompakt     | Nacht |
+| L3  | Fükw 1440 × 900, Auswahl (Einheit)                                  | kompakt     | Nacht |
+| L4  | Fükw 1440 × 900, Platzieren im Modus-Band                           | kompakt     | Nacht |
+| L5  | Fükw 1440 × 900, Ebenen mit Abweichung von der Kartenansicht        | kompakt     | Tag   |
+| L6  | Tablet 1280 × 800, Ebenen, Werkzeugmenü offen                       | Handschuh   | Nacht |
+| L7  | Tablet 1024 × 768, Objekte                                          | Handschuh   | Nacht |
+| L8  | Handy 390 × 844, Leiste unter der Karte offen, Objekte „83“         | komfortabel | Nacht |
+| L9  | Handy 390 × 844, Platzieren, Leiste zu, Fuß-Band                    | komfortabel | Nacht |
+| L10 | Zustände: Fachebenen, gesperrt, lädt, ausgefallen, leer, Suche „83“ | kompakt     | Nacht |
 
 ## Entscheidungen
 
@@ -262,6 +276,49 @@ Leistengrund `paneel`, aktives Segment `flaeche3` mit Text `text`, inaktive `fla
 Hellpalette. Text ≥ 7 : 1 am Tag, ≥ 5 : 1 bei Nacht; an/aus trägt zusätzlich das Farbfeld und
 `aria-checked`, nie die Farbe allein. Rot nur für Gefahr und die abgesetzte Löschhandlung, nie für
 Bedienung.
+
+## Abweichungen des Entwurfs (LLH-1340)
+
+Abgeglichen mit der Regel „Zielgliederung der Leiste (LLH-1023)“ und den Regeln der gebauten
+Leiste in `frontend/src/pages/lagekarte/AGENTS.md` (Stand `alpha`, 01.11.2026). Bei Widerspruch
+gewinnt die Regel; der Entwurf ist kein Auftrag, den Code nachzuziehen.
+
+**Entwurf folgt dem Code, nicht dem Prompt oder den Skizzen oben**
+
+1. **Kein Typzeichen je Objektzeile** (Regel „Objekte = eine Liste“, LFH-826); der Prompt nennt
+   eins.
+2. **Einsatzort ist die erste Zeile der Objekte**, keine eigene Gruppe „Einsatzort 1/1“ wie in der
+   Skizze.
+3. **Platzieren:** „Übernehmen“ gehört zum Koordinatenfeld, der einzige Modusknopf ist
+   „Abbrechen“ (`ModusBedienung`). Prompt und Skizze stellen beide als Paar nebeneinander. Unter
+   `lg` trägt das Fuß-Band nur Titel und „Abbrechen“; die Position setzt ein Tipp (Fadenkreuz).
+4. **Werkzeugmenü:** je Flächentyp ein Hauptknopf mit „Kreis“ bzw. „Linie“ daneben
+   (`werkzeugZeilen`), statt „Freie Skizze Fläche · Linie“ in einer Zeile; „Absperrgrenze“ ohne
+   Kreis.
+5. **Inspector der Einheit** mit den Feldern des Codes (Status, Stärke, Seit, Führer, Abschnitt);
+   „Abschnitt fokussieren“ steht nur am Abschnitt, nicht an der Einheit.
+6. **„Alles verortet“** steht in `gedaempft`, nicht in der Normalfarbe: der Satz ist keine
+   Lagebeurteilung.
+
+**Entwurf weicht vom Code ab (offen, nicht nachziehen ohne Entscheidung)**
+
+7. **Aktives Segment mit 2-px-Kante in der Bedienfarbe** links, wie die Skizzen (`▌`) und der
+   eingerastete Kartenknopf. Der Baustein `Segmentleiste` kennt nur `flaeche3` + `text`.
+8. **Suchfeld der Objekte** heißt im Entwurf „Objekt, Koordinate, Adresse“ (Prompt), im Code
+   „Kartenobjekte suchen“.
+9. **Marke „26 nicht verortet“** rechtsbündig unter dem Suchfeld, Zahl vorn. Im Code ist es ein
+   `SegmentUmschalter` „Nicht verortet“ mit der Zahl als Beschreibung, linksbündig.
+10. **Werkzeugmenü** sitzt im Entwurf links neben dem Knopfblock. Im Code steht es im
+    `KartenFuss` (kein Popover am Knopf); im Bild liegt es ebenfalls oben rechts über der Karte.
+    Es rollt in sich, im Entwurf bei 1280 × 800 angeschnitten.
+11. **Handy in `komfortabel`** (48 px), damit alle drei Dichten vorkommen; der Prompt lässt die
+    Dichte am Handy offen.
+
+**Nicht gezeichnet**
+
+Hintergrund aufgeklappt (Kartengrundlage am Handy, Karten-Design, Bild-Hintergründe), die Modi
+Taktisches Zeichen und Bild einpassen, die Rückmeldung „R-005 verortet“, das Werkzeugmenü bei
+1024 × 768 und Tagbetrieb außer L5. Sie folgen den Textskizzen oben.
 
 ## Prompt für Claude Design
 

@@ -41,6 +41,12 @@ draußen gelassen werden.
   Personenfeld aus der Liste anzeigt, prüft dasselbe. Herleitung:
   `/mnt/project-files/lfh-1095/design.md`, Bedrohungsmodell
   `/mnt/project-files/lfh-1003/bedrohungsmodell.md`, 5 a).
+- **Die Bereitstellungsräume nur als Liste, ungekürzt** (LLH-1318, Entscheidung Ruben
+  01.11.2026): `EINSATZ_KEYS.br` trägt Modulseite, Kartenebene und Materialort. Standort und
+  Notiz beschreiben den Raum, nicht eine Person, und bleiben wie bei den Betreuungsstellen auf
+  der Platte, ohne Kürzung. Detail, Verlauf, erwartete Kräfte und Stamm-Treffer bleiben draußen;
+  nach einem Neuladen ohne Netz öffnet sich ein Raum deshalb erst wieder mit Netz. Herleitung:
+  `/mnt/project-files/llh-1318/design.md`.
 - **Die Lagekarte liest Schäden als Marker** (`schadenMarker`, LFH-931, ohne Freitexte). Beide
   Prefixe stehen in `LAGEBILD_OFFLINE`: die Marker für Karte und Dashboard, die Volltextliste für
   die Schadenseite.
@@ -136,6 +142,9 @@ draußen gelassen werden.
   Ortscache, Erfassungswerte). Was nur auf dem Gerät liegt (ETB-Entwürfe), überlebt ein
   Sitzungsende, gebunden an `benutzer_id` und ohne angemeldeten Besitzer höchstens 24 h. Die
   Offline-Queue bleibt bei jedem Ausgang. Geräte-Einstellungen ohne Personenbezug bleiben.
+- **Zeilen eines früheren Gerätekontos** übernimmt nur eine neue Gerätesitzung derselben Stelle
+  (LLH-1331, `offline/fruehereKopplung.ts`, Regel in `frontend/src/geraet/AGENTS.md`,
+  „Vorgemerktes überdauert die Kopplung“); gezählt per Index-`count()`, nie über Payloads.
 - **Abgelehnte Queue-Einträge sind befristet** (LFH-1093): 30 Tage ab `abgelehnt_at`, geräumt
   beim Öffnen von `lifeline-offline` ohne Versionssprung, für jeden Benutzer und den Altbestand
   ohne Bindung, an der Geräteuhr wie `abgelehnt_at` selbst. Ausstehende Einträge haben keine

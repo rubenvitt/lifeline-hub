@@ -407,7 +407,7 @@ describe('BezirkAnlegenDialog', () => {
           sammelstelle_lat: 52.512,
           sammelstelle_lon: 13.401,
         },
-        'flaeche',
+        { wahl: 'flaeche' },
       ),
     );
   });
@@ -428,8 +428,9 @@ describe('BezirkAnlegenDialog', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
     const gruppe = within(dialog).getByRole('radiogroup', { name: 'Gebiet auf der Lagekarte' });
     expect(within(gruppe).getByRole('radio', { name: 'Fläche zeichnen' })).toBeChecked();
-    // Kein „Radius“, solange die Karte keinen Kreis kann (nach LLH-1043).
-    expect(within(gruppe).getAllByRole('radio')).toHaveLength(2);
+    // Keins · Fläche zeichnen · Radius (LLH-1346); ohne „Radius“ kein Radiusfeld.
+    expect(within(gruppe).getAllByRole('radio')).toHaveLength(3);
+    expect(within(dialog).queryByRole('spinbutton', { name: 'Radius in Metern' })).toBeNull();
     await userEvent.click(within(gruppe).getByRole('radio', { name: 'Keins' }));
     expect(within(gruppe).getByRole('radio', { name: 'Keins' })).toBeChecked();
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
@@ -438,7 +439,7 @@ describe('BezirkAnlegenDialog', () => {
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith(
         { bezeichnung: 'Deichweg', plan_personen: 12, plan_erhebung: 'geschaetzt' },
-        'keins',
+        { wahl: 'keins' },
       ),
     );
   });
@@ -465,10 +466,94 @@ describe('BezirkAnlegenDialog', () => {
     expect(flaeche).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(flaeche);
     expect(flaeche).not.toBeChecked();
+    expect(
+      within(gruppe).getByRole('radio', { name: 'Radius (Keine Berechtigung)' }),
+    ).toHaveAttribute('aria-disabled', 'true');
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith(expect.anything(), 'keins'));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(expect.anything(), { wahl: 'keins' }),
+    );
+  });
+
+  it('Gebiet „Radius“ (LLH-1346): Radius Pflicht, Schnellwahl 500 m, Kreis um den Einsatzort', async () => {
+    // Einsatzort 52.1, 8.6 aus dem Einsatzkopf (beforeEach).
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <BezirkAnlegenDialog
+        einsatzId={1}
+        abschnitte={ABSCHNITTE}
+        karteGesperrt={false}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
+    const gruppe = within(dialog).getByRole('radiogroup', { name: 'Gebiet auf der Lagekarte' });
+    await userEvent.click(within(gruppe).getByRole('radio', { name: 'Radius' }));
+    expect(await within(dialog).findByText('Radius um den Einsatzort')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    const meldung = await within(dialog).findByText('Bitte einen Radius angeben');
+    expect(onErfassen).not.toHaveBeenCalled();
+    // Pflicht, Fehler und Meldung erreichen das Zahlenfeld (Hilfstechnik).
+    const zahl = within(dialog).getByRole('spinbutton', { name: 'Radius in Metern' });
+    expect(zahl).toHaveAttribute('aria-required', 'true');
+    expect(zahl).toHaveAttribute('aria-invalid', 'true');
+    expect(zahl).toHaveAccessibleDescription(meldung.textContent!);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: '500 m' }));
+    expect(within(dialog).getByRole('button', { name: '500 m' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(dialog).getByRole('spinbutton', { name: 'Radius in Metern' })).toHaveValue('500');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(
+        { bezeichnung: 'Deichweg', plan_personen: 12, plan_erhebung: 'geschaetzt' },
+        { wahl: 'radius', kreis: { radius: 500, mitte: { lat: 52.1, lon: 8.6 } } },
+      ),
+    );
+  });
+
+  it('Gebiet „Radius“ ohne verorteten Einsatzort: nur der Radius geht mit (LLH-1346)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ id: 1, einsatzort_lat: null, einsatzort_lon: null }),
+      ),
+    );
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <BezirkAnlegenDialog
+        einsatzId={1}
+        abschnitte={ABSCHNITTE}
+        karteGesperrt={false}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Radius' }));
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
+    await userEvent.type(
+      within(dialog).getByRole('spinbutton', { name: 'Radius in Metern' }),
+      '750',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(expect.anything(), {
+        wahl: 'radius',
+        kreis: { radius: 750 },
+      }),
+    );
   });
 });
 

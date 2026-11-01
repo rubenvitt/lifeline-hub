@@ -24,6 +24,7 @@ import { sichtungsfarben } from '../../theme/tokens';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
 import { warnstufeTon, type Quellzustand } from './lagebild';
 import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';
+import BerichtigtMarke from '../../etb/BerichtigtMarke';
 import { modulName } from '../../einsatz/modulRegistry';
 import { MIT_ERLAEUTERUNG } from '../gefahren/erlaeuterungen';
 import { ErlaeuterungsZeichen } from '../gefahren/ErlaeuterungsMarke';
@@ -221,6 +222,7 @@ const VERBINDUNG_BREITE = `${Math.max(...Object.values(VERBINDUNG).map((w) => w.
 const STROM_TITEL = 'Jüngste ETB-Einträge';
 
 export function MeldungsstromPaneel({
+  einsatzId,
   zustand,
   sichtbar,
   neu,
@@ -232,6 +234,8 @@ export function MeldungsstromPaneel({
   onEtb,
   onErfassen,
 }: {
+  /** Für den Sprung auf die jüngste Berichtigung eines überholten Eintrags (LLH-1321). */
+  einsatzId: number;
   /** `gesperrt`: Modul ETB nicht freigegeben — Grund statt Fehler, kein Weg dorthin (LFH-669). */
   zustand: Quellzustand;
   sichtbar: EtbEintragAnzeige[];
@@ -288,7 +292,13 @@ export function MeldungsstromPaneel({
           nr={`Nr. ${e.lfd_nr}`}
           typ={e.typ}
           typwort={etbTyp[e.typ].label}
-          meta={stromQuelle(e)}
+          // Ein berichtigter Eintrag trägt dieselbe Marke wie in der Zeitachse (LLH-1321): sonst
+          // liest man im Strom die falsche Fassung als gültig.
+          meta={
+            <BerichtigtMarke einsatzId={einsatzId} eintrag={e}>
+              {stromQuelle(e)}
+            </BerichtigtMarke>
+          }
         >
           <span
             style={{

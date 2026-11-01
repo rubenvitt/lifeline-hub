@@ -108,6 +108,28 @@ describe('Lageentwicklung (LFH-873, Zählbild)', () => {
     expect(text).not.toContain('Nr. 40 ');
   });
 
+  it('kennzeichnet eine berichtigte Entscheidung mit der jüngsten Berichtigung (LLH-1321)', async () => {
+    serverAus([
+      eintrag(52, 'berichtigung', { berichtigt_eintrag_id: 490 }),
+      eintrag(51, 'berichtigung', { berichtigt_eintrag_id: 490 }),
+      ...ETB.map((e) =>
+        e.lfd_nr === 49
+          ? {
+              ...e,
+              berichtigt_durch: [
+                { id: 510, lfd_nr: 51 },
+                { id: 520, lfd_nr: 52 },
+              ],
+            }
+          : e,
+      ),
+    ]);
+    const text = await erzeuge();
+    expect(text).toContain(
+      '**Entscheidungen**\n- Nr. 49 · DTG(2026-10-04 09:49:00) · berichtigt → Nr. 52\n',
+    );
+  });
+
   it('übernimmt keinen Freitext aus dem ETB oder dem Entschluss', async () => {
     const text = await erzeuge();
     for (const f of FREITEXT) expect(text).not.toContain(f);

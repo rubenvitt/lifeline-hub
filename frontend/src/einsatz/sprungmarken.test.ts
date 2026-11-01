@@ -22,6 +22,8 @@ describe('Sprungmarken (LFH-620)', () => {
       'patienten',
       'vermisste',
       'fms-tableau',
+      // Einheiten ohne Schicht auf der Seite Ablösung (LLH-1312).
+      'ohne-schicht',
       // Arbeitsseiten des Stabs (LLH-1127), Sachgebiet S5.
       'presse',
       'infotelefon',
@@ -39,6 +41,7 @@ describe('Sprungmarken (LFH-620)', () => {
       patienten: '/einsaetze/7/personen?filter=alle&ansicht=raster',
       vermisste: '/einsaetze/7/personen?filter=vermisst&ansicht=zeilen',
       'fms-tableau': '/einsaetze/7/fahrzeuge?ansicht=tableau',
+      'ohne-schicht': '/einsaetze/7/abloesung?ansicht=ohne-schicht',
       presse: '/einsaetze/7/stab/presse',
       infotelefon: '/einsaetze/7/stab/infotelefon',
       fernmeldeskizze: '/einsaetze/7/fernmeldewesen?ansicht=skizze',
@@ -112,6 +115,7 @@ describe('Sprungmarken (LFH-620)', () => {
       'bereitstellungsraeume',
       'nachforderungen',
       'abloesung',
+      '↗ohne-schicht',
     ]);
   });
 

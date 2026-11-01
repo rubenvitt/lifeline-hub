@@ -129,7 +129,7 @@ pub struct ArchivTierAnzeige {
     pub storniert_at: Option<String>,
 }
 
-/// Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Status.
+/// Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Gefahr, Schadensgrad, Status.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct ArchivSchadenAnzeige {
     pub registrier_nr: i64,
@@ -137,6 +137,12 @@ pub struct ArchivSchadenAnzeige {
     pub registrier_anzeige: String,
     pub typ: crate::schaden::SchadenTyp,
     pub ausmass: crate::schaden::Ausmass,
+    /// Gefahrenart (LLH-1115, im Archiv seit LLH-1342); fehlt = keine Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gefahrenart: Option<crate::gefahr::Gefahrentyp>,
+    /// Schadensgrad nach DV 102, 5.8.4; fehlt = keine Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schadensgrad: Option<crate::schaden::Schadensgrad>,
     pub status: crate::schaden::SchadenStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschluss_grund: Option<crate::schaden::AbschlussGrund>,

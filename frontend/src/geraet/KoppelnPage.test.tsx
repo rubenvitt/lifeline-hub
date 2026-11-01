@@ -6,6 +6,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import KoppelnPage from './KoppelnPage';
 import { warGeraet } from './geraetMarke';
+import { loadGeraetKonten } from '../offline/fruehereKopplung';
 
 const PERSON = {
   id: 4,
@@ -117,5 +118,26 @@ describe('KoppelnPage (LFH-892)', () => {
       await screen.findByText('Gekoppelt als Tablet 1. Ein neuer Code ersetzt die Kopplung.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Gerät koppeln' })).toBeInTheDocument();
+  });
+
+  it('merkt sich das bestätigte Gerätekonto für eine spätere Kopplung (LLH-1331)', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ ...PERSON, id: 9, geraet: { ...GERAET, stelle_id: 2 } }),
+      ),
+    );
+    setup();
+    await waitFor(() =>
+      expect(loadGeraetKonten()).toEqual([
+        { benutzer_id: 9, einsatz_id: 7, ansicht: 'uhs-tablet', stelle_id: 2 },
+      ]),
+    );
+  });
+
+  it('merkt sich eine Person nie als Gerätekonto (LLH-1331)', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(PERSON)));
+    setup();
+    await screen.findByText('Angemeldet als Gerda Maier');
+    expect(loadGeraetKonten()).toEqual([]);
   });
 });

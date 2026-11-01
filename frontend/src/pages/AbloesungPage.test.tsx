@@ -8,6 +8,7 @@ import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
 import AbloesungPage, { SCHICHT_HERVORHEBUNG_MS } from './AbloesungPage';
 import { ApiError } from '../api/client';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung, ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
@@ -95,6 +96,7 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   art: 'einheit',
   besatzung: [],
   verbleib: 'ruhe' as const,
+  beginn_quelle: 'hand' as const,
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: inMinuten(-300),
@@ -1177,6 +1179,31 @@ describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
     expect(within(karte).getByText('eingetroffen')).toBeInTheDocument();
   });
 
+  it('?ansicht=ohne-schicht öffnet die Ansicht direkt (LLH-1312)', async () => {
+    renderPage('/einsaetze/1/abloesung?ansicht=ohne-schicht');
+    expect(await screen.findByRole('region', { name: 'Einheiten ohne Schicht' })).toBeVisible();
+    expect(segment(/^Ohne Schicht/)).toBeChecked();
+    await waitFor(() => expect(ohneKarten()).toEqual(['Florian 2 ohne Schicht']));
+    expect(adresse.suche).toBe('?ansicht=ohne-schicht');
+  });
+
+  it('der Segmentwechsel schreibt die Ansicht in die Adresse, „Laufend“ ohne Parameter', async () => {
+    renderPage();
+    await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveTextContent('(1)'));
+    await userEvent.click(segment(/^Ohne Schicht/));
+    await waitFor(() => expect(adresse.suche).toBe('?ansicht=ohne-schicht'));
+    await userEvent.click(segment('Vergangen'));
+    await waitFor(() => expect(adresse.suche).toBe('?ansicht=vergangen'));
+    await userEvent.click(segment(/^Laufend/));
+    await waitFor(() => expect(adresse.suche).toBe(''));
+  });
+
+  it('ein unbekannter Wert in ?ansicht= zeigt „Laufend“', async () => {
+    renderPage('/einsaetze/1/abloesung?ansicht=ohne');
+    await screen.findAllByRole('article');
+    expect(segment(/^Laufend/)).toBeChecked();
+  });
+
   it('die tragende Schicht nennt ihre Erben', async () => {
     renderPage();
     const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
@@ -1251,6 +1278,27 @@ describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
     await userEvent.click(segment(/^Ohne Schicht/));
     expect(segment(/^Laufend/)).toBeChecked();
     expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('?ansicht=ohne-schicht ohne Freigabe der Einheiten zeigt „Laufend“ (LLH-1312)', async () => {
+    freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
+    renderPage('/einsaetze/1/abloesung?ansicht=ohne-schicht');
+    await screen.findAllByRole('article');
+    await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveAttribute('aria-disabled', 'true'));
+    expect(segment(/^Laufend/)).toBeChecked();
+    expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('scheitern direkt unter ?ansicht=ohne-schicht die Freigaben, steht der Fehler mit erneutem Abruf', async () => {
+    vi.mocked(ladeModulFreigaben).mockRejectedValueOnce(new ApiError(500, 'kaputt'));
+    renderPage('/einsaetze/1/abloesung?ansicht=ohne-schicht');
+    expect(
+      await screen.findByText('Einheiten ohne Schicht konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.ant-spin')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+    await waitFor(() => expect(ohneKarten()).toEqual(['Florian 2 ohne Schicht']));
+    expect(screen.queryByText('Einheiten ohne Schicht konnten nicht geladen werden')).toBeNull();
   });
 
   it('scheitert die Zeitachse, steht der Fehler statt eines ewigen Ladens', async () => {

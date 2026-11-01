@@ -96,6 +96,7 @@ export default function OffeneVorgaengePaneel({
   nachforderungen,
   erinnerungen,
   abloesungen,
+  ohneSchicht,
   stelle,
   sicht,
   onSicht,
@@ -112,6 +113,12 @@ export default function OffeneVorgaengePaneel({
   nachforderungen: VorgangsQuelle<Nachforderung>;
   erinnerungen: VorgangsQuelle<Erinnerung>;
   abloesungen: VorgangsQuelle<Abloesung>;
+  /**
+   * Einheiten im Einsatz ohne Schicht (LLH-1312), gezählt vom Aufrufer über
+   * `abloesung/ohneSchicht.ts:findOhneSchicht` wie das Segment der Seite; `null` = unbekannt
+   * (Modul Einheiten gesperrt oder noch nicht geladen). Ein Sprung, kein zweiter Zähler.
+   */
+  ohneSchicht: number | null;
   stelle: MeineStelle;
   sicht: VorgangsSicht;
   onSicht: (sicht: VorgangsSicht) => void;
@@ -432,7 +439,32 @@ export default function OffeneVorgaengePaneel({
           zahl: abloesungZahl,
           zustand: stand(abloesungen),
           ladeZeilen: null,
-          notiz: meine ? 'alle Stellen' : 'fällig oder bald',
+          notiz: (
+            <>
+              {meine ? 'alle Stellen' : 'fällig oder bald'}
+              {ohneSchicht != null && ohneSchicht > 0 && (
+                <>
+                  {' · '}
+                  <Link
+                    to={abloesungPfad(einsatzId, { ansicht: 'ohne-schicht' })}
+                    data-lfh="vorgang-ohne-schicht"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: token.marginXXS,
+                      minHeight: token.controlHeight,
+                      ...monoStil(11),
+                      color: rollen.bedienText,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {ohneSchicht} ohne Schicht
+                    <span aria-hidden="true">↗</span>
+                  </Link>
+                </>
+              )}
+            </>
+          ),
           zahlWort: undefined,
           leer: 'keine',
           eintraege: abListe,
