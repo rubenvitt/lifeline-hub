@@ -84,13 +84,18 @@ function fruehereIds(aktuell: number | null): number[] {
  * Bestätigung noch einreihen.
  */
 export async function adoptFruehereKopplung(aktuell: number): Promise<number> {
+  const passende = passendeIds(aktuell);
+  return passende.length > 0 ? rebindQueueKonten(passende, aktuell) : 0;
+}
+
+/** Frühere Konten mit gleichem Einsatz, gleicher Ansicht und gleicher Stelle wie das aktuelle. */
+function passendeIds(aktuell: number): number[] {
   const konten = loadGeraetKonten();
   const eigenes = konten.find((k) => k.benutzer_id === aktuell);
-  if (!eigenes) return 0;
-  const passende = konten
+  if (!eigenes) return [];
+  return konten
     .filter((k) => k.benutzer_id !== aktuell && matches(k, eigenes))
     .map((k) => k.benutzer_id);
-  return passende.length > 0 ? rebindQueueKonten(passende, aktuell) : 0;
 }
 
 /**
@@ -114,12 +119,13 @@ export function countFruehereKopplung(aktuell: number | null): Promise<number> {
   return countQueueKonten(fruehereIds(aktuell));
 }
 
-/** Verwirft die Einträge früherer Gerätekonten (nur nach Rückfrage, D3). Passende Nachzügler
- *  übernimmt es vorher, statt sie zu löschen. Die Konten bleiben gemerkt, siehe
- *  {@link confirmGeraetKonto}. */
+/** Verwirft die Einträge nicht passender früherer Gerätekonten (nur nach Rückfrage, D3).
+ *  Passende übernimmt es und löscht sie nie, auch keinen Nachzügler zwischen beiden Schritten.
+ *  Die Konten bleiben gemerkt, siehe {@link confirmGeraetKonto}. */
 export async function discardFruehereKopplung(aktuell: number): Promise<number> {
   await adoptFruehereKopplung(aktuell);
-  return deleteQueueKonten(fruehereIds(aktuell));
+  const passende = passendeIds(aktuell);
+  return deleteQueueKonten(fruehereIds(aktuell).filter((id) => !passende.includes(id)));
 }
 
 /**

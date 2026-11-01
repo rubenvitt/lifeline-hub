@@ -1,4 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
+import * as queue from './queue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GeraetAnzeige } from '../api/types';
 import { rohLesen } from '../test/rohIdb';
@@ -124,6 +125,25 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
 
     expect(await queueZaehlerLaden(NEU, 7)).toMatchObject({ ausstehend: 1 });
     expect(await countFruehereKopplung(NEU)).toBe(0);
+  });
+
+  it('löscht beim Verwerfen nie ein passendes Konto, auch nicht nach der Übernahme', async () => {
+    await confirmGeraetKonto(ALT, geraet());
+    await confirmGeraetKonto(NEU, geraet({ kopplung_id: 4 }));
+    // Ein alter Tab reiht genau zwischen Übernahme und Löschen ein.
+    const echt = queue.rebindQueueKonten;
+    const spy = vi.spyOn(queue, 'rebindQueueKonten').mockImplementation(async (von, nach) => {
+      const n = await echt(von, nach);
+      await schreibaktionEinreihen(ALT, 7, sichtung('dazwischen'));
+      return n;
+    });
+    await schreibaktionEinreihen(ALT, 7, sichtung('vorher'));
+
+    expect(await discardFruehereKopplung(NEU)).toBe(0);
+    spy.mockRestore();
+
+    expect(await queueZaehlerLaden(ALT, 7)).toMatchObject({ ausstehend: 1 });
+    expect(await queueZaehlerLaden(NEU, 7)).toMatchObject({ ausstehend: 1 });
   });
 
   it.each([
