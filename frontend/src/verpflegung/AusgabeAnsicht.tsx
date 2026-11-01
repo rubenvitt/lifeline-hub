@@ -736,8 +736,10 @@ export default function AusgabeAnsicht() {
 
         {/* ── Ablehnungen: unter den Sonderkost-Tasten, damit sie keine Taste verschieben (D6):
              die eines Bündels bis zum nächsten Abschluss, die einer Rücknahme aus dem Hinweis
-             „Rückgängig“ bis zur nächsten Rücknahme. ─────────────────────────────────────── */}
-        <div data-lfh="ausgabe-ablehnung">
+             „Rückgängig“ bis zur nächsten Rücknahme. Die Hülle trägt keine eigene Box: leer
+             kostete sie sonst einen zweiten Abstand der Spalte, und am Gerät bei 390 × 700 rollte
+             die Ansicht um diese Pixel (LLH-1294 mit dem festen Bannerplatz aus LLH-1292). ── */}
+        <div data-lfh="ausgabe-ablehnung" style={{ display: 'contents' }}>
           <SpeicherFehler
             fehler={nachtrag.ruecknahmeFehler}
             titel="Nicht zurückgenommen"
