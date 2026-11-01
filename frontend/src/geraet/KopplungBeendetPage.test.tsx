@@ -99,7 +99,11 @@ describe('KopplungBeendetPage: nicht Übertragenes (LLH-1331)', () => {
     }) as const;
 
   it('nennt die Anzahl der Einträge der beendeten Kopplung, ohne Inhalt und ohne Verwerfen', async () => {
-    await geraetKontoBestaetigt(GERAET_ME.id, { ...GERAET_ME.geraet, stelle_id: 2 });
+    await geraetKontoBestaetigt(GERAET_ME.id, {
+      ...GERAET_ME.geraet,
+      ansicht: 'uhs-tablet',
+      stelle_id: 2,
+    });
     for (const cid of ['n-1', 'n-2', 'n-3']) {
       await schreibaktionEinreihen(GERAET_ME.id, 7, notiz(cid));
     }
