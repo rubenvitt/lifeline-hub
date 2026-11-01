@@ -6,7 +6,7 @@
 //! Takt des Erinnerungs-Planers ([`crate::erinnerung::scheduler`]) je Einsatz ein `verpflegung`,
 //! sobald dort eine solche Kopplung im Fenster `(seit, bis]` abgelaufen ist.
 //!
-//! Das Fenster führt der Planer im Speicher. Ein Ablauf während eines Neustarts bleibt ungemeldet:
+//! Das Fenster ([`AblaufFenster`]) führt der Planer im Speicher. Ein Ablauf während eines Neustarts bleibt ungemeldet:
 //! nach dem Neustart holen die Clients ohnehin alles neu (neuer Live-Kanal, Lücke).
 
 use crate::live::{LiveEvent, LiveHub};
@@ -33,23 +33,42 @@ pub async fn einsaetze_mit_ablauf(
 }
 
 /// Meldet je betroffenem Einsatz ein `verpflegung` (Nutzlast `{einsatz_id}`). Liefert die Zahl
-/// der Einsätze. Ein Fehler der Abfrage wird geloggt; der nächste Takt sieht nur sein Fenster.
+/// der Einsätze; ein Fehler der Abfrage geht an den Aufrufer, damit er das Fenster behält.
 pub async fn melde_abgelaufene(
     pool: &SqlitePool,
     live: &LiveHub,
     seit: DateTime<Utc>,
     bis: DateTime<Utc>,
-) -> usize {
-    match einsaetze_mit_ablauf(pool, seit, bis).await {
-        Ok(einsaetze) => {
-            for einsatz_id in &einsaetze {
-                live.publiziere_einsatz(*einsatz_id, LiveEvent::Verpflegung);
-            }
-            einsaetze.len()
-        }
-        Err(e) => {
-            tracing::warn!("Abgelaufene Gerätekopplungen nicht gemeldet: {e}");
-            0
-        }
+) -> Result<usize, sqlx::Error> {
+    let einsaetze = einsaetze_mit_ablauf(pool, seit, bis).await?;
+    for einsatz_id in &einsaetze {
+        live.publiziere_einsatz(*einsatz_id, LiveEvent::Verpflegung);
+    }
+    Ok(einsaetze.len())
+}
+
+/// Führt das Fenster von Takt zu Takt. Es rückt nur nach einer gelungenen Prüfung vor: scheitert
+/// die Abfrage, prüft der nächste Takt dasselbe Fenster mit, statt den Ablauf zu verlieren.
+#[derive(Debug, Clone, Copy)]
+pub struct AblaufFenster {
+    letzter: DateTime<Utc>,
+}
+
+impl AblaufFenster {
+    /// Beginnt bei `start`: Abläufe davor gelten als bekannt.
+    pub fn ab(start: DateTime<Utc>) -> Self {
+        Self { letzter: start }
+    }
+
+    /// Ein Takt bis `jetzt`. Liefert die Zahl der gemeldeten Einsätze.
+    pub async fn takt(
+        &mut self,
+        pool: &SqlitePool,
+        live: &LiveHub,
+        jetzt: DateTime<Utc>,
+    ) -> Result<usize, sqlx::Error> {
+        let n = melde_abgelaufene(pool, live, self.letzter, jetzt).await?;
+        self.letzter = jetzt;
+        Ok(n)
     }
 }

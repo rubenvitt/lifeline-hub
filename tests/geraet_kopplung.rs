@@ -5791,11 +5791,12 @@ async fn kopplung_an_verpflegungsstelle_meldet_sich_live() {
 }
 
 /// LLH-1316: Läuft eine Kopplung an einer Verpflegungsstelle ab, meldet der Takt des Planers
-/// genau einmal `verpflegung` (Fenster `(seit, bis]`). Abgelaufene Kopplungen ohne Stelle oder
-/// schon widerrufene melden nichts.
+/// genau einmal `verpflegung` (Fenster `(letzter Takt, jetzt]`), auch wenn ein Takt dazwischen
+/// an der Abfrage scheitert. Abgelaufene Kopplungen ohne Stelle oder schon widerrufene melden
+/// nichts.
 #[tokio::test]
 async fn ablauf_einer_kopplung_an_verpflegungsstelle_meldet_sich_live() {
-    use lifeline_hub::geraet::ablauf::melde_abgelaufene;
+    use lifeline_hub::geraet::ablauf::AblaufFenster;
     let (app, pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -5825,26 +5826,43 @@ async fn ablauf_einer_kopplung_an_verpflegungsstelle_meldet_sich_live() {
     }
     assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, false);
 
-    // Ein Takt vor dem Ablauf sieht nichts.
-    let frueher = jetzt - chrono::Duration::seconds(60);
-    assert_eq!(
-        melde_abgelaufene(&pool, &live, frueher, jetzt - chrono::Duration::seconds(30)).await,
-        0
-    );
+    // Takte wie im Planer, je 30 s: der vor dem Ablauf sieht nichts, der danach meldet ihn
+    // einmal, der nächste nicht noch einmal.
+    let takt = chrono::Duration::seconds(30);
+    let mut fenster = AblaufFenster::ab(jetzt - takt * 2);
+    assert_eq!(fenster.takt(&pool, &live, jetzt - takt).await.unwrap(), 0);
     assert_eq!(
         verpflegung_ereignisse(&mut rx, einsatz),
         0,
         "vor dem Ablauf"
     );
-
-    let seit = jetzt - chrono::Duration::seconds(30);
-    assert_eq!(melde_abgelaufene(&pool, &live, seit, jetzt).await, 1);
+    assert_eq!(fenster.takt(&pool, &live, jetzt).await.unwrap(), 1);
     assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 1, "Ablauf");
-
-    // Der nächste Takt meldet denselben Ablauf nicht noch einmal.
-    let spaeter = jetzt + chrono::Duration::seconds(30);
-    assert_eq!(melde_abgelaufene(&pool, &live, jetzt, spaeter).await, 0);
+    assert_eq!(fenster.takt(&pool, &live, jetzt + takt).await.unwrap(), 0);
     assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 0, "nächster Takt");
+
+    // Scheitert die Abfrage, bleibt das Fenster stehen: der nächste Takt meldet den Ablauf nach.
+    let mut fenster = AblaufFenster::ab(jetzt - takt);
+    sqlx::query("ALTER TABLE geraet_kopplung RENAME TO geraet_kopplung_weg")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(fenster.takt(&pool, &live, jetzt).await.is_err());
+    sqlx::query("ALTER TABLE geraet_kopplung_weg RENAME TO geraet_kopplung")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        verpflegung_ereignisse(&mut rx, einsatz),
+        0,
+        "Fehler meldet nichts"
+    );
+    assert_eq!(fenster.takt(&pool, &live, jetzt + takt).await.unwrap(), 1);
+    assert_eq!(
+        verpflegung_ereignisse(&mut rx, einsatz),
+        1,
+        "nach dem Fehler"
+    );
 }
 
 /// LLH-1048 (LLH-1024 F7): Die Verpflegung bindet wahlweise. Ohne Stelle koppelt das Gerät

@@ -209,19 +209,17 @@ pub fn starte_scheduler(pool: SqlitePool, live: LiveHub) {
         let mut ticker = tokio::time::interval(Duration::from_secs(TICK_SEKUNDEN));
         // Fenster für das Ende von Gerätekopplungen (LLH-1316): jeder Ablauf genau einmal, auch
         // wenn ein Takt länger braucht oder ausfällt.
-        let mut letzter = Utc::now();
+        let mut fenster = crate::geraet::ablauf::AblaufFenster::ab(Utc::now());
         loop {
             ticker.tick().await;
             let jetzt = Utc::now();
             // Eine Panic im Tick beendet nur diesen Tick, nie die Schleife (LFH-924): das
             // JoinHandle wird verworfen, ein gestorbener Task fiele niemandem auf.
             isoliert("Tick", tick_einmal(&pool, &live, jetzt)).await;
-            isoliert(
-                "Kopplungsende",
-                crate::geraet::ablauf::melde_abgelaufene(&pool, &live, letzter, jetzt),
-            )
-            .await;
-            letzter = jetzt;
+            if let Some(Err(e)) = isoliert("Kopplungsende", fenster.takt(&pool, &live, jetzt)).await
+            {
+                tracing::warn!("Abgelaufene Gerätekopplungen nicht gemeldet: {e}");
+            }
         }
     });
 }
