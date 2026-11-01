@@ -1,3 +1,32 @@
+## [1.0.0-alpha.164](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.163...v1.0.0-alpha.164) (2026-11-01)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration:** Diese Version erweitert das Datenmodell der Ablösung. Gespeichert werden jetzt der Verbleib der abgelösten Einheit, der gewählte Bereitstellungsraum und die dabei entstandenen Raumbuchungen, damit sich ein Vollzug später zurücknehmen lässt.
+
+### Kräfte und Mittel
+
+**Verbleib der abgelösten Einheit beim Vollzug**
+- Wird eine Ablösung als „Ganze Einheit“ vollzogen, fragt der Dialog jetzt im Feld „Danach“, wohin die abgelöste Einheit geht. Zur Wahl stehen: **In Ruhe** (Vorgabe), **in einen aktiven Bereitstellungsraum** oder **entlassen**.
+- **Bereitstellungsraum:** Die Einheit tritt im selben Schritt in den Raum ein. Dafür muss das Modul Bereitstellungsräume freigegeben sein. Ist der Raum nicht mehr aktiv oder storniert, oder steht die Einheit schon darin, bricht der Vollzug ab. Es wird dann nichts teilweise gespeichert.
+- **Entlassen:** Die Zeitachse der Einheit, ihrer Teileinheiten und ihrer Personen zeigt „Entlassung“ statt „Ablösung“. Die Schicht gilt weiter als abgelöst und wird nicht doppelt beendet.
+- **Ablöser aus dem Bereitstellungsraum:** Wartet die ablösende Einheit in einem Raum, wird sie automatisch abgerufen und aus dem Raum ausgebucht. Ist sie schon abgerufen, wird sie nur ausgebucht.
+- Der Eintrag im Einsatztagebuch nennt den Verbleib und den Abruf. Kommen sehr viele Räume zusammen, fallen überzählige Angaben weg und werden nur gezählt. Der Verbleib steht immer im Eintrag.
+- Die Karte der Ablösung zeigt den Verbleib als „danach …“.
+- Lässt sich die Liste der Räume nicht laden, nennt der Dialog unter „Danach“ den Grund.
+- **Rücknahme:** Wird ein Vollzug zurückgenommen, werden auch die Raumbuchungen rückgängig gemacht, solange sie das jüngste Ereignis der Einheit sind. Eine Entlassung wird dabei gestrichen. Eine ablösende Einheit kehrt nur in einen Raum zurück, der noch aktiv und nicht storniert ist, und nur, wenn die Einheit nicht aufgelöst wurde.
+- Die Anwenderdokumentation zur Ablösung ist ergänzt, mit Bild.
+
+**Bereitstellungsraum**
+- Verschwindet ein gerade ausgewählter Knopf aus der Liste, gibt die Liste neu eingehende Einträge wieder frei. Vorher konnte sie stehen bleiben.
+
+### Betreuung und Verpflegung
+
+- **„Letzte Buchungen“ springt nicht mehr:** Zählt ein zweites Gerät im selben Zeitfenster mit, schieben seine Buchungen die Liste nicht mehr nach unten. Solange die Liste mit Maus oder Stift bedient wird, ein Knopf darin ausgewählt ist oder eine Rückfrage offen ist, warten neue Buchungen anderer Geräte. Sie werden hinter einem Hinweis oben in der Liste gesammelt, etwa „1 neu“. So bleibt die Zeile stehen, auf der gerade „Zurücknehmen“ getippt wird.
+- Eigene Ausgaben erscheinen sofort, auch nachgetragene und solche, die nach einer Zeit ohne Netz nachgesendet werden.
+- Am Gerät mit kleinem Bildschirm (390 × 700) muss in der Ausgabeansicht nicht mehr gescrollt werden.
+- Die Anwenderdokumentation zu „Verpflegung“ und „Verpflegung am Gerät“ ist angepasst.
+
 ## [1.0.0-alpha.163](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.162...v1.0.0-alpha.163) (2026-11-01)
 
 ### Wichtige Änderungen
