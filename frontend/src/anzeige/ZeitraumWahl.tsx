@@ -1,12 +1,7 @@
 import { Button, Flex, Popover, theme } from 'antd';
 import { useRef, useState } from 'react';
-import {
-  ZEIT_BLATT,
-  zeitPanelAmFeldAb,
-  ZeitraumEingabe,
-  type Zeitraum,
-} from '../anzeige/ZeitpunktEingabe';
-import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { ZEIT_BLATT, zeitPanelAmFeldAb, ZeitraumEingabe, type Zeitraum } from './ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from './zeitEingabe';
 import {
   ZEITFENSTER_LABEL,
   zeitfensterArten,
@@ -14,8 +9,8 @@ import {
   taktisch,
   zeitraumBeschriftung,
   type ZeitfensterArt,
-} from '../anzeige/zeitfenster';
-import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+} from './zeitfenster';
+import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { serverJetzt } from '../offline/serveruhr';
@@ -33,11 +28,13 @@ interface Props {
   /** `abgehalten_at` der letzten Lagebesprechung — nur mit Freigabe und wenn es eine gibt. */
   letzteLb?: string | null;
   onWahl: (grenzen: ZeitraumGrenzen) => void;
+  /** `data-lfh` des Auslösers, je Liste eigen (`etb-zeitraum`, `lagemeldungen-zeitraum`). */
+  kennung: string;
 }
 
 /**
- * Der Platz „Zeitraum“ der ETB-Filterleiste (LLH-1080, Spec `etb-filterleiste`, „Zeitraum mit
- * Schnellwahl“): EIN Bedienziel statt zweier Felder. Es zeigt den wirksamen Wert („seit 1345“,
+ * Der Zeitraumfilter einer zeitlich geordneten Liste (LLH-1080, Spec `etb-filterleiste`, „Zeitraum
+ * mit Schnellwahl“; seit LLH-1322 auch die Lagemeldungen): EIN Bedienziel statt zweier Felder. Es zeigt den wirksamen Wert („seit 1345“,
  * „seit LB 1330“, „Heute“, „1000–1100“) und öffnet eine Spalte großer Ziele: die Schnellwahl
  * (`anzeige/zeitfenster.ts`) und einen eigenen Zeitraum im Zeiteingabe-Baustein (taktisch
  * tippbar, ohne Sekunden, „bis“ leer heißt jetzt).
@@ -47,7 +44,7 @@ interface Props {
  * das Feld passt (Handschirm, Handschuh), steht der Aufklapper als Blatt (`ZEIT_BLATT`, dieselbe
  * Weiche wie die Zeitfelder).
  */
-export default function EtbZeitraumWahl({ von, bis, letzteLb, onWahl }: Props) {
+export default function ZeitraumWahl({ von, bis, letzteLb, onWahl, kennung }: Props) {
   // Dieselbe Anzeigezone wie die Zeitfelder darin und der Druckkopf (LFH-692).
   const zone = useAnzeigeKonventionen().konventionen.zeitzone;
   const [offen, setOffen] = useState(false);
@@ -159,7 +156,7 @@ export default function EtbZeitraumWahl({ von, bis, letzteLb, onWahl }: Props) {
         aria-haspopup="dialog"
         aria-expanded={offen}
         aria-label={von || bis ? `Zeitraum ${beschriftung}` : 'Zeitraum'}
-        data-lfh="etb-zeitraum"
+        data-lfh={kennung}
       >
         <span style={von || bis ? monoStil(13) : undefined}>{beschriftung}</span>
       </Button>

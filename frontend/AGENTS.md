@@ -756,6 +756,11 @@ anwendbar), „nicht geprüft" ist keins.
   „T.M.JJJJ“, „TT.MM.JJ“, `YYYY-MM-DD`; zweistelliges Jahr = jüngstes nicht zukünftiges; „heute“
   als Tag der Anzeigezone vom Aufrufer), gespeichert als `YYYY-MM-DD`, gezeigt über
   `formatKalenderdatum` („TT.MM.JJJJ“, Altbestand roh); keine Schnellwahl, keine relative Eingabe.
+- **Zeitraumfilter einer Liste** (LLH-1080, LLH-1322, Spec `etb-filterleiste`, „Zeitraum mit
+  Schnellwahl“): ETB und Lagemeldungen nehmen `anzeige/ZeitraumWahl.tsx` mit der Schnellwahl
+  `anzeige/zeitfenster.ts`, kein eigenes Zeitfenster je Seite. Eine Wahl schreibt absolute,
+  minutengenaue `von`/`bis` in die Adresse; „Seit letzter Lagebesprechung“ liefert nur
+  `lagebesprechung/useLetzteLagebesprechung.ts` (Freigabe, volle Minute).
 - **Zeiteingabe ist ein Textfeld** (LLH-1070, Spec `zeiteingabe`, „Eingabe als Text“ ff.,
   `openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`): getippte
   Zeiten deutet nur `anzeige/zeitParser.ts:deuteZeit` (taktisch `1430`/`101430`/`101430okt26`,

@@ -3,11 +3,12 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route } from 'react-router';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import LagemeldungenPage from './LagemeldungenPage';
 import type { LageMeldung } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { setzeOnline } from '../test/utils';
+import { freigabenFixture } from '../test/fixtures';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 // `useAuthOptional`: die Marke „berichtigt“ fragt, ob ein Gerät angemeldet ist (LLH-1382).
@@ -29,6 +30,10 @@ vi.mock('../fuehrung/useFunktionsVorschlaege', () => ({
 const erfasseMeldungOfflineFaehig = vi.fn();
 vi.mock('../offline/schreiben', () => ({
   erfasseMeldungOfflineFaehig: (...a: unknown[]) => erfasseMeldungOfflineFaehig(...a),
+}));
+const fetchLagebesprechungStand = vi.fn();
+vi.mock('../api/lagebesprechung', () => ({
+  fetchLagebesprechungStand: (...a: unknown[]) => fetchLagebesprechungStand(...a),
 }));
 const listeLageMeldungen = vi.fn();
 const markLageMeldungGesehen = vi.fn();
@@ -70,14 +75,27 @@ const lage = (over: Partial<LageMeldung> = {}): LageMeldung => ({
   ...over,
 });
 
-function renderPage() {
+/** Die Adresse der Seite, für den Zeitraum (LLH-1322). */
+function Adresse() {
+  return <output data-testid="adresse">{decodeURIComponent(useLocation().search)}</output>;
+}
+
+function renderPage(pfad = '/einsaetze/1/lagemeldungen') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
-        <MemoryRouter initialEntries={['/einsaetze/1/lagemeldungen']}>
+        <MemoryRouter initialEntries={[pfad]}>
           <Routes>
-            <Route path="/einsaetze/:id/lagemeldungen" element={<LagemeldungenPage />} />
+            <Route
+              path="/einsaetze/:id/lagemeldungen"
+              element={
+                <>
+                  <LagemeldungenPage />
+                  <Adresse />
+                </>
+              }
+            />
             <Route path="/einsaetze/:id/meldungen" element={<div>MELDUNGEN-MODUL</div>} />
           </Routes>
         </MemoryRouter>
@@ -227,7 +245,11 @@ describe('LagemeldungenPage', () => {
     expect(suche).toHaveValue('');
   });
 
-  it('filtert über das Zeitfenster', async () => {
+  /**
+   * LLH-1322: dieselbe Schnellwahl wie im ETB (`anzeige/ZeitraumWahl.tsx`). Die Wahl schreibt
+   * absolute, minutengenaue Grenzen in die Adresse; gefiltert wird nach Ereigniszeit.
+   */
+  it('filtert über die Zeitraum-Schnellwahl und schreibt die Grenze in die Adresse', async () => {
     const jetzt = new Date();
     const vorMinuten = (m: number) => {
       const d = new Date(jetzt.getTime() - m * 60_000);
@@ -241,14 +263,99 @@ describe('LagemeldungenPage', () => {
     ]);
     renderPage();
     await screen.findByText('Vortag');
-    await userEvent.click(
-      within(screen.getByRole('radiogroup', { name: 'Zeitfenster' })).getByRole('radio', {
-        name: 'Letzte Stunde',
-      }),
-    );
+    expect(screen.queryByRole('radiogroup', { name: 'Zeitfenster' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Zeitraum' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Letzte Stunde' }));
     expect(screen.getByText('Frisch')).toBeInTheDocument();
     expect(screen.queryByText('Vorhin')).toBeNull();
     expect(screen.queryByText('Vortag')).toBeNull();
+    expect(screen.getByText('1 von 3 Lagemeldungen')).toBeInTheDocument();
+    // Absolut und auf die Minute abgerundet, ohne `bis`.
+    expect(screen.getByTestId('adresse').textContent).toMatch(
+      /^\?von=\d{4}-\d{2}-\d{2} \d{2}:\d{2}:00$/,
+    );
+    expect(screen.getByRole('button', { name: /^Zeitraum seit \d{4}$/ })).toBeInTheDocument();
+  });
+
+  it('ein geteilter Link mit Zeitraum zeigt dieselbe Menge, „Filter zurücksetzen“ räumt ihn', async () => {
+    listeLageMeldungen.mockResolvedValue([
+      lage({ id: 1, text: 'Davor', ereigniszeit: '2026-06-12 07:59:59' }),
+      lage({ id: 2, text: 'Am Anfang', ereigniszeit: '2026-06-12 08:00:00' }),
+      lage({ id: 3, text: 'Am Ende', ereigniszeit: '2026-06-12 09:00:00' }),
+      lage({ id: 4, text: 'Danach', ereigniszeit: '2026-06-12 09:00:30' }),
+    ]);
+    renderPage(
+      '/einsaetze/1/lagemeldungen?von=2026-06-12%2008%3A00%3A00&bis=2026-06-12%2009%3A00%3A00',
+    );
+    // Grenzen einschließend wie der ETB-Filter am Server.
+    expect(await screen.findByText('Am Anfang')).toBeInTheDocument();
+    expect(screen.getByText('Am Ende')).toBeInTheDocument();
+    expect(screen.queryByText('Davor')).toBeNull();
+    expect(screen.queryByText('Danach')).toBeNull();
+    const ort = (s: string) => alsOrtszeit(s)!.format('DDHHmm');
+    expect(
+      screen.getByRole('button', {
+        name: `Zeitraum ${ort('2026-06-12 08:00:00')}–${ort('2026-06-12 09:00:00')}`,
+      }),
+    ).toBeInTheDocument();
+
+    const suche = screen.getByRole('searchbox', { name: 'Suche in Lagemeldungen' });
+    await userEvent.type(suche, 'gibt es nicht');
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.getByText('Davor')).toBeInTheDocument();
+    expect(screen.getByText('Danach')).toBeInTheDocument();
+    expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/);
+    expect(screen.getByRole('button', { name: 'Zeitraum' })).toBeInTheDocument();
+  });
+
+  describe('„Seit letzter Lagebesprechung“ wie im ETB', () => {
+    const stand = {
+      anzahl_lagebesprechungen: 1,
+      letzte_lagebesprechung: {
+        // Sekundengenau vom Server; die Wahl läuft auf der vollen Minute.
+        abgehalten_at: '2026-06-12 08:30:42',
+        einsatz_id: 1,
+        entschluss: '',
+        erfasst_at: '2026-06-12 08:35:00',
+        erfasst_von_id: 1,
+        etb_eintrag_id: 50,
+        id: 1,
+        lfd_nr: 1,
+      },
+    };
+
+    it('mit Freigabe und abgehaltener Besprechung: Grenze auf der vollen Minute', async () => {
+      ladeModulFreigaben.mockResolvedValue(freigabenFixture());
+      fetchLagebesprechungStand.mockResolvedValue(stand);
+      listeLageMeldungen.mockResolvedValue([
+        lage({ id: 1, text: 'Vor der LB', ereigniszeit: '2026-06-12 08:29:59' }),
+        lage({ id: 2, text: 'In derselben Minute', ereigniszeit: '2026-06-12 08:30:10' }),
+      ]);
+      renderPage();
+      await screen.findByText('Vor der LB');
+      await userEvent.click(screen.getByRole('button', { name: 'Zeitraum' }));
+      const hhmm = alsOrtszeit('2026-06-12 08:30:00')!.format('DDHHmm');
+      await userEvent.click(
+        await screen.findByRole('button', { name: `Seit letzter Lagebesprechung (${hhmm})` }),
+      );
+      expect(screen.getByText('In derselben Minute')).toBeInTheDocument();
+      expect(screen.queryByText('Vor der LB')).toBeNull();
+      expect(screen.getByTestId('adresse')).toHaveTextContent('?von=2026-06-12 08:30:00');
+      expect(screen.getByRole('button', { name: `Zeitraum seit LB ${hhmm}` })).toBeInTheDocument();
+    });
+
+    it('ohne Freigabe der Lagebesprechung: keine Anfrage, keine Wahl', async () => {
+      ladeModulFreigaben.mockResolvedValue(
+        freigabenFixture({ lagebesprechung: { zugriff: false } }),
+      );
+      fetchLagebesprechungStand.mockResolvedValue(stand);
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(screen.getByRole('button', { name: 'Zeitraum' }));
+      await screen.findByRole('button', { name: 'Letzte Stunde' });
+      expect(screen.queryByRole('button', { name: /Seit letzter Lagebesprechung/ })).toBeNull();
+      expect(fetchLagebesprechungStand).not.toHaveBeenCalled();
+    });
   });
 
   /** Leer öffnet der Knopf das Erfassen (LFH-965, LLH-1031). */

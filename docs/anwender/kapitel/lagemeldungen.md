@@ -2,7 +2,7 @@
 titel: Lagemeldungen
 gruppen: [fuehrung]
 reihenfolge: 250
-quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/MeldungFormular.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts, frontend/src/meldungen/LageAngabenBearbeiten.tsx, frontend/src/pages/lagekarte/Inspector.tsx, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx]
+quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/anzeige/zeitfenster.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/MeldungFormular.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts, frontend/src/meldungen/LageAngabenBearbeiten.tsx, frontend/src/pages/lagekarte/Inspector.tsx, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx]
 ---
 
 ## Überblick
@@ -61,9 +61,12 @@ Dieselbe Lagemeldung lässt sich auch im Modul „Meldungen“ erfassen, mit der
 
    ![Zeitachse „Lagemeldungen“ mit zwei Lagemeldungen der Demo und vier übernommenen Meldungen, zwei davon verortet](../bilder/lagemeldungen/lagemeldungen.png)
 
-2. Zum Eingrenzen im Suchfeld nach Meldungstext, Absender oder Nummer suchen oder ein Zeitfenster
-   wählen: „Letzte Stunde“, „Letzte 4 Stunden“ oder „Heute“. Das Zeitfenster gilt für die
-   Ereigniszeit.
+2. Zum Eingrenzen im Suchfeld nach Meldungstext, Absender oder Nummer suchen oder „Zeitraum“
+   öffnen, dieselbe Schnellwahl wie im Einsatztagebuch: „Letzte Stunde“, „Letzte 4 Stunden“,
+   „Seit letzter Lagebesprechung“ (nur, wenn eine abgehalten ist) und „Heute“; unter „Eigener
+   Zeitraum“ lassen sich „von“ und „bis“ taktisch tippen, „bis“ leer heißt bis jetzt. Der Zeitraum
+   gilt für die Ereigniszeit und steht mit festen Uhrzeiten in der Adresse der Seite; ein Link
+   zeigt beim Empfänger dieselben Lagemeldungen.
 3. Nach dem Ort filtern: „Mit Koordinaten“ oder „Ohne Koordinaten“; nach der Herkunft: „Gerät“
    (von einem gekoppelten Gerät erfasst) oder „Übernommen“ (Meldungen anderer Art, die in die Lage
    übernommen wurden). Der Kopf nennt dann „… von … Lagemeldungen“.

@@ -37,13 +37,13 @@ import EtbLesemarkeBanner, { useEtbLesemarke } from '../etb/EtbLesemarkeBanner';
 import { lesemarkeImFenster } from '../etb/lesemarkeModell';
 import { Select } from '../components/Select';
 import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
-import EtbZeitraumWahl from '../etb/EtbZeitraumWahl';
+import ZeitraumWahl from '../anzeige/ZeitraumWahl';
 import { filterMerkmale } from '../etb/filterMerkmale';
 import { serverJetzt } from '../offline/serveruhr';
-import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { taktisch } from '../anzeige/zeitfenster';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { fetchLagebesprechungStand } from '../api/lagebesprechung';
+import { useLetzteLagebesprechung } from '../lagebesprechung/useLetzteLagebesprechung';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
@@ -287,26 +287,9 @@ export default function EtbPage() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const dokumenteFrei = istKeyFreigegeben('dokumente', modulFreigabenQuery.data);
-  /*
-   * Die letzte Lagebesprechung für die Schnellwahl „Seit letzter Lagebesprechung“ (LLH-1080):
-   * Gate ist die Freigabe `lagebesprechung` (LLH-1111), nicht der Stab. Ohne sie und ohne
-   * abgehaltene Besprechung wird die Wahl nicht angeboten. Derselbe Key wie die Modulseite.
-   */
-  const lagebesprechungFrei = istKeyFreigegeben('lagebesprechung', modulFreigabenQuery.data);
-  const lagebesprechungQuery = useQuery({
-    queryKey: einsatzKeys.lagebesprechung(einsatzId),
-    queryFn: () => fetchLagebesprechungStand(einsatzId),
-    enabled: lagebesprechungFrei,
-  });
-  const letzteLbStand = lagebesprechungFrei
-    ? (lagebesprechungQuery.data?.letzte_lagebesprechung ?? null)
-    : null;
-  // Auf die Minute abgerundet wie jede Wahl der Schnellwahl (Spec `etb-filterleiste`): „seit LB
-  // 1330“ schließt einen Eintrag um 13:30:10 ein, auch wenn die Besprechung um 13:30:42 endete.
-  const letzteLb = useMemo(() => {
-    const z = alsZeitpunkt(letzteLbStand?.abgehalten_at);
-    return z ? alsBackendZeit(z.utc().startOf('minute')) : null;
-  }, [letzteLbStand?.abgehalten_at]);
+  // Die letzte Lagebesprechung für „Seit letzter Lagebesprechung“ (LLH-1080): Freigabe und
+  // Minutengrenze im gemeinsamen Hook, dieselben Regeln wie in den Lagemeldungen (LLH-1322).
+  const { stand: letzteLbStand, von: letzteLb } = useLetzteLagebesprechung(einsatzId);
 
   /*
    * Nachträge vor der Lagebesprechung (LLH-1071/LLH-1080, Entscheidung Ruben 17.10.2026): „seit
@@ -1029,11 +1012,12 @@ export default function EtbPage() {
                   <>
                     {/* Ein Bedienziel statt zweier Felder (LLH-1080): schreibt absolute Grenzen
                         einmal, kein Entprellen — ein Sprungwert wie Typ und Einheit. */}
-                    <EtbZeitraumWahl
+                    <ZeitraumWahl
                       von={filter.von}
                       bis={filter.bis}
                       letzteLb={letzteLb}
                       onWahl={(g) => filterAendern(g)}
+                      kennung="etb-zeitraum"
                     />
                     {/* Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
                         der Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert. */}

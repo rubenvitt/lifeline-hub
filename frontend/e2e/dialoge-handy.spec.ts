@@ -48,7 +48,7 @@ const panel = (page: Page) =>
     .locator('.ant-popover:not(.ant-popover-hidden)')
     .filter({ has: page.locator('.lfh-zeit-fuss') });
 
-/** Die Zeitraum-Schnellwahl der ETB-Filterleiste (LLH-1080, `etb/EtbZeitraumWahl.tsx`). */
+/** Die Zeitraum-Schnellwahl der ETB-Filterleiste (LLH-1080, `anzeige/ZeitraumWahl.tsx`). */
 const zeitraumWahl = (page: Page) => page.locator('[data-lfh="etb-zeitraum"]');
 
 /**
