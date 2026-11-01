@@ -113,7 +113,7 @@ Sanitätsdienst. Wer einen Einsatz anlegt, wählt sie im Dialog „Neuen Einsatz
 4. Unter „Sichtbare Module“ die Häkchen der Module entfernen, die der Einsatz nicht zeigen soll.
    Die Module stehen nach den Kategorien der Navigation.
 
-   ![Dialog „Einsatz-Vorlage anlegen“ mit Bezeichnung „Großbrand“, Einsatzart „Realeinsatz“ und den sichtbaren Modulen nach Kategorien, „Stab“ und „Tiere“ ohne Häkchen](../bilder/stammdaten/einsatz-vorlage-anlegen.png)
+   ![Dialog „Einsatz-Vorlage anlegen“ mit Bezeichnung „Großbrand“, Einsatzart „Realeinsatz“, daneben Schichtmodell „keins“, und den sichtbaren Modulen nach Kategorien, „Stab“ und „Tiere“ ohne Häkchen](../bilder/stammdaten/einsatz-vorlage-anlegen.png)
 
 5. „Speichern“ wählen.
 
