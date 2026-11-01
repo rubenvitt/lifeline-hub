@@ -469,6 +469,8 @@ export type BrVerlaufEintrag = S['BrVerlaufEintrag'];
 export type EintreffenEingabe = S['EintreffenEingabe'];
 /** Erwartete Kraft aus einer Nachforderung mit Ziel = Raum (LLH-1387). */
 export type ErwarteteKraft = S['ErwarteteKraft'];
+/** Einheiten-Vorlage als Treffer beim Eintreffen am Raum (LLH-1300). */
+export type StammTreffer = S['StammTreffer'];
 export type EintreffenErgebnis = S['EintreffenErgebnis'];
 export type EintreffenZeitachse = S['EintreffenZeitachse'];
 export type UebernahmeBody = S['UebernahmeBody'];
@@ -1040,6 +1042,8 @@ export type VerpflegungEmpfaenger = S['VerpflegungEmpfaenger'];
 export type EmpfaengerEinheit = S['EmpfaengerEinheit'];
 /** Ein Einsatzabschnitt als Empfänger (Zuführung an den Abschnitt). */
 export type EmpfaengerAbschnitt = S['EmpfaengerAbschnitt'];
+/** Betreuungsstelle der Empfängerliste (LLH-1295): nur Kennung, Bezeichnung, geschlossen. */
+export type EmpfaengerBetreuungsstelle = S['EmpfaengerBetreuungsstelle'];
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `POST …/verpflegung/stellen` (`StelleAnlegen`).
@@ -1160,11 +1164,13 @@ export interface AusgabeEingabe {
   /** Verpflegungsstelle (LLH-1040): fremd, unbekannt oder storniert 422, aufgelöst 409 — außer
    *  `zeitpunkt_at` liegt vor der Auflösung. */
   verpflegungsstelle_id?: number;
-  /** Empfänger (LLH-1055), höchstens einer von `einheit_id` und `abschnitt_id` (beide 422).
-   *  Unbekannte oder fremde Einheit bzw. Abschnitt 404; aufgelöste Einheit 409 — außer
-   *  `zeitpunkt_at` liegt vor der Auflösung. */
+  /** Empfänger (LLH-1055, LLH-1295), höchstens einer von `einheit_id`, `abschnitt_id` und
+   *  `betreuungsstelle_id` (mehr als einer 422). Unbekannte oder fremde Einheit, Abschnitt oder
+   *  Stelle 404, ebenso eine stornierte Stelle; aufgelöste Einheit 409 — außer `zeitpunkt_at`
+   *  liegt vor der Auflösung. Eine geschlossene Stelle nimmt an. */
   einheit_id?: number;
   abschnitt_id?: number;
+  betreuungsstelle_id?: number;
   /** Idempotenzschlüssel der Offline-Queue (LFH-688); ein Replay liefert die gespeicherte Ausgabe. */
   client_id?: string;
 }

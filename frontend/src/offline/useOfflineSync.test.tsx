@@ -505,7 +505,7 @@ describe('Verpflegungsausgaben in der Offline-Queue (LFH-688)', () => {
     client.setQueryData<Verpflegung>(einsatzKeys.verpflegung(7), {
       zeitfenster: [fenster(8, 0), fenster(9, 100)],
       stellen: [],
-      empfaenger: { einheiten: [], abschnitte: [] },
+      empfaenger: { einheiten: [], abschnitte: [], betreuungsstellen: [] },
     });
     vi.mocked(erfasseAusgabe).mockResolvedValue({ ausgabe_id: 5, zeitfenster: fenster(9, 220) });
     await schreibaktionEinreihen(BENUTZER_A, 7, ausgabe);
@@ -551,7 +551,7 @@ describe('Verpflegungsausgaben in der Offline-Queue (LFH-688)', () => {
     client.setQueryData<Verpflegung>(einsatzKeys.verpflegung(7), {
       zeitfenster: [vorher],
       stellen: [],
-      empfaenger: { einheiten: [], abschnitte: [] },
+      empfaenger: { einheiten: [], abschnitte: [], betreuungsstellen: [] },
     });
     const nachher = zeitfenster({
       id: 9,

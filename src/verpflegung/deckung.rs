@@ -132,6 +132,7 @@ mod tests {
             verpflegungsstelle_id: stelle,
             einheit_id: None,
             abschnitt_id: None,
+            betreuungsstelle_id: None,
             zurueckgenommen_at: zurueck.then(|| "2026-09-24 10:05:00".into()),
             erfasst_at: "2026-09-24 10:00:00".into(),
         }

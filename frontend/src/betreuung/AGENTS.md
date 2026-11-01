@@ -89,7 +89,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
 - **Verpflegung** (LFH-634, `pages/VerpflegungPage.tsx`, `src/verpflegung/`): eigene Zeitfenster;
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge
   der EP; Ausgabe verweist nur per Kennung (`nachforderung_id`, `verpflegungsstelle_id`, Empfänger
-  `einheit_id` oder `abschnitt_id`); Einstufung im Client (`verpflegung/deckung.ts`); ins ETB nur
+  `einheit_id`, `abschnitt_id` oder `betreuungsstelle_id`); Einstufung im Client (`verpflegung/deckung.ts`); ins ETB nur
   Zeitfenster und Bedarf (Zone des Einsatzes vor der Organisation, `zeitdarstellung::zeitstil_laden`,
   LLH-1443), dazu Art und Stellen des Zeitfensters und Inbetriebnahme/Auflösung einer Stelle; kein
   Modulzähler. Ein Zeitfenster wird in seiner Karte
@@ -125,6 +125,14 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   `einheit` und `abschnitt` erreichen Leser der Verpflegung über die Gate-Menge
   (`LiveEvent::modul_keys`), `personal` nicht; der Client lädt dann `einsatzKeys.verpflegung` neu.
   Eine Ausgabe an eine Einheit ist eine Spur (`SPUREN_EINHEIT`): auflösen behält sie, stornieren 422.
+  **Betreuungsstelle als Empfänger** (LLH-1295, Ausgabe an Betreute): dritte Kennung
+  `betreuungsstelle_id` (Migration 0260), mehr als ein Empfänger 422; fremd, unbekannt oder
+  storniert 404, geschlossen nimmt an. In `empfaenger.betreuungsstellen` nur `id`, `bezeichnung`,
+  `geschlossen` (Feldmenge in `tests/verpflegung.rs` gepinnt, keine Leitung/Kontakt/Belegung), auch
+  ohne Modul `betreuung`; dafür erreicht das Ereignis `betreuung` Leser der Verpflegung. Der Storno
+  der Stelle löst den Bezug ihrer Ausgaben (`verpflegung::repo::loese_betreuungsstelle_tx`). Im
+  Client keine Stärke-Taste, nie unter „Noch nicht verpflegt“, unter „Verpflegt“ je Stelle eine
+  Zeile; geschlossene Stellen nur im Nachtrag.
   Oberfläche (LLH-1055 Teil II, Kern `verpflegung/empfaengerKern.ts`): Empfänger nur aus
   `empfaenger`, Vorgabe „ohne Empfänger“ (Zählen bleibt so schnell wie ohne), die Wahl wird nie
   gemerkt. Mengenvorgabe einer Einheit = Ist-Stärke ihres Teilbaums über `summiereStaerke`

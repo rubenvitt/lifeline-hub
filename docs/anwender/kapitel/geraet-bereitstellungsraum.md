@@ -2,7 +2,7 @@
 titel: Bereitstellungsraum am Gerät
 gruppen: [geraete]
 reihenfolge: 740
-quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/kraefte/MaterialAmOrt.tsx, src/routes/einsatz_material.rs, src/geraet/mod.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/offline/schreiben.ts, frontend/src/offline/useOfflineSync.ts, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/kraefte/MaterialAmOrt.tsx, src/routes/einsatz_material.rs, src/geraet/mod.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, src/bereitstellungsraum/eintreffen.rs, src/bereitstellungsraum/stamm_treffer.rs, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/offline/schreiben.ts, frontend/src/offline/useOfflineSync.ts, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs]
 ---
 
 ## Überblick
@@ -35,12 +35,15 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
 1. „Raum“ öffnen und oben „Eintreffen buchen“ wählen. Die Suche füllt den Bildschirm.
 2. Den Namen oder einen Funkrufnamen der Kraft eingeben. Die Treffer stehen unter „Erwartet“ und
    „Im Einsatz“. Kündigt eine Nachforderung Kräfte für diesen Raum an, stehen sie darüber unter
-   „Aus Nachforderungen“, je Rufname mit Art, Nachforderung und „erwartet …“.
+   „Aus Nachforderungen“, je Rufname mit Art, Nachforderung und „erwartet …“. Ab drei Zeichen
+   stehen darunter unter „Aus den Stammdaten“ die passenden Einheiten-Vorlagen der Organisation.
 3. Beim Treffer „Eintreffen“ wählen. Die Bestätigung lautet „… gebucht“; die Kraft erscheint am
    Ende von „Bereitgestellte Einheiten“ oder „Bereitgestellte Fahrzeuge“ mit „seit“ und ihrer
    Wartezeit. Oben steht, wer am längsten wartet. Unter „Aus Nachforderungen“ bucht „Eintreffen“
    die gleichnamige Einheit des Einsatzes; gibt es keine, öffnet sich die Erfassung mit Rufname und
-   Art vorbelegt und „Aus Nachforderung …“ darüber, und „Eintreffen buchen“ legt sie an.
+   Art vorbelegt und „Aus Nachforderung …“ darüber, und „Eintreffen buchen“ legt sie an. Unter
+   „Aus den Stammdaten“ legt „Eintreffen“ die Einheit mit ihren Fahrzeugen aus der Vorlage an und
+   bucht sie; sie gilt sofort als übernommen.
 
    ![Aktiver Bereitstellungsraum mit leerem „Abgerufen“ und drei bereitgestellten Einheiten, je mit „seit … · 0 min“ und Aktionsmenü, die unangemeldete „Florian Nachbarort 1/46-1“ mit „nicht übernommen“, und „Kräfte ohne BR“ mit zugeklapptem „Im Einsatz“](../bilder/geraet-bereitstellungsraum/raum.png)
 
@@ -139,8 +142,10 @@ storniert ihn nicht; das bleibt der Einsatzleitung. Auch an den Einheiten und Fa
 mit einer Ausnahme: „Unangemeldet buchen“ und „Eintreffen buchen“ aus einer Nachforderung legen eine
 neue Einheit mit ihren Fahrzeugen an, und „Diese buchen“ aus einer Nachforderung macht ein Fahrzeug
 ohne Einheit zur Einheit. Ob sie bleibt, entscheidet die Einsatzleitung; Übernehmen und
-Abweisen gibt es am Tablet nicht (Kapitel [Einheiten](einheiten.md)). Die Suche findet nur Kräfte
-des Einsatzes, keine aus den Stammdaten.
+Abweisen gibt es am Tablet nicht (Kapitel [Einheiten](einheiten.md)). Aus den Stammdaten sieht das
+Tablet nur die Einheiten-Vorlagen, die zur Suche passen, mit Namen, Typ und Funkrufnamen; die
+Stammdaten selbst öffnet es nicht. Eine Einheit aus einer Vorlage bringt nur ihre Fahrzeuge mit,
+keine Besatzung und kein Material.
 
 Nachforderungen selbst stehen am Tablet nicht. Es sieht nur, wer für den eigenen Raum erwartet wird
 (Art, Anzahl, Stufe, Rufnamen, erwartetes Eintreffen), und verknüpft beim Buchen die Einheit mit der

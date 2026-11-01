@@ -12,9 +12,9 @@ Zeitfenster steht der Bedarf für Einsatzkräfte, Betreute und weitere Personen,
 und dagegen stehen die Ausgaben. Die Seite zeigt je Zeitfenster, was ausgegeben ist und was fehlt,
 und stuft es als „gedeckt“, „offen“ oder „Unterdeckung“ ein. Ausgegeben wird an
 **Verpflegungsstellen**, etwa einer Feldküche oder einer Ausgabestelle; je Stelle zeigt die Seite,
-was dort ausgegeben wurde. Eine Ausgabe kann an eine **Einheit** gehen, die ihr Essen abholt, oder
-als **Zuführung** an einen Einsatzabschnitt; je Zeitfenster zeigt die Seite dann, welche Einheit
-noch nicht verpflegt ist.
+was dort ausgegeben wurde. Eine Ausgabe kann an eine **Einheit** gehen, die ihr Essen abholt,
+als **Zuführung** an einen Einsatzabschnitt oder an eine **Betreuungsstelle**, wenn dort Betroffene
+versorgt werden; je Zeitfenster zeigt die Seite dann, welche Einheit noch nicht verpflegt ist.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
 Zeitfenster an, zählen an der Ausgabe die Portionen, tragen Ausgaben nach und fordern nach, wenn
@@ -92,7 +92,8 @@ Für Einsatzleitung und Führungspersonal:
 3. Unter „ohne Eintreffen“ stehen Einheiten, für die die Kräfte-Zeitachse kein Eintreffen kennt.
 4. Unter „Verpflegt“ stehen die Einheiten mit Menge und Uhrzeit jeder Ausgabe, etwa „9 EP 11:40“,
    und wie viele Untereinheiten die Ausgabe mit verpflegt hat; darunter die Zuführungen an
-   Abschnitte.
+   Abschnitte und die Ausgaben an Betreuungsstellen, etwa „Turnhalle Nord · 40 EP 12:10“. Eine
+   Betreuungsstelle steht nie unter „Noch nicht verpflegt“.
 5. Dieselben Listen stehen in der Ausgabeansicht unter den Sonderkost-Tasten.
 
 ### Ein Zeitfenster anlegen
@@ -146,7 +147,8 @@ Für Einsatzleitung und Führungspersonal:
 3. Holt eine Einheit ihr Essen ab, darunter unter „Empfänger“ die Einheit wählen oder in der Liste
    „Noch nicht verpflegt“ bei ihr „Wählen“. Daneben steht dann eine Taste mit ihrer Stärke, etwa
    „+9“; sie zählt so viele Portionen auf einmal. Für eine Zuführung „Zuführung …“ mit dem
-   Abschnitt wählen. Ohne Wahl bleibt es bei „ohne Empfänger“.
+   Abschnitt wählen, für Betroffene in einer Betreuungsstelle die Stelle unter
+   „Betreuungsstelle“. Ohne Wahl bleibt es bei „ohne Empfänger“.
 4. Je ausgegebene Portion „+1“ wählen, für mehrere auf einmal „+5“ oder „+10“. „Menge …“ öffnet
    „Menge zählen“ für eine größere Zahl, bei gewählter Einheit schon mit ihrer Stärke; „Zählen“
    übernimmt sie.
@@ -159,7 +161,9 @@ Für Einsatzleitung und Führungspersonal:
    Sammlung. Ohne Sammlung ist „−1“ gesperrt, der Grund „keine Sammlung“ steht über den Tasten.
 7. Die Sammlung bucht sich nach kurzer Ruhe selbst; „Buchen“ bucht sofort. Die Meldung „Gebucht:
    … EP zu ‚…‘“ bietet „Rückgängig“, falls es das falsche Zeitfenster war. Unter „Letzte Buchungen“
-   stehen die jüngsten Ausgaben, je mit ihrem Empfänger, etwa „9 EP · an 2. Gruppe“.
+   stehen die jüngsten Ausgaben, je mit ihrem Empfänger, etwa „9 EP · an 2. Gruppe“. Ausgaben
+   eines anderen Geräts rücken dort nicht unter den Zeiger, sondern warten hinter dem Knopf
+   „1 neu“ (siehe [Verpflegung am Gerät](geraet-verpflegung.md)).
 
 ### Eine Ausgabe nachtragen
 

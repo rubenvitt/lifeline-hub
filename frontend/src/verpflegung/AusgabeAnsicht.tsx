@@ -1,6 +1,6 @@
 import { Alert, Breadcrumb, Button, Flex, Form, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useId, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -18,12 +18,15 @@ import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
 import { FOKUSABSTAND_ZAEHLTASTEN, useFokusabstandUnten } from '../components/fokusabstandUnten';
+import { REST_UNTEN_VAR, useRestHoehe } from '../components/restHoehe';
 import {
   Augenbraue,
   Aufgliederung,
   Kennzahl,
   Kennzahlenband,
+  Sammelbanner,
   Zeitachseneintrag,
+  sammelbannerKurz,
   monoStil,
   useRollen,
 } from '../components/instrument';
@@ -33,10 +36,21 @@ import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { useOnline } from '../offline/useOnline';
+import {
+  OFFLINE_SCHREIBAKTION_GESENDET_EVENT,
+  type OfflineSchreibaktionGesendet,
+} from '../offline/ereignisse';
 import { useVorgemerkteAusgaben } from '../offline/useVorgemerkteAusgaben';
+import {
+  useBelegungZufluss,
+  useHalteFlaeche,
+  zuflussText,
+} from '../pages/bereitstellungsraum/belegungZufluss';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { parseVerpflegungStelle } from '../routing/deeplinks';
 import { Select } from '../components/Select';
+import { useDichte } from '../theme/ThemeModeProvider';
+import type { Dichte } from '../theme/tokens';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
 import { AusgabeDialog, RuecknahmeDialog } from './VerpflegungDialoge';
 import type { Buendel } from './ausgabeSammlung';
@@ -47,6 +61,7 @@ import {
   empfaengerOptionen,
   empfaengerSchluessel,
   empfaengerText,
+  hatWaehlbareEmpfaenger,
   isEmpfaengerWaehlbar,
   parseEmpfaengerSchluessel,
   staerkeVorgabe,
@@ -71,6 +86,19 @@ import { zaehltasteStil, zaehltastenAbstand } from './zaehltasteStil';
 
 /** So viele Buchungen stehen unter „Letzte Buchungen“; ältere führt ein Link zur Karte (D6). */
 const LETZTE = 10;
+
+const KEINE_AUSGABEN: readonly VerpflegungAusgabe[] = [];
+
+/** Ziffern gespiegelt: aufsteigend sortiert ergibt das die absteigende Folge des Originals. */
+const gespiegelt = (s: string) => s.replace(/\d/g, (z) => String(9 - Number(z)));
+
+/**
+ * Folge der „Letzten Buchungen“ für die Schleuse (LLH-1292): die jüngste zuerst, bei gleichem
+ * Zeitpunkt die neuere Kennung. Die Schleuse sortiert aufsteigend, der Schlüssel ist deshalb
+ * gespiegelt; alle Zeitpunkte haben das Format `YYYY-MM-DD HH:MM:SS`.
+ */
+const neuesteZuerst = (a: VerpflegungAusgabe) =>
+  `${gespiegelt(a.zeitpunkt_at)}|${gespiegelt(String(a.id).padStart(16, '0'))}`;
 
 /** Kurzgrund an „−1“ und „Buchen“, solange nichts gesammelt ist (AK 4). */
 const KEINE_SAMMLUNG = 'keine Sammlung';
@@ -136,6 +164,17 @@ function davon(b: Buendel): string {
  * alten Empfänger. Unter den Tasten zeigt `EmpfaengerStand`, wer noch nicht verpflegt ist; „Wählen“
  * an einer Zeile setzt die Einheit als Empfänger (Handschuh: die Zeile statt der Auswahlliste).
  */
+/**
+ * Mindestbreite einer Kennzahl im Kopf je Dichte: was „1840 EP“ samt Innenabstand braucht,
+ * gemessen bei 320 bis 390 px (kompakt 110, komfortabel 122, Handschuh über 126), mit etwas Luft.
+ * Kompakt stehen so bei 390 px alle drei in einer Zeile.
+ */
+const KENNZAHL_ZELLE_MIN: Record<Dichte, number> = {
+  kompakt: 112,
+  komfortabel: 124,
+  handschuh: 160,
+};
+
 export default function AusgabeAnsicht() {
   const { id, zeitfensterId } = useParams();
   const einsatzId = Number(id);
@@ -152,6 +191,8 @@ export default function AusgabeAnsicht() {
   const qc = useQueryClient();
   const grundId = useId();
   const tastenRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ZAEHLTASTEN);
+  const restHoehe = useRestHoehe<HTMLDivElement>();
+  const { dichte } = useDichte();
 
   const [dialog, setDialog] = useState<
     | { art: 'nachtragen' }
@@ -174,9 +215,34 @@ export default function AusgabeAnsicht() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const nachforderung = useNachforderungWahl(einsatzId, freigabenQuery.data);
-  const nachtrag = useAusgabeNachtragen(einsatzId);
 
   const zf = verpflegungQuery.data?.zeitfenster.find((z) => z.id === zfId) ?? null;
+
+  // ── Live-Zufluss „Letzte Buchungen“ (LLH-1292, Muster `belegungZufluss.ts`) ─────────────────
+  // Zählt ein zweites Gerät am selben Zeitfenster, rückten seine Buchungen oben ein und schoben
+  // die Zeile, auf der gerade „Zurücknehmen“ getippt wird. Fokus oder Maus-/Stiftzeiger in der
+  // Liste und die offene Rückfrage halten; fremde Zugänge warten dann hinter dem Sammelbanner.
+  // Eigene stehen sofort: gezählt, nachgetragen oder aus der Warteschlange gebucht (Kennung vor
+  // dem Cache vorgemerkt). Kopf und Kennzahlen rechnen mit der vollen Menge.
+  const { gehalten, flaeche } = useHalteFlaeche();
+  const ausgabenZufluss = useBelegungZufluss(
+    zf?.ausgaben ?? KEINE_AUSGABEN,
+    neuesteZuerst,
+    gehalten || dialog?.art === 'ruecknahme',
+    zfId,
+  );
+  const merkeEigene = ausgabenZufluss.merkeEigene;
+  const nachSync = useEffectEvent((d: OfflineSchreibaktionGesendet) => {
+    if (d.art === 'ausgabe' && d.benutzerId === benutzer?.id && d.einsatzId === einsatzId) {
+      merkeEigene(d.ausgabeId);
+    }
+  });
+  useEffect(() => {
+    const hoere = (e: Event) => nachSync((e as CustomEvent<OfflineSchreibaktionGesendet>).detail);
+    window.addEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, hoere);
+    return () => window.removeEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, hoere);
+  }, []);
+  const nachtrag = useAusgabeNachtragen(einsatzId, merkeEigene);
 
   // ── Stellenwahl (LLH-1040) ─────────────────────────────────────────────────────────────
   const stellen = verpflegungQuery.data?.stellen ?? [];
@@ -218,10 +284,9 @@ export default function AusgabeAnsicht() {
   };
   // ── Empfänger (LLH-1055 Teil II) ─────────────────────────────────────────────────────────
   const empfaengerListe = verpflegungQuery.data?.empfaenger ?? LEERE_EMPFAENGER;
-  const hatEmpfaenger =
-    empfaengerListe.einheiten.some((e) => !e.aufgeloest_at) ||
-    empfaengerListe.abschnitte.length > 0;
-  // Die Wahl gilt je Zeitfenster; eine inzwischen aufgelöste Einheit fällt aus ihr.
+  const hatEmpfaenger = hatWaehlbareEmpfaenger(empfaengerListe);
+  // Die Wahl gilt je Zeitfenster; eine inzwischen aufgelöste Einheit oder geschlossene oder
+  // stornierte Betreuungsstelle (LLH-1295) fällt aus ihr.
   const [empfaengerWahl, setEmpfaengerWahl] = useState<{
     zeitfenster: number;
     wahl: EmpfaengerWahl | null;
@@ -258,11 +323,13 @@ export default function AusgabeAnsicht() {
     vergangen,
     stelleId: gewaehlteStelle,
     empfaenger: gewaehlterEmpfaenger,
-    onGebucht: (ausgabeId, b) =>
+    onGebucht: (ausgabeId, b) => {
+      merkeEigene(ausgabeId);
       nachtrag.zeigeGebucht(
         `Gebucht: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}${davon(b)}`,
         ausgabeId,
-      ),
+      );
+    },
     onVorgemerkt: (b) =>
       nachtrag.zeigeVorgemerkt(
         `Offline vorgemerkt: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}`,
@@ -354,9 +421,9 @@ export default function AusgabeAnsicht() {
   const mitBedarf = KOSTFORMEN.filter((k) => zf.bedarf.sonderkost[k] > 0);
   const ohneBedarf = KOSTFORMEN.filter((k) => zf.bedarf.sonderkost[k] === 0);
 
-  const serverAusgaben = [...zf.ausgaben].sort((a, b) =>
-    b.zeitpunkt_at.localeCompare(a.zeitpunkt_at),
-  );
+  // Schon in der Folge „jüngste zuerst“; zurückgehaltene fremde fehlen, der Banner nennt sie.
+  const serverAusgaben = ausgabenZufluss.sichtbar;
+  const wartend = ausgabenZufluss.zurueckgehalten.length;
   const zeilenAusstehend = ausstehend.slice(0, LETZTE);
   const zeilenServer = serverAusgaben.slice(0, Math.max(0, LETZTE - zeilenAusstehend.length));
   const aeltere = ausstehend.length + serverAusgaben.length - LETZTE;
@@ -396,15 +463,13 @@ export default function AusgabeAnsicht() {
       hinweis={!darfSchreiben && <SeitenHinweise rechteFehlt rechteText={rechteText} />}
     >
       <div
+        ref={restHoehe}
         data-lfh="ausgabe-ansicht"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: token.margin,
-          // Mindestens ein Fenster hoch: das klebende Tastenfeld steht so immer am unteren Rand,
-          // auch bei kurzer Liste (D9, Daumenreichweite).
-          minHeight: '100dvh',
-        }}
+        // Mindestens bis zur Unterkante des Bildlaufs: das klebende Tastenfeld steht so immer am
+        // unteren Rand, auch bei kurzer Liste (D9, Daumenreichweite). Gemessen statt `100dvh`, sonst
+        // rollte die Seite um Kopfleiste und Gerätenavigation, und der Kopf ginge aus dem Bild
+        // (LLH-1294).
+        style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}
       >
         {/* ── Kopf: Deckung ─────────────────────────────────────────────────────────── */}
         <section
@@ -435,7 +500,16 @@ export default function AusgabeAnsicht() {
               {online ? '' : 'Offline vorgemerkt'}
             </span>
           </Flex>
-          <Kennzahlenband beschriftung={`Deckung ${zf.bezeichnung}`}>
+          <Kennzahlenband
+            beschriftung={`Deckung ${zf.bezeichnung}`}
+            // Soll, ausgegeben und fehlt möglichst in einer Zeile: zwei Zeilen kosteten bei
+            // 390 × 700 so viel Höhe, dass die Ansicht rollen müsste und der Kopf aus dem Bild
+            // ginge (LLH-1294). Wo die Zelle für eine vierstellige Zahl zu schmal wird, bricht das
+            // Band um, statt überzulaufen.
+            style={{
+              gridTemplateColumns: `repeat(auto-fit, minmax(min(${KENNZAHL_ZELLE_MIN[dichte]}px, 100%), 1fr))`,
+            }}
+          >
             <Kennzahl titel="Soll" wert={zf.bedarf.gesamt} einheit="EP" />
             <Kennzahl titel="ausgegeben" wert={zf.ausgegeben.gesamt} einheit="EP" />
             <Kennzahl
@@ -571,7 +645,8 @@ export default function AusgabeAnsicht() {
               </Flex>
             )}
           </div>
-          {/* Empfänger (LLH-1055); ohne Einheiten und Abschnitte bleibt der Platz leer. Die Wahl
+          {/* Empfänger (LLH-1055, LLH-1295); ohne Einheiten, Abschnitte und offene
+              Betreuungsstellen bleibt der Platz leer. Die Wahl
               nimmt den Rest der Zeile, „+n“ steht fest daneben. */}
           <div data-lfh="ausgabe-empfaenger">
             {hatEmpfaenger && (
@@ -691,77 +766,100 @@ export default function AusgabeAnsicht() {
 
         {/* ── Letzte Buchungen (D6) ───────────────────────────────────────────────── */}
         <section aria-labelledby={`${grundId}-letzte`} style={{ flex: '1 0 auto' }}>
-          <Augenbraue als="h2" id={`${grundId}-letzte`}>
-            Letzte Buchungen
-          </Augenbraue>
-          <ul data-lfh="ausgabe-letzte" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {zeilenAusstehend.map((v) => {
-              const d = v.aktion.daten;
-              const sk = sonderkostText(sonderkostVoll(d.sonderkost));
-              return (
-                <Zeitachseneintrag
-                  key={`ausstehend-${v.id ?? d.client_id}`}
-                  als="li"
-                  data-lfh="ausgabe-zeile-ausstehend"
-                  zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
-                  typwort="ausstehend"
+          <div data-lfh="ausgabe-letzte-flaeche" {...flaeche}>
+            {/* Der Banner steht im Kopf, an einem Platz fester Höhe: über der Liste schöbe er selbst
+              die Zeilen unter dem Finger (wie `BrDetailPage`). */}
+            <Flex
+              align="center"
+              justify="space-between"
+              gap={token.marginSM}
+              style={{ minHeight: token.controlHeight }}
+            >
+              <Augenbraue als="h2" id={`${grundId}-letzte`}>
+                Letzte Buchungen
+              </Augenbraue>
+              {(wartend > 0 || ausgabenZufluss.umgeordnet) && (
+                <Sammelbanner
+                  aktion={{ label: 'anzeigen', onKlick: ausgabenZufluss.gibFrei }}
+                  kurz={sammelbannerKurz(wartend, ausgabenZufluss.umgeordnet)}
                 >
-                  <span style={{ color: rollen.text2 }}>
-                    <span style={monoStil(13, 500)}>{d.menge} EP</span>
-                    {d.verpflegungsstelle_id != null
-                      ? ` · ${stellenName(d.verpflegungsstelle_id, stellen)}`
-                      : ''}
-                    {mitPunkt(empfaengerText(d, empfaengerListe))}
-                    {sk ? ` · ${sk}` : ''}
-                  </span>
-                </Zeitachseneintrag>
-              );
-            })}
-            {zeilenServer.map((a) => {
-              const zurueck = a.zurueckgenommen_at != null;
-              const uhr = uhrzeit(a.zeitpunkt_at, konventionen);
-              const sk = sonderkostText(a.sonderkost);
-              return (
-                <Zeitachseneintrag
-                  key={a.id}
-                  als="li"
-                  data-lfh="ausgabe-zeile"
-                  data-zurueckgenommen={zurueck ? 'true' : undefined}
-                  zeit={uhr}
-                  typwort={zurueck ? 'zurückgenommen' : 'Ausgabe'}
-                  aktionen={
-                    darfSchreiben && !zurueck ? (
-                      <Button
-                        aria-label={`Zurücknehmen: Ausgabe ${a.menge} EP um ${uhr}`}
-                        onClick={() => {
-                          ruecknahmeMut.reset();
-                          setDialog({ art: 'ruecknahme', ausgabe: a });
-                        }}
-                      >
-                        Zurücknehmen
-                      </Button>
-                    ) : undefined
-                  }
-                >
-                  <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
-                    <span style={monoStil(13, 500)}>{a.menge} EP</span>
-                    {a.verpflegungsstelle_id != null
-                      ? ` · ${stellenName(a.verpflegungsstelle_id, stellen)}`
-                      : ''}
-                    {mitPunkt(empfaengerText(a, empfaengerListe))}
-                    {sk ? ` · ${sk}` : ''}
-                  </span>
-                </Zeitachseneintrag>
-              );
-            })}
-          </ul>
-          {aeltere > 0 && (
-            <div style={{ paddingBlock: token.paddingSM }}>
-              <SprungKnopf to={verpflegungPfad}>
-                {aeltere === 1 ? '1 ältere Ausgabe' : `${aeltere} ältere Ausgaben`}
-              </SprungKnopf>
-            </div>
-          )}
+                  {zuflussText(
+                    wartend,
+                    ['neue Buchung', 'neue Buchungen'],
+                    ausgabenZufluss.umgeordnet,
+                  )}
+                </Sammelbanner>
+              )}
+            </Flex>
+            <ul data-lfh="ausgabe-letzte" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {zeilenAusstehend.map((v) => {
+                const d = v.aktion.daten;
+                const sk = sonderkostText(sonderkostVoll(d.sonderkost));
+                return (
+                  <Zeitachseneintrag
+                    key={`ausstehend-${v.id ?? d.client_id}`}
+                    als="li"
+                    data-lfh="ausgabe-zeile-ausstehend"
+                    zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
+                    typwort="ausstehend"
+                  >
+                    <span style={{ color: rollen.text2 }}>
+                      <span style={monoStil(13, 500)}>{d.menge} EP</span>
+                      {d.verpflegungsstelle_id != null
+                        ? ` · ${stellenName(d.verpflegungsstelle_id, stellen)}`
+                        : ''}
+                      {mitPunkt(empfaengerText(d, empfaengerListe))}
+                      {sk ? ` · ${sk}` : ''}
+                    </span>
+                  </Zeitachseneintrag>
+                );
+              })}
+              {zeilenServer.map((a) => {
+                const zurueck = a.zurueckgenommen_at != null;
+                const uhr = uhrzeit(a.zeitpunkt_at, konventionen);
+                const sk = sonderkostText(a.sonderkost);
+                return (
+                  <Zeitachseneintrag
+                    key={a.id}
+                    als="li"
+                    data-lfh="ausgabe-zeile"
+                    data-zurueckgenommen={zurueck ? 'true' : undefined}
+                    zeit={uhr}
+                    typwort={zurueck ? 'zurückgenommen' : 'Ausgabe'}
+                    aktionen={
+                      darfSchreiben && !zurueck ? (
+                        <Button
+                          aria-label={`Zurücknehmen: Ausgabe ${a.menge} EP um ${uhr}`}
+                          onClick={() => {
+                            ruecknahmeMut.reset();
+                            setDialog({ art: 'ruecknahme', ausgabe: a });
+                          }}
+                        >
+                          Zurücknehmen
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
+                      <span style={monoStil(13, 500)}>{a.menge} EP</span>
+                      {a.verpflegungsstelle_id != null
+                        ? ` · ${stellenName(a.verpflegungsstelle_id, stellen)}`
+                        : ''}
+                      {mitPunkt(empfaengerText(a, empfaengerListe))}
+                      {sk ? ` · ${sk}` : ''}
+                    </span>
+                  </Zeitachseneintrag>
+                );
+              })}
+            </ul>
+            {aeltere > 0 && (
+              <div style={{ paddingBlock: token.paddingSM }}>
+                <SprungKnopf to={verpflegungPfad}>
+                  {aeltere === 1 ? '1 ältere Ausgabe' : `${aeltere} ältere Ausgaben`}
+                </SprungKnopf>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* ── Tastenfeld am unteren Rand (D9, D10) ─────────────────────────────────── */}
@@ -775,7 +873,10 @@ export default function AusgabeAnsicht() {
             display: 'flex',
             flexDirection: 'column',
             gap: token.marginXS,
-            paddingBlock: token.paddingSM,
+            paddingBlockStart: token.paddingSM,
+            // Am Stab reicht die Ansicht über die Seitenpolsterung bis an die Fensterkante
+            // (`useRestHoehe`); die Polsterung kommt hier zurück, die Tasten stehen nicht an der Kante.
+            paddingBlockEnd: `calc(${token.paddingSM}px + var(${REST_UNTEN_VAR}, 0px))`,
             background: rollen.paneel,
             borderBlockStart: `1px solid ${rollen.linie}`,
           }}

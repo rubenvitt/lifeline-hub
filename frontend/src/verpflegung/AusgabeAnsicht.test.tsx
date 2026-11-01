@@ -1,11 +1,13 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { ModulFreigaben, VerpflegungZeitfenster } from '../api/types';
+import { meldeOfflineSchreibaktionGesendet } from '../offline/ereignisse';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
@@ -13,6 +15,7 @@ import { renderMitProviders, setzeOnline } from '../test/utils';
 import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
 import {
   ABSCHNITT_DEICH,
+  BS_TURNHALLE,
   DEICH,
   FELDKUECHE,
   GRUPPE_1,
@@ -21,6 +24,7 @@ import {
   TURNHALLE,
   ausgabe,
   empfaenger,
+  empfaengerMitBetreuung,
   stelle,
   verpflegungMitStellen,
   zeitfenster,
@@ -951,11 +955,184 @@ describe('AusgabeAnsicht — Empfänger (LLH-1055 Teil II)', () => {
     );
   });
 
+  it('Betreuungsstelle (LLH-1295): eigene Gruppe ohne geschlossene, keine Stärke-Taste, das Bündel trägt die Stelle', async () => {
+    liefert([mittag()], [], empfaengerMitBetreuung());
+    zeige();
+    await geladen();
+    await oeffne('Empfänger');
+    const optionen = optionenVon('Empfänger');
+    expect(optionen.slice(-2)).toEqual(['Zuführung Deich', 'Turnhalle Nord']);
+    expect(optionen).not.toContain('Schule Süd');
+    await waehle('Empfänger', 'Turnhalle Nord');
+    expect(screen.queryByRole('button', { name: /^Stärke zählen/ })).toBeNull();
+    await userEvent.click(taste('+10'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        menge: 10,
+        betreuungsstelle_id: BS_TURNHALLE,
+      }),
+    );
+  });
+
+  it('nur eine offene Betreuungsstelle: die Empfängerwahl steht', async () => {
+    liefert([mittag()], [], {
+      einheiten: [],
+      abschnitte: [],
+      betreuungsstellen: [{ id: BS_TURNHALLE, bezeichnung: 'Turnhalle Nord', geschlossen: false }],
+    });
+    zeige();
+    await geladen();
+    expect(screen.getByRole('combobox', { name: 'Empfänger' })).toBeVisible();
+  });
+
   it('ohne Einheiten und Abschnitte bleibt der Platz leer und es gibt keine Liste', async () => {
-    liefert([mittag()], [], { einheiten: [], abschnitte: [] });
+    liefert([mittag()], [], { einheiten: [], abschnitte: [], betreuungsstellen: [] });
     zeige();
     await geladen();
     expect(platz().childNodes).toHaveLength(0);
     expect(document.querySelector('[data-lfh="verpflegung-stand"]')).toBeNull();
+  });
+});
+
+describe('AusgabeAnsicht — Live-Zufluss „Letzte Buchungen“ (LLH-1292)', () => {
+  const a1 = ausgabe({ id: 101, menge: 7, zeitpunkt_at: um(-20) });
+  const a2 = ausgabe({ id: 102, menge: 8, zeitpunkt_at: um(-10) });
+  /** Die Buchung eines zweiten Geräts: jünger, sie käme ganz oben an. */
+  const fremd = ausgabe({ id: 200, menge: 33, zeitpunkt_at: um(-1) });
+
+  const flaeche = () => document.querySelector<HTMLElement>('[data-lfh="ausgabe-letzte-flaeche"]')!;
+  const mengen = () =>
+    [...document.querySelectorAll('[data-lfh="ausgabe-zeile"]')].map(
+      (z) => /(\d+) EP/.exec(z.textContent ?? '')?.[1],
+    );
+
+  /** Der Ereignisstrom invalidiert die Verpflegung; der nächste Abruf trägt `ausgaben`. */
+  async function liveStand(
+    client: import('@tanstack/react-query').QueryClient,
+    ausgaben: ReturnType<typeof ausgabe>[],
+  ) {
+    liefert([mittag({ ausgaben })]);
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.verpflegung(1) }));
+  }
+
+  it('fremde Buchung bei gehaltenem Zeiger: keine eingeschobene Zeile, sie erscheint nach dem Banner oben', async () => {
+    liefert([mittag({ ausgaben: [a1, a2] })]);
+    const { client } = zeige();
+    await geladen();
+    expect(mengen()).toEqual(['8', '7']);
+
+    fireEvent.pointerMove(flaeche(), { pointerType: 'mouse' });
+    await liveStand(client, [a1, a2, fremd]);
+
+    const banner = await screen.findByRole('button', { name: '1 neu anzeigen' });
+    expect(screen.getByText('1 neue Buchung')).toBeInTheDocument();
+    expect(mengen()).toEqual(['8', '7']);
+    // Kopf und Kennzahlen rechnen mit der vollen Menge; nur die Liste wartet.
+    expect(screen.queryByText('33 EP')).toBeNull();
+
+    fireEvent.click(banner);
+    await waitFor(() => expect(mengen()).toEqual(['33', '8', '7']));
+    expect(screen.queryByRole('button', { name: '1 neu anzeigen' })).toBeNull();
+  });
+
+  it('ohne Zeiger und Fokus erscheint eine fremde Buchung sofort, ohne Banner', async () => {
+    liefert([mittag({ ausgaben: [a1, a2] })]);
+    const { client } = zeige();
+    await geladen();
+    await liveStand(client, [a1, a2, fremd]);
+    await waitFor(() => expect(mengen()).toEqual(['33', '8', '7']));
+    expect(screen.queryByRole('button', { name: /neu anzeigen/ })).toBeNull();
+  });
+
+  it('Touch hält nicht: ein Tipp betritt und verlässt die Liste', async () => {
+    liefert([mittag({ ausgaben: [a1, a2] })]);
+    const { client } = zeige();
+    await geladen();
+    fireEvent.pointerMove(flaeche(), { pointerType: 'touch' });
+    await liveStand(client, [a1, a2, fremd]);
+    await waitFor(() => expect(mengen()).toEqual(['33', '8', '7']));
+  });
+
+  it('Fokus auf „Zurücknehmen“ hält; der Sprung zum Banner nicht, das Verlassen gibt frei', async () => {
+    liefert([mittag({ ausgaben: [a1, a2] })]);
+    const { client } = zeige();
+    await geladen();
+    const zuruck = taste(/^Zurücknehmen: Ausgabe 7 EP/);
+    act(() => zuruck.focus());
+    await liveStand(client, [a1, a2, fremd]);
+    const banner = await screen.findByRole('button', { name: '1 neu anzeigen' });
+    expect(mengen()).toEqual(['8', '7']);
+
+    act(() => banner.focus());
+    expect(mengen()).toEqual(['8', '7']);
+
+    act(() => banner.blur());
+    await waitFor(() => expect(mengen()).toEqual(['33', '8', '7']));
+  });
+
+  it('die offene Rückfrage „Zurücknehmen?“ hält, auch ohne Fokus in der Liste', async () => {
+    liefert([mittag({ ausgaben: [a1, a2] })]);
+    const { client } = zeige();
+    await geladen();
+    // Ohne Zeiger und Fokus in der Liste (Touch): allein die offene Rückfrage hält.
+    fireEvent.click(taste(/^Zurücknehmen: Ausgabe 7 EP/));
+    const dialog = await screen.findByRole('dialog', { name: 'Ausgabe zurücknehmen?' });
+    expect(flaeche()).not.toContainElement(document.activeElement as HTMLElement);
+    await liveStand(client, [a1, a2, fremd]);
+    expect(await screen.findByText('1 neue Buchung')).toBeInTheDocument();
+    expect(mengen()).toEqual(['8', '7']);
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it('verschwindet der fokussierte „Zurücknehmen“-Knopf, hält die Liste nicht weiter', async () => {
+    liefert([mittag({ ausgaben: [a1, a2] })]);
+    const { client } = zeige();
+    await geladen();
+    act(() => taste(/^Zurücknehmen: Ausgabe 7 EP/).focus());
+    // Die Ausgabe ist zurückgenommen (ihr Knopf fällt weg), dazu kommt eine fremde.
+    await liveStand(client, [{ ...a1, zurueckgenommen_at: um(-2) }, a2, fremd]);
+    await waitFor(() => expect(mengen()).toEqual(['33', '8', '7']));
+    expect(screen.queryByRole('button', { name: /neu anzeigen/ })).toBeNull();
+  });
+
+  it('eigene Buchung erscheint sofort, auch bei gehaltenem Zeiger', async () => {
+    liefert([mittag({ ausgaben: [a1, a2] })]);
+    const eigene = ausgabe({ id: 300, menge: 1, zeitpunkt_at: um(0) });
+    erfasseAusgabe.mockImplementation(() => {
+      liefert([mittag({ ausgaben: [a1, a2, eigene] })]);
+      return Promise.resolve({
+        ausgabe_id: 300,
+        zeitfenster: mittag({ ausgaben: [a1, a2, eigene] }),
+      });
+    });
+    zeige();
+    await geladen();
+    fireEvent.pointerMove(flaeche(), { pointerType: 'mouse' });
+    // `fireEvent` statt `userEvent`: der Zeiger bleibt dabei in der Liste.
+    fireEvent.click(taste('+1'));
+    fireEvent.click(taste('Buchen'));
+    await waitFor(() => expect(mengen()).toEqual(['1', '8', '7']));
+    expect(screen.queryByRole('button', { name: /neu anzeigen/ })).toBeNull();
+  });
+
+  it('eine vorgemerkte Ausgabe, die der Abgleich bucht, gilt als eigene', async () => {
+    liefert([mittag({ ausgaben: [a1, a2] })]);
+    const { client } = zeige();
+    await geladen();
+    fireEvent.pointerMove(flaeche(), { pointerType: 'mouse' });
+    const nachgeholt = ausgabe({ id: 400, menge: 4, zeitpunkt_at: um(-5) });
+    act(() =>
+      meldeOfflineSchreibaktionGesendet({
+        art: 'ausgabe',
+        benutzerId: BENUTZER_ID,
+        einsatzId: 1,
+        zeitfensterId: 1,
+        ausgabeId: 400,
+      }),
+    );
+    await liveStand(client, [a1, a2, nachgeholt, fremd]);
+    await waitFor(() => expect(mengen()).toEqual(['4', '8', '7']));
+    expect(screen.getByText('1 neue Buchung')).toBeInTheDocument();
   });
 });

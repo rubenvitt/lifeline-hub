@@ -1543,6 +1543,10 @@ pub async fn stelle_stornieren_tx(
     // Verweis müsste an jeder Leseseite herausgefiltert werden. Kein eigener ETB-Eintrag.
     let geloest =
         crate::nachforderung::repo::loese_betreuungsstelle_tx(conn, einsatz_id, id).await?;
+    // LLH-1295 (design.md D5): ebenso Verpflegungsausgaben an die Stelle; sie zählen weiter, nur
+    // ohne Empfänger. Leser der Verpflegung erfahren es über das `betreuung`-Ereignis, das seit
+    // LLH-1295 auch sie erreicht (`LiveEvent::modul_keys`).
+    crate::verpflegung::repo::loese_betreuungsstelle_tx(conn, einsatz_id, id).await?;
     let etb_id = crate::etb::system_audit_tx(
         conn,
         einsatz_id,

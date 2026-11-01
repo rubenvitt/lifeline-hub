@@ -99,6 +99,7 @@ fn ausgabe_eingabe(menge: i64) -> AusgabeEingabe {
         verpflegungsstelle_id: None,
         einheit_id: None,
         abschnitt_id: None,
+        betreuungsstelle_id: None,
         client_id: None,
     }
 }

@@ -321,10 +321,12 @@ async fn load_ziel_fahrzeug_tx(
     fahrzeug_id: i64,
     einheit_id: Option<i64>,
 ) -> Result<ZielName, AppError> {
-    let zeile: Option<(String, Option<i64>, Option<String>)> = sqlx::query_as(
-        "SELECT snap_funkrufname, einheit_id, beendet_at FROM einsatz_fahrzeug \
-         WHERE id = ? AND einsatz_id = ?",
-    )
+    let zeile: Option<(String, Option<i64>, Option<String>)> = sqlx::query_as(concat!(
+        "SELECT ",
+        crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+        ", ef.einheit_id, ef.beendet_at FROM einsatz_fahrzeug ef \
+         WHERE ef.id = ? AND ef.einsatz_id = ?",
+    ))
     .bind(fahrzeug_id)
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)

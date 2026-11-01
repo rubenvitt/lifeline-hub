@@ -209,9 +209,9 @@ darf.
 Die Funktionsansicht `bereitstellungsraum` SHALL an genau einen Bereitstellungsraum des Einsatzes
 gebunden sein und die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben;
 was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR der Kopplung. Das
-Anlegen einer unangemeldeten Kraft beim Eintreffen ist die einzige Änderung an Einheiten und
-Fahrzeugen, die das Gerät darf; sie verlangt wie am Desktop die Freigabe der Module Einheiten und
-Fahrzeuge. Abrufen ist eine Entscheidung der Führung: Das Gerät sieht einen Abruf und bestätigt
+Anlegen einer Kraft beim Eintreffen, unangemeldet oder aus einer Einheiten-Vorlage der
+Organisation, ist die einzige Änderung an Einheiten und Fahrzeugen, die das Gerät darf; sie
+verlangt wie am Desktop die Freigabe der Module Einheiten und Fahrzeuge. Abrufen ist eine Entscheidung der Führung: Das Gerät sieht einen Abruf und bestätigt
 das Ausrücken als Austritt, ruft aber selbst nicht ab.
 
 | Modul / Bereich | Bereitstellungsraum |
@@ -220,8 +220,9 @@ das Ausrücken als Austritt, ruft aber selbst nicht ab.
 | `bereitstellungsraeume`: eigener BR mit Belegung, abgerufene Kräfte mit Ziel | L |
 | `bereitstellungsraeume`: Verlauf der Belegung des eigenen BR | L |
 | `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt), Ausrücken einer abgerufenen Kraft bestätigen (Austritt) | S |
-| `bereitstellungsraeume`: Eintreffen am eigenen BR buchen, auch eine unangemeldete Kraft anlegen (Einheit mit Fahrzeugen, Meldung an die Einsatzleitung), auf Wunsch mit Verweis auf eine Nachforderung mit Ziel = eigener BR | S |
+| `bereitstellungsraeume`: Eintreffen am eigenen BR buchen, auch eine unangemeldete Kraft anlegen (Einheit mit Fahrzeugen, Meldung an die Einsatzleitung) oder eine Einheit aus einer Einheiten-Vorlage bilden (mit ihren Stamm-Fahrzeugen, ohne Besatzung und Material), auf Wunsch mit Verweis auf eine Nachforderung mit Ziel = eigener BR | S |
 | `bereitstellungsraeume`: erwartete Kräfte aus Nachforderungen mit Ziel = eigener BR (Art, Anzahl, Stufe, offene Rufnamen, erwartetes Eintreffen) | L |
+| `bereitstellungsraeume`: Stamm-Treffer zum eigenen BR (Suche ab drei Zeichen, höchstens zehn Einheiten-Vorlagen mit Name, Funkrufname, Typ, Zahl der Untereinheiten und Funkrufnamen der mitkommenden Fahrzeuge) | L |
 | `nachforderungen`: Liste, Stufen, Zusage, Übernahme als Einheit | — |
 | `bereitstellungsraeume`: eigenen BR in Betrieb nehmen (`geplant → aktiv`) | S |
 | `bereitstellungsraeume`: Kräfte abrufen, Abruf zurücknehmen, in einen anderen BR verlegen | — |
@@ -232,7 +233,15 @@ das Ausrücken als Austritt, ruft aber selbst nicht ab.
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
 | `material`: Material des eigenen BR (Materialliste, auf den eigenen BR geschnitten) | L |
 | `material`: zuordnen, lösen, Status setzen, ausgeben, aufteilen, erfassen | — |
+| Stammdaten-Kataloge (`/api/einheit-vorlagen`, `/api/fahrzeuge`, …) | — |
 | alle übrigen Module, Einstellungen, Verwaltung | — |
+
+#### Scenario: Stamm-Treffer ohne Katalog
+
+- **WHEN** das Gerät des BR Sportplatz `…/bereitstellungsraeume/{Sportplatz}/stamm-treffer?suche=florian`
+  und danach `GET /api/einheit-vorlagen` abfragt
+- **THEN** liefert die erste Anfrage die passenden Vorlagen und die zweite 403; am BR Schule
+  antwortet `…/stamm-treffer` mit 404
 
 #### Scenario: Material des eigenen BR
 

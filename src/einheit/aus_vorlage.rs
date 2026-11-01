@@ -415,18 +415,20 @@ async fn load_personal_lagen_tx(
     ids: &[i64],
     vorlagen_fahrzeug: &HashMap<i64, i64>,
 ) -> Result<HashMap<i64, PersonalLage>, AppError> {
-    let zeilen: Vec<PersonalZeile> = sqlx::query_as(
+    let zeilen: Vec<PersonalZeile> = sqlx::query_as(concat!(
         "SELECT j.value AS personal_id, p.dienststatus, ep.id AS ep_id, \
                 ep.beendet_at AS ep_beendet_at, ep.beendet_als AS ep_beendet_als, \
                 e.id AS einheit_id, e.name AS einheit_name, \
                 ef.id AS ef_id, ef.fahrzeug_id AS ef_fahrzeug_id, \
-                ef.snap_funkrufname AS fahrzeug_name \
+                ",
+        crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+        " AS fahrzeug_name \
          FROM json_each(?1) j \
          JOIN personal p ON p.id = j.value AND p.org_id = ?2 \
          LEFT JOIN einsatz_personal ep ON ep.personal_id = j.value AND ep.einsatz_id = ?3 \
          LEFT JOIN einsatz_einheit e ON e.id = ep.einheit_id AND e.aufgeloest_at IS NULL \
          LEFT JOIN einsatz_fahrzeug ef ON ef.id = ep.fahrzeug_id",
-    )
+    ))
     .bind(ids_json(ids.iter().copied()))
     .bind(org_id)
     .bind(einsatz_id)

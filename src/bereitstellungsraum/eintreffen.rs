@@ -20,7 +20,7 @@ use utoipa::ToSchema;
 // ─── Eingabe ────────────────────────────────────────────────────────────────
 
 /// Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von
-/// `kraft` und `unangemeldet`.
+/// `kraft`, `unangemeldet` und `vorlage` (LLH-1300).
 #[derive(Debug, Default, Deserialize, ToSchema)]
 pub struct EintreffenEingabe {
     /// Eine Einheit oder ein einheitenloses Fahrzeug des Einsatzes.
@@ -29,6 +29,10 @@ pub struct EintreffenEingabe {
     /// Eine Kraft, die im Einsatz noch nicht geführt wird.
     #[serde(default)]
     pub unangemeldet: Option<UnangemeldetEingabe>,
+    /// Eine Einheit aus einer Einheiten-Vorlage der Organisation (LLH-1300, Stamm-Treffer): sie
+    /// wird beim Buchen gebildet. Nicht zusammen mit `nachforderung_id`.
+    #[serde(default)]
+    pub vorlage: Option<VorlageAngabe>,
     /// Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in
     /// der Zukunft. Ohne Angabe gilt „jetzt“.
     #[serde(default)]
@@ -48,6 +52,12 @@ pub struct EintreffenEingabe {
 pub struct KraftAngabe {
     pub objekt_typ: String,
     pub objekt_id: i64,
+}
+
+/// Einheiten-Vorlage, aus der die eintreffende Einheit gebildet wird (LLH-1300).
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct VorlageAngabe {
+    pub vorlage_id: i64,
 }
 
 /// Unangemeldete Kraft (design.md D1/D2).
@@ -111,24 +121,55 @@ pub struct Unangemeldet {
 /// Was eingebucht wird.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Erfassung {
-    Bekannt { typ: ObjektTyp, objekt_id: i64 },
+    Bekannt {
+        typ: ObjektTyp,
+        objekt_id: i64,
+    },
     Unangemeldet(Unangemeldet),
+    /// Aus einer Einheiten-Vorlage bilden und einbuchen (LLH-1300).
+    Vorlage {
+        vorlage_id: i64,
+    },
 }
 
 impl Erfassung {
     pub fn is_unangemeldet(&self) -> bool {
         matches!(self, Erfassung::Unangemeldet(_))
     }
+
+    /// Die Buchung legt Einheit und Fahrzeuge an (unangemeldet oder aus einer Vorlage): Rechte an
+    /// beiden Modulen.
+    pub fn is_neuanlage(&self) -> bool {
+        matches!(self, Erfassung::Unangemeldet(_) | Erfassung::Vorlage { .. })
+    }
 }
 
 /// Feldprüfung vor jedem Schreiben (design.md D2): 400 für jedes Feld für sich, danach 422,
-/// wenn `kraft` und `unangemeldet` zugleich kommen. Weder noch → 400. Ein Fahrzeug mit
-/// Nachforderung ist seit LLH-1444 kein 422 mehr: es wird beim Buchen zur Einheit.
+/// wenn mehr als eines von `kraft`, `unangemeldet` und `vorlage` kommt. Keines → 400. Ein
+/// Fahrzeug mit Nachforderung ist seit LLH-1444 kein 422 mehr: es wird beim Buchen zur Einheit.
+/// Eine Vorlage mit Nachforderung → 422 (LLH-1300, design.md D3).
 pub fn check(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
-    if eingabe.kraft.is_none() && eingabe.unangemeldet.is_none() {
+    if eingabe.kraft.is_none() && eingabe.unangemeldet.is_none() && eingabe.vorlage.is_none() {
         return Err(AppError::Validation(
             "Kraft oder unangemeldete Kraft fehlt".into(),
         ));
+    }
+    if let Some(v) = &eingabe.vorlage {
+        if eingabe.kraft.is_some() || eingabe.unangemeldet.is_some() {
+            return Err(AppError::UnprocessableEntity(
+                "Entweder eine bekannte Kraft, eine unangemeldete oder eine aus den Stammdaten \
+                 buchen, nicht mehrere"
+                    .into(),
+            ));
+        }
+        if eingabe.nachforderung_id.is_some() {
+            return Err(AppError::UnprocessableEntity(
+                "Eine Einheit aus den Stammdaten bucht ohne Nachforderung".into(),
+            ));
+        }
+        return Ok(Erfassung::Vorlage {
+            vorlage_id: v.vorlage_id,
+        });
     }
     let bekannt = eingabe
         .kraft
@@ -278,6 +319,18 @@ pub struct Gebucht {
     pub nachforderung_id: Option<i64>,
     /// Das gebuchte Fahrzeug ist dabei zur Einheit geworden (LLH-1444): Live meldet es mit.
     pub als_einheit: bool,
+    /// Aus einer Vorlage gebildet (LLH-1300): die Untereinheiten, die mit eingetreten sind, alle
+    /// zugeordneten Fahrzeuge und die Räume, aus denen ein freies Fahrzeug dabei ausgetreten ist.
+    /// Sonst leer.
+    pub gebildet: GebildetLive,
+}
+
+/// Was eine Bildung aus einer Vorlage beim Eintreffen zusätzlich berührt hat (LLH-1300), für Live.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GebildetLive {
+    pub untereinheiten: Vec<i64>,
+    pub fahrzeuge: Vec<i64>,
+    pub raeume: Vec<i64>,
 }
 
 /// Rahmen einer Buchung: wer, wo, wann.
@@ -328,6 +381,10 @@ pub async fn eintreffen_tx(
             bekannt_tx(conn, r, &br.bezeichnung, *typ, *objekt_id, h).await
         }
         (Erfassung::Unangemeldet(u), h) => unangemeldet_tx(conn, r, &br, u, h).await,
+        // `check` lässt keine Nachforderung zu (LLH-1300, design.md D3).
+        (Erfassung::Vorlage { vorlage_id }, _) => {
+            super::stamm_treffer::vorlage_tx(conn, r, &br.bezeichnung, *vorlage_id).await
+        }
     }
 }
 
@@ -464,7 +521,7 @@ async fn eintreffen_zeitachse_tx(
     })
 }
 
-async fn aktive_fahrzeuge_tx(
+pub(super) async fn aktive_fahrzeuge_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
@@ -587,10 +644,11 @@ async fn bekannt_tx(
                 )
                 .await?
                 .ereignis;
-                let name: String = sqlx::query_scalar(
-                    "SELECT snap_funkrufname FROM einsatz_fahrzeug \
-                     WHERE id = ? AND einsatz_id = ?",
-                )
+                let name: String = sqlx::query_scalar(concat!(
+                    "SELECT ",
+                    crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+                    " FROM einsatz_fahrzeug ef WHERE ef.id = ? AND ef.einsatz_id = ?",
+                ))
                 .bind(objekt_id)
                 .bind(r.einsatz_id)
                 .fetch_one(&mut *conn)
@@ -648,6 +706,7 @@ async fn bekannt_tx(
         hinweise,
         nachforderung_id: herkunft.filter(|_| typ == ObjektTyp::Einheit).map(|h| h.id),
         als_einheit: false,
+        gebildet: GebildetLive::default(),
     })
 }
 
@@ -785,6 +844,7 @@ async fn fahrzeug_als_einheit_tx(
         hinweise: e.hinweise,
         nachforderung_id: Some(h.id),
         als_einheit: true,
+        gebildet: GebildetLive::default(),
     })
 }
 
@@ -874,6 +934,23 @@ async fn namensbestand_tx(
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?)
+}
+
+/// Die Vergleichsformen ([`normalize`]) aller Namen und Funkrufnamen aktiver Kräfte des Einsatzes
+/// (LLH-1300: ein Stamm-Treffer mit einem dieser Namen steht schon im Einsatz).
+pub async fn vergebene_namen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<std::collections::HashSet<String>, AppError> {
+    Ok(namensbestand_tx(conn, einsatz_id)
+        .await?
+        .into_iter()
+        .flat_map(|b| {
+            let mut namen = vec![normalize(&b.name)];
+            namen.extend(b.funkrufname.as_deref().map(normalize));
+            namen
+        })
+        .collect())
 }
 
 /// Die Kräfte, deren Name oder Funkrufname nach [`normalize`] `neu` gleicht.
@@ -1090,6 +1167,7 @@ async fn unangemeldet_tx(
         hinweise: beruehrt.hinweise,
         nachforderung_id: herkunft.map(|h| h.id),
         als_einheit: false,
+        gebildet: GebildetLive::default(),
     })
 }
 

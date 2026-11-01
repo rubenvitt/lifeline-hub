@@ -35,7 +35,10 @@
 //! „nichts Hineingejointes aus anderen Modulen“ (LFH-634 D4). Die Feldmenge ist gepinnt; Führer,
 //! Erreichbarkeit, Mitglieder, Fahrzeuge und Material bleiben draußen. Wer noch nicht verpflegt
 //! ist, leitet der Client ab, weil nur er die vorgemerkten Ausgaben kennt; der Server liefert
-//! keine solche Liste.
+//! keine solche Liste. Als dritter Empfänger kommt eine **Betreuungsstelle** dazu (LLH-1295,
+//! Ausgabe an Betreute, LLH-1024 U4): nur die Kennung an der Ausgabe, in der Empfängerliste nur
+//! Bezeichnung und „geschlossen“, auch für Leser ohne Modul `betreuung`. Sie steht nie unter
+//! „noch nicht verpflegt“.
 //!
 //! **Gerät an einer Stelle** (LLH-1048, [`stellensicht`]): ein an eine Verpflegungsstelle
 //! gebundenes Gerät sieht die Zeitfenster seiner Stelle und die einsatzweiten, im Einzelnen nur
@@ -244,13 +247,19 @@ pub struct AusgabeAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verpflegungsstelle_id: Option<i64>,
     /// Empfänger-Einheit (LLH-1055, Abholung) — nur die Kennung; Name und Gliederung stehen in
-    /// `VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id` und `abschnitt_id`.
+    /// `VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id`, `abschnitt_id` und
+    /// `betreuungsstelle_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einheit_id: Option<i64>,
     /// Empfänger-Abschnitt (LLH-1055, Zuführung) — nur die Kennung. Fehlt auch, wenn der
     /// Abschnitt inzwischen gelöscht ist.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_id: Option<i64>,
+    /// Empfänger-Betreuungsstelle (LLH-1295, Ausgabe an Betreute) — nur die Kennung; die
+    /// Bezeichnung steht in `VerpflegungAnzeige.empfaenger`. Fehlt auch, wenn die Stelle
+    /// inzwischen storniert ist (der Storno löst den Bezug).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub betreuungsstelle_id: Option<i64>,
     /// Gesetzt, wenn die Ausgabe zurückgenommen ist; sie zählt dann nicht mehr mit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zurueckgenommen_at: Option<String>,
@@ -326,8 +335,8 @@ pub struct VerpflegungAnzeige {
     /// Alle nicht stornierten Verpflegungsstellen nach Bezeichnung, auch aufgelöste (die Karte
     /// braucht ihre Namen). Keine eigene Leseroute (LLH-1040 D4).
     pub stellen: Vec<VerpflegungsstelleAnzeige>,
-    /// Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten und Abschnitte ohne
-    /// Personenangaben. Keine eigene Leseroute.
+    /// Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten, Abschnitte und
+    /// Betreuungsstellen (LLH-1295) ohne Personenangaben. Keine eigene Leseroute.
     pub empfaenger: VerpflegungEmpfaenger,
 }
 
@@ -376,12 +385,26 @@ pub struct EmpfaengerAbschnitt {
     pub ueber_abschnitt_id: Option<i64>,
 }
 
+/// Eine Betreuungsstelle der Empfängerliste (LLH-1295, design.md D3): Ziel einer Ausgabe an
+/// Betreute. Nur Kennung, Bezeichnung und ob sie geschlossen ist; die Feldmenge ist gepinnt
+/// (`tests/verpflegung.rs`, `ausgabe_an_betreuungsstelle`): keine
+/// Leitung, kein Kontakt, keine Notiz, kein Standort, keine Kapazität, keine Belegung.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct EmpfaengerBetreuungsstelle {
+    pub id: i64,
+    pub bezeichnung: String,
+    /// Geschlossen: nimmt weiter Ausgaben an (Nachtrag), steht aber nicht in der Wahl beim Zählen.
+    pub geschlossen: bool,
+}
+
 /// Empfängerliste der Verpflegung: die nicht aufgelösten Einheiten des Einsatzes (dazu
-/// aufgelöste mit Ausgabe) in der Folge des Kräftebaums und alle Abschnitte.
+/// aufgelöste mit Ausgabe) in der Folge des Kräftebaums, alle Abschnitte und die nicht
+/// stornierten Betreuungsstellen nach Bezeichnung.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
 pub struct VerpflegungEmpfaenger {
     pub einheiten: Vec<EmpfaengerEinheit>,
     pub abschnitte: Vec<EmpfaengerAbschnitt>,
+    pub betreuungsstellen: Vec<EmpfaengerBetreuungsstelle>,
 }
 
 /// Antwort auf „Ausgabe erfassen“ und „Ausgabe zurücknehmen“: die Kennung der Ausgabe (für

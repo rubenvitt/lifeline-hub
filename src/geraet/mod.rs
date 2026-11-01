@@ -396,6 +396,12 @@ const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
         "GET",
         "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/erwartet",
     ),
+    // Einheiten-Vorlagen als Treffer zum eigenen Raum, nur Namen und Funkrufnamen (LLH-1300
+    // design.md D2); der Stammdaten-Katalog bleibt gesperrt.
+    (
+        "GET",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/stamm-treffer",
+    ),
     (
         "POST",
         "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
@@ -704,6 +710,11 @@ mod tests {
                 "GET",
                 "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/erwartet",
             ),
+            // Stamm-Treffer zum eigenen Raum (LLH-1300 design.md D2).
+            (
+                "GET",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/stamm-treffer",
+            ),
         ] {
             assert!(darf_route(b, m, p), "BR-Gerät darf {m} {p}");
         }
@@ -722,6 +733,14 @@ mod tests {
             // Nachforderungen bleiben der Führung, auch mit Ziel = eigener Raum (LLH-1383
             // design.md D11): weder die Liste lesen noch „Eintreffen melden“ noch als Einheit
             // übernehmen. Was erwartet wird, liest das Gerät nur über `…/erwartet` (LLH-1387).
+            // Den Stammdaten-Katalog liest das Gerät nie, Treffer nur über `…/stamm-treffer`
+            // (LLH-1300).
+            ("GET", "/api/einheit-vorlagen"),
+            (
+                "GET",
+                "/api/einsaetze/{id}/einheiten/aus-vorlage/{vorlage_id}",
+            ),
+            ("POST", "/api/einsaetze/{id}/einheiten/aus-vorlage"),
             ("GET", "/api/einsaetze/{id}/nachforderungen"),
             ("POST", "/api/einsaetze/{id}/nachforderungen/{nid}/status"),
             ("POST", "/api/einsaetze/{id}/einheiten/aus-nachforderung"),

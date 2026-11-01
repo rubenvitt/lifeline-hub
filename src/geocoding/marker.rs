@@ -11,7 +11,8 @@ use sqlx::SqlitePool;
 /// heißt nach der Nummer ihrer Meldung („Lagemeldung #3“, LLH-1039), damit der Ortsbezug sagt,
 /// welche; sie ist eine verortete lagerelevante Meldung, ihre Kennung die der Meldung (LLH-1031).
 pub async fn lade_marker(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Marker>, AppError> {
-    let marker = sqlx::query_as::<_, Marker>(
+    // Fahrzeuge heißen wie in der Fahrzeugliste (LLH-1290).
+    let marker = sqlx::query_as::<_, Marker>(concat!(
         "SELECT 'einsatzort' AS typ, id, COALESCE(NULLIF(einsatzort, ''), bezeichnung) AS label, \
                 einsatzort_lat AS lat, einsatzort_lon AS lon \
            FROM einsatz \
@@ -26,15 +27,18 @@ pub async fn lade_marker(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Marke
          SELECT 'einheit', id, name, lat, lon FROM einsatz_einheit \
           WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND aufgeloest_at IS NULL \
          UNION ALL \
-         SELECT 'fahrzeug', id, snap_funkrufname, lat, lon FROM einsatz_fahrzeug \
-          WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND beendet_at IS NULL \
+         SELECT 'fahrzeug', ef.id, ",
+        crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+        ", ef.lat, ef.lon FROM einsatz_fahrzeug ef \
+          WHERE ef.einsatz_id = ?1 AND ef.lat IS NOT NULL AND ef.lon IS NOT NULL \
+            AND ef.beendet_at IS NULL \
          UNION ALL \
          SELECT 'personal', id, snap_name, lat, lon FROM einsatz_personal \
           WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND beendet_at IS NULL \
          UNION ALL \
          SELECT 'lagemeldung', id, 'Lagemeldung #' || lfd_nr, lat, lon FROM meldung \
           WHERE einsatz_id = ?1 AND lagerelevant = 1 AND lat IS NOT NULL AND lon IS NOT NULL",
-    )
+    ))
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;

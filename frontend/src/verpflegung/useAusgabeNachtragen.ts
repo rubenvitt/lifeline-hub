@@ -45,7 +45,14 @@ export interface AusgabeNachtragen {
   ruecknahmeFehler: unknown;
 }
 
-export function useAusgabeNachtragen(einsatzId: number): AusgabeNachtragen {
+/**
+ * `onEigene` erhält die Kennung einer nachgetragenen Ausgabe, bevor die Verpflegung neu geladen
+ * wird: die Ausgabeansicht zeigt sie so auch hinter gehaltener Schleuse sofort (LLH-1292).
+ */
+export function useAusgabeNachtragen(
+  einsatzId: number,
+  onEigene?: (ausgabeId: number) => void,
+): AusgabeNachtragen {
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -94,6 +101,7 @@ export function useAusgabeNachtragen(einsatzId: number): AusgabeNachtragen {
         zeigeVorgemerkt(`Offline vorgemerkt: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`);
         return;
       }
+      onEigene?.(ergebnis.daten.ausgabe_id);
       invalidiere();
       zeigeGebucht(
         `Ausgabe nachgetragen: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`,

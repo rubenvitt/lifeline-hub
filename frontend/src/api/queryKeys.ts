@@ -71,6 +71,10 @@ export const EINSATZ_KEYS = {
   // offenen Dialog „Eintreffen buchen“; live über `nachforderung` (Führung) und
   // `bereitstellungsraum` (eine Buchung am Gerät), nicht auf der Platte.
   brErwartet: 'einsatz-br-erwartet',
+  // Stamm-Treffer zum Raum (LLH-1300): Einheiten-Vorlagen je Suchtext, lädt nur im offenen Dialog
+  // „Eintreffen buchen“ ab drei Zeichen; live über `bereitstellungsraum` (eine Buchung bildet eine
+  // Einheit, die dann kein Treffer mehr ist), nicht auf der Platte.
+  brStammTreffer: 'einsatz-br-stamm-treffer',
   kartenbilder: 'einsatz-kartenbilder',
   etb: 'etb',
   befehle: 'einsatz-befehle',
@@ -315,6 +319,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.brDetail,
     EINSATZ_KEYS.brVerlauf,
     EINSATZ_KEYS.brErwartet,
+    EINSATZ_KEYS.brStammTreffer,
   ],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
   // Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
@@ -349,8 +354,9 @@ export const EINSATZ_STREAM_EVENTS = {
   abloesung: [EINSATZ_KEYS.abloesungen, EINSATZ_KEYS.kraefteZeitachse],
   // Stellen und ihre Meldereihen unter EINEM Prefix, damit ein Ereignis Übersicht und Kopfzahl
   // trifft. Nutzlast nur Kennungen. Den Modulzähler rechnet der Client aus der Übersicht
-  // (`ClientZaehlerQuelle`), er hängt am selben Prefix.
-  betreuung: [EINSATZ_KEYS.betreuung],
+  // (`ClientZaehlerQuelle`), er hängt am selben Prefix. Dazu die Verpflegung (LLH-1295): ihre
+  // Empfängerliste trägt die Betreuungsstellen, und ein Storno löst den Bezug von Ausgaben.
+  betreuung: [EINSATZ_KEYS.betreuung, EINSATZ_KEYS.verpflegung],
   // Bezirke und ihre Standreihen (LLH-1034), wie `betreuung`. Die Kennzahl „Evakuiert“ und der
   // Modulzähler lesen dieselbe Übersicht.
   evakuierung: [EINSATZ_KEYS.evakuierung],
@@ -881,6 +887,11 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.brVerlauf, einsatzId, brId] as const,
   brErwartet: (einsatzId: number, brId: number) =>
     [EINSATZ_KEYS.brErwartet, einsatzId, brId] as const,
+  /** Ohne `suche` der Prefix aller Suchen am Raum (Invalidierung). */
+  brStammTreffer: (einsatzId: number, brId: number, suche?: string) =>
+    suche == null
+      ? ([EINSATZ_KEYS.brStammTreffer, einsatzId, brId] as const)
+      : ([EINSATZ_KEYS.brStammTreffer, einsatzId, brId, suche] as const),
 
   // Befehle
   befehle: (einsatzId: number) => [EINSATZ_KEYS.befehle, einsatzId] as const,

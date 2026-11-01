@@ -865,7 +865,8 @@ pub async fn verlauf(
     einsatz_id: i64,
     br_id: i64,
 ) -> Result<Vec<BrVerlaufEintrag>, AppError> {
-    let zeilen: Vec<VerlaufZeile> = sqlx::query_as(
+    // Ein Fahrzeug heißt wie in der Fahrzeugliste (LLH-1290).
+    let zeilen: Vec<VerlaufZeile> = sqlx::query_as(concat!(
         "WITH objekte AS ( \
              SELECT DISTINCT objekt_typ, objekt_id FROM br_belegung \
              WHERE br_id = ?2 AND einsatz_id = ?1), \
@@ -882,8 +883,9 @@ pub async fn verlauf(
              WHERE b.einsatz_id = ?1 \
              WINDOW fenster AS (PARTITION BY b.objekt_typ, b.objekt_id ORDER BY b.id)) \
          SELECT r.id, r.zeitpunkt_at, r.art, r.br_id, r.objekt_typ, r.objekt_id, r.notiz, \
-                COALESCE(CASE r.objekt_typ WHEN 'einheit' THEN e.name \
-                                           ELSE f.snap_funkrufname END, '') AS objekt_name, \
+                COALESCE(CASE r.objekt_typ WHEN 'einheit' THEN e.name ELSE ",
+        crate::fahrzeug::funkrufname_anzeige_sql!("f"),
+        " END, '') AS objekt_name, \
                 CASE WHEN r.vorher_art <> 'austritt' THEN vb.bezeichnung END \
                     AS vorher_bezeichnung, \
                 zb.bezeichnung AS ziel_bezeichnung, \
@@ -901,7 +903,7 @@ pub async fn verlauf(
          WHERE r.br_id = ?2 \
             OR (r.art = 'wechsel' AND r.vorher_br_id = ?2 AND r.vorher_art <> 'austritt') \
          ORDER BY r.id DESC",
-    )
+    ))
     .bind(einsatz_id)
     .bind(br_id)
     .fetch_all(pool)

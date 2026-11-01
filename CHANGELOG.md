@@ -1,3 +1,40 @@
+## [1.0.0-alpha.163](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.162...v1.0.0-alpha.163) (2026-11-01)
+
+### Wichtige Änderungen
+
+- **Zwei neue Datenbankmigrationen:** Ablösungsschichten speichern jetzt einen Vermerk, wenn ihre Planung entfallen ist. Verpflegungsausgaben können eine Betreuungsstelle als Empfänger tragen. Beide Migrationen laufen beim Start automatisch.
+- **Schnittstelle Verpflegung:** Eine Ausgabe kann jetzt neben Einheit und Abschnitt eine Betreuungsstelle als Empfänger haben. Gibt eine Anfrage mehr als einen Empfänger an, lehnt der Server sie ab. Die Verpflegungsübersicht liefert dafür zusätzlich die Liste der Betreuungsstellen.
+- **Schnittstelle Bereitstellungsraum:** Für Bezeichnung (200 Zeichen), Standort (500) und Notiz (2.000) eines Raums gelten jetzt Höchstlängen, ebenso für die Notiz einer Belegung (2.000). Längere Werte lehnt der Server ab und nennt das Feld. Neu ist eine Abfrage für Treffer aus den Stammdaten beim Eintreffen.
+- **Eintreffen buchen:** Beim Eintreffen kann jetzt eine Einheiten-Vorlage angegeben werden. Dann wird die Einheit direkt aus den Stammdaten gebildet.
+
+### Kräfte und Mittel
+
+- **Eintreffen aus den Stammdaten:** Im Dialog „Eintreffen buchen“ erscheint ab drei eingegebenen Zeichen die Gruppe „Aus den Stammdaten“ mit bis zu zehn passenden Einheiten-Vorlagen der Organisation. Ein Klick auf „Eintreffen“ bildet die Einheit samt Untereinheiten und freien Stammfahrzeugen, aber ohne Besatzung und Material. Die Einheit tritt sofort in den Raum ein, und es entsteht ein ETB-Eintrag. Eine Meldung an die Einsatzleitung geht dabei nicht raus. Das BR-Gerät sieht weiterhin nicht den ganzen Stammdaten-Katalog.
+- **Stärke im Bereitstellungsraum korrigiert:** „Bereitgestellt“ zählt nur noch Kräfte, die tatsächlich im Raum stehen. Bisher wurden Untereinheiten, die in einem anderen Raum oder schon im Einsatz waren, mitgezählt und erschienen auch auf der Lagekarte doppelt. Die Zeile einer Einheit zeigt die Einheit samt ihren Untereinheiten im selben Raum. Fehlen Angaben, steht dort „—“ statt einer zu kleinen Zahl.
+- **Bereitstellungsraum bearbeiten:** Die Masken „anlegen“ und „bearbeiten“ zeigen einen Zeichenzähler und senden nicht, solange ein Feld zu lang ist. Bei einem stornierten Raum fallen „Bearbeiten“ und „Auf Karte verorten“ weg.
+- **Ablösung:** Fällt eine Planung weg, weil die geplante Einheit aufgelöst oder entlassen wurde, zeigt die Karte der laufenden Schicht dezent zum Beispiel „Planung entfallen · 2. Rettungsstaffel aufgelöst“. Eine neue Planung entfernt den Vermerk. Steht der Ablöser abgerufen im Bereitstellungsraum, nennt die Karte die Abrufzeit („· abgerufen 1425“). Lässt sich die Raumliste nicht laden, weist die Ansicht „Laufend“ darauf hin.
+- **Funkrufnamen einheitlich:** Wird ein Fahrzeug in den Stammdaten umbenannt, zeigen jetzt alle Stellen den neuen Namen wie die Fahrzeugliste, und zwar live ohne Neuladen. Das betrifft Bereitstellungsraum, Kartenmarker, Benachrichtigungen, Auftragsempfänger, Kräfte-Disposition, das Bilden aus einer Vorlage und die letzte Besetzung einer Einheit. Bestehende ETB-Einträge bleiben unverändert.
+- **Verpflegung an Betreuungsstellen:** Eine Verpflegungsausgabe lässt sich jetzt an eine Betreuungsstelle buchen. In der Empfängerwahl haben die Stellen eine eigene Gruppe. Geschlossene Stellen stehen nur im Nachtrag zur Wahl. Unter „Verpflegt“ erscheint die Stelle als eigene Zeile. Wird eine Betreuungsstelle storniert, verlieren ihre Ausgaben den Bezug zu ihr.
+- **Ausgabeansicht der Verpflegung:** Der Kopf mit Soll, ausgegeben und fehlt bleibt im Bild. Die Seite lässt sich nicht mehr um Kopfleiste und Gerätenavigation verschieben. Auf schmalen Bildschirmen brechen die Kennzahlen um, statt überzulaufen.
+- **Verpflegungsstelle in Betrieb nehmen:** Bis der Server antwortet, zeigt die Zeile einen Ladezustand und lässt keinen zweiten Aufruf zu. Lehnt der Server ab, steht der Grund an der Zeile. Nach Erfolg springt die Zeile nicht mehr auf „geplant“ zurück.
+- **Verpflegung ohne Daten:** Konnte die Modulseite keinen Stand laden, zeigt sie jetzt „nicht geladen“ statt einer leeren Liste.
+
+### Führung
+
+- **Abschnittsname live:** Wird ein Abschnitt umbenannt oder aufgelöst, sehen Bereitstellungsräume, Betreuungsstellen und Evakuierungsbezirke die Änderung sofort, auch bei Nutzenden ohne Recht auf Einsatzabschnitte.
+
+### Kommunikation
+
+- **Erinnerung an fällige Meldungen:** Die automatische Erinnerung nennt jetzt die Meldungsart, zum Beispiel Lage- oder Rückmeldung, statt immer „Sofortmeldung“. Meldungen mit Priorität „sofort“ heißen weiterhin „Sofortmeldung“, sonstige Meldungen heißen „Meldung“.
+
+### Arbeiten ohne Netz
+
+- **Abgelehnte Verpflegungsausgabe:** Wurde eine offline vorgemerkte Ausgabe abgelehnt, weil die Verpflegungsstelle inzwischen aufgelöst ist, nennt der Wiederherstellungsbereich jetzt den Namen der Stelle statt einer internen Kennung. Lässt sich die Stelle nicht zuordnen, steht dort „unbekannte Stelle“.
+
+### Betrieb und Installation
+
+- **Desktop-Updater:** Die Aktualisierung der Desktop-App nutzt jetzt eine neuere Version ihrer Entpack-Bibliothek. Damit sind drei bekannte Sicherheitslücken geschlossen.
+
 ## [1.0.0-alpha.162](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.161...v1.0.0-alpha.162) (2026-10-30)
 
 ### Kräfte und Mittel

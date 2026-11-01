@@ -753,8 +753,16 @@ export interface components {
             bemerkung?: string | null;
             /**
              * Format: int64
+             * @description Empfänger-Betreuungsstelle (LLH-1295, Ausgabe an Betreute) — nur die Kennung; die
+             *     Bezeichnung steht in `VerpflegungAnzeige.empfaenger`. Fehlt auch, wenn die Stelle
+             *     inzwischen storniert ist (der Storno löst den Bezug).
+             */
+            betreuungsstelle_id?: number | null;
+            /**
+             * Format: int64
              * @description Empfänger-Einheit (LLH-1055, Abholung) — nur die Kennung; Name und Gliederung stehen in
-             *     `VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id` und `abschnitt_id`.
+             *     `VerpflegungAnzeige.empfaenger`. Höchstens einer von `einheit_id`, `abschnitt_id` und
+             *     `betreuungsstelle_id`.
              */
             einheit_id?: number | null;
             erfasst_at: string;
@@ -2641,7 +2649,7 @@ export interface components {
         Einstufung: "planmaessig" | "vorwarnung" | "ueberfaellig";
         /**
          * @description Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von
-         *     `kraft` und `unangemeldet`.
+         *     `kraft`, `unangemeldet` und `vorlage` (LLH-1300).
          */
         EintreffenEingabe: {
             /** @description Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen). */
@@ -2655,6 +2663,7 @@ export interface components {
              */
             nachforderung_id?: number | null;
             unangemeldet?: components["schemas"]["UnangemeldetEingabe"] | null;
+            vorlage?: components["schemas"]["VorlageAngabe"] | null;
             /**
              * @description Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in
              *     der Zukunft. Ohne Angabe gilt „jetzt“.
@@ -2693,6 +2702,19 @@ export interface components {
             name: string;
             /** Format: int64 */
             ueber_abschnitt_id?: number | null;
+        };
+        /**
+         * @description Eine Betreuungsstelle der Empfängerliste (LLH-1295, design.md D3): Ziel einer Ausgabe an
+         *     Betreute. Nur Kennung, Bezeichnung und ob sie geschlossen ist; die Feldmenge ist gepinnt
+         *     (`tests/verpflegung.rs`, `ausgabe_an_betreuungsstelle`): keine
+         *     Leitung, kein Kontakt, keine Notiz, kein Standort, keine Kapazität, keine Belegung.
+         */
+        EmpfaengerBetreuungsstelle: {
+            bezeichnung: string;
+            /** @description Geschlossen: nimmt weiter Ausgaben an (Nachtrag), steht aber nicht in der Wahl beim Zählen. */
+            geschlossen: boolean;
+            /** Format: int64 */
+            id: number;
         };
         /** @description Eine Einheit der Empfängerliste. */
         EmpfaengerEinheit: {
@@ -6014,6 +6036,23 @@ export interface components {
          * @enum {string}
          */
         StaerkePosition: "fuehrer" | "unterfuehrer" | "mannschaft";
+        /** @description Ein Stamm-Treffer am Raum (design.md D2): nur, was der Einweiser zum Erkennen braucht. */
+        StammTreffer: {
+            /** @description Funkrufnamen der Stamm-Fahrzeuge, die beim Buchen mitkämen, über den ganzen Baum. */
+            fahrzeuge: string[];
+            funkrufname?: string | null;
+            /** @description Trägt die Vorlage eine Demo-Marke (Spec `demo-daten`)? */
+            ist_demo: boolean;
+            name: string;
+            typ_label: string;
+            /**
+             * Format: int64
+             * @description Zahl der aktiven Untereinheiten, die mit gebildet würden.
+             */
+            untereinheiten: number;
+            /** Format: int64 */
+            vorlage_id: number;
+        };
         /**
          * @description Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
          *     `aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.
@@ -6579,8 +6618,8 @@ export interface components {
         /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
         VerpflegungAnzeige: {
             /**
-             * @description Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten und Abschnitte ohne
-             *     Personenangaben. Keine eigene Leseroute.
+             * @description Wem ausgegeben werden kann (LLH-1055, design.md D3): Einheiten, Abschnitte und
+             *     Betreuungsstellen (LLH-1295) ohne Personenangaben. Keine eigene Leseroute.
              */
             empfaenger: components["schemas"]["VerpflegungEmpfaenger"];
             /**
@@ -6593,10 +6632,12 @@ export interface components {
         };
         /**
          * @description Empfängerliste der Verpflegung: die nicht aufgelösten Einheiten des Einsatzes (dazu
-         *     aufgelöste mit Ausgabe) in der Folge des Kräftebaums und alle Abschnitte.
+         *     aufgelöste mit Ausgabe) in der Folge des Kräftebaums, alle Abschnitte und die nicht
+         *     stornierten Betreuungsstellen nach Bezeichnung.
          */
         VerpflegungEmpfaenger: {
             abschnitte: components["schemas"]["EmpfaengerAbschnitt"][];
+            betreuungsstellen: components["schemas"]["EmpfaengerBetreuungsstelle"][];
             einheiten: components["schemas"]["EmpfaengerEinheit"][];
         };
         /**
@@ -6743,6 +6784,11 @@ export interface components {
             dateiname: string;
             /** Format: int64 */
             groesse: number;
+        };
+        /** @description Einheiten-Vorlage, aus der die eintreffende Einheit gebildet wird (LLH-1300). */
+        VorlageAngabe: {
+            /** Format: int64 */
+            vorlage_id: number;
         };
         /** @description Vorschau einer Vorlage im Einsatz (D2): der Baum mit dem Zustand jeder Kraft. Schreibt nichts. */
         VorlageVorschau: {

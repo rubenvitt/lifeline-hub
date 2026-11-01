@@ -120,6 +120,15 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
+  it('bildet betreuung auf Betreuung und Verpflegung ab (LFH-639, LLH-1295)', () => {
+    // Die Empfängerliste der Verpflegung trägt die Betreuungsstellen, und ein Storno löst den
+    // Bezug von Ausgaben; fehlt `verpflegung`, friert die Empfängerwahl am Tresen ein.
+    expect(EINSATZ_STREAM_EVENTS.betreuung).toEqual([
+      EINSATZ_KEYS.betreuung,
+      EINSATZ_KEYS.verpflegung,
+    ]);
+  });
+
   it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Evakuierung, Lagemonitor, BR-Liste und Verpflegung ab (LFH-612/635/639, LLH-1095, LLH-1055, LLH-1034)', () => {
     // Bezirke, Stellen und die Liste der Bereitstellungsräume tragen den Abschnittsnamen per Join;
     // fehlen sie hier, zeigt die Seite still den alten Namen. Der Lagemonitor zeigt die
@@ -200,6 +209,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.brDetail,
       EINSATZ_KEYS.brVerlauf,
       EINSATZ_KEYS.brErwartet,
+      EINSATZ_KEYS.brStammTreffer,
     ]);
   });
 
@@ -341,6 +351,13 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.brDetail(1, 2)).toEqual(['einsatz-br-detail', 1, 2]);
     expect(einsatzKeys.brVerlauf(1, 2)).toEqual(['einsatz-br-verlauf', 1, 2]);
     expect(einsatzKeys.brErwartet(1, 2)).toEqual(['einsatz-br-erwartet', 1, 2]);
+    expect(einsatzKeys.brStammTreffer(1, 2)).toEqual(['einsatz-br-stamm-treffer', 1, 2]);
+    expect(einsatzKeys.brStammTreffer(1, 2, 'florian')).toEqual([
+      'einsatz-br-stamm-treffer',
+      1,
+      2,
+      'florian',
+    ]);
     expect(einsatzKeys.befehl(1, 2)).toEqual(['einsatz-befehl', 1, 2]);
     expect(einsatzKeys.lagebericht(1, 2)).toEqual(['einsatz-lagebericht', 1, 2]);
   });

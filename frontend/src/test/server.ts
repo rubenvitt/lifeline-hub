@@ -240,6 +240,13 @@ export const server = setupServer(
     HttpResponse.json([]),
   ),
   /**
+   * Stamm-Treffer eines Raums (LLH-1300) — keine als Default. Der Dialog „Eintreffen buchen“ fragt
+   * sie ab drei Zeichen ab; Tests mit Vorlagen überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume/:brId/stamm-treffer', () =>
+    HttpResponse.json([]),
+  ),
+  /**
    * Tiere — leer als Default. Die Lagekarte fragt sie mit Freigabe `tiere` ab (Ebene „Tiere",
    * LLH-1123); Tests mit Tieren überschreiben per `server.use()`.
    */

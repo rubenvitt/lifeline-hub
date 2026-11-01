@@ -137,11 +137,33 @@ export function empfaenger(): VerpflegungEmpfaenger {
       empfaengerEinheit({ id: WASSERRETTUNG, name: 'Wasserrettung' }),
     ],
     abschnitte: [ABSCHNITT_DEICH_EMPFAENGER],
+    betreuungsstellen: [],
   };
 }
 
-/** Keine Empfänger: Einsatz ohne Einheiten und Abschnitte. */
-export const KEINE_EMPFAENGER: VerpflegungEmpfaenger = { einheiten: [], abschnitte: [] };
+export const BS_SCHULE = 51;
+export const BS_TURNHALLE = 52;
+
+/**
+ * Die Empfängerliste mit zwei Betreuungsstellen (LLH-1295) nach Bezeichnung: die geschlossene
+ * „Schule Süd“ und die offene „Turnhalle Nord“.
+ */
+export function empfaengerMitBetreuung(): VerpflegungEmpfaenger {
+  return {
+    ...empfaenger(),
+    betreuungsstellen: [
+      { id: BS_SCHULE, bezeichnung: 'Schule Süd', geschlossen: true },
+      { id: BS_TURNHALLE, bezeichnung: 'Turnhalle Nord', geschlossen: false },
+    ],
+  };
+}
+
+/** Keine Empfänger: Einsatz ohne Einheiten, Abschnitte und Betreuungsstellen. */
+export const KEINE_EMPFAENGER: VerpflegungEmpfaenger = {
+  einheiten: [],
+  abschnitte: [],
+  betreuungsstellen: [],
+};
 
 export const FELDKUECHE = 21;
 export const TURNHALLE = 22;

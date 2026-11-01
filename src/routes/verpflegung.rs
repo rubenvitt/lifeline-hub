@@ -454,12 +454,16 @@ pub struct AusgabeErfassen {
     #[serde(default)]
     verpflegungsstelle_id: Option<i64>,
     /// Empfänger-Einheit desselben Einsatzes (LLH-1055 D2); fremd oder unbekannt 404, aufgelöst
-    /// 409 (außer mit einem Zeitpunkt vor der Auflösung). Mit `abschnitt_id` zusammen 422.
+    /// 409 (außer mit einem Zeitpunkt vor der Auflösung). Mit einem zweiten Empfänger 422.
     #[serde(default)]
     einheit_id: Option<i64>,
     /// Empfänger-Abschnitt desselben Einsatzes (Zuführung, LLH-1055 D2); fremd oder unbekannt 404.
     #[serde(default)]
     abschnitt_id: Option<i64>,
+    /// Empfänger-Betreuungsstelle desselben Einsatzes (Ausgabe an Betreute, LLH-1295 D2); fremd,
+    /// unbekannt oder storniert 404, geschlossen nimmt an.
+    #[serde(default)]
+    betreuungsstelle_id: Option<i64>,
     /// Idempotenzschlüssel der Offline-Queue (LFH-688): leer = fehlend, > 64 Zeichen = 400.
     #[serde(default)]
     client_id: Option<String>,
@@ -538,6 +542,7 @@ pub async fn ausgabe_erfassen(
         verpflegungsstelle_id,
         einheit_id: req.einheit_id,
         abschnitt_id: req.abschnitt_id,
+        betreuungsstelle_id: req.betreuungsstelle_id,
         client_id,
     };
     let benutzer_id = ctx.benutzer.id;

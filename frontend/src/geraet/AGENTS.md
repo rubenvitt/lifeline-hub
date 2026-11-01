@@ -118,11 +118,14 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Listeneintrag mit Stellenprüfung auf Quelle und Ziel.
   `br-eintreffen` (LLH-1075, design.md D14, nur Ansicht `bereitstellungsraum`) öffnet
   „Eintreffen buchen“ (`pages/bereitstellungsraum/EintreffenDialog.tsx`, am Gerät vollflächig) und
-  ist die einzige Stelle, an der ein Gerät Einheiten und Fahrzeuge anlegt („Unangemeldet buchen“);
-  Übernehmen und Abweisen bleiben der Führung und erscheinen am Gerät nie. Die Suche kennt nur
-  Kräfte des Einsatzes, keine Stammdaten. Erwartete Kräfte aus Nachforderungen mit Ziel = eigener
-  Raum (LLH-1387, Gruppe „Aus Nachforderungen“) liest das Gerät nur über
-  `…/bereitstellungsraeume/{bid}/erwartet` (Projektion `nachforderung::erwartet`, von den Freitexten
+  ist die einzige Stelle, an der ein Gerät Einheiten und Fahrzeuge anlegt („Unangemeldet buchen“, „Aus den Stammdaten“);
+  Übernehmen und Abweisen bleiben der Führung und erscheinen am Gerät nie. Den Stammdaten-Katalog
+  liest das Gerät nie; Einheiten-Vorlagen findet es nur über die Projektion
+  `…/bereitstellungsraeume/{bid}/stamm-treffer` (LLH-1300, ab drei Zeichen, höchstens zehn, nur Namen
+  und Funkrufnamen), und „Eintreffen“ an einem solchen Treffer bildet die Einheit mit ihren freien
+  Stamm-Fahrzeugen, ohne Besatzung und Material (`src/bereitstellungsraum/stamm_treffer.rs`).
+  Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum (LLH-1387, Gruppe „Aus
+  Nachforderungen“) liest das Gerät nur über `…/bereitstellungsraeume/{bid}/erwartet` (Projektion `nachforderung::erwartet`, von den Freitexten
   nur Art und Rufnamen); `GET …/nachforderungen` und `nachforderungen` in den Lese-Modulen bleiben
   gesperrt. Beim Buchen trägt `nachforderung_id` den Verweis an die Einheit (ein einheitenloses
   Fahrzeug wird dabei serverseitig zur Einheit, LLH-1444); eine Stufe schaltet das Gerät nie. Ohne Netz merkt der Dialog vor (Teil III; Regeln in
@@ -175,7 +178,10 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
   (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/verpflegung`, **nie**
   `GET …/einheiten` (bleibt 403); Einheitennamen sind keine Namen von Einsatzkräften, Führer- und
-  Mitgliedernamen bleiben draußen; Lese-Module und Routenliste `VERPFLEGUNG` unverändert. Das
+  Mitgliedernamen bleiben draußen; Lese-Module und Routenliste `VERPFLEGUNG` unverändert. Ebenso
+  Betreuungsstellen als Empfänger (LLH-1295): nur Kennung, Bezeichnung und „geschlossen“ aus
+  `empfaenger.betreuungsstellen`, **nie** `GET …/betreuung` (bleibt 403); das Ereignis `betreuung`
+  erreicht das Gerät über das Lese-Modul `verpflegung`. Das
   Gerät wählt den Empfänger wie der Stab (Ausgabeansicht und Nachtrag) und zeigt daraus „Noch
   nicht verpflegt“; gemerkt wird auch der Empfänger nicht. Den
   Einsatzleiter am Einsatzkopf bekommt keine Gerätesitzung (LLH-1168, `src/routes/einsatz.rs::detail`).
