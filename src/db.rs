@@ -11925,20 +11925,20 @@ mod tests {
                  VALUES (?, 'flaeche_je_person_m2', 3.5, datetime('now'), ?)"
             );
             sqlx::query(sqlx::AssertSqlSafe(&*mit_wert))
-            .bind(id)
-            .bind(benutzer)
-            .execute(&pool)
-            .await
-            .unwrap();
+                .bind(id)
+                .bind(benutzer)
+                .execute(&pool)
+                .await
+                .unwrap();
             let doppelt = format!(
                 "INSERT INTO {tabelle} ({scope}, schluessel, wert, geaendert_at) \
                  VALUES (?, 'flaeche_je_person_m2', 5, datetime('now'))"
             );
             sqlx::query(sqlx::AssertSqlSafe(&*doppelt))
-            .bind(id)
-            .execute(&pool)
-            .await
-            .expect_err("je Ebene und Schlüssel höchstens eine Zeile");
+                .bind(id)
+                .execute(&pool)
+                .await
+                .expect_err("je Ebene und Schlüssel höchstens eine Zeile");
         }
 
         sqlx::query("DELETE FROM einsatz WHERE id = ?")

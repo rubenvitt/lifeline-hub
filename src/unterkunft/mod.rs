@@ -58,9 +58,8 @@ fn basiswert(schluessel: &str) -> Option<&'static Basiswert> {
 /// Prüft einen Override: bekannter Schlüssel (sonst 400), endliche Zahl in den Grenzen, bei
 /// Ganzzahl-Werten ohne Nachkommastellen (sonst 400).
 pub fn pruefe(schluessel: &str, wert: f64) -> Result<(), AppError> {
-    let b = basiswert(schluessel).ok_or_else(|| {
-        AppError::Validation(format!("Unbekannter Richtwert '{schluessel}'"))
-    })?;
+    let b = basiswert(schluessel)
+        .ok_or_else(|| AppError::Validation(format!("Unbekannter Richtwert '{schluessel}'")))?;
     if !wert.is_finite() || wert < b.min || wert > b.max {
         return Err(AppError::Validation(format!(
             "{schluessel} muss zwischen {} und {} liegen",

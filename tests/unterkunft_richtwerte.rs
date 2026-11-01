@@ -74,7 +74,11 @@ async fn org_setzen_nur_admin_und_leeren_erbt() {
         Some(&json!({"wert": 3.5})),
     )
     .await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "nur der Admin pflegt Org-Werte");
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "nur der Admin pflegt Org-Werte"
+    );
 
     let (status, json) = anfrage_json(
         &app,
@@ -86,7 +90,10 @@ async fn org_setzen_nur_admin_und_leeren_erbt() {
     .await;
     assert_eq!(status, StatusCode::OK, "{json}");
     let f = eintrag(&json, "flaeche_je_person_m2");
-    assert_eq!((f["wert"].as_f64(), f["herkunft"].as_str()), (Some(3.5), Some("org")));
+    assert_eq!(
+        (f["wert"].as_f64(), f["herkunft"].as_str()),
+        (Some(3.5), Some("org"))
+    );
     assert_eq!(f["basis"], 4.0, "die Basis bleibt sichtbar");
 
     let (_, json) = anfrage(&app, "GET", ORG, &fk, None).await;
@@ -102,7 +109,10 @@ async fn org_setzen_nur_admin_und_leeren_erbt() {
     .await;
     assert_eq!(status, StatusCode::OK);
     let f = eintrag(&json, "flaeche_je_person_m2");
-    assert_eq!((f["wert"].as_f64(), f["herkunft"].as_str()), (Some(4.0), Some("basis")));
+    assert_eq!(
+        (f["wert"].as_f64(), f["herkunft"].as_str()),
+        (Some(4.0), Some("basis"))
+    );
 }
 
 #[tokio::test]
@@ -112,11 +122,23 @@ async fn unbekannter_schluessel_und_grenzen_400() {
     for (schluessel, body, nennt) in [
         ("foo", json!({"wert": 1}), "'foo'"),
         ("foo", json!({"wert": null}), "'foo'"),
-        ("flaeche_je_person_m2", json!({"wert": 0.5}), "zwischen 1 und 20"),
-        ("zelt_sg30_schlafplaetze", json!({"wert": 10.5}), "ganze Zahl"),
+        (
+            "flaeche_je_person_m2",
+            json!({"wert": 0.5}),
+            "zwischen 1 und 20",
+        ),
+        (
+            "zelt_sg30_schlafplaetze",
+            json!({"wert": 10.5}),
+            "ganze Zahl",
+        ),
     ] {
         let (status, json) = anfrage_json(&app, "PUT", &org_put(schluessel), &a, Some(&body)).await;
-        assert_eq!(status, StatusCode::BAD_REQUEST, "{schluessel} {body}: {json}");
+        assert_eq!(
+            status,
+            StatusCode::BAD_REQUEST,
+            "{schluessel} {body}: {json}"
+        );
         assert!(json.to_string().contains(nennt), "{json} nennt {nennt}");
     }
 }
@@ -125,13 +147,22 @@ async fn unbekannter_schluessel_und_grenzen_400() {
 async fn org_werte_gelten_nur_in_der_eigenen_org() {
     let (app, pool) = setup_mit_pool().await;
     let a = admin(&app).await;
-    anfrage_json(&app, "PUT", &org_put("wasser_je_person_l"), &a, Some(&json!({"wert": 15})))
-        .await;
+    anfrage_json(
+        &app,
+        "PUT",
+        &org_put("wasser_je_person_l"),
+        &a,
+        Some(&json!({"wert": 15})),
+    )
+    .await;
     fremde_org_anlegen(&pool, "Nachbar", "fremd", "fremdpw12", "keine").await;
     let fremd = login_cookie(&app, "fremd", "fremdpw12").await;
     let (_, json) = anfrage(&app, "GET", ORG, &fremd, None).await;
     let w = eintrag(&json, "wasser_je_person_l");
-    assert_eq!((w["wert"].as_f64(), w["herkunft"].as_str()), (Some(25.0), Some("basis")));
+    assert_eq!(
+        (w["wert"].as_f64(), w["herkunft"].as_str()),
+        (Some(25.0), Some("basis"))
+    );
 }
 
 #[tokio::test]
@@ -139,8 +170,14 @@ async fn einsatz_vor_organisation_und_zurueck() {
     let app = setup().await;
     let a = admin(&app).await;
     let einsatz = einsatz_anlegen(&app, &a).await;
-    anfrage_json(&app, "PUT", &org_put("flaeche_je_person_m2"), &a, Some(&json!({"wert": 3.5})))
-        .await;
+    anfrage_json(
+        &app,
+        "PUT",
+        &org_put("flaeche_je_person_m2"),
+        &a,
+        Some(&json!({"wert": 3.5})),
+    )
+    .await;
 
     let (status, json) = anfrage_json(
         &app,
@@ -154,7 +191,10 @@ async fn einsatz_vor_organisation_und_zurueck() {
     let f = eintrag(&json, "flaeche_je_person_m2");
     assert_eq!(f["wert"], 5.0);
     assert_eq!(f["herkunft"], "einsatz");
-    assert_eq!((f["basis"].as_f64(), f["org"].as_f64()), (Some(4.0), Some(3.5)));
+    assert_eq!(
+        (f["basis"].as_f64(), f["org"].as_f64()),
+        (Some(4.0), Some(3.5))
+    );
 
     let (status, json) = anfrage(&app, "GET", &einsatz_pfad(einsatz), &a, None).await;
     assert_eq!(status, StatusCode::OK);
@@ -169,7 +209,10 @@ async fn einsatz_vor_organisation_und_zurueck() {
     )
     .await;
     let f = eintrag(&json, "flaeche_je_person_m2");
-    assert_eq!((f["wert"].as_f64(), f["herkunft"].as_str()), (Some(3.5), Some("org")));
+    assert_eq!(
+        (f["wert"].as_f64(), f["herkunft"].as_str()),
+        (Some(3.5), Some("org"))
+    );
 
     // Die Org-Seite kennt keine Einsatz-Werte.
     let (_, json) = anfrage(&app, "GET", ORG, &a, None).await;

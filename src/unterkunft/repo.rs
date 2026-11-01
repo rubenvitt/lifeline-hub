@@ -14,12 +14,11 @@ pub async fn org_werte(
     conn: &mut SqliteConnection,
     org_id: i64,
 ) -> Result<HashMap<String, f64>, AppError> {
-    let zeilen: Vec<(String, f64)> = sqlx::query_as(
-        "SELECT schluessel, wert FROM org_unterkunft_richtwert WHERE org_id = ?",
-    )
-    .bind(org_id)
-    .fetch_all(&mut *conn)
-    .await?;
+    let zeilen: Vec<(String, f64)> =
+        sqlx::query_as("SELECT schluessel, wert FROM org_unterkunft_richtwert WHERE org_id = ?")
+            .bind(org_id)
+            .fetch_all(&mut *conn)
+            .await?;
     Ok(zeilen.into_iter().collect())
 }
 

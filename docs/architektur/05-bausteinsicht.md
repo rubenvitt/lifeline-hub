@@ -155,6 +155,7 @@ Regeln: [frontend/src/personen/AGENTS.md](../../frontend/src/personen/AGENTS.md)
 | `src/person` | Betroffene: Sichtung, Verbleib, Transport, Maßnahmen, Verletzungen, Vermisstenabgleich, Anhänge | `…/{id}/personen`, `…/personen/{pid}/…`; Live `person` |
 | `src/uhs` | Unfallhilfsstellen mit Plätzen, Belegung, Kräften, Grundriss und Anhängen | `…/{id}/uhs`; Live `uhs` |
 | `src/betreuung` | Evakuierungsbezirke und Betreuungsstellen als Mengen mit append-only Meldereihen | `…/{id}/betreuung`, `…/{id}/evakuierung`; Live `betreuung`, `evakuierung` |
+| `src/unterkunft` | Richtwerte des Unterkunftsrechners: Basis aus `richtwerte_basis.json`, Werte je Organisation und Einsatz | `/api/unterkunft-richtwerte`, `/api/org-unterkunft-richtwerte/{schluessel}`, `…/{id}/unterkunft-richtwerte` |
 | `src/verpflegung` | Verpflegungszeitfenster, erfasster Bedarf, Ausgaben, Stellen und Org-Vorlagen | `…/{id}/verpflegung`, `/api/verpflegung-vorlagen`; Live `verpflegung` |
 
 ### Kommunikation & Meldungen

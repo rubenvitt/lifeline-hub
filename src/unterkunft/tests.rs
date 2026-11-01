@@ -16,7 +16,11 @@ fn basis_ist_lesbar() {
     let flaeche = basiswert("flaeche_je_person_m2").expect("Fläche je Person");
     assert_eq!(flaeche.wert, 4.0);
     for b in basis() {
-        assert!(b.min <= b.wert && b.wert <= b.max, "{} in den Grenzen", b.schluessel);
+        assert!(
+            b.min <= b.wert && b.wert <= b.max,
+            "{} in den Grenzen",
+            b.schluessel
+        );
     }
 }
 
@@ -56,7 +60,11 @@ fn einsatz_vor_organisation_vor_basis() {
 
     let w = wert(&r, "wasser_je_person_l");
     assert_eq!((w.wert, w.herkunft), (25.0, RichtwertHerkunft::Basis));
-    assert_eq!(r.werte.len(), basis().len(), "jeder Schlüssel der Basis kommt vor");
+    assert_eq!(
+        r.werte.len(),
+        basis().len(),
+        "jeder Schlüssel der Basis kommt vor"
+    );
 }
 
 #[test]
@@ -81,11 +89,12 @@ async fn grundlage(pool: &sqlx::SqlitePool) -> (i64, i64) {
     .fetch_one(pool)
     .await
     .unwrap();
-    let e: i64 =
-        sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id")
-            .fetch_one(pool)
-            .await
-            .unwrap();
+    let e: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
     (b, e)
 }
 
@@ -101,7 +110,10 @@ async fn org_werte_setzen_leeren_und_isoliert() {
         .await
         .unwrap();
     assert_eq!(
-        repo::org_werte(&mut conn, 1).await.unwrap().get("flaeche_je_person_m2"),
+        repo::org_werte(&mut conn, 1)
+            .await
+            .unwrap()
+            .get("flaeche_je_person_m2"),
         Some(&3.0)
     );
     assert!(
@@ -123,7 +135,10 @@ async fn einsatz_werte_setzen_und_leeren() {
         .await
         .unwrap();
     assert_eq!(
-        repo::einsatz_werte(&mut conn, e).await.unwrap().get("wasser_je_person_l"),
+        repo::einsatz_werte(&mut conn, e)
+            .await
+            .unwrap()
+            .get("wasser_je_person_l"),
         Some(&15.0)
     );
     repo::einsatz_setzen(&mut conn, e, "wasser_je_person_l", None, b)
