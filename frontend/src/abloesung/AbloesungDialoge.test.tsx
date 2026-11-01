@@ -762,14 +762,11 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     );
   });
 
+  // Auch die Vorbelegung ohne die inzwischen Entlassene ist keine Änderung: Speichern räumt sie
+  // nicht still aus der Planung.
   it('Planen unverändert: kein Aufruf, eine inzwischen überholte Planung bleibt stehen', async () => {
-    // Ohne die inzwischen Entlassene: deren Wegfall wäre eine Änderung.
-    const ohneEntlassene = {
-      ...geplant,
-      besatzung_plan: geplant.besatzung_plan.slice(0, 1),
-    } as Abloesung;
     const onSchliessen = vi.fn();
-    const onErfassen = planung({ schicht: ohneEntlassene, onSchliessen });
+    const onErfassen = planung({ schicht: geplant, onSchliessen });
     const dialog = await screen.findByRole('dialog');
     await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
@@ -789,6 +786,19 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [12], besatzung_plan: [] }),
+    );
+  });
+
+  it('Planen nach der Vorbelegung geändert: der Plan geht ohne die Entlassene hinaus', async () => {
+    const onErfassen = planung({ schicht: geplant });
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
+    await waehle('Neue Besatzung', 'Dirk Neu');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        besatzung_plan: [{ personal_id: 21, einheit_id: 2, fahrzeug_id: 44 }, { personal_id: 24 }],
+      }),
     );
   });
 

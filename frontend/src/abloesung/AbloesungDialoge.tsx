@@ -1,6 +1,6 @@
 import { Checkbox, Collapse, Form, Input, Radio, Typography, type FormInstance } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type { Abloesung, AbloesungArt, BesatzungZielEingabe, VollzugBody } from '../api/types';
@@ -19,6 +19,7 @@ import {
   besatzungZiele,
   gleicheIds,
   gleicherPlan,
+  gleicheZiele,
   planVorbelegung,
   verteilungKopf,
   type BesatzungOption,
@@ -221,6 +222,8 @@ interface BesatzungWerte {
  * Personal und Einheiten da sind: die Listen laden oft erst mit dem offenen Dialog, und
  * `initialValues` greift nur beim Öffnen. Einmal je Dialog und nur, solange niemand die Besatzung
  * angefasst hat; ein Wechsel der Art sperrt sie nicht (bei „Ganze Einheit“ zählt die Besatzung nicht).
+ * Gibt die Vorbelegung als Ziele zurück (`null` ohne): sie lässt inzwischen Entlassene und nicht
+ * mehr wählbare Ziele weg, ist für das Planen aber kein eigener Änderungswunsch.
  */
 function usePlanVorbelegung(
   form: FormInstance<BesatzungWerte>,
@@ -228,8 +231,9 @@ function usePlanVorbelegung(
   personen: BesatzungOption[] | null,
   verteilung: VerteilungZiele | null | undefined,
   gesperrt: boolean,
-) {
+): RefObject<BesatzungZielEingabe[] | null> {
   const erledigt = useRef(false);
+  const vorbelegt = useRef<BesatzungZielEingabe[] | null>(null);
   // Eine eigene Auswahl merken: `isFieldTouched` vergisst sie, sobald das Feld beim Wechsel zu
   // „Ganze Einheit“ verschwindet, der Wert bleibt aber stehen (`preserve`).
   const ids = Form.useWatch('besatzung_ids', { form, preserve: true }) as number[] | undefined;
@@ -245,7 +249,9 @@ function usePlanVorbelegung(
     if (gewaehlt.current || form.isFieldTouched('besatzung_ids')) return;
     const v = planVorbelegung(schicht, personen, verteilung);
     form.setFieldsValue({ besatzung_ids: v.ids, verteilung: v.verteilung });
+    vorbelegt.current = besatzungZiele(v.ids, v.verteilung, schicht);
   }, [form, schicht, personen, verteilung, gesperrt]);
+  return vorbelegt;
 }
 
 /** Die Art, mit der ein Dialog öffnet: ein geplanter Besatzungswechsel gibt sie vor. */
@@ -604,7 +610,7 @@ export function AbloeserDialog({
   const artGrundId = useId();
   const gesperrt = besatzungGesperrt != null;
   const art = Form.useWatch('art', form) ?? artVorgabe(schicht, gesperrt);
-  usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
+  const vorbelegt = usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
   return (
     <ErfassungsModal<AbloeserWerte>
       offen={schicht != null}
@@ -629,7 +635,8 @@ export function AbloeserDialog({
         const abloeser = nurAbloeser || w.art !== 'besatzung' ? (w.abloeser_ids ?? []) : [];
         // Nur Geändertes senden, ohne Änderung kein Aufruf: ein unverändertes Speichern einer
         // inzwischen überholten Ansicht schriebe sonst die alte Planung zurück. Ein Art-Wechsel
-        // ändert beide Listen und sendet sie deshalb gemeinsam.
+        // ändert beide Listen und sendet sie deshalb gemeinsam. Unverändert ist auch die
+        // Vorbelegung selbst: sie räumt Entlassene nicht still aus der Planung.
         const eingabe: PlanungEingabe = {};
         if (!gleicheIds(abloeser, abloeserIds(schicht))) eingabe.abloeser_ids = abloeser;
         if (!nurAbloeser) {
@@ -637,7 +644,10 @@ export function AbloeserDialog({
             w.art === 'besatzung'
               ? besatzungZiele(w.besatzung_ids ?? [], w.verteilung, schicht)
               : [];
-          if (!gleicherPlan(plan, schicht)) eingabe.besatzung_plan = plan;
+          const unveraendert =
+            gleicherPlan(plan, schicht) ||
+            (vorbelegt.current != null && gleicheZiele(plan, vorbelegt.current));
+          if (!unveraendert) eingabe.besatzung_plan = plan;
         }
         return Object.keys(eingabe).length > 0 ? onErfassen(eingabe) : Promise.resolve();
       }}

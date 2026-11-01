@@ -218,22 +218,36 @@ export function besatzungZiele(
   });
 }
 
+type ZielVergleich = Pick<AbloesungBesatzungPlan, 'personal_id' | 'einheit_id' | 'fahrzeug_id'>;
+
+/** Gleiche Personen mit gleichen Zielen in gleicher Reihenfolge (Ziele wie aus `besatzungZiele`). */
+export function gleicheZiele(a: readonly ZielVergleich[], b: readonly ZielVergleich[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (z, i) =>
+        z.personal_id === b[i].personal_id &&
+        (z.einheit_id ?? null) === (b[i].einheit_id ?? null) &&
+        (z.fahrzeug_id ?? null) === (b[i].fahrzeug_id ?? null),
+    )
+  );
+}
+
 /**
  * Entspricht `ziele` dem geplanten Besatzungswechsel der Schicht? In derselben Reihenfolge, wie
  * der Server vergleicht; ein Ziel gleich der Einheit der Schicht zählt als „kein Ziel“.
  */
 export function gleicherPlan(ziele: readonly BesatzungZielEingabe[], schicht: Abloesung): boolean {
-  const plan = schicht.besatzung_plan ?? [];
-  const ziel = (e: number | null | undefined) => (e != null && e !== schicht.einheit_id ? e : null);
-  return (
-    ziele.length === plan.length &&
-    ziele.every(
-      (z, i) =>
-        z.personal_id === plan[i].personal_id &&
-        ziel(z.einheit_id) === ziel(plan[i].einheit_id) &&
-        (z.fahrzeug_id ?? null) === (plan[i].fahrzeug_id ?? null),
-    )
-  );
+  const plan = (schicht.besatzung_plan ?? []).map((p) => ({
+    personal_id: p.personal_id,
+    einheit_id: p.einheit_id !== schicht.einheit_id ? p.einheit_id : null,
+    fahrzeug_id: p.fahrzeug_id,
+  }));
+  const normiert = ziele.map((z) => ({
+    ...z,
+    einheit_id: z.einheit_id !== schicht.einheit_id ? z.einheit_id : null,
+  }));
+  return gleicheZiele(normiert, plan);
 }
 
 /** Gleiche Ids in gleicher Reihenfolge. */
