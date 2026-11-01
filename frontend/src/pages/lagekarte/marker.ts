@@ -63,7 +63,7 @@ export type MarkerTyp =
   /**
    * Tier (`buildTierMarker` in `tierMarker.ts`, LLH-1123): läuft wie der Bereitstellungsraum in
    * `alleVerortet` und „Nicht verortet", nur bei Lesezugriff auf das Modul Tiere (`tierEbene.ts`).
-   * Kreis mit Kurzzeichen „T", kein `tz`.
+   * Zeichen „Tier ohne Zustand" über `tierZeichen` (LLH-1343), kein `tz`; Rückfall Kreis mit „T".
    */
   | 'tier'
   /**
@@ -118,7 +118,10 @@ export interface KarteMarker {
    * Personen bleiben in `marker-cluster` mit den Sichtungs-Donuts.
    */
   clusterQuelle?: 'personen';
-  /** FMS-Status-Ring, nur für Fahrzeuge. */
+  /**
+   * Farbige Scheibe hinter dem Zeichen: FMS-Status der Fahrzeuge, bei einem vermissten Tier die
+   * Achtung-Farbe (LLH-1343).
+   */
   statusFarbe?: string | null;
   /**
    * Zusatz der Kartenplakette hinter dem Namen (Bereitstellungsraum: „0/2/9//11 · 3 Fz" oder
