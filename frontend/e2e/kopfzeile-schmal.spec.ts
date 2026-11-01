@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu } from './rollen-kern';
 import { einsatzAnlegen } from './einsatz-kern';
-import { oeffneMenue } from './menue-kern';
+import { klickeEintrag, oeffneMenue } from './menue-kern';
 
 /**
  * Die Kopfzeile auf dem Handschirm. Ob das Inline-`paddingInline` antds Klassenregel schlägt
@@ -267,11 +267,13 @@ test('Bediendichte bleibt auf 390 px bedienbar — über das Benutzermenü', asy
   );
 
   // Erst ins stehende Menü klicken: während `ant-slide-up-appear` geht der Klick unter Last
-  // verloren (`menue-kern.ts`, LLH-1487).
-  await (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Handschuh/ }).click();
+  // verloren (`menue-kern.ts`, LLH-1487). Im Handschuh rollt das Menü in sich (LLH-1337).
+  await klickeEintrag(
+    (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Handschuh/ }),
+  );
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
-  await (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Dunkel/ }).click();
+  await klickeEintrag((await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Dunkel/ }));
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
@@ -289,11 +291,13 @@ test('auch ab lg stehen die Umschalter nicht im Kopf — bedienbar bleiben sie',
 
   const trigger = page.getByRole('button', { name: 'Benutzermenü' });
   // Erst ins stehende Menü klicken: während `ant-slide-up-appear` geht der Klick unter Last
-  // verloren (`menue-kern.ts`, LLH-1487).
-  await (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Komfortabel/ }).click();
+  // verloren (`menue-kern.ts`, LLH-1487). Ein langes Menü rollt in sich (LLH-1337).
+  await klickeEintrag(
+    (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Komfortabel/ }),
+  );
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
 
-  await (await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Dunkel/ }).click();
+  await klickeEintrag((await oeffneMenue(page, trigger)).getByRole('menuitem', { name: /Dunkel/ }));
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 

@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
@@ -26,7 +26,8 @@ Einsatzleitung und Führungspersonal.
    Fälligkeit oben.
 2. Je Karte links die Uhrzeit der Fälligkeit lesen, rechts die Einstufung: „planmäßig“, „Ablösung
    bald fällig“ (ab der Vorwarnzeit, ohne anderes Schichtmodell 30 Minuten vorher) oder
-   „überfällig“. Darunter stehen „in …“ bzw. „seit …“, Abschnitt, „im Einsatz seit“, der Rhythmus
+   „überfällig“. Darunter stehen „in …“ bzw. „seit …“, Abschnitt, der Beginn der Schicht („im
+   Einsatz seit“, „seit Eintreffen“ oder „Folgeschicht seit“), der Rhythmus
    als Dauer mit seiner Quelle („Vorgabe“ des Abschnitts, „Vorgabe Einsatz“ oder „eigen“), unter
    „gilt auch für:“ die Untereinheiten, die in dieser Schicht mitlaufen, und die geplanten
    ablösenden Einheiten („Ablösung geplant durch …“). Ist eine von ihnen alarmiert oder
@@ -47,7 +48,9 @@ Einsatzleitung und Führungspersonal.
 ### Einheiten ohne Schicht finden
 
 1. „Ohne Schicht“ wählen. Die Zahl am Segment nennt die Einheiten im Einsatz, die keine Schicht
-   haben; auf dem Handy steht sie im Kopf der Seite („… ohne Schicht“).
+   haben; auf dem Handy steht sie im Kopf der Seite („… ohne Schicht“). Direkt hierher führen im
+   „Überblick“ unter „Ablösungen“ der Sprung „… ohne Schicht ↗“ und in der Sprungpalette „Ohne
+   Schicht“.
 2. Je Zeile links lesen, seit wann die Einheit eingetroffen ist („eingetroffen“) oder, solange sie
    unterwegs ist, seit wann sie alarmiert ist („alarmiert“); daneben Name und Abschnitt. Eine
    Einheit, die schon als ablösende Einheit geplant ist, nennt „als Ablöser geplant für …“.
@@ -363,8 +366,11 @@ mit ihrem Eintreffen keine eigene: sie läuft in der Schicht des Verbands mit. D
 Verbands nennt sie unter „gilt auch für:“, unter „Ohne Schicht“ steht sie nicht. Wer für sie
 trotzdem eine eigene Schicht braucht, beginnt sie von Hand.
 
-Ob eine Schicht von Hand oder mit dem Eintreffen begann, zeigt nur das Einsatztagebuch, nicht die
-Karte.
+Wie eine Schicht begann, steht an der Karte vor der Uhrzeit: „im Einsatz seit“ heißt von Hand
+begonnen, „seit Eintreffen“ mit dem Eintreffen, „Folgeschicht seit“ mit dem Vollzug der Ablösung
+ihres Vorgängers. Wird der Beginn einer mit dem Eintreffen begonnenen Schicht geändert, heißt es
+danach „im Einsatz seit“; eine Folgeschicht bleibt Folgeschicht. Schichten aus der Zeit vor dieser
+Kennzeichnung zeigen „im Einsatz seit“, außer Folgeschichten.
 
 ### Schicht endet mit der Entlassung
 
@@ -387,7 +393,9 @@ Aufgelöste Einheiten fehlen. Ein geplanter Ablöser steht dort ohne „Schicht 
 Schicht beginnt mit dem Vollzug der Ablösung, eine eigene ließe den Vollzug scheitern.
 
 Die Ansicht braucht Einheiten und Kräfte-Zeitachse und damit das Modul Einheiten. Fehlt es der
-Person, steht „Ohne Schicht“ gesperrt mit „Modul Einheiten gesperrt“.
+Person, steht „Ohne Schicht“ gesperrt mit „Modul Einheiten gesperrt“, ein Sprung dorthin zeigt
+„Laufend“, und der Überblick nennt keine Zahl ohne Schicht. Die gewählte Ansicht steht in der
+Adresse der Seite; ein Lesezeichen und der Weg zurück im Browser treffen sie wieder.
 
 Kommt eine Einheit ohne Schicht hinzu, während die Ansicht offen ist, zählt die Zahl sie sofort mit;
 die gezeigten Zeilen bleiben, wo sie sind, und ein Hinweis über der Liste nennt die neue, bis

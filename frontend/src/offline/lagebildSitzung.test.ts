@@ -408,6 +408,29 @@ describe('Lagebild-Sitzung', () => {
     ]);
   });
 
+  it('stellt die Liste der Bereitstellungsräume ungekürzt wieder her, das Detail nicht (LLH-1318)', async () => {
+    const raum = {
+      id: 4,
+      bezeichnung: 'BR Sportplatz',
+      standort: 'Sportplatz Nord, Zufahrt Tor 2',
+      notiz: 'Einweiser am Tor',
+      status: 'aktiv',
+    };
+    const erster = neuerClient();
+    await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    erster.setQueryData(einsatzKeys.br(3), [raum]);
+    erster.setQueryData(einsatzKeys.brDetail(3, 4), { ...raum, einheiten: [] });
+    erster.setQueryData(einsatzKeys.brVerlauf(3, 4), [{ id: 1 }]);
+    await warteAufGeschrieben((n) => n > 0);
+    await lagebildBeenden(erster);
+
+    const zweiter = neuerClient();
+    await lagebildStarten(zweiter, { art: 'netzfehler' }, { drosselMs: DROSSEL });
+    expect(zweiter.getQueryData(einsatzKeys.br(3))).toEqual([raum]);
+    expect(zweiter.getQueryData(einsatzKeys.brDetail(3, 4))).toBeUndefined();
+    expect(zweiter.getQueryData(einsatzKeys.brVerlauf(3, 4))).toBeUndefined();
+  });
+
   it('löscht bei einer Server-Ablehnung und stellt nichts wieder her', async () => {
     const erster = neuerClient();
     await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });

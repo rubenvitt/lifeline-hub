@@ -28,7 +28,8 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   freier Lagekarte abrufen; der Ausschnitt `BezirkKartenbild.tsx` ist nicht bedienbar, baut
   seine Karte im Cleanup ab und ohne Kartengrafik gar nicht (`pages/lagekarte/AGENTS.md`, „Karte
   ohne Grafik“). Die Stufenlinie (`standlinieKern.ts`) teilt die Abfrage mit
-  `MeldeVerlauf`, ohne Diagrammpaket und ohne Interpolation.
+  `MeldeVerlauf`, ohne Diagrammpaket und ohne Interpolation; die Darstellung teilt
+  `Stufenlinie.tsx` mit der Belegungslinie der Stelle.
 - **Gebiet beim Anlegen und am Bezirk** (LLH-1069, Spec `betreuung-lagekarte`): die Gebietswahl
   „Keins“ · „Fläche zeichnen“ steht sichtbar im Anlegedialog (Vorgabe Fläche nur bei freier
   Lagekarte, sonst gesperrt mit Grund); nach dem Anlegen springt `useBezirkHandlungen` erst beim
@@ -48,6 +49,11 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   gibt es nur in `betreuungText.ts`, nie negativ. „Betroffene hier“ fragt die Personenliste mit
   `?betreuungsstelle_id=` (Serverfilter, Key `einsatzKeys.personenDerStelle`) und nur, wenn die
   Übersicht `namentlich` liefert (Personenrecht); sonst steht der Grund als Zeile.
+  Belegungsverlauf (LLH-1347): Stufenlinie `StelleBelegungslinie` über dem Meldeverlauf, dieselbe
+  Darstellung wie die Bezirkslinie (`Stufenlinie.tsx`, Kern `standlinieKern.ts`) und dieselbe
+  Abfrage wie `MeldeVerlauf`; Kapazität gestrichelt nur, wenn bekannt. Ein Verbleib
+  „Notunterkunft“ mit Stelle führt über `personen/VerbleibText.tsx` auf die Seite
+  (`EinsatzPfade.betreuungsstelle`, am Gerät `null`; gesperrtes Modul: Text ohne Link).
   Leitung und `kontaktweg` (Migrationen 0226/0256, je 200 Zeichen; in der Oberfläche „Kontakt“,
   LLH-1134/LLH-1419) sind personenbezogen: im ETB nur
   „weitere Angaben“, Schwärzung leert sie, der gesicherte Lagestand friert sie nicht ein.

@@ -16,6 +16,7 @@ use crate::geraet::{
     code, Bindungsart, Funktionsansicht, GeraetAnzeige, Stelle, BEZEICHNUNG_MAX, PROVIDER,
     STANDARD_STUNDEN,
 };
+use crate::live::LiveEvent;
 use crate::uhs::UhsStatus;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -268,6 +269,9 @@ pub async fn anlegen(
         Ok((kopplung_id, code, code_bis, etb_id))
     })?;
     state.live.publiziere(einsatz_id, etb_id);
+    if stelle.is_some_and(|s| s.art == Bindungsart::Verpflegungsstelle) {
+        melde_verpflegungsstelle(&state, einsatz_id);
+    }
     let kopplung = repo::laden(&state.pool, einsatz_id, kopplung_id).await?;
     Ok((
         StatusCode::CREATED,
@@ -355,6 +359,9 @@ pub async fn widerrufen(
     state.live.melde_kopplung_ende(kopplung_id);
     if let Some(etb_id) = etb_id {
         state.live.publiziere(einsatz_id, etb_id);
+        if an_verpflegungsstelle(&vorher) {
+            melde_verpflegungsstelle(&state, einsatz_id);
+        }
     }
     Ok(Json(
         repo::laden(&state.pool, einsatz_id, kopplung_id).await?,
@@ -460,10 +467,28 @@ pub async fn koppeln(
         Ok(eintrag) => state.live.publiziere(ein.einsatz_id, eintrag.id),
         Err(e) => tracing::error!("ETB-Eintrag zur Gerätekopplung fehlgeschlagen: {e}"),
     }
+    if an_verpflegungsstelle(&anzeige) {
+        melde_verpflegungsstelle(&state, ein.einsatz_id);
+    }
     Ok((
         jar,
         Json(geraet_anzeige(&anzeige, ein.einsatz_id, ein.kopplung_id)),
     ))
+}
+
+/// Ob die Kopplung an einer Verpflegungsstelle hängt (LLH-1048). Nur dort zeigt die Stelle die
+/// Kopplung an (`VerpflegungsstelleAnzeige.geraet_gekoppelt`).
+fn an_verpflegungsstelle(k: &KopplungAnzeige) -> bool {
+    k.stelle_id.is_some() && k.ansicht.stellenart() == Some(Bindungsart::Verpflegungsstelle)
+}
+
+/// Meldet der Stellenliste der Verpflegung, dass sich `geraet_gekoppelt` einer Stelle geändert
+/// haben kann (LLH-1316): sonst stünde „Stornieren“ bis zum nächsten Abruf falsch gesperrt oder
+/// frei. Nutzlast nur `{einsatz_id}` wie jedes `verpflegung`-Ereignis.
+fn melde_verpflegungsstelle(state: &AppState, einsatz_id: i64) {
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Verpflegung);
 }
 
 /// Selbstsicht eines Geräts aus seiner Kopplung.

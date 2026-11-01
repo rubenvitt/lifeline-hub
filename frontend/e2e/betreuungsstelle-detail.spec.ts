@@ -4,7 +4,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 /**
  * Detailseite einer Betreuungsstelle (LLH-1044): aus der Übersicht über die Kennung hinein,
  * „Belegung melden“ aus dem Kopf, die Zahl im Band „Belegung in Zahlen“ folgt; Leitung und
- * Kontakt in der Ansicht bearbeiten. Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`).
+ * Kontakt in der Ansicht bearbeiten. Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`). Mit der
+ * zweiten Meldung entsteht die Stufenlinie der Belegung (LLH-1347).
  */
 
 async function senden<T = { id: number }>(
@@ -60,6 +61,12 @@ test('Übersicht → Detailseite → Belegung melden: die Kennzahl folgt, Stammd
   await expect(dialog).toBeHidden();
   await expect(band).toContainText('Belegt115fast voll');
   await expect(band).toContainText('Frei5');
+  // Ab der zweiten Meldung steht der Belegungsverlauf als Stufenlinie über der Liste (LLH-1347).
+  const linie = page.locator('[data-lfh="stelle-belegungslinie"]');
+  await expect(linie.getByRole('img')).toHaveAccessibleName(
+    /^Belegung von 40 \(.+\) auf 115 \(.+\), 2 Meldungen, Kapazität 120$/,
+  );
+  await expect(linie.locator('circle')).toHaveCount(2);
 
   // Leitung und Kontakt (LLH-1134, vormals „Erreichbarkeit“): Bearbeiten am Paneel „Stelle“, Speichern in der Leiste.
   await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();

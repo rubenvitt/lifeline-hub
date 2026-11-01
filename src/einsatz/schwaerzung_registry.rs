@@ -1269,7 +1269,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // LLH-1308 (0260): Verbleib der abgelösten Einheit beim Vollzug.
             retain("verbleib", G_ENUM),
             retain("verbleib_br_id", G_FK),
-            // LLH-1319 (0262): der Vollzug hat die Ablöser-Planung für die Rücknahme gesichert.
+            // LLH-1312 (0262): wie die Schicht begann.
+            retain("beginn_quelle", G_ENUM),
+            // LLH-1319 (0263): der Vollzug hat die Ablöser-Planung für die Rücknahme gesichert.
             retain("planung_gesichert", G_KONFIG),
         ],
     },
@@ -1330,7 +1332,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("fahrzeug_nachher_id", G_FK),
         ],
     },
-    // Geplanter Besatzungswechsel einer Schicht (LLH-1319, Mig 0262): wer kommen soll und wohin.
+    // Geplanter Besatzungswechsel einer Schicht (LLH-1319, Mig 0263): wer kommen soll und wohin.
     // Nur Verweise und Zeit; der Name steckt in `einsatz_personal` → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_abloesung_besatzung_plan",
@@ -1348,7 +1350,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
         ],
     },
-    // Ablöser-Planung vor dem Vollzug (LLH-1319, Mig 0262), damit die Rücknahme sie wiederherstellt.
+    // Ablöser-Planung vor dem Vollzug (LLH-1319, Mig 0263), damit die Rücknahme sie wiederherstellt.
     // Nur Verweise und Zeit → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_abloesung_planung_vorher",

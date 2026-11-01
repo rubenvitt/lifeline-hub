@@ -671,7 +671,10 @@ eine eigene laufende Schicht haben noch über `erbende_einheiten` eine erben, di
 Einsatz zuerst. Jede Zeile MUST Eintreffen (ohne es die Alarmierung) und Abschnitt zeigen und
 mit Schreibrecht „Schicht beginnen“ anbieten, das den Dialog mit der Einheit vorbelegt. Ein
 geplanter Ablöser MUST in der Ansicht stehen, mit der Einheit, die er ablösen soll, aber ohne
-„Schicht beginnen“.
+„Schicht beginnen“. Der Überblick SHALL im Abschnitt „Ablösungen“ der offenen Vorgänge den
+Sprung „<n> ohne Schicht ↗“ auf diese Ansicht führen, nur bei bekannter Zahl über null, mit
+derselben Menge wie das Segment (LLH-1312). Die Sprungpalette SHALL die Ansicht als „Ohne
+Schicht“ unter „Ansichten“ führen.
 
 #### Scenario: Zug, Trupp und eine einzelne Einheit
 - **WHEN** „Zug Nord“ eine laufende Schicht hat, sein „Trupp Nord“ und „Florian Süd“ eingetroffen sind und keine eigene haben
@@ -680,6 +683,14 @@ geplanter Ablöser MUST in der Ansicht stehen, mit der Einheit, die er ablösen 
 #### Scenario: Schicht aus der Zeile beginnen
 - **WHEN** jemand an der Zeile „Florian Süd“ „Schicht beginnen“ wählt und mit Rhythmus 6 h absendet
 - **THEN** ist „Florian Süd“ im Dialog vorbelegt, „Im Einsatz seit“ nennt das Eintreffen, die Schicht läuft, und die Zeile fällt weg
+
+#### Scenario: Zahl im Überblick
+- **WHEN** zwei Einheiten im Einsatz keine Schicht haben
+- **THEN** nennt der Überblick unter „Ablösungen“ „2 ohne Schicht ↗“, und die Zahl am Abschnitt bleibt die der fälligen Schichten
+
+#### Scenario: Ohne Freigabe der Einheiten
+- **WHEN** der Person die Freigabe des Moduls Einheiten fehlt
+- **THEN** steht im Überblick kein Sprung „ohne Schicht“, und der Überblick fragt die Zeitachse nicht ab
 
 ### Requirement: Zufluss und Sperre der Ansicht „Ohne Schicht“
 
@@ -1121,3 +1132,46 @@ Einstufung, Kante oder Fläche zu ändern.
 #### Scenario: Karte der Folgeschicht
 - **WHEN** die Schicht von „Florian 1“ als Besatzungswechsel mit „Cora Neu“ und „Dirk Neu“ vollzogen ist
 - **THEN** zeigt die Karte der laufenden Folgeschicht „nach Besatzungswechsel · Besatzung: Cora Neu, Dirk Neu“
+
+### Requirement: Herkunft des Beginns
+
+Jede Schicht SHALL ihre Herkunft `beginn_quelle` tragen (LLH-1312): `hand` (von Hand begonnen,
+auch mit dem übernommenen Eintreffen als Zeitpunkt), `eintreffen` (mit dem Eintreffen begonnen,
+Requirement „Schicht mit dem Eintreffen“) oder `vollzug` (vom Vollzug neu angelegte Folgeschicht,
+ganze Einheit wie Besatzungswechsel). Eine beim Vollzug übernommene Schicht MUST ihre Herkunft
+behalten; die Rücknahme MUST sie nicht ändern. Ändert jemand den Beginn einer Schicht mit
+Herkunft `eintreffen`, MUST sie danach `hand` tragen; eine Folgeschicht MUST `vollzug` behalten.
+Die Karte MUST die Herkunft im Beginn nennen: „im Einsatz seit <Zeit>“ (`hand`), „seit Eintreffen
+<Zeit>“ (`eintreffen`), „Folgeschicht seit <Zeit>“ (`vollzug`), in derselben Zeile wie heute.
+
+#### Scenario: Autostart
+- **WHEN** „Florian 1“ um 06:40 eintrifft und der Einsatz eine Vorgabe hat
+- **THEN** trägt die neue Schicht `beginn_quelle` `eintreffen`, und ihre Karte zeigt „seit Eintreffen 0640“
+
+#### Scenario: Folgeschicht
+- **WHEN** die Schicht von „Florian 1“ um 15:40 durch „Florian 2“ abgelöst wird
+- **THEN** trägt die Folgeschicht von „Florian 2“ `beginn_quelle` `vollzug`, und ihre Karte zeigt „Folgeschicht seit 1540“
+
+#### Scenario: Beginn korrigiert
+- **WHEN** jemand den Beginn einer mit dem Eintreffen begonnenen Schicht von 06:40 auf 07:10 ändert
+- **THEN** trägt sie `beginn_quelle` `hand`, und die Karte zeigt „im Einsatz seit 0710“
+
+#### Scenario: Bestand
+- **WHEN** die Migration auf eine Datenbank mit einer Folgeschicht und einer Auto-Schicht aus der Zeit davor läuft
+- **THEN** trägt die Folgeschicht `vollzug` und die Auto-Schicht `hand`
+
+### Requirement: Ansicht in der Adresse
+
+Die Seite Ablösung SHALL ihre Ansicht in der Adresse führen (LLH-1312, Muster Query-Param aus
+`frontend/AGENTS.md`): `?ansicht=ohne-schicht` oder `?ansicht=vergangen`, „Laufend“ ohne
+Parameter. Ein Wechsel des Segments MUST die Adresse ersetzen, nicht ergänzen; ein unbekannter
+Wert MUST als „Laufend“ gelten. Ohne Freigabe des Moduls Einheiten MUST `ohne-schicht` „Laufend“
+zeigen. Der Sprung `?schicht=` MUST die Ansicht seiner Schicht in die Adresse schreiben.
+
+#### Scenario: Aus dem Überblick
+- **WHEN** jemand im Überblick „2 ohne Schicht ↗“ wählt
+- **THEN** öffnet die Seite Ablösung mit der Ansicht „Ohne Schicht“, und die Adresse trägt `?ansicht=ohne-schicht`
+
+#### Scenario: Zurück
+- **WHEN** jemand in „Ohne Schicht“ eine Einheit öffnet und mit dem Browser zurückgeht
+- **THEN** steht wieder „Ohne Schicht“

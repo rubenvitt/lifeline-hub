@@ -25,6 +25,7 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   besatzung_plan: [],
   nach_besatzungswechsel: [],
   verbleib: 'ruhe' as const,
+  beginn_quelle: 'hand' as const,
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: '2026-01-05 06:00:00',

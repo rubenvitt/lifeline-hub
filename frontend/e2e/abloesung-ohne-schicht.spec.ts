@@ -9,8 +9,9 @@ import { expect, test, type Page } from '@playwright/test';
  * keine Schicht von selbst. Der Zug bekommt seine Schicht über die API, der Trupp erbt sie.
  *
  * Geprüft wird, was jsdom nicht sieht: die Menge aus Einheitenliste, Zeitachse und
- * `erbende_einheiten` des Servers, der vorbelegte Dialog bis zur angelegten Schicht, und dass eine
- * Entlassung die Schicht unter „Vergangen“ → „Beendet“ führt.
+ * `erbende_einheiten` des Servers, der Sprung aus dem Überblick auf `?ansicht=ohne-schicht`
+ * (LLH-1312), der vorbelegte Dialog bis zur angelegten Schicht, und dass eine Entlassung die
+ * Schicht unter „Vergangen“ → „Beendet“ führt.
  */
 
 const ADMIN = 'admin';
@@ -74,7 +75,17 @@ test('Ablösung: Einheiten ohne Schicht, vorbelegter Beginn, Vererbung und Ende 
   }
   await sende('post', 'abloesungen', { einheit_id: zug.id, rhythmus_minuten: 360 }, 'Schicht Zug');
 
+  // Der Überblick springt direkt auf „Ohne Schicht“, die Ansicht steht in der Adresse (LLH-1312).
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  await page.getByRole('link', { name: '1 ohne Schicht' }).click();
+  await expect(page).toHaveURL(/\/abloesung\?ansicht=ohne-schicht$/);
+  await expect(page.getByRole('region', { name: 'Einheiten ohne Schicht' })).toBeVisible();
+  // Von Hand begonnen: die Karte nennt den Beginn wie bisher.
   await page.goto(`/einsaetze/${einsatzId}/abloesung`);
+  await expect(
+    page.getByRole('article', { name: 'Schicht Zug Nord' }).getByText(/^im Einsatz seit \d{4,6}$/),
+  ).toBeVisible();
+
   const zugKarte = page.getByRole('article', { name: 'Schicht Zug Nord' });
   await expect(zugKarte.locator('[data-lfh="abloesung-erben"]')).toHaveText(
     'gilt auch für: Trupp Nord',

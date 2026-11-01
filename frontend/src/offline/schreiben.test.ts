@@ -74,7 +74,12 @@ describe('offlinefähige Fachschreibvorgänge (LFH-334)', () => {
       expect.objectContaining({
         aktion: {
           art: 'person',
-          daten: { name: 'Muster', status: 'vermisst', client_id: 'person-1' },
+          daten: {
+            name: 'Muster',
+            status: 'vermisst',
+            client_id: 'person-1',
+            zeitpunkt_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/),
+          },
         },
       }),
     ]);
@@ -303,6 +308,58 @@ describe('offlinefähige Verpflegungsausgaben (LFH-688)', () => {
       erfasseVerpflegungsausgabeOfflineFaehig(11, 7, mittag, { menge: 1 }),
     ).rejects.toMatchObject({ status: 404 });
     expect(await schreibaktionenLaden(11, 7)).toHaveLength(1);
+  });
+});
+
+describe('Aufnahme einer Person ohne Netz mit Erfassungszeit (LLH-1330)', () => {
+  const SERVER = Date.parse('2026-10-18T14:10:00Z');
+
+  // Die Geräteuhr geht 5 min vor, der Server hat vor dem Ausfall einmal geantwortet.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER + 5 * 60_000);
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(SERVER).toUTCString() } }));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('die vorgemerkte Aufnahme trägt zeitpunkt_at nach der Serveruhr', async () => {
+    online(false);
+    const ergebnis = await erfassePersonOfflineFaehig(11, 7, {
+      sichtung: 'sk2',
+      uhs_id: 4,
+      client_id: 'aufnahme-1',
+    });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'aufnahme-1' });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion).toEqual({
+      art: 'person',
+      daten: {
+        sichtung: 'sk2',
+        uhs_id: 4,
+        status: 'erfasst',
+        client_id: 'aufnahme-1',
+        zeitpunkt_at: '2026-10-18 14:10:00',
+      },
+    });
+  });
+
+  it('online ohne Zeitpunkt, nach Netzfehler vorgemerkt mit derselben client_id und Zeit', async () => {
+    vi.mocked(legePersonAn).mockRejectedValueOnce(new NetzFehler());
+    const ergebnis = await erfassePersonOfflineFaehig(11, 7, { sichtung: 'sk3' });
+    expect(ergebnis.zustand).toBe('vorgemerkt');
+    const gesendet = vi.mocked(legePersonAn).mock.calls[0][1];
+    expect(gesendet).not.toHaveProperty('zeitpunkt_at');
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toEqual({ ...gesendet, zeitpunkt_at: '2026-10-18 14:10:00' });
+  });
+
+  it('ein eingetragener Zeitpunkt bleibt', async () => {
+    online(false);
+    await erfassePersonOfflineFaehig(11, 7, { zeitpunkt_at: '2026-10-18 14:02:00' });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toHaveProperty('zeitpunkt_at', '2026-10-18 14:02:00');
   });
 });
 

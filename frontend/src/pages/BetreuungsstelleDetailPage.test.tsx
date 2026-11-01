@@ -565,4 +565,56 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     renderPage('/einsaetze/1/betreuung/abc');
     expect(await screen.findByTestId('ziel-uebersicht')).toBeInTheDocument();
   });
+
+  describe('Belegungsverlauf (LLH-1347)', () => {
+    const meldung = (id: number, belegt: number, zeit: string, aktuell = false) => ({
+      id,
+      belegt,
+      zeitpunkt_at: zeit,
+      erfasst_at: zeit,
+      erfasst_von: 'Leitung',
+      aktuell,
+    });
+
+    it('ab zwei Meldungen eine Stufenlinie als EIN Bild mit Aussage und Kapazität, darunter die Liste', async () => {
+      api.ladeBelegungVerlauf.mockResolvedValue([
+        meldung(31, 115, '2026-09-23 10:15:00', true),
+        meldung(30, 40, '2026-09-23 09:00:00'),
+      ]);
+      renderPage();
+      const linie = await screen.findByRole('img', { name: /^Belegung von 40 .* auf 115 / });
+      expect(linie).toHaveAccessibleName(/2 Meldungen, Kapazität 150$/);
+      const figur = linie.closest('[data-lfh="stelle-belegungslinie"]')!;
+      expect(figur).not.toBeNull();
+      // Stufe, keine Schräge: nur waagerechte und senkrechte Segmente.
+      const d = figur.querySelector('[data-lfh="standlinie-stufen"]')!.getAttribute('d')!;
+      expect(d).toMatch(/^M [\d.]+ [\d.]+ H [\d.]+ V [\d.]+$/);
+      expect(figur.querySelector('[data-lfh="standlinie-bezug"]')).not.toBeNull();
+      expect(await screen.findByText('115 untergebracht')).toBeInTheDocument();
+      // Linie und Liste teilen den Abruf.
+      expect(api.ladeBelegungVerlauf).toHaveBeenCalledTimes(1);
+    });
+
+    it('mit einer Meldung keine Linie', async () => {
+      api.ladeBelegungVerlauf.mockResolvedValue([meldung(31, 115, '2026-09-23 10:15:00', true)]);
+      renderPage();
+      expect(await screen.findByText('115 untergebracht')).toBeInTheDocument();
+      expect(document.querySelector('[data-lfh="stelle-belegungslinie"]')).toBeNull();
+    });
+
+    it('ohne Kapazität keine Bezugslinie', async () => {
+      api.ladeBetreuung.mockResolvedValue({
+        ...MIT_DATEN,
+        stellen: [{ ...TURNHALLE, kapazitaet_personen: null }, STADION],
+      });
+      api.ladeBelegungVerlauf.mockResolvedValue([
+        meldung(31, 115, '2026-09-23 10:15:00', true),
+        meldung(30, 40, '2026-09-23 09:00:00'),
+      ]);
+      renderPage();
+      const linie = await screen.findByRole('img', { name: /^Belegung von 40 / });
+      expect(linie).toHaveAccessibleName(/2 Meldungen$/);
+      expect(document.querySelector('[data-lfh="standlinie-bezug"]')).toBeNull();
+    });
+  });
 });

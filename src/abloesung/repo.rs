@@ -18,7 +18,7 @@ use super::{
     AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung, AbloesungBesatzungPlan,
     AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungPlanungEntfallen,
     AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
-    BeendetGrund, BesatzungRolle, BesatzungZiel, PlanungEntfallenGrund, PlanungsStand,
+    BeendetGrund, BeginnQuelle, BesatzungRolle, BesatzungZiel, PlanungEntfallenGrund, PlanungsStand,
     RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
@@ -115,6 +115,8 @@ struct Zeile {
     abschnitt_id: Option<i64>,
     abschnitt_name: Option<String>,
     beginn_at: String,
+    #[sqlx(try_from = "String")]
+    beginn_quelle: BeginnQuelle,
     rhythmus_minuten: i64,
     #[sqlx(try_from = "String")]
     rhythmus_quelle: RhythmusQuelle,
@@ -186,6 +188,7 @@ impl Zeile {
             abschnitt_id: self.abschnitt_id,
             abschnitt_name: self.abschnitt_name,
             beginn_at: self.beginn_at,
+            beginn_quelle: self.beginn_quelle,
             rhythmus_minuten: self.rhythmus_minuten,
             rhythmus_quelle: self.rhythmus_quelle,
             faellig_at: self.faellig_at,
@@ -232,7 +235,8 @@ impl Zeile {
 /// ([`VORWARNUNG_VORGABE_MINUTEN`], im SQL als Literal; `vorwarnung_vorgabe_im_sql` hält beide
 /// gleich).
 const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS einheit_name, \
-            a.abschnitt_id, s.name AS abschnitt_name, a.beginn_at, a.rhythmus_minuten, \
+            a.abschnitt_id, s.name AS abschnitt_name, a.beginn_at, a.beginn_quelle, \
+            a.rhythmus_minuten, \
             a.rhythmus_quelle, a.faellig_at, \
             COALESCE(m.vorwarnung_minuten, 30) AS vorwarnung_minuten, a.abloesende_einheit_id, \
             ae.name AS abloesende_einheit_name, a.status, a.vollzogen_at, a.vollzogen_von_id, \
@@ -1409,6 +1413,7 @@ async fn create_schicht_tx(
     quelle: RhythmusQuelle,
     vorgabe: &EinsatzVorgabe,
     vorgaenger_id: Option<i64>,
+    beginn_quelle: BeginnQuelle,
     jetzt: &str,
 ) -> Result<(i64, i64), AppError> {
     if has_laufende_tx(conn, einheit_id).await? {
@@ -1420,8 +1425,8 @@ async fn create_schicht_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO einsatz_abloesung \
             (einsatz_id, einheit_id, abschnitt_id, beginn_at, rhythmus_minuten, rhythmus_quelle, \
-             faellig_at, vorgaenger_id, angelegt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             faellig_at, vorgaenger_id, angelegt_von_id, beginn_quelle) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(einheit_id)
@@ -1432,6 +1437,7 @@ async fn create_schicht_tx(
     .bind(&faellig_at)
     .bind(vorgaenger_id)
     .bind(benutzer_id)
+    .bind(beginn_quelle.as_str())
     .fetch_one(&mut *conn)
     .await?;
     set_fristen_tx(
@@ -1478,6 +1484,7 @@ pub async fn beginnen(
                 beginn_at: &beginn_at,
                 rhythmus_minuten: eingabe.rhythmus_minuten,
                 wie: "begonnen",
+                beginn_quelle: BeginnQuelle::Hand,
             },
             jetzt,
         )
@@ -1505,6 +1512,8 @@ pub(crate) struct Start<'a> {
     pub rhythmus_minuten: Option<i64>,
     /// Wie der ETB-Eintrag den Beginn nennt („begonnen“, „mit dem Eintreffen begonnen“).
     pub wie: &'a str,
+    /// Herkunft an der Schicht (LLH-1312): `hand` oder `eintreffen`.
+    pub beginn_quelle: BeginnQuelle,
 }
 
 /// Beginnt eine Schicht in der Transaktion des Aufrufers. Rangfolge (LLH-1122): eigener
@@ -1542,6 +1551,7 @@ pub(crate) async fn start_schicht_tx(
         quelle,
         &vorgabe,
         None,
+        s.beginn_quelle,
         jetzt,
     )
     .await?;
@@ -1723,14 +1733,20 @@ pub async fn aendern(
         if teile.is_empty() {
             return Ok(None);
         }
+        // Ein geänderter Beginn ist nicht mehr das Eintreffen: die Schicht gilt danach als von Hand
+        // begonnen; eine Folgeschicht bleibt Folgeschicht (LLH-1312, design.md D2).
         sqlx::query(
             "UPDATE einsatz_abloesung SET beginn_at = ?, rhythmus_minuten = ?, \
-                rhythmus_quelle = ?, faellig_at = ? WHERE id = ?",
+                rhythmus_quelle = ?, faellig_at = ?, \
+                beginn_quelle = CASE WHEN ? AND beginn_quelle = 'eintreffen' THEN 'hand' \
+                    ELSE beginn_quelle END \
+             WHERE id = ?",
         )
         .bind(&beginn_at)
         .bind(rhythmus)
         .bind(quelle.as_str())
         .bind(&faellig_at)
+        .bind(beginn_at != roh.beginn_at)
         .bind(id)
         .execute(&mut *conn)
         .await?;
@@ -2329,6 +2345,7 @@ async fn vollziehen_einheit_tx(
                     roh.rhythmus_quelle,
                     &vorgabe,
                     Some(id),
+                    BeginnQuelle::Vollzug,
                     jetzt,
                 )
                 .await?;
@@ -3070,6 +3087,7 @@ async fn vollziehen_besatzung_tx(
         roh.rhythmus_quelle,
         &vorgabe,
         Some(id),
+        BeginnQuelle::Vollzug,
         jetzt,
     )
     .await?;
@@ -3098,7 +3116,7 @@ async fn vollziehen_besatzung_tx(
 /// noch ohne ist, jeder Ablöser seinen alten, solange er noch im übergebenen steht. Die Planung
 /// von vor dem Vollzug gilt wieder (LLH-1319, [`restore_planung_tx`]): die gesicherte Liste der
 /// Ablöser, ein geplanter Besatzungswechsel steht ohnehin noch; ohne Sicherung (Vollzug vor
-/// Migration 0262) bleibt die Liste des Vollzugs als Planung stehen. Einen Besatzungswechsel
+/// Migration 0263) bleibt die Liste des Vollzugs als Planung stehen. Einen Besatzungswechsel
 /// nimmt [`zuruecknehmen_besatzung_tx`] zurück (LLH-1150).
 pub async fn zuruecknehmen(
     pool: &SqlitePool,
@@ -3326,7 +3344,7 @@ async fn save_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), App
 
 /// Stellt bei der Rücknahme die vor dem Vollzug gesicherte Ablöser-Liste wieder her (LLH-1319),
 /// ohne inzwischen aufgelöste Einheiten, und räumt die Sicherung. Ohne Sicherung (Vollzug vor
-/// Migration 0262) bleibt die Liste des Vollzugs als Planung, wie bisher.
+/// Migration 0263) bleibt die Liste des Vollzugs als Planung, wie bisher.
 async fn restore_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     let gesichert: bool =
         sqlx::query_scalar("SELECT planung_gesichert FROM einsatz_abloesung WHERE id = ?")
@@ -3479,7 +3497,7 @@ async fn zuruecknehmen_besatzung_tx(
 
     let mut wirkung = VollzugWirkung::default();
     // Die neue Besatzung zurück, solange sie noch in ihrer Ziel-Einheit steht (LLH-1319; ohne
-    // Ziel, Bestand vor 0262, die Einheit der Schicht).
+    // Ziel, Bestand vor 0263, die Einheit der Schicht).
     let neu: Vec<(i64, Option<i64>)> = sqlx::query_as(
         "UPDATE einsatz_personal SET einheit_id = \
             (SELECT e.id FROM einsatz_abloesung_besatzung b \

@@ -7,7 +7,8 @@ import { kontoAnlegen } from './konto-anlegen';
 // es um das Zusammenspiel: Paneel „Verbleib erfassen" im Patientenkopf (LLH-1094, kein Dialog)
 // → POST → Personenseite, und eine ZWEITE geöffnete
 // Betreuungsseite, die „davon namentlich 1" ohne Neuladen bekommt (Live-Fan-out
-// `person → betreuung`). Dazu der Gegenfall ohne Modul Betreuung.
+// `person → betreuung`), und der Sprung vom Verbleib auf die Stelle (LLH-1347). Dazu der
+// Gegenfall ohne Modul Betreuung.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -113,6 +114,16 @@ test('Notunterkunft mit Stelle: Ziel vorbelegt, Personenseite zeigt es, zweite B
       .filter({ hasText: 'In Betreuung' }),
   ).toContainText('40');
   await zweite.screenshot({ path: info.outputPath('betreuung-davon-namentlich.png') });
+
+  // Der Verbleib im Kopf führt auf die Seite der Stelle (LLH-1347).
+  await page
+    .getByRole('region', { name: 'Patientenkopf' })
+    .getByRole('link', { name: 'Notunterkunft → NU Turnhalle Nord', exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/betreuung/${sid}$`));
+  await expect(
+    page.getByRole('heading', { level: 1, name: /Betreuungsstelle NU Turnhalle Nord/ }),
+  ).toBeVisible();
 });
 
 test('ohne Modul Betreuung: keine Stellenauswahl, Freitext-Ziel bleibt', async ({
@@ -126,12 +137,20 @@ test('ohne Modul Betreuung: keine Stellenauswahl, Freitext-Ziel bleibt', async (
     bezeichnung: `E2E Deichlage ${LAUF}`,
   });
   const basis = `/api/einsaetze/${e}`;
-  await senden(page, 'post', `${basis}/betreuung/stellen`, {
+  const { id: sid } = await senden(page, 'post', `${basis}/betreuung/stellen`, {
     bezeichnung: 'NU Halle Ost',
     art: 'notunterkunft',
   });
   const { id: p } = await senden(page, 'post', `${basis}/personen`, {});
   await senden(page, 'post', `${basis}/personen/${p}/sichtung`, { kategorie: 'sk3' });
+  // Eine zweite Person, schon in der Stelle untergebracht (gesät vor der Sperre).
+  const { id: p2 } = await senden(page, 'post', `${basis}/personen`, {});
+  await senden(page, 'post', `${basis}/personen/${p2}/sichtung`, { kategorie: 'sk3' });
+  await senden(page, 'post', `${basis}/personen/${p2}/verbleib`, {
+    art: 'notunterkunft',
+    ziel: 'NU Halle Ost',
+    betreuungsstelle_id: sid,
+  });
   const name = `fk${LAUF}`;
   const { id: bid } = await kontoAnlegen(page.request, {
     anzeigename: name,
@@ -154,4 +173,12 @@ test('ohne Modul Betreuung: keine Stellenauswahl, Freitext-Ziel bleibt', async (
     0,
   );
   await seite.screenshot({ path: info.outputPath('dialog-ohne-betreuung.png') });
+
+  // Ohne Modul Betreuung bleibt der Verbleib Text, kein Sprung ins gesperrte Modul (LLH-1347).
+  await seite.goto(`/einsaetze/${e}/personen/${p2}`);
+  const aufenthalt = seite
+    .getByRole('region', { name: 'Patientenkopf' })
+    .locator('[data-lfh="aufenthalt"]');
+  await expect(aufenthalt).toContainText('Notunterkunft → NU Halle Ost');
+  await expect(aufenthalt.getByRole('link')).toHaveCount(0);
 });

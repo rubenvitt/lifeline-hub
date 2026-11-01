@@ -14,6 +14,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abloeserText } from './abloeser';
 import { besatzungPlanText, besatzungText, nachBesatzungswechselText } from './besatzung';
 import { verbleibText } from './verbleib';
+import { beginnWort } from './beginnText';
 import { abloeserStandText, type AbloeserStand } from './abloeserStand';
 import { formatDauer } from './dauer';
 import { abloesungZeit, einstufungOf } from './einstufung';
@@ -211,7 +212,8 @@ export default function AbloesungKarte({
           {laufend && <Text data-lfh="abloesung-abstand">{abstandText(s.faellig_at, jetzt)}</Text>}
           <Text type="secondary">
             {s.abschnitt_name ? `${s.abschnitt_name} · ` : ''}
-            im Einsatz seit{' '}
+            {/* Die Herkunft im Wort vor der Zeit (LLH-1312), keine eigene Zeile. */}
+            {beginnWort(s.beginn_quelle)}{' '}
             {/* Zeiten in Mono mit festen Ziffern, in der Größe der Zeile (LFH-771): in der
                 Textschrift hinge die Breite und damit der Umbruch an den Ziffern. */}
             <span

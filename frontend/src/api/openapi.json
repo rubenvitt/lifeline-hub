@@ -100,6 +100,7 @@
           "einheit_id",
           "einheit_name",
           "beginn_at",
+          "beginn_quelle",
           "rhythmus_minuten",
           "rhythmus_quelle",
           "faellig_at",
@@ -191,6 +192,10 @@
           },
           "beginn_at": {
             "type": "string"
+          },
+          "beginn_quelle": {
+            "$ref": "#/components/schemas/BeginnQuelle",
+            "description": "Wie die Schicht begann (LLH-1312): von Hand, mit dem Eintreffen oder als Folgeschicht."
           },
           "besatzung": {
             "type": "array",
@@ -1315,7 +1320,7 @@
       },
       "ArchivSchadenAnzeige": {
         "type": "object",
-        "description": "Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Status.",
+        "description": "Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Gefahr, Schadensgrad, Status.",
         "required": [
           "registrier_nr",
           "registrier_anzeige",
@@ -1341,6 +1346,17 @@
           "erfasst_at": {
             "type": "string"
           },
+          "gefahrenart": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Gefahrentyp",
+                "description": "Gefahrenart (LLH-1115, im Archiv seit LLH-1342); fehlt = keine Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "registrier_anzeige": {
             "type": "string",
             "description": "Anzeigeform, z. B. `S-003`."
@@ -1348,6 +1364,17 @@
           "registrier_nr": {
             "type": "integer",
             "format": "int64"
+          },
+          "schadensgrad": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Schadensgrad",
+                "description": "Schadensgrad nach DV 102, 5.8.4; fehlt = keine Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/SchadenStatus"
@@ -2477,6 +2504,15 @@
           "befehl_ladef",
           "befehl_schnee",
           "befehl_ea_zmw"
+        ]
+      },
+      "BeginnQuelle": {
+        "type": "string",
+        "description": "Wie eine Schicht begann (`einsatz_abloesung.beginn_quelle`, LLH-1312). Geschrieben beim\nAnlegen; ein geänderter Beginn macht aus `eintreffen` ein `hand`, eine Folgeschicht bleibt\n`vollzug`. Wire == `as_str()`.",
+        "enum": [
+          "hand",
+          "eintreffen",
+          "vollzug"
         ]
       },
       "BelegungAnzeige": {

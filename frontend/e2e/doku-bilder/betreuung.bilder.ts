@@ -12,7 +12,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                        frontend/src/betreuung/UnterbringungKennzahlen.tsx
  *   belegung-melden.png  frontend/src/betreuung/BetreuungDialoge.tsx
  *   stelle.png           frontend/src/pages/BetreuungsstelleDetailPage.tsx,
- *                        frontend/src/betreuung/StelleBelegung.tsx
+ *                        frontend/src/betreuung/StelleBelegung.tsx,
+ *                        frontend/src/betreuung/StelleBelegungslinie.tsx
  *
  * Daten: der Demo-Einsatz hat eine Betreuungsstelle. Eine fast volle Notunterkunft kommt per API
  * dazu (D3), damit die Auslastung zu sehen ist.
@@ -38,6 +39,18 @@ async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
       kontaktweg: 'Kanal 3',
     });
     await fuelle(page, 'patch', `${basis}/stellen/${stelle.id}`, { status: 'in_betrieb' });
+    // Zwei frühere Meldungen, damit die Seite der Stelle den Belegungsverlauf zeigt (LLH-1347).
+    const vor = (min: number) =>
+      new Date(Date.now() - min * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+    for (const [belegt, min] of [
+      [30, 180],
+      [55, 90],
+    ] as const) {
+      await fuelle(page, 'post', `${basis}/stellen/${stelle.id}/belegungen`, {
+        belegt,
+        zeitpunkt_at: vor(min),
+      });
+    }
     await fuelle(page, 'post', `${basis}/stellen/${stelle.id}/belegungen`, { belegt: 74 });
     return stelle.id;
   }
@@ -78,6 +91,7 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/betreuung/${stelle}`);
     await expect(page.getByRole('group', { name: 'Belegung in Zahlen' })).toContainText('74');
     await expect(page.getByText('Hallenwart Meyer')).toBeVisible();
+    await expect(page.locator('[data-lfh="stelle-belegungslinie"]')).toBeVisible();
     await fotografiere(page, KAPITEL, 'stelle');
   });
 });

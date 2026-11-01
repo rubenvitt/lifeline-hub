@@ -46,6 +46,9 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-lagemeldungen',
   'einsatz-fuehrungskraefte',
   'einsatz-betreuung',
+  // Liste der Bereitstellungsräume mit Belegung (LLH-1318, Entscheidung Ruben 01.11.2026):
+  // ungekürzt wie die Betreuungsstellen; Detail, Verlauf und Dialogdaten bleiben draußen.
+  'einsatz-br',
   // Eigenes Modul seit LLH-1034: Räumungsstand gehört zum Lagebild ohne Netz.
   'einsatz-evakuierung',
   'einsatz-karten-ansicht',
@@ -121,6 +124,14 @@ describe('istLagebildOfflineKey', () => {
 
   it('nimmt den Verlauf der Benachrichtigungen offline (LLH-1422)', () => {
     expect(istLagebildOfflineKey(einsatzKeys.benachrichtigungVerlauf(7))).toBe(true);
+  });
+
+  it('nimmt von den Bereitstellungsräumen nur die Liste (LLH-1318)', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.br(7))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.brDetail(7, 3))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.brVerlauf(7, 3))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.brErwartet(7, 3))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.brStammTreffer(7, 3, 'hlf'))).toBe(false);
   });
 
   it('nimmt die Lagebesprechung nicht offline (LLH-1111)', () => {

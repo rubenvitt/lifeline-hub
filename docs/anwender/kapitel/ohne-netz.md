@@ -54,6 +54,7 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 - Meldebild mit Einheiten, Personal, Fahrzeugen, Material, Abschnitten und Fahrzeugstatus
 - Aufträge und Befehle
 - Betroffene, Unfallhilfsstellen, Betreuung
+- Bereitstellungsräume als Liste mit Standort und Belegung; die Seite eines einzelnen Raums nicht
 - Lagekarte mit Zonen, Zeichen, Gefahrengebieten und Schäden
 - Rückmeldungen und der Kommunikationsplan des Fernmeldewesens
 - „Eingänge“, der Verlauf der eigenen Benachrichtigungen

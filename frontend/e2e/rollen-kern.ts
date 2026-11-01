@@ -88,11 +88,25 @@ export async function mitgliedEintragen(
   ).toBe(true);
 }
 
-/** Wechselt die Sitzung im selben Kontext auf `konto`. */
-export async function wechsleZu(page: Page, konto: Pick<Konto, 'benutzername' | 'passwort'>) {
+async function abmelden(page: Page) {
   const abgemeldet = await page.request.post('/api/auth/logout');
   expect(abgemeldet.ok(), `Abmelden: ${abgemeldet.status()}`).toBe(true);
+}
+
+/** Wechselt die Sitzung im selben Kontext auf `konto`. */
+export async function wechsleZu(page: Page, konto: Pick<Konto, 'benutzername' | 'passwort'>) {
+  await abmelden(page);
   await anmeldenAls(page, konto.benutzername, konto.passwort);
+}
+
+/**
+ * Wechselt die Sitzung im selben Kontext zurück auf den Admin. Ein Objekt mit dem Schlüssel
+ * `passwort` und der Kennwort-Konstante im Spec hielt GitGuardian für ein echtes Passwort
+ * (LLH-1317); dieser Weg reicht Name und Kennwort nur als Argumente weiter.
+ */
+export async function wechsleZuAdmin(page: Page) {
+  await abmelden(page);
+  await anmeldenAlsAdmin(page);
 }
 
 /**

@@ -39,7 +39,6 @@ import {
   VERLETZUNG_ART_WORT,
   VERLETZUNG_SCHWERE_WORT,
   gueltig,
-  kurzVerbleib,
   transportText,
 } from './personMeta';
 import { nummeriere, regionName } from './koerperschema/koerperschemaKern';
@@ -52,6 +51,7 @@ import { SichtungFelder, useSaveSichtung, type SichtungWerte } from './SichtungD
 import { useSavePersonEintrag, vormerkungText } from './personEintragSpeichern';
 import { useVerbleibFelder } from './VerbleibErfassung';
 import { UebergabePaneel } from './UebergabeQuittieren';
+import VerbleibText from './VerbleibText';
 import type { VerbleibFormWerte } from './verbleibErfassungKern';
 
 export interface PatientenkopfProps {
@@ -261,7 +261,7 @@ export default function Patientenkopf({
                   </>
                 ) : letzterVerbleib ? (
                   <>
-                    {kurzVerbleib(letzterVerbleib)} ·{' '}
+                    <VerbleibText verbleib={letzterVerbleib} /> ·{' '}
                     <ZeitAnzeige wert={letzterVerbleib.zeitpunkt_at} rolle="kurz" />
                   </>
                 ) : (

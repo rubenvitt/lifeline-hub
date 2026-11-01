@@ -46,6 +46,7 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   nach_besatzungswechsel: [],
   abschnitt_uebergeben: false,
   verbleib: 'ruhe',
+  beginn_quelle: 'hand',
   planung_warnungen: [],
   angelegt_at: '2026-10-17 06:00:00',
   ...over,
@@ -133,6 +134,31 @@ describe('AbloesungKarte — Ende und Vererbung (LLH-1128)', () => {
   it('ohne Erben keine Zeile', () => {
     zeige(schicht());
     expect(document.querySelector('[data-lfh="abloesung-erben"]')).toBeNull();
+  });
+});
+
+describe('AbloesungKarte — Herkunft des Beginns (LLH-1312)', () => {
+  const beginnZeile = () =>
+    document.querySelector<HTMLElement>('[data-lfh="abloesung-beginn"]')!.parentElement!;
+
+  it.each([
+    ['hand', 'im Einsatz seit'],
+    ['eintreffen', 'seit Eintreffen'],
+    ['vollzug', 'Folgeschicht seit'],
+  ] as const)('%s: „%s“ vor der Zeit, in derselben Zeile wie der Abschnitt', (quelle, wort) => {
+    zeige(schicht({ beginn_quelle: quelle }));
+    expect(beginnZeile()).toHaveTextContent(new RegExp(`^Deich · ${wort} \\d{4,6}$`));
+  });
+
+  it('auch eine abgelöste Folgeschicht nennt ihre Herkunft', () => {
+    zeige(
+      schicht({
+        beginn_quelle: 'vollzug',
+        status: 'abgeloest',
+        vollzogen_at: '2026-10-17 11:00:00',
+      }),
+    );
+    expect(beginnZeile()).toHaveTextContent(/^Deich · Folgeschicht seit \d{4,6}$/);
   });
 });
 

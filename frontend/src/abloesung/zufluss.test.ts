@@ -37,6 +37,7 @@ function schicht(id: number, faellig_at = '2026-09-22 18:00:00'): Abloesung {
     besatzung_plan: [],
     nach_besatzungswechsel: [],
     verbleib: 'ruhe' as const,
+    beginn_quelle: 'hand' as const,
     abschnitt_uebergeben: false,
     planung_warnungen: [],
     angelegt_at: '2026-09-22 09:30:00',
