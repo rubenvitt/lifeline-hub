@@ -744,6 +744,14 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     );
   });
 
+  it('Planen ohne geladenes Personal: der geplante Wechsel bleibt unberührt', async () => {
+    const onErfassen = planung({ schicht: geplant, personen: null });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [] }));
+  });
+
   it('Planen gesperrt: nur die Ablöser gehen hinaus, die Planung bleibt unberührt', async () => {
     const onErfassen = planung({ besatzungGesperrt: 'Modul Personal gesperrt' });
     const dialog = await screen.findByRole('dialog');

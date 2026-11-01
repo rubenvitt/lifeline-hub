@@ -575,7 +575,7 @@ interface AbloeserProps {
  * Eine Schicht plant entweder Ablöser oder einen Besatzungswechsel; der Dialog sendet deshalb
  * beide Listen, die der anderen Art leer (der Server lehnte beides mit 422 ab). Ohne Freigabe der
  * Module Einheiten und Personal ist der Besatzungswechsel gesperrt mit Grund, und seine Planung
- * bleibt beim Speichern unberührt.
+ * bleibt beim Speichern unberührt; ebenso, solange das Personal nicht geladen ist.
  */
 export function AbloeserDialog({
   schicht,
@@ -607,7 +607,11 @@ export function AbloeserDialog({
         besatzung_ids: [],
       }}
       onErfassen={(w) => {
-        if (gesperrt || !schicht) return onErfassen({ abloeser_ids: w.abloeser_ids ?? [] });
+        // Ohne geladenes Personal kennt der Dialog den geplanten Wechsel nicht: er bleibt unberührt.
+        const planUnbekannt = w.art === 'besatzung' && personen == null;
+        if (gesperrt || !schicht || planUnbekannt) {
+          return onErfassen({ abloeser_ids: w.abloeser_ids ?? [] });
+        }
         return w.art === 'besatzung'
           ? onErfassen({
               abloeser_ids: [],
