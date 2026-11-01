@@ -1,9 +1,10 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
 import { kalendertag, zeitKurz } from '../anzeige/zeitDarstellung';
+import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 
 /**
- * Zeitachse der Lagemeldungen: Tagesgruppen und Zeitfenster, rein und ohne React.
+ * Zeitachse der Lagemeldungen: Tagesgruppen und Filter, rein und ohne React.
  *
  * Maßgeblich ist die **Ereigniszeit** der Quellmeldung (`ereigniszeit`), nicht der Zeitpunkt der
  * Übergabe an die Lage (LLH-1039): eine nachgereichte Meldung steht dort, wo sie geschah. Das Feld
@@ -14,14 +15,6 @@ import { kalendertag, zeitKurz } from '../anzeige/zeitDarstellung';
  * die Tagesgrenze. Deshalb läuft alles über `inZone` — dieselbe Zone, in der `ZeitAnzeige`
  * die Uhrzeit rendert.
  */
-
-export type Zeitfenster = 'stunde' | 'vierStunden' | 'heute';
-
-export const ZEITFENSTER: readonly { readonly text: string; readonly value: Zeitfenster }[] = [
-  { text: 'Letzte Stunde', value: 'stunde' },
-  { text: 'Letzte 4 Stunden', value: 'vierStunden' },
-  { text: 'Heute', value: 'heute' },
-];
 
 /** Gruppenschlüssel: das Datum in der Anzeigezone, `YYYY-MM-DD` — sortierbar als Text. */
 export function tagesSchluessel(
@@ -61,22 +54,20 @@ export function tagesEtikett(
   return kalendertag(schluessel, konv);
 }
 
-/** Trifft der Zeitpunkt in das Fenster? Grenzen einschließend (59 min drin, 61 min draußen). */
-export function imZeitfenster(
-  utc: string,
-  fenster: Zeitfenster,
-  jetzt: Dayjs = dayjs(),
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): boolean {
-  const d = inZone(utc, konv);
-  switch (fenster) {
-    case 'stunde':
-      return !d.isBefore(jetzt.subtract(1, 'hour'));
-    case 'vierStunden':
-      return !d.isBefore(jetzt.subtract(4, 'hour'));
-    case 'heute':
-      return d.isSame(jetztInZone(konv, jetzt), 'day');
-  }
+/**
+ * Trifft der Zeitpunkt in den Zeitraum? Absolute Grenzen (Wire, UTC) aus der Schnellwahl
+ * `anzeige/ZeitraumWahl.tsx` (LLH-1322), einschließend wie der ETB-Filter am Server
+ * (`ereigniszeit >= von`, `<= bis`). Eine fehlende oder unlesbare Grenze ist offen.
+ */
+export function imZeitraum(utc: string, { von, bis }: { von?: string; bis?: string }): boolean {
+  const d = alsZeitpunkt(utc);
+  const ab = alsZeitpunkt(von);
+  const bisZ = alsZeitpunkt(bis);
+  if (!ab && !bisZ) return true;
+  if (!d) return false;
+  if (ab && d.isBefore(ab)) return false;
+  if (bisZ && d.isAfter(bisZ)) return false;
+  return true;
 }
 
 /** Ortsfilter der Zeitachse: alle, nur verortete, nur unverortete Einträge. */
@@ -90,7 +81,12 @@ export type Herkunftsfilter = 'alle' | 'geraet' | 'uebernommen';
 
 /** Filterstand der Zeitachse — `'alle'` heißt „kein Filter auf dieser Achse". */
 export interface LageFilter {
-  fenster: Zeitfenster | 'alle';
+  /**
+   * Zeitraum nach Ereigniszeit: absolute Grenzen (Wire, UTC) aus der Adresse, wie im ETB
+   * (Spec `etb-filterleiste`, „Zeitraum mit Schnellwahl“). Fehlt eine, ist sie offen.
+   */
+  von?: string;
+  bis?: string;
   ort: Ortsfilter;
   herkunft: Herkunftsfilter;
   /** Freitext über Meldungstext, Absender und Meldungsnummer; leer = kein Filter. */
@@ -98,7 +94,6 @@ export interface LageFilter {
 }
 
 export const LEERER_FILTER: LageFilter = {
-  fenster: 'alle',
   ort: 'alle',
   herkunft: 'alle',
   suche: '',
@@ -106,13 +101,19 @@ export const LEERER_FILTER: LageFilter = {
 
 /** Ist irgendein Filter gesetzt? Trennt „leer" von „weggefiltert" im Leerzustand. */
 export function filterAktiv(f: LageFilter): boolean {
-  return f.fenster !== 'alle' || f.ort !== 'alle' || f.herkunft !== 'alle' || f.suche.trim() !== '';
+  return (
+    f.von != null ||
+    f.bis != null ||
+    f.ort !== 'alle' ||
+    f.herkunft !== 'alle' ||
+    f.suche.trim() !== ''
+  );
 }
 
 /** Die Felder, die ein Lageobjekt für Filter und Gruppen braucht (Teil von `LageMeldung`). */
 interface LageEintragKern {
   text: string;
-  /** Ereigniszeit der Quellmeldung (UTC-Wire) — Zeit, Tag, Fenster und Ordnung. */
+  /** Ereigniszeit der Quellmeldung (UTC-Wire) — Zeit, Tag, Zeitraum und Ordnung. */
   ereigniszeit: string;
   lat?: number | null;
   lon?: number | null;
@@ -140,14 +141,10 @@ function herkunftPasst(l: LageEintragKern, herkunft: Herkunftsfilter): boolean {
 export function filtereLagemeldungen<T extends LageEintragKern>(
   eintraege: readonly T[],
   f: LageFilter,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-  jetzt: Dayjs = dayjs(),
 ): T[] {
   const nadel = f.suche.trim().toLowerCase();
   return eintraege.filter((l) => {
-    if (f.fenster !== 'alle' && !imZeitfenster(l.ereigniszeit, f.fenster, jetzt, konv)) {
-      return false;
-    }
+    if (!imZeitraum(l.ereigniszeit, f)) return false;
     if (f.ort !== 'alle' && (l.lat != null && l.lon != null) !== (f.ort === 'mit')) return false;
     if (!herkunftPasst(l, f.herkunft)) return false;
     if (nadel !== '') {

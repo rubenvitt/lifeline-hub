@@ -12,7 +12,11 @@
  *
  * Ein geplanter Ablöser bleibt in der Menge, er hat ja keine Schicht; er nennt die Einheit, die
  * er ablösen soll. Seine Schicht entsteht mit dem Vollzug (Spec `kraefte-abloesung`, „Schicht
- * mit dem Eintreffen“), „Schicht beginnen“ bietet die Seite für ihn deshalb nicht an.
+ * mit dem Eintreffen“), „Schicht beginnen“ bietet die Seite für ihn deshalb nicht an. Geplant ist
+ * auch die Untereinheit eines geplanten Verbands (LLH-1311): er löst als Knoten ab, sie erbt die
+ * Folgeschicht, und der Server lässt ihren Autostart aus (`abloesung::kopplung`,
+ * `is_geplanter_abloeser_tx`). Wie dort zählt die eigene Planung zuerst, dann der nächste
+ * geplante Vorfahr über `ueber_einheit_id` der Einheitenliste; ein Zyklus endet.
  *
  * Ordnung: wer am längsten im Einsatz ist, zuerst (Beginn der Periode, dann Kennung). Der Beginn
  * ist zugleich der Sortierschlüssel der Zuflussschleuse (`abloesung/zufluss.ts`).
@@ -25,6 +29,7 @@ export interface EinheitKurz {
   id: number;
   name: string;
   abschnitt_name?: string | null;
+  ueber_einheit_id?: number | null;
 }
 
 export interface OhneSchicht {
@@ -62,6 +67,7 @@ export function findOhneSchicht(
         eintreffen_at: letzte.eintreffen_at ?? null,
       });
   }
+  const ueber = new Map(einheiten.map((e) => [e.id, e.ueber_einheit_id ?? null]));
   const ergebnis: OhneSchicht[] = [];
   for (const e of einheiten) {
     const periode = offen.get(e.id);
@@ -71,12 +77,30 @@ export function findOhneSchicht(
       einheit_name: e.name,
       abschnitt_name: e.abschnitt_name ?? null,
       ...periode,
-      abloeser_fuer: abloeserFuer.get(e.id) ?? null,
+      abloeser_fuer: geplantFuer(e.id, ueber, abloeserFuer),
     });
   }
   return ergebnis.sort((a, b) =>
     a.beginn_at < b.beginn_at ? -1 : a.beginn_at > b.beginn_at ? 1 : a.id - b.id,
   );
+}
+
+/**
+ * Wofür die Einheit oder ihr nächster geplanter Vorfahr als Ablöser geplant ist; `null`, wenn
+ * keiner in der Kette. Mit Besucht-Menge wie `is_geplanter_abloeser_tx` am Server.
+ */
+function geplantFuer(
+  einheit: number,
+  ueber: ReadonlyMap<number, number | null>,
+  abloeserFuer: ReadonlyMap<number, string>,
+): string | null {
+  const besucht = new Set<number>();
+  for (let k: number | null = einheit; k != null && !besucht.has(k); k = ueber.get(k) ?? null) {
+    besucht.add(k);
+    const fuer = abloeserFuer.get(k);
+    if (fuer != null) return fuer;
+  }
+  return null;
 }
 
 /** Sortierschlüssel der Zuflussschleuse: der Beginn der offenen Periode. */

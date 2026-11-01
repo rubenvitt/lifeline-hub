@@ -2,11 +2,11 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { AnzeigeKonventionenProvider } from './AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
 import { tippeZeit, zeitFeld } from '../test/zeitEingabe';
-import EtbZeitraumWahl from './EtbZeitraumWahl';
+import ZeitraumWahl from './ZeitraumWahl';
 
 vi.mock('../offline/serveruhr', async (orig) => ({
   ...(await orig<typeof import('../offline/serveruhr')>()),
@@ -16,11 +16,11 @@ vi.mock('../offline/serveruhr', async (orig) => ({
 
 afterEach(() => vi.useRealTimers());
 
-function bau(props: Partial<Parameters<typeof EtbZeitraumWahl>[0]> = {}) {
+function bau(props: Partial<Parameters<typeof ZeitraumWahl>[0]> = {}) {
   const onWahl = vi.fn();
   renderMitProviders(
     <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
-      <EtbZeitraumWahl onWahl={onWahl} {...props} />
+      <ZeitraumWahl onWahl={onWahl} kennung="test-zeitraum" {...props} />
     </AnzeigeKonventionenProvider>,
   );
   return onWahl;
@@ -29,7 +29,7 @@ function bau(props: Partial<Parameters<typeof EtbZeitraumWahl>[0]> = {}) {
 /*
  * Prozesszone UTC, Anzeigezone Berlin (LFH-692): sonst wäre jede Zonenaussage hier blind grün.
  */
-describe('EtbZeitraumWahl (LLH-1080)', () => {
+describe('ZeitraumWahl (LLH-1080)', () => {
   mitProzessZone('UTC');
 
   it('zeigt den wirksamen Wert und schreibt eine Schnellwahl EINMAL als absolute Grenze', async () => {

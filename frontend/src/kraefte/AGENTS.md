@@ -68,7 +68,9 @@ Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`. „
 (LLH-1128) bildet nur `abloesung/ohneSchicht.ts`: offene Periode wie `has_offene_periode_tx`,
 Einheitenliste, minus eigene laufende Schicht und `erbende_einheiten`; nur mit Freigabe des
 Moduls Einheiten (sonst gesperrt mit Grund), eigene Zuflussschleuse, kein „Schicht beginnen“ für
-einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO stehen. Die Ansicht
+einen geplanten Ablöser, auch nicht für die Untereinheit eines geplanten Verbands (LLH-1311:
+Vorfahrenkette über `ueber_einheit_id` wie `kopplung::is_geplanter_abloeser_tx`, keine
+Vererbung). Kein Server-Anteil, solange Perioden und Erben im DTO stehen. Die Ansicht
 der Seite steht in der Adresse (LLH-1312, `abloesungPfad(…, { ansicht })`, Zustand wie beim
 Funkplan, „laufend“ ohne Parameter); ein Sprung von außen auf „Ohne Schicht“ nimmt diesen Pfad.
 **Herkunft des Beginns** (LLH-1312, `einsatz_abloesung.beginn_quelle` `hand | eintreffen |

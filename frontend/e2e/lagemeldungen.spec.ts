@@ -149,3 +149,59 @@ test('eine Meldung an der Karte korrigiert, in der Lage versetzt und herausgenom
     ]),
   );
 });
+
+/**
+ * LLH-1322: dieselbe Zeitraum-Schnellwahl wie im ETB (`anzeige/ZeitraumWahl.tsx`). Die Wahl steht
+ * mit fester, minutengenauer Grenze in der Adresse; neu geladen zeigt die Seite dieselbe Menge.
+ */
+test('der Zeitraum ist die Schnellwahl des ETB und steht in der Adresse (LLH-1322)', async ({
+  page,
+}) => {
+  const { id } = await post(page, '/api/einsaetze', {
+    bezeichnung: `E2E Lage-Zeitraum ${Date.now()}`,
+  });
+  const inDieLage = async (inhalt: string, vorMinuten: number) => {
+    const m = await post(page, `/api/einsaetze/${id}/meldungen`, {
+      absender: 'Florian Nord 1',
+      meldeweg: 'funk',
+      meldungsart: 'rueckmeldung',
+      inhalt,
+      ereigniszeit: new Date(Date.now() - vorMinuten * 60_000).toISOString(),
+    });
+    await post(page, `/api/einsaetze/${id}/meldungen/${m.id}/lagerelevant`, {});
+  };
+  await inDieLage('Pegel Mühlbach steigt', 10);
+  // Eben übergeben, aber vor drei Stunden geschehen: zählt nach der Ereigniszeit.
+  await inDieLage('Deich Unterstadt hält', 180);
+
+  await page.goto(`/einsaetze/${id}/lagemeldungen`);
+  const zeilen = page.getByRole('region', { name: 'Lagemeldungen' }).getByRole('listitem');
+  await expect(zeilen).toHaveCount(2);
+  const zeitraum = page.locator('[data-lfh="lagemeldungen-zeitraum"]');
+  await expect(zeitraum).toHaveAccessibleName('Zeitraum');
+  // Erst wählen, wenn der Aufklapper steht: ein Klick, solange er noch skaliert, trifft daneben
+  // und lässt ihn offen (wie `dialoge-handy.spec.ts`).
+  const waehle = async (knopf: string) => {
+    await zeitraum.click();
+    const dialog = page.getByRole('dialog', { name: 'Zeitraum' });
+    await expect(dialog).toBeVisible();
+    await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+    await dialog.getByRole('button', { name: knopf }).click();
+    await expect(dialog).toBeHidden();
+  };
+  await waehle('Letzte Stunde');
+  await expect(zeilen).toHaveCount(1);
+  await expect(zeilen).toContainText('Pegel Mühlbach steigt');
+  await expect(page.getByText('1 von 2 Lagemeldungen', { exact: true })).toBeVisible();
+  await expect(zeitraum).toHaveAccessibleName(/^Zeitraum seit \d{4}$/);
+  await expect(page).toHaveURL(/[?&]von=\d{4}-\d{2}-\d{2}(\+|%20)\d{2}%3A\d{2}%3A00$/);
+
+  // Dieselbe Adresse, dieselbe Menge.
+  await page.reload();
+  await expect(zeilen).toHaveCount(1);
+  await expect(zeilen).toContainText('Pegel Mühlbach steigt');
+
+  await waehle('Ohne Zeitraum');
+  await expect(zeilen).toHaveCount(2);
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagemeldungen$`));
+});
