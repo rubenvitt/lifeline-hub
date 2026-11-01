@@ -582,6 +582,27 @@ describe('freiesZeichen — Fachaufgaben (D5)', () => {
     },
   );
 
+  it('meldet zwei verschiedene Zusätze an derselben Marke als vereinfacht', () => {
+    pruefe(
+      {
+        grundzeichen: 'taktische-formation',
+        fachaufgabe: 'dekontamination-geraete',
+        symbol: 'dekontamination-personen',
+      },
+      { kind: 'formation', bodyMarks: ['decontamination'], labels: { center: 'P' } },
+      'kaskade',
+    );
+    pruefe(
+      {
+        grundzeichen: 'taktische-formation',
+        fachaufgabe: 'dekontamination-personen',
+        symbol: 'dekontamination-personen',
+      },
+      { kind: 'formation', bodyMarks: ['decontamination'], labels: { center: 'P' } },
+      'exakt',
+    );
+  });
+
   it('ignoriert eine Fachaufgabe an einem Grundzeichen, das keine annahm (Altkatalog)', () => {
     pruefe(
       { grundzeichen: 'gefahr', fachaufgabe: 'brandbekaempfung' },

@@ -524,7 +524,14 @@ function ausAltspalten(e: FreiesZeichenEingabe, verloren: boolean): FreiesZeiche
   const funktionId = nimm('funktion', e.funktion);
   const rolle = eigen(FUNKTIONSROLLE, funktionId);
 
+  // Zwei verschiedene Zusätze an derselben Marke (Fachaufgabe „G“, Symbol „P“): es steht nur
+  // einer im Bild, der Lauf des Symbols überstimmt den der Fachaufgabe.
+  const fachZusatz = eigen(ZUSATZ, fachaufgabe);
+  const symbolZusatz = nutzlast && 'zusatz' in nutzlast ? nutzlast.zusatz : undefined;
+  const zusatzKonflikt = !!fachZusatz && !!symbolZusatz && fachZusatz !== symbolZusatz;
+
   const ohneNachfolger =
+    zusatzKonflikt ||
     (orgId !== undefined && org.organization === undefined) ||
     (einheitId !== undefined && !staerke) ||
     (fachaufgabe !== undefined && fach.length === 0) ||
