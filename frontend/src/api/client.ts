@@ -110,7 +110,7 @@ export class NetzFehler extends TypeError {
   }
 }
 
-const AUSGANG_UNBEKANNT_TEXT =
+export const AUSGANG_UNBEKANNT_TEXT =
   'Keine Antwort — ob die Aktion angekommen ist, ist unklar. Erst die Liste prüfen, dann erneut versuchen';
 
 /**

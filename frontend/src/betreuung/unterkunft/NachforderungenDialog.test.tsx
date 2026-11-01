@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, AusgangUnbekannt } from '../../api/client';
+import { ApiError, AUSGANG_UNBEKANNT_TEXT, AusgangUnbekannt, NetzFehler } from '../../api/client';
 import type { NeueNachforderung } from '../../api/types';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
@@ -58,13 +58,16 @@ describe('legePostenAn', () => {
     const lauf = await legePostenAn(
       1,
       8,
-      POSTEN.slice(0, 1),
+      POSTEN.slice(0, 2),
       { adressat_kategorie: 'leitstelle', prioritaet: 'normal' },
-      () => Promise.reject(new AusgangUnbekannt()),
+      (_id, body) =>
+        Promise.reject(body.art === 'Feldbetten' ? new AusgangUnbekannt() : new NetzFehler()),
     );
     expect(lauf.angelegt).toEqual([]);
+    // Auch der `NetzFehler` aus `apiSend` (Zeitlimit, Abbruch) ist mehrdeutig.
     expect(lauf.gescheitert).toEqual([
-      { art: 'Feldbetten', fehler: new AusgangUnbekannt().message, unbekannt: true },
+      { art: 'Feldbetten', fehler: AUSGANG_UNBEKANNT_TEXT, unbekannt: true },
+      { art: 'Decken', fehler: AUSGANG_UNBEKANNT_TEXT, unbekannt: true },
     ]);
   });
 });

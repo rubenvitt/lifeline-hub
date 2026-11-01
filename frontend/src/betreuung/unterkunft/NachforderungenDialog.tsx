@@ -1,6 +1,6 @@
 import { Alert, Checkbox, Modal, Space, Typography } from 'antd';
 import { useState, type CSSProperties } from 'react';
-import { AusgangUnbekannt, fehlerText } from '../../api/client';
+import { AUSGANG_UNBEKANNT_TEXT, NetzFehler, fehlerText } from '../../api/client';
 import { legeNachforderungAn } from '../../api/nachforderungen';
 import type {
   AdressatKategorie,
@@ -25,7 +25,7 @@ interface Zeile extends Posten {
 
 export interface Lauf {
   angelegt: string[];
-  /** `unbekannt`: Anfrage angekommen, Antwort ausgeblieben; die Nachforderung kann schon stehen. */
+  /** `unbekannt`: Netzfehler oder Antwort ausgeblieben; die Nachforderung kann schon stehen. */
   gescheitert: { art: string; fehler: string; unbekannt?: boolean }[];
 }
 
@@ -53,11 +53,13 @@ export async function legePostenAn(
       });
       lauf.angelegt.push(p.art);
     } catch (e) {
-      lauf.gescheitert.push({
-        art: p.art,
-        fehler: fehlerText(e, 'nicht angelegt'),
-        ...(e instanceof AusgangUnbekannt ? { unbekannt: true } : {}),
-      });
+      // `apiSend` meldet Zeitlimit und Leitungsabbruch als `NetzFehler`, auch wenn der Server
+      // schon gespeichert hat: im Sammellauf gilt jeder Netzfehler als unbekannter Ausgang.
+      lauf.gescheitert.push(
+        e instanceof NetzFehler
+          ? { art: p.art, fehler: AUSGANG_UNBEKANNT_TEXT, unbekannt: true }
+          : { art: p.art, fehler: fehlerText(e, 'nicht angelegt') },
+      );
     }
   }
   return lauf;
@@ -66,7 +68,7 @@ export async function legePostenAn(
 /**
  * Dialog „Nachforderungen anlegen“ aus dem Ergebnis des Rechners: Posten mit Anzahl, Adressat
  * und Priorität gemeinsam. Nach einem Lauf mit Fehlern bleibt er offen; angelegte Posten stehen
- * als angelegt, gescheiterte bleiben angehakt mit Grund. Ohne Antwort (Ausgang unbekannt) wird
+ * als angelegt, gescheiterte bleiben angehakt mit Grund. Bei einem Netzfehler (Ausgang unbekannt) wird
  * der Posten abgehakt, damit ein zweiter Lauf ihn nicht doppelt anlegt.
  */
 export default function NachforderungenDialog({

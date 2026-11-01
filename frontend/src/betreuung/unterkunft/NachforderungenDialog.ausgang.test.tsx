@@ -1,17 +1,17 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { AusgangUnbekannt } from '../../api/client';
+import { AUSGANG_UNBEKANNT_TEXT, NetzFehler } from '../../api/client';
 import { renderMitProviders } from '../../test/utils';
 import NachforderungenDialog from './NachforderungenDialog';
 
 /**
- * Unbekannter Ausgang im Dialog „Nachforderungen anlegen“ (LLH-1520): die Anfrage kam an, die
- * Antwort blieb aus. Der Posten wird abgehakt, damit ein zweiter Lauf ihn nicht doppelt anlegt.
+ * Unbekannter Ausgang im Dialog „Nachforderungen anlegen“ (LLH-1520): `apiSend` meldet Zeitlimit
+ * und Abbruch als `NetzFehler`, auch wenn der Server schon gespeichert hat. Der Posten wird abgehakt, damit ein zweiter Lauf ihn nicht doppelt anlegt.
  */
 
 vi.mock('../../api/nachforderungen', () => ({
-  legeNachforderungAn: vi.fn(() => Promise.reject(new AusgangUnbekannt())),
+  legeNachforderungAn: vi.fn(() => Promise.reject(new NetzFehler())),
 }));
 
 describe('NachforderungenDialog bei unbekanntem Ausgang', () => {
@@ -34,7 +34,7 @@ describe('NachforderungenDialog bei unbekanntem Ausgang', () => {
     await waitFor(() =>
       expect(within(posten).getByRole('checkbox', { name: /Feldbetten/ })).not.toBeChecked(),
     );
-    expect(within(posten).getByText(new AusgangUnbekannt().message)).toBeInTheDocument();
+    expect(within(posten).getByText(AUSGANG_UNBEKANNT_TEXT)).toBeInTheDocument();
     expect(
       within(dialog).getByRole('button', { name: /0 Nachforderungen anlegen$/ }),
     ).toBeDisabled();
