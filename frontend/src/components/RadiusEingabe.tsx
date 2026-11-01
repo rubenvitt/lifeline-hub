@@ -12,6 +12,10 @@ interface RadiusEingabeProps {
   onChange?: (radiusM: number | null) => void;
   disabled?: boolean;
   onPressEnter?: () => void;
+  /** Vom `Form.Item` gereicht: Fehlermeldung, Fehler- und Pflichtzustand für Hilfstechnik. */
+  'aria-describedby'?: string;
+  'aria-invalid'?: boolean | 'true' | 'false';
+  'aria-required'?: boolean | 'true' | 'false';
 }
 
 /**
@@ -26,6 +30,9 @@ export default function RadiusEingabe({
   onChange,
   disabled,
   onPressEnter,
+  'aria-describedby': ariaDescribedby,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: RadiusEingabeProps) {
   const { token } = useRollen();
   const radius = value ?? null;
@@ -34,6 +41,9 @@ export default function RadiusEingabe({
       <InputNumber<number>
         id={id}
         aria-label="Radius in Metern"
+        aria-describedby={ariaDescribedby}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         value={radius}
         min={1}
         max={KREIS_RADIUS_M_MAX}

@@ -498,8 +498,13 @@ describe('BezirkAnlegenDialog', () => {
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    expect(await within(dialog).findByText('Bitte einen Radius angeben')).toBeInTheDocument();
+    const meldung = await within(dialog).findByText('Bitte einen Radius angeben');
     expect(onErfassen).not.toHaveBeenCalled();
+    // Pflicht, Fehler und Meldung erreichen das Zahlenfeld (Hilfstechnik).
+    const zahl = within(dialog).getByRole('spinbutton', { name: 'Radius in Metern' });
+    expect(zahl).toHaveAttribute('aria-required', 'true');
+    expect(zahl).toHaveAttribute('aria-invalid', 'true');
+    expect(zahl).toHaveAccessibleDescription(meldung.textContent!);
 
     await userEvent.click(within(dialog).getByRole('button', { name: '500 m' }));
     expect(within(dialog).getByRole('button', { name: '500 m' })).toHaveAttribute(

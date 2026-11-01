@@ -7,7 +7,7 @@ import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortFelder } from '../anzeige/ortsfeldFormular';
 import { serverJetzt } from '../offline/serveruhr';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import type {
   Betreuungsstelle,
   BetreuungsstelleArt,
@@ -410,12 +410,11 @@ function gebietNachAnlegen(
   return { wahl: 'keins' };
 }
 
-/** Radius als Formularfeld: Zahl und Schnellwahl in einer umbrechenden Zeile. */
-function RadiusFeld(props: {
-  id?: string;
-  value?: number | null;
-  onChange?: (radiusM: number | null) => void;
-}) {
+/**
+ * Radius als Formularfeld: Zahl und Schnellwahl in einer umbrechenden Zeile. `Form.Item` reicht
+ * `id`, `value`/`onChange` und die ARIA-Zustände (Pflicht, Fehler, Meldung) hinein.
+ */
+function RadiusFeld(props: ComponentProps<typeof RadiusEingabe>) {
   return (
     <div
       data-lfh="bezirk-radius"
