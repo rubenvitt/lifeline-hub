@@ -71,6 +71,8 @@ import { wetterAbfrage } from '../../api/wetter';
 import { unwetterLage } from '../../wetter/unwetter';
 import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
 import { listeAbloesungen } from '../../api/abloesungen';
+import { listeEinheitenPerioden } from '../../api/kraefteZeitachse';
+import { findOhneSchicht } from '../../abloesung/ohneSchicht';
 import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
 import {
   auftraegePfad,
@@ -354,6 +356,29 @@ export default function UeberblickPage() {
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
     enabled: abloesungSichtbar,
   });
+  // „n ohne Schicht ↗“ (LLH-1312): dieselbe Menge wie das Segment der Seite Ablösung, aus
+  // denselben Fächern (`findOhneSchicht`, Regel „Eine Heimat je Zahl“). Die Zeitachse gehört dem
+  // Modul Einheiten: ohne dessen Freigabe keine Anfrage und kein Sprung.
+  const ohneSchichtFrei = abloesungSichtbar && einheitenFrei;
+  const periodenQ = useQuery({
+    queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
+    queryFn: () => listeEinheitenPerioden(einsatzId),
+    enabled: ohneSchichtFrei,
+  });
+  // Nur ein erfolgreicher Abruf zählt (wie bei den Rückmeldungen): react-query behält `data` nach
+  // einem gescheiterten Neuabruf, der Sprung nennte sonst eine veraltete Zahl.
+  const ohneSchichtQuellenFehler = einheitenQ.isError || periodenQ.isError || abloesungenQ.isError;
+  const ohneSchichtZahl = useMemo(
+    () =>
+      ohneSchichtFrei &&
+      !ohneSchichtQuellenFehler &&
+      einheitenQ.data &&
+      periodenQ.data &&
+      abloesungenQ.data
+        ? findOhneSchicht(einheitenQ.data, periodenQ.data, abloesungenQ.data).length
+        : null,
+    [ohneSchichtFrei, ohneSchichtQuellenFehler, einheitenQ.data, periodenQ.data, abloesungenQ.data],
+  );
   const etbQ = useQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),
     queryFn: () => listeEtb(einsatzId, ETB_ENTSCHEIDUNGEN),
@@ -804,6 +829,7 @@ export default function UeberblickPage() {
                 nachforderungen={{ q: nachforderungenQ, frei: nachforderungenFrei }}
                 erinnerungen={{ q: erinnerungenQ, frei: erinnerungenFrei }}
                 abloesungen={{ q: abloesungenQ, frei: abloesungSichtbar }}
+                ohneSchicht={ohneSchichtZahl}
                 stelle={stelle}
                 sicht={sicht}
                 onSicht={waehleSicht}

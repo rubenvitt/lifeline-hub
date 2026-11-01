@@ -30,7 +30,7 @@ use sqlx::SqliteConnection;
 
 use super::hinweis::{self, Wirkung};
 use super::repo::{self, Start};
-use super::{BeendetGrund, PlanungEntfallenGrund};
+use super::{BeendetGrund, BeginnQuelle, PlanungEntfallenGrund};
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::error::AppError;
 use crate::zeitachse::{ZeitachseArt, ZeitachseQuelle};
@@ -364,6 +364,7 @@ async fn autostart_tx(
         beginn_at: eintreffen_at,
         rhythmus_minuten: None,
         wie: WIE_AUTOSTART,
+        beginn_quelle: BeginnQuelle::Eintreffen,
     };
     Ok(repo::start_schicht_tx(conn, &start, &jetzt)
         .await?

@@ -7,7 +7,12 @@ import {
   KEINE_BERECHTIGUNG,
   type ModulEintrag,
 } from './modulRegistry';
-import { navZeilen, sprungZiel, type Sprungmarke } from './sprungmarken';
+import {
+  navZeilen,
+  sprungVoraussetzungGesperrt,
+  sprungZiel,
+  type Sprungmarke,
+} from './sprungmarken';
 import { form, schrift, type Farbrollen } from '../theme/tokens';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
@@ -185,7 +190,8 @@ export function ModulListe({
           const ziel = sprungZiel(marke);
           // Ein Sprung in ein ausgeblendetes oder unfertiges Modul wäre einer ins Leere.
           if (!ziel || ziel.status !== 'fertig' || !istModulSichtbar(ziel, freigaben)) return null;
-          const gesperrt = istModulGesperrt(ziel, freigaben);
+          const gesperrt =
+            istModulGesperrt(ziel, freigaben) || sprungVoraussetzungGesperrt(marke, freigaben);
           return (
             <button
               key={`sprung:${marke.key}`}

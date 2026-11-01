@@ -67,6 +67,8 @@ export interface components {
             /** Format: int64 */
             beendet_von_id?: number | null;
             beginn_at: string;
+            /** @description Wie die Schicht begann (LLH-1312): von Hand, mit dem Eintreffen oder als Folgeschicht. */
+            beginn_quelle: components["schemas"]["BeginnQuelle"];
             /**
              * @description Beim Besatzungswechsel: wer ging (`alt`) und wer kam (`neu`), je in der Reihenfolge des
              *     Vollzugs. Leer bei jeder anderen Schicht.
@@ -938,6 +940,13 @@ export interface components {
          * @enum {string}
          */
         BefehlVorlage: "befehl_lad" | "befehl_ladef" | "befehl_schnee" | "befehl_ea_zmw";
+        /**
+         * @description Wie eine Schicht begann (`einsatz_abloesung.beginn_quelle`, LLH-1312). Geschrieben beim
+         *     Anlegen; ein geänderter Beginn macht aus `eintreffen` ein `hand`, eine Folgeschicht bleibt
+         *     `vollzug`. Wire == `as_str()`.
+         * @enum {string}
+         */
+        BeginnQuelle: "hand" | "eintreffen" | "vollzug";
         /** @description Belegungs-Verlaufseintrag (1:1 zu `person_uhs_belegung`). */
         BelegungAnzeige: {
             art: components["schemas"]["BelegungsArt"];

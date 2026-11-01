@@ -65,7 +65,15 @@ Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`. „
 (LLH-1128) bildet nur `abloesung/ohneSchicht.ts`: offene Periode wie `has_offene_periode_tx`,
 Einheitenliste, minus eigene laufende Schicht und `erbende_einheiten`; nur mit Freigabe des
 Moduls Einheiten (sonst gesperrt mit Grund), eigene Zuflussschleuse, kein „Schicht beginnen“ für
-einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO stehen.
+einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO stehen. Die Ansicht
+der Seite steht in der Adresse (LLH-1312, `abloesungPfad(…, { ansicht })`, Zustand wie beim
+Funkplan, „laufend“ ohne Parameter); ein Sprung von außen auf „Ohne Schicht“ nimmt diesen Pfad.
+**Herkunft des Beginns** (LLH-1312, `einsatz_abloesung.beginn_quelle` `hand | eintreffen |
+vollzug`): geschrieben nur in `abloesung::repo::create_schicht_tx` (Handweg, Autostart der
+Kopplung, Folgeschicht des Vollzugs); eine übernommene Schicht behält ihren Wert, die Rücknahme
+ändert ihn nie, nur ein geänderter Beginn (`aendern`) macht aus `eintreffen` ein `hand`. Der Client
+leitet die Herkunft nicht aus Vorgänger oder Zeitachse ab; das Wort an der Karte bildet nur
+`abloesung/beginnText.ts`.
 **Geplant** heißt Einzelplanung `abloesende_einheit_id` oder Ablöser-Liste
 `einsatz_abloesung_abloeser`; jede Prüfung darauf liest beide (Planungshinweis, Hinweise,
 Planungswarnungen, LLH-1131). Die Planungswarnungen ermittelt der Server beim Lesen

@@ -106,6 +106,22 @@ impl Default for AbloesungVerbleib {
 }
 
 wire_enum! {
+    /// Wie eine Schicht begann (`einsatz_abloesung.beginn_quelle`, LLH-1312). Geschrieben beim
+    /// Anlegen; ein geänderter Beginn macht aus `eintreffen` ein `hand`, eine Folgeschicht bleibt
+    /// `vollzug`. Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BeginnQuelle {
+        /// Von Hand begonnen („Schicht beginnen“), auch mit dem Eintreffen als Zeitpunkt.
+        Hand => "hand",
+        /// Mit dem Eintreffen der Einheit begonnen (Autostart, [`kopplung`]).
+        Eintreffen => "eintreffen",
+        /// Vom Vollzug des Vorgängers als Folgeschicht angelegt.
+        Vollzug => "vollzug",
+    }
+    try_from = |s| format!("Ungültige Herkunft des Beginns: {s}");
+}
+
+wire_enum! {
     /// Rolle einer Person beim Besatzungswechsel (`einsatz_abloesung_besatzung.rolle`). Wire ==
     /// `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -360,6 +376,8 @@ pub struct AbloesungAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_name: Option<String>,
     pub beginn_at: String,
+    /// Wie die Schicht begann (LLH-1312): von Hand, mit dem Eintreffen oder als Folgeschicht.
+    pub beginn_quelle: BeginnQuelle,
     pub rhythmus_minuten: i64,
     pub rhythmus_quelle: RhythmusQuelle,
     pub faellig_at: String,
