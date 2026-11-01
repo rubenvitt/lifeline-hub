@@ -5462,6 +5462,68 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
+/// LLH-1330: eine ohne Netz vorgemerkte Aufnahme an der Betreuungsstelle trägt ihre
+/// Erfassungszeit in der Anlage, im Verbleib und in dessen ETB-Eintrag.
+#[tokio::test]
+async fn vorgemerkte_aufnahme_an_der_betreuungsstelle_traegt_ihre_erfassungszeit() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, _, geraet) = zwei_stellen_mit_geraet(&app, &admin).await;
+    let zeit = |sek: i64| {
+        (chrono::Utc::now() + chrono::Duration::seconds(sek))
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string()
+    };
+    sqlx::query("UPDATE einsatz SET begonnen_at = ? WHERE id = ?")
+        .bind(zeit(-3600))
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let vorgemerkt = zeit(-1200);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({"name": "Muster", "zeitpunkt_at": vorgemerkt, "client_id": "nu-1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["erfasst_at"], vorgemerkt.as_str());
+    let p = v["id"].as_i64().unwrap();
+    let (s, d) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{p}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{d}");
+    assert_eq!(d["verbleib"][0]["zeitpunkt_at"], vorgemerkt.as_str(), "{d}");
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let zeilen: Vec<&Value> = etb
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|z| {
+            z["typ"] == "system" && z["inhalt"].as_str().unwrap().starts_with("Person R-001")
+        })
+        .collect();
+    assert_eq!(zeilen.len(), 2, "erfasst und Verbleib: {zeilen:?}");
+    for z in zeilen {
+        assert_eq!(z["ereigniszeit"], vorgemerkt.as_str(), "{z}");
+    }
+}
+
 #[tokio::test]
 async fn betreuungsstelle_bringt_in_keine_fremde_notunterkunft() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
