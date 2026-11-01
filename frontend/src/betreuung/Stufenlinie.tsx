@@ -101,9 +101,10 @@ export default function Stufenlinie({
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
           />
-          {g.punkte.map((p) => (
+          {g.punkte.map((p, i) => (
             <circle
-              key={p.stufe.t}
+              // Position statt Zeit: zwei gültige Meldungen können denselben Zeitpunkt tragen.
+              key={i}
               cx={p.x}
               cy={p.y}
               r={PUNKT / 2}
