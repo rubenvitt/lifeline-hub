@@ -18,8 +18,8 @@ import {
   countQueueKonten,
 } from './queue';
 
-/** Ohne Obergrenze: ein Konto fällt erst weg, wenn es keine Zeilen mehr hat (Aufräumen in
- *  {@link confirmGeraetKonto}); eine Kürzung ließe Zeilen unsichtbar zurück. */
+/** Ohne Obergrenze und ohne Aufräumen: ein vergessenes Konto ließe Zeilen unsichtbar zurück, die
+ *  ein anderer Tab noch nach dem Zählen einreiht. Ein Eintrag sind wenige Byte je Kopplung. */
 const SCHLUESSEL = 'lifeline-hub.geraet-konten';
 
 export interface GeraetKonto {
@@ -80,7 +80,9 @@ function fruehereIds(aktuell: number | null): number[] {
 
 /**
  * Der Server hat eine Gerätesitzung bestätigt (`AuthProvider`, neben `merkeGeraet`): Konto
- * merken, passende frühere Konten übernehmen, Konten ohne Zeilen vergessen. Wirft nie.
+ * merken und passende frühere Konten übernehmen. Kein Konto wird vergessen: Ein Tab der beendeten
+ * Kopplung kann noch einreihen, seine Zeilen bleiben so sichtbar und die nächste passende
+ * Kopplung übernimmt sie. Wirft nie.
  */
 export async function confirmGeraetKonto(benutzerId: number, geraet: GeraetAnzeige): Promise<void> {
   try {
@@ -89,15 +91,6 @@ export async function confirmGeraetKonto(benutzerId: number, geraet: GeraetAnzei
     save([aktuell, ...bisher]);
     const passende = bisher.filter((k) => matches(k, aktuell)).map((k) => k.benutzer_id);
     if (passende.length > 0) await rebindQueueKonten(passende, benutzerId);
-    // Vergessen nur, was keine Zeilen mehr hat; ein anderer Tab kann die Liste inzwischen
-    // erweitert haben, deshalb frisch gelesen.
-    const behalten: GeraetKonto[] = [];
-    for (const k of loadGeraetKonten()) {
-      if (k.benutzer_id === benutzerId || (await countQueueKonten([k.benutzer_id])) > 0) {
-        behalten.push(k);
-      }
-    }
-    save(behalten);
   } catch (e) {
     console.error('Frühere Kopplung: Übernahme fehlgeschlagen', e);
   }
@@ -108,12 +101,10 @@ export function countFruehereKopplung(aktuell: number | null): Promise<number> {
   return countQueueKonten(fruehereIds(aktuell));
 }
 
-/** Verwirft alle Einträge früherer Gerätekonten (nur nach Rückfrage, D3). */
-export async function discardFruehereKopplung(aktuell: number): Promise<number> {
-  const ids = fruehereIds(aktuell);
-  const geloescht = await deleteQueueKonten(ids);
-  save(loadGeraetKonten().filter((k) => !ids.includes(k.benutzer_id)));
-  return geloescht;
+/** Verwirft alle Einträge früherer Gerätekonten (nur nach Rückfrage, D3). Die Konten bleiben
+ *  gemerkt, aus demselben Grund wie in {@link confirmGeraetKonto}. */
+export function discardFruehereKopplung(aktuell: number): Promise<number> {
+  return deleteQueueKonten(fruehereIds(aktuell));
 }
 
 /**

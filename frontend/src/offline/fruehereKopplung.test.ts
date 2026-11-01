@@ -52,9 +52,9 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
     await confirmGeraetKonto(ALT, geraet());
     await confirmGeraetKonto(NEU, geraet({ stelle_id: 5 }));
     await confirmGeraetKonto(NEU, geraet({ stelle_id: 5 }));
-    // ALT hat keine Zeilen mehr und fällt weg; das aktuelle Konto bleibt immer.
     expect(loadGeraetKonten()).toEqual([
       { benutzer_id: NEU, einsatz_id: 7, ansicht: 'uhs-tablet', stelle_id: 5 },
+      { benutzer_id: ALT, einsatz_id: 7, ansicht: 'uhs-tablet', stelle_id: 2 },
     ]);
   });
 
@@ -76,7 +76,19 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
     expect((await schreibaktionenAbgelehntLaden(NEU, 7))[0].grund).toBe(
       'Person nicht in dieser UHS',
     );
-    expect(loadGeraetKonten().map((k) => k.benutzer_id)).toEqual([NEU]);
+    expect(loadGeraetKonten().map((k) => k.benutzer_id)).toEqual([NEU, ALT]);
+  });
+
+  it('übernimmt, was ein Tab der beendeten Kopplung nach der Übernahme noch einreiht', async () => {
+    await confirmGeraetKonto(ALT, geraet());
+    await confirmGeraetKonto(NEU, geraet({ kopplung_id: 4 }));
+    // Zuerst ohne Zeilen übernommen; danach reiht ein offener Tab unter dem alten Konto ein.
+    await schreibaktionEinreihen(ALT, 7, sichtung('spaet-1'));
+    expect(await countFruehereKopplung(NEU)).toBe(1);
+
+    await confirmGeraetKonto(NEU, geraet({ kopplung_id: 4 }));
+    expect(await queueZaehlerLaden(NEU, 7)).toMatchObject({ ausstehend: 1 });
+    expect(await countFruehereKopplung(NEU)).toBe(0);
   });
 
   it.each([
@@ -111,7 +123,7 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
     expect(await countFruehereKopplung(null)).toBe(2);
   });
 
-  it('verwirft nur Zeilen früherer Gerätekonten und vergisst sie', async () => {
+  it('verwirft nur Zeilen früherer Gerätekonten und behält deren Kennung', async () => {
     await confirmGeraetKonto(ALT, geraet());
     await schreibaktionEinreihen(ALT, 7, sichtung('s-1'));
     await schreibaktionEinreihen(PERSON, 7, sichtung('person-1'));
@@ -124,7 +136,10 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
       benutzer_id: number;
     }[];
     expect(platte.map((z) => z.benutzer_id).sort()).toEqual([PERSON, NEU].sort());
-    expect(loadGeraetKonten().map((k) => k.benutzer_id)).toEqual([NEU]);
+    expect(await countFruehereKopplung(NEU)).toBe(0);
+    // Ein später Eintrag des alten Kontos bleibt sichtbar.
+    await schreibaktionEinreihen(ALT, 7, sichtung('spaet-1'));
+    expect(await countFruehereKopplung(NEU)).toBe(1);
   });
 
   it('übersteht einen unlesbaren Speicherstand', async () => {

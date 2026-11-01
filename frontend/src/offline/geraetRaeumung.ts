@@ -132,7 +132,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     datei: 'offline/fruehereKopplung.ts',
     entscheidung: 'bleibt',
     grund:
-      'Nur Kennungen der Gerätekonten dieses Browsers mit Einsatz, Ansicht und Stelle (LLH-1331); gebraucht gerade nach dem Ende einer Kopplung, damit eine neue Kopplung derselben Stelle deren Vorgemerktes übernimmt. Ein Konto ohne Zeilen in der Queue fällt beim nächsten Start einer Gerätesitzung weg.',
+      'Nur Kennungen der Gerätekonten dieses Browsers mit Einsatz, Ansicht und Stelle (LLH-1331); gebraucht gerade nach dem Ende einer Kopplung, damit eine neue Kopplung derselben Stelle deren Vorgemerktes übernimmt. Kein Eintrag wird vergessen, sonst blieben spät eingereihte Zeilen eines alten Tabs unsichtbar; wenige Byte je Kopplung.',
   },
   {
     ort: 'localStorage lifeline-serveruhr',
