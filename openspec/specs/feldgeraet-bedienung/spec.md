@@ -60,13 +60,20 @@ das hervorheben.
 
 Antwortet der Server einer Gerätesitzung mit 401, SHALL das Gerät eine Seite „Kopplung beendet“
 zeigen, mit dem Hinweis, sich bei der Einsatzleitung zu melden, und einem Weg zurück zu
-`/koppeln`. Eine Anmeldemaske für Personen MUST es dort nicht anbieten.
+`/koppeln`. Eine Anmeldemaske für Personen MUST es dort nicht anbieten. Liegen auf dem Gerät noch
+nicht übertragene Einträge früherer Kopplungen, SHALL die Seite deren Anzahl nennen, ohne Inhalt
+und ohne Weg zum Verwerfen.
 
 #### Scenario: Widerrufenes Tablet
 
 - **WHEN** die Einsatzleitung das Tablet widerruft
 - **THEN** zeigt das Tablet „Kopplung beendet“
 - **AND** keine Patientendaten mehr
+
+#### Scenario: Kopplung endet mit vorgemerkten Einträgen
+
+- **WHEN** das Tablet drei Einträge ohne Netz vorgemerkt hat und danach „Kopplung beendet“ zeigt
+- **THEN** nennt die Seite „3 Einträge nicht übertragen“
 
 ### Requirement: Touchtauglich und handschuhfest
 
@@ -107,3 +114,35 @@ auch Notiztexte, bis sie übertragen oder verworfen sind.
 - **WHEN** das Tablet ohne Netz bei einer geöffneten Person eine Nachsichtung übernimmt
 - **THEN** steht die Nachsichtung in der Warteschlange und wird bei Verbindung mit ihrer
   Erfassungszeit übertragen
+
+### Requirement: Vorgemerktes überdauert das Ende der Kopplung
+
+Ein Gerät SHALL sich die Kennungen seiner Gerätekonten merken. Bestätigt der Server eine neue
+Gerätesitzung im selben Einsatz mit derselben Ansicht und Stelle, MUST das Gerät die vorgemerkten
+und abgelehnten Einträge früherer Gerätekonten dieses Browsers auf das neue Konto übernehmen und
+wie eigene übertragen; der Server prüft sie mit den Rechten des neuen Kontos. Einträge früherer
+Gerätekonten, die nicht passen, SHALL die Gerätehülle mit Anzahl zeigen und nur nach Rückfrage
+verwerfen. Einträge von Personen MUST ein Gerät nie übernehmen.
+
+#### Scenario: Neuer Code für dieselbe UHS
+
+- **WHEN** die Kopplung des UHS-Tablets abläuft, während es eine Nachsichtung vorgemerkt hat
+- **AND** das Tablet einen neuen Code für dieselbe UHS bekommt
+- **THEN** wird die Nachsichtung mit ihrer Erfassungszeit übertragen
+
+#### Scenario: Server lehnt einen übernommenen Eintrag ab
+
+- **WHEN** ein übernommener Eintrag eine Person betrifft, die die UHS inzwischen verlassen hat
+- **THEN** steht er als abgelehnt im Wiederherstellungsbereich des Geräts
+
+#### Scenario: Neue Kopplung an anderer Stelle
+
+- **WHEN** das Tablet mit vorgemerkten Einträgen an eine andere UHS gekoppelt wird
+- **THEN** werden die Einträge nicht gesendet
+- **AND** der Wiederherstellungsbereich zeigt „Aus früherer Kopplung“ mit ihrer Anzahl
+- **AND** „Verwerfen“ löscht sie erst nach Rückfrage
+
+#### Scenario: Person am früheren Gerät
+
+- **WHEN** sich an einem Browser, der Gerät war, eine Person anmeldet
+- **THEN** übernimmt sie keine Einträge der Gerätekonten

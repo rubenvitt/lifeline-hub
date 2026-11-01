@@ -7,6 +7,7 @@ import { ladeVerpflegung } from '../api/verpflegung';
 import { neuerQueryClient } from '../test/utils';
 import { FELDKUECHE, stelle, verpflegungMitStellen } from '../test/verpflegungDaten';
 import OfflineRecoveryDrawer from './OfflineRecoveryDrawer';
+import { countFruehereKopplung, confirmGeraetKonto } from './fruehereKopplung';
 import {
   OFFLINE_QUEUE_EVENT,
   abgelehntEntfernen,
@@ -90,6 +91,64 @@ describe('OfflineRecoveryDrawer: nicht attribuierbare Legacy-Daten', () => {
     );
 
     await waitFor(async () => expect(await queueNichtZugeordnetZaehlen()).toBe(0));
+  });
+});
+
+describe('OfflineRecoveryDrawer: Einträge früherer Kopplung (LLH-1331)', () => {
+  const geraet = {
+    kopplung_id: 3,
+    einsatz_id: 7,
+    ansicht: 'uhs-tablet' as const,
+    stelle_id: 2,
+    uhs_id: 2,
+    stelle: 'UHS Nord',
+    bezeichnung: 'Tablet 1',
+    laeuft_ab_at: '2026-11-01 18:00:00',
+  };
+
+  async function vorbereiten() {
+    await confirmGeraetKonto(41, geraet);
+    await schreibaktionEinreihen(41, 7, {
+      art: 'notiz',
+      person_id: 10,
+      bezeichnung: 'R-012',
+      daten: { text: 'Geheime Notiz', client_id: 'n-1' },
+    });
+    // Neue Kopplung an einer anderen UHS: keine Übernahme.
+    await confirmGeraetKonto(42, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
+  }
+
+  it('zeigt am Gerät die Anzahl ohne Inhalt und verwirft erst nach Rückfrage', async () => {
+    await vorbereiten();
+    const user = userEvent.setup();
+    render(
+      <App>
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={42} geraet />
+      </App>,
+    );
+    expect(await screen.findByText('Aus früherer Kopplung')).toBeInTheDocument();
+    expect(screen.getByText('1 Eintrag · nicht übertragbar')).toBeInTheDocument();
+    expect(screen.queryByText(/Geheime Notiz/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    expect(
+      await screen.findByText('Einträge früherer Kopplung endgültig verwerfen?'),
+    ).toBeInTheDocument();
+    expect(await countFruehereKopplung(42)).toBe(1);
+    await user.click(screen.getByRole('button', { name: 'Endgültig verwerfen' }));
+    await waitFor(async () => expect(await countFruehereKopplung(42)).toBe(0));
+  });
+
+  it('zeigt einer Person keine Einträge von Gerätekonten', async () => {
+    await vorbereiten();
+    render(
+      <App>
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={42} />
+      </App>,
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('Aus früherer Kopplung')).not.toBeInTheDocument(),
+    );
   });
 });
 

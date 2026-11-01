@@ -2,7 +2,7 @@
 titel: Gerät bedienen
 gruppen: [geraete]
 reihenfolge: 710
-quellen: [frontend/src/geraet/KoppelnPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/live/useEinsatzLiveStream.ts, frontend/src/geraet/GeraeteKopf.tsx, frontend/src/geraet/GeraeteMenue.tsx, frontend/src/theme/dichte.ts, frontend/src/theme/darstellungOptionen.ts, frontend/src/geraet/KopplungBeendetPage.tsx, frontend/src/hilfe/HilfePage.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/KoppelnPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/live/useEinsatzLiveStream.ts, frontend/src/geraet/GeraeteKopf.tsx, frontend/src/geraet/GeraeteMenue.tsx, frontend/src/theme/dichte.ts, frontend/src/theme/darstellungOptionen.ts, frontend/src/geraet/KopplungBeendetPage.tsx, frontend/src/offline/fruehereKopplung.ts, frontend/src/hilfe/HilfePage.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -85,6 +85,8 @@ Ein Tablet mit Touchbildschirm beginnt mit der Bediendichte „Komfortabel“.
 
    ![Seite „Kopplung beendet“ mit den Knöpfen „Neuen Code eingeben“ und „Erneut prüfen“](../bilder/geraet-bedienen/kopplung-beendet.png)
 
+   Hat das Gerät noch Erfassungen vorgemerkt, steht darunter ihre Anzahl, etwa „3 Einträge nicht
+   übertragen“.
 2. Mit dem neuen Code der Einsatzleitung „Neuen Code eingeben“ wählen und wie oben koppeln.
    „Erneut prüfen“ fragt beim Server nach, ob die Kopplung doch noch besteht.
 
@@ -124,3 +126,16 @@ Bricht das Netz ab, zeigt die Kopfzeile den Stand der Daten, und „Kopplung bee
 „Keine Verbindung“; das Gerät prüft selbst, sobald das Netz zurück ist. Erfassungen merkt das
 Gerät vor und sendet sie nach, wie in [Arbeiten ohne Netz](ohne-netz.md) beschrieben. Ein
 Lagebild für die Arbeit ohne Netz legt ein gekoppeltes Gerät nicht ab.
+
+### Vorgemerktes nach dem Ende der Kopplung
+
+Endet die Kopplung, bevor das Gerät seine vorgemerkten Erfassungen senden konnte, bleiben sie auf
+dem Gerät. Bekommt dasselbe Gerät einen neuen Code für denselben Einsatz, dieselbe Ansicht und
+dieselbe Stelle, sendet es sie mit der neuen Kopplung nach, ohne weiteren Handgriff. Die
+Erfassungszeit bleibt erhalten; als Absender steht die neue Kopplung. Der Server prüft jede
+Erfassung wie eine neue; was er ablehnt, steht unter „abgelehnt – prüfen“.
+
+Wird das Gerät an eine andere Stelle oder in einen anderen Einsatz gekoppelt, sendet es nichts
+davon. Die Statuszeile zeigt dann „Aus früherer Kopplung“ mit der Anzahl; dort lassen sich die
+Einträge nach einer Rückfrage verwerfen. Wer sie doch senden will, lässt das Gerät noch einmal an
+die alte Stelle koppeln.

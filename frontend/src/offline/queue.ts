@@ -795,6 +795,74 @@ export async function queueNichtZugeordnetAlleVerwerfen(): Promise<number> {
   return geloescht;
 }
 
+/**
+ * Zeilen früherer Gerätekonten dieses Browsers (LLH-1331, Change
+ * `e8n4y8en-vorgemerktes-nach-kopplungsende`, D3/D4). Gezählt über den Index `by-benutzer`,
+ * ohne Payload, über alle vier Stores (ausstehend und abgelehnt).
+ */
+export async function countQueueKonten(benutzerIds: readonly number[]): Promise<number> {
+  if (benutzerIds.length === 0) return 0;
+  const d = await db();
+  const tx = d.transaction(OFFLINE_STORE_NAMEN, 'readonly');
+  const je = await Promise.all(
+    OFFLINE_STORE_NAMEN.flatMap((name) =>
+      benutzerIds.map((id) => tx.objectStore(name).index('by-benutzer').count(id)),
+    ),
+  );
+  await tx.done;
+  return je.reduce((summe, n) => summe + n, 0);
+}
+
+/**
+ * Bindet alle Zeilen der Konten `von` in EINER Transaktion an `nach` (LLH-1331, D1/D3): das neue
+ * Gerätekonto derselben Stelle übernimmt, was das alte vorgemerkt hat. Danach sendet der Abgleich
+ * wie gewohnt; der Server prüft mit den Rechten des neuen Kontos. Schlüssel, `client_id` und
+ * Erfassungszeit bleiben. Liefert die Zahl der umgebundenen Zeilen.
+ */
+export async function rebindQueueKonten(von: readonly number[], nach: number): Promise<number> {
+  const quellen = von.filter((id) => id !== nach);
+  if (quellen.length === 0) return 0;
+  const d = await db();
+  const tx = d.transaction(OFFLINE_STORE_NAMEN, 'readwrite');
+  let umgebunden = 0;
+  for (const name of OFFLINE_STORE_NAMEN) {
+    const index = tx.objectStore(name).index('by-benutzer');
+    for (const id of quellen) {
+      let cursor = await index.openCursor(id);
+      while (cursor) {
+        await cursor.update({ ...cursor.value, benutzer_id: nach });
+        umgebunden += 1;
+        cursor = await cursor.continue();
+      }
+    }
+  }
+  await tx.done;
+  if (umgebunden > 0) meldeQueueAenderung();
+  return umgebunden;
+}
+
+/** Verwirft alle Zeilen der Konten in einer Transaktion (LLH-1331, D3: nur nach Rückfrage). */
+export async function deleteQueueKonten(benutzerIds: readonly number[]): Promise<number> {
+  if (benutzerIds.length === 0) return 0;
+  const d = await db();
+  const tx = d.transaction(OFFLINE_STORE_NAMEN, 'readwrite');
+  let geloescht = 0;
+  for (const name of OFFLINE_STORE_NAMEN) {
+    const index = tx.objectStore(name).index('by-benutzer');
+    for (const id of benutzerIds) {
+      let cursor = await index.openCursor(id);
+      while (cursor) {
+        await cursor.delete();
+        geloescht += 1;
+        cursor = await cursor.continue();
+      }
+    }
+  }
+  await tx.done;
+  if (geloescht > 0) meldeQueueAenderung();
+  return geloescht;
+}
+
 export async function queueZaehlerLaden(
   benutzerId: number,
   einsatzId?: number,
