@@ -1,6 +1,6 @@
 {
   "_erzeugt": "frontend/scripts/zeichen-werte.mjs aus @einsatzzeichen (LFH-836) — nicht von Hand ändern, neu erzeugen mit: mise exec -- pnpm -C frontend zeichen-werte",
-  "bibliothek": "6.8.0",
+  "bibliothek": "6.10.0",
   "formatVersion": 1,
   "freestanding": {
     "animal-state": {
@@ -9,7 +9,7 @@
         "state": { "form": "wert", "werte": ["contaminated-animal", "dead-animal", "sick-animal"] },
         "variant": { "form": "wert", "werte": ["alternative", "primary"] }
       },
-      "pflicht": ["kind", "state"]
+      "pflicht": ["kind"]
     },
     "line": {
       "felder": {

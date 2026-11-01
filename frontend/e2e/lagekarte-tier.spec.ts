@@ -126,7 +126,10 @@ test('Tier: aus der Detailseite verorten, Tierzeichen, ohne ETB, zurück zur Det
   const f = await tierFeature(page, hund);
   expect(f?.beschriftung).toBe('T-001 (Hund)');
   // Das Tier ohne Zustand aus @einsatzzeichen (LLH-1343), kein Kreis mit Kurzzeichen.
-  expect(f?.icon).toBe('ez|{"v":1,"freestanding":{"kind":"animal-state"}}');
+  // Tag- oder Nachtbild (`ez|` bzw. `ez|dark|`, LLH-1141), beide mit derselben Spec.
+  expect(String(f?.icon)).toMatch(
+    /^ez\|(dark\|)?\{"v":1,"freestanding":\{"kind":"animal-state"\}\}$/,
+  );
   expect(f?.kurzzeichen).toBeUndefined();
   expect(f?.statusFarbe).toBeUndefined();
   // Kein ETB-Eintrag für die Verortung.
