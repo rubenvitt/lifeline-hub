@@ -15,7 +15,7 @@ export function legeEinsatzVorlageAn(daten: EinsatzVorlageEingabe): Promise<Eins
   return apiSend<EinsatzVorlage>('/api/einsatz-vorlagen', 'POST', daten);
 }
 
-/** Vollersatz: Bezeichnung, Einsatzart und die ganze Menge ausgeblendeter Module. */
+/** Vollersatz: Bezeichnung, Einsatzart, Schichtmodell und die ganze Menge ausgeblendeter Module. */
 export function aktualisiereEinsatzVorlage(
   id: number,
   daten: EinsatzVorlageEingabe,

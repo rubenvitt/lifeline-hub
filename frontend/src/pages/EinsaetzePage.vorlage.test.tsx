@@ -234,6 +234,99 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
   });
 });
 
+describe('Anlegedialog · Schichtmodell der Vorlage (LLH-1313)', () => {
+  const modell = (id: number, bezeichnung: string, ist_vorgabe: boolean) => ({
+    id,
+    bezeichnung,
+    typ: 'rhythmus',
+    rhythmus_minuten: 360,
+    vorwarnung_minuten: 30,
+    planungsvorlauf_minuten: 120,
+    ist_vorgabe,
+    ist_demo: false,
+  });
+
+  it('nennt das Modell der Vorlage, sonst die Vorgabe der Organisation', async () => {
+    const mitModell = VORLAGEN.map((v) => (v.id === 2 ? { ...v, schichtmodell_id: 9 } : v));
+    const rumpf = setup(mitModell);
+    server.use(
+      http.get('/api/schichtmodelle', () =>
+        HttpResponse.json([
+          modell(1, '12-h-Schicht', true),
+          modell(9, 'Sanitätsdienst 6 h', false),
+        ]),
+      ),
+    );
+    const dialog = await oeffneDialog();
+    expect(
+      await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
+    ).toBeInTheDocument();
+
+    await waehle('Module', 'Sanitätsdienst');
+    expect(
+      await within(dialog).findByText('Schichtmodell: Sanitätsdienst 6 h (Vorgabe Vorlage)'),
+    ).toBeInTheDocument();
+    // Weiter kein eigenes Feld (Feldbudget, LFH-1175).
+    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+
+    await waehle('Module', 'Kleinlage');
+    expect(
+      await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
+    ).toBeInTheDocument();
+
+    // Die Wahl geht nur als `vorlage_id` hinaus; das Modell rechnet der Server.
+    await waehle('Module', 'Sanitätsdienst');
+    const body = await anlegen(rumpf);
+    expect(body.vorlage_id).toBe(2);
+    expect(body).not.toHaveProperty('schichtmodell_id');
+  });
+
+  it('Vorlage mit Modell ohne Org-Vorgabe zeigt die Zeile erst mit der Vorlage', async () => {
+    const mitModell = VORLAGEN.map((v) => (v.id === 3 ? { ...v, schichtmodell_id: 9 } : v));
+    setup(mitModell);
+    server.use(
+      http.get('/api/schichtmodelle', () =>
+        HttpResponse.json([modell(9, '12-h-Schicht 0600/1800', false)]),
+      ),
+    );
+    const dialog = await oeffneDialog();
+    expect(within(dialog).queryByText(/^Schichtmodell:/)).toBeNull();
+    await waehle('Module', 'MANV');
+    expect(
+      await within(dialog).findByText('Schichtmodell: 12-h-Schicht 0600/1800 (Vorgabe Vorlage)'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('Anlegedialog · Modell der Vorlage fehlt im Cache (LLH-1313)', () => {
+  it('zeigt dann keine Zeile statt der Org-Vorgabe', async () => {
+    const mitModell = VORLAGEN.map((v) => (v.id === 2 ? { ...v, schichtmodell_id: 77 } : v));
+    setup(mitModell);
+    server.use(
+      http.get('/api/schichtmodelle', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            bezeichnung: '12-h-Schicht',
+            typ: 'rhythmus',
+            rhythmus_minuten: 720,
+            vorwarnung_minuten: 30,
+            planungsvorlauf_minuten: 120,
+            ist_vorgabe: true,
+            ist_demo: false,
+          },
+        ]),
+      ),
+    );
+    const dialog = await oeffneDialog();
+    expect(
+      await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
+    ).toBeInTheDocument();
+    await waehle('Module', 'Sanitätsdienst');
+    await waitFor(() => expect(within(dialog).queryByText(/^Schichtmodell:/)).toBeNull());
+  });
+});
+
 describe('einsatzVorlageWahlKern', () => {
   it('koppelt nur exakt, nur an eine bekannte Vorlage', () => {
     expect(gekoppelteVorlage('MANV15', VORSCHLAEGE, VORLAGEN)).toBe(3);

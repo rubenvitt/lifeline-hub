@@ -48,8 +48,11 @@ LFH-46 E17 (Feldbefund) auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
 der Rangfolge eigener Wert → Vorgabe des Abschnitts → Vorgabe des Einsatzes
 (`rhythmus_quelle` `einheit`/`abschnitt`/`einsatz`). Die Vorgabe des Einsatzes ist eine Kopie
 eines Schichtmodells (`einsatz_schichtmodell`), nie ein Verweis auf die Stammdaten: Ändern oder
-Löschen eines Modells berührt keinen laufenden Einsatz. Die Rangfolge rechnet der Server beim
-Beginnen; der Client zeigt sie nur (Karte „(Vorgabe Einsatz)“, Platzhalter über
+Löschen eines Modells berührt keinen laufenden Einsatz. Welches Modell ein neuer Einsatz kopiert
+(Modell der Einsatz-Vorlage → Vorgabe der Organisation → keins, LLH-1313), entscheidet der Server
+beim Anlegen (`schichtmodell::repo::copy_vorgabe_tx`); der Anlegedialog zeigt es nur
+(„(Vorgabe Vorlage)“ über `vorlageVorgabe`) und sendet allein `vorlage_id`. Die Rangfolge der
+Schicht rechnet der Server beim Beginnen; der Client zeigt sie nur (Karte „(Vorgabe Einsatz)“, Platzhalter über
 `components/vorgabeText.ts`) und erlaubt ein leeres Rhythmusfeld, sobald eine Stufe darüber
 greift. Die Vorwarnzeit kommt je Schicht aus dem DTO (`vorwarnung_minuten`, aus dem
 Schichtmodell des Einsatzes), nie aus einer Konstante im Client (`abloesung/einstufung.ts`,

@@ -2,6 +2,7 @@ import { App, Button, Modal, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { listeEinsatzVorlagen } from '../api/einsatzVorlagen';
 import { globalKeys } from '../api/queryKeys';
 import {
   createSchichtmodell,
@@ -43,11 +44,19 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
  * - **Vorgabe wechseln in einem Handgriff:** der Server lehnt eine zweite Vorgabe mit 409 ab,
  *   `setOrgVorgabe` hebt deshalb erst die bisherige auf und setzt dann die neue (und stellt die
  *   bisherige wieder her, wenn der zweite Schritt scheitert). Umkehrbar, ohne Rückfrage.
- * - **Löschen** ist unumkehrbar und fragt nach; Einsätze behalten ihre Kopie (ein Satz zur Folge).
+ * - **Löschen** ist unumkehrbar und fragt nach; Einsätze behalten ihre Kopie (ein Satz zur Folge),
+ *   Einsatz-Vorlagen, die das Modell vorgeben, verlieren es (LLH-1313, ein zweiter Satz nennt sie).
  * - Live über das Org-Ereignis `stammdaten` (`globalKeys.schichtmodelle`).
  * - Wechselzeiten in der Zeitdarstellung (LLH-1437); außerhalb jedes Einsatzes kommt sie aus Gerät
  *   und Organisation (`OrgAnzeigeProvider`).
  */
+/** Folge des Löschens für Einsatz-Vorlagen, die das Modell vorgeben (LLH-1313). */
+function verlierenText(vorlagen: string[]): string {
+  return vorlagen.length === 1
+    ? `Die Vorlage ${vorlagen[0]} verliert es.`
+    : `Die Vorlagen ${vorlagen.join(', ')} verlieren es.`;
+}
+
 export default function SchichtmodelleTab() {
   return (
     <OrgAnzeigeProvider>
@@ -72,6 +81,15 @@ function SchichtmodelleInhalt() {
   });
   const modelle = modelleQuery.data ?? [];
   const invalidiere = () => qc.invalidateQueries({ queryKey: globalKeys.schichtmodelle() });
+  // Nur für die Rückfrage beim Löschen: welche Vorlagen das Modell vorgeben (LLH-1313).
+  const { data: vorlagen = [] } = useQuery({
+    queryKey: globalKeys.einsatzVorlagen(),
+    queryFn: listeEinsatzVorlagen,
+    enabled: zuLoeschen != null,
+  });
+  const betroffeneVorlagen = zuLoeschen
+    ? vorlagen.filter((v) => v.schichtmodell_id === zuLoeschen.id).map((v) => v.bezeichnung)
+    : [];
 
   // KEIN `onError`-Toast (LFH-1077): Gründe stehen im Hinweis der Seite bzw. im Dialog.
   const vorgabe = useMutation({
@@ -91,7 +109,11 @@ function SchichtmodelleInhalt() {
   });
   const loeschen = useMutation({
     mutationFn: (modell: Schichtmodell) => deleteSchichtmodell(modell.id),
-    onSuccess: (_, modell) => message.success(`${modell.bezeichnung} gelöscht`),
+    onSuccess: (_, modell) => {
+      message.success(`${modell.bezeichnung} gelöscht`);
+      // Vorlagen, die das Modell vorgaben, verlieren den Verweis (LLH-1313, design.md D3).
+      void qc.invalidateQueries({ queryKey: globalKeys.einsatzVorlagen() });
+    },
     onSettled: () => {
       setZuLoeschen(null);
       void invalidiere();
@@ -250,7 +272,12 @@ function SchichtmodelleInhalt() {
         onCancel={() => setZuLoeschen(null)}
         destroyOnHidden
       >
-        Laufende Einsätze behalten ihre Kopie.
+        <p style={{ margin: 0 }}>Laufende Einsätze behalten ihre Kopie.</p>
+        {betroffeneVorlagen.length > 0 && (
+          <p data-lfh="loeschen-vorlagen" style={{ margin: 0 }}>
+            {verlierenText(betroffeneVorlagen)}
+          </p>
+        )}
       </Modal>
       {formular && (
         <SchichtmodellModal

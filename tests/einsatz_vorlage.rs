@@ -557,3 +557,227 @@ async fn spaetere_aenderung_der_vorlage_wirkt_nur_auf_neue_einsaetze() {
     assert!(keys(a).contains(&"stab".to_string()));
     assert_eq!(keys(n), ["chat"]);
 }
+
+// ------------------- Schichtmodell an der Vorlage (LLH-1313) -------------------
+
+/// Legt ein Schichtmodell der eigenen Organisation über die Route an; liefert seine id.
+async fn schichtmodell(app: &axum::Router, cookie: &str, body: &str) -> i64 {
+    let (status, json) = anfrage(app, "POST", "/api/schichtmodelle", cookie, Some(body)).await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    json["id"].as_i64().unwrap()
+}
+
+/// Bezeichnung der Vorgabe des Einsatzes; `None` = keine.
+async fn einsatz_vorgabe(app: &axum::Router, cookie: &str, einsatz: i64) -> Option<String> {
+    let (status, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/abloesungen/schichtmodell"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    json["schichtmodell"]["bezeichnung"]
+        .as_str()
+        .map(str::to_string)
+}
+
+/// Spec `einsatz-vorlagen`, „Eine Vorlage gibt das Schichtmodell vor“: die Vorlage mit Modell
+/// schlägt die Org-Vorgabe, eine Vorlage ohne Modell und die Anlage ohne Vorlage bekommen die
+/// Org-Vorgabe.
+#[tokio::test]
+async fn vorlage_gibt_das_schichtmodell_vor() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    schichtmodell(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Sanitätsdienst 6 h","typ":"rhythmus","rhythmus_minuten":360,"ist_vorgabe":true}"#,
+    )
+    .await;
+    let zwoelf = schichtmodell(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"12-h-Schicht","typ":"wechselzeiten","wechselzeiten":["06:00","18:00"],"mindestdauer_minuten":240}"#,
+    )
+    .await;
+    let unwetter = vorlage_id(&app, &admin, "Unwetter").await;
+    let body = format!(
+        r#"{{"bezeichnung":"Unwetter","einsatzart":"realeinsatz","schichtmodell_id":{zwoelf},"ausgeblendet":["stab"]}}"#
+    );
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("{PFAD}/{unwetter}"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["schichtmodell_id"], zwoelf);
+
+    let (_, json) = einsatz_mit_vorlage(&app, &admin, Some(unwetter)).await;
+    let mit = json["id"].as_i64().unwrap();
+    assert_eq!(
+        einsatz_vorgabe(&app, &admin, mit).await.as_deref(),
+        Some("12-h-Schicht")
+    );
+
+    // MANV zeigt das Modul Ablösung (Kleinlage blendet es aus) und gibt kein Modell vor.
+    let manv = vorlage_id(&app, &admin, "MANV").await;
+    let (_, json) = einsatz_mit_vorlage(&app, &admin, Some(manv)).await;
+    let ohne_modell = json["id"].as_i64().unwrap();
+    let (_, json) = einsatz_mit_vorlage(&app, &admin, None).await;
+    let ohne_vorlage = json["id"].as_i64().unwrap();
+    for einsatz in [ohne_modell, ohne_vorlage] {
+        assert_eq!(
+            einsatz_vorgabe(&app, &admin, einsatz).await.as_deref(),
+            Some("Sanitätsdienst 6 h"),
+            "Einsatz {einsatz}"
+        );
+    }
+
+    // Die Liste nennt das Modell nur an der Vorlage, die eines vorgibt.
+    let (_, liste) = vorlagen(&app, &admin).await;
+    for v in &liste {
+        let erwartet = if v["id"] == unwetter {
+            serde_json::json!(zwoelf)
+        } else {
+            Value::Null
+        };
+        assert_eq!(v["schichtmodell_id"], erwartet, "{v:?}");
+    }
+}
+
+/// Ohne Org-Vorgabe und ohne Modell an der Vorlage bleibt der Einsatz ohne Vorgabe; mit Modell an
+/// der Vorlage bekommt er es trotzdem.
+#[tokio::test]
+async fn vorlage_mit_modell_ohne_org_vorgabe() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let san = schichtmodell(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"Sanitätsdienst 6 h","typ":"rhythmus","rhythmus_minuten":360}"#,
+    )
+    .await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        PFAD,
+        &admin,
+        Some(&format!(
+            r#"{{"bezeichnung":"Konzert","schichtmodell_id":{san},"ausgeblendet":[]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    let konzert = json["id"].as_i64().unwrap();
+
+    let (_, json) = einsatz_mit_vorlage(&app, &admin, Some(konzert)).await;
+    let mit = json["id"].as_i64().unwrap();
+    assert_eq!(
+        einsatz_vorgabe(&app, &admin, mit).await.as_deref(),
+        Some("Sanitätsdienst 6 h")
+    );
+    let (_, json) = einsatz_mit_vorlage(&app, &admin, None).await;
+    let ohne = json["id"].as_i64().unwrap();
+    assert_eq!(einsatz_vorgabe(&app, &admin, ohne).await, None);
+}
+
+/// Spec „Fremdes Schichtmodell“: ein Modell einer anderen Organisation oder ein unbekanntes ist
+/// ein Feldfehler (400), beim Anlegen wie beim Vollersatz, und es wird nichts gespeichert.
+#[tokio::test]
+async fn fremdes_oder_unbekanntes_schichtmodell_ist_400() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (fremd_org, _) = fremde_org_anlegen(&pool, "Fremd-Org", "fremd", "fremdpw1", "keine").await;
+    let fremd: i64 = sqlx::query_scalar(
+        "INSERT INTO schichtmodell (org_id, bezeichnung, typ, rhythmus_minuten) \
+         VALUES (?, 'Fremd', 'rhythmus', 720) RETURNING id",
+    )
+    .bind(fremd_org)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let unwetter = vorlage_id(&app, &admin, "Unwetter").await;
+    let (_, vorher) = vorlagen(&app, &admin).await;
+
+    for modell in [fremd, 999_999] {
+        let (status, json) = anfrage(
+            &app,
+            "POST",
+            PFAD,
+            &admin,
+            Some(&format!(
+                r#"{{"bezeichnung":"Neu","schichtmodell_id":{modell},"ausgeblendet":[]}}"#
+            )),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{modell}: {json:?}");
+        let (status, json) = anfrage(
+            &app,
+            "PUT",
+            &format!("{PFAD}/{unwetter}"),
+            &admin,
+            Some(&format!(
+                r#"{{"bezeichnung":"Unwetter neu","schichtmodell_id":{modell},"ausgeblendet":[]}}"#
+            )),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{modell}: {json:?}");
+    }
+    let (_, nachher) = vorlagen(&app, &admin).await;
+    assert_eq!(nachher, vorher, "nichts gespeichert");
+}
+
+/// Spec „Modell gelöscht“: das Löschen durch den Admin löst den Verweis der Vorlage; ein Einsatz,
+/// der die Kopie schon hat, behält sie, ein neuer bekommt wieder die Org-Vorgabe (hier keine).
+#[tokio::test]
+async fn geloeschtes_modell_loest_die_vorlage() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let zwoelf = schichtmodell(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"12-h-Schicht","typ":"rhythmus","rhythmus_minuten":720}"#,
+    )
+    .await;
+    let unwetter = vorlage_id(&app, &admin, "Unwetter").await;
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{PFAD}/{unwetter}"),
+        &admin,
+        Some(&format!(
+            r#"{{"bezeichnung":"Unwetter","schichtmodell_id":{zwoelf},"ausgeblendet":[]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, json) = einsatz_mit_vorlage(&app, &admin, Some(unwetter)).await;
+    let laufend = json["id"].as_i64().unwrap();
+
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/schichtmodelle/{zwoelf}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let (_, liste) = vorlagen(&app, &admin).await;
+    let v = liste.iter().find(|v| v["id"] == unwetter).unwrap();
+    assert!(v.get("schichtmodell_id").is_none(), "Verweis gelöst: {v:?}");
+    assert_eq!(
+        einsatz_vorgabe(&app, &admin, laufend).await.as_deref(),
+        Some("12-h-Schicht"),
+        "die Kopie am laufenden Einsatz bleibt"
+    );
+    let (_, json) = einsatz_mit_vorlage(&app, &admin, Some(unwetter)).await;
+    let neu = json["id"].as_i64().unwrap();
+    assert_eq!(einsatz_vorgabe(&app, &admin, neu).await, None);
+}

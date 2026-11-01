@@ -106,11 +106,14 @@ pub(crate) async fn anlegen_tx(
     .await?
     .unwrap_or((None, None));
     // LLH-1375: die Vorlage vor jedem Schreiben prüfen; fremd oder unbekannt ist ein Feldfehler.
-    let vorlage_aus = match daten.vorlage_id {
+    // Sie liefert die ausgeblendeten Module und, seit LLH-1313, ihr Schichtmodell.
+    let (vorlage_aus, vorlage_schichtmodell) = match daten.vorlage_id {
         Some(vid) => {
-            crate::einsatz_vorlage::repo::load_ausgeblendet_tx(&mut *conn, org_id, vid).await?
+            let v =
+                crate::einsatz_vorlage::repo::load_for_anlage_tx(&mut *conn, org_id, vid).await?;
+            (v.ausgeblendet, v.schichtmodell_id)
         }
-        None => Vec::new(),
+        None => (Vec::new(), None),
     };
     let jahr = super::nummer::jahr_in_zone(jetzt, zeitzone.as_deref());
     // Das Löschprotokoll zählt mit (LFH-750, design.md D5): die Nummer eines endgültig
@@ -196,9 +199,17 @@ pub(crate) async fn anlegen_tx(
     .bind(EINSATZ_ROLLE_LEITUNG)
     .execute(&mut *conn)
     .await?;
-    // LLH-1122: die Vorgabe der Organisation wird als Kopie die Vorgabe des Einsatzes, damit die
-    // Ablösung vom ersten Eintreffen an rechnen kann; ohne Org-Vorgabe keine.
-    crate::schichtmodell::repo::copy_org_vorgabe_tx(conn, einsatz_id, org_id, ersteller_id).await?;
+    // LLH-1122/LLH-1313: das Schichtmodell der Vorlage, sonst die Vorgabe der Organisation wird
+    // als Kopie die Vorgabe des Einsatzes, damit die Ablösung vom ersten Eintreffen an rechnen
+    // kann; ohne beides keine.
+    crate::schichtmodell::repo::copy_vorgabe_tx(
+        conn,
+        einsatz_id,
+        org_id,
+        vorlage_schichtmodell,
+        ersteller_id,
+    )
+    .await?;
     write_vorlage_overrides_tx(conn, einsatz_id, &vorlage_aus, ersteller_id).await?;
     Ok(einsatz_id)
 }

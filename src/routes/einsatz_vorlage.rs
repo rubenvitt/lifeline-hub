@@ -26,11 +26,14 @@ pub async fn list(
 
 /// Body von POST und PUT (Vollersatz). `ausgeblendet` sind die Modulschlüssel, die ein mit der
 /// Vorlage angelegter Einsatz ausblendet; Pflichtfeld (leer = blendet nichts aus), damit ein
-/// Vollersatz ohne das Feld die Menge nicht still leert.
+/// Vollersatz ohne das Feld die Menge nicht still leert. `schichtmodell_id` fehlt oder `null` =
+/// die Vorlage gibt kein Schichtmodell vor (LLH-1313).
 #[derive(Debug, Deserialize)]
 pub struct EinsatzVorlageEingabe {
     pub bezeichnung: String,
     pub einsatzart: Option<String>,
+    #[serde(default)]
+    pub schichtmodell_id: Option<i64>,
     pub ausgeblendet: Vec<String>,
 }
 
@@ -57,7 +60,8 @@ fn check_eingabe(
 }
 
 /// POST /api/einsatz-vorlagen — Admin. Legt eine Vorlage am Ende der Liste an (201). Feldfehler
-/// 400, Bezeichnung in der Organisation doppelt 409 (wie Stichworte und Einheiten-Vorlagen).
+/// 400 (auch ein fremdes oder unbekanntes Schichtmodell), Bezeichnung in der Organisation doppelt
+/// 409 (wie Stichworte und Einheiten-Vorlagen).
 pub async fn create(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -70,6 +74,7 @@ pub async fn create(
         VorlageDaten {
             bezeichnung: &bezeichnung,
             einsatzart,
+            schichtmodell_id: body.schichtmodell_id,
             ausgeblendet: &ausgeblendet,
         },
     )
@@ -77,9 +82,9 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(vorlage)))
 }
 
-/// PUT /api/einsatz-vorlagen/{id} — Admin, Vollersatz von Bezeichnung, Einsatzart und
-/// Modulmenge; `sortier` bleibt. Fremde oder unbekannte id 404, Feldfehler 400, Bezeichnung
-/// doppelt 409. Wirkt nur auf neue Einsätze.
+/// PUT /api/einsatz-vorlagen/{id} — Admin, Vollersatz von Bezeichnung, Einsatzart,
+/// Schichtmodell und Modulmenge; `sortier` bleibt. Fremde oder unbekannte id 404, Feldfehler 400,
+/// Bezeichnung doppelt 409. Wirkt nur auf neue Einsätze.
 pub async fn update(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -94,6 +99,7 @@ pub async fn update(
         VorlageDaten {
             bezeichnung: &bezeichnung,
             einsatzart,
+            schichtmodell_id: body.schichtmodell_id,
             ausgeblendet: &ausgeblendet,
         },
     )

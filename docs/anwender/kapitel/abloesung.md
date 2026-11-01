@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx]
 ---
 
 ## Überblick
@@ -240,8 +240,11 @@ Achtung, nicht in Rot; sie ändern die Einstufung der Karte nicht, und die Planu
 
 Woher der Rhythmus einer Schicht kommt, folgt einer festen Reihenfolge: ein eigener Wert der
 Schicht, sonst die Vorgabe des Abschnitts, sonst die Vorgabe des Einsatzes. Die Vorgabe des
-Einsatzes ist die Kopie eines Schichtmodells. Ein neuer Einsatz bekommt das Schichtmodell, das die
-Organisation als Vorgabe führt; hat sie keines, hat auch der Einsatz keine Vorgabe.
+Einsatzes ist die Kopie eines Schichtmodells. Ein neuer Einsatz bekommt das Schichtmodell seiner
+Einsatz-Vorlage, wenn sie eines vorgibt, sonst das Schichtmodell, das die Organisation als Vorgabe
+führt; hat keine von beiden eines, hat auch der Einsatz keine Vorgabe. Der Dialog „Neuen Einsatz
+anlegen“ nennt es unter den Feldern, etwa „Schichtmodell: 12-h-Schicht (Vorgabe Vorlage)“ oder
+„Schichtmodell: Sanitätsdienst 6 h (Vorgabe)“.
 
 Ein Schichtmodell gibt einen festen Rhythmus vor oder feste Wechselzeiten, etwa 06:00 und 18:00
 mit vier Stunden Mindestdauer. Bei Wechselzeiten ist die Schicht zum ersten Wechsel fällig, zu dem
@@ -250,7 +253,8 @@ sonst der Organisation: wer um 13:42 beginnt, ist um 18:00 fällig, wer um 15:00
 am Folgetag. Das Schichtmodell legt auch fest, wie lange vorher der Hinweis kommt.
 
 Gesetzt wird die Vorgabe des Einsatzes in den Einstellungen des Einsatzes, Reiter „Ablösung“; die
-Schichtmodelle der Organisation pflegt die Verwaltung (Kapitel [Stammdaten](stammdaten.md)).
+Schichtmodelle der Organisation und das Schichtmodell einer Einsatz-Vorlage pflegt die Verwaltung
+(Kapitel [Stammdaten](stammdaten.md)).
 Ändert sich die Vorgabe des Einsatzes, rechnen die Schichten neu, die ihr folgen; Schichten mit
 eigenem Rhythmus oder nach der Vorgabe ihres Abschnitts bleiben. Ändert jemand das Schichtmodell in
 den Stammdaten oder löscht es, bleibt der laufende Einsatz unberührt.

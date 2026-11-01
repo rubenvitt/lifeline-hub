@@ -2505,6 +2505,12 @@ export interface components {
             einsatzart?: components["schemas"]["Einsatzart"] | null;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: int64
+             * @description Schichtmodell der Organisation, das ein mit der Vorlage angelegter Einsatz als Kopie
+             *     bekommt (LLH-1313); fehlt, wenn die Vorlage keines vorgibt (dann gilt die Org-Vorgabe).
+             */
+            schichtmodell_id?: number | null;
             /** Format: int64 */
             sortier: number;
         };

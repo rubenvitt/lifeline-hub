@@ -18,7 +18,7 @@ import {
   type VorlageWahl,
 } from './einsatzVorlageWahlKern';
 import { auswahlWert, vorlageAusWert, vorlagenOptionen } from '../stammdaten/einsatzVorlageModule';
-import { mitVorgabe } from '../components/vorgabeText';
+import { mitVorgabe, vorlageVorgabe } from '../components/vorgabeText';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
@@ -243,9 +243,10 @@ function EinsaetzeInhalt() {
     queryFn: listeStichwortVorschlaege,
   });
   const stichwortOptionen = stichwortVorschlaege.map((v) => ({ value: v.text }));
-  // Die Vorgabe der Organisation geht als Kopie in den neuen Einsatz (LLH-1122). Kein Feld
-  // (Feldbudget): eine Zeile sagt, was der Einsatz bekommt; geändert wird in den
-  // Einsatz-Einstellungen. Ohne Org-Vorgabe keine Zeile (keine erfundene Zahl).
+  // Das Schichtmodell der Vorlage oder die Vorgabe der Organisation geht als Kopie in den neuen
+  // Einsatz (LLH-1122, LLH-1313). Kein Feld (Feldbudget): eine Zeile sagt, was der Einsatz
+  // bekommt; geändert wird in den Einsatz-Einstellungen. Ohne beides keine Zeile (keine erfundene
+  // Zahl).
   const { data: schichtmodelle } = useQuery({
     queryKey: globalKeys.schichtmodelle(),
     queryFn: fetchSchichtmodelle,
@@ -259,6 +260,21 @@ function EinsaetzeInhalt() {
     queryFn: listeEinsatzVorlagen,
     enabled: dialogOffen,
   });
+  // Was der neue Einsatz als Schichtmodell bekommt (LLH-1313, Spec `kraefte-abloesung`,
+  // „Schichtmodell in der Einsatzanlage“): das Modell der gewählten Vorlage, sonst die Vorgabe der
+  // Organisation, sonst keins. Dieselbe Rangfolge rechnet der Server beim Anlegen. Kennt der Cache
+  // das Modell der Vorlage (noch) nicht, keine Zeile statt der falschen Org-Vorgabe.
+  const vorlageModellId = vorlagen.find((v) => v.id === vorlageWahl.vorlageId)?.schichtmodell_id;
+  const vorlageSchichtmodell =
+    vorlageModellId == null ? undefined : schichtmodelle?.find((m) => m.id === vorlageModellId);
+  const schichtmodellText =
+    vorlageModellId != null
+      ? vorlageSchichtmodell
+        ? vorlageVorgabe(vorlageSchichtmodell.bezeichnung)
+        : null
+      : orgSchichtmodell
+        ? mitVorgabe(orgSchichtmodell.bezeichnung)
+        : null;
 
   /** Neue Vorlage; die Einsatzart folgt ihr, solange niemand sie von Hand geändert hat. */
   function setzeVorlage(wahl: VorlageWahl) {
@@ -670,8 +686,8 @@ function EinsaetzeInhalt() {
           />
         </Form.Item>
         {/* Gedämpfte Zeile unter den Feldern (design.md D3): Vorlage als kompakte Auswahl ohne
-            Rahmen, daneben, was der Einsatz von der Organisation bekommt (LLH-1122). */}
-        {(vorlagen.length > 0 || orgSchichtmodell) && (
+            Rahmen, daneben das Schichtmodell, das der Einsatz bekommt (LLH-1122, LLH-1313). */}
+        {(vorlagen.length > 0 || schichtmodellText) && (
           <div
             data-lfh="anlage-vorgaben"
             style={{
@@ -702,11 +718,9 @@ function EinsaetzeInhalt() {
                 />
               </span>
             )}
-            {vorlagen.length > 0 && orgSchichtmodell && <span aria-hidden>·</span>}
-            {orgSchichtmodell && (
-              <span data-lfh="anlage-schichtmodell">
-                {`Schichtmodell: ${mitVorgabe(orgSchichtmodell.bezeichnung)}`}
-              </span>
+            {vorlagen.length > 0 && schichtmodellText && <span aria-hidden>·</span>}
+            {schichtmodellText && (
+              <span data-lfh="anlage-schichtmodell">{`Schichtmodell: ${schichtmodellText}`}</span>
             )}
           </div>
         )}

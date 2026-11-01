@@ -11822,4 +11822,85 @@ mod tests {
             .unwrap();
         assert_eq!(rest, 0, "die Zeilen fallen weiter mit dem Einsatz");
     }
+
+    // --- LLH-1313: Schichtmodell an der Einsatz-Vorlage (0263) ---
+
+    /// LLH-1313 (Change `ktc297tx-schichtmodell-je-vorlage`, design.md D2/D3): der Bestand
+    /// bleibt ohne Modell; der Verweis hält das Modell fest (kein ON DELETE), damit das Entfernen
+    /// der Demo-Daten ein benutztes Modell stehen lässt, und der Teilindex ist da.
+    #[tokio::test]
+    async fn migration_0263_einsatz_vorlage_schichtmodell() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 263;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        bild_grundlage(&pool).await;
+        let vorlage: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_vorlage (org_id, bezeichnung, einsatzart) \
+             VALUES (1, 'Unwetter', 'realeinsatz') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: Option<i64> =
+            sqlx::query_scalar("SELECT schichtmodell_id FROM einsatz_vorlage WHERE id = ?")
+                .bind(vorlage)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bestand, None, "der Bestand gibt kein Modell vor");
+
+        let fk: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT \"table\", \"to\", on_delete FROM pragma_foreign_key_list('einsatz_vorlage') \
+             WHERE \"from\" = 'schichtmodell_id'",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            fk,
+            vec![("schichtmodell".into(), "id".into(), "NO ACTION".into())]
+        );
+        let index: Option<String> = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' \
+             AND name = 'idx_einsatz_vorlage_schichtmodell'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        let index = index.expect("Teilindex angelegt");
+        assert!(
+            index.contains("WHERE schichtmodell_id IS NOT NULL"),
+            "{index}"
+        );
+
+        let modell: i64 = sqlx::query_scalar(
+            "INSERT INTO schichtmodell (org_id, bezeichnung, typ, rhythmus_minuten) \
+             VALUES (1, '12-h-Schicht', 'rhythmus', 720) RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_vorlage SET schichtmodell_id = ? WHERE id = ?")
+            .bind(modell)
+            .bind(vorlage)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM schichtmodell WHERE id = ?")
+            .bind(modell)
+            .execute(&pool)
+            .await
+            .expect_err("ein verwiesenes Modell lässt sich nicht still löschen");
+        sqlx::query("DELETE FROM einsatz_vorlage WHERE id = ?")
+            .bind(vorlage)
+            .execute(&pool)
+            .await
+            .expect("die Vorlage fällt ohne Rücksicht auf das Modell");
+    }
 }

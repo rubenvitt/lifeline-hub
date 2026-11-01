@@ -1366,6 +1366,58 @@ async fn schichtmodell_wird_angelegt_und_markiert_oder_mitbenutzt() {
     assert!(!modelle[0].ist_demo, "mitbenutzt → keine Marke");
 }
 
+/// LLH-1313 (Spec `einsatz-vorlagen`, „Demo-Modell in echter Vorlage“): zeigt eine eigene
+/// Einsatz-Vorlage auf das Demo-Modell, bleibt es beim Entfernen stehen (Fremdschlüssel ohne
+/// ON-DELETE-Aktion), und die Vorlage zeigt weiter darauf. Ohne Verweis fällt es.
+#[tokio::test]
+async fn einsatz_vorlage_haelt_das_demo_schichtmodell() {
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+    let vorlage: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_vorlage (org_id, bezeichnung, schichtmodell_id) \
+         VALUES (?, 'Unwetter', ?) RETURNING id",
+    )
+    .bind(a.org)
+    .bind(erg.schichtmodell)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let bericht = entfernen(&pool, a.org).await;
+
+    assert_eq!(
+        entfernt_behalten(&bericht, DemoStammdatenArt::Schichtmodell),
+        (0, 1),
+        "das Modell der eigenen Vorlage bleibt"
+    );
+    let verweis: Option<i64> =
+        sqlx::query_scalar("SELECT schichtmodell_id FROM einsatz_vorlage WHERE id = ?")
+            .bind(vorlage)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        verweis,
+        Some(erg.schichtmodell),
+        "die Vorlage zeigt weiter darauf"
+    );
+
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+    let bericht = entfernen(&pool, a.org).await;
+    assert_eq!(
+        entfernt_behalten(&bericht, DemoStammdatenArt::Schichtmodell),
+        (1, 0),
+        "ohne Verweis fällt das Demo-Modell"
+    );
+}
+
 /// LLH-1261: Material-Positionen folgen derselben Regel wie Fahrzeuge. Die Demo-Vorlage nimmt ihre
 /// Positionen per Kaskade mit; ein Demo-Material, auf das eine eigene Vorlage verweist, bleibt.
 #[tokio::test]
