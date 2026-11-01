@@ -133,4 +133,16 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
     await geraetKontoBestaetigt(NEU, geraet());
     expect(geraetKontenLesen().map((k) => k.benutzer_id)).toEqual([NEU]);
   });
+
+  it('behält jedes Konto mit Zeilen, auch über zehn Kopplungen hinaus', async () => {
+    await geraetKontoBestaetigt(100, geraet({ stelle_id: 100 }));
+    await schreibaktionEinreihen(100, 7, sichtung('aeltestes'));
+    for (let id = 101; id <= 112; id++) {
+      await geraetKontoBestaetigt(id, geraet({ stelle_id: id }));
+      await schreibaktionEinreihen(id, 7, sichtung(`k-${id}`));
+    }
+    await geraetKontoBestaetigt(NEU, geraet({ stelle_id: 999 }));
+    expect(await fruehereKopplungZaehlen(NEU)).toBe(13);
+    expect(geraetKontenLesen().map((k) => k.benutzer_id)).toContain(100);
+  });
 });

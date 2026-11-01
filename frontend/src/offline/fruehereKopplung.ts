@@ -18,9 +18,9 @@ import {
   queueKontenZaehlen,
 } from './queue';
 
+/** Ohne Obergrenze: ein Konto fällt erst weg, wenn es keine Zeilen mehr hat (Aufräumen in
+ *  {@link geraetKontoBestaetigt}); eine Kürzung ließe Zeilen unsichtbar zurück. */
 const SCHLUESSEL = 'lifeline-hub.geraet-konten';
-/** Mehr Kopplungen hat ein Tablet in einem Einsatz kaum; ältere ohne Zeilen fallen ohnehin weg. */
-const HOECHSTENS = 10;
 
 export interface GeraetKonto {
   benutzer_id: number;
@@ -54,7 +54,7 @@ export function geraetKontenLesen(): GeraetKonto[] {
 
 function schreiben(konten: GeraetKonto[]): void {
   // Gesperrter Speicher (privater Modus): keine Übernahme, die Zeilen bleiben wie vor LLH-1331.
-  sicherSchreiben(SCHLUESSEL, JSON.stringify(konten.slice(0, HOECHSTENS)));
+  sicherSchreiben(SCHLUESSEL, JSON.stringify(konten));
 }
 
 /** Gleicher Einsatz, gleiche Ansicht, gleiche Stelle (D3). */
