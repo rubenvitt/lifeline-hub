@@ -331,8 +331,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   den Grund auf.
 - **Gesperrt trägt die Sperre ohne Farbe** (LLH-1233): gesperrte antd-Knöpfe und -Felder haben
   einen gestrichelten Rand in `steuer-rahmen`, randlose Einträge (Menü, Auswahlliste, antds
-  `Segmented`) eine Strichlinie nach innen (`index.css`). Gestrichelt heißt nur gesperrt: die
-  Knopfvariante `dashed` ist gesperrt (`theme/gesperrtZeichen.guard.test.ts`).
+  `Segmented`, eigene `Segmentleiste`) eine Strichlinie nach innen (`index.css`, `sprache.css`).
+  Gestrichelt heißt nur gesperrt: die Knopfvariante `dashed` ist gesperrt
+  (`theme/gesperrtZeichen.guard.test.ts`).
 
 ## Farbe und Zeichen
 
