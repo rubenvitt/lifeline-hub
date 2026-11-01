@@ -364,12 +364,19 @@ export default function UeberblickPage() {
     queryFn: () => listeEinheitenPerioden(einsatzId),
     enabled: ohneSchichtFrei,
   });
+  // Nur ein erfolgreicher Abruf zählt (wie bei den Rückmeldungen): react-query behält `data` nach
+  // einem gescheiterten Neuabruf, der Sprung nennte sonst eine veraltete Zahl.
+  const ohneSchichtQuellenFehler = einheitenQ.isError || periodenQ.isError || abloesungenQ.isError;
   const ohneSchichtZahl = useMemo(
     () =>
-      ohneSchichtFrei && einheitenQ.data && periodenQ.data && abloesungenQ.data
+      ohneSchichtFrei &&
+      !ohneSchichtQuellenFehler &&
+      einheitenQ.data &&
+      periodenQ.data &&
+      abloesungenQ.data
         ? findOhneSchicht(einheitenQ.data, periodenQ.data, abloesungenQ.data).length
         : null,
-    [ohneSchichtFrei, einheitenQ.data, periodenQ.data, abloesungenQ.data],
+    [ohneSchichtFrei, ohneSchichtQuellenFehler, einheitenQ.data, periodenQ.data, abloesungenQ.data],
   );
   const etbQ = useQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),

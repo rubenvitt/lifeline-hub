@@ -13,6 +13,7 @@ import type { ModulFreigabe } from '../../api/types';
 import { leseZuletztModule } from '../../einsatz/zuletztModule';
 import { GLIEDERUNG_KLASSE } from '../../components/instrument';
 import UeberblickPage from './UeberblickPage';
+import { einsatzKeys } from '../../api/queryKeys';
 
 dayjs.extend(utc);
 
@@ -850,6 +851,31 @@ describe('UeberblickPage', () => {
     const sprung = await within(ab).findByRole('link', { name: '1 ohne Schicht' });
     expect(sprung).toHaveAttribute('href', '/einsaetze/1/abloesung?ansicht=ohne-schicht');
     expect(abschnittZahl('Ablösungen')).toHaveTextContent(/^0$/);
+  });
+
+  it('„n ohne Schicht“ verschwindet, wenn ein Neuabruf scheitert, statt die alte Zahl zu nennen', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/einheiten/zeitachse', () =>
+        HttpResponse.json([
+          {
+            einheit_id: 10,
+            perioden: [{ anker: 'alarmierung', beginn_at: vor(60), eintreffen_at: vor(30) }],
+          },
+        ]),
+      ),
+    ]);
+    const { client } = rendern();
+    await waitFor(() => vorgaenge());
+    await within(abschnitt('Ablösungen')).findByRole('link', { name: '1 ohne Schicht' });
+    server.use(
+      http.get('/api/einsaetze/1/einheiten/zeitachse', () =>
+        HttpResponse.json({ fehler: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    await act(() => client.refetchQueries({ queryKey: einsatzKeys.kraefteZeitachseEinheiten(1) }));
+    await waitFor(() =>
+      expect(abschnitt('Ablösungen').querySelector('[data-lfh="vorgang-ohne-schicht"]')).toBeNull(),
+    );
   });
 
   describe('Offene Vorgänge · meine Stelle (LLH-1145 D5)', () => {
