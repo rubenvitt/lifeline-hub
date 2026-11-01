@@ -105,7 +105,7 @@ test.describe(KAPITEL, () => {
     await ortVorschau;
     await expect(page.getByText('Ort wird ermittelt …')).toHaveCount(0);
     await fotografiere(page, KAPITEL, 'lagemeldungen');
-    // Ablauf weiter: suchen, Zeitfenster, Ort, Sprung zur Quellmeldung.
+    // Ablauf weiter: suchen, Ort, Herkunft, Sprung zur Quellmeldung.
     const suche = page.getByPlaceholder('Meldungstext, Absender oder Nr.');
     await suche.fill('Kellerabgang');
     await expect(eintraege).toHaveCount(1);

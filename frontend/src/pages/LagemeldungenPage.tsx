@@ -1,7 +1,7 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -44,28 +44,23 @@ import LageAngabenBearbeiten from '../meldungen/LageAngabenBearbeiten';
 import { MELDUNGSART_LABEL } from '../meldungen/meldungKennzahlen';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { useOhneVerbindung } from '../offline/verbindung';
-import { meldungenPfad } from '../routing/deeplinks';
+import { lagemeldungenPfad, meldungenPfad, parseLageZeitraum } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
 import {
   LEERER_FILTER,
-  ZEITFENSTER,
   filterAktiv,
   filtereLagemeldungen,
   gruppiereNachTag,
   type Herkunftsfilter,
   type LageFilter,
   type Ortsfilter,
-  type Zeitfenster,
   uebergabeZeit,
 } from '../lagemeldungen/zeitachse';
+import ZeitraumWahl, { type ZeitraumGrenzen } from '../anzeige/ZeitraumWahl';
+import { useLetzteLagebesprechung } from '../lagebesprechung/useLetzteLagebesprechung';
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
-
-const FENSTER_OPTIONEN: SegmentOption<Zeitfenster | 'alle'>[] = [
-  { wert: 'alle', label: 'Alle' },
-  ...ZEITFENSTER.map((z) => ({ wert: z.value, label: z.text })),
-];
 
 const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
   { wert: 'alle', label: 'Alle Orte' },
@@ -88,15 +83,18 @@ const HERKUNFT_OPTIONEN: SegmentOption<Herkunftsfilter>[] = [
  * braucht Zeit · Typkante · Text · Herkunft · Ort — das trägt der Baustein `Zeitachseneintrag`,
  * nicht der Kartenplan (Titel + drei Sekundärfelder).
  *
- * - Zeit, Tag, Zeitfenster und Ordnung sind die Ereigniszeit der Quellmeldung (`ereigniszeit`),
+ * - Zeit, Tag, Zeitraum und Ordnung sind die Ereigniszeit der Quellmeldung (`ereigniszeit`),
  *   nicht die Übergabe (LLH-1039); die Übernahme steht als „übernommen …“ im Meta
  *   (`uebergabeZeit`).
  * - Tagesgruppen jüngster Tag zuerst, Tagesgrenze in der Anzeigezone (`lagemeldungen/zeitachse.ts`,
  *   `gruppiereNachTag` über `tagesSchluessel`/`tagesEtikett`). In der Gruppe genügt die Uhrzeit (`uhrzeit`) —
  *   der Tag steht im Kopf; „gesehen“ trägt den Tag nur, wenn er ein anderer ist.
  * - Rückweg zur Quellmeldung über `meldungenPfad`, im Meta der Zeile.
- * - Filterachsen (Zeitfenster, Koordinaten, Herkunft, Freitext) als Filterleiste über der Achse,
- *   Prädikate in `filtereLagemeldungen`.
+ * - Filterachsen (Zeitraum, Koordinaten, Herkunft, Freitext) als Filterleiste über der Achse,
+ *   Prädikate in `filtereLagemeldungen`. Der Zeitraum ist dieselbe Schnellwahl wie im ETB
+ *   (`anzeige/ZeitraumWahl.tsx`, LLH-1322): absolute, minutengenaue Grenzen in der Adresse
+ *   (`lagemeldungenPfad`), „Seit letzter Lagebesprechung“ mit derselben Freigabe
+ *   (`useLetzteLagebesprechung`). Die übrigen Filter bleiben im Zustand der Seite.
  * - „Lagemeldung erfassen“ öffnet über der Achse das Meldungsformular mit der Art Lagemeldung
  *   (`artVorgabe`) und schließt nach dem Erfassen; gesendet wie im Meldungseingang
  *   (`erfasseMeldungOfflineFaehig`). Ohne Schreibrecht im Einsatz oder ohne Modul Meldungen steht
@@ -125,7 +123,24 @@ export default function LagemeldungenPage() {
   const { token, rollen } = useRollen();
   const queryClient = useQueryClient();
   const ohneVerbindung = useOhneVerbindung();
-  const [filter, setFilter] = useState<LageFilter>(LEERER_FILTER);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  // Über den Query-String, nicht das Objekt: react-router gibt bei jeder Navigation ein neues.
+  const adresse = searchParams.toString();
+  const zeitraum = useMemo(() => parseLageZeitraum(new URLSearchParams(adresse)), [adresse]);
+  const [uebrige, setFilter] = useState<LageFilter>(LEERER_FILTER);
+  const filter = useMemo<LageFilter>(
+    () => ({ ...uebrige, von: zeitraum.von, bis: zeitraum.bis }),
+    [uebrige, zeitraum],
+  );
+  const letzteLb = useLetzteLagebesprechung(einsatzId).von;
+  // `replace` wie im ETB: eine Wahl ist ein Filterstand, kein Verlaufsschritt.
+  const zeitraumWaehlen = (g: ZeitraumGrenzen) =>
+    navigate(lagemeldungenPfad(einsatzId, g), { replace: true });
+  const filterZuruecksetzen = () => {
+    setFilter(LEERER_FILTER);
+    zeitraumWaehlen({ von: undefined, bis: undefined });
+  };
   const [formOffen, setFormOffen] = useState(false);
   // Die Zeile, deren Lage-Angaben gerade bearbeitet werden (Kennung der Meldung).
   const [bearbeitetId, setBearbeitetId] = useState<number | null>(null);
@@ -214,10 +229,7 @@ export default function LagemeldungenPage() {
   }, [einsatzId, leere, alleGesehenReset]);
 
   const eintraege = useMemo(() => lageQuery.data ?? [], [lageQuery.data]);
-  const angezeigt = useMemo(
-    () => filtereLagemeldungen(eintraege, filter, konventionen),
-    [eintraege, filter, konventionen],
-  );
+  const angezeigt = useMemo(() => filtereLagemeldungen(eintraege, filter), [eintraege, filter]);
   const gruppen = useMemo(
     () => gruppiereNachTag(angezeigt, konventionen),
     [angezeigt, konventionen],
@@ -384,7 +396,7 @@ export default function LagemeldungenPage() {
     inhalt = (
       <SeitenLeer
         titel="Keine Lagemeldung passt zum Filter"
-        aktion={{ label: 'Filter zurücksetzen', onClick: () => setFilter(LEERER_FILTER) }}
+        aktion={{ label: 'Filter zurücksetzen', onClick: filterZuruecksetzen }}
       />
     );
   } else {
@@ -515,11 +527,12 @@ export default function LagemeldungenPage() {
             onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
             style={{ flex: '1 1 220px', maxWidth: 360 }}
           />
-          <Segmentleiste
-            beschriftung="Zeitfenster"
-            optionen={FENSTER_OPTIONEN}
-            wert={filter.fenster}
-            onWechsel={(fenster) => setFilter((f) => ({ ...f, fenster }))}
+          <ZeitraumWahl
+            von={filter.von}
+            bis={filter.bis}
+            letzteLb={letzteLb}
+            onWahl={zeitraumWaehlen}
+            kennung="lagemeldungen-zeitraum"
           />
           <Segmentleiste
             beschriftung="Ort"

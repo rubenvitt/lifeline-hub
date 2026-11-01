@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest';
 import type { Abloesung, EinheitPerioden } from '../api/types';
 import { findOhneSchicht, ohneSchichtZuflussText, type EinheitKurz } from './ohneSchicht';
 
-const einheit = (id: number, name: string, abschnitt_name: string | null = null): EinheitKurz => ({
+const einheit = (
+  id: number,
+  name: string,
+  abschnitt_name: string | null = null,
+  ueber_einheit_id: number | null = null,
+): EinheitKurz => ({
   id,
   name,
   abschnitt_name,
+  ueber_einheit_id,
 });
 
 const offen = (einheit_id: number, beginn_at: string, eintreffen_at?: string): EinheitPerioden => ({
@@ -161,6 +167,63 @@ describe('findOhneSchicht (LLH-1128)', () => {
       ['Florian 2', 'Florian 1'],
       ['Florian 3', 'Florian 1'],
     ]);
+  });
+
+  it('Untereinheiten eines geplanten Verbands gelten als geplant, über die ganze Kette (LLH-1311)', () => {
+    const ergebnis = findOhneSchicht(
+      [
+        einheit(1, 'Florian 1'),
+        einheit(2, 'Zug 2'),
+        einheit(3, '1. Trupp', null, 2),
+        einheit(4, 'Melder', null, 3),
+        einheit(5, 'Florian 5'),
+      ],
+      [
+        offen(2, '2026-10-17 10:00:00'),
+        offen(3, '2026-10-17 10:01:00'),
+        offen(4, '2026-10-17 10:02:00'),
+        offen(5, '2026-10-17 10:03:00'),
+      ],
+      [
+        schicht({
+          einheit_id: 1,
+          einheit_name: 'Florian 1',
+          abloeser: [{ einheit_id: 2, einheit_name: 'Zug 2' }],
+        }),
+      ],
+    );
+    expect(ergebnis.map((e) => [e.einheit_name, e.abloeser_fuer])).toEqual([
+      ['Zug 2', 'Florian 1'],
+      ['1. Trupp', 'Florian 1'],
+      ['Melder', 'Florian 1'],
+      ['Florian 5', null],
+    ]);
+  });
+
+  it('die eigene Planung geht der des Verbands vor (LLH-1311)', () => {
+    const ergebnis = findOhneSchicht(
+      [
+        einheit(1, 'Florian 1'),
+        einheit(2, 'Zug 2'),
+        einheit(3, '1. Trupp', null, 2),
+        einheit(9, 'Florian 9'),
+      ],
+      [offen(3, '2026-10-17 10:00:00')],
+      [
+        schicht({ einheit_id: 1, einheit_name: 'Florian 1', abloesende_einheit_id: 2 }),
+        schicht({ einheit_id: 9, einheit_name: 'Florian 9', abloesende_einheit_id: 3 }),
+      ],
+    );
+    expect(ergebnis.map((e) => e.abloeser_fuer)).toEqual(['Florian 9']);
+  });
+
+  it('ein Zyklus in der Gliederung endet ohne Planung (LLH-1311)', () => {
+    const ergebnis = findOhneSchicht(
+      [einheit(1, 'A', null, 2), einheit(2, 'B', null, 1)],
+      [offen(1, '2026-10-17 10:00:00')],
+      [],
+    );
+    expect(ergebnis.map((e) => [e.einheit_name, e.abloeser_fuer])).toEqual([['A', null]]);
   });
 
   it('nur Einheiten der Liste: eine aufgelöste mit offener Periode fehlt', () => {
