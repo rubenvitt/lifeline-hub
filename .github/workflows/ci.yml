@@ -387,7 +387,9 @@ jobs:
       # „Could not get lock“. `install-deps` reicht apt keine Optionen durch, daher Sperr-Wartezeit
       # und Netz-Fristen als apt-Konfiguration. 15 min je Versuch, weil ein Lauf ohne Paket-Cache
       # am langsamen Spiegel schon 24 min brauchte (s. o.); was ein abgebrochener Versuch geladen
-      # hat, bleibt im Archiv. Die Browser lädt der Runner-Nutzer, damit sie in seinem Cache liegen.
+      # hat, bleibt im Archiv. Die Browser lädt der Runner-Nutzer, damit sie in seinem Cache liegen;
+      # meist kommen sie aus dem Cache, daher 5 min je Versuch. So endet der Schritt auch im
+      # schlimmsten Fall (3 × 15 + 3 × 5 min) mit eigenem Grund vor dem Job-Timeout von 75 min.
       - name: Playwright-Browser (Chromium, Firefox, WebKit)
         if: env.E2E != 'false'
         run: |
@@ -398,7 +400,7 @@ jobs:
           sudo env "WIEDERHOLEN_PAUSE_SEK=15" ./scripts/wiederholen.sh 3 900 -- \
             sh -c 'dpkg --configure -a && "$0" frontend/node_modules/@playwright/test/cli.js install-deps chromium firefox webkit' \
             "$node_bin"
-          ./scripts/wiederholen.sh 3 900 -- \
+          ./scripts/wiederholen.sh 3 300 -- \
             mise exec -- pnpm -C frontend exec playwright install chromium firefox webkit
           # Für den Cache (s. o.): was apt-get geladen hat, liegt danach in seinem Archiv.
           if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then
