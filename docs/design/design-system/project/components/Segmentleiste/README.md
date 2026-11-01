@@ -19,6 +19,12 @@ BEDIENZIEL: jedes Segment ist ein `<button>` ohne antd-Höhe und trägt die ZWEI
 LFH-365 (`segmentStil`). Die Staffel 30 / 48 / 72 gilt, nicht die Entwurfsskizze — als
 Mindesthöhe und Mindestbreite (LLH-1224), das Wort steht mittig.
 
+WORTLAUT: einzeilig. Ein Zeilenumbruch (`\n`) im `label` ist erlaubt und bricht dort
+(`white-space: pre-line` an `.lfh-segment`), mittig in zwei Zeilen. Nur wo die Höhe zwei
+Zeilen trägt und einzeilig neben den übrigen Segmenten kein Platz bliebe, etwa
+„Ohne\nSchicht“ der Ablösung im Handschuh-Betrieb auf dem Handschirm (72 px, LLH-1128). Der
+zugängliche Name bleibt „Ohne Schicht“; wo Platz ist, steht derselbe Wortlaut ohne Umbruch.
+
 ZIELABSTAND (LFH-865, Muster LFH-630, Bedien-Leitlinie Kriterium 2): die Fuge bleibt 1 px,
 und jedes Segment steht in einer eigenen Rasterzelle (`data-lfh="segment-zelle"`, Grund
 `flaeche`), in der es um `zielEinzug` (0 / 4 / 8 px) von jedem Rand abrückt — auch oben
