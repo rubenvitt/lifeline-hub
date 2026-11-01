@@ -19,6 +19,7 @@ const schicht = (over: Partial<Abloesung> & { id: number; einheit_id: number }):
   art: 'einheit',
   besatzung: [],
   verbleib: 'ruhe' as const,
+  beginn_quelle: 'hand' as const,
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: '2026-10-17 06:00:00',

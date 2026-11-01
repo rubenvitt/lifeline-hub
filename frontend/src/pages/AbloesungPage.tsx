@@ -1,8 +1,8 @@
 import { IconStift } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useLinkClickHandler, useParams } from 'react-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useLinkClickHandler, useParams, useSearchParams } from 'react-router';
 import {
   aendereSchicht,
   beginneSchicht,
@@ -80,7 +80,11 @@ import {
   MODUL_PERSONAL_GESPERRT,
 } from '../components/nurAnsicht';
 import { abschnittVorgabe, einsatzVorgabe } from '../components/vorgabeText';
-import { einsatzEinstellungenPfad } from '../routing/deeplinks';
+import {
+  einsatzEinstellungenPfad,
+  parseAbloesungAnsicht,
+  type AbloesungAnsicht,
+} from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
 const { Text } = Typography;
@@ -92,9 +96,10 @@ const abloesungRechteText = einsatzRechteGrund;
  * Die Ansichten der Seite (LLH-1128): laufende Schichten, Einheiten im Einsatz ohne Schicht und
  * die vergangenen Schichten. „Vergangen“ teilt sich in abgelöste und beendete; ein eigenes
  * Segment je Status trüge die Werkzeugzeile auf 390 px im Handschuh-Betrieb nicht neben dem
- * Sammelbanner (gemessen in `e2e/gate1-ueberlauf.spec.ts`).
+ * Sammelbanner (gemessen in `e2e/gate1-ueberlauf.spec.ts`). Die Ansicht steht in der Adresse
+ * (`?ansicht=`, LLH-1312), der Status unter „Vergangen“ nur im State.
  */
-type Ansicht = 'laufend' | 'ohne' | 'vergangen';
+type Ansicht = AbloesungAnsicht;
 type Vergangen = 'abgeloest' | 'beendet';
 
 type Rhythmusziel =
@@ -156,6 +161,10 @@ const BEREICH: Record<AbloesungStatus, string> = {
  * {@link SCHICHT_HERVORHEBUNG_MS} lang hervor; der Parameter wird geräumt. Steht die Schicht nicht
  * unter den laufenden, sucht die Seite sie unter den abgelösten und beendeten; eine unbekannte
  * Kennung ändert nichts.
+ *
+ * Die Ansicht ist Zustand der Adresse (LLH-1312, Muster `funkplanPfad`): `?ansicht=ohne-schicht`
+ * bzw. `?ansicht=vergangen`, „Laufend“ ohne Parameter, geschrieben mit `replace`. So springen
+ * Überblick und Sprungpalette direkt auf „Ohne Schicht“, und Browser-Zurück trifft die Ansicht.
  */
 const BR_NICHT_GELADEN = 'Bereitstellungsräume konnten nicht geladen werden';
 
@@ -169,7 +178,30 @@ export default function AbloesungPage() {
   const jetzt = useUhr();
   const { istSchmal } = useViewport();
 
-  const [ansicht, setAnsicht] = useState<Ansicht>('laufend');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ansicht: Ansicht = parseAbloesungAnsicht(searchParams) ?? 'laufend';
+  const setAnsicht = useCallback(
+    (a: Ansicht) =>
+      setSearchParams(
+        (p) => {
+          const n = new URLSearchParams(p);
+          if (a === 'laufend') n.delete('ansicht');
+          else n.set('ansicht', a);
+          return n;
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  );
+  // Ein Sprung `?schicht=` wählt die Ansicht erst, wenn sein Parameter geräumt ist: das Räumen
+  // (`useQueryParamSelektion`) schreibt die Adresse aus demselben Stand und überschriebe sonst
+  // die gewählte Ansicht.
+  const [sprungAnsicht, setSprungAnsicht] = useState<Ansicht | null>(null);
+  useEffect(() => {
+    if (sprungAnsicht == null || searchParams.has('schicht')) return;
+    if (sprungAnsicht !== ansicht) setAnsicht(sprungAnsicht);
+    setSprungAnsicht(null);
+  }, [sprungAnsicht, searchParams, ansicht, setAnsicht]);
   const [vergangen, setVergangen] = useState<Vergangen>('abgeloest');
   const [beginnenOffen, setBeginnenOffen] = useState(false);
   // Aus einer Zeile „Ohne Schicht“: die Einheit steht im Dialog schon gewählt.
@@ -409,7 +441,7 @@ export default function AbloesungPage() {
     if (laufende.some((x) => x.id === id)) {
       gibFrei();
       gibOhneFrei();
-      setAnsicht('laufend');
+      setSprungAnsicht('laufend');
       springeZu(id);
     } else {
       setSucheSchicht(id);
@@ -429,7 +461,7 @@ export default function AbloesungPage() {
         ? 'beendet'
         : null;
     if (status) {
-      setAnsicht('vergangen');
+      setSprungAnsicht('vergangen');
       setVergangen(status);
       setHervorhebung({ id: sucheSchicht });
       setScrollZiel(sucheSchicht);
@@ -635,7 +667,7 @@ export default function AbloesungPage() {
   const einsatz = einsatzQuery.data;
   const faellig = countFaellige(laufende, jetzt);
   // Ist „Ohne Schicht“ gesperrt, gilt die Ansicht nicht, auch wenn die Sperre erst später kam.
-  const wirksam: Ansicht = ansicht === 'ohne' && einheitenGesperrt ? 'laufend' : ansicht;
+  const wirksam: Ansicht = ansicht === 'ohne-schicht' && einheitenGesperrt ? 'laufend' : ansicht;
   const vergangenQuery = vergangen === 'abgeloest' ? abgeloestQuery : beendetQuery;
   const listenArt = wirksam === 'laufend' ? 'laufend' : vergangen;
   const listenQuery = wirksam === 'laufend' ? laufendQuery : vergangenQuery;
@@ -649,7 +681,7 @@ export default function AbloesungPage() {
           kurz: sammelbannerKurz(zurueckgehalten.length, umgeordnet),
           onKlick: gibFrei,
         }
-      : wirksam === 'ohne'
+      : wirksam === 'ohne-schicht'
         ? {
             zeigen: ohneGeteilt.zurueckgehalten.length > 0 || ohneGeteilt.umgeordnet,
             text: ohneSchichtZuflussText(
@@ -732,7 +764,7 @@ export default function AbloesungPage() {
           optionen={[
             { wert: 'laufend', label: `Laufend${segmentZahl(laufende.length)}` },
             {
-              wert: 'ohne',
+              wert: 'ohne-schicht',
               label: `${ohneWort}${segmentZahl(ohneZahl)}`,
               gesperrt: einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined,
             },
@@ -775,7 +807,7 @@ export default function AbloesungPage() {
         />
       )}
 
-      {wirksam === 'ohne' ? (
+      {wirksam === 'ohne-schicht' ? (
         <>
           {ohneFehler && (
             <Alert

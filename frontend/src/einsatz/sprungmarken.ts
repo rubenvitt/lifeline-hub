@@ -1,4 +1,5 @@
 import {
+  abloesungPfad,
   etbPfad,
   fahrzeugePfad,
   funkplanPfad,
@@ -169,6 +170,18 @@ export const sprungmarken: Sprungmarke[] = [
     hinweis: 'Fahrzeuge · FMS-Tableau',
     schlagworte: ['fms', 'status', 'statustableau', 'fahrzeugstatus'],
     pfad: (einsatzId) => fahrzeugePfad(einsatzId, { ansicht: 'tableau' }),
+  },
+  {
+    // Einheiten im Einsatz ohne Schicht (LLH-1312): die Ansicht der Seite Ablösung, die in der
+    // Anlaufphase zählt. Ohne Freigabe des Moduls Einheiten zeigt die Seite „Laufend“.
+    key: 'ohne-schicht',
+    kategorie: 'kraefte',
+    label: 'Ohne Schicht',
+    zielModul: 'abloesung',
+    nach: 'abloesung',
+    hinweis: 'Ablösung · Ohne Schicht',
+    schlagworte: ['ohne schicht', 'schicht beginnen', 'anlaufphase', 'eingetroffen'],
+    pfad: (einsatzId) => abloesungPfad(einsatzId, { ansicht: 'ohne-schicht' }),
   },
   ...stabMarken(),
   ...FERNMELDEWESEN_MARKEN,

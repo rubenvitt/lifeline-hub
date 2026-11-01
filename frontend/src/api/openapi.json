@@ -100,6 +100,7 @@
           "einheit_id",
           "einheit_name",
           "beginn_at",
+          "beginn_quelle",
           "rhythmus_minuten",
           "rhythmus_quelle",
           "faellig_at",
@@ -189,6 +190,10 @@
           },
           "beginn_at": {
             "type": "string"
+          },
+          "beginn_quelle": {
+            "$ref": "#/components/schemas/BeginnQuelle",
+            "description": "Wie die Schicht begann (LLH-1312): von Hand, mit dem Eintreffen oder als Folgeschicht."
           },
           "besatzung": {
             "type": "array",
@@ -2415,6 +2420,15 @@
           "befehl_ladef",
           "befehl_schnee",
           "befehl_ea_zmw"
+        ]
+      },
+      "BeginnQuelle": {
+        "type": "string",
+        "description": "Wie eine Schicht begann (`einsatz_abloesung.beginn_quelle`, LLH-1312). Geschrieben beim\nAnlegen; ein geänderter Beginn macht aus `eintreffen` ein `hand`, eine Folgeschicht bleibt\n`vollzug`. Wire == `as_str()`.",
+        "enum": [
+          "hand",
+          "eintreffen",
+          "vollzug"
         ]
       },
       "BelegungAnzeige": {

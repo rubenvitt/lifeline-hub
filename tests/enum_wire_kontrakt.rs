@@ -1090,6 +1090,16 @@ fn abloesung_verbleib_wire() {
     } in lifeline_hub::abloesung::AbloesungVerbleib::ALLE);
 }
 
+/// Herkunft des Beginns einer Schicht (LLH-1312, `migrations/0262_abloesung_beginn_quelle.sql`).
+#[test]
+fn abloesung_beginn_quelle_wire() {
+    enum_wire!(lifeline_hub::abloesung::BeginnQuelle {
+        Hand => "hand",
+        Eintreffen => "eintreffen",
+        Vollzug => "vollzug",
+    } in lifeline_hub::abloesung::BeginnQuelle::ALLE);
+}
+
 /// `einsatz` seit LLH-1122 (Neubau in `migrations/0212_schichtmodell.sql`).
 #[test]
 fn abloesung_rhythmus_quelle_wire() {

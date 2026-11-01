@@ -302,6 +302,8 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     // Laufende Schichten; die Modul-Freigaben (Sichtbarkeit der Ablösung) liefert der
     // MSW-Default: alles frei.
     http.get('/api/einsaetze/1/abloesungen', json([])),
+    // Perioden der Einheiten für „n ohne Schicht ↗“ (LLH-1312): ohne offene Periode keine.
+    http.get('/api/einsaetze/1/einheiten/zeitachse', json([])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
       // Die Seite fragt NUR Entscheidungen ab — ein Abruf ohne Filter wäre ein Fehler.
@@ -799,6 +801,8 @@ describe('UeberblickPage', () => {
       faellig_at,
       status: 'laufend',
       ruecknehmbar: false,
+      erbende_einheiten: [],
+      abloeser: [],
       angelegt_at: vor(300),
     });
     stelleBereit(volleDaten, [
@@ -825,6 +829,27 @@ describe('UeberblickPage', () => {
     expect(zeilen[0]).toHaveTextContent('überfällig');
     expect(zeilen[1]).toHaveTextContent('bald fällig');
     expect(abschnittZahl('Ablösungen')).toHaveTextContent(/^2$/);
+    // Ohne Einheit mit offener Periode kein Sprung „ohne Schicht“.
+    expect(ab.querySelector('[data-lfh="vorgang-ohne-schicht"]')).toBeNull();
+  });
+
+  it('Offene Vorgänge · Ablösungen: „1 ohne Schicht ↗“ springt auf die Ansicht, die Zahl bleibt die der fälligen (LLH-1312)', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/einheiten/zeitachse', () =>
+        HttpResponse.json([
+          {
+            einheit_id: 10,
+            perioden: [{ anker: 'alarmierung', beginn_at: vor(60), eintreffen_at: vor(30) }],
+          },
+        ]),
+      ),
+    ]);
+    rendern();
+    await waitFor(() => vorgaenge());
+    const ab = abschnitt('Ablösungen');
+    const sprung = await within(ab).findByRole('link', { name: '1 ohne Schicht' });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/abloesung?ansicht=ohne-schicht');
+    expect(abschnittZahl('Ablösungen')).toHaveTextContent(/^0$/);
   });
 
   describe('Offene Vorgänge · meine Stelle (LLH-1145 D5)', () => {
@@ -1077,6 +1102,8 @@ describe('UeberblickPage', () => {
       faellig_at: nach(60),
       status: 'laufend',
       ruecknehmbar: false,
+      erbende_einheiten: [],
+      abloeser: [],
       angelegt_at: vor(300),
     });
     stelleBereit(volleDaten, [
@@ -1553,6 +1580,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     '/api/einsaetze/1/fahrzeuge',
     '/api/einsaetze/1/material',
     '/api/einsaetze/1/einheiten',
+    '/api/einsaetze/1/einheiten/zeitachse',
     '/api/einsaetze/1/abschnitte',
     '/api/einsaetze/1/gefahrengebiete',
     '/api/einsaetze/1/auftraege',
@@ -1593,6 +1621,15 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   /** Die Zelle einer Kennzahl im Band — mit oder ohne Link. */
   const zelle = (titel: string) =>
     within(band()).getByText(titel).closest('[data-lfh="kennzahl"]') as HTMLElement;
+
+  it('Modul Einheiten gesperrt: keine Anfrage an die Zeitachse, kein Sprung „ohne Schicht“ (LLH-1312)', async () => {
+    const aufrufe = mitFreigaben({ einheiten: { zugriff: false } });
+    rendern();
+    await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
+    await waitFor(() => vorgaenge());
+    expect(aufrufe['/api/einsaetze/1/einheiten/zeitachse']).toBeUndefined();
+    expect(document.querySelector('[data-lfh="vorgang-ohne-schicht"]')).toBeNull();
+  });
 
   it('gesperrte Module: keine Anfrage, „—" mit Grund statt Zahl, kein Fehlerhinweis', async () => {
     const aufrufe = mitFreigaben({

@@ -791,6 +791,8 @@ export type PlanungEntfallenGrund = S['PlanungEntfallenGrund'];
 export type AbloesungArt = S['AbloesungArt'];
 /** Verbleib der abgelösten Einheit nach dem Vollzug (LLH-1308). */
 export type AbloesungVerbleib = S['AbloesungVerbleib'];
+/** Wie eine Schicht begann: von Hand, mit dem Eintreffen oder als Folgeschicht (LLH-1312). */
+export type BeginnQuelle = S['BeginnQuelle'];
 export type AbloesungBesatzung = S['AbloesungBesatzung'];
 export type BesatzungRolle = S['BesatzungRolle'];
 
