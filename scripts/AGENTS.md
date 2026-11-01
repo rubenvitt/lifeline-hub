@@ -76,7 +76,9 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   (`openspec/changes/archive/2026-10-05-lfh-912-gate-dev-seed/design.md`).
 - **Netz-Schritte in Workflows haben eine Frist je Versuch und Wiederholung** (LFH-1101):
   Systempakete nur über `scripts/apt-pakete.sh`, nie `apt-get` direkt; andere Netz-Schritte,
-  die selbst apt rufen (`playwright install --with-deps`), über `scripts/wiederholen.sh`. Ein
+  die selbst apt rufen (`playwright install-deps`), über `scripts/wiederholen.sh`, und zwar
+  `sudo … wiederholen.sh`, nicht umgekehrt: sonst trifft `timeout` nur `sudo`, das apt-get als
+  root lebt weiter und hält den apt-Lock (LLH-1420, LLH-1507). Ein
   hängender Ubuntu-Spiegel hielt sonst jeden Job bis zu seinem Timeout fest, auf allen PRs
   zugleich; apts eigene Zeitgrenzen fangen einen tröpfelnden Spiegel nicht. Selbsttest
   `scripts/wiederholen.test.sh` (Schritt 11).

@@ -380,14 +380,28 @@ jobs:
           fi
       # ALLE DREI in jedem Shard: welcher Shard die Firefox- und WebKit-Fälle bekommt, entscheidet
       # die Verteilung nach Laufzeit, und die verschiebt sich mit jeder aufgefrischten Tabelle.
-      # `--with-deps` ruft apt-get selbst: Frist und Wiederholung wie `scripts/apt-pakete.sh`
-      # (LFH-1101). 15 min je Versuch, weil ein Lauf ohne Paket-Cache am langsamen Spiegel schon
-      # 24 min brauchte (s. o.); was ein abgebrochener Versuch geladen hat, bleibt im Archiv.
+      # Systempakete und Browser getrennt. `install-deps` ruft apt-get: Frist und Wiederholung wie
+      # `scripts/apt-pakete.sh` (LFH-1101), und wie dort läuft die Schleife UNTER `sudo`
+      # (LLH-1420, LLH-1507). Darüber traf `timeout` nur `sudo`; das apt-get als root lud am
+      # hängenden Spiegel weiter, hielt den apt-Lock, und Versuch 2 und 3 endeten sofort mit
+      # „Could not get lock“. `install-deps` reicht apt keine Optionen durch, daher Sperr-Wartezeit
+      # und Netz-Fristen als apt-Konfiguration. 15 min je Versuch, weil ein Lauf ohne Paket-Cache
+      # am langsamen Spiegel schon 24 min brauchte (s. o.); was ein abgebrochener Versuch geladen
+      # hat, bleibt im Archiv. Die Browser lädt der Runner-Nutzer, damit sie in seinem Cache liegen;
+      # meist kommen sie aus dem Cache, daher 5 min je Versuch. So endet der Schritt auch im
+      # schlimmsten Fall (3 × 15 + 3 × 5 min) mit eigenem Grund vor dem Job-Timeout von 75 min.
       - name: Playwright-Browser (Chromium, Firefox, WebKit)
         if: env.E2E != 'false'
         run: |
-          ./scripts/wiederholen.sh 3 900 -- \
-            mise exec -- pnpm -C frontend exec playwright install --with-deps chromium firefox webkit
+          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' \
+            'Acquire::https::Timeout "30";' 'DPkg::Lock::Timeout "120";' |
+            sudo tee /etc/apt/apt.conf.d/99lfh-fristen > /dev/null
+          node_bin="$(mise exec -- node -p 'process.execPath')"
+          sudo env "WIEDERHOLEN_PAUSE_SEK=15" ./scripts/wiederholen.sh 3 900 -- \
+            sh -c 'dpkg --configure -a && "$0" frontend/node_modules/@playwright/test/cli.js install-deps chromium firefox webkit' \
+            "$node_bin"
+          ./scripts/wiederholen.sh 3 300 -- \
+            mise exec -- pnpm -C frontend exec playwright install chromium firefox webkit
           # Für den Cache (s. o.): was apt-get geladen hat, liegt danach in seinem Archiv.
           if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then
             cp /var/cache/apt/archives/*.deb ~/.cache/apt-playwright/
