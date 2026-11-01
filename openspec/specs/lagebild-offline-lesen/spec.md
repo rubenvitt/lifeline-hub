@@ -20,6 +20,8 @@ geräteseitig vorhalten und nach einem Neuladen ohne Netz anzeigen:
 - **Betroffene** mit Personen und Unfallhilfsstellen
 - **Aufträge** mit Aufträgen und Befehlen
 - **Lagekarte** mit den Datenebenen des Einsatzes
+- **Bereitstellungsräume** als Liste mit Status, Standort und Belegung; die Seite eines
+  einzelnen Raums nicht
 - **Kommunikationsplan** mit den gepflegten Stellen und Verbindungen des Fernmeldewesens
 - **Eingänge** mit dem Verlauf der eigenen Benachrichtigungen (Spec `benachrichtigungen`,
   „Verlauf ohne Netz“)
@@ -52,6 +54,18 @@ Person zuvor mit Netz tatsächlich geladen hat.
 
 - **WHEN** eine Person eine Ansicht ohne Netz öffnet, die sie mit Netz nie geladen hat
 - **THEN** zeigt das System keine Daten dieser Ansicht an und erfindet keinen Stand
+
+#### Scenario: Liste der Bereitstellungsräume ohne Netz
+
+- **WHEN** eine Person die Liste der Bereitstellungsräume mit Netz geöffnet hat und ohne Netz
+  neu lädt
+- **THEN** zeigt die Liste die zuletzt geladenen Räume mit Standort und Belegung, und die
+  Lagekarte zeichnet die Ebene „Bereitstellungsräume“ aus diesem Stand
+
+#### Scenario: Seite eines Bereitstellungsraums ohne Netz
+
+- **WHEN** eine Person nach einem Neuladen ohne Netz einen Raum aus der Liste öffnet
+- **THEN** meldet die Seite, dass der Raum nicht geladen werden konnte, und erfindet keinen Stand
 
 #### Scenario: Kommunikationsplan ohne Netz
 
