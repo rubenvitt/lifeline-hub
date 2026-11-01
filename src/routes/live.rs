@@ -257,6 +257,7 @@ pub const STAMMDATEN_PFADE: &[&str] = &[
     "/api/stichwort-vorschlaege",
     "/api/externe-stellen",
     "/api/org-fuehrungsfunktionen",
+    "/api/org-unterkunft-richtwerte",
     "/api/organisation",
 ];
 

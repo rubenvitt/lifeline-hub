@@ -660,6 +660,11 @@ export interface FuehrungsfunktionUpdate {
   aktiv?: boolean;
 }
 
+// ============================== LLH-1520 Unterkunftsrechner ==============================
+export type UnterkunftRichtwerte = S['UnterkunftRichtwerte'];
+export type RichtwertEbenen = S['RichtwertEbenen'];
+export type RichtwertHerkunft = S['RichtwertHerkunft'];
+
 // ============================== LFH-46 Stab (S1–S6) ==============================
 export type Stab = S['StabAnzeige'];
 export type Stabsfunktion = S['StabsfunktionAnzeige'];

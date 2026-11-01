@@ -83,6 +83,7 @@ pub mod system;
 pub mod tier_anhang;
 pub mod uhs_anhang;
 pub mod uhs_plan;
+pub mod unterkunft_richtwerte;
 pub mod verpflegung;
 pub mod verpflegung_vorlage;
 pub mod versionsstand;

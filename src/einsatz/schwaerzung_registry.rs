@@ -1880,6 +1880,20 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_von", G_FK),
         ],
     },
+    // Richtwerte des Unterkunftsrechners je Einsatz (LLH-1520): Zahlen ohne Personenbezug.
+    TabellenRegel {
+        tabelle: "einsatz_unterkunft_richtwert",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("schluessel", G_ENUM),
+            retain("wert", G_KONFIG),
+            retain("geaendert_at", G_ZEIT),
+            retain("geaendert_von", G_FK),
+        ],
+    },
     // Kategorie-Fristen (LFH-749): Aufbewahrungsstruktur, die die Schwärzung überleben muss,
     // damit Archivakte und Zustand sie zeigen.
     TabellenRegel {
@@ -3403,6 +3417,8 @@ mod tests {
             // nicht, ihre Wirkung sind eigene Zeilen in `einsatz_modul_override`.
             "einsatz_vorlage",
             "einsatz_vorlage_modul_aus",
+            // Richtwerte des Unterkunftsrechners je Organisation (LLH-1520): Org-Stammdatum.
+            "org_unterkunft_richtwert",
             "qualifikation",
             "karte_registry",
             // Logo der Organisation: hängt an der Org, nicht am Einsatz. Ein späterer FK Richtung

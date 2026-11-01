@@ -607,6 +607,11 @@ export const einsatzKeys = {
    *  dieselbe Invalidierung, kein Live-Ereignis, kein Personenbezug. */
   aufbewahrungKategorien: (einsatzId: number) =>
     [EINSATZ_KEYS.einstellungen, einsatzId, 'aufbewahrung-kategorien'] as const,
+  /** Richtwerte des Unterkunftsrechners im Einsatz (LLH-1520, design.md D2/D9) — Unter-Key der
+   *  Einstellungen: dieselbe Seite, kein Live-Ereignis, kein Personenbezug, mit dem Prefix im
+   *  Lagebild offline, damit der Rechner ohne Netz mit den wirksamen Werten rechnet. */
+  unterkunftRichtwerte: (einsatzId: number) =>
+    [EINSATZ_KEYS.einstellungen, einsatzId, 'unterkunft-richtwerte'] as const,
   mitglieder: (einsatzId: number) => [EINSATZ_KEYS.mitglieder, einsatzId] as const,
   /** Aufnehmbare Personen der Einsatz-Org (LFH-1141), nur für die Einsatzleitung, nicht live. */
   mitgliedAuswahl: (einsatzId: number) => [EINSATZ_KEYS.mitgliedAuswahl, einsatzId] as const,
@@ -1053,6 +1058,9 @@ export const GLOBAL_KEYS = {
   // Katalog der Führungsfunktionen mit Mandantenlabels (LFH-549). Nicht im Lagebild: gelesen
   // werden Snapshot und Auflösung, die im Auftrag stecken.
   fuehrungsfunktionen: 'fuehrungsfunktionen',
+  // Richtwerte des Unterkunftsrechners je Organisation (LLH-1520). Nicht im Lagebild: im Einsatz
+  // liest der Rechner die Einsatz-Fassung (Unter-Key der Einstellungen), die die Org-Werte trägt.
+  unterkunftRichtwerte: 'unterkunft-richtwerte',
   // Katalog „Schichtmodelle“ (LLH-1122). Nicht im Lagebild: der Einsatz trägt seine Kopie
   // (`einsatz-abloesungen`), und gewählt wird ein Modell nur mit Netz.
   schichtmodelle: 'schichtmodelle',
@@ -1154,6 +1162,7 @@ export const globalKeys = {
   stichwortVorschlaege: () => [GLOBAL_KEYS.stichwortVorschlaege] as const,
   einsatzVorlagen: () => [GLOBAL_KEYS.einsatzVorlagen] as const,
   fuehrungsfunktionen: () => [GLOBAL_KEYS.fuehrungsfunktionen] as const,
+  unterkunftRichtwerte: () => [GLOBAL_KEYS.unterkunftRichtwerte] as const,
   schichtmodelle: () => [GLOBAL_KEYS.schichtmodelle] as const,
 
   // Dienstfilter-Listen: barer Prefix (= Invalidierung beider Fächer) + adressiertes Fach
@@ -1252,6 +1261,7 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.einsatzVorlagen,
     GLOBAL_KEYS.externeStellen,
     GLOBAL_KEYS.fuehrungsfunktionen,
+    GLOBAL_KEYS.unterkunftRichtwerte,
     GLOBAL_KEYS.schichtmodelle,
     GLOBAL_KEYS.organisation,
     // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.

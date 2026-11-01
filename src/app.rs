@@ -329,6 +329,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
         )
         .route(
+            "/api/einsaetze/{id}/unterkunft-richtwerte",
+            get(routes::unterkunft_richtwerte::einsatz_lesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/unterkunft-richtwerte/{schluessel}",
+            put(routes::unterkunft_richtwerte::einsatz_setzen),
+        )
+        .route(
             "/api/einsaetze/{id}/modul-overrides",
             get(routes::einsatz::modul_overrides_laden),
         )
@@ -1735,6 +1743,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/org-fuehrungsfunktionen/{funktion}",
             put(routes::fuehrungsfunktion::setzen),
+        )
+        // Richtwerte des Unterkunftsrechners (LLH-1520, design.md D2).
+        .route(
+            "/api/unterkunft-richtwerte",
+            get(routes::unterkunft_richtwerte::org_lesen),
+        )
+        .route(
+            "/api/org-unterkunft-richtwerte/{schluessel}",
+            put(routes::unterkunft_richtwerte::org_setzen),
         )
         .route(
             "/api/org-modul-einstellungen",

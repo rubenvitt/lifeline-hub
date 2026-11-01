@@ -13961,6 +13961,56 @@
           "extern"
         ]
       },
+      "RichtwertEbenen": {
+        "type": "object",
+        "description": "Ein Richtwert mit allen Ebenen. `org`/`einsatz` sind `null`, wenn die Ebene erbt.",
+        "required": [
+          "schluessel",
+          "basis",
+          "wert",
+          "herkunft"
+        ],
+        "properties": {
+          "basis": {
+            "type": "number",
+            "format": "double"
+          },
+          "einsatz": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "herkunft": {
+            "$ref": "#/components/schemas/RichtwertHerkunft"
+          },
+          "org": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "schluessel": {
+            "type": "string"
+          },
+          "wert": {
+            "type": "number",
+            "format": "double",
+            "description": "Wirksamer Wert: Einsatz vor Organisation vor Basis."
+          }
+        }
+      },
+      "RichtwertHerkunft": {
+        "type": "string",
+        "description": "Woher der wirksame Wert stammt.",
+        "enum": [
+          "basis",
+          "org",
+          "einsatz"
+        ]
+      },
       "RueckmeldungenAnzeige": {
         "type": "object",
         "description": "Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben\nnoch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt\ngebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.",
@@ -16263,6 +16313,25 @@
           "trotzdem_anlegen": {
             "type": "boolean",
             "description": "Neuanlage trotz gleichnamiger Kraft im Einsatz (D9)."
+          }
+        }
+      },
+      "UnterkunftRichtwerte": {
+        "type": "object",
+        "description": "Antwort der Richtwert-Routen: Stand der Basis und alle Schlüssel in der Reihenfolge der Datei.",
+        "required": [
+          "stand",
+          "werte"
+        ],
+        "properties": {
+          "stand": {
+            "type": "string"
+          },
+          "werte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RichtwertEbenen"
+            }
           }
         }
       },
