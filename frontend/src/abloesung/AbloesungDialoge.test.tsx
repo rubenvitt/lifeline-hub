@@ -480,8 +480,8 @@ describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
   } as unknown as Abloesung;
   const einheiten = [{ value: 12, label: 'Florian 2' }];
   const personen = [
-    { value: 21, label: 'Cora Neu' },
-    { value: 22, label: 'Fritz · führt Florian 2', disabled: true },
+    { value: 21, label: 'Cora Neu', name: 'Cora Neu' },
+    { value: 22, label: 'Fritz · führt Florian 2', name: 'Fritz', disabled: true },
   ];
 
   function oeffne(onErfassen = vi.fn().mockResolvedValue(undefined), gesperrt?: string) {
@@ -547,7 +547,7 @@ describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
       expect(onErfassen).toHaveBeenCalledWith({
         vollzogen_at: undefined,
         art: 'besatzung',
-        besatzung_ids: [21],
+        besatzung: [{ personal_id: 21 }],
       }),
     );
   });
@@ -564,6 +564,195 @@ describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith(expect.objectContaining({ abloeser_ids: [12] })),
     );
+  });
+});
+
+/**
+ * LLH-1319: Verteilen und Planen. Das Klappteil „Verteilen“ bietet je gewählter Person die
+ * Einheit samt Erben und deren Fahrzeuge an; sein Kopf nennt die Abweichung. Ein geplanter
+ * Besatzungswechsel belegt Art, Personen und Verteilung vor, auch wenn das Personal erst nach
+ * dem Öffnen lädt. „Ablösung planen“ trägt dieselbe Art-Wahl und sendet beide Listen.
+ */
+describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () => {
+  const schicht = {
+    id: 3,
+    einheit_id: 1,
+    einheit_name: 'Florian 1',
+    erbende_einheiten: [{ einheit_id: 2, einheit_name: 'Gruppe 1' }],
+    abloeser: [],
+    besatzung_plan: [],
+  } as unknown as Abloesung;
+  const geplant = {
+    ...schicht,
+    besatzung_plan: [
+      {
+        personal_id: 21,
+        name: 'Cora Neu',
+        einheit_id: 2,
+        einheit_name: 'Gruppe 1',
+        fahrzeug_id: 44,
+        funkrufname: 'Florian 1-44',
+      },
+      { personal_id: 23, name: 'Erik Entlassen' },
+    ],
+  } as unknown as Abloesung;
+  const personen = [
+    { value: 21, label: 'Cora Neu', name: 'Cora Neu' },
+    { value: 24, label: 'Dirk Neu', name: 'Dirk Neu' },
+  ];
+  const verteilung = {
+    einheiten: [
+      { value: 1, label: 'Florian 1' },
+      { value: 2, label: 'Gruppe 1' },
+    ],
+    fahrzeuge: [{ value: 44, label: 'Florian 1-44' }],
+  };
+  const kopf = (dialog: HTMLElement) =>
+    dialog.querySelector('[data-lfh="besatzung-verteilen"] .ant-collapse-header');
+
+  function vollzug(props: Partial<Parameters<typeof VollzugDialog>[0]> = {}) {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const ui = (p: Partial<Parameters<typeof VollzugDialog>[0]>) => (
+      <VollzugDialog
+        schicht={schicht}
+        einheiten={[]}
+        bisherigeBesatzung={['Anna Alt']}
+        personen={personen}
+        verteilung={verteilung}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+        {...p}
+      />
+    );
+    const r = renderMitProviders(ui(props));
+    return {
+      onErfassen,
+      neu: (p: Partial<Parameters<typeof VollzugDialog>[0]>) => r.rerender(ui(p)),
+    };
+  }
+
+  it('verteilt im Klappteil auf Gruppe und Fahrzeug; der Kopf nennt die Abweichung', async () => {
+    const { onErfassen } = vollzug();
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    // Ohne gewählte Person gibt es nichts zu verteilen.
+    expect(kopf(dialog)).toBeNull();
+    await waehle('Neue Besatzung', 'Cora Neu', 'Dirk Neu');
+    await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · alle in Florian 1'));
+    await userEvent.click(kopf(dialog)!);
+    await waehle('Einheit für Cora Neu', 'Gruppe 1');
+    await waehle('Fahrzeug für Cora Neu', 'Florian 1-44');
+    await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        vollzogen_at: undefined,
+        art: 'besatzung',
+        besatzung: [{ personal_id: 21, einheit_id: 2, fahrzeug_id: 44 }, { personal_id: 24 }],
+      }),
+    );
+  });
+
+  it('ohne Erben und Fahrzeuge kein Klappteil', async () => {
+    vollzug({ verteilung: null });
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    await waehle('Neue Besatzung', 'Cora Neu');
+    expect(kopf(dialog)).toBeNull();
+  });
+
+  it('belegt aus der Planung vor, sobald das Personal da ist; Entlassene fehlen', async () => {
+    const { onErfassen, neu } = vollzug({ schicht: geplant, personen: null });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    expect(kopf(dialog)).toBeNull();
+    neu({ schicht: geplant, personen });
+    await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        vollzogen_at: undefined,
+        art: 'besatzung',
+        besatzung: [{ personal_id: 21, einheit_id: 2, fahrzeug_id: 44 }],
+      }),
+    );
+  });
+
+  it('gesperrt: keine Vorbelegung, die ganze Einheit bleibt', async () => {
+    vollzug({ schicht: geplant, besatzungGesperrt: 'Modul Personal gesperrt' });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked();
+  });
+
+  function planung(props: Partial<Parameters<typeof AbloeserDialog>[0]> = {}) {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <AbloeserDialog
+        schicht={schicht}
+        einheiten={[{ value: 12, label: 'Florian 2' }]}
+        bisherigeBesatzung={['Anna Alt']}
+        personen={personen}
+        verteilung={verteilung}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+        {...props}
+      />,
+    );
+    return onErfassen;
+  }
+
+  it('Planen: Besatzungswechsel mit Verteilung, die Ablöser gehen leer mit', async () => {
+    const onErfassen = planung();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked();
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    expect(within(dialog).queryByText('Zeitpunkt')).toBeNull();
+    await waehle('Neue Besatzung', 'Dirk Neu');
+    await userEvent.click(kopf(dialog)!);
+    await waehle('Fahrzeug für Dirk Neu', 'Florian 1-44');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        abloeser_ids: [],
+        besatzung_plan: [{ personal_id: 24, fahrzeug_id: 44 }],
+      }),
+    );
+  });
+
+  it('Planen: Ablöser heben einen geplanten Wechsel auf; die Vorbelegung zeigt ihn', async () => {
+    const onErfassen = planung({ schicht: geplant });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
+    );
+    await waehle('Ablösende Einheiten', 'Florian 2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [12], besatzung_plan: [] }),
+    );
+  });
+
+  it('Planen gesperrt: nur die Ablöser gehen hinaus, die Planung bleibt unberührt', async () => {
+    const onErfassen = planung({ besatzungGesperrt: 'Modul Personal gesperrt' });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeDisabled();
+    expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
+      'Modul Personal gesperrt',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [] }));
   });
 });
 

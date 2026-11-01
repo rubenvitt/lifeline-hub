@@ -16,8 +16,8 @@ use crate::abloesung::repo::{
 };
 use crate::abloesung::{
     AbloesungAnzeige, AbloesungArt, AbloesungEinsatzVorgabeAnzeige, AbloesungStatus,
-    AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, ABLOESER_MAX,
-    BESATZUNG_MAX, RHYTHMUS_MAX_MINUTEN,
+    AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BesatzungZiel,
+    ABLOESER_MAX, BESATZUNG_MAX, RHYTHMUS_MAX_MINUTEN,
 };
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
@@ -131,6 +131,41 @@ fn abloeser_aus(
     }
 }
 
+/// Eine neue Besatzung von außen (LLH-1150, LLH-1319): mehr als [`BESATZUNG_MAX`] Personen,
+/// gezählt vor dem Entdoppeln → 400 (`feld` nennt das Feld); liefert sie nach Person entdoppelt in
+/// ihrer Reihenfolge (der erste Eintrag einer Person gilt).
+fn check_besatzung(ziele: &[BesatzungZiel], feld: &str) -> Result<Vec<BesatzungZiel>, AppError> {
+    if ziele.len() > BESATZUNG_MAX {
+        return Err(AppError::Validation(format!(
+            "{feld}: höchstens {BESATZUNG_MAX} Personen"
+        )));
+    }
+    Ok(crate::kraefte_disposition::dedupe(ziele, |z| z.personal_id))
+}
+
+/// Die neue Besatzung eines Vollzugs aus dem Bestand `besatzung_ids` (alle in die Einheit, ohne
+/// Fahrzeug) oder `besatzung` mit Ziel je Person (LLH-1319). Beide zugleich → 422.
+fn besatzung_aus(
+    ids: Option<Vec<i64>>,
+    ziele: Option<Vec<BesatzungZiel>>,
+) -> Result<Option<Vec<BesatzungZiel>>, AppError> {
+    match (ids, ziele) {
+        (Some(_), Some(_)) => Err(AppError::UnprocessableEntity(
+            "Entweder besatzung_ids oder besatzung, nicht beides".into(),
+        )),
+        (Some(ids), None) => Ok(Some(
+            ids.into_iter()
+                .map(|personal_id| BesatzungZiel {
+                    personal_id,
+                    einheit_id: None,
+                    fahrzeug_id: None,
+                })
+                .collect(),
+        )),
+        (None, z) => Ok(z),
+    }
+}
+
 /// Ein Rhythmus außerhalb von 1..=7 Tagen scheitert am Feld isoliert → 400 (LFH-267).
 fn pruefe_rhythmus(minuten: i64) -> Result<i64, AppError> {
     if minuten <= 0 || minuten > RHYTHMUS_MAX_MINUTEN {
@@ -233,6 +268,11 @@ pub struct Aendern {
     /// Planung aufheben.
     #[serde(default)]
     abloeser_ids: Option<Vec<i64>>,
+    /// Der geplante Besatzungswechsel (LLH-1319): je Person ein Ziel, höchstens
+    /// [`BESATZUNG_MAX`]; fehlt = unverändert, `[]` = Planung aufheben. Ablöser und
+    /// Besatzungswechsel zugleich geplant → 422.
+    #[serde(default)]
+    besatzung_plan: Option<Vec<BesatzungZiel>>,
 }
 
 /// PATCH /api/einsaetze/{id}/abloesungen/{aid}
@@ -248,10 +288,15 @@ pub async fn aendern(
         andere => andere,
     };
     let abloeser = abloeser_aus(req.abloeser_ids, req.abloesende_einheit_id)?;
+    let besatzung_plan = req
+        .besatzung_plan
+        .map(|p| check_besatzung(&p, "besatzung_plan"))
+        .transpose()?;
     let eingabe = AenderungEingabe {
         beginn_at: zeit(req.beginn_at, "Beginn")?,
         rhythmus_minuten,
         abloeser,
+        besatzung_plan,
     };
     let (anzeige, etb_id) = repo::aendern(
         &state.pool,
@@ -288,9 +333,14 @@ pub struct Vollziehen {
     #[serde(default)]
     art: Option<String>,
     /// Beim Besatzungswechsel die neue Besatzung (`einsatz_personal.id`, höchstens
-    /// [`BESATZUNG_MAX`]); Pflicht dort, sonst verboten.
+    /// [`BESATZUNG_MAX`]), alle in die Einheit; Bestand neben `besatzung`.
     #[serde(default)]
     besatzung_ids: Option<Vec<i64>>,
+    /// Beim Besatzungswechsel die neue Besatzung mit Ziel je Person (LLH-1319): Einheit (die der
+    /// Schicht oder eine erbende Untereinheit) und Fahrzeug dieser Einheiten. Eine der beiden
+    /// Angaben ist dort Pflicht, sonst sind beide verboten.
+    #[serde(default)]
+    besatzung: Option<Vec<BesatzungZiel>>,
     /// Was danach mit der abgelösten Einheit geschieht (LLH-1308): `ruhe` (Vorgabe),
     /// `bereitstellungsraum` oder `entlassen`. Als `String` für die benannte 400.
     #[serde(default)]
@@ -341,10 +391,10 @@ fn vollzug_verbleib(
 /// → 422. Liefert die Art und die neue Besatzung entdoppelt in ihrer Reihenfolge.
 fn vollzug_art(
     art: Option<&str>,
-    besatzung: Option<&[i64]>,
+    besatzung: Option<&[BesatzungZiel]>,
     abloeser: &[i64],
     abschnitt_uebergeben: bool,
-) -> Result<(AbloesungArt, Vec<i64>), AppError> {
+) -> Result<(AbloesungArt, Vec<BesatzungZiel>), AppError> {
     let art = match art.map(str::trim) {
         None | Some("") => AbloesungArt::Einheit,
         Some(s) => AbloesungArt::parse(s).ok_or_else(|| {
@@ -353,17 +403,12 @@ fn vollzug_art(
             ))
         })?,
     };
-    if besatzung.is_some_and(|b| b.len() > BESATZUNG_MAX) {
-        return Err(AppError::Validation(format!(
-            "besatzung_ids: höchstens {BESATZUNG_MAX} Personen"
-        )));
-    }
+    let ids = check_besatzung(besatzung.unwrap_or_default(), "besatzung")?;
     match art {
         AbloesungArt::Besatzung => {
-            let ids = crate::kraefte_disposition::dedupe(besatzung.unwrap_or_default(), |id| *id);
             if ids.is_empty() {
                 return Err(AppError::Validation(
-                    "besatzung_ids fehlt: ein Besatzungswechsel braucht die neue Besatzung".into(),
+                    "besatzung fehlt: ein Besatzungswechsel braucht die neue Besatzung".into(),
                 ));
             }
             if !abloeser.is_empty() {
@@ -382,7 +427,7 @@ fn vollzug_art(
         AbloesungArt::Einheit => {
             if besatzung.is_some() {
                 return Err(AppError::UnprocessableEntity(
-                    "besatzung_ids gilt nur beim Besatzungswechsel (art: besatzung)".into(),
+                    "besatzung gilt nur beim Besatzungswechsel (art: besatzung)".into(),
                 ));
             }
             Ok((art, Vec::new()))
@@ -402,9 +447,10 @@ pub async fn vollziehen(
     let vollzogen_at = zeit(req.vollzogen_at, "Vollzug")?.unwrap_or_else(|| jetzt.clone());
     let abloeser =
         abloeser_aus(req.abloeser_ids, req.abloesende_einheit_id.map(Some))?.unwrap_or_default();
+    let besatzung = besatzung_aus(req.besatzung_ids, req.besatzung)?;
     let (art, besatzung) = vollzug_art(
         req.art.as_deref(),
-        req.besatzung_ids.as_deref(),
+        besatzung.as_deref(),
         &abloeser,
         req.abschnitt_uebergeben,
     )?;
@@ -615,12 +661,27 @@ mod tests {
         assert_eq!(abloeser_aus(None, None).unwrap(), None);
     }
 
+    fn ziele(ids: &[i64]) -> Vec<BesatzungZiel> {
+        ids.iter()
+            .map(|&personal_id| BesatzungZiel {
+                personal_id,
+                einheit_id: None,
+                fahrzeug_id: None,
+            })
+            .collect()
+    }
+
+    fn personen(r: (AbloesungArt, Vec<BesatzungZiel>)) -> (AbloesungArt, Vec<i64>) {
+        (r.0, r.1.iter().map(|z| z.personal_id).collect())
+    }
+
     /// LLH-1150: erst das Feld (400), dann der Zusammenhang (422).
     #[test]
     fn vollzug_art_prueft_feld_vor_zusammenhang() {
-        let code = |r: Result<(AbloesungArt, Vec<i64>), AppError>| r.unwrap_err().status();
+        let code =
+            |r: Result<(AbloesungArt, Vec<BesatzungZiel>), AppError>| r.unwrap_err().status();
         assert_eq!(
-            vollzug_art(None, None, &[3], true).unwrap(),
+            personen(vollzug_art(None, None, &[3], true).unwrap()),
             (AbloesungArt::Einheit, vec![]),
             "ohne Art die ganze Einheit"
         );
@@ -629,7 +690,12 @@ mod tests {
             StatusCode::BAD_REQUEST
         );
         assert_eq!(
-            code(vollzug_art(Some("besatzung"), Some(&[]), &[], false)),
+            code(vollzug_art(
+                Some("besatzung"),
+                Some(&ziele(&[])),
+                &[],
+                false
+            )),
             StatusCode::BAD_REQUEST,
             "leere neue Besatzung"
         );
@@ -638,13 +704,13 @@ mod tests {
             StatusCode::BAD_REQUEST,
             "fehlende neue Besatzung"
         );
-        let viele: Vec<i64> = (1..=BESATZUNG_MAX as i64 + 1).collect();
+        let viele = ziele(&(1..=BESATZUNG_MAX as i64 + 1).collect::<Vec<_>>());
         assert_eq!(
             code(vollzug_art(Some("besatzung"), Some(&viele), &[7], false)),
             StatusCode::BAD_REQUEST,
             "Grenze vor dem Zusammenhang"
         );
-        let genau: Vec<i64> = (1..=BESATZUNG_MAX as i64).collect();
+        let genau = ziele(&(1..=BESATZUNG_MAX as i64).collect::<Vec<_>>());
         assert_eq!(
             vollzug_art(Some("besatzung"), Some(&genau), &[], false)
                 .unwrap()
@@ -653,24 +719,77 @@ mod tests {
             BESATZUNG_MAX
         );
         assert_eq!(
-            code(vollzug_art(Some("besatzung"), Some(&[1]), &[7], false)),
+            code(vollzug_art(
+                Some("besatzung"),
+                Some(&ziele(&[1])),
+                &[7],
+                false
+            )),
             StatusCode::UNPROCESSABLE_ENTITY,
             "mit ablösender Einheit"
         );
         assert_eq!(
-            code(vollzug_art(Some("besatzung"), Some(&[1]), &[], true)),
+            code(vollzug_art(
+                Some("besatzung"),
+                Some(&ziele(&[1])),
+                &[],
+                true
+            )),
             StatusCode::UNPROCESSABLE_ENTITY,
             "mit Abschnittsübergabe"
         );
         assert_eq!(
-            code(vollzug_art(Some("einheit"), Some(&[1]), &[], false)),
+            code(vollzug_art(Some("einheit"), Some(&ziele(&[1])), &[], false)),
             StatusCode::UNPROCESSABLE_ENTITY,
             "neue Besatzung ohne Besatzungswechsel"
         );
         assert_eq!(
-            vollzug_art(Some("besatzung"), Some(&[4, 2, 4]), &[], false).unwrap(),
+            personen(vollzug_art(Some("besatzung"), Some(&ziele(&[4, 2, 4])), &[], false).unwrap()),
             (AbloesungArt::Besatzung, vec![4, 2]),
             "entdoppelt in der Reihenfolge"
+        );
+    }
+
+    /// LLH-1319: Bestand und Liste mit Ziel schließen sich aus; der Bestand geht ohne Ziel in die
+    /// Einheit.
+    #[test]
+    fn besatzung_aus_bestand_oder_mit_ziel() {
+        assert_eq!(
+            besatzung_aus(Some(vec![1]), Some(ziele(&[2])))
+                .unwrap_err()
+                .status(),
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert_eq!(
+            besatzung_aus(Some(vec![1, 2]), None).unwrap(),
+            Some(ziele(&[1, 2]))
+        );
+        let mit_ziel = vec![BesatzungZiel {
+            personal_id: 3,
+            einheit_id: Some(9),
+            fahrzeug_id: Some(4),
+        }];
+        assert_eq!(
+            besatzung_aus(None, Some(mit_ziel.clone())).unwrap(),
+            Some(mit_ziel)
+        );
+        assert_eq!(besatzung_aus(None, None).unwrap(), None);
+        // Je Person gilt der erste Eintrag.
+        let doppelt = vec![
+            BesatzungZiel {
+                personal_id: 3,
+                einheit_id: Some(9),
+                fahrzeug_id: None,
+            },
+            BesatzungZiel {
+                personal_id: 3,
+                einheit_id: None,
+                fahrzeug_id: Some(4),
+            },
+        ];
+        assert_eq!(
+            check_besatzung(&doppelt, "besatzung_plan").unwrap(),
+            vec![doppelt[0]]
         );
     }
 

@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest';
 import type { Abloesung } from '../api/types';
 import {
   besatzungOptionen,
+  besatzungPlanText,
   besatzungText,
+  besatzungZiele,
   bisherigeBesatzung,
+  nachBesatzungswechselText,
+  planVorbelegung,
+  verteilungKopf,
+  verteilungZiele,
   type BesatzungEinheit,
+  type BesatzungOption,
   type BesatzungPerson,
+  type VerteilungEinheit,
 } from './besatzung';
 
 const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
@@ -26,6 +34,8 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   uebernommen_bei_vollzug: false,
   art: 'einheit',
   besatzung: [],
+  besatzung_plan: [],
+  nach_besatzungswechsel: [],
   verbleib: 'ruhe' as const,
   abschnitt_uebergeben: false,
   planung_warnungen: [],
@@ -71,9 +81,9 @@ describe('besatzung (LLH-1150)', () => {
       person(15, 'Erik', undefined, '2026-10-17 07:00:00'),
     ];
     expect(besatzungOptionen(personal, einheiten, schicht())).toEqual([
-      { value: 12, label: 'Cora' },
-      { value: 13, label: 'Fritz · führt Florian 2', disabled: true },
-      { value: 14, label: 'Dirk · Florian 2' },
+      { value: 12, label: 'Cora', name: 'Cora' },
+      { value: 13, label: 'Fritz · führt Florian 2', name: 'Fritz', disabled: true },
+      { value: 14, label: 'Dirk · Florian 2', name: 'Dirk' },
     ]);
   });
 
@@ -90,5 +100,108 @@ describe('besatzung (LLH-1150)', () => {
     expect(besatzungText(s, 'neu')).toBe('Cora, Dirk');
     expect(besatzungText(s, 'alt')).toBe('Anna');
     expect(besatzungText(schicht(), 'neu')).toBeNull();
+  });
+});
+
+describe('Verteilung und Planung (LLH-1319)', () => {
+  const fahrzeug = (ef_id: number, funkrufname: string) => ({ ef_id, funkrufname });
+  // Florian 1 ohne Fahrzeug, Gruppe 1 (erbt) mit „Florian 1-44“, Florian 2 mit „Florian 2-83“.
+  const verteilEinheiten: VerteilungEinheit[] = [
+    { id: 1, name: 'Florian 1', fahrzeug_mitglieder: [] },
+    { id: 2, name: 'Gruppe 1', fahrzeug_mitglieder: [fahrzeug(44, 'Florian 1-44')] },
+    { id: 3, name: 'Florian 2', fahrzeug_mitglieder: [fahrzeug(83, 'Florian 2-83')] },
+  ];
+
+  it('Ziele: die Einheit, ihre Erben und deren Fahrzeuge; ohne Wahl kein Klappteil', () => {
+    expect(verteilungZiele(schicht(), verteilEinheiten)).toEqual({
+      einheiten: [
+        { value: 1, label: 'Florian 1' },
+        { value: 2, label: 'Gruppe 1' },
+      ],
+      fahrzeuge: [{ value: 44, label: 'Florian 1-44' }],
+    });
+    // Ohne Erben bleibt das Fahrzeug der Einheit selbst.
+    const allein: VerteilungEinheit[] = [
+      { id: 1, name: 'Florian 1', fahrzeug_mitglieder: [fahrzeug(45, 'Florian 1-45')] },
+    ];
+    expect(verteilungZiele(schicht({ erbende_einheiten: [] }), allein)).toEqual({
+      einheiten: [{ value: 1, label: 'Florian 1' }],
+      fahrzeuge: [{ value: 45, label: 'Florian 1-45' }],
+    });
+    // Keine Erben, keine Fahrzeuge: nichts zu wählen.
+    expect(verteilungZiele(schicht({ erbende_einheiten: [] }), verteilEinheiten)).toBeNull();
+    expect(verteilungZiele(schicht(), undefined)).toBeNull();
+  });
+
+  it('Kopf nennt die Abweichung, die Ziele lassen die Vorgabe weg', () => {
+    const s = schicht();
+    expect(verteilungKopf([12, 14], {}, s)).toBe('Verteilen · alle in Florian 1');
+    // Die Einheit der Schicht ausdrücklich gewählt ist keine Abweichung.
+    expect(verteilungKopf([12], { '12': { einheit_id: 1 } }, s)).toBe(
+      'Verteilen · alle in Florian 1',
+    );
+    const verteilung = { '12': { einheit_id: 2, fahrzeug_id: 44 }, '14': { einheit_id: 1 } };
+    expect(verteilungKopf([12, 14], verteilung, s)).toBe('Verteilen · 1 verteilt');
+    expect(besatzungZiele([12, 14], verteilung, s)).toEqual([
+      { personal_id: 12, einheit_id: 2, fahrzeug_id: 44 },
+      { personal_id: 14 },
+    ]);
+    // Eine abgewählte Person zählt nicht mehr, auch wenn ihr Ziel noch im Formular steht.
+    expect(verteilungKopf([14], verteilung, s)).toBe('Verteilen · alle in Florian 1');
+  });
+
+  it('Vorbelegung aus der Planung: nur wählbare Personen, nur bestehende Ziele', () => {
+    const s = schicht({
+      besatzung_plan: [
+        { personal_id: 12, name: 'Cora', einheit_id: 2, einheit_name: 'Gruppe 1', fahrzeug_id: 44 },
+        { personal_id: 13, name: 'Fritz' },
+        { personal_id: 15, name: 'Erik' },
+        { personal_id: 14, name: 'Dirk', fahrzeug_id: 99, funkrufname: 'weg' },
+      ],
+    });
+    const personen: BesatzungOption[] = [
+      { value: 12, label: 'Cora', name: 'Cora' },
+      { value: 13, label: 'Fritz · führt Florian 2', name: 'Fritz', disabled: true },
+      { value: 14, label: 'Dirk · Florian 2', name: 'Dirk' },
+    ];
+    const ziele = verteilungZiele(s, verteilEinheiten);
+    expect(planVorbelegung(s, personen, ziele)).toEqual({
+      ids: [12, 14],
+      verteilung: { '12': { einheit_id: 2, fahrzeug_id: 44 }, '14': {} },
+    });
+    // Ohne Ziele (kein Klappteil) bleibt nur die Auswahl.
+    expect(planVorbelegung(s, personen, null)).toEqual({
+      ids: [12, 14],
+      verteilung: { '12': {}, '14': {} },
+    });
+  });
+
+  it('Texte der Planung und der Folgeschicht', () => {
+    const s = schicht({
+      besatzung_plan: [
+        {
+          personal_id: 12,
+          name: 'Cora',
+          einheit_id: 2,
+          einheit_name: 'Gruppe 1',
+          fahrzeug_id: 44,
+          funkrufname: 'Florian 1-44',
+        },
+        { personal_id: 14, name: 'Dirk' },
+      ],
+    });
+    expect(besatzungPlanText(s)).toEqual({
+      kurz: 'Cora, Dirk',
+      voll: 'Cora (Gruppe 1, Florian 1-44), Dirk',
+    });
+    expect(besatzungPlanText(schicht())).toBeNull();
+    const folge = schicht({
+      nach_besatzungswechsel: [
+        { personal_id: 12, name: 'Cora', rolle: 'neu' },
+        { personal_id: 14, name: 'Dirk', rolle: 'neu' },
+      ],
+    });
+    expect(nachBesatzungswechselText(folge)).toBe('Cora, Dirk');
+    expect(nachBesatzungswechselText(schicht())).toBeNull();
   });
 });

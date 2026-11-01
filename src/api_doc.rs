@@ -420,6 +420,7 @@ use utoipa::OpenApi;
         crate::abloesung::AbloesungArt,
         crate::abloesung::AbloesungVerbleib,
         crate::abloesung::AbloesungBesatzung,
+        crate::abloesung::AbloesungBesatzungPlan,
         crate::abloesung::BesatzungRolle,
         crate::abloesung::AbloesungFolge,
         crate::abloesung::AbloesungPlanungEntfallen,

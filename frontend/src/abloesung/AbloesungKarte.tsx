@@ -12,7 +12,7 @@ import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abloeserText } from './abloeser';
-import { besatzungText } from './besatzung';
+import { besatzungPlanText, besatzungText, nachBesatzungswechselText } from './besatzung';
 import { verbleibText } from './verbleib';
 import { abloeserStandText, type AbloeserStand } from './abloeserStand';
 import { formatDauer } from './dauer';
@@ -86,9 +86,12 @@ function zeitspalte(s: Abloesung): { zeit: string | null | undefined; wort: stri
  * rot, Vorwarnung gelb, sonst Linienfarbe. Zweiter Kanal ist das Wort im Etikett (WCAG 1.4.1).
  * Nichts blinkt.
  *
- * „Ablösung vollziehen" ist die sichtbare Kartenaktion, „Ablösende Einheit planen" und
- * „Rhythmus ändern" liegen im Dreipunkt-Menü (ab drei Aktionen wird gebündelt). Ohne
- * Schreibrecht fällt die Aktionszeile ganz weg; den Grund nennt der Seitenkopf.
+ * „Ablösung vollziehen" ist die sichtbare Kartenaktion, „Ablösung planen" (Ablöser oder
+ * Besatzungswechsel, LLH-1319) und „Rhythmus ändern" liegen im Dreipunkt-Menü (ab drei Aktionen
+ * wird gebündelt). Ohne Schreibrecht fällt die Aktionszeile ganz weg; den Grund nennt der
+ * Seitenkopf. Ein geplanter Besatzungswechsel steht an der Stelle der Ablöser („Besatzungswechsel
+ * geplant · neu: …“), die Folgeschicht eines Wechsels nennt ihre Besatzung („nach
+ * Besatzungswechsel · Besatzung: …“).
  *
  * Nicht laufend ist eine Schicht abgelöst (Zeitspalte: Vollzug) oder beendet (LLH-1128,
  * Zeitspalte: Ende, dazu „beendet · entlassen …“ bzw. „beendet · aufgelöst“). Eine laufende nennt
@@ -125,6 +128,8 @@ export default function AbloesungKarte({
       ? `gilt auch für: ${s.erbende_einheiten.map((e) => e.einheit_name).join(', ')}`
       : null;
   const durch = abloeserText(s);
+  const plan = laufend ? besatzungPlanText(s) : null;
+  const nachWechsel = laufend ? nachBesatzungswechselText(s) : null;
   const stufe = laufend ? einstufungOf(s, jetzt) : null;
   const darstellung = stufe ? abloesungEinstufung[stufe] : null;
   const kante =
@@ -144,7 +149,7 @@ export default function AbloesungKarte({
         : rollen.paneel;
 
   const menue: MenueEintrag<'abloeser' | 'rhythmus'>[] = [
-    ...(onAbloeserPlanen ? [{ key: 'abloeser' as const, label: 'Ablösende Einheit planen' }] : []),
+    ...(onAbloeserPlanen ? [{ key: 'abloeser' as const, label: 'Ablösung planen' }] : []),
     ...(onRhythmusAendern ? [{ key: 'rhythmus' as const, label: 'Rhythmus ändern' }] : []),
   ];
 
@@ -255,6 +260,30 @@ export default function AbloesungKarte({
               }}
             >
               {erben}
+            </Text>
+          )}
+          {/* Folgeschicht eines Besatzungswechsels (LLH-1319): die Besatzung beim Wechsel, nicht
+              die heutige Zuordnung; einzeilig, der ganze Text im Titel, ohne Einstufung. */}
+          {nachWechsel && (
+            <Text
+              type="secondary"
+              data-lfh="abloesung-nach-besatzungswechsel"
+              title={`nach Besatzungswechsel · Besatzung: ${nachWechsel}`}
+              style={EINZEILIG}
+            >
+              nach Besatzungswechsel · Besatzung: {nachWechsel}
+            </Text>
+          )}
+          {/* Geplanter Besatzungswechsel (LLH-1319) an der Stelle der Ablöser: eine Schicht plant
+              das eine oder das andere. Einzeilig, samt Verteilung im Titel. */}
+          {plan && (
+            <Text
+              type="secondary"
+              data-lfh="abloesung-besatzung-plan"
+              title={`Besatzungswechsel geplant · neu: ${plan.voll}`}
+              style={EINZEILIG}
+            >
+              Besatzungswechsel geplant · neu: {plan.kurz}
             </Text>
           )}
           {/* Die Ablöser als Liste (LLH-1132), eine übernommene Schicht mit Vermerk. Einzeilig

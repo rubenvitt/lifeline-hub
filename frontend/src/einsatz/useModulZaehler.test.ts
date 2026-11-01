@@ -104,6 +104,8 @@ describe('Modul-Zähler', () => {
       uebernommen_bei_vollzug: false,
       art: 'einheit' as const,
       besatzung: [],
+      besatzung_plan: [],
+      nach_besatzungswechsel: [],
       verbleib: 'ruhe' as const,
       abschnitt_uebergeben: false,
       planung_warnungen: [],

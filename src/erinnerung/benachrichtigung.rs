@@ -116,14 +116,17 @@ async fn anlass(pool: &SqlitePool, f: &FaelligeErinnerung) -> Result<Option<Anla
 }
 
 /// Ob der Planungshinweis einer Schicht noch gilt (LLH-1131): sie läuft, und weder die
-/// Einzelplanung noch die Ablöser-Liste nennt eine ablösende Einheit. Das Planen schließt die
+/// Einzelplanung noch die Ablöser-Liste nennt eine ablösende Einheit, und kein Besatzungswechsel
+/// ist geplant (LLH-1319). Das Planen schließt die
 /// Frist schon; das hier ist das Netz gegen einen Tick im selben Augenblick.
 async fn planung_offen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<bool, AppError> {
     let r: Option<i64> = sqlx::query_scalar(
         "SELECT 1 FROM einsatz_abloesung a \
          WHERE a.id = ? AND a.einsatz_id = ? AND a.status = 'laufend' \
            AND a.abloesende_einheit_id IS NULL \
-           AND NOT EXISTS (SELECT 1 FROM einsatz_abloesung_abloeser l WHERE l.abloesung_id = a.id)",
+           AND NOT EXISTS (SELECT 1 FROM einsatz_abloesung_abloeser l WHERE l.abloesung_id = a.id) \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_abloesung_besatzung_plan p \
+                           WHERE p.abloesung_id = a.id)",
     )
     .bind(id)
     .bind(einsatz_id)

@@ -26,6 +26,8 @@ function schicht(teil: Partial<Abloesung> & { id: number }): Abloesung {
     uebernommen_bei_vollzug: false,
     art: 'einheit',
     besatzung: [],
+    besatzung_plan: [],
+    nach_besatzungswechsel: [],
     verbleib: 'ruhe' as const,
     abschnitt_uebergeben: false,
     planung_warnungen: [],

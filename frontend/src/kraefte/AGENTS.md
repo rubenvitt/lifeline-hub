@@ -66,9 +66,11 @@ Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`. „
 Einheitenliste, minus eigene laufende Schicht und `erbende_einheiten`; nur mit Freigabe des
 Moduls Einheiten (sonst gesperrt mit Grund), eigene Zuflussschleuse, kein „Schicht beginnen“ für
 einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO stehen.
-**Geplant** heißt Einzelplanung `abloesende_einheit_id` oder Ablöser-Liste
-`einsatz_abloesung_abloeser`; jede Prüfung darauf liest beide (Planungshinweis, Hinweise,
-Planungswarnungen, LLH-1131). Die Planungswarnungen ermittelt der Server beim Lesen
+**Geplant** heißt Einzelplanung `abloesende_einheit_id`, Ablöser-Liste
+`einsatz_abloesung_abloeser` oder geplanter Besatzungswechsel `einsatz_abloesung_besatzung_plan`
+(LLH-1319); der Planungshinweis liest alle drei (`has_planung_tx`, im Scheduler `planung_offen`),
+Hinweise, Ausnahme vom Autostart und Planungswarnungen nur die beiden Einheiten-Quellen
+(LLH-1131). Die Planungswarnungen ermittelt der Server beim Lesen
 (`planung_warnungen`), der Client zeigt sie nur (`abloesung/planungWarnung.ts`), an der Karte in
 der Rolle Achtung, nie als Einstufung. Der Planungshinweis ist eine Frist, keine Einstufung.
 Den Stand eines geplanten Ablösers an der Karte („Ablösung: … · alarmiert … · eingetroffen …
@@ -119,4 +121,13 @@ Führung. Die Zeitachse bekommt nur Personen-Ereignisse (alt `abloesung`, neu `e
 dafür zuständig). Der Wechsel verlangt die Freigabe des Moduls Einheiten (Server) und im Dialog
 dazu die des Moduls Personal (Auswahl); die bisherige Besatzung und die wählbaren Personen bildet
 nur `abloesung/besatzung.ts`. Die Rücknahme legt nur zurück, was noch den Stand des Vollzugs
-trägt.
+trägt. **Verteilung und Planung** (LLH-1319): je neuer Person optional Ziel-Einheit (die Einheit
+oder ein Erbe, sonst 422) und Fahrzeug (aktiv, einer dieser Einheiten; 404/409/422), geprüft in
+`check_neue_besatzung_tx` (eine Abfrage); der Vollzug merkt das Ziel in `einheit_nachher_id`/
+`fahrzeug_nachher_id`, die Rücknahme legt nur zurück, wer noch dort steht bzw. sitzt. Eine Schicht
+plant entweder Ablöser oder einen Besatzungswechsel (`besatzung_plan`, beides → 422, einziger
+Schreibweg `set_besatzung_plan_tx`); der Dialog sendet deshalb beide Listen. Der Vollzug sichert
+die Ablöser-Liste (`einsatz_abloesung_planung_vorher`, `planung_gesichert`), die Rücknahme stellt
+sie wieder her; der geplante Wechsel bleibt beim Vollzug stehen. Ziele, Vorbelegung und Texte
+(„Besatzungswechsel geplant · neu: …“, „nach Besatzungswechsel · Besatzung: …“) bildet nur
+`abloesung/besatzung.ts`.

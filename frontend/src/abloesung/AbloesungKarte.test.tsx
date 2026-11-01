@@ -42,6 +42,8 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   uebernommen_bei_vollzug: false,
   art: 'einheit',
   besatzung: [],
+  besatzung_plan: [],
+  nach_besatzungswechsel: [],
   abschnitt_uebergeben: false,
   verbleib: 'ruhe',
   planung_warnungen: [],
@@ -157,6 +159,68 @@ describe('AbloesungKarte — Besatzungswechsel (LLH-1150)', () => {
   it('eine laufende oder als ganze Einheit abgelöste Schicht hat keine solche Zeile', () => {
     zeige(schicht());
     expect(document.querySelector('[data-lfh="abloesung-besatzung"]')).toBeNull();
+  });
+});
+
+describe('AbloesungKarte — geplanter Besatzungswechsel und Folgeschicht (LLH-1319)', () => {
+  it('die laufende Schicht nennt den geplanten Wechsel einzeilig, die Verteilung im Titel', () => {
+    zeige(
+      schicht({
+        besatzung_plan: [
+          {
+            personal_id: 2,
+            name: 'Cora Neu',
+            einheit_id: 12,
+            einheit_name: 'Gruppe 1',
+            fahrzeug_id: 44,
+            funkrufname: 'Florian 1-44',
+          },
+          { personal_id: 3, name: 'Dirk Neu' },
+        ],
+      }),
+    );
+    const zeile = document.querySelector<HTMLElement>('[data-lfh="abloesung-besatzung-plan"]')!;
+    expect(zeile).toHaveTextContent('Besatzungswechsel geplant · neu: Cora Neu, Dirk Neu');
+    expect(zeile.title).toBe(
+      'Besatzungswechsel geplant · neu: Cora Neu (Gruppe 1, Florian 1-44), Dirk Neu',
+    );
+    expect(zeile.style.whiteSpace).toBe('nowrap');
+    expect(document.querySelector('[data-lfh="abloesung-abloeser"]')).toBeNull();
+  });
+
+  it('die Folgeschicht eines Wechsels nennt ihre Besatzung, ohne Einstufung zu ändern', () => {
+    const ohne = zeige(schicht());
+    const kanteOhne = ohne.container.querySelector<HTMLElement>('[data-lfh="abloesung-karte"]')!
+      .style.cssText;
+    ohne.unmount();
+    zeige(
+      schicht({
+        nach_besatzungswechsel: [
+          { personal_id: 2, name: 'Cora Neu', rolle: 'neu' },
+          { personal_id: 3, name: 'Dirk Neu', rolle: 'neu' },
+        ],
+      }),
+    );
+    const zeile = document.querySelector<HTMLElement>(
+      '[data-lfh="abloesung-nach-besatzungswechsel"]',
+    )!;
+    expect(zeile).toHaveTextContent('nach Besatzungswechsel · Besatzung: Cora Neu, Dirk Neu');
+    expect(zeile.title).toBe('nach Besatzungswechsel · Besatzung: Cora Neu, Dirk Neu');
+    expect(document.querySelector<HTMLElement>('[data-lfh="abloesung-karte"]')!.style.cssText).toBe(
+      kanteOhne,
+    );
+  });
+
+  it('ohne Planung und ohne Wechsel keine solchen Zeilen; abgelöst zählt der Plan nicht', () => {
+    zeige(
+      schicht({
+        status: 'abgeloest',
+        vollzogen_at: '2026-10-17 11:40:00',
+        besatzung_plan: [{ personal_id: 2, name: 'Cora Neu' }],
+      }),
+    );
+    expect(document.querySelector('[data-lfh="abloesung-besatzung-plan"]')).toBeNull();
+    expect(document.querySelector('[data-lfh="abloesung-nach-besatzungswechsel"]')).toBeNull();
   });
 });
 

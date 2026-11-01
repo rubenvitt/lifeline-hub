@@ -72,6 +72,12 @@ export interface components {
              *     Vollzugs. Leer bei jeder anderen Schicht.
              */
             besatzung: components["schemas"]["AbloesungBesatzung"][];
+            /**
+             * @description Der geplante Besatzungswechsel einer laufenden Schicht (LLH-1319), in der Reihenfolge der
+             *     Planung; leer ohne einen und bei abgelösten und beendeten Schichten. Eine Schicht plant
+             *     entweder Ablöser oder einen Besatzungswechsel.
+             */
+            besatzung_plan: components["schemas"]["AbloesungBesatzungPlan"][];
             /** Format: int64 */
             einheit_id: number;
             einheit_name: string;
@@ -94,6 +100,11 @@ export interface components {
             folgeschichten: components["schemas"]["AbloesungFolge"][];
             /** Format: int64 */
             id: number;
+            /**
+             * @description Ist der Vorgänger dieser Schicht als Besatzungswechsel vollzogen, die neue Besatzung dieses
+             *     Wechsels (Rolle `neu`, LLH-1319); sonst leer.
+             */
+            nach_besatzungswechsel: components["schemas"]["AbloesungBesatzung"][];
             planung_entfallen?: components["schemas"]["AbloesungPlanungEntfallen"] | null;
             /**
              * @description Warnungen zur geplanten ablösenden Einheit (LLH-1131): schon für eine andere Schicht
@@ -155,6 +166,30 @@ export interface components {
              */
             personal_id: number;
             rolle: components["schemas"]["BesatzungRolle"];
+        };
+        /**
+         * @description Eine Person des geplanten Besatzungswechsels (Eintrag in `einsatz_abloesung_besatzung_plan`,
+         *     LLH-1319) mit ihrem Ziel.
+         */
+        AbloesungBesatzungPlan: {
+            /**
+             * Format: int64
+             * @description Ziel-Einheit; fehlt = die Einheit der Schicht.
+             */
+            einheit_id?: number | null;
+            einheit_name?: string | null;
+            /**
+             * Format: int64
+             * @description Ziel-Fahrzeug (`einsatz_fahrzeug.id`); fehlt = keins.
+             */
+            fahrzeug_id?: number | null;
+            funkrufname?: string | null;
+            name: string;
+            /**
+             * Format: int64
+             * @description `einsatz_personal.id`
+             */
+            personal_id: number;
         };
         /**
          * @description Vorgabe des Einsatzes (LLH-1122): die Kopie eines Schichtmodells, die beim Anlegen aus der

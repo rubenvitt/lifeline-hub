@@ -15,11 +15,11 @@ use std::collections::{HashMap, HashSet};
 use super::hinweis::{self, Wirkung};
 use super::{
     einstufung, faelligkeit, planung_warnungen, rhythmus_text, vererbung, vorwarnzeit,
-    AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung,
+    AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung, AbloesungBesatzungPlan,
     AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungPlanungEntfallen,
     AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
-    BeendetGrund, BesatzungRolle, PlanungEntfallenGrund, PlanungsStand, RhythmusQuelle,
-    PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
+    BeendetGrund, BesatzungRolle, BesatzungZiel, PlanungEntfallenGrund, PlanungsStand,
+    RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
@@ -77,6 +77,10 @@ pub struct AenderungEingabe {
     /// Die geplanten Ablöser in ihrer Reihenfolge, von der Route begrenzt und entdoppelt;
     /// `Some(vec![])` = Planung aufheben.
     pub abloeser: Option<Vec<i64>>,
+    /// Der geplante Besatzungswechsel (LLH-1319), von der Route begrenzt und nach Person
+    /// entdoppelt; `Some(vec![])` = Planung aufheben. Nach der Änderung plant die Schicht
+    /// entweder Ablöser oder einen Besatzungswechsel (sonst 422).
+    pub besatzung_plan: Option<Vec<BesatzungZiel>>,
 }
 
 /// Eingabe „Vollzug" (LLH-1132) — von der Route validiert (Zeit normalisiert, Liste begrenzt
@@ -91,9 +95,9 @@ pub struct VollzugEingabe {
     /// Ganze Einheit oder Besatzungswechsel (LLH-1150); beim Besatzungswechsel sind `abloeser`
     /// leer und `abschnitt_uebergeben` aus (die Route prüft das).
     pub art: AbloesungArt,
-    /// Beim Besatzungswechsel die neue Besatzung (`einsatz_personal.id`), begrenzt und
-    /// entdoppelt; sonst leer.
-    pub besatzung: Vec<i64>,
+    /// Beim Besatzungswechsel die neue Besatzung mit ihrem Ziel (LLH-1319), begrenzt und nach
+    /// Person entdoppelt; sonst leer.
+    pub besatzung: Vec<BesatzungZiel>,
     /// Was danach mit der abgelösten Einheit geschieht (LLH-1308); beim Besatzungswechsel
     /// immer `ruhe` (die Route prüft das).
     pub verbleib: AbloesungVerbleib,
@@ -201,6 +205,8 @@ impl Zeile {
             uebergebener_abschnitt_name: self.uebergebener_abschnitt_name,
             art: self.art,
             besatzung: Vec::new(),
+            besatzung_plan: Vec::new(),
+            nach_besatzungswechsel: Vec::new(),
             verbleib: self.verbleib,
             verbleib_br_bezeichnung: self.verbleib_br_bezeichnung,
             ruecknehmbar,
@@ -358,12 +364,81 @@ async fn attach_listen(
                 rolle,
             });
     }
+    // Die neue Besatzung je Besatzungswechsel, für die Kennzeichnung seiner Folgeschicht
+    // (LLH-1319); vor dem Verteilen der Listen, weil der Vorgänger nicht in `liste` stehen muss.
+    let mut neu_je_wechsel: HashMap<i64, Vec<AbloesungBesatzung>> = HashMap::new();
+    for (abloesung_id, besatzung) in &je_besatzung {
+        let neu: Vec<AbloesungBesatzung> = besatzung
+            .iter()
+            .filter(|b| b.rolle == BesatzungRolle::Neu)
+            .cloned()
+            .collect();
+        if !neu.is_empty() {
+            neu_je_wechsel.insert(*abloesung_id, neu);
+        }
+    }
+    let mut je_plan = load_besatzung_plaene(pool, einsatz_id).await?;
     for a in liste.iter_mut() {
         a.abloeser = je_schicht.remove(&a.id).unwrap_or_default();
         a.folgeschichten = je_vorgaenger.remove(&a.id).unwrap_or_default();
         a.besatzung = je_besatzung.remove(&a.id).unwrap_or_default();
+        if a.status == AbloesungStatus::Laufend {
+            a.besatzung_plan = je_plan.remove(&a.id).unwrap_or_default();
+        }
+        if let Some(v) = a.vorgaenger_id {
+            a.nach_besatzungswechsel = neu_je_wechsel.get(&v).cloned().unwrap_or_default();
+        }
     }
     Ok(())
+}
+
+/// Die geplanten Besatzungswechsel der laufenden Schichten eines Einsatzes (LLH-1319), je Schicht
+/// in der Reihenfolge der Planung, mit den Namen der Ziele. EINE Abfrage für den ganzen Einsatz.
+async fn load_besatzung_plaene(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, Vec<AbloesungBesatzungPlan>>, AppError> {
+    #[derive(sqlx::FromRow)]
+    struct PlanZeile {
+        abloesung_id: i64,
+        personal_id: i64,
+        name: String,
+        einheit_id: Option<i64>,
+        einheit_name: Option<String>,
+        fahrzeug_id: Option<i64>,
+        funkrufname: Option<String>,
+    }
+    let zeilen: Vec<PlanZeile> = sqlx::query_as(
+        "SELECT p.abloesung_id, p.personal_id, ep.snap_name AS name, p.einheit_id, \
+                e.name AS einheit_name, p.fahrzeug_id, \
+                CASE WHEN ef.id IS NULL THEN NULL \
+                     ELSE coalesce(f.funkrufname, ef.snap_funkrufname, '') END AS funkrufname \
+         FROM einsatz_abloesung_besatzung_plan p \
+         JOIN einsatz_abloesung a ON a.id = p.abloesung_id \
+         JOIN einsatz_personal ep ON ep.id = p.personal_id \
+         LEFT JOIN einsatz_einheit e ON e.id = p.einheit_id \
+         LEFT JOIN einsatz_fahrzeug ef ON ef.id = p.fahrzeug_id \
+         LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+         WHERE a.einsatz_id = ? AND a.status = 'laufend' ORDER BY p.abloesung_id, p.rowid",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut je_schicht: HashMap<i64, Vec<AbloesungBesatzungPlan>> = HashMap::new();
+    for z in zeilen {
+        je_schicht
+            .entry(z.abloesung_id)
+            .or_default()
+            .push(AbloesungBesatzungPlan {
+                personal_id: z.personal_id,
+                name: z.name,
+                einheit_id: z.einheit_id,
+                einheit_name: z.einheit_name,
+                fahrzeug_id: z.fahrzeug_id,
+                funkrufname: z.funkrufname,
+            });
+    }
+    Ok(je_schicht)
 }
 
 /// Die Gliederung eines Einsatzes für die Knoten-Vererbung: je aktive Einheit ihre
@@ -733,6 +808,69 @@ async fn set_abloeser_tx(
     sync_spiegel_tx(conn, id).await
 }
 
+/// Ziele einer neuen Besatzung als JSON für `json_each` (`p` Person, `e` Einheit, `f` Fahrzeug).
+fn ziele_json(ziele: &[BesatzungZiel]) -> Result<String, AppError> {
+    serde_json::to_string(
+        &ziele
+            .iter()
+            .map(|z| serde_json::json!({"p": z.personal_id, "e": z.einheit_id, "f": z.fahrzeug_id}))
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Der geplante Besatzungswechsel einer Schicht in seiner Reihenfolge (LLH-1319).
+async fn load_besatzung_plan_tx(
+    conn: &mut SqliteConnection,
+    id: i64,
+) -> Result<Vec<BesatzungZiel>, AppError> {
+    let zeilen: Vec<(i64, Option<i64>, Option<i64>)> = sqlx::query_as(
+        "SELECT personal_id, einheit_id, fahrzeug_id FROM einsatz_abloesung_besatzung_plan \
+         WHERE abloesung_id = ? ORDER BY rowid",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(zeilen
+        .into_iter()
+        .map(|(personal_id, einheit_id, fahrzeug_id)| BesatzungZiel {
+            personal_id,
+            einheit_id,
+            fahrzeug_id,
+        })
+        .collect())
+}
+
+/// Ersetzt den geplanten Besatzungswechsel einer Schicht (LLH-1319, Reihenfolge wie übergeben,
+/// EINE Anweisung über `json_each`). Einziger Schreibweg von `einsatz_abloesung_besatzung_plan`;
+/// eine leere Liste hebt die Planung auf. Der Vollzug lässt die Zeilen stehen, damit die Rücknahme
+/// die Planung wiederfindet.
+async fn set_besatzung_plan_tx(
+    conn: &mut SqliteConnection,
+    id: i64,
+    ziele: &[BesatzungZiel],
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM einsatz_abloesung_besatzung_plan WHERE abloesung_id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    if !ziele.is_empty() {
+        let json = ziele_json(ziele)?;
+        sqlx::query(
+            "INSERT INTO einsatz_abloesung_besatzung_plan \
+                (abloesung_id, personal_id, einheit_id, fahrzeug_id) \
+             SELECT ?, json_extract(j.value, '$.p'), json_extract(j.value, '$.e'), \
+                    json_extract(j.value, '$.f') \
+             FROM json_each(?) j ORDER BY j.key",
+        )
+        .bind(id)
+        .bind(json)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
 /// `abloesende_einheit_id` = erster Ablöser der Liste, NULL ohne einen.
 async fn sync_spiegel_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     sqlx::query(
@@ -937,13 +1075,16 @@ async fn set_fristen_tx(
     .await
 }
 
-/// Ob für die Schicht eine ablösende Einheit geplant ist: Einzelplanung oder Ablöser-Liste.
-async fn has_abloeser_tx(conn: &mut SqliteConnection, id: i64) -> Result<bool, AppError> {
+/// Ob für die Schicht eine Ablösung geplant ist: Einzelplanung, Ablöser-Liste oder ein
+/// geplanter Besatzungswechsel (LLH-1319).
+async fn has_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<bool, AppError> {
     let r: Option<i64> = sqlx::query_scalar(
         "SELECT 1 FROM einsatz_abloesung a WHERE a.id = ? \
            AND (a.abloesende_einheit_id IS NOT NULL \
                 OR EXISTS (SELECT 1 FROM einsatz_abloesung_abloeser l \
-                           WHERE l.abloesung_id = a.id))",
+                           WHERE l.abloesung_id = a.id) \
+                OR EXISTS (SELECT 1 FROM einsatz_abloesung_besatzung_plan p \
+                           WHERE p.abloesung_id = a.id))",
     )
     .bind(id)
     .fetch_optional(&mut *conn)
@@ -974,7 +1115,7 @@ async fn set_planung_frist_tx(
 ) -> Result<(), AppError> {
     let zeit = planungszeit(faellig_at, planungsvorlauf_minuten).filter(|p| p.as_str() > jetzt);
     match zeit {
-        Some(p) if !has_abloeser_tx(conn, id).await? => {
+        Some(p) if !has_planung_tx(conn, id).await? => {
             erinnerung_repo::setze_auto_frist_tx(
                 conn,
                 einsatz_id,
@@ -1517,6 +1658,68 @@ pub async fn aendern(
             _ => None,
         };
 
+        // Geplanter Besatzungswechsel (LLH-1319): eine Liste von Personen mit Ziel; ein Ziel gleich
+        // der Einheit der Schicht steht als „kein Ziel“.
+        let neuer_plan = match &eingabe.besatzung_plan {
+            Some(neu) => {
+                let neu: Vec<BesatzungZiel> = neu
+                    .iter()
+                    .map(|z| BesatzungZiel {
+                        einheit_id: z.einheit_id.filter(|e| *e != roh.einheit_id),
+                        ..*z
+                    })
+                    .collect();
+                let bisher = load_besatzung_plan_tx(conn, id).await?;
+                if neu == bisher {
+                    None
+                } else {
+                    let geprueft = if neu.is_empty() {
+                        Vec::new()
+                    } else {
+                        let g = load_gliederung(&mut *conn, einsatz_id).await?;
+                        let einheiten: Vec<i64> = std::iter::once(roh.einheit_id)
+                            .chain(erben_von(&g, roh.einheit_id))
+                            .collect();
+                        check_neue_besatzung_tx(conn, einsatz_id, &einheiten, &neu).await?
+                    };
+                    let gleiche_personen = {
+                        let mut a: Vec<i64> = neu.iter().map(|z| z.personal_id).collect();
+                        let mut b: Vec<i64> = bisher.iter().map(|z| z.personal_id).collect();
+                        a.sort_unstable();
+                        b.sort_unstable();
+                        a == b
+                    };
+                    teile.push(if geprueft.is_empty() {
+                        "Planung des Besatzungswechsels aufgehoben".into()
+                    } else if gleiche_personen {
+                        "Besatzungswechsel umgeplant".into()
+                    } else {
+                        format!(
+                            "Besatzungswechsel geplant, neu {}",
+                            personen_text(geprueft.iter().map(|p| p.name.as_str()))
+                        )
+                    });
+                    Some(neu)
+                }
+            }
+            None => None,
+        };
+        // Eine Planung je Schicht: Ablöser oder Besatzungswechsel (design.md D1).
+        let hat_abloeser = match neue_abloeser {
+            Some(neu) => !neu.is_empty(),
+            None => !load_abloeser_ids_tx(conn, id).await?.is_empty(),
+        };
+        let hat_plan = match &neuer_plan {
+            Some(neu) => !neu.is_empty(),
+            None => !load_besatzung_plan_tx(conn, id).await?.is_empty(),
+        };
+        if hat_abloeser && hat_plan {
+            return Err(AppError::UnprocessableEntity(
+                "Geplant ist entweder eine Ablösung durch Einheiten oder ein Besatzungswechsel"
+                    .into(),
+            ));
+        }
+
         if teile.is_empty() {
             return Ok(None);
         }
@@ -1531,9 +1734,12 @@ pub async fn aendern(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-        let abloeser_geaendert = neue_abloeser.is_some();
+        let abloeser_geaendert = neue_abloeser.is_some() || neuer_plan.is_some();
         if let Some(neu) = neue_abloeser {
             set_abloeser_tx(conn, id, neu).await?;
+        }
+        if let Some(neu) = &neuer_plan {
+            set_besatzung_plan_tx(conn, id, neu).await?;
         }
         if faellig_at != roh.faellig_at {
             set_fristen_tx(
@@ -1954,6 +2160,8 @@ pub async fn vollziehen(
                 "Der Vollzug liegt vor dem Beginn der Schicht".into(),
             ));
         }
+        // Die Planung für die Rücknahme sichern, bevor der Vollzug die Liste ersetzt (LLH-1319).
+        save_planung_tx(conn, id).await?;
         let (folge_ids, inhalt, wirkung) = match eingabe.art {
             AbloesungArt::Einheit => vollziehen_einheit_tx(conn, &vorgang, &roh, eingabe).await?,
             AbloesungArt::Besatzung => {
@@ -2479,76 +2687,146 @@ struct NeuePerson {
     name: String,
     /// Ihre bisherige Einheit (keine = `None`).
     einheit_id: Option<i64>,
+    /// Ihr bisheriges Fahrzeug (keins = `None`).
+    fahrzeug_id: Option<i64>,
+    /// Wohin der Wechsel sie verteilt (LLH-1319): die Einheit der Schicht oder eine erbende
+    /// Untereinheit, mit Namen für den ETB-Text.
+    ziel_einheit: i64,
+    ziel_einheit_name: String,
+    /// Das Ziel-Fahrzeug samt Funkrufnamen; `None` = ihr Fahrzeug bleibt.
+    ziel_fahrzeug: Option<(i64, String)>,
 }
 
-/// Prüft die neue Besatzung (LLH-1150) mit EINER Abfrage über `json_each` (`src/AGENTS.md`,
-/// „Eingabegrenzen“): fremd oder unbekannt → 404, entlassen oder storniert → 409 (wie
+/// Prüft die neue Besatzung samt Verteilung (LLH-1150, LLH-1319) mit EINER Abfrage über
+/// `json_each` (`src/AGENTS.md`, „Eingabegrenzen“), in dieser Reihenfolge je Person: fremd oder
+/// unbekannt → 404, entlassen oder storniert → 409 (wie
 /// `personal::disposition_repo::require_nicht_beendet`), schon in der bisherigen Besatzung
 /// (`einheiten`: die Einheit und ihre Erben) → 422, Führung einer anderen aktiven Einheit → 422
-/// (die neue Besatzung nimmt niemandem die Führung). Liefert die Personen in der Reihenfolge der
-/// Liste.
+/// (die neue Besatzung nimmt niemandem die Führung); Ziel-Einheit außerhalb von `einheiten` → 422;
+/// Ziel-Fahrzeug fremd oder unbekannt → 404, entlassen oder storniert → 409, keiner dieser
+/// Einheiten zugeordnet → 422. Ohne Ziel-Einheit gilt `einheiten[0]` (die Einheit der Schicht).
+/// Liefert die Personen in der Reihenfolge der Liste.
 async fn check_neue_besatzung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheiten: &[i64],
-    ids: &[i64],
+    ziele: &[BesatzungZiel],
 ) -> Result<Vec<NeuePerson>, AppError> {
-    /// `(id, Name, Einheit, beendet_als, beendet, in der bisherigen Besatzung, führt)`
-    type Pruefung = (
-        i64,
-        Option<String>,
-        Option<i64>,
-        Option<String>,
-        bool,
-        bool,
-        Option<String>,
-    );
+    #[derive(sqlx::FromRow)]
+    struct Pruefung {
+        id: i64,
+        name: Option<String>,
+        einheit_id: Option<i64>,
+        fahrzeug_id: Option<i64>,
+        beendet_als: Option<String>,
+        beendet: bool,
+        in_besatzung: bool,
+        fuehrt: Option<String>,
+        ziel_einheit: i64,
+        ziel_einheit_name: Option<String>,
+        ziel_einheit_passt: bool,
+        ziel_fahrzeug: Option<i64>,
+        fahrzeug_bekannt: bool,
+        fahrzeug_beendet_als: Option<String>,
+        fahrzeug_passt: bool,
+        funkrufname: String,
+    }
+    let Some(&selbst) = einheiten.first() else {
+        return Ok(Vec::new());
+    };
+    let json = ziele_json(ziele)?;
     let zeilen: Vec<Pruefung> = sqlx::query_as(
-        "SELECT j.value, p.snap_name, p.einheit_id, p.beendet_als, \
-                p.beendet_at IS NOT NULL, \
-                COALESCE(p.einheit_id IN (SELECT value FROM json_each(?3)), 0), \
+        "SELECT json_extract(j.value, '$.p') AS id, p.snap_name AS name, p.einheit_id, \
+                p.fahrzeug_id, p.beendet_als, p.beendet_at IS NOT NULL AS beendet, \
+                COALESCE(p.einheit_id IN (SELECT value FROM json_each(?3)), 0) AS in_besatzung, \
                 (SELECT e.name FROM einsatz_einheit e \
                  WHERE e.fuehrer_id = p.id AND e.aufgeloest_at IS NULL \
                    AND e.id NOT IN (SELECT value FROM json_each(?3)) \
-                 ORDER BY e.id LIMIT 1) \
+                 ORDER BY e.id LIMIT 1) AS fuehrt, \
+                COALESCE(json_extract(j.value, '$.e'), ?4) AS ziel_einheit, \
+                ze.name AS ziel_einheit_name, \
+                COALESCE(json_extract(j.value, '$.e'), ?4) IN (SELECT value FROM json_each(?3)) \
+                   AS ziel_einheit_passt, \
+                json_extract(j.value, '$.f') AS ziel_fahrzeug, \
+                zf.id IS NOT NULL AS fahrzeug_bekannt, zf.beendet_als AS fahrzeug_beendet_als, \
+                COALESCE(zf.einheit_id IN (SELECT value FROM json_each(?3)), 0) AS fahrzeug_passt, \
+                coalesce(fz.funkrufname, zf.snap_funkrufname, '') AS funkrufname \
          FROM json_each(?1) j \
-         LEFT JOIN einsatz_personal p ON p.id = j.value AND p.einsatz_id = ?2 \
+         LEFT JOIN einsatz_personal p ON p.id = json_extract(j.value, '$.p') AND p.einsatz_id = ?2 \
+         LEFT JOIN einsatz_einheit ze \
+                ON ze.id = COALESCE(json_extract(j.value, '$.e'), ?4) AND ze.einsatz_id = ?2 \
+         LEFT JOIN einsatz_fahrzeug zf \
+                ON zf.id = json_extract(j.value, '$.f') AND zf.einsatz_id = ?2 \
+         LEFT JOIN fahrzeug fz ON fz.id = zf.fahrzeug_id \
          ORDER BY j.key",
     )
-    .bind(crate::kraefte_disposition::ids_json(ids))
+    .bind(json)
     .bind(einsatz_id)
     .bind(crate::kraefte_disposition::ids_json(einheiten))
+    .bind(selbst)
     .fetch_all(&mut *conn)
     .await?;
+    let einheit_name: String = sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ?")
+        .bind(selbst)
+        .fetch_one(&mut *conn)
+        .await?;
     zeilen
         .into_iter()
-        .map(
-            |(id, name, einheit_id, beendet_als, beendet, in_besatzung, fuehrt)| {
-                let Some(name) = name else {
-                    return Err(AppError::NotFound);
-                };
-                if beendet {
-                    return Err(crate::personal::disposition_repo::beendet_conflict(
-                        beendet_als.as_deref().unwrap_or_default(),
-                    ));
-                }
-                if in_besatzung {
+        .map(|z| {
+            let Some(name) = z.name else {
+                return Err(AppError::NotFound);
+            };
+            if z.beendet {
+                return Err(crate::personal::disposition_repo::beendet_conflict(
+                    z.beendet_als.as_deref().unwrap_or_default(),
+                ));
+            }
+            if z.in_besatzung {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "«{name}» gehört schon zur bisherigen Besatzung"
+                )));
+            }
+            if let Some(einheit) = z.fuehrt {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "«{name}» führt die Einheit «{einheit}»"
+                )));
+            }
+            let ziel_einheit_name = match (z.ziel_einheit_passt, z.ziel_einheit_name) {
+                (true, Some(n)) => n,
+                _ => {
                     return Err(AppError::UnprocessableEntity(format!(
-                        "«{name}» gehört schon zur bisherigen Besatzung"
-                    )));
+                        "«{name}»: die Ziel-Einheit gehört nicht zu «{einheit_name}» oder ihren \
+                         Untereinheiten"
+                    )))
                 }
-                if let Some(einheit) = fuehrt {
+            };
+            let ziel_fahrzeug = match z.ziel_fahrzeug {
+                None => None,
+                Some(_) if !z.fahrzeug_bekannt => return Err(AppError::NotFound),
+                Some(_) if z.fahrzeug_beendet_als.is_some() => {
+                    return Err(crate::fahrzeug::disposition_repo::beendet_conflict(
+                        z.fahrzeug_beendet_als.as_deref().unwrap_or_default(),
+                    ))
+                }
+                Some(_) if !z.fahrzeug_passt => {
                     return Err(AppError::UnprocessableEntity(format!(
-                        "«{name}» führt die Einheit «{einheit}»"
-                    )));
+                        "«{name}»: das Fahrzeug «{}» gehört nicht zu «{einheit_name}» oder ihren \
+                         Untereinheiten",
+                        z.funkrufname
+                    )))
                 }
-                Ok(NeuePerson {
-                    id,
-                    name,
-                    einheit_id,
-                })
-            },
-        )
+                Some(f) => Some((f, z.funkrufname)),
+            };
+            Ok(NeuePerson {
+                id: z.id,
+                name,
+                einheit_id: z.einheit_id,
+                fahrzeug_id: z.fahrzeug_id,
+                ziel_einheit: z.ziel_einheit,
+                ziel_einheit_name,
+                ziel_fahrzeug,
+            })
+        })
         .collect()
 }
 
@@ -2584,6 +2862,32 @@ async fn besatzung_ereignis_tx(
     })
 }
 
+/// Die neue Besatzung für den ETB-Text (LLH-1319): „«A» (Gruppe 1, Florian 1-44), «B»“; die
+/// Klammer nennt nur, was von der Vorgabe abweicht (eine andere Einheit als `selbst`, ein
+/// Fahrzeug). Ohne Person „keine“.
+fn verteilung_text(neu: &[NeuePerson], selbst: i64) -> String {
+    if neu.is_empty() {
+        return "keine".into();
+    }
+    neu.iter()
+        .map(|p| {
+            let mut wohin: Vec<&str> = Vec::new();
+            if p.ziel_einheit != selbst {
+                wohin.push(&p.ziel_einheit_name);
+            }
+            if let Some((_, f)) = &p.ziel_fahrzeug {
+                wohin.push(f);
+            }
+            if wohin.is_empty() {
+                format!("«{}»", p.name)
+            } else {
+                format!("«{}» ({})", p.name, wohin.join(", "))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Namen für ETB-Texte: „«A», «B»“, ohne einen „keine“.
 fn personen_text<'a>(namen: impl Iterator<Item = &'a str>) -> String {
     let text = namen
@@ -2606,12 +2910,16 @@ fn personen_text<'a>(namen: impl Iterator<Item = &'a str>) -> String {
 /// Die neue Besatzung kommt in die Einheit selbst und bekommt `eintreffen`; die Einheiten selbst
 /// bekommen kein Ereignis, ihre Periode läuft weiter. Keine Grenzwerte, keine Ruhezeitrechnung
 /// (LFH-860). Was die Rücknahme braucht, steht in `einsatz_abloesung_besatzung`.
+///
+/// LLH-1319: die neue Besatzung kommt je Person in ihre Ziel-Einheit (die Einheit oder eine
+/// erbende Untereinheit) und, mit Ziel-Fahrzeug, auf dieses; die Zeile hält Ziel und vorheriges
+/// Fahrzeug für die Rücknahme.
 async fn vollziehen_besatzung_tx(
     conn: &mut SqliteConnection,
     v: &Vorgang<'_>,
     roh: &Roh,
     vollzogen_at: &str,
-    neu_ids: &[i64],
+    ziele: &[BesatzungZiel],
 ) -> Result<(Vec<i64>, String, VollzugWirkung), AppError> {
     use crate::zeitachse::ZeitachseArt;
     let Vorgang {
@@ -2626,7 +2934,7 @@ async fn vollziehen_besatzung_tx(
         .chain(erben_von(&g, roh.einheit_id))
         .collect();
     let einheiten_json = crate::kraefte_disposition::ids_json(&einheiten);
-    let neu = check_neue_besatzung_tx(conn, einsatz_id, &einheiten, neu_ids).await?;
+    let neu = check_neue_besatzung_tx(conn, einsatz_id, &einheiten, ziele).await?;
 
     // Die alte Besatzung, wie der Vollzug sie vorfindet: das Fahrzeug nur, wenn es einer dieser
     // Einheiten gehört, die Führung nur die der eigenen Einheit.
@@ -2664,7 +2972,8 @@ async fn vollziehen_besatzung_tx(
 
     let zeile = "INSERT INTO einsatz_abloesung_besatzung \
             (abloesung_id, personal_id, rolle, einheit_vorher_id, fahrzeug_vorher_id, \
-             war_fuehrer, zeitachse_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
+             war_fuehrer, zeitachse_id, einheit_nachher_id, fahrzeug_nachher_id) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     for (person, _, einheit, fahrzeug, fuehrer) in &alt {
         let z = besatzung_ereignis_tx(
             conn,
@@ -2683,6 +2992,8 @@ async fn vollziehen_besatzung_tx(
             .bind(fahrzeug)
             .bind(fuehrer)
             .bind(z)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
             .execute(&mut *conn)
             .await?;
     }
@@ -2696,20 +3007,24 @@ async fn vollziehen_besatzung_tx(
             vollzogen_at,
         )
         .await?;
+        // Das vorherige Fahrzeug zählt nur, wenn der Wechsel ihr eines gibt (LLH-1319).
+        let ziel_fahrzeug = p.ziel_fahrzeug.as_ref().map(|(f, _)| *f);
         sqlx::query(zeile)
             .bind(id)
             .bind(p.id)
             .bind(BesatzungRolle::Neu.as_str())
             .bind(p.einheit_id)
-            .bind(None::<i64>)
+            .bind(ziel_fahrzeug.and(p.fahrzeug_id))
             .bind(false)
             .bind(z)
+            .bind(p.ziel_einheit)
+            .bind(ziel_fahrzeug)
             .execute(&mut *conn)
             .await?;
     }
 
     // Zugehörigkeit in je einer Anweisung: die alte Besatzung verlässt Führung, Fahrzeug und
-    // Einheit, die neue kommt in die Einheit.
+    // Einheit, die neue kommt in ihre Ziel-Einheit und, wo eines genannt ist, auf ihr Fahrzeug.
     sqlx::query(
         "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE id IN \
             (SELECT einheit_vorher_id FROM einsatz_abloesung_besatzung \
@@ -2730,12 +3045,15 @@ async fn vollziehen_besatzung_tx(
     .execute(&mut *conn)
     .await?;
     sqlx::query(
-        "UPDATE einsatz_personal SET einheit_id = ?2 \
+        "UPDATE einsatz_personal SET \
+            einheit_id = (SELECT b.einheit_nachher_id FROM einsatz_abloesung_besatzung b \
+                WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id), \
+            fahrzeug_id = COALESCE((SELECT b.fahrzeug_nachher_id FROM einsatz_abloesung_besatzung b \
+                WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id), fahrzeug_id) \
          WHERE id IN (SELECT personal_id FROM einsatz_abloesung_besatzung \
                       WHERE abloesung_id = ?1 AND rolle = 'neu')",
     )
     .bind(id)
-    .bind(roh.einheit_id)
     .execute(&mut *conn)
     .await?;
 
@@ -2767,7 +3085,7 @@ async fn vollziehen_besatzung_tx(
         "Ablösung vollzogen: Besatzungswechsel «{name}», Einheit und Fahrzeug bleiben. \
          Alte Besatzung: {}. Neue Besatzung: {}.",
         personen_text(alt.iter().map(|(_, n, ..)| n.as_str())),
-        personen_text(neu.iter().map(|p| p.name.as_str())),
+        verteilung_text(&neu, roh.einheit_id),
     );
     Ok((vec![folge], inhalt, wirkung))
 }
@@ -2777,9 +3095,11 @@ async fn vollziehen_besatzung_tx(
 /// gelöst. Das Ereignis `abloesung` wird an der Einheit und an jeder Untereinheit gestrichen,
 /// die die wieder laufende Schicht erbt. Eine Abschnittsübergabe wird zurückgegeben, wo der
 /// Vollzug den Stand hinterlassen hat: die abgelöste Einheit bekommt ihren Abschnitt, solange sie
-/// noch ohne ist, jeder Ablöser seinen alten, solange er noch im übergebenen steht. Die Liste
-/// der Ablöser bleibt als Planung stehen. Einen Besatzungswechsel nimmt
-/// [`zuruecknehmen_besatzung_tx`] zurück (LLH-1150).
+/// noch ohne ist, jeder Ablöser seinen alten, solange er noch im übergebenen steht. Die Planung
+/// von vor dem Vollzug gilt wieder (LLH-1319, [`restore_planung_tx`]): die gesicherte Liste der
+/// Ablöser, ein geplanter Besatzungswechsel steht ohnehin noch; ohne Sicherung (Vollzug vor
+/// Migration 0262) bleibt die Liste des Vollzugs als Planung stehen. Einen Besatzungswechsel
+/// nimmt [`zuruecknehmen_besatzung_tx`] zurück (LLH-1150).
 pub async fn zuruecknehmen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -2937,6 +3257,9 @@ pub async fn zuruecknehmen(
         .bind(id)
         .execute(&mut *conn)
         .await?;
+        // Die Planung von vor dem Vollzug gilt wieder (LLH-1319), bevor die Fristen den
+        // Planungshinweis setzen; nach der Abschnittsrückgabe, die die Liste noch liest.
+        restore_planung_tx(conn, id).await?;
         restore_fristen_tx(conn, einsatz_id, benutzer_id, id, &roh, &name, jetzt).await?;
 
         let mut inhalt = format!("Vollzug der Ablösung «{name}» zurückgenommen.");
@@ -2975,6 +3298,62 @@ pub async fn zuruecknehmen(
         Ok((etb_id, wirkung))
     })?;
     Ok((laden(pool, einsatz_id, id, jetzt).await?, etb_id, wirkung))
+}
+
+/// Sichert die geplante Ablöser-Liste einer Schicht vor dem Vollzug (LLH-1319, design.md D4) in
+/// `einsatz_abloesung_planung_vorher` und markiert die Schicht (`planung_gesichert`), auch bei
+/// leerer Planung. Ein geplanter Besatzungswechsel braucht keine Sicherung: der Vollzug lässt
+/// seine Zeilen stehen.
+async fn save_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM einsatz_abloesung_planung_vorher WHERE abloesung_id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "INSERT INTO einsatz_abloesung_planung_vorher (abloesung_id, einheit_id) \
+         SELECT abloesung_id, einheit_id FROM einsatz_abloesung_abloeser \
+         WHERE abloesung_id = ? ORDER BY rowid",
+    )
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query("UPDATE einsatz_abloesung SET planung_gesichert = 1 WHERE id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Stellt bei der Rücknahme die vor dem Vollzug gesicherte Ablöser-Liste wieder her (LLH-1319),
+/// ohne inzwischen aufgelöste Einheiten, und räumt die Sicherung. Ohne Sicherung (Vollzug vor
+/// Migration 0262) bleibt die Liste des Vollzugs als Planung, wie bisher.
+async fn restore_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
+    let gesichert: bool =
+        sqlx::query_scalar("SELECT planung_gesichert FROM einsatz_abloesung WHERE id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if !gesichert {
+        return Ok(());
+    }
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT v.einheit_id FROM einsatz_abloesung_planung_vorher v \
+         JOIN einsatz_einheit e ON e.id = v.einheit_id AND e.aufgeloest_at IS NULL \
+         WHERE v.abloesung_id = ? ORDER BY v.rowid",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    set_abloeser_tx(conn, id, &ids).await?;
+    sqlx::query("DELETE FROM einsatz_abloesung_planung_vorher WHERE abloesung_id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("UPDATE einsatz_abloesung SET planung_gesichert = 0 WHERE id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
 }
 
 /// Legt die Belegungsbuchungen eines Vollzugs im Bereitstellungsraum zurück (LLH-1308, design.md
@@ -3052,10 +3431,12 @@ async fn buchungen_zuruecknehmen_tx(
 /// Nimmt einen Besatzungswechsel zurück (LLH-1150): streicht die Ereignisse der Personen aus dem
 /// Vollzug (Grund „Ablösung zurückgenommen“; bräche das die Folge einer Person → 422 mit ihrem
 /// Namen, nichts geändert) und legt jede Person zurück, solange sie noch so steht, wie der
-/// Vollzug sie hinterlassen hat: die neue verlässt die Einheit wieder (zurück in ihre bisherige,
-/// solange die aktiv ist), die alte kommt in ihre Einheit (solange sie ohne Einheit und aktiv ist
-/// und die Einheit nicht aufgelöst), auf ihr Fahrzeug (solange sie auf keinem sitzt und es
-/// aktiv ist) und in ihre Führung (solange die Einheit keine hat). Danach fallen die Zeilen.
+/// Vollzug sie hinterlassen hat: die neue verlässt die Einheit wieder, in die der Vollzug sie
+/// verteilt hat (zurück in ihre bisherige, solange die aktiv ist), und das Ziel-Fahrzeug (zurück
+/// auf ihr bisheriges, solange es aktiv ist; LLH-1319), die alte kommt in ihre Einheit
+/// (solange sie ohne Einheit und aktiv ist und die Einheit nicht aufgelöst), auf ihr Fahrzeug
+/// (solange sie auf keinem sitzt und es aktiv ist) und in ihre Führung (solange die Einheit
+/// keine hat). Danach fallen die Zeilen.
 async fn zuruecknehmen_besatzung_tx(
     conn: &mut SqliteConnection,
     v: &Vorgang<'_>,
@@ -3097,19 +3478,37 @@ async fn zuruecknehmen_besatzung_tx(
     }
 
     let mut wirkung = VollzugWirkung::default();
-    // Die neue Besatzung zurück, solange sie noch in der Einheit steht.
+    // Die neue Besatzung zurück, solange sie noch in ihrer Ziel-Einheit steht (LLH-1319; ohne
+    // Ziel, Bestand vor 0262, die Einheit der Schicht).
     let neu: Vec<(i64, Option<i64>)> = sqlx::query_as(
         "UPDATE einsatz_personal SET einheit_id = \
             (SELECT e.id FROM einsatz_abloesung_besatzung b \
              JOIN einsatz_einheit e ON e.id = b.einheit_vorher_id AND e.aufgeloest_at IS NULL \
              WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id) \
-         WHERE einheit_id = ?2 AND id IN (SELECT personal_id FROM einsatz_abloesung_besatzung \
-                                          WHERE abloesung_id = ?1 AND rolle = 'neu') \
+         WHERE EXISTS (SELECT 1 FROM einsatz_abloesung_besatzung b \
+                       WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id \
+                         AND b.rolle = 'neu' \
+                         AND einsatz_personal.einheit_id = COALESCE(b.einheit_nachher_id, ?2)) \
          RETURNING id, einheit_id",
     )
     .bind(id)
     .bind(einheit_id)
     .fetch_all(&mut *conn)
+    .await?;
+    // Ihr Fahrzeug zurück, solange sie noch auf dem sitzt, das der Wechsel ihr gab: auf das
+    // vorherige, solange es aktiv ist, sonst auf keins (LLH-1319).
+    sqlx::query(
+        "UPDATE einsatz_personal SET fahrzeug_id = \
+            (SELECT f.id FROM einsatz_abloesung_besatzung b \
+             JOIN einsatz_fahrzeug f ON f.id = b.fahrzeug_vorher_id AND f.beendet_at IS NULL \
+             WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id) \
+         WHERE EXISTS (SELECT 1 FROM einsatz_abloesung_besatzung b \
+                       WHERE b.abloesung_id = ?1 AND b.personal_id = einsatz_personal.id \
+                         AND b.rolle = 'neu' \
+                         AND b.fahrzeug_nachher_id = einsatz_personal.fahrzeug_id)",
+    )
+    .bind(id)
+    .execute(&mut *conn)
     .await?;
     // Die alte Besatzung zurück, solange sie ohne Einheit und noch im Einsatz ist.
     let alt: Vec<(i64, Option<i64>)> = sqlx::query_as(
@@ -3223,7 +3622,7 @@ async fn restore_fristen_tx(
         // ausgelöster wird nicht wiederholt.
         let vorlauf = vorgabe.planungsvorlauf();
         if let Some(p) = planungszeit(&faellig_at, vorlauf).filter(|p| p.as_str() > jetzt) {
-            if !has_abloeser_tx(conn, id).await? {
+            if !has_planung_tx(conn, id).await? {
                 erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG_PLANUNG, id).await?;
                 if open_frist_at_tx(conn, OBJEKT_ABLOESUNG_PLANUNG, id).await? != Some(p) {
                     set_planung_frist_tx(

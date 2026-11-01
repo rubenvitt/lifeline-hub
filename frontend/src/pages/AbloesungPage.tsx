@@ -22,7 +22,12 @@ import type { Abloesung, AbloesungStatus, AbloesungVorgabe } from '../api/types'
 import AbloesungKarte from '../abloesung/AbloesungKarte';
 import { abloeserIds, abloeserOptionen, abloeserText } from '../abloesung/abloeser';
 import { buildAbloeserStand, type AbloeserStand } from '../abloesung/abloeserStand';
-import { besatzungOptionen, besatzungText, bisherigeBesatzung } from '../abloesung/besatzung';
+import {
+  besatzungOptionen,
+  besatzungText,
+  bisherigeBesatzung,
+  verteilungZiele,
+} from '../abloesung/besatzung';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import OhneSchichtKarte from '../abloesung/OhneSchichtKarte';
 import {
@@ -255,13 +260,14 @@ export default function AbloesungPage() {
     enabled: einheitenFrei,
   });
   // Besatzungswechsel (LLH-1150): die neue Besatzung kommt aus dem Personal des Einsatzes (Modul
-  // Personal), geladen erst mit offenem Vollzug-Dialog. Der Wechsel schreibt die Zuordnung, die
-  // sonst das Modul Einheiten schreibt; ohne eine der beiden Freigaben ist er gesperrt mit Grund.
+  // Personal), geladen erst mit offenem Vollzug- oder Planungsdialog (LLH-1319). Der Wechsel
+  // schreibt die Zuordnung, die sonst das Modul Einheiten schreibt; ohne eine der beiden
+  // Freigaben ist er gesperrt mit Grund.
   const personalFrei = istKeyFreigegeben('personal', freigabenQuery.data);
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
-    enabled: personalFrei && vollzugSchicht != null,
+    enabled: personalFrei && (vollzugSchicht != null || abloeserSchicht != null),
   });
   const besatzungGesperrt =
     freigabenQuery.data == null
@@ -271,6 +277,20 @@ export default function AbloesungPage() {
         : !personalFrei
           ? MODUL_PERSONAL_GESPERRT
           : undefined;
+  // Die Felder des Besatzungswechsels, wie Vollzug und Planung sie brauchen (LLH-1319): Personen
+  // `null`, solange das Personal lädt, Ziele `undefined`, solange die Einheiten laden.
+  const besatzungProps = (schicht: Abloesung) => ({
+    bisherigeBesatzung: bisherigeBesatzung(schicht, einheitenQuery.data),
+    personen: personalQuery.data
+      ? besatzungOptionen(personalQuery.data, einheitenQuery.data ?? [], schicht)
+      : null,
+    verteilung: einheitenQuery.data
+      ? verteilungZiele(schicht, einheitenQuery.data)
+      : einheitenQuery.isError
+        ? null
+        : undefined,
+    besatzungGesperrt,
+  });
 
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
 
@@ -980,13 +1000,7 @@ export default function AbloesungPage() {
               : (vollzugSchicht.abschnitt_name ?? null)
           }
           uebergabeGesperrt={einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined}
-          bisherigeBesatzung={bisherigeBesatzung(vollzugSchicht, einheitenQuery.data)}
-          personen={besatzungOptionen(
-            personalQuery.data ?? [],
-            einheitenQuery.data ?? [],
-            vollzugSchicht,
-          )}
-          besatzungGesperrt={besatzungGesperrt}
+          {...besatzungProps(vollzugSchicht)}
           raeume={verbleibRaeume(brFrei ? brQuery.data : undefined)}
           raumGesperrt={raumGesperrt}
           laeuft={vollzugMut.isPending}
@@ -1000,13 +1014,11 @@ export default function AbloesungPage() {
           key={abloeserSchicht.id}
           schicht={abloeserSchicht}
           einheiten={abloeserOptionen(einheitenQuery.data ?? [], laufende, abloeserSchicht)}
+          {...besatzungProps(abloeserSchicht)}
           laeuft={aendernMut.isPending}
           fehler={aendernMut.error}
-          onErfassen={(abloeserIds) =>
-            aendernMut.mutateAsync({
-              abloesungId: abloeserSchicht.id,
-              body: { abloeser_ids: abloeserIds },
-            })
+          onErfassen={(eingabe) =>
+            aendernMut.mutateAsync({ abloesungId: abloeserSchicht.id, body: eingabe })
           }
           onSchliessen={() => setAbloeserSchicht(null)}
         />
