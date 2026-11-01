@@ -2743,6 +2743,26 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     expect(gebucht).toHaveLength(0);
   });
 
+  it('verlegt jemand anderes die Kraft während der Wahl, sperrt der Dialog und bucht nichts', async () => {
+    const stand = { br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) };
+    const gebucht = seite(stand.br);
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
+    );
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await waehle('Ziel-Raum', 'BR Nord');
+    stand.br = brDetail({ einheiten: [] });
+    await act(() => gebucht.qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(1, 1) }));
+    expect(
+      await within(dialog()).findByText('steht nicht mehr bereit in diesem Raum'),
+    ).toBeInTheDocument();
+    const knopf = within(dialog()).getByRole('button', { name: /^Verlegen/ });
+    expect(knopf).toBeDisabled();
+    fireEvent.click(knopf);
+    expect(gebucht).toHaveLength(0);
+  });
+
   it('ohne Ziel-Raum geht nichts hinaus', async () => {
     const gebucht = seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }));
     await screen.findByText('HLF 20');

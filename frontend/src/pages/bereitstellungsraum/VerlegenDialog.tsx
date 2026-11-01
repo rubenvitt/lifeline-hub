@@ -16,6 +16,7 @@ export interface VerlegenZiel {
 }
 
 const RAUM_WEG = 'Raum nicht mehr in Betrieb';
+const KRAFT_WEG = 'steht nicht mehr bereit in diesem Raum';
 
 interface VerlegenWerte {
   ziel_br_id?: number;
@@ -29,6 +30,12 @@ export interface VerlegenDialogProps {
   ziel: VerlegenZiel | null;
   /** Die wählbaren Räume (`zielRaeume`): in Betrieb, nicht storniert, ohne den eigenen. */
   raeume: readonly BrListenEintrag[];
+  /**
+   * Steht die Kraft noch bereitgestellt in diesem Raum (Live-Stand der Seite)? Hat jemand anderes
+   * sie inzwischen verlegt, ausgetragen oder abgerufen, bucht der Dialog nichts: ein Wechsel aus
+   * dem neuen Raum wäre eine zweite Verlegung, die niemand gewählt hat.
+   */
+  kraftImRaum: boolean;
   onClose: () => void;
 }
 
@@ -45,6 +52,7 @@ export default function VerlegenDialog({
   brId,
   ziel,
   raeume,
+  kraftImRaum,
   onClose,
 }: VerlegenDialogProps) {
   const [form] = Form.useForm<VerlegenWerte>();
@@ -87,8 +95,11 @@ export default function VerlegenDialog({
       speicherung={mutation}
       speicherFehlerTitel="Nicht verlegt"
       speicherFehlerFallback="Verlegen fehlgeschlagen"
+      gesperrt={!kraftImRaum}
+      zusammenfassung={kraftImRaum ? undefined : KRAFT_WEG}
       onErfassen={async (w) => {
         if (!ziel) return;
+        if (!kraftImRaum) throw new Error(KRAFT_WEG);
         const raum = raeume.find((r) => r.id === w.ziel_br_id);
         // Der gewählte Raum ging während der Wahl außer Betrieb (Live-Liste): nichts senden, der
         // Dialog bleibt offen und nennt den Grund am Feld.

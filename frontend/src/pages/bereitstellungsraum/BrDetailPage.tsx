@@ -424,6 +424,13 @@ export default function BrDetailPage() {
   const eintreffen = darf('br-eintreffen') && darfImEinsatzSchreiben(einsatz);
   const inBetrieb = br.status === 'aktiv';
   const verlegenRaeume = raeumeQuery.data ? zielRaeume(raeumeQuery.data, br.id) : null;
+  // Steht die Kraft des offenen Verlegen-Dialogs noch bereitgestellt hier? Aus dem Serverstand,
+  // nicht aus der gehaltenen Ansicht: eine fremde Verlegung sperrt den Dialog sofort.
+  const verlegenBereit =
+    verlegenZiel != null &&
+    (verlegenZiel.objekt_typ === 'einheit' ? teilung.einheiten : teilung.fahrzeuge).some(
+      (k) => k.id === verlegenZiel.objekt_id,
+    );
   const vorgemerktHier = vorgemerkt.filter((v) => v.aktion.br_id === br.id);
 
   function onZuweisenEinheit(einheit: Einheit) {
@@ -1055,6 +1062,7 @@ export default function BrDetailPage() {
           brId={br.id}
           ziel={verlegenZiel}
           raeume={verlegenRaeume ?? []}
+          kraftImRaum={verlegenBereit}
           onClose={() => setVerlegenZiel(null)}
         />
       )}
