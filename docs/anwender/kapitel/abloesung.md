@@ -94,8 +94,9 @@ Für Einsatzleitung und Führungspersonal:
    ![Dialog „Ablösung Rettungsstaffel vollziehen“ mit ablösender Einheit „2. Rettungsstaffel“, Zeitpunkt jetzt, angehaktem „Abschnitt übergeben (Sanitätsdienst)“ und „Danach: Bereitstellungsraum «Parkplatz Stadion Nord»“](../bilder/abloesung/vollziehen.png)
 
 6. „Vollziehen“ wählen. Die abgelöste Schicht wandert nach „Vergangen“, „Abgelöst“, ihre Karte
-   nennt den Verbleib („danach Bereitstellungsraum …“, „danach entlassen“); jede ablösende Einheit
-   beginnt eine Folgeschicht mit demselben Rhythmus.
+   nennt den Verbleib („danach Bereitstellungsraum …“, „danach entlassen“). Jede neue Folgeschicht
+   beginnt mit demselben Rhythmus; die eigene laufende Schicht einer ungeplant eingetroffenen
+   ablösenden Einheit übernimmt der Vollzug mit Beginn, Fälligkeit und Erinnerungen (siehe unten).
 7. War es die falsche Karte, in der Meldung „Rückgängig“ wählen. Später geht das unter „Vergangen“,
    „Abgelöst“ mit „Vollzug zurücknehmen“, solange jede Folgeschicht unberührt ist.
 
@@ -379,7 +380,9 @@ dem ihr Einsatzabschnitt endet, ebenso an jeder Untereinheit, die in ihrer Schic
 an deren Personen; die Rücknahme streicht alle wieder. Ein Besatzungswechsel schreibt stattdessen
 nur an Personen: die bisherige Besatzung bekommt „Ablösung“, die neue „Eintreffen“; die Einheit
 behält ihren Einsatzabschnitt. Mit „Danach: Entlassen“ steht an der abgelösten Einheit, den
-mitlaufenden Untereinheiten und deren Personen „Entlassung“ statt „Ablösung“. Diese Ereignisse
+mitlaufenden Untereinheiten und deren Personen „Entlassung“ statt „Ablösung“. Beides steht nur
+an Einheiten, die gerade im Einsatz sind; ohne offenen Einsatzabschnitt bleibt ihre Zeitachse, wie sie
+ist. Diese Ereignisse
 lassen sich nicht
 von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
 Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben).

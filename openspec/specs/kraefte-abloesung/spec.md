@@ -888,7 +888,8 @@ mit dem Ereignis `abloesung` enden; bei `bereitstellungsraum` MUST die abgelöst
 derselben Transaktion in den gewählten Raum eintreten (Belegung `eintritt`). Bei `entlassen` MUST
 statt `abloesung` das Ereignis `entlassung` (Quelle `abloesung`) an der Einheit und jeder
 erbenden Untereinheit stehen, je samt Fan-out; die Schicht MUST `abgeloest` bleiben und darf
-nicht zusätzlich mit Grund `entlassung` beendet werden. Ist der Raum fremd oder unbekannt (404),
+nicht zusätzlich mit Grund `entlassung` beendet werden. Beide Ende-Ereignisse MUST nur an einer
+Einheit mit offener Periode stehen; ohne offene Periode bleibt ihre Zeitachse unberührt. Ist der Raum fremd oder unbekannt (404),
 nicht aktiv oder storniert (422) oder steht die Einheit schon in einem Raum (422), MUST der
 Vollzug scheitern und nichts schreiben. `verbleib_br_id` ohne `bereitstellungsraum` und
 `bereitstellungsraum` ohne Raum MUST 422 sein, ein unbekannter `verbleib` 400, ein `verbleib`

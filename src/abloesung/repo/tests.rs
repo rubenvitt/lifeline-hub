@@ -3832,3 +3832,51 @@ async fn abloeser_im_raum_ruecken_aus_und_kommen_bei_ruecknahme_zurueck() {
     );
     assert!(!text.contains("«Florian 4»"), "{text}");
 }
+
+/// LLH-1308: der ETB-Text des Vollzugs bleibt in der ETB-Grenze; überzählige Raum-Sätze fallen
+/// weg und werden gezählt, der Verbleib bleibt stehen.
+#[test]
+fn vollzug_inhalt_bleibt_in_der_grenze() {
+    let kopf = "Ablösung vollzogen: «A» durch «B».".to_string();
+    let saetze: Vec<String> = (0..4)
+        .map(|i| format!("«R{i}» rückt aus Raum X aus"))
+        .collect();
+    let verbleib = " «A» danach entlassen.";
+
+    let voll = vollzug_inhalt_gekappt(kopf.clone(), &saetze, Some(verbleib), 10_000);
+    assert_eq!(
+        voll,
+        "Ablösung vollzogen: «A» durch «B». «R0» rückt aus Raum X aus. «R1» rückt aus Raum X aus. \
+         «R2» rückt aus Raum X aus. «R3» rückt aus Raum X aus. «A» danach entlassen."
+    );
+
+    let max = kopf.chars().count() + 2 * 25 + 80;
+    let gekappt = vollzug_inhalt_gekappt(kopf.clone(), &saetze, Some(verbleib), max);
+    assert!(gekappt.chars().count() <= max, "{gekappt}");
+    assert!(gekappt.ends_with(" «A» danach entlassen."), "{gekappt}");
+    assert!(
+        gekappt.contains("weitere ablösende Einheit"),
+        "überzählige Sätze werden gezählt: {gekappt}"
+    );
+    let stehen = saetze
+        .iter()
+        .filter(|s| gekappt.contains(s.as_str()))
+        .count();
+    let gezaehlt: usize = gekappt
+        .split(" weitere")
+        .next()
+        .and_then(|v| v.rsplit(' ').next())
+        .and_then(|n| n.parse().ok())
+        .unwrap();
+    assert_eq!(stehen + gezaehlt, saetze.len(), "{gekappt}");
+
+    // Passt kein Raum-Satz, zählt der Text alle; der Verbleib steht trotzdem.
+    let eng = kopf.chars().count() + 75 + verbleib.chars().count();
+    let nur_zahl = vollzug_inhalt_gekappt(kopf.clone(), &saetze, Some(verbleib), eng);
+    assert_eq!(
+        nur_zahl,
+        format!(
+            "{kopf} 4 weitere ablösende Einheiten aus Bereitstellungsräumen ausgerückt.{verbleib}"
+        )
+    );
+}

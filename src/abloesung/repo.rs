@@ -2229,15 +2229,55 @@ async fn vollziehen_einheit_tx(
             namen_text(&an)
         ));
     }
-    for satz in br_saetze {
+    let inhalt = vollzug_inhalt_gekappt(
+        inhalt,
+        &br_saetze,
+        verbleib_satz.as_deref(),
+        crate::etb::INHALT_MAX,
+    );
+    Ok((folge_ids, inhalt, wirkung))
+}
+
+/// Hängt die Sätze der aus einem Raum ausgerückten Ablöser und den Verbleib an den ETB-Text des
+/// Vollzugs, so dass er höchstens `max` Zeichen lang bleibt (`src/AGENTS.md`, Eingabegrenzen):
+/// passt ein Raum-Satz nicht mehr, fällt er mit allen folgenden weg, ein Zählsatz nennt ihre
+/// Anzahl. Der Verbleib bleibt immer stehen; ein Systemtext darf nicht scheitern.
+fn vollzug_inhalt_gekappt(
+    mut inhalt: String,
+    br_saetze: &[String],
+    verbleib_satz: Option<&str>,
+    max: usize,
+) -> String {
+    let verbleib_len = verbleib_satz.map_or(0, |s| s.chars().count());
+    let zaehlsatz = |n: usize| {
+        if n == 1 {
+            " 1 weitere ablösende Einheit aus einem Bereitstellungsraum ausgerückt.".to_string()
+        } else {
+            format!(" {n} weitere ablösende Einheiten aus Bereitstellungsräumen ausgerückt.")
+        }
+    };
+    let mut laenge = inhalt.chars().count();
+    for (i, satz) in br_saetze.iter().enumerate() {
+        let teil = satz.chars().count() + 2;
+        let weitere = br_saetze.len() - i - 1;
+        let danach = if weitere > 0 {
+            zaehlsatz(weitere).chars().count()
+        } else {
+            0
+        };
+        if laenge + teil + danach + verbleib_len > max {
+            inhalt.push_str(&zaehlsatz(br_saetze.len() - i));
+            break;
+        }
         inhalt.push(' ');
-        inhalt.push_str(&satz);
+        inhalt.push_str(satz);
         inhalt.push('.');
+        laenge += teil;
     }
     if let Some(satz) = verbleib_satz {
-        inhalt.push_str(&satz);
+        inhalt.push_str(satz);
     }
-    Ok((folge_ids, inhalt, wirkung))
+    inhalt
 }
 
 /// Das Ende-Ereignis der Zeitachse zum Verbleib (LLH-1308, design.md D2): „entlassen“ endet mit

@@ -157,6 +157,8 @@ const BEREICH: Record<AbloesungStatus, string> = {
  * unter den laufenden, sucht die Seite sie unter den abgelösten und beendeten; eine unbekannte
  * Kennung ändert nichts.
  */
+const BR_NICHT_GELADEN = 'Bereitstellungsräume konnten nicht geladen werden';
+
 export default function AbloesungPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -287,8 +289,14 @@ export default function AbloesungPage() {
     queryFn: () => listeBr(einsatzId),
     enabled: brFrei && (abloeserImBr || vollzugSchicht != null),
   });
-  // Gesperrt erst, wenn die Freigaben da sind (wie `besatzungGesperrt`).
-  const raumGesperrt = freigabenQuery.data != null && !brFrei ? MODUL_BR_GESPERRT : undefined;
+  // Gesperrt erst, wenn die Freigaben da sind (wie `besatzungGesperrt`). Scheitert die Raumliste,
+  // steht der Grund unter „Danach“, statt dass die Räume still fehlen.
+  const raumGesperrt =
+    freigabenQuery.data != null && !brFrei
+      ? MODUL_BR_GESPERRT
+      : brFrei && brQuery.isError
+        ? BR_NICHT_GELADEN
+        : undefined;
   const standJeSchicht = useMemo(() => {
     const m = new Map<number, AbloeserStand[]>();
     if (!periodenQuery.data) return m;
@@ -811,7 +819,7 @@ export default function AbloesungPage() {
               type="warning"
               showIcon
               style={{ marginBottom: token.marginSM }}
-              title="Bereitstellungsräume konnten nicht geladen werden"
+              title={BR_NICHT_GELADEN}
             />
           )}
           {listenQuery.isLoading ? (
