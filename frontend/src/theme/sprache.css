@@ -262,11 +262,15 @@
   color: var(--lfh-text);
 }
 /* Gesperrt: sichtbar, fokussierbar (den Grund nennt die Leiste), aber ohne Hover-Aufhellung.
-   Die Farbe ist nicht der einzige Kanal — `Segmentleiste` nennt den Grund. */
+   Die Farbe ist nicht der einzige Kanal: `Segmentleiste` nennt den Grund, und das Segment trägt
+   die Strichlinie nach innen wie antds `Segmented` (LLH-1233, LLH-1334; `index.css`). Nach innen,
+   damit im Fugenraster nichts wächst; der Fokusring darunter löst sie ab, solange er steht. */
 .lfh-segment[aria-disabled='true'],
 .lfh-segment[aria-disabled='true']:hover {
   color: var(--lfh-schwach);
   cursor: not-allowed;
+  outline: 1px dashed var(--lfh-steuer-rahmen);
+  outline-offset: -1px;
 }
 /* Nach innen versetzt: im Fugenraster läge ein äußerer Ring unter dem Nachbarsegment. */
 .lfh-segment:focus-visible {

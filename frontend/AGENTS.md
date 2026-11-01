@@ -423,8 +423,9 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   den Grund auf.
 - **Gesperrt trägt die Sperre ohne Farbe** (LLH-1233): gesperrte antd-Knöpfe und -Felder haben
   einen gestrichelten Rand in `steuer-rahmen`, randlose Einträge (Menü, Auswahlliste, antds
-  `Segmented`) eine Strichlinie nach innen (`index.css`). Gestrichelt heißt nur gesperrt: die
-  Knopfvariante `dashed` ist gesperrt (`theme/gesperrtZeichen.guard.test.ts`).
+  `Segmented`, eigene `Segmentleiste`) eine Strichlinie nach innen (`index.css`, `sprache.css`).
+  Gestrichelt heißt nur gesperrt: die Knopfvariante `dashed` ist gesperrt
+  (`theme/gesperrtZeichen.guard.test.ts`).
 
 **Lagekarte** (auch `pages/LagekartePage.tsx`): `frontend/src/pages/lagekarte/AGENTS.md`.
 

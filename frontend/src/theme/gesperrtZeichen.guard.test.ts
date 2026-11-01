@@ -5,7 +5,8 @@ import { ohneKommentare } from '../test/ohneKommentare';
 
 /**
  * Zeichen der Sperre ohne Farbe (LLH-1233, Spec `textstufen-kontrast`): gesperrte antd-Knöpfe,
- * Felder und Einträge tragen einen GESTRICHELTEN Rand (`index.css`). Damit das Zeichen eindeutig
+ * Felder und Einträge tragen einen GESTRICHELTEN Rand (`index.css`), ebenso das gesperrte Segment
+ * der eigenen `Segmentleiste` (`theme/sprache.css`, LLH-1334). Damit das Zeichen eindeutig
  * bleibt, ist gestrichelt für Freies gesperrt: antds Knopfvariante `dashed` kommt im Quelltext
  * nicht vor.
  *
@@ -58,6 +59,9 @@ function lieseQuellen(verzeichnis: string, praefix = ''): Record<string, string>
 
 const QUELLEN = lieseQuellen(SRC);
 const INDEX_CSS = ohneKommentare(readFileSync(join(SRC, 'index.css'), 'utf8')).join('\n');
+const SPRACHE_CSS = ohneKommentare(readFileSync(join(SRC, 'theme', 'sprache.css'), 'utf8')).join(
+  '\n',
+);
 
 /** Der Regelblock, der einen Selektor enthält, oder `undefined`. */
 function regelZu(css: string, selektor: string): string | undefined {
@@ -94,6 +98,27 @@ describe('Gesperrtes trägt einen gestrichelten Rand (LLH-1233)', () => {
     const regel = regelZu(INDEX_CSS, selektor);
     expect(regel, `Kein Regelblock für ${selektor} in index.css`).toBeDefined();
     expect(regel).toMatch(/outline:\s*1px dashed var\(--lfh-steuer-rahmen\)/);
+  });
+
+  // Die eigene Segmentleiste ersetzt antds `Segmented` und trägt dasselbe Zeichen (LLH-1334).
+  it.each([".lfh-segment[aria-disabled='true']", ".lfh-segment[aria-disabled='true']:hover"])(
+    '%s (sprache.css, Strichlinie nach innen)',
+    (selektor) => {
+      const regel = regelZu(SPRACHE_CSS, selektor);
+      expect(regel, `Kein Regelblock für ${selektor} in theme/sprache.css`).toBeDefined();
+      expect(regel).toMatch(/outline:\s*1px dashed var\(--lfh-steuer-rahmen\)/);
+      expect(regel).toMatch(/outline-offset:\s*-1px/);
+    },
+  );
+
+  it('ein freies Segment trägt keine Strichlinie (sprache.css)', () => {
+    const regeln = SPRACHE_CSS.split('}').filter((block) =>
+      (block.split('{')[0] ?? '')
+        .split(',')
+        .some((s) => /\.lfh-segment\b/.test(s) && !s.includes("[aria-disabled='true']")),
+    );
+    expect(regeln.length).toBeGreaterThan(0);
+    for (const regel of regeln) expect(regel).not.toMatch(/dashed/);
   });
 });
 
