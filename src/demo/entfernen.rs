@@ -10,8 +10,8 @@
 //! - Stammdaten fallen nur mit einer Marke dieses Kopfes und in der eigenen Org. Ob eine Zeile
 //!   noch verwiesen wird, entscheidet die Datenbank: je Zeile ein `SAVEPOINT`, und ein
 //!   Fremdschlüsselfehler (787) heißt „behalten“. Das trägt nur, solange kein Fremdschlüssel auf
-//!   `fahrzeug`/`personal`/`material`/`einheit_vorlage` kaskadiert (außer den Kindzeilen einer
-//!   Vorlage) oder aufgeschoben ist (Guard
+//!   `fahrzeug`/`personal`/`material`/`einheit_vorlage`/`schichtmodell` kaskadiert (außer den
+//!   Kindzeilen einer Vorlage) oder aufgeschoben ist (Guard
 //!   `kein_fk_kaskadiert_in_stammdaten` in `schema_tests.rs`) und die Verbindung Fremdschlüssel
 //!   sofort prüft ([`crate::db::fk_pruefung_sicherstellen`]).
 //!
@@ -88,8 +88,9 @@ const LOESCHWEGE: [Loeschweg; 5] = [
         loeschen: "DELETE FROM material WHERE id = ? AND org_id = ?",
         mehrere_runden: false,
     },
-    // LLH-1122: Kein Fremdschlüssel zeigt auf ein Schichtmodell (Einsätze halten eine Kopie),
-    // das Löschen gelingt also immer; der Demo-Einsatz behält seine Kopie, bis er selbst fällt.
+    // LLH-1122: Einsätze halten eine Kopie, der Demo-Einsatz behält seine, bis er selbst fällt.
+    // LLH-1313: Eine Einsatz-Vorlage, die das Modell vorgibt, hält es über den Fremdschlüssel
+    // (ohne ON-DELETE-Aktion) fest; dann bleibt es stehen, statt die Vorlage still zu leeren.
     Loeschweg {
         art: DemoStammdatenArt::Schichtmodell,
         behalten_wenn: None,

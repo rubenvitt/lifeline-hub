@@ -104,10 +104,12 @@ Eine Einsatz-Vorlage ist ein Satz sichtbarer Module, etwa für einen MANV oder e
 Sanitätsdienst. Wer einen Einsatz anlegt, wählt sie im Dialog „Neuen Einsatz anlegen“ (Kapitel
 [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)).
 
-1. Unter „Stammdaten“ „Einsatz-Vorlagen“ öffnen. Je Vorlage stehen Bezeichnung, Einsatzart und
-   wie viele Module sie zeigt, etwa „27 von 34 Modulen“.
+1. Unter „Stammdaten“ „Einsatz-Vorlagen“ öffnen. Je Vorlage stehen Bezeichnung, Einsatzart,
+   Schichtmodell und wie viele Module sie zeigt, etwa „27 von 34 Modulen“.
 2. „Einsatz-Vorlage anlegen“ wählen.
-3. „Bezeichnung“ eintragen und nach Bedarf die „Einsatzart“ wählen.
+3. „Bezeichnung“ eintragen und nach Bedarf die „Einsatzart“ und das „Schichtmodell“ wählen. Die
+   Auswahl „Schichtmodell“ steht nur da, wenn die Organisation Schichtmodelle führt; leer gilt die
+   Vorgabe der Organisation.
 4. Unter „Sichtbare Module“ die Häkchen der Module entfernen, die der Einsatz nicht zeigen soll.
    Die Module stehen nach den Kategorien der Navigation.
 
@@ -166,7 +168,7 @@ Ein Schichtmodell legt fest, wann eine Einheit abgelöst werden soll (Kapitel
 
 Zum Ändern oder Löschen in der Zeile das Menü „Aktionen zu …“ öffnen und „Bearbeiten“ bzw.
 „Löschen“ wählen; Löschen fragt mit „… löschen?“ nach und wird mit „Schichtmodell löschen“
-bestätigt.
+bestätigt. Gibt eine Einsatz-Vorlage das Modell vor, nennt die Rückfrage sie.
 
 ### Die Vorgabe der Organisation festlegen
 
@@ -265,6 +267,11 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
   Werte des Einsatzes; im Reiter „Module“ der Einstellungen lassen sie sich wieder einschalten
   (Kapitel [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Eine Vorlage
   blendet nur aus, nie ein: was die Organisation für alle Einsätze ausblendet, bleibt ausgeblendet.
+- Eine Vorlage kann ein Schichtmodell vorgeben, etwa „12-h-Schicht“ für „Unwetter“ und
+  „Sanitätsdienst 6 h“ für „Sanitätsdienst“. Ein Einsatz mit dieser Vorlage bekommt dann dieses
+  Modell statt der Vorgabe der Organisation (Kapitel [Ablösung](abloesung.md)). Die mitgelieferten
+  Vorlagen geben keines vor. Wird das Schichtmodell gelöscht, verliert die Vorlage es und neue
+  Einsätze bekommen wieder die Vorgabe der Organisation.
 - Ein Einsatz merkt sich seine Vorlage nicht. Eine spätere Änderung der Vorlage wirkt nur auf neue
   Einsätze.
 - Ein Stichwort zeigt auf höchstens eine Vorlage. Wird im Dialog „Neuen Einsatz anlegen“ ein

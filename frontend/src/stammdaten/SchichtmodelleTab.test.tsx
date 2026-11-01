@@ -206,4 +206,44 @@ describe('SchichtmodelleTab (LLH-1122)', () => {
     );
     await waitFor(() => expect(aufrufe).toEqual(['DELETE 1']));
   });
+
+  it('nennt in der Rückfrage die Vorlagen, die das Modell verlieren (LLH-1313)', async () => {
+    stelleBereit();
+    server.use(
+      http.get('/api/einsatz-vorlagen', () =>
+        HttpResponse.json([
+          { id: 1, bezeichnung: 'Unwetter', schichtmodell_id: 2, ausgeblendet: [], sortier: 10 },
+          { id: 2, bezeichnung: 'MANV', schichtmodell_id: 2, ausgeblendet: [], sortier: 20 },
+          { id: 3, bezeichnung: 'Kleinlage', schichtmodell_id: 1, ausgeblendet: [], sortier: 30 },
+        ]),
+      ),
+    );
+    renderMitProviders(<SchichtmodelleTab />);
+    await zeilenaktion('12-h-Schicht Hochwasser', 'Löschen');
+    const rueckfrage = await screen.findByRole('dialog', {
+      name: '12-h-Schicht Hochwasser löschen?',
+    });
+    expect(
+      await within(rueckfrage).findByText('Die Vorlagen Unwetter, MANV verlieren es.'),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne betroffene Vorlage nur der Satz zu den Einsätzen', async () => {
+    stelleBereit();
+    let beantwortet = false;
+    server.use(
+      http.get('/api/einsatz-vorlagen', () => {
+        beantwortet = true;
+        return HttpResponse.json([
+          { id: 1, bezeichnung: 'Unwetter', schichtmodell_id: 2, ausgeblendet: [], sortier: 10 },
+        ]);
+      }),
+    );
+    renderMitProviders(<SchichtmodelleTab />);
+    await zeilenaktion('Sanitätsdienst', 'Löschen');
+    const rueckfrage = await screen.findByRole('dialog', { name: 'Sanitätsdienst löschen?' });
+    await waitFor(() => expect(beantwortet).toBe(true));
+    expect(rueckfrage).toHaveTextContent('Laufende Einsätze behalten ihre Kopie.');
+    expect(within(rueckfrage).queryByText(/verlier/)).toBeNull();
+  });
 });

@@ -49,8 +49,33 @@ describe('EinsatzVorlagenTab (LLH-1375)', () => {
     const n = modulRegistry.length;
     expect(within(zeile('Kleinlage')).getByText('Realeinsatz')).toBeInTheDocument();
     expect(within(zeile('Kleinlage')).getByText(`${n - 2} von ${n} Modulen`)).toBeInTheDocument();
-    expect(within(zeile('Großbrand')).getByText('—')).toBeInTheDocument();
+    // Weder Einsatzart noch Schichtmodell: zweimal „—“.
+    expect(within(zeile('Großbrand')).getAllByText('—')).toHaveLength(2);
     expect(within(zeile('Großbrand')).getByText(`${n} von ${n} Modulen`)).toBeInTheDocument();
+  });
+
+  it('Spalte „Schichtmodell“ nennt das Modell der Vorlage (LLH-1313)', async () => {
+    server.use(
+      http.get('/api/schichtmodelle', () =>
+        HttpResponse.json([
+          {
+            id: 9,
+            bezeichnung: '12-h-Schicht',
+            typ: 'rhythmus',
+            rhythmus_minuten: 720,
+            vorwarnung_minuten: 30,
+            planungsvorlauf_minuten: 120,
+            ist_vorgabe: false,
+            ist_demo: false,
+          },
+        ]),
+      ),
+    );
+    setup(admin, [{ ...VORLAGEN[0], schichtmodell_id: 9 }, VORLAGEN[1]]);
+    await screen.findByText('Kleinlage');
+    expect(screen.getByRole('columnheader', { name: /Schichtmodell/ })).toBeInTheDocument();
+    expect(await within(zeile('Kleinlage')).findByText('12-h-Schicht')).toBeInTheDocument();
+    expect(within(zeile('Kleinlage')).queryByText('—')).toBeNull();
   });
 
   it('Admin: Anlegen öffnet das Formular, Bearbeiten belegt es vor', async () => {

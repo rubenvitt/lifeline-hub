@@ -61,6 +61,13 @@ function Harness({ vorlage = null }: { vorlage?: EinsatzVorlage | null }) {
 const kaestchen = (name: string) => screen.getByRole('checkbox', { name });
 
 describe('EinsatzVorlageFormModal (LLH-1375)', () => {
+  it('ohne Schichtmodelle der Organisation keine Auswahl „Schichtmodell“', async () => {
+    renderMitProviders(<Harness />);
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByLabelText('Bezeichnung')).toBeInTheDocument());
+    expect(within(dialog).queryByRole('combobox', { name: 'Schichtmodell' })).toBeNull();
+  });
+
   it('drei Felder; neu sind alle Module angehakt, Module nach den Kategorien der Navigation', async () => {
     renderMitProviders(<Harness />);
     const dialog = await screen.findByRole('dialog', { name: 'Einsatz-Vorlage anlegen' });
@@ -107,6 +114,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
       rumpf: {
         bezeichnung: 'Großbrand',
         einsatzart: null,
+        schichtmodell_id: null,
         ausgeblendet: inRegistryFolge(['stab', 'tiere']),
       },
     });
@@ -134,6 +142,7 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
       rumpf: {
         bezeichnung: 'MANV',
         einsatzart: 'sanitaetsdienst',
+        schichtmodell_id: null,
         ausgeblendet: inRegistryFolge(['tiere', 'betreuung']),
       },
     });
@@ -157,5 +166,66 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(await within(dialog).findByText('Bezeichnung bereits vergeben')).toBeInTheDocument();
     expect(screen.getByTestId('offen')).toHaveTextContent('offen');
+  });
+
+  describe('Schichtmodell (LLH-1313)', () => {
+    const modelle = [
+      {
+        id: 1,
+        bezeichnung: '12-h-Schicht',
+        typ: 'rhythmus',
+        rhythmus_minuten: 720,
+        vorwarnung_minuten: 30,
+        planungsvorlauf_minuten: 120,
+        ist_vorgabe: true,
+        ist_demo: false,
+      },
+      {
+        id: 9,
+        bezeichnung: 'Sanitätsdienst 6 h',
+        typ: 'rhythmus',
+        rhythmus_minuten: 360,
+        vorwarnung_minuten: 30,
+        planungsvorlauf_minuten: 120,
+        ist_vorgabe: false,
+        ist_demo: false,
+      },
+    ];
+
+    it('steht in der Zeile der Einsatzart, leer mit der Vorgabe der Organisation', async () => {
+      server.use(http.get('/api/schichtmodelle', () => HttpResponse.json(modelle)));
+      const anfragen = aufzeichnen();
+      renderMitProviders(<Harness />);
+      const dialog = await screen.findByRole('dialog');
+      const feld = await within(dialog).findByRole('combobox', { name: 'Schichtmodell' });
+      // Eine Zeile mit der Einsatzart: das Feldbudget des Modals bleibt bei drei Zeilen.
+      const zeile = dialog.querySelector('[data-lfh="vorlage-vorbelegung"]')!;
+      expect(zeile).toContainElement(feld);
+      expect(zeile).toContainElement(within(dialog).getByRole('combobox', { name: 'Einsatzart' }));
+      expect(feld.closest('.ant-select')?.textContent).toContain('12-h-Schicht (Vorgabe)');
+
+      await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Konzert');
+      await waehle('Schichtmodell', 'Sanitätsdienst 6 h');
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() => expect(anfragen).toHaveLength(1));
+      expect(anfragen[0].rumpf).toMatchObject({ bezeichnung: 'Konzert', schichtmodell_id: 9 });
+    });
+
+    it('Bearbeiten belegt das Modell vor; Leeren schickt `null`', async () => {
+      server.use(http.get('/api/schichtmodelle', () => HttpResponse.json(modelle)));
+      const anfragen = aufzeichnen();
+      renderMitProviders(<Harness vorlage={{ ...MANV, schichtmodell_id: 9 }} />);
+      const dialog = await screen.findByRole('dialog', { name: 'Einsatz-Vorlage bearbeiten' });
+      const feld = await within(dialog).findByRole('combobox', { name: 'Schichtmodell' });
+      await waitFor(() =>
+        expect(feld.closest('.ant-select')?.textContent).toContain('Sanitätsdienst 6 h'),
+      );
+      const auswahl = feld.closest<HTMLElement>('.ant-select')!;
+      await userEvent.hover(auswahl);
+      await userEvent.click(auswahl.querySelector<HTMLElement>('.ant-select-clear')!);
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() => expect(anfragen).toHaveLength(1));
+      expect(anfragen[0].rumpf).toMatchObject({ schichtmodell_id: null });
+    });
   });
 });

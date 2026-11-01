@@ -142,8 +142,9 @@ Demo-Daten MUST `ist_demo` melden.
 ### Requirement: Vorgabe des Einsatzes
 
 Das System SHALL beim Anlegen eines Einsatzes die Vorgabe der Organisation als Kopie zur
-Vorgabe des Einsatzes machen. Hat die Organisation keine Vorgabe, MUST der Einsatz ohne Vorgabe
-bleiben. Eine spätere Änderung oder das Löschen des Modells in den Stammdaten MUST die Kopie und
+Vorgabe des Einsatzes machen, außer die Einsatz-Vorlage gibt ein Schichtmodell vor (Spec
+`einsatz-vorlagen`, „Eine Vorlage gibt das Schichtmodell vor“, LLH-1313). Hat weder die Vorlage
+noch die Organisation eines, MUST der Einsatz ohne Vorgabe bleiben. Eine spätere Änderung oder das Löschen des Modells in den Stammdaten MUST die Kopie und
 damit laufende Fälligkeiten unverändert lassen. Die Vorgabe des Einsatzes MUST mit den Rechten der
 Abschnittsvorgabe lesbar und änderbar sein: als Kopie eines Modells der eigenen Organisation, mit
 eigenen Werten oder entfernt. Ändert sie sich, MUST das System Rhythmus, Fälligkeit und Fristen
@@ -465,13 +466,19 @@ Org-Ereignis `stammdaten` live bleiben.
 
 ### Requirement: Schichtmodell in der Einsatzanlage
 
-Der Dialog „Neuen Einsatz anlegen“ SHALL die Vorgabe der Organisation als Zeile
-„Schichtmodell: <Bezeichnung> (Vorgabe)“ nennen, ohne eigenes Feld. Ohne Vorgabe der
-Organisation MUST die Zeile fehlen.
+Der Dialog „Neuen Einsatz anlegen“ SHALL das Schichtmodell, das der neue Einsatz bekommt, als
+Zeile nennen, ohne eigenes Feld: „Schichtmodell: <Bezeichnung> (Vorgabe Vorlage)“, wenn die
+gewählte Einsatz-Vorlage eines vorgibt, sonst „Schichtmodell: <Bezeichnung> (Vorgabe)“ für die
+Vorgabe der Organisation. Gibt weder die Vorlage noch die Organisation eines vor, MUST die Zeile
+fehlen. Die Zeile MUST einem Wechsel der Vorlage folgen.
 
 #### Scenario: Zeile in der Einsatzanlage
 - **WHEN** die Organisation „12-h-Schicht“ als Vorgabe führt und jemand „Neuen Einsatz anlegen“ öffnet
 - **THEN** steht im Dialog „Schichtmodell: 12-h-Schicht (Vorgabe)“, und der Dialog hat weiter fünf Felder
+
+#### Scenario: Vorlage gibt das Modell vor
+- **WHEN** die Vorlage „Sanitätsdienst“ auf „Sanitätsdienst 6 h“ zeigt und jemand sie im Dialog wählt
+- **THEN** steht im Dialog „Schichtmodell: Sanitätsdienst 6 h (Vorgabe Vorlage)“
 
 ### Requirement: Vorgabe des Einsatzes in den Einstellungen
 

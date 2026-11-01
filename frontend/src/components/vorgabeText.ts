@@ -31,6 +31,14 @@ export function einsatzVorgabe(wert: string): string {
   return `${wert} (Vorgabe Einsatz)`;
 }
 
+/**
+ * Zeile der Einsatzanlage, deren Wert die gewählte Einsatz-Vorlage liefert (LLH-1313,
+ * Schichtmodell der Vorlage statt der Vorgabe der Organisation).
+ */
+export function vorlageVorgabe(wert: string): string {
+  return `${wert} (Vorgabe Vorlage)`;
+}
+
 /** Hinweis unter einem leeren Feld, für das der Einheitstyp einen Wert setzt (LLH-1042). */
 export function typVorgabe(wert: string): string {
   return `Vorgabe des Einheitstyps: ${wert}`;

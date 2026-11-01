@@ -7,9 +7,10 @@
 //!
 //! - **Stammdatum der Organisation** (`schichtmodell`, [`repo`]): höchstens eines ist die
 //!   „Vorgabe der Organisation“.
-//! - **Kopie am Einsatz** (`einsatz_schichtmodell`): die Einsatzanlage kopiert die Vorgabe der
-//!   Organisation ([`repo::copy_org_vorgabe_tx`]). Spätere Stammdatenänderungen verschieben
-//!   keine laufende Fälligkeit; ohne Org-Vorgabe hat der Einsatz keine (keine erfundene Zahl).
+//! - **Kopie am Einsatz** (`einsatz_schichtmodell`): die Einsatzanlage kopiert das Modell der
+//!   Einsatz-Vorlage, sonst die Vorgabe der Organisation ([`repo::copy_vorgabe_tx`], LLH-1313).
+//!   Spätere Stammdatenänderungen verschieben keine laufende Fälligkeit; ohne beides hat der
+//!   Einsatz keine (keine erfundene Zahl).
 //!
 //! Die Fälligkeit rechnet [`Regel::faelligkeit`] rein und deterministisch; gespeichert wird sie
 //! an der Schicht (`einsatz_abloesung.faellig_at`).

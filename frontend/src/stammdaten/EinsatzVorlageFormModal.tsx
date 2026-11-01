@@ -1,12 +1,14 @@
 import { Checkbox, Form, Input, Typography, theme } from 'antd';
 import { useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { augenbraueStil, useRollen } from '../components/instrument';
 import { aktualisiereEinsatzVorlage, legeEinsatzVorlageAn } from '../api/einsatzVorlagen';
 import { EINSATZ_VORLAGE_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import { globalKeys } from '../api/queryKeys';
+import { fetchSchichtmodelle } from '../api/schichtmodelle';
+import { mitVorgabe } from '../components/vorgabeText';
 import type { Einsatzart, EinsatzVorlage, EinsatzVorlageEingabe } from '../api/types';
 import { EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istModulAusblendbar, kategorien, moduleNachKategorie } from '../einsatz/modulRegistry';
@@ -15,6 +17,8 @@ import { ausgeblendetAus, sichtbarAus } from './einsatzVorlageModule';
 interface FormWerte {
   bezeichnung: string;
   einsatzart?: Einsatzart | null;
+  /** Schichtmodell der Organisation, das ein neuer Einsatz bekommt; leer = Vorgabe der Org. */
+  schichtmodell_id?: number | null;
   /** Häkchen = sichtbar; gespeichert wird das Komplement (`ausgeblendetAus`). */
   sichtbar: string[];
 }
@@ -90,8 +94,10 @@ function ModulHaekchen({
 
 /**
  * Anlegen und Bearbeiten einer Einsatz-Vorlage (LLH-1375, design.md D3a): Bezeichnung, Einsatzart
- * und die sichtbaren Module, drei Felder (Feldbudget eines Modals, LFH-19). Gespeichert wird als
- * Vollersatz mit dem Komplement der Häkchen als `ausgeblendet`.
+ * und die sichtbaren Module, drei Zeilen (Feldbudget eines Modals, LFH-19). Das Schichtmodell
+ * (LLH-1313, design.md D6) steht als zweite Vorbelegung in der Zeile der Einsatzart, damit das
+ * Budget hält; ohne Schichtmodelle in der Organisation fehlt es. Gespeichert wird als Vollersatz
+ * mit dem Komplement der Häkchen als `ausgeblendet`.
  */
 export default function EinsatzVorlageFormModal({
   offen,
@@ -105,6 +111,13 @@ export default function EinsatzVorlageFormModal({
 }) {
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
+  const { token } = theme.useToken();
+  const { data: schichtmodelle = [] } = useQuery({
+    queryKey: globalKeys.schichtmodelle(),
+    queryFn: fetchSchichtmodelle,
+    enabled: offen,
+  });
+  const orgVorgabe = schichtmodelle.find((m) => m.ist_vorgabe);
 
   // VORBELEGUNG, kein Zurücksetzen (Begründung in `FahrzeugFormModal`); die Werte einer neuen
   // Vorlage stehen als `initialValues` an der Hülle.
@@ -113,6 +126,7 @@ export default function EinsatzVorlageFormModal({
     form.setFieldsValue({
       bezeichnung: vorlage.bezeichnung,
       einsatzart: vorlage.einsatzart ?? undefined,
+      schichtmodell_id: vorlage.schichtmodell_id ?? undefined,
       sichtbar: sichtbarAus(vorlage.ausgeblendet),
     });
   }, [offen, vorlage, form]);
@@ -122,6 +136,7 @@ export default function EinsatzVorlageFormModal({
       const daten: EinsatzVorlageEingabe = {
         bezeichnung: werte.bezeichnung.trim(),
         einsatzart: werte.einsatzart ?? null,
+        schichtmodell_id: werte.schichtmodell_id ?? null,
         ausgeblendet: ausgeblendetAus(werte.sichtbar ?? []),
       };
       return vorlage ? aktualisiereEinsatzVorlage(vorlage.id, daten) : legeEinsatzVorlageAn(daten);
@@ -153,14 +168,33 @@ export default function EinsatzVorlageFormModal({
       >
         <Input placeholder="z. B. Großbrand" maxLength={EINSATZ_VORLAGE_BEZEICHNUNG_MAX} />
       </Form.Item>
-      <Form.Item label="Einsatzart" name="einsatzart">
-        <Select<Einsatzart>
-          aria-label="Einsatzart"
-          allowClear
-          placeholder="keine"
-          options={EINSATZART_OPTIONEN}
-        />
-      </Form.Item>
+      <div
+        data-lfh="vorlage-vorbelegung"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          columnGap: token.marginSM,
+        }}
+      >
+        <Form.Item label="Einsatzart" name="einsatzart">
+          <Select<Einsatzart>
+            aria-label="Einsatzart"
+            allowClear
+            placeholder="keine"
+            options={EINSATZART_OPTIONEN}
+          />
+        </Form.Item>
+        {schichtmodelle.length > 0 && (
+          <Form.Item label="Schichtmodell" name="schichtmodell_id">
+            <Select<number>
+              aria-label="Schichtmodell"
+              allowClear
+              placeholder={orgVorgabe ? mitVorgabe(orgVorgabe.bezeichnung) : 'keins'}
+              options={schichtmodelle.map((m) => ({ value: m.id, label: m.bezeichnung }))}
+            />
+          </Form.Item>
+        )}
+      </div>
       <Form.Item label="Sichtbare Module" name="sichtbar">
         <ModulHaekchen />
       </Form.Item>

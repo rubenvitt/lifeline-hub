@@ -127,6 +127,7 @@ fn daten<'a>(bezeichnung: &'a str, aus: &'a [&'a str]) -> VorlageDaten<'a> {
     VorlageDaten {
         bezeichnung,
         einsatzart: None,
+        schichtmodell_id: None,
         ausgeblendet: aus,
     }
 }
@@ -164,6 +165,7 @@ async fn anlegen_aendern_loeschen_je_organisation() {
         VorlageDaten {
             bezeichnung: "Großbrand groß",
             einsatzart: Some(Einsatzart::Uebung),
+            schichtmodell_id: None,
             ausgeblendet: &["stab", "chat"],
         },
     )

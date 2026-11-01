@@ -12,12 +12,39 @@ use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
 
 /// Felder einer Vorlage beim Anlegen und beim Vollersatz, schon geprüft: Bezeichnung getrimmt
-/// und nicht leer, Module bekannt, ausblendbar und entdoppelt.
+/// und nicht leer, Module bekannt, ausblendbar und entdoppelt. Ob das Schichtmodell zur
+/// Organisation gehört, prüft das Schreiben selbst ([`check_schichtmodell_tx`]).
 #[derive(Debug, Clone, Copy)]
 pub struct VorlageDaten<'a> {
     pub bezeichnung: &'a str,
     pub einsatzart: Option<Einsatzart>,
+    pub schichtmodell_id: Option<i64>,
     pub ausgeblendet: &'a [&'a str],
+}
+
+/// Ein Schichtmodell an der Vorlage muss eines der eigenen Organisation sein (LLH-1313,
+/// design.md D2); fremd oder unbekannt ist ein Feldfehler (400), wie eine fremde Vorlage am
+/// Stichwort-Vorschlag. Läuft in der Schreibtransaktion, damit das Modell nicht dazwischen fällt.
+async fn check_schichtmodell_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    schichtmodell_id: Option<i64>,
+) -> Result<(), AppError> {
+    let Some(id) = schichtmodell_id else {
+        return Ok(());
+    };
+    let vorhanden: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM schichtmodell WHERE id = ? AND org_id = ?)",
+    )
+    .bind(id)
+    .bind(org_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if vorhanden {
+        Ok(())
+    } else {
+        Err(AppError::Validation("Unbekanntes Schichtmodell".into()))
+    }
 }
 
 const BEZEICHNUNG_DOPPELT: &str = "Eine Einsatz-Vorlage mit dieser Bezeichnung gibt es schon";
@@ -52,16 +79,20 @@ fn sort_keys(keys: &mut [String]) {
     });
 }
 
-type KopfZeile = (i64, String, Option<String>, i64);
+type KopfZeile = (i64, String, Option<String>, Option<i64>, i64);
+
+/// Spalten der Kopfzeile in der Reihenfolge von [`KopfZeile`].
+const KOPF_SPALTEN: &str = "id, bezeichnung, einsatzart, schichtmodell_id, sortier";
 
 fn build(kopf: KopfZeile, mut ausgeblendet: Vec<String>) -> EinsatzVorlage {
-    let (id, bezeichnung, einsatzart, sortier) = kopf;
+    let (id, bezeichnung, einsatzart, schichtmodell_id, sortier) = kopf;
     sort_keys(&mut ausgeblendet);
     EinsatzVorlage {
         id,
         bezeichnung,
         // Die Spalte trägt einen CHECK auf die vier Werte; ein unlesbarer Wert fiele weg.
         einsatzart: einsatzart.as_deref().and_then(Einsatzart::parse),
+        schichtmodell_id,
         ausgeblendet,
         sortier,
     }
@@ -78,10 +109,10 @@ pub async fn list_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
 ) -> Result<Vec<EinsatzVorlage>, AppError> {
-    let koepfe: Vec<KopfZeile> = sqlx::query_as(
-        "SELECT id, bezeichnung, einsatzart, sortier FROM einsatz_vorlage \
-         WHERE org_id = ? ORDER BY sortier, bezeichnung, id",
-    )
+    let koepfe: Vec<KopfZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {KOPF_SPALTEN} FROM einsatz_vorlage \
+         WHERE org_id = ? ORDER BY sortier, bezeichnung, id"
+    )))
     .bind(org_id)
     .fetch_all(&mut *conn)
     .await?;
@@ -121,10 +152,9 @@ pub async fn load_for_org_tx(
     org_id: i64,
     id: i64,
 ) -> Result<Option<EinsatzVorlage>, AppError> {
-    let kopf: Option<KopfZeile> = sqlx::query_as(
-        "SELECT id, bezeichnung, einsatzart, sortier FROM einsatz_vorlage \
-         WHERE id = ? AND org_id = ?",
-    )
+    let kopf: Option<KopfZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {KOPF_SPALTEN} FROM einsatz_vorlage WHERE id = ? AND org_id = ?"
+    )))
     .bind(id)
     .bind(org_id)
     .fetch_optional(&mut *conn)
@@ -163,22 +193,24 @@ async fn replace_module_tx(
 }
 
 /// Legt eine Vorlage am Ende der Liste an (`sortier` = höchster Wert + 10) und liefert ihre id.
-/// Bezeichnung doppelt in der Organisation → `Conflict`.
+/// Bezeichnung doppelt in der Organisation → `Conflict`, fremdes Schichtmodell → `Validation`.
 pub async fn create_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     daten: &VorlageDaten<'_>,
     sortier: Option<i64>,
 ) -> Result<i64, AppError> {
+    check_schichtmodell_tx(conn, org_id, daten.schichtmodell_id).await?;
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO einsatz_vorlage (org_id, bezeichnung, einsatzart, sortier) \
-         VALUES (?1, ?2, ?3, COALESCE(?4, \
+        "INSERT INTO einsatz_vorlage (org_id, bezeichnung, einsatzart, schichtmodell_id, sortier) \
+         VALUES (?1, ?2, ?3, ?4, COALESCE(?5, \
                  (SELECT COALESCE(MAX(sortier), 0) + 10 FROM einsatz_vorlage WHERE org_id = ?1))) \
          RETURNING id",
     )
     .bind(org_id)
     .bind(daten.bezeichnung)
     .bind(daten.einsatzart.map(|a| a.as_str()))
+    .bind(daten.schichtmodell_id)
     .bind(sortier)
     .fetch_one(&mut *conn)
     .await
@@ -202,8 +234,9 @@ pub async fn create(
     })
 }
 
-/// Vollersatz einer Vorlage: Bezeichnung, Einsatzart und Modulmenge. `sortier` bleibt. Fremde
-/// oder unbekannte id → `NotFound`, Bezeichnung doppelt → `Conflict`.
+/// Vollersatz einer Vorlage: Bezeichnung, Einsatzart, Schichtmodell und Modulmenge. `sortier`
+/// bleibt. Fremde oder unbekannte id → `NotFound`, Bezeichnung doppelt → `Conflict`, fremdes
+/// Schichtmodell → `Validation`.
 pub async fn update(
     pool: &SqlitePool,
     org_id: i64,
@@ -211,13 +244,15 @@ pub async fn update(
     daten: VorlageDaten<'_>,
 ) -> Result<EinsatzVorlage, AppError> {
     write_retry!(pool, |conn| {
+        check_schichtmodell_tx(conn, org_id, daten.schichtmodell_id).await?;
         let n = sqlx::query(
-            "UPDATE einsatz_vorlage SET bezeichnung = ?, einsatzart = ?, \
+            "UPDATE einsatz_vorlage SET bezeichnung = ?, einsatzart = ?, schichtmodell_id = ?, \
                     geaendert_at = datetime('now') \
              WHERE id = ? AND org_id = ?",
         )
         .bind(daten.bezeichnung)
         .bind(daten.einsatzart.map(|a| a.as_str()))
+        .bind(daten.schichtmodell_id)
         .bind(id)
         .bind(org_id)
         .execute(&mut *conn)
@@ -250,17 +285,16 @@ pub async fn delete(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppEr
     Ok(())
 }
 
-/// Ausgeblendete Module der Vorlage `vorlage_id` für einen neuen Einsatz der Organisation
-/// `org_id`. Eine fremde oder unbekannte Vorlage ist ein Feldfehler (400): die Anlage scheitert,
-/// ohne dass ein Einsatz entsteht (Spec `einsatz-vorlagen`, „Fremde Vorlage“).
-pub async fn load_ausgeblendet_tx(
+/// Die Vorlage `vorlage_id` für einen neuen Einsatz der Organisation `org_id`: ausgeblendete
+/// Module und Schichtmodell. Eine fremde oder unbekannte Vorlage ist ein Feldfehler (400): die
+/// Anlage scheitert, ohne dass ein Einsatz entsteht (Spec `einsatz-vorlagen`, „Fremde Vorlage“).
+pub async fn load_for_anlage_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     vorlage_id: i64,
-) -> Result<Vec<String>, AppError> {
+) -> Result<EinsatzVorlage, AppError> {
     load_for_org_tx(conn, org_id, vorlage_id)
         .await?
-        .map(|v| v.ausgeblendet)
         .ok_or_else(|| AppError::Validation("Unbekannte Einsatz-Vorlage".into()))
 }
 
@@ -275,6 +309,7 @@ pub async fn seed_startliste_tx(conn: &mut SqliteConnection, org_id: i64) -> Res
             &VorlageDaten {
                 bezeichnung: start.bezeichnung,
                 einsatzart: Some(start.einsatzart),
+                schichtmodell_id: None,
                 ausgeblendet: &ausgeblendet,
             },
             Some(start.sortier),

@@ -6223,6 +6223,14 @@
             "type": "integer",
             "format": "int64"
           },
+          "schichtmodell_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Schichtmodell der Organisation, das ein mit der Vorlage angelegter Einsatz als Kopie\nbekommt (LLH-1313); fehlt, wenn die Vorlage keines vorgibt (dann gilt die Org-Vorgabe)."
+          },
           "sortier": {
             "type": "integer",
             "format": "int64"
