@@ -278,17 +278,14 @@ export default function AbloesungPage() {
           ? MODUL_PERSONAL_GESPERRT
           : undefined;
   // Die Felder des Besatzungswechsels, wie Vollzug und Planung sie brauchen (LLH-1319): Personen
-  // `null`, solange das Personal lädt, Ziele `undefined`, solange die Einheiten laden.
+  // `null`, solange das Personal lädt, Ziele `undefined`, solange die Einheiten fehlen. Auch ein
+  // Fehler bleibt `undefined`: die Ziele eines geplanten Wechsels sind dann unbekannt, nicht leer.
   const besatzungProps = (schicht: Abloesung) => ({
     bisherigeBesatzung: bisherigeBesatzung(schicht, einheitenQuery.data),
     personen: personalQuery.data
       ? besatzungOptionen(personalQuery.data, einheitenQuery.data ?? [], schicht)
       : null,
-    verteilung: einheitenQuery.data
-      ? verteilungZiele(schicht, einheitenQuery.data)
-      : einheitenQuery.isError
-        ? null
-        : undefined,
+    verteilung: einheitenQuery.data ? verteilungZiele(schicht, einheitenQuery.data) : undefined,
     besatzungGesperrt,
   });
 

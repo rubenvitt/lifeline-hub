@@ -372,7 +372,7 @@ interface VollzugProps {
   personen?: BesatzungOption[] | null;
   /**
    * Ziele der Verteilung (`abloesung/besatzung.ts:verteilungZiele`, LLH-1319): `null` = nichts zu
-   * wählen (kein Klappteil), `undefined`, solange die Einheiten laden.
+   * wählen (kein Klappteil), `undefined`, solange die Einheiten fehlen (laden oder Fehler).
    */
   verteilung?: VerteilungZiele | null;
   /** Grund in wenigen Wörtern, warum der Besatzungswechsel gesperrt ist (Module Einheiten, Personal). */
@@ -607,8 +607,12 @@ export function AbloeserDialog({
         besatzung_ids: [],
       }}
       onErfassen={(w) => {
-        // Ohne geladenes Personal kennt der Dialog den geplanten Wechsel nicht: er bleibt unberührt.
-        const planUnbekannt = w.art === 'besatzung' && personen == null;
+        // Solange Personal oder Einheiten fehlen, ist ein geplanter Wechsel nicht vorbelegt: er
+        // bleibt unberührt, statt geleert oder ohne seine Ziele gespeichert zu werden.
+        const planUnbekannt =
+          w.art === 'besatzung' &&
+          (schicht?.besatzung_plan ?? []).length > 0 &&
+          (personen == null || verteilung === undefined);
         if (gesperrt || !schicht || planUnbekannt) {
           return onErfassen({ abloeser_ids: w.abloeser_ids ?? [] });
         }
