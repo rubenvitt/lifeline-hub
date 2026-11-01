@@ -11656,9 +11656,9 @@ mod tests {
     /// Besatzungswechsels je Person einmal je Schicht, Sicherung der Ablöser-Planung, Ziel-Spalten
     /// an der Besatzung (Bestand NULL); alles fällt mit der Schicht, Ziele werden beim Löschen leer.
     #[tokio::test]
-    async fn migration_0263_besatzung_planung() {
+    async fn migration_0264_besatzung_planung() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 263;
+        const VERSION: i64 = 264;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,

@@ -13,19 +13,19 @@
 -- 2. `einsatz_abloesung_planung_vorher` — die geplante Ablöser-Liste, wie sie VOR dem Vollzug
 --    galt; der Vollzug ersetzt die Liste durch die beim Vollzug genannte, die Rücknahme schreibt
 --    diese hier zurück und löscht die Zeilen. `einsatz_abloesung.planung_gesichert` = 1 sagt, dass
---    der Vollzug gesichert hat (auch eine leere Planung); 0 (Bestand, Vollzug vor 0263) lässt die
+--    der Vollzug gesichert hat (auch eine leere Planung); 0 (Bestand, Vollzug vor 0264) lässt die
 --    Liste des Vollzugs als Planung stehen, wie bisher.
 --
 -- 3. `einsatz_abloesung_besatzung.einheit_nachher_id` / `fahrzeug_nachher_id` — nur bei der neuen
 --    Besatzung: wohin der Vollzug die Person verteilt hat. Die Rücknahme legt sie zurück, solange
 --    sie noch dort steht bzw. sitzt; `fahrzeug_vorher_id` ist bei der neuen Besatzung das Fahrzeug
 --    vor dem Wechsel (nur gesetzt, wenn der Vollzug ihr eines gab). Bestand: beide NULL, die
---    Rücknahme behandelt ihn wie vor 0263 (Ziel = Einheit der Schicht, Fahrzeug unberührt).
+--    Rücknahme behandelt ihn wie vor 0264 (Ziel = Einheit der Schicht, Fahrzeug unberührt).
 --
 -- Fremdschlüssel wie 0216: Schicht und Person CASCADE, Einheit/Fahrzeug als Ziel SET NULL; in der
 -- Sicherung der Ablöser fällt eine gelöschte Einheit weg (CASCADE). Kein Freitext: Namen stehen
 -- nur in `einsatz_personal` bzw. `einsatz_einheit`. Abgesichert von
--- db::tests::migration_0263_besatzung_planung.
+-- db::tests::migration_0264_besatzung_planung.
 CREATE TABLE einsatz_abloesung_besatzung_plan (
     abloesung_id INTEGER NOT NULL REFERENCES einsatz_abloesung(id) ON DELETE CASCADE,
     personal_id  INTEGER NOT NULL REFERENCES einsatz_personal(id) ON DELETE CASCADE,

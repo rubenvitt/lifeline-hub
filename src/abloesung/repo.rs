@@ -3116,7 +3116,7 @@ async fn vollziehen_besatzung_tx(
 /// noch ohne ist, jeder Ablöser seinen alten, solange er noch im übergebenen steht. Die Planung
 /// von vor dem Vollzug gilt wieder (LLH-1319, [`restore_planung_tx`]): die gesicherte Liste der
 /// Ablöser, ein geplanter Besatzungswechsel steht ohnehin noch; ohne Sicherung (Vollzug vor
-/// Migration 0263) bleibt die Liste des Vollzugs als Planung stehen. Einen Besatzungswechsel
+/// Migration 0264) bleibt die Liste des Vollzugs als Planung stehen. Einen Besatzungswechsel
 /// nimmt [`zuruecknehmen_besatzung_tx`] zurück (LLH-1150).
 pub async fn zuruecknehmen(
     pool: &SqlitePool,
@@ -3344,7 +3344,7 @@ async fn save_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), App
 
 /// Stellt bei der Rücknahme die vor dem Vollzug gesicherte Ablöser-Liste wieder her (LLH-1319),
 /// ohne inzwischen aufgelöste Einheiten, und räumt die Sicherung. Ohne Sicherung (Vollzug vor
-/// Migration 0263) bleibt die Liste des Vollzugs als Planung, wie bisher.
+/// Migration 0264) bleibt die Liste des Vollzugs als Planung, wie bisher.
 async fn restore_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     let gesichert: bool =
         sqlx::query_scalar("SELECT planung_gesichert FROM einsatz_abloesung WHERE id = ?")
@@ -3497,7 +3497,7 @@ async fn zuruecknehmen_besatzung_tx(
 
     let mut wirkung = VollzugWirkung::default();
     // Die neue Besatzung zurück, solange sie noch in ihrer Ziel-Einheit steht (LLH-1319; ohne
-    // Ziel, Bestand vor 0263, die Einheit der Schicht).
+    // Ziel, Bestand vor 0264, die Einheit der Schicht).
     let neu: Vec<(i64, Option<i64>)> = sqlx::query_as(
         "UPDATE einsatz_personal SET einheit_id = \
             (SELECT e.id FROM einsatz_abloesung_besatzung b \

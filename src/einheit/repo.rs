@@ -1347,7 +1347,7 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
         "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung_abloeser WHERE einheit_id = ?)",
         "Die Einheit ist als Ablösung geplant",
     ),
-    // LLH-1319 (Mig 0263): Ziel eines geplanten Besatzungswechsels und die vor einem Vollzug
+    // LLH-1319 (Mig 0264): Ziel eines geplanten Besatzungswechsels und die vor einem Vollzug
     // gesicherte Ablöser-Liste zählen wie die Liste selbst.
     (
         "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung_besatzung_plan WHERE einheit_id = ?)",
@@ -1358,7 +1358,7 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
         "Die Einheit ist als Ablösung geplant",
     ),
     // LLH-1150 (Mig 0216): eine Besatzung stand beim Besatzungswechsel in der Einheit; seit
-    // LLH-1319 (Mig 0263) auch: der Wechsel hat sie dorthin verteilt.
+    // LLH-1319 (Mig 0264) auch: der Wechsel hat sie dorthin verteilt.
     (
         "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung_besatzung \
                        WHERE einheit_vorher_id = ?1 OR einheit_nachher_id = ?1)",
