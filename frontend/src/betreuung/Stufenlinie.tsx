@@ -9,6 +9,14 @@ const HOEHE = 96;
 const RAND = 6;
 /** Durchmesser der Meldepunkte (≥ 8 px). */
 const PUNKT = 8;
+/** Höchste Bildhöhe in px. */
+const MAX_HOEHE = 140;
+/**
+ * Höchste Breite der Figur: die Breite, bei der das Bild seine Höchsthöhe erreicht. Breiter
+ * schrumpfte das SVG mittig in sein Seitenverhältnis, und die Zeiten der Beschriftung stünden
+ * nicht mehr unter den Enden der Linie.
+ */
+const MAX_BREITE = Math.floor((MAX_HOEHE * BREITE) / (HOEHE + 2 * RAND));
 
 /** Wire-Zeit einer Stufe zurück in den Wire-String für die Zeitanzeige. */
 function wire(t: number): string {
@@ -57,13 +65,16 @@ export default function Stufenlinie({
   const beschriftung = { ...monoStil(11), color: rollen.schwach };
 
   return (
-    <figure data-lfh={kennung} style={{ margin: 0, marginBottom: token.marginSM }}>
+    <figure
+      data-lfh={kennung}
+      style={{ margin: 0, marginBottom: token.marginSM, maxWidth: MAX_BREITE }}
+    >
       <svg
         role="img"
         aria-label={aussage(zeit(erste), zeit(letzte))}
         viewBox={`0 ${-RAND} ${BREITE} ${HOEHE + 2 * RAND}`}
         width="100%"
-        style={{ display: 'block', maxHeight: 140, overflow: 'visible' }}
+        style={{ display: 'block', maxHeight: MAX_HOEHE, overflow: 'visible' }}
       >
         <g aria-hidden="true">
           {/* Grundlinie bei 0: zurückhaltend, ohne Raster. */}
