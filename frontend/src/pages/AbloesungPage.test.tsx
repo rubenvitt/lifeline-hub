@@ -8,6 +8,7 @@ import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
 import AbloesungPage, { SCHICHT_HERVORHEBUNG_MS } from './AbloesungPage';
 import { ApiError } from '../api/client';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung, ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
@@ -1286,6 +1287,18 @@ describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
     await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveAttribute('aria-disabled', 'true'));
     expect(segment(/^Laufend/)).toBeChecked();
     expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('scheitern direkt unter ?ansicht=ohne-schicht die Freigaben, steht der Fehler mit erneutem Abruf', async () => {
+    vi.mocked(ladeModulFreigaben).mockRejectedValueOnce(new ApiError(500, 'kaputt'));
+    renderPage('/einsaetze/1/abloesung?ansicht=ohne-schicht');
+    expect(
+      await screen.findByText('Einheiten ohne Schicht konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.ant-spin')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+    await waitFor(() => expect(ohneKarten()).toEqual(['Florian 2 ohne Schicht']));
+    expect(screen.queryByText('Einheiten ohne Schicht konnten nicht geladen werden')).toBeNull();
   });
 
   it('scheitert die Zeitachse, steht der Fehler statt eines ewigen Ladens', async () => {

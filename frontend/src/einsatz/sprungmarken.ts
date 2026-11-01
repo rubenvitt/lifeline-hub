@@ -8,7 +8,13 @@ import {
 } from '../routing/deeplinks';
 import { SACHGEBIETE } from '../stab/sachgebiete';
 import { unterseitenFuer } from '../stab/unterseiten';
-import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegistry';
+import {
+  istModulFreigegeben,
+  modulRegistry,
+  type KategorieKey,
+  type ModulEintrag,
+} from './modulRegistry';
+import type { ModulFreigaben } from '../api/types';
 
 /**
  * Sprungmarken im Modulpanel: Einträge, die der Entwurf als eigene Module führt, deren Daten
@@ -49,6 +55,11 @@ export interface Sprungmarke {
   hinweis: string;
   /** Suchworte für die Sprungpalette; das Menü zeigt sie nicht. */
   schlagworte: string[];
+  /**
+   * Weitere Module (Registry-Schlüssel), ohne deren Daten die Ansicht nicht steht. Ist eines nicht
+   * frei, ist die Marke gesperrt wie bei gesperrtem Zielmodul (LLH-1312).
+   */
+  braucht?: string[];
   pfad: (einsatzId: number) => string;
 }
 
@@ -173,7 +184,8 @@ export const sprungmarken: Sprungmarke[] = [
   },
   {
     // Einheiten im Einsatz ohne Schicht (LLH-1312): die Ansicht der Seite Ablösung, die in der
-    // Anlaufphase zählt. Ohne Freigabe des Moduls Einheiten zeigt die Seite „Laufend“.
+    // Anlaufphase zählt. Ohne Freigabe des Moduls Einheiten zeigt die Seite „Laufend“, deshalb
+    // sperrt sie auch die Marke.
     key: 'ohne-schicht',
     kategorie: 'kraefte',
     label: 'Ohne Schicht',
@@ -181,6 +193,7 @@ export const sprungmarken: Sprungmarke[] = [
     nach: 'abloesung',
     hinweis: 'Ablösung · Ohne Schicht',
     schlagworte: ['ohne schicht', 'schicht beginnen', 'anlaufphase', 'eingetroffen'],
+    braucht: ['einheiten'],
     pfad: (einsatzId) => abloesungPfad(einsatzId, { ansicht: 'ohne-schicht' }),
   },
   ...stabMarken(),
@@ -200,6 +213,23 @@ export function sprungZiel(
   register: ModulEintrag[] = modulRegistry,
 ): ModulEintrag | null {
   return register.find((m) => m.key === marke.zielModul) ?? null;
+}
+
+/**
+ * Sperrt ein Modul aus `braucht` die Marke? Erst mit bekannten Freigaben, wie `istModulGesperrt`:
+ * beim Laden flackerte das Menü sonst. Die Sprungpalette prüft das Zielmodul ohnehin mit
+ * `istModulFreigegeben`, das bei Unbekanntem zu bleibt.
+ */
+export function sprungVoraussetzungGesperrt(
+  marke: Sprungmarke,
+  freigaben?: ModulFreigaben,
+  register: ModulEintrag[] = modulRegistry,
+): boolean {
+  if (freigaben == null) return false;
+  return (marke.braucht ?? []).some((key) => {
+    const modul = register.find((m) => m.key === key);
+    return !modul || !istModulFreigegeben(modul, freigaben);
+  });
 }
 
 type NavZeile = { art: 'modul'; modul: ModulEintrag } | { art: 'sprung'; marke: Sprungmarke };

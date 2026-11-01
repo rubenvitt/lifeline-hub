@@ -698,8 +698,17 @@ export default function AbloesungPage() {
     setBeginnenOffen(true);
   };
   const ohneZahl = ohneSchicht?.length;
-  // Jede der drei Quellen kann scheitern; dann steht der Fehler statt eines ewigen Ladens.
-  const ohneFehler = einheitenQuery.isError || periodenQuery.isError || laufendQuery.isError;
+  // Jede Quelle kann scheitern, auch die Freigaben, an denen die Abrufe hängen (direkt über
+  // `?ansicht=ohne-schicht` geöffnet); dann steht der Fehler statt eines ewigen Ladens.
+  const ohneFehler =
+    freigabenQuery.isError ||
+    einheitenQuery.isError ||
+    periodenQuery.isError ||
+    laufendQuery.isError;
+  const ohneNeuAbrufen = () => {
+    for (const q of [freigabenQuery, einheitenQuery, periodenQuery, laufendQuery])
+      if (q.isError) void q.refetch();
+  };
   // Auf dem Handschirm tragen die Segmente keine Zahl (Platz neben dem Banner, LLH-1128); der
   // Kopf nennt sie dort wie überall. Im Handschuh-Betrieb bricht „Ohne Schicht“ zudem in zwei
   // Zeilen: das Segment ist dort 72 px hoch, und einzeilig bliebe neben drei Segmenten kein Platz
@@ -815,6 +824,7 @@ export default function AbloesungPage() {
               showIcon
               style={{ marginBottom: token.marginSM }}
               title="Einheiten ohne Schicht konnten nicht geladen werden"
+              action={<Button onClick={ohneNeuAbrufen}>Erneut abrufen</Button>}
             />
           )}
           {ohneSchicht == null ? (

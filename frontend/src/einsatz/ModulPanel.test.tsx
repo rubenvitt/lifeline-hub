@@ -464,6 +464,49 @@ describe('ModulListe — Sprungmarken', () => {
   });
 });
 
+describe('ModulListe — Sprungmarke mit weiterem Modul (LLH-1312)', () => {
+  const marke: Sprungmarke = {
+    key: 'ohne-schicht',
+    kategorie: 'kraefte',
+    label: 'Ohne Schicht',
+    zielModul: 'abloesung',
+    nach: 'abloesung',
+    hinweis: 'Ablösung · Ohne Schicht',
+    schlagworte: [],
+    braucht: ['einheiten'],
+    pfad: () => '/einsaetze/1/abloesung?ansicht=ohne-schicht',
+  };
+  const kraefte: ModulEintrag[] = [
+    basis({ key: 'abloesung', kategorie: 'kraefte', label: 'Ablösung', status: 'fertig' }),
+  ];
+  const zeige = (freigabenWert?: ModulFreigaben) =>
+    renderMitProviders(
+      <ModulPanel
+        titel="Kräfte"
+        module={kraefte}
+        freigaben={freigabenWert}
+        aktiverModulKey="abloesung"
+        onModulKlick={() => {}}
+        sprungmarken={[marke]}
+      />,
+    );
+
+  it('ist gesperrt, wenn ein Modul aus `braucht` gesperrt ist, auch bei freiem Ziel', () => {
+    zeige(freigabenFixture({ einheiten: { zugriff: false } }));
+    const sprung = screen.getByRole('button', { name: /Ohne Schicht/ });
+    expect(sprung).toBeDisabled();
+    expect(sprung).toHaveAttribute('title', 'Keine Berechtigung');
+  });
+
+  it('ist frei mit beiden Freigaben und flackert beim Laden nicht', () => {
+    const { unmount } = zeige(freigabenFixture());
+    expect(screen.getByRole('button', { name: /Ohne Schicht/ })).toBeEnabled();
+    unmount();
+    zeige(undefined);
+    expect(screen.getByRole('button', { name: /Ohne Schicht/ })).toBeEnabled();
+  });
+});
+
 describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
   const mitBeschreibung: ModulEintrag[] = [
     basis({
