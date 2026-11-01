@@ -403,3 +403,100 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
     await kontext.close();
   }
 });
+
+/**
+ * Vorgemerktes überdauert das Ende der Kopplung (LLH-1331, Spec `feldgeraet-bedienung`): das
+ * Tablet merkt ohne Netz eine Nachsichtung vor, die Einsatzleitung widerruft die Kopplung.
+ * „Kopplung beendet“ nennt den Eintrag; mit einem neuen Code für dieselbe UHS sendet das neue
+ * Gerätekonto ihn genau einmal, mit der Erfassungszeit von unterwegs.
+ *
+ * Mutationsprobe: in `AuthContext` den Aufruf `geraetKontoBestaetigt` entfernt → die Anzahl auf
+ * „Kopplung beendet“ fehlt und die Sichtung erreicht den Server nie (rot).
+ */
+test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten Kopplung', async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  await anmeldenAlsAdmin(page);
+  const e = (
+    await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Kopplungsende ${Date.now()}` })
+  ).id;
+  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+    typ: 'behandlungsplatz',
+    bezeichnung: 'UHS Nord',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  const person = await anlegen(page, `/api/einsaetze/${e}/personen`, {
+    name: 'Patient',
+    sichtung: 'sk3',
+    uhs_id: nord.id,
+  });
+  const koppeln = () =>
+    anlegen<{ kopplung: { id: number }; code: { code: string } }>(
+      page,
+      `/api/einsaetze/${e}/geraete`,
+      { ansicht: 'uhs-tablet', uhs_id: nord.id, bezeichnung: 'Tablet 1' },
+    );
+  const erste = await koppeln();
+
+  const kontext = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    hasTouch: true,
+  });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${erste.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/patienten$`));
+    await tablet.goto(`/geraet/${e}/patienten/${person.id}`);
+    const kopf = tablet.getByRole('region', { name: 'Patientenkopf' });
+    await expect(kopf.getByRole('button', { name: /^Nachsichten, aktuell SK III/ })).toBeVisible();
+
+    const offlineAb = Date.now();
+    await kontext.setOffline(true);
+    await kopf.getByRole('button', { name: /^Nachsichten/ }).click();
+    const sichtung = tablet.getByRole('region', { name: 'Sichtung erfassen' });
+    await sichtung.getByRole('radio', { name: /^SK II,/ }).click();
+    await sichtung.getByRole('button', { name: 'Übernehmen' }).click();
+    await expect(kopf.getByRole('region', { name: 'Offline vorgemerkt' })).toContainText(
+      'Sichtung SK II',
+    );
+    const offlineBis = Date.now();
+
+    // Die Kopplung endet, während das Tablet kein Netz hat.
+    await anlegen(page, `/api/einsaetze/${e}/geraete/${erste.kopplung.id}/widerrufen`);
+    await kontext.setOffline(false);
+    await expect(tablet).toHaveURL(/\/kopplung-beendet$/, { timeout: 30_000 });
+    await expect(tablet.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();
+    await expect(tablet.getByText('1 Eintrag nicht übertragen')).toBeVisible();
+
+    // Neuer Code für dieselbe UHS: das neue Gerätekonto sendet die Sichtung.
+    const zweite = await koppeln();
+    await tablet.getByRole('button', { name: 'Neuen Code eingeben' }).click();
+    await tablet.getByLabel('Kopplungscode').fill(zweite.code.code);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/patienten$`));
+
+    await expect
+      .poll(
+        async () => {
+          const detail = (await (
+            await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+          ).json()) as { sichtungen: { kategorie: string }[] };
+          return detail.sichtungen.filter((s) => s.kategorie === 'sk2').length;
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(1);
+    const detail = (await (
+      await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+    ).json()) as { sichtungen: { kategorie: string; gesichtet_at: string }[] };
+    const sk2 = detail.sichtungen.find((s) => s.kategorie === 'sk2')!;
+    expect(ms(sk2.gesichtet_at)).toBeGreaterThanOrEqual(offlineAb - 1_000);
+    expect(ms(sk2.gesichtet_at)).toBeLessThanOrEqual(offlineBis);
+    await expect(tablet.getByText('Aus früherer Kopplung')).toHaveCount(0);
+  } finally {
+    await kontext.close();
+  }
+});
