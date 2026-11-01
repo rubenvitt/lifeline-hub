@@ -743,7 +743,7 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     return onErfassen;
   }
 
-  it('Planen: Besatzungswechsel mit Verteilung, die Ablöser gehen leer mit', async () => {
+  it('Planen: Besatzungswechsel mit Verteilung; nur der Plan geht hinaus', async () => {
     const onErfassen = planung();
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked();
@@ -757,10 +757,24 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({
-        abloeser_ids: [],
         besatzung_plan: [{ personal_id: 24, fahrzeug_id: 44 }],
       }),
     );
+  });
+
+  it('Planen unverändert: kein Aufruf, eine inzwischen überholte Planung bleibt stehen', async () => {
+    // Ohne die inzwischen Entlassene: deren Wegfall wäre eine Änderung.
+    const ohneEntlassene = {
+      ...geplant,
+      besatzung_plan: geplant.besatzung_plan.slice(0, 1),
+    } as Abloesung;
+    const onSchliessen = vi.fn();
+    const onErfassen = planung({ schicht: ohneEntlassene, onSchliessen });
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
   });
 
   it('Planen: Ablöser heben einen geplanten Wechsel auf; die Vorbelegung zeigt ihn', async () => {
@@ -779,19 +793,23 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
   });
 
   it('Planen ohne geladenes Personal: der geplante Wechsel bleibt unberührt', async () => {
-    const onErfassen = planung({ schicht: geplant, personen: null });
+    const onSchliessen = vi.fn();
+    const onErfassen = planung({ schicht: geplant, personen: null, onSchliessen });
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [] }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
   });
 
   it('Planen ohne geladene Einheiten: der geplante Wechsel bleibt mit seinen Zielen stehen', async () => {
-    const onErfassen = planung({ schicht: geplant, verteilung: undefined });
+    const onSchliessen = vi.fn();
+    const onErfassen = planung({ schicht: geplant, verteilung: undefined, onSchliessen });
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [] }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
   });
 
   it('Planen gesperrt: nur die Ablöser gehen hinaus, die Planung bleibt unberührt', async () => {
@@ -801,8 +819,9 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
       'Modul Personal gesperrt',
     );
+    await waehle('Ablösende Einheiten', 'Florian 2');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [] }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [12] }));
   });
 });
 

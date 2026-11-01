@@ -659,8 +659,8 @@ describe('AbloesungPage (LFH-635)', () => {
     expect(
       await screen.findByText('Florian 2 schon für Schicht Florian 5 geplant'),
     ).toBeInTheDocument();
-    // Eine Schicht plant entweder Ablöser oder einen Besatzungswechsel (LLH-1319): beide Listen.
-    expect(aendereSchicht).toHaveBeenCalledWith(1, 1, { abloeser_ids: [12], besatzung_plan: [] });
+    // Nur die geänderte Liste geht hinaus (LLH-1319); ein Besatzungswechsel war nicht geplant.
+    expect(aendereSchicht).toHaveBeenCalledWith(1, 1, { abloeser_ids: [12] });
   });
 
   it('Rhythmus-Vorgabe am Abschnitt: Platzhalter „keine Vorgabe“, kein Erklärsatz', async () => {

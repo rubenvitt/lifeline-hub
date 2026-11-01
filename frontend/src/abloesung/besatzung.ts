@@ -218,6 +218,29 @@ export function besatzungZiele(
   });
 }
 
+/**
+ * Entspricht `ziele` dem geplanten Besatzungswechsel der Schicht? In derselben Reihenfolge, wie
+ * der Server vergleicht; ein Ziel gleich der Einheit der Schicht zählt als „kein Ziel“.
+ */
+export function gleicherPlan(ziele: readonly BesatzungZielEingabe[], schicht: Abloesung): boolean {
+  const plan = schicht.besatzung_plan ?? [];
+  const ziel = (e: number | null | undefined) => (e != null && e !== schicht.einheit_id ? e : null);
+  return (
+    ziele.length === plan.length &&
+    ziele.every(
+      (z, i) =>
+        z.personal_id === plan[i].personal_id &&
+        ziel(z.einheit_id) === ziel(plan[i].einheit_id) &&
+        (z.fahrzeug_id ?? null) === (plan[i].fahrzeug_id ?? null),
+    )
+  );
+}
+
+/** Gleiche Ids in gleicher Reihenfolge. */
+export function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
 /** Eine Person des Plans mit ihrer Verteilung, wo sie abweicht: „Cora Neu (Gruppe 1, Florian 1-44)“. */
 function planPerson(p: AbloesungBesatzungPlan): string {
   const ziel = [p.einheit_name, p.funkrufname].filter((t): t is string => !!t);

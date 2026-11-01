@@ -6,6 +6,8 @@ import {
   besatzungText,
   besatzungZiele,
   bisherigeBesatzung,
+  gleicheIds,
+  gleicherPlan,
   nachBesatzungswechselText,
   planVorbelegung,
   verteilungKopf,
@@ -149,6 +151,24 @@ describe('Verteilung und Planung (LLH-1319)', () => {
     ]);
     // Eine abgewählte Person zählt nicht mehr, auch wenn ihr Ziel noch im Formular steht.
     expect(verteilungKopf([14], verteilung, s)).toBe('Verteilen · alle in Florian 1');
+  });
+
+  it('gleicher Plan: Reihenfolge und Ziele zählen, die Einheit der Schicht ist kein Ziel', () => {
+    const s = schicht({
+      besatzung_plan: [
+        { personal_id: 12, name: 'Cora', einheit_id: 2, einheit_name: 'Gruppe 1', fahrzeug_id: 44 },
+        { personal_id: 14, name: 'Dirk' },
+      ],
+    });
+    const plan = [{ personal_id: 12, einheit_id: 2, fahrzeug_id: 44 }, { personal_id: 14 }];
+    expect(gleicherPlan(plan, s)).toBe(true);
+    expect(gleicherPlan([plan[0], { personal_id: 14, einheit_id: 1 }], s)).toBe(true);
+    expect(gleicherPlan([plan[1], plan[0]], s)).toBe(false);
+    expect(gleicherPlan([plan[0], { personal_id: 14, fahrzeug_id: 44 }], s)).toBe(false);
+    expect(gleicherPlan([plan[0]], s)).toBe(false);
+    expect(gleicherPlan([], schicht())).toBe(true);
+    expect(gleicheIds([12, 13], [12, 13])).toBe(true);
+    expect(gleicheIds([13, 12], [12, 13])).toBe(false);
   });
 
   it('Vorbelegung aus der Planung: nur wählbare Personen, nur bestehende Ziele', () => {

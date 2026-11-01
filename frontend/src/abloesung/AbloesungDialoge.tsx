@@ -17,6 +17,8 @@ import {
 import { abloeserIds } from './abloeser';
 import {
   besatzungZiele,
+  gleicheIds,
+  gleicherPlan,
   planVorbelegung,
   verteilungKopf,
   type BesatzungOption,
@@ -554,10 +556,12 @@ interface AbloeserWerte {
   verteilung?: Verteilung;
 }
 
-/** Was der Dialog „Ablösung planen“ sendet (PATCH, beide Listen dreiwertig). */
+/**
+ * Was der Dialog „Ablösung planen“ sendet (PATCH, beide Listen dreiwertig): nur, was sich gegenüber
+ * der Schicht geändert hat. Eine fehlende Liste bleibt unberührt.
+ */
 export interface PlanungEingabe {
-  abloeser_ids: number[];
-  /** Fehlt, wenn der Besatzungswechsel gesperrt ist: die Planung bleibt dann unberührt. */
+  abloeser_ids?: number[];
   besatzung_plan?: BesatzungZielEingabe[];
 }
 
@@ -614,21 +618,28 @@ export function AbloeserDialog({
         besatzung_ids: [],
       }}
       onErfassen={(w) => {
+        if (!schicht) return Promise.resolve();
         // Solange Personal oder Einheiten fehlen, ist ein geplanter Wechsel nicht vorbelegt: er
         // bleibt unberührt, statt geleert oder ohne seine Ziele gespeichert zu werden.
         const planUnbekannt =
           w.art === 'besatzung' &&
-          (schicht?.besatzung_plan ?? []).length > 0 &&
+          (schicht.besatzung_plan ?? []).length > 0 &&
           (personen == null || verteilung === undefined);
-        if (gesperrt || !schicht || planUnbekannt) {
-          return onErfassen({ abloeser_ids: w.abloeser_ids ?? [] });
+        const nurAbloeser = gesperrt || planUnbekannt;
+        const abloeser = nurAbloeser || w.art !== 'besatzung' ? (w.abloeser_ids ?? []) : [];
+        // Nur Geändertes senden, ohne Änderung kein Aufruf: ein unverändertes Speichern einer
+        // inzwischen überholten Ansicht schriebe sonst die alte Planung zurück. Ein Art-Wechsel
+        // ändert beide Listen und sendet sie deshalb gemeinsam.
+        const eingabe: PlanungEingabe = {};
+        if (!gleicheIds(abloeser, abloeserIds(schicht))) eingabe.abloeser_ids = abloeser;
+        if (!nurAbloeser) {
+          const plan =
+            w.art === 'besatzung'
+              ? besatzungZiele(w.besatzung_ids ?? [], w.verteilung, schicht)
+              : [];
+          if (!gleicherPlan(plan, schicht)) eingabe.besatzung_plan = plan;
         }
-        return w.art === 'besatzung'
-          ? onErfassen({
-              abloeser_ids: [],
-              besatzung_plan: besatzungZiele(w.besatzung_ids ?? [], w.verteilung, schicht),
-            })
-          : onErfassen({ abloeser_ids: w.abloeser_ids ?? [], besatzung_plan: [] });
+        return Object.keys(eingabe).length > 0 ? onErfassen(eingabe) : Promise.resolve();
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
