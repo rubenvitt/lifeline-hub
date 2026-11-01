@@ -39,7 +39,7 @@ function Etikett({ text, annahme }: { text: string; annahme: boolean }) {
     <Space size={6} wrap>
       <span>{text}</span>
       {annahme && (
-        <Tag bordered={false} data-lfh="annahme">
+        <Tag variant="filled" data-lfh="annahme">
           Annahme
         </Tag>
       )}

@@ -131,7 +131,7 @@ function RichtwertZeile({
     <div style={zeile} data-schluessel={b.schluessel}>
       <Space size={6} wrap>
         <Typography.Text>{b.bezeichnung}</Typography.Text>
-        {b.herkunft === 'annahme' && <Tag bordered={false}>Annahme</Tag>}
+        {b.herkunft === 'annahme' && <Tag variant="filled">Annahme</Tag>}
       </Space>
       {ebene === 'anzeige' ? (
         <Typography.Text style={{ fontVariantNumeric: 'tabular-nums' }}>
