@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GeraetAnzeige } from '../api/types';
 import { rohLesen } from '../test/rohIdb';
 import {
@@ -6,8 +7,10 @@ import {
   countFruehereKopplung,
   loadGeraetKonten,
   confirmGeraetKonto,
+  useFruehereKopplungCount,
 } from './fruehereKopplung';
 import {
+  QUEUE_KANAL,
   queueEinreihen,
   queueLeerenFuerTests,
   queueZaehlerLaden,
@@ -79,14 +82,46 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
     expect(loadGeraetKonten().map((k) => k.benutzer_id)).toEqual([NEU, ALT]);
   });
 
-  it('übernimmt, was ein Tab der beendeten Kopplung nach der Übernahme noch einreiht', async () => {
+  it('übernimmt Nachzügler eines Tabs der beendeten Kopplung, statt sie zu zählen', async () => {
     await confirmGeraetKonto(ALT, geraet());
     await confirmGeraetKonto(NEU, geraet({ kopplung_id: 4 }));
-    // Zuerst ohne Zeilen übernommen; danach reiht ein offener Tab unter dem alten Konto ein.
+    const { result } = renderHook(() => useFruehereKopplungCount(NEU, true));
+    // Nach der Bestätigung reiht ein offener Tab noch unter dem alten Konto ein.
     await schreibaktionEinreihen(ALT, 7, sichtung('spaet-1'));
-    expect(await countFruehereKopplung(NEU)).toBe(1);
 
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(NEU, 7)).toMatchObject({ ausstehend: 1 }),
+    );
+    expect(await queueZaehlerLaden(ALT, 7)).toMatchObject({ ausstehend: 0 });
+    expect(result.current).toBe(0);
+  });
+
+  it('zählt auch, was ein anderer Tab einreiht (BroadcastChannel)', async () => {
+    await confirmGeraetKonto(ALT, geraet());
+    const { result } = renderHook(() => useFruehereKopplungCount(null, true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(result.current).toBe(0);
+
+    // Der andere Tab reiht ein: hier kommt kein lokales Fenster-Ereignis an …
+    const lokal = vi.spyOn(window, 'dispatchEvent').mockImplementation(() => true);
+    await schreibaktionEinreihen(ALT, 7, sichtung('anderer-tab'));
+    lokal.mockRestore();
+    // … nur sein datenloses Signal über den Kanal.
+    const andererTab = new BroadcastChannel(QUEUE_KANAL);
+    andererTab.postMessage({ typ: 'queue-geaendert' });
+    await waitFor(() => expect(result.current).toBe(1));
+    andererTab.close();
+  });
+
+  it('verwirft passende Nachzügler nie, sondern übernimmt sie', async () => {
+    await confirmGeraetKonto(ALT, geraet());
+    await confirmGeraetKonto(9, geraet({ stelle_id: 5 }));
     await confirmGeraetKonto(NEU, geraet({ kopplung_id: 4 }));
+    await schreibaktionEinreihen(ALT, 7, sichtung('spaet-1'));
+    await schreibaktionEinreihen(9, 7, sichtung('fremd-1'));
+
+    expect(await discardFruehereKopplung(NEU)).toBe(1);
+
     expect(await queueZaehlerLaden(NEU, 7)).toMatchObject({ ausstehend: 1 });
     expect(await countFruehereKopplung(NEU)).toBe(0);
   });

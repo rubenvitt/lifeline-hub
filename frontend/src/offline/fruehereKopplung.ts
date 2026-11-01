@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 import type { GeraetAnzeige } from '../api/types';
 import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 import {
-  OFFLINE_QUEUE_EVENT,
+  beobachteQueueAenderungen,
   rebindQueueKonten,
   deleteQueueKonten,
   countQueueKonten,
@@ -79,18 +79,31 @@ function fruehereIds(aktuell: number | null): number[] {
 }
 
 /**
+ * Übernimmt die Zeilen aller früheren Konten, die zum aktuellen passen (D3). Ohne gemerktes
+ * aktuelles Konto nichts. Auch für Nachzügler: Ein Tab der beendeten Kopplung kann nach der
+ * Bestätigung noch einreihen.
+ */
+export async function adoptFruehereKopplung(aktuell: number): Promise<number> {
+  const konten = loadGeraetKonten();
+  const eigenes = konten.find((k) => k.benutzer_id === aktuell);
+  if (!eigenes) return 0;
+  const passende = konten
+    .filter((k) => k.benutzer_id !== aktuell && matches(k, eigenes))
+    .map((k) => k.benutzer_id);
+  return passende.length > 0 ? rebindQueueKonten(passende, aktuell) : 0;
+}
+
+/**
  * Der Server hat eine Gerätesitzung bestätigt (`AuthProvider`, neben `merkeGeraet`): Konto
  * merken und passende frühere Konten übernehmen. Kein Konto wird vergessen: Ein Tab der beendeten
- * Kopplung kann noch einreihen, seine Zeilen bleiben so sichtbar und die nächste passende
- * Kopplung übernimmt sie. Wirft nie.
+ * Kopplung kann noch einreihen, seine Zeilen bleiben so sichtbar und werden übernommen
+ * ({@link useFruehereKopplungCount}). Wirft nie.
  */
 export async function confirmGeraetKonto(benutzerId: number, geraet: GeraetAnzeige): Promise<void> {
   try {
-    const aktuell = toKonto(benutzerId, geraet);
     const bisher = loadGeraetKonten().filter((k) => k.benutzer_id !== benutzerId);
-    save([aktuell, ...bisher]);
-    const passende = bisher.filter((k) => matches(k, aktuell)).map((k) => k.benutzer_id);
-    if (passende.length > 0) await rebindQueueKonten(passende, benutzerId);
+    save([toKonto(benutzerId, geraet), ...bisher]);
+    await adoptFruehereKopplung(benutzerId);
   } catch (e) {
     console.error('Frühere Kopplung: Übernahme fehlgeschlagen', e);
   }
@@ -101,15 +114,18 @@ export function countFruehereKopplung(aktuell: number | null): Promise<number> {
   return countQueueKonten(fruehereIds(aktuell));
 }
 
-/** Verwirft alle Einträge früherer Gerätekonten (nur nach Rückfrage, D3). Die Konten bleiben
- *  gemerkt, aus demselben Grund wie in {@link confirmGeraetKonto}. */
-export function discardFruehereKopplung(aktuell: number): Promise<number> {
+/** Verwirft die Einträge früherer Gerätekonten (nur nach Rückfrage, D3). Passende Nachzügler
+ *  übernimmt es vorher, statt sie zu löschen. Die Konten bleiben gemerkt, siehe
+ *  {@link confirmGeraetKonto}. */
+export async function discardFruehereKopplung(aktuell: number): Promise<number> {
+  await adoptFruehereKopplung(aktuell);
   return deleteQueueKonten(fruehereIds(aktuell));
 }
 
 /**
  * Reaktive Anzahl für „Kopplung beendet“ und die Gerätehülle. `aktiv = false` (Person, kein
- * Gerät) liefert immer 0: eine Person sieht und verwirft keine Zeilen von Gerätekonten.
+ * Gerät) liefert immer 0: eine Person sieht und verwirft keine Zeilen von Gerätekonten. Mit
+ * aktueller Gerätesitzung übernimmt jeder Lauf zuerst passende Nachzügler, auch aus anderen Tabs.
  */
 export function useFruehereKopplungCount(aktuell: number | null, aktiv: boolean): number {
   const [anzahl, setAnzahl] = useState(0);
@@ -120,18 +136,22 @@ export function useFruehereKopplungCount(aktuell: number | null, aktiv: boolean)
     }
     let gueltig = true;
     const laden = () => {
-      countFruehereKopplung(aktuell).then(
-        (n) => {
-          if (gueltig) setAnzahl(n);
-        },
-        () => undefined,
-      );
+      // Eine Übernahme meldet die Änderung selbst und löst einen zweiten, dann leeren Lauf aus.
+      const vorher = aktuell === null ? Promise.resolve(0) : adoptFruehereKopplung(aktuell);
+      vorher
+        .then(() => countFruehereKopplung(aktuell))
+        .then(
+          (n) => {
+            if (gueltig) setAnzahl(n);
+          },
+          () => undefined,
+        );
     };
     laden();
-    window.addEventListener(OFFLINE_QUEUE_EVENT, laden);
+    const beenden = beobachteQueueAenderungen(laden);
     return () => {
       gueltig = false;
-      window.removeEventListener(OFFLINE_QUEUE_EVENT, laden);
+      beenden();
     };
   }, [aktuell, aktiv]);
   return aktiv ? anzahl : 0;

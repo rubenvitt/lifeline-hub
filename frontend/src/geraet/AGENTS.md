@@ -91,7 +91,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Abgleich sendet, der Server prüft mit den Rechten des neuen Kontos; Erfasser ist das neue Konto.
   Die Übernahme läuft ohne Knopf (Entscheidung Ruben 01.11.2026). Was nicht passt, zeigt nur die
   Gerätehülle als „Aus früherer Kopplung“ (Anzahl, Verwerfen mit Rückfrage), „Kopplung beendet“
-  nur als Anzahl; Zeilen von Personen fasst der Weg nie an. Kein Serverweg: die
+  nur als Anzahl; Zeilen von Personen fasst der Weg nie an. Gemerkte Konten werden nie vergessen:
+  ein Tab der beendeten Kopplung kann noch einreihen, die Gerätehülle übernimmt solche Nachzügler
+  (`adoptFruehereKopplung`, auch vor dem Verwerfen). Kein Serverweg: die
   `client_id`-Wiedergabe ist je Einsatz eindeutig, nicht je Benutzer.
 - **Kopfzeile und Navigation** (`geraet/GeraeteKopf.tsx`): Stelle, Gerät, Verbindung und
   Kopplungsende stehen immer, unter einer Stunde mit Wort und Farbe; ohne Netz der jüngste
