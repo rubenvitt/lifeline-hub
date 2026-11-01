@@ -41,6 +41,11 @@ import {
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../../stab/einsatzleiter';
 import { SACHGEBIETE } from '../../stab/sachgebiete';
 import {
+  GEFAHR_LABEL,
+  GEFAHRENARTEN,
+  SCHADENSGRAD_LABEL,
+} from '../../pages/schaeden/gefahrWorte';
+import {
   etbTyp,
   personStatus,
   schadenAusmass,
@@ -442,6 +447,25 @@ function personenBilanz(personen: Person[]): Inhalt[] {
   ];
 }
 
+/**
+ * Zählung einer optionalen Angabe in fester Reihenfolge, nur Werte, die vorkommen: ein Schaden
+ * ohne Angabe zählt nirgends, ein unbekannter gespeicherter Wert fällt weg (wie `gefahrText`).
+ */
+function vorkommende<K extends string>(
+  reihe: readonly K[],
+  label: Record<K, string>,
+  werte: (K | null | undefined)[],
+): Zeile[] {
+  return reihe.flatMap((k) => {
+    const n = werte.filter((w) => w === k).length;
+    return n > 0 ? [{ etikett: label[k], wert: zahl(n) }] : [];
+  });
+}
+
+/**
+ * Schadensbilanz (LFH-726). Gefahr und Schadensgrad (LLH-1342) sind optional: jede Gruppe nennt
+ * nur, was vorkommt, und fehlt ganz, wenn kein Schaden die Angabe trägt.
+ */
 function schadenBilanz(schaeden: Schaden[]): Inhalt[] {
   const status = { offen: 0, uebergeben: 0, abgeschlossen: 0 };
   const ausmass = { gering: 0, mittel: 0, gross: 0, katastrophal: 0 };
@@ -449,6 +473,16 @@ function schadenBilanz(schaeden: Schaden[]): Inhalt[] {
     status[s.status] += 1;
     ausmass[s.ausmass] += 1;
   }
+  const gefahr = vorkommende(
+    GEFAHRENARTEN,
+    GEFAHR_LABEL,
+    schaeden.map((s) => s.gefahrenart),
+  );
+  const grad = vorkommende(
+    Object.keys(SCHADENSGRAD_LABEL) as (keyof typeof SCHADENSGRAD_LABEL)[],
+    SCHADENSGRAD_LABEL,
+    schaeden.map((s) => s.schadensgrad),
+  );
   return [
     zeilen([{ etikett: 'Schäden gesamt', wert: zahl(schaeden.length) }]),
     zeilen(
@@ -465,6 +499,8 @@ function schadenBilanz(schaeden: Schaden[]): Inhalt[] {
       })),
       'Nach Ausmaß',
     ),
+    ...(gefahr.length > 0 ? [zeilen(gefahr, 'Nach Gefahr')] : []),
+    ...(grad.length > 0 ? [zeilen(grad, 'Nach Schadensgrad')] : []),
   ];
 }
 

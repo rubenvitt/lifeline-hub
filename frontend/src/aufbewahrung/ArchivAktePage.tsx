@@ -38,7 +38,13 @@ import { istAdmin } from '../einsatz/schreibrecht';
 import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 import { istNachgetragen } from '../etb/typFarben';
 import { verfasserText } from '../etb/verfasser';
-import { ABSCHLUSS_LABEL, TYP_LABEL } from '../pages/schaeden/schadenHelfer';
+import {
+  ABSCHLUSS_LABEL,
+  GEFAHR_LABEL,
+  GEFAHRENARTEN,
+  TYP_LABEL,
+  gefahrText,
+} from '../pages/schaeden/schadenHelfer';
 import { SPEZIES_META, TIER_STATUS, TIER_VERBLEIB } from '../pages/tiere/tierHelfer';
 import { parseRouteId } from '../routing/deeplinks';
 import {
@@ -245,6 +251,15 @@ const schadenSpalten: KatalogSpalte<ArchivSchaden>[] = [
     filters: werteAusKatalog(schadenAusmass),
     onFilter: (w, s) => s.ausmass === w,
     render: (_, s) => <StatusTag darstellung={schadenAusmass[s.ausmass]} />,
+  },
+  {
+    // Gefahr und Schadensgrad in einer Spalte wie in der Schadensliste (LLH-1342).
+    key: 'gefahr',
+    title: 'Gefahr',
+    width: 220,
+    filters: GEFAHRENARTEN.map((g) => ({ text: GEFAHR_LABEL[g], value: g })),
+    onFilter: (w, s) => s.gefahrenart === w,
+    render: (_, s) => gefahrText(s),
   },
   {
     key: 'status',
