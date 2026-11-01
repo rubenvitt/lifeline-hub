@@ -1008,20 +1008,34 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Segmentleiste',
     title: 'Segmentleiste',
     group: 'Bedienung',
-    height: 190,
+    height: 280,
     source: 'components/instrument/Segmentleiste.tsx',
+    // Die zweite Leiste zeigt den Zeilenumbruch im Wortlaut (Ablösung im Handschuh-Betrieb).
+    // `alignItems` hält beide Leisten so breit wie ihre Segmente, wie in der App.
     content: () => (
-      <Segmentleiste<string>
-        beschriftung="Meldungen filtern"
-        wert="offen"
-        onWechsel={nichts}
-        optionen={[
-          { wert: 'alle', label: 'Alle' },
-          { wert: 'offen', label: 'Offen' },
-          { wert: 'erledigt', label: 'Erledigt' },
-          { wert: 'archiv', label: 'Archiv', gesperrt: 'Nur Einsatzleitung' },
-        ]}
-      />
+      <div className="ds-stapel" style={{ alignItems: 'flex-start' }}>
+        <Segmentleiste<string>
+          beschriftung="Meldungen filtern"
+          wert="offen"
+          onWechsel={nichts}
+          optionen={[
+            { wert: 'alle', label: 'Alle' },
+            { wert: 'offen', label: 'Offen' },
+            { wert: 'erledigt', label: 'Erledigt' },
+            { wert: 'archiv', label: 'Archiv', gesperrt: 'Nur Einsatzleitung' },
+          ]}
+        />
+        <Segmentleiste<string>
+          beschriftung="Ansicht"
+          wert="laufend"
+          onWechsel={nichts}
+          optionen={[
+            { wert: 'laufend', label: 'Laufend' },
+            { wert: 'ohne', label: 'Ohne\nSchicht' },
+            { wert: 'vergangen', label: 'Vergangen' },
+          ]}
+        />
+      </div>
     ),
   },
   {
