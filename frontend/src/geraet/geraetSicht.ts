@@ -50,6 +50,12 @@ export type GeraetFaehigkeit =
    * Führung, kein Gerät (Routenliste ohne `…/abruf`). Das Ausrücken bucht das Gerät als Austritt.
    */
   | 'br-abrufen'
+  /**
+   * Eine bereitgestellte Kraft in einen anderen Raum verlegen (LLH-1315): wie der Abruf eine
+   * Entscheidung der Führung. Ein Wechsel hinaus wäre für das Gerät ohnehin 404 (`{bid}` ist der
+   * Zielraum, `fordere_stelle`).
+   */
+  | 'br-verlegen'
   /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044); Verpflegungsstellen
    *  anlegen, bearbeiten, in Betrieb nehmen, auflösen, stornieren und Zeitfenstern zuordnen
    *  (LLH-1040). Das Gerät liest die Stellen und wählt sie beim Buchen. */
@@ -74,6 +80,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'uhs-verwalten':
     case 'br-verwalten':
     case 'br-abrufen':
+    case 'br-verlegen':
     case 'verpflegung-planen':
     case 'person-status':
     case 'person-zuordnungen':

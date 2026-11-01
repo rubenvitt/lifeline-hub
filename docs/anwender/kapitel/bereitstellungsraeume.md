@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/repo.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, src/bereitstellungsraum/stamm_treffer.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/repo.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, src/bereitstellungsraum/stamm_treffer.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, frontend/src/pages/bereitstellungsraum/VerlegenDialog.tsx, frontend/src/pages/bereitstellungsraum/verlegenKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs]
 ---
 
 ## Überblick
@@ -167,6 +167,22 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
    „Abrufen und austragen“ wählen: derselbe Dialog, „Abrufen und austragen“ ruft ab und trägt die
    Kraft im selben Schritt aus dem Raum aus.
 
+### Eine Kraft in einen anderen Raum verlegen
+
+Für Einsatzleitung und Führungspersonal, solange beide Räume aktiv sind:
+
+1. Den Raum öffnen und bei der Einheit oder dem Fahrzeug unter „Bereitgestellte Einheiten“ bzw.
+   „Bereitgestellte Fahrzeuge“ das Aktionsmenü öffnen.
+2. „In anderen BR verlegen …“ wählen. Ist kein anderer Raum in Betrieb, steht der Eintrag
+   gesperrt mit „kein anderer Raum in Betrieb“.
+3. Unter „Ziel-Raum“ den Raum wählen; angeboten werden die anderen aktiven Räume des Einsatzes.
+4. „Verlegen“ wählen. Die Bestätigung lautet etwa „Einheit „Rettungsstaffel“ nach Schulhof Süd
+   verlegt“. Die Kraft steht danach im neuen Raum, ihr „seit“ beginnt dort neu, und die Fahrzeuge
+   einer Einheit gehen mit ihr.
+
+Eine abgerufene Kraft lässt sich nicht verlegen: erst den Abruf zurücknehmen. Am Tablet eines
+Raums gibt es das Verlegen nicht.
+
 ### Ausrücken buchen oder einen Abruf zurücknehmen
 
 1. Den Raum öffnen. Unter „Abgerufen“ stehen die abgerufenen Kräfte, die am längsten abgerufene
@@ -249,7 +265,7 @@ ist; ein aufgelöster Raum ist nur zu lesen.
 Fahrzeuge einer Einheit werden nicht einzeln zugewiesen, sondern über ihre Einheit. Wird ein
 Fahrzeug, das ohne Einheit im Raum steht, einer Einheit zugeordnet, tritt es aus dem Raum aus und
 steht danach nur noch bei seiner Einheit; ein abgerufenes Fahrzeug erst nach dem Ausrücken oder
-dem Zurücknehmen des Abrufs. Eine Kraft steht höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten ausgetragen. Die Stärke
+dem Zurücknehmen des Abrufs. Eine Kraft steht höchstens in einem Raum; soll sie in einen anderen, wird sie über „In anderen BR verlegen …“ verlegt. Die Stärke
 rechnet unterstellte Einheiten mit ein und zählt keine doppelt.
 
 „Erwartet“ und „Im Einsatz“ trennen nach dem Abschnitt: eine Einheit ohne eigenen Abschnitt zählt
@@ -393,7 +409,8 @@ Ist die Lagekarte gesperrt, steht „Auf Karte verorten (Keine Berechtigung)“ 
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält fest, wenn ein Raum in Betrieb genommen oder aufgelöst wird und wenn eine
-Kraft in einen Raum eintritt, dort eintrifft oder ihn verlässt, jeweils mit Namen. Ein Abruf
+Kraft in einen Raum eintritt, dort eintrifft, in einen anderen Raum verlegt wird („… wechselt zu
+Bereitstellungsraum …“) oder ihn verlässt, jeweils mit Namen. Ein Abruf
 schreibt genau einen Eintrag mit Ziel und Auftragsnummer, etwa „Rettungsstaffel aus
 Bereitstellungsraum Parkplatz Stadion Nord abgerufen nach Sanitätsdienst (Auftrag Nr. 7)“, mit
 mitgenommenen Untereinheiten „… mit …“, bei „Abrufen und austragen“ mit „… und ausgerückt“; den
@@ -405,7 +422,7 @@ frühere Einträge den alten Namen.
 ### Rechte und ohne Netz
 
 Lesen darf, wer das Modul Bereitstellungsräume sieht. Anlegen, ändern, in Betrieb nehmen,
-Eintreffen buchen, zuweisen, abrufen, Ausrücken buchen, Abrufe zurücknehmen, austragen, auflösen
+Eintreffen buchen, zuweisen, abrufen, Ausrücken buchen, Abrufe zurücknehmen, verlegen, austragen, auflösen
 und stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel
 [Rechte im Einsatz](rechte-im-einsatz.md)).
 Eine unangemeldete Kraft verlangt zusätzlich das Recht auf Einheiten und auf Fahrzeuge; fehlt es,
