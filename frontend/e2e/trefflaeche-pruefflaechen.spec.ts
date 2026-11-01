@@ -1121,10 +1121,14 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
       ziele: [
         {
           sorte: 'Lagemeldungen Filter',
-          ziele: segment(
-            /^(Alle|Letzte Stunde|Letzte 4 Stunden|Heute|Alle Orte|Mit Koordinaten|Ohne Koordinaten|Gerät|Übernommen)$/,
-          ),
-          mindestens: 10,
+          ziele: segment(/^(Alle|Alle Orte|Mit Koordinaten|Ohne Koordinaten|Gerät|Übernommen)$/),
+          mindestens: 6,
+        },
+        {
+          // Dieselbe Zeitraum-Schnellwahl wie im ETB (LLH-1322): ein Knopf statt Segmenten.
+          sorte: 'Lagemeldungen Zeitraum',
+          ziele: (page) => inMain(page).locator('[data-lfh="lagemeldungen-zeitraum"]'),
+          mindestens: 1,
         },
         {
           sorte: 'Lagemeldungen Suche',

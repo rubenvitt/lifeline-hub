@@ -7,7 +7,7 @@ import {
   filterAktiv,
   filtereLagemeldungen,
   gruppiereNachTag,
-  imZeitfenster,
+  imZeitraum,
   tagesEtikett,
   tagesSchluessel,
   uebergabeZeit,
@@ -48,17 +48,20 @@ describe('zeitachse', () => {
     expect(tagesEtikett(lokal.format('YYYY-MM-DD'), undefined, lokal)).toBe('Heute');
   });
 
-  it('Zeitfenster: Grenzen einschließend, in der Anzeigezone', () => {
-    const jetzt = dayjs.utc('2026-06-13 10:00:00').local();
-    expect(imZeitfenster('2026-06-13 09:01:00', 'stunde', jetzt)).toBe(true);
-    expect(imZeitfenster('2026-06-13 08:59:00', 'stunde', jetzt)).toBe(false);
-    expect(imZeitfenster('2026-06-13 06:01:00', 'vierStunden', jetzt)).toBe(true);
-    expect(imZeitfenster('2026-06-13 05:59:00', 'vierStunden', jetzt)).toBe(false);
-    // „Heute" kippt an der Tagesgrenze der ZONE: 22:30 UTC am 12. ist in Berlin der 13.
-    const berlin = { zeitzone: 'Europe/Berlin' };
-    const jetztBerlin = dayjs.utc('2026-06-13 10:00:00').tz('Europe/Berlin');
-    expect(imZeitfenster('2026-06-12 22:30:00', 'heute', jetztBerlin, berlin)).toBe(true);
-    expect(imZeitfenster('2026-06-12 21:30:00', 'heute', jetztBerlin, berlin)).toBe(false);
+  /**
+   * LLH-1322: absolute Grenzen wie im ETB (Server `>= von`, `<= bis`). Die Schnellwahl rechnet
+   * „Letzte Stunde“ oder „Heute“ vorher in `von` um (`anzeige/zeitfenster.ts`, dort getestet).
+   */
+  it('Zeitraum: Grenzen einschließend, eine fehlende oder unlesbare Grenze ist offen', () => {
+    const von = '2026-06-13 09:00:00';
+    const bis = '2026-06-13 11:00:00';
+    expect(imZeitraum('2026-06-13 09:00:00', { von })).toBe(true);
+    expect(imZeitraum('2026-06-13 08:59:59', { von })).toBe(false);
+    expect(imZeitraum('2026-06-13 11:00:00', { von, bis })).toBe(true);
+    expect(imZeitraum('2026-06-13 11:00:01', { von, bis })).toBe(false);
+    expect(imZeitraum('2026-06-12 07:00:00', { bis })).toBe(true);
+    expect(imZeitraum('2026-06-12 07:00:00', {})).toBe(true);
+    expect(imZeitraum('2026-06-12 07:00:00', { von: 'kaputt' })).toBe(true);
   });
 
   const eintrag = (ereigniszeit: string, text: string, lat: number | null = null) => ({
@@ -90,20 +93,23 @@ describe('zeitachse', () => {
     expect(gruppiereNachTag([])).toEqual([]);
   });
 
-  it('filtert nach Ort, Zeitfenster und Freitext — jede Achse für sich und zusammen', () => {
-    const jetzt = dayjs.utc('2026-06-13 10:00:00').local();
+  it('filtert nach Ort, Zeitraum und Freitext — jede Achse für sich und zusammen', () => {
     const menge = [
       eintrag('2026-06-13 09:30:00', 'Brücke gesperrt', 50.1),
       eintrag('2026-06-13 07:00:00', 'Pegel steigt'),
       eintrag('2026-06-12 07:00:00', 'Deich hält', 50.2),
     ];
     const texte = (f: Partial<typeof LEERER_FILTER>) =>
-      filtereLagemeldungen(menge, { ...LEERER_FILTER, ...f }, undefined, jetzt).map((l) => l.text);
+      filtereLagemeldungen(menge, { ...LEERER_FILTER, ...f }).map((l) => l.text);
     expect(texte({})).toEqual(['Brücke gesperrt', 'Pegel steigt', 'Deich hält']);
     expect(texte({ ort: 'mit' })).toEqual(['Brücke gesperrt', 'Deich hält']);
     expect(texte({ ort: 'ohne' })).toEqual(['Pegel steigt']);
-    expect(texte({ fenster: 'stunde' })).toEqual(['Brücke gesperrt']);
-    expect(texte({ fenster: 'vierStunden', ort: 'ohne' })).toEqual(['Pegel steigt']);
+    expect(texte({ von: '2026-06-13 09:00:00' })).toEqual(['Brücke gesperrt']);
+    expect(texte({ von: '2026-06-13 06:00:00', ort: 'ohne' })).toEqual(['Pegel steigt']);
+    expect(texte({ von: '2026-06-12 00:00:00', bis: '2026-06-13 08:00:00' })).toEqual([
+      'Pegel steigt',
+      'Deich hält',
+    ]);
     // Freitext trifft Text, Absender und Nummer, ohne Groß-/Kleinschreibung.
     expect(texte({ suche: '  DEICH ' })).toEqual(['Deich hält']);
     expect(texte({ suche: 'florian' })).toHaveLength(3);
@@ -172,20 +178,18 @@ describe('zeitachse', () => {
     expect(gruppen.map((g) => g.etikett)).toEqual(['Gestern']);
   });
 
-  it('Zeitfenster „Letzte Stunde“ filtert nach Ereigniszeit', () => {
-    const jetzt = dayjs.utc('2026-06-12 13:10:00').local();
+  it('der Zeitraum filtert nach Ereigniszeit, nicht nach Übergabe', () => {
+    // „Letzte Stunde“ um 13:10 UTC: `von` 12:10.
     const menge = [
       // Vor zwei Stunden geschehen, eben erst übergeben: nicht in der letzten Stunde.
       uebergeben('2026-06-12 11:14:00', '2026-06-12 13:05:00', 'Nachgereicht'),
       // Vor 30 Minuten geschehen, schon vor 25 Minuten übergeben: drin.
       uebergeben('2026-06-12 12:40:00', '2026-06-12 12:45:00', 'Frisch'),
     ];
-    const texte = filtereLagemeldungen(
-      menge,
-      { ...LEERER_FILTER, fenster: 'stunde' },
-      undefined,
-      jetzt,
-    ).map((l) => l.text);
+    const texte = filtereLagemeldungen(menge, {
+      ...LEERER_FILTER,
+      von: '2026-06-12 12:10:00',
+    }).map((l) => l.text);
     expect(texte).toEqual(['Frisch']);
   });
 
@@ -203,7 +207,8 @@ describe('zeitachse', () => {
     expect(filterAktiv(LEERER_FILTER)).toBe(false);
     expect(filterAktiv({ ...LEERER_FILTER, suche: '   ' })).toBe(false);
     expect(filterAktiv({ ...LEERER_FILTER, ort: 'mit' })).toBe(true);
-    expect(filterAktiv({ ...LEERER_FILTER, fenster: 'heute' })).toBe(true);
+    expect(filterAktiv({ ...LEERER_FILTER, von: '2026-06-12 22:00:00' })).toBe(true);
+    expect(filterAktiv({ ...LEERER_FILTER, bis: '2026-06-13 08:00:00' })).toBe(true);
     expect(filterAktiv({ ...LEERER_FILTER, herkunft: 'geraet' })).toBe(true);
   });
 });

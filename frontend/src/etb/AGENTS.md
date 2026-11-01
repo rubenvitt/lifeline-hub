@@ -86,11 +86,11 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D4–D5): ab `md` stehen alle Filter in
   `EtbFilterleiste` über der Zeitachse, in zwei Gruppen — Typ-Segmente und Umschaltknopf „System“
   (`SegmentUmschalter`, `aria-pressed`, fester Name „Systemeinträge zeigen“, Zahl als
-  Beschreibung), dann Zeitraum (`EtbZeitraumWahl`), Einheit, Volltext. Der Seitenkopf trägt ab
+  Beschreibung), dann Zeitraum (`anzeige/ZeitraumWahl.tsx`, dieselbe Schnellwahl wie die Lagemeldungen, LLH-1322), Einheit, Volltext. Der Seitenkopf trägt ab
   `md` keinen Filter. Die Leiste führt nur `q` (entprellt); Typ, System, Zeitraum und Einheit
   sind Sprungwerte der Seite aus der URL. Der Zeitraum schreibt bei jeder Wahl ABSOLUTE,
   minutengenaue Grenzen (`anzeige/zeitfenster.ts`); „Seit letzter Lagebesprechung“ nur mit
-  Freigabe `lagebesprechung` und abgehaltener Besprechung.
+  Freigabe `lagebesprechung` und abgehaltener Besprechung (`lagebesprechung/useLetzteLagebesprechung.ts`).
 - **Systemeinträge ausblenden** (LFH-958, Spec `etb-zeitachse-darstellung`): `ohne_system=true`
   ist ein Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste,
   `zaehler` und `anzahl` erben ihn zusammen. Zustand in der URL (`etbPfad`/`parseEtbFilter`),

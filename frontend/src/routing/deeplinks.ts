@@ -600,6 +600,28 @@ export function etbDruckPfad(
 }
 
 /**
+ * Lagemeldungen mit Zeitraum (LLH-1322): dieselben absoluten, minutengenauen Grenzen wie
+ * {@link etbPfad} (Schnellwahl `anzeige/ZeitraumWahl.tsx`), damit ein Link beim Empfänger dieselbe
+ * Menge zeigt. Die übrigen Filter der Seite reisen nicht mit.
+ */
+export function lagemeldungenPfad(
+  einsatzId: number,
+  opts: { von?: string; bis?: string } = {},
+): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'lagemeldungen'), { von: opts.von, bis: opts.bis });
+}
+
+/** Umkehr von {@link lagemeldungenPfad}; die Zeitwerte gehen ungeprüft durch wie im ETB. */
+export function parseLageZeitraum(params: URLSearchParams): { von?: string; bis?: string } {
+  const werte: { von?: string; bis?: string } = {};
+  const von = params.get('von');
+  if (von) werte.von = von;
+  const bis = params.get('bis');
+  if (bis) werte.bis = bis;
+  return werte;
+}
+
+/**
  * Umkehr der Filterachse von {@link etbPfad}.
  *
  * Verwirft Unbrauchbares GANZ: ein unbekannter Typ ergibt gar keinen Filter, sonst entstünde
