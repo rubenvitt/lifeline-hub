@@ -54,7 +54,8 @@ export interface AusgabeSammlungOptionen {
   stelleId?: number | null;
   /** Gewählter Empfänger (LLH-1055); `null` oder fehlt: ohne Empfänger. */
   empfaenger?: EmpfaengerWahl | null;
-  /** Mit Netz gebucht; nur, solange die Ansicht dieses Zeitfensters steht. */
+  /** Mit Netz gebucht; nur, solange die Ansicht dieses Zeitfensters steht. Läuft, bevor das
+   *  bestätigte Zeitfenster im Cache steht. */
   onGebucht?: (ausgabeId: number, buendel: Buendel) => void;
   /** Ohne Netz an Ort und Stelle vorgemerkt; nur, solange die Ansicht dieses Zeitfensters steht. */
   onVorgemerkt?: (buendel: Buendel) => void;
@@ -177,6 +178,9 @@ export function useAusgabeSammlung({
             if (amOrt()) aktuell.current.onVorgemerkt?.(buendel);
             return;
           }
+          // `onGebucht` VOR dem Cache: die Ansicht merkt die Ausgabe als eigene vor, sonst stünde
+          // sie bei gehaltener Liste einen Takt lang hinter dem Sammelbanner (LLH-1292).
+          if (amOrt()) aktuell.current.onGebucht?.(ergebnis.daten.ausgabe_id, buendel);
           // Erst das bestätigte Zeitfenster in den Cache, dann das Bündel aus „Sammlung“: beides
           // im selben Takt, ohne Zwischenstand mit kleinerer Summe (wie der Sync, LFH-688 D7).
           const key = einsatzKeys.verpflegung(eid);
@@ -188,7 +192,6 @@ export function useAusgabeSammlung({
           );
           entferne();
           void qc.invalidateQueries({ queryKey: key });
-          if (amOrt()) aktuell.current.onGebucht?.(ergebnis.daten.ausgabe_id, buendel);
         },
         (fehler: unknown) => {
           entferne();

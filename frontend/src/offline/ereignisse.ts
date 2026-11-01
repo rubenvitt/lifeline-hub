@@ -126,6 +126,15 @@ export type OfflineSchreibaktionGesendet =
       einsatzId: number;
       clientId: string;
       daten: Meldung;
+    }
+  | {
+      /** Eine vorgemerkte Ausgabe ist gebucht: die Ausgabeansicht zeigt sie als eigene sofort,
+       *  auch hinter gehaltener Schleuse (LLH-1292). */
+      art: 'ausgabe';
+      benutzerId: number;
+      einsatzId: number;
+      zeitfensterId: number;
+      ausgabeId: number;
     };
 
 export function meldeOfflineSchreibaktionGesendet(detail: OfflineSchreibaktionGesendet): void {

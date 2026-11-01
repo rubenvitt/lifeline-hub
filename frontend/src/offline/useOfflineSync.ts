@@ -168,13 +168,22 @@ export function useOfflineSync(benutzerId?: number): void {
             // LFH-688, design.md D7: das bestätigte Zeitfenster steht im Cache, BEVOR die
             // ausstehende Zeile verschwindet — sonst fehlte die Ausgabe einen Takt lang auf der
             // Karte. Kein ETB: eine Ausgabe schreibt keinen Eintrag.
-            const { zeitfenster } = await erfasseAusgabe(
+            const { zeitfenster, ausgabe_id } = await erfasseAusgabe(
               element.wert.einsatz_id,
               aktion.zeitfenster_id,
               aktion.daten,
               { offlineQueueBenutzerId: aktuellerBenutzerId },
             );
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            // Vor dem Cache: die Ausgabeansicht merkt die Ausgabe als eigene vor, sonst wartete
+            // sie bei gehaltener Liste hinter dem Sammelbanner (LLH-1292).
+            meldeOfflineSchreibaktionGesendet({
+              art: 'ausgabe',
+              benutzerId: aktuellerBenutzerId,
+              einsatzId: element.wert.einsatz_id,
+              zeitfensterId: aktion.zeitfenster_id,
+              ausgabeId: ausgabe_id,
+            });
             const key = einsatzKeys.verpflegung(element.wert.einsatz_id);
             qc.setQueryData<Verpflegung>(key, (alt) =>
               alt

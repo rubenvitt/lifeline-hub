@@ -137,6 +137,12 @@ Zeitfensters ändert; nur das Auflösen der gewählten Stelle setzt sie auf „o
 Zähltasten gesperrt („Zeitfenster vorbei“). „Fehlt“ zählt nur Gebuchtes; die Sammlung steht
 daneben.
 
+Zählt ein zweites Gerät am selben Zeitfenster, stehen seine Ausgaben sofort in „Ausgegeben“ und
+„Fehlt“. Unter „Letzte Buchungen“ rücken sie nicht ein, solange die Maus, der Stift oder der
+Fokus in der Liste steht oder die Rückfrage „Ausgabe zurücknehmen?“ offen ist: die gezeigten
+Zeilen bleiben, wo sie sind, und im Kopf der Liste steht der Knopf „1 neu“, bis er sie einreiht.
+Eigene Ausgaben, auch nachgesendete, stehen immer sofort.
+
 ### Wer als verpflegt gilt
 
 Eine Ausgabe an eine Einheit verpflegt auch ihre Untereinheiten. Eine Zuführung an einen
