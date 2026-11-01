@@ -172,6 +172,8 @@ const volleDaten = {
         { id: 23, lfd_nr: 3 },
         { id: 24, lfd_nr: 4 },
       ],
+      // Wie vom Server: leer statt fehlend (LFH-689); eine berichtigte füllt es (LLH-1321).
+      berichtigt_durch: [] as { id: number; lfd_nr: number }[],
     },
   ],
   /** Maßgebliche Pegel — im Grundbestand keiner festgelegt. */
@@ -912,6 +914,38 @@ describe('UeberblickPage', () => {
     expect(within(li).getByText('2 Aufträge')).toBeInTheDocument();
     await userEvent.click(within(p).getByRole('button', { name: 'ETB' }));
     expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/etb?typ=entscheidung');
+  });
+
+  it('Entscheidungen: eine berichtigte trägt die Marke und springt auf die jüngste Berichtigung (LLH-1321)', async () => {
+    stelleBereit({
+      ...volleDaten,
+      etb: [
+        {
+          ...volleDaten.etb[0],
+          berichtigt_durch: [
+            { id: 430, lfd_nr: 413 },
+            { id: 450, lfd_nr: 415 },
+          ],
+        },
+      ],
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Entscheidungen der letzten Stunde'));
+    const li = (await within(p).findByText('Turnhalle Ost wird Notunterkunft.')).closest('li')!;
+    expect(within(li).getByText('berichtigt')).toBeInTheDocument();
+    const sprung = within(li).getByRole('link', { name: '→ Nr. 415' });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=450');
+    await userEvent.click(sprung);
+    expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/etb?eintrag=450');
+  });
+
+  it('Entscheidungen: eine unberichtigte trägt keine Marke (LLH-1321)', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    const p = await waitFor(() => paneel('Entscheidungen der letzten Stunde'));
+    const li = (await within(p).findByText('Turnhalle Ost wird Notunterkunft.')).closest('li')!;
+    expect(within(li).queryByText('berichtigt')).toBeNull();
+    expect(within(li).getByText('Brandt')).toBeInTheDocument();
   });
 
   it('Entscheidungen: ohne Eintrag der letzten Stunde ehrlich als „Letzte Entscheidungen"', async () => {

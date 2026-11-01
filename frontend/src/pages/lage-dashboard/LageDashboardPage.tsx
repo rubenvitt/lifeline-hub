@@ -512,6 +512,7 @@ export default function LageDashboardPage() {
               onAufnehmen={() => waehle(personenAufnahmePfad(einsatzId))}
             />
             <MeldungsstromPaneel
+              einsatzId={einsatzId}
               zustand={zStrom}
               sichtbar={strom.sichtbar}
               neu={strom.neu}
