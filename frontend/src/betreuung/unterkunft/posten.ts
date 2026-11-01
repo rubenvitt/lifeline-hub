@@ -23,7 +23,12 @@ const ZELT_NAME = new Map(ZELTTYPEN.map((t) => [t.typ, t.bezeichnung]));
 
 export function postenAus(ergebnis: Ergebnis): Posten[] {
   const liste: Posten[] = [
-    { schluessel: 'feldbetten', art: 'Feldbetten', anzahl: ergebnis.material.feldbetten, vorgewaehlt: true },
+    {
+      schluessel: 'feldbetten',
+      art: 'Feldbetten',
+      anzahl: ergebnis.material.feldbetten,
+      vorgewaehlt: true,
+    },
     { schluessel: 'decken', art: 'Decken', anzahl: ergebnis.material.decken, vorgewaehlt: true },
     {
       schluessel: 'toiletten',
@@ -31,14 +36,24 @@ export function postenAus(ergebnis: Ergebnis): Posten[] {
       anzahl: ergebnis.sanitaer.toiletten,
       vorgewaehlt: true,
     },
-    { schluessel: 'urinale', art: 'Urinale', anzahl: ergebnis.sanitaer.urinale, vorgewaehlt: false },
+    {
+      schluessel: 'urinale',
+      art: 'Urinale',
+      anzahl: ergebnis.sanitaer.urinale,
+      vorgewaehlt: false,
+    },
     {
       schluessel: 'waschplaetze',
       art: 'Waschplätze',
       anzahl: ergebnis.sanitaer.waschplaetze,
       vorgewaehlt: true,
     },
-    { schluessel: 'duschen', art: 'Duschen', anzahl: ergebnis.sanitaer.duschen, vorgewaehlt: false },
+    {
+      schluessel: 'duschen',
+      art: 'Duschen',
+      anzahl: ergebnis.sanitaer.duschen,
+      vorgewaehlt: false,
+    },
     {
       schluessel: 'garnituren',
       art: 'Biergarnituren',

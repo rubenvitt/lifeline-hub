@@ -128,7 +128,10 @@ export default function ErgebnisAnzeige({
         </Datenraster>
       </Paneel>
 
-      <Paneel titel={e.weg === 'zelte' ? 'Zelte (Bestand belegt)' : 'Unterbringung im Zelt'} koerperPolster>
+      <Paneel
+        titel={e.weg === 'zelte' ? 'Zelte (Bestand belegt)' : 'Unterbringung im Zelt'}
+        koerperPolster
+      >
         <Datenraster spalten={3} beschriftung="Zelte">
           {e.schlafen.zelte_je_typ.map((z) => (
             <Datenfeld key={z.typ} label={`nur ${ZELT_NAME.get(z.typ) ?? z.typ}`} mono>
@@ -141,10 +144,7 @@ export default function ErgebnisAnzeige({
           <Datenfeld label="Grundfläche Zeltmix" mono>
             {wert(e.schlafen.zeltmix_grundflaeche_m2, 'm²')}
           </Datenfeld>
-          <Datenfeld
-            label={`Platzbedarf mit ${menge(richtwerte.zelt_abstand_m)} m Abstand`}
-            mono
-          >
+          <Datenfeld label={`Platzbedarf mit ${menge(richtwerte.zelt_abstand_m)} m Abstand`} mono>
             {wert(e.schlafen.zeltmix_platzbedarf_m2, 'm²')}
           </Datenfeld>
         </Datenraster>
@@ -182,14 +182,19 @@ export default function ErgebnisAnzeige({
           </Datenfeld>
           <Datenfeld
             label={
-              <Etikett text="Fläche Krankenstation" annahme={annahme('krankenflaeche_je_bett_m2')} />
+              <Etikett
+                text="Fläche Krankenstation"
+                annahme={annahme('krankenflaeche_je_bett_m2')}
+              />
             }
             mono
           >
             {wert(e.gesundheit.flaeche_m2, 'm²')}
           </Datenfeld>
           <Datenfeld
-            label={<Etikett text="Isolierstation" annahme={annahme('isolierstation_ab_personen')} />}
+            label={
+              <Etikett text="Isolierstation" annahme={annahme('isolierstation_ab_personen')} />
+            }
           >
             {e.gesundheit.isolierstation ? (
               <Typography.Text strong>erforderlich</Typography.Text>
@@ -228,7 +233,9 @@ export default function ErgebnisAnzeige({
             }
             mono
           >
-            {e.verpflegung.ausgabestellen > 0 ? `mind. ${menge(e.verpflegung.ausgabestellen)}` : '0'}
+            {e.verpflegung.ausgabestellen > 0
+              ? `mind. ${menge(e.verpflegung.ausgabestellen)}`
+              : '0'}
           </Datenfeld>
           <Datenfeld label="Sitzplätze" mono>
             {wert(e.verpflegung.sitzplaetze)}

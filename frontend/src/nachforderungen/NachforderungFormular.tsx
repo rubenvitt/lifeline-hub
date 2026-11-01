@@ -39,7 +39,7 @@ import {
 
 const { TextArea } = Input;
 
-const ADRESSAT_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
+export const ADRESSAT_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
   { value: 'leitstelle', label: 'Leitstelle' },
   { value: 'nachbar_ea', label: 'Nachbar-Einsatzabschnitt' },
   { value: 'uebergeordnet', label: 'Übergeordnete Führung' },
@@ -60,7 +60,7 @@ interface FormWerte {
   begruendung: string;
 }
 
-const PRIORITAET_OPTIONEN: { value: NachforderungPrioritaet; label: string }[] = [
+export const PRIORITAET_OPTIONEN: { value: NachforderungPrioritaet; label: string }[] = [
   { value: 'sofort', label: 'Sofort' },
   { value: 'dringend', label: 'Dringend' },
   { value: 'normal', label: 'Normal' },
