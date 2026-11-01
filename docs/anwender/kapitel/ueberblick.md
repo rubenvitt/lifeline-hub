@@ -69,7 +69,8 @@ Modulen selbst.
   über ihrer Frist sind.
 - **Entscheidungen der letzten Stunde:** Gab es in der letzten Stunde keine, heißt das Paneel
   „Letzte Entscheidungen“ und zeigt die jüngsten fünf mit dem Hinweis „keine in der letzten
-  Stunde“.
+  Stunde“. Eine berichtigte Entscheidung trägt wie im Einsatztagebuch die Marke „berichtigt“ und
+  den Sprung „→ Nr. …“ auf die jüngste Berichtigung.
 - Die Zahlen eines Abschnitts schließen seine Unterabschnitte ein; zusammen ergeben die Zeilen
   die Einsatzstärke. Kräfte ohne Abschnitt stehen in der Zeile „Ohne Abschnitt“ am Ende.
 
