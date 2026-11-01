@@ -272,8 +272,11 @@
   outline: 1px dashed var(--lfh-steuer-rahmen);
   outline-offset: -1px;
 }
-/* Nach innen versetzt: im Fugenraster läge ein äußerer Ring unter dem Nachbarsegment. */
-.lfh-segment:focus-visible {
+/* Nach innen versetzt: im Fugenraster läge ein äußerer Ring unter dem Nachbarsegment. Der
+   gesperrte Fall steht eigens da: sonst gewänne die Hover-Regel des gesperrten Segments (höhere
+   Spezifität) mit ihrer Strichlinie, und unter dem Mauszeiger fehlte der Fokusring (LLH-1334). */
+.lfh-segment:focus-visible,
+.lfh-segment[aria-disabled='true']:focus-visible {
   position: relative;
   z-index: 1;
   outline: 2px solid var(--lfh-bedien);

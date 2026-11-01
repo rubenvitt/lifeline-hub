@@ -111,6 +111,16 @@ describe('Gesperrtes trägt einen gestrichelten Rand (LLH-1233)', () => {
     },
   );
 
+  it('der Fokusring schlägt die Strichlinie auch am gesperrten Segment unter dem Mauszeiger', () => {
+    // `[aria-disabled]:hover` (0,3,0) gewänne sonst gegen `:focus-visible` (0,2,0).
+    const regel = regelZu(SPRACHE_CSS, ".lfh-segment[aria-disabled='true']:focus-visible");
+    expect(regel, 'Fokusregel für das gesperrte Segment fehlt in theme/sprache.css').toBeDefined();
+    expect(regel).toMatch(/outline:\s*2px solid var\(--lfh-bedien\)/);
+    expect(SPRACHE_CSS.indexOf(regel!)).toBeGreaterThan(
+      SPRACHE_CSS.indexOf(regelZu(SPRACHE_CSS, ".lfh-segment[aria-disabled='true']:hover")!),
+    );
+  });
+
   it('ein freies Segment trägt keine Strichlinie (sprache.css)', () => {
     const regeln = SPRACHE_CSS.split('}').filter((block) =>
       (block.split('{')[0] ?? '')
