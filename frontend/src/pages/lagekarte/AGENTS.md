@@ -362,7 +362,8 @@ diese Zusage.
 
 Vorgabe für jeden Umbau der Kartenleiste. Bis ein Punkt gebaut ist, gelten die Regeln oben
 unverändert; das Ticket, das ihn baut, schreibt die betroffene Regel oben und die Specs fort und
-streicht den Punkt hier. Zustände und Entwurf: `docs/design/2026-10-20-lagekarte-leiste/README.md`.
+streicht den Punkt hier. Zustände und Entwurf: `docs/design/2026-10-20-lagekarte-leiste/README.md`
+und `leiste.dc.html` daneben (LLH-1340, Abweichungen zum Code dort benannt).
 
 - **Die Leiste bleibt 300 px** und Inhalt (Kopf, LFH-557): keine Reiter am Kartenrand, kein
   Drawer, keine neue Breite. Ein neuer Klappzustand bekommt einen Schlüssel in `GERAETESPEICHER`.
