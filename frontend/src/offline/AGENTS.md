@@ -136,6 +136,9 @@ draußen gelassen werden.
   Ortscache, Erfassungswerte). Was nur auf dem Gerät liegt (ETB-Entwürfe), überlebt ein
   Sitzungsende, gebunden an `benutzer_id` und ohne angemeldeten Besitzer höchstens 24 h. Die
   Offline-Queue bleibt bei jedem Ausgang. Geräte-Einstellungen ohne Personenbezug bleiben.
+- **Zeilen eines früheren Gerätekontos** übernimmt nur eine neue Gerätesitzung derselben Stelle
+  (LLH-1331, `offline/fruehereKopplung.ts`, Regel in `frontend/src/geraet/AGENTS.md`,
+  „Vorgemerktes überdauert die Kopplung“); gezählt per Index-`count()`, nie über Payloads.
 - **Abgelehnte Queue-Einträge sind befristet** (LFH-1093): 30 Tage ab `abgelehnt_at`, geräumt
   beim Öffnen von `lifeline-offline` ohne Versionssprung, für jeden Benutzer und den Altbestand
   ohne Bindung, an der Geräteuhr wie `abgelehnt_at` selbst. Ausstehende Einträge haben keine

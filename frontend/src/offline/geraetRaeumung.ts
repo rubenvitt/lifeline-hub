@@ -128,6 +128,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Nur „dieser Browser ist ein gekoppeltes Gerät" (LFH-892), damit ein Ende der Kopplung „Kopplung beendet" statt der Anmeldung zeigt; kein Personenbezug.',
   },
   {
+    ort: 'localStorage lifeline-hub.geraet-konten',
+    datei: 'offline/fruehereKopplung.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Nur Kennungen der Gerätekonten dieses Browsers mit Einsatz, Ansicht und Stelle (LLH-1331); gebraucht gerade nach dem Ende einer Kopplung, damit eine neue Kopplung derselben Stelle deren Vorgemerktes übernimmt. Ein Konto ohne Zeilen in der Queue fällt beim nächsten Start einer Gerätesitzung weg.',
+  },
+  {
     ort: 'localStorage lifeline-serveruhr',
     datei: 'offline/serveruhr.ts',
     entscheidung: 'bleibt',

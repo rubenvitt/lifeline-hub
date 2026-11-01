@@ -38,6 +38,7 @@ import {
   schreibaktionenAbgelehntLaden,
 } from './queue';
 import { useOfflineSync } from './useOfflineSync';
+import { geraetKontoBestaetigt } from './fruehereKopplung';
 import { merkeVerpflegungsausgabeVor } from './schreiben';
 import { useVorgemerkteAusgaben } from './useVorgemerkteAusgaben';
 import { KEINE_SONDERKOST, ausgabe as serverAusgabe, zeitfenster } from '../test/verpflegungDaten';
@@ -1009,5 +1010,58 @@ describe('abgleichFuer (LFH-387)', () => {
   it('pausiert während eines Konflikts und ohne Benutzer', () => {
     expect(abgleichFuer(anna, true)).toBeUndefined();
     expect(abgleichFuer(null, false)).toBeUndefined();
+  });
+});
+
+describe('Vorgemerktes einer beendeten Kopplung (LLH-1331)', () => {
+  const geraet = {
+    kopplung_id: 3,
+    einsatz_id: 7,
+    ansicht: 'uhs-tablet' as const,
+    stelle_id: 2,
+    uhs_id: 2,
+    stelle: 'UHS Nord',
+    bezeichnung: 'Tablet 1',
+    laeuft_ab_at: '2026-11-01 18:00:00',
+  };
+  const nachsichtung = {
+    art: 'sichtung' as const,
+    person_id: 10,
+    bezeichnung: 'R-012',
+    daten: {
+      kategorie: 'sk2' as const,
+      notiz: null,
+      client_id: 'sichtung-alt-1',
+      zeitpunkt_at: '2026-11-01 14:10:00',
+    },
+  };
+
+  it('neuer Code für dieselbe UHS sendet die Nachsichtung des alten Kontos mit Erfassungszeit', async () => {
+    vi.mocked(erfasseSichtung).mockResolvedValue({ id: 99 } as never);
+    await geraetKontoBestaetigt(BENUTZER_A, geraet);
+    await schreibaktionEinreihen(BENUTZER_A, 7, nachsichtung);
+    // Kopplung abgelaufen, neuer Code: neues Gerätekonto derselben UHS.
+    await geraetKontoBestaetigt(BENUTZER_B, { ...geraet, kopplung_id: 4 });
+
+    renderHook(() => useOfflineSync(BENUTZER_B), { wrapper: wrapperFuer().Wrapper });
+
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_B, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 0 }),
+    );
+    expect(erfasseSichtung).toHaveBeenCalledExactlyOnceWith(7, 10, nachsichtung.daten, {
+      offlineQueueBenutzerId: BENUTZER_B,
+    });
+  });
+
+  it('neue Kopplung an einer anderen UHS sendet nichts', async () => {
+    await geraetKontoBestaetigt(BENUTZER_A, geraet);
+    await schreibaktionEinreihen(BENUTZER_A, 7, nachsichtung);
+    await geraetKontoBestaetigt(BENUTZER_B, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
+
+    renderHook(() => useOfflineSync(BENUTZER_B), { wrapper: wrapperFuer().Wrapper });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(erfasseSichtung).not.toHaveBeenCalled();
+    expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1 });
   });
 });

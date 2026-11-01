@@ -32,6 +32,7 @@ import {
   type AbgelehnterEintrag,
   type OfflineSchreibaktion,
 } from './queue';
+import { fruehereKopplungVerwerfen, useFruehereKopplungAnzahl } from './fruehereKopplung';
 import { PERSON_EINTRAG_ABGELEHNT } from './personEintrag';
 
 interface OfflineRecoveryDrawerProps {
@@ -39,6 +40,8 @@ interface OfflineRecoveryDrawerProps {
   onClose: () => void;
   benutzerId?: number;
   einsatzId?: number;
+  /** Gerätesitzung: zeigt Einträge früherer Kopplungen dieses Geräts (LLH-1331). */
+  geraet?: boolean;
 }
 
 /** Kartentitel einer abgelehnten Schreibaktion; exhaustiv über die Art. Stand- und
@@ -192,8 +195,13 @@ export default function OfflineRecoveryDrawer({
   onClose,
   benutzerId,
   einsatzId,
+  geraet = false,
 }: OfflineRecoveryDrawerProps) {
   const { message } = App.useApp();
+  const fruehereKopplung = useFruehereKopplungAnzahl(
+    benutzerId ?? null,
+    open && geraet && benutzerId != null,
+  );
   const scopeKey = `${benutzerId ?? 'anonym'}:${einsatzId ?? 'alle'}`;
   const [etb, setEtb] = useState<AbgelehnterEintrag[]>([]);
   const [schreibaktionen, setSchreibaktionen] = useState<AbgelehnteSchreibaktion[]>([]);
@@ -349,8 +357,11 @@ export default function OfflineRecoveryDrawer({
   const sichtbareNichtZugeordnet = scopeAktuell ? nichtZugeordnet : 0;
   const legacyZeile = { schluessel: 'legacy', titel: 'Alte Offline-Daten ohne Zuordnung' };
   const legacyGrund = zeilen.grund(legacyZeile.schluessel);
+  const fruehereZeile = { schluessel: 'fruehere-kopplung', titel: 'Aus früherer Kopplung' };
+  const fruehereGrund = zeilen.grund(fruehereZeile.schluessel);
   const sichtbareZeilen = new Set([
     ...(sichtbareNichtZugeordnet > 0 ? [legacyZeile.schluessel] : []),
+    ...(fruehereKopplung > 0 ? [fruehereZeile.schluessel] : []),
     ...sichtbareEtb.map((e) => `etb:${e.id}`),
     ...sichtbareSchreibaktionen.map((e) => `schreiben:${e.id}`),
   ]);
@@ -361,7 +372,8 @@ export default function OfflineRecoveryDrawer({
     ladeFehler == null &&
     sichtbareEtb.length === 0 &&
     sichtbareSchreibaktionen.length === 0 &&
-    sichtbareNichtZugeordnet === 0;
+    sichtbareNichtZugeordnet === 0 &&
+    fruehereKopplung === 0;
 
   return (
     <Drawer
@@ -391,6 +403,43 @@ export default function OfflineRecoveryDrawer({
             )
           );
         })}
+        {fruehereKopplung > 0 && benutzerId != null && (
+          <Alert
+            type="warning"
+            showIcon
+            title="Aus früherer Kopplung"
+            description={
+              <Space orientation="vertical" size="small">
+                {/* Passende Kopplungen (gleicher Einsatz, Ansicht und Stelle) übernimmt die neue
+                    Sitzung von selbst (LLH-1331, D3); hier steht nur, was nicht passt. */}
+                <Typography.Text>
+                  {`${anzahl(fruehereKopplung, 'Eintrag', 'Einträge')} · nicht übertragbar`}
+                </Typography.Text>
+                <Popconfirm
+                  title="Einträge früherer Kopplung endgültig verwerfen?"
+                  okText="Endgültig verwerfen"
+                  cancelText="Abbrechen"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() =>
+                    ausfuehren(
+                      fruehereZeile,
+                      'fruehere-kopplung:discard-all',
+                      async () => (await fruehereKopplungVerwerfen(benutzerId)) > 0,
+                      'Einträge früherer Kopplung verworfen',
+                    )
+                  }
+                >
+                  <Button danger loading={aktionLaeuft === 'fruehere-kopplung:discard-all'}>
+                    Verwerfen
+                  </Button>
+                </Popconfirm>
+                {fruehereGrund && (
+                  <ZeilenFehler fehler={fruehereGrund.fehler} fallback={fruehereGrund.fallback} />
+                )}
+              </Space>
+            }
+          />
+        )}
         {sichtbareNichtZugeordnet > 0 && (
           <Alert
             type="warning"
