@@ -412,9 +412,10 @@ Eine unangemeldete Kraft verlangt zusätzlich das Recht auf Einheiten und auf Fa
 steht der Grund im Dialog und nichts wird gebucht. Beim Abruf verlangt der Ziel-Abschnitt
 zusätzlich das Modul Einheiten (die Liste der Abschnitte das Modul Einsatzabschnitte), der Auftrag
 das Modul Aufträge; fehlt eines, steht das Feld gesperrt mit „Modul … gesperrt“, und der Abruf
-geht ohne diese Angabe. Die Bereitstellungsräume
-gehören nicht zu dem, was die App für die Arbeit ohne Netz vorhält (Kapitel
-[Ohne Netz](ohne-netz.md)). Auf einer mit Netz geöffneten Seite eines Raums lässt sich ein
+geht ohne diese Angabe. Die Liste der Bereitstellungsräume mit Standort und Belegung hält die
+App für die Arbeit ohne Netz vor, die Seite eines einzelnen Raums nicht (Kapitel
+[Ohne Netz](ohne-netz.md)): Nach einem Neuladen ohne Netz zeigt die Liste den zuletzt geladenen
+Stand, ein Raum öffnet sich erst wieder mit Netz. Auf einer mit Netz geöffneten Seite eines Raums lässt sich ein
 Eintreffen trotzdem buchen: Die App merkt es vor und sendet es genau einmal, sobald wieder Netz da
 ist, mit dem Zeitpunkt der Erfassung. „Vorgemerkt“ steht nur auf dem Gerät, das gebucht hat; in
 den Zahlen des Raums zählt die Kraft erst nach dem Senden.

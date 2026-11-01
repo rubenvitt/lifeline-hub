@@ -376,15 +376,12 @@ export function useLagekarteDaten({
         : evakuierungQuery.isError
           ? undefined
           : evakuierungQuery.data?.bezirke;
-  // Räume hinter derselben Grenze wie die Stellen.
+  // Räume hinter derselben Grenze wie die Stellen, aber ein Fehler mit Daten ist ein Stand
+  // (`offline/AGENTS.md`, LLH-1318): die Liste liegt im Lagebild ohne Netz, und scheitert der
+  // Abruf an der Leitung, zeichnet die Karte den letzten Stand; „Bereitstellungsräume“ steht
+  // dann im Ausfall. Ein 403 sperrt über `brZugriff`.
   const raeumeRoh =
-    brZugriff !== 'frei'
-      ? undefined
-      : istSnapshot
-        ? snap?.bereitstellungsraeume
-        : brQuery.isError
-          ? undefined
-          : brQuery.data;
+    brZugriff !== 'frei' ? undefined : istSnapshot ? snap?.bereitstellungsraeume : brQuery.data;
   // Tiere hinter derselben Grenze.
   const tiereRoh =
     tierZugriff !== 'frei'
