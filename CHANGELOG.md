@@ -1,3 +1,62 @@
+## [1.0.0-alpha.165](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.164...v1.0.0-alpha.165) (2026-11-01)
+
+### Wichtige Änderungen
+
+- **Zwei neue Datenbank-Migrationen** werden beim Start automatisch eingespielt:
+  - Die Ablösung speichert jetzt, wie eine Schicht begann. Bestehende Folgeschichten gelten als „Folgeschicht“, alle anderen Schichten als „von Hand begonnen“.
+  - Einsatz-Vorlagen können auf ein Schichtmodell verweisen.
+- **Erfassungszeit bei ohne Netz aufgenommenen Personen:** Beim Anlegen einer Person nimmt der Server jetzt die Zeit der Erfassung an. Liegt sie mehr als 60 Sekunden in der Zukunft, lehnt er die Anfrage ab. Ein Zeitpunkt vor dem Einsatzbeginn wird nicht übernommen.
+
+### Einsatztagebuch
+
+- Ein berichtigter ETB-Eintrag ist jetzt überall als „berichtigt“ gekennzeichnet und hat einen Sprung auf die jüngste Berichtigung. Das gilt im Lagebild („Jüngste ETB-Einträge“), im Überblick („Entscheidungen“) und in der Lageentwicklung des Lagevortrags.
+- Die Typkante „Entscheidung“ ist im Nachtbetrieb heller und damit deutlich besser zu erkennen.
+
+### Meldungen
+
+- Den Zeitraum der Lagemeldungen wählen Sie jetzt mit derselben Schnellwahl wie im Einsatztagebuch: „Letzte Stunde“, „Letzte 4 Stunden“, „Seit letzter Lagebesprechung“, „Heute“ und „Eigener Zeitraum“. Ein geteilter Link zeigt dem Empfänger genau denselben Zeitraum.
+
+### Lagekarte
+
+- Tiere erscheinen mit einem Tierzeichen statt als Kreis mit „T“. Hinter einem vermissten Tier liegt eine farbige Scheibe, damit es auch in weit herausgezoomten Ansichten auffällt.
+- Die Dekontamination von Personen und von Geräten ist jetzt an „P“ bzw. „G“ im Zeichen zu unterscheiden. Tragen an einem freien Zeichen Symbol und Fachaufgabe verschiedene Dekon-Zusätze, gilt das Zeichen als vereinfacht.
+- Die Ebene „Bereitstellungsräume“ zeigt nach einem Abruffehler den zuletzt geladenen Stand, statt die Räume auszublenden.
+
+### Kräfte und Mittel
+
+- **Ablösung:**
+  - Die Schichtkarte zeigt, wie die Schicht begann: „im Einsatz seit“ (von Hand), „seit Eintreffen“ (automatisch) oder „Folgeschicht seit“.
+  - Die gewählte Ansicht der Ablösung („Ohne Schicht“, „Vergangen“) steht in der Adresse und lässt sich als Link weitergeben.
+  - Der Überblick zeigt unter „Ablösungen“, wie viele Einheiten ohne Schicht sind, und springt direkt dorthin. Die Sprungpalette kennt die Ansicht ebenfalls.
+  - Untereinheiten eines Verbands, der als Ablöser geplant ist, erscheinen unter „Ohne Schicht“ jetzt als geplant. Bisher wurde ihnen fälschlich „Schicht beginnen“ angeboten.
+  - Lassen sich die Freigaben unter „Ohne Schicht“ nicht laden, erscheint eine Fehlermeldung mit „Erneut abrufen“ statt eines endlosen Ladesymbols.
+- **Bereitstellungsräume:**
+  - Eine bereitgestellte Kraft lässt sich mit „In anderen BR verlegen …“ direkt in einen anderen Raum verlegen. Ist die Kraft inzwischen nicht mehr im Raum oder wurde der Ziel-Raum geschlossen, sperrt der Dialog das Verlegen und nennt den Grund.
+  - Die Liste der Bereitstellungsräume mit Standort und Belegung bleibt jetzt auch ohne Netz lesbar.
+
+### Betroffene
+
+- **Personen:** Eine ohne Netz aufgenommene Person steht mit ihrer tatsächlichen Erfassungszeit im Verlauf und im ETB, nicht mehr mit der Zeit der Übertragung. Im ETB erscheint sie als nachgetragen.
+- **Betreuung:**
+  - Die Detailseite einer Betreuungsstelle zeigt ab zwei Meldungen den Verlauf der Belegung als Stufenlinie, mit der Kapazität als gestrichelter Linie.
+  - Ein Verbleib „Notunterkunft“ führt aus Patientenkopf und Personenverlauf direkt auf die Seite der Stelle.
+- **Evakuierung:** Beim Anlegen eines Evakuierungsbezirks lässt sich als Gebiet ein Radius um den Einsatzort wählen, als Zahl oder per Schnellwahl von 50 bis 1000 m. Die Lagekarte öffnet den Kreis anschließend vorbelegt zum Übernehmen.
+- **Schäden:** Einsatzbericht und Archivakte schlüsseln Schäden zusätzlich nach Gefahr und nach Schadensgrad auf.
+
+### Gekoppelte Geräte
+
+- Was ein Gerät ohne Netz vorgemerkt hat, geht nach dem Ende der Kopplung nicht mehr verloren. Wird das Gerät erneut für denselben Einsatz, dieselbe Ansicht und dieselbe Stelle gekoppelt, überträgt es diese Einträge. Andernfalls zeigt die Gerätehülle sie als „Aus früherer Kopplung“ an und bietet „Verwerfen“ nach Rückfrage.
+- Wird ein Gerät an einer Verpflegungsstelle gekoppelt, entkoppelt oder läuft seine Kopplung ab, aktualisiert sich die Stellenliste sofort, ohne neu zu laden.
+
+### Verwaltung
+
+- Eine Einsatz-Vorlage kann ein Schichtmodell vorgeben. Beim Anlegen eines Einsatzes gilt das Modell der Vorlage, sonst die Vorgabe der Organisation.
+- Die Vorlagenliste zeigt das Schichtmodell in einer eigenen Spalte. Die Rückfrage beim Löschen eines Modells nennt die betroffenen Vorlagen.
+
+### Bedienung
+
+- In Segmentleisten hat ein gesperrtes Segment jetzt eine Strichlinie und ist auch im Tagbetrieb klar von einem freien zu unterscheiden. Der Fokusring bleibt sichtbar, auch wenn der Mauszeiger auf dem Segment steht.
+
 ## [1.0.0-alpha.164](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.163...v1.0.0-alpha.164) (2026-11-01)
 
 ### Wichtige Änderungen
