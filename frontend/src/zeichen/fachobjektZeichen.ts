@@ -135,6 +135,15 @@ const FAEHIGKEIT: Record<string, CapabilityId[]> = {
   transport: ['transport'],
 };
 
+// Zusatz einer Fachaufgabe als mittiger Lauf an ihrer Körpermarke: „P“ und „G“ der
+// Dekontamination stehen zwischen den Klammern der Zange (C.1.8, C.1.10, C.2.25; einsatzzeichen
+// ESZ-132, LLH-1338). Die Box (`capabilities`) trägt ihn nicht: dort stünde der Buchstabe auf dem
+// eingepassten Piktogramm.
+export const ZUSATZ: Record<string, string> = {
+  'dekontamination-personen': 'P',
+  'dekontamination-geraete': 'G',
+};
+
 // Versorgung (Anhang G) ist ein Fußband, keine Fähigkeit.
 const VERSORGUNG: Record<string, Teil> = {
   logistik: { bodyVariant: 'foot-band' },
@@ -265,7 +274,11 @@ export function fassungen(fachaufgabe: string | undefined, koerper: Teil): Teil[
   if (versorgung) return [[versorgung], [{ bodyVariant: versorgung.bodyVariant }]];
   const faehigkeiten = eigen(FAEHIGKEIT, fachaufgabe);
   if (!faehigkeiten) return [];
-  const stufe: Teil[] = [{ bodyMarks: faehigkeiten }, { capabilities: faehigkeiten }];
+  const zusatz = eigen(ZUSATZ, fachaufgabe);
+  const randbuendig: Teil = zusatz
+    ? { bodyMarks: faehigkeiten, labels: { center: zusatz } }
+    : { bodyMarks: faehigkeiten };
+  const stufe: Teil[] = [randbuendig, { capabilities: faehigkeiten }];
   // Rettungsdienstfahrzeuge stehen auf dem Radpaar, nicht auf einer Kfz-Kategorie: RTW/KTW mit
   // Sanität (F.2), NEF/NAW mit Arzt (F.2.4/F.2.5 „alternative“). Seit 4.0 zeichnet der Motor die
   // Marke auch abgeleitet auf der Kategorie; die vermessene Radpaar-Fassung geht trotzdem vor,

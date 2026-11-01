@@ -508,6 +508,58 @@ describe('fachobjektZeichen — Schaden mit Gefahrenart und Schadensgrad (LLH-11
   });
 });
 
+// Personen- und Gerätedekontamination: „P“ bzw. „G“ als mittiger Lauf zwischen den Klammern der
+// Zange (C.1.8, C.1.10, C.2.25; einsatzzeichen ESZ-132, LLH-1338).
+describe('fachobjektZeichen — Dekontamination Personen/Geräte', () => {
+  const TRAEGER: TzProps[] = [
+    { grundzeichen: 'taktische-formation', organisation: 'feuerwehr', einheit: 'staffel' },
+    { grundzeichen: 'kraftfahrzeug-landgebunden', organisation: 'feuerwehr' },
+    { grundzeichen: 'stelle' },
+    { grundzeichen: 'person', organisation: 'hilfsorganisation' },
+  ];
+
+  it.each(TRAEGER)('trägt P und G an der Marke ($grundzeichen)', (basis) => {
+    for (const [fachaufgabe, zusatz] of [
+      ['dekontamination-personen', 'P'],
+      ['dekontamination-geraete', 'G'],
+    ] as const) {
+      const z = fachobjektZeichen({ ...basis, fachaufgabe } as TzProps)!;
+      expect(z.spec).toMatchObject({
+        bodyMarks: ['decontamination'],
+        labels: { center: zusatz },
+      });
+      expect(renderSvg(z.drawing)).toContain(`>${zusatz}<`);
+    }
+  });
+
+  it('zeichnet die Staffel (C.1.8) und das Kfz (C.2.25) vermessen', () => {
+    for (const basis of TRAEGER.slice(0, 2)) {
+      const z = fachobjektZeichen({
+        ...basis,
+        fachaufgabe: 'dekontamination-personen',
+      } as TzProps)!;
+      expect(z.drawing.derivations ?? []).toEqual([]);
+    }
+  });
+
+  it('unterscheidet Dekontamination, Personen und Geräte im Bildschlüssel', () => {
+    const schluessel = [
+      'dekontamination',
+      'dekontamination-personen',
+      'dekontamination-geraete',
+    ].map(
+      (fachaufgabe) => fachobjektZeichen({ ...TRAEGER[0], fachaufgabe } as TzProps)!.schluessel,
+    );
+    expect(new Set(schluessel).size).toBe(3);
+  });
+
+  it('lässt die Dekontamination ohne Zusatz ohne Lauf', () => {
+    expect(
+      wirksam({ ...TRAEGER[0], fachaufgabe: 'dekontamination' } as TzProps).labels,
+    ).toBeUndefined();
+  });
+});
+
 // Drift-Wache: welche Fachaufgaben des Hub-Vokabulars die Bibliothek am Körper NICHT zeichnet
 // (Rückfall ohne Fachaufgabe) und welche sie nur ABGELEITET zeichnet. Ändert ein Update von
 // @einsatzzeichen die Komponierbarkeit oder die Vermessung, wird das hier in BEIDE Richtungen rot —

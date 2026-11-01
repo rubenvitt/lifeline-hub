@@ -140,7 +140,8 @@ describe('freiesZeichen — Grundzeichen (D5)', () => {
 interface SymbolErwartung {
   frei: AnySpec | null;
   imKoerper: Teil | null;
-  naeherung?: true;
+  /** `'frei'`: nur freistehend eine Näherung, im Grundzeichen exakt. */
+  naeherung?: true | 'frei';
 }
 
 const C = (c: NonNullable<SymbolSpec['capabilities']>[number]): Teil => ({ bodyMarks: [c] });
@@ -270,8 +271,17 @@ const SYMBOLE: Record<string, SymbolErwartung> = {
   abc: faehig('cbrn-protection'),
   dekontamination: faehig('decontamination'),
   // Der Zusatz P/G ginge nur als Beschriftung, die eine Spec nicht tragen darf (D3).
-  'dekontamination-personen': faehig('decontamination', true),
-  'dekontamination-geraete': faehig('decontamination', true),
+  // „P“/„G“ als Lauf an der Marke (LLH-1338); freistehend trägt das Piktogramm keinen Lauf.
+  'dekontamination-personen': {
+    frei: PIKTO('decontamination'),
+    imKoerper: { bodyMarks: ['decontamination'], labels: { center: 'P' } },
+    naeherung: 'frei',
+  },
+  'dekontamination-geraete': {
+    frei: PIKTO('decontamination'),
+    imKoerper: { bodyMarks: ['decontamination'], labels: { center: 'G' } },
+    naeherung: 'frei',
+  },
   // Bildtreu: zwei Wellenlinien, wie in 4.7.1.
   wasser: faehig('water-hazard-control', true),
   wasserfahrzeug: koerper({ kind: 'vehicle-water' }),
@@ -361,7 +371,7 @@ const IM_GRUNDZEICHEN = TRAEGER.flatMap(([gz, k]) =>
     gz,
     symbol,
     e.imKoerper ? ({ ...k, ...e.imKoerper } as SymbolSpec) : k,
-    e.imKoerper === null ? 'kaskade' : e.naeherung ? 'naeherung' : 'exakt',
+    e.imKoerper === null ? 'kaskade' : e.naeherung === true ? 'naeherung' : 'exakt',
   ]),
 );
 
@@ -470,8 +480,8 @@ const FACHAUFGABEN: Array<[string, Teil | null]> = [
   ['abc', { bodyMarks: ['cbrn-protection'] }],
   ['messen', { bodyMarks: ['cbrn-detection'] }],
   ['dekontamination', { bodyMarks: ['decontamination'] }],
-  ['dekontamination-personen', { bodyMarks: ['decontamination'] }],
-  ['dekontamination-geraete', { bodyMarks: ['decontamination'] }],
+  ['dekontamination-personen', { bodyMarks: ['decontamination'], labels: { center: 'P' } }],
+  ['dekontamination-geraete', { bodyMarks: ['decontamination'], labels: { center: 'G' } }],
   ['umweltschaeden-gewaesser', { bodyMarks: ['water-environmental-damage-control'] }],
   ['rettungswesen', { bodyMarks: ['medical-service'] }],
   ['aerztliche-versorgung', { bodyMarks: ['physician'] }],
@@ -501,11 +511,7 @@ const FACHAUFGABEN: Array<[string, Teil | null]> = [
   // Näherung: Lautsprecherwarnung.
   ['warnen', { capabilities: ['loudspeaker-warning'] }],
 ];
-const FACHAUFGABE_NAEHERUNG = new Set([
-  'dekontamination-personen',
-  'dekontamination-geraete',
-  'warnen',
-]);
+const FACHAUFGABE_NAEHERUNG = new Set(['warnen']);
 
 // Grundzeichen, die im Altkatalog eine Fachaufgabe annahmen, und ihr Körper (`kind`).
 const FACHAUFGABE_TRAEGER: Array<[string, SymbolSpec['kind']]> = [
@@ -557,6 +563,24 @@ describe('freiesZeichen — Fachaufgaben (D5)', () => {
       expect(() => drawAnySpec(z.spec)).not.toThrow();
     }
   });
+
+  // „P“/„G“ der Dekontamination an jedem annehmenden Grundzeichen an der Marke (LLH-1338).
+  it.each(FACHAUFGABE_TRAEGER)(
+    'Dekontamination Personen/Geräte mit Zusatz am Grundzeichen %s',
+    (gz) => {
+      for (const [fachaufgabe, zusatz] of [
+        ['dekontamination-personen', 'P'],
+        ['dekontamination-geraete', 'G'],
+      ] as const) {
+        const z = freiesZeichen({ grundzeichen: gz, fachaufgabe, organisation: 'feuerwehr' });
+        expect(z.spec, `${gz} + ${fachaufgabe}`).toMatchObject({
+          bodyMarks: ['decontamination'],
+          labels: { center: zusatz },
+        });
+        expect(z.vereinfacht).toBe(false);
+      }
+    },
+  );
 
   it('ignoriert eine Fachaufgabe an einem Grundzeichen, das keine annahm (Altkatalog)', () => {
     pruefe(
