@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { useState } from 'react';
@@ -61,17 +61,25 @@ function Harness({ vorlage = null }: { vorlage?: EinsatzVorlage | null }) {
 const kaestchen = (name: string) => screen.getByRole('checkbox', { name });
 
 describe('EinsatzVorlageFormModal (LLH-1375)', () => {
-  it('ohne Schichtmodelle der Organisation keine Auswahl „Schichtmodell“', async () => {
+  it('ohne Schichtmodelle der Organisation keine sichtbare Auswahl „Schichtmodell“', async () => {
+    let beantwortet = false;
+    server.use(
+      http.get('/api/schichtmodelle', () => {
+        beantwortet = true;
+        return HttpResponse.json([]);
+      }),
+    );
     renderMitProviders(<Harness />);
     const dialog = await screen.findByRole('dialog');
-    await waitFor(() => expect(within(dialog).getByLabelText('Bezeichnung')).toBeInTheDocument());
+    await waitFor(() => expect(beantwortet).toBe(true));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
     expect(within(dialog).queryByRole('combobox', { name: 'Schichtmodell' })).toBeNull();
   });
 
   it('drei Felder; neu sind alle Module angehakt, Module nach den Kategorien der Navigation', async () => {
     renderMitProviders(<Harness />);
     const dialog = await screen.findByRole('dialog', { name: 'Einsatz-Vorlage anlegen' });
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(3);
+    expect(dialog.querySelectorAll('.ant-form-item:not(.ant-form-item-hidden)').length).toBe(3);
     const alle = within(dialog).getAllByRole('checkbox');
     expect(alle).toHaveLength(modulRegistry.length);
     for (const k of alle) expect(k).toBeChecked();
@@ -226,6 +234,21 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       await waitFor(() => expect(anfragen).toHaveLength(1));
       expect(anfragen[0].rumpf).toMatchObject({ schichtmodell_id: null });
+    });
+
+    it('lädt die Modellliste nicht, bleibt das gespeicherte Modell im Vollersatz', async () => {
+      server.use(
+        http.get('/api/schichtmodelle', () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      const anfragen = aufzeichnen();
+      renderMitProviders(<Harness vorlage={{ ...MANV, schichtmodell_id: 9 }} />);
+      await screen.findByRole('dialog', { name: 'Einsatz-Vorlage bearbeiten' });
+      await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveValue('MANV'));
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() => expect(anfragen).toHaveLength(1));
+      expect(anfragen[0].rumpf).toMatchObject({ schichtmodell_id: 9 });
     });
   });
 });

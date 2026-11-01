@@ -228,22 +228,24 @@ describe('SchichtmodelleTab (LLH-1122)', () => {
     ).toBeInTheDocument();
   });
 
-  it('ohne betroffene Vorlage nur der Satz zu den Einsätzen', async () => {
+  it('nennt nur die Vorlagen des gewählten Modells', async () => {
     stelleBereit();
-    let beantwortet = false;
     server.use(
-      http.get('/api/einsatz-vorlagen', () => {
-        beantwortet = true;
-        return HttpResponse.json([
+      http.get('/api/einsatz-vorlagen', () =>
+        HttpResponse.json([
           { id: 1, bezeichnung: 'Unwetter', schichtmodell_id: 2, ausgeblendet: [], sortier: 10 },
-        ]);
-      }),
+          { id: 3, bezeichnung: 'Kleinlage', schichtmodell_id: 1, ausgeblendet: [], sortier: 30 },
+        ]),
+      ),
     );
     renderMitProviders(<SchichtmodelleTab />);
     await zeilenaktion('Sanitätsdienst', 'Löschen');
     const rueckfrage = await screen.findByRole('dialog', { name: 'Sanitätsdienst löschen?' });
-    await waitFor(() => expect(beantwortet).toBe(true));
+    // Erst die geladene Liste zeigt die Folge; dann darf „Unwetter“ (anderes Modell) nicht stehen.
+    expect(
+      await within(rueckfrage).findByText('Die Vorlage Kleinlage verliert es.'),
+    ).toBeInTheDocument();
     expect(rueckfrage).toHaveTextContent('Laufende Einsätze behalten ihre Kopie.');
-    expect(within(rueckfrage).queryByText(/verlier/)).toBeNull();
+    expect(within(rueckfrage).queryByText(/Unwetter/)).toBeNull();
   });
 });

@@ -184,16 +184,20 @@ export default function EinsatzVorlageFormModal({
             options={EINSATZART_OPTIONEN}
           />
         </Form.Item>
-        {schichtmodelle.length > 0 && (
-          <Form.Item label="Schichtmodell" name="schichtmodell_id">
-            <Select<number>
-              aria-label="Schichtmodell"
-              allowClear
-              placeholder={orgVorgabe ? mitVorgabe(orgVorgabe.bezeichnung) : 'keins'}
-              options={schichtmodelle.map((m) => ({ value: m.id, label: m.bezeichnung }))}
-            />
-          </Form.Item>
-        )}
+        {/* Immer registriert, nur ohne Modelle verborgen: solange die Liste lädt oder fehlt,
+            behält der Vollersatz so den gespeicherten Wert, statt ihn still auf `null` zu setzen. */}
+        <Form.Item
+          label="Schichtmodell"
+          name="schichtmodell_id"
+          hidden={schichtmodelle.length === 0}
+        >
+          <Select<number>
+            aria-label="Schichtmodell"
+            allowClear
+            placeholder={orgVorgabe ? mitVorgabe(orgVorgabe.bezeichnung) : 'keins'}
+            options={schichtmodelle.map((m) => ({ value: m.id, label: m.bezeichnung }))}
+          />
+        </Form.Item>
       </div>
       <Form.Item label="Sichtbare Module" name="sichtbar">
         <ModulHaekchen />

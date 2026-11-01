@@ -298,6 +298,35 @@ describe('Anlegedialog · Schichtmodell der Vorlage (LLH-1313)', () => {
   });
 });
 
+describe('Anlegedialog · Modell der Vorlage fehlt im Cache (LLH-1313)', () => {
+  it('zeigt dann keine Zeile statt der Org-Vorgabe', async () => {
+    const mitModell = VORLAGEN.map((v) => (v.id === 2 ? { ...v, schichtmodell_id: 77 } : v));
+    setup(mitModell);
+    server.use(
+      http.get('/api/schichtmodelle', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            bezeichnung: '12-h-Schicht',
+            typ: 'rhythmus',
+            rhythmus_minuten: 720,
+            vorwarnung_minuten: 30,
+            planungsvorlauf_minuten: 120,
+            ist_vorgabe: true,
+            ist_demo: false,
+          },
+        ]),
+      ),
+    );
+    const dialog = await oeffneDialog();
+    expect(
+      await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
+    ).toBeInTheDocument();
+    await waehle('Module', 'Sanitätsdienst');
+    await waitFor(() => expect(within(dialog).queryByText(/^Schichtmodell:/)).toBeNull());
+  });
+});
+
 describe('einsatzVorlageWahlKern', () => {
   it('koppelt nur exakt, nur an eine bekannte Vorlage', () => {
     expect(gekoppelteVorlage('MANV15', VORSCHLAEGE, VORLAGEN)).toBe(3);

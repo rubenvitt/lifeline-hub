@@ -262,15 +262,19 @@ function EinsaetzeInhalt() {
   });
   // Was der neue Einsatz als Schichtmodell bekommt (LLH-1313, Spec `kraefte-abloesung`,
   // „Schichtmodell in der Einsatzanlage“): das Modell der gewählten Vorlage, sonst die Vorgabe der
-  // Organisation, sonst keins. Dieselbe Rangfolge rechnet der Server beim Anlegen.
+  // Organisation, sonst keins. Dieselbe Rangfolge rechnet der Server beim Anlegen. Kennt der Cache
+  // das Modell der Vorlage (noch) nicht, keine Zeile statt der falschen Org-Vorgabe.
   const vorlageModellId = vorlagen.find((v) => v.id === vorlageWahl.vorlageId)?.schichtmodell_id;
   const vorlageSchichtmodell =
     vorlageModellId == null ? undefined : schichtmodelle?.find((m) => m.id === vorlageModellId);
-  const schichtmodellText = vorlageSchichtmodell
-    ? vorlageVorgabe(vorlageSchichtmodell.bezeichnung)
-    : orgSchichtmodell
-      ? mitVorgabe(orgSchichtmodell.bezeichnung)
-      : null;
+  const schichtmodellText =
+    vorlageModellId != null
+      ? vorlageSchichtmodell
+        ? vorlageVorgabe(vorlageSchichtmodell.bezeichnung)
+        : null
+      : orgSchichtmodell
+        ? mitVorgabe(orgSchichtmodell.bezeichnung)
+        : null;
 
   /** Neue Vorlage; die Einsatzart folgt ihr, solange niemand sie von Hand geändert hat. */
   function setzeVorlage(wahl: VorlageWahl) {
