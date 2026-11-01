@@ -42,6 +42,7 @@ import {
 import MeldeVerlauf from '../betreuung/MeldeVerlauf';
 import StelleBedarf from '../betreuung/StelleBedarf';
 import StelleBelegung from '../betreuung/StelleBelegung';
+import StelleBelegungslinie from '../betreuung/StelleBelegungslinie';
 import StelleBetroffene from '../betreuung/StelleBetroffene';
 import { GESCHLOSSEN_HINWEIS } from '../betreuung/StellenBlock';
 import { ART_LABEL, inBetreuung, personenZahl } from '../betreuung/betreuungText';
@@ -569,6 +570,11 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
         </Paneel>
 
         <Paneel titel="Meldeverlauf" koerperPolster>
+          <StelleBelegungslinie
+            einsatzId={einsatzId}
+            stelleId={s.id}
+            kapazitaet={s.kapazitaet_personen ?? null}
+          />
           <MeldeVerlauf
             einsatzId={einsatzId}
             art="stelle"

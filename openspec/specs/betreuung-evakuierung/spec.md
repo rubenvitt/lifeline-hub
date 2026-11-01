@@ -443,7 +443,10 @@ Die Oberfläche SHALL jede nicht stornierte Betreuungsstelle unter
 der Betreuungsübersicht lesen. Eine unbekannte, fremde oder stornierte Stelle und eine
 unlesbare Kennung MUST auf die Übersicht führen. Die Adresse `…/betreuung?stelle=<id>` MUST
 auf diese Seite umleiten. Die Bezeichnung einer Stelle in der Übersicht MUST auf ihre Seite
-führen; Sprünge von der Lagekarte und der Rückweg nach dem Verorten MUST dorthin führen.
+führen; Sprünge von der Lagekarte und der Rückweg nach dem Verorten MUST dorthin führen. Ein
+Verbleib „Notunterkunft“, der auf eine Stelle zeigt, MUST an der Stabsoberfläche (Patientenkopf
+und Verlauf der Person) auf deren Seite führen; ist das Modul Betreuung gesperrt oder wird am
+gekoppelten Gerät gelesen, MUST er Text ohne Link bleiben.
 
 Der Kopf MUST Bezeichnung, Art und Status zeigen und genau eine Primäraktion „Belegung
 melden“ tragen; an einer geschlossenen Stelle MUST sie gesperrt stehen und der Grund sichtbar
@@ -457,6 +460,13 @@ Die Seite MUST zeigen: „Belegung in Zahlen“ (Belegt, Kapazität, Frei, mit P
 Meldeverlauf, mit Personenrecht die namentlich hier untergebrachten Personen und den Anteil
 der Stelle an „in Betreuung“ mit einem Sprung ins Modul Verpflegung, wenn dieses frei ist.
 „Frei“ MUST nie negativ sein; eine Überbelegung nennt das Auslastungswort.
+
+Über dem Meldeverlauf MUST ab zwei gültigen Meldungen mit verschiedenem Zeitpunkt eine
+Stufenlinie der Belegung stehen: zurückgenommene Meldungen fehlen, zwischen zwei Meldungen gilt
+die ältere weiter (keine Interpolation), die Linie endet an der jüngsten Meldung, die y-Achse
+beginnt bei 0, und eine bekannte Kapazität steht gestrichelt mit Wort und Zahl daneben. Die
+Linie MUST als ein Bild mit einer Aussage zugänglich sein (Anfang, Ende, Zahl der Meldungen,
+Kapazität). Mit weniger als zwei Meldungen MUST die Linie fehlen.
 
 #### Scenario: Aus der Übersicht hinein
 - **WHEN** in der Übersicht die Bezeichnung „Turnhalle Ost“ gewählt wird
@@ -481,6 +491,16 @@ der Stelle an „in Betreuung“ mit einem Sprung ins Modul Verpflegung, wenn di
 #### Scenario: Überbelegt
 - **WHEN** eine Stelle mit Kapazität 150 eine Belegung von 170 trägt
 - **THEN** zeigt „Frei“ 0 und „Belegt“ das Wort „überbelegt“
+
+#### Scenario: Belegungsverlauf als Stufenlinie
+- **WHEN** eine Stelle mit Kapazität 120 die Meldungen 40 und danach 115 trägt
+- **THEN** steht über dem Meldeverlauf eine Stufenlinie „Belegung von 40 … auf 115 …, 2 Meldungen, Kapazität 120“
+- **AND** mit nur einer Meldung steht keine Linie
+
+#### Scenario: Vom Verbleib auf die Stelle
+- **WHEN** im Patientenkopf einer Person der Verbleib „Notunterkunft → Turnhalle Ost“ mit Stelle steht und das Modul Betreuung frei ist
+- **THEN** führt der Verbleib auf `…/betreuung/<stellen-id>`
+- **AND** ohne Zugriff auf das Modul Betreuung bleibt er Text
 
 ### Requirement: Belegung melden
 
