@@ -40,11 +40,7 @@ import {
 } from '../../personen/personenBilanz';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../../stab/einsatzleiter';
 import { SACHGEBIETE } from '../../stab/sachgebiete';
-import {
-  GEFAHR_LABEL,
-  GEFAHRENARTEN,
-  SCHADENSGRAD_LABEL,
-} from '../../pages/schaeden/gefahrWorte';
+import { GEFAHR_LABEL, GEFAHRENARTEN, SCHADENSGRAD_LABEL } from '../../pages/schaeden/gefahrWorte';
 import {
   etbTyp,
   personStatus,
