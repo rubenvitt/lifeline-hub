@@ -246,7 +246,7 @@ a{color:var(--ant-color-link);text-decoration:var(--ant-link-decoration);backgro
   --lfh-etb-meldung-wort: #5c9dff;
   --lfh-etb-anordnung-kante: #d46b08;
   --lfh-etb-anordnung-wort: #e8852a;
-  --lfh-etb-entscheidung-kante: #722ed1;
+  --lfh-etb-entscheidung-kante: #8f4be3;
   --lfh-etb-entscheidung-wort: #a57ff0;
   --lfh-etb-lage-kante: #13c2c2;
   --lfh-etb-lage-wort: #13c2c2;
@@ -464,8 +464,11 @@ a{color:var(--ant-color-link);text-decoration:var(--ant-link-decoration);backgro
 .lfh-segment[aria-disabled='true']:hover {
   color: var(--lfh-schwach);
   cursor: not-allowed;
+  outline: 1px dashed var(--lfh-steuer-rahmen);
+  outline-offset: -1px;
 }
-.lfh-segment:focus-visible {
+.lfh-segment:focus-visible,
+.lfh-segment[aria-disabled='true']:focus-visible {
   position: relative;
   z-index: 1;
   outline: 2px solid var(--lfh-bedien);

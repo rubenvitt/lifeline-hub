@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { oeffneMenue } from './menue-kern';
+import { klickeEintrag, oeffneMenue } from './menue-kern';
 import { anmeldenAlsAdmin, anmeldenAls, benutzerAnlegen } from './rollen-kern';
 
 /**
@@ -85,15 +85,15 @@ test('die Wahl gehört zum Gerät, nicht zur Person', async ({ page }) => {
   const zweite = await benutzerAnlegen(page, 'beobachter');
 
   // Geklickt wird erst im stehenden Menü: ins einblendende geht der Klick unter Last verloren
-  // (`menue-kern.ts`, Ursache in LFH-1058).
+  // (`menue-kern.ts`, Ursache in LFH-1058). Im Handschuh rollt es in sich (LLH-1337).
   const trigger = page.getByRole('button', { name: 'Benutzermenü' });
   let menue = await oeffneMenue(page, trigger);
-  await menue.getByRole('menuitem', { name: /Handschuh/ }).click();
+  await klickeEintrag(menue.getByRole('menuitem', { name: /Handschuh/ }));
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
   // Abmelden über den Bedienweg, den eine Person am geteilten Tablet nimmt.
   menue = await oeffneMenue(page, trigger);
-  await menue.getByRole('menuitem', { name: 'Abmelden' }).click();
+  await klickeEintrag(menue.getByRole('menuitem', { name: 'Abmelden' }));
   await expect(page).toHaveURL(/\/login/);
   await stehtAuf(page, 'handschuh');
 

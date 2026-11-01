@@ -200,6 +200,22 @@ export async function randKontrast(ziel: Locator, seite: 'left' | 'top' = 'left'
 }
 
 /**
+ * Kontrast einer SVG-Grafik (WCAG 1.4.11): `stroke` eines Strichs oder `fill` eines Punkts gegen
+ * die komponierte Fläche, auf der das `<svg>` steht (LLH-1347, Stufenlinie). Opacity an Element
+ * und Vorfahren lehnt der Kern ab wie überall; eine Deckkraft der Farbe (`stroke-opacity`,
+ * `fill-opacity`) < 1 ist ein Fehler, keine Messung.
+ */
+export async function grafikKontrast(ziel: Locator, farbe: 'stroke' | 'fill' = 'stroke') {
+  const deckkraft = await ziel.evaluate(
+    (el, f) => Number(getComputedStyle(el).getPropertyValue(`${f}-opacity`)),
+    farbe,
+  );
+  if (deckkraft !== 1) throw new Error(`Durchscheinende Grafik nicht modelliert: ${deckkraft}`);
+  const m = await messe(ziel, { vordergrund: farbe, grund: 'selbst' });
+  return { farbe: m.vordergrund, grund: m.grund, verhaeltnis: m.verhaeltnis };
+}
+
+/**
  * Kontrast eines Fokusumrisses (`outline`, WCAG 1.4.11) gegen den Grund, auf dem er steht
  * (LFH-737). Mit `outline-offset` ≥ 0 liegt der Umriss AUSSERHALB der Border-Box, also auf der
  * Fläche des Elternteils; ein negativer Versatz legt ihn auf die eigene Fläche.

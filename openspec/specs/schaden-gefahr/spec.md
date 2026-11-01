@@ -56,3 +56,41 @@ einfrieren.
 #### Scenario: CSV-Export
 - **WHEN** die Schadensliste als CSV exportiert wird
 - **THEN** nennt jede Zeile Gefahr und Schadensgrad in Worten, etwa „Elektrizität“ und „total zerstört“
+
+### Requirement: Gefahrenhinweis je Gefahr
+
+Das Kartenzeichen eines Schadens SHALL einen Gefahrenhinweis nur tragen, wenn DV 102 Kap. 5.8.1
+für seine Gefahr einen Hinweis festlegt. Das System MUST NOT eigene Hinweise oder Kennbuchstaben
+erfinden, die wie ein Hinweis nach DV 102 aussehen. Eine Gefahr ohne Hinweis MUST das leere
+Gefahrenzeichen in der Farbe des Ausmaßes zeigen; die Gefahr steht dann in Worten (Inspector,
+Liste, Druck). Die Abbildung MUST dieser Tabelle folgen:
+
+| Gefahr | Hinweis | Begründung |
+| --- | --- | --- |
+| Atomare Strahlung | 5.8.1.8 „Gefahr durch Radioaktivität“ | genau |
+| Chemische Stoffe | 5.8.1.7 „Gefährliche Stoffe“ | genau |
+| Explosion | 5.8.1.11 „Gefahr durch Explosion“ | genau |
+| Elektrizität | 5.8.1.9 „Gefahr durch elektrische Energie“ | genau |
+| Ertrinken | 5.8.1.6 „Gefahr durch Wassereinbruch“ | Näherung: beide meinen Gefahr durch Wasser |
+| Atemgifte | keiner | DV 102 kennt keinen Hinweis; „Gefährliche Stoffe“ meint Gefahrstoffe und deckt Brandrauch und Sauerstoffmangel nicht |
+| Angstreaktion | keiner | DV 102 kennt keinen Hinweis für eine Reaktion von Menschen |
+| Ausbreitung | keiner | DV 102 kennt keinen Hinweis; Ausbreitung ist keine Gefahrenquelle, sondern ihr Verlauf |
+| Erkrankung/Verletzung | keiner | DV 102 kennt dafür nur Zustände an Personen und Tieren (5.8.6, 5.8.8), keinen Gefahrenhinweis |
+| Einsturz | keiner | DV 102 kennt keinen Hinweis; der Schadensgrad (5.8.4) beschreibt das Bauwerk |
+| Absturz | keiner | DV 102 kennt keinen Hinweis |
+| Brand | keiner | DV 102 kennt nur Brandphasen (5.8.5); sie bezeichnen die Phase eines Brandes, keine Gefahr |
+| Durchbruch | keiner | DV 102 kennt keinen Hinweis |
+
+Die Hinweise „Überschwemmtes Gebiet“ (5.8.1.5), „Gefahr durch Mineralöl“ (5.8.1.10) und „Gefahr
+durch explosionsfähige Kampfmittel“ (5.8.1.12) SHALL ungenutzt bleiben. Die Gefahren eines
+Schadens sind die Gefahren der Gefahrenmatrix; Mineralöl gehört dort zu „Chemische Stoffe“,
+Kampfmittel zu „Explosion“, Überschwemmung zu „Ertrinken“. Eine eigene Gefahr dafür hätte im
+Gefahrengebiet keine Zeile.
+
+#### Scenario: Gefahr mit Hinweis
+- **WHEN** ein Schaden mit Ausmaß „mittel“ und Gefahr „Explosion“ verortet ist
+- **THEN** zeigt die Karte das gelbe Gefahrenzeichen mit dem Hinweis „Gefahr durch Explosion“
+
+#### Scenario: Gefahr ohne Hinweis
+- **WHEN** ein Schaden mit Ausmaß „gering“ und Gefahr „Atemgifte“ verortet ist
+- **THEN** zeigt die Karte das grüne Gefahrenzeichen ohne Hinweis, und der Inspector nennt „Atemgifte“

@@ -41,6 +41,7 @@ import { anteil } from '../../components/instrument/Aufgliederung';
 import { einsatzKeys } from '../../api/queryKeys';
 import { schlechtesterZustand, type AbrufZustand } from '../../api/abrufZustand';
 import { verfasserText } from '../../etb/verfasser';
+import BerichtigtMarke from '../../etb/BerichtigtMarke';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import type { ModulFreigaben } from '../../api/types';
 import { listePersonen } from '../../api/einsatzPerson';
@@ -914,7 +915,13 @@ export default function UeberblickPage() {
                       typwort={etbTyp.entscheidung.label}
                       zeit={kurz(e.ereigniszeit)}
                       nr={`Nr. ${e.lfd_nr}`}
-                      meta={verfasserText(e)}
+                      // Eine berichtigte Entscheidung trägt dieselbe Marke wie in der Zeitachse
+                      // (LLH-1321): sonst gälte hier die überholte Fassung.
+                      meta={
+                        <BerichtigtMarke einsatzId={einsatzId} eintrag={e}>
+                          {verfasserText(e)}
+                        </BerichtigtMarke>
+                      }
                       aktionen={
                         folgeWort ? (
                           <span

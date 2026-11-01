@@ -1009,6 +1009,9 @@ async fn pruefe_skelett(
     assert_eq!(akte["personen"][0]["aktuelle_sichtung"], "sk2");
     assert_eq!(akte["tiere"][0]["registrier_anzeige"], "T-001");
     assert_eq!(akte["schaeden"][0]["registrier_anzeige"], "S-001");
+    // Gefahr und Schadensgrad sind Retain-Aufzählungen und stehen im Register (LLH-1342).
+    assert_eq!(akte["schaeden"][0]["gefahrenart"], "elektrizitaet");
+    assert_eq!(akte["schaeden"][0]["schadensgrad"], "teilzerstoert");
     let (s, archiv_etb) = anfrage(
         app,
         "GET",
@@ -1174,6 +1177,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &format!("{basis}/schaeden"),
         json!({
             "typ": "sachschaden", "ausmass": "mittel", "ort": "Birkenallee-9",
+            "gefahrenart": "elektrizitaet", "schadensgrad": "teilzerstoert",
             "beschreibung": "Dachschaden-Beschreibung", "geschaedigt_kontakt": "Eigentuemer-0173-1234"
         }),
     )

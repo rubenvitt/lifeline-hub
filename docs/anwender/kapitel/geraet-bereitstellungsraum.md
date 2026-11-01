@@ -156,8 +156,8 @@ Material zeigt das Tablet nur an, und nur das Material des eigenen Raums. Zuordn
 Ausgeben, Erfassen und den Status ändern bleibt der Führungsstelle (Kapitel
 [Material](material.md)); fehlt am Raum etwas, geht das als Meldung an die Einsatzleitung.
 
-Abrufen ist eine Entscheidung der Einsatzleitung: am Tablet gibt es weder „Abrufen“ noch „Abruf
-zurücknehmen“. Das Tablet zeigt den Abruf und bucht das Ausrücken. Bis dahin zählt die abgerufene
+Abrufen und Verlegen sind Entscheidungen der Einsatzleitung: am Tablet gibt es weder „Abrufen“
+noch „Abruf zurücknehmen“ noch „In anderen BR verlegen …“. Das Tablet zeigt den Abruf und bucht das Ausrücken. Bis dahin zählt die abgerufene
 Kraft weiter in den Zahlen des Raums.
 
 ### Was ein Eintreffen schreibt

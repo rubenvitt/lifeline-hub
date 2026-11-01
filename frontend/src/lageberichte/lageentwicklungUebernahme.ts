@@ -6,6 +6,7 @@ import type { EtbEintragAnzeige, EtbTyp, LagebesprechungStand, ModulFreigaben } 
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { DRUCK_SEITE } from '../etb/druckAbruf';
+import { berichtigtText } from '../etb/berichtigung';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
 import { etbTypMehrzahl } from '../theme/statusFarben';
 import { gesperrt, ladeListe, type Geladen, type UebernahmeQuelle } from './uebernahmeQuelle';
@@ -33,8 +34,11 @@ const frei = (m: keyof typeof MODUL, freigaben: ModulFreigaben) =>
 
 const fehlt = (zustand: Exclude<AbrufZustand, 'daten'>) => `- — (${ZUSTAND_GRUND[zustand]})`;
 
-/** Was von einem Eintrag gebraucht wird: kein Freitext im Zwischenspeicher (er wird offline gesichert). */
-type NeuerEintrag = Pick<EtbEintragAnzeige, 'lfd_nr' | 'typ' | 'ereigniszeit'>;
+/**
+ * Was von einem Eintrag gebraucht wird: kein Freitext im Zwischenspeicher (er wird offline
+ * gesichert). `berichtigt_durch` trägt nur Nummern (LLH-1321).
+ */
+type NeuerEintrag = Pick<EtbEintragAnzeige, 'lfd_nr' | 'typ' | 'ereigniszeit' | 'berichtigt_durch'>;
 
 interface Neuerungen {
   /** Gezählte neue Einträge (ohne System und Lagevorträge), neueste zuerst. */
@@ -56,9 +60,12 @@ async function neueEintraege(einsatzId: number, grenzeId: number | null): Promis
   const eintraege: NeuerEintrag[] = [];
   const nimm = (liste: EtbEintragAnzeige[]) =>
     eintraege.push(
-      ...liste
-        .filter(zaehlt)
-        .map(({ lfd_nr, typ, ereigniszeit }) => ({ lfd_nr, typ, ereigniszeit })),
+      ...liste.filter(zaehlt).map(({ lfd_nr, typ, ereigniszeit, berichtigt_durch }) => ({
+        lfd_nr,
+        typ,
+        ereigniszeit,
+        berichtigt_durch: berichtigt_durch ?? [],
+      })),
     );
   let cursor: number | undefined;
   for (;;) {
@@ -154,7 +161,13 @@ export const LAGEENTWICKLUNG_QUELLE: UebernahmeQuelle = {
           : [
               ...entscheidungen
                 .slice(0, LISTE_MAX)
-                .map((e) => `- Nr. ${e.lfd_nr} · ${dtg(e.ereigniszeit)}`),
+                // Eine berichtigte Entscheidung sagt es (LLH-1321): sonst ginge die überholte
+                // Fassung als gültig in den Vortrag.
+                .map((e) =>
+                  [`- Nr. ${e.lfd_nr}`, dtg(e.ereigniszeit), berichtigtText(e)]
+                    .filter(Boolean)
+                    .join(' · '),
+                ),
               ...(entscheidungen.length > LISTE_MAX
                 ? [`- und ${entscheidungen.length - LISTE_MAX} weitere`]
                 : []),

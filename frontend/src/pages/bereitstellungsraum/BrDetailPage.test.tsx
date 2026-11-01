@@ -21,6 +21,7 @@ import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { einsatzKeys } from '../../api/queryKeys';
 import { setzeOnline } from '../../test/utils';
 import { mitProzessZone } from '../../test/prozessZone';
+import { oeffne, optionenVon, waehle } from '../../test/auswahlListe';
 import {
   queueLeerenFuerTests,
   schreibaktionEinreihen,
@@ -2369,7 +2370,12 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
       within(menue)
         .getAllByRole('menuitem')
         .map((m) => m.textContent),
-    ).toEqual(['Abrufen und austragen', 'Austragen']);
+    ).toEqual([
+      'Abrufen und austragen',
+      // Ohne zweiten Raum in Betrieb (Standard-Handler: keine Räume) gesperrt mit Grund (LLH-1315).
+      'In anderen BR verlegen (kein anderer Raum in Betrieb)',
+      'Austragen',
+    ]);
   });
 
   it('Abrufen: Ziel-Abschnitt mit dem Abschnitt des Raums vorbelegt, mit Auftrag', async () => {
@@ -2593,6 +2599,177 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
 
     expect(await within(abgerufen()).findByText('HLF 20')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /neu anzeigen/ })).toBeNull();
+  });
+});
+
+/**
+ * „In anderen BR verlegen …“ (LLH-1315, Spec `bereitstellungsraum-belegung`, „Verlegen in einen
+ * anderen Raum“): ein Wechsel, gebucht am Zielraum. Nur die Führung verlegt; am Gerät fehlt der
+ * Eintrag (`frontend/src/geraet/AGENTS.md`, „Bereitstellungsraum“).
+ */
+describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
+  /** Ein Eintrag der Raumliste; die Seite liest daraus nur Kennung, Bezeichnung und Zustand. */
+  function raum(over: Partial<BrDetail>) {
+    return { ...brDetail(over), abrufe: [], einheit_ids: [] };
+  }
+  const NORD = raum({ id: 2, bezeichnung: 'BR Nord' });
+
+  function seite(
+    br: BrDetail,
+    {
+      raeume = [raum({ id: 1, bezeichnung: 'BR Alpha' }), NORD],
+      wechsel = () => HttpResponse.json({}, { status: 201 }),
+    }: { raeume?: unknown[]; wechsel?: () => Response } = {},
+  ) {
+    const gebucht: { br: string; daten: unknown }[] = [];
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json(raeume)),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.post(
+        '/api/einsaetze/1/bereitstellungsraeume/:brId/belegung',
+        async ({ request, params }) => {
+          gebucht.push({ br: String(params.brId), daten: await request.json() });
+          return wechsel();
+        },
+      ),
+    );
+    const qc = renderBrDetail();
+    return Object.assign(gebucht, { qc });
+  }
+
+  const dialog = () => screen.getByRole('dialog');
+
+  async function verlegenWaehlen(name: string) {
+    const menue = await openMenue(name);
+    await userEvent.click(
+      within(menue).getByRole('menuitem', { name: 'In anderen BR verlegen …' }),
+    );
+    return within(dialog()).findByText(`${name} verlegen`);
+  }
+
+  it('bucht einen Wechsel am gewählten Raum und quittiert mit Ziel', async () => {
+    const gebucht = seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }));
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await waehle('Ziel-Raum', 'BR Nord');
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
+
+    await waitFor(() => expect(gebucht).toHaveLength(1));
+    expect(gebucht[0]).toEqual({
+      br: '2',
+      daten: { objekt_typ: 'einheit', objekt_id: 10, art: 'wechsel' },
+    });
+    expect(await screen.findByText('Einheit „HLF 20“ nach BR Nord verlegt')).toBeInTheDocument();
+  });
+
+  it('ein einheitenloses Fahrzeug wird als Fahrzeug verlegt', async () => {
+    const gebucht = seite(brDetail({ fahrzeuge: [{ id: 20, funkrufname: 'Florian 1' }] }));
+    await screen.findByText('Florian 1');
+    await verlegenWaehlen('Florian 1');
+    await waehle('Ziel-Raum', 'BR Nord');
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
+    await waitFor(() => expect(gebucht).toHaveLength(1));
+    expect(gebucht[0].daten).toEqual({ objekt_typ: 'fahrzeug', objekt_id: 20, art: 'wechsel' });
+    expect(
+      await screen.findByText('Fahrzeug „Florian 1“ nach BR Nord verlegt'),
+    ).toBeInTheDocument();
+  });
+
+  it('zur Wahl stehen nur andere Räume in Betrieb', async () => {
+    seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }), {
+      raeume: [
+        raum({ id: 1, bezeichnung: 'BR Alpha' }),
+        NORD,
+        raum({ id: 3, bezeichnung: 'BR Süd', status: 'geplant' }),
+        raum({ id: 4, bezeichnung: 'BR Ost', storniert_at: '2026-10-15 10:00:00' }),
+        raum({ id: 5, bezeichnung: 'BR West', status: 'aufgeloest' }),
+        raum({ id: 6, bezeichnung: 'BR Hafen' }),
+      ],
+    });
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await oeffne('Ziel-Raum');
+    expect(optionenVon('Ziel-Raum')).toEqual(['BR Hafen', 'BR Nord']);
+  });
+
+  it('ohne zweiten Raum in Betrieb steht der Eintrag gesperrt mit Grund', async () => {
+    seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }), {
+      raeume: [
+        raum({ id: 1, bezeichnung: 'BR Alpha' }),
+        raum({ id: 3, bezeichnung: 'BR Süd', status: 'geplant' }),
+      ],
+    });
+    await screen.findByText('HLF 20');
+    const menue = await openMenue('HLF 20');
+    const eintrag = within(menue).getByRole('menuitem', {
+      name: 'In anderen BR verlegen (kein anderer Raum in Betrieb)',
+    });
+    expect(eintrag).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('eine Ablehnung des Servers steht im Dialog, der bleibt offen, kein Toast', async () => {
+    seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }), {
+      wechsel: () =>
+        HttpResponse.json({ error: 'Bereitstellungsraum ist nicht aktiv' }, { status: 422 }),
+    });
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await waehle('Ziel-Raum', 'BR Nord');
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
+    expect(await within(dialog()).findByText('Nicht verlegt')).toBeInTheDocument();
+    expect(within(dialog()).getByText('Bereitstellungsraum ist nicht aktiv')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('geht der gewählte Raum während der Wahl außer Betrieb, geht nichts hinaus und das Feld nennt es', async () => {
+    const gebucht = seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }));
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await waehle('Ziel-Raum', 'BR Nord');
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+        HttpResponse.json([
+          raum({ id: 1, bezeichnung: 'BR Alpha' }),
+          { ...NORD, status: 'aufgeloest' },
+        ]),
+      ),
+    );
+    await act(() => gebucht.qc.invalidateQueries({ queryKey: einsatzKeys.br(1) }));
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
+    expect(await within(dialog()).findByText('Raum nicht mehr in Betrieb')).toBeInTheDocument();
+    expect(gebucht).toHaveLength(0);
+  });
+
+  it('verlegt jemand anderes die Kraft während der Wahl, sperrt der Dialog und bucht nichts', async () => {
+    const stand = { br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) };
+    const gebucht = seite(stand.br);
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
+    );
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await waehle('Ziel-Raum', 'BR Nord');
+    stand.br = brDetail({ einheiten: [] });
+    await act(() => gebucht.qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(1, 1) }));
+    expect(
+      await within(dialog()).findByText('steht nicht mehr bereit in diesem Raum'),
+    ).toBeInTheDocument();
+    const knopf = within(dialog()).getByRole('button', { name: /^Verlegen/ });
+    expect(knopf).toBeDisabled();
+    fireEvent.click(knopf);
+    expect(gebucht).toHaveLength(0);
+  });
+
+  it('ohne Ziel-Raum geht nichts hinaus', async () => {
+    const gebucht = seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }));
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
+    expect(await within(dialog()).findByText('Ziel-Raum wählen')).toBeInTheDocument();
+    expect(gebucht).toHaveLength(0);
   });
 });
 

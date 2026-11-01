@@ -77,8 +77,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `PaneelZustand` · `Kennzahl`/`Kennzahlenband` („Zahl führt") · `Aufgliederung`/`Balken` (nie
   Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`StatusChip` (`wort` Pflicht, Übersetzung
   nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`; `SegmentUmschalter` als ein
-  Umschaltknopf daneben, LLH-1065) · `Sammelbanner` · `Filterhinweis` (Band über einer gefilterten
-  Liste, Achtungsrolle, Zahlen nur aus Serverzählungen, LLH-1071) ·
+  Umschaltknopf daneben, LLH-1065; Wortlaut einzeilig; ein `\n` im `label` bricht ihn in zwei
+  Zeilen, nur wo die Höhe sie trägt und einzeilig kein Platz bliebe: „Ohne\nSchicht“ der
+  Ablösung im Handschuh-Betrieb auf dem Handschirm, LLH-1128) · `Sammelbanner` ·
+  `Filterhinweis` (Band über einer gefilterten Liste, Achtungsrolle, Zahlen nur aus Serverzählungen, LLH-1071) ·
   `Schnellerfassungszeile` · `Datenraster`/`Datenfeld` (statt `Descriptions`) ·
   `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
   `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
@@ -329,8 +331,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   den Grund auf.
 - **Gesperrt trägt die Sperre ohne Farbe** (LLH-1233): gesperrte antd-Knöpfe und -Felder haben
   einen gestrichelten Rand in `steuer-rahmen`, randlose Einträge (Menü, Auswahlliste, antds
-  `Segmented`) eine Strichlinie nach innen (`index.css`). Gestrichelt heißt nur gesperrt: die
-  Knopfvariante `dashed` ist gesperrt (`theme/gesperrtZeichen.guard.test.ts`).
+  `Segmented`, eigene `Segmentleiste`) eine Strichlinie nach innen (`index.css`, `sprache.css`).
+  Gestrichelt heißt nur gesperrt: die Knopfvariante `dashed` ist gesperrt
+  (`theme/gesperrtZeichen.guard.test.ts`).
 
 ## Farbe und Zeichen
 
