@@ -214,7 +214,8 @@ pub async fn anlegen_tx(
     daten: NeueDaten<'_>,
 ) -> Result<(i64, i64), AppError> {
     let (id, registrier_nr, _) =
-        anlegen_tx_mit_optionen(conn, einsatz_id, erfasser_id, "erfasst", None, daten).await?;
+        anlegen_tx_mit_optionen(conn, einsatz_id, erfasser_id, "erfasst", None, None, daten)
+            .await?;
     Ok((id, registrier_nr))
 }
 
@@ -223,12 +224,16 @@ pub async fn anlegen_tx(
 /// sichert der partielle Unique-Index `(einsatz_id, client_id)` exactly-once bei
 /// einem später wiederholten Request. Die Race-Auflösung geschieht im Handler,
 /// weil dort die gesamte atomare Transaktion einschließlich System-ETB liegt.
+///
+/// `erfasst_at` ist die Erfassungszeit einer ohne Netz vorgemerkten Aufnahme (LLH-1330), bereits
+/// im Handler gekappt; `None` = jetzt.
 pub async fn anlegen_tx_mit_optionen(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
     status: &str,
     client_id: Option<&str>,
+    erfasst_at: Option<&str>,
     daten: NeueDaten<'_>,
 ) -> Result<(i64, i64, bool), AppError> {
     // Unter dem BEGIN-IMMEDIATE-Kontrakt des Aufrufers kann zwischen diesem
@@ -251,10 +256,10 @@ pub async fn anlegen_tx_mit_optionen(
             (einsatz_id, registrier_nr, status, name, vorname, geschlecht, \
              geburtsdatum, alter_geschaetzt, herkunft_adresse, antreff_ort, \
              melder_kontakt, notiz, erfasst_von, geaendert_von, client_id, \
-             zustand, antreff_lat, antreff_lon, vermisst_seit) \
+             zustand, antreff_lat, antreff_lon, vermisst_seit, erfasst_at) \
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, ?2, ?3, ?4, ?5, \
                 ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13, \
-                ?14, ?15, ?16, ?17 \
+                ?14, ?15, ?16, ?17, COALESCE(?18, strftime('%Y-%m-%d %H:%M:%S','now')) \
          FROM einsatz_person WHERE einsatz_id = ?1 \
          RETURNING id, registrier_nr",
     )
@@ -275,6 +280,7 @@ pub async fn anlegen_tx_mit_optionen(
     .bind(daten.antreff_lat)
     .bind(daten.antreff_lon)
     .bind(daten.vermisst_seit)
+    .bind(erfasst_at)
     .fetch_one(&mut *conn)
     .await?;
     Ok((row.0, row.1, true))
@@ -684,6 +690,7 @@ mod tests {
             b,
             "vermisst",
             Some("offline-person-1"),
+            None,
             leere_daten(),
         )
         .await
@@ -697,6 +704,7 @@ mod tests {
             b,
             "vermisst",
             Some("offline-person-1"),
+            None,
             leere_daten(),
         )
         .await

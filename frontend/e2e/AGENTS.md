@@ -72,3 +72,10 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   Umgekehrt prüfen Specs in `OHNE_WEBGL_SPECS` die Karten OHNE Kartengrafik (LLH-1353,
   LLH-1370, Lagemonitor LLH-1377): in Firefox wie sie sind, in Chromium mit dem Init-Skript `ohneWebgl2`
   (`e2e/kartenFixture.ts`), das `getContext('webgl2')` `null` liefern lässt.
+- **Wer eine Fremdänderung über den Live-Strom erwartet, wartet vorher auf `/live`** (LLH-1317):
+  der Server abonniert erst mit der Antwort auf `GET /api/einsaetze/<id>/live`, und die Seite
+  ruft beim Verbindungsaufbau nicht nach. Schreibt der „andere Schirm“ früher, bleibt das Banner
+  unter Last aus (Gate 1, Sammelbanner 390 px). Je Seitenaufbau (`goto`, `reload`) eigens warten:
+  `waitForResponse` vor dem Schritt anlegen, danach abwarten.
+- **Zurück zum Admin über `wechsleZuAdmin`** (LLH-1317): ein Objekt `{ …, passwort: ADMIN_PW }`
+  im Spec meldet GitGuardian als echtes Passwort.

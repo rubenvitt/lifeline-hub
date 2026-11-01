@@ -9,9 +9,9 @@ import {
   VERLETZUNG_ART_WORT,
   VERLETZUNG_SCHWERE_WORT,
   istNachgetragen,
-  kurzVerbleib,
   transportText,
 } from './personMeta';
+import VerbleibText from './VerbleibText';
 
 const { useToken } = theme;
 
@@ -81,7 +81,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       at: v.zeitpunkt_at,
       node: (
         <span>
-          <Tag>Verbleib</Tag> {kurzVerbleib(v)}
+          <Tag>Verbleib</Tag> <VerbleibText verbleib={v} />
           <Bestaetigt name={v.bestaetigt_name} />
           <Nachgetragen erfassung={v.zeitpunkt_at} eingang={v.eingegangen_at} />
         </span>

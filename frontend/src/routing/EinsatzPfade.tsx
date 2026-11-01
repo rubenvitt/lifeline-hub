@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import {
+  betreuungsstellePfad,
   geraetAufnahmePfad,
   geraetBetroffenAufnahmePfad,
   geraetBetroffenePfad,
@@ -35,6 +36,11 @@ export interface EinsatzPfade {
     zeitfensterId: number,
     opts?: { stelle?: number },
   ) => string;
+  /**
+   * Seite einer Betreuungsstelle (LLH-1347, Sprung aus dem Verbleib „Notunterkunft“). Nur an der
+   * Stabsoberfläche: das Gerät hat keine Stellenseite, dort bleibt der Verbleib Text.
+   */
+  betreuungsstelle: ((einsatzId: number, stelleId: number) => string) | null;
 }
 
 export const STAB_PFADE: EinsatzPfade = {
@@ -44,6 +50,7 @@ export const STAB_PFADE: EinsatzPfade = {
   aufnahme: personenAufnahmePfad,
   verpflegung: verpflegungPfad,
   verpflegungAusgabe: verpflegungAusgabePfad,
+  betreuungsstelle: betreuungsstellePfad,
 };
 
 export const GERAET_PFADE: EinsatzPfade = {
@@ -53,6 +60,7 @@ export const GERAET_PFADE: EinsatzPfade = {
   aufnahme: geraetAufnahmePfad,
   verpflegung: geraetVerpflegungPfad,
   verpflegungAusgabe: geraetVerpflegungAusgabePfad,
+  betreuungsstelle: null,
 };
 
 /**
@@ -67,6 +75,7 @@ export const GERAET_BETREUUNG_PFADE: EinsatzPfade = {
   aufnahme: (einsatzId) => geraetBetroffenAufnahmePfad(einsatzId),
   verpflegung: geraetVerpflegungPfad,
   verpflegungAusgabe: geraetVerpflegungAusgabePfad,
+  betreuungsstelle: null,
 };
 
 const PfadeKontext = createContext<EinsatzPfade>(STAB_PFADE);

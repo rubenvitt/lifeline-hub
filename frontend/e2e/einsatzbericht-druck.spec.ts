@@ -1,6 +1,12 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 import { erwarteHandyBreite, mitHandy } from './druckansicht-mobil-kern';
-import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
+import {
+  benutzerAnlegen,
+  mitgliedEintragen,
+  wechsleZu,
+  wechsleZuAdmin,
+  wechsleZuRolle,
+} from './rollen-kern';
 import { einsatzAnlegen } from './einsatz-kern';
 
 /**
@@ -277,7 +283,7 @@ test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensp
   );
 
   // ── Rollensperre auf Personen (zurück zum Admin, dann wieder Beobachter).
-  await wechsleZu(page, { benutzername: ADMIN, passwort: PW });
+  await wechsleZuAdmin(page);
   await sende(page, 'PUT', `${basis}/modul-overrides/personen`, {
     sichtbar: true,
     benoetigte_rolle: 'fuehrungskraft',
