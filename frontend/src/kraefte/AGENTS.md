@@ -65,7 +65,9 @@ Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`. „
 (LLH-1128) bildet nur `abloesung/ohneSchicht.ts`: offene Periode wie `has_offene_periode_tx`,
 Einheitenliste, minus eigene laufende Schicht und `erbende_einheiten`; nur mit Freigabe des
 Moduls Einheiten (sonst gesperrt mit Grund), eigene Zuflussschleuse, kein „Schicht beginnen“ für
-einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO stehen.
+einen geplanten Ablöser, auch nicht für die Untereinheit eines geplanten Verbands (LLH-1311:
+Vorfahrenkette über `ueber_einheit_id` wie `kopplung::is_geplanter_abloeser_tx`, keine
+Vererbung). Kein Server-Anteil, solange Perioden und Erben im DTO stehen.
 **Geplant** heißt Einzelplanung `abloesende_einheit_id` oder Ablöser-Liste
 `einsatz_abloesung_abloeser`; jede Prüfung darauf liest beide (Planungshinweis, Hinweise,
 Planungswarnungen, LLH-1131). Die Planungswarnungen ermittelt der Server beim Lesen
