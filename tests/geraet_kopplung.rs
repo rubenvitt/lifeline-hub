@@ -5779,6 +5779,154 @@ async fn stelle_mit_gekoppeltem_geraet_ist_nicht_stornierbar() {
     assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
 }
 
+/// Zählt die anstehenden `verpflegung`-Ereignisse am Abo und leert es; prüft die Nutzlast.
+fn verpflegung_ereignisse(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>,
+    einsatz: i64,
+) -> usize {
+    let mut n = 0;
+    while let Ok(m) = rx.try_recv() {
+        if m.event == lifeline_hub::live::LiveEvent::Verpflegung {
+            assert_eq!(m.data, json!({ "einsatz_id": einsatz }).to_string());
+            n += 1;
+        }
+    }
+    n
+}
+
+/// LLH-1316: Anlegen, Einlösen und Widerrufen einer Kopplung an einer Verpflegungsstelle melden
+/// je ein `verpflegung`, damit die Stellenliste `geraet_gekoppelt` (und damit „Stornieren“) live
+/// nachzieht. Ein zweiter Widerruf ändert nichts und meldet nichts; eine Kopplung ohne
+/// Verpflegungsstelle (einsatzweit, andere Ansicht) meldet keins.
+#[tokio::test]
+async fn kopplung_an_verpflegungsstelle_meldet_sich_live() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kueche = verpflegungsstelle(&app, &admin, einsatz, "Feldküche", "geplant").await;
+    let mut rx = live.abonniere(einsatz);
+
+    let (kid, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "verpflegung", "stelle_id": kueche, "bezeichnung": "Tresen"}),
+    )
+    .await;
+    assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 1, "anlegen");
+    assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, true);
+
+    let a = koppeln(&app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 1, "einlösen");
+
+    widerrufen(&app, &admin, einsatz, kid).await;
+    assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 1, "widerrufen");
+    assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, false);
+    widerrufen(&app, &admin, einsatz, kid).await;
+    assert_eq!(
+        verpflegung_ereignisse(&mut rx, einsatz),
+        0,
+        "zweiter Widerruf"
+    );
+
+    // Ohne Verpflegungsstelle: weder einsatzweit noch eine andere Ansicht.
+    let (weit, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "verpflegung", "bezeichnung": "Ausgabe Deich"}),
+    )
+    .await;
+    let a = koppeln(&app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    widerrufen(&app, &admin, einsatz, weit).await;
+    let (monitor, _) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"}),
+    )
+    .await;
+    widerrufen(&app, &admin, einsatz, monitor).await;
+    assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 0, "ohne Stelle");
+}
+
+/// LLH-1316: Läuft eine Kopplung an einer Verpflegungsstelle ab, meldet der Takt des Planers
+/// genau einmal `verpflegung` (Fenster `(letzter Takt, jetzt]`), auch wenn ein Takt dazwischen
+/// an der Abfrage scheitert. Abgelaufene Kopplungen ohne Stelle oder schon widerrufene melden
+/// nichts.
+#[tokio::test]
+async fn ablauf_einer_kopplung_an_verpflegungsstelle_meldet_sich_live() {
+    use lifeline_hub::geraet::ablauf::AblaufFenster;
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kueche = verpflegungsstelle(&app, &admin, einsatz, "Feldküche", "geplant").await;
+    let (kid, _geraet) = verpflegungsgeraet_an(&app, &admin, einsatz, kueche).await;
+    let (weit, _) = verpflegungsgeraet(&app, &admin, einsatz).await;
+    let turnhalle = verpflegungsstelle(&app, &admin, einsatz, "Turnhalle", "geplant").await;
+    let (widerrufen_id, _) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "verpflegung", "stelle_id": turnhalle, "bezeichnung": "Tresen 2"}),
+    )
+    .await;
+    widerrufen(&app, &admin, einsatz, widerrufen_id).await;
+    let mut rx = live.abonniere(einsatz);
+
+    let jetzt = chrono::Utc::now();
+    let vorhin = lifeline_hub::zeit::formatiere_utc(jetzt - chrono::Duration::seconds(5));
+    for id in [kid, weit, widerrufen_id] {
+        sqlx::query("UPDATE geraet_kopplung SET laeuft_ab_at = ? WHERE id = ?")
+            .bind(&vorhin)
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, false);
+
+    // Takte wie im Planer, je 30 s: der vor dem Ablauf sieht nichts, der danach meldet ihn
+    // einmal, der nächste nicht noch einmal.
+    let takt = chrono::Duration::seconds(30);
+    let mut fenster = AblaufFenster::ab(jetzt - takt * 2);
+    assert_eq!(fenster.takt(&pool, &live, jetzt - takt).await.unwrap(), 0);
+    assert_eq!(
+        verpflegung_ereignisse(&mut rx, einsatz),
+        0,
+        "vor dem Ablauf"
+    );
+    assert_eq!(fenster.takt(&pool, &live, jetzt).await.unwrap(), 1);
+    assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 1, "Ablauf");
+    assert_eq!(fenster.takt(&pool, &live, jetzt + takt).await.unwrap(), 0);
+    assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 0, "nächster Takt");
+
+    // Scheitert die Abfrage, bleibt das Fenster stehen: der nächste Takt meldet den Ablauf nach.
+    let mut fenster = AblaufFenster::ab(jetzt - takt);
+    sqlx::query("ALTER TABLE geraet_kopplung RENAME TO geraet_kopplung_weg")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(fenster.takt(&pool, &live, jetzt).await.is_err());
+    sqlx::query("ALTER TABLE geraet_kopplung_weg RENAME TO geraet_kopplung")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        verpflegung_ereignisse(&mut rx, einsatz),
+        0,
+        "Fehler meldet nichts"
+    );
+    assert_eq!(fenster.takt(&pool, &live, jetzt + takt).await.unwrap(), 1);
+    assert_eq!(
+        verpflegung_ereignisse(&mut rx, einsatz),
+        1,
+        "nach dem Fehler"
+    );
+}
+
 /// LLH-1048 (LLH-1024 F7): Die Verpflegung bindet wahlweise. Ohne Stelle koppelt das Gerät
 /// einsatzweit wie bisher; mit Stelle nur an eine geplante oder aktive Verpflegungsstelle des
 /// eigenen Einsatzes, und es trägt deren Namen.
