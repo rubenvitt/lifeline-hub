@@ -499,15 +499,17 @@ export interface components {
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
         };
-        /** @description Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Status. */
+        /** @description Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Gefahr, Schadensgrad, Status. */
         ArchivSchadenAnzeige: {
             abschluss_grund?: components["schemas"]["SchadenAbschlussGrund"] | null;
             ausmass: components["schemas"]["Ausmass"];
             erfasst_at: string;
+            gefahrenart?: components["schemas"]["Gefahrentyp"] | null;
             /** @description Anzeigeform, z. B. `S-003`. */
             registrier_anzeige: string;
             /** Format: int64 */
             registrier_nr: number;
+            schadensgrad?: components["schemas"]["Schadensgrad"] | null;
             status: components["schemas"]["SchadenStatus"];
             storniert_at?: string | null;
             typ: components["schemas"]["SchadenTyp"];

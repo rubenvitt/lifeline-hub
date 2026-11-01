@@ -50,6 +50,8 @@ function akte(zustand: AufbewahrungZustand): ArchivAkte {
         registrier_anzeige: 'S-001',
         typ: 'sachschaden',
         ausmass: 'mittel',
+        gefahrenart: 'elektrizitaet',
+        schadensgrad: 'zerstoert',
         status: 'abgeschlossen',
         abschluss_grund: 'behoben',
         erfasst_at: '2026-05-01 10:00:00',
@@ -199,6 +201,8 @@ describe('ArchivAktePage — Inhalt', () => {
     zeige('vorgemerkt');
     expect(await screen.findByText('R-001')).toBeInTheDocument();
     expect(screen.getByText('S-001')).toBeInTheDocument();
+    // Gefahr und Schadensgrad in Worten; ohne Angabe ein Strich (LLH-1342).
+    expect(screen.getByText('Elektrizität · total zerstört')).toBeInTheDocument();
     expect(screen.getByText('Keine Tiere erfasst')).toBeInTheDocument();
     expect(screen.getAllByText('zur Löschung vorgemerkt').length).toBeGreaterThan(0);
   });

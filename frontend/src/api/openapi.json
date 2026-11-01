@@ -1253,7 +1253,7 @@
       },
       "ArchivSchadenAnzeige": {
         "type": "object",
-        "description": "Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Status.",
+        "description": "Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Gefahr, Schadensgrad, Status.",
         "required": [
           "registrier_nr",
           "registrier_anzeige",
@@ -1279,6 +1279,17 @@
           "erfasst_at": {
             "type": "string"
           },
+          "gefahrenart": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Gefahrentyp",
+                "description": "Gefahrenart (LLH-1115, im Archiv seit LLH-1342); fehlt = keine Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "registrier_anzeige": {
             "type": "string",
             "description": "Anzeigeform, z. B. `S-003`."
@@ -1286,6 +1297,17 @@
           "registrier_nr": {
             "type": "integer",
             "format": "int64"
+          },
+          "schadensgrad": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Schadensgrad",
+                "description": "Schadensgrad nach DV 102, 5.8.4; fehlt = keine Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/SchadenStatus"

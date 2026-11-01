@@ -83,13 +83,16 @@ pub const TIER: Projektion = Projektion {
     ],
 };
 
-/// Schadensregister: Registriernummer, Typ, Ausmaß, Status, Abschlussgrund.
+/// Schadensregister: Registriernummer, Typ, Ausmaß, Gefahrenart, Schadensgrad (LLH-1342),
+/// Status, Abschlussgrund.
 pub const SCHADEN: Projektion = Projektion {
     tabelle: "einsatz_schaden",
     spalten: &[
         "registrier_nr",
         "typ",
         "ausmass",
+        "gefahrenart",
+        "schadensgrad",
         "status",
         "abschluss_grund",
         "erfasst_at",
