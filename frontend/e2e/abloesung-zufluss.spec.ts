@@ -43,6 +43,14 @@ async function schriftenGeladen(page: Page) {
   });
 }
 
+async function mitStrom(page: Page, einsatzId: number, schritt: () => Promise<unknown>) {
+  const strom = page.waitForResponse(
+    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+  );
+  await schritt();
+  await strom;
+}
+
 async function stelleDichte(page: Page, dichte: string) {
   await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
     DICHTE_SCHLUESSEL,
@@ -81,8 +89,11 @@ for (const kontext of KONTEXTE) {
     }
     const fremdeEinheit = await einheit('Florian Süd 9');
 
-    await page.goto(`/einsaetze/${einsatzId}/abloesung`);
-    await stelleDichte(page, kontext.dichte);
+    // Die fremde Schicht kommt nur über den Live-Strom, und der Server abonniert erst mit der
+    // Antwort auf `/live`: eine Anlage davor ginge verloren (LLH-1317). Gewartet wird je
+    // Seitenaufbau, sonst löste die Antwort der ersten Seite das Warten nach dem Neuladen aus.
+    await mitStrom(page, einsatzId, () => page.goto(`/einsaetze/${einsatzId}/abloesung`));
+    await mitStrom(page, einsatzId, () => stelleDichte(page, kontext.dichte));
 
     const karten = page.locator('[data-lfh="abloesung-karte"]');
     const zeile = page.locator('[data-lfh="abloesung-werkzeugzeile"]');
