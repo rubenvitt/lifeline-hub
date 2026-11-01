@@ -867,14 +867,39 @@ Doppelbuchung melden; die Prüfung trägt dann der Server beim Senden.
 ### Requirement: Abruf in der Oberfläche
 Die Detailseite eines aktiven Raums SHALL je bereitgestellter Einheit und je einheitenlosem
 Fahrzeug „Abrufen“ als Hauptaktion anbieten. „Abrufen und austragen“ (Abruf mit
-`ausgerueckt: true`) und „Austragen“ (Austritt) MUST als Nebenwege im Aktionsmenü der Zeile
-stehen; die Belegung MUST keinen roten Knopf tragen. Eine Mehrfachauswahl gibt es nicht; ein
+`ausgerueckt: true`), „In anderen BR verlegen …“ (Wechsel) und „Austragen“ (Austritt) MUST als
+Nebenwege im Aktionsmenü der Zeile stehen; die Belegung MUST keinen roten Knopf tragen. Eine Mehrfachauswahl gibt es nicht; ein
 Verband geht mit seiner Einheit.
 
 #### Scenario: Kein roter Knopf
 - **WHEN** die Führung einen aktiven Raum mit bereitgestellten Kräften öffnet
-- **THEN** trägt jede Zeile „Abrufen“ und ein Aktionsmenü mit „Abrufen und austragen“ und
-  „Austragen“, und die Belegung zeigt keinen roten Knopf
+- **THEN** trägt jede Zeile „Abrufen“ und ein Aktionsmenü mit „Abrufen und austragen“, „In
+  anderen BR verlegen …“ und „Austragen“, und die Belegung zeigt keinen roten Knopf
+
+### Requirement: Verlegen in einen anderen Raum
+Das Aktionsmenü einer bereitgestellten Kraft SHALL bei der Führung „In anderen BR verlegen …“
+anbieten: eine Auswahl der aktiven, nicht stornierten Räume des Einsatzes ohne den eigenen, die
+einen Wechsel am gewählten Raum bucht (`art: 'wechsel'` über dessen `…/belegung`). Die Quittung
+MUST Art, Name und Zielraum nennen. Ohne anderen aktiven Raum MUST der Eintrag gesperrt mit Grund
+stehen. Eine abgerufene Kraft MUST keinen Eintrag zum Verlegen tragen, und am Gerät des Raums MUST
+der Eintrag fehlen: Verlegen entscheidet die Führung (LLH-1315). Eine Ablehnung des Servers MUST
+im Dialog stehen, ohne Fehler-Toast.
+
+#### Scenario: Einheit verlegen
+- **WHEN** die Führung im BR Sportplatz bei „HLF 20“ „In anderen BR verlegen …“ wählt, „BR Schule“
+  wählt und „Verlegen“ bestätigt
+- **THEN** geht am BR Schule ein Wechsel für „HLF 20“ hinaus, und ein Hinweis nennt „Einheit
+  „HLF 20“ nach BR Schule verlegt“
+- **AND** der Verlauf des BR Sportplatz zeigt „Wechsel nach BR Schule“, der des BR Schule
+  „Wechsel von BR Sportplatz“
+
+#### Scenario: Kein anderer Raum in Betrieb
+- **WHEN** außer dem BR Sportplatz nur geplante, aufgelöste oder stornierte Räume bestehen
+- **THEN** steht „In anderen BR verlegen“ gesperrt mit „kein anderer Raum in Betrieb“
+
+#### Scenario: Am Gerät kein Verlegen
+- **WHEN** der Einweiser am Tablet des BR Sportplatz das Aktionsmenü von „HLF 20“ öffnet
+- **THEN** steht dort nur „Austragen“
 
 ### Requirement: Felder des Abruf-Dialogs
 Der Abruf-Dialog SHALL einen Ziel-Abschnitt, nur bei einer Einheit und vorbelegt mit dem

@@ -29,6 +29,7 @@ import {
   storniereBr,
   belegeBr,
   hebtBrAbrufAuf,
+  listeBr,
 } from '../../api/einsatzBereitstellungsraum';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeEinheiten } from '../../api/einheiten';
@@ -96,6 +97,8 @@ import {
   type AbrufZeile,
 } from './abrufKern';
 import AbrufDialog, { type AbrufZiel } from './AbrufDialog';
+import VerlegenDialog, { type VerlegenZiel } from './VerlegenDialog';
+import { verlegenEintrag, zielRaeume } from './verlegenKern';
 import { MenueAusloeser, type MenueEintrag } from '../../components/MenueAusloeser';
 import BrVerlauf from './BrVerlauf';
 import EintreffenDialog from './EintreffenDialog';
@@ -174,6 +177,8 @@ export default function BrDetailPage() {
   // Abrufen und Zurücknehmen (LLH-1085) sind Führungsentscheidungen; das Gerät bucht nur das
   // Ausrücken (`frontend/src/geraet/AGENTS.md`, „Bereitstellungsraum“).
   const abrufen = darf('br-abrufen');
+  // Verlegen in einen anderen Raum (LLH-1315) entscheidet ebenso die Führung.
+  const verlegen = darf('br-verlegen');
   const { token, rollen } = useRollen();
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
@@ -223,6 +228,14 @@ export default function BrDetailPage() {
     queryFn: () => listeAbschnitte(einsatzId),
     enabled:
       canLoadMaterial && abrufen && istKeyFreigegeben('einsatzabschnitte', freigabenQuery.data),
+  });
+
+  // Ziele des Verlegens (LLH-1315): dieselbe Liste wie der Umschalter im Kopf, also keine zweite
+  // Anfrage; ein Gerät verlegt nicht und fragt sie nicht ab.
+  const raeumeQuery = useQuery({
+    queryKey: einsatzKeys.br(einsatzId),
+    queryFn: () => listeBr(einsatzId),
+    enabled: verlegen,
   });
 
   // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier. Ein
@@ -294,6 +307,8 @@ export default function BrDetailPage() {
   const [eintreffenOffen, setEintreffenOffen] = useState(false);
   // Die Kraft, die der Abruf-Dialog gerade abruft (LLH-1085); `null` = zu.
   const [abrufZiel, setAbrufZiel] = useState<AbrufZiel | null>(null);
+  // Die Kraft, die der Verlegen-Dialog gerade verlegt (LLH-1315); `null` = zu.
+  const [verlegenZiel, setVerlegenZiel] = useState<VerlegenZiel | null>(null);
   const nichtInBetriebId = useId();
   // Ohne Netz vorgemerkte Buchungen dieses Geräts (Teil III): die Seite zeigt die des Raums unter
   // „Vorgemerkt“, der Dialog bietet keine davon erneut an. Alle Räume des Einsatzes, weil eine
@@ -375,6 +390,7 @@ export default function BrDetailPage() {
     setBearbeitenOffen(false);
     setEintreffenOffen(false);
     setAbrufZiel(null);
+    setVerlegenZiel(null);
   }, [brId, statusReset, stornoReset, leereZeilen]);
 
   // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
@@ -407,6 +423,7 @@ export default function BrDetailPage() {
   const materialAmBr = (materialQuery.data ?? []).filter((em) => em.br_id === br.id);
   const eintreffen = darf('br-eintreffen') && darfImEinsatzSchreiben(einsatz);
   const inBetrieb = br.status === 'aktiv';
+  const verlegenRaeume = raeumeQuery.data ? zielRaeume(raeumeQuery.data, br.id) : null;
   const vorgemerktHier = vorgemerkt.filter((v) => v.aktion.br_id === br.id);
 
   function onZuweisenEinheit(einheit: Einheit) {
@@ -523,15 +540,25 @@ export default function BrDetailPage() {
 
   /**
    * Aktionen einer bereitgestellten Kraft (LLH-1085): „Abrufen“ ist die Hauptaktion; „Abrufen und
-   * austragen“ (Lage ohne Einweiser) und „Austragen“ (Fehlbuchung, umkehrbar) sind Nebenwege im
-   * Aktionsmenü, kein roter Hauptknopf. Am Gerät bleibt nur „Austragen“, ebenfalls im Menü: so
-   * steht es an Desktop und Tablet an derselben Stelle.
+   * austragen“ (Lage ohne Einweiser), „In anderen BR verlegen …“ (LLH-1315) und „Austragen“
+   * (Fehlbuchung, umkehrbar) sind Nebenwege im Aktionsmenü, kein roter Hauptknopf. Am Gerät bleibt
+   * nur „Austragen“, ebenfalls im Menü: so steht es an Desktop und Tablet an derselben Stelle.
    */
   function bereitAktionen(typ: 'einheit' | 'fahrzeug', objektId: number, name: string) {
     if (schreibgeschuetzt) return [];
-    type Weg = 'abrufen-austragen' | 'austragen';
+    type Weg = 'abrufen-austragen' | 'verlegen' | 'austragen';
+    const verlegenWeg = verlegenEintrag(verlegenRaeume);
     const weitere: MenueEintrag<Weg>[] = [
       ...(abrufen ? [{ key: 'abrufen-austragen' as const, label: 'Abrufen und austragen' }] : []),
+      ...(verlegen
+        ? [
+            {
+              key: 'verlegen' as const,
+              label: verlegenWeg.label,
+              ...(verlegenWeg.gesperrt ? { gesperrt: true as const } : {}),
+            },
+          ]
+        : []),
       { key: 'austragen', label: 'Austragen' },
     ];
     const ziel = { objekt_typ: typ, objekt_id: objektId, name };
@@ -552,11 +579,11 @@ export default function BrDetailPage() {
         eintraege={weitere}
         zugaenglicherName={`Weitere Aktionen zu ${name}`}
         laeuft={laeuft(typ, objektId)}
-        onWahl={(weg) =>
-          weg === 'austragen'
-            ? austrittBuchen(typ, objektId, name, false)
-            : setAbrufZiel({ ...ziel, austragen: true })
-        }
+        onWahl={(weg) => {
+          if (weg === 'austragen') austrittBuchen(typ, objektId, name, false);
+          else if (weg === 'verlegen') setVerlegenZiel(ziel);
+          else setAbrufZiel({ ...ziel, austragen: true });
+        }}
       />,
     ];
   }
@@ -1020,6 +1047,15 @@ export default function BrDetailPage() {
               abgerufenZufluss.merkeEigene(abrufZeilenId('einheit', id)),
             );
           }}
+        />
+      )}
+      {verlegen && (
+        <VerlegenDialog
+          einsatzId={einsatzId}
+          brId={br.id}
+          ziel={verlegenZiel}
+          raeume={verlegenRaeume ?? []}
+          onClose={() => setVerlegenZiel(null)}
         />
       )}
       {verwalten && (
