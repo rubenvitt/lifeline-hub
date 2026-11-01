@@ -27,7 +27,7 @@ import {
 } from './BetreuungDialoge';
 import type { BezirkAktion } from './BezirkTabelle';
 import { personenZahl } from './betreuungText';
-import { gebietZeichnenPfad } from './gebietZeichnen';
+import { gebietZeichnenPfad, type GebietKreis } from './gebietZeichnen';
 
 /**
  * Welcher Dialog offen ist — einer zur Zeit, jeder frisch montiert (`initialValues`). Der Datensatz
@@ -107,15 +107,16 @@ export function useBezirkHandlungen({
   const qc = useQueryClient();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const schliessen = useCallback(() => setDialog(null), []);
-  // Gebiet nach dem Anlegen (LLH-1069): die Lagekarte muss frei sein. Gesperrt steht die Wahl
-  // „Fläche zeichnen“ im Dialog gesperrt mit Grund.
+  // Gebiet nach dem Anlegen (LLH-1069, LLH-1346): die Lagekarte muss frei sein. Gesperrt stehen
+  // „Fläche zeichnen“ und „Radius“ im Dialog gesperrt mit Grund.
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   /**
    * Der eben angelegte Bezirk, dessen Fläche gezeichnet werden soll — gesetzt nach dem Erfolg des
    * Anlegens, verbraucht beim Schließen des Dialogs. Ein Ref, weil die Erfassungs-Hülle den
    * Dialog erst nach `onErfassen` schließt; der Sprung kommt danach, nicht mitten im Absenden.
+   * `kreis`: mit „Radius“ (LLH-1346) als Kreis vorbelegt.
    */
-  const zeichnenNachAnlegen = useRef<number | null>(null);
+  const zeichnenNachAnlegen = useRef<{ bezirkId: number; kreis?: GebietKreis } | null>(null);
 
   // Die Abschnitte braucht nur, wer anlegen oder bearbeiten darf.
   const abschnitteQuery = useQuery({
@@ -230,10 +231,10 @@ export function useBezirkHandlungen({
     setDialog({ art: 'anlegen' });
   }, [resetAnlegen]);
   const schliesseAnlegen = useCallback(() => {
-    const bezirkId = zeichnenNachAnlegen.current;
+    const ziel = zeichnenNachAnlegen.current;
     zeichnenNachAnlegen.current = null;
     setDialog(null);
-    if (bezirkId != null) navigate(gebietZeichnenPfad(einsatzId, bezirkId));
+    if (ziel != null) navigate(gebietZeichnenPfad(einsatzId, ziel.bezirkId, ziel.kreis));
   }, [navigate, einsatzId]);
   const oeffneStand = useCallback(
     (bezirk: Evakuierungsbezirk) => {
@@ -297,7 +298,13 @@ export function useBezirkHandlungen({
           fehler={anlegenMut.error}
           onErfassen={async (body, gebiet) => {
             const b = await anlegenMut.mutateAsync(body);
-            zeichnenNachAnlegen.current = gebiet === 'flaeche' && !karteGesperrt ? b.id : null;
+            zeichnenNachAnlegen.current =
+              gebiet.wahl === 'keins' || karteGesperrt
+                ? null
+                : {
+                    bezirkId: b.id,
+                    ...(gebiet.wahl === 'radius' ? { kreis: gebiet.kreis } : {}),
+                  };
           }}
           onSchliessen={schliesseAnlegen}
         />

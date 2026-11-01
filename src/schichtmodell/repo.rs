@@ -7,7 +7,7 @@
 //! - Die Bezeichnung ist je Org eindeutig, ohne Unterschied von Groß- und Kleinschreibung
 //!   (409). Verglichen wird in Rust (`to_lowercase` faltet auch Umlaute), der Index ist das Netz.
 //! - Löschen ist echt: kein Einsatz verweist auf das Modell, er hat eine Kopie. Eine Demo-Marke
-//!   fällt in derselben Transaktion mit.
+//!   fällt in derselben Transaktion mit, Verweise von Einsatz-Vorlagen (LLH-1313) werden gelöst.
 //! - Fremde Organisation: 404, wie nicht vorhanden.
 
 use sqlx::{SqliteConnection, SqlitePool};
@@ -248,9 +248,19 @@ pub async fn update(
 }
 
 /// Löscht ein Modell samt Demo-Marke. 404 bei fremdem oder unbekanntem Modell. Kopien an
-/// Einsätzen bleiben unberührt.
+/// Einsätzen bleiben unberührt. Einsatz-Vorlagen, die das Modell vorgeben, verlieren den Verweis
+/// im selben Schritt und fallen auf die Vorgabe der Organisation zurück (LLH-1313, design.md D3);
+/// der Fremdschlüssel selbst hält fest, damit das Entfernen der Demo-Daten es stehen lässt.
 pub async fn delete(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
+        sqlx::query(
+            "UPDATE einsatz_vorlage SET schichtmodell_id = NULL, geaendert_at = datetime('now') \
+             WHERE schichtmodell_id = ? AND org_id = ?",
+        )
+        .bind(id)
+        .bind(org_id)
+        .execute(&mut *conn)
+        .await?;
         let geloescht = sqlx::query("DELETE FROM schichtmodell WHERE id = ? AND org_id = ?")
             .bind(id)
             .bind(org_id)
@@ -349,21 +359,26 @@ pub(crate) async fn set_einsatz_tx(
     Ok(())
 }
 
-/// Einsatzanlage (`einsatz::repo::anlegen_tx`): kopiert die Vorgabe der Organisation an den
-/// neuen Einsatz. Ohne Vorgabe bleibt der Einsatz ohne (keine erfundene Zahl).
-pub(crate) async fn copy_org_vorgabe_tx(
+/// Einsatzanlage (`einsatz::repo::anlegen_tx`): kopiert ein Modell als Vorgabe an den neuen
+/// Einsatz. Rangfolge (LLH-1313, design.md D4): das Modell der Einsatz-Vorlage (`modell_id`),
+/// sonst die Vorgabe der Organisation, sonst keins (keine erfundene Zahl). `modell_id` stammt aus
+/// einer Vorlage derselben Organisation; die Org-Bedingung bleibt trotzdem im WHERE.
+pub(crate) async fn copy_vorgabe_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
+    modell_id: Option<i64>,
     benutzer_id: i64,
 ) -> Result<(), AppError> {
     sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO einsatz_schichtmodell (einsatz_id, {WERTE_SPALTEN}, geaendert_von_id) \
-         SELECT ?, {WERTE_SPALTEN}, ? FROM schichtmodell WHERE org_id = ? AND ist_vorgabe = 1"
+         SELECT ?1, {WERTE_SPALTEN}, ?2 FROM schichtmodell \
+         WHERE org_id = ?3 AND (id = ?4 OR (?4 IS NULL AND ist_vorgabe = 1))"
     )))
     .bind(einsatz_id)
     .bind(benutzer_id)
     .bind(org_id)
+    .bind(modell_id)
     .execute(&mut *conn)
     .await?;
     Ok(())

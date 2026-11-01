@@ -1,7 +1,9 @@
 //! Stammdaten-Katalog „Einsatz-Vorlagen“ je Organisation (LLH-1375, Spec
-//! `openspec/specs/einsatz-vorlagen`). Eine Vorlage ist ein Modulsatz mit optionaler Einsatzart:
-//! beim Anlegen eines Einsatzes schreibt sie für jedes ausgeblendete Modul einen eigenen
-//! Einsatzwert `sichtbar = 0` (`einsatz::repo::anlegen_tx`). Sie blendet nur aus, nie ein.
+//! `openspec/specs/einsatz-vorlagen`). Eine Vorlage ist ein Modulsatz mit optionaler Einsatzart
+//! und optionalem Schichtmodell: beim Anlegen eines Einsatzes schreibt sie für jedes ausgeblendete
+//! Modul einen eigenen Einsatzwert `sichtbar = 0` (`einsatz::repo::anlegen_tx`). Sie blendet nur
+//! aus, nie ein. Gibt sie ein Schichtmodell vor, bekommt der Einsatz dessen Kopie statt der
+//! Vorgabe der Organisation (LLH-1313).
 //!
 //! Gespeichert werden die **ausgeblendeten** Module (`einsatz_vorlage_modul_aus`), nicht die
 //! sichtbaren: ein neu hinzukommendes Modul ist so in jeder Vorlage sichtbar, wie ohne Vorlage
@@ -28,6 +30,10 @@ pub struct EinsatzVorlage {
     /// Einsatzart, die der Anlegedialog vorbelegt; fehlt, wenn die Vorlage keine vorgibt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatzart: Option<Einsatzart>,
+    /// Schichtmodell der Organisation, das ein mit der Vorlage angelegter Einsatz als Kopie
+    /// bekommt (LLH-1313); fehlt, wenn die Vorlage keines vorgibt (dann gilt die Org-Vorgabe).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schichtmodell_id: Option<i64>,
     pub ausgeblendet: Vec<String>,
     pub sortier: i64,
 }

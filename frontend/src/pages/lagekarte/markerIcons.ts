@@ -1,5 +1,9 @@
 import type { Drawing } from '@einsatzzeichen/schema';
-import { bereitstellungsraumZeichen, fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
+import {
+  bereitstellungsraumZeichen,
+  fachobjektZeichen,
+  tierZeichen,
+} from '../../zeichen/fachobjektZeichen';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
 import type { KartenTheme } from './basemapStil';
 import type { KarteMarker } from './marker';
@@ -15,6 +19,8 @@ export function markerZeichen(mk: MitZeichen): { schluessel: string; drawing: Dr
   // Das Raumzeichen ist ein freistehendes Führungszeichen, kein Grundzeichen mit Merkmalen: es
   // hängt am Typ (LLH-1107).
   if (mk.typ === 'bereitstellungsraum') return bereitstellungsraumZeichen();
+  // Das Tier ohne Zustand (LLH-1343) hängt ebenso am Typ.
+  if (mk.typ === 'tier') return tierZeichen();
   return mk.tz ? fachobjektZeichen(mk.tz) : null;
 }
 

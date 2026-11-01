@@ -13,6 +13,7 @@ import {
 import type { Ausmass, UhsTyp } from '../api/types';
 import {
   bereitstellungsraumZeichen,
+  tierZeichen,
   fachobjektZeichen,
   funktionsZeichen,
 } from './fachobjektZeichen';
@@ -753,5 +754,21 @@ describe('bereitstellungsraumZeichen — Raumzeichen nach DV 102 (LLH-1107)', ()
 
   it('ist für jeden Raum dasselbe Bild (ein Bildschlüssel, gecacht)', () => {
     expect(bereitstellungsraumZeichen()).toBe(bereitstellungsraumZeichen());
+  });
+});
+
+describe('tierZeichen — Tier ohne Zustand (LLH-1343)', () => {
+  it('zeichnet das Tier ohne Zustand aus @einsatzzeichen: die Silhouette, als abgeleitet gekennzeichnet', () => {
+    const z = tierZeichen();
+    expect(z).not.toBeNull();
+    expect(z!.spec).toEqual({ kind: 'animal-state' });
+    // Kein Original zeigt ein Tier ohne Zustand; die Bibliothek sagt das selbst.
+    expect(z!.drawing.derivations?.length).toBeGreaterThan(0);
+    expect(z!.drawing.children).toHaveLength(1);
+    expect(z!.schluessel).toBe('ez|{"v":1,"freestanding":{"kind":"animal-state"}}');
+  });
+
+  it('ist für jedes Tier dasselbe Bild (gecacht)', () => {
+    expect(tierZeichen()).toBe(tierZeichen());
   });
 });

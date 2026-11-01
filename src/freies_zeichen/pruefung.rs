@@ -468,6 +468,14 @@ mod tests {
         }
     }
 
+    /// Das Tier ohne Zustand (LLH-1343): `state` ist an `animal-state` seit @einsatzzeichen
+    /// 6.10.0 optional.
+    #[test]
+    fn tier_ohne_zustand_wird_angenommen() {
+        let tier = r#"{"v":1,"freestanding":{"kind":"animal-state"}}"#;
+        assert_eq!(pruefe_zeichen_spec(tier).unwrap(), tier);
+    }
+
     #[test]
     fn verlauf_wird_nur_der_form_nach_geprueft() {
         assert_eq!(pruefe_zeichen_spec(PFEIL).unwrap(), PFEIL);

@@ -82,6 +82,19 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Anlegen; auch ein Ende der Kopplung räumt sie nicht (Beweissicherung, Fristen in
   `frontend/src/offline/AGENTS.md`, „Gerätedaten beim Abmelden“). Was nicht im Speicher des Tabs
   geladen ist, geht ohne Netz nicht.
+- **Vorgemerktes überdauert die Kopplung** (LLH-1331, Spec `feldgeraet-bedienung`,
+  `offline/fruehereKopplung.ts`): jede Kopplung ist ein eigenes Gerätekonto, die Warteschlange
+  hängt an der `benutzer_id`. Der Browser merkt sich seine Gerätekonten
+  (`lifeline-hub.geraet-konten`, nur Kennungen), geschrieben allein über `uebernimm` im
+  `AuthProvider`. Eine bestätigte Gerätesitzung mit gleichem Einsatz, gleicher Ansicht und gleicher
+  Stelle bindet die Zeilen früherer Konten in einer Transaktion um (`rebindQueueKonten`), der
+  Abgleich sendet, der Server prüft mit den Rechten des neuen Kontos; Erfasser ist das neue Konto.
+  Die Übernahme läuft ohne Knopf (Entscheidung Ruben 01.11.2026). Was nicht passt, zeigt nur die
+  Gerätehülle als „Aus früherer Kopplung“ (Anzahl, Verwerfen mit Rückfrage), „Kopplung beendet“
+  nur als Anzahl; Zeilen von Personen fasst der Weg nie an. Gemerkte Konten werden nie vergessen:
+  ein Tab der beendeten Kopplung kann noch einreihen, die Gerätehülle übernimmt solche Nachzügler
+  (`adoptFruehereKopplung`, auch vor dem Verwerfen). Kein Serverweg: die
+  `client_id`-Wiedergabe ist je Einsatz eindeutig, nicht je Benutzer.
 - **Kopfzeile und Navigation** (`geraet/GeraeteKopf.tsx`): Stelle, Gerät, Verbindung und
   Kopplungsende stehen immer, unter einer Stunde mit Wort und Farbe; ohne Netz der jüngste
   Datenstand. Den Namen der Stelle liest `useStellenName` (`geraet/stellenName.ts`) aus der live

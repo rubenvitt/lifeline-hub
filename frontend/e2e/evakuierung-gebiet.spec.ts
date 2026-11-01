@@ -113,3 +113,133 @@ test('Bezirk mit Fläche anlegen: zeichnen, zuordnen, zurück zum Bezirk', async
 
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });
+
+/** Einsatzort des Radius-Tests: die Mitte des Kreises. */
+const EINSATZORT = { lat: 54.12, lon: 9.5 };
+
+interface KartenHaken {
+  jumpTo(o: { center: readonly [number, number]; zoom: number }): void;
+  querySourceFeatures(quelle: string): { properties: { label?: string } }[];
+}
+
+interface ZoneAntwort {
+  typ: string;
+  label?: string | null;
+  evakuierungsbezirk_id?: number | null;
+  kreis_radius_m?: number | null;
+  kreis_mitte_lat?: number | null;
+  kreis_mitte_lon?: number | null;
+}
+
+/**
+ * LLH-1346: „Radius“ als Gebietswahl. Anlegen mit 500 m → die Karte öffnet den Kreis um den
+ * Einsatzort, vorbelegt und mit dem Bezirk im Kopf; „Übernehmen“ legt die Kreisfläche mit
+ * Zuordnung an, und ihre Beschriftung auf der Karte nennt den Radius.
+ */
+test('Bezirk mit Radius 500 m um den Einsatzort anlegen: Kreisfläche mit Zuordnung und Radius', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (f) => seitenFehler.push(f));
+  await anmelden(page);
+  const { id: einsatzId } = await senden(page, '/api/einsaetze', {
+    bezeichnung: `E2E Bezirk-Radius ${Date.now()}`,
+  });
+  const ort = await page.request.patch(`/api/einsaetze/${einsatzId}`, {
+    data: {
+      einsatzort: 'Deichtor',
+      einsatzort_lat: EINSATZORT.lat,
+      einsatzort_lon: EINSATZORT.lon,
+    },
+  });
+  expect(ort.ok(), `PATCH Einsatzort: ${ort.status()}`).toBeTruthy();
+
+  await page.goto(`/einsaetze/${einsatzId}/evakuierung`);
+  await page.getByRole('button', { name: 'Evakuierungsbezirk anlegen', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
+  await dialog.getByLabel('Bezeichnung').fill(BEZIRK);
+  await dialog.getByLabel('Plangröße (Personen)').fill('85');
+  await dialog.getByRole('radio', { name: 'Radius' }).check();
+  await expect(dialog.getByText('Radius um den Einsatzort')).toBeVisible();
+  await dialog.getByRole('button', { name: '500 m' }).click();
+  await expect(dialog.getByRole('spinbutton', { name: 'Radius in Metern' })).toHaveValue('500');
+  await dialog.getByRole('button', { name: 'Anlegen', exact: true }).click();
+
+  // Karte im Kreis-Modus mit Bezug; Radius und Mitte vorbelegt, der Auftrag aus der Adresse.
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte$`));
+  await karteBereit(page);
+  const band = page.locator('[data-lfh="kreis-steuerung"]');
+  await expect(band).toBeVisible();
+  await expect(band.getByText(`Bezirk ${BEZIRK} · Kreis`)).toBeVisible();
+  await expect(band.getByRole('spinbutton', { name: 'Radius in Metern' })).toHaveValue('500');
+  await expect(band.locator('[data-lfh="kreis-mitte"]')).not.toContainText('—');
+  await expect(band.getByRole('switch', { name: 'Weitere zeichnen' })).toHaveCount(0);
+  // Erst „Übernehmen“ legt an.
+  const vorher = (await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/zonen`)
+  ).json()) as ZoneAntwort[];
+  expect(vorher).toEqual([]);
+
+  const anfrage = page.waitForRequest(
+    (r) => r.method() === 'POST' && r.url().endsWith(`/api/einsaetze/${einsatzId}/zonen`),
+  );
+  await band.getByRole('button', { name: 'Übernehmen' }).click();
+  const body = (await anfrage).postDataJSON() as {
+    typ: string;
+    label?: string;
+    evakuierungsbezirk_id?: number;
+    kreis?: { radius_m: number };
+  };
+  expect(body).toMatchObject({
+    typ: 'evakuierungsbezirk',
+    label: BEZIRK,
+    kreis: { radius_m: 500 },
+  });
+  const bezirkId = body.evakuierungsbezirk_id!;
+  expect(bezirkId).toEqual(expect.any(Number));
+  await expect(page.getByText(`Gebiet für Bezirk ${BEZIRK} gespeichert`)).toBeVisible();
+
+  // Der Server trägt Kreis, Mitte am Einsatzort und Zuordnung; der Bezirk hat eine Fläche.
+  const [zone] = (await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/zonen`)
+  ).json()) as ZoneAntwort[];
+  expect(zone).toMatchObject({
+    typ: 'evakuierungsbezirk',
+    label: BEZIRK,
+    evakuierungsbezirk_id: bezirkId,
+    kreis_radius_m: 500,
+  });
+  expect(zone.kreis_mitte_lat).toBeCloseTo(EINSATZORT.lat, 5);
+  expect(zone.kreis_mitte_lon).toBeCloseTo(EINSATZORT.lon, 5);
+  const r = await page.request.get(`/api/einsaetze/${einsatzId}/evakuierung`);
+  const { bezirke } = (await r.json()) as { bezirke: { id: number; flaechen: number }[] };
+  expect(bezirke.find((b) => b.id === bezirkId)).toMatchObject({ flaechen: 1 });
+
+  // Sichtbarer Radius: die Beschriftung der Fläche auf der Karte nennt ihn.
+  await page.getByRole('button', { name: 'Auf der Karte bleiben' }).click();
+  await page.evaluate(
+    ({ lat, lon }) =>
+      (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte.jumpTo({
+        center: [lon, lat],
+        zoom: 14,
+      }),
+    EINSATZORT,
+  );
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (name) =>
+            (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte
+              .querySourceFeatures('zonen')
+              .map((f) => f.properties.label ?? '')
+              .find((l) => l.includes(name)) ?? '',
+          BEZIRK,
+        ),
+      { message: 'Beschriftung der Kreisfläche nennt den Radius' },
+    )
+    .toContain('r = 500 m');
+
+  expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});

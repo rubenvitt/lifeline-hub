@@ -3,6 +3,7 @@ import type { Tier } from '../../api/types';
 import { rollenFarbe } from '../../theme/statusFarben';
 import { registrierNummer } from '../../anzeige/registrierNummer';
 import { SPEZIES_META } from '../tiere/tierHelfer';
+import { tierZeichen } from '../../zeichen/fachobjektZeichen';
 import type { KarteMarker, NichtVerortet } from './marker';
 
 /**
@@ -23,9 +24,9 @@ export type TierKartenEintrag = Pick<
 > & { storniert_at?: string | null };
 
 /**
- * Kurzzeichen im Kreis. DV 102 kennt in @einsatzzeichen kein Zeichen „Tier“ ohne Zustand (nur
- * `animal-state`: erkrankt, kontaminiert, tot), deshalb zeichnet die Karte einen Kreis mit „T“
- * statt eines Eigenbau-Zeichens (LLH-1123, design.md D5).
+ * Kurzzeichen im Kreis, nur als Rückfall: Das Tier steht als Zeichen „Tier ohne Zustand“ aus
+ * @einsatzzeichen auf der Karte (LLH-1343, `tierZeichen`). Zeichnet die Bibliothek es nicht, bleibt
+ * der Kreis mit „T“ (LLH-1123).
  */
 export const TIER_KURZZEICHEN = 'T';
 
@@ -38,12 +39,17 @@ export function tierKartenLabel(t: Pick<Tier, 'registrier_nr' | 'spezies'>): str
  * Tiere (LLH-1123): offene und vermisste mit Koordinate als Marker, ohne Koordinate in „Nicht
  * verortet“. Abgeschlossene und stornierte fallen heraus, auch aus einem gesicherten Stand. Ein
  * vermisstes Tier trägt Rolle `achtung` und das Wort „vermisst“ hinter dem Namen, ein offenes
- * `bedien` wie UHS und Betreuungsstelle.
+ * `bedien` wie UHS und Betreuungsstelle. Das Zeichen (LLH-1343) ist für beide dasselbe; damit ein
+ * vermisstes Tier auch ohne Beschriftung, also unter deren Mindestzoom, auffällt, liegt hinter
+ * seinem Zeichen eine Scheibe in der Achtung-Farbe (`statusFarbe`, derselbe Layer wie der
+ * FMS-Status der Fahrzeuge).
  */
 export function buildTierMarker(
   tiere: readonly TierKartenEintrag[],
   token: GlobalToken,
 ): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
+  const mitZeichen = tierZeichen() !== null;
+  const achtung = rollenFarbe('achtung', token);
   const verortet: KarteMarker[] = [];
   const nichtVerortet: NichtVerortet[] = [];
   for (const t of tiere) {
@@ -58,10 +64,12 @@ export function buildTierMarker(
         lat: t.antreff_lat,
         lon: t.antreff_lon,
         label,
-        farbe: rollenFarbe(vermisst ? 'achtung' : 'bedien', token),
-        kurzzeichen: TIER_KURZZEICHEN,
+        farbe: vermisst ? achtung : rollenFarbe('bedien', token),
+        ...(mitZeichen ? {} : { kurzzeichen: TIER_KURZZEICHEN }),
         trefferDurchmesser: token.controlHeight,
-        ...(vermisst ? { beschriftungZusatz: 'vermisst' } : {}),
+        ...(vermisst
+          ? { beschriftungZusatz: 'vermisst', ...(mitZeichen ? { statusFarbe: achtung } : {}) }
+          : {}),
       });
     } else {
       nichtVerortet.push({ typ: 'tier', id: t.id, label });

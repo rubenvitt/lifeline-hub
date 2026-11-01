@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { listeEinsatzVorlagen, loescheEinsatzVorlage } from '../api/einsatzVorlagen';
 import { globalKeys } from '../api/queryKeys';
+import { fetchSchichtmodelle } from '../api/schichtmodelle';
 import type { EinsatzVorlage } from '../api/types';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
@@ -42,6 +43,15 @@ export default function EinsatzVorlagenTab() {
     queryKey: globalKeys.einsatzVorlagen(),
     queryFn: listeEinsatzVorlagen,
   });
+  // Bezeichnungen für die Spalte „Schichtmodell“ (LLH-1313); die Vorlage trägt nur die id.
+  const { data: schichtmodelle = [] } = useQuery({
+    queryKey: globalKeys.schichtmodelle(),
+    queryFn: fetchSchichtmodelle,
+  });
+  const modellName = (v: EinsatzVorlage) =>
+    v.schichtmodell_id == null
+      ? undefined
+      : schichtmodelle.find((m) => m.id === v.schichtmodell_id)?.bezeichnung;
 
   // KEIN `onError` (LFH-473): der Grund steht im `SeitenHinweise`-Slot, bis zum nächsten Versuch.
   const loeschen = useMutation({
@@ -74,6 +84,13 @@ export default function EinsatzVorlagenTab() {
         v.einsatzart ? EINSATZART_FOLGE.indexOf(v.einsatzart) : null,
       ),
       render: (_, v) => (v.einsatzart ? EINSATZART_LABELS[v.einsatzart] : '—'),
+    },
+    {
+      title: 'Schichtmodell',
+      key: 'schichtmodell',
+      suchText: modellName,
+      sorter: nachText(modellName),
+      render: (_, v) => modellName(v) ?? '—',
     },
     {
       title: 'Module',

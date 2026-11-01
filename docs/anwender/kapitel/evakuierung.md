@@ -2,7 +2,7 @@
 titel: Evakuierung
 gruppen: [alle, fuehrung]
 reihenfolge: 525
-quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkKartenbild.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/Stufenlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, src/routes/evakuierung.rs, src/betreuung/repo.rs]
+quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkKartenbild.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/Stufenlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, frontend/src/components/RadiusEingabe.tsx, src/routes/evakuierung.rs, src/betreuung/repo.rs]
 ---
 
 ## Überblick
@@ -70,8 +70,8 @@ Bezirke. Jeder Bezirk hat eine eigene Seite mit allem, was zu ihm gehört.
 3. Die „Plangröße (Personen)“ eintragen und unter „Erhebung“ angeben, ob sie „gezählt“ oder
    „geschätzt“ ist.
 4. Unter „Gebiet auf der Lagekarte“ „Keins“ wählen, wenn das Gebiet nicht gleich gezeichnet
-   werden soll. Vorgewählt ist „Fläche zeichnen“ (weiter unter „Einen Bezirk mit Gebiet
-   anlegen“).
+   werden soll. Vorgewählt ist „Fläche zeichnen“; „Radius“ legt das Gebiet als Kreis um den
+   Einsatzort an (weiter unter „Einen Bezirk mit Gebiet anlegen“).
 5. Unter „Weitere Angaben“ bei Bedarf „Einsatzabschnitt“, „Sammelstelle“ und „Notiz“ ergänzen.
    Die Sammelstelle mit Enter oder „Ort suchen“ suchen und einen Treffer wählen, dann ist sie
    verortet; ohne Treffer bleibt sie freier Text. Eine Koordinate lässt sich gleich ins Feld
@@ -92,6 +92,19 @@ Bezirke. Jeder Bezirk hat eine eigene Seite mit allem, was zu ihm gehört.
 
 4. Die Rückmeldung „Gebiet für Bezirk … gespeichert“ bietet „Zurück zu Bezirk …“ an; „Auf der
    Karte bleiben“ schließt sie. Die Fläche ist dem Bezirk zugeordnet und trägt seine Bezeichnung.
+
+### Einen Bezirk mit Radius anlegen
+
+1. Den Bezirk anlegen wie oben, unter „Gebiet auf der Lagekarte“ „Radius“ gewählt.
+2. Den Radius in Metern eintragen oder eine der Stufen 50, 100, 300, 500 oder 1000 m wählen. Ist
+   der Einsatzort verortet, heißt das Feld „Radius um den Einsatzort“.
+3. Nach „Anlegen“ öffnet die Lagekarte mit dem Kreis: Das Band unten nennt „Bezirk … · Kreis“, die
+   Mitte steht auf dem Einsatzort, der Radius ist eingetragen. Mitte und Radius lassen sich noch
+   ändern wie beim [Kreis auf der Lagekarte](lagekarte.md); ohne verorteten Einsatzort fehlt die
+   Mitte und wird auf der Karte gesetzt.
+4. „Übernehmen“ legt den Kreis als Fläche des Bezirks an. Seine Beschriftung auf der Karte nennt
+   den Radius, etwa „Deichweg · r = 500 m“. Danach kommt dieselbe Rückmeldung wie beim Zeichnen
+   einer Fläche.
 
 Ein Gebiet für einen bestehenden Bezirk entsteht ebenso über „Gebiet zeichnen“ oder „Weitere
 Teilfläche zeichnen“ im Menü des Bezirks oder auf seiner Seite. „Verwerfen“ beim Zeichnen lässt
@@ -190,8 +203,8 @@ Anlegen und melden dürfen Einsatzleitung und Führungspersonal eines laufenden 
 ([Rechte im Einsatz](rechte-im-einsatz.md)); ohne dieses Recht steht ein Hinweis über der Seite,
 und die Knöpfe sind gesperrt. Die Seite eines Bezirks bleibt lesbar, ohne „Stand melden“ und
 „Bearbeiten“. Wer die Lagekarte nicht sehen darf, sieht unter „Gebiet“ nur die Zahl der Flächen
-und kann kein Gebiet zeichnen: „Fläche zeichnen“, „Gebiet zeichnen“ und „Weitere Teilfläche
-zeichnen“ sind dann gesperrt. Ein Link zum Zeichnen auf einen fremden oder stornierten Bezirk
+und kann kein Gebiet zeichnen: „Fläche zeichnen“, „Radius“, „Gebiet zeichnen“ und „Weitere
+Teilfläche zeichnen“ sind dann gesperrt. Ein Link zum Zeichnen auf einen fremden oder stornierten Bezirk
 öffnet die Lagekarte ohne Zeichenmodus. „Evakuierung“ und „Betreuung“ sind getrennte Module: jedes lässt sich
 für sich ausblenden oder auf Rollen beschränken
 ([Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Das gekoppelte Gerät einer

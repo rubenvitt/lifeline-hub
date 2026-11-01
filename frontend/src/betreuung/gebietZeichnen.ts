@@ -10,10 +10,27 @@ export function gebietZeichnenText(flaechen: number): string {
   return flaechen > 0 ? 'Weitere Teilfläche zeichnen' : 'Gebiet zeichnen';
 }
 
+/** Ein Kreis als Gebiet (LLH-1346): Radius in Metern, Mitte nur, wenn sie feststeht. */
+export interface GebietKreis {
+  radius: number;
+  mitte?: { lat: number; lon: number };
+}
+
 /**
  * Die Lagekarte im Zeichenmodus für eine Fläche dieses Bezirks
  * (`?zeichnen=evakuierungsbezirk&bezirk=<id>`); die Karte belegt Bezeichnung und Zuordnung vor.
+ * Mit `kreis` (LLH-1346) als Kreis um einen Punkt
+ * (`?zeichnen=evakuierungsbezirk:kreis&radius=<m>[&mitte=<lat>,<lon>]&bezirk=<id>`): Radius und
+ * Mitte stehen vorbelegt, angelegt wird erst mit „Übernehmen“ auf der Karte.
  */
-export function gebietZeichnenPfad(einsatzId: number, bezirkId: number): string {
-  return lagekartePfad(einsatzId, { zeichnen: { typ: 'evakuierungsbezirk', bezirk: bezirkId } });
+export function gebietZeichnenPfad(
+  einsatzId: number,
+  bezirkId: number,
+  kreis?: GebietKreis,
+): string {
+  return lagekartePfad(einsatzId, {
+    zeichnen: kreis
+      ? { typ: 'evakuierungsbezirk', form: 'kreis', ...kreis, bezirk: bezirkId }
+      : { typ: 'evakuierungsbezirk', bezirk: bezirkId },
+  });
 }

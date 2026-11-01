@@ -369,9 +369,9 @@ Berechtigung“ und findet keinen Raum in der Suche.
 
 ### Tiere
 
-Die Ebene „Tiere“ zeigt offene und vermisste Tiere mit Koordinate als Kreis mit „T“, beschriftet
-mit Registriernummer und Spezies, etwa „T-003 (Hund)“; ein vermisstes Tier trägt zusätzlich
-„vermisst“. Ein abgeschlossenes Tier fehlt. Ausgewählt zeigt die Karte Status, Spezies, Rufname
+Die Ebene „Tiere“ zeigt offene und vermisste Tiere mit Koordinate mit dem taktischen Zeichen für
+ein Tier, beschriftet mit Registriernummer und Spezies, etwa „T-003 (Hund)“; ein vermisstes Tier
+liegt auf einer Scheibe in Achtung-Farbe und trägt zusätzlich „vermisst“. Ein abgeschlossenes Tier fehlt. Ausgewählt zeigt die Karte Status, Spezies, Rufname
 und Fundort und springt mit „Im Fachmodul öffnen“ zur Seite des Tiers. Verortet wird ein Tier aus
 seiner Seite heraus oder in der Leiste unter „Objekte“ (Kapitel [Tiere](tiere.md)). Wer das Modul Tiere
 nicht sehen darf, sieht die Ebene gesperrt mit „Keine Berechtigung“ und findet kein Tier in der

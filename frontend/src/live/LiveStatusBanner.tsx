@@ -7,6 +7,7 @@ import {
   istAppAktualisierungVerfuegbar,
 } from '../pwa/appAktualisierung';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
+import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
 import { useViewport } from '../components/useViewport';
@@ -25,13 +26,20 @@ import { anzahl } from '../anzeige/anzahl';
 export default function LiveStatusBanner({
   benutzerId,
   klebend = false,
+  geraet = false,
 }: {
   benutzerId?: number;
   klebend?: boolean;
+  /** Gerätehülle: Einträge früherer Kopplungen dieses Geräts zählen mit (LLH-1331). */
+  geraet?: boolean;
 }) {
   // Offline-Aktionen bleiben einsatzübergreifend sichtbar: gefiltert auf den Route-Einsatz
   // verschwände eine abgelehnte Aktion aus Einsatz A beim Wechsel nach B aus dem Blick.
   const queue = useOfflineQueueZaehler(benutzerId);
+  const fruehereKopplung = useFruehereKopplungCount(
+    benutzerId ?? null,
+    geraet && benutzerId != null,
+  );
   const { token } = theme.useToken();
   // Dieselbe Quelle wie das Instrumentenband des Lage-Dashboards.
   const status = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
@@ -92,13 +100,17 @@ export default function LiveStatusBanner({
     hinweise.length > 0 ||
     queue.ausstehend > 0 ||
     queue.abgelehnt > 0 ||
-    queue.nicht_zugeordnet > 0;
+    queue.nicht_zugeordnet > 0 ||
+    fruehereKopplung > 0;
   if (!bannerSichtbar && !recoveryOffen) return null;
 
   const typ =
     stoerung || queue.abgelehnt > 0
       ? 'error'
-      : status === 'connecting' || queue.ausstehend > 0 || queue.nicht_zugeordnet > 0
+      : status === 'connecting' ||
+          queue.ausstehend > 0 ||
+          queue.nicht_zugeordnet > 0 ||
+          fruehereKopplung > 0
         ? 'warning'
         : 'info';
 
@@ -131,6 +143,18 @@ export default function LiveStatusBanner({
           <Space size={4}>
             <Badge count={queue.abgelehnt} overflowCount={999} color={token.colorError} />
             <span>abgelehnt – prüfen</span>
+          </Space>
+        </Button>
+      )}
+      {fruehereKopplung > 0 && (
+        <Button
+          type="text"
+          aria-label={`Aus früherer Kopplung (${anzahl(fruehereKopplung, 'Eintrag', 'Einträge')})`}
+          onClick={() => setRecoveryOffen(true)}
+        >
+          <Space size={4}>
+            <Badge count={fruehereKopplung} overflowCount={999} color={token.colorWarning} />
+            <span>Aus früherer Kopplung</span>
           </Space>
         </Button>
       )}
@@ -180,6 +204,7 @@ export default function LiveStatusBanner({
         open={recoveryOffen}
         onClose={() => setRecoveryOffen(false)}
         benutzerId={benutzerId}
+        geraet={geraet}
       />
     </>
   );

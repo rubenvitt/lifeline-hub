@@ -75,7 +75,13 @@ struct StammdatenFk {
 }
 
 /// Stammdatentabellen, die eine Demo-Marke tragen können (`demo::DemoStammdatenArt`).
-const MARKIERBAR: [&str; 4] = ["fahrzeug", "personal", "material", "einheit_vorlage"];
+const MARKIERBAR: [&str; 5] = [
+    "fahrzeug",
+    "personal",
+    "material",
+    "einheit_vorlage",
+    "schichtmodell",
+];
 
 /// Begründete Kaskaden auf eine markierbare Tabelle, `(tabelle, spalte, ziel)`: die Kindzeilen
 /// einer Einheiten-Vorlage (LLH-1042, Spec `demo-daten`, „Demo-Vorlagen vor den Fahrzeugen
@@ -94,7 +100,8 @@ async fn eingehende_stammdaten_fks(pool: &SqlitePool) -> Vec<StammdatenFk> {
                 f.on_delete AS on_delete \
          FROM sqlite_master m, pragma_foreign_key_list(m.name) f \
          WHERE m.type = 'table' \
-           AND lower(f.\"table\") IN ('fahrzeug', 'personal', 'material', 'einheit_vorlage') \
+           AND lower(f.\"table\") IN ('fahrzeug', 'personal', 'material', 'einheit_vorlage', \
+                                      'schichtmodell') \
          ORDER BY ziel, m.name, f.\"from\"",
     )
     .fetch_all(pool)
@@ -148,7 +155,7 @@ async fn loeschweg_verstoesse(pool: &SqlitePool) -> Vec<String> {
     verstoesse
 }
 
-/// Jeder Fremdschlüssel auf `fahrzeug`/`personal`/`material`/`einheit_vorlage` trägt
+/// Jeder Fremdschlüssel auf `fahrzeug`/`personal`/`material`/`einheit_vorlage`/`schichtmodell` trägt
 /// `ON DELETE NO ACTION` oder `RESTRICT` (Ausnahme: [`ERLAUBTE_KASKADEN`]), und keiner im Schema
 /// ist aufgeschoben. Nur dann erkennt der Savepoint je Zeile
 /// „wird noch verwiesen“ über Code 787, ohne handgepflegte Verweisliste.
