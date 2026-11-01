@@ -3,7 +3,7 @@ import type { Dayjs } from 'dayjs';
 import { useEffect, useId, useRef } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
-import type { Abloesung, AbloesungArt, BesatzungZiel, VollzugBody } from '../api/types';
+import type { Abloesung, AbloesungArt, BesatzungZielEingabe, VollzugBody } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -551,7 +551,7 @@ interface AbloeserWerte {
 export interface PlanungEingabe {
   abloeser_ids: number[];
   /** Fehlt, wenn der Besatzungswechsel gesperrt ist: die Planung bleibt dann unberührt. */
-  besatzung_plan?: BesatzungZiel[];
+  besatzung_plan?: BesatzungZielEingabe[];
 }
 
 interface AbloeserProps {

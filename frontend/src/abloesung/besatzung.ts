@@ -18,7 +18,7 @@ import type {
   Abloesung,
   AbloesungBesatzungPlan,
   BesatzungRolle,
-  BesatzungZiel,
+  BesatzungZielEingabe,
   Einheit,
   EinsatzPersonal,
 } from '../api/types';
@@ -206,10 +206,10 @@ export function besatzungZiele(
   ids: readonly number[],
   verteilung: Verteilung | undefined,
   schicht: Abloesung,
-): BesatzungZiel[] {
+): BesatzungZielEingabe[] {
   return ids.map((id) => {
     const wert = verteilung?.[String(id)];
-    const ziel: BesatzungZiel = { personal_id: id };
+    const ziel: BesatzungZielEingabe = { personal_id: id };
     if (wert?.einheit_id != null && wert.einheit_id !== schicht.einheit_id) {
       ziel.einheit_id = wert.einheit_id;
     }

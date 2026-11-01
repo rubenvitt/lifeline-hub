@@ -802,7 +802,7 @@ export type AbloesungBesatzungPlan = S['AbloesungBesatzungPlan'];
  * Untereinheit (422); `fahrzeug_id` fehlt = die Person behält ihr Fahrzeug, sonst ein aktives
  * Fahrzeug einer dieser Einheiten (404/409/422).
  */
-export interface BesatzungZiel {
+export interface BesatzungZielEingabe {
   personal_id: number;
   einheit_id?: number;
   fahrzeug_id?: number;
@@ -881,7 +881,7 @@ export interface SchichtAendernBody {
   rhythmus_minuten?: number | null;
   abloesende_einheit_id?: number | null;
   abloeser_ids?: number[];
-  besatzung_plan?: BesatzungZiel[];
+  besatzung_plan?: BesatzungZielEingabe[];
 }
 
 /**
@@ -902,7 +902,7 @@ export interface VollzugBody {
   abschnitt_uebergeben?: boolean;
   art?: AbloesungArt;
   besatzung_ids?: number[];
-  besatzung?: BesatzungZiel[];
+  besatzung?: BesatzungZielEingabe[];
   verbleib?: AbloesungVerbleib;
   verbleib_br_id?: number;
 }
