@@ -181,7 +181,8 @@ Für Einsatzleitung und Führungspersonal:
 Der alte Eintrag trägt danach in seiner Kopfzeile die Marke „berichtigt“ und den Sprung „→ Nr. …“
 auf die jüngste Berichtigung; sein Text bleibt unverändert lesbar. Die Marke steht auch, wenn die
 Berichtigung gerade nicht angezeigt ist, etwa unter dem Typfilter „Meldung“, und ebenso im
-Lagebild, im Überblick und in der Lageentwicklung eines Lagevortrags. Die Berichtigung
+Lagebild und im Überblick. In der Lageentwicklung eines Lagevortrags steht eine berichtigte
+Entscheidung mit dem Text „berichtigt → Nr. …“. Die Berichtigung
 zeigt „berichtigt Nr. …“ mit dem Verweis „Grundeintrag anzeigen ↗“. Auch eine Berichtigung lässt
 sich wieder berichtigen; die Erfassungsleiste nennt dann die Kette, etwa „Berichtigung zu Nr. 135
 (berichtigt Nr. 134)“.
