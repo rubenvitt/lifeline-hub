@@ -218,7 +218,7 @@ interface BesatzungWerte {
  * Belegt die Besatzung aus dem geplanten Besatzungswechsel vor (LLH-1319, design.md D6), sobald
  * Personal und Einheiten da sind: die Listen laden oft erst mit dem offenen Dialog, und
  * `initialValues` greift nur beim Öffnen. Einmal je Dialog und nur, solange niemand die Besatzung
- * oder die Art angefasst hat.
+ * angefasst hat; ein Wechsel der Art sperrt sie nicht (bei „Ganze Einheit“ zählt die Besatzung nicht).
  */
 function usePlanVorbelegung(
   form: FormInstance<BesatzungWerte>,
@@ -233,7 +233,7 @@ function usePlanVorbelegung(
     if ((schicht.besatzung_plan ?? []).length === 0) return;
     if (personen == null || verteilung === undefined) return;
     erledigt.current = true;
-    if (form.isFieldTouched('besatzung_ids') || form.isFieldTouched('art')) return;
+    if (form.isFieldTouched('besatzung_ids')) return;
     const v = planVorbelegung(schicht, personen, verteilung);
     form.setFieldsValue({ besatzung_ids: v.ids, verteilung: v.verteilung });
   }, [form, schicht, personen, verteilung, gesperrt]);

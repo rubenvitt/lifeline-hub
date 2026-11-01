@@ -684,6 +684,19 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     );
   });
 
+  it('belegt auch vor, wenn die Art vor dem Laden hin- und zurückgewechselt wurde', async () => {
+    const { neu } = vollzug({ schicht: geplant, personen: null });
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
+    );
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    neu({ schicht: geplant, personen });
+    await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
+  });
+
   it('gesperrt: keine Vorbelegung, die ganze Einheit bleibt', async () => {
     vollzug({ schicht: geplant, besatzungGesperrt: 'Modul Personal gesperrt' });
     const dialog = await screen.findByRole('dialog');

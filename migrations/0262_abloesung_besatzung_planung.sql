@@ -5,8 +5,9 @@
 -- 1. `einsatz_abloesung_besatzung_plan` — der geplante Besatzungswechsel einer laufenden Schicht:
 --    je Zeile eine Person der neuen Besatzung, Reihenfolge über `rowid` (wie die Ablöser-Liste).
 --    `einheit_id` ist die Ziel-Einheit (die Einheit der Schicht oder eine erbende Untereinheit,
---    NULL = die Einheit der Schicht), `fahrzeug_id` das Ziel-Fahrzeug (NULL = keins). Eine Schicht
---    plant entweder Ablöser oder einen Besatzungswechsel (der Server prüft das). Der Vollzug lässt
+--    NULL = die Einheit der Schicht), `fahrzeug_id` das Ziel-Fahrzeug (NULL = die Person behält
+--    ihr Fahrzeug). Eine Schicht plant entweder Ablöser oder einen Besatzungswechsel (der Server
+--    prüft das). Der Vollzug lässt
 --    die Zeilen stehen, damit die Rücknahme die Planung wieder vorfindet.
 --
 -- 2. `einsatz_abloesung_planung_vorher` — die geplante Ablöser-Liste, wie sie VOR dem Vollzug
