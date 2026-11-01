@@ -263,10 +263,19 @@ pub struct AnlegenBody {
     /// Stabiler, client-generierter Idempotenzschlüssel für Offline-Queue und
     /// Timeout-Replay. Leer/fehlend behält das Verhalten älterer Clients.
     pub client_id: Option<String>,
+    /// Erfassungszeit einer ohne Netz vorgemerkten Aufnahme (LLH-1330, Spec `personen-verlauf`);
+    /// fehlt = jetzt. Gekappt über [`crate::routes::support::erfassungszeitpunkt`], Untergrenze
+    /// ist der Beginn des Einsatzes.
+    #[serde(default)]
+    pub zeitpunkt_at: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen — Person anlegen (initial erfasst/vermisst/betroffen).
 /// Schreibberechtigt + aktiver Einsatz. Schreibt pseudonymen ETB-Eintrag + SSE.
+///
+/// Ohne Netz vormerkbar mit Erfassungszeit (LLH-1330): Anlage (`erfasst_at`), Erst-Sichtung,
+/// Verbleib an der Betreuungsstelle und ihre ETB-Einträge tragen `zeitpunkt_at`; der ETB zeigt
+/// eine spät übertragene Aufnahme damit als nachgetragen. Der UHS-Eintritt bleibt beim Eingang.
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibfreigabe<Personen>,
@@ -338,6 +347,13 @@ pub async fn anlegen(
         Some(roh) => Some(pruefe_geburtsdatum(&roh, chrono::Utc::now().date_naive())?),
         None => None,
     };
+    // LLH-1330: die Erfassungszeit für sich (400). Vor dem Einsatzbeginn wird sie auf ihn gesetzt.
+    let jetzt = jetzt_utc();
+    let erfasst_at = crate::routes::support::erfassungszeitpunkt(
+        body.zeitpunkt_at.as_deref(),
+        jetzt.and_utc(),
+        &ctx.einsatz.begonnen_at,
+    )?;
 
     let status = body
         .status
@@ -410,18 +426,17 @@ pub async fn anlegen(
             "Eine Bestätigung gibt es nur zu einer Erst-Sichtung".into(),
         ));
     }
-    // Die Erst-Sichtung trägt die Serverzeit, also gilt „aktiv jetzt“.
+    // Zur Erfassungszeit (wie `sichten`): eine vor der Übertragung entlassene Kraft bestätigt weiter.
     let bestaetigung = crate::geraet::bestaetigung::aufloesen(
         &state.pool,
         ctx.geraet.as_ref(),
         einsatz_id,
         body.bestaetigt_personal_id,
-        None,
+        Some(&erfasst_at),
     )
     .await?;
 
     // LFH-613: erst das Feld isoliert (400), dann der Zusammenhang mit dem Status (422).
-    let jetzt = jetzt_utc();
     let vermisst_seit_angabe = match trimme(body.vermisst_seit) {
         Some(roh) => Some(pruefe_vermisst_seit(&roh, jetzt)?),
         None => None,
@@ -431,13 +446,12 @@ pub async fn anlegen(
             "vermisst_seit ist nur mit Status vermisst zulässig".into(),
         ));
     }
-    // Fehlt die Angabe bei einer Vermisstmeldung, gilt die Meldezeit. Sie steht im INSERT und
+    // Fehlt die Angabe bei einer Vermisstmeldung, gilt die Meldezeit (die Erfassungszeit der
+    // Aufnahme, LLH-1330). Sie steht im INSERT und
     // ist damit Teil der Replay-idempotenten Anlage: ein client_id-Replay kommt nicht bis
     // hierher (Lookup oben) bzw. schreibt in der Tx nichts neu (`war_neu`).
     let vermisst_seit = match status_enum {
-        PersonStatus::Vermisst => {
-            Some(vermisst_seit_angabe.unwrap_or_else(|| crate::zeit::formatiere(jetzt)))
-        }
+        PersonStatus::Vermisst => Some(vermisst_seit_angabe.unwrap_or_else(|| erfasst_at.clone())),
         _ => None,
     };
     pruefe_koordinate(
@@ -459,6 +473,7 @@ pub async fn anlegen(
                 ctx.benutzer.id,
                 status_enum.as_str(),
                 client_id.as_deref(),
+                Some(&erfasst_at),
                 repo::NeueDaten {
                     name: name.as_deref(),
                     vorname: vorname.as_deref(),
@@ -483,8 +498,15 @@ pub async fn anlegen(
                 // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
                 // ein zweiter Roundtrip für einen Wert, der schon dasteht.
                 let text = crate::person::etb_text_erfasst(reg);
-                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                    .await?;
+                crate::etb::system_audit_zu_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    startwert,
+                    &text,
+                    &erfasst_at,
+                )
+                .await?;
 
                 /*
                  * Erst-Sichtung NUR bei einer wirklich neuen Person: bei einem Offline-Replay
@@ -508,6 +530,7 @@ pub async fn anlegen(
                         id,
                         &sichtung_repo::NeueSichtung {
                             kategorie: k.as_str(),
+                            gesichtet_at: Some(&erfasst_at),
                             bestaetigung: bestaetigung.as_ref(),
                             ..Default::default()
                         },
@@ -521,12 +544,13 @@ pub async fn anlegen(
                         crate::person::etb_text_sichtung(reg, k),
                         bestaetigung.as_ref(),
                     );
-                    crate::etb::system_audit_tx(
+                    crate::etb::system_audit_zu_tx(
                         conn,
                         einsatz_id,
                         ctx.benutzer.id,
                         startwert,
                         &text,
+                        &erfasst_at,
                     )
                     .await?;
                 }
@@ -563,6 +587,7 @@ pub async fn anlegen(
                         verbleib_repo::VerbleibDaten {
                             art: art.as_str(),
                             betreuungsstelle_id: Some(stelle_id),
+                            zeitpunkt_at: Some(&erfasst_at),
                             // Eine Bestätigung gibt es nur zu einer Erst-Sichtung (oben).
                             ..Default::default()
                         },
@@ -575,12 +600,13 @@ pub async fn anlegen(
                         art.etb_sachverhalt()
                     );
                     verbleib_etb_id = Some(
-                        crate::etb::system_audit_tx(
+                        crate::etb::system_audit_zu_tx(
                             conn,
                             einsatz_id,
                             ctx.benutzer.id,
                             startwert,
                             &text,
+                            &erfasst_at,
                         )
                         .await?,
                     );

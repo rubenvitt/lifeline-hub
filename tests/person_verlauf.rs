@@ -752,3 +752,168 @@ async fn pat_nummer_ueber_der_grenze_ist_400() {
     .await;
     assert_eq!(s, StatusCode::OK, "genau die Grenze, nach dem Trimmen: {v}");
 }
+
+// ---------- Aufnahme ohne Netz (LLH-1330) ----------
+
+/// Verlegt den Beginn des Einsatzes `minuten` in die Vergangenheit, damit eine vorgemerkte
+/// Aufnahme nicht auf ihn gekappt wird.
+async fn einsatz_begonnen_vor(pool: &sqlx::SqlitePool, einsatz: i64, minuten: i64) {
+    sqlx::query("UPDATE einsatz SET begonnen_at = ? WHERE id = ?")
+        .bind(zeit(-60 * minuten))
+        .bind(einsatz)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn vorgemerkte_aufnahme_traegt_ihre_erfassungszeit() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    einsatz_begonnen_vor(&pool, e, 60).await;
+    // Um 14:10 ohne Netz aufgenommen, um 14:30 übertragen.
+    let vorgemerkt = zeit(-1200);
+    let body = json!({
+        "sichtung": "sk2",
+        "zeitpunkt_at": vorgemerkt,
+        "client_id": "aufnahme-1",
+    });
+    let pfad = format!("/api/einsaetze/{e}/personen");
+    let (s, person) = post(&app, &admin, &pfad, body.clone()).await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    let p = person["id"].as_i64().unwrap();
+    assert_eq!(
+        person["erfasst_at"],
+        vorgemerkt.as_str(),
+        "Anlage zur Erfassungszeit"
+    );
+    assert_eq!(person["aktuelle_sichtung_at"], vorgemerkt.as_str());
+
+    let d = detail(&app, &admin, e, p).await;
+    let sichtungen = d["sichtungen"].as_array().unwrap();
+    assert_eq!(sichtungen.len(), 1);
+    assert_eq!(
+        sichtungen[0]["gesichtet_at"],
+        vorgemerkt.as_str(),
+        "die Erstsichtung trägt 14:10, nicht die Ankunft"
+    );
+    assert_ne!(
+        sichtungen[0]["eingegangen_at"],
+        vorgemerkt.as_str(),
+        "die Ankunft steht dabei"
+    );
+
+    let etb = system_etb(&app, &admin, e).await;
+    for inhalt in ["Person R-001 erfasst", "Person R-001: Sichtung SK II"] {
+        let z = etb
+            .iter()
+            .find(|z| z["inhalt"] == inhalt)
+            .unwrap_or_else(|| panic!("kein ETB „{inhalt}“: {etb:?}"));
+        assert_eq!(
+            z["ereigniszeit"],
+            vorgemerkt.as_str(),
+            "„{inhalt}“ steht zur Erfassungszeit im ETB (nachgetragen)"
+        );
+    }
+
+    // Der Replay derselben Aufnahme legt nichts ein zweites Mal an.
+    let (s, replay) = post(&app, &admin, &pfad, body).await;
+    assert_eq!(s, StatusCode::CREATED, "{replay}");
+    assert_eq!(replay["id"], p);
+    assert_eq!(
+        detail(&app, &admin, e, p).await["sichtungen"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(system_etb(&app, &admin, e).await.len(), etb.len());
+}
+
+#[tokio::test]
+async fn aufnahme_ohne_zeitpunkt_traegt_die_serverzeit() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    einsatz_begonnen_vor(&pool, e, 60).await;
+    let vorher = zeit(-1);
+    let (s, person) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({ "sichtung": "sk3" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    let erfasst = person["erfasst_at"].as_str().unwrap();
+    assert!(
+        erfasst >= vorher.as_str() && erfasst <= zeit(1).as_str(),
+        "{erfasst}"
+    );
+    assert_eq!(person["aktuelle_sichtung_at"], erfasst);
+}
+
+#[tokio::test]
+async fn aufnahme_vor_dem_einsatzbeginn_wird_auf_ihn_gekappt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    einsatz_begonnen_vor(&pool, e, 10).await;
+    let beginn: String = sqlx::query_scalar("SELECT begonnen_at FROM einsatz WHERE id = ?")
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (s, person) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({ "sichtung": "sk2", "zeitpunkt_at": zeit(-3600) }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    assert_eq!(person["erfasst_at"], beginn.as_str());
+    assert_eq!(person["aktuelle_sichtung_at"], beginn.as_str());
+}
+
+#[tokio::test]
+async fn aufnahme_weit_in_der_zukunft_ist_400_und_legt_nichts_an() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({ "sichtung": "sk2", "zeitpunkt_at": zeit(600) }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    let anzahl: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(anzahl, 0);
+}
+
+#[tokio::test]
+async fn vorgemerkte_vermisstmeldung_gilt_ab_ihrer_erfassungszeit() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    einsatz_begonnen_vor(&pool, e, 60).await;
+    let vorgemerkt = zeit(-1200);
+    let (s, person) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({ "status": "vermisst", "zeitpunkt_at": vorgemerkt }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    assert_eq!(person["vermisst_seit"], vorgemerkt.as_str());
+    assert_eq!(person["erfasst_at"], vorgemerkt.as_str());
+}
