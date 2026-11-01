@@ -20,7 +20,7 @@ import {
   queueLegacyEinreihenFuerTests,
   schreibaktionEinreihen,
 } from '../offline/queue';
-import { geraetKontoBestaetigt } from '../offline/fruehereKopplung';
+import { confirmGeraetKonto } from '../offline/fruehereKopplung';
 
 function melde(status: string) {
   act(() => {
@@ -242,14 +242,14 @@ describe('LiveStatusBanner: Einträge früherer Kopplung (LLH-1331)', () => {
   };
 
   async function vorbereiten() {
-    await geraetKontoBestaetigt(41, geraet);
+    await confirmGeraetKonto(41, geraet);
     await schreibaktionEinreihen(41, 7, {
       art: 'notiz',
       person_id: 10,
       bezeichnung: 'R-012',
       daten: { text: 'x', client_id: 'n-1' },
     });
-    await geraetKontoBestaetigt(11, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
+    await confirmGeraetKonto(11, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
   }
 
   it('zeigt in der Gerätehülle die Anzahl und öffnet die Wiederherstellung', async () => {

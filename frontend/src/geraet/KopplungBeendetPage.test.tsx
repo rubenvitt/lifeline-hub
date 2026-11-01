@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import KopplungBeendetPage from './KopplungBeendetPage';
-import { geraetKontoBestaetigt } from '../offline/fruehereKopplung';
+import { confirmGeraetKonto } from '../offline/fruehereKopplung';
 import { queueLeerenFuerTests, schreibaktionEinreihen } from '../offline/queue';
 
 const GERAET_ME = {
@@ -99,7 +99,7 @@ describe('KopplungBeendetPage: nicht Übertragenes (LLH-1331)', () => {
     }) as const;
 
   it('nennt die Anzahl der Einträge der beendeten Kopplung, ohne Inhalt und ohne Verwerfen', async () => {
-    await geraetKontoBestaetigt(GERAET_ME.id, {
+    await confirmGeraetKonto(GERAET_ME.id, {
       ...GERAET_ME.geraet,
       ansicht: 'uhs-tablet',
       stelle_id: 2,

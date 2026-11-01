@@ -800,7 +800,7 @@ export async function queueNichtZugeordnetAlleVerwerfen(): Promise<number> {
  * `e8n4y8en-vorgemerktes-nach-kopplungsende`, D3/D4). Gezählt über den Index `by-benutzer`,
  * ohne Payload, über alle vier Stores (ausstehend und abgelehnt).
  */
-export async function queueKontenZaehlen(benutzerIds: readonly number[]): Promise<number> {
+export async function countQueueKonten(benutzerIds: readonly number[]): Promise<number> {
   if (benutzerIds.length === 0) return 0;
   const d = await db();
   const tx = d.transaction(OFFLINE_STORE_NAMEN, 'readonly');
@@ -819,7 +819,7 @@ export async function queueKontenZaehlen(benutzerIds: readonly number[]): Promis
  * wie gewohnt; der Server prüft mit den Rechten des neuen Kontos. Schlüssel, `client_id` und
  * Erfassungszeit bleiben. Liefert die Zahl der umgebundenen Zeilen.
  */
-export async function queueKontenUmbinden(von: readonly number[], nach: number): Promise<number> {
+export async function rebindQueueKonten(von: readonly number[], nach: number): Promise<number> {
   const quellen = von.filter((id) => id !== nach);
   if (quellen.length === 0) return 0;
   const d = await db();
@@ -842,7 +842,7 @@ export async function queueKontenUmbinden(von: readonly number[], nach: number):
 }
 
 /** Verwirft alle Zeilen der Konten in einer Transaktion (LLH-1331, D3: nur nach Rückfrage). */
-export async function queueKontenVerwerfen(benutzerIds: readonly number[]): Promise<number> {
+export async function deleteQueueKonten(benutzerIds: readonly number[]): Promise<number> {
   if (benutzerIds.length === 0) return 0;
   const d = await db();
   const tx = d.transaction(OFFLINE_STORE_NAMEN, 'readwrite');

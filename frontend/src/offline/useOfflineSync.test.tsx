@@ -38,7 +38,7 @@ import {
   schreibaktionenAbgelehntLaden,
 } from './queue';
 import { useOfflineSync } from './useOfflineSync';
-import { geraetKontoBestaetigt } from './fruehereKopplung';
+import { confirmGeraetKonto } from './fruehereKopplung';
 import { merkeVerpflegungsausgabeVor } from './schreiben';
 import { useVorgemerkteAusgaben } from './useVorgemerkteAusgaben';
 import { KEINE_SONDERKOST, ausgabe as serverAusgabe, zeitfenster } from '../test/verpflegungDaten';
@@ -1038,10 +1038,10 @@ describe('Vorgemerktes einer beendeten Kopplung (LLH-1331)', () => {
 
   it('neuer Code für dieselbe UHS sendet die Nachsichtung des alten Kontos mit Erfassungszeit', async () => {
     vi.mocked(erfasseSichtung).mockResolvedValue({ id: 99 } as never);
-    await geraetKontoBestaetigt(BENUTZER_A, geraet);
+    await confirmGeraetKonto(BENUTZER_A, geraet);
     await schreibaktionEinreihen(BENUTZER_A, 7, nachsichtung);
     // Kopplung abgelaufen, neuer Code: neues Gerätekonto derselben UHS.
-    await geraetKontoBestaetigt(BENUTZER_B, { ...geraet, kopplung_id: 4 });
+    await confirmGeraetKonto(BENUTZER_B, { ...geraet, kopplung_id: 4 });
 
     renderHook(() => useOfflineSync(BENUTZER_B), { wrapper: wrapperFuer().Wrapper });
 
@@ -1054,9 +1054,9 @@ describe('Vorgemerktes einer beendeten Kopplung (LLH-1331)', () => {
   });
 
   it('neue Kopplung an einer anderen UHS sendet nichts', async () => {
-    await geraetKontoBestaetigt(BENUTZER_A, geraet);
+    await confirmGeraetKonto(BENUTZER_A, geraet);
     await schreibaktionEinreihen(BENUTZER_A, 7, nachsichtung);
-    await geraetKontoBestaetigt(BENUTZER_B, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
+    await confirmGeraetKonto(BENUTZER_B, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
 
     renderHook(() => useOfflineSync(BENUTZER_B), { wrapper: wrapperFuer().Wrapper });
 

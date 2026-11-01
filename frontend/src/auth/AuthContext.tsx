@@ -33,7 +33,7 @@ import {
   type AusgangsAnlass,
 } from '../offline/geraetRaeumung';
 import { merkeGeraet } from '../geraet/geraetMarke';
-import { geraetKontoBestaetigt } from '../offline/fruehereKopplung';
+import { confirmGeraetKonto } from '../offline/fruehereKopplung';
 import { pushAbgleichen } from '../alarm/webPush';
 import {
   GATEWAY_NICHT_ERREICHBAR,
@@ -149,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (b) merkeGeraet(b.geraet != null);
     // Vorgemerktes früherer Kopplungen derselben Stelle übernehmen (LLH-1331,
     // `offline/fruehereKopplung.ts`). Nicht abgewartet, wirft nie.
-    if (b?.geraet) void geraetKontoBestaetigt(b.id, b.geraet);
+    if (b?.geraet) void confirmGeraetKonto(b.id, b.geraet);
     benutzerRef.current = b;
     setzeErwartetenBenutzer(b?.id ?? null);
     erfassungsSitzungBinden(b?.id ?? null);

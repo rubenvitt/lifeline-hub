@@ -7,7 +7,7 @@ import { ladeVerpflegung } from '../api/verpflegung';
 import { neuerQueryClient } from '../test/utils';
 import { FELDKUECHE, stelle, verpflegungMitStellen } from '../test/verpflegungDaten';
 import OfflineRecoveryDrawer from './OfflineRecoveryDrawer';
-import { fruehereKopplungZaehlen, geraetKontoBestaetigt } from './fruehereKopplung';
+import { countFruehereKopplung, confirmGeraetKonto } from './fruehereKopplung';
 import {
   OFFLINE_QUEUE_EVENT,
   abgelehntEntfernen,
@@ -107,7 +107,7 @@ describe('OfflineRecoveryDrawer: Einträge früherer Kopplung (LLH-1331)', () =>
   };
 
   async function vorbereiten() {
-    await geraetKontoBestaetigt(41, geraet);
+    await confirmGeraetKonto(41, geraet);
     await schreibaktionEinreihen(41, 7, {
       art: 'notiz',
       person_id: 10,
@@ -115,7 +115,7 @@ describe('OfflineRecoveryDrawer: Einträge früherer Kopplung (LLH-1331)', () =>
       daten: { text: 'Geheime Notiz', client_id: 'n-1' },
     });
     // Neue Kopplung an einer anderen UHS: keine Übernahme.
-    await geraetKontoBestaetigt(42, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
+    await confirmGeraetKonto(42, { ...geraet, kopplung_id: 4, stelle_id: 5, uhs_id: 5 });
   }
 
   it('zeigt am Gerät die Anzahl ohne Inhalt und verwirft erst nach Rückfrage', async () => {
@@ -134,9 +134,9 @@ describe('OfflineRecoveryDrawer: Einträge früherer Kopplung (LLH-1331)', () =>
     expect(
       await screen.findByText('Einträge früherer Kopplung endgültig verwerfen?'),
     ).toBeInTheDocument();
-    expect(await fruehereKopplungZaehlen(42)).toBe(1);
+    expect(await countFruehereKopplung(42)).toBe(1);
     await user.click(screen.getByRole('button', { name: 'Endgültig verwerfen' }));
-    await waitFor(async () => expect(await fruehereKopplungZaehlen(42)).toBe(0));
+    await waitFor(async () => expect(await countFruehereKopplung(42)).toBe(0));
   });
 
   it('zeigt einer Person keine Einträge von Gerätekonten', async () => {

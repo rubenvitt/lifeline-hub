@@ -32,7 +32,7 @@ import {
   type AbgelehnterEintrag,
   type OfflineSchreibaktion,
 } from './queue';
-import { fruehereKopplungVerwerfen, useFruehereKopplungAnzahl } from './fruehereKopplung';
+import { discardFruehereKopplung, useFruehereKopplungCount } from './fruehereKopplung';
 import { PERSON_EINTRAG_ABGELEHNT } from './personEintrag';
 
 interface OfflineRecoveryDrawerProps {
@@ -198,7 +198,7 @@ export default function OfflineRecoveryDrawer({
   geraet = false,
 }: OfflineRecoveryDrawerProps) {
   const { message } = App.useApp();
-  const fruehereKopplung = useFruehereKopplungAnzahl(
+  const fruehereKopplung = useFruehereKopplungCount(
     benutzerId ?? null,
     open && geraet && benutzerId != null,
   );
@@ -424,7 +424,7 @@ export default function OfflineRecoveryDrawer({
                     ausfuehren(
                       fruehereZeile,
                       'fruehere-kopplung:discard-all',
-                      async () => (await fruehereKopplungVerwerfen(benutzerId)) > 0,
+                      async () => (await discardFruehereKopplung(benutzerId)) > 0,
                       'Einträge früherer Kopplung verworfen',
                     )
                   }

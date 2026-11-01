@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { anzahl } from '../anzeige/anzahl';
-import { useFruehereKopplungAnzahl } from '../offline/fruehereKopplung';
+import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import { useOnline } from '../offline/useOnline';
 import { GERAET_START_PFAD, KOPPELN_PFAD } from '../routing/deeplinks';
 import { GeraeteKarte } from './GeraeteKarte';
@@ -25,7 +25,7 @@ export default function KopplungBeendetPage() {
   const online = useOnline();
   const navigate = useNavigate();
   const [prueft, setPrueft] = useState(false);
-  const offen = useFruehereKopplungAnzahl(null, !benutzer && !geraet);
+  const offen = useFruehereKopplungCount(null, !benutzer && !geraet);
 
   function pruefen() {
     setPrueft(true);

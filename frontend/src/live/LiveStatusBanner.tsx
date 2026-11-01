@@ -7,7 +7,7 @@ import {
   istAppAktualisierungVerfuegbar,
 } from '../pwa/appAktualisierung';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
-import { useFruehereKopplungAnzahl } from '../offline/fruehereKopplung';
+import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
 import { useViewport } from '../components/useViewport';
@@ -36,7 +36,7 @@ export default function LiveStatusBanner({
   // Offline-Aktionen bleiben einsatzübergreifend sichtbar: gefiltert auf den Route-Einsatz
   // verschwände eine abgelehnte Aktion aus Einsatz A beim Wechsel nach B aus dem Blick.
   const queue = useOfflineQueueZaehler(benutzerId);
-  const fruehereKopplung = useFruehereKopplungAnzahl(
+  const fruehereKopplung = useFruehereKopplungCount(
     benutzerId ?? null,
     geraet && benutzerId != null,
   );

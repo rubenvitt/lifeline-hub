@@ -410,7 +410,7 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
  * „Kopplung beendet“ nennt den Eintrag; mit einem neuen Code für dieselbe UHS sendet das neue
  * Gerätekonto ihn genau einmal, mit der Erfassungszeit von unterwegs.
  *
- * Mutationsprobe: in `AuthContext` den Aufruf `geraetKontoBestaetigt` entfernt → die Anzahl auf
+ * Mutationsprobe: in `AuthContext` den Aufruf `confirmGeraetKonto` entfernt → die Anzahl auf
  * „Kopplung beendet“ fehlt und die Sichtung erreicht den Server nie (rot).
  */
 test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten Kopplung', async ({

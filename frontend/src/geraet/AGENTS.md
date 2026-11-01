@@ -87,7 +87,7 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   hängt an der `benutzer_id`. Der Browser merkt sich seine Gerätekonten
   (`lifeline-hub.geraet-konten`, nur Kennungen), geschrieben allein über `uebernimm` im
   `AuthProvider`. Eine bestätigte Gerätesitzung mit gleichem Einsatz, gleicher Ansicht und gleicher
-  Stelle bindet die Zeilen früherer Konten in einer Transaktion um (`queueKontenUmbinden`), der
+  Stelle bindet die Zeilen früherer Konten in einer Transaktion um (`rebindQueueKonten`), der
   Abgleich sendet, der Server prüft mit den Rechten des neuen Kontos; Erfasser ist das neue Konto.
   Die Übernahme läuft ohne Knopf (Entscheidung Ruben 01.11.2026). Was nicht passt, zeigt nur die
   Gerätehülle als „Aus früherer Kopplung“ (Anzahl, Verwerfen mit Rückfrage), „Kopplung beendet“

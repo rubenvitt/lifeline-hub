@@ -6,7 +6,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import KoppelnPage from './KoppelnPage';
 import { warGeraet } from './geraetMarke';
-import { geraetKontenLesen } from '../offline/fruehereKopplung';
+import { loadGeraetKonten } from '../offline/fruehereKopplung';
 
 const PERSON = {
   id: 4,
@@ -128,7 +128,7 @@ describe('KoppelnPage (LFH-892)', () => {
     );
     setup();
     await waitFor(() =>
-      expect(geraetKontenLesen()).toEqual([
+      expect(loadGeraetKonten()).toEqual([
         { benutzer_id: 9, einsatz_id: 7, ansicht: 'uhs-tablet', stelle_id: 2 },
       ]),
     );
@@ -138,6 +138,6 @@ describe('KoppelnPage (LFH-892)', () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json(PERSON)));
     setup();
     await screen.findByText('Angemeldet als Gerda Maier');
-    expect(geraetKontenLesen()).toEqual([]);
+    expect(loadGeraetKonten()).toEqual([]);
   });
 });

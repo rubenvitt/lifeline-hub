@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { GeraetAnzeige } from '../api/types';
 import { rohLesen } from '../test/rohIdb';
 import {
-  fruehereKopplungVerwerfen,
-  fruehereKopplungZaehlen,
-  geraetKontenLesen,
-  geraetKontoBestaetigt,
+  discardFruehereKopplung,
+  countFruehereKopplung,
+  loadGeraetKonten,
+  confirmGeraetKonto,
 } from './fruehereKopplung';
 import {
   queueEinreihen,
@@ -49,17 +49,17 @@ beforeEach(async () => {
 
 describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
   it('merkt sich das Gerätekonto, neueste zuerst, ohne Doppel', async () => {
-    await geraetKontoBestaetigt(ALT, geraet());
-    await geraetKontoBestaetigt(NEU, geraet({ stelle_id: 5 }));
-    await geraetKontoBestaetigt(NEU, geraet({ stelle_id: 5 }));
+    await confirmGeraetKonto(ALT, geraet());
+    await confirmGeraetKonto(NEU, geraet({ stelle_id: 5 }));
+    await confirmGeraetKonto(NEU, geraet({ stelle_id: 5 }));
     // ALT hat keine Zeilen mehr und fällt weg; das aktuelle Konto bleibt immer.
-    expect(geraetKontenLesen()).toEqual([
+    expect(loadGeraetKonten()).toEqual([
       { benutzer_id: NEU, einsatz_id: 7, ansicht: 'uhs-tablet', stelle_id: 5 },
     ]);
   });
 
   it('übernimmt bei gleicher Stelle Ausstehendes und Abgelehntes mit Schlüssel und Erfassungszeit', async () => {
-    await geraetKontoBestaetigt(ALT, geraet());
+    await confirmGeraetKonto(ALT, geraet());
     await schreibaktionEinreihen(ALT, 7, sichtung('s-1'));
     await schreibaktionEinreihen(ALT, 7, sichtung('s-2'));
     await schreibaktionEinreihen(ALT, 7, sichtung('s-3'));
@@ -67,7 +67,7 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
     await schreibaktionAblehnen(ALT, zweite, 'Person nicht in dieser UHS');
     await queueEinreihen(ALT, 7, { typ: 'meldung', inhalt: 'x', client_id: 'etb-1' });
 
-    await geraetKontoBestaetigt(NEU, geraet({ kopplung_id: 4, bezeichnung: 'Tablet 1 neu' }));
+    await confirmGeraetKonto(NEU, geraet({ kopplung_id: 4, bezeichnung: 'Tablet 1 neu' }));
 
     expect(await queueZaehlerLaden(ALT, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 0 });
     expect(await queueZaehlerLaden(NEU, 7)).toMatchObject({ ausstehend: 3, abgelehnt: 1 });
@@ -76,7 +76,7 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
     expect((await schreibaktionenAbgelehntLaden(NEU, 7))[0].grund).toBe(
       'Person nicht in dieser UHS',
     );
-    expect(geraetKontenLesen().map((k) => k.benutzer_id)).toEqual([NEU]);
+    expect(loadGeraetKonten().map((k) => k.benutzer_id)).toEqual([NEU]);
   });
 
   it.each([
@@ -84,65 +84,65 @@ describe('Vorgemerktes früherer Kopplungen (LLH-1331)', () => {
     ['anderer Einsatz', { einsatz_id: 8 }],
     ['andere Ansicht', { ansicht: 'uhs-laptop' as const }],
   ])('übernimmt bei %s nichts und zählt die Einträge als frühere Kopplung', async (_, teil) => {
-    await geraetKontoBestaetigt(ALT, geraet());
+    await confirmGeraetKonto(ALT, geraet());
     await schreibaktionEinreihen(ALT, 7, sichtung('s-1'));
 
-    await geraetKontoBestaetigt(NEU, geraet(teil));
+    await confirmGeraetKonto(NEU, geraet(teil));
 
     expect(await queueZaehlerLaden(NEU)).toMatchObject({ ausstehend: 0 });
-    expect(await fruehereKopplungZaehlen(NEU)).toBe(1);
-    expect(geraetKontenLesen().map((k) => k.benutzer_id)).toEqual([NEU, ALT]);
+    expect(await countFruehereKopplung(NEU)).toBe(1);
+    expect(loadGeraetKonten().map((k) => k.benutzer_id)).toEqual([NEU, ALT]);
   });
 
   it('übernimmt nie Zeilen einer Person, die vorher an diesem Browser angemeldet war', async () => {
     await schreibaktionEinreihen(PERSON, 7, sichtung('person-1'));
-    await geraetKontoBestaetigt(NEU, geraet());
+    await confirmGeraetKonto(NEU, geraet());
 
     expect(await queueZaehlerLaden(PERSON, 7)).toMatchObject({ ausstehend: 1 });
     expect(await queueZaehlerLaden(NEU, 7)).toMatchObject({ ausstehend: 0 });
-    expect(await fruehereKopplungZaehlen(NEU)).toBe(0);
-    expect(await fruehereKopplungZaehlen(null)).toBe(0);
+    expect(await countFruehereKopplung(NEU)).toBe(0);
+    expect(await countFruehereKopplung(null)).toBe(0);
   });
 
   it('ohne Sitzung zählt jede gemerkte Kopplung, auch die gerade beendete', async () => {
-    await geraetKontoBestaetigt(ALT, geraet());
+    await confirmGeraetKonto(ALT, geraet());
     await schreibaktionEinreihen(ALT, 7, sichtung('s-1'));
     await queueEinreihen(ALT, 7, { typ: 'meldung', inhalt: 'x' });
-    expect(await fruehereKopplungZaehlen(null)).toBe(2);
+    expect(await countFruehereKopplung(null)).toBe(2);
   });
 
   it('verwirft nur Zeilen früherer Gerätekonten und vergisst sie', async () => {
-    await geraetKontoBestaetigt(ALT, geraet());
+    await confirmGeraetKonto(ALT, geraet());
     await schreibaktionEinreihen(ALT, 7, sichtung('s-1'));
     await schreibaktionEinreihen(PERSON, 7, sichtung('person-1'));
-    await geraetKontoBestaetigt(NEU, geraet({ stelle_id: 5 }));
+    await confirmGeraetKonto(NEU, geraet({ stelle_id: 5 }));
     await schreibaktionEinreihen(NEU, 7, sichtung('neu-1'));
 
-    expect(await fruehereKopplungVerwerfen(NEU)).toBe(1);
+    expect(await discardFruehereKopplung(NEU)).toBe(1);
 
     const platte = (await rohLesen('lifeline-offline', 'schreibaktionen')) as {
       benutzer_id: number;
     }[];
     expect(platte.map((z) => z.benutzer_id).sort()).toEqual([PERSON, NEU].sort());
-    expect(geraetKontenLesen().map((k) => k.benutzer_id)).toEqual([NEU]);
+    expect(loadGeraetKonten().map((k) => k.benutzer_id)).toEqual([NEU]);
   });
 
   it('übersteht einen unlesbaren Speicherstand', async () => {
     localStorage.setItem('lifeline-hub.geraet-konten', '{kaputt');
-    expect(geraetKontenLesen()).toEqual([]);
-    await geraetKontoBestaetigt(NEU, geraet());
-    expect(geraetKontenLesen().map((k) => k.benutzer_id)).toEqual([NEU]);
+    expect(loadGeraetKonten()).toEqual([]);
+    await confirmGeraetKonto(NEU, geraet());
+    expect(loadGeraetKonten().map((k) => k.benutzer_id)).toEqual([NEU]);
   });
 
   it('behält jedes Konto mit Zeilen, auch über zehn Kopplungen hinaus', async () => {
-    await geraetKontoBestaetigt(100, geraet({ stelle_id: 100 }));
+    await confirmGeraetKonto(100, geraet({ stelle_id: 100 }));
     await schreibaktionEinreihen(100, 7, sichtung('aeltestes'));
     for (let id = 101; id <= 112; id++) {
-      await geraetKontoBestaetigt(id, geraet({ stelle_id: id }));
+      await confirmGeraetKonto(id, geraet({ stelle_id: id }));
       await schreibaktionEinreihen(id, 7, sichtung(`k-${id}`));
     }
-    await geraetKontoBestaetigt(NEU, geraet({ stelle_id: 999 }));
-    expect(await fruehereKopplungZaehlen(NEU)).toBe(13);
-    expect(geraetKontenLesen().map((k) => k.benutzer_id)).toContain(100);
+    await confirmGeraetKonto(NEU, geraet({ stelle_id: 999 }));
+    expect(await countFruehereKopplung(NEU)).toBe(13);
+    expect(loadGeraetKonten().map((k) => k.benutzer_id)).toContain(100);
   });
 });
