@@ -228,12 +228,19 @@ function usePlanVorbelegung(
   gesperrt: boolean,
 ) {
   const erledigt = useRef(false);
+  // Eine eigene Auswahl merken: `isFieldTouched` vergisst sie, sobald das Feld beim Wechsel zu
+  // „Ganze Einheit“ verschwindet, der Wert bleibt aber stehen (`preserve`).
+  const ids = Form.useWatch('besatzung_ids', { form, preserve: true }) as number[] | undefined;
+  const gewaehlt = useRef(false);
+  useEffect(() => {
+    if (!erledigt.current && (ids ?? []).length > 0) gewaehlt.current = true;
+  }, [ids]);
   useEffect(() => {
     if (erledigt.current || schicht == null || gesperrt) return;
     if ((schicht.besatzung_plan ?? []).length === 0) return;
     if (personen == null || verteilung === undefined) return;
     erledigt.current = true;
-    if (form.isFieldTouched('besatzung_ids')) return;
+    if (gewaehlt.current || form.isFieldTouched('besatzung_ids')) return;
     const v = planVorbelegung(schicht, personen, verteilung);
     form.setFieldsValue({ besatzung_ids: v.ids, verteilung: v.verteilung });
   }, [form, schicht, personen, verteilung, gesperrt]);

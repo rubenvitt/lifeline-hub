@@ -697,6 +697,27 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
   });
 
+  it('eine eigene Auswahl übersteht den Art-Wechsel, bis die Einheiten da sind', async () => {
+    const { onErfassen, neu } = vollzug({ schicht: geplant, verteilung: undefined });
+    const dialog = await screen.findByRole('dialog');
+    await waehle('Neue Besatzung', 'Dirk Neu');
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
+    );
+    neu({ schicht: geplant, verteilung });
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        vollzogen_at: undefined,
+        art: 'besatzung',
+        besatzung: [{ personal_id: 24 }],
+      }),
+    );
+  });
+
   it('gesperrt: keine Vorbelegung, die ganze Einheit bleibt', async () => {
     vollzug({ schicht: geplant, besatzungGesperrt: 'Modul Personal gesperrt' });
     const dialog = await screen.findByRole('dialog');
