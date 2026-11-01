@@ -11448,6 +11448,127 @@ mod tests {
         assert_eq!(rest, 0, "die Vorgabe fällt mit dem Einsatz");
     }
 
+    /// LLH-1308 (Change `u124pu63-vollzug-verbleib`, design.md D4/D5): der Bestand trägt den
+    /// Verbleib `ruhe`, der Raum steht nur beim Verbleib `bereitstellungsraum`, und die Buchungen
+    /// eines Vollzugs fallen mit der Schicht und mit dem Einsatz.
+    #[tokio::test]
+    async fn migration_0261_verbleib_und_buchungen() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 261;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Florian 1') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let schicht: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, rhythmus_minuten, \
+                rhythmus_quelle, faellig_at, angelegt_von_id, status) \
+             VALUES (?, ?, '2026-10-31 06:00:00', 720, 'einheit', '2026-10-31 18:00:00', ?, \
+                'abgeloest') RETURNING id",
+        )
+        .bind(e)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (String, Option<i64>) =
+            sqlx::query_as("SELECT verbleib, verbleib_br_id FROM einsatz_abloesung WHERE id = ?")
+                .bind(schicht)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            bestand,
+            ("ruhe".to_string(), None),
+            "der Bestand bleibt in Ruhe"
+        );
+
+        let raum: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, \
+                geaendert_von, status) VALUES (?, 'Schule', ?, ?, 'aktiv') RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let setzen = "UPDATE einsatz_abloesung SET verbleib = ?, verbleib_br_id = ? WHERE id = ?";
+        sqlx::query(setzen)
+            .bind("ruhe")
+            .bind(raum)
+            .bind(schicht)
+            .execute(&pool)
+            .await
+            .expect_err("ein Raum nur beim Verbleib im Bereitstellungsraum");
+        sqlx::query(setzen)
+            .bind("unterwegs")
+            .bind(None::<i64>)
+            .bind(schicht)
+            .execute(&pool)
+            .await
+            .expect_err("nur die drei Werte");
+        sqlx::query(setzen)
+            .bind("bereitstellungsraum")
+            .bind(raum)
+            .bind(schicht)
+            .execute(&pool)
+            .await
+            .expect("Verbleib im Raum");
+
+        let belegung: i64 = sqlx::query_scalar(
+            "INSERT INTO br_belegung (einsatz_id, br_id, objekt_typ, objekt_id, art, erfasst_von) \
+             VALUES (?, ?, 'einheit', ?, 'eintritt', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(raum)
+        .bind(einheit)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let buchung = "INSERT INTO einsatz_abloesung_br_buchung (abloesung_id, belegung_id) \
+                       VALUES (?, ?)";
+        sqlx::query(buchung)
+            .bind(schicht)
+            .bind(belegung)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(buchung)
+            .bind(schicht)
+            .bind(belegung)
+            .execute(&pool)
+            .await
+            .expect_err("je Schicht und Buchung eine Zeile");
+        sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
+            .bind(schicht)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_abloesung_br_buchung")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "die Buchungen fallen mit der Schicht");
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("der Einsatz fällt samt Raum und Belegung");
+    }
+
     /// LLH-1445 (Change `o659va5r-nachforderung-herkunft`, design.md D1): der Bestand gilt als
     /// nicht am Raum verknüpft (0), der Schalter nimmt nur 0 und 1.
     #[tokio::test]

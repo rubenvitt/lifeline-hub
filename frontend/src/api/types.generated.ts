@@ -118,6 +118,13 @@ export interface components {
              *     löst sie wieder vom Vorgänger, statt sie zu entfernen.
              */
             uebernommen_bei_vollzug: boolean;
+            /**
+             * @description Was nach dem Vollzug mit der abgelösten Einheit geschah (LLH-1308); eine laufende trägt
+             *     `ruhe`.
+             */
+            verbleib: components["schemas"]["AbloesungVerbleib"];
+            /** @description Bezeichnung des Raums beim Verbleib `bereitstellungsraum`. */
+            verbleib_br_bezeichnung?: string | null;
             vollzogen_at?: string | null;
             /** Format: int64 */
             vollzogen_von_id?: number | null;
@@ -225,6 +232,13 @@ export interface components {
          * @enum {string}
          */
         AbloesungStatus: "laufend" | "abgeloest" | "beendet";
+        /**
+         * @description Was nach dem Vollzug mit der abgelösten Einheit geschieht (`einsatz_abloesung.verbleib`,
+         *     LLH-1308). Eine laufende Schicht und jeder Besatzungswechsel tragen `ruhe`. Wire ==
+         *     `as_str()`.
+         * @enum {string}
+         */
+        AbloesungVerbleib: "ruhe" | "bereitstellungsraum" | "entlassen";
         /** @description Antwort auf einen Vollzug: die abgelöste Schicht und — mit Ablösern — ihre Folgeschichten. */
         AbloesungVollzugAnzeige: {
             abgeloest: components["schemas"]["AbloesungAnzeige"];

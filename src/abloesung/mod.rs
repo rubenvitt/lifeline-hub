@@ -84,6 +84,28 @@ impl Default for AbloesungArt {
 }
 
 wire_enum! {
+    /// Was nach dem Vollzug mit der abgelösten Einheit geschieht (`einsatz_abloesung.verbleib`,
+    /// LLH-1308). Eine laufende Schicht und jeder Besatzungswechsel tragen `ruhe`. Wire ==
+    /// `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AbloesungVerbleib {
+        /// In Ruhe: die Periode der Zeitachse endet mit der Ablösung.
+        Ruhe => "ruhe",
+        /// Wie Ruhe, dazu der Eintritt in einen Bereitstellungsraum.
+        Bereitstellungsraum => "bereitstellungsraum",
+        /// Aus dem Einsatz entlassen: die Periode endet mit der Entlassung statt der Ablösung.
+        Entlassen => "entlassen",
+    }
+    try_from = |s| format!("Ungültiger Verbleib der abgelösten Einheit: {s}");
+}
+
+impl Default for AbloesungVerbleib {
+    fn default() -> Self {
+        Self::Ruhe
+    }
+}
+
+wire_enum! {
     /// Rolle einer Person beim Besatzungswechsel (`einsatz_abloesung_besatzung.rolle`). Wire ==
     /// `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -384,6 +406,12 @@ pub struct AbloesungAnzeige {
     /// Beim Besatzungswechsel: wer ging (`alt`) und wer kam (`neu`), je in der Reihenfolge des
     /// Vollzugs. Leer bei jeder anderen Schicht.
     pub besatzung: Vec<AbloesungBesatzung>,
+    /// Was nach dem Vollzug mit der abgelösten Einheit geschah (LLH-1308); eine laufende trägt
+    /// `ruhe`.
+    pub verbleib: AbloesungVerbleib,
+    /// Bezeichnung des Raums beim Verbleib `bereitstellungsraum`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verbleib_br_bezeichnung: Option<String>,
     /// Der Vollzug lässt sich zurücknehmen: abgelöst, und jede Folgeschicht ist noch unberührt
     /// (laufend).
     pub ruecknehmbar: bool,
@@ -709,6 +737,9 @@ mod tests {
         }
         for a in AbloesungArt::ALLE {
             assert_eq!(AbloesungArt::parse(a.as_str()), Some(a));
+        }
+        for v in AbloesungVerbleib::ALLE {
+            assert_eq!(AbloesungVerbleib::parse(v.as_str()), Some(v));
         }
         for r in BesatzungRolle::ALLE {
             assert_eq!(BesatzungRolle::parse(r.as_str()), Some(r));

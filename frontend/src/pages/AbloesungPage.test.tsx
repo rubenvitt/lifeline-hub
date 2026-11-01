@@ -94,6 +94,7 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   uebernommen_bei_vollzug: false,
   art: 'einheit',
   besatzung: [],
+  verbleib: 'ruhe' as const,
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: inMinuten(-300),
@@ -1429,6 +1430,23 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
         screen.queryByText('Bereitstellungsräume konnten nicht geladen werden'),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it('scheitert die Raumliste, nennt der Vollzug-Dialog den Grund unter „Danach“ (LLH-1308)', async () => {
+    const a = schicht({ id: 1, faellig_at: inMinuten(-12), abloesende_einheit_id: 12 });
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(status === 'laufend' ? [a] : []),
+    );
+    listeBr.mockRejectedValue(new Error('kaputt'));
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(dialog.querySelector('[data-lfh="vollzug-raum-gesperrt"]')).toHaveTextContent(
+        'Bereitstellungsräume konnten nicht geladen werden',
+      ),
+    );
+    expect(listeBr).toHaveBeenCalledWith(1);
   });
 
   it('live: ein neues Ereignis der Zeitachse ändert die Zeile über die bestehende Invalidierung', async () => {

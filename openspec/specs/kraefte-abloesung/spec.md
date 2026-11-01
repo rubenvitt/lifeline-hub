@@ -338,6 +338,16 @@ Schicht der Vorgabe des Einsatzes und rechnet deren Regel inzwischen anders, MUS
 Fälligkeit samt neuer Fristen gelten. Ein ETB-Eintrag vom Typ Berichtigung MUST auf den Vollzugseintrag
 verweisen.
 
+Die Rücknahme MUST die Folgen des Verbleibs und des Abrufs
+zurücklegen, solange sie noch den Stand des Vollzugs tragen: die Entlassung an Einheit und Erben
+samt Fan-out streichen (Grund „Ablösung zurückgenommen“), für die abgelöste Einheit einen
+`austritt` buchen, wenn die Eintrittsbuchung des Vollzugs noch ihr jüngstes Ereignis ist, und
+für jeden abgerufenen Ablöser samt Mitgenommenen einen `eintritt` in den Raum buchen, wenn er in
+keinem Raum steht und der Austritt des Vollzugs sein jüngstes Ereignis ist. Jede dieser
+Gegenbuchungen MUST außerdem einen noch aktiven, nicht stornierten Raum und eine nicht
+aufgelöste Einheit voraussetzen; sonst bleibt die Belegung unverändert. Die Berichtigung im
+ETB MUST nennen, was zurückgelegt wurde. Danach MUST der Verbleib wieder `ruhe` sein.
+
 #### Scenario: Rücknahme direkt nach Vollzug
 - **WHEN** ein Vollzug von „Florian 1“ durch „Florian 2“ zurückgenommen wird
 - **THEN** ist die Schicht von „Florian 1“ wieder laufend mit ihrer alten Fälligkeit
@@ -359,6 +369,18 @@ verweisen.
 #### Scenario: Schicht ohne Vollzug
 - **WHEN** eine laufende Schicht zurückgenommen werden soll
 - **THEN** antwortet das System mit 422
+
+#### Scenario: Zurück aus dem Raum
+- **WHEN** der Vollzug „Florian 1 → BR Schule“ zurückgenommen wird und „Florian 1“ dort noch steht
+- **THEN** steht „Florian 1“ in keinem Raum, seine Schicht läuft, und die Berichtigung nennt „«Florian 1» verlässt Bereitstellungsraum Schule wieder“
+
+#### Scenario: Inzwischen abgerufen
+- **WHEN** „Florian 1“ nach dem Vollzug aus dem BR Schule abgerufen wurde und der Vollzug zurückgenommen wird
+- **THEN** bleibt die Belegung des BR Schule unverändert
+
+#### Scenario: Entlassung zurück
+- **WHEN** ein Vollzug mit Verbleib „entlassen“ zurückgenommen wird
+- **THEN** sind die Entlassungen gestrichen, die Perioden wieder offen und die Schicht läuft
 
 ### Requirement: Rechte und Modulsichtbarkeit
 
@@ -857,10 +879,60 @@ Schicht erbt.
 - **WHEN** die Schicht von „Florian 1“ vollzogen wird, deren „Gruppe 1“ und „Trupp 1“ sie erben
 - **THEN** endet die Periode aller drei mit der Ablösung, auch die des Truppführers, und die Rücknahme öffnet sie wieder
 
+### Requirement: Verbleib der abgelösten Einheit
+
+Der Vollzug als „Ganze Einheit“ SHALL die Angabe `verbleib` annehmen: `ruhe` (Vorgabe, fehlt =
+`ruhe`), `bereitstellungsraum` mit `verbleib_br_id` oder `entlassen`. Bei `ruhe` und
+`bereitstellungsraum` MUST die Periode der abgelösten Einheit und ihrer erbenden Untereinheiten
+mit dem Ereignis `abloesung` enden; bei `bereitstellungsraum` MUST die abgelöste Einheit in
+derselben Transaktion in den gewählten Raum eintreten (Belegung `eintritt`). Bei `entlassen` MUST
+statt `abloesung` das Ereignis `entlassung` (Quelle `abloesung`) an der Einheit und jeder
+erbenden Untereinheit stehen, je samt Fan-out; die Schicht MUST `abgeloest` bleiben und darf
+nicht zusätzlich mit Grund `entlassung` beendet werden. Beide Ende-Ereignisse MUST nur an einer
+Einheit mit offener Periode stehen; ohne offene Periode bleibt ihre Zeitachse unberührt. Ist der Raum fremd oder unbekannt (404),
+nicht aktiv oder storniert (422) oder steht die Einheit schon in einem Raum (422), MUST der
+Vollzug scheitern und nichts schreiben. `verbleib_br_id` ohne `bereitstellungsraum` und
+`bereitstellungsraum` ohne Raum MUST 422 sein, ein unbekannter `verbleib` 400, ein `verbleib`
+außer `ruhe` beim Besatzungswechsel 422. `bereitstellungsraum` MUST die Freigabe des Moduls
+Bereitstellungsräume verlangen (403 ohne). Der ETB-Eintrag des Vollzugs MUST den Verbleib nennen;
+es entsteht kein zweiter Eintrag. Die Schicht MUST den Verbleib tragen (`verbleib`,
+`verbleib_br_bezeichnung`).
+
+#### Scenario: In den Bereitstellungsraum
+- **WHEN** „Florian 1“ um 15:40 durch „Florian 2“ abgelöst wird, danach „Bereitstellungsraum Schule“
+- **THEN** endet die Periode von „Florian 1“ um 15:40 mit der Ablösung, „Florian 1“ steht im BR Schule
+- **AND** das ETB enthält genau einen neuen Eintrag „Ablösung vollzogen: «Florian 1» durch «Florian 2». «Florian 1» danach in Bereitstellungsraum Schule.“
+
+#### Scenario: Raum inaktiv
+- **WHEN** der gewählte Raum inzwischen aufgelöst ist
+- **THEN** antwortet das System mit 422 und dem Grund, die Schicht läuft weiter, und es gibt weder Folgeschicht noch Belegung noch ETB-Eintrag
+
+#### Scenario: Entlassen
+- **WHEN** „Florian 1“ (mit „Gruppe 1“, die die Schicht erbt) abgelöst wird, danach „entlassen“
+- **THEN** endet die Periode von „Florian 1“, „Gruppe 1“ und ihren Personen mit der Entlassung, keine trägt ein Ereignis `abloesung`
+- **AND** die Schicht ist `abgeloest`, nicht `beendet`, und das ETB enthält keinen Eintrag „mit der Entlassung beendet“
+
+#### Scenario: Ohne Freigabe der Bereitstellungsräume
+- **WHEN** eine Person ohne Freigabe des Moduls Bereitstellungsräume mit Verbleib im Raum vollzieht
+- **THEN** antwortet das System mit 403 und ändert nichts
+
+### Requirement: Abruf des Ablösers aus dem Bereitstellungsraum
+
+Steht ein Ablöser beim Vollzug in einem Bereitstellungsraum, SHALL der Vollzug ihn in derselben
+Transaktion abrufen und austreten lassen (Abruf mit `ausgerueckt`, ohne Abschnitt und ohne
+Auftrag, Verband nach `bereitstellungsraum-belegung`); ist er dort schon abgerufen, MUST nur der
+Austritt gebucht werden. Das verlangt keine Freigabe des Moduls Bereitstellungsräume. Der
+ETB-Eintrag des Vollzugs MUST den Abruf nennen; einen eigenen Eintrag MUST es nicht geben.
+
+#### Scenario: Ablöser wartet im Raum
+- **WHEN** „Florian 2“ im BR Sportplatz steht und als Ablöser von „Florian 1“ vollzogen wird
+- **THEN** steht „Florian 2“ in keinem Raum mehr, der Verlauf des BR Sportplatz zeigt Abruf und Ausrücken
+- **AND** das ETB-Eintrag des Vollzugs nennt „«Florian 2» aus Bereitstellungsraum Sportplatz abgerufen und ausgerückt“
+
 ### Requirement: Vollzug-Dialog mit Ablöser-Liste
 
 Der Vollzug-Dialog SHALL die Ablöser als Liste wählen lassen (höchstens `ABLOESUNG_ABLOESER_MAX`,
-vorbelegt mit der Planung), dazu Zeitpunkt und „Abschnitt übergeben“; mehr Felder hat er nicht.
+vorbelegt mit der Planung), dazu Zeitpunkt, „Abschnitt übergeben“ und „Danach“; mehr Felder hat er nicht.
 Wählbar MUST jede andere Einheit sein, deren laufende Schicht keine Folgeschicht ist; eine mit
 eigener laufender Schicht steht mit „· Schicht läuft“ in der Liste. „Abschnitt übergeben“ MUST
 mit dem Abschnitt der abgelösten Einheit beschriftet und vorbelegt sein, sobald sie einen hat;
@@ -869,9 +941,20 @@ gesperrt“. Die Planung wählt die Liste ebenso. Die Karte MUST alle Ablöser n
 übernommene Schicht mit „(Schicht übernommen)“) und an der abgelösten Schicht den übergebenen
 Abschnitt.
 
+Bei „Ganze Einheit“ SHALL der Dialog das Feld „Danach“ zeigen,
+vorbelegt mit „In Ruhe“, mit je aktivem Raum „Bereitstellungsraum «Bezeichnung»“ und
+„Entlassen“. Ohne Freigabe des Moduls Bereitstellungsräume MUST unter dem Feld „Modul
+Bereitstellungsräume gesperrt“ stehen und keine Raum-Option wählbar sein. Beim
+Besatzungswechsel fehlt das Feld. Lehnt der Server den Raum ab, MUST der Dialog offen bleiben
+und den Grund zeigen.
+
 #### Scenario: Vorbelegt aus der Planung
 - **WHEN** an der Schicht von „Florian 1“ (Abschnitt „Deichwache Nord“) „Florian 3“ und „Florian 2“ geplant sind und jemand „Ablösung vollziehen“ wählt
 - **THEN** stehen beide im Feld „Ablösende Einheiten“, und „Abschnitt übergeben (Deichwache Nord)“ ist angehakt
+
+#### Scenario: Danach im Dialog
+- **WHEN** jemand an der Schicht von „Florian 1“ „Ablösung vollziehen“ wählt und unter „Danach“ „Bereitstellungsraum Schule“ wählt
+- **THEN** steht „Florian 1“ nach dem Vollziehen im BR Schule, und die Karte der abgelösten Schicht nennt „danach Bereitstellungsraum Schule“
 
 ### Requirement: Besatzungswechsel
 

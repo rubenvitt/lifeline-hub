@@ -96,6 +96,16 @@ nur am Knoten und an der abgelösten Einheit, mit Vorher-Werten an Schicht und L
 verlangt die Freigabe des Moduls Einheiten; die Rücknahme legt nur zurück, was noch den Stand des
 Vollzugs trägt.
 
+**Verbleib nach dem Vollzug** (LLH-1308, Spec `kraefte-abloesung`): `einsatz_abloesung.verbleib`
+(`ruhe` | `bereitstellungsraum` | `entlassen`, nur bei Art `einheit`) wählt das Ende-Ereignis der
+Zeitachse (`zeitachse::repo::vollzug_ende_tx`: `abloesung`, bei `entlassen` stattdessen
+`entlassung`); die Schicht steht vorher schon auf `abgeloest`, daher endet sie über die Kopplung
+LLH-1128 nicht zusätzlich. Jede Belegungsbuchung des Vollzugs (Eintritt der abgelösten Einheit,
+Abruf/Austritt eines Ablösers im Raum) steht in `einsatz_abloesung_br_buchung`; nur daraus bucht
+die Rücknahme das Gegenstück, und nur solange die Buchung das jüngste Ereignis ihrer Kraft ist.
+Der Raum verlangt die Freigabe des Moduls Bereitstellungsräume, der Abruf des Ablösers nicht.
+Optionen, Body und Kartentext des Felds „Danach“ bildet nur `abloesung/verbleib.ts`.
+
 **Besatzungswechsel** (LLH-1150, Entscheidung LLH-1118 Punkt 4, Spec `kraefte-abloesung`): Das
 LFH-635-Non-Goal „keine Personal-Ebene“ ist **nur hierfür** aufgehoben. Art `einheit | besatzung`
 an der Schicht (`einsatz_abloesung.art`, eine laufende trägt `einheit`); Einheit, Fahrzeug und

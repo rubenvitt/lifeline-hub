@@ -16,12 +16,12 @@ use crate::abloesung::repo::{
 };
 use crate::abloesung::{
     AbloesungAnzeige, AbloesungArt, AbloesungEinsatzVorgabeAnzeige, AbloesungStatus,
-    AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, ABLOESER_MAX, BESATZUNG_MAX,
-    RHYTHMUS_MAX_MINUTEN,
+    AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, ABLOESER_MAX,
+    BESATZUNG_MAX, RHYTHMUS_MAX_MINUTEN,
 };
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Abloesung, Einheiten};
+use crate::einsatz::modul::{Abloesung, Bereitstellungsraeume, Einheiten};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
@@ -73,7 +73,19 @@ pub(crate) async fn publish_kopplung(
 /// Fan-out die ihrer Personen, mit der Abschnittsübergabe auch Einheiten, mit dem
 /// Besatzungswechsel Personen und ihre Einheiten (LLH-1150); deren Leser mit nur Einheiten- oder
 /// Personalrecht erreicht `abloesung` nicht (LLH-1189). Je Einheit und je Person ein Ereignis.
-fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: VollzugWirkung) {
+/// Dazu je berührtem Bereitstellungsraum `bereitstellungsraum` (LLH-1308) und die Wirkung der
+/// Kopplung (eine entfallene Planung der entlassenen Einheit).
+async fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: VollzugWirkung) {
+    for br_id in crate::kraefte_disposition::dedupe(&wirkung.raeume, |id| *id) {
+        super::einsatz_bereitstellungsraum::sse_br(state, einsatz_id, br_id);
+    }
+    publish_kopplung(
+        state,
+        einsatz_id,
+        &wirkung.kopplung.etb,
+        &wirkung.kopplung.anlaesse,
+    )
+    .await;
     let mut gemeldet: Vec<i64> = Vec::new();
     let mut personen = wirkung.personen;
     for (einheit_id, beruehrt) in wirkung.zeitachse {
@@ -279,6 +291,47 @@ pub struct Vollziehen {
     /// [`BESATZUNG_MAX`]); Pflicht dort, sonst verboten.
     #[serde(default)]
     besatzung_ids: Option<Vec<i64>>,
+    /// Was danach mit der abgelösten Einheit geschieht (LLH-1308): `ruhe` (Vorgabe),
+    /// `bereitstellungsraum` oder `entlassen`. Als `String` für die benannte 400.
+    #[serde(default)]
+    verbleib: Option<String>,
+    /// Der Raum genau beim Verbleib `bereitstellungsraum`.
+    #[serde(default)]
+    verbleib_br_id: Option<i64>,
+}
+
+/// Verbleib der abgelösten Einheit (LLH-1308, design.md D1): unbekannter Wert → 400; Raum ohne
+/// Verbleib im Raum, Verbleib im Raum ohne Raum und ein anderer Verbleib als `ruhe` beim
+/// Besatzungswechsel → 422.
+fn vollzug_verbleib(
+    verbleib: Option<&str>,
+    br_id: Option<i64>,
+    art: AbloesungArt,
+) -> Result<(AbloesungVerbleib, Option<i64>), AppError> {
+    let verbleib = match verbleib.map(str::trim) {
+        None | Some("") => AbloesungVerbleib::Ruhe,
+        Some(s) => AbloesungVerbleib::parse(s).ok_or_else(|| {
+            AppError::Validation(format!(
+                "Unbekannter Verbleib '{s}' (erlaubt: ruhe, bereitstellungsraum, entlassen)"
+            ))
+        })?,
+    };
+    if art == AbloesungArt::Besatzung && verbleib != AbloesungVerbleib::Ruhe {
+        return Err(AppError::UnprocessableEntity(
+            "Beim Besatzungswechsel bleibt die Einheit im Einsatz; einen Verbleib gibt es nicht"
+                .into(),
+        ));
+    }
+    match (verbleib, br_id) {
+        (AbloesungVerbleib::Bereitstellungsraum, None) => Err(AppError::UnprocessableEntity(
+            "verbleib_br_id fehlt: welcher Bereitstellungsraum?".into(),
+        )),
+        (AbloesungVerbleib::Bereitstellungsraum, Some(id)) => Ok((verbleib, Some(id))),
+        (_, Some(_)) => Err(AppError::UnprocessableEntity(
+            "verbleib_br_id gilt nur beim Verbleib bereitstellungsraum".into(),
+        )),
+        (v, None) => Ok((v, None)),
+    }
 }
 
 /// Art und neue Besatzung eines Vollzugs (LLH-1150), erst die Felder für sich (400), dann der
@@ -357,8 +410,17 @@ pub async fn vollziehen(
     )?;
     // Abschnittsübergabe und Besatzungswechsel schreiben, was sonst das Modul Einheiten schreibt
     // (Unterstellung, Personalzuordnung).
+    let (verbleib, verbleib_br_id) =
+        vollzug_verbleib(req.verbleib.as_deref(), req.verbleib_br_id, art)?;
     if req.abschnitt_uebergeben || art == AbloesungArt::Besatzung {
         ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+    }
+    // Der Eintritt in einen Raum schreibt, was sonst das Modul Bereitstellungsräume schreibt
+    // (LLH-1308). Der Abruf eines Ablösers aus dem Raum ist Folge des Vollzugs und verlangt
+    // nichts (design.md D5).
+    if verbleib == AbloesungVerbleib::Bereitstellungsraum {
+        ctx.fordere_zielmodul::<Bereitstellungsraeume>(&state.pool)
+            .await?;
     }
     let (anzeige, etb_id, wirkung) = repo::vollziehen(
         &state.pool,
@@ -371,12 +433,14 @@ pub async fn vollziehen(
             abschnitt_uebergeben: req.abschnitt_uebergeben,
             art,
             besatzung,
+            verbleib,
+            verbleib_br_id,
         },
         &jetzt,
     )
     .await?;
     publiziere(&state, einsatz_id, Some(etb_id));
-    publish_zeitachse(&state, einsatz_id, wirkung);
+    publish_zeitachse(&state, einsatz_id, wirkung).await;
     Ok(Json(anzeige))
 }
 
@@ -390,7 +454,7 @@ pub async fn zuruecknehmen(
     let (anzeige, etb_id, wirkung) =
         repo::zuruecknehmen(&state.pool, einsatz_id, aid, ctx.benutzer.id, &jetzt()).await?;
     publiziere(&state, einsatz_id, Some(etb_id));
-    publish_zeitachse(&state, einsatz_id, wirkung);
+    publish_zeitachse(&state, einsatz_id, wirkung).await;
     Ok(Json(anzeige))
 }
 

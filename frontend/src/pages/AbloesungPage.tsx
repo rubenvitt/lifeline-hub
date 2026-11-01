@@ -33,6 +33,7 @@ import {
   type EinheitAuswahl,
 } from '../abloesung/AbloesungDialoge';
 import { formatDauer } from '../abloesung/dauer';
+import { verbleibRaeume } from '../abloesung/verbleib';
 import { planungWarnungText } from '../abloesung/planungWarnung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { countFaellige } from '../abloesung/einstufung';
@@ -74,6 +75,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import {
   einsatzRechteGrund,
+  MODUL_BR_GESPERRT,
   MODUL_EINHEITEN_GESPERRT,
   MODUL_PERSONAL_GESPERRT,
 } from '../components/nurAnsicht';
@@ -155,6 +157,8 @@ const BEREICH: Record<AbloesungStatus, string> = {
  * unter den laufenden, sucht die Seite sie unter den abgelösten und beendeten; eine unbekannte
  * Kennung ändert nichts.
  */
+const BR_NICHT_GELADEN = 'Bereitstellungsräume konnten nicht geladen werden';
+
 export default function AbloesungPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -273,7 +277,8 @@ export default function AbloesungPage() {
   // Stand der geplanten Ablöser (LLH-1131 Teil II): Zeitpunkte aus der Zeitachse, der Raum aus
   // `aktueller_br_id` der Einheit und dem Namen in der Raumliste, der Abruf aus deren `abrufe`
   // (LLH-1309). Die Liste der Räume gehört dem Modul Bereitstellungsräume und wird nur geholt,
-  // wenn ein Ablöser gerade in einem Raum steht; ein abgerufener steht noch im Raum.
+  // wenn ein Ablöser gerade in einem Raum steht (ein abgerufener steht noch im Raum) oder der
+  // Vollzug-Dialog offen ist (LLH-1308: „Danach“ bietet die aktiven Räume an).
   const brFrei = istKeyFreigegeben('bereitstellungsraeume', freigabenQuery.data);
   const abloeserImBr = useMemo(() => {
     const ids = new Set(laufende.flatMap(abloeserIds));
@@ -282,8 +287,16 @@ export default function AbloesungPage() {
   const brQuery = useQuery({
     queryKey: einsatzKeys.br(einsatzId),
     queryFn: () => listeBr(einsatzId),
-    enabled: brFrei && abloeserImBr,
+    enabled: brFrei && (abloeserImBr || vollzugSchicht != null),
   });
+  // Gesperrt erst, wenn die Freigaben da sind (wie `besatzungGesperrt`). Scheitert die Raumliste,
+  // steht der Grund unter „Danach“, statt dass die Räume still fehlen.
+  const raumGesperrt =
+    freigabenQuery.data != null && !brFrei
+      ? MODUL_BR_GESPERRT
+      : brFrei && brQuery.isError
+        ? BR_NICHT_GELADEN
+        : undefined;
   const standJeSchicht = useMemo(() => {
     const m = new Map<number, AbloeserStand[]>();
     if (!periodenQuery.data) return m;
@@ -806,7 +819,7 @@ export default function AbloesungPage() {
               type="warning"
               showIcon
               style={{ marginBottom: token.marginSM }}
-              title="Bereitstellungsräume konnten nicht geladen werden"
+              title={BR_NICHT_GELADEN}
             />
           )}
           {listenQuery.isLoading ? (
@@ -974,6 +987,8 @@ export default function AbloesungPage() {
             vollzugSchicht,
           )}
           besatzungGesperrt={besatzungGesperrt}
+          raeume={verbleibRaeume(brFrei ? brQuery.data : undefined)}
+          raumGesperrt={raumGesperrt}
           laeuft={vollzugMut.isPending}
           fehler={vollzugMut.error}
           onErfassen={(body) => vollzugMut.mutateAsync({ abloesungId: vollzugSchicht.id, body })}

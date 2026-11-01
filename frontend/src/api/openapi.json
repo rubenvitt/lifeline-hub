@@ -111,6 +111,7 @@
           "abschnitt_uebergeben",
           "art",
           "besatzung",
+          "verbleib",
           "ruecknehmbar",
           "erbende_einheiten",
           "planung_warnungen",
@@ -289,6 +290,17 @@
           "uebernommen_bei_vollzug": {
             "type": "boolean",
             "description": "Diese Schicht lief schon vor dem Vollzug ihres Vorgängers (ungeplanter Ablöser, etwa mit\ndem Eintreffen begonnen) und wurde von ihm als Folgeschicht übernommen. Die Rücknahme\nlöst sie wieder vom Vorgänger, statt sie zu entfernen."
+          },
+          "verbleib": {
+            "$ref": "#/components/schemas/AbloesungVerbleib",
+            "description": "Was nach dem Vollzug mit der abgelösten Einheit geschah (LLH-1308); eine laufende trägt\n`ruhe`."
+          },
+          "verbleib_br_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung des Raums beim Verbleib `bereitstellungsraum`."
           },
           "vollzogen_at": {
             "type": [
@@ -500,6 +512,15 @@
           "laufend",
           "abgeloest",
           "beendet"
+        ]
+      },
+      "AbloesungVerbleib": {
+        "type": "string",
+        "description": "Was nach dem Vollzug mit der abgelösten Einheit geschieht (`einsatz_abloesung.verbleib`,\nLLH-1308). Eine laufende Schicht und jeder Besatzungswechsel tragen `ruhe`. Wire ==\n`as_str()`.",
+        "enum": [
+          "ruhe",
+          "bereitstellungsraum",
+          "entlassen"
         ]
       },
       "AbloesungVollzugAnzeige": {

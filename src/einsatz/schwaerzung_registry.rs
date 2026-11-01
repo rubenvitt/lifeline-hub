@@ -1266,6 +1266,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("planung_entfallen_at", G_ZEIT),
             retain("planung_entfallen_einheit_name", G_OP_LABEL),
             retain("planung_entfallen_grund", G_ENUM),
+            // LLH-1308 (0260): Verbleib der abgelösten Einheit beim Vollzug.
+            retain("verbleib", G_ENUM),
+            retain("verbleib_br_id", G_FK),
         ],
     },
     // Ablöser einer Schicht (LLH-1122, Mig 0212; Vollzug ab LLH-1132): nur Verweise und Zeit.
@@ -1281,6 +1284,22 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abloesung_id", G_FK),
             retain("einheit_id", G_FK),
             retain("abschnitt_vorher_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+        ],
+    },
+    // Belegungsbuchungen eines Vollzugs im Bereitstellungsraum (LLH-1308, Mig 0260): nur
+    // Verweise und Zeit, damit die Rücknahme das Gegenstück buchen kann.
+    TabellenRegel {
+        tabelle: "einsatz_abloesung_br_buchung",
+        scoping: Scoping::UeberParent {
+            fk: "abloesung_id",
+            parent: "einsatz_abloesung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("abloesung_id", G_FK),
+            retain("belegung_id", G_FK),
             retain("angelegt_at", G_ZEIT),
         ],
     },

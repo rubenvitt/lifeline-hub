@@ -30,6 +30,7 @@ const schicht = (
   uebernommen_bei_vollzug: false,
   art: 'einheit',
   besatzung: [],
+  verbleib: 'ruhe' as const,
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: '2026-09-22 09:00:00',

@@ -230,7 +230,10 @@ test.describe(KAPITEL, () => {
     await expect(dialog.getByTitle('2. Rettungsstaffel', { exact: true })).toBeVisible();
     // Der Dialog setzt den Fokus ins erste Feld; das Bild soll keinen Fokusrahmen zeigen.
     await expect(dialog.getByRole('checkbox', { name: /^Abschnitt übergeben/ })).toBeChecked();
-    await dialog.getByRole('combobox', { name: 'Ablösende Einheiten' }).blur();
+    // „Danach“ (LLH-1308): die abgelöste Staffel geht in den Bereitstellungsraum des Demo-Einsatzes.
+    const danach = dialog.getByRole('combobox', { name: 'Danach' });
+    await waehleIn(danach, 'Bereitstellungsraum «Parkplatz Stadion Nord»');
+    await danach.blur();
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'vollziehen');
