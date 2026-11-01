@@ -34,7 +34,7 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
   Gefahrenhinweis kennt, MUST das Zeichen diesen Hinweis tragen (Atomare Strahlung, Chemische
   Stoffe, Explosion, Elektrizität, Ertrinken als Wassereinbruch). Trägt er einen Schadensgrad, MUST
   das Zeichen den Schadensgrad nach 5.8.4 tragen. Eine Gefahr ohne Hinweis MUST das Zeichen wie
-  ohne Gefahr lassen. Das Zeichen MUST beim Lesen aus Gefahr und Schadensgrad gebildet werden.
+  ohne Gefahr lassen; welche Gefahr welchen Hinweis trägt, legt Capability `schaden-gefahr` fest. Das Zeichen MUST beim Lesen aus Gefahr und Schadensgrad gebildet werden.
 - **Unfallhilfsstelle und Betreuungsstelle**: Stelle mit Arzt (Behandlungsplatz), Sanität
   (sonstige) oder Betreuung (Betreuungsstelle). Die Stelle trägt die Organisation des Betreibers,
   also die Organisations-Vorgabe des Hubs. Ist keine hinterlegt, MUST sie ohne Organisation

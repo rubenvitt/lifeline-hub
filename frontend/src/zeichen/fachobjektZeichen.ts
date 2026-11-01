@@ -169,9 +169,10 @@ const FARBE_TOKEN: Record<string, ColorToken> = {
 
 // Gefahrenart eines Schadens → Gefahrenhinweis nach DV 102, 5.8.1 (LLH-1115, design.md D3). Der
 // Hinweis steht als Zustand am Träger „Gefahr“; die Bibliothek setzt ihn in die Randlage neben den
-// verkleinerten Träger (abgeleitet aus 5.8.1.13_2), die Füllung (Ausmaß) bleibt. `undefined` ist
-// eine Lücke im Katalog: das Zeichen bleibt das leere Dreieck. Vollständig per Typ, damit eine neue
-// Gefahrenart hier entschieden werden muss.
+// verkleinerten Träger (abgeleitet aus 5.8.1.13_2), die Füllung (Ausmaß) bleibt. `undefined` heißt:
+// DV 102 kennt für diese Gefahr keinen Hinweis, das Zeichen bleibt das leere Dreieck. Keine eigenen
+// Hinweise erfinden; die Begründung je Lücke steht in der Spec `schaden-gefahr` (LLH-1341).
+// Vollständig per Typ, damit eine neue Gefahrenart hier entschieden werden muss.
 const GEFAHRENHINWEIS: Record<Gefahrentyp, StateId | undefined> = {
   atemgifte: undefined,
   angstreaktion: undefined,
