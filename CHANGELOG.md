@@ -1,3 +1,30 @@
+## [1.0.0-alpha.167](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.166...v1.0.0-alpha.167) (2026-11-02)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration:** Dieses Release legt eine neue Tabelle für Richtwerte zur Unterkunftsplanung an. Die Migration läuft beim ersten Start automatisch.
+
+### Betroffene: Betreuung und Unterkunft
+
+- **Neu: „Unterkunft planen“ an der Betreuungsstelle.** Der Rechner ermittelt den Unterkunftsbedarf aus der Zahl der Personen und aus Räumen, Fläche oder Zelten. Auf Wunsch rechnet er getrennt nach Männern und Frauen.
+- Das Ergebnis lässt sich als **Kapazität der Betreuungsstelle übernehmen**.
+- Aus dem Ergebnis lassen sich **Nachforderungen mit Bezug zur Stelle** anlegen, mehrere in einem Durchgang.
+- **Kein doppeltes Anlegen bei Netzproblemen:** Bricht beim Anlegen die Verbindung ab oder kommt keine Antwort, bleibt offen, ob die Nachforderung gespeichert wurde. Der Posten gilt dann als erledigt, damit ein zweiter Durchgang ihn nicht noch einmal anlegt.
+  - Ein Hinweis bittet darum, in der Liste der Nachforderungen nachzusehen.
+  - In der Zusammenfassung stehen solche Posten als „ungeklärt“, nicht als „nicht angelegt“.
+  - Der Dialog bleibt offen, bis der Hinweis gelesen werden konnte.
+
+### Verwaltung
+
+- **Richtwerte für die Unterkunftsplanung lassen sich anpassen:**
+  - für die ganze Organisation unter *Stammdaten → Unterkunft* (nur Administratoren)
+  - für einen einzelnen Einsatz in den *Einsatz-Einstellungen* (mit Verwaltungszugriff auf den Einsatz)
+- Es gilt der Wert des Einsatzes, sonst der Wert der Organisation, sonst die mitgelieferte Vorgabe. Jede Zeile zeigt die Vorgabe zum Vergleich an.
+
+### Dokumentation
+
+- Die Kapitel Betreuung, Stammdaten und Einsatz-Einstellungen der Anwenderdokumentation beschreiben jetzt den Unterkunftsrechner und die Richtwerte.
+
 ## [1.0.0-alpha.166](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.165...v1.0.0-alpha.166) (2026-11-02)
 
 ### Wichtige Änderungen
