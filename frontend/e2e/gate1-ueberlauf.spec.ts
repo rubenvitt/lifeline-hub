@@ -246,7 +246,7 @@ const BESTAND_OFFEN: readonly Freistellung[] = [];
 /** Lange Bezeichnung einer externen Stelle im Kommunikationsplan (LFH-848). */
 const KOMMUNIKATION_STELLE = 'Polizeiinspektion Musterstadt-Nordwest, Führungsgruppe';
 
-async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = true } = {}) {
+async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = false } = {}) {
   const anlegen = async (pfad: string, data: unknown, was: string) => {
     const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
     expect(
@@ -403,7 +403,7 @@ async function ueberlauf(page: Page): Promise<{ ueber: number; schuldige: string
  * Meldet an, legt den Einsatz an und sät den Überlaufstoff aller Routen — je Test. Die
  * org-weite Einheiten-Vorlage nur mit `vorlage` (siehe {@link Gate1Durchgang}).
  */
-async function gate1Vorbereiten(page: Page, { vorlage = true } = {}): Promise<string> {
+async function gate1Vorbereiten(page: Page, { vorlage = false } = {}): Promise<string> {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate1 ${Date.now()}`);
   await seedeUeberlaufstoff(page, einsatzId, { vorlage });
