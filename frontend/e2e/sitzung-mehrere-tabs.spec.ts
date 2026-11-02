@@ -281,11 +281,13 @@ test('(b2) Lesen aus dem veralteten Tab: 403 unter der fremden Sitzung zeigt den
   expect((await live).status()).toBe(200);
   await api.ruhig();
 
-  // Vor dem Wechsel abonniert: die erste 403 kann auch eine späte Nachlade-Welle sein.
+  // Genau die ETB-Liste, die der Live-Anstoß nachlädt: eine späte Nachlade-Welle anderer
+  // Abfragen erfüllte die Bedingung sonst, ohne dass dieser Weg geprüft wäre. Vor dem Wechsel
+  // abonniert, damit auch eine sehr schnelle Antwort nicht verloren geht.
   const verweigert = tab1.waitForResponse(
     (r) =>
       r.request().method() === 'GET' &&
-      pfad(r.request()).startsWith(`/api/einsaetze/${einsatzId}`) &&
+      pfad(r.request()) === `/api/einsaetze/${einsatzId}/etb` &&
       r.status() === 403,
   );
   const login = await ctx.request.post('/api/auth/login', {
