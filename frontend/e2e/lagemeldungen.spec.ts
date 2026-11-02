@@ -193,7 +193,9 @@ test('der Zeitraum ist die Schnellwahl des ETB und steht in der Adresse (LLH-132
   await expect(zeilen).toHaveCount(1);
   await expect(zeilen).toContainText('Pegel Mühlbach steigt');
   await expect(page.getByText('1 von 2 Lagemeldungen', { exact: true })).toBeVisible();
-  await expect(zeitraum).toHaveAccessibleName(/^Zeitraum seit \d{4}$/);
+  // Taktisch „2302“, liegt die Grenze vor Mitternacht der Serveruhr „022302“
+  // (`anzeige/zeitfenster.ts`, `taktisch`): zwischen 0 und 1 Uhr ist die letzte Stunde von gestern.
+  await expect(zeitraum).toHaveAccessibleName(/^Zeitraum seit (\d{2})?\d{4}$/);
   await expect(page).toHaveURL(/[?&]von=\d{4}-\d{2}-\d{2}(\+|%20)\d{2}%3A\d{2}%3A00$/);
 
   // Dieselbe Adresse, dieselbe Menge.
