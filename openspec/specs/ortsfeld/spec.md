@@ -312,7 +312,7 @@ getippte Koordinate erfassbar bleiben.
 - **THEN** trägt die Stelle Standort und Koordinate und erscheint als Marker auf der Lagekarte
 
 ### Requirement: Orte an UHS, Bereitstellungsraum, Tier und Auftrag
-Der Standort einer UHS und eines Bereitstellungsraums beim Anlegen und Bearbeiten, der Fundort eines Tiers beim Erfassen und Bearbeiten und das
+Der Standort einer UHS, eines Bereitstellungsraums und einer Verpflegungsstelle beim Anlegen und Bearbeiten, der Fundort eines Tiers beim Erfassen und Bearbeiten und das
 Ziel eines Auftrags beim Erteilen und Berichtigen SHALL das Ortsfeld mit Kartenvorschau und
 Ortssuche im Einsatz nehmen. Es gelten dieselben Regeln wie für die Orte in Schäden und Betreuung:
 Text und Koordinate gemeinsam aus Treffer, getippter Koordinate oder Kartenpunkt, sonst nur Text;
@@ -336,6 +336,10 @@ erteilen.
 #### Scenario: Ziel eines Auftrags berichtigen
 - **WHEN** am Ziel „Deich km 3“ eines verorteten Auftrags nur der Text auf „Deich km 3,5“ berichtigt wird
 - **THEN** geht nur der Text hinaus, und der Auftrag behält seine Koordinate
+
+#### Scenario: Standort einer Verpflegungsstelle berichtigen
+- **WHEN** am verorteten Standort „Sportplatz“ einer Verpflegungsstelle nur der Text auf „Sportplatz 2“ berichtigt und gespeichert wird
+- **THEN** geht nur der Text hinaus, und die Stelle behält ihre Koordinate
 
 #### Scenario: Standort einer UHS bearbeiten
 - **WHEN** die Person an einer UHS „Bearbeiten“ wählt, als Standort nach „Turnhalle“ sucht, den Treffer „Turnhalle Nord“ wählt und speichert
