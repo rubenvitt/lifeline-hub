@@ -3189,6 +3189,70 @@ async fn stamm_geraet_mit_bestandsnummer_nur_einmal_aktiv() {
     }
 }
 
+/// LLH-1398: ein Stamm-Gerät mit Bestandsnummer wird über den Einsatz nicht zum Verbrauchsgut
+/// (422, ohne ETB); so lässt es sich auch nicht aufteilen und steht nie zweimal aktiv im Einsatz.
+#[tokio::test]
+async fn stamm_geraet_mit_bestandsnummer_bleibt_geraet() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Stromerzeuger 5 kVA","bestandsnummer":"SE-1","art":"geraet"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let stueck = json["id"].as_i64().unwrap();
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{stueck}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let em = json["id"].as_i64().unwrap();
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        r#"{"art":"verbrauchsgut","menge":2}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Das Gerät «Stromerzeuger 5 kVA» (SE-1) ist ein bestimmtes Stück und bleibt Gerät"
+    );
+    let zeile = material_zeile(&app, &admin, einsatz, em).await;
+    assert_eq!(zeile["art"], "geraet");
+    assert_eq!(zeile["menge"], 1);
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+
+    let (s, json) = aufteilen(&app, &admin, einsatz, em, r#"{"menge":1}"#).await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Gerät je Stück: {json}"
+    );
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste.as_array().unwrap().len(), 1);
+}
+
 // ── Vorhandenen Posten mit einer Nachforderung verknüpfen (LLH-1259) ─────────────────────
 
 /// `POST …/material/{em}/nachforderung` mit rohem Body.
