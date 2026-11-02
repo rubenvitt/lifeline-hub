@@ -774,6 +774,8 @@ export function useLagekarteDaten({
           fkQuery.dataUpdatedAt,
           brZugriff === 'frei' ? brQuery.dataUpdatedAt : undefined,
           tierZugriff === 'frei' ? tierQuery.dataUpdatedAt : undefined,
+          // Sammelstellen (LLH-1393) kommen aus der Bezirksliste.
+          evakuierungZugriff === 'frei' ? evakuierungQuery.dataUpdatedAt : undefined,
         ),
     // Namen der Lagebild-Quellen, deren Abruf scheiterte (leer = vollständig). Die Kürzung für die
     // Anzeige ist Darstellung und liegt bei der Seite.

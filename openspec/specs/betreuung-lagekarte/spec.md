@@ -230,12 +230,14 @@ erhalten bleiben. Die Änderung MUST live an die Karte verteilt werden.
 ### Requirement: Bezirk und Fläche in beide Richtungen verbunden
 
 Die Anzeige eines Evakuierungsbezirks SHALL die Zahl der ihm zugeordneten Zonen tragen.
-Die Evakuierungsseite MUST je Bezirk mit mindestens einer Zone „Auf Karte zeigen“ anbieten,
+Die Evakuierungsseite MUST je Bezirk mit mindestens einer Zone oder mit einer Sammelstelle, die
+die Karte zeigt, „Auf Karte zeigen“ anbieten,
 auch Personen ohne Schreibrecht (ein Sprung ist Lesen).
 Die Adresse `/einsaetze/<id>/lagekarte?evakuierungsbezirk=<bezirk-id>` MUST eine Zone dieses
 Bezirks auswählen, die Karte dorthin führen und den Parameter danach entfernen. Liegt die
 Zone in einer anderen Kartenansicht, MUST die Karte zuerst zu dieser Ansicht wechseln. Ein
-unbrauchbarer Wert oder ein Bezirk ohne Zone MUST den Parameter ebenfalls entfernen. Die
+unbrauchbarer Wert oder ein Bezirk ohne Zone und ohne Sammelstellen-Marker MUST den Parameter
+ebenfalls entfernen. Die
 Auswahl einer zugeordneten Zone MUST für Personen mit Lesezugriff auf das Modul Bezirk,
 Räumungszustand und den Stand „evakuiert N von M“ zeigen und einen Sprung ins Modul
 anbieten, der die Detailseite des Bezirks öffnet. Die Beschriftung einer zugeordneten Zone auf der
@@ -273,7 +275,7 @@ Kennzahl „Evakuiert“ und die Lagekennzahl MUST davon unberührt bleiben.
 - **THEN** wechselt die Karte zur Ansicht „Nord“ und wählt dort die Zone aus
 
 #### Scenario: Bezirk ohne Fläche
-- **WHEN** ein Bezirk keine zugeordnete Zone hat
+- **WHEN** ein Bezirk keine zugeordnete Zone und keine Sammelstelle auf der Karte hat
 - **THEN** bietet die Evakuierungsseite an ihm kein „Auf Karte zeigen“ an
 
 #### Scenario: Aus der Karte ins Modul

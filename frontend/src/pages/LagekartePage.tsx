@@ -1020,7 +1020,8 @@ export default function LagekartePage() {
   // (2) ein unbrauchbarer Wert oder ein Auftrag ohne Fläche wird geräumt, sobald die Zonen
   //     feststehen.
   // Ohne Fläche, aber mit verorteter Sammelstelle (LLH-1393) wählt die Karte die Sammelstelle und
-  // fliegt sie an; geräumt wird dann erst, wenn auch die Bezirke feststehen.
+  // fliegt sie an, sobald die Zonen feststehen; geräumt wird dann erst, wenn auch die Bezirke
+  // feststehen.
   useEffect(() => {
     const roh = searchParams.get('evakuierungsbezirk');
     if (roh === null) return;
@@ -1036,6 +1037,8 @@ export default function LagekartePage() {
     }
     const zone = zonenAlle.find((z) => z.evakuierungsbezirk_id === ziel);
     if (!zone) {
+      // Erst wenn die Zonen feststehen: eine noch ladende Fläche hat Vorrang vor der Sammelstelle.
+      if (!zonenGeladen) return;
       const sammelstelle = alleVerortet.find((m) => m.typ === 'sammelstelle' && m.id === ziel);
       if (sammelstelle) {
         setAuswahl(sammelstelle.schluessel);
@@ -1044,7 +1047,7 @@ export default function LagekartePage() {
         return;
       }
       const bezirkeEntschieden = evakuierungZugriff === 'frei' ? bezirkeGeladen : rechteBekannt;
-      if (zonenGeladen && bezirkeEntschieden) raeumen();
+      if (bezirkeEntschieden) raeumen();
       return;
     }
     if (zone.ansicht_id != null && zone.ansicht_id !== aktiveAnsichtId) {
