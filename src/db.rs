@@ -12056,4 +12056,58 @@ mod tests {
             .await
             .expect("die Vorlage fällt ohne Rücksicht auf das Modell");
     }
+
+    #[tokio::test]
+    async fn migration_0265_unterkunft_richtwerte() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 265;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (einsatz, benutzer) = bild_grundlage(&pool).await;
+        migriere_bis(&pool, VERSION).await;
+
+        for (tabelle, scope, id) in [
+            ("org_unterkunft_richtwert", "org_id", 1),
+            ("einsatz_unterkunft_richtwert", "einsatz_id", einsatz),
+        ] {
+            let mit_wert = format!(
+                "INSERT INTO {tabelle} ({scope}, schluessel, wert, geaendert_at, geaendert_von) \
+                 VALUES (?, 'flaeche_je_person_m2', 3.5, datetime('now'), ?)"
+            );
+            sqlx::query(sqlx::AssertSqlSafe(&*mit_wert))
+                .bind(id)
+                .bind(benutzer)
+                .execute(&pool)
+                .await
+                .unwrap();
+            let doppelt = format!(
+                "INSERT INTO {tabelle} ({scope}, schluessel, wert, geaendert_at) \
+                 VALUES (?, 'flaeche_je_person_m2', 5, datetime('now'))"
+            );
+            sqlx::query(sqlx::AssertSqlSafe(&*doppelt))
+                .bind(id)
+                .execute(&pool)
+                .await
+                .expect_err("je Ebene und Schlüssel höchstens eine Zeile");
+        }
+
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_unterkunft_richtwert")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "Einsatz-Werte fallen mit dem Einsatz");
+        let org: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM org_unterkunft_richtwert")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(org, 1, "Org-Werte bleiben");
+    }
 }

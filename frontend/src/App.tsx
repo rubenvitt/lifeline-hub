@@ -62,6 +62,7 @@ import EinsatzModule from './pages/einstellungen/EinsatzModule';
 import EinsatzPegel from './pages/einstellungen/EinsatzPegel';
 import EinsatzKennzahlen from './pages/einstellungen/EinsatzKennzahlen';
 import EinsatzAbloesung from './pages/einstellungen/EinsatzAbloesung';
+import EinsatzUnterkunft from './pages/einstellungen/EinsatzUnterkunft';
 import EinsatzBenachrichtigungen from './pages/einstellungen/EinsatzBenachrichtigungen';
 import EinsatzGeraete from './pages/einstellungen/EinsatzGeraete';
 import EinsatzZugriff from './pages/einstellungen/EinsatzZugriff';
@@ -91,6 +92,7 @@ import PressemitteilungDetailPage from './pages/PressemitteilungDetailPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
 import BetreuungsstelleDetailPage from './pages/BetreuungsstelleDetailPage';
+import UnterkunftPlanenPage from './pages/UnterkunftPlanenPage';
 import EvakuierungPage from './pages/EvakuierungPage';
 import EvakuierungsbezirkPage from './pages/EvakuierungsbezirkPage';
 import VerpflegungPage from './pages/VerpflegungPage';
@@ -221,6 +223,7 @@ const EINSTELLUNGEN_ROUTEN = (
     <Route path="pegel" element={<EinsatzPegel />} />
     <Route path="kennzahlen" element={<EinsatzKennzahlen />} />
     <Route path="abloesung" element={<EinsatzAbloesung />} />
+    <Route path="unterkunft" element={<EinsatzUnterkunft />} />
     <Route path="benachrichtigungen" element={<EinsatzBenachrichtigungen />} />
     <Route path="geraete" element={<EinsatzGeraete />} />
     <Route path="zugriff" element={<EinsatzZugriff />} />
@@ -442,6 +445,8 @@ export const appRouten = createRoutesFromElements(
           <Route path="personen/:personId/druck" element={<PersonDruckPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />
           <Route path="betreuung/:stelleId" element={<BetreuungsstelleDetailPage />} />
+          {/* Unterkunftsrechner der Stelle (LLH-1520); gegatet über das Segment `betreuung`. */}
+          <Route path="betreuung/:stelleId/unterkunft" element={<UnterkunftPlanenPage />} />
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
           {/* Detailseite eines Evakuierungsbezirks; gegatet über das Segment `evakuierung`. */}
           <Route path="evakuierung/:bezirkId" element={<EvakuierungsbezirkPage />} />

@@ -5644,6 +5644,27 @@ export interface components {
          * @enum {string}
          */
         Richtung: "intern" | "extern";
+        /** @description Ein Richtwert mit allen Ebenen. `org`/`einsatz` sind `null`, wenn die Ebene erbt. */
+        RichtwertEbenen: {
+            /** Format: double */
+            basis: number;
+            /** Format: double */
+            einsatz?: number | null;
+            herkunft: components["schemas"]["RichtwertHerkunft"];
+            /** Format: double */
+            org?: number | null;
+            schluessel: string;
+            /**
+             * Format: double
+             * @description Wirksamer Wert: Einsatz vor Organisation vor Basis.
+             */
+            wert: number;
+        };
+        /**
+         * @description Woher der wirksame Wert stammt.
+         * @enum {string}
+         */
+        RichtwertHerkunft: "basis" | "org" | "einsatz";
         /**
          * @description Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben
          *     noch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt
@@ -6514,6 +6535,11 @@ export interface components {
             staerke?: components["schemas"]["StaerkeEingabe"] | null;
             /** @description Neuanlage trotz gleichnamiger Kraft im Einsatz (D9). */
             trotzdem_anlegen?: boolean;
+        };
+        /** @description Antwort der Richtwert-Routen: Stand der Basis und alle Schlüssel in der Reihenfolge der Datei. */
+        UnterkunftRichtwerte: {
+            stand: string;
+            werte: components["schemas"]["RichtwertEbenen"][];
         };
         /**
          * @description Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die

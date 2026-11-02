@@ -805,6 +805,8 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'externe-stellen',
         'fuehrungsfunktionen',
         'schichtmodelle',
+        // Richtwerte des Unterkunftsrechners (LLH-1520).
+        'unterkunft-richtwerte',
         'organisation',
         // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
         'einsaetze',

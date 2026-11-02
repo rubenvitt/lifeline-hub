@@ -1773,3 +1773,12 @@ fn vorschau_material_zustand_wire() {
         ImEinsatz => "im_einsatz",
     } in lifeline_hub::einheit::aus_vorlage::VorschauMaterialZustand::ALLE);
 }
+
+#[test]
+fn richtwert_herkunft_wire() {
+    enum_wire!(lifeline_hub::unterkunft::RichtwertHerkunft {
+        Basis => "basis",
+        Org => "org",
+        Einsatz => "einsatz",
+    });
+}

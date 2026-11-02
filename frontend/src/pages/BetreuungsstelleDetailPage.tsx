@@ -44,6 +44,7 @@ import StelleBedarf from '../betreuung/StelleBedarf';
 import StelleBelegung from '../betreuung/StelleBelegung';
 import StelleBelegungslinie from '../betreuung/StelleBelegungslinie';
 import StelleBetroffene from '../betreuung/StelleBetroffene';
+import StelleUnterkunft from '../betreuung/StelleUnterkunft';
 import { GESCHLOSSEN_HINWEIS } from '../betreuung/StellenBlock';
 import { ART_LABEL, inBetreuung, personenZahl } from '../betreuung/betreuungText';
 import { STATUS_HANDLUNG, schliessenBrauchtLeermeldung } from '../betreuung/stelleStatus';
@@ -111,7 +112,7 @@ function sitzungsWerte(s: Betreuungsstelle): StelleWerte {
 
 /**
  * Detailseite einer Betreuungsstelle (LLH-1044, Spec `betreuung-evakuierung`): Belegung in
- * Zahlen, Bedarf (LLH-1082), Stammdaten, Meldeverlauf, Betroffene hier und Verpflegung auf einer
+ * Zahlen, Bedarf (LLH-1082), Unterkunft (LLH-1520), Stammdaten, Meldeverlauf, Betroffene hier und Verpflegung auf einer
  * Seite.
  *
  * Die Stelle kommt aus `GET …/betreuung` (derselbe Cache wie Übersicht und Gerät, live über das
@@ -507,6 +508,11 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           stelleId={s.id}
           freigaben={freigaben}
           darfSchreiben={darfSchreiben}
+        />
+        <StelleUnterkunft
+          einsatzId={einsatzId}
+          stelleId={s.id}
+          kapazitaet={s.kapazitaet_personen ?? null}
         />
 
         <Paneel

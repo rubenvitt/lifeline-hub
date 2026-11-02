@@ -262,6 +262,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/abschliessen", None),
     ("/api/einsaetze/{id}/aufbewahrungsfrist", None),
     ("/api/einsaetze/{id}/einstellungen", None),
+    // Richtwerte des Unterkunftsrechners (LLH-1520): Einstellung des Einsatzes, modul-los wie die
+    // übrigen Einstellungen; der Rechner der Betreuung und die Einstellungsseite lesen sie.
+    ("/api/einsaetze/{id}/unterkunft-richtwerte", None),
     ("/api/einsaetze/{id}/modul-overrides", None),
     // Modul-Vorgaben der Einsatz-Org (LLH-1183): modul-los wie die Overrides, die Antwort
     // beschreibt die Modulregeln selbst.

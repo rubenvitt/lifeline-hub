@@ -85,6 +85,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.einheitVorlagenListe('alle')).toEqual(['einheit-vorlagen', 'alle']);
     // Schichtmodelle (LLH-1122).
     expect(globalKeys.schichtmodelle()).toEqual(['schichtmodelle']);
+    expect(globalKeys.unterkunftRichtwerte()).toEqual(['unterkunft-richtwerte']);
     // Verpflegungsplan (LLH-1058): Verwaltung liest alle, der Tag aus der Vorlage die aktiven.
     expect(globalKeys.verpflegungVorlagen()).toEqual(['verpflegung-vorlagen']);
     expect(globalKeys.verpflegungVorlagenListe('aktiv')).toEqual(['verpflegung-vorlagen', 'aktiv']);
@@ -135,10 +136,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 37 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 38 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(37);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(37);
+    expect(werte).toHaveLength(38);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(38);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

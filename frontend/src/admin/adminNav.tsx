@@ -16,6 +16,7 @@ import VerpflegungsplanTab from '../stammdaten/VerpflegungsplanTab';
 import OrganisationTab from '../stammdaten/OrganisationTab';
 import SprechgruppenTab from '../stammdaten/SprechgruppenTab';
 import FuehrungsfunktionenTab from '../stammdaten/FuehrungsfunktionenTab';
+import UnterkunftRichtwerteTab from '../stammdaten/UnterkunftRichtwerteTab';
 import AnzeigeEinstellungen from '../pages/einstellungen/AnzeigeEinstellungen';
 import EinsatzDefaults from '../pages/einstellungen/EinsatzDefaults';
 import Anmeldeverfahren from '../pages/einstellungen/Anmeldeverfahren';
@@ -74,6 +75,8 @@ export const adminGruppen: AdminGruppe[] = [
         label: 'Führungsfunktionen',
         element: <FuehrungsfunktionenTab />,
       },
+      // LLH-1520: Richtwerte des Unterkunftsrechners; ein Einsatz überschreibt sie einzeln.
+      { key: 'unterkunft', label: 'Unterkunft', element: <UnterkunftRichtwerteTab /> },
     ],
   },
   {

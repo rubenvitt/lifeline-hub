@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, frontend/src/pages/einstellungen/EinsatzBenachrichtigungen.tsx, src/benachrichtigung/vorgabe.rs, src/benachrichtigung/aufloesung.rs, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, frontend/src/pages/einstellungen/EinsatzBenachrichtigungen.tsx, frontend/src/pages/einstellungen/EinsatzUnterkunft.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/routes/unterkunft_richtwerte.rs, src/benachrichtigung/vorgabe.rs, src/benachrichtigung/aufloesung.rs, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -71,6 +71,19 @@ Für Einsatzleitung und Führungspersonal:
 
 Jede Änderung gilt sofort, ohne Speichern-Leiste. Die App meldet „Vorgabe des Einsatzes
 gespeichert“.
+
+### Richtwerte für die Unterkunft anpassen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Den Reiter „Unterkunft“ öffnen. Jede Zeile nennt einen Richtwert des Rechners „Unterkunft
+   planen“, gruppiert nach „Schlafen“, „Sanitär“, „Gesundheit“, „Ver- und Entsorgung“,
+   „Verpflegung“ und „Zelte“.
+2. Den Wert für diesen Einsatz ins Feld eintragen und das Feld verlassen oder Enter drücken.
+3. Um zum Wert der Organisation zurückzukehren, das Feld leeren und verlassen.
+
+Jede Änderung gilt sofort, ohne Speichern-Leiste. Neben dem Feld steht, woher der wirksame Wert
+kommt („Einsatz“, „Organisation“ oder „Vorgabe“), und die Vorgabe des Programms.
 
 ### Nachforderungen im Lagebild zeigen
 
@@ -223,6 +236,8 @@ die Organisation selbst ausblendet, bleibt auch mit Vorlage ausgeblendet.
   mit dieser Rolle.
 - „Ablösung“ ändern die Einsatzleitung und das Führungspersonal eines laufenden Einsatzes, wie
   die Rhythmus-Vorgabe eines Abschnitts; ein System-Admin ohne Rolle im Einsatz sieht sie nur.
+- „Unterkunft“ ändern die Einsatzleitung, das Führungspersonal und System-Admins der
+  Organisation des Einsatzes, solange er läuft; alle anderen sehen die Werte nur.
 - „Kennzahlen“ ändern die Einsatzleitung und das Führungspersonal eines laufenden Einsatzes, wie
   die Pegel; ein System-Admin ohne Rolle im Einsatz sieht den Schalter nur.
 - „Benachrichtigungen“ ändern die Einsatzleitung, das Führungspersonal und System-Admins der
