@@ -1,3 +1,25 @@
+## [1.0.0-alpha.166](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.165...v1.0.0-alpha.166) (2026-11-02)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Für geplante Besatzungswechsel und deren Verteilung kommen neue Tabellen und Spalten hinzu. Die Migration läuft beim Start automatisch. Die neuen Daten werden beim Schwärzen berücksichtigt.
+
+### Kräfte und Mittel
+
+- **Besatzungswechsel vorab planen:** In „Ablösung planen“ wählt man jetzt die Art, wie beim Vollzug. Eine Schicht plant entweder Ablöser oder einen Besatzungswechsel, nicht beides. Ist ein Besatzungswechsel geplant, verschwindet der Hinweis auf die fehlende Planung. Beim Vollzug sind Art, Personen und Verteilung dann schon ausgefüllt. Die Karte zeigt „Besatzungswechsel geplant · neu: …“.
+- **Neue Besatzung verteilen:** Für jede Person lässt sich festlegen, zu welcher Einheit sie kommt (die Einheit selbst oder eine ihrer Untereinheiten) und auf welches Fahrzeug. Das ist freiwillig. Im Dialog steht die Verteilung unter dem eingeklappten Punkt „Verteilen“. Seine Überschrift zeigt, wo die Verteilung abweicht. Beim Vollzug werden die Personen entsprechend zugeordnet.
+- **Folgeschicht nennt ihre Besatzung:** Nach einem Besatzungswechsel zeigt die Karte der neuen Schicht „nach Besatzungswechsel · Besatzung: …“.
+- **Rücknahme vollständig:** Nimmt man einen Besatzungswechsel zurück, verlassen die verteilten Personen ihre Ziel-Einheit und ihr Ziel-Fahrzeug wieder. Außerdem gilt wieder die Planung von vor dem Vollzug, also die vorgesehenen Ablöser oder der geplante Wechsel.
+- **Planung wird nicht versehentlich überschrieben:** Der Planungsdialog speichert nur, was man geändert hat. Wer unverändert speichert, überschreibt keine Planung, die inzwischen jemand anderes geändert hat. Der Dialog leert den geplanten Wechsel auch nicht, solange Personal oder Einheiten noch laden oder nicht geladen werden konnten.
+
+### Einsatztagebuch
+
+- Weicht die Verteilung beim Besatzungswechsel ab, steht im Eintrag zum Wechsel, wohin die Personen gekommen sind.
+
+### Dokumentation
+
+- Die Anwenderdokumentation beschreibt jetzt, wie man Besatzungswechsel plant und verteilt, mit einem Bild.
+
 ## [1.0.0-alpha.165](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.164...v1.0.0-alpha.165) (2026-11-01)
 
 ### Wichtige Änderungen
