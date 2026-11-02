@@ -131,16 +131,21 @@ zu dieser Adresse führt, sofern die Person Schreibrecht hat.
 
 ### Requirement: Modulfreigabe auf der Karte
 
-Wer das Modul Betreuung nicht lesen darf, MUST auf der Lagekarte weder Betreuungsstellen
-noch Bezirksnamen oder Räumungszustände sehen. Die Karte MUST das in der Ebenenliste als
-gesperrte Ebene mit Begründung ausweisen und MUST den gesperrten Abruf nicht als
-Quellenfehler melden. Zonen vom Typ Evakuierungsbezirk MUST auch dann als Flächen
-erscheinen, beschriftet nur mit ihrem eigenen Zonennamen oder dem Typwort.
+Wer das Modul Betreuung nicht lesen darf, MUST auf der Lagekarte keine Betreuungsstellen sehen.
+Wer das Modul Evakuierung nicht lesen darf, MUST weder Bezirksnamen, Räumungszustände noch
+Sammelstellen sehen. Die Karte MUST das in der Ebenenliste als gesperrte Ebene mit Begründung
+ausweisen und MUST den gesperrten Abruf nicht als Quellenfehler melden. Zonen vom Typ
+Evakuierungsbezirk MUST auch dann als Flächen erscheinen, beschriftet nur mit ihrem eigenen
+Zonennamen oder dem Typwort.
 
 #### Scenario: Ohne Modulrecht
 - **WHEN** eine Person ohne Lesezugriff auf das Modul Betreuung die Lagekarte öffnet
 - **THEN** zeigt die Ebenenliste „Betreuungsstellen“ als gesperrt mit Begründung
 - **AND** es erscheint kein Hinweis auf eine fehlerhafte Datenquelle
+
+#### Scenario: Ohne Evakuierung
+- **WHEN** eine Person ohne Lesezugriff auf das Modul Evakuierung die Lagekarte öffnet
+- **THEN** zeigt die Ebenenliste „Sammelstellen“ als gesperrt mit Begründung, und kein Sammelstellen-Marker erscheint
 
 #### Scenario: Bezirksfläche ohne Modulrecht
 - **WHEN** dieselbe Person eine einem Bezirk zugeordnete Zone ansieht
@@ -318,6 +323,56 @@ Kennzahl „Evakuiert“ und die Lagekennzahl MUST davon unberührt bleiben.
 #### Scenario: Lagekarte gesperrt beim Anlegen
 - **WHEN** eine Person die Lagekarte nicht nutzen darf und den Dialog „Evakuierungsbezirk anlegen“ öffnet
 - **THEN** ist „Keins“ gewählt, und „Fläche zeichnen“ und „Radius“ sind gesperrt mit Grund
+
+### Requirement: Sammelstellen als Marker
+
+Die Lagekarte SHALL die verortete Sammelstelle jedes nicht stornierten Evakuierungsbezirks,
+dessen Räumung nicht aufgehoben ist, als Marker an ihrer Koordinate zeigen, mit dem taktischen
+Zeichen Grundzeichen „Stelle“ und „Sammelplatz für Betroffene“, beschriftet „Sammelstelle
+<Bezirksbezeichnung>“. Die Marker MUST eine eigene, schaltbare Ebene „Sammelstellen“ bilden. Die
+Auswahl eines Markers MUST Bezirk, Sammelstelle-Text, Räumungszustand und Stand zeigen und einen
+Sprung auf die Detailseite des Bezirks anbieten.
+
+#### Scenario: Verortete Sammelstelle
+- **WHEN** der Bezirk „Nord“ eine verortete Sammelstelle „Parkplatz Sporthalle“ trägt
+- **THEN** zeigt die Lagekarte an ihrer Koordinate einen Marker „Sammelstelle Nord“ mit dem Zeichen Stelle/Sammelplatz
+
+#### Scenario: Bezirk ohne Fläche
+- **WHEN** ein Bezirk keine Fläche, aber eine verortete Sammelstelle hat
+- **THEN** steht der Marker trotzdem auf der Karte
+- **AND** `?evakuierungsbezirk=<id>` wählt die Sammelstelle und fliegt sie an
+
+#### Scenario: Aufgehoben oder storniert
+- **WHEN** die Räumung eines Bezirks aufgehoben oder der Bezirk storniert wird
+- **THEN** verschwindet der Marker seiner Sammelstelle
+
+#### Scenario: Ebene ausblenden
+- **WHEN** die Ebene „Sammelstellen“ ausgeschaltet wird
+- **THEN** zeigt die Karte keinen Sammelstellen-Marker, die Bezirksflächen bleiben
+
+### Requirement: Sammelstelle auf der Karte verorten
+
+Eine Person mit Schreibrecht MUST die Sammelstelle auf der Karte neu setzen und ihre Verortung
+löschen können; beides ändert nur die Koordinate, der Text der Sammelstelle bleibt. Ein Bezirk mit
+Sammelstelle-Text, aber ohne Koordinate MUST in der Objektliste als nicht verortet stehen und von
+dort durch einen Klick in die Karte verortet werden können. Die Adresse
+`?platzieren=sammelstelle:<bezirk-id>` MUST den Platziermodus für diese Sammelstelle öffnen.
+
+#### Scenario: Neu setzen
+- **WHEN** eine Person mit Schreibrecht über `?platzieren=sammelstelle:<id>` für „Sammelstelle Nord“ einen neuen Punkt setzt
+- **THEN** trägt der Bezirk die neue Koordinate, der Text „Parkplatz Sporthalle“ bleibt, und es entsteht kein ETB-Eintrag
+
+#### Scenario: Verortung löschen
+- **WHEN** eine Person mit Schreibrecht am ausgewählten Marker „Verortung löschen“ wählt
+- **THEN** verliert der Bezirk nur die Koordinate der Sammelstelle und sie steht in der Objektliste als nicht verortet
+
+#### Scenario: Aus der Liste platzieren
+- **WHEN** der Bezirk „Süd“ die Sammelstelle „Schule“ ohne Koordinate hat und eine Person mit Schreibrecht sie aus „Nicht verortet“ platziert
+- **THEN** erscheint der Marker „Sammelstelle Süd“ am Klickpunkt
+
+#### Scenario: Ohne Sammelstelle
+- **WHEN** ein Bezirk weder Sammelstelle-Text noch Koordinate trägt
+- **THEN** erscheint er weder als Marker noch unter „Nicht verortet“
 
 ### Requirement: Lage-Snapshot und Schwärzung
 

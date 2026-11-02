@@ -451,6 +451,23 @@ describe('EvakuierungPage (LLH-1034)', () => {
     );
   });
 
+  it('„Auf Karte zeigen" auch am Bezirk ohne Fläche, aber mit verorteter Sammelstelle (LLH-1393)', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    api.ladeEvakuierung.mockResolvedValue({
+      bezirke: [{ ...HAFEN, flaechen: 0, sammelstelle_lat: 53.54, sammelstelle_lon: 9.98 }],
+    });
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' }),
+    );
+    await userEvent.click(
+      within(await offenesMenue()).getByRole('menuitem', { name: /Auf Karte zeigen/ }),
+    );
+    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
+      `/einsaetze/1/lagekarte?evakuierungsbezirk=${HAFEN.id}`,
+    );
+  });
+
   it('ohne Schreibrecht: am Bezirk mit Fläche nur „Auf Karte zeigen", ohne Fläche kein Menü (LFH-673)', async () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
     api.ladeEvakuierung.mockResolvedValue({ bezirke: [{ ...UFER, flaechen: 1 }, HAFEN] });

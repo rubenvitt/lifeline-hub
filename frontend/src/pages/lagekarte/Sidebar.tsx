@@ -7,6 +7,7 @@ import type {
   BetreuungEbenenAngabe,
   BrEbenenAngabe,
   TierEbenenAngabe,
+  SammelstelleEbenenAngabe,
 } from './leistenDaten';
 import type { PlatzierModus } from './PlatzierSteuerung';
 import ModusBand from './ModusBand';
@@ -56,6 +57,11 @@ export interface LayerSichtbar {
   bereitstellungsraum: boolean;
   /** Ebene „Tiere" (LLH-1123), Grenze an der Datenquelle (`tierEbene.ts`). */
   tier: boolean;
+  /**
+   * Ebene „Sammelstellen" (LLH-1393): die Sammelstellen der Evakuierungsbezirke, Grenze an der
+   * Datenquelle des Moduls Evakuierung.
+   */
+  sammelstelle: boolean;
 }
 
 /**
@@ -72,7 +78,8 @@ export type PlatzierenPunktTyp =
   | 'person'
   | 'betreuungsstelle'
   | 'bereitstellungsraum'
-  | 'tier';
+  | 'tier'
+  | 'sammelstelle';
 
 const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   uhs: 'UHS',
@@ -84,6 +91,7 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   betreuungsstelle: 'Betreuungsstelle',
   bereitstellungsraum: 'Bereitstellungsraum',
   tier: 'Tier',
+  sammelstelle: 'Sammelstelle',
 };
 
 /**
@@ -112,6 +120,7 @@ const PUNKT_TYPEN: ReadonlySet<MarkerTyp> = new Set<PlatzierenPunktTyp>([
   'betreuungsstelle',
   'bereitstellungsraum',
   'tier',
+  'sammelstelle',
 ]);
 const istPunktTyp = (typ: MarkerTyp): typ is PlatzierenPunktTyp => PUNKT_TYPEN.has(typ);
 
@@ -248,6 +257,8 @@ export interface SidebarProps {
   br?: BrEbenenAngabe;
   /** Ebene „Tiere" (LLH-1123): ebenso nur die Zugriffsgrenze. */
   tier?: TierEbenenAngabe;
+  /** Ebene „Sammelstellen" (LLH-1393): ebenso nur die Zugriffsgrenze (Modul Evakuierung). */
+  sammelstelle?: SammelstelleEbenenAngabe;
   /**
    * Gewählte Kartengrundlage. Gewählt wird sie in der Segmentleiste über der Karte; das Paneel
    * trägt nur, was dort keinen Platz hat.

@@ -59,6 +59,7 @@ import { betreuungZugriffVon } from './betreuungEbene';
 import { checkBrZugriff } from './brEbene';
 import { checkTierZugriff } from './tierEbene';
 import { buildTierMarker } from './tierMarker';
+import { buildSammelstelleMarker } from './sammelstelleMarker';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 
 /**
@@ -260,8 +261,9 @@ export function useLagekarteDaten({
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
   const hasBetreuungError = liveAn && betreuungZugriff === 'frei' && betreuungQuery.isError;
   // Evakuierungsbezirke (LLH-1034, eigenes Modul): dieselbe Grenze, eigenes Fach
-  // (`einsatzKeys.evakuierung`, live über das `evakuierung`-Event). Keine eigene Ebene: die Bezirke
-  // beschriften die Bezirksflächen und füllen den Zonen-Inspector.
+  // (`einsatzKeys.evakuierung`, live über das `evakuierung`-Event). Die Bezirke beschriften die
+  // Bezirksflächen und füllen den Zonen-Inspector; ihre Sammelstellen bilden die Ebene
+  // „Sammelstellen“ (LLH-1393).
   const evakuierungVorab = betreuungZugriffVon({
     modul: EVAKUIERUNG_MODUL,
     freigaben,
@@ -427,6 +429,10 @@ export function useLagekarteDaten({
     [raeumeRoh, einheitenRoh, token],
   );
   const tiere = useMemo(() => buildTierMarker(tiereRoh ?? [], token), [tiereRoh, token]);
+  const sammelstellen = useMemo(
+    () => buildSammelstelleMarker(bezirkeRoh ?? [], token),
+    [bezirkeRoh, token],
+  );
   const fuehrungsstelleMarker = useMemo(
     () => buildFuehrungsstelleMarker(fuehrungsstelleRoh, token),
     [fuehrungsstelleRoh, token],
@@ -436,19 +442,34 @@ export function useLagekarteDaten({
       ...basisVerortet,
       ...(fuehrungsstelleMarker ? [fuehrungsstelleMarker] : []),
       ...stellen.verortet,
+      ...sammelstellen.verortet,
       ...raeume.verortet,
       ...tiere.verortet,
     ],
-    [basisVerortet, fuehrungsstelleMarker, stellen.verortet, raeume.verortet, tiere.verortet],
+    [
+      basisVerortet,
+      fuehrungsstelleMarker,
+      stellen.verortet,
+      sammelstellen.verortet,
+      raeume.verortet,
+      tiere.verortet,
+    ],
   );
   const nichtVerortet = useMemo(
     () => [
       ...basisNichtVerortet,
       ...stellen.nichtVerortet,
+      ...sammelstellen.nichtVerortet,
       ...raeume.nichtVerortet,
       ...tiere.nichtVerortet,
     ],
-    [basisNichtVerortet, stellen.nichtVerortet, raeume.nichtVerortet, tiere.nichtVerortet],
+    [
+      basisNichtVerortet,
+      stellen.nichtVerortet,
+      sammelstellen.nichtVerortet,
+      raeume.nichtVerortet,
+      tiere.nichtVerortet,
+    ],
   );
 
   const taktisch = useMemo(
@@ -729,6 +750,8 @@ export function useLagekarteDaten({
         // speisen den Startausschnitt).
         !freigabenQuery.isFetched ||
         betreuungQuery.isLoading ||
+        // Die Sammelstellen (LLH-1393) speisen ihn ebenso.
+        evakuierungQuery.isLoading ||
         brQuery.isLoading ||
         tierQuery.isLoading,
     // Datenstand der Karte (LFH-723): der älteste geladene Teil der Live-Ebenen, wie beim
@@ -775,6 +798,7 @@ export function useLagekarteDaten({
     // (LLH-1069) wartet darauf, statt den Bezirk beim Kaltstart als unbekannt zu verwerfen.
     bezirkeGeladen: istSnapshot ? !snapQuery.isLoading : evakuierungQuery.isFetched,
     // Modul Evakuierung frei? Der Inspector bietet Zuordnung und Sprung nur dann an (LLH-1034).
+    // Zugleich die Grenze der Ebene „Sammelstellen“ (LLH-1393).
     evakuierungZugriff,
     // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup.
     freieZeichen,
@@ -791,6 +815,7 @@ export function useLagekarteDaten({
       betreuungsstellen: stellenRoh ?? [],
       bereitstellungsraeume: raeumeRoh ?? [],
       tiere: tiereRoh ?? [],
+      bezirke: bezirkeRoh ?? [],
       fuehrungsstelle: fuehrungsstelleRoh ?? null,
       // Nur ein erfolgreicher Live-Abruf; nach Fehler bliebe `data` als stiller Altstand stehen.
       rueckmeldungen:

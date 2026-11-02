@@ -292,12 +292,14 @@ describe('MarkerSuche — kein Name aus gesperrten Modulen (LFH-716)', () => {
         betreuungZugriff: zugriff,
         brZugriff: zugriff,
         tierZugriff: zugriff,
+        evakuierungZugriff: zugriff,
       }),
       nichtVerortet,
       einsatzortOhneOrt: false,
       betreuungZugriff: zugriff,
       brZugriff: zugriff,
       tierZugriff: zugriff,
+      evakuierungZugriff: zugriff,
     });
 
   it('mit Recht: alle Namen sind auffindbar', async () => {

@@ -103,6 +103,9 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
     // Tiere ebenso (LLH-1123).
     case 'tier':
       return undefined;
+    // Sammelstellen ebenso (LLH-1393): sie hängen am Modul Evakuierung.
+    case 'sammelstelle':
+      return undefined;
   }
 }
 
