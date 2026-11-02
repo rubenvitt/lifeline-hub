@@ -46,6 +46,19 @@ const spalte = (stufe: string) =>
 const stufeVon = (text: string) =>
   screen.getByText(text).closest('[data-lfh="board-spalte"]')?.getAttribute('data-stufe');
 /**
+ * Füllt „Was“ und „Details / Zweck“ der Erfassung (LLH-1392). Das Tippen ist in diesen Tests nicht
+ * Gegenstand, kostete aber 40–80 ms je Zeichen (das AutoComplete rechnet seine Vorschläge bei
+ * jeder Taste neu); unter Last riss „setzt eine Nachforderung ab“ so das 10-s-Timeout. `paste`
+ * setzt den Text mit einem echten Eingabe-Ereignis in einem Schritt.
+ */
+async function fuelleErfassung(was: string, details: string) {
+  const nutzer = userEvent.setup({ delay: null });
+  await nutzer.click(screen.getByLabelText('Was'));
+  await nutzer.paste(was);
+  await nutzer.click(screen.getByLabelText('Details / Zweck'));
+  await nutzer.paste(details);
+}
+/**
  * Ein Eintrag im ⋮-Menü einer Karte (LLH-1097 D10); ohne Karte die erste. Gewählt wird erst, wenn
  * das Menü seinen Fokus hat (`test/menue.ts`): sonst zieht ihn der späte `autoFocus` des Menüs aus
  * dem danach geöffneten Dialog, und der getippte Grund ginge verloren (LLH-1390).
@@ -210,8 +223,7 @@ describe('NachforderungenPage', () => {
     await screen.findByText('2 RTW zur Verstärkung');
     // Das Formular liegt hinter dem Kopf-Toggle → erst aufklappen.
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await userEvent.type(screen.getByLabelText('Was'), 'SEG');
-    await userEvent.type(screen.getByLabelText('Details / Zweck'), 'Eine SEG');
+    await fuelleErfassung('SEG', 'Eine SEG');
     await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
     await waitFor(() =>
       expect(legeNachforderungAn).toHaveBeenCalledWith(
@@ -710,8 +722,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await userEvent.type(screen.getByLabelText('Was'), 'SEG');
-    await userEvent.type(screen.getByLabelText('Details / Zweck'), 'Eine SEG');
+    await fuelleErfassung('SEG', 'Eine SEG');
     await setzeAb();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Art unbekannt');
@@ -726,8 +737,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await userEvent.type(screen.getByLabelText('Was'), 'SEG');
-    await userEvent.type(screen.getByLabelText('Details / Zweck'), 'Eine SEG');
+    await fuelleErfassung('SEG', 'Eine SEG');
     await setzeAb();
     await screen.findByText('Art unbekannt');
 
@@ -740,8 +750,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await userEvent.type(screen.getByLabelText('Was'), 'SEG');
-    await userEvent.type(screen.getByLabelText('Details / Zweck'), 'Eine SEG');
+    await fuelleErfassung('SEG', 'Eine SEG');
     await setzeAb();
     await screen.findByText('Art unbekannt');
 
@@ -1555,8 +1564,7 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
       ),
     );
 
-    await userEvent.type(screen.getByLabelText('Was'), 'Decken');
-    await userEvent.type(screen.getByLabelText('Details / Zweck'), '100 Wolldecken');
+    await fuelleErfassung('Decken', '100 Wolldecken');
     await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
     await waitFor(() =>
       expect(legeNachforderungAn).toHaveBeenCalledWith(
