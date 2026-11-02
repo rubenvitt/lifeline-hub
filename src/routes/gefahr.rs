@@ -8,7 +8,7 @@ use crate::extract::PfadParam;
 use crate::gefahr::repo::{self as gefahr_repo, BewertungDaten};
 use crate::gefahr::{self, GefahrBewertungAnzeige, GefahrengebietAnzeige};
 use crate::live::LiveEvent;
-use crate::routes::support::{deserialize_optional_field, parse_enum, trimme, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, optional_max, parse_enum, trimme_tri};
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
@@ -82,6 +82,10 @@ pub async fn bewerten(
         &body.warnstufe,
         format!("Unbekannte Warnstufe: {}", body.warnstufe),
     )?;
+    // Freitexte haben eine Grenze (LLH-1366); auch sie betrifft das Feld für sich → 400, vor
+    // der Kombinationsprüfung.
+    let beschreibung = optional_max(body.beschreibung, "Erläuterung", gefahr::BESCHREIBUNG_MAX)?;
+    let gemeldet_von = optional_max(body.gemeldet_von, "Gemeldet von", gefahr::GEMELDET_VON_MAX)?;
     if !gefahr::kombination_gueltig(&body.gefahrentyp, &body.schutzobjekt) {
         return Err(AppError::UnprocessableEntity(format!(
             "Kombination {} × {} ist nicht zulässig",
@@ -93,9 +97,6 @@ pub async fn bewerten(
         gefahr_repo::aktuelle_warnstufe(&state.pool, gid, &body.gefahrentyp, &body.schutzobjekt)
             .await?
             .unwrap_or_else(|| "keine".to_string());
-
-    let beschreibung = trimme(body.beschreibung.clone());
-    let gemeldet_von = trimme(body.gemeldet_von.clone());
 
     // F06/LFH-244 Tier-A: UPSERT + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE
     // + Retry). ETB-Entscheidung/-Text folgen exakt dem alten Pfad: nur bei

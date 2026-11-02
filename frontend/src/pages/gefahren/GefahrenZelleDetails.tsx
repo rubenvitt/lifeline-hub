@@ -2,6 +2,8 @@ import { Form, Input } from 'antd';
 import { useEffect, useRef } from 'react';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
+import { GEFAHR_BESCHREIBUNG_MAX, GEFAHR_GEMELDET_VON_MAX } from '../../api/eingabegrenzen';
 import type { GefahrBewertung } from '../../api/types';
 
 interface Werte {
@@ -82,11 +84,21 @@ export default function GefahrenZelleDetails({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item name="beschreibung" label="Erläuterung">
-        <Input.TextArea rows={3} />
+      {/* Grenzen wie beim Server (LLH-1366). Ein schon längerer Wert wird nie gekürzt, die Regel
+          sperrt dann das Speichern. */}
+      <Form.Item
+        name="beschreibung"
+        label="Erläuterung"
+        rules={[zeichenRegel(GEFAHR_BESCHREIBUNG_MAX, 'Erläuterung')]}
+      >
+        <Input.TextArea rows={3} count={zeichenGrenze(GEFAHR_BESCHREIBUNG_MAX)} />
       </Form.Item>
-      <Form.Item name="gemeldet_von" label="Gemeldet von">
-        <Input />
+      <Form.Item
+        name="gemeldet_von"
+        label="Gemeldet von"
+        rules={[zeichenRegel(GEFAHR_GEMELDET_VON_MAX, 'Gemeldet von')]}
+      >
+        <Input maxLength={GEFAHR_GEMELDET_VON_MAX} />
       </Form.Item>
       <SpeicherFehler fehler={fehler} />
     </ErfassungsModal>

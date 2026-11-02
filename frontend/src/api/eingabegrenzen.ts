@@ -94,6 +94,10 @@ export const SCHADEN_ORT_MAX = 500;
 export const EINSATZORT_MAX = 500;
 /** Beschreibung eines Schadens. */
 export const SCHADEN_BESCHREIBUNG_MAX = 8_000;
+/** Erläuterung einer Zelle der Gefahrenmatrix (LLH-1366). */
+export const GEFAHR_BESCHREIBUNG_MAX = 2_000;
+/** „Gemeldet von“ einer Zelle der Gefahrenmatrix (LLH-1366). */
+export const GEFAHR_GEMELDET_VON_MAX = 200;
 /** Stützpunkte einer Zone oder Abschnittsfläche (alle Ringe zusammen). */
 export const GEOMETRIE_STUETZPUNKTE_MAX = 5_000;
 /** Höchster Radius eines Kreises um einen Punkt in Metern (LLH-1043). */
