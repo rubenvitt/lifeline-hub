@@ -26,7 +26,7 @@ fall() { # <pfad> <erwartete Wörter>
   [ "$ist" = "$2" ] && ok "$1 → ${2:-keine}" || rot "$1 → '${ist}' (Soll '$2')"
 }
 fall website/src/pages/index.astro ""
-fall website/src/daten/module.ts "frontend"
+fall website/src/daten/module.json "frontend"
 fall docs/betrieb.md ""
 fall docs/anwender/kapitel/x.md "frontend e2e"
 fall openspec/specs/x/spec.md ""

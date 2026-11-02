@@ -19,7 +19,7 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
 - **CI:** `website/` löst keine schwere Suite aus; ein PR, der nur hier ändert, fährt nur die
   Schnellprüfungen (Bereichs-Erkennung, `scripts/AGENTS.md`).
 - **Kopien statt zweiter Quelle:** `src/styles/rollen.css` (aus `frontend/src/theme/rollen.css`),
-  `src/daten/module.ts` (aus `frontend/src/einsatz/modulRegistry.ts`, Name und Beschreibung
+  `src/daten/module.json` (aus `frontend/src/einsatz/modulRegistry.ts`, Name und Beschreibung
   wörtlich), `src/components/Bildmarke.astro` (aus `frontend/src/marke/bildmarkeGeometrie.ts`),
   `src/daten/gruppen.ts` (aus `frontend/src/hilfe/gruppen.ts`), `src/daten/bereiche.ts` (aus
   `frontend/src/hilfe/bereiche.ts`, Bereiche und Kurztext) und `public/schriften/` samt
