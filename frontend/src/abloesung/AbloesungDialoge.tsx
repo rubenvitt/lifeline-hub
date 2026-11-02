@@ -644,9 +644,14 @@ export function AbloeserDialog({
             w.art === 'besatzung'
               ? besatzungZiele(w.besatzung_ids ?? [], w.verteilung, schicht)
               : [];
+          // Der Vergleich mit der Vorbelegung gilt nur für den Besatzungswechsel: Ist keine
+          // geplante Person mehr wählbar, ist die Vorbelegung leer wie der Plan der ganzen
+          // Einheit, und deren Wechsel muss den alten Plan trotzdem aufheben.
           const unveraendert =
             gleicherPlan(plan, schicht) ||
-            (vorbelegt.current != null && gleicheZiele(plan, vorbelegt.current));
+            (w.art === 'besatzung' &&
+              vorbelegt.current != null &&
+              gleicheZiele(plan, vorbelegt.current));
           if (!unveraendert) eingabe.besatzung_plan = plan;
         }
         return Object.keys(eingabe).length > 0 ? onErfassen(eingabe) : Promise.resolve();

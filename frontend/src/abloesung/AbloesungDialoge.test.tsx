@@ -789,6 +789,24 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     );
   });
 
+  it('Planen: ist keine geplante Person mehr wählbar, heben Ablöser den Wechsel trotzdem auf', async () => {
+    const nurEntlassene = {
+      ...schicht,
+      besatzung_plan: [{ personal_id: 23, name: 'Erik Entlassen' }],
+    } as unknown as Abloesung;
+    const onErfassen = planung({ schicht: nurEntlassene });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
+    );
+    await waehle('Ablösende Einheiten', 'Florian 2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [12], besatzung_plan: [] }),
+    );
+  });
+
   it('Planen nach der Vorbelegung geändert: der Plan geht ohne die Entlassene hinaus', async () => {
     const onErfassen = planung({ schicht: geplant });
     const dialog = await screen.findByRole('dialog');
