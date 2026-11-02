@@ -19,12 +19,16 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
 - **CI:** `website/` löst keine schwere Suite aus; ein PR, der nur hier ändert, fährt nur die
   Schnellprüfungen (Bereichs-Erkennung, `scripts/AGENTS.md`).
 - **Kopien statt zweiter Quelle:** `src/styles/rollen.css` (aus `frontend/src/theme/rollen.css`),
-  `src/daten/module.ts` (aus `frontend/src/einsatz/modulRegistry.ts`, Name und Beschreibung
+  `src/daten/module.json` (aus `frontend/src/einsatz/modulRegistry.ts`, Name und Beschreibung
   wörtlich), `src/components/Bildmarke.astro` (aus `frontend/src/marke/bildmarkeGeometrie.ts`),
   `src/daten/gruppen.ts` (aus `frontend/src/hilfe/gruppen.ts`), `src/daten/bereiche.ts` (aus
   `frontend/src/hilfe/bereiche.ts`, Bereiche und Kurztext) und `public/schriften/` samt
   Lizenztexten (aus `frontend/src/assets/fonts/`). Wer dort eine Rolle, ein Modul, eine
-  Lesergruppe, die Marke oder einen Schnitt ändert, zieht es hier nach.
+  Lesergruppe, die Marke oder einen Schnitt ändert, zieht es hier nach. Die Modulliste prüft
+  `frontend/src/einsatz/websiteModule.guard.test.ts` gegen die Registry (LLH-1378): Bereich,
+  Name, Beschreibung und Reihenfolge der fertigen Module, ohne die Einstellungen.
+- **Formatierung:** `.prettierrc` wie in `frontend/` (einfache Anführungszeichen, Breite 100);
+  ohne sie prüfte Prettier mit seinen Vorgaben und meldete jede Datei als unformatiert.
 - **Doku** (`src/pages/doku/`, LFH-1096): die Anwenderdokumentation aus
   `docs/anwender/kapitel/`, gelesen als Content-Collection (`src/content.config.ts`, Glob-Loader
   mit Basis außerhalb von `website/`), nie kopiert. Form und Regeln der Kapitel:
