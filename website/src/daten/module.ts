@@ -1,10 +1,11 @@
 /**
  * Die Module der Anwendung, wie sie Modulmenü und Sprungpalette zeigen.
  *
- * KOPIE aus `frontend/src/einsatz/modulRegistry.ts` (Stand 08.10.2026): Name (`label`) und
- * zweite Zeile (`beschreibung`) wörtlich, Reihenfolge wie dort, nur Module mit Status
- * `fertig`, ohne „Einstellungen“. Ein neues oder umbenanntes Modul zieht hier nach
- * (website/AGENTS.md).
+ * KOPIE aus `frontend/src/einsatz/modulRegistry.ts`: Bereich (`Kategorie.label`), Name
+ * (`label`) und zweite Zeile (`beschreibung`) wörtlich, Reihenfolge wie dort, nur Module mit
+ * Status `fertig`, ohne die Kategorie „Einstellungen“ am Fuß der Rail. Ein neues oder
+ * umbenanntes Modul zieht hier nach (website/AGENTS.md); der Wächter
+ * `frontend/src/einsatz/websiteModule.guard.test.ts` schlägt an, sobald beide auseinanderlaufen.
  */
 
 export interface Modul {
@@ -25,7 +26,8 @@ export const bereiche: Bereich[] = [
       { name: 'Einsatzdaten', beschreibung: 'Bezeichnung, Stichwort, Zeiten, Leitung' },
       { name: 'Einsatzabschnitte', beschreibung: 'Abschnitte und ihre Einheiten' },
       { name: 'Aufträge/Befehle', beschreibung: 'Aufträge, Befehle, Quittungen' },
-      { name: 'Stab', beschreibung: 'S1–S6, Lagebesprechung' },
+      { name: 'Lagebesprechung', beschreibung: 'Termin, Vorbereitung, Entschluss' },
+      { name: 'Stab', beschreibung: 'S1–S6, Besetzung' },
       { name: 'Dokumente', beschreibung: 'Lagepläne, Formulare, Fotos' },
     ],
   },
@@ -49,7 +51,8 @@ export const bereiche: Bereich[] = [
       { name: 'ETB', beschreibung: 'Einsatztagebuch' },
       { name: 'Betroffene', beschreibung: 'Vermisste, Betroffene, Patienten' },
       { name: 'Unfallhilfsstellen', beschreibung: 'Behandlungsplätze, Belegung, Material' },
-      { name: 'Betreuung', beschreibung: 'Evakuierung, Betreuungsstellen' },
+      { name: 'Evakuierung', beschreibung: 'Räumungsbezirke, Stand evakuiert' },
+      { name: 'Betreuung', beschreibung: 'Betreuungsstellen, Unterbringung' },
       { name: 'Tiere', beschreibung: 'Betroffene Tiere' },
       { name: 'Schäden', beschreibung: 'Sach-, Infrastruktur-, Umweltschäden' },
     ],
@@ -71,6 +74,7 @@ export const bereiche: Bereich[] = [
       { name: 'Chat', beschreibung: 'Nachrichten im Einsatz' },
       { name: 'Erinnerungen', beschreibung: 'Termine, Fristen' },
       { name: 'Meldungen', beschreibung: 'Eingang, Ausgang, Bearbeitung' },
+      { name: 'Fernmeldewesen', beschreibung: 'Funkplan, Skizze, Kommunikationsplan' },
     ],
   },
 ];

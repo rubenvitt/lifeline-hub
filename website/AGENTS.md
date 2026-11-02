@@ -24,7 +24,11 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   `src/daten/gruppen.ts` (aus `frontend/src/hilfe/gruppen.ts`), `src/daten/bereiche.ts` (aus
   `frontend/src/hilfe/bereiche.ts`, Bereiche und Kurztext) und `public/schriften/` samt
   Lizenztexten (aus `frontend/src/assets/fonts/`). Wer dort eine Rolle, ein Modul, eine
-  Lesergruppe, die Marke oder einen Schnitt ändert, zieht es hier nach.
+  Lesergruppe, die Marke oder einen Schnitt ändert, zieht es hier nach. Die Modulliste prüft
+  `frontend/src/einsatz/websiteModule.guard.test.ts` gegen die Registry (LLH-1378): Bereich,
+  Name, Beschreibung und Reihenfolge der fertigen Module, ohne die Einstellungen.
+- **Formatierung:** `.prettierrc` wie in `frontend/` (einfache Anführungszeichen, Breite 100);
+  ohne sie prüfte Prettier mit seinen Vorgaben und meldete jede Datei als unformatiert.
 - **Doku** (`src/pages/doku/`, LFH-1096): die Anwenderdokumentation aus
   `docs/anwender/kapitel/`, gelesen als Content-Collection (`src/content.config.ts`, Glob-Loader
   mit Basis außerhalb von `website/`), nie kopiert. Form und Regeln der Kapitel:
