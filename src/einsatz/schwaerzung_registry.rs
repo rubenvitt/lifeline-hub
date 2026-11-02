@@ -1271,6 +1271,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("verbleib_br_id", G_FK),
             // LLH-1312 (0262): wie die Schicht begann.
             retain("beginn_quelle", G_ENUM),
+            // LLH-1319 (0264): der Vollzug hat die Ablöser-Planung für die Rücknahme gesichert.
+            retain("planung_gesichert", G_KONFIG),
         ],
     },
     // Ablöser einer Schicht (LLH-1122, Mig 0212; Vollzug ab LLH-1132): nur Verweise und Zeit.
@@ -1325,6 +1327,42 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("fahrzeug_vorher_id", G_FK),
             retain("war_fuehrer", G_KONFIG),
             retain("zeitachse_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+            retain("einheit_nachher_id", G_FK),
+            retain("fahrzeug_nachher_id", G_FK),
+        ],
+    },
+    // Geplanter Besatzungswechsel einer Schicht (LLH-1319, Mig 0264): wer kommen soll und wohin.
+    // Nur Verweise und Zeit; der Name steckt in `einsatz_personal` → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_abloesung_besatzung_plan",
+        scoping: Scoping::UeberParent {
+            fk: "abloesung_id",
+            parent: "einsatz_abloesung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("abloesung_id", G_FK),
+            retain("personal_id", G_FK),
+            retain("einheit_id", G_FK),
+            retain("fahrzeug_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+        ],
+    },
+    // Ablöser-Planung vor dem Vollzug (LLH-1319, Mig 0264), damit die Rücknahme sie wiederherstellt.
+    // Nur Verweise und Zeit → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_abloesung_planung_vorher",
+        scoping: Scoping::UeberParent {
+            fk: "abloesung_id",
+            parent: "einsatz_abloesung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("abloesung_id", G_FK),
+            retain("einheit_id", G_FK),
             retain("angelegt_at", G_ZEIT),
         ],
     },

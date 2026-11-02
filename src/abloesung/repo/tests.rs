@@ -154,12 +154,23 @@ async fn vollzug(
     .await
 }
 
-/// Vollzug als Besatzungswechsel (LLH-1150) mit der neuen Besatzung `neu`.
+/// Vollzug als Besatzungswechsel (LLH-1150) mit der neuen Besatzung `neu`, alle in die Einheit.
 async fn besatzungswechsel(
     w: &Welt,
     id: i64,
     vollzogen_at: &str,
     neu: &[i64],
+) -> Result<(AbloesungVollzugAnzeige, i64, VollzugWirkung), AppError> {
+    let ziele: Vec<BesatzungZiel> = neu.iter().map(|&p| ziel(p, None, None)).collect();
+    besatzungswechsel_mit(w, id, vollzogen_at, &ziele).await
+}
+
+/// Vollzug als Besatzungswechsel mit Ziel je Person (LLH-1319).
+async fn besatzungswechsel_mit(
+    w: &Welt,
+    id: i64,
+    vollzogen_at: &str,
+    neu: &[BesatzungZiel],
 ) -> Result<(AbloesungVollzugAnzeige, i64, VollzugWirkung), AppError> {
     super::vollziehen(
         &w.pool,
@@ -175,6 +186,14 @@ async fn besatzungswechsel(
         vollzogen_at,
     )
     .await
+}
+
+fn ziel(personal_id: i64, einheit_id: Option<i64>, fahrzeug_id: Option<i64>) -> BesatzungZiel {
+    BesatzungZiel {
+        personal_id,
+        einheit_id,
+        fahrzeug_id,
+    }
 }
 
 // ── Schicht einer Einheit ───────────────────────────────────────────────────────────────────
@@ -2576,7 +2595,7 @@ async fn abloesungsereignisse(w: &Welt, spalte: &str, id: i64) -> i64 {
 
 /// Entscheidung LLH-1118 Punkt 3: je Ablöser eine Folgeschicht, in der Reihenfolge der Liste;
 /// die Liste steht an der Schicht, der Spiegel ist ihr erster Eintrag, das ETB nennt alle. Die
-/// Rücknahme entfernt alle Folgeschichten und lässt die Liste als Planung stehen.
+/// Rücknahme entfernt alle Folgeschichten; die Planung von vor dem Vollzug gilt wieder (LLH-1319).
 #[tokio::test]
 async fn vollzug_mit_liste_legt_je_abloeser_eine_folgeschicht_an() {
     let w = welt().await;
@@ -2584,6 +2603,19 @@ async fn vollzug_mit_liste_legt_je_abloeser_eine_folgeschicht_an() {
     let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
         .await
         .unwrap();
+    aendern(
+        &w.pool,
+        w.e,
+        a.id,
+        w.b,
+        &AenderungEingabe {
+            abloeser: Some(vec![f3, w.f2]),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
     let jetzt = "2026-09-22 15:40:00";
     let (v, _, _) = vollzug(&w.pool, w.e, a.id, w.b, jetzt, &[f3, w.f2], false, jetzt)
         .await
@@ -2647,7 +2679,7 @@ async fn vollzug_mit_liste_legt_je_abloeser_eine_folgeschicht_an() {
         assert!(offene_fristen(&w.pool, f.id).await.is_empty());
     }
     let geplant: Vec<i64> = r.abloeser.iter().map(|a| a.einheit_id).collect();
-    assert_eq!(geplant, vec![f3, w.f2], "die Liste bleibt als Planung");
+    assert_eq!(geplant, vec![f3, w.f2], "die Planung gilt wieder");
 }
 
 /// Löst ein Verband ab, bekommt nur der Knoten eine Schicht; seine Untereinheit in derselben
@@ -4020,4 +4052,385 @@ async fn uebernommene_schicht_behaelt_ihre_herkunft() {
     zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
     let geloest = laden(&w.pool, w.e, eigene.id, jetzt).await.unwrap();
     assert_eq!(geloest.beginn_quelle, BeginnQuelle::Eintreffen);
+}
+
+// ── LLH-1319: Besatzungswechsel planen, verteilen, Planung über die Rücknahme ────────────────
+
+/// Plant an der Schicht den Besatzungswechsel `ziele` (und leert bei `abloeser_leeren` die
+/// Ablöser, wie der Dialog es tut).
+async fn plane_besatzung(
+    w: &Welt,
+    schicht: i64,
+    ziele: Vec<BesatzungZiel>,
+    abloeser_leeren: bool,
+) -> Result<AbloesungAnzeige, AppError> {
+    aendern(
+        &w.pool,
+        w.e,
+        schicht,
+        w.b,
+        &AenderungEingabe {
+            abloeser: abloeser_leeren.then(Vec::new),
+            besatzung_plan: Some(ziele),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .map(|(a, _)| a)
+}
+
+async fn fahrzeug(w: &Welt, funkrufname: &str, einheit: Option<i64>) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname, einheit_id) \
+         VALUES (?, ?, ?) RETURNING id",
+    )
+    .bind(w.e)
+    .bind(funkrufname)
+    .bind(einheit)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+/// Spec „Besatzungswechsel verteilen“: „Cora Neu“ geht in die erbende Gruppe und auf das Fahrzeug
+/// des Zugs, „Dirk Neu“ (bisher auf einem Fahrzeug von „Florian 2“) nur auf das Fahrzeug, die
+/// Einheit ist die Vorgabe. Das ETB nennt nur die Abweichungen; die Folgeschicht trägt die neue
+/// Besatzung; die Rücknahme legt Einheit und Fahrzeug zurück.
+#[tokio::test]
+async fn besatzungswechsel_verteilt_auf_gruppe_und_fahrzeug_und_ruecknahme_legt_zurueck() {
+    let w = welt().await;
+    let l = lage(&w).await;
+    let fz2 = fahrzeug(&w, "Florian 2-83", Some(w.f2)).await;
+    sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = ? WHERE id = ?")
+        .bind(fz2)
+        .bind(l.fremd)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, wirkung) = besatzungswechsel_mit(
+        &w,
+        l.schicht,
+        jetzt,
+        &[
+            ziel(l.frei, Some(l.gruppe), Some(l.fahrzeug)),
+            ziel(l.fremd, None, Some(l.fahrzeug)),
+        ],
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        zuordnung(&w, l.frei).await,
+        (Some(l.gruppe), Some(l.fahrzeug))
+    );
+    assert_eq!(zuordnung(&w, l.fremd).await, (Some(w.f1), Some(l.fahrzeug)));
+    assert!(wirkung.einheiten.contains(&l.gruppe));
+    let inhalt = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert!(
+        inhalt.contains(
+            "Neue Besatzung: «Cora Neu» (Gruppe 1, Florian 1-44), «Dirk Neu» (Florian 1-44)."
+        ),
+        "{inhalt}"
+    );
+    let folge = v.folgeschicht.unwrap();
+    let namen: Vec<&str> = folge
+        .nach_besatzungswechsel
+        .iter()
+        .map(|b| b.name.as_str())
+        .collect();
+    assert_eq!(
+        namen,
+        vec!["Cora Neu", "Dirk Neu"],
+        "Kennzeichnung der Folgeschicht"
+    );
+    let liste = liste(&w.pool, w.e, Some(AbloesungStatus::Laufend), jetzt)
+        .await
+        .unwrap();
+    let laufend = liste.iter().find(|a| a.id == folge.id).unwrap();
+    assert_eq!(laufend.nach_besatzungswechsel.len(), 2, "auch in der Liste");
+    assert!(
+        v.abgeloest.nach_besatzungswechsel.is_empty(),
+        "die abgelöste Schicht folgt keinem Besatzungswechsel"
+    );
+
+    zuruecknehmen(&w.pool, w.e, l.schicht, w.b, "2026-09-22 15:41:00")
+        .await
+        .unwrap();
+    assert_eq!(
+        zuordnung(&w, l.frei).await,
+        (None, None),
+        "zurück ohne Fahrzeug"
+    );
+    assert_eq!(
+        zuordnung(&w, l.fremd).await,
+        (Some(w.f2), Some(fz2)),
+        "zurück auf das vorherige Fahrzeug"
+    );
+    assert_eq!(
+        zuordnung(&w, l.fuehrer).await,
+        (Some(w.f1), Some(l.fahrzeug))
+    );
+}
+
+/// Hat jemand die neue Person nach dem Wechsel von Hand umgesetzt, lässt die Rücknahme Einheit
+/// und Fahrzeug, wie sie sind.
+#[tokio::test]
+async fn ruecknahme_der_verteilung_laesst_handaenderungen_stehen() {
+    let w = welt().await;
+    let l = lage(&w).await;
+    let fz2 = fahrzeug(&w, "Florian 2-83", Some(w.f2)).await;
+    let jetzt = "2026-09-22 15:40:00";
+    besatzungswechsel_mit(
+        &w,
+        l.schicht,
+        jetzt,
+        &[ziel(l.frei, Some(l.gruppe), Some(l.fahrzeug))],
+    )
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_personal SET einheit_id = ?, fahrzeug_id = ? WHERE id = ?")
+        .bind(w.f2)
+        .bind(fz2)
+        .bind(l.frei)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    zuruecknehmen(&w.pool, w.e, l.schicht, w.b, jetzt)
+        .await
+        .unwrap();
+    assert_eq!(zuordnung(&w, l.frei).await, (Some(w.f2), Some(fz2)));
+}
+
+/// Spec „Besatzungswechsel verteilen“: Ziele außerhalb der Einheit und ihrer Erben lehnt der
+/// Vollzug ab, ohne etwas zu ändern: fremde Einheit 422, Fahrzeug einer anderen Einheit 422,
+/// unbekanntes Fahrzeug 404, entlassenes 409.
+#[tokio::test]
+async fn verteilung_lehnt_ziele_ausserhalb_ab() {
+    let w = welt().await;
+    let l = lage(&w).await;
+    let fz2 = fahrzeug(&w, "Florian 2-83", Some(w.f2)).await;
+    let entlassen = fahrzeug(&w, "Florian 1-19", Some(w.f1)).await;
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET beendet_at = '2026-09-22 10:00:00', \
+            beendet_als = 'entlassen' WHERE id = ?",
+    )
+    .bind(entlassen)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    for (z, erwartet) in [
+        (
+            ziel(l.frei, Some(w.f2), None),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            ziel(l.frei, None, Some(fz2)),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (ziel(l.frei, None, Some(999_999)), StatusCode::NOT_FOUND),
+        (ziel(l.frei, None, Some(entlassen)), StatusCode::CONFLICT),
+    ] {
+        let err = besatzungswechsel_mit(&w, l.schicht, jetzt, &[z])
+            .await
+            .unwrap_err();
+        assert_eq!(status(err), erwartet, "{z:?}");
+    }
+    let a = laden(&w.pool, w.e, l.schicht, jetzt).await.unwrap();
+    assert_eq!(a.status, AbloesungStatus::Laufend);
+    assert_eq!(zuordnung(&w, l.frei).await, (None, None));
+}
+
+/// Spec „Besatzungswechsel planen“: der geplante Wechsel schließt den Planungshinweis, steht an
+/// der Schicht und im ETB; Ablöser und Besatzungswechsel zugleich sind 422; das Aufheben bringt
+/// den Hinweis zurück; eine Person der bisherigen Besatzung ist schon beim Planen 422.
+#[tokio::test]
+async fn besatzungswechsel_planen_schliesst_den_planungshinweis() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    let gruppe = untereinheit(&w, "Gruppe 1", w.f1).await;
+    let cora = person(&w, "Cora Neu", None, None).await;
+    let dirk = person(&w, "Dirk Neu", Some(w.f2), None).await;
+    let alt = person(&w, "Anna Alt", Some(w.f1), None).await;
+    assert!(planung_frist(&w.pool, id).await.is_some());
+
+    let a = plane_besatzung(
+        &w,
+        id,
+        vec![ziel(cora, Some(gruppe), None), ziel(dirk, Some(w.f1), None)],
+        false,
+    )
+    .await
+    .unwrap();
+    let plan: Vec<(&str, Option<&str>)> = a
+        .besatzung_plan
+        .iter()
+        .map(|p| (p.name.as_str(), p.einheit_name.as_deref()))
+        .collect();
+    assert_eq!(
+        plan,
+        vec![("Cora Neu", Some("Gruppe 1")), ("Dirk Neu", None)],
+        "die Einheit der Schicht steht als Vorgabe"
+    );
+    assert_eq!(
+        planung_frist(&w.pool, id).await,
+        None,
+        "geplant: kein Hinweis"
+    );
+    let text = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert_eq!(
+        text,
+        "Ablösung «Florian 1»: Besatzungswechsel geplant, neu «Cora Neu», «Dirk Neu»"
+    );
+
+    // Dieselben Personen anders verteilt.
+    plane_besatzung(
+        &w,
+        id,
+        vec![ziel(cora, None, None), ziel(dirk, Some(gruppe), None)],
+        false,
+    )
+    .await
+    .unwrap();
+    let text = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert_eq!(text, "Ablösung «Florian 1»: Besatzungswechsel umgeplant");
+    let etb_vorher = etb(&w.pool, w.e).await.len();
+    plane_besatzung(
+        &w,
+        id,
+        vec![ziel(cora, Some(w.f1), None), ziel(dirk, Some(gruppe), None)],
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        etb(&w.pool, w.e).await.len(),
+        etb_vorher,
+        "unverändert: kein Eintrag"
+    );
+
+    // Ablöser dazu → 422, die Planung bleibt.
+    let err = aendern(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &AenderungEingabe {
+            abloeser: Some(vec![w.f2]),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(status(err), StatusCode::UNPROCESSABLE_ENTITY);
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(a.besatzung_plan.len(), 2);
+    assert!(a.abloeser.is_empty());
+
+    let err = plane_besatzung(&w, id, vec![ziel(alt, None, None)], false)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        status(err),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "alte Besatzung"
+    );
+
+    let a = plane_besatzung(&w, id, vec![], false).await.unwrap();
+    assert!(a.besatzung_plan.is_empty());
+    assert_eq!(
+        planung_frist(&w.pool, id).await.as_deref(),
+        Some("2030-06-03 12:00:00"),
+        "aufgehoben: der Hinweis steht wieder an"
+    );
+    let text = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert_eq!(
+        text,
+        "Ablösung «Florian 1»: Planung des Besatzungswechsels aufgehoben"
+    );
+}
+
+/// Der Dialog wechselt die Art, indem er beide Listen sendet: Ablöser geplant, dann
+/// Besatzungswechsel mit leerer Ablöser-Liste.
+#[tokio::test]
+async fn planung_wechselt_die_art_mit_beiden_listen() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    let cora = person(&w, "Cora Neu", None, None).await;
+    plane(&w, id, Some(w.f2)).await;
+    let err = plane_besatzung(&w, id, vec![ziel(cora, None, None)], false)
+        .await
+        .unwrap_err();
+    assert_eq!(status(err), StatusCode::UNPROCESSABLE_ENTITY);
+    let a = plane_besatzung(&w, id, vec![ziel(cora, None, None)], true)
+        .await
+        .unwrap();
+    assert!(a.abloeser.is_empty());
+    assert_eq!(a.besatzung_plan.len(), 1);
+    assert_eq!(planung_frist(&w.pool, id).await, None);
+}
+
+/// Spec „Rücknahme eines Vollzugs“ (LLH-1319): die Planung von vor dem Vollzug gilt wieder, auch
+/// nach einem Vollzug ohne Ablöser oder als Besatzungswechsel; ein ungeplanter Ablöser bleibt
+/// nicht als Planung stehen. Bestand ohne Sicherung lässt die Liste des Vollzugs stehen.
+#[tokio::test]
+async fn ruecknahme_stellt_die_planung_von_vor_dem_vollzug_wieder_her() {
+    let w = welt().await;
+    let jetzt = "2030-06-03 10:00:00";
+
+    // Geplant „Florian 2“, vollzogen ohne Ablöser.
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+    vollziehen(&w.pool, w.e, id, w.b, jetzt, None, jetzt)
+        .await
+        .unwrap();
+    let r = zuruecknehmen(&w.pool, w.e, id, w.b, jetzt).await.unwrap().0;
+    let geplant: Vec<i64> = r.abloeser.iter().map(|a| a.einheit_id).collect();
+    assert_eq!(geplant, vec![w.f2]);
+    assert_eq!(
+        planung_frist(&w.pool, id).await,
+        None,
+        "geplant: kein Hinweis"
+    );
+
+    // Ungeplant durch „Florian 2“ vollzogen: danach wieder ohne Planung.
+    plane(&w, id, None).await;
+    vollziehen(&w.pool, w.e, id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+    let r = zuruecknehmen(&w.pool, w.e, id, w.b, jetzt).await.unwrap().0;
+    assert!(r.abloeser.is_empty(), "wie vor dem Vollzug");
+    assert_eq!(
+        planung_frist(&w.pool, id).await.as_deref(),
+        Some("2030-06-03 12:00:00"),
+        "ohne Planung steht der Hinweis wieder an"
+    );
+
+    // Geplanter Besatzungswechsel, als solcher vollzogen und zurückgenommen.
+    let cora = person(&w, "Cora Neu", None, None).await;
+    plane_besatzung(&w, id, vec![ziel(cora, None, None)], false)
+        .await
+        .unwrap();
+    besatzungswechsel(&w, id, jetzt, &[cora]).await.unwrap();
+    let r = zuruecknehmen(&w.pool, w.e, id, w.b, jetzt).await.unwrap().0;
+    let plan: Vec<i64> = r.besatzung_plan.iter().map(|p| p.personal_id).collect();
+    assert_eq!(plan, vec![cora], "der geplante Wechsel gilt wieder");
+    assert_eq!(planung_frist(&w.pool, id).await, None);
+
+    // Bestand: ein Vollzug ohne Sicherung lässt die Liste des Vollzugs als Planung stehen.
+    plane_besatzung(&w, id, vec![], false).await.unwrap();
+    vollziehen(&w.pool, w.e, id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE einsatz_abloesung SET planung_gesichert = 0 WHERE id = ?")
+        .bind(id)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let r = zuruecknehmen(&w.pool, w.e, id, w.b, jetzt).await.unwrap().0;
+    let geplant: Vec<i64> = r.abloeser.iter().map(|a| a.einheit_id).collect();
+    assert_eq!(geplant, vec![w.f2], "Bestand wie bisher");
 }

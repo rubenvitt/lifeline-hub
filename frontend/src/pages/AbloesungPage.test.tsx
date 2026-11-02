@@ -95,6 +95,8 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   uebernommen_bei_vollzug: false,
   art: 'einheit',
   besatzung: [],
+  besatzung_plan: [],
+  nach_besatzungswechsel: [],
   verbleib: 'ruhe' as const,
   beginn_quelle: 'hand' as const,
   abschnitt_uebergeben: false,
@@ -418,6 +420,40 @@ describe('AbloesungPage (LFH-635)', () => {
     await waitFor(() => expect(nimmVollzugZurueck).toHaveBeenCalledWith(1, 1));
   });
 
+  /** LLH-1319: ein geplanter Besatzungswechsel belegt den Vollzug vor, sobald das Personal lädt. */
+  it('Besatzungswechsel geplant: Vollzug vorbelegt mit Art und Personen', async () => {
+    const a = schicht({
+      id: 1,
+      faellig_at: inMinuten(-12),
+      besatzung_plan: [{ personal_id: 21, name: 'Cora Neu' }],
+    });
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(status === 'laufend' ? [a] : []),
+    );
+    listeEinsatzPersonal.mockResolvedValue([
+      { id: 20, name: 'Anna Alt', einheit_id: 11 },
+      { id: 21, name: 'Cora Neu', einheit_id: null },
+    ]);
+    renderPage();
+    expect(
+      await screen.findByText('Besatzungswechsel geplant · neu: Cora Neu'),
+    ).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    await waitFor(() =>
+      expect(dialog.querySelector('.ant-select-selection-item[title="Cora Neu"]')).not.toBeNull(),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(vollzieheAbloesung).toHaveBeenCalledWith(1, 1, {
+        vollzogen_at: undefined,
+        art: 'besatzung',
+        besatzung: [{ personal_id: 21 }],
+      }),
+    );
+  });
+
   /** LLH-1150: Besatzungswechsel aus dem Dialog, die neue Besatzung aus dem Personal. */
   it('Besatzungswechsel: bisherige Besatzung vorbelegt, neue gewählt, POST und Hinweis', async () => {
     const a = schicht({ id: 1, faellig_at: inMinuten(-12) });
@@ -461,7 +497,7 @@ describe('AbloesungPage (LFH-635)', () => {
       expect(vollzieheAbloesung).toHaveBeenCalledWith(1, 1, {
         vollzogen_at: undefined,
         art: 'besatzung',
-        besatzung_ids: [21],
+        besatzung: [{ personal_id: 21 }],
       }),
     );
     expect(
@@ -614,7 +650,7 @@ describe('AbloesungPage (LFH-635)', () => {
     const menu = document.querySelector(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     ) as HTMLElement;
-    await userEvent.click(within(menu).getByText('Ablösende Einheit planen'));
+    await userEvent.click(within(menu).getByText('Ablösung planen'));
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }));
     await userEvent.click(await screen.findByTitle('Florian 2'));
@@ -623,6 +659,7 @@ describe('AbloesungPage (LFH-635)', () => {
     expect(
       await screen.findByText('Florian 2 schon für Schicht Florian 5 geplant'),
     ).toBeInTheDocument();
+    // Nur die geänderte Liste geht hinaus (LLH-1319); ein Besatzungswechsel war nicht geplant.
     expect(aendereSchicht).toHaveBeenCalledWith(1, 1, { abloeser_ids: [12] });
   });
 

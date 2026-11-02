@@ -30,6 +30,11 @@
 //! Personalzuordnung der Einheit und ihrer erbenden Untereinheiten geht, die gewählte neue
 //! Besatzung kommt (`einsatz_abloesung_besatzung`). Die Kräfte-Zeitachse bekommt nur
 //! Personen-Ereignisse, keine Grenzwerte und keine Ruhezeitrechnung (Abgrenzung zu LFH-860).
+//! Seit LLH-1319 lässt sich der Wechsel vorab planen (`einsatz_abloesung_besatzung_plan`, eine
+//! Planung je Schicht: Ablöser oder Besatzungswechsel), die neue Besatzung wird beim Vollzug auf
+//! die Einheit, ihre erbenden Untereinheiten und deren Fahrzeuge verteilt ([`BesatzungZiel`]),
+//! und die Folgeschicht nennt sie (`nach_besatzungswechsel`). Die Rücknahme eines Vollzugs stellt
+//! die Planung von vor dem Vollzug wieder her.
 //!
 //! **Knoten-Modell** (LLH-1118 Punkt 1): eine Untereinheit ohne eigene laufende Schicht erbt die
 //! ihres nächsten Vorfahren mit laufender Schicht (über `ueber_einheit_id`). Ermittelt wird das
@@ -42,7 +47,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::wire_enum::wire_enum;
 use crate::zeit;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub mod hinweis;
@@ -424,6 +429,13 @@ pub struct AbloesungAnzeige {
     /// Beim Besatzungswechsel: wer ging (`alt`) und wer kam (`neu`), je in der Reihenfolge des
     /// Vollzugs. Leer bei jeder anderen Schicht.
     pub besatzung: Vec<AbloesungBesatzung>,
+    /// Der geplante Besatzungswechsel einer laufenden Schicht (LLH-1319), in der Reihenfolge der
+    /// Planung; leer ohne einen und bei abgelösten und beendeten Schichten. Eine Schicht plant
+    /// entweder Ablöser oder einen Besatzungswechsel.
+    pub besatzung_plan: Vec<AbloesungBesatzungPlan>,
+    /// Ist der Vorgänger dieser Schicht als Besatzungswechsel vollzogen, die neue Besatzung dieses
+    /// Wechsels (Rolle `neu`, LLH-1319); sonst leer.
+    pub nach_besatzungswechsel: Vec<AbloesungBesatzung>,
     /// Was nach dem Vollzug mit der abgelösten Einheit geschah (LLH-1308); eine laufende trägt
     /// `ruhe`.
     pub verbleib: AbloesungVerbleib,
@@ -469,6 +481,39 @@ pub struct AbloesungBesatzung {
     pub personal_id: i64,
     pub name: String,
     pub rolle: BesatzungRolle,
+}
+
+/// Ziel einer Person der neuen Besatzung (LLH-1319), beim Planen und beim Vollzug: die Einheit
+/// (die der Schicht oder eine Untereinheit, die ihre Schicht erbt; fehlt = die der Schicht) und
+/// ein Fahrzeug dieser Einheiten (fehlt = beim Vollzug bleibt ihr Fahrzeug, wie es ist).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub struct BesatzungZiel {
+    /// `einsatz_personal.id`
+    pub personal_id: i64,
+    #[serde(default)]
+    pub einheit_id: Option<i64>,
+    /// `einsatz_fahrzeug.id`
+    #[serde(default)]
+    pub fahrzeug_id: Option<i64>,
+}
+
+/// Eine Person des geplanten Besatzungswechsels (Eintrag in `einsatz_abloesung_besatzung_plan`,
+/// LLH-1319) mit ihrem Ziel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungBesatzungPlan {
+    /// `einsatz_personal.id`
+    pub personal_id: i64,
+    pub name: String,
+    /// Ziel-Einheit; fehlt = die Einheit der Schicht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einheit_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einheit_name: Option<String>,
+    /// Ziel-Fahrzeug (`einsatz_fahrzeug.id`); fehlt = keins.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fahrzeug_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub funkrufname: Option<String>,
 }
 
 /// Eine Folgeschicht aus dem Vollzug einer Schicht.

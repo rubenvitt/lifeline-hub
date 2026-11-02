@@ -421,6 +421,7 @@ use utoipa::OpenApi;
         crate::abloesung::AbloesungVerbleib,
         crate::abloesung::BeginnQuelle,
         crate::abloesung::AbloesungBesatzung,
+        crate::abloesung::AbloesungBesatzungPlan,
         crate::abloesung::BesatzungRolle,
         crate::abloesung::AbloesungFolge,
         crate::abloesung::AbloesungPlanungEntfallen,
