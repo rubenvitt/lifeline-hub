@@ -736,7 +736,8 @@ export function useLagekarteDaten({
     // Stehen alle Quellen der Marker fest (geladen oder gescheitert)? Die Startansicht
     // (`startAnsicht.ts`) braucht das vollständige Bild; `ladt` hängt nur an Einsatz und Config.
     markerLaden: istSnapshot
-      ? snapQuery.isLoading
+      ? // Auch im Rückblick hängen Stellen und Sammelstellen an den Freigaben (LLH-1393).
+        snapQuery.isLoading || !freigabenQuery.isFetched
       : einsatzQuery.isLoading ||
         uhsQuery.isLoading ||
         schaedenQuery.isLoading ||
