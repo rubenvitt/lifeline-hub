@@ -9,6 +9,7 @@ import { renderMitProviders } from '../test/utils';
 import SchaedenDetailPage from './SchaedenDetailPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 
@@ -364,12 +365,15 @@ async function oeffneKopfmenue(): Promise<HTMLElement> {
   );
   const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
   expect(menue).not.toBeNull();
+  await warteAufMenueFokus();
   return menue as HTMLElement;
 }
 
 async function ausKopfmenue(name: string) {
-  const menue = await oeffneKopfmenue();
-  await userEvent.click(within(menue).getByRole('menuitem', { name }));
+  await waehleMenueEintrag(
+    await screen.findByRole('button', { name: 'Weitere Aktionen zu Schaden S-001' }),
+    name,
+  );
 }
 
 /** Die Knöpfe im Seitenkopf, über die Marke des Primitivs eingegrenzt. */

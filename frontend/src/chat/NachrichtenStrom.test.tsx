@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { renderMitProviders } from '../test/utils';
+import { warteAufMenueFokus } from '../test/menue';
 import { ORIGINAL_TEXT } from '../components/DownloadAnker';
 import NachrichtenStrom from './NachrichtenStrom';
 import type { ChatNachricht } from '../api/types';
@@ -35,13 +36,16 @@ const AKTIONEN = /^Aktionen zu Nachricht von /;
 
 /** Das GEÖFFNETE Menü: rc-dropdown lässt geschlossene Overlays im DOM stehen. */
 async function offenesMenue(): Promise<HTMLElement> {
-  return waitFor(() => {
+  const menue = await waitFor(() => {
     const m = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
     expect(m).not.toBeNull();
     return m!;
   });
+  // Erst wählen, wenn der späte `autoFocus` verbraucht ist (LLH-1390, `test/menue.ts`).
+  await warteAufMenueFokus();
+  return menue;
 }
 
 describe('NachrichtenStrom', () => {

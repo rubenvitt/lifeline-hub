@@ -14,6 +14,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { lagekartePfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import { FakeEventSource } from '../test/eventSource';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 /**
  * Zeilenaktionen der Betroffenenliste (LLH-1130, Spec `betroffene-lagedaten`, „Sichtung und
@@ -273,16 +274,21 @@ describe('Verbleib aus der Zeile (LLH-1130, 2.2)', () => {
   });
 });
 
-/** Das offene Zeilenmenü (Muster aus `frontend/AGENTS.md`, „Datensatz-Aktionen“). */
+/**
+ * Das offene Zeilenmenü (Muster aus `frontend/AGENTS.md`, „Datensatz-Aktionen“), erst wenn es den
+ * Fokus hat (LLH-1390, `test/menue.ts`).
+ */
 async function offenesMenue() {
   await waitFor(() =>
     expect(
       document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'),
     ).not.toBeNull(),
   );
-  return document.querySelector(
+  const menue = document.querySelector(
     '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
   ) as HTMLElement;
+  await warteAufMenueFokus();
+  return menue;
 }
 
 describe('Ohne Netz aus der Zeile (LLH-1138, design.md D8)', () => {
@@ -423,8 +429,10 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
     const user = userEvent.setup();
     render(() => [r007]);
 
-    await user.click(await screen.findByRole('button', { name: 'Aktionen zu R-007' }));
-    await user.click(within(await offenesMenue()).getByRole('menuitem', { name: 'Sichten' }));
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Aktionen zu R-007' }),
+      'Sichten',
+    );
     const dialog = await screen.findByRole('dialog', { name: 'Sichtung erfassen' });
     await user.click(within(dialog).getByRole('radio', { name: /^SK III,/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
@@ -435,9 +443,9 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
       expect(screen.queryByRole('dialog', { name: 'Sichtung erfassen' })).toBeNull(),
     );
 
-    await user.click(screen.getByRole('button', { name: 'Aktionen zu R-007' }));
-    await user.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: 'Verbleib erfassen' }),
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Aktionen zu R-007' }),
+      'Verbleib erfassen',
     );
     expect(await screen.findByRole('dialog', { name: 'Verbleib erfassen' })).toBeInTheDocument();
     expect(screen.queryByText('Detailseite')).toBeNull();

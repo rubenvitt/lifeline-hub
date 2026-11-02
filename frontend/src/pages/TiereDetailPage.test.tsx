@@ -10,6 +10,7 @@ import TiereDetailPage from './TiereDetailPage';
 import type { Tier } from '../api/types';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 /** Ziel des Sprungs „Auf Karte verorten“ (LLH-1123): zeigt den Auftrag aus der Adresse. */
 function KartenSonde() {
@@ -101,17 +102,22 @@ async function oeffneKopfmenue(): Promise<HTMLElement> {
   await userEvent.click(
     await screen.findByRole('button', { name: 'Weitere Aktionen zu Tier T-001' }),
   );
-  return waitFor(() => {
-    const menue = document.querySelector<HTMLElement>(
+  const menue = await waitFor(() => {
+    const m = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
-    expect(menue).not.toBeNull();
-    return menue!;
+    expect(m).not.toBeNull();
+    return m!;
   });
+  await warteAufMenueFokus();
+  return menue;
 }
 
 async function ausMenue(name: string) {
-  await userEvent.click(within(await oeffneKopfmenue()).getByRole('menuitem', { name }));
+  await waehleMenueEintrag(
+    await screen.findByRole('button', { name: 'Weitere Aktionen zu Tier T-001' }),
+    name,
+  );
 }
 
 /** Der Storno-Dialog (LLH-1105): ein `<Modal>` außerhalb des Menüs, kein `Popconfirm`. */

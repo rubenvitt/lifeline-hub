@@ -20,6 +20,7 @@ import type {
 import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { einsatzKeys } from '../../api/queryKeys';
 import { setzeOnline } from '../../test/utils';
+import { warteAufMenueFokus } from '../../test/menue';
 import { mitProzessZone } from '../../test/prozessZone';
 import { oeffne, optionenVon, waehle } from '../../test/auswahlListe';
 import {
@@ -185,12 +186,14 @@ function kennzahl(titel: string): HTMLElement {
 
 /**
  * Das zuletzt geöffnete antd-Menü (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“):
- * jedes Portal kommt beim ersten Öffnen ans Ende von `body`.
+ * jedes Portal kommt beim ersten Öffnen ans Ende von `body`. Zurück kommt es erst, wenn sein
+ * `autoFocus` verbraucht ist (`test/menue.ts`).
  */
 async function openMenue(name: string, bereich: HTMLElement = document.body) {
   await userEvent.click(
     within(bereich).getByRole('button', { name: new RegExp(`^Weitere Aktionen zu ${name}`) }),
   );
+  await warteAufMenueFokus();
   return waitFor(() => {
     const offen = document.querySelectorAll<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',

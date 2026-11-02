@@ -19,6 +19,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { SERVER_SUCHE_ENTPRELLUNG_MS } from '../components/Datensicht';
+import { warteAufMenueFokus } from '../test/menue';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({
@@ -1342,9 +1343,12 @@ describe('AuftraegePage', () => {
   describe('Aufheben (LLH-1098)', () => {
     const menue = async (name: string) => {
       await userEvent.click(await screen.findByRole('button', { name }));
-      return document.querySelector<HTMLElement>(
+      const m = document.querySelector<HTMLElement>(
         '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
       )!;
+      // Erst wählen, wenn der späte `autoFocus` verbraucht ist (LLH-1390, `test/menue.ts`).
+      await warteAufMenueFokus();
+      return m;
     };
     const aufgehoben = (over: Partial<Auftrag> = {}) =>
       auftrag({
@@ -1373,7 +1377,9 @@ describe('AuftraegePage', () => {
       expect(await within(dialog).findByText('Bitte einen Grund angeben')).toBeInTheDocument();
       expect(hebeAuf).not.toHaveBeenCalled();
 
-      await userEvent.type(within(dialog).getByLabelText('Grund'), 'Lage hat sich erledigt');
+      const grund = within(dialog).getByLabelText('Grund');
+      await userEvent.type(grund, 'Lage hat sich erledigt');
+      expect(grund).toHaveValue('Lage hat sich erledigt');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag aufheben' }));
       await waitFor(() => expect(hebeAuf).toHaveBeenCalledWith(1, 1, 'Lage hat sich erledigt'));
       // Unumkehrbar: kein Rückgängig-Toast (LFH-343).
@@ -1390,7 +1396,9 @@ describe('AuftraegePage', () => {
         }),
       );
       const dialog = await screen.findByRole('dialog');
-      await userEvent.type(within(dialog).getByLabelText('Grund'), 'doppelt');
+      const grund = within(dialog).getByLabelText('Grund');
+      await userEvent.type(grund, 'doppelt');
+      expect(grund).toHaveValue('doppelt');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag aufheben' }));
       expect(
         await within(dialog).findByText('Der Auftrag ist bereits aufgehoben'),
@@ -1450,9 +1458,12 @@ describe('AuftraegePage', () => {
   describe('Berichtigen (LLH-1098)', () => {
     const menue = async (name: string) => {
       await userEvent.click(await screen.findByRole('button', { name }));
-      return document.querySelector<HTMLElement>(
+      const m = document.querySelector<HTMLElement>(
         '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
       )!;
+      // Erst wählen, wenn der späte `autoFocus` verbraucht ist (LLH-1390, `test/menue.ts`).
+      await warteAufMenueFokus();
+      return m;
     };
 
     it('öffnet das Formular vorbelegt und sendet nur das Geänderte', async () => {
@@ -1469,6 +1480,7 @@ describe('AuftraegePage', () => {
       expect(text).toHaveValue('Deich sichern');
       await userEvent.clear(text);
       await userEvent.type(text, 'Deich Nord sichern');
+      expect(text).toHaveValue('Deich Nord sichern');
       await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
       await waitFor(() =>
         expect(patcheAuftrag).toHaveBeenCalledWith(1, 1, { auftrag_text: 'Deich Nord sichern' }),
@@ -1495,6 +1507,7 @@ describe('AuftraegePage', () => {
       );
       const text = await screen.findByLabelText('Auftrag / Was');
       await userEvent.type(text, ' jetzt');
+      expect(text).toHaveValue('Deich sichern jetzt');
       await userEvent.click(screen.getByRole('button', { name: 'Berichtigung speichern' }));
       expect(
         await screen.findByText(
@@ -1527,7 +1540,13 @@ describe('AuftraegePage', () => {
         auftrag({ lfd_nr: 4, berichtigbar: false, quittiert_anzahl: 1 }),
       ]);
       renderPage();
-      const eintrag = within(await menue('Aktionen zu Auftrag #4')).getByRole('menuitem', {
+      // Ohne Warten auf den Fokus: hier wird nichts gewählt, und `autoFocus` findet in jsdom kein
+      // Ziel (gesperrt der erste Eintrag, dann der Trenner), der Fokus bleibt am Auslöser.
+      await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Auftrag #4' }));
+      const menu = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      )!;
+      const eintrag = within(menu).getByRole('menuitem', {
         name: 'Berichtigen (schon quittiert)',
       });
       expect(eintrag).toHaveAttribute('aria-disabled', 'true');

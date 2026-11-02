@@ -7,6 +7,7 @@ import { meHandler, server } from '../../test/server';
 import { adminFixture } from '../../test/fixtures';
 import { renderMitProviders } from '../../test/utils';
 import { mitProzessZone } from '../../test/prozessZone';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../../test/menue';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { QueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -162,17 +163,12 @@ const zeilentitel = () =>
     (h) => h.textContent,
   );
 
-/** Öffnet das Zeilenmenü und klickt einen Eintrag — immer über das OFFENE Menü. */
+/** Öffnet das Zeilenmenü und klickt einen Eintrag — immer im zuletzt geöffneten Menü. */
 async function zeilenaktion(name: string, eintrag: RegExp) {
-  await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Pegel ${name}` }));
-  const menue = await waitFor(() => {
-    const m = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    );
-    expect(m).not.toBeNull();
-    return m!;
-  });
-  await userEvent.click(within(menue).getByRole('menuitem', { name: eintrag }));
+  await waehleMenueEintrag(
+    screen.getByRole('button', { name: `Aktionen zu Pegel ${name}` }),
+    eintrag,
+  );
 }
 
 async function waehleStation(label: string) {
@@ -293,6 +289,7 @@ describe('EinsatzPegel', () => {
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Pegel HANN. MÜNDEN' }));
+    await warteAufMenueFokus();
     const menue = await waitFor(() => {
       const m = document.querySelector<HTMLElement>(
         '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
@@ -672,6 +669,7 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
     await waitFor(() => expect(zeilentitel()).toEqual(['1. HANN. MÜNDEN']));
     expect(document.querySelector('[data-lfh="pegel-prognose"]')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Pegel HANN. MÜNDEN' }));
+    await warteAufMenueFokus();
     const menue = await waitFor(() => {
       const m = document.querySelector<HTMLElement>(
         '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
@@ -691,6 +689,7 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(1));
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Pegel HANN. MÜNDEN' }));
+    await warteAufMenueFokus();
     const menue = await waitFor(() => {
       const m = document.querySelector<HTMLElement>(
         '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',

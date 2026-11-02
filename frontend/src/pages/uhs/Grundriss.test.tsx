@@ -29,6 +29,7 @@ import { setzeMasse } from '../../test/elementMasse';
 import { DEFAULT_KONVENTIONEN } from '../../anzeige/format';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../../test/menue';
 
 /**
  * Der Abwurf eines Zugs, abgegriffen am `DndContext` (sonst unverändert): jsdom misst keine
@@ -1155,6 +1156,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   it('öffnet beim Tipp auf einen unbelegten Platz das Menü, nicht den Zuweisungsdialog', async () => {
     renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
     await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+    await warteAufMenueFokus();
 
     expect(eintraege()[0]).toContain('Patient zuweisen');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -1172,6 +1174,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   it('führt beim belegten Platz Verbleib oben, Person und Rückweg, zurückweisen zuletzt', async () => {
     renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
     await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+    await warteAufMenueFokus();
 
     const namen = eintraege();
     expect(namen[0]).toContain('Verbleib / Entlassung erfassen');
@@ -1200,15 +1203,19 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
       ),
     );
     renderGrundriss(unbelegt(), [p], false, 'komfortabel');
-    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
-    await userEvent.click(within(offenesMenue()).getByText('Person öffnen'));
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }),
+      /Person öffnen/,
+    );
     expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
   });
 
   it('öffnet über „Verbleib / Entlassung erfassen" den Verbleib-Dialog', async () => {
     renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
-    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
-    await userEvent.click(within(offenesMenue()).getByText('Verbleib / Entlassung erfassen'));
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }),
+      /Verbleib \/ Entlassung erfassen/,
+    );
     expect(await screen.findByRole('textbox', { name: /Ziel/ })).toBeInTheDocument();
   });
 
@@ -1219,6 +1226,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
   it('öffnet beim Tipp auf die Personenmarke das Menü, nicht direkt den Drawer', async () => {
     renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
     await userEvent.click(await screen.findByText(/R-007/));
+    await warteAufMenueFokus();
     expect(eintraege()[0]).toContain('Verbleib / Entlassung erfassen');
     // Der Drawer ist ein `dialog` und stünde sofort im Baum — eine Textprüfung auf seinen erst
     // später geladenen Inhalt wäre blind.
@@ -1240,8 +1248,10 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     // Mit zuweisbarer Person: sonst zeigte ein fälschlich ausgelöster Zuweisungsweg nur eine
     // Meldung, und die Prüfung wäre blind.
     renderGrundriss(uhs, [wartend()], false, 'komfortabel');
-    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
-    await userEvent.click(within(offenesMenue()).getByText('als defekt markieren'));
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }),
+      /als defekt markieren/,
+    );
 
     await waitFor(() => expect(gesendet).not.toBeNull());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -1253,6 +1263,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
     karte.focus();
     await userEvent.keyboard('{Enter}');
+    await warteAufMenueFokus();
     expect(eintraege()[0]).toContain('Patient zuweisen');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
@@ -1345,6 +1356,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
     await userEvent.click(await screen.findByRole('button', { name: 'Plätze bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+    await warteAufMenueFokus();
 
     const namen = eintraege();
     expect(namen.some((n) => n.includes('Patient zuweisen'))).toBe(false);

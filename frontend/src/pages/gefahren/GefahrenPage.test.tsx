@@ -7,6 +7,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
+import { waehleMenueEintrag } from '../../test/menue';
 import GefahrenPage, { gebietszeileStil } from './GefahrenPage';
 
 /**
@@ -515,15 +516,10 @@ describe('GefahrenPage', () => {
     );
     renderPage();
     // Die Zelle trägt einen Auslöser; sein Name nennt Zeile, Spalte und aktuelle Stufe.
-    await userEvent.click(
+    await waehleMenueEintrag(
       await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
+      /hoch/i,
     );
-    // Über das offene Menü greifen — antd lässt Portale geschlossener Dropdowns stehen.
-    const menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    );
-    if (!menue) throw new Error('kein offenes Menü im Baum');
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /hoch/i }));
     // Auf den PUT selbst warten, es gibt keine Neuzeichnung, auf die ein Textsucher warten könnte.
     await waitFor(() =>
       expect(put).toMatchObject({
@@ -754,13 +750,6 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
   describe('LFH-966: abgelehnte Bewertung ohne Toast', () => {
     const keinToast = () =>
       expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
-    function offenesMenue(): HTMLElement {
-      const menue = document.querySelector<HTMLElement>(
-        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-      );
-      if (!menue) throw new Error('kein offenes Menü im Baum');
-      return menue;
-    }
 
     it('ein abgelehnter Stufenwechsel steht über der Matrix, bis zum nächsten Absenden', async () => {
       let versuch = 0;
@@ -777,13 +766,11 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
       const zelle = await screen.findByRole('button', {
         name: 'Bewertung Brand × Menschen: keine',
       });
-      await userEvent.click(zelle);
-      await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: /hoch/i }));
+      await waehleMenueEintrag(zelle, /hoch/i);
       const hinweis = await screen.findByText('Bewertung abgelehnt');
       expect(hinweis.closest('[data-fehler]')).not.toBeNull();
       keinToast();
-      await userEvent.click(zelle);
-      await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: /mittel/i }));
+      await waehleMenueEintrag(zelle, /mittel/i);
       await waitFor(() => expect(screen.queryByText('Bewertung abgelehnt')).toBeNull());
     });
 
@@ -807,14 +794,14 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
         ),
       );
       renderPage();
-      await userEvent.click(
+      await waehleMenueEintrag(
         await screen.findByRole('button', { name: /^Bewertung Brand × Menschen: hoch/ }),
-      );
-      await userEvent.click(
-        within(offenesMenue()).getByRole('menuitem', { name: 'Erläuterung …' }),
+        'Erläuterung …',
       );
       const dialog = await screen.findByRole('dialog');
-      await userEvent.type(within(dialog).getByLabelText('Erläuterung'), 'Rauch');
+      const erlaeuterung = within(dialog).getByLabelText('Erläuterung');
+      await userEvent.type(erlaeuterung, 'Rauch');
+      expect(erlaeuterung).toHaveValue('Rauch');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
       expect(await within(dialog).findByText('Details abgelehnt')).toBeInTheDocument();
       expect(document.querySelector('[data-fehler]')).toBeNull();

@@ -13,6 +13,7 @@ import { queueLeerenFuerTests } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
+import { waehleMenueEintrag } from '../test/menue';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -499,11 +500,9 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
   it('Menü: unverortet „Auf Karte verorten“ mit Rückweg, Stornieren mit Rückfrage führt auf die Übersicht', async () => {
     api.storniereStelle.mockResolvedValue({ ...TURNHALLE, storniert_at: 'x' });
     renderPage();
-    await userEvent.click(
+    await waehleMenueEintrag(
       await screen.findByRole('button', { name: 'Weitere Aktionen zu Stelle Turnhalle Ost' }),
-    );
-    await userEvent.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: /Stornieren/ }),
+      /Stornieren/,
     );
     const dialog = await dialogMit('Betreuungsstelle Turnhalle Ost stornieren?');
     expect(
@@ -518,11 +517,9 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
 
   it('Menü: „Auf Karte verorten“ öffnet den Platziermodus mit Rückweg', async () => {
     renderPage();
-    await userEvent.click(
+    await waehleMenueEintrag(
       await screen.findByRole('button', { name: 'Weitere Aktionen zu Stelle Turnhalle Ost' }),
-    );
-    await userEvent.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: 'Auf Karte verorten' }),
+      'Auf Karte verorten',
     );
     expect(await screen.findByTestId('ziel-lagekarte')).toHaveTextContent(
       '/einsaetze/1/lagekarte?platzieren=betreuungsstelle%3A8&zurueck=1',

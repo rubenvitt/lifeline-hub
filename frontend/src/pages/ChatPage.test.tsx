@@ -10,6 +10,7 @@ import type { ChatKanal, ChatNachricht } from '../api/types';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 import { installiereXhrAttrappe } from '../test/xhrAttrappe';
+import { waehleMenueEintrag } from '../test/menue';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -350,8 +351,10 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Bezug' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }),
+      'Bezug',
+    );
     const comboboxen = screen.getAllByRole('combobox');
     await userEvent.click(comboboxen[0]);
     await userEvent.click(await screen.findByText('Schaden'));
@@ -389,11 +392,14 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Bearbeiten' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }),
+      'Bearbeiten',
+    );
     const feld = await screen.findByDisplayValue('Erste Lage');
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Lage korrigiert');
+    expect(feld).toHaveValue('Lage korrigiert');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(bearbeitet).not.toBeNull());
@@ -440,8 +446,10 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Zu ETB' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }),
+      'Zu ETB',
+    );
     expect(await screen.findByRole('checkbox', { name: /deich\.jpg/ })).toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
 
@@ -853,14 +861,12 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
       expect(offen).toHaveLength(1);
       return offen[0];
     });
+  /** Wählt erst, wenn das Menü seinen Fokus hat (`test/menue.ts`, LLH-1390). */
   async function aktion(name: string, index = 0) {
-    await userEvent.click(
+    await waehleMenueEintrag(
       screen.getAllByRole('button', { name: /^Aktionen zu Nachricht von / })[index],
+      name,
     );
-    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
-      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
-    );
-    await userEvent.click(within(offen[offen.length - 1]).getByRole('menuitem', { name }));
     return offenerDialog();
   }
   const zeile = (text: string) =>
@@ -877,6 +883,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     await screen.findByText('Erste Lage');
     const dialog = await aktion('Bearbeiten');
     await userEvent.type(within(dialog).getByLabelText('Text'), ' ergänzt');
+    expect(within(dialog).getByLabelText('Text')).toHaveValue('Erste Lage ergänzt');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 
     const grund = await within(dialog).findByRole('alert');

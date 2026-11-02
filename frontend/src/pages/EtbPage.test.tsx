@@ -15,6 +15,7 @@ import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
 import { adminFixture, freigabenFixture } from '../test/fixtures';
 import { SCHLUESSEL_ETB_STANDARD_RUFNAME } from '../etb/standardRufname';
+import { warteAufMenueFokus } from '../test/menue';
 
 /**
  * Sperre vor dem Laden der Entwürfe: offen, bis ein Test sie schließt. Damit montiert die
@@ -88,7 +89,9 @@ const eintrag = {
 /**
  * Wählt eine Zeilenaktion der ETB-Zeitachse: erst den Menü-Auslöser, dann den Eintrag (Rolle
  * `menuitem`). Der Eintrag wird über das geöffnete Menü geholt: antd lässt die Portale
- * geschlossener Dropdowns im Baum stehen.
+ * geschlossener Dropdowns im Baum stehen. Gewählt wird erst, wenn das Menü seinen Fokus hat
+ * (`test/menue.ts`): sonst zieht ihn der späte `autoFocus` aus dem danach geöffneten Dialog
+ * (LLH-1390).
  */
 async function waehleZeilenaktion(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(await screen.findByRole('button', { name: /^Aktionen zu Eintrag/ }));
@@ -96,6 +99,7 @@ async function waehleZeilenaktion(user: ReturnType<typeof userEvent.setup>, name
     '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
   );
   if (!menue) throw new Error('Das Zeilen-Aktionsmenü ließ sich nicht öffnen');
+  await warteAufMenueFokus();
   await user.click(within(menue).getByRole('menuitem', { name }));
 }
 
@@ -1410,6 +1414,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
     if (!menue) throw new Error('Menü nicht offen');
+    await warteAufMenueFokus();
     const punkt = within(menue).getByRole('menuitem', { name: /Berichtigen/ });
     expect(punkt).toHaveAttribute('aria-disabled', 'true');
     expect(punkt).toHaveTextContent('erst nach dem Senden');
@@ -1736,6 +1741,7 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
       expect(m).not.toBeNull();
       return m!;
     });
+    await warteAufMenueFokus();
     await userEvent.click(within(menue).getByRole('menuitem', { name }));
   }
 
@@ -2222,6 +2228,7 @@ describe('EtbPage: Berichtigung einer Berichtigung (LLH-1099)', () => {
     const menue = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     )!;
+    await warteAufMenueFokus();
     await user.click(within(menue).getByRole('menuitem', { name: 'Berichtigen' }));
     expect(
       await screen.findByText('Berichtigung zu Nr. 135 (berichtigt Nr. 134)'),

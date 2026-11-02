@@ -11,6 +11,7 @@ import DokumentePage from './DokumentePage';
 import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { warteAufMenueFokus } from '../test/menue';
 
 // Gewartet wird mit RTLs `waitFor` (5 s, `test/setup.ts`), nicht mit `vi.waitFor`: dessen Budget
 // steht fest auf 1 s, und unter Last kam der Einsatz später — „?neu=1 … NICHT für Beobachter“
@@ -115,15 +116,21 @@ async function dialogBearbeiten() {
   return treffer!;
 }
 
-/** Das offene Menü der gebündelten Kartenaktionen (Muster `Datensicht.test.tsx`). */
+/**
+ * Das offene Menü der gebündelten Kartenaktionen (Muster `Datensicht.test.tsx`). Zurück kommt es
+ * erst, wenn es seinen Fokus hat (`test/menue.ts`): sonst zieht ihn der späte `autoFocus` aus der
+ * danach geöffneten Rückfrage (LLH-1390).
+ */
 async function offenesMenue() {
-  return waitFor(() => {
+  const menue = await waitFor(() => {
     const m = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
     expect(m).not.toBeNull();
     return m!;
   });
+  await warteAufMenueFokus();
+  return menue;
 }
 
 const kopfAktionen = () => document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
