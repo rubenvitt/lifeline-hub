@@ -9,6 +9,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { formatiere } from '../anzeige/koordinaten';
+import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
@@ -542,6 +543,17 @@ function platzierModusAn(): boolean {
 function LocationSonde() {
   const location = useLocation();
   return <div data-testid="location-search">{location.search}</div>;
+}
+
+/**
+ * Hält den Router-Commit an: Die Seite sieht weiter die Adresse des ersten Renders, auch nachdem sie
+ * navigiert hat. So steht es unter Last, solange React Router die Räumung eines Link-Auftrags noch
+ * in einer Transition rendert (LLH-1361).
+ */
+function AdresseSteht({ children }: { children: ReactNode }) {
+  const aktuell = useContext(UNSAFE_LocationContext);
+  const [fest] = useState(aktuell);
+  return <UNSAFE_LocationContext.Provider value={fest}>{children}</UNSAFE_LocationContext.Provider>;
 }
 
 function renderSeiteMitSonde(route: string) {
@@ -3486,13 +3498,6 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
         return HttpResponse.json({ id: 9 });
       }),
     ]);
-    function AdresseSteht({ children }: { children: ReactNode }) {
-      const aktuell = useContext(UNSAFE_LocationContext);
-      const [fest] = useState(aktuell);
-      return (
-        <UNSAFE_LocationContext.Provider value={fest}>{children}</UNSAFE_LocationContext.Provider>
-      );
-    }
     const user = userEvent.setup();
     const { client } = renderMitProviders(
       <AdresseSteht>
@@ -4603,5 +4608,260 @@ describe('LLH-1057: Abschnitt fokussieren', () => {
     await user.keyboard('{Escape}');
     expect(band()).toBeNull();
     expect(kartenHandle.stelleKameraHer).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Link-Aufträge gelten einmal je Verlaufseintrag (LLH-1361, `routing/useLinkAuftrag.ts`). Das
+ * Räumen ist eine Navigation, die React Router in einer Transition rendert; bis dahin sehen weitere
+ * Renders noch den Auftrag. Je Auftrag zwei Fälle:
+ *
+ * - Hängender Router-Commit (`AdresseSteht`): Die Person macht den Auftrag rückgängig, danach ändert
+ *   sich eine Abhängigkeit seines Effekts (Live-Daten, Rechte, Einstellungen, Bildschirmbreite).
+ *   Der Auftrag wirkt nicht noch einmal.
+ * - Ein neuer Link derselben Art ist ein neuer Verlaufseintrag und wirkt wieder.
+ */
+describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
+  const POLYGON =
+    '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}';
+  const ZONE_GG = {
+    id: 7,
+    einsatz_id: 1,
+    typ: 'gefahrengebiet',
+    geometrie_typ: 'Polygon',
+    geometrie: POLYGON,
+    label: 'GG-Zone',
+    farbe: null,
+    notiz: null,
+    gefahrengebiet_id: 10,
+    erstellt_von: 1,
+    erstellt_at: '',
+    geaendert_at: '',
+  };
+  const GEBIET = {
+    id: 10,
+    einsatz_id: 1,
+    label: 'Nord',
+    zonen_ids: [7],
+    hoechste_warnstufe: 'keine',
+  };
+  const ZONE_EB = {
+    ...ZONE_GG,
+    id: 8,
+    typ: 'evakuierungsbezirk',
+    label: null,
+    gefahrengebiet_id: null,
+    evakuierungsbezirk_id: 5,
+  };
+  const UFER = {
+    id: 5,
+    einsatz_id: 1,
+    bezeichnung: 'Uferstraße 12–40',
+    plan_personen: 640,
+    plan_erhebung: 'geschaetzt',
+    raeumung: 'laeuft',
+    flaechen: 1,
+    angelegt_at: '',
+  };
+  const NORD = { ...ABSCHNITT_OHNE_FLAECHE, ueber_abschnitt_id: null, flaeche_geojson: POLYGON };
+  type Nutzer = ReturnType<typeof userEvent.setup>;
+
+  /** Zählt die Datenstände: 0 beim Öffnen, danach je {@link abhaengigkeitNeu} eins mehr. */
+  let runde = 0;
+  beforeEach(() => {
+    runde = 0;
+    objekteVorn();
+  });
+
+  interface Fall {
+    name: string;
+    route: string;
+    /** Antworten, die sich mit der Runde ändern: daran hängt eine Abhängigkeit des Effekts. */
+    handler?: () => Parameters<typeof basisHandler>[0];
+    /** Eine Änderung außerhalb der Daten (Bildschirmbreite). */
+    aendern?: () => void;
+    /** Wartet, bis der Auftrag gewirkt hat. */
+    gewirkt: () => Promise<unknown>;
+    /** Macht ihn so rückgängig, wie eine Person es täte. */
+    aufheben: (user: Nutzer) => Promise<unknown>;
+    /** Steht seine Wirkung (wieder)? */
+    wirkt: () => boolean;
+  }
+
+  const FAELLE: Fall[] = [
+    {
+      name: 'Gefahrengebiet',
+      route: '/einsaetze/1/lagekarte?gefahrengebiet=10',
+      // Eine Zone ändert sich (Live-Ereignis): neue Zonenliste.
+      handler: () => [
+        http.get('/api/einsaetze/1/zonen', () =>
+          HttpResponse.json([{ ...ZONE_GG, geaendert_at: String(runde) }]),
+        ),
+        http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([GEBIET])),
+      ],
+      gewirkt: () => screen.findByLabelText('Gehört zu Gefahrengebiet'),
+      aufheben: (user) => user.keyboard('{Escape}'),
+      wirkt: () => screen.queryByLabelText('Gehört zu Gefahrengebiet') != null,
+    },
+    {
+      name: 'Evakuierungsbezirk',
+      route: '/einsaetze/1/lagekarte?evakuierungsbezirk=5',
+      handler: () => [
+        http.get('/api/einsaetze/1/zonen', () =>
+          HttpResponse.json([{ ...ZONE_EB, geaendert_at: String(runde) }]),
+        ),
+        http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke: [UFER] })),
+      ],
+      gewirkt: () => screen.findByLabelText('Gehört zu Evakuierungsbezirk'),
+      aufheben: (user) => user.keyboard('{Escape}'),
+      wirkt: () => screen.queryByLabelText('Gehört zu Evakuierungsbezirk') != null,
+    },
+    {
+      name: 'Platzieren',
+      route: '/einsaetze/1/lagekarte?platzieren=schaden:10',
+      // Die Modulfreigaben ändern sich (ein anderes Modul wird gesperrt).
+      handler: () => [
+        http.get('/api/einsaetze/1/modul-freigaben', () =>
+          HttpResponse.json(freigabenFixture(runde > 0 ? { personen: { zugriff: false } } : {})),
+        ),
+      ],
+      gewirkt: () => waitFor(() => expect(platzierModusAn()).toBe(true)),
+      aufheben: async (user) =>
+        user.click(await screen.findByRole('button', { name: 'Abbrechen' })),
+      wirkt: platzierModusAn,
+    },
+    {
+      name: 'Zeichnen',
+      route: '/einsaetze/1/lagekarte?zeichnen=gefahrengebiet',
+      // Die Bezirksliste lädt neu (der Fall aus PR #878).
+      handler: () => [
+        http.get('/api/einsaetze/1/evakuierung', () =>
+          HttpResponse.json({ bezirke: runde > 0 ? [UFER] : [] }),
+        ),
+      ],
+      gewirkt: () => screen.findByText('Gefahrengebiet · Fläche'),
+      aufheben: (user) => user.keyboard('{Escape}'),
+      wirkt: () => screen.queryByText('Gefahrengebiet · Fläche') != null,
+    },
+    {
+      name: 'Zentrum',
+      route: '/einsaetze/1/lagekarte?zentrum=52.52,13.405',
+      // Das Koordinatenformat des Einsatzes ändert sich (`EinsatzAnzeigeProvider`): neue Formatter.
+      handler: () => [
+        http.get('/api/einsaetze/1/einstellungen', () =>
+          HttpResponse.json({
+            ...EINSTELLUNGEN,
+            koordinatenformat: runde > 0 ? 'utm' : null,
+          }),
+        ),
+      ],
+      gewirkt: () => screen.findByRole('region', { name: 'Suchnadel' }),
+      aufheben: (user) => user.click(screen.getByRole('button', { name: 'Suchnadel entfernen' })),
+      wirkt: () => screen.queryByRole('region', { name: 'Suchnadel' }) != null,
+    },
+    {
+      name: 'Ort',
+      route: '/einsaetze/1/lagekarte?ort=Rathaus',
+      handler: () => [
+        http.get('/api/einsaetze/1/karte/ort-suche', () =>
+          HttpResponse.json({
+            zustand: 'ok',
+            treffer: [
+              { lat: 51.1, lon: 10.4, name: 'Rathaus, A' },
+              { lat: 48.1, lon: 11.5, name: 'Rathaus, B' },
+            ],
+          }),
+        ),
+      ],
+      // Das Gerät dreht sich (Tablet hochkant): die Leiste wechselt ihre Klasse.
+      aendern: () => setzeViewportBreite(390),
+      gewirkt: () =>
+        waitFor(() => expect(screen.getByLabelText('Kartenobjekte suchen')).toHaveValue('Rathaus')),
+      aufheben: (user) => user.clear(screen.getByLabelText('Kartenobjekte suchen')),
+      wirkt: () =>
+        (screen.queryByLabelText('Kartenobjekte suchen') as HTMLInputElement | null)?.value ===
+        'Rathaus',
+    },
+    {
+      name: 'Abschnitt',
+      route: '/einsaetze/1/lagekarte?abschnitt=3',
+      handler: () => [
+        http.get('/api/einsaetze/1/abschnitte', () =>
+          HttpResponse.json([{ ...NORD, tz_fachaufgabe: runde > 0 ? 'Sanitätsdienst' : null }]),
+        ),
+      ],
+      gewirkt: () =>
+        waitFor(() =>
+          expect(document.querySelector('[data-lfh="fokus-band"]')).toHaveTextContent('EA Nord'),
+        ),
+      aufheben: async (user) =>
+        user.click(await screen.findByRole('button', { name: 'Fokus aufheben' })),
+      wirkt: () => document.querySelector('[data-lfh="fokus-band"]') != null,
+    },
+  ];
+
+  /** Eine Abhängigkeit des Effekts ändert sich: neue Daten (und ggf. eine neue Breite). */
+  async function abhaengigkeitNeu(fall: Fall, client: QueryClient) {
+    runde += 1;
+    await act(async () => {
+      fall.aendern?.();
+      await client.invalidateQueries();
+    });
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+  }
+
+  /** Ein Link derselben Art aus der App: ein neuer Verlaufseintrag mit demselben Auftrag. */
+  function NeuerLink({ ziel }: { ziel: string }) {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate(ziel)}>neuer-link</button>;
+  }
+
+  it.each(FAELLE)(
+    '$name: ein hängender Router-Commit wendet den Auftrag nicht noch einmal an',
+    async (fall) => {
+      basisHandler(fall.handler?.());
+      const user = userEvent.setup();
+      const { client } = renderMitProviders(
+        <AdresseSteht>
+          <EinsatzAnzeigeProvider einsatzId={1}>
+            <Routes>
+              <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+            </Routes>
+          </EinsatzAnzeigeProvider>
+        </AdresseSteht>,
+        { route: fall.route },
+      );
+      await fall.gewirkt();
+      await fall.aufheben(user);
+      await waitFor(() => expect(fall.wirkt()).toBe(false));
+
+      await abhaengigkeitNeu(fall, client);
+      expect(fall.wirkt()).toBe(false);
+    },
+  );
+
+  it.each(FAELLE)('$name: ein neuer Link derselben Art wirkt wieder', async (fall) => {
+    basisHandler(fall.handler?.());
+    const user = userEvent.setup();
+    renderMitProviders(
+      <>
+        <EinsatzAnzeigeProvider einsatzId={1}>
+          <Routes>
+            <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+          </Routes>
+        </EinsatzAnzeigeProvider>
+        <NeuerLink ziel={fall.route} />
+        <LocationSonde />
+      </>,
+      { route: fall.route },
+    );
+    await fall.gewirkt();
+    await waitFor(() => expect(screen.getByTestId('location-search')).toBeEmptyDOMElement());
+    await fall.aufheben(user);
+    await waitFor(() => expect(fall.wirkt()).toBe(false));
+
+    await user.click(screen.getByRole('button', { name: 'neuer-link' }));
+    await fall.gewirkt();
+    await waitFor(() => expect(screen.getByTestId('location-search')).toBeEmptyDOMElement());
   });
 });
