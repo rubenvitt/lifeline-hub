@@ -45,6 +45,10 @@ bereiche_von() {
     # (designSystem.guard.test.ts); die README schneidet es aus den Frontend-Regeln.
     docs/design/design-system/project/* | frontend/AGENTS.md)
       echo "frontend" ;;
+    # Vitest liest die Modulliste der Website und vergleicht sie mit der Registry
+    # (websiteModule.guard.test.ts, LLH-1378). Steht vor der Website-Regel unten.
+    website/src/daten/module.json)
+      echo "frontend" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
     # liest keine Suite; Prettier über `frontend/**/*.md` läuft in den Schnellprüfungen.
