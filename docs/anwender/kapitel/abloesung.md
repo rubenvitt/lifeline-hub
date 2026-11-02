@@ -114,26 +114,37 @@ getauscht wird:
    mitlaufen.
 3. Unter „Neue Besatzung“ die Personen wählen, die übernehmen. Wer schon zur bisherigen Besatzung
    gehört, fehlt in der Liste; wer eine andere Einheit führt, steht dort gesperrt mit „· führt …“.
+   Ist der Wechsel geplant, stehen Art, Personen und ihre Verteilung schon da.
 
-   ![Dialog „Ablösung Sanitätszug Musterstadt vollziehen“ mit Art „Besatzungswechsel“, der bisherigen Besatzung und den neuen Personen „Lena Brandt“ und „Tom Weber“](../bilder/abloesung/besatzungswechsel.png)
+   ![Dialog „Ablösung Sanitätszug Musterstadt vollziehen“ mit Art „Besatzungswechsel“, der bisherigen Besatzung und den neuen Personen „Lena Brandt“ und „Tom Weber“ sowie dem eingeklappten „Verteilen · alle in Sanitätszug Musterstadt“](../bilder/abloesung/besatzungswechsel.png)
 
-4. „Zeitpunkt“ leer lassen für jetzt oder den Zeitpunkt des Wechsels wählen.
-5. „Vollziehen“ wählen. Die Einheit behält ihr Fahrzeug, ihren Abschnitt und eine Folgeschicht mit
-   demselben Rhythmus; die abgelöste Schicht steht unter „Vergangen“, „Abgelöst“ mit
-   „Besatzungswechsel · neu: …“.
-6. „Rückgängig“ in der Meldung oder später „Vollzug zurücknehmen“ stellt die alte Besatzung wieder
+4. Sollen Personen in eine Untereinheit oder auf ein Fahrzeug, „Verteilen“ aufklappen und je
+   Person Einheit und Fahrzeug wählen. Der Kopf zeigt „alle in …“, solange alle in die Einheit
+   selbst kommen, sonst wie viele verteilt sind. Ohne Untereinheiten und Fahrzeuge fehlt
+   „Verteilen“.
+5. „Zeitpunkt“ leer lassen für jetzt oder den Zeitpunkt des Wechsels wählen.
+6. „Vollziehen“ wählen. Die Einheit behält ihr Fahrzeug, ihren Abschnitt und eine Folgeschicht mit
+   demselben Rhythmus; die Karte der Folgeschicht zeigt „nach Besatzungswechsel · Besatzung: …“.
+   Die abgelöste Schicht steht unter „Vergangen“, „Abgelöst“ mit „Besatzungswechsel · neu: …“.
+7. „Rückgängig“ in der Meldung oder später „Vollzug zurücknehmen“ stellt die alte Besatzung wieder
    her.
 
-### Ablösende Einheit planen und Rhythmus ändern
+### Ablösung planen und Rhythmus ändern
 
 Für Einsatzleitung und Führungspersonal:
 
 1. Auf der Karte das Menü „Aktionen zu …“ (drei Punkte) öffnen.
-2. „Ablösende Einheit planen“ wählen, unter „Ablösende Einheiten“ eine oder mehrere Einheiten
-   wählen (höchstens acht) und „Speichern“ wählen. Ist eine Einheit
+2. „Ablösung planen“ wählen. Mit „Ganze Einheit“ unter „Ablösende Einheiten“ eine oder mehrere
+   Einheiten wählen (höchstens acht) und „Speichern“ wählen. Ist eine Einheit
    schon für eine andere Schicht geplant oder steht sie selbst im Einsatz, nennt eine Meldung das,
    etwa „2. Rettungsstaffel schon für Schicht Florian 1 geplant“ oder „… steht selbst im Einsatz
    seit 1340“. Die Planung gilt trotzdem.
+
+   Mit „Besatzungswechsel“ stattdessen die neue Besatzung wählen und bei Bedarf verteilen, wie
+   beim Vollzug. Die Karte zeigt dann „Besatzungswechsel geplant · neu: …“, und beim Vollzug ist
+   alles vorbelegt. Geplant ist entweder das eine oder das andere; wer zur anderen Art wechselt
+   und speichert, hebt die bisherige Planung auf. Leer gespeichert hebt die Planung auf.
+
 3. Für einen anderen Rhythmus „Rhythmus ändern“ wählen, den Wert als Dauer eintragen und
    „Speichern“ wählen. Hat der Abschnitt oder der Einsatz eine Vorgabe, lässt ein leeres Feld die
    Schicht wieder ihr folgen.
@@ -177,7 +188,8 @@ Marken.
 Ist zwei Stunden vor der Fälligkeit noch keine ablösende Einheit geplant, kommt der Hinweis
 „Keine ablösende Einheit geplant“, ebenfalls mit Einheit und Uhrzeit der Fälligkeit. Wie lange
 vorher, legt der Planungsvorlauf des Schichtmodells fest. Er kommt einmal; ändert sich die
-Fälligkeit, kommt er zur neuen Zeit. Ist eine Einheit geplant, kommt er nicht; wird die Planung
+Fälligkeit, kommt er zur neuen Zeit. Ist eine Einheit oder ein Besatzungswechsel geplant, kommt
+er nicht; wird die Planung
 aufgehoben oder entfällt sie, steht er wieder an, solange seine Zeit noch nicht vorbei ist. Er
 ändert die Einstufung der Karte nicht.
 
@@ -290,12 +302,18 @@ Beim Besatzungswechsel bleiben die Einheit, ihr Fahrzeug und ihr Abschnitt; die 
 läuft an derselben Einheit weiter, ihre Untereinheiten laufen wie vorher darin mit. Die bisherige
 Besatzung sind alle Personen, die beim Vollzug der Einheit oder einer dieser Untereinheiten
 zugeordnet sind. Sie verlassen ihre Einheit, ein Fahrzeug dieser Einheiten und eine Führung dort
-und bleiben im Einsatz, ohne Einheit. Die neue Besatzung kommt in die Einheit selbst; wer sie auf
-Untereinheiten und Fahrzeuge verteilt, tut das danach im Modul Einheiten. Eine Person, die eine
-andere Einheit führt, lässt sich nicht wählen, bis sie die Führung dort abgibt.
+und bleiben im Einsatz, ohne Einheit. Die neue Besatzung kommt in die Einheit selbst oder, mit
+„Verteilen“, in eine dieser Untereinheiten und auf ein Fahrzeug dieser Einheiten; ohne
+gewähltes Fahrzeug behält eine Person ihres. Das Einsatztagebuch nennt die Verteilung, wo sie
+abweicht, etwa „Neue Besatzung: «Cora Neu» (Gruppe 1, Florian 1-44), «Dirk Neu».“ Eine Person,
+die eine andere Einheit führt, lässt sich nicht wählen, bis sie die Führung dort abgibt.
+
+Ein geplanter Besatzungswechsel prüft die Personen schon beim Planen. Wer bis zum Vollzug
+entlassen ist oder nicht mehr wählbar, fehlt in der Vorbelegung.
 
 Die Rücknahme legt jede Person zurück, solange sie noch so steht, wie der Wechsel sie hinterlassen
-hat; wer danach von Hand umgehängt wurde, bleibt dort. Der Besatzungswechsel braucht die Module
+hat, auch aus der Untereinheit und vom Fahrzeug, auf die sie verteilt wurde; wer danach von Hand
+umgehängt wurde, bleibt dort. Der Besatzungswechsel braucht die Module
 Einheiten und Personal; fehlt eines, steht „Besatzungswechsel“ gesperrt mit „Modul Einheiten
 gesperrt“ bzw. „Modul Personal gesperrt“. Einsatzdauer und Ruhezeit je Person rechnet die Ablösung
 nicht; sie stehen in der Kräfte-Zeitachse.
@@ -327,6 +345,9 @@ die in ihrer Schicht mitlaufen.
 Steht eine ablösende Einheit beim Vollzug in einem Bereitstellungsraum, ruft der Vollzug sie
 dort ab und lässt sie ausrücken; war sie schon abgerufen, tritt sie nur aus. Dafür braucht es das
 Modul Bereitstellungsräume nicht.
+
+Nach der Rücknahme gilt wieder die Planung von vor dem Vollzug: die geplanten ablösenden
+Einheiten, auch wenn der Vollzug andere oder keine nannte, bzw. der geplante Besatzungswechsel.
 
 Die Rücknahme legt auch das zurück, solange es noch so steht, wie der Vollzug es hinterlassen
 hat: Die abgelöste Einheit verlässt den Raum wieder, die Entlassung wird gestrichen, und eine

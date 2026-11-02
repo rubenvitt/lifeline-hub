@@ -18,6 +18,8 @@ const schicht = (over: Partial<Abloesung> & { id: number; einheit_id: number }):
   uebernommen_bei_vollzug: false,
   art: 'einheit',
   besatzung: [],
+  besatzung_plan: [],
+  nach_besatzungswechsel: [],
   verbleib: 'ruhe' as const,
   beginn_quelle: 'hand' as const,
   abschnitt_uebergeben: false,

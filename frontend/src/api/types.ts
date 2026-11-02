@@ -800,6 +800,20 @@ export type AbloesungVerbleib = S['AbloesungVerbleib'];
 export type BeginnQuelle = S['BeginnQuelle'];
 export type AbloesungBesatzung = S['AbloesungBesatzung'];
 export type BesatzungRolle = S['BesatzungRolle'];
+/** Eine Person des geplanten Besatzungswechsels samt Verteilung (LLH-1319). */
+export type AbloesungBesatzungPlan = S['AbloesungBesatzungPlan'];
+
+/**
+ * Kein Backend-Schema: eine Person der neuen Besatzung mit Verteilung (LLH-1319,
+ * `abloesung::BesatzungZiel`). `einheit_id` fehlt = die Einheit der Schicht, sonst eine erbende
+ * Untereinheit (422); `fahrzeug_id` fehlt = die Person behält ihr Fahrzeug, sonst ein aktives
+ * Fahrzeug einer dieser Einheiten (404/409/422).
+ */
+export interface BesatzungZielEingabe {
+  personal_id: number;
+  einheit_id?: number;
+  fahrzeug_id?: number;
+}
 
 // ============================== LLH-1375 Einsatz-Vorlagen ==============================
 /**
@@ -869,13 +883,17 @@ export interface SchichtBeginnenBody {
  * Schlüssel fehlt = unverändert · `rhythmus_minuten: null` = zurück zur Abschnittsvorgabe ·
  * `abloeser_ids: []` = Planung aufheben. `abloeser_ids` (LLH-1132, höchstens
  * `ABLOESUNG_ABLOESER_MAX`) ersetzt die Liste der Ablöser; die Einzelangabe
- * `abloesende_einheit_id` ist Bestand und nicht zugleich erlaubt (422).
+ * `abloesende_einheit_id` ist Bestand und nicht zugleich erlaubt (422). `besatzung_plan`
+ * (LLH-1319, höchstens `ABLOESUNG_BESATZUNG_MAX`) ersetzt den geplanten Besatzungswechsel, `[]`
+ * hebt ihn auf; eine Schicht plant entweder Ablöser oder einen Besatzungswechsel (sonst 422),
+ * der Dialog sendet deshalb beide Listen.
  */
 export interface SchichtAendernBody {
   beginn_at?: string;
   rhythmus_minuten?: number | null;
   abloesende_einheit_id?: number | null;
   abloeser_ids?: number[];
+  besatzung_plan?: BesatzungZielEingabe[];
 }
 
 /**
@@ -885,7 +903,8 @@ export interface SchichtAendernBody {
  * `art: 'besatzung'` (LLH-1150) mit `besatzung_ids` (`einsatz_personal.id`, höchstens
  * `ABLOESUNG_BESATZUNG_MAX`, Pflicht) ist der Besatzungswechsel, ohne Ablöser und ohne
  * Abschnittsübergabe (sonst 422); er verlangt ebenfalls die Freigabe des Moduls Einheiten.
- * `verbleib` (LLH-1308, fehlt = `ruhe`) nur bei `art: 'einheit'`; `bereitstellungsraum` braucht
+ * Statt `besatzung_ids` nimmt `besatzung` (LLH-1319) die Personen mit Verteilung; beide zugleich
+ * → 422. `verbleib` (LLH-1308, fehlt = `ruhe`) nur bei `art: 'einheit'`; `bereitstellungsraum` braucht
  * `verbleib_br_id` (aktiver Raum) und die Freigabe des Moduls Bereitstellungsräume (sonst 403).
  */
 export interface VollzugBody {
@@ -895,6 +914,7 @@ export interface VollzugBody {
   abschnitt_uebergeben?: boolean;
   art?: AbloesungArt;
   besatzung_ids?: number[];
+  besatzung?: BesatzungZielEingabe[];
   verbleib?: AbloesungVerbleib;
   verbleib_br_id?: number;
 }

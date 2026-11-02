@@ -26,6 +26,11 @@ LLH-1150 (Entscheidung LLH-1118 Punkt 4) hebt das Non-Goal „keine Personal-Ebe
 Personal wechselt; die Schicht hält fest, wer ging und wer kam. Es bleibt dabei, dass die Ablösung
 keine Grenzwerte und keine Ruhezeit je Person rechnet (LFH-860).
 
+LLH-1319 (Folge aus LLH-1150) ergänzt den Besatzungswechsel: er lässt sich vorab planen, die neue
+Besatzung wird beim Vollzug auf die Einheit, ihre Erben und deren Fahrzeuge verteilt, und die
+Folgeschicht nennt die Besatzung, mit der sie begann. Die Rücknahme eines Vollzugs stellt die
+Planung von vor dem Vollzug wieder her.
+
 ## Requirements
 
 ### Requirement: Schicht einer Einheit
@@ -331,8 +336,11 @@ laufende Schicht selbst schon eine Folgeschicht, MUST der Vollzug mit 422 scheit
 Das System SHALL einen Vollzug zurücknehmen, solange jede daraus entstandene Folgeschicht
 unberührt ist, also noch laufend und ohne eigenen Vollzug. Bei der Rücknahme MUST jede neu
 angelegte Folgeschicht samt ihrer Fristen entfernt werden; eine übernommene MUST nur vom
-Vorgänger gelöst werden und samt Fristen weiterlaufen. Die Liste der Ablöser bleibt als
-Planung stehen. Die abgelöste Schicht MUST wieder laufend
+Vorgänger gelöst werden und samt Fristen weiterlaufen. Die Rücknahme MUST die Planung
+wiederherstellen, die vor dem Vollzug galt (LLH-1319): die Ablöser-Liste wie geplant (auch wenn
+der Vollzug andere oder keine Ablöser nannte) und einen geplanten Besatzungswechsel; erst danach
+MUST die Planungs-Frist gesetzt werden. Ein Vollzug ohne gesicherte Planung (vor LLH-1319
+vollzogen) lässt die Liste des Vollzugs als Planung stehen. Die abgelöste Schicht MUST wieder laufend
 sein, ihre Fristen MUST wieder offen sein, ohne dass eine schon erfolgte Auslösung
 wiederholt wird. Die Vorwarn-Frist MUST dabei der aktuellen Vorwarnzeit folgen; folgt die
 Schicht der Vorgabe des Einsatzes und rechnet deren Regel inzwischen anders, MUST die neue
@@ -382,6 +390,14 @@ ETB MUST nennen, was zurückgelegt wurde. Danach MUST der Verbleib wieder `ruhe`
 #### Scenario: Entlassung zurück
 - **WHEN** ein Vollzug mit Verbleib „entlassen“ zurückgenommen wird
 - **THEN** sind die Entlassungen gestrichen, die Perioden wieder offen und die Schicht läuft
+
+#### Scenario: Planung nach Vollzug ohne Ablöser
+- **WHEN** an der Schicht von „Florian 1“ „Florian 2“ geplant ist, die Schicht ohne ablösende Einheit vollzogen und der Vollzug zurückgenommen wird
+- **THEN** ist „Florian 2“ wieder als Ablöser geplant
+
+#### Scenario: Planung nach Besatzungswechsel
+- **WHEN** ein geplanter Besatzungswechsel vollzogen und zurückgenommen wird
+- **THEN** ist er wieder geplant, mit denselben Personen und derselben Verteilung
 
 ### Requirement: Rechte und Modulsichtbarkeit
 
@@ -706,8 +722,9 @@ Das System SHALL für jede laufende Schicht ohne geplante ablösende Einheit ein
 führen, den Planungsvorlauf vor der Fälligkeit (aus dem Schichtmodell des Einsatzes, ohne eines
 2 h; LLH-1118 Punkt 5). Erreicht der Scheduler sie, MUST er genau einmal die Benachrichtigung
 `abloesung_planung` („Keine ablösende Einheit geplant“, Hinweis) an alle Leser des Moduls Ablösung
-melden. Die Frist MUST mit der Fälligkeit und mit dem Planungsvorlauf wandern, beim Planen einer
-ablösenden Einheit (auch über die Ablöser-Liste) schließen und mit einer aufgehobenen oder
+melden. Geplant MUST heißen: Einzelplanung, Ablöser-Liste oder geplanter Besatzungswechsel
+(LLH-1319). Die Frist MUST mit der Fälligkeit und mit dem Planungsvorlauf wandern, beim Planen einer
+ablösenden Einheit (auch über die Ablöser-Liste) oder eines Besatzungswechsels schließen und mit einer aufgehobenen oder
 entfallenen Planung wieder entstehen, solange ihr Zeitpunkt noch vor uns liegt; ein Zeitpunkt in
 der Vergangenheit MUST keine Frist ergeben. Der Planungshinweis MUST NOT eine Einstufung sein:
 es bleibt bei `planmaessig`, `vorwarnung` und `ueberfaellig`.
@@ -984,7 +1001,7 @@ Besatzung MUST die Personalzuordnung der Einheit und jeder Untereinheit sein, di
 (Knoten-Vererbung, dieselbe Menge wie der Fan-out der ganzen Einheit); jede ihrer Personen MUST
 ihre Einheit, ein Fahrzeug dieser Einheiten und deren Führung verlassen. Die neue Besatzung
 (Pflicht, höchstens `BESATZUNG_MAX = 50` Personen des Einsatzes) MUST der Einheit zugeordnet
-werden. Die Schicht MUST beide Besatzungen nennen (`besatzung`, Rolle `alt`/`neu`, Tabelle
+werden, sofern der Vollzug sie nicht verteilt (Requirement „Besatzungswechsel verteilen“). Die Schicht MUST beide Besatzungen nennen (`besatzung`, Rolle `alt`/`neu`, Tabelle
 `einsatz_abloesung_besatzung`), und ein ETB-Eintrag MUST Einheit, alte und neue Besatzung nennen.
 Abgelehnt werden MUST, ohne etwas zu ändern: eine unbekannte oder fremde Person (404), eine
 entlassene oder stornierte (409), eine aus der alten Besatzung oder die Führung einer anderen
@@ -1015,7 +1032,9 @@ sperren (`ruecknehmbar`). Sie MUST die Personen-Ereignisse des Vollzugs streiche
 zurücklegen, solange sie noch so steht, wie der Vollzug sie hinterlassen hat: die neue Besatzung
 in ihre bisherige Einheit (solange sie noch in der Einheit steht), die alte in ihre Einheit, auf
 ihr Fahrzeug und in ihre Führung (solange sie ohne Einheit, ohne Fahrzeug bzw. die Einheit ohne
-Führung ist). Danach MUST die Schicht wieder Art `einheit` tragen und keine Besatzung nennen.
+Führung ist). Eine verteilte Person der neuen Besatzung MUST aus ihrer Ziel-Einheit zurückgelegt
+werden, solange sie noch dort steht, und vom Ziel-Fahrzeug auf ihr vorheriges (aktives, sonst
+keins), solange sie noch darauf sitzt (LLH-1319). Danach MUST die Schicht wieder Art `einheit` tragen und keine Besatzung nennen.
 Bräche die Streichung die Folge einer Person, MUST die Rücknahme mit 422 scheitern, die Person
 nennen und nichts ändern.
 
@@ -1035,7 +1054,10 @@ Besatzung sichtbar vorbelegt zeigen (kein Feld) und die neue Besatzung als Pflic
 Personen wählen lassen; nicht wählbar ist, wer zur bisherigen gehört, wer eine andere Einheit
 führt, steht gesperrt mit Grund in der Liste. Ohne Freigabe der Module Einheiten oder Personal
 MUST „Besatzungswechsel“ gesperrt sein, mit dem Grund daneben. Mehr als Art, Kräfte und Zeitpunkt
-hat er nicht („Abschnitt übergeben“ gehört als Option zu den Ablösern). Die abgelöste Karte MUST
+hat er nicht („Abschnitt übergeben“ gehört als Option zu den Ablösern); beim Besatzungswechsel
+MUST darunter das eingeklappte Klappteil „Verteilen“ stehen (Requirement „Besatzungswechsel
+verteilen“, LLH-1319). Der Dialog „Ablösung planen“ MUST dieselbe Art-Wahl tragen und beim
+Besatzungswechsel dieselben Felder (ohne Zeitpunkt). Die abgelöste Karte MUST
 „Besatzungswechsel · neu: …“ mit der neuen Besatzung zeigen.
 
 #### Scenario: Wechsel aus dem Dialog
@@ -1045,6 +1067,78 @@ hat er nicht („Abschnitt übergeben“ gehört als Option zu den Ablösern). D
 #### Scenario: Modul Personal gesperrt
 - **WHEN** der Person die Freigabe des Moduls Personal fehlt
 - **THEN** ist „Besatzungswechsel“ gesperrt, daneben steht „Modul Personal gesperrt“
+
+### Requirement: Besatzungswechsel planen
+
+Das System SHALL an einer laufenden Schicht einen Besatzungswechsel vormerken: die neue
+Besatzung als Liste von Personen (höchstens `BESATZUNG_MAX`, entdoppelt nach Person, gezählt vor
+dem Entdoppeln), je Person optional eine Ziel-Einheit und ein Fahrzeug (Regeln wie
+„Besatzungswechsel verteilen“). Die Liste ersetzt die bisherige, eine leere hebt die Planung
+auf. Eine Schicht MUST entweder Ablöser oder einen Besatzungswechsel geplant haben; ergäbe eine
+Änderung beides, MUST das System mit 422 antworten und nichts ändern. Beim Planen MUST das System
+die Personen prüfen wie beim Vollzug (404, 409, 422). Ein geplanter Besatzungswechsel MUST als
+Planung gelten: er schließt den Planungshinweis, sein Aufheben öffnet ihn wieder. Ein ETB-Eintrag
+MUST die Planung nennen. Die laufende Schicht MUST die Planung tragen (`besatzung_plan`), ihre
+Karte MUST einzeilig „Besatzungswechsel geplant · neu: …“ zeigen, und der Vollzug-Dialog MUST
+mit Art „Besatzungswechsel“ und den noch wählbaren Personen samt Verteilung vorbelegt sein.
+
+#### Scenario: Wechsel vormerken
+- **WHEN** an der laufenden Schicht von „Florian 1“ ein Besatzungswechsel mit „Cora Neu“ und „Dirk Neu“ geplant wird
+- **THEN** zeigt die Karte „Besatzungswechsel geplant · neu: Cora Neu, Dirk Neu“, das ETB nennt „Ablösung «Florian 1»: Besatzungswechsel geplant, neu «Cora Neu», «Dirk Neu»“, und es kommt kein Planungshinweis
+
+#### Scenario: Ablöser und Besatzung zugleich
+- **WHEN** an einer Schicht mit geplantem Ablöser „Florian 2“ ein Besatzungswechsel geplant wird, ohne die Ablöser zu leeren
+- **THEN** antwortet das System mit 422, und die Planung bleibt „Florian 2“
+
+#### Scenario: Aufheben
+- **WHEN** der geplante Besatzungswechsel aufgehoben wird und die Fälligkeit noch mehr als den Planungsvorlauf entfernt ist
+- **THEN** trägt die Schicht keine Planung, und der Planungshinweis steht wieder an
+
+#### Scenario: Vorbelegt im Vollzug
+- **WHEN** jemand an dieser Schicht „Ablösung vollziehen“ wählt
+- **THEN** steht „Besatzungswechsel“, „Cora Neu“ und „Dirk Neu“ stehen im Feld „Neue Besatzung“ mit ihrer geplanten Verteilung
+
+#### Scenario: Geplante Person inzwischen entlassen
+- **WHEN** „Dirk Neu“ nach der Planung entlassen wurde und jemand „Ablösung vollziehen“ wählt
+- **THEN** steht nur „Cora Neu“ vorbelegt im Feld
+
+### Requirement: Besatzungswechsel verteilen
+
+Der Besatzungswechsel SHALL je neuer Person eine Ziel-Einheit und ein Fahrzeug annehmen
+(`besatzung: [{personal_id, einheit_id?, fahrzeug_id?}]`, neben dem Bestand `besatzung_ids`;
+beide zugleich MUST 422 sein). Die Ziel-Einheit MUST die Einheit der Schicht oder eine
+Untereinheit sein, die ihre Schicht erbt (sonst 422); ohne Angabe gilt die Einheit. Das Fahrzeug
+MUST ein Fahrzeug des Einsatzes (sonst 404), aktiv (sonst 409) und einer dieser Einheiten
+zugeordnet sein (sonst 422); ohne Angabe behält die Person ihr Fahrzeug. Die Rücknahme MUST jede
+Person aus ihrer Ziel-Einheit zurücklegen, solange sie noch dort steht, und vom Ziel-Fahrzeug auf
+ihr vorheriges, solange sie noch darauf sitzt. Der ETB-Eintrag des Vollzugs MUST die Verteilung
+nennen, wo sie von der Vorgabe abweicht. Der Dialog MUST die Verteilung in einem Klappteil
+„Verteilen“ anbieten, dessen Kopf die Abweichung nennt; ohne Erben und Fahrzeuge fehlt es.
+
+#### Scenario: In die Gruppe, auf das Fahrzeug
+- **WHEN** die Schicht von „Florian 1“ (mit erbender „Gruppe 1“ und Fahrzeug „Florian 1-44“) als Besatzungswechsel mit „Cora Neu“ nach „Gruppe 1“ auf „Florian 1-44“ und „Dirk Neu“ ohne Angabe vollzogen wird
+- **THEN** gehört „Cora Neu“ zu „Gruppe 1“ und sitzt auf „Florian 1-44“, „Dirk Neu“ gehört zu „Florian 1“
+- **AND** das ETB nennt „Neue Besatzung: «Cora Neu» (Gruppe 1, Florian 1-44), «Dirk Neu».“
+- **AND** nach der Rücknahme steht „Cora Neu“ wieder in ihrer bisherigen Einheit und auf ihrem bisherigen Fahrzeug
+
+#### Scenario: Fremde Einheit als Ziel
+- **WHEN** „Florian 2“ als Ziel-Einheit eines Besatzungswechsels von „Florian 1“ genannt wird
+- **THEN** antwortet das System mit 422, und die Schicht bleibt laufend
+
+#### Scenario: Fahrzeug einer anderen Einheit
+- **WHEN** ein Fahrzeug von „Florian 2“ als Ziel genannt wird
+- **THEN** antwortet das System mit 422 und ändert nichts
+
+### Requirement: Folgeschicht nach Besatzungswechsel
+
+Eine Schicht, deren Vorgänger als Besatzungswechsel vollzogen ist, SHALL die neue Besatzung
+dieses Wechsels tragen (`nach_besatzungswechsel`). Die Karte einer solchen laufenden Schicht MUST
+einzeilig „nach Besatzungswechsel · Besatzung: …“ zeigen, der ganze Text im Titel, ohne
+Einstufung, Kante oder Fläche zu ändern.
+
+#### Scenario: Karte der Folgeschicht
+- **WHEN** die Schicht von „Florian 1“ als Besatzungswechsel mit „Cora Neu“ und „Dirk Neu“ vollzogen ist
+- **THEN** zeigt die Karte der laufenden Folgeschicht „nach Besatzungswechsel · Besatzung: Cora Neu, Dirk Neu“
 
 ### Requirement: Herkunft des Beginns
 

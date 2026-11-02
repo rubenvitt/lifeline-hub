@@ -1,9 +1,9 @@
-import { Checkbox, Form, Input, Radio, Typography } from 'antd';
+import { Checkbox, Collapse, Form, Input, Radio, Typography, type FormInstance } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useId } from 'react';
+import { useEffect, useId, useRef, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
-import type { Abloesung, AbloesungArt, VollzugBody } from '../api/types';
+import type { Abloesung, AbloesungArt, BesatzungZielEingabe, VollzugBody } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -15,7 +15,17 @@ import {
   ABLOESUNG_RHYTHMUS_MAX_MINUTEN,
 } from '../api/eingabegrenzen';
 import { abloeserIds } from './abloeser';
-import type { BesatzungOption } from './besatzung';
+import {
+  besatzungZiele,
+  gleicheIds,
+  gleicherPlan,
+  gleicheZiele,
+  planVorbelegung,
+  verteilungKopf,
+  type BesatzungOption,
+  type Verteilung,
+  type VerteilungZiele,
+} from './besatzung';
 import { verbleibBody, verbleibOptionen, type VerbleibRaum, type VerbleibWert } from './verbleib';
 import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
@@ -191,6 +201,7 @@ interface VollzugWerte {
   abloeser_ids?: number[];
   abschnitt_uebergeben?: boolean;
   besatzung_ids?: number[];
+  verteilung?: Verteilung;
   verbleib?: VerbleibWert;
 }
 
@@ -198,6 +209,160 @@ const ART_OPTIONEN: { value: AbloesungArt; label: string }[] = [
   { value: 'einheit', label: 'Ganze Einheit' },
   { value: 'besatzung', label: 'Besatzungswechsel' },
 ];
+
+/** Die Felder des Besatzungswechsels, die Vollzug und Planung teilen. */
+interface BesatzungWerte {
+  art?: AbloesungArt;
+  besatzung_ids?: number[];
+  verteilung?: Verteilung;
+}
+
+/**
+ * Belegt die Besatzung aus dem geplanten Besatzungswechsel vor (LLH-1319, design.md D6), sobald
+ * Personal und Einheiten da sind: die Listen laden oft erst mit dem offenen Dialog, und
+ * `initialValues` greift nur beim Öffnen. Einmal je Dialog und nur, solange niemand die Besatzung
+ * angefasst hat; ein Wechsel der Art sperrt sie nicht (bei „Ganze Einheit“ zählt die Besatzung nicht).
+ * Gibt die Vorbelegung als Ziele zurück (`null` ohne): sie lässt inzwischen Entlassene und nicht
+ * mehr wählbare Ziele weg, ist für das Planen aber kein eigener Änderungswunsch.
+ */
+function usePlanVorbelegung(
+  form: FormInstance<BesatzungWerte>,
+  schicht: Abloesung | null,
+  personen: BesatzungOption[] | null,
+  verteilung: VerteilungZiele | null | undefined,
+  gesperrt: boolean,
+): RefObject<BesatzungZielEingabe[] | null> {
+  const erledigt = useRef(false);
+  const vorbelegt = useRef<BesatzungZielEingabe[] | null>(null);
+  // Eine eigene Auswahl merken: `isFieldTouched` vergisst sie, sobald das Feld beim Wechsel zu
+  // „Ganze Einheit“ verschwindet, der Wert bleibt aber stehen (`preserve`).
+  const ids = Form.useWatch('besatzung_ids', { form, preserve: true }) as number[] | undefined;
+  const gewaehlt = useRef(false);
+  useEffect(() => {
+    if (!erledigt.current && (ids ?? []).length > 0) gewaehlt.current = true;
+  }, [ids]);
+  useEffect(() => {
+    if (erledigt.current || schicht == null || gesperrt) return;
+    if ((schicht.besatzung_plan ?? []).length === 0) return;
+    if (personen == null || verteilung === undefined) return;
+    erledigt.current = true;
+    if (gewaehlt.current || form.isFieldTouched('besatzung_ids')) return;
+    const v = planVorbelegung(schicht, personen, verteilung);
+    form.setFieldsValue({ besatzung_ids: v.ids, verteilung: v.verteilung });
+    vorbelegt.current = besatzungZiele(v.ids, v.verteilung, schicht);
+  }, [form, schicht, personen, verteilung, gesperrt]);
+  return vorbelegt;
+}
+
+/** Die Art, mit der ein Dialog öffnet: ein geplanter Besatzungswechsel gibt sie vor. */
+function artVorgabe(schicht: Abloesung | null, gesperrt: boolean): AbloesungArt {
+  return !gesperrt && (schicht?.besatzung_plan ?? []).length > 0 ? 'besatzung' : 'einheit';
+}
+
+interface BesatzungFelderProps {
+  form: FormInstance<BesatzungWerte>;
+  schicht: Abloesung | null;
+  bisherigeBesatzung: string[] | null;
+  personen: BesatzungOption[];
+  verteilung: VerteilungZiele | null | undefined;
+  /** Vollzug: die neue Besatzung ist Pflicht; Planung: leer hebt die Planung auf. */
+  pflicht: boolean;
+}
+
+/**
+ * Bisherige Besatzung, neue Besatzung und das Klappteil „Verteilen“ (LLH-1319): je gewählter
+ * Person Einheit (die Einheit der Schicht oder ein Erbe) und Fahrzeug. Es bietet nur gültige Ziele
+ * an und kann deshalb keine Ablehnung auslösen; sein Kopf nennt die Abweichung von der Vorgabe
+ * (`frontend/AGENTS.md`, „Ein Pflichtfeld gehört nie hinter den Collapse“). Ohne Erben und
+ * Fahrzeuge fehlt es. `forceRender` ist tragend, sonst fehlen die Werte beim Senden.
+ */
+function BesatzungFelder({
+  form,
+  schicht,
+  bisherigeBesatzung,
+  personen,
+  verteilung,
+  pflicht,
+}: BesatzungFelderProps) {
+  const ids = (Form.useWatch('besatzung_ids', form) as number[] | undefined) ?? [];
+  const werte = Form.useWatch('verteilung', form) as Verteilung | undefined;
+  const name = new Map(personen.map((p) => [p.value, p.name]));
+  return (
+    <>
+      {/* Die bisherige Besatzung ist kein Feld: sie geht mit dem Vollzug, sichtbar vorbelegt.
+          Einzeilig, der ganze Text steht im Titel. */}
+      <Typography.Paragraph
+        type="secondary"
+        data-lfh="vollzug-bisherige-besatzung"
+        ellipsis={{ rows: 1, tooltip: false }}
+        title={bisherigeBesatzung?.join(', ')}
+      >
+        Bisherige Besatzung:{' '}
+        {bisherigeBesatzung == null
+          ? '…'
+          : bisherigeBesatzung.length > 0
+            ? bisherigeBesatzung.join(', ')
+            : 'keine'}
+      </Typography.Paragraph>
+      <Form.Item<BesatzungWerte>
+        name="besatzung_ids"
+        label="Neue Besatzung"
+        rules={pflicht ? [{ required: true, message: 'Bitte die neue Besatzung auswählen' }] : []}
+      >
+        <Select
+          mode="multiple"
+          allowClear
+          maxCount={ABLOESUNG_BESATZUNG_MAX}
+          placeholder={pflicht ? 'Personen auswählen…' : 'keine geplant'}
+          options={personen}
+        />
+      </Form.Item>
+      {schicht && verteilung && ids.length > 0 && (
+        <Collapse
+          ghost
+          data-lfh="besatzung-verteilen"
+          items={[
+            {
+              key: 'verteilen',
+              label: verteilungKopf(ids, werte, schicht),
+              forceRender: true,
+              children: ids.map((id) => {
+                const person = name.get(id) ?? String(id);
+                return (
+                  <Form.Item key={id} label={person} style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {verteilung.einheiten.length > 1 && (
+                        <Form.Item name={['verteilung', String(id), 'einheit_id']} noStyle>
+                          <Select
+                            aria-label={`Einheit für ${person}`}
+                            placeholder={schicht.einheit_name}
+                            options={verteilung.einheiten}
+                            style={{ flex: 1, minWidth: 0 }}
+                          />
+                        </Form.Item>
+                      )}
+                      {verteilung.fahrzeuge.length > 0 && (
+                        <Form.Item name={['verteilung', String(id), 'fahrzeug_id']} noStyle>
+                          <Select
+                            aria-label={`Fahrzeug für ${person}`}
+                            allowClear
+                            placeholder="Fahrzeug wie bisher"
+                            options={verteilung.fahrzeuge}
+                            style={{ flex: 1, minWidth: 0 }}
+                          />
+                        </Form.Item>
+                      )}
+                    </div>
+                  </Form.Item>
+                );
+              }),
+            },
+          ]}
+        />
+      )}
+    </>
+  );
+}
 
 interface VollzugProps {
   schicht: Abloesung | null;
@@ -215,8 +380,16 @@ interface VollzugProps {
    * (`abloesung/besatzung.ts:bisherigeBesatzung`), `null`, solange sie nicht bekannt ist.
    */
   bisherigeBesatzung?: string[] | null;
-  /** Wählbare Personen der neuen Besatzung (`abloesung/besatzung.ts:besatzungOptionen`). */
-  personen?: BesatzungOption[];
+  /**
+   * Wählbare Personen der neuen Besatzung (`abloesung/besatzung.ts:besatzungOptionen`); `null`,
+   * solange das Personal lädt.
+   */
+  personen?: BesatzungOption[] | null;
+  /**
+   * Ziele der Verteilung (`abloesung/besatzung.ts:verteilungZiele`, LLH-1319): `null` = nichts zu
+   * wählen (kein Klappteil), `undefined`, solange die Einheiten fehlen (laden oder Fehler).
+   */
+  verteilung?: VerteilungZiele | null;
   /** Grund in wenigen Wörtern, warum der Besatzungswechsel gesperrt ist (Module Einheiten, Personal). */
   besatzungGesperrt?: string;
   /** Aktive Bereitstellungsräume für „Danach“ (LLH-1308, `abloesung/verbleib.ts:verbleibRaeume`). */
@@ -241,6 +414,10 @@ interface VollzugProps {
  * „Abschnitt übergeben“ gehört als Option zu den Ablösern. Die ganze Einheit fragt zuletzt
  * „Danach“ (LLH-1308): „In Ruhe“ (Vorgabe), je aktivem Raum, „Entlassen“; ohne Freigabe des Moduls
  * Bereitstellungsräume fehlen die Räume und der Grund steht unter dem Feld.
+ *
+ * LLH-1319: Der Besatzungswechsel verteilt die neue Besatzung im Klappteil „Verteilen“ auf die
+ * Einheit, ihre Erben und deren Fahrzeuge. Ein geplanter Besatzungswechsel belegt Art, Personen
+ * (die noch wählbaren) und Verteilung vor.
  */
 export function VollzugDialog({
   schicht,
@@ -248,7 +425,8 @@ export function VollzugDialog({
   abschnittName,
   uebergabeGesperrt,
   bisherigeBesatzung = null,
-  personen = [],
+  personen = null,
+  verteilung,
   besatzungGesperrt,
   raeume = [],
   raumGesperrt,
@@ -263,6 +441,8 @@ export function VollzugDialog({
   const raumGrundId = useId();
   const art = Form.useWatch('art', form) ?? 'einheit';
   const uebergabeMoeglich = abschnittName != null && uebergabeGesperrt == null;
+  const gesperrt = besatzungGesperrt != null;
+  usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
   return (
     <ErfassungsModal<VollzugWerte>
       offen={schicht != null}
@@ -271,7 +451,7 @@ export function VollzugDialog({
       erfassenText="Vollziehen"
       laeuft={laeuft}
       initialValues={{
-        art: 'einheit',
+        art: artVorgabe(schicht, gesperrt),
         abloeser_ids: schicht ? abloeserIds(schicht) : [],
         abschnitt_uebergeben: uebergabeMoeglich,
         besatzung_ids: [],
@@ -279,11 +459,11 @@ export function VollzugDialog({
       }}
       onErfassen={(w) => {
         const vollzogen_at = w.zeitpunkt ? alsBackendZeit(w.zeitpunkt) : undefined;
-        if (w.art === 'besatzung') {
+        if (w.art === 'besatzung' && schicht) {
           return onErfassen({
             vollzogen_at,
             art: 'besatzung',
-            besatzung_ids: w.besatzung_ids ?? [],
+            besatzung: besatzungZiele(w.besatzung_ids ?? [], w.verteilung, schicht),
           });
         }
         const ids = w.abloeser_ids ?? [];
@@ -314,36 +494,14 @@ export function VollzugDialog({
         </Typography.Text>
       )}
       {art === 'besatzung' ? (
-        <>
-          {/* Die bisherige Besatzung ist kein Feld: sie geht mit dem Vollzug, sichtbar vorbelegt.
-              Einzeilig, der ganze Text steht im Titel. */}
-          <Typography.Paragraph
-            type="secondary"
-            data-lfh="vollzug-bisherige-besatzung"
-            ellipsis={{ rows: 1, tooltip: false }}
-            title={bisherigeBesatzung?.join(', ')}
-          >
-            Bisherige Besatzung:{' '}
-            {bisherigeBesatzung == null
-              ? '…'
-              : bisherigeBesatzung.length > 0
-                ? bisherigeBesatzung.join(', ')
-                : 'keine'}
-          </Typography.Paragraph>
-          <Form.Item<VollzugWerte>
-            name="besatzung_ids"
-            label="Neue Besatzung"
-            rules={[{ required: true, message: 'Bitte die neue Besatzung auswählen' }]}
-          >
-            <Select
-              mode="multiple"
-              allowClear
-              maxCount={ABLOESUNG_BESATZUNG_MAX}
-              placeholder="Personen auswählen…"
-              options={personen}
-            />
-          </Form.Item>
-        </>
+        <BesatzungFelder
+          form={form}
+          schicht={schicht}
+          bisherigeBesatzung={bisherigeBesatzung}
+          personen={personen ?? []}
+          verteilung={verteilung}
+          pflicht
+        />
       ) : (
         <>
           <Form.Item<VollzugWerte> name="abloeser_ids" label="Ablösende Einheiten">
@@ -395,32 +553,64 @@ export function VollzugDialog({
   );
 }
 
-// ── Ablöser planen ────────────────────────────────────────────────────────────
+// ── Ablösung planen ───────────────────────────────────────────────────────────
 
 interface AbloeserWerte {
+  art?: AbloesungArt;
   abloeser_ids?: number[];
+  besatzung_ids?: number[];
+  verteilung?: Verteilung;
+}
+
+/**
+ * Was der Dialog „Ablösung planen“ sendet (PATCH, beide Listen dreiwertig): nur, was sich gegenüber
+ * der Schicht geändert hat. Eine fehlende Liste bleibt unberührt.
+ */
+export interface PlanungEingabe {
+  abloeser_ids?: number[];
+  besatzung_plan?: BesatzungZielEingabe[];
 }
 
 interface AbloeserProps {
   schicht: Abloesung | null;
   einheiten: EinheitAuswahl[];
+  /** Wie im Vollzug (LLH-1319): bisherige Besatzung, Personen, Ziele der Verteilung, Sperrgrund. */
+  bisherigeBesatzung?: string[] | null;
+  personen?: BesatzungOption[] | null;
+  verteilung?: VerteilungZiele | null;
+  besatzungGesperrt?: string;
   laeuft: boolean;
   fehler: unknown;
-  /** Die geplanten Ablöser in ihrer Reihenfolge; leer = Planung aufheben. */
-  onErfassen: (abloeserIds: number[]) => Promise<unknown>;
+  /** Die Planung; eine leere Liste der gewählten Art hebt sie auf. */
+  onErfassen: (eingabe: PlanungEingabe) => Promise<unknown>;
   onSchliessen: () => void;
 }
 
-/** Ablöser planen (LLH-1132): eine Liste wie im Vollzug, sie ersetzt die bisherige Planung. */
+/**
+ * Ablösung planen (LLH-1132, LLH-1319): dieselbe Art-Wahl wie im Vollzug. „Ganze Einheit“ nimmt
+ * die Ablöser als Liste, „Besatzungswechsel“ die neue Besatzung samt Verteilung (ohne Zeitpunkt).
+ * Eine Schicht plant entweder Ablöser oder einen Besatzungswechsel; der Dialog sendet deshalb
+ * beide Listen, die der anderen Art leer (der Server lehnte beides mit 422 ab). Ohne Freigabe der
+ * Module Einheiten und Personal ist der Besatzungswechsel gesperrt mit Grund, und seine Planung
+ * bleibt beim Speichern unberührt; ebenso, solange das Personal nicht geladen ist.
+ */
 export function AbloeserDialog({
   schicht,
   einheiten,
+  bisherigeBesatzung = null,
+  personen = null,
+  verteilung,
+  besatzungGesperrt,
   laeuft,
   fehler,
   onErfassen,
   onSchliessen,
 }: AbloeserProps) {
   const [form] = Form.useForm<AbloeserWerte>();
+  const artGrundId = useId();
+  const gesperrt = besatzungGesperrt != null;
+  const art = Form.useWatch('art', form) ?? artVorgabe(schicht, gesperrt);
+  const vorbelegt = usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
   return (
     <ErfassungsModal<AbloeserWerte>
       offen={schicht != null}
@@ -428,20 +618,82 @@ export function AbloeserDialog({
       form={form}
       erfassenText="Speichern"
       laeuft={laeuft}
-      initialValues={{ abloeser_ids: schicht ? abloeserIds(schicht) : [] }}
-      onErfassen={(w) => onErfassen(w.abloeser_ids ?? [])}
+      initialValues={{
+        art: artVorgabe(schicht, gesperrt),
+        abloeser_ids: schicht ? abloeserIds(schicht) : [],
+        besatzung_ids: [],
+      }}
+      onErfassen={(w) => {
+        if (!schicht) return Promise.resolve();
+        // Solange Personal oder Einheiten fehlen, ist ein geplanter Wechsel nicht vorbelegt: er
+        // bleibt unberührt, statt geleert oder ohne seine Ziele gespeichert zu werden.
+        const planUnbekannt =
+          w.art === 'besatzung' &&
+          (schicht.besatzung_plan ?? []).length > 0 &&
+          (personen == null || verteilung === undefined);
+        const nurAbloeser = gesperrt || planUnbekannt;
+        const abloeser = nurAbloeser || w.art !== 'besatzung' ? (w.abloeser_ids ?? []) : [];
+        // Nur Geändertes senden, ohne Änderung kein Aufruf: ein unverändertes Speichern einer
+        // inzwischen überholten Ansicht schriebe sonst die alte Planung zurück. Ein Art-Wechsel
+        // ändert beide Listen und sendet sie deshalb gemeinsam. Unverändert ist auch die
+        // Vorbelegung selbst: sie räumt Entlassene nicht still aus der Planung.
+        const eingabe: PlanungEingabe = {};
+        if (!gleicheIds(abloeser, abloeserIds(schicht))) eingabe.abloeser_ids = abloeser;
+        if (!nurAbloeser) {
+          const plan =
+            w.art === 'besatzung'
+              ? besatzungZiele(w.besatzung_ids ?? [], w.verteilung, schicht)
+              : [];
+          // Der Vergleich mit der Vorbelegung gilt nur für den Besatzungswechsel: Ist keine
+          // geplante Person mehr wählbar, ist die Vorbelegung leer wie der Plan der ganzen
+          // Einheit, und deren Wechsel muss den alten Plan trotzdem aufheben.
+          const unveraendert =
+            gleicherPlan(plan, schicht) ||
+            (w.art === 'besatzung' &&
+              vorbelegt.current != null &&
+              gleicheZiele(plan, vorbelegt.current));
+          if (!unveraendert) eingabe.besatzung_plan = plan;
+        }
+        return Object.keys(eingabe).length > 0 ? onErfassen(eingabe) : Promise.resolve();
+      }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<AbloeserWerte> name="abloeser_ids" label="Ablösende Einheiten">
-        <Select
-          mode="multiple"
-          allowClear
-          maxCount={ABLOESUNG_ABLOESER_MAX}
-          placeholder="keine geplant"
-          options={einheiten}
+      <Form.Item<AbloeserWerte> name="art" label="Art">
+        <Radio.Group
+          optionType="button"
+          aria-describedby={gesperrt ? artGrundId : undefined}
+          options={ART_OPTIONEN.map((o) => ({
+            ...o,
+            disabled: o.value === 'besatzung' && gesperrt,
+          }))}
         />
       </Form.Item>
+      {gesperrt && (
+        <Typography.Text type="secondary" id={artGrundId} data-lfh="planung-besatzung-gesperrt">
+          {besatzungGesperrt}
+        </Typography.Text>
+      )}
+      {art === 'besatzung' ? (
+        <BesatzungFelder
+          form={form}
+          schicht={schicht}
+          bisherigeBesatzung={bisherigeBesatzung}
+          personen={personen ?? []}
+          verteilung={verteilung}
+          pflicht={false}
+        />
+      ) : (
+        <Form.Item<AbloeserWerte> name="abloeser_ids" label="Ablösende Einheiten">
+          <Select
+            mode="multiple"
+            allowClear
+            maxCount={ABLOESUNG_ABLOESER_MAX}
+            placeholder="keine geplant"
+            options={einheiten}
+          />
+        </Form.Item>
+      )}
       <SpeicherFehler fehler={fehler} titel="Planung konnte nicht gespeichert werden" />
     </ErfassungsModal>
   );

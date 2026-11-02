@@ -112,6 +112,8 @@
           "abschnitt_uebergeben",
           "art",
           "besatzung",
+          "besatzung_plan",
+          "nach_besatzungswechsel",
           "verbleib",
           "ruecknehmbar",
           "erbende_einheiten",
@@ -202,6 +204,13 @@
             },
             "description": "Beim Besatzungswechsel: wer ging (`alt`) und wer kam (`neu`), je in der Reihenfolge des\nVollzugs. Leer bei jeder anderen Schicht."
           },
+          "besatzung_plan": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbloesungBesatzungPlan"
+            },
+            "description": "Der geplante Besatzungswechsel einer laufenden Schicht (LLH-1319), in der Reihenfolge der\nPlanung; leer ohne einen und bei abgelösten und beendeten Schichten. Eine Schicht plant\nentweder Ablöser oder einen Besatzungswechsel."
+          },
           "einheit_id": {
             "type": "integer",
             "format": "int64"
@@ -252,6 +261,13 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "nach_besatzungswechsel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbloesungBesatzung"
+            },
+            "description": "Ist der Vorgänger dieser Schicht als Besatzungswechsel vollzogen, die neue Besatzung dieses\nWechsels (Rolle `neu`, LLH-1319); sonst leer."
           },
           "planung_entfallen": {
             "oneOf": [
@@ -362,6 +378,52 @@
           },
           "rolle": {
             "$ref": "#/components/schemas/BesatzungRolle"
+          }
+        }
+      },
+      "AbloesungBesatzungPlan": {
+        "type": "object",
+        "description": "Eine Person des geplanten Besatzungswechsels (Eintrag in `einsatz_abloesung_besatzung_plan`,\nLLH-1319) mit ihrem Ziel.",
+        "required": [
+          "personal_id",
+          "name"
+        ],
+        "properties": {
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ziel-Einheit; fehlt = die Einheit der Schicht."
+          },
+          "einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ziel-Fahrzeug (`einsatz_fahrzeug.id`); fehlt = keins."
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_personal.id`"
           }
         }
       },

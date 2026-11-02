@@ -11652,6 +11652,159 @@ mod tests {
             .expect("eintreffen");
     }
 
+    /// LLH-1319 (Change `zjwlwwv7-besatzungswechsel-planen`, design.md D5): Planung des
+    /// Besatzungswechsels je Person einmal je Schicht, Sicherung der Ablöser-Planung, Ziel-Spalten
+    /// an der Besatzung (Bestand NULL); alles fällt mit der Schicht, Ziele werden beim Löschen leer.
+    #[tokio::test]
+    async fn migration_0264_besatzung_planung() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 264;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let einheit = |name: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let florian = einheit("Florian 1").await;
+        let gruppe = einheit("Gruppe 1").await;
+        let person: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Neu') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let schicht: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, rhythmus_minuten, \
+                rhythmus_quelle, faellig_at, angelegt_von_id, art, status) \
+             VALUES (?, ?, '2026-11-01 06:00:00', 720, 'einheit', '2026-11-01 18:00:00', ?, \
+                'besatzung', 'abgeloest') RETURNING id",
+        )
+        .bind(e)
+        .bind(florian)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_abloesung_besatzung (abloesung_id, personal_id, rolle) \
+             VALUES (?, ?, 'neu')",
+        )
+        .bind(schicht)
+        .bind(person)
+        .execute(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (Option<i64>, Option<i64>) = sqlx::query_as(
+            "SELECT einheit_nachher_id, fahrzeug_nachher_id FROM einsatz_abloesung_besatzung",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(bestand, (None, None), "der Bestand hat kein Ziel");
+        let gesichert: i64 =
+            sqlx::query_scalar("SELECT planung_gesichert FROM einsatz_abloesung WHERE id = ?")
+                .bind(schicht)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(gesichert, 0, "der Bestand hat keine Planung gesichert");
+        sqlx::query("UPDATE einsatz_abloesung SET planung_gesichert = 2 WHERE id = ?")
+            .bind(schicht)
+            .execute(&pool)
+            .await
+            .expect_err("nur 0 und 1");
+
+        let plan = "INSERT INTO einsatz_abloesung_besatzung_plan \
+                    (abloesung_id, personal_id, einheit_id) VALUES (?, ?, ?)";
+        sqlx::query(plan)
+            .bind(schicht)
+            .bind(person)
+            .bind(gruppe)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(plan)
+            .bind(schicht)
+            .bind(person)
+            .bind(None::<i64>)
+            .execute(&pool)
+            .await
+            .expect_err("je Schicht und Person eine Zeile");
+        let vorher = "INSERT INTO einsatz_abloesung_planung_vorher (abloesung_id, einheit_id) \
+                      VALUES (?, ?)";
+        for ziel in [gruppe, florian] {
+            sqlx::query(vorher)
+                .bind(schicht)
+                .bind(ziel)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        sqlx::query(vorher)
+            .bind(schicht)
+            .bind(gruppe)
+            .execute(&pool)
+            .await
+            .expect_err("je Schicht und Einheit eine Zeile");
+
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+            .bind(gruppe)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let ziel: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM einsatz_abloesung_besatzung_plan")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(ziel, None, "die gelöschte Ziel-Einheit wird leer");
+        let gesichert: Vec<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM einsatz_abloesung_planung_vorher")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            gesichert,
+            vec![florian],
+            "die gelöschte Einheit fällt aus der Sicherung"
+        );
+
+        sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
+            .bind(schicht)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM einsatz_abloesung_besatzung_plan), \
+                    (SELECT COUNT(*) FROM einsatz_abloesung_planung_vorher)",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rest, (0, 0), "Planung und Sicherung fallen mit der Schicht");
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("der Einsatz fällt samt allem");
+    }
+
     /// LLH-1445 (Change `o659va5r-nachforderung-herkunft`, design.md D1): der Bestand gilt als
     /// nicht am Raum verknüpft (0), der Schalter nimmt nur 0 und 1.
     #[tokio::test]

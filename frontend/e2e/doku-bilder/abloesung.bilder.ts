@@ -25,7 +25,8 @@ import {
  *   vollziehen.png       frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog mit Ablöser-Liste und
  *                        „Abschnitt übergeben“, LLH-1132), frontend/src/abloesung/abloeser.ts
  *   besatzungswechsel.png frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog mit Art
- *                        „Besatzungswechsel“, LLH-1150), frontend/src/abloesung/besatzung.ts
+ *                        „Besatzungswechsel“, LLH-1150, Klappteil „Verteilen“, LLH-1319),
+ *                        frontend/src/abloesung/besatzung.ts
  *   vorgaben.png         frontend/src/pages/AbloesungPage.tsx (Paneel „Rhythmus je Abschnitt“)
  *   einsatz-vorgabe.png  frontend/src/pages/AbloesungPage.tsx (Paneel „Vorgabe des Einsatzes“),
  *                        frontend/src/abloesung/schichtmodellText.ts, frontend/src/abloesung/dauer.ts
