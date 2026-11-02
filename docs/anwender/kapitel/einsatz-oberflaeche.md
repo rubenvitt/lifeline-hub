@@ -196,6 +196,14 @@ Der Schalter gilt für diesen Browser auf diesem Gerät, nicht für die Person; 
 melden soll, einmal einschalten. Nach dem Abmelden kommen keine Meldungen mehr; meldet sich
 dieselbe Person wieder an, gilt der Schalter wieder, ohne dass sie ihn neu setzt.
 
+Ist der Schalter an, erscheint darunter „Mit Absender und Wortlaut“, zunächst aus. Aus heißt:
+Eine Meldung bei geschlossener App sagt nur, dass eine Sofortmeldung oder neue Meldung kam, etwa
+„Sofortmeldung eingegangen“, ohne Absender und Wortlaut. Das ist Absicht, denn die Meldung steht
+auch auf dem gesperrten Bildschirm, wo Umstehende sie lesen können, und bleibt dort, bis sie
+weggewischt wird. Wer ein Gerät nur selbst in der Hand hat, kann den Schalter einschalten; dann
+nennt die Meldung wie in der App den Absender und den Anfang des Wortlauts. Auch dieser Schalter
+gilt nur für dieses Gerät und bleibt nach einer neuen Anmeldung erhalten.
+
 Fehlt der Schalter, bietet ihn dieses Gerät nicht: Der Betrieb hat die Zustellung nicht
 eingeschaltet, der Browser kann sie nicht, oder die App läuft als Desktop-App, die ohnehin selbst
 meldet. Auf dem iPhone und iPad erscheint er nur in der installierten App („Zum Home-Bildschirm“

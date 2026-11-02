@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { meldungInhaltVon } from './meldungInhalt';
+import type { BenachrichtigungArt, BenachrichtigungBezugTyp } from '../api/types';
 
 /**
  * `public/alarm-sw.js` läuft im Service Worker (LFH-1062). Der Test lädt die Datei wie
@@ -278,5 +280,122 @@ describe('alarm-sw.js: Web Push (LLH-1223)', () => {
     expect(f).not.toHaveBeenCalled();
     expect(registration.showNotification).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+  /** Server mit Text der Benachrichtigung und einer Meldung; `meldung: Error` lässt sie scheitern. */
+  function serverMitMeldung(meldung: Record<string, unknown> | Error | 'haengt') {
+    const f = vi.fn(async (pfad: string, init?: RequestInit) => {
+      if (pfad.startsWith('/api/benachrichtigungen/')) {
+        return new Response(
+          JSON.stringify({ titel: 'Sofortmeldung eingegangen', detail: 'Meldung #3', pfad: '/x' }),
+        );
+      }
+      if (meldung === 'haengt') {
+        return new Promise<Response>((_, ablehnen) =>
+          init?.signal?.addEventListener('abort', () => ablehnen(new Error('abgebrochen'))),
+        );
+      }
+      if (meldung instanceof Error) throw meldung;
+      return new Response(JSON.stringify(meldung));
+    });
+    vi.stubGlobal('fetch', f);
+    return f;
+  }
+
+  const MELDUNG = {
+    absender: 'Rettungsstaffel',
+    inhalt: 'Kellerabgang Mühlbachweg 34: eine schwer verletzte Person geborgen',
+  };
+
+  describe('Inhalt der Meldung nur auf Wunsch (LLH-1369)', () => {
+    it('zeigt ohne Marke den Text des Servers und holt die Meldung nicht', async () => {
+      const f = serverMitMeldung(MELDUNG);
+      const { push, gezeigt } = ladeMitPush([]);
+      await push(EREIGNIS);
+      expect(f).toHaveBeenCalledOnce();
+      expect(gezeigt[0]!.titel).toBe('Sofortmeldung eingegangen');
+      expect(gezeigt[0]!.optionen.body).toBe('Meldung #3');
+      vi.unstubAllGlobals();
+    });
+
+    it('zeigt mit Marke Absender und Wortlaut-Anfang, geholt mit der Sitzung', async () => {
+      const f = serverMitMeldung(MELDUNG);
+      const { push, gezeigt } = ladeMitPush([]);
+      await push({ ...EREIGNIS, inhalt: true });
+      expect(f).toHaveBeenCalledWith(
+        '/api/einsaetze/7/meldungen/3',
+        expect.objectContaining({ credentials: 'same-origin' }),
+      );
+      expect(gezeigt[0]!.titel).toBe('Sofortmeldung · Rettungsstaffel');
+      expect(gezeigt[0]!.optionen.body).toBe(MELDUNG.inhalt);
+      vi.unstubAllGlobals();
+    });
+
+    it('bleibt beim Text des Servers, wenn die Meldung nicht kommt', async () => {
+      serverMitMeldung(new TypeError('Failed to fetch'));
+      const erster = ladeMitPush([]);
+      await erster.push({ ...EREIGNIS, inhalt: true });
+      expect(erster.gezeigt[0]!.titel).toBe('Sofortmeldung eingegangen');
+      expect(erster.gezeigt[0]!.optionen.body).toBe('Meldung #3');
+      vi.unstubAllGlobals();
+
+      vi.useFakeTimers();
+      serverMitMeldung('haengt');
+      const zweiter = ladeMitPush([]);
+      const fertig = zweiter.push({ ...EREIGNIS, inhalt: true });
+      await vi.advanceTimersByTimeAsync(5000);
+      await fertig;
+      expect(zweiter.gezeigt[0]!.titel).toBe('Sofortmeldung eingegangen');
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it('holt für andere Arten keinen Inhalt, auch mit Marke', async () => {
+      const f = serverMitMeldung(MELDUNG);
+      const { push, gezeigt } = ladeMitPush([]);
+      await push({
+        ...EREIGNIS,
+        art: 'auftrag_erteilt',
+        stufe: 'hinweis',
+        bezug_typ: 'auftrag',
+        inhalt: true,
+      });
+      expect(f).toHaveBeenCalledOnce();
+      expect(gezeigt[0]!.titel).toBe('Sofortmeldung eingegangen');
+      vi.unstubAllGlobals();
+    });
+
+    const LANG = `Lagemeldung vom Abschnitt Nord: ${'Wasser steht im Keller und steigt weiter, '.repeat(5)}`;
+    const FAELLE: {
+      art: BenachrichtigungArt;
+      bezug_typ: BenachrichtigungBezugTyp;
+      meldung: { absender: string; inhalt: string };
+    }[] = [
+      { art: 'sofortmeldung', bezug_typ: 'meldung', meldung: MELDUNG },
+      {
+        art: 'sofortmeldung_eskaliert',
+        bezug_typ: 'meldung',
+        meldung: { ...MELDUNG, inhalt: LANG },
+      },
+      { art: 'meldung', bezug_typ: 'meldung', meldung: { absender: '  ', inhalt: ' a\n\n b ' } },
+      { art: 'meldung', bezug_typ: 'lage_uebernahme', meldung: { absender: 'UHS', inhalt: '' } },
+      {
+        art: 'sofortmeldung',
+        bezug_typ: 'meldung',
+        meldung: { absender: 'ELW', inhalt: 'x'.repeat(200) },
+      },
+    ];
+
+    it.each(FAELLE)(
+      'nennt dasselbe wie der Alarm im Tab: $art / $bezug_typ',
+      async ({ art, bezug_typ, meldung }) => {
+        serverMitMeldung(meldung);
+        const { push, gezeigt } = ladeMitPush([]);
+        await push({ ...EREIGNIS, art, bezug_typ, inhalt: true });
+        const tab = meldungInhaltVon(art, meldung, bezug_typ)!;
+        expect(gezeigt[0]!.titel).toBe(tab.titel ?? 'Sofortmeldung eingegangen');
+        expect(gezeigt[0]!.optionen.body).toBe(tab.anfang ?? 'Meldung #3');
+        vi.unstubAllGlobals();
+      },
+    );
   });
 });

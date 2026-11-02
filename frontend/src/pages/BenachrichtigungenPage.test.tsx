@@ -9,6 +9,7 @@ import { benutzerFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import BenachrichtigungenPage, {
   IMMER_AN,
+  PUSH_INHALT_SCHALTER,
   PUSH_SCHALTER,
   TEST_TEXT,
   TEST_TITEL,
@@ -20,10 +21,12 @@ vi.mock('../alarm/alarmTon', async (original) => ({
   spieleAlarmTon: vi.fn(),
 }));
 
+type Stand = { zustand: string; inhalt: boolean };
 const push = vi.hoisted(() => ({
-  ladePushZustand: vi.fn(async () => 'fehlt'),
+  ladePushStand: vi.fn(async (): Promise<Stand> => ({ zustand: 'fehlt', inhalt: false })),
   pushEinschalten: vi.fn(async () => 'an'),
   pushAusschalten: vi.fn(async () => 'aus'),
+  pushInhaltSetzen: vi.fn(async (_id: number, an: boolean) => an),
 }));
 vi.mock('../alarm/webPush', async (original) => ({
   ...(await original<typeof import('../alarm/webPush')>()),
@@ -31,9 +34,10 @@ vi.mock('../alarm/webPush', async (original) => ({
 }));
 
 afterEach(() => {
-  push.ladePushZustand.mockReset().mockResolvedValue('fehlt');
+  push.ladePushStand.mockReset().mockResolvedValue({ zustand: 'fehlt', inhalt: false });
   push.pushEinschalten.mockReset().mockResolvedValue('an');
   push.pushAusschalten.mockReset().mockResolvedValue('aus');
+  push.pushInhaltSetzen.mockReset().mockImplementation(async (_id: number, an: boolean) => an);
 });
 
 function zeige(aus: string[] | null = null) {
@@ -135,12 +139,12 @@ describe('Web Push: „Auch bei geschlossener App“ (LLH-1223, D8)', () => {
   it('fehlt, wenn Browser, Hülle oder Server kein Push bieten', async () => {
     zeige();
     await screen.findByRole('region', { name: 'Hinweise' });
-    await waitFor(() => expect(push.ladePushZustand).toHaveBeenCalled());
+    await waitFor(() => expect(push.ladePushStand).toHaveBeenCalled());
     expect(screen.queryByRole('switch', { name: PUSH_SCHALTER })).not.toBeInTheDocument();
   });
 
   it('schaltet ein und aus', async () => {
-    push.ladePushZustand.mockResolvedValue('aus');
+    push.ladePushStand.mockResolvedValue({ zustand: 'aus', inhalt: false });
     zeige();
     const s = await schalter(PUSH_SCHALTER);
     expect(s).not.toBeChecked();
@@ -154,7 +158,7 @@ describe('Web Push: „Auch bei geschlossener App“ (LLH-1223, D8)', () => {
   });
 
   it('blockierte Erlaubnis: Schalter aus und gesperrt, mit Marke', async () => {
-    push.ladePushZustand.mockResolvedValue('aus');
+    push.ladePushStand.mockResolvedValue({ zustand: 'aus', inhalt: false });
     push.pushEinschalten.mockResolvedValue('blockiert');
     zeige();
     await userEvent.click(await schalter(PUSH_SCHALTER));
@@ -163,8 +167,47 @@ describe('Web Push: „Auch bei geschlossener App“ (LLH-1223, D8)', () => {
     expect(await schalter(PUSH_SCHALTER)).toBeDisabled();
   });
 
+  it('„Mit Absender und Wortlaut“ erscheint nur bei eingeschaltetem Push, Vorgabe aus (LLH-1369)', async () => {
+    push.ladePushStand.mockResolvedValue({ zustand: 'aus', inhalt: false });
+    zeige();
+    await schalter(PUSH_SCHALTER);
+    expect(screen.queryByRole('switch', { name: PUSH_INHALT_SCHALTER })).not.toBeInTheDocument();
+
+    await userEvent.click(await schalter(PUSH_SCHALTER));
+    const inhalt = await schalter(PUSH_INHALT_SCHALTER);
+    expect(inhalt).not.toBeChecked();
+    await userEvent.click(inhalt);
+    await waitFor(async () => expect(await schalter(PUSH_INHALT_SCHALTER)).toBeChecked());
+    expect(push.pushInhaltSetzen).toHaveBeenCalledWith(benutzerFixture().id, true);
+
+    await userEvent.click(await schalter(PUSH_SCHALTER));
+    await waitFor(() =>
+      expect(screen.queryByRole('switch', { name: PUSH_INHALT_SCHALTER })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('zeigt die gespeicherte Wahl und schaltet sie aus (LLH-1369)', async () => {
+    push.ladePushStand.mockResolvedValue({ zustand: 'an', inhalt: true });
+    zeige();
+    const inhalt = await schalter(PUSH_INHALT_SCHALTER);
+    expect(inhalt).toBeChecked();
+    await userEvent.click(inhalt);
+    await waitFor(async () => expect(await schalter(PUSH_INHALT_SCHALTER)).not.toBeChecked());
+    expect(push.pushInhaltSetzen).toHaveBeenCalledWith(benutzerFixture().id, false);
+  });
+
+  it('scheitert die Wahl des Inhalts, bleibt sie und die Zeile sagt es (LLH-1369)', async () => {
+    push.ladePushStand.mockResolvedValue({ zustand: 'an', inhalt: false });
+    push.pushInhaltSetzen.mockRejectedValue(new Error('500'));
+    zeige();
+    await userEvent.click(await schalter(PUSH_INHALT_SCHALTER));
+    expect(await screen.findByText('nicht gespeichert')).toBeInTheDocument();
+    expect(await schalter(PUSH_INHALT_SCHALTER)).not.toBeChecked();
+    expect(await schalter(PUSH_SCHALTER)).toBeChecked();
+  });
+
   it('scheitert das Einschalten, bleibt der Schalter aus und die Zeile sagt es', async () => {
-    push.ladePushZustand.mockResolvedValue('aus');
+    push.ladePushStand.mockResolvedValue({ zustand: 'aus', inhalt: false });
     push.pushEinschalten.mockRejectedValue(new Error('kein Worker'));
     zeige();
     await userEvent.click(await schalter(PUSH_SCHALTER));

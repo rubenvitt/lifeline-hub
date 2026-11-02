@@ -8,6 +8,9 @@
 //! - Abo je Browserprofil, an die Sitzung gebunden (`ON DELETE CASCADE`, D3).
 //! - Versand nach dem Live-Ereignis, nebenläufig, mit Zeitlimit; die Nutzlast ist das
 //!   Live-Ereignis selbst (nur Kennungen), verschlüsselt nach RFC 8291 ([`krypto`], D4).
+//! - Will die Person auf einem Gerät Absender und Wortlaut sehen (LLH-1369, Abo mit `inhalt`),
+//!   bekommt die Nutzlast an dieses Abo nur die Marke `"inhalt": true` ([`nutzlast_fuer`]); den
+//!   Inhalt holt der Service Worker selbst mit der Sitzung.
 //! - Endpunkte nur bei bekannten Push-Diensten ([`endpunkt_pruefen`], D5), sonst wäre das Abo
 //!   ein Weg, den Server POSTs ins interne Netz schicken zu lassen.
 
@@ -243,7 +246,8 @@ impl WebPush {
         let url = Url::parse(&abo.endpoint).map_err(|_| "Endpunkt keine URL".to_owned())?;
         let p256dh = b64_lesen(&abo.p256dh).ok_or("p256dh kein Base64")?;
         let auth = b64_lesen(&abo.auth).ok_or("auth kein Base64")?;
-        let rumpf = krypto::verschluesseln(s.nutzlast.as_bytes(), &p256dh, &auth)
+        let nutzlast = nutzlast_fuer(&s.nutzlast, abo.inhalt);
+        let rumpf = krypto::verschluesseln(nutzlast.as_bytes(), &p256dh, &auth)
             .map_err(|e| e.to_string())?;
         let aud = url.origin().ascii_serialization();
         let exp = chrono::Utc::now().timestamp() + VAPID_GUELTIG_SEKUNDEN;
@@ -267,6 +271,23 @@ impl WebPush {
             // Ohne URL: reqwest hängt sie sonst an die Meldung.
             .map_err(|e| e.without_url().to_string())?;
         Ok(antwort.status())
+    }
+}
+
+/// Die Nutzlast an ein Abo (LLH-1369, Spec `web-push`, „Inhalt der Meldung nur auf Wunsch“):
+/// das Live-Ereignis, bei einem Abo mit `inhalt` dazu die Marke `"inhalt": true`. Die Marke sagt
+/// dem Service Worker nur, dass er Absender und Wortlaut holen darf; der Inhalt selbst reist nie
+/// mit. Ein Ereignis, das kein JSON-Objekt ist, geht unverändert.
+pub fn nutzlast_fuer(ereignis: &str, inhalt: bool) -> std::borrow::Cow<'_, str> {
+    if !inhalt {
+        return std::borrow::Cow::Borrowed(ereignis);
+    }
+    match serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(ereignis) {
+        Ok(mut objekt) => {
+            objekt.insert("inhalt".into(), serde_json::Value::Bool(true));
+            std::borrow::Cow::Owned(serde_json::Value::Object(objekt).to_string())
+        }
+        Err(_) => std::borrow::Cow::Borrowed(ereignis),
     }
 }
 
