@@ -17505,12 +17505,17 @@
         "description": "Stand von Web Push für diese Sitzung.",
         "required": [
           "schluessel",
-          "angemeldet"
+          "angemeldet",
+          "inhalt"
         ],
         "properties": {
           "angemeldet": {
             "type": "boolean",
             "description": "Diese Sitzung hat ein Abo."
+          },
+          "inhalt": {
+            "type": "boolean",
+            "description": "Das Abo dieser Sitzung zeigt Absender und Wortlaut (LLH-1369); ohne Abo `false`."
           },
           "schluessel": {
             "type": "string",
