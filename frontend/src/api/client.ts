@@ -158,10 +158,21 @@ export function istKonflikt(e: unknown): e is ApiError {
   return e instanceof ApiError && e.status === 409;
 }
 
-async function fehlerWerfen(res: Response): Promise<never> {
+/** Die Sitzungsprüfung selbst: eine 403 darauf stößt keine neue Prüfung an, sonst liefe der
+ *  Provider in eine Schleife (`AuthContext`, `pruefe` holt nach jedem Anstoß nach). */
+const ME_PFAD = '/api/auth/me';
+
+async function fehlerWerfen(res: Response, pfad: string): Promise<never> {
   // 412 heißt: die Sitzung gehört (vielleicht) nicht mehr dem Benutzer, den dieser Tab zeigt.
   // Nie abmelden — nur prüfen lassen; das entscheidet der AuthProvider (LFH-387).
-  if (res.status === 412) window.dispatchEvent(new CustomEvent(BENUTZER_PRUEFEN));
+  // 403 ebenso (LLH-1360): Lesende Anfragen sind nicht an den Benutzer gebunden und laufen nach
+  // einem Wechsel im anderen Tab still unter der fremden Sitzung. Fehlt der neuen Person das
+  // Recht, ist die 403 das einzige Zeichen, und die Seite zeigte „Keine Berechtigung“ statt des
+  // Konflikts. Ein echtes Rechteproblem kostet nur eine `/me`-Abfrage, gleichzeitige Anstöße
+  // fasst der Provider zusammen.
+  if (res.status === 412 || (res.status === 403 && pfad !== ME_PFAD)) {
+    window.dispatchEvent(new CustomEvent(BENUTZER_PRUEFEN));
+  }
   let message = `Serverfehler (${res.status})`;
   let vomAnwendungsserver = false;
   let zeilen: ZeilenGrund[] = [];
@@ -204,7 +215,7 @@ export async function apiGet<T>(pfad: string): Promise<T> {
     });
     // Jede Antwort des Servers, auch eine Ablehnung, nennt seine Uhr (LFH-705).
     merkeServerzeit(res);
-    if (!res.ok) return fehlerWerfen(res);
+    if (!res.ok) return fehlerWerfen(res, pfad);
     return (await res.json()) as T;
   } catch (e) {
     netzFehlerWerfen(e);
@@ -230,7 +241,7 @@ export async function apiDatei(pfad: string, optionen: DateiOptionen = {}): Prom
       cache: 'no-store',
       signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
     });
-    if (!res.ok) return fehlerWerfen(res);
+    if (!res.ok) return fehlerWerfen(res, pfad);
     return await res.blob();
   } catch (e) {
     netzFehlerWerfen(e);
@@ -261,7 +272,7 @@ export async function apiUpload<T>(
       signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
     });
     merkeServerzeit(res);
-    if (!res.ok) return fehlerWerfen(res);
+    if (!res.ok) return fehlerWerfen(res, pfad);
     return (await res.json()) as T;
   } catch (e) {
     netzFehlerWerfen(e);
@@ -331,7 +342,7 @@ export function apiUploadMitFortschritt<T>(
         return;
       }
       const body = OHNE_BODY.has(xhr.status) ? null : xhr.responseText;
-      fehlerWerfen(new Response(body, { status: xhr.status })).catch(reject);
+      fehlerWerfen(new Response(body, { status: xhr.status }), pfad).catch(reject);
     });
 
     xhr.send(formData);
@@ -358,7 +369,7 @@ export async function apiSend<T>(
       signal: AbortSignal.timeout(15_000),
     });
     merkeServerzeit(res);
-    if (!res.ok) return fehlerWerfen(res);
+    if (!res.ok) return fehlerWerfen(res, pfad);
     // Leerer Body: nicht nur 204, sondern auch 200/201 ohne Json (z. B. WebAuthn-Finish). Aufrufer
     // solcher Endpunkte MÜSSEN T = void verwenden, nur dann ist der Cast sicher; `res.json()`
     // würfe auf leerem Body einen SyntaxError.

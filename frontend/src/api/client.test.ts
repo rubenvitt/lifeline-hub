@@ -295,7 +295,53 @@ describe('erwarteter Benutzer (LFH-387)', () => {
     }
   });
 
-  it.each([401, 409, 422])('löst bei %i keine Benutzerprüfung aus', async (status) => {
+  // LLH-1360: Leseanfragen tragen den Kopf nicht und laufen nach einem Wechsel im anderen Tab
+  // unter der fremden Sitzung. Fehlt der neuen Person das Recht, ist die 403 das einzige Zeichen.
+  it('löst bei 403 einer Leseanfrage eine Benutzerprüfung aus und wirft den ApiError unverändert', async () => {
+    server.use(
+      http.get('/api/ding', () =>
+        HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
+      ),
+    );
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      setzeErwartetenBenutzer(7);
+      await expect(apiGet('/api/ding')).rejects.toMatchObject({
+        status: 403,
+        message: 'Keine Berechtigung',
+      });
+      expect(pruefen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  it('löst bei 403 auf die Sitzungsprüfung selbst keine weitere aus (keine Schleife)', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 403 })));
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      await expect(apiGet('/api/auth/me')).rejects.toMatchObject({ status: 403 });
+      expect(pruefen).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  it('löst bei 403 einer Schreibanfrage eine Benutzerprüfung aus', async () => {
+    server.use(http.post('/api/ding', () => HttpResponse.json({ error: 'x' }, { status: 403 })));
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      await expect(apiSend('/api/ding', 'POST', {})).rejects.toMatchObject({ status: 403 });
+      expect(pruefen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  it.each([401, 404, 409, 422])('löst bei %i keine Benutzerprüfung aus', async (status) => {
     server.use(http.post('/api/ding', () => HttpResponse.json({ error: 'x' }, { status })));
     const pruefen = vi.fn();
     window.addEventListener(BENUTZER_PRUEFEN, pruefen);

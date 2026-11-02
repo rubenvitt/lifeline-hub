@@ -22,6 +22,8 @@ import { kontoAnlegen } from './konto-anlegen';
  *   (b) gleichzeitige Mutation: B meldet sich an der App vorbei an (kein App-Code, also keine
  *       Kanalmeldung), Tab 1 sendet trotzdem → der Server lehnt mit 412 ab, der Eintrag
  *       entsteht nicht, Tab 1 zeigt den Konflikt, B bleibt angemeldet.
+ *   (b2) wie (b), aber Tab 1 liest nur nach: Leseanfragen sind nicht gebunden, unter B kommt 403
+ *       → Tab 1 zeigt den Konflikt statt „Keine Berechtigung“ (LLH-1360).
  *   (c) Sitzungsablauf: die Sitzung endet an der App vorbei, Tab 1 schreibt → Anmeldung mit
  *       Rückkehrziel; Tab 2 folgt ohne Neuladen.
  */
@@ -37,12 +39,12 @@ const passwortVon = (name: string) => `${name}-pw`;
  * Abfrage der vorigen Seite, die `page.goto` abbricht, meldet Playwright weder als beendet noch
  * als gescheitert.
  *
- * Gebraucht in Fall (b): Nach dem ersten Öffnen des Einsatzstroms gleicht der Tab die Org-Listen
- * nach (`useEinsatzLiveStream`, Erst-Open), in ein bis zwei Wellen einige hundert ms nach dem
- * sichtbaren Eingabefeld. Meldet sich B an, bevor diese Wellen durch sind, laufen sie schon unter
- * B: die Einsatzliste ohne den Einsatz holt den Einsatzkopf neu, der antwortet 403, und der Tab
- * steht auf „Nicht verfügbar“ statt auf der ETB, von der er senden soll. Einen Inhaltsanker für
- * „Abgleich fertig“ gibt es nicht, `networkidle` hält der SSE-Strom offen.
+ * Gebraucht in (b) und (b2): Nach dem ersten Öffnen des Einsatzstroms gleicht der Tab die
+ * Org-Listen nach (`useEinsatzLiveStream`, Erst-Open), in ein bis zwei Wellen einige hundert ms
+ * nach dem sichtbaren Eingabefeld. Meldet sich B an, bevor diese Wellen durch sind, laufen sie
+ * schon unter B: die Einsatzliste ohne den Einsatz holt den Einsatzkopf neu, der antwortet 403,
+ * und der Tab zeigt den Konflikt (LLH-1360), bevor der Fall ihn selbst auslöst. Einen
+ * Inhaltsanker für „Abgleich fertig“ gibt es nicht, `networkidle` hält der SSE-Strom offen.
  */
 function apiBeobachter(page: Page) {
   let zuletzt = Date.now();
@@ -199,14 +201,24 @@ test('(b) gleichzeitige Mutation aus dem veralteten Tab: 412, kein Eintrag, B bl
   const ctx = await browser.newContext();
   const tab1 = await ctx.newPage();
   const api = apiBeobachter(tab1);
+  const abfragen = lesendeAbfragenVerfolgen(tab1);
 
-  await anmelden(tab1, ADMIN, ADMIN_PW);
+  // Anmelden an der Seite vorbei, damit Tab 1 genau EIN Dokument lädt (s. `LesendeAbfragen`).
+  const al = await ctx.request.post('/api/auth/login', {
+    data: { benutzername: ADMIN, passwort: ADMIN_PW },
+  });
+  expect(al.ok()).toBeTruthy();
   const b = await zweitenBenutzerAnlegen(ctx);
   const einsatzId = await einsatzAnlegen(ctx);
   await tab1.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(tab1.getByPlaceholder('Inhalt …')).toBeVisible();
   // Erst wenn der Tab fertig nachgeladen hat, als Admin (siehe `apiBeobachter`).
   await api.ruhig();
+  // Dieser Fall prüft den Schreibweg (412). Eine Leseanfrage unter B bekäme 403 und zeigte den
+  // Konflikt schon vor dem Senden (Fall (b2), LLH-1360) — ein Live-Ereignis anderer Tests kann
+  // jederzeit eine auslösen. Deshalb erreicht ab hier nur noch die Sitzungsprüfung den Server.
+  await lesendeAbfragenAnhalten(abfragen, ['/api/auth/me']);
+  await eingeschwungen(abfragen, 'Tab 1');
 
   // B meldet sich an der App vorbei an: das Cookie des Kontexts gehört jetzt B, aber kein
   // App-Code lief — Tab 1 hat keine Meldung bekommen und zeigt weiter den Admin.
@@ -240,6 +252,58 @@ test('(b) gleichzeitige Mutation aus dem veralteten Tab: 412, kein Eintrag, B bl
   expect(etb.map((e) => e.inhalt)).not.toContain(inhalt);
 
   await pruefer.close();
+  await ctx.close();
+});
+
+test('(b2) Lesen aus dem veralteten Tab: 403 unter der fremden Sitzung zeigt den Konflikt', async ({
+  browser,
+}) => {
+  /*
+   * LLH-1360: Leseanfragen sind nicht an den Benutzer gebunden (kein 412). Holt der alte Tab
+   * nach dem Wechsel etwas nach, läuft das unter B; fehlt B das Recht, antwortet der Server 403.
+   * Die Seite allein sagte dann „Keine Berechtigung“ — der Tab muss stattdessen den Konflikt
+   * erkennen. Angestoßen wird das Nachladen von außen: ein ETB-Eintrag des Admins aus einem
+   * eigenen Kontext kommt über den Live-Strom an, den Tab 1 noch als Admin geöffnet hat.
+   */
+  const ctx = await browser.newContext();
+  const tab1 = await ctx.newPage();
+  const api = apiBeobachter(tab1);
+
+  await anmelden(tab1, ADMIN, ADMIN_PW);
+  const b = await zweitenBenutzerAnlegen(ctx);
+  const einsatzId = await einsatzAnlegen(ctx);
+  await tab1.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(tab1.getByPlaceholder('Inhalt …')).toBeVisible();
+  await api.ruhig();
+
+  // Vor dem Wechsel abonniert: die erste 403 kann auch eine späte Nachlade-Welle sein.
+  const verweigert = tab1.waitForResponse(
+    (r) =>
+      r.request().method() === 'GET' &&
+      pfad(r.request()).startsWith(`/api/einsaetze/${einsatzId}`) &&
+      r.status() === 403,
+  );
+  const login = await ctx.request.post('/api/auth/login', {
+    data: { benutzername: b.name, passwort: b.passwort },
+  });
+  expect(login.ok()).toBeTruthy();
+  const admin = await browser.newContext();
+  const al = await admin.request.post('/api/auth/login', {
+    data: { benutzername: ADMIN, passwort: ADMIN_PW },
+  });
+  expect(al.ok()).toBeTruthy();
+  const eintrag = await admin.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    data: { typ: 'meldung', von: 'ELW 1', an: 'Leitstelle', inhalt: `Von außen ${Date.now()}` },
+  });
+  expect(eintrag.ok(), `ETB-Eintrag: ${eintrag.status()}`).toBeTruthy();
+  await verweigert;
+
+  const dialog = konfliktDialog(tab1);
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText(b.anzeige);
+  expect(await aktuellerBenutzer(ctx)).toBe(b.name);
+
+  await admin.close();
   await ctx.close();
 });
 
