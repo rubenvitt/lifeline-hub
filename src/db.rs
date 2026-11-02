@@ -12058,9 +12058,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn migration_0264_unterkunft_richtwerte() {
+    async fn migration_0265_unterkunft_richtwerte() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 264;
+        const VERSION: i64 = 265;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
