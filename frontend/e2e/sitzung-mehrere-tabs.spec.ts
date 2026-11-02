@@ -272,8 +272,13 @@ test('(b2) Lesen aus dem veralteten Tab: 403 unter der fremden Sitzung zeigt den
   await anmelden(tab1, ADMIN, ADMIN_PW);
   const b = await zweitenBenutzerAnlegen(ctx);
   const einsatzId = await einsatzAnlegen(ctx);
+  // Das Ereignis von außen braucht den stehenden Einsatzstrom, noch als Admin geöffnet.
+  const live = tab1.waitForResponse(
+    (r) => pfad(r.request()) === `/api/einsaetze/${einsatzId}/live`,
+  );
   await tab1.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(tab1.getByPlaceholder('Inhalt …')).toBeVisible();
+  expect((await live).status()).toBe(200);
   await api.ruhig();
 
   // Vor dem Wechsel abonniert: die erste 403 kann auch eine späte Nachlade-Welle sein.

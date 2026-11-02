@@ -15,13 +15,14 @@ originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Ka
 - `POST /api/auth/logout` mit fremder Kennung → 412, Sitzung bleibt; `logout()` liefert dann
   `false` und meldet nicht ab. Die Sitzungswache meldet nach 401 **nur lokal** ab
   (`abmeldenLokal`) — ein Server-Logout träfe eine inzwischen neue Sitzung.
-- Jede 412 und jede 403 stößt `lfh:benutzer-pruefen` an (403: Leseanfragen sind nicht gebunden
-  und laufen nach einem Wechsel unter der fremden Sitzung, LLH-1360), der Provider prüft per
-  `/me` (auch auf Kanalmeldung `auth/authKanal.ts` und Sichtbarkeit; Generationszähler verwirft
-  veraltete Antworten); fremder Benutzer → `BenutzerKonfliktDialog` (eine Aktion, nicht
-  schließbar). Ein Kanalobjekt je Tab (kein Selbst-Echo). **Der Konflikt wird per Neuladen gelöst, nie im laufenden Baum** — sonst
-  speicherte eine noch montierte Seite von A ihren Entwurf mit der Kennung von B. Offline-Abgleich
-  ruht im Konflikt (`abgleichFuer`).
+- Jede 412 und jede 403 auf eine **lesende** Anfrage stößt `lfh:benutzer-pruefen` an (403:
+  Leseanfragen sind nicht gebunden und laufen nach einem Wechsel unter der fremden Sitzung,
+  LLH-1360; ausgenommen `/me` selbst, sonst Schleife), der Provider prüft per `/me` (auch auf
+  Kanalmeldung `auth/authKanal.ts` und Sichtbarkeit; Generationszähler verwirft veraltete
+  Antworten); fremder Benutzer → `BenutzerKonfliktDialog` (eine Aktion, nicht schließbar). Ein
+  Kanalobjekt je Tab (kein Selbst-Echo). **Der Konflikt wird per Neuladen gelöst, nie im
+  laufenden Baum** — sonst speicherte eine noch montierte Seite von A ihren Entwurf mit der
+  Kennung von B. Offline-Abgleich ruht im Konflikt (`abgleichFuer`).
 
 ## Sitzungen beenden (LFH-1092)
 

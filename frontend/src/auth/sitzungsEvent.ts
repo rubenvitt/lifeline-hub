@@ -24,8 +24,10 @@ export function sitzungsMeldungZuruecksetzen(): void {
 }
 
 /** Fensterereignis „prüfe, wem die Sitzung gehört“ (LFH-387). `api/client.ts` feuert es bei jeder
- *  412- und 403-Antwort, der `AuthProvider` fragt daraufhin `GET /api/auth/me` ab. 412 kommt aus
- *  zwei Quellen — Queue-Besitzer (LFH-334) und erwarteter Benutzer des Tabs —, die der Client
- *  nicht trennen muss; 403 kann eine Leseanfrage sein, die schon unter einer fremden Sitzung lief
- *  (LLH-1360). Gehört die Sitzung weiter dem angezeigten Benutzer, ergibt die Prüfung nichts. */
+ *  412-Antwort und bei einer 403 auf eine lesende Anfrage, der `AuthProvider` fragt daraufhin
+ *  `GET /api/auth/me` ab. 412 kommt aus zwei Quellen — Queue-Besitzer (LFH-334) und erwarteter
+ *  Benutzer des Tabs —, die der Client nicht trennen muss; die 403 kann eine Leseanfrage sein, die
+ *  schon unter einer fremden Sitzung lief (LLH-1360). Ausgenommen ist eine 403 auf
+ *  `/api/auth/me` selbst, sonst liefe die Prüfung im Kreis. Gehört die Sitzung weiter dem
+ *  angezeigten Benutzer, ergibt die Prüfung nichts. */
 export const BENUTZER_PRUEFEN = 'lfh:benutzer-pruefen';

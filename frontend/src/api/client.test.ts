@@ -329,13 +329,50 @@ describe('erwarteter Benutzer (LFH-387)', () => {
     }
   });
 
-  it('löst bei 403 einer Schreibanfrage eine Benutzerprüfung aus', async () => {
-    server.use(http.post('/api/ding', () => HttpResponse.json({ error: 'x' }, { status: 403 })));
+  it('löst bei 403 einer GET-Anfrage über apiSend eine Benutzerprüfung aus', async () => {
+    server.use(http.get('/api/ding', () => HttpResponse.json({ error: 'x' }, { status: 403 })));
     const pruefen = vi.fn();
     window.addEventListener(BENUTZER_PRUEFEN, pruefen);
     try {
-      await expect(apiSend('/api/ding', 'POST', {})).rejects.toMatchObject({ status: 403 });
+      await expect(apiSend('/api/ding', 'GET')).rejects.toMatchObject({ status: 403 });
       expect(pruefen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  // Schreibende Anfragen tragen den Kopf und bekämen nach einem Wechsel 412. Ihre 403 ist ein
+  // echtes Rechteproblem; eine abgelehnte Server-Abmeldung darf keine Prüfung anstoßen, deren
+  // Nachlauf die lokale Abmeldung wieder aufhöbe.
+  it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)(
+    'löst bei 403 auf %s keine Benutzerprüfung aus',
+    async (methode) => {
+      server.use(
+        http[methode.toLowerCase() as 'post']('/api/ding', () =>
+          HttpResponse.json({ error: 'x' }, { status: 403 }),
+        ),
+      );
+      const pruefen = vi.fn();
+      window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+      try {
+        setzeErwartetenBenutzer(7);
+        await expect(apiSend('/api/ding', methode, {})).rejects.toMatchObject({ status: 403 });
+        expect(pruefen).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+      }
+    },
+  );
+
+  it('löst bei 403 einer abgelehnten Abmeldung keine Benutzerprüfung aus', async () => {
+    server.use(
+      http.post('/api/auth/logout', () => HttpResponse.json({ error: 'x' }, { status: 403 })),
+    );
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      await expect(apiSend('/api/auth/logout', 'POST')).rejects.toMatchObject({ status: 403 });
+      expect(pruefen).not.toHaveBeenCalled();
     } finally {
       window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
     }
