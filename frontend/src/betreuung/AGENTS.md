@@ -64,6 +64,18 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   über `nachforderungenPfad(…, { bezugStelle, stelle })` ins Formular der Nachforderungsseite.
   Prüfkette 403 (vor dem Lesen) → 404 → 409, geschlossen erlaubt; der Storno der Stelle löst den
   Bezug in seiner Transaktion (`stelle_stornieren_tx`). Kein „Bedarf melden“ auf dem Gerät.
+- **Unterkunftsrechner** (LLH-1520, Spec `unterkunftsrechner`, `pages/UnterkunftPlanenPage.tsx`,
+  `betreuung/unterkunft/`): rechnet nur im Browser (`rechnerKern.ts`); der Rust-Kern der
+  Rechner-API folgt mit LLH-1524. **Eine Fallsammlung** `tests/fixtures/unterkunft/faelle.json`
+  prüft den Kern (ab LLH-1524 beide); wer rechnet, ändert sie mit. **Eine Basis** `src/unterkunft/richtwerte_basis.json` (Wert, Grenzen,
+  Herkunft `belegt`/`annahme`, Quelle), Rust per `include_str!`, die Oberfläche per Import;
+  `richtwerte.guard.test.ts` hält Kern und Basis deckungsgleich. Wirksam ist Einsatz vor
+  Organisation vor Basis (`org_unterkunft_richtwert`, `einsatz_unterkunft_richtwert`, `null`
+  erbt); der Einsatz-Key liegt unter den Einstellungen und damit im Lagebild ohne Netz. Bedarf
+  `ceil`, Plätze `floor` je Raum und Zelt, über `glatt` gegen Gleitkomma-Reste. Der Rechner
+  ändert nur die Kapazität der Stelle und legt Nachforderungen über den bestehenden Schreibweg an
+  (je Posten eine, mit `betreuungsstelle_id`); Belegung und „in Betreuung“ bleiben unberührt.
+  Quellenangaben nennen Vorschriften und Werke, nie Personen; ohne Quelle „Ausgangstabellen“.
 - **Übersicht als Lagebild** (LLH-1050, Spec `betreuung-evakuierung`, „Übersicht der
   Betreuung“): das Band „Unterbringung in Zahlen“ (`betreuung/UnterbringungKennzahlen.tsx`) rechnet
   nur über `betreuung/unterbringungKennzahl.ts`, und die nur mit `inBetreuung`, `freiePlaetze` und

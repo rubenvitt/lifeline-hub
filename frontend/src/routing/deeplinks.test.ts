@@ -45,6 +45,7 @@ import {
   parseAbloesungAnsicht,
   betreuungPfad,
   betreuungsstellePfad,
+  unterkunftPlanenPfad,
   evakuierungPfad,
   evakuierungsbezirkPfad,
   verpflegungAusgabePfad,
@@ -619,6 +620,10 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(betreuungPfad(E, {})).toBe('/einsaetze/5/betreuung');
   });
 
+  it('unterkunftPlanenPfad: Unterroute der Stelle (LLH-1520)', () => {
+    expect(unterkunftPlanenPfad(7, 3)).toBe(`${betreuungsstellePfad(7, 3)}/unterkunft`);
+  });
+
   it('betreuungsstellePfad: Item-Route unter dem Modul Betreuung (LLH-1044)', () => {
     expect(betreuungsstellePfad(E, 4)).toBe('/einsaetze/5/betreuung/4');
     // Der Modulwächter liest das Modul aus dem dritten Segment — die Detailseite gehört dazu.
@@ -1064,6 +1069,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
       'pegel',
       'kennzahlen',
       'abloesung',
+      'unterkunft',
       'benachrichtigungen',
       'geraete',
       'zugriff',

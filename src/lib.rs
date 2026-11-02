@@ -78,6 +78,7 @@ pub mod transfer;
 pub mod tx;
 pub mod uhrzeit;
 pub mod uhs;
+pub mod unterkunft;
 pub mod verbindung;
 pub mod verpflegung;
 pub mod versionsstand;

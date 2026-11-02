@@ -438,6 +438,11 @@ export function betreuungsstellePfad(einsatzId: number, stelleId: number): strin
   return `${einsatzModulPfad(einsatzId, 'betreuung')}/${stelleId}`;
 }
 
+/** Rechner „Unterkunft planen“ einer Betreuungsstelle (LLH-1520), Unterroute der Detailseite. */
+export function unterkunftPlanenPfad(einsatzId: number, stelleId: number): string {
+  return `${betreuungsstellePfad(einsatzId, stelleId)}/unterkunft`;
+}
+
 /**
  * Evakuierungs-Modul (LLH-1034). `?bezirk=<id>` ist seit LLH-1076 nur noch Altadresse: die Seite
  * leitet auf die Detailseite des Bezirks um ({@link evakuierungsbezirkPfad}). Neue Sprünge auf einen
@@ -1317,6 +1322,7 @@ export type EinstellungenSektion =
   | 'pegel'
   | 'kennzahlen'
   | 'abloesung'
+  | 'unterkunft'
   | 'benachrichtigungen'
   | 'geraete'
   | 'zugriff';
@@ -1339,6 +1345,8 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   // Vorgabe des Einsatzes für die Ablösung (LLH-1122): Schichtmodell, Rechte wie die
   // Abschnittsvorgabe.
   { key: 'abloesung', label: 'Ablösung' },
+  // Richtwerte des Unterkunftsrechners (LLH-1520): überschreiben die der Organisation.
+  { key: 'unterkunft', label: 'Unterkunft' },
   // Vorgabe je Funktion (LLH-1421): wer welche Eingänge still bekommt; Rechte wie die übrigen
   // Einstellungen.
   { key: 'benachrichtigungen', label: 'Benachrichtigungen' },
