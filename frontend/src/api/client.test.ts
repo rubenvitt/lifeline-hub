@@ -322,6 +322,7 @@ describe('erwarteter Benutzer (LFH-387)', () => {
     const pruefen = vi.fn();
     window.addEventListener(BENUTZER_PRUEFEN, pruefen);
     try {
+      setzeErwartetenBenutzer(7);
       await expect(apiGet('/api/auth/me')).rejects.toMatchObject({ status: 403 });
       expect(pruefen).not.toHaveBeenCalled();
     } finally {
@@ -334,8 +335,35 @@ describe('erwarteter Benutzer (LFH-387)', () => {
     const pruefen = vi.fn();
     window.addEventListener(BENUTZER_PRUEFEN, pruefen);
     try {
+      setzeErwartetenBenutzer(7);
       await expect(apiSend('/api/ding', 'GET')).rejects.toMatchObject({ status: 403 });
       expect(pruefen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  // Eine Leseanfrage, die erst nach dem Abmelden mit 403 zurückkommt, darf über `/me` nicht die
+  // (bei gescheiterter Server-Abmeldung noch gültige) Sitzung wieder übernehmen.
+  it('löst bei 403 einer Leseanfrage ohne angezeigten Benutzer keine Prüfung aus', async () => {
+    let antworten: () => void = () => {};
+    const freigegeben = new Promise<void>((r) => (antworten = r));
+    server.use(
+      http.get('/api/ding', async () => {
+        await freigegeben;
+        return HttpResponse.json({ error: 'x' }, { status: 403 });
+      }),
+    );
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      setzeErwartetenBenutzer(7);
+      const anfrage = apiGet('/api/ding');
+      // Abgemeldet, während die Anfrage noch läuft.
+      setzeErwartetenBenutzer(null);
+      antworten();
+      await expect(anfrage).rejects.toMatchObject({ status: 403 });
+      expect(pruefen).not.toHaveBeenCalled();
     } finally {
       window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
     }

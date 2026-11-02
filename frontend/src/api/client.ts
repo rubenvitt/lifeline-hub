@@ -178,7 +178,9 @@ async function fehlerWerfen(res: Response, lese403: boolean): Promise<never> {
   // Person das Recht, ist die 403 das einzige Zeichen, und die Seite zeigte „Keine Berechtigung“
   // statt des Konflikts. Ein echtes Rechteproblem kostet nur eine `/me`-Abfrage, gleichzeitige
   // Anstöße fasst der Provider zusammen.
-  if (res.status === 412 || (res.status === 403 && lese403)) {
+  // Nur solange der Tab jemanden zeigt: ohne angezeigten Benutzer gibt es nichts zu vergleichen,
+  // und eine verspätete 403 nach dem Abmelden übernähme sonst über `/me` die Sitzung erneut.
+  if (res.status === 412 || (res.status === 403 && lese403 && erwarteterBenutzer != null)) {
     window.dispatchEvent(new CustomEvent(BENUTZER_PRUEFEN));
   }
   let message = `Serverfehler (${res.status})`;
