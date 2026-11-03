@@ -87,6 +87,19 @@ describe('App-Routing', () => {
       http.get('/api/auth/providers', () => HttpResponse.json([])),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      // Der Admin darf beide Einstellungen lesen. Die Default-403 stieße sonst die
+      // Benutzerprüfung an (LLH-1360), und `/me` antwortet hier immer 401.
+      http.get('/api/org-einstellungen', () =>
+        HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
+      ),
+      http.get('/api/einsaetze/7/einstellungen', () =>
+        HttpResponse.json({
+          einsatz_id: 7,
+          etb_nummer_eingefroren: false,
+          meldung_nummer_eingefroren: false,
+          auftrag_nummer_eingefroren: false,
+        }),
+      ),
     );
     const ziel = '/einsaetze/7/wip-probe?ansicht=detail#lage';
     const { router } = renderApp(ziel);

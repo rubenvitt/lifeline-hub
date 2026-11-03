@@ -295,7 +295,118 @@ describe('erwarteter Benutzer (LFH-387)', () => {
     }
   });
 
-  it.each([401, 409, 422])('löst bei %i keine Benutzerprüfung aus', async (status) => {
+  // LLH-1360: Leseanfragen tragen den Kopf nicht und laufen nach einem Wechsel im anderen Tab
+  // unter der fremden Sitzung. Fehlt der neuen Person das Recht, ist die 403 das einzige Zeichen.
+  it('löst bei 403 einer Leseanfrage eine Benutzerprüfung aus und wirft den ApiError unverändert', async () => {
+    server.use(
+      http.get('/api/ding', () =>
+        HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
+      ),
+    );
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      setzeErwartetenBenutzer(7);
+      await expect(apiGet('/api/ding')).rejects.toMatchObject({
+        status: 403,
+        message: 'Keine Berechtigung',
+      });
+      expect(pruefen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  it('löst bei 403 auf die Sitzungsprüfung selbst keine weitere aus (keine Schleife)', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 403 })));
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      setzeErwartetenBenutzer(7);
+      await expect(apiGet('/api/auth/me')).rejects.toMatchObject({ status: 403 });
+      expect(pruefen).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  it('löst bei 403 einer GET-Anfrage über apiSend eine Benutzerprüfung aus', async () => {
+    server.use(http.get('/api/ding', () => HttpResponse.json({ error: 'x' }, { status: 403 })));
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      setzeErwartetenBenutzer(7);
+      await expect(apiSend('/api/ding', 'GET')).rejects.toMatchObject({ status: 403 });
+      expect(pruefen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  // Eine Leseanfrage, die erst nach dem Abmelden mit 403 zurückkommt, darf über `/me` nicht die
+  // (bei gescheiterter Server-Abmeldung noch gültige) Sitzung wieder übernehmen.
+  it('löst bei 403 einer Leseanfrage ohne angezeigten Benutzer keine Prüfung aus', async () => {
+    let antworten: () => void = () => {};
+    const freigegeben = new Promise<void>((r) => (antworten = r));
+    server.use(
+      http.get('/api/ding', async () => {
+        await freigegeben;
+        return HttpResponse.json({ error: 'x' }, { status: 403 });
+      }),
+    );
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      setzeErwartetenBenutzer(7);
+      const anfrage = apiGet('/api/ding');
+      // Abgemeldet, während die Anfrage noch läuft.
+      setzeErwartetenBenutzer(null);
+      antworten();
+      await expect(anfrage).rejects.toMatchObject({ status: 403 });
+      expect(pruefen).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  // Schreibende Anfragen tragen den Kopf und bekämen nach einem Wechsel 412. Ihre 403 ist ein
+  // echtes Rechteproblem; eine abgelehnte Server-Abmeldung darf keine Prüfung anstoßen, deren
+  // Nachlauf die lokale Abmeldung wieder aufhöbe.
+  it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)(
+    'löst bei 403 auf %s keine Benutzerprüfung aus',
+    async (methode) => {
+      server.use(
+        http[methode.toLowerCase() as 'post']('/api/ding', () =>
+          HttpResponse.json({ error: 'x' }, { status: 403 }),
+        ),
+      );
+      const pruefen = vi.fn();
+      window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+      try {
+        setzeErwartetenBenutzer(7);
+        await expect(apiSend('/api/ding', methode, {})).rejects.toMatchObject({ status: 403 });
+        expect(pruefen).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+      }
+    },
+  );
+
+  it('löst bei 403 einer abgelehnten Abmeldung keine Benutzerprüfung aus', async () => {
+    server.use(
+      http.post('/api/auth/logout', () => HttpResponse.json({ error: 'x' }, { status: 403 })),
+    );
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      await expect(apiSend('/api/auth/logout', 'POST')).rejects.toMatchObject({ status: 403 });
+      expect(pruefen).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  it.each([401, 404, 409, 422])('löst bei %i keine Benutzerprüfung aus', async (status) => {
     server.use(http.post('/api/ding', () => HttpResponse.json({ error: 'x' }, { status })));
     const pruefen = vi.fn();
     window.addEventListener(BENUTZER_PRUEFEN, pruefen);
