@@ -232,7 +232,8 @@ pub struct Gestrichen {
     pub beruehrt: Beruehrt,
 }
 
-/// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien. Prüfung
+/// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien an Personen,
+/// die noch im Einsatz sind (die Kopie an einer entlassenen bleibt, LLH-1459). Prüfung
 /// (Spec „Streichung"): fremdes Ereignis → 404; schon gestrichen → 422; Art `abloesung` (auch die
 /// Fan-out-Kopie an einer Person) oder Quelle `abloesung` (Besatzungswechsel, LLH-1150) ohne
 /// `durch_ruecknahme` → 422; ein Rest, der die Perioden-Regeln der Kraft oder einer betroffenen
@@ -282,10 +283,14 @@ pub async fn streiche_tx(
     perioden::pruefe_streichen(&bestand, &[id])
         .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
 
-    // Fan-out-Kopien: je Person einzeln prüfen, bevor irgendetwas geschrieben wird.
+    // Fan-out-Kopien: je Person einzeln prüfen, bevor irgendetwas geschrieben wird. Die Kopie
+    // an einer inzwischen beendeten Person bleibt stehen (LLH-1459): die Zeitachse der
+    // Entlassenen ist ihr eigener Nachweis, und ohne die Kopie stünde sie entlassen mit offener
+    // Periode da. Berichtigt wird sie an der Person selbst.
     let kopien: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT id, personal_id FROM einsatz_kraft_zeitachse \
-         WHERE ursprung_id = ? AND gestrichen_at IS NULL AND personal_id IS NOT NULL",
+        "SELECT z.id, z.personal_id FROM einsatz_kraft_zeitachse z \
+         JOIN einsatz_personal ep ON ep.id = z.personal_id AND ep.beendet_at IS NULL \
+         WHERE z.ursprung_id = ? AND z.gestrichen_at IS NULL",
     )
     .bind(id)
     .fetch_all(&mut *conn)
