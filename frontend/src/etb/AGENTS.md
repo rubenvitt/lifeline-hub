@@ -38,7 +38,9 @@ Ableitungen in `etb/zeitachseModell.ts`)
   wenn er im ungefilterten Fenster steht (`lesemarkeImFenster`), sonst ein Banner mit „Zur Marke
   springen“. „Nach oben“ (`etb/nachOben.ts`) steht erst ab mehr als einer Fensterhöhe Abstand
   zum Anfang, rechts in der Überlagerung der Zeitachse über dem Sammelbanner (gestapelt, nie
-  darüber gelegt). Lagemeldungen bleiben neueste zuerst.
+  darüber gelegt), und nur, wenn er ganz unter den klebenden Kopf passt (LLH-1386,
+  `useNachObenPasst`): macht eine hohe Leiste (Anhangliste, Hinweise) den Platz zu knapp, steht er
+  unsichtbar und ist kein Tab-Stopp. Lagemeldungen bleiben neueste zuerst.
   `KARTEN_EIGENBAU` ist leer (`datensicht.guard.test.ts` pinnt 0).
 - Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`); unter `xl` erst nach der ersten Liste, dann
   stehend (Riegel `bilanzFrei`, nicht `isLoading`).

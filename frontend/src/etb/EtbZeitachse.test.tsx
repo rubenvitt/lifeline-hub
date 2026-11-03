@@ -1041,4 +1041,54 @@ describe('Nach oben', () => {
       rolle(0);
     }
   });
+  /*
+   * LLH-1386: ist die Leiste hoch und das Fenster niedrig, rutscht der Knopf hinter den klebenden
+   * Kopf. Dann steht er unsichtbar (kein Tab-Stopp), bis der Beobachter wieder Platz meldet.
+   */
+  it('steht unsichtbar, solange er nicht ganz unter den klebenden Kopf passt', () => {
+    const beobachter: {
+      rueckruf: IntersectionObserverCallback;
+      optionen?: IntersectionObserverInit;
+    }[] = [];
+    class Beobachter {
+      constructor(rueckruf: IntersectionObserverCallback, optionen?: IntersectionObserverInit) {
+        beobachter.push({ rueckruf, optionen });
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('IntersectionObserver', Beobachter);
+    const melde = (anteil: number) =>
+      act(() => {
+        beobachter[beobachter.length - 1].rueckruf(
+          [
+            {
+              isIntersecting: anteil > 0,
+              intersectionRatio: anteil,
+            } as IntersectionObserverEntry,
+          ],
+          {} as IntersectionObserver,
+        );
+      });
+    rolle(window.innerHeight + 1);
+    try {
+      renderZeitachse({ eintraege: [eintrag()] });
+      const knopf = screen.getByRole('button', { name: 'Nach oben' });
+      expect(beobachter[beobachter.length - 1].optionen?.rootMargin).toMatch(
+        /^-\d+px 0px 0px 0px$/,
+      );
+
+      melde(0.4);
+      expect(knopf).toHaveStyle({ visibility: 'hidden' });
+      expect(screen.queryByRole('button', { name: 'Nach oben' })).toBeNull();
+
+      melde(1);
+      expect(screen.getByRole('button', { name: 'Nach oben' })).not.toHaveStyle({
+        visibility: 'hidden',
+      });
+    } finally {
+      rolle(0);
+      vi.unstubAllGlobals();
+    }
+  });
 });

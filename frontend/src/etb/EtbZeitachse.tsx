@@ -42,7 +42,7 @@ import BerichtigtMarke from './BerichtigtMarke';
 import { berichtigtDurch } from './berichtigung';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import EtbDokumente, { type EtbDokument } from './EtbDokumente';
-import { scrollNachOben, useWeitGerollt } from './nachOben';
+import { scrollNachOben, useNachObenPasst, useWeitGerollt } from './nachOben';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { SYSTEM_RUFNAME } from './systemKennung';
@@ -276,6 +276,7 @@ export default function EtbZeitachse({
   /** Liegt der Fokus in der Zeitachse? Zweiter Grund zum Einfrieren neben „nicht am Ende“. */
   const [fokusDrin, setFokusDrin] = useState(false);
   const weitGerollt = useWeitGerollt();
+  const [nachObenPasst, nachObenRef] = useNachObenPasst();
   /*
    * Hochgerollt friert ein, zurück am Ende taut auf — sofern kein Fokus darin liegt (LLH-1149,
    * design.md D2). Im Render angeglichen wie der Sprung unten: ein Effekt käme einen Commit zu
@@ -552,8 +553,8 @@ export default function EtbZeitachse({
       {/* Überlagerung mit Nullhöhe am UNTEREN Rand (LLH-1149): neue Einträge kommen unten an,
           das Banner klebt dort über der angepinnten Erfassung (`--lfh-etb-fokusabstand`, ihre
           gemessene Höhe) und nimmt keinen Platz im Fluss. „Nach oben“ steht rechts darüber,
-          gestapelt statt überlagert, damit es das Banner nie verdeckt. Die Schale lässt Zeiger
-          durch. */}
+          gestapelt statt überlagert, damit es das Banner nie verdeckt, und nur, wenn es ganz unter
+          den klebenden Kopf passt (LLH-1386, `useNachObenPasst`). Die Schale lässt Zeiger durch. */}
       <div
         style={{
           position: 'sticky',
@@ -576,13 +577,18 @@ export default function EtbZeitachse({
         >
           {weitGerollt && (
             <Button
+              ref={nachObenRef}
               data-lfh="etb-nach-oben"
               icon={<IconPfeilHoch />}
               style={{
-                pointerEvents: 'auto',
+                // Unsichtbar statt ausgehängt: der Beobachter misst weiter und holt ihn zurück.
+                visibility: nachObenPasst ? undefined : 'hidden',
+                pointerEvents: nachObenPasst ? 'auto' : 'none',
                 marginInlineEnd: token.marginSM,
-                // Ohne Banner steht der Knopf mit Luft über der Erfassung, sonst trennt `gap`.
-                marginBlockEnd: zurueckgehalten > 0 ? 0 : token.marginSM,
+                // Kein eigener Abstand nach unten: die Luft über der Erfassung trägt schon
+                // `--lfh-etb-fokusabstand` (Leiste + marginSM), zum Banner trennt `gap`. Ein
+                // zweiter Rand hob den Knopf bei 1366 × 520 im Handschuh-Betrieb unter den Kopf
+                // (LLH-1386).
               }}
               onClick={() => {
                 // Der Knopf verschwindet oben, und mit ihm der Fokus — ohne Blur-Ereignis (wie

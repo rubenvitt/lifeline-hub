@@ -1312,6 +1312,114 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
 });
 
 /**
+ * ETB (LLH-1386): „Nach oben“ steht in der Überlagerung der Zeitachse über der angepinnten
+ * Erfassung und stapelt nach oben. Macht eine Anhangliste die Leiste hoch, rutschte er bei
+ * 1366 × 520 im Handschuh-Betrieb hinter den klebenden Kopf und blieb dort ein unsichtbarer
+ * Tab-Stopp. Jetzt steht er nur, wenn er ganz zwischen Kopf und Leiste passt.
+ *
+ * Vorbedingung, damit der Fall nicht leer besteht: ohne Anhänge steht der Knopf frei, mit ihnen
+ * läge er (gemessen, auch unsichtbar) mindestens teilweise unter dem Kopf. Die Zeitachse behält
+ * dabei ihre Höhe: die Überlagerung nimmt keinen Platz im Fluss, nichts springt.
+ */
+test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf (1366 × 520, handschuh)', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Nach oben 1386 ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  for (let n = 1; n <= 24; n += 1) {
+    const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+      data: {
+        typ: 'meldung',
+        inhalt: `Probe ${n}: Lage unverändert`,
+        von: 'ELW 1',
+        an: 'Leitstelle',
+      },
+    });
+    expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
+  }
+
+  await page.setViewportSize({ width: 1366, height: 520 });
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await stelleDichte(page, 'handschuh');
+  const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
+  await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(24);
+  const LEISTE = '.etb-erfassung-sticky';
+  await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
+  const knopf = page.locator('[data-lfh="etb-nach-oben"]');
+
+  /** Lage des Knopfs gegen den Kopf; gemessen auch, wenn er unsichtbar steht. */
+  const lage = () =>
+    knopf.evaluate((el, leiste) => {
+      const r = el.getBoundingClientRect();
+      const kopf = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
+      );
+      const oben = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return {
+        top: r.top,
+        bottom: r.bottom,
+        kopf,
+        sichtbar: getComputedStyle(el).visibility !== 'hidden',
+        // Was am Mittelpunkt zuoberst liegt: der Knopf selbst, nicht der Kopf.
+        frei: oben != null && el.contains(oben),
+        leiste: Math.round(document.querySelector(leiste)!.getBoundingClientRect().height),
+        achse: Math.round(
+          document.querySelector('[data-lfh="etb-zeitachse"]')!.getBoundingClientRect().height,
+        ),
+      };
+    }, LEISTE);
+
+  // Die Seite öffnet am Ende, mehr als eine Fensterhöhe unter dem Anfang: der Knopf steht.
+  await expect(knopf).toBeVisible();
+  await expect.poll(async () => (await lage()).frei, { message: 'ohne Anhänge frei' }).toBe(true);
+  const ohne = await lage();
+  expect(ohne.top, `ohne Anhänge unter dem Kopf (${ohne.kopf}px)`).toBeGreaterThanOrEqual(
+    ohne.kopf - 1,
+  );
+
+  // Drei Anhänge: die Liste „Gewählte Anhänge“ hebt die Leiste.
+  await page.locator('[data-lfh="etb-anhang-eingabe"]').setInputFiles(
+    ['a', 'b', 'c'].map((n) => ({
+      name: `Fax Leitstelle ${n}.pdf`,
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n%%EOF\n'),
+    })),
+  );
+  await expect(
+    page.getByRole('list', { name: 'Gewählte Anhänge' }).getByRole('listitem'),
+  ).toHaveCount(3);
+  await expect
+    .poll(async () => (await lage()).top, { message: 'die Leiste wächst, der Knopf rückt hoch' })
+    .toBeLessThan(ohne.top - 40);
+  const mit = await lage();
+  expect(
+    mit.top,
+    `Vorbedingung: mit Anhängen (Leiste ${mit.leiste}px) läge der Knopf unter dem Kopf (${mit.kopf}px)`,
+  ).toBeLessThan(mit.kopf);
+  await expect(knopf, 'hinter dem Kopf steht er nicht, auch nicht als Tab-Stopp').toBeHidden();
+  expect(mit.achse, 'die Zeitachse behält ihre Höhe').toBe(ohne.achse);
+
+  // Anhänge wieder weg: der Knopf kommt zurück, frei unter dem Kopf.
+  for (const n of ['a', 'b', 'c']) {
+    await page.getByRole('button', { name: `Anhang Fax Leitstelle ${n}.pdf entfernen` }).click();
+  }
+  await expect(knopf).toBeVisible();
+  await expect.poll(async () => (await lage()).frei).toBe(true);
+  const danach = await lage();
+  expect(danach.achse, 'die Zeitachse behält ihre Höhe').toBe(ohne.achse);
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `Kopf ${ohne.kopf}px; Leiste ${ohne.leiste}px → Knopf oben ${Math.round(ohne.top)}px; mit Anhängen Leiste ${mit.leiste}px → ${Math.round(mit.top)}px (unsichtbar)`,
+  });
+});
+
+/**
  * Ausgabeansicht der Verpflegung (LLH-1032, design.md D10): das klebende Tastenfeld am unteren
  * Rand verdeckt keinen fokussierten Eintrag der Liste „Letzte Buchungen“. Fokusziele sind die
  * „Zurücknehmen“-Knöpfe der zehn gezeigten Ausgaben. Den Abstand trägt
