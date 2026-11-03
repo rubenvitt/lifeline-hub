@@ -13,6 +13,7 @@ import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
+import { warteAufMenueFokus } from '../test/menue';
 import { ApiError } from '../api/client';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
@@ -135,6 +136,9 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
  * über `pointerEvents` filtern und genau einen Treffer verlangen. Bewusste Kopie aus
  * `meldungen/MeldungKarte.test.tsx`: ein Import aus einer fremden `.test.tsx` zöge deren Suite in
  * jeden Lauf dieser hier.
+ *
+ * Kommt erst zurück, wenn der späte `autoFocus` verbraucht ist: sonst zieht er den Fokus nach der
+ * Wahl aus dem Dialog ins geschlossene Menü (LLH-1390, `test/menue.ts`).
  */
 async function oeffneAktionsmenue(lfdNr = 1): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Meldung ${lfdNr}` }));
@@ -144,6 +148,7 @@ async function oeffneAktionsmenue(lfdNr = 1): Promise<HTMLElement> {
   expect(offen).toHaveLength(1);
   const menue = offen[0].querySelector<HTMLElement>('[role="menu"]');
   if (!menue) throw new Error(`Das Aktionsmenü zu Meldung ${lfdNr} ließ sich nicht öffnen`);
+  await warteAufMenueFokus();
   return menue;
 }
 
@@ -421,7 +426,9 @@ describe('MeldungenPage', () => {
     );
     // Die formatbewusste Eingabe (KoordinatenEingabe) ist ein Feld: im WGS84-Default wird "lat,
     // lon" getippt.
-    await userEvent.type(await screen.findByPlaceholderText('Koordinate eingeben'), '50.1, 8.6');
+    const koordinate = await screen.findByPlaceholderText('Koordinate eingeben');
+    await userEvent.type(koordinate, '50.1, 8.6');
+    expect(koordinate).toHaveValue('50.1, 8.6');
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
     const [eid, mid, daten] = markiereLagerelevant.mock.calls[0];
@@ -732,7 +739,9 @@ describe('MeldungenPage', () => {
 
     const menue = await oeffneAktionsmenue();
     await userEvent.click(within(menue).getByText(/Auftrag erteilen/));
-    await userEvent.type(await screen.findByLabelText('Auftrag / Was'), 'Riegelstellung');
+    const text = await screen.findByLabelText('Auftrag / Was');
+    await userEvent.type(text, 'Riegelstellung');
+    expect(text).toHaveValue('Florian Nord 1: Deich instabilRiegelstellung');
     await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
@@ -748,7 +757,9 @@ describe('MeldungenPage', () => {
 
     const menue = await oeffneAktionsmenue();
     await userEvent.click(within(menue).getByText(/Auftrag erteilen/));
-    await userEvent.type(await screen.findByLabelText('Auftrag / Was'), 'Riegelstellung');
+    const text = await screen.findByLabelText('Auftrag / Was');
+    await userEvent.type(text, 'Riegelstellung');
+    expect(text).toHaveValue('Florian Nord 1: Deich instabilRiegelstellung');
     await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
@@ -1129,7 +1140,9 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
   async function erteileAuftrag() {
     await userEvent.click(within(await oeffneAktionsmenue()).getByText(/Auftrag erteilen/));
     const dialog = await offenerDialog();
-    await userEvent.type(within(dialog).getByLabelText('Auftrag / Was'), 'Riegelstellung');
+    const text = within(dialog).getByLabelText('Auftrag / Was');
+    await userEvent.type(text, 'Riegelstellung');
+    expect(text).toHaveValue('Florian Nord 1: Deich instabilRiegelstellung');
     await userEvent.type(within(dialog).getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
     return dialog;
@@ -1343,7 +1356,9 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
         return offenerDialog();
       },
       sende: async (dialog: HTMLElement) => {
-        await userEvent.type(within(dialog).getByLabelText('Auftrag / Was'), 'Riegelstellung');
+        const text = within(dialog).getByLabelText('Auftrag / Was');
+        await userEvent.type(text, 'Riegelstellung');
+        expect(text).toHaveValue('Florian Nord 1: Deich instabilRiegelstellung');
         await userEvent.type(within(dialog).getByLabelText('Empfänger'), 'EA Nord{Enter}');
         await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
       },

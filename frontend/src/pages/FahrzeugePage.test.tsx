@@ -13,6 +13,7 @@ import type { EinsatzAnzeige } from '../api/types';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { listeVon, oeffne, waehle } from '../test/auswahlListe';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; dass die Systemrolle
 // fürs Schreiben nicht zählt, deckt schreibrecht.test.ts ab.
@@ -140,6 +141,7 @@ async function oeffneStatusmenue(zeile: HTMLElement, funkrufname: string): Promi
   await userEvent.click(
     within(zeile).getByRole('button', { name: `Status von ${funkrufname} ändern` }),
   );
+  await warteAufMenueFokus();
   const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
     (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
   );
@@ -154,11 +156,10 @@ async function oeffneStatusmenue(zeile: HTMLElement, funkrufname: string): Promi
  * als erster Eintrag). Das geöffnete Menü-Portal wird über die sichtbare Dropdown-Hülle gegriffen.
  */
 async function waehleImZeilenmenue(funkrufname: string, eintrag: string) {
-  await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${funkrufname}` }));
-  const menue = document.querySelector<HTMLElement>(
-    '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-  )!;
-  await userEvent.click(within(menue).getByRole('menuitem', { name: eintrag }));
+  await waehleMenueEintrag(
+    screen.getByRole('button', { name: `Weitere Aktionen zu ${funkrufname}` }),
+    eintrag,
+  );
 }
 
 describe('FahrzeugePage', () => {
@@ -365,11 +366,7 @@ describe('FahrzeugePage', () => {
     );
     const { container } = render(einsatz());
     await screen.findByText('Florian 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zu Florian 1' }));
-    const menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    )!;
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Stornieren' }));
+    await waehleImZeilenmenue('Florian 1', 'Stornieren');
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Florian 1 stornieren?');
     expect(dialog.querySelector('.ant-modal-body')).toHaveTextContent(
@@ -1069,6 +1066,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
     await userEvent.click(
       within(bereich).getByRole('button', { name: `Weitere Aktionen zu ${name}` }),
     );
+    await warteAufMenueFokus();
     return document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     )!;
@@ -1211,11 +1209,7 @@ describe('FahrzeugePage · Angaben ändern (LLH-1073)', () => {
     );
     const name = String(zeilenDaten.funkrufname);
     await screen.findByText(name);
-    await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${name}` }));
-    const menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    )!;
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Angaben ändern …' }));
+    await waehleImZeilenmenue(name, 'Angaben ändern …');
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(`Angaben zu ${name} ändern`);
     return { dialog, patches };
@@ -1241,6 +1235,9 @@ describe('FahrzeugePage · Angaben ändern (LLH-1073)', () => {
     await userEvent.type(name, 'Florian Nachbarstadt 44/1');
     await userEvent.type(within(dialog).getByLabelText('Fahrzeugtyp'), 'HLF 20');
     await userEvent.clear(within(dialog).getByLabelText('Trägerorganisation'));
+    expect(name).toHaveValue('Florian Nachbarstadt 44/1');
+    expect(within(dialog).getByLabelText('Fahrzeugtyp')).toHaveValue('HLF 20');
+    expect(within(dialog).getByLabelText('Trägerorganisation')).toHaveValue('');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(patches).toEqual([
@@ -1291,6 +1288,7 @@ describe('FahrzeugePage · Angaben ändern (LLH-1073)', () => {
       ),
     );
     await userEvent.type(within(dialog).getByLabelText('Fahrzeugtyp'), 'HLF 20');
+    expect(within(dialog).getByLabelText('Fahrzeugtyp')).toHaveValue('HLF 20');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     expect(await within(dialog).findByText(/Fahrzeug ist entlassen/)).toBeInTheDocument();
     expect(dialog).not.toHaveClass('ant-zoom-leave');
@@ -1878,6 +1876,7 @@ describe('FahrzeugePage · Als eigene Einheit führen (LLH-1073 Teil II, design.
   };
   const menueTexte = async (name: string) => {
     await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${name}` }));
+    await warteAufMenueFokus();
     const menue = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     )!;

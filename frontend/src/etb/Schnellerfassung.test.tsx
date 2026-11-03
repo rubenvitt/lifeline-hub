@@ -16,6 +16,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ohneSicherenKontext } from '../test/ohneSicherenKontext';
 import { useLocation } from 'react-router';
 import { rufnameZugriff } from '../test/standardRufname';
+import { waehleMenueEintrag } from '../test/menue';
 import dayjs from 'dayjs';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { theme } from 'antd';
@@ -600,8 +601,10 @@ describe('Schnellerfassung', () => {
       screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
     ).not.toBeInTheDocument();
     // Typ auf 'Lage' umstellen — über den Präfix, der den Typ als Befehl zeigt.
-    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }),
+      'Lage',
+    );
     expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeInTheDocument();
     expect(
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
@@ -619,8 +622,10 @@ describe('Schnellerfassung', () => {
         <Ort />
       </>,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }),
+      'Lage',
+    );
     await userEvent.click(
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
     );
@@ -638,8 +643,10 @@ describe('Schnellerfassung', () => {
     await waitFor(() =>
       expect(client.getQueryData(einsatzKeys.modulFreigaben(einsatz.id))).toBeDefined(),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }),
+      'Lage',
+    );
     expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
@@ -1125,8 +1132,10 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
   it('„Standard-Rufname ändern“ im Chip-Menü öffnet die Abfrage mit Abbrechen', async () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
     expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Standard-Rufname ändern' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Aktionen zu An' }),
+      'Standard-Rufname ändern',
+    );
     const abfrage = screen.getByRole('group', { name: 'Dein Rufname für Von und An' });
     expect(abfrage).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
@@ -1413,9 +1422,12 @@ describe('Nur protokollieren', () => {
   const gesendet = (p: ReturnType<typeof props>, n = 0) =>
     (p.erfassen as ReturnType<typeof vi.fn>).mock.calls[n][0] as NeuerEintrag;
 
+  /** Wählt erst, wenn das Typmenü seinen Fokus hat (`test/menue.ts`, LLH-1390). */
   async function waehleTyp(von: string, nach: string) {
-    await userEvent.click(screen.getByRole('button', { name: `Eintragstyp ${von} ändern` }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: nach }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: `Eintragstyp ${von} ändern` }),
+      nach,
+    );
   }
 
   it('steht bei „Meldung“ aus, und der Eintrag geht in den Meldungseingang', async () => {
@@ -1449,7 +1461,10 @@ describe('Nur protokollieren', () => {
     const { unmount } = renderMitProviders(<Schnellerfassung {...p} />);
     await waehleTyp('Meldung', 'Anordnung');
     expect(screen.queryByRole('checkbox', { name: 'Nur protokollieren' })).toBeNull();
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Abmarsch{Enter}');
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Abmarsch');
+    expect(feld).toHaveValue('Abmarsch');
+    await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect(gesendet(p)).toMatchObject({ typ: 'anordnung', in_meldungseingang: false });
     unmount();

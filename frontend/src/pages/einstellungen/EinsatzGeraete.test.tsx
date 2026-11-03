@@ -7,6 +7,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { tippeZeit } from '../../test/zeitEingabe';
+import { waehleMenueEintrag } from '../../test/menue';
 import EinsatzGeraete from './EinsatzGeraete';
 
 /** Sektion „Geräte“ (LFH-892, Spec `geraete-kopplung`). */
@@ -116,15 +117,10 @@ function rendern() {
 }
 
 async function zeilenaktion(name: string, eintrag: RegExp) {
-  await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Gerät ${name}` }));
-  const menue = await waitFor(() => {
-    const m = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    );
-    expect(m).not.toBeNull();
-    return m!;
-  });
-  await userEvent.click(within(menue).getByRole('menuitem', { name: eintrag }));
+  await waehleMenueEintrag(
+    screen.getByRole('button', { name: `Aktionen zu Gerät ${name}` }),
+    eintrag,
+  );
 }
 
 async function waehle(feld: string, option: string) {

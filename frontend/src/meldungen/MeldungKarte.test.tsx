@@ -7,6 +7,7 @@ import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenConte
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
+import { warteAufMenueFokus } from '../test/menue';
 import type { Meldung } from '../api/types';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
@@ -55,6 +56,8 @@ function renderKarte(ui: React.ReactElement) {
  */
 async function oeffneAktionsmenue(lfdNr = 1): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Meldung ${lfdNr}` }));
+  // Erst wählen, wenn der späte `autoFocus` verbraucht ist (LLH-1390, `test/menue.ts`).
+  await warteAufMenueFokus();
   const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
     (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
   );

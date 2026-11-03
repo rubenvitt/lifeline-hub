@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { renderMitProviders } from '../../test/utils';
+import { warteAufMenueFokus } from '../../test/menue';
 import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
 import GefahrenMatrix, {
   SPALTEN_FREIRAUM,
@@ -36,8 +37,11 @@ const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
  * verlassendes Portal bleibt in `ant-slide-up-leave-active` ohne `ant-dropdown-hidden` stehen.
  * Verlässliches Merkmal ist sein `pointer-events: none`. Die Zählung ist streng, damit eine falsche
  * Annahme laut wird.
+ *
+ * Gewählt wird erst, wenn der späte `autoFocus` des Dropdowns verbraucht ist: sonst zieht er den
+ * Fokus aus dem danach geöffneten Dialog ins geschlossene Menü (LLH-1390, `test/menue.ts`).
  */
-function imMenue() {
+async function imMenue() {
   const offen = Array.from(
     document.querySelectorAll<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden)'),
   ).filter((d) => d.style.pointerEvents !== 'none');
@@ -45,6 +49,7 @@ function imMenue() {
     throw new Error(`genau ein offenes Menü erwartet, ${offen.length} gefunden`);
   const menue = offen[0].querySelector('[role="menu"]');
   if (!menue) throw new Error('das offene Dropdown trägt kein Menü');
+  await warteAufMenueFokus();
   return within(menue as HTMLElement);
 }
 
@@ -79,7 +84,7 @@ async function oeffneDetails(stufe: string, spalte = 'Menschen') {
       name: new RegExp(`^Bewertung Brand × ${spalte}: ${stufe}( · mit Erläuterung)?$`),
     }),
   );
-  await userEvent.click(imMenue().getByRole('menuitem', { name: 'Erläuterung …' }));
+  await userEvent.click((await imMenue()).getByRole('menuitem', { name: 'Erläuterung …' }));
   return screen.findByLabelText('Erläuterung');
 }
 
@@ -100,7 +105,7 @@ describe('GefahrenMatrix', () => {
     );
     // Regex mit `i`: der Normalisierer von Testing Library faltet Leerraum, schreibt aber nicht
     // klein.
-    await userEvent.click(imMenue().getByRole('menuitem', { name: /hoch/i }));
+    await userEvent.click((await imMenue()).getByRole('menuitem', { name: /hoch/i }));
     await waitFor(() =>
       expect(onSetzen).toHaveBeenCalledWith({
         gefahrentyp: 'brand',
@@ -157,7 +162,7 @@ describe('GefahrenMatrix', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Bewertung Brand × Menschen: hoch · mit Erläuterung' }),
     );
-    await userEvent.click(imMenue().getByRole('menuitem', { name: /akut/i }));
+    await userEvent.click((await imMenue()).getByRole('menuitem', { name: /akut/i }));
     await waitFor(() =>
       expect(onSetzen).toHaveBeenCalledWith({
         gefahrentyp: 'brand',
@@ -224,6 +229,7 @@ describe('GefahrenMatrix', () => {
     rendereMatrix({ onDetailsSpeichern });
     const feld = await oeffneDetails('keine');
     await userEvent.type(feld, 'Hang beobachten');
+    expect(feld).toHaveValue('Hang beobachten');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(onDetailsSpeichern).toHaveBeenCalledWith({
@@ -250,6 +256,7 @@ describe('GefahrenMatrix', () => {
     rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })], onDetailsSpeichern });
     const feld = await oeffneDetails('hoch');
     await userEvent.type(feld, 'Dachstuhl brennt');
+    expect(feld).toHaveValue('Dachstuhl brennt');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onDetailsSpeichern).toHaveBeenCalled());
     // Zugesichert ist nur: nicht geleert. „Nicht geschlossen" ist in jsdom nicht beobachtbar

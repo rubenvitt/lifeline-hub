@@ -6,6 +6,7 @@ import { setzeZeitdarstellung } from '../anzeige/zeitDarstellungStore';
 import { meHandler, server } from '../test/server';
 import { adminFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
+import { waehleMenueEintrag } from '../test/menue';
 import type { Schichtmodell } from '../api/types';
 import SchichtmodelleTab from './SchichtmodelleTab';
 
@@ -59,15 +60,10 @@ function stelleBereit(liste: Schichtmodell[] = [SAND, HOCHWASSER]) {
 }
 
 async function zeilenaktion(name: string, eintrag: string) {
-  await userEvent.click(await screen.findByRole('button', { name: `Aktionen zu ${name}` }));
-  const menue = await waitFor(() => {
-    const m = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    );
-    expect(m).not.toBeNull();
-    return m!;
-  });
-  await userEvent.click(within(menue).getByRole('menuitem', { name: eintrag }));
+  await waehleMenueEintrag(
+    await screen.findByRole('button', { name: `Aktionen zu ${name}` }),
+    eintrag,
+  );
 }
 
 describe('SchichtmodelleTab (LLH-1122)', () => {
@@ -186,6 +182,7 @@ describe('SchichtmodelleTab (LLH-1122)', () => {
     expect(rhythmus).toHaveValue('6 h');
     await userEvent.clear(rhythmus);
     await userEvent.type(rhythmus, '8');
+    expect(rhythmus).toHaveValue('8');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(aufrufe).toEqual([

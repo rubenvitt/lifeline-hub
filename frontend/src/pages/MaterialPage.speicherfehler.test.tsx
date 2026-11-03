@@ -8,6 +8,7 @@ import { renderMitProviders } from '../test/utils';
 import MaterialPage from './MaterialPage';
 import { waehle } from '../test/auswahlListe';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 /**
  * Abgelehnte Speichervorgänge der Materialseite stehen am Ort der Handlung (LFH-1077,
@@ -222,10 +223,10 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Wolldecke');
-    await userEvent.click(
+    await waehleMenueEintrag(
       within(zeile(container, 10)).getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }),
+      'Menge ändern …',
     );
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Menge ändern …' }));
     const dialog = await screen.findByRole('dialog');
     const feld = within(dialog).getByRole('spinbutton', { name: 'Menge' });
     await waitFor(() => expect(feld).toHaveValue('50'));
@@ -277,6 +278,7 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
       await userEvent.click(
         within(zeile(container, 10)).getByRole('button', { name: 'Status von Wolldecke ändern' }),
       );
+      await warteAufMenueFokus();
       const menue = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')]
         .filter(
           (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',

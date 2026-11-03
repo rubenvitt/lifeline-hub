@@ -12,6 +12,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { listeVon, oeffne, waehle } from '../test/auswahlListe';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 const admin = adminFixture();
 
@@ -129,6 +130,7 @@ async function openStatusmenue(wurzel: HTMLElement, bezeichnung: string): Promis
   await userEvent.click(
     within(wurzel).getByRole('button', { name: `Status von ${bezeichnung} ändern` }),
   );
+  await warteAufMenueFokus();
   const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
     (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
   );
@@ -652,11 +654,10 @@ describe('MaterialPage', () => {
     );
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
-    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }));
-    const menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    )!;
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Stornieren' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }),
+      'Stornieren',
+    );
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Wolldecke stornieren?');
     expect(dialog.querySelector('.ant-modal-body')).toHaveTextContent(
@@ -1308,8 +1309,10 @@ describe('MaterialPage · Disponieren im Dialog (LFH-983)', () => {
   it('das Mengenfeld im Dialog nennt sich; keine englischen Stufentexte auf der Seite', async () => {
     zeige([em]);
     await screen.findByText('Wolldecke');
-    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Menge ändern …' }));
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }),
+      'Menge ändern …',
+    );
     const dialog = await screen.findByRole('dialog');
     await waitFor(() =>
       expect(within(dialog).getByRole('spinbutton', { name: 'Menge' })).toHaveValue('50'),
@@ -1340,9 +1343,14 @@ async function selectInDialog(dialog: HTMLElement, feld: string, option: string)
   await userEvent.click(knoten);
 }
 
-/** Öffnet das Zeilenmenü einer Position und liefert das offene Menü. */
-async function openZeilenmenue(bezeichnung: string): Promise<HTMLElement> {
+/**
+ * Öffnet das Zeilenmenü einer Position und liefert das offene Menü, erst wenn es den Fokus hat
+ * (`test/menue.ts`). `nimmtFokus: false` für ein Menü, dessen erster freier Knoten der Trenner ist:
+ * in jsdom (kein Layout) fokussiert rc-menu dann nichts.
+ */
+async function openZeilenmenue(bezeichnung: string, nimmtFokus = true): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${bezeichnung}` }));
+  if (nimmtFokus) await warteAufMenueFokus();
   // Das zuletzt geöffnete: in jsdom endet die Schließanimation eines vorigen Menüs nie.
   const offen = document.querySelectorAll<HTMLElement>(
     '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
@@ -1406,10 +1414,9 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const menue = await openZeilenmenue('Wolldecke');
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Ausgabe zurücknehmen …' }));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.type(
-      within(dialog).getByRole('spinbutton', { name: 'Menge zurücknehmen' }),
-      '5',
-    );
+    const feld = within(dialog).getByRole('spinbutton', { name: 'Menge zurücknehmen' });
+    await userEvent.type(feld, '5');
+    expect(feld).toHaveValue('5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Zurücknehmen' }));
     await waitFor(() => expect(gesendet).toEqual([{ ausgegeben: 15 }]));
     expect(await screen.findByText('Wolldecke: 5 zurückgenommen')).toBeInTheDocument();
@@ -1432,6 +1439,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await waitFor(() => expect(feld).toHaveValue('50'));
     await userEvent.clear(feld);
     await userEvent.type(feld, '80');
+    expect(feld).toHaveValue('80');
     expect(gesendet).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(gesendet).toEqual([{ menge: 80 }]));
@@ -1649,7 +1657,8 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     expect(within(zeile).getByText('1')).toBeInTheDocument();
     expect(within(zeile).queryByRole('button', { name: 'Trage ausgeben' })).toBeNull();
-    const menue = await openZeilenmenue('Trage');
+    // Nur „Stornieren“ ist frei, und es steht hinter dem Trenner.
+    const menue = await openZeilenmenue('Trage', false);
     expect(
       within(menue)
         .getAllByRole('menuitem')
@@ -1760,6 +1769,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await waitFor(() => expect(feld).toHaveValue('Feldbeten'));
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Feldbetten');
+    expect(feld).toHaveValue('Feldbetten');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(gesendet).toEqual([{ bezeichnung: 'Feldbetten' }]));
   });
@@ -1865,7 +1875,9 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const menue = await openZeilenmenue('Wolldecke');
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aufteilen …' }));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '20');
+    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' });
+    await userEvent.type(menge, '20');
+    expect(menge).toHaveValue('20');
     // Das Feld „Ort“ des Dialogs; die Seite trägt weitere Felder dieses Namens (Filter der Spalte).
     const ort = within(dialog).getByRole('combobox', { name: 'Ort' });
     await userEvent.click(ort);
@@ -1908,7 +1920,9 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     });
     await waitFor(() => expect(document.querySelector('[data-row-key="10"]')).toBeNull());
     expect(dialog).toBeInTheDocument();
-    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '20');
+    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' });
+    await userEvent.type(menge, '20');
+    expect(menge).toHaveValue('20');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
     expect(await within(dialog).findByText(/nicht mehr im Einsatz/)).toBeInTheDocument();
   });
@@ -1935,6 +1949,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(feld).toHaveValue('Feldbeten');
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Feldbetten');
+    expect(feld).toHaveValue('Feldbetten');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     expect(await within(dialog).findByText(/nicht mehr im Einsatz/)).toBeInTheDocument();
   });
