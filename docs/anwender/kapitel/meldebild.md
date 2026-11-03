@@ -2,7 +2,7 @@
 titel: Meldebild und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs, src/abloesung/kopplung.rs]
 ---
 
 ## Überblick
@@ -207,8 +207,9 @@ Ereignisse werden nie geändert oder gelöscht, nur gestrichen. Die Streichung i
 ### Berichtigen statt streichen und nachtragen
 
 „Zeit berichtigen“ streicht das alte Ereignis und trägt eines derselben Art zur neuen Zeit nach, in
-einem Schritt und mit einem einzigen Eintrag im Einsatztagebuch, etwa „Zeitachse: Einheit
-«Rettungsstaffel» eingetroffen berichtigt von … auf … — Grund: …“. Die Notiz des alten Ereignisses
+einem Schritt und mit einem Eintrag im Einsatztagebuch, etwa „Zeitachse: Einheit
+«Rettungsstaffel» eingetroffen berichtigt von … auf … — Grund: …“. Betrifft die Berichtigung eine
+Schicht der Ablösung, kommen deren Einträge dazu. Die Notiz des alten Ereignisses
 geht mit. Geprüft wird nur das Ergebnis: Ein Eintreffen, mit dem ein Einsatzabschnitt beginnt,
 lässt sich so verschieben, obwohl es sich allein weder streichen noch davor nachtragen ließe. Passt
 das Ergebnis nicht in die Reihenfolge, etwa eine Alarmierung nach dem Eintreffen, lehnt die App ab
