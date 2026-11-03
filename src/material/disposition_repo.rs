@@ -756,6 +756,50 @@ pub async fn check_verknuepfbar_tx(
     Ok(posten)
 }
 
+/// Darf der Bezug des Postens gelöst werden (LLH-1403, design.md D2/D3)? Unbekannt oder fremd 404,
+/// beendet 409 ([`beendet_conflict`], wie beim Verknüpfen), ohne Bezug 422. Liefert den Posten und
+/// die Bezeichnung seiner Nachforderung (sonst ihre Art) für den ETB-Text.
+pub async fn check_loesbar_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+) -> Result<(EinsatzMaterialAnzeige, i64, String), AppError> {
+    require_aktiv_tx(&mut *conn, einsatz_id, em_id).await?;
+    let posten = load_anzeige_tx(&mut *conn, einsatz_id, em_id, true).await?;
+    let Some(nachforderung_id) = posten.nachforderung_id else {
+        return Err(AppError::UnprocessableEntity(
+            "Der Posten verweist auf keine Nachforderung".into(),
+        ));
+    };
+    let bezeichnung: String = sqlx::query_scalar(
+        "SELECT COALESCE(bezeichnung, art) FROM nachforderung WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(nachforderung_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok((posten, nachforderung_id, bezeichnung))
+}
+
+/// Entfernt den Bezug eines aktiven Postens (LLH-1403, design.md D2); Menge, Ort, Art und Status
+/// bleiben. Geprüft hat der Aufrufer in derselben Transaktion ([`check_loesbar_tx`]); die
+/// Bedingungen im UPDATE sind nur das Netz dahinter.
+pub async fn clear_nachforderung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_material SET nachforderung_id = NULL \
+         WHERE id = ? AND einsatz_id = ? AND nachforderung_id IS NOT NULL AND beendet_als IS NULL",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Der 409 an beendetem Material (Lebenszyklus), je Endzustand.
 pub fn beendet_conflict(beendet_als: &str) -> AppError {
     AppError::Conflict(match beendet_als {

@@ -30,10 +30,12 @@ import {
   disponiereMaterial,
   listEinsatzMaterial,
   listEntlassenesMaterial,
+  loeseNachforderung,
   nimmAusDemEinsatz,
   reaktiviereDisposition,
   setzeMaterialStatus,
   storniereDisposition,
+  verknuepfeNachforderung,
   type MaterialOrtPatch,
   type MaterialPatch,
 } from '../api/einsatzMaterial';
@@ -477,16 +479,56 @@ function MaterialInhalt() {
     onSuccess: () => void invalidate(),
     onError: (e, emId) => zeilen.melde(emId, e, 'Nicht erneut disponiert'),
   });
-  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
+  /** Grund eines gescheiterten Rückgängig aus dem Toast, mit dem Titel seiner Handlung. */
+  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<{
+    fehler: unknown;
+    titel: string;
+  } | null>(null);
   // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
   const rueckgaengigMutation = useMutation({
     mutationFn: (emId: number) => reaktiviereDisposition(einsatzId, emId),
     onMutate: () => setRueckgaengigFehler(null),
     onSuccess: invalidate,
     onError: (e) => {
-      setRueckgaengigFehler(e);
+      setRueckgaengigFehler({ fehler: e, titel: 'Nicht erneut disponiert' });
       invalidate();
     },
+  });
+  // Die Karte der Nachforderung zählt den Posten mit; ihr Cache-Fach teilt die Seite (Herkunft).
+  const invalidiereMitNachforderungen = () => {
+    void qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
+    return invalidate();
+  };
+  /*
+   * Rückgängig nach „Von Nachforderung lösen“ (LLH-1403, design.md D5): wieder verknüpfen, bewusst
+   * als Ergänzung, falls inzwischen ein anderer Posten die Nachforderung trägt. Der Grund einer
+   * Ablehnung (etwa: die Nachforderung ist nicht mehr eingetroffen) steht im Seitenhinweis.
+   */
+  const wiederVerknuepfenMutation = useMutation({
+    mutationFn: (v: { emId: number; nachforderungId: number }) =>
+      verknuepfeNachforderung(einsatzId, v.emId, v.nachforderungId, true),
+    onMutate: () => setRueckgaengigFehler(null),
+    onSuccess: invalidiereMitNachforderungen,
+    onError: (e) => {
+      setRueckgaengigFehler({ fehler: e, titel: 'Nicht wieder verknüpft' });
+      void invalidiereMitNachforderungen();
+    },
+  });
+  /*
+   * Eine Fehlzuordnung lösen (LLH-1403, design.md D4/D5): nur der Bezug geht, der Posten bleibt.
+   * Umkehrbar, deshalb ohne Rückfrage und mit Rückgängig; eine Ablehnung steht an der Zeile.
+   */
+  const loesenMutation = useMutation({
+    mutationFn: (v: { emId: number; name: string; nachforderungId: number }) =>
+      loeseNachforderung(einsatzId, v.emId),
+    onMutate: (v) => zeilen.beginne(v.emId),
+    onSuccess: (_, v) => {
+      void invalidiereMitNachforderungen();
+      zeigeRueckgaengig(message, `${v.name} von Nachforderung gelöst`, () =>
+        wiederVerknuepfenMutation.mutate({ emId: v.emId, nachforderungId: v.nachforderungId }),
+      );
+    },
+    onError: (e, v) => zeilen.melde(v.emId, e, 'Nicht gelöst'),
   });
   // Aus dem Einsatz nehmen ist umkehrbar: keine Rückfrage, sondern ein Rückgängig-Toast
   // (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“, design.md D8). Rückgängig
@@ -537,6 +579,7 @@ function MaterialInhalt() {
     (herausnehmenMutation.isPending && herausnehmenMutation.variables?.emId === emId) ||
     (aufteilenMutation.isPending && aufteilenMutation.variables?.em.id === emId) ||
     (artMutation.isPending && artMutation.variables?.emId === emId) ||
+    (loesenMutation.isPending && loesenMutation.variables?.emId === emId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === emId);
   /**
    * Zeilenmenü nach Art (LLH-1225 D6, Spec `material-liste`, „Zeilenaktionen“). Verbrauchsgut:
@@ -596,6 +639,11 @@ function MaterialInhalt() {
         ? { key: 'angaben', label: 'Angaben ändern …' }
         : { key: 'angaben', label: 'Angaben ändern · im Stamm pflegen', gesperrt: true },
     );
+    // Eine Fehlzuordnung lösen (LLH-1403, design.md D4): nur mit Bezug und bedienbaren
+    // Nachforderungen; sonst fehlt der Eintrag, wie „Erfassten Posten zuordnen …“ an der Karte.
+    if (em.nachforderung_id != null && nachforderungenFrei) {
+      eintraege.push({ key: 'loesen', label: 'Von Nachforderung lösen' });
+    }
     // Der Server lehnt das Stornieren eines Postens mit Ort sicher ab (Spec `material-liste`,
     // „Zeilenaktionen“); Frist und frühere Herausnahme prüft weiter er.
     eintraege.push(
@@ -623,6 +671,12 @@ function MaterialInhalt() {
     } else if (key === 'aufteilen') {
       aufteilenMutation.reset();
       setAufteilenFuer(em);
+    } else if (key === 'loesen' && em.nachforderung_id != null) {
+      loesenMutation.mutate({
+        emId: em.id,
+        name: em.bezeichnung,
+        nachforderungId: em.nachforderung_id,
+      });
     } else if (key === 'stornieren') setStornoFuer({ id: em.id, name: em.bezeichnung });
   };
   const angabenPosten = angabenFuer
@@ -901,7 +955,8 @@ function MaterialInhalt() {
                   laeuft={
                     (stornierenMutation.isPending && stornierenMutation.variables === em.id) ||
                     (aufteilenMutation.isPending && aufteilenMutation.variables?.em.id === em.id) ||
-                    (artMutation.isPending && artMutation.variables?.emId === em.id)
+                    (artMutation.isPending && artMutation.variables?.emId === em.id) ||
+                    (loesenMutation.isPending && loesenMutation.variables?.emId === em.id)
                   }
                   onWahl={(key) => handleAktion(key, em)}
                 />
@@ -934,8 +989,8 @@ function MaterialInhalt() {
               <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
             )}
             <SeitenHinweise
-              fehler={rueckgaengigFehler}
-              fehlerTitel="Nicht erneut disponiert"
+              fehler={rueckgaengigFehler?.fehler ?? null}
+              fehlerTitel={rueckgaengigFehler?.titel ?? 'Nicht erneut disponiert'}
               fehlerFallback="Rückgängig fehlgeschlagen"
             />
           </Space>
