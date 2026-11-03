@@ -382,8 +382,9 @@ Wird eine Einheit entlassen (Status mit der Marke „Entlassung“ oder nachgetr
 laufende Schicht ohne Ablösung, und ihre Erinnerungen fallen weg: eine entlassene Einheit meldet
 nie „Ablösung fällig“. Die Schicht steht danach unter „Vergangen“, „Beendet“ mit „beendet ·
 entlassen“ und der Uhrzeit. Wird diese Entlassung in der Kräfte-Zeitachse wieder gestrichen, läuft
-die Schicht weiter wie zuvor. Wird eine Einheit aufgelöst, endet ihre Schicht ebenso („beendet ·
-aufgelöst“); sie bleibt als Nachweis erhalten.
+die Schicht weiter wie zuvor. Wird ihre Zeit berichtigt, endet die Schicht zur neuen Zeit; das
+Einsatztagebuch hält dazu „läuft wieder“ und „mit der Entlassung beendet“ fest. Wird eine Einheit
+aufgelöst, endet ihre Schicht ebenso („beendet · aufgelöst“); sie bleibt als Nachweis erhalten.
 
 Endet die Schicht eines Verbands mit seiner Entlassung, laufen seine Untereinheiten nicht mehr in
 ihr mit. Sind sie selbst noch im Einsatz, stehen sie danach unter „Ohne Schicht“.
@@ -418,7 +419,8 @@ an Einheiten, die gerade im Einsatz sind; ohne offenen Einsatzabschnitt bleibt i
 ist. Diese Ereignisse
 lassen sich nicht
 von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
-Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben).
+Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben). Wird die Zeit
+des Eintreffens berichtigt, bleibt der Beginn der Schicht, wo er war.
 
 ### Einsatztagebuch
 

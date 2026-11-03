@@ -1,14 +1,20 @@
 //! Routen der Kräfte-Zeitachse (LFH-552): Perioden je Einheit/Person (Listen fürs Meldebild und
-//! die Personal-Seite), Zeitachse einer Kraft, Nachtrag und Streichung.
+//! die Personal-Seite), Zeitachse einer Kraft, Nachtrag, Streichung und Berichtigung des
+//! Zeitpunkts (LLH-1455).
 //!
 //! Alle Pfade liegen unter den Präfixen der Module Einheiten bzw. Personal und erben deren
 //! Gate strukturell (`EinsatzLesezugriff`/`EinsatzSchreibzugriff`, design.md D6). Zeiten werden
 //! hier normalisiert (`etb::normalisiere_zeit`, 400 bei Unparsbarem), nie im Repo.
 //!
 //! Statuscodes (LFH-267): Art fehlt/unbekannt/`abloesung`, Zeitpunkt fehlt, leerer Grund → 400;
-//! Zukunft, Perioden-Verstoß, doppelte Streichung, Streichen eines Ablösungsereignisses, offene
-//! Periode an einer entlassenen Person → 422; stornierte Person, aufgelöste Einheit → 409;
-//! fremde Kraft oder fremdes Ereignis → 404.
+//! Zukunft, Perioden-Verstoß, doppelte Streichung, Streichen oder Berichtigen eines
+//! Ablösungsereignisses, unveränderter Zeitpunkt einer Berichtigung, offene Periode an einer
+//! entlassenen Person → 422; stornierte Person, aufgelöste Einheit → 409; fremde Kraft oder
+//! fremdes Ereignis → 404.
+//!
+//! Die Berichtigung (LLH-1455, Spec `kraefte-zeitachse` „Zeitpunkt berichtigen“) streicht das
+//! Ereignis und schreibt es zum neuen Zeitpunkt neu, in einer Transaktion; geprüft wird nur das
+//! Ergebnis (`zeitachse::repo::berichtige_tx`).
 //!
 //! An einer entlassenen Person sind Nachtrag und Streichung erlaubt (LLH-1263, Spec
 //! `kraefte-entlassung`, „Zeitachse einer entlassenen Person berichtigen“): danach bleibt keine
@@ -26,6 +32,7 @@ use crate::einsatz::modul::{Einheiten, Personal};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
+use crate::routes::support::hoechstens;
 use crate::zeitachse::repo::{self, Beruehrt, Kraft, Neu, Schreibergebnis};
 use crate::zeitachse::{
     EinheitPerioden, PersonPerioden, ZeitachseAnzeige, ZeitachseArt, ZeitachseQuelle,
@@ -46,6 +53,23 @@ pub struct NachtragBody {
 #[derive(Debug, Deserialize)]
 pub struct StreichenBody {
     grund: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BerichtigenBody {
+    zeitpunkt_at: String,
+    grund: String,
+}
+
+/// Pflichtgrund von Streichung und Berichtigung: leer 400 „Grund fehlt“, zu lang 400 (vor jedem
+/// 422 des Zusammenhangs).
+fn pflichtgrund(roh: &str) -> Result<String, AppError> {
+    let grund = roh.trim().to_string();
+    if grund.is_empty() {
+        return Err(AppError::Validation("Grund fehlt".into()));
+    }
+    hoechstens(&grund, "Grund", crate::zeitachse::GRUND_MAX)?;
+    Ok(grund)
 }
 
 /// Art eines Nachtrags: Pflicht, bekannt, nie `abloesung` (die entsteht nur aus dem Vollzug).
@@ -215,10 +239,7 @@ async fn streichen(
     zid: i64,
     body: StreichenBody,
 ) -> Result<ZeitachseAnzeige, AppError> {
-    let grund = body.grund.trim().to_string();
-    if grund.is_empty() {
-        return Err(AppError::Validation("Grund fehlt".into()));
-    }
+    let grund = pflichtgrund(&body.grund)?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
@@ -247,6 +268,59 @@ async fn streichen(
         )
         .await?;
         Ok((etb_id, g.beruehrt))
+    })?;
+    publiziere(state, einsatz_id, etb_id, kraft, &beruehrt).await;
+    repo::laden(&state.pool, einsatz_id, kraft).await
+}
+
+async fn berichtigen(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    kraft: Kraft,
+    zid: i64,
+    body: BerichtigenBody,
+) -> Result<ZeitachseAnzeige, AppError> {
+    let grund = pflichtgrund(&body.grund)?;
+    let zeitpunkt = nachtrag_zeit(&body.zeitpunkt_at, &crate::zeit::jetzt())?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
+    let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
+        let is_berichtigung = require_berichtigbar_tx(conn, einsatz_id, kraft).await?;
+        let offen_vorher =
+            is_berichtigung && repo::has_offene_periode_kraft_tx(conn, kraft).await?;
+        let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
+        let b = repo::berichtige_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            kraft,
+            zid,
+            &zeitpunkt,
+            &grund,
+        )
+        .await?;
+        if is_berichtigung {
+            require_keine_offene_periode_tx(conn, kraft, offen_vorher).await?;
+        }
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            startwert,
+            &repo::etb_text_berichtigung(
+                kraft,
+                &name,
+                b.art,
+                &b.alt_at,
+                &zeitpunkt,
+                &grund,
+                stil,
+                is_berichtigung,
+            ),
+        )
+        .await?;
+        Ok((etb_id, b.beruehrt))
     })?;
     publiziere(state, einsatz_id, etb_id, kraft, &beruehrt).await;
     repo::laden(&state.pool, einsatz_id, kraft).await
@@ -313,6 +387,26 @@ pub async fn einheit_streichen(
     ))
 }
 
+/// POST /api/einsaetze/{id}/einheiten/{eid}/zeitachse/{zid}/berichtigen (LLH-1455)
+pub async fn einheit_berichtigen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_id, eid, zid)): PfadParam<(i64, i64, i64)>,
+    JsonBody(body): JsonBody<BerichtigenBody>,
+) -> Result<Json<ZeitachseAnzeige>, AppError> {
+    Ok(Json(
+        berichtigen(
+            &state,
+            ctx.einsatz.id,
+            ctx.benutzer.id,
+            Kraft::Einheit(eid),
+            zid,
+            body,
+        )
+        .await?,
+    ))
+}
+
 // ── Personal ────────────────────────────────────────────────────────────────────────────────
 
 /// GET /api/einsaetze/{id}/personal/zeitachse — Perioden je Person (Personal-Seite).
@@ -363,6 +457,26 @@ pub async fn person_streichen(
 ) -> Result<Json<ZeitachseAnzeige>, AppError> {
     Ok(Json(
         streichen(
+            &state,
+            ctx.einsatz.id,
+            ctx.benutzer.id,
+            Kraft::Person(ep_id),
+            zid,
+            body,
+        )
+        .await?,
+    ))
+}
+
+/// POST /api/einsaetze/{id}/personal/{ep_id}/zeitachse/{zid}/berichtigen (LLH-1455)
+pub async fn person_berichtigen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_id, ep_id, zid)): PfadParam<(i64, i64, i64)>,
+    JsonBody(body): JsonBody<BerichtigenBody>,
+) -> Result<Json<ZeitachseAnzeige>, AppError> {
+    Ok(Json(
+        berichtigen(
             &state,
             ctx.einsatz.id,
             ctx.benutzer.id,

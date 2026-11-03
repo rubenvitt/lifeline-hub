@@ -454,6 +454,12 @@ async fn streichung_mit_grund_und_statuscodes() {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+    let lang = format!(
+        r#"{{"grund":"{}"}}"#,
+        "x".repeat(lifeline_hub::zeitachse::GRUND_MAX + 1)
+    );
+    let (s, _) = anfrage(&w.app, "POST", &streich, &w.admin, Some(&lang)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Grund zu lang");
     // Fremde Kraft im Pfad → 404
     let (s, _) = anfrage(
         &w.app,
@@ -506,6 +512,21 @@ async fn rechte_und_modulsperre() {
         &bea,
         Some(&format!(
             r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#,
+            vor(8, 0)
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    // Die Berichtigung (LLH-1455) verlangt dasselbe Schreibrecht.
+    let (_, z) = zeitachse(&w.app, &w.admin, &w.person_pfad()).await;
+    let alarmierung = ereignis_id(&z, "alarmierung");
+    let (s, _) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{}/zeitachse/{alarmierung}/berichtigen", w.person_pfad()),
+        &bea,
+        Some(&format!(
+            r#"{{"zeitpunkt_at":"{}","grund":"x"}}"#,
             vor(8, 0)
         )),
     )
@@ -1505,4 +1526,230 @@ async fn offene_periode_aus_dem_bestand_nennt_den_nachtrag_der_entlassung() {
         .await;
     assert_eq!(s, StatusCode::CREATED, "{z:?}");
     assert!(alle_geschlossen(&z), "{z:?}");
+}
+
+// ── Zeitpunkt berichtigen (LLH-1455, Spec `kraefte-zeitachse` „Zeitpunkt berichtigen“) ──────
+
+async fn berichtige(w: &Welt, pfad: &str, zid: i64, body: &str) -> (StatusCode, Value) {
+    anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/zeitachse/{zid}/berichtigen"),
+        &w.admin,
+        Some(body),
+    )
+    .await
+}
+
+fn berichtigung(zeitpunkt: &str, grund: &str) -> String {
+    format!(r#"{{"zeitpunkt_at":"{zeitpunkt}","grund":"{grund}"}}"#)
+}
+
+/// Spec „Eintreffen als Anker berichtigen“ und „Kopien der Personen folgen“: Streichen allein gibt
+/// 422, die Berichtigung gelingt in einem Schritt, die Kopie der Person folgt, das ETB nennt beide
+/// Zeitpunkte und den Grund.
+#[tokio::test]
+async fn eintreffen_als_anker_an_der_einheit_berichtigen() {
+    let (app, pool) = setup_mit_pool().await;
+    let w = welt_in(app).await;
+    sqlx::query("UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? WHERE personal_id = ?")
+        .bind(vor(5, 0))
+        .bind(w.ep)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let pfad = w.einheit_pfad();
+    for (art, zeitpunkt) in [("eintreffen", vor(4, 0)), ("entlassung", vor(1, 0))] {
+        let (s, json) = w
+            .nachtrag(
+                &pfad,
+                &format!(r#"{{"art":"{art}","zeitpunkt_at":"{zeitpunkt}"}}"#),
+            )
+            .await;
+        assert_eq!(s, StatusCode::CREATED, "{art}: {json:?}");
+    }
+    let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let eintreffen = ereignis_id(&z, "eintreffen");
+    let (s, json) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/zeitachse/{eintreffen}/streichen"),
+        &w.admin,
+        Some(r#"{"grund":"x"}"#),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Streichen allein: {json:?}"
+    );
+
+    let richtig = vor(4, -10);
+    let (s, z) = berichtige(
+        &w,
+        &pfad,
+        eintreffen,
+        &berichtigung(&richtig, "Zeit verwechselt"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    let perioden = z["perioden"].as_array().unwrap();
+    assert_eq!(perioden.len(), 1, "{z:?}");
+    assert_eq!(perioden[0]["beginn_at"], richtig.as_str());
+    assert!(perioden[0]["ende_at"].is_string(), "{z:?}");
+    assert_eq!(
+        arten(&z),
+        vec![
+            paar("eintreffen", "nachtrag"),
+            paar("entlassung", "nachtrag")
+        ]
+    );
+
+    let (_, anna) = zeitachse(&w.app, &w.admin, &w.person_pfad()).await;
+    let kopie = anna["ereignisse"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["art"] == "eintreffen" && e.get("gestrichen_at").is_none())
+        .unwrap()
+        .clone();
+    assert_eq!(kopie["zeitpunkt_at"], richtig.as_str());
+    assert_eq!(kopie["quelle"], "einheit");
+
+    let etb = system_etb_inhalte(&w.app, &w.admin, w.e).await;
+    assert_eq!(
+        etb.iter()
+            .filter(
+                |t| t.contains("Einheit «Florian 1» eingetroffen berichtigt von")
+                    && t.contains("— Grund: Zeit verwechselt")
+            )
+            .count(),
+        1,
+        "{etb:?}"
+    );
+}
+
+/// Spec „Entlassungszeit nach dem Entlassen berichtigen“ (`kraefte-entlassung`).
+#[tokio::test]
+async fn abschliessende_entlassung_einer_entlassenen_person_berichtigen() {
+    let (w, _pool) = entlassene_anna().await;
+    let pfad = w.person_pfad();
+    let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let entlassung = ereignis_id(&z, "entlassung");
+
+    let richtig = vor(1, -30);
+    let (s, z) = berichtige(
+        &w,
+        &pfad,
+        entlassung,
+        &berichtigung(&richtig, "zu spät gemeldet"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    let perioden = z["perioden"].as_array().unwrap();
+    assert_eq!(perioden.len(), 1, "{z:?}");
+    assert_eq!(perioden[0]["ende_at"], richtig.as_str());
+
+    let etb = system_etb_inhalte(&w.app, &w.admin, w.e).await;
+    assert!(
+        etb.iter().any(|t| t.contains("entlassen berichtigt von")
+            && t.contains("(nach Entlassung) — Grund: zu spät gemeldet")),
+        "{etb:?}"
+    );
+    let (_, json) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personal?entlassene=1", w.e),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(json[0]["beendet_als"], "entlassen");
+}
+
+/// Spec „Ergebnis verletzt die Regeln“ und „Berichtigung öffnet eine Periode“: 422, Zeitachse und
+/// ETB bleiben unverändert.
+#[tokio::test]
+async fn berichtigung_mit_verstoss_schreibt_nichts() {
+    let (w, _pool) = entlassene_anna().await;
+    let pfad = w.person_pfad();
+    let (_, vorher) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let etb_vorher = system_etb_anzahl(&w.app, &w.admin, w.e).await;
+    let alarmierung = ereignis_id(&vorher, "alarmierung");
+    let eintreffen = ereignis_id(&vorher, "eintreffen");
+
+    // Alarmierung nach das Eintreffen: Regelverstoß.
+    let (s, json) = berichtige(&w, &pfad, alarmierung, &berichtigung(&vor(3, 0), "x")).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    // Eintreffen nach die Entlassung: regelkonform, aber eine offene Periode.
+    let (s, json) = berichtige(&w, &pfad, eintreffen, &berichtigung(&vor(0, -30), "x")).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    assert!(
+        json["error"]
+            .as_str()
+            .unwrap()
+            .contains("Erneut disponieren"),
+        "{json:?}"
+    );
+
+    let (_, nachher) = zeitachse(&w.app, &w.admin, &pfad).await;
+    assert_eq!(vorher, nachher);
+    assert_eq!(system_etb_anzahl(&w.app, &w.admin, w.e).await, etb_vorher);
+}
+
+/// Statuscodes der Berichtigung (D1): 400 für das Feld, 422 für den Zusammenhang, 404 fremd, 409
+/// an einer stornierten Person.
+#[tokio::test]
+async fn berichtigung_statuscodes() {
+    let w = welt().await;
+    let pfad = w.person_pfad();
+    let (_, z) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let alarmierung = ereignis_id(&z, "alarmierung");
+    let alt = z["ereignisse"][0]["zeitpunkt_at"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let (s, _) = berichtige(&w, &pfad, alarmierung, &berichtigung(&vor(1, 0), " ")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "leerer Grund");
+    // Grenze am Grund (Streichung und Berichtigung), vor dem 422 „unverändert“.
+    let lang = "x".repeat(lifeline_hub::zeitachse::GRUND_MAX + 1);
+    let (s, json) = berichtige(&w, &pfad, alarmierung, &berichtigung(&alt, &lang)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json:?}");
+    let (s, _) = berichtige(&w, &pfad, alarmierung, &berichtigung("", "x")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Zeitpunkt fehlt");
+    let (s, _) = berichtige(&w, &pfad, alarmierung, &berichtigung(&vor(-1, 0), "x")).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Zukunft");
+    let (s, _) = berichtige(&w, &pfad, alarmierung, &berichtigung(&alt, "x")).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "unverändert");
+    let (s, _) = berichtige(
+        &w,
+        &w.einheit_pfad(),
+        alarmierung,
+        &berichtigung(&vor(1, 0), "x"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Ereignis einer anderen Kraft");
+
+    let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
+    let bert_pfad = format!("/api/einsaetze/{}/personal/{bert}", w.e);
+    let (_, z) = zeitachse(&w.app, &w.admin, &bert_pfad).await;
+    let bert_alarmierung = ereignis_id(&z, "alarmierung");
+    let (s, _) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{bert_pfad}/stornieren"),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = berichtige(
+        &w,
+        &bert_pfad,
+        bert_alarmierung,
+        &berichtigung(&vor(1, 0), "x"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "stornierte Person");
 }

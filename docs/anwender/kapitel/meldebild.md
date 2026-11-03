@@ -2,7 +2,7 @@
 titel: Meldebild und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs, src/abloesung/kopplung.rs]
 ---
 
 ## Überblick
@@ -109,6 +109,20 @@ Für Einsatzleitung und Führungspersonal:
 
 4. „Nachtragen“ wählen.
 
+### Einen Zeitpunkt berichtigen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Am Ereignis mit der falschen Zeit „Zeit berichtigen“ wählen.
+2. Im Dialog „Zeit berichtigen: …“ den „Zeitpunkt“ ändern; er steht auf der bisherigen Zeit und
+   darf nicht in der Zukunft liegen. Einen „Grund“ eingeben; ohne Grund lässt sich nicht
+   berichtigen.
+
+   ![Dialog „Zeit berichtigen: Rettungsstaffel“ mit dem bisherigen Eintreffen, Zeitpunkt und Grund](../bilder/meldebild/zeitachse-berichtigen.png)
+
+3. „Berichtigen“ wählen. Das alte Ereignis bleibt durchgestrichen mit Grund stehen, das neue steht
+   mit „nachgetragen“ an seiner Zeit. Lehnt die App ab, steht der Grund im Dialog.
+
 ### Ein Ereignis streichen
 
 Für Einsatzleitung und Führungspersonal:
@@ -190,6 +204,24 @@ Eine Einheit ohne jede Rückmeldung meldet nichts.
 
 Ereignisse werden nie geändert oder gelöscht, nur gestrichen. Die Streichung ist endgültig.
 
+### Berichtigen statt streichen und nachtragen
+
+„Zeit berichtigen“ streicht das alte Ereignis und trägt eines derselben Art zur neuen Zeit nach, in
+einem Schritt und mit einem Eintrag im Einsatztagebuch, etwa „Zeitachse: Einheit
+«Rettungsstaffel» eingetroffen berichtigt von … auf … — Grund: …“. Betrifft die Berichtigung eine
+Schicht der Ablösung, kommen deren Einträge dazu. Die Notiz des alten Ereignisses
+geht mit. Geprüft wird nur das Ergebnis: Ein Eintreffen, mit dem ein Einsatzabschnitt beginnt,
+lässt sich so verschieben, obwohl es sich allein weder streichen noch davor nachtragen ließe. Passt
+das Ergebnis nicht in die Reihenfolge, etwa eine Alarmierung nach dem Eintreffen, lehnt die App ab
+und ändert nichts.
+
+An einer Einheit ändern sich die Einträge der Personen mit, die das alte Ereignis über die Einheit
+tragen; wer erst später zur Einheit kam, bekommt keins, und bei einer inzwischen entlassenen
+Person bleibt der Eintrag wie bei der Streichung stehen. Passt das Ergebnis bei einer dieser
+Personen nicht, nennt die App sie und ändert nichts. Ereignisse aus der Ablösung lassen sich nicht
+berichtigen. Zur Schicht der Ablösung wirkt die Berichtigung wie eine Streichung mit anschließendem
+Nachtrag (Kapitel [Ablösung](abloesung.md)).
+
 ### Einsatzdauer und Ruhezeit
 
 Die Einsatzdauer zählt ab der Alarmierung, fehlt sie, ab dem Eintreffen. „gesamt“ addiert alle
@@ -202,11 +234,11 @@ zeigt sie nicht.
 ### Rechte
 
 Lesen darf, wer die Module Einheiten und Personal sieht. Den Zulauf sieht nur, wer auch das Modul
-Nachforderungen lesen darf; sonst fehlt die Kennzahl ganz. Status setzen, nachtragen, streichen und in
-den Lagebericht übernehmen dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
+Nachforderungen lesen darf; sonst fehlt die Kennzahl ganz. Status setzen, nachtragen, Zeit berichtigen,
+streichen und in den Lagebericht übernehmen dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
 (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
 
 ### Ohne Netz
 
-Meldebild und Zeitachse bleiben mit dem zuletzt geladenen Stand lesbar. Status setzen, Nachtragen
-und Streichen brauchen das Netz (Kapitel [Ohne Netz](ohne-netz.md)).
+Meldebild und Zeitachse bleiben mit dem zuletzt geladenen Stand lesbar. Status setzen, Nachtragen,
+Zeit berichtigen und Streichen brauchen das Netz (Kapitel [Ohne Netz](ohne-netz.md)).

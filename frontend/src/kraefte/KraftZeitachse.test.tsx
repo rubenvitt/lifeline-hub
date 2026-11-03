@@ -235,12 +235,126 @@ describe('KraftZeitachse (LFH-552)', () => {
     await waitFor(() => expect(rumpf).toEqual({ grund: 'Zeit verwechselt' }));
   });
 
-  it('ohne Schreibrecht: Grund genannt, Nachtragen und Streichen gesperrt statt entfernt', async () => {
+  it('ohne Schreibrecht: Grund genannt, Nachtragen, Berichtigen und Streichen gesperrt statt entfernt', async () => {
     rendere(false);
     await waitFor(() => expect(eintraege()).toHaveLength(3));
     expect(screen.getByText(ZEITACHSE_RECHTE_TEXT)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Alarmierung .* streichen$/ })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /^Alarmierung .* Zeit berichtigen$/ }),
+    ).toBeDisabled();
+  });
+
+  describe('Zeit berichtigen (LLH-1455)', () => {
+    it('vorbelegt mit dem alten Zeitpunkt, verlangt einen Grund und schickt Zeitpunkt (UTC) und Grund', async () => {
+      let rumpf: Record<string, unknown> | null = null;
+      server.use(
+        http.post(`${PFAD}/2/berichtigen`, async ({ request }) => {
+          rumpf = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(ZEITACHSE);
+        }),
+      );
+      rendere();
+      await waitFor(() => expect(eintraege()).toHaveLength(3));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /^Eintreffen .* Zeit berichtigen$/ }));
+      const dialog = await screen.findByRole('dialog', { name: 'Zeit berichtigen: Anna' });
+      expect(dialog).toHaveTextContent(/Eintreffen/);
+      const feld = within(dialog).getByRole('textbox', { name: 'Zeitpunkt' });
+      await waitFor(() => expect(feld).not.toHaveValue(''));
+      const vorbelegt = (feld as HTMLInputElement).value;
+
+      await user.click(within(dialog).getByRole('button', { name: 'Berichtigen' }));
+      expect(await within(dialog).findByText('Bitte einen Grund angeben')).toBeInTheDocument();
+      expect(rumpf).toBeNull();
+      expect(feld).toHaveValue(vorbelegt);
+
+      await user.type(within(dialog).getByLabelText('Grund'), 'Zeit verwechselt');
+      await user.click(within(dialog).getByRole('button', { name: 'Berichtigen' }));
+      await waitFor(() =>
+        expect(rumpf).toEqual({ zeitpunkt_at: '2026-09-30 04:40:00', grund: 'Zeit verwechselt' }),
+      );
+    });
+
+    it('zeigt den alten Zeitpunkt in der Anzeigezone und schickt den neuen als UTC', async () => {
+      let rumpf: Record<string, unknown> | null = null;
+      server.use(
+        http.get(PFAD, () => HttpResponse.json(ZEITACHSE)),
+        http.post(`${PFAD}/2/berichtigen`, async ({ request }) => {
+          rumpf = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(ZEITACHSE);
+        }),
+      );
+      renderMitProviders(
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <KraftZeitachse einsatzId={1} art="person" id={7} kennung="Anna" darfSchreiben />
+        </AnzeigeKonventionenProvider>,
+      );
+      await waitFor(() => expect(eintraege()).toHaveLength(3));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /^Eintreffen .* Zeit berichtigen$/ }));
+      const dialog = await screen.findByRole('dialog', { name: 'Zeit berichtigen: Anna' });
+      const feld = within(dialog).getByRole('textbox', { name: 'Zeitpunkt' });
+      // 04:40 UTC = 06:40 MESZ
+      await waitFor(() => expect(feld).toHaveValue('300640sep26'));
+      await tippeZeit(user, feld, '300630sep26');
+      await user.type(within(dialog).getByLabelText('Grund'), 'Zeit verwechselt{Enter}');
+      await waitFor(() =>
+        expect(rumpf).toEqual({ zeitpunkt_at: '2026-09-30 04:30:00', grund: 'Zeit verwechselt' }),
+      );
+    });
+
+    it('eine 422 steht im Dialog, nicht im Toast, und die Felder bleiben', async () => {
+      server.use(
+        http.post(`${PFAD}/1/berichtigen`, () =>
+          HttpResponse.json(
+            {
+              error:
+                'Eine Alarmierung (2026-09-30 05:00:00) darf nicht nach dem Eintreffen derselben Periode liegen',
+            },
+            { status: 422 },
+          ),
+        ),
+      );
+      rendere();
+      await waitFor(() => expect(eintraege()).toHaveLength(3));
+      await userEvent.click(
+        screen.getByRole('button', { name: /^Alarmierung .* Zeit berichtigen$/ }),
+      );
+      const dialog = await screen.findByRole('dialog', { name: 'Zeit berichtigen: Anna' });
+      await userEvent.type(within(dialog).getByLabelText('Grund'), 'falsch');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Berichtigen' }));
+      expect(
+        await within(dialog).findByText(/darf nicht nach dem Eintreffen derselben Periode liegen/),
+      ).toBeInTheDocument();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+      expect(within(dialog).getByLabelText('Grund')).toHaveValue('falsch');
+    });
+
+    it('eine gestrichene Zeile und eine Ablösung tragen kein „Zeit berichtigen“', async () => {
+      rendere(true, {
+        ...ZEITACHSE,
+        ereignisse: [
+          ...ZEITACHSE.ereignisse,
+          {
+            id: 6,
+            art: 'abloesung',
+            zeitpunkt_at: '2026-09-30 06:00:00',
+            quelle: 'abloesung',
+            erfasst_von: 1,
+            erfasst_at: '2026-09-30 06:00:00',
+          },
+        ],
+      });
+      await waitFor(() => expect(eintraege()).toHaveLength(4));
+      expect(
+        within(eintraege()[2] as HTMLElement).queryByRole('button', { name: /Zeit berichtigen/ }),
+      ).toBeNull();
+      expect(
+        within(eintraege()[3] as HTMLElement).queryByRole('button', { name: /Zeit berichtigen/ }),
+      ).toBeNull();
+    });
   });
 
   it('lesend (aufgelöste Einheit, LLH-1266): Ereignisse ohne Nachtragen, Streichen und Rechte-Hinweis', async () => {
@@ -286,6 +400,10 @@ describe('KraftZeitachse (LFH-552)', () => {
       expect(
         within(eintraege()[3] as HTMLElement).getByText('erst erneut disponieren'),
       ).toBeVisible();
+      // Verschieben geht (LLH-1455): der Server prüft nur das Ergebnis.
+      expect(
+        screen.getByRole('button', { name: /^Entlassung .* Zeit berichtigen$/ }),
+      ).toBeEnabled();
     });
 
     it('ohne `isBeendet` bleibt dieselbe Entlassung streichbar', async () => {
@@ -343,6 +461,24 @@ describe('KraftZeitachse (LFH-552)', () => {
         '2026-09-30 07:00',
       ]);
     });
+  });
+
+  it('das Eintreffen der neuen Besatzung aus dem Vollzug trägt keine Knöpfe', async () => {
+    rendere(true, {
+      ereignisse: [
+        {
+          id: 9,
+          art: 'eintreffen',
+          zeitpunkt_at: '2026-09-30 12:40:00',
+          quelle: 'abloesung',
+          erfasst_von: 1,
+          erfasst_at: '2026-09-30 12:40:00',
+        },
+      ],
+      perioden: [],
+    });
+    await waitFor(() => expect(eintraege()).toHaveLength(1));
+    expect(within(eintraege()[0] as HTMLElement).queryByRole('button')).toBeNull();
   });
 
   it('eine Ablösung — auch die Kopie über die Einheit — trägt keinen Streichknopf', async () => {
@@ -579,6 +715,47 @@ describe('KraftZeitachse — Zufluss hinter dem Sammelbanner (LFH-861)', () => {
       ),
     });
     await waitFor(() => expect(eintraege()[1]).toHaveAttribute('data-gestrichen', 'true'));
+    expect(banner()).toBeNull();
+  });
+
+  it('die eigene Berichtigung erscheint sofort, auch unter dem Zeiger (LLH-1455)', async () => {
+    const NEU: Zeitachse['ereignisse'][number] = {
+      id: 7,
+      art: 'eintreffen',
+      zeitpunkt_at: '2026-09-30 04:30:00',
+      quelle: 'nachtrag',
+      erfasst_von: 1,
+      erfasst_at: '2026-09-30 06:00:00',
+    };
+    const NACH: Zeitachse = {
+      ...ZEITACHSE,
+      ereignisse: [
+        ZEITACHSE.ereignisse[0],
+        NEU,
+        {
+          ...ZEITACHSE.ereignisse[1],
+          gestrichen_at: '2026-09-30 06:00:00',
+          gestrichen_von: 1,
+          streichgrund: 'Zeit verwechselt',
+        },
+        ZEITACHSE.ereignisse[2],
+      ],
+    };
+    server.use(
+      http.post(`${PFAD}/2/berichtigen`, () => {
+        server.use(http.get(PFAD, () => HttpResponse.json(NACH)));
+        return HttpResponse.json(NACH);
+      }),
+    );
+    await bereit();
+    fireEvent.mouseEnter(liste());
+    const user = userEvent.setup({ skipHover: true });
+    await user.click(screen.getByRole('button', { name: /^Eintreffen .* Zeit berichtigen$/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Zeit berichtigen: Anna' });
+    await user.type(within(dialog).getByLabelText('Grund'), 'Zeit verwechselt{Enter}');
+
+    await waitFor(() => expect(eintraege()).toHaveLength(4));
+    expect(eintraege()[2]).toHaveAttribute('data-gestrichen', 'true');
     expect(banner()).toBeNull();
   });
 

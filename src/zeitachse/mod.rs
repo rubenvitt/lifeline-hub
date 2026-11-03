@@ -19,6 +19,10 @@ use utoipa::ToSchema;
 pub mod perioden;
 pub mod repo;
 
+/// Höchstlänge des Grunds einer Streichung oder Berichtigung (Zeichen nach dem Trimmen); er steht
+/// im ETB-Eintrag und am gestrichenen Ereignis.
+pub const GRUND_MAX: usize = 500;
+
 wire_enum! {
     /// Art eines Ereignisses. Wire == `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

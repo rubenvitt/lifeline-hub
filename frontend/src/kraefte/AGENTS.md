@@ -17,7 +17,15 @@ keine Zeitachse: Dauer und Perioden rechnen nur aus der Zeitachse. Nachtrag und 
 einer entlassenen Person sind der einzige Schreibweg an einer beendeten Kraft neben dem erneuten
 Disponieren (LLH-1263, `src/routes/zeitachse.rs`): danach ist keine Periode offen (sonst 422),
 das ETB vermerkt „berichtigt nach Entlassung“, die stornierte Person und die aufgelöste Einheit
-bleiben bei 409; der Client sperrt die abschließende Entlassung (`abschliessendeEntlassungId`).
+bleiben bei 409; der Client sperrt das Streichen der abschließenden Entlassung
+(`abschliessendeEntlassungId`). „Zeit berichtigen“ (LLH-1455, `zeitachse::repo::berichtige_tx`,
+Routen `…/zeitachse/{zid}/berichtigen`) streicht ein Ereignis und schreibt es mit gleicher Art,
+Quelle `nachtrag` und der alten Notiz zum neuen Zeitpunkt neu, in einer Transaktion; die
+Perioden-Regeln gelten nur am Ergebnis (`perioden::ersetze`). Die Kopien folgen den bisherigen
+Kopien, nie der heutigen Zuordnung; eine Person der Kette, deren Folge bräche oder die als
+Entlassene eine offene Periode bekäme, macht alles zur 422 mit Namen. Die Kopplung an die
+Ablösung läuft wie Streichung, dann Nachtrag; der Schichtbeginn wandert nicht mit. Ein
+ETB-Eintrag „… berichtigt von … auf … — Grund: …“.
 Einziger Schreibpfad
 `zeitachse::repo::schreibe_tx` (Perioden-Regeln rein in `zeitachse/perioden.rs`; ein Verstoß
 bricht nie den Statuswechsel). Ereignisse entstehen aus `zeitachse_marke` am Status-Katalog
