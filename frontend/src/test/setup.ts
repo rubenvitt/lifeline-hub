@@ -10,6 +10,7 @@ import { benachrichtigungenZuruecksetzenFuerTests } from '../alarm/benachrichtig
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import { setzeMasseZurueck } from './elementMasse';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
+import { installiereAnfragenGrenze, trenneOffeneAnfragen } from './offeneAnfragen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -113,11 +114,17 @@ if (globalThis.localStorage == null) {
 // Hatte die Datei je einen Upload-Listeneintrag im DOM? Steuert die Länge des Drains unten.
 let uploadListeGemountet = false;
 
+// Eine absichtlich gehaltene Anfrage bricht nach ihrem Test nicht mehr ab (LLH-1536).
+installiereAnfragenGrenze();
+
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => {
   // VOR `cleanup()` prüfen, danach ist der Eintrag ausgehängt — sein Timer läuft aber weiter.
   uploadListeGemountet ||= document.querySelector('.ant-upload-list-item') !== null;
   cleanup();
+  // Nach dem Unmount: Ein späterer Abbruch (Frist aus `api/client.ts`) einer noch offenen Anfrage
+  // ließe msw im nächsten Test dessen Anfragen ins echte Netz (`offeneAnfragen.ts`, LLH-1536).
+  trenneOffeneAnfragen();
   server.resetHandlers();
   // Ein offline geschalteter Test (`setzeOnline`) leckt sonst: beide Hälften zurück, damit
   // nicht TanStack online und `navigator.onLine` offline meldet.
