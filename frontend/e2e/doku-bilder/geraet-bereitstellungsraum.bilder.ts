@@ -229,7 +229,7 @@ test.describe(KAPITEL, () => {
       await expect(material.getByText('Flutlichtstrahler')).toBeVisible();
       // Am Gerät nur lesen: kein Zuordnen, kein Lösen, kein Ausgeben (LLH-1252).
       await expect(material.getByRole('combobox')).toHaveCount(0);
-      await expect(material.getByRole('button', { name: /Lösen|Ausgeben/ })).toHaveCount(0);
+      await expect(material.getByRole('button', { name: /lösen|ausgeben/i })).toHaveCount(0);
       await material.scrollIntoViewIfNeeded();
       await geraet.mouse.move(0, 0);
       await fotografiere(material, KAPITEL, 'material');
