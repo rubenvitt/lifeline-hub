@@ -1,7 +1,8 @@
 //! HTTP-Routen von Web Push (LLH-1223, design.md D3/D5; Spec `web-push`).
 //!
 //! GET    /api/web-push      — öffentlicher Schlüssel und ob diese Sitzung ein Abo hat
-//! PUT    /api/web-push/abo  — Abo dieses Browsers für diese Sitzung anmelden (204)
+//! PUT    /api/web-push/abo  — Abo dieses Browsers für diese Sitzung anmelden, samt der Wahl
+//!                             „Mit Absender und Wortlaut“ (204)
 //! DELETE /api/web-push/abo  — Abo dieser Sitzung abmelden (idempotent, 204)
 //!
 //! Ohne `--web-push` antworten alle drei 404 wie ein unbekannter Pfad. Das Abo hängt an der
@@ -31,6 +32,8 @@ pub struct WebPushStand {
     pub schluessel: String,
     /// Diese Sitzung hat ein Abo.
     pub angemeldet: bool,
+    /// Das Abo dieser Sitzung zeigt Absender und Wortlaut (LLH-1369); ohne Abo `false`.
+    pub inhalt: bool,
 }
 
 /// Abo eines Browsers, wie `PushSubscription.toJSON()` es liefert (`keys` flach gelegt).
@@ -39,6 +42,9 @@ pub struct AboAnmeldung {
     pub endpoint: String,
     pub p256dh: String,
     pub auth: String,
+    /// „Mit Absender und Wortlaut“ (LLH-1369); fehlt es, bleibt das Abo ohne Inhalt.
+    #[serde(default)]
+    pub inhalt: bool,
 }
 
 fn web_push(state: &AppState) -> Result<&WebPush, AppError> {
@@ -59,10 +65,11 @@ pub async fn stand(
     jar: CookieJar,
 ) -> Result<Json<WebPushStand>, AppError> {
     let wp = web_push(&state)?;
-    let angemeldet = repo::hat_abo(&state.pool, &sitzung(&jar)?).await?;
+    let abo = repo::abo_inhalt(&state.pool, &sitzung(&jar)?).await?;
     Ok(Json(WebPushStand {
         schluessel: wp.oeffentlicher_schluessel(),
-        angemeldet,
+        angemeldet: abo.is_some(),
+        inhalt: abo.unwrap_or(false),
     }))
 }
 
@@ -100,6 +107,7 @@ pub async fn anmelden(
         endpoint,
         &crate::web_push::krypto::b64(&p256dh),
         &crate::web_push::krypto::b64(&auth),
+        req.inhalt,
     )
     .await?;
     Ok(StatusCode::NO_CONTENT)

@@ -129,6 +129,43 @@ async fn anmelden_und_abmelden_fuer_diese_sitzung() {
     assert_eq!(zahl, 0);
 }
 
+/// LLH-1369: „Mit Absender und Wortlaut“ hängt am Abo; jede Anmeldung setzt die Wahl neu, ohne
+/// Angabe gilt aus.
+#[tokio::test]
+async fn wahl_des_inhalts_haengt_am_abo() {
+    let (app, _pool, _live) = mit_web_push(PUSH_DIENSTE).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    assert_eq!(
+        anfrage(&app, "GET", "/api/web-push", &admin, None).await.1["inhalt"],
+        false
+    );
+    let b = Browser::neu();
+    let mut mit: Value = serde_json::from_str(&b.abo(FCM)).unwrap();
+    mit["inhalt"] = json!(true);
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        "/api/web-push/abo",
+        &admin,
+        Some(&mit.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    let stand = anfrage(&app, "GET", "/api/web-push", &admin, None).await.1;
+    assert_eq!(
+        (stand["angemeldet"].clone(), stand["inhalt"].clone()),
+        (json!(true), json!(true))
+    );
+
+    let (s, _) = anfrage(&app, "PUT", "/api/web-push/abo", &admin, Some(&b.abo(FCM))).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let stand = anfrage(&app, "GET", "/api/web-push", &admin, None).await.1;
+    assert_eq!(
+        (stand["angemeldet"].clone(), stand["inhalt"].clone()),
+        (json!(true), json!(false))
+    );
+}
+
 #[tokio::test]
 async fn fremde_endpunkte_und_kaputte_schluessel_sind_400() {
     let (app, pool, _live) = mit_web_push(PUSH_DIENSTE).await;
@@ -308,6 +345,11 @@ impl Versandwelt {
     /// Legt ein Abo für `benutzer` direkt im Speicher an (die Route nimmt kein `http`), mit
     /// einer eigenen Sitzung.
     async fn abo(&self, benutzer: i64, pfad: &str, b: &Browser) {
+        self.abo_mit(benutzer, pfad, b, false).await;
+    }
+
+    /// Wie [`Self::abo`], mit der Wahl „Mit Absender und Wortlaut“ (LLH-1369).
+    async fn abo_mit(&self, benutzer: i64, pfad: &str, b: &Browser, inhalt: bool) {
         let token = lifeline_hub::auth::session::anlegen(
             &self.pool,
             benutzer,
@@ -323,6 +365,7 @@ impl Versandwelt {
             &format!("{}{pfad}", self.basis),
             &b64(b.schluessel.oeffentlich()),
             &b64(&b.auth),
+            inhalt,
         )
         .await
         .unwrap();
@@ -393,6 +436,39 @@ async fn alarm_geht_verschluesselt_an_jedes_abo_des_empfaengers() {
     }
     pfade.sort();
     assert_eq!(pfade, ["/anna-handy", "/anna-laptop"]);
+    w.keiner().await;
+}
+
+/// LLH-1369, Spec „Inhalt der Meldung nur auf Wunsch“: nur das Abo mit Wahl bekommt die Marke
+/// `inhalt`, und auch dort trägt die Nutzlast keinen Text.
+#[tokio::test]
+async fn inhaltsmarke_nur_an_das_abo_mit_wahl() {
+    let mut w = versandwelt().await;
+    let handy = Browser::neu();
+    let laptop = Browser::neu();
+    w.abo_mit(w.anna, "/anna-handy", &handy, true).await;
+    w.abo(w.anna, "/anna-laptop", &laptop).await;
+    w.melden_an(Art::Sofortmeldung, Typ::Meldung, w.anna).await;
+
+    for _ in 0..2 {
+        let e = w.naechster().await;
+        let browser = if e.pfad == "/anna-handy" {
+            &handy
+        } else {
+            &laptop
+        };
+        let klar = entschluesseln(&e.rumpf, &browser.schluessel, &browser.auth).unwrap();
+        let v: Value = serde_json::from_slice(&klar).unwrap();
+        if e.pfad == "/anna-handy" {
+            assert_eq!(v["inhalt"], true, "{v}");
+        } else {
+            assert!(v.get("inhalt").is_none(), "{v}");
+        }
+        assert!(
+            v.get("titel").is_none() && v.get("absender").is_none(),
+            "nur Kennungen: {v}"
+        );
+    }
     w.keiner().await;
 }
 
@@ -475,6 +551,7 @@ async fn haengender_push_dienst_haelt_melden_nicht_auf() {
         &format!("http://{adresse}/haengt"),
         &b64(b.schluessel.oeffentlich()),
         &b64(&b.auth),
+        false,
     )
     .await
     .unwrap();
@@ -514,7 +591,7 @@ async fn abo_haengt_an_der_sitzung_und_faellt_mit_ihr() {
     let benutzer = admin_id(&pool).await;
     let token = sitzung(&pool, benutzer).await;
     let hash = lifeline_hub::auth::session::hash_token(&token);
-    repo::anmelden(&pool, benutzer, &hash, FCM, "p", "a")
+    repo::anmelden(&pool, benutzer, &hash, FCM, "p", "a", false)
         .await
         .unwrap();
     assert!(repo::hat_abo(&pool, &hash).await.unwrap());
@@ -533,10 +610,10 @@ async fn gleicher_endpunkt_haengt_an_die_neue_sitzung_um() {
     let benutzer = admin_id(&pool).await;
     let alt = lifeline_hub::auth::session::hash_token(&sitzung(&pool, benutzer).await);
     let neu = lifeline_hub::auth::session::hash_token(&sitzung(&pool, benutzer).await);
-    repo::anmelden(&pool, benutzer, &alt, FCM, "p1", "a1")
+    repo::anmelden(&pool, benutzer, &alt, FCM, "p1", "a1", true)
         .await
         .unwrap();
-    repo::anmelden(&pool, benutzer, &neu, FCM, "p2", "a2")
+    repo::anmelden(&pool, benutzer, &neu, FCM, "p2", "a2", false)
         .await
         .unwrap();
     assert!(!repo::hat_abo(&pool, &alt).await.unwrap());
@@ -544,8 +621,13 @@ async fn gleicher_endpunkt_haengt_an_die_neue_sitzung_um() {
     let abos = repo::abos_von(&pool, &[benutzer]).await.unwrap();
     assert_eq!(abos.len(), 1);
     assert_eq!(
-        (abos[0].p256dh.as_str(), abos[0].auth.as_str()),
-        ("p2", "a2")
+        (
+            abos[0].p256dh.as_str(),
+            abos[0].auth.as_str(),
+            abos[0].inhalt
+        ),
+        ("p2", "a2", false),
+        "auch die Wahl des Inhalts kommt von der neuen Anmeldung"
     );
 
     // Ein erloschenes Abo fällt nur, solange es denselben Endpunkt hat.

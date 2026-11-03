@@ -45,11 +45,14 @@ pub struct Abo {
     pub endpoint: String,
     pub p256dh: String,
     pub auth: String,
+    /// Die Person will auf diesem Gerät Absender und Wortlaut sehen (LLH-1369): die Nutzlast an
+    /// dieses Abo trägt dann `"inhalt": true`, nie den Inhalt selbst.
+    pub inhalt: bool,
 }
 
 /// Meldet das Abo eines Browsers für die Sitzung `token_hash` an. Gibt es den Endpunkt schon
 /// (dasselbe Browserprofil nach neuer Anmeldung oder mit einem anderen Nutzer), gehört er danach
-/// dieser Sitzung und diesem Nutzer, mit den neuen Schlüsseln.
+/// dieser Sitzung und diesem Nutzer, mit den neuen Schlüsseln und der neuen Wahl `inhalt`.
 pub async fn anmelden(
     pool: &SqlitePool,
     benutzer_id: i64,
@@ -57,19 +60,21 @@ pub async fn anmelden(
     endpoint: &str,
     p256dh: &str,
     auth: &str,
+    inhalt: bool,
 ) -> Result<(), AppError> {
     sqlx::query(
-        "INSERT INTO web_push_abo (benutzer_id, session_token_hash, endpoint, p256dh, auth) \
-         VALUES (?, ?, ?, ?, ?) \
+        "INSERT INTO web_push_abo (benutzer_id, session_token_hash, endpoint, p256dh, auth, inhalt) \
+         VALUES (?, ?, ?, ?, ?, ?) \
          ON CONFLICT(endpoint) DO UPDATE SET benutzer_id = excluded.benutzer_id, \
              session_token_hash = excluded.session_token_hash, p256dh = excluded.p256dh, \
-             auth = excluded.auth",
+             auth = excluded.auth, inhalt = excluded.inhalt",
     )
     .bind(benutzer_id)
     .bind(token_hash)
     .bind(endpoint)
     .bind(p256dh)
     .bind(auth)
+    .bind(inhalt)
     .execute(pool)
     .await?;
     Ok(())
@@ -86,13 +91,17 @@ pub async fn abmelden(pool: &SqlitePool, token_hash: &str) -> Result<(), AppErro
 
 /// Hat die Sitzung ein Abo?
 pub async fn hat_abo(pool: &SqlitePool, token_hash: &str) -> Result<bool, AppError> {
-    let ja: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM web_push_abo WHERE session_token_hash = ?)",
-    )
-    .bind(token_hash)
-    .fetch_one(pool)
-    .await?;
-    Ok(ja)
+    Ok(abo_inhalt(pool, token_hash).await?.is_some())
+}
+
+/// Das Abo der Sitzung: `None` ohne Abo, sonst ob es den Inhalt zeigen soll (LLH-1369).
+pub async fn abo_inhalt(pool: &SqlitePool, token_hash: &str) -> Result<Option<bool>, AppError> {
+    let inhalt: Option<bool> =
+        sqlx::query_scalar("SELECT inhalt FROM web_push_abo WHERE session_token_hash = ? LIMIT 1")
+            .bind(token_hash)
+            .fetch_optional(pool)
+            .await?;
+    Ok(inhalt)
 }
 
 /// Alle Abos dieser Nutzer, in einer Abfrage.
@@ -102,7 +111,7 @@ pub async fn abos_von(pool: &SqlitePool, benutzer_ids: &[i64]) -> Result<Vec<Abo
     }
     let liste = serde_json::to_string(benutzer_ids).expect("Zahlenliste serialisierbar");
     let abos = sqlx::query_as::<_, Abo>(
-        "SELECT id, benutzer_id, endpoint, p256dh, auth FROM web_push_abo \
+        "SELECT id, benutzer_id, endpoint, p256dh, auth, inhalt FROM web_push_abo \
          WHERE benutzer_id IN (SELECT value FROM json_each(?)) ORDER BY id",
     )
     .bind(liste)

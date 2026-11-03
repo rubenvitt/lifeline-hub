@@ -274,7 +274,10 @@ describe('LagemeldungenPage', () => {
     expect(screen.getByTestId('adresse').textContent).toMatch(
       /^\?von=\d{4}-\d{2}-\d{2} \d{2}:\d{2}:00$/,
     );
-    expect(screen.getByRole('button', { name: /^Zeitraum seit \d{4}$/ })).toBeInTheDocument();
+    // Zwischen 0 und 1 Uhr liegt die Grenze am Vortag: „seit 022302“ statt „seit 2302“.
+    expect(
+      screen.getByRole('button', { name: /^Zeitraum seit (\d{2})?\d{4}$/ }),
+    ).toBeInTheDocument();
   });
 
   it('ein geteilter Link mit Zeitraum zeigt dieselbe Menge, „Filter zurücksetzen“ räumt ihn', async () => {

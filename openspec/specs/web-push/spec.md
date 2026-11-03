@@ -64,8 +64,9 @@ ablehnen.
 ### Requirement: Push an jedes Abo der Empfänger
 
 Erhält ein Nutzer eine Benachrichtigung der Stufe Alarm oder Hinweis, SHALL der Server sie an
-jedes seiner Abos senden. Die Nutzlast MUST nur Kennungen tragen wie das Live-Ereignis und MUST
-Ende-zu-Ende verschlüsselt sein. Der Versand MUST die auslösende Anfrage weder verzögern noch
+jedes seiner Abos senden. Die Nutzlast MUST nur Kennungen tragen wie das Live-Ereignis, an ein
+Abo mit gewähltem Inhalt dazu die Marke `inhalt` (Anforderung „Inhalt der Meldung nur auf
+Wunsch“), und MUST Ende-zu-Ende verschlüsselt sein. Der Versand MUST die auslösende Anfrage weder verzögern noch
 scheitern lassen. Meldet der Push-Dienst ein Abo als erloschen, MUST der Server es löschen.
 
 #### Scenario: Alarm bei geschlossener App
@@ -98,6 +99,35 @@ verdeckter Tab und ein Push zur selben Benachrichtigung MUST NOT zwei OS-Meldung
 #### Scenario: App im Vordergrund
 - **WHEN** ein Push eintrifft, während ein Tab der App fokussiert ist
 - **THEN** bleibt keine OS-Meldung stehen, und der Tab zeigt den Toast
+
+### Requirement: Inhalt der Meldung nur auf Wunsch
+
+Bei eingeschaltetem Push SHALL die Seite „Benachrichtigungen“ einen zweiten Schalter „Mit
+Absender und Wortlaut“ zeigen, Vorgabe aus. Die Wahl MUST am Abo dieses Browsers hängen und mit
+ihm an die nächste Sitzung derselben Person gehen; ein neu eingeschaltetes Push MUST ohne Inhalt
+beginnen. Nur an ein Abo mit dieser Wahl MUST der Server die Marke `inhalt` in die Nutzlast legen;
+Absender und Wortlaut MUST NOT in der Nutzlast reisen. Trägt ein Push die Marke und ist er eine
+Sofortmeldung, ihre Eskalation oder eine neue Meldung, SHALL der Service Worker die Meldung mit
+der Sitzung des Browsers holen und Absender und Anfang des Wortlauts zeigen wie der Alarm im Tab
+(Spec `benachrichtigungen`, „Der Sofortalarm nennt die Meldung und springt zu ihr“). Kommt die
+Meldung nicht innerhalb der Frist des Textes (keine Sitzung, Server nicht erreichbar, Fehler),
+MUST die Meldung beim Text der Benachrichtigung bleiben.
+
+#### Scenario: Vorgabe aus
+- **WHEN** Person A Push auf ihrem Handy einschaltet und eine Sofortmeldung der Rettungsstaffel eingeht
+- **THEN** zeigt das Handy „Sofortmeldung eingegangen“ mit „Meldung #‹Nummer›“, und die Nutzlast trägt keine Marke `inhalt`
+
+#### Scenario: Inhalt gewählt
+- **WHEN** Person A auf dem Handy „Mit Absender und Wortlaut“ einschaltet und die Rettungsstaffel per Sofortmeldung „Kellerabgang Mühlbachweg 34: eine schwer verletzte Person geborgen“ meldet
+- **THEN** zeigt das Handy „Sofortmeldung · Rettungsstaffel“ mit dem Anfang des Wortlauts, und der Laptop von A ohne diese Wahl zeigt „Sofortmeldung eingegangen“
+
+#### Scenario: Meldung nicht abrufbar
+- **WHEN** ein Push mit Marke eintrifft und die Abfrage der Meldung scheitert oder nicht rechtzeitig antwortet
+- **THEN** zeigt das Gerät den Text der Benachrichtigung, „Sofortmeldung eingegangen“ mit „Meldung #‹Nummer›“
+
+#### Scenario: Neue Sitzung
+- **WHEN** die Sitzung von Person A auf dem Handy abläuft und A sich dort neu anmeldet
+- **THEN** meldet das Handy das Abo wieder mit „Mit Absender und Wortlaut“ an, ohne dass A den Schalter erneut betätigt
 
 ### Requirement: Schalter je Gerät
 

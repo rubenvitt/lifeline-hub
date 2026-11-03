@@ -2980,6 +2980,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("endpoint", G_WEB_PUSH),
             retain("p256dh", G_WEB_PUSH),
             retain("auth", G_WEB_PUSH),
+            retain("inhalt", G_WEB_PUSH),
             retain("erstellt_at", G_ZEIT),
         ],
     },

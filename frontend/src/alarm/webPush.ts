@@ -11,6 +11,11 @@ import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSp
  * Das Abo hängt am Server an der Sitzung und fällt mit ihr. Damit die Wahl ein Sitzungsende
  * überlebt, merkt sich der Browser je Person, dass Push gewählt ist ({@link pushMerker}); die
  * nächste Sitzung derselben Person meldet das Abo still wieder an.
+ *
+ * „Mit Absender und Wortlaut“ (LLH-1369, Spec `web-push`, „Inhalt der Meldung nur auf Wunsch“)
+ * hängt am selben Abo: der Server legt dann eine Marke in die Nutzlast, und der Service Worker
+ * holt den Inhalt selbst. Der Merker hält die Wahl mit ({@link MERKER_MIT_INHALT}), damit die
+ * nächste Sitzung sie mit anmeldet. Vorgabe aus.
  */
 
 /** `fehlt`: kein Schalter (Browser ohne Push, Hülle, Server ohne `--web-push`, Gerätekonto). */
@@ -20,6 +25,14 @@ export type PushZustand = 'fehlt' | 'aus' | 'an' | 'blockiert';
 export function pushMerker(benutzerId: number): string {
   return `lfh:web-push:${benutzerId}`;
 }
+
+/** Wert des Merkers: Push gewählt, ohne Inhalt. */
+const MERKER_OHNE_INHALT = '1';
+/** Wert des Merkers: Push gewählt, mit Absender und Wortlaut (LLH-1369). */
+export const MERKER_MIT_INHALT = 'inhalt';
+
+/** Stand für die Schalter: Push auf diesem Gerät und ob er den Inhalt zeigt. */
+export type PushStand = { zustand: PushZustand; inhalt: boolean };
 
 /** Wie lange auf den Service Worker gewartet wird; ohne Registrierung löst `ready` nie auf. */
 const WORKER_FRIST_MS = 10_000;
@@ -80,12 +93,13 @@ async function abonnieren(schluessel: string): Promise<PushSubscription> {
   return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
 }
 
-async function anmelden(abo: PushSubscription): Promise<void> {
+async function anmelden(abo: PushSubscription, inhalt: boolean): Promise<void> {
   const json = abo.toJSON();
   await meldeWebPushAn({
     endpoint: abo.endpoint,
     p256dh: json.keys?.p256dh ?? '',
     auth: json.keys?.auth ?? '',
+    inhalt,
   });
 }
 
@@ -94,18 +108,25 @@ function ohnePush(e: unknown): boolean {
   return e instanceof ApiError && (e.status === 404 || e.status === 403);
 }
 
-/** Der Stand für den Schalter. Wirft bei einem Fehler des Servers (die Seite zeigt ihn). */
-export async function ladePushZustand(): Promise<PushZustand> {
-  if (!moeglich()) return 'fehlt';
-  let angemeldet: boolean;
+/** Der Stand für die Schalter. Wirft bei einem Fehler des Servers (die Seite zeigt ihn). */
+export async function ladePushStand(): Promise<PushStand> {
+  if (!moeglich()) return { zustand: 'fehlt', inhalt: false };
+  let stand: { angemeldet: boolean; inhalt?: boolean };
   try {
-    angemeldet = (await ladeWebPushStand()).angemeldet;
+    stand = await ladeWebPushStand();
   } catch (e) {
-    if (ohnePush(e)) return 'fehlt';
+    if (ohnePush(e)) return { zustand: 'fehlt', inhalt: false };
     throw e;
   }
-  if (Notification.permission === 'denied') return 'blockiert';
-  return angemeldet ? 'an' : 'aus';
+  if (Notification.permission === 'denied') return { zustand: 'blockiert', inhalt: false };
+  return stand.angemeldet
+    ? { zustand: 'an', inhalt: stand.inhalt === true }
+    : { zustand: 'aus', inhalt: false };
+}
+
+/** Nur der Zustand des Push-Schalters, wie {@link ladePushStand}. */
+export async function ladePushZustand(): Promise<PushZustand> {
+  return (await ladePushStand()).zustand;
 }
 
 /**
@@ -118,9 +139,21 @@ export async function pushEinschalten(benutzerId: number): Promise<PushZustand> 
   if (erlaubnis === 'denied') return 'blockiert';
   if (erlaubnis !== 'granted') return 'aus';
   const { schluessel } = await ladeWebPushStand();
-  await anmelden(await abonnieren(schluessel));
-  sicherSchreiben(pushMerker(benutzerId), '1');
+  await anmelden(await abonnieren(schluessel), false);
+  sicherSchreiben(pushMerker(benutzerId), MERKER_OHNE_INHALT);
   return 'an';
+}
+
+/**
+ * „Mit Absender und Wortlaut“ (LLH-1369): meldet das Abo dieses Browsers mit der neuen Wahl
+ * erneut an und merkt sie für die nächste Sitzung. Nur bei eingeschaltetem Push; wirft, wenn der
+ * Server sie nicht annimmt (die Seite zeigt es).
+ */
+export async function pushInhaltSetzen(benutzerId: number, an: boolean): Promise<boolean> {
+  const { schluessel } = await ladeWebPushStand();
+  await anmelden(await abonnieren(schluessel), an);
+  sicherSchreiben(pushMerker(benutzerId), an ? MERKER_MIT_INHALT : MERKER_OHNE_INHALT);
+  return an;
 }
 
 /** Schalter aus: erst der Merker, damit ein halber Abbruch nicht wieder anmeldet. */
@@ -139,10 +172,11 @@ export async function pushAusschalten(benutzerId: number): Promise<PushZustand> 
  */
 export async function pushAbgleichen(benutzerId: number): Promise<void> {
   try {
-    if (!moeglich() || sicherLesen(pushMerker(benutzerId)) == null) return;
+    const merker = moeglich() ? sicherLesen(pushMerker(benutzerId)) : null;
+    if (merker == null) return;
     if (Notification.permission !== 'granted') return;
     const stand = await ladeWebPushStand();
-    await anmelden(await abonnieren(stand.schluessel));
+    await anmelden(await abonnieren(stand.schluessel), merker === MERKER_MIT_INHALT);
   } catch {
     // Ohne Schalter am Server, offline oder ohne Worker: die App meldet weiter im Tab.
   }

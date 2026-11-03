@@ -175,7 +175,11 @@ Beide Alarme einer Sofortmeldung SHALL Absender und Anfang des Wortlauts der Mel
 beides MUST das Frontend über die Abfrage der Meldung holen, nie über das Live-Ereignis oder den
 Text der Benachrichtigung. Antwortet die Abfrage nicht rechtzeitig, MUST der Alarm mit dem Text
 der Benachrichtigung erscheinen. „Öffnen“ und der Klick auf die OS-Meldung MUST zur Meldung
-springen und sie hervorheben.
+springen und sie hervorheben. Eine Push-Meldung bei geschlossener App (Spec `web-push`) SHALL
+Absender und Wortlaut nur auf einem Gerät nennen, auf dem die Person „Mit Absender und Wortlaut“
+eingeschaltet hat (Entscheidung 02.11.2026, LLH-1369: der Sperrbildschirm ist für Umstehende
+lesbar, und Schwärzung und Aufbewahrung erreichen die Meldung des Betriebssystems nicht); sonst
+MUST sie beim Text der Benachrichtigung bleiben.
 
 #### Scenario: Inhalt im Alarm
 - **WHEN** die Rettungsstaffel per Sofortmeldung „Kellerabgang Mühlbachweg 34: eine schwer verletzte Person geborgen“ meldet
@@ -188,6 +192,10 @@ springen und sie hervorheben.
 #### Scenario: Öffnen
 - **WHEN** eine Person im Alarm „Öffnen“ wählt oder die OS-Meldung anklickt
 - **THEN** steht die Meldungsseite mit `?meldung=‹id›` offen und die Karte der Meldung ist hervorgehoben
+
+#### Scenario: Push auf dem Sperrbildschirm
+- **WHEN** die Rettungsstaffel eine Sofortmeldung absetzt und Person A sie per Push auf dem gesperrten Handy erhält, ohne dort „Mit Absender und Wortlaut“ eingeschaltet zu haben
+- **THEN** zeigt der Sperrbildschirm „Sofortmeldung eingegangen“ mit „Meldung #‹Nummer›“, ohne Absender und Wortlaut
 
 ### Requirement: Bestätigen sichtet die Sofortmeldung
 
