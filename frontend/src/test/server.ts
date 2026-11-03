@@ -89,6 +89,13 @@ export const server = setupServer(
    * überschreiben per `server.use()`.
    */
   http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+  /**
+   * Fahrzeuge im Einsatz — keine als Default. Das ETB fragt sie für Von/An ab und lädt sie nach
+   * einem eigenen Eintrag neu; kam die Antwort erst nach dem Test, lief sie ohne Handler in den
+   * nächsten und stellte ihn auf „offline“ (LLH-1412). Tests mit Fahrzeugen überschreiben per
+   * `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/fahrzeuge', () => HttpResponse.json([])),
   http.get('/api/externe-stellen', () => HttpResponse.json([])),
   /**
    * Aufbewahrung je Datenkategorie (LFH-749) — alle drei Kategorien ohne eigene Frist und ohne
@@ -128,6 +135,15 @@ export const server = setupServer(
    * Stichwort-Katalog fragen sie ab; Tests mit Vorlagen überschreiben per `server.use()`.
    */
   http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+  /**
+   * Stand der Lagebesprechung (LLH-1111) — noch keine abgehalten als Default, der echte Zustand
+   * eines neuen Einsatzes. ETB und Lagemeldungen fragen ihn für „Seit letzter Lagebesprechung“
+   * beim Mount ab; ohne Handler scheiterte der Abruf an der Leitung und die Seite stünde kurz auf
+   * „offline“ (LLH-1412). Tests mit Besprechung überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/lagebesprechung', () =>
+    HttpResponse.json({ anzahl_lagebesprechungen: 0 }),
+  ),
   /**
    * Dokumentenablage — leere Liste als Default (LFH-743). Die ETB-Seite fragt sie mit Freigabe
    * `dokumente` beim Mount ab, um Dokumente mit ETB-Bezug am Eintrag zu zeigen; `[]` ist ein

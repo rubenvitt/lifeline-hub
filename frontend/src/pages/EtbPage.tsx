@@ -311,8 +311,16 @@ export default function EtbPage() {
   }, [filter]);
   const lbZeit = letzteLb ?? undefined;
   const lbEintrag = letzteLbStand?.etb_eintrag_id;
+  /*
+   * `?? null`, nie `undefined` im Schlüssel (LLH-1412): TanStack lässt `undefined` beim Hashen weg.
+   * Ohne Lagebesprechung und ohne Zeitfilter lag die Abfrage sonst im Fach der Seitenkette oben,
+   * und deren Neuladen lief mit den Optionen dieser Abfrage (ohne `getNextPageParam`).
+   */
   const nachtraegeQuery = useQuery({
-    queryKey: einsatzKeys.etbListe(einsatzId, { ...filterOhneZeit, nachtraegeVorLb: lbEintrag }),
+    queryKey: einsatzKeys.etbListe(einsatzId, {
+      ...filterOhneZeit,
+      nachtraegeVorLb: lbEintrag ?? null,
+    }),
     queryFn: () => listeEtb(einsatzId, { ...filterOhneZeit, bis: lbZeit }),
     enabled: seitLb && lbZeit != null && lbEintrag != null,
   });
