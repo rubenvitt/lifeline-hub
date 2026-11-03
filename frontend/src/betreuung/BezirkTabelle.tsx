@@ -62,12 +62,16 @@ const MENUE: readonly MenueEintrag<BezirkAktion>[] = [
 ];
 
 /**
- * Menü einer Zeile: „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche hat — auch OHNE
+ * Menü einer Zeile: „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche oder eine verortete
+ * Sammelstelle auf der Karte hat (LLH-1393: ohne Fläche fliegt die Karte die Sammelstelle an) — auch OHNE
  * Schreibrecht. Mit Schreibrecht danach „Gebiet zeichnen“ bzw. „Weitere Teilfläche zeichnen“
  * (LLH-1069). Ist die Lagekarte gesperrt, stehen beide gesperrt mit Grund da (LFH-888).
  */
 export function bezirkMenue(
-  b: Pick<Evakuierungsbezirk, 'flaechen'>,
+  b: Pick<
+    Evakuierungsbezirk,
+    'flaechen' | 'sammelstelle_lat' | 'sammelstelle_lon' | 'raeumung' | 'storniert_at'
+  >,
   darfSchreiben: boolean,
   karteGesperrt: boolean,
 ): readonly MenueEintrag<BezirkAktion>[] {
@@ -75,7 +79,14 @@ export function bezirkMenue(
     karteGesperrt
       ? { key, label: `${label} (${KEINE_BERECHTIGUNG})`, gesperrt: true }
       : { key, label };
-  const karte = b.flaechen > 0 ? [eintrag('karte', 'Auf Karte zeigen')] : [];
+  // Die Sammelstelle nur, wenn die Karte sie zeigt (gleiche Regel wie `buildSammelstelleMarker`).
+  const sammelstelleAufKarte =
+    b.sammelstelle_lat != null &&
+    b.sammelstelle_lon != null &&
+    !b.storniert_at &&
+    b.raeumung !== 'aufgehoben';
+  const aufKarte = b.flaechen > 0 || sammelstelleAufKarte;
+  const karte = aufKarte ? [eintrag('karte', 'Auf Karte zeigen')] : [];
   if (!darfSchreiben) return karte;
   return [...karte, eintrag('zeichnen', gebietZeichnenText(b.flaechen)), ...MENUE];
 }

@@ -67,6 +67,13 @@ export type MarkerTyp =
    */
   | 'tier'
   /**
+   * Sammelstelle eines Evakuierungsbezirks (`buildSammelstelleMarker` in `sammelstelleMarker.ts`,
+   * LLH-1393): läuft wie die Betreuungsstelle in `alleVerortet` und „Nicht verortet", nur bei
+   * Lesezugriff auf das Modul Evakuierung. `id` ist die des Bezirks. Zeichen über
+   * `sammelstelleZeichen`, kein `tz`; Rückfall Kreis mit „SSt".
+   */
+  | 'sammelstelle'
+  /**
    * Betroffene, nur aus `personenMarker` — auf der Betroffenen-Seite und als Ebene „Betroffene" der
    * Lagekarte. Dort laufen sie als eigene Liste `personenVerortet` neben `alleVerortet` und
    * clustern in eigener Quelle (`PERSONEN_CLUSTER_QUELLE`).
@@ -155,7 +162,8 @@ export interface NichtVerortet {
     | 'abschnitt'
     | 'betreuungsstelle'
     | 'bereitstellungsraum'
-    | 'tier';
+    | 'tier'
+    | 'sammelstelle';
   id: number;
   label: string;
 }

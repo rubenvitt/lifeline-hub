@@ -356,6 +356,7 @@ export default function Ebenenbaum(props: SidebarProps) {
     props.br,
     props.eingeblendet ?? null,
     props.tier,
+    props.sammelstelle,
   );
   const eigene = ebenenGruppen(zeilen).map((g) => ({
     ...g,

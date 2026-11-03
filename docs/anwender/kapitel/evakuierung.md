@@ -2,7 +2,7 @@
 titel: Evakuierung
 gruppen: [alle, fuehrung]
 reihenfolge: 525
-quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkKartenbild.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/Stufenlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, frontend/src/components/RadiusEingabe.tsx, src/routes/evakuierung.rs, src/betreuung/repo.rs]
+quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkKartenbild.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/Stufenlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/pages/lagekarte/sammelstelleMarker.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, frontend/src/components/RadiusEingabe.tsx, src/routes/evakuierung.rs, src/betreuung/repo.rs]
 ---
 
 ## Überblick
@@ -143,8 +143,8 @@ In der Tabelle setzt „Räumung setzen“ im Menü eines Bezirks den Zustand eb
 
 Die „Sammelstelle“ zeigt beim Bearbeiten einen gespeicherten Punkt als Kartenausschnitt. Eine
 Korrektur am Text behält den Punkt; ein neuer Treffer ersetzt ihn, ein geleertes Feld nimmt Text
-und Koordinate weg. Die Koordinate der Sammelstelle steht nicht im Einsatztagebuch und nicht auf
-der Lagekarte.
+und Koordinate weg. Die Koordinate der Sammelstelle steht nicht im Einsatztagebuch; auf der
+Lagekarte steht sie in der Ebene „Sammelstellen“.
 
 Wer mit ungespeicherten Änderungen die Seite verlässt, wird gefragt, ob die Änderungen verworfen
 werden sollen.
@@ -152,11 +152,13 @@ werden sollen.
 ### Einen Bezirk auf der Lagekarte zeigen
 
 1. Im Menü des Bezirks „Auf Karte zeigen“ wählen oder auf seiner Seite „Auf Lagekarte öffnen“.
-   Beides steht nur an Bezirken, denen auf der Lagekarte mindestens eine Fläche zugeordnet ist.
-2. Die Lagekarte öffnet mit einer Fläche des Bezirks ausgewählt.
+   „Auf Karte zeigen“ steht an Bezirken mit mindestens einer Fläche auf der Lagekarte oder mit
+   verorteter Sammelstelle, „Auf Lagekarte öffnen“ nur an Bezirken mit Fläche.
+2. Die Lagekarte öffnet mit einer Fläche des Bezirks ausgewählt; ohne Fläche mit seiner
+   Sammelstelle.
 
-Umgekehrt führt „Im Fachmodul öffnen“ an einer zugeordneten Fläche auf der Lagekarte auf die
-Seite des Bezirks.
+Umgekehrt führt „Im Fachmodul öffnen“ an einer zugeordneten Fläche oder an einer Sammelstelle auf
+der Lagekarte auf die Seite des Bezirks.
 
 ### Eine Standmeldung zurücknehmen
 

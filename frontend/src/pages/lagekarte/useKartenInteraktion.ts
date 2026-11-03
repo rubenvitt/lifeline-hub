@@ -10,6 +10,7 @@ import { aktualisierePerson } from '../../api/einsatzPerson';
 import { aendereStelle } from '../../api/betreuung';
 import { aktualisiereBr } from '../../api/einsatzBereitstellungsraum';
 import { aktualisiereTier } from '../../api/einsatzTier';
+import { aendereBezirk } from '../../api/evakuierung';
 import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
 import {
@@ -486,6 +487,13 @@ export function useKartenInteraktion({
           antreff_lat: p.lat,
           antreff_lon: p.lon,
         });
+      } else if (platzierungZiel.typ === 'sammelstelle') {
+        // Sammelstelle (LLH-1393): nur das Paar am Bezirk; der Freitext bleibt. Der Server schreibt
+        // für eine reine Koordinate kein ETB, verteilt aber live (LLH-1121 D7).
+        await aendereBezirk(einsatzId, platzierungZiel.id, {
+          sammelstelle_lat: p.lat,
+          sammelstelle_lon: p.lon,
+        });
       } else if (platzierungZiel.typ === 'einsatzort') {
         // Einsatzort: nur das Koordinatenpaar. Ein Kopf aus dem Cache überschriebe die
         // gleichzeitige Änderung einer anderen Person (Leitstellen-Nr., Stichwort …).
@@ -522,6 +530,9 @@ export function useKartenInteraktion({
       if (ziel?.typ === 'tier') {
         qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
         qc.invalidateQueries({ queryKey: einsatzKeys.tier(einsatzId, ziel.id) });
+      }
+      if (ziel?.typ === 'sammelstelle') {
+        qc.invalidateQueries({ queryKey: einsatzKeys.evakuierung(einsatzId) });
       }
       // Ein Auftrag von außen meldet am Ort statt per Toast (LLH-1125, design.md D2): der Modus wird
       // zu „verortet“, der neue Marker ist gewählt und angeflogen — eine Fehlplatzierung fällt so
@@ -739,6 +750,16 @@ export function useKartenInteraktion({
         return {
           aufruf: aktualisiereTier(einsatzId, marker.id, { antreff_lat: null, antreff_lon: null }),
           faecher: [einsatzKeys.tiere(einsatzId), einsatzKeys.tier(einsatzId, marker.id)],
+        };
+      case 'sammelstelle':
+        // Ebenso: der Bezirk und der Freitext der Sammelstelle bleiben, nur ihr Kartenpunkt geht
+        // (LLH-1393). Umkehrbar über „Nicht verortet“ oder das Ortsfeld der Bezirksseite.
+        return {
+          aufruf: aendereBezirk(einsatzId, marker.id, {
+            sammelstelle_lat: null,
+            sammelstelle_lon: null,
+          }),
+          faecher: [einsatzKeys.evakuierung(einsatzId)],
         };
       case 'person':
         // Betroffene: nur die zwei Koordinatenfelder wie im Platzier-Zweig; die Person bleibt, nur

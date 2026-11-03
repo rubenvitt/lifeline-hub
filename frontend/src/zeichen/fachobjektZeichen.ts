@@ -492,3 +492,27 @@ export function tierZeichen(): TierZeichen | null {
   }
   return tierZeichenCache;
 }
+
+/**
+ * Das Zeichen der Sammelstelle eines Evakuierungsbezirks (LLH-1393): Grundzeichen „Stelle“ mit der
+ * Körpermarke F.3.12 (Doppelpfeil, Stiel, V), dasselbe Motiv, das ein freies Zeichen „Sammelplatz
+ * für Betroffene“ im Grundzeichen trägt (`freiesZeichen.ts`). Ohne Organisation: eine Sammelstelle
+ * betreibt keine. Ein eigener Weg statt `fachobjektZeichen`, weil dort das Symbol bis LFH-834 durch
+ * „Rettungswesen“ ersetzt wird (`SYMBOL_ERSATZ`, gilt weiter für die UHS).
+ */
+const SAMMELSTELLE_SPEC: SymbolSpec = {
+  kind: 'circle-12',
+  bodyMarks: ['circle-double-arrow-lower-v'],
+};
+
+let sammelstelleZeichenCache: FachobjektZeichen | null | undefined;
+
+/**
+ * Wie `tierZeichen`: gecacht, wirft nie; `null`, wenn die Bibliothek die Marke im Kreis nicht
+ * zeichnet (dann bleibt der Marker ein Kreis mit Kurzzeichen).
+ */
+export function sammelstelleZeichen(): FachobjektZeichen | null {
+  if (sammelstelleZeichenCache === undefined)
+    sammelstelleZeichenCache = waehle([SAMMELSTELLE_SPEC]);
+  return sammelstelleZeichenCache;
+}

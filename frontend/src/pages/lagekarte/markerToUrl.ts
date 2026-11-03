@@ -12,6 +12,7 @@ import {
   betreuungsstellePfad,
   bereitstellungsraumDetailPfad,
   tiereDetailPfad,
+  evakuierungsbezirkPfad,
 } from '../../routing/deeplinks';
 
 /**
@@ -48,6 +49,9 @@ export function markerToUrl(marker: KarteMarker, einsatzId: number): string {
     // Tier (LLH-1123): Vollseiten-Detail → Item-Route.
     case 'tier':
       return tiereDetailPfad(einsatzId, marker.id);
+    // Sammelstelle (LLH-1393): die Detailseite ihres Bezirks, `marker.id` ist die Bezirks-ID.
+    case 'sammelstelle':
+      return evakuierungsbezirkPfad(einsatzId, marker.id);
     case 'lagemeldung':
       return meldungenPfad(
         einsatzId,

@@ -55,6 +55,7 @@ const ALLE_AN: LayerSichtbar = {
   betreuungsstelle: true,
   bereitstellungsraum: true,
   tier: true,
+  sammelstelle: true,
 };
 
 const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
@@ -284,6 +285,47 @@ describe('ebenenZeilen', () => {
       zugriff: 'gesperrt',
     });
     const z = zeilen.find((x) => x.key === 'tier')!;
+    expect(z).toMatchObject({ anzahl: null, sichtbar: false, sperrgrund: 'Keine Berechtigung' });
+  });
+
+  // Ebene „Sammelstellen" (LLH-1393): dieselbe Regel an der Grenze des Moduls Evakuierung.
+  it('„Sammelstellen" ohne Angabe: keine Zeile (Vorgabe „ausgeblendet")', () => {
+    const zeilen = ebenenZeilen([marker('sammelstelle')], 0, ALLE_AN, false);
+    expect(zeilen.map((z) => z.key)).not.toContain('sammelstelle');
+  });
+
+  it('„Sammelstellen" frei: Zeile nach den Betreuungsstellen, gezählt aus den Markern', () => {
+    const zeilen = ebenenZeilen(
+      [marker('sammelstelle', 1), marker('sammelstelle', 2)],
+      0,
+      ALLE_AN,
+      false,
+      undefined,
+      { zugriff: 'frei' },
+      undefined,
+      null,
+      undefined,
+      { zugriff: 'frei' },
+    );
+    const i = zeilen.findIndex((z) => z.key === 'sammelstelle');
+    expect(zeilen[i]).toMatchObject({ name: 'Sammelstellen', anzahl: 2, sichtbar: true });
+    expect(zeilen[i - 1].key).toBe('betreuungsstelle');
+  });
+
+  it('„Sammelstellen" gesperrt: Grund, keine Zahl, nie „an"', () => {
+    const zeilen = ebenenZeilen(
+      [],
+      0,
+      ALLE_AN,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      null,
+      undefined,
+      { zugriff: 'gesperrt' },
+    );
+    const z = zeilen.find((x) => x.key === 'sammelstelle')!;
     expect(z).toMatchObject({ anzahl: null, sichtbar: false, sperrgrund: 'Keine Berechtigung' });
   });
 
@@ -761,7 +803,7 @@ describe('Gruppen des Ebenenbaums', () => {
         'Lage',
         ['einsatzort', 'fuehrungsstelle', 'zone', 'schaden', 'lagemeldung', 'freies_zeichen'],
       ],
-      ['Betroffene & Versorgung', ['person', 'uhs', 'betreuungsstelle', 'tier']],
+      ['Betroffene & Versorgung', ['person', 'uhs', 'betreuungsstelle', 'sammelstelle', 'tier']],
     ]);
     expect(FACHEBENEN_GRUPPEN.map((g) => [g.name, g.ebenen])).toEqual([
       ['Warnungen', ['nina', 'dwd']],
@@ -907,5 +949,41 @@ describe('auswahlRaster — Tier (LLH-1123)', () => {
   });
   it('Unterzeile nennt die Objektart', () => {
     expect(auswahlUnterzeile(marker('tier', 7), roh)).toBe('Tier');
+  });
+});
+
+describe('auswahlRaster — Sammelstelle (LLH-1393)', () => {
+  const bezirk = {
+    id: 4,
+    einsatz_id: 1,
+    bezeichnung: 'Nord',
+    abschnitt_name: 'EA Süd',
+    plan_personen: 120,
+    plan_erhebung: 'gezaehlt',
+    raeumung: 'laeuft',
+    sammelstelle: 'Parkplatz Sporthalle',
+    sammelstelle_lat: 51.9,
+    sammelstelle_lon: 8.8,
+    flaechen: 0,
+    stand: { id: 1, evakuiert: 40, erhebung: 'gezaehlt', zeitpunkt_at: '2026-11-02 10:00:00' },
+    angelegt_at: '2026-11-02 09:00:00',
+  } as const;
+  const roh: AuswahlRoh = { ...ROH, bezirke: [bezirk] };
+  it('Räumung mit Rolle, Stand und Abschnitt des Bezirks', () => {
+    const raster = auswahlRaster(marker('sammelstelle', 4), roh, zeit);
+    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+      ['Räumung', 'läuft'],
+      ['Evakuiert', '40 · von 120 geplant'],
+      ['Abschnitt', 'EA Süd'],
+    ]);
+    expect(raster[0].rolle).toBe('achtung');
+  });
+  it('fehlt der Bezirk, bleibt das Raster leer', () => {
+    expect(auswahlRaster(marker('sammelstelle', 9), roh, zeit)).toEqual([]);
+  });
+  it('Unterzeile: Objektart und Freitext der Sammelstelle', () => {
+    expect(auswahlUnterzeile(marker('sammelstelle', 4), roh)).toBe(
+      'Sammelstelle · Parkplatz Sporthalle',
+    );
   });
 });

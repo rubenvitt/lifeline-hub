@@ -53,6 +53,7 @@ const basisProps: SidebarProps = {
     betreuungsstelle: true,
     bereitstellungsraum: true,
     tier: true,
+    sammelstelle: true,
   },
   onLayerToggle: vi.fn(),
   zonenAnzahl: 0,

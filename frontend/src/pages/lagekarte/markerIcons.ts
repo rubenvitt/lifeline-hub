@@ -2,6 +2,7 @@ import type { Drawing } from '@einsatzzeichen/schema';
 import {
   bereitstellungsraumZeichen,
   fachobjektZeichen,
+  sammelstelleZeichen,
   tierZeichen,
 } from '../../zeichen/fachobjektZeichen';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
@@ -21,6 +22,8 @@ export function markerZeichen(mk: MitZeichen): { schluessel: string; drawing: Dr
   if (mk.typ === 'bereitstellungsraum') return bereitstellungsraumZeichen();
   // Das Tier ohne Zustand (LLH-1343) hängt ebenso am Typ.
   if (mk.typ === 'tier') return tierZeichen();
+  // Die Sammelstelle eines Bezirks (LLH-1393) ebenso: Stelle mit „Sammelplatz für Betroffene“.
+  if (mk.typ === 'sammelstelle') return sammelstelleZeichen();
   return mk.tz ? fachobjektZeichen(mk.tz) : null;
 }
 

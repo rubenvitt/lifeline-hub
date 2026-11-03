@@ -327,6 +327,10 @@ test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort
   await expect(
     page.getByRole('button', { name: 'Betreuungsstellen – Keine Berechtigung' }),
   ).toBeDisabled();
+  // Sammelstellen hängen an `evakuierung` (LLH-1393).
+  await expect(
+    page.getByRole('button', { name: 'Sammelstellen – Keine Berechtigung' }),
+  ).toBeDisabled();
   await expect.poll(() => zonenLabel(page), { timeout: 30_000 }).toEqual(['Evakuierungsbezirk']);
   // Kein Ausfallhinweis für eine gesperrte Quelle.
   await expect(

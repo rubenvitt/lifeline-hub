@@ -623,6 +623,7 @@ export default function LagekartePage() {
         betreuungZugriff,
         brZugriff,
         tierZugriff,
+        evakuierungZugriff,
       }),
     [
       alleVerortet,
@@ -632,6 +633,7 @@ export default function LagekartePage() {
       betreuungZugriff,
       brZugriff,
       tierZugriff,
+      evakuierungZugriff,
     ],
   );
   // Die Objektliste der Ansicht „Objekte“ (LLH-1033): verortet und nicht verortet in einer Liste,
@@ -648,8 +650,17 @@ export default function LagekartePage() {
         betreuungZugriff,
         brZugriff,
         tierZugriff,
+        evakuierungZugriff,
       }),
-    [suchbar, nichtVerortetAlle, einsatzortOhneOrt, betreuungZugriff, brZugriff, tierZugriff],
+    [
+      suchbar,
+      nichtVerortetAlle,
+      einsatzortOhneOrt,
+      betreuungZugriff,
+      brZugriff,
+      tierZugriff,
+      evakuierungZugriff,
+    ],
   );
 
   // Unter `lg` liegt die Leiste unter der Karte, ab `lg` rechts daneben. Auf jeder Breite lässt sie
@@ -1008,6 +1019,9 @@ export default function LagekartePage() {
   //     zuerst dorthin (`?ansicht=`), der Auftrag bleibt für die nächste Runde stehen;
   // (2) ein unbrauchbarer Wert oder ein Auftrag ohne Fläche wird geräumt, sobald die Zonen
   //     feststehen.
+  // Ohne Fläche, aber mit verorteter Sammelstelle (LLH-1393) wählt die Karte die Sammelstelle und
+  // fliegt sie an, sobald die Zonen feststehen; geräumt wird dann erst, wenn auch die Bezirke
+  // feststehen.
   useEffect(() => {
     const roh = searchParams.get('evakuierungsbezirk');
     if (roh === null) return;
@@ -1023,7 +1037,17 @@ export default function LagekartePage() {
     }
     const zone = zonenAlle.find((z) => z.evakuierungsbezirk_id === ziel);
     if (!zone) {
-      if (zonenGeladen) raeumen();
+      // Erst wenn die Zonen feststehen: eine noch ladende Fläche hat Vorrang vor der Sammelstelle.
+      if (!zonenGeladen) return;
+      const sammelstelle = alleVerortet.find((m) => m.typ === 'sammelstelle' && m.id === ziel);
+      if (sammelstelle) {
+        setAuswahl(sammelstelle.schluessel);
+        setFlyToZiel({ lng: sammelstelle.lon, lat: sammelstelle.lat });
+        raeumen();
+        return;
+      }
+      const bezirkeEntschieden = evakuierungZugriff === 'frei' ? bezirkeGeladen : rechteBekannt;
+      if (bezirkeEntschieden) raeumen();
       return;
     }
     if (zone.ansicht_id != null && zone.ansicht_id !== aktiveAnsichtId) {
@@ -1040,6 +1064,11 @@ export default function LagekartePage() {
   }, [
     zonenAlle,
     zonenGeladen,
+    alleVerortet,
+    evakuierungZugriff,
+    bezirkeGeladen,
+    rechteBekannt,
+    setAuswahl,
     aktiveAnsichtId,
     searchParams,
     setSearchParams,
@@ -1079,7 +1108,10 @@ export default function LagekartePage() {
             : // Ein Tier nur mit dem Modul Tiere (LLH-1123).
               auftrag.typ === 'tier'
               ? tierZugriff
-              : null;
+              : // Eine Sammelstelle nur mit dem Modul Evakuierung (LLH-1393).
+                auftrag.typ === 'sammelstelle'
+                ? evakuierungZugriff
+                : null;
     if (modulZugriff !== null && !rechteBekannt) return;
     // Erst anwenden, dann räumen: mit dem Räumen zuerst kam die Navigation nicht durch, während der
     // Modus startete, und der Parameter blieb in der URL stehen.
@@ -1103,6 +1135,7 @@ export default function LagekartePage() {
     brZugriff,
     personenZugriff,
     tierZugriff,
+    evakuierungZugriff,
   ]);
 
   /**
@@ -1965,6 +1998,7 @@ export default function LagekartePage() {
         betreuung={{ zugriff: betreuungZugriff }}
         br={{ zugriff: brZugriff }}
         tier={{ zugriff: tierZugriff }}
+        sammelstelle={{ zugriff: evakuierungZugriff }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
         onMarkerWaehlen={waehleObjekt}
