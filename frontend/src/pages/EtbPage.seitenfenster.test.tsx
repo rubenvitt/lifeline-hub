@@ -187,6 +187,9 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     expect(listenAbrufe.length).toBeGreaterThan(0);
     expect(listenAbrufe.length).toBeLessThanOrEqual(5);
     expect(zeile(container, 50)).not.toBeNull();
+    // Das Neuladen gelingt, statt mit den Optionen einer fremden Abfrage im selben Cache-Fach zu
+    // scheitern (LLH-1412): ohne Lagebesprechung trug die Nachtragsabfrage denselben Schlüssel.
+    expect(client.getQueryState(einsatzKeys.etbListe(7, {}))?.status).toBe('success');
   }, 120000);
 
   it('Kopfzahl bleibt die Serverzählung, nicht das Fenster', async () => {
