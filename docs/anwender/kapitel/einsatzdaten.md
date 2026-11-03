@@ -83,7 +83,9 @@ anderer Text eintragen.
    vom Einsatzort; danach „Speichern“ wählen.
 5. „Rufname“, „Sprechgruppen“, „Telefon und weitere Verbindungen“ und „Führungsfahrzeuge“
    Zeile für Zeile eintragen und speichern wie jede andere Angabe. Rufname und Sprechgruppen sind
-   der Funk. Unter „Telefon und weitere Verbindungen“ wählt ein Tipp auf eine Nummer sie;
+   der Funk. Jede hinzugefügte oder entfernte Sprechgruppe steht danach im Einsatztagebuch; was
+   ein anderer Arbeitsplatz währenddessen an den Sprechgruppen ändert, bleibt erhalten. Unter
+   „Telefon und weitere Verbindungen“ wählt ein Tipp auf eine Nummer sie;
    geändert wird über „Bearbeiten“ neben der Liste, und „Verbindung hinzufügen“ fügt je Nummer
    oder Adresse eine Zeile mit Mittel und Hinweis an, wie bei Abschnitt und Einheit. Bei
    „ortsfest“ stehen die Führungsfahrzeuge eingeklappt; ein Klick auf die Anzahl öffnet sie.
@@ -128,7 +130,8 @@ Für die Einsatzleitung:
 - „Bezeichnung“ und „Alarmzeit“ sind Pflicht: leer gespeichert bleibt der bisherige Wert stehen,
   und die Zeile sagt, dass die Angabe Pflicht ist.
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie
-  schreiben keinen Eintrag ins Einsatztagebuch, mit einer Ausnahme: der Einsatzleiter.
+  schreiben keinen Eintrag ins Einsatztagebuch, mit zwei Ausnahmen: der Einsatzleiter und jede
+  Sprechgruppe, die an der Führungsstelle hinzukommt oder wegfällt.
 - Die „Einsatznummer“ vergibt das System; sie lässt sich nicht ändern. Sie steht im Seitenkopf und
   im Paneel „Einsatz“, ebenso die Leitstellen-Nr., mit der Leitstelle, Rückfragen und
   Einsatzbericht arbeiten.

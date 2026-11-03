@@ -134,6 +134,31 @@ export function patcheFuehrungsstelle(
   return apiSend<Fuehrungsstelle>(`/api/einsaetze/${id}/fuehrungsstelle`, 'PATCH', patch);
 }
 
+/**
+ * Eine Sprechgruppe der Führungsstelle zuordnen (LLH-1456, D4): idempotent, `204` ohne Körper; eine
+ * wirksame Zuordnung schreibt der Server ins Tagebuch.
+ */
+export function ordneFuehrungsstelleSprechgruppeZu(
+  einsatzId: number,
+  sprechgruppeId: number,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/fuehrungsstelle/sprechgruppen/${sprechgruppeId}`,
+    'PUT',
+  );
+}
+
+/** Eine Sprechgruppe der Führungsstelle lösen (LLH-1456, D4): idempotent, `204` ohne Körper. */
+export function loeseFuehrungsstelleSprechgruppe(
+  einsatzId: number,
+  sprechgruppeId: number,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/fuehrungsstelle/sprechgruppen/${sprechgruppeId}`,
+    'DELETE',
+  );
+}
+
 /** Einsatz-Einstellungen laden (LFH-131); existiert keine Zeile → Defaults (alle null). */
 export function ladeEinstellungen(id: number): Promise<EinsatzEinstellungen> {
   return apiGet<EinsatzEinstellungen>(`/api/einsaetze/${id}/einstellungen`);

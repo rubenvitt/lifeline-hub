@@ -95,6 +95,42 @@ pub mod zugangsprotokoll;
 
 use crate::app::AppState;
 
+/// System-Eintrag zu einer wirksamen Sprechgruppen-Änderung am Einzelweg einer Einheit, eines
+/// Abschnitts oder der Führungsstelle (LLH-1265, Change `pcrn0wn1-einheit-sprechgruppen-einzelwege`,
+/// D3; LLH-1456, Change `tjh219fc-abschnitt-fuehrungsstelle-sprechgruppen-einzelwege`, D2):
+/// `{traeger}: Sprechgruppe «{bezeichnung}» ({TMO|DMO}) {wirkung}`. Degradiert wie
+/// [`etb_system_degradiert`]: nach dem Schreiben, ein Fehler beim Lesen von Träger oder Sprechgruppe
+/// wird geloggt und macht die Zuordnung nicht rückgängig. Die externe Stelle des
+/// Kommunikationsplans ruft das bewusst nicht (D3).
+pub(crate) async fn etb_sprechgruppe(
+    state: &AppState,
+    einsatz_id: i64,
+    org_id: i64,
+    benutzer_id: i64,
+    traeger: Result<String, crate::error::AppError>,
+    sprechgruppe_id: i64,
+    wirkung: &str,
+) {
+    let gruppe = crate::sprechgruppe::repo::laden(&state.pool, org_id, sprechgruppe_id).await;
+    match (traeger, gruppe) {
+        (Ok(traeger), Ok(gruppe)) => {
+            let inhalt = format!(
+                "{traeger}: Sprechgruppe «{}» ({}) {wirkung}",
+                gruppe.bezeichnung,
+                gruppe.betriebsart.as_str()
+            );
+            etb_system_degradiert(state, einsatz_id, benutzer_id, &inhalt).await;
+        }
+        (traeger, gruppe) => tracing::error!(
+            einsatz_id,
+            sprechgruppe_id,
+            traeger_fehler = ?traeger.err(),
+            sprechgruppe_fehler = ?gruppe.err(),
+            "ETB-Eintrag zur Sprechgruppe fehlgeschlagen (degradiert, nicht fatal)"
+        ),
+    }
+}
+
 /// Legt einen System-ETB-Eintrag DEGRADIERT an (F06/LFH-244, Tier-B): schlägt der ETB-Write
 /// NACH dem bereits committeten Domänen-Write fehl, wird der Fehler NICHT fatal propagiert
 /// (kein falscher 500) — er wird geloggt, die Domänen-Aktion samt ihres SSE-Broadcasts bleibt

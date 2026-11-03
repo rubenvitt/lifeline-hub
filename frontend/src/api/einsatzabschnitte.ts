@@ -14,7 +14,10 @@ export interface AbschnittEingabe {
    */
   verbindungen?: NeueVerbindung[];
   sortier?: number;
-  /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
+  /**
+   * LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog, nur beim Anlegen; ein bestehender
+   * Abschnitt ändert sie einzeln (`AbschnittPatch`, LLH-1456 D4).
+   */
   sprechgruppe_ids?: number[];
   /** LFH-608: Rufname im Einsatz („EA-N"), je Einsatz eindeutig (409 sonst). */
   kurzbezeichnung?: string | null;
@@ -39,9 +42,11 @@ export function legeAbschnittAn(
  * Teiländerung eines Abschnitts (LFH-306, Tri-State): nur die übergebenen Schlüssel gehen hinaus,
  * `null` leert. Der einzige Schreibweg für einen bestehenden Abschnitt: die Zeilen des Details
  * (LFH-1208) und die Fernmeldeskizze (LFH-893) schicken je ein Feld — ein mitgeschickter Stand
- * vom Öffnen überschriebe, was ein anderer Arbeitsplatz inzwischen geändert hat.
+ * vom Öffnen überschriebe, was ein anderer Arbeitsplatz inzwischen geändert hat. Ohne
+ * `sprechgruppe_ids`: die Sprechgruppen gehen einzeln über `ordneAbschnittSprechgruppeZu`/
+ * `loeseAbschnittSprechgruppe` (LLH-1456, D4). Der Server nimmt das Feld weiter an (Wire-Grenze).
  */
-export type AbschnittPatch = Partial<AbschnittEingabe>;
+export type AbschnittPatch = Partial<Omit<AbschnittEingabe, 'sprechgruppe_ids'>>;
 
 export function patcheAbschnitt(
   einsatzId: number,
@@ -49,6 +54,33 @@ export function patcheAbschnitt(
   patch: AbschnittPatch,
 ): Promise<Einsatzabschnitt> {
   return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte/${aid}`, 'PATCH', patch);
+}
+
+/**
+ * Eine Sprechgruppe dem Abschnitt zuordnen (LLH-1456, D4): idempotent, `204` ohne Körper; eine
+ * wirksame Zuordnung schreibt der Server ins Tagebuch.
+ */
+export function ordneAbschnittSprechgruppeZu(
+  einsatzId: number,
+  aid: number,
+  sprechgruppeId: number,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/abschnitte/${aid}/sprechgruppen/${sprechgruppeId}`,
+    'PUT',
+  );
+}
+
+/** Eine Sprechgruppe vom Abschnitt lösen (LLH-1456, D4): idempotent, `204` ohne Körper. */
+export function loeseAbschnittSprechgruppe(
+  einsatzId: number,
+  aid: number,
+  sprechgruppeId: number,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/abschnitte/${aid}/sprechgruppen/${sprechgruppeId}`,
+    'DELETE',
+  );
 }
 
 export function loeseAbschnittAuf(einsatzId: number, aid: number): Promise<void> {

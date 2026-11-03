@@ -255,3 +255,13 @@ erzeugen. Eine Zuordnung aus der Skizze MUST im ETB dieselbe Wirkung haben wie d
 #### Scenario: Verschieben
 - **WHEN** eine Person zehn Elemente verschiebt
 - **THEN** entsteht kein ETB-Eintrag
+
+#### Scenario: Zuordnung an Abschnitt oder Führungsstelle
+- **WHEN** eine Person in der Skizze dem Abschnitt „Nord“ die Sprechgruppe „311“ (TMO) zuordnet
+- **THEN** erhält das ETB denselben Eintrag wie bei der Zuordnung in der Abschnittsansicht:
+  „Abschnitt «Nord»: Sprechgruppe «311» (TMO) zugeordnet“
+
+#### Scenario: Zuordnung an eine externe Stelle
+- **WHEN** eine Person in der Skizze der externen Stelle „Leitstelle“ die Sprechgruppe „311“
+  zuordnet
+- **THEN** entsteht kein ETB-Eintrag, wie bei derselben Zuordnung im Kommunikationsplan

@@ -1006,6 +1006,8 @@ describe('EinsatzdatenPage — Nebenweg „Zugriff verwalten“ (LFH-1170)', () 
  * Angaben (LFH-1181), jede schickt nur ihr Feld an `…/fuehrungsstelle`.
  */
 describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
+  // Die Sprechgruppen gehen über die Einzelwege (LLH-1456, D1): je Anfrage „PUT 1“ / „DELETE 2“.
+  let einzelwege: string[] = [];
   /** Nimmt jeden PATCH-Body auf und legt ihn wie der Server über den Stand. */
   function fuehrungsstelleMitschnitt(
     start: Fuehrungsstelle = {
@@ -1016,13 +1018,24 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     },
   ) {
     const bodies: FuehrungsstellePatch[] = [];
+    einzelwege = [];
     let stand: Fuehrungsstelle = start;
+    const einzelweg = ({ request, params }: { request: Request; params: { sg?: unknown } }) => {
+      const sg = Number(params.sg);
+      einzelwege.push(`${request.method} ${sg}`);
+      const ohne = stand.sprechgruppen.filter((g) => g.id !== sg);
+      const neu = sprechgruppenListe.find((g) => g.id === sg)!;
+      stand = { ...stand, sprechgruppen: request.method === 'PUT' ? [...ohne, neu] : ohne };
+      return new HttpResponse(null, { status: 204 });
+    };
     server.use(
       http.get('/api/einsaetze/7/fuehrungsstelle', () => HttpResponse.json(stand)),
+      http.put('/api/einsaetze/7/fuehrungsstelle/sprechgruppen/:sg', einzelweg),
+      http.delete('/api/einsaetze/7/fuehrungsstelle/sprechgruppen/:sg', einzelweg),
       http.patch('/api/einsaetze/7/fuehrungsstelle', async ({ request }) => {
         const body = (await request.json()) as FuehrungsstellePatch;
         bodies.push(body);
-        const { sprechgruppe_ids, fahrzeug_ids, einsatzleiter, ...felder } = body;
+        const { fahrzeug_ids, einsatzleiter, ...felder } = body;
         // Wie der Server: `null` leert, ein Wert ersetzt (die Art ist nie `null`).
         const naechster = { ...stand } as Record<string, unknown>;
         if (einsatzleiter === null) delete naechster.einsatzleiter;
@@ -1043,11 +1056,6 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
           else naechster[k] = v;
         }
         if (fahrzeug_ids) naechster.fahrzeug_ids = [...fahrzeug_ids].sort((a, b) => a - b);
-        if (sprechgruppe_ids) {
-          naechster.sprechgruppen = sprechgruppenListe.filter((g) =>
-            sprechgruppe_ids.includes(g.id),
-          );
-        }
         stand = naechster as unknown as Fuehrungsstelle;
         return HttpResponse.json(stand);
       }),
@@ -1450,7 +1458,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     );
   });
 
-  it('Sprechgruppen: Auswahl geht als `sprechgruppe_ids`, Anzeige nach Betriebsart', async () => {
+  it('Sprechgruppen: je gewählter eine Zuordnung am Einzelweg, kein PATCH, Anzeige nach Betriebsart', async () => {
     setup();
     const bodies = fuehrungsstelleMitschnitt();
     const user = userEvent.setup();
@@ -1460,7 +1468,29 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     await user.click(await screen.findByText('311'));
     await user.click(await screen.findByText('505 (lokal)'));
     await user.click(p.getByRole('button', { name: 'Sprechgruppen speichern' }));
-    await waitFor(() => expect(bodies).toEqual([{ sprechgruppe_ids: [1, 2] }]));
+    await waitFor(() => expect(einzelwege).toEqual(['PUT 1', 'PUT 2']));
+    expect(bodies).toEqual([]);
+    expect(
+      await p.findByRole('button', { name: 'Sprechgruppen bearbeiten' }),
+    ).toHaveAccessibleDescription('TMO 311 · DMO 505');
+  });
+
+  it('Sprechgruppen: Hinzufügen schickt nur den einen Eintrag (LLH-1456)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt({
+      art: 'mobil',
+      sprechgruppen: [sprechgruppenListe[0]],
+      verbindungen: [],
+      fahrzeug_ids: [],
+    });
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    await user.click(p.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await user.click(await screen.findByText('505 (lokal)'));
+    await user.click(p.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() => expect(einzelwege).toEqual(['PUT 2']));
+    expect(bodies).toEqual([]);
     expect(
       await p.findByRole('button', { name: 'Sprechgruppen bearbeiten' }),
     ).toHaveAccessibleDescription('TMO 311 · DMO 505');

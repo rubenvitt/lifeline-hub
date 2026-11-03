@@ -378,7 +378,10 @@ export type EinsatzleiterEingabe =
 
 /**
  * Teiländerung der Führungsstelle (kein Backend-Schema, `routes/einsatz_fuehrungsstelle.rs`):
- * fehlender Schlüssel = unverändert, `null` = leeren; `sprechgruppe_ids` ersetzt vollständig.
+ * fehlender Schlüssel = unverändert, `null` = leeren. Ohne `sprechgruppe_ids`: die Sprechgruppen
+ * gehen einzeln über `ordneFuehrungsstelleSprechgruppeZu`/`loeseFuehrungsstelleSprechgruppe`
+ * (LLH-1456, D4), damit kein Speichern die Zuordnung eines anderen Arbeitsplatzes überschreibt. Der
+ * Server nimmt das Feld weiter an (Wire-Grenze).
  */
 export interface FuehrungsstellePatch {
   /** Nie `null`: die Art lässt sich nicht leeren (400). */
@@ -391,7 +394,6 @@ export interface FuehrungsstellePatch {
   rufname?: string | null;
   /** LLH-1134: Telefon und weitere Verbindungen; ersetzt vollständig (`[]` leert). */
   verbindungen?: NeueVerbindung[];
-  sprechgruppe_ids?: number[];
   /** Dispositionszeilen, die die Führungsstelle tragen (LFH-1106); ersetzt vollständig. */
   fahrzeug_ids?: number[];
   /** Der Einsatzleiter (LFH-1199); `null` leert ihn, ein Wechsel schreibt ins ETB. */

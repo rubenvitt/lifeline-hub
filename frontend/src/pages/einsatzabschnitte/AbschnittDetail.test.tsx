@@ -7,6 +7,7 @@ import { renderMitProviders } from '../../test/utils';
 import { ApiError } from '../../api/client';
 import { ABSCHNITT_RUFNAME_MAX } from '../../api/eingabegrenzen';
 import type { Einsatzabschnitt } from '../../api/types';
+import type { SprechgruppenHandler } from '../../components/SprechgruppenAngabe';
 import AbschnittDetail, { type AbschnittPatchHandler } from './AbschnittDetail';
 import AbschnittDaten from './AbschnittDaten';
 
@@ -52,10 +53,12 @@ function renderDetail(
   {
     darfSchreiben = true,
     onPatch = vi.fn<AbschnittPatchHandler>().mockResolvedValue(undefined),
+    onSprechgruppen = vi.fn<SprechgruppenHandler>().mockResolvedValue(undefined),
     abschnitte = [abschnitt, ...(abschnitt.id === sued.id ? [] : [sued])],
   }: {
     darfSchreiben?: boolean;
     onPatch?: ReturnType<typeof vi.fn<AbschnittPatchHandler>>;
+    onSprechgruppen?: ReturnType<typeof vi.fn<SprechgruppenHandler>>;
     abschnitte?: Einsatzabschnitt[];
   } = {},
 ) {
@@ -68,9 +71,10 @@ function renderDetail(
       staerken={{ eigene: null, inklUnter: null }}
       darfSchreiben={darfSchreiben}
       onPatch={onPatch}
+      onSprechgruppen={onSprechgruppen}
     />,
   );
-  return { onPatch, ansicht };
+  return { onPatch, onSprechgruppen, ansicht };
 }
 
 const labelsOf = (wurzel: HTMLElement) =>
@@ -222,17 +226,68 @@ describe('AbschnittDetail (LFH-1208)', () => {
       ),
     );
     const user = userEvent.setup();
-    const onPatch = vi
-      .fn<AbschnittPatchHandler>()
+    const onSprechgruppen = vi
+      .fn<SprechgruppenHandler>()
       .mockRejectedValue(new ApiError(400, 'Sprechgruppe gehört nicht zum Einsatz'));
-    renderDetail(nord(), { onPatch });
+    const { onPatch } = renderDetail(nord(), { onSprechgruppen });
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen eintragen' }));
     await user.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
     await user.click(await screen.findByText('DMO 31'));
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
     expect(await screen.findByText('Sprechgruppe gehört nicht zum Einsatz')).toBeInTheDocument();
-    expect(onPatch).toHaveBeenCalledWith('Sprechgruppen', { sprechgruppe_ids: [8] });
+    expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [8], weg: [] }, expect.any(Function));
+    expect(onPatch).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Sprechgruppen speichern' })).toBeInTheDocument();
+  });
+
+  // Einzelwege (LLH-1456, Change `tjh219fc-abschnitt-fuehrungsstelle-sprechgruppen-einzelwege`, D1).
+  it('Sprechgruppe hinzugefügt: nur dieser eine Eintrag, kein PATCH', async () => {
+    const tmo = sprechgruppe(7, '412_F_DRK', 'TMO');
+    const dmo = sprechgruppe(8, 'DMO 31', 'DMO');
+    server.use(http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json([tmo, dmo])));
+    const user = userEvent.setup();
+    const { onPatch, onSprechgruppen } = renderDetail(nord({ sprechgruppen: [tmo] }));
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    await user.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await user.click(await screen.findByTitle('DMO 31'));
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() =>
+      expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [8], weg: [] }, expect.any(Function)),
+    );
+    expect(onSprechgruppen).toHaveBeenCalledTimes(1);
+    expect(onPatch).not.toHaveBeenCalled();
+  });
+
+  it('eine während der Bearbeitung fremd zugeordnete Sprechgruppe bleibt stehen', async () => {
+    const tmo = sprechgruppe(7, '412_F_DRK', 'TMO');
+    const dmo = sprechgruppe(8, 'DMO 31', 'DMO');
+    server.use(http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json([tmo, dmo])));
+    const user = userEvent.setup();
+    const onSprechgruppen = vi.fn<SprechgruppenHandler>().mockResolvedValue(undefined);
+    const props = {
+      abschnitte: [nord(), sued],
+      personal,
+      einsatzId: 1,
+      staerken: { eigene: null, inklUnter: null },
+      darfSchreiben: true,
+      onPatch: vi.fn<AbschnittPatchHandler>().mockResolvedValue(undefined),
+      onSprechgruppen,
+    };
+    const { rerender } = renderMitProviders(
+      <AbschnittDetail abschnitt={nord({ sprechgruppen: [tmo] })} {...props} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
+    const feld = screen.getByRole('combobox', { name: 'Sprechgruppen' }).closest('.ant-select')!;
+    await waitFor(() =>
+      expect(feld.querySelectorAll('.ant-select-selection-item')).toHaveLength(1),
+    );
+    // Ein anderer Arbeitsplatz ordnet DMO 31 zu; der Stand kommt live, der Entwurf bleibt.
+    rerender(<AbschnittDetail abschnitt={nord({ sprechgruppen: [tmo, dmo] })} {...props} />);
+    await user.click(feld.querySelector('.ant-select-clear')!);
+    await user.click(screen.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() =>
+      expect(onSprechgruppen).toHaveBeenCalledWith({ hinzu: [], weg: [7] }, expect.any(Function)),
+    );
   });
 
   describe('Lagezustand mit einem Klick', () => {
