@@ -110,8 +110,8 @@ Einsatzleitung muss niemand abzählen. Am UHS-Laptop steht dieselbe Zeile im Ber
 Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist:
 
 1. Die Stelle öffnen und in der Leiste „Material“ wählen, oder im Kopf der Stelle die Zahl der
-   Posten antippen, etwa „3 Posten · 1 Ausfall“. Der Bereich zeigt jeden Posten mit Menge und
-   Status, darüber dieselbe Zahl.
+   Posten antippen, etwa „3 Posten · 1 Ausfall“. Die Zahl steht dort erst, wenn Posten an der
+   Stelle liegen. Der Bereich zeigt jeden Posten mit Menge und Status, darüber dieselbe Zahl.
 2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
    anderem Ort“ Posten, die schon an einem anderen Ort liegen, etwa bei einer Einheit, mit diesem
    Ort im Eintrag. Der Posten liegt danach an der Stelle. Bei einem Verbrauchsgut mit Menge ab 2 und
