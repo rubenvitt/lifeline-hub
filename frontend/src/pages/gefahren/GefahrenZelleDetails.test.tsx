@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { GEFAHR_BESCHREIBUNG_MAX, GEFAHR_GEMELDET_VON_MAX } from '../../api/eingabegrenzen';
 import { renderMitProviders } from '../../test/utils';
 import GefahrenZelleDetails, { type GefahrenZelleDetailsProps } from './GefahrenZelleDetails';
 import type { GefahrBewertung } from '../../api/types';
@@ -70,5 +72,37 @@ describe('GefahrenZelleDetails', () => {
     );
     rerender(dialog({ zelle: zelle({ beschreibung: 'vom Server' }) }));
     expect(screen.getByLabelText('Erläuterung')).toHaveValue('Dachstuhl');
+  });
+
+  /**
+   * Grenzen wie beim Server (LLH-1366): „Gemeldet von“ trägt sie als `maxLength`, die Erläuterung
+   * den Zähler. Eine schon zu lange Erläuterung wird nicht gekürzt, nennt die Überlänge und sperrt
+   * das Speichern. Mutationsprobe: ohne `maxLength` fällt die erste Prüfung, ohne `zeichenRegel`
+   * die zweite.
+   */
+  it('Grenzen: „Gemeldet von“ mit maxLength wie der Server', async () => {
+    renderMitProviders(dialog());
+    expect(await screen.findByLabelText('Gemeldet von')).toHaveAttribute(
+      'maxlength',
+      String(GEFAHR_GEMELDET_VON_MAX),
+    );
+  });
+
+  it('Grenzen: eine zu lange Erläuterung nennt die Überlänge, kürzt nicht und speichert nicht', async () => {
+    const onSpeichern = vi.fn(async () => {});
+    const nutzer = userEvent.setup();
+    const zuLang = 'x'.repeat(GEFAHR_BESCHREIBUNG_MAX + 1);
+    renderMitProviders(dialog({ zelle: zelle({ beschreibung: zuLang }), onSpeichern }));
+    const feld = await screen.findByLabelText('Erläuterung');
+    expect(feld).toHaveValue(zuLang);
+
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    expect(
+      await screen.findByText('Erläuterung darf höchstens 2.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/2\.001 \/ 2\.000 · zu lang/)).toBeInTheDocument();
+    expect(feld).toHaveValue(zuLang);
+    expect(onSpeichern).not.toHaveBeenCalled();
   });
 });
