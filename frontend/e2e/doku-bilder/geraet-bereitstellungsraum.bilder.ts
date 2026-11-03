@@ -34,6 +34,12 @@ import {
  *                 Gerät vollflächig), frontend/src/kraefte/AdhocFahrzeugFelder.tsx,
  *                 frontend/src/components/Erfassung.tsx
  *   melden.png    frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx
+ *   material.png  frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx (Sektion „Material“,
+ *                 Gerätezweig), frontend/src/kraefte/MaterialAmOrt.tsx (nur lesen)
+ *
+ * Demo-Lücke (LLH-1252): im Demo-Einsatz liegt kein Material an einem Bereitstellungsraum. Der
+ * letzte Test legt als Einsatzleitung zwei Posten an den Raum, einen davon defekt, und gibt von den
+ * Feldbetten einen Teil aus; die Bilder davor zeigen den Raum ohne Material.
  */
 
 const KAPITEL = 'geraet-bereitstellungsraum';
@@ -121,6 +127,11 @@ test.describe(KAPITEL, () => {
       await dialog.getByRole('spinbutton', { name: 'Mannschaft' }).fill('8');
       await dialog.getByRole('spinbutton', { name: 'Mannschaft' }).blur();
       await geraet.mouse.move(0, 0);
+      // Erst aufnehmen, wenn der Dialog steht: bei angehaltener Uhr hing die Einblendung einmal im
+      // Startzustand (Maßstab 0,2), das helle Bild war 257 × 161 px groß (LLH-1401).
+      await expect
+        .poll(async () => (await dialog.boundingBox())?.width ?? 0)
+        .toBe(KONTEXTE.tablet.width);
       await fotografiere(dialog, KAPITEL, 'unangemeldet');
       await dialog.getByRole('button', { name: 'Unangemeldet buchen' }).click();
       await expect(belegung.getByText(UNANGEMELDET, { exact: true }).first()).toBeVisible();
@@ -191,6 +202,37 @@ test.describe(KAPITEL, () => {
       await geraet.getByRole('button', { name: 'Meldung senden' }).click();
       await expect(geraet.getByText(/Meldung #\d+ gesendet/)).toBeVisible();
       await expect(geraet.getByText('Zufahrt Tor 3 blockiert', { exact: false })).toBeVisible();
+    } finally {
+      await kontext.close();
+    }
+  });
+
+  test('Material des Raums ansehen', async ({ page, browser }) => {
+    const { kontext, geraet, einsatzId, brId } = await raumTablet(page, browser);
+    try {
+      const basis = `/api/einsaetze/${einsatzId}/material`;
+      const betten = await fuelle<{ id: number }>(page, 'post', basis, {
+        adhoc: { bezeichnung: 'Feldbetten' },
+        menge: 20,
+        art: 'verbrauchsgut',
+        br_id: brId,
+      });
+      await fuelle(page, 'patch', `${basis}/${betten.id}`, { ausgegeben: 5 });
+      const strahler = await fuelle<{ id: number }>(page, 'post', basis, {
+        adhoc: { bezeichnung: 'Flutlichtstrahler' },
+        br_id: brId,
+      });
+      await fuelle(page, 'patch', `${basis}/${strahler.id}`, { status: 'defekt' });
+      await geraet.reload();
+      const material = geraet.getByTestId('br-material');
+      await expect(material.getByText('15 von 20 übrig')).toBeVisible();
+      await expect(material.getByText('Flutlichtstrahler')).toBeVisible();
+      // Am Gerät nur lesen: kein Zuordnen, kein Lösen, kein Ausgeben (LLH-1252).
+      await expect(material.getByRole('combobox')).toHaveCount(0);
+      await expect(material.getByRole('button', { name: /Lösen|Ausgeben/ })).toHaveCount(0);
+      await material.scrollIntoViewIfNeeded();
+      await geraet.mouse.move(0, 0);
+      await fotografiere(material, KAPITEL, 'material');
     } finally {
       await kontext.close();
     }

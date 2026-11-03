@@ -119,6 +119,8 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
 2. Je Posten stehen Bezeichnung, Menge (etwa „6 von 10 übrig“) und Status. Liegt nichts im Raum,
    steht dort „Kein Material“.
 
+   ![Sektion „Material 2 Posten · 1 Ausfall“ am Tablet: Feldbetten mit „15 von 20 übrig“ und ein defekter Flutlichtstrahler, ohne Knöpfe zum Ausgeben oder Lösen](../bilder/geraet-bereitstellungsraum/material.png)
+
 Die Sektion fehlt, wenn das Modul Material im Einsatz nicht freigegeben ist.
 
 ### Meldung an die Einsatzleitung
