@@ -130,7 +130,8 @@ Für die Einsatzleitung:
 - „Bezeichnung“ und „Alarmzeit“ sind Pflicht: leer gespeichert bleibt der bisherige Wert stehen,
   und die Zeile sagt, dass die Angabe Pflicht ist.
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie
-  schreiben keinen Eintrag ins Einsatztagebuch, mit einer Ausnahme: der Einsatzleiter.
+  schreiben keinen Eintrag ins Einsatztagebuch, mit zwei Ausnahmen: der Einsatzleiter und jede
+  Sprechgruppe, die an der Führungsstelle hinzukommt oder wegfällt.
 - Die „Einsatznummer“ vergibt das System; sie lässt sich nicht ändern. Sie steht im Seitenkopf und
   im Paneel „Einsatz“, ebenso die Leitstellen-Nr., mit der Leitstelle, Rückfragen und
   Einsatzbericht arbeiten.
