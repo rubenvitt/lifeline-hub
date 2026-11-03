@@ -21,6 +21,7 @@ import dayjs from 'dayjs';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { theme } from 'antd';
 import { etbTypFarbe } from '../theme/statusFarben';
+import { mitProzessZone } from '../test/prozessZone';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
 // onUnhandledFrame: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
@@ -1241,6 +1242,8 @@ describe('Ereigniszeit eines vorgehenden Geräts (LFH-895)', () => {
 
 // LLH-1088: `/zeit` als Kurzeingabe der Ereigniszeit und die Sperre gegen eine Zeit in der Zukunft.
 describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
+  // Ohne Org-Zone gilt die Browserzone; die Wanduhr-Erwartungen unten sind Berliner Zeit (LLH-1411).
+  mitProzessZone('Europe/Berlin');
   // 14:31 Berlin.
   const SERVER = Date.parse('2026-10-17T12:31:00Z');
 
