@@ -1,3 +1,31 @@
+## [1.0.0-alpha.169](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.168...v1.0.0-alpha.169) (2026-11-03)
+
+### Kräfte und Mittel
+
+- **Zeitpunkt eines Ereignisses berichtigen:** In der Kräfte-Zeitachse einer Einheit oder Person steht an jedem Ereignis „Zeit berichtigen“. Sie geben den neuen Zeitpunkt und einen Grund an. Die App ersetzt das alte Ereignis in einem Schritt durch eines derselben Art zur neuen Zeit und schreibt dazu einen einzigen ETB-Eintrag („… berichtigt von … auf … — Grund: …“).
+  - Geprüft wird nur das Ergebnis. Dadurch lässt sich jetzt auch ein Eintreffen verschieben, mit dem ein Einsatzabschnitt beginnt. An einer entlassenen Person lässt sich auch die Zeit der Entlassung berichtigen.
+  - Bei einer Einheit werden die Einträge der Personen im Einsatz mitgezogen. Die Zeitachse bereits entlassener Personen bleibt unverändert. Würde die Berichtigung bei einer Person die Reihenfolge verletzen, lehnt die App sie ab, nennt die Person und speichert nichts.
+  - Für die Schicht der Ablösung zählt die Berichtigung wie Streichung und Nachtrag. Der Schichtbeginn wird nicht mitverschoben.
+- **Grund höchstens 500 Zeichen:** Beim Streichen und Berichtigen eines Zeitachsen-Ereignisses darf der Grund höchstens 500 Zeichen lang sein. Die Dialoge zählen die Zeichen mit.
+- **Streichen an der Einheit ändert entlassene Personen nicht mehr:** Bisher wurde beim Streichen an der Einheit auch die Kopie bei einer bereits entlassenen Person gestrichen. Ihre Periode war danach wieder offen, und Berichtigungen an ihr scheiterten mit einem irreführenden Hinweis. Ist eine solche Periode aus älteren Daten noch offen, weist die App jetzt darauf hin, die Entlassung nachzutragen.
+- Am Eintreffen der neuen Besatzung nach einem Besatzungswechsel bietet die Zeitachse „Zeit berichtigen“ und „Streichen“ nicht mehr an. Bisher wurden diese Aktionen angezeigt und dann abgelehnt.
+- **Material von einer Nachforderung lösen:** Wurde ein Posten versehentlich einer Nachforderung zugeordnet oder aus ihr übernommen, lösen Sie ihn in der Materialliste über „Von Nachforderung lösen“. Menge, Ort und Status bleiben erhalten. Danach lässt sich „Eingetroffen“ zurücknehmen. Der Schritt wird im ETB vermerkt und lässt sich rückgängig machen. Bisher blieb nur der Storno des ganzen Postens.
+- **Unfallhilfsstelle:** Der Seitenkopf zeigt „0 Posten“ nicht mehr, wenn die UHS kein Material hat. Die Materialzahl erscheint wie beim Bereitstellungsraum und bei der Einheit nur noch, wenn Posten vorhanden sind.
+
+### Kommunikation
+
+- **Sprechgruppen an Abschnitt und Führungsstelle einzeln speichern:** Abschnitte und die eigene Führungsstelle speichern Sprechgruppen jetzt wie Einheiten einzeln. Zwei Arbeitsplätze überschreiben sich dabei nicht mehr gegenseitig.
+- Jede Änderung schreibt einen eigenen ETB-Eintrag, zum Beispiel „Abschnitt «Nord»: Sprechgruppe «311» (TMO) zugeordnet“. Das gilt auch für Änderungen aus der Fernmeldeskizze. Externe Stellen im Kommunikationsplan schreiben weiterhin keinen ETB-Eintrag.
+
+### Einsatztagebuch
+
+- Im ungefilterten ETB ohne Lagebesprechung konnte das Neuladen nach einem Live-Ereignis oder einem eigenen Eintrag mit einem Fehler abbrechen. Das ist behoben.
+
+### Dokumentation
+
+- Die Anwenderdokumentation zu Meldebild, Personal, Ablösung, Material, Nachforderung, Sprechgruppen und Unfallhilfsstellen beschreibt die neuen Abläufe.
+- Die Bilder zu „Fahrzeuge und FMS“ und „Bereitstellungsraum am Gerät“ sind neu erzeugt. Für den Bereitstellungsraum gibt es ein neues Bild zum Ansehen des Materials am Tablet.
+
 ## [1.0.0-alpha.168](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.167...v1.0.0-alpha.168) (2026-11-03)
 
 ### Wichtige Änderungen
