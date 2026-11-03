@@ -1,3 +1,59 @@
+## [1.0.0-alpha.168](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.167...v1.0.0-alpha.168) (2026-11-03)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Beim Start wird eine Migration eingespielt, die an jedem Web-Push-Abo speichert, ob die Benachrichtigung Absender und Wortlaut zeigen darf. Bestehende Abos stehen danach auf „aus“.
+- **Neue Grenzen in der Schnittstelle:**
+  - Die Bewertung einer Gefahrenmatrix-Zelle wird mit 400 abgelehnt, wenn die Erläuterung mehr als 2.000 Zeichen oder „Gemeldet von“ mehr als 200 Zeichen hat.
+  - Ein Materialposten, dessen Stamm-Gerät eine Bestandsnummer trägt, lässt sich nicht mehr als Verbrauchsgut führen (422). Ein solcher Posten lässt sich auch nicht mehr aufteilen (409).
+- **Schnittstelle erweitert:** Der Web-Push-Status meldet zusätzlich, ob für das Gerät Absender und Wortlaut eingeschaltet sind.
+
+### Einsatztagebuch
+
+- Wird die Erfassungsleiste bei einem niedrigen Fenster sehr hoch, etwa durch Anhänge, Hinweise oder eine Berichtigungswarnung, rutscht „Nach oben“ nicht mehr hinter den klebenden Kopf. Der Knopf erscheint nur, wenn er ganz sichtbar ist. Bisher war er dort ein unsichtbarer Tab-Stopp.
+- Im Handschuh-Betrieb fällt der doppelte Abstand über der Erfassung weg. Er hatte den Knopf schon bei normaler Leiste unter den Kopf geschoben.
+
+### Lagekarte
+
+- **Neu: Sammelstellen als Marker.** Hat ein Evakuierungsbezirk eine verortete Sammelstelle, steht sie als eigener Marker in der neuen Ebene „Sammelstellen“ (Gruppe „Betroffene & Versorgung“). Das gilt nicht für stornierte Bezirke und nicht, wenn die Räumung aufgehoben ist. Der Marker trägt das taktische Zeichen „Sammelplatz für Betroffene“ und die Beschriftung „Sammelstelle <Bezirk>“.
+  - Wählt man ihn aus, zeigt die Karte Freitext, Räumungsstand, Zahl der Evakuierten und Abschnitt. Von dort geht es zur Bezirksseite.
+  - Die Sammelstelle lässt sich auf der Karte neu setzen oder ihre Verortung löschen. Eine Sammelstelle ohne Punkt steht unter „Nicht verortet“.
+  - Hat ein Bezirk keine Fläche, springt die Karte auf seine Sammelstelle. „Auf Karte zeigen“ steht dann auch im Bezirksmenü, aber nur, wenn die Karte die Sammelstelle tatsächlich zeigt.
+  - Sichtbar nur mit dem Recht für das Modul Evakuierung.
+- Links, die die Karte öffnen und etwas darauf zeigen, wirken nur noch einmal. Das gilt für Links auf ein Gefahrengebiet, einen Evakuierungsbezirk, einen Ort, ein Zentrum oder einen Abschnitt und für Links, die das Platzieren oder Zeichnen starten. Bisher kamen eine aufgehobene Auswahl, ein abgebrochener Platziermodus oder die Suchnadel manchmal von selbst zurück. Ein Link mit mehreren solchen Angaben wirkt jetzt vollständig und nur einmal.
+- Im Rückblick wartet der Startausschnitt der Karte auf die Modulfreigaben, damit Stellen und Sammelstellen mitberücksichtigt werden.
+
+### Kräfte und Mittel
+
+- Ein Gerät mit Bestandsnummer ist ein bestimmtes Stück. Es bleibt Gerät und lässt sich nicht mehr als Verbrauchsgut aufteilen. So steht dasselbe Stück nicht mehr doppelt im Einsatz.
+
+### Betroffene und Versorgung
+
+- Der Standort einer Verpflegungsstelle nutzt jetzt dasselbe Ortsfeld mit Kartenvorschau wie Schadensort, Standort und Sammelstelle:
+  - Eine Korrektur am Text behält den gespeicherten Kartenpunkt.
+  - Ein neuer Suchtreffer ersetzt den Punkt, und die Nadel kann ihn berichtigen.
+  - Ein geleertes Feld leert Text und Punkt.
+
+### Gefahren
+
+- Erläuterung und „Gemeldet von“ in der Gefahrenmatrix haben eine Längengrenze von 2.000 bzw. 200 Zeichen. Der Dialog zeigt einen Zähler und weist auf zu lange, bereits gespeicherte Texte hin.
+
+### Kommunikation und Benachrichtigungen
+
+- **Push-Meldungen bei geschlossener App mit Absender und Wortlaut, nur auf Wunsch.** Unter „Auch bei geschlossener App“ gibt es auf der Seite Benachrichtigungen einen zweiten Schalter: „Mit Absender und Wortlaut“. Er ist anfangs aus.
+  - Ist er an, nennt die Benachrichtigung bei Sofortmeldungen, deren Eskalation und neuen Meldungen den Absender und den Anfang des Textes.
+  - Die Wahl gilt je Gerät und endet mit der Sitzung. Bei einer erneuten Anmeldung wird sie mitgenommen.
+  - Der Inhalt selbst wird nicht über den Push-Dienst verschickt. Das Gerät holt ihn mit der eigenen Sitzung. Klappt das nicht rechtzeitig, bleibt der allgemeine Text.
+
+### Anmeldung und Sitzung
+
+- Meldet sich in einem anderen Tab eine andere Person an, zeigt der Tab jetzt den Konfliktdialog zum Benutzerwechsel. Bisher stand dort fälschlich „Keine Berechtigung“, wenn der neuen Person ein Recht fehlte.
+- Nach dem Abmelden übernimmt eine verspätet abgelehnte Leseanfrage keine Sitzung mehr, die auf dem Server noch gültig ist.
+
+### Website
+
+- Die Modulliste der Website entspricht wieder der App: Lagebesprechung, Evakuierung und Fernmeldewesen sind ergänzt, die Beschreibungen von Stab und Betreuung aktualisiert. Eine automatische Prüfung meldet künftig, wenn die beiden Listen auseinanderlaufen.
+
 ## [1.0.0-alpha.167](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.166...v1.0.0-alpha.167) (2026-11-02)
 
 ### Wichtige Änderungen
