@@ -215,8 +215,8 @@ zugeordnet oder von ihr abgezogen werden, stehen ebenfalls dort.
 
 ### Kräfte und Material
 
-Der Kopf der Stelle nennt ihre Stärke und, mit Freigabe des Moduls Material, die Zahl ihrer
-Posten samt Ausfall; Ausfall fasst defekt, verbraucht, Desinfektion nötig und aufgebraucht
+Der Kopf der Stelle nennt ihre Stärke und, mit Freigabe des Moduls Material und sobald Posten an
+der Stelle liegen, die Zahl ihrer Posten samt Ausfall; Ausfall fasst defekt, verbraucht, Desinfektion nötig und aufgebraucht
 zusammen (Kapitel [Material](material.md)). Unter „Kräfte“ werden Kräfte und Einheiten mit „Kraft
 zuordnen“ und „Einheit zuordnen“ an die Stelle gesetzt, „Kraft erfassen“ legt eine Kraft neu an.
 Die Tabelle der Kräfte sortiert per Klick auf den Spaltenkopf nach Name, Funktion, Position oder
