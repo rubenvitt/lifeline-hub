@@ -644,6 +644,46 @@ pub async fn verknuepfen(
     Ok(Json(anzeige))
 }
 
+/// DELETE /api/einsaetze/{id}/material/{em_id}/nachforderung — eine Fehlzuordnung lösen (LLH-1403,
+/// design.md D1–D6, Spec `nachforderung-material`, „Fehlzuordnung lösen“): nur der Bezug geht, der
+/// Posten bleibt mit Menge, Ort, Art und Status. Reihenfolge: Gate Material → 403 (Nachforderungen
+/// nicht freigegeben, vor jedem Lesen) → in der Transaktion 404 (fremd) / 409 (beendet) / 422 (ohne
+/// Bezug). Bezug und genau ein ETB-Eintrag atomar. Danach zählt der Posten nicht mehr als
+/// Übernahme; Live `material` und `nachforderung`. Liefert den Posten.
+pub async fn loesen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    // Erst die Freigabe (403), sonst verriete 422 gegen 200 den Bezug (wie `verknuepfen`).
+    ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
+        .await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let anzeige = crate::write_retry!(&state.pool, |conn| {
+        let (posten, _nid, herkunft) =
+            disposition_repo::check_loesbar_tx(conn, einsatz_id, em_id).await?;
+        disposition_repo::clear_nachforderung_tx(conn, einsatz_id, em_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::material::etb_text_von_nachforderung_geloest(
+                &posten.bezeichnung,
+                posten.menge,
+                &herkunft,
+            ),
+        )
+        .await?;
+        disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await
+    })?;
+    sse_material(&state, einsatz_id, em_id);
+    // Der Posten trägt den Bezug nicht mehr: die Karte zählt neu, die Rücknahme wird möglich.
+    super::nachforderung::sse(&state, einsatz_id);
+    Ok(Json(anzeige))
+}
+
 /// POST /api/einsaetze/{id}/material/{em_id}/entlassen — aus dem Einsatz nehmen (LLH-1079, Spec
 /// `kraefte-entlassung`; die Oberfläche sagt „Aus dem Einsatz nehmen“, LLH-1093 Nr. 3). Die
 /// Zeile bleibt, der Ort geht (LLH-1224 D13). Ohne Rückfrage, der Rückweg ist `…/reaktivieren`.

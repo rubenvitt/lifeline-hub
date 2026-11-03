@@ -2067,6 +2067,80 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  /**
+   * Fehlzuordnung lösen (LLH-1403, design.md D4/D5): ein Eintrag im Zeilenmenü, ohne Rückfrage,
+   * danach „Rückgängig“, das wieder verknüpft — bewusst als Ergänzung.
+   */
+  it('„Von Nachforderung lösen“ fragt nicht nach und verknüpft mit Rückgängig wieder', async () => {
+    nachforderungen(() => HttpResponse.json([nachforderung]));
+    const aufrufe: unknown[] = [];
+    server.use(
+      http.delete('/api/einsaetze/1/material/21/nachforderung', () => {
+        aufrufe.push('loesen');
+        return HttpResponse.json({ ...uebernommen, nachforderung_id: null });
+      }),
+      http.post('/api/einsaetze/1/material/21/nachforderung', async ({ request }) => {
+        aufrufe.push(await request.json());
+        return HttpResponse.json(uebernommen);
+      }),
+    );
+    render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    await screen.findByRole('link', { name: /aus Nachforderung/ });
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }),
+      'Von Nachforderung lösen',
+    );
+    await waitFor(() => expect(aufrufe).toEqual(['loesen']));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await screen.findByText('Wolldecke von Nachforderung gelöst')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() =>
+      expect(aufrufe).toEqual(['loesen', { nachforderung_id: 4, ergaenzen: true }]),
+    );
+  });
+
+  it('eine Ablehnung des Lösens steht an der Zeile', async () => {
+    nachforderungen(() => HttpResponse.json([nachforderung]));
+    server.use(
+      http.delete('/api/einsaetze/1/material/21/nachforderung', () =>
+        HttpResponse.json(
+          { error: 'Das Material ist aus dem Einsatz genommen; erst erneut disponieren' },
+          { status: 409 },
+        ),
+      ),
+    );
+    const { container } = render(einsatzAktiv, [uebernommen as unknown as typeof em]);
+    await screen.findByRole('link', { name: /aus Nachforderung/ });
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }),
+      'Von Nachforderung lösen',
+    );
+    const zeile = container.querySelector('[data-row-key="21"]') as HTMLElement;
+    expect(await within(zeile).findByRole('alert')).toHaveTextContent('erst erneut disponieren');
+  });
+
+  it('„Von Nachforderung lösen“ fehlt ohne Bezug und ohne Freigabe für Nachforderungen', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
+      ),
+    );
+    render(einsatzAktiv, [
+      uebernommen as unknown as typeof em,
+      { ...em, id: 22, bezeichnung: 'Trage' },
+    ]);
+    expect(await screen.findByText('aus Nachforderung #4')).toBeInTheDocument();
+    for (const name of ['Wolldecke', 'Trage']) {
+      await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen zu ${name}` }));
+      await warteAufMenueFokus();
+      expect(
+        (await screen.findAllByRole('menuitem', { name: /^Angaben ändern/ })).length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByRole('menuitem', { name: 'Von Nachforderung lösen' })).toBeNull();
+      await userEvent.keyboard('{Escape}');
+    }
+  });
+
   it('ohne verknüpften Posten ruft die Seite keine Nachforderungen ab', async () => {
     const abrufe = nachforderungen(() => HttpResponse.json([nachforderung]));
     const { client } = render(einsatzAktiv, [em]);

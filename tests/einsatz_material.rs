@@ -3583,6 +3583,238 @@ async fn verknuepfen_mit_vorhandenem_posten_braucht_ergaenzen() {
     );
 }
 
+// ── Fehlzuordnung lösen (LLH-1403) ───────────────────────────────────────────────────────
+
+/// `DELETE …/material/{em}/nachforderung`.
+async fn loesen(app: &axum::Router, cookie: &str, einsatz: i64, em: i64) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/nachforderung"),
+        cookie,
+        None,
+    )
+    .await
+}
+
+/// LLH-1403 D2/D6, Spec `nachforderung-material`, „Fehlzuordnung lösen“: der Bezug geht, der Posten
+/// bleibt, wie er war; genau ein ETB-Eintrag nennt Posten und Nachforderung. Danach zählt die
+/// Nachforderung ihn nicht mehr, und „Eingetroffen“ lässt sich zurücknehmen.
+#[tokio::test]
+async fn loesen_nimmt_den_bezug_schreibt_einen_etb_eintrag_und_gibt_die_ruecknahme_frei() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let a = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Tauchpumpe THW", 1).await;
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        &format!(r#"{{"einheit_id":{a}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "3 Tauchpumpen für Keller Hauptstraße",
+        3,
+        "eingetroffen",
+    )
+    .await;
+    let (s, json) = verknuepfen(&app, &admin, einsatz, em, nid).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let vorher = material_zeile(&app, &admin, einsatz, em).await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+    let system_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = loesen(&app, &admin, einsatz, em).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["id"], em);
+    assert!(json["nachforderung_id"].is_null(), "{json}");
+    let nachher = material_zeile(&app, &admin, einsatz, em).await;
+    assert!(nachher["nachforderung_id"].is_null());
+    for feld in ["menge", "status", "art", "bezeichnung", "einheit_id"] {
+        assert_eq!(nachher[feld], vorher[feld], "{feld} unverändert");
+    }
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher + 1);
+    assert_eq!(
+        neue_etb(&app, &admin, einsatz, system_vorher).await,
+        ["Material «Tauchpumpe THW» (×1) von Nachforderung «3 Tauchpumpen für Keller Hauptstraße» \
+          gelöst"]
+    );
+    assert!(material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await).is_empty());
+    let (s, json) = nachforderung_status(&app, &admin, einsatz, nid, "unterwegs").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+}
+
+/// LLH-1403 D2, Freigabe: wer Material schreiben darf, die Nachforderungen aber nicht sieht,
+/// bekommt 403, auch an einem Posten ohne Bezug (sonst verriete 422 gegen 200 den Bezug); nichts
+/// wird geschrieben.
+#[tokio::test]
+async fn loesen_ohne_freigabe_der_nachforderungen_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nid = nachforderung_bis(&app, &admin, einsatz, "Trage", "Trage", 1, "eingetroffen").await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
+    let (s, json) = verknuepfen(&app, &admin, einsatz, em, nid).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let ohne_bezug = adhoc_disponieren(&app, &admin, einsatz, "Decke", 1).await;
+    let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, frieda_id, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/nachforderungen"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+    for posten in [em, ohne_bezug, 999_999] {
+        let (s, json) = loesen(&app, &frieda, einsatz, posten).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{posten}: {json}");
+    }
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
+    assert_eq!(
+        material_zeile(&app, &admin, einsatz, em).await["nachforderung_id"],
+        nid
+    );
+}
+
+/// LLH-1403 D2/D3, Posten: unbekannt oder fremd 404 (auch mit Bezug in seinem eigenen Einsatz),
+/// storniert oder aus dem Einsatz genommen 409, ohne Bezug 422. Nichts wird geschrieben, ein
+/// beendeter Posten behält seinen Bezug.
+#[tokio::test]
+async fn loesen_prueft_den_posten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let nid = nachforderung_bis(&app, &admin, einsatz, "Trage", "Trage", 5, "eingetroffen").await;
+    let fremde_nid =
+        nachforderung_bis(&app, &admin, anderer, "Trage", "fremd", 1, "eingetroffen").await;
+    let (_, json) = disponieren_roh(
+        &app,
+        &admin,
+        anderer,
+        &uebernahme("Trage", 1, fremde_nid, ""),
+    )
+    .await;
+    let fremd = json["id"].as_i64().unwrap();
+    let (_, json) = disponieren_roh(&app, &admin, einsatz, &uebernahme("Trage", 1, nid, "")).await;
+    let storniert = json["id"].as_i64().unwrap();
+    assert_eq!(
+        aktion(&app, &admin, einsatz, storniert, "stornieren")
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    let (_, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Trage", 1, nid, r#","ergaenzen":true"#),
+    )
+    .await;
+    let entlassen = json["id"].as_i64().unwrap();
+    assert_eq!(
+        aktion(&app, &admin, einsatz, entlassen, "entlassen")
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let ohne_bezug = adhoc_disponieren(&app, &admin, einsatz, "Decke", 1).await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+
+    for (em, erwartet, grund) in [
+        (999_999, StatusCode::NOT_FOUND, None),
+        (fremd, StatusCode::NOT_FOUND, None),
+        (
+            storniert,
+            StatusCode::CONFLICT,
+            Some("Das Material ist storniert; erst erneut disponieren"),
+        ),
+        (
+            entlassen,
+            StatusCode::CONFLICT,
+            Some("Das Material ist aus dem Einsatz genommen; erst erneut disponieren"),
+        ),
+        (
+            ohne_bezug,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Some("Der Posten verweist auf keine Nachforderung"),
+        ),
+    ] {
+        let (s, json) = loesen(&app, &admin, einsatz, em).await;
+        assert_eq!(s, erwartet, "{em}: {json}");
+        if let Some(grund) = grund {
+            assert_eq!(json["error"], grund, "{em}");
+        }
+    }
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
+    let (_, entlassene) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/material?entlassene=1"),
+        &admin,
+        None,
+    )
+    .await;
+    let zeile = entlassene
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|z| z["id"] == entlassen)
+        .expect("herausgenommener Posten");
+    assert_eq!(zeile["nachforderung_id"], nid);
+}
+
+/// LLH-1403 D5: Rückgängig ist das Verknüpfen mit `ergaenzen`; danach zählt die Nachforderung den
+/// Posten wieder.
+#[tokio::test]
+async fn nach_dem_loesen_verknuepft_rueckgaengig_wieder() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Sandsäcke",
+        "Deich",
+        500,
+        "eingetroffen",
+    )
+    .await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Sandsäcke", 500).await;
+    assert_eq!(
+        verknuepfen(&app, &admin, einsatz, em, nid).await.0,
+        StatusCode::OK
+    );
+    assert_eq!(loesen(&app, &admin, einsatz, em).await.0, StatusCode::OK);
+    let (s, json) = verknuepfen_roh(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        &format!(r#"{{"nachforderung_id":{nid},"ergaenzen":true}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
+        vec![em]
+    );
+}
+
 /// Spec `material-modell`, „Ein Schreibweg für den Ort“, Scenario „Frühere Einheiten-Route“
 /// (LLH-1253): `PUT`/`DELETE …/einheiten/{eid}/material/{em}` gibt es nicht mehr. Beide sind 404,
 /// der Posten bleibt, wo er war, und kein ETB-Eintrag entsteht.

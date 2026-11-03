@@ -236,7 +236,10 @@ Gerät führen“, „Angaben ändern …“ und „Stornieren“; bei einem Ger
 „Angaben ändern …“ und „Stornieren“. Die Einträge zur Art MUST nur ein Ad-hoc-Posten tragen; ein
 Stamm-Posten trägt die Art seines Stammeintrags (LLH-1224). Ein Eintrag, den es für die Art gibt, der aber gerade nicht
 möglich ist, MUST gesperrt mit seinem Grund im Etikett stehen. „Stornieren“ MUST rot hinter einem
-Trenner stehen und vor dem Senden in einem Dialog mit dem Knopf „Stornieren“ rückfragen.
+Trenner stehen und vor dem Senden in einem Dialog mit dem Knopf „Stornieren“ rückfragen. Ein
+Posten mit Verweis auf eine Nachforderung MUST vor dem Trenner zusätzlich „Von Nachforderung lösen“
+tragen, wenn das Modul Nachforderungen bedienbar ist (LLH-1403, Spec `nachforderung-material`,
+„Lösen an der Materialzeile“).
 
 #### Scenario: Stamm-Posten im Menü
 - **WHEN** die Person das Zeilenmenü eines Stamm-Postens öffnet

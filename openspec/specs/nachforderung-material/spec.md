@@ -130,7 +130,8 @@ Menge im Verhältnis zur Anzahl; ohne Freigabe MUST sie nur die Zahl der Posten 
 
 Ist aus einer Nachforderung mindestens ein nicht stornierter Posten übernommen, MUST die Rücknahme
 von „Eingetroffen“ auf „Unterwegs“ mit 422 und dem Grund abgelehnt werden; auch eine gleichzeitig
-laufende Übernahme MUST NOT eine zurückgenommene Nachforderung mit Posten hinterlassen.
+laufende Übernahme MUST NOT eine zurückgenommene Nachforderung mit Posten hinterlassen. Ein von der
+Nachforderung gelöster Posten zählt dafür nicht mehr (LLH-1403).
 
 #### Scenario: Rückgängig nach Übernahme
 - **WHEN** nach „Eintreffen melden“ ein Posten übernommen und danach „Rückgängig“ gewählt wird
@@ -175,6 +176,37 @@ Antwortet der Server mit 409, MUST der Dialog offen bleiben und den Grund nennen
 #### Scenario: Kein freier Posten
 - **WHEN** jeder Posten des Einsatzes schon auf eine Nachforderung verweist
 - **THEN** nennt der Dialog „Kein Posten ohne Nachforderung im Einsatz“, und „Zuordnen“ ist gesperrt
+
+### Requirement: Fehlzuordnung lösen
+
+Das System SHALL den Verweis eines aktiven Postens auf seine Nachforderung über einen eigenen
+Schreibweg lösen können (`DELETE …/material/{em_id}/nachforderung`); der Posten MUST mit Menge,
+Ort, Art und Status bleiben. Das Lösen MUST mit 403 abgelehnt werden, wenn das Modul
+Nachforderungen nicht freigegeben ist, vor jedem Lesen; mit 404 für einen unbekannten oder fremden
+Posten, mit 409 für einen stornierten oder aus dem Einsatz genommenen und mit 422 für einen Posten
+ohne Verweis. Verweis und genau ein ETB-Eintrag MUST in einer Transaktion entfallen bzw.
+entstehen; danach MUST das System die Live-Ereignisse `material` und `nachforderung` senden. Ein
+gelöster Posten MUST NOT mehr als Übernahme zählen.
+
+#### Scenario: Falsch zugeordnete Tauchpumpe
+- **WHEN** die Einsatzleitung den Posten „Tauchpumpe THW“, der der Nachforderung „3 Tauchpumpen für Keller Hauptstraße“ zugeordnet ist, von ihr löst
+- **THEN** steht der Posten unverändert in der Materialliste ohne Verweis, und das ETB enthält „Material «Tauchpumpe THW» (×1) von Nachforderung «3 Tauchpumpen für Keller Hauptstraße» gelöst“
+- **AND** trägt die Nachforderung sonst keinen Posten und keine Einheit, gelingt die Rücknahme von „Eingetroffen“ auf „Unterwegs“
+
+#### Scenario: Ohne Freigabe Nachforderungen
+- **WHEN** eine Person mit Material-, aber ohne Nachforderungsfreigabe den Bezug lösen will
+- **THEN** antwortet der Server mit 403, und der Posten verweist weiter auf die Nachforderung
+
+### Requirement: Lösen an der Materialzeile
+
+Die Oberfläche SHALL im Zeilenmenü jedes aktiven Postens mit Verweis „Von Nachforderung lösen“
+anbieten, nur mit Schreibrecht im Einsatz und bedienbarem Modul Nachforderungen; sonst MUST der
+Eintrag fehlen. Das Lösen MUST ohne Rückfrage geschehen und danach „Rückgängig“ anbieten, das den
+Posten wieder mit derselben Nachforderung verknüpft. Eine Ablehnung MUST an der Zeile stehen.
+
+#### Scenario: Rückgängig
+- **WHEN** nach „Von Nachforderung lösen“ im Hinweis „Rückgängig“ gewählt wird
+- **THEN** verweist der Posten wieder auf die Nachforderung, und ihre Karte zählt ihn
 
 ### Requirement: Bezug über den Lebenszyklus des Postens
 
