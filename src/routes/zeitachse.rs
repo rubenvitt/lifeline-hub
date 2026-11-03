@@ -134,17 +134,26 @@ async fn require_berichtigbar_tx(
 
 /// Nach dem Schreiben an einer entlassenen Person: eine offene Periode entsteht nur über das
 /// erneute Disponieren (design.md D3). Der Fehler rollt die Transaktion zurück, samt ETB.
+///
+/// `offen_vorher`: Bestand aus der Zeit vor LLH-1459, in dem eine Streichung an der Einheit die
+/// Periode einer schon entlassenen Person geöffnet hat. Dort hat nicht die Berichtigung die
+/// Periode geöffnet, und der Weg heraus ist der Nachtrag einer Entlassung, nicht das erneute
+/// Disponieren; die 422 sagt das.
 async fn require_keine_offene_periode_tx(
     conn: &mut sqlx::SqliteConnection,
     kraft: Kraft,
+    offen_vorher: bool,
 ) -> Result<(), AppError> {
-    if repo::has_offene_periode_kraft_tx(conn, kraft).await? {
-        return Err(AppError::UnprocessableEntity(
-            "Die Person ist entlassen; eine offene Einsatzperiode entsteht nur über „Erneut disponieren“"
-                .into(),
-        ));
+    if !repo::has_offene_periode_kraft_tx(conn, kraft).await? {
+        return Ok(());
     }
-    Ok(())
+    Err(AppError::UnprocessableEntity(if offen_vorher {
+        "Die Person ist entlassen, ihre Einsatzperiode aber noch offen; zuerst die Entlassung nachtragen"
+            .into()
+    } else {
+        "Die Person ist entlassen; eine offene Einsatzperiode entsteht nur über „Erneut disponieren“"
+            .into()
+    }))
 }
 
 async fn nachtragen(
@@ -162,6 +171,8 @@ async fn nachtragen(
     let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
         let is_berichtigung = require_berichtigbar_tx(conn, einsatz_id, kraft).await?;
+        let offen_vorher =
+            is_berichtigung && repo::has_offene_periode_kraft_tx(conn, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
         let (ergebnis, beruehrt) = repo::schreibe_tx(
             conn,
@@ -180,7 +191,7 @@ async fn nachtragen(
             return Err(AppError::UnprocessableEntity(v.to_string()));
         }
         if is_berichtigung {
-            require_keine_offene_periode_tx(conn, kraft).await?;
+            require_keine_offene_periode_tx(conn, kraft, offen_vorher).await?;
         }
         let etb_id = crate::etb::system_audit_tx(
             conn,
@@ -212,10 +223,12 @@ async fn streichen(
     let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
         let is_berichtigung = require_berichtigbar_tx(conn, einsatz_id, kraft).await?;
+        let offen_vorher =
+            is_berichtigung && repo::has_offene_periode_kraft_tx(conn, kraft).await?;
         let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
         let g = repo::streiche_tx(conn, einsatz_id, benutzer_id, kraft, zid, &grund, false).await?;
         if is_berichtigung {
-            require_keine_offene_periode_tx(conn, kraft).await?;
+            require_keine_offene_periode_tx(conn, kraft, offen_vorher).await?;
         }
         let etb_id = crate::etb::system_audit_tx(
             conn,

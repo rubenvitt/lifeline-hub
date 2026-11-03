@@ -205,8 +205,10 @@ Jede Berichtigung schreibt einen Eintrag ins Einsatztagebuch mit dem Vermerk „
 Entlassung“. Eine offene Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag ab, der
 eine Periode beginnen würde, etwa ein Eintreffen nach der Entlassung, und ebenso die Streichung
 der Entlassung, mit der die letzte Periode endet. Deshalb lässt sich auch eine ganz fehlende
-Periode nach dem Entlassen nicht mehr nachtragen. Eine stornierte Person und eine aufgelöste
-Einheit lassen sich nicht berichtigen.
+Periode nach dem Entlassen nicht mehr nachtragen. Eine Streichung an ihrer früheren Einheit
+berührt die Zeitachse der entlassenen Person nicht. Steht eine entlassene Person aus älteren
+Daten noch mit offener Periode da, verlangt die App zuerst den Nachtrag ihrer Entlassung. Eine
+stornierte Person und eine aufgelöste Einheit lassen sich nicht berichtigen.
 
 ### Einsatzfunktion und Qualifikation
 

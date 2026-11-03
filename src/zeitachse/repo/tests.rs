@@ -321,6 +321,50 @@ async fn streichen_prueft_jede_person_der_kette() {
     assert_eq!(folge(&w, Kraft::Einheit(w.f1)).await.len(), 1);
 }
 
+/// LLH-1459: die Kopie an einer inzwischen beendeten Person bleibt stehen, auch wenn ihre Folge
+/// ohne sie bräche; die Personen im Einsatz verlieren ihre Kopie wie bisher.
+#[tokio::test]
+async fn streichung_laesst_die_kopie_an_der_beendeten_person_stehen() {
+    let w = welt().await;
+    schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:00", Q::Nachtrag).await;
+    let Schreibergebnis::Geschrieben(id) =
+        schreibe(&w, Kraft::Einheit(w.f1), Entlassung, "10:00", Q::Nachtrag).await
+    else {
+        panic!()
+    };
+    sqlx::query(
+        "UPDATE einsatz_personal SET beendet_at = ?, beendet_als = 'entlassen', einheit_id = NULL \
+         WHERE id = ?",
+    )
+    .bind(t("11:00"))
+    .bind(w.p[0])
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let g = streiche(&w, Kraft::Einheit(w.f1), id, "noch vor Ort")
+        .await
+        .unwrap();
+    assert_eq!(g.beruehrt.personen, vec![w.p[1], w.p[2]]);
+    assert_eq!(
+        folge(&w, Kraft::Person(w.p[0])).await,
+        vec![
+            ev("eintreffen", "06:00", "einheit"),
+            ev("entlassung", "10:00", "einheit"),
+        ]
+    );
+    let mut conn = w.pool.acquire().await.unwrap();
+    assert!(
+        !has_offene_periode_kraft_tx(&mut conn, Kraft::Person(w.p[0]))
+            .await
+            .unwrap()
+    );
+    assert!(
+        has_offene_periode_kraft_tx(&mut conn, Kraft::Person(w.p[1]))
+            .await
+            .unwrap()
+    );
+}
+
 #[tokio::test]
 async fn ereignis_einer_anderen_kraft_ist_not_found() {
     let w = welt().await;
