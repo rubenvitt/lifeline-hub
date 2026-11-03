@@ -197,8 +197,10 @@ Kopplung an die Ablösung MUST wie bei einer Streichung mit anschließendem Nach
 Grund leer oder länger als 500 Zeichen (ebenso bei der Streichung), Zeitpunkt fehlt bzw.
 unlesbar → 400. Zeitpunkt in der Zukunft, unveränderter
 Zeitpunkt, schon gestrichenes Ereignis und ein Ereignis der Art oder Quelle `abloesung` → 422.
-Fremde Kraft oder fremdes Ereignis → 404. Jede Berichtigung MUST genau einen System-ETB-Eintrag
-schreiben, der Kraft, Art, alten und neuen Zeitpunkt und den Grund nennt.
+Fremde Kraft oder fremdes Ereignis → 404. Jede Berichtigung MUST genau einen eigenen
+System-ETB-Eintrag schreiben, der Kraft, Art, alten und neuen Zeitpunkt und den Grund nennt; die
+Einträge der Kopplung an die Ablösung (etwa „läuft wieder“ und „mit der Entlassung beendet“)
+kommen dazu.
 
 #### Scenario: Eintreffen als Anker berichtigen
 - **WHEN** „Florian 1“ ohne Alarmierung um 06:40 eintraf, um 14:00 entlassen wurde und das Eintreffen mit Grund „Zeit verwechselt“ auf 06:30 berichtigt wird
