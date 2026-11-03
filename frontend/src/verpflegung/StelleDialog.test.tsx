@@ -24,6 +24,21 @@ const ort = vi.hoisted(() => ({
 }));
 vi.mock('../api/ortSuche', () => ({ sucheOrtImEinsatz: ort.suche }));
 
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div role="group" aria-label={`Karte: ${etikett}`}>
+      {punkt && `${punkt.lat},${punkt.lon}`}
+    </div>
+  ),
+}));
+
 const { StelleDialog, createStelleBody, stellePatch } = await import('./StelleDialog');
 
 const TREFFER: OrtSucheAntwort = {
@@ -150,6 +165,13 @@ describe('createStelleBody / stellePatch (rein)', () => {
       abschnitt_id: 4,
     };
     expect(stellePatch(vorher, gleich)).toEqual({});
+    // Textkorrektur am verorteten Standort (LLH-1394): der Punkt bleibt, nur der Text geht hinaus.
+    expect(
+      stellePatch(vorher, {
+        ...gleich,
+        standort: { text: 'Sportplatz 2', koordinate: { lat: 52.5, lon: 13.4 }, quelle: 'karte' },
+      }),
+    ).toEqual({ standort: 'Sportplatz 2' });
     expect(
       stellePatch(vorher, { ...gleich, standort: { text: 'Sportplatz Ost', koordinate: null } }),
     ).toEqual({ standort: 'Sportplatz Ost', lat: null, lon: null });
@@ -326,6 +348,20 @@ describe('StelleDialog bearbeiten', () => {
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ bezeichnung: 'Feldküche Sportplatz' }),
     );
+  });
+
+  it('eine Textkorrektur am verorteten Standort behält den Punkt (LLH-1394)', async () => {
+    const { onErfassen, dialog } = zeigeBearbeiten(vorher);
+    expect(within(dialog).getByRole('group', { name: 'Karte: Standort' })).toHaveTextContent(
+      '52.5,13.4',
+    );
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Standort' }), ' 2');
+    expect(within(dialog).getByRole('group', { name: 'Karte: Standort' })).toHaveTextContent(
+      '52.5,13.4',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ standort: 'Sportplatz 2' }));
+    expect(ort.suche).not.toHaveBeenCalled();
   });
 
   it('ein geleerter Standort leert auch die Koordinate', async () => {

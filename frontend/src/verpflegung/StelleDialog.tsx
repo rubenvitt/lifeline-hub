@@ -1,12 +1,12 @@
 import { Collapse, Form, Input } from 'antd';
 import { useState } from 'react';
-import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { ortFelder, ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import {
   VERPFLEGUNG_STANDORT_MAX,
   VERPFLEGUNG_STELLE_BEZEICHNUNG_MAX,
 } from '../api/eingabegrenzen';
-import { sucheOrtImEinsatz } from '../api/ortSuche';
-import { einsatzKeys } from '../api/queryKeys';
 import type {
   Verpflegungsstelle,
   VerpflegungsstelleArt,
@@ -25,10 +25,10 @@ import { STELLE_ART_LABEL } from './verpflegungText';
  * FELDBUDGET: drei sichtbare Felder (Bezeichnung, Art, Standort); der Abschnitt liegt im Klappteil
  * „Weitere Angaben“, dessen Kopf die Wahl nennt. Ohne Abschnitte im Einsatz gibt es ihn nicht.
  *
- * STANDORT: über das Ortsfeld (Spec `ortsfeld`): ein Treffer setzt Text und Koordinate, eine
- * getippte Koordinate wird erkannt, jede andere Textänderung nimmt die Koordinate weg. Hinaus gehen
- * `standort`, `lat` und `lon` deshalb immer zusammen; ein geänderter Text ohne Treffer leert beim
- * Bearbeiten die alte Koordinate.
+ * STANDORT: über das Ortsfeld im Einsatz mit Kartenvorschau (Spec `ortsfeld`): ein Treffer, eine getippte Koordinate oder ein
+ * Kartenpunkt setzt Text und Koordinate, sonst geht nur der Text hinaus. Beim Bearbeiten steht eine
+ * gespeicherte Koordinate als Punkt im Feld (`ortsfeldAusGespeichert`, LLH-1394 wie LLH-1121 D3):
+ * eine Textkorrektur behält ihn, ein neuer Treffer ersetzt ihn, ein geleerter Text leert beide.
  *
  * PATCH: nur Geändertes gegen den Stand beim Öffnen; `null` leert Standort, Koordinate und
  * Abschnitt. Ein leerer PATCH wird nicht gesendet. Gründe des Servers (409 doppelte Bezeichnung,
@@ -53,23 +53,12 @@ function text(s: string | null | undefined): string | null {
   return t ? t : null;
 }
 
-/** Standort und Koordinate als Wire-Felder; die Koordinate nur mit Text und Treffer. */
-function ortFelder(w: OrtsfeldWert | undefined): {
-  standort: string | null;
-  lat: number | null;
-  lon: number | null;
-} {
-  const standort = text(w?.text);
-  const k = standort != null ? w?.koordinate : null;
-  return { standort, lat: k?.lat ?? null, lon: k?.lon ?? null };
-}
-
 export function createStelleBody(w: StelleWerte): VerpflegungsstelleEingabe {
   const ort = ortFelder(w.standort);
   return {
     bezeichnung: w.bezeichnung.trim(),
     art: w.art,
-    ...(ort.standort != null ? { standort: ort.standort } : {}),
+    ...(ort.text != null ? { standort: ort.text } : {}),
     ...(ort.lat != null && ort.lon != null ? { lat: ort.lat, lon: ort.lon } : {}),
     ...(w.abschnitt_id != null ? { abschnitt_id: w.abschnitt_id } : {}),
   };
@@ -81,7 +70,7 @@ export function stellePatch(vorher: Verpflegungsstelle, w: StelleWerte): Verpfle
   if (bezeichnung != null && bezeichnung !== vorher.bezeichnung) patch.bezeichnung = bezeichnung;
   if (w.art !== vorher.art) patch.art = w.art;
   const ort = ortFelder(w.standort);
-  if (ort.standort !== (vorher.standort ?? null)) patch.standort = ort.standort;
+  if (ort.text !== (vorher.standort ?? null)) patch.standort = ort.text;
   // Paarweise: der Server nimmt `lat` und `lon` nur zusammen (422 sonst).
   if (ort.lat !== (vorher.lat ?? null) || ort.lon !== (vorher.lon ?? null)) {
     patch.lat = ort.lat;
@@ -140,11 +129,7 @@ export function StelleDialog({
     ? {
         bezeichnung: vorher.bezeichnung,
         art: vorher.art,
-        standort: {
-          text: vorher.standort ?? '',
-          koordinate:
-            vorher.lat != null && vorher.lon != null ? { lat: vorher.lat, lon: vorher.lon } : null,
-        },
+        standort: ortsfeldAusGespeichert(vorher.standort, vorher.lat, vorher.lon),
         abschnitt_id: vorher.abschnitt_id ?? undefined,
       }
     : undefined;
@@ -189,9 +174,9 @@ export function StelleDialog({
         <Select options={ART_OPTIONEN} />
       </Form.Item>
       <Form.Item<StelleWerte> name="standort" label="Standort" rules={[standortRegel]}>
-        <Ortsfeld
-          suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
-          suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(einsatzId, begriff)}
+        <EinsatzOrtsfeld
+          einsatzId={einsatzId}
+          etikett="Standort"
           count={zeichenGrenze(VERPFLEGUNG_STANDORT_MAX)}
         />
       </Form.Item>
