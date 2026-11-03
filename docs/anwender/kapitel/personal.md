@@ -201,15 +201,15 @@ nennt den Grund je Person.
 ### Berichtigen nach dem Entlassen
 
 Eine entlassene Person bleibt im Nachweis, deshalb lässt sich ihre Zeitachse weiter berichtigen.
-Jede Berichtigung schreibt einen Eintrag ins Einsatztagebuch mit dem Vermerk „berichtigt nach
-Entlassung“. Eine offene Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag ab, der
-eine Periode beginnen würde, etwa ein Eintreffen nach der Entlassung, und ebenso die Streichung
-der Entlassung, mit der die letzte Periode endet. Die Berichtigung einer Zeit lehnt sie ab, wenn
-danach eine Periode offen stünde, etwa eine Entlassung vor dem Eintreffen; gelingt sie, vermerkt
-das Einsatztagebuch „(nach Entlassung)“. Dasselbe gilt, wenn an einer Einheit eine Zeit berichtigt
-wird, die eine entlassene Person über die Einheit trägt. Eine ganz fehlende Periode lässt sich nach
-dem Entlassen nicht mehr nachtragen. Eine stornierte Person und eine aufgelöste
-Einheit lassen sich nicht berichtigen.
+Jeder Nachtrag und jede Streichung schreibt einen Eintrag ins Einsatztagebuch mit dem Vermerk
+„berichtigt nach Entlassung“, die Berichtigung einer Zeit mit „(nach Entlassung)“. Eine offene
+Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag ab, der eine Periode beginnen würde,
+etwa ein Eintreffen nach der Entlassung, und ebenso die Streichung der Entlassung, mit der die
+letzte Periode endet. Die Berichtigung einer Zeit lehnt sie ab, wenn danach eine Periode offen
+stünde, etwa eine Entlassung vor dem Eintreffen. Dasselbe gilt, wenn an einer Einheit eine Zeit
+berichtigt wird, die eine entlassene Person über die Einheit trägt. Eine ganz fehlende Periode lässt
+sich nach dem Entlassen nicht mehr nachtragen. Eine stornierte Person und eine aufgelöste Einheit
+lassen sich nicht berichtigen.
 
 ### Einsatzfunktion und Qualifikation
 
@@ -308,7 +308,7 @@ der Ansicht, statt eine Person als nicht eingeteilt zu zeigen. Ohne Freigabe der
 gruppiert die Liste nicht.
 
 Die Ansicht einer entlassenen Person bleibt lesbar, mit der Marke „entlassen“ und dem Zeitpunkt;
-ändern lässt sich dort nur die Zeitachse (Nachtragen, Streichen), bis sie erneut disponiert ist.
+ändern lässt sich dort nur die Zeitachse (Nachtragen, Zeit berichtigen, Streichen), bis sie erneut disponiert ist.
 Die Ansicht einer
 stornierten Person meldet „Nicht (mehr) im Einsatz“.
 

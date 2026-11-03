@@ -454,6 +454,12 @@ async fn streichung_mit_grund_und_statuscodes() {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+    let lang = format!(
+        r#"{{"grund":"{}"}}"#,
+        "x".repeat(lifeline_hub::zeitachse::GRUND_MAX + 1)
+    );
+    let (s, _) = anfrage(&w.app, "POST", &streich, &w.admin, Some(&lang)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Grund zu lang");
     // Fremde Kraft im Pfad → 404
     let (s, _) = anfrage(
         &w.app,
@@ -1566,6 +1572,10 @@ async fn berichtigung_statuscodes() {
 
     let (s, _) = berichtige(&w, &pfad, alarmierung, &berichtigung(&vor(1, 0), " ")).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "leerer Grund");
+    // Grenze am Grund (Streichung und Berichtigung), vor dem 422 „unverändert“.
+    let lang = "x".repeat(lifeline_hub::zeitachse::GRUND_MAX + 1);
+    let (s, json) = berichtige(&w, &pfad, alarmierung, &berichtigung(&alt, &lang)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json:?}");
     let (s, _) = berichtige(&w, &pfad, alarmierung, &berichtigung("", "x")).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "Zeitpunkt fehlt");
     let (s, _) = berichtige(&w, &pfad, alarmierung, &berichtigung(&vor(-1, 0), "x")).await;

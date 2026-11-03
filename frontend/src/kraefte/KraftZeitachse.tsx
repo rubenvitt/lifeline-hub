@@ -15,6 +15,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Zeitachse, ZeitachseEreignis, ZeitachseNachtragBody } from '../api/types';
 import { useUhr } from '../abloesung/useUhr';
 import { ErfassungsModal } from '../components/Erfassung';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { ZEITACHSE_GRUND_MAX } from '../api/eingabegrenzen';
 import {
   PaneelZustand,
   Sammelbanner,
@@ -469,9 +471,12 @@ export default function KraftZeitachse({
         <Form.Item<BerichtigWerte>
           name="grund"
           label="Grund"
-          rules={[{ required: true, whitespace: true, message: 'Bitte einen Grund angeben' }]}
+          rules={[
+            { required: true, whitespace: true, message: 'Bitte einen Grund angeben' },
+            zeichenRegel(ZEITACHSE_GRUND_MAX, 'Grund'),
+          ]}
         >
-          <Input placeholder="z. B. Zeit verwechselt" />
+          <Input placeholder="z. B. Zeit verwechselt" count={zeichenGrenze(ZEITACHSE_GRUND_MAX)} />
         </Form.Item>
         <SpeicherFehler fehler={berichtigung.error} titel="Nicht berichtigt" />
       </ErfassungsModal>
@@ -498,9 +503,12 @@ export default function KraftZeitachse({
         <Form.Item<StreichWerte>
           name="grund"
           label="Grund"
-          rules={[{ required: true, whitespace: true, message: 'Bitte einen Grund angeben' }]}
+          rules={[
+            { required: true, whitespace: true, message: 'Bitte einen Grund angeben' },
+            zeichenRegel(ZEITACHSE_GRUND_MAX, 'Grund'),
+          ]}
         >
-          <Input placeholder="z. B. Zeit verwechselt" />
+          <Input placeholder="z. B. Zeit verwechselt" count={zeichenGrenze(ZEITACHSE_GRUND_MAX)} />
         </Form.Item>
         <SpeicherFehler fehler={streichung.error} titel="Nicht gestrichen" />
       </ErfassungsModal>

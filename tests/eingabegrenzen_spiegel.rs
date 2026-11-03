@@ -9,7 +9,7 @@ use lifeline_hub::{
     abloesung, auftrag, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage, einsatz,
     einsatz_vorlage, etb, externe_stelle, fahrzeug, fuehrung, gefahr, infotelefon,
     kraefte_disposition, lage_zone, lagebesprechung, material, nachforderung, person, personal,
-    presse, schaden, schichtmodell, sprechgruppe, verpflegung, vorlagendokument,
+    presse, schaden, schichtmodell, sprechgruppe, verpflegung, vorlagendokument, zeitachse,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
@@ -199,6 +199,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ),
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
         ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),
+        ("ZEITACHSE_GRUND_MAX", zeitachse::GRUND_MAX),
     ])
 }
 

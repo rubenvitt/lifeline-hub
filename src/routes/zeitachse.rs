@@ -32,6 +32,7 @@ use crate::einsatz::modul::{Einheiten, Personal};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
+use crate::routes::support::hoechstens;
 use crate::zeitachse::repo::{self, Beruehrt, Kraft, Neu, Schreibergebnis};
 use crate::zeitachse::{
     EinheitPerioden, PersonPerioden, ZeitachseAnzeige, ZeitachseArt, ZeitachseQuelle,
@@ -60,11 +61,14 @@ pub struct BerichtigenBody {
     grund: String,
 }
 
+/// Pflichtgrund von Streichung und Berichtigung: leer 400 „Grund fehlt“, zu lang 400 (vor jedem
+/// 422 des Zusammenhangs).
 fn pflichtgrund(roh: &str) -> Result<String, AppError> {
     let grund = roh.trim().to_string();
     if grund.is_empty() {
         return Err(AppError::Validation("Grund fehlt".into()));
     }
+    hoechstens(&grund, "Grund", crate::zeitachse::GRUND_MAX)?;
     Ok(grund)
 }
 

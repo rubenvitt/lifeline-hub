@@ -239,6 +239,9 @@ struct Streichbar {
     notiz: Option<String>,
 }
 
+/// Zeile für [`lade_streichbar_tx`]: art, zeitpunkt_at, gestrichen_at, quelle, notiz.
+type StreichbarZeile = (String, String, Option<String>, String, Option<String>);
+
 /// Lädt das Ereignis `id` der Kraft für eine Streichung oder Berichtigung (Spec „Streichung“):
 /// fremdes Ereignis → 404; schon gestrichen → 422; Art `abloesung` (auch die Fan-out-Kopie an
 /// einer Person) oder Quelle `abloesung` (Besatzungswechsel, LLH-1150) ohne `durch_ruecknahme` →
@@ -250,17 +253,16 @@ async fn lade_streichbar_tx(
     id: i64,
     durch_ruecknahme: bool,
 ) -> Result<Streichbar, AppError> {
-    let zeile: Option<(String, String, Option<String>, String, Option<String>)> =
-        sqlx::query_as(sqlx::AssertSqlSafe(format!(
-            "SELECT art, zeitpunkt_at, gestrichen_at, quelle, notiz FROM einsatz_kraft_zeitachse \
+    let zeile: Option<StreichbarZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT art, zeitpunkt_at, gestrichen_at, quelle, notiz FROM einsatz_kraft_zeitachse \
              WHERE id = ? AND einsatz_id = ? AND {} = ?",
-            kraft.spalte()
-        )))
-        .bind(id)
-        .bind(einsatz_id)
-        .bind(kraft.id())
-        .fetch_optional(&mut *conn)
-        .await?;
+        kraft.spalte()
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .bind(kraft.id())
+    .fetch_optional(&mut *conn)
+    .await?;
     let (art, zeitpunkt_at, gestrichen_at, quelle, notiz) = zeile.ok_or(AppError::NotFound)?;
     let art = ZeitachseArt::parse(&art)
         .ok_or_else(|| AppError::Internal(format!("Unbekannte Zeitachsen-Art '{art}'")))?;

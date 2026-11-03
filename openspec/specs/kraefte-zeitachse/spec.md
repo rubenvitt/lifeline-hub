@@ -194,7 +194,8 @@ An einer Einheit MUST jede Person, die eine nicht gestrichene Fan-out-Kopie des 
 trägt, statt ihrer eine Kopie des neuen bekommen; andere Personen MUST unberührt bleiben. Die
 Kopplung an die Ablösung MUST wie bei einer Streichung mit anschließendem Nachtrag laufen.
 
-Grund leer oder Zeitpunkt fehlt bzw. unlesbar → 400. Zeitpunkt in der Zukunft, unveränderter
+Grund leer oder länger als 500 Zeichen (ebenso bei der Streichung), Zeitpunkt fehlt bzw.
+unlesbar → 400. Zeitpunkt in der Zukunft, unveränderter
 Zeitpunkt, schon gestrichenes Ereignis und ein Ereignis der Art oder Quelle `abloesung` → 422.
 Fremde Kraft oder fremdes Ereignis → 404. Jede Berichtigung MUST genau einen System-ETB-Eintrag
 schreiben, der Kraft, Art, alten und neuen Zeitpunkt und den Grund nennt.
