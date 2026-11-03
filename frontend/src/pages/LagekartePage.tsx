@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Alert, App, Breadcrumb, Button, Typography } from 'antd';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import FensterRahmen from '../components/FensterRahmen';
@@ -129,6 +129,7 @@ import Datenstand from '../components/Datenstand';
 import { fehlerText } from '../api/client';
 import { useKartenFehler } from './lagekarte/useKartenFehler';
 import { KartenFehlerHinweis } from './lagekarte/KartenFehlerHinweis';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { modulName } from '../einsatz/modulRegistry';
 import { waermeVokabularAuf } from './lagekarte/zeichenWahl';
@@ -178,7 +179,6 @@ export default function LagekartePage() {
   const { effektiv } = useThemeMode();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { key: adresseSchluessel } = useLocation();
 
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
@@ -999,19 +999,19 @@ export default function LagekartePage() {
     return () => window.removeEventListener('keydown', taste);
   }, [auswahlEsc]);
 
+  const gefahrengebietAuftrag = useLinkAuftrag();
   useEffect(() => {
     const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
     if (ziel == null) return;
+    if (gefahrengebietAuftrag.verbraucht()) return;
     const zone = zonen.find((z) => z.gefahrengebiet_id === ziel);
     if (!zone) return; // Zonen noch nicht geladen / Gebiet ohne Zone → auf spätere Runde warten
     setZoneAuswahl(zone.id);
     const poly = parsePolygon(zone.geometrie);
     const zentroid = poly ? polygonZentroid(poly) : null;
     if (zentroid) setFlyToZiel({ lng: zentroid[0], lat: zentroid[1] });
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('gefahrengebiet');
-    setSearchParams(naechste, { replace: true });
-  }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
+    gefahrengebietAuftrag.raeume('gefahrengebiet');
+  }, [zonen, searchParams, gefahrengebietAuftrag, setZoneAuswahl, setFlyToZiel]);
 
   // Bezirksfläche: ?evakuierungsbezirk=<id> von der Evakuierungsseite, apply-then-clean wie
   // `?gefahrengebiet=`, mit zwei Unterschieden, weil der Sprung die Kartenansicht nicht kennt:
@@ -1022,14 +1022,13 @@ export default function LagekartePage() {
   // Ohne Fläche, aber mit verorteter Sammelstelle (LLH-1393) wählt die Karte die Sammelstelle und
   // fliegt sie an, sobald die Zonen feststehen; geräumt wird dann erst, wenn auch die Bezirke
   // feststehen.
+  // Auch der Ansichtswechsel verbraucht den Verlaufseintrag: der nächste trägt den Auftrag neu.
+  const bezirkAuftrag = useLinkAuftrag();
   useEffect(() => {
     const roh = searchParams.get('evakuierungsbezirk');
     if (roh === null) return;
-    const raeumen = () => {
-      const naechste = new URLSearchParams(searchParams);
-      naechste.delete('evakuierungsbezirk');
-      setSearchParams(naechste, { replace: true });
-    };
+    if (bezirkAuftrag.verbraucht()) return;
+    const raeumen = () => bezirkAuftrag.raeume('evakuierungsbezirk');
     const ziel = parseRouteId(roh);
     if (ziel == null) {
       raeumen();
@@ -1051,9 +1050,8 @@ export default function LagekartePage() {
       return;
     }
     if (zone.ansicht_id != null && zone.ansicht_id !== aktiveAnsichtId) {
-      const naechste = new URLSearchParams(searchParams);
-      naechste.set('ansicht', String(zone.ansicht_id));
-      setSearchParams(naechste, { replace: true });
+      const ansicht = String(zone.ansicht_id);
+      bezirkAuftrag.weiter((naechste) => naechste.set('ansicht', ansicht));
       return;
     }
     setZoneAuswahl(zone.id);
@@ -1071,7 +1069,7 @@ export default function LagekartePage() {
     setAuswahl,
     aktiveAnsichtId,
     searchParams,
-    setSearchParams,
+    bezirkAuftrag,
     setZoneAuswahl,
     setFlyToZiel,
   ]);
@@ -1091,9 +1089,11 @@ export default function LagekartePage() {
    * In-App-Weg über `SchaedenDetailPage` verdeckt das, weil `darfSchreiben` dort schon im ersten
    * Render steht.
    */
+  const platzierAuftrag = useLinkAuftrag();
   useEffect(() => {
     const auftrag = parsePlatzierenAuftrag(searchParams.get('platzieren'));
     if (!auftrag) return;
+    if (platzierAuftrag.verbraucht()) return;
     if (ladt) return;
     // Eine Stelle platziert nur, wer das Modul Betreuung lesen darf, ein Raum nur mit dem Modul
     // Bereitstellungsräume (LLH-1107), eine Person nur mit dem Modul Personen (LFH-670) — sonst
@@ -1120,13 +1120,10 @@ export default function LagekartePage() {
     if (darfSchreiben && (modulZugriff === null || modulZugriff === 'frei')) {
       onVerortungsauftragStart({ ...auftrag, zurueck: parseZurueck(searchParams.get('zurueck')) });
     }
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('platzieren');
-    naechste.delete('zurueck');
-    setSearchParams(naechste, { replace: true });
+    platzierAuftrag.raeume('platzieren', 'zurueck');
   }, [
     searchParams,
-    setSearchParams,
+    platzierAuftrag,
     ladt,
     darfSchreiben,
     onVerortungsauftragStart,
@@ -1153,17 +1150,17 @@ export default function LagekartePage() {
    * startet nur mit freiem Modul Evakuierung für einen Bezirk der Liste; sonst wird er wie jeder
    * ungültige Auftrag nur geräumt — beide Parameter, auch ein `bezirk` ohne `zeichnen`.
    *
-   * Ein Auftrag gilt einmal je Adresse (`location.key`): Das Räumen ist eine Navigation, und bis sie
-   * gerendert ist, zeigen weitere Renders noch die alte Adresse mit Auftrag. Ändert sich in der Zeit
-   * eine Abhängigkeit (die Bezirksliste nach dem Speichern), liefe der Auftrag sonst noch einmal und
-   * startete den Modus neu: gezeichnete Punkte weg, statt der Rückmeldung ein leerer Zeichenmodus.
+   * Ein Auftrag gilt einmal je Verlaufseintrag (`routing/useLinkAuftrag.ts`), wie alle Link-Aufträge
+   * der Karte: Ändert sich bis zum Rendern der Räumung eine Abhängigkeit (die Bezirksliste nach dem
+   * Speichern), startete der Modus sonst neu: gezeichnete Punkte weg, statt der Rückmeldung ein
+   * leerer Zeichenmodus.
    */
-  const zeichenAuftragVerbraucht = useRef<string | null>(null);
+  const zeichenAuftrag = useLinkAuftrag();
   useEffect(() => {
     const roh = searchParams.get('zeichnen');
     const rohBezirk = searchParams.get('bezirk');
     if (roh === null && rohBezirk === null) return;
-    if (zeichenAuftragVerbraucht.current === adresseSchluessel) return;
+    if (zeichenAuftrag.verbraucht()) return;
     if (ladt) return;
     const auftrag = parseZeichnenBezug(parseZeichnenAuftrag(roh), rohBezirk);
     // Kreis (LLH-1043, D9): Radius und Mitte belegen nur mit `:kreis` vor; ein unbrauchbarer
@@ -1180,17 +1177,10 @@ export default function LagekartePage() {
       entwurf = bezirkZeichnenEntwurf(entwurf, auftrag.bezirk, { evakuierungFrei, bezirke });
     }
     if (entwurf) onZoneZeichnenStart(entwurf);
-    zeichenAuftragVerbraucht.current = adresseSchluessel;
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('zeichnen');
-    naechste.delete('radius');
-    naechste.delete('mitte');
-    naechste.delete('bezirk');
-    setSearchParams(naechste, { replace: true });
+    zeichenAuftrag.raeume('zeichnen', 'radius', 'mitte', 'bezirk');
   }, [
     searchParams,
-    adresseSchluessel,
-    setSearchParams,
+    zeichenAuftrag,
     ladt,
     darfSchreiben,
     onZoneZeichnenStart,
@@ -1220,9 +1210,11 @@ export default function LagekartePage() {
    * belegt die Karteninstanz als gestartet (`startAufKarteRef`), die später geladene Startansicht
    * zieht sie also nicht wieder weg.
    */
+  const zentrumAuftrag = useLinkAuftrag();
   useEffect(() => {
     const roh = searchParams.get('zentrum');
     if (roh === null) return;
+    if (zentrumAuftrag.verbraucht()) return;
     if (ladt) return;
     const zentrum = parseKartenzentrum(roh);
     // Mit Suchnadel (LFH-638): der Sprung markiert die Stelle, beschriftet im eingestellten Format.
@@ -1234,19 +1226,19 @@ export default function LagekartePage() {
         art: 'koordinate',
       });
     }
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('zentrum');
-    setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, ladt, zeigeOrt, formatKoordinate]);
+    zentrumAuftrag.raeume('zentrum');
+  }, [searchParams, zentrumAuftrag, ladt, zeigeOrt, formatKoordinate]);
 
   /**
    * Adresssuche per Link: `?ort=<Text>` aus der Sprungpalette (LFH-638) — Text ins Suchfeld der
    * Leiste, Adresssuche auslösen, Leiste zeigen (am Handschirm nur für die Sitzung, `zeige()`),
    * dann räumen. Wie beim Koordinatensprung erst mit geladener Seite: vorher steht keine Leiste.
    */
+  const ortAuftrag = useLinkAuftrag();
   useEffect(() => {
     const roh = searchParams.get('ort');
     if (roh === null) return;
+    if (ortAuftrag.verbraucht()) return;
     if (ladt) return;
     const text = roh.trim();
     if (text) {
@@ -1257,10 +1249,8 @@ export default function LagekartePage() {
       wechsleLeistenAnsicht('objekte');
       verlasseAuswahl();
     }
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('ort');
-    setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, ladt, zeigeLeiste, wechsleLeistenAnsicht, verlasseAuswahl]);
+    ortAuftrag.raeume('ort');
+  }, [searchParams, ortAuftrag, ladt, zeigeLeiste, wechsleLeistenAnsicht, verlasseAuswahl]);
 
   // Lageplan (LLH-1051, Spec `lagekarte-druck`): Druck und Anlage des aktuellen Ausschnitts. Kopf
   // und Legende liest der Hook erst bei der Aufnahme; die Legende nennt nur, was gezeichnet ist.
@@ -1313,16 +1303,16 @@ export default function LagekartePage() {
    * zuerst, „Fokus aufheben“ führt also auf sie zurück. Ein unbekannter Abschnitt wird trotzdem
    * geräumt.
    */
+  const abschnittAuftrag = useLinkAuftrag();
   useEffect(() => {
     const roh = searchParams.get('abschnitt');
     if (roh === null) return;
+    if (abschnittAuftrag.verbraucht()) return;
     if (ladt || start === undefined) return;
     const id = parseRouteId(roh);
     if (id != null) fokussiereAbschnitt(id);
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('abschnitt');
-    setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, ladt, start, fokussiereAbschnitt]);
+    abschnittAuftrag.raeume('abschnitt');
+  }, [searchParams, abschnittAuftrag, ladt, start, fokussiereAbschnitt]);
 
   if (ladt) {
     return <SeitenSkeleton />;
