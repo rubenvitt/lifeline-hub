@@ -413,6 +413,19 @@ pub fn etb_text_mit_nachforderung_verknuepft(
     )
 }
 
+/// System-ETB beim Lösen einer Fehlzuordnung (LLH-1403, design.md D6), das Gegenstück zu
+/// [`etb_text_mit_nachforderung_verknuepft`]: „Material «Tauchpumpe THW» (×1) von Nachforderung
+/// «3 Tauchpumpen für Keller Hauptstraße» gelöst“.
+pub fn etb_text_von_nachforderung_geloest(
+    bezeichnung: &str,
+    menge: i64,
+    nachforderung_bezeichnung: &str,
+) -> String {
+    format!(
+        "Material «{bezeichnung}» (×{menge}) von Nachforderung «{nachforderung_bezeichnung}» gelöst"
+    )
+}
+
 /// System-ETB bei jedem Ortswechsel eines Postens, auf jedem Weg (LLH-1224, design.md D11): alter
 /// und neuer Ort im Wortlaut von [`ort::ort_text_tx`], leer „ohne Ort“.
 pub fn etb_text_ort_gewechselt(

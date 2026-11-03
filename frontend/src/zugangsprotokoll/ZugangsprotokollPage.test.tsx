@@ -11,6 +11,7 @@ import { renderMitProviders } from '../test/utils';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import ZugangsprotokollPage, { parseZugangsprotokollFilter } from './ZugangsprotokollPage';
 import { tippeZeit, zeitFeld } from '../test/zeitEingabe';
+import { mitProzessZone } from '../test/prozessZone';
 
 /** Zugangsprotokoll der Verwaltung (LFH-1097). */
 
@@ -103,6 +104,9 @@ async function tabelle(): Promise<HTMLElement> {
 }
 
 describe('ZugangsprotokollPage', () => {
+  // Ohne Org-Zone gilt die Browserzone; die DTG-Erwartungen sind Berliner Zeit (LLH-1411).
+  mitProzessZone('Europe/Berlin');
+
   it('zeigt die Admin-Spur als Vorgabe, mit Aktion als Wort und ohne DB-id', async () => {
     zeige();
     const t = await tabelle();
@@ -147,7 +151,7 @@ describe('ZugangsprotokollPage', () => {
       },
     ]);
     const t = await tabelle();
-    // Europe/Berlin (TZ des Testlaufs): 12:13:34 UTC ist 14:13 Ortszeit.
+    // Europe/Berlin (Prozesszone des Blocks): 12:13:34 UTC ist 14:13 Ortszeit.
     expect(
       await within(t).findByText('Safari · iPadOS, angemeldet 101413okt26'),
     ).toBeInTheDocument();

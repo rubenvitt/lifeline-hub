@@ -189,7 +189,9 @@ Eine Einheit ohne jede Rückmeldung meldet nichts.
   (Eintreffen) und „abgemeldet“ (Entlassung). Bei einer Einheit zählt das erste Fahrzeug, das einen
   solchen Status meldet; die Entlassung erst, wenn alle Fahrzeuge entlassen sind.
 - **Über die Einheit:** ein Ereignis der Einheit gilt auch für die Personen, die ihr in diesem
-  Augenblick zugeordnet sind. Eine Streichung an der Einheit streicht diese Einträge mit.
+  Augenblick zugeordnet sind. Eine Streichung an der Einheit streicht diese Einträge mit, außer
+  bei einer Person, die inzwischen entlassen ist: ihre Zeitachse bleibt, wie sie ist, und wird bei
+  Bedarf an der Person selbst berichtigt.
 - **Aus der Ablösung:** der Vollzug einer Ablösung beendet den Einsatzabschnitt der abgelösten
   Einheit. Dieses Ereignis lässt sich nicht streichen, nur mit der Rücknahme des Vollzugs aufheben
   (Kapitel [Ablösung](abloesung.md)).
@@ -213,7 +215,8 @@ das Ergebnis nicht in die Reihenfolge, etwa eine Alarmierung nach dem Eintreffen
 und ändert nichts.
 
 An einer Einheit ändern sich die Einträge der Personen mit, die das alte Ereignis über die Einheit
-tragen; wer erst später zur Einheit kam, bekommt keins. Passt das Ergebnis bei einer dieser
+tragen; wer erst später zur Einheit kam, bekommt keins, und bei einer inzwischen entlassenen
+Person bleibt der Eintrag wie bei der Streichung stehen. Passt das Ergebnis bei einer dieser
 Personen nicht, nennt die App sie und ändert nichts. Ereignisse aus der Ablösung lassen sich nicht
 berichtigen. Zur Schicht der Ablösung wirkt die Berichtigung wie eine Streichung mit anschließendem
 Nachtrag (Kapitel [Ablösung](abloesung.md)).

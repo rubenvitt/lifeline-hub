@@ -290,12 +290,17 @@ async fn lade_streichbar_tx(
     })
 }
 
-/// Die nicht gestrichenen Fan-out-Kopien des Ereignisses `id`: `(kopie, person)`.
+/// Die nicht gestrichenen Fan-out-Kopien des Ereignisses `id` an Personen, die noch im Einsatz
+/// sind: `(kopie, person)`. Die Kopie an einer inzwischen beendeten Person bleibt bei Streichung
+/// und Berichtigung stehen (LLH-1459): die Zeitachse der Entlassenen ist ihr eigener Nachweis,
+/// und ohne die Kopie stünde sie entlassen mit offener Periode da. Berichtigt wird sie an der
+/// Person selbst.
 async fn kopien_tx(conn: &mut SqliteConnection, id: i64) -> Result<Vec<(i64, i64)>, AppError> {
     Ok(sqlx::query_as(
-        "SELECT id, personal_id FROM einsatz_kraft_zeitachse \
-         WHERE ursprung_id = ? AND gestrichen_at IS NULL AND personal_id IS NOT NULL \
-         ORDER BY id",
+        "SELECT z.id, z.personal_id FROM einsatz_kraft_zeitachse z \
+         JOIN einsatz_personal ep ON ep.id = z.personal_id AND ep.beendet_at IS NULL \
+         WHERE z.ursprung_id = ? AND z.gestrichen_at IS NULL \
+         ORDER BY z.id",
     )
     .bind(id)
     .fetch_all(&mut *conn)
@@ -337,7 +342,8 @@ async fn person_verstoss_tx(
     )))
 }
 
-/// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien. Prüfung
+/// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien an Personen,
+/// die noch im Einsatz sind ([`kopien_tx`]). Prüfung
 /// (Spec „Streichung"): wie [`lade_streichbar_tx`]; ein Rest, der die Perioden-Regeln der Kraft
 /// oder einer betroffenen Person verletzt → 422 (mit Namen der Person).
 pub async fn streiche_tx(
@@ -423,9 +429,9 @@ pub struct Berichtigt {
 ///
 /// - Prüfung wie [`lade_streichbar_tx`] (404/422), dazu 422 bei unverändertem Zeitpunkt.
 /// - Die Perioden-Regeln gelten nur für das **Ergebnis** ([`perioden::ersetze`]), bei der Kraft
-///   und bei jeder Person, die eine Kopie trägt (422 mit Namen). Ist eine solche Person
-///   entlassen, darf danach keine Periode offen sein (LLH-1263, 422 mit Namen).
-/// - Fan-out: die Kopien folgen den Kopien, nicht der heutigen Zuordnung (D4).
+///   und bei jeder Person im Einsatz, die eine Kopie trägt (422 mit Namen).
+/// - Fan-out: die Kopien folgen den Kopien, nicht der heutigen Zuordnung (D4); die Kopie an
+///   einer inzwischen beendeten Person bleibt wie bei der Streichung stehen ([`kopien_tx`]).
 /// - Kopplung an die Ablösung wie Streichung, dann Nachtrag (D5).
 ///
 /// Geschrieben wird erst nach allen Prüfungen. Die Prüfung „keine offene Periode“ an der Kraft
@@ -454,18 +460,8 @@ pub async fn berichtige_tx(
     let kopien = kopien_tx(conn, id).await?;
     for (kopie, person) in &kopien {
         let bestand = bestand_tx(conn, Kraft::Person(*person)).await?;
-        let perioden = match perioden::ersetze(&bestand, *kopie, art, zeitpunkt_at) {
-            Ok(p) => p,
-            Err(v) => return Err(person_verstoss_tx(conn, einsatz_id, *person, v).await?),
-        };
-        let entlassen =
-            crate::personal::disposition_repo::lebenszustand_tx(conn, einsatz_id, *person).await?
-                == Some(crate::entlassung::BeendetAls::Entlassen);
-        if entlassen && perioden.last().is_some_and(|p| p.ende_at.is_none()) {
-            let name = kraft_name_tx(conn, einsatz_id, Kraft::Person(*person)).await?;
-            return Err(AppError::UnprocessableEntity(format!(
-                "«{name}» ist entlassen; eine offene Einsatzperiode entsteht nur über „Erneut disponieren“"
-            )));
+        if let Err(v) = perioden::ersetze(&bestand, *kopie, art, zeitpunkt_at) {
+            return Err(person_verstoss_tx(conn, einsatz_id, *person, v).await?);
         }
     }
 

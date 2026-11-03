@@ -152,6 +152,17 @@ export function verknuepfeNachforderung(
 }
 
 /**
+ * Eine Fehlzuordnung lösen (LLH-1403, design.md D1): nur der Bezug auf die Nachforderung geht, der
+ * Posten bleibt. Rückgängig ist {@link verknuepfeNachforderung} mit `ergaenzen`.
+ */
+export function loeseNachforderung(einsatzId: number, emId: number): Promise<EinsatzMaterial> {
+  return apiSend<EinsatzMaterial>(
+    `/api/einsaetze/${einsatzId}/material/${emId}/nachforderung`,
+    'DELETE',
+  );
+}
+
+/**
  * Aus dem Einsatz genommenes Material (LLH-1079 Teil II, Block „Aus dem Einsatz genommen“). Auf
  * dem Draht heißt der Endzustand wie bei jeder Kraft `entlassen`.
  */

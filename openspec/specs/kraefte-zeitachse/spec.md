@@ -190,8 +190,9 @@ alte Ereignis mit diesem Grund streichen und eines derselben Art zum neuen Zeitp
 für den Zwischenstand. Verletzt das Ergebnis sie bei der Kraft oder einer betroffenen Person, MUST
 das System mit 422 antworten, die Person nennen und nichts schreiben.
 
-An einer Einheit MUST jede Person, die eine nicht gestrichene Fan-out-Kopie des alten Ereignisses
-trägt, statt ihrer eine Kopie des neuen bekommen; andere Personen MUST unberührt bleiben. Die
+An einer Einheit MUST jede Person im Einsatz, die eine nicht gestrichene Fan-out-Kopie des alten
+Ereignisses trägt, statt ihrer eine Kopie des neuen bekommen; andere Personen, auch eine
+inzwischen entlassene mit Kopie, MUST wie bei der Streichung unberührt bleiben. Die
 Kopplung an die Ablösung MUST wie bei einer Streichung mit anschließendem Nachtrag laufen.
 
 Grund leer oder länger als 500 Zeichen (ebenso bei der Streichung), Zeitpunkt fehlt bzw.
@@ -309,7 +310,7 @@ nicht speichern und MUST sie nicht gegen Grenzwerte einstufen.
 ### Requirement: Rechte
 
 Lesende Endpunkte der Zeitachse MUST Lesezugriff auf den Einsatz verlangen, dazu für Einheiten
-das Modul Einheiten und für Personen das Modul Personal. Nachtrag und Streichung MUST
+das Modul Einheiten und für Personen das Modul Personal. Nachtrag, Berichtigung und Streichung MUST
 Schreibrecht im Einsatz, einen aktiven Einsatz und dasselbe Modul verlangen. Ist das Modul
 ausgeblendet oder fehlt das Recht, MUST das System 403 liefern.
 

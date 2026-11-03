@@ -263,6 +263,33 @@ describe('UhsDetailPage — Materialzahl im Kopf (LLH-1133)', () => {
     expect(within(kopf()).queryByText(/Posten/)).not.toBeInTheDocument();
     vi.mocked(ladeModulFreigaben).mockReset();
   });
+
+  it('ohne Material steht keine Zahl im Kopf, der Bereich Material bleibt über die Leiste (LLH-1400)', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
+    vi.mocked(ladeUhs).mockResolvedValue({ ...uhs, material: [] } as unknown as Awaited<
+      ReturnType<typeof ladeUhs>
+    >);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    // Positiver Anker zuerst: die Meta steht, nur die Zahl fehlt.
+    await screen.findByText('GRUNDRISS');
+    await within(kopf()).findByText(/Patientenablage · Halle 1/);
+    await waitFor(() => expect(vi.mocked(ladeModulFreigaben)).toHaveBeenCalled());
+    // Die Freigaben sind da (Gegenprobe am Kopf: „Patient aufnehmen“ ist frei), die Zahl fehlt.
+    expect(await screen.findByRole('button', { name: 'Patient aufnehmen' })).toBeEnabled();
+    expect(within(kopf()).queryByText(/Posten/)).not.toBeInTheDocument();
+    // Kein Sprung in den Bereich Material im Kopf (die Brotkrumen bleiben Links).
+    expect(
+      within(kopf())
+        .queryAllByRole('link')
+        .filter((a) => a.getAttribute('href')?.includes('bereich=material')),
+    ).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Material' }));
+    expect(await screen.findByText('MATERIAL-TAB')).toBeInTheDocument();
+    vi.mocked(ladeModulFreigaben).mockReset();
+  });
 });
 
 describe('UhsDetailPage — Reiter „Dateien“ (LFH-758)', () => {

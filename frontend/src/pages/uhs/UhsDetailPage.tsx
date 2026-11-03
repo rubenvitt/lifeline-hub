@@ -238,9 +238,11 @@ export default function UhsDetailPage() {
     `Stärke ${staerkeText(uhs.staerke)}`,
   ].join(' · ');
   // Die Materialzahl im Wortlaut des Bausteins („3 Posten · 1 Ausfall“, eine Heimat je Zahl,
-  // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät) oder ohne
-  // Freigabe Material steht keine Zahl.
-  const showMaterialzahl = bereichListe.includes('material') && materialFrei;
+  // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät), ohne Freigabe
+  // Material oder ohne Posten steht keine Zahl (wie am BR und an der Einheit, LLH-1400); in den
+  // Bereich führt dann die Bereichsleiste.
+  const showMaterialzahl =
+    bereichListe.includes('material') && materialFrei && uhs.material.length > 0;
   // Die Meta bricht im Kopf nicht um (`seitenMetaStil`); vor der Zahl darf sie es, sonst liefe
   // der Kopf bei 390 px über den Rand. Die Teile selbst bleiben ganz.
   const meta = showMaterialzahl ? (

@@ -2,7 +2,7 @@
 titel: Nachforderungen
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts, frontend/src/pages/einheit/EinheitUebernahmeStorno.tsx, migrations/0246_einheit_nachforderung_herkunft.sql, migrations/0250_einheit_nachforderung_am_raum.sql, src/nachforderung/erwartet.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/nachforderungen/PostenZuordnenModal.tsx, frontend/src/nachforderungen/nurVorwaerts.ts]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts, frontend/src/pages/einheit/EinheitUebernahmeStorno.tsx, migrations/0246_einheit_nachforderung_herkunft.sql, migrations/0250_einheit_nachforderung_am_raum.sql, src/nachforderung/erwartet.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/nachforderungen/PostenZuordnenModal.tsx, frontend/src/pages/MaterialPage.tsx, src/material/disposition_repo.rs, frontend/src/nachforderungen/nurVorwaerts.ts]
 ---
 
 ## Überblick
@@ -169,6 +169,23 @@ der Materialliste steht, etwa weil die Tauchpumpe direkt an der Einsatzstelle er
 Der Posten bleibt, wie er ist, mit Menge, Ort und Status; er verweist danach auf die
 Nachforderung und zählt an ihrer Karte wie ein übernommener. Ein Posten, der schon auf eine
 Nachforderung verweist, lässt sich keiner anderen zuordnen.
+
+### Eine Fehlzuordnung von Material lösen
+
+Für Einsatzleitung und Führungspersonal, wenn die Module Material und Nachforderungen freigegeben
+sind, etwa wenn die Tauchpumpe der falschen Nachforderung zugeordnet wurde:
+
+1. An der Karte „Material ↗“ wählen; die [Materialliste](material.md) öffnet sich, bei einem
+   Posten mit hervorgehobener Zeile.
+2. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Von Nachforderung lösen“ wählen. Eine
+   Rückfrage gibt es nicht.
+3. Der Verweis „aus Nachforderung: …“ verschwindet. Der Hinweis unten bietet einige Sekunden lang
+   „Rückgängig“; das verknüpft den Posten wieder mit derselben Nachforderung.
+
+Der Posten bleibt mit Menge, Ort und Status in der Liste und lässt sich danach der richtigen
+Nachforderung zuordnen. Steht an der Karte kein übernommener Posten und keine Einheit mehr, lässt
+sich „Eingetroffen“ zurücknehmen. Bei mehreren Posten wird jeder einzeln gelöst; ein aus dem
+Einsatz genommener Posten erst nach „Erneut disponieren“.
 
 ### Eingetroffene Kräfte als Einheit übernehmen
 
@@ -374,9 +391,10 @@ im Menü „Einheiten verknüpft“, beim Bearbeiten etwa „Mindestens 2: so vi
 verknüpft“. Eine zurückgenommene Zusage leert Wer und Eintreffen; eine
 Teilung bleibt dabei bestehen, der Rest bleibt eine eigene Karte. Ist aus einer Nachforderung
 Material oder eine Einheit übernommen, lässt sich „Eingetroffen“ nicht mehr zurücknehmen; die App
-nennt den Grund an der Karte. Wer versehentlich Material übernommen hat, storniert zuerst den
-Posten in der [Materialliste](material.md) und nimmt dann zurück; eine versehentlich übernommene
-Einheit wird in ihrer Ansicht mit „Übernahme stornieren“ zurückgenommen (Ablauf oben).
+nennt den Grund an der Karte. Wer versehentlich Material übernommen oder zugeordnet hat, löst den
+Posten in der [Materialliste](material.md) mit „Von Nachforderung lösen“ und nimmt dann zurück;
+eine versehentlich übernommene Einheit wird in ihrer Ansicht mit „Übernahme stornieren“
+zurückgenommen (Abläufe oben).
 
 ### Übernommenes Material
 
@@ -401,15 +419,18 @@ verweisen beide Teile auf die Nachforderung. Die Nachforderung selbst ändert si
 Übernahme nicht.
 
 Übernehmen dürfen Einsatzleitung und Führungspersonal, wenn das Modul Material für sie
-freigegeben ist; ebenso das Zuordnen. Ist es gesperrt, steht der Knopf gesperrt mit „Keine
+freigegeben ist; ebenso das Zuordnen. Ein gelöster Posten zählt nicht mehr als übernommen; lösen
+dürfen dieselben, wenn zusätzlich das Modul Nachforderungen freigegeben ist, sonst fehlt „Von
+Nachforderung lösen“ im Menü. Ist es gesperrt, steht der Knopf gesperrt mit „Keine
 Berechtigung“, „Erfassten Posten zuordnen …“ fehlt, und die Karte zeigt statt der Posten nur
 ihre Zahl, etwa „2 Posten übernommen“.
 
 Jede Übernahme schreibt einen Eintrag ins Einsatztagebuch, etwa „Material «Tauchpumpe» (×1)
 disponiert, Ort Einheit «Rettungsstaffel», aus Nachforderung «3 Tauchpumpen für Keller
 Hauptstraße»“, ohne Ort ohne den Ort-Teil. Das Zuordnen schreibt etwa „Material «Tauchpumpe THW»
-(×1) mit Nachforderung «3 Tauchpumpen für Keller Hauptstraße» verknüpft“. Die Nachforderung
-schreibt dafür keinen eigenen Eintrag.
+(×1) mit Nachforderung «3 Tauchpumpen für Keller Hauptstraße» verknüpft“, das Lösen „Material
+«Tauchpumpe THW» (×1) von Nachforderung «3 Tauchpumpen für Keller Hauptstraße» gelöst“. Die
+Nachforderung schreibt dafür keinen eigenen Eintrag.
 
 ### Übernommene Einheiten
 

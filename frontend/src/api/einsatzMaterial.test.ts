@@ -1,7 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
-import { disponiereAdhoc, disponiereMaterial, verknuepfeNachforderung } from './einsatzMaterial';
+import {
+  disponiereAdhoc,
+  disponiereMaterial,
+  loeseNachforderung,
+  verknuepfeNachforderung,
+} from './einsatzMaterial';
 
 /** Fängt den Körper des Material-POST ab. */
 function faengeKoerper(): unknown[] {
@@ -87,5 +92,22 @@ describe('api/einsatzMaterial — vorhandenen Posten verknüpfen (LLH-1259 D1)',
       { pfad: '5/7', koerper: { nachforderung_id: 4 } },
       { pfad: '5/8', koerper: { nachforderung_id: 4, ergaenzen: true } },
     ]);
+  });
+});
+
+describe('api/einsatzMaterial — Fehlzuordnung lösen (LLH-1403 D1)', () => {
+  it('sendet DELETE auf den Bezug, ohne Körper', async () => {
+    const aufrufe: { pfad: string; koerper: string }[] = [];
+    server.use(
+      http.delete('/api/einsaetze/:id/material/:em/nachforderung', async ({ request, params }) => {
+        aufrufe.push({
+          pfad: `${String(params.id)}/${String(params.em)}`,
+          koerper: await request.text(),
+        });
+        return HttpResponse.json({ id: Number(params.em), nachforderung_id: null });
+      }),
+    );
+    await expect(loeseNachforderung(5, 7)).resolves.toMatchObject({ id: 7 });
+    expect(aufrufe).toEqual([{ pfad: '5/7', koerper: '' }]);
   });
 });

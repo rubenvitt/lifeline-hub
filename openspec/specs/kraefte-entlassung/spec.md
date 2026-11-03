@@ -195,8 +195,8 @@ Zustand nicht prüft.
 Das System SHALL an einer entlassenen Person Nachtrag, Streichung und Berichtigung des Zeitpunkts
 an ihrer Zeitachse annehmen, mit denselben Regeln wie an einer aktiven Kraft. Danach MUST die
 Person ohne offene Einsatzperiode sein, sonst MUST das System mit 422 antworten, nichts schreiben
-und auf das erneute Disponieren verweisen. Das gilt auch für eine entlassene Person, deren Kopie
-bei der Berichtigung eines Einheit-Ereignisses mitgeändert würde. Der ETB-Eintrag MUST „berichtigt
+und auf das erneute Disponieren verweisen. Eine Streichung oder Berichtigung an ihrer früheren
+Einheit MUST die Kopie an der entlassenen Person stehen lassen. Der ETB-Eintrag MUST „berichtigt
 nach Entlassung“ bzw. bei der Berichtigung „(nach Entlassung)“ vermerken. An einer stornierten
 Person und an einer aufgelösten Einheit MUST alles drei weiter mit 409 scheitern.
 
