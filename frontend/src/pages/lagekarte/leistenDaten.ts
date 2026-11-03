@@ -1,6 +1,7 @@
 import type {
   Betreuungsstelle,
   BrListenEintrag,
+  Evakuierungsbezirk,
   Fuehrungsstelle,
   Einheit,
   Einsatzabschnitt,
@@ -17,6 +18,7 @@ import {
   auslastung,
   betreuungsstelleStatus,
   brStatus,
+  raeumungszustand,
   schadenAusmass,
   schadenStatus,
   statusKategorie,
@@ -36,7 +38,7 @@ import { TIER_SPERRGRUND, type TierZugriff } from './tierEbene';
 import type { TierKartenEintrag } from './tierMarker';
 import { SPEZIES_META, TIER_STATUS } from '../tiere/tierHelfer';
 import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
-import { ART_LABEL, personenZahl } from '../../betreuung/betreuungText';
+import { ART_LABEL, evakuiertText, personenZahl } from '../../betreuung/betreuungText';
 import { staerkeText } from '../../anzeige/staerke';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { GEFAHR_LABEL, SCHADENSGRAD_LABEL } from '../schaeden/gefahrWorte';
@@ -63,6 +65,7 @@ export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'zone', name: 'Zonen' },
   { key: 'uhs', name: 'UHS' },
   { key: 'betreuungsstelle', name: 'Betreuungsstellen' },
+  { key: 'sammelstelle', name: 'Sammelstellen' },
   { key: 'bereitstellungsraum', name: 'Bereitstellungsräume' },
   { key: 'tier', name: 'Tiere' },
   { key: 'schaden', name: 'Schäden' },
@@ -147,6 +150,14 @@ export interface TierEbenenAngabe {
 }
 
 /**
+ * Zugriffsangabe der Ebene „Sammelstellen" (LLH-1393): die Grenze des Moduls Evakuierung, dieselbe
+ * wie die der Bezirksbeschriftung an den Flächen.
+ */
+export interface SammelstelleEbenenAngabe {
+  zugriff: BetreuungZugriff;
+}
+
+/**
  * Die Zeilen des Paneels „Ebenen".
  *
  * `zonenAnzahl` ist die ungegatterte Zonenliste (`useLagekarteDaten().zonen`), nicht
@@ -166,6 +177,7 @@ export function ebenenZeilen(
   /** Die Ebene, die nur der Verortungsauftrag zeichnet (`ebeneMitVorrang`, LLH-1125). */
   eingeblendet: keyof LayerSichtbar | null = null,
   tier: TierEbenenAngabe = { zugriff: 'ausgeblendet' },
+  sammelstelle: SammelstelleEbenenAngabe = { zugriff: 'ausgeblendet' },
 ): EbenenZeile[] {
   const zaehlung = new Map<MarkerTyp, number>();
   for (const m of verortet) zaehlung.set(m.typ, (zaehlung.get(m.typ) ?? 0) + 1);
@@ -191,6 +203,13 @@ export function ebenenZeilen(
       if (tier.zugriff === 'ausgeblendet') return [];
       if (tier.zugriff === 'gesperrt') {
         return [{ key, name, anzahl: null, sichtbar: false, sperrgrund: TIER_SPERRGRUND }];
+      }
+    }
+    // Sammelstellen ebenso, an der Grenze des Moduls Evakuierung (LLH-1393).
+    if (key === 'sammelstelle') {
+      if (sammelstelle.zugriff === 'ausgeblendet') return [];
+      if (sammelstelle.zugriff === 'gesperrt') {
+        return [{ key, name, anzahl: null, sichtbar: false, sperrgrund: BETREUUNG_SPERRGRUND }];
       }
     }
     const n = key === 'zone' ? zonenAnzahl : (zaehlung.get(key) ?? 0);
@@ -261,7 +280,7 @@ export const EBENEN_GRUPPEN: readonly {
   {
     kennung: 'betroffene',
     name: 'Betroffene & Versorgung',
-    ebenen: ['person', 'uhs', 'betreuungsstelle', 'tier'],
+    ebenen: ['person', 'uhs', 'betreuungsstelle', 'sammelstelle', 'tier'],
   },
 ];
 
@@ -406,6 +425,8 @@ export interface AuswahlRoh {
   bereitstellungsraeume: readonly BrListenEintrag[];
   /** Tiere (LLH-1123) — leer ohne Modulrecht. */
   tiere: readonly TierKartenEintrag[];
+  /** Evakuierungsbezirke, für die Auswahl einer Sammelstelle (LLH-1393) — leer ohne Modulrecht. */
+  bezirke: readonly Evakuierungsbezirk[];
   /** Eigene Führungsstelle (LFH-1181); fehlt sie, zeigt der Inspector nur den Sprung. */
   fuehrungsstelle?: Fuehrungsstelle | null;
   /**
@@ -426,6 +447,7 @@ export const LEERE_ROHDATEN: AuswahlRoh = {
   betreuungsstellen: [],
   bereitstellungsraeume: [],
   tiere: [],
+  bezirke: [],
 };
 
 /** Ein Feld des Datenrasters: Augenbraue + Wert, optional mit Statusrolle (getönter Chip). */
@@ -453,6 +475,7 @@ export const OBJEKTART: Record<MarkerTyp, string> = {
   betreuungsstelle: 'Betreuungsstelle',
   bereitstellungsraum: 'Bereitstellungsraum',
   tier: 'Tier',
+  sammelstelle: 'Sammelstelle',
 };
 
 export { staerkeText };
@@ -485,6 +508,9 @@ export function auswahlUnterzeile(marker: KarteMarker, roh: AuswahlRoh): string 
         const s = roh.betreuungsstellen.find((x) => x.id === marker.id);
         return s ? ART_LABEL[s.art] : undefined;
       }
+      // Der Freitext der Sammelstelle (LLH-1393); der Bezirk steht schon im Namen.
+      case 'sammelstelle':
+        return roh.bezirke.find((b) => b.id === marker.id)?.sammelstelle ?? undefined;
       default:
         return undefined;
     }
@@ -589,6 +615,17 @@ export function auswahlRaster(
         { label: 'Status', wert: st?.label ?? s.status, rolle: st?.rolle, mono: false },
         { label: 'Belegung', wert: belegung, rolle: auslastung(belegt, kap)?.rolle },
         { label: 'Abschnitt', wert: abschnittName(s.abschnitt_id), mono: false },
+      ];
+    }
+    // Sammelstelle (LLH-1393): Räumung und Stand des Bezirks, wie auf seiner Karte im Modul.
+    case 'sammelstelle': {
+      const b = roh.bezirke.find((x) => x.id === marker.id);
+      if (!b) return [];
+      const r = raeumungszustand[b.raeumung];
+      return [
+        { label: 'Räumung', wert: r?.label ?? b.raeumung, rolle: r?.rolle, mono: false },
+        { label: 'Evakuiert', wert: evakuiertText(b), mono: false },
+        { label: 'Abschnitt', wert: text(b.abschnitt_name), mono: false },
       ];
     }
     // Tier (LLH-1123): der Rufname steht hier, nicht auf der Karte; „vermisst" trägt die Rolle.

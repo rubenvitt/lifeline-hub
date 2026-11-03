@@ -14,6 +14,7 @@ import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -627,26 +628,15 @@ describe('BetreuungPage (LFH-639)', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Aktionen zu Stelle Schule Nord' }),
     );
-    expect(
-      within(await offenesMenue()).queryByRole('menuitem', { name: /Auf Karte verorten/ }),
-    ).toBeNull();
+    const verortet = await offenesMenue();
+    // Erst schließen, wenn das Menü seinen Fokus hat (`test/menue.ts`, LLH-1390).
+    await warteAufMenueFokus();
+    expect(within(verortet).queryByRole('menuitem', { name: /Auf Karte verorten/ })).toBeNull();
     await userEvent.keyboard('{Escape}');
     // Unverortet: Eintrag, Sprung mit Platzier-Auftrag.
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }));
-    await waitFor(() => {
-      const offen = document.querySelectorAll(
-        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-      );
-      const menue = offen[offen.length - 1] as HTMLElement;
-      expect(within(menue).getByRole('menuitem', { name: /Auf Karte verorten/ })).toBeTruthy();
-    });
-    const offen = document.querySelectorAll(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    );
-    await userEvent.click(
-      within(offen[offen.length - 1] as HTMLElement).getByRole('menuitem', {
-        name: /Auf Karte verorten/,
-      }),
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
+      /Auf Karte verorten/,
     );
     expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
       // Mit Herkunft: die Karte bietet danach „Zurück zu …“ an (LLH-1125).
@@ -683,6 +673,7 @@ describe('BetreuungPage (LFH-639)', () => {
       await screen.findByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
     );
     const menue = await offenesMenue();
+    await warteAufMenueFokus();
     expect(within(menue).queryByRole('menuitem', { name: /Bearbeiten/ })).toBeNull();
     expect(within(menue).getByRole('menuitem', { name: /Stornieren/ })).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
@@ -708,11 +699,9 @@ describe('BetreuungPage (LFH-639)', () => {
   it('Stelle stornieren über das Menü: eigener Dialog mit rotem Knopf, dann POST an DIESE Stelle (LFH-682)', async () => {
     api.storniereStelle.mockResolvedValue({ ...TURNHALLE, storniert_at: '2026-09-23 11:00:00' });
     renderPage();
-    await userEvent.click(
+    await waehleMenueEintrag(
       await screen.findByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
-    );
-    await userEvent.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: /Stornieren/ }),
+      /Stornieren/,
     );
     const dialog = await dialogMit('Betreuungsstelle Turnhalle Ost stornieren?');
     const ok = within(dialog).getByRole('button', { name: 'Stornieren' });
@@ -731,11 +720,9 @@ describe('BetreuungPage (LFH-639)', () => {
 
   it('Stelle stornieren: Abbrechen sendet nichts (LFH-682)', async () => {
     renderPage();
-    await userEvent.click(
+    await waehleMenueEintrag(
       await screen.findByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
-    );
-    await userEvent.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: /Stornieren/ }),
+      /Stornieren/,
     );
     const dialog = await dialogMit('Betreuungsstelle Turnhalle Ost stornieren?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
@@ -745,11 +732,9 @@ describe('BetreuungPage (LFH-639)', () => {
 
   it('Stelle stornieren zeigt „Stattdessen Status setzen“ und führt auf die Detailseite (LFH-1078, LLH-1044)', async () => {
     renderPage();
-    await userEvent.click(
+    await waehleMenueEintrag(
       await screen.findByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
-    );
-    await userEvent.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: /Stornieren/ }),
+      /Stornieren/,
     );
     const stelleStorno = await dialogMit('Betreuungsstelle Turnhalle Ost stornieren?');
     await userEvent.click(

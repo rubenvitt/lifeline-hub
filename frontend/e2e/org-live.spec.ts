@@ -77,10 +77,19 @@ test('LFH-734: eine anderswo angelegte Person erscheint in der offenen Personal-
   await anmelden(page);
   await oeffnenMitStrom(page, '/admin/stammdaten/personal', '/api/live');
   const name = `E2E Org-live Person ${Date.now()}`;
-  await expect(page.getByText(name)).toHaveCount(0);
+  /*
+   * Ab `BLAETTER_SCHWELLE` (50) Personen blättert die Tabelle, und die neue Person kann auf Seite 2
+   * landen, wenn andere Specs im selben Anteil schon Personal angelegt haben (LLH-1362). Die Suche
+   * siebt vorab auf genau diesen Namen: die Treffermenge bleibt eine Zeile, ganz gleich, wie groß
+   * der Bestand ist. Gesucht wird die ZEILE, nicht der Text: der Filterhinweis nennt den Suchbegriff
+   * ebenfalls.
+   */
+  await page.getByPlaceholder('Name, Personalnr. oder Träger').fill(name);
+  const zeile = page.getByRole('row').filter({ hasText: name });
+  await expect(zeile).toHaveCount(0);
 
   const antwort = await page.request.post('/api/personal', { data: { name } });
   expect(antwort.ok()).toBeTruthy();
 
-  await expect(page.getByText(name)).toBeVisible();
+  await expect(zeile).toBeVisible();
 });

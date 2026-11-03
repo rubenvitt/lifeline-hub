@@ -15,6 +15,7 @@ export const EBENE_DES_AUFTRAGS: Record<PlatzierenZielTyp, keyof LayerSichtbar> 
   betreuungsstelle: 'betreuungsstelle',
   bereitstellungsraum: 'bereitstellungsraum',
   tier: 'tier',
+  sammelstelle: 'sammelstelle',
 };
 
 /**

@@ -2,10 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import {
+  ladePushStand,
   ladePushZustand,
+  MERKER_MIT_INHALT,
   pushAbgleichen,
   pushAusschalten,
   pushEinschalten,
+  pushInhaltSetzen,
   pushMerker,
   schliessePushMeldungen,
 } from './webPush';
@@ -61,11 +64,13 @@ function browser(opts: { erlaubnis?: NotificationPermission; vorhanden?: Abo | n
   return { pushManager, notification, gezeigt, registration, aktuell: () => aktuell };
 }
 
-function serverMitPush(angemeldet = false) {
+function serverMitPush(angemeldet = false, inhalt = false) {
   const anmeldungen: unknown[] = [];
   let abmeldungen = 0;
   server.use(
-    http.get('/api/web-push', () => HttpResponse.json({ schluessel: SCHLUESSEL, angemeldet })),
+    http.get('/api/web-push', () =>
+      HttpResponse.json({ schluessel: SCHLUESSEL, angemeldet, inhalt }),
+    ),
     http.put('/api/web-push/abo', async ({ request }) => {
       anmeldungen.push(await request.json());
       return new HttpResponse(null, { status: 204 });
@@ -113,6 +118,57 @@ describe('webPush: ob der Schalter erscheint (D8)', () => {
   });
 });
 
+describe('webPush: Inhalt der Meldung nur auf Wunsch (LLH-1369)', () => {
+  it('liest die Wahl nur bei angemeldetem Abo', async () => {
+    browser();
+    serverMitPush(true, true);
+    expect(await ladePushStand()).toEqual({ zustand: 'an', inhalt: true });
+    serverMitPush(true, false);
+    expect(await ladePushStand()).toEqual({ zustand: 'an', inhalt: false });
+    serverMitPush(false, true);
+    expect(await ladePushStand()).toEqual({ zustand: 'aus', inhalt: false });
+  });
+
+  it('meldet das Abo mit der Wahl neu an und merkt sie', async () => {
+    const vorhanden = abo('https://fcm.googleapis.com/alt');
+    browser({ vorhanden });
+    const s = serverMitPush(true);
+    localStorage.setItem(pushMerker(7), '1');
+    expect(await pushInhaltSetzen(7, true)).toBe(true);
+    expect(s.anmeldungen).toEqual([
+      expect.objectContaining({ endpoint: vorhanden.endpoint, inhalt: true }),
+    ]);
+    expect(localStorage.getItem(pushMerker(7))).toBe(MERKER_MIT_INHALT);
+
+    expect(await pushInhaltSetzen(7, false)).toBe(false);
+    expect(s.anmeldungen[1]).toEqual(expect.objectContaining({ inhalt: false }));
+    expect(localStorage.getItem(pushMerker(7))).toBe('1');
+  });
+
+  it('die nächste Sitzung meldet die Wahl mit an', async () => {
+    const b = browser({ vorhanden: abo('https://fcm.googleapis.com/alt') });
+    b.notification.permission = 'granted';
+    const s = serverMitPush(false);
+    localStorage.setItem(pushMerker(7), MERKER_MIT_INHALT);
+    await pushAbgleichen(7);
+    localStorage.setItem(pushMerker(7), '1');
+    await pushAbgleichen(7);
+    expect(s.anmeldungen).toEqual([
+      expect.objectContaining({ inhalt: true }),
+      expect.objectContaining({ inhalt: false }),
+    ]);
+  });
+
+  it('neu eingeschaltetes Push zeigt keinen Inhalt', async () => {
+    browser();
+    const s = serverMitPush();
+    localStorage.setItem(pushMerker(7), MERKER_MIT_INHALT);
+    await pushAusschalten(7);
+    await pushEinschalten(7);
+    expect(s.anmeldungen).toEqual([expect.objectContaining({ inhalt: false })]);
+  });
+});
+
 describe('webPush: einschalten und ausschalten', () => {
   it('fragt die Erlaubnis, abonniert mit dem Serverschlüssel und meldet das Abo an', async () => {
     const b = browser();
@@ -124,7 +180,7 @@ describe('webPush: einschalten und ausschalten', () => {
       applicationServerKey: new Uint8Array(SCHLUESSEL_BYTES),
     });
     expect(s.anmeldungen).toEqual([
-      { endpoint: 'https://fcm.googleapis.com/neu', p256dh: 'P256', auth: 'AUTH' },
+      { endpoint: 'https://fcm.googleapis.com/neu', p256dh: 'P256', auth: 'AUTH', inhalt: false },
     ]);
     expect(localStorage.getItem(pushMerker(7))).toBe('1');
   });

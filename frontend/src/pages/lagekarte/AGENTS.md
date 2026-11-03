@@ -69,6 +69,13 @@ diese Zusage.
   ein Kreis mit Kurzzeichen „T“ (`tierMarker.ts`), kein Eigenbau-Zeichen; vermisst heißt Rolle
   `achtung` plus das Wort „vermisst“. Die Liste trägt Halterkontakt und Kennzeichnung, deshalb
   bewusst nicht in `LAGEBILD_OFFLINE`.
+- **Sammelstellen auf der Karte** (LLH-1393, Spec `betreuung-lagekarte`): Muster der Tiere
+  (`alleVerortet`, Objektliste, `?platzieren=sammelstelle:<bezirk-id>`), Quelle sind die Bezirke
+  (`einsatzKeys.evakuierung`), die Sperre ist `evakuierungZugriff`. Markertyp `sammelstelle`, `id` =
+  Bezirks-ID (`sammelstelleMarker.ts`); storniert und `aufgehoben` fehlen, `geraeumt` bleibt. Das
+  Zeichen ist Stelle + Marke F.3.12 (`sammelstelleZeichen`), nicht `fachobjektZeichen` mit Symbol
+  (dort gilt noch der Ersatz LFH-834). Schreiben nur das Paar `sammelstelle_lat/lon` per
+  `aendereBezirk`, der Freitext bleibt.
 - **Kartenquellen eines fremden Moduls laden nur mit Freigabe des Servers** (LFH-669, Spec
   `modul-freigabe`, `openspec/changes/archive/2026-10-01-lfh-669-modulfreigabe-vom-server/design.md` D4):
   `useLagekarteDaten` fragt UHS, Schäden, Einheiten, Fahrzeuge, Abschnitte, Gefahrengebiete,

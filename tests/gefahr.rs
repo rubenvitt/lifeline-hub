@@ -170,6 +170,106 @@ async fn ungueltiger_enum_ist_400_kombination_bleibt_422() {
     );
 }
 
+/// Erläuterung und „Gemeldet von“ haben eine Grenze (LLH-1366): genau die Grenze geht durch,
+/// ein Zeichen mehr ist 400 mit dem Feldnamen, gezählt nach dem Trimmen. Die Überlänge wird vor
+/// der Kombination geprüft (400 statt 422) und schreibt nichts.
+#[tokio::test]
+async fn zu_lange_erlaeuterung_oder_meldeweg_ist_400() {
+    use lifeline_hub::gefahr::{BESCHREIBUNG_MAX, GEMELDET_VON_MAX};
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+    let m = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix");
+    let u = format!("{m}/bewertung");
+    let mit = |objekt: &str, beschreibung: String, gemeldet_von: String| {
+        json!({
+            "gefahrentyp": "brand",
+            "schutzobjekt": objekt,
+            "warnstufe": "hoch",
+            "beschreibung": beschreibung,
+            "gemeldet_von": gemeldet_von,
+        })
+        .to_string()
+    };
+
+    let (status, z) = anfrage(
+        &app,
+        "PUT",
+        &u,
+        &admin,
+        Some(&mit(
+            "menschen",
+            format!("  {}  ", "ä".repeat(BESCHREIBUNG_MAX)),
+            "x".repeat(GEMELDET_VON_MAX),
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{z:?}");
+    assert_eq!(
+        z["beschreibung"].as_str().unwrap().chars().count(),
+        BESCHREIBUNG_MAX
+    );
+
+    let (status, f) = anfrage(
+        &app,
+        "PUT",
+        &u,
+        &admin,
+        Some(&mit(
+            "tiere",
+            "x".repeat(BESCHREIBUNG_MAX + 1),
+            "KdoW".into(),
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{f:?}");
+    assert_eq!(
+        f["error"],
+        format!("Erläuterung darf höchstens {BESCHREIBUNG_MAX} Zeichen lang sein")
+    );
+
+    let (status, f) = anfrage(
+        &app,
+        "PUT",
+        &u,
+        &admin,
+        Some(&mit(
+            "tiere",
+            "Weidezaun".into(),
+            "x".repeat(GEMELDET_VON_MAX + 1),
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{f:?}");
+    assert_eq!(
+        f["error"],
+        format!("Gemeldet von darf höchstens {GEMELDET_VON_MAX} Zeichen lang sein")
+    );
+
+    // Ungültige Kombination UND Überlänge: die Grenze des Felds greift zuerst.
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &u,
+        &admin,
+        Some(
+            &json!({
+                "gefahrentyp": "atemgifte",
+                "schutzobjekt": "sachwerte",
+                "warnstufe": "hoch",
+                "beschreibung": "x".repeat(BESCHREIBUNG_MAX + 1),
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    let (_, zellen) = anfrage(&app, "GET", &m, &admin, None).await;
+    assert_eq!(zellen.as_array().unwrap().len(), 1, "{zellen:?}");
+}
+
 #[tokio::test]
 async fn etb_bei_warnstufenwechsel_nicht_bei_reiner_beschreibung() {
     let (app, _live) = setup_mit_live().await;

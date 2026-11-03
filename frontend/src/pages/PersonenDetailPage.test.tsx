@@ -13,6 +13,7 @@ import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtu
 import { FakeEventSource } from '../test/eventSource';
 import { STATUS_META } from '../personen/personMeta';
 import { alsSchadenAuswahl } from '../api/einsatzSchaden';
+import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 /** Die Schadenauswahl, wie der Server sie aus den Vollzeilen ableitet (LFH-1075). */
 const auswahlAus = (liste: readonly object[]) =>
@@ -285,13 +286,13 @@ async function oeffneKopfmenue(): Promise<HTMLElement> {
   await userEvent.click(await screen.findByRole('button', { name: /Weitere Aktionen/ }));
   const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
   expect(menue).not.toBeNull();
+  await warteAufMenueFokus();
   return menue as HTMLElement;
 }
 
 /** Eine Aktion aus dem Kopfmenü auslösen (Teilstring, wie bei antd-Icons im Eintrag nötig). */
 async function ausMenue(name: RegExp) {
-  const menue = await oeffneKopfmenue();
-  await userEvent.click(within(menue).getByRole('menuitem', { name }));
+  await waehleMenueEintrag(await screen.findByRole('button', { name: /Weitere Aktionen/ }), name);
 }
 
 /**
@@ -395,8 +396,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
       }),
     ]);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    const menue = await oeffneKopfmenue();
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /vermisst/ }));
+    await ausMenue(/vermisst/);
     await waitFor(() => expect(gerufen.status).toBe('vermisst'));
   });
 
@@ -409,8 +409,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
       }),
     ]);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    const menue = await oeffneKopfmenue();
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /verstorben/ }));
+    await ausMenue(/verstorben/);
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(/verstorben/i);
     // Die tragende Hälfte: bis zur Bestätigung ist nichts passiert.

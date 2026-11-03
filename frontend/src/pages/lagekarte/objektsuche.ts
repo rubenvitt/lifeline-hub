@@ -34,11 +34,14 @@ export function suchbareMarker(a: {
   brZugriff: BrZugriff;
   /** Ebene „Tiere" (LLH-1123). */
   tierZugriff: TierZugriff;
+  /** Ebene „Sammelstellen" (LLH-1393): die Grenze des Moduls Evakuierung. */
+  evakuierungZugriff: BetreuungZugriff;
 }): KarteMarker[] {
   const personenFrei = a.personenZugriff === 'frei' && a.personenEbeneAn;
   const betreuungFrei = a.betreuungZugriff === 'frei';
   const brFrei = a.brZugriff === 'frei';
   const tierFrei = a.tierZugriff === 'frei';
+  const evakuierungFrei = a.evakuierungZugriff === 'frei';
   const erlaubt = (x: KarteMarker) =>
     x.typ === 'person'
       ? personenFrei
@@ -48,7 +51,9 @@ export function suchbareMarker(a: {
           ? brFrei
           : x.typ === 'tier'
             ? tierFrei
-            : true;
+            : x.typ === 'sammelstelle'
+              ? evakuierungFrei
+              : true;
   return [...a.verortet, ...(personenFrei ? a.personen : [])].filter(erlaubt);
 }
 
@@ -68,6 +73,7 @@ export const OBJEKT_GRUPPEN: readonly { typ: MarkerTyp; nurVerortet?: true }[] =
   { typ: 'bereitstellungsraum' },
   { typ: 'uhs' },
   { typ: 'betreuungsstelle' },
+  { typ: 'sammelstelle' },
   { typ: 'tier' },
   { typ: 'schaden' },
   { typ: 'lagemeldung', nurVerortet: true },
@@ -111,11 +117,13 @@ export function objektEintraege(a: {
   betreuungZugriff: BetreuungZugriff;
   brZugriff: BrZugriff;
   tierZugriff: TierZugriff;
+  evakuierungZugriff: BetreuungZugriff;
 }): ObjektEintrag[] {
   const gesperrt = (typ: MarkerTyp) =>
     (typ === 'betreuungsstelle' && a.betreuungZugriff !== 'frei') ||
     (typ === 'bereitstellungsraum' && a.brZugriff !== 'frei') ||
-    (typ === 'tier' && a.tierZugriff !== 'frei');
+    (typ === 'tier' && a.tierZugriff !== 'frei') ||
+    (typ === 'sammelstelle' && a.evakuierungZugriff !== 'frei');
   const liste: ObjektEintrag[] = a.suchbar
     .filter((m) => !gesperrt(m.typ))
     .map((m) => ({

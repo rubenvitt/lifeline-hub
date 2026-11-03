@@ -12,6 +12,7 @@ import { erzeugeQueryClient } from '../api/queryClient';
 import { alsSchadenAuswahl } from '../api/einsatzSchaden';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { waehleMenueEintrag } from '../test/menue';
 
 /**
  * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Dialoge nennen
@@ -180,12 +181,7 @@ const keinToast = () => expect(document.querySelectorAll('.ant-message-notice'))
 const seitenHinweis = () => document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
 
 async function ausMenue(name: RegExp) {
-  await userEvent.click(await screen.findByRole('button', { name: /Weitere Aktionen/ }));
-  const menue = document.querySelector<HTMLElement>(
-    '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-  );
-  expect(menue).not.toBeNull();
-  await userEvent.click(within(menue as HTMLElement).getByRole('menuitem', { name }));
+  await waehleMenueEintrag(await screen.findByRole('button', { name: /Weitere Aktionen/ }), name);
 }
 
 async function klappeBezuegeAuf() {

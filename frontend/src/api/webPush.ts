@@ -14,6 +14,8 @@ export interface WebPushAboEingabe {
   endpoint: string;
   p256dh: string;
   auth: string;
+  /** „Mit Absender und Wortlaut“ auf diesem Gerät (LLH-1369); fehlt es, gilt aus. */
+  inhalt?: boolean;
 }
 
 /** Meldet das Abo dieses Browsers für diese Sitzung an; dasselbe Abo hängt der Server um. */

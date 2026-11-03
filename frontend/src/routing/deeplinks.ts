@@ -1131,7 +1131,13 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * `pages/LagekartePage.tsx` mit.
  */
 export type PlatzierenZielTyp =
-  'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum' | 'tier';
+  | 'schaden'
+  | 'uhs'
+  | 'person'
+  | 'betreuungsstelle'
+  | 'bereitstellungsraum'
+  | 'tier'
+  | 'sammelstelle';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -1145,6 +1151,8 @@ const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
   bereitstellungsraum: true,
   // Fundort eines Tiers („Auf Karte verorten" der Tier-Detailseite, LLH-1123).
   tier: true,
+  // Sammelstelle eines Evakuierungsbezirks (LLH-1393), die Kennung ist die des Bezirks.
+  sammelstelle: true,
 };
 
 /**
@@ -1181,6 +1189,7 @@ const RUECKWEG: Record<PlatzierenZielTyp, ((einsatzId: number, id: number) => st
   betreuungsstelle: betreuungsstellePfad,
   bereitstellungsraum: bereitstellungsraumDetailPfad,
   tier: tiereDetailPfad,
+  sammelstelle: evakuierungsbezirkPfad,
   // Die UHS hat keinen äußeren Verortungseinstieg: sie wird auf der Karte über „Nicht verortet“
   // verortet, es gibt keine Seite, zu der man zurückwollte.
   uhs: null,

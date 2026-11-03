@@ -16,6 +16,10 @@ import type {
  * Text der Benachrichtigung (`src/benachrichtigung/text.rs`, nur Retain-Spalten). Der Client holt
  * sie über die Meldung selbst (`GET …/meldungen/{id}`, Leserecht Meldungen, das jeder Empfänger
  * hat). Antwortet sie nicht rechtzeitig, bleibt der Text des Servers.
+ *
+ * Der Service Worker (`public/alarm-sw.js`) zeigt in Push-Meldungen dasselbe, wenn die Person es
+ * auf dem Gerät gewählt hat (LLH-1369). Er kann dieses Modul nicht laden und hält Titelwörter und
+ * Kürzung selbst; `alarmSw.test.ts` vergleicht beide.
  */
 
 /** Höchstlänge des Wortlautanfangs in Zeichen, samt „ …“. */

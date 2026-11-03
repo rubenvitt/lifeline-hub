@@ -7002,6 +7002,8 @@ export interface components {
         WebPushStand: {
             /** @description Diese Sitzung hat ein Abo. */
             angemeldet: boolean;
+            /** @description Das Abo dieser Sitzung zeigt Absender und Wortlaut (LLH-1369); ohne Abo `false`. */
+            inhalt: boolean;
             /**
              * @description Öffentlicher Schlüssel der Instanz (Base64url, unkomprimierter P-256-Punkt) für
              *     `pushManager.subscribe({ applicationServerKey })`.

@@ -246,7 +246,7 @@ const BESTAND_OFFEN: readonly Freistellung[] = [];
 /** Lange Bezeichnung einer externen Stelle im Kommunikationsplan (LFH-848). */
 const KOMMUNIKATION_STELLE = 'Polizeiinspektion Musterstadt-Nordwest, Führungsgruppe';
 
-async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
+async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = false } = {}) {
   const anlegen = async (pfad: string, data: unknown, was: string) => {
     const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
     expect(
@@ -348,8 +348,9 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
     },
     'Verbindung',
   );
-  // Einheit aus Vorlage bilden (LLH-1049): Zug mit Staffel, Fahrzeugen und Besatzung.
-  VORLAGE.set(einsatzId, await seedeVorlage(page, 'Gate1 '));
+  // Einheit aus Vorlage bilden (LLH-1049): Zug mit Staffel, Fahrzeugen und Besatzung. Org-weit,
+  // deshalb nur, wo ein Durchgang sie zeigt (LLH-1363).
+  if (vorlage) VORLAGE.set(einsatzId, await seedeVorlage(page, 'Gate1 '));
 }
 
 /**
@@ -398,11 +399,14 @@ async function ueberlauf(page: Page): Promise<{ ueber: number; schuldige: string
   });
 }
 
-/** Meldet an, legt den Einsatz an und sät den Überlaufstoff aller Routen — je Prüfbreite. */
-async function gate1Vorbereiten(page: Page): Promise<string> {
+/**
+ * Meldet an, legt den Einsatz an und sät den Überlaufstoff aller Routen — je Test. Die
+ * org-weite Einheiten-Vorlage nur mit `vorlage` (siehe {@link Gate1Durchgang}).
+ */
+async function gate1Vorbereiten(page: Page, { vorlage = false } = {}): Promise<string> {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate1 ${Date.now()}`);
-  await seedeUeberlaufstoff(page, einsatzId);
+  await seedeUeberlaufstoff(page, einsatzId, { vorlage });
   // Eine Schicht mit absichtlich langem Einheits- und Abschnittsnamen.
   {
     const post = async (pfad: string, data: unknown, was: string) => {
@@ -572,9 +576,47 @@ function rechteHinweis(p: Page, text: RegExp) {
 
 const NUR_SCHREIBENDE = /nur Einsatzleitung und Führungspersonal$/;
 
-function gate1Routen(einsatzId: string): Gate1Route[] {
+/*
+ * DIE ROUTEN VON GATE 1 in sechs Durchgängen (LLH-1363). Alle in einem Test passten mit Trace bei
+ * einer Wiederholung auf einem 2-vCPU-Runner nicht mehr ins Budget: ein echter Fund kam als
+ * Zeitüberschreitung an. Gemessen mit Trace auf zwei Kernen kostet jede Route rund 13 s (`goto`
+ * allein rund 10 s), Anmeldung und Saat rund 18 s; sechs Routen je Durchgang bleiben damit unter
+ * der Hälfte des Budgets. Jeder Durchgang ist ein eigener Test mit eigenem Einsatz. Eine neue
+ * Route kommt in den Durchgang ihrer Familie, solange er höchstens sieben trägt, sonst in einen
+ * neuen; zusammen messen die Durchgänge jede Route genau einmal je Breite und Rolle.
+ */
+type Gate1Durchgang = {
+  name: string;
+  routen: (einsatzId: string) => Gate1Route[];
+  /**
+   * Sät die Einheiten-Vorlage (org-weit: Fahrzeuge, Stammpersonal, Vorlagen). Nur der Durchgang,
+   * der sie zeigt: Stammdaten-Listen und „Einheit aus Vorlage bilden“. Jede weitere Saat füllte
+   * die Personal- und Fahrzeuglisten der Organisation für alle Specs des Shards (LLH-1362).
+   */
+  vorlage?: boolean;
+};
+
+const GATE1_DURCHGAENGE: readonly Gate1Durchgang[] = [
+  { name: 'Lage und ETB', routen: gate1RoutenLage },
+  { name: 'Verwaltung und Vorlagen', routen: gate1RoutenVerwaltung, vorlage: true },
+  { name: 'Kräfte und Fernmeldewesen', routen: gate1RoutenKraefte },
+  { name: 'Führung und Stab', routen: gate1RoutenStab },
+  { name: 'Betroffene und Evakuierung', routen: gate1RoutenBetroffene },
+  { name: 'Betreuung, Verpflegung und Lagekarte', routen: gate1RoutenVersorgung },
+];
+
+/** Alle Routen aller Durchgänge: Grundlage der Prüfung auf tote Freistellungen. */
+function gate1AlleRouten(einsatzId: string): Gate1Route[] {
+  return GATE1_DURCHGAENGE.flatMap((d) => d.routen(einsatzId));
+}
+
+/**
+ * Durchgang „Lage und ETB“: Einsatzliste, Überblick, Lagebild, ETB und die Schichtvorgabe des
+ * Einsatzes.
+ */
+function gate1RoutenLage(einsatzId: string): Gate1Route[] {
   // Eine Route je Layoutfamilie (Ebene-1-Shell, Lagebild, Einsatz-Workspace, Admin-Layout)
-  // plus die Datensicht- und Fachmodule.
+  // plus die Datensicht- und Fachmodule, verteilt auf die Durchgänge.
   //
   // JE ROUTE EIN INHALTSANKER, den NUR diese Seite hat — `.ant-layout-content` steht auf
   // jeder Route, und ein Redirect auf eine leere Seite mäße sich überlauffrei. Die Anker
@@ -621,6 +663,21 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       },
     },
     {
+      // LLH-1122: Vorgabe des Einsatzes; der Beobachter sieht sie mit dem Rechtehinweis.
+      pfad: `/einsaetze/${einsatzId}/einstellungen/abloesung`,
+      anker: (p: Page) => p.getByRole('region', { name: 'Schichtmodell des Einsatzes' }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
+    },
+  ];
+}
+
+/**
+ * Durchgang „Verwaltung und Vorlagen“: Verwaltung (Benutzer, Stammdaten) und „Einheit aus Vorlage
+ * bilden“: die Flächen mit der org-weiten Einheiten-Vorlage.
+ */
+function gate1RoutenVerwaltung(einsatzId: string): Gate1Route[] {
+  return [
+    {
       pfad: '/admin/benutzer',
       anker: (p: Page) => p.locator('tr.ant-table-row').first(),
       umleitungOhneAdmin: true,
@@ -650,11 +707,22 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       umleitungOhneAdmin: true,
     },
     {
-      // LLH-1122: Vorgabe des Einsatzes; der Beobachter sieht sie mit dem Rechtehinweis.
-      pfad: `/einsaetze/${einsatzId}/einstellungen/abloesung`,
-      anker: (p: Page) => p.getByRole('region', { name: 'Schichtmodell des Einsatzes' }),
+      // Einheit aus Vorlage bilden (LLH-1049): Kopf, Baum der Vorlage mit Zustandswort je Zeile
+      // und die Zusammenfassung am Knopf. Datenanker ist das Kästchen eines Fahrzeugs der Staffel.
+      pfad: `/einsaetze/${einsatzId}/einheiten/aus-vorlage/${VORLAGE.get(einsatzId)?.vorlageId}`,
+      anker: (p: Page) =>
+        p.getByRole('checkbox', { name: VORLAGE.get(einsatzId)?.fahrzeuge.rtw2 ?? '' }),
       lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
+  ];
+}
+
+/**
+ * Durchgang „Kräfte und Fernmeldewesen“: Personal, Kräfteübersicht, Lagebesprechung, Funk- und
+ * Kommunikationsplan, Fernmeldeskizze.
+ */
+function gate1RoutenKraefte(einsatzId: string): Gate1Route[] {
+  return [
     {
       pfad: `/einsaetze/${einsatzId}/personal`,
       anker: (p: Page) => p.getByText('Kirchgassner-Wohlfahrt, Maximiliane'),
@@ -664,14 +732,6 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       // Sammelzeile „Ohne Einheit" gibt es nur, wenn eine Kraft disponiert ist.
       pfad: `/einsaetze/${einsatzId}/kraefteuebersicht`,
       anker: (p: Page) => p.getByText('Ohne Einheit', { exact: true }),
-    },
-    {
-      // Einheit aus Vorlage bilden (LLH-1049): Kopf, Baum der Vorlage mit Zustandswort je Zeile
-      // und die Zusammenfassung am Knopf. Datenanker ist das Kästchen eines Fahrzeugs der Staffel.
-      pfad: `/einsaetze/${einsatzId}/einheiten/aus-vorlage/${VORLAGE.get(einsatzId)?.vorlageId}`,
-      anker: (p: Page) =>
-        p.getByRole('checkbox', { name: VORLAGE.get(einsatzId)?.fahrzeuge.rtw2 ?? '' }),
-      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
       // Lagebesprechung (LLH-1111) mit Termin, Vorbereitung (LFH-550) und Verlauf. Anker ist die
@@ -761,6 +821,12 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         },
       },
     },
+  ];
+}
+
+/** Durchgang „Führung und Stab“: Organigramm, Presse, Informationstelefon, Stab und Aufträge. */
+function gate1RoutenStab(einsatzId: string): Gate1Route[] {
+  return [
     {
       // Organigramm der Führungsorganisation (LFH-626): Ansicht der Seite Einsatzabschnitte, über
       // die Sichtvorgabe geöffnet. Datenanker ist die gesäte Einheit mit langem Namen IM
@@ -848,6 +914,12 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       },
       anker: (p: Page) => p.getByRole('button', { name: /^Befehl v1: Befehl an den 2\. Zug/ }),
     },
+  ];
+}
+
+/** Durchgang „Betroffene und Evakuierung“: Personen, Tiere, Wetter, Ablösung und Evakuierung. */
+function gate1RoutenBetroffene(einsatzId: string): Gate1Route[] {
+  return [
     {
       pfad: `/einsaetze/${einsatzId}/personen`,
       anker: (p: Page) => p.getByText('Oberacher-Dreiszigmark'),
@@ -887,6 +959,12 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       },
       anker: (p: Page) => p.locator('[data-lfh="verlauf-eintrag"]').getByText(/1.180 evakuiert/),
     },
+  ];
+}
+
+/** Durchgang „Betreuung, Verpflegung und Lagekarte“: Betreuung, Verpflegung und die Lagekarte. */
+function gate1RoutenVersorgung(einsatzId: string): Gate1Route[] {
+  return [
     {
       // Betreuung: nur noch die Stellen-Tabelle, mit ihrem eigenen Bildlauf auf 390 px.
       pfad: `/einsaetze/${einsatzId}/betreuung`,
@@ -1045,13 +1123,16 @@ function gate1VerwaltungRouten(): Gate1Route[] {
 
 /**
  * Misst alle Routen einer Rolle auf einer Breite und meldet gesammelt. Für Nicht-Admins
- * gelten Lese-Anker und Vorbedingungen des Nur-Lese-Zweigs (`lesend`).
+ * gelten Lese-Anker und Vorbedingungen des Nur-Lese-Zweigs (`lesend`). `alleRouten` ist die
+ * Gesamtheit, aus der `routen` ein Durchgang ist: eine Freistellung, deren Modul in einem
+ * ANDEREN Durchgang liegt, prüft dieser Test nicht auf Tod.
  */
 async function gate1Messen(
   page: Page,
   routen: Gate1Route[],
   rolle: Gate1Rolle,
   { name, breite, hoehe }: (typeof PRUEFBREITEN)[number],
+  alleRouten: Gate1Route[] = routen,
 ) {
   // ALLE Routen messen und gesammelt melden: sonst verdeckt der erste Fund die übrigen.
   const verstoesse: string[] = [];
@@ -1116,11 +1197,16 @@ async function gate1Messen(
   }
 
   // Ein Eintrag, den keine Route dieser Breite und Rolle getroffen hat, ist ebenso tot. Einträge
-  // auf einer Breite, die keine Prüfbreite ist, meldet JEDER Test seiner Rolle.
+  // auf einer Breite, die keine Prüfbreite ist, meldet JEDER Test seiner Rolle; ebenso Einträge,
+  // deren Modul in KEINEM Durchgang liegt. Liegt es in einem anderen Durchgang, ist der zuständig.
   const pruefbreiten: readonly number[] = PRUEFBREITEN.map((pb) => pb.breite);
+  const trifft = (b: Freistellung, r: Gate1Route[]) =>
+    r.some(({ pfad }) => pfad.endsWith(`/${b.modul}`));
   for (const b of BESTAND_OFFEN) {
     if (b.rolle !== rolle) continue;
-    const hierZustaendig = b.breite === breite || !pruefbreiten.includes(b.breite);
+    const hierZustaendig =
+      (b.breite === breite || !pruefbreiten.includes(b.breite)) &&
+      (trifft(b, routen) || !trifft(b, alleRouten));
     if (hierZustaendig && !genutzteFreistellungen.has(`${b.modul}@${b.breite}`)) {
       tot.push(
         `BESTAND_OFFEN nennt ${b.modul}@${b.breite}px (${b.rolle}), aber diese Route × Breite ` +
@@ -1135,9 +1221,9 @@ async function gate1Messen(
 }
 
 /*
- * JE PRÜFBREITE UND ROLLE EIN TEST: jeder hat sein eigenes Zeitbudget, und ein Bruch nennt
- * Breite und Rolle im Testnamen. Innerhalb eines Tests wird ALLES gemessen und gesammelt
- * gemeldet.
+ * JE PRÜFBREITE, ROLLE UND DURCHGANG EIN TEST: jeder hat sein eigenes Zeitbudget, und ein Bruch
+ * nennt Breite, Rolle und Durchgang im Testnamen. Innerhalb eines Tests wird ALLES gemessen und
+ * gesammelt gemeldet.
  *
  * ROLLEN (LFH-435): der Admin läuft nur durch die freien Zweige. Der Beobachter (weder
  * Verwaltungs- noch Schreibrecht) sieht Rechtehinweise, gesperrte Aktionen und den
@@ -1150,26 +1236,40 @@ test.describe('Gate 1', () => {
   test.describe.configure({ mode: 'parallel' });
   for (const pruefbreite of PRUEFBREITEN) {
     const { name, breite } = pruefbreite;
-    test(`Gate 1 · ${name} (${breite} px): keine tragende Route läuft waagerecht über`, async ({
-      page,
-    }) => {
-      // 20 Routen je Breite, jede mit `goto` und Inhaltsanker; `test.slow()` (90 s) reichte
-      // unter Last nicht mehr, seit der Überblick mitgemessen wird (LFH-435). Die drei
-      // S5-Seiten (LFH-554) kosten je Breite rund 10 s mehr.
-      test.setTimeout(240_000);
-      const einsatzId = await gate1Vorbereiten(page);
-      await gate1Messen(page, gate1Routen(einsatzId), 'admin', pruefbreite);
-    });
+    for (const durchgang of GATE1_DURCHGAENGE) {
+      test(`Gate 1 · ${name} (${breite} px) · ${durchgang.name}: keine tragende Route läuft waagerecht über`, async ({
+        page,
+      }) => {
+        // Fünf bis sechs Routen je Durchgang, jede mit `goto` und Inhaltsanker. Das Budget blieb
+        // beim Teilen gleich (LLH-1363): vorher trug es alle 35 Routen, mit Trace bei einer
+        // Wiederholung reichte es auf einem 2-vCPU-Runner nicht mehr.
+        test.setTimeout(240_000);
+        const einsatzId = await gate1Vorbereiten(page, { vorlage: durchgang.vorlage });
+        await gate1Messen(
+          page,
+          durchgang.routen(einsatzId),
+          'admin',
+          pruefbreite,
+          gate1AlleRouten(einsatzId),
+        );
+      });
 
-    test(`Gate 1 · ${name} (${breite} px) · Beobachter: auch ohne Schreibrecht läuft keine Route über`, async ({
-      page,
-    }) => {
-      test.setTimeout(240_000);
-      // Gesät wird als Admin; der Wechsel im selben Kontext behält den Wetter-Stub.
-      const einsatzId = await gate1Vorbereiten(page);
-      await wechsleZuRolle(page, 'beobachter', einsatzId);
-      await gate1Messen(page, gate1Routen(einsatzId), 'beobachter', pruefbreite);
-    });
+      test(`Gate 1 · ${name} (${breite} px) · Beobachter · ${durchgang.name}: auch ohne Schreibrecht läuft keine Route über`, async ({
+        page,
+      }) => {
+        test.setTimeout(240_000);
+        // Gesät wird als Admin; der Wechsel im selben Kontext behält den Wetter-Stub.
+        const einsatzId = await gate1Vorbereiten(page, { vorlage: durchgang.vorlage });
+        await wechsleZuRolle(page, 'beobachter', einsatzId);
+        await gate1Messen(
+          page,
+          durchgang.routen(einsatzId),
+          'beobachter',
+          pruefbreite,
+          gate1AlleRouten(einsatzId),
+        );
+      });
+    }
 
     test(`Gate 1 · ${name} (${breite} px) · Führungskraft: die Verwaltung ohne Admin-Recht läuft nicht über`, async ({
       page,

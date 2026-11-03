@@ -5,6 +5,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { freigabenFixture } from '../../test/fixtures';
+import { warteAufMenueFokus } from '../../test/menue';
 import type { ComponentProps } from 'react';
 import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, ModulFreigaben } from '../../api/types';
 import { buildBesatzungMittel, buildEinheitRechte } from './einheitAnsichtKern';
@@ -182,10 +183,12 @@ const fahrzeugZeile = (funkrufname: string) =>
 /**
  * Das offene antd-Menü (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“). Jede Person
  * hat ihr eigenes Portal, das beim ersten Öffnen ans Ende von `body` kommt; das zuletzt
- * geöffnete ist deshalb das letzte, auch solange das vorige noch ausblendet.
+ * geöffnete ist deshalb das letzte, auch solange das vorige noch ausblendet. Zurück kommt es erst,
+ * wenn sein `autoFocus` verbraucht ist (`test/menue.ts`).
  */
 async function oeffneMenue(name: string) {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Person ${name}` }));
+  await warteAufMenueFokus();
   return waitFor(() => {
     const offen = document.querySelectorAll<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
@@ -201,6 +204,7 @@ async function waehleStatus(funkrufname: string, eintrag: string) {
       name: `Status von ${funkrufname} ändern`,
     }),
   );
+  await warteAufMenueFokus();
   const menue = await waitFor(() => {
     const offen = document.querySelectorAll<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',

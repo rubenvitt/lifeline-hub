@@ -8,6 +8,7 @@ import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils'
 import { setzeViewportBreite } from '../test/viewport';
 import BenutzerPage from './BenutzerPage';
 import { adminFixture } from '../test/fixtures';
+import { warteAufMenueFokus } from '../test/menue';
 import {
   EIGENES_KONTO,
   EIGENES_PASSWORT,
@@ -45,15 +46,21 @@ const ausloeser = (anzeigename: string) =>
   });
 
 /**
- * Wählt im Aktionsmenü der Zeile `anzeigename` den Eintrag `eintrag`. Erst wenn ein Menü den Fokus
- * hat: `Dropdown autoFocus` zieht ihn drei Frames nach dem Öffnen ins Menü und bricht das beim
- * Schließen nicht ab. Ein früherer Klick ließe ihn dem Dialog danach wieder wegnehmen. „Ein“
- * Menü, nicht das neue: beim zweiten Öffnen hält jsdom den Fokus noch im ausblendenden ersten.
+ * Öffnet das Aktionsmenü der Zeile `anzeigename` und liefert es, erst wenn ein Menü den Fokus hat:
+ * `Dropdown autoFocus` zieht ihn drei Frames nach dem Öffnen ins Menü und bricht das beim
+ * Schließen nicht ab (LLH-1390, `test/menue.ts`). Ein früherer Klick ließe ihn dem Dialog danach
+ * wieder wegnehmen.
  */
-async function waehle(anzeigename: string, eintrag: string) {
+async function oeffneMenue(anzeigename: string): Promise<HTMLElement> {
   await userEvent.click(await ausloeser(anzeigename));
   const menue = await offenesMenue();
-  await waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull());
+  await warteAufMenueFokus();
+  return menue;
+}
+
+/** Wählt im Aktionsmenü der Zeile `anzeigename` den Eintrag `eintrag` (siehe `oeffneMenue`). */
+async function waehle(anzeigename: string, eintrag: string) {
+  const menue = await oeffneMenue(anzeigename);
   await userEvent.click(within(menue).getByRole('menuitem', { name: eintrag }));
 }
 
@@ -154,6 +161,7 @@ describe('BenutzerPage', () => {
     const input = await screen.findByLabelText('Anzeigename');
     await userEvent.clear(input);
     await userEvent.type(input, 'Eva Neu');
+    expect(input).toHaveValue('Eva Neu');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(patchBody).not.toBeNull());
@@ -805,9 +813,8 @@ describe('BenutzerPage', () => {
         ),
       );
       seite();
-      await userEvent.click(await ausloeser('Admin'));
       // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
-      const eintrag = within(await offenesMenue()).getByRole('menuitem', {
+      const eintrag = within(await oeffneMenue('Admin')).getByRole('menuitem', {
         name: `Deaktivieren gesperrt: ${LETZTER_ADMIN}`,
       });
       expect(eintrag).toHaveAttribute('aria-disabled', 'true');
@@ -824,16 +831,14 @@ describe('BenutzerPage', () => {
         ),
       );
       seite();
-      await userEvent.click(await ausloeser('Admin'));
       expect(
-        within(await offenesMenue()).getByRole('menuitem', {
+        within(await oeffneMenue('Admin')).getByRole('menuitem', {
           name: `Deaktivieren gesperrt: ${EIGENES_KONTO}`,
         }),
       ).toHaveAttribute('aria-disabled', 'true');
       await userEvent.keyboard('{Escape}');
       await waitFor(() => expect(menueOffen()).toBeNull());
-      await userEvent.click(await ausloeser('Zweit'));
-      const menue = await offenesMenue();
+      const menue = await oeffneMenue('Zweit');
       expect(within(menue).getByRole('menuitem', { name: 'Deaktivieren' })).not.toHaveAttribute(
         'aria-disabled',
         'true',
@@ -848,8 +853,7 @@ describe('BenutzerPage', () => {
         http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
       );
       seite();
-      await userEvent.click(await ausloeser('Admin'));
-      const eintrag = within(await offenesMenue()).getByRole('menuitem', {
+      const eintrag = within(await oeffneMenue('Admin')).getByRole('menuitem', {
         name: `Deaktivieren gesperrt: ${LETZTER_ADMIN}`,
       });
       expect(eintrag).toHaveAttribute('aria-disabled', 'true');
@@ -959,8 +963,7 @@ describe('BenutzerPage', () => {
         ),
       );
       seite();
-      await userEvent.click(await ausloeser('Eva'));
-      const menue = await offenesMenue();
+      const menue = await oeffneMenue('Eva');
       const eintrag = within(menue).getByRole('menuitem', { name: EINTRAG });
       expect(eintrag).toHaveClass('ant-dropdown-menu-item-danger');
       // Unumkehrbar: hinter dem Trenner, nach den umkehrbaren Einträgen.
@@ -971,8 +974,9 @@ describe('BenutzerPage', () => {
       await userEvent.keyboard('{Escape}');
       await waitFor(() => expect(menueOffen()).toBeNull());
 
-      await userEvent.click(await ausloeser('Max'));
-      expect(within(await offenesMenue()).queryByRole('menuitem', { name: EINTRAG })).toBeNull();
+      expect(
+        within(await oeffneMenue('Max')).queryByRole('menuitem', { name: EINTRAG }),
+      ).toBeNull();
     });
 
     it('fragt zurück; erst die Bestätigung setzt zurück, Abbrechen sendet nichts', async () => {
@@ -1007,8 +1011,9 @@ describe('BenutzerPage', () => {
       expect(await screen.findByText('Zweiter Faktor von Eva zurückgesetzt')).toBeInTheDocument();
       // Nach dem Neuladen hat Eva keinen zweiten Faktor mehr: die Aktion fällt weg.
       await waitFor(async () => {
-        await userEvent.click(await ausloeser('Eva'));
-        expect(within(await offenesMenue()).queryByRole('menuitem', { name: EINTRAG })).toBeNull();
+        expect(
+          within(await oeffneMenue('Eva')).queryByRole('menuitem', { name: EINTRAG }),
+        ).toBeNull();
       });
     });
 

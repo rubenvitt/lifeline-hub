@@ -27,16 +27,18 @@ const STELLE = m('betreuungsstelle', 2, 'Turnhalle Mitte');
 const RAUM = m('bereitstellungsraum', 4, 'BR Sportplatz');
 const PERSON = m('person', 3, 'Müller, Anna');
 const TIER = m('tier', 5, 'T-005 (Hund)');
+const SAMMELSTELLE = m('sammelstelle', 6, 'Sammelstelle Nord');
 
 describe('suchbareMarker — Modulsperren (LFH-716, D1)', () => {
   const basis = {
-    verortet: [UHS, STELLE, RAUM, TIER],
+    verortet: [UHS, STELLE, RAUM, TIER, SAMMELSTELLE],
     personen: [PERSON],
     personenZugriff: 'frei' as const,
     personenEbeneAn: true,
     betreuungZugriff: 'frei' as const,
     brZugriff: 'frei' as const,
     tierZugriff: 'frei' as const,
+    evakuierungZugriff: 'frei' as const,
   };
   const namen = (a: typeof basis | Parameters<typeof suchbareMarker>[0]) =>
     suchbareMarker(a).map((x) => x.label);
@@ -78,6 +80,19 @@ describe('suchbareMarker — Modulsperren (LFH-716, D1)', () => {
       const liste = namen({ ...basis, tierZugriff: zugriff });
       expect(liste).not.toContain('T-005 (Hund)');
       expect(liste).toContain('BR Sportplatz');
+    },
+  );
+
+  it('mit Recht auf Evakuierung: die Sammelstelle ist suchbar (LLH-1393)', () => {
+    expect(namen(basis)).toContain('Sammelstelle Nord');
+  });
+
+  it.each(['gesperrt', 'ausgeblendet'] as const)(
+    'ohne Recht auf Evakuierung (%s): keine Sammelstelle in der Suche (LLH-1393)',
+    (zugriff) => {
+      const liste = namen({ ...basis, evakuierungZugriff: zugriff });
+      expect(liste).not.toContain('Sammelstelle Nord');
+      expect(liste).toContain('Turnhalle Mitte');
     },
   );
 
@@ -125,11 +140,13 @@ describe('objektEintraege — eine Liste für verortet und nicht verortet (LLH-1
       { typ: 'betreuungsstelle' as const, id: 8, label: 'AS Rathaus' },
       { typ: 'bereitstellungsraum' as const, id: 9, label: 'BR Nord' },
       { typ: 'tier' as const, id: 10, label: 'T-010 (Katze)' },
+      { typ: 'sammelstelle' as const, id: 11, label: 'Sammelstelle Süd' },
     ],
     einsatzortOhneOrt: false,
     betreuungZugriff: 'frei' as const,
     brZugriff: 'frei' as const,
     tierZugriff: 'frei' as const,
+    evakuierungZugriff: 'frei' as const,
   };
   const namen = (a: Parameters<typeof objektEintraege>[0]) =>
     objektEintraege(a).map((x) => x.label);
@@ -151,6 +168,7 @@ describe('objektEintraege — eine Liste für verortet und nicht verortet (LLH-1
     ['betreuungZugriff', 'AS Rathaus'],
     ['brZugriff', 'BR Nord'],
     ['tierZugriff', 'T-010 (Katze)'],
+    ['evakuierungZugriff', 'Sammelstelle Süd'],
   ] as const)(
     'Modulsperre je Typ auch für nicht verortete: ohne %s fehlt „%s“',
     (schluessel, name) => {

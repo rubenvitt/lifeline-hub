@@ -4,6 +4,12 @@ use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
+/// Erläuterung einer Matrixzelle (`beschreibung`, LLH-1366); sie steht auch im Lagevortrag und im
+/// Karten-Inspector. Lang wie die übrigen Bemerkungen und Notizen.
+pub const BESCHREIBUNG_MAX: usize = 2_000;
+/// „Gemeldet von“ einer Matrixzelle (LLH-1366): ein kurzer Name oder Rufname.
+pub const GEMELDET_VON_MAX: usize = 200;
+
 wire_enum! {
     /// Gefahrentyp (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `gefahrentyp`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

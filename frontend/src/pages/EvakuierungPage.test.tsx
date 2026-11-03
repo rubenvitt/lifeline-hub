@@ -16,6 +16,7 @@ import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { warteAufMenueFokus } from '../test/menue';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -170,15 +171,21 @@ async function dialogUnter(titel: string): Promise<HTMLElement> {
   });
 }
 
-/** Das geöffnete Menü — antd lässt die Portale geschlossener Dropdowns im Baum stehen. */
+/**
+ * Das geöffnete Menü — antd lässt die Portale geschlossener Dropdowns im Baum stehen. Kommt erst
+ * zurück, wenn der späte `autoFocus` verbraucht ist: sonst zieht er den Fokus nach der Wahl ins
+ * geschlossene Menü (LLH-1390, siehe `test/menue.ts`).
+ */
 async function offenesMenue() {
-  return waitFor(() => {
+  const menue = await waitFor(() => {
     const offen = document.querySelectorAll(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
     expect(offen.length).toBeGreaterThan(0);
     return offen[offen.length - 1] as HTMLElement;
   });
+  await warteAufMenueFokus();
+  return menue;
 }
 
 async function meldeStand(evakuiert: string) {
@@ -448,6 +455,23 @@ describe('EvakuierungPage (LLH-1034)', () => {
     );
     expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
       '/einsaetze/1/lagekarte?evakuierungsbezirk=5',
+    );
+  });
+
+  it('„Auf Karte zeigen" auch am Bezirk ohne Fläche, aber mit verorteter Sammelstelle (LLH-1393)', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    api.ladeEvakuierung.mockResolvedValue({
+      bezirke: [{ ...HAFEN, flaechen: 0, sammelstelle_lat: 53.54, sammelstelle_lon: 9.98 }],
+    });
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' }),
+    );
+    await userEvent.click(
+      within(await offenesMenue()).getByRole('menuitem', { name: /Auf Karte zeigen/ }),
+    );
+    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
+      `/einsaetze/1/lagekarte?evakuierungsbezirk=${HAFEN.id}`,
     );
   });
 

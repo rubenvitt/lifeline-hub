@@ -65,3 +65,19 @@ async fn schluessel_wird_einmal_erzeugt_und_danach_gelesen() {
         .unwrap();
     assert_eq!(zeilen, 1);
 }
+
+#[test]
+fn nutzlast_traegt_die_inhaltsmarke_nur_mit_wahl() {
+    let ereignis = r#"{"einsatz_id":1,"benachrichtigung_id":7,"art":"sofortmeldung"}"#;
+    assert_eq!(nutzlast_fuer(ereignis, false), ereignis);
+    let mit: serde_json::Value = serde_json::from_str(&nutzlast_fuer(ereignis, true)).unwrap();
+    assert_eq!(mit["inhalt"], true);
+    assert_eq!(mit["benachrichtigung_id"], 7);
+    assert_eq!(
+        mit.as_object().unwrap().len(),
+        4,
+        "nur die Marke kommt dazu: {mit}"
+    );
+    // Kein Objekt: unverändert, der Worker übergeht es ohnehin.
+    assert_eq!(nutzlast_fuer("kaputt", true), "kaputt");
+}

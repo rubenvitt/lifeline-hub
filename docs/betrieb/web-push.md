@@ -38,7 +38,9 @@ ausgehenden Verkehr beschränkt, muss diese Hosts freigeben.
 
 - **Inhalt: nichts.** Der Push trägt nur Kennungen (Benachrichtigung, Einsatz, Art, Stufe),
   verschlüsselt für den Browser (RFC 8291). Titel und Text holt das Gerät danach selbst beim
-  Server, mit seiner Sitzung.
+  Server, mit seiner Sitzung. Hat die Person auf dem Gerät „Mit Absender und Wortlaut“
+  eingeschaltet (LLH-1369), trägt der Push dazu nur die Marke `inhalt`; Absender und Wortlaut
+  einer Meldung holt das Gerät ebenso selbst.
 - **Wohl aber:** wann eine Benachrichtigung an welches Abo ging, die Größe des Pushs und die
   Dringlichkeit (Alarm `high`, Hinweis `normal`). Dazu die Adresse des Servers und den Kontakt.
 

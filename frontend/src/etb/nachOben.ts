@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useRahmenOben } from '../components/rahmenOben';
 
 /**
  * „Nach oben“ im ETB: in Funkprotokoll-Ordnung öffnet die Seite am Ende (`etb/AGENTS.md`,
@@ -32,6 +33,44 @@ export function useWeitGerollt(): boolean {
     };
   }, []);
   return weit;
+}
+
+/**
+ * Ab welchem Anteil ein Knopf als ganz unter dem Rahmen gilt. Knapp unter 1: Chromium meldet für ein
+ * ganz enthaltenes Ziel auf Bruchteil-Pixeln mitunter 0,999…, und ein Pixel Überlappung verdeckt
+ * nichts.
+ */
+export const GANZ_FREI_AB = 0.98;
+
+/**
+ * Passt der Knopf ganz zwischen den klebenden Rahmen oben (`--lfh-rahmen-oben`) und die
+ * Erfassungsleiste unten (LLH-1386)? Die Überlagerung der Zeitachse hängt über der Leiste und
+ * stapelt nach oben: ist die Leiste hoch (Hinweise, Anhangliste, Berichtigungswarnung) und das
+ * Fenster niedrig, rutscht „Nach oben“ ganz hinter den Kopf und bliebe dort ein Tab-Stopp, den
+ * niemand sieht. Dann steht er unsichtbar (`visibility: hidden`: kein Tab-Stopp, kein Vorleser,
+ * aber weiter vermessen), bis wieder Platz ist.
+ *
+ * Gemessen über einen `IntersectionObserver`, dessen Wurzel oben um den Rahmen gekürzt ist: er
+ * meldet jede Lageänderung — Bildlauf, Fenstergröße, wachsende Leiste, eintreffendes Banner —
+ * ohne eigene Zuhörer. Ohne ihn (jsdom) gilt der Knopf als frei.
+ */
+export function useNachObenPasst(): [boolean, (el: HTMLElement | null) => void] {
+  const rahmenOben = useRahmenOben();
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [passt, setPasst] = useState(true);
+  useEffect(() => {
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const beobachter = new IntersectionObserver(
+      (eintraege) => {
+        const letzter = eintraege[eintraege.length - 1];
+        setPasst(letzter.isIntersecting && letzter.intersectionRatio >= GANZ_FREI_AB);
+      },
+      { rootMargin: `-${rahmenOben}px 0px 0px 0px`, threshold: [0, GANZ_FREI_AB, 1] },
+    );
+    beobachter.observe(el);
+    return () => beobachter.disconnect();
+  }, [el, rahmenOben]);
+  return [passt, setEl];
 }
 
 /**

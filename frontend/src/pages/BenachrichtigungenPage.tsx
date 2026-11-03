@@ -11,9 +11,10 @@ import {
 } from '../alarm/desktopAlarm';
 import { useBenachrichtigungsEinstellungen } from '../alarm/useBenachrichtigungsEinstellungen';
 import {
-  ladePushZustand,
+  ladePushStand,
   pushAusschalten,
   pushEinschalten,
+  pushInhaltSetzen,
   type PushZustand,
 } from '../alarm/webPush';
 import { useAuthOptional } from '../auth/AuthContext';
@@ -30,21 +31,83 @@ export const IMMER_AN = 'immer an';
 export const PUSH_SCHALTER = 'Auch bei geschlossener App';
 
 /**
+ * Name des Schalters für den Inhalt in Push-Meldungen (LLH-1369, Spec `web-push`, „Inhalt der
+ * Meldung nur auf Wunsch“). Nur bei eingeschaltetem Push, Vorgabe aus.
+ */
+export const PUSH_INHALT_SCHALTER = 'Mit Absender und Wortlaut';
+
+/** Eine Zeile mit Beschriftung, „nicht gespeichert“ bei Fehler, und dem Schalter rechts. */
+function SchalterZeile({
+  zeile,
+  feldId,
+  name,
+  fehler,
+  marke,
+  an,
+  laeuft,
+  gesperrt,
+  setze,
+}: {
+  zeile: CSSProperties;
+  feldId: string;
+  name: string;
+  fehler: boolean;
+  marke?: string;
+  an: boolean;
+  laeuft: boolean;
+  gesperrt: boolean;
+  setze: (an: boolean) => void;
+}) {
+  const { token } = theme.useToken();
+  return (
+    <PaneelZeile
+      style={fehler ? { borderInlineStart: `3px solid ${token.colorError}` } : undefined}
+    >
+      <div style={zeile} data-fehler={fehler ? 'true' : undefined}>
+        <label htmlFor={feldId} style={{ cursor: 'pointer', minWidth: 0 }}>
+          {name}
+          {fehler && (
+            <Typography.Text type="danger" style={{ display: 'block', fontSize: token.fontSizeSM }}>
+              nicht gespeichert
+            </Typography.Text>
+          )}
+        </label>
+        <span style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
+          {marke && <Typography.Text type="warning">{marke}</Typography.Text>}
+          <Switch
+            id={feldId}
+            aria-label={name}
+            checked={an}
+            loading={laeuft}
+            disabled={laeuft || gesperrt}
+            onChange={setze}
+          />
+        </span>
+      </div>
+    </PaneelZeile>
+  );
+}
+
+/**
  * Web Push für diesen Browser (LLH-1223, design.md D8). Fehlt, wo es kein Push gibt (Browser,
  * Hülle, Server ohne Schalter). Erlaubnis, iOS und was der Schalter bewirkt, erklärt die
  * Anwenderdoku.
  */
 function PushSchalter({ zeile }: { zeile: CSSProperties }) {
-  const { token } = theme.useToken();
   const benutzerId = useAuthOptional()?.benutzer?.id ?? null;
   const [zustand, setZustand] = useState<PushZustand | null>(null);
-  const [laeuft, setLaeuft] = useState(false);
-  const [fehler, setFehler] = useState(false);
+  const [inhalt, setInhalt] = useState(false);
+  const [laeuft, setLaeuft] = useState<'push' | 'inhalt' | null>(null);
+  const [fehler, setFehler] = useState<'push' | 'inhalt' | null>(null);
 
   useEffect(() => {
     let aktiv = true;
-    ladePushZustand().then(
-      (z) => aktiv && setZustand(z),
+    ladePushStand().then(
+      (s) => {
+        if (!aktiv) return;
+        setZustand(s.zustand);
+        setInhalt(s.inhalt);
+      },
       () => aktiv && setZustand('fehlt'),
     );
     return () => {
@@ -54,44 +117,52 @@ function PushSchalter({ zeile }: { zeile: CSSProperties }) {
 
   if (zustand == null || zustand === 'fehlt' || benutzerId == null) return null;
   const blockiert = zustand === 'blockiert';
-  const setze = (an: boolean) => {
-    setLaeuft(true);
-    setFehler(false);
+  const setzePush = (an: boolean) => {
+    setLaeuft('push');
+    setFehler(null);
     (an ? pushEinschalten(benutzerId) : pushAusschalten(benutzerId))
-      .then(setZustand, () => setFehler(true))
-      .finally(() => setLaeuft(false));
+      .then(
+        (z) => {
+          setZustand(z);
+          // Neu eingeschaltet oder aus: die Vorgabe gilt, ohne Inhalt.
+          setInhalt(false);
+        },
+        () => setFehler('push'),
+      )
+      .finally(() => setLaeuft(null));
   };
-  const feldId = 'benachrichtigung-push';
+  const setzeInhalt = (an: boolean) => {
+    setLaeuft('inhalt');
+    setFehler(null);
+    pushInhaltSetzen(benutzerId, an)
+      .then(setInhalt, () => setFehler('inhalt'))
+      .finally(() => setLaeuft(null));
+  };
   return (
     <Paneel titel="Dieses Gerät">
-      <PaneelZeile
-        style={fehler ? { borderInlineStart: `3px solid ${token.colorError}` } : undefined}
-      >
-        <div style={zeile} data-fehler={fehler ? 'true' : undefined}>
-          <label htmlFor={feldId} style={{ cursor: 'pointer', minWidth: 0 }}>
-            {PUSH_SCHALTER}
-            {fehler && (
-              <Typography.Text
-                type="danger"
-                style={{ display: 'block', fontSize: token.fontSizeSM }}
-              >
-                nicht gespeichert
-              </Typography.Text>
-            )}
-          </label>
-          <span style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
-            {blockiert && <Typography.Text type="warning">Vom Browser blockiert</Typography.Text>}
-            <Switch
-              id={feldId}
-              aria-label={PUSH_SCHALTER}
-              checked={zustand === 'an'}
-              loading={laeuft}
-              disabled={laeuft || blockiert}
-              onChange={setze}
-            />
-          </span>
-        </div>
-      </PaneelZeile>
+      <SchalterZeile
+        zeile={zeile}
+        feldId="benachrichtigung-push"
+        name={PUSH_SCHALTER}
+        fehler={fehler === 'push'}
+        marke={blockiert ? 'Vom Browser blockiert' : undefined}
+        an={zustand === 'an'}
+        laeuft={laeuft === 'push'}
+        gesperrt={laeuft != null || blockiert}
+        setze={setzePush}
+      />
+      {zustand === 'an' && (
+        <SchalterZeile
+          zeile={zeile}
+          feldId="benachrichtigung-push-inhalt"
+          name={PUSH_INHALT_SCHALTER}
+          fehler={fehler === 'inhalt'}
+          an={inhalt}
+          laeuft={laeuft === 'inhalt'}
+          gesperrt={laeuft != null}
+          setze={setzeInhalt}
+        />
+      )}
     </Paneel>
   );
 }

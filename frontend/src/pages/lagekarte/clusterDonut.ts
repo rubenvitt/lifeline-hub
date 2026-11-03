@@ -28,6 +28,8 @@ export const CLUSTER_TYP_FARBE: Record<Exclude<ClusterTyp, 'person'>, string> = 
   bereitstellungsraum: '#65a30d', // limette
   // Tiere (LLH-1123): weder Gefahr noch Kräfte, abgesetzt von Indigo und Violett.
   tier: '#db2777', // pink
+  // Sammelstellen (LLH-1393): neben der Betreuung, abgesetzt von Cyan, Pink und Amber.
+  sammelstelle: '#92400e', // braun
 };
 
 /**
@@ -68,6 +70,7 @@ const TYP_REIHENFOLGE: Exclude<ClusterTyp, 'person'>[] = [
   'abschnitt',
   'uhs',
   'betreuungsstelle',
+  'sammelstelle',
   'bereitstellungsraum',
   'tier',
   'schaden',
