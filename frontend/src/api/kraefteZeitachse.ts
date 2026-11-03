@@ -2,8 +2,8 @@ import { apiGet, apiSend } from './client';
 import type { EinheitPerioden, PersonPerioden, Zeitachse, ZeitachseNachtragBody } from './types';
 
 /**
- * Kräfte-Zeitachse (LFH-552): Perioden je Einheit/Person, Zeitachse einer Kraft, Nachtrag und
- * Streichung. Die Pfade liegen unter den Modulen Einheiten bzw. Personal und erben deren Sperre.
+ * Kräfte-Zeitachse (LFH-552): Perioden je Einheit/Person, Zeitachse einer Kraft, Nachtrag,
+ * Streichung und Berichtigung des Zeitpunkts (LLH-1455). Die Pfade liegen unter den Modulen Einheiten bzw. Personal und erben deren Sperre.
  */
 export type KraftArt = 'einheit' | 'person';
 
@@ -47,4 +47,22 @@ export function streicheEreignis(
   return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/${ereignisId}/streichen`, 'POST', {
     grund,
   });
+}
+
+/**
+ * Berichtigt den Zeitpunkt eines Ereignisses in einem Schritt (LLH-1455): der Server streicht es mit
+ * dem Grund und schreibt es zum neuen Zeitpunkt neu; geprüft wird nur das Ergebnis.
+ */
+export function berichtigeEreignis(
+  einsatzId: number,
+  art: KraftArt,
+  id: number,
+  ereignisId: number,
+  body: { zeitpunkt_at: string; grund: string },
+): Promise<Zeitachse> {
+  return apiSend<Zeitachse>(
+    `${kraftPfad(einsatzId, art, id)}/${ereignisId}/berichtigen`,
+    'POST',
+    body,
+  );
 }

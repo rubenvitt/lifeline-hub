@@ -354,6 +354,227 @@ async fn ablosungsereignis_nur_ueber_ruecknahme() {
     assert!(matches!(r, Err(AppError::UnprocessableEntity(_))));
 }
 
+// ── Berichtigung (LLH-1455) ─────────────────────────────────────────────────────────────────
+
+async fn berichtige(
+    w: &Welt,
+    kraft: Kraft,
+    id: i64,
+    uhr: &str,
+    grund: &str,
+) -> Result<Berichtigt, AppError> {
+    let mut conn = w.pool.acquire().await.unwrap();
+    berichtige_tx(&mut conn, w.e, w.b, kraft, id, &t(uhr), grund).await
+}
+
+fn id_von(r: Schreibergebnis) -> i64 {
+    match r {
+        Schreibergebnis::Geschrieben(id) => id,
+        Schreibergebnis::Ausgelassen(v) => panic!("ausgelassen: {v}"),
+    }
+}
+
+/// Spec „Eintreffen als Anker berichtigen": Streichen allein bräche die Ordnung, Nachtragen allein
+/// verdoppelte; die Berichtigung prüft nur das Ergebnis.
+#[tokio::test]
+async fn berichtigung_verschiebt_das_eintreffen_als_anker() {
+    let w = welt().await;
+    let p = Kraft::Person(w.p[0]);
+    let id = id_von(schreibe(&w, p, Eintreffen, "06:40", Q::Status).await);
+    schreibe(&w, p, Entlassung, "14:00", Q::Nachtrag).await;
+    assert!(
+        streiche(&w, p, id, "x").await.is_err(),
+        "Streichen allein bricht"
+    );
+
+    let b = berichtige(&w, p, id, "06:30", "Zeit verwechselt")
+        .await
+        .unwrap();
+    assert_eq!(b.art, Eintreffen);
+    assert_eq!(b.alt_at, t("06:40"));
+    assert_ne!(b.id, id);
+    assert_eq!(
+        folge(&w, p).await,
+        vec![
+            ev("eintreffen", "06:30", "nachtrag"),
+            ev("entlassung", "14:00", "nachtrag")
+        ]
+    );
+    let z = laden(&w.pool, w.e, p).await.unwrap();
+    let alt = z.ereignisse.iter().find(|e| e.id == id).unwrap();
+    assert_eq!(alt.streichgrund.as_deref(), Some("Zeit verwechselt"));
+    assert_eq!(z.perioden.len(), 1);
+    assert_eq!(z.perioden[0].beginn_at, t("06:30"));
+}
+
+#[tokio::test]
+async fn berichtigung_verschiebt_die_abschliessende_entlassung_und_behaelt_die_notiz() {
+    let w = welt().await;
+    let p = Kraft::Person(w.p[0]);
+    schreibe(&w, p, Eintreffen, "06:40", Q::Status).await;
+    let mut conn = w.pool.acquire().await.unwrap();
+    let z = t("14:00");
+    let (r, _) = schreibe_tx(
+        &mut conn,
+        w.e,
+        w.b,
+        p,
+        Neu {
+            art: Entlassung,
+            zeitpunkt_at: &z,
+            quelle: Q::Nachtrag,
+            notiz: Some("per Funk"),
+        },
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    let id = id_von(r);
+    berichtige(&w, p, id, "13:30", "zu spät gemeldet")
+        .await
+        .unwrap();
+    let z = laden(&w.pool, w.e, p).await.unwrap();
+    assert_eq!(z.perioden[0].ende_at.as_deref(), Some(t("13:30").as_str()));
+    let neu = z
+        .ereignisse
+        .iter()
+        .find(|e| e.gestrichen_at.is_none() && e.art == Entlassung)
+        .unwrap();
+    assert_eq!(neu.notiz.as_deref(), Some("per Funk"));
+}
+
+/// Spec „Ergebnis verletzt die Regeln": 422, nichts gestrichen, nichts geschrieben.
+#[tokio::test]
+async fn berichtigung_mit_regelverstoss_ist_422_und_schreibt_nichts() {
+    let w = welt().await;
+    let p = Kraft::Person(w.p[0]);
+    let id = id_von(schreibe(&w, p, Alarmierung, "06:10", Q::Status).await);
+    schreibe(&w, p, Eintreffen, "06:40", Q::Status).await;
+    let r = berichtige(&w, p, id, "07:00", "x").await;
+    assert!(matches!(r, Err(AppError::UnprocessableEntity(_))), "{r:?}");
+    let z = laden(&w.pool, w.e, p).await.unwrap();
+    assert_eq!(z.ereignisse.len(), 2);
+    assert!(z.ereignisse.iter().all(|e| e.gestrichen_at.is_none()));
+}
+
+#[tokio::test]
+async fn berichtigung_unveraendert_gestrichen_vollzug_und_fremd() {
+    let w = welt().await;
+    let p = Kraft::Person(w.p[0]);
+    let id = id_von(schreibe(&w, p, Eintreffen, "06:40", Q::Nachtrag).await);
+    assert!(matches!(
+        berichtige(&w, p, id, "06:40", "x").await,
+        Err(AppError::UnprocessableEntity(_))
+    ));
+    assert!(matches!(
+        berichtige(&w, Kraft::Person(w.p[1]), id, "06:30", "x").await,
+        Err(AppError::NotFound)
+    ));
+    streiche(&w, p, id, "x").await.unwrap();
+    assert!(matches!(
+        berichtige(&w, p, id, "06:30", "x").await,
+        Err(AppError::UnprocessableEntity(_))
+    ));
+
+    schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "07:00", Q::Status).await;
+    let mut conn = w.pool.acquire().await.unwrap();
+    abloesung_vollzogen_tx(&mut conn, w.e, w.b, w.f1, &t("14:40"))
+        .await
+        .unwrap();
+    drop(conn);
+    let abl = laden(&w.pool, w.e, Kraft::Einheit(w.f1))
+        .await
+        .unwrap()
+        .ereignisse
+        .into_iter()
+        .find(|e| e.art == Abloesung)
+        .unwrap()
+        .id;
+    assert!(matches!(
+        berichtige(&w, Kraft::Einheit(w.f1), abl, "14:30", "x").await,
+        Err(AppError::UnprocessableEntity(_))
+    ));
+}
+
+/// Spec „Kopien der Personen folgen": die Personen mit Kopie bekommen die berichtigte, eine
+/// später zugeordnete keine.
+#[tokio::test]
+async fn berichtigung_an_der_einheit_folgt_den_kopien() {
+    let w = welt().await;
+    let id = id_von(schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await);
+    let spaet = person(&w.pool, w.e, "Dora", Some(w.f1)).await;
+    // Bert wechselt danach die Einheit: seine Zeit bleibt die der Einheit.
+    let f2 = einheit(&w.pool, w.e, "Florian 2").await;
+    sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
+        .bind(f2)
+        .bind(w.p[1])
+        .execute(&w.pool)
+        .await
+        .unwrap();
+
+    let b = berichtige(&w, Kraft::Einheit(w.f1), id, "06:30", "Zeit verwechselt")
+        .await
+        .unwrap();
+    assert_eq!(b.beruehrt.personen, w.p.to_vec());
+    for p in w.p {
+        assert_eq!(
+            folge(&w, Kraft::Person(p)).await,
+            vec![ev("eintreffen", "06:30", "einheit")]
+        );
+    }
+    assert!(folge(&w, Kraft::Person(spaet)).await.is_empty());
+    let kopie = laden(&w.pool, w.e, Kraft::Person(w.p[0]))
+        .await
+        .unwrap()
+        .ereignisse
+        .into_iter()
+        .find(|e| e.gestrichen_at.is_none())
+        .unwrap();
+    assert_eq!(kopie.ursprung_id, Some(b.id));
+}
+
+/// Spec „Person verlöre ihre Ordnung": alles oder nichts, mit Namen.
+#[tokio::test]
+async fn berichtigung_prueft_jede_person_der_kette() {
+    let w = welt().await;
+    let id = id_von(schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await);
+    schreibe(&w, Kraft::Person(w.p[1]), Entlassung, "06:50", Q::Status).await;
+    let r = berichtige(&w, Kraft::Einheit(w.f1), id, "07:00", "x").await;
+    match r {
+        Err(AppError::UnprocessableEntity(m)) => assert!(m.contains("Bert"), "{m}"),
+        andere => panic!("422 erwartet, war {andere:?}"),
+    }
+    assert_eq!(
+        folge(&w, Kraft::Einheit(w.f1)).await,
+        vec![ev("eintreffen", "06:40", "status")]
+    );
+    assert_eq!(folge(&w, Kraft::Person(w.p[0])).await.len(), 1);
+}
+
+/// An einer entlassenen Person der Kette darf die Berichtigung keine Periode öffnen (LLH-1263).
+#[tokio::test]
+async fn berichtigung_oeffnet_keine_periode_einer_entlassenen_person_der_kette() {
+    let w = welt().await;
+    schreibe(&w, Kraft::Einheit(w.f1), Alarmierung, "06:10", Q::Status).await;
+    let ein = id_von(schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await);
+    schreibe(&w, Kraft::Person(w.p[2]), Entlassung, "10:00", Q::Status).await;
+    sqlx::query(
+        "UPDATE einsatz_personal SET beendet_at = '2026-09-30 10:00:00', beendet_als = 'entlassen' \
+         WHERE id = ?",
+    )
+    .bind(w.p[2])
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    // Das Eintreffen nach die Entlassung von Cem: bei ihm schlösse die Entlassung die Periode
+    // vorher, das Eintreffen öffnete eine neue.
+    let r = berichtige(&w, Kraft::Einheit(w.f1), ein, "10:30", "x").await;
+    match r {
+        Err(AppError::UnprocessableEntity(m)) => assert!(m.contains("Cem"), "{m}"),
+        andere => panic!("422 erwartet, war {andere:?}"),
+    }
+}
+
 // ── Aus Statuswechseln ──────────────────────────────────────────────────────────────────────
 
 async fn pstatus(pool: &SqlitePool, label: &str, marke: Option<&str>) -> i64 {
@@ -720,6 +941,43 @@ fn etb_texte_vermerken_die_berichtigung_nach_entlassung() {
     assert_eq!(
         s,
         "Zeitachse: Person «Anna» eingetroffen 300640sep26 gestrichen (berichtigt nach Entlassung) — Grund: Zeit verwechselt"
+    );
+}
+
+/// LLH-1455, design.md D6: ein Eintrag mit altem und neuem Zeitpunkt.
+#[test]
+fn etb_text_der_berichtigung() {
+    let tz = crate::zeitdarstellung::Zeitstil::new(
+        chrono_tz::Europe::Berlin,
+        crate::zeitdarstellung::Zeitdarstellung::Taktisch,
+    );
+    let s = etb_text_berichtigung(
+        Kraft::Einheit(1),
+        "Florian 1",
+        Eintreffen,
+        "2026-09-30 04:40:00",
+        "2026-09-30 04:30:00",
+        "Zeit verwechselt",
+        tz,
+        false,
+    );
+    assert_eq!(
+        s,
+        "Zeitachse: Einheit «Florian 1» eingetroffen berichtigt von 300640sep26 auf 300630sep26 — Grund: Zeit verwechselt"
+    );
+    let s = etb_text_berichtigung(
+        Kraft::Person(1),
+        "Anna",
+        Entlassung,
+        "2026-09-30 12:00:00",
+        "2026-09-30 11:30:00",
+        "zu spät gemeldet",
+        tz,
+        true,
+    );
+    assert_eq!(
+        s,
+        "Zeitachse: Person «Anna» entlassen berichtigt von 301400sep26 auf 301330sep26 (nach Entlassung) — Grund: zu spät gemeldet"
     );
 }
 

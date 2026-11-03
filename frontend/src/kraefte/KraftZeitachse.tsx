@@ -4,9 +4,15 @@ import { useEffect, useId, useRef, useState, type FocusEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
-import { ladeZeitachse, streicheEreignis, trageNach, type KraftArt } from '../api/kraefteZeitachse';
+import {
+  berichtigeEreignis,
+  ladeZeitachse,
+  streicheEreignis,
+  trageNach,
+  type KraftArt,
+} from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
-import type { ZeitachseEreignis, ZeitachseNachtragBody } from '../api/types';
+import type { Zeitachse, ZeitachseEreignis, ZeitachseNachtragBody } from '../api/types';
 import { useUhr } from '../abloesung/useUhr';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
@@ -18,7 +24,7 @@ import {
 } from '../components/instrument';
 import { Select } from '../components/Select';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
-import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import {
   ART_WORT,
   HERKUNFT_WORT,
@@ -34,25 +40,30 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
 /**
  * Zeitachse einer Kraft (LFH-552) — Einheit-Detailseite und aufgeklappte Personalzeile teilen
  * dieses Bauteil: Dauerzeile, Ereignisse nach Zeit (gestrichene durchgestrichen mit Grund, die
- * Herkunft als Wort), Nachtrag und Streichung.
+ * Herkunft als Wort), Nachtrag, Berichtigung des Zeitpunkts und Streichung.
  *
  * - Nachtrag: `ErfassungsModal` mit drei Feldern (Art, Zeitpunkt, Notiz); die Ablösung fehlt in
  *   der Auswahl, sie entsteht nur aus dem Vollzug. Ein Fehler (422) steht im Dialog, kein Toast.
  * - Streichung: unumkehrbar und ohne serverseitigen Rückweg, deshalb Rückfrage mit Pflichtgrund
  *   (LFH-343/363); ein Ereignis aus der Ablösung streicht nur deren Rücknahme.
+ * - „Zeit berichtigen“ (LLH-1455): Zeitpunkt (vorbelegt mit dem alten) und Pflichtgrund; der
+ *   Server streicht und schreibt neu in einem Schritt und prüft nur das Ergebnis. So lässt sich
+ *   auch ein Ereignis verschieben, das seine Periode trägt. Nicht unumkehrbar: eine zweite
+ *   Berichtigung setzt die Zeit zurück. Ein Fehler (422) steht im Dialog.
  * - Ohne Schreibrecht nennt `RechteHinweis` den Grund, die Knöpfe stehen gesperrt da (M16).
- * - Entlassene Person (`isBeendet`, LLH-1263): Nachtrag und Streichung bleiben, aber eine offene
- *   Periode darf nicht entstehen. Die Entlassung, die die letzte Periode schließt, steht deshalb
- *   gesperrt mit Kurzgrund (LFH-966); einen Nachtrag, der eine Periode öffnet, meldet die 422 im
- *   Dialog, weil das am eingegebenen Zeitpunkt hängt.
+ * - Entlassene Person (`isBeendet`, LLH-1263): Nachtrag, Berichtigung und Streichung bleiben, aber
+ *   eine offene Periode darf nicht entstehen. Das Streichen der Entlassung, die die letzte Periode
+ *   schließt, steht deshalb gesperrt mit Kurzgrund (LFH-966), ihr „Zeit berichtigen“ bleibt offen;
+ *   was eine Periode öffnet, meldet die 422 im Dialog, weil das am eingegebenen Zeitpunkt hängt.
  *
  * ZUFLUSS (LFH-861, Prüfliste LFH-552 Kriterium 12, WCAG 3.2.5): steht Fokus ODER Zeiger in der
  * Liste, friert die MENGE der Ereignisse ein; ein fremdes neues wartet hinter dem Sammelbanner
  * unter der Liste (darüber verschiebt sich nichts). Der Zeiger zählt mit wie in
  * `abloesung/zufluss.ts`: „Streichen“ trifft man meist mit der Maus. Der Inhalt fließt — eine
  * Streichung ändert nur die Zeile selbst, und die Folge der gezeigten bleibt (append-only, der
- * Zeitpunkt eines Ereignisses ändert sich nie). Der eigene Nachtrag steht sofort: seine Ids
- * (Antwort minus bisheriger Stand) kommen zur gehaltenen Menge. Eine leere Liste friert nicht ein,
+ * Zeitpunkt eines Ereignisses ändert sich nie, eine Berichtigung streicht und schreibt neu). Der
+ * eigene Nachtrag und die eigene Berichtigung stehen sofort: ihre Ids (Antwort minus bisheriger
+ * Stand) kommen zur gehaltenen Menge. Eine leere Liste friert nicht ein,
  * und die Schleuse gilt je Kraft, nicht je Bauteil.
  */
 
@@ -63,6 +74,11 @@ interface NachtragWerte {
 }
 
 interface StreichWerte {
+  grund: string;
+}
+
+interface BerichtigWerte {
+  zeitpunkt: Dayjs;
   grund: string;
 }
 
@@ -121,8 +137,10 @@ export default function KraftZeitachse({
 
   const [nachtragOffen, setNachtragOffen] = useState(false);
   const [streiche, setStreiche] = useState<ZeitachseEreignis | null>(null);
+  const [berichtige, setBerichtige] = useState<ZeitachseEreignis | null>(null);
   const [nachtragForm] = Form.useForm<NachtragWerte>();
   const [streichForm] = Form.useForm<StreichWerte>();
+  const [berichtigForm] = Form.useForm<BerichtigWerte>();
 
   // Vorbelegung „jetzt" bei JEDEM Öffnen, nach dem Einhängen des Dialogs (Muster
   // `KatalogVerwaltung`). Nicht über `initialValues`: der Formularspeicher überlebt das Schließen
@@ -131,6 +149,11 @@ export default function KraftZeitachse({
   useEffect(() => {
     if (nachtragOffen) nachtragForm.setFieldsValue({ zeitpunkt: serverJetzt() });
   }, [nachtragOffen, nachtragForm]);
+  // Ebenso die Berichtigung: vorbelegt mit dem alten Zeitpunkt des gewählten Ereignisses.
+  useEffect(() => {
+    if (berichtige)
+      berichtigForm.setFieldsValue({ zeitpunkt: alsZeitpunkt(berichtige.zeitpunkt_at) });
+  }, [berichtige, berichtigForm]);
 
   const schluessel = zeitachseKey(einsatzId, art, id);
   const query = useQuery({
@@ -186,23 +209,36 @@ export default function KraftZeitachse({
   const invalidiere = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.kraefteZeitachse(einsatzId) });
 
+  // Der eigene Nachtrag bzw. die eigene Berichtigung steht sofort, auch in gehaltener Liste; was
+  // gleichzeitig fremd eintraf, steckt schon im bisherigen Stand und wartet weiter.
+  const uebernimmEigene = (antwort: Zeitachse) => {
+    const bisher = new Set(
+      qc.getQueryData<Zeitachse>(schluessel)?.ereignisse.map((e) => e.id) ?? [],
+    );
+    const eigene = antwort.ereignisse.filter((e) => !bisher.has(e.id)).map((e) => e.id);
+    setGefroren((g) =>
+      g && g.kraft === kraft && eigene.length > 0
+        ? { kraft, ids: new Set([...g.ids, ...eigene]) }
+        : g,
+    );
+    qc.setQueryData(schluessel, antwort);
+    return invalidiere();
+  };
+
   const nachtrag = useMutation({
     mutationFn: (body: ZeitachseNachtragBody) => trageNach(einsatzId, art, id, body),
-    onSuccess: (antwort) => {
-      // Der eigene Nachtrag steht sofort, auch in gehaltener Liste; was gleichzeitig fremd
-      // eintraf, steckt schon im bisherigen Stand und wartet weiter.
-      const bisher = new Set(
-        qc.getQueryData<typeof antwort>(schluessel)?.ereignisse.map((e) => e.id) ?? [],
-      );
-      const eigene = antwort.ereignisse.filter((e) => !bisher.has(e.id)).map((e) => e.id);
-      setGefroren((g) =>
-        g && g.kraft === kraft && eigene.length > 0
-          ? { kraft, ids: new Set([...g.ids, ...eigene]) }
-          : g,
-      );
-      qc.setQueryData(schluessel, antwort);
-      return invalidiere();
-    },
+    onSuccess: uebernimmEigene,
+  });
+  const berichtigung = useMutation({
+    mutationFn: ({
+      ereignisId,
+      ...body
+    }: {
+      ereignisId: number;
+      zeitpunkt_at: string;
+      grund: string;
+    }) => berichtigeEreignis(einsatzId, art, id, ereignisId, body),
+    onSuccess: uebernimmEigene,
   });
   const streichung = useMutation({
     mutationFn: ({ ereignisId, grund }: { ereignisId: number; grund: string }) =>
@@ -297,39 +333,52 @@ export default function KraftZeitachse({
                   aktionen={
                     // Nach der Art: auch die Kopie an einer Person streicht nur die Rücknahme der Ablösung.
                     !lesend && !gestrichen && e.art !== 'abloesung' ? (
-                      e.id === gesperrtId ? (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: token.paddingXS,
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          gap: token.paddingXS,
+                        }}
+                      >
+                        <Button
+                          disabled={!darfSchreiben}
+                          aria-label={`${beschreibung} Zeit berichtigen`}
+                          onClick={() => {
+                            berichtigung.reset();
+                            setBerichtige(e);
                           }}
                         >
-                          <span id={sperrGrundId} style={{ color: rollen.gedaempft }}>
-                            {ENTLASSUNG_GESPERRT_TEXT}
-                          </span>
+                          Zeit berichtigen
+                        </Button>
+                        {e.id === gesperrtId ? (
+                          <>
+                            <span id={sperrGrundId} style={{ color: rollen.gedaempft }}>
+                              {ENTLASSUNG_GESPERRT_TEXT}
+                            </span>
+                            <Button
+                              danger
+                              disabled
+                              aria-label={`${beschreibung} streichen`}
+                              aria-describedby={sperrGrundId}
+                            >
+                              Streichen
+                            </Button>
+                          </>
+                        ) : (
                           <Button
                             danger
-                            disabled
+                            disabled={!darfSchreiben}
                             aria-label={`${beschreibung} streichen`}
-                            aria-describedby={sperrGrundId}
+                            onClick={() => {
+                              streichung.reset();
+                              setStreiche(e);
+                            }}
                           >
                             Streichen
                           </Button>
-                        </span>
-                      ) : (
-                        <Button
-                          danger
-                          disabled={!darfSchreiben}
-                          aria-label={`${beschreibung} streichen`}
-                          onClick={() => {
-                            streichung.reset();
-                            setStreiche(e);
-                          }}
-                        >
-                          Streichen
-                        </Button>
-                      )
+                        )}
+                      </span>
                     ) : undefined
                   }
                 >
@@ -389,6 +438,42 @@ export default function KraftZeitachse({
           <Input placeholder="z. B. per Funk gemeldet" />
         </Form.Item>
         <SpeicherFehler fehler={nachtrag.error} titel="Nicht nachgetragen" />
+      </ErfassungsModal>
+
+      <ErfassungsModal<BerichtigWerte>
+        offen={berichtige !== null}
+        titel={`Zeit berichtigen: ${kennung}`}
+        form={berichtigForm}
+        erfassenText="Berichtigen"
+        laeuft={berichtigung.isPending}
+        onErfassen={(w) =>
+          berichtigung.mutateAsync({
+            ereignisId: berichtige!.id,
+            zeitpunkt_at: alsBackendZeit(w.zeitpunkt),
+            grund: w.grund.trim(),
+          })
+        }
+        onFertig={() => setBerichtige(null)}
+        onAbbrechen={() => setBerichtige(null)}
+      >
+        <Typography.Paragraph>
+          {berichtige && `${ART_WORT[berichtige.art]} ${zeit(berichtige.zeitpunkt_at)}`}
+        </Typography.Paragraph>
+        <Form.Item<BerichtigWerte>
+          name="zeitpunkt"
+          label="Zeitpunkt"
+          rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
+        >
+          <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
+        </Form.Item>
+        <Form.Item<BerichtigWerte>
+          name="grund"
+          label="Grund"
+          rules={[{ required: true, whitespace: true, message: 'Bitte einen Grund angeben' }]}
+        >
+          <Input placeholder="z. B. Zeit verwechselt" />
+        </Form.Item>
+        <SpeicherFehler fehler={berichtigung.error} titel="Nicht berichtigt" />
       </ErfassungsModal>
 
       <ErfassungsModal<StreichWerte>

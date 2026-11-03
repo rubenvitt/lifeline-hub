@@ -21,9 +21,10 @@ import {
  *                             frontend/src/kraefte/KraeftebaumZelle.tsx
  *   zeitachse.png             frontend/src/kraefte/KraftZeitachse.tsx (in EinheitDetailPage.tsx)
  *   zeitachse-nachtragen.png  frontend/src/kraefte/KraftZeitachse.tsx (Dialog „Nachtragen“)
+ *   zeitachse-berichtigen.png frontend/src/kraefte/KraftZeitachse.tsx (Dialog „Zeit berichtigen“)
  *
  * Demo-Lücke (D3): die Demo-Daten tragen keine Ereignisse der Kräfte-Zeitachse. Die Spec trägt
- * für zwei Einheiten Alarmierung und Eintreffen nach und streicht ein falsches Eintreffen, damit
+ * für zwei Einheiten Alarmierung und Eintreffen nach und berichtigt ein falsches Eintreffen, damit
  * Spalte „Im Einsatz“ und die Zeitachse etwas zeigen.
  *
  * Den Kräftebaum (Untereinheiten unter dem Sanitätszug, Besatzung, „Ohne Fahrzeug“, Material mit
@@ -72,16 +73,15 @@ test.describe(KAPITEL, () => {
 
       const rettung = await einheitNamens(api, demo.id, 'Rettungsstaffel');
       await nachtrag(rettung.id, 'alarmierung', vor(jetzt, 287), 'Alarmierung über ILS');
-      const falsch = await nachtrag(rettung.id, 'eintreffen', vor(jetzt, 262));
+      const falsch = await nachtrag(rettung.id, 'eintreffen', vor(jetzt, 262), 'per Funk gemeldet');
       const irrtum = falsch.ereignisse.find((e) => e.art === 'eintreffen');
       expect(irrtum, 'nachgetragenes Eintreffen').toBeDefined();
       await fuelle(
         api,
         'post',
-        `/api/einsaetze/${demo.id}/einheiten/${rettung.id}/zeitachse/${irrtum!.id}/streichen`,
-        { grund: 'Zeit verwechselt' },
+        `/api/einsaetze/${demo.id}/einheiten/${rettung.id}/zeitachse/${irrtum!.id}/berichtigen`,
+        { zeitpunkt_at: draht(vor(jetzt, 271)), grund: 'Zeit verwechselt' },
       );
-      await nachtrag(rettung.id, 'eintreffen', vor(jetzt, 271), 'per Funk gemeldet');
 
       const zug = await einheitNamens(api, demo.id, 'Sanitätszug Musterstadt');
       await nachtrag(zug.id, 'alarmierung', vor(jetzt, 288));
@@ -136,5 +136,20 @@ test.describe(KAPITEL, () => {
     await dialog.getByLabel('Notiz (optional)').blur();
     await page.mouse.move(0, 0);
     await fotografiere(dialog, KAPITEL, 'zeitachse-nachtragen');
+  });
+
+  test('Dialog „Zeit berichtigen“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const rettung = await einheitNamens(page.request, demo.id, 'Rettungsstaffel');
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/einheiten/${rettung.id}`);
+    const paneel = page.getByRole('region', { name: 'Zeitachse' });
+    await paneel.getByRole('button', { name: /^Eintreffen .* Zeit berichtigen$/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Zeit berichtigen: Rettungsstaffel' });
+    await dialog.getByLabel('Grund').fill('Uhrzeit vom Funkprotokoll');
+    await dialog.getByLabel('Grund').blur();
+    await page.mouse.move(0, 0);
+    await fotografiere(dialog, KAPITEL, 'zeitachse-berichtigen');
   });
 });

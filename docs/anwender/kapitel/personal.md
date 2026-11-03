@@ -178,12 +178,12 @@ Für Einsatzleitung und Führungspersonal, in der Ansicht der Person:
 Für Einsatzleitung und Führungspersonal, solange der Einsatz läuft:
 
 1. Unter der Personalliste „Entlassen“ aufklappen und den Namen der Person wählen.
-2. Im Paneel „Zeitachse“ ein falsches Ereignis mit „Streichen“ und einem Grund streichen, ein
-   fehlendes mit „Nachtragen“ ergänzen. Alles andere in der Ansicht bleibt gesperrt.
+2. Im Paneel „Zeitachse“ eine falsche Zeit mit „Zeit berichtigen“ und einem Grund berichtigen,
+   ein falsches Ereignis mit „Streichen“ streichen, ein fehlendes mit „Nachtragen“ ergänzen.
+   Alles andere in der Ansicht bleibt gesperrt.
 3. Lehnt die App ab, weil sonst wieder eine offene Einsatzperiode entstünde, steht der Grund im
    Dialog. Die Entlassung, mit der die letzte Periode endet, lässt sich nicht streichen; daneben
-   steht „erst erneut disponieren“. Die Entlassungszeit deshalb vor dem Entlassen nachtragen
-   (Ablauf oben).
+   steht „erst erneut disponieren“. Ihre Zeit lässt sich mit „Zeit berichtigen“ verschieben.
 
 ## Hintergrund
 
@@ -204,8 +204,11 @@ Eine entlassene Person bleibt im Nachweis, deshalb lässt sich ihre Zeitachse we
 Jede Berichtigung schreibt einen Eintrag ins Einsatztagebuch mit dem Vermerk „berichtigt nach
 Entlassung“. Eine offene Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag ab, der
 eine Periode beginnen würde, etwa ein Eintreffen nach der Entlassung, und ebenso die Streichung
-der Entlassung, mit der die letzte Periode endet. Deshalb lässt sich auch eine ganz fehlende
-Periode nach dem Entlassen nicht mehr nachtragen. Eine stornierte Person und eine aufgelöste
+der Entlassung, mit der die letzte Periode endet. Die Berichtigung einer Zeit lehnt sie ab, wenn
+danach eine Periode offen stünde, etwa eine Entlassung vor dem Eintreffen; gelingt sie, vermerkt
+das Einsatztagebuch „(nach Entlassung)“. Dasselbe gilt, wenn an einer Einheit eine Zeit berichtigt
+wird, die eine entlassene Person über die Einheit trägt. Eine ganz fehlende Periode lässt sich nach
+dem Entlassen nicht mehr nachtragen. Eine stornierte Person und eine aufgelöste
 Einheit lassen sich nicht berichtigen.
 
 ### Einsatzfunktion und Qualifikation

@@ -232,23 +232,27 @@ pub struct Gestrichen {
     pub beruehrt: Beruehrt,
 }
 
-/// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien. Prüfung
-/// (Spec „Streichung"): fremdes Ereignis → 404; schon gestrichen → 422; Art `abloesung` (auch die
-/// Fan-out-Kopie an einer Person) oder Quelle `abloesung` (Besatzungswechsel, LLH-1150) ohne
-/// `durch_ruecknahme` → 422; ein Rest, der die Perioden-Regeln der Kraft oder einer betroffenen
-/// Person verletzt → 422 (mit Namen der Person).
-pub async fn streiche_tx(
+/// Ein Ereignis, das sich streichen oder berichtigen lässt (geprüft von [`lade_streichbar_tx`]).
+struct Streichbar {
+    art: ZeitachseArt,
+    zeitpunkt_at: String,
+    notiz: Option<String>,
+}
+
+/// Lädt das Ereignis `id` der Kraft für eine Streichung oder Berichtigung (Spec „Streichung“):
+/// fremdes Ereignis → 404; schon gestrichen → 422; Art `abloesung` (auch die Fan-out-Kopie an
+/// einer Person) oder Quelle `abloesung` (Besatzungswechsel, LLH-1150) ohne `durch_ruecknahme` →
+/// 422.
+async fn lade_streichbar_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
-    benutzer_id: i64,
     kraft: Kraft,
     id: i64,
-    grund: &str,
     durch_ruecknahme: bool,
-) -> Result<Gestrichen, AppError> {
-    let zeile: Option<(String, String, Option<String>, String)> =
+) -> Result<Streichbar, AppError> {
+    let zeile: Option<(String, String, Option<String>, String, Option<String>)> =
         sqlx::query_as(sqlx::AssertSqlSafe(format!(
-            "SELECT art, zeitpunkt_at, gestrichen_at, quelle FROM einsatz_kraft_zeitachse \
+            "SELECT art, zeitpunkt_at, gestrichen_at, quelle, notiz FROM einsatz_kraft_zeitachse \
              WHERE id = ? AND einsatz_id = ? AND {} = ?",
             kraft.spalte()
         )))
@@ -257,7 +261,7 @@ pub async fn streiche_tx(
         .bind(kraft.id())
         .fetch_optional(&mut *conn)
         .await?;
-    let (art, zeitpunkt_at, gestrichen_at, quelle) = zeile.ok_or(AppError::NotFound)?;
+    let (art, zeitpunkt_at, gestrichen_at, quelle, notiz) = zeile.ok_or(AppError::NotFound)?;
     let art = ZeitachseArt::parse(&art)
         .ok_or_else(|| AppError::Internal(format!("Unbekannte Zeitachsen-Art '{art}'")))?;
     if gestrichen_at.is_some() {
@@ -277,26 +281,86 @@ pub async fn streiche_tx(
                 .into(),
         ));
     }
+    Ok(Streichbar {
+        art,
+        zeitpunkt_at,
+        notiz,
+    })
+}
+
+/// Die nicht gestrichenen Fan-out-Kopien des Ereignisses `id`: `(kopie, person)`.
+async fn kopien_tx(conn: &mut SqliteConnection, id: i64) -> Result<Vec<(i64, i64)>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT id, personal_id FROM einsatz_kraft_zeitachse \
+         WHERE ursprung_id = ? AND gestrichen_at IS NULL AND personal_id IS NOT NULL \
+         ORDER BY id",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
+/// Der eine Schreibweg der Streichung (Guard `repo_ist_append_only`).
+async fn markiere_gestrichen_tx(
+    conn: &mut SqliteConnection,
+    benutzer_id: i64,
+    grund: &str,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    for i in ids {
+        sqlx::query(
+            "UPDATE einsatz_kraft_zeitachse \
+             SET gestrichen_at = datetime('now'), gestrichen_von = ?, streichgrund = ? \
+             WHERE id = ? AND gestrichen_at IS NULL",
+        )
+        .bind(benutzer_id)
+        .bind(grund)
+        .bind(i)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
+/// 422 für eine Person der Fan-out-Kette, deren Folge bräche.
+async fn person_verstoss_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person: i64,
+    v: Verstoss,
+) -> Result<AppError, AppError> {
+    let name = kraft_name_tx(conn, einsatz_id, Kraft::Person(person)).await?;
+    Ok(AppError::UnprocessableEntity(format!(
+        "Die Zeitachse von «{name}» verlöre ihre Ordnung: {v}"
+    )))
+}
+
+/// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien. Prüfung
+/// (Spec „Streichung"): wie [`lade_streichbar_tx`]; ein Rest, der die Perioden-Regeln der Kraft
+/// oder einer betroffenen Person verletzt → 422 (mit Namen der Person).
+pub async fn streiche_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    kraft: Kraft,
+    id: i64,
+    grund: &str,
+    durch_ruecknahme: bool,
+) -> Result<Gestrichen, AppError> {
+    let Streichbar {
+        art, zeitpunkt_at, ..
+    } = lade_streichbar_tx(conn, einsatz_id, kraft, id, durch_ruecknahme).await?;
 
     let bestand = bestand_tx(conn, kraft).await?;
     perioden::pruefe_streichen(&bestand, &[id])
         .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
 
     // Fan-out-Kopien: je Person einzeln prüfen, bevor irgendetwas geschrieben wird.
-    let kopien: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT id, personal_id FROM einsatz_kraft_zeitachse \
-         WHERE ursprung_id = ? AND gestrichen_at IS NULL AND personal_id IS NOT NULL",
-    )
-    .bind(id)
-    .fetch_all(&mut *conn)
-    .await?;
+    let kopien = kopien_tx(conn, id).await?;
     for (kopie, person) in &kopien {
         let bestand = bestand_tx(conn, Kraft::Person(*person)).await?;
         if let Err(v) = perioden::pruefe_streichen(&bestand, &[*kopie]) {
-            let name = kraft_name_tx(conn, einsatz_id, Kraft::Person(*person)).await?;
-            return Err(AppError::UnprocessableEntity(format!(
-                "Die Zeitachse von «{name}» verlöre ihre Ordnung: {v}"
-            )));
+            return Err(person_verstoss_tx(conn, einsatz_id, *person, v).await?);
         }
     }
 
@@ -312,18 +376,7 @@ pub async fn streiche_tx(
 
     let mut ids = vec![id];
     ids.extend(kopien.iter().map(|(k, _)| *k));
-    for i in &ids {
-        sqlx::query(
-            "UPDATE einsatz_kraft_zeitachse \
-             SET gestrichen_at = datetime('now'), gestrichen_von = ?, streichgrund = ? \
-             WHERE id = ? AND gestrichen_at IS NULL",
-        )
-        .bind(benutzer_id)
-        .bind(grund)
-        .bind(i)
-        .execute(&mut *conn)
-        .await?;
-    }
+    markiere_gestrichen_tx(conn, benutzer_id, grund, &ids).await?;
     let abloesung = match kraft {
         Kraft::Einheit(einheit_id) => {
             crate::abloesung::kopplung::nach_streichung_tx(
@@ -348,6 +401,154 @@ pub async fn streiche_tx(
             hinweise: abloesung.anlaesse,
         },
     })
+}
+
+/// Eine Berichtigung des Zeitpunkts (LLH-1455).
+#[derive(Debug, Clone)]
+pub struct Berichtigt {
+    pub art: ZeitachseArt,
+    /// Zeitpunkt des alten, jetzt gestrichenen Ereignisses.
+    pub alt_at: String,
+    /// Das neue Ereignis an der Kraft.
+    pub id: i64,
+    pub beruehrt: Beruehrt,
+}
+
+/// Berichtigt den Zeitpunkt des Ereignisses `id` in einem Schritt (LLH-1455, Spec
+/// `kraefte-zeitachse` „Zeitpunkt berichtigen“, design.md D2–D5 der Change
+/// `t60jbya1-zeitpunkt-berichtigen`): streicht es mit `grund` und schreibt eines derselben Art
+/// zum Zeitpunkt `zeitpunkt_at` (Quelle `nachtrag`, Notiz des alten).
+///
+/// - Prüfung wie [`lade_streichbar_tx`] (404/422), dazu 422 bei unverändertem Zeitpunkt.
+/// - Die Perioden-Regeln gelten nur für das **Ergebnis** ([`perioden::ersetze`]), bei der Kraft
+///   und bei jeder Person, die eine Kopie trägt (422 mit Namen). Ist eine solche Person
+///   entlassen, darf danach keine Periode offen sein (LLH-1263, 422 mit Namen).
+/// - Fan-out: die Kopien folgen den Kopien, nicht der heutigen Zuordnung (D4).
+/// - Kopplung an die Ablösung wie Streichung, dann Nachtrag (D5).
+///
+/// Geschrieben wird erst nach allen Prüfungen. Die Prüfung „keine offene Periode“ an der Kraft
+/// selbst (entlassene Person) macht der Aufrufer, wie bei Nachtrag und Streichung.
+pub async fn berichtige_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    kraft: Kraft,
+    id: i64,
+    zeitpunkt_at: &str,
+    grund: &str,
+) -> Result<Berichtigt, AppError> {
+    let alt = lade_streichbar_tx(conn, einsatz_id, kraft, id, false).await?;
+    if alt.zeitpunkt_at == zeitpunkt_at {
+        return Err(AppError::UnprocessableEntity(
+            "Der Zeitpunkt ist unverändert".into(),
+        ));
+    }
+    let art = alt.art;
+
+    let bestand = bestand_tx(conn, kraft).await?;
+    perioden::ersetze(&bestand, id, art, zeitpunkt_at)
+        .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
+
+    let kopien = kopien_tx(conn, id).await?;
+    for (kopie, person) in &kopien {
+        let bestand = bestand_tx(conn, Kraft::Person(*person)).await?;
+        let perioden = match perioden::ersetze(&bestand, *kopie, art, zeitpunkt_at) {
+            Ok(p) => p,
+            Err(v) => return Err(person_verstoss_tx(conn, einsatz_id, *person, v).await?),
+        };
+        let entlassen =
+            crate::personal::disposition_repo::lebenszustand_tx(conn, einsatz_id, *person).await?
+                == Some(crate::entlassung::BeendetAls::Entlassen);
+        if entlassen && perioden.last().is_some_and(|p| p.ende_at.is_none()) {
+            let name = kraft_name_tx(conn, einsatz_id, Kraft::Person(*person)).await?;
+            return Err(AppError::UnprocessableEntity(format!(
+                "«{name}» ist entlassen; eine offene Einsatzperiode entsteht nur über „Erneut disponieren“"
+            )));
+        }
+    }
+
+    let hinweis = match kraft {
+        Kraft::Einheit(einheit_id) => {
+            crate::abloesung::kopplung::vor_streichung_tx(conn, einheit_id, art, &alt.zeitpunkt_at)
+                .await
+        }
+        Kraft::Person(_) => None,
+    };
+    let mut ids = vec![id];
+    ids.extend(kopien.iter().map(|(k, _)| *k));
+    markiere_gestrichen_tx(conn, benutzer_id, grund, &ids).await?;
+    let mut beruehrt = Beruehrt::default();
+    if let Kraft::Einheit(einheit_id) = kraft {
+        let w = crate::abloesung::kopplung::nach_streichung_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            einheit_id,
+            art,
+            &alt.zeitpunkt_at,
+            hinweis,
+        )
+        .await?;
+        beruehrt.abloesung.extend(w.etb);
+        beruehrt.hinweise.extend(w.anlaesse);
+    }
+
+    let neu = Neu {
+        art,
+        zeitpunkt_at,
+        quelle: ZeitachseQuelle::Nachtrag,
+        notiz: alt.notiz.as_deref(),
+    };
+    let neu_id =
+        geschrieben(schreibe_einzeln_tx(conn, einsatz_id, benutzer_id, kraft, neu, None).await?)?;
+    for (_, person) in &kopien {
+        let kopie = Neu {
+            quelle: ZeitachseQuelle::Einheit,
+            notiz: None,
+            ..neu
+        };
+        geschrieben(
+            schreibe_einzeln_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                Kraft::Person(*person),
+                kopie,
+                Some(neu_id),
+            )
+            .await?,
+        )?;
+        beruehrt.personen.push(*person);
+    }
+    if let Kraft::Einheit(einheit_id) = kraft {
+        let w = crate::abloesung::kopplung::nach_ereignis_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            einheit_id,
+            art,
+            neu.quelle,
+            zeitpunkt_at,
+        )
+        .await?;
+        beruehrt.abloesung.extend(w.etb);
+        beruehrt.hinweise.extend(w.anlaesse);
+    }
+    Ok(Berichtigt {
+        art,
+        alt_at: alt.zeitpunkt_at,
+        id: neu_id,
+        beruehrt,
+    })
+}
+
+/// Nach der Prüfung am Ergebnis kann das Einfügen nicht mehr ausgelassen werden; geschieht es
+/// doch, bricht die Berichtigung mit 422 statt still eine Kopie zu verlieren.
+fn geschrieben(r: Schreibergebnis) -> Result<i64, AppError> {
+    match r {
+        Schreibergebnis::Geschrieben(id) => Ok(id),
+        Schreibergebnis::Ausgelassen(v) => Err(AppError::UnprocessableEntity(v.to_string())),
+    }
 }
 
 // ── Aus Statuswechseln ──────────────────────────────────────────────────────────────────────
@@ -834,6 +1035,34 @@ pub fn etb_text_streichung(
         kraft_wort(kraft),
         art.partizip(),
         stil.zeitpunkt_text(zeitpunkt_at)
+    )
+}
+
+/// „Zeitachse: Einheit «Florian 1» eingetroffen berichtigt von 300640sep26 auf 300630sep26 —
+/// Grund: …" (LLH-1455, design.md D6), an einer entlassenen Person (`is_nach_entlassung`)
+/// „… auf … (nach Entlassung) — Grund: …".
+#[allow(clippy::too_many_arguments)]
+pub fn etb_text_berichtigung(
+    kraft: Kraft,
+    name: &str,
+    art: ZeitachseArt,
+    alt_at: &str,
+    neu_at: &str,
+    grund: &str,
+    stil: Zeitstil,
+    is_nach_entlassung: bool,
+) -> String {
+    let vermerk = if is_nach_entlassung {
+        " (nach Entlassung)"
+    } else {
+        ""
+    };
+    format!(
+        "Zeitachse: {} «{name}» {} berichtigt von {} auf {}{vermerk} — Grund: {grund}",
+        kraft_wort(kraft),
+        art.partizip(),
+        stil.zeitpunkt_text(alt_at),
+        stil.zeitpunkt_text(neu_at)
     )
 }
 

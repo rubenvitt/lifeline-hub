@@ -181,6 +181,49 @@ die die Perioden-Regeln verletzt, MUST sie mit 422 scheitern und die Person nenn
 - **WHEN** ein bereits gestrichenes Ereignis erneut gestrichen werden soll
 - **THEN** antwortet das System mit 422
 
+### Requirement: Zeitpunkt berichtigen
+
+Das System SHALL ein nicht gestrichenes Ereignis einer Einheit oder Person in einem Schritt auf
+einen neuen Zeitpunkt berichtigen lassen, mit Pflichtgrund. In derselben Transaktion MUST es das
+alte Ereignis mit diesem Grund streichen und eines derselben Art zum neuen Zeitpunkt schreiben
+(Quelle `nachtrag`, Notiz des alten). Die Perioden-Regeln MUST nur für das Ergebnis gelten, nicht
+für den Zwischenstand. Verletzt das Ergebnis sie bei der Kraft oder einer betroffenen Person, MUST
+das System mit 422 antworten, die Person nennen und nichts schreiben.
+
+An einer Einheit MUST jede Person, die eine nicht gestrichene Fan-out-Kopie des alten Ereignisses
+trägt, statt ihrer eine Kopie des neuen bekommen; andere Personen MUST unberührt bleiben. Die
+Kopplung an die Ablösung MUST wie bei einer Streichung mit anschließendem Nachtrag laufen.
+
+Grund leer oder Zeitpunkt fehlt bzw. unlesbar → 400. Zeitpunkt in der Zukunft, unveränderter
+Zeitpunkt, schon gestrichenes Ereignis und ein Ereignis der Art oder Quelle `abloesung` → 422.
+Fremde Kraft oder fremdes Ereignis → 404. Jede Berichtigung MUST genau einen System-ETB-Eintrag
+schreiben, der Kraft, Art, alten und neuen Zeitpunkt und den Grund nennt.
+
+#### Scenario: Eintreffen als Anker berichtigen
+- **WHEN** „Florian 1“ ohne Alarmierung um 06:40 eintraf, um 14:00 entlassen wurde und das Eintreffen mit Grund „Zeit verwechselt“ auf 06:30 berichtigt wird
+- **THEN** ist das Eintreffen 06:40 gestrichen, ein Eintreffen 06:30 mit Herkunft „nachgetragen“ steht da, die Periode reicht von 06:30 bis 14:00
+- **AND** das ETB nennt „Zeitachse: Einheit «Florian 1» eingetroffen berichtigt von … auf … — Grund: Zeit verwechselt“
+
+#### Scenario: Kopien der Personen folgen
+- **WHEN** das Eintreffen von „Florian 1“ berichtigt wird und zwei Personen seine Kopie tragen, eine dritte erst danach zugeordnet wurde
+- **THEN** tragen die beiden das Eintreffen zum neuen Zeitpunkt über die Einheit, und die dritte bekommt keins
+
+#### Scenario: Ergebnis verletzt die Regeln
+- **WHEN** die Alarmierung 06:10 einer Periode mit Eintreffen 06:40 auf 07:00 berichtigt werden soll
+- **THEN** antwortet das System mit 422, und Zeitachse und ETB bleiben unverändert
+
+#### Scenario: Person verlöre ihre Ordnung
+- **WHEN** eine Person mit Kopie des Eintreffens 06:40 der Einheit selbst um 06:50 entlassen wurde und das Eintreffen der Einheit auf 07:00 berichtigt werden soll
+- **THEN** antwortet das System mit 422, nennt die Person und schreibt nichts
+
+#### Scenario: Unveränderter Zeitpunkt
+- **WHEN** ein Ereignis auf seinen eigenen Zeitpunkt berichtigt werden soll
+- **THEN** antwortet das System mit 422
+
+#### Scenario: Ereignis aus dem Vollzug
+- **WHEN** eine Ablösung oder das Eintreffen einer neuen Besatzung berichtigt werden soll
+- **THEN** antwortet das System mit 422
+
 ### Requirement: Kopplung an die Ablösung
 
 Vollzieht das System eine Ablösungsschicht einer Einheit, SHALL es in derselben Transaktion ein
@@ -285,14 +328,15 @@ Das Meldebild SHALL je Einheit eine Spalte „Im Einsatz“ mit der laufenden Ei
 in Mono mit Tabellenziffern, mit dem Anker als zugänglicher Beschreibung, und ohne Periode mit
 „—“; die Spalte MUST auch im Druck erscheinen. Die Einheit-Detailseite SHALL die Zeitachse als
 Folge von Zeitachseneinträgen zeigen, gestrichene Einträge durchgestrichen mit Grund, und
-Nachtrag und Streichung anbieten. Die Personalliste des Einsatzes SHALL je Person die
-Einsatzdauer zeigen und die Ruhezeit als Spalte über den Spaltenschalter anbieten; sie MUST NOT
-die Zeitachse einer Person aufklappen. Die Personenansicht SHALL im Kopf die laufende
-Einsatzdauer bzw. die Ruhezeit zeigen und die Zeitachse der Person als eigenen Abschnitt nach
-Einteilung und Person führen, samt Nachtrag und Streichung. Die Herkunft eines Ereignisses
-(Status, über Einheit, Ablösung, nachgetragen) MUST als Wort erkennbar sein. Keine Angabe darf
-blinken oder eingefärbt eingestuft werden. Ohne Schreibrecht MUST die Seite den Grund nennen und
-Nachtrag und Streichung gesperrt statt entfernt zeigen.
+Nachtrag, Berichtigung des Zeitpunkts („Zeit berichtigen“) und Streichung anbieten. Die
+Personalliste des Einsatzes SHALL je Person die Einsatzdauer zeigen und die Ruhezeit als Spalte
+über den Spaltenschalter anbieten; sie MUST NOT die Zeitachse einer Person aufklappen. Die
+Personenansicht SHALL im Kopf die laufende Einsatzdauer bzw. die Ruhezeit zeigen und die
+Zeitachse der Person als eigenen Abschnitt nach Einteilung und Person führen, samt Nachtrag,
+Berichtigung und Streichung. Die Herkunft eines Ereignisses (Status, über Einheit, Ablösung,
+nachgetragen) MUST als Wort erkennbar sein. Keine Angabe darf blinken oder eingefärbt eingestuft
+werden. Ohne Schreibrecht MUST die Seite den Grund nennen und Nachtrag, Berichtigung und
+Streichung gesperrt statt entfernt zeigen.
 
 #### Scenario: Meldebild ohne Ereignisse
 - **WHEN** eine Einheit ohne Ereignisse im Meldebild steht
@@ -313,6 +357,10 @@ Nachtrag und Streichung gesperrt statt entfernt zeigen.
 #### Scenario: Ruhe im Spaltenschalter
 - **WHEN** die Personalliste ohne eigene Spaltenwahl geöffnet wird
 - **THEN** ist die Spalte „Ruhe“ ausgeblendet, im Zähler des Spaltenschalters mitgezählt und dort einblendbar
+
+#### Scenario: Zeit berichtigen im Dialog
+- **WHEN** an einem Eintreffen 06:40 „Zeit berichtigen“ gewählt wird
+- **THEN** öffnet ein Dialog mit dem Zeitpunkt 06:40 vorbelegt und einem Pflichtfeld Grund, und eine Ablehnung des Servers steht im Dialog
 
 ### Requirement: Keine Kraft verliert ihre Zeitachse
 

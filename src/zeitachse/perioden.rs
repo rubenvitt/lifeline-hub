@@ -1,7 +1,7 @@
 //! Einsatzperioden aus einer Ereignisfolge — rein, ohne DB (Muster `einheit::repo::leite_status_ab`).
 //!
-//! Dieselbe Funktion prüft beim Einfügen, beim Streichen und bildet beim Lesen die Perioden
-//! (design.md D3). Die Regeln (Spec „Einsatzperioden"):
+//! Dieselbe Funktion prüft beim Einfügen, beim Streichen, beim Ersetzen (LLH-1455) und bildet
+//! beim Lesen die Perioden (design.md D3). Die Regeln (Spec „Einsatzperioden"):
 //! - eine Periode beginnt mit Alarmierung oder Eintreffen, wenn keine offen ist;
 //! - sie endet mit Ablösung oder Entlassung;
 //! - in einer offenen Periode höchstens eine Alarmierung und ein Eintreffen, und die
@@ -88,6 +88,26 @@ pub fn pruefe_streichen(bestand: &[Ereignis], ids: &[i64]) -> Result<(), Verstos
         .cloned()
         .collect();
     bilde(&folge).map(|_| ())
+}
+
+/// Bildet die Perioden, die entstehen, wenn das Ereignis `id` durch eines der Art `art` zum
+/// Zeitpunkt `zeitpunkt_at` ersetzt wird (LLH-1455, „Zeitpunkt berichtigen“). Geprüft wird nur
+/// das Ergebnis, nie der Zwischenstand ohne das alte Ereignis: so lässt sich auch der Anker einer
+/// Periode oder die Entlassung, die sie schließt, verschieben. Der Kandidat steht bei gleicher
+/// Sekunde hinter dem Bestand, wie beim Einfügen.
+pub fn ersetze(
+    bestand: &[Ereignis],
+    id: i64,
+    art: ZeitachseArt,
+    zeitpunkt_at: &str,
+) -> Result<Vec<Einsatzperiode>, Verstoss> {
+    let mut folge: Vec<Ereignis> = bestand.iter().filter(|e| e.id != id).cloned().collect();
+    folge.push(Ereignis {
+        id: i64::MAX,
+        art,
+        zeitpunkt_at: zeitpunkt_at.to_string(),
+    });
+    bilde(&folge)
 }
 
 /// Das Eintreffen der offenen Periode, falls es eine gibt und sie eins trägt.
@@ -293,6 +313,59 @@ mod tests {
         ));
         assert!(pruefe_streichen(&bestand, &[2]).is_ok());
         assert!(pruefe_streichen(&bestand, &[1, 2]).is_ok());
+    }
+
+    /// LLH-1455: Das Eintreffen als Anker lässt sich verschieben, obwohl der Zwischenstand ohne
+    /// es die Entlassung ohne Periode ließe.
+    #[test]
+    fn ersetzen_verschiebt_den_anker() {
+        let bestand = [e(1, Eintreffen, "06:40"), e(2, Entlassung, "14:00")];
+        assert!(
+            pruefe_streichen(&bestand, &[1]).is_err(),
+            "Zwischenstand bricht"
+        );
+        let p = ersetze(&bestand, 1, Eintreffen, &t("06:30")).unwrap();
+        assert_eq!(p.len(), 1);
+        assert_eq!(p[0].beginn_at, t("06:30"));
+        assert_eq!(p[0].ende_at.as_deref(), Some(t("14:00").as_str()));
+    }
+
+    /// LLH-1455: Die abschließende Entlassung lässt sich verschieben, ein zweites Ende entsteht
+    /// nicht.
+    #[test]
+    fn ersetzen_verschiebt_das_ende() {
+        let bestand = [
+            e(1, Alarmierung, "06:10"),
+            e(2, Eintreffen, "06:40"),
+            e(3, Entlassung, "14:00"),
+        ];
+        let p = ersetze(&bestand, 3, Entlassung, &t("13:30")).unwrap();
+        assert_eq!(p.len(), 1);
+        assert_eq!(p[0].ende_at.as_deref(), Some(t("13:30").as_str()));
+    }
+
+    #[test]
+    fn ersetzen_prueft_das_ergebnis() {
+        let bestand = [e(1, Alarmierung, "06:10"), e(2, Eintreffen, "06:40")];
+        assert!(matches!(
+            ersetze(&bestand, 1, Alarmierung, &t("07:00")),
+            Err(Verstoss::AlarmierungNachEintreffen { .. })
+        ));
+        let zu = [e(1, Eintreffen, "06:40"), e(2, Entlassung, "14:00")];
+        assert!(matches!(
+            ersetze(&zu, 2, Entlassung, &t("06:00")),
+            Err(Verstoss::EndeOhnePeriode { .. })
+        ));
+        // Eine Entlassung vor das Eintreffen schließt eine Periode früh, das Eintreffen öffnet
+        // danach eine neue: regelkonform, aber offen.
+        let drei = [
+            e(1, Alarmierung, "06:10"),
+            e(2, Eintreffen, "06:40"),
+            e(3, Entlassung, "14:00"),
+        ];
+        let p = ersetze(&drei, 3, Entlassung, &t("06:20")).unwrap();
+        assert_eq!(p.len(), 2);
+        assert_eq!(p[1].ende_at, None);
     }
 
     #[test]

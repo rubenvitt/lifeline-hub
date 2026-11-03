@@ -192,11 +192,13 @@ Zustand nicht prüft.
 
 ### Requirement: Zeitachse einer entlassenen Person berichtigen
 
-Das System SHALL an einer entlassenen Person Nachtrag und Streichung an ihrer Zeitachse annehmen,
-mit denselben Regeln wie an einer aktiven Kraft. Danach MUST die Person ohne offene
-Einsatzperiode sein, sonst MUST das System mit 422 antworten, nichts schreiben und auf das erneute
-Disponieren verweisen. Der ETB-Eintrag MUST „berichtigt nach Entlassung“ vermerken. An einer
-stornierten Person und an einer aufgelösten Einheit MUST beides weiter mit 409 scheitern.
+Das System SHALL an einer entlassenen Person Nachtrag, Streichung und Berichtigung des Zeitpunkts
+an ihrer Zeitachse annehmen, mit denselben Regeln wie an einer aktiven Kraft. Danach MUST die
+Person ohne offene Einsatzperiode sein, sonst MUST das System mit 422 antworten, nichts schreiben
+und auf das erneute Disponieren verweisen. Das gilt auch für eine entlassene Person, deren Kopie
+bei der Berichtigung eines Einheit-Ereignisses mitgeändert würde. Der ETB-Eintrag MUST „berichtigt
+nach Entlassung“ bzw. bei der Berichtigung „(nach Entlassung)“ vermerken. An einer stornierten
+Person und an einer aufgelösten Einheit MUST alles drei weiter mit 409 scheitern.
 
 #### Scenario: Eintreffzeit nach dem Entlassen berichtigen
 - **WHEN** an einer um 14:00 entlassenen Person das Eintreffen 06:40 mit Grund „Zeit verwechselt“ gestrichen und ein Eintreffen 06:30 nachgetragen wird, während ihre Periode mit der Alarmierung 06:10 beginnt
@@ -226,9 +228,17 @@ stornierten Person und an einer aufgelösten Einheit MUST beides weiter mit 409 
 - **WHEN** an einer aufgelösten Einheit ein Ereignis nachgetragen oder gestrichen werden soll
 - **THEN** antwortet das System mit 409
 
+#### Scenario: Entlassungszeit nach dem Entlassen berichtigen
+- **WHEN** an einer um 14:00 entlassenen Person die abschließende Entlassung mit Grund „zu spät gemeldet“ auf 13:30 berichtigt wird
+- **THEN** gelingt es, die letzte Periode endet um 13:30, die Person bleibt entlassen, und das ETB vermerkt „(nach Entlassung)“
+
+#### Scenario: Berichtigung öffnet eine Periode
+- **WHEN** an einer um 14:00 entlassenen Person mit Alarmierung 06:10 und Eintreffen 06:40 die Entlassung auf 06:20 berichtigt werden soll
+- **THEN** antwortet das System mit 422 und dem Hinweis, die Person erst erneut zu disponieren (das Eintreffen 06:40 begänne eine offene Periode), und die Zeitachse bleibt unverändert
+
 #### Scenario: Oberfläche einer entlassenen Person
 - **WHEN** eine Person mit Schreibrecht im aktiven Einsatz die Ansicht einer entlassenen Person öffnet
-- **THEN** bietet das Paneel „Zeitachse“ „Nachtragen“ und „Streichen“, und Einteilung und Angaben bleiben nur lesbar
+- **THEN** bietet das Paneel „Zeitachse“ „Nachtragen“, „Zeit berichtigen“ und „Streichen“, an der abschließenden Entlassung steht „Streichen“ gesperrt mit Kurzgrund und „Zeit berichtigen“ offen, und Einteilung und Angaben bleiben nur lesbar
 
 ### Requirement: Entlassene im Nachweis
 
