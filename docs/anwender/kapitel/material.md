@@ -309,9 +309,9 @@ Tauchpumpen für Keller Hauptstraße“. Der Verweis öffnet die Nachforderungen
 Der Posten verhält sich wie jeder andere: Ort, Menge, Status und Angaben lassen sich ändern.
 Aufgeteilt verweisen beide Teile auf die Nachforderung; storniert oder aus dem Einsatz genommen
 behält er den Verweis. Der Eintrag im Einsatztagebuch beim Übernehmen nennt die Herkunft (Abschnitt
-„Einsatztagebuch“). Gehört der Posten zu einer anderen oder zu keiner Nachforderung, löst „Weitere
-Aktionen“, „Von Nachforderung lösen“ nur den Verweis; der Posten bleibt mit Menge, Ort und Status
-in der Liste (Ablauf im Kapitel [Nachforderungen](nachforderung.md)).
+„Einsatztagebuch“). Gehört der Posten zu einer anderen oder zu keiner Nachforderung, löst „Von
+Nachforderung lösen“ unter „Weitere Aktionen“ nur den Verweis; der Posten bleibt mit Menge, Ort und
+Status in der Liste (Ablauf im Kapitel [Nachforderungen](nachforderung.md)).
 
 ### Status
 
