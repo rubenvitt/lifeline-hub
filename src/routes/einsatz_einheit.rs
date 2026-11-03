@@ -782,9 +782,8 @@ pub async fn update(
 }
 
 /// System-Eintrag zu einer wirksamen Sprechgruppen-Änderung an der Einheit (LLH-1265, Change
-/// `pcrn0wn1-einheit-sprechgruppen-einzelwege`, design.md D3). Nach dem Schreiben und degradiert
-/// wie der Eintrag zum Führerwechsel: scheitert das Laden der Namen, bleibt die Zuordnung, und
-/// nur der Eintrag fehlt.
+/// `pcrn0wn1-einheit-sprechgruppen-einzelwege`, design.md D3): „Einheit «…»: …“ über den
+/// gemeinsamen, degradierten Helfer [`super::etb_sprechgruppe`].
 async fn etb_sprechgruppe(
     state: &AppState,
     ctx: &EinsatzSchreibzugriff<Einheiten>,
@@ -799,26 +798,11 @@ async fn etb_sprechgruppe(
     .bind(eid)
     .bind(einsatz_id)
     .fetch_one(&state.pool)
-    .await;
-    let gruppe = crate::sprechgruppe::repo::laden(&state.pool, ctx.einsatz.org_id, sg).await;
-    match (name, gruppe) {
-        (Ok(name), Ok(gruppe)) => {
-            let inhalt = format!(
-                "Einheit «{name}»: Sprechgruppe «{}» ({}) {wirkung}",
-                gruppe.bezeichnung,
-                gruppe.betriebsart.as_str()
-            );
-            super::etb_system_degradiert(state, einsatz_id, ctx.benutzer.id, &inhalt).await;
-        }
-        (name, gruppe) => tracing::error!(
-            einsatz_id,
-            einheit_id = eid,
-            sprechgruppe_id = sg,
-            name_fehler = ?name.err(),
-            sprechgruppe_fehler = ?gruppe.err(),
-            "ETB-Eintrag zur Sprechgruppe fehlgeschlagen (degradiert, nicht fatal)"
-        ),
-    }
+    .await
+    .map(|name| format!("Einheit «{name}»"))
+    .map_err(AppError::from);
+    let (org_id, benutzer_id) = (ctx.einsatz.org_id, ctx.benutzer.id);
+    super::etb_sprechgruppe(state, einsatz_id, org_id, benutzer_id, name, sg, wirkung).await;
 }
 
 /// PUT /api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg} — eine Sprechgruppe zuordnen

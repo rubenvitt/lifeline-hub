@@ -117,13 +117,14 @@ Die Seite Einsatzdaten SHALL ein Paneel „Eigene Führungsstelle“ mit Einsatz
 Bezeichnung, Standort, Rufname, Sprechgruppen, „Telefon und weitere Verbindungen“ und
 Führungsfahrzeugen zeigen. Jede
 Angabe MUST einzeln in der Leseansicht bearbeitbar sein und beim Speichern genau ihr eigenes Feld
-senden; der Standort sendet Adresse und Koordinate zusammen. Ein unveränderter Wert sendet nichts.
+senden; der Standort sendet Adresse und Koordinate zusammen, die Sprechgruppen gehen einzeln
+(Anforderung „Sprechgruppen einzeln zuordnen und lösen“). Ein unveränderter Wert sendet nichts.
 Ohne Schreibrecht MUST keine Angabe eine Aufforderung tragen, leere Angaben zeigen „—“. Ein
 Speicherfehler MUST an der Zeile stehen.
 
 #### Scenario: Sprechgruppen zuordnen
 - **WHEN** eine schreibberechtigte Person an der Zeile „Sprechgruppen“ die Sprechgruppen „TMO 311“ und „DMO 505“ wählt und speichert
-- **THEN** zeigt die Zeile beide nach Betriebsart, und die Anfrage trug nur die Sprechgruppen
+- **THEN** zeigt die Zeile beide nach Betriebsart, und es gingen genau zwei Zuordnungen an den Einzelweg, kein PATCH
 
 #### Scenario: ELW 2 zuordnen
 - **WHEN** eine schreibberechtigte Person an der Zeile „Führungsfahrzeuge“ den ELW 2 „Florian Musterstadt 10/1“ wählt und speichert
@@ -366,3 +367,39 @@ zeigen.
 #### Scenario: Wechsel auf einem anderen Schirm
 - **WHEN** auf Schirm A der Einsatzleiter gewechselt wird und Schirm B die Einsatzliste offen hat
 - **THEN** zeigt die Kachel auf Schirm B den neuen Einsatzleiter ohne Neuladen
+
+### Requirement: Sprechgruppen einzeln zuordnen und lösen
+Das Speichern der Sprechgruppen der Führungsstelle SHALL je hinzugefügter Sprechgruppe eine
+Zuordnung (`PUT …/fuehrungsstelle/sprechgruppen/{sg}`) und je entfernter eine Lösung (`DELETE`,
+derselbe Pfad) senden, berechnet gegen den Stand beim Öffnen der Zeile. Die ganze Menge MUST
+nicht gesendet werden. Sprechgruppen, die hier nicht geändert wurden, MUST unberührt bleiben,
+auch wenn ein anderer Arbeitsplatz sie inzwischen zugeordnet oder gelöst hat.
+
+#### Scenario: Eine Sprechgruppe hinzufügen
+- **WHEN** die Führungsstelle die Sprechgruppe „311“ hat und jemand „505“ hinzufügt und speichert
+- **THEN** geht genau eine Zuordnung für „505“ hinaus, keine Anfrage für „311“ und kein PATCH
+
+#### Scenario: Zwei Arbeitsplätze zugleich
+- **WHEN** zwei Arbeitsplätze die Führungsstelle ohne Sprechgruppe öffnen, der eine „311“ und der
+  andere danach „505“ hinzufügt und beide speichern
+- **THEN** hat die Führungsstelle beide Sprechgruppen „311“ und „505“
+
+### Requirement: ETB-Eintrag je Sprechgruppen-Änderung
+Jede wirksame Zuordnung oder Lösung einer Sprechgruppe an der Führungsstelle über die Einzelwege
+SHALL einen System-Eintrag im ETB erzeugen, der die Führungsstelle (mit Bezeichnung, wenn eine
+gesetzt ist) und die Sprechgruppe mit Betriebsart nennt. Eine wiederholte Anfrage ohne Wirkung
+MUST keinen Eintrag erzeugen. Das gilt für jede Quelle dieser Wege, auch die Fernmeldeskizze.
+
+#### Scenario: Mit Bezeichnung
+- **WHEN** die Führungsstelle „ELW Musterstadt“ heißt und jemand ihr die Sprechgruppe „311“ (TMO)
+  zuordnet
+- **THEN** erhält das ETB den System-Eintrag „Führungsstelle «ELW Musterstadt»: Sprechgruppe
+  «311» (TMO) zugeordnet“
+
+#### Scenario: Ohne Bezeichnung
+- **WHEN** die Führungsstelle keine Bezeichnung hat und jemand die Sprechgruppe „311“ (TMO) löst
+- **THEN** erhält das ETB den System-Eintrag „Führungsstelle: Sprechgruppe «311» (TMO) entfernt“
+
+#### Scenario: Wiederholte Lösung
+- **WHEN** eine nicht zugeordnete Sprechgruppe an der Führungsstelle gelöst wird
+- **THEN** entsteht kein ETB-Eintrag

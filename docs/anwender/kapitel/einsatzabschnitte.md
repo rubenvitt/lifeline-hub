@@ -69,6 +69,9 @@ nimmt den Rufnamen vor der Kurzbezeichnung.
 Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie für diesen Einsatz an
 („Neue Bezeichnung“, „Neue Betriebsart“, dann „Anlegen“). Sie trägt danach den Zusatz „(lokal)“.
 
+Jede hinzugefügte oder entfernte Sprechgruppe steht danach im Einsatztagebuch. Was ein anderer
+Arbeitsplatz währenddessen an den Sprechgruppen ändert, bleibt erhalten.
+
 ### Einen Abschnitt umhängen
 
 Für Einsatzleitung und Führungspersonal:
@@ -140,8 +143,9 @@ lautet er „Auf Karte zeigen (Keine Berechtigung)“ und ist gesperrt. Einzelhe
   Ziehen in der Gliederung und beim „Rückgängig“.
 - Auflösen: „Abschnitt «…» aufgelöst“. Ein Gerät, das an den Abschnitt gekoppelt war, verliert
   dabei seinen Zugriff; auch das steht im Einsatztagebuch.
-- Andere Korrekturen, das Umhängen eines Abschnitts und die Zuordnung von Sprechgruppen schreiben
-  keinen Eintrag.
+- Eine hinzugefügte oder entfernte Sprechgruppe: „Abschnitt «…»: Sprechgruppe «…» (TMO)
+  zugeordnet“ bzw. „… entfernt“, auch aus der Fernmeldeskizze.
+- Andere Korrekturen und das Umhängen eines Abschnitts schreiben keinen Eintrag.
 
 ### Regeln der Gliederung
 

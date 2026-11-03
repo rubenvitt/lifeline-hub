@@ -15,10 +15,11 @@ import {
   useRollen,
   type SegmentOption,
 } from '../../components/instrument';
-import { mitBetriebsart, teileSprechgruppen } from '../../components/kommunikationsmittel';
 import { Select } from '../../components/Select';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
-import SprechgruppenPicker from '../../components/SprechgruppenPicker';
+import SprechgruppenAngabe, {
+  type SprechgruppenHandler,
+} from '../../components/SprechgruppenAngabe';
 import { VerbindungenAngabe } from '../../components/VerbindungenFeld';
 import StatusTag from '../../components/StatusTag';
 import { abschnittLagezustand, rollenFarbe } from '../../theme/statusFarben';
@@ -42,17 +43,13 @@ interface AbschnittDetailProps {
   staerken: AbschnittStaerken;
   darfSchreiben: boolean;
   onPatch: AbschnittPatchHandler;
+  /** Sprechgruppen über die Einzelwege des Abschnitts (LLH-1456, D1). */
+  onSprechgruppen: SprechgruppenHandler;
 }
 
 /** Leer ist ein Text, der nach dem Trimmen nichts übrig lässt — wie `leerZuNull` beim Senden. */
 const isEmptyText = (w: string) => w.trim() === '';
 const isSameText = (a: string, b: string) => a.trim() === b.trim();
-
-function isSameIds(a: readonly number[], b: readonly number[]): boolean {
-  if (a.length !== b.length) return false;
-  const set = new Set(a);
-  return b.every((id) => set.has(id));
-}
 
 /**
  * Das Detail eines Einsatzabschnitts zum Lesen UND Bearbeiten (LFH-1208, Spec
@@ -69,6 +66,8 @@ function isSameIds(a: readonly number[], b: readonly number[]): boolean {
  * der Kurzbezeichnung im Funkplan) und „Sprechgruppen“ sind Funk; „Telefon und weitere
  * Verbindungen“ ist die typisierte Liste, als Ganzes ersetzt (`verbindungen`). Der Rufname ist
  * vorerst ein Freitext; das Vorschlagsfeld „aus Stammdaten oder frei“ hängt LLH-1144 hier ein.
+ * Die Sprechgruppen gehen einzeln, als Differenz zum Stand beim Öffnen (`SprechgruppenAngabe`,
+ * LLH-1456, Change `tjh219fc-abschnitt-fuehrungsstelle-sprechgruppen-einzelwege`, D1).
  *
  * Den Über-Abschnitt ändert keine Zeile, sondern das Umhängen in der Gliederung (Ziehen oder
  * „Verschieben unter …“, LFH-1212); die Gliederung zeigt ihn.
@@ -85,6 +84,7 @@ export default function AbschnittDetail({
   staerken,
   darfSchreiben,
   onPatch,
+  onSprechgruppen,
 }: AbschnittDetailProps) {
   const textRow = (
     etikett: string,
@@ -126,14 +126,6 @@ export default function AbschnittDetail({
       }
     />
   );
-
-  const { tmo, dmo } = teileSprechgruppen(a.sprechgruppen);
-  const sprechgruppenText = [
-    tmo.length > 0 ? mitBetriebsart('TMO', tmo.map((s) => s.bezeichnung).join(', ')) : null,
-    dmo.length > 0 ? mitBetriebsart('DMO', dmo.map((s) => s.bezeichnung).join(', ')) : null,
-  ]
-    .filter((t): t is string => t != null)
-    .join(' · ');
 
   return (
     <Datenraster spalten={2} beschriftung="Abschnittsdaten">
@@ -221,22 +213,11 @@ export default function AbschnittDetail({
         )}
       </Datenfeld>
       <Datenfeld label="Sprechgruppen">
-        <InlineAngabe<number[]>
-          etikett="Sprechgruppen"
-          wert={(a.sprechgruppen ?? []).map((s) => s.id)}
-          anzeige={<span style={monoStil(13)}>{sprechgruppenText}</span>}
-          leer={(ids) => ids.length === 0}
-          gleich={isSameIds}
+        <SprechgruppenAngabe
+          sprechgruppen={a.sprechgruppen}
+          einsatzId={einsatzId}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(ids) => onPatch('Sprechgruppen', { sprechgruppe_ids: ids })}
-          eingabe={({ feld, popup, value, onChange }) => (
-            <SprechgruppenPicker
-              einsatzId={einsatzId}
-              value={value}
-              onChange={onChange}
-              auswahl={{ ...feld, ...popup }}
-            />
-          )}
+          onSpeichern={onSprechgruppen}
         />
       </Datenfeld>
       <Datenfeld label="Telefon und weitere Verbindungen" breit>

@@ -1146,6 +1146,91 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
 });
 
 /**
+ * Sprechgruppen über die Einzelwege (LLH-1456, Change
+ * `tjh219fc-abschnitt-fuehrungsstelle-sprechgruppen-einzelwege`, D1/D5): je Änderung ein PUT bzw.
+ * DELETE, kein PATCH mit der ganzen Menge; die erste Ablehnung steht an der Zeile.
+ */
+describe('EinsatzabschnittePage · Sprechgruppen einzeln (LLH-1456)', () => {
+  const detail = () => screen.getByRole('region', { name: 'Abschnitt: Nord' });
+
+  /** Zustandsbehafteter Server: Einzelwege ändern den Abschnitt, den der GET der Liste liefert. */
+  function einzelwege(ablehnen?: string) {
+    const abschnitt = { ...funkAbschnitt, sprechgruppen: [tmoSprechgruppe] };
+    const anfragen: string[] = [];
+    const patches: unknown[] = [];
+    const alle = [tmoSprechgruppe, dmoSprechgruppe];
+    const weg = ({ request, params }: { request: Request; params: { sg?: unknown } }) => {
+      const sg = Number(params.sg);
+      anfragen.push(`${request.method} ${sg}`);
+      if (ablehnen && request.method === 'PUT') {
+        return HttpResponse.json({ error: ablehnen }, { status: 422 });
+      }
+      const ohne = abschnitt.sprechgruppen.filter((g) => g.id !== sg);
+      abschnitt.sprechgruppen =
+        request.method === 'PUT' ? [...ohne, alle.find((g) => g.id === sg)!] : ohne;
+      return new HttpResponse(null, { status: 204 });
+    };
+    server.use(
+      // Vor `handlers`: der erste passende Handler gewinnt.
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([abschnitt])),
+      ...handlers('einsatzleitung', 'aktiv', []),
+      http.put('/api/einsaetze/1/abschnitte/5/sprechgruppen/:sg', weg),
+      http.delete('/api/einsaetze/1/abschnitte/5/sprechgruppen/:sg', weg),
+      http.patch('/api/einsaetze/1/abschnitte/5', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json(abschnitt);
+      }),
+    );
+    return { anfragen, patches };
+  }
+
+  async function waehle(bezeichnung: string) {
+    await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    await userEvent.click(
+      within(detail()).getByRole('button', { name: 'Sprechgruppen bearbeiten' }),
+    );
+    await userEvent.click(within(detail()).getByRole('combobox', { name: 'Sprechgruppen' }));
+    await userEvent.click(await screen.findByTitle(bezeichnung));
+  }
+
+  it('Hinzufügen schickt genau ein PUT, kein PATCH, und zeigt den neuen Stand', async () => {
+    const { anfragen, patches } = einzelwege();
+    renderPage();
+    await waehle('DMO 31');
+    await userEvent.click(
+      within(detail()).getByRole('button', { name: 'Sprechgruppen speichern' }),
+    );
+    await waitFor(() => expect(anfragen).toEqual(['PUT 8']));
+    expect(patches).toEqual([]);
+    expect(
+      await within(detail()).findByRole('button', { name: 'Sprechgruppen bearbeiten' }),
+    ).toHaveAccessibleDescription('TMO 412_F_DRK · DMO 31');
+  });
+
+  it('Teilablehnung: Grund an der Zeile, Entwurf offen, kein Toast, gelöste bleibt gelöst', async () => {
+    const { anfragen } = einzelwege('Sprechgruppe gehört nicht zum Einsatz');
+    renderPage();
+    await waehle('DMO 31');
+    // 412_F_DRK abwählen: Tausch, erst lösen, dann zuordnen.
+    const option = (await screen.findAllByTitle('412_F_DRK')).find((e) =>
+      e.classList.contains('ant-select-item-option'),
+    )!;
+    await userEvent.click(option);
+    await userEvent.click(
+      within(detail()).getByRole('button', { name: 'Sprechgruppen speichern' }),
+    );
+    expect(await within(detail()).findByRole('alert')).toHaveTextContent(
+      'Sprechgruppe gehört nicht zum Einsatz',
+    );
+    expect(anfragen).toEqual(['DELETE 7', 'PUT 8']);
+    expect(
+      within(detail()).getByRole('button', { name: 'Sprechgruppen speichern' }),
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+});
+
+/**
  * Umhängen in der Gliederung (LFH-1212): per Zeiger (dnd-kit, `ZugPointerSensor`) und per Menü
  * „Verschieben unter …“, mit Rückgängig im Toast und Live-Zufluss über die Schleuse.
  */

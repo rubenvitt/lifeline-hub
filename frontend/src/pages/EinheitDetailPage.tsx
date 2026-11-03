@@ -36,15 +36,17 @@ import { einheitenPfad, nachforderungenPfad, parseRouteId } from '../routing/dee
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import {
+  schreibeSprechgruppen,
+  type SprechgruppenAenderung,
+  type SprechgruppenSchritt,
+} from '../components/SprechgruppenAngabe';
+import {
   buildBesatzungMittel,
   buildEinheitRechte,
   visibleBesatzungRows,
 } from './einheit/einheitAnsichtKern';
 import EinheitKopf from './einheit/EinheitKopf';
-import EinheitFunk, {
-  type SprechgruppenAenderung,
-  type SprechgruppenSchritt,
-} from './einheit/EinheitFunk';
+import EinheitFunk from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
 import EinheitAufgeloestAnsicht from './einheit/EinheitAufgeloestAnsicht';
 import EinheitAufloesen from './einheit/EinheitAufloesen';
@@ -300,25 +302,19 @@ function EinheitAnsicht({
    * Server ins Tagebuch, deshalb auch `etb`.
    */
   const sprechgruppen = useMutation({
-    mutationFn: async (v: {
+    mutationFn: (v: {
       aenderung: SprechgruppenAenderung;
       onSchritt: (schritt: SprechgruppenSchritt) => void;
-    }) => {
-      const { aenderung, onSchritt } = v;
-      try {
-        for (const id of aenderung.weg) {
-          await loeseEinheitSprechgruppe(einsatzId, einheitId, id);
-          onSchritt({ art: 'weg', id });
-        }
-        for (const id of aenderung.hinzu) {
-          await ordneEinheitSprechgruppeZu(einsatzId, einheitId, id);
-          onSchritt({ art: 'hinzu', id });
-        }
-      } finally {
-        qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-        await qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-      }
-    },
+    }) =>
+      schreibeSprechgruppen({
+        ...v,
+        loesen: (id) => loeseEinheitSprechgruppe(einsatzId, einheitId, id),
+        zuordnen: (id) => ordneEinheitSprechgruppeZu(einsatzId, einheitId, id),
+        nachladen: () => {
+          qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+          return qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+        },
+      }),
     onSuccess: () => message.success('Sprechgruppen gespeichert'),
   });
   // Das Zeichen geht über den Lageweg, ohne Tagebuch-Eintrag (D4).

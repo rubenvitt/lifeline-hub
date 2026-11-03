@@ -413,9 +413,28 @@ pub async fn aufloesen(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// System-Eintrag zu einer wirksamen Sprechgruppen-Änderung am Abschnitt (LLH-1456, Change
+/// `tjh219fc-abschnitt-fuehrungsstelle-sprechgruppen-einzelwege`, D2): „Abschnitt «…»: …“ über
+/// den gemeinsamen, degradierten Helfer [`super::etb_sprechgruppe`].
+async fn etb_sprechgruppe(
+    state: &AppState,
+    ctx: &EinsatzSchreibzugriff<Einsatzabschnitte>,
+    aid: i64,
+    sg: i64,
+    wirkung: &str,
+) {
+    let einsatz_id = ctx.einsatz.id;
+    let name = abschnitt_repo::load(&state.pool, einsatz_id, aid)
+        .await
+        .map(|a| format!("Abschnitt «{}»", a.name));
+    let (org_id, benutzer_id) = (ctx.einsatz.org_id, ctx.benutzer.id);
+    super::etb_sprechgruppe(state, einsatz_id, org_id, benutzer_id, name, sg, wirkung).await;
+}
+
 /// PUT /api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg} — eine Sprechgruppe zuordnen
 /// (LFH-893, design.md D5). Idempotent; dieselbe Prüfung, Zuordnung und Live-Wirkung wie der
-/// PATCH mit `sprechgruppe_ids`, kein ETB (auch der PATCH schreibt dafür keinen).
+/// PATCH mit `sprechgruppe_ids`. Anders als der PATCH schreibt eine wirksame Zuordnung einen
+/// System-Eintrag ins ETB (LLH-1456, D2), eine wiederholte keinen.
 pub async fn sprechgruppe_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
@@ -433,11 +452,13 @@ pub async fn sprechgruppe_zuordnen(
     .await?
     {
         sse_abschnitt(&state, einsatz_id, aid);
+        etb_sprechgruppe(&state, &ctx, aid, sg, "zugeordnet").await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg} — Zuordnung lösen, idempotent.
+/// DELETE /api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg} — Zuordnung lösen, idempotent;
+/// eine wirksame Lösung schreibt einen System-Eintrag ins ETB (LLH-1456, D2).
 pub async fn sprechgruppe_loesen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
@@ -447,6 +468,7 @@ pub async fn sprechgruppe_loesen(
     let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Abschnitt(aid);
     if crate::sprechgruppe::repo::einzeln_loesen(&state.pool, einsatz_id, ziel, sg).await? {
         sse_abschnitt(&state, einsatz_id, aid);
+        etb_sprechgruppe(&state, &ctx, aid, sg, "entfernt").await;
     }
     Ok(StatusCode::NO_CONTENT)
 }

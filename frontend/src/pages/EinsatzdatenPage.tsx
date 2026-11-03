@@ -46,6 +46,8 @@ import {
   ladeModulFreigaben,
   patcheEinsatz,
   patcheFuehrungsstelle,
+  loeseFuehrungsstelleSprechgruppe,
+  ordneFuehrungsstelleSprechgruppeZu,
   schliesseEinsatzAb,
   type KopfdatenPatch,
 } from '../api/einsaetze';
@@ -86,8 +88,11 @@ import {
   rufnameVorschlaege,
 } from '../stab/rufnameVorschlaege';
 import PaneelZustand from '../components/instrument/PaneelZustand';
-import SprechgruppenPicker from '../components/SprechgruppenPicker';
-import { mitBetriebsart, teileSprechgruppen } from '../components/kommunikationsmittel';
+import SprechgruppenAngabe, {
+  schreibeSprechgruppen,
+  type SprechgruppenAenderung,
+  type SprechgruppenSchritt,
+} from '../components/SprechgruppenAngabe';
 import { VerbindungenAngabe } from '../components/VerbindungenFeld';
 import EinsatzleiterAngabe from './EinsatzleiterAngabe';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
@@ -355,18 +360,7 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
   );
 }
 
-/** Sprechgruppen als eine Zeile: „TMO 311, 312 · DMO 505“ — dieselbe Teilung wie der Funkplan. */
-function sprechgruppenText(fs: Pick<Fuehrungsstelle, 'sprechgruppen'>): string {
-  const { tmo, dmo } = teileSprechgruppen(fs.sprechgruppen);
-  return [
-    tmo.length > 0 ? mitBetriebsart('TMO', tmo.map((s) => s.bezeichnung).join(', ')) : null,
-    dmo.length > 0 ? mitBetriebsart('DMO', dmo.map((s) => s.bezeichnung).join(', ')) : null,
-  ]
-    .filter((t): t is string => t != null)
-    .join(' · ');
-}
-
-/** Gleiche Auswahl (Sprechgruppen, Fahrzeuge) unabhängig von der Reihenfolge („unverändert → kein Senden“). */
+/** Gleiche Auswahl (Fahrzeuge) unabhängig von der Reihenfolge („unverändert → kein Senden“). */
 function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
   if (a.length !== b.length) return false;
   const menge = new Set(a);
@@ -612,6 +606,28 @@ function FuehrungsstellePaneel({
   });
   const speichern = (etikett: string, patch: FuehrungsstellePatch) =>
     mutation.mutateAsync({ etikett, patch });
+  /*
+   * Sprechgruppen über die Einzelwege (LLH-1456, D1/D5): erst lösen, dann zuordnen; die erste
+   * Ablehnung hält an und steht an der Zeile. Die Wege antworten ohne Körper, deshalb wartet das
+   * Paneel in jedem Fall auf den neu geladenen Stand. Jede wirksame Änderung schreibt der Server ins
+   * Tagebuch, deshalb auch `etb`.
+   */
+  const sprechgruppen = useMutation({
+    mutationFn: (v: {
+      aenderung: SprechgruppenAenderung;
+      onSchritt: (schritt: SprechgruppenSchritt) => void;
+    }) =>
+      schreibeSprechgruppen({
+        ...v,
+        loesen: (id) => loeseFuehrungsstelleSprechgruppe(einsatzId, id),
+        zuordnen: (id) => ordneFuehrungsstelleSprechgruppeZu(einsatzId, id),
+        nachladen: () => {
+          qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+          return qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungsstelle(einsatzId) });
+        },
+      }),
+    onSuccess: () => message.success('Sprechgruppen gespeichert'),
+  });
   const fahrzeugQuelle = useFahrzeugeQuelle(einsatzId);
 
   const fs = query.data;
@@ -709,22 +725,13 @@ function FuehrungsstellePaneel({
               {
                 etikett: 'Sprechgruppen',
                 wert: (
-                  <InlineAngabe<number[]>
-                    etikett="Sprechgruppen"
-                    wert={fs.sprechgruppen.map((s) => s.id)}
-                    anzeige={<span style={monoStil(13)}>{sprechgruppenText(fs)}</span>}
-                    leer={(ids) => ids.length === 0}
-                    gleich={gleicheIds}
+                  <SprechgruppenAngabe
+                    sprechgruppen={fs.sprechgruppen}
+                    einsatzId={einsatzId}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(ids) => speichern('Sprechgruppen', { sprechgruppe_ids: ids })}
-                    eingabe={({ feld, popup, value, onChange }) => (
-                      <SprechgruppenPicker
-                        einsatzId={einsatzId}
-                        value={value}
-                        onChange={onChange}
-                        auswahl={{ ...feld, ...popup }}
-                      />
-                    )}
+                    onSpeichern={(aenderung, onSchritt) =>
+                      sprechgruppen.mutateAsync({ aenderung, onSchritt })
+                    }
                   />
                 ),
               },

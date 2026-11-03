@@ -19,6 +19,8 @@ import {
   listeAbschnitte,
   loeseAbschnittAuf,
   patcheAbschnitt,
+  loeseAbschnittSprechgruppe,
+  ordneAbschnittSprechgruppeZu,
   type AbschnittPatch,
 } from '../api/einsatzabschnitte';
 import type { Einheit, Einsatzabschnitt } from '../api/types';
@@ -37,6 +39,12 @@ import { Augenbraue, Paneel, Segmentleiste, monoStil, useRollen } from '../compo
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
+import {
+  schreibeSprechgruppen,
+  type SprechgruppenAenderung,
+  type SprechgruppenHandler,
+  type SprechgruppenSchritt,
+} from '../components/SprechgruppenAngabe';
 import AbschnittDetail, { type AbschnittPatchHandler } from './einsatzabschnitte/AbschnittDetail';
 import AbschnittAnlegenModal from './einsatzabschnitte/AbschnittAnlegenModal';
 import { abrufZustand } from '../api/abrufZustand';
@@ -299,6 +307,34 @@ export default function EinsatzabschnittePage() {
     (aid: number): AbschnittPatchHandler =>
     (etikett, p) =>
       patch.mutateAsync({ aid, etikett, patch: p });
+  /*
+   * Sprechgruppen über die Einzelwege (LLH-1456, D1/D5): erst lösen, dann zuordnen, eine Anfrage
+   * nach der anderen; die erste Ablehnung hält an und steht an der Zeile. Die Wege antworten ohne
+   * Körper, deshalb wartet die Seite in jedem Fall auf den neu geladenen Stand. Jede wirksame
+   * Änderung schreibt der Server ins Tagebuch, deshalb auch `etb`.
+   */
+  const sprechgruppen = useMutation({
+    mutationFn: (v: {
+      aid: number;
+      aenderung: SprechgruppenAenderung;
+      onSchritt: (schritt: SprechgruppenSchritt) => void;
+    }) =>
+      schreibeSprechgruppen({
+        aenderung: v.aenderung,
+        onSchritt: v.onSchritt,
+        loesen: (id) => loeseAbschnittSprechgruppe(einsatzId, v.aid, id),
+        zuordnen: (id) => ordneAbschnittSprechgruppeZu(einsatzId, v.aid, id),
+        nachladen: () => {
+          qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+          return qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });
+        },
+      }),
+    onSuccess: () => message.success('Sprechgruppen gespeichert'),
+  });
+  const sprechgruppenHandler =
+    (aid: number): SprechgruppenHandler =>
+    (aenderung, onSchritt) =>
+      sprechgruppen.mutateAsync({ aid, aenderung, onSchritt });
   const aufloesen = useMutation({
     mutationFn: (aid: number) => loeseAbschnittAuf(einsatzId, aid),
     onSuccess: (_, aid) => {
@@ -812,6 +848,7 @@ export default function EinsatzabschnittePage() {
                     staerken={staerken}
                     darfSchreiben={darfSchreiben}
                     onPatch={patchHandler(aktuell.id)}
+                    onSprechgruppen={sprechgruppenHandler(aktuell.id)}
                   />
 
                   {darfSchreiben && (

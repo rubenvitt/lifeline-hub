@@ -30,6 +30,8 @@ Sprechgruppen) und Telefon stehen getrennt; die Verbindungen werden als ganze Li
 Das Speichern einer Angabe SHALL genau dieses eine Feld an
 `PATCH /api/einsaetze/{id}/abschnitte/{aid}` senden. Ist der Wert unverändert, MUST keine
 Anfrage entstehen. Leert jemand eine optionale Angabe, MUST das Feld als `null` gesendet werden.
+Die Sprechgruppen gehen nicht über diesen Weg, sondern einzeln (Anforderung „Sprechgruppen
+einzeln zuordnen und lösen“).
 
 #### Scenario: Zwei Angaben nacheinander aus altem Stand
 - **WHEN** der Detailstand einen Abschnitt mit Lagezustand „planmäßig“ zeigt, an einem anderen
@@ -157,3 +159,40 @@ heißt. Eine Ablehnung MUST im Detail stehen.
 - **WHEN** jemand im Menü „Weitere Aktionen“ „Auflösen“ wählt und „Abschnitt auflösen“ bestätigt
 - **THEN** verschwindet der Abschnitt aus der Gliederung, und das Detail zeigt den ersten
   verbliebenen Abschnitt
+
+### Requirement: Sprechgruppen einzeln zuordnen und lösen
+Das Speichern der Sprechgruppen eines Abschnitts SHALL je hinzugefügter Sprechgruppe eine
+Zuordnung (`PUT …/abschnitte/{aid}/sprechgruppen/{sg}`) und je entfernter eine Lösung (`DELETE`,
+derselbe Pfad) senden, berechnet gegen den Stand beim Öffnen der Zeile. Die ganze Menge MUST
+nicht gesendet werden. Sprechgruppen, die hier nicht geändert wurden, MUST unberührt bleiben,
+auch wenn ein anderer Arbeitsplatz sie inzwischen zugeordnet oder gelöst hat.
+
+#### Scenario: Eine Sprechgruppe hinzufügen
+- **WHEN** der Abschnitt „Nord“ die Sprechgruppe „311“ hat und jemand „505“ hinzufügt und
+  speichert
+- **THEN** geht genau eine Zuordnung für „505“ hinaus, keine Anfrage für „311“ und kein PATCH
+
+#### Scenario: Zwei Arbeitsplätze zugleich
+- **WHEN** zwei Arbeitsplätze denselben Abschnitt ohne Sprechgruppe öffnen, der eine „311“ und
+  der andere danach „505“ hinzufügt und beide speichern
+- **THEN** hat der Abschnitt beide Sprechgruppen „311“ und „505“
+
+#### Scenario: Teilweise abgelehnt
+- **WHEN** von zwei Änderungen die zweite abgelehnt wird
+- **THEN** bleibt die Zeile mit dem Entwurf offen, der Grund steht darunter, und die Ansicht zeigt
+  den gespeicherten Stand mit der ersten Änderung
+
+### Requirement: ETB-Eintrag je Sprechgruppen-Änderung
+Jede wirksame Zuordnung oder Lösung einer Sprechgruppe an einem Abschnitt über die Einzelwege
+SHALL einen System-Eintrag im ETB erzeugen, der Abschnitt und Sprechgruppe mit Betriebsart nennt.
+Eine wiederholte Anfrage ohne Wirkung MUST keinen Eintrag erzeugen. Das gilt für jede Quelle
+dieser Wege, auch die Fernmeldeskizze.
+
+#### Scenario: Zuordnen und Lösen
+- **WHEN** jemand dem Abschnitt „Nord“ die Sprechgruppe „311“ (TMO) zuordnet und sie danach löst
+- **THEN** erhält das ETB zwei System-Einträge: „Abschnitt «Nord»: Sprechgruppe «311» (TMO)
+  zugeordnet“ und „Abschnitt «Nord»: Sprechgruppe «311» (TMO) entfernt“
+
+#### Scenario: Wiederholte Zuordnung
+- **WHEN** dieselbe Sprechgruppe dem Abschnitt ein zweites Mal zugeordnet wird
+- **THEN** entsteht kein weiterer ETB-Eintrag

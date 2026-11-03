@@ -4,10 +4,11 @@
 //!
 //! Tragend: idempotent, eine Zuordnung verdrängt keine andere (zwei Arbeitsplätze zugleich),
 //! dieselben Prüfungen wie der PATCH mit `sprechgruppe_ids`, dasselbe Live-Ereignis, 403 je
-//! fehlendem Recht, 422 für eine Funktion mit Sprechgruppe. Ins ETB schreibt nur die Einheit, je
-//! wirksamer Änderung einen System-Eintrag (LLH-1265, Change
-//! `pcrn0wn1-einheit-sprechgruppen-einzelwege`, design.md D3); die übrigen Ziele und der PATCH
-//! schreiben keinen.
+//! fehlendem Recht, 422 für eine Funktion mit Sprechgruppe. Einheit, Abschnitt und Führungsstelle
+//! schreiben je wirksamer Änderung einen System-Eintrag ins ETB (LLH-1265, Change
+//! `pcrn0wn1-einheit-sprechgruppen-einzelwege`, D3; LLH-1456, Change
+//! `tjh219fc-abschnitt-fuehrungsstelle-sprechgruppen-einzelwege`, D2); die externe Stelle (D3) und
+//! der PATCH schreiben keinen.
 
 use axum::http::StatusCode;
 use lifeline_hub::live::{LiveEvent, LiveNachricht};
@@ -250,7 +251,7 @@ async fn gleichzeitig_zwei_kanaele_und_idempotent() {
 }
 
 #[tokio::test]
-async fn gleiches_live_und_etb_nur_an_der_einheit() {
+async fn gleiches_live_und_etb_ausser_an_der_stelle() {
     let a = aufbau().await;
     let vor = system_etb_anzahl(&a.app, &a.admin, a.einsatz).await;
     for ziel in a.ziele {
@@ -271,16 +272,21 @@ async fn gleiches_live_und_etb_nur_an_der_einheit() {
             None,
         )
         .await;
-        // Nur die Einheit schreibt je wirksamer Änderung ins ETB (LLH-1265, D3).
-        let etb = usize::from(matches!(ziel, Ziel::Einheit(_))) * 2;
+        // Einheit, Abschnitt und Führungsstelle schreiben je wirksamer Änderung ins ETB, die
+        // externe Stelle des Kommunikationsplans nicht (LLH-1456, D3).
+        let etb = usize::from(!matches!(ziel, Ziel::Stelle(_))) * 2;
         assert_eq!(
             zaehle(&mut rx, ziel.live()),
             (2, etb),
-            "je wirksamer Änderung ein Ereignis des Datensatzes, ETB nur an der Einheit"
+            "je wirksamer Änderung ein Ereignis des Datensatzes, ETB außer an der Stelle"
         );
     }
     let nach_einzelwegen = system_etb_anzahl(&a.app, &a.admin, a.einsatz).await;
-    assert_eq!(nach_einzelwegen, vor + 2, "zwei Einträge der Einheit");
+    assert_eq!(
+        nach_einzelwegen,
+        vor + 6,
+        "je zwei Einträge an Abschnitt, Einheit und Führungsstelle"
+    );
     // Der PATCH mit derselben Wirkung schreibt ebenfalls nichts ins ETB.
     let b = format!("/api/einsaetze/{}", a.einsatz);
     let mut rx = a.live.abonniere(a.einsatz);
@@ -338,59 +344,115 @@ async fn gleiches_live_und_etb_nur_an_der_einheit() {
     }
 }
 
-#[tokio::test]
-async fn einheit_etb_je_wirksamer_aenderung() {
-    let a = aufbau().await;
-    let Ziel::Einheit(eh) = a.ziele[1] else {
-        unreachable!()
+/// Die ETB-Texte je Ziel: Datensatz mit Namen, Sprechgruppe mit Betriebsart (LLH-1456, D2).
+fn etb_text(ziel: Ziel, sg: &str, wirkung: &str) -> String {
+    let traeger = match ziel {
+        Ziel::Abschnitt(_) => "Abschnitt «EA 1»",
+        Ziel::Einheit(_) => "Einheit «1. Zug»",
+        Ziel::Fuehrungsstelle => "Führungsstelle",
+        Ziel::Stelle(_) => unreachable!("die Stelle schreibt kein ETB"),
     };
-    let pfad = Ziel::Einheit(eh).pfad(a.einsatz, a.tmo311);
-    let vor = system_etb_inhalte(&a.app, &a.admin, a.einsatz).await.len();
-    // Zweimal zuordnen, zweimal lösen: nur die wirksame Änderung schreibt.
-    for methode in ["PUT", "PUT", "DELETE", "DELETE"] {
-        let (status, _) = anfrage(&a.app, methode, &pfad, &a.admin, None).await;
-        assert_eq!(status, StatusCode::NO_CONTENT);
+    format!("{traeger}: Sprechgruppe «{sg}» {wirkung}")
+}
+
+#[tokio::test]
+async fn etb_je_wirksamer_aenderung_an_abschnitt_einheit_und_fuehrungsstelle() {
+    let a = aufbau().await;
+    for ziel in &a.ziele[..3] {
+        let pfad = ziel.pfad(a.einsatz, a.tmo311);
+        let vor = system_etb_inhalte(&a.app, &a.admin, a.einsatz).await;
+        // Zweimal zuordnen, zweimal lösen: nur die wirksame Änderung schreibt.
+        for methode in ["PUT", "PUT", "DELETE", "DELETE"] {
+            let (status, _) = anfrage(&a.app, methode, &pfad, &a.admin, None).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+        }
+        let inhalte = system_etb_inhalte(&a.app, &a.admin, a.einsatz).await;
+        let neu: Vec<&String> = inhalte.iter().filter(|i| !vor.contains(i)).collect();
+        assert_eq!(inhalte.len(), vor.len() + 2, "{inhalte:?}");
+        for wirkung in ["(TMO) zugeordnet", "(TMO) entfernt"] {
+            let erwartet = etb_text(*ziel, "311", wirkung);
+            assert!(neu.iter().any(|i| **i == erwartet), "{erwartet}: {neu:?}");
+        }
     }
+}
+
+/// Mit Bezeichnung nennt der Eintrag die Führungsstelle beim Namen (LLH-1456, D2).
+#[tokio::test]
+async fn etb_nennt_die_bezeichnung_der_fuehrungsstelle() {
+    let a = aufbau().await;
+    let b = format!("/api/einsaetze/{}", a.einsatz);
+    let (status, json) = anfrage_json(
+        &a.app,
+        "PATCH",
+        &format!("{b}/fuehrungsstelle"),
+        &a.admin,
+        Some(&json!({"bezeichnung": "ELW Musterstadt"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    let pfad = Ziel::Fuehrungsstelle.pfad(a.einsatz, a.dmo505);
+    let (status, _) = anfrage(&a.app, "PUT", &pfad, &a.admin, None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
     let inhalte = system_etb_inhalte(&a.app, &a.admin, a.einsatz).await;
-    let neu: Vec<&String> = inhalte
-        .iter()
-        .filter(|i| i.contains("Sprechgruppe"))
-        .collect();
-    assert_eq!(inhalte.len(), vor + 2, "{inhalte:?}");
     assert!(
-        neu.iter()
-            .any(|i| *i == "Einheit «1. Zug»: Sprechgruppe «311» (TMO) zugeordnet"),
-        "{inhalte:?}"
-    );
-    assert!(
-        neu.iter()
-            .any(|i| *i == "Einheit «1. Zug»: Sprechgruppe «311» (TMO) entfernt"),
+        inhalte
+            .iter()
+            .any(|i| i == "Führungsstelle «ELW Musterstadt»: Sprechgruppe «505» (DMO) zugeordnet"),
         "{inhalte:?}"
     );
 }
 
-/// Zwei Arbeitsplätze ordnen zugleich je eine Sprechgruppe zu (LLH-1265): beide bleiben, und das
-/// ETB nennt beide.
+/// Die externe Stelle des Kommunikationsplans schreibt kein ETB, auch nicht beim Statuswechsel
+/// (LLH-1456, D3).
 #[tokio::test]
-async fn einheit_zwei_arbeitsplaetze_zugleich_beide_bleiben() {
+async fn stelle_schreibt_kein_etb() {
     let a = aufbau().await;
-    let ziel = a.ziele[1];
+    let ziel = a.ziele[3];
     let vor = system_etb_anzahl(&a.app, &a.admin, a.einsatz).await;
-    let p311 = ziel.pfad(a.einsatz, a.tmo311);
-    let p505 = ziel.pfad(a.einsatz, a.dmo505);
-    let ((s1, _), (s2, _)) = tokio::join!(
-        anfrage(&a.app, "PUT", &p311, &a.admin, None),
-        anfrage(&a.app, "PUT", &p505, &a.admin, None),
-    );
-    assert_eq!((s1, s2), (StatusCode::NO_CONTENT, StatusCode::NO_CONTENT));
-    let mut namen = ziel.namen(&a.app, &a.admin, a.einsatz).await;
-    namen.sort();
-    assert_eq!(namen, ["311", "505"]);
-    let inhalte = system_etb_inhalte(&a.app, &a.admin, a.einsatz).await;
-    assert_eq!(inhalte.len(), vor + 2, "{inhalte:?}");
-    assert!(inhalte
-        .iter()
-        .any(|i| i == "Einheit «1. Zug»: Sprechgruppe «505» (DMO) zugeordnet"));
+    let pfad = ziel.pfad(a.einsatz, a.tmo311);
+    for status in ["geplant", "bestehend"] {
+        let (s, json) = anfrage_json(
+            &a.app,
+            "PUT",
+            &pfad,
+            &a.admin,
+            Some(&json!({ "status": status })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{json:?}");
+    }
+    let (s, _) = anfrage(&a.app, "DELETE", &pfad, &a.admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(system_etb_anzahl(&a.app, &a.admin, a.einsatz).await, vor);
+}
+
+/// Zwei Arbeitsplätze ordnen zugleich je eine Sprechgruppe zu (LLH-1265, LLH-1456): beide
+/// bleiben, und das ETB nennt beide, an Einheit, Abschnitt und Führungsstelle.
+#[tokio::test]
+async fn zwei_arbeitsplaetze_zugleich_beide_bleiben() {
+    let a = aufbau().await;
+    for ziel in &a.ziele[..3] {
+        let vor = system_etb_anzahl(&a.app, &a.admin, a.einsatz).await;
+        let p311 = ziel.pfad(a.einsatz, a.tmo311);
+        let p505 = ziel.pfad(a.einsatz, a.dmo505);
+        let ((s1, _), (s2, _)) = tokio::join!(
+            anfrage(&a.app, "PUT", &p311, &a.admin, None),
+            anfrage(&a.app, "PUT", &p505, &a.admin, None),
+        );
+        assert_eq!((s1, s2), (StatusCode::NO_CONTENT, StatusCode::NO_CONTENT));
+        let mut namen = ziel.namen(&a.app, &a.admin, a.einsatz).await;
+        namen.sort();
+        assert_eq!(namen, ["311", "505"]);
+        let inhalte = system_etb_inhalte(&a.app, &a.admin, a.einsatz).await;
+        assert_eq!(inhalte.len(), vor + 2, "{inhalte:?}");
+        for (sg, art) in [("311", "(TMO)"), ("505", "(DMO)")] {
+            let erwartet = etb_text(*ziel, sg, &format!("{art} zugeordnet"));
+            assert!(
+                inhalte.iter().any(|i| *i == erwartet),
+                "{erwartet}: {inhalte:?}"
+            );
+        }
+    }
 }
 
 #[tokio::test]
