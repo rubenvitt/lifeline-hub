@@ -328,6 +328,27 @@ async fn check_stueck_frei_tx(
     Ok(())
 }
 
+/// Das bestimmte Stück hinter einem Stamm-Posten (LLH-1256): Bezeichnung und Bestandsnummer, wenn
+/// der Stamm jetzt ein Gerät mit Bestandsnummer ist, sonst `None`. Maßgeblich ist der Stamm, nicht
+/// die Art der Zeile: auch eine Zeile, die vor LLH-1398 als Verbrauchsgut geführt wurde, bleibt
+/// dieses eine Stück. Ohne Org- und Dienststatus-Prüfung, die Zeile steht schon im Einsatz.
+async fn stamm_stueck_tx(
+    conn: &mut SqliteConnection,
+    material_id: i64,
+) -> Result<Option<(String, String)>, AppError> {
+    let stamm: Option<(String, String, Option<String>)> =
+        sqlx::query_as("SELECT bezeichnung, art, bestandsnummer FROM material WHERE id = ?")
+            .bind(material_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    Ok(stamm.and_then(|(bezeichnung, art, nummer)| {
+        (art == MaterialArt::Geraet.as_str())
+            .then_some(nummer)
+            .flatten()
+            .map(|n| (bezeichnung, n))
+    }))
+}
+
 /// Pool-Wrapper um [`disponiere_stamm_tx`].
 pub async fn disponiere_stamm(
     pool: &SqlitePool,
@@ -449,7 +470,8 @@ pub fn stamm_angaben_error() -> AppError {
 
 /// Aktualisiert eine Dispositionszeile nach [`MaterialPatch`]. `NotFound`, falls die Zeile nicht
 /// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079), `UnprocessableEntity` bei
-/// Ad-hoc-Angaben an einem Stamm-Posten und wenn die Ergebniszeile gegen Art, Menge, Ausgabe oder
+/// Ad-hoc-Angaben an einem Stamm-Posten, beim Wechsel eines Stamm-Geräts mit Bestandsnummer zum
+/// Verbrauchsgut (LLH-1398) und wenn die Ergebniszeile gegen Art, Menge, Ausgabe oder
 /// Status verstößt ([`check_zeile`], LLH-1224); die Prüfung des Orts (404/409/422) läuft nur bei
 /// geändertem Ziel. Erst wird alles geprüft, dann geschrieben: jede Ablehnung schreibt nichts.
 pub async fn update_tx(
@@ -475,6 +497,17 @@ pub async fn update_tx(
     patch.ort.validate()?;
     let art = MaterialArt::try_from(art).map_err(AppError::Internal)?;
     let status = MaterialStatus::try_from(status).map_err(AppError::Internal)?;
+    // Ein Stamm-Gerät mit Bestandsnummer bleibt Gerät (LLH-1398): als Verbrauchsgut ließe es sich
+    // aufteilen und stünde dann zweimal im Einsatz (LLH-1256).
+    if let (Some(mid), Some(MaterialArt::Verbrauchsgut), MaterialArt::Geraet) =
+        (material_id, patch.art, art)
+    {
+        if let Some((bezeichnung, nummer)) = stamm_stueck_tx(conn, mid).await? {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Das Gerät «{bezeichnung}» ({nummer}) ist ein bestimmtes Stück und bleibt Gerät"
+            )));
+        }
+    }
     check_zeile(
         patch.art.unwrap_or(art),
         patch.menge.unwrap_or(menge),
@@ -548,7 +581,8 @@ pub async fn update(
 /// sie kam mit derselben Lieferung (LLH-1226, design.md D9). Die neue Zeile ist aktiv.
 /// `NotFound`/`Conflict` wie
 /// [`require_aktiv_tx`], `UnprocessableEntity` an einem Gerät, wenn `menge` nicht kleiner als die
-/// Menge ist und wenn sie den Rest übersteigt. `menge` ≥ 1 prüft die Route (400).
+/// Menge ist und wenn sie den Rest übersteigt, `Conflict`, wenn der Stamm ein Gerät mit
+/// Bestandsnummer ist (LLH-1398). `menge` ≥ 1 prüft die Route (400).
 ///
 /// `ort_patch` setzt den Ort der neuen Zeile in derselben Anfrage (t1hvaqzu, design.md D1/D2): dieselben
 /// Tri-State-Felder wie im PATCH, bezogen auf den Ort der Ausgangszeile, den die neue Zeile erbt;
@@ -565,8 +599,9 @@ pub async fn teile_auf_tx(
     ort_patch: OrtPatch,
 ) -> Result<(i64, ort::OrtWechsel), AppError> {
     require_aktiv_tx(conn, einsatz_id, em_id).await?;
-    let (ausgang, ausgegeben, art): (i64, i64, String) = sqlx::query_as(
-        "SELECT menge, ausgegeben, art FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    let (material_id, ausgang, ausgegeben, art): (Option<i64>, i64, i64, String) = sqlx::query_as(
+        "SELECT material_id, menge, ausgegeben, art FROM einsatz_material \
+         WHERE id = ? AND einsatz_id = ?",
     )
     .bind(em_id)
     .bind(einsatz_id)
@@ -574,6 +609,16 @@ pub async fn teile_auf_tx(
     .await?;
     if art == MaterialArt::Geraet.as_str() {
         return Err(AppError::UnprocessableEntity(GERAET_JE_STUECK.into()));
+    }
+    // Auch eine Zeile, die (vor LLH-1398) als Verbrauchsgut geführt wird, bleibt ein Stück, wenn
+    // ihr Stamm ein Gerät mit Bestandsnummer ist: Aufteilen ergäbe zwei aktive Zeilen (LLH-1256).
+    if let Some(mid) = material_id {
+        if let Some((bezeichnung, nummer)) = stamm_stueck_tx(conn, mid).await? {
+            return Err(AppError::Conflict(format!(
+                "Das Gerät «{bezeichnung}» ({nummer}) ist ein bestimmtes Stück und lässt sich \
+                 nicht aufteilen"
+            )));
+        }
     }
     if menge >= ausgang {
         return Err(AppError::UnprocessableEntity(
@@ -1944,6 +1989,87 @@ mod tests {
             load_anzeige(&pool, einsatz, em, true).await.unwrap().menge,
             3
         );
+    }
+
+    /// LLH-1398: ein Stamm-Gerät mit Bestandsnummer ist ein bestimmtes Stück (LLH-1256). Der
+    /// Wechsel zum Verbrauchsgut ist 422, und eine Zeile, die schon als Verbrauchsgut geführt wird
+    /// (Bestand vor LLH-1398), lässt sich nicht aufteilen (409); beides schreibt nichts. Ohne
+    /// Bestandsnummer bleibt beides wie bisher möglich.
+    #[tokio::test]
+    async fn stamm_geraet_mit_bestandsnummer_wird_nicht_zum_verbrauchsgut_und_nie_geteilt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let g = mat_repo::anlegen(
+            &pool,
+            1,
+            MaterialDaten {
+                bestandsnummer: Some("SE-1"),
+                ..geraet_daten("Stromerzeuger")
+            },
+        )
+        .await
+        .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, g.id, 1, benutzer)
+            .await
+            .unwrap();
+        let als_verbrauchsgut = MaterialPatch {
+            art: Some(MaterialArt::Verbrauchsgut),
+            menge: Some(3),
+            ..MaterialPatch::default()
+        };
+        assert_eq!(
+            grund(
+                update(&pool, einsatz, em, als_verbrauchsgut)
+                    .await
+                    .unwrap_err()
+            ),
+            "Das Gerät «Stromerzeuger» (SE-1) ist ein bestimmtes Stück und bleibt Gerät"
+        );
+        let zeile = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!((zeile.art, zeile.menge), (MaterialArt::Geraet, 1));
+
+        // Bestand: die Zeile steht schon als Verbrauchsgut mit Menge 3 im Einsatz.
+        sqlx::query("UPDATE einsatz_material SET art = 'verbrauchsgut', menge = 3 WHERE id = ?")
+            .bind(em)
+            .execute(&pool)
+            .await
+            .unwrap();
+        match teile_nach(&pool, einsatz, em, 1, OrtPatch::default()).await {
+            Err(AppError::Conflict(g)) => assert_eq!(
+                g,
+                "Das Gerät «Stromerzeuger» (SE-1) ist ein bestimmtes Stück und lässt sich \
+                 nicht aufteilen"
+            ),
+            other => panic!("409 erwartet, bekam {other:?}"),
+        }
+        let aktiv = list(&pool, einsatz, true).await.unwrap();
+        assert_eq!(aktiv.len(), 1, "kein zweites aktives Stück");
+        assert_eq!(aktiv[0].menge, 3);
+        // Zurück zum Gerät geht (Menge 1).
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                art: Some(MaterialArt::Geraet),
+                menge: Some(1),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        // Ohne Bestandsnummer: Verbrauchsgut und Aufteilen bleiben möglich.
+        let t = mat_repo::anlegen(&pool, 1, geraet_daten("Trage"))
+            .await
+            .unwrap();
+        let trage = disponiere_stamm(&pool, einsatz, 1, t.id, 1, benutzer)
+            .await
+            .unwrap();
+        update(&pool, einsatz, trage, als_verbrauchsgut)
+            .await
+            .unwrap();
+        teile(&pool, einsatz, trage, 1).await.unwrap();
     }
 
     /// Einheit „Staffel A“, UHS „Turnhalle“, Fahrzeug „Florian 1/83-1“ und 50 Wolldecken an der
