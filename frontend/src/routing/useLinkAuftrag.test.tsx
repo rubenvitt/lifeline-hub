@@ -46,7 +46,7 @@ describe('useLinkAuftrag (LLH-1361)', () => {
   it('weiter verbraucht den Eintrag und ersetzt die Adresse', async () => {
     const { result } = renderHook(useSonde, { wrapper: wrapper('/x?bezirk=5') });
     const alt = result.current.a;
-    act(() => alt.weiter(new URLSearchParams('bezirk=5&ansicht=2')));
+    act(() => alt.weiter((p) => p.set('ansicht', '2')));
     expect(alt.verbraucht()).toBe(true);
     await waitFor(() => expect(result.current.location.search).toBe('?bezirk=5&ansicht=2'));
     expect(result.current.a.verbraucht()).toBe(false);
@@ -58,5 +58,32 @@ describe('useLinkAuftrag (LLH-1361)', () => {
     act(() => a.raeume('abschnitt'));
     expect(a.verbraucht()).toBe(true);
     expect(b.verbraucht()).toBe(false);
+  });
+
+  it('zwei Aufträge eines Eintrags räumen gemeinsam, keiner stellt den Parameter des anderen wieder her', async () => {
+    const { result } = renderHook(useSonde, {
+      wrapper: wrapper('/x?gefahrengebiet=10&evakuierungsbezirk=5&ansicht=3'),
+    });
+    // Beide Effekte laufen im selben Commit, also mit demselben Stand.
+    const { a, b } = result.current;
+    act(() => {
+      a.raeume('gefahrengebiet');
+      b.raeume('evakuierungsbezirk');
+    });
+    await waitFor(() => expect(result.current.location.search).toBe('?ansicht=3'));
+  });
+
+  it('ein Ansichtswechsel nach einer Räumung desselben Eintrags behält die Räumung', async () => {
+    const { result } = renderHook(useSonde, {
+      wrapper: wrapper('/x?gefahrengebiet=10&evakuierungsbezirk=5'),
+    });
+    const { a, b } = result.current;
+    act(() => {
+      a.raeume('gefahrengebiet');
+      b.weiter((p) => p.set('ansicht', '2'));
+    });
+    await waitFor(() =>
+      expect(result.current.location.search).toBe('?evakuierungsbezirk=5&ansicht=2'),
+    );
   });
 });

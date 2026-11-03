@@ -1050,9 +1050,8 @@ export default function LagekartePage() {
       return;
     }
     if (zone.ansicht_id != null && zone.ansicht_id !== aktiveAnsichtId) {
-      const naechste = new URLSearchParams(searchParams);
-      naechste.set('ansicht', String(zone.ansicht_id));
-      bezirkAuftrag.weiter(naechste);
+      const ansicht = String(zone.ansicht_id);
+      bezirkAuftrag.weiter((naechste) => naechste.set('ansicht', ansicht));
       return;
     }
     setZoneAuswahl(zone.id);
