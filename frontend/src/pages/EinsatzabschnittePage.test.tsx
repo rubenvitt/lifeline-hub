@@ -1155,7 +1155,10 @@ describe('EinsatzabschnittePage · Sprechgruppen einzeln (LLH-1456)', () => {
 
   /** Zustandsbehafteter Server: Einzelwege ändern den Abschnitt, den der GET der Liste liefert. */
   function einzelwege(ablehnen?: string) {
-    const abschnitt = { ...funkAbschnitt, sprechgruppen: [tmoSprechgruppe] };
+    const abschnitt: { sprechgruppen: (typeof tmoSprechgruppe | typeof dmoSprechgruppe)[] } & Omit<
+      typeof funkAbschnitt,
+      'sprechgruppen'
+    > = { ...funkAbschnitt, sprechgruppen: [tmoSprechgruppe] };
     const anfragen: string[] = [];
     const patches: unknown[] = [];
     const alle = [tmoSprechgruppe, dmoSprechgruppe];
