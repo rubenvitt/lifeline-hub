@@ -333,8 +333,9 @@ export default function KraftZeitachse({
                   toenung={gestrichen ? 'berichtigung' : undefined}
                   hinweis={gestrichen ? `gestrichen: ${e.streichgrund ?? ''}` : undefined}
                   aktionen={
-                    // Nach der Art: auch die Kopie an einer Person streicht nur die Rücknahme der Ablösung.
-                    !lesend && !gestrichen && e.art !== 'abloesung' ? (
+                    // Nach Art und Quelle: auch die Kopie an einer Person und das Eintreffen der neuen
+                    // Besatzung (Quelle `abloesung`) hebt nur die Rücknahme des Vollzugs auf.
+                    !lesend && !gestrichen && e.art !== 'abloesung' && e.quelle !== 'abloesung' ? (
                       <span
                         style={{
                           display: 'inline-flex',

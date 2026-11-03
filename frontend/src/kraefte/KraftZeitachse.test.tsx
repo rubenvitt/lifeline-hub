@@ -463,6 +463,24 @@ describe('KraftZeitachse (LFH-552)', () => {
     });
   });
 
+  it('das Eintreffen der neuen Besatzung aus dem Vollzug trägt keine Knöpfe', async () => {
+    rendere(true, {
+      ereignisse: [
+        {
+          id: 9,
+          art: 'eintreffen',
+          zeitpunkt_at: '2026-09-30 12:40:00',
+          quelle: 'abloesung',
+          erfasst_von: 1,
+          erfasst_at: '2026-09-30 12:40:00',
+        },
+      ],
+      perioden: [],
+    });
+    await waitFor(() => expect(eintraege()).toHaveLength(1));
+    expect(within(eintraege()[0] as HTMLElement).queryByRole('button')).toBeNull();
+  });
+
   it('eine Ablösung — auch die Kopie über die Einheit — trägt keinen Streichknopf', async () => {
     rendere(true, {
       ereignisse: [
