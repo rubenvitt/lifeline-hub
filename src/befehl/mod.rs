@@ -230,8 +230,20 @@ mod tests {
             schluessel: "lage".into(),
             text: "Hochwasser.".into(),
         }];
-        let a = render_snapshot(v, "Befehl 1", "2026-06-02 10:00:00", &abschnitte);
-        let b = render_snapshot(v, "Befehl 1", "2026-06-02 10:00:00", &abschnitte);
+        let a = render_snapshot(
+            &crate::zeitdarstellung::Zeitstil::VORGABE,
+            v,
+            "Befehl 1",
+            "2026-06-02 10:00:00",
+            &abschnitte,
+        );
+        let b = render_snapshot(
+            &crate::zeitdarstellung::Zeitstil::VORGABE,
+            v,
+            "Befehl 1",
+            "2026-06-02 10:00:00",
+            &abschnitte,
+        );
         assert_eq!(a, b);
         assert!(a.contains("# Befehl 1"));
         assert!(a.contains("## Lage"));

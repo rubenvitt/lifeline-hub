@@ -12,6 +12,8 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
+use crate::zeitdarstellung::Zeitstil;
+
 pub mod ankuendigung;
 pub mod repo;
 
@@ -62,18 +64,23 @@ pub struct LagebesprechungStand {
 /// eine Aussage ist und keine fehlende Angabe.
 ///
 /// Die Zeiten gehen als bereits normalisierte UTC-Strings herein (`etb::normalisiere_zeit`
-/// läuft in der Route) — dieselbe Arbeitsteilung wie bei `lagebericht::render_snapshot`.
+/// läuft in der Route) und stehen im Text in der Rolle „Zeitpunkt“ von Zone und Darstellung des
+/// Einsatzes (`zeitdarstellung::zeitstil_laden`, LLH-1476) — wie bei `lagebericht::render_snapshot`.
 pub fn render_snapshot(
+    stil: &Zeitstil,
     lfd_nr: i64,
     abgehalten_at: &str,
     entschluss: &str,
     naechste_at: Option<&str>,
 ) -> String {
-    let mut out = format!("Lagebesprechung Nr. {lfd_nr} ({abgehalten_at})\n");
+    let mut out = format!(
+        "Lagebesprechung Nr. {lfd_nr} ({})\n",
+        stil.zeitpunkt_text(abgehalten_at)
+    );
     out.push_str(&format!("Entschluss: {}\n", entschluss.trim()));
     out.push_str(&format!(
         "Nächste Lagebesprechung: {}",
-        naechste_at.unwrap_or("kein Termin")
+        naechste_at.map_or_else(|| "kein Termin".to_string(), |t| stil.zeitpunkt_text(t))
     ));
     out
 }
@@ -81,37 +88,81 @@ pub fn render_snapshot(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::einsatz::nummer::ZEITZONE_VORGABE;
+    use crate::zeitdarstellung::Zeitdarstellung;
+
+    const TAKTISCH: Zeitstil = Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::Taktisch);
 
     #[test]
     fn snapshot_ist_deterministisch() {
         let a = render_snapshot(
+            &TAKTISCH,
             3,
             "2026-09-12 14:30:00",
             "Lage unverändert",
             Some("2026-09-12 16:30:00"),
         );
         let b = render_snapshot(
+            &TAKTISCH,
             3,
             "2026-09-12 14:30:00",
             "Lage unverändert",
             Some("2026-09-12 16:30:00"),
         );
         assert_eq!(a, b, "zweimal rendern muss gleich sein");
-        assert!(a.contains("Lagebesprechung Nr. 3 (2026-09-12 14:30:00)"));
+        assert!(a.contains("Lagebesprechung Nr. 3 (121630sep26)"), "{a}");
         assert!(a.contains("Entschluss: Lage unverändert"));
-        assert!(a.contains("Nächste Lagebesprechung: 2026-09-12 16:30:00"));
+        assert!(a.contains("Nächste Lagebesprechung: 121830sep26"), "{a}");
+    }
+
+    /// LLH-1476: Abhaltezeit und Termin in Zone und Darstellung des Einsatzes, nicht als
+    /// UTC-Text — taktisch wie „Datum und Uhrzeit“.
+    #[test]
+    fn snapshot_nennt_die_zeiten_im_zeitstil_des_einsatzes() {
+        use chrono_tz::Asia::Tokyo;
+        let snapshot = |darstellung| {
+            render_snapshot(
+                &Zeitstil::new(Tokyo, darstellung),
+                2,
+                "2026-09-12 14:30:00",
+                "Lage unverändert",
+                Some("2026-09-12 16:30:00"),
+            )
+        };
+        assert_eq!(
+            snapshot(Zeitdarstellung::Taktisch),
+            "Lagebesprechung Nr. 2 (122330sep26)\nEntschluss: Lage unverändert\n\
+             Nächste Lagebesprechung: 130130sep26"
+        );
+        assert_eq!(
+            snapshot(Zeitdarstellung::DatumUhrzeit),
+            "Lagebesprechung Nr. 2 (12.09.26 23:30)\nEntschluss: Lage unverändert\n\
+             Nächste Lagebesprechung: 13.09.26 01:30"
+        );
     }
 
     /// „kein Termin" ist eine AUSSAGE, keine fehlende Angabe — sie gehört in den Beleg.
     #[test]
     fn snapshot_ohne_termin_sagt_kein_termin() {
-        let t = render_snapshot(1, "2026-09-12 08:00:00", "Abschnitte bilden", None);
+        let t = render_snapshot(
+            &TAKTISCH,
+            1,
+            "2026-09-12 08:00:00",
+            "Abschnitte bilden",
+            None,
+        );
         assert!(t.contains("Nächste Lagebesprechung: kein Termin"), "{t}");
     }
 
     #[test]
     fn snapshot_trimmt_den_entschluss() {
-        let t = render_snapshot(1, "2026-09-12 08:00:00", "  Maßnahmen fortführen  ", None);
+        let t = render_snapshot(
+            &TAKTISCH,
+            1,
+            "2026-09-12 08:00:00",
+            "  Maßnahmen fortführen  ",
+            None,
+        );
         assert!(t.contains("Entschluss: Maßnahmen fortführen\n"), "{t}");
     }
 }

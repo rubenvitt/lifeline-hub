@@ -131,7 +131,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     assert_eq!(e["an"], "System");
     assert_eq!(
         e["inhalt"],
-        "# Befehl 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Lage\nHochwasser steigt.\n\n## Auftrag\nDeich sichern.\n\n## Durchführung\n_(keine Angabe)_\n"
+        "# Befehl 10:00\n\n_Zeitstand: 021200jun26_\n\n## Lage\nHochwasser steigt.\n\n## Auftrag\nDeich sichern.\n\n## Durchführung\n_(keine Angabe)_\n"
     );
 
     // Zweite Freigabe: 422 mit dem Wortlaut der Status-Prüfung, kein zweiter Snapshot.

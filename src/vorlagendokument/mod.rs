@@ -11,6 +11,7 @@ pub mod repo;
 pub mod verteiler;
 
 use crate::error::AppError;
+use crate::zeitdarstellung::Zeitstil;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -114,8 +115,11 @@ pub fn gefuellte_abschnitte<A: Abschnittsart>(v: &VorlageDef, startinhalt: &[A])
 }
 
 /// Deterministisches Markdown-Rendering (Snapshot-Inhalt für das ETB).
-/// Reihenfolge = Vorlage; fehlende Abschnitte werden als leer gerendert.
+/// Reihenfolge = Vorlage; fehlende Abschnitte werden als leer gerendert. Der Zeitstand kommt im
+/// Drahtformat herein und steht in der Rolle „Zeitpunkt“ von Zone und Darstellung des Einsatzes
+/// (`zeitdarstellung::zeitstil_laden`, LLH-1476).
 pub fn render_snapshot<A: Abschnittsart>(
+    stil: &Zeitstil,
     v: &VorlageDef,
     titel: &str,
     zeitstand: &str,
@@ -123,7 +127,10 @@ pub fn render_snapshot<A: Abschnittsart>(
 ) -> String {
     let mut out = String::new();
     out.push_str(&format!("# {titel}\n\n"));
-    out.push_str(&format!("_Zeitstand: {zeitstand}_\n"));
+    out.push_str(&format!(
+        "_Zeitstand: {}_\n",
+        stil.zeitpunkt_text(zeitstand)
+    ));
     for def in v.abschnitte {
         let text = abschnitte
             .iter()

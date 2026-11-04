@@ -214,6 +214,67 @@ async fn entscheidungen(app: &axum::Router, cookie: &str, einsatz: i64) -> usize
         .unwrap_or(0)
 }
 
+/// LLH-1476: Abhaltezeit und Termin im ETB-Snapshot stehen in Zone und Darstellung des
+/// Einsatzes (Tokio), nicht in denen der Organisation (New York) und nicht als UTC-Text.
+/// 14:30/16:30 UTC sind in Tokio 23:30 am 12.09. und 01:30 am 13.09.
+#[tokio::test]
+async fn snapshot_nennt_die_zeiten_im_zeitstil_des_einsatzes() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+         VALUES (1, 'America/New_York', 'datum_uhrzeit') \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+            zeitdarstellung = excluded.zeitdarstellung",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    for (darstellung, abgehalten, termin) in [
+        ("taktisch", "122330sep26", "130130sep26"),
+        ("datum_uhrzeit", "12.09.26 23:30", "13.09.26 01:30"),
+    ] {
+        let einsatz = einsatz_anlegen(&app, &admin).await;
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+             VALUES (?, 'Asia/Tokyo', ?) \
+             ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+                zeitdarstellung = excluded.zeitdarstellung",
+        )
+        .bind(einsatz)
+        .bind(darstellung)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let (status, json) = anfrage(
+            &app,
+            "POST",
+            &besprechungen_pfad(einsatz),
+            &admin,
+            Some(
+                r#"{"entschluss":"Lage unverändert",
+                    "abgehalten_at":"2026-09-12 14:30:00",
+                    "naechste_at":"2026-09-12 16:30:00"}"#,
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{json:?}");
+        let text = format!(
+            "Lagebesprechung Nr. 1 ({abgehalten})\nEntschluss: Lage unverändert\n\
+             Nächste Lagebesprechung: {termin}"
+        );
+        assert_eq!(
+            etb_treffer(&app, &admin, einsatz, &text).await,
+            1,
+            "{darstellung}"
+        );
+        assert_eq!(
+            json["letzte_lagebesprechung"]["abgehalten_at"], "2026-09-12 14:30:00",
+            "die Zeile bleibt im Drahtformat"
+        );
+    }
+}
+
 #[tokio::test]
 async fn abschluss_schreibt_etb_entscheidung_zeile_und_termin() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
@@ -250,13 +311,7 @@ async fn abschluss_schreibt_etb_entscheidung_zeile_und_termin() {
     // Der Beleg: genau EIN ETB-Eintrag vom Typ `entscheidung`, mit dem Snapshot-Text.
     assert_eq!(entscheidungen(&app, &admin, einsatz).await, 1);
     assert_eq!(
-        etb_treffer(
-            &app,
-            &admin,
-            einsatz,
-            "Lagebesprechung Nr. 1 (2026-09-12 14:30:00)"
-        )
-        .await,
+        etb_treffer(&app, &admin, einsatz, "Lagebesprechung Nr. 1 (121630sep26)").await,
         1
     );
     assert_eq!(
@@ -264,7 +319,7 @@ async fn abschluss_schreibt_etb_entscheidung_zeile_und_termin() {
             &app,
             &admin,
             einsatz,
-            "Nächste Lagebesprechung: 2026-09-12 16:30:00"
+            "Nächste Lagebesprechung: 121830sep26"
         )
         .await,
         1

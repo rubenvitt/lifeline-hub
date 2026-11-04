@@ -167,6 +167,9 @@ pub async fn abschliessen(
     eingabe: &AbschlussEingabe,
 ) -> Result<AbschlussErgebnis, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
+    // Zone und Darstellung der Zeiten im Snapshot (LLH-1476), wie der Startwert vor der
+    // Transaktion geladen.
+    let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
 
     write_retry!(pool, |conn| {
         // 1. Server-autoritative, lückenlose Nummer je Einsatz.
@@ -193,6 +196,7 @@ pub async fn abschliessen(
         // 3. ETB-Eintrag vom Typ `entscheidung` — ein FACHLICHER Eintrag (kein `system`): er
         //    dokumentiert die Entscheidung der Einsatzleitung, nicht eine Systemhandlung.
         let inhalt = super::render_snapshot(
+            &stil,
             lfd_nr,
             &eingabe.abgehalten_at,
             &eingabe.entschluss,

@@ -910,6 +910,7 @@ pub async fn soft_delete_einsatz(
     jetzt: &str,
 ) -> Result<bool, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
     // Die Fälligkeit wird im UPDATE selbst noch einmal geprüft (LFH-23): eine Frist, die
     // zwischen Kandidatenliste und diesem Schreibvorgang verlängert wurde, gewinnt.
@@ -935,10 +936,12 @@ pub async fn soft_delete_einsatz(
         // — kein Audit.
         return Ok(false);
     };
+    // Der Karenz-Beginn in Zone und Darstellung des Einsatzes (LLH-1476).
     let audit = if karenz_beginn.as_str() < jetzt {
         format!(
             "Aufbewahrungsfrist abgelaufen — Einsatz zur Löschung vorgemerkt (Soft-Delete). \
-             Die Karenz bis zur unwiderruflichen PII-Schwärzung läuft seit {karenz_beginn}."
+             Die Karenz bis zur unwiderruflichen PII-Schwärzung läuft seit {}.",
+            stil.zeitpunkt_text(&karenz_beginn)
         )
     } else {
         "Aufbewahrungsfrist abgelaufen — Einsatz zur Löschung vorgemerkt (Soft-Delete). \

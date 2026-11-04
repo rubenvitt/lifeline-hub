@@ -1959,7 +1959,7 @@ mod tests {
             "vorgemerkt mit dem Fristablauf als Karenz-Beginn"
         );
         let audit = vormerkungs_audit(&pool, id).await;
-        assert!(audit.contains("seit 2026-06-01 00:00:00"), "{audit}");
+        assert!(audit.contains("seit 010200jun26"), "{audit}");
 
         assert_eq!(
             tick_einmal(&pool, &LiveHub::new(), t("2026-06-30 23:59:59")).await,
@@ -2411,6 +2411,56 @@ mod tests {
         .unwrap()
     }
 
+    /// LLH-1476: Zone und Darstellung des Einsatzes, nicht der Organisation (New York).
+    async fn zeitstil_einsatz_tokio(pool: &SqlitePool, e: i64, darstellung: &str) {
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+             VALUES (1, 'America/New_York', 'datum_uhrzeit')",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+             VALUES (?, 'Asia/Tokyo', ?)",
+        )
+        .bind(e)
+        .bind(darstellung)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// LLH-1476: der Karenz-Beginn im ETB steht in Zone und Darstellung des Einsatzes, für den
+    /// Einsatz wie für eine Datenkategorie.
+    #[tokio::test]
+    async fn karenz_beginn_im_etb_folgt_dem_zeitstil_des_einsatzes() {
+        for (darstellung, erwartet) in [
+            ("taktisch", "seit 010900jun26"),
+            ("datum_uhrzeit", "seit 01.06.26 09:00"),
+        ] {
+            let pool = crate::db::test_pool().await;
+            let id = abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+            frist_gesetzt_am(&pool, id, "2026-01-01 00:00:00").await;
+            zeitstil_einsatz_tokio(&pool, id, darstellung).await;
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-11 12:00:00")).await;
+            let audit = vormerkungs_audit(&pool, id).await;
+            assert!(audit.contains(erwartet), "Einsatz, {darstellung}: {audit}");
+
+            let pool = crate::db::test_pool().await;
+            let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+            kategorie_mit_frist(&pool, e, "personenauskunft", "2026-06-01 00:00:00").await;
+            kategorie_frist_gesetzt_am(&pool, e, "personenauskunft", "2026-01-01 00:00:00").await;
+            zeitstil_einsatz_tokio(&pool, e, darstellung).await;
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-11 12:00:00")).await;
+            let audit = kategorie_vormerkungs_audit(&pool, e).await;
+            assert!(
+                audit.contains(erwartet),
+                "Kategorie, {darstellung}: {audit}"
+            );
+        }
+    }
+
     /// Spec `aufbewahrung-kategorien`, „Erster Lauf lange nach dem Fristablauf“: die Frist der
     /// Kategorie lief am 01.06. ab, der erste Lauf kommt zehn Tage später. Die Karenz rechnet ab
     /// dem 01.06., und das ETB nennt diesen Beginn.
@@ -2431,7 +2481,7 @@ mod tests {
             (Some("2026-06-01 00:00:00".into()), None)
         );
         let audit = kategorie_vormerkungs_audit(&pool, e).await;
-        assert!(audit.contains("seit 2026-06-01 00:00:00"), "{audit}");
+        assert!(audit.contains("seit 010200jun26"), "{audit}");
 
         assert_eq!(
             tick_einmal(&pool, &LiveHub::new(), t("2026-06-30 23:59:59")).await,

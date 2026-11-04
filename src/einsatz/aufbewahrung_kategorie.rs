@@ -412,6 +412,7 @@ pub async fn vormerken(
     jetzt: &str,
 ) -> Result<bool, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
     // `MAX`/`MIN` vergleichen Text; alle Zeitpunkte stehen im Format von `zeit::formatiere_utc`.
     // SQLites `MAX` mit mehreren Argumenten liefert bei einem NULL selbst NULL, daher `COALESCE`.
@@ -447,9 +448,10 @@ pub async fn vormerken(
     .fetch_one(&mut *tx)
     .await?;
     // Ein Karenz-Beginn vor dem Lauf steht im ETB (LFH-1049): er erklärt, warum die Schwärzung
-    // schon kurz nach der Vormerkung folgt.
+    // schon kurz nach der Vormerkung folgt. Er steht in Zone und Darstellung des Einsatzes
+    // (LLH-1476).
     let seit = if karenz_beginn.as_str() < jetzt {
-        format!(" seit {karenz_beginn}")
+        format!(" seit {}", stil.zeitpunkt_text(&karenz_beginn))
     } else {
         String::new()
     };

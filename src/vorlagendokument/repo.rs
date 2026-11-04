@@ -440,7 +440,10 @@ pub async fn freigeben_tx<T: Dokumentart>(
     }
     let v = vorlage::<T>(&dok.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
     validiere_freigabe::<T>(v, &dok.abschnitte)?;
-    let mut render = render_snapshot(v, &dok.titel, &dok.zeitstand, &dok.abschnitte);
+    // LLH-1476: der Zeitstand in Zone und Darstellung des Einsatzes, gelesen auf derselben
+    // Verbindung (ein Import sieht so die Einstellungen seines noch offenen Einsatzes).
+    let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
+    let mut render = render_snapshot(&stil, v, &dok.titel, &dok.zeitstand, &dok.abschnitte);
     // LFH-1028: die Anlagen stehen im selben Snapshot, gelesen in derselben Transaktion.
     render.push_str(&super::anlage::snapshot_abschnitt::<T>(&mut *conn, einsatz_id, id).await?);
     // LLH-1172: der Verteiler nach den Anlagen und als `an`; ohne Verteiler bleibt beides wie
@@ -609,7 +612,8 @@ mod tests {
         etb_typ_enum: EtbTyp,
         etb_verweis: &'static str,
         verweis_gelesen: fn(&EtbEintragAnzeige) -> Option<i64>,
-        /// Snapshot nach Freigabe mit „Inhalt" in jedem Abschnitt der Vorlage.
+        /// Snapshot nach Freigabe mit „Inhalt" in jedem Abschnitt der Vorlage, Einsatz in Tokio
+        /// mit „Datum und Uhrzeit“ (Zeitstand 2026-06-02 10:00:00 UTC).
         snapshot_inhalt: &'static str,
         leer: &'static str,
         abschnitt_fehlt: &'static str,
@@ -626,7 +630,7 @@ mod tests {
         etb_typ_enum: EtbTyp::Anordnung,
         etb_verweis: "befehl_id",
         verweis_gelesen: |e| e.befehl_id,
-        snapshot_inhalt: "# Befehl 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Lage\nInhalt\n\n## Auftrag\nInhalt\n\n## Durchführung\nInhalt\n",
+        snapshot_inhalt: "# Befehl 10:00\n\n_Zeitstand: 02.06.26 19:00_\n\n## Lage\nInhalt\n\n## Auftrag\nInhalt\n\n## Durchführung\nInhalt\n",
         leer: "Der Befehl ist leer und kann nicht freigegeben werden",
         abschnitt_fehlt: "Abschnitt «Auftrag» fehlt im Befehl",
         bereits_freigegeben: "Befehl ist bereits freigegeben",
@@ -642,7 +646,7 @@ mod tests {
         etb_typ_enum: EtbTyp::Lage,
         etb_verweis: "lagebericht_id",
         verweis_gelesen: |e| e.lagebericht_id,
-        snapshot_inhalt: "# Lage 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Bericht\nInhalt\n",
+        snapshot_inhalt: "# Lage 10:00\n\n_Zeitstand: 02.06.26 19:00_\n\n## Bericht\nInhalt\n",
         leer: "Der Bericht ist leer und kann nicht freigegeben werden",
         abschnitt_fehlt: "Abschnitt «Bericht» fehlt im Bericht",
         bereits_freigegeben: "Bericht ist bereits freigegeben",
@@ -925,8 +929,18 @@ mod tests {
             )
             .fetch_one(&mut *conn)
             .await?;
+            // LLH-1476: Zone und Darstellung des Zeitstands kommen ebenfalls aus derselben
+            // Transaktion, der Einsatz vor der Organisation (New York, taktisch).
             sqlx::query(
-                "INSERT INTO einsatz_einstellungen (einsatz_id, etb_nummer_start) VALUES (?, 100)",
+                "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+                 VALUES (1, 'America/New_York', 'taktisch')",
+            )
+            .execute(&mut *conn)
+            .await?;
+            sqlx::query(
+                "INSERT INTO einsatz_einstellungen \
+                    (einsatz_id, etb_nummer_start, zeitzone, zeitdarstellung) \
+                 VALUES (?, 100, 'Asia/Tokyo', 'datum_uhrzeit')",
             )
             .bind(einsatz)
             .execute(&mut *conn)
@@ -972,6 +986,52 @@ mod tests {
     async fn freigeben_tx_liest_startwert_und_entwurf_auf_der_verbindung() {
         freigeben_tx_auf_der_verbindung_fall::<Befehl>(&BEFEHL).await;
         freigeben_tx_auf_der_verbindung_fall::<Lagebericht>(&LAGEBERICHT).await;
+    }
+
+    /// LLH-1476: der Zeitstand im Snapshot steht in Zone und Darstellung des Einsatzes, nicht
+    /// in denen der Organisation und nicht als UTC-Text (hier taktisch; „Datum und Uhrzeit“
+    /// prüft `freigeben_tx_auf_der_verbindung_fall`).
+    async fn freigabe_nennt_den_zeitstand_im_zeitstil_des_einsatzes_fall<T: Dokumentart>(f: &Fall) {
+        let (pool, einsatz, ersteller, d) = mit_entwurf::<T>(f).await;
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+             VALUES (1, 'America/New_York', 'datum_uhrzeit')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+             VALUES (?, 'Asia/Tokyo', 'taktisch')",
+        )
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+        fuelle::<T>(&pool, einsatz, d.id, &gefuellt::<T>(f, "Inhalt")).await;
+        let frei = freigeben_gerendert::<T>(&pool, einsatz, d.id, ersteller)
+            .await
+            .unwrap();
+        let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+            .bind(frei.etb_eintrag_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert!(
+            inhalt.contains("\n_Zeitstand: 021900jun26_\n"),
+            "Tokio, taktisch: {inhalt}"
+        );
+        assert_eq!(
+            frei.zeitstand, "2026-06-02 10:00:00",
+            "das Feld bleibt im Drahtformat"
+        );
+    }
+
+    #[tokio::test]
+    async fn freigabe_nennt_den_zeitstand_im_zeitstil_des_einsatzes() {
+        freigabe_nennt_den_zeitstand_im_zeitstil_des_einsatzes_fall::<Befehl>(&BEFEHL).await;
+        freigabe_nennt_den_zeitstand_im_zeitstil_des_einsatzes_fall::<Lagebericht>(&LAGEBERICHT)
+            .await;
     }
 
     /// Die Freigabe prüft Inhalt und Vorlagen-Struktur; eine zweite Freigabe scheitert an der
