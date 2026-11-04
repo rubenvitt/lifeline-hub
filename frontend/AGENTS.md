@@ -80,7 +80,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
-  seine Breite. `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
+  seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
+  `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
   `flaeche.seiteBreit` fällt beim Umbau.
 - **Orientierung** (LFH-954, Spec `seiten-orientierung`): den Tab-Titel setzen nur die Rahmen über
   `components/useDokumentTitel.ts`, aus dem Modulnamen der Registry („Seite · Einsatz ·
