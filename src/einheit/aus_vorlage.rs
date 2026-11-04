@@ -179,6 +179,8 @@ pub struct VorschauPersonal {
     pub einheit_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einheit_name: Option<String>,
+    /// Die Person führt diese Einheit; umgehängt endet die Führung (LLH-1461).
+    pub einheitsfuehrer: bool,
     /// Das Fahrzeug, auf dem die Person sitzt (`einsatz_fahrzeug.id`; bei `gebunden`, oder bei
     /// `frei`, wenn es schon ihr Fahrzeug der Vorlage ist).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -224,6 +226,8 @@ pub struct PersonalLage {
     /// Nur bei einer aktiven Dispositionszeile.
     pub ep_id: Option<i64>,
     pub einheit: Option<Bezug>,
+    /// Führt die Person `einheit` (LLH-1461)?
+    pub einheitsfuehrer: bool,
     pub fahrzeug: Option<Bezug>,
 }
 
@@ -345,6 +349,7 @@ struct PersonalZeile {
     ep_beendet_als: Option<String>,
     einheit_id: Option<i64>,
     einheit_name: Option<String>,
+    fuehrt: bool,
     ef_id: Option<i64>,
     /// Stamm-ID des Fahrzeugs, auf dem die Person sitzt.
     ef_fahrzeug_id: Option<i64>,
@@ -419,6 +424,7 @@ async fn load_personal_lagen_tx(
         "SELECT j.value AS personal_id, p.dienststatus, ep.id AS ep_id, \
                 ep.beendet_at AS ep_beendet_at, ep.beendet_als AS ep_beendet_als, \
                 e.id AS einheit_id, e.name AS einheit_name, \
+                COALESCE(e.fuehrer_id = ep.id, 0) AS fuehrt, \
                 ef.id AS ef_id, ef.fahrzeug_id AS ef_fahrzeug_id, \
                 ",
         crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
@@ -466,6 +472,7 @@ async fn load_personal_lagen_tx(
                 PersonalLage {
                     zustand,
                     ep_id: if aktiv { z.ep_id } else { None },
+                    einheitsfuehrer: einheit.is_some() && z.fuehrt,
                     einheit,
                     fahrzeug,
                 },
@@ -627,6 +634,7 @@ pub fn vorschau(plan: &Plan, gesperrt: Lesen) -> VorlageVorschau {
                             ep_id: lage.ep_id,
                             einheit_id: lage.einheit.as_ref().map(|e| e.id),
                             einheit_name: lage.einheit.as_ref().map(|e| e.name.clone()),
+                            einheitsfuehrer: lage.einheitsfuehrer,
                             ef_id: lage.fahrzeug.as_ref().map(|f| f.id),
                             fahrzeug_name: lage.fahrzeug.as_ref().map(|f| f.name.clone()),
                         })
@@ -743,11 +751,31 @@ pub fn check_against_plan(
     zeilen
 }
 
-/// Eine umgehängte Kraft für den ETB-Text: Name und woher („aus «2. Zug»“, „von «83-4»“).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Eine umgehängte Kraft für den ETB-Text: Name und woher („aus «2. Zug»“, „von «83-4»“), dazu
+/// die Einheiten, deren Führung die Person dabei abgibt (LLH-1461).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Umgehaengt {
     pub name: String,
     pub woher: String,
+    pub fuehrung_endet: Vec<String>,
+}
+
+impl Umgehaengt {
+    /// „Rita aus «2. Zug»“, mit endender Führung „… (Einheitsführer von «2. Zug» endet)“: der
+    /// Wortlaut des Einzelwechsels (`etb_text_personal_eingeteilt`), geklammert, weil die Liste
+    /// des Sammeleintrags schon mit Komma trennt.
+    pub fn text(&self) -> String {
+        let mut text = format!("{} {}", self.name, self.woher);
+        if !self.fuehrung_endet.is_empty() {
+            let fuehrung: Vec<String> = self
+                .fuehrung_endet
+                .iter()
+                .map(|f| format!("Einheitsführer von «{f}» endet"))
+                .collect();
+            text.push_str(&format!(" ({})", fuehrung.join(", ")));
+        }
+        text
+    }
 }
 
 /// Was [`bilde_tx`] angelegt und berührt hat (für ETB-Text, Antwort und Ereignisse).
@@ -948,6 +976,7 @@ pub async fn bilde_tx(
                         gebildet.umgehaengt.push(Umgehaengt {
                             name: name.clone(),
                             woher: format!("aus «{}»", alt.name),
+                            ..Default::default()
                         });
                     }
                     Bezug { id: ef_id, name }
@@ -1017,9 +1046,16 @@ pub async fn bilde_tx(
                     let ep_id = lage
                         .ep_id
                         .ok_or_else(|| AppError::Internal("Person im Einsatz ohne Zeile".into()))?;
-                    let name = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id)
-                        .await?
-                        .name;
+                    let z =
+                        mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+                    let name = z.name;
+                    // Führte die Person ihre bisherige Einheit, endet die Führung (LLH-1461): die
+                    // Einheit wird gemeldet, und das ETB nennt es.
+                    for (id, _) in &z.fuehrung_endet {
+                        push_unique(&mut gebildet.alte_einheiten, *id);
+                    }
+                    let fuehrung_endet: Vec<String> =
+                        z.fuehrung_endet.into_iter().map(|(_, n)| n).collect();
                     let ziel_ef = p.fahrzeug_id.and_then(|f| ef_von.get(&f).copied());
                     match (ziel_ef, &lage.fahrzeug) {
                         (Some(ef), _) => {
@@ -1043,12 +1079,14 @@ pub async fn bilde_tx(
                             gebildet.umgehaengt.push(Umgehaengt {
                                 name: name.clone(),
                                 woher: format!("aus «{}»", alt.name),
+                                fuehrung_endet,
                             });
                         }
                         (None, Some(alt)) if ziel_ef != Some(alt.id) => {
                             gebildet.umgehaengt.push(Umgehaengt {
                                 name: name.clone(),
                                 woher: format!("von «{}»", alt.name),
+                                fuehrung_endet,
                             })
                         }
                         _ => {}
@@ -1115,7 +1153,7 @@ pub fn etb_text(vorlage: &str, g: &Gebildet) -> String {
         &g.material_namen,
         &g.umgehaengt
             .iter()
-            .map(|u| format!("{} {}", u.name, u.woher))
+            .map(Umgehaengt::text)
             .collect::<Vec<_>>(),
     )
 }
