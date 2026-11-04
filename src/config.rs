@@ -60,6 +60,11 @@ pub struct OnlineStyle {
     /// nicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hinweis: Option<String>,
+    /// Die Grundlage ist dunkel (LLH-1486): die Lagekarte rastert ihre taktischen Zeichen dann mit
+    /// dem Render-Theme `dark`, sonst ohne. Eine Online-Karte gilt als hell, solange sie nicht so
+    /// markiert ist; deshalb absent statt `false` (`dunkel?` im generierten Typ), wie `hinweis`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dunkel: bool,
 }
 
 /// Eingebaute, schlüsselfreie Vorschlagsliste (`GET /api/karte/online-quellen/katalog`), kein
@@ -79,6 +84,7 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
             typ: OnlineStyleTyp::Vektor,
             attribution: Some("© OpenMapTiles © OpenStreetMap-Mitwirkende".into()),
             hinweis: None,
+            dunkel: false,
         },
         OnlineStyle {
             name: "basemap.de Farbe".into(),
@@ -86,6 +92,7 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
             typ: OnlineStyleTyp::Vektor,
             attribution: Some("© GeoBasis-DE / BKG (2026) CC BY 4.0".into()),
             hinweis: None,
+            dunkel: false,
         },
         OnlineStyle {
             name: "basemap.de Grau".into(),
@@ -93,6 +100,7 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
             typ: OnlineStyleTyp::Vektor,
             attribution: Some("© GeoBasis-DE / BKG (2026) CC BY 4.0".into()),
             hinweis: None,
+            dunkel: false,
         },
         OnlineStyle {
             name: "OpenFreeMap Dark".into(),
@@ -100,6 +108,7 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
             typ: OnlineStyleTyp::Vektor,
             attribution: Some("© OpenMapTiles © OpenStreetMap-Mitwirkende".into()),
             hinweis: None,
+            dunkel: true,
         },
         OnlineStyle {
             name: "TopPlusOpen (Topographie)".into(),
@@ -107,6 +116,7 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
             typ: OnlineStyleTyp::Raster,
             attribution: Some("© GeoBasis-DE / BKG (2026), TopPlusOpen".into()),
             hinweis: None,
+            dunkel: false,
         },
         OnlineStyle {
             name: "Satellit (Esri)".into(),
@@ -121,6 +131,7 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
                  die eigene Lizenz das erlaubt. Wird inaktiv übernommen."
                     .into(),
             ),
+            dunkel: false,
         },
     ]
 }
@@ -1568,6 +1579,7 @@ mod tests {
             typ: OnlineStyleTyp::Vektor,
             attribution: None,
             hinweis: None,
+            dunkel: false,
         })
         .unwrap();
         let o = v.as_object().unwrap();
@@ -1579,5 +1591,29 @@ mod tests {
         // deckt
         // `#[schema(required)]` ab.
         assert_eq!(o.get("typ").and_then(|t| t.as_str()), Some("vektor"));
+    }
+
+    /// LLH-1486: `dunkel` fehlt bei einer hellen Grundlage und steht nur, wenn sie dunkel ist.
+    #[test]
+    fn online_style_serialisiert_dunkel_nur_wenn_gesetzt() {
+        let mut stil = default_online_styles()
+            .into_iter()
+            .find(|s| s.name == "OpenFreeMap Dark")
+            .expect("Katalog trägt OpenFreeMap Dark");
+        let v = serde_json::to_value(&stil).unwrap();
+        assert_eq!(v.get("dunkel"), Some(&serde_json::Value::Bool(true)));
+        stil.dunkel = false;
+        let v = serde_json::to_value(&stil).unwrap();
+        assert!(!v.as_object().unwrap().contains_key("dunkel"));
+        let dunkle = default_online_styles()
+            .into_iter()
+            .filter(|s| s.dunkel)
+            .map(|s| s.name)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            dunkle,
+            vec!["OpenFreeMap Dark".to_string()],
+            "nur ein dunkler Eintrag"
+        );
     }
 }

@@ -6,6 +6,7 @@ import {
   baueOnlineStyle,
   blindStyle,
   defaultModus,
+  grundlageTheme,
   loeseKartenTheme,
   offlineStyle,
 } from './basemapStil';
@@ -194,6 +195,31 @@ describe('basemapStil', () => {
     // Kompat: eine Region mit karte_id 0 aus offline_tiles_url.
     expect(s.sources['basemap-0'].type).toBe('vector');
     expect(s.sources['basemap-0'].tiles[0]).toBe('/api/karte/offline/tiles/{z}/{x}/{y}?v=abc');
+  });
+
+  it('grundlageTheme: helle Online-Karte bleibt nachts hell, eine dunkel markierte auch am Tag dunkel (LLH-1486)', () => {
+    expect(grundlageTheme('online', 'dark', beides, vektorView)).toBe('light');
+    expect(grundlageTheme('online', 'dark', beides, rasterView)).toBe('light');
+    const dunkleKarte: OnlineStyle = { ...vektorView, dunkel: true };
+    expect(grundlageTheme('online', 'dark', beides, dunkleKarte)).toBe('dark');
+    expect(grundlageTheme('online', 'light', beides, dunkleKarte)).toBe('dark');
+  });
+
+  it('grundlageTheme: Blind- und Offline-Vektorstil folgen dem Kartenthema, Raster-Offline bleibt hell', () => {
+    expect(grundlageTheme('blind', 'dark', leer, undefined)).toBe('dark');
+    expect(grundlageTheme('blind', 'light', leer, undefined)).toBe('light');
+    // Online ohne View fällt wie `baueBasemapStyle` auf den Blindstil.
+    expect(grundlageTheme('online', 'dark', leer, undefined)).toBe('dark');
+    expect(grundlageTheme('offline', 'dark', nurOffline, undefined)).toBe('dark');
+    expect(grundlageTheme('offline', 'light', nurOffline, undefined)).toBe('light');
+    const rasterOffline: KarteServerConfig = {
+      ...nurOffline,
+      offline_format: 'raster',
+      offline_regionen: [region(5, 'raster')],
+    };
+    expect(grundlageTheme('offline', 'dark', rasterOffline, undefined)).toBe('light');
+    // Offline ohne bereite Karte: Blindstil.
+    expect(grundlageTheme('offline', 'dark', leer, undefined)).toBe('dark');
   });
 
   it('loeseKartenTheme: auto folgt dem App-Theme, explizite Wahl überschreibt', () => {

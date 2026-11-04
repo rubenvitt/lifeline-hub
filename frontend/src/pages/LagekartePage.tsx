@@ -331,7 +331,7 @@ export default function LagekartePage() {
     setKartenZoom,
   } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
 
-  const { style, basisAttribution, kartenThemeEffektiv } = useBasemap({
+  const { style, basisAttribution, zeichenTheme } = useBasemap({
     basemap: effektiveBasemap,
     onlineStilName,
     kartenTheme,
@@ -1629,7 +1629,7 @@ export default function LagekartePage() {
       <Kartenflaeche
         ref={kartenRef}
         style={style}
-        kartenTheme={kartenThemeEffektiv}
+        kartenTheme={zeichenTheme}
         attribution={attribution}
         markers={kartenMarker}
         onKarteKlick={onKarteKlick}

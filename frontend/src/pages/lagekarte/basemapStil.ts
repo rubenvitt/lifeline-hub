@@ -580,6 +580,28 @@ export function baueBasemapStyle(
 }
 
 /**
+ * Helligkeit der tatsächlich gezeichneten Grundlage (LLH-1486), das Thema der taktischen Zeichen
+ * (`markerIconKey`). Folgt derselben Wahl wie `baueBasemapStyle`: Blindstil und Offline-Vektorstil
+ * färbt `theme`, sie sind so hell oder dunkel wie das aufgelöste Kartenthema. Eine Online-Karte und
+ * eine Raster-Offline-Karte bringen ihr eigenes Bild mit und folgen dem Thema nicht: hell, außer die
+ * Online-Quelle ist als dunkel markiert (`dunkel`), dann auch am Tag dunkel.
+ */
+export function grundlageTheme(
+  modus: BasemapModus,
+  theme: KartenTheme,
+  config: KarteServerConfig | undefined,
+  onlineStil: OnlineStyle | undefined,
+): KartenTheme {
+  if (modus === 'online' && onlineStil) return onlineStil.dunkel ? 'dark' : 'light';
+  if (modus === 'offline') {
+    const vektorRegionen = (config?.offline_regionen ?? []).filter((r) => r.format !== 'raster');
+    if (vektorRegionen.length > 0) return theme;
+    if (config?.offline_tiles_url && config.offline_format === 'raster') return 'light';
+  }
+  return theme;
+}
+
+/**
  * Config-autoritative Pflicht-Attribution des aktiven Views. Online: die des Views; offline: die
  * Lizenz der aktiven Offline-Karte (auch ohne Netz rechtlich sichtbar); blind: keine.
  */

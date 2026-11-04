@@ -20,6 +20,7 @@ interface FormWerte {
   sortier: number;
   aktiv: boolean;
   proxy: boolean;
+  dunkel: boolean;
 }
 
 const TYP_OPTIONEN: { value: OnlineStyleTyp; label: string }[] = [
@@ -36,7 +37,7 @@ const URL_PLATZHALTER: Record<OnlineStyleTyp, string> = {
  * Schnellerfassung/Bearbeitung einer Online-Quelle als Form-in-Modal.
  *
  * Feldbudget: sichtbar sind die VIER Pflichtwerte — Name, Typ, URL und Attribution —,
- * eingeklappt Sortierung, Aktiv und Proxy. `attribution` ist Pflicht, serverseitig erzwungen
+ * eingeklappt Sortierung, Aktiv, Proxy und „Dunkle Karte“. `attribution` ist Pflicht, serverseitig erzwungen
  * und ohne brauchbare Vorgabe (Urheber und Lizenz je Quelle verschieden); hinter dem Collapse
  * käme eine Ablehnung von einem unsichtbaren Feld.
  *
@@ -72,6 +73,7 @@ export default function OnlineQuelleFormModal({
       sortier: quelle.sortier,
       aktiv: quelle.aktiv,
       proxy: quelle.proxy,
+      dunkel: quelle.dunkel,
     });
   }, [offen, quelle, form]);
 
@@ -86,6 +88,8 @@ export default function OnlineQuelleFormModal({
         aktiv: werte.aktiv ?? true,
         // Default-an.
         proxy: werte.proxy ?? true,
+        // Eine Online-Karte gilt als hell, solange sie nicht als dunkel markiert ist (LLH-1486).
+        dunkel: werte.dunkel ?? false,
       };
       return quelle ? aktualisiereOnlineQuelle(quelle.id, body) : legeOnlineQuelleAn(body);
     },
@@ -105,7 +109,13 @@ export default function OnlineQuelleFormModal({
       laeuft={mutation.isPending}
       speicherung={mutation}
       // Proxy ist Default-an (key-frei + serverseitig gecacht).
-      initialValues={{ typ: 'vektor', sortier: naechsteSortier, aktiv: true, proxy: true }}
+      initialValues={{
+        typ: 'vektor',
+        sortier: naechsteSortier,
+        aktiv: true,
+        proxy: true,
+        dunkel: false,
+      }}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen.
       //
       // Der Formularspeicher statt der `onFinish`-Werte: ohne `forceRender` sind Sortierung, Aktiv
@@ -170,6 +180,11 @@ export default function OnlineQuelleFormModal({
                     proxy === false ? 'Schlüssel in der URL ist im Browser sichtbar.' : undefined
                   }
                 >
+                  <Switch />
+                </Form.Item>
+                {/* Dunkle Grundlage: die Lagekarte rastert die Zeichen darauf mit dem Theme
+                    `dark` (LLH-1486, `grundlageTheme` in `pages/lagekarte/basemapStil.ts`). */}
+                <Form.Item label="Dunkle Karte" name="dunkel" valuePropName="checked">
                   <Switch />
                 </Form.Item>
               </>

@@ -1527,6 +1527,7 @@ mod service_tests {
                 sortier: 0,
                 aktiv: true,
                 proxy: true,
+                dunkel: false,
             },
         )
         .await

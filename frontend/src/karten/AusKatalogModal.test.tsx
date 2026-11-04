@@ -21,6 +21,13 @@ const KATALOG = [
     attribution: 'Esri',
     hinweis: 'Esri-Nutzungsbedingungen: ArcGIS-Konto nötig.',
   },
+  {
+    name: 'OpenFreeMap Dark',
+    url: 'https://tiles.openfreemap.org/styles/dark',
+    typ: 'vektor',
+    attribution: 'OSM',
+    dunkel: true,
+  },
 ];
 
 function rendere() {
@@ -42,6 +49,21 @@ function rendere() {
 function zeile(name: string): HTMLElement {
   return screen.getByText(name).closest('li') as HTMLElement;
 }
+
+describe('AusKatalogModal — Dunkle Karte (LLH-1486)', () => {
+  it('übernimmt eine dunkle Katalog-Karte als dunkel, eine helle als hell', async () => {
+    const posts = rendere();
+    await screen.findByText('OpenFreeMap Dark');
+    await userEvent.click(
+      within(zeile('OpenFreeMap Dark')).getByRole('button', { name: 'Hinzufügen' }),
+    );
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toMatchObject({ name: 'OpenFreeMap Dark', dunkel: true });
+    await userEvent.click(within(zeile('TopPlusOpen')).getByRole('button', { name: 'Hinzufügen' }));
+    await waitFor(() => expect(posts).toHaveLength(2));
+    expect(posts[1]).toMatchObject({ name: 'TopPlusOpen', dunkel: false });
+  });
+});
 
 describe('AusKatalogModal — Betreiberhinweis (LFH-616)', () => {
   it('zeigt den Hinweis am Eintrag und übernimmt ihn INAKTIV', async () => {

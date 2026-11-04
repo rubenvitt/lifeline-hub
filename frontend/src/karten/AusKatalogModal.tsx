@@ -61,6 +61,8 @@ export default function AusKatalogModal({
         // Katalog-Quellen serverseitig proxen und cachen; ein Schlüssel bleibt so auf dem Server. Ob
         // der Cache bei Esri erlaubt ist, sagt der Hinweis am Eintrag.
         proxy: true,
+        // Eine dunkle Katalog-Karte kommt als dunkel an (LLH-1486); absent heißt hell.
+        dunkel: eintrag.dunkel ?? false,
       };
       return legeOnlineQuelleAn(body);
     },

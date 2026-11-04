@@ -3,6 +3,7 @@ import type { KarteServerConfig } from '../../api/karte';
 import {
   baueBasemapStyle,
   aktuelleAttribution,
+  grundlageTheme,
   loeseKartenTheme,
   type BasemapModus,
   type KartenTheme,
@@ -44,11 +45,16 @@ export function useBasemap({
     [basemap, kartenThemeEffektiv, config, onlineStil],
   );
 
+  // Thema der Zeichen: so hell oder dunkel wie die gezeichnete Grundlage, nicht wie die Kartenwahl.
+  // Eine helle Online-Karte behält nachts ihren Stil, die Zeichen bleiben dann ohne Theme `dark`
+  // (LLH-1486).
+  const zeichenTheme = grundlageTheme(basemap, kartenThemeEffektiv, config, onlineStil);
+
   // Basisbaustein der Attribution (ohne Fachebenen) — die Page mergt ihn mit fachebenenAttribution.
   const basisAttribution = useMemo(
     () => aktuelleAttribution(basemap, onlineStil, config),
     [basemap, onlineStil, config],
   );
 
-  return { onlineStil, style, basisAttribution, kartenThemeEffektiv };
+  return { onlineStil, style, basisAttribution, kartenThemeEffektiv, zeichenTheme };
 }

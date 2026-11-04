@@ -23,8 +23,8 @@ Nachschlagen.
 2. „Quelle hinzufügen“ wählen.
 3. „Name“ eintragen, unter „Typ“ „Vektor (Style-JSON)“ oder „Raster (XYZ-Kacheln)“ wählen und
    „URL“ und „Attribution“ eintragen.
-4. Bei Bedarf „Weitere Angaben“ aufklappen und „Sortierung“, „Aktiv“ und „Über Server proxen“
-   einstellen.
+4. Bei Bedarf „Weitere Angaben“ aufklappen und „Sortierung“, „Aktiv“, „Über Server proxen“ und
+   „Dunkle Karte“ einstellen.
 
    ![Dialog „Online-Quelle hinzufügen“ mit einer Rasterquelle und aufgeklappten weiteren Angaben](../bilder/karten/online-quelle.png)
 
@@ -80,6 +80,11 @@ die nächste Prüfung ansteht.
   Nutzungsbedingungen, kommt die Quelle inaktiv an („Quelle übernommen — inaktiv, bitte Hinweis
   prüfen“); erst nach dem Prüfen „Aktiv“ einschalten.
 - Die „Attribution“ ist Pflicht; sie nennt die Herkunft der Karte.
+- **„Dunkle Karte“** sagt der Lagekarte, dass die Quelle dunkel gezeichnet ist. Eine
+  Online-Quelle bringt ihre eigenen Farben mit und wechselt nicht mit dem Nachtbetrieb. Auf einer
+  dunklen Karte sind die taktischen Zeichen hell umrandet, auf einer hellen nicht, auch nachts.
+  Ohne den Schalter gilt eine Quelle als hell. „OpenFreeMap Dark“ aus dem Katalog kommt als
+  dunkle Karte an.
 
 ### Offline-Karten
 

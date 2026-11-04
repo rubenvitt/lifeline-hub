@@ -1225,6 +1225,48 @@ async fn patch_attribution_null_ist_400() {
 
 /// `sortier` hing am `#[serde(default)]` (0): jeder PATCH ohne das Feld warf die
 /// Reihenfolge auf 0 zurück. NOT-NULL-Spalte, fällt gegen HEAD hart durch.
+/// LLH-1486: Eine Online-Quelle gilt als hell, bis sie als dunkel markiert ist. `dunkel` wird
+/// angelegt, per Teil-Patch umgeschaltet, von einem Patch ohne das Feld nicht angefasst und in
+/// `/api/karte/config` nur gesendet, wenn es gilt.
+#[tokio::test]
+async fn online_quelle_dunkel_bis_in_die_config() {
+    let (app, cookie) = admin_app().await;
+    let id = online_quelle_anlegen(
+        &app,
+        &cookie,
+        r#"{"name":"Hell","url":"https://tiles.example/hell","typ":"vektor","attribution":"© OSM","proxy":false}"#,
+    )
+    .await;
+    let stil = erster_online_stil(&app, &cookie).await;
+    assert!(stil.get("dunkel").is_none(), "hell → absent: {stil:?}");
+
+    let uri = format!("/api/karte/online-quellen/{id}");
+    let akt = patch_json(&app, &cookie, &uri, r#"{"dunkel":true}"#).await;
+    assert_eq!(akt["dunkel"], true);
+    let akt = patch_json(&app, &cookie, &uri, r#"{"name":"Dunkel"}"#).await;
+    assert_eq!(akt["dunkel"], true, "nicht gesendet → bleibt");
+    assert_eq!(erster_online_stil(&app, &cookie).await["dunkel"], true);
+
+    let akt = patch_json(&app, &cookie, &uri, r#"{"dunkel":false}"#).await;
+    assert_eq!(akt["dunkel"], false);
+    assert!(erster_online_stil(&app, &cookie)
+        .await
+        .get("dunkel")
+        .is_none());
+}
+
+async fn erster_online_stil(app: &axum::Router, cookie: &str) -> serde_json::Value {
+    let res = anfrage(app, "GET", "/api/karte/config", Some(cookie), None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    json(res).await["online_styles"][0].clone()
+}
+
+async fn patch_json(app: &axum::Router, cookie: &str, uri: &str, body: &str) -> serde_json::Value {
+    let res = anfrage(app, "PATCH", uri, Some(cookie), Some(body)).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    json(res).await
+}
+
 #[tokio::test]
 async fn patch_ohne_sortier_behaelt_sortier() {
     let (app, cookie) = admin_app().await;
