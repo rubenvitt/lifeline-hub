@@ -1371,14 +1371,15 @@ describe('KraefteuebersichtPage — Druck', () => {
 
   it('„Drucken" und „Spalten" stehen in der Werkzeugzeile der Seite, nicht in der des Primitivs', async () => {
     // `.kraefte-no-print` ist innerhalb von `Datensicht` nicht setzbar (kein `className`), und
-    // Fokus in der Sicht hielte die Zeilen (LLH-1417). Die Zeile des Primitivs bleibt als
-    // Standzeile des Sammelbanners.
+    // Fokus in der Sicht hielte die Zeilen (LLH-1417). Vom Primitiv bleibt nur der Anker ohne
+    // Höhe, an dem der Sammelbanner als Pille über dem Tabellenkopf schwebt (LLH-1479).
     mitEinheit();
     const { container } = setup();
     await screen.findByText('1. Zug');
     const seite = container.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
     const primitiv = container.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
     expect(primitiv).not.toBeNull();
+    expect(primitiv).toHaveAttribute('data-schwebend');
     expect(within(primitiv).queryByRole('button', { name: /Drucken/i })).toBeNull();
     expect(within(primitiv).queryByRole('button', { name: /Spalten/ })).toBeNull();
     expect(within(seite).getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
