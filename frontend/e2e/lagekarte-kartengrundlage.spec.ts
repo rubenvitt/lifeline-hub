@@ -38,9 +38,10 @@ const ORT = { lat: 49.3519, lon: 9.1457 };
  * sich beide dasselbe `ez|`-Bild, und der Nachweis sähe nur den Einsatzort.
  */
 const ZEICHEN_SPEC = '{"v":1,"spec":{"kind":"hazard"}}';
-// Die Karte läuft in e2e im Nachtbetrieb (Vorgabe `auto` folgt dem dunklen App-Thema): Zeichen
-// rastern dort mit dem dunklen Render-Theme unter eigenem Schlüssel (LLH-1141, `markerIcons.ts`).
-const ZEICHEN_BILD = `ez|dark|${ZEICHEN_SPEC}`;
+// Die Karte läuft in e2e im Nachtbetrieb, beide Grundlagen sind aber helle Online-Karten (ohne
+// „Dunkle Karte“): das Zeichenthema folgt der Grundlage, die Zeichen rastern also wie am Tag unter
+// dem Schlüssel ohne `dark|` (LLH-1486, `grundlageTheme` in `basemapStil.ts`).
+const ZEICHEN_BILD = `ez|${ZEICHEN_SPEC}`;
 
 /** Online-Views des Wechsels: eigene Style-Pfade, eigene Source-Ids, gemeinsame Kacheln. */
 const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
