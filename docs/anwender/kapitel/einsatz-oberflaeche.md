@@ -424,7 +424,9 @@ Beginns, und liegt sie davor, am Folgetag („2200“ bis „0600“ geht über 
 In der Nacht, in der die Sommerzeit endet, gibt es 02:00 bis 02:59 zweimal. Ein Feld für
 Ereignisse nimmt dann das letzte Mal, das schon vorbei ist: „0247“ um 02:50 Winterzeit ist drei
 Minuten her. Ein Feld für Fristen nimmt das nächste Mal, das noch kommt. Andere Felder und der
-Kalender nehmen das erste Mal (Sommerzeit).
+Kalender nehmen das erste Mal (Sommerzeit). Wenn die Sommerzeit beginnt, gibt es 02:00 bis 02:59
+nicht; eine solche Uhrzeit gilt eine Stunde später. Nur ein Feld für Ereignisse nimmt sie eine
+Stunde früher, wenn sie sonst noch bevorstünde: „0230“ um 03:20 ist dann 01:30 Winterzeit.
 
 Eine Eingabe, die sich nicht lesen lässt, wird nicht übernommen; das Feld nennt den Grund („Uhrzeit
 gibt es nicht“). Wer das Feld trotzdem verlässt, behält den bisherigen Wert. „Jetzt“ und die

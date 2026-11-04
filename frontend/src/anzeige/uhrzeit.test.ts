@@ -8,6 +8,7 @@ import {
   taktischeUhrzeitAus,
   uhrzeitAmTag,
   uhrzeitenAmTag,
+  uhrzeitVorDerLuecke,
 } from './uhrzeit';
 
 const BERLIN = 'Europe/Berlin';
@@ -91,6 +92,17 @@ describe('uhrzeitAmTag — Browser UTC, Anzeigezone Europe/Berlin', () => {
     expect(alle('2026-10-25', '03:00')).toEqual(['2026-10-25 02:00:00']);
     expect(alle('2026-03-29', '02:30')).toEqual(['2026-03-29 01:30:00']);
     expect(alle('2026-10-11', '06:30')).toEqual(['2026-10-11 04:30:00']);
+  });
+
+  it('uhrzeitVorDerLuecke liest eine Uhrzeit der Lücke um die Lücke früher, sonst nichts', () => {
+    const frueher = (tag: string, uhrzeit: string) => {
+      const z = uhrzeitVorDerLuecke(tag, uhrzeit, BERLIN);
+      return z ? alsBackendZeit(z) : null;
+    };
+    expect(frueher('2026-03-29', '02:30')).toBe('2026-03-29 00:30:00');
+    expect(frueher('2026-03-29', '01:30')).toBeNull();
+    expect(frueher('2026-03-29', '03:00')).toBeNull();
+    expect(frueher('2026-10-25', '02:30')).toBeNull();
   });
 
   it('29.03. 02:30 gibt es nicht: die Uhrzeit rückt nach vorn auf 03:30 Sommerzeit', () => {

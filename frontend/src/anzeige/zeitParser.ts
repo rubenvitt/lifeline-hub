@@ -4,7 +4,8 @@
  * ohne Uhr: `jetzt` reicht der Aufrufer herein (im Baustein `serverJetzt()`).
  *
  * Gelesen wird als Wanduhr der Anzeigezone; der Zeitpunkt entsteht über
- * {@link uhrzeitenAmTag} (Lücke: nach vorn), damit es genau eine Sommerzeitregel gibt. Eine
+ * {@link uhrzeitenAmTag} (Lücke: nach vorn; ein Ereignis, das dann noch bevorstünde, um die Lücke
+ * früher, LLH-1472), damit es genau eine Sommerzeitregel gibt. Eine
  * Uhrzeit, die es zweimal gibt, gilt nach Feldart beim Vorkommen, das dem Jetzt am nächsten liegt
  * (LLH-1471, `zeitpunktAm`), ohne Feldart beim ersten. Ziffernblöcke sind nach ihrer Länge
  * eindeutig: 3–4 Ziffern Uhrzeit, 6 Ziffern Tag und Uhrzeit; alles andere wird nicht erraten,
@@ -13,7 +14,7 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { MONATE_DTG } from './format';
-import { naechsterTag, uhrzeitenAmTag } from './uhrzeit';
+import { naechsterTag, uhrzeitenAmTag, uhrzeitVorDerLuecke } from './uhrzeit';
 import { heuteInZone, tagInZone } from './zeitEingabe';
 
 dayjs.extend(utc);
@@ -151,7 +152,16 @@ function zeitpunktAm(d: Datum, u: Uhr, o: DeutungsOptionen, nach?: Dayjs | null)
   );
   if (nach) return alle.find((k) => k.isAfter(nach)) ?? alle[0];
   const passend = alle.filter((k) => !falschHerum(k, o));
-  if (passend.length === 0) return alle[0];
+  if (passend.length === 0) {
+    // Lücke der Vorstellung: ein Ereignis, das nach vorn gerückt noch bevorstünde, liegt um die
+    // Lücke früher statt am Vortag (LLH-1472).
+    const frueher =
+      richtung(o) === -1
+        ? uhrzeitVorDerLuecke(tagText(d), `${zwei(u.stunde)}:${zwei(u.minute)}`, o.zone)
+        : null;
+    const ereignis = frueher?.add(u.sekunde, 'second');
+    return ereignis && !falschHerum(ereignis, o) ? ereignis : alle[0];
+  }
   return richtung(o) === -1 ? passend[passend.length - 1] : passend[0];
 }
 

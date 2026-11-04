@@ -85,6 +85,35 @@ export function uhrzeitenAmTag(
   uhrzeit: string,
   zone: string | null | undefined,
 ): Dayjs[] {
+  const { vorher, passend } = lesarten(tag, uhrzeit, zone);
+  // Lücke: mit dem Versatz vor der Umstellung gelesen, landet die Uhrzeit um die Lücke später.
+  return (passend.length > 0 ? passend : [vorher]).map((k) => dayjs.utc(k));
+}
+
+/**
+ * Liegt `uhrzeit` am Kalendertag `tag` in der Lücke der Vorstellung, die Uhrzeit um die Lücke
+ * früher gelesen (mit dem Versatz nach der Umstellung, am 29.03.2026 02:30 → 01:30 Winterzeit);
+ * sonst `null`. Für ein Ereignis, das nach vorn gerückt noch bevorstünde (`zeitParser.ts`,
+ * LLH-1472).
+ */
+export function uhrzeitVorDerLuecke(
+  tag: string,
+  uhrzeit: string,
+  zone: string | null | undefined,
+): Dayjs | null {
+  const { nachher, passend } = lesarten(tag, uhrzeit, zone);
+  return passend.length === 0 ? dayjs.utc(nachher) : null;
+}
+
+/**
+ * Die Wanduhr gelesen mit dem Versatz einen Tag davor (`vorher`) und danach (`nachher`), dazu die
+ * Lesarten, an denen die Uhr sie wirklich zeigt (`passend`, frühester zuerst; leer in der Lücke).
+ */
+function lesarten(
+  tag: string,
+  uhrzeit: string,
+  zone: string | null | undefined,
+): { vorher: number; nachher: number; passend: number[] } {
   const z = effektiveZone(zone) ?? browserZone();
   const [jahr, monat, tagImMonat] = tag.split('-').map(Number);
   const [stunde, minute] = uhrzeit.split(':').map(Number);
@@ -95,8 +124,7 @@ export function uhrzeitenAmTag(
   const passend = [...new Set([vorher, nachher])]
     .filter((k) => k + versatz(k, z) === wand)
     .sort((a, b) => a - b);
-  // Lücke: mit dem Versatz vor der Umstellung gelesen, landet die Uhrzeit um die Lücke später.
-  return (passend.length > 0 ? passend : [vorher]).map((k) => dayjs.utc(k));
+  return { vorher, nachher, passend };
 }
 
 /**

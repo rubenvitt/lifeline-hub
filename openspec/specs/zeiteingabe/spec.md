@@ -116,7 +116,8 @@ Angezeigt wird sie taktisch („0630“). Wird sie auf einen Kalendertag gelegt,
 Anzeigezone geschehen, nie in der Browserzone. Eine Uhrzeit, die es an dem Tag zweimal gibt
 (Rückstellung), MUST beim ersten Mal gelten, außer eine Zeiteingabe wählt nach Feldart oder Bezug
 („Richtung nach Feldart“, „Ende eines Zeitraums ohne Tag“); eine, die es nicht gibt (Vorstellung),
-MUST um die Länge der Lücke später gelten. Die Grenzen eines Kalendertags sind 00:00 des Tages und 00:00 des
+MUST um die Länge der Lücke später gelten, außer ein Ereignisfeld läge damit in der Zukunft
+(„Richtung nach Feldart“). Die Grenzen eines Kalendertags sind 00:00 des Tages und 00:00 des
 Folgetags in der Anzeigezone; am Tag einer Umstellung liegen sie 23 bzw. 25 Stunden auseinander.
 
 #### Scenario: Stab-Schreibweise
@@ -193,7 +194,9 @@ Monat entsprechend auf den Vor- bzw. Folgemonat. Ohne Feldart MUST heute bzw. de
 gelten. Wechselt der Tag dadurch, MUST das Feld „gestern“ bzw. „morgen“ nennen. Gibt es die
 Uhrzeit an dem Tag zweimal (Rückstellung), MUST im Ereignisfeld das spätere Mal gelten, das nicht
 in der Zukunft liegt, und im Fristfeld das frühere, das nicht vorbei ist; liegen beide falsch
-herum, MUST der Tag wechseln wie oben. Ohne Feldart MUST das erste Mal gelten.
+herum, MUST der Tag wechseln wie oben. Ohne Feldart MUST das erste Mal gelten. Gibt es die
+Uhrzeit an dem Tag nicht (Vorstellung) und läge sie um die Lücke später im Ereignisfeld noch in
+der Zukunft, MUST sie um die Lücke früher gelten, bevor der Tag wechselt.
 
 #### Scenario: Ereignis kurz nach Mitternacht
 - **WHEN** es 2026-10-17 00:20 ist und in einem Ereignisfeld „2350“ eingegeben wird
@@ -221,6 +224,12 @@ herum, MUST der Tag wechseln wie oben. Ohne Feldart MUST das erste Mal gelten.
   und in einem Fristfeld „0250“ eingegeben wird
 - **THEN** gilt die 02:50 in zehn Minuten, gesendet wird `2026-10-25 01:50:00`, und das Feld nennt
   nicht „morgen“
+
+#### Scenario: Ereignis in der Lücke
+- **WHEN** die Anzeigezone Europe/Berlin ist, es am 29.03.2026 03:20 Sommerzeit ist (`01:20:00` UTC)
+  und in einem Ereignisfeld „0230“ eingegeben wird
+- **THEN** gilt sie um die Lücke früher, gesendet wird `2026-03-29 00:30:00`, und das Feld nennt
+  nicht „gestern“
 
 ### Requirement: Unlesbare Eingabe wird nicht übernommen
 Eine Eingabe, die sich nicht eindeutig als Zeitpunkt lesen lässt, SHALL nicht übernommen und

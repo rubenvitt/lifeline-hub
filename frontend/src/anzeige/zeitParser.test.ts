@@ -282,6 +282,50 @@ describe('deuteZeit (Spec zeiteingabe, Eingabe als Text)', () => {
     });
   });
 
+  describe('Lücke der Vorstellung nach Feldart (LLH-1472)', () => {
+    // 29.03.2026: um 01:00 UTC springt die Uhr von 02:00 Winterzeit auf 03:00 Sommerzeit vor.
+    /** 01:50 Winterzeit. */
+    const davor = dayjs.utc('2026-03-29 00:50:00');
+    /** 03:20 Sommerzeit. */
+    const danach = dayjs.utc('2026-03-29 01:20:00');
+    const ereignis = 'ereignis' as const;
+    const frist = 'frist' as const;
+
+    it('Ereignis: eine Uhrzeit vor der Lücke ist eindeutig', () => {
+      expect(utcVon('0150', { jetzt: danach, art: ereignis })).toBe('2026-03-29 00:50:00');
+    });
+
+    it('Ereignis: „0230“ stünde nach vorn gerückt noch bevor, es gilt um die Lücke früher', () => {
+      expect(utcVon('0230', { jetzt: danach, art: ereignis })).toBe('2026-03-29 00:30:00');
+      expect(hinweis('0230', { jetzt: danach, art: ereignis })).toBeUndefined();
+    });
+
+    it('Ereignis: liegt „0230“ nach vorn gerückt schon zurück, gilt das', () => {
+      const jetzt = dayjs.utc('2026-03-29 02:00:00'); // 04:00 Sommerzeit
+      expect(utcVon('0230', { jetzt, art: ereignis })).toBe('2026-03-29 01:30:00');
+    });
+
+    it('Ereignis: liegt auch die frühere Lesart noch voraus, gilt gestern', () => {
+      const jetzt = dayjs.utc('2026-03-29 00:20:00'); // 01:20 Winterzeit
+      expect(utcVon('0230', { jetzt, art: ereignis })).toBe('2026-03-28 01:30:00');
+      expect(hinweis('0230', { jetzt, art: ereignis })).toBe('gestern');
+    });
+
+    it('Frist: „0230“ rückt um die Lücke nach vorn, nie früher', () => {
+      expect(utcVon('0230', { jetzt: davor, art: frist })).toBe('2026-03-29 01:30:00');
+      expect(utcVon('0230', { jetzt: danach, art: frist })).toBe('2026-03-29 01:30:00');
+    });
+
+    it('Frist: ist auch die nach vorn gerückte Zeit vorbei, gilt morgen', () => {
+      const jetzt = dayjs.utc('2026-03-29 01:40:00'); // 03:40 Sommerzeit
+      expect(utcVon('0230', { jetzt, art: frist })).toBe('2026-03-30 00:30:00');
+    });
+
+    it('ohne Feldart rückt „0230“ weiter nach vorn', () => {
+      expect(utcVon('0230', { jetzt: danach })).toBe('2026-03-29 01:30:00');
+    });
+  });
+
   describe('leer und Unlesbares', () => {
     it('leer ist kein Zeitpunkt', () => {
       expect(utcVon('')).toBe('∅');
