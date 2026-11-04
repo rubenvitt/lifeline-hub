@@ -4,16 +4,17 @@
  * ohne Uhr: `jetzt` reicht der Aufrufer herein (im Baustein `serverJetzt()`).
  *
  * Gelesen wird als Wanduhr der Anzeigezone; der Zeitpunkt entsteht über
- * {@link lesartenAmTag}, damit es genau eine Sommerzeitrechnung gibt. Ohne Feldart und mit vollem
- * Datum gilt deren Regel (doppelte Stunde: die erste, Lücke: nach vorn). Fehlt der Tag oder der
- * Monat und trägt das Feld eine Richtung, entscheidet sie (LLH-1472): im Ereignisfeld die jüngste
- * Lesart vor jetzt, im Fristfeld die früheste danach. Ziffernblöcke sind nach ihrer Länge eindeutig: 3–4 Ziffern Uhrzeit,
- * 6 Ziffern Tag und Uhrzeit; alles andere wird nicht erraten, sondern abgelehnt.
+ * {@link uhrzeitenAmTag} (Lücke: nach vorn; ein Ereignis, das dann noch bevorstünde, um die Lücke
+ * früher, LLH-1472), damit es genau eine Sommerzeitregel gibt. Eine
+ * Uhrzeit, die es zweimal gibt, gilt nach Feldart beim Vorkommen, das dem Jetzt am nächsten liegt
+ * (LLH-1471, `zeitpunktAm`), ohne Feldart beim ersten. Ziffernblöcke sind nach ihrer Länge
+ * eindeutig: 3–4 Ziffern Uhrzeit, 6 Ziffern Tag und Uhrzeit; alles andere wird nicht erraten,
+ * sondern abgelehnt.
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { MONATE_DTG } from './format';
-import { lesartenAmTag, naechsterTag } from './uhrzeit';
+import { naechsterTag, uhrzeitenAmTag, uhrzeitVorDerLuecke } from './uhrzeit';
 import { heuteInZone, tagInZone } from './zeitEingabe';
 
 dayjs.extend(utc);
@@ -115,36 +116,6 @@ function vollesJahr(jahr: string | undefined, vorgabe: number): number {
   return jahr.length === 2 ? 2000 + Number(jahr) : Number(jahr);
 }
 
-/**
- * Die Lesarten von Tag und Uhrzeit, in der Reihenfolge, in der sie gelten sollen. Die erste ist die
- * Regel ohne Richtung (doppelte Stunde: die erste, Lücke: nach vorn). Mit Richtung kommen die
- * übrigen dazu: in der doppelten Stunde die jüngste zuerst (Ereignis) bzw. die früheste (Frist);
- * in der Lücke darf ein Ereignis auch um die Lücke früher liegen, statt auf gestern zu fallen.
- */
-function lesartenAm(d: Datum, u: Uhr, zone: DeutungsOptionen['zone'], r: -1 | 0 | 1): Dayjs[] {
-  const { lesarten, luecke } = lesartenAmTag(
-    tagText(d),
-    `${zwei(u.stunde)}:${zwei(u.minute)}`,
-    zone,
-  );
-  const mitSekunde = lesarten.map((l) => l.add(u.sekunde, 'second'));
-  const frueheste = mitSekunde[0];
-  const spaeteste = mitSekunde[mitSekunde.length - 1];
-  if (mitSekunde.length === 1) return mitSekunde;
-  if (luecke) return r === -1 ? [spaeteste, frueheste] : [spaeteste];
-  if (r === -1) return [spaeteste, frueheste];
-  return r === 1 ? [frueheste, spaeteste] : [frueheste];
-}
-
-function zeitpunktAm(d: Datum, u: Uhr, zone: DeutungsOptionen['zone']): Dayjs {
-  return lesartenAm(d, u, zone, 0)[0];
-}
-
-/** Die erste Lesart am Tag, die nicht falsch herum liegt; keine, wenn alle es tun. */
-function inRichtung(d: Datum, u: Uhr, o: DeutungsOptionen): Dayjs | undefined {
-  return lesartenAm(d, u, o.zone, richtung(o)).find((k) => !falschHerum(k, o));
-}
-
 function tagVersetzt(tag: string, tage: number): string {
   return tage === 1 ? naechsterTag(tag) : dayjs.utc(tag).add(tage, 'day').format('YYYY-MM-DD');
 }
@@ -168,25 +139,48 @@ function falschHerum(kandidat: Dayjs, o: DeutungsOptionen): boolean {
   return false;
 }
 
+/**
+ * Der Zeitpunkt, an dem die Anzeigezone am Tag `d` die Uhrzeit `u` zeigt. In der doppelten Stunde
+ * der Rückstellung gibt es zwei (Spec `zeiteingabe`, „Richtung nach Feldart“, LLH-1471): nach einem
+ * Bezug gilt das erste danach, sonst das dem Jetzt nächste, das nicht falsch herum liegt
+ * (Ereignis: das spätere vergangene, Frist: das frühere kommende); ohne Feldart, oder wenn beide
+ * falsch herum liegen, das erste.
+ */
+function zeitpunktAm(d: Datum, u: Uhr, o: DeutungsOptionen, nach?: Dayjs | null): Dayjs {
+  const alle = uhrzeitenAmTag(tagText(d), `${zwei(u.stunde)}:${zwei(u.minute)}`, o.zone).map((k) =>
+    k.add(u.sekunde, 'second'),
+  );
+  if (nach) return alle.find((k) => k.isAfter(nach)) ?? alle[0];
+  const passend = alle.filter((k) => !falschHerum(k, o));
+  if (passend.length === 0) {
+    // Lücke der Vorstellung: ein Ereignis, das nach vorn gerückt noch bevorstünde, liegt um die
+    // Lücke früher statt am Vortag (LLH-1472).
+    const frueher =
+      richtung(o) === -1
+        ? uhrzeitVorDerLuecke(tagText(d), `${zwei(u.stunde)}:${zwei(u.minute)}`, o.zone)
+        : null;
+    const ereignis = frueher?.add(u.sekunde, 'second');
+    return ereignis && !falschHerum(ereignis, o) ? ereignis : alle[0];
+  }
+  return richtung(o) === -1 ? passend[passend.length - 1] : passend[0];
+}
+
 type Ergebnis = { zeitpunkt: Dayjs } | { grund: string };
 
 /** Nur die Uhrzeit: heute bzw. am Tag des Bezugs, nach Feldart verschoben. */
 function ausUhrzeit(u: Uhr, o: DeutungsOptionen): Ergebnis {
   if (!gibtEsUhr(u)) return { grund: GRUND.uhrzeit };
   if (o.bezug) {
-    // Nach dem Bezug: in der doppelten Stunde die früheste Lesart, die danach liegt.
-    const bezug = o.bezug;
-    const tag = tagInZone(bezug, o.zone);
-    const am = lesartenAm(datumAus(tag), u, o.zone, 1).find((k) => k.isAfter(bezug));
-    return { zeitpunkt: am ?? zeitpunktAm(datumAus(naechsterTag(tag)), u, o.zone) };
+    const tag = tagInZone(o.bezug, o.zone);
+    const am = zeitpunktAm(datumAus(tag), u, o, o.bezug);
+    return {
+      zeitpunkt: am.isAfter(o.bezug) ? am : zeitpunktAm(datumAus(naechsterTag(tag)), u, o, o.bezug),
+    };
   }
   const heute = heuteInZone(o.zone, o.jetzt);
-  const r = richtung(o);
-  if (r === 0) return { zeitpunkt: zeitpunktAm(datumAus(heute), u, o.zone) };
-  const passend = inRichtung(datumAus(heute), u, o);
-  if (passend) return { zeitpunkt: passend };
-  // Am Vor- bzw. Folgetag liegen alle Lesarten richtig herum; die erste ist die nächste an jetzt.
-  return { zeitpunkt: lesartenAm(datumAus(tagVersetzt(heute, r)), u, o.zone, r)[0] };
+  const kandidat = zeitpunktAm(datumAus(heute), u, o);
+  if (!falschHerum(kandidat, o)) return { zeitpunkt: kandidat };
+  return { zeitpunkt: zeitpunktAm(datumAus(tagVersetzt(heute, richtung(o))), u, o) };
 }
 
 /**
@@ -210,18 +204,15 @@ function ausTeilDatum(
   };
   const vollstaendig = teil.jahr !== undefined && teil.monat !== undefined;
   const r = richtung(o);
-  if (vollstaendig || r === 0) {
-    return gibtEsTag(kandidat)
-      ? { zeitpunkt: zeitpunktAm(kandidat, u, o.zone) }
-      : { grund: GRUND.tag };
+  const passt = (d: Datum) => gibtEsTag(d) && !falschHerum(zeitpunktAm(d, u, o), o);
+  if (vollstaendig || r === 0 || passt(kandidat)) {
+    return gibtEsTag(kandidat) ? { zeitpunkt: zeitpunktAm(kandidat, u, o) } : { grund: GRUND.tag };
   }
-  const passend = gibtEsTag(kandidat) ? inRichtung(kandidat, u, o) : undefined;
-  if (passend) return { zeitpunkt: passend };
   // Ohne Monat ein Monat weiter, ohne Jahr ein Jahr; der Tag des 31. kann mehrere Monate fehlen.
   const schritt = teil.monat === undefined ? 1 : 12;
   for (let n = 1; n <= 12; n += 1) {
     const weiter = monatVersetzt(kandidat, r * schritt * n);
-    if (gibtEsTag(weiter)) return { zeitpunkt: lesartenAm(weiter, u, o.zone, r)[0] };
+    if (gibtEsTag(weiter)) return { zeitpunkt: zeitpunktAm(weiter, u, o) };
   }
   return { grund: GRUND.tag };
 }
@@ -230,7 +221,7 @@ function vollesDatum(d: Datum, u: Uhr, o: DeutungsOptionen): Ergebnis {
   if (d.monat < 1 || d.monat > 12) return { grund: GRUND.monat };
   if (!gibtEsTag(d)) return { grund: GRUND.tag };
   if (!gibtEsUhr(u)) return { grund: GRUND.uhrzeit };
-  return { zeitpunkt: zeitpunktAm(d, u, o.zone) };
+  return { zeitpunkt: zeitpunktAm(d, u, o) };
 }
 
 function lies(t: string, o: DeutungsOptionen): Ergebnis {

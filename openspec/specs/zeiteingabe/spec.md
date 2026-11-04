@@ -114,8 +114,10 @@ Eine Uhrzeit ohne Datum (etwa der Beginn einer Mahlzeit im Verpflegungsplan) SHA
 23:59; gesendet MUST sie als `HH:MM` werden, alles andere MUST die Eingabe als unlesbar ablehnen.
 Angezeigt wird sie taktisch („0630“). Wird sie auf einen Kalendertag gelegt, MUST das in der
 Anzeigezone geschehen, nie in der Browserzone. Eine Uhrzeit, die es an dem Tag zweimal gibt
-(Rückstellung), MUST beim ersten Mal gelten; eine, die es nicht gibt (Vorstellung), MUST um die
-Länge der Lücke später gelten. Die Grenzen eines Kalendertags sind 00:00 des Tages und 00:00 des
+(Rückstellung), MUST beim ersten Mal gelten, außer eine Zeiteingabe wählt nach Feldart oder Bezug
+(„Richtung nach Feldart“, „Ende eines Zeitraums ohne Tag“); eine, die es nicht gibt (Vorstellung),
+MUST um die Länge der Lücke später gelten, außer ein Ereignisfeld läge damit in der Zukunft
+(„Richtung nach Feldart“). Die Grenzen eines Kalendertags sind 00:00 des Tages und 00:00 des
 Folgetags in der Anzeigezone; am Tag einer Umstellung liegen sie 23 bzw. 25 Stunden auseinander.
 
 #### Scenario: Stab-Schreibweise
@@ -190,11 +192,11 @@ Eine Zeiteingabe SHALL eine Feldart tragen können: Ereignis (Vergangenheit) ode
 noch bevorsteht, und im Fristfeld auf den Folgetag, wenn sie heute vorbei ist; ein Tag ohne
 Monat entsprechend auf den Vor- bzw. Folgemonat. Ohne Feldart MUST heute bzw. der laufende Monat
 gelten. Wechselt der Tag dadurch, MUST das Feld „gestern“ bzw. „morgen“ nennen. Gibt es die
-Uhrzeit am Tag zweimal (Rückstellung), MUST im Ereignisfeld die jüngste vor jetzt und im
-Fristfeld die früheste nach jetzt gelten; erst wenn keine passt, wechselt der Tag. Gibt es sie
-nicht (Vorstellung), gilt sie um die Lücke später; nur wenn das im Ereignisfeld noch bevorstünde,
-MUST sie um die Lücke früher gelten statt am Vortag. Ohne Feldart und bei vollem Datum bleibt es
-bei der ersten bzw. der späteren Lesart („Uhrzeit ohne Datum“).
+Uhrzeit an dem Tag zweimal (Rückstellung), MUST im Ereignisfeld das spätere Mal gelten, das nicht
+in der Zukunft liegt, und im Fristfeld das frühere, das nicht vorbei ist; liegen beide falsch
+herum, MUST der Tag wechseln wie oben. Ohne Feldart MUST das erste Mal gelten. Gibt es die
+Uhrzeit an dem Tag nicht (Vorstellung) und läge sie um die Lücke später im Ereignisfeld noch in
+der Zukunft, MUST sie um die Lücke früher gelten, bevor der Tag wechselt.
 
 #### Scenario: Ereignis kurz nach Mitternacht
 - **WHEN** es 2026-10-17 00:20 ist und in einem Ereignisfeld „2350“ eingegeben wird
@@ -213,16 +215,21 @@ bei der ersten bzw. der späteren Lesart („Uhrzeit ohne Datum“).
 - **THEN** gilt es als Ereignisfeld
 
 #### Scenario: Ereignis in der doppelten Stunde
-- **WHEN** die Anzeigezone Europe/Berlin ist, es 2026-10-25 03:20 Winterzeit ist und in einem Ereignisfeld „0250“ eingegeben wird
-- **THEN** gilt die zweite 02:50 (vor 30 Minuten), gesendet wird `2026-10-25 01:50:00`
+- **WHEN** die Anzeigezone Europe/Berlin ist, es am 25.10.2026 02:48 Winterzeit ist (`01:48:00` UTC)
+  und in einem Ereignisfeld „0230“ eingegeben wird
+- **THEN** gilt die 02:30 vor 18 Minuten, gesendet wird `2026-10-25 01:30:00`
 
 #### Scenario: Frist in der doppelten Stunde
-- **WHEN** die Anzeigezone Europe/Berlin ist, es 2026-10-25 02:20 Winterzeit (das zweite Mal) ist und in einem Fristfeld „0250“ eingegeben wird
-- **THEN** gilt die zweite 02:50, gesendet wird `2026-10-25 01:50:00`
+- **WHEN** die Anzeigezone Europe/Berlin ist, es am 25.10.2026 02:40 Winterzeit ist (`01:40:00` UTC)
+  und in einem Fristfeld „0250“ eingegeben wird
+- **THEN** gilt die 02:50 in zehn Minuten, gesendet wird `2026-10-25 01:50:00`, und das Feld nennt
+  nicht „morgen“
 
 #### Scenario: Ereignis in der Lücke
-- **WHEN** die Anzeigezone Europe/Berlin ist, es 2026-03-29 03:20 Sommerzeit ist und in einem Ereignisfeld „0230“ eingegeben wird
-- **THEN** gilt sie um die Lücke früher, gesendet wird `2026-03-29 00:30:00`, nicht der Vortag
+- **WHEN** die Anzeigezone Europe/Berlin ist, es am 29.03.2026 03:20 Sommerzeit ist (`01:20:00` UTC)
+  und in einem Ereignisfeld „0230“ eingegeben wird
+- **THEN** gilt sie um die Lücke früher, gesendet wird `2026-03-29 00:30:00`, und das Feld nennt
+  nicht „gestern“
 
 ### Requirement: Unlesbare Eingabe wird nicht übernommen
 Eine Eingabe, die sich nicht eindeutig als Zeitpunkt lesen lässt, SHALL nicht übernommen und
@@ -289,7 +296,8 @@ ab jetzt nach Serveruhr. Ein Knopf der Schnellwahl MUST die Steuerhöhe der Dich
 
 ### Requirement: Ende eines Zeitraums ohne Tag
 In einer Zeitraum-Eingabe SHALL ein Ende, das nur als Uhrzeit eingegeben wird, auf dem Tag des
-Beginns liegen; läge es dort nicht nach dem Beginn, MUST es auf dem Folgetag liegen.
+Beginns liegen; läge es dort nicht nach dem Beginn, MUST es auf dem Folgetag liegen. Gibt es die
+Uhrzeit an dem Tag zweimal (Rückstellung), MUST das erste Mal nach dem Beginn gelten.
 
 #### Scenario: Mittag
 - **WHEN** der Beginn 171200okt26 ist und als Ende „1330“ eingegeben wird
@@ -298,6 +306,11 @@ Beginns liegen; läge es dort nicht nach dem Beginn, MUST es auf dem Folgetag li
 #### Scenario: Über Mitternacht
 - **WHEN** der Beginn 172200okt26 ist und als Ende „0600“ eingegeben wird
 - **THEN** ist das Ende 180600okt26
+
+#### Scenario: Beginn in der doppelten Stunde
+- **WHEN** die Anzeigezone Europe/Berlin ist, der Beginn am 25.10.2026 02:10 Winterzeit liegt
+  (`01:10:00` UTC) und als Ende „0230“ eingegeben wird
+- **THEN** ist das Ende 02:30 Winterzeit desselben Tages, gesendet wird `2026-10-25 01:30:00`
 
 ### Requirement: Kalenderdatum ohne Uhrzeit und Zone
 

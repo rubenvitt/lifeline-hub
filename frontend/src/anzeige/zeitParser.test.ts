@@ -228,76 +228,76 @@ describe('deuteZeit (Spec zeiteingabe, Eingabe als Text)', () => {
     });
   });
 
-  describe('Umstellungsnächte nach Feldart (LLH-1472)', () => {
-    // 25.10.2026: um 01:00 UTC springt die Uhr von 03:00 Sommerzeit auf 02:00 Winterzeit zurück.
-    /** 02:20 Sommerzeit, das erste Mal. */
-    const herbstErstes = dayjs.utc('2026-10-25 00:20:00');
-    /** 02:20 Winterzeit, das zweite Mal. */
-    const herbstZweites = dayjs.utc('2026-10-25 01:20:00');
-    /** 03:20 Winterzeit. */
-    const herbstDanach = dayjs.utc('2026-10-25 02:20:00');
+  /**
+   * In der Nacht auf den 25.10.2026 läuft 02:00–02:59 zweimal: erst Sommerzeit (00:00–00:59 UTC),
+   * dann Winterzeit (01:00–01:59 UTC). Nach Feldart gilt das Mal, das dem Jetzt am nächsten liegt
+   * (LLH-1471), ohne Feldart das erste.
+   */
+  describe('doppelte Stunde nach Feldart', () => {
+    /** 02:48 Winterzeit, das zweite Mal. */
+    const zweitesMal = dayjs.utc('2026-10-25 01:48:00');
+    /** 02:40 Sommerzeit, das erste Mal. */
+    const erstesMal = dayjs.utc('2026-10-25 00:40:00');
+
+    it('Ereigniszeit im zweiten Mal: die eben vergangene, nicht eine Stunde früher', () => {
+      expect(utcVon('0230', { jetzt: zweitesMal, art: 'ereignis' })).toBe('2026-10-25 01:30:00');
+      expect(utcVon('250230', { jetzt: zweitesMal, art: 'ereignis' })).toBe('2026-10-25 01:30:00');
+      expect(utcVon('0230', { jetzt: zweitesMal, keineZukunftstage: true })).toBe(
+        '2026-10-25 01:30:00',
+      );
+    });
+
+    it('Ereigniszeit, deren zweites Mal noch kommt: das erste', () => {
+      expect(utcVon('0255', { jetzt: zweitesMal, art: 'ereignis' })).toBe('2026-10-25 00:55:00');
+      expect(utcVon('0230', { jetzt: erstesMal, art: 'ereignis' })).toBe('2026-10-25 00:30:00');
+    });
+
+    it('Ereigniszeit später am Tag: die jüngere der beiden', () => {
+      const morgens = dayjs.utc('2026-10-25 09:00:00');
+      expect(utcVon('0230', { jetzt: morgens, art: 'ereignis' })).toBe('2026-10-25 01:30:00');
+    });
+
+    it('Frist im zweiten Mal: die kommende heute, nicht morgen', () => {
+      const jetzt = dayjs.utc('2026-10-25 01:40:00');
+      expect(utcVon('0250', { jetzt, art: 'frist' })).toBe('2026-10-25 01:50:00');
+      expect(hinweis('0250', { jetzt, art: 'frist' })).toBeUndefined();
+    });
+
+    it('Frist im ersten Mal: die erste, ist sie vorbei, die zweite', () => {
+      expect(utcVon('0250', { jetzt: erstesMal, art: 'frist' })).toBe('2026-10-25 00:50:00');
+      expect(utcVon('0230', { jetzt: erstesMal, art: 'frist' })).toBe('2026-10-25 01:30:00');
+    });
+
+    it('ohne Feldart bleibt es beim ersten Mal', () => {
+      expect(utcVon('0230', { jetzt: zweitesMal })).toBe('2026-10-25 00:30:00');
+      expect(utcVon('25.10.2026 02:30', { jetzt: zweitesMal })).toBe('2026-10-25 00:30:00');
+    });
+
+    it('Ende eines Zeitraums: das erste Mal nach dem Beginn', () => {
+      const imZweiten = dayjs.utc('2026-10-25 01:10:00');
+      const imErsten = dayjs.utc('2026-10-25 00:10:00');
+      expect(utcVon('0230', { bezug: imZweiten })).toBe('2026-10-25 01:30:00');
+      expect(utcVon('0230', { bezug: imErsten })).toBe('2026-10-25 00:30:00');
+      expect(utcVon('0205', { bezug: imZweiten })).toBe('2026-10-26 01:05:00');
+    });
+  });
+
+  describe('Lücke der Vorstellung nach Feldart (LLH-1472)', () => {
+    // 29.03.2026: um 01:00 UTC springt die Uhr von 02:00 Winterzeit auf 03:00 Sommerzeit vor.
+    /** 01:50 Winterzeit. */
+    const davor = dayjs.utc('2026-03-29 00:50:00');
+    /** 03:20 Sommerzeit. */
+    const danach = dayjs.utc('2026-03-29 01:20:00');
     const ereignis = 'ereignis' as const;
     const frist = 'frist' as const;
 
-    it('Ereignis: um 03:20 ist „0250“ die zweite 02:50, vor 30 Minuten', () => {
-      expect(utcVon('0250', { jetzt: herbstDanach, art: ereignis })).toBe('2026-10-25 01:50:00');
-      expect(hinweis('0250', { jetzt: herbstDanach, art: ereignis })).toBeUndefined();
-    });
-
-    it('Ereignis: um die zweite 02:20 ist „0250“ die erste, die zweite stünde noch bevor', () => {
-      expect(utcVon('0250', { jetzt: herbstZweites, art: ereignis })).toBe('2026-10-25 00:50:00');
-    });
-
-    it('Ereignis: wenige Minuten vor der zweiten 02:50 gilt sie schon (Uhren gehen nie gleich)', () => {
-      const jetzt = dayjs.utc('2026-10-25 01:47:00');
-      expect(utcVon('0250', { jetzt, art: ereignis })).toBe('2026-10-25 01:50:00');
-    });
-
-    it('Ereignis: um die erste 02:20 stehen beide 02:50 bevor, es gilt gestern', () => {
-      expect(utcVon('0250', { jetzt: herbstErstes, art: ereignis })).toBe('2026-10-24 00:50:00');
-      expect(hinweis('0250', { jetzt: herbstErstes, art: ereignis })).toBe('gestern');
-    });
-
-    it('Ereignis: Tag und Uhrzeit ohne Monat folgen derselben Richtung', () => {
-      expect(utcVon('250250', { jetzt: herbstDanach, art: ereignis })).toBe('2026-10-25 01:50:00');
-    });
-
-    it('Frist: vor der Umstellung ist „0250“ die erste 02:50', () => {
-      const jetzt = dayjs.utc('2026-10-24 23:30:00'); // 01:30 Sommerzeit
-      expect(utcVon('0250', { jetzt, art: frist })).toBe('2026-10-25 00:50:00');
-    });
-
-    it('Frist: um die zweite 02:20 ist die erste 02:50 vorbei, es gilt die zweite', () => {
-      expect(utcVon('0250', { jetzt: herbstZweites, art: frist })).toBe('2026-10-25 01:50:00');
-      expect(hinweis('0250', { jetzt: herbstZweites, art: frist })).toBeUndefined();
-    });
-
-    it('Frist: um 03:20 sind beide 02:50 vorbei, es gilt morgen', () => {
-      expect(utcVon('0250', { jetzt: herbstDanach, art: frist })).toBe('2026-10-26 01:50:00');
-      expect(hinweis('0250', { jetzt: herbstDanach, art: frist })).toBe('morgen');
-    });
-
-    it('ohne Feldart gilt weiter die erste 02:50', () => {
-      expect(utcVon('0250', { jetzt: herbstDanach })).toBe('2026-10-25 00:50:00');
-    });
-
-    it('Bezug in der zweiten Stunde: das Ende ist die zweite 02:50, nicht morgen', () => {
-      const bezug = dayjs.utc('2026-10-25 01:40:00'); // 02:40 Winterzeit
-      expect(utcVon('0250', { bezug })).toBe('2026-10-25 01:50:00');
-    });
-
-    // 29.03.2026: um 01:00 UTC springt die Uhr von 02:00 Winterzeit auf 03:00 Sommerzeit vor.
-    /** 01:50 Winterzeit. */
-    const fruehjahrDavor = dayjs.utc('2026-03-29 00:50:00');
-    /** 03:20 Sommerzeit. */
-    const fruehjahrDanach = dayjs.utc('2026-03-29 01:20:00');
-
     it('Ereignis: eine Uhrzeit vor der Lücke ist eindeutig', () => {
-      expect(utcVon('0150', { jetzt: fruehjahrDanach, art: ereignis })).toBe('2026-03-29 00:50:00');
+      expect(utcVon('0150', { jetzt: danach, art: ereignis })).toBe('2026-03-29 00:50:00');
     });
 
-    it('Ereignis: „0230“ liegt nach vorn gerückt noch voraus, es gilt um die Lücke früher', () => {
-      expect(utcVon('0230', { jetzt: fruehjahrDanach, art: ereignis })).toBe('2026-03-29 00:30:00');
+    it('Ereignis: „0230“ stünde nach vorn gerückt noch bevor, es gilt um die Lücke früher', () => {
+      expect(utcVon('0230', { jetzt: danach, art: ereignis })).toBe('2026-03-29 00:30:00');
+      expect(hinweis('0230', { jetzt: danach, art: ereignis })).toBeUndefined();
     });
 
     it('Ereignis: liegt „0230“ nach vorn gerückt schon zurück, gilt das', () => {
@@ -305,14 +305,24 @@ describe('deuteZeit (Spec zeiteingabe, Eingabe als Text)', () => {
       expect(utcVon('0230', { jetzt, art: ereignis })).toBe('2026-03-29 01:30:00');
     });
 
+    it('Ereignis: liegt auch die frühere Lesart noch voraus, gilt gestern', () => {
+      const jetzt = dayjs.utc('2026-03-29 00:20:00'); // 01:20 Winterzeit
+      expect(utcVon('0230', { jetzt, art: ereignis })).toBe('2026-03-28 01:30:00');
+      expect(hinweis('0230', { jetzt, art: ereignis })).toBe('gestern');
+    });
+
     it('Frist: „0230“ rückt um die Lücke nach vorn, nie früher', () => {
-      expect(utcVon('0230', { jetzt: fruehjahrDavor, art: frist })).toBe('2026-03-29 01:30:00');
-      expect(utcVon('0230', { jetzt: fruehjahrDanach, art: frist })).toBe('2026-03-29 01:30:00');
+      expect(utcVon('0230', { jetzt: davor, art: frist })).toBe('2026-03-29 01:30:00');
+      expect(utcVon('0230', { jetzt: danach, art: frist })).toBe('2026-03-29 01:30:00');
     });
 
     it('Frist: ist auch die nach vorn gerückte Zeit vorbei, gilt morgen', () => {
       const jetzt = dayjs.utc('2026-03-29 01:40:00'); // 03:40 Sommerzeit
       expect(utcVon('0230', { jetzt, art: frist })).toBe('2026-03-30 00:30:00');
+    });
+
+    it('ohne Feldart rückt „0230“ weiter nach vorn', () => {
+      expect(utcVon('0230', { jetzt: danach })).toBe('2026-03-29 01:30:00');
     });
   });
 

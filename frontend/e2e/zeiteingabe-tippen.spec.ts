@@ -11,12 +11,13 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * nach jetzt kurz vor Mitternacht auf morgen; erwartet wird in beiden Fällen genau der Zeitpunkt,
  * aus dem die Uhrzeit stammt. Browser in Europe/Berlin, wie die Anzeigezone ohne Org-Zone.
  *
- * In der Nacht, in der die Sommerzeit endet, gibt es 02:00–02:59 zweimal. Ein Ereignisfeld nimmt
- * dann die jüngste Lesart vor jetzt, ein Fristfeld die früheste danach (Spec `zeiteingabe`,
- * „Richtung nach Feldart“). Weniger als eine Stunde vor jetzt ist das genau die gemeinte Zeit; die
- * Ereignisfelder prüfen deshalb ohne Umweg auch die doppelte Stunde. Die Frist liegt 90 Minuten
- * voraus: dort kann die andere Lesart ebenfalls bevorstehen, und „HHMM“ ist wirklich mehrdeutig.
- * Sie wählt deshalb eine eindeutige Uhrzeit (`eindeutig`).
+ * In der Nacht, in der die Sommerzeit endet, gibt es 02:00–02:59 zweimal. Eine getippte Uhrzeit
+ * daraus gilt im Ereignisfeld beim letzten Mal, das nicht nach jetzt liegt, im Fristfeld beim
+ * ersten Mal, das nicht vor jetzt liegt (Spec `zeiteingabe`, „Richtung nach Feldart“, LLH-1471,
+ * LLH-1474). Die Abstände zu jetzt bleiben deshalb unter einer Stunde abzüglich der Toleranz von
+ * 5 min: Dann ist das andere Mal derselben Uhrzeit nie das gewählte, und der Test erwartet in jeder
+ * Stunde des Jahres genau den Zeitpunkt, aus dem er die Uhrzeit gebildet hat. Den Fall selbst prüft
+ * der letzte Test mit gestellter Uhr.
  */
 
 test.use({ timezoneId: 'Europe/Berlin' });
@@ -28,18 +29,6 @@ function umJetzt(minuten: number): Date {
   const d = new Date(Date.now() + minuten * 60_000);
   d.setUTCSeconds(0, 0);
   return d;
-}
-
-/**
- * Rückt `d` um je eine Stunde weiter, solange seine Uhrzeit in der Anzeigezone eine Stunde früher
- * oder später noch einmal vorkommt (doppelte Stunde der Rückstellung).
- */
-function eindeutig(d: Date): Date {
-  let t = d;
-  const doppelt = (x: Date) =>
-    [-1, 1].some((h) => hhmm(new Date(x.getTime() + h * 3_600_000)) === hhmm(x));
-  while (doppelt(t)) t = new Date(t.getTime() + 3_600_000);
-  return t;
 }
 
 /** Die Uhrzeit als „HHMM“ in der Anzeigezone, so wie sie diktiert würde. */
@@ -112,7 +101,7 @@ test('Auftragsfrist: HHMM + Enter übernimmt die Frist und erteilt den Auftrag',
   const text = `Hydrant freilegen ${Date.now()}`;
   await dialog.getByLabel('Auftrag / Was').fill(text);
 
-  const frist = eindeutig(umJetzt(90));
+  const frist = umJetzt(40);
   const feld = dialog.getByRole('textbox', { name: 'Frist (Quittung/Vollzug)' });
   await feld.fill(hhmm(frist));
   // Enter übernimmt die Frist und sendet ab (Erfassungs-Norm).
@@ -174,4 +163,55 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
   );
   expect(schicht, 'Schicht angelegt').toBeTruthy();
   expect(schicht!.beginn_at).toBe(draht(beginn));
+});
+
+test('doppelte Stunde: „0247“ um 02:50 Winterzeit ist im Ereignisfeld drei Minuten her', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await neuerEinsatz(page, 'Doppelte Stunde');
+
+  // Gestellte Uhr: 25.10.2026, 02:50 Winterzeit. 02:47 gab es eine Stunde vorher schon einmal.
+  const gestellt = Date.parse('2026-10-25T01:50:00Z');
+  const echtAb = Date.now();
+  await page.clock.install({ time: gestellt });
+  // `serverJetzt` misst die Serveruhr am `Date`-Header; stünde dort die echte Zeit, rechnete die
+  // Seite die gestellte Uhr zurück. Die Antworten tragen deshalb die gestellte Zeit. Der Live-Strom
+  // (`EventSource`) misst nicht und bleibt offen, er geht unverändert durch.
+  await page.route('**/api/**', async (route) => {
+    if (route.request().headers()['accept']?.includes('text/event-stream')) {
+      await route.continue();
+      return;
+    }
+    const antwort = await route.fetch();
+    const jetzt = new Date(gestellt + (Date.now() - echtAb));
+    await route.fulfill({
+      response: antwort,
+      headers: { ...antwort.headers(), date: jetzt.toUTCString() },
+    });
+  });
+
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  const inhalt = `Doppelte Stunde ${Date.now()}`;
+  const feld = page.getByPlaceholder('Inhalt …');
+  await feld.fill(inhalt);
+  await page.getByRole('button', { name: 'Feld', exact: true }).click();
+  await page.getByRole('option', { name: /^Ereigniszeit/ }).click();
+  const chip = page.getByRole('textbox', { name: 'Ereigniszeit' });
+  await expect(chip).toBeFocused();
+  await chip.fill('0247');
+  await chip.press('Enter');
+  // Derselbe Tag, also ohne Tag im Chip.
+  await expect(page.getByText(/^Ereigniszeit: 0247$/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await expect(feld).toHaveValue('');
+  const r = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const eintrag = ((await r.json()) as { inhalt: string; ereigniszeit: string }[]).find(
+    (e) => e.inhalt === inhalt,
+  );
+  expect(eintrag, 'Eintrag gespeichert').toBeTruthy();
+  // Die zweite 02:47 (Winterzeit), nicht die erste eine Stunde früher (00:47 UTC).
+  expect(eintrag!.ereigniszeit).toBe('2026-10-25 01:47:00');
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });

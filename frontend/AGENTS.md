@@ -754,7 +754,9 @@ anwendbar), „nicht geprüft" ist keins.
   **Uhrzeit ohne Datum** (Verpflegungsplan, LLH-1058, Spec
   `zeiteingabe`, „Uhrzeit ohne Datum“) liest nur `anzeige/uhrzeit.ts:parseUhrzeit` („0630“, „6:30“)
   und legt nur `uhrzeitAmTag` in der Anzeigezone auf einen Tag (doppelte Stunde: die erste, Lücke:
-  nach vorn); die Tagesgrenzen `tagesgrenzen`. Ein **Kalenderdatum ohne Uhrzeit** (Geburtsdatum,
+  nach vorn); die Tagesgrenzen `tagesgrenzen`. Getippte Zeitpunkte mit Feldart oder Bezug wählen
+  in der doppelten Stunde über `uhrzeitenAmTag` das Mal, das in Feldrichtung dem Jetzt am
+  nächsten liegt bzw. als erstes nach dem Beginn kommt (`zeitParser.ts:zeitpunktAm`, LLH-1471). Ein **Kalenderdatum ohne Uhrzeit** (Geburtsdatum,
   LLH-1103, Spec `zeiteingabe`, „Kalenderdatum ohne Uhrzeit und Zone“) ist die Ausnahme von der
   Anzeigezone: gelesen nur über `anzeige/kalenderdatum.ts:parseKalenderdatum` („TT.MM.JJJJ“,
   „T.M.JJJJ“, „TT.MM.JJ“, `YYYY-MM-DD`; zweistelliges Jahr = jüngstes nicht zukünftiges; „heute“
