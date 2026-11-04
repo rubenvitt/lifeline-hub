@@ -47,10 +47,29 @@ export function markVerlaufGelesen(
 }
 
 /**
- * Legt ein vorgemerktes „Alle gelesen“ über den Serverstand (LLH-1422): kehrt das Netz zurück,
- * ruft der Rahmen den Verlauf ab, bevor der Abgleich gesendet hat, und die Zahl spränge sonst
- * zurück. Der Abgleich lädt den Verlauf neu, bevor er die Zeile entfernt
- * (`offline/useOfflineSync.ts`). Ist die Queue nicht lesbar, gilt der Serverstand.
+ * Der Verlauf mit diesen Einträgen als gelesen, wie der Server einen einzelnen quittiert
+ * (LLH-1477): jede Stufe, auch ein Alarm, den jemand geöffnet oder geschlossen hat. Die Zahl zählt
+ * wie bei {@link markVerlaufGelesen}.
+ */
+export function markVerlaufQuittiert(
+  verlauf: BenachrichtigungVerlauf,
+  ids: ReadonlySet<number>,
+): BenachrichtigungVerlauf {
+  if (!verlauf.eintraege.some((a) => ids.has(a.id) && !a.quittiert_at)) return verlauf;
+  const jetzt = alsBackendZeit(serverJetzt());
+  const eintraege = verlauf.eintraege.map((a) =>
+    ids.has(a.id) && !a.quittiert_at ? { ...a, quittiert_at: jetzt } : a,
+  );
+  const ungelesen = eintraege.filter((a) => a.stufe === 'hinweis' && !a.quittiert_at).length;
+  return { eintraege, ungelesen };
+}
+
+/**
+ * Legt den vorgemerkten Lesestand über den Serverstand: „Alle gelesen“ (LLH-1422) und einzeln
+ * quittierte Eingänge (LLH-1477). Kehrt das Netz zurück, ruft der Rahmen den Verlauf ab, bevor
+ * der Abgleich gesendet hat, und die Zahl spränge sonst zurück. Der Abgleich lädt den Verlauf
+ * neu, bevor er die Zeile entfernt (`offline/useOfflineSync.ts`). Ist die Queue nicht lesbar,
+ * gilt der Serverstand.
  */
 async function mitVorgemerktemGelesen(
   verlauf: BenachrichtigungVerlauf,
@@ -58,10 +77,16 @@ async function mitVorgemerktemGelesen(
   einsatzId: number,
 ): Promise<BenachrichtigungVerlauf> {
   const zeilen = await schreibaktionenLaden(benutzerId, einsatzId).catch(() => []);
-  const bis = Math.max(
-    ...zeilen.map((z) => (z.aktion.art === 'eingaenge_gelesen' ? z.aktion.daten.bis_id : -1)),
-  );
-  return bis >= 0 ? markVerlaufGelesen(verlauf, bis) : verlauf;
+  let bis = -1;
+  const einzeln = new Set<number>();
+  for (const { aktion } of zeilen) {
+    if (aktion.art === 'eingaenge_gelesen') bis = Math.max(bis, aktion.daten.bis_id);
+    else if (aktion.art === 'benachrichtigung_quittiert') {
+      einzeln.add(aktion.daten.benachrichtigung_id);
+    }
+  }
+  const gelesen = bis >= 0 ? markVerlaufGelesen(verlauf, bis) : verlauf;
+  return einzeln.size > 0 ? markVerlaufQuittiert(gelesen, einzeln) : gelesen;
 }
 
 /**

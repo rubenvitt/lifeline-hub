@@ -6,7 +6,10 @@ import { meldeBelegung } from '../api/betreuung';
 import { meldeStand } from '../api/evakuierung';
 import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
-import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
+import {
+  markiereBenachrichtigungenGelesen,
+  quittiereBenachrichtigung,
+} from '../api/benachrichtigungen';
 import { erfasseEtb } from '../api/etb';
 import {
   createMassnahme,
@@ -19,6 +22,7 @@ import {
 } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
+import { quittiert as gedaechtnis } from '../alarm/benachrichtigungGedaechtnis';
 import type { Person, Verpflegung, VerpflegungZeitfenster } from '../api/types';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
@@ -58,7 +62,10 @@ vi.mock('../api/betreuung', () => ({ meldeBelegung: vi.fn() }));
 vi.mock('../api/evakuierung', () => ({ meldeStand: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
-vi.mock('../api/benachrichtigungen', () => ({ markiereBenachrichtigungenGelesen: vi.fn() }));
+vi.mock('../api/benachrichtigungen', () => ({
+  markiereBenachrichtigungenGelesen: vi.fn(),
+  quittiereBenachrichtigung: vi.fn(),
+}));
 
 const BENUTZER_A = 11;
 const BENUTZER_B = 22;
@@ -965,7 +972,9 @@ describe('„Alle gelesen“ der Eingänge in der Offline-Queue (LLH-1422)', () 
     } finally {
       window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
     }
-    expect(markiereBenachrichtigungenGelesen).toHaveBeenCalledExactlyOnceWith(7, 42);
+    expect(markiereBenachrichtigungenGelesen).toHaveBeenCalledExactlyOnceWith(7, 42, {
+      offlineQueueBenutzerId: BENUTZER_A,
+    });
     expect(beimEntfernen[0]).toBe(true);
   });
 
@@ -999,6 +1008,91 @@ describe('„Alle gelesen“ der Eingänge in der Offline-Queue (LLH-1422)', () 
     expect(await schreibaktionenAbgelehntLaden(BENUTZER_A, 7)).toEqual([
       expect.objectContaining({ aktion: gelesen, grund: 'Keine Berechtigung' }),
     ]);
+  });
+});
+
+describe('Einzeln quittierter Eingang in der Offline-Queue (LLH-1477)', () => {
+  const quittiert = {
+    art: 'benachrichtigung_quittiert' as const,
+    daten: { benachrichtigung_id: 42 },
+  };
+
+  it('quittiert nach der Rückkehr und lädt den Verlauf neu, bevor die Zeile verschwindet', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    const key = einsatzKeys.benachrichtigungVerlauf(7);
+    client.setQueryData(key, { eintraege: [], ungelesen: 0 });
+    vi.mocked(quittiereBenachrichtigung).mockResolvedValue(undefined);
+    await schreibaktionEinreihen(BENUTZER_A, 7, quittiert);
+    const beimEntfernen: (boolean | undefined)[] = [];
+    const merke = () => beimEntfernen.push(client.getQueryState(key)?.isInvalidated);
+    window.addEventListener(OFFLINE_QUEUE_EVENT, merke);
+    try {
+      renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+      await waitFor(async () =>
+        expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
+          ausstehend: 0,
+          abgelehnt: 0,
+        }),
+      );
+    } finally {
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
+    }
+    expect(quittiereBenachrichtigung).toHaveBeenCalledExactlyOnceWith(42, {
+      offlineQueueBenutzerId: BENUTZER_A,
+    });
+    expect(beimEntfernen[0]).toBe(true);
+  });
+
+  it('bleibt bei einem Leitungsfehler stehen und geht beim nächsten Versuch genau einmal', async () => {
+    vi.mocked(quittiereBenachrichtigung)
+      .mockRejectedValueOnce(new NetzFehler())
+      .mockResolvedValueOnce(undefined);
+    await schreibaktionEinreihen(BENUTZER_A, 7, quittiert);
+    const { unmount } = renderHook(() => useOfflineSync(BENUTZER_A), {
+      wrapper: wrapperFuer().Wrapper,
+    });
+    await waitFor(() => expect(quittiereBenachrichtigung).toHaveBeenCalledTimes(1));
+    expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
+    window.dispatchEvent(new Event('online'));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 0 }),
+    );
+    expect(quittiereBenachrichtigung).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it('räumt eine inzwischen aufgeräumte Benachrichtigung (404) ohne Karte ab', async () => {
+    vi.mocked(quittiereBenachrichtigung).mockRejectedValue(new ApiError(404, 'Nicht gefunden'));
+    await schreibaktionEinreihen(BENUTZER_A, 7, quittiert);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 0 }),
+    );
+    expect(quittiereBenachrichtigung).toHaveBeenCalledTimes(1);
+  });
+
+  it('legt eine andere Ablehnung unter „abgelehnt“ ab', async () => {
+    vi.mocked(quittiereBenachrichtigung).mockRejectedValue(new ApiError(403, 'Keine Berechtigung'));
+    await schreibaktionEinreihen(BENUTZER_A, 7, quittiert);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 1 }),
+    );
+    expect(await schreibaktionenAbgelehntLaden(BENUTZER_A, 7)).toEqual([
+      expect.objectContaining({ aktion: quittiert, grund: 'Keine Berechtigung' }),
+    ]);
+  });
+
+  it('gibt den Eingang nach einer Ablehnung wieder frei und lädt den Verlauf neu', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    const key = einsatzKeys.benachrichtigungVerlauf(7);
+    client.setQueryData(key, { eintraege: [], ungelesen: 0 });
+    gedaechtnis.add(42);
+    vi.mocked(quittiereBenachrichtigung).mockRejectedValue(new ApiError(403, 'Keine Berechtigung'));
+    await schreibaktionEinreihen(BENUTZER_A, 7, quittiert);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+    await waitFor(() => expect(gedaechtnis.has(42)).toBe(false));
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
   });
 });
 

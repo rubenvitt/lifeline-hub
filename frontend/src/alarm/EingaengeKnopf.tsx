@@ -17,7 +17,7 @@ import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeName, useKopfBuendelt } from './eingaenge';
 import { EINGANG_ARTEN, setzeStumm, useStummeArten } from './eingaengeStumm';
 import EingaengeZahl from './EingaengeZahl';
-import { quittiereNachNutzer } from './useBenachrichtigungen';
+import { useQuittiereNachNutzer } from './useBenachrichtigungen';
 import {
   markVerlaufGelesen,
   useBenachrichtigungVerlauf,
@@ -29,7 +29,15 @@ function istNeu(a: BenachrichtigungAnzeige): boolean {
   return !a.quittiert_at && a.stufe !== 'still';
 }
 
-function Eintrag({ a, beiSprung }: { a: BenachrichtigungAnzeige; beiSprung: () => void }) {
+function Eintrag({
+  a,
+  quittiere,
+  beiSprung,
+}: {
+  a: BenachrichtigungAnzeige;
+  quittiere: (id: number) => void;
+  beiSprung: () => void;
+}) {
   const { token } = theme.useToken();
   const art = BENACHRICHTIGUNG_ARTEN[a.art]?.name;
   return (
@@ -37,7 +45,7 @@ function Eintrag({ a, beiSprung }: { a: BenachrichtigungAnzeige; beiSprung: () =
       <Link
         to={a.pfad}
         onClick={() => {
-          if (!a.quittiert_at) quittiereNachNutzer(a.id);
+          if (!a.quittiert_at) quittiere(a.id);
           beiSprung();
         }}
         style={{
@@ -85,10 +93,12 @@ function Eintrag({ a, beiSprung }: { a: BenachrichtigungAnzeige; beiSprung: () =
 function Gruppe({
   name,
   eintraege,
+  quittiere,
   beiSprung,
 }: {
   name: string;
   eintraege: BenachrichtigungAnzeige[];
+  quittiere: (id: number) => void;
   beiSprung: () => void;
 }) {
   if (eintraege.length === 0) return null;
@@ -99,7 +109,7 @@ function Gruppe({
       </Augenbraue>
       <ul aria-label={name} style={{ margin: 0, padding: 0 }}>
         {eintraege.map((a) => (
-          <Eintrag key={a.id} a={a} beiSprung={beiSprung} />
+          <Eintrag key={a.id} a={a} quittiere={quittiere} beiSprung={beiSprung} />
         ))}
       </ul>
     </>
@@ -165,6 +175,9 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
   const ohneVerbindung = useOhneVerbindung();
   const vorgemerkt =
     useVorgemerkteSchreibaktionen(benutzerId, einsatzId, 'eingaenge_gelesen').length > 0;
+  // Der Sprung aus einem Eintrag merkt ohne Netz vor (LLH-1477): die Zahl fällt sofort; das
+  // Paneel schließt danach, ein „Offline vorgemerkt“ hätte hier keinen Ort.
+  const quittiere = useQuittiereNachNutzer(einsatzId);
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState(false);
   const [stummOffen, setStummOffen] = useState(false);
@@ -239,8 +252,8 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
         <p style={{ color: token.colorTextSecondary }}>Keine Eingänge.</p>
       ) : (
         <>
-          <Gruppe name="Neu" eintraege={neu} beiSprung={schliessen} />
-          <Gruppe name="Früher" eintraege={frueher} beiSprung={schliessen} />
+          <Gruppe name="Neu" eintraege={neu} quittiere={quittiere} beiSprung={schliessen} />
+          <Gruppe name="Früher" eintraege={frueher} quittiere={quittiere} beiSprung={schliessen} />
         </>
       )}
     </section>

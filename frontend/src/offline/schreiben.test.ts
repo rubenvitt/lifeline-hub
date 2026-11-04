@@ -14,7 +14,10 @@ import {
 import { legeMeldungAn } from '../api/meldungen';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
-import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
+import {
+  markiereBenachrichtigungenGelesen,
+  quittiereBenachrichtigung,
+} from '../api/benachrichtigungen';
 import { OFFLINE_QUEUE_EVENT, queueLeerenFuerTests, schreibaktionenLaden } from './queue';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from './serveruhr';
 import {
@@ -25,6 +28,7 @@ import {
   erfasseStandOfflineFaehig,
   erfasseVerpflegungsausgabeOfflineFaehig,
   merkeVerpflegungsausgabeVor,
+  saveBenachrichtigungQuittiertOfflineCapable,
   saveEingaengeGelesenOfflineCapable,
   savePersonEintragOfflineCapable,
 } from './schreiben';
@@ -47,7 +51,10 @@ vi.mock('../api/betreuung', () => ({ meldeBelegung: vi.fn() }));
 vi.mock('../api/evakuierung', () => ({ meldeStand: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
-vi.mock('../api/benachrichtigungen', () => ({ markiereBenachrichtigungenGelesen: vi.fn() }));
+vi.mock('../api/benachrichtigungen', () => ({
+  markiereBenachrichtigungenGelesen: vi.fn(),
+  quittiereBenachrichtigung: vi.fn(),
+}));
 
 function online(wert: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: wert });
@@ -714,7 +721,9 @@ describe('„Alle gelesen“ der Eingänge ohne Netz (LLH-1422)', () => {
   it('sendet online und merkt nichts vor', async () => {
     vi.mocked(markiereBenachrichtigungenGelesen).mockResolvedValue(undefined);
     expect(await saveEingaengeGelesenOfflineCapable(11, 7, 42)).toBe('gesendet');
-    expect(markiereBenachrichtigungenGelesen).toHaveBeenCalledExactlyOnceWith(7, 42);
+    expect(markiereBenachrichtigungenGelesen).toHaveBeenCalledExactlyOnceWith(7, 42, {
+      offlineQueueBenutzerId: 11,
+    });
     expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
   });
 
@@ -730,5 +739,35 @@ describe('„Alle gelesen“ der Eingänge ohne Netz (LLH-1422)', () => {
     expect((await schreibaktionenLaden(11, 7)).map((z) => z.aktion)).toEqual([
       { art: 'eingaenge_gelesen', daten: { bis_id: 42 } },
     ]);
+  });
+});
+
+describe('Einzelnen Eingang ohne Netz quittieren (LLH-1477)', () => {
+  const quittiert = { art: 'benachrichtigung_quittiert', daten: { benachrichtigung_id: 42 } };
+
+  it('merkt offline die Kennung vor, ohne zu senden', async () => {
+    online(false);
+    expect(await saveBenachrichtigungQuittiertOfflineCapable(11, 7, 42)).toBe('vorgemerkt');
+    expect(quittiereBenachrichtigung).not.toHaveBeenCalled();
+    expect((await schreibaktionenLaden(11, 7)).map((z) => z.aktion)).toEqual([quittiert]);
+  });
+
+  it('sendet online mit dem erwarteten Benutzer und merkt nichts vor', async () => {
+    vi.mocked(quittiereBenachrichtigung).mockResolvedValue(undefined);
+    expect(await saveBenachrichtigungQuittiertOfflineCapable(11, 7, 42)).toBe('gesendet');
+    expect(quittiereBenachrichtigung).toHaveBeenCalledExactlyOnceWith(42, {
+      offlineQueueBenutzerId: 11,
+    });
+    expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
+  });
+
+  it('merkt nach einem Leitungsfehler vor, eine fachliche Ablehnung wirft', async () => {
+    vi.mocked(quittiereBenachrichtigung).mockRejectedValueOnce(new NetzFehler());
+    expect(await saveBenachrichtigungQuittiertOfflineCapable(11, 7, 42)).toBe('vorgemerkt');
+    vi.mocked(quittiereBenachrichtigung).mockRejectedValueOnce(new ApiError(404, 'Nicht gefunden'));
+    await expect(saveBenachrichtigungQuittiertOfflineCapable(11, 7, 43)).rejects.toMatchObject({
+      status: 404,
+    });
+    expect((await schreibaktionenLaden(11, 7)).map((z) => z.aktion)).toEqual([quittiert]);
   });
 });

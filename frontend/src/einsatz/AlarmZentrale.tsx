@@ -25,7 +25,7 @@ import {
   schliesseDesktopAlarm,
 } from '../alarm/desktopAlarm';
 import { useAlarmToasts } from '../alarm/useAlarmToasts';
-import { quittiereNachNutzer, useBenachrichtigungen } from '../alarm/useBenachrichtigungen';
+import { useBenachrichtigungen, useQuittiereNachNutzer } from '../alarm/useBenachrichtigungen';
 import { useEingangshinweis } from '../alarm/useEingangshinweis';
 import { eingaengeName, oeffneEingaenge, useKopfBuendelt } from '../alarm/eingaenge';
 import EingaengeZahl from '../alarm/EingaengeZahl';
@@ -147,6 +147,8 @@ export default function AlarmZentrale({
   const [permission, setPermission] = useState(desktopPermission());
   const [tonStatus, setTonStatus] = useState<TonZustand>(alarmTonStatus() ?? 'prueft');
   // Das gemeinsame Budget (`alarm/useAlarmToasts.tsx`): Benachrichtigungen und Unwetter teilen es.
+  // Ohne Netz vorgemerkt (LLH-1477): Öffnen und Schließen quittieren auch dann.
+  const quittiereNachNutzer = useQuittiereNachNutzer(einsatzId);
   const toasts = useAlarmToasts(einsatzId, quittiereNachNutzer);
   const { hinweis: eingang, band: eingangsband } = useEingangshinweis(
     einsatzId,

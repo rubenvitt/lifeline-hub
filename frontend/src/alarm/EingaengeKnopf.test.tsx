@@ -317,6 +317,54 @@ describe('Eingänge ohne Netz (LLH-1422)', () => {
     expect(await schreibaktionenLaden(BENUTZER, 1)).toEqual([]);
   });
 
+  it('ein Eintrag ohne Netz: Zahl fällt sofort, nach der Rückkehr genau einmal quittiert (LLH-1477)', async () => {
+    const zaehler = serverMit({ eintraege: [eintrag(9), eintrag(4)], ungelesen: 2 });
+    rendern();
+    const paneel = await oeffnenOhneNetz('Eingänge, 2 ungelesen');
+    await userEvent.click(within(paneel).getByRole('link', { name: /Auftrag #9/ }));
+
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege?auftrag=9');
+    expect(
+      await screen.findByRole('button', { name: 'Eingänge, 1 ungelesen' }),
+    ).toBeInTheDocument();
+    expect(zaehler.quittiert).toEqual([]);
+    expect((await schreibaktionenLaden(BENUTZER, 1)).map((z) => z.aktion)).toEqual([
+      { art: 'benachrichtigung_quittiert', daten: { benachrichtigung_id: 9 } },
+    ]);
+
+    setzeOnline(true);
+    await waitFor(() => expect(zaehler.quittiert).toEqual([9]));
+    await waitFor(async () => expect(await schreibaktionenLaden(BENUTZER, 1)).toEqual([]));
+  });
+
+  it('ein Abruf vor dem Senden zeigt den vorgemerkten Eintrag weiter als gelesen (LLH-1477)', async () => {
+    await schreibaktionEinreihen(BENUTZER, 1, {
+      art: 'benachrichtigung_quittiert',
+      daten: { benachrichtigung_id: 9 },
+    });
+    serverMit({ eintraege: [eintrag(10), eintrag(9), eintrag(4)], ungelesen: 3 });
+    server.use(http.post('/api/benachrichtigungen/:id/quittieren', () => HttpResponse.error()));
+    rendern();
+    await screen.findByTestId('angemeldet');
+    // Ein Ereignis ruft den Verlauf ab, wie die Rückkehr des Netzes vor dem Abgleich.
+    act(() => {
+      const detail: BenachrichtigungEreignis = {
+        einsatz_id: 1,
+        benachrichtigung_id: 10,
+        art: 'auftrag_erteilt',
+        stufe: 'hinweis',
+        bezug_typ: 'auftrag',
+        bezug_id: 10,
+        quittiert: false,
+      };
+      window.dispatchEvent(new CustomEvent(BENACHRICHTIGUNG_WINDOW_EVENT, { detail }));
+    });
+    // 9 ist vorgemerkt gelesen, 10 und 4 bleiben offen.
+    expect(
+      await screen.findByRole('button', { name: 'Eingänge, 2 ungelesen' }),
+    ).toBeInTheDocument();
+  });
+
   it('ein Abruf vor dem Senden zeigt das Vorgemerkte weiter als gelesen', async () => {
     // Die Rückkehr des Netzes ruft den Verlauf ab, bevor der Abgleich gesendet hat: die Zahl
     // springt nicht zurück. Das Senden scheitert hier an der Leitung, die Zeile bleibt stehen.

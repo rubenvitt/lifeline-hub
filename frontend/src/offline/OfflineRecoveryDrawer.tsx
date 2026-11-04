@@ -66,6 +66,9 @@ function aktionsTitel(aktion: OfflineSchreibaktion): string {
     case 'eingaenge_gelesen':
       // LLH-1422: der Grund (Einsatz nicht mehr lesbar) steht darunter.
       return 'Abgelehnt: Eingänge „Alle gelesen“';
+    case 'benachrichtigung_quittiert':
+      // LLH-1477: ein einzelner Eingang; der Grund steht darunter.
+      return 'Abgelehnt: Eingang gelesen';
     case 'sichtung':
     case 'verbleib':
     case 'notiz':

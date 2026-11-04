@@ -40,6 +40,9 @@ export type OfflineSchreibaktion =
   /** „Alle gelesen“ der Eingänge eines Einsatzes (LLH-1422): ohne `client_id`, der Server setzt
    *  nur offene Zeilen bis `bis_id` auf gelesen, ein zweites Senden ändert nichts. */
   | { art: 'eingaenge_gelesen'; daten: { bis_id: number } }
+  /** Ein einzelner Eingang gelesen (LLH-1477): Sprung aus dem Verlauf, Toast oder Eingangsband.
+   *  Ohne `client_id` wie „Alle gelesen“: der Server quittiert nur eine offene Zeile. */
+  | { art: 'benachrichtigung_quittiert'; daten: { benachrichtigung_id: number } }
   | PersonEintragAktion;
 
 export interface AusstehendeSchreibaktion {

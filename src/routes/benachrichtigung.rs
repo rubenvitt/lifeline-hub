@@ -32,7 +32,7 @@ use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::Deserialize;
 use sqlx::SqlitePool;
@@ -144,11 +144,17 @@ pub async fn lesen(
 /// POST /api/benachrichtigungen/{id}/quittieren — quittiert eine eigene Benachrichtigung
 /// (idempotent, 204). Beim ersten Quittieren geht dasselbe Ereignis mit `quittiert: true` an
 /// alle Verbindungen des Nutzers, damit der Toast überall verschwindet. Fremd: 404.
+///
+/// Ohne Netz vorgemerkt (LLH-1477) sendet der Abgleich den erwarteten Benutzer mit
+/// (`x-offline-queue-benutzer-id`); weicht er von der Sitzung ab, ist es 412 und nichts ändert
+/// sich.
 pub async fn quittieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
+    headers: HeaderMap,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, benutzer.id)?;
     let jetzt_quittiert = repo::quittieren(&state.pool, id, benutzer.id)
         .await?
         .ok_or(AppError::NotFound)?;
@@ -225,12 +231,15 @@ pub struct GelesenEingabe {
 /// D4): quittiert die eigenen Eingänge (und Stilles) dieses Einsatzes bis `bis_id`, nie einen
 /// Alarm, und meldet es den eigenen Verbindungen mit einem Ereignis. Idempotent, 204. Ein
 /// persönlicher Lesestand, deshalb Lese- statt Schreibrecht und auch am abgeschlossenen Einsatz.
+/// Den Kopf des erwarteten Benutzers prüft es wie [`quittieren`] (LLH-1477).
 pub async fn gelesen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
+    headers: HeaderMap,
     JsonBody(eingabe): JsonBody<GelesenEingabe>,
 ) -> Result<StatusCode, AppError> {
     let ctx = ctx.0;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
     crate::benachrichtigung::gelesen_bis(
         &state.pool,
         &state.live,
