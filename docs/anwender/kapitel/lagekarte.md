@@ -234,10 +234,11 @@ mit „Koordinate kopieren“, „Messen ab hier“ und, mit Schreibrecht, „Hi
 
 Steht die Karte dunkel, ist jedes taktische Zeichen hell umrandet: ein schmaler weißer Rand folgt
 seinem Umriss, Stärkepunkte und Räder sind weiß. Dunkel ist die Karte ohne Kartengrundlage und
-die Offline-Karte im Nachtbetrieb oder mit dem Karten-Design „Dunkel“. Eine Online-Karte behält
-ihre eigenen Farben; sie gilt als dunkel, wenn die Verwaltung sie als „Dunkle Karte“ eingetragen
-hat (siehe Kapitel Karten). Auf einer hellen Online-Karte bleiben die Zeichen auch nachts ohne
-Rand. Zeichen ohne Organisationsfarbe, etwa der Einsatzort, sind sonst nur ein
+die selbst gezeichnete Offline-Karte (Vektorkarte) im Nachtbetrieb oder mit dem Karten-Design
+„Dunkel“. Eine Online-Karte behält ihre eigenen Farben; sie gilt als dunkel, wenn die Verwaltung
+sie als „Dunkle Karte“ eingetragen hat (siehe Kapitel Karten). Eine Offline-Karte aus fertigen
+Bildkacheln (Rasterkarte) behält ebenfalls ihre Farben und gilt als hell. Auf einer hellen
+Online- oder Rasterkarte bleiben die Zeichen auch nachts ohne Rand. Zeichen ohne Organisationsfarbe, etwa der Einsatzort, sind sonst nur ein
 schwarzer Umriss und wären auf dem dunklen Grund nicht zu sehen. Farbige Flächen und die schwarze
 Schrift darin bleiben, wie sie sind; nur Blau ist etwas heller. Auf heller Karte entfällt der
 Rand. Der Lageplan zeigt die Karte, wie sie zu sehen ist. Die Symbolkachel im Inspector zeigt das

@@ -236,8 +236,9 @@ diese Zusage.
   `lagekarte-taktische-zeichen`): ist die gezeichnete Grundlage dunkel (`grundlageTheme` in
   `basemapStil.ts`, Prop `kartenTheme` der `Kartenflaeche`), rastert jedes Zeichen (Fachobjekt und freies Zeichen) mit
   `ZEICHEN_THEME_DUNKEL` (`zeichen/zeichenTheme.ts`, Theme `dark` von @einsatzzeichen, ESZ-119):
-  weiße Hinterlegung eng an der Tinte, Kopfmarken und Fahrwerk weiß, Körper unverändert; am Tag
-  ohne Theme. Dunkel heißt Blind- oder Offline-Vektorstil bei dunklem Kartenthema
+  weiße Hinterlegung eng an der Tinte, Kopfmarken und Fahrwerk weiß, Körper unverändert; auf
+  heller Grundlage ohne Theme, auch nachts. Eine dunkel markierte Online-Quelle braucht `dark`
+  auch am Tag. Dunkel heißt Blind- oder Offline-Vektorstil bei dunklem Kartenthema
   (`loeseKartenTheme`) oder eine Online-Quelle mit `dunkel` (LLH-1486, Schalter „Dunkle Karte“);
   eine Online- oder Raster-Offline-Karte folgt dem Kartenthema nie. Keine helle Fläche hinter dem Zeichen, kein eigenes Einfärben oder Invertieren. Das
   Thema steht im Bildschlüssel (`ez|dark|…`, nur `markerIconKey`/`baueZeichenRegistry` bilden

@@ -206,7 +206,8 @@ gelten, außer ihre Quelle ist als dunkel markiert, dann MUST sie auch am Tag al
 - **THEN** sind alle Zeichen hell hinterlegt
 
 #### Scenario: Wechsel des Karten-Designs
-- **WHEN** die Person das Karten-Design von „Hell“ auf „Dunkel“ stellt
+- **WHEN** die Person auf Blindstil oder Offline-Vektorkarte das Karten-Design von „Hell“ auf
+  „Dunkel“ stellt
 - **THEN** sind alle Zeichen hell hinterlegt, ohne dass die Seite neu lädt
 
 ### Requirement: Symbolkachel eines farblosen freien Zeichens bleibt lesbar
