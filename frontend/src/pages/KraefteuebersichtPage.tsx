@@ -97,6 +97,7 @@ import {
 } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
+import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
 import './kraefteuebersichtPrint.css';
 import { KennungsLink } from '../components/kennungsLink';
@@ -1181,8 +1182,9 @@ export default function KraefteuebersichtPage() {
           ? 'laden'
           : 'daten';
   /**
-   * Die Mittel, die dem Raster ohne Freigabe fehlen (LLH-1462): ohne die Marke sähen Zeilen,
-   * Stärke und „n von m Kräften“ vollständig aus. Einheiten und Personal nennt das Statusband.
+   * Die Nachbarmodule, die dem Raster ohne Freigabe fehlen (LLH-1462): ohne die Marke sähen
+   * Zeilen, Stärke und „n von m Kräften“ vollständig aus. Einheiten und Personal nennt das
+   * Statusband. Ohne Einsatzabschnitte fehlt die Gliederung, die der Lagebericht trägt.
    */
   const sperreId = `meldebild-sperre-${einsatzId}`;
   const mittelGesperrt = modulSperre(
@@ -1190,13 +1192,25 @@ export default function KraefteuebersichtPage() {
       frei.personal === false ? 'Personal' : null,
       frei.fahrzeuge === false ? 'Fahrzeuge' : null,
       frei.material === false ? 'Material' : null,
+      frei.abschnitte === false ? 'Einsatzabschnitte' : null,
     ].filter((n): n is string => n != null),
   );
   /**
-   * Der Lagebericht braucht alle Listen, auch Material (sonst trüge er „0 Positionen“); ohne
-   * Einheiten nennt das Statusband den Grund.
+   * Der Lagebericht braucht alle Listen, auch Material (sonst trüge er „0 Positionen“) und die
+   * Abschnitte (der Bericht gliedert nach ihnen, eine Einheit ohne bekannten Abschnitt fiele
+   * heraus); ohne Einheiten nennt das Statusband den Grund.
    */
   const berichtGesperrt = frei.einheiten === false ? MODUL_EINHEITEN_GESPERRT : mittelGesperrt;
+  /** Erst mit allen Listen geladen: aus unbekannten Freigaben oder Listen entstünden leere Bestände. */
+  const berichtQuellenDa = (
+    [
+      [einheitenQuery, frei.einheiten],
+      [personalQuery, frei.personal],
+      [fahrzeugeQuery, frei.fahrzeuge],
+      [materialQuery, frei.material],
+      [abschnitteQuery, frei.abschnitte],
+    ] as const
+  ).every(([q, f]) => f === true && q.isSuccess);
 
   const meta = meldebildMeta({
     einheiten: einheitenZeilen,
@@ -1443,7 +1457,7 @@ export default function KraefteuebersichtPage() {
               loading={uebernehmen.isPending}
               // Ein Bericht ohne eine der Listen meldete eine Lage, die niemand geprüft hat
               // (LLH-1462): gesperrt, der Grund steht sichtbar in derselben Zeile.
-              disabled={lageberichtGesperrt || berichtGesperrt != null}
+              disabled={lageberichtGesperrt || berichtGesperrt != null || !berichtQuellenDa}
               title={lageberichtGesperrt ? KEINE_BERECHTIGUNG : (berichtGesperrt ?? undefined)}
               aria-describedby={berichtGesperrt != null && mittelGesperrt ? sperreId : undefined}
               onClick={() => uebernehmen.mutate()}
@@ -1494,11 +1508,17 @@ export default function KraefteuebersichtPage() {
           spaltenSchalterAussen={spaltenSchalter}
           daten={raster}
           zeilenSchluessel="key"
-          ladend={einheitenQuery.isLoading}
+          // Unbekannte Freigaben laden mit, ein deaktivierter Abruf ohne Cache „lädt“ sonst nicht.
+          ladend={
+            einheitenQuery.isLoading || (frei.einheiten === undefined && !freigabenGescheitert)
+          }
           leerText={
-            // Ohne Freigabe Einheiten ist der Bestand unbekannt, nicht leer (LLH-1462).
+            // Ohne Freigabe Einheiten ist der Bestand unbekannt, nicht leer (LLH-1462); ebenso nach
+            // einem gescheiterten Abruf (das Statusband bietet „Erneut abrufen“).
             frei.einheiten === false ? (
               <span>{MODUL_EINHEITEN_GESPERRT}</span>
+            ) : freigabenGescheitert || einheitenQuery.isError ? (
+              <span>{PANEEL_FEHLER_TITEL}</span>
             ) : (
               <span>
                 Keine Einheiten und keine Kräfte im Einsatz

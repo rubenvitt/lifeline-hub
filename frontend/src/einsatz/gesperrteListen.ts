@@ -52,6 +52,10 @@ export function raeumeGesperrteListen(
     const betroffen = qc.getQueryCache().findAll({ predicate: (q) => imBereich(q.queryKey) });
     if (betroffen.length === 0) continue;
     lagebildSperren(qc, [PRAEFIX[modul], einsatzId], 'prefix');
+    // Ein laufender Abruf von vor dem Entzug setzte seine Antwort sonst wieder ein. Der Abbruch
+    // verwirft sie, auch wenn der Abruf selbst kein Abbruchsignal nimmt; das Zurücksetzen auf den
+    // Stand vor dem Abruf geschieht sofort und wird gleich darunter geleert.
+    void qc.cancelQueries({ predicate: (q) => imBereich(q.queryKey) }, { revert: true });
     for (const q of betroffen) {
       if (q.getObserversCount() > 0 && q.state.data !== undefined) {
         q.setState({ data: undefined, dataUpdatedAt: 0, status: 'pending', error: null });

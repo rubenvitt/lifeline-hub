@@ -767,6 +767,13 @@ function FahrzeugeInhalt() {
     nichtGefundenInhalt(personalQuery, {
       allgemein: 'Kräfte konnten nicht geladen werden',
     }) ?? 'Keine freien Kräfte';
+  /** Personal frei, aber ohne Daten (LLH-1462): „—“ beim Laden, sonst der Abruffehler. */
+  const besatzungUnbekannt =
+    personalGesperrt || personalQuery.data !== undefined
+      ? undefined
+      : personalQuery.isError
+        ? besatzungInhalt
+        : '—';
 
   /**
    * Trägerfilter aus den eigenen Daten (Muster der Kräfteübersicht). `undefined`, wenn kein
@@ -1169,13 +1176,7 @@ function FahrzeugeInhalt() {
                       zuordnenFehler={zuordnenFehler.grund(ef.id)}
                       freigebenFehler={freigebenFehler.grund}
                       gesperrt={personalGesperrt}
-                      unbekannt={
-                        personalQuery.data !== undefined
-                          ? undefined
-                          : personalQuery.isError
-                            ? besatzungInhalt
-                            : '—'
-                      }
+                      unbekannt={besatzungUnbekannt}
                       uebernehmen={
                         ef.einheit_id != null
                           ? {
@@ -1367,6 +1368,7 @@ function FahrzeugeInhalt() {
         fahrzeug={einheitFuer}
         personal={personal}
         abschnitte={einheitenFrei && abschnitteFrei ? abschnitte : null}
+        besatzungUnbekannt={personalGesperrt ?? besatzungUnbekannt}
         onSchliessen={() => setEinheitFuer(null)}
       />
 

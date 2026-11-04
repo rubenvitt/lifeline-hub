@@ -58,6 +58,30 @@ describe('raeumeGesperrteListen (LLH-1462)', () => {
     abmelden();
   });
 
+  it('verwirft die späte Antwort eines Abrufs von vor dem Entzug', async () => {
+    const qc = client();
+    let antworte: (daten: { id: number }[]) => void = () => {};
+    const spaet = new Promise<{ id: number }[]>((r) => (antworte = r));
+    qc.setQueryData(einsatzKeys.personal(EINSATZ), [{ id: 1 }]);
+    const observer = new QueryObserver(qc, {
+      queryKey: einsatzKeys.personal(EINSATZ),
+      queryFn: () => spaet,
+      enabled: false,
+    });
+    const abmelden = observer.subscribe(() => {});
+    // Der Abruf lief schon, als die Freigabe fiel.
+    void observer.refetch();
+    expect(qc.getQueryState(einsatzKeys.personal(EINSATZ))?.fetchStatus).toBe('fetching');
+
+    raeumeGesperrteListen(qc, EINSATZ, freigabenFixture({ personal: GESPERRT }));
+    antworte([{ id: 2 }]);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(qc.getQueryData(einsatzKeys.personal(EINSATZ))).toBeUndefined();
+    expect(observer.getCurrentResult().data).toBeUndefined();
+    abmelden();
+  });
+
   it('lässt eine noch ungeprüft abfragende Seite neu fragen', async () => {
     const qc = client();
     const queryFn = vi.fn(async () => [{ id: 9 }]);

@@ -109,12 +109,14 @@ function zeige({
   vorgemerkt = [],
   gesperrt = null,
   einheitenFrei = true,
+  abruf,
 }: {
   einheiten?: Einheit[];
   fahrzeuge?: EinsatzFahrzeug[];
   vorgemerkt?: EintreffenEingabe[];
   gesperrt?: string | null;
   einheitenFrei?: boolean;
+  abruf?: 'laden' | 'fehler';
 } = {}) {
   const onClose = vi.fn();
   const onGebucht = vi.fn();
@@ -131,6 +133,7 @@ function zeige({
           vorgemerkt={vorgemerkt}
           gesperrt={gesperrt}
           einheitenFrei={einheitenFrei}
+          abruf={abruf}
           offen={offen}
           onClose={onClose}
           onGebucht={onGebucht}
@@ -224,6 +227,14 @@ describe('EintreffenDialog — gesperrte Listen (LLH-1462)', () => {
     // Der Weg über „Nicht in der Liste“ bleibt.
     expect(within(dialog()).getByRole('button', { name: 'Nicht in der Liste' })).toBeEnabled();
     expect(zeitachse).toEqual([]);
+  });
+});
+
+describe('EintreffenDialog — unbekannte Listen (LLH-1462)', () => {
+  it('ohne geladene Listen steht der Abrufzustand, nie „Keine Treffer“', async () => {
+    zeige({ einheiten: [], fahrzeuge: [], abruf: 'fehler' });
+    expect(await within(dialog()).findByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(within(dialog()).queryByText('Keine Treffer')).toBeNull();
   });
 });
 

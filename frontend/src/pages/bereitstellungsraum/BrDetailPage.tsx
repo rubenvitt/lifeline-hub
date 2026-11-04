@@ -1068,6 +1068,7 @@ export default function BrDetailPage() {
           vorgemerkt={vorgemerkteDaten}
           gesperrt={listenGesperrt}
           einheitenFrei={einheitenFrei === true}
+          abruf={listenAbruf}
           offen={eintreffenOffen}
           onClose={() => setEintreffenOffen(false)}
           onGebucht={(ergebnis) => {

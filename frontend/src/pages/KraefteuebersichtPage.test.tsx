@@ -1238,6 +1238,8 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     vi.mocked(aktualisiereLagebericht).mockClear();
     setup();
     const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    // Erst mit allen Listen geladen (LLH-1462), sonst trüge der Bericht leere Bestände.
+    await waitFor(() => expect(btn).toBeEnabled());
     fireEvent.click(btn);
     await waitFor(() =>
       expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
@@ -1275,7 +1277,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     ]);
     setup();
     expect(await screen.findByText('Entlassen (1)')).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    fireEvent.click(await uebernahmeBereit());
     await waitFor(() =>
       expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
         1,
@@ -1319,7 +1321,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     setup();
     expect(await screen.findByText('Entlassen (1)')).toBeInTheDocument();
     expect(await screen.findByText('Aus dem Einsatz genommen (1)')).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    fireEvent.click(await uebernahmeBereit());
     await waitFor(() =>
       expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
         1,
@@ -1341,7 +1343,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
       new ApiError(422, 'Einsatz ist abgeschlossen'),
     );
     const { container } = setup();
-    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    fireEvent.click(await uebernahmeBereit());
     expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
     expect(container.ownerDocument.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     expect(navigiere).not.toHaveBeenCalled();
@@ -1678,7 +1680,7 @@ describe('KraefteuebersichtPage — Stand der Übernahme in der Anzeigezone (LFH
       </AnzeigeKonventionenProvider>,
       { route: '/einsaetze/1/kraefteuebersicht' },
     );
-    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    fireEvent.click(await uebernahmeBereit());
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalled());
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte?.[0]?.text;
     expect(text).toContain('**Stand:** 141200jul26');
@@ -1881,6 +1883,13 @@ describe('KraefteuebersichtPage — Spalten in der Werkzeugzeile (LLH-1417)', ()
   });
 });
 
+/** „In Lagebericht übernehmen“, sobald alle Listen geladen sind (LLH-1462). */
+async function uebernahmeBereit() {
+  const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+  await waitFor(() => expect(btn).toBeEnabled());
+  return btn;
+}
+
 /**
  * Gesperrte Nachbarmodule (LLH-1462, Spec `modul-freigabe`): ohne Freigabe fragt das Meldebild die
  * Liste nicht ab und nennt das Modul, statt eines Abruffehlers oder einer erfundenen Null.
@@ -1952,6 +1961,29 @@ describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
       'Modul Material gesperrt',
     );
     expect(listEinsatzMaterial).not.toHaveBeenCalled();
+  });
+
+  it('Einsatzabschnitte gesperrt: der Bericht verlöre Einheiten, die Übernahme ist gesperrt', async () => {
+    mitEinheit();
+    sperre('einsatzabschnitte');
+    setup();
+    const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="meldebild-sperre"]')).toHaveTextContent(
+        'Modul Einsatzabschnitte gesperrt',
+      ),
+    );
+    expect(btn).toBeDisabled();
+  });
+
+  it('Freigaben gescheitert: weder leerer Einsatz noch Übernahme in den Lagebericht', async () => {
+    mitEinheit();
+    vi.mocked(ladeModulFreigaben).mockRejectedValueOnce(new ApiError(500, 'kaputt'));
+    setup();
+    const e = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await within(e).findByRole('button', { name: 'Erneut abrufen' });
+    expect(screen.queryByText(/Keine Einheiten und keine Kräfte/)).toBeNull();
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/i })).toBeDisabled();
   });
 
   it('Einheiten gesperrt: das Raster nennt das Modul, keinen leeren Einsatz', async () => {
