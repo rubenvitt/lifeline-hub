@@ -1,3 +1,34 @@
+## [1.0.0-alpha.170](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.169...v1.0.0-alpha.170) (2026-11-04)
+
+### Zeitangaben und Zeitumstellung
+
+- **Doppelte Stunde bei der Rückstellung auf Winterzeit:** In der Nacht der Rückstellung gibt es 02:00–02:59 zweimal. Bisher galt eine getippte Uhrzeit aus dieser Stunde immer beim ersten Mal. Eine Ereigniszeit lag dadurch im zweiten Durchgang eine Stunde zu früh, und eine Frist konnte auf den nächsten Tag fallen. Jetzt hängt die Deutung von der Art des Feldes ab:
+  - **Ereigniszeit:** das spätere Vorkommen, das nicht in der Zukunft liegt
+  - **Frist:** das frühere Vorkommen, das noch nicht vorbei ist
+  - **Ende eines Zeitraums:** das erste Vorkommen nach dem Beginn
+- **Lücke bei der Vorstellung auf Sommerzeit:** Eine Ereigniszeit, die in die übersprungene Stunde fällt und nach vorn gerückt noch in der Zukunft läge, gilt jetzt um die Länge der Lücke früher. Bisher landete sie am Vortag.
+- **Zeitangaben in Einsatztagebuch-Einträgen:** Einige automatisch geschriebene Einträge zeigten Uhrzeiten bisher im technischen Rohformat. Sie erscheinen jetzt im Zeitstil, der für den Einsatz eingestellt ist (Einsatz vor Organisation vor Standard):
+  - Abhaltezeit und nächster Termin der Lagebesprechung
+  - Zeitstand von Befehl, Lagebericht und Pressemitteilung
+  - Beginn der Karenzzeit bei der Löschvormerkung einer Datenkategorie und des ganzen Einsatzes
+
+  Bereits geschriebene Einträge bleiben unverändert.
+- Die Anwenderdokumentation erklärt unter „Wie Zeitfelder Zeiten lesen“ jetzt beide Fälle der Zeitumstellung.
+
+### Kräfte und Mittel
+
+- **Einheit aus Vorlage bilden:** Wird dabei eine Person umgehängt, die ihre bisherige Einheit führt, endet die Führung nicht mehr unbemerkt. Der Sammeleintrag im Einsatztagebuch nennt das ausdrücklich (z. B. „Einheitsführer von «2. Zug» endet“), und die betroffene Einheit wird gemeldet.
+- Die Vorschau beim Bilden aus einer Vorlage kennzeichnet solche Personen mit der Marke „Einheitsführer“, wie es Personalliste und Personenansicht schon tun.
+
+### Bedienung und Darstellung
+
+- **Ruhiger Seitenkopf:** Auf breiteren Bildschirmen erschienen Datenstand und Zusatzangaben im Seitenkopf erst mit den Daten. Die Aktionsknöpfe brachen dann in eine neue Zeile um, und der Inhalt rutschte nach unten. Diese Angaben halten ihren Platz jetzt von Anfang an. Das gilt unter anderem für Einsatzabschnitte, Verpflegung, Schäden, Tiere und Material.
+- **Eingangsband verdeckt nichts mehr:**
+  - **Einsatztagebuch:** Das Band weicht jetzt dem Knopf „Nach oben“ und dem Sammelbanner der Zeitachse aus.
+  - **Lagekarte:** Das Band weicht jetzt den Knöpfen „Abschließen“ und „Beenden“ beim Messen, dem Knopf „Zeitachse einblenden“ und der Zeitachse im Kartenfuß aus.
+  - Auch über vielen gestapelten Leisten bleibt das Band vollständig im sichtbaren Bereich.
+- **Meldebild:** Das Sammelbanner für neue Einträge schwebt jetzt als kleine Pille über dem Tabellenkopf. Bisher hielt es dafür eine leere Zeile frei. Beim Erscheinen verschiebt sich nichts, und beim Scrollen bleibt die Pille sichtbar.
+
 ## [1.0.0-alpha.169](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.168...v1.0.0-alpha.169) (2026-11-03)
 
 ### Kräfte und Mittel
