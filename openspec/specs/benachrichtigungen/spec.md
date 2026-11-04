@@ -77,7 +77,8 @@ Neuladen, und dabei seinen Stand als offline kennzeichnen. „Alle gelesen“ SH
 Gerät vorgemerkt werden: Die Zahl der ungelesenen Eingänge MUST sofort fallen und bis zum Senden
 nicht zurückspringen, der Verlauf MUST „Offline vorgemerkt“ zeigen, und nach der Rückkehr des Netzes
 MUST das System die Markierung ohne weiteres Zutun senden. Alarme MUST auch dabei unberührt
-bleiben.
+bleiben. Ein einzeln geöffneter oder geschlossener Eintrag eines Einsatzes SHALL ohne Netz ebenso
+vorgemerkt werden: er MUST sofort als gelesen gelten und nach der Rückkehr quittiert werden.
 
 #### Scenario: Verlauf nach dem Neuladen ohne Netz
 - **WHEN** Person A „Eingänge“ mit Netz geöffnet hat, das Netz wegfällt und sie neu lädt
@@ -93,6 +94,12 @@ bleiben.
 - **THEN** sendet das System „Alle gelesen“ bis zur damals jüngsten Kennung, die Zahl springt
   dazwischen nicht zurück, und ihre anderen Geräte zeigen die Eingänge als gelesen
 - **AND** was inzwischen eingegangen ist, bleibt ungelesen
+
+#### Scenario: Einzelnen Eintrag ohne Netz öffnen
+- **WHEN** Person A ohne Netz einen ungelesenen Eingang unter „Eingänge“ öffnet
+- **THEN** springt die App zum Gegenstand, und die Zahl der ungelesenen Eingänge sinkt sofort um eins
+- **AND** nach der Rückkehr des Netzes quittiert das System den Eintrag, ohne dass die Zahl
+  dazwischen zurückspringt
 
 ### Requirement: Der Server bestimmt die Empfänger
 

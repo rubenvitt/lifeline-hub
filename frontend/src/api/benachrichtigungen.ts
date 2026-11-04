@@ -1,4 +1,4 @@
-import { apiGet, apiSend, mitParametern } from './client';
+import { apiGet, apiSend, mitParametern, type ApiSendOptionen } from './client';
 import type {
   BenachrichtigungAnzeige,
   BenachrichtigungArt,
@@ -27,9 +27,12 @@ export function ladeOffeneBenachrichtigungen(): Promise<BenachrichtigungAnzeige[
   );
 }
 
-/** Quittiert eine eigene Benachrichtigung; idempotent. Der Server meldet es allen Verbindungen. */
-export function quittiereBenachrichtigung(id: number): Promise<void> {
-  return apiSend<void>(`/api/benachrichtigungen/${id}/quittieren`, 'POST');
+/**
+ * Quittiert eine eigene Benachrichtigung; idempotent. Der Server meldet es allen Verbindungen.
+ * `offlineQueueBenutzerId` bindet ein vorgemerktes Quittieren an seinen Benutzer (LLH-1477).
+ */
+export function quittiereBenachrichtigung(id: number, optionen?: ApiSendOptionen): Promise<void> {
+  return apiSend<void>(`/api/benachrichtigungen/${id}/quittieren`, 'POST', undefined, optionen);
 }
 
 /**
@@ -42,12 +45,20 @@ export function ladeBenachrichtigungVerlauf(einsatzId: number): Promise<Benachri
 
 /**
  * „Alle gelesen“ (design.md D4): alles bis einschließlich `bisId` außer Alarmen. Der Server meldet
- * es den anderen Tabs mit einem Ereignis samt `gelesen_bis`.
+ * es den anderen Tabs mit einem Ereignis samt `gelesen_bis`. `offlineQueueBenutzerId` wie beim
+ * Quittieren (LLH-1477).
  */
-export function markiereBenachrichtigungenGelesen(einsatzId: number, bisId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/benachrichtigungen/gelesen`, 'POST', {
-    bis_id: bisId,
-  });
+export function markiereBenachrichtigungenGelesen(
+  einsatzId: number,
+  bisId: number,
+  optionen?: ApiSendOptionen,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/benachrichtigungen/gelesen`,
+    'POST',
+    { bis_id: bisId },
+    optionen,
+  );
 }
 
 /**

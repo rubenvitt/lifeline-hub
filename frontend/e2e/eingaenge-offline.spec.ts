@@ -18,6 +18,10 @@ import { anmeldenAlsAdmin, benutzerAnlegen, mitgliedEintragen } from './rollen-k
  *
  * Mutationsprobe: das Paneel sendet „Alle gelesen“ wie vor LLH-1422 direkt → rot, „Offline
  * vorgemerkt“ erscheint nicht.
+ *
+ * Zweiter Fall (LLH-1477): ein einzelner Eintrag ohne Netz geöffnet: die Zahl sinkt sofort, der
+ * Server kennt die Quittung noch nicht; nach der Rückkehr geht genau ein Quittieren hinaus.
+ * Mutationsprobe: der Eintrag quittiert wie vor LLH-1477 direkt → rot, die Zahl bleibt bei 2.
  */
 
 const WORTLAUT = 'Pegel am Deichtor 2,40 m, steigend; Sandsackverbau an der Nordseite läuft.';
@@ -36,10 +40,8 @@ async function ungeleseneAmServer(page: Page, einsatzId: number): Promise<number
   return ((await r.json()) as { ungelesen: number }).ungelesen;
 }
 
-test('„Alle gelesen“ ohne Netz wird vorgemerkt und nach der Rückkehr gesendet (LLH-1422)', async ({
-  page,
-}) => {
-  test.setTimeout(120_000);
+/** Einsatz mit zwei ungelesenen Lagemeldungen eines zweiten Kontos, `seite` mit Netz geöffnet. */
+async function zweiEingaenge(page: Page, seite: string): Promise<number> {
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmeldenAlsAdmin(page);
   const angelegt = await page.request.post('/api/einsaetze', {
@@ -50,7 +52,7 @@ test('„Alle gelesen“ ohne Netz wird vorgemerkt und nach der Rückkehr gesend
 
   const konto = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Zweiter Schirm');
   await mitgliedEintragen(page, String(einsatzId), konto.id, 'fuehrungspersonal');
-  await oeffnenMitStrom(page, `/einsaetze/${einsatzId}/erinnerungen`, einsatzId);
+  await oeffnenMitStrom(page, `/einsaetze/${einsatzId}/${seite}`, einsatzId);
 
   const zweiter = await request.newContext({ baseURL: test.info().project.use.baseURL });
   try {
@@ -73,6 +75,15 @@ test('„Alle gelesen“ ohne Netz wird vorgemerkt und nach der Rückkehr gesend
   } finally {
     await zweiter.dispose();
   }
+
+  return einsatzId;
+}
+
+test('„Alle gelesen“ ohne Netz wird vorgemerkt und nach der Rückkehr gesendet (LLH-1422)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const einsatzId = await zweiEingaenge(page, 'erinnerungen');
 
   // Vorbedingung: der Verlauf ist mit Netz geladen.
   const knopf = page.getByRole('button', { name: 'Eingänge, 2 ungelesen' });
@@ -99,6 +110,39 @@ test('„Alle gelesen“ ohne Netz wird vorgemerkt und nach der Rückkehr gesend
     await expect(verlauf.getByText(/^Stand /)).toHaveCount(0);
     expect(await ungeleseneAmServer(page, einsatzId)).toBe(0);
     await expect(page.getByRole('button', { name: 'Eingänge, keine ungelesen' })).toBeVisible();
+  } finally {
+    await page.context().setOffline(false);
+  }
+});
+
+test('ein einzelner Eintrag ohne Netz gilt sofort als gelesen und wird danach quittiert (LLH-1477)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  // Die Meldungen sind schon geladen: der Sprung braucht ohne Netz kein neues Modul.
+  const einsatzId = await zweiEingaenge(page, 'meldungen');
+  const knopf = page.getByRole('button', { name: 'Eingänge, 2 ungelesen' });
+  await expect(knopf).toBeVisible({ timeout: 20_000 });
+
+  await page.context().setOffline(true);
+  try {
+    await knopf.click();
+    const verlauf = page.getByRole('region', { name: 'Eingänge' });
+    const neu = verlauf.getByRole('list', { name: 'Neu' }).getByRole('link');
+    await expect(neu).toHaveCount(2);
+    await neu.first().click();
+    await expect(page.getByRole('button', { name: 'Eingänge, 1 ungelesen' })).toBeVisible();
+    expect(await ungeleseneAmServer(page, einsatzId)).toBe(2);
+
+    const quittiert = page.waitForResponse(
+      (r) =>
+        /\/api\/benachrichtigungen\/\d+\/quittieren$/.test(r.url()) &&
+        r.request().method() === 'POST',
+    );
+    await page.context().setOffline(false);
+    expect((await quittiert).status()).toBe(204);
+    await expect.poll(() => ungeleseneAmServer(page, einsatzId)).toBe(1);
+    await expect(page.getByRole('button', { name: 'Eingänge, 1 ungelesen' })).toBeVisible();
   } finally {
     await page.context().setOffline(false);
   }

@@ -1,13 +1,22 @@
-import { useEffect, useRef } from 'react';
+import { QueryClientContext, type QueryClient } from '@tanstack/react-query';
+import { useCallback, useContext, useEffect, useRef } from 'react';
 import {
   ladeBenachrichtigung,
   ladeOffeneBenachrichtigungen,
   quittiereBenachrichtigung,
 } from '../api/benachrichtigungen';
 import { ApiError } from '../api/client';
-import type { BenachrichtigungAnzeige, BenachrichtigungEreignis } from '../api/types';
+import { einsatzKeys } from '../api/queryKeys';
+import type {
+  BenachrichtigungAnzeige,
+  BenachrichtigungEreignis,
+  BenachrichtigungVerlauf,
+} from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AnzeigeKonventionen } from '../anzeige/format';
+import { useAuthOptional } from '../auth/AuthContext';
+import { schreibaktionenLaden } from '../offline/queue';
+import { saveBenachrichtigungQuittiertOfflineCapable } from '../offline/schreiben';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import {
   BENACHRICHTIGUNG_WINDOW_EVENT,
@@ -25,6 +34,7 @@ import {
 import { gezeigt, inArbeit, quittiert } from './benachrichtigungGedaechtnis';
 import { ladeMeldungInhalt, type MeldungInhalt } from './meldungInhalt';
 import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
+import { markVerlaufQuittiert } from './useBenachrichtigungVerlauf';
 import {
   eingangTon,
   merkeEingangTon,
@@ -33,16 +43,74 @@ import {
 } from './useEingangshinweis';
 import { schliessePushMeldungen } from './webPush';
 
+/** Wer in welchem Einsatz quittiert: nötig, um ohne Netz vorzumerken (LLH-1477). */
+export interface QuittierOrt {
+  benutzerId: number;
+  einsatzId: number;
+  /** Trägt den Verlauf; ohne ihn (Zentrale ohne Query-Provider) zählt erst der nächste Abruf. */
+  qc?: QueryClient;
+}
+
 /**
  * Quittiert auf dem Server; der Server meldet es allen Verbindungen des Nutzers (Spec
  * „Quittieren gilt für alle Verbindungen“). Scheitert der Aufruf, darf das Nachreichen sie
  * wieder zeigen: verloren ist dann nur ein Klick, nicht die Benachrichtigung.
+ *
+ * Mit `ort` (eine Einsatz-Zentrale, LLH-1477) merkt es ohne Netz vor, statt zu scheitern: der
+ * Eintrag gilt im Verlauf sofort als gelesen, die Zahl fällt, und der Abgleich quittiert nach der
+ * Rückkehr (`offline/useOfflineSync.ts`). Ohne `ort` (Org-Zentrale) bleibt es online.
  */
-export function quittiereNachNutzer(id: number): void {
+export function quittiereNachNutzer(id: number, ort?: QuittierOrt): void {
   if (quittiert.has(id)) return;
   quittiert.add(id);
   void schliessePushMeldungen(id);
-  quittiereBenachrichtigung(id).catch(() => quittiert.delete(id));
+  if (!ort) {
+    quittiereBenachrichtigung(id).catch(() => quittiert.delete(id));
+    return;
+  }
+  saveBenachrichtigungQuittiertOfflineCapable(ort.benutzerId, ort.einsatzId, id).then(
+    (zustand) => {
+      // Gesendet: das Quittier-Ereignis des Servers gleicht den Verlauf ab (useVerlaufAbgleich).
+      if (zustand !== 'vorgemerkt') return;
+      ort.qc?.setQueryData<BenachrichtigungVerlauf>(
+        einsatzKeys.benachrichtigungVerlauf(ort.einsatzId),
+        (alt) => (alt ? markVerlaufQuittiert(alt, new Set([id])) : alt),
+      );
+    },
+    () => quittiert.delete(id),
+  );
+}
+
+/**
+ * {@link quittiereNachNutzer} für die Zentrale eines Einsatzes (LLH-1477): Verlauf, Toasts und
+ * Eingangsband merken ohne Netz vor. `null` (Org-Zentrale) oder ohne Benutzer: nur online.
+ */
+export function useQuittiereNachNutzer(einsatzId: number | null): (id: number) => void {
+  // Optional wie in `AnhangVorschau`: die Zentrale steht auch ohne Query-Provider (Tests).
+  const qc = useContext(QueryClientContext);
+  const benutzerId = useAuthOptional()?.benutzer?.id;
+  return useCallback(
+    (id: number) =>
+      quittiereNachNutzer(
+        id,
+        einsatzId != null && benutzerId != null ? { benutzerId, einsatzId, qc } : undefined,
+      ),
+    [einsatzId, benutzerId, qc],
+  );
+}
+
+/**
+ * Vorgemerkte Quittierungen dieses Benutzers (LLH-1477) gelten als quittiert, auch nach einem
+ * Neuladen ohne Netz: das Nachreichen nach der Rückkehr zeigte sie sonst wieder, bevor der
+ * Abgleich gesendet hat. Ist die Queue nicht lesbar, bleibt es beim Gedächtnis.
+ */
+async function merkeVorgemerkteQuittierungen(benutzerId: number | undefined): Promise<void> {
+  if (benutzerId == null) return;
+  const zeilen = await schreibaktionenLaden(benutzerId).catch(() => []);
+  for (const { aktion } of zeilen) {
+    if (aktion.art === 'benachrichtigung_quittiert')
+      quittiert.add(aktion.daten.benachrichtigung_id);
+  }
 }
 
 type Bezug = Pick<BenachrichtigungEreignis, 'art' | 'einsatz_id'>;
@@ -162,6 +230,8 @@ export function useBenachrichtigungen(
   // Über eine Ref: laden Zone oder Darstellung nach, soll das nicht noch einmal nachreichen.
   const konvRef = useRef<AnzeigeKonventionen>({});
   konvRef.current = useAnzeigeKonventionen().konventionen;
+  const benutzerIdRef = useRef<number | undefined>(undefined);
+  benutzerIdRef.current = useAuthOptional()?.benutzer?.id;
 
   useEffect(() => {
     let aktiv = true;
@@ -244,6 +314,7 @@ export function useBenachrichtigungen(
           } catch {
             return;
           }
+          await merkeVorgemerkteQuittierungen(benutzerIdRef.current);
           if (!aktiv) return;
           // Der Server liefert jüngste zuerst.
           const offen = [...liste]

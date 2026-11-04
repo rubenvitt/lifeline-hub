@@ -81,6 +81,8 @@ ist.
 - Einträge im Einsatztagebuch
 - „Alle gelesen“ unter „Eingänge“; dort steht dann „Offline vorgemerkt“, die Zahl der ungelesenen
   Eingänge verschwindet sofort
+- das Lesen eines einzelnen Eingangs: unter „Eingänge“ öffnen, im Eingangsband oder an einem
+  Toast „Öffnen“ oder ✕ wählen; die Zahl der ungelesenen Eingänge sinkt sofort
 
 Anhänge brauchen Netz: Im Einsatztagebuch ist „Anhang“ ohne Netz gesperrt und trägt „offline“.
 Bei Personen brauchen das Aufheben einer Maßnahme oder Verletzung, das Eintragen von PAT-Nummer

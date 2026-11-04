@@ -156,7 +156,7 @@ nicht angenommen. Ohne Netz zeigt „Eingänge“ den Stand der letzten Verbindu
 offline“), auch nach einem Neuladen; „Alle gelesen“ merkt die App dann vor („Offline vorgemerkt“),
 die Zahl verschwindet sofort, und die Markierung geht hinaus, sobald wieder Netz da ist. Was bis
 dahin neu eingeht, bleibt ungelesen. Einen einzelnen Eintrag ohne Netz zu öffnen, markiert ihn
-nicht als gelesen.
+ebenso: Die Zahl sinkt sofort, die Markierung geht hinaus, sobald wieder Netz da ist.
 
 ### Eingänge auf diesem Gerät stumm schalten
 

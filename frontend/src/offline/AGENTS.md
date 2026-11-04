@@ -224,8 +224,18 @@ draußen gelassen werden.
   Der Lesestand ist ein Zustand der Person, keine Kennzahl: die Zahl fällt sofort
   (`setQueryData`), und bis zum Senden legt `useBenachrichtigungVerlauf` das Vorgemerkte über
   jeden Abruf, sonst spränge sie bei der Rückkehr des Netzes zurück, weil der Rahmen den Verlauf
-  vor dem Abgleich abruft. Das Paneel zeigt „Offline vorgemerkt“. Das Quittieren eines einzelnen Eintrags (Sprung aus dem Verlauf,
-  Toast) bleibt online: scheitert es, zeigt das Nachreichen die Benachrichtigung wieder.
+  vor dem Abgleich abruft. Das Paneel zeigt „Offline vorgemerkt“.
+- **Ein einzelner Eingang wird ebenso vorgemerkt** (LLH-1477,
+  `saveBenachrichtigungQuittiertOfflineCapable`): Aktion `benachrichtigung_quittiert` mit der
+  Kennung, ohne `client_id`, weil der Server nur eine offene Zeile quittiert. Den Ort (Benutzer,
+  Einsatz) bindet `useQuittiereNachNutzer(einsatzId)` der Einsatz-Zentrale; Sprung aus dem
+  Verlauf, Toast und Eingangsband laufen darüber, ein Klick auf eine Push-Meldung landet bei Toast
+  oder Band des Tabs. Die Zahl fällt sofort, die Überlagerung im Verlauf gilt wie oben, und das
+  Nachreichen nimmt vorgemerkte Kennungen als quittiert, auch nach einem Neuladen. Kein „Offline
+  vorgemerkt“: das Paneel schließt nach dem Sprung. Eine aufgeräumte Benachrichtigung (404) räumt
+  der Abgleich ohne Karte ab. Die Org-Zentrale (ohne Einsatz) quittiert nur online: scheitert es,
+  zeigt das Nachreichen die Benachrichtigung wieder. Beide Routen prüfen den Kopf des erwarteten
+  Benutzers.
 - **Seitentests schalten offline über `setzeOnline` (`test/utils.tsx`)**, nicht nur über
   `navigator.onLine`. Ein Browser führt beim Ereignis `offline` auch TanStacks `onlineManager`
   nach. Der alte Testaufbau blieb gegen den Fehler grün. Geladen wird dabei online, dann fällt

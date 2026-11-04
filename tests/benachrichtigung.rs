@@ -15,7 +15,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool_und_live,
+    anfrage, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einsatz_anlegen, login_cookie,
+    rolle_setzen, setup_mit_pool_und_live,
 };
 
 struct Welt {
@@ -807,9 +808,32 @@ async fn lesen_liste_und_quittieren() {
     assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
     assert_eq!(v[0]["id"], id);
 
+    // Vorgemerkt unter einem anderen Benutzer (LLH-1477): 412, nichts quittiert, kein Ereignis.
+    let (s, _) = anfrage_mit_offline_queue_benutzer(
+        &w.app,
+        "POST",
+        &format!("{pfad}/quittieren"),
+        &anna,
+        None,
+        w.bert,
+    )
+    .await;
+    assert_eq!(s, StatusCode::PRECONDITION_FAILED, "fremder Queue-Benutzer");
+    let (_, v) = anfrage(&w.app, "GET", &pfad, &anna, None).await;
+    assert!(v.get("quittiert_at").is_none(), "{v}");
+
     let feed = format!("/api/einsaetze/{}/live", w.einsatz);
     let zweiter_tab = oeffnen(&w.app, &feed, &anna, None).await;
-    let (s, _) = anfrage(&w.app, "POST", &format!("{pfad}/quittieren"), &anna, None).await;
+    // Der Abgleich sendet den eigenen Benutzer mit (LLH-1477).
+    let (s, _) = anfrage_mit_offline_queue_benutzer(
+        &w.app,
+        "POST",
+        &format!("{pfad}/quittieren"),
+        &anna,
+        None,
+        w.anna,
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let (s, _) = anfrage(&w.app, "POST", &format!("{pfad}/quittieren"), &anna, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "idempotent");
@@ -1096,6 +1120,19 @@ async fn alle_gelesen_quittiert_eingaenge_nicht_alarme_und_meldet_einmal() {
             .an(Adressat::Nutzer(w.anna)),
     )
     .await;
+
+    // Vorgemerkt unter einem anderen Benutzer (LLH-1477): 412, nichts gelesen.
+    let (s, _) = anfrage_mit_offline_queue_benutzer(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/benachrichtigungen/gelesen", w.einsatz),
+        &anna,
+        Some(&json!({ "bis_id": bis }).to_string()),
+        w.bert,
+    )
+    .await;
+    assert_eq!(s, StatusCode::PRECONDITION_FAILED, "fremder Queue-Benutzer");
+    assert!(w.zeilen_von(w.anna).await.iter().all(|(_, q)| !q));
 
     let feed = format!("/api/einsaetze/{}/live", w.einsatz);
     let zweiter_tab = oeffnen(&w.app, &feed, &anna, None).await;

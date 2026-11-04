@@ -2,7 +2,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { meldeBelegung } from '../api/betreuung';
 import { meldeStand } from '../api/evakuierung';
-import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
+import {
+  markiereBenachrichtigungenGelesen,
+  quittiereBenachrichtigung,
+} from '../api/benachrichtigungen';
 import { ApiError, fehlerText } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
@@ -218,10 +221,30 @@ export function useOfflineSync(benutzerId?: number): void {
             // Ablehnung (Einsatz nicht mehr lesbar, 403/404) geht unten in den
             // Wiederherstellungsbereich.
             const einsatzId = element.wert.einsatz_id;
-            await markiereBenachrichtigungenGelesen(einsatzId, aktion.daten.bis_id);
+            await markiereBenachrichtigungenGelesen(einsatzId, aktion.daten.bis_id, {
+              offlineQueueBenutzerId: aktuellerBenutzerId,
+            });
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
             // Der Verlauf trägt den Serverstand, BEVOR die Zeile verschwindet: bis dahin legt
             // `useBenachrichtigungVerlauf` das Vorgemerkte über jeden Abruf. Der Abruf wirft nicht.
+            await qc.invalidateQueries({
+              queryKey: einsatzKeys.benachrichtigungVerlauf(einsatzId),
+            });
+            await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+          } else if (aktion.art === 'benachrichtigung_quittiert') {
+            // LLH-1477: idempotent wie „Alle gelesen“. Eine fremde oder inzwischen aufgeräumte
+            // Benachrichtigung (404) hat keinen Lesestand mehr, den jemand retten könnte: die
+            // Zeile geht ohne Karte im Wiederherstellungsbereich.
+            const einsatzId = element.wert.einsatz_id;
+            try {
+              await quittiereBenachrichtigung(aktion.daten.benachrichtigung_id, {
+                offlineQueueBenutzerId: aktuellerBenutzerId,
+              });
+            } catch (e) {
+              if (!(e instanceof ApiError && e.status === 404)) throw e;
+            }
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            // Wie oben: der Serverstand steht im Verlauf, BEVOR die Überlagerung wegfällt.
             await qc.invalidateQueries({
               queryKey: einsatzKeys.benachrichtigungVerlauf(einsatzId),
             });

@@ -1,6 +1,9 @@
 import { meldeBelegung } from '../api/betreuung';
 import { meldeStand } from '../api/evakuierung';
-import { markiereBenachrichtigungenGelesen } from '../api/benachrichtigungen';
+import {
+  markiereBenachrichtigungenGelesen,
+  quittiereBenachrichtigung,
+} from '../api/benachrichtigungen';
 import { ApiError } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { legePersonAn, type PersonAnlegenEingabe } from '../api/einsatzPerson';
@@ -312,11 +315,43 @@ export async function saveEingaengeGelesenOfflineCapable(
   };
   if (!navigator.onLine) return vormerkenGelesen();
   try {
-    await markiereBenachrichtigungenGelesen(einsatzId, bisId);
+    await markiereBenachrichtigungenGelesen(einsatzId, bisId, {
+      offlineQueueBenutzerId: benutzerId,
+    });
     return 'gesendet';
   } catch (e) {
     if (!istOfflineTransient(e)) throw e;
     if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
     return vormerkenGelesen();
+  }
+}
+
+/**
+ * Einen einzelnen Eingang quittieren oder vormerken (LLH-1477): der Sprung aus dem Verlauf, das
+ * Öffnen oder Schließen eines Toasts, das ✕ im Eingangsband. Ohne `client_id` wie „Alle gelesen“:
+ * der Server quittiert nur eine noch offene Zeile, ein zweites Senden ändert nichts. `einsatzId`
+ * ist der Einsatz der Zentrale, in der getippt wurde; die Queue ordnet die Zeile dort ein, die
+ * Route kennt nur die Kennung.
+ */
+export async function saveBenachrichtigungQuittiertOfflineCapable(
+  benutzerId: number,
+  einsatzId: number,
+  benachrichtigungId: number,
+): Promise<'gesendet' | 'vorgemerkt'> {
+  const vormerken = async () => {
+    await schreibaktionEinreihen(benutzerId, einsatzId, {
+      art: 'benachrichtigung_quittiert',
+      daten: { benachrichtigung_id: benachrichtigungId },
+    });
+    return 'vorgemerkt' as const;
+  };
+  if (!navigator.onLine) return vormerken();
+  try {
+    await quittiereBenachrichtigung(benachrichtigungId, { offlineQueueBenutzerId: benutzerId });
+    return 'gesendet';
+  } catch (e) {
+    if (!istOfflineTransient(e)) throw e;
+    if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
+    return vormerken();
   }
 }

@@ -27,7 +27,8 @@ herleitung:
   `save…OfflineCapable`-Funktionen in `frontend/src/offline/schreiben.ts` in die Warteschlange
   (`frontend/src/offline/queue.ts`) und tragen eine `client_id`, über die der Server ein
   Replay erkennt. Ausgenommen ist ein Lesestand, den der Server von sich aus idempotent setzt
-  („Alle gelesen“, `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
+  („Alle gelesen“ und ein einzeln gelesener Eingang, `frontend/src/offline/AGENTS.md`,
+  „Schreiben ohne Netz“).
 - MUST NOT: keine Änderung bestehender Daten (PATCH) vormerken; solche Wege sind ohne Netz
   gesperrt. Die Einzelregeln stehen in `frontend/src/offline/AGENTS.md` und werden hier nicht
   wiederholt.
