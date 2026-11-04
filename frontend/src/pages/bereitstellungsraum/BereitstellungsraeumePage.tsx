@@ -2,6 +2,9 @@ import { Breadcrumb, Button } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import { freigabeVon } from '../../einsatz/modulRegistry';
+import { useModulFreigaben } from '../../einsatz/useSprungSperre';
+import { MODUL_EINHEITEN_GESPERRT } from '../../components/nurAnsicht';
 import { useEffect, useMemo, useState } from 'react';
 import { bereitstellungsraumDetailPfad, einsaetzePfad, einsatzPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
@@ -82,11 +85,13 @@ export default function BereitstellungsraeumePage() {
     queryKey: einsatzKeys.br(einsatzId),
     queryFn: () => listeBr(einsatzId),
   });
-  // Für die Stärke im Raum (LLH-1095 D13). Ohne Freigabe Einheiten (403) oder bei einem Fehler
-  // bleibt `data` leer, und „Stärke“ zeigt „—“ wie die Detailseite.
+  // Für die Stärke im Raum (LLH-1095 D13). Ohne Freigabe Einheiten keine Anfrage, „Stärke“ nennt
+  // die Sperre (LLH-1462); bei einem Fehler bleibt `data` leer, und „Stärke“ zeigt „—“.
+  const einheitenFrei = freigabeVon('einheiten', useModulFreigaben(einsatzId));
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: einheitenFrei === true,
   });
   const jetzt = useUhr(60_000);
   const { rollen } = useRollen();
@@ -182,7 +187,12 @@ export default function BereitstellungsraeumePage() {
         const { staerke, unvollstaendig } = staerkeImRaum(br.einheit_ids, einheitenQuery.data);
         // Der Grund steht sichtbar an der Zelle wie auf der Detailseite (Ton achtung), nie nur
         // als Tooltip: sonst sähe „unvollständig“ aus wie ein leerer Raum (D1, Touch).
-        return unvollstaendig ? (
+        // Gesperrt ist kein Ausfall (LLH-1462): gedämpft, mit dem Modul als Grund.
+        return unvollstaendig && einheitenFrei === false ? (
+          <span data-lfh="br-staerke-gesperrt" style={{ color: rollen.gedaempft }}>
+            {MODUL_EINHEITEN_GESPERRT}
+          </span>
+        ) : unvollstaendig ? (
           <span data-lfh="br-staerke-unvollstaendig" style={{ color: rollen.achtungText }}>
             — unvollständig
           </span>

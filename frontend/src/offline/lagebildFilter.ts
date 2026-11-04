@@ -11,14 +11,23 @@ import { HOECHSTLIEGEZEIT_MS } from './lagebildStart';
  */
 const SPERREN = new WeakMap<QueryClient, Set<string>>();
 
-/** `einsatz` sperrt alles des Einsatzes, `prefix` nur den Prefix des Keys in diesem Einsatz. */
-export type LagebildSperrBereich = 'einsatz' | 'prefix';
+/** `einsatz` sperrt alles des Einsatzes, `prefix` nur den Prefix des Keys in diesem Einsatz,
+ *  `unterbereich` nur Prefix und dritte Stelle (die Kräfte-Zeitachse je Modul, LLH-1462). */
+export type LagebildSperrBereich = 'einsatz' | 'prefix' | 'unterbereich';
 
 function einsatzMarke(einsatzId: number) {
   return `e:${einsatzId}`;
 }
 function prefixMarke(prefix: unknown, einsatzId: number) {
   return `p:${String(prefix)}:${einsatzId}`;
+}
+function unterMarke(key: readonly unknown[], einsatzId: number) {
+  return `u:${String(key[0])}:${String(key[2])}:${einsatzId}`;
+}
+
+function marke(key: readonly unknown[], einsatzId: number, bereich: LagebildSperrBereich) {
+  if (bereich === 'einsatz') return einsatzMarke(einsatzId);
+  return bereich === 'prefix' ? prefixMarke(key[0], einsatzId) : unterMarke(key, einsatzId);
 }
 
 export function lagebildSperren(
@@ -30,16 +39,17 @@ export function lagebildSperren(
   if (typeof einsatzId !== 'number') return;
   let marken = SPERREN.get(qc);
   if (!marken) SPERREN.set(qc, (marken = new Set()));
-  marken.add(bereich === 'einsatz' ? einsatzMarke(einsatzId) : prefixMarke(key[0], einsatzId));
+  marken.add(marke(key, einsatzId, bereich));
 }
 
-/** Nach einem Fetch-Erfolg: die Prefix-Marke des Keys fällt, die Einsatz-Marke nur mit dem
+/** Nach einem Fetch-Erfolg: Prefix- und Unterbereichs-Marke des Keys fallen, die Einsatz-Marke nur mit dem
  *  Einsatzkopf selbst — erst er belegt, dass der Einsatz wieder lesbar ist. */
 export function lagebildEntsperren(qc: QueryClient, key: readonly unknown[]): void {
   const einsatzId = key[1];
   const marken = SPERREN.get(qc);
   if (!marken || typeof einsatzId !== 'number') return;
   marken.delete(prefixMarke(key[0], einsatzId));
+  if (key.length > 2) marken.delete(unterMarke(key, einsatzId));
   if (key[0] === EINSATZ_KEYS.einsatz) marken.delete(einsatzMarke(einsatzId));
 }
 
@@ -47,7 +57,11 @@ export function istLagebildGesperrt(qc: QueryClient, key: readonly unknown[]): b
   const einsatzId = key[1];
   const marken = SPERREN.get(qc);
   if (!marken || typeof einsatzId !== 'number') return false;
-  return marken.has(einsatzMarke(einsatzId)) || marken.has(prefixMarke(key[0], einsatzId));
+  return (
+    marken.has(einsatzMarke(einsatzId)) ||
+    marken.has(prefixMarke(key[0], einsatzId)) ||
+    (key.length > 2 && marken.has(unterMarke(key, einsatzId)))
+  );
 }
 
 /**

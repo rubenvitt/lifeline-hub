@@ -86,3 +86,55 @@ describe('KraefteOhneBrSidebar: „Im Einsatz“ eingeklappt (LLH-1075, design.m
     expect(onZuweisen).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 });
+
+describe('KraefteOhneBrSidebar: gesperrte Listen (LLH-1462)', () => {
+  const basis = {
+    alleEinheiten: [],
+    alleFahrzeuge: [],
+    brEinheiten: [],
+    brFahrzeuge: [],
+    schreibgeschuetzt: false,
+    onZuweisenEinheit: vi.fn(),
+    onZuweisenFahrzeug: vi.fn(),
+  };
+
+  it('beide gesperrt: der Grund statt „keine freien Kräfte“, ohne Suche und Zähler', () => {
+    renderMitProviders(
+      <KraefteOhneBrSidebar
+        {...basis}
+        gesperrt="Module Einheiten und Fahrzeuge gesperrt"
+        alleGesperrt
+      />,
+    );
+    expect(screen.getByText('Module Einheiten und Fahrzeuge gesperrt')).toBeVisible();
+    expect(screen.queryByText('keine freien Kräfte')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Kräfte suchen' })).toBeNull();
+    expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('eine gesperrt: der Grund steht über dem, was die freie Liste trägt', () => {
+    renderMitProviders(<KraefteOhneBrSidebar {...basis} gesperrt="Modul Einheiten gesperrt" />);
+    expect(screen.getByText('Modul Einheiten gesperrt')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Kräfte suchen' })).toBeVisible();
+    // Die gesperrte Hälfte ist unbekannt: leer ist die Leiste damit nicht.
+    expect(screen.queryByText('keine freien Kräfte')).toBeNull();
+  });
+
+  it('Abruf gescheitert: Fehler mit erneutem Abruf, weder Zähler noch Leerzustand', async () => {
+    const onWiederholen = vi.fn();
+    renderMitProviders(
+      <KraefteOhneBrSidebar {...basis} abruf="fehler" onWiederholen={onWiederholen} />,
+    );
+    expect(screen.getByRole('alert')).toBeVisible();
+    expect(screen.queryByText('keine freien Kräfte')).toBeNull();
+    expect(screen.queryByText('0')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+    expect(onWiederholen).toHaveBeenCalledTimes(1);
+  });
+
+  it('Abruf läuft: kein Leerzustand', () => {
+    renderMitProviders(<KraefteOhneBrSidebar {...basis} abruf="laden" />);
+    expect(screen.queryByText('keine freien Kräfte')).toBeNull();
+    expect(screen.queryByText('0')).toBeNull();
+  });
+});

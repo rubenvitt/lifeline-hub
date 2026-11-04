@@ -51,7 +51,13 @@ beforeEach(() => {
   bodies = [];
 });
 
-function Harness({ abschnitte = ABSCHNITTE }: { abschnitte?: Einsatzabschnitt[] | null }) {
+function Harness({
+  abschnitte = ABSCHNITTE,
+  besatzungUnbekannt,
+}: {
+  abschnitte?: Einsatzabschnitt[] | null;
+  besatzungUnbekannt?: string;
+}) {
   const [fahrzeug, setFahrzeug] = useState<EinsatzFahrzeug | null>(RTW);
   return (
     <>
@@ -61,6 +67,7 @@ function Harness({ abschnitte = ABSCHNITTE }: { abschnitte?: Einsatzabschnitt[] 
         fahrzeug={fahrzeug}
         personal={PERSONAL}
         abschnitte={abschnitte}
+        besatzungUnbekannt={besatzungUnbekannt}
         onSchliessen={() => setFahrzeug(null)}
       />
     </>
@@ -114,6 +121,13 @@ describe('EigeneEinheitDialog — Als eigene Einheit führen (LLH-1073, design.m
     await waitFor(() => expect(auswahlWert('Typ')).toBe('Rettungstrupp'));
     // Carl gehört einer anderen Einheit an und bleibt dort (D10).
     expect(screen.getByText('Besatzung: Anna, Berta')).toBeInTheDocument();
+  });
+
+  it('Personal gesperrt: die Besatzungszeile nennt die Sperre statt keiner Besatzung (LLH-1462)', async () => {
+    handler();
+    renderMitProviders(<Harness besatzungUnbekannt="Modul Personal gesperrt" />);
+    expect(await screen.findByText('Besatzung: Modul Personal gesperrt')).toBeInTheDocument();
+    expect(screen.queryByText('Besatzung: Anna, Berta')).toBeNull();
   });
 
   it('rät keinen Typ, wenn zwei Typen dasselbe Soll haben', async () => {

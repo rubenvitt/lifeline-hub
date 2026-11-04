@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   einsatzRechteGrund,
+  MODUL_PERSONAL_GESPERRT,
+  MODULE_PERSONAL_FAHRZEUGE_GESPERRT,
+  modulSperre,
   NUR_ADMIN,
   NUR_LEITUNG_FUEHRUNG_ORG_ADMIN,
   NUR_LEITUNG_ORG_ADMIN,
@@ -21,5 +24,16 @@ describe('nurAnsicht (LFH-1078)', () => {
       NUR_LEITUNG_ORG_ADMIN,
     ])
       expect(grund.split(' ').length).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('modulSperre (LLH-1462)', () => {
+  it('nennt ein, zwei und drei Module im Wortlaut der Konstanten', () => {
+    expect(modulSperre([])).toBeNull();
+    expect(modulSperre(['Personal'])).toBe(MODUL_PERSONAL_GESPERRT);
+    expect(modulSperre(['Personal', 'Fahrzeuge'])).toBe(MODULE_PERSONAL_FAHRZEUGE_GESPERRT);
+    expect(modulSperre(['Einheiten', 'Personal', 'Fahrzeuge'])).toBe(
+      'Module Einheiten, Personal und Fahrzeuge gesperrt',
+    );
   });
 });

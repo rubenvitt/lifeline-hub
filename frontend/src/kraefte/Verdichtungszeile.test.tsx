@@ -220,3 +220,43 @@ describe('Verdichtungszeile · Meldebild gesperrt (LFH-888)', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Meldebild' })).toBeNull());
   });
 });
+
+describe('Verdichtungszeile · Nachbarmodul gesperrt (LLH-1462)', () => {
+  const sperre = (modul: 'personal' | 'fahrzeuge') =>
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ [modul]: { zugriff: false } })),
+      ),
+    );
+
+  beforeEach(() => {
+    vi.mocked(listeEinsatzPersonal).mockClear();
+    vi.mocked(listeEinsatzFahrzeuge).mockClear();
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { status_kategorie: 'verfuegbar' },
+    ] as never);
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([
+      { staerke_position: 'fuehrer', status_kategorie: 'gebunden' },
+    ] as never);
+  });
+
+  it('Personal gesperrt: Stärke „—“ statt Null, Fahrzeugzahlen stehen, Grund in Worten', async () => {
+    sperre('personal');
+    const { container } = setup();
+    expect(await screen.findByText('Modul Personal gesperrt')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('Fzg 1')).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\d\/\d\/\d\/\/\d/);
+    expect(listeEinsatzPersonal).not.toHaveBeenCalled();
+  });
+
+  it('Fahrzeuge gesperrt: Stärke steht, keine Fahrzeugzahlen, Grund in Worten', async () => {
+    sperre('fahrzeuge');
+    setup();
+    expect(await screen.findByText('Modul Fahrzeuge gesperrt')).toBeInTheDocument();
+    expect(screen.getByText('1/0/0//1')).toBeInTheDocument();
+    expect(screen.queryByText(/^Fzg/)).toBeNull();
+    expect(screen.queryByText(/verfügbar$/)).toBeNull();
+    expect(listeEinsatzFahrzeuge).not.toHaveBeenCalled();
+  });
+});

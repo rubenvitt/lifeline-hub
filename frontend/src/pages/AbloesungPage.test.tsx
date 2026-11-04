@@ -9,6 +9,7 @@ import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-rou
 import AbloesungPage, { SCHICHT_HERVORHEBUNG_MS } from './AbloesungPage';
 import { ApiError } from '../api/client';
 import { ladeModulFreigaben } from '../api/einsaetze';
+import { listeEinheiten } from '../api/einheiten';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung, ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
@@ -597,19 +598,29 @@ describe('AbloesungPage (LFH-635)', () => {
     await waitFor(() => expect(beginn.getAttribute('placeholder')).toMatch(/^Eintreffen /));
   });
 
-  it('Schicht beginnen: ohne Freigabe des Moduls Einheiten keine Zeitachsen-Anfrage', async () => {
+  it('Schicht beginnen: ohne Freigabe des Moduls Einheiten gesperrt, mit Grund, ohne Abruf (LLH-1462)', async () => {
     freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
+    listeAbloesungen.mockResolvedValue([]);
+    vi.mocked(listeEinheiten).mockClear();
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    // Ohne Einheitenliste gibt es keine Einheit zur Wahl; die Liste antwortete mit 403.
+    const knopf = screen.getByRole('button', { name: 'Schicht beginnen' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription(
+      'Schicht beginnen, Ohne Schicht · Modul Einheiten gesperrt',
+    );
+    expect(listeEinheiten).not.toHaveBeenCalled();
+    expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('Schicht beginnen: gesperrt, solange die Freigaben gescheitert sind (LLH-1462)', async () => {
+    vi.mocked(ladeModulFreigaben).mockRejectedValueOnce(new ApiError(500, 'kaputt'));
     listeAbloesungen.mockResolvedValue([]);
     renderPage();
     await screen.findByText('Keine laufenden Schichten');
-    await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
-    const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
-    await userEvent.click(await screen.findByTitle('Florian 2'));
-    // Ohne Zeitachse ist der wirksame Wert unbekannt: kein Platzhalter statt eines falschen.
-    const beginn = within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' });
-    expect(beginn.getAttribute('placeholder') ?? '').not.toMatch(/Eintreffen|jetzt/);
-    expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+    // Der Dialog öffnete sonst ohne wählbare Einheit: die Einheitenliste fragt erst mit Freigabe.
+    expect(screen.getByRole('button', { name: 'Schicht beginnen' })).toBeDisabled();
   });
 
   it('Rhythmus einer Schicht: die Abschnittsvorgabe steht als Platzhalter, kein „Leer:“', async () => {
@@ -1311,10 +1322,24 @@ describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
     await screen.findAllByRole('article');
     await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveAttribute('aria-disabled', 'true'));
     expect(segment(/^Ohne Schicht/)).toHaveAccessibleDescription('Modul Einheiten gesperrt');
+    // Der Grund steht auch sichtbar, nicht nur im Tooltip des Segments (LLH-1462).
+    expect(
+      screen.getByText('Schicht beginnen, Ohne Schicht · Modul Einheiten gesperrt'),
+    ).toBeInTheDocument();
     expect(screen.getByText('1 laufend · 0 fällig')).toBeInTheDocument();
     await userEvent.click(segment(/^Ohne Schicht/));
     expect(segment(/^Laufend/)).toBeChecked();
     expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('Beobachter ohne Freigabe der Einheiten: der Grund steht sichtbar, ohne Abruf (LLH-1462)', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
+    vi.mocked(listeEinheiten).mockClear();
+    renderPage();
+    await screen.findAllByRole('article');
+    expect(await screen.findByText('Ohne Schicht · Modul Einheiten gesperrt')).toBeInTheDocument();
+    expect(listeEinheiten).not.toHaveBeenCalled();
   });
 
   it('?ansicht=ohne-schicht ohne Freigabe der Einheiten zeigt „Laufend“ (LLH-1312)', async () => {

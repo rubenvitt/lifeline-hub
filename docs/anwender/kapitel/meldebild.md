@@ -233,7 +233,12 @@ zeigt sie nicht.
 
 ### Rechte
 
-Lesen darf, wer die Module Einheiten und Personal sieht. Den Zulauf sieht nur, wer auch das Modul
+Das Meldebild zeigt die Daten aus den Modulen Einheiten und Personal, soweit diese freigegeben sind.
+Fehlt eines davon oder das Modul Fahrzeuge oder Material, steht an seiner Stelle „Modul … gesperrt“:
+im Statusband im Paneel des Moduls, neben der Auswahlzeile für die Mittel. Ohne Einheiten steht der
+Grund auch in der Tabelle, statt eines leeren Einsatzes. Ohne Personal ist die Stärke unbekannt und
+steht als „—“. Fehlt Personal, Fahrzeuge oder Material, ist „In Lagebericht übernehmen“ gesperrt,
+weil der Bericht sonst falsche Zahlen trüge. Ohne das Modul Aufträge steht in der Spalte „Auftrag“ „Modul Aufträge gesperrt“. Den Zulauf sieht nur, wer auch das Modul
 Nachforderungen lesen darf; sonst fehlt die Kennzahl ganz. Status setzen, nachtragen, Zeit berichtigen,
 streichen und in den Lagebericht übernehmen dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
 (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).

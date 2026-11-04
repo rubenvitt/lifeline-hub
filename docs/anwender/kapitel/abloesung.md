@@ -399,7 +399,8 @@ Schicht beginnt mit dem Vollzug der Ablösung, eine eigene ließe den Vollzug sc
 
 Die Ansicht braucht Einheiten und Kräfte-Zeitachse und damit das Modul Einheiten. Fehlt es der
 Person, steht „Ohne Schicht“ gesperrt mit „Modul Einheiten gesperrt“, ein Sprung dorthin zeigt
-„Laufend“, und der Überblick nennt keine Zahl ohne Schicht. Die gewählte Ansicht steht in der
+„Laufend“, und der Überblick nennt keine Zahl ohne Schicht. Der Grund steht auch sichtbar unter der
+Ansichtsleiste. „Schicht beginnen“ ist dann gesperrt: ohne die Einheiten gibt es keine zur Wahl. Die gewählte Ansicht steht in der
 Adresse der Seite; ein Lesezeichen und der Weg zurück im Browser treffen sie wieder.
 
 Kommt eine Einheit ohne Schicht hinzu, während die Ansicht offen ist, zählt die Zahl sie sofort mit;

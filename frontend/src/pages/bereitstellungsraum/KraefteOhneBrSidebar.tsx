@@ -1,6 +1,12 @@
 import { useState, type CSSProperties } from 'react';
 import { Button, Collapse, Input, Typography } from 'antd';
-import { Augenbraue, Paneel, monoStil, useRollen } from '../../components/instrument';
+import {
+  Augenbraue,
+  Paneel,
+  PaneelZustand,
+  monoStil,
+  useRollen,
+} from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../../components/useZeilenFehler';
@@ -21,6 +27,20 @@ interface Props {
   onZuweisenFahrzeug: (fahrzeug: EinsatzFahrzeug) => void;
   /** Grund einer abgelehnten Zuweisung je Zeile, Schlüssel aus {@link brObjektSchluessel}. */
   zeilenFehler?: (schluessel: string) => ZeilenGrund | null;
+  /**
+   * Grund, wenn Einheiten oder Fahrzeuge ohne Freigabe sind (LLH-1462, „Modul Einheiten
+   * gesperrt“): die Seite fragt die Liste dann nicht ab, die Leiste nennt die Sperre statt
+   * „keine freien Kräfte“.
+   */
+  gesperrt?: string | null;
+  /** Beide Listen gesperrt: es gibt nichts zu zeigen außer dem Grund. */
+  alleGesperrt?: boolean;
+  /**
+   * Eine freie Liste (oder die Freigaben selbst) lädt noch oder ist gescheitert (LLH-1462): die
+   * Menge ist unbekannt, also weder Zähler noch „keine freien Kräfte“.
+   */
+  abruf?: 'laden' | 'fehler';
+  onWiederholen?: () => void;
 }
 
 /** Schlüssel einer Kraft für die Gründe je Zeile, gleich in Seitenleiste und Raum. */
@@ -59,6 +79,10 @@ export default function KraefteOhneBrSidebar({
   onZuweisenEinheit,
   onZuweisenFahrzeug,
   zeilenFehler,
+  gesperrt = null,
+  alleGesperrt = false,
+  abruf,
+  onWiederholen,
 }: Props) {
   const { abBreite } = useViewport();
   const breit = abBreite('md');
@@ -151,18 +175,22 @@ export default function KraefteOhneBrSidebar({
     >
       <Paneel
         titel="Kräfte ohne BR"
-        meta={freieEinheiten.length + freiFahrzeuge.length}
+        // Mit gesperrter Liste ist die Zahl unvollständig — kein Zähler statt einer zu kleinen.
+        meta={gesperrt || abruf ? undefined : freieEinheiten.length + freiFahrzeuge.length}
         koerperPolster
         style={{ flex: '1 1 auto' }}
       >
-        <Input
-          allowClear
-          placeholder="Kräfte suchen"
-          aria-label="Kräfte suchen"
-          value={suche}
-          onChange={(e) => setSuche(e.target.value)}
-          style={{ marginBottom: token.marginSM }}
-        />
+        {/* Ohne beide Listen gibt es nichts zu suchen. */}
+        {!alleGesperrt && (
+          <Input
+            allowClear
+            placeholder="Kräfte suchen"
+            aria-label="Kräfte suchen"
+            value={suche}
+            onChange={(e) => setSuche(e.target.value)}
+            style={{ marginBottom: token.marginSM }}
+          />
+        )}
         {verdeckt.length > 0 && (
           <div
             data-lfh="br-verdeckte-fehler"
@@ -181,7 +209,29 @@ export default function KraefteOhneBrSidebar({
         {/* Eigener Scroll: die Höhenkette endet hier an der Karte, nicht am Layout (vgl. H51) —
             deshalb ein dvh-Maß direkt am Container. */}
         <div style={{ maxHeight: 'min(60dvh, 560px)', overflowY: 'auto' }}>
-          {leer && <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>}
+          {gesperrt && (
+            <Typography.Text
+              type="secondary"
+              data-lfh="br-kraefte-sperre"
+              style={{ display: 'block', marginBottom: token.marginXS }}
+            >
+              {gesperrt}
+            </Typography.Text>
+          )}
+          {abruf && (
+            <PaneelZustand
+              zustand={abruf}
+              titel="Kräfte ohne BR"
+              leerText=""
+              onNeuladen={() => onWiederholen?.()}
+            >
+              {null}
+            </PaneelZustand>
+          )}
+          {/* Mit einer gesperrten Liste ist die Menge unbekannt, nicht leer. */}
+          {leer && !gesperrt && !abruf && (
+            <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>
+          )}
           {!leer && gruppen.length === 0 && trefferImEinsatz === 0 && (
             <Typography.Text type="secondary">keine Treffer</Typography.Text>
           )}

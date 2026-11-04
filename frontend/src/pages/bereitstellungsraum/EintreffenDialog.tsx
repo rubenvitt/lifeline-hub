@@ -27,6 +27,7 @@ import DemoMarke from '../../components/DemoMarke';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { monoStil, useRollen } from '../../components/instrument';
+import { PANEEL_FEHLER_TITEL, PANEEL_LADEN_TEXT } from '../../components/instrument/PaneelZustand';
 import AdhocFahrzeugFelder from '../../kraefte/AdhocFahrzeugFelder';
 import { eintreffenQueryKeys } from '../../bereitstellungsraum/eintreffenQueryKeys';
 import { erfasseEintreffenOfflineFaehig } from '../../offline/schreiben';
@@ -105,6 +106,18 @@ export interface EintreffenDialogProps {
    * noch nicht, der Dialog bietet sie deshalb nicht erneut zum Buchen an.
    */
   vorgemerkt?: readonly EintreffenEingabe[];
+  /**
+   * Gesperrte Listen (LLH-1462): ohne Freigabe Einheiten oder Fahrzeuge fehlen deren Treffer.
+   * Der Grund steht über den Gruppen, sonst läse sich „Keine Treffer“ wie „niemand erwartet“.
+   */
+  gesperrt?: string | null;
+  /** Ohne Freigabe Einheiten fragt der Dialog die Zeitachse nicht ab (sie antwortete mit 403). */
+  einheitenFrei?: boolean;
+  /**
+   * Eine freie Liste (oder die Freigaben) lädt noch oder ist gescheitert: dann ist „Keine
+   * Treffer“ unbelegt, statt dessen steht der Abrufzustand.
+   */
+  abruf?: 'laden' | 'fehler';
   offen: boolean;
   onClose: () => void;
   /** Nach einer Buchung beim Server, vor der Invalidierung: die eigene Anmeldung steht sofort. */
@@ -139,6 +152,9 @@ export default function EintreffenDialog({
   einheiten,
   fahrzeuge,
   vorgemerkt = KEINE_VORGEMERKT,
+  gesperrt = null,
+  einheitenFrei = true,
+  abruf,
   offen,
   onClose,
   onGebucht,
@@ -163,7 +179,7 @@ export default function EintreffenDialog({
   const periodenQuery = useQuery({
     queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
     queryFn: () => listeEinheitenPerioden(einsatzId),
-    enabled: offen,
+    enabled: offen && einheitenFrei,
   });
 
   // Erwartete Kräfte aus Nachforderungen (LLH-1387): ohne Freigabe 403, dann ohne Gruppe.
@@ -556,15 +572,32 @@ export default function EintreffenDialog({
         fallback="Buchen fehlgeschlagen"
       />
       <div>
+        {gesperrt && (
+          <Typography.Text
+            type="secondary"
+            data-lfh="eintreffen-sperre"
+            style={{ display: 'block' }}
+          >
+            {gesperrt}
+          </Typography.Text>
+        )}
         {gruppeNachgefordert}
         {gruppe('Erwartet', erwartetTreffer)}
         {gruppe('Im Einsatz', imEinsatzTreffer)}
         {gruppeStamm}
-        {nachgefordert.length +
-          erwartetTreffer.length +
-          imEinsatzTreffer.length +
-          stammZeilen.length ===
-          0 && <Typography.Text type="secondary">Keine Treffer</Typography.Text>}
+        {abruf && (
+          <Typography.Text type="secondary" data-lfh="eintreffen-abruf">
+            {abruf === 'laden' ? PANEEL_LADEN_TEXT : PANEEL_FEHLER_TITEL}
+          </Typography.Text>
+        )}
+        {/* Mit gesperrter Liste ist „keine Treffer“ unbelegt: dort steht schon der Grund. */}
+        {!gesperrt &&
+          !abruf &&
+          nachgefordert.length +
+            erwartetTreffer.length +
+            imEinsatzTreffer.length +
+            stammZeilen.length ===
+            0 && <Typography.Text type="secondary">Keine Treffer</Typography.Text>}
       </div>
       <Button block onClick={() => zuSchrittZwei()}>
         Nicht in der Liste

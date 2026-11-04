@@ -424,10 +424,13 @@ describe('FahrzeugePage', () => {
   });
 
   /** Das Besatzungs-Urteil der Tabellenzeile (die Spalte „Besatzung"), nicht das im Aufklappteil. */
-  function urteilDerZeile(container: HTMLElement): HTMLElement {
-    const el = container.querySelector<HTMLElement>('[data-lfh="besatzung-urteil"]');
-    if (!el) throw new Error('kein Besatzungs-Urteil gerendert');
-    return el;
+  /** Wartet auf das Urteil: die Personalliste lädt erst nach der Modulfreigabe (LLH-1462). */
+  function urteilDerZeile(container: HTMLElement): Promise<HTMLElement> {
+    return waitFor(() => {
+      const el = container.querySelector<HTMLElement>('[data-lfh="besatzung-urteil"]');
+      if (!el) throw new Error('kein Besatzungs-Urteil gerendert');
+      return el;
+    });
   }
 
   it('zeigt Unterbesetzung rot, mit beschriftetem Ist und Soll (LFH-962)', async () => {
@@ -436,7 +439,7 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     // Besatzungs-Spalte dauerhaft sichtbar. Ist 1/0/0//1 < Soll 0/1/8//9 → unterbesetzt.
     expect(screen.getByRole('columnheader', { name: 'Besatzung' })).toBeInTheDocument();
-    const urteil = urteilDerZeile(container);
+    const urteil = await urteilDerZeile(container);
     expect(urteil).toHaveAttribute('data-urteil', 'unterbesetzt');
     expect(within(urteil).getByText('unterbesetzt')).toBeInTheDocument();
     expect(urteil).toHaveTextContent('Ist 1/0/0//1 · Soll 0/1/8//9');
@@ -445,7 +448,7 @@ describe('FahrzeugePage', () => {
   it('zeigt eine nicht zugeordnete Besatzung neutral als „nicht erfasst", nie rot (LFH-962)', async () => {
     const { container } = render(einsatz(), []);
     await screen.findByText('Florian 1');
-    const urteil = urteilDerZeile(container);
+    const urteil = await urteilDerZeile(container);
     expect(urteil).toHaveAttribute('data-urteil', 'nicht_erfasst');
     expect(within(urteil).getByText('Besatzung nicht erfasst')).toBeInTheDocument();
     // Kein Ist-Wert, der wie eine Unterschreitung aussähe; das Soll bleibt als Auskunft.
@@ -467,7 +470,7 @@ describe('FahrzeugePage', () => {
     const { container } = render(einsatz(), [fuehrer, ohnePosition]);
     await screen.findByText('Florian 1');
     // 1 Führer + 1 ohne Position → 1/0/1//2 (nicht 1/0/0//1, die zweite Kraft verschwindet sonst).
-    expect(urteilDerZeile(container)).toHaveTextContent('Ist 1/0/1//2 · Soll 0/1/8//9');
+    expect(await urteilDerZeile(container)).toHaveTextContent('Ist 1/0/1//2 · Soll 0/1/8//9');
   });
 
   it('zeigt erfülltes Soll als „Soll erfüllt"', async () => {
@@ -475,7 +478,7 @@ describe('FahrzeugePage', () => {
     const crew = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
     const { container } = render(einsatz(), [crew], sollKlein);
     await screen.findByText('Florian 1');
-    const urteil = urteilDerZeile(container);
+    const urteil = await urteilDerZeile(container);
     expect(urteil).toHaveAttribute('data-urteil', 'erfuellt');
     expect(within(urteil).getByText('Soll erfüllt')).toBeInTheDocument();
   });
@@ -489,7 +492,7 @@ describe('FahrzeugePage', () => {
     const { container } = render(einsatz(), crew, sollKlein);
     await screen.findByText('Florian 1');
     // Ist 1/0/1//2 ≥ Soll 1/0/0//1 in jeder Position (Mannschaft über Soll) → erfüllt.
-    expect(urteilDerZeile(container)).toHaveAttribute('data-urteil', 'erfuellt');
+    expect(await urteilDerZeile(container)).toHaveAttribute('data-urteil', 'erfuellt');
   });
 
   it('zeigt fehlendes Soll neutral ohne Soll-Kontext', async () => {
@@ -498,7 +501,7 @@ describe('FahrzeugePage', () => {
     const { container } = render(einsatz(), [crew], ohneSoll);
     await screen.findByText('Florian 1');
     // Kein hinterlegtes Soll → kein „erfüllt"-Urteil möglich → neutral (LFH-891: Blau bedient).
-    const urteil = urteilDerZeile(container);
+    const urteil = await urteilDerZeile(container);
     expect(urteil).toHaveAttribute('data-urteil', 'kein_soll');
     expect(urteil).toHaveTextContent('Ist 1/0/0//1');
     expect(urteil).not.toHaveTextContent('Soll 0');
@@ -1405,15 +1408,21 @@ describe('FahrzeugePage · Datenzustände', () => {
    * Derselbe Fehlermodus eine Ebene tiefer: scheitert die Personalliste, filtert der
    * Besatzungs-Pool auf die leere Menge und behauptete „Keine freien Kräfte".
    */
-  it('gescheiterte Personalliste: der Besatzungs-Pool nennt den Ausfall', async () => {
+  it('gescheiterte Personalliste: der Besatzungsblock nennt den Ausfall, ohne Auswahl', async () => {
     const { container } = zeige(
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
       http.get('/api/einsaetze/7/personal', () => new HttpResponse(null, { status: 500 })),
     );
     await screen.findByText('Florian 1');
     await klappeZeileAuf(container);
-    await oeffneAuswahl(container, 'Kraft zur Besatzung …');
-    expect(await screen.findByText('Kräfte konnten nicht geladen werden')).toBeInTheDocument();
+    // Die Besatzung ist unbekannt (LLH-1462): kein „Keine Besatzung zugeordnet“, kein Ist/Soll.
+    const grund = await waitFor(() => {
+      const el = container.querySelector('[data-lfh="besatzung-unbekannt"]');
+      expect(el).toHaveTextContent('Kräfte konnten nicht geladen werden');
+      return el;
+    });
+    expect(grund).toBeVisible();
+    expect(screen.queryByText('Kraft zur Besatzung …')).not.toBeInTheDocument();
     expect(screen.queryByText('Keine freien Kräfte')).not.toBeInTheDocument();
   });
 
@@ -1684,7 +1693,9 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     );
     renderTableau();
     const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
-    expect(await within(tableau).findByText(/Einheiten nicht abrufbar/)).toBeInTheDocument();
+    // Die Sperre heißt Sperre, nicht Abruffehler (LLH-1462).
+    expect(await within(tableau).findByText(/^Modul Einheiten gesperrt/)).toBeInTheDocument();
+    expect(within(tableau).queryByText(/nicht abrufbar/)).toBeNull();
     expect(within(tableau).getByRole('heading', { name: 'Alle Fahrzeuge' })).toBeInTheDocument();
     expect(within(tableau).queryByRole('heading', { name: 'EA Nord' })).toBeNull();
   });
@@ -2247,5 +2258,39 @@ describe('FahrzeugePage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)',
     await userEvent.click(screen.getByRole('link', { name: 'Einsätze' }));
     expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: RUECKFRAGE })).toBeNull();
+  });
+});
+
+describe('FahrzeugePage · Personal gesperrt (LLH-1462)', () => {
+  it('fragt die Personalliste nicht ab und nennt die Sperre statt „nicht erfasst“', async () => {
+    const abrufe: string[] = [];
+    render(einsatz(), [person({ fahrzeug_id: 10 })]);
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ personal: { zugriff: false } })),
+      ),
+      http.get('/api/einsaetze/7/personal', ({ request }) => {
+        abrufe.push(request.url);
+        return HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 });
+      }),
+    );
+    await screen.findByText('Florian 1');
+    // Spalte Besatzung: der Grund in Worten, kein Urteil über eine unbekannte Besatzung.
+    expect(
+      await screen.findByText('Modul Personal gesperrt', {
+        selector: '[data-lfh="besatzung-sperre"]',
+      }),
+    ).toBeInTheDocument();
+    await klappeZeileAuf(document.body);
+    const block = await waitFor(() => {
+      const b = document.querySelector<HTMLElement>('[data-lfh="besatzung-block"]');
+      expect(b).not.toBeNull();
+      return b!;
+    });
+    expect(within(block).getByText('Modul Personal gesperrt')).toBeInTheDocument();
+    expect(within(block).queryByText('Kraft zur Besatzung …')).toBeNull();
+    expect(screen.queryByText(/Besatzung nicht erfasst/)).toBeNull();
+    expect(screen.queryByText('Keine Besatzung zugeordnet')).toBeNull();
+    expect(abrufe).toEqual([]);
   });
 });

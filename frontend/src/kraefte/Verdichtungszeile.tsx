@@ -1,6 +1,8 @@
 import { Space } from 'antd';
 import { Fragment } from 'react';
-import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
+import { freigabeVon } from '../einsatz/modulRegistry';
+import { MODUL_FAHRZEUGE_GESPERRT, MODUL_PERSONAL_GESPERRT } from '../components/nurAnsicht';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
@@ -58,6 +60,11 @@ export function verdichtungsTextfarbe(
  * ein- und ausblendender Platzhalter verschöbe die Tabelle darunter. Die Fehleranzeige gehört
  * der Tabelle, die dieselben Daten trägt.
  *
+ * GESPERRTES NACHBARMODUL (LLH-1462): ohne Freigabe von Personal oder Fahrzeuge fragt die Zeile
+ * die Liste gar nicht ab (kein 403). Die freie Hälfte bleibt stehen, die gesperrte steht als
+ * „—“ (Stärke) bzw. fehlt (Fahrzeugzahlen), daneben der Grund in Worten. Sind beide gesperrt,
+ * ist die Zeile still: dann gibt es nichts zu verdichten.
+ *
  * Den Pfad baut der Aufrufer; die Komponente kennt keine Einsatz-Routen.
  */
 
@@ -73,21 +80,36 @@ export default function Verdichtungszeile({
   const { token, rollen } = useRollen();
   // Kein Link in ein gesperrtes Meldebild (LFH-888, design.md D4); die Zahlen bleiben.
   const meldebildGesperrt = useSprungSperre(einsatzId)('kraefteuebersicht');
+  const freigaben = useModulFreigaben(einsatzId);
+  const personalFrei = freigabeVon('personal', freigaben);
+  const fahrzeugeFrei = freigabeVon('fahrzeuge', freigaben);
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
+    enabled: personalFrei === true,
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: fahrzeugeFrei === true,
   });
 
   // Der Datenriegel steht VORN: liegen keine Zahlen vor, ist die Zeile still — ob der Abruf noch
   // läuft oder scheiterte. Liegen Zahlen vor und scheitert erst ein Folgeabruf, bleiben sie
   // stehen (echt, nur womöglich alt), sonst spränge die Tabelle darunter unter dem Cursor.
-  if (!personalQuery.data || !fahrzeugeQuery.data) return null;
+  // Eine gesperrte Liste wartet auf nichts: sie fehlt bewusst (LLH-1462).
+  const personalDa = personalFrei === false || personalQuery.data !== undefined;
+  const fahrzeugeDa = fahrzeugeFrei === false || fahrzeugeQuery.data !== undefined;
+  if (!personalDa || !fahrzeugeDa) return null;
+  if (personalFrei === false && fahrzeugeFrei === false) return null;
 
-  const v = verdichte(personalQuery.data, fahrzeugeQuery.data, []);
+  const v = verdichte(personalQuery.data ?? [], fahrzeugeQuery.data ?? [], []);
+  const sperre =
+    personalFrei === false
+      ? MODUL_PERSONAL_GESPERRT
+      : fahrzeugeFrei === false
+        ? MODUL_FAHRZEUGE_GESPERRT
+        : null;
   return (
     <Space
       wrap
@@ -96,19 +118,33 @@ export default function Verdichtungszeile({
       style={{ marginBlockEnd: token.margin }}
     >
       <span style={{ color: token.colorTextSecondary }}>Stärke</span>
-      <strong>{staerkeText(v.staerke)}</strong>
-      <span aria-hidden>·</span>
-      <span style={{ color: token.colorTextSecondary }}>Fzg {v.anzahlFahrzeuge}</span>
-      {/* Zahl vor Wort, dieselben Wörter wie der Zählerstreifen der Tabelle darunter (LFH-973,
-          `statusKategorie`): „verfügbar“ statt „frei“, „nicht verfügbar“ ausgeschrieben. */}
-      {KATEGORIEN.map((k, i) => (
-        <Fragment key={k}>
-          {i > 0 && <span aria-hidden>·</span>}
-          <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie[k].rolle) }}>
-            {v.fahrzeugStatus[k]} {statusKategorie[k].label}
+      {/* Ohne Personal ist die Stärke unbekannt: „—“, nie „0/0/0//0“ (keine erfundenen Daten). */}
+      <strong>{personalFrei === false ? '—' : staerkeText(v.staerke)}</strong>
+      {fahrzeugeFrei !== false && (
+        <>
+          <span aria-hidden>·</span>
+          <span style={{ color: token.colorTextSecondary }}>Fzg {v.anzahlFahrzeuge}</span>
+          {/* Zahl vor Wort, dieselben Wörter wie der Zählerstreifen der Tabelle darunter
+              (LFH-973, `statusKategorie`): „verfügbar“ statt „frei“, „nicht verfügbar“
+              ausgeschrieben. */}
+          {KATEGORIEN.map((k, i) => (
+            <Fragment key={k}>
+              {i > 0 && <span aria-hidden>·</span>}
+              <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie[k].rolle) }}>
+                {v.fahrzeugStatus[k]} {statusKategorie[k].label}
+              </span>
+            </Fragment>
+          ))}
+        </>
+      )}
+      {sperre && (
+        <>
+          <span aria-hidden>·</span>
+          <span data-lfh="verdichtung-sperre" style={{ color: token.colorTextSecondary }}>
+            {sperre}
           </span>
-        </Fragment>
-      ))}
+        </>
+      )}
       {/* Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`. */}
       {!meldebildGesperrt && (
         <Link to={pfad} style={verdichtungsLinkStil(token)}>

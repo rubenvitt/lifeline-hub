@@ -364,6 +364,19 @@ describe('meldebildMeta', () => {
       }),
     ).toBe('3 von 7 Einheiten · Stärke 1/0/5//6 von 2/3/10//15');
   });
+
+  it('nennt ohne Freigabe Einheiten keine Einheitenzahl (LLH-1462)', () => {
+    expect(
+      meldebildMeta({
+        einheiten: 0,
+        einheitenGesamt: 0,
+        staerke: '0/0/1//1',
+        staerkeGesamt: '0/0/1//1',
+        gefiltert: false,
+        einheitenUnbekannt: true,
+      }),
+    ).toBe('Stärke 0/0/1//1');
+  });
 });
 
 describe('KraefteuebersichtPage — Statusband', () => {
@@ -799,7 +812,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     await screen.findByText('1. Zug');
     const e = await waitFor(() => {
       const z = zeile(container, 'eh-20')!;
-      expect(within(z).getByTitle('Aufträge für diese Rolle nicht einsehbar')).toBeInTheDocument();
+      expect(within(z).getByText('Modul Aufträge gesperrt')).toBeInTheDocument();
       return z;
     });
     expect(within(e).queryByTitle('Aufträge nicht abrufbar')).toBeNull();
@@ -1225,6 +1238,8 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     vi.mocked(aktualisiereLagebericht).mockClear();
     setup();
     const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    // Erst mit allen Listen geladen (LLH-1462), sonst trüge der Bericht leere Bestände.
+    await waitFor(() => expect(btn).toBeEnabled());
     fireEvent.click(btn);
     await waitFor(() =>
       expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
@@ -1262,7 +1277,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     ]);
     setup();
     expect(await screen.findByText('Entlassen (1)')).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    fireEvent.click(await uebernahmeBereit());
     await waitFor(() =>
       expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
         1,
@@ -1306,7 +1321,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     setup();
     expect(await screen.findByText('Entlassen (1)')).toBeInTheDocument();
     expect(await screen.findByText('Aus dem Einsatz genommen (1)')).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    fireEvent.click(await uebernahmeBereit());
     await waitFor(() =>
       expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
         1,
@@ -1328,7 +1343,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
       new ApiError(422, 'Einsatz ist abgeschlossen'),
     );
     const { container } = setup();
-    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    fireEvent.click(await uebernahmeBereit());
     expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
     expect(container.ownerDocument.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     expect(navigiere).not.toHaveBeenCalled();
@@ -1666,7 +1681,7 @@ describe('KraefteuebersichtPage — Stand der Übernahme in der Anzeigezone (LFH
       </AnzeigeKonventionenProvider>,
       { route: '/einsaetze/1/kraefteuebersicht' },
     );
-    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    fireEvent.click(await uebernahmeBereit());
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalled());
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte?.[0]?.text;
     expect(text).toContain('**Stand:** 141200jul26');
@@ -1687,7 +1702,8 @@ describe('KraefteuebersichtPage Sprungziele (LFH-888)', () => {
     await waitFor(() => expect(knopf).toBeDisabled());
     expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
     expect(screen.queryByRole('link', { name: 'Einheit bilden' })).toBeNull();
-    expect(screen.getByText(/Keine Einheiten und keine Kräfte im Einsatz/)).toBeInTheDocument();
+    // Ohne Freigabe ist der Bestand unbekannt, kein leerer Einsatz (LLH-1462).
+    expect(screen.queryByText(/Keine Einheiten und keine Kräfte im Einsatz/)).toBeNull();
   });
 
   it('gesperrte Lageberichte: „In Lagebericht übernehmen" gesperrt mit Grund', async () => {
@@ -1865,5 +1881,155 @@ describe('KraefteuebersichtPage — Spalten in der Werkzeugzeile (LLH-1417)', ()
     const container = await mitNeuemZug((c) => zeile(c, 'eh-20')!.querySelector('a')!);
     expect(await screen.findByRole('button', { name: /1 neuer Eintrag/ })).toBeInTheDocument();
     expect(zeile(container, 'eh-40')).toBeNull();
+  });
+});
+
+/** „In Lagebericht übernehmen“, sobald alle Listen geladen sind (LLH-1462). */
+async function uebernahmeBereit() {
+  const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+  await waitFor(() => expect(btn).toBeEnabled());
+  return btn;
+}
+
+/**
+ * Gesperrte Nachbarmodule (LLH-1462, Spec `modul-freigabe`): ohne Freigabe fragt das Meldebild die
+ * Liste nicht ab und nennt das Modul, statt eines Abruffehlers oder einer erfundenen Null.
+ */
+describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
+  const sperre = (key: string) =>
+    vi
+      .mocked(ladeModulFreigaben)
+      .mockResolvedValue(freigabenFixture({ [key]: { zugriff: false } }));
+
+  it('Personal gesperrt: kein Abruf, das Paneel nennt das Modul, die Stärke ist unbekannt', async () => {
+    mitEinheit();
+    sperre('personal');
+    vi.mocked(listeEinsatzPersonal).mockClear();
+    vi.mocked(listEntlassenesPersonal).mockClear();
+    setup();
+    const p = await screen.findByRole('region', { name: 'Personal nach Status' });
+    await waitFor(() => expect(within(p).getByText('Modul Personal gesperrt')).toBeVisible());
+    // Die Einheiten zählen weiter, nichts heißt „nicht abrufbar“.
+    const e = screen.getByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(e).getByText('1 Einheit')).toBeInTheDocument());
+    expect(screen.queryByText(/nicht abrufbar|Stand unbekannt/)).toBeNull();
+    expect(await (await seitenkopf()).findByText('1 Einheit · Stärke —')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="meldebild-sperre"]')).toHaveTextContent(
+      'Modul Personal gesperrt',
+    );
+    // Ein Bericht ohne Personal meldete eine falsche Stärke.
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/i })).toBeDisabled();
+    expect(screen.getByText('— von — Kräften')).toBeInTheDocument();
+    expect(listeEinsatzPersonal).not.toHaveBeenCalled();
+    expect(listEntlassenesPersonal).not.toHaveBeenCalled();
+  });
+
+  it('Personal noch ohne Daten: Stärke und Kräftezahl unbekannt, nie 0', async () => {
+    mitEinheit();
+    vi.mocked(listeEinsatzPersonal).mockReturnValue(new Promise(() => {}));
+    const { container } = setup();
+    expect(await (await seitenkopf()).findByText('1 Einheit · Stärke —')).toBeInTheDocument();
+    expect(screen.getByText('— von — Kräften')).toBeInTheDocument();
+    await waitFor(() => expect(zeile(container, 'eh-20')).not.toBeNull());
+    expect(zeile(container, 'eh-20')).toHaveTextContent('—');
+    expect(zeile(container, 'eh-20')).not.toHaveTextContent('0/0/0//0');
+  });
+
+  it('Fahrzeuge gesperrt: kein Abruf, das Band steht, die Werkzeugzeile nennt das Modul', async () => {
+    mitEinheit();
+    sperre('fahrzeuge');
+    vi.mocked(listeEinsatzFahrzeuge).mockClear();
+    setup();
+    const e = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(e).getByText('1 Einheit')).toBeInTheDocument());
+    expect(screen.queryByText(/nicht abrufbar|Stand unbekannt/)).toBeNull();
+    expect(document.querySelector('[data-lfh="meldebild-sperre"]')).toHaveTextContent(
+      'Modul Fahrzeuge gesperrt',
+    );
+    expect(listeEinsatzFahrzeuge).not.toHaveBeenCalled();
+  });
+
+  it('Einheiten gesperrt: kein Abruf, das Paneel nennt das Modul, keine „0 Einheiten“', async () => {
+    mitEinheit();
+    sperre('einheiten');
+    vi.mocked(listeEinheiten).mockClear();
+    vi.mocked(listeEinheitenPerioden).mockClear();
+    setup();
+    const e = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(e).getByText('Modul Einheiten gesperrt')).toBeVisible());
+    expect(screen.queryByText(/nicht abrufbar|Stand unbekannt/)).toBeNull();
+    expect((await seitenkopf()).queryByText(/0 Einheiten/)).toBeNull();
+    expect(listeEinheiten).not.toHaveBeenCalled();
+    expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('Material gesperrt: der Bericht trüge „0 Positionen“, die Übernahme ist gesperrt', async () => {
+    mitEinheit();
+    sperre('material');
+    vi.mocked(listEinsatzMaterial).mockClear();
+    setup();
+    const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    await waitFor(() => expect(btn).toBeDisabled());
+    expect(document.querySelector('[data-lfh="meldebild-sperre"]')).toHaveTextContent(
+      'Modul Material gesperrt',
+    );
+    expect(listEinsatzMaterial).not.toHaveBeenCalled();
+  });
+
+  it('Einsatzabschnitte gesperrt: der Bericht verlöre Einheiten, die Übernahme ist gesperrt', async () => {
+    mitEinheit();
+    sperre('einsatzabschnitte');
+    setup();
+    const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="meldebild-sperre"]')).toHaveTextContent(
+        'Modul Einsatzabschnitte gesperrt',
+      ),
+    );
+    expect(btn).toBeDisabled();
+  });
+
+  it('Freigaben gescheitert: weder leerer Einsatz noch Übernahme in den Lagebericht', async () => {
+    mitEinheit();
+    vi.mocked(ladeModulFreigaben).mockRejectedValueOnce(new ApiError(500, 'kaputt'));
+    setup();
+    const e = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await within(e).findByRole('button', { name: 'Erneut abrufen' });
+    expect(screen.queryByText(/Keine Einheiten und keine Kräfte/)).toBeNull();
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/i })).toBeDisabled();
+  });
+
+  it('Einheiten gesperrt: das Raster nennt das Modul, keinen leeren Einsatz', async () => {
+    mitEinheit();
+    sperre('einheiten');
+    setup();
+    const e = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(e).getByText('Modul Einheiten gesperrt')).toBeVisible());
+    expect(screen.queryByText(/Keine Einheiten und keine Kräfte/)).toBeNull();
+  });
+
+  it('Freigaben gescheitert: Fehler mit Neuladen statt ewigem Laden', async () => {
+    mitEinheit();
+    vi.mocked(ladeModulFreigaben).mockRejectedValueOnce(new ApiError(500, 'kaputt'));
+    vi.mocked(listeEinheiten).mockClear();
+    setup();
+    const e = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    const knopf = await within(e).findByRole('button', { name: 'Erneut abrufen' });
+    expect(listeEinheiten).not.toHaveBeenCalled();
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
+    fireEvent.click(knopf);
+    await waitFor(() => expect(within(e).getByText('1 Einheit')).toBeInTheDocument());
+  });
+
+  it('Aufträge gesperrt: kein Abruf, die Zelle nennt das Modul sichtbar', async () => {
+    mitEinheit();
+    sperre('auftraege');
+    vi.mocked(listeOffeneAuftraege).mockClear();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    await waitFor(() =>
+      expect(within(zeile(container, 'eh-20')!).getByText('Modul Aufträge gesperrt')).toBeVisible(),
+    );
+    expect(listeOffeneAuftraege).not.toHaveBeenCalled();
   });
 });

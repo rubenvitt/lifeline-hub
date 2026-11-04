@@ -6,6 +6,7 @@ import {
   VerteilungsPaneel,
   useRollen,
 } from '../components/instrument';
+import { MODUL_EINHEITEN_GESPERRT, MODUL_PERSONAL_GESPERRT } from '../components/nurAnsicht';
 import type { BandZelle } from './meldebildRaster';
 import { bandVerteilung } from './statusbandStil';
 import type { ZulaufZelle } from './zulauf';
@@ -20,8 +21,8 @@ import type { ZulaufZelle } from './zulauf';
  * `statusbandStil.ts`; hier wird nur gesetzt.
  *
  * Eine Füllkachel gibt es nicht: die Paneele füllen die Reihe (`PaneelReihe` zählt nur gerenderte
- * Kinder), ein Status ohne Einheit steht gar nicht da. Laden, Fehler und Leer zeigt jedes Paneel
- * selbst (`PaneelZustand`), nie als Null.
+ * Kinder), ein Status ohne Einheit steht gar nicht da. Laden, Fehler, Leer und Gesperrt zeigt
+ * jedes Paneel selbst (`PaneelZustand`), nie als Null.
  *
  * „Keine Rückmeldung“ ist eine EIGENE Kennzahl: es ist kein FMS-Status, in der Verteilung stünde
  * die Einheit doppelt, und ein Vorleser hörte eine Statusstufe. Ob sie erscheint, entscheidet die
@@ -38,6 +39,9 @@ import type { ZulaufZelle } from './zulauf';
  * Kennzahl): Prüfanker der Seite und der e2e-Suite, und ein Vorleser springt so in die Gruppe.
  */
 
+/** Zustand eines Paneels im Band. */
+export type StatusbandZustand = 'daten' | 'laden' | 'fehler' | 'gesperrt';
+
 const summe = (zellen: readonly BandZelle[]) => zellen.reduce((s, z) => s + z.wert, 0);
 
 /** Zähler im Kopf, Einzahl und Mehrzahl richtig (LFH-973): „1 Einheit“, nicht „1 Einheiten“. */
@@ -45,9 +49,6 @@ const zaehler = (zellen: readonly BandZelle[], einzahl: string, mehrzahl: string
   const n = summe(zellen);
   return `${n} ${n === 1 ? einzahl : mehrzahl}`;
 };
-
-/** Grund im Zustand `gesperrt` — das Band hat keinen, die Listen gehören der Seite selbst. */
-const GESPERRT = 'Modul nicht freigegeben.';
 
 interface StatusbandProps {
   einheiten: readonly BandZelle[];
@@ -57,8 +58,13 @@ interface StatusbandProps {
    */
   einheitenHinweis?: string | null;
   personal: readonly BandZelle[];
-  /** Datenzustand beider Listen zusammen. */
-  zustand: 'daten' | 'laden' | 'fehler';
+  /**
+   * Datenzustand je Paneel. `gesperrt` (LLH-1462): die Seite fragt die Liste ohne Freigabe ihres
+   * Moduls nicht ab, das Paneel nennt das Modul (`MODUL_EINHEITEN_GESPERRT`,
+   * `MODUL_PERSONAL_GESPERRT`) statt eines Abruffehlers.
+   */
+  einheitenZustand: StatusbandZustand;
+  personalZustand: StatusbandZustand;
   /** Erneuter Abruf beider Listen (Fehlerzustand der Paneele). */
   onNeuladen: () => void;
   /** Kennzahl „keine Rückmeldung" — `null`/fehlend, wenn es nichts zu melden gibt oder nichts lesbar ist. */
@@ -75,7 +81,8 @@ export default function Statusband({
   einheiten,
   einheitenHinweis,
   personal,
-  zustand,
+  einheitenZustand,
+  personalZustand,
   onNeuladen,
   rueckmeldung = null,
   rueckmeldungZiel,
@@ -83,9 +90,8 @@ export default function Statusband({
   zulaufZiel,
 }: StatusbandProps) {
   const { rollen } = useRollen();
-  const daten = zustand === 'daten';
-  const kopf = (text: string, marke?: ReactNode) =>
-    daten ? (
+  const kopf = (zustand: StatusbandZustand, text: string, marke?: ReactNode) =>
+    zustand === 'daten' ? (
       <>
         {text}
         {marke}
@@ -98,8 +104,11 @@ export default function Statusband({
           titel="Einheiten nach FMS-Status"
           kennung="statusband-einheit"
           dichte="kompakt"
-          zustand={daten && einheiten.length === 0 ? 'leer' : zustand}
+          zustand={
+            einheitenZustand === 'daten' && einheiten.length === 0 ? 'leer' : einheitenZustand
+          }
           meta={kopf(
+            einheitenZustand,
             zaehler(einheiten, 'Einheit', 'Einheiten'),
             einheitenHinweis ? (
               <>
@@ -109,7 +118,7 @@ export default function Statusband({
             ) : undefined,
           )}
           leerText="Keine Einheiten gebildet."
-          gesperrtText={GESPERRT}
+          gesperrtText={MODUL_EINHEITEN_GESPERRT}
           onNeuladen={onNeuladen}
           zeilen={bandVerteilung(einheiten, rollen)}
         />
@@ -117,10 +126,10 @@ export default function Statusband({
           titel="Personal nach Status"
           kennung="statusband-personal"
           dichte="kompakt"
-          zustand={daten && personal.length === 0 ? 'leer' : zustand}
-          meta={kopf(zaehler(personal, 'Kraft', 'Kräfte'))}
+          zustand={personalZustand === 'daten' && personal.length === 0 ? 'leer' : personalZustand}
+          meta={kopf(personalZustand, zaehler(personal, 'Kraft', 'Kräfte'))}
           leerText="Kein Personal erfasst."
-          gesperrtText={GESPERRT}
+          gesperrtText={MODUL_PERSONAL_GESPERRT}
           onNeuladen={onNeuladen}
           zeilen={bandVerteilung(personal, rollen)}
         />

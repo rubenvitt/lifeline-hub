@@ -629,6 +629,15 @@ export function istKeyFreigegeben(key: string, freigaben?: ModulFreigaben): bool
 }
 
 /**
+ * {@link istKeyFreigegeben} mit drittem Wert (LLH-1462): `undefined`, solange die Freigaben
+ * unbekannt sind. Für Seiten, die eine gesperrte Nachbarliste nicht abfragen, die Sperre aber
+ * benennen (`zustandNachFreigabe` in `api/abrufZustand.ts`): beim Laden darf noch kein Grund stehen.
+ */
+export function freigabeVon(key: string, freigaben?: ModulFreigaben): boolean | undefined {
+  return freigaben == null ? undefined : istKeyFreigegeben(key, freigaben);
+}
+
+/**
  * Grund einer Sperre an einem Bedienelement (M16: erklären statt stumm wegschalten). EINE
  * Konstante für Navigation, Sprungstellen und Kartenebenen: eine abweichende Fassung fiele
  * niemandem auf, weil jede Stelle für sich plausibel aussieht.

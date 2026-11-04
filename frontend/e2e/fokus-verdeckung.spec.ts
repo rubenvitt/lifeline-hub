@@ -12,6 +12,7 @@ import {
   zuordnungsZiele,
 } from './einheit-fixture';
 import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
+import { SPERR_SZENARIEN, seedKraefteGesperrt, sperrzweigSteht } from './kraefte-sperre-fixture';
 import { einsatzAnlegen } from './einsatz-kern';
 import { seedeVorlage } from './vorlage-kern';
 import { oeffneZeichenWahl, waehleWerkzeug } from './leisten-kern';
@@ -844,6 +845,68 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
         description: `${viewport.width}px ${rolle}: ${messwerte.join(' | ')}`,
       });
     });
+  }
+}
+
+/**
+ * Sperrzweig der Kräfte-Seiten (LLH-1462), dieselbe Achse wie die Einheit-Ansicht darüber: ein
+ * Nachbarmodul per Override gesperrt, Grund sichtbar, kein 403 (`kraefte-sperre-fixture.ts`). Ein
+ * ganzer Umlauf je Seite; jedes freie Ziel der Rolle muss besucht werden, keins verschwindet. Ein
+ * gesperrtes Ziel ist kein Tabulatorstopp und zählt nicht mit.
+ */
+for (const szenario of SPERR_SZENARIEN) {
+  for (const seite of szenario.seiten) {
+    for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
+      test(`${seite.name} (${rolle === 'beobachter' ? 'Beobachter' : 'Führungspersonal'}, Modulsperre ${szenario.name}): verbleibende Ziele frei bei 1366px, kompakt und handschuh`, async ({
+        page,
+      }) => {
+        test.setTimeout(120_000);
+        await page.setViewportSize({ width: 1366, height: 520 });
+        await anmelden(page);
+        const sperre = await seedKraefteGesperrt(page, szenario.module, rolle);
+        const messwerte: string[] = [];
+        for (const dichte of ['kompakt', 'handschuh']) {
+          await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+          await page.goto(seite.pfad(sperre));
+          await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+          await sperrzweigSteht(page, seite, sperre);
+          const namen: string[] = [];
+          for (const { name, fokus, mindestens, fokusMindestens } of seite.ziele(page, rolle)) {
+            if (!fokus) continue;
+            const anzahl = await fokus.count();
+            expect(anzahl, `${seite.name}: ${name}`).toBeGreaterThanOrEqual(
+              fokusMindestens ?? mindestens ?? 1,
+            );
+            for (let i = 0; i < anzahl; i += 1) {
+              const kennung = anzahl > 1 ? `${name} #${i + 1}` : name;
+              await fokus.nth(i).evaluate((el, k) => el.setAttribute('data-e2e-fokus', k), kennung);
+              namen.push(kennung);
+            }
+          }
+          const stopps = await stoppsEinUmlauf(page);
+          await page.getByRole('main').getByRole('link', { name: 'Einsätze', exact: true }).focus();
+          const befund = await pruefeFokusVerdeckung(page, stopps, 'Tab', {
+            region: 'nav[aria-label="Kategorien"]',
+          });
+          expect(
+            befund.besuchteZiele.sort(),
+            `${seite.name} ${dichte}: jedes freie Ziel muss per Tab besucht werden`,
+          ).toEqual(namen.sort());
+          expect(befund.stoppsInRegion, 'der Lauf erreicht die Rail').toBeGreaterThan(0);
+          expect(befund.fixierteKandidaten).toBeGreaterThan(0);
+          expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+          messwerte.push(
+            `${seite.name} ${dichte}: ${befund.besuchteZiele.length} Ziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,
+          );
+        }
+        // Auch der Tab-Umlauf über alle Ziele fragt keine gesperrte Liste ab.
+        expect(sperre.verboten, `${seite.name}: keine gesperrte Liste abgefragt`).toEqual([]);
+        test.info().annotations.push({
+          type: 'messwert',
+          description: `${rolle}: ${messwerte.join(' | ')}`,
+        });
+      });
+    }
   }
 }
 

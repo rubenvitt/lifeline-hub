@@ -280,11 +280,12 @@ export default function AbloesungPage() {
   const einheitenFrei = istKeyFreigegeben('einheiten', freigabenQuery.data);
   // Gesperrt erst, wenn die Freigaben da sind: beim Laden steht das Segment offen, ohne Zahl.
   const einheitenGesperrt = freigabenQuery.data != null && !einheitenFrei;
-  // Die Einheiten braucht, wer Schichten beginnen oder Ablöser wählen darf, und „Ohne Schicht“.
+  // Die Einheiten braucht, wer Schichten beginnen oder Ablöser wählen darf, und „Ohne Schicht“ —
+  // auch beim Schreiben nur mit Freigabe (LLH-1462): ohne sie antwortete die Liste mit 403.
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: darfSchreiben || einheitenFrei,
+    enabled: einheitenFrei,
   });
   const periodenQuery = useQuery({
     queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
@@ -749,11 +750,19 @@ export default function AbloesungPage() {
       }
       // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
-        <Button type="primary" disabled={!darfSchreiben} onClick={() => oeffneBeginnen()}>
+        // Ohne Modul Einheiten gibt es keine Einheit zur Wahl (LLH-1462): gesperrt, der Grund
+        // steht sichtbar unter der Werkzeugzeile. Ebenso, solange die Freigaben unbekannt sind:
+        // der Dialog öffnete sonst ohne wählbare Einheit (ihr Fehler steht im Einsatzrahmen).
+        <Button
+          type="primary"
+          disabled={!darfSchreiben || !einheitenFrei}
+          aria-describedby={darfSchreiben && einheitenGesperrt ? 'abloesung-sperre' : undefined}
+          onClick={() => oeffneBeginnen()}
+        >
           Schicht beginnen
         </Button>
       }
-      neueZeile={darfSchreiben ? () => oeffneBeginnen() : undefined}
+      neueZeile={darfSchreiben && einheitenFrei ? () => oeffneBeginnen() : undefined}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (!darfSchreiben || rueckgaengigFehler != null) && (
@@ -818,6 +827,19 @@ export default function AbloesungPage() {
           </Sammelbanner>
         )}
       </Flex>
+      {/* Der Grund des gesperrten Segments sichtbar unter der Leiste (LLH-1462, LFH-1078): der
+          Tooltip des Segments erreicht kein Tablet, und im Segment selbst fehlt neben dem Banner
+          der Platz. Er hängt nur an den Freigaben, verschiebt also beim Arbeiten nichts. */}
+      {einheitenGesperrt && (
+        <Typography.Text
+          type="secondary"
+          id="abloesung-sperre"
+          data-lfh="abloesung-sperre"
+          style={{ display: 'block', marginTop: -token.marginXS, marginBottom: token.margin }}
+        >
+          {`${darfSchreiben ? 'Schicht beginnen, Ohne Schicht' : 'Ohne Schicht'} · ${MODUL_EINHEITEN_GESPERRT}`}
+        </Typography.Text>
+      )}
       {/* Die vergangenen Schichten nach Status (LLH-1128). Eine eigene Zeile: in dieser Ansicht
           steht kein Banner, und neben der Ansichtsleiste fehlte auf dem Handschirm der Platz. */}
       {wirksam === 'vergangen' && (

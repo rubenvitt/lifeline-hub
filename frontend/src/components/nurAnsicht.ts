@@ -38,6 +38,17 @@ export const MODUL_MELDUNGEN_GESPERRT = 'Modul Meldungen gesperrt';
 /** Verbleib im Bereitstellungsraum nach dem Vollzug einer Ablösung (LLH-1308). */
 export const MODUL_BR_GESPERRT = 'Modul Bereitstellungsräume gesperrt';
 
+/**
+ * Grund für eine Fläche, der mehrere Quellen fehlen können (LLH-1462, Meldebild): „Modul Personal
+ * gesperrt“, „Module Personal und Fahrzeuge gesperrt“. `null` ohne gesperrtes Modul. Die Namen
+ * kommen vom Aufrufer im Wortlaut der Konstanten oben.
+ */
+export function modulSperre(namen: readonly string[]): string | null {
+  if (namen.length === 0) return null;
+  if (namen.length === 1) return `Modul ${namen[0]} gesperrt`;
+  return `Module ${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]} gesperrt`;
+}
+
 /** Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. */
 export function einsatzRechteGrund(einsatzStatus: EinsatzStatus): string {
   return einsatzStatus !== 'aktiv' ? EINSATZ_ABGESCHLOSSEN : NUR_LEITUNG_FUEHRUNG;

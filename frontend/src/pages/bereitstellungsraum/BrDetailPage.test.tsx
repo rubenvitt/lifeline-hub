@@ -172,6 +172,17 @@ function renderBrDetail(brId = 1): QueryClient {
   return qc;
 }
 
+/**
+ * Wartet auf Einheiten- und Fahrzeugliste: sie laden erst nach der Modulfreigabe (LLH-1462), also
+ * nach dem Raum selbst.
+ */
+async function warteAufListen(qc: QueryClient) {
+  await waitFor(() => {
+    expect(qc.getQueryState(einsatzKeys.einheiten(1))?.status).toBe('success');
+    expect(qc.getQueryState(einsatzKeys.fahrzeuge(1))?.status).toBe('success');
+  });
+}
+
 /** Text einer Kennzahl des Belegungsbands, gefunden über ihre Augenbraue. */
 function kennzahl(titel: string): HTMLElement {
   const zellen = screen
@@ -387,7 +398,7 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
       http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     );
 
-    renderBrDetail();
+    await warteAufListen(renderBrDetail());
 
     // Kräfte sind sichtbar …
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
@@ -453,7 +464,7 @@ describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
       ),
     );
 
-    renderBrDetail();
+    await warteAufListen(renderBrDetail());
 
     await screen.findByTestId('br-summe');
     expect(kennzahl('Bereitgestellt')).toHaveTextContent('1/4/20//25');
@@ -1678,12 +1689,90 @@ function stelleBelegtBereit(br: BrDetail = BELEGT, zaehler?: { detail: number })
   );
 }
 
+describe('BrDetailPage — gesperrte Nachbarmodule (LLH-1462)', () => {
+  mitUhr();
+
+  function gesperrt(module: ('einheiten' | 'fahrzeuge')[]) {
+    const abrufe: string[] = [];
+    stelleBelegtBereit();
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture(Object.fromEntries(module.map((m) => [m, { zugriff: false }]))),
+        ),
+      ),
+      ...module.map((m) =>
+        http.get(`/api/einsaetze/1/${m}`, ({ request }) => {
+          abrufe.push(new URL(request.url).pathname);
+          return HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 });
+        }),
+      ),
+    );
+    renderBrDetail();
+    return abrufe;
+  }
+
+  it('Einheiten gesperrt: Stärke „—“ mit dem Modul als Grund, kein Abruf', async () => {
+    const abrufe = gesperrt(['einheiten']);
+    await screen.findByTestId('br-summe');
+    await waitFor(() =>
+      expect(kennzahl('Bereitgestellt')).toHaveTextContent('Modul Einheiten gesperrt'),
+    );
+    expect(kennzahl('Bereitgestellt')).not.toHaveTextContent('unvollständig');
+    expect(
+      await screen.findByText('Modul Einheiten gesperrt', {
+        selector: '[data-lfh="br-kraefte-sperre"]',
+      }),
+    ).toBeInTheDocument();
+    expect(abrufe).toEqual([]);
+  });
+
+  it('beide gesperrt: die Seitenleiste nennt beide Module, behauptet keine leere Liste', async () => {
+    const abrufe = gesperrt(['einheiten', 'fahrzeuge']);
+    expect(
+      await screen.findByText('Module Einheiten und Fahrzeuge gesperrt', {
+        selector: '[data-lfh="br-kraefte-sperre"]',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/keine freien Kräfte/i)).toBeNull();
+    expect(abrufe).toEqual([]);
+  });
+});
+
+describe('BrDetailPage — gescheiterte Freigaben (LLH-1462)', () => {
+  mitUhr();
+
+  it('die Seitenleiste meldet den Fehler mit erneutem Abruf, keine leere Liste', async () => {
+    stelleBelegtBereit();
+    // Die Freigaben scheitern, bis der Knopf gedrückt ist: auch ein später eingehängter
+    // Beobachter, der beim Einhängen neu fragt, bekommt den Fehler und nicht schon den Erfolg.
+    let heil = false;
+    let nachKlick = 0;
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () => {
+        if (heil) nachKlick += 1;
+        return heil
+          ? HttpResponse.json(freigabenFixture())
+          : HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+      }),
+    );
+    renderBrDetail();
+    const leiste = await screen.findByTestId('kraefte-ohne-br');
+    const knopf = await within(leiste).findByRole('button', { name: 'Erneut abrufen' });
+    expect(within(leiste).queryByText(/keine freien Kräfte/i)).toBeNull();
+    heil = true;
+    await userEvent.click(knopf);
+    await waitFor(() => expect(within(leiste).queryByRole('alert')).toBeNull());
+    expect(nachKlick).toBeGreaterThanOrEqual(1);
+  });
+});
+
 describe('BrDetailPage — Kennzahlenband der Belegung (LLH-1095 D9)', () => {
   mitUhr();
 
   it('zeigt Stärke, Fahrzeuge, Einheiten und längste Wartezeit', async () => {
     stelleBelegtBereit();
-    renderBrDetail();
+    await warteAufListen(renderBrDetail());
     await screen.findByTestId('br-summe');
     expect(kennzahl('Bereitgestellt')).toHaveTextContent('0/1/5//6');
     expect(kennzahl('Fahrzeuge')).toHaveTextContent(/^Fahrzeuge3$/);
@@ -1738,7 +1827,7 @@ describe('BrDetailPage — Zeile je Kraft mit Wartezeit (LLH-1095 D10)', () => {
 
   it('Einheit mit Typ, Stärke und den Funkrufnamen ihrer Fahrzeuge', async () => {
     stelleBelegtBereit();
-    renderBrDetail();
+    await warteAufListen(renderBrDetail());
     await screen.findByText('1. Zug');
     const zeile = belegungsZeile('1. Zug');
     expect(zeile).toHaveTextContent('Zug');
@@ -1749,7 +1838,7 @@ describe('BrDetailPage — Zeile je Kraft mit Wartezeit (LLH-1095 D10)', () => {
 
   it('Fahrzeug ohne Einheit mit Typ und „seit …“', async () => {
     stelleBelegtBereit();
-    renderBrDetail();
+    await warteAufListen(renderBrDetail());
     await screen.findByText('Florian 1/83-1');
     const zeile = belegungsZeile('Florian 1/83-1');
     expect(zeile).toHaveTextContent('GW-San');
@@ -2156,7 +2245,7 @@ describe('BrDetailPage — Eintreffen ohne Netz (LLH-1075 Teil III)', () => {
   });
 
   it('am Gerät: ein Tipp merkt vor, der Raum zeigt „Vorgemerkt“, der Treffer ist gesperrt', async () => {
-    renderBrDetail();
+    await warteAufListen(renderBrDetail());
     const knopf = await screen.findByRole('button', { name: 'Eintreffen buchen' });
     act(() => setzeOnline(false));
     await userEvent.click(knopf);

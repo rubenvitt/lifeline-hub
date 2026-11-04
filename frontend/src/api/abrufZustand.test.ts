@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { abrufZustand, schlechtesterZustand } from './abrufZustand';
+import { abrufZustand, schlechtesterZustand, zustandNachFreigabe } from './abrufZustand';
 import { ApiError } from './client';
 
 const ruhig = { error: null, isError: false, isPending: false };
@@ -39,5 +39,26 @@ describe('schlechtesterZustand', () => {
     expect(schlechtesterZustand('laden', 'fehler', 'daten')).toBe('fehler');
     expect(schlechtesterZustand('fehler', 'gesperrt')).toBe('gesperrt');
     expect(schlechtesterZustand('daten', 'daten')).toBe('daten');
+  });
+});
+
+describe('zustandNachFreigabe', () => {
+  it('ohne Freigabe gesperrt, auch wenn die Abfrage nie lief', () => {
+    expect(zustandNachFreigabe({ ...ruhig, isPending: true }, false)).toBe('gesperrt');
+  });
+
+  it('bei unbekannten Freigaben laden, nie Daten', () => {
+    expect(zustandNachFreigabe(ruhig, undefined)).toBe('laden');
+  });
+
+  it('bei gescheiterten Freigaben Fehler, nie ewig laden', () => {
+    expect(zustandNachFreigabe({ ...ruhig, isPending: true }, undefined, true)).toBe('fehler');
+  });
+
+  it('mit Freigabe der Abrufzustand', () => {
+    expect(zustandNachFreigabe(ruhig, true)).toBe('daten');
+    expect(
+      zustandNachFreigabe({ error: new Error('Netz'), isError: true, isPending: false }, true),
+    ).toBe('fehler');
   });
 });

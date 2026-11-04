@@ -61,6 +61,7 @@ import {
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
+import { useGesperrteListenRaeumen } from './gesperrteListen';
 import { setzeAppBadge } from '../alarm/appBadge';
 import EingaengeKnopf from '../alarm/EingaengeKnopf';
 import { useUngeleseneEingaenge } from '../alarm/useBenachrichtigungVerlauf';
@@ -258,6 +259,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const modulFreigaben = modulFreigabenQuery.data;
+  useGesperrteListenRaeumen(einsatzId, modulFreigaben);
   // Tab-Titel aus dem Menünamen (LFH-954, Entscheidung 3: „Seite · Einsatz · lifeline-hub“). Hier
   // im Rahmen, nicht je Seite: so tragen auch Unterrouten und die Lagekarte ohne `EinsatzSeite`
   // einen Titel, und der Name kommt aus derselben Quelle wie das Menü. Davor die Zahl der

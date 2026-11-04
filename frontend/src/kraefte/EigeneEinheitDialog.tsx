@@ -23,6 +23,11 @@ export interface EigeneEinheitDialogProps {
   personal: readonly EinsatzPersonal[];
   /** Abschnitte zur Wahl; `null` ohne Freigabe des Moduls Einsatzabschnitte (Feld entfällt). */
   abschnitte: readonly Einsatzabschnitt[] | null;
+  /**
+   * Besatzung unbekannt (LLH-1462): Personal gesperrt („Modul Personal gesperrt“), lädt („—“) oder
+   * gescheitert. Der Server übernimmt die Besatzung trotzdem, die Zeile sagt das vor dem Bilden.
+   */
+  besatzungUnbekannt?: string;
   onSchliessen: () => void;
 }
 
@@ -40,6 +45,7 @@ export default function EigeneEinheitDialog({
   fahrzeug,
   personal,
   abschnitte,
+  besatzungUnbekannt,
   onSchliessen,
 }: EigeneEinheitDialogProps) {
   const qc = useQueryClient();
@@ -90,7 +96,11 @@ export default function EigeneEinheitDialog({
   });
 
   const grund = fahrzeug ? gruendeJeKraft(mutation.error, 'fahrzeug').get(fahrzeug.id) : undefined;
-  const zeile = fahrzeug ? besatzungZeile(mitkommendeBesatzung(personal, fahrzeug.id)) : null;
+  const zeile = !fahrzeug
+    ? null
+    : besatzungUnbekannt
+      ? `Besatzung: ${besatzungUnbekannt}`
+      : besatzungZeile(mitkommendeBesatzung(personal, fahrzeug.id));
 
   return (
     <ErfassungsModal<Werte>

@@ -107,10 +107,16 @@ function zeige({
   einheiten = EINHEITEN,
   fahrzeuge = FAHRZEUGE,
   vorgemerkt = [],
+  gesperrt = null,
+  einheitenFrei = true,
+  abruf,
 }: {
   einheiten?: Einheit[];
   fahrzeuge?: EinsatzFahrzeug[];
   vorgemerkt?: EintreffenEingabe[];
+  gesperrt?: string | null;
+  einheitenFrei?: boolean;
+  abruf?: 'laden' | 'fehler';
 } = {}) {
   const onClose = vi.fn();
   const onGebucht = vi.fn();
@@ -125,6 +131,9 @@ function zeige({
           einheiten={einheiten}
           fahrzeuge={fahrzeuge}
           vorgemerkt={vorgemerkt}
+          gesperrt={gesperrt}
+          einheitenFrei={einheitenFrei}
+          abruf={abruf}
           offen={offen}
           onClose={onClose}
           onGebucht={onGebucht}
@@ -192,6 +201,40 @@ describe('EintreffenDialog — Schritt 1 (LLH-1075, design.md D14)', () => {
     ).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+});
+
+describe('EintreffenDialog — gesperrte Listen (LLH-1462)', () => {
+  it('nennt die Sperre über den Gruppen und fragt ohne Einheiten keine Zeitachse ab', async () => {
+    const zeitachse: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/1/einheiten/zeitachse', ({ request }) => {
+        zeitachse.push(request.url);
+        return HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 });
+      }),
+    );
+    zeige({
+      einheiten: [],
+      fahrzeuge: [],
+      gesperrt: 'Module Einheiten und Fahrzeuge gesperrt',
+      einheitenFrei: false,
+    });
+    expect(
+      await within(dialog()).findByText('Module Einheiten und Fahrzeuge gesperrt'),
+    ).toBeInTheDocument();
+    // Ungefragte Listen sind kein leeres Ergebnis.
+    expect(within(dialog()).queryByText('Keine Treffer')).toBeNull();
+    // Der Weg über „Nicht in der Liste“ bleibt.
+    expect(within(dialog()).getByRole('button', { name: 'Nicht in der Liste' })).toBeEnabled();
+    expect(zeitachse).toEqual([]);
+  });
+});
+
+describe('EintreffenDialog — unbekannte Listen (LLH-1462)', () => {
+  it('ohne geladene Listen steht der Abrufzustand, nie „Keine Treffer“', async () => {
+    zeige({ einheiten: [], fahrzeuge: [], abruf: 'fehler' });
+    expect(await within(dialog()).findByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(within(dialog()).queryByText('Keine Treffer')).toBeNull();
   });
 });
 
