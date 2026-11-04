@@ -33,3 +33,18 @@ const RANG: Record<AbrufZustand, number> = { daten: 0, laden: 1, fehler: 2, gesp
 export function schlechtesterZustand(...zustaende: AbrufZustand[]): AbrufZustand {
   return zustaende.reduce<AbrufZustand>((a, b) => (RANG[b] > RANG[a] ? b : a), 'daten');
 }
+
+/**
+ * {@link abrufZustand} einer Liste, die an der Freigabe ihres Moduls hängt (LLH-1462, Spec
+ * `modul-freigabe`): Die Seite fragt eine gesperrte Liste gar nicht erst ab, also kommt `gesperrt`
+ * aus der Freigabe, nicht aus einem 403. `frei` ist `undefined`, solange die Freigaben unbekannt
+ * sind; die Abfrage wartet dann (`enabled: frei === true`), und die Aussage lädt.
+ */
+export function zustandNachFreigabe(
+  q: Parameters<typeof abrufZustand>[0],
+  frei: boolean | undefined,
+): AbrufZustand {
+  if (frei === false) return 'gesperrt';
+  if (frei === undefined) return 'laden';
+  return abrufZustand(q);
+}

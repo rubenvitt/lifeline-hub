@@ -37,7 +37,8 @@ import {
 } from '../routing/deeplinks';
 import { gibFahrzeugFrei, listeEinheiten, ordneFahrzeugZu } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { freigabeVon, istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { MODUL_EINHEITEN_GESPERRT, MODUL_PERSONAL_GESPERRT } from '../components/nurAnsicht';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import EinheitAngabe from '../kraefte/EinheitAngabe';
 import { funktionText } from '../kraefte/einsatzfunktionKern';
@@ -145,6 +146,7 @@ function BesatzungsBlock({
   zuordnenFehler,
   freigebenFehler,
   uebernehmen,
+  gesperrt,
 }: {
   ef: EinsatzFahrzeug;
   personal: EinsatzPersonal[];
@@ -166,7 +168,24 @@ function BesatzungsBlock({
    * (der Knopf fehlt), sonst die Zahl freier Kräfte der Einheit und der Öffner des Dialogs.
    */
   uebernehmen: { kandidaten: number; onOeffnen: () => void } | null;
+  /**
+   * Grund, wenn das Modul Personal gesperrt ist (LLH-1462): die Seite fragt das Personal dann nicht
+   * ab, die Besatzung ist unbekannt, nicht leer. Der Block nennt nur den Grund, ohne Auswahl.
+   */
+  gesperrt?: string;
 }) {
+  if (gesperrt) {
+    return (
+      <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }}>
+        <Space size={abstand.sm}>
+          <Typography.Text type="secondary">Besatzung</Typography.Text>
+          <Typography.Text type="secondary" data-lfh="besatzung-sperre">
+            {gesperrt}
+          </Typography.Text>
+        </Space>
+      </div>
+    );
+  }
   const crew = personal.filter((p) => p.fahrzeug_id === ef.id);
   const frei = personal.filter((p) => p.fahrzeug_id == null);
   return (
@@ -407,10 +426,7 @@ function FahrzeugeInhalt() {
     queryKey: globalKeys.fahrzeugStatus(),
     queryFn: listeFahrzeugStatus,
   });
-  const personalQuery = useQuery({
-    queryKey: einsatzKeys.personal(einsatzId),
-    queryFn: () => listeEinsatzPersonal(einsatzId),
-  });
+
   // Einheit und Abschnitt hängen am Modul `einheiten`, nicht an `fahrzeuge` (LLH-1073, design.md
   // D5): ohne Freigabe weder Spalten noch Abruf, das Tableau läuft ungegliedert. Die Freigaben
   // teilen den Schlüssel mit `useModulFreigaben`; der Abruf hier liefert zusätzlich den Ladezustand,
@@ -420,6 +436,15 @@ function FahrzeugeInhalt() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const einheitenFrei = istKeyFreigegeben('einheiten', freigabenQuery.data);
+  // Die Besatzung kommt aus dem Personal (Modul Personal, LLH-1462): ohne Freigabe kein Abruf, und
+  // Spalte wie Aufklapper nennen die Sperre statt „Ist 0“ und „Keine Besatzung zugeordnet“.
+  const personalFrei = freigabeVon('personal', freigabenQuery.data);
+  const personalGesperrt = personalFrei === false ? MODUL_PERSONAL_GESPERRT : undefined;
+  const personalQuery = useQuery({
+    queryKey: einsatzKeys.personal(einsatzId),
+    queryFn: () => listeEinsatzPersonal(einsatzId),
+    enabled: personalFrei === true,
+  });
   const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigabenQuery.data);
   // Beladung im Aufklapper (LLH-1225, design.md D11): Fahrzeuge haben kein eigenes Material-DTO,
   // die Posten kommen aus der Materialliste. Ohne Freigabe Material weder Block noch Abruf (D9).
@@ -905,12 +930,20 @@ function FahrzeugeInhalt() {
       width: 320,
       // Nach der Ist-Stärke, wie das Abzeichen sie zählt.
       sortWert: (ef) => personal.filter((p) => p.fahrzeug_id === ef.id).length,
-      render: (_, ef) => (
-        <BesatzungsStaerkeBadge
-          crew={personal.filter((p) => p.fahrzeug_id === ef.id)}
-          soll={ef.soll_besatzung ?? null}
-        />
-      ),
+      render: (_, ef) =>
+        personalGesperrt ? (
+          <Typography.Text type="secondary" data-lfh="besatzung-sperre">
+            {personalGesperrt}
+          </Typography.Text>
+        ) : personalQuery.data === undefined ? (
+          // Liste noch nicht da (oder nicht abrufbar): unbekannt heißt „—“, nicht „nicht erfasst“.
+          <Typography.Text type="secondary">—</Typography.Text>
+        ) : (
+          <BesatzungsStaerkeBadge
+            crew={personal.filter((p) => p.fahrzeug_id === ef.id)}
+            soll={ef.soll_besatzung ?? null}
+          />
+        ),
     },
     {
       title: 'Kennzeichen',
@@ -1067,11 +1100,14 @@ function FahrzeugeInhalt() {
               einheiten={einheitenFrei ? (einheitenQuery.data ?? null) : null}
               // Nur ohne Daten: scheitert bloß ein Refetch, steht die bekannte Gliederung weiter
               // da. Ohne Freigabe sagt der Hinweis ebenfalls, warum ungegliedert.
+              // Gesperrt nennt der Hinweis das Modul (LLH-1462), nur ein Ausfall heißt „nicht
+              // abrufbar“.
               einheitenHinweis={
-                (freigabenQuery.isSuccess && !einheitenFrei) ||
-                (einheitenQuery.isError && !einheitenQuery.data)
-                  ? 'Einheiten nicht abrufbar — Fahrzeuge ohne Gliederung'
-                  : undefined
+                freigabenQuery.isSuccess && !einheitenFrei
+                  ? `${MODUL_EINHEITEN_GESPERRT} · Fahrzeuge ohne Gliederung`
+                  : einheitenQuery.isError && !einheitenQuery.data
+                    ? 'Einheiten nicht abrufbar — Fahrzeuge ohne Gliederung'
+                    : undefined
               }
               darfSchreiben={darfSchreiben}
               bedienungVon={statusBedienungVon}
@@ -1123,6 +1159,7 @@ function FahrzeugeInhalt() {
                       onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
                       zuordnenFehler={zuordnenFehler.grund(ef.id)}
                       freigebenFehler={freigebenFehler.grund}
+                      gesperrt={personalGesperrt}
                       uebernehmen={
                         ef.einheit_id != null
                           ? {

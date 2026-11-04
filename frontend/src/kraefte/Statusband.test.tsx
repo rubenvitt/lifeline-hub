@@ -42,7 +42,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
           zelle('x', 'neutral', 1, null),
         ]}
         personal={[]}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     const p = paneel('Einheiten nach FMS-Status');
@@ -62,7 +63,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
         {...basis}
         einheiten={[]}
         personal={[zelle('p1', 'achtung', 12, null)]}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     const p = paneel('Personal nach Status');
@@ -77,7 +79,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
         {...basis}
         einheiten={[zelle('s4', 'achtung', 3)]}
         personal={[zelle('p1', 'achtung', 12, null)]}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     expect(container.querySelectorAll('[data-lfh="paneel"]')).toHaveLength(2);
@@ -91,7 +94,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
         einheiten={[zelle('s4', 'achtung', 3)]}
         personal={[]}
         rueckmeldung={RUECKMELDUNG}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     const k = paneel('Einheiten ohne Rückmeldung').querySelector(
@@ -106,7 +110,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
         {...basis}
         einheiten={[zelle('s4', 'achtung', 3)]}
         personal={[]}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
@@ -119,7 +124,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
         einheiten={[zelle('s4', 'achtung', 3)]}
         personal={[]}
         rueckmeldung={RUECKMELDUNG}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     const p = paneel('Einheiten ohne Rückmeldung');
@@ -133,7 +139,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
         einheiten={[zelle('s4', 'achtung', 3)]}
         einheitenHinweis="ungefiltert"
         personal={[]}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     expect(
@@ -154,7 +161,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
           eintraege: [],
         }}
         zulaufZiel="/einsaetze/1/nachforderungen"
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
       { route: '/einsaetze/1/kraefteuebersicht' },
     );
@@ -170,7 +178,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
         {...basis}
         einheiten={[zelle('s4', 'achtung', 3)]}
         personal={[]}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     expect(screen.queryByRole('region', { name: 'Zulauf aus Nachforderungen' })).toBeNull();
@@ -188,7 +197,8 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
           ton: 'achtung',
           eintraege: [],
         }}
-        zustand="daten"
+        einheitenZustand="daten"
+        personalZustand="daten"
       />,
     );
     const k = kennzahl('Zulauf aus Nachforderungen');
@@ -197,7 +207,15 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
   });
 
   it('leer: der Satz statt einer Null-Liste', () => {
-    renderMitProviders(<Statusband {...basis} einheiten={[]} personal={[]} zustand="daten" />);
+    renderMitProviders(
+      <Statusband
+        {...basis}
+        einheiten={[]}
+        personal={[]}
+        einheitenZustand="daten"
+        personalZustand="daten"
+      />,
+    );
     expect(
       within(paneel('Einheiten nach FMS-Status')).getByText('Keine Einheiten gebildet.'),
     ).toBeInTheDocument();
@@ -207,7 +225,15 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
   });
 
   it('laden: benannter Ladezustand statt einer Null', () => {
-    renderMitProviders(<Statusband {...basis} einheiten={[]} personal={[]} zustand="laden" />);
+    renderMitProviders(
+      <Statusband
+        {...basis}
+        einheiten={[]}
+        personal={[]}
+        einheitenZustand="laden"
+        personalZustand="laden"
+      />,
+    );
     expect(screen.getByLabelText('Einheiten nach FMS-Status wird geladen')).toBeInTheDocument();
     expect(screen.queryByText('Keine Einheiten gebildet.')).toBeNull();
   });
@@ -215,12 +241,35 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
   it('Fehler: „Stand unbekannt“ und Neuladen, nie eine Null', () => {
     const onNeuladen = vi.fn();
     renderMitProviders(
-      <Statusband onNeuladen={onNeuladen} einheiten={[]} personal={[]} zustand="fehler" />,
+      <Statusband
+        onNeuladen={onNeuladen}
+        einheiten={[]}
+        personal={[]}
+        einheitenZustand="fehler"
+        personalZustand="fehler"
+      />,
     );
     const alarme = screen.getAllByRole('alert');
     expect(alarme).toHaveLength(2);
     fireEvent.click(within(alarme[0]).getByRole('button', { name: 'Erneut abrufen' }));
     expect(onNeuladen).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('gesperrt (LLH-1462): jedes Paneel nennt sein Modul, das freie zählt weiter', () => {
+    renderMitProviders(
+      <Statusband
+        {...basis}
+        einheiten={[zelle('s3', 'achtung', 2)]}
+        personal={[]}
+        einheitenZustand="daten"
+        personalZustand="gesperrt"
+      />,
+    );
+    const personal = paneel('Personal nach Status');
+    expect(within(personal).getByText('Modul Personal gesperrt')).toBeVisible();
+    expect(within(personal).queryByRole('button', { name: 'Erneut abrufen' })).toBeNull();
+    expect(within(paneel('Einheiten nach FMS-Status')).getByText('2 Einheiten')).toBeVisible();
+    expect(screen.queryByText(/nicht abrufbar|Stand unbekannt/)).toBeNull();
   });
 });

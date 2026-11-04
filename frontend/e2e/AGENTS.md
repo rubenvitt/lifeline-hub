@@ -17,7 +17,10 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   `openspec/changes/archive/2026-10-03-lfh-820-layout-gates-modulsperre-override/pruefliste.md`.
   Kräfte-Seiten (LLH-1270): Gate 3 und `fokus-verdeckung` messen die Einheit-Ansicht mit
   gesperrtem Personal („Ohne Besatzung“, `seedEinheitPersonalGesperrt` in `e2e/einheit-fixture.ts`),
-  dort zusätzlich als Führungspersonal, weil die Sperre auch Schreibziele ändert.
+  dort zusätzlich als Führungspersonal, weil die Sperre auch Schreibziele ändert. Ebenso den
+  Sperrzweig von Meldebild, Fahrzeugen, FMS-Tableau, Bereitstellungsräumen und Ablösung
+  (LLH-1462, `SPERR_SZENARIEN` in `e2e/kraefte-sperre-fixture.ts`): Vorbedingung je Seite ist
+  der sichtbare Grund und keine 403 beim Laden.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
   `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.

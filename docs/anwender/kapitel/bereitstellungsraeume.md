@@ -425,7 +425,9 @@ Lesen darf, wer das Modul Bereitstellungsräume sieht. Anlegen, ändern, in Betr
 Eintreffen buchen, zuweisen, abrufen, Ausrücken buchen, Abrufe zurücknehmen, verlegen, austragen, auflösen
 und stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel
 [Rechte im Einsatz](rechte-im-einsatz.md)).
-Eine unangemeldete Kraft verlangt zusätzlich das Recht auf Einheiten und auf Fahrzeuge; fehlt es,
+Ohne das Modul Einheiten steht die Stärke eines Raums als „Modul Einheiten gesperrt“; fehlen
+Einheiten oder Fahrzeuge, nennt die Seitenleiste „Kräfte ohne BR“ und der Dialog „Eintreffen
+buchen“ das gesperrte Modul, statt eine leere Liste zu zeigen. Eine unangemeldete Kraft verlangt zusätzlich das Recht auf Einheiten und auf Fahrzeuge; fehlt es,
 steht der Grund im Dialog und nichts wird gebucht. Beim Abruf verlangt der Ziel-Abschnitt
 zusätzlich das Modul Einheiten (die Liste der Abschnitte das Modul Einsatzabschnitte), der Auftrag
 das Modul Aufträge; fehlt eines, steht das Feld gesperrt mit „Modul … gesperrt“, und der Abruf

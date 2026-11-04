@@ -1,6 +1,11 @@
 import { IconPlus, IconTrichter } from '../icons';
 import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
-import { istKeyFreigegeben, KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
+import {
+  freigabeVon,
+  istKeyFreigegeben,
+  KEINE_BERECHTIGUNG,
+  modulName,
+} from '../einsatz/modulRegistry';
 import { Breadcrumb, Button, Input, Popover, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -34,7 +39,7 @@ import {
   RUECKMELDUNG_WORT,
   rueckmeldungJeEinheit,
 } from '../meldungen/rueckmeldung';
-import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
+import { abrufZustand, zustandNachFreigabe, type AbrufZustand } from '../api/abrufZustand';
 import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { ankerText, dauerText, kraftDauern, type LaufendeDauer } from '../kraefte/zeitachse';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
@@ -61,7 +66,7 @@ import {
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
 import { handStatusOptionen, KEIN_HANDSTATUS } from '../kraefte/fmsTableauKern';
-import Statusband from '../kraefte/Statusband';
+import Statusband, { type StatusbandZustand } from '../kraefte/Statusband';
 import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
 import {
   besatzungZeilen,
@@ -95,6 +100,11 @@ import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/inst
 import Segmentleiste from '../components/instrument/Segmentleiste';
 import './kraefteuebersichtPrint.css';
 import { KennungsLink } from '../components/kennungsLink';
+import {
+  MODUL_AUFTRAEGE_GESPERRT,
+  MODUL_EINHEITEN_GESPERRT,
+  modulSperre,
+} from '../components/nurAnsicht';
 import { funktionText } from '../kraefte/einsatzfunktionKern';
 import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
 
@@ -182,7 +192,14 @@ export function meldebildMeta(args: {
   staerke: string;
   staerkeGesamt: string;
   gefiltert: boolean;
+  /** Ohne Freigabe Einheiten ist ihre Zahl unbekannt (LLH-1462): keine „0 Einheiten“. */
+  einheitenGesperrt?: boolean;
 }): string {
+  if (args.einheitenGesperrt) {
+    return args.gefiltert
+      ? `Stärke ${args.staerke} von ${args.staerkeGesamt}`
+      : `Stärke ${args.staerkeGesamt}`;
+  }
   const wort = args.einheitenGesamt === 1 ? 'Einheit' : 'Einheiten';
   if (!args.gefiltert) return `${args.einheitenGesamt} ${wort} · Stärke ${args.staerkeGesamt}`;
   return (
@@ -236,6 +253,8 @@ function rasterSpalten(
   rueckmeldung: RueckmeldungSpalte,
   imEinsatz: ImEinsatzSpalte,
   sprungGesperrt: SprungGesperrt,
+  /** Ohne Freigabe Personal ist jede Stärke unbekannt, nie 0 (LLH-1462). */
+  staerkeBekannt: boolean,
 ) {
   // Spaltenfolge nach der Frage am Schirm (LFH-973): Status, Rückmeldung und Auftrag stehen
   // vorn, damit sie bei 1440 px ohne Querscrollen im Bild liegen; Funkrufname und Mittel weichen
@@ -304,7 +323,11 @@ function rasterSpalten(
       // Einheit: kumulierte Stärke (D2). Fahrzeug: die Besatzung Ist/Soll statt einer Stärke
       // (D4), gedämpft — sie ist in der Elternzahl schon enthalten.
       render: (_t, z) =>
-        z.staerke ? (
+        !staerkeBekannt ? (
+          z.art === 'einheit' || z.art === 'fahrzeug' ? (
+            <span style={monoStil(12)}>—</span>
+          ) : null
+        ) : z.staerke ? (
           <span style={monoStil(12)}>{staerkeText(z.staerke)}</span>
         ) : z.besatzung ? (
           <StaerkeBesatzung zeilen={besatzungZeilen(z.besatzung)} />
@@ -536,12 +559,14 @@ function AuftragZelle({
   const { rollen } = useRollen();
   if (z.art !== 'einheit' || z.einheitId == null) return null;
   // Scheitert der Auftragsabruf, bleibt die Tabelle stehen — die Zelle sagt, dass sie nichts weiß,
-  // statt „kein Auftrag" zu behaupten. Eine Rolle ohne Auftragsrecht bekommt 403 — „nicht für
-  // dich", keine Störung, und darf nicht wie eine aussehen.
+  // statt „kein Auftrag" zu behaupten. Ohne Freigabe Aufträge fragt die Seite nicht ab — „nicht
+  // für dich", keine Störung, und darf nicht wie eine aussehen.
   if (zustand === 'gesperrt') {
+    // Der Grund steht sichtbar in der Zelle (LLH-1462): ein `title` erreicht kein Tablet, und
+    // die Karte des Handschirms zeigt die Zelle ohne Spaltenkopf.
     return (
-      <span title="Aufträge für diese Rolle nicht einsehbar" style={{ color: rollen.gedaempft }}>
-        —
+      <span data-lfh="meldebild-auftrag-sperre" style={{ color: rollen.gedaempft }}>
+        {MODUL_AUFTRAEGE_GESPERRT}
       </span>
     );
   }
@@ -651,7 +676,20 @@ export default function KraefteuebersichtPage() {
   const meldungenGesperrt = sprungGesperrt('meldungen');
   // Zulauf aus Nachforderungen (LLH-1384, design.md D7): nur mit Freigabe des Moduls, sonst weder
   // Abruf noch Kennzahl. Dieselben Freigaben aus dem Rahmen-Cache wie die Sprungsperre.
-  const nachforderungenFrei = istKeyFreigegeben('nachforderungen', useModulFreigaben(einsatzId));
+  const freigaben = useModulFreigaben(einsatzId);
+  const nachforderungenFrei = istKeyFreigegeben('nachforderungen', freigaben);
+  // Die Listen der Nachbarmodule nur mit deren Freigabe (LLH-1462, Spec `modul-freigabe`): eine
+  // gesperrte Liste wird nicht abgefragt, die Fläche nennt die Sperre statt eines Abruffehlers.
+  // `undefined`, solange die Freigaben laden (der Rahmen hat sie beim Kaltstart schon im Cache).
+  const frei = {
+    einheiten: freigabeVon('einheiten', freigaben),
+    personal: freigabeVon('personal', freigaben),
+    fahrzeuge: freigabeVon('fahrzeuge', freigaben),
+    material: freigabeVon('material', freigaben),
+    abschnitte: freigabeVon('einsatzabschnitte', freigaben),
+    auftraege: freigabeVon('auftraege', freigaben),
+    meldungen: freigabeVon('meldungen', freigaben),
+  };
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const qc = useQueryClient();
@@ -677,10 +715,12 @@ export default function KraefteuebersichtPage() {
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: frei.einheiten === true,
   });
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
+    enabled: frei.personal === true,
   });
   // Nachweis der beendeten Kräfte (LLH-1079, LLH-1235): Blöcke unter dem Raster und im
   // Lagebericht. Scheitert ein Abruf, fehlt am Schirm nur sein Teil; der Lagebericht sagt
@@ -688,26 +728,32 @@ export default function KraefteuebersichtPage() {
   const entlasseneQuery = useQuery({
     queryKey: einsatzKeys.personalEntlassene(einsatzId),
     queryFn: () => listEntlassenesPersonal(einsatzId),
+    enabled: frei.personal === true,
   });
   const fahrzeugeEntlasseneQuery = useQuery({
     queryKey: einsatzKeys.fahrzeugeEntlassene(einsatzId),
     queryFn: () => listEntlasseneFahrzeuge(einsatzId),
+    enabled: frei.fahrzeuge === true,
   });
   const materialEntlassenQuery = useQuery({
     queryKey: einsatzKeys.materialEntlassene(einsatzId),
     queryFn: () => listEntlassenesMaterial(einsatzId),
+    enabled: frei.material === true,
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: frei.fahrzeuge === true,
   });
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listEinsatzMaterial(einsatzId),
+    enabled: frei.material === true,
   });
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
+    enabled: frei.abschnitte === true,
   });
   // Die zwei Zusatzabrufe des Rasters. Beide dürfen scheitern, ohne die Seite zu nehmen:
   // ohne Katalog fehlen nur die FMS-Codes, ohne Aufträge nur die Auftragsspalte.
@@ -720,6 +766,7 @@ export default function KraefteuebersichtPage() {
   const auftraegeQuery = useQuery({
     queryKey: einsatzKeys.auftraegePhase(einsatzId, 'offen', 'alle', 'alle'),
     queryFn: () => listeOffeneAuftraege(einsatzId),
+    enabled: frei.auftraege === true,
   });
   // Dritter Zusatzabruf. Liegt unter dem `meldungen`-Präfix und wird vom Live-Ereignis `meldung`
   // mit invalidiert. 403 heißt „Meldungen für diese Rolle nicht lesbar" — dann gibt es weder Spalte
@@ -727,12 +774,14 @@ export default function KraefteuebersichtPage() {
   const rueckmeldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
     queryFn: () => holeRueckmeldungen(einsatzId),
+    enabled: frei.meldungen === true,
   });
   // Vierter Zusatzabruf (LFH-552): Perioden je Einheit für „Im Einsatz". Scheitert er, fehlt nur
   // die Dauer.
   const periodenQuery = useQuery({
     queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
     queryFn: () => listeEinheitenPerioden(einsatzId),
+    enabled: frei.einheiten === true,
   });
   // Fünfter Zusatzabruf (LLH-1384): derselbe Cache wie das Board, live über `nachforderung`.
   // Scheitert er, fehlt nur die Kennzahl „Zulauf“.
@@ -801,7 +850,7 @@ export default function KraefteuebersichtPage() {
     [expandedKeys, raster],
   );
 
-  const rueckmeldungZustand = abrufZustand(rueckmeldungenQuery);
+  const rueckmeldungZustand = zustandNachFreigabe(rueckmeldungenQuery, frei.meldungen);
   const rueckmeldungDaten = rueckmeldungZustand === 'daten' ? rueckmeldungenQuery.data : undefined;
   /**
    * Anzeige je Zeilenschlüssel — nur bei lesbaren Daten. Beim Laden, bei Fehler und bei 403 bleibt
@@ -876,8 +925,8 @@ export default function KraefteuebersichtPage() {
     [personalQuery.data, fahrzeugeQuery.data, materialQuery.data],
   );
 
-  const auftraegeZustand = abrufZustand(auftraegeQuery);
-  const periodenZustand = abrufZustand(periodenQuery);
+  const auftraegeZustand = zustandNachFreigabe(auftraegeQuery, frei.auftraege);
+  const periodenZustand = zustandNachFreigabe(periodenQuery, frei.einheiten);
   const jetztMs = jetzt.valueOf();
   const imEinsatzJeEinheit = useMemo(() => {
     const m = new Map<number, LaufendeDauer>();
@@ -947,6 +996,7 @@ export default function KraefteuebersichtPage() {
         { zustand: rueckmeldungZustand, jeZeile: rueckmeldungJeZeile },
         { zustand: periodenZustand, jeEinheit: imEinsatzJeEinheit },
         sprungGesperrt,
+        frei.personal !== false,
       ).filter((spalte) => !druckt || !NUR_AM_SCHIRM.has(spalte.key)),
     [
       druckt,
@@ -960,6 +1010,7 @@ export default function KraefteuebersichtPage() {
       periodenZustand,
       imEinsatzJeEinheit,
       sprungGesperrt,
+      frei.personal,
     ],
   );
   // Der Spaltenschalter steht in der eigenen Werkzeugzeile, nicht in der des Primitivs (LLH-1417):
@@ -1034,9 +1085,18 @@ export default function KraefteuebersichtPage() {
   // gescheiterte Mittel-Liste (Modul ohne Freigabe) hält den Sprung nicht auf. Steht NACH dem
   // Rücksetzen oben, sonst räumte es beim ersten Bild den Sprung wieder ab. Eine unbekannte oder
   // fremde ID lässt die Vorgabe ohne Markierung.
+  // Eine gesperrte Liste wird nie abgefragt (LLH-1462) und hält den Sprung ebenso nicht auf.
+  // Erst mit bekannten Freigaben: vorher ruht jede Abfrage, und ein alter Cache sähe frisch aus.
   const listenFrisch =
+    frei.einheiten === true &&
     einheitenQuery.isSuccess &&
-    [einheitenQuery, personalQuery, fahrzeugeQuery].every((q) => !q.isPending && !q.isFetching);
+    !einheitenQuery.isFetching &&
+    (
+      [
+        [personalQuery, frei.personal],
+        [fahrzeugeQuery, frei.fahrzeuge],
+      ] as const
+    ).every(([q, f]) => f === false || (f === true && !q.isPending && !q.isFetching));
   useQueryParamSelektion('einheit', listenFrisch, (eid) => {
     const ziel = `eh-${eid}`;
     const sprung = schluesselZumSprung(raster, ziel);
@@ -1089,13 +1149,47 @@ export default function KraefteuebersichtPage() {
   const filterZahl = (filter.traeger ? 1 : 0) + (filter.kategorie ? 1 : 0);
 
   const listenFehler = personalQuery.isError || fahrzeugeQuery.isError || einheitenQuery.isError;
-  const listenLaden = personalQuery.isLoading || fahrzeugeQuery.isLoading;
+  const listenLaden =
+    personalQuery.isLoading ||
+    fahrzeugeQuery.isLoading ||
+    frei.personal === undefined ||
+    frei.fahrzeuge === undefined;
+  /** Ein Paneel des Statusbands: gesperrt vor Fehler vor Laden (LLH-1462). */
+  const bandZustand = (modulFrei: boolean | undefined): StatusbandZustand =>
+    modulFrei === false
+      ? 'gesperrt'
+      : listenFehler
+        ? 'fehler'
+        : listenLaden || modulFrei === undefined
+          ? 'laden'
+          : 'daten';
+  /**
+   * Die Mittel, die dem Raster ohne Freigabe fehlen (LLH-1462): ohne die Marke sähen Zeilen,
+   * Stärke und „n von m Kräften“ vollständig aus. Einheiten und Personal nennt das Statusband.
+   */
+  const sperreId = `meldebild-sperre-${einsatzId}`;
+  const mittelGesperrt = modulSperre(
+    [
+      frei.personal === false ? 'Personal' : null,
+      frei.fahrzeuge === false ? 'Fahrzeuge' : null,
+      frei.material === false ? 'Material' : null,
+    ].filter((n): n is string => n != null),
+  );
+  /** Der Lagebericht braucht alle drei Listen; ohne Einheiten nennt das Statusband den Grund. */
+  const berichtGesperrt =
+    frei.einheiten === false
+      ? MODUL_EINHEITEN_GESPERRT
+      : frei.personal === false || frei.fahrzeuge === false
+        ? mittelGesperrt
+        : null;
 
   const meta = meldebildMeta({
     einheiten: einheitenZeilen,
     einheitenGesamt: (einheitenQuery.data ?? []).length,
-    staerke: staerkeText(v.staerke),
-    staerkeGesamt: staerkeText(gesamt.staerke),
+    // Ohne Freigabe Personal unbekannt (LLH-1462): „—“ statt einer erfundenen 0.
+    staerke: frei.personal === false ? '—' : staerkeText(v.staerke),
+    staerkeGesamt: frei.personal === false ? '—' : staerkeText(gesamt.staerke),
+    einheitenGesperrt: frei.einheiten === false,
     gefiltert,
   });
 
@@ -1196,7 +1290,8 @@ export default function KraefteuebersichtPage() {
             zulaufZiel={nachforderungenPfad(einsatzId)}
             // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
             rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
-            zustand={listenFehler ? 'fehler' : listenLaden ? 'laden' : 'daten'}
+            einheitenZustand={bandZustand(frei.einheiten)}
+            personalZustand={bandZustand(frei.personal)}
             onNeuladen={() => {
               void personalQuery.refetch();
               void fahrzeugeQuery.refetch();
@@ -1223,6 +1318,15 @@ export default function KraefteuebersichtPage() {
           <span style={{ color: token.colorTextSecondary }}>
             {sichtbareKraefte} von {alleKraefte} Kräften
           </span>
+          {mittelGesperrt && (
+            <span
+              id={sperreId}
+              data-lfh="meldebild-sperre"
+              style={{ color: token.colorTextSecondary }}
+            >
+              {mittelGesperrt}
+            </span>
+          )}
           {chips.map((chip) => (
             <Tag
               key={chip.schluessel}
@@ -1320,8 +1424,11 @@ export default function KraefteuebersichtPage() {
           {darfSchreiben && (
             <Button
               loading={uebernehmen.isPending}
-              disabled={lageberichtGesperrt}
-              title={lageberichtGesperrt ? KEINE_BERECHTIGUNG : undefined}
+              // Ein Bericht ohne eine der Listen meldete eine Lage, die niemand geprüft hat
+              // (LLH-1462): gesperrt, der Grund steht sichtbar in derselben Zeile.
+              disabled={lageberichtGesperrt || berichtGesperrt != null}
+              title={lageberichtGesperrt ? KEINE_BERECHTIGUNG : (berichtGesperrt ?? undefined)}
+              aria-describedby={berichtGesperrt != null && mittelGesperrt ? sperreId : undefined}
               onClick={() => uebernehmen.mutate()}
             >
               In Lagebericht übernehmen

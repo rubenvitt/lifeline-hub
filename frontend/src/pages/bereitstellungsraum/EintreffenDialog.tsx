@@ -105,6 +105,13 @@ export interface EintreffenDialogProps {
    * noch nicht, der Dialog bietet sie deshalb nicht erneut zum Buchen an.
    */
   vorgemerkt?: readonly EintreffenEingabe[];
+  /**
+   * Gesperrte Listen (LLH-1462): ohne Freigabe Einheiten oder Fahrzeuge fehlen deren Treffer.
+   * Der Grund steht über den Gruppen, sonst läse sich „Keine Treffer“ wie „niemand erwartet“.
+   */
+  gesperrt?: string | null;
+  /** Ohne Freigabe Einheiten fragt der Dialog die Zeitachse nicht ab (sie antwortete mit 403). */
+  einheitenFrei?: boolean;
   offen: boolean;
   onClose: () => void;
   /** Nach einer Buchung beim Server, vor der Invalidierung: die eigene Anmeldung steht sofort. */
@@ -139,6 +146,8 @@ export default function EintreffenDialog({
   einheiten,
   fahrzeuge,
   vorgemerkt = KEINE_VORGEMERKT,
+  gesperrt = null,
+  einheitenFrei = true,
   offen,
   onClose,
   onGebucht,
@@ -163,7 +172,7 @@ export default function EintreffenDialog({
   const periodenQuery = useQuery({
     queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
     queryFn: () => listeEinheitenPerioden(einsatzId),
-    enabled: offen,
+    enabled: offen && einheitenFrei,
   });
 
   // Erwartete Kräfte aus Nachforderungen (LLH-1387): ohne Freigabe 403, dann ohne Gruppe.
@@ -556,6 +565,15 @@ export default function EintreffenDialog({
         fallback="Buchen fehlgeschlagen"
       />
       <div>
+        {gesperrt && (
+          <Typography.Text
+            type="secondary"
+            data-lfh="eintreffen-sperre"
+            style={{ display: 'block' }}
+          >
+            {gesperrt}
+          </Typography.Text>
+        )}
         {gruppeNachgefordert}
         {gruppe('Erwartet', erwartetTreffer)}
         {gruppe('Im Einsatz', imEinsatzTreffer)}

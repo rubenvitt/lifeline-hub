@@ -10,6 +10,7 @@ import {
   zuordnungsKarte,
   zuordnungsZiele,
 } from './einheit-fixture';
+import { SPERR_SZENARIEN, seedKraefteGesperrt, sperrzweigSteht } from './kraefte-sperre-fixture';
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { tippe } from './fernmeldeskizze-kern';
 import { seedeVorlage } from './vorlage-kern';
@@ -653,6 +654,47 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
       gegenprobe(je, 'Funkrufname');
       test.info().annotations.push({ type: 'messwert', description: messwerte.join(' | ') });
     });
+  }
+}
+
+// Sperrzweig der Kräfte-Seiten (LLH-1462), dieselbe Achse wie die Einheit-Ansicht darüber: ein
+// Nachbarmodul per Override gesperrt, je Seite steht der Grund sichtbar und die gesperrte Liste
+// wird nicht abgefragt (Vorbedingung, `kraefte-sperre-fixture.ts`). Gemessen wird, was der Rolle
+// bleibt; ein gesperrtes Ziel ist ein sichtbares Ziel und hält die Stufe wie ein freies.
+
+for (const szenario of SPERR_SZENARIEN) {
+  for (const seite of szenario.seiten) {
+    for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
+      test(`${seite.name} (${rolle === 'beobachter' ? 'Beobachter' : 'Führungspersonal'}, Modulsperre ${szenario.name}): verbleibende Ziele halten 30 / 48 / 72 px`, async ({
+        page,
+      }) => {
+        test.setTimeout(120_000);
+        await page.setViewportSize(FUEKW);
+        await anmelden(page);
+        const sperre = await seedKraefteGesperrt(page, szenario.module, rolle);
+        const messwerte: string[] = [];
+        for (const { dichte, soll } of STAFFEL) {
+          await page.goto(seite.pfad(sperre));
+          await stelleDichte(page, dichte);
+          await sperrzweigSteht(page, seite, sperre);
+          let minimum = Infinity;
+          const ziele = seite.ziele(page, rolle);
+          for (const { name, ziel, gesperrt, mindestens } of ziele) {
+            const titel = `${seite.name}: ${name} (${dichte})`;
+            const hoehe = mindestens
+              ? await alleHaltenStufe(ziel, soll, titel, mindestens)
+              : gesperrt
+                ? await gesperrtHaeltStufe(ziel, soll, titel)
+                : await haeltStufe(ziel, soll, titel);
+            minimum = Math.min(minimum, hoehe);
+          }
+          messwerte.push(
+            `${seite.name} ${dichte} (Soll ≥ ${soll}): ${ziele.length} Ziele, kleinste ${minimum}px`,
+          );
+        }
+        test.info().annotations.push({ type: 'messwert', description: messwerte.join(' | ') });
+      });
+    }
   }
 }
 

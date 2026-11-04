@@ -77,7 +77,8 @@ import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../../components/S
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { listEinsatzMaterial } from '../../api/einsatzMaterial';
-import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
+import { freigabeVon, istKeyFreigegeben } from '../../einsatz/modulRegistry';
+import { MODUL_EINHEITEN_GESPERRT, modulSperre } from '../../components/nurAnsicht';
 import MaterialAmOrt from '../../kraefte/MaterialAmOrt';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { useDruckModus } from '../../components/druck/useDruckModus';
@@ -198,23 +199,37 @@ export default function BrDetailPage() {
     queryFn: () => ladeBr(einsatzId, brId),
     enabled: idGueltig,
   });
+  // Die Freigaben tragen Einheiten, Fahrzeuge und Material; bis `/me` feststeht kein Abruf. Ein
+  // Gerät bekommt sie vom Server auf seine Ansicht verengt (`geraet::verenge_freigaben`).
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+    enabled: !authLaedt,
+  });
+  // Einheiten und Fahrzeuge gehören ihren Modulen (LLH-1462, Spec `modul-freigabe`): ohne Freigabe
+  // kein Abruf, Seitenleiste und Kennzahl nennen die Sperre statt „keine freien Kräfte“.
+  const einheitenFrei = freigabeVon('einheiten', freigabenQuery.data);
+  const fahrzeugeFrei = freigabeVon('fahrzeuge', freigabenQuery.data);
+  const listenGesperrt = modulSperre(
+    [
+      einheitenFrei === false ? 'Einheiten' : null,
+      fahrzeugeFrei === false ? 'Fahrzeuge' : null,
+    ].filter((n): n is string => n != null),
+  );
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: einheitenFrei === true,
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: fahrzeugeFrei === true,
   });
   // Sektion „Material“ (LLH-1225, design.md D13): Posten aus der Materialliste (`br_id`), nur mit
   // Freigabe Material. Das BR-Gerät liest sie mit, vom Server auf den eigenen Raum geschnitten,
-  // und bedient nichts (LLH-1252, Entscheidung 22.10.2026); bis `/me` feststeht kein Abruf.
+  // und bedient nichts (LLH-1252, Entscheidung 22.10.2026).
   const canLoadMaterial = !authLaedt && (geraet == null || darf('br-material'));
-  const freigabenQuery = useQuery({
-    queryKey: einsatzKeys.modulFreigaben(einsatzId),
-    queryFn: () => ladeModulFreigaben(einsatzId),
-    enabled: canLoadMaterial,
-  });
   const materialFrei = canLoadMaterial && istKeyFreigegeben('material', freigabenQuery.data);
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
@@ -836,11 +851,14 @@ export default function BrDetailPage() {
                 groesse="klein"
                 wert={unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />}
                 einheit={unvollstaendig ? undefined : 'F/UF/M//Σ'}
-                ton={unvollstaendig ? 'achtung' : 'neutral'}
+                // Gesperrt ist kein Ausfall (LLH-1462): neutraler Ton, das Modul als Grund.
+                ton={unvollstaendig && einheitenFrei !== false ? 'achtung' : 'neutral'}
                 notiz={
-                  unvollstaendig
-                    ? '(Stärke unvollständig — Einheitenliste nicht geladen)'
-                    : undefined
+                  einheitenFrei === false && unvollstaendig
+                    ? MODUL_EINHEITEN_GESPERRT
+                    : unvollstaendig
+                      ? '(Stärke unvollständig — Einheitenliste nicht geladen)'
+                      : undefined
                 }
               />
               <Kennzahl
@@ -1013,6 +1031,8 @@ export default function BrDetailPage() {
           onZuweisenEinheit={onZuweisenEinheit}
           onZuweisenFahrzeug={onZuweisenFahrzeug}
           zeilenFehler={zeilen.grund}
+          gesperrt={listenGesperrt}
+          alleGesperrt={einheitenFrei === false && fahrzeugeFrei === false}
         />
       </div>
 
@@ -1027,6 +1047,8 @@ export default function BrDetailPage() {
           einheiten={einheitenQuery.data ?? []}
           fahrzeuge={fahrzeugeQuery.data ?? []}
           vorgemerkt={vorgemerkteDaten}
+          gesperrt={listenGesperrt}
+          einheitenFrei={einheitenFrei === true}
           offen={eintreffenOffen}
           onClose={() => setEintreffenOffen(false)}
           onGebucht={(ergebnis) => {

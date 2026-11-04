@@ -86,3 +86,35 @@ describe('KraefteOhneBrSidebar: „Im Einsatz“ eingeklappt (LLH-1075, design.m
     expect(onZuweisen).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 });
+
+describe('KraefteOhneBrSidebar: gesperrte Listen (LLH-1462)', () => {
+  const basis = {
+    alleEinheiten: [],
+    alleFahrzeuge: [],
+    brEinheiten: [],
+    brFahrzeuge: [],
+    schreibgeschuetzt: false,
+    onZuweisenEinheit: vi.fn(),
+    onZuweisenFahrzeug: vi.fn(),
+  };
+
+  it('beide gesperrt: der Grund statt „keine freien Kräfte“, ohne Suche und Zähler', () => {
+    renderMitProviders(
+      <KraefteOhneBrSidebar
+        {...basis}
+        gesperrt="Module Einheiten und Fahrzeuge gesperrt"
+        alleGesperrt
+      />,
+    );
+    expect(screen.getByText('Module Einheiten und Fahrzeuge gesperrt')).toBeVisible();
+    expect(screen.queryByText('keine freien Kräfte')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Kräfte suchen' })).toBeNull();
+    expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('eine gesperrt: der Grund steht über dem, was die freie Liste trägt', () => {
+    renderMitProviders(<KraefteOhneBrSidebar {...basis} gesperrt="Modul Einheiten gesperrt" />);
+    expect(screen.getByText('Modul Einheiten gesperrt')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Kräfte suchen' })).toBeVisible();
+  });
+});

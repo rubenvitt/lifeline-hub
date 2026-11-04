@@ -364,6 +364,19 @@ describe('meldebildMeta', () => {
       }),
     ).toBe('3 von 7 Einheiten · Stärke 1/0/5//6 von 2/3/10//15');
   });
+
+  it('nennt ohne Freigabe Einheiten keine Einheitenzahl (LLH-1462)', () => {
+    expect(
+      meldebildMeta({
+        einheiten: 0,
+        einheitenGesamt: 0,
+        staerke: '0/0/1//1',
+        staerkeGesamt: '0/0/1//1',
+        gefiltert: false,
+        einheitenGesperrt: true,
+      }),
+    ).toBe('Stärke 0/0/1//1');
+  });
 });
 
 describe('KraefteuebersichtPage — Statusband', () => {
@@ -799,7 +812,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     await screen.findByText('1. Zug');
     const e = await waitFor(() => {
       const z = zeile(container, 'eh-20')!;
-      expect(within(z).getByTitle('Aufträge für diese Rolle nicht einsehbar')).toBeInTheDocument();
+      expect(within(z).getByText('Modul Aufträge gesperrt')).toBeInTheDocument();
       return z;
     });
     expect(within(e).queryByTitle('Aufträge nicht abrufbar')).toBeNull();
@@ -1864,5 +1877,78 @@ describe('KraefteuebersichtPage — Spalten in der Werkzeugzeile (LLH-1417)', ()
     const container = await mitNeuemZug((c) => zeile(c, 'eh-20')!.querySelector('a')!);
     expect(await screen.findByRole('button', { name: /1 neuer Eintrag/ })).toBeInTheDocument();
     expect(zeile(container, 'eh-40')).toBeNull();
+  });
+});
+
+/**
+ * Gesperrte Nachbarmodule (LLH-1462, Spec `modul-freigabe`): ohne Freigabe fragt das Meldebild die
+ * Liste nicht ab und nennt das Modul, statt eines Abruffehlers oder einer erfundenen Null.
+ */
+describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
+  const sperre = (key: string) =>
+    vi
+      .mocked(ladeModulFreigaben)
+      .mockResolvedValue(freigabenFixture({ [key]: { zugriff: false } }));
+
+  it('Personal gesperrt: kein Abruf, das Paneel nennt das Modul, die Stärke ist unbekannt', async () => {
+    mitEinheit();
+    sperre('personal');
+    vi.mocked(listeEinsatzPersonal).mockClear();
+    vi.mocked(listEntlassenesPersonal).mockClear();
+    setup();
+    const p = await screen.findByRole('region', { name: 'Personal nach Status' });
+    await waitFor(() => expect(within(p).getByText('Modul Personal gesperrt')).toBeVisible());
+    // Die Einheiten zählen weiter, nichts heißt „nicht abrufbar“.
+    const e = screen.getByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(e).getByText('1 Einheit')).toBeInTheDocument());
+    expect(screen.queryByText(/nicht abrufbar|Stand unbekannt/)).toBeNull();
+    expect(await (await seitenkopf()).findByText('1 Einheit · Stärke —')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="meldebild-sperre"]')).toHaveTextContent(
+      'Modul Personal gesperrt',
+    );
+    // Ein Bericht ohne Personal meldete eine falsche Stärke.
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/i })).toBeDisabled();
+    expect(listeEinsatzPersonal).not.toHaveBeenCalled();
+    expect(listEntlassenesPersonal).not.toHaveBeenCalled();
+  });
+
+  it('Fahrzeuge gesperrt: kein Abruf, das Band steht, die Werkzeugzeile nennt das Modul', async () => {
+    mitEinheit();
+    sperre('fahrzeuge');
+    vi.mocked(listeEinsatzFahrzeuge).mockClear();
+    setup();
+    const e = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(e).getByText('1 Einheit')).toBeInTheDocument());
+    expect(screen.queryByText(/nicht abrufbar|Stand unbekannt/)).toBeNull();
+    expect(document.querySelector('[data-lfh="meldebild-sperre"]')).toHaveTextContent(
+      'Modul Fahrzeuge gesperrt',
+    );
+    expect(listeEinsatzFahrzeuge).not.toHaveBeenCalled();
+  });
+
+  it('Einheiten gesperrt: kein Abruf, das Paneel nennt das Modul, keine „0 Einheiten“', async () => {
+    mitEinheit();
+    sperre('einheiten');
+    vi.mocked(listeEinheiten).mockClear();
+    vi.mocked(listeEinheitenPerioden).mockClear();
+    setup();
+    const e = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(e).getByText('Modul Einheiten gesperrt')).toBeVisible());
+    expect(screen.queryByText(/nicht abrufbar|Stand unbekannt/)).toBeNull();
+    expect((await seitenkopf()).queryByText(/0 Einheiten/)).toBeNull();
+    expect(listeEinheiten).not.toHaveBeenCalled();
+    expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('Aufträge gesperrt: kein Abruf, die Zelle nennt das Modul sichtbar', async () => {
+    mitEinheit();
+    sperre('auftraege');
+    vi.mocked(listeOffeneAuftraege).mockClear();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    await waitFor(() =>
+      expect(within(zeile(container, 'eh-20')!).getByText('Modul Aufträge gesperrt')).toBeVisible(),
+    );
+    expect(listeOffeneAuftraege).not.toHaveBeenCalled();
   });
 });

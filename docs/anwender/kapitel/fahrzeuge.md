@@ -340,6 +340,9 @@ gebildete Einheit, das zugeordnete Fahrzeug und, wenn Personen mitkommen, die mi
 ### Rechte und ohne Netz
 
 Lesen darf, wer das Modul Fahrzeuge sieht; beide Ansichten stehen auch ohne Schreibrecht offen.
+Ohne das Modul Personal steht in der Spalte „Besatzung“ und im aufgeklappten Fahrzeug „Modul
+Personal gesperrt“ statt einer Besatzung, und die Stärke über der Liste steht als „—“. Ohne das
+Modul Einheiten zeigt das FMS-Tableau die Fahrzeuge ungegliedert mit „Modul Einheiten gesperrt“.
 Disponieren, Status setzen, die Einheit wählen, Angaben ändern, Besatzung zuordnen oder aus der
 Einheit übernehmen, entlassen und stornieren dürfen Einsatzleitung und Führungspersonal, solange
 der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Die Einheit wählen und ein

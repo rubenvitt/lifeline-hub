@@ -9,7 +9,7 @@ import BereitstellungsraeumePage from './BereitstellungsraeumePage';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrListenEintrag, Einheit, EinsatzAnzeige } from '../../api/types';
 import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
-import { einsatzFixture } from '../../test/fixtures';
+import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { setzeViewportBreite } from '../../test/viewport';
 import { kopfFilterWaehlen } from '../../test/kopfFilter';
 
@@ -529,6 +529,25 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
       expect((await zeileVon('BR Sportplatz')).Stärke).toBe('— unvollständig'),
     );
     expect((await zeileVon('BR Sportplatz')).Fahrzeuge).toBe('3');
+  });
+
+  it('ohne Freigabe der Einheiten: kein Abruf, die Zelle nennt das Modul (LLH-1462)', async () => {
+    const abrufe: string[] = [];
+    stelleBereit([SPORTPLATZ], () => {
+      abrufe.push('einheiten');
+      return new HttpResponse(null, { status: 403 });
+    });
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
+      ),
+    );
+    renderPage();
+    await waitFor(async () =>
+      expect((await zeileVon('BR Sportplatz')).Stärke).toBe('Modul Einheiten gesperrt'),
+    );
+    expect((await zeileVon('BR Sportplatz')).Fahrzeuge).toBe('3');
+    expect(abrufe).toEqual([]);
   });
 
   it('ohne Abschnitt und ohne Belegung „—“, ein leerer Raum ist nicht unvollständig', async () => {
