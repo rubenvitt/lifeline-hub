@@ -1744,22 +1744,26 @@ describe('BrDetailPage — gescheiterte Freigaben (LLH-1462)', () => {
 
   it('die Seitenleiste meldet den Fehler mit erneutem Abruf, keine leere Liste', async () => {
     stelleBelegtBereit();
-    let versuche = 0;
+    // Die Freigaben scheitern, bis der Knopf gedrückt ist: auch ein später eingehängter
+    // Beobachter, der beim Einhängen neu fragt, bekommt den Fehler und nicht schon den Erfolg.
+    let heil = false;
+    let nachKlick = 0;
     server.use(
       http.get('/api/einsaetze/:einsatzId/modul-freigaben', () => {
-        versuche += 1;
-        return versuche === 1
-          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
-          : HttpResponse.json(freigabenFixture());
+        if (heil) nachKlick += 1;
+        return heil
+          ? HttpResponse.json(freigabenFixture())
+          : HttpResponse.json({ error: 'kaputt' }, { status: 500 });
       }),
     );
     renderBrDetail();
     const leiste = await screen.findByTestId('kraefte-ohne-br');
     const knopf = await within(leiste).findByRole('button', { name: 'Erneut abrufen' });
     expect(within(leiste).queryByText(/keine freien Kräfte/i)).toBeNull();
+    heil = true;
     await userEvent.click(knopf);
     await waitFor(() => expect(within(leiste).queryByRole('alert')).toBeNull());
-    expect(versuche).toBeGreaterThanOrEqual(2);
+    expect(nachKlick).toBeGreaterThanOrEqual(1);
   });
 });
 
