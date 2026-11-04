@@ -20,14 +20,24 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  *
  * GESÄT wird so, dass vier Abschnitte Einträge zeigen (Meldungen, Aufträge, Nachforderungen je drei
  * bzw. zwei, Erinnerungen zwei, nur „bald“) und Ablösungen „keine“. Ohne Alarm: keine Frist
- * überschritten — ein Alarm brächte Ton und Toast, die nichts zur Messung beitragen. Bewusst OHNE
- * Einheiten: eine Ablösung braucht eine, und das Paneel „Einsatzabschnitte“ darüber wächst dann
- * selbst beim Laden (Platzhalter → Block „Ohne Abschnitt“, auf 390 px rund 140 px, Seiten-CLS
- * ≈ 0,03 allein). Das ist ein eigener Sprung außerhalb dieses Paneels.
+ * überschritten — ein Alarm brächte Ton und Toast, die nichts zur Messung beitragen. Dazu
+ * EINHEITEN mit und ohne Abschnitt (LLH-1481): das Paneel „Einsatzabschnitte“ links bzw. darüber
+ * zeigt dann zwei Zeilen, den Abschnitt und den Block „Ohne Abschnitt“.
  *
- * ZWEI LADEFOLGEN, Muster `lagebild-cls-schmal.spec.ts`: der Sprung hängt daran, was zuerst kommt.
+ * DIE URSACHE DES ZWEITEN SPRUNGS (LLH-1481, Messwerte vor dem Fix): das Paneel „Einsatzabschnitte“
+ * zeigte beim Laden eine Zeile „wird abgerufen“ und wuchs mit seinen Quellen auf die Zeilen der
+ * Gliederung, auf 390 px rund 140 px je Zeile; alles darunter rückte (Seiten-CLS 0,030–0,036 mit
+ * zwei Einheiten ohne Abschnitt). Wie viele Zeilen kommen und wie hoch sie werden, sagt keine Zahl
+ * des Modulzählers (oberste Abschnitte, „Ohne Abschnitt“ aus vier Listen). Seither erscheinen die
+ * Paneelreihen des Überblicks erst mit den Quellen der Gliederung (`UeberblickPage.tsx`); was
+ * unter dem Kennzahlenband erscheint, verschiebt nichts.
+ *
+ * DREI LADEFOLGEN, Muster `lagebild-cls-schmal.spec.ts`: der Sprung hängt daran, was zuerst kommt.
  *  - `Listen zuletzt`: die fünf Listen warten, bis die Seite im Ladezustand ruht (jeder Abschnitt
  *    zeigt seine Platzhalter). Misst Platzhalter → Einträge.
+ *  - `Gliederung zuletzt`: die fünf Quellen der Gliederung warten (Abschnitte, Einheiten,
+ *    Personal, Fahrzeuge, Material), bis die Seite ruht. Misst den Sprung des Paneels
+ *    „Einsatzabschnitte“ (LLH-1481).
  *  - `natürlich`: ohne Eingriff. Der Modulzähler kommt mit dem Rahmen, vor den Listen der Seite.
  * Kommt der Zähler NACH den Listen, kennt der Ladezustand die Zahl nicht und bleibt bei einer Zeile;
  * diese Folge misst der Spec nicht, sie ist die Grenze des Platzhalters.
@@ -108,14 +118,29 @@ async function einsatzMitVorgaengen(page: Page): Promise<string> {
   ] as const) {
     await post(page, `${basis}/erinnerungen`, { titel, faellig_at: inMin(min) });
   }
+  // Einheiten mit und ohne Abschnitt (LLH-1481): zwei Zeilen der Gliederung.
+  const abschnittId = await post(page, `${basis}/abschnitte`, {
+    name: 'EA Nord',
+    kurzbezeichnung: 'EA-N',
+  });
+  await post(page, `${basis}/einheiten`, { name: 'Florian Nord 1', abschnitt_id: abschnittId });
+  for (const name of ['RTW 2', 'Florian Süd 3']) {
+    await post(page, `${basis}/einheiten`, { name });
+  }
   return einsatzId;
 }
 
-type Folge = 'Listen zuletzt' | 'natürlich';
-const FOLGEN: Folge[] = ['Listen zuletzt', 'natürlich'];
+type Folge = 'Listen zuletzt' | 'Gliederung zuletzt' | 'natürlich';
+const FOLGEN: Folge[] = ['Listen zuletzt', 'Gliederung zuletzt', 'natürlich'];
 
 /** Die Listen der fünf Abschnitte, ohne Unterpfade (`/nachforderungen/arten` gehört nicht dazu). */
 const LISTEN = ['meldungen', 'auftraege', 'nachforderungen', 'erinnerungen', 'abloesungen'];
+
+/** Die Quellen des Paneels „Einsatzabschnitte“ (`abschnittZeilen`), ohne Unterpfade. */
+const GLIEDERUNG = ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material'];
+
+/** Zeilen der Gliederung nach dem Säen: „EA Nord“ und „Ohne Abschnitt“. */
+const GLIEDERUNG_ZEILEN = 2;
 
 /** Hält die GET-Abfragen der Folge zurück, bis `freigeben()` sie loslässt. */
 async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge) {
@@ -123,7 +148,9 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge) {
   let loslassen!: () => void;
   const tor = new Promise<void>((f) => (loslassen = f));
   const kopf = `/api/einsaetze/${einsatzId}`;
-  const gehaltenePfade = folge === 'Listen zuletzt' ? LISTEN.map((l) => `${kopf}/${l}`) : [];
+  const gehaltenePfade = (
+    folge === 'Listen zuletzt' ? LISTEN : folge === 'Gliederung zuletzt' ? GLIEDERUNG : []
+  ).map((l) => `${kopf}/${l}`);
   let gehalten = 0;
   await page.route(new RegExp(`/api/einsaetze/${einsatzId}/`), async (route) => {
     const anfrage = route.request();
@@ -159,6 +186,7 @@ async function zeilenStehen(page: Page) {
 async function endzustand(page: Page) {
   await expect(page.locator('[data-lfh="seitenkopf"]')).toContainText(NAME_PRAEFIX);
   await zeilenStehen(page);
+  await expect(page.locator('[data-lfh="ueberblick-abschnitt"]')).toHaveCount(GLIEDERUNG_ZEILEN);
   await expect(vorgaenge(page).locator('[data-lfh="abschnitt-zahl"]').first()).not.toHaveText('—');
   await expect(page.locator('[data-lfh="seiten-inhalt"] [aria-busy="true"]')).toHaveCount(0);
 }
@@ -174,6 +202,14 @@ async function messe(page: Page, einsatzId: string, folge: Folge): Promise<Messu
     ).toHaveText(String(ERWARTET.meldung));
     await ruheShifts(page);
     abfragen.freigeben();
+  } else if (folge === 'Gliederung zuletzt') {
+    // Vorbedingung: das Kennzahlenband steht, die Quellen der Gliederung fehlen noch.
+    await expect(
+      page.getByRole('group', { name: 'Lage in Zahlen' }).locator('a[data-lfh="kennzahl"]').first(),
+    ).toBeVisible();
+    await expect(page.locator('[data-lfh="ueberblick-abschnitt"]')).toHaveCount(0);
+    await ruheShifts(page);
+    abfragen.freigeben();
   }
   await endzustand(page);
   return ruheShifts(page);
@@ -184,7 +220,7 @@ for (const [ansicht, groesse] of Object.entries(ANSICHTEN)) {
     test(`Überblick ${ansicht} als ${rolle}: CLS ≤ ${HAUS_GRENZE}, während „Offene Vorgänge“ nachlädt (${groesse.width} px)`, async ({
       page,
     }) => {
-      test.setTimeout(150_000);
+      test.setTimeout(210_000);
       await anmeldenAlsAdmin(page);
       const einsatzId = await einsatzMitVorgaengen(page);
       if (rolle === 'beobachter') {

@@ -1376,28 +1376,71 @@ describe('UeberblickPage', () => {
   /*
    * LFH-629: der Ladezustand eines Paneels hat die Form seines Leerzustands — Satz und, wo „leer"
    * eine Aktion trägt, ihr Platz in Knopfhöhe. Höhen misst jsdom nicht; die Seiten-CLS auf 390 px
-   * misst `e2e/lagebild-cls-schmal.spec.ts`. Hier die Struktur, als Paar mit und ohne Aktion.
+   * misst `e2e/lagebild-cls-schmal.spec.ts`. Hier die Struktur. „Einsatzabschnitte“ (leer mit
+   * „Abschnitt anlegen“) lädt seit LLH-1481 nicht mehr sichtbar, die Paneelreihen warten auf seine
+   * Quellen; der Platz der Leeraktion steht im Baustein-Test (`PaneelZustand`).
    */
-  it('Ladezustand hält den Platz der Leeraktion, nur wo „leer" eine trägt (LFH-629)', async () => {
+  it('Ladezustand ohne Leeraktion hält keinen Knopfplatz (LFH-629)', async () => {
     const haengt = async () => {
       await delay('infinite');
       return HttpResponse.json([]);
     };
-    stelleBereit(leereDaten, [
-      http.get('/api/einsaetze/1/abschnitte', haengt),
-      http.get('/api/einsaetze/1/auftraege', haengt),
-    ]);
+    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/auftraege', haengt)]);
     rendern();
     await bandDa();
-    // „Einsatzabschnitte" trägt leer „Abschnitt anlegen" — im Laden steht ihr Platz, kein Knopf.
-    const abschnitte = paneel('Einsatzabschnitte');
-    const laden = within(abschnitte).getByText('wird abgerufen').closest('[aria-busy="true"]')!;
-    expect(laden.querySelectorAll('.ant-skeleton-button')).toHaveLength(1);
-    expect(within(abschnitte).queryByRole('button', { name: /anlegen/ })).toBeNull();
     // Der Aufträge-Abschnitt der „Offenen Vorgänge" trägt leer keine Aktion, also kein Platz.
-    const auftraege = abschnitt('Aufträge');
+    const auftraege = await waitFor(() => abschnitt('Aufträge'));
     expect(within(auftraege).getByText('wird abgerufen')).toBeInTheDocument();
     expect(vorgaenge().querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
+    // Die Gliederung ist da: leer mit Ausweg, kein Ladezustand.
+    expect(
+      within(paneel('Einsatzabschnitte')).getByRole('button', { name: 'Abschnitt anlegen' }),
+    ).toBeInTheDocument();
+  });
+
+  /*
+   * LLH-1481: wie viele Zeilen „Einsatzabschnitte“ bekommt, sagt keine Zahl vorher; mit einer
+   * Ladezeile wuchs das Paneel um jede Zeile und schob alles darunter. Die Paneelreihen erscheinen
+   * deshalb erst mit allen Quellen der Gliederung, das Kennzahlenband steht schon. Ein Fehler hält
+   * nichts auf. Die Seiten-CLS misst `e2e/ueberblick-vorgaenge-cls.spec.ts`.
+   */
+  describe('Paneelreihen warten auf die Quellen der Gliederung (LLH-1481)', () => {
+    for (const quelle of ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material']) {
+      it(`${quelle} lädt: Band steht, keine Paneelreihe; mit der Antwort die Zeilen`, async () => {
+        let loslassen!: () => void;
+        const tor = new Promise<void>((f) => (loslassen = f));
+        const daten = volleDaten[quelle as keyof typeof volleDaten];
+        stelleBereit(volleDaten, [
+          http.get(`/api/einsaetze/1/${quelle}`, async () => {
+            await tor;
+            return HttpResponse.json(daten as object);
+          }),
+        ]);
+        rendern();
+        await bandDa();
+        // Unabhängige Quellen laden durch, die Paneelreihen bleiben weg.
+        await waitFor(() => expect(band()).toHaveTextContent('Pers.'));
+        expect(screen.queryByRole('region', { name: 'Einsatzabschnitte' })).toBeNull();
+        expect(screen.queryByRole('region', { name: 'Offene Vorgänge' })).toBeNull();
+        expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
+        loslassen();
+        const p = await waitFor(() => paneel('Einsatzabschnitte'));
+        expect(await within(p).findByRole('link', { name: /Abschnitt Nord/ })).toBeInTheDocument();
+        expect(p.querySelector('[aria-busy="true"]')).toBeNull();
+      });
+    }
+
+    it('scheitert eine Quelle, stehen die Paneele mit „Stand unbekannt“', async () => {
+      stelleBereit(volleDaten, [
+        http.get('/api/einsaetze/1/einheiten', () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      ]);
+      rendern();
+      const p = await waitFor(() => paneel('Einsatzabschnitte'));
+      expect(await within(p).findByRole('alert')).toHaveTextContent('Stand unbekannt');
+      expect(vorgaenge()).toBeInTheDocument();
+    });
   });
 
   /*
@@ -1912,9 +1955,9 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     rendern();
     await waitFor(() => expect(zelle('Kräfte im Einsatz')).toHaveTextContent('nicht freigegeben'));
     expect(zelle('Kräfte im Einsatz')).toHaveTextContent('—');
-    expect(
-      within(paneel('Einsatzabschnitte')).getByText('Modul nicht freigegeben.'),
-    ).toBeInTheDocument();
+    // Die Paneelreihen kommen mit den übrigen Quellen der Gliederung (LLH-1481).
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    expect(within(p).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
   });
 });
 

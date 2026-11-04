@@ -533,6 +533,16 @@ export default function UeberblickPage() {
     for (const { q, frei } of quellen) if (frei) void q.refetch();
   };
 
+  // Die Paneelreihen warten auf die Quellen der Gliederung (LLH-1481): wie viele Zeilen das Paneel
+  // „Einsatzabschnitte“ bekommt (oberste Abschnitte, „Ohne Abschnitt“ aus Einheiten, Personal,
+  // Fahrzeugen und Material) und wie hoch sie werden, sagt keine Zahl vorher. Mit einer Ladezeile
+  // wuchs es um jede Zeile (auf 390 px rund 140 px) und schob alles darunter. Unter dem
+  // Kennzahlenband steht bis dahin nichts; was dort erscheint, verschiebt nichts. Wie beim Körper
+  // zählt nur das erste Laden: Fehler, „ohne Netz“ und gesperrte Module halten nichts auf.
+  const gliederungLaedt = [abschnitteQ, einheitenQ, personalQ, fahrzeugeQ, materialQ].some(
+    (q) => q.isLoading,
+  );
+
   const zeile = listenZeileStil(rollen, token);
   // Rolle „kurz“ (LLH-1061): die Liste reicht über Mitternacht; eine Lücke hält Ziffernbreite.
   const kurz = (s: string | null | undefined) =>
@@ -664,7 +674,9 @@ export default function UeberblickPage() {
             Ebenso auf den Modulzähler (LLH-1430): aus ihm wissen die „Offenen Vorgänge“, wie viele
             Platzhalterzeilen sie beim Laden halten. Kam er nach dem Körper, wuchsen die Abschnitte
             von einer Zeile auf ihre Platzhalter, derselbe Sprung wie ohne sie. Der Rahmen ruft ihn
-            ohnehin (Rail); ein Fehler oder „ohne Netz“ hält den Körper nicht auf (`isLoading`). */}
+            ohnehin (Rail); ein Fehler oder „ohne Netz“ hält den Körper nicht auf (`isLoading`).
+            Die Paneelreihen unter dem Band warten zusätzlich auf die Gliederung (`gliederungLaedt`,
+            LLH-1481). */}
         {einsatzQ.isLoading || zaehlerQ.isLoading ? null : (
           <DashboardFlaeche kennung="ueberblick">
             {/* Sechs Plätze wie im Lagebild (Kennzahlenband, LFH-640; Belegung LLH-1140 E1).
@@ -766,209 +778,220 @@ export default function UeberblickPage() {
               />
             </Kennzahlenband>
 
-            <PaneelReihe kennung="ueberblick-paneele">
-              <GliederungsPaneel
-                titel="Einsatzabschnitte"
-                kennung="ueberblick-abschnitt"
-                zustand={mitLeer(zAbschnitte, zeilen.length === 0)}
-                // Beim Laden hält ein unsichtbares Meta seinen Platz (Muster `Datenstand
-                // platzHalten`): auf 390 px bricht der Kopf mit dem Meta um (38 → 52 px), und
-                // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883).
-                meta={
-                  zAbschnitte === 'daten' ? (
-                    // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.
-                    `${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')}`
-                  ) : zAbschnitte === 'laden' ? (
-                    <span
-                      data-lfh="paneel-meta-platzhalter"
-                      aria-hidden="true"
-                      style={{ visibility: 'hidden' }}
-                    >
-                      0 Abschnitte · 0 Einheiten
-                    </span>
-                  ) : undefined
-                }
-                sprung={{
-                  label: modulName('einsatzabschnitte'),
-                  onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
-                }}
-                fuss={
-                  zAbschnitte === 'daten' && zeilen.length > 0 && auftraegeFehlen ? (
-                    <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                      Aufträge nicht abrufbar, Auftragstexte fehlen
-                    </span>
-                  ) : undefined
-                }
-                leerText={
-                  abschnitteHinweis
-                    ? `Noch keine Abschnitte, Einheiten oder Personal erfasst. ${abschnitteHinweis}`
-                    : 'Noch keine Abschnitte und keine Kräfte erfasst.'
-                }
-                gesperrtText={GESPERRT}
-                leerAktion={
-                  darfSchreiben
-                    ? {
-                        label: 'Abschnitt anlegen',
-                        onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
-                      }
-                    : undefined
-                }
-                onNeuladen={() =>
-                  nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
-                }
-                zeilen={zeilen.map((z) => abschnittGliederung(z, einsatzId, kurz, token, rollen))}
-              />
+            {gliederungLaedt ? null : (
+              <>
+                <PaneelReihe kennung="ueberblick-paneele">
+                  <GliederungsPaneel
+                    titel="Einsatzabschnitte"
+                    kennung="ueberblick-abschnitt"
+                    zustand={mitLeer(zAbschnitte, zeilen.length === 0)}
+                    // Beim Laden hält ein unsichtbares Meta seinen Platz (Muster `Datenstand
+                    // platzHalten`): auf 390 px bricht der Kopf mit dem Meta um (38 → 52 px), und
+                    // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883). Seit LLH-1481
+                    // lädt das Paneel hier nur noch, solange die Freigaben fehlen (`gliederungLaedt`).
+                    meta={
+                      zAbschnitte === 'daten' ? (
+                        // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.
+                        `${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')}`
+                      ) : zAbschnitte === 'laden' ? (
+                        <span
+                          data-lfh="paneel-meta-platzhalter"
+                          aria-hidden="true"
+                          style={{ visibility: 'hidden' }}
+                        >
+                          0 Abschnitte · 0 Einheiten
+                        </span>
+                      ) : undefined
+                    }
+                    sprung={{
+                      label: modulName('einsatzabschnitte'),
+                      onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
+                    }}
+                    fuss={
+                      zAbschnitte === 'daten' && zeilen.length > 0 && auftraegeFehlen ? (
+                        <span style={{ ...monoStil(10), color: rollen.schwach }}>
+                          Aufträge nicht abrufbar, Auftragstexte fehlen
+                        </span>
+                      ) : undefined
+                    }
+                    leerText={
+                      abschnitteHinweis
+                        ? `Noch keine Abschnitte, Einheiten oder Personal erfasst. ${abschnitteHinweis}`
+                        : 'Noch keine Abschnitte und keine Kräfte erfasst.'
+                    }
+                    gesperrtText={GESPERRT}
+                    leerAktion={
+                      darfSchreiben
+                        ? {
+                            label: 'Abschnitt anlegen',
+                            onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
+                          }
+                        : undefined
+                    }
+                    onNeuladen={() =>
+                      nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
+                    }
+                    zeilen={zeilen.map((z) =>
+                      abschnittGliederung(z, einsatzId, kurz, token, rollen),
+                    )}
+                  />
 
-              <OffeneVorgaengePaneel
-                einsatzId={einsatzId}
-                jetzt={jetzt.valueOf()}
-                zustand={zVorgaenge}
-                zaehler={zaehlerQ}
-                meldungen={{ q: meldungenOffenQ, frei: rueckmeldungenFrei }}
-                auftraege={{ q: auftraegeQ, frei: auftraegeFrei }}
-                nachforderungen={{ q: nachforderungenQ, frei: nachforderungenFrei }}
-                erinnerungen={{ q: erinnerungenQ, frei: erinnerungenFrei }}
-                abloesungen={{ q: abloesungenQ, frei: abloesungSichtbar }}
-                ohneSchicht={ohneSchichtZahl}
-                stelle={stelle}
-                sicht={sicht}
-                onSicht={waehleSicht}
-                onNeuladen={() => void freigabenQ.refetch()}
-              />
-            </PaneelReihe>
+                  <OffeneVorgaengePaneel
+                    einsatzId={einsatzId}
+                    jetzt={jetzt.valueOf()}
+                    zustand={zVorgaenge}
+                    zaehler={zaehlerQ}
+                    meldungen={{ q: meldungenOffenQ, frei: rueckmeldungenFrei }}
+                    auftraege={{ q: auftraegeQ, frei: auftraegeFrei }}
+                    nachforderungen={{ q: nachforderungenQ, frei: nachforderungenFrei }}
+                    erinnerungen={{ q: erinnerungenQ, frei: erinnerungenFrei }}
+                    abloesungen={{ q: abloesungenQ, frei: abloesungSichtbar }}
+                    ohneSchicht={ohneSchichtZahl}
+                    stelle={stelle}
+                    sicht={sicht}
+                    onSicht={waehleSicht}
+                    onNeuladen={() => void freigabenQ.refetch()}
+                  />
+                </PaneelReihe>
 
-            <PaneelReihe kennung="ueberblick-paneele-fristen">
-              <ListenPaneel
-                titel="Nächste Marken"
-                zustand={zMarken}
-                // Die Marken kommen aus mehreren Modulen: kein Sprung, die Zahl der weiteren als
-                // Meta (`naechsteMarken` kürzt selbst).
-                meta={
-                  zMarken === 'daten' && marken.weitere > 0
-                    ? `+${marken.weitere} weitere`
-                    : undefined
-                }
-                fuss={
-                  // Im Leerzustand steht der Hinweis im Leertext.
-                  zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
-                    <span style={{ fontSize: 12, color: rollen.gedaempft }}>{markenHinweis}</span>
-                  ) : undefined
-                }
-                leerText={
-                  markenHinweis
-                    ? `Keine sichtbaren Fristen. ${markenHinweis}`
-                    : 'Keine anstehenden Fristen.'
-                }
-                gesperrtText={GESPERRT}
-                onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
-                eintraege={marken.marken}
-                max={marken.marken.length}
-                schluessel={(m) => m.key}
-                zeile={(m) => (
-                  <MarkenZeile
-                    ziel={markenZiel(m)}
-                    ton={m.ton}
-                    style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
-                  >
-                    <span
-                      style={{
-                        flex: '0 0 auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        minWidth: 52,
-                      }}
-                    >
-                      <span style={{ ...monoStil(13), color: markenFarbe(m) }}>{kurz(m.zeit)}</span>
-                      <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
-                    </span>
-                    <span
-                      style={{
-                        flex: '1 1 auto',
-                        minWidth: 0,
-                        fontSize: 12,
-                        lineHeight: 1.4,
-                        color: rollen.gedaempft,
-                        overflowWrap: 'anywhere',
-                      }}
-                    >
-                      {m.text}
-                    </span>
-                  </MarkenZeile>
-                )}
-              />
-
-              <StromPaneel
-                titel={entscheidungTitel}
-                zustand={mitLeer(zEntscheidungen, entscheidungen.eintraege.length === 0)}
-                meta={
-                  zEntscheidungen === 'daten' &&
-                  entscheidungen.modus === 'zuletzt' &&
-                  entscheidungen.eintraege.length > 0
-                    ? 'keine in der letzten Stunde'
-                    : undefined
-                }
-                sprung={{
-                  label: 'ETB',
-                  onKlick: () => waehle(etbPfad(einsatzId, { typ: 'entscheidung' })),
-                }}
-                leerText="Noch keine Entscheidung im Einsatztagebuch."
-                gesperrtText={GESPERRT}
-                leerAktion={
-                  darfSchreiben
-                    ? {
-                        label: 'Eintrag erfassen',
-                        onKlick: () => waehle(etbPfad(einsatzId, { neu: true })),
-                      }
-                    : undefined
-                }
-                onNeuladen={() => nachladen(qEtb)}
-                listeName="Entscheidungen"
-                // Die Auswahl rechnet die Seite je Takt neu (letzte Stunde); einen Zufluss mit
-                // Wassermarke hat sie nicht, also kein Banner.
-                neu={0}
-                bannerText=""
-                onAnzeigen={() => undefined}
-              >
-                {entscheidungen.eintraege.map((e) => {
-                  // Aus dem ETB-Eintrag selbst, nicht aus der Auftragsliste — die bekommt nicht,
-                  // wer das Aufträge-Modul gesperrt hat.
-                  const folgeWort = folgeText(e.folgeauftraege.length);
-                  return (
-                    <Zeitachseneintrag
-                      key={e.id}
-                      als="li"
-                      typ="entscheidung"
-                      typwort={etbTyp.entscheidung.label}
-                      zeit={kurz(e.ereigniszeit)}
-                      nr={`Nr. ${e.lfd_nr}`}
-                      // Eine berichtigte Entscheidung trägt dieselbe Marke wie in der Zeitachse
-                      // (LLH-1321): sonst gälte hier die überholte Fassung.
-                      meta={
-                        <BerichtigtMarke einsatzId={einsatzId} eintrag={e}>
-                          {verfasserText(e)}
-                        </BerichtigtMarke>
-                      }
-                      aktionen={
-                        folgeWort ? (
-                          <span
-                            data-lfh="entscheidung-folge"
-                            style={{
-                              ...monoStil(10),
-                              letterSpacing: '0.06em',
-                              color: rollen.bedien,
-                            }}
-                          >
-                            {folgeWort}
+                <PaneelReihe kennung="ueberblick-paneele-fristen">
+                  <ListenPaneel
+                    titel="Nächste Marken"
+                    zustand={zMarken}
+                    // Die Marken kommen aus mehreren Modulen: kein Sprung, die Zahl der weiteren als
+                    // Meta (`naechsteMarken` kürzt selbst).
+                    meta={
+                      zMarken === 'daten' && marken.weitere > 0
+                        ? `+${marken.weitere} weitere`
+                        : undefined
+                    }
+                    fuss={
+                      // Im Leerzustand steht der Hinweis im Leertext.
+                      zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
+                        <span style={{ fontSize: 12, color: rollen.gedaempft }}>
+                          {markenHinweis}
+                        </span>
+                      ) : undefined
+                    }
+                    leerText={
+                      markenHinweis
+                        ? `Keine sichtbaren Fristen. ${markenHinweis}`
+                        : 'Keine anstehenden Fristen.'
+                    }
+                    gesperrtText={GESPERRT}
+                    onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
+                    eintraege={marken.marken}
+                    max={marken.marken.length}
+                    schluessel={(m) => m.key}
+                    zeile={(m) => (
+                      <MarkenZeile
+                        ziel={markenZiel(m)}
+                        ton={m.ton}
+                        style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
+                      >
+                        <span
+                          style={{
+                            flex: '0 0 auto',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            minWidth: 52,
+                          }}
+                        >
+                          <span style={{ ...monoStil(13), color: markenFarbe(m) }}>
+                            {kurz(m.zeit)}
                           </span>
-                        ) : undefined
-                      }
-                    >
-                      {e.inhalt}
-                    </Zeitachseneintrag>
-                  );
-                })}
-              </StromPaneel>
-            </PaneelReihe>
+                          <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
+                        </span>
+                        <span
+                          style={{
+                            flex: '1 1 auto',
+                            minWidth: 0,
+                            fontSize: 12,
+                            lineHeight: 1.4,
+                            color: rollen.gedaempft,
+                            overflowWrap: 'anywhere',
+                          }}
+                        >
+                          {m.text}
+                        </span>
+                      </MarkenZeile>
+                    )}
+                  />
+
+                  <StromPaneel
+                    titel={entscheidungTitel}
+                    zustand={mitLeer(zEntscheidungen, entscheidungen.eintraege.length === 0)}
+                    meta={
+                      zEntscheidungen === 'daten' &&
+                      entscheidungen.modus === 'zuletzt' &&
+                      entscheidungen.eintraege.length > 0
+                        ? 'keine in der letzten Stunde'
+                        : undefined
+                    }
+                    sprung={{
+                      label: 'ETB',
+                      onKlick: () => waehle(etbPfad(einsatzId, { typ: 'entscheidung' })),
+                    }}
+                    leerText="Noch keine Entscheidung im Einsatztagebuch."
+                    gesperrtText={GESPERRT}
+                    leerAktion={
+                      darfSchreiben
+                        ? {
+                            label: 'Eintrag erfassen',
+                            onKlick: () => waehle(etbPfad(einsatzId, { neu: true })),
+                          }
+                        : undefined
+                    }
+                    onNeuladen={() => nachladen(qEtb)}
+                    listeName="Entscheidungen"
+                    // Die Auswahl rechnet die Seite je Takt neu (letzte Stunde); einen Zufluss mit
+                    // Wassermarke hat sie nicht, also kein Banner.
+                    neu={0}
+                    bannerText=""
+                    onAnzeigen={() => undefined}
+                  >
+                    {entscheidungen.eintraege.map((e) => {
+                      // Aus dem ETB-Eintrag selbst, nicht aus der Auftragsliste — die bekommt nicht,
+                      // wer das Aufträge-Modul gesperrt hat.
+                      const folgeWort = folgeText(e.folgeauftraege.length);
+                      return (
+                        <Zeitachseneintrag
+                          key={e.id}
+                          als="li"
+                          typ="entscheidung"
+                          typwort={etbTyp.entscheidung.label}
+                          zeit={kurz(e.ereigniszeit)}
+                          nr={`Nr. ${e.lfd_nr}`}
+                          // Eine berichtigte Entscheidung trägt dieselbe Marke wie in der Zeitachse
+                          // (LLH-1321): sonst gälte hier die überholte Fassung.
+                          meta={
+                            <BerichtigtMarke einsatzId={einsatzId} eintrag={e}>
+                              {verfasserText(e)}
+                            </BerichtigtMarke>
+                          }
+                          aktionen={
+                            folgeWort ? (
+                              <span
+                                data-lfh="entscheidung-folge"
+                                style={{
+                                  ...monoStil(10),
+                                  letterSpacing: '0.06em',
+                                  color: rollen.bedien,
+                                }}
+                              >
+                                {folgeWort}
+                              </span>
+                            ) : undefined
+                          }
+                        >
+                          {e.inhalt}
+                        </Zeitachseneintrag>
+                      );
+                    })}
+                  </StromPaneel>
+                </PaneelReihe>
+              </>
+            )}
           </DashboardFlaeche>
         )}
       </EinsatzSeite>
