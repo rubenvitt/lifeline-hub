@@ -1,6 +1,6 @@
 import { IconPfeilRunter } from '../../icons';
 import { Button } from 'antd';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, Ref } from 'react';
 import { monoStil, useRollen } from './rollenwerte';
 
 /**
@@ -63,13 +63,15 @@ interface SammelbannerProps {
    */
   kurz?: string;
   style?: CSSProperties;
+  /** An die Wurzel, z. B. damit das Eingangsband dem Banner ausweicht (LLH-1478). */
+  ref?: Ref<HTMLDivElement>;
 }
 
-export default function Sammelbanner({ children, aktion, kurz, style }: SammelbannerProps) {
+export default function Sammelbanner({ children, aktion, kurz, style, ref }: SammelbannerProps) {
   const { token, rollen } = useRollen();
   if (kurz != null && aktion != null) {
     return (
-      <div role="status" data-lfh="sammelbanner" style={{ display: 'flex', ...style }}>
+      <div ref={ref} role="status" data-lfh="sammelbanner" style={{ display: 'flex', ...style }}>
         <span style={NUR_VORLESER}>{children}</span>
         <Button
           onClick={aktion.onKlick}
@@ -96,6 +98,7 @@ export default function Sammelbanner({ children, aktion, kurz, style }: Sammelba
   }
   return (
     <div
+      ref={ref}
       role="status"
       data-lfh="sammelbanner"
       style={{

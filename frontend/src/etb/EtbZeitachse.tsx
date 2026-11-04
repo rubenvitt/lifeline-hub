@@ -16,6 +16,7 @@ import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import { HERVORGEHOBEN } from '../components/Datensicht';
 import { funkprotokollFolge } from '../components/useFunkprotokollLauf';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { useAlsUntereLeiste } from '../components/untereLeiste';
 import Markdown from '../components/Markdown';
 import Fundstellen from '../components/Fundstellen';
 import { fundstellen as fundstellenIn, suchphrasen } from '../components/volltextFundstellen';
@@ -276,7 +277,21 @@ export default function EtbZeitachse({
   /** Liegt der Fokus in der Zeitachse? Zweiter Grund zum Einfrieren neben „nicht am Ende“. */
   const [fokusDrin, setFokusDrin] = useState(false);
   const weitGerollt = useWeitGerollt();
-  const [nachObenPasst, nachObenRef] = useNachObenPasst();
+  const [nachObenPasst, nachObenMessen] = useNachObenPasst();
+  /*
+   * „Nach oben“ und das Sammelbanner schweben über der Erfassung; das Eingangsband rückt über
+   * die Erfassung und muss beiden ebenso ausweichen (LLH-1478, `components/untereLeiste.ts`).
+   * Der Knopf meldet sich nur, solange er sichtbar steht.
+   */
+  const nachObenMelden = useAlsUntereLeiste(nachObenPasst);
+  const nachObenRef = useCallback(
+    (el: HTMLElement | null) => {
+      nachObenMessen(el);
+      nachObenMelden(el);
+    },
+    [nachObenMessen, nachObenMelden],
+  );
+  const bannerRef = useAlsUntereLeiste();
   /*
    * Hochgerollt friert ein, zurück am Ende taut auf — sofern kein Fokus darin liegt (LLH-1149,
    * design.md D2). Im Render angeglichen wie der Sprung unten: ein Effekt käme einen Commit zu
@@ -556,6 +571,7 @@ export default function EtbZeitachse({
           gestapelt statt überlagert, damit es das Banner nie verdeckt, und nur, wenn es ganz unter
           den klebenden Kopf passt (LLH-1386, `useNachObenPasst`). Die Schale lässt Zeiger durch. */}
       <div
+        data-lfh="etb-schwebend"
         style={{
           position: 'sticky',
           bottom: 'var(--lfh-etb-fokusabstand, 0px)',
@@ -602,6 +618,7 @@ export default function EtbZeitachse({
           )}
           {zurueckgehalten > 0 && (
             <Sammelbanner
+              ref={bannerRef}
               aktion={{
                 label: 'anzeigen',
                 onKlick: () => {
