@@ -1,6 +1,12 @@
 import { useState, type CSSProperties } from 'react';
 import { Button, Collapse, Input, Typography } from 'antd';
-import { Augenbraue, Paneel, monoStil, useRollen } from '../../components/instrument';
+import {
+  Augenbraue,
+  Paneel,
+  PaneelZustand,
+  monoStil,
+  useRollen,
+} from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../../components/useZeilenFehler';
@@ -29,6 +35,12 @@ interface Props {
   gesperrt?: string | null;
   /** Beide Listen gesperrt: es gibt nichts zu zeigen außer dem Grund. */
   alleGesperrt?: boolean;
+  /**
+   * Eine freie Liste (oder die Freigaben selbst) lädt noch oder ist gescheitert (LLH-1462): die
+   * Menge ist unbekannt, also weder Zähler noch „keine freien Kräfte“.
+   */
+  abruf?: 'laden' | 'fehler';
+  onWiederholen?: () => void;
 }
 
 /** Schlüssel einer Kraft für die Gründe je Zeile, gleich in Seitenleiste und Raum. */
@@ -69,6 +81,8 @@ export default function KraefteOhneBrSidebar({
   zeilenFehler,
   gesperrt = null,
   alleGesperrt = false,
+  abruf,
+  onWiederholen,
 }: Props) {
   const { abBreite } = useViewport();
   const breit = abBreite('md');
@@ -162,7 +176,7 @@ export default function KraefteOhneBrSidebar({
       <Paneel
         titel="Kräfte ohne BR"
         // Mit gesperrter Liste ist die Zahl unvollständig — kein Zähler statt einer zu kleinen.
-        meta={gesperrt ? undefined : freieEinheiten.length + freiFahrzeuge.length}
+        meta={gesperrt || abruf ? undefined : freieEinheiten.length + freiFahrzeuge.length}
         koerperPolster
         style={{ flex: '1 1 auto' }}
       >
@@ -204,7 +218,18 @@ export default function KraefteOhneBrSidebar({
               {gesperrt}
             </Typography.Text>
           )}
-          {leer && !alleGesperrt && (
+          {abruf && (
+            <PaneelZustand
+              zustand={abruf}
+              titel="Kräfte ohne BR"
+              leerText=""
+              onNeuladen={() => onWiederholen?.()}
+            >
+              {null}
+            </PaneelZustand>
+          )}
+          {/* Mit einer gesperrten Liste ist die Menge unbekannt, nicht leer. */}
+          {leer && !gesperrt && !abruf && (
             <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>
           )}
           {!leer && gruppen.length === 0 && trefferImEinsatz === 0 && (

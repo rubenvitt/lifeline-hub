@@ -1,5 +1,5 @@
 import { IconPlus, IconTrichter } from '../icons';
-import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
+import { useModulFreigabenStand, useSprungSperre } from '../einsatz/useSprungSperre';
 import {
   freigabeVon,
   istKeyFreigegeben,
@@ -676,11 +676,16 @@ export default function KraefteuebersichtPage() {
   const meldungenGesperrt = sprungGesperrt('meldungen');
   // Zulauf aus Nachforderungen (LLH-1384, design.md D7): nur mit Freigabe des Moduls, sonst weder
   // Abruf noch Kennzahl. Dieselben Freigaben aus dem Rahmen-Cache wie die Sprungsperre.
-  const freigaben = useModulFreigaben(einsatzId);
+  const {
+    freigaben,
+    gescheitert: freigabenGescheitert,
+    wiederholen: freigabenWiederholen,
+  } = useModulFreigabenStand(einsatzId);
   const nachforderungenFrei = istKeyFreigegeben('nachforderungen', freigaben);
   // Die Listen der Nachbarmodule nur mit deren Freigabe (LLH-1462, Spec `modul-freigabe`): eine
   // gesperrte Liste wird nicht abgefragt, die Fläche nennt die Sperre statt eines Abruffehlers.
-  // `undefined`, solange die Freigaben laden (der Rahmen hat sie beim Kaltstart schon im Cache).
+  // `undefined`, solange die Freigaben laden (der Rahmen hat sie beim Kaltstart schon im Cache)
+  // oder gescheitert sind (`freigabenGescheitert`: Fehler mit Neuladen, kein ewiges Laden).
   const frei = {
     einheiten: freigabeVon('einheiten', freigaben),
     personal: freigabeVon('personal', freigaben),
@@ -850,7 +855,11 @@ export default function KraefteuebersichtPage() {
     [expandedKeys, raster],
   );
 
-  const rueckmeldungZustand = zustandNachFreigabe(rueckmeldungenQuery, frei.meldungen);
+  const rueckmeldungZustand = zustandNachFreigabe(
+    rueckmeldungenQuery,
+    frei.meldungen,
+    freigabenGescheitert,
+  );
   const rueckmeldungDaten = rueckmeldungZustand === 'daten' ? rueckmeldungenQuery.data : undefined;
   /**
    * Anzeige je Zeilenschlüssel — nur bei lesbaren Daten. Beim Laden, bei Fehler und bei 403 bleibt
@@ -925,8 +934,12 @@ export default function KraefteuebersichtPage() {
     [personalQuery.data, fahrzeugeQuery.data, materialQuery.data],
   );
 
-  const auftraegeZustand = zustandNachFreigabe(auftraegeQuery, frei.auftraege);
-  const periodenZustand = zustandNachFreigabe(periodenQuery, frei.einheiten);
+  const auftraegeZustand = zustandNachFreigabe(
+    auftraegeQuery,
+    frei.auftraege,
+    freigabenGescheitert,
+  );
+  const periodenZustand = zustandNachFreigabe(periodenQuery, frei.einheiten, freigabenGescheitert);
   const jetztMs = jetzt.valueOf();
   const imEinsatzJeEinheit = useMemo(() => {
     const m = new Map<number, LaufendeDauer>();
@@ -1148,7 +1161,11 @@ export default function KraefteuebersichtPage() {
   /** Die zwei Filter hinter „Filter (n)“ — Abschnitt steht im Kopf, die Suche offen. */
   const filterZahl = (filter.traeger ? 1 : 0) + (filter.kategorie ? 1 : 0);
 
-  const listenFehler = personalQuery.isError || fahrzeugeQuery.isError || einheitenQuery.isError;
+  const listenFehler =
+    freigabenGescheitert ||
+    personalQuery.isError ||
+    fahrzeugeQuery.isError ||
+    einheitenQuery.isError;
   const listenLaden =
     personalQuery.isLoading ||
     fahrzeugeQuery.isLoading ||
@@ -1175,13 +1192,11 @@ export default function KraefteuebersichtPage() {
       frei.material === false ? 'Material' : null,
     ].filter((n): n is string => n != null),
   );
-  /** Der Lagebericht braucht alle drei Listen; ohne Einheiten nennt das Statusband den Grund. */
-  const berichtGesperrt =
-    frei.einheiten === false
-      ? MODUL_EINHEITEN_GESPERRT
-      : frei.personal === false || frei.fahrzeuge === false
-        ? mittelGesperrt
-        : null;
+  /**
+   * Der Lagebericht braucht alle Listen, auch Material (sonst trüge er „0 Positionen“); ohne
+   * Einheiten nennt das Statusband den Grund.
+   */
+  const berichtGesperrt = frei.einheiten === false ? MODUL_EINHEITEN_GESPERRT : mittelGesperrt;
 
   const meta = meldebildMeta({
     einheiten: einheitenZeilen,
@@ -1293,9 +1308,11 @@ export default function KraefteuebersichtPage() {
             einheitenZustand={bandZustand(frei.einheiten)}
             personalZustand={bandZustand(frei.personal)}
             onNeuladen={() => {
-              void personalQuery.refetch();
-              void fahrzeugeQuery.refetch();
-              void einheitenQuery.refetch();
+              // Nur freie Listen: `refetch` liefe trotz `enabled: false` in den 403.
+              if (freigabenGescheitert) freigabenWiederholen();
+              if (frei.personal === true) void personalQuery.refetch();
+              if (frei.fahrzeuge === true) void fahrzeugeQuery.refetch();
+              if (frei.einheiten === true) void einheitenQuery.refetch();
             }}
           />
         </div>
@@ -1479,15 +1496,20 @@ export default function KraefteuebersichtPage() {
           zeilenSchluessel="key"
           ladend={einheitenQuery.isLoading}
           leerText={
-            <span>
-              Keine Einheiten und keine Kräfte im Einsatz
-              {darfSchreiben && !einheitenGesperrt && (
-                <>
-                  {' — '}
-                  <Link to={einheitenPfad(einsatzId)}>Einheit bilden</Link>
-                </>
-              )}
-            </span>
+            // Ohne Freigabe Einheiten ist der Bestand unbekannt, nicht leer (LLH-1462).
+            frei.einheiten === false ? (
+              <span>{MODUL_EINHEITEN_GESPERRT}</span>
+            ) : (
+              <span>
+                Keine Einheiten und keine Kräfte im Einsatz
+                {darfSchreiben && !einheitenGesperrt && (
+                  <>
+                    {' — '}
+                    <Link to={einheitenPfad(einsatzId)}>Einheit bilden</Link>
+                  </>
+                )}
+              </span>
+            )
           }
           baum={{
             kinder: 'children',

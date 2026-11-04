@@ -692,6 +692,8 @@ for (const szenario of SPERR_SZENARIEN) {
             `${seite.name} ${dichte} (Soll ≥ ${soll}): ${ziele.length} Ziele, kleinste ${minimum}px`,
           );
         }
+        // Auch die Messung selbst (Dichtewechsel, Neuladen) fragt keine gesperrte Liste ab.
+        expect(sperre.verboten, `${seite.name}: keine gesperrte Liste abgefragt`).toEqual([]);
         test.info().annotations.push({ type: 'messwert', description: messwerte.join(' | ') });
       });
     }

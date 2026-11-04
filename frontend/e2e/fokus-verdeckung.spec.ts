@@ -899,6 +899,8 @@ for (const szenario of SPERR_SZENARIEN) {
             `${seite.name} ${dichte}: ${befund.besuchteZiele.length} Ziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,
           );
         }
+        // Auch der Tab-Umlauf über alle Ziele fragt keine gesperrte Liste ab.
+        expect(sperre.verboten, `${seite.name}: keine gesperrte Liste abgefragt`).toEqual([]);
         test.info().annotations.push({
           type: 'messwert',
           description: `${rolle}: ${messwerte.join(' | ')}`,

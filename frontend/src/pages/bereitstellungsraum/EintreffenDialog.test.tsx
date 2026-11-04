@@ -219,6 +219,8 @@ describe('EintreffenDialog — gesperrte Listen (LLH-1462)', () => {
     expect(
       await within(dialog()).findByText('Module Einheiten und Fahrzeuge gesperrt'),
     ).toBeInTheDocument();
+    // Ungefragte Listen sind kein leeres Ergebnis.
+    expect(within(dialog()).queryByText('Keine Treffer')).toBeNull();
     // Der Weg über „Nicht in der Liste“ bleibt.
     expect(within(dialog()).getByRole('button', { name: 'Nicht in der Liste' })).toBeEnabled();
     expect(zeitachse).toEqual([]);

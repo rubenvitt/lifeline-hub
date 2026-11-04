@@ -38,13 +38,16 @@ export function schlechtesterZustand(...zustaende: AbrufZustand[]): AbrufZustand
  * {@link abrufZustand} einer Liste, die an der Freigabe ihres Moduls hängt (LLH-1462, Spec
  * `modul-freigabe`): Die Seite fragt eine gesperrte Liste gar nicht erst ab, also kommt `gesperrt`
  * aus der Freigabe, nicht aus einem 403. `frei` ist `undefined`, solange die Freigaben unbekannt
- * sind; die Abfrage wartet dann (`enabled: frei === true`), und die Aussage lädt.
+ * sind; die Abfrage wartet dann (`enabled: frei === true`), und die Aussage lädt, bis die
+ * Freigaben gescheitert sind (`freigabenGescheitert`): dann ist sie ein Fehler.
  */
 export function zustandNachFreigabe(
   q: Parameters<typeof abrufZustand>[0],
   frei: boolean | undefined,
+  freigabenGescheitert = false,
 ): AbrufZustand {
   if (frei === false) return 'gesperrt';
-  if (frei === undefined) return 'laden';
+  // Ohne Freigaben fragt die Liste nie: gescheiterte Freigaben sind ihr Fehler, kein Laden.
+  if (frei === undefined) return freigabenGescheitert ? 'fehler' : 'laden';
   return abrufZustand(q);
 }

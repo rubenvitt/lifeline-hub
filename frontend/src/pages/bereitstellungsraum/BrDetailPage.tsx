@@ -77,6 +77,7 @@ import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../../components/S
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { listEinsatzMaterial } from '../../api/einsatzMaterial';
+import { zustandNachFreigabe } from '../../api/abrufZustand';
 import { freigabeVon, istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { MODUL_EINHEITEN_GESPERRT, modulSperre } from '../../components/nurAnsicht';
 import MaterialAmOrt from '../../kraefte/MaterialAmOrt';
@@ -226,6 +227,22 @@ export default function BrDetailPage() {
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
     enabled: fahrzeugeFrei === true,
   });
+  // Unbekannte Freigaben oder eine gescheiterte freie Liste sind kein leerer Bestand (LLH-1462).
+  const freigabenGescheitert = freigabenQuery.isError && freigabenQuery.data === undefined;
+  const listenZustaende = [
+    zustandNachFreigabe(einheitenQuery, einheitenFrei, freigabenGescheitert),
+    zustandNachFreigabe(fahrzeugeQuery, fahrzeugeFrei, freigabenGescheitert),
+  ];
+  const listenAbruf = listenZustaende.includes('fehler')
+    ? ('fehler' as const)
+    : listenZustaende.includes('laden')
+      ? ('laden' as const)
+      : undefined;
+  const listenWiederholen = () => {
+    if (freigabenGescheitert) void freigabenQuery.refetch();
+    if (einheitenFrei === true) void einheitenQuery.refetch();
+    if (fahrzeugeFrei === true) void fahrzeugeQuery.refetch();
+  };
   // Sektion „Material“ (LLH-1225, design.md D13): Posten aus der Materialliste (`br_id`), nur mit
   // Freigabe Material. Das BR-Gerät liest sie mit, vom Server auf den eigenen Raum geschnitten,
   // und bedient nichts (LLH-1252, Entscheidung 22.10.2026).
@@ -1033,6 +1050,8 @@ export default function BrDetailPage() {
           zeilenFehler={zeilen.grund}
           gesperrt={listenGesperrt}
           alleGesperrt={einheitenFrei === false && fahrzeugeFrei === false}
+          abruf={listenAbruf}
+          onWiederholen={listenWiederholen}
         />
       </div>
 

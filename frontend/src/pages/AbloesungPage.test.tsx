@@ -614,6 +614,15 @@ describe('AbloesungPage (LFH-635)', () => {
     expect(listeEinheitenPerioden).not.toHaveBeenCalled();
   });
 
+  it('Schicht beginnen: gesperrt, solange die Freigaben gescheitert sind (LLH-1462)', async () => {
+    vi.mocked(ladeModulFreigaben).mockRejectedValueOnce(new ApiError(500, 'kaputt'));
+    listeAbloesungen.mockResolvedValue([]);
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    // Der Dialog öffnete sonst ohne wählbare Einheit: die Einheitenliste fragt erst mit Freigabe.
+    expect(screen.getByRole('button', { name: 'Schicht beginnen' })).toBeDisabled();
+  });
+
   it('Rhythmus einer Schicht: die Abschnittsvorgabe steht als Platzhalter, kein „Leer:“', async () => {
     renderPage();
     await screen.findAllByRole('article');

@@ -51,6 +51,10 @@ describe('zustandNachFreigabe', () => {
     expect(zustandNachFreigabe(ruhig, undefined)).toBe('laden');
   });
 
+  it('bei gescheiterten Freigaben Fehler, nie ewig laden', () => {
+    expect(zustandNachFreigabe({ ...ruhig, isPending: true }, undefined, true)).toBe('fehler');
+  });
+
   it('mit Freigabe der Abrufzustand', () => {
     expect(zustandNachFreigabe(ruhig, true)).toBe('daten');
     expect(

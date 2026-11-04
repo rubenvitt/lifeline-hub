@@ -578,11 +578,13 @@ export default function EintreffenDialog({
         {gruppe('Erwartet', erwartetTreffer)}
         {gruppe('Im Einsatz', imEinsatzTreffer)}
         {gruppeStamm}
-        {nachgefordert.length +
-          erwartetTreffer.length +
-          imEinsatzTreffer.length +
-          stammZeilen.length ===
-          0 && <Typography.Text type="secondary">Keine Treffer</Typography.Text>}
+        {/* Mit gesperrter Liste ist „keine Treffer“ unbelegt: dort steht schon der Grund. */}
+        {!gesperrt &&
+          nachgefordert.length +
+            erwartetTreffer.length +
+            imEinsatzTreffer.length +
+            stammZeilen.length ===
+            0 && <Typography.Text type="secondary">Keine Treffer</Typography.Text>}
       </div>
       <Button block onClick={() => zuSchrittZwei()}>
         Nicht in der Liste

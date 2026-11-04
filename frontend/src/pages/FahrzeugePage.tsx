@@ -147,6 +147,7 @@ function BesatzungsBlock({
   freigebenFehler,
   uebernehmen,
   gesperrt,
+  unbekannt,
 }: {
   ef: EinsatzFahrzeug;
   personal: EinsatzPersonal[];
@@ -173,14 +174,22 @@ function BesatzungsBlock({
    * ab, die Besatzung ist unbekannt, nicht leer. Der Block nennt nur den Grund, ohne Auswahl.
    */
   gesperrt?: string;
+  /**
+   * Personal frei, aber (noch) ohne Daten: „—“ oder der Abruffehler (LLH-1462). Wie gesperrt ohne
+   * Urteil und ohne Auswahl, sonst stünde „Keine Besatzung zugeordnet“ für eine ungeprüfte Lage.
+   */
+  unbekannt?: string;
 }) {
-  if (gesperrt) {
+  if (gesperrt || unbekannt) {
     return (
       <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }}>
         <Space size={abstand.sm}>
           <Typography.Text type="secondary">Besatzung</Typography.Text>
-          <Typography.Text type="secondary" data-lfh="besatzung-sperre">
-            {gesperrt}
+          <Typography.Text
+            type="secondary"
+            data-lfh={gesperrt ? 'besatzung-sperre' : 'besatzung-unbekannt'}
+          >
+            {gesperrt ?? unbekannt}
           </Typography.Text>
         </Space>
       </div>
@@ -1160,6 +1169,13 @@ function FahrzeugeInhalt() {
                       zuordnenFehler={zuordnenFehler.grund(ef.id)}
                       freigebenFehler={freigebenFehler.grund}
                       gesperrt={personalGesperrt}
+                      unbekannt={
+                        personalQuery.data !== undefined
+                          ? undefined
+                          : personalQuery.isError
+                            ? besatzungInhalt
+                            : '—'
+                      }
                       uebernehmen={
                         ef.einheit_id != null
                           ? {

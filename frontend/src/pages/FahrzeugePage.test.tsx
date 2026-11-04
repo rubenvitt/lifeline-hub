@@ -1408,15 +1408,21 @@ describe('FahrzeugePage · Datenzustände', () => {
    * Derselbe Fehlermodus eine Ebene tiefer: scheitert die Personalliste, filtert der
    * Besatzungs-Pool auf die leere Menge und behauptete „Keine freien Kräfte".
    */
-  it('gescheiterte Personalliste: der Besatzungs-Pool nennt den Ausfall', async () => {
+  it('gescheiterte Personalliste: der Besatzungsblock nennt den Ausfall, ohne Auswahl', async () => {
     const { container } = zeige(
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
       http.get('/api/einsaetze/7/personal', () => new HttpResponse(null, { status: 500 })),
     );
     await screen.findByText('Florian 1');
     await klappeZeileAuf(container);
-    await oeffneAuswahl(container, 'Kraft zur Besatzung …');
-    expect(await screen.findByText('Kräfte konnten nicht geladen werden')).toBeInTheDocument();
+    // Die Besatzung ist unbekannt (LLH-1462): kein „Keine Besatzung zugeordnet“, kein Ist/Soll.
+    const grund = await waitFor(() => {
+      const el = container.querySelector('[data-lfh="besatzung-unbekannt"]');
+      expect(el).toHaveTextContent('Kräfte konnten nicht geladen werden');
+      return el;
+    });
+    expect(grund).toBeVisible();
+    expect(screen.queryByText('Kraft zur Besatzung …')).not.toBeInTheDocument();
     expect(screen.queryByText('Keine freien Kräfte')).not.toBeInTheDocument();
   });
 

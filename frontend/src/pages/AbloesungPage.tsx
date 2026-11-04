@@ -751,17 +751,18 @@ export default function AbloesungPage() {
       // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
         // Ohne Modul Einheiten gibt es keine Einheit zur Wahl (LLH-1462): gesperrt, der Grund
-        // steht sichtbar unter der Werkzeugzeile.
+        // steht sichtbar unter der Werkzeugzeile. Ebenso, solange die Freigaben unbekannt sind:
+        // der Dialog öffnete sonst ohne wählbare Einheit (ihr Fehler steht im Einsatzrahmen).
         <Button
           type="primary"
-          disabled={!darfSchreiben || einheitenGesperrt}
+          disabled={!darfSchreiben || !einheitenFrei}
           aria-describedby={darfSchreiben && einheitenGesperrt ? 'abloesung-sperre' : undefined}
           onClick={() => oeffneBeginnen()}
         >
           Schicht beginnen
         </Button>
       }
-      neueZeile={darfSchreiben && !einheitenGesperrt ? () => oeffneBeginnen() : undefined}
+      neueZeile={darfSchreiben && einheitenFrei ? () => oeffneBeginnen() : undefined}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (!darfSchreiben || rueckgaengigFehler != null) && (
