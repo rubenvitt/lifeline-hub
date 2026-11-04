@@ -15,7 +15,7 @@ import BetroffeneKarte, { ohneKoordinateText } from './BetroffeneKarte';
  */
 vi.mock('../pages/lagekarte/Kartenflaeche', () => ({
   default: (props: Partial<KartenflaecheProps>) => (
-    <div data-testid="kartenflaeche-stub">
+    <div data-testid="kartenflaeche-stub" data-karten-theme={props.kartenTheme}>
       {(props.markers ?? [])
         .filter((m) => m.typ === 'person')
         .map((m) => (
@@ -99,6 +99,23 @@ describe('ohneKoordinateText', () => {
   it('wartet ein Zugang, behauptet er KEINE vollständige Karte (LFH-668, D6)', () => {
     expect(ohneKoordinateText(0, 2, 1)).toBe('Keine Person ohne Koordinate');
     expect(ohneKoordinateText(0, 0, 1)).toBe('Keine Person ohne Koordinate');
+  });
+});
+
+describe('BetroffeneKarte — Zeichenthema (LLH-1486)', () => {
+  it('auf einer dunkel markierten Online-Karte rastern die Zeichen dunkel', async () => {
+    server.use(
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [
+            { name: 'Dunkel', typ: 'vektor', url: '/api/karte/proxy/1/style.json', dunkel: true },
+          ],
+        }),
+      ),
+    );
+    renderKarte([p(1)]);
+    const karte = await screen.findByTestId('kartenflaeche-stub');
+    await vi.waitFor(() => expect(karte).toHaveAttribute('data-karten-theme', 'dark'));
   });
 });
 
