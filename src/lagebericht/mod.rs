@@ -237,12 +237,24 @@ mod tests {
     fn render_ist_deterministisch_und_in_reihenfolge() {
         let v = vorlage("freitext").unwrap();
         let abschnitte = vec![Abschnitt::neu("text".into(), "Hochwasser steigt.".into())];
-        let a = render_snapshot(v, "Lage 10:00", "2026-06-02 10:00:00", &abschnitte);
-        let b = render_snapshot(v, "Lage 10:00", "2026-06-02 10:00:00", &abschnitte);
+        let a = render_snapshot(
+            &crate::zeitdarstellung::Zeitstil::VORGABE,
+            v,
+            "Lage 10:00",
+            "2026-06-02 10:00:00",
+            &abschnitte,
+        );
+        let b = render_snapshot(
+            &crate::zeitdarstellung::Zeitstil::VORGABE,
+            v,
+            "Lage 10:00",
+            "2026-06-02 10:00:00",
+            &abschnitte,
+        );
         assert_eq!(a, b);
         assert!(a.contains("# Lage 10:00"));
         assert!(a.contains("Zeitstand"));
-        assert!(a.contains("2026-06-02 10:00:00"));
+        assert!(a.contains("_Zeitstand: 021200jun26_"), "{a}");
         assert!(a.contains("Hochwasser steigt."));
     }
 

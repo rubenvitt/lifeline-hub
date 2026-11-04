@@ -351,7 +351,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     assert_eq!(e["ereigniszeit"], "2026-06-02 10:00:00");
     assert_eq!(
         e["inhalt"],
-        "# Lage 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Bericht\nHochwasser steigt.\n"
+        "# Lage 10:00\n\n_Zeitstand: 021200jun26_\n\n## Bericht\nHochwasser steigt.\n"
     );
 
     let (s, antwort) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;

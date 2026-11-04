@@ -375,7 +375,13 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                     .collect();
                 eintrag(
                     "anordnung",
-                    crate::befehl::render_snapshot(v, d.titel, &zeit, &abschnitte),
+                    crate::befehl::render_snapshot(
+                        &crate::zeitdarstellung::Zeitstil::VORGABE,
+                        v,
+                        d.titel,
+                        &zeit,
+                        &abschnitte,
+                    ),
                 );
             }
             Vorgang::Lagebericht(d) => {
@@ -391,7 +397,13 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                     .collect();
                 eintrag(
                     "lage",
-                    crate::lagebericht::render_snapshot(v, d.titel, &zeit, &abschnitte),
+                    crate::lagebericht::render_snapshot(
+                        &crate::zeitdarstellung::Zeitstil::VORGABE,
+                        v,
+                        d.titel,
+                        &zeit,
+                        &abschnitte,
+                    ),
                 );
             }
             Vorgang::Erinnerung(_) | Vorgang::ErinnerungErledigt { .. } => {}
