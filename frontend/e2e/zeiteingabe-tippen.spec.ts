@@ -12,8 +12,10 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * aus dem die Uhrzeit stammt. Browser in Europe/Berlin, wie die Anzeigezone ohne Org-Zone.
  *
  * In der Nacht, in der die Sommerzeit endet, gibt es 02:00–02:59 zweimal; eine getippte Uhrzeit
- * daraus gilt beim ersten Mal (Spec `zeiteingabe`, „Uhrzeit ohne Datum“). Der Test wählt deshalb
- * eine eindeutige Uhrzeit (`eindeutig`, LLH-1470), sonst erwartete er womöglich das zweite Mal.
+ * daraus gilt nach Feldart beim Mal, das dem Jetzt am nächsten liegt (Spec `zeiteingabe`,
+ * „Richtung nach Feldart“, LLH-1471). Für eine Ereigniszeit kurz vor jetzt ist das genau der
+ * Zeitpunkt, aus dem sie stammt. Die Frist liegt anderthalb Stunden voraus, ihr anderes Mal kann
+ * näher liegen; dort wählt der Test eine eindeutige Uhrzeit (`eindeutig`, LLH-1470).
  */
 
 test.use({ timezoneId: 'Europe/Berlin' });
@@ -74,7 +76,7 @@ test('ETB-Chip „Ereigniszeit“: HHMM + Enter übernimmt ohne Maus, der Eintra
   const feld = page.getByPlaceholder('Inhalt …');
   await feld.fill(inhalt);
 
-  const zeit = eindeutig(umJetzt(-20), -1);
+  const zeit = umJetzt(-20);
   await page.getByRole('button', { name: 'Feld', exact: true }).click();
   await page.getByRole('option', { name: /^Ereigniszeit/ }).click();
   const chip = page.getByRole('textbox', { name: 'Ereigniszeit' });
@@ -142,8 +144,7 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
   // Ohne Vorgabe beginnt mit dem Eintreffen keine Schicht (Spec `kraefte-abloesung`).
   await sende('put', 'abloesungen/schichtmodell', { schichtmodell: null }, 'keine Vorgabe');
   const einheit = await sende('post', 'einheiten', { name: 'Florian Süd' }, 'Einheit');
-  // Der Beginn liegt nach dem Eintreffen, auch wenn `eindeutig` ihn zurückrückt.
-  const beginn = eindeutig(umJetzt(-30), -1);
+  const beginn = umJetzt(-30);
   await sende(
     'post',
     `einheiten/${einheit.id}/zeitachse`,

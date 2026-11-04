@@ -13,6 +13,7 @@
  * - **Sommerzeit**: eine Uhrzeit, die es an dem Tag zweimal gibt (Rückstellung, in Berlin
  *   25.10.2026 02:30), gilt beim ersten Mal; eine, die es nicht gibt (Vorstellung, 29.03.2026
  *   02:30), rückt um die Lücke nach vorn (03:30) — nie früher als gewünscht, wie `zuWanduhr`.
+ *   Getippte Zeitpunkte wählen mit {@link uhrzeitenAmTag} nach Feldart (`zeitParser.ts`, LLH-1471).
  *
  * Die Zonenrechnung steht hier, in `anzeige/`, weil nur hier die Browserzone gelesen wird (Guard
  * `zeitEingabe.guard.test.ts`).
@@ -71,6 +72,19 @@ function versatz(ms: number, zone: string): number {
  * davon passen null (Lücke der Vorstellung), einer oder zwei (doppelte Stunde der Rückstellung).
  */
 export function uhrzeitAmTag(tag: string, uhrzeit: string, zone: string | null | undefined): Dayjs {
+  return uhrzeitenAmTag(tag, uhrzeit, zone)[0];
+}
+
+/**
+ * Alle Zeitpunkte, an denen die Uhr der Anzeigezone am Kalendertag `tag` die Uhrzeit `uhrzeit`
+ * zeigt, frühester zuerst: einer, in der doppelten Stunde der Rückstellung zwei. In der Lücke der
+ * Vorstellung einer, um die Lücke später (wie {@link uhrzeitAmTag}).
+ */
+export function uhrzeitenAmTag(
+  tag: string,
+  uhrzeit: string,
+  zone: string | null | undefined,
+): Dayjs[] {
   const z = effektiveZone(zone) ?? browserZone();
   const [jahr, monat, tagImMonat] = tag.split('-').map(Number);
   const [stunde, minute] = uhrzeit.split(':').map(Number);
@@ -78,9 +92,11 @@ export function uhrzeitAmTag(tag: string, uhrzeit: string, zone: string | null |
   const wand = Date.UTC(jahr, monat - 1, tagImMonat, stunde, minute);
   const vorher = wand - versatz(wand - TAG_MS, z);
   const nachher = wand - versatz(wand + TAG_MS, z);
-  const passend = [vorher, nachher].filter((k) => k + versatz(k, z) === wand).sort((a, b) => a - b);
+  const passend = [...new Set([vorher, nachher])]
+    .filter((k) => k + versatz(k, z) === wand)
+    .sort((a, b) => a - b);
   // Lücke: mit dem Versatz vor der Umstellung gelesen, landet die Uhrzeit um die Lücke später.
-  return dayjs.utc(passend[0] ?? vorher);
+  return (passend.length > 0 ? passend : [vorher]).map((k) => dayjs.utc(k));
 }
 
 /**

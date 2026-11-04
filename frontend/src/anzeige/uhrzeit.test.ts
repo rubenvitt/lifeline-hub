@@ -7,6 +7,7 @@ import {
   tagesgrenzen,
   taktischeUhrzeitAus,
   uhrzeitAmTag,
+  uhrzeitenAmTag,
 } from './uhrzeit';
 
 const BERLIN = 'Europe/Berlin';
@@ -81,6 +82,15 @@ describe('uhrzeitAmTag — Browser UTC, Anzeigezone Europe/Berlin', () => {
 
   it('25.10. 02:30 gibt es zweimal: es gilt die erste (Sommerzeit)', () => {
     expect(wire('2026-10-25', '02:30')).toBe('2026-10-25 00:30:00');
+  });
+
+  it('uhrzeitenAmTag nennt beide 02:30 des 25.10., sonst genau einen Zeitpunkt', () => {
+    const alle = (tag: string, uhrzeit: string) =>
+      uhrzeitenAmTag(tag, uhrzeit, BERLIN).map(alsBackendZeit);
+    expect(alle('2026-10-25', '02:30')).toEqual(['2026-10-25 00:30:00', '2026-10-25 01:30:00']);
+    expect(alle('2026-10-25', '03:00')).toEqual(['2026-10-25 02:00:00']);
+    expect(alle('2026-03-29', '02:30')).toEqual(['2026-03-29 01:30:00']);
+    expect(alle('2026-10-11', '06:30')).toEqual(['2026-10-11 04:30:00']);
   });
 
   it('29.03. 02:30 gibt es nicht: die Uhrzeit rückt nach vorn auf 03:30 Sommerzeit', () => {
