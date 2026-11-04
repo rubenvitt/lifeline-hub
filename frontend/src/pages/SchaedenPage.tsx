@@ -379,6 +379,7 @@ export default function SchaedenPage() {
           ? `${bestandQuery.data.gesamt} Schäden · ${bestandQuery.data.offen} offen`
           : undefined
       }
+      metaPlatzhalter="0 Schäden · 0 offen"
       titel={modulName('schaeden')}
       breadcrumb={
         <Breadcrumb

@@ -335,6 +335,14 @@ interface EinsatzSeiteProps {
    */
   meta?: ReactNode;
   /**
+   * Die Form der Meta, solange sie noch lädt (LLH-1463), z. B. `0 Tiere` für „12 Tiere“. Fehlt
+   * `meta`, steht dieser Text unsichtbar und stumm an ihrer Stelle und hält ihre Breite wie der
+   * Platzhalter des Datenstands. Sonst kam die Meta erst mit den Daten, der Titelblock wurde
+   * breiter, und die Aktionen brachen in eine eigene Zeile (`e2e/rahmen-cls-dichte.spec.ts`).
+   * Zahlen als `0`: Mono mit Tabellenziffern, eine Ziffer ist so breit wie jede andere.
+   */
+  metaPlatzhalter?: string;
+  /**
    * Rechter Header-Slot — **genau eine Primäraktion**, der Rest sekundär.
    *
    * Der Slot wird AUSSERHALB jedes `<Form>` gerendert. Ein Speichern-Button hier darf KEIN
@@ -433,6 +441,7 @@ export default function EinsatzSeite({
   breadcrumb,
   ortspfadAbMd = false,
   meta,
+  metaPlatzhalter,
   aktionen,
   weitere,
   neueZeile,
@@ -512,7 +521,7 @@ export default function EinsatzSeite({
           {/* Meta und Datenstand sind EINE Gruppe mit eigener Zeile unter `md` (`EinsatzSeite.css`,
               LFH-373): in der Titelzeile schöbe eine spät eintreffende Meta alles darunter nach unten.
               Per CSS, nicht per `useViewport`, dessen erstes Bild bewusst breit ist. */}
-          {(meta || dataUpdatedAt !== undefined) && (
+          {(meta || metaPlatzhalter || dataUpdatedAt !== undefined) && (
             <span
               className="lfh-seitenkopf__meta"
               style={{
@@ -526,10 +535,31 @@ export default function EinsatzSeite({
             >
               {/* Die Gruppe bricht um, ihre Teile nicht — eine lange Meta liefe bei 390 px sonst quer
                   über die Seite. */}
-              {meta && <span style={seitenMetaStil(farben)}>{meta}</span>}
-              <span style={{ color: farben.gedaempft, whiteSpace: 'nowrap' }}>
-                {/* Führt die Seite einen Datenstand (auch `0` vor dem ersten Abruf), hält der Kopf seinen
-                    Platz frei — sonst bräche er beim Eintreffen um. */}
+              {/* Platzhalter und Meta sind zwei Knoten (`key`), wie beim Datenstand unten. */}
+              {meta ? (
+                <span key="meta" style={seitenMetaStil(farben)}>
+                  {meta}
+                </span>
+              ) : (
+                metaPlatzhalter && (
+                  <span
+                    key="meta-platzhalter"
+                    data-lfh="meta-platzhalter"
+                    aria-hidden="true"
+                    style={{ ...seitenMetaStil(farben), visibility: 'hidden' }}
+                  >
+                    {metaPlatzhalter}
+                  </span>
+                )
+              )}
+              {/* Führt die Seite einen Datenstand (auch `0` vor dem ersten Abruf), hält der Kopf seinen
+                  Platz frei, in jeder Breite (LLH-1463) — sonst bräche er beim Eintreffen um. Der
+                  `key` macht aus Platzhalter und Stand zwei Knoten: kommt die Meta mit den Daten,
+                  rückte derselbe Knoten sonst seitwärts und zählte als Sprung (`EinsatzSeite.css`). */}
+              <span
+                key={dataUpdatedAt ? 'stand' : 'platzhalter'}
+                style={{ color: farben.gedaempft, whiteSpace: 'nowrap' }}
+              >
                 <Datenstand
                   dataUpdatedAt={dataUpdatedAt}
                   platzHalten={dataUpdatedAt !== undefined}

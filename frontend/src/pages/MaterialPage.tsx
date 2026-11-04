@@ -981,6 +981,7 @@ function MaterialInhalt() {
       titel={modulName('material')}
       // Die Gesamtzahl steht einmal, hier; die Verdichtung über der Liste teilt sie auf (D10).
       meta={emQuery.isSuccess ? `${ems.length} Posten` : undefined}
+      metaPlatzhalter="0 Posten"
       dataUpdatedAt={emQuery.dataUpdatedAt}
       hinweis={
         (!darfSchreiben && einsatz.status !== 'aktiv') || rueckgaengigFehler != null ? (

@@ -195,14 +195,53 @@ describe('EinsatzSeite', () => {
     expect(regel![1]).toMatch(/flex-basis:\s*100%/);
   });
 
-  // LFH-373 (`einsatzauswahl-cls.spec.ts`): ab `md` steht die Gruppe in der Titelzeile, und die
-  // spät eintreffende Meta schöbe den Platzhalter nach rechts (CLS). Der Platzhalter gilt deshalb
-  // nur unter `md`.
-  it('blendet den Datenstand-Platzhalter ab md aus', () => {
-    const regel = seiteCss.match(/@media\s*\(min-width:\s*768px\)\s*\{([^}]*\{[^}]*\})/);
-    expect(regel, 'EinsatzSeite.css trägt die Breit-Regel').not.toBeNull();
-    expect(regel![1]).toContain('datenstand-platzhalter');
-    expect(regel![1]).toMatch(/display:\s*none/);
+  // LLH-1463: der Platzhalter hält seinen Platz auch ab `md`. Sonst kam der Stand dort allein nach,
+  // und in `handschuh` brachen die Aktionen um (`e2e/rahmen-cls-dichte.spec.ts`).
+  it('blendet den Datenstand-Platzhalter in keiner Breite aus', () => {
+    expect(seiteCss).not.toMatch(/datenstand-platzhalter[^{]*\{[^}]*display:\s*none/);
+  });
+
+  // LLH-1463 (`einsatzauswahl-cls.spec.ts`): kommt die Meta mit den Daten, rückte derselbe Knoten
+  // seitwärts und zählte als Sprung. Platzhalter und Stand sind deshalb zwei Knoten.
+  it('ersetzt den Platzhalter durch einen neuen Knoten, statt ihn zu verschieben', () => {
+    const { container, rerender } = renderMitProviders(
+      <EinsatzSeite titel="Liste" dataUpdatedAt={0}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    const huelle = container.querySelector('[data-lfh="datenstand-platzhalter"]')!.parentElement;
+    rerender(
+      <EinsatzSeite titel="Liste" meta="8 Einträge" dataUpdatedAt={Date.now()}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    const stand = container.querySelector('[data-stand]');
+    expect(stand).not.toBeNull();
+    expect(huelle!.isConnected).toBe(false);
+    expect(stand!.parentElement).not.toBe(huelle);
+  });
+
+  // LLH-1463: eine Meta, die erst mit den Daten kommt, hält ihren Platz über ihre Form.
+  it('hält mit metaPlatzhalter die Breite der Meta frei und ersetzt ihn durch einen neuen Knoten', () => {
+    const { container, rerender } = renderMitProviders(
+      <EinsatzSeite titel="Tiere" metaPlatzhalter="0 Tiere" dataUpdatedAt={0}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    const platz = container.querySelector('[data-lfh="meta-platzhalter"]') as HTMLElement;
+    expect(platz).not.toBeNull();
+    expect(platz).toHaveTextContent('0 Tiere');
+    expect(platz).toHaveAttribute('aria-hidden', 'true');
+    expect(platz.style.visibility).toBe('hidden');
+    expect(platz.closest('.lfh-seitenkopf__meta')).not.toBeNull();
+    rerender(
+      <EinsatzSeite titel="Tiere" meta="12 Tiere" metaPlatzhalter="0 Tiere" dataUpdatedAt={0}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(container.querySelector('[data-lfh="meta-platzhalter"]')).toBeNull();
+    expect(platz.isConnected).toBe(false);
+    expect(screen.getByText('12 Tiere')).toBeVisible();
   });
 
   it('rendert ohne Meta und ohne Datenstand keine leere Gruppe', () => {

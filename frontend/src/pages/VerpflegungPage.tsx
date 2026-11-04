@@ -450,6 +450,7 @@ export default function VerpflegungPage() {
     <EinsatzSeite
       titel={modulName('verpflegung')}
       meta={geladen ? `${alle.length} Zeitfenster · ${unterdeckung} mit Unterdeckung` : undefined}
+      metaPlatzhalter="0 Zeitfenster · 0 mit Unterdeckung"
       dataUpdatedAt={verpflegungQuery.dataUpdatedAt}
       breadcrumb={
         darf('fremde-module') && (
