@@ -321,6 +321,30 @@ describe('EinheitAusVorlagePage · Baum', () => {
     expect(zeile('personal-200')).toHaveTextContent('verlässt «RTW 1»');
   });
 
+  it('ein gebundener Einheitsführer trägt die Marke „Einheitsführer“', async () => {
+    zeige(
+      http.get('/api/einsaetze/1/einheiten/aus-vorlage/5', () =>
+        HttpResponse.json(
+          sanitaetszug(
+            {},
+            {
+              202: {
+                zustand: 'gebunden',
+                einheit_id: 9,
+                einheit_name: '2. Zug',
+                einheitsfuehrer: true,
+              },
+              203: { zustand: 'gebunden', einheit_id: 9, einheit_name: '2. Zug' },
+            },
+          ),
+        ),
+      ),
+    );
+    await warteAufBaum();
+    expect(zeile('personal-202')).toHaveTextContent('Einheitsführer');
+    expect(zeile('personal-203')).not.toHaveTextContent('Einheitsführer');
+  });
+
   it('ein gesperrtes Modul steht als Wort, ohne Zeilen und ohne Zählung', async () => {
     const ohnePersonal = sanitaetszug({}, {}, { personal_gesperrt: true });
     for (const k of ohnePersonal.knoten) k.personal = [];

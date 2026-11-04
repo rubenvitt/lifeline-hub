@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Checkbox, Form, Input, Typography } from 'antd';
+import { App, Breadcrumb, Button, Checkbox, Form, Input, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -550,6 +550,13 @@ function PersonZeile({
       grund={grund}
       onWahl={onWahl}
       hinweise={hinweise}
+      // Umgehängt endet die Führung (LLH-1461): die Marke steht wie in Liste und Ansicht schon
+      // vor dem Wechsel am Wert.
+      marke={
+        person.zustand === 'gebunden' && person.einheitsfuehrer ? (
+          <Tag style={{ marginInlineEnd: 0 }}>Einheitsführer</Tag>
+        ) : undefined
+      }
       beschriftung={
         <>
           {person.name}
@@ -653,6 +660,7 @@ function KraftZeile({
   onWahl,
   beschriftung,
   hinweise = [],
+  marke,
 }: {
   art: ZeilenArt;
   zeile: VorschauFahrzeug | VorschauPersonal;
@@ -662,6 +670,8 @@ function KraftZeile({
   onWahl: BaumProps['onWahl'];
   beschriftung: ReactNode;
   hinweise?: string[];
+  /** Marke vor dem Zustand, etwa „Einheitsführer“ an einer gebundenen Person. */
+  marke?: ReactNode;
 }) {
   const { token } = useRollen();
   const id =
@@ -698,6 +708,7 @@ function KraftZeile({
         {beschriftung}
         {umhaengen && <span> · {umhaengen}</span>}
       </Checkbox>
+      {marke}
       <Typography.Text type="secondary" data-lfh="vorlage-zustand" style={{ whiteSpace: 'nowrap' }}>
         {zustandWort(art, zeile)}
       </Typography.Text>

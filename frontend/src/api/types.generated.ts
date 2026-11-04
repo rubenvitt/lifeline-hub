@@ -6966,6 +6966,8 @@ export interface components {
              */
             einheit_id?: number | null;
             einheit_name?: string | null;
+            /** @description Die Person führt diese Einheit; umgehängt endet die Führung (LLH-1461). */
+            einheitsfuehrer: boolean;
             /**
              * Format: int64
              * @description Die Dispositionszeile (`einsatz_personal.id`), wenn die Person aktiv im Einsatz ist.

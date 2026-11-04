@@ -17400,7 +17400,8 @@
         "required": [
           "personal_id",
           "name",
-          "zustand"
+          "zustand",
+          "einheitsfuehrer"
         ],
         "properties": {
           "ef_id": {
@@ -17424,6 +17425,10 @@
               "string",
               "null"
             ]
+          },
+          "einheitsfuehrer": {
+            "type": "boolean",
+            "description": "Die Person führt diese Einheit; umgehängt endet die Führung (LLH-1461)."
           },
           "ep_id": {
             "type": [

@@ -680,6 +680,7 @@ fn lage_p(zustand: VorschauZustand, einheit: Option<&str>, fz: Option<&str>) -> 
             id: 9,
             name: n.into(),
         }),
+        einheitsfuehrer: false,
         fahrzeug: fz.map(|n| Bezug {
             id: 8,
             name: n.into(),
@@ -1086,7 +1087,8 @@ async fn fahrzeuge_neu_disponiert_frei_zugeordnet_gebunden_umgehaengt() {
         g.umgehaengt,
         [Umgehaengt {
             name: "RTW 2".into(),
-            woher: "aus «2. Zug»".into()
+            woher: "aus «2. Zug»".into(),
+            ..Default::default()
         }]
     );
     let zuordnung: Vec<(String, Option<i64>)> = sqlx::query_as(
@@ -1262,7 +1264,8 @@ async fn personen_nach_vorlage_mit_position_und_besatzung() {
         g.umgehaengt,
         [Umgehaengt {
             name: "Rettsan Rita".into(),
-            woher: "aus «2. Zug»".into()
+            woher: "aus «2. Zug»".into(),
+            ..Default::default()
         }]
     );
     let zeitachse_nachher = zaehle(
@@ -1334,7 +1337,8 @@ async fn besatzung_wechselt_aufs_vorlagenfahrzeug() {
         g.umgehaengt,
         [Umgehaengt {
             name: "Notsan Nils".into(),
-            woher: "von «83-4»".into()
+            woher: "von «83-4»".into(),
+            ..Default::default()
         }]
     );
     assert_eq!(g.alte_fahrzeuge, [ef_fremd]);
@@ -1466,6 +1470,69 @@ async fn etb_text_aus_dem_ergebnis() {
         "Einheit «1. Zug» aus Vorlage «Sanitätszug Musterstadt» gebildet; Untereinheit: \
          «Rettungsstaffel»; 3 Fahrzeuge: ELW 1, RTW 1, RTW 2; 2 Kräfte: Rettsan Rita, \
          Rettsan Rolf; umgehängt: RTW 2 aus «2. Zug»"
+    );
+}
+
+/// Ein umgehängter Einheitsführer gibt die Führung seiner bisherigen Einheit ab (LLH-1461): die
+/// Vorschau kennzeichnet ihn vorher, das ETB nennt die endende Führung, die alte Einheit ist ohne
+/// Führer und wird gemeldet.
+#[tokio::test]
+async fn umgehaengter_einheitsfuehrer_gibt_die_fuehrung_ab() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let zweiter = einheit(&pool, z.k.einsatz_id, "2. Zug").await;
+    let ep_rita = im_einsatz_person(&pool, z.k, z.rettsan1, None, Some(zweiter), None).await;
+    im_einsatz_person(&pool, z.k, z.rettsan2, None, Some(zweiter), None).await;
+    einheit_repo::setze_fuehrer(&pool, z.k.einsatz_id, zweiter, Some(ep_rita))
+        .await
+        .unwrap();
+
+    let plan = load_plan(&pool, &z, z.zug).await.unwrap();
+    assert!(plan.personal[&z.rettsan1].einheitsfuehrer);
+    assert!(
+        !plan.personal[&z.rettsan2].einheitsfuehrer,
+        "Mitglied ohne Führung"
+    );
+    let v = vorschau(&plan, NICHTS_GESPERRT);
+    let fuehrer: Vec<(i64, bool)> = v
+        .knoten
+        .iter()
+        .flat_map(|k| k.personal.iter())
+        .filter(|p| p.zustand == VorschauZustand::Gebunden)
+        .map(|p| (p.personal_id, p.einheitsfuehrer))
+        .collect();
+    assert_eq!(fuehrer, [(z.rettsan1, true), (z.rettsan2, false)]);
+
+    let personal = [Wahl {
+        id: z.rettsan1,
+        umhaengen: true,
+    }];
+    let g = bilde(&pool, &z, &anfrage(&[], &personal)).await.unwrap();
+    assert_eq!(
+        g.umgehaengt,
+        [Umgehaengt {
+            name: "Rettsan Rita".into(),
+            woher: "aus «2. Zug»".into(),
+            fuehrung_endet: vec!["2. Zug".into()],
+        }]
+    );
+    assert_eq!(
+        g.alte_einheiten,
+        [zweiter],
+        "die alte Einheit wird gemeldet"
+    );
+    let fuehrer_alt: Option<i64> =
+        sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?")
+            .bind(zweiter)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(fuehrer_alt, None, "die alte Einheit ist ohne Führer");
+    assert_eq!(
+        etb_text("Sanitätszug Musterstadt", &g),
+        "Einheit «Sanitätszug Musterstadt» aus Vorlage «Sanitätszug Musterstadt» gebildet; \
+         Untereinheit: «Rettungsstaffel»; 1 Kraft: Rettsan Rita; umgehängt: Rettsan Rita aus \
+         «2. Zug» (Einheitsführer von «2. Zug» endet)"
     );
 }
 

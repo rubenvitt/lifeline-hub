@@ -352,7 +352,10 @@ Der Zustand je Zeile:
 - „in «2. Zug»“ bzw. „auf «RTW 3»“: gehört schon einer Einheit an oder sitzt auf einem anderen
   Fahrzeug. Wählbar nur als „umhängen aus «2. Zug»“ bzw. „umhängen von «RTW 3»“; sie verlässt dann
   ihre Einheit oder ihr Fahrzeug. Ein umgehängtes Fahrzeug nimmt seine Besatzung mit, auch wer
-  nicht in der Vorlage steht; das Einsatztagebuch zählt sie zu den Kräften.
+  nicht in der Vorlage steht; das Einsatztagebuch zählt sie zu den Kräften. Führt eine Person ihre
+  Einheit, steht an ihr die Marke „Einheitsführer“: umgehängt ist ihre Einheit danach ohne Führer,
+  und das Einsatztagebuch sagt es dazu, etwa „Anna Probe aus «2. Zug» (Einheitsführer von «2. Zug»
+  endet)“.
 - „außer Dienst“: nicht wählbar.
 - „entlassen, wird wieder aufgenommen“: aus dem Einsatz entlassen; die Kraft wird beim Bilden
   erneut in den Einsatz geholt. Ein entlassenes Fahrzeug ist vorab gewählt, eine Person nicht.
