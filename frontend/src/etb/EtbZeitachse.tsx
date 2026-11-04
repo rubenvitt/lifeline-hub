@@ -287,13 +287,7 @@ export default function EtbZeitachse({
   const nachObenRef = useCallback(
     (el: HTMLElement | null) => {
       nachObenMessen(el);
-      const abmelden = nachObenMelden(el);
-      // Mit Aufräumfunktion ruft React den Ref beim Aushängen nicht mehr mit `null`: die Messung
-      // ließe sonst das ausgehängte Element beobachten.
-      return () => {
-        abmelden?.();
-        nachObenMessen(null);
-      };
+      nachObenMelden(el);
     },
     [nachObenMessen, nachObenMelden],
   );

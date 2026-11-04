@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import { Button } from 'antd';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   bandAbstand,
@@ -67,6 +68,23 @@ describe('useAlsUntereLeiste (LLH-1478)', () => {
     expect(untereLeisten()).toEqual([]);
     rerender(<Schwebend aktiv />);
     expect(untereLeisten()).toEqual([el]);
+    unmount();
+    expect(untereLeisten()).toEqual([]);
+  });
+
+  it('meldet auch über einen weitergereichten Ref ab, der React keine Aufräumfunktion gibt (antd-Knopf)', () => {
+    // antd führt den Ref über `composeRef` zusammen und ruft ihn beim Aushängen mit `null`; eine
+    // zurückgegebene Aufräumfunktion erreicht React dort nicht.
+    function Knopf({ aktiv }: { aktiv: boolean }) {
+      return <Button ref={useAlsUntereLeiste(aktiv)}>Nach oben</Button>;
+    }
+    const { rerender, unmount } = render(<Knopf aktiv />);
+    const knopf = screen.getByRole('button', { name: 'Nach oben' });
+    expect(untereLeisten()).toEqual([knopf]);
+    rerender(<Knopf aktiv={false} />);
+    expect(untereLeisten()).toEqual([]);
+    rerender(<Knopf aktiv />);
+    expect(untereLeisten()).toEqual([knopf]);
     unmount();
     expect(untereLeisten()).toEqual([]);
   });

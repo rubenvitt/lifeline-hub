@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from 'react';
+import { useEffect, useState, useSyncExternalStore, type RefObject } from 'react';
 
 /**
  * Untere Leisten und was ihnen ausweicht (LLH-1424, Spec `benachrichtigungen`, „Das Eingangsband
@@ -46,18 +46,21 @@ export function entferneUntereLeiste(leiste: HTMLElement) {
  * Callback-Ref für ein schwebendes Element über dem unteren Rand, das keine Fußleiste mit
  * Fokusabstand ist, dem das Band aber ebenso ausweicht (LLH-1478): „Nach oben“ und das
  * Sammelbanner des ETB. `aktiv` meldet nur, was gerade sichtbar ist; ein unsichtbar gehaltener
- * Knopf (`visibility: hidden`) behält seinen Kasten, das Band rückte sonst über Leere. Stabil
- * je `aktiv`: ein Wechsel hängt die alte Meldung ab (Aufräumfunktion, React 19) und die neue an.
+ * Knopf (`visibility: hidden`) behält seinen Kasten, das Band rückte sonst über Leere.
+ *
+ * Der Ref merkt nur das Element, gemeldet wird im Effekt. Ein Ref, der je `aktiv` neu entstünde
+ * oder sich über seine Aufräumfunktion abmeldete, hinge an einem antd-`Button` fest: antd führt
+ * den Ref über `composeRef` zusammen, ruft ihn beim Aushängen mit `null` statt die Aufräumfunktion
+ * weiterzugeben und bei einer neuen Ref-Identität gar nicht neu.
  */
-export function useAlsUntereLeiste(aktiv = true) {
-  return useCallback(
-    (el: HTMLElement | null) => {
-      if (!el || !aktiv) return undefined;
-      meldeUntereLeiste(el);
-      return () => entferneUntereLeiste(el);
-    },
-    [aktiv],
-  );
+export function useAlsUntereLeiste(aktiv = true): (el: HTMLElement | null) => void {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!el || !aktiv) return undefined;
+    meldeUntereLeiste(el);
+    return () => entferneUntereLeiste(el);
+  }, [el, aktiv]);
+  return setEl;
 }
 
 /**
