@@ -57,8 +57,14 @@ for (const viewport of BREITEN) {
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `E2E Meldebild Banner ${Date.now()}`);
     const b = await seedKraeftebaum(page, einsatzId);
-    // Neu navigieren: der Login leitet im selben Dokument weiter (`cls-kern.ts`).
+    // Neu navigieren: der Login leitet im selben Dokument weiter (`cls-kern.ts`). Die neue Einheit
+    // kommt nur über den Live-Strom, und der Server abonniert erst mit der Antwort auf `/live`
+    // (LLH-1317, `e2e/AGENTS.md`): vorher geschrieben, bliebe der Banner aus.
+    const strom = page.waitForResponse(
+      (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+    );
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+    await strom;
     const bereich = page.getByRole('region', { name: 'Meldebild' });
     await expect(bereich.locator(`tr[data-row-key="eh-${b.zug}"]`)).toBeVisible();
 
