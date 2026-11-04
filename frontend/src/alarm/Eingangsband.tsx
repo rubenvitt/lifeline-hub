@@ -18,7 +18,8 @@ import { IconKreuz } from '../icons';
  * **Es weicht unteren Leisten aus** (LLH-1424): schnitte es eine angemeldete Fußleiste
  * (ETB-Erfassung, Aktionsleiste des Befehlsentwurfs, Speicherleiste …), steht es über deren
  * Oberkante (`components/untereLeiste.ts`), schmal wie breit. Vorher lag es über „Erfassen“ und
- * „Freigeben“, bis man es schloss. Nachweis `e2e/eingangsband-ausweichen.spec.ts`.
+ * „Freigeben“, bis man es schloss. Ebenso über „Nach oben“ und dem Sammelbanner im ETB, die über
+ * der Erfassung schweben (LLH-1478). Nachweis `e2e/eingangsband-ausweichen.spec.ts`.
  */
 export function bandUnten(rand: number, abstand: number) {
   // Am Rand gilt weiter die sichere Fläche; über einer Leiste ist sie in deren Lage schon drin.

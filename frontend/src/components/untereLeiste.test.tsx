@@ -5,6 +5,7 @@ import {
   entferneUntereLeiste,
   meldeUntereLeiste,
   untereLeisten,
+  useAlsUntereLeiste,
   useUntereLeisten,
 } from './untereLeiste';
 
@@ -53,6 +54,24 @@ describe('Anmeldung', () => {
   });
 });
 
+describe('useAlsUntereLeiste (LLH-1478)', () => {
+  function Schwebend({ aktiv }: { aktiv?: boolean }) {
+    return <div data-testid="schwebend" ref={useAlsUntereLeiste(aktiv)} />;
+  }
+
+  it('meldet ein schwebendes Element an, solange es aktiv und eingehängt ist', () => {
+    const { rerender, unmount } = render(<Schwebend />);
+    const el = screen.getByTestId('schwebend');
+    expect(untereLeisten()).toEqual([el]);
+    rerender(<Schwebend aktiv={false} />);
+    expect(untereLeisten()).toEqual([]);
+    rerender(<Schwebend aktiv />);
+    expect(untereLeisten()).toEqual([el]);
+    unmount();
+    expect(untereLeisten()).toEqual([]);
+  });
+});
+
 describe('bandAbstand', () => {
   // Fenster 900 hoch, Band 130 hoch rechts (966–1350), Rand 16: am Rand belegt es 754–884.
   const grund = {
@@ -90,6 +109,11 @@ describe('bandAbstand', () => {
 
   it('eine Leiste ohne Fläche zählt nicht', () => {
     expect(bandAbstand({ ...grund, leisten: [leiste(0, 0, 0, 0)] })).toBe(16);
+  });
+
+  it('reicht der Stapel bis unter den Kopf, bleibt das Band ganz im Fenster (LLH-1478)', () => {
+    // Kartenfuß mit aufgeklappter Zeitachse: Oberkante 60, das Band (130 hoch) hätte keinen Platz.
+    expect(bandAbstand({ ...grund, leisten: [leiste(60, 888)] })).toBe(900 - 130 - 16);
   });
 
   it('über zwei gestapelten Leisten landet es über der oberen', () => {

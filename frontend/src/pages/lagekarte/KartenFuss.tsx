@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { theme } from 'antd';
+import { meldeKinderAlsUntereLeisten } from '../../components/untereLeiste';
 import { UEBERLAGERUNG_RAND, kartenKnopfKante } from './KartenUeberlagerung';
 
 /** Abstand der Fußleiste zum Kartenrand und zwischen ihren Bändern (px). */
@@ -72,11 +73,19 @@ export function fussStil(knopfKante: number): CSSProperties {
  *
  * Die Zeichnen-Steuerung steht oben und schwenkt über der Leiste ein; sie erscheint nur im
  * Zeichenmodus.
+ *
+ * Jedes Band meldet sich als untere Leiste (LLH-1478, `components/untereLeiste.ts`): das
+ * Eingangsband lag schmal über „Abschließen“ und „Beenden“ der Messung und über „Zeitachse
+ * einblenden“, breit über dem rechten Ende der Zeitachse; jetzt rückt es über die Bänder.
  */
 export function KartenFuss({ children }: { children?: ReactNode }) {
   const { token } = theme.useToken();
   return (
-    <div data-lfh="karten-fuss" style={fussStil(kartenKnopfKante(token))}>
+    <div
+      ref={meldeKinderAlsUntereLeisten}
+      data-lfh="karten-fuss"
+      style={fussStil(kartenKnopfKante(token))}
+    >
       {children}
     </div>
   );

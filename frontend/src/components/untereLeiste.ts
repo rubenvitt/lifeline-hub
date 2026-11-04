@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type RefObject } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from 'react';
 
 /**
  * Untere Leisten und was ihnen ausweicht (LLH-1424, Spec `benachrichtigungen`, „Das Eingangsband
@@ -9,7 +9,9 @@ import { useEffect, useState, useSyncExternalStore, type RefObject } from 'react
  * dem unteren Rand liegt, das Eingangsband (`alarm/Eingangsband.tsx`), rückt über sie. Gemeldet
  * wird nicht je Seite, sondern einmal in der gemeinsamen Messung `beobachteFussleiste`
  * (`components/fokusabstandUnten.ts`): jede Leiste, die ihren Fokusabstand misst, ist damit
- * angeschlossen, eine neue braucht keine zweite Zeile.
+ * angeschlossen, eine neue braucht keine zweite Zeile. Was ohne eigene Fußleiste über dem Rand
+ * schwebt („Nach oben“ und das Sammelbanner des ETB), meldet sich über {@link useAlsUntereLeiste}
+ * (LLH-1478), die Bänder des Kartenfußes über {@link meldeKinderAlsUntereLeisten}.
  *
  * **Gemessen wird die LAGE der Leiste, nicht nur ihre Höhe.** `sticky; bottom: 0` klebt nur, wenn
  * die Seite höher als das Fenster ist; auf einem leeren ETB stand die Erfassung gemessen bei
@@ -40,6 +42,48 @@ export function entferneUntereLeiste(leiste: HTMLElement) {
   verteile();
 }
 
+/**
+ * Callback-Ref für ein schwebendes Element über dem unteren Rand, das keine Fußleiste mit
+ * Fokusabstand ist, dem das Band aber ebenso ausweicht (LLH-1478): „Nach oben“ und das
+ * Sammelbanner des ETB. `aktiv` meldet nur, was gerade sichtbar ist; ein unsichtbar gehaltener
+ * Knopf (`visibility: hidden`) behält seinen Kasten, das Band rückte sonst über Leere. Stabil
+ * je `aktiv`: ein Wechsel hängt die alte Meldung ab (Aufräumfunktion, React 19) und die neue an.
+ */
+export function useAlsUntereLeiste(aktiv = true) {
+  return useCallback(
+    (el: HTMLElement | null) => {
+      if (!el || !aktiv) return undefined;
+      meldeUntereLeiste(el);
+      return () => entferneUntereLeiste(el);
+    },
+    [aktiv],
+  );
+}
+
+/**
+ * Callback-Ref für einen Rahmen, der Bänder im Fluss stapelt (Kartenfuß der Lagekarte, LLH-1478):
+ * jedes Kind ist eine untere Leiste, gemeldet, solange es im Rahmen hängt. Nicht der Rahmen
+ * selbst: der Kartenfuß spannt bis zur Oberkante der Karte, das Band rückte sonst ganz nach
+ * oben. Ein Kind ohne Fläche (ausgeblendetes Band) zählt in {@link bandAbstand} nicht.
+ */
+export function meldeKinderAlsUntereLeisten(rahmen: HTMLElement | null) {
+  if (!rahmen) return undefined;
+  let gemeldet: HTMLElement[] = [];
+  const abgleichen = () => {
+    const jetzt = [...rahmen.children].filter((k): k is HTMLElement => k instanceof HTMLElement);
+    for (const el of gemeldet) if (!jetzt.includes(el)) entferneUntereLeiste(el);
+    for (const el of jetzt) meldeUntereLeiste(el);
+    gemeldet = jetzt;
+  };
+  abgleichen();
+  const beobachter = new MutationObserver(abgleichen);
+  beobachter.observe(rahmen, { childList: true });
+  return () => {
+    beobachter.disconnect();
+    for (const el of gemeldet) entferneUntereLeiste(el);
+  };
+}
+
 /** Die angemeldeten Leisten; ein stabiles Feld, das nur bei einer Änderung neu entsteht. */
 export function untereLeisten(): readonly HTMLElement[] {
   return schnappschuss;
@@ -65,6 +109,8 @@ export type Kasten = Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right'>;
  * Beginnt am `rand` und rückt, solange das Band an dieser Stelle eine Leiste schnitte, über deren
  * Oberkante (plus `rand`). Mehrere Leisten werden von unten nach oben abgearbeitet, damit das
  * Band nach dem Rücken nicht in der nächsten landet. Eine Leiste ohne Fläche zählt nicht.
+ * Höchstens so weit, dass das Band ganz im Fenster bleibt (LLH-1478): ein Stapel bis unter den
+ * Kopf (Kartenfuß mit aufgeklappter Zeitachse) schöbe es sonst aus dem Bild.
  */
 export function bandAbstand({
   fenster,
@@ -90,7 +136,7 @@ export function bandAbstand({
       l.top < unten && l.bottom > oben && l.left < band.right && l.right > band.left;
     if (schneidet) abstand = Math.max(abstand, fenster - l.top + rand);
   }
-  return abstand;
+  return Math.max(rand, Math.min(abstand, fenster - band.hoehe - rand));
 }
 
 /**

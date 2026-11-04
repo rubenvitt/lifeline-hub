@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { untereLeisten } from '../../components/untereLeiste';
 import { KartenFuss, bandStil, fussStil, FUSS_ABSTAND } from './KartenFuss';
 
 /**
@@ -70,6 +71,27 @@ describe('KartenFuss — Rahmen', () => {
       'oben',
       'unten',
     ]);
+  });
+
+  it('meldet jedes Band als untere Leiste, nicht den Rahmen, und folgt Ein- und Ausblenden (LLH-1478)', async () => {
+    function Fuss({ messen }: { messen: boolean }) {
+      return (
+        <KartenFuss>
+          {messen && <div data-testid="messen">Messen</div>}
+          <div data-testid="zeitachse">Zeitachse</div>
+        </KartenFuss>
+      );
+    }
+    const { rerender, unmount } = render(<Fuss messen={false} />);
+    const zeitachse = screen.getByTestId('zeitachse');
+    expect(untereLeisten()).toEqual([zeitachse]);
+    rerender(<Fuss messen />);
+    const messen = screen.getByTestId('messen');
+    await waitFor(() => expect(untereLeisten()).toEqual([zeitachse, messen]));
+    rerender(<Fuss messen={false} />);
+    await waitFor(() => expect(untereLeisten()).toEqual([zeitachse]));
+    unmount();
+    expect(untereLeisten()).toEqual([]);
   });
 });
 
