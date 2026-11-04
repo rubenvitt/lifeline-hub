@@ -234,7 +234,10 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    „Erst „Titel“ speichern oder abbrechen“, sichtbar am Element. Getragen vom Merker
    `components/offeneBearbeitung.tsx` (ein Paneel belegt die Seite beim Öffnen, die Rückfrage vor
    dem Verlassen kommt erst mit einer Änderung); ohne Merker der Seite legt der Baustein seinen
-   eigenen an. Jede offene Bearbeitung trägt CAS über `useEditSitzung`.
+   eigenen an. Jede offene Bearbeitung trägt CAS über `useEditSitzung`. **Listenseiten mit
+   Inline-Angaben folgen derselben Regel** (LLH-1480, Fahrzeuge, Material): der Grund steht dort
+   EINMAL in der Werkzeugzeile der Liste (`OffeneBearbeitungGrundZeile`), die gesperrten Angaben
+   und Bemerkungen verweisen darauf, statt ihn unter jede Zelle jeder Zeile zu schreiben.
 4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
    Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
    übernehmen“ / „Verwerfen und neu laden“.
@@ -983,12 +986,16 @@ und `pages/personen/`.
   `components/offeneBearbeitung.tsx` (`OffeneBearbeitungProvider` speist
   `useFormularVerlassenSchutz` und rendert `VerlassenRueckfrage`; ein Feld meldet sich mit
   `useOffeneBearbeitung(etikett)` über `onEntwurf` an, eine `InlineAngabe` ohne eigenes
-  `onEntwurf` selbst, dann ohne Sperre der übrigen, LLH-1468). Höchstens ein Entwurf je Seite: die
-  übrigen Felder sind gesperrt mit „Erst „Name“ speichern oder abbrechen“
-  (`useOffeneBearbeitungGrund` liefert den Grund der Seite; wo er steht, sagt die Bereichsdatei,
-  für Personendaten `frontend/src/personen/AGENTS.md`). Ein offenes Feld ohne Änderung meldet sich
-  nicht an. **Ein Wechsel in der Seite, der die offene Bearbeitung aushängt** (Segmentleiste oder
-  Reiter ohne Pfadwechsel), geht über `useWechselNachRueckfrage` desselben Merkers: mit Änderung
+  `onEntwurf` selbst, LLH-1468). Höchstens ein Entwurf je Seite: die übrigen Felder sind gesperrt
+  mit „Erst „Name“ speichern oder abbrechen“, der Grund steht an EINER Stelle. Wer selbst anmeldet,
+  zeigt ihn selbst (`useOffeneBearbeitungGrund`; wo er steht, sagt die Bereichsdatei, für
+  Personendaten `frontend/src/personen/AGENTS.md`). Eine Listenseite stellt dafür
+  `<OffeneBearbeitungGrundZeile />` in die Werkzeugzeile ihrer `Datensicht` (`werkzeuge`,
+  LLH-1480): solange sie steht, sperren sich die selbst angemeldeten Inline-Angaben und die
+  `BemerkungZelle`n der Seite mit Verweis darauf (`aria-describedby`); ohne sie sperren sie nicht.
+  Ein eigenes `gesperrt` (ohne Netz) geht vor. Ein offenes Feld ohne Änderung meldet sich nicht an.
+  **Ein Wechsel in der Seite, der die offene Bearbeitung aushängt** (Segmentleiste oder Reiter ohne
+  Pfadwechsel), geht über `useWechselNachRueckfrage` desselben Merkers: mit Änderung
   dieselbe Rückfrage (`VerlassenDialog`), ohne still; der Provider umfasst dafür auch die Leiste
   (LLH-1415, Vorbild `pages/VerpflegungPage.tsx`; ebenso Fahrzeuge, Liste ↔ Tableau, LLH-1468). Ein
   Wechsel, der sie stehen lässt, fragt nicht (Gruppierung der Materialliste: die Zeile behält ihren
