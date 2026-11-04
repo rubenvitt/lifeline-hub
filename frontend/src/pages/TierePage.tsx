@@ -394,6 +394,7 @@ export default function TierePage() {
     <EinsatzSeite
       dataUpdatedAt={tiereQuery.dataUpdatedAt}
       meta={tiereQuery.isSuccess ? `${tiereQuery.data.length} Tiere` : undefined}
+      metaPlatzhalter="0 Tiere"
       titel={modulName('tiere')}
       breadcrumb={
         <Breadcrumb

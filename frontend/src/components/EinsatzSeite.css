@@ -100,8 +100,14 @@
    bewegten Fläche, im Gate hob das den Ladewechsel der Einsatzauswahl von 0,020 auf 0,068
    (`e2e/einsatzauswahl-cls.spec.ts`). Ab `md` erscheint der Stand deshalb wie zuvor erst mit
    den Daten, am Ende der Zeile, wo er nichts schiebt. */
-@media (min-width: 768px) {
-  .lfh-seitenkopf__meta [data-lfh='datenstand-platzhalter'] {
-    display: none;
-  }
-}
+/* Der Datenstand-Platzhalter hält seinen Platz in jeder Breite (LLH-1463). Bis dahin galt er nur
+   unter `md`, und ab `md` kam der Stand erst mit den Daten. Im Meldebild steht die Meta aber vom
+   ersten Bild an, und der Stand kam allein: In `handschuh` bei 1280 px wurde der Titelblock
+   breiter, die Aktionen brachen in eine eigene Zeile, und der Inhalt rückte 79 px (Seiten-CLS
+   0,28, `e2e/rahmen-cls-dichte.spec.ts`).
+
+   Ausgeblendet war er ab `md`, weil eine spät eintreffende Meta den schon stehenden Platzhalter
+   weit nach rechts schob: CLS rechnet die größte Strecke eines Bildes mal der ganzen bewegten
+   Fläche, im Gate hob das den Ladewechsel der Einsatzauswahl von 0,020 auf 0,068
+   (`e2e/einsatzauswahl-cls.spec.ts`). Das verhindert jetzt `EinsatzSeite.tsx`: Platzhalter und
+   Stand sind verschiedene Knoten. Ein neuer Knoten verschiebt sich nicht, er erscheint. */

@@ -598,6 +598,7 @@ export default function EinsatzabschnittePage() {
       titel={modulName('einsatzabschnitte')}
 
       meta={abschnitteQuery.isSuccess ? `${abschnitte.length} Abschnitte` : undefined}
+      metaPlatzhalter="0 Abschnitte"
       dataUpdatedAt={gemeinsamerDatenstand(
         abschnitteQuery.dataUpdatedAt,
         einheitenQuery.dataUpdatedAt,

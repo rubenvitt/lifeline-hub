@@ -138,12 +138,7 @@ async function findWrapEdge(page: Page) {
   return { twoRows, oneRow, rowHeight };
 }
 
-/*
- * `handschuh` steht hier noch nicht: das Meldebild springt dort bei 1280 px im eigenen Seitenkopf
- * (das Meta kommt nach, die Aktionen brechen um; Seiten-CLS 0,28), nicht im Rahmen. Nachzug
- * LLH-1463; den Rahmen in `handschuh` misst der Fall an der Kante unten.
- */
-for (const dichte of ['kompakt', 'komfortabel'] as const) {
+for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
   test(`Rahmen bei ${ARBEITSPLATZ.width}×${ARBEITSPLATZ.height}, ${dichte}: CLS < ${CLS_GUT} auf ${SEITEN.length} Seiten`, async ({
     page,
   }) => {

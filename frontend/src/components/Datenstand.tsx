@@ -13,8 +13,8 @@ interface DatenstandProps {
    * Vor dem ersten Abruf die Breite freihalten statt nichts zu zeigen (LFH-373): sonst erschiene
    * „Stand hh:mm" erst mit den Daten, bräche auf 390 px um und schöbe alles darunter nach unten
    * (`e2e/leisten-flaeche.spec.ts`, „Laden ohne Sprung"). Die Uhrzeit in Mono mit
-   * Tabellenziffern — ein Platzhalter mit gleich vielen Ziffern der Darstellung ist gleich breit. Wirksam nur unter `md`: ab dort blendet
-   * `EinsatzSeite.css` ihn aus, weil die spät eintreffende Meta ihn seitwärts schöbe.
+   * Tabellenziffern — ein Platzhalter mit gleich vielen Ziffern der Darstellung ist gleich breit. Im
+   * Seitenkopf gilt er in jeder Breite (LLH-1463, `EinsatzSeite.css`).
    */
   platzHalten?: boolean;
   /**

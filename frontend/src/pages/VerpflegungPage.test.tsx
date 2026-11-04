@@ -313,7 +313,10 @@ describe('VerpflegungPage (LFH-634)', () => {
       renderPage((client) => client.setQueryData(einsatzKeys.einsatz(1), einsatz.wert));
       expect(await screen.findByText('Zeitfenster nicht geladen')).toBeInTheDocument();
       expect(screen.queryByText('Noch kein Zeitfenster')).toBeNull();
-      expect(screen.queryByText(/0 Zeitfenster/)).toBeNull();
+      // Der unsichtbare Platzhalter der Meta (LLH-1463) hält nur ihre Breite, er zählt nicht.
+      expect(
+        screen.queryByText(/0 Zeitfenster/, { ignore: '[data-lfh="meta-platzhalter"]' }),
+      ).toBeNull();
       expect(screen.getByRole('radio', { name: 'laufend & anstehend' })).toBeInTheDocument();
       expect(ladeVerpflegung).not.toHaveBeenCalled();
 
