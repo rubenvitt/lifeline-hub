@@ -100,7 +100,8 @@ import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGeda
  * 5. **Zeilen springen nicht unter dem Cursor.** Solange der Fokus in der Sicht liegt oder ein
  *    Maus- bzw. Stiftzeiger über ihr (LFH-1020), sind Zeilenmenge und -reihenfolge eingefroren,
  *    im Baum auf jeder Ebene; Zellinhalte laufen weiter; Zufluss erscheint als Banner (WCAG 3.2.5,
- *    CLS ≤ 0,1). Die Werkzeugzeile steht IMMER, auch leer.
+ *    CLS ≤ 0,1). Die Werkzeugzeile steht IMMER, auch leer; mit `spaltenSchalterAussen` und sonst
+ *    leerer Zeile schwebt der Banner stattdessen als Pille über dem Tabellenkopf (LLH-1479).
  * 6. **Eine Einschränkung ist sichtbar und gemerkt** (LLH-1086, Spec `tabellen-sortieren-filtern`).
  *    Wirkt eine Suche oder ein Filter, steht der `Filterhinweis` (Treffer von Gesamt, im Servermodus
  *    nur aus der Serverzählung) und je Wert ein Chip; „Filter zurücksetzen“ leert Suche und Filter,
@@ -560,7 +561,8 @@ interface DatensichtProps<T extends object, K extends string> {
    * Meldebild): Zustand aus `useSpaltenSchalterZustand` (`components/SpaltenSchalter.tsx`), die Seite
    * rendert `SpaltenSchalter` damit selbst. Die Sicht liest Spaltenwahl und Offen-Achse von dort,
    * zeichnet keinen eigenen Schalter, und der Fokus auf dem Schalter hält die Zeilenschleuse nicht.
-   * Die Werkzeugzeile der Sicht bleibt als Standzeile des Sammelbanners. Schließt
+   * Trüge die Werkzeugzeile der Sicht dann nur noch den Sammelbanner, entfällt sie: der Banner
+   * schwebt als Pille über dem Tabellenkopf (LLH-1479), statt eine leere Standzeile zu halten. Schließt
    * `spaltenAus`/`spaltenAusVoreinstellung` und die Spaltenwahl aus `gedaechtnis` aus.
    */
   spaltenSchalterAussen?: SpaltenSchalterZustand<NoInfer<K>>;
@@ -1618,154 +1620,215 @@ export default function Datensicht<T extends object, const K extends string>(
   const fensterAttribute = (zeile: T): HTMLAttributes<HTMLElement> =>
     ({ [FENSTER_EINTRAG]: String(schluessel(zeile)) }) as HTMLAttributes<HTMLElement>;
 
-  const werkzeugzeile =
-    (
-      /**
-       * IMMER gerendert, auch leer: eine Zeile, die erst beim Eintreffen erscheint, verschiebt Inhalt.
-       * AUSSERHALB des Tabellenrahmens, weil `katalogtabelle-schmal.spec.ts` die Bildlaufbreite an
-       * dessen Wurzel misst.
-       */
-      <div
-        ref={werkzeugWurzel}
-        data-lfh="datensicht-werkzeuge"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: token.paddingSM,
-          marginBlockEnd: token.marginXS,
-          minHeight: token.controlHeight,
-        }}
-      >
-        {werkzeuge}
-        {suche != null && baum == null && (
-          // Ein nacktes `<input type="search">` statt `Input.Search`: `KatalogTabelle` bekommt hier keine
-          // `suche`, zwei Felder wären die Folge. Höhe aus `controlHeight`, fluide Breite.
-          <input
-            type="search"
-            aria-label={`Suche in ${bezeichnung}`}
-            placeholder={suche.platzhalter}
-            value={suchbegriff}
-            onChange={(e) => {
-              setSuchbegriff(e.target.value);
-              nachBenutzeraktion();
-            }}
-            style={{
-              height: token.controlHeight,
-              // Schrumpfbar statt `width: 100%`: bei 390 px stehen Suche und „Sortieren“ in EINER
-              // Zeile, die erste Karte bleibt im ersten Bild (`betroffene-handy.spec.ts`).
-              flex: '1 1 140px',
-              minWidth: 0,
-              maxWidth: 220,
-              paddingInline: token.paddingSM,
-              border: `1px solid ${token.colorBorder}`,
-              borderRadius: token.borderRadius,
-              background: token.colorBgContainer,
-              color: token.colorText,
-              fontSize: token.fontSize,
-            }}
-          />
-        )}
-        {/* Sortierauswahl des Kartenzweigs (LLH-1086): die Karte hat keinen Kopf, der Pfeil fehlt. */}
-        {!alsTabelle && sortierOptionen.length > 0 && (
-          <Select
-            allowClear
-            aria-label="Sortieren"
-            prefix={
-              <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
-                Sortieren:
-              </span>
-            }
-            placeholder="wie geliefert"
-            value={
-              aktiveSortierung
-                ? `${aktiveSortierung.spalte}:${aktiveSortierung.richtung}`
-                : undefined
-            }
-            onChange={(wert?: string) => {
-              if (!wert) {
-                setzeSortierung(null);
-                return;
-              }
-              const trenner = wert.lastIndexOf(':');
-              setzeSortierung({
-                spalte: wert.slice(0, trenner) as K,
-                richtung: wert.slice(trenner + 1) === 'ab' ? 'ab' : 'auf',
-              });
-            }}
-            options={sortierOptionen}
-            // Neben der Suche in derselben Zeile (siehe dort); ein langer Wert kürzt mit Auslassung.
-            style={{ flex: '1 1 160px', minWidth: 0, maxWidth: 280 }}
-          />
-        )}
-        {/* Im Tabellenzweig sitzt der Filter im Spaltenkopf (LLH-1086); die Karte hat keinen Kopf
-            und behält das Auswahlfeld je Filterspalte. In der Tabelle bekommt nur eine Spalte,
-            die mit `feldOhneSpalte` der Breite weicht, das Feld (LLH-1276). */}
-        {baum == null &&
-          (alsTabelle
-            ? feldSpalten
-            : filterSpalten.filter((spalte) => !spalte.filter!.ohneKartenfeld)
-          ).map((spalte) => (
-            <Select
-              key={spalte.key}
-              mode="multiple"
-              allowClear
-              maxTagCount="responsive"
-              // Eigene Kennung: ohne sie vergibt antd im Test eine feste (`test-id`), die mit der
-              // Titelkennung eines Dialogs auf derselben Seite kollidiert.
-              id={`${idPraefix}-filter-${idTeil(spalte.key)}`}
-              aria-label={etikettVon(spalte) ?? spalte.key}
-              /*
-               * Das Etikett steht als PRÄFIX im Feld (LFH-967): nach der Wahl verschwindet der
-               * Platzhalter, und „Anlaufstelle ×“ allein sagt nicht, zu welcher Achse der Wert
-               * gehört. Der zugängliche Name trägt es schon, deshalb `aria-hidden`.
-               */
-              prefix={
-                <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
-                  {etikettVon(spalte) ?? spalte.key}:
-                </span>
-              }
-              placeholder="alle"
-              value={[...(filterWerte[spalte.key] ?? [])]}
-              onChange={(werte: string[]) => setzeFilter(spalte.key, werte)}
-              options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
-              style={{ minWidth: 160 }}
-            />
-          ))}
-        {/* Steht der Schalter bei der Seite (`spaltenSchalterAussen`), zeichnet ihn nur sie. */}
-        {alsTabelle && !aussen && (
-          <SpaltenSchalter
-            bezeichnung={bezeichnung}
-            spalten={spalten}
-            aus={aktiveSpaltenAus}
-            onAus={setzeSpaltenAus}
-            an={spaltenAn}
-            onAn={setzeSpaltenAn}
-            offen={spaltenOffen}
-            onOffen={setSpaltenOffen}
-          />
-        )}
-        {/* ZAHL VOR WORT, MIT SICHTBAREM TRENNER (LFH-973): „1 verfügbar · 6 gebunden · 1 nicht
-            verfügbar“. Wort vor Zahl und nur ein Abstand dazwischen las sich als „6 nicht
-            verfügbar“. Der Punkt ist Optik; vorgelesen trennen die Glieder sich selbst. */}
-        {gruppenZaehler.length > 0 && alsTabelle && (
-          <Typography.Text type="secondary" data-lfh="datensicht-gruppenzaehler">
-            {gruppenZaehler.map((g, i) => (
-              <Fragment key={g.wert}>
-                {i > 0 && <span aria-hidden="true"> · </span>}
-                <span style={{ whiteSpace: 'nowrap' }}>{gruppenZahl(g)}</span>
-              </Fragment>
-            ))}
-          </Typography.Text>
-        )}
-        {banner != null && (
-          // Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5). Kein `danger`: Rot bedient nichts.
-          <Button type="primary" onClick={nachBenutzeraktion}>
+  /** Was die Werkzeugzeile außer dem Banner trägt; EINE Wahrheit für Zeile und Schwebeform. */
+  const feldFilter =
+    baum != null
+      ? []
+      : alsTabelle
+        ? feldSpalten
+        : filterSpalten.filter((spalte) => !spalte.filter!.ohneKartenfeld);
+  const zeigtSuche = suche != null && baum == null;
+  const zeigtSortierung = !alsTabelle && sortierOptionen.length > 0;
+  const zeigtZaehler = gruppenZaehler.length > 0 && alsTabelle;
+  /**
+   * Schwebender Sammelbanner (LLH-1479): steht der Spaltenschalter bei der Seite und trüge die Zeile
+   * sonst nur den Banner, hielte sie im Meldebild fast immer eine leere Standzeile (~40 px) als
+   * Lücke zwischen Seitenzeile und Tabelle. Dann steht statt der Zeile ein klebender Anker OHNE
+   * Höhe, und der Banner schwebt als Pille über dem Tabellenkopf: nichts verschiebt sich, wenn er
+   * erscheint (WCAG 3.2.5), und beim Rollen bleibt er unter dem Rahmen stehen. Ohne
+   * `spaltenSchalterAussen` bleibt alles wie zuvor.
+   */
+  const bannerSchwebt =
+    aussen != null &&
+    (werkzeuge == null || werkzeuge === false) &&
+    !zeigtSuche &&
+    !zeigtSortierung &&
+    feldFilter.length === 0 &&
+    !zeigtZaehler;
+
+  const werkzeugzeile = bannerSchwebt ? (
+    /**
+     * Derselbe Knoten wie die Zeile (`datensicht-werkzeuge`: Tastaturebene, Druckregel), aber 0 px
+     * hoch. Die Pille liegt absolut darin und deckt den Kopf nur, solange Einträge warten.
+     */
+    <div
+      ref={werkzeugWurzel}
+      data-lfh="datensicht-werkzeuge"
+      data-schwebend=""
+      style={{
+        position: 'sticky',
+        top: 'var(--lfh-rahmen-oben, 0px)',
+        // Über dem stehenden Tabellenkopf (antd: 19) und seinen fixierten Zellen (10), unter dem
+        // klebenden Rahmen (`RAHMEN_EBENE`, 100) und antds Overlays.
+        zIndex: 30,
+        height: 0,
+        pointerEvents: 'none',
+      }}
+    >
+      {banner != null && (
+        <div
+          data-lfh="datensicht-banner-pille"
+          style={{
+            position: 'absolute',
+            insetInline: 0,
+            top: token.paddingXXS,
+            display: 'flex',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5). Kein `danger`: Rot bedient nichts. */}
+          <Button
+            type="primary"
+            shape="round"
+            onClick={nachBenutzeraktion}
+            style={{ pointerEvents: 'auto', boxShadow: token.boxShadowSecondary }}
+          >
             {banner}
           </Button>
-        )}
-      </div>
-    );
+        </div>
+      )}
+    </div>
+  ) : (
+    /**
+     * IMMER gerendert, auch leer: eine Zeile, die erst beim Eintreffen erscheint, verschiebt Inhalt.
+     * AUSSERHALB des Tabellenrahmens, weil `katalogtabelle-schmal.spec.ts` die Bildlaufbreite an
+     * dessen Wurzel misst.
+     */
+    <div
+      ref={werkzeugWurzel}
+      data-lfh="datensicht-werkzeuge"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: token.paddingSM,
+        marginBlockEnd: token.marginXS,
+        minHeight: token.controlHeight,
+      }}
+    >
+      {werkzeuge}
+      {zeigtSuche && (
+        // Ein nacktes `<input type="search">` statt `Input.Search`: `KatalogTabelle` bekommt hier keine
+        // `suche`, zwei Felder wären die Folge. Höhe aus `controlHeight`, fluide Breite.
+        <input
+          type="search"
+          aria-label={`Suche in ${bezeichnung}`}
+          placeholder={suche.platzhalter}
+          value={suchbegriff}
+          onChange={(e) => {
+            setSuchbegriff(e.target.value);
+            nachBenutzeraktion();
+          }}
+          style={{
+            height: token.controlHeight,
+            // Schrumpfbar statt `width: 100%`: bei 390 px stehen Suche und „Sortieren“ in EINER
+            // Zeile, die erste Karte bleibt im ersten Bild (`betroffene-handy.spec.ts`).
+            flex: '1 1 140px',
+            minWidth: 0,
+            maxWidth: 220,
+            paddingInline: token.paddingSM,
+            border: `1px solid ${token.colorBorder}`,
+            borderRadius: token.borderRadius,
+            background: token.colorBgContainer,
+            color: token.colorText,
+            fontSize: token.fontSize,
+          }}
+        />
+      )}
+      {/* Sortierauswahl des Kartenzweigs (LLH-1086): die Karte hat keinen Kopf, der Pfeil fehlt. */}
+      {zeigtSortierung && (
+        <Select
+          allowClear
+          aria-label="Sortieren"
+          prefix={
+            <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
+              Sortieren:
+            </span>
+          }
+          placeholder="wie geliefert"
+          value={
+            aktiveSortierung ? `${aktiveSortierung.spalte}:${aktiveSortierung.richtung}` : undefined
+          }
+          onChange={(wert?: string) => {
+            if (!wert) {
+              setzeSortierung(null);
+              return;
+            }
+            const trenner = wert.lastIndexOf(':');
+            setzeSortierung({
+              spalte: wert.slice(0, trenner) as K,
+              richtung: wert.slice(trenner + 1) === 'ab' ? 'ab' : 'auf',
+            });
+          }}
+          options={sortierOptionen}
+          // Neben der Suche in derselben Zeile (siehe dort); ein langer Wert kürzt mit Auslassung.
+          style={{ flex: '1 1 160px', minWidth: 0, maxWidth: 280 }}
+        />
+      )}
+      {/* Im Tabellenzweig sitzt der Filter im Spaltenkopf (LLH-1086); die Karte hat keinen Kopf
+            und behält das Auswahlfeld je Filterspalte. In der Tabelle bekommt nur eine Spalte,
+            die mit `feldOhneSpalte` der Breite weicht, das Feld (LLH-1276). */}
+      {feldFilter.map((spalte) => (
+        <Select
+          key={spalte.key}
+          mode="multiple"
+          allowClear
+          maxTagCount="responsive"
+          // Eigene Kennung: ohne sie vergibt antd im Test eine feste (`test-id`), die mit der
+          // Titelkennung eines Dialogs auf derselben Seite kollidiert.
+          id={`${idPraefix}-filter-${idTeil(spalte.key)}`}
+          aria-label={etikettVon(spalte) ?? spalte.key}
+          /*
+           * Das Etikett steht als PRÄFIX im Feld (LFH-967): nach der Wahl verschwindet der
+           * Platzhalter, und „Anlaufstelle ×“ allein sagt nicht, zu welcher Achse der Wert
+           * gehört. Der zugängliche Name trägt es schon, deshalb `aria-hidden`.
+           */
+          prefix={
+            <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
+              {etikettVon(spalte) ?? spalte.key}:
+            </span>
+          }
+          placeholder="alle"
+          value={[...(filterWerte[spalte.key] ?? [])]}
+          onChange={(werte: string[]) => setzeFilter(spalte.key, werte)}
+          options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
+          style={{ minWidth: 160 }}
+        />
+      ))}
+      {/* Steht der Schalter bei der Seite (`spaltenSchalterAussen`), zeichnet ihn nur sie. */}
+      {alsTabelle && !aussen && (
+        <SpaltenSchalter
+          bezeichnung={bezeichnung}
+          spalten={spalten}
+          aus={aktiveSpaltenAus}
+          onAus={setzeSpaltenAus}
+          an={spaltenAn}
+          onAn={setzeSpaltenAn}
+          offen={spaltenOffen}
+          onOffen={setSpaltenOffen}
+        />
+      )}
+      {/* ZAHL VOR WORT, MIT SICHTBAREM TRENNER (LFH-973): „1 verfügbar · 6 gebunden · 1 nicht
+            verfügbar“. Wort vor Zahl und nur ein Abstand dazwischen las sich als „6 nicht
+            verfügbar“. Der Punkt ist Optik; vorgelesen trennen die Glieder sich selbst. */}
+      {zeigtZaehler && (
+        <Typography.Text type="secondary" data-lfh="datensicht-gruppenzaehler">
+          {gruppenZaehler.map((g, i) => (
+            <Fragment key={g.wert}>
+              {i > 0 && <span aria-hidden="true"> · </span>}
+              <span style={{ whiteSpace: 'nowrap' }}>{gruppenZahl(g)}</span>
+            </Fragment>
+          ))}
+        </Typography.Text>
+      )}
+      {banner != null && (
+        // Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5). Kein `danger`: Rot bedient nichts.
+        <Button type="primary" onClick={nachBenutzeraktion}>
+          {banner}
+        </Button>
+      )}
+    </div>
+  );
 
   // ── Tabellenzweig ─────────────────────────────────────────────────────────────────
   /**

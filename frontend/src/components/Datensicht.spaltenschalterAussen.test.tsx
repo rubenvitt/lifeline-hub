@@ -88,14 +88,44 @@ const spaltenMenue = () =>
   document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
 
 describe('Datensicht · Spaltenschalter bei der Seite (LLH-1417)', () => {
-  it('steht nur in der Werkzeugzeile der Seite; die der Sicht bleibt als Standzeile', () => {
+  it('steht nur in der Werkzeugzeile der Seite; die der Sicht hält keine leere Standzeile', () => {
+    // LLH-1479: trüge die Zeile der Sicht nur noch den Banner, steht statt ihrer ein Anker ohne Höhe.
     const { container } = renderMitProviders(<SeiteMitSchalter daten={DREI} />);
     const seite = container.querySelector<HTMLElement>('[data-lfh="seiten-werkzeuge"]')!;
     const sicht = container.querySelector<HTMLElement>('[data-lfh="datensicht-werkzeuge"]');
     expect(within(seite).getByRole('button', { name: /^Spalten/ })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^Spalten/ })).toHaveLength(1);
-    expect(sicht, 'die Standzeile des Sammelbanners fehlt').not.toBeNull();
+    expect(sicht, 'der Anker des Sammelbanners fehlt').not.toBeNull();
+    expect(sicht).toHaveAttribute('data-schwebend');
+    expect(sicht!.style.height).toBe('0px');
+    expect(sicht!.style.minHeight).toBe('');
+    expect(sicht!.style.position).toBe('sticky');
+    expect(sicht!.style.top).toContain('--lfh-rahmen-oben');
     expect(within(sicht!).queryByRole('button', { name: /^Spalten/ })).toBeNull();
+  });
+
+  it('der Banner schwebt als Pille im Anker, absolut gesetzt, und gibt den Zufluss frei', () => {
+    const { container, rerender } = renderMitProviders(<SeiteMitSchalter daten={DREI} />);
+    screen.getByRole('link', { name: 'Florian 1' }).focus();
+    rerender(<SeiteMitSchalter daten={VIER} />);
+
+    const pille = container.querySelector<HTMLElement>('[data-lfh="datensicht-banner-pille"]');
+    expect(pille, 'die Pille fehlt').not.toBeNull();
+    expect(pille!.style.position).toBe('absolute');
+    expect(pille!.closest('[data-lfh="datensicht-werkzeuge"]')).toHaveAttribute('data-schwebend');
+    expect(within(pille!).getByRole('button', { name: /neuer Eintrag/ })).toBe(banner());
+
+    fireEvent.click(banner()!);
+    expect(zeilenZahl(container)).toBe(4);
+    expect(banner()).toBeNull();
+  });
+
+  it('Gegenprobe: mit eingebautem Schalter bleibt die Werkzeugzeile eine Zeile mit Höhe', () => {
+    const { container } = renderMitProviders(<EingebauterSchalter daten={DREI} />);
+    const sicht = container.querySelector<HTMLElement>('[data-lfh="datensicht-werkzeuge"]')!;
+    expect(sicht).not.toHaveAttribute('data-schwebend');
+    expect(sicht.style.minHeight).not.toBe('');
+    expect(sicht.style.position).toBe('');
   });
 
   it('der Fokus auf „Spalten“ friert die Tabelle nicht ein', () => {
