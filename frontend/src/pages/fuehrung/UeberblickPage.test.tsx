@@ -1363,7 +1363,8 @@ describe('UeberblickPage', () => {
     const betroffene = await within(await bandDa()).findByRole('link', { name: /Betroffene/ });
     expect(betroffene).toHaveTextContent('wird abgerufen');
     expect(betroffene.querySelector('[aria-busy="true"]')).not.toBeNull();
-    const p = abschnitt('Aufträge');
+    // Die Paneelreihen kommen erst mit den Quellen der Gliederung (LLH-1481).
+    const p = await waitFor(() => abschnitt('Aufträge'));
     expect(within(p).getByText('wird abgerufen').closest('[aria-busy="true"]')).not.toBeNull();
     // Eine unabhängige Quelle lädt trotzdem durch.
     await waitFor(() =>
@@ -1761,6 +1762,8 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     expect(betroffene).not.toHaveTextContent('Stand unbekannt');
 
     // Abschnitte des gesperrten Moduls: „—“ mit Grund statt „keine" und statt Ausfall, kein Link.
+    // Die Paneelreihen kommen erst mit den Quellen der Gliederung (LLH-1481).
+    await waitFor(() => vorgaenge());
     for (const name of ['Meldungen', 'Aufträge', 'Nachforderungen']) {
       const a = abschnitt(name);
       expect(within(a).getByText('nicht freigegeben')).toBeInTheDocument();
@@ -1925,9 +1928,12 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       'href',
       '/einsaetze/1/kraefteuebersicht',
     );
-    const zeile = await within(paneel('Einsatzabschnitte')).findByRole('link', {
-      name: /Abschnitt Nord/,
-    });
+    const zeile = await within(await waitFor(() => paneel('Einsatzabschnitte'))).findByRole(
+      'link',
+      {
+        name: /Abschnitt Nord/,
+      },
+    );
     expect(zeile).toHaveTextContent('1/0/1//2');
     expect(aufrufe['/api/einsaetze/1/fahrzeuge']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/material']).toBeUndefined();
