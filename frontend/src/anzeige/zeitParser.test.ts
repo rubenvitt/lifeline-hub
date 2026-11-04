@@ -228,6 +228,60 @@ describe('deuteZeit (Spec zeiteingabe, Eingabe als Text)', () => {
     });
   });
 
+  /**
+   * In der Nacht auf den 25.10.2026 läuft 02:00–02:59 zweimal: erst Sommerzeit (00:00–00:59 UTC),
+   * dann Winterzeit (01:00–01:59 UTC). Nach Feldart gilt das Mal, das dem Jetzt am nächsten liegt
+   * (LLH-1471), ohne Feldart das erste.
+   */
+  describe('doppelte Stunde nach Feldart', () => {
+    /** 02:48 Winterzeit, das zweite Mal. */
+    const zweitesMal = dayjs.utc('2026-10-25 01:48:00');
+    /** 02:40 Sommerzeit, das erste Mal. */
+    const erstesMal = dayjs.utc('2026-10-25 00:40:00');
+
+    it('Ereigniszeit im zweiten Mal: die eben vergangene, nicht eine Stunde früher', () => {
+      expect(utcVon('0230', { jetzt: zweitesMal, art: 'ereignis' })).toBe('2026-10-25 01:30:00');
+      expect(utcVon('250230', { jetzt: zweitesMal, art: 'ereignis' })).toBe('2026-10-25 01:30:00');
+      expect(utcVon('0230', { jetzt: zweitesMal, keineZukunftstage: true })).toBe(
+        '2026-10-25 01:30:00',
+      );
+    });
+
+    it('Ereigniszeit, deren zweites Mal noch kommt: das erste', () => {
+      expect(utcVon('0255', { jetzt: zweitesMal, art: 'ereignis' })).toBe('2026-10-25 00:55:00');
+      expect(utcVon('0230', { jetzt: erstesMal, art: 'ereignis' })).toBe('2026-10-25 00:30:00');
+    });
+
+    it('Ereigniszeit später am Tag: die jüngere der beiden', () => {
+      const morgens = dayjs.utc('2026-10-25 09:00:00');
+      expect(utcVon('0230', { jetzt: morgens, art: 'ereignis' })).toBe('2026-10-25 01:30:00');
+    });
+
+    it('Frist im zweiten Mal: die kommende heute, nicht morgen', () => {
+      const jetzt = dayjs.utc('2026-10-25 01:40:00');
+      expect(utcVon('0250', { jetzt, art: 'frist' })).toBe('2026-10-25 01:50:00');
+      expect(hinweis('0250', { jetzt, art: 'frist' })).toBeUndefined();
+    });
+
+    it('Frist im ersten Mal: die erste, ist sie vorbei, die zweite', () => {
+      expect(utcVon('0250', { jetzt: erstesMal, art: 'frist' })).toBe('2026-10-25 00:50:00');
+      expect(utcVon('0230', { jetzt: erstesMal, art: 'frist' })).toBe('2026-10-25 01:30:00');
+    });
+
+    it('ohne Feldart bleibt es beim ersten Mal', () => {
+      expect(utcVon('0230', { jetzt: zweitesMal })).toBe('2026-10-25 00:30:00');
+      expect(utcVon('25.10.2026 02:30', { jetzt: zweitesMal })).toBe('2026-10-25 00:30:00');
+    });
+
+    it('Ende eines Zeitraums: das erste Mal nach dem Beginn', () => {
+      const imZweiten = dayjs.utc('2026-10-25 01:10:00');
+      const imErsten = dayjs.utc('2026-10-25 00:10:00');
+      expect(utcVon('0230', { bezug: imZweiten })).toBe('2026-10-25 01:30:00');
+      expect(utcVon('0230', { bezug: imErsten })).toBe('2026-10-25 00:30:00');
+      expect(utcVon('0205', { bezug: imZweiten })).toBe('2026-10-26 01:05:00');
+    });
+  });
+
   describe('leer und Unlesbares', () => {
     it('leer ist kein Zeitpunkt', () => {
       expect(utcVon('')).toBe('∅');

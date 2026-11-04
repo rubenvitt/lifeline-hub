@@ -4,14 +4,16 @@
  * ohne Uhr: `jetzt` reicht der Aufrufer herein (im Baustein `serverJetzt()`).
  *
  * Gelesen wird als Wanduhr der Anzeigezone; der Zeitpunkt entsteht über
- * {@link uhrzeitAmTag} (doppelte Stunde: die erste, Lücke: nach vorn), damit es genau eine
- * Sommerzeitregel gibt. Ziffernblöcke sind nach ihrer Länge eindeutig: 3–4 Ziffern Uhrzeit,
- * 6 Ziffern Tag und Uhrzeit; alles andere wird nicht erraten, sondern abgelehnt.
+ * {@link uhrzeitenAmTag} (Lücke: nach vorn), damit es genau eine Sommerzeitregel gibt. Eine
+ * Uhrzeit, die es zweimal gibt, gilt nach Feldart beim Vorkommen, das dem Jetzt am nächsten liegt
+ * (LLH-1471, `zeitpunktAm`), ohne Feldart beim ersten. Ziffernblöcke sind nach ihrer Länge
+ * eindeutig: 3–4 Ziffern Uhrzeit, 6 Ziffern Tag und Uhrzeit; alles andere wird nicht erraten,
+ * sondern abgelehnt.
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { MONATE_DTG } from './format';
-import { naechsterTag, uhrzeitAmTag } from './uhrzeit';
+import { naechsterTag, uhrzeitenAmTag } from './uhrzeit';
 import { heuteInZone, tagInZone } from './zeitEingabe';
 
 dayjs.extend(utc);
@@ -113,13 +115,6 @@ function vollesJahr(jahr: string | undefined, vorgabe: number): number {
   return jahr.length === 2 ? 2000 + Number(jahr) : Number(jahr);
 }
 
-function zeitpunktAm(d: Datum, u: Uhr, zone: DeutungsOptionen['zone']): Dayjs {
-  return uhrzeitAmTag(tagText(d), `${zwei(u.stunde)}:${zwei(u.minute)}`, zone).add(
-    u.sekunde,
-    'second',
-  );
-}
-
 function tagVersetzt(tag: string, tage: number): string {
   return tage === 1 ? naechsterTag(tag) : dayjs.utc(tag).add(tage, 'day').format('YYYY-MM-DD');
 }
@@ -143,6 +138,23 @@ function falschHerum(kandidat: Dayjs, o: DeutungsOptionen): boolean {
   return false;
 }
 
+/**
+ * Der Zeitpunkt, an dem die Anzeigezone am Tag `d` die Uhrzeit `u` zeigt. In der doppelten Stunde
+ * der Rückstellung gibt es zwei (Spec `zeiteingabe`, „Richtung nach Feldart“, LLH-1471): nach einem
+ * Bezug gilt das erste danach, sonst das dem Jetzt nächste, das nicht falsch herum liegt
+ * (Ereignis: das spätere vergangene, Frist: das frühere kommende); ohne Feldart, oder wenn beide
+ * falsch herum liegen, das erste.
+ */
+function zeitpunktAm(d: Datum, u: Uhr, o: DeutungsOptionen, nach?: Dayjs | null): Dayjs {
+  const alle = uhrzeitenAmTag(tagText(d), `${zwei(u.stunde)}:${zwei(u.minute)}`, o.zone).map((k) =>
+    k.add(u.sekunde, 'second'),
+  );
+  if (nach) return alle.find((k) => k.isAfter(nach)) ?? alle[0];
+  const passend = alle.filter((k) => !falschHerum(k, o));
+  if (passend.length === 0) return alle[0];
+  return richtung(o) === -1 ? passend[passend.length - 1] : passend[0];
+}
+
 type Ergebnis = { zeitpunkt: Dayjs } | { grund: string };
 
 /** Nur die Uhrzeit: heute bzw. am Tag des Bezugs, nach Feldart verschoben. */
@@ -150,15 +162,15 @@ function ausUhrzeit(u: Uhr, o: DeutungsOptionen): Ergebnis {
   if (!gibtEsUhr(u)) return { grund: GRUND.uhrzeit };
   if (o.bezug) {
     const tag = tagInZone(o.bezug, o.zone);
-    const am = zeitpunktAm(datumAus(tag), u, o.zone);
+    const am = zeitpunktAm(datumAus(tag), u, o, o.bezug);
     return {
-      zeitpunkt: am.isAfter(o.bezug) ? am : zeitpunktAm(datumAus(naechsterTag(tag)), u, o.zone),
+      zeitpunkt: am.isAfter(o.bezug) ? am : zeitpunktAm(datumAus(naechsterTag(tag)), u, o, o.bezug),
     };
   }
   const heute = heuteInZone(o.zone, o.jetzt);
-  const kandidat = zeitpunktAm(datumAus(heute), u, o.zone);
+  const kandidat = zeitpunktAm(datumAus(heute), u, o);
   if (!falschHerum(kandidat, o)) return { zeitpunkt: kandidat };
-  return { zeitpunkt: zeitpunktAm(datumAus(tagVersetzt(heute, richtung(o))), u, o.zone) };
+  return { zeitpunkt: zeitpunktAm(datumAus(tagVersetzt(heute, richtung(o))), u, o) };
 }
 
 /**
@@ -182,17 +194,15 @@ function ausTeilDatum(
   };
   const vollstaendig = teil.jahr !== undefined && teil.monat !== undefined;
   const r = richtung(o);
-  const passt = (d: Datum) => gibtEsTag(d) && !falschHerum(zeitpunktAm(d, u, o.zone), o);
+  const passt = (d: Datum) => gibtEsTag(d) && !falschHerum(zeitpunktAm(d, u, o), o);
   if (vollstaendig || r === 0 || passt(kandidat)) {
-    return gibtEsTag(kandidat)
-      ? { zeitpunkt: zeitpunktAm(kandidat, u, o.zone) }
-      : { grund: GRUND.tag };
+    return gibtEsTag(kandidat) ? { zeitpunkt: zeitpunktAm(kandidat, u, o) } : { grund: GRUND.tag };
   }
   // Ohne Monat ein Monat weiter, ohne Jahr ein Jahr; der Tag des 31. kann mehrere Monate fehlen.
   const schritt = teil.monat === undefined ? 1 : 12;
   for (let n = 1; n <= 12; n += 1) {
     const weiter = monatVersetzt(kandidat, r * schritt * n);
-    if (gibtEsTag(weiter)) return { zeitpunkt: zeitpunktAm(weiter, u, o.zone) };
+    if (gibtEsTag(weiter)) return { zeitpunkt: zeitpunktAm(weiter, u, o) };
   }
   return { grund: GRUND.tag };
 }
@@ -201,7 +211,7 @@ function vollesDatum(d: Datum, u: Uhr, o: DeutungsOptionen): Ergebnis {
   if (d.monat < 1 || d.monat > 12) return { grund: GRUND.monat };
   if (!gibtEsTag(d)) return { grund: GRUND.tag };
   if (!gibtEsUhr(u)) return { grund: GRUND.uhrzeit };
-  return { zeitpunkt: zeitpunktAm(d, u, o.zone) };
+  return { zeitpunkt: zeitpunktAm(d, u, o) };
 }
 
 function lies(t: string, o: DeutungsOptionen): Ergebnis {

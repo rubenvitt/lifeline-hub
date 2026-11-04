@@ -114,8 +114,9 @@ Eine Uhrzeit ohne Datum (etwa der Beginn einer Mahlzeit im Verpflegungsplan) SHA
 23:59; gesendet MUST sie als `HH:MM` werden, alles andere MUST die Eingabe als unlesbar ablehnen.
 Angezeigt wird sie taktisch („0630“). Wird sie auf einen Kalendertag gelegt, MUST das in der
 Anzeigezone geschehen, nie in der Browserzone. Eine Uhrzeit, die es an dem Tag zweimal gibt
-(Rückstellung), MUST beim ersten Mal gelten; eine, die es nicht gibt (Vorstellung), MUST um die
-Länge der Lücke später gelten. Die Grenzen eines Kalendertags sind 00:00 des Tages und 00:00 des
+(Rückstellung), MUST beim ersten Mal gelten, außer eine Zeiteingabe wählt nach Feldart oder Bezug
+(„Richtung nach Feldart“, „Ende eines Zeitraums ohne Tag“); eine, die es nicht gibt (Vorstellung),
+MUST um die Länge der Lücke später gelten. Die Grenzen eines Kalendertags sind 00:00 des Tages und 00:00 des
 Folgetags in der Anzeigezone; am Tag einer Umstellung liegen sie 23 bzw. 25 Stunden auseinander.
 
 #### Scenario: Stab-Schreibweise
@@ -189,7 +190,10 @@ Eine Zeiteingabe SHALL eine Feldart tragen können: Ereignis (Vergangenheit) ode
 (Zukunft). Eine Uhrzeit ohne Tag MUST im Ereignisfeld auf den Vortag fallen, wenn sie heute
 noch bevorsteht, und im Fristfeld auf den Folgetag, wenn sie heute vorbei ist; ein Tag ohne
 Monat entsprechend auf den Vor- bzw. Folgemonat. Ohne Feldart MUST heute bzw. der laufende Monat
-gelten. Wechselt der Tag dadurch, MUST das Feld „gestern“ bzw. „morgen“ nennen.
+gelten. Wechselt der Tag dadurch, MUST das Feld „gestern“ bzw. „morgen“ nennen. Gibt es die
+Uhrzeit an dem Tag zweimal (Rückstellung), MUST im Ereignisfeld das spätere Mal gelten, das nicht
+in der Zukunft liegt, und im Fristfeld das frühere, das nicht vorbei ist; liegen beide falsch
+herum, MUST der Tag wechseln wie oben. Ohne Feldart MUST das erste Mal gelten.
 
 #### Scenario: Ereignis kurz nach Mitternacht
 - **WHEN** es 2026-10-17 00:20 ist und in einem Ereignisfeld „2350“ eingegeben wird
@@ -206,6 +210,17 @@ gelten. Wechselt der Tag dadurch, MUST das Feld „gestern“ bzw. „morgen“ 
 #### Scenario: Keine Zukunftstage
 - **WHEN** ein Feld keine Zukunftstage erlaubt und keine Feldart nennt
 - **THEN** gilt es als Ereignisfeld
+
+#### Scenario: Ereignis in der doppelten Stunde
+- **WHEN** die Anzeigezone Europe/Berlin ist, es am 25.10.2026 02:48 Winterzeit ist (`01:48:00` UTC)
+  und in einem Ereignisfeld „0230“ eingegeben wird
+- **THEN** gilt die 02:30 vor 18 Minuten, gesendet wird `2026-10-25 01:30:00`
+
+#### Scenario: Frist in der doppelten Stunde
+- **WHEN** die Anzeigezone Europe/Berlin ist, es am 25.10.2026 02:40 Winterzeit ist (`01:40:00` UTC)
+  und in einem Fristfeld „0250“ eingegeben wird
+- **THEN** gilt die 02:50 in zehn Minuten, gesendet wird `2026-10-25 01:50:00`, und das Feld nennt
+  nicht „morgen“
 
 ### Requirement: Unlesbare Eingabe wird nicht übernommen
 Eine Eingabe, die sich nicht eindeutig als Zeitpunkt lesen lässt, SHALL nicht übernommen und
@@ -272,7 +287,8 @@ ab jetzt nach Serveruhr. Ein Knopf der Schnellwahl MUST die Steuerhöhe der Dich
 
 ### Requirement: Ende eines Zeitraums ohne Tag
 In einer Zeitraum-Eingabe SHALL ein Ende, das nur als Uhrzeit eingegeben wird, auf dem Tag des
-Beginns liegen; läge es dort nicht nach dem Beginn, MUST es auf dem Folgetag liegen.
+Beginns liegen; läge es dort nicht nach dem Beginn, MUST es auf dem Folgetag liegen. Gibt es die
+Uhrzeit an dem Tag zweimal (Rückstellung), MUST das erste Mal nach dem Beginn gelten.
 
 #### Scenario: Mittag
 - **WHEN** der Beginn 171200okt26 ist und als Ende „1330“ eingegeben wird
@@ -281,6 +297,11 @@ Beginns liegen; läge es dort nicht nach dem Beginn, MUST es auf dem Folgetag li
 #### Scenario: Über Mitternacht
 - **WHEN** der Beginn 172200okt26 ist und als Ende „0600“ eingegeben wird
 - **THEN** ist das Ende 180600okt26
+
+#### Scenario: Beginn in der doppelten Stunde
+- **WHEN** die Anzeigezone Europe/Berlin ist, der Beginn am 25.10.2026 02:10 Winterzeit liegt
+  (`01:10:00` UTC) und als Ende „0230“ eingegeben wird
+- **THEN** ist das Ende 02:30 Winterzeit desselben Tages, gesendet wird `2026-10-25 01:30:00`
 
 ### Requirement: Kalenderdatum ohne Uhrzeit und Zone
 
