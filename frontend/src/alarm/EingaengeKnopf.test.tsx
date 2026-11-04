@@ -182,6 +182,9 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     const zaehler = serverMit({ eintraege: [], ungelesen: 0 });
     rendern();
     await screen.findByRole('button', { name: 'Eingänge, keine ungelesen' });
+    // Die Zahl „keine“ steht schon, solange der erste Abruf läuft; unter Last kam er sonst erst
+    // nach `vorher` beim Server an und zählte wie ein Abgleich.
+    await waitFor(() => expect(zaehler.abrufe).toBe(1));
     const vorher = zaehler.abrufe;
     const senden = (einsatz_id: number) =>
       act(() => {
