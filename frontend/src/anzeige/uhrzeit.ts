@@ -64,23 +64,42 @@ function versatz(ms: number, zone: string): number {
 }
 
 /**
- * Der Zeitpunkt, an dem die Uhr der Anzeigezone am Kalendertag `tag` die Uhrzeit `uhrzeit`
- * (`HH:MM`) zeigt. Ohne gültige Anzeigezone gilt die Browserzone.
+ * Die Lesarten der Wanduhrzeit `uhrzeit` (`HH:MM`) am Kalendertag `tag` der Anzeigezone, früheste
+ * zuerst. Meist genau eine; in der doppelten Stunde der Rückstellung zwei echte (`luecke: false`).
+ * In der Lücke der Vorstellung gibt es keine echte, dann stehen hier ihre beiden Nachbarn
+ * (`luecke: true`): mit dem Versatz nach der Umstellung gelesen (früher) und mit dem davor (um die
+ * Lücke später). Ohne gültige Anzeigezone gilt die Browserzone.
  *
  * Gerechnet wird über die Versätze einen Tag vor und nach der Wanduhr: höchstens zwei Kandidaten,
- * davon passen null (Lücke der Vorstellung), einer oder zwei (doppelte Stunde der Rückstellung).
+ * davon passen null (Lücke), einer oder zwei (doppelte Stunde).
  */
-export function uhrzeitAmTag(tag: string, uhrzeit: string, zone: string | null | undefined): Dayjs {
+export function lesartenAmTag(
+  tag: string,
+  uhrzeit: string,
+  zone: string | null | undefined,
+): { lesarten: Dayjs[]; luecke: boolean } {
   const z = effektiveZone(zone) ?? browserZone();
   const [jahr, monat, tagImMonat] = tag.split('-').map(Number);
   const [stunde, minute] = uhrzeit.split(':').map(Number);
   // Die Wanduhr als wäre sie UTC; der wahre Zeitpunkt liegt um den Versatz davor.
   const wand = Date.UTC(jahr, monat - 1, tagImMonat, stunde, minute);
-  const vorher = wand - versatz(wand - TAG_MS, z);
-  const nachher = wand - versatz(wand + TAG_MS, z);
-  const passend = [vorher, nachher].filter((k) => k + versatz(k, z) === wand).sort((a, b) => a - b);
+  const kandidaten = [
+    ...new Set([wand - versatz(wand - TAG_MS, z), wand - versatz(wand + TAG_MS, z)]),
+  ].sort((a, b) => a - b);
+  const passend = kandidaten.filter((k) => k + versatz(k, z) === wand);
+  const luecke = passend.length === 0;
+  return { lesarten: (luecke ? kandidaten : passend).map((k) => dayjs.utc(k)), luecke };
+}
+
+/**
+ * Der Zeitpunkt, an dem die Uhr der Anzeigezone am Kalendertag `tag` die Uhrzeit `uhrzeit`
+ * (`HH:MM`) zeigt: in der doppelten Stunde die erste, in der Lücke um die Lücke später
+ * ({@link lesartenAmTag}). Ohne gültige Anzeigezone gilt die Browserzone.
+ */
+export function uhrzeitAmTag(tag: string, uhrzeit: string, zone: string | null | undefined): Dayjs {
+  const { lesarten, luecke } = lesartenAmTag(tag, uhrzeit, zone);
   // Lücke: mit dem Versatz vor der Umstellung gelesen, landet die Uhrzeit um die Lücke später.
-  return dayjs.utc(passend[0] ?? vorher);
+  return luecke ? lesarten[lesarten.length - 1] : lesarten[0];
 }
 
 /**

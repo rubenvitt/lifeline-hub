@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mitProzessZone } from '../test/prozessZone';
 import { alsBackendZeit } from './zeitEingabe';
 import {
+  lesartenAmTag,
   naechsterTag,
   parseUhrzeit,
   tagesgrenzen,
@@ -100,6 +101,36 @@ describe('uhrzeitAmTag — Browser UTC, Anzeigezone Europe/Berlin', () => {
     const { von, bis } = tagesgrenzen('2026-10-11', BERLIN);
     expect(alsBackendZeit(von)).toBe('2026-10-10 22:00:00');
     expect(alsBackendZeit(bis)).toBe('2026-10-11 22:00:00');
+  });
+});
+
+describe('lesartenAmTag — Lesarten in den Umstellungsnächten (LLH-1472)', () => {
+  mitProzessZone('UTC');
+
+  const lesarten = (tag: string, uhrzeit: string) => {
+    const { lesarten: l, luecke } = lesartenAmTag(tag, uhrzeit, BERLIN);
+    return { wire: l.map(alsBackendZeit), luecke };
+  };
+
+  it('ein gewöhnlicher Tag hat eine Lesart', () => {
+    expect(lesarten('2026-10-11', '06:30')).toEqual({
+      wire: ['2026-10-11 04:30:00'],
+      luecke: false,
+    });
+  });
+
+  it('die doppelte Stunde am 25.10. hat zwei echte Lesarten, früheste zuerst', () => {
+    expect(lesarten('2026-10-25', '02:50')).toEqual({
+      wire: ['2026-10-25 00:50:00', '2026-10-25 01:50:00'],
+      luecke: false,
+    });
+  });
+
+  it('in der Lücke am 29.03. stehen die beiden Nachbarn', () => {
+    expect(lesarten('2026-03-29', '02:30')).toEqual({
+      wire: ['2026-03-29 00:30:00', '2026-03-29 01:30:00'],
+      luecke: true,
+    });
   });
 });
 

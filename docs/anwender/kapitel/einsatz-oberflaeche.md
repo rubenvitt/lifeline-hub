@@ -421,6 +421,11 @@ bevorsteht, auf gestern: „2350“ kurz nach Mitternacht ist der Vorabend. Feld
 nennt dann „gestern“ oder „morgen“. Beim Ende eines Zeitraums gilt eine Uhrzeit am Tag des
 Beginns, und liegt sie davor, am Folgetag („2200“ bis „0600“ geht über Mitternacht).
 
+In der Nacht, in der die Sommerzeit endet, gibt es 02:00 bis 02:59 zweimal. Ein Ereignisfeld nimmt
+dann das letzte Mal, das schon vorbei ist, ein Fristfeld das erste, das noch bevorsteht: „0250“ um
+03:20 ist im Ereignisfeld eine halbe Stunde her. Felder ohne Richtung und ein volles Datum nehmen
+das erste Mal.
+
 Eine Eingabe, die sich nicht lesen lässt, wird nicht übernommen; das Feld nennt den Grund („Uhrzeit
 gibt es nicht“). Wer das Feld trotzdem verlässt, behält den bisherigen Wert. „Jetzt“ und die
 Schnellwahlen rechnen mit der Uhr des Servers, nicht mit der des Geräts. Zeiten gelten in der

@@ -189,7 +189,12 @@ Eine Zeiteingabe SHALL eine Feldart tragen können: Ereignis (Vergangenheit) ode
 (Zukunft). Eine Uhrzeit ohne Tag MUST im Ereignisfeld auf den Vortag fallen, wenn sie heute
 noch bevorsteht, und im Fristfeld auf den Folgetag, wenn sie heute vorbei ist; ein Tag ohne
 Monat entsprechend auf den Vor- bzw. Folgemonat. Ohne Feldart MUST heute bzw. der laufende Monat
-gelten. Wechselt der Tag dadurch, MUST das Feld „gestern“ bzw. „morgen“ nennen.
+gelten. Wechselt der Tag dadurch, MUST das Feld „gestern“ bzw. „morgen“ nennen. Gibt es die
+Uhrzeit am Tag zweimal (Rückstellung), MUST im Ereignisfeld die jüngste vor jetzt und im
+Fristfeld die früheste nach jetzt gelten; erst wenn keine passt, wechselt der Tag. Gibt es sie
+nicht (Vorstellung), gilt sie um die Lücke später; nur wenn das im Ereignisfeld noch bevorstünde,
+MUST sie um die Lücke früher gelten statt am Vortag. Ohne Feldart und bei vollem Datum bleibt es
+bei der ersten bzw. der späteren Lesart („Uhrzeit ohne Datum“).
 
 #### Scenario: Ereignis kurz nach Mitternacht
 - **WHEN** es 2026-10-17 00:20 ist und in einem Ereignisfeld „2350“ eingegeben wird
@@ -206,6 +211,18 @@ gelten. Wechselt der Tag dadurch, MUST das Feld „gestern“ bzw. „morgen“ 
 #### Scenario: Keine Zukunftstage
 - **WHEN** ein Feld keine Zukunftstage erlaubt und keine Feldart nennt
 - **THEN** gilt es als Ereignisfeld
+
+#### Scenario: Ereignis in der doppelten Stunde
+- **WHEN** die Anzeigezone Europe/Berlin ist, es 2026-10-25 03:20 Winterzeit ist und in einem Ereignisfeld „0250“ eingegeben wird
+- **THEN** gilt die zweite 02:50 (vor 30 Minuten), gesendet wird `2026-10-25 01:50:00`
+
+#### Scenario: Frist in der doppelten Stunde
+- **WHEN** die Anzeigezone Europe/Berlin ist, es 2026-10-25 02:20 Winterzeit (das zweite Mal) ist und in einem Fristfeld „0250“ eingegeben wird
+- **THEN** gilt die zweite 02:50, gesendet wird `2026-10-25 01:50:00`
+
+#### Scenario: Ereignis in der Lücke
+- **WHEN** die Anzeigezone Europe/Berlin ist, es 2026-03-29 03:20 Sommerzeit ist und in einem Ereignisfeld „0230“ eingegeben wird
+- **THEN** gilt sie um die Lücke früher, gesendet wird `2026-03-29 00:30:00`, nicht der Vortag
 
 ### Requirement: Unlesbare Eingabe wird nicht übernommen
 Eine Eingabe, die sich nicht eindeutig als Zeitpunkt lesen lässt, SHALL nicht übernommen und
