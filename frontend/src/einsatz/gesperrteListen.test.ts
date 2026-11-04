@@ -1,7 +1,12 @@
 import { QueryClient, QueryObserver, dehydrate, hydrate } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { EINSATZ_KEYS, einsatzKeys } from '../api/queryKeys';
-import { istLagebildGesperrt, lagebildDehydrierOptionen } from '../offline/lagebildFilter';
+import {
+  istLagebildGesperrt,
+  lagebildDehydrierOptionen,
+  lagebildEntsperren,
+  lagebildStandZulaessig,
+} from '../offline/lagebildFilter';
 import { freigabenFixture } from '../test/fixtures';
 import { raeumeGesperrteListen } from './gesperrteListen';
 
@@ -35,6 +40,12 @@ describe('raeumeGesperrteListen (LLH-1462)', () => {
     expect(qc.getQueryData(einsatzKeys.personal(EINSATZ + 1))).toEqual([{ id: 3 }]);
     expect(istLagebildGesperrt(qc, einsatzKeys.personal(EINSATZ))).toBe(true);
     expect(istLagebildGesperrt(qc, einsatzKeys.fahrzeuge(EINSATZ))).toBe(false);
+    expect(istLagebildGesperrt(qc, [EINSATZ_KEYS.kraefteZeitachse, EINSATZ, 'personal', 1])).toBe(
+      true,
+    );
+    expect(istLagebildGesperrt(qc, [EINSATZ_KEYS.kraefteZeitachse, EINSATZ, 'einheiten', 1])).toBe(
+      false,
+    );
   });
 
   it('nimmt einer beobachteten, abgeschalteten Liste die Daten, ohne neu zu fragen', async () => {
@@ -133,6 +144,30 @@ describe('raeumeGesperrteListen (LLH-1462)', () => {
     expect(neu.getQueryData(einsatzKeys.personalEntlassene(EINSATZ))).toBeUndefined();
     expect(neu.getQueryData(einsatzKeys.fahrzeuge(EINSATZ))).toEqual([{ id: 2 }]);
     abmelden();
+  });
+
+  it('sperrt auch einen Stand, der nur im Vorrat der Sitzung liegt', () => {
+    const qc = client();
+    // Kein Material im Cache: die Seite war nie offen, der Stand kam nur von der Platte.
+    raeumeGesperrteListen(qc, EINSATZ, freigabenFixture({ material: GESPERRT }));
+    expect(lagebildStandZulaessig(qc, einsatzKeys.material(EINSATZ), Date.now())).toBe(false);
+    expect(lagebildStandZulaessig(qc, einsatzKeys.fahrzeuge(EINSATZ), Date.now())).toBe(true);
+  });
+
+  it('sperrt nur den Zeitachsen-Anteil des gesperrten Moduls, bis er wieder lädt', () => {
+    const qc = client();
+    const personalAchse = [EINSATZ_KEYS.kraefteZeitachse, EINSATZ, 'personal', 1];
+    const einheitenAchse = [EINSATZ_KEYS.kraefteZeitachse, EINSATZ, 'einheiten', 1];
+
+    raeumeGesperrteListen(qc, EINSATZ, freigabenFixture({ personal: GESPERRT }));
+
+    expect(lagebildStandZulaessig(qc, personalAchse, Date.now())).toBe(false);
+    expect(lagebildStandZulaessig(qc, einheitenAchse, Date.now())).toBe(true);
+    // Erst ein Abruf-Erfolg der Zeitachse selbst hebt ihre Marke auf, nicht der der Liste.
+    lagebildEntsperren(qc, einsatzKeys.personal(EINSATZ));
+    expect(istLagebildGesperrt(qc, personalAchse)).toBe(true);
+    lagebildEntsperren(qc, personalAchse);
+    expect(istLagebildGesperrt(qc, personalAchse)).toBe(false);
   });
 
   it('lässt bei vollen Freigaben alles stehen', () => {

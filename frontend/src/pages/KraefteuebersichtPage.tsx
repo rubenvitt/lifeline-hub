@@ -193,10 +193,10 @@ export function meldebildMeta(args: {
   staerke: string;
   staerkeGesamt: string;
   gefiltert: boolean;
-  /** Ohne Freigabe Einheiten ist ihre Zahl unbekannt (LLH-1462): keine „0 Einheiten“. */
-  einheitenGesperrt?: boolean;
+  /** Ohne Freigabe oder Liste der Einheiten ist ihre Zahl unbekannt (LLH-1462): keine „0 Einheiten“. */
+  einheitenUnbekannt?: boolean;
 }): string {
-  if (args.einheitenGesperrt) {
+  if (args.einheitenUnbekannt) {
     return args.gefiltert
       ? `Stärke ${args.staerke} von ${args.staerkeGesamt}`
       : `Stärke ${args.staerkeGesamt}`;
@@ -254,7 +254,7 @@ function rasterSpalten(
   rueckmeldung: RueckmeldungSpalte,
   imEinsatz: ImEinsatzSpalte,
   sprungGesperrt: SprungGesperrt,
-  /** Ohne Freigabe Personal ist jede Stärke unbekannt, nie 0 (LLH-1462). */
+  /** Ohne Freigabe oder Liste des Personals ist jede Stärke unbekannt, nie 0 (LLH-1462). */
   staerkeBekannt: boolean,
 ) {
   // Spaltenfolge nach der Frage am Schirm (LFH-973): Status, Rückmeldung und Auftrag stehen
@@ -761,6 +761,8 @@ export default function KraefteuebersichtPage() {
     queryFn: () => listeAbschnitte(einsatzId),
     enabled: frei.abschnitte === true,
   });
+  /** Stärken nur aus einer vorliegenden Personalliste; gesperrt oder noch ohne Daten „—“, nie 0. */
+  const personalBekannt = frei.personal !== false && personalQuery.data !== undefined;
   // Die zwei Zusatzabrufe des Rasters. Beide dürfen scheitern, ohne die Seite zu nehmen:
   // ohne Katalog fehlen nur die FMS-Codes, ohne Aufträge nur die Auftragsspalte.
   const statusKatalogQuery = useQuery({
@@ -1010,7 +1012,7 @@ export default function KraefteuebersichtPage() {
         { zustand: rueckmeldungZustand, jeZeile: rueckmeldungJeZeile },
         { zustand: periodenZustand, jeEinheit: imEinsatzJeEinheit },
         sprungGesperrt,
-        frei.personal !== false,
+        personalBekannt,
       ).filter((spalte) => !druckt || !NUR_AM_SCHIRM.has(spalte.key)),
     [
       druckt,
@@ -1024,7 +1026,7 @@ export default function KraefteuebersichtPage() {
       periodenZustand,
       imEinsatzJeEinheit,
       sprungGesperrt,
-      frei.personal,
+      personalBekannt,
     ],
   );
   // Der Spaltenschalter steht in der eigenen Werkzeugzeile, nicht in der des Primitivs (LLH-1417):
@@ -1157,6 +1159,9 @@ export default function KraefteuebersichtPage() {
   /** „Kräfte" = Personal + Fahrzeuge, kein Material (eigene Statusachse). */
   const sichtbareKraefte = v.anzahlPersonal + v.anzahlFahrzeuge;
   const alleKraefte = gesamt.anzahlPersonal + gesamt.anzahlFahrzeuge;
+  /** Fehlt eine der beiden Listen (gesperrt, unbekannt, noch nicht da), ist die Zahl unbekannt. */
+  const kraefteBekannt =
+    personalBekannt && frei.fahrzeuge !== false && fahrzeugeQuery.data !== undefined;
   // Rekursiv (D12): eine Untereinheit ist eine Einheit der Auswahl.
   const einheitenZeilen = einheitZeilen(raster).filter((z) => z.einheitId != null).length;
   /** Die zwei Filter hinter „Filter (n)“ — Abschnitt steht im Kopf, die Suche offen. */
@@ -1215,10 +1220,10 @@ export default function KraefteuebersichtPage() {
   const meta = meldebildMeta({
     einheiten: einheitenZeilen,
     einheitenGesamt: (einheitenQuery.data ?? []).length,
-    // Ohne Freigabe Personal unbekannt (LLH-1462): „—“ statt einer erfundenen 0.
-    staerke: frei.personal === false ? '—' : staerkeText(v.staerke),
-    staerkeGesamt: frei.personal === false ? '—' : staerkeText(gesamt.staerke),
-    einheitenGesperrt: frei.einheiten === false,
+    // Ohne Freigabe oder Liste des Personals unbekannt (LLH-1462): „—“ statt einer erfundenen 0.
+    staerke: personalBekannt ? staerkeText(v.staerke) : '—',
+    staerkeGesamt: personalBekannt ? staerkeText(gesamt.staerke) : '—',
+    einheitenUnbekannt: frei.einheiten === false || einheitenQuery.data === undefined,
     gefiltert,
   });
 
@@ -1347,7 +1352,7 @@ export default function KraefteuebersichtPage() {
           }}
         >
           <span style={{ color: token.colorTextSecondary }}>
-            {sichtbareKraefte} von {alleKraefte} Kräften
+            {kraefteBekannt ? `${sichtbareKraefte} von ${alleKraefte} Kräften` : '— von — Kräften'}
           </span>
           {mittelGesperrt && (
             <span

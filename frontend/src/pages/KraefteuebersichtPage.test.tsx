@@ -373,7 +373,7 @@ describe('meldebildMeta', () => {
         staerke: '0/0/1//1',
         staerkeGesamt: '0/0/1//1',
         gefiltert: false,
-        einheitenGesperrt: true,
+        einheitenUnbekannt: true,
       }),
     ).toBe('Stärke 0/0/1//1');
   });
@@ -1918,8 +1918,20 @@ describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
     );
     // Ein Bericht ohne Personal meldete eine falsche Stärke.
     expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/i })).toBeDisabled();
+    expect(screen.getByText('— von — Kräften')).toBeInTheDocument();
     expect(listeEinsatzPersonal).not.toHaveBeenCalled();
     expect(listEntlassenesPersonal).not.toHaveBeenCalled();
+  });
+
+  it('Personal noch ohne Daten: Stärke und Kräftezahl unbekannt, nie 0', async () => {
+    mitEinheit();
+    vi.mocked(listeEinsatzPersonal).mockReturnValue(new Promise(() => {}));
+    const { container } = setup();
+    expect(await (await seitenkopf()).findByText('1 Einheit · Stärke —')).toBeInTheDocument();
+    expect(screen.getByText('— von — Kräften')).toBeInTheDocument();
+    await waitFor(() => expect(zeile(container, 'eh-20')).not.toBeNull());
+    expect(zeile(container, 'eh-20')).toHaveTextContent('—');
+    expect(zeile(container, 'eh-20')).not.toHaveTextContent('0/0/0//0');
   });
 
   it('Fahrzeuge gesperrt: kein Abruf, das Band steht, die Werkzeugzeile nennt das Modul', async () => {
