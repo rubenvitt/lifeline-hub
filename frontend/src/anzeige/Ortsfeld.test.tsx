@@ -5,6 +5,8 @@ import { createRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OrtSucheAntwort } from '../api/karteOrtSuche';
 import { einsatzKeys } from '../api/queryKeys';
+import { benutzerFixture } from '../test/fixtures';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import { Ortsfeld, type OrtsfeldWert } from './Ortsfeld';
 
@@ -279,6 +281,47 @@ describe('Ortsfeld', () => {
     expect(screen.getByText('Adresssuche ohne Netz nicht verfügbar')).toBeInTheDocument();
     expect(suchen).not.toHaveBeenCalled();
     expect(wert()).toEqual({ text: 'Hauptstraße 12', koordinate: null });
+  });
+
+  it('fragt am gekoppelten Gerät nie: kein „Ort suchen“, Enter sendet nicht ab (LLH-1483)', async () => {
+    server.use(
+      meHandler({
+        ...benutzerFixture({ anzeigename: 'Betreuungsstelle Halle · Tablet 1' }),
+        geraet: {
+          kopplung_id: 4,
+          einsatz_id: 7,
+          ansicht: 'betreuungsstelle',
+          uhs_id: null,
+          stelle_id: 2,
+          stelle: 'Halle',
+          bezeichnung: 'Tablet 1',
+          laeuft_ab_at: '2026-10-08 12:00:00',
+        },
+      }),
+    );
+    const suchen = vi.fn().mockResolvedValue(TREFFER);
+    const onSubmit = vi.fn();
+    renderMitProviders(<Aufbau suchen={suchen} onSubmit={onSubmit} />);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Ort suchen' })).not.toBeInTheDocument(),
+    );
+    const feld = screen.getByRole('textbox', { name: 'Einsatzort' });
+    await userEvent.type(feld, 'Bahnhofstraße 1{Enter}');
+    expect(suchen).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByRole('list', { name: 'Treffer' })).not.toBeInTheDocument();
+    expect(wert()).toEqual({ text: 'Bahnhofstraße 1', koordinate: null });
+    // Ohne Netz kein Hinweis auf die Adresssuche: es gibt sie hier nicht.
+    act(() => setzeOnline(false));
+    expect(screen.queryByText('Adresssuche ohne Netz nicht verfügbar')).not.toBeInTheDocument();
+    // Eine getippte Koordinate erkennt das Feld weiter ohne Server.
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '51.16040, 10.45140');
+    expect(wert()).toEqual({
+      text: '51.16040, 10.45140',
+      koordinate: { lat: 51.1604, lon: 10.4514 },
+      quelle: 'koordinate',
+    });
   });
 
   it('zeigt während der Suche einen Ladezustand', async () => {
