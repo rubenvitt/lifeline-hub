@@ -14,6 +14,7 @@ import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person, Verpflegung } from '../api/types';
 import { erfasseAusgabe } from '../api/verpflegung';
+import { quittiert } from '../alarm/benachrichtigungGedaechtnis';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 import { eintreffenQueryKeys } from '../bereitstellungsraum/eintreffenQueryKeys';
 import { meldeOfflineSchreibaktionGesendet } from './ereignisse';
@@ -301,6 +302,15 @@ export function useOfflineSync(benutzerId?: number): void {
               element.wert,
               fehlerText(e, 'Abgelehnt'),
             );
+            const aktion = element.wert.aktion;
+            if (aktion.art === 'benachrichtigung_quittiert') {
+              // LLH-1477: auf dem Server ungelesen. Der Tab darf sie wieder zeigen, und der
+              // Verlauf lädt den Serverstand statt des vorgemerkten „gelesen“.
+              quittiert.delete(aktion.daten.benachrichtigung_id);
+              void qc.invalidateQueries({
+                queryKey: einsatzKeys.benachrichtigungVerlauf(element.wert.einsatz_id),
+              });
+            }
           }
         }
       }

@@ -233,7 +233,8 @@ draußen gelassen werden.
   oder Band des Tabs. Die Zahl fällt sofort, die Überlagerung im Verlauf gilt wie oben, und das
   Nachreichen nimmt vorgemerkte Kennungen als quittiert, auch nach einem Neuladen. Kein „Offline
   vorgemerkt“: das Paneel schließt nach dem Sprung. Eine aufgeräumte Benachrichtigung (404) räumt
-  der Abgleich ohne Karte ab. Die Org-Zentrale (ohne Einsatz) quittiert nur online: scheitert es,
+  der Abgleich ohne Karte ab; eine andere Ablehnung gibt sie im Tab wieder frei und lädt den
+  Verlauf neu. Die Org-Zentrale (ohne Einsatz) quittiert nur online: scheitert es,
   zeigt das Nachreichen die Benachrichtigung wieder. Beide Routen prüfen den Kopf des erwarteten
   Benutzers.
 - **Seitentests schalten offline über `setzeOnline` (`test/utils.tsx`)**, nicht nur über

@@ -22,6 +22,7 @@ import {
 } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
+import { quittiert as gedaechtnis } from '../alarm/benachrichtigungGedaechtnis';
 import type { Person, Verpflegung, VerpflegungZeitfenster } from '../api/types';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
@@ -1080,6 +1081,18 @@ describe('Einzeln quittierter Eingang in der Offline-Queue (LLH-1477)', () => {
     expect(await schreibaktionenAbgelehntLaden(BENUTZER_A, 7)).toEqual([
       expect.objectContaining({ aktion: quittiert, grund: 'Keine Berechtigung' }),
     ]);
+  });
+
+  it('gibt den Eingang nach einer Ablehnung wieder frei und lädt den Verlauf neu', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    const key = einsatzKeys.benachrichtigungVerlauf(7);
+    client.setQueryData(key, { eintraege: [], ungelesen: 0 });
+    gedaechtnis.add(42);
+    vi.mocked(quittiereBenachrichtigung).mockRejectedValue(new ApiError(403, 'Keine Berechtigung'));
+    await schreibaktionEinreihen(BENUTZER_A, 7, quittiert);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+    await waitFor(() => expect(gedaechtnis.has(42)).toBe(false));
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
   });
 });
 
