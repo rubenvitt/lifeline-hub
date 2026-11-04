@@ -1,7 +1,7 @@
-import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import { QueryClient, QueryObserver, dehydrate, hydrate } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { EINSATZ_KEYS, einsatzKeys } from '../api/queryKeys';
-import { istLagebildGesperrt } from '../offline/lagebildFilter';
+import { istLagebildGesperrt, lagebildDehydrierOptionen } from '../offline/lagebildFilter';
 import { freigabenFixture } from '../test/fixtures';
 import { raeumeGesperrteListen } from './gesperrteListen';
 
@@ -96,6 +96,42 @@ describe('raeumeGesperrteListen (LLH-1462)', () => {
     raeumeGesperrteListen(qc, EINSATZ, freigabenFixture({ material: GESPERRT }));
 
     await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1));
+    abmelden();
+  });
+
+  it('nimmt Liste und Entlassene aus Anzeige, Cache und Offline-Stand', () => {
+    const qc = client();
+    qc.setQueryData(einsatzKeys.personal(EINSATZ), [{ id: 1 }]);
+    qc.setQueryData(einsatzKeys.personalEntlassene(EINSATZ), [{ id: 4 }]);
+    qc.setQueryData(einsatzKeys.fahrzeuge(EINSATZ), [{ id: 2 }]);
+    // Die Liste steht auf der Seite, die Entlassenen nur im Cache.
+    const observer = new QueryObserver(qc, {
+      queryKey: einsatzKeys.personal(EINSATZ),
+      queryFn: async () => [{ id: 9 }],
+      enabled: false,
+    });
+    const abmelden = observer.subscribe(() => {});
+    const vorher = dehydrate(qc, lagebildDehydrierOptionen(qc)).queries.map((q) => q.queryKey);
+    expect(vorher).toContainEqual(einsatzKeys.personalEntlassene(EINSATZ));
+
+    raeumeGesperrteListen(qc, EINSATZ, freigabenFixture({ personal: GESPERRT }));
+
+    expect(observer.getCurrentResult().data).toBeUndefined();
+    expect(qc.getQueryData(einsatzKeys.personalEntlassene(EINSATZ))).toBeUndefined();
+    // Auch ein danach noch gesetzter Stand ginge nicht auf die Platte.
+    qc.setQueryData(einsatzKeys.personalEntlassene(EINSATZ), [{ id: 5 }]);
+    const stand = dehydrate(qc, lagebildDehydrierOptionen(qc));
+    const keys = stand.queries.map((q) => q.queryKey);
+    expect(keys).not.toContainEqual(einsatzKeys.personal(EINSATZ));
+    expect(keys).not.toContainEqual(einsatzKeys.personalEntlassene(EINSATZ));
+    expect(keys).toContainEqual(einsatzKeys.fahrzeuge(EINSATZ));
+
+    // Die Wiederherstellung aus diesem Stand bringt nichts davon zurück.
+    const neu = client();
+    hydrate(neu, stand);
+    expect(neu.getQueryData(einsatzKeys.personal(EINSATZ))).toBeUndefined();
+    expect(neu.getQueryData(einsatzKeys.personalEntlassene(EINSATZ))).toBeUndefined();
+    expect(neu.getQueryData(einsatzKeys.fahrzeuge(EINSATZ))).toEqual([{ id: 2 }]);
     abmelden();
   });
 
