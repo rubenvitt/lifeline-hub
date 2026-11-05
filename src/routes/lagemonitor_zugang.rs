@@ -157,6 +157,9 @@ pub async fn freigeben(
     let name = ctx.benutzer.anzeigename.clone();
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let etb_ids = crate::write_retry!(&state.pool, |conn| {
+        // Der Extractor sah den Stand vor der Transaktion; ein Abschluss dazwischen darf keine
+        // Freigabe an einem geschlossenen Einsatz hinterlassen.
+        crate::stab::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         let bezeichnung = zugang::gueltige_bezeichnung(conn, org_id, zugang_id).await?;
         let mut etb_ids = Vec::new();
         match zugang::freigeben_tx(conn, zugang_id, einsatz_id, von).await? {

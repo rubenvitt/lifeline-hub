@@ -68,7 +68,8 @@ Der Monitor erhält Bezeichnung, Stichwort, Einsatzart und Beginn des Einsatzes,
 Betroffenen und Kräften, die Belegung der Unfallhilfsstellen und die Zahl der offenen
 Sofortmeldungen, also dieselben Zahlen wie der [Lagemonitor](lagemonitor.md). Dazu kommt die
 „Zusammenfassung“ des zuletzt freigegebenen Lageberichts (siehe
-[Lageberichte](lageberichte.md)); ein Entwurf geht nicht hinaus.
+[Lageberichte](lageberichte.md)); ein Entwurf geht nicht hinaus. Die Zusammenfassung geht so
+hinaus, wie sie freigegeben ist: Bei einem freigegebenen Einsatz gehören keine Namen hinein.
 
 Die Karte trägt den Einsatzort als Punkt ohne Adresse, die Gefahrenzonen, die Flächen der
 Einsatzabschnitte mit ihrer Bezeichnung, die verorteten Unfallhilfsstellen mit Bezeichnung und
