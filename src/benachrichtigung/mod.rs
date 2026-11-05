@@ -204,6 +204,9 @@ wire_enum! {
         /// Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht mehr.
         AbloeserAlarmierungGestrichen => "abloeser_alarmierung_gestrichen",
         AbloeserEintreffenGestrichen => "abloeser_eintreffen_gestrichen",
+        /// Die Entlassung der ablösenden Einheit, mit der ihre Planung entfiel, ist gestrichen:
+        /// die Planung ist zurückgeholt (LLH-1510), der Hinweis „entfallen“ gilt nicht mehr.
+        AbloeserWiederhergestellt => "abloeser_wiederhergestellt",
         /// Der Termin der Lagebesprechung am Einsatz; `bezug_id` ist die Einsatzkennung.
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
@@ -252,7 +255,8 @@ impl BenachrichtigungBezugTyp {
             | BenachrichtigungBezugTyp::AbloeserAbgerufen
             | BenachrichtigungBezugTyp::AbloeserEntfallen
             | BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen
-            | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen => Some("abloesung"),
+            | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen
+            | BenachrichtigungBezugTyp::AbloeserWiederhergestellt => Some("abloesung"),
             BenachrichtigungBezugTyp::Lagebesprechung => Some("lagebesprechung"),
             BenachrichtigungBezugTyp::Nachforderung
             | BenachrichtigungBezugTyp::NachforderungZugesagt

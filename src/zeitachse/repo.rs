@@ -177,6 +177,7 @@ pub async fn schreibe_tx(
             einsatz_id,
             benutzer_id,
             einheit_id,
+            *ursprung,
             neu.art,
             neu.quelle,
             neu.zeitpunkt_at,
@@ -392,6 +393,7 @@ pub async fn streiche_tx(
                 einsatz_id,
                 benutzer_id,
                 einheit_id,
+                id,
                 art,
                 &zeitpunkt_at,
                 hinweis,
@@ -484,6 +486,7 @@ pub async fn berichtige_tx(
             einsatz_id,
             benutzer_id,
             einheit_id,
+            id,
             art,
             &alt.zeitpunkt_at,
             hinweis,
@@ -527,6 +530,7 @@ pub async fn berichtige_tx(
             einsatz_id,
             benutzer_id,
             einheit_id,
+            neu_id,
             art,
             neu.quelle,
             zeitpunkt_at,
@@ -534,6 +538,9 @@ pub async fn berichtige_tx(
         .await?;
         beruehrt.abloesung.extend(w.etb);
         beruehrt.hinweise.extend(w.anlaesse);
+        if art == ZeitachseArt::Entlassung {
+            crate::abloesung::hinweis::cancel_wiederhergestellt_entfallen(&mut beruehrt.hinweise);
+        }
     }
     Ok(Berichtigt {
         art,
