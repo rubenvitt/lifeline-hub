@@ -1407,6 +1407,11 @@ export interface NeueNachforderung {
   ziel_text?: string;
   /** Bedarfszeit „benötigt bis“ (UTC); fehlt = sofort. */
   benoetigt_bis?: string;
+  /**
+   * Idempotenzschlüssel (LLH-1526): ein erneuter Versuch derselben Anlage nach einem Netzfehler
+   * liefert die schon gespeicherte Nachforderung statt einer zweiten.
+   */
+  client_id?: string;
 }
 
 /**

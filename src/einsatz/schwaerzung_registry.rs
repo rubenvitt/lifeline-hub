@@ -2545,6 +2545,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("teilung_aus_id", G_FK),
             retain("zurueckgezogen_at", G_ZEIT),
             scrub("zurueckgezogen_grund", Strategie::NullSetzen, Z_EINSATZ),
+            // Idempotenzschlüssel der Anlage (LLH-1526): zufällige UUID ohne Inhalt.
+            retain("client_id", G_IDEMPOTENZ),
         ],
     },
     // ---------- Chat / Erinnerungen (Freitexte gescrubbt) ----------

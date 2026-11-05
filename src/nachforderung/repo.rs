@@ -111,6 +111,9 @@ pub struct NachforderungDaten<'a> {
     pub ziel_text: Option<&'a str>,
     /// Bedarfszeit „benötigt bis“, normalisiert (UTC); `None` = sofort.
     pub benoetigt_bis: Option<&'a str>,
+    /// Idempotenzschlüssel der Anlage (LLH-1526), von der Route getrimmt und begrenzt. Dieselbe
+    /// `client_id` im Einsatz legt nichts Neues an, sondern liefert die gespeicherte Nachforderung.
+    pub client_id: Option<&'a str>,
 }
 
 /// Inhalt des ETB-Eintrags der Anlage (LLH-1089 design.md D9): „Nachforderung: 2× RTW → BR Nord,
@@ -224,8 +227,8 @@ pub async fn create_tx(
         "INSERT INTO nachforderung \
            (einsatz_id, art, bezeichnung, anzahl, adressat_kategorie, adressat_bezeichnung, \
             begruendung, prioritaet, angefordert_at, erstellt_von_id, betreuungsstelle_id, \
-            ziel_br_id, ziel_abschnitt_id, ziel_text, benoetigt_bis) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            ziel_br_id, ziel_abschnitt_id, ziel_text, benoetigt_bis, client_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.art)
@@ -242,6 +245,7 @@ pub async fn create_tx(
     .bind(daten.ziel_abschnitt_id)
     .bind(daten.ziel_text)
     .bind(daten.benoetigt_bis)
+    .bind(daten.client_id)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -309,6 +313,14 @@ pub async fn create_tx(
     Ok(id)
 }
 
+/// Ergebnis von [`anlegen`]: die Nachforderung und ob sie gerade erst geschrieben wurde.
+pub struct Angelegt {
+    pub nachforderung: NachforderungAnzeige,
+    /// `false` nur bei der Wiederholung einer schon gespeicherten Anlage über ihre `client_id`
+    /// (LLH-1526): nichts geschrieben, also auch nichts zu publizieren.
+    pub neu: bool,
+}
+
 /// Legt eine Nachforderung an (eigener Commit) und liefert die Anzeige.
 pub async fn create(
     pool: &SqlitePool,
@@ -316,11 +328,49 @@ pub async fn create(
     ersteller_id: i64,
     daten: NachforderungDaten<'_>,
 ) -> Result<NachforderungAnzeige, AppError> {
+    Ok(anlegen(pool, einsatz_id, ersteller_id, daten)
+        .await?
+        .nachforderung)
+}
+
+/// Legt eine Nachforderung an, idempotent über `daten.client_id` (LLH-1526, Muster von ETB und
+/// Meldung): Steht im Einsatz schon eine mit diesem Schlüssel, kommt sie unverändert zurück
+/// (`neu: false`). Unter `BEGIN IMMEDIATE` ergeben auch zwei gleichzeitige Versuche genau eine.
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ersteller_id: i64,
+    daten: NachforderungDaten<'_>,
+) -> Result<Angelegt, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
-    let mut tx = pool.begin().await?;
-    let id = create_tx(&mut tx, einsatz_id, ersteller_id, etb_startwert, &daten).await?;
-    tx.commit().await?;
-    load(pool, id).await
+    let (id, neu) = crate::write_retry!(pool, |conn| {
+        if let Some(cid) = daten.client_id {
+            if let Some(id) = id_nach_client_id(&mut *conn, einsatz_id, cid).await? {
+                return Ok((id, false));
+            }
+        }
+        let id = create_tx(conn, einsatz_id, ersteller_id, etb_startwert, &daten).await?;
+        Ok((id, true))
+    })?;
+    Ok(Angelegt {
+        nachforderung: load(pool, id).await?,
+        neu,
+    })
+}
+
+/// Die Nachforderung mit dieser `client_id` im Einsatz (LLH-1526). Einsatzgebunden: derselbe
+/// Schlüssel in einem anderen Einsatz findet nichts.
+pub async fn id_nach_client_id<'e, E: sqlx::SqliteExecutor<'e>>(
+    executor: E,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<i64>, AppError> {
+    sqlx::query_scalar("SELECT id FROM nachforderung WHERE einsatz_id = ? AND client_id = ?")
+        .bind(einsatz_id)
+        .bind(client_id)
+        .fetch_optional(executor)
+        .await
+        .map_err(Into::into)
 }
 
 /// Listet Nachforderungen eines Einsatzes (optional Status-Filter). Sortierung:
@@ -1086,6 +1136,55 @@ mod tests {
                 .unwrap();
         assert_eq!(typ, "meldung");
         assert_eq!(backlink, n.id);
+    }
+
+    /// LLH-1526: zwei gleichzeitige Versuche mit derselben `client_id` ergeben genau eine
+    /// Nachforderung mit einem ETB-Eintrag; der zweite liefert sie als Wiederholung zurück. Ein
+    /// anderer Einsatz kennt den Schlüssel nicht, ohne Schlüssel entsteht jedes Mal eine neue.
+    #[tokio::test]
+    async fn gleiche_client_id_legt_genau_eine_nachforderung_an() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mit_schluessel = |cid| NachforderungDaten {
+            client_id: Some(cid),
+            ..daten("Feldbetten", "Turnhalle Ost")
+        };
+        let (erste, zweite) = tokio::join!(
+            anlegen(&pool, e, b, mit_schluessel("nf-1")),
+            anlegen(&pool, e, b, mit_schluessel("nf-1")),
+        );
+        let (erste, zweite) = (erste.unwrap(), zweite.unwrap());
+        assert_eq!(erste.nachforderung.id, zweite.nachforderung.id);
+        assert_ne!(erste.neu, zweite.neu, "genau einer schreibt");
+        let anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM nachforderung WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(anzahl, 1);
+        assert_eq!(
+            etb_der_nachforderung(&pool, erste.nachforderung.id)
+                .await
+                .len(),
+            1
+        );
+
+        let anderer: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Andere Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let dort = anlegen(&pool, anderer, b, mit_schluessel("nf-1"))
+            .await
+            .unwrap();
+        assert!(dort.neu);
+        assert_ne!(dort.nachforderung.id, erste.nachforderung.id);
+
+        let ohne_a = create(&pool, e, b, daten("Decken", "x")).await.unwrap();
+        let ohne_b = create(&pool, e, b, daten("Decken", "x")).await.unwrap();
+        assert_ne!(ohne_a.id, ohne_b.id);
     }
 
     /// Von und An eines ETB-Eintrags, dazu Typ, Inhalt und der Verweis auf die Nachforderung.
