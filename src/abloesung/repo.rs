@@ -1350,7 +1350,8 @@ pub(crate) async fn drop_planungen_tx(
         // Rückt ein weiterer Ablöser der Liste nach, wird er der Spiegel (LLH-1132).
         sync_spiegel_tx(conn, id).await?;
         // Vermerk für die Karte (LLH-1309); er zeigt sich nur, solange kein Ablöser bleibt. Die ID
-        // der Einheit braucht die Streichung ihrer Entlassung (LLH-1510, [`restore_planungen_tx`]).
+        // der Einheit braucht die Streichung ihrer Entlassung (LLH-1510,
+        // [`restore_entfallene_planungen_tx`]).
         sqlx::query(
             "UPDATE einsatz_abloesung SET planung_entfallen_at = ?, planung_entfallen_grund = ?, \
                 planung_entfallen_einheit_name = ?, planung_entfallen_einheit_id = ? WHERE id = ?",
