@@ -395,6 +395,7 @@ pub async fn streiche_tx(
                 art,
                 &zeitpunkt_at,
                 hinweis,
+                None,
             )
             .await?
         }
@@ -432,7 +433,8 @@ pub struct Berichtigt {
 ///   und bei jeder Person im Einsatz, die eine Kopie trägt (422 mit Namen).
 /// - Fan-out: die Kopien folgen den Kopien, nicht der heutigen Zuordnung (D4); die Kopie an
 ///   einer inzwischen beendeten Person bleibt wie bei der Streichung stehen ([`kopien_tx`]).
-/// - Kopplung an die Ablösung wie Streichung, dann Nachtrag (D5).
+/// - Kopplung an die Ablösung wie Streichung, dann Nachtrag (D5); nur eine mit dem Eintreffen
+///   begonnene Schicht wird nicht gestrichen, sondern wandert mit (LLH-1508).
 ///
 /// Geschrieben wird erst nach allen Prüfungen. Die Prüfung „keine offene Periode“ an der Kraft
 /// selbst (entlassene Person) macht der Aufrufer, wie bei Nachtrag und Streichung.
@@ -485,6 +487,7 @@ pub async fn berichtige_tx(
             art,
             &alt.zeitpunkt_at,
             hinweis,
+            Some(zeitpunkt_at),
         )
         .await?;
         beruehrt.abloesung.extend(w.etb);

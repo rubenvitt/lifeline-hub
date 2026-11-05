@@ -603,6 +603,20 @@ Schicht entsteht mit dem Vollzug als Folgeschicht. Das gilt
 für jeden Weg des Eintreffens (Statuswechsel, Nachtrag, Bereitstellungsraum). Ein Fehler beim
 Anlegen MUST nur das Anlegen zurücknehmen; Statuswechsel und Eintreffen gelingen trotzdem.
 
+Wird das Eintreffen der offenen Periode gestrichen, SHALL das System die laufende Schicht der
+Einheit in derselben Transaktion entfernen, wenn sie mit genau diesem Eintreffen automatisch
+begonnen hat und nichts anderes an ihr hängt (LLH-1508, Leitlinie aus LLH-1310: eine Streichung
+ist eine Korrektur): Herkunft `eintreffen`, Beginn = gestrichenes Eintreffen, nicht beim Vollzug
+übernommen, Rhythmus nicht von Hand (Quelle nicht `einheit`). Ihre Fristen MUST mit entfallen,
+das ETB MUST „Ablösung: Schicht von «X» mit dem Eintreffen gestrichen“ nennen. Ist an ihr ein
+Ablöser oder ein Besatzungswechsel geplant, MUST der ETB-Eintrag die entfallene Planung nennen
+(„…, Planung der ablösenden Einheit «A» entfallen“), ein geplanter Ablöser dazu den Hinweis
+`abloeser_entfallen` auslösen. Sonst MUST die Schicht stehen bleiben. Wird das Eintreffen nur
+berichtigt (LLH-1455), MUST dieselbe Schicht stattdessen auf das neue Eintreffen wandern: Beginn,
+Fälligkeit und Fristen folgen, Herkunft und Planung bleiben, das ETB nennt „Ablösung: Beginn der
+Schicht von «X» folgt dem berichtigten Eintreffen“. Ein Fehler dabei MUST nur diese Folge
+zurücknehmen; die Streichung bzw. Berichtigung gelingt trotzdem.
+
 #### Scenario: Einsatzvorgabe 6 h
 - **WHEN** der Einsatz die Vorgabe „Sanitätsdienst“ mit 6 h hat und „Florian 1“ um 08:00 per Status eintrifft
 - **THEN** läuft eine Schicht ab 08:00, fällig um 14:00, mit Fristen zu 13:30 und 14:00, und das ETB nennt „mit dem Eintreffen begonnen … (Vorgabe Einsatz «Sanitätsdienst»)“
@@ -626,6 +640,22 @@ Anlegen MUST nur das Anlegen zurücknehmen; Statuswechsel und Eintreffen gelinge
 #### Scenario: Fehler im Autostart
 - **WHEN** das Anlegen der Schicht scheitert
 - **THEN** gelingt der Statuswechsel, das Eintreffen steht, und von der Schicht bleibt nichts zurück
+
+#### Scenario: Eintreffen gestrichen
+- **WHEN** „Florian 2“ um 08:00 eintrifft, die Schicht damit beginnt und das Eintreffen gestrichen wird
+- **THEN** ist die Schicht samt Fristen weg, das ETB nennt „Ablösung: Schicht von «Florian 2» mit dem Eintreffen gestrichen“, und ein neues Eintreffen um 08:10 beginnt eine neue Schicht ab 08:10
+
+#### Scenario: Geänderte Schicht bleibt
+- **WHEN** an der mit dem Eintreffen begonnenen Schicht der Beginn oder ein eigener Rhythmus gesetzt wurde oder ein Vollzug sie übernommen hat und das Eintreffen gestrichen wird
+- **THEN** läuft die Schicht weiter
+
+#### Scenario: Planung entfällt mit
+- **WHEN** an der Schicht von „Florian 1“ „Florian 2“ als Ablöser geplant ist und das Eintreffen von „Florian 1“ gestrichen wird
+- **THEN** ist die Schicht weg, das ETB nennt „…, Planung der ablösenden Einheit «Florian 2» entfallen“, und die Führung bekommt „Planung der ablösenden Einheit entfallen“
+
+#### Scenario: Eintreffen berichtigt
+- **WHEN** das Eintreffen von „Florian 2“ von 08:00 auf 08:20 berichtigt wird
+- **THEN** läuft dieselbe Schicht ab 08:20, fällig um 14:20, mit ihrer Planung, und das ETB nennt „folgt dem berichtigten Eintreffen“
 
 ### Requirement: Ende mit der Entlassung
 
