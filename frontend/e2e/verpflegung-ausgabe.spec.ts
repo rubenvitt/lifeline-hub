@@ -414,6 +414,17 @@ async function pruefeKurzzeile(page: Page, wo: string, scrollbereich: string | n
   }, scrollbereich);
   expect(vorab.strecke, `${wo}: die Ansicht rollt`).toBeGreaterThan(200);
   expect(vorab.zeilen, `${wo}: das Kennzahlenband steht zweizeilig`).toBe(2);
+  // Schmal stehen die Sonderkost-Tasten untereinander und gleich breit, links bündig.
+  const sonderkost = await page
+    .locator('[data-lfh="ausgabe-sonderkost"] [data-kostform]')
+    .evaluateAll((el) =>
+      el.map((e) => {
+        const r = e.getBoundingClientRect();
+        return { links: Math.round(r.left), breite: Math.round(r.width) };
+      }),
+    );
+  expect(sonderkost, `${wo}: Sonderkost`).toHaveLength(2);
+  expect(sonderkost[1], `${wo}: Sonderkost gleich breit, untereinander`).toEqual(sonderkost[0]);
   await expect(kurzzeile, `${wo}: ohne Bildlauf keine Kurzzeile`).toHaveAttribute(
     'data-sichtbar',
     'false',

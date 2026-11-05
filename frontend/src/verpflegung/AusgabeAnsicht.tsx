@@ -434,6 +434,7 @@ export default function AusgabeAnsicht() {
 
   const mitBedarf = KOSTFORMEN.filter((k) => zf.bedarf.sonderkost[k] > 0);
   const ohneBedarf = KOSTFORMEN.filter((k) => zf.bedarf.sonderkost[k] === 0);
+  const hatWeitereKostform = ohneBedarf.length > 0;
 
   // Schon in der Folge „jüngste zuerst“; zurückgehaltene fremde fehlen, der Banner nennt sie.
   const serverAusgaben = ausgabenZufluss.sichtbar;
@@ -767,7 +768,22 @@ export default function AusgabeAnsicht() {
 
         {/* ── Sonderkost ───────────────────────────────────────────────────────────── */}
         <section aria-label="Sonderkost" data-lfh="ausgabe-sonderkost">
-          <Flex wrap gap={abstand} align="center">
+          <div
+            // Schmal stehen die Kostformen untereinander, gleich breit und links bündig; das Menü
+            // weiterer Kostformen steht rechts neben der letzten (LLH-1504). Breit in einer Reihe.
+            style={
+              istSchmal
+                ? {
+                    display: 'grid',
+                    gridTemplateColumns: hatWeitereKostform
+                      ? 'minmax(0, 1fr) auto'
+                      : 'minmax(0, 1fr)',
+                    gap: abstand,
+                    alignItems: 'center',
+                  }
+                : { display: 'flex', flexWrap: 'wrap', gap: abstand, alignItems: 'center' }
+            }
+          >
             {mitBedarf.map((k) => {
               const n = sammlung.sonderkost[k];
               const fehlt = zf.fehlmenge.sonderkost[k];
@@ -783,7 +799,11 @@ export default function AusgabeAnsicht() {
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  style={{ ...uebrige, height: 'auto' }}
+                  style={{
+                    ...uebrige,
+                    height: 'auto',
+                    ...(istSchmal ? { gridColumn: 1, justifyContent: 'flex-start' } : {}),
+                  }}
                   disabled={tastenGesperrt}
                   aria-describedby={beschrieben(tastenGesperrt)}
                   onClick={() => sammlung.tippe(1, k)}
@@ -803,13 +823,26 @@ export default function AusgabeAnsicht() {
                 </Button>
               );
             })}
-            <MenueAusloeser<Kostform>
-              eintraege={ohneBedarf.map((k) => ({ key: k, label: KOSTFORM_LABEL[k] }))}
-              zugaenglicherName="Weitere Kostform …"
-              gesperrt={tastenGesperrt}
-              onWahl={(k) => sammlung.tippe(1, k)}
-            />
-          </Flex>
+            {hatWeitereKostform && (
+              <div
+                style={
+                  istSchmal
+                    ? {
+                        gridColumn: mitBedarf.length > 0 ? 2 : 1,
+                        gridRow: Math.max(1, mitBedarf.length),
+                      }
+                    : { display: 'contents' }
+                }
+              >
+                <MenueAusloeser<Kostform>
+                  eintraege={ohneBedarf.map((k) => ({ key: k, label: KOSTFORM_LABEL[k] }))}
+                  zugaenglicherName="Weitere Kostform …"
+                  gesperrt={tastenGesperrt}
+                  onWahl={(k) => sammlung.tippe(1, k)}
+                />
+              </div>
+            )}
+          </div>
         </section>
 
         {/* ── Ablehnungen: unter den Sonderkost-Tasten, damit sie keine Taste verschieben (D6):
