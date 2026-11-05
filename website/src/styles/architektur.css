@@ -34,7 +34,7 @@
   color: var(--lfh-gedaempft);
 }
 
-.doku-liste a[aria-current="page"] .arch-navi__nummer {
+.doku-liste a[aria-current='page'] .arch-navi__nummer {
   color: var(--lfh-bedien-text);
 }
 
@@ -119,7 +119,7 @@
 }
 
 .arch-text a[data-extern]:not(.arch-pfad)::after {
-  content: "↗";
+  content: '↗';
   margin-left: 2px;
   font-size: 0.8em;
 }

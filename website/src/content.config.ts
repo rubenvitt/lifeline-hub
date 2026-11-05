@@ -39,9 +39,9 @@ const architektur = defineCollection({
 });
 
 /** YAML liest `2026-05-23` als Datum; die Seite zeigt es als Text wie in der Datei. */
-const datum = z.union([z.string(), z.date()]).transform((d) =>
-  typeof d === 'string' ? d : d.toISOString().slice(0, 10),
-);
+const datum = z
+  .union([z.string(), z.date()])
+  .transform((d) => (typeof d === 'string' ? d : d.toISOString().slice(0, 10)));
 
 const entscheidungen = defineCollection({
   loader: glob({

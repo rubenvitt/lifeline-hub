@@ -26,8 +26,9 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,
   **nie** in einer Bedingung (`if`/`||` schaltet errexit im ganzen Körper ab). Übersprungen
   meldet ein Schritt mit `return "$UEBERSPRUNGEN_RC"`, nicht mit 0.
-- Prettier prüft nur `frontend/`; nicht idempotent (nach `--write` noch rot → nochmal).
-  Ausnahmen nur mit Begründung in `frontend/.prettierignore`. Kein `.git-blame-ignore-revs`.
+- Prettier prüft `frontend/` und `website/` (diese mit dem Prettier des Frontends, LLH-1529);
+  nicht idempotent (nach `--write` noch rot → nochmal). Ausnahmen nur mit Begründung in der
+  `.prettierignore` des Bereichs. Kein `.git-blame-ignore-revs`.
 - **Node und pnpm stehen nur in `[tools]` von `mise.toml`** (LFH-773): Skripte rufen
   `mise exec -- …`, Workflows `jdx/mise-action` ohne `install_args`. `packageManager`,
   `engines.node` und der Devcontainer spiegeln die Zahl; `scripts/check-toolversionen.sh`
