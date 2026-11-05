@@ -160,7 +160,7 @@ nächste Fuhre Sandsäcke:
 
 1. An der Karte „Weiteren Posten übernehmen“ wählen.
 
-   ![Karte einer eingetroffenen Nachforderung „Sandsäcke“ mit dem übernommenen Posten „Sandsäcke · 1200 · Rettungsstaffel“, „übernommen 1200 von 2000“, „Material ↗“ und den Knöpfen „Weiteren Posten übernehmen“ und „Erfassten Posten zuordnen …“](../bilder/nachforderung/nachforderung-material-posten.png)
+   ![Karte einer eingetroffenen Nachforderung „Sandsäcke“ mit dem übernommenen Posten „Sandsäcke · 1200 · Rettungsstaffel“, „übernommen 1200 von 2000“, „Material ↗“ und den Knöpfen „Weiteren Posten übernehmen“ und „Erfassten Posten zuordnen …“, darunter das Menü ⋮](../bilder/nachforderung/nachforderung-material-posten.png)
 
 2. Art, Menge und Ort wie beim ersten Posten setzen. Die Menge ist mit dem Rest der Anzahl
    vorbelegt.
@@ -229,7 +229,7 @@ ist, etwa der dritte von drei KTW:
 
 1. An der Karte „Weitere Einheit übernehmen“ wählen.
 
-   ![Karte einer eingetroffenen Nachforderung „KTW“ mit „Als Einheit übernommen: Nachbarstadt 85-1 ↗, Nachbarstadt 85-2 ↗“ und dem Knopf „Weitere Einheit übernehmen“](../bilder/nachforderung/nachforderung-einheit-weitere.png)
+   ![Karte einer eingetroffenen Nachforderung „KTW“ mit „Als Einheit übernommen: Nachbarstadt 85-1 ↗, Nachbarstadt 85-2 ↗“ dem Knopf „Weitere Einheit übernehmen“ und dem Menü ⋮](../bilder/nachforderung/nachforderung-einheit-weitere.png)
 
 2. Unter „Einheiten“ die fehlenden Rufnamen prüfen. Vorbelegt sind die Rufnamen der Zusage, die
    noch keine Einheit tragen; es passen höchstens so viele Einträge, wie noch fehlen.
