@@ -8,7 +8,13 @@ import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import type { LatLon } from './koordinaten';
-import { nachTextaenderung, Ortsfeld, type OrtsfeldKarte, type OrtsfeldWert } from './Ortsfeld';
+import {
+  nachKartenpunkt,
+  nachTextaenderung,
+  Ortsfeld,
+  type OrtsfeldKarte,
+  type OrtsfeldWert,
+} from './Ortsfeld';
 
 /**
  * Ortsfeld mit Koordinate im Feld, Kartenvorschau und ohne Suche (LLH-1108, Spec `ortsfeld`).
@@ -22,6 +28,10 @@ import { nachTextaenderung, Ortsfeld, type OrtsfeldKarte, type OrtsfeldWert } fr
  *   die Koordinate auch ohne Netz“.
  * - Vorschlag ohne Abgleich mit dem Text: rot in „schlägt den Ortsnamen nicht vor, wenn …“.
  * - `ohneSuche` rendert das Feld mit Suche: rot in „ist reiner Text …“.
+ * - `nachTextaenderung` behält den Kartenpunkt auch bei leerem Text (LLH-1534): rot in
+ *   „ein geleerter Text leert auch einen Kartenpunkt“ und „ein Kartenpunkt ins leere Feld …“.
+ * - `nachKartenpunkt` lässt einen leeren Text leer: rot in „nachKartenpunkt“ und „ein Kartenpunkt
+ *   ins leere Feld …“.
  */
 
 const karte = vi.hoisted(() => ({
@@ -179,6 +189,46 @@ describe('nachTextaenderung', () => {
     });
     // „12 34“ ist eine Hausnummer, keine Koordinate.
     expect(nachTextaenderung(leer, '12 34')).toEqual({ text: '12 34', koordinate: null });
+  });
+
+  it('ein geleerter Text leert auch einen Kartenpunkt (LLH-1534)', () => {
+    const gesetzt: OrtsfeldWert = { text: 'A', koordinate: { lat: 1, lon: 2 }, quelle: 'karte' };
+    expect(nachTextaenderung(gesetzt, '')).toEqual({ text: '', koordinate: null });
+    expect(nachTextaenderung(gesetzt, '  ')).toEqual({ text: '  ', koordinate: null });
+  });
+});
+
+describe('nachKartenpunkt', () => {
+  const fmt = (lat: number, lon: number) => `${lat}/${lon}`;
+  const p = { lat: 3, lon: 4 };
+
+  it('setzt in ein leeres Feld die Koordinate als Text', () => {
+    expect(nachKartenpunkt({ text: '', koordinate: null }, p, fmt)).toEqual({
+      text: '3/4',
+      koordinate: p,
+      quelle: 'karte',
+    });
+    expect(nachKartenpunkt({ text: ' ', koordinate: null }, p, fmt).text).toBe('3/4');
+  });
+
+  it('lässt einen getippten Text stehen', () => {
+    const vorher: OrtsfeldWert = {
+      text: 'Waldweg',
+      koordinate: { lat: 1, lon: 2 },
+      quelle: 'adresse',
+    };
+    expect(nachKartenpunkt(vorher, p, fmt)).toEqual({
+      text: 'Waldweg',
+      koordinate: p,
+      quelle: 'karte',
+    });
+  });
+
+  it('zieht einen Text mit, der die alte Koordinate ist', () => {
+    const vorher: OrtsfeldWert = { text: '1/2', koordinate: { lat: 1, lon: 2 }, quelle: 'karte' };
+    expect(nachKartenpunkt(vorher, p, fmt).text).toBe('3/4');
+    // Eine andere Koordinate im Text ist getippt und bleibt.
+    expect(nachKartenpunkt({ ...vorher, text: '9/9' }, p, fmt).text).toBe('9/9');
   });
 });
 
@@ -349,6 +399,35 @@ describe('Ortsfeld — Kartenvorschau', () => {
     });
     expect(screen.queryByRole('dialog', { name: 'Karte wählen' })).not.toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Karte: Einsatzort' })).toBeInTheDocument();
+  });
+
+  it('ein Kartenpunkt ins leere Feld setzt die Koordinate als Text, ein geleerter Text nimmt ihn weg (LLH-1534)', async () => {
+    ortVorschau();
+    renderMitProviders(<Aufbau kartenProp={{ etikett: 'Einsatzort', einsatzId: 7 }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Auf Karte wählen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Punkt übernehmen' }));
+    expect(wert()).toEqual({
+      text: '53.10000, 8.80000',
+      koordinate: { lat: 53.1, lon: 8.8 },
+      quelle: 'karte',
+    });
+    // Der Ortsname bleibt ein Vorschlag.
+    expect(
+      await screen.findByRole('button', { name: 'Als Adresse übernehmen' }),
+    ).toBeInTheDocument();
+
+    // Die Koordinate als Text zieht mit der Nadel mit.
+    await userEvent.click(screen.getByRole('button', { name: 'Nadel ziehen' }));
+    expect(wert()).toEqual({
+      text: '52.50000, 13.40000',
+      koordinate: { lat: 52.5, lon: 13.4 },
+      quelle: 'karte',
+    });
+
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Ort' }));
+    expect(wert()).toEqual({ text: '', koordinate: null });
+    expect(screen.getByText('Nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Karte: Einsatzort' })).not.toBeInTheDocument();
   });
 
   it('„Auf Karte wählen“ geht auch ohne Netz; Abbrechen lässt den Wert', async () => {
