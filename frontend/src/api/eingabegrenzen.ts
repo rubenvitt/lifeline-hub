@@ -98,6 +98,10 @@ export const SCHADEN_BESCHREIBUNG_MAX = 8_000;
 export const GEFAHR_BESCHREIBUNG_MAX = 2_000;
 /** „Gemeldet von“ einer Zelle der Gefahrenmatrix (LLH-1366). */
 export const GEFAHR_GEMELDET_VON_MAX = 200;
+/** Bezeichnung eines Gefahrengebiets (LLH-1531); steht wörtlich im ETB der Beurteilung. */
+export const GEFAHR_GEBIET_LABEL_MAX = 200;
+/** Bezeichnung einer Zone der Lagekarte (LLH-1531); steht wörtlich im ETB. */
+export const ZONE_LABEL_MAX = 200;
 /** Stützpunkte einer Zone oder Abschnittsfläche (alle Ringe zusammen). */
 export const GEOMETRIE_STUETZPUNKTE_MAX = 5_000;
 /** Höchster Radius eines Kreises um einen Punkt in Metern (LLH-1043). */

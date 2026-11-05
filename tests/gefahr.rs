@@ -477,6 +477,58 @@ async fn umbenennen_setzt_label_und_fremdes_gid_ist_404() {
     assert_eq!(s2, StatusCode::NOT_FOUND);
 }
 
+/// Die Bezeichnung eines Gefahrengebiets hat eine Grenze (LLH-1531), sie steht wörtlich im
+/// System-ETB der Beurteilung: genau die Grenze geht durch, ein Zeichen mehr ist 400 und ändert
+/// nichts.
+#[tokio::test]
+async fn zu_lange_gebietsbezeichnung_ist_400() {
+    use lifeline_hub::gefahr::GEBIET_LABEL_MAX;
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}");
+
+    let genau = "ä".repeat(GEBIET_LABEL_MAX);
+    let (status, g) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({ "label": format!(" {genau} ") }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{g:?}");
+    assert_eq!(g["label"], genau.as_str());
+
+    let (status, f) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({ "label": "x".repeat(GEBIET_LABEL_MAX + 1) }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{f:?}");
+    assert_eq!(
+        f["error"],
+        format!("Bezeichnung darf höchstens {GEBIET_LABEL_MAX} Zeichen lang sein")
+    );
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        liste[0]["label"],
+        genau.as_str(),
+        "die Überlänge ändert nichts"
+    );
+}
+
 // ---------- LFH-306: Teil-PATCH mit Tri-State ----------
 
 /// **Der unterscheidende Test.** `gefahrengebiet.label` ist nullable — vor LFH-306 nahm der

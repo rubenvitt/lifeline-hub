@@ -8,6 +8,7 @@ import { renderMitProviders } from '../../test/utils';
 import type { GefahrBewertung, Gefahrengebiet, LageZone } from '../../api/types';
 import ZonenInspector, { type ZonenInspectorProps } from './ZonenInspector';
 import { FREIE_SKIZZE_VORGABEFARBE, zoneStil } from './zonenStil';
+import { ZONE_LABEL_MAX } from '../../api/eingabegrenzen';
 
 const basisZone: LageZone = {
   id: 1,
@@ -97,6 +98,16 @@ beforeEach(() => {
 });
 
 describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
+  // Die Bezeichnung steht wörtlich im ETB; der Server begrenzt sie (LLH-1531), das Feld ebenso.
+  // Mutationsprobe: ohne `maxLength` am Feld fällt die Prüfung.
+  it('begrenzt die Bezeichnung wie der Server', () => {
+    renderInspector({});
+    expect(screen.getByRole('textbox', { name: 'Label' })).toHaveAttribute(
+      'maxlength',
+      String(ZONE_LABEL_MAX),
+    );
+  });
+
   it('hält Eingaben kontrolliert und quittiert den laufenden Speichervorgang sichtbar', async () => {
     let freigeben: (() => void) | undefined;
     const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(

@@ -38,6 +38,7 @@ import { dichten } from '../../theme/tokens';
 import { einsatzKeys } from '../../api/queryKeys';
 import { formatiereDatenstand } from '../../components/Datenstand';
 import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
+import { GEFAHR_GEBIET_LABEL_MAX } from '../../api/eingabegrenzen';
 
 const einsatz = einsatzFixture({ bezeichnung: 'Lage' });
 const gebiet = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
@@ -242,6 +243,19 @@ describe('GefahrenPage', () => {
     await user.clear(feld);
     await user.type(feld, '  Nord-Ost {Enter}');
     await waitFor(() => expect(patch).toEqual({ label: 'Nord-Ost' }));
+  });
+
+  // Die Bezeichnung steht wörtlich im ETB der Beurteilung; der Server begrenzt sie (LLH-1531),
+  // das Feld ebenso. Mutationsprobe: ohne `maxLength` am Feld fällt die Prüfung.
+  it('begrenzt die Bezeichnung beim Umbenennen wie der Server', async () => {
+    server.use(...handlers());
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Umbenennen' }));
+    expect(screen.getByRole('textbox', { name: 'Bezeichnung' })).toHaveAttribute(
+      'maxlength',
+      String(GEFAHR_GEBIET_LABEL_MAX),
+    );
   });
 
   it('sendet beim Umbenennen mit leerer Eingabe nichts — die Bezeichnung ist Pflicht', async () => {
