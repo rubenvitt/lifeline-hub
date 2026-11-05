@@ -5846,7 +5846,8 @@
           "ausgegeben",
           "status",
           "disponiert_at",
-          "ist_demo"
+          "ist_demo",
+          "is_bestandsdoppel"
         ],
         "properties": {
           "art": {
@@ -5938,6 +5939,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "is_bestandsdoppel": {
+            "type": "boolean",
+            "description": "Bestandsdoppel (LLH-1528): der Stamm ist jetzt ein Gerät mit Bestandsnummer, also ein\nbestimmtes Stück (LLH-1256), und die aktive Zeile steht nicht allein für dieses eine Stück:\neine weitere aktive Zeile desselben Stamms im Einsatz oder eine Menge über 1 (Bestand vor\nLLH-1256/LLH-1398). Beendete Zeilen und Ad-hoc-Posten tragen es nie."
           },
           "ist_adhoc": {
             "type": "boolean"

@@ -10,6 +10,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN material). Der Status ist ein festes Enum
 /// auf der Zeile, kein Katalog-JOIN. Live oder Snapshot wählt `zu_anzeige`. `ist_demo` liest die
 /// Demo-Marke des Stamm-Materials live (LFH-733, design.md D2); ad-hoc findet keine Marke.
+/// `is_bestandsdoppel` (LLH-1528) misst am Stamm, wie er jetzt ist, nicht an der Art der Zeile.
 const SELECT_AUFGELOEST: &str = "\
     SELECT em.id, em.einsatz_id, em.material_id, em.einheit_id, em.uhs_id, em.menge, em.status, \
            em.snap_bezeichnung, em.snap_kategorie, em.snap_bestandsnummer, \
@@ -20,7 +21,11 @@ const SELECT_AUFGELOEST: &str = "\
            m.bestandsnummer AS live_bestandsnummer, m.traegerorganisation AS live_traegerorganisation, \
            m.dienststatus AS live_dienststatus, \
            EXISTS(SELECT 1 FROM demo_herkunft dh \
-                  WHERE dh.tabelle = 'material' AND dh.datensatz_id = em.material_id) AS ist_demo \
+                  WHERE dh.tabelle = 'material' AND dh.datensatz_id = em.material_id) AS ist_demo, \
+           (em.beendet_at IS NULL AND m.art = 'geraet' AND m.bestandsnummer IS NOT NULL \
+            AND (em.menge > 1 OR EXISTS(SELECT 1 FROM einsatz_material d \
+                 WHERE d.einsatz_id = em.einsatz_id AND d.material_id = em.material_id \
+                   AND d.beendet_at IS NULL AND d.id <> em.id))) AS is_bestandsdoppel \
     FROM einsatz_material em \
     LEFT JOIN material m ON m.id = em.material_id";
 
@@ -57,6 +62,8 @@ struct Row {
     live_dienststatus: Option<String>,
     /// LFH-733: Demo-Marke des Stamm-Datensatzes (D2), bei Ad-hoc ohne Treffer und damit `false`.
     ist_demo: bool,
+    /// LLH-1528: aktives Stamm-Gerät mit Bestandsnummer, das doppelt im Einsatz steht.
+    is_bestandsdoppel: bool,
 }
 
 /// Auflösungsregel: Live-Felder nur mit Stamm-Bezug, aktivem Einsatz UND Material in Dienst,
@@ -105,6 +112,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzMaterialAnzeige {
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
         ist_demo: row.ist_demo,
+        is_bestandsdoppel: row.is_bestandsdoppel,
         beendet_at: row.beendet_at,
         beendet_von: row.beendet_von,
         beendet_als: row.beendet_als,
@@ -2114,6 +2122,143 @@ mod tests {
             .await
             .unwrap();
         teile(&pool, einsatz, trage, 1).await.unwrap();
+    }
+
+    /// LLH-1528: Bestand von vor LLH-1256/LLH-1398 kann ein Stamm-Gerät mit Bestandsnummer doppelt
+    /// führen. Zwei aktive Zeilen desselben Stücks tragen beide die Marke, nach dem Herausnehmen
+    /// einer keine mehr; eine Zeile mit Menge über 1 trägt sie allein, bis sie wieder ein Stück
+    /// ist. Ohne Bestandsnummer und ad-hoc gibt es keine Marke, die herausgenommene Zeile hat nie
+    /// eine.
+    #[tokio::test]
+    async fn bestandsdoppel_eines_stamm_geraets_mit_bestandsnummer_ist_markiert() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let g = mat_repo::anlegen(
+            &pool,
+            1,
+            MaterialDaten {
+                bestandsnummer: Some("SE-1"),
+                ..geraet_daten("Stromerzeuger")
+            },
+        )
+        .await
+        .unwrap();
+        let erste = disponiere_stamm(&pool, einsatz, 1, g.id, 1, benutzer)
+            .await
+            .unwrap();
+        // Ohne Bestandsnummer ist Mehrfach-Disposition gewollt: keine Marke.
+        let t = mat_repo::anlegen(&pool, 1, geraet_daten("Trage"))
+            .await
+            .unwrap();
+        disponiere_stamm(&pool, einsatz, 1, t.id, 1, benutzer)
+            .await
+            .unwrap();
+        disponiere_stamm(&pool, einsatz, 1, t.id, 1, benutzer)
+            .await
+            .unwrap();
+        let marken = |zeilen: Vec<EinsatzMaterialAnzeige>| -> Vec<(i64, bool)> {
+            zeilen
+                .into_iter()
+                .map(|z| (z.id, z.is_bestandsdoppel))
+                .collect()
+        };
+        assert!(
+            marken(list(&pool, einsatz, true).await.unwrap())
+                .iter()
+                .all(|(_, m)| !m),
+            "ein Stück allein, Trage ohne Nummer"
+        );
+
+        // Bestand: dasselbe Stück steht ein zweites Mal aktiv im Einsatz (Prüfung umgangen).
+        let zweite: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, material_id, menge, art, status, \
+                 snap_bezeichnung, snap_bestandsnummer, disponiert_von) \
+             VALUES (?, ?, 1, 'geraet', 'einsatzbereit', 'Stromerzeuger', 'SE-1', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(g.id)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let aktiv = marken(list(&pool, einsatz, true).await.unwrap());
+        let doppel: Vec<i64> = aktiv
+            .iter()
+            .filter(|(_, m)| *m)
+            .map(|(id, _)| *id)
+            .collect();
+        assert_eq!(doppel, vec![erste, zweite], "beide Zeilen des Stücks");
+        assert!(
+            load_anzeige(&pool, einsatz, zweite, true)
+                .await
+                .unwrap()
+                .is_bestandsdoppel
+        );
+
+        nimm_heraus(&pool, einsatz, zweite, benutzer).await.unwrap();
+        assert!(
+            marken(list(&pool, einsatz, true).await.unwrap())
+                .iter()
+                .all(|(_, m)| !m),
+            "nach dem Herausnehmen keine Marke mehr"
+        );
+        let entlassen = list_entlassene(&pool, einsatz, true).await.unwrap();
+        assert_eq!(marken(entlassen), vec![(zweite, false)]);
+
+        // Bestand: die verbliebene Zeile als Verbrauchsgut mit Menge 3 ist allein ein Doppel.
+        sqlx::query("UPDATE einsatz_material SET art = 'verbrauchsgut', menge = 3 WHERE id = ?")
+            .bind(erste)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(
+            load_anzeige(&pool, einsatz, erste, true)
+                .await
+                .unwrap()
+                .is_bestandsdoppel
+        );
+        // „Als Gerät führen“ mit Menge 1 löst es auf.
+        update(
+            &pool,
+            einsatz,
+            erste,
+            MaterialPatch {
+                art: Some(MaterialArt::Geraet),
+                menge: Some(1),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            !load_anzeige(&pool, einsatz, erste, true)
+                .await
+                .unwrap()
+                .is_bestandsdoppel
+        );
+
+        // Ad-hoc mit derselben Nummer ist kein Stamm-Stück.
+        let adhoc = disponiere_adhoc(
+            &pool,
+            einsatz,
+            AdhocDaten {
+                bezeichnung: "Stromerzeuger",
+                kategorie: None,
+                bestandsnummer: Some("SE-1"),
+                traegerorganisation: None,
+            },
+            None,
+            1,
+            benutzer,
+        )
+        .await
+        .unwrap();
+        assert!(
+            !load_anzeige(&pool, einsatz, adhoc, true)
+                .await
+                .unwrap()
+                .is_bestandsdoppel
+        );
     }
 
     /// Einheit „Staffel A“, UHS „Turnhalle“, Fahrzeug „Florian 1/83-1“ und 50 Wolldecken an der
