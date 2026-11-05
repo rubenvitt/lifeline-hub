@@ -916,8 +916,9 @@ Ablöser, MUST nichts übergeben werden. Die alten Werte MUST an der Schicht
 (`abgeloest_abschnitt_vorher_id`) und an der Liste (`abschnitt_vorher_id`) stehen; die
 Rücknahme MUST jeden auf seinen alten Wert legen, solange er noch den Stand trägt, den der
 Vollzug hinterlassen hat (eine Änderung von Hand danach bleibt). ETB von Vollzug und Rücknahme
-nennen den Abschnitt. Die Option MUST die Freigabe des Moduls Einheiten verlangen (403 ohne);
-der Vollzug ohne Option nicht.
+nennen den Abschnitt. Eine Übergabe, die etwas übergibt, MUST die Freigabe des Moduls Einheiten
+verlangen (403 ohne); der Vollzug ohne Option nicht, und eine Option ohne Wirkung (kein Abschnitt
+oder kein Ablöser) auch nicht: sie wird übergangen wie ohne Option (LLH-1512).
 
 #### Scenario: Übergabe und Rücknahme
 - **WHEN** „Florian 1“ (Abschnitt „Deichwache Nord“) durch „Florian 2“ (ohne Abschnitt) und „Zug 2“ (Abschnitt „Süd“) mit „Abschnitt übergeben“ vollzogen wird
@@ -929,8 +930,12 @@ der Vollzug ohne Option nicht.
 - **THEN** lässt die Rücknahme ihn dort
 
 #### Scenario: Ohne Freigabe des Moduls Einheiten
-- **WHEN** eine Person ohne Freigabe des Moduls Einheiten mit „Abschnitt übergeben“ vollzieht
+- **WHEN** eine Person ohne Freigabe des Moduls Einheiten „Florian 1“ (Abschnitt „Deichwache Nord“) durch „Florian 2“ mit „Abschnitt übergeben“ vollzieht
 - **THEN** antwortet das System mit 403 und ändert nichts
+
+#### Scenario: Übergabe ohne Wirkung ohne Freigabe
+- **WHEN** eine Person ohne Freigabe des Moduls Einheiten mit „Abschnitt übergeben“ eine Einheit ohne Abschnitt oder ohne Ablöser vollzieht
+- **THEN** gelingt der Vollzug wie ohne die Option, und nichts wird übergeben
 
 ### Requirement: Ablösung der erbenden Untereinheiten
 
