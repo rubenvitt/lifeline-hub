@@ -1,6 +1,13 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { anmeldenOhneStartseite } from './lageplan-kern';
 import { waehleImMenue } from './menue-kern';
-import { anmeldenAls, anmeldenAlsAdmin, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
+import {
+  ADMIN,
+  ADMIN_PW,
+  anmeldenImFormular,
+  benutzerAnlegen,
+  mitgliedEintragen,
+} from './rollen-kern';
 
 /*
  * LFH-1092 — Sitzungen beenden ohne Deaktivieren.
@@ -11,7 +18,21 @@ import { anmeldenAls, anmeldenAlsAdmin, benutzerAnlegen, mitgliedEintragen } fro
  * Lagebild. Geprüft wird die Oberfläche UND die IndexedDB selbst.
  *
  * Eigene Person statt `admin`: „alle anderen beenden“ träfe sonst die Sitzungen paralleler Specs.
+ *
+ * Angemeldet wird über die API, nicht über das Formular (LLH-1517): die Anmeldung ist hier nicht
+ * Gegenstand, kostet aber je eine volle Seitenladung. Unter `--workers=3` braucht jede davon über
+ * den Vite-Dev-Server 6–7 s; mit vier bis sechs Ladungen lief der Fall lokal ins 30-s-Budget
+ * (rot an einem `goto`, nicht an einer Zusicherung). Das Formular bleibt dort, wo es etwas belegt:
+ * bei der Wiederanmeldung auf dem geräumten Gerät.
+ *
+ * Lokal trotzdem 60 s statt 30 s (die CI hat ohnehin 90 s): übrig bleiben die zwei Ladungen, um
+ * die es geht (Einsatzseite auf dem Tablet, Profil bzw. Benutzerverwaltung in einem zweiten
+ * Kontext), danach die gestreute Wiederverbindungspause des Servers (bis 5 s, `live::strom`),
+ * bevor das Gerät die 401 sieht. Unter `--workers=3` sind das 26–30 s; `geraeumt` allein darf
+ * schon 30 s warten.
  */
+
+test.describe.configure({ timeout: process.env.CI ? 90_000 : 60_000 });
 
 const IPAD =
   'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) ' +
@@ -51,7 +72,7 @@ async function vorgehalteneKeys(page: Page): Promise<string[] | null> {
 
 /** Admin legt einen Einsatz und eine Person darin an. */
 async function vorbereiten(page: Page) {
-  await anmeldenAlsAdmin(page);
+  await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Sitzung beenden ${Date.now()}` },
   });
@@ -70,7 +91,9 @@ async function verlorenesGeraet(
 ) {
   const kontext = await browser.newContext({ userAgent: IPAD });
   const geraet = await kontext.newPage();
-  await anmeldenAls(geraet, person.benutzername, person.passwort);
+  // Der API-Aufruf läuft im Kontext des Tablets und trägt dessen User-Agent: die Sitzung heißt
+  // „Safari · iPadOS“ wie nach einer Anmeldung im Formular.
+  await anmeldenOhneStartseite(geraet, person.benutzername, person.passwort);
   await geraet.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(geraet.getByPlaceholder('Inhalt …')).toBeVisible();
   // Vorbedingung: ohne vorgehaltenes Lagebild wäre „geräumt“ grün durch Konstruktion.
@@ -93,7 +116,8 @@ test('die Person beendet im Profil die Anmeldung des verlorenen Geräts', async 
   const { einsatzId, person } = await vorbereiten(page);
   const { kontext, geraet } = await verlorenesGeraet(browser, einsatzId, person);
 
-  await anmeldenAls(page, person.benutzername, person.passwort);
+  // Dieselbe Person an diesem Gerät; das Cookie der Admin-Sitzung wird ersetzt.
+  await anmeldenOhneStartseite(page, person.benutzername, person.passwort);
   await page.goto('/profil');
   const liste = page.locator('[data-lfh="sitzungsliste"]');
   await expect(liste.getByText('dieses Gerät')).toBeVisible();
@@ -101,8 +125,9 @@ test('die Person beendet im Profil die Anmeldung des verlorenen Geräts', async 
   await expect(liste.getByText('Safari · iPadOS')).toHaveCount(0);
 
   await geraeumt(geraet);
-  // Das Konto bleibt: dieselbe Person meldet sich auf dem Gerät wieder an.
-  await anmeldenAls(geraet, person.benutzername, person.passwort);
+  // Das Konto bleibt: dieselbe Person meldet sich auf dem Gerät wieder an, im Formular, auf dem
+  // das Gerät eben gelandet ist (ohne erneute Seitenladung).
+  await anmeldenImFormular(geraet, person.benutzername, person.passwort);
   await kontext.close();
 });
 
