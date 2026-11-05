@@ -1,3 +1,25 @@
+## [1.0.0-alpha.173](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.172...v1.0.0-alpha.173) (2026-11-05)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Bei Online-Kartenquellen wird jetzt gespeichert, ob die Karte dunkel ist. Die Migration läuft beim ersten Start automatisch. Bestehende Einträge, die aus dem Katalog übernommen wurden, stellt sie dabei passend ein. Die Kartenkonfiguration der Schnittstelle liefert dazu eine neue, optionale Angabe.
+
+### Lagekarte
+
+- **Taktische Zeichen bleiben nachts lesbar:** Im Nachtbetrieb wurden taktische Zeichen bisher immer im dunklen Stil gezeichnet, auch auf hellen Online-Karten. Die weiße Hinterlegung und die Kopfmarken waren dann nur noch als Punkte zu sehen. Jetzt richtet sich das Aussehen der Zeichen nach der Helligkeit der Karte darunter:
+  - Blindkarte und Offline-Vektorkarte folgen wie bisher dem Farbschema der App.
+  - Online- und Raster-Offline-Karten gelten als hell, außer eine Online-Quelle ist als dunkel gekennzeichnet.
+- Die Betroffenenkarte und die Abschnittskarte der Geräte stellen ihre Zeichen jetzt ebenfalls passend zur gewählten Karte dar. Bisher zeigten sie die Zeichen auch auf dunklen Karten immer hell.
+- Das Anwenderhandbuch zu Karten und Lagekarte ist entsprechend aktualisiert, mit neuen Bildern.
+
+### Verwaltung
+
+- Für Online-Kartenquellen gibt es den neuen Schalter **„Dunkle Karte“**. Damit legen Sie fest, ob eine eigene Quelle dunkel ist. „OpenFreeMap Dark“ ist im Katalog bereits als dunkel eingetragen.
+
+### Überblick
+
+- **Der Überblick springt beim Laden nicht mehr:** Hatte ein Einsatz Einheiten, wuchs das Paneel „Einsatzabschnitte“ beim Laden Zeile für Zeile. Alles darunter rutschte dabei nach unten, auf schmalen Bildschirmen deutlich spürbar. Die Paneele unter dem Kennzahlenband erscheinen jetzt erst, wenn die Gliederung des Einsatzes vollständig geladen ist. Ein Ladefehler, fehlendes Netz oder ein gesperrtes Modul halten die Anzeige nicht auf.
+
 ## [1.0.0-alpha.172](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.171...v1.0.0-alpha.172) (2026-11-05)
 
 ### Wichtige Änderungen
