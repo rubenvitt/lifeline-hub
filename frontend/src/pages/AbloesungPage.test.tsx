@@ -631,7 +631,7 @@ describe('AbloesungPage (LFH-635)', () => {
 
   it('Ablösung planen ohne Freigabe des Moduls Einheiten: keine leere Auswahl ohne Grund (LLH-1542)', async () => {
     freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
-    laufendLiefert([schicht({ id: 1 })]);
+    laufendLiefert([schicht({ id: 1, abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }] })]);
     vi.mocked(listeEinheiten).mockClear();
     renderPage();
     await screen.findAllByRole('article');
@@ -646,6 +646,7 @@ describe('AbloesungPage (LFH-635)', () => {
     ).toHaveAccessibleDescription('Modul Einheiten gesperrt');
     // Der Besatzungswechsel ist aus demselben Grund gesperrt; der Grund steht einmal.
     expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
+    expect(await gewaehlteOptionen('Ablösende Einheiten')).toEqual(['Florian 2']);
     expect(listeEinheiten).not.toHaveBeenCalled();
   });
 

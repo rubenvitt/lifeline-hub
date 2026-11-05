@@ -638,6 +638,23 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     };
   }
 
+  it('Freigaben erst nach dem Öffnen: bei gewähltem Besatzungswechsel bleibt der Grund an der Art (LLH-1542)', async () => {
+    const { neu } = vollzug({ schicht: geplant });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    neu({
+      schicht: geplant,
+      einheitenGesperrt: 'Modul Einheiten gesperrt',
+      besatzungGesperrt: 'Modul Einheiten gesperrt',
+    });
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
+        'Modul Einheiten gesperrt',
+      ),
+    );
+    expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
+  });
+
   it('verteilt im Klappteil auf Gruppe und Fahrzeug; der Kopf nennt die Abweichung', async () => {
     const { onErfassen } = vollzug();
     const dialog = await screen.findByRole('dialog');

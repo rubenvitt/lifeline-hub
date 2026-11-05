@@ -452,8 +452,11 @@ export function VollzugDialog({
   const art = Form.useWatch('art', form) ?? 'einheit';
   const uebergabeMoeglich = abschnittName != null && uebergabeGesperrt == null;
   const gesperrt = besatzungGesperrt != null;
-  // Sperrt dasselbe Modul Art und Ablöser, steht der Grund einmal, unter den Ablösern.
-  const artGrund = besatzungGesperrt !== einheitenGesperrt ? besatzungGesperrt : undefined;
+  // Sperrt dasselbe Modul Art und Ablöser, steht der Grund einmal, unter den Ablösern. Steht die
+  // Art schon auf dem Besatzungswechsel (Freigaben kamen erst nach dem Öffnen), fehlen die
+  // Ablöser, und der Grund bleibt an der Art.
+  const artGrund =
+    besatzungGesperrt !== einheitenGesperrt || art === 'besatzung' ? besatzungGesperrt : undefined;
   usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
   return (
     <ErfassungsModal<VollzugWerte>
@@ -636,9 +639,11 @@ export function AbloeserDialog({
   const artGrundId = useId();
   const abloeserGrundId = useId();
   const gesperrt = besatzungGesperrt != null;
-  // Wie im Vollzug: sperrt dasselbe Modul Art und Ablöser, steht der Grund einmal.
-  const artGrund = besatzungGesperrt !== einheitenGesperrt ? besatzungGesperrt : undefined;
   const art = Form.useWatch('art', form) ?? artVorgabe(schicht, gesperrt);
+  // Wie im Vollzug: sperrt dasselbe Modul Art und Ablöser, steht der Grund einmal, außer die Art
+  // steht schon auf dem Besatzungswechsel.
+  const artGrund =
+    besatzungGesperrt !== einheitenGesperrt || art === 'besatzung' ? besatzungGesperrt : undefined;
   const vorbelegt = usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
   return (
     <ErfassungsModal<AbloeserWerte>
