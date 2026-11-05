@@ -86,6 +86,7 @@ pub async fn liste(
     if let Some(geraet) = ctx.geraet.as_ref() {
         let sicht = stelle::sicht(Some(geraet), Bindungsart::Bereitstellungsraum);
         liste.retain(|em| em.br_id.is_some_and(|br| sicht.sieht(br)));
+        crate::material::limit_bestandsdoppel_to_rows(&mut liste);
     }
     Ok(Json(liste))
 }

@@ -223,6 +223,22 @@ impl EinsatzMaterialAnzeige {
     }
 }
 
+/// Bestandsdoppel nur aus den Zeilen, die der Leser sieht (LLH-1528, Review): ein gebundenes
+/// Gerät liest einen Ausschnitt (`frontend/src/geraet/AGENTS.md`, „Stellenbindung je Art“). Die
+/// Marke darf dort nicht verraten, dass dasselbe Stück außerhalb steht; es bleibt die Menge über 1
+/// und eine zweite sichtbare Zeile desselben Stamms. Nach dem Zuschnitt aufrufen.
+pub fn limit_bestandsdoppel_to_rows(liste: &mut [EinsatzMaterialAnzeige]) {
+    let sichtbar: Vec<(i64, Option<i64>)> =
+        liste.iter().map(|em| (em.id, em.material_id)).collect();
+    for em in liste.iter_mut() {
+        em.is_bestandsdoppel = em.is_bestandsdoppel
+            && (em.menge > 1
+                || sichtbar
+                    .iter()
+                    .any(|(id, mid)| *id != em.id && *mid == em.material_id));
+    }
+}
+
 /// Prüft eine Zeile, wie sie nach einer Änderung aussähe, gegen die Regeln von Art, Menge,
 /// Ausgabe und Status (LLH-1224, design.md D2–D4, D10); die CHECKs der Tabelle sind nur das Netz.
 /// `ausgabe_geaendert` wählt den Grund, wenn die Ausgabe über der Menge läge: die Anfrage setzt die

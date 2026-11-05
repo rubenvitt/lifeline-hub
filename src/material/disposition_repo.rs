@@ -2208,6 +2208,25 @@ mod tests {
             .map(|(id, _)| *id)
             .collect();
         assert_eq!(doppel, vec![erste, zweite], "beide Zeilen des Stücks");
+        // Ein gebundenes Gerät, das nur eine der beiden Zeilen sieht, erfährt nichts vom Doppel.
+        let mut ausschnitt: Vec<_> = list(&pool, einsatz, true)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|z| z.id == erste)
+            .collect();
+        crate::material::limit_bestandsdoppel_to_rows(&mut ausschnitt);
+        assert!(
+            !ausschnitt[0].is_bestandsdoppel,
+            "die zweite Zeile ist nicht sichtbar"
+        );
+        let mut beide = list(&pool, einsatz, true).await.unwrap();
+        crate::material::limit_bestandsdoppel_to_rows(&mut beide);
+        assert_eq!(
+            beide.iter().filter(|z| z.is_bestandsdoppel).count(),
+            2,
+            "sieht es beide, bleibt die Marke"
+        );
         assert!(
             load_anzeige(&pool, einsatz, zweite, true)
                 .await
