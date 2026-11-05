@@ -1,85 +1,103 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { ApiError, AUSGANG_UNBEKANNT_TEXT, NetzFehler } from '../../api/client';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AUSGANG_UNBEKANNT_TEXT, NetzFehler } from '../../api/client';
 import { legeNachforderungAn } from '../../api/nachforderungen';
+import type { NeueNachforderung } from '../../api/types';
 import { renderMitProviders } from '../../test/utils';
 import NachforderungenDialog from './NachforderungenDialog';
+import type { Posten } from './posten';
 
 /**
- * Unbekannter Ausgang im Dialog „Nachforderungen anlegen“ (LLH-1520): `apiSend` meldet Zeitlimit
- * und Abbruch als `NetzFehler`, auch wenn der Server schon gespeichert hat. Der Posten wird abgehakt, damit ein zweiter Lauf ihn nicht doppelt anlegt.
+ * Unbekannter Ausgang im Dialog „Nachforderungen anlegen“ (LLH-1520, LLH-1526): `apiSend` meldet
+ * Zeitlimit und Abbruch als `NetzFehler`, auch wenn der Server schon gespeichert hat. Der Posten
+ * bleibt angehakt und geht beim nächsten Versuch mit demselben Schlüssel, auch nach Schließen und
+ * erneutem Öffnen; der Server liefert dann die schon gespeicherte Nachforderung zurück.
  */
 
 vi.mock('../../api/nachforderungen', () => ({
-  legeNachforderungAn: vi.fn(() => Promise.reject(new NetzFehler())),
+  legeNachforderungAn: vi.fn(),
 }));
 
+const FELDBETTEN: Posten = {
+  schluessel: 'feldbetten',
+  art: 'Feldbetten',
+  anzahl: 50,
+  vorgewaehlt: true,
+};
+
+function gesendeteSchluessel(): (string | undefined)[] {
+  return vi
+    .mocked(legeNachforderungAn)
+    .mock.calls.map(([, body]: [number, NeueNachforderung]) => body.client_id);
+}
+
+function zeigeDialog(clientIds: Map<string, string>, onSchliessen = vi.fn()) {
+  return renderMitProviders(
+    <NachforderungenDialog
+      einsatzId={1}
+      stelleId={8}
+      stelleName="Turnhalle Ost"
+      posten={[FELDBETTEN]}
+      clientIds={clientIds}
+      onFertig={vi.fn()}
+      onSchliessen={onSchliessen}
+    />,
+  );
+}
+
 describe('NachforderungenDialog bei unbekanntem Ausgang', () => {
-  it('hakt den Posten ab und nennt den Prüfhinweis', async () => {
-    const onFertig = vi.fn();
+  beforeEach(() => vi.mocked(legeNachforderungAn).mockReset());
+
+  it('lässt den Posten angehakt und schickt ihn beim nächsten Lauf mit demselben Schlüssel', async () => {
+    vi.mocked(legeNachforderungAn)
+      .mockRejectedValueOnce(new NetzFehler())
+      .mockResolvedValueOnce({} as never);
     const onSchliessen = vi.fn();
-    renderMitProviders(
-      <NachforderungenDialog
-        einsatzId={1}
-        stelleId={8}
-        stelleName="Turnhalle Ost"
-        posten={[{ schluessel: 'feldbetten', art: 'Feldbetten', anzahl: 50, vorgewaehlt: true }]}
-        onFertig={onFertig}
-        onSchliessen={onSchliessen}
-      />,
-    );
+    zeigeDialog(new Map(), onSchliessen);
     const dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
     await userEvent.click(within(dialog).getByRole('button', { name: '1 Nachforderung anlegen' }));
     const posten = within(dialog).getByRole('group', { name: 'Posten' });
-    await waitFor(() =>
-      expect(within(posten).getByRole('checkbox', { name: /Feldbetten/ })).not.toBeChecked(),
-    );
-    expect(within(posten).getByText(AUSGANG_UNBEKANNT_TEXT)).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole('button', { name: /0 Nachforderungen anlegen$/ }),
-    ).toBeDisabled();
-    expect(onFertig).not.toHaveBeenCalled();
+    expect(await within(posten).findByText(AUSGANG_UNBEKANNT_TEXT)).toBeInTheDocument();
+    expect(within(posten).getByRole('checkbox', { name: /Feldbetten/ })).toBeChecked();
+    expect(within(dialog).getByText('1 Posten nicht angelegt')).toBeInTheDocument();
     expect(onSchliessen).not.toHaveBeenCalled();
-    expect(within(dialog).getByText('1 Posten ungeklärt')).toBeInTheDocument();
-    expect(within(dialog).queryByText(/nicht angelegt/)).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: /1 Nachforderung anlegen$/ }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalledTimes(1));
+    const [erster, zweiter] = gesendeteSchluessel();
+    expect(erster).toMatch(/^[0-9a-f-]{36}$/);
+    expect(zweiter).toBe(erster);
   });
 
-  it('bleibt offen, solange ein Ausgang ungeklärt ist, auch wenn der nächste Lauf klappt', async () => {
+  it('behält den Schlüssel über Schließen und erneutes Öffnen; ein angelegter Posten gibt ihn frei', async () => {
     vi.mocked(legeNachforderungAn)
       .mockRejectedValueOnce(new NetzFehler())
-      .mockRejectedValueOnce(new ApiError(422, 'Lager leer'))
+      .mockResolvedValueOnce({} as never)
       .mockResolvedValueOnce({} as never);
-    const onFertig = vi.fn();
-    const onSchliessen = vi.fn();
-    renderMitProviders(
-      <NachforderungenDialog
-        einsatzId={1}
-        stelleId={8}
-        stelleName="Turnhalle Ost"
-        posten={[
-          { schluessel: 'feldbetten', art: 'Feldbetten', anzahl: 50, vorgewaehlt: true },
-          { schluessel: 'decken', art: 'Decken', anzahl: 100, vorgewaehlt: true },
-        ]}
-        onFertig={onFertig}
-        onSchliessen={onSchliessen}
-      />,
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: '2 Nachforderungen anlegen' }),
-    );
-    expect(await within(dialog).findByText('1 Posten ungeklärt')).toBeInTheDocument();
-    expect(within(dialog).getByText('1 Posten nicht angelegt')).toBeInTheDocument();
+    const clientIds = new Map<string, string>();
 
-    // Zweiter Lauf: nur Decken, klappt. Der ungeklärte Posten hält den Dialog offen.
-    await userEvent.click(within(dialog).getByRole('button', { name: /1 Nachforderung anlegen$/ }));
-    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
-    expect(onFertig).toHaveBeenLastCalledWith({ angelegt: ['Decken'], gescheitert: [] }, true);
-    expect(onSchliessen).not.toHaveBeenCalled();
-    const posten = within(dialog).getByRole('group', { name: 'Posten' });
-    expect(within(posten).getByText(AUSGANG_UNBEKANNT_TEXT)).toBeInTheDocument();
-    expect(within(dialog).getByText('1 Posten ungeklärt')).toBeInTheDocument();
-    expect(within(dialog).queryByText(/nicht angelegt/)).not.toBeInTheDocument();
+    const erst = zeigeDialog(clientIds);
+    let dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
+    await userEvent.click(within(dialog).getByRole('button', { name: '1 Nachforderung anlegen' }));
+    expect(await within(dialog).findByText(AUSGANG_UNBEKANNT_TEXT)).toBeInTheDocument();
+    erst.unmount();
+
+    // Neu geöffnet ist der Posten wieder vorgewählt und trägt denselben Schlüssel.
+    const zweit = zeigeDialog(clientIds);
+    dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
+    await userEvent.click(within(dialog).getByRole('button', { name: '1 Nachforderung anlegen' }));
+    await waitFor(() => expect(legeNachforderungAn).toHaveBeenCalledTimes(2));
+    zweit.unmount();
+
+    // Nach dem Anlegen ist eine weitere Nachforderung desselben Postens eine neue.
+    zeigeDialog(clientIds);
+    dialog = await screen.findByRole('dialog', { name: 'Nachforderungen für Turnhalle Ost' });
+    await userEvent.click(within(dialog).getByRole('button', { name: '1 Nachforderung anlegen' }));
+    await waitFor(() => expect(legeNachforderungAn).toHaveBeenCalledTimes(3));
+
+    const [erster, zweiter, dritter] = gesendeteSchluessel();
+    expect(zweiter).toBe(erster);
+    expect(dritter).not.toBe(erster);
   });
 });

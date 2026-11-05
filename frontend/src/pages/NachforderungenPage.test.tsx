@@ -6,11 +6,11 @@ import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import NachforderungenPage from './NachforderungenPage';
 import { AuthProvider } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { ApiError, NetzFehler } from '../api/client';
 import { ladeEinsatz } from '../api/einsaetze';
 import { nachforderungenPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
-import type { EinsatzMaterial, Nachforderung } from '../api/types';
+import type { EinsatzMaterial, Nachforderung, NeueNachforderung } from '../api/types';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
@@ -743,6 +743,35 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
 
     await setzeAb();
     await waitFor(() => expect(screen.queryByText('Art unbekannt')).not.toBeInTheDocument());
+  });
+
+  it('Anlegen: der nächste Versuch nach einem Netzfehler trägt denselben Schlüssel, die nächste Nachforderung einen neuen', async () => {
+    // LLH-1526: Zeitlimit oder Abbruch nach dem Speichern; der Server erkennt die Wiederholung.
+    legeNachforderungAn
+      .mockRejectedValueOnce(new NetzFehler())
+      .mockResolvedValueOnce(nf())
+      .mockResolvedValueOnce(nf());
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+    await fuelleErfassung('SEG', 'Eine SEG');
+    await setzeAb();
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Was')).toHaveValue('SEG');
+
+    await setzeAb();
+    await waitFor(() => expect(legeNachforderungAn).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByLabelText('Was')).toHaveValue(''));
+    await fuelleErfassung('KTW', 'Ein KTW');
+    await setzeAb();
+    await waitFor(() => expect(legeNachforderungAn).toHaveBeenCalledTimes(3));
+
+    const [erster, zweiter, dritter] = legeNachforderungAn.mock.calls.map(
+      ([, body]) => (body as NeueNachforderung).client_id,
+    );
+    expect(erster).toMatch(/^[0-9a-f-]{36}$/);
+    expect(zweiter).toBe(erster);
+    expect(dritter).not.toBe(erster);
   });
 
   it('Anlegen: Zuklappen und erneutes Öffnen zeigen keinen alten Grund', async () => {

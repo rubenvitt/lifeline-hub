@@ -81,6 +81,8 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
   const [ansicht, setAnsicht] = useState<Ansicht>('rechner');
   const [eingabe, setEingabe] = useState<Eingabe>(() => leereEingabe('raeume'));
   const [dialog, setDialog] = useState(false);
+  // Idempotenzschlüssel der Posten über das Schließen des Dialogs hinaus (LLH-1526).
+  const [clientIds] = useState(() => new Map<string, string>());
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -240,6 +242,7 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
           stelleId={stelleId}
           stelleName={stelle.bezeichnung}
           posten={posten}
+          clientIds={clientIds}
           onFertig={(lauf: Lauf) => {
             void qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
             const n = lauf.angelegt.length;
