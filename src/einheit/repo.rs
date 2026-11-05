@@ -3088,10 +3088,14 @@ mod tests {
     /// sind nur die Unterstellung (rückt beim Auflösen hoch), die Sprechgruppen und die
     /// Verbindungen (LLH-1134; beide Angaben der Einheit selbst, sie gehen per Kaskade mit) und
     /// die letzte Besetzung (LLH-1266): sie entsteht erst beim Auflösen einer Einheit, die
-    /// ohnehin stehen bleibt, und geht per Kaskade mit ihr.
+    /// ohnehin stehen bleibt, und geht per Kaskade mit ihr. Dazu die Einheit am Vermerk der
+    /// entfallenen Planung (LLH-1510, Migration 0272): der Vermerk trägt ihren Namen als Kopie,
+    /// die ID dient nur dem Zurückholen und fällt mit `SET NULL` weg, ohne dass etwas Sichtbares
+    /// verloren geht.
     #[tokio::test]
     async fn jeder_verweis_auf_eine_einheit_ist_spur() {
         const KEINE_SPUR: &[(&str, &str)] = &[
+            ("einsatz_abloesung", "planung_entfallen_einheit_id"),
             ("einsatz_einheit", "ueber_einheit_id"),
             ("einsatz_einheit_letzte_besetzung", "einheit_id"),
             ("einsatz_einheit_sprechgruppe", "einheit_id"),
