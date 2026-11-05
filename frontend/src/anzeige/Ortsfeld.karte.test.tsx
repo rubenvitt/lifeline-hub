@@ -34,6 +34,7 @@ import {
  *   ins leere Feld …“.
  * - Gleichheit über festen Abstand (1e-4°) statt über das Format: rot in „eine Koordinate im Text,
  *   die der Kartenpunkt ist …“ (52.50009) und „… im Format dms“.
+ * - Nur die Rückrechnung zählt, nicht der Text selbst: rot in „… an der UTM-Zonengrenze …“.
  */
 
 const karte = vi.hoisted(() => ({
@@ -239,6 +240,17 @@ describe('nachTextaenderung', () => {
       expect(nachTextaenderung(mitLeerzeichen, gesetzt.text, fmtF)).toEqual(gesetzt);
     },
   );
+
+  it('ein Kartenpunkt an der UTM-Zonengrenze übersteht das Nachtippen seines Textes', () => {
+    const fmtUtm = (lat: number, lon: number) => formatiere(lat, lon, 'utm');
+    const punkt = { lat: 48, lon: 12 };
+    const gesetzt = nachKartenpunkt({ text: '', koordinate: null }, punkt, fmtUtm);
+    const mitLeerzeichen = nachTextaenderung(gesetzt, `${gesetzt.text} `, fmtUtm);
+    expect(mitLeerzeichen).toEqual({ ...gesetzt, text: `${gesetzt.text} ` });
+    expect(nachTextaenderung(mitLeerzeichen, `${gesetzt.text} x`, fmtUtm).koordinate).toEqual(
+      punkt,
+    );
+  });
 });
 
 describe('nachKartenpunkt', () => {

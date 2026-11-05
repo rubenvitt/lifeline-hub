@@ -569,6 +569,19 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     await waitFor(() => expect(bodies).toEqual([{ einsatzort: null }]));
   });
 
+  it('leeren der Adresse mit gespeichertem Punkt leert auch die Koordinate (LLH-1534)', async () => {
+    const ort = { einsatzort: 'Deich Süd', einsatzort_lat: 53.1, einsatzort_lon: 8.8 };
+    setup({ einsatz: ort });
+    const bodies = patchMitschnitt(ort);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Adresse' }));
+    await user.click(screen.getByRole('button', { name: 'Adresse speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([{ einsatzort: null, einsatzort_lat: null, einsatzort_lon: null }]),
+    );
+  });
+
   it('unveränderter Wert sendet nichts', async () => {
     setup({ einsatz: { meldende_stelle: 'ILS Nord' } });
     const bodies = patchMitschnitt({ meldende_stelle: 'ILS Nord' });

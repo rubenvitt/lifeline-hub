@@ -59,11 +59,13 @@ export function nachTextaenderung(
   if (!text.trim()) return { text, koordinate: null };
   const getippt = erkenneKoordinate(text);
   const kartenpunkt = vorher.quelle === 'karte' ? vorher.koordinate : null;
+  const alsText = kartenpunkt && formatKoordinate(kartenpunkt.lat, kartenpunkt.lon);
+  // Der Text selbst zählt vor der Rückrechnung: an einer UTM-Zonengrenze formatiert die erkannte
+  // Koordinate in die Nachbarzone und wäre sonst ein anderer Punkt.
   const derselbe =
-    getippt != null &&
-    kartenpunkt != null &&
-    formatKoordinate(getippt.lat, getippt.lon) ===
-      formatKoordinate(kartenpunkt.lat, kartenpunkt.lon);
+    alsText != null &&
+    (text.trim() === alsText ||
+      (getippt != null && formatKoordinate(getippt.lat, getippt.lon) === alsText));
   if (getippt && !derselbe) return { text, koordinate: getippt, quelle: 'koordinate' };
   if (kartenpunkt) return { text, koordinate: kartenpunkt, quelle: 'karte' };
   return { text, koordinate: null };
