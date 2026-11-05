@@ -31,7 +31,8 @@ ETB-Eintrag „… berichtigt von … auf … — Grund: …“.
 Transaktion (Quelle `nachtrag`, Notiz am Beginn); die Regeln gelten nur am Ergebnis, und die
 Ereignisse müssen darin eine eigene Periode bilden (`perioden::fuege_periode_ein`, sonst 422).
 Fan-out an die jetzt zugeordneten Personen ganz oder gar nicht, nie eine halbe Periode; Kopplung
-wie die einzelnen Nachträge in Zeitfolge. Einziger INSERT bleibt `insert_tx`.
+erst am fertigen Stand: Alarmierung/Eintreffen der abgeschlossenen Periode wirken nicht, die
+Entlassung beendet eine laufende Schicht nur, wenn danach keine Periode offen ist. Einziger INSERT bleibt `insert_tx`.
 Einziger Schreibpfad
 `zeitachse::repo::schreibe_tx` (Perioden-Regeln rein in `zeitachse/perioden.rs`; ein Verstoß
 bricht nie den Statuswechsel). Ereignisse entstehen aus `zeitachse_marke` am Status-Katalog

@@ -245,7 +245,8 @@ Eintreffen oder die Entlassung nicht nach dem Beginn liegt.
 
 An einer Einheit gilt die Periode wie ein Nachtrag auch für die jetzt zugeordneten Personen. Eine
 Person, zu deren Zeitachse sie nicht passt, bekommt keinen ihrer Einträge, auch nicht einen Teil.
-Zur Schicht der Ablösung wirkt sie wie die drei Nachträge nacheinander.
+Eine Schicht der Ablösung beginnt dadurch nicht. Die Entlassung beendet eine laufende Schicht nur,
+wenn danach keine Periode mehr offen ist.
 
 ### Einsatzdauer und Ruhezeit
 
@@ -264,11 +265,11 @@ im Statusband im Paneel des Moduls, neben der Auswahlzeile für die Mittel. Ohne
 Grund auch in der Tabelle, statt eines leeren Einsatzes. Ohne Personal ist die Stärke unbekannt und
 steht als „—“. Fehlt Personal, Fahrzeuge oder Material, ist „In Lagebericht übernehmen“ gesperrt,
 weil der Bericht sonst falsche Zahlen trüge. Ohne das Modul Aufträge steht in der Spalte „Auftrag“ „Modul Aufträge gesperrt“. Den Zulauf sieht nur, wer auch das Modul
-Nachforderungen lesen darf; sonst fehlt die Kennzahl ganz. Status setzen, nachtragen, Zeit berichtigen,
-streichen und in den Lagebericht übernehmen dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
+Nachforderungen lesen darf; sonst fehlt die Kennzahl ganz. Status setzen, nachtragen, eine Periode
+nachtragen, Zeit berichtigen, streichen und in den Lagebericht übernehmen dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
 (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
 
 ### Ohne Netz
 
 Meldebild und Zeitachse bleiben mit dem zuletzt geladenen Stand lesbar. Status setzen, Nachtragen,
-Zeit berichtigen und Streichen brauchen das Netz (Kapitel [Ohne Netz](ohne-netz.md)).
+Periode nachtragen, Zeit berichtigen und Streichen brauchen das Netz (Kapitel [Ohne Netz](ohne-netz.md)).

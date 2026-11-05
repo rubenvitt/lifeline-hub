@@ -22,7 +22,7 @@ import type {
 import { useUhr } from '../abloesung/useUhr';
 import { ErfassungsModal } from '../components/Erfassung';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { ZEITACHSE_GRUND_MAX } from '../api/eingabegrenzen';
+import { ZEITACHSE_GRUND_MAX, ZEITACHSE_NOTIZ_MAX } from '../api/eingabegrenzen';
 import {
   PaneelZustand,
   Sammelbanner,
@@ -481,8 +481,12 @@ export default function KraftZeitachse({
           {/* Zeit und Kalendertag in der Anzeigezone (LFH-692, `keineZukunftstage`). */}
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
         </Form.Item>
-        <Form.Item<NachtragWerte> name="notiz" label="Notiz (optional)">
-          <Input placeholder="z. B. per Funk gemeldet" />
+        <Form.Item<NachtragWerte>
+          name="notiz"
+          label="Notiz (optional)"
+          rules={[zeichenRegel(ZEITACHSE_NOTIZ_MAX, 'Notiz')]}
+        >
+          <Input placeholder="z. B. per Funk gemeldet" count={zeichenGrenze(ZEITACHSE_NOTIZ_MAX)} />
         </Form.Item>
         <SpeicherFehler fehler={nachtrag.error} titel="Nicht nachgetragen" />
       </ErfassungsModal>
@@ -529,8 +533,15 @@ export default function KraftZeitachse({
         >
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
         </Form.Item>
-        <Form.Item<PeriodeWerte> name="notiz" label="Notiz (optional)">
-          <Input placeholder="z. B. aus dem Funkprotokoll" />
+        <Form.Item<PeriodeWerte>
+          name="notiz"
+          label="Notiz (optional)"
+          rules={[zeichenRegel(ZEITACHSE_NOTIZ_MAX, 'Notiz')]}
+        >
+          <Input
+            placeholder="z. B. aus dem Funkprotokoll"
+            count={zeichenGrenze(ZEITACHSE_NOTIZ_MAX)}
+          />
         </Form.Item>
         <SpeicherFehler fehler={periode.error} titel="Nicht nachgetragen" />
       </ErfassungsModal>

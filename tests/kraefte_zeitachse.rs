@@ -409,6 +409,18 @@ async fn nachtrag_statuscodes() {
         )
         .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    // 400 vor 422: zu lange Notiz, auch bei einem Zeitpunkt in der Zukunft.
+    let (s, _) = w
+        .nachtrag(
+            &pfad,
+            &format!(
+                r#"{{"art":"eintreffen","zeitpunkt_at":"{}","notiz":"{}"}}"#,
+                zukunft.format("%Y-%m-%d %H:%M:%S"),
+                "x".repeat(lifeline_hub::zeitachse::NOTIZ_MAX + 1)
+            ),
+        )
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Notiz zu lang");
     // 422: doppeltes Eintreffen (Spec „Doppeltes Eintreffen"), und nichts geschrieben.
     let eins = format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(8, 0));
     let eins = eins.as_str();
@@ -1967,6 +1979,14 @@ async fn periode_statuscodes() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Zukunft");
     let (s, _) = periode(&w, &pfad, &periode_body(None, Some(&vor(1, 0)), &vor(2, 0))).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Ende vor dem Beginn");
+    let lang = format!(
+        r#"{{"eintreffen_at":"{}","entlassung_at":"{}","notiz":"{}"}}"#,
+        vor(1, 0),
+        vor(2, 0),
+        "x".repeat(lifeline_hub::zeitachse::NOTIZ_MAX + 1)
+    );
+    let (s, _) = periode(&w, &pfad, &lang).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Notiz zu lang, vor dem 422");
     let (s, _) = periode(
         &w,
         &pfad,

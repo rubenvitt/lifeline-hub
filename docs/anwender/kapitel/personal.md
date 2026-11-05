@@ -311,7 +311,7 @@ der Ansicht, statt eine Person als nicht eingeteilt zu zeigen. Ohne Freigabe der
 gruppiert die Liste nicht.
 
 Die Ansicht einer entlassenen Person bleibt lesbar, mit der Marke „entlassen“ und dem Zeitpunkt;
-ändern lässt sich dort nur die Zeitachse (Nachtragen, Zeit berichtigen, Streichen), bis sie erneut disponiert ist.
+ändern lässt sich dort nur die Zeitachse (Nachtragen, Periode nachtragen, Zeit berichtigen, Streichen), bis sie erneut disponiert ist.
 Die Ansicht einer
 stornierten Person meldet „Nicht (mehr) im Einsatz“.
 

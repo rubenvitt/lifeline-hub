@@ -201,6 +201,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
         ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),
         ("ZEITACHSE_GRUND_MAX", zeitachse::GRUND_MAX),
+        ("ZEITACHSE_NOTIZ_MAX", zeitachse::NOTIZ_MAX),
         (
             "LAGEMONITOR_BEZEICHNUNG_MAX",
             lagemonitor_zugang::BEZEICHNUNG_MAX,

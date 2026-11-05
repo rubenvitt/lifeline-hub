@@ -584,7 +584,10 @@ pub struct PeriodeNachgetragen {
 ///   eigene Periode bilden ([`perioden::fuege_periode_ein`], D2); sonst 422, nichts geschrieben.
 /// - Fan-out an einer Einheit wie beim Nachtrag an die JETZT zugeordneten Personen, aber ganz
 ///   oder gar nicht (D3): eine Person, in deren Folge die Periode nicht passt, bekommt keine Kopie.
-/// - Kopplung an die Ablösung wie drei Nachträge in Zeitfolge (D4).
+/// - Kopplung an die Ablösung erst nach allen Einfügungen, je Ereignis in Zeitfolge (D4): am
+///   fertigen Stand tragen Alarmierung und Eintreffen nie die offene Periode und wirken nicht
+///   (kein Hinweis, kein Schichtbeginn); die Entlassung beendet eine laufende Schicht nur, wenn
+///   danach keine Periode offen ist.
 ///
 /// Die Reihenfolge der Zeitpunkte und die Prüfung „keine offene Periode“ an einer entlassenen
 /// Person macht der Aufrufer, wie beim Nachtrag.

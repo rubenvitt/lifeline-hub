@@ -130,8 +130,8 @@ keine früheren Ereignisse der Einheit erben.
 ### Requirement: Nachtrag von Hand
 
 Das System SHALL an einer Einheit oder Person ein Ereignis mit Art, Zeitpunkt und optionaler
-Notiz von Hand erfassen lassen (Quelle `nachtrag`). Art und Zeitpunkt sind Pflicht; fehlt eines
-oder ist die Art unbekannt, MUST das System mit 400 antworten. Ein Zeitpunkt in der Zukunft oder
+Notiz von Hand erfassen lassen (Quelle `nachtrag`). Art und Zeitpunkt sind Pflicht; fehlt eines,
+ist die Art unbekannt oder die Notiz länger als 500 Zeichen, MUST das System mit 400 antworten. Ein Zeitpunkt in der Zukunft oder
 ein Ereignis, das die Perioden-Regeln verletzt, MUST mit 422 scheitern und nichts schreiben. Die
 Art `abloesung` MUST nicht nachgetragen werden können (400), sie entsteht nur aus dem Vollzug.
 Ein Nachtrag an einer Einheit MUST den Fan-out auslösen. Jeder Nachtrag MUST einen
@@ -236,13 +236,16 @@ kommen dazu.
 Das System SHALL an einer Einheit oder Person eine abgeschlossene Einsatzperiode in einem Schritt
 nachtragen lassen: Alarmierung und/oder Eintreffen und eine Entlassung (Quelle `nachtrag`, Notiz
 optional am Beginn), in einer Transaktion. Fehlen Alarmierung und Eintreffen zugleich, fehlt die
-Entlassung oder ist eine Zeit unlesbar, MUST das System mit 400 antworten. Ein Zeitpunkt in der
+Entlassung, ist eine Zeit unlesbar oder die Notiz länger als 500 Zeichen, MUST das System mit
+400 antworten. Ein Zeitpunkt in der
 Zukunft, eine Alarmierung nach dem Eintreffen, ein Ende nicht nach dem Beginn, ein Ergebnis, das
 die Perioden-Regeln verletzt, oder eines, in dem die Ereignisse keine eigene Periode bilden,
 MUST mit 422 scheitern und nichts schreiben. Die Perioden-Regeln MUST nur am Ergebnis geprüft
 werden. An einer Einheit MUST jede jetzt zugeordnete Person die Periode als Kopie bekommen, in
 deren Folge sie passt; eine andere MUST keine Kopie bekommen, auch keine teilweise. Die Kopplung
-an die Ablösung MUST wie bei den einzelnen Nachträgen in Zeitfolge laufen. Der Weg MUST einen
+an die Ablösung MUST erst am fertigen Stand laufen: Alarmierung und Eintreffen der
+nachgetragenen Periode MUST weder einen Hinweis geben noch eine Schicht beginnen; die Entlassung
+MUST eine laufende Schicht nur beenden, wenn danach keine Periode offen ist. Der Weg MUST einen
 System-ETB-Eintrag schreiben, der Kraft und die Zeitpunkte nennt.
 
 #### Scenario: Periode vor der laufenden nachtragen

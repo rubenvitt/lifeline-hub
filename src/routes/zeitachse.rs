@@ -38,7 +38,7 @@ use crate::einsatz::modul::{Einheiten, Personal};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
-use crate::routes::support::hoechstens;
+use crate::routes::support::{hoechstens, optional_max};
 use crate::zeitachse::perioden::NeuePeriode;
 use crate::zeitachse::repo::{self, Beruehrt, Kraft, Neu, Schreibergebnis};
 use crate::zeitachse::{
@@ -172,8 +172,9 @@ fn neue_periode(body: &PeriodeBody, jetzt: &str) -> Result<NeuePeriode, AppError
     })
 }
 
-fn notiz(roh: Option<String>) -> Option<String> {
-    roh.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+/// Getrimmte Notiz, leer wie keine; zu lang → 400 (vor jeder Zeitprüfung mit 422).
+fn notiz(roh: Option<String>) -> Result<Option<String>, AppError> {
+    optional_max(roh, "Notiz", crate::zeitachse::NOTIZ_MAX)
 }
 
 /// Nach dem Commit: ETB-Kurzruf, die Kraft selbst und jede per Fan-out berührte Person, dazu die
@@ -259,9 +260,9 @@ async fn nachtragen(
     body: NachtragBody,
 ) -> Result<ZeitachseAnzeige, AppError> {
     let jetzt = crate::zeit::jetzt();
+    let notiz = notiz(body.notiz)?;
     let art = nachtrag_art(&body.art)?;
     let zeitpunkt = nachtrag_zeit(&body.zeitpunkt_at, &jetzt)?;
-    let notiz = notiz(body.notiz);
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
@@ -307,10 +308,10 @@ async fn periode_nachtragen(
     einsatz_id: i64,
     benutzer_id: i64,
     kraft: Kraft,
-    body: PeriodeBody,
+    mut body: PeriodeBody,
 ) -> Result<ZeitachseAnzeige, AppError> {
+    let notiz = notiz(body.notiz.take())?;
     let neu = neue_periode(&body, &crate::zeit::jetzt())?;
-    let notiz = notiz(body.notiz);
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
