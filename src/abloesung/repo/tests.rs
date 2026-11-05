@@ -2515,6 +2515,270 @@ async fn vermerk_zeigt_sich_erst_ohne_verbleibenden_abloeser() {
     );
 }
 
+// ── Gestrichene Entlassung holt die Planung zurück (LLH-1510) ───────────────────────────────
+
+/// ID der Einheit am Vermerk der entfallenen Planung (Migration 0272).
+async fn vermerk_einheit(pool: &SqlitePool, id: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT planung_entfallen_einheit_id FROM einsatz_abloesung WHERE id = ?")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+fn abloeser_ids(a: &AbloesungAnzeige) -> Vec<i64> {
+    a.abloeser.iter().map(|x| x.einheit_id).collect()
+}
+
+/// Spec „Gestrichene Entlassung holt die Planung zurück“: A geplant, A entlassen → Planung
+/// entfällt; Entlassung gestrichen → A wieder geplant, Vermerk weg, ETB und Hinweis da, der
+/// Planungshinweis ist wieder zu.
+#[tokio::test]
+async fn gestrichene_entlassung_holt_die_entfallene_planung_zurueck() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    assert_eq!(vermerk_einheit(&w.pool, id).await, Some(w.f2));
+    assert!(planung_frist(&w.pool, id).await.is_some());
+
+    let b = streiche(&w, w.f2, Entlassung).await;
+    assert_eq!(
+        b.hinweise,
+        vec![anlass(&w, id, Bezugstyp::AbloeserWiederhergestellt)]
+    );
+    assert_eq!(b.abloesung.len(), 1, "der ETB-Eintrag für Kurzruf und Live");
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(a.abloesende_einheit_id, Some(w.f2));
+    assert_eq!(abloeser_ids(&a), vec![w.f2]);
+    assert_eq!(a.planung_entfallen, None);
+    assert_eq!(vermerk_einheit(&w.pool, id).await, None);
+    assert_eq!(
+        planung_frist(&w.pool, id).await,
+        None,
+        "wieder geplant: kein Planungshinweis"
+    );
+    let etb = etb(&w.pool, w.e).await;
+    assert!(
+        etb.iter().any(|(_, i, _, _)| i
+            == "Ablösung «Florian 1»: Planung der ablösenden Einheit wiederhergestellt, \
+                Entlassung von «Florian 2» gestrichen"),
+        "{etb:?}"
+    );
+}
+
+/// Ein verbliebener Ablöser bleibt Spiegel, der zurückgeholte reiht sich hinten ein.
+#[tokio::test]
+async fn zurueckgeholter_abloeser_reiht_sich_hinten_ein() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    aendern(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &AenderungEingabe {
+            abloeser: Some(vec![w.f2, f3]),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(abloeser_ids(&a), vec![f3]);
+
+    let b = streiche(&w, w.f2, Entlassung).await;
+    assert_eq!(
+        b.hinweise,
+        vec![anlass(&w, id, Bezugstyp::AbloeserWiederhergestellt)]
+    );
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(abloeser_ids(&a), vec![f3, w.f2]);
+    assert_eq!(a.abloesende_einheit_id, Some(f3), "Spiegel bleibt");
+    assert_eq!(vermerk_einheit(&w.pool, id).await, None);
+}
+
+/// Spec: überschriebener Vermerk (Planung von Hand, jüngere entfallene Planung), eine Schicht,
+/// die nicht mehr läuft, oder eine anderswo geplante Einheit → nichts wird zurückgeholt.
+#[tokio::test]
+async fn gestrichene_entlassung_holt_nichts_zurueck_wenn_etwas_anderes_daran_haengt() {
+    // Von Hand umgeplant und wieder geleert: der Vermerk ist geräumt.
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    plane(&w, id, Some(w.f2)).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    plane(&w, id, Some(f3)).await;
+    let b = streiche(&w, w.f2, Entlassung).await;
+    assert!(b.hinweise.is_empty(), "{:?}", b.hinweise);
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(abloeser_ids(&a), vec![f3], "die Neuplanung bleibt allein");
+
+    // Jüngere entfallene Planung (Auflösung) hat den Vermerk überschrieben.
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    aendern(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &AenderungEingabe {
+            abloeser: Some(vec![w.f2, f3]),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    crate::einheit::repo::aufloesen(&w.pool, w.e, f3, w.b)
+        .await
+        .unwrap();
+    let b = streiche(&w, w.f2, Entlassung).await;
+    assert!(b.hinweise.is_empty(), "{:?}", b.hinweise);
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert!(a.abloeser.is_empty());
+    assert_eq!(
+        a.planung_entfallen.map(|v| v.grund),
+        Some(crate::abloesung::PlanungEntfallenGrund::Aufloesung)
+    );
+
+    // Die Schicht läuft nicht mehr (ihre Einheit ist aufgelöst).
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    crate::einheit::repo::aufloesen(&w.pool, w.e, w.f1, w.b)
+        .await
+        .unwrap();
+    let b = streiche(&w, w.f2, Entlassung).await;
+    assert!(b.hinweise.is_empty(), "{:?}", b.hinweise);
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(a.status, AbloesungStatus::Beendet);
+    assert!(a.abloeser.is_empty());
+
+    // Inzwischen an einer anderen Schicht geplant: dort bleibt sie, hier kommt nichts zurück.
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let id3 = schicht_zukunft(&w, f3).await;
+    plane(&w, id, Some(w.f2)).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    plane(&w, id3, Some(w.f2)).await;
+    let b = streiche(&w, w.f2, Entlassung).await;
+    assert!(b.hinweise.is_empty(), "{:?}", b.hinweise);
+    assert!(laden(&w.pool, w.e, id, T0)
+        .await
+        .unwrap()
+        .abloeser
+        .is_empty());
+    assert_eq!(
+        abloeser_ids(&laden(&w.pool, w.e, id3, T0).await.unwrap()),
+        vec![w.f2]
+    );
+}
+
+/// Die Einheit muss wieder im Einsatz sein (offene Periode), sonst kommt nichts zurück. Und nur
+/// der Grund `entlassung` holt zurück, nie ein Vermerk der Auflösung.
+#[tokio::test]
+async fn gestrichene_entlassung_holt_nur_zurueck_wenn_die_einheit_wieder_im_einsatz_ist() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    // Ohne offene Periode (die Einheit ist noch entlassen) holt der Schreibweg nichts zurück.
+    let mut conn = w.pool.acquire().await.unwrap();
+    let wirkung = restore_entfallene_planungen_tx(&mut conn, w.e, w.b, w.f2, T0)
+        .await
+        .unwrap();
+    drop(conn);
+    assert!(wirkung.is_empty(), "{wirkung:?}");
+    assert!(laden(&w.pool, w.e, id, T0)
+        .await
+        .unwrap()
+        .abloeser
+        .is_empty());
+    assert_eq!(vermerk_einheit(&w.pool, id).await, Some(w.f2));
+
+    // Vermerk mit derselben Einheit, aber Grund Auflösung: kein Zurückholen.
+    sqlx::query("UPDATE einsatz_abloesung SET planung_entfallen_grund = 'aufloesung' WHERE id = ?")
+        .bind(id)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let b = streiche(&w, w.f2, Entlassung).await;
+    assert!(b.hinweise.is_empty(), "{:?}", b.hinweise);
+    assert!(laden(&w.pool, w.e, id, T0)
+        .await
+        .unwrap()
+        .abloeser
+        .is_empty());
+}
+
+/// LLH-1455 + LLH-1510: die Berichtigung einer Entlassung holt die Planung zurück und lässt sie
+/// gleich wieder entfallen; die beiden Hinweise heben sich auf, der Vermerk bleibt.
+#[tokio::test]
+async fn berichtigte_entlassung_meldet_planung_nicht_doppelt() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    plane(&w, id, Some(w.f2)).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
+    let zid: i64 = sqlx::query_scalar(
+        "SELECT id FROM einsatz_kraft_zeitachse WHERE einheit_id = ? AND art = 'entlassung'",
+    )
+    .bind(w.f2)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    let mut tx = w.pool.begin().await.unwrap();
+    let r = crate::zeitachse::repo::berichtige_tx(
+        &mut tx,
+        w.e,
+        w.b,
+        crate::zeitachse::repo::Kraft::Einheit(w.f2),
+        zid,
+        "2030-06-03 10:40:00",
+        "Uhrzeit",
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert!(r.beruehrt.hinweise.is_empty(), "{:?}", r.beruehrt.hinweise);
+    let a = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert!(a.abloeser.is_empty());
+    assert_eq!(
+        a.planung_entfallen.map(|v| v.grund),
+        Some(crate::abloesung::PlanungEntfallenGrund::Entlassung)
+    );
+    assert_eq!(vermerk_einheit(&w.pool, id).await, Some(w.f2));
+}
+
+/// Migration 0272: die ID der Einheit gibt es nur mit Vermerk.
+#[tokio::test]
+async fn vermerk_einheit_nur_mit_vermerk() {
+    let w = welt().await;
+    let id = schicht_zukunft(&w, w.f1).await;
+    let r =
+        sqlx::query("UPDATE einsatz_abloesung SET planung_entfallen_einheit_id = ? WHERE id = ?")
+            .bind(w.f2)
+            .bind(id)
+            .execute(&w.pool)
+            .await;
+    assert!(r.is_err(), "ID ohne Vermerk angenommen");
+}
+
 /// Spec „Plausibilität beim Planen“: eine Einheit, die schon eine andere Schicht plant, oder
 /// eine mit eigener laufender Schicht ergibt eine Warnung im Antwort-DTO, die Planung gelingt.
 #[tokio::test]

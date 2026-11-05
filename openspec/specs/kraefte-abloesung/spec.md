@@ -798,6 +798,36 @@ Karte MUST dezent in der Rolle Achtung „Planung entfallen · 2. Rettungsstaffe
 - **WHEN** zwei Ablöser geplant sind und einer entlassen wird
 - **THEN** trägt die Schicht keinen sichtbaren Vermerk, und die Karte nennt den verbleibenden Ablöser
 
+### Requirement: Gestrichene Entlassung holt die Planung zurück
+
+Wird die Entlassung gestrichen, mit der die Planung einer ablösenden Einheit entfallen ist, SHALL
+das System die Planung zurückholen (LLH-1510, Entscheidung LLH-1310 Punkt 3: eine Streichung ist
+eine Korrektur, ihre Folgen gehen mit, solange nichts anderes daran hängt). Dafür MUST der
+Vermerk der entfallenen Planung auch die ID der Einheit festhalten. Zurückgeholt wird an jeder
+laufenden Schicht, deren Vermerk noch Grund `entlassung` und diese Einheit trägt, und nur, wenn
+die Einheit danach wieder eine offene Periode hat, nicht aufgelöst ist, nirgends sonst als
+ablösende Einheit geplant ist, die Schicht keinen Besatzungswechsel plant und ihre Liste noch
+Platz hat. Die Einheit MUST sich hinten in die Ablöser-Liste einreihen; ein verbliebener Ablöser
+bleibt erster Eintrag. Je Schicht MUST der Vermerk geräumt, der Planungshinweis neu bewertet, ein
+ETB-Eintrag „Ablösung «…»: Planung der ablösenden Einheit wiederhergestellt, Entlassung von «…»
+gestrichen“ geschrieben und ein Hinweis `abloesung_abloeser` mit Bezugstyp
+`abloeser_wiederhergestellt` an die Leser des Moduls gemeldet werden. Hat eine Planung von Hand
+oder eine jüngere entfallene Planung den Vermerk überschrieben oder läuft die Schicht nicht mehr,
+MUST nichts zurückkommen. Die Berichtigung einer Entlassung (Streichung, dann Nachtrag) MUST
+weder „wiederhergestellt“ noch ein zweites „entfallen“ melden.
+
+#### Scenario: Entlassung gestrichen
+- **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant war, entlassen wurde und diese Entlassung gestrichen wird
+- **THEN** ist „2. Rettungsstaffel“ wieder geplant, die Karte trägt keinen Vermerk, das ETB nennt „Planung der ablösenden Einheit wiederhergestellt“, und die Leser erhalten den Hinweis „Planung der ablösenden Einheit wiederhergestellt“
+
+#### Scenario: Verbliebener Ablöser bleibt vorn
+- **WHEN** „2. Rettungsstaffel“ und „3. Rettungsstaffel“ geplant waren, die erste entlassen wurde und ihre Entlassung gestrichen wird
+- **THEN** stehen „3. Rettungsstaffel“ und „2. Rettungsstaffel“ in dieser Reihenfolge in der Liste
+
+#### Scenario: Inzwischen von Hand umgeplant
+- **WHEN** nach der entfallenen Planung „3. Rettungsstaffel“ von Hand geplant wurde und dann die Entlassung gestrichen wird
+- **THEN** bleibt „3. Rettungsstaffel“ allein geplant, und es entsteht kein Hinweis
+
 ### Requirement: Plausibilität beim Planen
 
 Das System SHALL beim Planen einer ablösenden Einheit warnen, aber nicht ablehnen: jede laufende

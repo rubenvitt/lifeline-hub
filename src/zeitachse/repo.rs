@@ -531,6 +531,9 @@ pub async fn berichtige_tx(
         .await?;
         beruehrt.abloesung.extend(w.etb);
         beruehrt.hinweise.extend(w.anlaesse);
+        if art == ZeitachseArt::Entlassung {
+            crate::abloesung::hinweis::cancel_wiederhergestellt_entfallen(&mut beruehrt.hinweise);
+        }
     }
     Ok(Berichtigt {
         art,

@@ -12,15 +12,18 @@
 //!   keine: ihre Schicht entsteht mit dem Vollzug als Folgeschicht.
 //! - **Entlassung**, die die letzte Periode schließt: die laufende Schicht der Einheit endet als
 //!   `beendet` mit Grund `entlassung`, ihre Fristen schließen.
-//! - **Streichung dieser Entlassung**: die Schicht läuft wieder, samt Fristen.
+//! - **Streichung dieser Entlassung**: die Schicht läuft wieder, samt Fristen, und die mit der
+//!   Entlassung entfallenen Planungen kommen zurück (LLH-1510,
+//!   [`repo::restore_entfallene_planungen_tx`]).
 //!
 //! Dazu die **Hinweise zur ablösenden Einheit** (LLH-1131, [`super::hinweis`]): ist die Einheit
 //! als ablösende geplant, wird ihre Alarmierung und ihr Eintreffen (beide nur als Beginn der
 //! offenen Periode) je geplanter Schicht ein Anlass; das Eintreffen am Bereitstellungsraum meldet
 //! dessen Buchung selbst. Ihre Entlassung ohne offene Periode danach hebt die Planung auf
-//! (Hinweis und ETB „Planung der ablösenden Einheit entfallen“). Wird die Alarmierung oder das
-//! Eintreffen gestrichen, mit dem ihre offene Periode begann, folgt der Hinweis „… gestrichen“
-//! (LLH-1425, [`vor_streichung_tx`]).
+//! (Hinweis und ETB „Planung der ablösenden Einheit entfallen“), die Streichung dieser
+//! Entlassung holt sie zurück (Hinweis und ETB „… wiederhergestellt“, LLH-1510). Wird die
+//! Alarmierung oder das Eintreffen gestrichen, mit dem ihre offene Periode begann, folgt der
+//! Hinweis „… gestrichen“ (LLH-1425, [`vor_streichung_tx`]).
 //!
 //! **Ein Fehler hier bricht nie den Anlass** (gleiche Regel wie ein Perioden-Verstoß beim
 //! Statuswechsel): die Kopplung läuft in einem eigenen `SAVEPOINT`, ein Fehler rollt nur sie
@@ -108,10 +111,11 @@ pub async fn vor_streichung_tx(
 }
 
 /// Nach einem gestrichenen Ereignis an einer Einheit. Eine gestrichene Entlassung öffnet die mit
-/// ihr beendete Schicht. War es der Beginn der offenen Periode (`hinweis` aus
-/// [`vor_streichung_tx`]), geht je Schicht, die die Einheit als ablösende plant, der Hinweis
-/// „Alarmierung/Eintreffen der ablösenden Einheit gestrichen“ hinaus (LLH-1425): der frühere
-/// Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht mehr.
+/// ihr beendete Schicht und holt die mit ihr entfallenen Planungen zurück (LLH-1510). War es der
+/// Beginn der offenen Periode (`hinweis` aus [`vor_streichung_tx`]), geht je Schicht, die die
+/// Einheit als ablösende plant, der Hinweis „Alarmierung/Eintreffen der ablösenden Einheit
+/// gestrichen“ hinaus (LLH-1425): der frühere Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht
+/// mehr.
 pub async fn nach_streichung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -429,7 +433,8 @@ async fn reopen_tx(
     entlassung_at: &str,
 ) -> Result<Wirkung, AppError> {
     let jetzt = crate::zeit::jetzt();
-    let Some((_, name)) = repo::reopen_nach_entlassung_tx(
+    let mut wirkung = Wirkung::default();
+    if let Some((_, name)) = repo::reopen_nach_entlassung_tx(
         conn,
         einsatz_id,
         benutzer_id,
@@ -438,20 +443,24 @@ async fn reopen_tx(
         &jetzt,
     )
     .await?
-    else {
-        return Ok(Wirkung::default());
-    };
-    let startwert = crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
-    let etb_id = crate::etb::system_audit_tx(
-        conn,
-        einsatz_id,
-        benutzer_id,
-        startwert,
-        &format!("Ablösung: Schicht von «{name}» läuft wieder, Entlassung gestrichen"),
-    )
-    .await?;
-    Ok(Wirkung {
-        etb: vec![etb_id],
-        anlaesse: Vec::new(),
-    })
+    {
+        let startwert =
+            crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
+        wirkung.etb.push(
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                startwert,
+                &format!("Ablösung: Schicht von «{name}» läuft wieder, Entlassung gestrichen"),
+            )
+            .await?,
+        );
+    }
+    // Die mit der Entlassung entfallenen Planungen kommen zurück (LLH-1510).
+    wirkung.append(
+        repo::restore_entfallene_planungen_tx(conn, einsatz_id, benutzer_id, einheit_id, &jetzt)
+            .await?,
+    );
+    Ok(wirkung)
 }

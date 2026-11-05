@@ -100,8 +100,11 @@ Zeitachse; der Raum kommt aus `aktueller_br_id` und der Raumliste, die nur mit F
 Bereitstellungsräume und nur bei einem Ablöser im Raum abgefragt wird, „· abgerufen …“ aus deren
 `abrufe` (LLH-1309: das Abruf-Ereignis der BR-Belegung, kein Zeitachsen-Ereignis, keine Spalte an
 der Einheit; nach dem Ausrücken fällt es weg). Kein eigener Abruf, kein DTO-Feld der Ablösung:
-live über die bestehenden Ereignisse. Den Vermerk „Planung entfallen“ (LLH-1309) schreibt nur
-`drop_planungen_tx`, räumt nur `set_abloeser_tx`; ob er gilt (laufend, kein Ablöser), entscheidet
+live über die bestehenden Ereignisse. Den Vermerk „Planung entfallen“ (LLH-1309, mit der ID der
+Einheit ab LLH-1510) schreibt nur `drop_planungen_tx`, räumt `set_abloeser_tx` und die Streichung
+der Entlassung (`restore_entfallene_planungen_tx`: holt die Planung zurück, nur solange der
+Vermerk noch Grund `entlassung` und diese Einheit trägt; eine Berichtigung hebt „wiederhergestellt“
+und „entfallen“ gegeneinander auf); ob er gilt (laufend, kein Ablöser), entscheidet
 der Server (`planung_entfallen`), der Client zeigt ihn nur (`abloesung/planungWarnung.ts`). Jede Benachrichtigung der Ablösung springt zu
 ihrer Schicht (`abloesungPfad(…, { schicht })`, Server `benachrichtigung::text::pfad`, beide
 gleich); die Seite nimmt `?schicht=` nach `useQueryParamSelektion` an.

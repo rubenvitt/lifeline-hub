@@ -255,6 +255,8 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
   // Gestrichene Alarmierung bzw. gestrichenes Eintreffen in der Kräfte-Zeitachse (LLH-1425).
   abloeser_alarmierung_gestrichen: 'abloesung',
   abloeser_eintreffen_gestrichen: 'abloesung',
+  // Gestrichene Entlassung holt die entfallene Planung zurück (LLH-1510).
+  abloeser_wiederhergestellt: 'abloesung',
   lagebesprechung: 'lagebesprechung',
   nachforderung: 'nachforderungen',
   nachforderung_zugesagt: 'nachforderungen',
