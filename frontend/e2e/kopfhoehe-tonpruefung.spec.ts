@@ -98,8 +98,9 @@ async function tonPruefungNachbilden(page: Page, ton: 'bereit' | 'blockiert') {
             punkte.push({ t: performance.now(), hoehe: kopf.clientHeight, ton, sync });
           }
         }
-        // Ohne festes Ende im Takt der Messung: unter Last steht die Verbindung später (LLH-1506).
-        if (performance.now() < 60_000) requestAnimationFrame(bild);
+        // Ohne festes Ende: unter Last steht die Verbindung später (LLH-1506). Jedes `goto` lädt
+        // ein neues Dokument mit eigener Aufnahme, `messe` schneidet bei `bis` ab.
+        requestAnimationFrame(bild);
       };
       requestAnimationFrame(bild);
     },
