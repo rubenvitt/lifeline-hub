@@ -35,6 +35,7 @@ pub async fn eintritt(
             platz_id,
             notiz,
             erfasst_von,
+            None,
         )
         .await
     })?;
@@ -43,6 +44,11 @@ pub async fn eintritt(
 
 /// Eintritt auf der Transaktion des Aufrufers: bei der Aufnahme gehören Person, Sichtung,
 /// Belegung und Audit zusammen. Kein eigener Commit, kein Pool-Read.
+///
+/// `zeitpunkt_at` ist die Erfassungszeit einer ohne Netz vorgemerkten Aufnahme (LLH-1515), vom
+/// Aufrufer schon gekappt; `None` = jetzt. Nur für eine im selben Schritt angelegte Person: sie
+/// hat noch kein Belegungsereignis, vor das der Eintritt rutschen könnte.
+#[allow(clippy::too_many_arguments)]
 pub async fn eintritt_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -51,6 +57,7 @@ pub async fn eintritt_tx(
     platz_id: Option<i64>,
     notiz: Option<&str>,
     erfasst_von: i64,
+    zeitpunkt_at: Option<&str>,
 ) -> Result<i64, AppError> {
     pruefe_uhs_aktiv(&mut *conn, einsatz_id, uhs_id).await?;
     pruefe_person_nicht_belegt(&mut *conn, einsatz_id, person_id).await?;
@@ -66,6 +73,7 @@ pub async fn eintritt_tx(
         "eintritt",
         notiz,
         erfasst_von,
+        zeitpunkt_at,
     )
     .await?;
     update_cache(&mut *conn, einsatz_id, person_id, Some(uhs_id), platz_id).await?;
@@ -107,6 +115,7 @@ pub async fn wechsel(
             "wechsel",
             notiz,
             erfasst_von,
+            None,
         )
         .await?;
         // Cache erst nach Aufbereitung umsetzen, sonst greift der Belegungs-Check beim Ex-Platz nicht.
@@ -151,6 +160,7 @@ pub async fn austritt(
             "austritt",
             notiz,
             erfasst_von,
+            None,
         )
         .await?;
         if let Some(ex_pid) = ex_platz {
@@ -232,6 +242,7 @@ pub async fn austritt_intern_tx(
                 "austritt",
                 notiz,
                 erfasst_von,
+                None,
             )
             .await?;
             if let Some(ex_pid) = ex_platz {
@@ -409,6 +420,8 @@ async fn lade_cache(
         .ok_or(AppError::NotFound)
 }
 
+/// `zeitpunkt_at` `None` = jetzt, im Format der Spaltenvorgabe (Migration 0029).
+#[allow(clippy::too_many_arguments)]
 async fn insert_event(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -418,11 +431,13 @@ async fn insert_event(
     art: &str,
     notiz: Option<&str>,
     erfasst_von: i64,
+    zeitpunkt_at: Option<&str>,
 ) -> Result<i64, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO person_uhs_belegung \
-            (einsatz_id, person_id, uhs_id, platz_id, art, notiz, erfasst_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (einsatz_id, person_id, uhs_id, platz_id, art, notiz, erfasst_von, zeitpunkt_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, strftime('%Y-%m-%d %H:%M:%S','now'))) \
+         RETURNING id",
     )
     .bind(einsatz_id)
     .bind(person_id)
@@ -431,6 +446,7 @@ async fn insert_event(
     .bind(art)
     .bind(notiz)
     .bind(erfasst_von)
+    .bind(zeitpunkt_at)
     .fetch_one(&mut *conn)
     .await;
     match ergebnis {
