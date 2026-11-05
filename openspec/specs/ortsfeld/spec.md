@@ -234,7 +234,8 @@ Umschalt in großen Schritten). Das Verschieben MUST die Koordinate des Werts ä
 stehen lassen; ist der Text eine Koordinate (beim Setzen eingetragen oder getippt), MUST er die
 neue Koordinate tragen, damit Text und Nadel denselben Ort nennen. Eine Textänderung, nach der der
 Text wieder den Punkt der Nadel nennt, MUST den Kartenpunkt stehen lassen; erst eine andere
-getippte Koordinate ersetzt ihn. Die Nadel MUST ein Bedienziel mit der Steuerhöhe der aktiven Dichtestufe im
+getippte Koordinate ersetzt ihn. „Derselbe Punkt“ heißt: gleich in der Genauigkeit des
+eingestellten Koordinatenformats, nicht innerhalb eines festen Abstands. Die Nadel MUST ein Bedienziel mit der Steuerhöhe der aktiven Dichtestufe im
 Quadrat sein.
 
 #### Scenario: Gezogen

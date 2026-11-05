@@ -44,27 +44,29 @@ export interface OrtsfeldWert {
  * Karte gesetzter Punkt bleibt; die Koordinate eines Treffers oder einer getippten Koordinate
  * fällt weg. Ein geleerter Text leert auch einen Kartenpunkt (LLH-1534): ohne Text geht keine
  * Koordinate hinaus (`ortFelder`), die Maske zeigte sonst einen Punkt, der nie gespeichert wird.
- * Neben einem Kartenpunkt steht als Koordinate im Text nur dieser Punkt (`nachKartenpunkt` zieht
- * sie mit); erkennt der Text ihn wieder (etwa nach einem angehängten und wieder gelöschten
- * Zeichen), bleibt der Kartenpunkt. Erst eine andere getippte Koordinate ersetzt ihn.
+ * Neben einem Kartenpunkt steht als Koordinate im Text nur dieser Punkt (`nachKartenpunkt` schreibt
+ * ihn im eingestellten Format hinein). Nennt der Text in diesem Format denselben Punkt (etwa nach
+ * einem angehängten und wieder gelöschten Zeichen), bleibt der Kartenpunkt mit voller Genauigkeit;
+ * jede andere getippte Koordinate ersetzt ihn. Verglichen wird in der Genauigkeit des Formats,
+ * nicht mit einem festen Abstand: 52.50000 → 52.50009 ist eine Änderung, ein auf Sekunden
+ * gerundetes DMS derselbe Punkt.
  */
-export function nachTextaenderung(vorher: OrtsfeldWert, text: string): OrtsfeldWert {
+export function nachTextaenderung(
+  vorher: OrtsfeldWert,
+  text: string,
+  formatKoordinate: (lat: number, lon: number) => string,
+): OrtsfeldWert {
   if (!text.trim()) return { text, koordinate: null };
   const getippt = erkenneKoordinate(text);
   const kartenpunkt = vorher.quelle === 'karte' ? vorher.koordinate : null;
-  if (getippt && !(kartenpunkt && nahe(getippt, kartenpunkt))) {
-    return { text, koordinate: getippt, quelle: 'koordinate' };
-  }
+  const derselbe =
+    getippt != null &&
+    kartenpunkt != null &&
+    formatKoordinate(getippt.lat, getippt.lon) ===
+      formatKoordinate(kartenpunkt.lat, kartenpunkt.lon);
+  if (getippt && !derselbe) return { text, koordinate: getippt, quelle: 'koordinate' };
   if (kartenpunkt) return { text, koordinate: kartenpunkt, quelle: 'karte' };
   return { text, koordinate: null };
-}
-
-/**
- * Derselbe Punkt, bis auf die Rundung der Anzeige: fünf Nachkommastellen (WGS84) bzw. ein Meter
- * (UTM, MGRS) liegen unter 1e-4 Grad.
- */
-function nahe(a: LatLon, b: LatLon): boolean {
-  return Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(a.lon - b.lon) < 1e-4;
 }
 
 /**
@@ -239,6 +241,7 @@ function OrtsfeldMitSuche({
 }: OrtsfeldGemeinsam & MitSuche) {
   const { token, rollen } = useRollen();
   const online = useOnline();
+  const { formatKoordinate } = useAnzeigeKonventionen();
   // Am gekoppelten Gerät keine Suche (LLH-1483): die Route steht nicht in seiner Liste.
   const sucheMoeglich = (useAuthOptional()?.geraet ?? null) == null;
   const [anfrage, setAnfrage] = useState<Anfrage | null>(null);
@@ -317,7 +320,7 @@ function OrtsfeldMitSuche({
           value={value.text}
           count={count}
           onChange={(e) => {
-            onChange?.(nachTextaenderung(value, e.target.value));
+            onChange?.(nachTextaenderung(value, e.target.value, formatKoordinate));
             setAnfrage(null);
           }}
           onKeyDown={tasten}
