@@ -778,6 +778,18 @@ export interface ZeitachseNachtragBody {
   notiz?: string;
 }
 
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST …/{einheiten|personal}/{id}/zeitachse/periode`
+ * (LLH-1538). Alarmierung und/oder Eintreffen, die Entlassung Pflicht (sonst 400); Zeitpunkte als
+ * UTC 'YYYY-MM-DD HH:mm:ss', nicht in der Zukunft, in Zeitfolge (sonst 422).
+ */
+export interface ZeitachsePeriodeBody {
+  alarmierung_at?: string;
+  eintreffen_at?: string;
+  entlassung_at: string;
+  notiz?: string;
+}
+
 // ============================== LFH-635 Ablösung ==============================
 export type Abloesung = S['AbloesungAnzeige'];
 export type AbloesungVollzug = S['AbloesungVollzugAnzeige'];

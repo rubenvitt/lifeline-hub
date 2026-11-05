@@ -12,6 +12,12 @@
 //! entlassenen Person → 422; stornierte Person, aufgelöste Einheit → 409; fremde Kraft oder
 //! fremdes Ereignis → 404.
 //!
+//! „Periode nachtragen“ (LLH-1538, Spec `kraefte-zeitachse` „Periode nachtragen“) schreibt
+//! Alarmierung und/oder Eintreffen und die Entlassung in einer Transaktion; geprüft wird nur das
+//! Ergebnis, und die Ereignisse müssen eine eigene Periode bilden
+//! (`zeitachse::repo::trage_periode_nach_tx`). Beginn oder Entlassung fehlt → 400; Reihenfolge
+//! verkehrt oder Überschneidung → 422.
+//!
 //! Die Berichtigung (LLH-1455, Spec `kraefte-zeitachse` „Zeitpunkt berichtigen“) streicht das
 //! Ereignis und schreibt es zum neuen Zeitpunkt neu, in einer Transaktion; geprüft wird nur das
 //! Ergebnis (`zeitachse::repo::berichtige_tx`).
@@ -32,7 +38,8 @@ use crate::einsatz::modul::{Einheiten, Personal};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
-use crate::routes::support::hoechstens;
+use crate::routes::support::{hoechstens, optional_max};
+use crate::zeitachse::perioden::NeuePeriode;
 use crate::zeitachse::repo::{self, Beruehrt, Kraft, Neu, Schreibergebnis};
 use crate::zeitachse::{
     EinheitPerioden, PersonPerioden, ZeitachseAnzeige, ZeitachseArt, ZeitachseQuelle,
@@ -46,6 +53,19 @@ pub(crate) const UHRENTOLERANZ_MINUTEN: i64 = 2;
 pub struct NachtragBody {
     art: String,
     zeitpunkt_at: String,
+    #[serde(default)]
+    notiz: Option<String>,
+}
+
+/// Body von „Periode nachtragen“ (LLH-1538): Alarmierung und/oder Eintreffen, Entlassung Pflicht.
+#[derive(Debug, Deserialize)]
+pub struct PeriodeBody {
+    #[serde(default)]
+    alarmierung_at: Option<String>,
+    #[serde(default)]
+    eintreffen_at: Option<String>,
+    #[serde(default)]
+    entlassung_at: Option<String>,
     #[serde(default)]
     notiz: Option<String>,
 }
@@ -101,8 +121,60 @@ fn nachtrag_zeit(roh: &str, jetzt: &str) -> Result<String, AppError> {
     Ok(zeit)
 }
 
-fn notiz(roh: Option<String>) -> Option<String> {
-    roh.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+/// Ein optionaler Zeitpunkt: leer wie fehlend, sonst wie [`nachtrag_zeit`].
+fn optionale_zeit(roh: Option<&str>) -> Result<Option<String>, AppError> {
+    match roh.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Ok(None),
+        Some(s) => crate::etb::normalisiere_zeit(s).map(Some),
+    }
+}
+
+/// Feldprüfung von „Periode nachtragen“ (LLH-1538, design.md D1): erst alle 400 (Beginn fehlt,
+/// Entlassung fehlt, unlesbar), dann die 422 (Zukunft, Reihenfolge).
+fn neue_periode(body: &PeriodeBody, jetzt: &str) -> Result<NeuePeriode, AppError> {
+    let alarmierung_at = optionale_zeit(body.alarmierung_at.as_deref())?;
+    let eintreffen_at = optionale_zeit(body.eintreffen_at.as_deref())?;
+    if alarmierung_at.is_none() && eintreffen_at.is_none() {
+        return Err(AppError::Validation(
+            "Alarmierung oder Eintreffen fehlt".into(),
+        ));
+    }
+    let Some(entlassung_at) = optionale_zeit(body.entlassung_at.as_deref())? else {
+        return Err(AppError::Validation("entlassung_at fehlt".into()));
+    };
+    for z in [
+        &alarmierung_at,
+        &eintreffen_at,
+        &Some(entlassung_at.clone()),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        nachtrag_zeit(z, jetzt)?;
+    }
+    if let (Some(a), Some(e)) = (&alarmierung_at, &eintreffen_at) {
+        if a > e {
+            return Err(AppError::UnprocessableEntity(
+                "Die Alarmierung liegt nach dem Eintreffen".into(),
+            ));
+        }
+    }
+    let letzter_beginn = eintreffen_at.as_ref().or(alarmierung_at.as_ref());
+    if letzter_beginn.is_some_and(|b| *b >= entlassung_at) {
+        return Err(AppError::UnprocessableEntity(
+            "Die Entlassung liegt nicht nach dem Beginn der Periode".into(),
+        ));
+    }
+    Ok(NeuePeriode {
+        alarmierung_at,
+        eintreffen_at,
+        entlassung_at,
+    })
+}
+
+/// Getrimmte Notiz, leer wie keine; zu lang → 400 (vor jeder Zeitprüfung mit 422).
+fn notiz(roh: Option<String>) -> Result<Option<String>, AppError> {
+    optional_max(roh, "Notiz", crate::zeitachse::NOTIZ_MAX)
 }
 
 /// Nach dem Commit: ETB-Kurzruf, die Kraft selbst und jede per Fan-out berührte Person, dazu die
@@ -188,9 +260,9 @@ async fn nachtragen(
     body: NachtragBody,
 ) -> Result<ZeitachseAnzeige, AppError> {
     let jetzt = crate::zeit::jetzt();
+    let notiz = notiz(body.notiz)?;
     let art = nachtrag_art(&body.art)?;
     let zeitpunkt = nachtrag_zeit(&body.zeitpunkt_at, &jetzt)?;
-    let notiz = notiz(body.notiz);
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
     let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
@@ -226,6 +298,48 @@ async fn nachtragen(
         )
         .await?;
         Ok((etb_id, beruehrt))
+    })?;
+    publiziere(state, einsatz_id, etb_id, kraft, &beruehrt).await;
+    repo::laden(&state.pool, einsatz_id, kraft).await
+}
+
+async fn periode_nachtragen(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    kraft: Kraft,
+    mut body: PeriodeBody,
+) -> Result<ZeitachseAnzeige, AppError> {
+    let notiz = notiz(body.notiz.take())?;
+    let neu = neue_periode(&body, &crate::zeit::jetzt())?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, einsatz_id).await?;
+    let (etb_id, beruehrt) = crate::write_retry!(&state.pool, |conn| {
+        let is_berichtigung = require_berichtigbar_tx(conn, einsatz_id, kraft).await?;
+        let offen_vorher =
+            is_berichtigung && repo::has_offene_periode_kraft_tx(conn, kraft).await?;
+        let name = repo::kraft_name_tx(conn, einsatz_id, kraft).await?;
+        let p = repo::trage_periode_nach_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            kraft,
+            &neu,
+            notiz.as_deref(),
+        )
+        .await?;
+        if is_berichtigung {
+            require_keine_offene_periode_tx(conn, kraft, offen_vorher).await?;
+        }
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            startwert,
+            &repo::etb_text_periode(kraft, &name, &neu, stil, is_berichtigung),
+        )
+        .await?;
+        Ok((etb_id, p.beruehrt))
     })?;
     publiziere(state, einsatz_id, etb_id, kraft, &beruehrt).await;
     repo::laden(&state.pool, einsatz_id, kraft).await
@@ -367,6 +481,24 @@ pub async fn einheit_nachtragen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
+/// POST /api/einsaetze/{id}/einheiten/{eid}/zeitachse/periode — Periode nachtragen (LLH-1538).
+pub async fn einheit_periode_nachtragen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_id, eid)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<PeriodeBody>,
+) -> Result<(StatusCode, Json<ZeitachseAnzeige>), AppError> {
+    let z = periode_nachtragen(
+        &state,
+        ctx.einsatz.id,
+        ctx.benutzer.id,
+        Kraft::Einheit(eid),
+        body,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(z)))
+}
+
 /// POST /api/einsaetze/{id}/einheiten/{eid}/zeitachse/{zid}/streichen
 pub async fn einheit_streichen(
     State(state): State<AppState>,
@@ -448,6 +580,24 @@ pub async fn person_nachtragen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
+/// POST /api/einsaetze/{id}/personal/{ep_id}/zeitachse/periode — Periode nachtragen (LLH-1538).
+pub async fn person_periode_nachtragen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_id, ep_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<PeriodeBody>,
+) -> Result<(StatusCode, Json<ZeitachseAnzeige>), AppError> {
+    let z = periode_nachtragen(
+        &state,
+        ctx.einsatz.id,
+        ctx.benutzer.id,
+        Kraft::Person(ep_id),
+        body,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(z)))
+}
+
 /// POST /api/einsaetze/{id}/personal/{ep_id}/zeitachse/{zid}/streichen
 pub async fn person_streichen(
     State(state): State<AppState>,
@@ -506,6 +656,92 @@ mod tests {
         assert!(matches!(
             nachtrag_art("pause"),
             Err(AppError::Validation(_))
+        ));
+    }
+
+    fn body(a: Option<&str>, e: Option<&str>, ende: Option<&str>) -> PeriodeBody {
+        PeriodeBody {
+            alarmierung_at: a.map(str::to_string),
+            eintreffen_at: e.map(str::to_string),
+            entlassung_at: ende.map(str::to_string),
+            notiz: None,
+        }
+    }
+
+    #[test]
+    fn neue_periode_regeln() {
+        let jetzt = "2026-09-30 20:00:00";
+        let p = neue_periode(
+            &body(
+                Some("2026-09-30 06:10:00"),
+                Some(" "),
+                Some("2026-09-30 14:00:00"),
+            ),
+            jetzt,
+        )
+        .unwrap();
+        assert_eq!(p.alarmierung_at.as_deref(), Some("2026-09-30 06:10:00"));
+        assert_eq!(p.eintreffen_at, None, "leer wie fehlend");
+        // 400: kein Beginn, kein Ende, unlesbar.
+        assert!(matches!(
+            neue_periode(&body(None, None, Some("2026-09-30 14:00:00")), jetzt),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            neue_periode(&body(Some("2026-09-30 06:10:00"), None, None), jetzt),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            neue_periode(
+                &body(Some("gestern"), None, Some("2026-09-30 14:00:00")),
+                jetzt
+            ),
+            Err(AppError::Validation(_))
+        ));
+        // 422: Zukunft, Alarmierung nach Eintreffen, Ende nicht nach dem Beginn.
+        assert!(matches!(
+            neue_periode(
+                &body(
+                    Some("2026-09-30 06:10:00"),
+                    None,
+                    Some("2026-09-30 21:00:00")
+                ),
+                jetzt
+            ),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            neue_periode(
+                &body(
+                    Some("2026-09-30 07:00:00"),
+                    Some("2026-09-30 06:40:00"),
+                    Some("2026-09-30 14:00:00")
+                ),
+                jetzt
+            ),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            neue_periode(
+                &body(
+                    None,
+                    Some("2026-09-30 14:00:00"),
+                    Some("2026-09-30 14:00:00")
+                ),
+                jetzt
+            ),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            neue_periode(
+                &body(
+                    Some("2026-09-30 06:10:00"),
+                    Some("2026-09-30 15:00:00"),
+                    Some("2026-09-30 14:00:00")
+                ),
+                jetzt
+            ),
+            Err(AppError::UnprocessableEntity(_))
         ));
     }
 

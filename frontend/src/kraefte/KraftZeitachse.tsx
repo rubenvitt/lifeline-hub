@@ -9,14 +9,20 @@ import {
   ladeZeitachse,
   streicheEreignis,
   trageNach,
+  tragePeriodeNach,
   type KraftArt,
 } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Zeitachse, ZeitachseEreignis, ZeitachseNachtragBody } from '../api/types';
+import type {
+  Zeitachse,
+  ZeitachseEreignis,
+  ZeitachseNachtragBody,
+  ZeitachsePeriodeBody,
+} from '../api/types';
 import { useUhr } from '../abloesung/useUhr';
 import { ErfassungsModal } from '../components/Erfassung';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { ZEITACHSE_GRUND_MAX } from '../api/eingabegrenzen';
+import { ZEITACHSE_GRUND_MAX, ZEITACHSE_NOTIZ_MAX } from '../api/eingabegrenzen';
 import {
   PaneelZustand,
   Sammelbanner,
@@ -46,6 +52,11 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
  *
  * - Nachtrag: `ErfassungsModal` mit drei Feldern (Art, Zeitpunkt, Notiz); die Ablösung fehlt in
  *   der Auswahl, sie entsteht nur aus dem Vollzug. Ein Fehler (422) steht im Dialog, kein Toast.
+ * - „Periode nachtragen“ (LLH-1538): eigener Dialog mit Alarmierung, Eintreffen (mindestens
+ *   eines), Entlassung und Notiz, leer vorbelegt (eine vergangene Periode beginnt nie „jetzt“).
+ *   Der Server schreibt alles in einem Schritt und prüft nur das Ergebnis; so geht es auch an
+ *   einer entlassenen Person und vor einer laufenden Periode. Reihenfolge und Überschneidung
+ *   meldet die 422 im Dialog.
  * - Streichung: unumkehrbar und ohne serverseitigen Rückweg, deshalb Rückfrage mit Pflichtgrund
  *   (LFH-343/363); ein Ereignis aus der Ablösung streicht nur deren Rücknahme.
  * - „Zeit berichtigen“ (LLH-1455): Zeitpunkt (vorbelegt mit dem alten) und Pflichtgrund; der
@@ -72,6 +83,13 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
 interface NachtragWerte {
   art: ZeitachseNachtragBody['art'];
   zeitpunkt: Dayjs;
+  notiz?: string;
+}
+
+interface PeriodeWerte {
+  alarmierung?: Dayjs | null;
+  eintreffen?: Dayjs | null;
+  entlassung: Dayjs;
   notiz?: string;
 }
 
@@ -138,9 +156,11 @@ export default function KraftZeitachse({
   const zeit = (utc: string) => zeitKurz(utc, konventionen);
 
   const [nachtragOffen, setNachtragOffen] = useState(false);
+  const [periodeOffen, setPeriodeOffen] = useState(false);
   const [streiche, setStreiche] = useState<ZeitachseEreignis | null>(null);
   const [berichtige, setBerichtige] = useState<ZeitachseEreignis | null>(null);
   const [nachtragForm] = Form.useForm<NachtragWerte>();
+  const [periodeForm] = Form.useForm<PeriodeWerte>();
   const [streichForm] = Form.useForm<StreichWerte>();
   const [berichtigForm] = Form.useForm<BerichtigWerte>();
 
@@ -151,6 +171,10 @@ export default function KraftZeitachse({
   useEffect(() => {
     if (nachtragOffen) nachtragForm.setFieldsValue({ zeitpunkt: serverJetzt() });
   }, [nachtragOffen, nachtragForm]);
+  // „Periode nachtragen“ beginnt bei jedem Öffnen leer.
+  useEffect(() => {
+    if (periodeOffen) periodeForm.resetFields();
+  }, [periodeOffen, periodeForm]);
   // Ebenso die Berichtigung: vorbelegt mit dem alten Zeitpunkt des gewählten Ereignisses.
   useEffect(() => {
     if (berichtige)
@@ -231,6 +255,10 @@ export default function KraftZeitachse({
     mutationFn: (body: ZeitachseNachtragBody) => trageNach(einsatzId, art, id, body),
     onSuccess: uebernimmEigene,
   });
+  const periode = useMutation({
+    mutationFn: (body: ZeitachsePeriodeBody) => tragePeriodeNach(einsatzId, art, id, body),
+    onSuccess: uebernimmEigene,
+  });
   const berichtigung = useMutation({
     mutationFn: ({
       ereignisId,
@@ -274,6 +302,17 @@ export default function KraftZeitachse({
       Nachtragen
     </Button>
   );
+  const periodeKnopf = (
+    <Button
+      disabled={!darfSchreiben}
+      onClick={() => {
+        periode.reset();
+        setPeriodeOffen(true);
+      }}
+    >
+      Periode nachtragen
+    </Button>
+  );
 
   return (
     <div
@@ -291,7 +330,12 @@ export default function KraftZeitachse({
         }}
       >
         <DauerZeile dauern={dauern} zeit={zeit} />
-        {!lesend && nachtragKnopf}
+        {!lesend && (
+          <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: token.paddingXS }}>
+            {nachtragKnopf}
+            {periodeKnopf}
+          </span>
+        )}
       </div>
       <PaneelZustand
         zustand={zustand}
@@ -437,10 +481,69 @@ export default function KraftZeitachse({
           {/* Zeit und Kalendertag in der Anzeigezone (LFH-692, `keineZukunftstage`). */}
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
         </Form.Item>
-        <Form.Item<NachtragWerte> name="notiz" label="Notiz (optional)">
-          <Input placeholder="z. B. per Funk gemeldet" />
+        <Form.Item<NachtragWerte>
+          name="notiz"
+          label="Notiz (optional)"
+          rules={[zeichenRegel(ZEITACHSE_NOTIZ_MAX, 'Notiz')]}
+        >
+          <Input placeholder="z. B. per Funk gemeldet" count={zeichenGrenze(ZEITACHSE_NOTIZ_MAX)} />
         </Form.Item>
         <SpeicherFehler fehler={nachtrag.error} titel="Nicht nachgetragen" />
+      </ErfassungsModal>
+
+      <ErfassungsModal<PeriodeWerte>
+        offen={periodeOffen}
+        titel={`Periode nachtragen: ${kennung}`}
+        form={periodeForm}
+        erfassenText="Nachtragen"
+        laeuft={periode.isPending}
+        onErfassen={(w) =>
+          periode.mutateAsync({
+            alarmierung_at: w.alarmierung ? alsBackendZeit(w.alarmierung) : undefined,
+            eintreffen_at: w.eintreffen ? alsBackendZeit(w.eintreffen) : undefined,
+            entlassung_at: alsBackendZeit(w.entlassung),
+            notiz: w.notiz?.trim() || undefined,
+          })
+        }
+        onFertig={() => setPeriodeOffen(false)}
+        onAbbrechen={() => setPeriodeOffen(false)}
+      >
+        <Form.Item<PeriodeWerte> name="alarmierung" label="Alarmierung">
+          <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
+        </Form.Item>
+        <Form.Item<PeriodeWerte>
+          name="eintreffen"
+          label="Eintreffen"
+          dependencies={['alarmierung']}
+          rules={[
+            ({ getFieldValue }) => ({
+              validator: (_, wert) =>
+                wert || getFieldValue('alarmierung')
+                  ? Promise.resolve()
+                  : Promise.reject(new Error('Bitte Alarmierung oder Eintreffen angeben')),
+            }),
+          ]}
+        >
+          <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
+        </Form.Item>
+        <Form.Item<PeriodeWerte>
+          name="entlassung"
+          label="Entlassung"
+          rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
+        >
+          <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
+        </Form.Item>
+        <Form.Item<PeriodeWerte>
+          name="notiz"
+          label="Notiz (optional)"
+          rules={[zeichenRegel(ZEITACHSE_NOTIZ_MAX, 'Notiz')]}
+        >
+          <Input
+            placeholder="z. B. aus dem Funkprotokoll"
+            count={zeichenGrenze(ZEITACHSE_NOTIZ_MAX)}
+          />
+        </Form.Item>
+        <SpeicherFehler fehler={periode.error} titel="Nicht nachgetragen" />
       </ErfassungsModal>
 
       <ErfassungsModal<BerichtigWerte>

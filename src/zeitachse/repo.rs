@@ -201,6 +201,22 @@ async fn schreibe_einzeln_tx(
     if let Err(v) = perioden::pruefe_einfuegen(&bestand, neu.art, neu.zeitpunkt_at) {
         return Ok(Schreibergebnis::Ausgelassen(v));
     }
+    insert_tx(conn, einsatz_id, benutzer_id, kraft, neu, ursprung_id)
+        .await
+        .map(Schreibergebnis::Geschrieben)
+}
+
+/// Der eine INSERT der Zeitachse (Guard `repo_ist_append_only`). Ohne Prüfung: der Aufrufer hat
+/// die Perioden-Regeln schon geprüft, einzeln ([`schreibe_einzeln_tx`]) oder am Ergebnis
+/// ([`trage_periode_nach_tx`]).
+async fn insert_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    kraft: Kraft,
+    neu: Neu<'_>,
+    ursprung_id: Option<i64>,
+) -> Result<i64, AppError> {
     let (einheit_id, personal_id) = match kraft {
         Kraft::Einheit(id) => (Some(id), None),
         Kraft::Person(id) => (None, Some(id)),
@@ -222,7 +238,7 @@ async fn schreibe_einzeln_tx(
     .bind(benutzer_id)
     .fetch_one(&mut *conn)
     .await?;
-    Ok(Schreibergebnis::Geschrieben(id))
+    Ok(id)
 }
 
 /// Ein gestrichenes Ereignis samt Fan-out-Kette.
@@ -575,6 +591,113 @@ async fn geschrieben_tx(
         Schreibergebnis::Geschrieben(id) => Ok(id),
         Schreibergebnis::Ausgelassen(v) => Err(verstoss_tx(conn, einsatz_id, &v).await?),
     }
+}
+
+/// Eine nachgetragene Periode (LLH-1538).
+#[derive(Debug, Clone)]
+pub struct PeriodeNachgetragen {
+    /// Die neuen Ereignisse an der Kraft in Zeitfolge.
+    pub ids: Vec<i64>,
+    pub beruehrt: Beruehrt,
+}
+
+/// Trägt eine abgeschlossene Periode in einem Schritt nach (LLH-1538, Spec `kraefte-zeitachse`
+/// „Periode nachtragen“, design.md der Change `srlxd826-periode-nachtragen`): Alarmierung
+/// und/oder Eintreffen und die Entlassung, Quelle `nachtrag`, die Notiz am Beginn.
+///
+/// - Die Perioden-Regeln gelten nur für das **Ergebnis**, und die Ereignisse müssen darin eine
+///   eigene Periode bilden ([`perioden::fuege_periode_ein`], D2); sonst 422, nichts geschrieben.
+/// - Fan-out an einer Einheit wie beim Nachtrag an die JETZT zugeordneten Personen, aber ganz
+///   oder gar nicht (D3): eine Person, in deren Folge die Periode nicht passt, bekommt keine Kopie.
+/// - Kopplung an die Ablösung erst nach allen Einfügungen, je Ereignis in Zeitfolge (D4): am
+///   fertigen Stand tragen Alarmierung und Eintreffen nie die offene Periode und wirken nicht
+///   (kein Hinweis, kein Schichtbeginn); die Entlassung beendet eine laufende Schicht nur, wenn
+///   danach keine Periode offen ist.
+///
+/// Die Reihenfolge der Zeitpunkte und die Prüfung „keine offene Periode“ an einer entlassenen
+/// Person macht der Aufrufer, wie beim Nachtrag.
+pub async fn trage_periode_nach_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    kraft: Kraft,
+    neu: &perioden::NeuePeriode,
+    notiz: Option<&str>,
+) -> Result<PeriodeNachgetragen, AppError> {
+    kraft_name_tx(conn, einsatz_id, kraft).await?;
+    let bestand = bestand_tx(conn, kraft).await?;
+    perioden::fuege_periode_ein(&bestand, neu)
+        .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
+
+    // Fan-out: je Person am Ergebnis prüfen, bevor irgendetwas geschrieben wird.
+    let mut personen = Vec::new();
+    if let Kraft::Einheit(einheit_id) = kraft {
+        let zugeordnet: Vec<i64> = sqlx::query_scalar(
+            "SELECT id FROM einsatz_personal \
+             WHERE einsatz_id = ? AND einheit_id = ? AND beendet_at IS NULL ORDER BY id",
+        )
+        .bind(einsatz_id)
+        .bind(einheit_id)
+        .fetch_all(&mut *conn)
+        .await?;
+        for person in zugeordnet {
+            let bestand = bestand_tx(conn, Kraft::Person(person)).await?;
+            if perioden::fuege_periode_ein(&bestand, neu).is_ok() {
+                personen.push(person);
+            }
+        }
+    }
+
+    let mut ids = Vec::new();
+    for (i, (art, zeitpunkt_at)) in neu.ereignisse().into_iter().enumerate() {
+        let ereignis = Neu {
+            art,
+            zeitpunkt_at,
+            quelle: ZeitachseQuelle::Nachtrag,
+            notiz: if i == 0 { notiz } else { None },
+        };
+        let id = insert_tx(conn, einsatz_id, benutzer_id, kraft, ereignis, None).await?;
+        for person in &personen {
+            let kopie = Neu {
+                quelle: ZeitachseQuelle::Einheit,
+                notiz: None,
+                ..ereignis
+            };
+            insert_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                Kraft::Person(*person),
+                kopie,
+                Some(id),
+            )
+            .await?;
+        }
+        ids.push(id);
+    }
+
+    let mut beruehrt = Beruehrt {
+        personen,
+        ..Beruehrt::default()
+    };
+    if let Kraft::Einheit(einheit_id) = kraft {
+        for (&id, (art, zeitpunkt_at)) in ids.iter().zip(neu.ereignisse()) {
+            let w = crate::abloesung::kopplung::nach_ereignis_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                id,
+                art,
+                ZeitachseQuelle::Nachtrag,
+                zeitpunkt_at,
+            )
+            .await?;
+            beruehrt.abloesung.extend(w.etb);
+            beruehrt.hinweise.extend(w.anlaesse);
+        }
+    }
+    Ok(PeriodeNachgetragen { ids, beruehrt })
 }
 
 // ── Aus Statuswechseln ──────────────────────────────────────────────────────────────────────
@@ -1089,6 +1212,33 @@ pub fn etb_text_berichtigung(
         art.partizip(),
         stil.zeitpunkt_text(alt_at),
         stil.zeitpunkt_text(neu_at)
+    )
+}
+
+/// „Zeitachse: Einheit «Florian 1» Einsatzperiode nachgetragen: alarmiert 300610sep26,
+/// eingetroffen 300640sep26, entlassen 301400sep26“ (LLH-1538, design.md D5), an einer
+/// entlassenen Person (`is_berichtigung`) mit „ (berichtigt nach Entlassung)“.
+pub fn etb_text_periode(
+    kraft: Kraft,
+    name: &str,
+    neu: &perioden::NeuePeriode,
+    stil: Zeitstil,
+    is_berichtigung: bool,
+) -> String {
+    let teile: Vec<String> = neu
+        .ereignisse()
+        .into_iter()
+        .map(|(art, z)| format!("{} {}", art.partizip(), stil.zeitpunkt_text(z)))
+        .collect();
+    let vermerk = if is_berichtigung {
+        format!(" ({BERICHTIGT})")
+    } else {
+        String::new()
+    };
+    format!(
+        "Zeitachse: {} «{name}» Einsatzperiode nachgetragen: {}{vermerk}",
+        kraft_wort(kraft),
+        teile.join(", ")
     )
 }
 

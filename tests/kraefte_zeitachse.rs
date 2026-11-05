@@ -457,6 +457,18 @@ async fn nachtrag_statuscodes() {
         )
         .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    // 400 vor 422: zu lange Notiz, auch bei einem Zeitpunkt in der Zukunft.
+    let (s, _) = w
+        .nachtrag(
+            &pfad,
+            &format!(
+                r#"{{"art":"eintreffen","zeitpunkt_at":"{}","notiz":"{}"}}"#,
+                zukunft.format("%Y-%m-%d %H:%M:%S"),
+                "x".repeat(lifeline_hub::zeitachse::NOTIZ_MAX + 1)
+            ),
+        )
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Notiz zu lang");
     // 422: doppeltes Eintreffen (Spec „Doppeltes Eintreffen"), und nichts geschrieben.
     let eins = format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(8, 0));
     let eins = eins.as_str();
@@ -1797,6 +1809,267 @@ async fn berichtigung_statuscodes() {
         &bert_pfad,
         bert_alarmierung,
         &berichtigung(&vor(1, 0), "x"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "stornierte Person");
+}
+
+// ── Periode nachtragen (LLH-1538) ───────────────────────────────────────────────────────────
+
+async fn periode(w: &Welt, pfad: &str, body: &str) -> (StatusCode, Value) {
+    anfrage(
+        &w.app,
+        "POST",
+        &format!("{pfad}/zeitachse/periode"),
+        &w.admin,
+        Some(body),
+    )
+    .await
+}
+
+fn periode_body(alarmierung: Option<&str>, eintreffen: Option<&str>, ende: &str) -> String {
+    let feld = |name: &str, wert: Option<&str>| {
+        wert.map(|z| format!(r#""{name}":"{z}","#))
+            .unwrap_or_default()
+    };
+    format!(
+        r#"{{{}{}"entlassung_at":"{ende}","notiz":"aus dem Funkprotokoll"}}"#,
+        feld("alarmierung_at", alarmierung),
+        feld("eintreffen_at", eintreffen)
+    )
+}
+
+/// Akzeptanzkriterium LLH-1538, Spec „Fehlende Periode nach dem Entlassen nachtragen“: an der
+/// entlassenen Anna (Periode vor 5 h bis vor 1 h) eine frühere Periode in einem Schritt.
+#[tokio::test]
+async fn fehlende_periode_an_entlassener_person_nachtragen() {
+    let (w, _pool) = entlassene_anna().await;
+    let pfad = w.person_pfad();
+    let (eintreffen, ende) = (vor(9, 0), vor(7, 0));
+    let (s, z) = periode(&w, &pfad, &periode_body(None, Some(&eintreffen), &ende)).await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    let perioden = z["perioden"].as_array().unwrap();
+    assert_eq!(perioden.len(), 2, "{z:?}");
+    assert!(alle_geschlossen(&z), "{z:?}");
+    assert_eq!(perioden[0]["beginn_at"], eintreffen.as_str());
+    assert_eq!(perioden[0]["anker"], "eintreffen");
+    assert_eq!(perioden[0]["ende_at"], ende.as_str());
+    let neu: Vec<&Value> = z["ereignisse"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["zeitpunkt_at"] == eintreffen.as_str() || e["zeitpunkt_at"] == ende.as_str())
+        .collect();
+    assert_eq!(neu.len(), 2);
+    assert!(neu.iter().all(|e| e["quelle"] == "nachtrag"));
+    assert_eq!(neu[0]["notiz"], "aus dem Funkprotokoll", "Notiz am Beginn");
+    assert!(neu[1].get("notiz").is_none(), "{z:?}");
+
+    let etb = system_etb_inhalte(&w.app, &w.admin, w.e).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("Einsatzperiode nachgetragen: eingetroffen")
+                && t.contains("entlassen")
+                && t.ends_with("(berichtigt nach Entlassung)")),
+        "{etb:?}"
+    );
+    let (_, json) = anfrage(
+        &w.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personal?entlassene=1", w.e),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(json[0]["beendet_als"], "entlassen", "bleibt entlassen");
+}
+
+/// Akzeptanzkriterium LLH-1538: ein Ergebnis mit Regelverstoß gibt 422 und schreibt nichts,
+/// auch keinen ETB-Eintrag.
+#[tokio::test]
+async fn periode_mit_verstoss_schreibt_nichts() {
+    let (w, _pool) = entlassene_anna().await;
+    let pfad = w.person_pfad();
+    let (_, vorher) = zeitachse(&w.app, &w.admin, &pfad).await;
+    let etb_vorher = system_etb_anzahl(&w.app, &w.admin, w.e).await;
+
+    // In die bestehende Periode hinein.
+    let (s, json) = periode(&w, &pfad, &periode_body(None, Some(&vor(3, 0)), &vor(2, 0))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    // Über die bestehende hinweg: ihre Entlassung schlösse die neue.
+    let (s, json) = periode(
+        &w,
+        &pfad,
+        &periode_body(Some(&vor(6, 0)), None, &vor(0, 30)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+
+    let (_, nachher) = zeitachse(&w.app, &w.admin, &pfad).await;
+    assert_eq!(vorher, nachher);
+    assert_eq!(system_etb_anzahl(&w.app, &w.admin, w.e).await, etb_vorher);
+}
+
+/// Spec „Periode vor der laufenden nachtragen“ und „Fan-out ganz oder gar nicht“: Florian 1 ist
+/// seit 1 h eingetroffen. Anna bekommt die Periode als Kopie, Bert trägt im Zeitraum schon eine
+/// eigene und bekommt keine.
+#[tokio::test]
+async fn periode_an_der_einheit_vor_der_laufenden() {
+    let (app, pool) = setup_mit_pool().await;
+    let w = welt_in(app).await;
+    let (s, json) = w
+        .nachtrag(
+            &w.einheit_pfad(),
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(1, 0)),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+
+    let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
+    let bert_pfad = format!("/api/einsaetze/{}/personal/{bert}", w.e);
+    sqlx::query("UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? WHERE personal_id = ?")
+        .bind(vor(8, 0))
+        .bind(bert)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, json) = w
+        .nachtrag(
+            &bert_pfad,
+            &format!(r#"{{"art":"entlassung","zeitpunkt_at":"{}"}}"#, vor(6, 0)),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+    let (s, _) = anfrage(
+        &w.app,
+        "PUT",
+        &format!(
+            "/api/einsaetze/{}/einheiten/{}/personal/{bert}",
+            w.e, w.einheit
+        ),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (_, bert_vorher) = zeitachse(&w.app, &w.admin, &bert_pfad).await;
+
+    let (s, z) = periode(
+        &w,
+        &w.einheit_pfad(),
+        &periode_body(Some(&vor(10, 0)), Some(&vor(9, 30)), &vor(5, 0)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    let perioden = z["perioden"].as_array().unwrap();
+    assert_eq!(perioden.len(), 2, "{z:?}");
+    assert!(perioden[0]["ende_at"].is_string());
+    assert!(
+        perioden[1].get("ende_at").is_none(),
+        "die laufende bleibt offen: {z:?}"
+    );
+
+    let (_, anna) = zeitachse(&w.app, &w.admin, &w.person_pfad()).await;
+    let kopien: Vec<String> = anna["ereignisse"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| {
+            e["quelle"] == "einheit" && e["zeitpunkt_at"].as_str() <= Some(vor(5, 0).as_str())
+        })
+        .map(|e| e["art"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(
+        kopien,
+        ["alarmierung", "eintreffen", "entlassung"],
+        "{anna:?}"
+    );
+    let (_, bert_nachher) = zeitachse(&w.app, &w.admin, &bert_pfad).await;
+    assert_eq!(bert_vorher, bert_nachher, "keine halbe Periode");
+
+    let etb = system_etb_inhalte(&w.app, &w.admin, w.e).await;
+    assert!(
+        etb.iter().any(|t| t
+            .contains("Einheit «Florian 1» Einsatzperiode nachgetragen: alarmiert")
+            && !t.contains("berichtigt nach Entlassung")),
+        "{etb:?}"
+    );
+}
+
+/// Statuscodes (design.md D1): 400 für die Felder, 422 für Zukunft und Reihenfolge, 404 fremd,
+/// 409 an einer stornierten Person.
+#[tokio::test]
+async fn periode_statuscodes() {
+    let w = welt().await;
+    let pfad = w.einheit_pfad();
+    let (s, _) = periode(
+        &w,
+        &pfad,
+        &format!(r#"{{"entlassung_at":"{}"}}"#, vor(1, 0)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Beginn fehlt");
+    let (s, _) = periode(
+        &w,
+        &pfad,
+        &format!(r#"{{"eintreffen_at":"{}"}}"#, vor(2, 0)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Entlassung fehlt");
+    let (s, _) = periode(&w, &pfad, &periode_body(None, Some("gestern"), &vor(1, 0))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "unlesbar");
+    let (s, _) = periode(
+        &w,
+        &pfad,
+        &periode_body(None, Some(&vor(2, 0)), &vor(-1, 0)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Zukunft");
+    let (s, _) = periode(&w, &pfad, &periode_body(None, Some(&vor(1, 0)), &vor(2, 0))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Ende vor dem Beginn");
+    let lang = format!(
+        r#"{{"eintreffen_at":"{}","entlassung_at":"{}","notiz":"{}"}}"#,
+        vor(1, 0),
+        vor(2, 0),
+        "x".repeat(lifeline_hub::zeitachse::NOTIZ_MAX + 1)
+    );
+    let (s, _) = periode(&w, &pfad, &lang).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Notiz zu lang, vor dem 422");
+    let (s, _) = periode(
+        &w,
+        &pfad,
+        &periode_body(Some(&vor(2, 0)), Some(&vor(3, 0)), &vor(1, 0)),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Alarmierung nach Eintreffen"
+    );
+    let fremd = format!("/api/einsaetze/{}/einheiten/999999", w.e);
+    let (s, _) = periode(
+        &w,
+        &fremd,
+        &periode_body(None, Some(&vor(2, 0)), &vor(1, 0)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+
+    let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
+    let bert_pfad = format!("/api/einsaetze/{}/personal/{bert}", w.e);
+    let (s, _) = anfrage(
+        &w.app,
+        "POST",
+        &format!("{bert_pfad}/stornieren"),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = periode(
+        &w,
+        &bert_pfad,
+        &periode_body(None, Some(&vor(9, 0)), &vor(8, 0)),
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "stornierte Person");
