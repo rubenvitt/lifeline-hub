@@ -94,7 +94,13 @@ async function verlorenesGeraet(
   // Der API-Aufruf läuft im Kontext des Tablets und trägt dessen User-Agent: die Sitzung heißt
   // „Safari · iPadOS“ wie nach einer Anmeldung im Formular.
   await anmeldenOhneStartseite(geraet, person.benutzername, person.passwort);
+  // Vor der Navigation abonniert: beendet wird erst, wenn der Live-Strom steht. Sonst bekäme der
+  // erste Aufbau die 401 und das Gerät räumte, ohne dass ein offener Strom geschlossen wurde.
+  const strom = geraet.waitForResponse(
+    (r) => new URL(r.url()).pathname === `/api/einsaetze/${einsatzId}/live` && r.ok(),
+  );
   await geraet.goto(`/einsaetze/${einsatzId}/etb`);
+  await strom;
   await expect(geraet.getByPlaceholder('Inhalt …')).toBeVisible();
   // Vorbedingung: ohne vorgehaltenes Lagebild wäre „geräumt“ grün durch Konstruktion.
   await expect
