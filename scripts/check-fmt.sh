@@ -44,9 +44,9 @@ echo "==> [3/3] prettier --check (Website, LLH-1529)"
 # `.prettierrc`, `.prettierignore` und `.gitignore` gelten.
 if ! (cd "$ROOT/website" && mise exec -- "$FE/node_modules/.bin/prettier" --check .); then
   echo "FEHLER: Website-Code ist nicht prettier-clean." >&2
-  echo "        In website/ '../frontend/node_modules/.bin/prettier --write .' laufen lassen" >&2
-  echo "        und die Formatierung mitcommitten. Generiertes gehört mit Begründung in" >&2
-  echo "        website/.prettierignore." >&2
+  echo "        In website/ 'mise exec -- ../frontend/node_modules/.bin/prettier --write .'" >&2
+  echo "        laufen lassen und die Formatierung mitcommitten. Generiertes gehört in" >&2
+  echo "        website/.prettierignore, mit Begründung." >&2
   exit 1
 fi
 

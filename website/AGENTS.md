@@ -31,8 +31,8 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   ohne sie prüfte Prettier mit seinen Vorgaben und meldete jede Datei als unformatiert.
   `scripts/check-fmt.sh` prüft ganz `website/` mit dem Prettier des Frontends (LLH-1529), also
   in den Schnellprüfungen jedes PR; Ausnahmen mit Begründung in `.prettierignore`. Beheben:
-  in `website/` `../frontend/node_modules/.bin/prettier --write .`. `.astro`-Dateien sieht
-  Prettier ohne Plugin nicht.
+  in `website/` `mise exec -- ../frontend/node_modules/.bin/prettier --write .`.
+  `.astro`-Dateien sieht Prettier ohne Plugin nicht.
 - **Doku** (`src/pages/doku/`, LFH-1096): die Anwenderdokumentation aus
   `docs/anwender/kapitel/`, gelesen als Content-Collection (`src/content.config.ts`, Glob-Loader
   mit Basis außerhalb von `website/`), nie kopiert. Form und Regeln der Kapitel:
