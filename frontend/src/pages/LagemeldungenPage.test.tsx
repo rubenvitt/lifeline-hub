@@ -351,12 +351,19 @@ describe('LagemeldungenPage', () => {
       ladeModulFreigaben.mockResolvedValue(freigabenFixture());
       fetchLagebesprechungStand.mockResolvedValue(stand);
       listeLageMeldungen.mockResolvedValue([
-        // Um 08:10 geschehen, um 08:45 übernommen: unter „seit LB 0830“ der Nachtrag.
+        // Um 08:10:35 geschehen, um 08:45 übernommen: unter „seit LB 0830“ der Nachtrag.
         lage({
           id: 1,
           text: 'Nachgereicht',
-          ereigniszeit: '2026-06-12 08:10:00',
+          ereigniszeit: '2026-06-12 08:10:35',
           erstellt_at: '2026-06-12 08:45:00',
+        }),
+        // Dieselbe Minute, vorher übernommen: kein Nachtrag, aber unter „seit 0810“ zu sehen.
+        lage({
+          id: 4,
+          text: 'Gleiche Minute',
+          ereigniszeit: '2026-06-12 08:10:20',
+          erstellt_at: '2026-06-12 08:15:00',
         }),
         // Vor der Besprechung übernommen: war bekannt, kein Nachtrag.
         lage({
@@ -384,8 +391,10 @@ describe('LagemeldungenPage', () => {
       await userEvent.click(within(hinweis).getByRole('button', { name: 'anzeigen' }));
       expect(screen.getByText('Nachgereicht')).toBeInTheDocument();
       expect(screen.getByText('Danach')).toBeInTheDocument();
+      expect(screen.getByText('Gleiche Minute')).toBeInTheDocument();
       expect(screen.queryByText('Bekannt')).toBeNull();
-      expect(screen.getByTestId('adresse')).toHaveTextContent('?von=2026-06-12 08:10:00');
+      // Die Grenze liegt auf der vollen Minute des frühesten Nachtrags.
+      expect(screen.getByTestId('adresse')).toHaveTextContent(/^\?von=2026-06-12 08:10:00$/);
       // Die Grenze ist nicht mehr die der Besprechung: der Hinweis geht.
       expect(document.querySelector('[data-lfh="lagemeldungen-nachtraege"]')).toBeNull();
     });

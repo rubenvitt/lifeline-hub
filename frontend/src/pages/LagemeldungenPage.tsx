@@ -59,7 +59,7 @@ import {
   uebergabeZeit,
 } from '../lagemeldungen/zeitachse';
 import ZeitraumWahl, { type ZeitraumGrenzen } from '../anzeige/ZeitraumWahl';
-import { alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { taktisch } from '../anzeige/zeitfenster';
 import { serverJetzt } from '../offline/serveruhr';
 import { useLetzteLagebesprechung } from '../lagebesprechung/useLetzteLagebesprechung';
@@ -597,9 +597,15 @@ export default function LagemeldungenPage() {
             style={{ paddingInline: 0 }}
             onClick={() =>
               zeitraumWaehlen({
-                von: nachtraege.reduce(
-                  (frueh, l) => (l.ereigniszeit < frueh ? l.ereigniszeit : frueh),
-                  nachtraege[0].ereigniszeit,
+                // Auf die volle Minute wie jede Grenze der Schnellwahl: „seit 0810“ zeigt dann
+                // auch, was um 08:10:20 geschah, wenn der früheste Nachtrag um 08:10:35 lag.
+                von: alsBackendZeit(
+                  alsZeitpunkt(
+                    nachtraege.reduce(
+                      (frueh, l) => (l.ereigniszeit < frueh ? l.ereigniszeit : frueh),
+                      nachtraege[0].ereigniszeit,
+                    ),
+                  )!.startOf('minute'),
                 ),
                 bis: undefined,
               })
