@@ -682,3 +682,23 @@ test('Kennzahlen im Kopf laufen auch vierstellig nicht über (320 bis 390 px, ko
     }
   }
 });
+
+test('Sonderkost mit vierstelligem Soll läuft bei 320 px nicht über (alle Dichten)', async ({
+  page,
+}) => {
+  const { e, zf } = await saeen(page, -10, 110, {
+    sonderkost: { vegetarisch: 4, ohne_schwein: 1000 },
+    kraefte: 1830,
+  });
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const dichte of ['kompakt', 'komfortabel', 'handschuh']) {
+    await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+    await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    await expect(page.locator('[data-kostform="ohne_schwein"]')).toHaveAttribute(
+      'aria-label',
+      /^ohne Schweinefleisch 0\/1000 fehlt 1000$/,
+    );
+    await pruefeSonderkostLage(page, `320 px, ${dichte}, Soll 1000`);
+  }
+});

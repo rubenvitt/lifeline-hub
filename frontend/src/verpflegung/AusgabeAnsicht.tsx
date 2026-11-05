@@ -824,10 +824,18 @@ export default function AusgabeAnsicht() {
                       Buchung („fehlt“ sinkt oder entfällt, ausgegeben wächst) ändert weder die
                       Breite noch, wo der Name schmal umbricht, also auch keine Höhe (LLH-1504).
                       Ausgegeben darf das Soll übersteigen: sein Platz hält eine Stelle mehr, also
-                      bis zum Zehnfachen des Solls. */}
+                      bis zum Zehnfachen des Solls. Reicht die Taste nicht für alle drei Plätze
+                      (vierstelliges Soll, Handschuh, 320 px), brechen sie einzeln um. */}
                   <span
                     data-lfh="sonderkost-zahlen"
-                    style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                    style={{
+                      display: 'inline-flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'baseline',
+                      whiteSpace: 'nowrap',
+                      minWidth: 0,
+                      maxWidth: '100%',
+                    }}
                   >
                     <span
                       style={{
