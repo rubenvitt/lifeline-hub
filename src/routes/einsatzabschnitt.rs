@@ -28,8 +28,9 @@ pub(super) fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
 }
 
 /// Meldet jedes Objekt, das den Abschnittsnamen per Join trägt, mit dem Ereignis seines Moduls
-/// (LLH-1291): `abschnitt` erreicht nur Leser mit Modul `einsatzabschnitte`, wer nur Räume,
-/// Stellen oder Bezirke sieht, behielte den alten Namen bis zum Neuladen. Nach dem Commit.
+/// (LLH-1291, LLH-1501): `abschnitt` erreicht nur Leser mit Modul `einsatzabschnitte`, wer nur
+/// Räume, Stellen, Bezirke, Einheiten oder Dokumente sieht, behielte den alten Namen bis zum
+/// Neuladen. Nach dem Commit.
 fn sse_namens_traeger(state: &AppState, einsatz_id: i64, t: &NamensTraeger) {
     for &br_id in &t.raeume {
         super::einsatz_bereitstellungsraum::sse_br(state, einsatz_id, br_id);
@@ -40,11 +41,27 @@ fn sse_namens_traeger(state: &AppState, einsatz_id: i64, t: &NamensTraeger) {
     for &bezirk_id in &t.bezirke {
         super::evakuierung::publiziere(state, einsatz_id, &[], bezirk_id);
     }
+    for &einheit_id in &t.einheiten {
+        super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);
+    }
+    if t.dokumente {
+        super::dokument::sse(state, einsatz_id);
+    }
+}
+
+/// Die Rhythmus-Vorgaben der Ablösung listen jeden Abschnitt mit Namen
+/// (`abloesung::repo::vorgaben`, Modul `abloesung`): Anlegen, Umbenennen und Auflösen ändern sie
+/// immer, Schichten im Abschnitt oder nicht (LLH-1501). Kein Leck, ihr GET zeigt dieselben
+/// Abschnitte ohnehin. Nach dem Commit.
+fn sse_abloesung_vorgaben(state: &AppState, einsatz_id: i64) {
+    super::abloesung::sse(state, einsatz_id);
 }
 
 /// [`sse_namens_traeger`] nach einem Umbenennen: liest die Träger nach dem Commit. Scheitert das
 /// Lesen, bleibt es bei einer Warnung (Muster `etb_system_degradiert`); der Name ist gespeichert.
+/// Die Vorgaben der Ablösung brauchen kein Lesen und gehen in jedem Fall.
 async fn sse_umbenannt(state: &AppState, einsatz_id: i64, aid: i64) {
+    sse_abloesung_vorgaben(state, einsatz_id);
     let gelesen = match state.pool.acquire().await {
         Ok(mut conn) => abschnitt_repo::namens_traeger(&mut conn, einsatz_id, aid).await,
         Err(e) => Err(e),
@@ -202,6 +219,7 @@ pub async fn create(
     )
     .await;
     sse_abschnitt(&state, einsatz_id, anzeige.id);
+    sse_abloesung_vorgaben(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -389,8 +407,9 @@ pub async fn aufloesen(
     // Ein an den Abschnitt gekoppeltes Gerät (LFH-1040) hätte keine Stelle mehr: es endet mit
     // dem Abschnitt, wie bei einem Widerruf durch die Einsatzleitung.
     let (widerrufen, traeger) = crate::write_retry!(&state.pool, |conn| {
-        // Vor dem Freigeben der Bezüge: danach zeigen Räume, Stellen und Bezirke keinen
-        // Abschnitt mehr, und ihre Leser erfahren das sonst nicht (LLH-1291).
+        // Vor dem Freigeben der Bezüge: danach zeigen Räume, Stellen, Bezirke, Einheiten und
+        // Dokumente keinen Abschnitt mehr, und ihre Leser erfahren das sonst nicht (LLH-1291,
+        // LLH-1501).
         let traeger = abschnitt_repo::namens_traeger(conn, einsatz_id, aid).await?;
         let geraete =
             crate::geraet::repo::widerrufe_am_abschnitt(conn, einsatz_id, aid, von).await?;
@@ -410,6 +429,7 @@ pub async fn aufloesen(
     }
     sse_abschnitt(&state, einsatz_id, aid);
     sse_namens_traeger(&state, einsatz_id, &traeger);
+    sse_abloesung_vorgaben(&state, einsatz_id);
     Ok(StatusCode::NO_CONTENT)
 }
 

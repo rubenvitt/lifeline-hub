@@ -31,7 +31,7 @@ use crate::zeit::jetzt;
 
 /// Listen-Refresh für Ablösungs-Leser. Ohne `art` — nur der Scheduler setzt `art` und löst
 /// damit den Hinweis in der AlarmZentrale aus (Muster wie `erinnerung`).
-fn sse(state: &AppState, einsatz_id: i64) {
+pub(super) fn sse(state: &AppState, einsatz_id: i64) {
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Abloesung);

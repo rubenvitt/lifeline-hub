@@ -129,10 +129,10 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
-  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Evakuierung, Lagemonitor, BR-Liste und Verpflegung ab (LFH-612/635/639, LLH-1095, LLH-1055, LLH-1034)', () => {
-    // Bezirke, Stellen und die Liste der Bereitstellungsräume tragen den Abschnittsnamen per Join;
-    // fehlen sie hier, zeigt die Seite still den alten Namen. Der Lagemonitor zeigt die
-    // Abschnittsflächen (LLH-1153).
+  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Evakuierung, Einheiten, Dokumente, Lagemonitor, BR-Liste und Verpflegung ab (LFH-612/635/639, LLH-1095, LLH-1055, LLH-1034, LLH-1501)', () => {
+    // Bezirke, Stellen, Einheiten, Dokumente und die Liste der Bereitstellungsräume tragen den
+    // Abschnittsnamen per Join; fehlen sie hier, zeigt die Seite still den alten Namen. Der
+    // Lagemonitor zeigt die Abschnittsflächen (LLH-1153).
     expect(EINSATZ_STREAM_EVENTS.abschnitt).toEqual([
       EINSATZ_KEYS.abschnitte,
       EINSATZ_KEYS.fuehrungskraefte,
@@ -140,6 +140,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.abloesungen,
       EINSATZ_KEYS.betreuung,
       EINSATZ_KEYS.evakuierung,
+      EINSATZ_KEYS.einheiten,
+      EINSATZ_KEYS.dokumente,
       EINSATZ_KEYS.lagemonitor,
       EINSATZ_KEYS.br,
       // Die Empfängerliste der Verpflegung trägt die Abschnitte (LLH-1055 D4).

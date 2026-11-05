@@ -21,7 +21,7 @@ use crate::routes::support::{deserialize_optional_field, pflicht};
 
 use super::support::{anhang_antwort, original_freigeben, Fassung, FassungParam};
 
-fn sse(state: &AppState, einsatz_id: i64) {
+pub(super) fn sse(state: &AppState, einsatz_id: i64) {
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Dokument);
