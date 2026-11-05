@@ -2821,6 +2821,19 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("vollzogen_at", G_ZEIT),
         ],
     },
+    // ---------- Freigabe für externe Anzeigen (LLH-1484, migrations/0270) ----------
+    TabellenRegel {
+        tabelle: "lagemonitor_freigabe",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("zugang_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("freigegeben_von", G_FK),
+            retain("freigegeben_at", G_ZEIT),
+        ],
+    },
     // ---------- Gerätekopplung (LFH-892, migrations/0147; Stellen LFH-1040, 0158;
     // Verpflegungsstelle LLH-1048, 0213) ----------
     TabellenRegel {

@@ -4931,6 +4931,79 @@ mod tests {
         assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
     }
 
+    const MIGRATION_0269: &str = include_str!("../migrations/0269_admin_audit_lesezugang.sql");
+
+    /// 0269 (LLH-1484) baut den aktion-CHECK neu und nimmt dabei `org_id` und ihren Index aus 0191
+    /// mit: Zeilen, Org-Schnappschuss, Sequenz und Schema bleiben, nur der CHECK wächst.
+    #[tokio::test]
+    async fn migration_0269_admin_audit_rebuild_erhaelt_zeilen_org_sequenz_und_schema() {
+        let pool = minimal_pool_mit_benutzer().await;
+        sqlx::raw_sql(include_str!("../migrations/0156_admin_audit.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(MIGRATION_0170).execute(&pool).await.unwrap();
+        sqlx::raw_sql(MIGRATION_0174).execute(&pool).await.unwrap();
+        // Der admin_audit-Teil von 0191 (die Migration selbst braucht auth_audit und organisation).
+        sqlx::raw_sql(
+            "ALTER TABLE admin_audit ADD COLUMN org_id INTEGER; \
+             CREATE INDEX idx_admin_audit_org ON admin_audit (org_id, id);",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO admin_audit (zeitpunkt, aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id) \
+             VALUES ('2026-10-09 10:00:00', 'benutzer_angelegt', 1, 'admin', 2, 'max', 'keiner', '10.0.0.1', 1), \
+                    ('2026-10-09 10:01:00', 'einmalpasswort_vergeben', 1, 'admin', 2, 'max', NULL, NULL, NULL), \
+                    ('2026-10-09 10:02:00', 'benutzer_deaktiviert', 1, 'admin', 2, 'max', NULL, NULL, 1)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM admin_audit WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let schema_vorher = schema_von(&pool, "admin_audit").await;
+        type Zeile = (i64, String, String, Option<String>, Option<i64>);
+        let alle = "SELECT id, zeitpunkt, aktion, detail, org_id FROM admin_audit ORDER BY id";
+        let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+
+        assert!(MIGRATION_0269.starts_with("-- no-transaction"));
+        sqlx::raw_sql(MIGRATION_0269).execute(&pool).await.unwrap();
+
+        let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(zeilen_nachher, zeilen_vorher);
+        assert_eq!(schema_von(&pool, "admin_audit").await, schema_vorher);
+        for aktion in ["lesezugang_angelegt", "lesezugang_widerrufen"] {
+            sqlx::query("INSERT INTO admin_audit (aktion, akteur_id, ziel) VALUES (?, 1, 'FüKW')")
+                .bind(aktion)
+                .execute(&pool)
+                .await
+                .unwrap_or_else(|e| panic!("der neue CHECK nimmt {aktion}: {e}"));
+        }
+        let hoechste: i64 = sqlx::query_scalar("SELECT MAX(id) FROM admin_audit")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(hoechste, 5, "AUTOINCREMENT-Sequenz bleibt erhalten");
+        assert!(
+            sqlx::query("INSERT INTO admin_audit (aktion, ziel) VALUES ('foo', 'x')")
+                .execute(&pool)
+                .await
+                .is_err()
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'admin_audit_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'admin_audit_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+    }
+
     /// 0115 übernimmt nur Bestandsnummern im exakten Muster `JJJJ-NNN` in die Zahlenspalten. Gegen
     /// die echte Migration auf einem Minimal-Schema: `2026-01` neben `2026-001` ergäbe sonst
     /// dasselbe Zahlenpaar und spränge den Unique-Index mitten in der Migration.

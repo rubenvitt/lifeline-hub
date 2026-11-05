@@ -632,6 +632,9 @@ pub async fn abschliessen(
     // Abschluss-tx, NICHT über frist_setzen — der Verkürzungs-Gate (None→Some)
     // würde das sonst als bestätigungspflichtige Verkürzung werten (LFH-135).
     if ergebnis.rows_affected() == 1 {
+        // LLH-1484: Externe Anzeigen zeigen nur laufende Einsätze; der Abschluss beendet ihre
+        // Freigabe in derselben Transaktion.
+        crate::lagemonitor_zugang::freigaben_loeschen_tx(&mut tx, einsatz_id).await?;
         if let Some(dauer) =
             super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen)
         {

@@ -44,6 +44,7 @@ interface Aufbau {
   kopplungen?: unknown[];
   sperren?: unknown[];
   ansichten?: unknown[];
+  lagemonitore?: unknown[];
 }
 
 /** Die heute koppelbaren Ansichten, wie der Server sie anbietet (LFH-1040). */
@@ -70,6 +71,9 @@ function stelleBereit(a: Aufbau = {}) {
       });
     }),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
+    http.get('/api/einsaetze/1/lagemonitor-zugaenge', () =>
+      HttpResponse.json(a.lagemonitore ?? []),
+    ),
     http.get('/api/einsaetze/1/betreuung', () =>
       HttpResponse.json({
         stellen: [
@@ -443,5 +447,49 @@ describe('EinsatzGeraete (LFH-892)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  describe('Externe Lagemonitore (LLH-1484)', () => {
+    const zugang = (zugang_id: number, extra: Record<string, unknown> = {}) => ({
+      zugang_id,
+      bezeichnung: `FüKW ${zugang_id}`,
+      freigegeben: false,
+      anderer_einsatz: false,
+      ...extra,
+    });
+
+    it('bleibt ohne angelegten Zugang weg', async () => {
+      stelleBereit();
+      rendern();
+      await screen.findByText('UHS Nord · Tablet 1');
+      expect(screen.queryByText('Externe Lagemonitore')).not.toBeInTheDocument();
+    });
+
+    it('gibt den Einsatz per Schalter frei und nennt einen anderen', async () => {
+      stelleBereit({
+        lagemonitore: [zugang(1), zugang(2, { anderer_einsatz: true })],
+      });
+      let methode: string | null = null;
+      server.use(
+        http.put('/api/einsaetze/1/lagemonitor-zugaenge/1/freigabe', ({ request }) => {
+          methode = request.method;
+          return HttpResponse.json([
+            zugang(1, { freigegeben: true }),
+            zugang(2, { anderer_einsatz: true }),
+          ]);
+        }),
+      );
+      rendern();
+      await screen.findByText('Externe Lagemonitore');
+      expect(screen.getByText('zeigt einen anderen Einsatz')).toBeInTheDocument();
+      const schalter = screen.getByRole('switch', {
+        name: 'Lagemonitor FüKW 1 zeigt diesen Einsatz',
+      });
+      expect(schalter).not.toBeChecked();
+      await userEvent.setup().click(schalter);
+      await waitFor(() => expect(methode).toBe('PUT'));
+      await waitFor(() => expect(schalter).toBeChecked());
+      expect(screen.getByText('zeigt diesen Einsatz')).toBeInTheDocument();
+    });
   });
 });

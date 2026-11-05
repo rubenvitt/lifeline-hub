@@ -32,6 +32,7 @@ use crate::uhs::{UhsStatus, UhsTyp};
 use axum::extract::State;
 use axum::Json;
 use serde::Serialize;
+use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// Betroffene in Zahlen, wie die Kopfzahl des Lage-Dashboards (`lageVerdichtung.ts`).
@@ -124,9 +125,13 @@ pub async fn lagebild(
     if ctx.geraet.as_ref().map(|g| g.ansicht) != Some(Funktionsansicht::Lagemonitor) {
         return Err(AppError::Forbidden);
     }
-    let einsatz_id = ctx.einsatz.id;
-    let pool = &state.pool;
+    Ok(Json(verdichte(&state.pool, ctx.einsatz.id).await?))
+}
 
+/// Die Verdichtung des Lagebilds. Sie trägt den gekoppelten Lagemonitor und die Schnittstelle für
+/// externe Anzeigen (`routes::lagemonitor_v1`, LLH-1484), damit beide dieselben Zahlen zeigen.
+/// Prüft keine Rechte: das tun die Aufrufer.
+pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<LagemonitorAnzeige, AppError> {
     let mut betroffene = LagemonitorBetroffene::default();
     // Sichtung und Versorgungszustand je Person; die Zählung ist die gemeinsame Regel
     // (`person::zaehle_lage_sichtung`, Fixture `regeln.json` Abschnitt `versorgung`).
@@ -273,7 +278,7 @@ pub async fn lagebild(
 
     let sofortmeldungen_offen = crate::meldung::repo::count_sofort_offen(pool, einsatz_id).await?;
 
-    Ok(Json(LagemonitorAnzeige {
+    Ok(LagemonitorAnzeige {
         stand_at: crate::zeit::jetzt(),
         betroffene,
         kraefte: LagemonitorKraefte {
@@ -285,5 +290,5 @@ pub async fn lagebild(
         zonen,
         abschnitte,
         sofortmeldungen_offen,
-    }))
+    })
 }

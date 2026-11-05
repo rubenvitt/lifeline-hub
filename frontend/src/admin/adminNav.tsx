@@ -20,6 +20,7 @@ import UnterkunftRichtwerteTab from '../stammdaten/UnterkunftRichtwerteTab';
 import AnzeigeEinstellungen from '../pages/einstellungen/AnzeigeEinstellungen';
 import EinsatzDefaults from '../pages/einstellungen/EinsatzDefaults';
 import Anmeldeverfahren from '../pages/einstellungen/Anmeldeverfahren';
+import LagemonitorZugaenge from '../pages/einstellungen/LagemonitorZugaenge';
 import KartenOnlineSektion from '../karten/KartenOnlineSektion';
 import KartenOfflineSektion from '../karten/KartenOfflineSektion';
 
@@ -86,6 +87,8 @@ export const adminGruppen: AdminGruppe[] = [
       { key: 'anzeige', label: 'Anzeige', element: <AnzeigeEinstellungen /> },
       { key: 'einsatz', label: 'Einsatz-Vorgaben', element: <EinsatzDefaults /> },
       { key: 'anmeldung', label: 'Anmeldeverfahren', element: <Anmeldeverfahren /> },
+      // LLH-1484: Lesezugänge externer Lagemonitore; den Einsatz gibt die Einsatzleitung frei.
+      { key: 'lagemonitore', label: 'Lagemonitore', element: <LagemonitorZugaenge /> },
     ],
   },
   {

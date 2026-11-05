@@ -44,12 +44,12 @@ describe('adminNav — Registry', () => {
   /**
    * „Demo-Daten“, „Aufbewahrung“ und „Zugangsprotokoll“ sind Sonder-Einträge neben „Benutzer“, NICHT in
    * `adminGruppen`: die Gruppen kennen kein Rollenprädikat, eine Sektion dort sähe jede
-   * Führungskraft. Die Zahl 23 ist deshalb eine Aussage. Die Sonder-Einträge sind einzeln
+   * Führungskraft. Die Zahl 24 ist deshalb eine Aussage. Die Sonder-Einträge sind einzeln
    * gepinnt, samt Eindeutigkeit gegenüber den Gruppen-Keys (gleiche Ebene `/admin/<key>`).
    */
-  it('drei Gruppen mit 23 Sektionen gesamt (Stammdaten 18), dazu vier Sonder-Einträge', () => {
+  it('drei Gruppen mit 24 Sektionen gesamt (Stammdaten 18), dazu vier Sonder-Einträge', () => {
     expect(adminGruppen.map((g) => g.key)).toEqual(['stammdaten', 'einstellungen', 'karten']);
-    expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(23);
+    expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(24);
     expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(18);
     expect(adminBenutzer.key).toBe('benutzer');
     expect(adminDemoDaten).toEqual({ key: 'demo-daten', label: 'Demo-Daten' });
