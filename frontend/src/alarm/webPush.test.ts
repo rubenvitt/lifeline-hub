@@ -207,7 +207,11 @@ describe('webPush: „Stumm auf diesem Gerät“ geht mit dem Abo (LLH-1482)', (
     ]);
   });
   it('schnelles Umschalten: die Anmeldungen laufen nacheinander, die letzte trägt den Stand', async () => {
-    const b = browser({ vorhanden: abo('https://fcm.googleapis.com/alt') });
+    const vorhanden = abo('https://fcm.googleapis.com/alt');
+    // `anmelden` liest die Schlüssel als Erstes; der zweite Aufruf heißt: Der zweite Abgleich steht an.
+    const schluesselGelesen = vi.fn(vorhanden.toJSON);
+    vorhanden.toJSON = schluesselGelesen;
+    const b = browser({ vorhanden });
     b.notification.permission = 'granted';
     serverMitPush(true);
     localStorage.setItem(pushMerker(7), '1');
@@ -238,7 +242,8 @@ describe('webPush: „Stumm auf diesem Gerät“ geht mit dem Abo (LLH-1482)', (
     await vi.waitFor(() => expect(anmeldungen).toHaveLength(1));
     setzeStumm('meldung', false);
     const zweite = pushAbgleichen(7);
-    // Die zweite wartet, bis die erste beantwortet ist.
+    await vi.waitFor(() => expect(schluesselGelesen).toHaveBeenCalledTimes(2));
+    // Die zweite Anmeldung steht an; ohne Kette wäre ihr PUT jetzt unterwegs. Sie wartet auf die erste.
     await new Promise((r) => setTimeout(r, 50));
     expect(anmeldungen).toHaveLength(1);
     ersteFrei();
