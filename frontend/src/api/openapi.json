@@ -12487,7 +12487,8 @@
           "typ",
           "sortier",
           "aktiv",
-          "proxy"
+          "proxy",
+          "dunkel"
         ],
         "properties": {
           "aktiv": {
@@ -12498,6 +12499,10 @@
               "string",
               "null"
             ]
+          },
+          "dunkel": {
+            "type": "boolean",
+            "description": "Dunkle Grundlage (LLH-1486): die Lagekarte rastert die Zeichen darauf mit dem Theme `dark`."
           },
           "id": {
             "type": "integer",
@@ -12537,6 +12542,10 @@
               "null"
             ],
             "description": "LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist."
+          },
+          "dunkel": {
+            "type": "boolean",
+            "description": "Die Grundlage ist dunkel (LLH-1486): die Lagekarte rastert ihre taktischen Zeichen dann mit\ndem Render-Theme `dark`, sonst ohne. Eine Online-Karte gilt als hell, solange sie nicht so\nmarkiert ist; deshalb absent statt `false` (`dunkel?` im generierten Typ), wie `hinweis`."
           },
           "hinweis": {
             "type": [

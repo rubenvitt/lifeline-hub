@@ -26,6 +26,8 @@ export interface OnlineQuelleBody {
   aktiv: boolean;
   /** Über den Server proxen (key-basierte Anbieter). Default false. */
   proxy: boolean;
+  /** Dunkle Grundlage: die Lagekarte rastert ihre Zeichen darauf mit dem Theme `dark` (LLH-1486). */
+  dunkel: boolean;
 }
 
 export function listeOnlineQuellen(): Promise<OnlineQuelle[]> {

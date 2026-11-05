@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { kartenConfigBeantworten } from './kartenFixture';
+import {
+  kachelnBeantworten,
+  kartenConfigBeantworten,
+  vektorStilBeantworten,
+} from './kartenFixture';
 import { kartenpunktAufSeite } from './karten-pixel-kern';
 import { einsatzAnlegen } from './fernmeldeskizze-kern';
 import { FUEKW, anmelden, post } from './fuehrungsorganisation-kern';
@@ -25,6 +29,12 @@ import { FUEKW, anmelden, post } from './fuehrungsorganisation-kern';
  * Hinterlegung gegen Grund fällt auf rund 1 : 1, der Test wird rot. Ein Zeichen mit
  * Organisationsfarbe hielte auch ohne Theme; deshalb ist ein Zeichen ohne Organisation
  * (Einsatzort, freies Zeichen „Formation“) Vorbedingung.
+ *
+ * Eine helle Online-Karte folgt dem App-Thema nicht (LLH-1486): nachts bleibt ihr Stil hell, die
+ * Zeichen rastern deshalb wie am Tag, ohne Theme `dark`. Dort hält die Kontur gegen den hellen
+ * Grund (eigener Test unten, Grund `#e8e8e8` der Fixture `vektorStilBeantworten`). Mutationsprobe
+ * (04.11.2026): koppelt `useBasemap` das Zeichenthema wieder an das Kartenthema statt an
+ * `grundlageTheme`, tragen die Zeichen `ez|dark|…` und der Test wird rot.
  *
  * Mutationsprobe (Rechteck-Fassung, 22.10.2026): ohne helles Rastern messen Einsatzort und freies
  * Zeichen 1,00 und 1,10, der Test wird rot. Die Fassung mit dem Theme `dark` ist lokal nicht
@@ -293,3 +303,91 @@ test('Tagbetrieb: die Zeichen der Lagekarte rastern ohne Theme `dark`', async ({
       .toMatch(/^ez\|(?!dark\|)/);
   }
 });
+
+/** Online-Fixture ohne Netz: Stil mit hellem Grund `#e8e8e8`, Kacheln ohne gezeichnete Linie. */
+const HELLE_KARTE = {
+  name: 'Helle Karte',
+  stil: '/api/karte/proxy/7/a/style.json',
+  quelle: 'hell',
+};
+const KACHEL_PRAEFIX = '/api/karte/proxy/7/tile/';
+
+test('Nachtbetrieb auf heller Online-Karte: die Zeichen rastern wie am Tag und halten 3 : 1 gegen den hellen Grund (LLH-1486)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (f) => seitenFehler.push(f));
+  await kartenConfigBeantworten(page, {
+    online_styles: [{ name: HELLE_KARTE.name, typ: 'vektor', url: HELLE_KARTE.stil }],
+  });
+  // Der Stil zeichnet seinen Linien-Layer auf einen Layer, den die Kachel nicht trägt: der Grund
+  // bleibt einfarbig, keine Linie läuft durch einen Messausschnitt.
+  await vektorStilBeantworten(page, HELLE_KARTE.stil, {
+    id: HELLE_KARTE.quelle,
+    kachelVorlage: `${KACHEL_PRAEFIX}{z}/{x}/{y}.pbf`,
+    layer: 'ohne',
+  });
+  await kachelnBeantworten(page, KACHEL_PRAEFIX, 'strassen');
+  await page.addInitScript(([s, v]) => localStorage.setItem(s, v), [THEMA_SCHLUESSEL, 'dark']);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Kartenzeichen Online ${Date.now()}`);
+  const proben = await seede(page, einsatzId);
+
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  // Die Karte entsteht mit dem Blindstil und bekommt den Online-Stil mit der Kartenansicht.
+  await page.waitForFunction(
+    (grund) => {
+      const k = (
+        window as unknown as {
+          __lfhKarte?: { isStyleLoaded(): boolean; getLayer(id: string): unknown };
+        }
+      ).__lfhKarte;
+      return Boolean(k?.isStyleLoaded() && k.getLayer(grund));
+    },
+    `${HELLE_KARTE.quelle}-grund`,
+    { timeout: 60_000 },
+  );
+  await page.mouse.move(0, 0);
+
+  const werte: string[] = [];
+  const befunde: string[] = [];
+  for (const p of proben) {
+    await springe(page, p.ort);
+    // Vorbedingung und eigentliche Aussage: auf heller Grundlage kein Nachtbild.
+    await expect
+      .poll(() => bildAm(page, p.ort), {
+        message: `${p.name}: Zeichen gezeichnet`,
+        timeout: 20_000,
+      })
+      .toMatch(/^ez\|(?!dark\|)/);
+    const m = await messeZeichen(page, await kartenpunktAufSeite(page, p.ort));
+    // Vorbedingung: gemessen wird gegen den hellen Grund der Online-Karte.
+    expect(m.grund, `${p.name}: Kartengrund`).toBe('rgb(232, 232, 232)');
+    const konturGrund = kontrast(m.kontur, m.grund);
+    werte.push(
+      `${p.name}: Kontur ${konturGrund.toFixed(2)} gegen Grund (${m.kontur} auf ${m.grund})`,
+    );
+    if (konturGrund < 3) befunde.push(`${p.name}: Kontur ${konturGrund.toFixed(2)}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
+  await page.screenshot({ path: test.info().outputPath('lagekarte-zeichen-nacht-online.png') });
+
+  expect(befunde, 'Zeichen unter 3 : 1 auf heller Online-Karte im Nachtbetrieb').toEqual([]);
+  expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});
+
+/** WCAG-Kontrast zweier `rgb(r, g, b)`-Angaben. */
+function kontrast(a: string, b: string): number {
+  const lum = (rgb: string) => {
+    const [r, g, bl] = rgb.match(/\d+/g)!.map((n) => {
+      const t = Number(n) / 255;
+      return t <= 0.04045 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4;
+    });
+    return r * 0.2126 + g * 0.7152 + bl * 0.0722;
+  };
+  const [la, lb] = [lum(a), lum(b)];
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}

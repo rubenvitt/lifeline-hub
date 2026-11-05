@@ -119,7 +119,7 @@ export default function GeraetAbschnittKarte() {
     () => setFallback((f) => ((f ?? basemap) === 'online' ? 'offline' : 'blind')),
     [basemap],
   );
-  const { style, basisAttribution } = useBasemap({
+  const { style, basisAttribution, zeichenTheme } = useBasemap({
     basemap,
     onlineStilName: null,
     kartenTheme: 'auto',
@@ -205,6 +205,7 @@ export default function GeraetAbschnittKarte() {
           <Kartenflaeche
             ref={kartenRef}
             style={style}
+            kartenTheme={zeichenTheme}
             attribution={basisAttribution}
             markers={marker}
             flaechen={flaechen}

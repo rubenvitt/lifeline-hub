@@ -219,8 +219,9 @@ export interface KartenflaecheProps {
    */
   startAnsicht?: StartAnsicht | null;
   /**
-   * Aufgelöstes Thema der Kartengrundlage (`loeseKartenTheme`). Nachts tragen alle Zeichen die
-   * Hinterlegung des Render-Themes `dark` (LLH-1141, `markerIconKey`); ohne Angabe Tag.
+   * Helligkeit der gezeichneten Grundlage (`grundlageTheme`, LLH-1486). Auf dunkler Grundlage
+   * tragen alle Zeichen die Hinterlegung des Render-Themes `dark` (LLH-1141, `markerIconKey`);
+   * ohne Angabe hell.
    */
   kartenTheme?: KartenTheme;
   /** Style-Ladefehler (online nicht erreichbar) → Page stuft ab. */

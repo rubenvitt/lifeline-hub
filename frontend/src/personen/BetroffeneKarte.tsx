@@ -110,7 +110,7 @@ export default function BetroffeneKarte({
     einsatzId,
     config,
   });
-  const { style, basisAttribution } = useBasemap({
+  const { style, basisAttribution, zeichenTheme } = useBasemap({
     basemap: effektiveBasemap,
     onlineStilName,
     kartenTheme,
@@ -321,6 +321,7 @@ export default function BetroffeneKarte({
         <Kartenflaeche
           ref={kartenRef}
           style={style}
+          kartenTheme={zeichenTheme}
           attribution={basisAttribution}
           markers={alleMarker}
           onMarkerKlick={(schluessel) => {

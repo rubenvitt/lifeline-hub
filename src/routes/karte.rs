@@ -100,6 +100,7 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
                 typ,
                 attribution: q.attribution,
                 hinweis: None,
+                dunkel: q.dunkel,
             }
         })
         .collect();
@@ -632,6 +633,9 @@ pub struct OnlineQuelleBody {
     /// abschaltbar pro Quelle für proxy-verbotene Anbieter.
     #[serde(default = "default_proxy")]
     pub proxy: bool,
+    /// Dunkle Grundlage (LLH-1486). Default **false**: eine Online-Karte gilt als hell.
+    #[serde(default)]
+    pub dunkel: bool,
 }
 
 /// Request-Body zum Registrieren einer Offline-Karte (Grundstein: vorhandene Datei).
@@ -671,6 +675,7 @@ pub struct OnlineQuellePatch {
     pub sortier: Option<i64>,
     pub aktiv: Option<bool>,
     pub proxy: Option<bool>,
+    pub dunkel: Option<bool>,
 }
 
 /// Normalisierter Teil-Patch: nur die gesendeten Felder sind `Some`.
@@ -682,6 +687,7 @@ struct OnlinePatchNormalisiert {
     sortier: Option<i64>,
     aktiv: Option<bool>,
     proxy: Option<bool>,
+    dunkel: Option<bool>,
     /// `url` ODER `proxy` standen im Patch → die Proxy-Slots der Quelle sind stale.
     beruehrt_proxy_ziel: bool,
 }
@@ -696,6 +702,7 @@ impl OnlinePatchNormalisiert {
             sortier: self.sortier,
             aktiv: self.aktiv,
             proxy: self.proxy,
+            dunkel: self.dunkel,
         }
     }
 }
@@ -802,6 +809,7 @@ fn validiere_online_patch(
         sortier: body.sortier,
         aktiv: body.aktiv,
         proxy: body.proxy,
+        dunkel: body.dunkel,
         beruehrt_proxy_ziel,
     })
 }
@@ -838,6 +846,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
         sortier: body.sortier,
         aktiv: body.aktiv,
         proxy: proxy_effektiv,
+        dunkel: body.dunkel,
     })
 }
 

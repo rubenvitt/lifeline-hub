@@ -21,6 +21,8 @@ pub struct OnlineQuelle {
     /// Serverseitig proxen (key-basierte Anbieter): `/config` gibt nur relative Proxy-URLs aus,
     /// die Upstream-`url` (inkl. Key) bleibt server-seitig (LFH-182).
     pub proxy: bool,
+    /// Dunkle Grundlage (LLH-1486): die Lagekarte rastert die Zeichen darauf mit dem Theme `dark`.
+    pub dunkel: bool,
 }
 
 /// Eingabefelder zum Anlegen/Aktualisieren einer Online-Quelle (vom Handler aus dem JSON-Body).
@@ -32,6 +34,7 @@ pub struct OnlineQuelleEingabe {
     pub sortier: i64,
     pub aktiv: bool,
     pub proxy: bool,
+    pub dunkel: bool,
 }
 
 // sqlx 0.9: `query_as` nimmt nur `&'static str`; die Spaltenliste steht deshalb je Query als
@@ -47,6 +50,7 @@ pub struct OnlineQuelleConfig {
     pub typ: String,
     pub attribution: Option<String>,
     pub proxy: bool,
+    pub dunkel: bool,
 }
 
 /// Eine Online-Quelle per `id`, oder `None` (für die Proxy-Handler).
@@ -55,7 +59,7 @@ pub async fn finde_online_quelle(
     id: i64,
 ) -> Result<Option<OnlineQuelle>, sqlx::Error> {
     sqlx::query_as::<_, OnlineQuelle>(
-        "SELECT id, name, url, typ, attribution, sortier, aktiv, proxy \
+        "SELECT id, name, url, typ, attribution, sortier, aktiv, proxy, dunkel \
          FROM karte_online_quelle WHERE id = ?",
     )
     .bind(id)
@@ -68,7 +72,7 @@ pub async fn aktive_online_quellen_fuer_config(
     pool: &SqlitePool,
 ) -> Result<Vec<OnlineQuelleConfig>, sqlx::Error> {
     sqlx::query_as::<_, OnlineQuelleConfig>(
-        "SELECT id, name, url, typ, attribution, proxy FROM karte_online_quelle \
+        "SELECT id, name, url, typ, attribution, proxy, dunkel FROM karte_online_quelle \
          WHERE aktiv = 1 ORDER BY sortier, id",
     )
     .fetch_all(pool)
@@ -289,7 +293,7 @@ async fn hole_online_quelle(pool: &SqlitePool, id: i64) -> Result<OnlineQuelle, 
 /// Alle Online-Quellen (auch inaktive) für die Admin-Liste, nach `sortier`, `id`.
 pub async fn liste_online_quellen(pool: &SqlitePool) -> Result<Vec<OnlineQuelle>, sqlx::Error> {
     sqlx::query_as::<_, OnlineQuelle>(
-        "SELECT id, name, url, typ, attribution, sortier, aktiv, proxy \
+        "SELECT id, name, url, typ, attribution, sortier, aktiv, proxy, dunkel \
          FROM karte_online_quelle ORDER BY sortier, id",
     )
     .fetch_all(pool)
@@ -302,8 +306,9 @@ pub async fn anlegen_online_quelle(
     eingabe: &OnlineQuelleEingabe,
 ) -> Result<OnlineQuelle, sqlx::Error> {
     let id = sqlx::query(
-        "INSERT INTO karte_online_quelle (name, url, typ, attribution, sortier, aktiv, proxy) \
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO karte_online_quelle \
+            (name, url, typ, attribution, sortier, aktiv, proxy, dunkel) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&eingabe.name)
     .bind(&eingabe.url)
@@ -312,6 +317,7 @@ pub async fn anlegen_online_quelle(
     .bind(eingabe.sortier)
     .bind(eingabe.aktiv)
     .bind(eingabe.proxy)
+    .bind(eingabe.dunkel)
     .execute(pool)
     .await?
     .last_insert_rowid();
@@ -332,6 +338,7 @@ pub struct OnlineQuelleFelder<'a> {
     pub sortier: Option<i64>,
     pub aktiv: Option<bool>,
     pub proxy: Option<bool>,
+    pub dunkel: Option<bool>,
 }
 
 /// Teil-Patch einer Online-Quelle. `Ok(None)`, wenn keine Zeile mit `id` existiert.
@@ -354,8 +361,9 @@ pub async fn patche_online_quelle(
             sortier = CASE WHEN ?9 IS NULL THEN sortier ELSE ?10 END, \
             aktiv = CASE WHEN ?11 IS NULL THEN aktiv ELSE ?12 END, \
             proxy = CASE WHEN ?13 IS NULL THEN proxy ELSE ?14 END, \
+            dunkel = CASE WHEN ?15 IS NULL THEN dunkel ELSE ?16 END, \
             geaendert_at = datetime('now') \
-         WHERE id = ?15",
+         WHERE id = ?17",
     )
     .bind(patch.name.map(|_| 1_i64))
     .bind(patch.name)
@@ -371,6 +379,8 @@ pub async fn patche_online_quelle(
     .bind(patch.aktiv)
     .bind(patch.proxy.map(|_| 1_i64))
     .bind(patch.proxy)
+    .bind(patch.dunkel.map(|_| 1_i64))
+    .bind(patch.dunkel)
     .bind(id)
     .execute(pool)
     .await?
@@ -914,6 +924,7 @@ mod tests {
             sortier,
             aktiv,
             proxy: false,
+            dunkel: false,
         }
     }
 
@@ -965,6 +976,7 @@ mod tests {
                 sortier: Some(9),
                 aktiv: Some(false),
                 proxy: Some(true),
+                dunkel: Some(true),
             },
         )
         .await
@@ -977,7 +989,7 @@ mod tests {
         assert!(!akt.aktiv);
     }
 
-    /// Bind-Reihenfolge: alle sieben Spalten auf distinkte Werte setzen und einzeln prüfen.
+    /// Bind-Reihenfolge: alle acht Spalten auf distinkte Werte setzen und einzeln prüfen.
     #[tokio::test]
     async fn patche_online_quelle_setzt_jede_spalte_an_ihren_platz() {
         let pool = test_pool().await;
@@ -995,6 +1007,7 @@ mod tests {
                 sortier: Some(7),
                 aktiv: Some(false),
                 proxy: Some(true),
+                dunkel: Some(true),
             },
         )
         .await
@@ -1007,6 +1020,7 @@ mod tests {
         assert_eq!(akt.sortier, 7);
         assert!(!akt.aktiv);
         assert!(akt.proxy);
+        assert!(akt.dunkel);
     }
 
     /// Ein Patch fasst NUR die gesendeten Spalten an; insbesondere bleiben `proxy` und `sortier`
@@ -1035,6 +1049,7 @@ mod tests {
         assert_eq!(akt.sortier, 4, "unberührt");
         assert!(akt.aktiv, "unberührt");
         assert!(!akt.proxy, "unberührt — kein Rückfall auf den Default true");
+        assert!(!akt.dunkel, "unberührt");
 
         // Leerer Patch → alles bleibt, insbesondere kein `None`.
         let unveraendert = patche_online_quelle(&pool, q.id, OnlineQuelleFelder::default())

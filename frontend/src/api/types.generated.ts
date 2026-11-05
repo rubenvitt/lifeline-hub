@@ -5065,6 +5065,8 @@ export interface components {
         OnlineQuelle: {
             aktiv: boolean;
             attribution?: string | null;
+            /** @description Dunkle Grundlage (LLH-1486): die Lagekarte rastert die Zeichen darauf mit dem Theme `dark`. */
+            dunkel: boolean;
             /** Format: int64 */
             id: number;
             name: string;
@@ -5085,6 +5087,12 @@ export interface components {
         OnlineStyle: {
             /** @description LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist. */
             attribution?: string | null;
+            /**
+             * @description Die Grundlage ist dunkel (LLH-1486): die Lagekarte rastert ihre taktischen Zeichen dann mit
+             *     dem Render-Theme `dark`, sonst ohne. Eine Online-Karte gilt als hell, solange sie nicht so
+             *     markiert ist; deshalb absent statt `false` (`dunkel?` im generierten Typ), wie `hinweis`.
+             */
+            dunkel?: boolean;
             /**
              * @description Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag
              *     mit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll

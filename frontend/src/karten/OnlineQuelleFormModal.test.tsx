@@ -22,6 +22,7 @@ const quelle: OnlineQuelle = {
   sortier: 2,
   aktiv: true,
   proxy: true,
+  dunkel: false,
 };
 
 function handler() {
@@ -163,7 +164,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
    * `forceRender` liefert `onFinish` nur montierte Felder — ein Speichern setzte Sortierung,
    * Aktiv und Proxy still zurück, obwohl niemand sie angefasst hat.
    */
-  it('behält Sortierung, Aktiv und Proxy, wenn niemand aufklappt', async () => {
+  it('behält Sortierung, Aktiv, Proxy und Dunkle Karte, wenn niemand aufklappt', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
       http.patch('/api/karte/online-quellen/3', async ({ request }) => {
@@ -172,7 +173,9 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
       }),
     );
     const nutzer = userEvent.setup();
-    renderMitProviders(<Harness bestand={{ ...quelle, sortier: 2, aktiv: false, proxy: false }} />);
+    renderMitProviders(
+      <Harness bestand={{ ...quelle, sortier: 2, aktiv: false, proxy: false, dunkel: true }} />,
+    );
     const name = await screen.findByLabelText('Name');
     await nutzer.clear(name);
     await nutzer.type(name, 'OSM Standard');
@@ -187,6 +190,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
       sortier: 2,
       aktiv: false,
       proxy: false,
+      dunkel: true,
     });
   });
 
@@ -207,19 +211,20 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
     await screen.findByLabelText('Name');
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await nutzer.click(await screen.findByLabelText('Über Server proxen'));
+    await nutzer.click(screen.getByLabelText('Dunkle Karte'));
     await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(rumpf).not.toBeNull());
-    expect(rumpf).toMatchObject({ proxy: false, aktiv: true, sortier: 2 });
+    expect(rumpf).toMatchObject({ proxy: false, dunkel: true, aktiv: true, sortier: 2 });
   });
 
   /**
-   * Feldbudget: VIER sichtbare Felder statt sieben. Vier, weil `attribution` Pflicht ohne
+   * Feldbudget: VIER sichtbare Felder statt acht. Vier, weil `attribution` Pflicht ohne
    * brauchbare Vorgabe ist und nicht hinter den Collapse darf.
    * Gezählt werden `.ant-form-item`-Knoten (der Typ ist ein `Select`, keine textbox). „Höchstens
    * vier" allein erfüllte auch ein leerer Dialog.
    */
-  it('zeigt vier Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
+  it('zeigt vier Felder und deckt vier weitere erst beim Aufklappen auf', async () => {
     handler();
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness />);
@@ -229,7 +234,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
     expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(4);
 
     await nutzer.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(7));
+    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(8));
   });
 
   /**

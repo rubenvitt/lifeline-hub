@@ -27,6 +27,7 @@ const quelle: OnlineQuelle = {
   sortier: 0,
   aktiv: true,
   proxy: false,
+  dunkel: false,
 };
 
 const katalogEintrag = {
@@ -344,6 +345,7 @@ describe('OnlineQuellenVerwaltung', () => {
       sortier: 1,
       aktiv: true,
       proxy: true, // LFH-190: Katalog-Quellen werden default geproxt + gecacht
+      dunkel: false,
     });
   });
 
