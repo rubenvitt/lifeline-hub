@@ -728,9 +728,11 @@ anwendbar), „nicht geprüft" ist keins.
   Eingebaut in Einsatzort, Schaden, Standort der Betreuungs- und Verpflegungsstelle, Sammelstelle
   des Bezirks, Standort von UHS und Bereitstellungsraum, Fundort eines Tiers und Ziel eines
   Auftrags (LLH-1114), Fundort der Personen-Aufnahme und Ort der nachgetragenen Verpflegungsausgabe
-  (nur Suche, Formularwert bleibt Text; LLH-1407). **Gekoppelte Geräte erreichen die Ortssuche
-  nicht** (Routenliste in `src/geraet/mod.rs`): Masken, die dort laufen, prüfen
-  `useAuthOptional()?.geraet` und fallen auf ein Textfeld zurück. Strg/⌘ + Enter im Ortsfeld sucht
+  (nur Suche, Formularwert bleibt Text; LLH-1407). **Gekoppelte Geräte erreichen weder Ortssuche
+  noch Ort-Vorschau** (Routenliste in `src/geraet/mod.rs`, LLH-1483): `Ortsfeld` zeigt
+  dort kein „Ort suchen“, und `useOrtVorschau` fragt nicht, so bleibt die Ort-Zeile jeder Fläche
+  leer. Masken, die am Gerät laufen und ihren Wert anders zerlegen (Fundort der Aufnahme,
+  nachgetragene Ausgabe), fallen zusätzlich selbst auf ein Textfeld zurück. Strg/⌘ + Enter im Ortsfeld sucht
   nicht, es gehört der Erfassungshülle („Speichern und nächste“).
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number

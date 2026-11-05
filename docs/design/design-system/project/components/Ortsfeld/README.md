@@ -10,5 +10,10 @@ Freitext bleibt erlaubt. Eine getippte Koordinate (jede Form der Sprungpalette) 
 erkannt (LLH-1108). Mit `karte` stehen darunter die Vorschau mit ziehbarer Nadel, die Ort-Zeile
 (Peilung nur im Einsatz) und „Auf Karte wählen“; mit `ohneSuche` ist das Feld reiner Text.
 
+Am gekoppelten Gerät fragt das Feld nie den Geocoder (LLH-1483): seine
+Routenliste (`src/geraet/mod.rs`) kennt weder Ortssuche noch Ort-Vorschau. Dort fehlen „Ort
+suchen“ und die Ort-Zeile; Text, getippte Koordinate und Karte bleiben. So erzeugt keine Maske
+am Gerät eine 403, auch eine, die das Gerät nicht selbst abfängt.
+
 Quelle: `frontend/src/anzeige/Ortsfeld.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

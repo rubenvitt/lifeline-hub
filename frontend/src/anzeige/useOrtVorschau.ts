@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { LatLon } from './koordinaten';
 import { ladeOrtVorschau, ladeOrtVorschauInOrg, type OrtVorschau } from '../api/ortVorschau';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
+import { useAuthOptional } from '../auth/AuthContext';
 import { ortKeyVon, holeOrt, setzeOrt } from './ortCache';
 
 /** Auf ~100 m runden (3 Nachkommastellen) — teilt den serverseitigen Cache-Treffer. */
@@ -16,6 +17,10 @@ function runde(n: number): number {
  *
  * Ohne Einsatz (`einsatzId` `null`, LLH-1376) fragt sie die Ort-Vorschau der Organisation: nur
  * der Ortsname, keine Peilung, `exclude` entfällt.
+ *
+ * Am gekoppelten Gerät fragt sie nie (LLH-1483): seine Routenliste (`src/geraet/mod.rs`) kennt
+ * keine Ort-Vorschau, und die Peilung zeigte auf Marker außerhalb seiner Ansicht. Die Ort-Zeile
+ * bleibt dort leer, an jeder Fläche, die sie einbindet.
  */
 export function useOrtVorschau(
   einsatzId: number | null,
@@ -24,6 +29,7 @@ export function useOrtVorschau(
   debounceMs = 700,
 ) {
   const [debounced, setDebounced] = useState<LatLon | null>(null);
+  const amGeraet = (useAuthOptional()?.geraet ?? null) != null;
 
   // lat/lon als Primitive, sonst setzte die Objekt-Identität von `koord` je Render den Debounce zurück.
   const lat = koord?.lat;
@@ -72,7 +78,7 @@ export function useOrtVorschau(
         throw e;
       }
     },
-    enabled: (einsatzId == null || Number.isFinite(einsatzId)) && debounced != null,
+    enabled: !amGeraet && (einsatzId == null || Number.isFinite(einsatzId)) && debounced != null,
     // Peilung bleibt live (Marker ändern sich); der Ortsname ist über den Local-Store ohnehin dauerhaft.
     staleTime: 30_000,
   });

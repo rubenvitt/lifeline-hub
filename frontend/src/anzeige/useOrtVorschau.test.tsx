@@ -1,9 +1,11 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { render, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { server } from '../test/server';
+import { AuthProvider, useAuthOptional } from '../auth/AuthContext';
+import { benutzerFixture } from '../test/fixtures';
+import { meHandler, server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { holeOrt, ortCacheRaeumen, ortKeyVon, setzeOrt } from './ortCache';
 import { useOrtVorschau } from './useOrtVorschau';
@@ -122,5 +124,56 @@ describe('useOrtVorschau', () => {
     expect(abfragen).toHaveLength(1);
     expect(abfragen[0].searchParams.get('lat')).toBe('50.7');
     expect(abfragen[0].searchParams.has('exclude')).toBe(false);
+  });
+
+  it('fragt am gekoppelten Gerät nie, auch nicht ohne Einsatz (LLH-1483)', async () => {
+    const treffer = vi.fn();
+    server.use(
+      meHandler({
+        ...benutzerFixture({ anzeigename: 'UHS Nord · Tablet 1' }),
+        geraet: {
+          kopplung_id: 3,
+          einsatz_id: 1,
+          ansicht: 'uhs-tablet',
+          uhs_id: 3,
+          stelle_id: 3,
+          stelle: 'UHS Nord',
+          bezeichnung: 'Tablet 1',
+          laeuft_ab_at: '2026-10-08 12:00:00',
+        },
+      }),
+      http.get('/api/einsaetze/1/ort-vorschau', () => {
+        treffer();
+        return HttpResponse.json({ peilung: null, ortsname: 'Hauptstr. 5' });
+      }),
+      http.get('/api/ort-vorschau', () => {
+        treffer();
+        return HttpResponse.json({ ortsname: 'Hauptstr. 5' });
+      }),
+    );
+    // Der Hook hängt sich erst in die geladene Gerätesitzung ein: so ist der Befund nicht vom
+    // Wettlauf zwischen `/api/auth/me` und dem Debounce abhängig.
+    function Vorschau({ einsatzId }: { einsatzId: number | null }) {
+      const { fetchStatus } = useOrtVorschau(einsatzId, { lat: 51.5, lon: 10.25 }, undefined, 0);
+      return <span data-testid={`vorschau-${einsatzId ?? 'org'}`}>{fetchStatus}</span>;
+    }
+    function AmGeraet({ children }: { children: ReactNode }) {
+      return useAuthOptional()?.geraet ? <>{children}</> : null;
+    }
+    const client = neuerQueryClient();
+    const { findByTestId } = render(
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <AmGeraet>
+            <Vorschau einsatzId={1} />
+            <Vorschau einsatzId={null} />
+          </AmGeraet>
+        </AuthProvider>
+      </QueryClientProvider>,
+    );
+    expect(await findByTestId('vorschau-1')).toHaveTextContent('idle');
+    await new Promise((r) => setTimeout(r, 60));
+    expect(treffer).not.toHaveBeenCalled();
+    expect(await findByTestId('vorschau-org')).toHaveTextContent('idle');
   });
 });
