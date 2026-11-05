@@ -822,13 +822,25 @@ export default function AusgabeAnsicht() {
                   <span>{KOSTFORM_LABEL[k]}</span>{' '}
                   {/* Die Zahlen stehen auf festem Platz, bemessen an den Stellen des Solls: eine
                       Buchung („fehlt“ sinkt oder entfällt, ausgegeben wächst) ändert weder die
-                      Breite noch, wo der Name schmal umbricht, also auch keine Höhe (LLH-1504). */}
-                  <span style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      Breite noch, wo der Name schmal umbricht, also auch keine Höhe (LLH-1504).
+                      Ausgegeben darf das Soll übersteigen: sein Platz hält eine Stelle mehr, also
+                      bis zum Zehnfachen des Solls. */}
+                  <span
+                    data-lfh="sonderkost-zahlen"
+                    style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                  >
                     <span
                       style={{
                         ...monoStil(13),
                         display: 'inline-block',
-                        minWidth: `${2 * ziffern(zf.bedarf.sonderkost[k]) + 1}ch`,
+                        minWidth: `${
+                          Math.max(
+                            ziffern(zf.bedarf.sonderkost[k]) + 1,
+                            ziffern(zf.ausgegeben.sonderkost[k]),
+                          ) +
+                          1 +
+                          ziffern(zf.bedarf.sonderkost[k])
+                        }ch`,
                       }}
                     >
                       {zf.ausgegeben.sonderkost[k]}/{zf.bedarf.sonderkost[k]}

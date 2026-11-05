@@ -600,11 +600,13 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
     await expect(page.locator('[data-kostform="ohne_schwein"]')).toBeVisible();
     const tasten = page.locator('[data-lfh="ausgabe-sonderkost"] [data-kostform]');
+    // Taste und Zahlenplatz: auch innerhalb der Taste wandern die Zahlen nicht.
     const lagen = () =>
       tasten.evaluateAll((el) =>
         el.map((e) => {
           const r = e.getBoundingClientRect();
-          return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)];
+          const z = e.querySelector('[data-lfh="sonderkost-zahlen"]')!.getBoundingClientRect();
+          return [r.left, r.top, r.width, r.height, z.left, z.width].map(Math.round);
         }),
       );
     const vorher = await lagen();
@@ -617,6 +619,19 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
       /^ohne Schweinefleisch 100\/100$/,
     );
     expect(await lagen(), 'Stab, 390 px kompakt: Sonderkost-Tasten nach der Buchung').toEqual(
+      vorher,
+    );
+    // Ausgegeben über dem Soll (4 → 10/4) wächst um eine Stelle und bleibt im festen Platz
+    // (Mutationsprobe: Platz nur nach den Stellen des Solls → rot).
+    await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster/${zf}/ausgaben`, {
+      menge: 10,
+      sonderkost: { vegetarisch: 10 },
+    });
+    await expect(page.locator('[data-kostform="vegetarisch"]')).toHaveAttribute(
+      'aria-label',
+      /^vegetarisch 10\/4$/,
+    );
+    expect(await lagen(), 'Stab, 390 px kompakt: Sonderkost-Tasten nach Überdeckung').toEqual(
       vorher,
     );
   });
