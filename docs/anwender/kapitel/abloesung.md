@@ -213,8 +213,9 @@ einen Hinweis mit dezentem Ton, wenn diese Einheit
   Hinweis gilt dann nicht mehr.
 
 Die Zeile darunter nennt beide Einheiten, etwa „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“;
-„Öffnen“ führt zur Schicht. Sie nennt immer die Einheit, um die es beim Hinweis ging, auch wenn
-die Schicht inzwischen umgeplant ist oder die Planung entfallen ist. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
+„Öffnen“ führt zur Schicht. Sie nennt die Einheit, um die es beim Hinweis ging, auch nach einem
+Umplanen oder einer entfallenen Planung. Ist diese Einheit inzwischen gelöscht, nennt die Zeile nur
+die abzulösende Einheit. Hinweise aus älteren Versionen nennen die gerade geplante Einheit. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
 Alarmiert und eingetroffen zählen nur am Anfang ihres Einsatzabschnitts in der
 Kräfte-Zeitachse, auch als Nachtrag; ein Nachtrag in einen abgeschlossenen Abschnitt und seine
 Streichung melden nichts. Bei einem
