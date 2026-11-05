@@ -2158,6 +2158,16 @@ fn anlass(w: &Welt, schicht: i64, typ: Bezugstyp) -> crate::benachrichtigung::An
     crate::abloesung::hinweis::anlass(w.e, schicht, typ, w.b)
 }
 
+/// Der Anlass mit der gemeinten Einheit (LLH-1511).
+fn anlass_zu(
+    w: &Welt,
+    schicht: i64,
+    typ: Bezugstyp,
+    einheit: i64,
+) -> crate::benachrichtigung::Anlass {
+    anlass(w, schicht, typ).einheit(einheit)
+}
+
 /// Spec „Planungshinweis“: die dritte Frist liegt den Planungsvorlauf (Vorgabe 2 h) vor der
 /// Fälligkeit, gibt es nur ohne geplante ablösende Einheit, kommt mit einer aufgehobenen Planung
 /// wieder, wandert mit der Fälligkeit und mit dem Vorlauf des Schichtmodells, und der Vollzug
@@ -2257,12 +2267,12 @@ async fn alarmierung_und_eintreffen_der_geplanten_einheit_werden_je_ein_anlass()
     let b = ereignis(&w, w.f2, Alarmierung, "2030-06-03 10:00:00").await;
     assert_eq!(
         b.hinweise,
-        vec![anlass(&w, id, Bezugstyp::AbloeserAlarmiert)]
+        vec![anlass_zu(&w, id, Bezugstyp::AbloeserAlarmiert, w.f2)]
     );
     let b = ereignis(&w, w.f2, Eintreffen, "2030-06-03 10:40:00").await;
     assert_eq!(
         b.hinweise,
-        vec![anlass(&w, id, Bezugstyp::AbloeserEingetroffen)]
+        vec![anlass_zu(&w, id, Bezugstyp::AbloeserEingetroffen, w.f2)]
     );
     let (_, b) = schreibe(&w, w.f2, Eintreffen, "2030-06-03 10:41:00").await;
     assert!(b.hinweise.is_empty(), "ausgelassen: kein zweiter Hinweis");
@@ -2303,7 +2313,7 @@ async fn alarmierung_und_eintreffen_der_geplanten_einheit_werden_je_ein_anlass()
     let b = ereignis(&w, f3, Entlassung, "2030-06-03 11:00:00").await;
     assert_eq!(
         b.hinweise,
-        vec![anlass(&w, id4, Bezugstyp::AbloeserEntfallen)],
+        vec![anlass_zu(&w, id4, Bezugstyp::AbloeserEntfallen, f3)],
         "auch ein Eintrag der Ablöser-Liste entfällt"
     );
 }
@@ -2349,7 +2359,7 @@ async fn entlassung_der_geplanten_einheit_laesst_die_planung_entfallen() {
     let b = ereignis(&w, w.f2, Entlassung, "2030-06-03 10:30:00").await;
     assert_eq!(
         b.hinweise,
-        vec![anlass(&w, id, Bezugstyp::AbloeserEntfallen)]
+        vec![anlass_zu(&w, id, Bezugstyp::AbloeserEntfallen, w.f2)]
     );
     assert_eq!(b.abloesung.len(), 1, "der ETB-Eintrag für Kurzruf und Live");
     let a = laden(&w.pool, w.e, id, T0).await.unwrap();
@@ -2392,7 +2402,7 @@ async fn aufloesen_der_geplanten_einheit_laesst_die_planung_mit_hinweis_entfalle
     assert_eq!(a.abloesende_einheit_id, None);
     assert_eq!(
         f.abloesung_wirkung.anlaesse,
-        vec![anlass(&w, id, Bezugstyp::AbloeserEntfallen)]
+        vec![anlass_zu(&w, id, Bezugstyp::AbloeserEntfallen, w.f2)]
     );
     assert_eq!(f.abloesung_wirkung.etb.len(), 1);
     let etb = etb(&w.pool, w.e).await;
@@ -2561,7 +2571,12 @@ async fn gestrichene_entlassung_holt_die_entfallene_planung_zurueck() {
     let b = streiche(&w, w.f2, Entlassung).await;
     assert_eq!(
         b.hinweise,
-        vec![anlass(&w, id, Bezugstyp::AbloeserWiederhergestellt)]
+        vec![anlass_zu(
+            &w,
+            id,
+            Bezugstyp::AbloeserWiederhergestellt,
+            w.f2
+        )]
     );
     assert_eq!(b.abloesung.len(), 1, "der ETB-Eintrag für Kurzruf und Live");
     let a = laden(&w.pool, w.e, id, T0).await.unwrap();
@@ -2610,7 +2625,12 @@ async fn zurueckgeholter_abloeser_reiht_sich_hinten_ein() {
     let b = streiche(&w, w.f2, Entlassung).await;
     assert_eq!(
         b.hinweise,
-        vec![anlass(&w, id, Bezugstyp::AbloeserWiederhergestellt)]
+        vec![anlass_zu(
+            &w,
+            id,
+            Bezugstyp::AbloeserWiederhergestellt,
+            w.f2
+        )]
     );
     let a = laden(&w.pool, w.e, id, T0).await.unwrap();
     assert_eq!(abloeser_ids(&a), vec![f3, w.f2]);
@@ -2818,7 +2838,12 @@ async fn gestrichene_entlassung_holt_nur_ihre_eigenen_planungen_zurueck() {
     let b = streiche(&w, w.f2, Entlassung).await;
     assert_eq!(
         b.hinweise,
-        vec![anlass(&w, id3, Bezugstyp::AbloeserWiederhergestellt)]
+        vec![anlass_zu(
+            &w,
+            id3,
+            Bezugstyp::AbloeserWiederhergestellt,
+            w.f2
+        )]
     );
     assert_eq!(
         abloeser_ids(&laden(&w.pool, w.e, id3, T0).await.unwrap()),
@@ -4620,7 +4645,12 @@ async fn gestrichenes_eintreffen_des_abloesers_meldet_weiter_und_laesst_die_schi
     let b = streiche(&w, w.f2, Eintreffen).await;
     assert_eq!(
         b.hinweise,
-        vec![anlass(&w, id, Bezugstyp::AbloeserEintreffenGestrichen)]
+        vec![anlass_zu(
+            &w,
+            id,
+            Bezugstyp::AbloeserEintreffenGestrichen,
+            w.f2
+        )]
     );
     assert!(b.abloesung.is_empty());
     let s = laden(&w.pool, w.e, id, T0).await.unwrap();

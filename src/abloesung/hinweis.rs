@@ -64,8 +64,8 @@ pub(crate) async fn load_geplante_tx(
 }
 
 /// Je laufender Schicht, die `einheit_id` als ablösende plant, ein Anlass `abloesung_abloeser`
-/// mit dem Ereignis `typ` (ein `abloeser_*`-Bezug), ausgelöst von `von`. Leer, wenn die Einheit
-/// nirgends geplant ist.
+/// mit dem Ereignis `typ` (ein `abloeser_*`-Bezug), ausgelöst von `von`, mit der Einheit
+/// festgehalten (LLH-1511). Leer, wenn die Einheit nirgends geplant ist.
 pub(crate) async fn anlaesse_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -77,11 +77,13 @@ pub(crate) async fn anlaesse_tx(
     Ok(load_geplante_tx(conn, einsatz_id, einheit_id)
         .await?
         .into_iter()
-        .map(|schicht| anlass(einsatz_id, schicht, typ, von))
+        .map(|schicht| anlass(einsatz_id, schicht, typ, von).einheit(einheit_id))
         .collect())
 }
 
-/// Der Anlass eines Hinweises zur ablösenden Einheit einer Schicht.
+/// Der Anlass eines Hinweises zur ablösenden Einheit einer Schicht. Die gemeinte Einheit hält
+/// [`Anlass::einheit`] fest (LLH-1511); ohne sie liest die Detailzeile den Spiegel der Schicht,
+/// also die gerade geplante, nicht die gemeinte Einheit.
 pub(crate) fn anlass(
     einsatz_id: i64,
     schicht: i64,

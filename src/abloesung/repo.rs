@@ -1397,12 +1397,17 @@ pub(crate) async fn drop_planungen_tx(
             )
             .await?,
         );
-        wirkung.anlaesse.push(hinweis::anlass(
-            einsatz_id,
-            id,
-            BenachrichtigungBezugTyp::AbloeserEntfallen,
-            benutzer_id,
-        ));
+        // Die entfallene Einheit festhalten (LLH-1511): der Spiegel ist jetzt leer oder nennt den
+        // nachgerückten Ablöser.
+        wirkung.anlaesse.push(
+            hinweis::anlass(
+                einsatz_id,
+                id,
+                BenachrichtigungBezugTyp::AbloeserEntfallen,
+                benutzer_id,
+            )
+            .einheit(einheit_id),
+        );
     }
     Ok(wirkung)
 }
@@ -1513,12 +1518,17 @@ pub(crate) async fn restore_entfallene_planungen_tx(
             )
             .await?,
         );
-        wirkung.anlaesse.push(hinweis::anlass(
-            einsatz_id,
-            id,
-            BenachrichtigungBezugTyp::AbloeserWiederhergestellt,
-            benutzer_id,
-        ));
+        // Die zurückgeholte Einheit festhalten (LLH-1511): bleibt ein anderer Ablöser vorn, trägt
+        // der Spiegel diesen.
+        wirkung.anlaesse.push(
+            hinweis::anlass(
+                einsatz_id,
+                id,
+                BenachrichtigungBezugTyp::AbloeserWiederhergestellt,
+                benutzer_id,
+            )
+            .einheit(einheit_id),
+        );
     }
     Ok(wirkung)
 }
