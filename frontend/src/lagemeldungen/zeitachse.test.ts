@@ -8,6 +8,7 @@ import {
   filtereLagemeldungen,
   gruppiereNachTag,
   imZeitraum,
+  nachtraegeVorLb,
   tagesEtikett,
   tagesSchluessel,
   uebergabeZeit,
@@ -191,6 +192,31 @@ describe('zeitachse', () => {
       von: '2026-06-12 12:10:00',
     }).map((l) => l.text);
     expect(texte).toEqual(['Frisch']);
+  });
+
+  it('nennt unter „seit LB“ die danach übernommenen, früher geschehenen (LLH-1514)', () => {
+    // LB endete 13:30:42, die Wahl grenzt auf 13:30:00.
+    const lb = { von: '2026-06-12 13:30:00', abgehaltenAt: '2026-06-12 13:30:42' };
+    const menge = [
+      // Um 13:10 geschehen, um 13:45 übernommen: der Nachtrag.
+      uebergeben('2026-06-12 13:10:00', '2026-06-12 13:45:00', 'Nachtrag'),
+      // Vor der Besprechung schon übernommen: war bekannt.
+      uebergeben('2026-06-12 13:00:00', '2026-06-12 13:20:00', 'Bekannt'),
+      // In der Minute der Besprechung übernommen, vor ihrem Ende: war bekannt.
+      uebergeben('2026-06-12 13:29:00', '2026-06-12 13:30:20', 'Knapp'),
+      // Nach der Grenze geschehen: steht schon unter „seit LB“.
+      uebergeben('2026-06-12 13:30:10', '2026-06-12 13:50:00', 'Schon drin'),
+    ];
+    expect(nachtraegeVorLb(menge, LEERER_FILTER, lb).map((l) => l.text)).toEqual(['Nachtrag']);
+    // Die übrigen Filter gelten, der Zeitraum nicht.
+    expect(
+      nachtraegeVorLb(menge, { ...LEERER_FILTER, von: lb.von, suche: 'gibt es nicht' }, lb),
+    ).toEqual([]);
+    expect(
+      nachtraegeVorLb(menge, { ...LEERER_FILTER, von: lb.von, bis: '2026-06-12 14:00:00' }, lb),
+    ).toHaveLength(1);
+    // Ohne Besprechung nichts.
+    expect(nachtraegeVorLb(menge, LEERER_FILTER, { von: null, abgehaltenAt: null })).toEqual([]);
   });
 
   it('nennt die Übergabe als Uhrzeit, an einem anderen Tag mit Datum', () => {
