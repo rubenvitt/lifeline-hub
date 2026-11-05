@@ -905,7 +905,8 @@ Dialog stehen, ohne Fehler-Toast.
 ### Requirement: Wechsel gegen den erwarteten Quellraum
 Ein Wechsel über `…/belegung` MAY den Raum nennen, aus dem verlegt wird (`von_br_id`). Steht die
 Kraft beim Buchen nicht mehr in diesem Raum, MUST der Server mit 409 „Kraft steht inzwischen in
-einem anderen Raum“ ablehnen, ohne Belegungsereignis, ETB-Eintrag und Änderung des Raums der Kraft,
+einem anderen Raum“ ablehnen, steht sie in keinem Raum mehr, mit 409 „Kraft steht inzwischen in
+keinem Raum mehr“, ohne Belegungsereignis, ETB-Eintrag und Änderung des Raums der Kraft,
 geprüft in derselben Transaktion wie die Buchung (LLH-1521). Ohne `von_br_id` MUST der Wechsel wie
 bisher buchen (Gerät, Ablösung). Bei einer anderen Art als `wechsel` MUST `von_br_id` mit 400
 abgelehnt werden.

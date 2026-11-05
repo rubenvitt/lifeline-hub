@@ -4806,6 +4806,16 @@ async fn wechsel_aus_verlassenem_quellraum_409_ohne_spur() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "B→C mit passendem Quellraum: {v}");
     belegen(&app, &cookie, eid, a, "einheit", zug, "wechsel").await;
+
+    // Hat jemand die Kraft inzwischen ausgetragen, nennt die Ablehnung genau das (409).
+    belegen(&app, &cookie, eid, a, "einheit", zug, "austritt").await;
+    let (s, v) = verlegen(b).await;
+    assert_eq!(s, StatusCode::CONFLICT, "Wechsel nach Austritt: {v}");
+    assert!(
+        v.to_string()
+            .contains("Kraft steht inzwischen in keinem Raum mehr"),
+        "{v}"
+    );
 }
 
 /// `von_br_id` gehört nur zum Wechsel: bei Eintritt oder Austritt ist es 400 und bucht nichts.
@@ -4822,7 +4832,7 @@ async fn von_br_id_ausserhalb_des_wechsels_400() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    for art in ["eintritt", "austritt"] {
+    for art in ["eintritt", "abruf", "austritt"] {
         if art == "austritt" {
             belegen(&app, &cookie, eid, a, "einheit", zug, "eintritt").await;
         }

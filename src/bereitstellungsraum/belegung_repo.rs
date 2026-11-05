@@ -69,10 +69,11 @@ pub struct Belegt {
 ///
 /// # Regeln (in Reihenfolge)
 /// 1. `objekt_typ` unbekannt → `Validation`
-/// 2. `art` unbekannt → `Validation`; `abruf`/`abruf_aufgehoben` → `UnprocessableEntity`, sie
-///    haben eigene Routen (LLH-1085, design.md D2)
+/// 2. `art` unbekannt → `Validation`
 /// 3. `von_br_id` bei einer anderen Art als `wechsel` → `Validation` (LLH-1521)
-/// 4. ab hier [`belege_tx`]
+/// 4. `abruf`/`abruf_aufgehoben` → `UnprocessableEntity`, sie haben eigene Routen (LLH-1085,
+///    design.md D2)
+/// 5. ab hier [`belege_tx`]
 #[allow(clippy::too_many_arguments)]
 pub async fn belege_mit_folgen(
     pool: &SqlitePool,
@@ -92,13 +93,13 @@ pub async fn belege_mit_folgen(
     // 2. Art parsen
     let belegungs_art = BrBelegungsArt::parse(art)
         .ok_or_else(|| AppError::Validation(format!("Unbekannte art: '{art}'")))?;
-    check_belegungs_art(belegungs_art)?;
-    // 3. Der erwartete Quellraum gehört nur zum Wechsel (LLH-1521).
+    // 3. Der erwartete Quellraum gehört nur zum Wechsel (LLH-1521), auch vor Abruf und Rücknahme.
     if von_br_id.is_some() && belegungs_art != BrBelegungsArt::Wechsel {
         return Err(AppError::Validation(
             "von_br_id gibt es nur beim Wechsel".into(),
         ));
     }
+    check_belegungs_art(belegungs_art)?;
 
     let buchung = Buchung {
         art: belegungs_art,
@@ -157,10 +158,10 @@ pub struct BelegungsErgebnis {
 ///    (`UnprocessableEntity`) – in der Transaktion, gegen das Rennen mit „Auflösen“
 /// 2. Objekt muss im selben Einsatz existieren und aktiv sein → `NotFound` / `Conflict`
 /// 3. `fahrzeug`: `einheit_id` nicht NULL → `Conflict`
-/// 4. Art-Vorbedingung: `eintritt` → `aktueller_br_id` muss NULL; `wechsel`/`austritt` → muss
-///    gesetzt sein; `abruf`/`abruf_aufgehoben` → `UnprocessableEntity`
-/// 5. Wechsel mit erwartetem Quellraum (`von_br_id`), den die Kraft inzwischen verlassen hat →
+/// 4. Wechsel mit erwartetem Quellraum (`von_br_id`), den die Kraft inzwischen verlassen hat →
 ///    `Conflict`, ohne Ereignis und Cache-Änderung (LLH-1521)
+/// 5. Art-Vorbedingung: `eintritt` → `aktueller_br_id` muss NULL; `wechsel`/`austritt` → muss
+///    gesetzt sein; `abruf`/`abruf_aufgehoben` → `UnprocessableEntity`
 /// 6. Ein Wechsel einer abgerufenen Kraft → `UnprocessableEntity` (LLH-1085, design.md D12)
 /// 7. Event-Insert + Cache-Update
 /// 8. Austritt einer abgerufenen Einheit: genau die mit ihr abgerufenen Untereinheiten treten
@@ -194,8 +195,10 @@ pub async fn belege_tx(
         }
     };
 
+    // Der Quellraum zuerst: hat jemand die Kraft inzwischen ausgetragen, nennt der Dialog das
+    // statt der allgemeinen Art-Vorbedingung (LLH-1521).
+    check_quellraum(buchung, aktueller_br_id)?;
     check_art_vorbedingung(&buchung.art, aktueller_br_id, br_id)?;
-    check_quellraum(&buchung, aktueller_br_id)?;
     let vorher_abruf = match aktueller_br_id {
         Some(raum) => offener_abruf_tx(&mut *conn, einsatz_id, typ, objekt_id, raum).await?,
         None => None,
@@ -1027,8 +1030,11 @@ pub(super) fn check_quellraum(
     buchung: &Buchung<'_>,
     aktueller_br_id: Option<i64>,
 ) -> Result<(), AppError> {
-    match (buchung.art, buchung.von_br_id) {
-        (BrBelegungsArt::Wechsel, Some(von)) if aktueller_br_id != Some(von) => Err(
+    match (buchung.art, buchung.von_br_id, aktueller_br_id) {
+        (BrBelegungsArt::Wechsel, Some(_), None) => Err(AppError::Conflict(
+            "Kraft steht inzwischen in keinem Raum mehr".into(),
+        )),
+        (BrBelegungsArt::Wechsel, Some(von), Some(jetzt)) if jetzt != von => Err(
             AppError::Conflict("Kraft steht inzwischen in einem anderen Raum".into()),
         ),
         _ => Ok(()),
