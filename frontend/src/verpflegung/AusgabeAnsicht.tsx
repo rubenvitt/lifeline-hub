@@ -864,12 +864,19 @@ export default function AusgabeAnsicht() {
                     >
                       fehlt {fehlt}
                     </span>
-                    {/* Fester Platz für „+ n“: ein Tipp verbreitert die Taste nicht. */}
+                    {/* Fester Platz für „+ n“: ein Tipp verbreitert die Taste nicht. Leer steht
+                        ein unsichtbarer Platzhalter darin, damit der Platz auch allein in seiner
+                        Zeile eine Zeile hoch ist und der erste Tipp die Taste nicht wachsen lässt. */}
                     <span
                       data-lfh="sonderkost-sammlung"
-                      style={{ ...monoStil(12, 500), display: 'inline-block', minWidth: '5ch' }}
+                      style={{
+                        ...monoStil(12, 500),
+                        display: 'inline-block',
+                        minWidth: '5ch',
+                        visibility: n > 0 ? 'visible' : 'hidden',
+                      }}
                     >
-                      {n > 0 ? ` + ${n}` : ''}
+                      {n > 0 ? ` + ${n}` : ' + 0'}
                     </span>
                   </span>
                 </Button>

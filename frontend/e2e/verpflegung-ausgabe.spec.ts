@@ -701,4 +701,21 @@ test('Sonderkost mit vierstelligem Soll läuft bei 320 px nicht über (alle Dich
     );
     await pruefeSonderkostLage(page, `320 px, ${dichte}, Soll 1000`);
   }
+  // Der erste Tipp füllt den Sammelplatz („+ 1“). Im Handschuh bei 320 px bricht er allein in
+  // eine eigene Zeile um; auch leer hält er dort eine Zeile, also wächst und rückt keine Taste
+  // (Mutationsprobe: leerer Sammelplatz ohne Text, 0 px hoch → rot).
+  const lagen = () =>
+    page.locator('[data-lfh="ausgabe-sonderkost"] [data-kostform]').evaluateAll((el) =>
+      el.map((e) => {
+        const r = e.getBoundingClientRect();
+        const s = e.querySelector('[data-lfh="sonderkost-sammlung"]')!.getBoundingClientRect();
+        // Seitenbezogen: der Klick rollt die Taste ins Bild.
+        return [r.left, r.top + window.scrollY, r.width, r.height, s.height].map(Math.round);
+      }),
+    );
+  const taste = page.locator('[data-kostform="ohne_schwein"]');
+  const vorher = await lagen();
+  await taste.click();
+  await expect(taste).toHaveAttribute('aria-label', /\+ 1$/);
+  expect(await lagen(), '320 px, handschuh: erster Tipp').toEqual(vorher);
 });
