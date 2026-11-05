@@ -134,6 +134,7 @@ pub(super) async fn fristen_beim_abschluss(
     einsatz_id: i64,
     von_benutzer_id: i64,
     etb_startwert: i64,
+    stil: crate::zeitdarstellung::Zeitstil,
     abgeschlossen_at: &str,
     vorgaben: &[KategorieVorgabe],
 ) -> Result<Vec<i64>, AppError> {
@@ -160,9 +161,10 @@ pub(super) async fn fristen_beim_abschluss(
             continue;
         }
         let inhalt = format!(
-            "Aufbewahrungsfrist der Datenkategorie „{}“ automatisch gesetzt auf {frist} \
+            "Aufbewahrungsfrist der Datenkategorie „{}“ automatisch gesetzt auf {} \
              (Dauer {} Tage ab Abschluss; Rechtsgrundlage: {})",
             v.kategorie.bezeichnung(),
+            stil.zeitpunkt_text(&frist),
             v.dauer_tage,
             v.rechtsgrundlage
         );
@@ -209,6 +211,9 @@ pub async fn frist_setzen(
     jetzt: DateTime<Utc>,
 ) -> Result<FristErgebnis, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
+    // Alte und neue Frist und die Vormerkung im ETB in Zone und Darstellung des Einsatzes
+    // (LLH-1540).
+    let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let k = aenderung.kategorie;
     crate::write_retry!(pool, |conn| {
@@ -334,27 +339,40 @@ pub async fn frist_setzen(
         .await?;
 
         let name = k.bezeichnung();
+        let z = |wire: &str| stil.zeitpunkt_text(wire);
         // Alter und neuer Wert stehen im ETB (Spec „Kategorie-Frist am Einsatz ändern“), für die
         // Frist wie für die Rechtsgrundlage.
         let mut audit = match (alt.as_deref(), aenderung.neue_frist) {
             (Some(a), None) => format!(
-                "Aufbewahrungsfrist der Datenkategorie „{name}“ aufgehoben (bisher {a}; folgt \
-                 jetzt der Frist des Einsatzes)"
+                "Aufbewahrungsfrist der Datenkategorie „{name}“ aufgehoben (bisher {}; folgt \
+                 jetzt der Frist des Einsatzes)",
+                z(a)
             ),
             (None, None) => format!("Aufbewahrungsfrist der Datenkategorie „{name}“ unverändert"),
             (None, Some(neu)) => {
-                format!("Aufbewahrungsfrist der Datenkategorie „{name}“ gesetzt auf {neu}")
+                format!(
+                    "Aufbewahrungsfrist der Datenkategorie „{name}“ gesetzt auf {}",
+                    z(neu)
+                )
             }
             (Some(a), Some(neu)) if a == neu => {
-                format!("Aufbewahrungsfrist der Datenkategorie „{name}“ unverändert {neu}")
+                format!(
+                    "Aufbewahrungsfrist der Datenkategorie „{name}“ unverändert {}",
+                    z(neu)
+                )
             }
             (Some(a), Some(neu)) => {
-                format!("Aufbewahrungsfrist der Datenkategorie „{name}“ geändert von {a} auf {neu}")
+                format!(
+                    "Aufbewahrungsfrist der Datenkategorie „{name}“ geändert von {} auf {}",
+                    z(a),
+                    z(neu)
+                )
             }
         };
         if let Some(v) = &vorgemerkt_at {
             audit.push_str(&format!(
-                ". Löschvormerkung vom {v} aufgehoben (Wiederherstellung während der Karenz)"
+                ". Löschvormerkung vom {} aufgehoben (Wiederherstellung während der Karenz)",
+                z(v)
             ));
         }
         match zeile.as_ref().map(|z| z.rechtsgrundlage.as_str()) {
@@ -842,7 +860,12 @@ mod tests {
             .iter()
             .find(|t| t.contains("„Personenauskunft“"))
             .expect("ETB-Eintrag zur Kategorie-Frist");
-        assert!(eintrag.contains(&abgeschlossen_at));
+        // Die Frist (= Abschluss bei 0 Tagen) in der Vorgabe-Zeitdarstellung (LLH-1540).
+        let frist = crate::zeitdarstellung::Zeitstil::VORGABE.zeitpunkt_text(&abgeschlossen_at);
+        assert!(
+            eintrag.contains(&format!("gesetzt auf {frist} ")),
+            "{eintrag}"
+        );
         assert!(eintrag.contains("§ 46 Abs. 5 BHKG NRW"));
         assert!(etb.iter().any(|t| t.contains("„Anhänge“")));
 
@@ -994,7 +1017,11 @@ mod tests {
         let etb = etb_texte(&pool, einsatz).await;
         let letzter = etb.last().unwrap();
         assert!(letzter.contains("„Personenauskunft“"), "{letzter}");
-        assert!(letzter.contains("2026-07-30 12:00:00") && letzter.contains("2026-12-01 00:00:00"));
+        // Alte und neue Frist in der Vorgabe-Zeitdarstellung (LLH-1540).
+        assert!(
+            letzter.contains("geändert von 301400jul26 auf 010100dez26"),
+            "{letzter}"
+        );
 
         // Verkürzen ohne Bestätigung → 409, nichts geändert.
         let err = frist_setzen(
@@ -1072,7 +1099,7 @@ mod tests {
         );
         let letzter = etb_texte(&pool, einsatz).await.last().unwrap().clone();
         assert!(
-            letzter.contains("aufgehoben (bisher 2026-08-01 00:00:00"),
+            letzter.contains("aufgehoben (bisher 010200aug26"),
             "{letzter}"
         );
 
@@ -1240,6 +1267,193 @@ mod tests {
         .await
         .unwrap_err();
         assert_eq!(err.status(), axum::http::StatusCode::CONFLICT);
+    }
+
+    /// LLH-1540: Organisation New York, Einsatz Tokio (UTC+9) in der gegebenen Darstellung.
+    async fn zeitstil_einsatz_tokio(pool: &SqlitePool, einsatz: i64, darstellung: &str) {
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+             VALUES (1, 'America/New_York', 'datum_uhrzeit') \
+             ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+                zeitdarstellung = excluded.zeitdarstellung",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+             VALUES (?, 'Asia/Tokyo', ?) \
+             ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+                zeitdarstellung = excluded.zeitdarstellung",
+        )
+        .bind(einsatz)
+        .bind(darstellung)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// LLH-1540, Spec `zeitdarstellung`, „Servertexte“: jeder ETB-Text der Kategorie-Frist nennt
+    /// Fristen und Vormerkung in Zone und Darstellung des Einsatzes (Tokio), nicht der
+    /// Organisation (New York) und nicht als UTC-String.
+    #[tokio::test]
+    async fn kategorie_fristen_im_etb_folgen_dem_zeitstil_des_einsatzes() {
+        use crate::zeitdarstellung::{Zeitdarstellung, Zeitstil};
+        // (Darstellung, 30.07. 12:00Z, 01.12. 00:00Z, 20.06. 00:00Z, 25.06. 12:00Z, 29.08. 00:00Z)
+        for (darstellung, d, juli, dez, juni20, juni25, aug) in [
+            (
+                "taktisch",
+                Zeitdarstellung::Taktisch,
+                "302100jul26",
+                "010900dez26",
+                "200900jun26",
+                "252100jun26",
+                "290900aug26",
+            ),
+            (
+                "datum_uhrzeit",
+                Zeitdarstellung::DatumUhrzeit,
+                "30.07.26 21:00",
+                "01.12.26 09:00",
+                "20.06.26 09:00",
+                "25.06.26 21:00",
+                "29.08.26 09:00",
+            ),
+        ] {
+            let pool = crate::db::test_pool().await;
+            let (einsatz, leit) = einsatz_mit_leitung(&pool).await;
+            zeitstil_einsatz_tokio(&pool, einsatz, darstellung).await;
+            org_vorgabe(&pool, Datenkategorie::Personenauskunft, 30, "RG").await;
+            let auskunft = Datenkategorie::Personenauskunft;
+            let letzter = || async { etb_texte(&pool, einsatz).await.last().unwrap().clone() };
+
+            // Abschluss: „automatisch gesetzt auf …“.
+            super::super::repo::abschliessen(&pool, einsatz, leit)
+                .await
+                .unwrap();
+            let frist = zeile(&pool, einsatz, auskunft)
+                .await
+                .unwrap()
+                .frist_bis
+                .unwrap();
+            let tokio = Zeitstil::new(chrono_tz::Asia::Tokyo, d);
+            let auto = etb_texte(&pool, einsatz)
+                .await
+                .into_iter()
+                .find(|t| t.contains("automatisch gesetzt auf"))
+                .unwrap();
+            assert!(
+                auto.contains(&format!(
+                    "automatisch gesetzt auf {} ",
+                    tokio.zeitpunkt_text(&frist)
+                )),
+                "{darstellung}: {auto}"
+            );
+            assert!(!auto.contains(&frist), "kein UTC-String: {auto}");
+
+            // „geändert von … auf …“.
+            sqlx::query(
+                "UPDATE einsatz_aufbewahrung_kategorie SET frist_bis = '2026-07-30 12:00:00' \
+                 WHERE einsatz_id = ?",
+            )
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+            frist_setzen(
+                &pool,
+                einsatz,
+                leit,
+                aend(auskunft, Some("2026-12-01 00:00:00"), None, false),
+                t(JETZT),
+            )
+            .await
+            .unwrap();
+            let text = letzter().await;
+            assert!(
+                text.contains(&format!("geändert von {juli} auf {dez}")),
+                "{darstellung}: {text}"
+            );
+
+            // Gleiche Frist, neue Rechtsgrundlage: „unverändert …“.
+            frist_setzen(
+                &pool,
+                einsatz,
+                leit,
+                aend(auskunft, Some("2026-12-01 00:00:00"), Some("neu"), false),
+                t(JETZT),
+            )
+            .await
+            .unwrap();
+            let text = letzter().await;
+            assert!(
+                text.contains(&format!("unverändert {dez}")),
+                "{darstellung}: {text}"
+            );
+
+            // „aufgehoben (bisher …)“.
+            frist_setzen(
+                &pool,
+                einsatz,
+                leit,
+                aend(auskunft, None, None, false),
+                t(JETZT),
+            )
+            .await
+            .unwrap();
+            let text = letzter().await;
+            assert!(
+                text.contains(&format!("aufgehoben (bisher {dez};")),
+                "{darstellung}: {text}"
+            );
+
+            // Erste Frist einer weiteren Kategorie: „gesetzt auf …“.
+            frist_setzen(
+                &pool,
+                einsatz,
+                leit,
+                aend(
+                    Datenkategorie::Anhaenge,
+                    Some("2026-12-01 00:00:00"),
+                    Some("X"),
+                    true,
+                ),
+                t(JETZT),
+            )
+            .await
+            .unwrap();
+            let text = letzter().await;
+            assert!(
+                text.contains(&format!("„Anhänge“ gesetzt auf {dez}")),
+                "{darstellung}: {text}"
+            );
+
+            // In der Karenz: „Löschvormerkung vom … aufgehoben“, dazu die alte und neue Frist.
+            sqlx::query(
+                "UPDATE einsatz_aufbewahrung_kategorie SET frist_bis = '2026-06-20 00:00:00', \
+                    vorgemerkt_at = '2026-06-25 12:00:00' \
+                 WHERE einsatz_id = ? AND kategorie = 'personenauskunft'",
+            )
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+            frist_setzen(
+                &pool,
+                einsatz,
+                leit,
+                aend(auskunft, Some("2026-08-29 00:00:00"), None, false),
+                t(JETZT),
+            )
+            .await
+            .unwrap();
+            let text = letzter().await;
+            assert!(
+                text.contains(&format!("geändert von {juni20} auf {aug}"))
+                    && text.contains(&format!("Löschvormerkung vom {juni25} aufgehoben")),
+                "{darstellung}: {text}"
+            );
+        }
     }
 
     async fn frist_gesetzt_at(

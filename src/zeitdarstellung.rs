@@ -6,8 +6,9 @@
 //!
 //! Zone und Darstellung eines Einsatzes lädt nur [`zeitstil_laden`] (LLH-1443): beide Einsatz vor
 //! Organisation vor Vorgabe, so dass Verpflegung, Zeitachse, Auftragsfrist, Nachforderung,
-//! Ablösung, Hinweise, Lagebesprechung, Zeitstand der Vorlagendokumente und Karenz-Beginn der
-//! Aufbewahrung (LLH-1476) dieselbe Ortszeit nennen, die die Oberfläche des Einsatzes zeigt.
+//! Ablösung, Hinweise, Lagebesprechung, Zeitstand der Vorlagendokumente, Karenz-Beginn der
+//! Aufbewahrung (LLH-1476) und die Aufbewahrungsfristen von Einsatz und Datenkategorie samt
+//! Löschvormerkung (LLH-1540) dieselbe Ortszeit nennen, die die Oberfläche des Einsatzes zeigt.
 //!
 //! Das Gegenstück im Client ist `frontend/src/anzeige/zeitDarstellung.ts`; beide schreiben die
 //! Rolle „Zeitpunkt“ gleich (`101430okt26` bzw. `10.10.26 14:30`) und die Rolle „Uhrzeit“
