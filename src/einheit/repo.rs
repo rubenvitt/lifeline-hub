@@ -3185,7 +3185,7 @@ mod tests {
     /// Verbindungen (LLH-1134; beide Angaben der Einheit selbst, sie gehen per Kaskade mit) und
     /// die letzte Besetzung (LLH-1266): sie entsteht erst beim Auflösen einer Einheit, die
     /// ohnehin stehen bleibt, und geht per Kaskade mit ihr. Dazu die Einheit am Vermerk der
-    /// entfallenen Planung (LLH-1510, Migration 0272): der Vermerk trägt ihren Namen als Kopie,
+    /// entfallenen Planung (LLH-1510, Migration 0273): der Vermerk trägt ihren Namen als Kopie,
     /// die ID dient nur dem Zurückholen und fällt mit `SET NULL` weg, ohne dass etwas Sichtbares
     /// verloren geht.
     #[tokio::test]

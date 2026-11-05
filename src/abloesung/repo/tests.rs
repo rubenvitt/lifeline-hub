@@ -2517,7 +2517,7 @@ async fn vermerk_zeigt_sich_erst_ohne_verbleibenden_abloeser() {
 
 // ── Gestrichene Entlassung holt die Planung zurück (LLH-1510) ───────────────────────────────
 
-/// ID der Einheit am Vermerk der entfallenen Planung (Migration 0272).
+/// ID der Einheit am Vermerk der entfallenen Planung (Migration 0273).
 async fn vermerk_einheit(pool: &SqlitePool, id: i64) -> Option<i64> {
     sqlx::query_scalar("SELECT planung_entfallen_einheit_id FROM einsatz_abloesung WHERE id = ?")
         .bind(id)
@@ -2765,7 +2765,7 @@ async fn berichtigte_entlassung_meldet_planung_nicht_doppelt() {
     assert_eq!(vermerk_einheit(&w.pool, id).await, Some(w.f2));
 }
 
-/// Migration 0272: die ID der Einheit gibt es nur mit Vermerk.
+/// Migration 0273: die ID der Einheit gibt es nur mit Vermerk.
 #[tokio::test]
 async fn vermerk_einheit_nur_mit_vermerk() {
     let w = welt().await;
