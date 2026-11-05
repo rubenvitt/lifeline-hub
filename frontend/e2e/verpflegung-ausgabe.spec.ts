@@ -299,14 +299,9 @@ async function pruefeHoehe(
     page.evaluate((sel) => {
       const b = sel ? document.querySelector<HTMLElement>(sel)! : document.documentElement;
       const sicht = sel ? b.clientHeight : window.innerHeight;
-      // Die Kante, an der ein Fuß mit `bottom: 0` klebt: am Gerät über der Polsterung des
-      // `main`, am Stab die Fensterkante.
-      const kante = sel
-        ? b.getBoundingClientRect().top +
-          b.clientTop +
-          b.clientHeight -
-          parseFloat(getComputedStyle(b).paddingBottom)
-        : sicht;
+      // Die Unterkante des Bildlaufs: am Gerät die des `main` (über dessen Polsterung hinweg,
+      // LLH-1504), am Stab die Fensterkante.
+      const kante = sel ? b.getBoundingClientRect().top + b.clientTop + b.clientHeight : sicht;
       const feld = document.querySelector('[data-lfh="zaehltasten"]')!.getBoundingClientRect();
       return {
         // Wie weit sich der Scrollbereich rollen lässt.
@@ -399,7 +394,9 @@ for (const flaeche of [
  * die Zeile rollt mit hinaus, rot; `kurzzeileSichtbar` immer `false` → rot ab dem ersten Schritt
  * unter der Kante; die Regel `:root:has([data-lfh='ausgabe-kurzzeile'])` bzw. `main:has(…)` in
  * `index.css` entfernt → rückwärts getabbt steht ein Ziel hinter der Zeile, rot; der Polsterungsabzug in
- * `restHoeheVon` (Gerät) entfernt → die Zeile steht 12 px unter der Kante, rot.
+ * `restHoeheVon` (Gerät) entfernt → die Zeile steht 12 px unter der Kante, rot; `bottom` des
+ * Tastenfelds wieder `0` → am Gerät steht es beim Rollen 12 px über der Unterkante, die Liste
+ * scheint darunter durch, rot.
  */
 async function pruefeKurzzeile(page: Page, wo: string, scrollbereich: string | null) {
   await expect(page.locator('html'), wo).toHaveAttribute('data-dichte', 'komfortabel');
@@ -462,6 +459,12 @@ async function pruefeKurzzeile(page: Page, wo: string, scrollbereich: string | n
             aus.push(`${y}: „${w.textContent}“ im Kopf nicht frei, Kurzzeile verborgen`);
           }
         }
+      }
+      // Das Tastenfeld steht an jeder Stelle an der Unterkante: nichts schiene darunter durch,
+      // und keine Taste verschiebt sich beim Rollen.
+      const feld = document.querySelector('[data-lfh="zaehltasten"]')!.getBoundingClientRect();
+      if (Math.abs(feld.bottom - unten()) > 1) {
+        aus.push(`${y}: Tastenfeld endet bei ${feld.bottom}, Unterkante ${unten()}`);
       }
       if (y >= ende) break;
     }
