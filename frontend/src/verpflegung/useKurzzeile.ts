@@ -22,7 +22,7 @@ export function kurzzeileSichtbar(band: { top: number }, anker: { top: number })
 /**
  * Callback-Refs für Anker und Band und der Stand `sichtbar`. Gemessen beim Rollen (jeder
  * Scrollbereich: am Stab das Dokument, am Gerät das `main`, deshalb `capture` am Dokument), bei
- * Fenster- und Bandgröße, im nächsten Bild.
+ * Fenster-, Band- und Kopfgröße, im nächsten Bild.
  */
 export function useKurzzeile() {
   const [anker, setAnker] = useState<HTMLElement | null>(null);
@@ -42,8 +42,11 @@ export function useKurzzeile() {
     const optionen = { capture: true, passive: true } as const;
     document.addEventListener('scroll', planen, optionen);
     window.addEventListener('resize', planen);
+    // Auch der Kopf um das Band: wächst er darüber (Einstufungszeile bricht um, Dichtewechsel),
+    // rückt das Band ohne Bildlauf.
     const beobachter = new ResizeObserver(planen);
     beobachter.observe(band);
+    if (band.parentElement) beobachter.observe(band.parentElement);
     return () => {
       document.removeEventListener('scroll', planen, optionen);
       window.removeEventListener('resize', planen);
