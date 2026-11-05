@@ -639,7 +639,7 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
   }
 
   it('Freigaben erst nach dem Öffnen: bei gewähltem Besatzungswechsel bleibt der Grund an der Art (LLH-1542)', async () => {
-    const { neu } = vollzug({ schicht: geplant });
+    const { onErfassen, neu } = vollzug({ schicht: geplant });
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
     neu({
@@ -655,6 +655,11 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     );
     expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
     expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
+    // Hinaus geht der Besatzungswechsel (der Server lehnt ihn ab), nie ein Vollzug der Einheit.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalled());
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({ art: 'besatzung' });
+    expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('abloeser_ids');
   });
 
   it('verteilt im Klappteil auf Gruppe und Fahrzeug; der Kopf nennt die Abweichung', async () => {
