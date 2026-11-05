@@ -338,9 +338,22 @@ async fn person_verstoss_tx(
     v: Verstoss,
 ) -> Result<AppError, AppError> {
     let name = kraft_name_tx(conn, einsatz_id, Kraft::Person(person)).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
     Ok(AppError::UnprocessableEntity(format!(
-        "Die Zeitachse von «{name}» verlöre ihre Ordnung: {v}"
+        "Die Zeitachse von «{name}» verlöre ihre Ordnung: {}",
+        v.text(&stil)
     )))
+}
+
+/// 422 aus einem Verstoß der Kraft selbst; der Zeitpunkt im Zeitstil des Einsatzes (LLH-1541).
+/// Der Stil wird erst im Fehlerfall geladen, der Schreibweg bleibt ohne Zusatzabfrage.
+async fn verstoss_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    v: &Verstoss,
+) -> Result<AppError, AppError> {
+    let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
+    Ok(AppError::UnprocessableEntity(v.text(&stil)))
 }
 
 /// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien an Personen,
@@ -361,8 +374,9 @@ pub async fn streiche_tx(
     } = lade_streichbar_tx(conn, einsatz_id, kraft, id, durch_ruecknahme).await?;
 
     let bestand = bestand_tx(conn, kraft).await?;
-    perioden::pruefe_streichen(&bestand, &[id])
-        .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
+    if let Err(v) = perioden::pruefe_streichen(&bestand, &[id]) {
+        return Err(verstoss_tx(conn, einsatz_id, &v).await?);
+    }
 
     // Fan-out-Kopien: je Person einzeln prüfen, bevor irgendetwas geschrieben wird.
     let kopien = kopien_tx(conn, id).await?;
@@ -458,8 +472,9 @@ pub async fn berichtige_tx(
     let art = alt.art;
 
     let bestand = bestand_tx(conn, kraft).await?;
-    perioden::ersetze(&bestand, id, art, zeitpunkt_at)
-        .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
+    if let Err(v) = perioden::ersetze(&bestand, id, art, zeitpunkt_at) {
+        return Err(verstoss_tx(conn, einsatz_id, &v).await?);
+    }
 
     let kopien = kopien_tx(conn, id).await?;
     for (kopie, person) in &kopien {
@@ -503,25 +518,24 @@ pub async fn berichtige_tx(
         quelle: ZeitachseQuelle::Nachtrag,
         notiz: alt.notiz.as_deref(),
     };
-    let neu_id =
-        geschrieben(schreibe_einzeln_tx(conn, einsatz_id, benutzer_id, kraft, neu, None).await?)?;
+    let r = schreibe_einzeln_tx(conn, einsatz_id, benutzer_id, kraft, neu, None).await?;
+    let neu_id = geschrieben_tx(conn, einsatz_id, r).await?;
     for (_, person) in &kopien {
         let kopie = Neu {
             quelle: ZeitachseQuelle::Einheit,
             notiz: None,
             ..neu
         };
-        geschrieben(
-            schreibe_einzeln_tx(
-                conn,
-                einsatz_id,
-                benutzer_id,
-                Kraft::Person(*person),
-                kopie,
-                Some(neu_id),
-            )
-            .await?,
-        )?;
+        let r = schreibe_einzeln_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            Kraft::Person(*person),
+            kopie,
+            Some(neu_id),
+        )
+        .await?;
+        geschrieben_tx(conn, einsatz_id, r).await?;
         beruehrt.personen.push(*person);
     }
     if let Kraft::Einheit(einheit_id) = kraft {
@@ -552,10 +566,14 @@ pub async fn berichtige_tx(
 
 /// Nach der Prüfung am Ergebnis kann das Einfügen nicht mehr ausgelassen werden; geschieht es
 /// doch, bricht die Berichtigung mit 422 statt still eine Kopie zu verlieren.
-fn geschrieben(r: Schreibergebnis) -> Result<i64, AppError> {
+async fn geschrieben_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    r: Schreibergebnis,
+) -> Result<i64, AppError> {
     match r {
         Schreibergebnis::Geschrieben(id) => Ok(id),
-        Schreibergebnis::Ausgelassen(v) => Err(AppError::UnprocessableEntity(v.to_string())),
+        Schreibergebnis::Ausgelassen(v) => Err(verstoss_tx(conn, einsatz_id, &v).await?),
     }
 }
 

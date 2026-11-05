@@ -12,6 +12,7 @@
 //! Erfassung, ein Kandidat beim Einfügen steht also hinter dem Bestand.
 
 use super::{Einsatzperiode, ZeitachseArt};
+use crate::zeitdarstellung::Zeitstil;
 
 /// Ein nicht gestrichenes Ereignis als Eingabe.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,7 +22,7 @@ pub struct Ereignis {
     pub zeitpunkt_at: String,
 }
 
-/// Verstoß gegen die Perioden-Regeln; `Display` ist der Text der 422.
+/// Verstoß gegen die Perioden-Regeln; [`Verstoss::text`] ist der Text der 422.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verstoss {
     DoppelteAlarmierung { zeitpunkt_at: String },
@@ -30,24 +31,26 @@ pub enum Verstoss {
     EndeOhnePeriode { zeitpunkt_at: String },
 }
 
-impl std::fmt::Display for Verstoss {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Verstoss {
+    /// Text der 422. Der Zeitpunkt steht in Zone und Darstellung des Einsatzes, Rolle
+    /// „Zeitpunkt“ (LLH-1541, Spec `zeitdarstellung`), nie im UTC-Drahtformat.
+    pub fn text(&self, stil: &Zeitstil) -> String {
         match self {
-            Self::DoppelteAlarmierung { zeitpunkt_at } => write!(
-                f,
-                "Die Einsatzperiode trägt schon eine Alarmierung ({zeitpunkt_at})"
+            Self::DoppelteAlarmierung { zeitpunkt_at } => format!(
+                "Die Einsatzperiode trägt schon eine Alarmierung ({})",
+                stil.zeitpunkt_text(zeitpunkt_at)
             ),
-            Self::AlarmierungNachEintreffen { zeitpunkt_at } => write!(
-                f,
-                "Eine Alarmierung ({zeitpunkt_at}) darf nicht nach dem Eintreffen derselben Periode liegen"
+            Self::AlarmierungNachEintreffen { zeitpunkt_at } => format!(
+                "Eine Alarmierung ({}) darf nicht nach dem Eintreffen derselben Periode liegen",
+                stil.zeitpunkt_text(zeitpunkt_at)
             ),
-            Self::DoppeltesEintreffen { zeitpunkt_at } => write!(
-                f,
-                "Die Einsatzperiode trägt schon ein Eintreffen ({zeitpunkt_at})"
+            Self::DoppeltesEintreffen { zeitpunkt_at } => format!(
+                "Die Einsatzperiode trägt schon ein Eintreffen ({})",
+                stil.zeitpunkt_text(zeitpunkt_at)
             ),
-            Self::EndeOhnePeriode { zeitpunkt_at } => write!(
-                f,
-                "Zum Ende ({zeitpunkt_at}) gibt es keine offene Einsatzperiode"
+            Self::EndeOhnePeriode { zeitpunkt_at } => format!(
+                "Zum Ende ({}) gibt es keine offene Einsatzperiode",
+                stil.zeitpunkt_text(zeitpunkt_at)
             ),
         }
     }
@@ -269,6 +272,42 @@ mod tests {
             bilde(&[e(1, Entlassung, "06:40")]),
             Err(Verstoss::EndeOhnePeriode { .. })
         ));
+    }
+
+    /// LLH-1541: die vier Texte der 422 nennen den Zeitpunkt in Zone und Darstellung des
+    /// Einsatzes. 04:40 UTC ist in Tokio 13:40.
+    #[test]
+    fn texte_nennen_den_zeitpunkt_im_zeitstil() {
+        use crate::zeitdarstellung::Zeitdarstellung;
+        let taktisch = Zeitstil::new(chrono_tz::Asia::Tokyo, Zeitdarstellung::Taktisch);
+        let datum = Zeitstil::new(chrono_tz::Asia::Tokyo, Zeitdarstellung::DatumUhrzeit);
+        let z = || t("04:40");
+        let faelle = [
+            (
+                Verstoss::DoppelteAlarmierung { zeitpunkt_at: z() },
+                "Die Einsatzperiode trägt schon eine Alarmierung (301340sep26)",
+                "Die Einsatzperiode trägt schon eine Alarmierung (30.09.26 13:40)",
+            ),
+            (
+                Verstoss::AlarmierungNachEintreffen { zeitpunkt_at: z() },
+                "Eine Alarmierung (301340sep26) darf nicht nach dem Eintreffen derselben Periode liegen",
+                "Eine Alarmierung (30.09.26 13:40) darf nicht nach dem Eintreffen derselben Periode liegen",
+            ),
+            (
+                Verstoss::DoppeltesEintreffen { zeitpunkt_at: z() },
+                "Die Einsatzperiode trägt schon ein Eintreffen (301340sep26)",
+                "Die Einsatzperiode trägt schon ein Eintreffen (30.09.26 13:40)",
+            ),
+            (
+                Verstoss::EndeOhnePeriode { zeitpunkt_at: z() },
+                "Zum Ende (301340sep26) gibt es keine offene Einsatzperiode",
+                "Zum Ende (30.09.26 13:40) gibt es keine offene Einsatzperiode",
+            ),
+        ];
+        for (v, erwartet_taktisch, erwartet_datum) in faelle {
+            assert_eq!(v.text(&taktisch), erwartet_taktisch);
+            assert_eq!(v.text(&datum), erwartet_datum);
+        }
     }
 
     /// Ein Nachtrag in die Vergangenheit wird an seiner Zeitstelle geprüft: ein Eintreffen um
