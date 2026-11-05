@@ -79,7 +79,8 @@ pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static st
         | BenachrichtigungBezugTyp::AbloeserAbgerufen
         | BenachrichtigungBezugTyp::AbloeserEntfallen
         | BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen
-        | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen => None,
+        | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen
+        | BenachrichtigungBezugTyp::AbloeserWiederhergestellt => None,
         // Der Dokumenttitel ist ein Scrub-Wert; die Version unterscheidet die Fortschreibungen.
         BenachrichtigungBezugTyp::Befehl => Some(("befehl", "version")),
         BenachrichtigungBezugTyp::Lagebericht => Some(("lagebericht", "version")),
@@ -162,6 +163,9 @@ pub const fn abloeser_titel(typ: BenachrichtigungBezugTyp) -> Option<&'static st
         }
         BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen => {
             Some("Eintreffen der ablösenden Einheit gestrichen")
+        }
+        BenachrichtigungBezugTyp::AbloeserWiederhergestellt => {
+            Some("Planung der ablösenden Einheit wiederhergestellt")
         }
         _ => None,
     }
@@ -264,7 +268,8 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
         | BenachrichtigungBezugTyp::AbloeserAbgerufen
         | BenachrichtigungBezugTyp::AbloeserEntfallen
         | BenachrichtigungBezugTyp::AbloeserAlarmierungGestrichen
-        | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen => {
+        | BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen
+        | BenachrichtigungBezugTyp::AbloeserWiederhergestellt => {
             format!("{basis}/abloesung?schicht={id}")
         }
         BenachrichtigungBezugTyp::Lagebesprechung => format!("{basis}/lagebesprechung"),

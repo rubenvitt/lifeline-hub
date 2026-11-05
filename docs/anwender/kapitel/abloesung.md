@@ -226,6 +226,14 @@ Hinweis „Keine ablösende Einheit geplant“ wieder an. Bleibt kein Ablöser g
 den Grund, etwa „Planung entfallen · 2. Rettungsstaffel aufgelöst“, bis wieder eine Einheit
 geplant ist.
 
+Wird die Entlassung, mit der die Planung entfiel, in der Kräfte-Zeitachse gestrichen, ist die
+Einheit wieder geplant: sie reiht sich hinter einem noch geplanten Ablöser ein, der Vermerk an der
+Karte verschwindet, das Einsatztagebuch hält „Planung der ablösenden Einheit wiederhergestellt“
+fest, und die Leser bekommen den gleichnamigen Hinweis. Das gilt nur, solange niemand die Planung
+der Schicht inzwischen von Hand geändert hat, die Schicht noch läuft und die Einheit nicht schon
+an einer anderen Schicht geplant ist. Wird nur die Zeit der Entlassung berichtigt, bleibt die
+Planung entfallen, und es kommt kein weiterer Hinweis.
+
 ### Sprung zur Schicht
 
 „Öffnen“ in einem Hinweis der Ablösung (Vorwarnung, Fälligkeit, „Keine ablösende Einheit

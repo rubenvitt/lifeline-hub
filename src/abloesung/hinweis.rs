@@ -96,3 +96,31 @@ pub(crate) fn anlass(
     .von(von)
     .an(Adressat::ModulLeser("abloesung"))
 }
+
+/// Hebt die Hinweise „wiederhergestellt“ und „entfallen“ derselben Schicht gegeneinander auf.
+/// Für die Berichtigung einer Entlassung (LLH-1455: Streichung, dann Nachtrag in einer
+/// Transaktion): die Streichung holt die Planung zurück (LLH-1510), der Nachtrag lässt sie gleich
+/// wieder entfallen. Die Führung hat „entfallen“ schon bekommen; zwei Hinweise, die sich
+/// aufheben, sagten ihr nichts Neues. Die ETB-Einträge bleiben als Spur.
+pub(crate) fn cancel_wiederhergestellt_entfallen(anlaesse: &mut Vec<Anlass>) {
+    use std::collections::HashSet;
+    let schichten = |typ: BenachrichtigungBezugTyp| {
+        anlaesse
+            .iter()
+            .filter(|a| a.bezug.typ == typ)
+            .map(|a| a.bezug.id)
+            .collect::<HashSet<_>>()
+    };
+    let wieder = schichten(BenachrichtigungBezugTyp::AbloeserWiederhergestellt);
+    let beide: HashSet<i64> = schichten(BenachrichtigungBezugTyp::AbloeserEntfallen)
+        .intersection(&wieder)
+        .copied()
+        .collect();
+    anlaesse.retain(|a| {
+        !(matches!(
+            a.bezug.typ,
+            BenachrichtigungBezugTyp::AbloeserWiederhergestellt
+                | BenachrichtigungBezugTyp::AbloeserEntfallen
+        ) && beide.contains(&a.bezug.id))
+    });
+}

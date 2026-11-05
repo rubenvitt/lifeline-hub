@@ -10,9 +10,12 @@ import { useCallback } from 'react';
  * Ein Fuß mit `position: sticky; bottom: 0` steht an der Kante, an der sein Scrollbereich klebt,
  * und genau dort endet das Element, damit der Fuß bei kurzem und bei langem Inhalt an derselben
  * Stelle steht (Spec: eine Buchung verschiebt keine Zähltaste):
- *  - In einem eigenen Scrollbereich (die Gerätehülle rollt ihr `main`, `overflow: auto`) klebt der
- *    Fuß über dessen unterer Polsterung. Das Element füllt die sichtbare Höhe minus seine Lage
- *    darin minus diese Polsterung. Die Gerätenavigation steht außerhalb und zählt nie mit.
+ *  - In einem eigenen Scrollbereich (die Gerätehülle rollt ihr `main`, `overflow: auto`) klebt
+ *    Chromium ein `bottom: 0` über dessen unterer Polsterung; darunter schiene der Inhalt in einem
+ *    Streifen durch. Das Element reicht deshalb wie im Dokument über die Polsterung bis an die
+ *    Kante (sichtbare Höhe minus seine Lage darin, negativer Außenabstand in Höhe der Polsterung),
+ *    {@link REST_KANTE_VAR} setzt den Fuß um sie tiefer, {@link REST_UNTEN_VAR} gibt sie ihm als
+ *    Innenabstand zurück. Die Gerätenavigation steht außerhalb und zählt nie mit.
  *  - Rollt das Dokument, klebt der Fuß an der Fensterkante, die Seitenpolsterung
  *    (`--lfh-seiten-polsterung`, Inhalt von `EinsatzLayout`) liegt aber darüber. Das Element reicht
  *    deshalb über sie hinweg bis an die Kante (`100dvh` minus seine Lage im Dokument, negativer
@@ -48,6 +51,13 @@ export function scrollbereichVon(el: HTMLElement): HTMLElement | null {
 export const REST_UNTEN_VAR = '--lfh-rest-unten';
 
 /**
+ * Das `bottom` eines Fußes, der unten klebt (siehe oben): im Dokument `0px`, im eigenen
+ * Scrollbereich minus dessen untere Polsterung, damit er an der Kante steht und nicht darüber.
+ * Gesetzt als `bottom: var(--lfh-rest-kante, 0px)`.
+ */
+export const REST_KANTE_VAR = '--lfh-rest-kante';
+
+/**
  * Das `top` für ein Element, das in der Ansicht oben klebt (siehe oben): im Dokument unter dem
  * klebenden Rahmen, im eigenen Scrollbereich an dessen Oberkante (minus obere Polsterung). Gesetzt
  * als `top: var(--lfh-rest-oben, var(--lfh-rahmen-oben, 0px))`; der Rückfall gilt bis zur ersten
@@ -60,6 +70,8 @@ export interface RestHoehe {
   marginBottom: string;
   /** Wert für {@link REST_UNTEN_VAR}. */
   unten: string;
+  /** Wert für {@link REST_KANTE_VAR}. */
+  kante: string;
   /** Wert für {@link REST_OBEN_VAR}. */
   oben: string;
 }
@@ -74,6 +86,7 @@ export function restHoeheVon(el: HTMLElement): RestHoehe {
       minHeight: `calc(100dvh - ${imDokument}px)`,
       marginBottom: 'calc(-1 * var(--lfh-seiten-polsterung, 0px))',
       unten: 'var(--lfh-seiten-polsterung, 0px)',
+      kante: '0px',
       oben: 'var(--lfh-rahmen-oben, 0px)',
     };
   }
@@ -83,15 +96,16 @@ export function restHoeheVon(el: HTMLElement): RestHoehe {
   const polsterung = parseFloat(stil.paddingBottom) || 0;
   const polsterungOben = parseFloat(stil.paddingTop) || 0;
   return {
-    minHeight: `${Math.max(0, Math.floor(bereich.clientHeight - imBereich - polsterung))}px`,
-    marginBottom: '',
-    unten: '0px',
+    minHeight: `${Math.max(0, Math.floor(bereich.clientHeight - imBereich))}px`,
+    marginBottom: `${-polsterung}px`,
+    unten: `${polsterung}px`,
+    kante: `${-polsterung}px`,
     oben: `${-polsterungOben}px`,
   };
 }
 
 /**
- * Callback-Ref: setzt `min-height`, `margin-bottom`, {@link REST_UNTEN_VAR} und {@link REST_OBEN_VAR}
+ * Callback-Ref: setzt `min-height`, `margin-bottom`, {@link REST_UNTEN_VAR}, {@link REST_KANTE_VAR} und {@link REST_OBEN_VAR}
  * des Elements nach {@link restHoeheVon} und hält sie, solange es hängt. Neu gemessen wird, wenn sich ein Vorfahr
  * in der Größe ändert (Kopf bricht um, Hinweis erscheint, Dichtewechsel, Fenster) — im nächsten Bild, nicht im ResizeObserver selbst: die neue
  * Höhe ändert sofort die beobachteten Vorfahren (dieselbe Falle wie `FensterRahmen`, LLH-1335).
@@ -100,10 +114,11 @@ export function useRestHoehe<T extends HTMLElement>(): (el: T | null) => (() => 
   return useCallback((el: T | null) => {
     if (!el) return undefined;
     const messen = () => {
-      const { minHeight, marginBottom, unten, oben } = restHoeheVon(el);
+      const { minHeight, marginBottom, unten, kante, oben } = restHoeheVon(el);
       el.style.minHeight = minHeight;
       el.style.marginBottom = marginBottom;
       el.style.setProperty(REST_UNTEN_VAR, unten);
+      el.style.setProperty(REST_KANTE_VAR, kante);
       el.style.setProperty(REST_OBEN_VAR, oben);
     };
     messen();
