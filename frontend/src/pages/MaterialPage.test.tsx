@@ -2313,3 +2313,45 @@ describe('MaterialPage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)', 
     expect(screen.queryByRole('dialog', { name: RUECKFRAGE })).toBeNull();
   });
 });
+
+/**
+ * Eine offene Bearbeitung je Seite auch in der Liste (LLH-1480, `frontend/AGENTS.md`, „Bearbeiten
+ * in der Ansicht“): hat ein Ort einen Entwurf, sind die übrigen Orte und die Bemerkungen gesperrt,
+ * und der Grund steht EINMAL in der Werkzeugzeile der Liste.
+ *
+ * Mutationsprobe (von Hand, rot gesehen, dann zurückgedreht): ohne Seitensperre in der
+ * `BemerkungZelle` bleibt die Bemerkung bedienbar.
+ */
+describe('MaterialPage · eine offene Angabe zur Zeit (LLH-1480)', () => {
+  const GRUND = 'Erst „Ort zu Wolldecke“ speichern oder abbrechen';
+  const feldbett = { ...em, id: 11, material_id: 6, bezeichnung: 'Feldbett' };
+
+  it('ein Entwurf sperrt die übrigen Orte und die Bemerkungen, der Grund steht einmal', async () => {
+    render(einsatzAktiv, [
+      { ...em, einheit_id: 1 },
+      { ...feldbett, einheit_id: 1 },
+    ]);
+    await screen.findByText('Feldbett');
+    await userEvent.click(screen.getByRole('button', { name: 'Ort zu Wolldecke bearbeiten' }));
+    await waehle('Ort zu Wolldecke', 'UHS Turnhalle');
+
+    const andererOrt = screen.getByRole('button', { name: 'Ort zu Feldbett bearbeiten' });
+    expect(andererOrt).toBeDisabled();
+    // Der Wert bleibt Beschreibung, der Grund kommt dazu.
+    expect(andererOrt).toHaveAccessibleDescription(`Staffel A ${GRUND}`);
+    for (const name of ['Bemerkung zu Feldbett hinzufügen', 'Bemerkung zu Wolldecke hinzufügen']) {
+      const bemerkung = screen.getByRole('button', { name });
+      expect(bemerkung).toBeDisabled();
+      expect(bemerkung).toHaveAccessibleDescription(GRUND);
+    }
+    expect(screen.getAllByText(GRUND)).toHaveLength(1);
+    expect(screen.getByText(GRUND).closest('[data-lfh="datensicht-werkzeuge"]')).not.toBeNull();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Bearbeitung von Ort zu Wolldecke abbrechen' }),
+    );
+    expect(screen.getByRole('button', { name: 'Ort zu Feldbett bearbeiten' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Bemerkung zu Feldbett hinzufügen' })).toBeEnabled();
+    expect(screen.queryByText(GRUND)).toBeNull();
+  });
+});
