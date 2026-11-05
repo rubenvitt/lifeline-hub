@@ -23,7 +23,12 @@ import {
   useFokusabstandOben,
   useFokusabstandUnten,
 } from '../components/fokusabstandUnten';
-import { REST_OBEN_VAR, REST_UNTEN_VAR, useRestHoehe } from '../components/restHoehe';
+import {
+  REST_KANTE_VAR,
+  REST_OBEN_VAR,
+  REST_UNTEN_VAR,
+  useRestHoehe,
+} from '../components/restHoehe';
 import {
   Augenbraue,
   Aufgliederung,
@@ -506,17 +511,21 @@ export default function AusgabeAnsicht() {
             data-sichtbar={kurzzeile.sichtbar ? 'true' : 'false'}
             style={{
               position: 'absolute',
-              insetInline: 0,
+              // Seitlich über die Seitenpolsterung bis an den Rand, wie das Tastenfeld unten: eine
+              // Leiste unter dem Rahmen, kein abgeschnittener Kopf. Die Zahlen stehen über denen
+              // im Kopf.
+              insetInline: 'calc(-1 * var(--lfh-seiten-polsterung, 0px))',
               top: 0,
               visibility: kurzzeile.sichtbar ? 'visible' : 'hidden',
               display: 'grid',
               gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
               gap: token.marginXS,
               paddingBlock: token.paddingXXS,
-              paddingInline: token.padding,
+              paddingInline: `calc(${token.padding}px + var(--lfh-seiten-polsterung, 0px))`,
               background: rollen.paneel,
-              border: `1px solid ${rollen.linie}`,
+              borderBlockEnd: `1px solid ${rollen.linie}`,
               borderInlineStart: `3px solid ${stufe === 'offen' ? rollen.linie : ausgegebenFarbe}`,
+              boxShadow: token.boxShadowTertiary,
             }}
           >
             {(
@@ -939,15 +948,21 @@ export default function AusgabeAnsicht() {
           data-lfh="zaehltasten"
           style={{
             position: 'sticky',
-            bottom: 0,
+            // An der Kante des Bildlaufs, in der Gerätehülle unter der Polsterung des `main`
+            // hindurch: sonst schiene die Liste in einem Streifen unter dem Feld durch (LLH-1504).
+            bottom: `var(${REST_KANTE_VAR}, 0px)`,
             zIndex: 1,
             display: 'flex',
             flexDirection: 'column',
             gap: token.marginXS,
             paddingBlockStart: token.paddingSM,
-            // Am Stab reicht die Ansicht über die Seitenpolsterung bis an die Fensterkante
-            // (`useRestHoehe`); die Polsterung kommt hier zurück, die Tasten stehen nicht an der Kante.
+            // Die Ansicht reicht über die Polsterung unten bis an die Kante (`useRestHoehe`); die
+            // Polsterung kommt hier zurück, die Tasten stehen nicht an der Kante.
             paddingBlockEnd: `calc(${token.paddingSM}px + var(${REST_UNTEN_VAR}, 0px))`,
+            // Seitlich über die Seitenpolsterung bis an den Rand, wie die Gerätenavigation darunter;
+            // die Tasten stehen so breit wie zuvor.
+            marginInline: 'calc(-1 * var(--lfh-seiten-polsterung, 0px))',
+            paddingInline: 'var(--lfh-seiten-polsterung, 0px)',
             background: rollen.paneel,
             borderBlockStart: `1px solid ${rollen.linie}`,
           }}
