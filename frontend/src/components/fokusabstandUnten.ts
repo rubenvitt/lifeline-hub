@@ -34,6 +34,13 @@ export const FOKUSABSTAND_SPEICHERLEISTE = '--lfh-speicherleiste-fokusabstand';
 export const FOKUSABSTAND_ZAEHLTASTEN = '--lfh-zaehltasten-fokusabstand';
 /** Klebender Fuß der Erfassungs-Hülle im Dialog (LLH-1274): `scroll-padding` am Dialog (`index.css`). */
 export const FOKUSABSTAND_ERFASSUNG = '--lfh-erfassung-fokusabstand';
+/**
+ * Kurzzeile der Ausgabeansicht (LLH-1504), dieselbe Messung für die OBERE Kante: rückwärts
+ * getabbt rollt der Browser ein Ziel an den oberen Rand, unter die klebende Zeile mit Soll,
+ * ausgegeben und fehlt. `scroll-padding-block-start` am Scrollport (`index.css`), wie beim Rahmen
+ * (LFH-952).
+ */
+export const FOKUSABSTAND_AUSGABE_KURZZEILE = '--lfh-ausgabe-kurzzeile-fokusabstand';
 
 /**
  * Callback-Ref-Körper: misst die Leiste, schreibt Höhe + `abstand` als `variable` an `<html>`
@@ -45,6 +52,7 @@ export function beobachteFussleiste(
   leiste: HTMLElement | null,
   abstand: number,
   variable: string,
+  { untereLeiste = true }: { untereLeiste?: boolean } = {},
 ): (() => void) | undefined {
   if (!leiste) return undefined;
   const wurzel = document.documentElement;
@@ -52,14 +60,14 @@ export function beobachteFussleiste(
     wurzel.style.setProperty(variable, `${leiste.getBoundingClientRect().height + abstand}px`);
   aktualisiere();
   // Dieselbe Leiste meldet sich als untere Leiste, der das Eingangsband ausweicht (LLH-1424,
-  // `components/untereLeiste.ts`).
-  meldeUntereLeiste(leiste);
+  // `components/untereLeiste.ts`); ein Kopf oben nicht.
+  if (untereLeiste) meldeUntereLeiste(leiste);
   const beobachter = new ResizeObserver(aktualisiere);
   beobachter.observe(leiste);
   return () => {
     beobachter.disconnect();
     wurzel.style.removeProperty(variable);
-    entferneUntereLeiste(leiste);
+    if (untereLeiste) entferneUntereLeiste(leiste);
   };
 }
 
@@ -71,6 +79,17 @@ export function beobachteFussleiste(
 export function useFokusabstandUnten(abstand: number, variable: string) {
   return useCallback(
     (el: HTMLElement | null) => beobachteFussleiste(el, abstand, variable),
+    [abstand, variable],
+  );
+}
+
+/**
+ * Wie {@link useFokusabstandUnten}, für einen Kopf, der OBEN in seinem Scrollbereich klebt
+ * (LLH-1504): dieselbe Messung, aber keine Meldung als untere Leiste.
+ */
+export function useFokusabstandOben(abstand: number, variable: string) {
+  return useCallback(
+    (el: HTMLElement | null) => beobachteFussleiste(el, abstand, variable, { untereLeiste: false }),
     [abstand, variable],
   );
 }
