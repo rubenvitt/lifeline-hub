@@ -703,6 +703,14 @@ main:has([data-lfh='zaehltasten']) {
 :root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
   scroll-padding-block-start: 0px;
 }
+:root:has([data-lfh='ausgabe-kurzzeile']) {
+  scroll-padding-block-start: calc(
+    var(--lfh-rahmen-oben, 0px) + var(--lfh-ausgabe-kurzzeile-fokusabstand, 0px)
+  );
+}
+main:has([data-lfh='ausgabe-kurzzeile']) {
+  scroll-padding-block-start: var(--lfh-ausgabe-kurzzeile-fokusabstand, 0px);
+}
 .dokument-entwurf__kopf {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));

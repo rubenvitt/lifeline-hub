@@ -19,6 +19,12 @@ import { useCallback } from 'react';
  *    Außenabstand in Höhe der Polsterung; es muss das letzte im Inhalt sein), und
  *    {@link REST_UNTEN_VAR} gibt dem Fuß die Polsterung als Innenabstand zurück.
  *
+ * Dieselbe Unterscheidung gilt oben: was in der Ansicht oben klebt (LLH-1504, die Kurzzeile der
+ * Ausgabe), hängt sich im Dokument unter den klebenden Rahmen (`--lfh-rahmen-oben`), im eigenen
+ * Scrollbereich an dessen Oberkante; {@link REST_OBEN_VAR} trägt den passenden Wert. Dort zählt
+ * die obere Polsterung negativ: Chromium lässt ein `sticky` sonst um sie unter der Kante stehen,
+ * und der Inhalt schiene in diesem Streifen darüber durch.
+ *
  * GEMESSEN, wie `--lfh-rahmen-oben` (`rahmenOben.ts`) und `FensterRahmen`.
  * Die Lage wird in Inhaltskoordinaten gerechnet, also unabhängig vom aktuellen Bildlauf.
  */
@@ -41,11 +47,21 @@ export function scrollbereichVon(el: HTMLElement): HTMLElement | null {
  */
 export const REST_UNTEN_VAR = '--lfh-rest-unten';
 
+/**
+ * Das `top` für ein Element, das in der Ansicht oben klebt (siehe oben): im Dokument unter dem
+ * klebenden Rahmen, im eigenen Scrollbereich an dessen Oberkante (minus obere Polsterung). Gesetzt
+ * als `top: var(--lfh-rest-oben, var(--lfh-rahmen-oben, 0px))`; der Rückfall gilt bis zur ersten
+ * Messung.
+ */
+export const REST_OBEN_VAR = '--lfh-rest-oben';
+
 export interface RestHoehe {
   minHeight: string;
   marginBottom: string;
   /** Wert für {@link REST_UNTEN_VAR}. */
   unten: string;
+  /** Wert für {@link REST_OBEN_VAR}. */
+  oben: string;
 }
 
 /** Die Werte, gerechnet aus der aktuellen Lage. */
@@ -58,21 +74,25 @@ export function restHoeheVon(el: HTMLElement): RestHoehe {
       minHeight: `calc(100dvh - ${imDokument}px)`,
       marginBottom: 'calc(-1 * var(--lfh-seiten-polsterung, 0px))',
       unten: 'var(--lfh-seiten-polsterung, 0px)',
+      oben: 'var(--lfh-rahmen-oben, 0px)',
     };
   }
   const kasten = bereich.getBoundingClientRect();
   const imBereich = oben - kasten.top - bereich.clientTop + bereich.scrollTop;
-  const polsterung = parseFloat(getComputedStyle(bereich).paddingBottom) || 0;
+  const stil = getComputedStyle(bereich);
+  const polsterung = parseFloat(stil.paddingBottom) || 0;
+  const polsterungOben = parseFloat(stil.paddingTop) || 0;
   return {
     minHeight: `${Math.max(0, Math.floor(bereich.clientHeight - imBereich - polsterung))}px`,
     marginBottom: '',
     unten: '0px',
+    oben: `${-polsterungOben}px`,
   };
 }
 
 /**
- * Callback-Ref: setzt `min-height`, `margin-bottom` und {@link REST_UNTEN_VAR} des Elements nach
- * {@link restHoeheVon} und hält sie, solange es hängt. Neu gemessen wird, wenn sich ein Vorfahr
+ * Callback-Ref: setzt `min-height`, `margin-bottom`, {@link REST_UNTEN_VAR} und {@link REST_OBEN_VAR}
+ * des Elements nach {@link restHoeheVon} und hält sie, solange es hängt. Neu gemessen wird, wenn sich ein Vorfahr
  * in der Größe ändert (Kopf bricht um, Hinweis erscheint, Dichtewechsel, Fenster) — im nächsten Bild, nicht im ResizeObserver selbst: die neue
  * Höhe ändert sofort die beobachteten Vorfahren (dieselbe Falle wie `FensterRahmen`, LLH-1335).
  */
@@ -80,10 +100,11 @@ export function useRestHoehe<T extends HTMLElement>(): (el: T | null) => (() => 
   return useCallback((el: T | null) => {
     if (!el) return undefined;
     const messen = () => {
-      const { minHeight, marginBottom, unten } = restHoeheVon(el);
+      const { minHeight, marginBottom, unten, oben } = restHoeheVon(el);
       el.style.minHeight = minHeight;
       el.style.marginBottom = marginBottom;
       el.style.setProperty(REST_UNTEN_VAR, unten);
+      el.style.setProperty(REST_OBEN_VAR, oben);
     };
     messen();
     let bild: number | undefined;

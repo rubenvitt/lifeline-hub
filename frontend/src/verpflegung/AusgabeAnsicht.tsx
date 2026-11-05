@@ -17,8 +17,13 @@ import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
-import { FOKUSABSTAND_ZAEHLTASTEN, useFokusabstandUnten } from '../components/fokusabstandUnten';
-import { REST_UNTEN_VAR, useRestHoehe } from '../components/restHoehe';
+import {
+  FOKUSABSTAND_AUSGABE_KURZZEILE,
+  FOKUSABSTAND_ZAEHLTASTEN,
+  useFokusabstandOben,
+  useFokusabstandUnten,
+} from '../components/fokusabstandUnten';
+import { REST_OBEN_VAR, REST_UNTEN_VAR, useRestHoehe } from '../components/restHoehe';
 import {
   Augenbraue,
   Aufgliederung,
@@ -29,6 +34,7 @@ import {
   sammelbannerKurz,
   monoStil,
   useRollen,
+  zahlFarbe,
 } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useViewport } from '../components/useViewport';
@@ -72,6 +78,7 @@ import { useAusgabeNachtragen } from './useAusgabeNachtragen';
 import { loadGemerkteStelle, saveGemerkteStelle } from './stellenGedaechtnis';
 import { eigeneStelle, stellenName, stellenWahl } from './stellenKern';
 import { useAusgabeSammlung } from './useAusgabeSammlung';
+import { useKurzzeile } from './useKurzzeile';
 import { useNachforderungWahl } from './useNachforderungWahl';
 import {
   KOSTFORMEN,
@@ -192,6 +199,8 @@ export default function AusgabeAnsicht() {
   const grundId = useId();
   const tastenRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ZAEHLTASTEN);
   const restHoehe = useRestHoehe<HTMLDivElement>();
+  const kurzzeile = useKurzzeile();
+  const kurzzeileRef = useFokusabstandOben(token.marginSM, FOKUSABSTAND_AUSGABE_KURZZEILE);
   const { dichte } = useDichte();
 
   const [dialog, setDialog] = useState<
@@ -471,6 +480,63 @@ export default function AusgabeAnsicht() {
         // (LLH-1294).
         style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}
       >
+        {/* ── Kurzzeile (LLH-1504, `useKurzzeile`): rollt das Kennzahlenband unter die obere Kante,
+             stehen Soll, ausgegeben und fehlt einzeilig an ihr, am Handy auch bis ans Ende des
+             Bildlaufs. Der Anker klebt ohne eigene Höhe, die Zeile liegt über dem Inhalt: keine
+             Taste verschiebt sich, und ohne Bildlauf ist nichts davon zu sehen. Vorgelesen werden
+             die Zahlen im Kopf, die Zeile wiederholt sie nur. ── */}
+        <div
+          ref={kurzzeile.ankerRef}
+          data-lfh="ausgabe-kurzzeile-anker"
+          style={{
+            position: 'sticky',
+            // Im Dokument unter dem klebenden Rahmen, in der Gerätehülle an der Oberkante ihres
+            // `main` (`useRestHoehe`).
+            top: `var(${REST_OBEN_VAR}, var(--lfh-rahmen-oben, 0px))`,
+            zIndex: 2,
+            height: 0,
+            // Ein Kind der Spalte ohne Höhe: der Abstand nach ihm fällt weg, der Kopf steht wie zuvor.
+            marginBlockEnd: -token.margin,
+          }}
+        >
+          <div
+            ref={kurzzeileRef}
+            aria-hidden="true"
+            data-lfh="ausgabe-kurzzeile"
+            data-sichtbar={kurzzeile.sichtbar ? 'true' : 'false'}
+            style={{
+              position: 'absolute',
+              insetInline: 0,
+              top: 0,
+              visibility: kurzzeile.sichtbar ? 'visible' : 'hidden',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: token.marginXS,
+              paddingBlock: token.paddingXXS,
+              paddingInline: token.padding,
+              background: rollen.paneel,
+              border: `1px solid ${rollen.linie}`,
+              borderInlineStart: `3px solid ${stufe === 'offen' ? rollen.linie : ausgegebenFarbe}`,
+            }}
+          >
+            {(
+              [
+                ['Soll', zf.bedarf.gesamt, rollen.text],
+                ['ausgegeben', zf.ausgegeben.gesamt, rollen.text],
+                ['fehlt', zf.fehlmenge.gesamt, zahlFarbe(rollen, FEHLT_TON[stufe], 'daten')],
+              ] as const
+            ).map(([titel, wert, farbe]) => (
+              <div key={titel} data-lfh="kurzzeile-zahl" style={{ minWidth: 0 }}>
+                <Augenbraue style={{ ...einzeilig, display: 'block' }}>{titel}</Augenbraue>
+                <div style={{ ...einzeilig, ...monoStil(15, 500), color: farbe }}>
+                  {wert}
+                  <span style={{ ...monoStil(11), color: rollen.text2 }}> EP</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ── Kopf: Deckung ─────────────────────────────────────────────────────────── */}
         <section
           aria-label={`Deckung ${zf.bezeichnung}`}
@@ -500,25 +566,28 @@ export default function AusgabeAnsicht() {
               {online ? '' : 'Offline vorgemerkt'}
             </span>
           </Flex>
-          <Kennzahlenband
-            beschriftung={`Deckung ${zf.bezeichnung}`}
-            // Soll, ausgegeben und fehlt möglichst in einer Zeile: zwei Zeilen kosteten bei
-            // 390 × 700 so viel Höhe, dass die Ansicht rollen müsste und der Kopf aus dem Bild
-            // ginge (LLH-1294). Wo die Zelle für eine vierstellige Zahl zu schmal wird, bricht das
-            // Band um, statt überzulaufen.
-            style={{
-              gridTemplateColumns: `repeat(auto-fit, minmax(min(${KENNZAHL_ZELLE_MIN[dichte]}px, 100%), 1fr))`,
-            }}
-          >
-            <Kennzahl titel="Soll" wert={zf.bedarf.gesamt} einheit="EP" />
-            <Kennzahl titel="ausgegeben" wert={zf.ausgegeben.gesamt} einheit="EP" />
-            <Kennzahl
-              titel="fehlt"
-              wert={zf.fehlmenge.gesamt}
-              einheit="EP"
-              ton={FEHLT_TON[stufe]}
-            />
-          </Kennzahlenband>
+          {/* Die Hülle misst, wann das Band unter die Kante rollt (Kurzzeile, LLH-1504). */}
+          <div ref={kurzzeile.bandRef}>
+            <Kennzahlenband
+              beschriftung={`Deckung ${zf.bezeichnung}`}
+              // Soll, ausgegeben und fehlt möglichst in einer Zeile: zwei Zeilen kosteten bei
+              // 390 × 700 so viel Höhe, dass die Ansicht rollen müsste und der Kopf aus dem Bild
+              // ginge (LLH-1294). Wo die Zelle für eine vierstellige Zahl zu schmal wird, bricht das
+              // Band um, statt überzulaufen.
+              style={{
+                gridTemplateColumns: `repeat(auto-fit, minmax(min(${KENNZAHL_ZELLE_MIN[dichte]}px, 100%), 1fr))`,
+              }}
+            >
+              <Kennzahl titel="Soll" wert={zf.bedarf.gesamt} einheit="EP" />
+              <Kennzahl titel="ausgegeben" wert={zf.ausgegeben.gesamt} einheit="EP" />
+              <Kennzahl
+                titel="fehlt"
+                wert={zf.fehlmenge.gesamt}
+                einheit="EP"
+                ton={FEHLT_TON[stufe]}
+              />
+            </Kennzahlenband>
+          </div>
           <div style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}>
             <Aufgliederung
               titel="Ausgabe"

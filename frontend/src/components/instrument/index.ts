@@ -16,6 +16,7 @@ export {
   Kennzahl,
   Kennzahlenband,
   kennzahlenbandStil,
+  zahlFarbe,
   type KennzahlTon,
   type KennzahlZustand,
 } from './Kennzahl';

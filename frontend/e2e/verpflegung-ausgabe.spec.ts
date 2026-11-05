@@ -384,6 +384,193 @@ for (const flaeche of [
   });
 }
 
+/**
+ * Handy mit Touch ohne gespeicherte Wahl (LLH-1504): die Ansicht beginnt in `komfortabel` und ist
+ * bei 390 × 700 höher als der Schirm; das Kennzahlenband steht dort zweizeilig. Rollt es unter
+ * die obere Kante (am Stab unter den Rahmen, am Gerät an die Oberkante des `main`), stehen Soll,
+ * ausgegeben und fehlt in der Kurzzeile an dieser Kante, bis ans Ende des Bildlaufs. Das
+ * Tastenfeld bleibt unten erreichbar, und rückwärts fokussiert steht ein Ziel unter der Kurzzeile,
+ * nicht dahinter (`scroll-padding` in `index.css`).
+ *
+ * Geprüft wird der ganze Bildlauf in Schritten: an jeder Stelle stehen die drei Zahlen frei im
+ * Bild, im Band oder in der Kurzzeile.
+ *
+ * Mutationsproben: `position: 'sticky'` am Anker der Kurzzeile (`AusgabeAnsicht.tsx`) entfernt →
+ * die Zeile rollt mit hinaus, rot; `kurzzeileSichtbar` immer `false` → rot ab dem ersten Schritt
+ * unter der Kante; die Regel `:root:has([data-lfh='ausgabe-kurzzeile'])` bzw. `main:has(…)` in
+ * `index.css` entfernt → rückwärts getabbt steht ein Ziel hinter der Zeile, rot; der Polsterungsabzug in
+ * `restHoeheVon` (Gerät) entfernt → die Zeile steht 12 px unter der Kante, rot.
+ */
+async function pruefeKurzzeile(page: Page, wo: string, scrollbereich: string | null) {
+  await expect(page.locator('html'), wo).toHaveAttribute('data-dichte', 'komfortabel');
+  const kurzzeile = page.locator('[data-lfh="ausgabe-kurzzeile"]');
+  const kopf = page.locator('[data-lfh="ausgabe-kopf"]');
+
+  // Vorbedingungen: die Ansicht rollt wirklich, und das Band ist zweizeilig (sonst prüfte der Test
+  // den Fall nicht, für den es die Zeile gibt).
+  const vorab = await page.evaluate((sel) => {
+    const b = sel ? document.querySelector<HTMLElement>(sel)! : document.documentElement;
+    const werte = [
+      ...document.querySelectorAll('[data-lfh="ausgabe-kopf"] [data-lfh="kennzahl-wert"]'),
+    ].map((w) => Math.round(w.getBoundingClientRect().top));
+    return { strecke: b.scrollHeight - b.clientHeight, zeilen: new Set(werte).size };
+  }, scrollbereich);
+  expect(vorab.strecke, `${wo}: die Ansicht rollt`).toBeGreaterThan(200);
+  expect(vorab.zeilen, `${wo}: das Kennzahlenband steht zweizeilig`).toBe(2);
+  await expect(kurzzeile, `${wo}: ohne Bildlauf keine Kurzzeile`).toHaveAttribute(
+    'data-sichtbar',
+    'false',
+  );
+  await expect(kurzzeile).toHaveCSS('visibility', 'hidden');
+
+  // Der ganze Bildlauf in Schritten von 40 px: an jeder Stelle die drei Zahlen frei im Bild.
+  const befunde = await page.evaluate(async (sel) => {
+    const b = sel ? document.querySelector<HTMLElement>(sel)! : document.documentElement;
+    const bild = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const kante = () =>
+      sel
+        ? b.getBoundingClientRect().top + b.clientTop
+        : parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
+          ) || 0;
+    const unten = () =>
+      sel ? b.getBoundingClientRect().top + b.clientTop + b.clientHeight : innerHeight;
+    const frei = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      const oben = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return oben != null && (el === oben || el.contains(oben));
+    };
+    const aus: string[] = [];
+    const ende = b.scrollHeight - b.clientHeight;
+    for (let y = 0; ; y = Math.min(ende, y + 40)) {
+      b.scrollTop = y;
+      await bild();
+      const kz = document.querySelector('[data-lfh="ausgabe-kurzzeile"]')!;
+      const r = kz.getBoundingClientRect();
+      const k = kante();
+      if (getComputedStyle(kz).visibility === 'visible') {
+        if (Math.abs(r.top - k) > 1) aus.push(`${y}: Kurzzeile bei ${r.top}, Kante ${k}`);
+        for (const z of kz.querySelectorAll('[data-lfh="kurzzeile-zahl"]')) {
+          if (!frei(z)) aus.push(`${y}: Kurzzeile „${z.textContent}“ verdeckt`);
+        }
+      } else {
+        for (const w of document.querySelectorAll(
+          '[data-lfh="ausgabe-kopf"] [data-lfh="kennzahl-wert"]',
+        )) {
+          const wr = w.getBoundingClientRect();
+          if (wr.top < k - 0.5 || wr.bottom > unten() + 0.5 || !frei(w)) {
+            aus.push(`${y}: „${w.textContent}“ im Kopf nicht frei, Kurzzeile verborgen`);
+          }
+        }
+      }
+      if (y >= ende) break;
+    }
+    return aus;
+  }, scrollbereich);
+  expect(befunde, `${wo}: Zahlen beim Rollen`).toEqual([]);
+
+  // Am Ende des Bildlaufs: dieselben Zahlen wie im Kopf, das Tastenfeld ganz im Bild.
+  await expect(kurzzeile, `${wo}, am Ende`).toHaveAttribute('data-sichtbar', 'true');
+  await expect(kurzzeile, `${wo}, am Ende`).toBeInViewport({ ratio: 1 });
+  for (const titel of ['Soll', 'ausgegeben', 'fehlt']) {
+    const imKopf = await kopf
+      .locator('[data-lfh="kennzahl"]', { hasText: titel })
+      .locator('[data-lfh="kennzahl-wert"]')
+      .innerText();
+    await expect(
+      kurzzeile.locator('[data-lfh="kurzzeile-zahl"]', { hasText: titel }),
+      `${wo}: ${titel}`,
+    ).toContainText(imKopf.replace(/\s*EP$/, ''));
+  }
+  await expect(page.locator('[data-lfh="zaehltasten"]'), wo).toBeInViewport({ ratio: 1 });
+  const plusFrei = await plus1(page).evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  });
+  expect(plusFrei, `${wo}: „+1“ frei`).toBe(true);
+
+  // Rückwärts mit der Tastatur, von „+1“ bis zur Sonderkost: jedes Ziel rollt der Browser an die
+  // obere Kante, und dort steht es unter der Kurzzeile, nicht dahinter (`scroll-padding`).
+  await plus1(page).focus();
+  const verdeckt: string[] = [];
+  let anSonderkost = false;
+  for (let i = 0; i < 30 && !anSonderkost; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    const stand = await page.evaluate(() => {
+      const fokus = document.activeElement as HTMLElement;
+      const kz = document.querySelector('[data-lfh="ausgabe-kurzzeile"]')!;
+      const zeile = kz.getBoundingClientRect();
+      const r = fokus.getBoundingClientRect();
+      return {
+        name: fokus.getAttribute('aria-label') ?? fokus.textContent ?? '',
+        sonderkost: fokus.closest('[data-lfh="ausgabe-sonderkost"]') != null,
+        unter:
+          getComputedStyle(kz).visibility !== 'visible' || r.top >= zeile.bottom - 0.5
+            ? null
+            : `${Math.round(r.top)} < ${Math.round(zeile.bottom)}`,
+      };
+    });
+    if (stand.unter) verdeckt.push(`„${stand.name}“: ${stand.unter}`);
+    anSonderkost = stand.sonderkost;
+  }
+  expect(anSonderkost, `${wo}: rückwärts bis zur Sonderkost`).toBe(true);
+  expect(verdeckt, `${wo}: rückwärts getabbt unter der Kurzzeile`).toEqual([]);
+}
+
+test.describe('Handy mit Touch, komfortabel (390×700)', () => {
+  const flaeche = { width: 390, height: 700 };
+  test.use({ hasTouch: true, viewport: flaeche });
+
+  /** Zeitfenster mit Sonderkost und zehn Buchungen: die Liste ist lang. */
+  async function saeenLang(page: Page) {
+    const { e, zf } = await saeen(page, -60, 60, {
+      sonderkost: { vegetarisch: 4, vegan: 2 },
+      kraefte: 1830,
+    });
+    for (let n = 1; n <= 10; n += 1) {
+      await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster/${zf}/ausgaben`, {
+        menge: n,
+      });
+    }
+    return { e, zf };
+  }
+
+  test('am Stab: Soll, ausgegeben und fehlt bleiben beim Rollen im Bild, das Tastenfeld unten', async ({
+    page,
+  }) => {
+    const { e, zf } = await saeenLang(page);
+    await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+    await expect(page.locator('[data-lfh="ausgabe-zeile"]')).toHaveCount(10);
+    await pruefeKurzzeile(page, 'Stab', null);
+  });
+
+  test('am Gerät: Soll, ausgegeben und fehlt bleiben beim Rollen im Bild, das Tastenfeld unten', async ({
+    page,
+    browser,
+  }) => {
+    const { e, zf } = await saeenLang(page);
+    const kopplung = await anlegen<{ code: { code: string } }>(
+      page,
+      `/api/einsaetze/${e}/geraete`,
+      { ansicht: 'verpflegung', bezeichnung: 'Ausgabe Deich' },
+    );
+    const kontext = await browser.newContext({ viewport: flaeche, hasTouch: true });
+    const geraet = await kontext.newPage();
+    try {
+      await geraet.goto(`/koppeln#${kopplung.code.code}`);
+      await geraet.getByRole('button', { name: 'Gerät koppeln' }).click();
+      await expect(geraet).toHaveURL(new RegExp(`/geraet/${e}/verpflegung$`));
+      await geraet.goto(`/geraet/${e}/verpflegung/${zf}/ausgabe`);
+      await expect(geraet.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+      await expect(geraet.locator('[data-lfh="ausgabe-zeile"]')).toHaveCount(10);
+      await pruefeKurzzeile(geraet, 'Gerät', '.geraet-huelle > main');
+    } finally {
+      await kontext.close();
+    }
+  });
+});
+
 test('Kennzahlen im Kopf laufen auch vierstellig nicht über (320 bis 390 px, kompakt und komfortabel)', async ({
   page,
 }) => {
