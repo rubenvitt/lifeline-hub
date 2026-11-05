@@ -84,12 +84,15 @@ Für Einsatzleitung und Führungspersonal:
 4. Unter „Soll-Stärke (F/UF/M)“ Führer, Unterführer und Mannschaft zusammen eintragen. Unter „Ist
    (F/UF/M//Σ)“ steht die Ist-Stärke, mit unterstellten Einheiten auch die kumulierte, und
    daneben „unterbesetzt“ oder „Soll erfüllt“.
-5. Hat die Einheit kein Fahrzeug, unter „Status“ den Status wählen; „kein Status“ nimmt ihn
+5. Unter „Qualifikationssoll“ mit „Qualifikation fordern“ festlegen, welche Qualifikationen die
+   Einheit mindestens braucht. Ohne eigenes gilt das des Einheitstyps und trägt „(Vorgabe)“;
+   alle Zeilen entfernt heißt zurück zum Einheitstyp.
+6. Hat die Einheit kein Fahrzeug, unter „Status“ den Status wählen; „kein Status“ nimmt ihn
    zurück.
-6. Im Paneel „Funk“ ebenso die „Sprechgruppen“ ändern; den Funkrufnamen trägt der Kopf. Jede
+7. Im Paneel „Funk“ ebenso die „Sprechgruppen“ ändern; den Funkrufnamen trägt der Kopf. Jede
    hinzugefügte oder entfernte Sprechgruppe steht danach im Einsatztagebuch. Was ein anderer
    Arbeitsplatz währenddessen an den Sprechgruppen ändert, bleibt erhalten.
-7. Im Paneel „Telefon und weitere Verbindungen“ „Bearbeiten“ neben der Liste wählen, bei leerer
+8. Im Paneel „Telefon und weitere Verbindungen“ „Bearbeiten“ neben der Liste wählen, bei leerer
    Liste „Telefon und weitere Verbindungen eintragen“. „Verbindung hinzufügen“ legt eine Zeile
    an: das Mittel wählen (Festnetz, Mobil, Fax, E-Mail, Messenger, Melder oder Sonstiges),
    Nummer oder Adresse eintragen und bei Bedarf einen Hinweis wie „nur tagsüber“.

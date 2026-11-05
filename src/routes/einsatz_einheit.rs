@@ -18,6 +18,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::katalog::StatusKategorie;
 use crate::live::LiveEvent;
+use crate::personal::quali_soll::{self, QualiSollEingabe};
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
     pruefe_koordinate,
@@ -97,6 +98,9 @@ pub struct EinheitBody {
     pub soll_fuehrer: Option<i64>,
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
+    /// Eigenes Qualifikationssoll (LLH-1553); fehlt, `null` oder `[]` = erbt vom Typ.
+    #[serde(default)]
+    pub quali_soll: Option<Vec<QualiSollEingabe>>,
     pub bemerkung: Option<String>,
     /// LFH-614: eigener Funkrufname der Einheit (Freitext, leer = nicht gepflegt).
     pub funkrufname: Option<String>,
@@ -167,6 +171,7 @@ pub async fn bilden(
         body.soll_mannschaft,
     )
     .map_err(AppError::Validation)?;
+    let quali_soll = quali_soll::form_opt(body.quali_soll.as_deref())?;
     if let Some(ids) = &sprechgruppe_ids {
         crate::sprechgruppe::repo::pruefe_zuordenbar(&state.pool, org_id, einsatz_id, ids).await?;
     }
@@ -178,6 +183,7 @@ pub async fn bilden(
         soll_fuehrer: body.soll_fuehrer,
         soll_unterfuehrer: body.soll_unterfuehrer,
         soll_mannschaft: body.soll_mannschaft,
+        quali_soll: quali_soll.as_deref(),
         bemerkung: bemerkung.as_deref(),
         funkrufname: funkrufname.as_deref(),
         sortier: body.sortier,
@@ -624,6 +630,10 @@ pub struct EinheitPatchBody {
     pub soll_unterfuehrer: Option<Option<i64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub soll_mannschaft: Option<Option<i64>>,
+    /// Tri-State (LLH-1553): `null` oder `[]` = kein eigenes Qualifikationssoll, die Einheit
+    /// erbt wieder das des Typs.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub quali_soll: Option<Option<Vec<QualiSollEingabe>>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -663,6 +673,7 @@ pub async fn update(
     // Freitexte vor `require_aktiv` (409) und den Soll-Prüfungen (LLH-1242, Spec `eingabegrenzen`).
     let bemerkung = optional_max_tri(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
     let funkrufname = optional_max_tri(body.funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?;
+    let quali_soll = quali_soll::form_tri(body.quali_soll)?;
     verbindungen::lehne_altfelder_ab(
         body.kommunikationsmittel.is_some(),
         body.erreichbarkeit.is_some(),
@@ -713,6 +724,7 @@ pub async fn update(
             soll_fuehrer: body.soll_fuehrer,
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
+            quali_soll: quali_soll.as_ref().map(|v| v.as_deref()),
             bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
             funkrufname: funkrufname.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,

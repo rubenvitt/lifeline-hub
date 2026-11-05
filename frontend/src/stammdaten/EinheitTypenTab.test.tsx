@@ -6,19 +6,32 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
 import EinheitTypenTab from './EinheitTypenTab';
 import { adminFixture } from '../test/fixtures';
+import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 
 const typen = [
-  { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
+  {
+    id: 1,
+    label: 'Zug',
+    soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
+    sortier: 40,
+    quali_soll: [{ qualifikation_id: 2, label: 'Rettungssanitäter', anzahl: 1 }],
+  },
   { id: 2, label: 'Sonstige', soll: null, sortier: 50 },
+];
+
+const qualifikationen = [
+  { id: 1, label: 'Sanitäter', sortier: 10 },
+  { id: 2, label: 'Rettungssanitäter', sortier: 20, schliesst_ein_id: 1 },
 ];
 
 function render(benutzer: typeof admin, katalog = typen) {
   server.use(
     meHandler(benutzer),
     http.get('/api/einheit-typen', () => HttpResponse.json(katalog)),
+    http.get('/api/qualifikationen', () => HttpResponse.json(qualifikationen)),
   );
   return renderMitProviders(<EinheitTypenTab />);
 }
@@ -213,5 +226,37 @@ describe('EinheitTypenTab', () => {
     await screen.findByText('Label bereits vergeben');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(screen.getByRole('dialog')).getByLabelText('Label')).toHaveValue('Gruppe');
+  });
+
+  it('Qualifikationssoll: folgt der Soll-Stärke, Bearbeiten ergänzt eine Zeile und schickt alle', async () => {
+    const ruempfe: unknown[] = [];
+    server.use(
+      http.patch('/api/einheit-typen/1', async ({ request }) => {
+        ruempfe.push(await request.json());
+        return HttpResponse.json(typen[0]);
+      }),
+    );
+    render(admin);
+    expect(await screen.findByText(/· mind\. 1 Rettungssanitäter/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Qualifikation fordern' }));
+    // Rettungssanitäter steht schon in Zeile 1.
+    await oeffne('Qualifikation 2');
+    expect(optionenVon('Qualifikation 2')).toEqual(['Sanitäter']);
+    await waehle('Qualifikation 2', 'Sanitäter');
+    const anzahl = within(dialog).getByRole('spinbutton', { name: 'Anzahl 2' });
+    await userEvent.clear(anzahl);
+    await userEvent.type(anzahl, '2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(ruempfe).toHaveLength(1));
+    expect(ruempfe[0]).toMatchObject({
+      quali_soll: [
+        { qualifikation_id: 2, anzahl: 1 },
+        { qualifikation_id: 1, anzahl: 2 },
+      ],
+    });
   });
 });

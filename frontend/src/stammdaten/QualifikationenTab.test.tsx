@@ -8,6 +8,7 @@ import QualifikationenTab from './QualifikationenTab';
 import { adminFixture } from '../test/fixtures';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
+import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -17,9 +18,17 @@ const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
  * alphabetische ist — sonst sähe die Tabelle nach dem Sortierklick genauso aus wie davor und
  * die Zusicherung unten bewiese nichts.
  */
-const quals = [
+const quals: { id: number; label: string; sortier: number; schliesst_ein_id?: number | null }[] = [
   { id: 1, label: 'Sanitäter', sortier: 10 },
   { id: 2, label: 'Gruppenführer', sortier: 60 },
+];
+
+/** Eine Kette Notfallsanitäter → Rettungssanitäter → Sanitäter, daneben der Notarzt (LLH-1553). */
+const kette = [
+  { id: 1, label: 'Sanitäter', sortier: 10, schliesst_ein_id: null },
+  { id: 2, label: 'Rettungssanitäter', sortier: 20, schliesst_ein_id: 1 },
+  { id: 3, label: 'Notfallsanitäter', sortier: 30, schliesst_ein_id: 2 },
+  { id: 4, label: 'Notarzt', sortier: 40, schliesst_ein_id: null },
 ];
 
 /** Die Leitspalte aller Datenzeilen — der Kopf ist ein eigenes `<table>`, siehe KatalogTabelle. */
@@ -295,5 +304,29 @@ describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', 
       within(await offeneRueckfrage()).getByRole('button', { name: 'Qualifikation deaktivieren' }),
     );
     await keinStehenderFehler('Label bereits vergeben');
+  });
+
+  it('„Schließt ein“: Spalte zeigt die Stufe, die Auswahl lässt Kreise weg, Speichern schickt sie', async () => {
+    const ruempfe: unknown[] = [];
+    server.use(
+      http.patch('/api/qualifikationen/1', async ({ request }) => {
+        ruempfe.push(await request.json());
+        return HttpResponse.json({ ...kette[0], schliesst_ein_id: 4 });
+      }),
+    );
+    render(admin, kette);
+    const zeile = (await screen.findByText('Notfallsanitäter')).closest('tr')!;
+    expect(within(zeile).getByText('Rettungssanitäter')).toBeInTheDocument();
+
+    // Sanitäter steht unten in der Kette: RS und NotSan schlössen einen Kreis.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+    await screen.findByRole('dialog');
+    await oeffne('Schließt ein');
+    expect(optionenVon('Schließt ein')).toEqual(['Notarzt']);
+    await waehle('Schließt ein', 'Notarzt');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(ruempfe).toHaveLength(1));
+    expect(ruempfe[0]).toEqual({ label: 'Sanitäter', sortier: 10, schliesst_ein_id: 4 });
   });
 });

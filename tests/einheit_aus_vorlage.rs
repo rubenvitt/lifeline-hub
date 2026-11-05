@@ -72,6 +72,7 @@ fn neu<'a>(name: &'a str, typ: i64, ueber: Option<i64>, funkrufname: &'a str) ->
         tz_fachaufgabe: Some("rettungswesen"),
         tz_organisation: Some("hilfsorganisation"),
         soll: None,
+        quali_soll: None,
         bemerkung: None,
         sortier: 0,
     }

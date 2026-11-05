@@ -460,6 +460,7 @@ impl Ablauf<'_> {
                         soll_fuehrer: None,
                         soll_unterfuehrer: None,
                         soll_mannschaft: None,
+                        quali_soll: None,
                         bemerkung: None,
                         funkrufname: None,
                         sortier: v.sortier,

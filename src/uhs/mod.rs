@@ -9,6 +9,10 @@ pub mod repo;
 pub use hooks::{auto_austritt, auto_austritt_tx, AutoAustrittEffekt, AutoAustrittTx};
 
 use crate::wire_enum::wire_enum;
+
+/// Höchste Soll-Anzahl einer UHS (LLH-1553, CHECK in `migrations/0274_…`). Spiegel:
+/// `UHS_SOLL_ANZAHL_MAX` in `frontend/src/api/eingabegrenzen.ts`.
+pub const SOLL_ANZAHL_MAX: i64 = 200;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -151,6 +155,12 @@ pub struct UhsAnzeige {
     pub geaendert_at: String,
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
+    /// Soll-Anzahl der Kräfte (LLH-1553); `None` = kein Soll.
+    pub soll_anzahl: Option<i64>,
+    /// Qualifikationssoll (LLH-1553); `None` = keins. Die UHS hat keinen Typ-Katalog, es gibt nur
+    /// den eigenen Wert.
+    #[schema(value_type = Option<Vec<crate::personal::quali_soll::QualiSollEintrag>>)]
+    pub quali_soll: Option<crate::personal::quali_soll::QualiSoll>,
     /// Stärke aus den zugeordneten Einsatzkräften (LFH-1045, Spec `uhs-staerke`), berechnet in
     /// `repo::SELECT_ALLE`, nie gespeichert. `0/0/0` ohne Kräfte.
     #[sqlx(flatten)]

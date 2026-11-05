@@ -1,4 +1,4 @@
-import type { EinheitTyp } from './types';
+import type { EinheitTyp, QualiSollEingabe } from './types';
 import { katalogApi } from './katalogApi';
 
 export interface TypEingabe {
@@ -7,6 +7,8 @@ export interface TypEingabe {
   soll_unterfuehrer?: number | null;
   soll_mannschaft?: number | null;
   sortier: number;
+  /** Qualifikationssoll (LLH-1553); `[]` = keins. */
+  quali_soll?: QualiSollEingabe[] | null;
 }
 
 const api = katalogApi<EinheitTyp, TypEingabe>('/api/einheit-typen');

@@ -1,6 +1,7 @@
 import type { EinheitVorlage } from '../api/types';
 import { staerkeText } from '../anzeige/staerke';
 import { mitVorgabe } from '../components/vorgabeText';
+import { qualiSollText } from '../kraefte/qualiSoll';
 
 /**
  * Baumform und Anzeige der Einheiten-Vorlagen (LLH-1042) für Liste und Detailseite: rein, ohne
@@ -11,6 +12,13 @@ import { mitVorgabe } from '../components/vorgabeText';
 export function sollText(v: EinheitVorlage): string {
   if (!v.soll) return '—';
   return v.soll_eigen ? staerkeText(v.soll) : mitVorgabe(staerkeText(v.soll));
+}
+
+/** Wirksames Qualifikationssoll (LLH-1553); das des Einheitstyps trägt „(Vorgabe)“. Ohne leer. */
+export function qualiSollTextVon(v: EinheitVorlage): string {
+  const text = qualiSollText(v.quali_soll);
+  if (!text) return '';
+  return v.quali_soll_eigen ? text : mitVorgabe(text);
 }
 
 export interface VorlageRow {

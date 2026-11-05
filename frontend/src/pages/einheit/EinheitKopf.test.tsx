@@ -7,6 +7,7 @@ import { renderMitProviders } from '../../test/utils';
 import { ApiError } from '../../api/client';
 import { EINHEIT_BEMERKUNG_MAX, EINHEIT_FUNKRUFNAME_MAX } from '../../api/eingabegrenzen';
 import type { Einheit, EinheitTyp, Einsatzabschnitt } from '../../api/types';
+import { waehle } from '../../test/auswahlListe';
 import EinheitKopf, { type EinheitPatchHandler, type HandStatusHandler } from './EinheitKopf';
 
 /**
@@ -157,6 +158,7 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
       'Über-Einheit',
       'Einheitsführer',
       'Soll-Stärke (F/UF/M)',
+      'Qualifikationssoll',
       'Ist (F/UF/M//Σ)',
       'Status',
       'Bemerkung',
@@ -294,6 +296,36 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
       soll_fuehrer: 1,
       soll_unterfuehrer: 3,
       soll_mannschaft: 12,
+    });
+  });
+
+  it('Qualifikationssoll: das des Typs als Vorgabe, Ergänzen schickt die ganze Liste (LLH-1553)', async () => {
+    server.use(
+      http.get('/api/qualifikationen', () =>
+        HttpResponse.json([
+          { id: 1, label: 'Sanitäter', sortier: 10 },
+          { id: 2, label: 'Rettungssanitäter', sortier: 20, schliesst_ein_id: 1 },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    const { onPatch } = renderKopf(
+      einheit({
+        quali_soll: [{ qualifikation_id: 2, label: 'Rettungssanitäter', anzahl: 1 }],
+        quali_soll_eigen: false,
+      }),
+    );
+    expect(screen.getByText('mind. 1 Rettungssanitäter (Vorgabe)')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Qualifikationssoll bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Qualifikation fordern' }));
+    await waehle('Qualifikation 2', 'Sanitäter');
+    await user.click(screen.getByRole('button', { name: 'Qualifikationssoll speichern' }));
+    await waitFor(() => expect(onPatch).toHaveBeenCalledTimes(1));
+    expect(onPatch).toHaveBeenCalledWith('Qualifikationssoll', {
+      quali_soll: [
+        { qualifikation_id: 2, anzahl: 1 },
+        { qualifikation_id: 1, anzahl: 1 },
+      ],
     });
   });
 

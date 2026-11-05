@@ -1,4 +1,6 @@
 pub mod disposition_repo;
+pub mod quali_soll;
+pub mod qualifikation_deckung;
 pub mod qualifikation_repo;
 pub mod repo;
 pub mod status_repo;
@@ -49,6 +51,16 @@ pub const QUALIFIKATION_STARTLISTE: [(&str, i64); 9] = [
     ("Zugführer", 70),
     ("Maschinist", 80),
     ("Sprechfunker", 90),
+];
+
+/// Einschlüsse der Startliste (LLH-1553, design.md D2): (Qualifikation, die sie einschließt).
+/// Notarzt schließt nichts ein. **Muss mit dem Bestands-Update in
+/// `migrations/0274_qualifikation_einschluss_soll.sql` übereinstimmen.**
+pub const QUALIFIKATION_EINSCHLUSS_STARTLISTE: [(&str, &str); 4] = [
+    ("Rettungssanitäter", "Sanitäter"),
+    ("Notfallsanitäter", "Rettungssanitäter"),
+    ("Gruppenführer", "Truppführer"),
+    ("Zugführer", "Gruppenführer"),
 ];
 
 /// Default-Personal-Status-Katalog je neu angelegter Organisation
@@ -132,6 +144,9 @@ pub struct Qualifikation {
     pub id: i64,
     pub label: String,
     pub sortier: i64,
+    /// Die Qualifikation, die diese direkt einschließt (LLH-1553); transitiv gilt die ganze
+    /// Kette. Fehlt, wenn sie nur sich selbst deckt.
+    pub schliesst_ein_id: Option<i64>,
 }
 
 /// Personal-Status-Katalog-Eintrag (org-weit). Schema wie `FahrzeugStatus` minus `fms_anker`.

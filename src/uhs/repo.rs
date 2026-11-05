@@ -5,9 +5,12 @@ use sqlx::{SqliteConnection, SqlitePool};
 /// Die Stärke zählt die zugeordneten Einsatzkräfte je aufgelöster Position (Dispo-Override vor
 /// Stamm-Default) wie `einheit::mitglied_repo::ist_staerke` (LFH-1045, design.md D1); eine Kraft
 /// ohne Position zählt als Mannschaft wie in `Staerke::from_positions` (LLH-1234).
-const SELECT_ALLE: &str = "\
+const SELECT_ALLE: &str = concat!(
+    "\
     SELECT id, einsatz_id, abschnitt_id, typ, bezeichnung, standort, notiz, status, \
-           lat, lon, \
+           lat, lon, soll_anzahl, ",
+    crate::personal::quali_soll::quali_soll_sql!("uhs.quali_soll"),
+    " AS quali_soll, \
            erfasst_at, erfasst_von, geaendert_at, geaendert_von, storniert_at, \
            (SELECT COUNT(*) FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
              WHERE ep.uhs_id = uhs.id AND ep.beendet_at IS NULL \
@@ -20,7 +23,8 @@ const SELECT_ALLE: &str = "\
              WHERE ep.uhs_id = uhs.id AND ep.beendet_at IS NULL \
                AND COALESCE(ep.staerke_position, p.staerke_position, 'mannschaft') = 'mannschaft') \
              AS mannschaft \
-    FROM uhs";
+    FROM uhs"
+);
 
 /// Eingabedaten beim Anlegen (Handler hat Typ/`bezeichnung` validiert/getrimmt).
 #[derive(Debug)]
@@ -45,6 +49,11 @@ pub struct PatchDaten<'a> {
     pub notiz: Option<Option<&'a str>>,
     pub lat: Option<Option<f64>>,
     pub lon: Option<Option<f64>>,
+    /// Soll-Anzahl (LLH-1553), vom Handler auf 1 bis 200 geprüft; `Some(None)` = kein Soll.
+    pub soll_anzahl: Option<Option<i64>>,
+    /// Qualifikationssoll in gespeicherter Form (`personal::quali_soll::form`), Org-Prüfung
+    /// beim Handler; `Some(None)` = keins.
+    pub quali_soll: Option<Option<&'a str>>,
 }
 
 /// UHS eines Einsatzes (ohne stornierte), optional gefiltert nach Status und/oder Abschnitt.
@@ -174,6 +183,8 @@ pub async fn aktualisiere(
              notiz = CASE WHEN ?6 IS NULL THEN notiz ELSE ?7 END, \
              lat = CASE WHEN ?8 IS NULL THEN lat ELSE ?9 END, \
              lon = CASE WHEN ?10 IS NULL THEN lon ELSE ?11 END, \
+             soll_anzahl = CASE WHEN ?16 IS NULL THEN soll_anzahl ELSE ?17 END, \
+             quali_soll = CASE WHEN ?18 IS NULL THEN quali_soll ELSE ?19 END, \
              geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
              geaendert_von = ?12 \
          WHERE id = ?13 AND einsatz_id = ?14",
@@ -196,9 +207,13 @@ pub async fn aktualisiere(
         .bind(geaendert_von)
         .bind(id)
         .bind(einsatz_id);
-    if let Some(stand) = erwartet_geaendert_at {
-        q = q.bind(stand);
-    }
+    // ?15 ist der optionale Stand; ohne Guard bindet er trotzdem, damit ?16… ihren Platz behalten.
+    q = q
+        .bind(erwartet_geaendert_at)
+        .bind(daten.soll_anzahl.map(|_| 1_i64))
+        .bind(daten.soll_anzahl.flatten())
+        .bind(daten.quali_soll.map(|_| 1_i64))
+        .bind(daten.quali_soll.flatten());
     match q.execute(pool).await {
         Ok(r) if r.rows_affected() == 0 => {
             // Mit Guard: existiert die Zeile → veralteter Stand (409), sonst fehlt sie (404).

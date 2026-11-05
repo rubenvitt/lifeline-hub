@@ -48,8 +48,9 @@ export interface KatalogVerwaltungProps<T extends KatalogEintrag, W extends obje
   deaktivierenFrage: string;
   /** Bestätigungsknopf der Rückfrage, mit Verb und Objekt („Typ deaktivieren“), nie „OK“. */
   deaktivierenKnopf: string;
-  /** Die `Form.Item`s des Bearbeiten-Dialogs. */
-  felder: ReactNode;
+  /** Die `Form.Item`s des Bearbeiten-Dialogs; als Funktion mit dem bearbeiteten Eintrag und
+   *  dem geladenen Katalog (Auswahl, die vom Eintrag abhängt, LLH-1553). */
+  felder: ReactNode | ((bearbeite: T | null, eintraege: readonly T[]) => ReactNode);
   /** Optionaler Hinweis über der Tabelle, abgeleitet aus dem geladenen Katalog (erst nach dem
    *  Abruf, nie aus einem leeren Ladezustand). */
   vorTabelle?: (eintraege: readonly T[]) => ReactNode;
@@ -229,7 +230,7 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
         onFertig={() => setBearbeite(null)}
         onAbbrechen={() => setBearbeite(null)}
       >
-        {felder}
+        {typeof felder === 'function' ? felder(bearbeite, query.data ?? []) : felder}
       </ErfassungsModal>
     </AdminPage>
   );

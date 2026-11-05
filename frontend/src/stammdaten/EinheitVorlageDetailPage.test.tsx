@@ -10,6 +10,7 @@ import { EINHEIT_TYPEN, RETTUNGSSTAFFEL, SANITAETSZUG, VORLAGEN } from '../test/
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import EinheitVorlageDetailPage from './EinheitVorlageDetailPage';
 import { einheitVorlageDetailPath } from './stammdatenDetail';
+import { waehle } from '../test/auswahlListe';
 
 /** LLH-1042: Detailseite einer Einheiten-Vorlage (Spec `einheit-vorlagen`). */
 
@@ -101,6 +102,12 @@ function handler(benutzer = admin) {
     http.get('/api/fahrzeuge', () => HttpResponse.json(FAHRZEUGE)),
     http.get('/api/personal', () => HttpResponse.json(PERSONAL)),
     http.get('/api/material', () => HttpResponse.json(MATERIAL)),
+    http.get('/api/qualifikationen', () =>
+      HttpResponse.json([
+        { id: 1, label: 'Sanitäter', sortier: 10 },
+        { id: 2, label: 'Rettungssanitäter', sortier: 20, schliesst_ein_id: 1 },
+      ]),
+    ),
     http.patch('/api/einheit-vorlagen/:id', async ({ request }) => {
       calls.patch.push(await request.json());
       return HttpResponse.json(SANITAETSZUG);
@@ -208,6 +215,34 @@ describe('EinheitVorlageDetailPage', () => {
       soll_mannschaft: 6,
     });
     expect(await screen.findByText('Gespeichert: Funkrufname, Soll-Stärke')).toBeInTheDocument();
+  });
+
+  it('Qualifikationssoll: das des Typs steht als Vorgabe, ein eigenes geht allein hinaus (LLH-1553)', async () => {
+    const calls = handler();
+    server.use(
+      http.get('/api/einheit-typen', () =>
+        HttpResponse.json([
+          {
+            ...EINHEIT_TYPEN[0],
+            quali_soll: [{ qualifikation_id: 2, label: 'Rettungssanitäter', anzahl: 1 }],
+          },
+          ...EINHEIT_TYPEN.slice(1),
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDetail(SANITAETSZUG.id);
+    expect(
+      await screen.findByText('Vorgabe des Einheitstyps: mind. 1 Rettungssanitäter'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Qualifikation fordern' }));
+    await waehle('Qualifikation 1', 'Sanitäter');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(calls.patch).toHaveLength(1));
+    expect(calls.patch[0]).toEqual({ quali_soll: [{ qualifikation_id: 1, anzahl: 1 }] });
+    expect(await screen.findByText('Gespeichert: Qualifikationssoll')).toBeInTheDocument();
   });
 
   it('ohne Änderung geht kein PATCH hinaus', async () => {

@@ -1124,6 +1124,18 @@ async fn demo_vorlage_steht_mit_untereinheit_marke_und_fahrzeugen() {
         marke(&pool, "einheit_vorlage", staffel.id).await,
         Some(a.kopf)
     );
+    // LLH-1553: die Staffel fordert eigene Qualifikationen, der Zug keine.
+    assert!(staffel.quali_soll_eigen);
+    let soll: Vec<(&str, i64)> = staffel
+        .quali_soll
+        .as_ref()
+        .unwrap()
+        .0
+        .iter()
+        .map(|e| (e.label.as_str(), e.anzahl))
+        .collect();
+    assert_eq!(soll, [("Notfallsanitäter", 1), ("Rettungssanitäter", 2)]);
+    assert!(!zug.quali_soll_eigen);
 }
 
 /// Konfliktregel: eine aktive Vorlage gleichen Namens wird mitbenutzt, unverändert und ohne
@@ -1150,6 +1162,7 @@ async fn vorhandene_vorlage_gleichen_namens_wird_mitbenutzt() {
             tz_fachaufgabe: None,
             tz_organisation: None,
             soll: None,
+            quali_soll: None,
             bemerkung: None,
             sortier: 0,
         },
@@ -1223,6 +1236,7 @@ async fn eigene_untereinheit_haelt_die_demo_vorlage() {
             tz_fachaufgabe: None,
             tz_organisation: None,
             soll: None,
+            quali_soll: None,
             bemerkung: None,
             sortier: 0,
         },
@@ -1279,6 +1293,7 @@ async fn demo_vorlage_unter_eigener_obereinheit_bleibt() {
             tz_fachaufgabe: None,
             tz_organisation: None,
             soll: None,
+            quali_soll: None,
             bemerkung: None,
             sortier: 0,
         },
@@ -1459,6 +1474,7 @@ async fn material_einer_eigenen_vorlage_haelt_das_demo_material() {
             tz_fachaufgabe: None,
             tz_organisation: None,
             soll: None,
+            quali_soll: None,
             bemerkung: None,
             sortier: 0,
         },

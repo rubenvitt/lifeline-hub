@@ -125,6 +125,7 @@ function einheit(over: Partial<Einheit> = {}): Einheit {
   return {
     id: 30,
     einsatz_id: 1,
+    quali_soll_eigen: false,
     abschnitt_id: null,
     abschnitt_name: null,
     ueber_einheit_id: null,

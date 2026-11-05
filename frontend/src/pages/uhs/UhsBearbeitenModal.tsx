@@ -1,4 +1,4 @@
-import { App, Form, Input } from 'antd';
+import { App, Form, Input, InputNumber } from 'antd';
 import { EinsatzOrtsfeld } from '../../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../../anzeige/Ortsfeld';
 import { ortFelder, ortsfeldAusGespeichert } from '../../anzeige/ortsfeldFormular';
@@ -9,12 +9,18 @@ import { aktualisiereUhs, type UhsPatch } from '../../api/einsatzUhs';
 import { leerZuNull } from '../../api/patchTriState';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Uhs } from '../../api/types';
+import { UHS_SOLL_ANZAHL_MAX } from '../../api/eingabegrenzen';
+import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../../kraefte/QualiSollFeld';
+import { gleichesQualiSoll, qualiSollEingabe } from '../../kraefte/qualiSoll';
 
 interface FormWerte {
   bezeichnung: string;
   /** Ortsfeld (LLH-1114): Text und Koordinate des Standorts. */
   standort?: OrtsfeldWert;
   notiz?: string;
+  /** LLH-1553: Soll-Anzahl und Qualifikationssoll. */
+  soll_anzahl?: number | null;
+  quali_soll?: QualiSollZeile[];
 }
 
 /**
@@ -35,6 +41,12 @@ export function uhsPatchAus(basis: Uhs, werte: FormWerte): UhsPatch {
   }
   const notiz = leerZuNull(werte.notiz);
   if (notiz !== (basis.notiz ?? null)) patch.notiz = notiz;
+  const sollAnzahl = werte.soll_anzahl ?? null;
+  if (sollAnzahl !== (basis.soll_anzahl ?? null)) patch.soll_anzahl = sollAnzahl;
+  const qualiSoll = vollstaendig(werte.quali_soll);
+  if (!gleichesQualiSoll(qualiSoll, qualiSollEingabe(basis.quali_soll))) {
+    patch.quali_soll = qualiSoll.length > 0 ? qualiSoll : null;
+  }
   return patch;
 }
 
@@ -76,6 +88,8 @@ export default function UhsBearbeitenModal({
       bezeichnung: uhs.bezeichnung,
       standort: ortsfeldAusGespeichert(uhs.standort, uhs.lat, uhs.lon),
       notiz: uhs.notiz ?? undefined,
+      soll_anzahl: uhs.soll_anzahl ?? null,
+      quali_soll: qualiSollEingabe(uhs.quali_soll),
     });
   }, [offen, uhs, form]);
 
@@ -117,6 +131,12 @@ export default function UhsBearbeitenModal({
       </Form.Item>
       <Form.Item label="Standort (optional)" name="standort">
         <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Standort" exclude={`uhs:${uhs.id}`} />
+      </Form.Item>
+      <Form.Item label="Soll-Anzahl (optional)" name="soll_anzahl">
+        <InputNumber min={1} max={UHS_SOLL_ANZAHL_MAX} precision={0} style={{ width: 120 }} />
+      </Form.Item>
+      <Form.Item label="Qualifikationssoll" name="quali_soll">
+        <QualiSollFeld bekannt={uhs.quali_soll} />
       </Form.Item>
       <Form.Item label="Notiz (optional)" name="notiz">
         <Input.TextArea rows={3} />

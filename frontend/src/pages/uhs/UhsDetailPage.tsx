@@ -39,6 +39,7 @@ import BewegungenTab from './BewegungenTab';
 import UhsAnhaenge from './UhsAnhaenge';
 import UhsKraefte from './UhsKraefte';
 import { staerkeText } from '../../anzeige/staerke';
+import { qualiSollText } from '../../kraefte/qualiSoll';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { KennungsLink } from '../../components/kennungsLink';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
@@ -276,7 +277,16 @@ export default function UhsDetailPage() {
         </Space>
       }
       meta={meta}
-      beschreibung={uhs.notiz ? `Notiz: ${uhs.notiz}` : undefined}
+      // Das Soll (LLH-1553) steht vor der Notiz; die Zeile darf umbrechen, die Meta nicht.
+      beschreibung={
+        [
+          uhs.soll_anzahl != null ? `Soll ${uhs.soll_anzahl}` : null,
+          qualiSollText(uhs.quali_soll) || null,
+          uhs.notiz ? `Notiz: ${uhs.notiz}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || undefined
+      }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         kopfFehler != null && (

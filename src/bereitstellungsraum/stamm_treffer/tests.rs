@@ -77,6 +77,7 @@ async fn welt(pool: &SqlitePool) -> Welt {
         tz_fachaufgabe: None,
         tz_organisation: None,
         soll: None,
+        quali_soll: None,
         bemerkung: Some("Schlüssel im Spind 4"),
         sortier: 0,
     };
@@ -333,6 +334,7 @@ async fn suche_liefert_hoechstens_zehn_treffer_nach_name() {
                 tz_fachaufgabe: None,
                 tz_organisation: None,
                 soll: None,
+                quali_soll: None,
                 bemerkung: None,
                 sortier: 0,
             },
@@ -539,6 +541,7 @@ async fn fremde_vorlage_ist_404_und_deaktivierte_422() {
             tz_fachaufgabe: None,
             tz_organisation: None,
             soll: None,
+            quali_soll: None,
             bemerkung: None,
             sortier: 0,
         },

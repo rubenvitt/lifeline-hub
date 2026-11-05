@@ -59,6 +59,7 @@ async fn seed_einheit(
             soll_fuehrer: None,
             soll_unterfuehrer: None,
             soll_mannschaft: None,
+            quali_soll: None,
             bemerkung: None,
             funkrufname: None,
             sortier: 0,
@@ -169,6 +170,7 @@ async fn snapshot_friert_fachdaten_ein_umbenennen_aendert_stand_nicht() {
             bemerkung: None,
             funkrufname: None,
             sortier: None,
+            quali_soll: None,
         },
     )
     .await

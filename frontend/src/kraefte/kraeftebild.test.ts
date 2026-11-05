@@ -42,6 +42,7 @@ const eh = (
 ): Einheit => ({
   id,
   einsatz_id: 1,
+  quali_soll_eigen: false,
   abschnitt_id,
   abschnitt_name: null,
   ueber_einheit_id,

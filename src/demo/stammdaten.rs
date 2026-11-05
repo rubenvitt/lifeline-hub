@@ -257,6 +257,19 @@ pub async fn stammdaten_importieren_tx(
                     .filter(|u| angelegte_vorlagen.contains(u))
                     .map(|u| nachschlagen(&einheit_vorlagen, "Einheiten-Vorlage", u))
                     .transpose()?;
+                let quali_soll = crate::personal::quali_soll::form(
+                    &vorlage
+                        .quali_soll
+                        .iter()
+                        .map(|(label, anzahl)| {
+                            Ok(crate::personal::quali_soll::QualiSollEingabe {
+                                qualifikation_id: kataloge
+                                    .id(Katalogeintrag::Qualifikation(label))?,
+                                anzahl: *anzahl,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, AppError>>()?,
+                )?;
                 let daten = NewVorlage {
                     name: vorlage.name,
                     typ_id: kataloge.id(Katalogeintrag::Einheitstyp(vorlage.typ))?,
@@ -265,6 +278,7 @@ pub async fn stammdaten_importieren_tx(
                     tz_fachaufgabe: vorlage.tz_fachaufgabe,
                     tz_organisation: vorlage.tz_organisation,
                     soll: None,
+                    quali_soll: quali_soll.as_deref(),
                     bemerkung: Some(szenario::BEMERKUNG),
                     sortier: vorlage.sortier,
                 };

@@ -14,6 +14,9 @@ import type { Einheit, Einsatzabschnitt, EinheitTyp, Staerke } from '../../api/t
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../../anzeige/StaerkeEingabe';
+import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../../kraefte/QualiSollFeld';
+import { gleichesQualiSoll, qualiSollEingabe, qualiSollText } from '../../kraefte/qualiSoll';
+import { mitVorgabe } from '../../components/vorgabeText';
 import { InlineAngabe } from '../../components/InlineAngabe';
 import { KennungsLink } from '../../components/kennungsLink';
 import {
@@ -355,6 +358,28 @@ export default function EinheitKopf({
                 eingabe={({ feld, value, onChange }) => (
                   <div role="group" id={feld.id} aria-label={feld['aria-label']}>
                     <StaerkeEingabe value={value} onChange={onChange} autoFocus />
+                  </div>
+                )}
+              />
+            </Datenfeld>
+            {/* Qualifikationssoll (LLH-1553): ohne eigenes gilt das des Typs, mit „(Vorgabe)“.
+                Leere Zeilen gehen zurück auf den Typ. */}
+            <Datenfeld label="Qualifikationssoll">
+              <InlineAngabe<QualiSollZeile[]>
+                etikett="Qualifikationssoll"
+                wert={qualiSollEingabe(e.quali_soll)}
+                anzeige={
+                  e.quali_soll_eigen
+                    ? qualiSollText(e.quali_soll)
+                    : mitVorgabe(qualiSollText(e.quali_soll))
+                }
+                leer={(w) => vollstaendig(w).length === 0}
+                gleich={(a, b) => gleichesQualiSoll(vollstaendig(a), vollstaendig(b))}
+                darfSchreiben={canEdit}
+                onSpeichern={(w) => onPatch('Qualifikationssoll', { quali_soll: vollstaendig(w) })}
+                eingabe={({ feld, value, onChange }) => (
+                  <div role="group" id={feld.id} aria-label={feld['aria-label']}>
+                    <QualiSollFeld value={value} onChange={onChange} bekannt={e.quali_soll} />
                   </div>
                 )}
               />

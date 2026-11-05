@@ -205,6 +205,15 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "LAGEMONITOR_BEZEICHNUNG_MAX",
             lagemonitor_zugang::BEZEICHNUNG_MAX,
         ),
+        ("QUALI_SOLL_MAX", personal::quali_soll::QUALI_SOLL_MAX),
+        (
+            "QUALI_SOLL_ANZAHL_MAX",
+            usize::try_from(personal::quali_soll::QUALI_SOLL_ANZAHL_MAX).unwrap(),
+        ),
+        (
+            "UHS_SOLL_ANZAHL_MAX",
+            usize::try_from(lifeline_hub::uhs::SOLL_ANZAHL_MAX).unwrap(),
+        ),
     ])
 }
 
