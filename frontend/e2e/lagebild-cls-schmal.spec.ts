@@ -38,7 +38,9 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * DICHTE (LFH-883): gemessen wird in allen drei Stufen der Staffel. Handschuh ist der
  * Tablet-Kontext und auf 390 px selten, aber dort lagen die Platzhalter am weitesten neben dem
  * Endzustand: das Kennzahlenband wuchs 427 → 454 px, der Paneelkopf „Einsatzabschnitte“ des
- * Überblicks brach erst mit dem Meta um (38 → 52 px), Seiten-CLS 0,074–0,083. Die Stufe kommt
+ * Überblicks brach erst mit dem Meta um (38 → 52 px), Seiten-CLS 0,074–0,083. Den Kopf im
+ * Ladezustand gibt es seit LLH-1481 nicht mehr: die Paneelreihen erscheinen erst mit den Quellen
+ * der Gliederung (`ueberblick-vorgaenge-cls.spec.ts`). Die Stufe kommt
  * als gespeicherte Wahl per `addInitScript` vor jedem Dokument-Script; der Test prüft sie am
  * `data-dichte` der Wurzel, bevor er zählt.
  *
@@ -107,6 +109,9 @@ async function einsatzAnlegen(page: Page): Promise<string> {
   return id;
 }
 
+/** Die Quellen des Paneels „Einsatzabschnitte“ im Überblick (`abschnittZeilen`). */
+const UEBERBLICK_GLIEDERUNG = ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material'];
+
 type Folge = 'Einsatz zuerst' | 'Einsatz zuletzt' | 'natürlich';
 const FOLGEN: Folge[] = ['Einsatz zuerst', 'Einsatz zuletzt', 'natürlich'];
 
@@ -125,11 +130,15 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge, seite
   // Die Modulfreigaben gehören wie der Kopf zum Rahmen: bis sie antworten, wartet der Modulwächter
   // (LFH-888) und die Seite rendert noch nicht. Gehalten werden die Abfragen der Seite.
   // Der Überblick wartet mit seinem Körper außerdem auf den Modulzähler (LLH-1430, die
-  // Platzhalter der „Offenen Vorgänge“): gehalten zeigte er keinen Ladezustand, den man messen kann.
+  // Platzhalter der „Offenen Vorgänge“) und mit seinen Paneelreihen auf die Quellen der Gliederung
+  // (LLH-1481): gehalten zeigte er keinen Ladezustand, den man messen kann.
   const rahmen = (pfad: string) =>
     pfad === kopf ||
     pfad === `${kopf}/modul-freigaben` ||
-    (seite === 'ueberblick' && pfad === `${kopf}/modul-zaehler`);
+    (seite === 'ueberblick' &&
+      [`${kopf}/modul-zaehler`, ...UEBERBLICK_GLIEDERUNG.map((l) => `${kopf}/${l}`)].includes(
+        pfad,
+      ));
   const haelt = (pfad: string) =>
     folge === 'Einsatz zuerst' ? !rahmen(pfad) : folge === 'Einsatz zuletzt' && pfad === kopf;
   let gehalten = 0;
@@ -295,42 +304,6 @@ for (const dichte of DICHTEN) {
       expect.soft(Math.abs(nachher - vorher), `${dichte}, ${messwert}`).toBeLessThanOrEqual(1);
     }
     test.info().annotations.push({ type: 'messwert', description: hoehen.join(' | ') });
-  });
-}
-
-/**
- * Der Paneelkopf „Einsatzabschnitte“ im Überblick bricht auf 390 px um, sobald sein Meta „0
- * Abschnitte · 0 Einheiten“ neben dem Titel steht (38 → 52 px). Das Meta kam erst mit den Daten;
- * der Kopf hält seinen Umbruch jetzt schon im Ladezustand (LFH-883). Das Paneel steht unter dem
- * ersten Bildschirm, die Seiten-CLS sieht seinen Sprung nicht — deshalb die Geometrie.
- */
-for (const dichte of DICHTEN) {
-  test(`Überblick, ${dichte}: der Paneelkopf „Einsatzabschnitte“ hält seine Höhe über das Laden (390 px)`, async ({
-    page,
-  }) => {
-    test.setTimeout(90_000);
-    await anmeldenAlsAdmin(page);
-    const einsatzId = await einsatzAnlegen(page);
-    await stelleDichte(page, dichte);
-    await page.setViewportSize(HANDSCHIRM);
-
-    const abfragen = await stelleAbfragen(page, einsatzId, 'Einsatz zuerst', 'ueberblick');
-    await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
-    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
-    const paneel = page
-      .locator('section[data-lfh="paneel"]')
-      .filter({ has: page.getByRole('heading', { name: 'Einsatzabschnitte' }) });
-    const kopf = paneel.locator(':scope > div').first();
-    // Vorbedingung: das Paneel lädt noch.
-    await expect(paneel.locator('[aria-busy="true"]').first()).toBeVisible();
-    await page.evaluate(() => document.fonts.ready.then(() => undefined));
-    const vorher = (await kopf.boundingBox())?.height ?? Number.NaN;
-    abfragen.freigeben();
-    await expect(paneel.getByText('0 Abschnitte · 0 Einheiten')).toBeVisible();
-    const nachher = (await kopf.boundingBox())?.height ?? Number.NaN;
-    const messwert = `${vorher.toFixed(1)} → ${nachher.toFixed(1)}`;
-    test.info().annotations.push({ type: 'messwert', description: messwert });
-    expect(Math.abs(nachher - vorher), messwert).toBeLessThanOrEqual(1);
   });
 }
 
