@@ -5,7 +5,8 @@
 //! Nachtrag in die Zeitachse kommen (`tests/abloesung_hinweise.rs`). Neu ist die Streichung: wird
 //! die Alarmierung oder das Eintreffen gestrichen, mit dem die offene Periode der geplanten
 //! Einheit begann, gilt der frühere Hinweis nicht mehr; je Streichung genau ein Hinweis
-//! „… gestrichen“ an die Leser des Moduls Ablösung, nicht an die Auslöserin.
+//! „… gestrichen“ an die Leser des Moduls Ablösung, nicht an die Auslöserin. Die gestrichene
+//! Entlassung holt die mit ihr entfallene Planung zurück (LLH-1510, „… wiederhergestellt“).
 
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
@@ -286,5 +287,62 @@ async fn ohne_planung_oder_ausserhalb_der_offenen_periode_bleibt_es_still() {
     assert_eq!(
         w.empfaenger("abloeser_eintreffen_gestrichen").await,
         vec![w.admin_id, w.bert, w.carl]
+    );
+}
+
+/// LLH-1510: die Entlassung der geplanten Einheit ließ ihre Planung entfallen; wird sie
+/// gestrichen, ist die Planung zurück, und die Leser bekommen „Planung der ablösenden Einheit
+/// wiederhergestellt“, die Auslöserin nicht. Die Schicht trägt die Einheit wieder.
+#[tokio::test]
+async fn gestrichene_entlassung_der_abloesenden_einheit_meldet_wiederhergestellt() {
+    let w = welt().await;
+    w.nachtrag(w.abloeser, "alarmierung", 20).await;
+    let zid = w.nachtrag(w.abloeser, "entlassung", 10).await;
+    assert_eq!(
+        w.empfaenger("abloeser_entfallen").await,
+        vec![w.anna, w.bert, w.carl]
+    );
+
+    w.streichen(w.abloeser, zid).await;
+
+    assert_eq!(
+        w.empfaenger("abloeser_wiederhergestellt").await,
+        vec![w.admin_id, w.bert, w.carl]
+    );
+    let (s, v) = anfrage(&w.app, "GET", &w.pfad("abloesungen"), &w.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let v = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"] == w.schicht)
+        .unwrap_or_else(|| panic!("Schicht fehlt: {v}"))
+        .clone();
+    assert_eq!(v["abloesende_einheit_id"], w.abloeser);
+    assert!(v["planung_entfallen"].is_null(), "{v}");
+
+    let bert = login_cookie(&w.app, "bertram", "bertrampw1").await;
+    let (s, v) = anfrage(
+        &w.app,
+        "GET",
+        "/api/benachrichtigungen?offen=true",
+        &bert,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let eintrag = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["bezug_typ"] == "abloeser_wiederhergestellt")
+        .unwrap_or_else(|| panic!("kein Hinweis im Verlauf: {v}"));
+    assert_eq!(
+        eintrag["titel"],
+        "Planung der ablösenden Einheit wiederhergestellt"
+    );
+    assert_eq!(
+        eintrag["detail"],
+        "Ablösung für Rettungsstaffel: 2. Rettungsstaffel"
     );
 }

@@ -286,6 +286,7 @@ fn pfade_folgen_den_deeplinks() {
         B::AbloeserEntfallen,
         B::AbloeserAlarmierungGestrichen,
         B::AbloeserEintreffenGestrichen,
+        B::AbloeserWiederhergestellt,
     ] {
         assert_eq!(
             p(typ, 3),
@@ -677,6 +678,11 @@ async fn hinweis_zur_abloesenden_einheit_nennt_titel_aus_dem_bezug_und_beide_ein
         (
             BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen,
             "Eintreffen der ablösenden Einheit gestrichen",
+        ),
+        // Gestrichene Entlassung holt die Planung zurück (LLH-1510).
+        (
+            BenachrichtigungBezugTyp::AbloeserWiederhergestellt,
+            "Planung der ablösenden Einheit wiederhergestellt",
         ),
     ] {
         let t = text::bilden(&pool, e, art, Bezug::neu(typ, schicht))

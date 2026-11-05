@@ -66,6 +66,7 @@ describe('Katalog der Benachrichtigungsarten', () => {
       'abloeser_entfallen',
       'abloeser_alarmierung_gestrichen',
       'abloeser_eintreffen_gestrichen',
+      'abloeser_wiederhergestellt',
     ] as const) {
       expect(zielVon({ art: 'abloesung_abloeser', bezug_typ })).toBe('abloesung');
     }
