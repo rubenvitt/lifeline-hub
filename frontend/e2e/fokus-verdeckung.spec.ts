@@ -78,6 +78,9 @@ test('Selbstbeweis (LFH-373): Zusatzkandidaten machen einen ABSOLUTEN Verdecker 
   // die Verdeckung, OHNE nicht — die Vorgabe enthält die Option also nicht still mit.
   await anmelden(page);
   await page.setViewportSize({ width: 390, height: 400 });
+  // Der Devtools-Knopf (nur DEV-Build) liegt bei 390 × 400 im Tab-Umlauf und wäre ein Befund,
+  // den es im Betrieb nicht gibt; die Aussage „ohne Zusatzkandidat leer“ hinge sonst an ihm.
+  await ohneDevtoolsKnopf(page);
 
   const laufMitAttrappe = async (optionen?: { zusatzKandidaten: string[] }) => {
     await page.goto('/admin/benutzer');
@@ -172,6 +175,8 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
 
   // Höhe bewusst verkürzt: die Bildlaufreserve ist die Vorbedingung dieses Nachweises.
   await page.setViewportSize({ width: 390, height: 400 });
+  // Ohne den Devtools-Knopf (nur DEV-Build): der Umlauf erreicht ihn am Ende der Seite.
+  await ohneDevtoolsKnopf(page);
   await page.goto('/admin/benutzer');
 
   /**
