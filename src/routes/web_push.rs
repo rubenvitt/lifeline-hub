@@ -2,7 +2,7 @@
 //!
 //! GET    /api/web-push      — öffentlicher Schlüssel und ob diese Sitzung ein Abo hat
 //! PUT    /api/web-push/abo  — Abo dieses Browsers für diese Sitzung anmelden, samt der Wahl
-//!                             „Mit Absender und Wortlaut“ (204)
+//!                             „Mit Absender und Wortlaut“ und der stummen Arten des Geräts (204)
 //! DELETE /api/web-push/abo  — Abo dieser Sitzung abmelden (idempotent, 204)
 //!
 //! Ohne `--web-push` antworten alle drei 404 wie ein unbekannter Pfad. Das Abo hängt an der
@@ -10,6 +10,7 @@
 
 use crate::app::AppState;
 use crate::auth::session::{hash_token, CurrentUser, SESSION_COOKIE};
+use crate::benachrichtigung::BenachrichtigungArt;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::web_push::krypto::{b64_lesen, browser_schluessel, AUTH_LAENGE};
@@ -34,7 +35,13 @@ pub struct WebPushStand {
     pub angemeldet: bool,
     /// Das Abo dieser Sitzung zeigt Absender und Wortlaut (LLH-1369); ohne Abo `false`.
     pub inhalt: bool,
+    /// Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne
+    /// Abo leer.
+    pub stumm: Vec<BenachrichtigungArt>,
 }
+
+/// Höchstzahl der Einträge in `stumm`; mehr Arten gibt es nicht.
+pub const STUMM_MAX: usize = BenachrichtigungArt::ALLE.len();
 
 /// Abo eines Browsers, wie `PushSubscription.toJSON()` es liefert (`keys` flach gelegt).
 #[derive(Debug, Deserialize)]
@@ -45,6 +52,11 @@ pub struct AboAnmeldung {
     /// „Mit Absender und Wortlaut“ (LLH-1369); fehlt es, bleibt das Abo ohne Inhalt.
     #[serde(default)]
     pub inhalt: bool,
+    /// „Stumm auf diesem Gerät“ (LLH-1482): Wire-Werte der stummen Eingangsarten; fehlt es,
+    /// ist keine stumm. Unbekannte Werte, Alarme und andere nicht stellbare Arten fallen still
+    /// weg: ein abgelehntes Abo nähme dem Gerät auch die Alarme.
+    #[serde(default)]
+    pub stumm: Vec<String>,
 }
 
 fn web_push(state: &AppState) -> Result<&WebPush, AppError> {
@@ -65,17 +77,20 @@ pub async fn stand(
     jar: CookieJar,
 ) -> Result<Json<WebPushStand>, AppError> {
     let wp = web_push(&state)?;
-    let abo = repo::abo_inhalt(&state.pool, &sitzung(&jar)?).await?;
+    let abo = repo::abo_wahl(&state.pool, &sitzung(&jar)?).await?;
+    let angemeldet = abo.is_some();
+    let wahl = abo.unwrap_or_default();
     Ok(Json(WebPushStand {
         schluessel: wp.oeffentlicher_schluessel(),
-        angemeldet: abo.is_some(),
-        inhalt: abo.unwrap_or(false),
+        angemeldet,
+        inhalt: wahl.inhalt,
+        stumm: repo::stumm_bereinigt(&wahl.stumm),
     }))
 }
 
 /// PUT /api/web-push/abo — 400, wenn Endpunkt oder Schlüssel für sich nicht taugen (keine URL,
-/// kein bekannter Push-Dienst, kein P-256-Punkt); dasselbe Browserprofil hängt sein Abo an
-/// diese Sitzung um.
+/// kein bekannter Push-Dienst, kein P-256-Punkt, mehr stumme Arten als es Arten gibt); dasselbe
+/// Browserprofil hängt sein Abo an diese Sitzung um.
 pub async fn anmelden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -99,6 +114,16 @@ pub async fn anmelden(
     if auth.len() != AUTH_LAENGE {
         return Err(AppError::Validation("auth muss 16 Byte lang sein".into()));
     }
+    if req.stumm.len() > STUMM_MAX {
+        return Err(AppError::Validation(format!(
+            "stumm darf höchstens {STUMM_MAX} Arten nennen"
+        )));
+    }
+    let stumm: Vec<BenachrichtigungArt> = req
+        .stumm
+        .iter()
+        .filter_map(|a| BenachrichtigungArt::parse(a))
+        .collect();
     // Normalisiert speichern: ohne Auffüllung, wie der Versand sie liest.
     repo::anmelden(
         &state.pool,
@@ -107,7 +132,10 @@ pub async fn anmelden(
         endpoint,
         &crate::web_push::krypto::b64(&p256dh),
         &crate::web_push::krypto::b64(&auth),
-        req.inhalt,
+        &repo::Wahl {
+            inhalt: req.inhalt,
+            stumm,
+        },
     )
     .await?;
     Ok(StatusCode::NO_CONTENT)

@@ -7011,6 +7011,11 @@ export interface components {
              *     `pushManager.subscribe({ applicationServerKey })`.
              */
             schluessel: string;
+            /**
+             * @description Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne
+             *     Abo leer.
+             */
+            stumm: components["schemas"]["BenachrichtigungArt"][];
         };
         /**
          * @description Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle

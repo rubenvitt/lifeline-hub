@@ -11,6 +11,9 @@
 //! - Will die Person auf einem Gerät Absender und Wortlaut sehen (LLH-1369, Abo mit `inhalt`),
 //!   bekommt die Nutzlast an dieses Abo nur die Marke `"inhalt": true` ([`nutzlast_fuer`]); den
 //!   Inhalt holt der Service Worker selbst mit der Sitzung.
+//! - Ist eine Art auf dem Gerät eines Abos stumm (LLH-1482, `repo::Abo::stumm`), bekommt dieses
+//!   Abo für einen Hinweis dieser Art keinen Push; ein Alarm geht immer ([`soll_senden`]). Der
+//!   Service Worker kann das nicht selbst: zu jedem Push muss er eine Meldung zeigen.
 //! - Endpunkte nur bei bekannten Push-Diensten ([`endpunkt_pruefen`], D5), sonst wäre das Abo
 //!   ein Weg, den Server POSTs ins interne Netz schicken zu lassen.
 
@@ -20,6 +23,7 @@ pub mod repo;
 #[cfg(test)]
 mod tests;
 
+use crate::benachrichtigung::BenachrichtigungArt;
 use crate::log_drossel::Sammelzeile;
 use futures::StreamExt;
 use krypto::{b64_lesen, Schluessel};
@@ -85,6 +89,8 @@ pub fn endpunkt_pruefen(endpoint: &str, dienste: &[&str]) -> Result<Url, &'stati
 #[derive(Debug, Clone)]
 pub struct Sendung {
     pub benutzer_id: i64,
+    /// Art der Benachrichtigung, für die stummen Arten des Abos (LLH-1482).
+    pub art: BenachrichtigungArt,
     /// JSON des Live-Ereignisses (nur Kennungen).
     pub nutzlast: String,
     /// Alarm: `Urgency: high`, sonst `normal`.
@@ -193,7 +199,7 @@ impl WebPush {
                 let s = sendungen
                     .iter()
                     .find(|s| s.benutzer_id == abo.benutzer_id)?;
-                Some((abo, s))
+                soll_senden(&abo, s).then_some((abo, s))
             })
             .collect();
         futures::stream::iter(auftraege)
@@ -272,6 +278,13 @@ impl WebPush {
             .map_err(|e| e.without_url().to_string())?;
         Ok(antwort.status())
     }
+}
+
+/// Ob die Sendung an dieses Abo geht (LLH-1482, Spec `web-push`, „Push an jedes Abo der
+/// Empfänger“): ein Alarm immer, ein Hinweis nur, wenn seine Art auf dem Gerät des Abos nicht
+/// stumm ist.
+pub fn soll_senden(abo: &repo::Abo, s: &Sendung) -> bool {
+    s.alarm || !abo.ist_stumm(s.art)
 }
 
 /// Die Nutzlast an ein Abo (LLH-1369, Spec `web-push`, „Inhalt der Meldung nur auf Wunsch“):

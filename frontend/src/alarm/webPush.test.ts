@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
+import { setzeStumm, vergesseStummStand } from './eingaengeStumm';
 import {
   ladePushStand,
   ladePushZustand,
@@ -83,7 +84,10 @@ function serverMitPush(angemeldet = false, inhalt = false) {
   return { anmeldungen, abmeldungen: () => abmeldungen };
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  vergesseStummStand();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -169,6 +173,89 @@ describe('webPush: Inhalt der Meldung nur auf Wunsch (LLH-1369)', () => {
   });
 });
 
+describe('webPush: „Stumm auf diesem Gerät“ geht mit dem Abo (LLH-1482)', () => {
+  it('jede Anmeldung trägt die stummen Arten dieses Geräts', async () => {
+    const b = browser({ vorhanden: abo('https://fcm.googleapis.com/alt') });
+    const s = serverMitPush();
+    setzeStumm('meldung', true);
+    setzeStumm('lagebericht', true);
+    await pushEinschalten(7);
+    await pushInhaltSetzen(7, true);
+    b.notification.permission = 'granted';
+    await pushAbgleichen(7);
+    expect(s.anmeldungen).toHaveLength(3);
+    for (const a of s.anmeldungen) {
+      expect(a).toEqual(expect.objectContaining({ stumm: ['lagebericht', 'meldung'] }));
+    }
+  });
+
+  it('nach dem Umschalten meldet der Abgleich die neue Liste, ohne Push nichts', async () => {
+    const b = browser({ vorhanden: abo('https://fcm.googleapis.com/alt') });
+    b.notification.permission = 'granted';
+    const s = serverMitPush(true);
+    setzeStumm('meldung', true);
+    await pushAbgleichen(7);
+    expect(s.anmeldungen).toEqual([]);
+
+    localStorage.setItem(pushMerker(7), '1');
+    await pushAbgleichen(7);
+    setzeStumm('meldung', false);
+    await pushAbgleichen(7);
+    expect(s.anmeldungen).toEqual([
+      expect.objectContaining({ stumm: ['meldung'] }),
+      expect.objectContaining({ stumm: [] }),
+    ]);
+  });
+  it('schnelles Umschalten: die Anmeldungen laufen nacheinander, die letzte trägt den Stand', async () => {
+    const vorhanden = abo('https://fcm.googleapis.com/alt');
+    // `anmelden` liest die Schlüssel als Erstes; der zweite Aufruf heißt: Der zweite Abgleich steht an.
+    const schluesselGelesen = vi.fn(vorhanden.toJSON);
+    vorhanden.toJSON = schluesselGelesen;
+    const b = browser({ vorhanden });
+    b.notification.permission = 'granted';
+    serverMitPush(true);
+    localStorage.setItem(pushMerker(7), '1');
+    const anmeldungen: unknown[] = [];
+    let offen = 0;
+    let gleichzeitig = 0;
+    let ersteFrei: () => void = () => {};
+    const ersteHaelt = new Promise<void>((frei) => {
+      ersteFrei = frei;
+    });
+    server.use(
+      http.put('/api/web-push/abo', async ({ request }) => {
+        offen++;
+        gleichzeitig = Math.max(gleichzeitig, offen);
+        const koerper = await request.json();
+        if (anmeldungen.length === 0) {
+          anmeldungen.push(koerper);
+          await ersteHaelt;
+        } else {
+          anmeldungen.push(koerper);
+        }
+        offen--;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    setzeStumm('meldung', true);
+    const erste = pushAbgleichen(7);
+    await vi.waitFor(() => expect(anmeldungen).toHaveLength(1));
+    setzeStumm('meldung', false);
+    const zweite = pushAbgleichen(7);
+    await vi.waitFor(() => expect(schluesselGelesen).toHaveBeenCalledTimes(2));
+    // Die zweite Anmeldung steht an; ohne Kette wäre ihr PUT jetzt unterwegs. Sie wartet auf die erste.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(anmeldungen).toHaveLength(1);
+    ersteFrei();
+    await Promise.all([erste, zweite]);
+    expect(gleichzeitig).toBe(1);
+    expect(anmeldungen).toEqual([
+      expect.objectContaining({ stumm: ['meldung'] }),
+      expect.objectContaining({ stumm: [] }),
+    ]);
+  });
+});
+
 describe('webPush: einschalten und ausschalten', () => {
   it('fragt die Erlaubnis, abonniert mit dem Serverschlüssel und meldet das Abo an', async () => {
     const b = browser();
@@ -180,7 +267,13 @@ describe('webPush: einschalten und ausschalten', () => {
       applicationServerKey: new Uint8Array(SCHLUESSEL_BYTES),
     });
     expect(s.anmeldungen).toEqual([
-      { endpoint: 'https://fcm.googleapis.com/neu', p256dh: 'P256', auth: 'AUTH', inhalt: false },
+      {
+        endpoint: 'https://fcm.googleapis.com/neu',
+        p256dh: 'P256',
+        auth: 'AUTH',
+        inhalt: false,
+        stumm: [],
+      },
     ]);
     expect(localStorage.getItem(pushMerker(7))).toBe('1');
   });
