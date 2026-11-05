@@ -99,16 +99,27 @@ async function abonnieren(schluessel: string): Promise<PushSubscription> {
   return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
 }
 
-async function anmelden(abo: PushSubscription, inhalt: boolean): Promise<void> {
+/** Laufende Anmeldungen, eine nach der anderen (siehe {@link anmelden}). */
+let anmeldeKette: Promise<unknown> = Promise.resolve();
+
+/**
+ * Meldet das Abo an. Die Anmeldungen laufen nacheinander, und jede liest die stummen Arten erst,
+ * wenn sie dran ist: Nach schnellem Umschalten könnte eine ältere Anmeldung sonst als letzte
+ * ankommen, und der Server behielte den alten Stand (LLH-1482).
+ */
+function anmelden(abo: PushSubscription, inhalt: boolean): Promise<void> {
   const json = abo.toJSON();
-  await meldeWebPushAn({
-    endpoint: abo.endpoint,
-    p256dh: json.keys?.p256dh ?? '',
-    auth: json.keys?.auth ?? '',
-    inhalt,
-    // Erst hier gelesen: nach schnellem Umschalten trägt die letzte Anmeldung den letzten Stand.
-    stumm: [...stummeArten()],
-  });
+  const schritt = anmeldeKette.then(() =>
+    meldeWebPushAn({
+      endpoint: abo.endpoint,
+      p256dh: json.keys?.p256dh ?? '',
+      auth: json.keys?.auth ?? '',
+      inhalt,
+      stumm: [...stummeArten()],
+    }),
+  );
+  anmeldeKette = schritt.catch(() => undefined);
+  return schritt;
 }
 
 /** 404 (Server ohne Schalter) und 403 (Gerätekonto) heißen: hier gibt es kein Push. */

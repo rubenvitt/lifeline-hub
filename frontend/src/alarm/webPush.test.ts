@@ -206,6 +206,49 @@ describe('webPush: „Stumm auf diesem Gerät“ geht mit dem Abo (LLH-1482)', (
       expect.objectContaining({ stumm: [] }),
     ]);
   });
+  it('schnelles Umschalten: die Anmeldungen laufen nacheinander, die letzte trägt den Stand', async () => {
+    const b = browser({ vorhanden: abo('https://fcm.googleapis.com/alt') });
+    b.notification.permission = 'granted';
+    serverMitPush(true);
+    localStorage.setItem(pushMerker(7), '1');
+    const anmeldungen: unknown[] = [];
+    let offen = 0;
+    let gleichzeitig = 0;
+    let ersteFrei: () => void = () => {};
+    const ersteHaelt = new Promise<void>((frei) => {
+      ersteFrei = frei;
+    });
+    server.use(
+      http.put('/api/web-push/abo', async ({ request }) => {
+        offen++;
+        gleichzeitig = Math.max(gleichzeitig, offen);
+        const koerper = await request.json();
+        if (anmeldungen.length === 0) {
+          anmeldungen.push(koerper);
+          await ersteHaelt;
+        } else {
+          anmeldungen.push(koerper);
+        }
+        offen--;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    setzeStumm('meldung', true);
+    const erste = pushAbgleichen(7);
+    await vi.waitFor(() => expect(anmeldungen).toHaveLength(1));
+    setzeStumm('meldung', false);
+    const zweite = pushAbgleichen(7);
+    // Die zweite wartet, bis die erste beantwortet ist.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(anmeldungen).toHaveLength(1);
+    ersteFrei();
+    await Promise.all([erste, zweite]);
+    expect(gleichzeitig).toBe(1);
+    expect(anmeldungen).toEqual([
+      expect.objectContaining({ stumm: ['meldung'] }),
+      expect.objectContaining({ stumm: [] }),
+    ]);
+  });
 });
 
 describe('webPush: einschalten und ausschalten', () => {
