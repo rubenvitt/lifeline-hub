@@ -882,8 +882,9 @@ anbieten: eine Auswahl der aktiven, nicht stornierten Räume des Einsatzes ohne 
 einen Wechsel am gewählten Raum bucht (`art: 'wechsel'` über dessen `…/belegung`). Die Quittung
 MUST Art, Name und Zielraum nennen. Ohne anderen aktiven Raum MUST der Eintrag gesperrt mit Grund
 stehen. Eine abgerufene Kraft MUST keinen Eintrag zum Verlegen tragen, und am Gerät des Raums MUST
-der Eintrag fehlen: Verlegen entscheidet die Führung (LLH-1315). Eine Ablehnung des Servers MUST
-im Dialog stehen, ohne Fehler-Toast.
+der Eintrag fehlen: Verlegen entscheidet die Führung (LLH-1315). Der Wechsel MUST den eigenen Raum
+als erwarteten Quellraum mitsenden (`von_br_id`, LLH-1521). Eine Ablehnung des Servers MUST im
+Dialog stehen, ohne Fehler-Toast.
 
 #### Scenario: Einheit verlegen
 - **WHEN** die Führung im BR Sportplatz bei „HLF 20“ „In anderen BR verlegen …“ wählt, „BR Schule“
@@ -900,6 +901,24 @@ im Dialog stehen, ohne Fehler-Toast.
 #### Scenario: Am Gerät kein Verlegen
 - **WHEN** der Einweiser am Tablet des BR Sportplatz das Aktionsmenü von „HLF 20“ öffnet
 - **THEN** steht dort nur „Austragen“
+
+### Requirement: Wechsel gegen den erwarteten Quellraum
+Ein Wechsel über `…/belegung` MAY den Raum nennen, aus dem verlegt wird (`von_br_id`). Steht die
+Kraft beim Buchen nicht mehr in diesem Raum, MUST der Server mit 409 „Kraft steht inzwischen in
+einem anderen Raum“ ablehnen, ohne Belegungsereignis, ETB-Eintrag und Änderung des Raums der Kraft,
+geprüft in derselben Transaktion wie die Buchung (LLH-1521). Ohne `von_br_id` MUST der Wechsel wie
+bisher buchen (Gerät, Ablösung). Bei einer anderen Art als `wechsel` MUST `von_br_id` mit 400
+abgelehnt werden.
+
+#### Scenario: Zwei Plätze verlegen dieselbe Kraft
+- **WHEN** zwei Bedienplätze „HLF 20“ fast gleichzeitig aus dem BR Sportplatz verlegen, einer
+  nach BR Schule, der andere nach BR Halle, und der Wechsel nach BR Schule zuerst bucht
+- **THEN** lehnt der Server den Wechsel nach BR Halle mit 409 ab, und „HLF 20“ steht im BR Schule
+- **AND** der Verlauf und das ETB nennen nur den Wechsel nach BR Schule
+
+#### Scenario: Wechsel ohne Quellraum
+- **WHEN** ein Wechsel ohne `von_br_id` an einem Raum gebucht wird
+- **THEN** wechselt die Kraft aus ihrem aktuellen Raum wie bisher
 
 ### Requirement: Felder des Abruf-Dialogs
 Der Abruf-Dialog SHALL einen Ziel-Abschnitt, nur bei einer Einheit und vorbelegt mit dem

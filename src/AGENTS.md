@@ -465,6 +465,8 @@ Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
 - **Verband-Austritt und Wechsel-Sperre stehen in `belege_tx`, nicht in der Route.** Der Austritt
   einer abgerufenen Einheit bucht ihre mitgenommenen Untereinheiten mit aus; ein Wechsel einer
   abgerufenen Kraft ist 422. So gilt das für jeden Weg, der `belege_tx` ruft (Route, Gerät).
+  Ebenso der erwartete Quellraum (`Buchung::von_br_id`, LLH-1521): ein Wechsel, dessen Kraft
+  nicht mehr dort steht, ist 409 ohne Spur; wer aus einem gewählten Raum verlegt, sendet ihn mit.
 - „Abgerufen“ ist abgeleitet aus dem jüngsten Ereignis je Kraft, nie gespeichert; `seit` und
   `aktueller_br_id` sehen nur `eintritt`, `wechsel` und `austritt`.
 - **Die Koordinate des Raums prüft `repo::update_tx`, nicht der Handler** (LLH-1107): das
