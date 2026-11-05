@@ -26,6 +26,7 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
+  monoStil,
   Paneel,
   Segmentleiste,
   StatusChip,
@@ -51,12 +52,16 @@ import {
   filterAktiv,
   filtereLagemeldungen,
   gruppiereNachTag,
+  nachtraegeVorLb,
   type Herkunftsfilter,
   type LageFilter,
   type Ortsfilter,
   uebergabeZeit,
 } from '../lagemeldungen/zeitachse';
 import ZeitraumWahl, { type ZeitraumGrenzen } from '../anzeige/ZeitraumWahl';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { taktisch } from '../anzeige/zeitfenster';
+import { serverJetzt } from '../offline/serveruhr';
 import { useLetzteLagebesprechung } from '../lagebesprechung/useLetzteLagebesprechung';
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
@@ -94,7 +99,9 @@ const HERKUNFT_OPTIONEN: SegmentOption<Herkunftsfilter>[] = [
  *   Prädikate in `filtereLagemeldungen`. Der Zeitraum ist dieselbe Schnellwahl wie im ETB
  *   (`anzeige/ZeitraumWahl.tsx`, LLH-1322): absolute, minutengenaue Grenzen in der Adresse
  *   (`lagemeldungenPfad`), „Seit letzter Lagebesprechung“ mit derselben Freigabe
- *   (`useLetzteLagebesprechung`). Die übrigen Filter bleiben im Zustand der Seite.
+ *   (`useLetzteLagebesprechung`). Die übrigen Filter bleiben im Zustand der Seite. Unter dieser
+ *   Wahl stehen wie im ETB die Nachträge darüber: nach der Besprechung übernommen, davor geschehen
+ *   (LLH-1514, `nachtraegeVorLb`); „anzeigen“ zieht die Grenze bis zum frühesten.
  * - „Lagemeldung erfassen“ öffnet über der Achse das Meldungsformular mit der Art Lagemeldung
  *   (`artVorgabe`) und schließt nach dem Erfassen; gesendet wie im Meldungseingang
  *   (`erfasseMeldungOfflineFaehig`). Ohne Schreibrecht im Einsatz oder ohne Modul Meldungen steht
@@ -133,7 +140,7 @@ export default function LagemeldungenPage() {
     () => ({ ...uebrige, von: zeitraum.von, bis: zeitraum.bis }),
     [uebrige, zeitraum],
   );
-  const letzteLb = useLetzteLagebesprechung(einsatzId).von;
+  const { stand: letzteLbStand, von: letzteLb } = useLetzteLagebesprechung(einsatzId);
   // `replace` wie im ETB: eine Wahl ist ein Filterstand, kein Verlaufsschritt.
   const zeitraumWaehlen = (g: ZeitraumGrenzen) =>
     navigate(lagemeldungenPfad(einsatzId, g), { replace: true });
@@ -233,6 +240,22 @@ export default function LagemeldungenPage() {
   const gruppen = useMemo(
     () => gruppiereNachTag(angezeigt, konventionen),
     [angezeigt, konventionen],
+  );
+  /*
+   * Nachträge vor der Lagebesprechung (LLH-1514, wie im ETB): nur unter der Wahl „Seit letzter
+   * Lagebesprechung“ — `von` ist ihre Grenze, kein `bis`. Die Menge liegt ganz im Client, gezählt
+   * wird aus ihr (`nachtraegeVorLb`).
+   */
+  const seitLb =
+    letzteLb != null &&
+    filter.von != null &&
+    filter.bis == null &&
+    alsZeitpunkt(filter.von)?.isSame(alsZeitpunkt(letzteLb)) === true;
+  const lbEnde = letzteLbStand?.abgehalten_at;
+  const nachtraege = useMemo(
+    () =>
+      seitLb ? nachtraegeVorLb(eintraege, filter, { von: letzteLb, abgehaltenAt: lbEnde }) : [],
+    [seitLb, eintraege, filter, letzteLb, lbEnde],
   );
 
   if (einsatzQuery.isLoading) {
@@ -546,6 +569,50 @@ export default function LagemeldungenPage() {
             wert={filter.herkunft}
             onWechsel={(herkunft) => setFilter((f) => ({ ...f, herkunft }))}
           />
+        </div>
+      )}
+      {nachtraege.length > 0 && letzteLb && (
+        // Gestaltet wie die Zeile im Filterband des ETB: Achtung, denn die Achse zeigt nicht alles,
+        // was seit der Besprechung neu ist.
+        <div
+          role="status"
+          data-lfh="lagemeldungen-nachtraege"
+          style={{
+            background: rollen.achtungFlaeche,
+            color: rollen.achtungText,
+            borderInlineStart: `2px solid ${rollen.achtung}`,
+            paddingBlock: token.paddingXXS,
+            paddingInline: token.paddingSM,
+            marginBlockEnd: token.margin,
+          }}
+        >
+          +<span style={monoStil(12)}>{nachtraege.length}</span>{' '}
+          {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
+          <span style={monoStil(12)}>
+            {taktisch(letzteLb, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
+          </span>{' '}
+          übernommen ·{' '}
+          <Button
+            type="link"
+            style={{ paddingInline: 0 }}
+            onClick={() =>
+              zeitraumWaehlen({
+                // Auf die volle Minute wie jede Grenze der Schnellwahl: „seit 0810“ zeigt dann
+                // auch, was um 08:10:20 geschah, wenn der früheste Nachtrag um 08:10:35 lag.
+                von: alsBackendZeit(
+                  alsZeitpunkt(
+                    nachtraege.reduce(
+                      (frueh, l) => (l.ereigniszeit < frueh ? l.ereigniszeit : frueh),
+                      nachtraege[0].ereigniszeit,
+                    ),
+                  )!.startOf('minute'),
+                ),
+                bis: undefined,
+              })
+            }
+          >
+            anzeigen
+          </Button>
         </div>
       )}
       <div
