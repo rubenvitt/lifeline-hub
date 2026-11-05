@@ -12183,4 +12183,145 @@ mod tests {
             .unwrap();
         assert_eq!(org, 1, "Org-Werte bleiben");
     }
+
+    /// LLH-1498: Fahrzeuge, die vor LLH-1288 einer Einheit zugeordnet wurden, stehen noch mit
+    /// `aktueller_br_id` im Raum. Die Migration bucht den Austritt („Einheit zugeordnet“) und
+    /// leert den Cache; Fahrzeuge ohne Einheit oder ohne Raum bleiben unberührt.
+    #[tokio::test]
+    async fn migration_0272_fahrzeug_mit_einheit_tritt_aus_dem_raum_aus() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 272;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let buchender: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'B', 'b', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let raum: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, \
+                geaendert_von, status) VALUES (?, 'Sportplatz', ?, ?, 'aktiv') RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let zug: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fahrzeug = |name: &'static str, einheit: Option<i64>, br: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_fahrzeug \
+                        (einsatz_id, snap_funkrufname, einheit_id, aktueller_br_id) \
+                     VALUES (?, ?, ?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .bind(einheit)
+                .bind(br)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let eintritt = |ef: i64, von: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO br_belegung \
+                        (einsatz_id, br_id, objekt_typ, objekt_id, art, erfasst_von) \
+                     VALUES (?, ?, 'fahrzeug', ?, 'eintritt', ?)",
+                )
+                .bind(e)
+                .bind(raum)
+                .bind(ef)
+                .bind(von)
+                .execute(&pool)
+                .await
+                .unwrap();
+            }
+        };
+        // Verwaist, mit Eintritt eines anderen Benutzers.
+        let verwaist = fahrzeug("Florian 1/83-1", Some(zug), Some(raum)).await;
+        eintritt(verwaist, buchender).await;
+        // Verwaist, ohne jedes Ereignis und ohne Disponenten (Bestand vor dem Verlauf).
+        let ohne_verlauf = fahrzeug("Florian 1/83-2", Some(zug), Some(raum)).await;
+        // Steht ohne Einheit im Raum: bleibt.
+        let frei = fahrzeug("Florian 1/19-1", None, Some(raum)).await;
+        eintritt(frei, b).await;
+        // In einer Einheit, in keinem Raum: bleibt.
+        let unterwegs = fahrzeug("Florian 1/46-1", Some(zug), None).await;
+
+        migriere_bis(&pool, VERSION).await;
+
+        let rest: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_fahrzeug \
+             WHERE einheit_id IS NOT NULL AND aktueller_br_id IS NOT NULL",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rest, 0, "kein Fahrzeug mehr mit Einheit und Raum");
+
+        let ort = |ef: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, Option<i64>>(
+                    "SELECT aktueller_br_id FROM einsatz_fahrzeug WHERE id = ?",
+                )
+                .bind(ef)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(
+            ort(frei).await,
+            Some(raum),
+            "ohne Einheit bleibt es im Raum"
+        );
+        assert_eq!(ort(unterwegs).await, None);
+
+        let verlauf: Vec<(i64, i64, String, Option<String>, i64)> = sqlx::query_as(
+            "SELECT objekt_id, br_id, art, notiz, erfasst_von FROM br_belegung \
+             WHERE objekt_typ = 'fahrzeug' ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let austritt = |ef: i64, von: i64| {
+            (
+                ef,
+                raum,
+                "austritt".to_string(),
+                Some("Einheit zugeordnet".to_string()),
+                von,
+            )
+        };
+        assert_eq!(
+            verlauf,
+            vec![
+                (verwaist, raum, "eintritt".to_string(), None, buchender),
+                (frei, raum, "eintritt".to_string(), None, b),
+                // Wer zuletzt im Raum gebucht hat, sonst der erste Benutzer der Org.
+                austritt(verwaist, buchender),
+                austritt(ohne_verlauf, b),
+            ],
+            "der Verlauf zeigt je verwaistem Fahrzeug den Austritt"
+        );
+    }
 }
