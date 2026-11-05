@@ -647,10 +647,12 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
       einheitenGesperrt: 'Modul Einheiten gesperrt',
       besatzungGesperrt: 'Modul Einheiten gesperrt',
     });
+    // Zurück auf „Ganze Einheit“: die Personen wählte niemand, ohne dass sie gespeichert würden.
     await waitFor(() =>
-      expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
-        'Modul Einheiten gesperrt',
-      ),
+      expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked(),
+    );
+    expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
+      'Modul Einheiten gesperrt',
     );
     expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
   });
@@ -857,6 +859,37 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     const onErfassen = planung({ schicht: geplant, verteilung: undefined, onSchliessen });
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('Planen, Sperre erst nach dem Öffnen: zurück auf „Ganze Einheit“, die Planung bleibt (LLH-1542)', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onSchliessen = vi.fn();
+    const ui = (besatzungGesperrt?: string) => (
+      <AbloeserDialog
+        schicht={geplant}
+        einheiten={[]}
+        bisherigeBesatzung={['Anna Alt']}
+        personen={personen}
+        verteilung={verteilung}
+        besatzungGesperrt={besatzungGesperrt}
+        einheitenGesperrt={besatzungGesperrt}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={onSchliessen}
+      />
+    );
+    const r = renderMitProviders(ui());
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    r.rerender(ui('Modul Einheiten gesperrt'));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked(),
+    );
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeDisabled();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
     expect(onErfassen).not.toHaveBeenCalled();

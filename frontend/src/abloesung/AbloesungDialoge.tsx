@@ -254,6 +254,17 @@ function usePlanVorbelegung(
   return vorbelegt;
 }
 
+/**
+ * Kommt die Sperre des Besatzungswechsels erst nach dem Öffnen (die Freigaben laden noch, LLH-1542),
+ * stand die Art schon auf dem geplanten Wechsel: dann zurück auf „Ganze Einheit“. Sonst ließen sich
+ * Personen wählen, die das Speichern still verwürfe (die Planung bleibt dann unberührt).
+ */
+function useArtBeiSperre(form: FormInstance<{ art?: AbloesungArt }>, gesperrt: boolean) {
+  useEffect(() => {
+    if (gesperrt && form.getFieldValue('art') === 'besatzung') form.setFieldValue('art', 'einheit');
+  }, [form, gesperrt]);
+}
+
 /** Die Art, mit der ein Dialog öffnet: ein geplanter Besatzungswechsel gibt sie vor. */
 function artVorgabe(schicht: Abloesung | null, gesperrt: boolean): AbloesungArt {
   return !gesperrt && (schicht?.besatzung_plan ?? []).length > 0 ? 'besatzung' : 'einheit';
@@ -458,6 +469,7 @@ export function VollzugDialog({
   const artGrund =
     besatzungGesperrt !== einheitenGesperrt || art === 'besatzung' ? besatzungGesperrt : undefined;
   usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
+  useArtBeiSperre(form, gesperrt);
   return (
     <ErfassungsModal<VollzugWerte>
       offen={schicht != null}
@@ -645,6 +657,7 @@ export function AbloeserDialog({
   const artGrund =
     besatzungGesperrt !== einheitenGesperrt || art === 'besatzung' ? besatzungGesperrt : undefined;
   const vorbelegt = usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
+  useArtBeiSperre(form, gesperrt);
   return (
     <ErfassungsModal<AbloeserWerte>
       offen={schicht != null}
