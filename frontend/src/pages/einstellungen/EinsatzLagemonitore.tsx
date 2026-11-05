@@ -1,4 +1,4 @@
-import { Switch } from 'antd';
+import { Alert, Switch } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Formularpaneel, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
@@ -55,6 +55,10 @@ export default function EinsatzLagemonitore({
     onSuccess: (liste) => qc.setQueryData(einsatzKeys.lagemonitorZugaenge(einsatzId), liste),
   });
 
+  // Ein Ladefehler ist kein „kein Zugang angelegt“: sichtbar statt still ausgeblendet.
+  if (freigabenQ.isError) {
+    return <Alert type="error" title="Externe Lagemonitore nicht ladbar" showIcon />;
+  }
   const freigaben = freigabenQ.data ?? [];
   if (freigaben.length === 0) return null;
   const zeit = (wert: string) => zeitKurz(wert, konv);

@@ -465,6 +465,17 @@ describe('EinsatzGeraete (LFH-892)', () => {
       expect(screen.queryByText('Externe Lagemonitore')).not.toBeInTheDocument();
     });
 
+    it('nennt einen Ladefehler statt die Sektion still wegzulassen', async () => {
+      stelleBereit();
+      server.use(
+        http.get('/api/einsaetze/1/lagemonitor-zugaenge', () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      rendern();
+      expect(await screen.findByText('Externe Lagemonitore nicht ladbar')).toBeInTheDocument();
+    });
+
     it('gibt den Einsatz per Schalter frei und nennt einen anderen', async () => {
       stelleBereit({
         lagemonitore: [zugang(1), zugang(2, { anderer_einsatz: true })],

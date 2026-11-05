@@ -10,7 +10,8 @@ use crate::einsatz::kontext::{EinsatzLeitungszugriff, EinsatzLesezugriff};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PeerIp, PfadParam};
 use crate::lagemonitor_zugang::{
-    self as zugang, FreigabeWirkung, LesezugangAnzeige, LesezugangFreigabe, BEZEICHNUNG_MAX,
+    self as zugang, FreigabeWirkung, LesezugangAnzeige, LesezugangFreigabe, Widerruf,
+    BEZEICHNUNG_MAX,
 };
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -88,30 +89,27 @@ pub async fn widerrufen(
     PfadParam(zugang_id): PfadParam<i64>,
 ) -> Result<Json<LesezugangAnzeige>, AppError> {
     let vorher = zugang::laden(&state.pool, admin.org_id, zugang_id).await?; // 404 falls fremd
-    let etb = match vorher.einsatz_id {
-        Some(einsatz_id) => Some((
-            einsatz_id,
-            etb_startwert(&state.pool, einsatz_id).await?,
-            format!(
-                "Lagemonitor-Zugang „{}“ widerrufen von {}; der Einsatz wird dort nicht mehr \
-                 gezeigt.",
-                vorher.bezeichnung, admin.anzeigename
-            ),
-        )),
-        None => None,
-    };
+    let text = format!(
+        "Lagemonitor-Zugang „{}“ widerrufen von {}; der Einsatz wird dort nicht mehr gezeigt.",
+        vorher.bezeichnung, admin.anzeigename
+    );
     let von = admin.id;
     let org_id = admin.org_id;
+    // Der Einsatz für den ETB-Eintrag kommt aus der Transaktion selbst (`Widerruf`), nicht aus
+    // `vorher`: eine gleichzeitige Umstellung könnte ihn inzwischen geändert haben.
     let (wirkung, etb_id) = crate::write_retry!(&state.pool, |conn| {
-        let wirkung = zugang::widerrufen(conn, org_id, zugang_id, von).await?;
-        let etb_id = match (&etb, wirkung) {
-            (Some((einsatz_id, startwert, text)), true) => Some((
-                *einsatz_id,
-                crate::etb::system_audit_tx(conn, *einsatz_id, von, *startwert, text).await?,
-            )),
-            _ => None,
-        };
-        Ok((wirkung, etb_id))
+        match zugang::widerrufen(conn, org_id, zugang_id, von).await? {
+            Widerruf::Keine => Ok((false, None)),
+            Widerruf::Widerrufen { einsatz_id: None } => Ok((true, None)),
+            Widerruf::Widerrufen {
+                einsatz_id: Some(einsatz_id),
+            } => {
+                let startwert = etb_startwert(&mut *conn, einsatz_id).await?;
+                let etb_id =
+                    crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?;
+                Ok((true, Some((einsatz_id, etb_id))))
+            }
+        }
     })?;
     if let Some((einsatz_id, etb_id)) = etb_id {
         state.live.publiziere(einsatz_id, etb_id);

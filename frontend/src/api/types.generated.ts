@@ -4237,11 +4237,7 @@ export interface components {
             /** Format: int32 */
             api_version: number;
             einsatz: components["schemas"]["LagemonitorEinsatz"] | null;
-            /**
-             * @description Lagekarte als GeoJSON-FeatureCollection; fehlt ohne Einsatz, bei `?karte=aus` und wenn sie
-             *     der Fassung aus `?karte=<etag>` gleicht.
-             */
-            karte?: Record<string, never> | null;
+            karte?: components["schemas"]["GeoJsonFeatureCollection"] | null;
             /** @description Fassung der Karte; fehlt ohne Einsatz und bei `?karte=aus`. */
             karte_etag?: string | null;
             /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */

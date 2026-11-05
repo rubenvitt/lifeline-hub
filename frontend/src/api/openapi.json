@@ -10535,11 +10535,15 @@
             ]
           },
           "karte": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "description": "Lagekarte als GeoJSON-FeatureCollection; fehlt ohne Einsatz, bei `?karte=aus` und wenn sie\nder Fassung aus `?karte=<etag>` gleicht."
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GeoJsonFeatureCollection",
+                "description": "Lagekarte als GeoJSON-FeatureCollection; fehlt ohne Einsatz, bei `?karte=aus` und wenn sie\nder Fassung aus `?karte=<etag>` gleicht."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "karte_etag": {
             "type": [

@@ -44,7 +44,7 @@ pub struct LagemonitorLage {
     /// Lagekarte als GeoJSON-FeatureCollection; fehlt ohne Einsatz, bei `?karte=aus` und wenn sie
     /// der Fassung aus `?karte=<etag>` gleicht.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<Object>)]
+    #[schema(value_type = Option<crate::karte::typen::GeoJsonFeatureCollection>)]
     pub karte: Option<Value>,
     /// Fassung der Karte; fehlt ohne Einsatz und bei `?karte=aus`.
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -448,6 +448,11 @@ async fn lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_personen() {
     assert_eq!(e["betroffene"]["vermisst"], json!(1));
     assert_eq!(e["lagemeldung"]["text"], "Pegel steigt, Deich hält.");
     assert!(e["lagemeldung"]["freigegeben_at"].is_string());
+    // Die Karte passt auf das veröffentlichte Schema (OpenAPI `GeoJsonFeatureCollection`).
+    serde_json::from_value::<lifeline_hub::karte::typen::GeoJsonFeatureCollection>(
+        v["karte"].clone(),
+    )
+    .expect("karte entspricht GeoJsonFeatureCollection");
     let features = v["karte"]["features"].as_array().unwrap();
     assert!(features
         .iter()

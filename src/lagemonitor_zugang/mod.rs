@@ -134,13 +134,13 @@ pub async fn anlegen(
     .await?)
 }
 
-/// Widerruft einen Zugang und löst seine Freigabe. `true`, wenn er bis eben gültig war.
+/// Widerruft einen Zugang und löst seine Freigabe.
 pub async fn widerrufen(
     conn: &mut SqliteConnection,
     org_id: i64,
     zugang_id: i64,
     von: i64,
-) -> Result<bool, AppError> {
+) -> Result<Widerruf, AppError> {
     let wirkung = sqlx::query(
         "UPDATE lagemonitor_zugang SET widerrufen_at = datetime('now'), widerrufen_von = ? \
          WHERE id = ? AND org_id = ? AND widerrufen_at IS NULL",
@@ -152,13 +152,27 @@ pub async fn widerrufen(
     .await?
     .rows_affected()
         == 1;
-    if wirkung {
-        sqlx::query("DELETE FROM lagemonitor_freigabe WHERE zugang_id = ?")
-            .bind(zugang_id)
-            .execute(&mut *conn)
-            .await?;
+    if !wirkung {
+        return Ok(Widerruf::Keine);
     }
-    Ok(wirkung)
+    // Den gelösten Einsatz in derselben Transaktion bestimmen: ein vorher gelesener Stand
+    // könnte von einer gleichzeitigen Umstellung überholt sein.
+    let einsatz_id: Option<i64> = sqlx::query_scalar(
+        "DELETE FROM lagemonitor_freigabe WHERE zugang_id = ? RETURNING einsatz_id",
+    )
+    .bind(zugang_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(Widerruf::Widerrufen { einsatz_id })
+}
+
+/// Wirkung eines Widerrufs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Widerruf {
+    /// War schon widerrufen.
+    Keine,
+    /// Jetzt widerrufen; `einsatz_id` ist der Einsatz, dessen Freigabe dabei endete.
+    Widerrufen { einsatz_id: Option<i64> },
 }
 
 /// Die nicht widerrufenen Zugänge der Organisation aus Sicht eines Einsatzes.
