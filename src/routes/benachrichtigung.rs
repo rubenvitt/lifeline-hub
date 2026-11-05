@@ -60,11 +60,12 @@ async fn anzeige(
     if !recht.darf(benutzer, z.bezug_typ.modul()) {
         return Ok(None);
     }
-    let t = text::bilden(
+    let t = text::bilden_mit_einheit(
         pool,
         z.einsatz_id,
         z.art,
         Bezug::neu(z.bezug_typ, z.bezug_id),
+        z.einheit_id,
     )
     .await?;
     Ok(Some(BenachrichtigungAnzeige {

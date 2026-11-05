@@ -784,7 +784,10 @@ Eintreffen am Bereitstellungsraum meldet dessen Buchung, auch wenn die Zeitachse
 nicht zusätzlich als „eingetroffen“. Bei einem Verband zählt nur die geplante Einheit, nicht ihre
 mitgenommenen Untereinheiten. Gemeldet wird nach dem Commit; ein Fehler dabei MUST den
 Statuswechsel nicht brechen. Andere Leser und die auslösende Person MUST NOT einen Hinweis
-erhalten.
+erhalten. Jeder Hinweis `abloesung_abloeser` MUST die gemeinte Einheit beim Erzeugen festhalten
+(nur ihre ID, LLH-1511), und seine Detailzeile MUST deren Namen nennen, nicht die gerade geplante
+Einheit der Schicht; Hinweise ohne festgehaltene Einheit (vor LLH-1511) nennen die gerade
+geplante.
 
 #### Scenario: Eingetroffen
 - **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und per Status eintrifft
@@ -797,6 +800,14 @@ erhalten.
 #### Scenario: Nicht geplant
 - **WHEN** eine Einheit ohne Planung alarmiert wird
 - **THEN** entsteht kein Hinweis
+
+#### Scenario: Umgeplant
+- **WHEN** „2. Rettungsstaffel“ alarmiert wurde und die Schicht danach auf „3. Rettungsstaffel“ umgeplant wird
+- **THEN** nennt der Hinweis „Ablösende Einheit alarmiert“ weiter „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“
+
+#### Scenario: Zweiter Ablöser der Liste
+- **WHEN** „2. Rettungsstaffel“ und „3. Rettungsstaffel“ als Ablöser geplant sind und „3. Rettungsstaffel“ alarmiert wird
+- **THEN** nennt der Hinweis „Ablösung für Rettungsstaffel: 3. Rettungsstaffel“
 
 ### Requirement: Planung entfällt
 
@@ -827,6 +838,10 @@ Karte MUST dezent in der Rolle Achtung „Planung entfallen · 2. Rettungsstaffe
 #### Scenario: Weiterer Ablöser bleibt
 - **WHEN** zwei Ablöser geplant sind und einer entlassen wird
 - **THEN** trägt die Schicht keinen sichtbaren Vermerk, und die Karte nennt den verbleibenden Ablöser
+
+#### Scenario: Hinweis nennt die entfallene Einheit
+- **WHEN** die Planung von „2. Rettungsstaffel“ für „Rettungsstaffel“ entfällt
+- **THEN** nennt der Hinweis „Planung der ablösenden Einheit entfallen“ „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“, auch wenn ein weiterer Ablöser nachrückt
 
 ### Requirement: Gestrichene Entlassung holt die Planung zurück
 
