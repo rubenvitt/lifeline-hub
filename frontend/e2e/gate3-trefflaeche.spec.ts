@@ -2940,6 +2940,228 @@ test('Evakuierung und Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verla
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── Unterkunft planen (LLH-1525, Prüfliste LLH-1520 Kriterien 1 und 2) ──────────────────
+//
+// Die Eingaben leben nur auf der Seite: `stelleDichte` lädt neu und leert sie, deshalb baut
+// `unterkunftAufbauen` den Messzustand je Stufe neu auf. Gemessen wird der vollste Stand der
+// Grundlage: Weg „Räume“, Trennung an (je Raum ein Feld „Belegung“), zwei Räume (also je Raum
+// „… entfernen“) und ein Abzug im ersten Raum; dazu die Kopfaktionen frei und der Dialog
+// „Nachforderungen anlegen“ offen. Der Schalter folgt `kleineZeilenhoehe` (24 / 48 / 72,
+// `switchMasse`), die Kästchen im Dialog demselben Boden ({@link BODEN_KAESTCHEN}).
+
+const UNTERKUNFT_STELLE = 'Sporthalle Messweg';
+const BODEN_SCHALTER = { kompakt: 24, komfortabel: 48, handschuh: 72 } as const;
+/** Knöpfe der Grundlage im Messzustand: Abzug 1 entfernen, 2× Abzug hinzufügen, 2× Raum … entfernen, Raum hinzufügen. */
+const UNTERKUNFT_GRUNDLAGE_KNOEPFE = 6;
+/** Zahlenfelder: je Raum Länge und Breite, dazu Länge und Breite des Abzugs. */
+const UNTERKUNFT_ZAHLENFELDER = 6;
+
+async function unterkunftStelleSaeen(page: Page, einsatzId: string): Promise<number> {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/betreuung/stellen`, {
+    data: { bezeichnung: UNTERKUNFT_STELLE, art: 'notunterkunft', kapazitaet_personen: 30 },
+  });
+  expect(antwort.ok(), `Seeding Stelle: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  return ((await antwort.json()) as { id: number }).id;
+}
+
+/** Bringt die Grundlage in den Messzustand; Datenanker ist die freie Kopfaktion (200 m² ⇒ 50 Plätze). */
+async function unterkunftAufbauen(page: Page) {
+  const grundlage = page.getByRole('region', { name: 'Grundlage', exact: true });
+  await grundlage.getByRole('switch', { name: 'Nach Männern und Frauen trennen' }).click();
+  const raum1 = grundlage.getByRole('group', { name: 'Raum 1' });
+  await raum1.getByLabel('Länge Raum 1 (m)').fill('20');
+  await raum1.getByLabel('Breite Raum 1 (m)').fill('10');
+  await raum1.getByRole('button', { name: 'Abzug hinzufügen', exact: true }).click();
+  await grundlage.getByRole('button', { name: 'Raum hinzufügen', exact: true }).click();
+  await expect(grundlage.getByRole('group', { name: 'Raum 2' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Kapazität übernehmen · 50 Plätze', exact: true }),
+  ).toBeEnabled();
+  return grundlage;
+}
+
+test('Unterkunft planen (LLH-1525): Grundlage, Kopfaktionen und Dialog „Nachforderungen anlegen“ folgen der Dichte-Staffel, Abstand nach Stufe', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Unterkunft`);
+  const stelleId = await unterkunftStelleSaeen(page, einsatzId);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}/unterkunft`);
+    await stelleDichte(page, dichte);
+    const grundlage = await unterkunftAufbauen(page);
+
+    const segmente = page.getByRole('main').locator('[data-lfh="segmentleiste"] button');
+    await expect(segmente, 'Ansicht (2) und Grundlage (4)').toHaveCount(6);
+    const segment = await alleHaltenStufe(segmente, soll, `Segment (${dichte})`, 6);
+    const schalter = await haeltStufe(
+      grundlage.getByRole('switch', { name: 'Nach Männern und Frauen trennen' }),
+      BODEN_SCHALTER[dichte],
+      `Schalter Trennung (${dichte}, Boden ${BODEN_SCHALTER[dichte]})`,
+    );
+
+    const zahlen = grundlage.locator('.ant-input-number');
+    await expect(zahlen).toHaveCount(UNTERKUNFT_ZAHLENFELDER);
+    const zahl = await alleHaltenStufe(
+      zahlen,
+      soll,
+      `Zahlenfeld (${dichte})`,
+      UNTERKUNFT_ZAHLENFELDER,
+    );
+    const texte = grundlage.getByRole('textbox', { name: /^Bezeichnung Raum \d$/ });
+    await expect(texte).toHaveCount(2);
+    const text = await alleHaltenStufe(texte, soll, `Bezeichnung (${dichte})`, 2);
+    const auswahlen = grundlage.locator('.ant-select');
+    await expect(auswahlen, 'je Raum „Belegung“').toHaveCount(2);
+    const auswahl = await alleHaltenStufe(auswahlen, soll, `Belegung (${dichte})`, 2);
+
+    const knoepfe = grundlage.getByRole('button');
+    await expect(knoepfe).toHaveCount(UNTERKUNFT_GRUNDLAGE_KNOEPFE);
+    const knopf = await alleHaltenStufe(
+      knoepfe,
+      soll,
+      `Knopf der Grundlage (${dichte})`,
+      UNTERKUNFT_GRUNDLAGE_KNOEPFE,
+    );
+    let abstandGrundlage = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < UNTERKUNFT_GRUNDLAGE_KNOEPFE; i += 1) {
+      abstandGrundlage = Math.min(
+        abstandGrundlage,
+        await abstandZuNachbarn(grundlage, knoepfe.nth(i)),
+      );
+    }
+
+    const kopfAktionen = page.locator('[data-lfh="seitenkopf-aktionen"]');
+    const kopfKnoepfe = kopfAktionen.getByRole('button');
+    await expect(kopfKnoepfe, 'Kapazität übernehmen, Nachforderungen anlegen').toHaveCount(2);
+    const kopf = await alleHaltenStufe(kopfKnoepfe, soll, `Kopfaktion (${dichte})`, 2);
+    const abstandKopf = await abstandZuNachbarn(kopfAktionen, kopfKnoepfe.first());
+
+    const abstandSoll = ZIELABSTAND[dichte];
+    if (abstandSoll != null) {
+      expect(
+        abstandGrundlage,
+        `kleinster Abstand eines Knopfs der Grundlage zum Nachbarziel (${dichte})`,
+      ).toBeGreaterThanOrEqual(abstandSoll - SUBPIXEL);
+      expect(abstandKopf, `Abstand der Kopfaktionen (${dichte})`).toBeGreaterThanOrEqual(
+        abstandSoll - SUBPIXEL,
+      );
+    }
+
+    // Dialog „Nachforderungen anlegen“: Posten (Kästchen und Anzahl), Adressat, Priorität, Fuß.
+    await kopfAktionen
+      .getByRole('button', { name: 'Nachforderungen anlegen', exact: true })
+      .click();
+    const dialog = page.getByRole('dialog', { name: `Nachforderungen für ${UNTERKUNFT_STELLE}` });
+    await expect(dialog).toBeVisible();
+    await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    const posten = await mindestensKnoten(
+      dialog.locator('label.ant-checkbox-wrapper'),
+      3,
+      `Posten (${dichte})`,
+    );
+    const kaestchen = await alleHaltenStufe(
+      dialog.locator('label.ant-checkbox-wrapper'),
+      BODEN_KAESTCHEN[dichte],
+      `Kästchen Posten (${dichte}, Boden ${BODEN_KAESTCHEN[dichte]})`,
+      posten,
+    );
+    await expect(dialog.locator('.ant-input-number')).toHaveCount(posten);
+    const anzahl = await alleHaltenStufe(
+      dialog.locator('.ant-input-number'),
+      soll,
+      `Anzahl (${dichte})`,
+      posten,
+    );
+    await expect(dialog.locator('.ant-select'), 'Adressat, Priorität').toHaveCount(2);
+    const auswahlDialog = await alleHaltenStufe(
+      dialog.locator('.ant-select'),
+      soll,
+      `Adressat/Priorität (${dichte})`,
+      2,
+    );
+    const fussKnoepfe = dialog.locator('.ant-modal-footer button');
+    await expect(fussKnoepfe, 'Schließen, … anlegen').toHaveCount(2);
+    const fuss = await alleHaltenStufe(fussKnoepfe, soll, `Fuß (${dichte})`, 2);
+    const kreuz = await haeltStufe(
+      dialog.locator('.ant-modal-close'),
+      soll,
+      `Schließkreuz (${dichte})`,
+    );
+    const abstandFuss = await abstandZuNachbarn(
+      dialog.locator('.ant-modal-footer'),
+      fussKnoepfe.first(),
+    );
+    if (abstandSoll != null) {
+      expect(abstandFuss, `Abstand der Fußknöpfe (${dichte})`).toBeGreaterThanOrEqual(
+        abstandSoll - SUBPIXEL,
+      );
+    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    je.set(`${dichte} Zahlenfeld`, zahl);
+    je.set(`${dichte} Schalter`, schalter);
+    je.set(`${dichte} Kästchen`, kaestchen);
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Segment ${segment}, Schalter ${schalter}, Zahlenfeld ${zahl}, ` +
+        `Bezeichnung ${text}, Belegung ${auswahl}, Knopf Grundlage ${knopf} (Abstand ${abstandGrundlage}), ` +
+        `Kopf ${kopf} (Abstand ${abstandKopf}), Dialog: ${posten} Posten, Kästchen ${kaestchen}, ` +
+        `Anzahl ${anzahl}, Adressat/Priorität ${auswahlDialog}, Fuß ${fuss} (Abstand ${abstandFuss}), ` +
+        `Kreuz ${kreuz}`,
+    );
+  }
+  for (const sorte of ['Zahlenfeld', 'Schalter', 'Kästchen']) gegenprobe(je, sorte);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * Stichprobe der Richtwerte-Listen (LLH-1525): Stammdaten → Unterkunft (Organisation) und
+ * Einsatz-Einstellungen → Unterkunft. Jede Zeile trägt ein Zahlenfeld; gemessen wird JEDES.
+ * Die Zahl der Richtwerte steht in `richtwerte_basis.json` — hier nur als Untergrenze.
+ */
+const RICHTWERT_FELDER_MINDESTENS = 20;
+
+test('Richtwerte Unterkunft (LLH-1525): die Felder in Stammdaten und Einsatz-Einstellungen folgen der Dichte-Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Richtwerte`);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    const je: string[] = [];
+    for (const [wo, pfad] of [
+      ['Organisation', '/admin/stammdaten/unterkunft'],
+      ['Einsatz', `/einsaetze/${einsatzId}/einstellungen/unterkunft`],
+    ] as const) {
+      await page.goto(pfad);
+      await stelleDichte(page, dichte);
+      // Datenanker: die Zeile „Schlaffläche je Person“ steht als Feld.
+      await expect(
+        page.getByRole('spinbutton', { name: 'Schlaffläche je Person (m²)' }),
+      ).toBeEnabled();
+      const felder = page.locator('[data-schluessel] .ant-input-number');
+      const kleinstes = await alleHaltenStufe(
+        felder,
+        soll,
+        `Richtwert ${wo} (${dichte})`,
+        RICHTWERT_FELDER_MINDESTENS,
+      );
+      je.push(`${wo} ${await felder.count()} Felder ≥ ${kleinstes}`);
+    }
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): ${je.join(', ')}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── Verpflegung ──────────────────────────────────────────────────────────────────────
 //
 // Nur antd-`Button`, gemessen wird wegen der eigenen Flex-Hüllen (Aktionszeile der Karte,
