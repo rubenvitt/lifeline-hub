@@ -53,6 +53,8 @@ pub mod lagebericht;
 pub mod lagebesprechung;
 pub mod lagekennzahl_wahl;
 pub mod lagemonitor;
+pub mod lagemonitor_v1;
+pub mod lagemonitor_zugang;
 pub mod live;
 pub mod material;
 pub mod meldung;

@@ -77,6 +77,9 @@ abgewiesene Aktion hinterlässt nichts.
 - **„Anmeldeweg aktiviert“** und **„Anmeldeweg deaktiviert“**: jedes Schalten unter
   „Einstellungen“, „Anmeldeverfahren“, auch wenn der Weg schon so stand. „Ziel“ ist dann der
   Anmeldeweg, etwa „Passwort“ oder „SSO“.
+- **„Lagemonitor-Zugang angelegt“** und **„Lagemonitor-Zugang widerrufen“**: unter
+  „Einstellungen“, „Lagemonitore“. „Ziel“ ist die Bezeichnung des Zugangs; ein zweiter Widerruf
+  schreibt nichts.
 - **„Zweitfaktor zurückgesetzt“**: steht in der Auswahl; die Oberfläche der Verwaltung bietet
   das Zurücksetzen derzeit nicht an.
 

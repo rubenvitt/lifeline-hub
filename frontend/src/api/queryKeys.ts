@@ -123,6 +123,8 @@ export const EINSATZ_KEYS = {
   modulVorgaben: 'einsatz-modul-vorgaben',
   // Gerätekopplungen der Einsatzleitung (LFH-892).
   geraete: 'einsatz-geraete',
+  // Freigaben externer Lagemonitore an diesem Einsatz (LLH-1484), Seite der Geräte.
+  lagemonitorZugaenge: 'einsatz-lagemonitor-zugaenge',
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
   modulFreigaben: 'einsatz-modul-freigaben',
   // Verlauf der eigenen Benachrichtigungen samt ungelesenen Eingängen (LLH-1143): Knopf
@@ -483,6 +485,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   eigene Änderung in der Verwaltung invalidiert sie für alle Einsätze.
  * - `geraete` (LFH-892): Kopplungen sieht nur die Einsatzleitung auf ihrer Einstellungsseite; die
  *   eigene Änderung setzt die Antwort, der letzte Zugriff eines Geräts ist kein Ereignis.
+ * - `lagemonitorZugaenge` (LLH-1484): wie `geraete`; die Freigabe setzt die Antwort, ein Abruf
+ *   des externen Monitors ist kein Ereignis.
  * - `modulFreigaben`: abgeleitet aus Overrides und Org-Vorgaben, beide ohne LiveEvent (LFH-669).
  *   Die eigene Änderung invalidiert die Mutation; die eines anderen wirkt beim nächsten Abruf,
  *   das 403 der Server-Gates bleibt das Netz.
@@ -531,6 +535,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.modulOverrides,
   EINSATZ_KEYS.modulVorgaben,
   EINSATZ_KEYS.geraete,
+  EINSATZ_KEYS.lagemonitorZugaenge,
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.benachrichtigungVerlauf,
   EINSATZ_KEYS.ortVorschau,
@@ -624,6 +629,9 @@ export const einsatzKeys = {
   modulVorgabenAlle: () => [EINSATZ_KEYS.modulVorgaben] as const,
   /** Kopplungen und Modulsperren je Ansicht (LFH-892), nicht live. */
   geraete: (einsatzId: number) => [EINSATZ_KEYS.geraete, einsatzId] as const,
+  /** Lagemonitor-Zugänge der Org aus Sicht dieses Einsatzes (LLH-1484), nicht live. */
+  lagemonitorZugaenge: (einsatzId: number) =>
+    [EINSATZ_KEYS.lagemonitorZugaenge, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulFreigaben: (einsatzId: number | null) => [EINSATZ_KEYS.modulFreigaben, einsatzId] as const,
   // Invalidierungs-Prefix über ALLE Einsätze: eine Org-Vorgabe wirkt auf jeden Einsatz der Org.
@@ -1009,6 +1017,8 @@ export const GLOBAL_KEYS = {
   orgEinstellungen: 'org-einstellungen',
   orgModulEinstellungen: 'org-modul-einstellungen',
   authProvider: 'auth-provider',
+  // Lesezugänge externer Lagemonitore (LLH-1484), Verwaltung.
+  lagemonitorZugaenge: 'lagemonitor-zugaenge',
   // Präferenzen des ANGEMELDETEN Benutzers.
   benutzerEinstellungen: 'benutzer-einstellungen',
   // Versionsstand der Instanz und Lesestand der Neuigkeiten (Spec `versionsstand`).
@@ -1117,6 +1127,7 @@ export const globalKeys = {
   orgEinstellungen: () => [GLOBAL_KEYS.orgEinstellungen] as const,
   orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
+  lagemonitorZugaenge: () => [GLOBAL_KEYS.lagemonitorZugaenge] as const,
   /**
    * Sitzungen (LFH-1092): der argumentlose Accessor ist der Invalidierungs-Prefix für beide
    * Fächer, die eigenen Sitzungen und die einer Person (für den Admin).
@@ -1283,6 +1294,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * {@link ORG_STREAM_EVENTS} auftaucht ODER hier steht.
  *
  * - `benutzer`, `authProvider`: Benutzerverwaltung und Anmeldewege, nur für den Admin.
+ * - `lagemonitorZugaenge` (LLH-1484): Verwaltung der Lesezugänge; die eigene Änderung setzt die
+ *   Antwort, eine Freigabe am Einsatz wirkt beim nächsten Abruf.
  * - `orgEinstellungen`, `orgModulEinstellungen`: enger Lesekreis; ein Modulwechsel wirkt auf den
  *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
  * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
@@ -1298,6 +1311,7 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
 export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
   GLOBAL_KEYS.authProvider,
+  GLOBAL_KEYS.lagemonitorZugaenge,
   GLOBAL_KEYS.orgEinstellungen,
   GLOBAL_KEYS.orgModulEinstellungen,
   GLOBAL_KEYS.benutzerEinstellungen,

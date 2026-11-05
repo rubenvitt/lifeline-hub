@@ -33,8 +33,9 @@ pub const AUFBEWAHRUNG_TAGE: i64 = 365;
 
 wire_enum! {
     /// Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
-    /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` und
-    /// `0174_admin_audit_einmalpasswort.sql` — beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
+    /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
+    /// `0174_admin_audit_einmalpasswort.sql` und `0269_admin_audit_lesezugang.sql` — beide Seiten
+    /// müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
     /// Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AdminAktion {
@@ -52,6 +53,11 @@ wire_enum! {
         /// Einmalpasswort vergeben (LFH-1121): neues Passwort mit Änderungszwang, alle Sitzungen
         /// beendet. Ohne Detail; das Passwort steht nie in der Spur.
         EinmalpasswortVergeben => "einmalpasswort_vergeben",
+        /// Lesezugang für eine externe Anzeige angelegt (LLH-1484). Der Schlüssel steht nie in
+        /// der Spur.
+        LesezugangAngelegt => "lesezugang_angelegt",
+        /// Lesezugang für eine externe Anzeige widerrufen (LLH-1484).
+        LesezugangWiderrufen => "lesezugang_widerrufen",
     }
 }
 
@@ -62,6 +68,8 @@ pub enum Ziel<'a> {
     Benutzer { id: i64, benutzername: &'a str },
     /// Ein Anmeldeweg, mit seiner id (`passwort`, `oidc`, …).
     Anmeldeweg(&'a str),
+    /// Ein Lesezugang für externe Anzeigen, mit seiner Bezeichnung (LLH-1484).
+    Lesezugang(&'a str),
 }
 
 /// Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
@@ -125,7 +133,9 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
             Some(id),
             crate::auth::benutzername::fuer_protokoll(benutzername),
         ),
-        Ziel::Anmeldeweg(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
+        Ziel::Anmeldeweg(id) | Ziel::Lesezugang(id) => {
+            (None, crate::auth::benutzername::fuer_protokoll(id))
+        }
     };
     let akteur_name = crate::auth::benutzername::fuer_protokoll(&eintrag.akteur.benutzername);
     let peer_ip = eintrag.peer_ip.map(|ip| ip.to_string());
