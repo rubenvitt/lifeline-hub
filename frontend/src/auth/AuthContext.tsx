@@ -14,6 +14,12 @@ import { ApiError, NetzFehler, setzeErwartetenBenutzer } from '../api/client';
 import * as authApi from '../api/auth';
 import { abonniereAuthWechsel, meldeAuthWechsel } from './authKanal';
 import {
+  holeAbmeldungNach,
+  istAufgegebeneSitzung,
+  merkeOffeneAbmeldung,
+  vergissOffeneAbmeldung,
+} from './abmeldungOffen';
+import {
   BENUTZER_PRUEFEN,
   meldeSitzungAbgelaufen,
   sitzungsMeldungZuruecksetzen,
@@ -107,6 +113,8 @@ function meFehlerEinordnen(e: unknown): MeErgebnis {
   }
   // 401 = nicht angemeldet (erwartet); andere Fehler ebenfalls als „anonym" behandeln
   if (!(e instanceof ApiError)) console.error('Auth-Prüfung fehlgeschlagen', e);
+  // Keine Sitzung mehr: eine gescheiterte Abmeldung (LLH-1535) hat sich erledigt.
+  else if (e.status === 401) vergissOffeneAbmeldung();
   return { art: 'abgelehnt' };
 }
 
@@ -220,15 +228,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (veraltet()) return;
           // Keine gültige Sitzung: lokal abmelden, die Sitzungswache leitet mit Rückkehrziel zur
           // Anmeldung. Server nicht erreichbar (offline) oder sonstiger Fehler: nichts ändern.
-          if (e instanceof ApiError && e.status === 401 && benutzerRef.current) {
-            void abmeldenLokal(abmeldenAngekuendigt.current ? 'abmelden' : 'sitzungsende');
-            abmeldenAngekuendigt.current = false;
-            meldeSitzungAbgelaufen();
+          if (e instanceof ApiError && e.status === 401) {
+            vergissOffeneAbmeldung();
+            if (benutzerRef.current) {
+              void abmeldenLokal(abmeldenAngekuendigt.current ? 'abmelden' : 'sitzungsende');
+              abmeldenAngekuendigt.current = false;
+              meldeSitzungAbgelaufen();
+            }
           }
           return;
         }
         abmeldenAngekuendigt.current = false;
         if (veraltet()) return;
+        // Die Sitzung, deren Server-Abmeldung scheiterte (LLH-1535): nicht übernehmen. Ein Tab,
+        // der sie noch zeigt, meldet ab wie nach einer gelungenen Abmeldung (dort käme 401).
+        // Danach wird die Abmeldung nachgeholt.
+        if (istAufgegebeneSitzung(aufServer)) {
+          if (benutzerRef.current) {
+            void abmeldenLokal('abmelden');
+            meldeSitzungAbgelaufen();
+          }
+          void holeAbmeldungNach();
+          return;
+        }
+        vergissOffeneAbmeldung();
         const lokal = benutzerRef.current;
         if (!lokal) {
           // In einem anderen Tab angemeldet, dieser Tab war anonym: übernehmen — wie ein Login,
@@ -288,6 +311,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // `hydrate` überschreibt keinen Abruf, der inzwischen neuer ist.
         bestaetigt = true;
         meldeServerErreichbar(true);
+        // Die Sitzung einer gescheiterten Abmeldung (LLH-1535): ein Neuladen oder neuer Tab
+        // übernimmt sie nicht, sondern gilt wie abgelehnt und holt die Abmeldung nach.
+        if (istAufgegebeneSitzung(b)) {
+          void holeAbmeldungNach();
+          return { art: 'abgelehnt' };
+        }
+        vergissOffeneAbmeldung();
         if (aktuell()) {
           setze(b);
           laedtRef.current = false;
@@ -360,6 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Eine andere Person als die vorherige räumt deren Lagebild und Gerätedaten (LFH-767),
       // bevor der Benutzer wechselt.
       await vorhaltungAnmelden(antwort);
+      vergissOffeneAbmeldung();
       uebernimm(antwort);
       setKonflikt(null);
       // Neue gültige Sitzung → Melde-Sperre lösen, damit ein späterer Ablauf wieder gemeldet wird.
@@ -401,13 +432,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * ist in jedem Fall der sicherere Zustand; das Lagebild (LFH-723) geht mit. Ausnahme 412
    * (LFH-387): die Sitzung gehört jemand anderem und bleibt bestehen, samt ihrem Lagebild; die
    * 412 hat bereits die Prüfung angestoßen.
+   *
+   * Scheitert der Serverruf sonst, bleibt die Sitzung gültig. Sie wird VOR dem lokalen Abmelden
+   * als aufgegeben gemerkt (LLH-1535, `abmeldungOffen.ts`), damit weder die Prüfung, die das
+   * Abmelden in den anderen Tabs anstößt, noch ein späteres Neuladen sie wieder übernimmt.
    */
   const logout = useCallback(async (): Promise<boolean> => {
+    const bisher = benutzerRef.current;
     try {
       await authApi.logout();
     } catch (e) {
       if (e instanceof ApiError && e.status === 412) return false;
       console.error('Server-Abmeldung fehlgeschlagen — es wird trotzdem lokal abgemeldet', e);
+      if (bisher) merkeOffeneAbmeldung(bisher);
     }
     await abmeldenLokal('abmelden');
     return true;
@@ -416,6 +453,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const aktualisiere = useCallback(async () => {
     const b = await authApi.me();
     await vorhaltungAnmelden(b);
+    vergissOffeneAbmeldung();
     uebernimm(b);
     setKonflikt(null);
     // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber.

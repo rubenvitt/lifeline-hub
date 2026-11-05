@@ -15,6 +15,11 @@ originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Ka
 - `POST /api/auth/logout` mit fremder Kennung → 412, Sitzung bleibt; `logout()` liefert dann
   `false` und meldet nicht ab. Die Sitzungswache meldet nach 401 **nur lokal** ab
   (`abmeldenLokal`) — ein Server-Logout träfe eine inzwischen neue Sitzung.
+- Scheitert die Server-Abmeldung sonst (Netz, 5xx, 403), meldet `logout()` trotzdem lokal ab und
+  merkt die Sitzung **vorher** als aufgegeben (`auth/abmeldungOffen.ts`, LLH-1535): Benutzer-id
+  plus öffentliche Sitzungskennung aus `/me` (`MeAntwort.sitzung`). Prüfung und Erstladen
+  übernehmen diese Sitzung nicht (ein Tab, der sie noch zeigt, meldet ab) und holen die Abmeldung
+  nach. Jede neue Anmeldung hat eine neue Kennung und wird normal übernommen.
 - Jede 412 und jede 403 auf eine **lesende** Anfrage stößt `lfh:benutzer-pruefen` an (403:
   Leseanfragen sind nicht gebunden und laufen nach einem Wechsel unter der fremden Sitzung,
   LLH-1360; nur mit angezeigtem Benutzer, ausgenommen `/me` selbst, sonst Schleife), der

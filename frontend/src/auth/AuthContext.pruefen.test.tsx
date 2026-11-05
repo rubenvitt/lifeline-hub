@@ -8,14 +8,16 @@
 import { http, HttpResponse } from 'msw';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lagebildAnlegen, lagebildLesen } from '../offline/lagebildSpeicher';
-import type { BenutzerAnzeige } from '../api/types';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import type { BenutzerAnzeige, MeAntwort } from '../api/types';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { ERWARTETER_BENUTZER_HEADER, apiSend, setzeErwartetenBenutzer } from '../api/client';
 import { AuthProvider, useAuth } from './AuthContext';
 import type { AuthWechsel } from './authKanal';
+import { merkeOffeneAbmeldung, vergissOffeneAbmeldung } from './abmeldungOffen';
+import { sicherLesen } from '../lib/sichererSpeicher';
 import {
   BENUTZER_PRUEFEN,
   SITZUNG_ABGELAUFEN,
@@ -476,5 +478,141 @@ describe('An- und Abmelden über mehrere Tabs (LFH-387)', () => {
     } finally {
       ohr.schliessen();
     }
+  });
+});
+
+describe('Gescheiterte Server-Abmeldung hat Bestand (LLH-1535)', () => {
+  /** Kennung der Sitzung auf dem Server; eine neue Anmeldung bekommt eine neue. */
+  let kennung: string;
+  /** Antwort von `POST /api/auth/logout`: `null` = gelingt. */
+  let logoutFehler: number | 'netz' | null;
+
+  const merker = () => sicherLesen('lfh:abmeldung-offen');
+
+  beforeEach(() => {
+    kennung = 'k1';
+    logoutFehler = 500;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    server.use(
+      http.get('/api/auth/me', () => {
+        meAufrufe++;
+        if (sitzung === 'netz') return HttpResponse.error();
+        if (sitzung === null) return HttpResponse.json({ error: 'x' }, { status: 401 });
+        return HttpResponse.json({ ...sitzung, sitzung: kennung });
+      }),
+      http.post('/api/auth/logout', () => {
+        logoutAufrufe++;
+        if (logoutFehler === 'netz') return HttpResponse.error();
+        if (logoutFehler !== null)
+          return HttpResponse.json({ error: 'x' }, { status: logoutFehler });
+        sitzung = null;
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.post('/api/auth/login', () => {
+        sitzung = anna;
+        kennung = 'k-login';
+        return HttpResponse.json(anna);
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vergissOffeneAbmeldung();
+  });
+
+  async function abmeldenScheitert() {
+    ergebnisLogout = undefined;
+    await userEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(ergebnisLogout).toBe(true));
+    expect(screen.getByTestId('name')).toHaveTextContent('anonym');
+    expect(sitzung).toEqual(anna);
+  }
+
+  function andererTabMeldet(wechsel: AuthWechsel) {
+    const tab = new BroadcastChannel('lfh-auth');
+    tab.postMessage(wechsel);
+    tab.close();
+  }
+
+  it('Sichtbarkeitswechsel übernimmt die alte Sitzung nicht und holt die Abmeldung nach', async () => {
+    await starte();
+    await abmeldenScheitert();
+    expect(logoutAufrufe).toBe(1);
+    const vorher = meAufrufe;
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    await waitFor(() => expect(meAufrufe).toBe(vorher + 1));
+    await waitFor(() => expect(logoutAufrufe).toBe(2));
+    expect(screen.getByTestId('name')).toHaveTextContent('anonym');
+    expect(await kopfBeimSchreiben()).toBeNull();
+    // Scheitert auch der zweite Versuch, bleibt der Merker für den nächsten.
+    expect(merker()).not.toBeNull();
+
+    logoutFehler = null;
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    await waitFor(() => expect(sitzung).toBeNull());
+    expect(merker()).toBeNull();
+    expect(screen.getByTestId('name')).toHaveTextContent('anonym');
+  });
+
+  it('eine Kanalmeldung übernimmt die alte Sitzung nicht (Netzfehler beim Abmelden)', async () => {
+    logoutFehler = 'netz';
+    await starte();
+    await abmeldenScheitert();
+    const vorher = meAufrufe;
+    andererTabMeldet({ art: 'abgemeldet', anlass: 'abmelden' });
+    await waitFor(() => expect(meAufrufe).toBe(vorher + 1));
+    await waitFor(() => expect(logoutAufrufe).toBe(2));
+    expect(screen.getByTestId('name')).toHaveTextContent('anonym');
+  });
+
+  it('eine echte Anmeldung in einem anderen Tab wird weiter übernommen', async () => {
+    await starte();
+    await abmeldenScheitert();
+    kennung = 'k2';
+    andererTabMeldet({ art: 'angemeldet' });
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
+    expect(merker()).toBeNull();
+    expect(logoutAufrufe).toBe(1);
+  });
+
+  it('nach eigener Anmeldung (ohne Kennung im Tab) fragt der Tab die Kennung nach', async () => {
+    sitzung = null;
+    await starte('anonym');
+    await userEvent.click(screen.getByText('login'));
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
+    logoutFehler = 403;
+    await abmeldenScheitert();
+    await waitFor(() =>
+      expect(JSON.parse(merker() ?? '{}')).toEqual({ benutzer: 1, sitzung: 'k-login' }),
+    );
+
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    await waitFor(() => expect(logoutAufrufe).toBe(2));
+    expect(screen.getByTestId('name')).toHaveTextContent('anonym');
+
+    kennung = 'k3';
+    andererTabMeldet({ art: 'angemeldet' });
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
+  });
+
+  it('ein Neuladen übernimmt die alte Sitzung nicht und holt die Abmeldung nach', async () => {
+    await starte();
+    await abmeldenScheitert();
+    cleanup();
+    logoutFehler = null;
+    await starte('anonym');
+    await waitFor(() => expect(sitzung).toBeNull());
+    expect(merker()).toBeNull();
+  });
+
+  it('ein Tab, der die aufgegebene Sitzung noch zeigt, meldet auf die Kanalmeldung ab', async () => {
+    await starte();
+    // Die Abmeldung ist in einem anderen Tab gescheitert und hat den Merker gesetzt.
+    merkeOffeneAbmeldung({ ...anna, sitzung: 'k1' } as MeAntwort);
+    logoutFehler = null;
+    andererTabMeldet({ art: 'abgemeldet', anlass: 'abmelden' });
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
+    await waitFor(() => expect(sitzung).toBeNull());
+    expect(merker()).toBeNull();
   });
 });

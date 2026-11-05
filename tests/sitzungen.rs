@@ -141,6 +141,24 @@ async fn liste_zeigt_geraet_und_markiert_die_aktuelle() {
     }
 }
 
+/// `/me` nennt die Kennung der eigenen Sitzung (LLH-1535): ein Tab, dessen Server-Abmeldung
+/// scheiterte, erkennt daran die alte Sitzung; eine neue Anmeldung hat eine andere.
+#[tokio::test]
+async fn me_nennt_die_kennung_der_eigenen_sitzung() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    let firefox = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
+    let ipad = anmelden(&app, "marlene", "marlenepw1", IPAD).await;
+
+    let sitzungen = liste(&app, &firefox, "/api/auth/sitzungen").await;
+    for (cookie, geraet) in [(&firefox, "Firefox · Windows"), (&ipad, "Safari · iPadOS")] {
+        let (s, v) = anfrage(&app, "GET", "/api/auth/me", cookie, None).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["sitzung"], kennung(&sitzungen, geraet), "{v}");
+    }
+}
+
 #[tokio::test]
 async fn ohne_user_agent_fehlt_das_geraet() {
     let (app, _pool) = setup_mit_pool().await;
