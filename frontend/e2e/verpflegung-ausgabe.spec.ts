@@ -380,6 +380,35 @@ for (const flaeche of [
 }
 
 /**
+ * Schmal (LLH-1504): auch ein langer Name („ohne Schweinefleisch 0/100 fehlt 100“) bleibt in seiner
+ * Sonderkost-Taste, und das Menü weiterer Kostformen steht rechts neben der letzten, auf ihrer Höhe.
+ * Mutationsprobe: `whiteSpace: 'normal'` an der Taste entfernt → bei 320 px läuft sie über, rot.
+ */
+async function pruefeSonderkostLage(page: Page, wo: string) {
+  const lage = await page.evaluate(() => {
+    const tasten = [
+      ...document.querySelectorAll<HTMLElement>('[data-lfh="ausgabe-sonderkost"] [data-kostform]'),
+    ];
+    const letzte = tasten[tasten.length - 1].getBoundingClientRect();
+    const menue = document
+      .querySelector('[data-lfh="ausgabe-sonderkost"] [aria-label="Weitere Kostform …"]')!
+      .getBoundingClientRect();
+    return {
+      ueberlauf: tasten
+        .filter((t) => t.scrollWidth > t.clientWidth + 1)
+        .map((t) => t.dataset.kostform),
+      rechts: menue.left >= letzte.right,
+      aufHoehe: menue.top < letzte.bottom && menue.bottom > letzte.top,
+    };
+  });
+  expect(lage, `${wo}: Sonderkost-Tasten und Menü`).toEqual({
+    ueberlauf: [],
+    rechts: true,
+    aufHoehe: true,
+  });
+}
+
+/**
  * Handy mit Touch ohne gespeicherte Wahl (LLH-1504): die Ansicht beginnt in `komfortabel` und ist
  * bei 390 × 700 höher als der Schirm; das Kennzahlenband steht dort zweizeilig. Rollt es unter
  * die obere Kante (am Stab unter den Rahmen, am Gerät an die Oberkante des `main`), stehen Soll,
@@ -425,6 +454,7 @@ async function pruefeKurzzeile(page: Page, wo: string, scrollbereich: string | n
     );
   expect(sonderkost, `${wo}: Sonderkost`).toHaveLength(2);
   expect(sonderkost[1], `${wo}: Sonderkost gleich breit, untereinander`).toEqual(sonderkost[0]);
+  await pruefeSonderkostLage(page, wo);
   await expect(kurzzeile, `${wo}: ohne Bildlauf keine Kurzzeile`).toHaveAttribute(
     'data-sichtbar',
     'false',
@@ -538,7 +568,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
   /** Zeitfenster mit Sonderkost und zehn Buchungen: die Liste ist lang. */
   async function saeenLang(page: Page) {
     const { e, zf } = await saeen(page, -60, 60, {
-      sonderkost: { vegetarisch: 4, vegan: 2 },
+      sonderkost: { vegetarisch: 4, ohne_schwein: 100 },
       kraefte: 1830,
     });
     for (let n = 1; n <= 10; n += 1) {
@@ -557,6 +587,8 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
     await expect(page.locator('[data-lfh="ausgabe-zeile"]')).toHaveCount(10);
     await pruefeKurzzeile(page, 'Stab', null);
+    await page.setViewportSize({ width: 320, height: 700 });
+    await pruefeSonderkostLage(page, 'Stab, 320 px');
   });
 
   test('am Gerät: Soll, ausgegeben und fehlt bleiben beim Rollen im Bild, das Tastenfeld unten', async ({

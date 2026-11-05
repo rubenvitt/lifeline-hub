@@ -802,7 +802,15 @@ export default function AusgabeAnsicht() {
                   style={{
                     ...uebrige,
                     height: 'auto',
-                    ...(istSchmal ? { gridColumn: 1, justifyContent: 'flex-start' } : {}),
+                    // Schmal darf ein langer Name umbrechen, statt in die Menüspalte zu ragen.
+                    ...(istSchmal
+                      ? {
+                          gridColumn: 1,
+                          justifyContent: 'flex-start',
+                          whiteSpace: 'normal',
+                          textAlign: 'start',
+                        }
+                      : {}),
                   }}
                   disabled={tastenGesperrt}
                   aria-describedby={beschrieben(tastenGesperrt)}
