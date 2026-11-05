@@ -231,8 +231,10 @@ Seite bleiben.
 ### Requirement: Nadel verschieben
 Die Nadel der Kartenvorschau SHALL sich mit Maus, Finger und Pfeiltasten verschieben lassen (mit
 Umschalt in großen Schritten). Das Verschieben MUST die Koordinate des Werts ändern und den Text
-stehen lassen; steht im Text die Koordinate, die das Feld beim Setzen eingetragen hat (siehe „Auf
-Karte wählen“), zieht sie mit. Die Nadel MUST ein Bedienziel mit der Steuerhöhe der aktiven Dichtestufe im
+stehen lassen; ist der Text eine Koordinate (beim Setzen eingetragen oder getippt), MUST er die
+neue Koordinate tragen, damit Text und Nadel denselben Ort nennen. Eine Textänderung, nach der der
+Text wieder den Punkt der Nadel nennt, MUST den Kartenpunkt stehen lassen; erst eine andere
+getippte Koordinate ersetzt ihn. Die Nadel MUST ein Bedienziel mit der Steuerhöhe der aktiven Dichtestufe im
 Quadrat sein.
 
 #### Scenario: Gezogen

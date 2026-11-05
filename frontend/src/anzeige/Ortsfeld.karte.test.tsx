@@ -191,23 +191,23 @@ describe('nachTextaenderung', () => {
     expect(nachTextaenderung(leer, '12 34')).toEqual({ text: '12 34', koordinate: null });
   });
 
-  it('eine Koordinate im Text, die schon vor dem Ziehen dastand, verdrängt den Kartenpunkt nicht', () => {
-    // Getippt, dann die Nadel gezogen: der Text trägt noch die alte Koordinate.
-    const gezogen: OrtsfeldWert = {
-      text: '51.16040, 10.45140',
+  it('eine Koordinate im Text, die der Kartenpunkt ist, lässt ihn stehen; eine andere ersetzt ihn', () => {
+    const gesetzt: OrtsfeldWert = {
+      text: '52.50000, 13.40000',
       koordinate: { lat: 52.5, lon: 13.4 },
       quelle: 'karte',
     };
-    const mitLeerzeichen = nachTextaenderung(gezogen, '51.16040, 10.45140 ');
-    expect(mitLeerzeichen.koordinate).toEqual({ lat: 52.5, lon: 13.4 });
-    expect(nachTextaenderung(mitLeerzeichen, '51.16040, 10.45140 l').koordinate).toEqual({
-      lat: 52.5,
-      lon: 13.4,
-    });
-    // Eine neu getippte Koordinate ersetzt ihn weiter.
-    expect(nachTextaenderung(gezogen, '51.16040, 10.45141')).toEqual({
-      text: '51.16040, 10.45141',
-      koordinate: { lat: 51.1604, lon: 10.45141 },
+    // Zeichen anhängen und wieder löschen: der Punkt bleibt über alle Zwischenstände.
+    const l = nachTextaenderung(gesetzt, '52.50000, 13.40000 l');
+    expect(l).toEqual({ ...gesetzt, text: '52.50000, 13.40000 l' });
+    expect(nachTextaenderung(l, '52.50000, 13.40000')).toEqual(gesetzt);
+    // Gerundet wie in der Anzeige ist es derselbe Punkt.
+    const fein: OrtsfeldWert = { ...gesetzt, koordinate: { lat: 52.500003, lon: 13.399998 } };
+    expect(nachTextaenderung(fein, '52.50000, 13.40000').koordinate).toEqual(fein.koordinate);
+    // Eine andere getippte Koordinate ersetzt ihn.
+    expect(nachTextaenderung(gesetzt, '52.50000, 13.41000')).toEqual({
+      text: '52.50000, 13.41000',
+      koordinate: { lat: 52.5, lon: 13.41 },
       quelle: 'koordinate',
     });
   });
@@ -220,19 +220,21 @@ describe('nachTextaenderung', () => {
 });
 
 describe('nachKartenpunkt', () => {
-  const fmt = (lat: number, lon: number) => `${lat}/${lon}`;
-  const p = { lat: 3, lon: 4 };
+  const fmt = (lat: number, lon: number) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  const p = { lat: 52.5, lon: 13.4 };
 
   it('setzt in ein leeres Feld die Koordinate als Text', () => {
     expect(nachKartenpunkt({ text: '', koordinate: null }, p, fmt)).toEqual({
-      text: '3/4',
+      text: '52.50000, 13.40000',
       koordinate: p,
       quelle: 'karte',
     });
-    expect(nachKartenpunkt({ text: ' ', koordinate: null }, p, fmt).text).toBe('3/4');
+    expect(nachKartenpunkt({ text: ' ', koordinate: null }, p, fmt).text).toBe(
+      '52.50000, 13.40000',
+    );
   });
 
-  it('lässt einen getippten Text stehen', () => {
+  it('lässt einen Text stehen, der keine Koordinate ist', () => {
     const vorher: OrtsfeldWert = {
       text: 'Waldweg',
       koordinate: { lat: 1, lon: 2 },
@@ -245,13 +247,18 @@ describe('nachKartenpunkt', () => {
     });
   });
 
-  it('zieht einen Text mit, der die alte Koordinate ist', () => {
-    const vorher: OrtsfeldWert = { text: '1/2', koordinate: { lat: 1, lon: 2 }, quelle: 'karte' };
-    expect(nachKartenpunkt(vorher, p, fmt).text).toBe('3/4');
-    // Eine andere Koordinate im Text ist getippt und bleibt.
-    expect(nachKartenpunkt({ ...vorher, text: '9/9' }, p, fmt).text).toBe('9/9');
-    // Eine getippte Koordinate bleibt, auch wenn sie dem Format gleicht.
-    expect(nachKartenpunkt({ ...vorher, quelle: 'koordinate' }, p, fmt).text).toBe('1/2');
+  it('zieht eine Koordinate im Text mit, eingetragen oder getippt', () => {
+    const eingetragen: OrtsfeldWert = {
+      text: '51.16040, 10.45140',
+      koordinate: { lat: 51.1604, lon: 10.4514 },
+      quelle: 'karte',
+    };
+    expect(nachKartenpunkt(eingetragen, p, fmt).text).toBe('52.50000, 13.40000');
+    // Getippt, auch in einem anderen Format: sonst nennte der Text einen anderen Ort als die Nadel.
+    expect(
+      nachKartenpunkt({ ...eingetragen, text: '32U MB 12345 67890', quelle: 'koordinate' }, p, fmt)
+        .text,
+    ).toBe('52.50000, 13.40000');
   });
 });
 

@@ -44,34 +44,35 @@ export interface OrtsfeldWert {
  * Karte gesetzter Punkt bleibt; die Koordinate eines Treffers oder einer getippten Koordinate
  * fällt weg. Ein geleerter Text leert auch einen Kartenpunkt (LLH-1534): ohne Text geht keine
  * Koordinate hinaus (`ortFelder`), die Maske zeigte sonst einen Punkt, der nie gespeichert wird.
- * Steht neben einem Kartenpunkt dieselbe Koordinate im Text wie vorher (etwa nach einem
- * angehängten Leerzeichen), bleibt der Kartenpunkt: nur eine neu getippte Koordinate ersetzt ihn.
+ * Neben einem Kartenpunkt steht als Koordinate im Text nur dieser Punkt (`nachKartenpunkt` zieht
+ * sie mit); erkennt der Text ihn wieder (etwa nach einem angehängten und wieder gelöschten
+ * Zeichen), bleibt der Kartenpunkt. Erst eine andere getippte Koordinate ersetzt ihn.
  */
 export function nachTextaenderung(vorher: OrtsfeldWert, text: string): OrtsfeldWert {
   if (!text.trim()) return { text, koordinate: null };
   const getippt = erkenneKoordinate(text);
-  if (
-    getippt &&
-    !(vorher.quelle === 'karte' && gleichePunkte(getippt, erkenneKoordinate(vorher.text)))
-  ) {
+  const kartenpunkt = vorher.quelle === 'karte' ? vorher.koordinate : null;
+  if (getippt && !(kartenpunkt && nahe(getippt, kartenpunkt))) {
     return { text, koordinate: getippt, quelle: 'koordinate' };
   }
-  if (vorher.quelle === 'karte' && vorher.koordinate) {
-    return { text, koordinate: vorher.koordinate, quelle: 'karte' };
-  }
+  if (kartenpunkt) return { text, koordinate: kartenpunkt, quelle: 'karte' };
   return { text, koordinate: null };
 }
 
-function gleichePunkte(a: LatLon, b: LatLon | null): boolean {
-  return b != null && a.lat === b.lat && a.lon === b.lon;
+/**
+ * Derselbe Punkt, bis auf die Rundung der Anzeige: fünf Nachkommastellen (WGS84) bzw. ein Meter
+ * (UTM, MGRS) liegen unter 1e-4 Grad.
+ */
+function nahe(a: LatLon, b: LatLon): boolean {
+  return Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(a.lon - b.lon) < 1e-4;
 }
 
 /**
- * Wert nach einem Punkt aus der Karte (Nadel gezogen, „Auf Karte wählen“): `quelle: 'karte'`, der
+ * Wert nach einem Punkt aus der Karte (Nadel gezogen, „Auf Karte wählen“): `quelle: 'karte'`, ein
  * Text bleibt. Ist er leer, steht die Koordinate als Text da (LLH-1534), damit der Punkt mit
- * gespeichert wird (`ortFelder` schickt eine Koordinate nur neben einem Text); ein so gesetzter
- * Text zieht beim nächsten Punkt mit, eine getippte Koordinate (`quelle: 'koordinate'`) bleibt.
- * Den Ortsnamen bietet danach „Als Adresse übernehmen“ an.
+ * gespeichert wird (`ortFelder` schickt eine Koordinate nur neben einem Text). Ist er eine
+ * Koordinate (eingetragen oder getippt), zieht er mit: sonst nennte der Text einen anderen Ort als
+ * die Nadel. Den Ortsnamen bietet danach „Als Adresse übernehmen“ an.
  */
 export function nachKartenpunkt(
   vorher: OrtsfeldWert,
@@ -79,11 +80,7 @@ export function nachKartenpunkt(
   formatKoordinate: (lat: number, lon: number) => string,
 ): OrtsfeldWert {
   const alt = vorher.text.trim();
-  const mitziehen =
-    !alt ||
-    (vorher.quelle === 'karte' &&
-      vorher.koordinate != null &&
-      alt === formatKoordinate(vorher.koordinate.lat, vorher.koordinate.lon));
+  const mitziehen = !alt || erkenneKoordinate(alt) != null;
   return {
     text: mitziehen ? formatKoordinate(punkt.lat, punkt.lon) : vorher.text,
     koordinate: punkt,
