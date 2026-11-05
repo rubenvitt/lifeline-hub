@@ -1217,6 +1217,30 @@ export default function KraefteuebersichtPage() {
     ] as const
   ).every(([q, f]) => f === true && q.isSuccess);
 
+  /**
+   * Eine Liste der Meta lädt noch: Freigabe offen oder erteilt, weder Daten noch Fehler. Gesperrt
+   * oder gescheitert ist kein Laden, dann steht die Meta mit „—“ (LLH-1462).
+   */
+  const metaQuelleLaedt = (q: { data: unknown; isError: boolean }, f: boolean | undefined) =>
+    !freigabenGescheitert && f !== false && q.data === undefined && !q.isError;
+  /**
+   * Solange Einheiten oder Personal laden, hält die Form der fertigen Meta ihren Platz (LLH-1543).
+   * Sonst stand im ersten Bild „Stärke —“ und mit den Daten „0 Einheiten · Stärke 0/0/0//0“: Der
+   * Titelblock wurde breiter, die Aktionen brachen in eine eigene Zeile, und der Inhalt rückte
+   * 79 px (Handschuh bei 1280 px, Seiten-CLS 0,27, `e2e/rahmen-cls-dichte.spec.ts`).
+   */
+  const metaLaedt =
+    metaQuelleLaedt(einheitenQuery, frei.einheiten) ||
+    metaQuelleLaedt(personalQuery, frei.personal);
+  const nullStaerke = staerkeText({ fuehrer: 0, unterfuehrer: 0, mannschaft: 0 });
+  const metaPlatzhalter = meldebildMeta({
+    einheiten: 0,
+    einheitenGesamt: 0,
+    staerke: nullStaerke,
+    staerkeGesamt: nullStaerke,
+    einheitenUnbekannt: frei.einheiten === false,
+    gefiltert,
+  });
   const meta = meldebildMeta({
     einheiten: einheitenZeilen,
     einheitenGesamt: (einheitenQuery.data ?? []).length,
@@ -1242,7 +1266,8 @@ export default function KraefteuebersichtPage() {
             ]}
           />
         }
-        meta={meta}
+        meta={metaLaedt ? undefined : meta}
+        metaPlatzhalter={metaPlatzhalter}
         dataUpdatedAt={datenstand}
         aktionen={
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
