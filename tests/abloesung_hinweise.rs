@@ -686,3 +686,42 @@ async fn hinweis_planung_entfallen_nennt_die_entfallene_einheit() {
         "Ablösung für Rettungsstaffel: 2. Rettungsstaffel"
     );
 }
+
+/// Eine Einheit, die ein Hinweis nennt, hat eine Spur und wird nie gelöscht: Auflösen lässt
+/// ihre Zeile stehen, SQLite vergibt ihre ID (kein AUTOINCREMENT) also nicht neu, und der
+/// festgehaltene Hinweis kann keine fremde Einheit nennen.
+#[tokio::test]
+async fn hinweis_einheit_bleibt_beim_aufloesen_stehen_und_ihre_id_frei() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let rs2 = w.einheit("2. Rettungsstaffel").await;
+    let id = w.schicht(rs, 480).await;
+    w.aendern(id, json!({ "abloesende_einheit_id": rs2 })).await;
+    let anna = w.cookie("annika").await;
+    let (s, v) = anfrage(
+        &w.app,
+        "DELETE",
+        &w.pfad(&format!("einheiten/{rs2}")),
+        &anna,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    let steht: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE id = ?")
+        .bind(rs2)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        steht, 1,
+        "die Planung ist eine Spur: aufgelöst, nicht gelöscht"
+    );
+
+    let neu = w.einheit("Florian 7").await;
+    assert_ne!(neu, rs2, "die ID der aufgelösten Einheit bleibt belegt");
+
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_entfallen").await,
+        "Ablösung für Rettungsstaffel: 2. Rettungsstaffel"
+    );
+}
