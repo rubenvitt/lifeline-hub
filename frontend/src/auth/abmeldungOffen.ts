@@ -104,23 +104,25 @@ let nachholLauf: Promise<void> | null = null;
 /**
  * Holt die Server-Abmeldung der aufgegebenen Sitzung nach. Gelingt sie (oder ist die Sitzung
  * schon weg), fällt der Merker; sonst bleibt er für den nächsten Versuch. Läuft höchstens einmal
- * gleichzeitig und wirft nie. Der Aufrufer hat vorher lokal abgemeldet: ohne erwarteten Benutzer
- * trifft der Ruf die Sitzung des Cookies.
+ * gleichzeitig und wirft nie.
+ *
+ * Gebunden an `aufServer`, die Sitzung, die der Aufrufer eben bei `/me` gesehen hat: Benutzer und
+ * Kennung gehen als erwartete Köpfe mit. Hat sich dazwischen jemand neu angemeldet, gehört das
+ * Cookie einer anderen Sitzung, der Server antwortet 412 und beendet nichts. Dann ist der Merker
+ * überholt und fällt ebenfalls.
  */
-export function holeAbmeldungNach(): Promise<void> {
+export function holeAbmeldungNach(aufServer: MeAntwort): Promise<void> {
   nachholLauf ??= (async () => {
     // Nur der Merker, für den dieser Lauf startet, fällt mit ihm — nicht einer, den ein weiteres
     // gescheitertes Abmelden währenddessen angelegt hat.
     const vorgang = lesen()?.vorgang;
     try {
-      await authApi.logout();
+      await authApi.logout(aufServer);
       if (vorgang !== undefined) vergissOffeneAbmeldung(vorgang);
     } catch (e) {
-      if (!(e instanceof ApiError && e.status === 401)) {
-        console.error('Server-Abmeldung weiter nicht möglich', e);
-      } else if (vorgang !== undefined) {
-        vergissOffeneAbmeldung(vorgang);
-      }
+      const erledigt = e instanceof ApiError && (e.status === 401 || e.status === 412);
+      if (!erledigt) console.error('Server-Abmeldung weiter nicht möglich', e);
+      else if (vorgang !== undefined) vergissOffeneAbmeldung(vorgang);
     } finally {
       nachholLauf = null;
     }

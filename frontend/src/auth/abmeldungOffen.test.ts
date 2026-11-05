@@ -80,7 +80,7 @@ describe('Merker einer gescheiterten Abmeldung (LLH-1535)', () => {
       }),
     );
     merkeOffeneAbmeldung({ ...anna, sitzung: 'k1' });
-    const lauf = holeAbmeldungNach();
+    const lauf = holeAbmeldungNach({ ...anna, sitzung: 'k1' });
     await waitFor(() => expect(gerufen).toBe(true));
     merkeOffeneAbmeldung({ ...anna, sitzung: 'k2' });
     halt.freigeben();
@@ -91,7 +91,24 @@ describe('Merker einer gescheiterten Abmeldung (LLH-1535)', () => {
   it('ein gelungenes Nachholen löscht den eigenen Merker', async () => {
     server.use(http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })));
     merkeOffeneAbmeldung({ ...anna, sitzung: 'k1' });
-    await holeAbmeldungNach();
+    await holeAbmeldungNach({ ...anna, sitzung: 'k1' });
+    expect(merker()).toBeNull();
+  });
+
+  it('das Nachholen nennt die gesehene Sitzung; eine neue Anmeldung beendet es nicht (412)', async () => {
+    let koepfe: Headers | undefined;
+    server.use(
+      http.post('/api/auth/logout', ({ request }) => {
+        koepfe = request.headers;
+        // Inzwischen gehört das Cookie einer neuen Sitzung.
+        return HttpResponse.json({ error: 'fremd' }, { status: 412 });
+      }),
+    );
+    merkeOffeneAbmeldung({ ...anna, sitzung: 'k1' });
+    await holeAbmeldungNach({ ...anna, sitzung: 'k1' });
+    expect(koepfe?.get('X-Erwartete-Sitzung')).toBe('k1');
+    expect(koepfe?.get('X-Erwarteter-Benutzer-Id')).toBe('1');
+    // Der Merker ist überholt: die neue Sitzung wird normal übernommen.
     expect(merker()).toBeNull();
   });
 });

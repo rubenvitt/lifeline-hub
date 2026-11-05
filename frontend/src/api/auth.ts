@@ -1,5 +1,5 @@
 import type { AppCode, AuthProvider, BenutzerAnzeige, MeAntwort } from './types';
-import { apiGet, apiSend } from './client';
+import { ERWARTETER_BENUTZER_HEADER, apiGet, apiSend } from './client';
 
 /** Schmale Antwort auf `POST /api/auth/login`, wenn TOTP als zweiter Faktor aktiv ist: KEIN
  *  Benutzer, KEINE Session; der Server setzt ein HttpOnly `mfa_pending`-Cookie, weiter geht es
@@ -38,8 +38,19 @@ export function passwortFestlegen(neuesPasswort: string): Promise<BenutzerAnzeig
   });
 }
 
-export function logout(): Promise<void> {
-  return apiSend<void>('/api/auth/logout', 'POST');
+/** Kopf der erwarteten Sitzung beim Abmelden (LLH-1535, Server `ERWARTETE_SITZUNG_HEADER`). */
+export const ERWARTETE_SITZUNG_HEADER = 'X-Erwartete-Sitzung';
+
+/**
+ * Meldet die Sitzung des Cookies ab. Mit `erwartet` nur, wenn sie diesem Benutzer und, falls
+ * bekannt, dieser Sitzung gehört (sonst 412, nichts wird beendet): für das Nachholen einer
+ * gescheiterten Abmeldung, das sonst eine inzwischen neue Anmeldung träfe.
+ */
+export function logout(erwartet?: MeAntwort): Promise<void> {
+  if (!erwartet) return apiSend<void>('/api/auth/logout', 'POST');
+  const koepfe: Record<string, string> = { [ERWARTETER_BENUTZER_HEADER]: String(erwartet.id) };
+  if (erwartet.sitzung) koepfe[ERWARTETE_SITZUNG_HEADER] = erwartet.sitzung;
+  return apiSend<void>('/api/auth/logout', 'POST', undefined, { koepfe });
 }
 
 /** Der angemeldete Benutzer; eine Gerätesitzung (LFH-892) trägt zusätzlich `geraet`. */

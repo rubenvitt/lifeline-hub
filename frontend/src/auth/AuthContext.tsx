@@ -248,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             void abmeldenLokal('abmelden');
             meldeSitzungAbgelaufen();
           }
-          void holeAbmeldungNach();
+          void holeAbmeldungNach(aufServer);
           return;
         }
         vergissOffeneAbmeldung();
@@ -314,7 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Die Sitzung einer gescheiterten Abmeldung (LLH-1535): ein Neuladen oder neuer Tab
         // übernimmt sie nicht, sondern gilt wie abgelehnt und holt die Abmeldung nach.
         if (istAufgegebeneSitzung(b)) {
-          void holeAbmeldungNach();
+          void holeAbmeldungNach(b);
           return { art: 'abgelehnt' };
         }
         vergissOffeneAbmeldung();

@@ -443,8 +443,12 @@ pub async fn logout(
     jar: CookieJar,
 ) -> Result<(CookieJar, StatusCode), AppError> {
     if let Some(cookie) = jar.get(SESSION_COOKIE) {
-        if let Ok(inhaber) = session::benutzer_aus_token(&state.pool, cookie.value()).await {
+        if let Ok((inhaber, _, kennung)) =
+            session::sitzung_aus_token(&state.pool, cookie.value()).await
+        {
             session::pruefe_erwarteten_benutzer(&Method::POST, &headers, inhaber.id)?;
+            // Nachgeholte Abmeldung (LLH-1535): nur die Sitzung, die der Tab gesehen hat.
+            session::pruefe_erwartete_sitzung(&headers, kennung.as_ref())?;
         }
         // Wer sich abmeldet, wird vor dem Löschen bestimmt — danach ist die Zuordnung weg.
         let (benutzer_id, anmeldeweg) =
