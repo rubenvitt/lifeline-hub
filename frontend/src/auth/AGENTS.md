@@ -21,7 +21,9 @@ originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Ka
   übernehmen diese Sitzung nicht (ein Tab, der sie noch zeigt, meldet ab) und holen die Abmeldung
   nach. Jede neue Anmeldung hat eine neue Kennung und wird normal übernommen. Das Nachholen nennt
   Benutzer und Sitzung, die es bei `/me` gesehen hat (`X-Erwartete-Sitzung`); gehört das Cookie
-  inzwischen einer neuen Sitzung, antwortet der Server 412 und beendet nichts.
+  inzwischen einer neuen Sitzung, antwortet der Server 412 und beendet nichts. Eine `/me`-Antwort
+  vergisst nur den Merker, der beim Absenden stand (`offenerVorgang` →
+  `vergissOffeneAbmeldungSeit`), nie einen, den eine Abmeldung währenddessen gesetzt hat.
 - Jede 412 und jede 403 auf eine **lesende** Anfrage stößt `lfh:benutzer-pruefen` an (403:
   Leseanfragen sind nicht gebunden und laufen nach einem Wechsel unter der fremden Sitzung,
   LLH-1360; nur mit angezeigtem Benutzer, ausgenommen `/me` selbst, sonst Schleife), der

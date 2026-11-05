@@ -63,6 +63,19 @@ export function vergissOffeneAbmeldung(vorgang?: string): void {
   sicherEntfernen(SCHLUESSEL);
 }
 
+/** Der Vorgang des Merkers jetzt, `null` ohne Merker. Beim Absenden einer `/me`-Anfrage
+ *  festgehalten, für {@link vergissOffeneAbmeldungSeit}. */
+export function offenerVorgang(): string | null {
+  return lesen()?.vorgang ?? null;
+}
+
+/** Vergisst den Merker auf eine `/me`-Antwort hin, die bei Merker-Stand `vorher` angefragt wurde,
+ *  und nur, wenn es noch derselbe Merker ist. Ein Merker, der erst danach entstand (in diesem oder
+ *  einem anderen Tab), bleibt: die Antwort kennt seine Sitzung nicht. */
+export function vergissOffeneAbmeldungSeit(vorher: string | null): void {
+  if (vorher !== null) vergissOffeneAbmeldung(vorher);
+}
+
 /** Ist `aufServer` die Sitzung, deren Abmeldung scheiterte? */
 export function istAufgegebeneSitzung(aufServer: MeAntwort): boolean {
   const offen = lesen();

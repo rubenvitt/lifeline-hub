@@ -605,6 +605,64 @@ describe('Gescheiterte Server-Abmeldung hat Bestand (LLH-1535)', () => {
     expect(merker()).toBeNull();
   });
 
+  it('eine verspätete 401 beim Erstladen vergisst keinen inzwischen gesetzten Merker', async () => {
+    sitzung = null;
+    const halt = gehaltenesMe();
+    server.use(
+      http.get(
+        '/api/auth/me',
+        async () => {
+          meAufrufe++;
+          const antwort = HttpResponse.json({ error: 'x' }, { status: 401 });
+          await halt.gesperrt;
+          return antwort;
+        },
+        { once: true },
+      ),
+    );
+    rendere();
+    await waitFor(() => expect(meAufrufe).toBe(1));
+    // Währenddessen in einem anderen Tab: angemeldet, Abmeldung gescheitert.
+    sitzung = anna;
+    merkeOffeneAbmeldung({ ...anna, sitzung: 'k1' } as MeAntwort);
+    halt.freigeben();
+    await waitFor(() => expect(screen.getByTestId('laedt')).toHaveTextContent('fertig'));
+    expect(merker()).not.toBeNull();
+
+    cleanup();
+    await starte('anonym');
+    await waitFor(() => expect(logoutAufrufe).toBe(1));
+    expect(screen.getByTestId('name')).toHaveTextContent('anonym');
+  });
+
+  it('eine verspätete Antwort der Prüfung vergisst keinen inzwischen gesetzten Merker', async () => {
+    await starte();
+    const halt = gehaltenesMe();
+    server.use(
+      http.get(
+        '/api/auth/me',
+        async () => {
+          meAufrufe++;
+          // Die Sitzung, die vor der Anmeldung in einem anderen Tab galt.
+          const antwort = HttpResponse.json({ ...anna, sitzung: 'k0' });
+          await halt.gesperrt;
+          return antwort;
+        },
+        { once: true },
+      ),
+    );
+    const vorher = meAufrufe;
+    pruefenAnstossen();
+    await waitFor(() => expect(meAufrufe).toBe(vorher + 1));
+    // Währenddessen scheitert die Abmeldung von k1 in einem anderen Tab, der das meldet.
+    merkeOffeneAbmeldung({ ...anna, sitzung: 'k1' } as MeAntwort);
+    andererTabMeldet({ art: 'abgemeldet', anlass: 'abmelden' });
+    halt.freigeben();
+    await waitFor(() => expect(logoutAufrufe).toBe(1));
+    expect(screen.getByTestId('name')).toHaveTextContent('anonym');
+    expect(merker()).not.toBeNull();
+  });
+
   it('ein Tab, der die aufgegebene Sitzung noch zeigt, meldet auf die Kanalmeldung ab', async () => {
     await starte();
     // Die Abmeldung ist in einem anderen Tab gescheitert und hat den Merker gesetzt.

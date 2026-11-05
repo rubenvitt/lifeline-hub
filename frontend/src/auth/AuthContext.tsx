@@ -17,7 +17,9 @@ import {
   holeAbmeldungNach,
   istAufgegebeneSitzung,
   merkeOffeneAbmeldung,
+  offenerVorgang,
   vergissOffeneAbmeldung,
+  vergissOffeneAbmeldungSeit,
 } from './abmeldungOffen';
 import {
   BENUTZER_PRUEFEN,
@@ -99,7 +101,7 @@ const AuthContext = createContext<AuthWert | null>(null);
 /** Gescheiterte Sitzungsprüfung, klassifiziert für die Lagebild-Vorhaltung (LFH-723): nur ein
  *  Netzfehler (oder die Meldung eines Gateways, der Server sei nicht erreichbar) öffnet die
  *  Offline-Identität, jede Antwort des Servers selbst ungleich Erfolg nicht. */
-function meFehlerEinordnen(e: unknown): MeErgebnis {
+function meFehlerEinordnen(e: unknown, merkerVorher: string | null): MeErgebnis {
   // Auch 502/503/504 zählen, gleich von wem: über die Sitzung sagen sie nichts — ein
   // überlasteter eigener Server (503 MIT Umschlag) löschte sonst den vorgehaltenen Stand
   // (design.md D2). Als „nicht erreichbar" für die Kennzeichnung gilt nur ein echter
@@ -113,8 +115,9 @@ function meFehlerEinordnen(e: unknown): MeErgebnis {
   }
   // 401 = nicht angemeldet (erwartet); andere Fehler ebenfalls als „anonym" behandeln
   if (!(e instanceof ApiError)) console.error('Auth-Prüfung fehlgeschlagen', e);
-  // Keine Sitzung mehr: eine gescheiterte Abmeldung (LLH-1535) hat sich erledigt.
-  else if (e.status === 401) vergissOffeneAbmeldung();
+  // Keine Sitzung mehr: eine gescheiterte Abmeldung (LLH-1535) hat sich erledigt — die, die beim
+  // Absenden gemerkt war, nicht eine inzwischen neu gemerkte.
+  else if (e.status === 401) vergissOffeneAbmeldungSeit(merkerVorher);
   return { art: 'abgelehnt' };
 }
 
@@ -216,6 +219,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const lauf = (async () => {
         const angefragtIn = generation.current;
+        // Merker beim Absenden (LLH-1535): die Antwort darf nur ihn vergessen, nicht einen, den
+        // eine Abmeldung währenddessen gesetzt hat — auch in einem anderen Tab.
+        const merkerVorher = offenerVorgang();
         const veraltet = () => {
           if (generation.current === angefragtIn) return false;
           nachlaufNoetig.current = true;
@@ -229,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Keine gültige Sitzung: lokal abmelden, die Sitzungswache leitet mit Rückkehrziel zur
           // Anmeldung. Server nicht erreichbar (offline) oder sonstiger Fehler: nichts ändern.
           if (e instanceof ApiError && e.status === 401) {
-            vergissOffeneAbmeldung();
+            vergissOffeneAbmeldungSeit(merkerVorher);
             if (benutzerRef.current) {
               void abmeldenLokal(abmeldenAngekuendigt.current ? 'abmelden' : 'sitzungsende');
               abmeldenAngekuendigt.current = false;
@@ -251,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           void holeAbmeldungNach(aufServer);
           return;
         }
-        vergissOffeneAbmeldung();
+        vergissOffeneAbmeldungSeit(merkerVorher);
         const lokal = benutzerRef.current;
         if (!lokal) {
           // In einem anderen Tab angemeldet, dieser Tab war anonym: übernehmen — wie ein Login,
@@ -301,6 +307,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       uebernimm(b);
       eigeneGeneration = generation.current;
     };
+    // Wie in `pruefe` (LLH-1535): nur der Merker beim Absenden fällt mit der Antwort.
+    const merkerVorher = offenerVorgang();
+    const meFehlerNachAbsenden = (e: unknown) => meFehlerEinordnen(e, merkerVorher);
     authApi
       .me()
       .then((b): MeErgebnis => {
@@ -317,14 +326,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           void holeAbmeldungNach(b);
           return { art: 'abgelehnt' };
         }
-        vergissOffeneAbmeldung();
+        vergissOffeneAbmeldungSeit(merkerVorher);
         if (aktuell()) {
           setze(b);
           laedtRef.current = false;
           setLaedt(false);
         }
         return { art: 'ok', benutzer: b };
-      }, meFehlerEinordnen)
+      }, meFehlerNachAbsenden)
       .then(async (me) => {
         const b = await lagebildStarten(queryClient, me, { abgebrochen: () => !aktuell() });
         // Serverbestätigt kommt derselbe Benutzer zurück; ohne Server ist es die Identität des
@@ -451,9 +460,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [abmeldenLokal]);
 
   const aktualisiere = useCallback(async () => {
+    const merkerVorher = offenerVorgang();
     const b = await authApi.me();
     await vorhaltungAnmelden(b);
-    vergissOffeneAbmeldung();
+    vergissOffeneAbmeldungSeit(merkerVorher);
     uebernimm(b);
     setKonflikt(null);
     // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber.
