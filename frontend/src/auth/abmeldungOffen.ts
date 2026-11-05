@@ -120,11 +120,15 @@ let nachholLauf: Promise<void> | null = null;
  * gleichzeitig und wirft nie.
  *
  * Gebunden an `aufServer`, die Sitzung, die der Aufrufer eben bei `/me` gesehen hat: Benutzer und
- * Kennung gehen als erwartete Köpfe mit. Hat sich dazwischen jemand neu angemeldet, gehört das
+ * Kennung gehen als erwartete Köpfe mit; ohne Kennung unterbleibt der Ruf. Hat sich dazwischen jemand neu angemeldet, gehört das
  * Cookie einer anderen Sitzung, der Server antwortet 412 und beendet nichts. Dann ist der Merker
  * überholt und fällt ebenfalls.
  */
 export function holeAbmeldungNach(aufServer: MeAntwort): Promise<void> {
+  // Ohne Kennung ließe sich der Ruf nur an den Benutzer binden und träfe auch eine neue Sitzung
+  // derselben Person. Jede Sitzung trägt eine (Migration 0168); fehlt sie, bleibt der Merker,
+  // bis eine Anmeldung oder 401 ihn erledigt.
+  if (!aufServer.sitzung) return Promise.resolve();
   nachholLauf ??= (async () => {
     // Nur der Merker, für den dieser Lauf startet, fällt mit ihm — nicht einer, den ein weiteres
     // gescheitertes Abmelden währenddessen angelegt hat.

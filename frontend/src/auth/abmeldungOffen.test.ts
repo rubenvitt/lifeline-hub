@@ -111,4 +111,19 @@ describe('Merker einer gescheiterten Abmeldung (LLH-1535)', () => {
     // Der Merker ist überholt: die neue Sitzung wird normal übernommen.
     expect(merker()).toBeNull();
   });
+
+  it('ohne Kennung der gesehenen Sitzung unterbleibt das Nachholen', async () => {
+    let gerufen = false;
+    server.use(
+      http.post('/api/auth/logout', () => {
+        gerufen = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    merkeOffeneAbmeldung({ ...anna, sitzung: 'k1' });
+    // Nur an den Benutzer gebunden träfe der Ruf auch eine neue Sitzung derselben Person.
+    await holeAbmeldungNach(anna);
+    expect(gerufen).toBe(false);
+    expect(merker()?.sitzung).toBe('k1');
+  });
 });
