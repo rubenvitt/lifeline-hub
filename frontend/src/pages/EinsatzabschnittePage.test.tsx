@@ -6,6 +6,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
+import { waehleMenueEintrag } from '../test/menue';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
 import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
@@ -84,24 +85,16 @@ function recordPatches(basis: Record<string, unknown>, aid = 5) {
   return bodies;
 }
 
-/** Das offene Menü eines `MenueAusloeser` (`frontend/AGENTS.md`, „Aktionen“). */
-async function offenesMenue(): Promise<HTMLElement> {
-  let menue: HTMLElement | null = null;
-  await waitFor(() => {
-    menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    );
-    expect(menue).not.toBeNull();
-  });
-  return menue as unknown as HTMLElement;
-}
-
-/** „Weitere Aktionen zu Abschnitt …“ öffnen und einen Eintrag wählen (LFH-1212). */
+/**
+ * „Weitere Aktionen zu Abschnitt …“ öffnen und einen Eintrag wählen (LFH-1212). Über
+ * `waehleMenueEintrag`, damit der späte `autoFocus` des Menüs den Fokus nicht aus dem danach
+ * geöffneten Dialog zieht (LLH-1390, LLH-1537).
+ */
 async function weitereAktion(abschnitt: string, eintrag: string) {
-  await userEvent.click(
+  await waehleMenueEintrag(
     await screen.findByRole('button', { name: `Weitere Aktionen zu Abschnitt ${abschnitt}` }),
+    eintrag,
   );
-  await userEvent.click(within(await offenesMenue()).getByText(eintrag));
 }
 
 function renderPage() {

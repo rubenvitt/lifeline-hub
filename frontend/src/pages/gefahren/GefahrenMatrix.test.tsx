@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { renderMitProviders } from '../../test/utils';
-import { warteAufMenueFokus } from '../../test/menue';
+import { offenesMenue, warteAufMenueFokus } from '../../test/menue';
 import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
 import GefahrenMatrix, {
   SPALTEN_FREIRAUM,
@@ -31,23 +31,13 @@ const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
 
 /**
  * Der Eintrag wird immer über das geöffnete Menü gegriffen: antd lässt die Portale geschlossener
- * Dropdowns im Baum stehen.
- *
- * `:not(.ant-dropdown-hidden)` genügt hier nicht: in jsdom läuft keine Bewegung zu Ende, ein
- * verlassendes Portal bleibt in `ant-slide-up-leave-active` ohne `ant-dropdown-hidden` stehen.
- * Verlässliches Merkmal ist sein `pointer-events: none`. Die Zählung ist streng, damit eine falsche
- * Annahme laut wird.
+ * Dropdowns im Baum stehen (`offenesMenue`, `test/menue.ts`).
  *
  * Gewählt wird erst, wenn der späte `autoFocus` des Dropdowns verbraucht ist: sonst zieht er den
  * Fokus aus dem danach geöffneten Dialog ins geschlossene Menü (LLH-1390, `test/menue.ts`).
  */
 async function imMenue() {
-  const offen = Array.from(
-    document.querySelectorAll<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden)'),
-  ).filter((d) => d.style.pointerEvents !== 'none');
-  if (offen.length !== 1)
-    throw new Error(`genau ein offenes Menü erwartet, ${offen.length} gefunden`);
-  const menue = offen[0].querySelector('[role="menu"]');
+  const menue = offenesMenue().querySelector('[role="menu"]');
   if (!menue) throw new Error('das offene Dropdown trägt kein Menü');
   await warteAufMenueFokus();
   return within(menue as HTMLElement);
