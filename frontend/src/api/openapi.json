@@ -17520,7 +17520,8 @@
         "required": [
           "schluessel",
           "angemeldet",
-          "inhalt"
+          "inhalt",
+          "stumm"
         ],
         "properties": {
           "angemeldet": {
@@ -17534,6 +17535,13 @@
           "schluessel": {
             "type": "string",
             "description": "Öffentlicher Schlüssel der Instanz (Base64url, unkomprimierter P-256-Punkt) für\n`pushManager.subscribe({ applicationServerKey })`."
+          },
+          "stumm": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenachrichtigungArt"
+            },
+            "description": "Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne\nAbo leer."
           }
         }
       },

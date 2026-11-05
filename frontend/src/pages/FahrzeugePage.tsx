@@ -75,6 +75,7 @@ import { fmsEtikett } from '../kraefte/meldebildRaster';
 import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import {
+  OffeneBearbeitungGrundZeile,
   OffeneBearbeitungProvider,
   useWechselNachRueckfrage,
 } from '../components/offeneBearbeitung';
@@ -335,7 +336,9 @@ const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
 /**
  * Merker der Seite (LLH-1468, `frontend/AGENTS.md`, „Ein offenes, geändertes Einzelfeld in einer
  * Ansicht …“): eine geänderte Inline-Angabe der Liste (Einheit) meldet sich selbst an und fragt vor
- * dem Verlassen nach. Er umfasst auch die Segmentleiste im Seitenkopf: der Wechsel aufs Tableau
+ * dem Verlassen nach. Solange sie einen Entwurf hat, sind die übrigen Angaben und Bemerkungen
+ * gesperrt; der Grund steht EINMAL in der Werkzeugzeile der Liste (`OffeneBearbeitungGrundZeile`,
+ * LLH-1480). Er umfasst auch die Segmentleiste im Seitenkopf: der Wechsel aufs Tableau
  * hängt die Liste aus. Ohne `aktiv`, weil die Seite erst darunter weiß, ob sie schreiben darf;
  * ohne Schreibrecht meldet keine Angabe einen Entwurf.
  */
@@ -1139,6 +1142,8 @@ function FahrzeugeInhalt() {
               ladend={efQuery.isLoading}
               leerText="Noch keine Fahrzeuge disponiert"
               suche={{ platzhalter: 'Funkrufname, Typ, Kennzeichen' }}
+              // Der EINE Sperrgrund, solange eine Angabe einen Entwurf hat (LLH-1480).
+              werkzeuge={<OffeneBearbeitungGrundZeile />}
               mehrzahl="Fahrzeugen"
               gedaechtnis={gedaechtnis}
               spaltenAusVoreinstellung={['bemerkung']}

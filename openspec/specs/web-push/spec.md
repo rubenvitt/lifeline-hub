@@ -64,7 +64,11 @@ ablehnen.
 ### Requirement: Push an jedes Abo der Empfänger
 
 Erhält ein Nutzer eine Benachrichtigung der Stufe Alarm oder Hinweis, SHALL der Server sie an
-jedes seiner Abos senden. Die Nutzlast MUST nur Kennungen tragen wie das Live-Ereignis, an ein
+jedes seiner Abos senden. Ausgenommen ist ein Hinweis, dessen Art auf dem Gerät des Abos stumm
+ist (Spec `benachrichtigungen`, „Stumm auf diesem Gerät“): an dieses Abo MUST NOT ein Push gehen.
+Ein Alarm MUST an jedes Abo gehen. Die stummen Arten MUST am Abo hängen und mit jeder Anmeldung
+des Abos und jedem Umschalten bei eingeschaltetem Push vom Gerät kommen; der Service Worker
+MUST NOT selbst eine Meldung auslassen. Die Nutzlast MUST nur Kennungen tragen wie das Live-Ereignis, an ein
 Abo mit gewähltem Inhalt dazu die Marke `inhalt` (Anforderung „Inhalt der Meldung nur auf
 Wunsch“), und MUST Ende-zu-Ende verschlüsselt sein. Der Versand MUST die auslösende Anfrage weder verzögern noch
 scheitern lassen. Meldet der Push-Dienst ein Abo als erloschen, MUST der Server es löschen.
@@ -76,6 +80,14 @@ scheitern lassen. Meldet der Push-Dienst ein Abo als erloschen, MUST der Server 
 #### Scenario: Abgeschaltete Hinweis-Art
 - **WHEN** Person A die Art „Neue Gefahr“ abgeschaltet hat und eine Gefahr eingetragen wird
 - **THEN** sendet der Server keinen Push an A's Geräte
+
+#### Scenario: Stumme Art auf dem Handy
+- **WHEN** Person A auf dem Handy „Neue Meldung“ stumm geschaltet hat, Push dort an und die App geschlossen ist, und eine Meldung eingeht
+- **THEN** sendet der Server an das Abo des Handys keinen Push, an das Abo ihres Laptops schon
+
+#### Scenario: Alarm trotz stummer Arten
+- **WHEN** auf dem Handy von A Eingangsarten stumm sind und eine Sofortmeldung an A geht
+- **THEN** erscheint auf dem Handy die OS-Meldung „Sofortmeldung“
 
 #### Scenario: Erloschenes Abo
 - **WHEN** der Push-Dienst auf einen Versand mit 410 antwortet

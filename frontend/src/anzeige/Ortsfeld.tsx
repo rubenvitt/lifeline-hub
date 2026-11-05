@@ -9,6 +9,7 @@ import {
   type Ref,
 } from 'react';
 import type { OrtSucheAntwort, OrtTreffer } from '../api/karteOrtSuche';
+import { useAuthOptional } from '../auth/AuthContext';
 import { useRollen } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
 import { Kartenausschnitt } from './Kartenausschnitt';
@@ -148,6 +149,11 @@ const TREFFER_FRISCH_MS = 10 * 60_000;
  * Freitext bleibt erlaubt. Eine getippte Koordinate (jede Form der Sprungpalette) wird ohne Server
  * erkannt (LLH-1108). Mit `karte` stehen darunter die Vorschau mit ziehbarer Nadel, die Ort-Zeile
  * (Peilung nur im Einsatz) und „Auf Karte wählen“; mit `ohneSuche` ist das Feld reiner Text.
+ *
+ * Am gekoppelten Gerät fragt das Feld nie den Geocoder (LLH-1483): seine
+ * Routenliste (`src/geraet/mod.rs`) kennt weder Ortssuche noch Ort-Vorschau. Dort fehlen „Ort
+ * suchen“ und die Ort-Zeile; Text, getippte Koordinate und Karte bleiben. So erzeugt keine Maske
+ * am Gerät eine 403, auch eine, die das Gerät nicht selbst abfängt.
  */
 export function Ortsfeld(props: OrtsfeldProps) {
   if (props.ohneSuche !== undefined) {
@@ -197,13 +203,15 @@ function OrtsfeldMitSuche({
 }: OrtsfeldGemeinsam & MitSuche) {
   const { token, rollen } = useRollen();
   const online = useOnline();
+  // Am gekoppelten Gerät keine Suche (LLH-1483): die Route steht nicht in seiner Liste.
+  const sucheMoeglich = (useAuthOptional()?.geraet ?? null) == null;
   const [anfrage, setAnfrage] = useState<Anfrage | null>(null);
   const nrRef = useRef(0);
   const feldRef = useRef<InputRef>(null);
   // Der eigene `ref` bleibt für die Fokusrückgabe; der hereingereichte zeigt auf dasselbe Feld.
   useImperativeHandle(ref, () => feldRef.current as InputRef, []);
   const begriff = adressBegriff(value.text);
-  const listeOffen = online && anfrage !== null;
+  const listeOffen = sucheMoeglich && online && anfrage !== null;
 
   // Offen/zu nur beim Wechsel melden; der Anfangszustand „zu“ ist keine Meldung.
   const gemeldetRef = useRef(false);
@@ -214,7 +222,7 @@ function OrtsfeldMitSuche({
   }, [listeOffen, onOpenChange]);
 
   function sucheStarten() {
-    if (!online || begriff === null) return;
+    if (!sucheMoeglich || !online || begriff === null) return;
     nrRef.current += 1;
     setAnfrage({ begriff, nr: nrRef.current });
   }
@@ -278,11 +286,13 @@ function OrtsfeldMitSuche({
           }}
           onKeyDown={tasten}
         />
-        <Button disabled={!online || begriff === null} onClick={sucheStarten}>
-          Ort suchen
-        </Button>
+        {sucheMoeglich && (
+          <Button disabled={!online || begriff === null} onClick={sucheStarten}>
+            Ort suchen
+          </Button>
+        )}
       </Space.Compact>
-      {!online ? (
+      {!sucheMoeglich ? null : !online ? (
         <div role="status" style={{ color: rollen.text2 }}>
           Adresssuche ohne Netz nicht verfügbar
         </div>

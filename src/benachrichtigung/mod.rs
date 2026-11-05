@@ -495,6 +495,7 @@ async fn ausliefern(
                 .filter(|(_, e)| e.stufe != BenachrichtigungStufe::Still)
                 .map(|(benutzer_id, e)| crate::web_push::Sendung {
                     benutzer_id: *benutzer_id,
+                    art: e.art,
                     nutzlast: serde_json::to_string(e).expect("Nutzlast serialisierbar"),
                     alarm: e.stufe == BenachrichtigungStufe::Alarm,
                 })

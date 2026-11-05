@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useRollen } from './instrument/rollenwerte';
 import { useFormularVerlassenSchutz } from './useFormularVerlassenSchutz';
 import VerlassenRueckfrage, { VerlassenDialog } from './VerlassenRueckfrage';
 
@@ -51,9 +52,13 @@ import VerlassenRueckfrage, { VerlassenDialog } from './VerlassenRueckfrage';
  *   die offene Bearbeitung aushängt, geht über `useWechselNachRueckfrage` — dieselbe Rückfrage
  *   (`VerlassenDialog`), ohne Änderung still. Der Provider muss dafür auch die Leiste umfassen.
  * - **Eine `InlineAngabe` ohne eigenes `onEntwurf` meldet sich selbst an** (LLH-1468): ein Provider
- *   um die Seite genügt für die Rückfrage (Fahrzeuge, Material). Die übrigen Felder sperrt sie dabei
- *   nicht; wer das will, verdrahtet `useOffeneBearbeitung` selbst und zeigt den Grund an EINER
- *   Stelle (Personendaten).
+ *   um die Seite genügt für die Rückfrage (Fahrzeuge, Material).
+ * - **Listenseiten sperren über EINE Grundzeile** (LLH-1480): stellt die Seite
+ *   `OffeneBearbeitungGrundZeile` auf (Werkzeugzeile der Liste), sperren sich die selbst
+ *   angemeldeten Inline-Angaben und die `BemerkungZelle`n der Seite, solange ein anderes Feld einen
+ *   Entwurf hat, und verweisen per `aria-describedby` auf diese Zeile. Ohne Grundzeile sperren sie
+ *   nicht: in einer Liste stünde der Grund sonst unter jeder Zelle jeder Zeile. Wer selbst
+ *   verdrahtet (`useOffeneBearbeitung`, eigene Grundzeile), bleibt dabei (Personendaten).
  */
 
 /** Sperrgrund für die übrigen Felder; wenige Wörter (`frontend/AGENTS.md`, „Texte“). */
@@ -76,6 +81,10 @@ interface OffeneBearbeitungContextValue {
   abmelden: (id: string) => void;
   /** Führt `wechsel` aus, mit geänderter offener Bearbeitung erst nach „Verwerfen“. */
   nachRueckfrage: (wechsel: () => void) => void;
+  /** Kennung der Grundzeile der Seite (`OffeneBearbeitungGrundZeile`), solange sie steht. */
+  grundOrt: string | null;
+  setzeGrundOrt: (id: string) => void;
+  raeumeGrundOrt: (id: string) => void;
 }
 
 const OffeneBearbeitungContext = createContext<OffeneBearbeitungContextValue | null>(null);
@@ -98,6 +107,11 @@ export function OffeneBearbeitungProvider({
   // Ein Wechsel in der Seite, der auf die Rückfrage wartet (in ein Objekt gepackt: `useState`
   // riefe eine Funktion als Updater auf).
   const [angehalten, setAngehalten] = useState<{ wechsel: () => void } | null>(null);
+  const [grundOrt, setGrundOrt] = useState<string | null>(null);
+  const raeumeGrundOrt = useCallback(
+    (id: string) => setGrundOrt((alt) => (alt === id ? null : alt)),
+    [],
+  );
 
   useEffect(() => {
     if (hatEntwurf) geaendert();
@@ -140,8 +154,11 @@ export function OffeneBearbeitungProvider({
       anmelden,
       abmelden,
       nachRueckfrage,
+      grundOrt,
+      setzeGrundOrt: setGrundOrt,
+      raeumeGrundOrt,
     }),
-    [eintraege, anmelden, abmelden, nachRueckfrage],
+    [eintraege, anmelden, abmelden, nachRueckfrage, grundOrt, raeumeGrundOrt],
   );
 
   return (
@@ -190,9 +207,12 @@ function useAnmeldung(etikett: string) {
   useEffect(() => () => abmelden?.(id), [abmelden, id]);
 
   const halter = kontext?.halter ?? null;
-  const gesperrt =
-    halter && !kontext?.isAngemeldet(id) ? sperrGrundOffeneBearbeitung(halter.etikett) : undefined;
-  return { gesperrt, melde };
+  const fremd = halter != null && !kontext?.isAngemeldet(id);
+  const gesperrt = fremd ? sperrGrundOffeneBearbeitung(halter.etikett) : undefined;
+  const grundOrt = kontext?.grundOrt;
+  /** Dieselbe Sperre als Verweis auf die Grundzeile der Seite; ohne Grundzeile keine. */
+  const verweis = fremd && grundOrt ? { beschreibungId: grundOrt } : undefined;
+  return { gesperrt, verweis, melde };
 }
 
 /**
@@ -206,6 +226,63 @@ export function useOffeneBearbeitung(etikett: string): OffeneBearbeitung {
     [melde],
   );
   return { gesperrt, onEntwurf };
+}
+
+/**
+ * Selbstanmeldung einer `InlineAngabe` ohne eigenes `onEntwurf` (LLH-1468, LLH-1480): meldet den
+ * Entwurf wie `useOffeneBearbeitung`; gesperrt ist sie nur, wenn die Seite eine
+ * `OffeneBearbeitungGrundZeile` aufstellt, und dann mit Verweis auf diese Zeile.
+ */
+export function useSelbstanmeldung(etikett: string): {
+  gesperrt: { beschreibungId: string } | undefined;
+  onEntwurf: (geaendert: boolean) => void;
+} {
+  const { verweis, melde } = useAnmeldung(etikett);
+  const onEntwurf = useCallback(
+    (isGeaendert: boolean) => melde(isGeaendert ? 'geaendert' : 'zu'),
+    [melde],
+  );
+  return { gesperrt: verweis, onEntwurf };
+}
+
+/**
+ * Sperre für ein Feld, das sich nicht anmeldet, weil es beim Verlassen selbst speichert
+ * (`BemerkungZelle`, LLH-1480): gesperrt mit Verweis auf die Grundzeile, solange die Seite eine
+ * aufstellt und ein Feld einen Entwurf hat; sonst `undefined`.
+ */
+export function useSeitenSperre(): { beschreibungId: string } | undefined {
+  const kontext = useContext(OffeneBearbeitungContext);
+  const grundOrt = kontext?.grundOrt;
+  return kontext?.halter && grundOrt ? { beschreibungId: grundOrt } : undefined;
+}
+
+/**
+ * Die EINE Zeile mit dem Sperrgrund einer Listenseite (LLH-1480): „Erst „Einheit zu Florian 1“
+ * speichern oder abbrechen“, solange ein Feld einen Entwurf hat, sonst nichts. Solange sie steht,
+ * sperren sich die selbst angemeldeten Inline-Angaben und die Bemerkungen der Seite und verweisen
+ * per `aria-describedby` hierher; ohne sie sperren sie nicht. Sie gehört in die Werkzeugzeile der
+ * Liste (`Datensicht`, `werkzeuge`), nie unter jede Zelle. Dort steht sie HINTER Suche und
+ * Schaltern (`order`): erscheint der Grund, rückt kein Bedienziel der Zeile zur Seite. Ohne
+ * Provider zeigt sie nichts.
+ */
+export function OffeneBearbeitungGrundZeile() {
+  const kontext = useContext(OffeneBearbeitungContext);
+  const { rollen } = useRollen();
+  const id = useId();
+  const setze = kontext?.setzeGrundOrt;
+  const raeume = kontext?.raeumeGrundOrt;
+  useEffect(() => {
+    if (!setze || !raeume) return;
+    setze(id);
+    return () => raeume(id);
+  }, [setze, raeume, id]);
+  const halter = kontext?.halter;
+  if (!halter) return null;
+  return (
+    <div id={id} data-lfh="offene-bearbeitung-grund" style={{ color: rollen.text2, order: 1 }}>
+      {sperrGrundOffeneBearbeitung(halter.etikett)}
+    </div>
+  );
 }
 
 /**

@@ -390,7 +390,10 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Ereignisse an die Abos der Empfänger (`web_push::WebPush::versenden`), nebenläufig, nie
   abgewartet. Die Nutzlast ist das Live-Ereignis (nur Kennungen), verschlüsselt nach RFC 8291;
   nie Text. Einzige Zutat ist die Marke `"inhalt": true` an ein Abo mit dieser Wahl
-  (`web_push::nutzlast_fuer`, LLH-1369); Absender und Wortlaut holt der Service Worker selbst. Ziele nur aus `PUSH_DIENSTE` (https, Port 443, keine Weiterleitung), sonst wäre das
+  (`web_push::nutzlast_fuer`, LLH-1369); Absender und Wortlaut holt der Service Worker selbst.
+  „Stumm auf diesem Gerät“ (LLH-1482) filtert der Server (`web_push::soll_senden`, Spalte
+  `web_push_abo.stumm`), nie der Worker: zu jedem Push muss er eine Meldung zeigen
+  (`userVisibleOnly`), sonst ersetzt Chrome sie und Safari kündigt das Abo. Ein Alarm geht immer. Ziele nur aus `PUSH_DIENSTE` (https, Port 443, keine Weiterleitung), sonst wäre das
   Abo ein SSRF-Weg. Das Abo hängt per CASCADE an `session`; ohne `--web-push` ist
   `LiveHub::web_push()` `None` und die Routen antworten 404. Nachweis `tests/web_push.rs`.
 
