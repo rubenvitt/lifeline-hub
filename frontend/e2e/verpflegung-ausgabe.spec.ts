@@ -589,6 +589,36 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     await pruefeKurzzeile(page, 'Stab', null);
     await page.setViewportSize({ width: 320, height: 700 });
     await pruefeSonderkostLage(page, 'Stab, 320 px');
+    // Eine Buchung, die „fehlt“ einer Kostform auf null setzt, ändert keine Taste: die Zahlen
+    // bleiben in ihrer eigenen Zeile, nichts darunter rückt nach oben. In `kompakt` bei 390 px
+    // passten sie ohne „fehlt“ neben den Namen, mit ihm nicht, und die Taste würde niedriger
+    // (Mutationsprobe: „fehlt“ bei null ausgeblendet statt unsichtbar → rot). In `komfortabel`
+    // trägt die Mindesthöhe zwei Zeilen.
+    await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+    await expect(page.locator('[data-kostform="ohne_schwein"]')).toBeVisible();
+    const tasten = page.locator('[data-lfh="ausgabe-sonderkost"] [data-kostform]');
+    const lagen = () =>
+      tasten.evaluateAll((el) =>
+        el.map((e) => {
+          const r = e.getBoundingClientRect();
+          return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)];
+        }),
+      );
+    const vorher = await lagen();
+    await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster/${zf}/ausgaben`, {
+      menge: 100,
+      sonderkost: { ohne_schwein: 100 },
+    });
+    await expect(page.locator('[data-kostform="ohne_schwein"]')).toHaveAttribute(
+      'aria-label',
+      /^ohne Schweinefleisch 100\/100$/,
+    );
+    expect(await lagen(), 'Stab, 390 px kompakt: Sonderkost-Tasten nach der Buchung').toEqual(
+      vorher,
+    );
   });
 
   test('am Gerät: Soll, ausgegeben und fehlt bleiben beim Rollen im Bild, das Tastenfeld unten', async ({

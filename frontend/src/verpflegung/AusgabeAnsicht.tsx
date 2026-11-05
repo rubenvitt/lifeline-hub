@@ -809,6 +809,9 @@ export default function AusgabeAnsicht() {
                           justifyContent: 'flex-start',
                           whiteSpace: 'normal',
                           textAlign: 'start',
+                          // Passen die Zahlen nicht neben den Namen, stehen sie in einer eigenen
+                          // Zeile; ihr Platz ist fest, die Entscheidung also auch.
+                          flexWrap: 'wrap',
                         }
                       : {}),
                   }}
@@ -817,16 +820,37 @@ export default function AusgabeAnsicht() {
                   onClick={() => sammlung.tippe(1, k)}
                 >
                   <span>{KOSTFORM_LABEL[k]}</span>{' '}
-                  <span style={monoStil(13)}>
-                    {zf.ausgegeben.sonderkost[k]}/{zf.bedarf.sonderkost[k]}
-                  </span>
-                  {fehlt > 0 && <span style={monoStil(12, 500)}> fehlt {fehlt}</span>}
-                  {/* Fester Platz für „+ n“: ein Tipp verbreitert die Taste nicht. */}
-                  <span
-                    data-lfh="sonderkost-sammlung"
-                    style={{ ...monoStil(12, 500), display: 'inline-block', minWidth: '5ch' }}
-                  >
-                    {n > 0 ? ` + ${n}` : ''}
+                  {/* Die Zahlen stehen auf festem Platz, bemessen an den Stellen des Solls: eine
+                      Buchung („fehlt“ sinkt oder entfällt, ausgegeben wächst) ändert weder die
+                      Breite noch, wo der Name schmal umbricht, also auch keine Höhe (LLH-1504). */}
+                  <span style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    <span
+                      style={{
+                        ...monoStil(13),
+                        display: 'inline-block',
+                        minWidth: `${2 * ziffern(zf.bedarf.sonderkost[k]) + 1}ch`,
+                      }}
+                    >
+                      {zf.ausgegeben.sonderkost[k]}/{zf.bedarf.sonderkost[k]}
+                    </span>
+                    <span
+                      style={{
+                        ...monoStil(12, 500),
+                        display: 'inline-block',
+                        minWidth: `${ziffern(zf.bedarf.sonderkost[k]) + 6}ch`,
+                        marginInlineStart: '1ch',
+                        visibility: fehlt > 0 ? 'visible' : 'hidden',
+                      }}
+                    >
+                      fehlt {fehlt}
+                    </span>
+                    {/* Fester Platz für „+ n“: ein Tipp verbreitert die Taste nicht. */}
+                    <span
+                      data-lfh="sonderkost-sammlung"
+                      style={{ ...monoStil(12, 500), display: 'inline-block', minWidth: '5ch' }}
+                    >
+                      {n > 0 ? ` + ${n}` : ''}
+                    </span>
                   </span>
                 </Button>
               );
@@ -1130,4 +1154,9 @@ export default function AusgabeAnsicht() {
       )}
     </EinsatzSeite>
   );
+}
+
+/** Anzahl der Dezimalstellen einer nicht negativen Ganzzahl (für feste Zahlenplätze). */
+function ziffern(n: number): number {
+  return String(Math.max(0, Math.trunc(n))).length;
 }
