@@ -1,3 +1,48 @@
+## [1.0.0-alpha.172](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.171...v1.0.0-alpha.172) (2026-11-05)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Dieses Release spielt beim Start drei neue Migrationen ein: eine für die Stummschaltung von Web-Push-Abos und zwei für die neuen Lesezugänge der Lagemonitore samt ihrer Freigaben.
+- **Neue Schnittstelle für externe Lagemonitore:** Unter `GET /api/lagemonitor/v1/lage` können externe Anzeigen jetzt das Lagebild eines freigegebenen Einsatzes abrufen. Sie melden sich dafür mit einem Bearer-Schlüssel an.
+- **Web-Push-Schnittstelle erweitert:** Bei der Anmeldung eines Push-Abos kann ein Gerät jetzt angeben, welche Eingangsarten bei ihm stumm sind. Die Abfrage der Push-Einstellungen liefert diese Liste mit.
+
+### Lagemonitore
+
+- **Lagebild für externe Anzeigen:** Externe Anzeigen wie der Lagemonitor im FüKW können das Lagebild eines Einsatzes jetzt lesen, ohne als Gerät gekoppelt zu sein.
+- **Was der Monitor zeigt:**
+  - Einsatzkopf und Zahlen
+  - Belegung der UHS
+  - offene Sofortmeldungen
+  - die Zusammenfassung des zuletzt freigegebenen Lageberichts, so wie sie freigegeben wurde
+  - die Karte mit der Koordinate des Einsatzorts und den Bezeichnungen von Abschnitten und UHS
+
+  Namen, Meldungstexte und das ETB gibt der Monitor nicht weiter. Die Karte lässt sich abschalten oder nur bei Änderungen neu laden.
+- **Freigabe durch die Einsatzleitung:** Auf der Seite „Geräte“ gibt die Einsatzleitung ihren Einsatz für einen Lesezugang frei.
+  - Ein Zugang zeigt immer höchstens einen Einsatz.
+  - Freigabe, Umstellen, Ende und Widerruf werden im Einsatztagebuch festgehalten.
+  - Beim Abschluss des Einsatzes enden alle seine Freigaben.
+  - Wird ein Einsatz gerade abgeschlossen, während jemand ihn freigibt, lehnt das System die Freigabe ab. Sie bleibt also nicht an einem beendeten Einsatz hängen.
+- **Fehler werden angezeigt:** Lassen sich die Freigaben nicht laden, steht der Fehler sichtbar auf der Seite „Geräte“. Bisher verschwand der Bereich dann ohne Hinweis.
+
+### Verwaltung
+
+- **Lesezugänge anlegen:** Unter „Lagemonitore“ legt der System-Admin neue Lesezugänge an. Der Schlüssel wird genau einmal im Dialog angezeigt. Der Server speichert nur einen Hash davon.
+- **Admin-Protokoll:** Das Anlegen und Widerrufen von Zugängen wird im Admin-Protokoll festgehalten.
+
+### Benachrichtigungen
+
+- **„Stumm auf diesem Gerät“ gilt jetzt auch bei geschlossener App:** Ist eine Eingangsart auf einem Gerät stumm geschaltet, schickt der Server diesem Gerät dafür keinen Push mehr. Bisher meldete das Betriebssystem stumme Arten trotzdem, sobald kein Tab der App im Vordergrund war.
+- **Alarme kommen immer an:** Alarme lassen sich nicht stumm schalten.
+- **Schnelles Umschalten:** Schaltet man die Stummschaltung kurz hintereinander mehrmals um, gilt jetzt zuverlässig der zuletzt gewählte Stand.
+
+### Kräfte und Mittel
+
+- **Nur eine offene Bearbeitung je Liste:** Ändert man in den Listen für Fahrzeuge und Material eine Angabe direkt in der Zeile, sind die übrigen Angaben und Bemerkungen gesperrt, bis die Änderung gespeichert oder verworfen ist. Der Grund für die Sperre steht einmal oben in der Werkzeugzeile der Liste.
+
+### Gekoppelte Geräte
+
+- **Ortsfeld ohne Ortssuche:** An gekoppelten Geräten bieten Ortsfelder keine Ortssuche und keine Ort-Vorschau mehr an, weil diese Funktionen dort nicht zur Verfügung stehen. Freitext, eine eingetippte Koordinate und die Auswahl auf der Karte funktionieren weiter.
+
 ## [1.0.0-alpha.171](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.170...v1.0.0-alpha.171) (2026-11-05)
 
 ### Kräfte und Mittel
