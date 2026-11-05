@@ -626,11 +626,15 @@ function MaterialInhalt() {
       );
       // Zum Gerät nur mit Menge 1 ohne Ausgabe (LLH-1224 D2/D10, der Server prüft dasselbe).
       if (em.is_bestandsdoppel) {
-        // Ein bestimmtes Stück ist genau eins: die Menge geht mit auf 1 (LLH-1528).
+        // Ein bestimmtes Stück ist genau eins: die Menge geht mit auf 1 (LLH-1528). Steht es noch
+        // in einer zweiten Zeile, löst erst „Aus dem Einsatz nehmen“ (der Server lehnt mit 409 ab).
+        const zweiteZeile = ems.some((o) => o.id !== em.id && o.material_id === em.material_id);
         eintraege.push(
-          em.ausgegeben > 0
-            ? { key: 'art', label: 'Als Gerät führen · Ausgabe gebucht', gesperrt: true }
-            : { key: 'art', label: 'Als Gerät führen' },
+          zweiteZeile
+            ? { key: 'art', label: `Als Gerät führen · ${STUECK_IM_EINSATZ}`, gesperrt: true }
+            : em.ausgegeben > 0
+              ? { key: 'art', label: 'Als Gerät führen · Ausgabe gebucht', gesperrt: true }
+              : { key: 'art', label: 'Als Gerät führen' },
         );
       } else if (em.ist_adhoc) {
         eintraege.push(

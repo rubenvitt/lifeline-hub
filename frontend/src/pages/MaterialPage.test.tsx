@@ -1768,7 +1768,8 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
 
   /**
    * LLH-1528: ein Bestandsdoppel als Verbrauchsgut (Menge über 1) bietet „Als Gerät führen“, obwohl
-   * es ein Stamm-Posten ist; der Wechsel schickt die Menge 1 mit. Mit Ausgabe ist er gesperrt.
+   * es ein Stamm-Posten ist; der Wechsel schickt die Menge 1 mit. Mit Ausgabe oder einer zweiten
+   * aktiven Zeile desselben Stücks ist er gesperrt.
    */
   it('Bestandsdoppel als Verbrauchsgut: „Als Gerät führen“ schickt Art und Menge 1', async () => {
     const gesendet: unknown[] = [];
@@ -1788,13 +1789,27 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     );
     render(einsatzAktiv, [
       posten,
-      { ...posten, id: 11, bezeichnung: 'Lichtmast', ausgegeben: 1 },
+      { ...posten, id: 11, material_id: 8, bezeichnung: 'Lichtmast', ausgegeben: 1 },
+      { ...posten, id: 13, material_id: 9, bezeichnung: 'Pumpe', menge: 1 },
+      { ...posten, id: 14, material_id: 9, bezeichnung: 'Pumpe', menge: 1 },
       { ...em, id: 12, material_id: 5, is_bestandsdoppel: false },
     ] as never);
     await screen.findByText('Stromerzeuger');
     const gesperrt = await openZeilenmenue('Lichtmast');
     expect(
       within(gesperrt).getByRole('menuitem', { name: 'Als Gerät führen · Ausgabe gebucht' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{Escape}');
+    // Steht dasselbe Stück in einer zweiten Zeile, löst erst „Aus dem Einsatz nehmen“.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Weitere Aktionen zu Pumpe' })[0]);
+    await warteAufMenueFokus();
+    const offen = document.querySelectorAll<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(
+      within(offen[offen.length - 1]).getByRole('menuitem', {
+        name: 'Als Gerät führen · schon im Einsatz',
+      }),
     ).toHaveAttribute('aria-disabled', 'true');
     await userEvent.keyboard('{Escape}');
     // Ein gewöhnlicher Stamm-Posten wechselt die Art nicht.

@@ -477,7 +477,9 @@ pub fn stamm_angaben_error() -> AppError {
 }
 
 /// Aktualisiert eine Dispositionszeile nach [`MaterialPatch`]. `NotFound`, falls die Zeile nicht
-/// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079), `UnprocessableEntity` bei
+/// zum Einsatz gehört, `Conflict` an beendetem Material (LLH-1079) und beim Wechsel eines
+/// Bestandsdoppels zum Gerät, solange eine zweite aktive Zeile desselben Stücks steht (LLH-1528),
+/// `UnprocessableEntity` bei
 /// Ad-hoc-Angaben an einem Stamm-Posten, beim Wechsel eines Stamm-Geräts mit Bestandsnummer zum
 /// Verbrauchsgut (LLH-1398) und wenn die Ergebniszeile gegen Art, Menge, Ausgabe oder
 /// Status verstößt ([`check_zeile`], LLH-1224); die Prüfung des Orts (404/409/422) läuft nur bei
@@ -514,6 +516,24 @@ pub async fn update_tx(
             return Err(AppError::UnprocessableEntity(format!(
                 "Das Gerät «{bezeichnung}» ({nummer}) ist ein bestimmtes Stück und bleibt Gerät"
             )));
+        }
+    }
+    // Ein Bestandsdoppel wird erst Gerät, wenn keine zweite aktive Zeile desselben Stücks mehr
+    // steht (LLH-1528, Review): sonst stünden zwei Gerätezeilen für ein Stück im Einsatz.
+    if let (Some(mid), Some(MaterialArt::Geraet), MaterialArt::Verbrauchsgut) =
+        (material_id, patch.art, art)
+    {
+        if let Some((bezeichnung, nummer)) = stamm_stueck_tx(conn, mid).await? {
+            check_stueck_frei_tx(
+                conn,
+                einsatz_id,
+                mid,
+                Some(em_id),
+                MaterialArt::Geraet,
+                &bezeichnung,
+                Some(&nummer),
+            )
+            .await?;
         }
     }
     check_zeile(
@@ -2194,6 +2214,29 @@ mod tests {
                 .unwrap()
                 .is_bestandsdoppel
         );
+
+        // Als Verbrauchsgut wird keine der beiden Zeilen Gerät, solange die andere aktiv steht.
+        sqlx::query("UPDATE einsatz_material SET art = 'verbrauchsgut' WHERE id IN (?, ?)")
+            .bind(erste)
+            .bind(zweite)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let als_geraet = MaterialPatch {
+            art: Some(MaterialArt::Geraet),
+            menge: Some(1),
+            ..MaterialPatch::default()
+        };
+        match update(&pool, einsatz, erste, als_geraet).await {
+            Err(AppError::Conflict(g)) => assert_eq!(
+                g,
+                "Das Gerät «Stromerzeuger» (SE-1) ist in diesem Einsatz schon disponiert; \
+                 erst aus dem Einsatz nehmen"
+            ),
+            other => panic!("409 erwartet, bekam {other:?}"),
+        }
+        let zeile = load_anzeige(&pool, einsatz, erste, true).await.unwrap();
+        assert_eq!(zeile.art, MaterialArt::Verbrauchsgut, "nichts geschrieben");
 
         nimm_heraus(&pool, einsatz, zweite, benutzer).await.unwrap();
         assert!(
