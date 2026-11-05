@@ -2548,3 +2548,157 @@ async function einsatzAnlegenPerApi(page: Page, bezeichnung: string): Promise<nu
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }
+
+/**
+ * Unterkunft planen (LLH-1525, Prüfliste LLH-1520 Kriterium 13): eine lange Seite ohne eigene
+ * Leiste, deren Eingaben nur auf der Seite leben. Gemessen im vollsten Stand der Grundlage
+ * (Trennung an, zwei Räume, ein Abzug), vorwärts gegen stehende Flächen am unteren Rand und
+ * rückwärts gegen den klebenden Kopf. Die Ziele werden GENERISCH markiert (alles, was der Browser
+ * per Tab anläuft, in `main`), und der Lauf muss jedes besuchen — sonst wäre „0 verdeckt" trivial
+ * wahr. Danach derselbe Nachweis im Dialog „Nachforderungen anlegen“ bei 390 px im Handschuh.
+ */
+const UNTERKUNFT_STELLE = 'Sporthalle Fokusweg';
+
+async function unterkunftSeite(page: Page, dichte: string) {
+  const einsatzId = await einsatzAnlegenPerApi(page, `Fokus Unterkunft ${Date.now()}`);
+  const stelle = await page.request.post(`/api/einsaetze/${einsatzId}/betreuung/stellen`, {
+    data: { bezeichnung: UNTERKUNFT_STELLE, art: 'notunterkunft', kapazitaet_personen: 30 },
+  });
+  expect(stelle.ok(), await stelle.text()).toBeTruthy();
+  const { id: stelleId } = (await stelle.json()) as { id: number };
+  await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+  await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}/unterkunft`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+  const grundlage = page.getByRole('region', { name: 'Grundlage', exact: true });
+  await grundlage.getByRole('switch', { name: 'Nach Männern und Frauen trennen' }).click();
+  const raum1 = grundlage.getByRole('group', { name: 'Raum 1' });
+  await raum1.getByLabel('Länge Raum 1 (m)').fill('20');
+  await raum1.getByLabel('Breite Raum 1 (m)').fill('10');
+  await raum1.getByRole('button', { name: 'Abzug hinzufügen', exact: true }).click();
+  await grundlage.getByRole('button', { name: 'Raum hinzufügen', exact: true }).click();
+  await expect(grundlage.getByRole('group', { name: 'Raum 2' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Kapazität übernehmen · 50 Plätze', exact: true }),
+  ).toBeEnabled();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+}
+
+/** Markiert jedes Ziel unter `wurzel`, das der Browser per Tab anläuft, und liefert die Namen. */
+async function markiereTabZiele(wurzel: Locator): Promise<string[]> {
+  return wurzel.evaluate((w) => {
+    for (const alt of document.querySelectorAll('[data-e2e-fokus]'))
+      alt.removeAttribute('data-e2e-fokus');
+    const namen: string[] = [];
+    const kandidaten = w.querySelectorAll<HTMLElement>(
+      'a[href], button, input, select, textarea, [tabindex]',
+    );
+    for (const el of kandidaten) {
+      if (el.tabIndex < 0) continue;
+      if ((el as HTMLButtonElement).disabled) continue;
+      if (el.closest('[aria-hidden="true"]')) continue;
+      if (el instanceof HTMLInputElement && el.type === 'hidden') continue;
+      if (el instanceof HTMLInputElement && el.type === 'radio' && !el.checked) continue;
+      if (!el.checkVisibility()) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      const name = `ziel-${namen.length}:${(el.getAttribute('aria-label') ?? el.textContent ?? el.getAttribute('type') ?? el.tagName).trim().slice(0, 32)}`;
+      el.setAttribute('data-e2e-fokus', name);
+      namen.push(name);
+    }
+    return namen;
+  });
+}
+
+for (const viewport of [
+  { width: 1366, height: 520 },
+  { width: 390, height: 600 },
+]) {
+  for (const dichte of ['kompakt', 'handschuh']) {
+    test(`Unterkunft planen (LLH-1525): kein Ziel verdeckt bei ${viewport.width}px, ${dichte}, vorwärts und rückwärts`, async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await ohneDevtoolsKnopf(page);
+      await page.setViewportSize(viewport);
+      await anmelden(page);
+      await unterkunftSeite(page, dichte);
+
+      const ziele = await markiereTabZiele(page.getByRole('main'));
+      // Mindestens: Ansicht, Grundlage, Schalter, je Raum Bezeichnung/Länge/Breite/Belegung,
+      // Abzug (2 Felder, entfernen), 2× Abzug hinzufügen, 2× Raum entfernen, Raum hinzufügen.
+      expect(ziele.length, ziele.join(' | ')).toBeGreaterThanOrEqual(17);
+      const reserve = await page.evaluate(
+        () => document.documentElement.scrollHeight - innerHeight,
+      );
+      expect(reserve, 'Vorbedingung: die Seite rollt').toBeGreaterThan(200);
+
+      const markiert = page.getByRole('main').locator('[data-e2e-fokus]');
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await markiert.first().focus();
+      await page.keyboard.press('Shift+Tab');
+      const vor = await pruefeFokusVerdeckung(page, ziele.length + 2);
+      expect([...vor.besuchteZiele].sort(), 'vorwärts: jedes Ziel besucht').toEqual(
+        [...ziele].sort(),
+      );
+      expect(vor.verdeckt, `vorwärts:\n${vor.verdeckt.join('\n')}`).toEqual([]);
+
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await markiert.last().focus();
+      await page.keyboard.press('Tab');
+      const zurueck = await pruefeFokusVerdeckung(page, ziele.length + 2, 'Shift+Tab');
+      expect([...zurueck.besuchteZiele].sort(), 'rückwärts: jedes Ziel besucht').toEqual(
+        [...ziele].sort(),
+      );
+      if (viewport.width >= 768) {
+        expect(zurueck.fixierteKandidaten, 'Vorbedingung: der Kopf klebt').toBeGreaterThan(0);
+      }
+      expect(zurueck.verdeckt, `rückwärts:\n${zurueck.verdeckt.join('\n')}`).toEqual([]);
+      test.info().annotations.push({
+        type: 'messwert',
+        description:
+          `${viewport.width}×${viewport.height} ${dichte}: ${ziele.length} Ziele, Reserve ${reserve}px, ` +
+          `${vor.stoppsBeruehrt}/${zurueck.stoppsBeruehrt} Stopps an einer stehenden Fläche vor/rück, ` +
+          `${vor.fixierteKandidaten}/${zurueck.fixierteKandidaten} fixierte Kandidaten, 0 verdeckt`,
+      });
+    });
+  }
+}
+
+test('Unterkunft planen (LLH-1525): kein Ziel verdeckt im Dialog „Nachforderungen anlegen“ bei 390 px, handschuh', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await ohneDevtoolsKnopf(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await anmelden(page);
+  await unterkunftSeite(page, 'handschuh');
+
+  await page.getByRole('button', { name: 'Nachforderungen anlegen', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: `Nachforderungen für ${UNTERKUNFT_STELLE}` });
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+
+  const ziele = await markiereTabZiele(dialog);
+  await expect(dialog.locator('.ant-modal-close[data-e2e-fokus]')).toHaveCount(1);
+  await expect(dialog.locator('button.ant-btn-primary[data-e2e-fokus]')).toHaveCount(1);
+  // Je Posten Kästchen und Anzahl, dazu Adressat, Priorität, Kreuz und zwei Fußknöpfe.
+  expect(ziele.length, ziele.join(' | ')).toBeGreaterThanOrEqual(3 * 2 + 5);
+
+  await dialog.locator('[data-e2e-fokus]').first().focus();
+  const befund = await pruefeFokusVerdeckung(page, ziele.length * 2 + 4);
+  const scrollt = await page
+    .locator('.ant-modal-wrap')
+    .filter({ has: dialog })
+    .evaluate((w) => w.scrollHeight > w.clientHeight);
+  expect([...befund.besuchteZiele].sort(), 'jedes Dialogziel muss per Tab besucht werden').toEqual(
+    [...ziele].sort(),
+  );
+  expect(befund.fixierteKandidaten, 'Vorbedingung: es gibt fixierte Flächen').toBeGreaterThan(0);
+  expect(scrollt, 'Vorbedingung: der Dialog ist höher als der Schirm').toBe(true);
+  expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `Dialog 390×844 handschuh: ${ziele.length} Ziele, ${befund.stoppsGesamt} Stopps, ${befund.fixierteKandidaten} fixierte Kandidaten, Dialog scrollt: ${scrollt}, 0 verdeckt`,
+  });
+});
