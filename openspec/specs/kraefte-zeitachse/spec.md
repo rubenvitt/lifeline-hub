@@ -193,7 +193,10 @@ das System mit 422 antworten, die Person nennen und nichts schreiben.
 An einer Einheit MUST jede Person im Einsatz, die eine nicht gestrichene Fan-out-Kopie des alten
 Ereignisses trägt, statt ihrer eine Kopie des neuen bekommen; andere Personen, auch eine
 inzwischen entlassene mit Kopie, MUST wie bei der Streichung unberührt bleiben. Die
-Kopplung an die Ablösung MUST wie bei einer Streichung mit anschließendem Nachtrag laufen.
+Kopplung an die Ablösung MUST wie bei einer Streichung mit anschließendem Nachtrag laufen;
+nur eine mit dem berichtigten Eintreffen automatisch begonnene Schicht MUST nicht entfallen,
+sondern auf das neue Eintreffen wandern (LLH-1508, Spec `kraefte-abloesung` „Schicht mit dem
+Eintreffen“).
 
 Grund leer oder länger als 500 Zeichen (ebenso bei der Streichung), Zeitpunkt fehlt bzw.
 unlesbar → 400. Zeitpunkt in der Zukunft, unveränderter

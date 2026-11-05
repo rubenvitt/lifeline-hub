@@ -376,6 +376,17 @@ ihres Vorgängers. Wird der Beginn einer mit dem Eintreffen begonnenen Schicht g
 danach „im Einsatz seit“; eine Folgeschicht bleibt Folgeschicht. Schichten aus der Zeit vor dieser
 Kennzeichnung zeigen „im Einsatz seit“, außer Folgeschichten.
 
+Wird das Eintreffen, mit dem eine Schicht von selbst begann, in der Kräfte-Zeitachse gestrichen,
+verschwindet die Schicht samt ihren Erinnerungen; das Einsatztagebuch hält „mit dem Eintreffen
+gestrichen“ fest. Ein neu erfasstes Eintreffen beginnt dann eine neue Schicht zur richtigen Zeit.
+War an der Schicht schon eine ablösende Einheit oder ein Besatzungswechsel geplant, entfällt die
+Planung mit, und die Führung bekommt „Planung der ablösenden Einheit entfallen“, ohne Zeile mit
+den Einheiten, weil es die Schicht nicht mehr gibt; die Namen stehen im Einsatztagebuch. Wird die Zeit des
+Eintreffens nur berichtigt, bleibt die Schicht samt Planung und wandert mit: „Im Einsatz seit“,
+Fälligkeit und Erinnerungen folgen der neuen Zeit. Die Schicht bleibt in beiden Fällen stehen, wie
+sie ist, wenn ihr Beginn oder ein eigener Rhythmus von Hand gesetzt wurde oder ein Vollzug sie
+übernommen hat.
+
 ### Schicht endet mit der Entlassung
 
 Wird eine Einheit entlassen (Status mit der Marke „Entlassung“ oder nachgetragen), endet ihre
@@ -421,14 +432,15 @@ ist. Diese Ereignisse
 lassen sich nicht
 von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
 Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben). Wird die Zeit
-des Eintreffens berichtigt, bleibt der Beginn der Schicht, wo er war.
+des Eintreffens berichtigt, wandert eine mit ihm begonnene Schicht mit; wurde ihr Beginn von Hand
+geändert, bleibt er, wo er war.
 
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält den Beginn einer Schicht (auch mit dem Eintreffen), Änderungen an Rhythmus
 und Planung, eine entfallene Planung, jeden Vollzug mit Einheit, ablösenden Einheiten,
 übernommener Schicht, übergebenem Abschnitt, Verbleib, Abruf aus dem Bereitstellungsraum und
-Zeitpunkt, beim Besatzungswechsel mit alter und neuer Besatzung, jede Rücknahme und das Ende mit der Entlassung fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
+Zeitpunkt, beim Besatzungswechsel mit alter und neuer Besatzung, jede Rücknahme, das Ende mit der Entlassung und eine mit dem Eintreffen gestrichene Schicht fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
 dort als Entscheidung.
 
 ### Rechte und ohne Netz
