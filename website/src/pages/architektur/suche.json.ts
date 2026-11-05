@@ -12,7 +12,8 @@ import { getCollection } from 'astro:content';
 import { STATUS_NAME, aufbereiten, klartext, kopfVon } from '../../daten/architektur';
 import { abschnitte, type SuchKapitel } from '../../daten/suche';
 
-const ohneDiagramme = (html: string) => html.replace(/<figure class="arch-diagramm"[\s\S]*?<\/figure>/g, '');
+const ohneDiagramme = (html: string) =>
+  html.replace(/<figure class="arch-diagramm"[\s\S]*?<\/figure>/g, '');
 const ersterAbsatz = (html: string) => klartext(/<p>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? '');
 
 export const GET: APIRoute = async () => {
@@ -22,14 +23,17 @@ export const GET: APIRoute = async () => {
       const html = ohneDiagramme(
         aufbereiten(k.rendered?.html ?? '', `docs/architektur/${k.id}.md`),
       );
-      return { kopf, eintrag: {
-        k: k.id,
-        u: `/architektur/${k.id}/`,
-        t: `${kopf.nummer}. ${kopf.titel}`,
-        b: 'arc42',
-        kurz: ersterAbsatz(html),
-        a: abschnitte(html),
-      } satisfies SuchKapitel };
+      return {
+        kopf,
+        eintrag: {
+          k: k.id,
+          u: `/architektur/${k.id}/`,
+          t: `${kopf.nummer}. ${kopf.titel}`,
+          b: 'arc42',
+          kurz: ersterAbsatz(html),
+          a: abschnitte(html),
+        } satisfies SuchKapitel,
+      };
     })
     .sort((a, b) => a.kopf.nummer - b.kopf.nummer)
     .map((k) => k.eintrag);

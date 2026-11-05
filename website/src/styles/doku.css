@@ -18,7 +18,7 @@
 }
 
 .doku-label--marke::before {
-  content: "";
+  content: '';
   display: inline-block;
   width: 7px;
   height: 7px;
@@ -178,7 +178,6 @@
   padding: 8px var(--seite-rinne);
 }
 
-
 .doku-sprung {
   display: flex;
   gap: 2px;
@@ -222,7 +221,7 @@
   color: var(--lfh-text);
 }
 
-.doku-sprung a[aria-current="location"] {
+.doku-sprung a[aria-current='location'] {
   border-bottom-color: var(--lfh-bedien);
   color: var(--lfh-text);
 }
@@ -258,7 +257,7 @@
   color: var(--lfh-text);
 }
 
-.doku-filter button[aria-pressed="true"] {
+.doku-filter button[aria-pressed='true'] {
   border-color: var(--lfh-bedien);
   background: var(--lfh-bedien);
   color: var(--lfh-auf-bedien);
@@ -474,13 +473,13 @@
 }
 
 .doku-navi__summary::after {
-  content: "+";
+  content: '+';
   font-family: var(--lfh-schrift-zahl);
   color: var(--lfh-gedaempft);
 }
 
 .doku-navi__klappe[open] > .doku-navi__summary::after {
-  content: "–";
+  content: '–';
 }
 
 @media (min-width: 960px) {
@@ -521,7 +520,7 @@
 }
 
 .doku-navi__bereich > summary::before {
-  content: "";
+  content: '';
   flex: none;
   width: 6px;
   height: 6px;
@@ -572,7 +571,7 @@
   color: var(--lfh-text);
 }
 
-.doku-liste a[aria-current="page"] {
+.doku-liste a[aria-current='page'] {
   padding-left: 9px;
   border-left: 2px solid var(--lfh-bedien);
   background: var(--lfh-flaeche-2);
@@ -666,7 +665,7 @@
 }
 
 .doku-umfang span + span::before {
-  content: "·";
+  content: '·';
   margin-right: 14px;
 }
 
@@ -688,12 +687,12 @@
 }
 
 .doku-inhalt > summary::after {
-  content: "+";
+  content: '+';
   font-size: 14px;
 }
 
 .doku-inhalt[open] > summary::after {
-  content: "–";
+  content: '–';
 }
 
 .doku-inhalt .doku-toc {
@@ -761,13 +760,13 @@
   color: var(--lfh-text);
 }
 
-.doku-toc a[aria-current="location"] {
+.doku-toc a[aria-current='location'] {
   padding-left: 11px;
   border-left: 2px solid var(--lfh-bedien);
   color: var(--lfh-bedien-text);
 }
 
-.doku-toc ul a[aria-current="location"] {
+.doku-toc ul a[aria-current='location'] {
   padding-left: 21px;
 }
 
@@ -871,7 +870,7 @@
 }
 
 .doku-text ol > li:not(:last-child)::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 28px;
   bottom: -14px;
@@ -936,13 +935,13 @@
 
 /* Hell und dunkel: jedes Foto liegt in beiden Modi vor (docs/anwender/AGENTS.md, „Bilder“);
    sichtbar ist das zum Modus passende, im Druck immer das helle. */
-:root[data-theme="dark"] .doku-bild--hell,
-:root:not([data-theme="dark"]) .doku-bild--dunkel {
+:root[data-theme='dark'] .doku-bild--hell,
+:root:not([data-theme='dark']) .doku-bild--dunkel {
   display: none;
 }
 
 /* Quellen am Ende stehen klein und gedämpft: sie belegen, sie lenken nicht. */
-.doku-text h2[id^="grundlagen"] ~ * {
+.doku-text h2[id^='grundlagen'] ~ * {
   font-size: 14px;
   color: var(--lfh-gedaempft);
 }
@@ -1096,7 +1095,7 @@
   text-decoration: none;
 }
 
-.such-treffer [aria-selected="true"] .such-eintrag,
+.such-treffer [aria-selected='true'] .such-eintrag,
 .such-eintrag:hover {
   border-left-color: var(--lfh-bedien);
   background: var(--lfh-flaeche-2);

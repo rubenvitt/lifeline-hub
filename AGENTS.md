@@ -159,8 +159,8 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
 - **Kein `| tail` um Gate-Kommandos.** Testgüte belegen Mutationsproben, nicht Abdeckung.
 - Node und pnpm kommen nur aus `[tools]` von `mise.toml` (`mise exec -- …`, LFH-773); jeder
   Checkout baut in sein eigenes `target/` (LFH-520). Einzelheiten: `scripts/AGENTS.md`.
-- Prettier prüft ganz `frontend/`, auch die `AGENTS.md` dort; rustfmt das Backend
-  (`scripts/check-fmt.sh`).
+- Prettier prüft ganz `frontend/` und `website/`, auch die `AGENTS.md` dort; rustfmt das
+  Backend (`scripts/check-fmt.sh`).
 - Nach jeder Response-DTO-/Enum-Änderung `scripts/check-typ-codegen.sh` und beide generierten
   Dateien mitcommitten (LFH-120, `src/AGENTS.md`).
 
