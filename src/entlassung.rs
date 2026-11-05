@@ -110,6 +110,11 @@ mod tests {
             "Spurprüfung vor dem echten Löschen zählt jede Personal-, Fahrzeug- und Materialzeile der Einheit",
         ),
         (
+            "src/einsatzabschnitt/repo.rs",
+            1,
+            "Träger des Abschnittsnamens melden auch aufgelöste Einheiten: ihre Liste (`?aufgeloeste`) zeigt den Abschnitt weiter (LLH-1501)",
+        ),
+        (
             "src/fahrzeug/disposition_repo.rs",
             1,
             "Disponieren eines Stamm-Fahrzeugs sucht seine Zeile auch beendet, um sie wieder aufzunehmen",

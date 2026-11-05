@@ -150,12 +150,16 @@ impl LiveEvent {
             // erführen Stab-Leser ohne dieses Recht von jeder Besprechung.
             LiveEvent::Lagebesprechung => &["lagebesprechung"],
             // Nur `dokumente`: das Dokument ist ein Datenobjekt der Dokumentenablage; der
-            // ETB-Nachweis läuft über das eigene `etb`-Ereignis.
+            // ETB-Nachweis läuft über das eigene `etb`-Ereignis. Den Abschnittsnamen am Bezug
+            // frischt für Leser ohne Abschnittsrecht dieses Ereignis auf (LLH-1501,
+            // `routes::einsatzabschnitt::sse_namens_traeger`), nicht ein zweiter Key hier.
             LiveEvent::Dokument => &["dokumente"],
             // Nur `abloesung`: Schichten sind Datenobjekte des Ablösungsmoduls. Der
             // Scheduler-Hinweis zu einer Ablösungsfrist geht über DIESES Event statt über
             // `erinnerung` — so erreicht er Ablösungs-Leser, ohne dass sie alle Erinnerungen
-            // des Einsatzes erfahren (LFH-635, design.md D3).
+            // des Einsatzes erfahren (LFH-635, design.md D3). Die Rhythmus-Vorgaben listen jeden
+            // Abschnitt mit Namen; Anlegen, Umbenennen und Auflösen eines Abschnitts melden
+            // deshalb auch dieses Ereignis (LLH-1501).
             LiveEvent::Abloesung => &["abloesung"],
             // Nur `betreuung`: Stellen und ihre Belegungsreihen sind Datenobjekte des
             // Betreuungsmoduls (LFH-639). NICHT `einsatzabschnitte`, obwohl die Übersicht den

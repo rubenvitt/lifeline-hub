@@ -252,9 +252,11 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.verpflegung,
   ],
   // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke,
-  // Betreuungsstellen und die BR-Liste tragen den Abschnittsnamen per Join. Leser ohne Modul
-  // `einsatzabschnitte` bekommen dieses Ereignis nicht; für sie meldet der Server beim Umbenennen
-  // und Auflösen die betroffenen Räume, Stellen und Bezirke mit deren eigenem Ereignis (LLH-1291).
+  // Betreuungsstellen, die BR-Liste, Einheiten und Dokumente tragen den Abschnittsnamen per Join.
+  // Leser ohne Modul `einsatzabschnitte` bekommen dieses Ereignis nicht; für sie meldet der Server
+  // beim Umbenennen und Auflösen die betroffenen Räume, Stellen, Bezirke, Einheiten und Dokumente
+  // mit deren eigenem Ereignis, die Ablösung bei jedem Anlegen, Umbenennen und Auflösen
+  // (LLH-1291, LLH-1501).
   abschnitt: [
     EINSATZ_KEYS.abschnitte,
     EINSATZ_KEYS.fuehrungskraefte,
@@ -262,6 +264,10 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.abloesungen,
     EINSATZ_KEYS.betreuung,
     EINSATZ_KEYS.evakuierung,
+    // „Abschnitt“ an der Einheit, etwa in der Vorschau der Kräfte und am FMS-Tableau (LLH-1501).
+    EINSATZ_KEYS.einheiten,
+    // Bezug „Abschnitt“ eines Dokuments (LLH-1501).
+    EINSATZ_KEYS.dokumente,
     // Abschnittsflächen im Lagebild des Lagemonitors (LLH-1153).
     EINSATZ_KEYS.lagemonitor,
     // Die BR-Liste trägt den Abschnittsnamen per Join (LLH-1095).

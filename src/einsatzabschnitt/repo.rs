@@ -556,21 +556,22 @@ pub async fn aufloesen_tx(
     Ok(())
 }
 
-/// Objekte anderer Module, deren Lesesicht den Abschnittsnamen per Join mitliest (LLH-1291):
-/// Bereitstellungsräume, Betreuungsstellen und Evakuierungsbezirke. Ihre Leser erreicht das
-/// Ereignis `abschnitt` nur mit Modul `einsatzabschnitte` (`LiveEvent::modul_keys`); deshalb
-/// meldet ein Umbenennen oder Auflösen jedes dieser Objekte mit dem Ereignis seines Moduls.
+/// Objekte anderer Module, deren Lesesicht den Abschnittsnamen per Join mitliest:
+/// Bereitstellungsräume, Betreuungsstellen und Evakuierungsbezirke (LLH-1291), Einheiten und
+/// Dokumente (LLH-1501). Ihre Leser erreicht das Ereignis `abschnitt` nur mit Modul
+/// `einsatzabschnitte` (`LiveEvent::modul_keys`); deshalb meldet ein Umbenennen oder Auflösen
+/// jedes dieser Objekte mit dem Ereignis seines Moduls. Die Ablösung braucht keinen Eintrag: ihre
+/// Rhythmus-Vorgaben listen jeden Abschnitt, sie wird immer gemeldet.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct NamensTraeger {
     pub raeume: Vec<i64>,
     pub stellen: Vec<i64>,
     pub bezirke: Vec<i64>,
-}
-
-impl NamensTraeger {
-    pub fn is_empty(&self) -> bool {
-        self.raeume.is_empty() && self.stellen.is_empty() && self.bezirke.is_empty()
-    }
+    /// Einheiten im Abschnitt, auch aufgelöste (die Liste zeigt sie mit Marke).
+    pub einheiten: Vec<i64>,
+    /// Ob ein lebendes Dokument den Abschnitt als Bezug trägt. Ein Wahrheitswert genügt: das
+    /// Ereignis `dokument` trägt keine Kennung (`routes::dokument::sse`).
+    pub dokumente: bool,
 }
 
 /// [`NamensTraeger`] des Abschnitts `id`, auch stornierte (die Listen zeigen sie mit Marke).
@@ -601,10 +602,27 @@ pub async fn namens_traeger(
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
+    let einheiten = sqlx::query_scalar(
+        "SELECT id FROM einsatz_einheit WHERE abschnitt_id = ? AND einsatz_id = ? ORDER BY id",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let dokumente = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM einsatz_dokument \
+           WHERE bezug_abschnitt_id = ? AND einsatz_id = ? AND geloescht_at IS NULL)",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
     Ok(NamensTraeger {
         raeume,
         stellen,
         bezirke,
+        einheiten,
+        dokumente,
     })
 }
 
