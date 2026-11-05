@@ -9,7 +9,7 @@
 -- den Cache leeren. Ohne betroffene Zeilen ein No-op.
 --
 -- `erfasst_von` ist Pflicht und lässt sich nicht mehr ermitteln (die Zuordnung schrieb kein
--- Ereignis). Angerechnet wird, wer das Fahrzeug zuletzt im Raum gebucht hat, sonst wer es
+-- Ereignis). Angerechnet wird, wer das Fahrzeug zuletzt in diesem Raum gebucht hat, sonst wer es
 -- disponiert hat, sonst das erste Mitglied des Einsatzes, sonst der erste Benutzer der Org.
 -- Findet sich niemand, entfällt nur die Verlaufszeile; der Cache wird trotzdem geleert.
 -- Abgesichert von db::tests::migration_0272_*.
@@ -20,7 +20,7 @@ SELECT einsatz_id, br_id, 'fahrzeug', ef_id, 'austritt', 'Einheit zugeordnet', v
                COALESCE(
                    (SELECT b.erfasst_von FROM br_belegung b
                      WHERE b.einsatz_id = ef.einsatz_id AND b.objekt_typ = 'fahrzeug'
-                       AND b.objekt_id = ef.id
+                       AND b.objekt_id = ef.id AND b.br_id = ef.aktueller_br_id
                      ORDER BY b.id DESC LIMIT 1),
                    ef.disponiert_von,
                    (SELECT MIN(m.benutzer_id) FROM einsatz_mitgliedschaft m
