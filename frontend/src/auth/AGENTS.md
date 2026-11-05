@@ -16,12 +16,14 @@ originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Ka
   `false` und meldet nicht ab. Die Sitzungswache meldet nach 401 **nur lokal** ab
   (`abmeldenLokal`) — ein Server-Logout träfe eine inzwischen neue Sitzung.
 - Scheitert die Server-Abmeldung sonst (Netz, 5xx, 403), meldet `logout()` trotzdem lokal ab und
-  merkt die Sitzung **vorher** als aufgegeben (`auth/abmeldungOffen.ts`, LLH-1535): Benutzer-id
+  hat die Sitzung schon **vor dem Serverruf** als aufgegeben gemerkt (`beginneAbmeldung` in
+  `auth/abmeldungOffen.ts`, LLH-1535; Erfolg oder 412 vergisst genau diesen Vorgang): Benutzer-id
   plus öffentliche Sitzungskennung aus `/me` (`MeAntwort.sitzung`). Prüfung und Erstladen
   übernehmen diese Sitzung nicht (ein Tab, der sie noch zeigt, meldet ab) und holen die Abmeldung
   nach. Jede neue Anmeldung hat eine neue Kennung und wird normal übernommen. Das Nachholen nennt
   Benutzer und Sitzung, die es bei `/me` gesehen hat (`X-Erwartete-Sitzung`); gehört das Cookie
-  inzwischen einer neuen Sitzung, antwortet der Server 412 und beendet nichts. Eine `/me`-Antwort
+  inzwischen einer neuen Sitzung, antwortet der Server 412 und beendet nichts; der Merker fällt
+  dann nur, wenn er genau diese Sitzung nennt. Ohne Kennung kein Nachholruf. Eine `/me`-Antwort
   vergisst nur den Merker, der beim Absenden stand (`offenerVorgang` →
   `vergissOffeneAbmeldungSeit`), nie einen, den eine Abmeldung währenddessen gesetzt hat.
 - Jede 412 und jede 403 auf eine **lesende** Anfrage stößt `lfh:benutzer-pruefen` an (403:

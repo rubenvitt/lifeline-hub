@@ -595,6 +595,40 @@ describe('Gescheiterte Server-Abmeldung hat Bestand (LLH-1535)', () => {
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
   });
 
+  it('meldet sich während des Abmeldens jemand neu an, trifft das Scheitern die neue Sitzung nicht', async () => {
+    sitzung = null;
+    await starte('anonym');
+    await userEvent.click(screen.getByText('login'));
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
+    const halt = gehaltenesMe();
+    let gerufen = false;
+    server.use(
+      http.post(
+        '/api/auth/logout',
+        async () => {
+          logoutAufrufe++;
+          gerufen = true;
+          await halt.gesperrt;
+          return HttpResponse.json({ error: 'x' }, { status: 500 });
+        },
+        { once: true },
+      ),
+    );
+    ergebnisLogout = undefined;
+    await userEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(gerufen).toBe(true));
+    // Währenddessen meldet sich dieselbe Person in einem anderen Tab neu an.
+    kennung = 'k-neu';
+    vergissOffeneAbmeldung();
+    halt.freigeben();
+    await waitFor(() => expect(ergebnisLogout).toBe(true));
+    expect(merker()).toBeNull();
+
+    andererTabMeldet({ art: 'angemeldet' });
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Anna Admin'));
+    expect(logoutAufrufe).toBe(1);
+  });
+
   it('ein Neuladen übernimmt die alte Sitzung nicht und holt die Abmeldung nach', async () => {
     await starte();
     await abmeldenScheitert();

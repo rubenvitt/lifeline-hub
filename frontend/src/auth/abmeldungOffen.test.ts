@@ -10,6 +10,7 @@ import type { MeAntwort } from '../api/types';
 import { server } from '../test/server';
 import { sicherLesen } from '../lib/sichererSpeicher';
 import {
+  beginneAbmeldung,
   holeAbmeldungNach,
   istAufgegebeneSitzung,
   merkeOffeneAbmeldung,
@@ -110,6 +111,16 @@ describe('Merker einer gescheiterten Abmeldung (LLH-1535)', () => {
     expect(koepfe?.get('X-Erwarteter-Benutzer-Id')).toBe('1');
     // Der Merker ist überholt: die neue Sitzung wird normal übernommen.
     expect(merker()).toBeNull();
+  });
+
+  it('eine 412 auf eine veraltete Sitzung vergisst keinen Merker ohne Kennung', async () => {
+    server.use(
+      http.post('/api/auth/logout', () => HttpResponse.json({ error: 'fremd' }, { status: 412 })),
+    );
+    // Der Merker nennt keine Kennung; die gesehene Sitzung k-alt ist nicht mehr die des Cookies.
+    beginneAbmeldung(anna);
+    await holeAbmeldungNach({ ...anna, sitzung: 'k-alt' });
+    expect(merker()).toEqual(expect.objectContaining({ sitzung: null }));
   });
 
   it('ohne Kennung der gesehenen Sitzung unterbleibt das Nachholen', async () => {

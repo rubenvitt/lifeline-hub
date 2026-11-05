@@ -16,7 +16,8 @@ import { abonniereAuthWechsel, meldeAuthWechsel } from './authKanal';
 import {
   holeAbmeldungNach,
   istAufgegebeneSitzung,
-  merkeOffeneAbmeldung,
+  abmeldungGescheitert,
+  beginneAbmeldung,
   offenerVorgang,
   vergissOffeneAbmeldung,
   vergissOffeneAbmeldungSeit,
@@ -442,18 +443,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * (LFH-387): die Sitzung gehört jemand anderem und bleibt bestehen, samt ihrem Lagebild; die
    * 412 hat bereits die Prüfung angestoßen.
    *
-   * Scheitert der Serverruf sonst, bleibt die Sitzung gültig. Sie wird VOR dem lokalen Abmelden
+   * Scheitert der Serverruf sonst, bleibt die Sitzung gültig. Sie ist deshalb schon VOR dem Ruf
    * als aufgegeben gemerkt (LLH-1535, `abmeldungOffen.ts`), damit weder die Prüfung, die das
-   * Abmelden in den anderen Tabs anstößt, noch ein späteres Neuladen sie wieder übernimmt.
+   * Abmelden in den anderen Tabs anstößt, noch ein späteres Neuladen sie wieder übernimmt — und
+   * eine Anmeldung in einem anderen Tab während des Rufs den Merker vergessen kann.
    */
   const logout = useCallback(async (): Promise<boolean> => {
     const bisher = benutzerRef.current;
+    const vorgang = bisher ? beginneAbmeldung(bisher) : null;
     try {
       await authApi.logout();
+      if (vorgang !== null) vergissOffeneAbmeldung(vorgang);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 412) return false;
+      if (e instanceof ApiError && e.status === 412) {
+        if (vorgang !== null) vergissOffeneAbmeldung(vorgang);
+        return false;
+      }
       console.error('Server-Abmeldung fehlgeschlagen — es wird trotzdem lokal abgemeldet', e);
-      if (bisher) merkeOffeneAbmeldung(bisher);
+      if (bisher && vorgang !== null) abmeldungGescheitert(bisher, vorgang);
     }
     await abmeldenLokal('abmelden');
     return true;

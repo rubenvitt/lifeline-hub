@@ -84,16 +84,26 @@ export function istAufgegebeneSitzung(aufServer: MeAntwort): boolean {
 }
 
 /**
- * Merkt die Sitzung von `bisher` als aufgegeben. Synchron, damit der Merker steht, bevor das
- * lokale Abmelden die anderen Tabs anstößt. Kennt der Tab die Kennung nicht (er hat sich selbst
- * angemeldet, die Login-Antwort trägt sie nicht), fragt er danach `/me` — ohne das Abmelden
- * aufzuhalten.
+ * Merkt die Sitzung von `bisher` als aufgegeben, schon VOR dem Serverruf: meldet sich währenddessen
+ * jemand in einem anderen Tab an, vergisst dessen Anmeldung diesen Merker, und ein danach
+ * scheiternder Ruf legt keinen neuen an, der die neue Sitzung träfe. Gibt den Vorgang zurück;
+ * gelingt der Ruf (oder antwortet 412), fällt der Merker mit `vergissOffeneAbmeldung(vorgang)`.
+ * Synchron, damit er steht, bevor das lokale Abmelden die anderen Tabs anstößt.
  */
-export function merkeOffeneAbmeldung(bisher: MeAntwort): void {
-  const sitzung = bisher.sitzung ?? null;
+export function beginneAbmeldung(bisher: MeAntwort): string {
   const vorgang = neuerVorgang();
-  schreiben({ benutzer: bisher.id, sitzung, vorgang });
-  if (sitzung !== null) return;
+  schreiben({ benutzer: bisher.id, sitzung: bisher.sitzung ?? null, vorgang });
+  return vorgang;
+}
+
+/**
+ * Der Serverruf zu `vorgang` ist gescheitert. Kennt der Tab die Kennung nicht (er hat sich selbst
+ * angemeldet, die Login-Antwort trägt sie nicht), fragt er jetzt `/me` — ohne das Abmelden
+ * aufzuhalten. Ist der Merker schon vergessen (Anmeldung in einem anderen Tab), bleibt es dabei.
+ */
+export function abmeldungGescheitert(bisher: MeAntwort, vorgang: string): void {
+  const offen = lesen();
+  if (offen?.vorgang !== vorgang || offen.sitzung !== null) return;
   void (async () => {
     try {
       const aufServer = await authApi.me();
@@ -112,6 +122,13 @@ export function merkeOffeneAbmeldung(bisher: MeAntwort): void {
   })();
 }
 
+/** Merker und gescheiterter Serverruf in einem, für einen Ruf, der schon gescheitert ist. */
+export function merkeOffeneAbmeldung(bisher: MeAntwort): string {
+  const vorgang = beginneAbmeldung(bisher);
+  abmeldungGescheitert(bisher, vorgang);
+  return vorgang;
+}
+
 let nachholLauf: Promise<void> | null = null;
 
 /**
@@ -120,9 +137,11 @@ let nachholLauf: Promise<void> | null = null;
  * gleichzeitig und wirft nie.
  *
  * Gebunden an `aufServer`, die Sitzung, die der Aufrufer eben bei `/me` gesehen hat: Benutzer und
- * Kennung gehen als erwartete Köpfe mit; ohne Kennung unterbleibt der Ruf. Hat sich dazwischen jemand neu angemeldet, gehört das
- * Cookie einer anderen Sitzung, der Server antwortet 412 und beendet nichts. Dann ist der Merker
- * überholt und fällt ebenfalls.
+ * Kennung gehen als erwartete Köpfe mit; ohne Kennung unterbleibt der Ruf. Gehört das Cookie
+ * inzwischen einer anderen Sitzung, antwortet der Server 412 und beendet nichts. Der Merker fällt
+ * dann nur, wenn er genau `aufServer` nennt: sie ist nicht mehr die Sitzung des Cookies. Nennt er
+ * keine Kennung, kann `aufServer` auch eine veraltete Antwort sein — er bleibt, und die nächste
+ * Prüfung versucht es mit der aktuellen Sitzung.
  */
 export function holeAbmeldungNach(aufServer: MeAntwort): Promise<void> {
   // Ohne Kennung ließe sich der Ruf nur an den Benutzer binden und träfe auch eine neue Sitzung
@@ -132,14 +151,21 @@ export function holeAbmeldungNach(aufServer: MeAntwort): Promise<void> {
   nachholLauf ??= (async () => {
     // Nur der Merker, für den dieser Lauf startet, fällt mit ihm — nicht einer, den ein weiteres
     // gescheitertes Abmelden währenddessen angelegt hat.
-    const vorgang = lesen()?.vorgang;
+    const offen = lesen();
+    const vorgang = offen?.vorgang;
     try {
       await authApi.logout(aufServer);
       if (vorgang !== undefined) vergissOffeneAbmeldung(vorgang);
     } catch (e) {
-      const erledigt = e instanceof ApiError && (e.status === 401 || e.status === 412);
-      if (!erledigt) console.error('Server-Abmeldung weiter nicht möglich', e);
-      else if (vorgang !== undefined) vergissOffeneAbmeldung(vorgang);
+      const status = e instanceof ApiError ? e.status : null;
+      if (status !== 401 && status !== 412) {
+        console.error('Server-Abmeldung weiter nicht möglich', e);
+        return;
+      }
+      // 401: keine Sitzung mehr. 412: das Cookie gehört nicht mehr zu `aufServer`; überholt ist
+      // der Merker dann nur, wenn er genau sie nennt.
+      const erledigt = status === 401 || offen?.sitzung === aufServer.sitzung;
+      if (vorgang !== undefined && erledigt) vergissOffeneAbmeldung(vorgang);
     } finally {
       nachholLauf = null;
     }
