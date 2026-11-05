@@ -833,8 +833,10 @@ Karte MUST dezent in der Rolle Achtung „Planung entfallen · 2. Rettungsstaffe
 Wird die Entlassung gestrichen, mit der die Planung einer ablösenden Einheit entfallen ist, SHALL
 das System die Planung zurückholen (LLH-1510, Entscheidung LLH-1310 Punkt 3: eine Streichung ist
 eine Korrektur, ihre Folgen gehen mit, solange nichts anderes daran hängt). Dafür MUST der
-Vermerk der entfallenen Planung auch die ID der Einheit festhalten. Zurückgeholt wird an jeder
-laufenden Schicht, deren Vermerk noch Grund `entlassung` und diese Einheit trägt, und nur, wenn
+Vermerk der entfallenen Planung auch die Entlassung festhalten (ihre Zeile der Kräfte-Zeitachse).
+Zurückgeholt wird an jeder laufenden Schicht, deren Vermerk noch Grund `entlassung` und genau
+diese Entlassung trägt; der Vermerk einer älteren, weiter geltenden Entlassung derselben Einheit
+MUST stehen bleiben. Zurückgeholt wird nur, wenn
 die Einheit danach wieder eine offene Periode hat, nicht aufgelöst ist, nirgends sonst als
 ablösende Einheit geplant ist, die Schicht keinen Besatzungswechsel plant und ihre Liste noch
 Platz hat. Die Einheit MUST sich hinten in die Ablöser-Liste einreihen; ein verbliebener Ablöser
@@ -853,6 +855,10 @@ weder „wiederhergestellt“ noch ein zweites „entfallen“ melden.
 #### Scenario: Verbliebener Ablöser bleibt vorn
 - **WHEN** „2. Rettungsstaffel“ und „3. Rettungsstaffel“ geplant waren, die erste entlassen wurde und ihre Entlassung gestrichen wird
 - **THEN** stehen „3. Rettungsstaffel“ und „2. Rettungsstaffel“ in dieser Reihenfolge in der Liste
+
+#### Scenario: Ältere Entlassung gilt weiter
+- **WHEN** „2. Rettungsstaffel“ an Schicht A geplant war und entlassen wurde, wieder in den Einsatz kam, an Schicht B geplant und erneut entlassen wurde, und die zweite Entlassung gestrichen wird
+- **THEN** ist „2. Rettungsstaffel“ nur an Schicht B wieder geplant; Schicht A behält ihren Vermerk
 
 #### Scenario: Inzwischen von Hand umgeplant
 - **WHEN** nach der entfallenen Planung „3. Rettungsstaffel“ von Hand geplant wurde und dann die Entlassung gestrichen wird

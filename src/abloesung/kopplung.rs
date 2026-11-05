@@ -53,12 +53,15 @@ pub const WIE_AUTOSTART: &str = "mit dem Eintreffen begonnen";
 /// Nach einem geschriebenen Ereignis an einer Einheit. Liefert die ETB-Einträge, die die
 /// Kopplung geschrieben hat (für Kurzruf und `LiveEvent::Abloesung` nach dem Commit), und die
 /// Anlässe der Hinweise zur ablösenden Einheit; leer ohne Wirkung oder nach einem verschluckten
-/// Fehler.
+/// Fehler. `ereignis_id` ist die Zeile des Ereignisses in der Kräfte-Zeitachse; eine Entlassung
+/// hält sie am Vermerk der entfallenen Planung fest (LLH-1510).
+#[allow(clippy::too_many_arguments)]
 pub async fn nach_ereignis_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    ereignis_id: i64,
     art: ZeitachseArt,
     quelle: ZeitachseQuelle,
     zeitpunkt_at: &str,
@@ -70,7 +73,9 @@ pub async fn nach_ereignis_tx(
             // (`abloeser_br_eingetroffen`), auch wenn die Zeitachse es auslässt.
             hinweis: quelle != ZeitachseQuelle::Bereitstellungsraum,
         },
-        ZeitachseArt::Entlassung => Schritt::Ende,
+        ZeitachseArt::Entlassung => Schritt::Ende {
+            entlassung_id: ereignis_id,
+        },
         ZeitachseArt::Abloesung => return Ok(Wirkung::default()),
     };
     isoliert(
@@ -123,20 +128,24 @@ pub async fn vor_streichung_tx(
 /// gestrichen“ hinaus (LLH-1425): der frühere Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht
 /// mehr. War es das Eintreffen, entfällt dazu die Schicht, die es automatisch begonnen hat
 /// (LLH-1508, [`repo::drop_autostart_tx`]); ist es nur berichtigt (`berichtigt_auf`, das neue
-/// Eintreffen folgt), wandert sie stattdessen mit ([`repo::move_autostart_tx`]).
+/// Eintreffen folgt), wandert sie stattdessen mit ([`repo::move_autostart_tx`]). `ereignis_id`
+/// ist die gestrichene Zeile der Kräfte-Zeitachse.
 #[allow(clippy::too_many_arguments)]
 pub async fn nach_streichung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    ereignis_id: i64,
     art: ZeitachseArt,
     zeitpunkt_at: &str,
     hinweis: Option<BenachrichtigungBezugTyp>,
     berichtigt_auf: Option<&str>,
 ) -> Result<Wirkung, AppError> {
     let schritt = match (art, hinweis) {
-        (ZeitachseArt::Entlassung, _) => Schritt::Wiederaufnahme,
+        (ZeitachseArt::Entlassung, _) => Schritt::Wiederaufnahme {
+            entlassung_id: ereignis_id,
+        },
         (ZeitachseArt::Eintreffen, Some(typ)) => Schritt::EintreffenGestrichen {
             typ,
             neu: berichtigt_auf,
@@ -161,11 +170,11 @@ enum Schritt<'a> {
     /// Nur der Hinweis „alarmiert“, keine Schicht.
     Alarmierung,
     /// `hinweis`: dazu der Hinweis „eingetroffen“.
-    Autostart {
-        hinweis: bool,
-    },
-    Ende,
-    Wiederaufnahme,
+    Autostart { hinweis: bool },
+    /// Mit der Zeile der Entlassung in der Zeitachse.
+    Ende { entlassung_id: i64 },
+    /// Mit der Zeile der gestrichenen Entlassung.
+    Wiederaufnahme { entlassung_id: i64 },
     /// Nur der Hinweis „… gestrichen“ mit diesem Bezugstyp, keine Schicht.
     Gestrichen(BenachrichtigungBezugTyp),
     /// Der Hinweis „Eintreffen … gestrichen“, dazu entfällt die mit ihm begonnene Schicht; mit
@@ -205,9 +214,27 @@ async fn isoliert(
             )
             .await
         }
-        Schritt::Ende => end_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await,
-        Schritt::Wiederaufnahme => {
-            reopen_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await
+        Schritt::Ende { entlassung_id } => {
+            end_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                entlassung_id,
+                zeitpunkt_at,
+            )
+            .await
+        }
+        Schritt::Wiederaufnahme { entlassung_id } => {
+            reopen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                entlassung_id,
+                zeitpunkt_at,
+            )
+            .await
         }
         Schritt::Gestrichen(typ) => {
             hinweis::anlaesse_tx(conn, einsatz_id, einheit_id, typ, benutzer_id)
@@ -452,6 +479,7 @@ async fn end_tx(
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    entlassung_id: i64,
     entlassung_at: &str,
 ) -> Result<Wirkung, AppError> {
     // Nur eine Entlassung, nach der keine Periode mehr offen ist: eine in eine frühere Periode
@@ -467,6 +495,7 @@ async fn end_tx(
         benutzer_id,
         einheit_id,
         PlanungEntfallenGrund::Entlassung,
+        Some(entlassung_id),
         &jetzt,
     )
     .await?;
@@ -500,6 +529,7 @@ async fn reopen_tx(
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    entlassung_id: i64,
     entlassung_at: &str,
 ) -> Result<Wirkung, AppError> {
     let jetzt = crate::zeit::jetzt();
@@ -527,10 +557,17 @@ async fn reopen_tx(
             .await?,
         );
     }
-    // Die mit der Entlassung entfallenen Planungen kommen zurück (LLH-1510).
+    // Die mit genau dieser Entlassung entfallenen Planungen kommen zurück (LLH-1510).
     wirkung.append(
-        repo::restore_entfallene_planungen_tx(conn, einsatz_id, benutzer_id, einheit_id, &jetzt)
-            .await?,
+        repo::restore_entfallene_planungen_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            einheit_id,
+            entlassung_id,
+            &jetzt,
+        )
+        .await?,
     );
     Ok(wirkung)
 }

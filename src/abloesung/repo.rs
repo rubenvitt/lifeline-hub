@@ -793,7 +793,7 @@ async fn set_abloeser_tx(
     sqlx::query(
         "UPDATE einsatz_abloesung SET planung_entfallen_at = NULL, \
             planung_entfallen_grund = NULL, planung_entfallen_einheit_name = NULL, \
-            planung_entfallen_einheit_id = NULL WHERE id = ?",
+            planung_entfallen_entlassung_id = NULL WHERE id = ?",
     )
     .bind(id)
     .execute(&mut *conn)
@@ -1278,6 +1278,7 @@ pub async fn release_einheit_tx(
         benutzer_id,
         einheit_id,
         PlanungEntfallenGrund::Aufloesung,
+        None,
         jetzt,
     )
     .await?;
@@ -1308,14 +1309,16 @@ pub async fn release_einheit_tx(
 /// trägt (Einzelplanung und Ablöser-Liste), weil die Einheit aufgelöst oder entlassen ist
 /// (LLH-1131, Spec `kraefte-abloesung` „Planung entfällt“): je Schicht ein ETB-Eintrag
 /// „Ablösung «…»: Planung der ablösenden Einheit entfallen, «…» aufgelöst“, ein Hinweis
-/// `abloeser_entfallen`, der Vermerk an der Schicht (LLH-1309, der jüngste gewinnt) und, ohne
-/// verbleibende Planung, wieder die Planungs-Frist. Läuft in der Transaktion des Aufrufers.
+/// `abloeser_entfallen`, der Vermerk an der Schicht (LLH-1309, der jüngste gewinnt; mit
+/// `entlassung_id` die auslösende Entlassung, LLH-1510) und, ohne verbleibende Planung, wieder
+/// die Planungs-Frist. Läuft in der Transaktion des Aufrufers.
 pub(crate) async fn drop_planungen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
     grund: PlanungEntfallenGrund,
+    entlassung_id: Option<i64>,
     jetzt: &str,
 ) -> Result<Wirkung, AppError> {
     let schichten = hinweis::load_geplante_tx(conn, einsatz_id, einheit_id).await?;
@@ -1349,17 +1352,16 @@ pub(crate) async fn drop_planungen_tx(
         .await?;
         // Rückt ein weiterer Ablöser der Liste nach, wird er der Spiegel (LLH-1132).
         sync_spiegel_tx(conn, id).await?;
-        // Vermerk für die Karte (LLH-1309); er zeigt sich nur, solange kein Ablöser bleibt. Die ID
-        // der Einheit braucht die Streichung ihrer Entlassung (LLH-1510,
-        // [`restore_entfallene_planungen_tx`]).
+        // Vermerk für die Karte (LLH-1309); er zeigt sich nur, solange kein Ablöser bleibt. Die
+        // Entlassung braucht ihre Streichung (LLH-1510, [`restore_entfallene_planungen_tx`]).
         sqlx::query(
             "UPDATE einsatz_abloesung SET planung_entfallen_at = ?, planung_entfallen_grund = ?, \
-                planung_entfallen_einheit_name = ?, planung_entfallen_einheit_id = ? WHERE id = ?",
+                planung_entfallen_einheit_name = ?, planung_entfallen_entlassung_id = ? WHERE id = ?",
         )
         .bind(jetzt)
         .bind(grund.as_str())
         .bind(&abloeser_name)
-        .bind(einheit_id)
+        .bind(entlassung_id)
         .bind(id)
         .execute(&mut *conn)
         .await?;
@@ -1411,8 +1413,10 @@ pub(crate) async fn drop_planungen_tx(
 /// Korrektur, ihre Folgen gehen mit, solange nichts anderes daran hängt.
 ///
 /// Zurückgeholt wird an jeder laufenden Schicht, deren Vermerk (LLH-1309) noch Grund
-/// `entlassung` und diese Einheit trägt; eine Planung, Umplanung oder Leerung von Hand
-/// ([`set_abloeser_tx`]) und eine jüngere entfallene Planung haben ihn überschrieben. Nur, wenn
+/// `entlassung` und genau diese Entlassung (`entlassung_id`, Zeile der Kräfte-Zeitachse) trägt;
+/// eine Planung, Umplanung oder Leerung von Hand ([`set_abloeser_tx`]) und eine jüngere
+/// entfallene Planung haben ihn überschrieben, und der Vermerk einer älteren, weiter geltenden
+/// Entlassung derselben Einheit bleibt stehen. Nur, wenn
 /// die Einheit wieder im Einsatz ist (aktiv, offene Periode), nirgends sonst als Ablöser geplant
 /// ist und die Schicht keinen Besatzungswechsel plant (eine Planung je Schicht) und noch Platz
 /// in der Liste hat ([`ABLOESER_MAX`]). Die Einheit reiht sich hinten in die Liste ein, ein
@@ -1424,20 +1428,21 @@ pub(crate) async fn restore_entfallene_planungen_tx(
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    entlassung_id: i64,
     jetzt: &str,
 ) -> Result<Wirkung, AppError> {
     let schichten: Vec<(i64, String, String)> = sqlx::query_as(
         "SELECT a.id, e.name, a.faellig_at FROM einsatz_abloesung a \
          JOIN einsatz_einheit e ON e.id = a.einheit_id \
          WHERE a.einsatz_id = ? AND a.status = 'laufend' \
-           AND a.planung_entfallen_grund = ? AND a.planung_entfallen_einheit_id = ? \
+           AND a.planung_entfallen_grund = ? AND a.planung_entfallen_entlassung_id = ? \
            AND NOT EXISTS (SELECT 1 FROM einsatz_abloesung_besatzung_plan p \
                            WHERE p.abloesung_id = a.id) \
          ORDER BY a.id",
     )
     .bind(einsatz_id)
     .bind(PlanungEntfallenGrund::Entlassung.as_str())
-    .bind(einheit_id)
+    .bind(entlassung_id)
     .fetch_all(&mut *conn)
     .await?;
     if schichten.is_empty() {
@@ -1479,7 +1484,7 @@ pub(crate) async fn restore_entfallene_planungen_tx(
         sqlx::query(
             "UPDATE einsatz_abloesung SET planung_entfallen_at = NULL, \
                 planung_entfallen_grund = NULL, planung_entfallen_einheit_name = NULL, \
-                planung_entfallen_einheit_id = NULL WHERE id = ?",
+                planung_entfallen_entlassung_id = NULL WHERE id = ?",
         )
         .bind(id)
         .execute(&mut *conn)

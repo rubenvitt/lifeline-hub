@@ -1266,9 +1266,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("planung_entfallen_at", G_ZEIT),
             retain("planung_entfallen_einheit_name", G_OP_LABEL),
             retain("planung_entfallen_grund", G_ENUM),
-            // LLH-1510 (0273): die Einheit des Vermerks als Verweis, damit die gestrichene
-            // Entlassung die Planung zurückholen kann.
-            retain("planung_entfallen_einheit_id", G_FK),
+            // LLH-1510 (0273): die Entlassung des Vermerks als Verweis auf die Zeitachse, damit
+            // ihre Streichung die Planung zurückholen kann.
+            retain("planung_entfallen_entlassung_id", G_FK),
             // LLH-1308 (0260): Verbleib der abgelösten Einheit beim Vollzug.
             retain("verbleib", G_ENUM),
             retain("verbleib_br_id", G_FK),
