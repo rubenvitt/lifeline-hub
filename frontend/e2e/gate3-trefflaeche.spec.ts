@@ -22,6 +22,7 @@ import {
   HANDSCHIRM,
   STAFFEL,
   SUBPIXEL,
+  NUR_SCHREIBENDE,
   ZIELABSTAND,
   alleHaltenStufe,
   anlegen,
@@ -3117,6 +3118,75 @@ test('Unterkunft planen (LLH-1525): Grundlage, Kopfaktionen und Dialog „Nachfo
     );
   }
   for (const sorte of ['Zahlenfeld', 'Schalter', 'Kästchen']) gegenprobe(je, sorte);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// Nur-Lese-Zweig (LFH-435): gesät als Admin, gemessen als Beobachter im selben Kontext. Gerechnet
+// wird weiter im Browser, die Grundlage bleibt bedienbar; beide Kopfaktionen stehen gesperrt mit
+// dem Rechtegrund daneben und halten trotzdem die Stufe.
+test('Unterkunft planen (Beobachter, LLH-1525): Grundlage folgt der Staffel, beide Kopfaktionen stehen gesperrt mit Grund und halten die Stufe', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Unterkunft lesend`);
+  const stelleId = await unterkunftStelleSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}/unterkunft`);
+    await stelleDichte(page, dichte);
+    await rechteHinweisSteht(page);
+    const grundlage = page.getByRole('region', { name: 'Grundlage', exact: true });
+    const raum1 = grundlage.getByRole('group', { name: 'Raum 1' });
+    await raum1.getByLabel('Länge Raum 1 (m)').fill('20');
+    await raum1.getByLabel('Breite Raum 1 (m)').fill('10');
+    // Datenanker: das Ergebnis rechnet auch lesend (200 m² ⇒ 50 Plätze).
+    await expect(
+      page.getByRole('group', { name: 'Ergebnis in Zahlen' }).getByText('50', { exact: true }),
+    ).toBeVisible();
+
+    const kopfAktionen = page.locator('[data-lfh="seitenkopf-aktionen"]');
+    await expect(
+      kopfAktionen.getByText(NUR_SCHREIBENDE),
+      'Vorbedingung: der Rechtegrund steht an beiden Kopfaktionen',
+    ).toHaveCount(2);
+    const kapazitaet = await gesperrtHaeltStufe(
+      kopfAktionen.getByRole('button', { name: 'Kapazität übernehmen', exact: true }),
+      soll,
+      `Kapazität übernehmen gesperrt (${dichte})`,
+    );
+    const nachfordern = await gesperrtHaeltStufe(
+      kopfAktionen.getByRole('button', { name: 'Nachforderungen anlegen', exact: true }),
+      soll,
+      `Nachforderungen anlegen gesperrt (${dichte})`,
+    );
+
+    const segment = await alleHaltenStufe(
+      page.getByRole('main').locator('[data-lfh="segmentleiste"] button'),
+      soll,
+      `Segment (${dichte})`,
+      6,
+    );
+    const zahl = await alleHaltenStufe(
+      grundlage.locator('.ant-input-number'),
+      soll,
+      `Zahlenfeld (${dichte})`,
+      2,
+    );
+    const knopf = await alleHaltenStufe(
+      grundlage.getByRole('button'),
+      soll,
+      `Knopf der Grundlage (${dichte})`,
+      2,
+    );
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Kapazität gesperrt ${kapazitaet}, Nachforderungen gesperrt ${nachfordern}, ` +
+        `Segment ${segment}, Zahlenfeld ${zahl}, Knopf Grundlage ${knopf}`,
+    );
+  }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
