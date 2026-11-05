@@ -68,6 +68,12 @@ enum Feld {
     Verboten {
         grund: String,
     },
+    /// Ein Lauf, der nur als `{"center": <wert>}` an einer bestimmten Körpermarke steht (LLH-1522).
+    Zusatz {
+        grund: String,
+        marke: String,
+        werte: BTreeSet<String>,
+    },
 }
 
 /// Prüft eine gesendete Zeichenbeschreibung und liefert sie getrimmt zurück; sonst 400 mit Pfad.
@@ -258,6 +264,15 @@ fn pruefe_art(objekt: &Map<String, Value>, art: &Art, pfad: &str) -> Ergebnis {
                 "null ist kein zulässiger Wert; ein nicht gesetztes Feld wird weggelassen",
             ));
         }
+        if let Feld::Zusatz {
+            grund,
+            marke,
+            werte,
+        } = feld
+        {
+            pruefe_zusatz(objekt, wert, grund, marke, werte, &feldpfad)?;
+            continue;
+        }
         pruefe_feld(name, wert, feld, &feldpfad)?;
     }
     for name in &art.pflicht {
@@ -267,6 +282,46 @@ fn pruefe_art(objekt: &Map<String, Value>, art: &Art, pfad: &str) -> Ergebnis {
                 format!("Pflichtfeld „{name}“ fehlt"),
             ));
         }
+    }
+    Ok(())
+}
+
+/// Der Lauf der Dekontamination (LLH-1522, einsatzzeichen ESZ-132): `{"center":"P"}` oder „G“,
+/// und nur, wenn `bodyMarks` die Marke trägt, an der er steht. Jeder andere Lauf ist eine
+/// Beschriftung und gehört ins Feld `label` (`grund`).
+fn pruefe_zusatz(
+    art: &Map<String, Value>,
+    wert: &Value,
+    grund: &str,
+    marke: &str,
+    werte: &BTreeSet<String>,
+    pfad: &str,
+) -> Ergebnis {
+    let erlaubt = werte
+        .iter()
+        .map(|w| format!("„{w}“"))
+        .collect::<Vec<_>>()
+        .join(" oder ");
+    let abgelehnt = || {
+        verstoss(
+            pfad,
+            format!("{grund} Als Lauf steht hier nur {{\"center\": {erlaubt}}} an der Körpermarke „{marke}“."),
+        )
+    };
+    let lauf = wert.as_object().ok_or_else(abgelehnt)?;
+    let zusatz = match (lauf.len(), lauf.get("center").and_then(Value::as_str)) {
+        (1, Some(z)) if werte.contains(z) => z,
+        _ => return Err(abgelehnt()),
+    };
+    let traegt_marke = art
+        .get("bodyMarks")
+        .and_then(Value::as_array)
+        .is_some_and(|marken| marken.iter().any(|m| m.as_str() == Some(marke)));
+    if !traegt_marke {
+        return Err(verstoss(
+            pfad,
+            format!("der Zusatz „{zusatz}“ steht nur an der Körpermarke „{marke}“; sie fehlt in bodyMarks"),
+        ));
     }
     Ok(())
 }
@@ -366,7 +421,7 @@ fn pruefe_feld(name: &str, wert: &Value, feld: &Feld, pfad: &str) -> Ergebnis {
             Ok(())
         }
         // Steht vor dem Aufruf fest (pruefe_art); hier nur der Vollständigkeit halber.
-        Feld::Verboten { grund } => Err(verstoss(pfad, grund.clone())),
+        Feld::Verboten { grund } | Feld::Zusatz { grund, .. } => Err(verstoss(pfad, grund.clone())),
     }
 }
 
@@ -608,6 +663,44 @@ mod tests {
         let m = meldung(r#"{"v":1,"spec":{"kind":"post","labels":{"center":"Fam. Müller"}}}"#);
         assert!(m.contains("$.spec.labels"), "{m}");
         assert!(m.contains("„label“"), "{m}");
+    }
+
+    /// „P“/„G“ der Dekontamination als Lauf an ihrer Marke (LLH-1522); Ausgaben von
+    /// `serializeAnySpec` aus `@einsatzzeichen/core` 6.10.0.
+    #[test]
+    fn zusatz_der_dekontamination_wird_angenommen() {
+        for spec in [
+            r#"{"v":1,"spec":{"bodyMarks":["decontamination"],"kind":"formation","labels":{"center":"P"}}}"#,
+            r#"{"v":1,"spec":{"bodyMarks":["fire-fighting","decontamination"],"kind":"vehicle-land","labels":{"center":"G"}}}"#,
+        ] {
+            assert_eq!(pruefe_zeichen_spec(spec).unwrap(), spec);
+        }
+    }
+
+    #[test]
+    fn zusatz_ohne_marke_oder_mit_mehr_ist_400() {
+        let m = meldung(r#"{"v":1,"spec":{"kind":"formation","labels":{"center":"P"}}}"#);
+        assert!(m.contains("$.spec.labels"), "{m}");
+        assert!(m.contains("„decontamination“"), "{m}");
+        let m = meldung(
+            r#"{"v":1,"spec":{"bodyMarks":["fire-fighting"],"kind":"formation","labels":{"center":"G"}}}"#,
+        );
+        assert!(m.contains("sie fehlt in bodyMarks"), "{m}");
+        for labels in [
+            r#"{"center":"X"}"#,
+            r#"{"center":"p"}"#,
+            r#"{"left":"P"}"#,
+            r#"{"center":"P","right":"G"}"#,
+            r#"{"center":"P","centerCapHeightMm":3}"#,
+            r#"{}"#,
+            r#""P""#,
+        ] {
+            let m = meldung(&format!(
+                r#"{{"v":1,"spec":{{"bodyMarks":["decontamination"],"kind":"formation","labels":{labels}}}}}"#
+            ));
+            assert!(m.contains("$.spec.labels"), "{labels}: {m}");
+            assert!(m.contains("„label“"), "{labels}: {m}");
+        }
     }
 
     #[test]

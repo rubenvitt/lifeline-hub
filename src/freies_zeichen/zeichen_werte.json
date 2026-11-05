@@ -905,8 +905,10 @@
         ]
       },
       "labels": {
-        "form": "verboten",
-        "grund": "Die Bezeichnung steht im Feld „label“ des freien Zeichens, nicht in der Zeichenbeschreibung."
+        "form": "zusatz",
+        "grund": "Die Bezeichnung steht im Feld „label“ des freien Zeichens, nicht in der Zeichenbeschreibung.",
+        "marke": "decontamination",
+        "werte": ["G", "P"]
       },
       "organization": {
         "form": "wert",

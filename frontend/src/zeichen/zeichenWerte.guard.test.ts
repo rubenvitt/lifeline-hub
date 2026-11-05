@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { erzeugeZeichenWerte, ZIEL } from '../../scripts/zeichen-werte.mjs';
+import { ZUSATZ } from './fachobjektZeichen';
 
 /**
  * Wächter der Werteliste für den Server (LFH-836, design.md D3).
@@ -18,7 +19,7 @@ const frontend = join(hier, '..', '..');
 const repo = join(frontend, '..');
 const werteliste = join(repo, 'src', 'freies_zeichen', 'zeichen_werte.json');
 
-type Feld = { form: string; werte?: string[]; schluessel?: string[] };
+type Feld = { form: string; werte?: string[]; schluessel?: string[]; marke?: string };
 type Art = { felder: Record<string, Feld>; pflicht: string[] };
 type Werteliste = { spec: Art; freestanding: Record<string, Art> };
 
@@ -69,5 +70,14 @@ describe('Werteliste der Zeichenbeschreibung (src/freies_zeichen/zeichen_werte.j
       expect(befunde, 'Werte der Bibliothek fehlen in der Werteliste').toEqual([]);
     }
     expect(eingecheckt, 'Werteliste veraltet: pnpm -C frontend zeichen-werte').toBe(erzeugt);
+  });
+
+  it('nimmt als Lauf genau die Zusätze der Dekontamination an (LLH-1522)', () => {
+    const w = JSON.parse(readFileSync(werteliste, 'utf8')) as Werteliste;
+    expect(w.spec.felder.labels).toMatchObject({
+      form: 'zusatz',
+      marke: 'decontamination',
+      werte: [...new Set(Object.values(ZUSATZ))].sort(),
+    });
   });
 });

@@ -12,6 +12,7 @@ import {
   START_ZEICHEN_SPEC,
   darstellungsName,
   detailOptionen,
+  detailVon,
   grundzeichenOptionen,
   grundzeichenVon,
   leseEntwurf,
@@ -251,6 +252,42 @@ describe('Entwurf ändern', () => {
     });
     expect(mitDetail({ kind: 'hazard', technicalFill: 'rot' }, 'farbe', null)).toEqual({
       kind: 'hazard',
+    });
+  });
+
+  it('bietet Dekontamination von Personal und Gerät mit „P“/„G“ an der Marke an (LLH-1522)', () => {
+    const optionen = detailOptionen({ kind: 'formation' }).fachaufgabe;
+    const i = optionen.findIndex((o) => o.value === 'decontamination');
+    expect(optionen.slice(i, i + 3)).toEqual([
+      { value: 'decontamination', label: 'Dekontaminieren' },
+      { value: 'decontamination:P', label: 'Dekontaminieren von Personal' },
+      { value: 'decontamination:G', label: 'Dekontaminieren von Gerät' },
+    ]);
+
+    const personal = mitDetail({ kind: 'formation' }, 'fachaufgabe', 'decontamination:P');
+    expect(personal).toEqual({
+      kind: 'formation',
+      bodyMarks: ['decontamination'],
+      labels: { center: 'P' },
+    });
+    expect(detailVon(personal, 'fachaufgabe')).toBe('decontamination:P');
+    expect(zeichenName(personal)).toBe(
+      `${GRUNDZEICHEN_NAMEN.formation} · Dekontaminieren von Personal`,
+    );
+    // Wechsel der Fachaufgabe und „keine“ nehmen den Lauf mit.
+    expect(mitDetail(personal, 'fachaufgabe', 'decontamination:G')).toMatchObject({
+      labels: { center: 'G' },
+    });
+    expect(mitDetail(personal, 'fachaufgabe', 'decontamination')).toEqual({
+      kind: 'formation',
+      bodyMarks: ['decontamination'],
+    });
+    expect(mitDetail(personal, 'fachaufgabe', null)).toEqual({ kind: 'formation' });
+    // Der Grundzeichenwechsel behält Marke und Lauf, wo die neue Art sie zeichnet.
+    expect(mitGrundzeichen(personal, 'vehicle-land')).toEqual({
+      kind: 'vehicle-land',
+      bodyMarks: ['decontamination'],
+      labels: { center: 'P' },
     });
   });
 

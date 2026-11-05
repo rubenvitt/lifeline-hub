@@ -15,6 +15,8 @@
 //   verlauf   nur der Form nach: `points` (≥ 2 Stützpunkte) oder `start`/`directionDeg`/`lengthMm`
 //   flaeche   nur der Form nach: `width` und `height` größer als null (`canvasMm`)
 //   verboten  vom Hub gesperrt, mit `grund` — Bezeichnung und Beschriftung stehen in `label`
+//   zusatz    Objekt nur mit `center` aus `werte`, und nur, wenn `bodyMarks` die `marke` trägt
+//             („P“/„G“ der Dekontamination, ESZ-132, LLH-1522); sonst wie verboten mit `grund`
 //
 // Neu erzeugen: `mise exec -- pnpm -C frontend zeichen-werte`. Der Wächter
 // `src/zeichen/zeichenWerte.guard.test.ts` vergleicht die eingecheckte Datei mit dieser Ausgabe;
@@ -47,6 +49,13 @@ const BEZEICHNUNG_GESPERRT = {
 };
 
 /**
+ * Der einzige Lauf, den der Hub in der Zeichenbeschreibung annimmt: „P“ oder „G“ mittig an der
+ * Marke der Dekontamination (ESZ-132, LLH-1522). Dieselben Buchstaben wie `ZUSATZ` in
+ * `src/zeichen/fachobjektZeichen.ts`; der Wächter `zeichenWerte.guard.test.ts` hält beide gleich.
+ */
+const DEKONTAMINATION_ZUSATZ = { marke: 'decontamination', werte: ['G', 'P'] };
+
+/**
  * Felder ohne aufzählbaren Vorrat (`structured`, `text`): wie der Server sie prüft, und ein
  * gültiger Probewert für die Abfrage der Pflichtfelder.
  */
@@ -61,7 +70,20 @@ const STRUKTURIERT = {
       probe: {},
     },
     designation: { eintrag: () => BEZEICHNUNG_GESPERRT, probe: 'X' },
-    labels: { eintrag: () => BEZEICHNUNG_GESPERRT, probe: {} },
+    labels: {
+      eintrag: () => {
+        if (!SPEC_FIELD_VALUES.bodyMarks.values.includes(DEKONTAMINATION_ZUSATZ.marke)) {
+          throw new Error(`Körpermarke „${DEKONTAMINATION_ZUSATZ.marke}“ fehlt der Bibliothek.`);
+        }
+        return {
+          form: 'zusatz',
+          grund: BEZEICHNUNG_GESPERRT.grund,
+          marke: DEKONTAMINATION_ZUSATZ.marke,
+          werte: sortiert(DEKONTAMINATION_ZUSATZ.werte),
+        };
+      },
+      probe: { center: DEKONTAMINATION_ZUSATZ.werte[0] },
+    },
   },
   freestanding: {
     path: {

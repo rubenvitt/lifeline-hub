@@ -16,7 +16,8 @@
  *   (`variant: 'alternative'`) und zeichnet die Bibliothek sie freistehend, steht sie als eigene
  *   Kachel direkt hinter der ersten — mit unterscheidendem Namen ({@link darstellungsName}).
  * - **Details:** Organisation, Fachaufgabe als randbündige Körpermarke (`bodyMarks`, wie die
- *   Fachobjekte), Einheit (`strength`/`unitGrouping`), Farbe nur aus der Palette und nur, wo das
+ *   Fachobjekte; die Dekontamination auch mit „P“ oder „G“ als mittigem Lauf, {@link ZUSAETZE}),
+ *   Einheit (`strength`/`unitGrouping`), Farbe nur aus der Palette und nur, wo das
  *   Zeichen eine technische Füllung trägt (D6). Die Achse „Funktion“ des Altpakets gibt es nicht.
  */
 import {
@@ -55,6 +56,7 @@ import {
   type TechnicalFillToken,
   type UnitGroupingId,
 } from '@einsatzzeichen/schema';
+import { ZUSATZ } from '../../zeichen/fachobjektZeichen';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
 
 /**
@@ -196,6 +198,31 @@ const FACHAUFGABEN: readonly CapabilityId[] = SPEC_FIELD_VALUES.capabilities.val
 );
 const istFachaufgabe = (m: string) => (FACHAUFGABEN as readonly string[]).includes(m);
 
+/**
+ * Fachaufgaben mit Zusatz: „P“ und „G“ der Dekontamination als mittiger Lauf an ihrer Marke
+ * (`labels.center`, einsatzzeichen ESZ-132, LLH-1522), dieselben Buchstaben wie an den Fachobjekten
+ * (`ZUSATZ`). Der Server nimmt `labels` nur in dieser Form an (`src/freies_zeichen/pruefung.rs`).
+ * Der Wert einer solchen Option ist `<Fähigkeit>:<Zusatz>` (`decontamination:P`).
+ */
+const ZUSAETZE: Partial<Record<CapabilityId, readonly { zusatz: string; name: string }[]>> = {
+  decontamination: [
+    { zusatz: ZUSATZ['dekontamination-personen'], name: 'von Personal' },
+    { zusatz: ZUSATZ['dekontamination-geraete'], name: 'von Gerät' },
+  ],
+};
+
+/** Der Zusatz einer Fachaufgabe am Entwurf, wenn ihre Marke einen aus {@link ZUSAETZE} trägt. */
+function zusatzVon(spec: SymbolSpec, faehigkeit: CapabilityId): string | undefined {
+  const zusatz = spec.labels?.center;
+  return zusatz && ZUSAETZE[faehigkeit]?.some((z) => z.zusatz === zusatz) ? zusatz : undefined;
+}
+
+/** Der Name einer Fachaufgabe, mit Zusatz („Dekontaminieren von Personal“). */
+function fachaufgabeName(faehigkeit: CapabilityId, zusatz: string | undefined): string {
+  const z = zusatz ? ZUSAETZE[faehigkeit]?.find((e) => e.zusatz === zusatz) : undefined;
+  return z ? `${faehigkeitName(faehigkeit)} ${z.name}` : faehigkeitName(faehigkeit);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Entwurf
 // ---------------------------------------------------------------------------------------------
@@ -237,9 +264,18 @@ function fachaufgabenVon(spec: SymbolSpec): CapabilityId[] {
   return (spec.bodyMarks ?? []).filter(istFachaufgabe) as CapabilityId[];
 }
 
+/** Der Entwurf ohne Fachaufgabe; ihr Zusatz (`labels`, nur aus {@link ZUSAETZE}) geht mit. */
 function ohneFachaufgabe(spec: SymbolSpec): SymbolSpec {
   const rest = (spec.bodyMarks ?? []).filter((m) => !istFachaufgabe(m));
-  return rest.length > 0 ? { ...spec, bodyMarks: rest } : ohne(spec, 'bodyMarks');
+  const basis = ohne(spec, 'labels');
+  return rest.length > 0 ? { ...basis, bodyMarks: rest } : ohne(basis, 'bodyMarks');
+}
+
+/** Setzt eine Fachaufgabe (Wert einer Option, mit Zusatz `decontamination:P`) an den Entwurf. */
+function mitFachaufgabe(spec: SymbolSpec, wert: string): SymbolSpec {
+  const [faehigkeit, zusatz] = wert.split(':') as [CapabilityId, string | undefined];
+  const neu: SymbolSpec = { ...spec, bodyMarks: [...(spec.bodyMarks ?? []), faehigkeit] };
+  return zusatz ? { ...neu, labels: { center: zusatz } } : neu;
 }
 
 /**
@@ -258,7 +294,10 @@ export function mitGrundzeichen(alt: AnySpec, kind: SymbolKind): SymbolSpec {
   if (alt.technicalFill) versuche({ technicalFill: alt.technicalFill });
   if (alt.strength) versuche({ strength: alt.strength });
   if (alt.unitGrouping) versuche({ unitGrouping: alt.unitGrouping });
-  for (const m of fachaufgabenVon(alt)) versuche({ bodyMarks: [...(spec.bodyMarks ?? []), m] });
+  for (const m of fachaufgabenVon(alt)) {
+    const zusatz = zusatzVon(alt, m);
+    versuche(mitFachaufgabe(spec, zusatz ? `${m}:${zusatz}` : m));
+  }
   if (alt.capabilities?.length) versuche({ capabilities: alt.capabilities });
   if (alt.states?.length) versuche({ states: alt.states });
   return spec;
@@ -329,9 +368,7 @@ export function mitDetail(spec: AnySpec, achse: DetailAchse, wert: string | null
         : ohne(spec, 'technicalFill');
     case 'fachaufgabe': {
       const basis = ohneFachaufgabe(spec);
-      return wert
-        ? { ...basis, bodyMarks: [...(basis.bodyMarks ?? []), wert as CapabilityId] }
-        : basis;
+      return wert ? mitFachaufgabe(basis, wert) : basis;
     }
     case 'einheit': {
       const basis = ohne(spec, 'strength', 'unitGrouping');
@@ -352,8 +389,12 @@ export function detailVon(spec: AnySpec, achse: DetailAchse): string | null {
       return spec.organization ?? null;
     case 'farbe':
       return spec.technicalFill ?? null;
-    case 'fachaufgabe':
-      return fachaufgabenVon(spec)[0] ?? null;
+    case 'fachaufgabe': {
+      const faehigkeit = fachaufgabenVon(spec)[0];
+      if (!faehigkeit) return null;
+      const zusatz = zusatzVon(spec, faehigkeit);
+      return zusatz ? `${faehigkeit}:${zusatz}` : faehigkeit;
+    }
     case 'einheit':
       if (spec.strength) return `strength:${spec.strength}`;
       if (spec.unitGrouping) return `unitGrouping:${spec.unitGrouping}`;
@@ -552,6 +593,22 @@ export interface DetailOptionen {
   farbe: (DetailOption & { farbe: string })[];
 }
 
+/**
+ * Die Fachaufgaben, die das Vokabular am Entwurf (ohne Fachaufgabe) erlaubt; hinter einer mit
+ * Zusatz ihre Fassungen mit „P“/„G“, soweit sie zeichnen.
+ */
+function fachaufgabeOptionen(basis: SymbolSpec): DetailOption[] {
+  return erlaubt(vocabulary(basis, 'bodyMarks', { candidates: FACHAUFGABEN })).flatMap((c) => [
+    { value: c, label: faehigkeitName(c) },
+    ...(ZUSAETZE[c as CapabilityId] ?? [])
+      .map((z) => ({
+        value: `${c}:${z.zusatz}`,
+        label: fachaufgabeName(c as CapabilityId, z.zusatz),
+      }))
+      .filter((o) => zeichnet(mitFachaufgabe(basis, o.value))),
+  ]);
+}
+
 /** Ohne Grundzeichen gibt es unter „Details“ nur die Bezeichnung. */
 export const KEINE_DETAILS: DetailOptionen = {
   organisation: [],
@@ -576,9 +633,7 @@ export function detailOptionen(spec: AnySpec): DetailOptionen {
         value: o,
         label: ORGANIZATION_LABELS[o],
       })),
-      fachaufgabe: erlaubt(
-        vocabulary(ohneFachaufgabe(spec), 'bodyMarks', { candidates: FACHAUFGABEN }),
-      ).map((c) => ({ value: c, label: faehigkeitName(c) })),
+      fachaufgabe: fachaufgabeOptionen(ohneFachaufgabe(spec)),
       einheit: [
         ...erlaubt(vocabulary(ohneEinheit, 'strength')).map((s) => ({
           value: `strength:${s}`,
@@ -725,7 +780,7 @@ export function zeichenTeile(spec: AnySpec): { achse: string; name: string }[] {
     teile.push({ achse: 'Organisation', name: ORGANIZATION_LABELS[spec.organization] });
   }
   for (const f of fachaufgabenVon(spec)) {
-    teile.push({ achse: 'Fachaufgabe', name: faehigkeitName(f) });
+    teile.push({ achse: 'Fachaufgabe', name: fachaufgabeName(f, zusatzVon(spec, f)) });
   }
   const symbol = symbolName(spec);
   if (symbol) teile.push({ achse: 'Symbol', name: symbol });
