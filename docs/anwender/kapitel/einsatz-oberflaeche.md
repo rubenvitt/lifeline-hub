@@ -317,8 +317,10 @@ Eingang bringt auf diesem Gerät kein Band, keinen Ton und keine Meldung des Bet
 bleibt ungelesen, zählt über „Eingänge“, im Titel des Tabs und am Symbol der App und steht unter
 „Neu“. Andere Geräte derselben Person melden ihn wie sonst; so bleibt etwa das Tablet leise, während
 der Rechner im Stab klingelt. Alarme lassen sich nicht stumm schalten. Die Einstellung bleibt beim
-Abmelden auf dem Gerät, wie „Ton stumm“. Ist „Auch bei geschlossener App“ eingeschaltet, zeigt
-das Betriebssystem auch eine stumme Art, solange kein Tab der App vorn ist.
+Abmelden auf dem Gerät, wie „Ton stumm“. Sie gilt auch, wenn „Auch bei geschlossener App“
+eingeschaltet und die App zu ist: Für eine stumme Art erscheint dann keine Meldung des
+Betriebssystems, ein Alarm schon. Wer ohne Netz umschaltet, hat bei geschlossener App bis zur
+nächsten Anmeldung noch den alten Stand.
 
 Toasts tragen nur Alarme (dazu, außerhalb eines Einsatzes, „Neuer
 Einsatz“ und „Aufnahme in einen Einsatz“). Sie bleiben stehen, bis sie geöffnet oder geschlossen

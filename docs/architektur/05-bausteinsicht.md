@@ -200,6 +200,7 @@ Regeln: [frontend/src/geraet/AGENTS.md](../../frontend/src/geraet/AGENTS.md).
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
 | `src/geraet` | Gerätekopplung per Code, Gerätekonto, Funktionsansicht, Stellenbindung, Routen-Whitelist | `…/{id}/geraete`, `POST /api/geraete/koppeln`, `…/{id}/lagemonitor` |
+| `src/lagemonitor_zugang` | Lesezugang externer Lagemonitore: Schlüssel (nur Hash), Freigabe je Einsatz durch die Einsatzleitung, Extractor `LagemonitorZugriff` nur für den Abruf | `/api/lagemonitor-zugaenge`, `…/{id}/lagemonitor-zugaenge`, `GET /api/lagemonitor/v1/lage` (Bearer) |
 
 ### Auth & Organisation
 

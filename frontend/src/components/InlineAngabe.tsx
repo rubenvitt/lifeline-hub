@@ -13,7 +13,7 @@ import { Button, Space } from 'antd';
 import { FeldFehler } from './instrument';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
-import { useOffeneBearbeitung } from './offeneBearbeitung';
+import { useSelbstanmeldung } from './offeneBearbeitung';
 import { SpeicherFehler } from './SpeicherHinweis';
 import { useFokusRueckgabe } from './useFokusRueckgabe';
 
@@ -61,8 +61,10 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  *   Aushängen), für den Merker `components/offeneBearbeitung.tsx`. Ohne `onEntwurf` meldet sich
  *   die Angabe selbst beim Merker der Seite an (LLH-1468): unter einem `OffeneBearbeitungProvider`
  *   fragt ein geänderter Entwurf vor dem Verlassen und vor einem Wechsel in der Seite nach, ohne
- *   Provider bleibt es still. Die Sperre der übrigen Felder übernimmt sie dabei nicht: den Grund
- *   zeigt die Seite an EINER Stelle, also verdrahtet sie Anmeldung und `gesperrt` selbst
+ *   Provider bleibt es still. Gesperrt, solange ein anderes Feld einen Entwurf hat, ist sie dabei
+ *   nur, wenn die Seite den Grund an EINER Stelle zeigt (`OffeneBearbeitungGrundZeile`, LLH-1480,
+ *   Fahrzeuge und Material); sie verweist dann darauf, statt ihn unter jede Zelle zu schreiben. Ein
+ *   eigenes `gesperrt` geht vor. Wer `onEntwurf` reicht, verdrahtet die Sperre selbst
  *   (`useOffeneBearbeitung`, Vorbild Personendaten).
  * - `onOeffnen`: jedes Öffnen; der Aufrufer hält dort den Serverstand für den Feld-CAS fest.
  * - `onSchliessen`: jedes Schließen einer offenen Bearbeitung (gespeichert, abgebrochen, von der
@@ -279,13 +281,15 @@ export function InlineAngabe<T>({
   /** Zugänglicher Name der Angabe, in einer Liste mit der Zeile. */
   const name = kennung ? `${etikett} zu ${kennung}` : etikett;
   // Wer `onEntwurf` reicht, meldet selbst an; sonst die Angabe beim Merker der Seite (LLH-1468).
-  const merker = useOffeneBearbeitung(name);
+  // Deren Sperre gilt nur mit Grundzeile der Seite (LLH-1480); ein eigenes `gesperrt` geht vor.
+  const merker = useSelbstanmeldung(name);
   const meldeEntwurf = onEntwurf ?? merker.onEntwurf;
+  const sperre = gesperrt || (onEntwurf ? undefined : merker.gesperrt);
   /** Ein leerer Grund sperrt nicht: gesperrt heißt immer mit sichtbarem Grund. */
-  const isGesperrt = Boolean(gesperrt);
+  const isGesperrt = Boolean(sperre);
   /** Der Grund steht hier (Text) oder an anderer Stelle (Kennung seines Elements). */
-  const sperrText = typeof gesperrt === 'string' ? gesperrt : undefined;
-  const sperrBeschreibung = typeof gesperrt === 'object' ? gesperrt.beschreibungId : sperrId;
+  const sperrText = typeof sperre === 'string' ? sperre : undefined;
+  const sperrBeschreibung = typeof sperre === 'object' ? sperre.beschreibungId : sperrId;
   const geaendert = darfSchreiben && bearbeitet && !gleich(entwurf, wert);
   const pruefGrund = bearbeitet && pruefungAktiv && pruefe ? pruefe(entwurf) : null;
 

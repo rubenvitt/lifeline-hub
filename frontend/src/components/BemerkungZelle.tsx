@@ -2,6 +2,7 @@ import { IconStift } from '../icons';
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button, Typography } from 'antd';
 import { useRollen } from './instrument/rollenwerte';
+import { useSeitenSperre } from './offeneBearbeitung';
 import { useFokusRueckgabe } from './useFokusRueckgabe';
 import { istZuLang, Zeichenzaehler } from './zeichenGrenze';
 
@@ -120,8 +121,14 @@ interface BemerkungZelleProps {
    * gesperrt und verweisen per `aria-describedby` darauf. Ein schon offenes Feld behält seinen
    * Entwurf und sendet weder mit Enter noch beim Verlassen, bis die Sperre fällt — nichts geht
    * still verloren, nichts wird still nachgeholt.
+   *
+   * Steht der Grund schon an anderer Stelle sichtbar, nennt `{ beschreibungId }` dessen Element
+   * (wie bei `InlineAngabe`): gesperrt, Verweis per `aria-describedby`, keine eigene Zeile. So
+   * sperrt auch die Grundzeile einer Listenseite (`OffeneBearbeitungGrundZeile`, LLH-1480) die
+   * Bemerkungen, solange eine Inline-Angabe der Seite einen Entwurf hat; ein eigenes `gesperrt`
+   * geht vor.
    */
-  gesperrt?: string;
+  gesperrt?: string | { beschreibungId: string };
 }
 
 /** Wortlaut an EINER Stelle — Seiten und Tests greifen denselben Namen.
@@ -142,8 +149,13 @@ export function BemerkungZelle({
   const { token, rollen } = useRollen();
   const wertId = useId();
   const sperrId = useId();
+  const seitenSperre = useSeitenSperre();
+  const sperre = gesperrt || seitenSperre;
   /** Ein leerer Grund sperrt nicht: gesperrt heißt immer mit sichtbarem Grund. */
-  const isGesperrt = Boolean(gesperrt);
+  const isGesperrt = Boolean(sperre);
+  /** Der Grund steht hier (Text) oder an anderer Stelle (Kennung seines Elements). */
+  const sperrText = typeof sperre === 'string' ? sperre : undefined;
+  const sperrBeschreibung = typeof sperre === 'object' ? sperre.beschreibungId : sperrId;
   const knopfRef = useFokusRueckgabe(bearbeitet);
   // Ref, weil Enter und das folgende Verlassen im selben Zug ankommen.
   const sendetRef = useRef(false);
@@ -174,13 +186,13 @@ export function BemerkungZelle({
     if (!feld) return;
     if (zuLang) feld.setAttribute('aria-invalid', 'true');
     else feld.removeAttribute('aria-invalid');
-    if (isGesperrt) feld.setAttribute('aria-describedby', sperrId);
+    if (isGesperrt) feld.setAttribute('aria-describedby', sperrBeschreibung);
     else feld.removeAttribute('aria-describedby');
-  }, [zuLang, bearbeitet, isGesperrt, sperrId]);
+  }, [zuLang, bearbeitet, isGesperrt, sperrBeschreibung]);
 
-  const sperrHinweis = isGesperrt ? (
+  const sperrHinweis = sperrText ? (
     <div id={sperrId} style={{ color: rollen.text2 }}>
-      {gesperrt}
+      {sperrText}
     </div>
   ) : null;
 
@@ -207,7 +219,7 @@ export function BemerkungZelle({
           type="link"
           loading={laeuft}
           disabled={isGesperrt}
-          aria-describedby={isGesperrt ? sperrId : undefined}
+          aria-describedby={isGesperrt ? sperrBeschreibung : undefined}
           // `bedienText`, die Rolle für blauen TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
           // Gemessen auf der Lücken-Tönung in `e2e/betroffene-kontrast.spec.ts`.
           style={{ color: rollen.bedienText }}
@@ -236,7 +248,7 @@ export function BemerkungZelle({
           aria-label={
             kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : `${bezeichnung} bearbeiten`
           }
-          aria-describedby={isGesperrt ? `${wertId} ${sperrId}` : wertId}
+          aria-describedby={isGesperrt ? `${wertId} ${sperrBeschreibung}` : wertId}
           style={wertKnopfStil(token)}
           onClick={oeffnen}
         >

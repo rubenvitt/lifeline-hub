@@ -17,6 +17,7 @@ import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeName, useKopfBuendelt } from './eingaenge';
 import { EINGANG_ARTEN, setzeStumm, useStummeArten } from './eingaengeStumm';
 import EingaengeZahl from './EingaengeZahl';
+import { pushAbgleichen } from './webPush';
 import { useQuittiereNachNutzer } from './useBenachrichtigungen';
 import {
   markVerlaufGelesen,
@@ -119,10 +120,16 @@ function Gruppe({
 /**
  * „Stumm auf diesem Gerät“ (LLH-1421, design.md D6): je Eingangsart ein Schalter. Wirkt nur auf
  * Ton, Eingangsband und OS-Meldung dieses Geräts (`eingaengeStumm.ts`); Alarme stehen nicht da.
+ * Ist hier Push an, meldet das Umschalten die Liste auch dem Server (LLH-1482, `webPush.ts`).
  */
 function StummListe() {
   const { token } = theme.useToken();
   const stumm = useStummeArten();
+  const benutzerId = useAuthOptional()?.benutzer?.id;
+  const umschalten = (art: (typeof EINGANG_ARTEN)[number], an: boolean) => {
+    setzeStumm(art, an);
+    if (benutzerId != null) void pushAbgleichen(benutzerId);
+  };
   return (
     <section aria-label="Stumm auf diesem Gerät" style={{ marginBlockStart: token.marginXS }}>
       <Augenbraue als="h3">Stumm auf diesem Gerät</Augenbraue>
@@ -150,7 +157,7 @@ function StummListe() {
                 id={feldId}
                 aria-label={`Stumm: ${name}`}
                 checked={stumm.includes(art)}
-                onChange={(an) => setzeStumm(art, an)}
+                onChange={(an) => umschalten(art, an)}
               />
             </li>
           );

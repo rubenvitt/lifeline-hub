@@ -47,7 +47,9 @@ ausgehenden Verkehr beschränkt, muss diese Hosts freigeben.
 ## Verhalten
 
 - Jede Benachrichtigung geht an alle Abos der empfangenden Person, Alarm wie Hinweis; abgeschaltete
-  Hinweis-Arten nicht. Gekoppelte Geräte haben kein Abo.
+  Hinweis-Arten nicht. Ein Abo trägt außerdem die Arten, die auf seinem Gerät stumm sind
+  (LLH-1482, nur Namen von Eingangsarten); für sie geht an dieses Abo kein Push, ein Alarm immer.
+  Gekoppelte Geräte haben kein Abo.
 - Der Versand läuft neben der Anfrage her: höchstens acht Pushs gleichzeitig, je 10 s Zeitlimit.
   Ein hängender Dienst verzögert nichts in der App.
 - Ein Push gilt 12 Stunden; ist das Gerät so lange nicht erreichbar, verwirft der Dienst ihn.

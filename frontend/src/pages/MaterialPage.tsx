@@ -78,7 +78,10 @@ import { materialStatus } from '../theme/statusFarben';
 import DemoMarke from '../components/DemoMarke';
 import { demoGroupedOptions, type AuswahlOption } from '../stammdaten/demoAuswahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
-import { OffeneBearbeitungProvider } from '../components/offeneBearbeitung';
+import {
+  OffeneBearbeitungGrundZeile,
+  OffeneBearbeitungProvider,
+} from '../components/offeneBearbeitung';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -205,7 +208,9 @@ const GRUPPIERUNG_OPTIONEN = [
 /**
  * Merker der Seite (LLH-1468, `frontend/AGENTS.md`, „Ein offenes, geändertes Einzelfeld in einer
  * Ansicht …“): eine geänderte Inline-Angabe (Ort) meldet sich selbst an und fragt vor dem Verlassen
- * nach. Die Gruppierung im Kopf fragt nicht: die Zeile behält ihren Schlüssel, die Sicht ordnet nur
+ * nach. Solange sie einen Entwurf hat, sind die übrigen Angaben und Bemerkungen gesperrt; der Grund
+ * steht EINMAL in der Werkzeugzeile der Liste (`OffeneBearbeitungGrundZeile`, LLH-1480). Die
+ * Gruppierung im Kopf fragt nicht: die Zeile behält ihren Schlüssel, die Sicht ordnet nur
  * um, und die offene Angabe bleibt samt Entwurf stehen (`useWechselNachRueckfrage` gilt nur für
  * einen Wechsel, der sie aushängt). Ohne `aktiv`, weil die Seite erst darunter weiß, ob sie
  * schreiben darf; ohne Schreibrecht meldet keine Angabe einen Entwurf.
@@ -1058,6 +1063,8 @@ function MaterialInhalt() {
             ladend={emQuery.isLoading}
             leerText="Noch kein Material disponiert"
             suche={{ platzhalter: 'Bezeichnung, Kategorie, Ort' }}
+            // Der EINE Sperrgrund, solange eine Angabe einen Entwurf hat (LLH-1480).
+            werkzeuge={<OffeneBearbeitungGrundZeile />}
             mehrzahl="Posten"
             gedaechtnis={gedaechtnis}
             zeilenFehler={(em) => zeilen.grund(em.id)}

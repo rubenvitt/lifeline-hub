@@ -2261,6 +2261,57 @@ describe('FahrzeugePage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)',
   });
 });
 
+/**
+ * Eine offene Bearbeitung je Seite auch in der Liste (LLH-1480, `frontend/AGENTS.md`, „Bearbeiten
+ * in der Ansicht“): hat eine Einheit einen Entwurf, sind die übrigen Angaben gesperrt, und der
+ * Grund steht EINMAL in der Werkzeugzeile der Liste, nicht unter jeder Zelle.
+ *
+ * Mutationsprobe (von Hand, rot gesehen, dann zurückgedreht): ohne Grundzeile in der Werkzeugzeile
+ * bleibt die zweite Einheit bedienbar.
+ */
+describe('FahrzeugePage · eine offene Angabe zur Zeit (LLH-1480)', () => {
+  const EINHEITEN = [
+    { id: 1, name: 'Zug 1', abschnitt_id: null, abschnitt_name: null, ueber_einheit_id: null },
+  ];
+  const GRUND = 'Erst „Einheit zu Florian 1“ speichern oder abbrechen';
+  const zweites = { ...ef, id: 11, fahrzeug_id: 2, funkrufname: 'Florian 2' };
+
+  it('ein Entwurf sperrt die übrigen Einheiten, der Grund steht einmal in der Werkzeugzeile', async () => {
+    const { container } = render(einsatz(), [], [ef, zweites], [], EINHEITEN);
+    await screen.findByText('Florian 2');
+    const zeile = (key: number) =>
+      container.querySelector(`[data-row-key="${key}"]`) as HTMLElement;
+    await userEvent.click(
+      await within(zeile(10)).findByRole('button', { name: 'Einheit zu Florian 1 eintragen' }),
+    );
+    // Offen, aber unverändert: noch keine Sperre.
+    expect(
+      within(zeile(11)).getByRole('button', { name: 'Einheit zu Florian 2 eintragen' }),
+    ).toBeEnabled();
+    expect(screen.queryByText(GRUND)).toBeNull();
+
+    await waehle('Einheit zu Florian 1', 'Zug 1');
+    const zweiteEinheit = within(zeile(11)).getByRole('button', {
+      name: 'Einheit zu Florian 2 eintragen',
+    });
+    expect(zweiteEinheit).toBeDisabled();
+    expect(zweiteEinheit).toHaveAccessibleDescription(GRUND);
+    const grund = screen.getByText(GRUND);
+    expect(grund.closest('[data-lfh="datensicht-werkzeuge"]')).not.toBeNull();
+    expect(screen.getAllByText(GRUND)).toHaveLength(1);
+    // Der Halter selbst bleibt bedienbar.
+    expect(screen.getByRole('button', { name: 'Einheit zu Florian 1 speichern' })).toBeEnabled();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Bearbeitung von Einheit zu Florian 1 abbrechen' }),
+    );
+    expect(
+      within(zeile(11)).getByRole('button', { name: 'Einheit zu Florian 2 eintragen' }),
+    ).toBeEnabled();
+    expect(screen.queryByText(GRUND)).toBeNull();
+  });
+});
+
 describe('FahrzeugePage · Personal gesperrt (LLH-1462)', () => {
   it('fragt die Personalliste nicht ab und nennt die Sperre statt „nicht erfasst“', async () => {
     const abrufe: string[] = [];

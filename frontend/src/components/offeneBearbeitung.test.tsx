@@ -6,7 +6,9 @@ import { Link, Route, Routes } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { InlineAngabe } from './InlineAngabe';
+import { BemerkungZelle } from './BemerkungZelle';
 import {
+  OffeneBearbeitungGrundZeile,
   OffeneBearbeitungProvider,
   sperrGrundOffeneBearbeitung,
   useOffeneBearbeitung,
@@ -482,9 +484,11 @@ describe('offene Bearbeitung · Wechsel in der Seite (LLH-1415)', () => {
 function SelbstAngabe({
   etikett,
   onEntwurf,
+  gesperrt,
 }: {
   etikett: string;
   onEntwurf?: (geaendert: boolean) => void;
+  gesperrt?: string;
 }) {
   const [wert, setWert] = useState('');
   return (
@@ -496,6 +500,7 @@ function SelbstAngabe({
       darfSchreiben
       onSpeichern={async (w) => setWert(w)}
       onEntwurf={onEntwurf}
+      gesperrt={gesperrt}
       eingabe={({ feld, value, onChange }) => (
         <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
@@ -544,7 +549,7 @@ describe('offene Bearbeitung · Selbstanmeldung einer Inline-Angabe (LLH-1468)',
     expect(await screen.findByText('ANDERSWO')).toBeInTheDocument();
   });
 
-  it('die übrigen Angaben sperrt sie nicht: das verdrahtet der Aufrufer mit `gesperrt`', async () => {
+  it('ohne Grundzeile der Seite sperrt sie die übrigen Angaben nicht', async () => {
     const user = userEvent.setup();
     renderMitProviders(<SelbstSeite />, { route: '/liste', datenRouter: true });
     await user.click(screen.getByRole('button', { name: 'Ort eintragen' }));
@@ -592,5 +597,129 @@ describe('offene Bearbeitung · Selbstanmeldung einer Inline-Angabe (LLH-1468)',
     await user.click(screen.getByRole('link', { name: 'Anderswo' }));
     expect(await screen.findByText('ANDERSWO')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+/**
+ * Grundzeile einer Listenseite (LLH-1480): steht `OffeneBearbeitungGrundZeile`, sperren sich die
+ * selbst angemeldeten Inline-Angaben und die Bemerkungen der Seite, solange ein anderes Feld einen
+ * Entwurf hat, und verweisen auf diese EINE Zeile.
+ *
+ * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
+ * - Verweis ohne Prüfung auf den Halter (`fremd &&` entfernt): rot in „sperrt die übrigen …“ (der
+ *   Halter könnte nicht mehr speichern).
+ * - Grundzeile meldet ihre Kennung beim Aushängen nicht ab: rot in „hängt die Grundzeile aus …“.
+ * - Eigenes `gesperrt` nachrangig (`gesperrt || …` → `… || gesperrt`): rot in „ein eigener Grund
+ *   geht vor“.
+ */
+function GrundSeite({
+  mitGrundZeile = true,
+  ortGesperrt,
+  ortOnEntwurf,
+}: {
+  mitGrundZeile?: boolean;
+  ortGesperrt?: string;
+  ortOnEntwurf?: (geaendert: boolean) => void;
+}) {
+  const [bemerkung, setBemerkung] = useState<string | null>(null);
+  return (
+    <OffeneBearbeitungProvider>
+      <div data-testid="werkzeuge">{mitGrundZeile && <OffeneBearbeitungGrundZeile />}</div>
+      <SelbstAngabe etikett="Ort" gesperrt={ortGesperrt} onEntwurf={ortOnEntwurf} />
+      <SelbstAngabe etikett="Einheit" />
+      <BemerkungZelle
+        wert={bemerkung}
+        darfSchreiben
+        kennung="Wolldecke"
+        onSpeichern={(w) => setBemerkung(w)}
+      />
+    </OffeneBearbeitungProvider>
+  );
+}
+
+const ORT_SPERRT = 'Erst „Ort“ speichern oder abbrechen';
+const EINHEIT_SPERRT = 'Erst „Einheit“ speichern oder abbrechen';
+
+describe('offene Bearbeitung · Grundzeile einer Listenseite (LLH-1480)', () => {
+  it('sperrt die übrigen Angaben und die Bemerkung; der Grund steht einmal, in der Grundzeile', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<GrundSeite />, { datenRouter: true });
+    expect(screen.getByTestId('werkzeuge')).toBeEmptyDOMElement();
+
+    await user.click(screen.getByRole('button', { name: 'Ort eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Ort' }), 'Halle');
+
+    const einheit = screen.getByRole('button', { name: 'Einheit eintragen' });
+    expect(einheit).toBeDisabled();
+    expect(einheit).toHaveAccessibleDescription(ORT_SPERRT);
+    const bemerkung = screen.getByRole('button', { name: 'Bemerkung zu Wolldecke hinzufügen' });
+    expect(bemerkung).toBeDisabled();
+    expect(bemerkung).toHaveAccessibleDescription(ORT_SPERRT);
+    expect(screen.getAllByText(ORT_SPERRT)).toHaveLength(1);
+    expect(screen.getByTestId('werkzeuge')).toHaveTextContent(ORT_SPERRT);
+    // Der Halter bleibt bedienbar.
+    expect(screen.getByRole('button', { name: 'Ort speichern' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Bearbeitung von Ort abbrechen' }));
+    expect(screen.getByRole('button', { name: 'Einheit eintragen' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Bemerkung zu Wolldecke hinzufügen' })).toBeEnabled();
+    expect(screen.getByTestId('werkzeuge')).toBeEmptyDOMElement();
+  });
+
+  it('ein offenes, unverändertes Feld schließt, sobald ein anderes einen Entwurf hat', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<GrundSeite />, { datenRouter: true });
+    await user.click(screen.getByRole('button', { name: 'Ort eintragen' }));
+    await user.click(screen.getByRole('button', { name: 'Einheit eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Einheit' }), 'Zug 1');
+
+    expect(screen.queryByRole('textbox', { name: 'Ort' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Ort eintragen' })).toHaveAccessibleDescription(
+      EINHEIT_SPERRT,
+    );
+  });
+
+  it('hängt die Grundzeile aus, fällt die Sperre', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderMitProviders(<GrundSeite />, { datenRouter: true });
+    await user.click(screen.getByRole('button', { name: 'Ort eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Ort' }), 'Halle');
+    expect(screen.getByRole('button', { name: 'Einheit eintragen' })).toBeDisabled();
+
+    rerender(<GrundSeite mitGrundZeile={false} />);
+    expect(screen.getByRole('button', { name: 'Einheit eintragen' })).toBeEnabled();
+    expect(screen.queryByText(ORT_SPERRT)).toBeNull();
+  });
+
+  it('ein eigener Grund geht vor und steht am Feld', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<GrundSeite ortGesperrt="Ohne Verbindung" />, { datenRouter: true });
+    await user.click(screen.getByRole('button', { name: 'Einheit eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Einheit' }), 'Zug 1');
+
+    expect(screen.getByRole('button', { name: 'Ort eintragen' })).toHaveAccessibleDescription(
+      'Ohne Verbindung',
+    );
+  });
+
+  it('wer `onEntwurf` selbst reicht, verdrahtet auch die Sperre selbst', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<GrundSeite ortOnEntwurf={() => {}} />, { datenRouter: true });
+    await user.click(screen.getByRole('button', { name: 'Einheit eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Einheit' }), 'Zug 1');
+
+    expect(screen.getByRole('button', { name: 'Ort eintragen' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Bemerkung zu Wolldecke hinzufügen' }),
+    ).toBeDisabled();
+  });
+
+  it('ohne Provider zeigt die Grundzeile nichts', () => {
+    renderMitProviders(
+      <div data-testid="werkzeuge">
+        <OffeneBearbeitungGrundZeile />
+      </div>,
+    );
+    expect(screen.getByTestId('werkzeuge')).toBeEmptyDOMElement();
   });
 });

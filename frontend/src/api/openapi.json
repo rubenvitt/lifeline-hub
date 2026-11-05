@@ -682,7 +682,7 @@
       },
       "AdminAktion": {
         "type": "string",
-        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` und\n`0174_admin_audit_einmalpasswort.sql` — beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
+        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql` und `0269_admin_audit_lesezugang.sql` — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
         "enum": [
           "benutzer_angelegt",
           "benutzer_deaktiviert",
@@ -692,7 +692,9 @@
           "anmeldeweg_aktiviert",
           "anmeldeweg_deaktiviert",
           "sitzung_beendet",
-          "einmalpasswort_vergeben"
+          "einmalpasswort_vergeben",
+          "lesezugang_angelegt",
+          "lesezugang_widerrufen"
         ]
       },
       "AdressatKategorie": {
@@ -10424,6 +10426,67 @@
           }
         }
       },
+      "LagemonitorEinsatz": {
+        "type": "object",
+        "description": "Der gezeigte Einsatz, ohne Sachverhalt, Adresstext und meldende Stelle. Die Koordinate des\nEinsatzorts steht als Feature `einsatzort` in der Karte.",
+        "required": [
+          "bezeichnung",
+          "einsatzart",
+          "begonnen_at",
+          "betroffene",
+          "kraefte",
+          "uhs",
+          "sofortmeldungen_offen",
+          "lagemeldung"
+        ],
+        "properties": {
+          "begonnen_at": {
+            "type": "string",
+            "description": "UTC, SQLite-Format."
+          },
+          "betroffene": {
+            "$ref": "#/components/schemas/LagemonitorBetroffene"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatzart": {
+            "$ref": "#/components/schemas/Einsatzart"
+          },
+          "kraefte": {
+            "$ref": "#/components/schemas/LagemonitorKraefte"
+          },
+          "lagemeldung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorLagemeldung",
+                "description": "Zusammenfassung des jüngsten freigegebenen Lageberichts; `null` ohne einen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sofortmeldungen_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unbestätigte, nicht erledigte Sofortmeldungen; nur die Zahl."
+          },
+          "stichwort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uhs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorUhsZahl"
+            },
+            "description": "Nicht aufgelöste UHS mit Belegung als Zahl; die Lage steht in der Karte."
+          }
+        }
+      },
       "LagemonitorKraefte": {
         "type": "object",
         "description": "Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke.",
@@ -10443,6 +10506,72 @@
           },
           "staerke": {
             "$ref": "#/components/schemas/Staerke"
+          }
+        }
+      },
+      "LagemonitorLage": {
+        "type": "object",
+        "description": "Antwort der Schnittstelle.",
+        "required": [
+          "api_version",
+          "stand_at",
+          "einsatz"
+        ],
+        "properties": {
+          "api_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "einsatz": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorEinsatz",
+                "description": "Der freigegebene, laufende Einsatz; `null`, wenn keiner freigegeben ist."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "karte": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GeoJsonFeatureCollection",
+                "description": "Lagekarte als GeoJSON-FeatureCollection; fehlt ohne Einsatz, bei `?karte=aus` und wenn sie\nder Fassung aus `?karte=<etag>` gleicht."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "karte_etag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fassung der Karte; fehlt ohne Einsatz und bei `?karte=aus`."
+          },
+          "stand_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Berechnung (UTC, SQLite-Format)."
+          }
+        }
+      },
+      "LagemonitorLagemeldung": {
+        "type": "object",
+        "description": "Die Lagemeldung für die Anzeige.",
+        "required": [
+          "text",
+          "freigegeben_at"
+        ],
+        "properties": {
+          "freigegeben_at": {
+            "type": "string",
+            "description": "Freigabe des Lageberichts (UTC, SQLite-Format)."
+          },
+          "text": {
+            "type": "string"
           }
         }
       },
@@ -10503,6 +10632,48 @@
           }
         }
       },
+      "LagemonitorUhsZahl": {
+        "type": "object",
+        "description": "Eine UHS in Zahlen.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "typ",
+          "status",
+          "belegt",
+          "plaetze",
+          "kraefte"
+        ],
+        "properties": {
+          "belegt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kraefte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Stärke der zugeordneten Kräfte."
+          },
+          "plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Plätze ohne Wartebereich."
+          },
+          "status": {
+            "$ref": "#/components/schemas/UhsStatus"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/UhsTyp"
+          }
+        }
+      },
       "LagemonitorZone": {
         "type": "object",
         "description": "Eine Gefahrenzone für die Monitorkarte (Gefahrengebiet, Absperrung, Sperrgebiet), einsatzweit\nund gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext.",
@@ -10522,6 +10693,111 @@
           },
           "typ": {
             "$ref": "#/components/schemas/LageZoneTyp"
+          }
+        }
+      },
+      "LesezugangAnzeige": {
+        "type": "object",
+        "description": "Ein Lesezugang, wie die Verwaltung ihn sieht. Der Schlüssel steht nie darin.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string",
+            "description": "UTC im SQLite-Format."
+          },
+          "angelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der Person, die ihn angelegt hat; fehlt, wenn ihr Konto gelöscht ist."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der Einsatz, den der Zugang gerade zeigt; fehlt ohne aktive Freigabe."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "widerrufen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zuletzt_genutzt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter Abruf (höchstens minütlich fortgeschrieben); fehlt, solange ihn niemand nutzte."
+          }
+        }
+      },
+      "LesezugangFreigabe": {
+        "type": "object",
+        "description": "Ein Lesezugang aus Sicht eines Einsatzes (Seite „Geräte“ der Einsatzleitung).",
+        "required": [
+          "zugang_id",
+          "bezeichnung",
+          "freigegeben",
+          "anderer_einsatz"
+        ],
+        "properties": {
+          "anderer_einsatz": {
+            "type": "boolean",
+            "description": "Der Zugang zeigt gerade einen anderen aktiven Einsatz. Welchen, sagt die Antwort nicht."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "freigegeben": {
+            "type": "boolean",
+            "description": "Dieser Einsatz ist für den Zugang freigegeben."
+          },
+          "zugang_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zuletzt_genutzt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "LesezugangMitSchluessel": {
+        "type": "object",
+        "description": "Ein frisch angelegter Zugang. Der Schlüssel verlässt den Server nur hier, einmal.",
+        "required": [
+          "zugang",
+          "schluessel"
+        ],
+        "properties": {
+          "schluessel": {
+            "type": "string"
+          },
+          "zugang": {
+            "$ref": "#/components/schemas/LesezugangAnzeige"
           }
         }
       },
@@ -17511,7 +17787,8 @@
         "required": [
           "schluessel",
           "angemeldet",
-          "inhalt"
+          "inhalt",
+          "stumm"
         ],
         "properties": {
           "angemeldet": {
@@ -17525,6 +17802,13 @@
           "schluessel": {
             "type": "string",
             "description": "Öffentlicher Schlüssel der Instanz (Base64url, unkomprimierter P-256-Punkt) für\n`pushManager.subscribe({ applicationServerKey })`."
+          },
+          "stumm": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenachrichtigungArt"
+            },
+            "description": "Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne\nAbo leer."
           }
         }
       },
