@@ -93,6 +93,10 @@ pub struct VollzugEingabe {
     pub abloeser: Vec<i64>,
     /// Den Abschnitt der abgelösten Einheit an die Ablöser übergeben, die den Knoten bilden.
     pub abschnitt_uebergeben: bool,
+    /// Dem Benutzer fehlt die Freigabe des Moduls Einheiten (LLH-1512). Eine Übergabe, die
+    /// etwas übergäbe (Abschnitt da, mindestens ein Knoten-Ablöser), wird dann mit 403
+    /// abgewiesen, bevor etwas geschrieben bleibt; eine ohne Wirkung wird wie sonst übergangen.
+    pub ohne_freigabe_einheiten: bool,
     /// Ganze Einheit oder Besatzungswechsel (LLH-1150); beim Besatzungswechsel sind `abloeser`
     /// leer und `abschnitt_uebergeben` aus (die Route prüft das).
     pub art: AbloesungArt,
@@ -2390,6 +2394,10 @@ async fn vollziehen_einheit_tx(
     let erben = erben_von(&g, roh.einheit_id);
     // Übergeben wird nur, was es gibt: ein Abschnitt und mindestens ein Knoten-Ablöser.
     let uebergabe = abschnitt_vorher.filter(|_| eingabe.abschnitt_uebergeben && !knoten.is_empty());
+    // Erst eine wirksame Übergabe schreibt, was sonst das Modul Einheiten schreibt (LLH-1512).
+    if uebergabe.is_some() && eingabe.ohne_freigabe_einheiten {
+        return Err(AppError::Forbidden);
+    }
 
     let verbleib_br_id = match eingabe.verbleib {
         AbloesungVerbleib::Bereitstellungsraum => eingabe.verbleib_br_id,
