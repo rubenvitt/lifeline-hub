@@ -48,13 +48,21 @@ export function zaehlerText(anzahl: number, max: number): string | null {
 }
 
 /**
+ * Zeichen, die der Server am Wert zählt: nach dem Trimmen wie {@link istZuLang} (LLH-1532). Der
+ * Wert selbst bleibt unverändert, Rand-Leerzeichen zählen nur nicht mit.
+ */
+export function zaehlZeichen(s: string): number {
+  return zeichenZahl(s.trim());
+}
+
+/**
  * Der Zähler als Element: Mono-Meta mit `tabular-nums` (`frontend/AGENTS.md`, `schriftskala`).
  * Eine Überlänge steht in `alarmText`, nicht in antds Füllfarbe `colorError` (LFH-874), und
- * zusätzlich als Wort im Text.
+ * zusätzlich als Wort im Text. Gezählt wird wie beim Server nach dem Trimmen.
  */
 export function Zeichenzaehler({ wert, max }: { wert: string; max: number }) {
   const { rollen } = useRollen();
-  const anzahl = zeichenZahl(wert);
+  const anzahl = zaehlZeichen(wert);
   const text = zaehlerText(anzahl, max);
   if (text == null) return null;
   return (
@@ -66,8 +74,6 @@ export function Zeichenzaehler({ wert, max }: { wert: string; max: number }) {
     </span>
   );
 }
-
-const zaehlen = (s: string) => zeichenZahl(s);
 
 /** Je Grenze und Form genau eine Konfiguration: antd merkt sie sich per Identität (`useMemo`). */
 const konfigurationen = new Map<string, ZaehlerKonfig>();
@@ -86,7 +92,8 @@ export function zeichenGrenze(
   if (vorhanden) return vorhanden;
   const konfig: ZaehlerKonfig = {
     max,
-    strategy: zaehlen,
+    // Wie die Regel nach dem Trimmen: sonst färbte antd ein erlaubtes Feld als out-of-range.
+    strategy: zaehlZeichen,
   };
   if (zaehler) {
     konfig.show = ({ value }) => <Zeichenzaehler wert={value} max={max} />;
