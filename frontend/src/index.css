@@ -243,3 +243,17 @@ main:has([data-lfh='zaehltasten']) {
 :root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
   scroll-padding-block-start: 0px;
 }
+
+/* Ausgabeansicht der Verpflegung: Fokusabstand zur klebenden Kurzzeile mit Soll/ausgegeben/fehlt
+   (LLH-1504, WCAG 2.4.11), oben wie das Tastenfeld unten. Am Stab rollt das Dokument und die Zeile
+   hängt unter dem Rahmen, in der Gerätehülle rollt das `main` und sie klebt an dessen Oberkante.
+   Die Höhe setzt `components/fokusabstandUnten.ts` (`useFokusabstandOben`). Die Zeile trägt kein
+   Fokusziel; die Ausnahme für den Fokus im Rahmen (darüber) schlägt diese Regel. */
+:root:has([data-lfh='ausgabe-kurzzeile']) {
+  scroll-padding-block-start: calc(
+    var(--lfh-rahmen-oben, 0px) + var(--lfh-ausgabe-kurzzeile-fokusabstand, 0px)
+  );
+}
+main:has([data-lfh='ausgabe-kurzzeile']) {
+  scroll-padding-block-start: var(--lfh-ausgabe-kurzzeile-fokusabstand, 0px);
+}

@@ -31,6 +31,8 @@ describe('restHoehe', () => {
       minHeight: 'calc(100dvh - 160px)',
       marginBottom: 'calc(-1 * var(--lfh-seiten-polsterung, 0px))',
       unten: 'var(--lfh-seiten-polsterung, 0px)',
+      // Ein klebender Kopf hängt sich unter den klebenden Rahmen (LLH-1504).
+      oben: 'var(--lfh-rahmen-oben, 0px)',
     });
   });
 
@@ -41,9 +43,9 @@ describe('restHoehe', () => {
     document.body.style.removeProperty('overflow-x');
   });
 
-  it('im eigenen Scrollbereich (Gerätehülle): sichtbare Höhe minus Lage darin minus Polsterung unten', () => {
+  it('im eigenen Scrollbereich (Gerätehülle): sichtbare Höhe minus Lage darin minus Polsterung unten, oben über die Polsterung', () => {
     document.body.innerHTML =
-      '<main id="bereich" style="overflow-y: auto; padding-bottom: 12px"><div><div id="ziel"></div></div></main>';
+      '<main id="bereich" style="overflow-y: auto; padding: 12px"><div><div id="ziel"></div></div></main>';
     const bereich = document.getElementById('bereich')!;
     const ziel = document.getElementById('ziel')!;
     expect(scrollbereichVon(ziel)).toBe(bereich);
@@ -58,6 +60,9 @@ describe('restHoehe', () => {
       minHeight: `${560 - 70 - 12}px`,
       marginBottom: '',
       unten: '0px',
+      // Der Rahmen steht außerhalb des Bereichs: oben klebt es an seiner Kante, über die
+      // Polsterung hinweg.
+      oben: '-12px',
     });
   });
 
