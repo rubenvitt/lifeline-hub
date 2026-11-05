@@ -101,8 +101,8 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
    * der client_id); `vermisst` + UHS ist 422. */
   uhs_id?: number | null;
   /** Erfassungszeit einer ohne Netz vorgemerkten Aufnahme (`YYYY-MM-DD HH:MM:SS`, UTC; LLH-1330):
-   * Anlage, Erst-Sichtung und ihre ETB-Einträge tragen sie. Fehlt sie, gilt die Serverzeit. Setzt
-   * nur die Warteschlange. */
+   * Anlage, Erst-Sichtung, Eintritt in den UHS-Eingang (LLH-1515) und ihre ETB-Einträge tragen sie.
+   * Fehlt sie, gilt die Serverzeit. Setzt nur die Warteschlange. */
   zeitpunkt_at?: string | null;
 }
 
