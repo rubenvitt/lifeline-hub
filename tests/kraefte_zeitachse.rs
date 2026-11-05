@@ -381,6 +381,54 @@ async fn nachtrag_nennt_die_ortszeit_des_einsatzes_nicht_der_organisation() {
     );
 }
 
+/// LLH-1541: die 422 des Nachtrags nennt den Zeitpunkt in Zone und Darstellung des Einsatzes
+/// (Tokio, „Datum und Uhrzeit“), nicht der Organisation (New York, taktisch) und nicht im
+/// UTC-Drahtformat mit Sekunden.
+#[tokio::test]
+async fn nachtrag_422_nennt_den_zeitpunkt_im_zeitstil_des_einsatzes() {
+    let (app, pool) = setup_mit_pool().await;
+    let w = welt_in(app).await;
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+         VALUES (1, 'America/New_York', 'taktisch') ON CONFLICT (org_id) DO UPDATE SET \
+         zeitzone = excluded.zeitzone, zeitdarstellung = excluded.zeitdarstellung",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+         VALUES (?, 'Asia/Tokyo', 'datum_uhrzeit') ON CONFLICT (einsatz_id) DO UPDATE SET \
+         zeitzone = excluded.zeitzone, zeitdarstellung = excluded.zeitdarstellung",
+    )
+    .bind(w.e)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let pfad = w.einheit_pfad();
+    let eins = format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(8, 0));
+    assert_eq!(w.nachtrag(&pfad, &eins).await.0, StatusCode::CREATED);
+    let zweites = vor(8, 15);
+    let (s, json) = w
+        .nachtrag(
+            &pfad,
+            &format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{zweites}"}}"#),
+        )
+        .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    let tokio = chrono::NaiveDateTime::parse_from_str(&zweites, "%Y-%m-%d %H:%M:%S")
+        .unwrap()
+        .and_utc()
+        .with_timezone(&chrono_tz::Asia::Tokyo)
+        .format("%d.%m.%y %H:%M")
+        .to_string();
+    assert_eq!(
+        json["error"].as_str(),
+        Some(format!("Die Einsatzperiode trägt schon ein Eintreffen ({tokio})").as_str()),
+        "{json:?}"
+    );
+}
+
 #[tokio::test]
 async fn nachtrag_statuscodes() {
     let w = welt().await;

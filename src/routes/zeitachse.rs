@@ -212,7 +212,7 @@ async fn nachtragen(
         )
         .await?;
         if let Schreibergebnis::Ausgelassen(v) = ergebnis {
-            return Err(AppError::UnprocessableEntity(v.to_string()));
+            return Err(AppError::UnprocessableEntity(v.text(&stil)));
         }
         if is_berichtigung {
             require_keine_offene_periode_tx(conn, kraft, offen_vorher).await?;

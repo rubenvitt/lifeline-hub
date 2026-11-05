@@ -414,7 +414,7 @@ async fn berichtige(
 fn id_von(r: Schreibergebnis) -> i64 {
     match r {
         Schreibergebnis::Geschrieben(id) => id,
-        Schreibergebnis::Ausgelassen(v) => panic!("ausgelassen: {v}"),
+        Schreibergebnis::Ausgelassen(v) => panic!("ausgelassen: {v:?}"),
     }
 }
 
@@ -1250,4 +1250,80 @@ async fn migration_laesst_bestand_ohne_marke() {
         .unwrap();
         assert_eq!(mit_marke, 0, "{tabelle}");
     }
+}
+
+/// Organisation und Einsatz mit verschiedenen Zonen und Darstellungen (LLH-1541).
+async fn zeitstil_setzen(w: &Welt, org: (&str, &str), einsatz: (&str, &str)) {
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) VALUES (1, ?, ?) \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+         zeitdarstellung = excluded.zeitdarstellung",
+    )
+    .bind(org.0)
+    .bind(org.1)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+         VALUES (?, ?, ?) ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+         zeitdarstellung = excluded.zeitdarstellung",
+    )
+    .bind(w.e)
+    .bind(einsatz.0)
+    .bind(einsatz.1)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+}
+
+fn text_422(r: Result<Berichtigt, AppError>) -> String {
+    match r {
+        Err(AppError::UnprocessableEntity(m)) => m,
+        andere => panic!("422 erwartet, war {andere:?}"),
+    }
+}
+
+/// LLH-1541: die 422 der Kraft selbst nennt den Zeitpunkt in Zone und Darstellung des Einsatzes
+/// (Tokio, „Datum und Uhrzeit“), nicht der Organisation (New York, taktisch) und nicht im
+/// UTC-Drahtformat. 07:00 UTC ist in Tokio 16:00.
+#[tokio::test]
+async fn verstoss_der_kraft_nennt_den_zeitpunkt_im_zeitstil_des_einsatzes() {
+    let w = welt().await;
+    zeitstil_setzen(
+        &w,
+        ("America/New_York", "taktisch"),
+        ("Asia/Tokyo", "datum_uhrzeit"),
+    )
+    .await;
+    let f1 = Kraft::Einheit(w.f1);
+    let alarm = id_von(schreibe(&w, f1, Alarmierung, "06:10", Q::Status).await);
+    schreibe(&w, f1, Eintreffen, "06:40", Q::Status).await;
+    let m = text_422(berichtige(&w, f1, alarm, "07:00", "x").await);
+    assert_eq!(
+        m,
+        "Eine Alarmierung (30.09.26 16:00) darf nicht nach dem Eintreffen derselben Periode liegen"
+    );
+}
+
+/// LLH-1541: auch die 422 für eine Person der Kette nennt den Zeitpunkt im Zeitstil des
+/// Einsatzes (Tokio, taktisch), nicht der Organisation (New York, „Datum und Uhrzeit“).
+/// Berts Entlassung 06:50 UTC ist in Tokio 15:50.
+#[tokio::test]
+async fn verstoss_einer_person_nennt_den_zeitpunkt_im_zeitstil_des_einsatzes() {
+    let w = welt().await;
+    zeitstil_setzen(
+        &w,
+        ("America/New_York", "datum_uhrzeit"),
+        ("Asia/Tokyo", "taktisch"),
+    )
+    .await;
+    let id = id_von(schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await);
+    schreibe(&w, Kraft::Person(w.p[1]), Entlassung, "06:50", Q::Status).await;
+    let m = text_422(berichtige(&w, Kraft::Einheit(w.f1), id, "07:00", "x").await);
+    assert_eq!(
+        m,
+        "Die Zeitachse von «Bert» verlöre ihre Ordnung: Zum Ende (301550sep26) gibt es keine \
+         offene Einsatzperiode"
+    );
 }
