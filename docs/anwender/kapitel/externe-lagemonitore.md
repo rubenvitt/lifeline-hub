@@ -70,10 +70,11 @@ Sofortmeldungen, also dieselben Zahlen wie der [Lagemonitor](lagemonitor.md). Da
 „Zusammenfassung“ des zuletzt freigegebenen Lageberichts (siehe
 [Lageberichte](lageberichte.md)); ein Entwurf geht nicht hinaus.
 
-Die Karte trägt den Einsatzort, die Gefahrenzonen, die Flächen der Einsatzabschnitte, die
-verorteten Unfallhilfsstellen und die taktischen Zeichen der Lagekarte ohne ihre Beschriftung.
-Zeichen, die nur in einer eigenen Kartenansicht stehen, fehlen. Namen, Meldungstexte und das
-Einsatztagebuch erhält der Monitor nicht.
+Die Karte trägt den Einsatzort als Punkt ohne Adresse, die Gefahrenzonen, die Flächen der
+Einsatzabschnitte mit ihrer Bezeichnung, die verorteten Unfallhilfsstellen mit Bezeichnung und
+Belegung und die taktischen Zeichen der Lagekarte ohne ihre Beschriftung. Zeichen, die nur in
+einer eigenen Kartenansicht stehen, fehlen. Namen, Meldungstexte und das Einsatztagebuch erhält
+der Monitor nicht. Wer den Einsatz freigibt, gibt damit auch die Lage des Einsatzorts weiter.
 
 ### Schlüssel und Widerruf
 

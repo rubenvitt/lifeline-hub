@@ -10428,7 +10428,7 @@
       },
       "LagemonitorEinsatz": {
         "type": "object",
-        "description": "Der gezeigte Einsatz, ohne Sachverhalt, Ortsangabe und meldende Stelle.",
+        "description": "Der gezeigte Einsatz, ohne Sachverhalt, Adresstext und meldende Stelle. Die Koordinate des\nEinsatzorts steht als Feature `einsatzort` in der Karte.",
         "required": [
           "bezeichnung",
           "einsatzart",

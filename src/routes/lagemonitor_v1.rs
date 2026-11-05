@@ -8,8 +8,9 @@
 //!
 //! Die Zahlen kommen aus derselben Verdichtung wie beim gekoppelten Lagemonitor
 //! ([`super::lagemonitor::verdichte`]). Wie dort gilt: **keine Namen, keine Personenkennungen,
-//! keine Freitexte**. Einzige Ausnahme ist die Zusammenfassung des jüngsten freigegebenen
-//! Lageberichts (D6): sie ist für die Weitergabe geschrieben.
+//! keine freien Notizen**. Gezeigt werden nur Bezeichnungen (Einsatz, Abschnitte, UHS) und die
+//! Zusammenfassung des jüngsten freigegebenen Lageberichts (D6), die für die Weitergabe
+//! geschrieben ist. Die Karte trägt die Koordinate des Einsatzorts, nicht seine Adresse.
 
 use crate::app::AppState;
 use crate::einsatz::Einsatzart;
@@ -50,7 +51,8 @@ pub struct LagemonitorLage {
     pub karte_etag: Option<String>,
 }
 
-/// Der gezeigte Einsatz, ohne Sachverhalt, Ortsangabe und meldende Stelle.
+/// Der gezeigte Einsatz, ohne Sachverhalt, Adresstext und meldende Stelle. Die Koordinate des
+/// Einsatzorts steht als Feature `einsatzort` in der Karte.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LagemonitorEinsatz {
     pub bezeichnung: String,

@@ -4203,7 +4203,10 @@ export interface components {
             /** Format: int64 */
             vermisst: number;
         };
-        /** @description Der gezeigte Einsatz, ohne Sachverhalt, Ortsangabe und meldende Stelle. */
+        /**
+         * @description Der gezeigte Einsatz, ohne Sachverhalt, Adresstext und meldende Stelle. Die Koordinate des
+         *     Einsatzorts steht als Feature `einsatzort` in der Karte.
+         */
         LagemonitorEinsatz: {
             /** @description UTC, SQLite-Format. */
             begonnen_at: string;

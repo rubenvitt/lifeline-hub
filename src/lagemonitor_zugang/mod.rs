@@ -310,16 +310,24 @@ impl FromRequestParts<AppState> for LagemonitorZugriff {
             .map(str::trim)
             .filter(|s| s.starts_with(SCHLUESSEL_PRAEFIX) && s.len() <= 128)
             .ok_or(AppError::Unauthorized)?;
-        let (zugang_id, org_id): (i64, i64) = sqlx::query_as(
-            "SELECT id, org_id FROM lagemonitor_zugang \
+        let (zugang_id, org_id, nutzung_veraltet): (i64, i64, bool) = sqlx::query_as(
+            "SELECT id, org_id, \
+                    (zuletzt_genutzt_at IS NULL \
+                     OR zuletzt_genutzt_at < datetime('now', '-60 seconds')) \
+             FROM lagemonitor_zugang \
              WHERE schluessel_hash = ? AND widerrufen_at IS NULL",
         )
         .bind(hash(schluessel))
         .fetch_optional(&state.pool)
         .await?
         .ok_or(AppError::Unauthorized)?;
-        // „Zuletzt genutzt“ höchstens minütlich: ein Abruf je Minute soll nicht jedes Mal
-        // schreiben. Ein Fehler hier lässt den Abruf nicht scheitern.
+        // „Zuletzt genutzt“ höchstens minütlich. Geschrieben wird nur, wenn der Stand veraltet
+        // ist: auch ein UPDATE ohne Treffer nähme in SQLite die Schreibsperre. Die Bedingung im
+        // UPDATE bleibt gegen Rennen zweier Abrufe. Ein Fehler hier lässt den Abruf nicht
+        // scheitern.
+        if !nutzung_veraltet {
+            return Ok(LagemonitorZugriff { zugang_id, org_id });
+        }
         if let Err(e) = sqlx::query(
             "UPDATE lagemonitor_zugang SET zuletzt_genutzt_at = datetime('now') \
              WHERE id = ? AND (zuletzt_genutzt_at IS NULL \
