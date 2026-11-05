@@ -583,7 +583,7 @@ describe('Gescheiterte Server-Abmeldung hat Bestand (LLH-1535)', () => {
     logoutFehler = 403;
     await abmeldenScheitert();
     await waitFor(() =>
-      expect(JSON.parse(merker() ?? '{}')).toEqual({ benutzer: 1, sitzung: 'k-login' }),
+      expect(JSON.parse(merker() ?? '{}')).toMatchObject({ benutzer: 1, sitzung: 'k-login' }),
     );
 
     act(() => void document.dispatchEvent(new Event('visibilitychange')));

@@ -25,8 +25,16 @@ interface OffeneAbmeldung {
   benutzer: number;
   /** `null`: Kennung unbekannt, jede Sitzung dieser Person gilt als aufgegeben. */
   sitzung: string | null;
+  /** Kennt diese eine gescheiterte Abmeldung. Ein später angelegter Merker hat einen anderen
+   *  Vorgang, und ein noch laufendes Nachfragen oder Nachholen ändert oder löscht ihn nicht. */
+  vorgang: string;
 }
 
+function neuerVorgang(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Der gespeicherte Merker, oder `null` ohne Merker, bei gesperrtem Speicher oder kaputtem Wert. */
 function lesen(): OffeneAbmeldung | null {
   const roh = sicherLesen(SCHLUESSEL);
   if (roh === null) return null;
@@ -36,18 +44,22 @@ function lesen(): OffeneAbmeldung | null {
     return {
       benutzer: wert.benutzer,
       sitzung: typeof wert.sitzung === 'string' ? wert.sitzung : null,
+      vorgang: typeof wert.vorgang === 'string' ? wert.vorgang : '',
     };
   } catch {
     return null;
   }
 }
 
+/** Schreibt den Merker; ohne Speicher bleibt es beim bisherigen Verhalten (Übernahme möglich). */
 function schreiben(wert: OffeneAbmeldung): void {
   sicherSchreiben(SCHLUESSEL, JSON.stringify(wert));
 }
 
-/** Vergisst den Merker: die Sitzung ist auf dem Server beendet, oder jemand hat sich angemeldet. */
-export function vergissOffeneAbmeldung(): void {
+/** Vergisst den Merker: die Sitzung ist auf dem Server beendet, oder jemand hat sich angemeldet.
+ *  Mit `vorgang` nur, solange der Merker noch zu diesem Vorgang gehört. */
+export function vergissOffeneAbmeldung(vorgang?: string): void {
+  if (vorgang !== undefined && lesen()?.vorgang !== vorgang) return;
   sicherEntfernen(SCHLUESSEL);
 }
 
@@ -66,21 +78,22 @@ export function istAufgegebeneSitzung(aufServer: MeAntwort): boolean {
  */
 export function merkeOffeneAbmeldung(bisher: MeAntwort): void {
   const sitzung = bisher.sitzung ?? null;
-  schreiben({ benutzer: bisher.id, sitzung });
+  const vorgang = neuerVorgang();
+  schreiben({ benutzer: bisher.id, sitzung, vorgang });
   if (sitzung !== null) return;
   void (async () => {
     try {
       const aufServer = await authApi.me();
-      const offen = lesen();
-      // Inzwischen nachgeholt oder durch eine Anmeldung ersetzt: nichts mehr zu schärfen.
-      if (!offen || offen.benutzer !== bisher.id || offen.sitzung !== null) return;
+      // Inzwischen nachgeholt, durch eine Anmeldung oder einen neueren Merker ersetzt: die
+      // Antwort ist veraltet.
+      if (lesen()?.vorgang !== vorgang) return;
       if (aufServer.id === bisher.id) {
-        schreiben({ benutzer: bisher.id, sitzung: aufServer.sitzung ?? null });
+        schreiben({ benutzer: bisher.id, sitzung: aufServer.sitzung ?? null, vorgang });
       } else {
-        vergissOffeneAbmeldung();
+        vergissOffeneAbmeldung(vorgang);
       }
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) vergissOffeneAbmeldung();
+      if (e instanceof ApiError && e.status === 401) vergissOffeneAbmeldung(vorgang);
       // Sonst bleibt die Kennung unbekannt; die nächste Prüfung holt die Abmeldung nach.
     }
   })();
@@ -96,12 +109,18 @@ let nachholLauf: Promise<void> | null = null;
  */
 export function holeAbmeldungNach(): Promise<void> {
   nachholLauf ??= (async () => {
+    // Nur der Merker, für den dieser Lauf startet, fällt mit ihm — nicht einer, den ein weiteres
+    // gescheitertes Abmelden währenddessen angelegt hat.
+    const vorgang = lesen()?.vorgang;
     try {
       await authApi.logout();
-      vergissOffeneAbmeldung();
+      if (vorgang !== undefined) vergissOffeneAbmeldung(vorgang);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) vergissOffeneAbmeldung();
-      else console.error('Server-Abmeldung weiter nicht möglich', e);
+      if (!(e instanceof ApiError && e.status === 401)) {
+        console.error('Server-Abmeldung weiter nicht möglich', e);
+      } else if (vorgang !== undefined) {
+        vergissOffeneAbmeldung(vorgang);
+      }
     } finally {
       nachholLauf = null;
     }
