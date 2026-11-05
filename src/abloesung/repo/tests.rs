@@ -4318,6 +4318,366 @@ async fn uebernommene_schicht_behaelt_ihre_herkunft() {
     assert_eq!(geloest.beginn_quelle, BeginnQuelle::Eintreffen);
 }
 
+// ── LLH-1508: gestrichenes Eintreffen nimmt die automatisch begonnene Schicht mit ───────────────
+
+/// Zahl der Schichten der Einheit in der Tabelle, gleich welchen Status.
+async fn schicht_zeilen(w: &Welt, einheit: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_abloesung WHERE einheit_id = ?")
+        .bind(einheit)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+/// Zahl der Fristen (offen oder geschlossen) einer Schicht, über alle drei Objekte.
+async fn fristen_zeilen(w: &Welt, id: i64) -> i64 {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM erinnerung WHERE bezug_id = ? \
+           AND bezug_typ IN ('abloesung', 'abloesung_vorwarnung', 'abloesung_planung')",
+    )
+    .bind(id)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+/// Spec „Schicht mit dem Eintreffen“, Szenario „Eintreffen gestrichen“: Eintreffen erfassen →
+/// Schicht; Eintreffen streichen → Schicht samt Fristen weg, ETB-Zeile; neu erfassen → neue
+/// Schicht mit neuem Beginn (die Zeitkorrektur).
+#[tokio::test]
+async fn gestrichenes_eintreffen_nimmt_die_autostart_schicht_mit() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 07:30:00").await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f2).await[0].id;
+    assert!(fristen_zeilen(&w, id).await > 0);
+
+    let b = streiche(&w, w.f2, Eintreffen).await;
+    assert_eq!(b.abloesung.len(), 1, "der ETB-Eintrag für Kurzruf und Live");
+    assert!(b.hinweise.is_empty(), "ohne Planung kein Hinweis");
+    assert_eq!(schicht_zeilen(&w, w.f2).await, 0, "die Schicht ist weg");
+    assert_eq!(fristen_zeilen(&w, id).await, 0, "ihre Fristen mit");
+    let etb = etb(&w.pool, w.e).await;
+    assert!(
+        etb.iter()
+            .any(|(_, i, _, _)| i
+                == "Ablösung: Schicht von «Florian 2» mit dem Eintreffen gestrichen"),
+        "{etb:?}"
+    );
+
+    ereignis(&w, w.f2, Eintreffen, "2030-06-03 08:10:00").await;
+    let s = schichten(&w, w.f2).await;
+    assert_eq!(s.len(), 1);
+    assert_eq!(s[0].beginn_at, "2030-06-03 08:10:00");
+    assert_eq!(s[0].faellig_at, "2030-06-03 14:10:00");
+    assert_eq!(s[0].beginn_quelle, BeginnQuelle::Eintreffen);
+}
+
+/// Hängt etwas anderes an der Schicht, bleibt sie beim Streichen stehen: ein geänderter Beginn
+/// (auch zurück auf das Eintreffen), ein eigener Rhythmus, von Hand begonnen.
+#[tokio::test]
+async fn gestrichenes_eintreffen_laesst_eine_geaenderte_schicht_stehen() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+
+    // Beginn geändert und zurück: Herkunft `hand`, Beginn wieder gleich dem Eintreffen.
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let beginn_geaendert = schichten(&w, w.f2).await[0].id;
+    beginn_aendern(&w, beginn_geaendert, "2030-06-03 08:30:00").await;
+    beginn_aendern(&w, beginn_geaendert, ANKUNFT).await;
+    let b = streiche(&w, w.f2, Eintreffen).await;
+    assert!(b.abloesung.is_empty());
+    let s = laden(&w.pool, w.e, beginn_geaendert, T0).await.unwrap();
+    assert_eq!(s.status, AbloesungStatus::Laufend);
+
+    // Eigener Rhythmus.
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    ereignis(&w, f3, Eintreffen, ANKUNFT).await;
+    let eigener_rhythmus = schichten(&w, f3).await[0].id;
+    aendern(
+        &w.pool,
+        w.e,
+        eigener_rhythmus,
+        w.b,
+        &AenderungEingabe {
+            rhythmus_minuten: Some(Some(240)),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    let b = streiche(&w, f3, Eintreffen).await;
+    assert!(b.abloesung.is_empty());
+    assert_eq!(schicht_zeilen(&w, f3).await, 1);
+
+    // Zurück zur Vorgabe zählt nicht als eigener Rhythmus.
+    let f4 = einheit(&w.pool, w.e, "Florian 4", None).await;
+    ereignis(&w, f4, Eintreffen, ANKUNFT).await;
+    let zurueck = schichten(&w, f4).await[0].id;
+    for r in [Some(240), None] {
+        aendern(
+            &w.pool,
+            w.e,
+            zurueck,
+            w.b,
+            &AenderungEingabe {
+                rhythmus_minuten: Some(r),
+                ..Default::default()
+            },
+            T0,
+        )
+        .await
+        .unwrap();
+    }
+    streiche(&w, f4, Eintreffen).await;
+    assert_eq!(schicht_zeilen(&w, f4).await, 0);
+}
+
+/// Von Hand begonnen (auch mit dem Eintreffen als Beginn) bleibt stehen: begonnen hat sie ein
+/// Mensch, nicht das Eintreffen.
+#[tokio::test]
+async fn gestrichenes_eintreffen_laesst_eine_von_hand_begonnene_schicht_stehen() {
+    let w = welt().await;
+    // Eingetroffen ohne Vorgabe (kein Autostart), dann von Hand nach der Vorgabe des Einsatzes.
+    eintreffen(&w, w.f2, "2026-09-22 06:40:00").await;
+    set_einsatz_rhythmus(&w, 360).await;
+    let (s, _) = beginnen(
+        &w.pool,
+        w.e,
+        w.b,
+        &BeginnEingabe {
+            einheit_id: w.f2,
+            beginn_at: None,
+            rhythmus_minuten: None,
+        },
+        "2026-09-22 09:00:00",
+    )
+    .await
+    .unwrap();
+    assert_eq!(s.beginn_at, "2026-09-22 06:40:00");
+    assert_eq!(s.rhythmus_quelle, RhythmusQuelle::Einsatz);
+    let b = streiche(&w, w.f2, Eintreffen).await;
+    assert!(b.abloesung.is_empty());
+    assert_eq!(schicht_zeilen(&w, w.f2).await, 1);
+}
+
+/// Eine beim Vollzug übernommene Schicht gehört dem Vollzug: sie bleibt beim Streichen stehen,
+/// sonst bräche dessen Rücknahme.
+#[tokio::test]
+async fn gestrichenes_eintreffen_laesst_eine_uebernommene_schicht_stehen() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let eigene = schichten(&w, w.f2).await.remove(0).id;
+    let jetzt = "2030-06-03 15:40:00";
+    vollziehen(&w.pool, w.e, a.id, w.b, jetzt, Some(w.f2), jetzt)
+        .await
+        .unwrap();
+
+    let b = streiche(&w, w.f2, Eintreffen).await;
+    assert!(b.abloesung.is_empty());
+    let s = laden(&w.pool, w.e, eigene, jetzt).await.unwrap();
+    assert_eq!(s.status, AbloesungStatus::Laufend);
+    assert_eq!(s.vorgaenger_id, Some(a.id));
+    zuruecknehmen(&w.pool, w.e, a.id, w.b, jetzt).await.unwrap();
+}
+
+/// Ist an der Schicht ein Ablöser geplant, entfällt die Planung mit: ETB nennt sie, die Führung
+/// bekommt den Hinweis „Planung der ablösenden Einheit entfallen“ wie bei der Entlassung.
+#[tokio::test]
+async fn gestrichenes_eintreffen_laesst_die_planung_an_der_schicht_entfallen() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f1, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f1).await[0].id;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    aendern(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &AenderungEingabe {
+            abloeser: Some(vec![w.f2, f3]),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+
+    let b = streiche(&w, w.f1, Eintreffen).await;
+    assert_eq!(schicht_zeilen(&w, w.f1).await, 0);
+    let liste: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_abloesung_abloeser WHERE abloesung_id = ?",
+    )
+    .bind(id)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(liste, 0);
+    assert_eq!(
+        b.hinweise,
+        vec![anlass(&w, id, Bezugstyp::AbloeserEntfallen)]
+    );
+    let etb = etb(&w.pool, w.e).await;
+    assert!(
+        etb.iter().any(|(_, i, _, _)| i
+            == "Ablösung: Schicht von «Florian 1» mit dem Eintreffen gestrichen, Planung der \
+                ablösenden Einheiten «Florian 2», «Florian 3» entfallen"),
+        "{etb:?}"
+    );
+    // Die Ablöser sind frei: ihr Eintreffen beginnt ihre eigene Schicht.
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    assert_eq!(schichten(&w, w.f2).await.len(), 1);
+}
+
+/// Streichen einer als ablösende geplanten Einheit meldet weiter „Eintreffen gestrichen“
+/// (LLH-1425) und lässt die Schicht, die sie ablösen soll, stehen.
+#[tokio::test]
+async fn gestrichenes_eintreffen_des_abloesers_meldet_weiter_und_laesst_die_schicht() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f1, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f1).await[0].id;
+    plane(&w, id, Some(w.f2)).await;
+    ereignis(&w, w.f2, Eintreffen, "2030-06-03 13:00:00").await;
+
+    let b = streiche(&w, w.f2, Eintreffen).await;
+    assert_eq!(
+        b.hinweise,
+        vec![anlass(&w, id, Bezugstyp::AbloeserEintreffenGestrichen)]
+    );
+    assert!(b.abloesung.is_empty());
+    let s = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(s.status, AbloesungStatus::Laufend);
+    assert_eq!(s.abloesende_einheit_id, Some(w.f2), "die Planung bleibt");
+}
+
+/// Berichtigt den Zeitpunkt des jüngsten nicht gestrichenen Ereignisses `art` der Einheit
+/// (Route „Zeitpunkt berichtigen“, LLH-1455).
+async fn berichtige(
+    w: &Welt,
+    einheit: i64,
+    art: crate::zeitachse::ZeitachseArt,
+    zeit: &str,
+) -> crate::zeitachse::repo::Beruehrt {
+    let id: i64 = sqlx::query_scalar(
+        "SELECT id FROM einsatz_kraft_zeitachse WHERE einheit_id = ? AND art = ? \
+           AND gestrichen_at IS NULL ORDER BY id DESC LIMIT 1",
+    )
+    .bind(einheit)
+    .bind(art.as_str())
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    let mut tx = w.pool.begin().await.unwrap();
+    let b = crate::zeitachse::repo::berichtige_tx(
+        &mut tx,
+        w.e,
+        w.b,
+        crate::zeitachse::repo::Kraft::Einheit(einheit),
+        id,
+        zeit,
+        "Zeit korrigiert",
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    b.beruehrt
+}
+
+/// Die Berichtigung ist die Zeitkorrektur in einem Schritt: die mit dem Eintreffen begonnene
+/// Schicht wandert mit (Beginn, Fälligkeit, Fristen), dieselbe Schicht, ihre Planung bleibt.
+#[tokio::test]
+async fn berichtigtes_eintreffen_verschiebt_die_autostart_schicht() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f2).await[0].id;
+    plane(&w, id, Some(w.f1)).await;
+
+    let b = berichtige(&w, w.f2, Eintreffen, "2030-06-03 08:20:00").await;
+    assert_eq!(b.abloesung.len(), 1, "{b:?}");
+    assert!(b.hinweise.is_empty(), "{:?}", b.hinweise);
+    let s = schichten(&w, w.f2).await;
+    assert_eq!(s.len(), 1);
+    assert_eq!(s[0].id, id, "dieselbe Schicht");
+    assert_eq!(s[0].beginn_at, "2030-06-03 08:20:00");
+    assert_eq!(s[0].faellig_at, "2030-06-03 14:20:00");
+    assert_eq!(s[0].beginn_quelle, BeginnQuelle::Eintreffen);
+    assert_eq!(s[0].abloesende_einheit_id, Some(w.f1), "die Planung bleibt");
+    assert_eq!(
+        offene_fristen(&w.pool, id).await,
+        vec![
+            ("abloesung".into(), "2030-06-03 14:20:00".into()),
+            ("abloesung_vorwarnung".into(), "2030-06-03 13:50:00".into()),
+        ]
+    );
+    let etb = etb(&w.pool, w.e).await;
+    assert!(
+        etb.iter().any(|(_, i, _, _)| i
+            == "Ablösung: Beginn der Schicht von «Florian 2» folgt dem berichtigten Eintreffen"),
+        "{etb:?}"
+    );
+    assert!(
+        !etb.iter()
+            .any(|(_, i, _, _)| i.contains("mit dem Eintreffen gestrichen")),
+        "{etb:?}"
+    );
+}
+
+/// Ein geänderter Beginn bleibt auch bei der Berichtigung stehen (wie bisher).
+#[tokio::test]
+async fn berichtigtes_eintreffen_laesst_einen_geaenderten_beginn_stehen() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f2).await[0].id;
+    beginn_aendern(&w, id, "2030-06-03 07:50:00").await;
+    let b = berichtige(&w, w.f2, Eintreffen, "2030-06-03 08:20:00").await;
+    assert!(b.abloesung.is_empty(), "{b:?}");
+    let s = schichten(&w, w.f2).await;
+    assert_eq!(s.len(), 1);
+    assert_eq!(s[0].beginn_at, "2030-06-03 07:50:00");
+}
+
+/// Ein Fehler beim Entfernen rollt nur die Kopplung zurück: das Eintreffen ist gestrichen, die
+/// Schicht steht noch.
+#[tokio::test]
+async fn fehler_beim_entfernen_bricht_die_streichung_nicht() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f2).await[0].id;
+    sqlx::query(
+        "CREATE TRIGGER schicht_bleibt BEFORE DELETE ON einsatz_abloesung \
+         BEGIN SELECT RAISE(ABORT, 'erzwungen'); END",
+    )
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let b = streiche(&w, w.f2, Eintreffen).await;
+    assert!(b.abloesung.is_empty());
+    let offen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_kraft_zeitachse WHERE einheit_id = ? AND gestrichen_at IS NULL",
+    )
+    .bind(w.f2)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(offen, 0, "das Eintreffen ist gestrichen");
+    assert_eq!(
+        laden(&w.pool, w.e, id, T0).await.unwrap().status,
+        AbloesungStatus::Laufend
+    );
+    assert!(fristen_zeilen(&w, id).await > 0, "die Fristen stehen noch");
+}
+
 // ── LLH-1319: Besatzungswechsel planen, verteilen, Planung über die Rücknahme ────────────────
 
 /// Plant an der Schicht den Besatzungswechsel `ziele` (und leert bei `abloeser_leeren` die

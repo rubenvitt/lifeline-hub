@@ -4,7 +4,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ladeVerpflegung } from '../api/verpflegung';
-import { neuerQueryClient } from '../test/utils';
+import { neuerQueryClient, setzeOnline } from '../test/utils';
 import { FELDKUECHE, stelle, verpflegungMitStellen } from '../test/verpflegungDaten';
 import OfflineRecoveryDrawer from './OfflineRecoveryDrawer';
 import { countFruehereKopplung, confirmGeraetKonto } from './fruehereKopplung';
@@ -339,6 +339,21 @@ describe('OfflineRecoveryDrawer: abgelehnte Verpflegungsausgaben (LFH-688)', () 
       await screen.findByText('Abgelehnte Verpflegungsausgabe: Mittag · unbekannte Stelle'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+  });
+
+  it('ohne Netz heißt die Stelle „unbekannte Stelle“, statt auf die Verpflegung zu warten', async () => {
+    setzeOnline(false);
+    try {
+      await abgelehnteAusgabeAnStelle(FELDKUECHE);
+
+      expect(
+        await screen.findByText('Abgelehnte Verpflegungsausgabe: Mittag · unbekannte Stelle'),
+      ).toBeInTheDocument();
+      expect(within(stellenZeile()).getByText('unbekannte Stelle')).toBeInTheDocument();
+      expect(ladeVerpflegung).not.toHaveBeenCalled();
+    } finally {
+      setzeOnline(true);
+    }
   });
 
   it('eine Ausgabe ohne Stelle liest die Verpflegung nicht', async () => {

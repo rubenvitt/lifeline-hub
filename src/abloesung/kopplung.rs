@@ -15,6 +15,12 @@
 //! - **Streichung dieser Entlassung**: die Schicht läuft wieder, samt Fristen, und die mit der
 //!   Entlassung entfallenen Planungen kommen zurück (LLH-1510,
 //!   [`repo::restore_entfallene_planungen_tx`]).
+//! - **Streichung des Eintreffens** der offenen Periode: hat es die laufende Schicht der Einheit
+//!   automatisch begonnen und hängt nichts anderes an ihr (kein Vollzug, Beginn und Rhythmus
+//!   nicht von Hand), entfällt sie samt Fristen und Planung (LLH-1508,
+//!   [`repo::drop_autostart_tx`]). Ein neu erfasstes Eintreffen beginnt dann eine neue. Wird
+//!   das Eintreffen nur **berichtigt**, wandert die Schicht samt Fristen und Planung auf die neue
+//!   Zeit ([`repo::move_autostart_tx`]).
 //!
 //! Dazu die **Hinweise zur ablösenden Einheit** (LLH-1131, [`super::hinweis`]): ist die Einheit
 //! als ablösende geplant, wird ihre Alarmierung und ihr Eintreffen (beide nur als Beginn der
@@ -115,7 +121,10 @@ pub async fn vor_streichung_tx(
 /// Beginn der offenen Periode (`hinweis` aus [`vor_streichung_tx`]), geht je Schicht, die die
 /// Einheit als ablösende plant, der Hinweis „Alarmierung/Eintreffen der ablösenden Einheit
 /// gestrichen“ hinaus (LLH-1425): der frühere Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht
-/// mehr.
+/// mehr. War es das Eintreffen, entfällt dazu die Schicht, die es automatisch begonnen hat
+/// (LLH-1508, [`repo::drop_autostart_tx`]); ist es nur berichtigt (`berichtigt_auf`, das neue
+/// Eintreffen folgt), wandert sie stattdessen mit ([`repo::move_autostart_tx`]).
+#[allow(clippy::too_many_arguments)]
 pub async fn nach_streichung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -124,9 +133,14 @@ pub async fn nach_streichung_tx(
     art: ZeitachseArt,
     zeitpunkt_at: &str,
     hinweis: Option<BenachrichtigungBezugTyp>,
+    berichtigt_auf: Option<&str>,
 ) -> Result<Wirkung, AppError> {
     let schritt = match (art, hinweis) {
         (ZeitachseArt::Entlassung, _) => Schritt::Wiederaufnahme,
+        (ZeitachseArt::Eintreffen, Some(typ)) => Schritt::EintreffenGestrichen {
+            typ,
+            neu: berichtigt_auf,
+        },
         (_, Some(typ)) => Schritt::Gestrichen(typ),
         (_, None) => return Ok(Wirkung::default()),
     };
@@ -143,7 +157,7 @@ pub async fn nach_streichung_tx(
 
 /// Was die Kopplung an der Schicht tut.
 #[derive(Debug, Clone, Copy)]
-enum Schritt {
+enum Schritt<'a> {
     /// Nur der Hinweis „alarmiert“, keine Schicht.
     Alarmierung,
     /// `hinweis`: dazu der Hinweis „eingetroffen“.
@@ -154,6 +168,12 @@ enum Schritt {
     Wiederaufnahme,
     /// Nur der Hinweis „… gestrichen“ mit diesem Bezugstyp, keine Schicht.
     Gestrichen(BenachrichtigungBezugTyp),
+    /// Der Hinweis „Eintreffen … gestrichen“, dazu entfällt die mit ihm begonnene Schicht; mit
+    /// `neu` (Berichtigung) wandert sie auf das neue Eintreffen.
+    EintreffenGestrichen {
+        typ: BenachrichtigungBezugTyp,
+        neu: Option<&'a str>,
+    },
 }
 
 /// Führt den Schritt in einem Savepoint aus. Ein Fehler darin rollt nur den Savepoint zurück und
@@ -164,7 +184,7 @@ async fn isoliert(
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
-    schritt: Schritt,
+    schritt: Schritt<'_>,
     zeitpunkt_at: &str,
 ) -> Result<Wirkung, AppError> {
     sqlx::query(sqlx::AssertSqlSafe(format!("SAVEPOINT {SAVEPOINT}")))
@@ -196,6 +216,18 @@ async fn isoliert(
                     etb: Vec::new(),
                     anlaesse,
                 })
+        }
+        Schritt::EintreffenGestrichen { typ, neu } => {
+            eintreffen_gestrichen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                typ,
+                zeitpunkt_at,
+                neu,
+            )
+            .await
         }
     };
     match r {
@@ -281,6 +313,44 @@ async fn eintreffen_tx(
         etb: autostart_tx(conn, einsatz_id, benutzer_id, einheit_id, eintreffen_at).await?,
         anlaesse,
     })
+}
+
+/// Eintreffen der offenen Periode gestrichen: je Schicht, die die Einheit als ablösende plant,
+/// der Hinweis „Eintreffen der ablösenden Einheit gestrichen“ (LLH-1425), dann entfällt die
+/// Schicht, die das Eintreffen automatisch begonnen hat (LLH-1508), oder sie wandert bei einer
+/// Berichtigung auf das neue Eintreffen `neu`. Die Anlässe werden vorher gebildet; die eigene
+/// Schicht plant die Einheit nie als ablösende.
+async fn eintreffen_gestrichen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    typ: BenachrichtigungBezugTyp,
+    eintreffen_at: &str,
+    neu: Option<&str>,
+) -> Result<Wirkung, AppError> {
+    let mut wirkung = Wirkung {
+        etb: Vec::new(),
+        anlaesse: hinweis::anlaesse_tx(conn, einsatz_id, einheit_id, typ, benutzer_id).await?,
+    };
+    wirkung.append(match neu {
+        Some(neu_at) => {
+            repo::move_autostart_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                eintreffen_at,
+                neu_at,
+            )
+            .await?
+        }
+        None => {
+            repo::drop_autostart_tx(conn, einsatz_id, benutzer_id, einheit_id, eintreffen_at)
+                .await?
+        }
+    });
+    Ok(wirkung)
 }
 
 /// Aktiv (nicht aufgelöst) und im Einsatz.

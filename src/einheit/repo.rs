@@ -2651,6 +2651,102 @@ mod tests {
         assert_eq!(personal.iter().map(|p| p.ep_id).collect::<Vec<_>>(), [anna]);
     }
 
+    /// LLH-1503: Ein verknüpftes Stamm-Fahrzeug der letzten Besetzung trägt Funkrufname und Typ
+    /// wie die Fahrzeugliste (`disposition_repo::zu_anzeige`): live aus dem Stamm nur bei aktivem
+    /// Einsatz und Fahrzeug in Dienst, sonst der Snapshot der Dispozeile.
+    #[tokio::test]
+    async fn letzte_besetzung_loest_ein_stamm_fahrzeug_wie_die_fahrzeugliste_auf() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Florian 1", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        let stamm: i64 = sqlx::query_scalar(
+            "INSERT INTO fahrzeug (org_id, funkrufname, fahrzeugtyp) \
+             VALUES (1, 'Florian 1-83-1', 'RTW') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let ef: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, fahrzeug_id, einheit_id, snap_funkrufname, \
+                snap_fahrzeugtyp) VALUES (?, ?, ?, 'Florian 1-83-1', 'RTW') RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(stamm)
+        .bind(e.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        aufloesen_als(&pool, einsatz, e.id, b, Aufloesung::Aufloesen)
+            .await
+            .unwrap();
+        // Nach dem Auflösen im Stamm umbenannt und umgetypt.
+        sqlx::query(
+            "UPDATE fahrzeug SET funkrufname = 'Florian 1-83-9', fahrzeugtyp = 'HLF' WHERE id = ?",
+        )
+        .bind(stamm)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Prüft Name und Typ der letzten Besetzung gegen die erwarteten Werte und gegen die
+        // Auflösung der Fahrzeugliste.
+        let pruefe = |pool: SqlitePool, aktiv: bool, name: &'static str, typ: &'static str| async move {
+            let fahrzeuge = aufgeloeste_von(&pool, einsatz, e.id)
+                .await
+                .letzte_besetzung
+                .expect("festgehalten")
+                .fahrzeuge;
+            assert_eq!(
+                fahrzeuge,
+                [super::super::LetztesFahrzeug {
+                    ef_id: ef,
+                    funkrufname: name.into(),
+                    fahrzeugtyp: Some(typ.into()),
+                }]
+            );
+            let liste = crate::fahrzeug::disposition_repo::load_anzeige(&pool, einsatz, ef, aktiv)
+                .await
+                .unwrap();
+            assert_eq!(
+                (&fahrzeuge[0].funkrufname, &fahrzeuge[0].fahrzeugtyp),
+                (&liste.funkrufname, &liste.fahrzeugtyp),
+                "wie in der Fahrzeugliste"
+            );
+        };
+
+        // Aktiver Einsatz, Fahrzeug in Dienst: der neue Name aus dem Stamm.
+        pruefe(pool.clone(), true, "Florian 1-83-9", "HLF").await;
+
+        // Außer Dienst: der Snapshot.
+        sqlx::query("UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?")
+            .bind(stamm)
+            .execute(&pool)
+            .await
+            .unwrap();
+        pruefe(pool.clone(), true, "Florian 1-83-1", "RTW").await;
+
+        // Wieder in Dienst, aber der Einsatz ist abgeschlossen: der Snapshot.
+        sqlx::query("UPDATE fahrzeug SET dienststatus = 'in_dienst' WHERE id = ?")
+            .bind(stamm)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        pruefe(pool.clone(), false, "Florian 1-83-1", "RTW").await;
+    }
+
     /// Spec `kraefte-entlassung`, „Vor der Änderung aufgelöst“: ohne Kennzeichen kein Feld; eine
     /// ohne aktive Kräfte festgehaltene Einheit trägt drei leere Listen; aktive Einheiten nie.
     #[tokio::test]

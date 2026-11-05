@@ -3825,6 +3825,174 @@ pub(crate) async fn reopen_nach_entlassung_tx(
     Ok(Some((id, name)))
 }
 
+/// Entfernt die Schicht, die mit einem jetzt gestrichenen Eintreffen automatisch begonnen hat
+/// (LLH-1508, Spec `kraefte-abloesung` „Schicht mit dem Eintreffen“): Eine Streichung ist eine
+/// Korrektur, was das Eintreffen ausgelöst hat, geht mit, solange nichts anderes daran hängt
+/// (LLH-1310). Entfernt wird nur die laufende eigene Schicht der Einheit, die
+/// - mit dem Eintreffen begonnen hat (`beginn_quelle` `eintreffen`, ein geänderter Beginn hat
+///   `hand` gesetzt) und genau zu `eintreffen_at`,
+/// - keinem Vollzug gehört (nicht als Folgeschicht übernommen, `vorgaenger_id` leer) und
+/// - keinem eigenen Rhythmus folgt (`rhythmus_quelle` nicht `einheit`).
+///
+/// Sonst bleibt sie stehen ([`load_autostart_tx`]). Die Schicht verschwindet samt Fristen und
+/// Planung (die abhängigen Tabellen löschen mit, `ON DELETE CASCADE`); eine Planung nennt der
+/// ETB-Eintrag, eine geplante ablösende Einheit dazu ein Hinweis `abloeser_entfallen` wie bei
+/// der Entlassung ([`drop_planungen_tx`]). Einen Vermerk an der Karte gibt es nicht, die Karte
+/// ist weg. Läuft in der Transaktion des Aufrufers; leer ohne Wirkung.
+pub(crate) async fn drop_autostart_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    eintreffen_at: &str,
+) -> Result<Wirkung, AppError> {
+    let Some((id, name)) = load_autostart_tx(conn, einsatz_id, einheit_id, eintreffen_at).await?
+    else {
+        return Ok(Wirkung::default());
+    };
+    // Die Liste in ihrer Reihenfolge; ohne Liste der Spiegel (Bestand vor LLH-1132).
+    let mut abloeser: Vec<String> = sqlx::query_scalar(
+        "SELECT e.name FROM einsatz_abloesung_abloeser l \
+         JOIN einsatz_einheit e ON e.id = l.einheit_id \
+         WHERE l.abloesung_id = ? ORDER BY l.rowid",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
+    if abloeser.is_empty() {
+        abloeser = sqlx::query_scalar(
+            "SELECT e.name FROM einsatz_abloesung a \
+             JOIN einsatz_einheit e ON e.id = a.abloesende_einheit_id WHERE a.id = ?",
+        )
+        .bind(id)
+        .fetch_all(&mut *conn)
+        .await?;
+    }
+    let besatzung = !load_besatzung_plan_tx(conn, id).await?.is_empty();
+
+    delete_fristen_tx(conn, id).await?;
+    sqlx::query("DELETE FROM einsatz_abloesung WHERE id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+
+    let mut inhalt = format!("Ablösung: Schicht von «{name}» mit dem Eintreffen gestrichen");
+    match abloeser.as_slice() {
+        [] => {}
+        [a] => inhalt.push_str(&format!(", Planung der ablösenden Einheit «{a}» entfallen")),
+        viele => inhalt.push_str(&format!(
+            ", Planung der ablösenden Einheiten {} entfallen",
+            viele
+                .iter()
+                .map(|a| format!("«{a}»"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    }
+    if besatzung {
+        inhalt.push_str(", Planung des Besatzungswechsels entfallen");
+    }
+    let startwert = etb_startwert(&mut *conn, einsatz_id).await?;
+    let etb_id =
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &inhalt).await?;
+    let anlaesse = if abloeser.is_empty() {
+        Vec::new()
+    } else {
+        vec![hinweis::anlass(
+            einsatz_id,
+            id,
+            BenachrichtigungBezugTyp::AbloeserEntfallen,
+            benutzer_id,
+        )]
+    };
+    Ok(Wirkung {
+        etb: vec![etb_id],
+        anlaesse,
+    })
+}
+
+/// Verschiebt die Schicht, die mit einem jetzt berichtigten Eintreffen automatisch begonnen hat
+/// (LLH-1508), auf das neue Eintreffen: Beginn, Fälligkeit und Fristen folgen, Herkunft,
+/// Rhythmusquelle und Planung bleiben. Bedingungen wie [`drop_autostart_tx`]. Die Berichtigung
+/// ist die Zeitkorrektur in einem Schritt; eine geplante ablösende Einheit soll dabei nicht
+/// entfallen. Leer ohne Wirkung.
+pub(crate) async fn move_autostart_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    alt_at: &str,
+    neu_at: &str,
+) -> Result<Wirkung, AppError> {
+    let Some((id, name)) = load_autostart_tx(conn, einsatz_id, einheit_id, alt_at).await? else {
+        return Ok(Wirkung::default());
+    };
+    let roh = roh_tx(conn, einsatz_id, id).await?;
+    let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+    let (faellig_at, rhythmus) =
+        compute_faellig(neu_at, roh.rhythmus_minuten, roh.rhythmus_quelle, &vorgabe)?;
+    sqlx::query(
+        "UPDATE einsatz_abloesung SET beginn_at = ?, faellig_at = ?, rhythmus_minuten = ? \
+         WHERE id = ?",
+    )
+    .bind(neu_at)
+    .bind(&faellig_at)
+    .bind(rhythmus)
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
+    let jetzt = crate::zeit::jetzt();
+    set_fristen_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        id,
+        &name,
+        &faellig_at,
+        &vorgabe,
+        &jetzt,
+    )
+    .await?;
+    let startwert = etb_startwert(&mut *conn, einsatz_id).await?;
+    let etb_id = crate::etb::system_audit_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        startwert,
+        &format!("Ablösung: Beginn der Schicht von «{name}» folgt dem berichtigten Eintreffen"),
+    )
+    .await?;
+    Ok(Wirkung {
+        etb: vec![etb_id],
+        anlaesse: Vec::new(),
+    })
+}
+
+/// Die laufende eigene Schicht der Einheit, die das Eintreffen `eintreffen_at` automatisch
+/// begonnen hat und an der sonst nichts hängt (Bedingungen an [`drop_autostart_tx`]): ID und
+/// Name der Einheit, `None` ohne eine.
+async fn load_autostart_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    eintreffen_at: &str,
+) -> Result<Option<(i64, String)>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT a.id, e.name FROM einsatz_abloesung a \
+         JOIN einsatz_einheit e ON e.id = a.einheit_id \
+         WHERE a.einsatz_id = ? AND a.einheit_id = ? AND a.status = 'laufend' \
+           AND a.beginn_quelle = ? AND a.beginn_at = ? AND a.rhythmus_quelle <> ? \
+           AND a.vorgaenger_id IS NULL AND a.uebernommen_bei_vollzug = 0",
+    )
+    .bind(einsatz_id)
+    .bind(einheit_id)
+    .bind(BeginnQuelle::Eintreffen.as_str())
+    .bind(eintreffen_at)
+    .bind(RhythmusQuelle::Einheit.as_str())
+    .fetch_optional(&mut *conn)
+    .await?)
+}
+
 /// Text der 422 für eine Schicht, die nicht mehr läuft.
 fn nicht_laufend(status: AbloesungStatus, was: &str) -> String {
     match status {
