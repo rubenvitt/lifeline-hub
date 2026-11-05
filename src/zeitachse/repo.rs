@@ -663,12 +663,13 @@ pub async fn trage_periode_nach_tx(
         ..Beruehrt::default()
     };
     if let Kraft::Einheit(einheit_id) = kraft {
-        for (art, zeitpunkt_at) in neu.ereignisse() {
+        for (&id, (art, zeitpunkt_at)) in ids.iter().zip(neu.ereignisse()) {
             let w = crate::abloesung::kopplung::nach_ereignis_tx(
                 conn,
                 einsatz_id,
                 benutzer_id,
                 einheit_id,
+                id,
                 art,
                 ZeitachseQuelle::Nachtrag,
                 zeitpunkt_at,
