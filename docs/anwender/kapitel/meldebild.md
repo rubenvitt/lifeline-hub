@@ -109,6 +109,16 @@ Für Einsatzleitung und Führungspersonal:
 
 4. „Nachtragen“ wählen.
 
+### Eine ganze Einsatzperiode nachtragen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Im Paneel „Zeitachse“ „Periode nachtragen“ wählen.
+2. Im Dialog „Periode nachtragen: …“ „Alarmierung“ oder „Eintreffen“ eintragen, oder beides, und
+   die „Entlassung“. Die Felder stehen leer; keine Zeit darf in der Zukunft liegen. Bei Bedarf
+   eine „Notiz (optional)“ eingeben.
+3. „Nachtragen“ wählen. Lehnt die App ab, steht der Grund im Dialog.
+
 ### Einen Zeitpunkt berichtigen
 
 Für Einsatzleitung und Führungspersonal:
@@ -221,6 +231,21 @@ Person bleibt der Eintrag wie bei der Streichung stehen. Passt das Ergebnis bei 
 Personen nicht, nennt die App sie und ändert nichts. Ereignisse aus der Ablösung lassen sich nicht
 berichtigen. Zur Schicht der Ablösung wirkt die Berichtigung wie eine Streichung mit anschließendem
 Nachtrag (Kapitel [Ablösung](abloesung.md)).
+
+### Eine Periode in einem Schritt
+
+„Periode nachtragen“ trägt Alarmierung und Eintreffen (oder eines davon) und die Entlassung in einem
+Schritt nach, mit einem Eintrag im Einsatztagebuch, etwa „Zeitachse: Einheit «Rettungsstaffel»
+Einsatzperiode nachgetragen: alarmiert …, eingetroffen …, entlassen …“. Die Notiz steht am ersten
+Ereignis. Geprüft wird nur das Ergebnis: Eine abgeschlossene Periode lässt sich so auch vor eine
+laufende setzen, wo eine einzelne Alarmierung als zweite der laufenden Periode gälte. Die neue
+Periode muss für sich stehen; liegt ein bestehendes Ereignis darin oder schlösse ihre Entlassung
+eine andere Periode, lehnt die App ab und ändert nichts. Ebenso, wenn die Alarmierung nach dem
+Eintreffen oder die Entlassung nicht nach dem Beginn liegt.
+
+An einer Einheit gilt die Periode wie ein Nachtrag auch für die jetzt zugeordneten Personen. Eine
+Person, zu deren Zeitachse sie nicht passt, bekommt keinen ihrer Einträge, auch nicht einen Teil.
+Zur Schicht der Ablösung wirkt sie wie die drei Nachträge nacheinander.
 
 ### Einsatzdauer und Ruhezeit
 

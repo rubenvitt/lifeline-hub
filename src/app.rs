@@ -1045,6 +1045,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::zeitachse::person_berichtigen),
         )
         .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/zeitachse/periode",
+            post(routes::zeitachse::person_periode_nachtragen),
+        )
+        .route(
             "/api/einsaetze/{id}/karte/fuehrungskraefte",
             get(routes::einsatz_personal::karte_fuehrungskraefte),
         )
@@ -2044,6 +2048,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/zeitachse/{zid}/berichtigen",
             post(routes::zeitachse::einheit_berichtigen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/zeitachse/periode",
+            post(routes::zeitachse::einheit_periode_nachtragen),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",

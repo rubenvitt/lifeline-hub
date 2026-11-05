@@ -231,6 +231,36 @@ kommen dazu.
 - **WHEN** eine Ablösung oder das Eintreffen einer neuen Besatzung berichtigt werden soll
 - **THEN** antwortet das System mit 422
 
+### Requirement: Periode nachtragen
+
+Das System SHALL an einer Einheit oder Person eine abgeschlossene Einsatzperiode in einem Schritt
+nachtragen lassen: Alarmierung und/oder Eintreffen und eine Entlassung (Quelle `nachtrag`, Notiz
+optional am Beginn), in einer Transaktion. Fehlen Alarmierung und Eintreffen zugleich, fehlt die
+Entlassung oder ist eine Zeit unlesbar, MUST das System mit 400 antworten. Ein Zeitpunkt in der
+Zukunft, eine Alarmierung nach dem Eintreffen, ein Ende nicht nach dem Beginn, ein Ergebnis, das
+die Perioden-Regeln verletzt, oder eines, in dem die Ereignisse keine eigene Periode bilden,
+MUST mit 422 scheitern und nichts schreiben. Die Perioden-Regeln MUST nur am Ergebnis geprüft
+werden. An einer Einheit MUST jede jetzt zugeordnete Person die Periode als Kopie bekommen, in
+deren Folge sie passt; eine andere MUST keine Kopie bekommen, auch keine teilweise. Die Kopplung
+an die Ablösung MUST wie bei den einzelnen Nachträgen in Zeitfolge laufen. Der Weg MUST einen
+System-ETB-Eintrag schreiben, der Kraft und die Zeitpunkte nennt.
+
+#### Scenario: Periode vor der laufenden nachtragen
+- **WHEN** „Florian 1“ seit 22:00 alarmiert ist und eine Periode Alarmierung 06:10, Eintreffen 06:40, Entlassung 14:00 nachgetragen wird
+- **THEN** trägt die Einheit zwei Perioden, die laufende ab 22:00 bleibt offen, und das ETB nennt „Einsatzperiode nachgetragen: alarmiert …, eingetroffen …, entlassen …“
+
+#### Scenario: Überschneidung
+- **WHEN** eine Einheit mit Eintreffen 11:00 und offener Periode eine Periode 10:00 bis 12:00 nachgetragen bekommen soll
+- **THEN** antwortet das System mit 422 und schreibt nichts
+
+#### Scenario: Ende vor dem Beginn
+- **WHEN** eine Periode mit Eintreffen 14:00 und Entlassung 06:00 nachgetragen werden soll
+- **THEN** antwortet das System mit 422
+
+#### Scenario: Fan-out ganz oder gar nicht
+- **WHEN** an „Florian 1“ eine Periode nachgetragen wird und eine ihrer Personen in diesem Zeitraum schon eine Periode trägt
+- **THEN** bekommen die übrigen Personen alle Kopien, diese Person keine
+
 ### Requirement: Kopplung an die Ablösung
 
 Vollzieht das System eine Ablösungsschicht einer Einheit, SHALL es in derselben Transaktion ein

@@ -179,8 +179,9 @@ Für Einsatzleitung und Führungspersonal, solange der Einsatz läuft:
 
 1. Unter der Personalliste „Entlassen“ aufklappen und den Namen der Person wählen.
 2. Im Paneel „Zeitachse“ eine falsche Zeit mit „Zeit berichtigen“ und einem Grund berichtigen,
-   ein falsches Ereignis mit „Streichen“ streichen, ein fehlendes mit „Nachtragen“ ergänzen.
-   Alles andere in der Ansicht bleibt gesperrt.
+   ein falsches Ereignis mit „Streichen“ streichen, ein fehlendes mit „Nachtragen“ ergänzen, eine
+   ganz fehlende Einsatzperiode mit „Periode nachtragen“. Alles andere in der Ansicht bleibt
+   gesperrt.
 3. Lehnt die App ab, weil sonst wieder eine offene Einsatzperiode entstünde, steht der Grund im
    Dialog. Die Entlassung, mit der die letzte Periode endet, lässt sich nicht streichen; daneben
    steht „erst erneut disponieren“. Ihre Zeit lässt sich mit „Zeit berichtigen“ verschieben.
@@ -201,14 +202,15 @@ nennt den Grund je Person.
 ### Berichtigen nach dem Entlassen
 
 Eine entlassene Person bleibt im Nachweis, deshalb lässt sich ihre Zeitachse weiter berichtigen.
-Jeder Nachtrag und jede Streichung schreibt einen Eintrag ins Einsatztagebuch mit dem Vermerk
-„berichtigt nach Entlassung“, die Berichtigung einer Zeit mit „(nach Entlassung)“. Eine offene
-Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag ab, der eine Periode beginnen würde,
-etwa ein Eintreffen nach der Entlassung, und ebenso die Streichung der Entlassung, mit der die
-letzte Periode endet. Deshalb lässt sich auch eine ganz fehlende Periode nach dem Entlassen nicht
-mehr nachtragen. Die Berichtigung einer Zeit lehnt sie ab, wenn danach eine Periode offen stünde,
-etwa eine Entlassung vor dem Eintreffen. Eine Streichung oder Berichtigung an ihrer früheren
-Einheit berührt die Zeitachse der entlassenen Person nicht. Steht eine entlassene Person aus
+Jeder Nachtrag, jede nachgetragene Periode und jede Streichung schreibt einen Eintrag ins
+Einsatztagebuch mit dem Vermerk „berichtigt nach Entlassung“, die Berichtigung einer Zeit mit
+„(nach Entlassung)“. Eine offene Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag
+ab, der eine Periode beginnen würde, etwa ein Eintreffen nach der Entlassung, und ebenso die
+Streichung der Entlassung, mit der die letzte Periode endet. Eine ganz fehlende Periode trägt
+„Periode nachtragen“ mit Beginn und Entlassung in einem Schritt nach (Kapitel [Meldebild und
+Kräfte-Zeitachse](meldebild.md)). Die Berichtigung einer Zeit lehnt sie ab, wenn danach eine
+Periode offen stünde, etwa eine Entlassung vor dem Eintreffen. Eine Streichung oder Berichtigung an
+ihrer früheren Einheit berührt die Zeitachse der entlassenen Person nicht. Steht eine entlassene Person aus
 älteren Daten noch mit offener Periode da, verlangt die App zuerst den Nachtrag ihrer Entlassung.
 Eine stornierte Person und eine aufgelöste Einheit lassen sich nicht berichtigen.
 

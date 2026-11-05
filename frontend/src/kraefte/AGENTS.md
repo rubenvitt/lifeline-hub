@@ -26,6 +26,12 @@ Kopien, nie der heutigen Zuordnung; eine Person der Kette, deren Folge bräche o
 Entlassene eine offene Periode bekäme, macht alles zur 422 mit Namen. Die Kopplung an die
 Ablösung läuft wie Streichung, dann Nachtrag; der Schichtbeginn wandert nicht mit. Ein
 ETB-Eintrag „… berichtigt von … auf … — Grund: …“.
+„Periode nachtragen“ (LLH-1538, `zeitachse::repo::trage_periode_nach_tx`, Routen
+`…/zeitachse/periode`) schreibt Alarmierung und/oder Eintreffen und die Entlassung in einer
+Transaktion (Quelle `nachtrag`, Notiz am Beginn); die Regeln gelten nur am Ergebnis, und die
+Ereignisse müssen darin eine eigene Periode bilden (`perioden::fuege_periode_ein`, sonst 422).
+Fan-out an die jetzt zugeordneten Personen ganz oder gar nicht, nie eine halbe Periode; Kopplung
+wie die einzelnen Nachträge in Zeitfolge. Einziger INSERT bleibt `insert_tx`.
 Einziger Schreibpfad
 `zeitachse::repo::schreibe_tx` (Perioden-Regeln rein in `zeitachse/perioden.rs`; ein Verstoß
 bricht nie den Statuswechsel). Ereignisse entstehen aus `zeitachse_marke` am Status-Katalog
