@@ -3,11 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { einsatzKeys } from '../api/queryKeys';
 import type { BenachrichtigungAnzeige, BenachrichtigungEreignis } from '../api/types';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { useAuth } from '../auth/AuthContext';
 import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener';
+import { LIVE_SAMMELFENSTER_MS } from '../live/liveInvalidierung';
 import {
   queueLeerenFuerTests,
   schreibaktionEinreihen,
@@ -16,7 +18,7 @@ import {
 import { useOfflineSync } from '../offline/useOfflineSync';
 import { benutzerFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders, setzeOnline } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, setzeOnline } from '../test/utils';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import EingaengeKnopf from './EingaengeKnopf';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeZahlText } from './eingaenge';
@@ -78,7 +80,7 @@ function Abgleich() {
   return benutzer ? <output data-testid="angemeldet" /> : null;
 }
 
-function rendern() {
+function rendern(client = neuerQueryClient()) {
   return renderMitProviders(
     <Routes>
       <Route
@@ -92,7 +94,7 @@ function rendern() {
         }
       />
     </Routes>,
-    { route: '/einsaetze/1/lagekarte' },
+    { route: '/einsaetze/1/lagekarte', client },
   );
 }
 
@@ -212,12 +214,16 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
 
   it('gleicht bei einem Ereignis dieses Einsatzes ab, bei einem fremden nicht', async () => {
     const zaehler = serverMit({ eintraege: [], ungelesen: 0 });
-    rendern();
-    await screen.findByRole('button', { name: 'Eingänge, keine ungelesen' });
+    const client = neuerQueryClient();
+    const key = einsatzKeys.benachrichtigungVerlauf(1);
+    rendern(client);
     // Die Zahl „keine“ steht schon, solange der erste Abruf läuft; unter Last kam er sonst erst
-    // nach `vorher` beim Server an und zählte wie ein Abgleich.
-    await waitFor(() => expect(zaehler.abrufe).toBe(1));
-    const vorher = zaehler.abrufe;
+    // nach `vorher` beim Server an und zählte wie ein Abgleich. Gewartet wird, bis er fertig ist.
+    await waitFor(() =>
+      expect(client.getQueryState(key)).toMatchObject({ status: 'success', fetchStatus: 'idle' }),
+    );
+    expect(zaehler.abrufe).toBe(1);
+    const vorher = { abrufe: zaehler.abrufe, stand: client.getQueryState(key)!.dataUpdateCount };
     const senden = (einsatz_id: number) =>
       act(() => {
         const detail: BenachrichtigungEreignis = {
@@ -232,10 +238,18 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
         window.dispatchEvent(new CustomEvent(BENACHRICHTIGUNG_WINDOW_EVENT, { detail }));
       });
     senden(2);
-    await new Promise((r) => setTimeout(r, 400));
-    expect(zaehler.abrufe).toBe(vorher);
+    // Ein Abgleich liefe im Takt des Sammelfensters, dessen Zeitgeber vor dem Warten steht und
+    // deshalb auch unter Last zuerst feuert. Er markiert den Verlauf sofort als veraltet und ruft
+    // ab; das ist am Zustand der Abfrage sichtbar, bevor der Abruf beim Server ankommt.
+    await new Promise((r) => setTimeout(r, LIVE_SAMMELFENSTER_MS + 100));
+    expect(client.getQueryState(key)).toMatchObject({
+      fetchStatus: 'idle',
+      isInvalidated: false,
+      dataUpdateCount: vorher.stand,
+    });
+    expect(zaehler.abrufe).toBe(vorher.abrufe);
     senden(1);
-    await waitFor(() => expect(zaehler.abrufe).toBe(vorher + 1));
+    await waitFor(() => expect(zaehler.abrufe).toBe(vorher.abrufe + 1), { timeout: 5000 });
   });
 
   it('„Stumm“ klappt die Schalter dieses Geräts auf: nur Eingänge, kein Alarm (LLH-1421)', async () => {
