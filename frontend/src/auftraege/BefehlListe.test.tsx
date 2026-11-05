@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router';
+import { StrictMode } from 'react';
+import { MemoryRouter, RouterProvider, createMemoryRouter, useLocation } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import BefehlListe from './BefehlListe';
@@ -264,6 +265,53 @@ describe('BefehlListe — Liste + Detailpaneel (Spec `auftraege-befehle`)', () =
       'true',
     );
     await waitFor(() => expect(screen.getByTestId('suche')).not.toHaveTextContent('befehl='));
+  });
+
+  /**
+   * Rückweg aus der Vollseite (LLH-1530): Die Liste steht aus dem Cache sofort da, und StrictMode
+   * lässt jeden Effekt der frisch eingehängten Liste ein zweites Mal laufen. Die Vorauswahl der
+   * `ListeDetail` räumt dabei den Sprung; der Auftrag muss im zweiten Durchgang mitlaufen, sonst
+   * bliebe die Karte gewählt, aber nicht markiert.
+   */
+  it('?befehl= markiert den Befehl auch beim Rückweg mit Cache unter StrictMode', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/einsaetze/1/auftraege',
+          element: (
+            <CommandPaletteProvider>
+              <BefehlListe einsatzId={1} darfSchreiben />
+            </CommandPaletteProvider>
+          ),
+        },
+        { path: '/einsaetze/1/auftraege/befehle/:befehlId', element: <span>Vollseite</span> },
+      ],
+      { initialEntries: ['/einsaetze/1/auftraege?reiter=befehle'] },
+    );
+    render(
+      <StrictMode>
+        <QueryClientProvider client={qc}>
+          <AntApp>
+            <RouterProvider router={router} />
+          </AntApp>
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+    await liste('Befehlsentwürfe');
+    await act(() => router.navigate('/einsaetze/1/auftraege/befehle/7'));
+    await screen.findByText('Vollseite');
+
+    await act(() => router.navigate('/einsaetze/1/auftraege?befehl=7&reiter=befehle'));
+    const frei = await liste('Freigegebene Befehle');
+    const ziel = within(frei).getByRole('button', { name: 'Befehl v1: Befehl A' });
+    await waitFor(() => expect(ziel).toHaveAttribute('aria-current', 'true'));
+    expect(frei.querySelector('[data-befehl-id="7"]')).toHaveAttribute(
+      'data-hervorgehoben',
+      'true',
+    );
+    await waitFor(() => expect(router.state.location.search).toBe('?reiter=befehle'));
   });
 });
 
