@@ -1,3 +1,38 @@
+## [1.0.0-alpha.171](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.170...v1.0.0-alpha.171) (2026-11-05)
+
+### Kräfte und Mittel
+
+- **Gesperrte Module werden als Sperre angezeigt, nicht als Fehler:** Meldebild, Fahrzeuge, FMS-Tableau, Bereitstellungsräume, Ablösung und die Verdichtungszeile laden die Listen von Personal, Fahrzeugen, Einheiten und Aufträgen erst, wenn die Modulfreigaben bekannt sind. Fehlt eine Freigabe, steht der Grund sichtbar da (z. B. „Modul Personal gesperrt“). Bisher erschien in diesem Fall ein Abruffehler.
+- **Unbekannte Zahlen stehen als „—“:** Stärke, Zahl der Einheiten und Zahl der Kräfte zeigen „—“, solange die zugehörige Liste fehlt. Vorher stand dort „0“.
+- **Statusband:** Jedes Paneel zeigt seinen eigenen Zustand. Ist es gesperrt, nennt es das gesperrte Modul.
+- **Meldebild:**
+  - „In Lagebericht übernehmen“ geht erst, wenn alle Listen geladen sind.
+  - Ohne Einsatzabschnitte ist die Übernahme mit Begründung gesperrt. Der Bericht ist nach Abschnitten gegliedert, sonst würden Einheiten fehlen.
+  - Neuladen fragt nur die Listen ab, die freigegeben sind.
+  - Ist das Modul Einheiten gesperrt, sagt das Raster das, statt einen leeren Einsatz zu zeigen.
+- **Meldebild ohne Springen beim Laden:** Während Einheiten oder Personal laden, hält der Kopf den Platz für die Angaben frei. Die Aktionen rutschen nicht mehr in eine eigene Zeile, und der Inhalt verschiebt sich nicht mehr.
+- **Fahrzeuge:**
+  - Bei gesperrtem Personal steht in der Besatzung „Modul Personal gesperrt“ statt „nicht erfasst“.
+  - Ist die Besatzung unbekannt, zeigt der Aufklapper „—“ oder den Abruffehler, ohne Auswahl und ohne Ist/Soll.
+  - Bei „Als eigene Einheit führen“ nennt die Besatzungszeile gesperrtes oder unbekanntes Personal, statt die Zeile wegzulassen.
+- **Bereitstellungsräume:**
+  - Liste, Detail, Seitenleiste und Eintreffen-Dialog nennen die Sperre.
+  - Lädt eine Liste noch, ist sie gesperrt oder gescheitert, behaupten sie keine leere Menge mehr („Keine Treffer“). Sie zeigen dann den Ladezustand oder den Fehler.
+- **Ablösung:** Der Grund einer Sperre steht unter der Ansichtsleiste. „Schicht beginnen“ geht erst, wenn die Freigabe für Einheiten bekannt und erteilt ist.
+- **Freigaben, die nicht geladen werden konnten,** zeigen einen Fehler mit der Möglichkeit, erneut zu laden. Bisher lief die Anzeige endlos weiter.
+- **Rechteentzug wirkt sofort:** Wird eine Modulfreigabe entzogen, verschwinden die Daten des gesperrten Moduls aus Anzeige und Zwischenspeicher. Sie werden nicht lokal gespeichert und kommen auch nicht über die Wiederherstellung zurück. Laufende Abrufe werden abgebrochen, damit eine verspätete Antwort die Daten nicht wieder einspielt. Freigegebene Module bleiben unberührt.
+
+### Kommunikation
+
+- **Benachrichtigungen ohne Netz als gelesen markieren:** Ohne Verbindung lässt sich ein einzelner Eingang öffnen oder schließen, über den Verlauf, über „Öffnen“ oder mit ✕ an Hinweis und Eingangsband. Er wird dann als gelesen vorgemerkt. Die Zahl der ungelesenen Eingänge sinkt sofort, auch nach einem Neuladen. Sobald wieder Netz da ist, wird der Eingang genau einmal als gelesen gemeldet.
+- Ist eine vorgemerkte Benachrichtigung auf dem Server inzwischen aufgeräumt, verschwindet sie ohne Fehlermeldung.
+- Lehnt der Server das Gelesen-Markieren endgültig ab, gilt der Eingang wieder als ungelesen und erscheint erneut.
+- In der Org-Zentrale geht das Gelesen-Markieren weiterhin nur mit Netz.
+
+### Betrieb und Installation
+
+- „Gelesen“ und „Alle gelesen“ prüfen am Server jetzt dieselbe Benutzerkennung der Offline-Warteschlange wie die übrigen Schreibwege, die ohne Netz funktionieren. Die Anwendung sendet diese Kennung selbst mit.
+
 ## [1.0.0-alpha.170](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.169...v1.0.0-alpha.170) (2026-11-04)
 
 ### Zeitangaben und Zeitumstellung
