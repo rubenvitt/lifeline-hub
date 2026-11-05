@@ -59,7 +59,8 @@ export function nachTextaenderung(vorher: OrtsfeldWert, text: string): OrtsfeldW
  * Wert nach einem Punkt aus der Karte (Nadel gezogen, „Auf Karte wählen“): `quelle: 'karte'`, der
  * Text bleibt. Ist er leer, steht die Koordinate als Text da (LLH-1534), damit der Punkt mit
  * gespeichert wird (`ortFelder` schickt eine Koordinate nur neben einem Text); ein so gesetzter
- * Text zieht beim nächsten Punkt mit. Den Ortsnamen bietet danach „Als Adresse übernehmen“ an.
+ * Text zieht beim nächsten Punkt mit, eine getippte Koordinate (`quelle: 'koordinate'`) bleibt.
+ * Den Ortsnamen bietet danach „Als Adresse übernehmen“ an.
  */
 export function nachKartenpunkt(
   vorher: OrtsfeldWert,
@@ -69,7 +70,8 @@ export function nachKartenpunkt(
   const alt = vorher.text.trim();
   const mitziehen =
     !alt ||
-    (vorher.koordinate != null &&
+    (vorher.quelle === 'karte' &&
+      vorher.koordinate != null &&
       alt === formatKoordinate(vorher.koordinate.lat, vorher.koordinate.lon));
   return {
     text: mitziehen ? formatKoordinate(punkt.lat, punkt.lon) : vorher.text,

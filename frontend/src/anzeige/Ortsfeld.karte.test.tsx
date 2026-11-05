@@ -229,6 +229,8 @@ describe('nachKartenpunkt', () => {
     expect(nachKartenpunkt(vorher, p, fmt).text).toBe('3/4');
     // Eine andere Koordinate im Text ist getippt und bleibt.
     expect(nachKartenpunkt({ ...vorher, text: '9/9' }, p, fmt).text).toBe('9/9');
+    // Eine getippte Koordinate bleibt, auch wenn sie dem Format gleicht.
+    expect(nachKartenpunkt({ ...vorher, quelle: 'koordinate' }, p, fmt).text).toBe('1/2');
   });
 });
 
