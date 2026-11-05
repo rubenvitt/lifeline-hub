@@ -1928,7 +1928,14 @@ describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
     mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockReturnValue(new Promise(() => {}));
     const { container } = setup();
-    expect(await (await seitenkopf()).findByText('1 Einheit · Stärke —')).toBeInTheDocument();
+    // Die Meta lädt noch: Ihre Form hält unsichtbar den Platz (LLH-1543), sichtbar steht keine 0.
+    const kopf = await seitenkopf();
+    await waitFor(() => expect(zeile(container, 'eh-20')).not.toBeNull());
+    const platzhalter = document.querySelector('[data-lfh="meta-platzhalter"]');
+    expect(platzhalter).toHaveTextContent('0 Einheiten · Stärke 0/0/0//0');
+    expect(platzhalter).toHaveAttribute('aria-hidden', 'true');
+    expect(platzhalter).toHaveStyle({ visibility: 'hidden' });
+    expect(kopf.queryByText(/1 Einheit/)).toBeNull();
     expect(screen.getByText('— von — Kräften')).toBeInTheDocument();
     await waitFor(() => expect(zeile(container, 'eh-20')).not.toBeNull());
     expect(zeile(container, 'eh-20')).toHaveTextContent('—');
