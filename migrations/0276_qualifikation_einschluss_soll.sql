@@ -27,13 +27,13 @@ ALTER TABLE qualifikation ADD COLUMN schliesst_ein_id INTEGER REFERENCES qualifi
 CREATE INDEX idx_qualifikation_schliesst_ein ON qualifikation(schliesst_ein_id);
 
 ALTER TABLE einheit_typ ADD COLUMN quali_soll TEXT
-    CHECK (quali_soll IS NULL OR json_valid(quali_soll));
+    CHECK (quali_soll IS NULL OR (json_valid(quali_soll) AND json_type(quali_soll) = 'array'));
 ALTER TABLE einheit_vorlage ADD COLUMN quali_soll TEXT
-    CHECK (quali_soll IS NULL OR json_valid(quali_soll));
+    CHECK (quali_soll IS NULL OR (json_valid(quali_soll) AND json_type(quali_soll) = 'array'));
 ALTER TABLE einsatz_einheit ADD COLUMN quali_soll TEXT
-    CHECK (quali_soll IS NULL OR json_valid(quali_soll));
+    CHECK (quali_soll IS NULL OR (json_valid(quali_soll) AND json_type(quali_soll) = 'array'));
 ALTER TABLE uhs ADD COLUMN quali_soll TEXT
-    CHECK (quali_soll IS NULL OR json_valid(quali_soll));
+    CHECK (quali_soll IS NULL OR (json_valid(quali_soll) AND json_type(quali_soll) = 'array'));
 ALTER TABLE uhs ADD COLUMN soll_anzahl INTEGER
     CHECK (soll_anzahl IS NULL OR soll_anzahl BETWEEN 1 AND 200);
 

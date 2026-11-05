@@ -402,7 +402,7 @@ function DetailContent({
           </Formularpaneel>
 
           <Formularpaneel titel="Soll">
-            <SollField typen={typen} />
+            <SollField typen={typen} vorlage={vorlage} />
           </Formularpaneel>
 
           <Formularpaneel titel="Freitext">
@@ -471,7 +471,7 @@ function ZeichenVorschau({ typen }: { typen: EinheitTyp[] }) {
 }
 
 /** Eigenes Soll; leer gilt das des gewählten Typs, und das steht als Vorgabe darunter. */
-function SollField({ typen }: { typen: EinheitTyp[] }) {
+function SollField({ typen, vorlage }: { typen: EinheitTyp[]; vorlage: EinheitVorlage }) {
   const form = Form.useFormInstance<FormValues>();
   const typId = Form.useWatch('typ_id', form);
   const soll = Form.useWatch('soll', form);
@@ -481,8 +481,8 @@ function SollField({ typen }: { typen: EinheitTyp[] }) {
   const typQualiSoll = qualiSollText(typ?.quali_soll);
   return (
     <>
-      // EIN `Form.Item` für das Trio: der Server prüft „alle drei oder keiner“ (Muster //
-      `FahrzeugDetailPage`).
+      {/* EIN `Form.Item` für das Trio: der Server prüft „alle drei oder keiner“ (Muster
+          `FahrzeugDetailPage`). */}
       <Form.Item
         label="Soll-Stärke"
         name="soll"
@@ -499,7 +499,8 @@ function SollField({ typen }: { typen: EinheitTyp[] }) {
             : undefined
         }
       >
-        <QualiSollFeld />
+        {/* Labels deaktivierter Qualifikationen aus dem eigenen Soll (LLH-1553). */}
+        <QualiSollFeld bekannt={vorlage.quali_soll_eigen ? vorlage.quali_soll : null} />
       </Form.Item>
     </>
   );

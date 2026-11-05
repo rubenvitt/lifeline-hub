@@ -323,6 +323,9 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
   einmal.
 - Eine deaktivierte Qualifikation bleibt in Ketten und in einem bestehenden Soll wirksam.
 - Wer eine Einheit aus einer Vorlage bildet, bekommt deren eigenes Qualifikationssoll mit.
+- Die Ketten der Startliste gelten für neue Organisationen. Bestehende Organisationen haben sie
+  beim Update nur bekommen, wo beide Bezeichnungen genau so lauten und noch kein Einschluss gesetzt
+  war; eine Qualifikation wie „Rettungssanitäter/in“ bleibt ohne Kette.
 
 ### Einheiten-Vorlagen
 

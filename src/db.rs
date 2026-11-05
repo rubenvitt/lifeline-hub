@@ -12414,6 +12414,10 @@ mod tests {
         .execute(&pool)
         .await
         .expect_err("einheit_typ.quali_soll nur JSON");
+        sqlx::query("INSERT INTO einheit_typ (org_id, label, quali_soll) VALUES (1, 'Y', '{}')")
+            .execute(&pool)
+            .await
+            .expect_err("einheit_typ.quali_soll nur als Liste");
         sqlx::query(
             "INSERT INTO einheit_vorlage (org_id, name, typ_id, quali_soll) VALUES (1, 'V', ?, '[')",
         )
