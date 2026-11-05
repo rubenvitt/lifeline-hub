@@ -647,13 +647,13 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
       einheitenGesperrt: 'Modul Einheiten gesperrt',
       besatzungGesperrt: 'Modul Einheiten gesperrt',
     });
-    // Zurück auf „Ganze Einheit“: die Personen wählte niemand, ohne dass sie gespeichert würden.
+    // Die Art bleibt: still auf „Ganze Einheit“ umgestellt, beendete der Vollzug die Einheit.
     await waitFor(() =>
-      expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked(),
+      expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
+        'Modul Einheiten gesperrt',
+      ),
     );
-    expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
-      'Modul Einheiten gesperrt',
-    );
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
     expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
   });
 

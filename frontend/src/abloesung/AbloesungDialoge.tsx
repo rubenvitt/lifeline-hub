@@ -255,9 +255,10 @@ function usePlanVorbelegung(
 }
 
 /**
- * Kommt die Sperre des Besatzungswechsels erst nach dem Öffnen (die Freigaben laden noch, LLH-1542),
- * stand die Art schon auf dem geplanten Wechsel: dann zurück auf „Ganze Einheit“. Sonst ließen sich
- * Personen wählen, die das Speichern still verwürfe (die Planung bleibt dann unberührt).
+ * Planen: Kommt die Sperre des Besatzungswechsels erst nach dem Öffnen (die Freigaben laden noch,
+ * LLH-1542), stand die Art schon auf dem geplanten Wechsel: dann zurück auf „Ganze Einheit“. Sonst
+ * ließen sich Personen wählen, die das Speichern still verwürfe (die Planung bleibt unberührt). Nur
+ * für die Planung: im Vollzug wechselte die Art damit die Handlung.
  */
 function useArtBeiSperre(form: FormInstance<{ art?: AbloesungArt }>, gesperrt: boolean) {
   useEffect(() => {
@@ -468,8 +469,9 @@ export function VollzugDialog({
   // Ablöser, und der Grund bleibt an der Art.
   const artGrund =
     besatzungGesperrt !== einheitenGesperrt || art === 'besatzung' ? besatzungGesperrt : undefined;
+  // Kein `useArtBeiSperre` hier: ein still umgestellter Vollzug beendete die ganze Einheit statt
+  // die Besatzung zu wechseln. Die Art bleibt, der Grund steht an ihr, der Server lehnt ab (403).
   usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
-  useArtBeiSperre(form, gesperrt);
   return (
     <ErfassungsModal<VollzugWerte>
       offen={schicht != null}
