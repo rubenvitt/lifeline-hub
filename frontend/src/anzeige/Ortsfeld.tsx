@@ -44,15 +44,26 @@ export interface OrtsfeldWert {
  * Karte gesetzter Punkt bleibt; die Koordinate eines Treffers oder einer getippten Koordinate
  * fällt weg. Ein geleerter Text leert auch einen Kartenpunkt (LLH-1534): ohne Text geht keine
  * Koordinate hinaus (`ortFelder`), die Maske zeigte sonst einen Punkt, der nie gespeichert wird.
+ * Steht neben einem Kartenpunkt dieselbe Koordinate im Text wie vorher (etwa nach einem
+ * angehängten Leerzeichen), bleibt der Kartenpunkt: nur eine neu getippte Koordinate ersetzt ihn.
  */
 export function nachTextaenderung(vorher: OrtsfeldWert, text: string): OrtsfeldWert {
   if (!text.trim()) return { text, koordinate: null };
   const getippt = erkenneKoordinate(text);
-  if (getippt) return { text, koordinate: getippt, quelle: 'koordinate' };
+  if (
+    getippt &&
+    !(vorher.quelle === 'karte' && gleichePunkte(getippt, erkenneKoordinate(vorher.text)))
+  ) {
+    return { text, koordinate: getippt, quelle: 'koordinate' };
+  }
   if (vorher.quelle === 'karte' && vorher.koordinate) {
     return { text, koordinate: vorher.koordinate, quelle: 'karte' };
   }
   return { text, koordinate: null };
+}
+
+function gleichePunkte(a: LatLon, b: LatLon | null): boolean {
+  return b != null && a.lat === b.lat && a.lon === b.lon;
 }
 
 /**

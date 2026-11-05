@@ -191,6 +191,27 @@ describe('nachTextaenderung', () => {
     expect(nachTextaenderung(leer, '12 34')).toEqual({ text: '12 34', koordinate: null });
   });
 
+  it('eine Koordinate im Text, die schon vor dem Ziehen dastand, verdrängt den Kartenpunkt nicht', () => {
+    // Getippt, dann die Nadel gezogen: der Text trägt noch die alte Koordinate.
+    const gezogen: OrtsfeldWert = {
+      text: '51.16040, 10.45140',
+      koordinate: { lat: 52.5, lon: 13.4 },
+      quelle: 'karte',
+    };
+    const mitLeerzeichen = nachTextaenderung(gezogen, '51.16040, 10.45140 ');
+    expect(mitLeerzeichen.koordinate).toEqual({ lat: 52.5, lon: 13.4 });
+    expect(nachTextaenderung(mitLeerzeichen, '51.16040, 10.45140 l').koordinate).toEqual({
+      lat: 52.5,
+      lon: 13.4,
+    });
+    // Eine neu getippte Koordinate ersetzt ihn weiter.
+    expect(nachTextaenderung(gezogen, '51.16040, 10.45141')).toEqual({
+      text: '51.16040, 10.45141',
+      koordinate: { lat: 51.1604, lon: 10.45141 },
+      quelle: 'koordinate',
+    });
+  });
+
   it('ein geleerter Text leert auch einen Kartenpunkt (LLH-1534)', () => {
     const gesetzt: OrtsfeldWert = { text: 'A', koordinate: { lat: 1, lon: 2 }, quelle: 'karte' };
     expect(nachTextaenderung(gesetzt, '')).toEqual({ text: '', koordinate: null });
