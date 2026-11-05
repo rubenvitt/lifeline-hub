@@ -14,6 +14,7 @@ import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung, ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
+import { gewaehlteOptionen } from '../test/auswahlListe';
 
 dayjs.extend(utc);
 
@@ -612,6 +613,40 @@ describe('AbloesungPage (LFH-635)', () => {
     );
     expect(listeEinheiten).not.toHaveBeenCalled();
     expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('Vollzug ohne Freigabe des Moduls Einheiten: die Planung mit Namen, Grund an der Auswahl, ohne Abruf (LLH-1542)', async () => {
+    freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
+    laufendLiefert([schicht({ id: 1, abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }] })]);
+    vi.mocked(listeEinheiten).mockClear();
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }),
+    ).toHaveAccessibleDescription('Modul Einheiten gesperrt');
+    expect(await gewaehlteOptionen('Ablösende Einheiten')).toEqual(['Florian 2']);
+    expect(listeEinheiten).not.toHaveBeenCalled();
+  });
+
+  it('Ablösung planen ohne Freigabe des Moduls Einheiten: keine leere Auswahl ohne Grund (LLH-1542)', async () => {
+    freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
+    laufendLiefert([schicht({ id: 1 })]);
+    vi.mocked(listeEinheiten).mockClear();
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 1' }));
+    const menu = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    await userEvent.click(within(menu).getByText('Ablösung planen'));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }),
+    ).toHaveAccessibleDescription('Modul Einheiten gesperrt');
+    // Der Besatzungswechsel ist aus demselben Grund gesperrt; der Grund steht einmal.
+    expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
+    expect(listeEinheiten).not.toHaveBeenCalled();
   });
 
   it('Schicht beginnen: gesperrt, solange die Freigaben gescheitert sind (LLH-1462)', async () => {

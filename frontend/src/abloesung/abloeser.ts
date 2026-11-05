@@ -72,3 +72,23 @@ export function abloeserOptionen(
       label: laufendMitVorgaenger.has(e.id) ? `${e.name} · ${SCHICHT_LAEUFT}` : e.name,
     }));
 }
+
+/**
+ * Die geplanten Ablöser von `schicht` als Auswahl, mit den Namen aus der Schicht. Gilt, solange
+ * die Einheitenliste fehlt (Modul Einheiten gesperrt, LLH-1542, oder noch nicht geladen): die
+ * Auswahl zeigt die Planung dann mit Namen statt mit nackten IDs, und sie bleibt aufhebbar. Der
+ * Server nimmt Ablöser ohne Freigabe des Moduls Einheiten an.
+ */
+export function geplanteAbloeserOptionen(schicht: Abloesung): AbloeserOption[] {
+  if (schicht.abloeser.length > 0) {
+    return schicht.abloeser.map((a) => ({ value: a.einheit_id, label: a.einheit_name }));
+  }
+  return schicht.abloesende_einheit_id != null
+    ? [
+        {
+          value: schicht.abloesende_einheit_id,
+          label: schicht.abloesende_einheit_name ?? `Einheit ${schicht.abloesende_einheit_id}`,
+        },
+      ]
+    : [];
+}

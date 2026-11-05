@@ -376,6 +376,11 @@ interface VollzugProps {
   /** Grund in wenigen Wörtern, warum die Übergabe gesperrt ist (Modul Einheiten). */
   uebergabeGesperrt?: string;
   /**
+   * Grund in wenigen Wörtern, warum `einheiten` nur die geplanten Ablöser bietet (Modul Einheiten,
+   * LLH-1542); steht unter der Auswahl, statt sie leer und ohne Grund zu zeigen.
+   */
+  einheitenGesperrt?: string;
+  /**
    * Besatzungswechsel (LLH-1150): die bisherige Besatzung als Namen
    * (`abloesung/besatzung.ts:bisherigeBesatzung`), `null`, solange sie nicht bekannt ist.
    */
@@ -415,6 +420,9 @@ interface VollzugProps {
  * „Danach“ (LLH-1308): „In Ruhe“ (Vorgabe), je aktivem Raum, „Entlassen“; ohne Freigabe des Moduls
  * Bereitstellungsräume fehlen die Räume und der Grund steht unter dem Feld.
  *
+ * LLH-1542: Ohne Freigabe des Moduls Einheiten bieten die Ablöser nur die geplanten, der Grund
+ * steht unter der Auswahl; er gilt dann auch für den Besatzungswechsel und steht nur einmal.
+ *
  * LLH-1319: Der Besatzungswechsel verteilt die neue Besatzung im Klappteil „Verteilen“ auf die
  * Einheit, ihre Erben und deren Fahrzeuge. Ein geplanter Besatzungswechsel belegt Art, Personen
  * (die noch wählbaren) und Verteilung vor.
@@ -424,6 +432,7 @@ export function VollzugDialog({
   einheiten,
   abschnittName,
   uebergabeGesperrt,
+  einheitenGesperrt,
   bisherigeBesatzung = null,
   personen = null,
   verteilung,
@@ -439,9 +448,12 @@ export function VollzugDialog({
   const grundId = useId();
   const artGrundId = useId();
   const raumGrundId = useId();
+  const abloeserGrundId = useId();
   const art = Form.useWatch('art', form) ?? 'einheit';
   const uebergabeMoeglich = abschnittName != null && uebergabeGesperrt == null;
   const gesperrt = besatzungGesperrt != null;
+  // Sperrt dasselbe Modul Art und Ablöser, steht der Grund einmal, unter den Ablösern.
+  const artGrund = besatzungGesperrt !== einheitenGesperrt ? besatzungGesperrt : undefined;
   usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
   return (
     <ErfassungsModal<VollzugWerte>
@@ -481,16 +493,16 @@ export function VollzugDialog({
       <Form.Item<VollzugWerte> name="art" label="Art">
         <Radio.Group
           optionType="button"
-          aria-describedby={besatzungGesperrt != null ? artGrundId : undefined}
+          aria-describedby={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
           options={ART_OPTIONEN.map((o) => ({
             ...o,
             disabled: o.value === 'besatzung' && besatzungGesperrt != null,
           }))}
         />
       </Form.Item>
-      {besatzungGesperrt != null && (
+      {artGrund != null && (
         <Typography.Text type="secondary" id={artGrundId} data-lfh="vollzug-besatzung-gesperrt">
-          {besatzungGesperrt}
+          {artGrund}
         </Typography.Text>
       )}
       {art === 'besatzung' ? (
@@ -510,9 +522,19 @@ export function VollzugDialog({
               allowClear
               maxCount={ABLOESUNG_ABLOESER_MAX}
               placeholder="ohne ablösende Einheit"
+              aria-describedby={einheitenGesperrt != null ? abloeserGrundId : undefined}
               options={einheiten}
             />
           </Form.Item>
+          {einheitenGesperrt != null && (
+            <Typography.Text
+              type="secondary"
+              id={abloeserGrundId}
+              data-lfh="vollzug-abloeser-gesperrt"
+            >
+              {einheitenGesperrt}
+            </Typography.Text>
+          )}
         </>
       )}
       <Form.Item<VollzugWerte> name="zeitpunkt" label="Zeitpunkt">
@@ -579,6 +601,8 @@ interface AbloeserProps {
   personen?: BesatzungOption[] | null;
   verteilung?: VerteilungZiele | null;
   besatzungGesperrt?: string;
+  /** Wie im Vollzug (LLH-1542): Grund, warum `einheiten` nur die geplanten Ablöser bietet. */
+  einheitenGesperrt?: string;
   laeuft: boolean;
   fehler: unknown;
   /** Die Planung; eine leere Liste der gewählten Art hebt sie auf. */
@@ -592,7 +616,8 @@ interface AbloeserProps {
  * Eine Schicht plant entweder Ablöser oder einen Besatzungswechsel; der Dialog sendet deshalb
  * beide Listen, die der anderen Art leer (der Server lehnte beides mit 422 ab). Ohne Freigabe der
  * Module Einheiten und Personal ist der Besatzungswechsel gesperrt mit Grund, und seine Planung
- * bleibt beim Speichern unberührt; ebenso, solange das Personal nicht geladen ist.
+ * bleibt beim Speichern unberührt; ebenso, solange das Personal nicht geladen ist. Ohne Freigabe
+ * des Moduls Einheiten bieten die Ablöser nur die geplanten, mit Grund darunter (LLH-1542).
  */
 export function AbloeserDialog({
   schicht,
@@ -601,6 +626,7 @@ export function AbloeserDialog({
   personen = null,
   verteilung,
   besatzungGesperrt,
+  einheitenGesperrt,
   laeuft,
   fehler,
   onErfassen,
@@ -608,7 +634,10 @@ export function AbloeserDialog({
 }: AbloeserProps) {
   const [form] = Form.useForm<AbloeserWerte>();
   const artGrundId = useId();
+  const abloeserGrundId = useId();
   const gesperrt = besatzungGesperrt != null;
+  // Wie im Vollzug: sperrt dasselbe Modul Art und Ablöser, steht der Grund einmal.
+  const artGrund = besatzungGesperrt !== einheitenGesperrt ? besatzungGesperrt : undefined;
   const art = Form.useWatch('art', form) ?? artVorgabe(schicht, gesperrt);
   const vorbelegt = usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
   return (
@@ -662,16 +691,16 @@ export function AbloeserDialog({
       <Form.Item<AbloeserWerte> name="art" label="Art">
         <Radio.Group
           optionType="button"
-          aria-describedby={gesperrt ? artGrundId : undefined}
+          aria-describedby={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
           options={ART_OPTIONEN.map((o) => ({
             ...o,
             disabled: o.value === 'besatzung' && gesperrt,
           }))}
         />
       </Form.Item>
-      {gesperrt && (
+      {artGrund != null && (
         <Typography.Text type="secondary" id={artGrundId} data-lfh="planung-besatzung-gesperrt">
-          {besatzungGesperrt}
+          {artGrund}
         </Typography.Text>
       )}
       {art === 'besatzung' ? (
@@ -684,15 +713,27 @@ export function AbloeserDialog({
           pflicht={false}
         />
       ) : (
-        <Form.Item<AbloeserWerte> name="abloeser_ids" label="Ablösende Einheiten">
-          <Select
-            mode="multiple"
-            allowClear
-            maxCount={ABLOESUNG_ABLOESER_MAX}
-            placeholder="keine geplant"
-            options={einheiten}
-          />
-        </Form.Item>
+        <>
+          <Form.Item<AbloeserWerte> name="abloeser_ids" label="Ablösende Einheiten">
+            <Select
+              mode="multiple"
+              allowClear
+              maxCount={ABLOESUNG_ABLOESER_MAX}
+              placeholder="keine geplant"
+              aria-describedby={einheitenGesperrt != null ? abloeserGrundId : undefined}
+              options={einheiten}
+            />
+          </Form.Item>
+          {einheitenGesperrt != null && (
+            <Typography.Text
+              type="secondary"
+              id={abloeserGrundId}
+              data-lfh="planung-abloeser-gesperrt"
+            >
+              {einheitenGesperrt}
+            </Typography.Text>
+          )}
+        </>
       )}
       <SpeicherFehler fehler={fehler} titel="Planung konnte nicht gespeichert werden" />
     </ErfassungsModal>

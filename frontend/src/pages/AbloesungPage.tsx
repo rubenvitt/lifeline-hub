@@ -20,7 +20,12 @@ import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Abloesung, AbloesungStatus, AbloesungVorgabe } from '../api/types';
 import AbloesungKarte from '../abloesung/AbloesungKarte';
-import { abloeserIds, abloeserOptionen, abloeserText } from '../abloesung/abloeser';
+import {
+  abloeserIds,
+  abloeserOptionen,
+  abloeserText,
+  geplanteAbloeserOptionen,
+} from '../abloesung/abloeser';
 import { buildAbloeserStand, type AbloeserStand } from '../abloesung/abloeserStand';
 import {
   besatzungOptionen,
@@ -323,6 +328,14 @@ export default function AbloesungPage() {
   });
 
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
+  // Die Auswahl der Ablöser in Vollzug und Planung. Ohne Einheitenliste (Modul Einheiten gesperrt
+  // oder noch nicht geladen) die geplanten mit ihren Namen aus der Schicht, nie nackte IDs und
+  // nie eine leere Auswahl ohne Grund (LLH-1542): der Grund steht dann unter dem Feld.
+  const abloeserAuswahl = (schicht: Abloesung) =>
+    einheitenQuery.data
+      ? abloeserOptionen(einheitenQuery.data, laufende, schicht)
+      : geplanteAbloeserOptionen(schicht);
+  const einheitenGrund = einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined;
 
   // Stand der geplanten Ablöser (LLH-1131 Teil II): Zeitpunkte aus der Zeitachse, der Raum aus
   // `aktueller_br_id` der Einheit und dem Namen in der Raumliste, der Abruf aus deren `abrufe`
@@ -1051,7 +1064,8 @@ export default function AbloesungPage() {
         <VollzugDialog
           key={vollzugSchicht.id}
           schicht={vollzugSchicht}
-          einheiten={abloeserOptionen(einheitenQuery.data ?? [], laufende, vollzugSchicht)}
+          einheiten={abloeserAuswahl(vollzugSchicht)}
+          einheitenGesperrt={einheitenGrund}
           // Der Abschnitt der Einheit, wie die Einheitenliste ihn führt; ohne sie (Modul gesperrt)
           // der der Schicht, damit die gesperrte Option mit Grund sichtbar bleibt.
           abschnittName={
@@ -1060,7 +1074,7 @@ export default function AbloesungPage() {
                   ?.abschnitt_name ?? null)
               : (vollzugSchicht.abschnitt_name ?? null)
           }
-          uebergabeGesperrt={einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined}
+          uebergabeGesperrt={einheitenGrund}
           {...besatzungProps(vollzugSchicht)}
           raeume={verbleibRaeume(brFrei ? brQuery.data : undefined)}
           raumGesperrt={raumGesperrt}
@@ -1074,7 +1088,8 @@ export default function AbloesungPage() {
         <AbloeserDialog
           key={abloeserSchicht.id}
           schicht={abloeserSchicht}
-          einheiten={abloeserOptionen(einheitenQuery.data ?? [], laufende, abloeserSchicht)}
+          einheiten={abloeserAuswahl(abloeserSchicht)}
+          einheitenGesperrt={einheitenGrund}
           {...besatzungProps(abloeserSchicht)}
           laeuft={aendernMut.isPending}
           fehler={aendernMut.error}
