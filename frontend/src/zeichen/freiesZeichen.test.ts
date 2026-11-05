@@ -992,6 +992,29 @@ describe('freiesZeichen — gespeicherte Spec (zeichen_spec)', () => {
     );
   });
 
+  it('zeichnet „P“/„G“ der Dekontamination aus der Spec und behält den Lauf in der Kaskade', () => {
+    const personal: SymbolSpec = {
+      kind: 'formation',
+      organization: 'feuerwehr',
+      bodyMarks: ['decontamination'],
+      labels: { center: 'P' },
+    };
+    pruefe({ zeichen_spec: serializeAnySpec(personal) }, personal, 'exakt');
+    // Zwei Hinweise lehnt die Gefahr ab: der Zustand entfällt, Marke und „G“ bleiben (LLH-1522).
+    pruefe(
+      {
+        zeichen_spec: serializeAnySpec({
+          kind: 'hazard',
+          bodyMarks: ['decontamination'],
+          labels: { center: 'G' },
+          states: ['suspected-situation', 'acute-situation'],
+        }),
+      },
+      { kind: 'hazard', bodyMarks: ['decontamination'], labels: { center: 'G' } },
+      'kaskade',
+    );
+  });
+
   it('nimmt null und leeren String wie fehlend', () => {
     pruefe({ zeichen_spec: null, grundzeichen: 'gefahr' }, { kind: 'hazard' }, 'exakt');
     pruefe({ zeichen_spec: '', grundzeichen: 'gefahr' }, { kind: 'hazard' }, 'exakt');

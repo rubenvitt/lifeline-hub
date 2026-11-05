@@ -209,6 +209,20 @@ async fn spec_anlegen_und_lesen() {
     assert_eq!(liste[1]["zeichen_spec"], DREHLEITER);
 }
 
+/// LLH-1522: „P“/„G“ der Dekontamination ist der einzige Lauf, den die Beschreibung trägt; er
+/// kommt beim Lesen unverändert zurück.
+#[tokio::test]
+async fn dekontamination_mit_zusatz_anlegen_und_lesen() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let spec = r#"{"v":1,"spec":{"bodyMarks":["decontamination"],"kind":"formation","labels":{"center":"P"}}}"#;
+    let z = spec_zeichen_anlegen(&app, &admin, einsatz, spec).await;
+    assert_eq!(z["zeichen_spec"], spec, "{z:?}");
+    assert_eq!(liste(&app, &admin, einsatz).await[0]["zeichen_spec"], spec);
+}
+
 /// Spec „Veralteter Client sendet das alte Format“ (LLH-1160): Grundzeichen oder ein Overlay-Wert
 /// der Altform → 400 mit Hinweis, allein oder neben einer Zeichenbeschreibung, beim Anlegen wie
 /// beim Ändern. Es entsteht nichts und es ändert sich nichts; nichts wird still verworfen.
@@ -279,6 +293,10 @@ async fn ungueltige_spec_ist_400() {
         ),
         (
             r#"{"v":1,"spec":{"designation":"ELW 1","kind":"vehicle-land"}}"#,
+            "„label“",
+        ),
+        (
+            r#"{"v":1,"spec":{"bodyMarks":["decontamination"],"kind":"formation","labels":{"center":"Fam. Müller"}}}"#,
             "„label“",
         ),
         (r#"{"v":2,"spec":{"kind":"post"}}"#, "$.v"),
