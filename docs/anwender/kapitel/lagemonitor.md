@@ -16,6 +16,8 @@ Ziehen auf den Kacheln bleiben ohne Wirkung.
 Den Monitor koppelt die Einsatzleitung mit der Ansicht „Lagemonitor“ (siehe
 [Geräte koppeln](geraete-koppeln.md)). Gekoppelt wird wie bei jedem Gerät (siehe
 [Gerät bedienen](geraet-bedienen.md)).
+Eine eigene Anzeige außerhalb der App liest das Lagebild ohne Kopplung (siehe
+[Externe Lagemonitore](externe-lagemonitore.md)).
 
 ## Abläufe
 

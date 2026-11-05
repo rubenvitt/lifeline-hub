@@ -274,6 +274,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/fuehrungsstelle", None),
     // Gerätekopplung (LFH-892): Verwaltung der Einsatzleitung, modul-los wie die Mitglieder.
     ("/api/einsaetze/{id}/geraete", None),
+    // Freigabe für externe Anzeigen (LLH-1484): Verwaltung der Einsatzleitung wie die Geräte.
+    ("/api/einsaetze/{id}/lagemonitor-zugaenge", None),
 ];
 
 /// Der Einsatz selbst (`GET`/`PATCH /api/einsaetze/{id}`). In [`key_fuer_pfad`] trifft dieser

@@ -1332,6 +1332,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/geraete/{gid}/widerrufen",
             post(routes::geraet::widerrufen),
         )
+        // LLH-1484: Freigabe des Einsatzes für Lesezugänge externer Anzeigen, Einsatzleitung.
+        .route(
+            "/api/einsaetze/{id}/lagemonitor-zugaenge",
+            get(routes::lagemonitor_zugang::einsatz_liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/lagemonitor-zugaenge/{zid}/freigabe",
+            put(routes::lagemonitor_zugang::freigeben)
+                .delete(routes::lagemonitor_zugang::freigabe_beenden),
+        )
         .route("/api/einsaetze/{id}/uhs", get(routes::einsatz_uhs::liste))
         .route(
             "/api/einsaetze/{id}/uhs",
@@ -1721,6 +1731,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/aufbewahrung/einsaetze/{id}/personensuche",
             post(routes::aufbewahrung::personensuche),
+        )
+        // LLH-1484: Lesezugänge externer Anzeigen (Verwaltung) und ihr Abruf. Der Abruf zieht
+        // keinen `CurrentUser`, nur den Schlüssel (`lagemonitor_zugang::LagemonitorZugriff`).
+        .route(
+            "/api/lagemonitor-zugaenge",
+            get(routes::lagemonitor_zugang::liste).post(routes::lagemonitor_zugang::anlegen),
+        )
+        .route(
+            "/api/lagemonitor-zugaenge/{zid}/widerrufen",
+            post(routes::lagemonitor_zugang::widerrufen),
+        )
+        .route(
+            "/api/lagemonitor/v1/lage",
+            get(routes::lagemonitor_v1::lage),
         )
         .route("/api/organisation", get(routes::organisation::lesen))
         .route(

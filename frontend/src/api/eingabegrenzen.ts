@@ -188,3 +188,5 @@ export const BETREUUNG_LEITUNG_MAX = 200;
 export const BETREUUNG_KONTAKTWEG_MAX = 200;
 /** Grund einer Streichung oder Berichtigung in der Kräfte-Zeitachse (LLH-1455); steht im ETB. */
 export const ZEITACHSE_GRUND_MAX = 500;
+/** Bezeichnung eines Lesezugangs für einen externen Lagemonitor (LLH-1484). */
+export const LAGEMONITOR_BEZEICHNUNG_MAX = 60;

@@ -31,7 +31,14 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   anmeldeweg_deaktiviert: 'Anmeldeweg deaktiviert',
   sitzung_beendet: 'Sitzung beendet',
   einmalpasswort_vergeben: 'Einmalpasswort vergeben',
+  lesezugang_angelegt: 'Lagemonitor-Zugang angelegt',
+  lesezugang_widerrufen: 'Lagemonitor-Zugang widerrufen',
 };
+
+/** Aktionen am Lagemonitor-Zugang (LLH-1484): ihr Ziel ist die Bezeichnung des Zugangs. */
+export function istLesezugang(aktion: AdminAktion): boolean {
+  return aktion === 'lesezugang_angelegt' || aktion === 'lesezugang_widerrufen';
+}
 
 /**
  * Anmeldewege nach ihrer id (`auth::provider::Anmeldeweg`, LFH-1152). Exhaustiv wie Ereignis und

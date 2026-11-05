@@ -612,6 +612,8 @@ fn serde_wire_gleich_as_str() {
         AnmeldewegDeaktiviert,
         SitzungBeendet,
         EinmalpasswortVergeben,
+        LesezugangAngelegt,
+        LesezugangWiderrufen,
     });
 }
 

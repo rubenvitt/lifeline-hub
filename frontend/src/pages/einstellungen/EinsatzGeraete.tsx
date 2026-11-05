@@ -58,6 +58,7 @@ import {
   type StellenWert,
 } from './geraeteKern';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import EinsatzLagemonitore from './EinsatzLagemonitore';
 
 /**
  * Ohne Einsatzleitung lädt die Sektion nichts (der Server lässt nur sie zu, auch keinen Admin):
@@ -311,6 +312,8 @@ export default function EinsatzGeraete() {
           )}
         />
       </Formularpaneel>
+
+      <EinsatzLagemonitore einsatzId={einsatzId} darf={darf} />
 
       <ErfassungsModal<AnlegenWerte>
         offen={anlegenOffen}
