@@ -325,7 +325,9 @@ pub struct Vollziehen {
     #[serde(default)]
     abloeser_ids: Option<Vec<i64>>,
     /// Den Abschnitt der abgelösten Einheit an die Ablöser übergeben (LLH-1132). Verlangt die
-    /// Freigabe des Moduls Einheiten, das die Unterstellung sonst schreibt.
+    /// Freigabe des Moduls Einheiten, das die Unterstellung sonst schreibt, aber nur, wenn die
+    /// Übergabe etwas übergibt: Abschnitt da und mindestens ein Ablöser (LLH-1512). Sonst wird
+    /// das Flag übergangen.
     #[serde(default)]
     abschnitt_uebergeben: bool,
     /// `einheit` (Vorgabe) oder `besatzung` (LLH-1150). Als `String`, damit ein unbekannter Wert
@@ -454,13 +456,22 @@ pub async fn vollziehen(
         &abloeser,
         req.abschnitt_uebergeben,
     )?;
-    // Abschnittsübergabe und Besatzungswechsel schreiben, was sonst das Modul Einheiten schreibt
-    // (Unterstellung, Personalzuordnung).
     let (verbleib, verbleib_br_id) =
         vollzug_verbleib(req.verbleib.as_deref(), req.verbleib_br_id, art)?;
-    if req.abschnitt_uebergeben || art == AbloesungArt::Besatzung {
+    // Besatzungswechsel und Abschnittsübergabe schreiben, was sonst das Modul Einheiten schreibt
+    // (Personalzuordnung, Unterstellung).
+    if art == AbloesungArt::Besatzung {
         ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
     }
+    // Die Übergabe nur, wenn sie wirkt (LLH-1512): Ob die Einheit einen Abschnitt hat und ein
+    // Ablöser übernimmt, entscheidet die Transaktion; sie weist eine wirksame Übergabe ohne
+    // Freigabe vor dem Schreiben ab, eine ohne Wirkung übergeht sie wie sonst.
+    let ohne_freigabe_einheiten = req.abschnitt_uebergeben
+        && match ctx.fordere_zielmodul::<Einheiten>(&state.pool).await {
+            Ok(()) => false,
+            Err(AppError::Forbidden) => true,
+            Err(e) => return Err(e),
+        };
     // Der Eintritt in einen Raum schreibt, was sonst das Modul Bereitstellungsräume schreibt
     // (LLH-1308). Der Abruf eines Ablösers aus dem Raum ist Folge des Vollzugs und verlangt
     // nichts (design.md D5).
@@ -477,6 +488,7 @@ pub async fn vollziehen(
             vollzogen_at,
             abloeser,
             abschnitt_uebergeben: req.abschnitt_uebergeben,
+            ohne_freigabe_einheiten,
             art,
             besatzung,
             verbleib,
