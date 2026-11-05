@@ -10,7 +10,7 @@ pub use hooks::{auto_austritt, auto_austritt_tx, AutoAustrittEffekt, AutoAustrit
 
 use crate::wire_enum::wire_enum;
 
-/// Höchste Soll-Anzahl einer UHS (LLH-1553, CHECK in `migrations/0274_…`). Spiegel:
+/// Höchste Soll-Anzahl einer UHS (LLH-1553, CHECK in `migrations/0276_…`). Spiegel:
 /// `UHS_SOLL_ANZAHL_MAX` in `frontend/src/api/eingabegrenzen.ts`.
 pub const SOLL_ANZAHL_MAX: i64 = 200;
 use serde::Serialize;

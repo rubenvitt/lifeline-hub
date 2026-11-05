@@ -136,7 +136,7 @@ pub async fn bootstrap_admin(
             .execute(&mut *tx)
             .await?;
     }
-    // Ketten der Startliste (LLH-1553, design.md D2): wie das Bestands-Update in 0274.
+    // Ketten der Startliste (LLH-1553, design.md D2): wie das Bestands-Update in 0276.
     for (label, schliesst_ein) in QUALIFIKATION_EINSCHLUSS_STARTLISTE {
         sqlx::query(
             "UPDATE qualifikation SET schliesst_ein_id = \

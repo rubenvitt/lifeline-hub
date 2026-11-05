@@ -3,7 +3,7 @@
 //! „Qualifikationssoll“).
 //!
 //! Gespeichert als JSON-Spalte `quali_soll` in der Form `[{"q": <id>, "n": <anzahl>}]`
-//! (`migrations/0274_qualifikation_einschluss_soll.sql`). Eine Quelle für alle vier Träger:
+//! (`migrations/0276_qualifikation_einschluss_soll.sql`). Eine Quelle für alle vier Träger:
 //! - [`form`]/[`form_tri`]: Feldprüfung (400) und Umwandlung in die gespeicherte Form; eine leere
 //!   Liste wird zu `NULL` („kein Soll“).
 //! - [`pruefe_org`]: jede Qualifikation gehört zur eigenen Organisation (422), in einer Abfrage

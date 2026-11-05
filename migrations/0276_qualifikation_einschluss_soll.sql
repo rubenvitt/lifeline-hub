@@ -22,7 +22,7 @@
 --    Startliste gleichen und noch kein Einschluss gesetzt ist. Notarzt schließt nichts ein.
 --    Gleich mit `personal::QUALIFIKATION_EINSCHLUSS_STARTLISTE` halten.
 --
--- Abgesichert von db::tests::migration_0274_qualifikation_einschluss_soll.
+-- Abgesichert von db::tests::migration_0276_qualifikation_einschluss_soll.
 ALTER TABLE qualifikation ADD COLUMN schliesst_ein_id INTEGER REFERENCES qualifikation(id);
 CREATE INDEX idx_qualifikation_schliesst_ein ON qualifikation(schliesst_ein_id);
 

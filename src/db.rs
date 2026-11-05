@@ -12328,9 +12328,9 @@ mod tests {
     /// LLH-1553: Ketten der Startliste nur bei exakten Labels und leerem Einschluss; die neuen
     /// `quali_soll`-Spalten nehmen nur gültiges JSON, `uhs.soll_anzahl` nur 1 bis 200.
     #[tokio::test]
-    async fn migration_0274_qualifikation_einschluss_soll() {
+    async fn migration_0276_qualifikation_einschluss_soll() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 274;
+        const VERSION: i64 = 276;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,

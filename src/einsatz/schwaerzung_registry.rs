@@ -1070,7 +1070,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("soll_fuehrer", G_ZAEHLER),
             retain("soll_unterfuehrer", G_ZAEHLER),
             retain("soll_mannschaft", G_ZAEHLER),
-            // Qualifikationssoll (LLH-1553, Mig 0274): Katalog-Kennungen und Anzahlen, kein Freitext.
+            // Qualifikationssoll (LLH-1553, Mig 0276): Katalog-Kennungen und Anzahlen, kein Freitext.
             retain("quali_soll", G_KONFIG),
             scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             // Der Rufname benennt ein operatives Objekt, keine Person (wie fahrzeug.funkrufname).
@@ -2054,7 +2054,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("storniert_at", G_ZEIT),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
-            // Soll-Anzahl und Qualifikationssoll (LLH-1553, Mig 0274): Zahlen und Katalog-Kennungen.
+            // Soll-Anzahl und Qualifikationssoll (LLH-1553, Mig 0276): Zahlen und Katalog-Kennungen.
             retain("soll_anzahl", G_ZAEHLER),
             retain("quali_soll", G_KONFIG),
         ],

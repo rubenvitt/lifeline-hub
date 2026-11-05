@@ -55,7 +55,7 @@ pub const QUALIFIKATION_STARTLISTE: [(&str, i64); 9] = [
 
 /// Einschlüsse der Startliste (LLH-1553, design.md D2): (Qualifikation, die sie einschließt).
 /// Notarzt schließt nichts ein. **Muss mit dem Bestands-Update in
-/// `migrations/0274_qualifikation_einschluss_soll.sql` übereinstimmen.**
+/// `migrations/0276_qualifikation_einschluss_soll.sql` übereinstimmen.**
 pub const QUALIFIKATION_EINSCHLUSS_STARTLISTE: [(&str, &str); 4] = [
     ("Rettungssanitäter", "Sanitäter"),
     ("Notfallsanitäter", "Rettungssanitäter"),
