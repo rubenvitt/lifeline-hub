@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes, useLocation } from 'react-router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BenachrichtigungAnzeige, BenachrichtigungEreignis } from '../api/types';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
@@ -21,6 +21,7 @@ import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 import EingaengeKnopf from './EingaengeKnopf';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeZahlText } from './eingaenge';
 import { istStumm, setzeStumm, vergesseStummStand } from './eingaengeStumm';
+import { pushMerker } from './webPush';
 
 /**
  * Knopf „Eingänge“ mit Verlauf (LLH-1143, design.md D6): Zahl der ungelesenen Eingänge, Gruppen
@@ -105,7 +106,38 @@ beforeEach(async () => {
 afterEach(() => {
   setzeViewportBreite(VIEWPORT_STANDARD);
   setzeOnline(true);
+  vi.unstubAllGlobals();
+  Reflect.deleteProperty(navigator, 'serviceWorker');
+  localStorage.removeItem(pushMerker(BENUTZER));
 });
+
+/** Ein Browser mit erlaubtem Push und einem Abo zum Schlüssel des Servers (`webPush.test.ts`). */
+function browserMitPush() {
+  const abo = {
+    endpoint: 'https://fcm.googleapis.com/geraet',
+    options: { applicationServerKey: new Uint8Array([4, 1, 2, 3, 4]).buffer },
+    toJSON: () => ({ keys: { p256dh: 'P256', auth: 'AUTH' } }),
+    unsubscribe: async () => true,
+  };
+  const registration = { pushManager: { getSubscription: async () => abo } };
+  vi.stubGlobal('Notification', { permission: 'granted' });
+  vi.stubGlobal('PushManager', function PushManager() {});
+  Object.defineProperty(navigator, 'serviceWorker', {
+    configurable: true,
+    value: { ready: Promise.resolve(registration), controller: {} },
+  });
+  const anmeldungen: unknown[] = [];
+  server.use(
+    http.get('/api/web-push', () =>
+      HttpResponse.json({ schluessel: 'BAECAwQ', angemeldet: true, inhalt: false, stumm: [] }),
+    ),
+    http.put('/api/web-push/abo', async ({ request }) => {
+      anmeldungen.push(await request.json());
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return anmeldungen;
+}
 
 describe('Knopf „Eingänge“ (LLH-1143)', () => {
   it('nennt die Zahl der ungelesenen Eingänge sichtbar und im Namen', async () => {
@@ -232,6 +264,22 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     // Der Kopf nennt, wie viele Arten stumm sind; die Zahl der Eingänge bleibt.
     expect(within(paneel).getByRole('button', { name: 'Stumm · 1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Eingänge, 1 ungelesen' })).toBeInTheDocument();
+  });
+
+  it('mit Push auf diesem Gerät erfährt der Server die stumme Art (LLH-1482)', async () => {
+    serverMit({ eintraege: [eintrag(1)], ungelesen: 1 });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Eingänge, 1 ungelesen' }));
+    const paneel = await screen.findByRole('region', { name: 'Eingänge' });
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Stumm' }));
+    const anmeldungen = browserMitPush();
+    localStorage.setItem(pushMerker(BENUTZER), '1');
+    await userEvent.click(
+      within(paneel).getByRole('switch', { name: 'Stumm: Neue Meldung und Lagemeldung' }),
+    );
+    await waitFor(() =>
+      expect(anmeldungen).toEqual([expect.objectContaining({ stumm: ['meldung'] })]),
+    );
   });
 
   it('öffnet sich auf Bitte des Eingangsbands', async () => {

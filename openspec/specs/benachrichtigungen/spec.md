@@ -707,15 +707,19 @@ die die Einstellungen offen haben; ein abgeschlossener Einsatz MUST sie ablehnen
 
 Eine Person SHALL Eingangsarten auf einem Gerät stumm schalten können (Knopf „Stumm“ im Verlauf am
 Knopf „Eingänge“). Auf diesem Gerät MUST eine stumme Art keinen Ton, keinen Eintrag im
-Eingangsband und keine OS-Meldung des offenen Tabs auslösen; Zahl, Tab-Titel, App-Badge und
-Verlauf MUST unverändert bleiben. Die Einstellung liegt im Browserspeicher des Geräts, ohne
-Personenbezug, und bleibt beim Abmelden. Andere Geräte und andere Personen MUST NOT betroffen
-sein. Alarme MUST NOT stumm schaltbar sein. Push bei geschlossener App (Spec `web-push`) folgt
-der Einstellung nicht.
+Eingangsband und keine OS-Meldung auslösen, auch nicht über Push bei geschlossener App (Spec
+`web-push`, „Push an jedes Abo der Empfänger“); Zahl, Tab-Titel, App-Badge und Verlauf MUST
+unverändert bleiben. Die Einstellung liegt im Browserspeicher des Geräts, ohne Personenbezug, und
+bleibt beim Abmelden; das Push-Abo des Geräts trägt eine Kopie. Andere Geräte und andere
+Personen MUST NOT betroffen sein. Alarme MUST NOT stumm schaltbar sein.
 
 #### Scenario: Tablet stumm, Rechner laut
 - **WHEN** Person A „Neue Meldung“ auf dem Tablet stumm schaltet und eine Meldung eingeht
 - **THEN** zeigt das Tablet nur die höhere Zahl am Knopf „Eingänge“, der Rechner von A spielt den Ton und zeigt das Band
+
+#### Scenario: App geschlossen
+- **WHEN** Person A auf dem Handy Push eingeschaltet und „Neue Meldung“ stumm geschaltet hat, die App geschlossen ist und eine Meldung eingeht
+- **THEN** erscheint auf dem Handy keine OS-Meldung; eine Sofortmeldung erscheint weiter
 
 ### Requirement: Native Meldung in der Desktop-App
 

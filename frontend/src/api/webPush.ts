@@ -1,5 +1,5 @@
 import { apiGet, apiSend } from './client';
-import type { WebPushStand } from './types';
+import type { BenachrichtigungArt, WebPushStand } from './types';
 
 /**
  * Web Push (LLH-1223, Spec `web-push`). Ohne `--web-push` am Server antworten alle drei mit 404,
@@ -16,6 +16,11 @@ export interface WebPushAboEingabe {
   auth: string;
   /** „Mit Absender und Wortlaut“ auf diesem Gerät (LLH-1369); fehlt es, gilt aus. */
   inhalt?: boolean;
+  /**
+   * „Stumm auf diesem Gerät“ (LLH-1482): für diese Arten schickt der Server dem Abo keinen Push;
+   * Alarme nimmt er nicht an. Fehlt es, ist keine stumm.
+   */
+  stumm?: BenachrichtigungArt[];
 }
 
 /** Meldet das Abo dieses Browsers für diese Sitzung an; dasselbe Abo hängt der Server um. */

@@ -166,6 +166,62 @@ async fn wahl_des_inhalts_haengt_am_abo() {
     );
 }
 
+/// LLH-1482: die stummen Arten hängen am Abo; die Route legt nur stellbare Eingangsarten ab,
+/// in Katalogreihenfolge, und lässt Unbekanntes und Alarme still fallen. Jede Anmeldung setzt
+/// die Liste neu.
+#[tokio::test]
+async fn stumme_arten_haengen_am_abo() {
+    let (app, _pool, _live) = mit_web_push(PUSH_DIENSTE).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    assert_eq!(
+        anfrage(&app, "GET", "/api/web-push", &admin, None).await.1["stumm"],
+        json!([])
+    );
+    let b = Browser::neu();
+    let mut mit: Value = serde_json::from_str(&b.abo(FCM)).unwrap();
+    mit["stumm"] = json!([
+        "lagebericht",
+        "quatsch",
+        "sofortmeldung",
+        "meldung",
+        "meldung",
+        "einsatz_neu",
+        "unwetter"
+    ]);
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        "/api/web-push/abo",
+        &admin,
+        Some(&mit.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    let stand = anfrage(&app, "GET", "/api/web-push", &admin, None).await.1;
+    let mut erwartet: Vec<&str> = vec!["lagebericht", "meldung"];
+    erwartet.sort_by_key(|a| Art::ALLE.iter().position(|x| x.as_str() == *a).unwrap());
+    assert_eq!(stand["stumm"], json!(erwartet));
+
+    let (s, _) = anfrage(&app, "PUT", "/api/web-push/abo", &admin, Some(&b.abo(FCM))).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(
+        anfrage(&app, "GET", "/api/web-push", &admin, None).await.1["stumm"],
+        json!([])
+    );
+
+    let mut zu_viel: Value = serde_json::from_str(&b.abo(FCM)).unwrap();
+    zu_viel["stumm"] = json!(vec!["meldung"; Art::ALLE.len() + 1]);
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        "/api/web-push/abo",
+        &admin,
+        Some(&zu_viel.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+}
+
 #[tokio::test]
 async fn fremde_endpunkte_und_kaputte_schluessel_sind_400() {
     let (app, pool, _live) = mit_web_push(PUSH_DIENSTE).await;
@@ -365,7 +421,36 @@ impl Versandwelt {
             &format!("{}{pfad}", self.basis),
             &b64(b.schluessel.oeffentlich()),
             &b64(&b.auth),
-            inhalt,
+            &repo::Wahl {
+                inhalt,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    /// Wie [`Self::abo`], mit stummen Arten des Geräts (LLH-1482).
+    async fn abo_stumm(&self, benutzer: i64, pfad: &str, b: &Browser, stumm: &[Art]) {
+        let token = lifeline_hub::auth::session::anlegen(
+            &self.pool,
+            benutzer,
+            None,
+            lifeline_hub::auth::provider::Anmeldeweg::Passwort,
+        )
+        .await
+        .unwrap();
+        repo::anmelden(
+            &self.pool,
+            benutzer,
+            &lifeline_hub::auth::session::hash_token(&token),
+            &format!("{}{pfad}", self.basis),
+            &b64(b.schluessel.oeffentlich()),
+            &b64(&b.auth),
+            &repo::Wahl {
+                inhalt: false,
+                stumm: stumm.to_vec(),
+            },
         )
         .await
         .unwrap();
@@ -482,6 +567,66 @@ async fn hinweis_geht_mit_normaler_dringlichkeit() {
     assert_eq!(e.kopf["urgency"], "normal");
 }
 
+/// LLH-1482, Spec „Push an jedes Abo der Empfänger“, „Stumme Art auf dem Handy“: das Handy mit
+/// stummer „Neue Meldung“ bekommt keinen Push, der Laptop schon; ein Alarm geht an beide.
+#[tokio::test]
+async fn stumme_art_geht_nicht_an_dieses_abo_ein_alarm_schon() {
+    let mut w = versandwelt().await;
+    let handy = Browser::neu();
+    let laptop = Browser::neu();
+    w.abo_stumm(w.anna, "/anna-handy", &handy, &[Art::Meldung])
+        .await;
+    w.abo(w.anna, "/anna-laptop", &laptop).await;
+
+    w.melden_an(Art::Meldung, Typ::Meldung, w.anna).await;
+    let e = w.naechster().await;
+    assert_eq!(e.pfad, "/anna-laptop");
+    let klar = entschluesseln(&e.rumpf, &laptop.schluessel, &laptop.auth).unwrap();
+    let v: Value = serde_json::from_slice(&klar).unwrap();
+    assert_eq!(
+        (v["art"].clone(), v["stufe"].clone()),
+        (json!("meldung"), json!("hinweis"))
+    );
+    w.keiner().await;
+
+    // Eine andere Art bleibt auf dem Handy laut.
+    w.melden_an(Art::AuftragErteilt, Typ::Auftrag, w.anna).await;
+    let mut pfade = vec![w.naechster().await.pfad, w.naechster().await.pfad];
+    pfade.sort();
+    assert_eq!(pfade, ["/anna-handy", "/anna-laptop"]);
+    w.keiner().await;
+
+    w.melden_an(Art::Sofortmeldung, Typ::Meldung, w.anna).await;
+    let mut pfade = vec![w.naechster().await.pfad, w.naechster().await.pfad];
+    pfade.sort();
+    assert_eq!(pfade, ["/anna-handy", "/anna-laptop"]);
+    w.keiner().await;
+}
+
+/// Ein Alarm am Abo bleibt laut, auch wenn er in der Liste steht: die Anmeldung legt ihn gar
+/// nicht ab, und der Versand fragt die Liste für Alarme nicht.
+#[tokio::test]
+async fn alarm_in_der_stummliste_geht_trotzdem() {
+    let mut w = versandwelt().await;
+    let handy = Browser::neu();
+    w.abo_stumm(
+        w.anna,
+        "/anna-handy",
+        &handy,
+        &[Art::Sofortmeldung, Art::Meldung],
+    )
+    .await;
+    let abos = repo::abos_von(&w.pool, &[w.anna]).await.unwrap();
+    assert_eq!(abos[0].stumm.0, vec!["meldung".to_owned()]);
+
+    sqlx::query("UPDATE web_push_abo SET stumm = '[\"sofortmeldung\"]'")
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    w.melden_an(Art::Sofortmeldung, Typ::Meldung, w.anna).await;
+    assert_eq!(w.naechster().await.pfad, "/anna-handy");
+}
+
 /// Spec, „Abgeschaltete Hinweis-Art“: kein Push an die Geräte.
 #[tokio::test]
 async fn abgeschaltete_hinweis_art_sendet_nichts() {
@@ -551,7 +696,7 @@ async fn haengender_push_dienst_haelt_melden_nicht_auf() {
         &format!("http://{adresse}/haengt"),
         &b64(b.schluessel.oeffentlich()),
         &b64(&b.auth),
-        false,
+        &repo::Wahl::default(),
     )
     .await
     .unwrap();
@@ -591,9 +736,17 @@ async fn abo_haengt_an_der_sitzung_und_faellt_mit_ihr() {
     let benutzer = admin_id(&pool).await;
     let token = sitzung(&pool, benutzer).await;
     let hash = lifeline_hub::auth::session::hash_token(&token);
-    repo::anmelden(&pool, benutzer, &hash, FCM, "p", "a", false)
-        .await
-        .unwrap();
+    repo::anmelden(
+        &pool,
+        benutzer,
+        &hash,
+        FCM,
+        "p",
+        "a",
+        &repo::Wahl::default(),
+    )
+    .await
+    .unwrap();
     assert!(repo::hat_abo(&pool, &hash).await.unwrap());
     assert_eq!(repo::abos_von(&pool, &[benutzer]).await.unwrap().len(), 1);
 
@@ -610,12 +763,24 @@ async fn gleicher_endpunkt_haengt_an_die_neue_sitzung_um() {
     let benutzer = admin_id(&pool).await;
     let alt = lifeline_hub::auth::session::hash_token(&sitzung(&pool, benutzer).await);
     let neu = lifeline_hub::auth::session::hash_token(&sitzung(&pool, benutzer).await);
-    repo::anmelden(&pool, benutzer, &alt, FCM, "p1", "a1", true)
+    let vorher = repo::Wahl {
+        inhalt: true,
+        stumm: vec![Art::Meldung],
+    };
+    repo::anmelden(&pool, benutzer, &alt, FCM, "p1", "a1", &vorher)
         .await
         .unwrap();
-    repo::anmelden(&pool, benutzer, &neu, FCM, "p2", "a2", false)
-        .await
-        .unwrap();
+    repo::anmelden(
+        &pool,
+        benutzer,
+        &neu,
+        FCM,
+        "p2",
+        "a2",
+        &repo::Wahl::default(),
+    )
+    .await
+    .unwrap();
     assert!(!repo::hat_abo(&pool, &alt).await.unwrap());
     assert!(repo::hat_abo(&pool, &neu).await.unwrap());
     let abos = repo::abos_von(&pool, &[benutzer]).await.unwrap();
@@ -628,6 +793,11 @@ async fn gleicher_endpunkt_haengt_an_die_neue_sitzung_um() {
         ),
         ("p2", "a2", false),
         "auch die Wahl des Inhalts kommt von der neuen Anmeldung"
+    );
+    assert!(
+        abos[0].stumm.is_empty(),
+        "und die stummen Arten (LLH-1482): {:?}",
+        abos[0].stumm
     );
 
     // Ein erloschenes Abo fällt nur, solange es denselben Endpunkt hat.

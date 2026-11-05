@@ -2,6 +2,7 @@ import { ApiError } from '../api/client';
 import { ladeWebPushStand, meldeWebPushAb, meldeWebPushAn } from '../api/webPush';
 import { inHuelle } from '../huelle/faehigkeiten';
 import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
+import { stummeArten } from './eingaengeStumm';
 
 /**
  * Web Push in der Seite (LLH-1223, design.md D7/D8): Schalter „Auch bei geschlossener App“,
@@ -16,6 +17,11 @@ import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSp
  * hängt am selben Abo: der Server legt dann eine Marke in die Nutzlast, und der Service Worker
  * holt den Inhalt selbst. Der Merker hält die Wahl mit ({@link MERKER_MIT_INHALT}), damit die
  * nächste Sitzung sie mit anmeldet. Vorgabe aus.
+ *
+ * „Stumm auf diesem Gerät“ (LLH-1482, Spec `web-push`, „Push an jedes Abo der Empfänger“) geht
+ * mit jeder Anmeldung des Abos an den Server, der dann für eine stumme Art keinen Push schickt.
+ * Der Service Worker kann es nicht selbst lassen: zu jedem Push muss er eine Meldung zeigen.
+ * Nach dem Umschalten meldet {@link pushAbgleichen} das Abo mit der neuen Liste an.
  */
 
 /** `fehlt`: kein Schalter (Browser ohne Push, Hülle, Server ohne `--web-push`, Gerätekonto). */
@@ -100,6 +106,8 @@ async function anmelden(abo: PushSubscription, inhalt: boolean): Promise<void> {
     p256dh: json.keys?.p256dh ?? '',
     auth: json.keys?.auth ?? '',
     inhalt,
+    // Erst hier gelesen: nach schnellem Umschalten trägt die letzte Anmeldung den letzten Stand.
+    stumm: [...stummeArten()],
   });
 }
 
@@ -167,7 +175,9 @@ export async function pushAusschalten(benutzerId: number): Promise<PushZustand> 
 
 /**
  * Nach jeder bestätigten Anmeldung: Hat diese Person Push auf diesem Browser gewählt, meldet die
- * neue Sitzung das Abo wieder an (das alte fiel mit der alten Sitzung). Fragt nie nach der
+ * neue Sitzung das Abo wieder an (das alte fiel mit der alten Sitzung). Ebenso nach jedem
+ * Umschalten von „Stumm auf diesem Gerät“ (LLH-1482), damit der Server die neue Liste kennt;
+ * ohne Netz bleibt er bis zur nächsten Anmeldung beim alten Stand. Fragt nie nach der
  * Erlaubnis und wirft nie.
  */
 export async function pushAbgleichen(benutzerId: number): Promise<void> {
