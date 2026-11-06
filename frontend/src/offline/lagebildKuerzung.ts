@@ -65,6 +65,10 @@ export const PERSON_AUF_DER_PLATTE = {
   aktueller_transport_durch: 'behalten',
   aktuelles_einsatz_fahrzeug_id: 'behalten',
   versorgung: 'behalten',
+  // LLH-1566: der Anlass ist ein Katalogwert und bleibt ohne Netz wie die Sichtung (LLH-1109:
+  // ohne Netz nur Katalogwerte); seine Zeit braucht ohne Netz niemand.
+  anlass: 'behalten',
+  anlass_at: 'auslassen',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
 
 /**

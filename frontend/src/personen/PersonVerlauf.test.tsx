@@ -39,6 +39,7 @@ const basis = {
   transporte: [],
   massnahmen: [],
   verletzungen: [],
+  anlaesse: [],
 } as PersonDetail;
 
 const person: PersonDetail = {
@@ -268,5 +269,30 @@ describe('PersonVerlauf — PAT-Kern (Change y18v58dt-pat-kern)', () => {
     });
     expect(z[0]).not.toMatch(/nachgetragen/);
     expect(z[1]).toMatch(/SK I.*nachgetragen/);
+  });
+
+  it('führt jeden Stand des Anlasses, ein leerer heißt „aufgehoben“ (LLH-1566)', () => {
+    const anlass = (id: number, wert: PersonDetail['anlass'] | null, um: string) => ({
+      id,
+      einsatz_id: 1,
+      person_id: 10,
+      ...(wert ? { anlass: wert } : {}),
+      zeitpunkt_at: um,
+      erfasst_at: um,
+      erfasst_von: 1,
+    });
+    const z = zeilen({
+      ...basis,
+      anlaesse: [
+        anlass(3, null, '2026-05-27 09:40:00'),
+        anlass(2, 'hitze_kaelte', '2026-05-27 09:20:00'),
+        anlass(1, 'intoxikation', '2026-05-27 09:10:00'),
+      ],
+    } as PersonDetail);
+    expect(z).toHaveLength(3);
+    expect(z[0]).toMatch(/Anlass aufgehoben/);
+    expect(z[1]).toMatch(/Anlass Hitze \/ Kälte/);
+    expect(z[2]).toMatch(/Anlass Intoxikation/);
+    expect(z.join(' ')).not.toMatch(/nachgetragen/);
   });
 });

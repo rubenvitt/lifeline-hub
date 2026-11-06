@@ -57,6 +57,7 @@ const detail = {
   transporte: [],
   massnahmen: [],
   verletzungen: [],
+  anlaesse: [],
 } as PersonDetail;
 
 const uhsListe = [

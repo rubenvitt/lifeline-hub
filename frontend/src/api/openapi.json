@@ -902,6 +902,54 @@
           "lageplan"
         ]
       },
+      "AnlassAnzeige": {
+        "type": "object",
+        "description": "Ein Anlass-Stand (1:1 zu `person_anlass`). Ohne `anlass` heißt er „aufgehoben“.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "anlass": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PersonAnlass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann der Stand beim Server ankam."
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt."
+          }
+        }
+      },
       "AnmeldeEintragAnzeige": {
         "type": "object",
         "description": "Eine Zeile der Anmeldespur, wie die Verwaltung sie liest (LFH-1097).",
@@ -13356,6 +13404,20 @@
           }
         }
       },
+      "PersonAnlass": {
+        "type": "string",
+        "description": "Anlass der Hilfeleistung, fester Katalog (Ruben 05.11.2026: kein fester Statistikbogen).\nString = CHECK in `migrations/0284_person_anlass.sql`. Kategorie Behandlung, nie im ETB.",
+        "enum": [
+          "verletzung",
+          "internistisch",
+          "neurologisch",
+          "intoxikation",
+          "hitze_kaelte",
+          "allergie",
+          "psychisch",
+          "sonstiges"
+        ]
+      },
       "PersonAnzeige": {
         "type": "object",
         "description": "Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein\n`org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,\nkein Snapshot wie bei Material.",
@@ -13467,6 +13529,24 @@
               "null"
             ],
             "format": "int64"
+          },
+          "anlass": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PersonAnlass",
+                "description": "Anlass der Hilfeleistung (LLH-1566, Cache des jüngsten Stands in `person_anlass`);\nfehlt ohne Anlass oder nach dem Aufheben. Kategorie Behandlung, nie im ETB."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "anlass_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Erfassungszeit des aktuellen Anlasses."
           },
           "antreff_lat": {
             "type": [
@@ -13696,6 +13776,7 @@
               "verbleib",
               "abgleiche",
               "transporte",
+              "anlaesse",
               "massnahmen",
               "verletzungen"
             ],
@@ -13705,6 +13786,13 @@
                 "items": {
                   "$ref": "#/components/schemas/AbgleichAnzeige"
                 }
+              },
+              "anlaesse": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnlassAnzeige"
+                },
+                "description": "Anlass-Verlauf (LLH-1566), der aktuelle Stand zuerst; ein Stand ohne Anlass hebt auf."
               },
               "aufenthalt": {
                 "oneOf": [

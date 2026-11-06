@@ -116,6 +116,7 @@ function bereit() {
         transporte: [],
         massnahmen: [],
         verletzungen: [],
+        anlaesse: [],
       } as PersonDetail),
     ),
     http.post('/api/einsaetze/7/personen', async ({ request }) => {

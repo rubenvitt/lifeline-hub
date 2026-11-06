@@ -145,6 +145,36 @@ describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () =
   );
 });
 
+describe('AufnahmeFelder — Anlass der Hilfeleistung (LLH-1566)', () => {
+  it('liegt unter „Weitere Angaben“ als Flächenwahl des festen Katalogs', async () => {
+    zeige();
+    expect(screen.queryByRole('radiogroup', { name: 'Anlass' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    const gruppe = await screen.findByRole('radiogroup', { name: 'Anlass' });
+    expect(
+      within(gruppe)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual([
+      'Verletzung',
+      'Internistisch',
+      'Neurologisch',
+      'Intoxikation',
+      'Hitze / Kälte',
+      'Allergie / Insektenstich',
+      'Psychisch',
+      'Sonstiges',
+    ]);
+  });
+
+  it('fehlt bei einer vermissten Person', async () => {
+    zeige('vermisst');
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await waitFor(() => expect(screen.getByLabelText('Notiz')).toBeInTheDocument());
+    expect(screen.queryByRole('radiogroup', { name: 'Anlass' })).not.toBeInTheDocument();
+  });
+});
+
 describe('aufnahmeZuEingabe', () => {
   it('nimmt Text und Koordinate aus dem Ortsfeld des Fundorts (LLH-1407)', () => {
     expect(
@@ -187,6 +217,11 @@ describe('aufnahmeZuEingabe', () => {
 
   it('macht aus einer zurückgenommenen Wahl eine Erfassung ohne Sichtung (LLH-1083)', () => {
     expect(aufnahmeZuEingabe({ sichtung: null, bestaetigt_personal_id: 5 })).toEqual({});
+  });
+
+  it('schickt den Anlass mit, einen zurückgenommenen nicht (LLH-1566)', () => {
+    expect(aufnahmeZuEingabe({ anlass: 'intoxikation' })).toEqual({ anlass: 'intoxikation' });
+    expect(aufnahmeZuEingabe({ anlass: null })).toEqual({});
   });
 
   it('reicht „vermisst seit" als Wire-String durch', () => {

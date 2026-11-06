@@ -36,6 +36,7 @@ const ERWARTET_BEHALTEN = [
   'aktueller_transport_durch',
   'aktuelles_einsatz_fahrzeug_id',
   'versorgung',
+  'anlass',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
   'herkunft_adresse',
@@ -48,6 +49,7 @@ const ERWARTET_AUSGELASSEN = [
   'pat_nummer',
   'transport_fachrichtung',
   'transport_at',
+  'anlass_at',
 ].sort();
 
 /** Eine Person mit JEDEM Feld gesetzt — ein ausgelassenes Feld fiele sonst nicht auf. */
@@ -92,6 +94,8 @@ const VOLL: Person = {
   transport_art: 'liegend',
   transport_fachrichtung: 'psychiatrie',
   transport_at: '2026-10-18 09:00:00',
+  anlass: 'intoxikation',
+  anlass_at: '2026-10-18 09:01:00',
 };
 
 function eintrag(queryKey: readonly unknown[], data: unknown) {

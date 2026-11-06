@@ -68,6 +68,7 @@ pub mod ort_suche;
 pub mod ort_vorschau;
 pub mod pegel;
 pub mod person_anhang;
+pub mod person_anlass;
 pub mod person_massnahme;
 pub mod person_transport;
 pub mod person_verletzung;

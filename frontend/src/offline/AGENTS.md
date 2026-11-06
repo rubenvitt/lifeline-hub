@@ -32,8 +32,9 @@ draußen gelassen werden.
   09.10.2026): `lagebildKuerzen` (`offline/lagebildKuerzung.ts`) kürzt jede Person beim Speichern
   (Live und Vorrat) und vor dem `hydrate` (Bestand von davor) auf die Positivliste
   `PERSON_AUF_DER_PLATTE`. Weg sind Adresse, Melderkontakt, Notiz, Zustand, Fundort samt
-  Koordinate, PAT-Nummer, Fachrichtung und Zeit des Transports; Sichtung, Verbleib, UHS/Platz,
-  Kontamination sowie Priorität und Art des Transports bleiben. Verletzungen und Maßnahmen stehen
+  Koordinate, PAT-Nummer, Fachrichtung und Zeit des Transports, Zeit des Anlasses; Sichtung,
+  Verbleib, UHS/Platz, Kontamination, der Anlass (Katalogwert, LLH-1566) sowie Priorität und Art
+  des Transports bleiben. Verletzungen und Maßnahmen stehen
   nur im Detail und kommen nie auf die Platte. Ein neues Feld der Personenantwort bricht
   den Typcheck, bis es dort eingeordnet ist. Der Live-Cache bleibt voll. Der gekürzte Datensatz
   trägt `nicht_geladen`; jede Anzeige dieser Felder fragt `nichtGeladen(p, feld)` und zeigt
@@ -179,8 +180,8 @@ draußen gelassen werden.
   nie „Offline vorgemerkt“, und nach der Rückkehr des Netzes ginge die Erfassung online
   hinaus. Bis LFH-705 galt das für alle fünf solchen Mutationen.
 - **Die medizinischen Einträge einer Person gehen über EINE Aktionsart je POST**
-  (LLH-1138, Change `y18v58dt-pat-kern`, D8): Sichtung, Verbleib, Notiz, Transport, Maßnahme und
-  Verletzung als `PersonEintragAktion` (`offline/personEintrag.ts`, `sendPersonEintrag` exhaustiv,
+  (LLH-1138, Change `y18v58dt-pat-kern`, D8): Sichtung, Anlass, Verbleib, Notiz, Transport,
+  Maßnahme und Verletzung als `PersonEintragAktion` (`offline/personEintrag.ts`, `sendPersonEintrag` exhaustiv,
   auch im Abgleich), vorgemerkt über `savePersonEintragOfflineCapable` und damit über
   `mitErfassungszeitOfflineFaehig`: Erfassungszeit nach der Serveruhr, `client_id` für das
   Replay, „Bestätigt von“ reist mit. Die Aktion trägt `person_id` und die Registriernummer als

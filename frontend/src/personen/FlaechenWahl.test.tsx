@@ -59,4 +59,31 @@ describe('FlaechenWahl', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Infusion' }));
     expect(onChange).toHaveBeenLastCalledWith('c');
   });
+
+  it('meldet einen Tipp auf die gewählte Fläche erneut, mit onAbwaehlen nimmt er sie zurück', async () => {
+    const onChange = zeige('b');
+    await userEvent.click(screen.getByRole('radio', { name: 'Zugang' }));
+    expect(onChange).toHaveBeenLastCalledWith('b');
+  });
+
+  it('nimmt mit onAbwaehlen die gewählte Fläche zurück und wählt andere weiter (LLH-1566)', async () => {
+    const onChange = vi.fn();
+    const onAbwaehlen = vi.fn();
+    render(
+      <ConfigProvider>
+        <FlaechenWahl
+          optionen={OPTIONEN}
+          value="b"
+          onChange={onChange}
+          onAbwaehlen={onAbwaehlen}
+          aria-label="Maßnahme"
+        />
+      </ConfigProvider>,
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'Zugang' }));
+    expect(onAbwaehlen).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('radio', { name: 'Infusion' }));
+    expect(onChange).toHaveBeenCalledWith('c');
+  });
 });

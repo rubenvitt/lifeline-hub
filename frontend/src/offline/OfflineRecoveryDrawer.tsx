@@ -73,6 +73,7 @@ function aktionsTitel(aktion: OfflineSchreibaktion): string {
     case 'verbleib':
     case 'notiz':
     case 'transport':
+    case 'anlass':
     case 'massnahme':
     case 'verletzung':
       // LLH-1138: Art und Registriernummer; der Grund (storniert, nicht anwesend) steht darunter.

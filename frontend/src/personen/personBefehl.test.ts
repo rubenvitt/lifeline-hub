@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import type { Uhs } from '../api/types';
 import {
+  ANLASS_KUERZEL,
   SICHTUNG_BUCHSTABEN,
+  anlassAus,
   loeseBefehl,
   loeseUhsAuf,
   nameAus,
@@ -154,6 +156,62 @@ describe('Sichtung', () => {
     const b = parsePersonBefehl('sk1 sk3');
     expect(b.eingabe.sichtung).toBe('sk1');
     expect(b.probleme).toEqual(['Sichtung doppelt angegeben („sk3")']);
+  });
+});
+
+describe('Anlass (LLH-1566)', () => {
+  it.each([
+    ['!intox', 'intoxikation'],
+    ['!verl', 'verletzung'],
+    ['!Trauma', 'verletzung'],
+    ['!intern', 'internistisch'],
+    ['!neuro', 'neurologisch'],
+    ['!hitze', 'hitze_kaelte'],
+    ['!Kälte', 'hitze_kaelte'],
+    ['!stich', 'allergie'],
+    ['!psych', 'psychisch'],
+    ['!sonst', 'sonstiges'],
+  ])('„%s" → %s', (text, anlass) => {
+    const b = parsePersonBefehl(text);
+    expect(b.eingabe).toEqual({ anlass });
+    expect(b.teile).toEqual([{ art: 'anlass', text, wert: anlass }]);
+    expect(b.probleme).toEqual([]);
+  });
+
+  it('jedes Kürzel der Hinweiszeile führt zu seinem Anlass', () => {
+    for (const [anlass, kuerzel] of Object.entries(ANLASS_KUERZEL)) {
+      for (const k of kuerzel) expect(anlassAus(`!${k}`)).toBe(anlass);
+    }
+  });
+
+  it('nimmt den Anlass neben Name und Sichtung', () => {
+    const b = parsePersonBefehl('Kowalski, Anna w 34 sk2 !intox');
+    expect(b.eingabe).toEqual({
+      name: 'Kowalski',
+      vorname: 'Anna',
+      geschlecht: 'weiblich',
+      alter_geschaetzt: 34,
+      sichtung: 'sk2',
+      anlass: 'intoxikation',
+    });
+  });
+
+  it('meldet ein unbekanntes Kürzel und führt es nicht als Namen', () => {
+    const b = parsePersonBefehl('Bauer !blau');
+    expect(b.eingabe).toEqual({ name: 'Bauer' });
+    expect(b.probleme).toEqual(['Unbekannter Anlass („!blau")']);
+  });
+
+  it('meldet einen zweiten Anlass, statt den ersten still zu überschreiben', () => {
+    const b = parsePersonBefehl('!intox !verl');
+    expect(b.eingabe.anlass).toBe('intoxikation');
+    expect(b.probleme).toEqual(['Anlass doppelt angegeben („!verl")']);
+  });
+
+  it('beendet einen „@“-Suchtext am Anlass', () => {
+    const b = parsePersonBefehl('Bauer @Weserstadion !hitze');
+    expect(b.uhsSuche).toBe('Weserstadion');
+    expect(b.eingabe.anlass).toBe('hitze_kaelte');
   });
 });
 

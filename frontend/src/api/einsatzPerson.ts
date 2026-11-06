@@ -1,4 +1,5 @@
 import type {
+  Anlass,
   Bestaetiger,
   Fachrichtung,
   KoerperRegion,
@@ -6,6 +7,7 @@ import type {
   MassnahmeArt,
   Person,
   PersonAnhang,
+  PersonAnlass,
   PersonAuswahl,
   PersonDetail,
   PersonStatus,
@@ -100,6 +102,8 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
   /** Wartebereich-Eintritt in derselben Transaktion wie die Anlage (bleibt beim Offline-Replay an
    * der client_id); `vermisst` + UHS ist 422. */
   uhs_id?: number | null;
+  /** Anlass der Hilfeleistung in derselben Anlage (LLH-1566); mit `status: 'vermisst'` 422. */
+  anlass?: PersonAnlass;
   /** Erfassungszeit einer ohne Netz vorgemerkten Aufnahme (`YYYY-MM-DD HH:MM:SS`, UTC; LLH-1330):
    * Anlage, Erst-Sichtung, Eintritt in den UHS-Eingang (LLH-1515) und ihre ETB-Einträge tragen sie.
    * Fehlt sie, gilt die Serverzeit. Setzt nur die Warteschlange. */
@@ -368,6 +372,26 @@ export function legeNotizAn(
 // Je Schreibweg GENAU EINE Funktion, und jede Oberfläche ruft sie nur über ihre eine Mutation im
 // Patientenkopf, dort über `offline/schreiben.ts` (`savePersonEintragOfflineCapable`, design.md
 // D8). Das Aufheben bleibt online: seine Route kennt weder `client_id` noch Erfassungszeit.
+
+/** Ein Anlass der Hilfeleistung (LLH-1566): ein Katalogwert, `null` hebt ihn auf. Kein ETB. */
+export interface AnlassEingabe extends OfflineEintragEingabe {
+  anlass: PersonAnlass | null;
+}
+
+/** Anlass festlegen: ein neuer Eintrag im Verlauf, der jüngste gilt. */
+export function saveAnlass(
+  einsatzId: number,
+  personId: number,
+  eingabe: AnlassEingabe,
+  optionen?: ApiSendOptionen,
+): Promise<Anlass> {
+  return apiSend<Anlass>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/anlass`,
+    'POST',
+    eingabe,
+    optionen,
+  );
+}
 
 /** Ein voller Transportstand (Spec `personen-transport`): jedes Feld einzeln leer, alle drei leer
  * heben den Transport auf. Am Gerät optional „Bestätigt von“ (LFH-1046). */

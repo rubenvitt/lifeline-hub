@@ -440,6 +440,9 @@ export type PersonDetail = S['PersonDetail'];
 export type PersonZugriff = S['ZugriffAnzeige'];
 export type PersonZugriffArt = S['ZugriffArt'];
 export type PersonAnhang = S['PersonAnhangAnzeige'];
+/** Anlass der Hilfeleistung (LLH-1566): Verlaufseintrag und sein Katalog. */
+export type Anlass = S['AnlassAnzeige'];
+export type PersonAnlass = S['PersonAnlass'];
 /** Transport einer Person (LLH-1325): Verlaufseintrag und seine Kataloge. */
 export type Transport = S['TransportAnzeige'];
 export type TransportPrioritaet = S['TransportPrioritaet'];

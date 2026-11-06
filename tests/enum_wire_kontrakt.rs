@@ -178,6 +178,17 @@ fn serde_wire_gleich_as_str() {
         Bestaetigt,
         Verworfen,
     });
+    // Anlass der Hilfeleistung (LLH-1566)
+    enum_wire!(lifeline_hub::person::anlass_repo::PersonAnlass {
+        Verletzung => "verletzung",
+        Internistisch => "internistisch",
+        Neurologisch => "neurologisch",
+        Intoxikation => "intoxikation",
+        HitzeKaelte => "hitze_kaelte",
+        Allergie => "allergie",
+        Psychisch => "psychisch",
+        Sonstiges => "sonstiges",
+    });
     // Transport (LLH-1325, Spec `personen-transport`)
     enum_wire!(lifeline_hub::person::transport_repo::TransportPrioritaet {
         Sofort => "sofort",
