@@ -40,7 +40,7 @@ import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
 import ZeitraumWahl from '../anzeige/ZeitraumWahl';
 import { filterMerkmale } from '../etb/filterMerkmale';
 import { serverJetzt } from '../offline/serveruhr';
-import { alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { taktisch } from '../anzeige/zeitfenster';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useLetzteLagebesprechung } from '../lagebesprechung/useLetzteLagebesprechung';
@@ -806,9 +806,16 @@ export default function EtbPage() {
                   style={{ paddingInline: 0 }}
                   onClick={() =>
                     filterAendern({
-                      von: nachtraege.reduce(
-                        (frueh, e) => (e.ereigniszeit < frueh ? e.ereigniszeit : frueh),
-                        nachtraege[0].ereigniszeit,
+                      // Auf die volle Minute wie jede Grenze der Zeitraumwahl: „seit 0810“ zeigt
+                      // dann auch, was um 08:10:20 geschah, wenn der früheste Nachtrag um
+                      // 08:10:35 lag.
+                      von: alsBackendZeit(
+                        alsZeitpunkt(
+                          nachtraege.reduce(
+                            (frueh, e) => (e.ereigniszeit < frueh ? e.ereigniszeit : frueh),
+                            nachtraege[0].ereigniszeit,
+                          ),
+                        )!.startOf('minute'),
                       ),
                     })
                   }
