@@ -41,13 +41,18 @@ export default function GeraetMeldenPage() {
   const absender = [stelle?.name ?? geraet?.stelle, geraet?.bezeichnung]
     .filter(Boolean)
     .join(' · ');
+  // Ohne geladene Liste (noch unterwegs oder abgelehnt) trägt die Bindung des Geräts: den Absender
+  // setzt der Server, und eine Meldung soll sich auch dann vormerken lassen. Fehlt die Stelle in
+  // der geladenen Liste, ist sie aufgelöst.
+  const liste = istEinheit ? einheitenQuery.data : abschnitteQuery.data;
+  const stelleDa = liste ? stelle != null : geraet?.stelle_id != null;
 
   return (
     <EinsatzSeite titel="Melden">
       <GeraetMeldungen
         einsatzId={einsatzId}
         absender={absender}
-        schreibgeschuetzt={!darfImEinsatzSchreiben(einsatzQuery.data) || !stelle}
+        schreibgeschuetzt={!darfImEinsatzSchreiben(einsatzQuery.data) || !stelleDa}
         standort={istEinheit}
       />
     </EinsatzSeite>

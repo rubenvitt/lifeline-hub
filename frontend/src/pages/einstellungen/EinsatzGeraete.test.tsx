@@ -531,4 +531,27 @@ describe('Gerät koppeln aus dem Einheiten-Detail (LLH-1579)', () => {
     await waitFor(() => expect(aufrufe).toHaveLength(1));
     expect(aufrufe[0].body).toEqual({ ansicht: 'einheit', stelle_id: 11, bezeichnung: 'Handy' });
   });
+
+  it('öffnet „Gerät koppeln“ danach wieder leer', async () => {
+    stelleBereit({ kopplungen: [], ansichten: MIT_EINHEIT });
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([
+          { id: 11, name: 'Fußtrupp 1', funkrufname: 'Rotkreuz Musterstadt 74/1' },
+        ]),
+      ),
+    );
+    rendern('/einsaetze/1/einstellungen/geraete?einheit=11');
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTitle('Fußtrupp 1 (Rotkreuz Musterstadt 74/1)');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    // jsdom beendet die Ausblendung nie (kein `transitionend`), wie in `EinsatzDefaults.test.tsx`.
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    await userEvent.click(screen.getByRole('button', { name: 'Gerät koppeln' }));
+    await waitFor(() => expect(dialog).not.toHaveClass('ant-zoom-leave'));
+    const neu = screen.getByRole('dialog');
+    expect(within(neu).queryAllByTitle('Einheit')).toHaveLength(0);
+    expect(within(neu).queryByText('Einheit wählen')).not.toBeInTheDocument();
+    expect(within(neu).getByText('Ansicht wählen')).toBeInTheDocument();
+  });
 });

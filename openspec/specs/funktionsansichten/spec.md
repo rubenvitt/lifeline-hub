@@ -778,6 +778,8 @@ Modulzähler MUST das Gerät nicht erhalten. Gefahrenzonen und Karte gehören ni
 - **WHEN** das Gerät eine Meldung beliebiger Art mit Standort sendet
 - **THEN** speichert der Server den Ort an der Meldung
 - **AND** ermittelt das Gerät den Standort nur auf Knopfdruck, nie laufend
+- **AND** bleibt der Ort bei jeder Korrektur außerhalb der Lage und verortet die Meldung bei der Übernahme in die Lage
+- **AND** nimmt erst die Rücknahme aus der Lage ihn mit
 
 #### Scenario: Ohne Netz
 

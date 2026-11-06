@@ -7634,6 +7634,71 @@ async fn einheitengeraet_meldet_als_einheit_mit_standort() {
     assert_eq!(v.as_array().unwrap().len(), 2, "nur die eigenen: {v}");
 }
 
+/// Der Standort vom Einheitengerät gehört der Meldung (F9): Korrekturen außerhalb der Lage lassen
+/// ihn stehen, die Übernahme in die Lage (Route wie Korrektur) verortet sie mit ihm, und erst wer
+/// sie wieder aus der Lage nimmt, nimmt ihn mit (D5).
+#[tokio::test]
+async fn standort_vom_einheitengeraet_ueberdauert_korrektur_und_uebernahme() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let erfassen = || async {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &meldungen,
+            &geraet,
+            Some(&json!({
+                "absender": "2. Zug · Handy",
+                "meldeweg": "sonstige",
+                "meldungsart": "sonstige",
+                "inhalt": "Pumpe läuft",
+                "ereigniszeit": "2026-11-06 10:00:00",
+                "lat": 50.11,
+                "lon": 8.68,
+            })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        v["id"].as_i64().unwrap()
+    };
+    let korrigieren = |id: i64, body: Value| {
+        let (app, admin, pfad) = (app.clone(), admin.clone(), format!("{meldungen}/{id}"));
+        async move {
+            let (s, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&body)).await;
+            assert_eq!(s, StatusCode::OK, "{v}");
+            v
+        }
+    };
+    let ort = |v: &Value| (v["lat"].clone(), v["lon"].clone());
+    let da = (json!(50.11), json!(8.68));
+
+    // Korrektur außerhalb der Lage, dann Übernahme per Korrektur, dann Rücknahme.
+    let id = erfassen().await;
+    let v = korrigieren(id, json!({"prioritaet": "dringend"})).await;
+    assert_eq!(ort(&v), da, "{v}");
+    let v = korrigieren(id, json!({"lagerelevant": true})).await;
+    assert_eq!(v["lagerelevant"], true, "{v}");
+    assert_eq!(ort(&v), da, "{v}");
+    let v = korrigieren(id, json!({"lagerelevant": false})).await;
+    assert_eq!(ort(&v), (Value::Null, Value::Null), "{v}");
+
+    // Übernahme über die eigene Route behält ihn ebenso.
+    let id = erfassen().await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{meldungen}/{id}/lagerelevant"),
+        &admin,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(ort(&v), da, "{v}");
+}
+
 /// Ein Ort an einer Meldung, die keine Lagemeldung ist, bleibt den anderen Absendern verwehrt.
 #[tokio::test]
 async fn ort_ohne_lagemeldung_nur_vom_einheitengeraet() {

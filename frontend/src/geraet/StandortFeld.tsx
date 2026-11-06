@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Flex, Typography } from 'antd';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { IconKreuz, IconStandortZiel } from '../icons';
@@ -14,6 +14,9 @@ import {
  * Standort einer Meldung auf Knopfdruck (LLH-1579, F3/F9): einmal ermittelt, keine laufende
  * Ortung. Formularfeld (`value`/`onChange` von `Form.Item`); `null` heißt ohne Standort. Der
  * Standort bleibt auf dem Gerät, bis die Meldung ihn mitnimmt.
+ *
+ * Eine Antwort, die erst nach dem Senden kommt, verfällt: Zurücksetzen hängt das Feld neu ein
+ * (rc-field-form), und eine alte Ermittlung darf die nächste Meldung nicht verorten.
  */
 export default function StandortFeld({
   value,
@@ -29,13 +32,22 @@ export default function StandortFeld({
   const [fehler, setFehler] = useState<string | null>(null);
   const verfuegbarkeit = eigenpositionVerfuegbarkeit();
   const sperrgrund = verfuegbarkeit === 'bereit' ? null : EIGENPOSITION_SPERRGRUND[verfuegbarkeit];
+  const anfrage = useRef(0);
+  useEffect(
+    () => () => {
+      anfrage.current += 1;
+    },
+    [],
+  );
 
   const ermitteln = () => {
     if (verfuegbarkeit !== 'bereit') return;
+    const nr = ++anfrage.current;
     setLaeuft(true);
     setFehler(null);
     navigator.geolocation.getCurrentPosition(
       (p) => {
+        if (nr !== anfrage.current) return;
         setLaeuft(false);
         onChange?.({
           lat: p.coords.latitude,
@@ -44,6 +56,7 @@ export default function StandortFeld({
         });
       },
       (e) => {
+        if (nr !== anfrage.current) return;
         setLaeuft(false);
         setFehler(e.code === e.PERMISSION_DENIED ? MELDUNG_VERWEIGERT : MELDUNG_KEIN_STANDORT);
       },

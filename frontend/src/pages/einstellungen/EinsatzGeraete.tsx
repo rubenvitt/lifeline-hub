@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, App, Button, Form, Input, Modal, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router';
@@ -180,6 +180,18 @@ export default function EinsatzGeraete() {
       { replace: true },
     );
   }, [einheitAuftrag, daten.laedt, leitung, uebersichtDa, darf, setSuche]);
+
+  // Die Vorbelegung lebt im Formularspeicher weiter (Abbrechen und Erfolg setzen auf sie zurück,
+  // das Abhängen hält sie): ein Öffnen ohne Auftrag beginnt deshalb wieder leer.
+  const warVorbelegt = useRef(false);
+  useEffect(() => {
+    if (!anlegenOffen) return;
+    if (anlegenVorbelegung) warVorbelegt.current = true;
+    else if (warVorbelegt.current) {
+      warVorbelegt.current = false;
+      anlegenForm.resetFields();
+    }
+  }, [anlegenOffen, anlegenVorbelegung, anlegenForm]);
 
   /** Übernimmt eine geänderte Kopplung in die geladene Übersicht. */
   const uebernimm = (k: KopplungAnzeige) =>

@@ -283,6 +283,7 @@ describe('Einheitengerät — Status', () => {
             label: 'Einsatzbereit über Funk',
             fms_anker: 1,
             kategorie: 'verfuegbar',
+            sortier: 1,
           },
           verteilung: [],
         } as Einheit['status'],
@@ -370,5 +371,51 @@ describe('Einheitengerät — Melden', () => {
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).not.toHaveProperty('lat');
     expect(gesendet[0]).not.toHaveProperty('lon');
+  });
+
+  it('ein Standort, der erst nach dem Senden kommt, verortet nicht die nächste Meldung', async () => {
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+    let antwort: PositionCallback | undefined;
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (ok: PositionCallback) => {
+          antwort = ok;
+        },
+        watchPosition: vi.fn(),
+        clearWatch: vi.fn(),
+      },
+    });
+    const { gesendet } = stelleBereit();
+    renderApp('/geraet/7/melden');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Inhalt'), 'Erste');
+    await user.click(screen.getByRole('button', { name: 'Mein Standort' }));
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).not.toHaveProperty('lat');
+    await waitFor(() => expect(screen.getByLabelText('Inhalt')).toHaveValue(''));
+    act(() =>
+      antwort?.({
+        coords: { latitude: 50.11, longitude: 8.68, accuracy: 12 },
+      } as GeolocationPosition),
+    );
+    expect(screen.queryByText(/± 12/)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Inhalt'), 'Zweite');
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(2));
+    expect(gesendet[1]).not.toHaveProperty('lat');
+  });
+
+  it('meldet auch, wenn die Einheitenliste nicht kommt', async () => {
+    const { gesendet } = stelleBereit();
+    server.use(
+      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(null, { status: 500 })),
+    );
+    renderApp('/geraet/7/melden');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Inhalt'), 'Lage ruhig');
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
   });
 });
