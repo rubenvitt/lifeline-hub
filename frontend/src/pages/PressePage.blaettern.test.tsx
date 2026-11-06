@@ -10,6 +10,7 @@ import {
   ladeMedienkontakte,
   ladePressemitteilungen,
 } from '../api/presse';
+import { ApiError } from '../api/client';
 import { loadAnrufZaehler } from '../api/infotelefon';
 import type { EinsatzAnzeige, Medienkontakt } from '../api/types';
 import PressePage from './PressePage';
@@ -171,5 +172,26 @@ describe('PressePage · Blättern (LFH-1075)', () => {
     expect(
       screen.getByRole('button', { name: 'Filter Art: Anfrage entfernen' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('PressePage · Fehler beim Nachladen (LLH-1581)', () => {
+  it('der Fehler bleibt stehen, solange „Erneut abrufen" lädt', async () => {
+    vi.mocked(ladeErledigteMedienkontakte)
+      .mockRejectedValueOnce(new ApiError(500, 'kaputt', { vomAnwendungsserver: true }))
+      .mockImplementationOnce(() => new Promise<never>(() => {}));
+    setup();
+    const alarm = await screen.findByRole('alert');
+    expect(alarm).toHaveTextContent('Presse-Log konnte nicht geladen werden');
+    expect(alarm).toHaveTextContent('kaputt');
+    const knopf = within(alarm).getByRole('button', { name: 'Erneut abrufen' });
+    expect(knopf).not.toHaveClass('ant-btn-loading');
+
+    await userEvent.click(knopf);
+
+    await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Presse-Log konnte nicht geladen werden');
+    expect(screen.getByRole('alert')).toHaveTextContent('kaputt');
+    expect(karten()).toHaveLength(0);
   });
 });

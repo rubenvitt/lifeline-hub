@@ -6,6 +6,7 @@ import { abrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { fetchLagebesprechungStand } from '../api/lagebesprechung';
 import { einsatzKeys } from '../api/queryKeys';
+import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
@@ -51,6 +52,9 @@ export default function LagebesprechungPage() {
     queryKey: einsatzKeys.lagebesprechung(einsatzId),
     queryFn: () => fetchLagebesprechungStand(einsatzId),
   });
+  // Vor den frühen Returns (Hook-Reihenfolge). Der Fehler ohne Stand bleibt stehen, solange ein
+  // neuer Versuch läuft (LLH-1581).
+  const standFehler = useFehlerOhneDaten(standQuery);
   // Modul-Freigaben vom Server (LFH-669): Rechteweiche der Vorbereitung und ihre Übernahme.
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
@@ -105,7 +109,6 @@ export default function LagebesprechungPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const standGescheitert = standQuery.isError && !standQuery.data;
   const anzahl = standQuery.data?.anzahl_lagebesprechungen;
 
   return (
@@ -133,10 +136,11 @@ export default function LagebesprechungPage() {
         !darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
       }
     >
-      {standGescheitert ? (
+      {standFehler.gescheitert ? (
         <SeitenFehler
           text="Stand der Lagebesprechung konnte nicht geladen werden"
-          ursache={standQuery.error}
+          ursache={standFehler.fehler}
+          laedt={standFehler.laedt}
           onWiederholen={() => void standQuery.refetch()}
         />
       ) : (

@@ -256,6 +256,20 @@ describe('LagebesprechungPage · Aufbau', () => {
     expect(vorbereitungZeile(p, 'termin')).toHaveTextContent('—');
   });
 
+  it('der Fehler bleibt stehen, solange „Erneut abrufen" lädt (LLH-1581)', async () => {
+    rendere({ standStatus: 500 });
+    expect(await screen.findByText(STAND_FEHLER)).toBeInTheDocument();
+    const knopf = screen.getByRole('button', { name: 'Erneut abrufen' });
+    await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+
+    server.use(http.get('/api/einsaetze/1/lagebesprechung', () => new Promise<never>(() => {})));
+    await userEvent.click(knopf);
+
+    await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
+    expect(screen.getByText(STAND_FEHLER)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Termin' })).toBeNull();
+  });
+
   it('der Termin aus dem Paneel geht per PUT hinaus und steht danach in der Seite', async () => {
     const { termine } = rendere();
     const termin = await terminPaneel();
