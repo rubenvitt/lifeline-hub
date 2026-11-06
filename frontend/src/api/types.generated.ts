@@ -5444,7 +5444,7 @@ export interface components {
         };
         /**
          * @description Anlass der Hilfeleistung, fester Katalog (Ruben 05.11.2026: kein fester Statistikbogen).
-         *     String = CHECK in `migrations/0277_person_anlass.sql`. Kategorie Behandlung, nie im ETB.
+         *     String = CHECK in `migrations/0278_person_anlass.sql`. Kategorie Behandlung, nie im ETB.
          * @enum {string}
          */
         PersonAnlass: "verletzung" | "internistisch" | "neurologisch" | "intoxikation" | "hitze_kaelte" | "allergie" | "psychisch" | "sonstiges";
