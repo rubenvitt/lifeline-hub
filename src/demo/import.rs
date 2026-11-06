@@ -972,6 +972,8 @@ impl Ablauf<'_> {
                         antreff_lat: v.antreff.map(|(_, lat)| lat),
                         antreff_lon: v.antreff.map(|(lon, _)| lon),
                         vermisst_seit: None,
+                        versorgende_einheit_id: None,
+                        meldung_id: None,
                     },
                 )
                 .await?;

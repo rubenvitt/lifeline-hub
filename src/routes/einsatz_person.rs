@@ -224,6 +224,18 @@ pub async fn transportmittel(
     ))
 }
 
+/// GET /api/einsaetze/{id}/personen/einheiten — Wahl der versorgenden Einheit (LLH-1567,
+/// design.md D4). Am Modul Personen wie `transportmittel`; nicht auditiert (kein Personenbezug).
+/// Nicht am gekoppelten Gerät: dort wird die Einheit nicht gesetzt.
+pub async fn einheiten(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+) -> Result<Json<Vec<crate::person::VersorgendeEinheitAuswahl>>, AppError> {
+    Ok(Json(
+        repo::versorgende_einheiten(&state.pool, ctx.einsatz.id).await?,
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct AnlegenBody {
     pub name: Option<String>,
@@ -268,6 +280,14 @@ pub struct AnlegenBody {
     /// ist der Beginn des Einsatzes.
     #[serde(default)]
     pub zeitpunkt_at: Option<String>,
+    /// LLH-1567 (design.md D4): Einheit, die die Person versorgt; im Einsatz, nicht aufgelöst
+    /// (sonst 422).
+    #[serde(default)]
+    pub versorgende_einheit_id: Option<i64>,
+    /// LLH-1567 (design.md D5/D6): Meldung, aus der die Person angelegt wird; im Einsatz (sonst
+    /// 422), mit Zugriff auf das Modul Meldungen. Später nicht änderbar.
+    #[serde(default)]
+    pub meldung_id: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/personen — Person anlegen (initial erfasst/vermisst/betroffen).
@@ -461,6 +481,15 @@ pub async fn anlegen(
         "antreff_lat",
         "antreff_lon",
     )?;
+    // LLH-1567: die Bezüge zum Zusammenhang (422), nach den Feldern für sich.
+    if let Some(einheit_id) = body.versorgende_einheit_id {
+        repo::pruefe_versorgende_einheit(&state.pool, einsatz_id, einheit_id).await?;
+    }
+    if let Some(meldung_id) = body.meldung_id {
+        ctx.fordere_zielmodul::<crate::einsatz::modul::Meldungen>(&state.pool)
+            .await?;
+        repo::pruefe_meldung(&state.pool, einsatz_id, meldung_id).await?;
+    }
 
     // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
@@ -489,6 +518,8 @@ pub async fn anlegen(
                     antreff_lat: body.antreff_lat,
                     antreff_lon: body.antreff_lon,
                     vermisst_seit: vermisst_seit.as_deref(),
+                    versorgende_einheit_id: body.versorgende_einheit_id,
+                    meldung_id: body.meldung_id,
                 },
             )
             .await?;
@@ -631,6 +662,12 @@ pub async fn anlegen(
         for etb_id in uhs_etb_id.into_iter().chain(verbleib_etb_id) {
             state.live.publiziere(einsatz_id, etb_id);
         }
+        // Die Meldung zeigt ihre Patienten (design.md D6): ohne Neuladen.
+        if body.meldung_id.is_some() {
+            state
+                .live
+                .publiziere_einsatz(einsatz_id, LiveEvent::Meldung);
+        }
         // Nur bei einer wirklich neuen Person: ein `client_id`-Replay meldet nicht noch einmal.
         if kategorie.is_some_and(|k| wird_sk1(None, k)) {
             melde_sichtung_eins(&state, einsatz_id, person.id, ctx.benutzer.id).await;
@@ -756,6 +793,10 @@ pub struct PatchBody {
     /// LLH-1326: Kontamination (Tri-State; `null` heißt „keine Angabe“, nicht „nein“).
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub kontamination: Option<Option<bool>>,
+    /// LLH-1567 (design.md D4): versorgende Einheit (Tri-State; `null` leert). Im Einsatz, nicht
+    /// aufgelöst (422).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub versorgende_einheit_id: Option<Option<i64>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
     /// Konfliktdialog), wird bewusst blind geschrieben.
@@ -805,6 +846,8 @@ pub struct ErwartetBody {
     pub pat_nummer: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub kontamination: Option<Option<bool>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub versorgende_einheit_id: Option<Option<i64>>,
 }
 
 /// Ein Text-Altwert: `""` (auch nur Leerraum) heißt leer wie `null`. Sonst bleibt der Wert, wie
@@ -890,6 +933,11 @@ fn pruefe_erwartet(erwartet: &ErwartetBody, body: &PatchBody) -> Result<(), AppE
             "kontamination",
             erwartet.kontamination.is_some(),
             body.kontamination.is_some(),
+        ),
+        (
+            "versorgende_einheit_id",
+            erwartet.versorgende_einheit_id.is_some(),
+            body.versorgende_einheit_id.is_some(),
         ),
     ];
     if let Some((feld, _, _)) = felder.iter().find(|(_, alt, neu)| *alt && !*neu) {
@@ -977,6 +1025,10 @@ pub async fn aktualisieren(
     let notiz = optional_max_tri(body.notiz, "Notiz", PERSON_NOTIZ_MAX)?;
     let zustand = optional_max_tri(body.zustand, "Zustand / Verdacht", PERSON_ZUSTAND_MAX)?;
     let pat_nummer = optional_max_tri(body.pat_nummer, "PAT-Nummer", PAT_NUMMER_MAX)?;
+    // LLH-1567: eine neue Einheit muss im Einsatz stehen und aktiv sein (422); leeren geht immer.
+    if let Some(Some(einheit_id)) = body.versorgende_einheit_id {
+        repo::pruefe_versorgende_einheit(&state.pool, einsatz_id, einheit_id).await?;
+    }
 
     // LFH-613 „vermisst seit": zuerst das Feld isoliert (400 — leeren, unparsebar, Zukunft),
     // danach der Zusammenhang mit dem Status (422, unten gegen den geladenen Bestand).
@@ -1041,6 +1093,7 @@ pub async fn aktualisieren(
             vermisst_seit: alt_vermisst_seit.as_ref().map(|o| o.as_deref()),
             pat_nummer: alt_pat_nummer.as_ref().map(|o| o.as_deref()),
             kontamination: erwartet.kontamination,
+            versorgende_einheit_id: erwartet.versorgende_einheit_id,
         },
         repo::PatchDaten {
             name: name.as_ref().map(|o| o.as_deref()),
@@ -1058,6 +1111,7 @@ pub async fn aktualisieren(
             vermisst_seit: vermisst_seit.as_deref().map(Some),
             pat_nummer: pat_nummer.as_ref().map(|o| o.as_deref()),
             kontamination: body.kontamination,
+            versorgende_einheit_id: body.versorgende_einheit_id,
         },
     )
     .await?;

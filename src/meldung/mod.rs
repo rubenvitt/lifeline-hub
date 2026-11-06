@@ -195,6 +195,36 @@ pub struct MeldungAnzeige {
     /// `etb_berichtigung_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub etb_berichtigung_lfd_nr: Option<i64>,
+    /// Verortung (LLH-1031), auch für den Fundort eines Patienten aus der Meldung (LLH-1567).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lon: Option<f64>,
+    /// Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser
+    /// Meldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB.
+    #[sqlx(try_from = "String")]
+    #[schema(value_type = Vec<MeldungPatient>)]
+    pub patienten: MeldungPatienten,
+}
+
+/// Ein aus einer Meldung angelegter Patient (LLH-1567): Kennung und Registriernummer, sonst nichts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
+pub struct MeldungPatient {
+    pub id: i64,
+    pub registrier_nr: i64,
+}
+
+/// Die Patienten einer Meldung, gelesen als JSON-Feld der Anzeige-Abfrage (`json_group_array`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct MeldungPatienten(pub Vec<MeldungPatient>);
+
+impl TryFrom<String> for MeldungPatienten {
+    type Error = serde_json::Error;
+
+    fn try_from(json: String) -> Result<Self, Self::Error> {
+        serde_json::from_str(&json).map(MeldungPatienten)
+    }
 }
 
 impl MeldungAnzeige {

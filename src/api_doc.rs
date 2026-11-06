@@ -285,6 +285,7 @@ use utoipa::OpenApi;
         crate::person::Geschlecht,
         crate::person::PersonAnzeige,
         crate::person::PersonAuswahl,
+        crate::person::VersorgendeEinheitAuswahl,
         crate::person::PersonStatus,
         crate::person::Sichtungskategorie,
         crate::person::TransportDurch,

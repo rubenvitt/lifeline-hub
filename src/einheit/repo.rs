@@ -1412,6 +1412,13 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
         "SELECT EXISTS(SELECT 1 FROM meldung WHERE einheit_id = ?)",
         "Eine Meldung oder Rückmeldung nennt die Einheit",
     ),
+    // LLH-1567 (design.md D3): die Kontakte je Streife zählen im Bericht. Eine stornierte
+    // Person ist eine Fehleingabe und keine Spur; ihren Verweis leert `ON DELETE SET NULL`.
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_person \
+                       WHERE versorgende_einheit_id = ? AND storniert_at IS NULL)",
+        "Die Einheit hat Patienten versorgt",
+    ),
     (
         "SELECT EXISTS(SELECT 1 FROM einsatz_dokument WHERE bezug_einheit_id = ?)",
         "Ein Dokument bezieht sich auf die Einheit",
@@ -1441,9 +1448,9 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
 
 /// Der erste Grund, warum eine Einheit nicht spurlos gelöscht werden darf (design.md D3): eine
 /// Zeitachse, eine Schicht der Ablösung, eine ETB-Verknüpfung, eine Belegung eines
-/// Bereitstellungsraums, ein Auftrag, eine Meldung, ein Dokument, ein Verteiler, eine (auch
-/// zurückgenommene) Verpflegungsausgabe an sie (LLH-1055, design.md D9) oder eine (auch
-/// beendete) Kraft mit Verweis auf sie. `None` = keine Spur.
+/// Bereitstellungsraums, ein Auftrag, eine Meldung, ein versorgter Patient (LLH-1567), ein
+/// Dokument, ein Verteiler, eine (auch zurückgenommene) Verpflegungsausgabe an sie (LLH-1055,
+/// design.md D9) oder eine (auch beendete) Kraft mit Verweis auf sie. `None` = keine Spur.
 pub async fn find_spur_tx(
     conn: &mut SqliteConnection,
     id: i64,

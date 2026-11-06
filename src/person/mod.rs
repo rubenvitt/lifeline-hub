@@ -447,6 +447,19 @@ pub struct PersonAuswahl {
     pub pat_nummer: Option<String>,
 }
 
+/// Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/personen/einheiten`): je aktiver
+/// Einheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf
+/// die Kräfte geht.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct VersorgendeEinheitAuswahl {
+    pub id: i64,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_name: Option<String>,
+}
+
 /// Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
 /// `org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,
 /// kein Snapshot wie bei Material.
@@ -534,6 +547,23 @@ pub struct PersonAnzeige {
     /// Erfassungszeit des aktuellen Transportstands.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transport_at: Option<String>,
+    /// Einheit, die die Person versorgt (LLH-1567, design.md D1): Streife, UHS-Trupp, RTW.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub versorgende_einheit_id: Option<i64>,
+    /// Name der versorgenden Einheit, beim Lesen aufgelöst (auch nach dem Auflösen der Einheit).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub versorgende_einheit_name: Option<String>,
+    /// Abschnitt der versorgenden Einheit, zur Abfragezeit aus der Einheit (design.md D2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub versorgende_einheit_abschnitt_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub versorgende_einheit_abschnitt_name: Option<String>,
+    /// Meldung, aus der die Person angelegt wurde (LLH-1567, design.md D6); nur beim Anlegen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meldung_id: Option<i64>,
+    /// Laufende Nummer dieser Meldung, für „aus Meldung #n“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meldung_lfd_nr: Option<i64>,
 }
 
 impl PersonAnzeige {
