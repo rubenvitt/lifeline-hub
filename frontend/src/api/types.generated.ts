@@ -1352,7 +1352,7 @@ export interface components {
         /**
          * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048,
          *     Einheit LLH-1579). Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
-         *     (`migrations/0281_…`).
+         *     (`migrations/0283_…`).
          * @enum {string}
          */
         Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegungsstelle" | "einheit";
@@ -3442,7 +3442,7 @@ export interface components {
         FunktionsArt: "leitung" | "sachgebiet" | "fuehrungshilfspersonal" | "fachberater";
         /**
          * @description Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-         *     `migrations/0281_geraet_kopplung_einheit.sql`.
+         *     `migrations/0283_geraet_kopplung_einheit.sql`.
          * @enum {string}
          */
         Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit";

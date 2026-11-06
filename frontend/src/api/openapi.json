@@ -3328,7 +3328,7 @@
       },
       "Bindungsart": {
         "type": "string",
-        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048,\nEinheit LLH-1579). Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel\n(`migrations/0281_…`).",
+        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048,\nEinheit LLH-1579). Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel\n(`migrations/0283_…`).",
         "enum": [
           "uhs",
           "betreuungsstelle",
@@ -8480,7 +8480,7 @@
       },
       "Funktionsansicht": {
         "type": "string",
-        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0281_geraet_kopplung_einheit.sql`.",
+        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0283_geraet_kopplung_einheit.sql`.",
         "enum": [
           "uhs-tablet",
           "uhs-laptop",

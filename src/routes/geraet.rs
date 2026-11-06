@@ -268,6 +268,27 @@ pub async fn anlegen(
     );
     let von = ctx.benutzer.id;
     let (kopplung_id, code, code_bis, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        // Eine Einheit, die seit `stelle_pruefen` aufgelöst wurde, bekommt keine Kopplung mehr:
+        // `einheit::repo::aufloesen_tx` widerruft nur, was es bei seinem Lauf schon gab (LLH-1579).
+        if let Some(Stelle {
+            art: Bindungsart::Einheit,
+            id,
+        }) = stelle
+        {
+            let aktiv: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM einsatz_einheit \
+                 WHERE id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL)",
+            )
+            .bind(id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            if !aktiv {
+                return Err(AppError::UnprocessableEntity(
+                    "Die Einheit ist aufgelöst".into(),
+                ));
+            }
+        }
         let kopplung_id = repo::anlegen(
             conn,
             NeueKopplung {
