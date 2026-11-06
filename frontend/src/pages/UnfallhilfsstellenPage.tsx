@@ -2,6 +2,7 @@ import { Breadcrumb, Button } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { einsaetzePfad, einsatzPfad, uhsDetailPfad } from '../routing/deeplinks';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -65,15 +66,18 @@ export default function UnfallhilfsstellenPage() {
 
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  // Schnellaktion: ?neu=1 öffnet den Anlegen-Drawer, sobald die Rechte feststehen.
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
+  // Schnellaktion: ?neu=1 öffnet den Anlegen-Drawer, sobald die Rechte feststehen. Einmal je
+  // Verlaufseintrag (`useLinkAuftrag`, LLH-1558), geräumt aus einer Kopie statt der Instanz, die
+  // Render und andere Effekte lesen.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     if (!schreibgeschuetzt) setAnlegen(true);
-    searchParams.delete('neu');
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, schreibgeschuetzt]);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, schreibgeschuetzt]);
 
   // Sortieren und Filtern (LLH-1096, Spec `tabellen-sortieren-filtern`): jede Spalte sortiert,
   // Typ und Status sind Wertelisten und filtern. Standort ist Freitext: sortierbar, ohne Filter.

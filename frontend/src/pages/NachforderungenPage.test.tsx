@@ -3,7 +3,8 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
+import { Link, MemoryRouter, Routes, Route, useLocation } from 'react-router';
+import type { ReactNode } from 'react';
 import NachforderungenPage from './NachforderungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError, NetzFehler } from '../api/client';
@@ -21,6 +22,7 @@ import {
   NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX,
 } from '../api/eingabegrenzen';
 import { waehle } from '../test/auswahlListe';
+import { AdresseSteht } from '../test/adresseSteht';
 
 /*
  * Die Uhr steht auf dem Einsatztag (nur `Date`): „Eingetroffen“ zeigt die letzten 12 h, die
@@ -140,25 +142,33 @@ function OrtSonde() {
 /** Der Query-Client des letzten `renderPage`, für Abwesenheits-Prüfungen am Cache. */
 let zuletztClient: QueryClient | null = null;
 
-function renderPage(url = '/einsaetze/1/nachforderungen') {
+function renderPage(
+  url = '/einsaetze/1/nachforderungen',
+  {
+    adresseSteht = false,
+    daneben = null,
+  }: {
+    /** Hält den Router-Commit an (LLH-1558); die Sonde sieht die Adresse weiter. */
+    adresseSteht?: boolean;
+    /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
+    daneben?: ReactNode;
+  } = {},
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   zuletztClient = client;
+  const seite = (
+    <Routes>
+      <Route path="/einsaetze/:id/nachforderungen" element={<NachforderungenPage />} />
+    </Routes>
+  );
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
         <AuthProvider>
           <MemoryRouter initialEntries={[url]}>
-            <Routes>
-              <Route
-                path="/einsaetze/:id/nachforderungen"
-                element={
-                  <>
-                    <NachforderungenPage />
-                    <OrtSonde />
-                  </>
-                }
-              />
-            </Routes>
+            {adresseSteht ? <AdresseSteht>{seite}</AdresseSteht> : seite}
+            <OrtSonde />
+            {daneben}
           </MemoryRouter>
         </AuthProvider>
       </AntApp>
@@ -724,6 +734,53 @@ describe('NachforderungenPage', () => {
         expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
       );
       expect(screen.queryByLabelText('Was')).not.toBeInTheDocument();
+    });
+
+    /**
+     * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht der Auftrag
+     * noch in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu
+     * an (Einsatz lädt neu), öffnet die Erfassung nicht noch einmal vorbelegt. Die Positivhälfte
+     * (Kopfknopf wieder da) steht vor der Negativaussage.
+     */
+    it('ein hängender Router-Commit öffnet die geschlossene Erfassung nach neuem Recht nicht wieder (LLH-1558)', async () => {
+      renderPage(deeplink, { adresseSteht: true });
+      await erwarteVorbelegt();
+      await userEvent.click(screen.getAllByRole('button', { name: 'Formular schließen' })[0]);
+      await waitFor(() => expect(screen.queryByLabelText('Was')).not.toBeInTheDocument());
+
+      vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+        id: 1,
+        bezeichnung: 'Lage',
+        status: 'aktiv',
+        meine_rolle: 'beobachter',
+      } as Awaited<ReturnType<typeof ladeEinsatz>>);
+      await act(() => zuletztClient!.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('button', { name: /Nachforderung anlegen/ }),
+        ).not.toBeInTheDocument(),
+      );
+      await act(() => zuletztClient!.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+      expect(
+        await screen.findByRole('button', { name: /Nachforderung anlegen/ }),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText('Was')).not.toBeInTheDocument();
+    });
+
+    it('ein neuer Link mit Vorbelegung öffnet die Erfassung wieder (LLH-1558)', async () => {
+      renderPage(deeplink, { daneben: <Link to={deeplink}>neuer-link</Link> });
+      await erwarteVorbelegt();
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+      );
+      await userEvent.click(screen.getAllByRole('button', { name: 'Formular schließen' })[0]);
+      await waitFor(() => expect(screen.queryByLabelText('Was')).not.toBeInTheDocument());
+
+      await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+      await erwarteVorbelegt();
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+      );
     });
   });
 });
