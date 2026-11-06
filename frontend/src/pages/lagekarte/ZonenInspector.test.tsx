@@ -8,7 +8,7 @@ import { renderMitProviders } from '../../test/utils';
 import type { GefahrBewertung, Gefahrengebiet, LageZone } from '../../api/types';
 import ZonenInspector, { type ZonenInspectorProps } from './ZonenInspector';
 import { FREIE_SKIZZE_VORGABEFARBE, zoneStil } from './zonenStil';
-import { ZONE_LABEL_MAX } from '../../api/eingabegrenzen';
+import { ZONE_LABEL_MAX, ZONE_NOTIZ_MAX } from '../../api/eingabegrenzen';
 
 const basisZone: LageZone = {
   id: 1,
@@ -106,6 +106,30 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
       'maxlength',
       String(ZONE_LABEL_MAX),
     );
+  });
+
+  // Die Notiz begrenzt der Server ebenso (LLH-1559). Die Maske zählt ab 80 %, kürzt nie und
+  // schickt eine zu lange Notiz beim Verlassen nicht; gekürzt geht sie hinaus.
+  // Mutationsprobe: ohne den Riegel im `onBlur` ruft die Maske `onAendern` mit der Überlänge.
+  it('zählt die Notiz, sperrt eine zu lange und kürzt nicht', () => {
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>();
+    renderInspector({ onAendern });
+    const notiz = screen.getByRole('textbox', { name: 'Notiz' });
+
+    const zuLang = 'x'.repeat(ZONE_NOTIZ_MAX + 1);
+    fireEvent.change(notiz, { target: { value: zuLang } });
+    expect(screen.getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
+    expect(notiz).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.blur(notiz);
+    expect(onAendern).not.toHaveBeenCalled();
+    expect(notiz).toHaveValue(zuLang);
+
+    const genau = `  ${'x'.repeat(ZONE_NOTIZ_MAX)}  `;
+    fireEvent.change(notiz, { target: { value: genau } });
+    expect(screen.getByText('2.000 / 2.000')).toBeInTheDocument();
+    expect(notiz).not.toHaveAttribute('aria-invalid');
+    fireEvent.blur(notiz);
+    expect(onAendern).toHaveBeenCalledExactlyOnceWith({ notiz: 'x'.repeat(ZONE_NOTIZ_MAX) });
   });
 
   it('hält Eingaben kontrolliert und quittiert den laufenden Speichervorgang sichtbar', async () => {
