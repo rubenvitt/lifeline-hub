@@ -902,12 +902,14 @@ pub async fn block_aendern(
     })
 }
 
-/// Löscht einen Block mit CAS über `version` (409). Kein ETB.
+/// Löscht einen Block mit CAS über `version` (409). Ohne `darf_personen` (Freigabe Personal)
+/// nur einen leeren Block (403 sonst), geprüft im selben Stand. Kein ETB.
 pub async fn block_loeschen(
     pool: &SqlitePool,
     einsatz_id: i64,
     bid: i64,
     version: i64,
+    darf_personen: bool,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
         let stand: Option<i64> = sqlx::query_scalar(
@@ -925,6 +927,17 @@ pub async fn block_loeschen(
                 ))
             }
             Some(_) => {}
+        }
+        if !darf_personen {
+            let belegt: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM einsatz_planschicht_person WHERE planschicht_id = ?)",
+            )
+            .bind(bid)
+            .fetch_one(&mut *conn)
+            .await?;
+            if belegt {
+                return Err(AppError::Forbidden);
+            }
         }
         sqlx::query("DELETE FROM einsatz_planschicht WHERE id = ?")
             .bind(bid)

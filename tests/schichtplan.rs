@@ -674,6 +674,17 @@ async fn schichten_erzeugen_aus_laenge_und_schichtmodell() {
         .await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{laenge}");
     }
+    // Zeitraum unter 10 min: 400 (länger als 24 h ist erlaubt, siehe unten).
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &erzeugen,
+        &admin,
+        Some(&json!({"posten": posten, "von": "2026-11-06 10:00:00",
+                     "bis": "2026-11-06 10:05:00", "laenge_minuten": 10})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
     // Mehr als 100 Schichten: 400.
     let (s, _) = anfrage_json(
         &app,
@@ -893,6 +904,26 @@ async fn rechte_module_und_abgeschlossener_einsatz() {
     assert_eq!(
         block(&app, &frieda, e, pause.clone()).await.0,
         StatusCode::CREATED
+    );
+    // Löschen: den belegten Block nur mit Personal, den leeren schon.
+    let (_, plan) = anfrage(&app, "GET", &pfad(e), &frieda, None).await;
+    let pfad_von = |b: &Value| {
+        format!(
+            "{}/bloecke/{}?version={}",
+            pfad(e),
+            b["id"].as_i64().unwrap(),
+            b["version"].as_i64().unwrap()
+        )
+    };
+    let belegt = pfad_von(finde(&plan, "pause", "2026-11-06 10:00:00"));
+    let leer = pfad_von(finde(&plan, "pause", "2026-11-06 12:00:00"));
+    assert_eq!(
+        anfrage(&app, "DELETE", &belegt, &frieda, None).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        anfrage(&app, "DELETE", &leer, &frieda, None).await.0,
+        StatusCode::NO_CONTENT
     );
 
     // Abgeschlossen: lesen ja, schreiben 409.

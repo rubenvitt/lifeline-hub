@@ -19,8 +19,9 @@ use crate::abloesung::schichtplan::repo::{
 };
 use crate::abloesung::schichtplan::{
     zerlegung, PlanHelferAnzeige, PlanPerson, PlanPersonEingabe, Posten, PostenEingabe,
-    SchichtplanAnzeige, HELFER_QUALIFIKATIONEN_MAX, HELFER_TELEFON_MAX, HELFER_TEXT_MAX,
-    MAX_DIENST_BEREICH, MIN_RUHE_BEREICH, NOTIZ_MAX, PLAN_PERSONEN_MAX, SOLL_ANZAHL_MAX,
+    SchichtplanAnzeige, BLOCK_MIN_MINUTEN, HELFER_QUALIFIKATIONEN_MAX, HELFER_TELEFON_MAX,
+    HELFER_TEXT_MAX, MAX_DIENST_BEREICH, MIN_RUHE_BEREICH, NOTIZ_MAX, PLAN_PERSONEN_MAX,
+    SOLL_ANZAHL_MAX,
 };
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
@@ -283,7 +284,7 @@ pub struct VersionParams {
 }
 
 /// DELETE /api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}?version=… (409 bei
-/// veraltetem Stand).
+/// veraltetem Stand). Einen belegten Block löscht nur, wer Personal darf (403).
 pub async fn block_loeschen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -295,7 +296,10 @@ pub async fn block_loeschen(
         .ok_or_else(|| AppError::Validation("version fehlt".into()))?;
     let posten = repo::posten_von(&state.pool, ctx.einsatz.id, bid).await?;
     fordere_posten_modul(&state, &ctx, posten).await?;
-    repo::block_loeschen(&state.pool, ctx.einsatz.id, bid, version).await?;
+    // Ein belegter Block nimmt mit dem Löschen Einteilungen weg: das verlangt Personal, geprüft
+    // in der Transaktion gegen den Stand von `version`.
+    let darf_personen = mit_personen(&state, &ctx).await?;
+    repo::block_loeschen(&state.pool, ctx.einsatz.id, bid, version, darf_personen).await?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -321,10 +325,15 @@ pub async fn erzeugen(
     let posten = Posten::from(req.posten);
     let von = planzeit(&req.von, "Beginn")?;
     let bis = planzeit(&req.bis, "Ende")?;
-    if bis <= von {
-        return Err(AppError::Validation(
-            "Das Ende liegt nach dem Beginn".into(),
-        ));
+    // Ein Zeitraum unter der Mindestlänge ergäbe einen zu kurzen Block; länger als 24 h darf er
+    // sein, er wird zerlegt.
+    let dauer = crate::zeit::parse_utc(&bis)
+        .zip(crate::zeit::parse_utc(&von))
+        .map(|(b, v)| (b - v).num_minutes());
+    if !dauer.is_some_and(|m| m >= BLOCK_MIN_MINUTEN) {
+        return Err(AppError::Validation(format!(
+            "Der Zeitraum dauert mindestens {BLOCK_MIN_MINUTEN} Minuten"
+        )));
     }
     let laenge = req
         .laenge_minuten
