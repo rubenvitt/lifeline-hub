@@ -16,6 +16,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { prioRang } from '../kommunikation';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../offline/verbindung';
 
 /** Ziel einer Empfängerzeile (Auftrag) oder eines Verteiler-Eintrags (Befehl). */
 export type EmpfaengerZiel = {
@@ -53,6 +54,11 @@ function vergleiche(a: Auftrag, b: Auftrag): number {
  * und „Vollzug melden“. Erteilen und Abnehmen fehlen; die Liste schneidet der Server zu. Kein
  * Rückverweis ins ETB: das liest das Gerät nicht. Darunter die Einsatzbefehle an den Bereich
  * (LLH-1190, `GeraetBefehle`).
+ *
+ * Das Einheitengerät (LLH-1579) nutzt dieselbe Seite als Startseite: nur Aufträge mit der eigenen
+ * Einheit als Empfänger (nicht die ihres Abschnitts, F4), ohne Abschnitte und ohne Befehle. Ohne
+ * Verbindung bleiben Quittung und Vollzug gesperrt, die Liste zeigt den letzten Stand (F5): eine
+ * vorgemerkte Quittung käme womöglich nach einer Aufhebung an.
  */
 export default function GeraetAuftraegePage() {
   const { geraet } = useAuth();
@@ -60,6 +66,8 @@ export default function GeraetAuftraegePage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [vollzugFuer, setVollzugFuer] = useState<number | null>(null);
+  const istAbschnitt = geraet?.ansicht === 'einsatzabschnitt';
+  const ohneVerbindung = useOhneVerbindung();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -74,14 +82,15 @@ export default function GeraetAuftraegePage() {
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
-    enabled: geraet != null,
+    // Das Einheitengerät liest keine Abschnitte (403): sein Bereich ist die Einheit allein.
+    enabled: geraet != null && istAbschnitt,
   });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
     enabled: geraet != null,
   });
-  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data) && !ohneVerbindung;
 
   const eigeneAbschnitte = useMemo(
     () => new Set((abschnitteQuery.data ?? []).map((a) => a.id)),
@@ -147,7 +156,10 @@ export default function GeraetAuftraegePage() {
 
   return (
     <EinsatzSeite titel="Aufträge" dataUpdatedAt={auftraegeQuery.dataUpdatedAt}>
-      {auftraegeQuery.isError ? (
+      {ohneVerbindung && auftraege.length > 0 && (
+        <Alert type="warning" showIcon title={OHNE_VERBINDUNG_NICHT_AENDERBAR} />
+      )}
+      {auftraegeQuery.isError && auftraege.length === 0 ? (
         <Alert type="error" showIcon title="Aufträge konnten nicht geladen werden" />
       ) : auftraegeQuery.isLoading ? (
         <Spin />
@@ -167,7 +179,7 @@ export default function GeraetAuftraegePage() {
           quittierFehler={quittierFehler.grund}
         />
       )}
-      {geraet != null && (
+      {geraet != null && istAbschnitt && (
         <GeraetBefehle einsatzId={einsatzId} darfSchreiben={darfSchreiben} isEigen={isEigen} />
       )}
       <VollzugMeldenModal

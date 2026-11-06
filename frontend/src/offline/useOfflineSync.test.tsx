@@ -19,6 +19,7 @@ import {
   legeNotizAn,
   legePersonAn,
   saveTransport,
+  saveAnlass,
 } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
@@ -54,6 +55,7 @@ vi.mock('../api/einsatzPerson', () => ({
   erfasseVerbleib: vi.fn(),
   legeNotizAn: vi.fn(),
   saveTransport: vi.fn(),
+  saveAnlass: vi.fn(),
   createMassnahme: vi.fn(),
   createVerletzung: vi.fn(),
 }));
@@ -794,6 +796,7 @@ describe('Einträge einer Person in der Offline-Queue (LLH-1138, design.md D8)',
       api: saveTransport,
       daten: { prioritaet: 'dringlich' as const, art: null, fachrichtung: null },
     },
+    { art: 'anlass' as const, api: saveAnlass, daten: { anlass: 'psychisch' as const } },
     { art: 'massnahme' as const, api: createMassnahme, daten: { art: 'zugang' as const } },
     {
       art: 'verletzung' as const,

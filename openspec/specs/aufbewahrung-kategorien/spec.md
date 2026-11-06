@@ -12,7 +12,8 @@ Einsatz zu sperren.
 
 Das System SHALL genau drei Datenkategorien mit eigener Frist führen:
 - `behandlung`: Zustand einer Person, Notizen zu Sichtung, Verlauf und UHS-Belegung, Lage und
-  Notiz einer Verletzung, die benötigte Fachrichtung und die PAT-Nummer
+  Notiz einer Verletzung, die benötigte Fachrichtung, die PAT-Nummer und der Anlass der
+  Hilfeleistung
 - `personenauskunft`: Herkunftsadresse und Melderkontakt
 - `anhaenge`: Datei-Anhänge samt ihrer Ablage als Dokument, an Schaden, Chat und ETB, und die
   Bild-Hintergründe der Lagekarte
@@ -37,7 +38,7 @@ Transportart und Kontamination.
 
 #### Scenario: Schwärzung der Behandlung leert die PAT-Kern-Freitexte
 - **WHEN** die Kategorie `behandlung` eines Einsatzes geschwärzt wird
-- **THEN** sind PAT-Nummer, Fachrichtung sowie Lage und Notiz jeder Verletzung leer
+- **THEN** sind PAT-Nummer, Fachrichtung, Anlass sowie Lage und Notiz jeder Verletzung leer
 - **AND** Region und Art der Verletzungen, die Maßnahmen, Priorität, Art des Transports und
   Kontamination bleiben erhalten
 
@@ -49,10 +50,10 @@ einer Person SHALL das System
 erst schwärzen, wenn alle Zwecke dieser Person geschwärzt sind. Eine Person mit
 Behandlungsbezug MUST die Zwecke `behandlung` und `personenauskunft` tragen, jede andere nur
 `personenauskunft`. Behandlungsbezug MUST bestehen, sobald eine Sichtung, eine Verlaufsnotiz,
-eine UHS-Belegung, ein Zustand, eine Verletzung, eine Maßnahme, ein Transportstand, eine
-PAT-Nummer, Kontamination „ja“ oder ein Verbleib mit Einsatznummer der Leitstelle vorliegt, auch
-storniert oder aufgehoben. Ein Verbleib ohne Einsatznummer MUST NOT allein als Behandlungsbezug
-zählen. „Nicht kontaminiert“
+eine UHS-Belegung, ein Zustand, eine Verletzung, eine Maßnahme, ein Transportstand, ein
+Anlass, eine PAT-Nummer, Kontamination „ja“ oder ein Verbleib mit Einsatznummer der Leitstelle
+vorliegt, auch storniert oder aufgehoben. Ein Verbleib ohne Einsatznummer MUST NOT allein als
+Behandlungsbezug zählen. „Nicht kontaminiert“
 MUST NOT als Behandlungsbezug zählen.
 
 #### Scenario: Nur registriert

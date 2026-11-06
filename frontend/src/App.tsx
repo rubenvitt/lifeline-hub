@@ -15,7 +15,9 @@ import GeraeteLayout, {
   GeraetBetreuungRahmen,
   GeraetBetroffenAufnahme,
   GeraetBr,
+  GeraetEinheitRahmen,
   GeraetEinsatzRahmen,
+  GeraetFuehrungRahmen,
   GeraetMeldungen,
   GeraetVerpflegung,
   GeraetVerpflegungAusgabe,
@@ -31,6 +33,7 @@ import GeraetBetreuungsstellePage from './geraet/GeraetBetreuungsstellePage';
 import GeraetAbschnittPage from './geraet/GeraetAbschnittPage';
 import GeraetAuftraegePage from './geraet/GeraetAuftraegePage';
 import GeraetMeldenPage from './geraet/GeraetMeldenPage';
+import GeraetStatusPage from './geraet/GeraetStatusPage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
@@ -321,8 +324,6 @@ export const appRouten = createRoutesFromElements(
           {/* Abschnittsansicht (LFH-1043); jede andere Ansicht landet auf ihrer Startseite. */}
           <Route element={<GeraetAbschnittRahmen />}>
             <Route path="abschnitt" element={<GeraetAbschnittPage />} />
-            <Route path="auftraege" element={<GeraetAuftraegePage />} />
-            <Route path="melden" element={<GeraetMeldenPage />} />
             <Route
               path="karte"
               element={
@@ -331,6 +332,15 @@ export const appRouten = createRoutesFromElements(
                 </Suspense>
               }
             />
+          </Route>
+          {/* Aufträge und Melden: Abschnittsgerät und Einheitengerät (LLH-1579). */}
+          <Route element={<GeraetFuehrungRahmen />}>
+            <Route path="auftraege" element={<GeraetAuftraegePage />} />
+            <Route path="melden" element={<GeraetMeldenPage />} />
+          </Route>
+          {/* Status der eigenen Einheit (LLH-1579). */}
+          <Route element={<GeraetEinheitRahmen />}>
+            <Route path="status" element={<GeraetStatusPage />} />
           </Route>
           <Route path="*" element={<GeraetStart />} />
         </Route>

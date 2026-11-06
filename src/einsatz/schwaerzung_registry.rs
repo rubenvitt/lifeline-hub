@@ -296,6 +296,27 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("transport_art", G_TRIAGE),
             scrub("transport_fachrichtung", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("transport_at", G_ZEIT),
+            // LLH-1566: der Anlass der Hilfeleistung ist diagnosenah (psychisch, Intoxikation)
+            // und fällt mit der Behandlung (LLH-1109); seine Zeit bleibt wie die des Transports.
+            scrub("anlass", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("anlass_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "person_anlass",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("person_id", G_FK),
+            // LLH-1566: wie der Cache an der Person.
+            scrub("anlass", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von", G_FK),
+            retain("client_id", G_IDEMPOTENZ),
         ],
     },
     TabellenRegel {
@@ -2937,7 +2958,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // ---------- Gerätekopplung (LFH-892, migrations/0147; Stellen LFH-1040, 0158;
-    // Verpflegungsstelle LLH-1048, 0213) ----------
+    // Verpflegungsstelle LLH-1048, 0213; Einheit LLH-1579, 0286) ----------
     TabellenRegel {
         tabelle: "geraet_kopplung",
         scoping: Scoping::EinsatzId,
@@ -2964,6 +2985,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("bereitstellungsraum_id", G_FK),
             retain("abschnitt_id", G_FK),
             retain("verpflegungsstelle_id", G_FK),
+            retain("einheit_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -3204,6 +3226,8 @@ pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
     "person_uhs_belegung",
     // LLH-1325: ein Transportstand, auch ein aufgehobener (design.md D4).
     "person_transport",
+    // LLH-1566: ein Anlass der Hilfeleistung, auch ein aufgehobener.
+    "person_anlass",
     // LLH-1324: eine Maßnahme, auch eine aufgehobene.
     "person_massnahme",
     // LLH-1113: eine Verletzung, auch eine aufgehobene.
@@ -3969,9 +3993,11 @@ mod tests {
             (
                 "behandlung".to_string(),
                 menge(&[
+                    "einsatz_person.anlass",
                     "einsatz_person.pat_nummer",
                     "einsatz_person.transport_fachrichtung",
                     "einsatz_person.zustand",
+                    "person_anlass.anlass",
                     "person_sichtung.notiz",
                     "person_transport.fachrichtung",
                     "person_uhs_belegung.notiz",

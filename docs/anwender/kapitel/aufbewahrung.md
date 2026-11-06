@@ -116,9 +116,9 @@ Vormerkung, Schwärzung und jede Änderung einer Frist stehen im Einsatztagebuch
 
 ### Fristen je Datenkategorie
 
-- **Behandlung**: Zustand, PAT-Nummer und benötigte Fachrichtung der Personen, Lage und Notiz
-  ihrer Verletzungen, die Einsatznummer der Leitstelle am Transport sowie die Notizen zu
-  Sichtung, Verlauf und UHS-Belegung.
+- **Behandlung**: Zustand, PAT-Nummer, benötigte Fachrichtung und Anlass der Hilfeleistung der
+  Personen, Lage und Notiz ihrer Verletzungen, die Einsatznummer der Leitstelle am Transport sowie
+  die Notizen zu Sichtung, Verlauf und UHS-Belegung.
 - **Personenauskunft**: Herkunftsadresse und Melderkontakt der Personen.
 - **Anhänge**: Datei-Anhänge und die Bilder der Lagekarte.
 
@@ -128,8 +128,9 @@ Karenz geschwärzt; der Einsatz selbst bleibt lesbar. Name, Geburtsdatum, Fundor
 einer Person bleiben, bis alle Zwecke der Person abgelaufen sind. Zur Behandlung gehört eine
 Person, sobald sie eine Sichtung, eine Verlaufsnotiz, eine UHS-Belegung, einen Zustand, eine
 Verletzung, eine Maßnahme, einen Transport, eine PAT-Nummer, die Kontamination
-„kontaminiert“ oder am Verbleib eine Einsatznummer der Leitstelle trägt, auch wenn der Eintrag aufgehoben ist („nicht kontaminiert“ zählt nicht); ihr
-Name bleibt dann bis zum Ablauf der Behandlung.
+„kontaminiert“ oder am Verbleib eine Einsatznummer der Leitstelle trägt, auch wenn der Eintrag
+aufgehoben ist („nicht kontaminiert“ zählt nicht); ihr Name bleibt dann bis zum Ablauf der
+Behandlung.
 
 Auch nach der Schwärzung bleiben die Angaben aus festen Listen ohne Freitext:
 Sichtungskategorie, Körperregion, Ansicht, Art und Schwere einer Verletzung, die Maßnahmen,

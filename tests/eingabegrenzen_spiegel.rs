@@ -17,6 +17,15 @@ use lifeline_hub::{
 fn backend() -> BTreeMap<&'static str, usize> {
     BTreeMap::from([
         ("ETB_INHALT_MAX", etb::INHALT_MAX),
+        (
+            "BETREUUNG_STELLE_BEZEICHNUNG_MAX",
+            betreuung::STELLE_BEZEICHNUNG_MAX,
+        ),
+        (
+            "BETREUUNG_STELLE_STANDORT_MAX",
+            betreuung::STELLE_STANDORT_MAX,
+        ),
+        ("BETREUUNG_STELLE_NOTIZ_MAX", betreuung::STELLE_NOTIZ_MAX),
         ("BETREUUNG_LEITUNG_MAX", betreuung::LEITUNG_MAX),
         ("BETREUUNG_KONTAKTWEG_MAX", betreuung::KONTAKTWEG_MAX),
         (

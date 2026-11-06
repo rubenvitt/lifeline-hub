@@ -1352,7 +1352,17 @@ pub async fn stelle_anlegen_tx(
     startwert: i64,
     eingabe: &StelleEingabe,
 ) -> Result<Geschrieben, AppError> {
-    let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
+    let bezeichnung = pflicht_max(
+        &eingabe.bezeichnung,
+        "Bezeichnung",
+        super::STELLE_BEZEICHNUNG_MAX,
+    )?;
+    let standort = optional_max(
+        eingabe.standort.clone(),
+        "Standort",
+        super::STELLE_STANDORT_MAX,
+    )?;
+    let notiz = optional_max(eingabe.notiz.clone(), "Notiz", super::STELLE_NOTIZ_MAX)?;
     kapazitaet_pruefen(eingabe.kapazitaet_personen)?;
     // Koordinate aus dem Ortsfeld des Standorts (LLH-1121): dieselbe Prüfung wie beim Ändern.
     pruefe_koordinate(eingabe.lat, eingabe.lon, "lat", "lon")?;
@@ -1369,8 +1379,8 @@ pub async fn stelle_anlegen_tx(
     .bind(&bezeichnung)
     .bind(eingabe.art.as_str())
     .bind(eingabe.kapazitaet_personen)
-    .bind(text_opt(eingabe.standort.as_deref()))
-    .bind(text_opt(eingabe.notiz.as_deref()))
+    .bind(&standort)
+    .bind(&notiz)
     .bind(text_opt(eingabe.leitung.as_deref()))
     .bind(text_opt(eingabe.kontaktweg.as_deref()))
     .bind(eingabe.lat)
@@ -1407,9 +1417,18 @@ pub async fn stelle_aendern_tx(
     let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
     stelle_lebt(&roh)?;
 
+    // Feldgrenzen vor jedem 422 des Zusammenhangs (src/AGENTS.md, Eingabegrenzen).
     let bezeichnung = match &eingabe.bezeichnung {
-        Some(b) => pflicht(b, "bezeichnung")?,
+        Some(b) => pflicht_max(b, "Bezeichnung", super::STELLE_BEZEICHNUNG_MAX)?,
         None => roh.bezeichnung.clone(),
+    };
+    let standort = match &eingabe.standort {
+        Some(v) => optional_max(v.clone(), "Standort", super::STELLE_STANDORT_MAX)?,
+        None => roh.standort.clone(),
+    };
+    let notiz = match &eingabe.notiz {
+        Some(v) => optional_max(v.clone(), "Notiz", super::STELLE_NOTIZ_MAX)?,
+        None => roh.notiz.clone(),
     };
     let art = eingabe.art.unwrap_or(roh.art);
     let abschnitt_id = eingabe.abschnitt_id.unwrap_or(roh.abschnitt_id);
@@ -1418,14 +1437,6 @@ pub async fn stelle_aendern_tx(
         .unwrap_or(roh.kapazitaet_personen);
     kapazitaet_pruefen(kapazitaet)?;
     let status = eingabe.status.unwrap_or(roh.status);
-    let standort = match &eingabe.standort {
-        Some(v) => text_opt(v.as_deref()),
-        None => roh.standort.clone(),
-    };
-    let notiz = match &eingabe.notiz {
-        Some(v) => text_opt(v.as_deref()),
-        None => roh.notiz.clone(),
-    };
     let leitung = match &eingabe.leitung {
         Some(v) => text_opt(v.as_deref()),
         None => roh.leitung.clone(),

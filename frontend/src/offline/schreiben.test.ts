@@ -10,6 +10,7 @@ import {
   legeNotizAn,
   legePersonAn,
   saveTransport,
+  saveAnlass,
 } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { erfasseAusgabe } from '../api/verpflegung';
@@ -42,6 +43,7 @@ vi.mock('../api/einsatzPerson', async (importOriginal) => {
     erfasseVerbleib: vi.fn(),
     legeNotizAn: vi.fn(),
     saveTransport: vi.fn(),
+    saveAnlass: vi.fn(),
     createMassnahme: vi.fn(),
     createVerletzung: vi.fn(),
   };
@@ -605,6 +607,11 @@ describe('offlinefähige Einträge einer Person (LLH-1138, design.md D8)', () =>
         fachrichtung: null,
         bestaetigt_personal_id: 5,
       },
+    },
+    {
+      art: 'anlass' as const,
+      api: saveAnlass,
+      eingabe: { anlass: 'intoxikation' as const },
     },
     {
       art: 'massnahme' as const,

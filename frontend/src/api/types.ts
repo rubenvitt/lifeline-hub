@@ -443,6 +443,9 @@ export type PersonDetail = S['PersonDetail'];
 export type PersonZugriff = S['ZugriffAnzeige'];
 export type PersonZugriffArt = S['ZugriffArt'];
 export type PersonAnhang = S['PersonAnhangAnzeige'];
+/** Anlass der Hilfeleistung (LLH-1566): Verlaufseintrag und sein Katalog. */
+export type Anlass = S['AnlassAnzeige'];
+export type PersonAnlass = S['PersonAnlass'];
 /** Transport einer Person (LLH-1325): Verlaufseintrag und seine Kataloge. */
 export type Transport = S['TransportAnzeige'];
 export type TransportPrioritaet = S['TransportPrioritaet'];
@@ -1442,7 +1445,8 @@ export interface NeueMeldung {
   /** Strukturierter Absender: Einheit ODER Abschnitt dieses Einsatzes, nie beide. */
   einheit_id?: number;
   abschnitt_id?: number;
-  /** Verortung, nur bei der Art Lagemeldung (sonst 422); lat und lon nur gemeinsam. */
+  /** Verortung, nur bei der Art Lagemeldung (sonst 422), vom Einheitengerät an jeder Art
+   *  (LLH-1579); lat und lon nur gemeinsam. */
   lat?: number;
   lon?: number;
 }

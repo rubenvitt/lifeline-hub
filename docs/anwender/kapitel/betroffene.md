@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs]
 ---
 
 ## Überblick
@@ -64,7 +64,7 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
 
    ![Maske „Betroffene erfassen“ mit gewählter Sichtungskategorie SK II, Geschlecht, Alter und Fundort](../bilder/betroffene/erfassen.png)
 
-3. Name, Vorname, Zustand und Notiz stehen unter „Weitere Angaben“.
+3. Name, Vorname, Zustand, „Anlass“ und Notiz stehen unter „Weitere Angaben“.
 4. „Erfassen“ wählen. Die Quittung nennt die neue Registriernummer („Erfasst als R-…“).
 
 Kommen mehrere Personen nacheinander, speichert „Speichern und nächste“ (Strg + Enter) und hält
@@ -85,7 +85,9 @@ Sichtung wird nie übernommen.
 
 Die Kürzel: „Nachname, Vorname“; „m“, „w“ oder „d“ mit dem Alter (geschätzt als „~50“); „sk1“
 bis „sk4“, „skt“ für tot und „sku“ für unverletzt; „#Breite/Länge“ für die Koordinate des
-Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen wird.
+Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen wird; „!“ mit einem
+Kürzel für den Anlass der Hilfeleistung: „!verl“, „!intern“, „!neuro“, „!intox“, „!hitze“ (auch
+„!kaelte“), „!allergie“ (auch „!stich“), „!psych“ und „!sonst“.
 
 ### In der Liste nachsichten und Lücken schließen
 
@@ -108,7 +110,7 @@ Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansic
 
 1. In der Liste die Person öffnen. Oben auf der Seite „Person R-…“ steht der Patientenkopf:
    PAT-Nummer und „kontaminiert“, falls angegeben, darunter Sichtung mit Zeit („gesichtet … · vor
-   42 min“), „Zustand / Verdacht“, Aufenthalt oder Verbleib, „Transport“, „Maßnahmen“,
+   42 min“), „Anlass“, „Zustand / Verdacht“, Aufenthalt oder Verbleib, „Transport“, „Maßnahmen“,
    „Verletzungen“ und „Letzte Notiz“.
 2. Auf die Sichtung tippen. Darunter klappt die Sichtungswahl auf: die Fläche der Kategorie
    antippen, bei Bedarf eine „Kurzbegründung (optional)“, und „Übernehmen“ wählen.
@@ -140,6 +142,17 @@ Stelle. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Notiz anl
    Liste bietet ihn das Menü der Zeile, im Grundriss der Unfallhilfsstelle die Spalte „Unterwegs“.
 2. Bei Bedarf „Übergeben um“ (leer heißt jetzt) und das „Ziel“ anpassen.
 3. „Übergabe quittieren“ wählen. Der Kopf zeigt „übergeben → Ziel“, der Patient ist abgeschlossen.
+
+### Den Anlass festlegen
+
+1. Im Patientenkopf bei „Anlass“ „Anlass festlegen“ wählen.
+2. Die Fläche des Anlasses antippen: „Verletzung“, „Internistisch“, „Neurologisch“,
+   „Intoxikation“, „Hitze / Kälte“, „Allergie / Insektenstich“, „Psychisch“ oder „Sonstiges“.
+3. „Anlass festlegen“ im Paneel wählen. Der Kopf zeigt den Anlass.
+
+Das Paneel öffnet mit dem bisherigen Anlass. Ein zweiter Tipp auf die gewählte Fläche nimmt die
+Wahl zurück; gespeichert heißt das: ohne Anlass. Eine Person hat höchstens einen Anlass, jeder
+Wechsel steht im Verlauf.
 
 ### Den Transport festlegen
 
@@ -300,18 +313,25 @@ vermisst, kommt er wieder.
 
 ### Erfassungszeit und Verlauf
 
-Jeder Eintrag einer Person (Sichtung, Verbleib, Notiz, Transport, Maßnahme, Verletzung) trägt
-den Zeitpunkt seiner Erfassung, auch wenn er ohne Netz vorgemerkt war und später ankommt. Der
-Verlauf der Person steht nach diesen Zeitpunkten. Ein Eintrag, der deutlich nach seiner
+Jeder Eintrag einer Person (Sichtung, Anlass, Verbleib, Notiz, Transport, Maßnahme, Verletzung)
+trägt den Zeitpunkt seiner Erfassung, auch wenn er ohne Netz vorgemerkt war und später ankommt.
+Der Verlauf der Person steht nach diesen Zeitpunkten. Ein Eintrag, der deutlich nach seiner
 Erfassung ankam, trägt dort „nachgetragen …“ mit der Zeit der Ankunft.
 
 Was im Kopf gilt, entscheidet der jüngste Zeitpunkt, nicht die Ankunft: Kommt eine Sichtung von
 vor 20 Minuten an, nachdem schon eine neuere gespeichert ist, steht sie im Verlauf, die aktuelle
-Sichtung bleibt. Dasselbe gilt für Verbleib und Transport. Ein Zeitpunkt mehr als eine Minute in
-der Zukunft wird abgelehnt; einer vor dem Erfassen der Person zählt als Zeitpunkt der Erfassung
+Sichtung bleibt. Dasselbe gilt für Anlass, Verbleib und Transport. Ein Zeitpunkt mehr als eine
+Minute in der Zukunft wird abgelehnt; einer vor dem Erfassen der Person zählt als Zeitpunkt der Erfassung
 der Person. Ausgenommen ist die Uhrzeit, zu der eine Maßnahme durchgeführt wurde: Sie darf vor dem
 Erfassen der Person liegen, etwa bei einem Tourniquet am Fundort, aber nicht vor dem Beginn des
 Einsatzes; eine frühere Uhrzeit lehnt der Server ab.
+
+### Anlass der Hilfeleistung
+
+Der Anlass sagt, warum eine Person Hilfe brauchte, aus einem festen Katalog von acht Werten. Er
+gehört zur Behandlung: Am Ende der Aufbewahrung wird er wie Maßnahmen und Verletzungen
+geschwärzt, und nur wer sichten darf, legt ihn fest; an der Betreuungsstelle fehlt er. Eine
+vermisste Person hat keinen Anlass. Verbleib, Liste und Sichtung bleiben vom Anlass unberührt.
 
 ### Transport, Maßnahmen und Verletzungen
 
@@ -404,9 +424,10 @@ Das Einsatztagebuch führt Betroffene nur mit Registriernummer, ohne Namen: „P
 „Person R-…: Sichtung SK …“, „Person R-…: Transportpriorität dringlich“, Statuswechsel und
 Stornierungen. Ein nachgereichter älterer Eintrag steht dort zu seiner Erfassungszeit mit
 „nachgetragen“, bei Sichtung und Transportpriorität mit dem Wert, der weiter gilt. Art und
-Fachrichtung des Transports, Maßnahmen, Verletzungen, PAT-Nummer und Kontamination stehen nicht
-im Einsatztagebuch, ebenso wenig die Einsatznummer der Leitstelle, „Entlassen an“ und „Gegen
-Rat“: dort steht nur „entlassen“ oder „abtransportiert“. Die Notiz im Patientenkopf ist nicht änderbar und erscheint nicht im
+Fachrichtung des Transports, Anlass, Maßnahmen, Verletzungen, PAT-Nummer und Kontamination stehen
+nicht im Einsatztagebuch, ebenso wenig die Einsatznummer der Leitstelle, „Entlassen an“ und „Gegen
+Rat“: dort steht nur „entlassen“ oder „abtransportiert“. Die Notiz im Patientenkopf ist nicht
+änderbar und erscheint nicht im
 Einsatztagebuch.
 
 Jedes Öffnen der Seite einer Person wird protokolliert, ebenso jedes Öffnen ihrer Druckansicht,
@@ -419,9 +440,9 @@ Erfassen und ändern dürfen Einsatzleitung und Führungspersonal eines laufende
 ([Rechte im Einsatz](rechte-im-einsatz.md)). Einen Vermisstenabgleich bestätigen oder verwerfen
 darf nur die Einsatzleitung. Wer nicht schreiben darf, sieht über der Liste „Nur Ansicht“ mit dem
 Grund („nur Einsatzleitung und Führungspersonal“ bzw. „Einsatz abgeschlossen“); Sichtungswahl,
-„Verbleib erfassen“ und das Menü der Zeilen fehlen dann, ebenso „Transport festlegen“,
-„Maßnahme erfassen“, „Verletzung markieren“ und das Eintragen von PAT-Nummer und Kontamination;
-die Angaben stehen lesend da, leere Personendaten als Satz „Ohne Angabe: …“. Am Gerät (UHS,
+„Verbleib erfassen“ und das Menü der Zeilen fehlen dann, ebenso „Anlass festlegen“, „Transport
+festlegen“, „Maßnahme erfassen“, „Verletzung markieren“ und das Eintragen von PAT-Nummer und
+Kontamination; die Angaben stehen lesend da, leere Personendaten als Satz „Ohne Angabe: …“. Am Gerät (UHS,
 Betreuungsstelle) lassen sich die Personendaten ebenso schreiben. Am UHS-Gerät lässt sich aus der
 Liste sichten, aber nicht verorten,
 und eine Druckansicht gibt es dort nicht ([UHS-Tablet und UHS-Laptop](geraet-uhs.md)).
@@ -430,7 +451,7 @@ und eine Druckansicht gibt es dort nicht ([UHS-Tablet und UHS-Laptop](geraet-uhs
 
 Personen lassen sich ohne Netz erfassen, über die Maske, die Kurzeingabe und die Aufnahme; bis
 zur Verbindung tragen sie „R-…“ statt der Nummer. An einer schon geöffneten Person lassen sich
-Sichtung, Verbleib, Notiz, Transport, Maßnahme und Verletzung vormerken, aus der Liste Sichtung
+Sichtung, Anlass, Verbleib, Notiz, Transport, Maßnahme und Verletzung vormerken, aus der Liste Sichtung
 und Verbleib; am Ort
 steht dann „Offline vorgemerkt“, und der Eintrag geht mit seiner Erfassungszeit hinaus, sobald
 Netz da ist. Aufheben, PAT-Nummer, Kontamination, „Zustand / Verdacht“ (im Kopf und in der Liste)

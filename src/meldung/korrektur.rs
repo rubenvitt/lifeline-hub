@@ -160,14 +160,17 @@ fn ziel(alt: &Stand, a: &Aenderung) -> Result<Ziel, AppError> {
         ));
     }
     // Lage-Angaben: eine Meldung außerhalb der Lage trägt keine (D5); eine neu übernommene
-    // beginnt ohne; eine bleibende behält ihre, soweit die Änderung sie nicht setzt.
+    // beginnt ohne; eine bleibende behält ihre, soweit die Änderung sie nicht setzt. Ausnahme ist
+    // der Standort, den ein Einheitengerät beim Erfassen mitschickt (LLH-1579, F9): er gehört der
+    // Meldung, bleibt bei jeder Korrektur außerhalb der Lage und verortet sie bei der Übernahme
+    // (wie `als_lagerelevant`). Erst wer sie aus der Lage nimmt, nimmt ihn mit.
     let (lage_text, geo) = if !lagerelevant {
-        (None, None)
+        (None, if alt.lagerelevant { None } else { alt.geo() })
     } else {
         let (text_vorher, geo_vorher) = if alt.lagerelevant {
             (alt.lage_text.clone(), alt.geo())
         } else {
-            (None, None)
+            (None, alt.geo())
         };
         let text = match &a.lage_text {
             Some(t) => t.clone().filter(|t| *t != alt.inhalt),
@@ -638,8 +641,9 @@ mod tests {
     }
 
     #[test]
-    fn neue_uebernahme_beginnt_ohne_alte_angaben() {
-        // Ein Altstand mit Resten (Handeingriff) trägt sie nicht in die neue Übernahme.
+    fn neue_uebernahme_beginnt_ohne_alten_lage_text_und_behaelt_den_erfassten_ort() {
+        // Ein Lage-Text-Rest (Handeingriff) kommt nicht mit; ein Ort außerhalb der Lage ist der
+        // beim Erfassen mitgeschickte Standort des Einheitengeräts (LLH-1579) und verortet sie.
         let alt = Stand {
             lagerelevant: false,
             ..in_der_lage()
@@ -652,7 +656,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!((z.lage_text, z.geo), (None, None));
+        assert_eq!((z.lage_text, z.geo), (None, Some((52.0, 9.0))));
     }
 
     #[test]

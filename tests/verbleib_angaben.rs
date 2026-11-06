@@ -1,6 +1,6 @@
 //! Integrationstests zu LLH-1568 (Spec `verbleib-angaben`): Einsatznummer der Leitstelle,
 //! „Entlassen an“ und „Gegen Rat“ am Verbleib. Die Migration pinnt
-//! `db::tests::migration_0283_*`, die Schwärzung die Registry-Guards.
+//! `db::tests::migration_0287_*`, die Schwärzung die Registry-Guards.
 
 use axum::http::StatusCode;
 use serde_json::{json, Value};

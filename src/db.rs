@@ -9840,6 +9840,196 @@ mod tests {
         }
     }
 
+    // ── LLH-1579: Einheitengerät an einer Einheit (0286) ─────────────────────────────────
+
+    /// Der Rebuild von `geraet_kopplung` (Muster 0213) hält Codes, Ereignisse und
+    /// Gerätesitzungen 1:1, nimmt die Ansicht `einheit` an, bindet höchstens eine Stelle über alle
+    /// sechs Spalten, und eine gelöschte Einheit leert nur die Bindung der (widerrufenen) Zeile.
+    #[tokio::test]
+    async fn migration_0286_erhaelt_kinder_und_bindet_einheit() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 285).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let konto = |name: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+                     VALUES (1, ?, ?, 'h') RETURNING id",
+                )
+                .bind(name)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let tresen: i64 = sqlx::query_scalar(
+            "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, bezeichnung, \
+                erstellt_von, laeuft_ab_at, gekoppelt_at) \
+             VALUES (?, ?, 'verpflegung', 'Tresen', ?, '2099-01-01 00:00:00', \
+                '2026-11-06 08:00:00') RETURNING id",
+        )
+        .bind(e)
+        .bind(konto("geraet-1").await)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO geraet_kopplungscode (kopplung_id, code_hash, laeuft_ab_at) \
+             VALUES (?, 'hash', '2099-01-01 00:00:00')",
+        )
+        .bind(tresen)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO geraet_kopplung_ereignis (kopplung_id, ereignis, von) \
+             VALUES (?, 'angelegt', ?)",
+        )
+        .bind(tresen)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id) \
+             SELECT 's' || id, benutzer_id, '2099-01-01 00:00:00', id FROM geraet_kopplung",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let zaehle = |tabelle: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
+                    "SELECT COUNT(*) FROM {tabelle}"
+                )))
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        type Zeile = (i64, String, String, Option<String>);
+        let bestand = || {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, Zeile>(
+                    "SELECT id, ansicht, bezeichnung, gekoppelt_at FROM geraet_kopplung \
+                     ORDER BY id",
+                )
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let vorher = bestand().await;
+
+        migriere_bis(&pool, 286).await;
+
+        for t in [
+            "geraet_kopplung",
+            "geraet_kopplungscode",
+            "geraet_kopplung_ereignis",
+            "session",
+        ] {
+            assert_eq!(zaehle(t).await, 1, "{t} überlebt den Umbau");
+        }
+        assert_eq!(bestand().await, vorher, "Bestand 1:1, ids unverändert");
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+        for index in [
+            "idx_geraet_kopplung_einsatz",
+            "idx_geraet_kopplung_abschnitt",
+            "idx_geraet_kopplung_einheit",
+        ] {
+            let da: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?",
+            )
+            .bind(index)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(da, 1, "{index} steht");
+        }
+
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Trupp') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let neu = |name: &'static str, ansicht: &'static str, ein: Option<i64>, vs: Option<i64>| {
+            let pool = pool.clone();
+            let konto = konto(name);
+            async move {
+                let g = konto.await;
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, einheit_id, \
+                        verpflegungsstelle_id, bezeichnung, erstellt_von, laeuft_ab_at) \
+                     VALUES (?, ?, ?, ?, ?, 'Handy', ?, '2099-01-01 00:00:00') RETURNING id",
+                )
+                .bind(e)
+                .bind(g)
+                .bind(ansicht)
+                .bind(ein)
+                .bind(vs)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+            }
+        };
+        let handy = neu("geraet-2", "einheit", Some(einheit), None)
+            .await
+            .expect("Bindung an eine Einheit");
+        let stelle = verpflegungsstelle(&pool, e, b, "Feldküche").await;
+        assert!(
+            neu("geraet-3", "einheit", Some(einheit), Some(stelle))
+                .await
+                .is_err(),
+            "höchstens eine Stelle, auch mit der sechsten Spalte"
+        );
+        assert!(
+            neu("geraet-4", "einheit", Some(einheit + 1000), None)
+                .await
+                .is_err(),
+            "der Fremdschlüssel prüft die Einheit"
+        );
+        assert!(
+            neu("geraet-5", "handy", None, None).await.is_err(),
+            "die Ansicht bleibt im CHECK"
+        );
+
+        // Eine spurlos gelöschte Einheit leert nur die Bindung; die Zeile bleibt stehen.
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .expect("Einheit mit gebundener Kopplung löschbar");
+        let bindung: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM geraet_kopplung WHERE id = ?")
+                .bind(handy)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bindung, None);
+
+        // Die Kaskade auf die Kinder wirkt weiter.
+        sqlx::query("DELETE FROM geraet_kopplung WHERE id = ?")
+            .bind(tresen)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(zaehle("geraet_kopplungscode").await, 0);
+        assert_eq!(zaehle("geraet_kopplung_ereignis").await, 0);
+        assert_eq!(zaehle("session").await, 0);
+    }
+
     // --- LLH-1138: Erfassungszeit und Idempotenz der Personen-Einträge (0217) ---
 
     /// `client_id` und `eingegangen_at` an Sichtung, Verbleib und Verlaufsnotiz: nullable, ohne
@@ -12680,12 +12870,82 @@ mod tests {
         }
     }
 
+    /// LLH-1566: `person_anlass` nimmt nur Katalogwerte (leer hebt auf) und ist je Einsatz über
+    /// `client_id` eindeutig; der Cache an `einsatz_person` trägt denselben Katalog.
+    #[tokio::test]
+    async fn migration_0284_person_anlass() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 284;
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), VERSION).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let stand = |anlass: Option<&'static str>, client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_anlass (einsatz_id, person_id, anlass, zeitpunkt_at, \
+                        erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, '2026-11-06 20:00:00', '2026-11-06 20:00:05', ?, ?)",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(anlass)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        for a in [
+            "verletzung",
+            "internistisch",
+            "neurologisch",
+            "intoxikation",
+            "hitze_kaelte",
+            "allergie",
+            "psychisch",
+            "sonstiges",
+        ] {
+            stand(Some(a), None).await.unwrap();
+        }
+        stand(None, Some("a1")).await.expect("leer hebt auf");
+        stand(Some("sonstiges"), Some("a1"))
+            .await
+            .expect_err("derselbe Schlüssel im selben Einsatz");
+        stand(Some("kopfweh"), None)
+            .await
+            .expect_err("nur Katalogwerte");
+
+        let cache = |anlass: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query("UPDATE einsatz_person SET anlass = ?, anlass_at = ? WHERE id = ?")
+                    .bind(anlass)
+                    .bind("2026-11-06 20:00:00")
+                    .bind(p)
+                    .execute(&pool)
+                    .await
+            }
+        };
+        cache("intoxikation").await.unwrap();
+        cache("kopfweh").await.expect_err("Cache nur Katalogwerte");
+    }
+
     /// LLH-1568: vier Angaben am Verbleib, Bestand bleibt ohne Angabe, die CHECKs nehmen nur die
     /// Katalogwerte.
     #[tokio::test]
-    async fn migration_0283_person_verbleib_angaben() {
+    async fn migration_0287_person_verbleib_angaben() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 283;
+        const VERSION: i64 = 287;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,

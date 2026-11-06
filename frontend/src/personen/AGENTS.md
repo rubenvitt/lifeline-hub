@@ -46,7 +46,7 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
 - **Patientenkopf mit vollem PAT-Kern** (`personen/Patientenkopf.tsx`, Change
   `y18v58dt-pat-kern`, D14): Kopfzeile mit PAT-Nummer und Marke „kontaminiert“
   (`personen/PatKennzeichen.tsx`), darunter ab `lg` zwei Spalten — links Sichtung (DTG, „vor n
-  min“, „bestätigt: Name“), „Zustand / Verdacht“, Aufenthalt bzw. Verbleib, Transport; rechts
+  min“, „bestätigt: Name“), „Anlass“, „Zustand / Verdacht“, Aufenthalt bzw. Verbleib, Transport; rechts
   Maßnahmen, Verletzungen (Liste, ab `md` Mini-Figur) und letzte Notiz. Maßnahmen und
   Verletzungen mit Uhrzeit, die jüngsten zuerst, höchstens drei, dann „+ n weitere“: bei 1280 × 800 und 1440 × 900 steht alles
   ohne Bildlauf (Nachweis `e2e/personen-detail.spec.ts`). Sichten, Verbleib, Transport, Maßnahme
@@ -58,7 +58,7 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   `geraetDarf('person-behandlung')`, nur UHS). Die Lesefassung (`modus="lesen"`) dient den
   Schnellansichten.
 - **Ein Schreibweg für die medizinischen Einträge** (`personen/personEintragSpeichern.ts`,
-  `useSavePersonEintrag`): Sichtung, Verbleib, Notiz, Transport, Maßnahme und Verletzung gehen an
+  `useSavePersonEintrag`): Sichtung, Anlass, Verbleib, Notiz, Transport, Maßnahme und Verletzung gehen an
   jeder Ansatzstelle (Kopf, Zeilen-Sichtung, Sichtungs- und Verbleib-Dialog, Grundriss) über ihn,
   nie direkt über die POSTs aus `api/einsatzPerson.ts`. Ohne Netz merkt er vor (Regeln in
   `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“); vorgemerkt gibt es keinen neuen
@@ -70,6 +70,13 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   `NACHTRAG_SPIELRAUM_MS` nach der Erfassungszeit, `istNachgetragen` in `personMeta.ts`) und
   ändert den Kopf nicht. Aufgehobene Maßnahmen und
   Verletzungen bleiben im Verlauf, mit Zeit des Aufhebens.
+- **Anlass der Hilfeleistung** (LLH-1566, Spec `personen-anlass`): fester Katalog
+  (`ANLASS_WORT`/`ANLASS_REIHE` in `personMeta.ts`), ein Stand je Person wie der Transport (leer
+  hebt auf, jüngster Zeitpunkt gewinnt), Wahl über `personen/AnlassWahl.tsx` (Tipp auf die
+  gewählte Fläche nimmt zurück). Rechte wie Sichten (`darfSichten`, Betreuungsstelle 403). Drei
+  Wege: Maske („Weitere Angaben“), Kopf-Paneel, Kurzeingabe `!kürzel` (`ANLASS_KUERZEL` in
+  `personBefehl.ts`, Hinweiszeile aus derselben Quelle). Nie im ETB; Zählung `anlassbild` in
+  `personenBilanz.ts` für Lagebild und Bericht.
 - **Transport, Maßnahme, Verletzung** (Specs `personen-transport`, `personen-massnahmen`,
   `personen-verletzungen`): Transport ist ein voller Stand (Priorität, Art, Fachrichtung, alles
   leer hebt auf), Maßnahme und Verletzung werden angehängt und genau einmal aufgehoben (zweites

@@ -34,6 +34,9 @@ import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeic
 import {
   BETREUUNG_KONTAKTWEG_MAX,
   BETREUUNG_LEITUNG_MAX,
+  BETREUUNG_STELLE_BEZEICHNUNG_MAX,
+  BETREUUNG_STELLE_NOTIZ_MAX,
+  BETREUUNG_STELLE_STANDORT_MAX,
   EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX,
   EVAKUIERUNG_BEZIRK_NOTIZ_MAX,
   EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX,
@@ -675,9 +678,12 @@ export function StelleAnlegenDialog({
       <Form.Item
         name="bezeichnung"
         label="Bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+          zeichenRegel(BETREUUNG_STELLE_BEZEICHNUNG_MAX, 'Bezeichnung'),
+        ]}
       >
-        <Input />
+        <Input count={zeichenGrenze(BETREUUNG_STELLE_BEZEICHNUNG_MAX)} />
       </Form.Item>
       <Form.Item name="art" label="Art" rules={[{ required: true }]}>
         <Select options={ART_OPTIONEN} />
@@ -689,8 +695,16 @@ export function StelleAnlegenDialog({
       {weitere(
         <>
           {abschnittFeld(abschnitte)}
-          <Form.Item name="standort" label="Standort">
-            <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Standort" />
+          <Form.Item
+            name="standort"
+            label="Standort"
+            rules={[ortZeichenRegel(BETREUUNG_STELLE_STANDORT_MAX, 'Standort')]}
+          >
+            <EinsatzOrtsfeld
+              einsatzId={einsatzId}
+              etikett="Standort"
+              count={zeichenGrenze(BETREUUNG_STELLE_STANDORT_MAX)}
+            />
           </Form.Item>
           <Form.Item
             name="leitung"
@@ -706,8 +720,16 @@ export function StelleAnlegenDialog({
           >
             <Input count={zeichenGrenze(BETREUUNG_KONTAKTWEG_MAX)} />
           </Form.Item>
-          <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
-            <Input.TextArea autoSize={{ minRows: 2 }} />
+          <Form.Item
+            name="notiz"
+            label="Notiz"
+            rules={[zeichenRegel(BETREUUNG_STELLE_NOTIZ_MAX, 'Notiz')]}
+            style={{ marginBottom: 0 }}
+          >
+            <Input.TextArea
+              autoSize={{ minRows: 2 }}
+              count={zeichenGrenze(BETREUUNG_STELLE_NOTIZ_MAX)}
+            />
           </Form.Item>
         </>,
       )}

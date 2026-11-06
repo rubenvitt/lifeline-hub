@@ -7,7 +7,7 @@
 --   unterschrift              ob die Unterschrift dazu auf Papier vorliegt, nur mit gegen_rat
 -- Die Paarung mit der Art prüft der Handler (422). ADD COLUMN mit CHECK braucht keinen Rebuild;
 -- Bestand bleibt NULL (keine Angabe). Kein Cache an einsatz_person (design.md D1).
--- Abgesichert von db::tests::migration_0283_*.
+-- Abgesichert von db::tests::migration_0287_*.
 
 ALTER TABLE person_verbleib ADD COLUMN leitstelle_einsatznummer TEXT;
 ALTER TABLE person_verbleib ADD COLUMN entlassen_an TEXT

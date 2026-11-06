@@ -4,6 +4,7 @@ import type {
   GegenRat,
   MassnahmeArt,
   Person,
+  PersonAnlass,
   Sichtungskategorie,
   TransportArt,
   TransportPrioritaet,
@@ -178,6 +179,24 @@ export function transportText(
   ].filter((t): t is string => t != null);
   return teile.length > 0 ? teile.join(' · ') : null;
 }
+
+/**
+ * Das Wort je Anlass der Hilfeleistung aus dem festen Katalog (LLH-1566, Konzept LLH-1562 5.1),
+ * in der Folge der Wahl. Ein Gesundheitsdatum: steht nie im ETB.
+ */
+export const ANLASS_WORT: Record<PersonAnlass, string> = {
+  verletzung: 'Verletzung',
+  internistisch: 'Internistisch',
+  neurologisch: 'Neurologisch',
+  intoxikation: 'Intoxikation',
+  hitze_kaelte: 'Hitze / Kälte',
+  allergie: 'Allergie / Insektenstich',
+  psychisch: 'Psychisch',
+  sonstiges: 'Sonstiges',
+};
+
+/** Feste Folge der Anlässe in Wahl und Zählung: die Katalogfolge. */
+export const ANLASS_REIHE = Object.keys(ANLASS_WORT) as readonly PersonAnlass[];
 
 /** Das Wort je Maßnahme aus dem festen Katalog (LLH-1324), wie die Wahl im Paneel es zeigt. */
 export const MASSNAHME_WORT: Record<MassnahmeArt, string> = {

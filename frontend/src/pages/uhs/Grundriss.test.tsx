@@ -1067,6 +1067,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
       transporte: [],
       massnahmen: [],
       verletzungen: [],
+      anlaesse: [],
     };
   }
 

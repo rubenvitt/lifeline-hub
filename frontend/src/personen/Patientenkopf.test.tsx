@@ -9,7 +9,11 @@ import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { EinsatzPfadeProvider, GERAET_BETREUUNG_PFADE } from '../routing/EinsatzPfade';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
-import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
+import {
+  queueLeerenFuerTests,
+  schreibaktionEinreihen,
+  schreibaktionenLaden,
+} from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import {
   OHNE_VERBINDUNG_NICHT_AENDERBAR,
@@ -76,6 +80,7 @@ const basis = {
   transporte: [],
   massnahmen: [],
   verletzungen: [],
+  anlaesse: [],
   aufenthalt: {
     uhs_id: 3,
     uhs_bezeichnung: 'Turnhalle',
@@ -550,7 +555,7 @@ describe('Patientenkopf — voller PAT-Kern (LLH-1324/1325/1326/1113, design.md 
       [...dl.querySelectorAll('dt')].map((dt) => dt.textContent),
     );
     expect(begriffe).toEqual([
-      ['Sichtung', 'Zustand / Verdacht', 'Aufenthalt', 'Transport'],
+      ['Sichtung', 'Anlass', 'Zustand / Verdacht', 'Aufenthalt', 'Transport'],
       ['Maßnahmen', 'Verletzungen', 'Letzte Notiz'],
     ]);
     const huelle = spalten[0].parentElement!;
@@ -1094,6 +1099,157 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     expect((await vorgemerkt()).map((a) => a.art)).toEqual(['verbleib', 'transport', 'massnahme']);
   });
 
+  it('Anlass: ein ohne Netz vorgemerkter Anlass lässt sich ohne Serverstand wieder aufheben', async () => {
+    const user = userEvent.setup();
+    const { kopf } = zeige();
+    let paneel = await paneelOhneNetz(kopf, 'Anlass festlegen', 'Anlass festlegen');
+    await user.click(
+      within(within(paneel).getByRole('radiogroup', { name: 'Anlass' })).getByRole('radio', {
+        name: 'Intoxikation',
+      }),
+    );
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    // Der Kopf zeigt weiter den Serverstand.
+    expect(kopf.querySelector('[data-lfh="anlass"]')?.textContent).toBe('kein Anlass');
+    await waitFor(() =>
+      expect(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).toHaveTextContent(
+        'Intoxikation',
+      ),
+    );
+
+    // Das Paneel wählt den vorgemerkten Stand vor; ihn abwählen hebt ihn auf.
+    // Mutationsprobe: die Pflicht nur am Serverstand festmachen — „kein Anlass“ bleibt gesperrt, rot.
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    const gruppe = within(paneel).getByRole('radiogroup', { name: 'Anlass' });
+    expect(within(gruppe).getByRole('radio', { name: 'Intoxikation' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await user.click(within(gruppe).getByRole('radio', { name: 'Intoxikation' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    expect(within(kopf).queryByText('Bitte einen Anlass wählen')).toBeNull();
+    expect(gesendet).toEqual([]);
+    expect(
+      (await vorgemerkt()).map((a) => [a.art, (a.daten as { anlass?: unknown }).anlass]),
+    ).toEqual([
+      ['anlass', 'intoxikation'],
+      ['anlass', null],
+    ]);
+
+    // Ist die Aufhebung vorgemerkt, verlangt das Paneel wieder eine Wahl: kein zweites „aufgehoben“.
+    // Mutationsprobe: nur auf irgendeinen vorgemerkten Anlass schauen, nicht auf den jüngsten, rot.
+    await waitFor(() =>
+      expect(
+        within(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).getAllByRole(
+          'listitem',
+        ),
+      ).toHaveLength(2),
+    );
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(await vorgemerkt()).toHaveLength(2);
+  });
+
+  it('Anlass: eine vorgemerkte Aufhebung hebt die Vorbelegung mit dem Serverwert nicht wieder auf', async () => {
+    const user = userEvent.setup();
+    const { kopf } = zeige({ anlass: 'psychisch' });
+    let paneel = await paneelOhneNetz(kopf, 'Anlass festlegen', 'Anlass festlegen');
+    await user.click(
+      within(within(paneel).getByRole('radiogroup', { name: 'Anlass' })).getByRole('radio', {
+        name: 'Psychisch',
+      }),
+    );
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    await waitFor(async () => expect(await vorgemerkt()).toHaveLength(1));
+    await waitFor(() =>
+      expect(within(kopf).queryByRole('region', { name: 'Offline vorgemerkt' })).not.toBeNull(),
+    );
+    expect(kopf.querySelector('[data-lfh="anlass"]')?.textContent).toBe('Psychisch');
+
+    // Mutationsprobe: mit dem Serverwert vorbelegen — „Psychisch“ ginge erneut in die Warteschlange, rot.
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    expect(within(paneel).getByRole('radio', { name: 'Psychisch' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect((await vorgemerkt()).map((a) => (a.daten as { anlass?: unknown }).anlass)).toEqual([
+      null,
+    ]);
+  });
+
+  it('Anlass: merkt ein anderer Tab bei offenem Paneel etwas vor, geht keine alte Vorwahl zurück', async () => {
+    const user = userEvent.setup();
+    const { kopf } = zeige({ anlass: 'psychisch' });
+    const anderer = () =>
+      schreibaktionEinreihen(TABLET, 1, {
+        art: 'anlass',
+        person_id: 10,
+        bezeichnung: 'R-012',
+        daten: {
+          anlass: 'verletzung',
+          client_id: 'anderer-tab',
+          zeitpunkt_at: '2026-11-06 10:00:00',
+        },
+      });
+
+    // Unverändert abgeschickt: nichts geht hinaus, der Stand des anderen Tabs bleibt der letzte.
+    // Mutationsprobe: gegen den laufend nachgeführten Stand vergleichen — „Psychisch“ ginge zurück, rot.
+    let paneel = await paneelOhneNetz(kopf, 'Anlass festlegen', 'Anlass festlegen');
+    await anderer();
+    await waitFor(() =>
+      expect(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).toHaveTextContent(
+        'Verletzung',
+      ),
+    );
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    expect((await vorgemerkt()).map((a) => (a.daten as { anlass?: unknown }).anlass)).toEqual([
+      'verletzung',
+    ]);
+
+    // Eine bearbeitete Wahl bleibt und geht hinaus.
+    await queueLeerenFuerTests();
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    const gruppe = within(paneel).getByRole('radiogroup', { name: 'Anlass' });
+    await user.click(within(gruppe).getByRole('radio', { name: 'Allergie / Insektenstich' }));
+    await anderer();
+    await waitFor(() =>
+      expect(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).toHaveTextContent(
+        'Verletzung',
+      ),
+    );
+    expect(within(gruppe).getByRole('radio', { name: 'Allergie / Insektenstich' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    expect((await vorgemerkt()).map((a) => (a.daten as { anlass?: unknown }).anlass)).toEqual([
+      'verletzung',
+      'allergie',
+    ]);
+  });
+
   it('Maßnahme aufheben bleibt ohne Netz mit Grund gesperrt', async () => {
     const { kopf } = zeige(vollerKern);
     const paneel = await paneelOhneNetz(kopf, 'Maßnahme erfassen', 'Maßnahme erfassen');
@@ -1360,5 +1516,83 @@ describe('Patientenkopf — Zustand / Verdacht ohne Netz (LLH-1103)', () => {
       within(kopf).getByRole('button', { name: 'Zustand / Verdacht zu R-012 bearbeiten' }),
     ).toBeEnabled();
     expect(within(kopf).queryByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeNull();
+  });
+});
+
+describe('Patientenkopf — Anlass der Hilfeleistung (LLH-1566)', () => {
+  it('nennt den Anlass oder „kein Anlass“', () => {
+    const { kopf } = zeige({ anlass: 'intoxikation' });
+    expect(kopf.querySelector('[data-lfh="anlass"]')?.textContent).toBe('Intoxikation');
+  });
+
+  it('nennt ohne Anlass „kein Anlass“', () => {
+    const { kopf } = zeige();
+    expect(kopf.querySelector('[data-lfh="anlass"]')?.textContent).toBe('kein Anlass');
+  });
+
+  it('legt den Anlass im Paneel fest, ohne Dialog', async () => {
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    const paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(
+      within(within(paneel).getByRole('radiogroup', { name: 'Anlass' })).getByRole('radio', {
+        name: 'Hitze / Kälte',
+      }),
+    );
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+    expect(gesendet).toEqual([
+      { pfad: 'anlass', body: { anlass: 'hitze_kaelte', client_id: expect.any(String) } },
+    ]);
+  });
+
+  it('verlangt ohne bisherigen Anlass eine Wahl, bevor es sendet', async () => {
+    const { kopf } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    const paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(gesendet).toEqual([]);
+  });
+
+  it('nimmt einen gesetzten Anlass per Tipp auf die gewählte Fläche zurück', async () => {
+    const { kopf } = zeige({ anlass: 'psychisch' });
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    const paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    const gruppe = within(paneel).getByRole('radiogroup', { name: 'Anlass' });
+    expect(within(gruppe).getByRole('radio', { name: 'Psychisch' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await userEvent.click(within(gruppe).getByRole('radio', { name: 'Psychisch' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toEqual({
+      pfad: 'anlass',
+      body: { anlass: null, client_id: expect.any(String) },
+    });
+  });
+
+  it('sendet einen unverändert abgeschickten Anlass nicht erneut', async () => {
+    const { kopf } = zeige({ anlass: 'psychisch' });
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    const paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    // Mutationsprobe: ohne Vergleich mit dem geltenden Stand abschicken — ein zweiter Verlaufseintrag, rot.
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    expect(gesendet).toEqual([]);
+  });
+
+  it('bietet ohne Sichtungsrecht (Betreuungsstelle) keinen Anlass an', () => {
+    const { kopf } = zeige({ anlass: 'verletzung' }, { darfSichten: false });
+    expect(within(kopf).queryByRole('button', { name: 'Anlass festlegen' })).toBeNull();
+  });
+
+  it('bietet an einer vermissten Person keinen Anlass an', () => {
+    const { kopf } = zeige({ status: 'vermisst' });
+    expect(within(kopf).queryByRole('button', { name: 'Anlass festlegen' })).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import type { PersonDetail } from '../api/types';
 import { nummeriere, regionName } from './koerperschema/koerperschemaKern';
 import {
+  ANLASS_WORT,
   MASSNAHME_WORT,
   VERLETZUNG_ART_WORT,
   VERLETZUNG_SCHWERE_WORT,
@@ -45,8 +46,8 @@ function Aufgehoben({ am }: { am?: string | null }) {
 
 /**
  * Chronologischer Verlauf einer Person (neueste zuerst) — Sichtungen, Verlaufsnotizen, Verbleib,
- * Transport, Maßnahmen und Verletzungen in einer Spur, für Drawer und Detailseite. Aufgehobene
- * Maßnahmen und Verletzungen bleiben stehen und sind als solche gekennzeichnet; ein nachgereichter
+ * Anlass, Transport, Maßnahmen und Verletzungen in einer Spur, für Drawer und Detailseite.
+ * Aufgehobene Maßnahmen und Verletzungen bleiben stehen und sind als solche gekennzeichnet; ein nachgereichter
  * Eintrag steht zu seiner Erfassungszeit und trägt „nachgetragen“ (Change `y18v58dt-pat-kern`).
  * Die Überschrift bleibt beim Aufrufer. Zeitstempel über `ZeitAnzeige`, nie als roher Wire-String.
  */
@@ -84,6 +85,17 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
           <Tag>Verbleib</Tag> <VerbleibText verbleib={v} />
           <Bestaetigt name={v.bestaetigt_name} />
           <Nachgetragen erfassung={v.zeitpunkt_at} eingang={v.eingegangen_at} />
+        </span>
+      ),
+    })),
+    // Anlass der Hilfeleistung (LLH-1566): jeder Stand, ein leerer heißt „aufgehoben“.
+    ...(person.anlaesse ?? []).map((a) => ({
+      key: `a-${a.id}`,
+      at: a.zeitpunkt_at,
+      node: (
+        <span>
+          <Tag>Anlass</Tag> {a.anlass ? ANLASS_WORT[a.anlass] : 'aufgehoben'}
+          <Nachgetragen erfassung={a.zeitpunkt_at} eingang={a.erfasst_at} />
         </span>
       ),
     })),

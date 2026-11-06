@@ -21,6 +21,7 @@ export const ANSICHT_LABEL: Record<Funktionsansicht, string> = {
   bereitstellungsraum: 'Bereitstellungsraum',
   einsatzabschnitt: 'Einsatzabschnitt',
   verpflegung: 'Verpflegung',
+  einheit: 'Einheit',
 };
 
 /** Was eine Ansicht kann, in wenigen Fachwörtern für die Auswahl (kein Satz, LFH-1078). */
@@ -32,6 +33,7 @@ export const ANSICHT_ZWECK: Record<Funktionsansicht, string> = {
   bereitstellungsraum: 'Kräfte an- und abmelden in einem Bereitstellungsraum',
   einsatzabschnitt: 'Kräfte, Aufträge, Meldungen eines Abschnitts',
   verpflegung: 'Portionen je Zeitfenster ausgeben, Fehlmenge melden',
+  einheit: 'Aufträge, Status, Meldungen einer Einheit',
 };
 
 /** Feld der Kopplungsmaske je Stellenart: Beschriftung, Platzhalter, leere Auswahl. */
@@ -63,6 +65,11 @@ export const STELLENART_FELD: Record<
     label: 'Verpflegungsstelle',
     platzhalter: 'Verpflegungsstelle wählen',
     leer: 'Keine Verpflegungsstelle in diesem Einsatz',
+  },
+  einheit: {
+    label: 'Einheit',
+    platzhalter: 'Einheit wählen',
+    leer: 'Keine Einheit in diesem Einsatz',
   },
 };
 
@@ -114,7 +121,8 @@ export interface StellenOption {
 }
 
 /** Wählbar wie beim Server (`stelle_pruefen`): keine stornierte, keine aufgelöste UHS und kein
- *  aufgelöster Bereitstellungsraum; eine geschlossene Betreuungsstelle bleibt wählbar. */
+ *  aufgelöster Bereitstellungsraum; eine geschlossene Betreuungsstelle bleibt wählbar. Einheiten
+ *  kommen aus der Liste der aktiven (LLH-1579), mit Funkrufnamen, wo gepflegt. */
 export function stellenOptionen(
   quellen: {
     uhs?: readonly {
@@ -136,6 +144,7 @@ export function stellenOptionen(
     }[];
     abschnitte?: readonly { id: number; name: string }[];
     verpflegungsstellen?: readonly { id: number; bezeichnung: string; status: string }[];
+    einheiten?: readonly { id: number; name: string; funkrufname?: string | null }[];
   },
   art: Bindungsart,
 ): StellenOption[] {
@@ -161,6 +170,11 @@ export function stellenOptionen(
       return (quellen.verpflegungsstellen ?? [])
         .filter(benutzbar)
         .map((s) => ({ value: s.id, label: s.bezeichnung }));
+    case 'einheit':
+      return (quellen.einheiten ?? []).map((e) => ({
+        value: e.id,
+        label: e.funkrufname ? `${e.name} (${e.funkrufname})` : e.name,
+      }));
   }
 }
 

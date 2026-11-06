@@ -36,8 +36,9 @@ impl Datenkategorie {
     const fn entfernt(&self) -> &'static str {
         match self {
             Datenkategorie::Behandlung => {
-                "Zustand, PAT-Nummer und benötigte Fachrichtung der Personen, Lage und Notiz \
-                 ihrer Verletzungen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung"
+                "Zustand, PAT-Nummer, benötigte Fachrichtung und Anlass der Hilfeleistung der \
+                 Personen, Lage und Notiz ihrer Verletzungen sowie die Notizen zu Sichtung, \
+                 Verlauf und UHS-Belegung"
             }
             Datenkategorie::Personenauskunft => "Herkunftsadresse und Melderkontakt der Personen",
             Datenkategorie::Anhaenge => {

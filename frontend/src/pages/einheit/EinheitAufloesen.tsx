@@ -43,7 +43,7 @@ export default function EinheitAufloesen({
       )}
       <Popconfirm
         title="Einheit auflösen?"
-        description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
+        description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden."
         okText="Einheit auflösen"
         okButtonProps={{ danger: true }}
         onConfirm={aufloesen}

@@ -11,6 +11,13 @@ import { warteAufMenueFokus } from '../test/menue';
 import type { Meldung } from '../api/types';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
+// Gerätekontext (Standort ohne Lagekarte): vorgabe wie ohne Gerät, ein Test schaltet ab.
+const geraet = vi.hoisted(() => ({ darf: true }));
+vi.mock('../geraet/geraetSicht', async (importOriginal) => {
+  const echt = await importOriginal<typeof import('../geraet/geraetSicht')>();
+  return { ...echt, useGeraetDarf: () => () => geraet.darf };
+});
+
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   id: 1,
   einsatz_id: 7,
@@ -96,6 +103,33 @@ describe('MeldungKarte — Auftrags-Deeplink (F36/LFH-257)', () => {
   it('rendert ohne ausgelösten Auftrag keinen Auftrags-Deeplink', () => {
     renderKarte(<MeldungKarte meldung={meldung({ auftrag_id: null })} einsatzId={7} />);
     expect(screen.queryByRole('link', { name: /Auftrag/ })).toBeNull();
+  });
+});
+
+describe('MeldungKarte — Standort der Meldung (LLH-1579)', () => {
+  it('zeigt den Standort und springt mit ihm auf die Lagekarte', () => {
+    renderKarte(<MeldungKarte meldung={meldung({ lat: 50.11, lon: 8.68 })} einsatzId={7} />);
+    const link = screen.getByRole('link', { name: /50[.,]11/ });
+    expect(link.getAttribute('href')).toMatch(
+      /^\/einsaetze\/7\/lagekarte\?zentrum=50\.11(%2C|,)8\.68$/,
+    );
+  });
+
+  it('am Gerät ohne fremde Module nur als Text, ohne Sprung auf die Lagekarte', () => {
+    geraet.darf = false;
+    try {
+      renderKarte(<MeldungKarte meldung={meldung({ lat: 50.11, lon: 8.68 })} einsatzId={7} />);
+      const standort = document.querySelector('[data-lfh="meldung-standort"]');
+      expect(standort?.textContent).toMatch(/50[.,]11/);
+      expect(screen.queryByRole('link', { name: /50[.,]11/ })).toBeNull();
+    } finally {
+      geraet.darf = true;
+    }
+  });
+
+  it('ohne Standort keine Angabe', () => {
+    renderKarte(<MeldungKarte meldung={meldung()} einsatzId={7} />);
+    expect(document.querySelector('[data-lfh="meldung-standort"]')).toBeNull();
   });
 });
 

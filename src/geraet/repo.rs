@@ -119,7 +119,7 @@ impl KopplungZeile {
 macro_rules! stelle_id {
     () => {
         "COALESCE(k.uhs_id, k.betreuungsstelle_id, k.bereitstellungsraum_id, k.abschnitt_id, \
-                  k.verpflegungsstelle_id)"
+                  k.verpflegungsstelle_id, k.einheit_id)"
     };
 }
 
@@ -127,8 +127,8 @@ const ANZEIGE_SELECT: &str = concat!(
     "SELECT k.id, k.ansicht, k.uhs_id, ",
     stelle_id!(),
     " AS stelle_id, \
-        COALESCE(u.bezeichnung, bs.bezeichnung, br.bezeichnung, ea.name, vs.bezeichnung) \
-            AS stelle, \
+        COALESCE(u.bezeichnung, bs.bezeichnung, br.bezeichnung, ea.name, vs.bezeichnung, \
+                 ee.name) AS stelle, \
         k.bezeichnung, g.anzeigename, k.erstellt_at, e.anzeigename AS erstellt_von_name, \
         k.laeuft_ab_at, k.gekoppelt_at, k.letzter_zugriff_at, k.widerrufen_at, \
         w.anzeigename AS widerrufen_von_name, (k.laeuft_ab_at <= datetime('now')) AS abgelaufen \
@@ -140,7 +140,8 @@ const ANZEIGE_SELECT: &str = concat!(
      LEFT JOIN betreuungsstelle bs ON bs.id = k.betreuungsstelle_id \
      LEFT JOIN bereitstellungsraum br ON br.id = k.bereitstellungsraum_id \
      LEFT JOIN einsatzabschnitt ea ON ea.id = k.abschnitt_id \
-     LEFT JOIN verpflegungsstelle vs ON vs.id = k.verpflegungsstelle_id"
+     LEFT JOIN verpflegungsstelle vs ON vs.id = k.verpflegungsstelle_id \
+     LEFT JOIN einsatz_einheit ee ON ee.id = k.einheit_id"
 );
 
 /// Alle Kopplungen eines Einsatzes, neueste zuerst.
@@ -209,8 +210,9 @@ pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Resu
     let kopplung_id: i64 = sqlx::query_scalar(
         "INSERT INTO geraet_kopplung \
            (einsatz_id, benutzer_id, ansicht, uhs_id, betreuungsstelle_id, bereitstellungsraum_id, \
-            abschnitt_id, verpflegungsstelle_id, bezeichnung, erstellt_von, laeuft_ab_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            abschnitt_id, verpflegungsstelle_id, einheit_id, bezeichnung, erstellt_von, \
+            laeuft_ab_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(neu.einsatz_id)
     .bind(benutzer_id)
@@ -220,6 +222,7 @@ pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Resu
     .bind(spalte(Bindungsart::Bereitstellungsraum))
     .bind(spalte(Bindungsart::Einsatzabschnitt))
     .bind(spalte(Bindungsart::Verpflegungsstelle))
+    .bind(spalte(Bindungsart::Einheit))
     .bind(neu.bezeichnung)
     .bind(neu.von)
     .bind(neu.laeuft_ab_at)
@@ -466,6 +469,29 @@ pub async fn widerrufe_am_abschnitt(
     )
     .bind(einsatz_id)
     .bind(abschnitt_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for (id, _) in &offene {
+        widerrufen(&mut *conn, *id, von).await?;
+    }
+    Ok(offene)
+}
+
+/// Widerruft alle offenen Kopplungen, die an die Einheit gebunden sind, bevor sie aufgelöst oder
+/// gelöscht wird (LLH-1579): ein Einheitengerät hätte keine Einheit mehr. Liefert Kennung und
+/// Anzeigename jeder widerrufenen Kopplung wie [`widerrufe_am_abschnitt`].
+pub async fn widerrufe_an_einheit(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    von: i64,
+) -> Result<Vec<(i64, String)>, AppError> {
+    let offene: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT k.id, g.anzeigename FROM geraet_kopplung k JOIN benutzer g ON g.id = k.benutzer_id \
+         WHERE k.einsatz_id = ? AND k.einheit_id = ? AND k.widerrufen_at IS NULL ORDER BY k.id",
+    )
+    .bind(einsatz_id)
+    .bind(einheit_id)
     .fetch_all(&mut *conn)
     .await?;
     for (id, _) in &offene {
