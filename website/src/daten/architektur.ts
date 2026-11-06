@@ -67,7 +67,9 @@ const maske = (text: string) =>
 
 /** Klartext aus HTML (für Suche und Kurztexte). */
 export function klartext(html: string): string {
-  return entschluesselt(html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+  return entschluesselt(html.replace(/<[^>]+>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Repo-Pfad der Datei, auf die ein relativer Link aus `quelle` zeigt, oder `undefined`. */
@@ -150,9 +152,7 @@ function codeBloecke(html: string, bloecke: string[]): string {
  */
 export function aufbereiten(html: string, quelle: string): string {
   const bloecke: string[] = [];
-  let aus = html
-    .replace(/<h1[^>]*>[\s\S]*?<\/h1>\s*/, '')
-    .replace(/<p>Stand:[\s\S]*?<\/p>\s*/, '');
+  let aus = html.replace(/<h1[^>]*>[\s\S]*?<\/h1>\s*/, '').replace(/<p>Stand:[\s\S]*?<\/p>\s*/, '');
   aus = codeBloecke(aus, bloecke);
   aus = linksUmschreiben(aus, quelle);
   aus = pfadeVerlinken(aus);
@@ -179,7 +179,9 @@ export function gliederungVon(html: string): Gliederung[] {
 /** Kurzbeschreibung der Kapitel aus der Tabelle in `docs/architektur/README.md` (Spalte „Inhalt“). */
 export function inhaltAusReadme(readme: string): Record<string, string> {
   const aus: Record<string, string> = {};
-  for (const m of readme.matchAll(/^\|\s*\d+\s*\|\s*\[[^\]]+\]\((\d\d-[^)]+)\.md\)\s*\|\s*(.+?)\s*\|\s*$/gm)) {
+  for (const m of readme.matchAll(
+    /^\|\s*\d+\s*\|\s*\[[^\]]+\]\((\d\d-[^)]+)\.md\)\s*\|\s*(.+?)\s*\|\s*$/gm,
+  )) {
     aus[m[1]] = m[2];
   }
   return aus;

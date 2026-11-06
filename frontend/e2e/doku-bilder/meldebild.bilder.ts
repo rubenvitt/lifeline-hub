@@ -129,7 +129,7 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einheiten/${betreuung.id}`);
     const paneel = page.getByRole('region', { name: 'Zeitachse' });
-    await paneel.getByRole('button', { name: 'Nachtragen' }).click();
+    await paneel.getByRole('button', { name: 'Nachtragen', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Zeitachse nachtragen: Betreuungsgruppe' });
     await waehleIn(dialog.getByRole('combobox', { name: 'Ereignis' }), 'Eintreffen');
     await dialog.getByLabel('Notiz (optional)').fill('per Funk gemeldet');

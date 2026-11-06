@@ -319,6 +319,10 @@ pub struct Anlass {
     /// Benachrichtigung dafür (Spec „Eigene Aktionen benachrichtigen den Auslöser nicht“).
     pub ausloeser: Option<i64>,
     pub adressaten: Vec<Adressat>,
+    /// Die gemeinte Einheit, wenn der Bezug sie nicht allein trägt: beim Hinweis zur ablösenden
+    /// Einheit die geplante Einheit, um die es geht (LLH-1511). Die Zeile hält nur die ID fest,
+    /// den Namen liest die Detailzeile beim Lesen (design.md D1, keine Textspalte).
+    pub einheit_id: Option<i64>,
 }
 
 impl Anlass {
@@ -330,6 +334,7 @@ impl Anlass {
             bezug,
             ausloeser: None,
             adressaten: Vec::new(),
+            einheit_id: None,
         }
     }
 
@@ -342,6 +347,12 @@ impl Anlass {
     /// Fügt einen Adressaten hinzu.
     pub fn an(mut self, adressat: Adressat) -> Self {
         self.adressaten.push(adressat);
+        self
+    }
+
+    /// Hält die gemeinte Einheit fest (LLH-1511).
+    pub fn einheit(mut self, einheit_id: i64) -> Self {
+        self.einheit_id = Some(einheit_id);
         self
     }
 }

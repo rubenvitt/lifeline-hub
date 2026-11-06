@@ -11,20 +11,21 @@ import type { Posten } from './posten';
 
 /** „Nachforderungen anlegen“ aus dem Ergebnis des Rechners (LLH-1520, design.md D6). */
 
-const POSTEN: Posten[] = [
-  { schluessel: 'feldbetten', art: 'Feldbetten', anzahl: 50, vorgewaehlt: true },
-  { schluessel: 'decken', art: 'Decken', anzahl: 100, vorgewaehlt: true },
+const POSTEN: (Posten & { clientId: string })[] = [
+  { schluessel: 'feldbetten', art: 'Feldbetten', anzahl: 50, vorgewaehlt: true, clientId: 'k-1' },
+  { schluessel: 'decken', art: 'Decken', anzahl: 100, vorgewaehlt: true, clientId: 'k-2' },
   {
     schluessel: 'wasser',
     art: 'Wasser',
     anzahl: 1250,
     bezeichnung: 'Liter je Tag',
     vorgewaehlt: false,
+    clientId: 'k-3',
   },
 ];
 
 describe('legePostenAn', () => {
-  it('legt je Posten eine Nachforderung mit Bezug zur Stelle an; ein Fehler hält die übrigen nicht auf', async () => {
+  it('legt je Posten eine Nachforderung mit Bezug und Schlüssel an; ein Fehler hält die übrigen nicht auf', async () => {
     const bodies: NeueNachforderung[] = [];
     const anlegen = vi.fn(async (_id: number, body: NeueNachforderung) => {
       bodies.push(body);
@@ -48,13 +49,19 @@ describe('legePostenAn', () => {
         betreuungsstelle_id: 8,
         adressat_kategorie: 'leitstelle',
         prioritaet: 'dringend',
+        client_id: 'k-1',
       },
-      expect.objectContaining({ art: 'Decken', anzahl: 100 }),
-      expect.objectContaining({ art: 'Wasser', anzahl: 1250, bezeichnung: 'Liter je Tag' }),
+      expect.objectContaining({ art: 'Decken', anzahl: 100, client_id: 'k-2' }),
+      expect.objectContaining({
+        art: 'Wasser',
+        anzahl: 1250,
+        bezeichnung: 'Liter je Tag',
+        client_id: 'k-3',
+      }),
     ]);
   });
 
-  it('merkt einen unbekannten Ausgang gesondert: die Nachforderung kann schon stehen', async () => {
+  it('nennt bei einem Netzfehler den unbekannten Ausgang: die Nachforderung kann schon stehen', async () => {
     const lauf = await legePostenAn(
       1,
       8,
@@ -66,8 +73,8 @@ describe('legePostenAn', () => {
     expect(lauf.angelegt).toEqual([]);
     // Auch der `NetzFehler` aus `apiSend` (Zeitlimit, Abbruch) ist mehrdeutig.
     expect(lauf.gescheitert).toEqual([
-      { art: 'Feldbetten', fehler: AUSGANG_UNBEKANNT_TEXT, unbekannt: true },
-      { art: 'Decken', fehler: AUSGANG_UNBEKANNT_TEXT, unbekannt: true },
+      { art: 'Feldbetten', fehler: AUSGANG_UNBEKANNT_TEXT },
+      { art: 'Decken', fehler: AUSGANG_UNBEKANNT_TEXT },
     ]);
   });
 });

@@ -27,6 +27,7 @@ import {
   zustaendigeLeitstelle,
 } from '../stammdaten/externeStellenVorschlaege';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { neueClientId } from '../offline/clientId';
 import { KennungsLink } from '../components/kennungsLink';
 import { artOptionen, schnellwahlArten } from './artVorschlaege';
 import {
@@ -244,9 +245,16 @@ export default function NachforderungFormular({
     feld?.select();
   };
 
+  /*
+   * Idempotenzschlüssel der Anlage (LLH-1526): bleibt über jeden Versuch derselben Nachforderung
+   * stehen, damit ein Wiederholen nach einem Netzfehler nicht doppelt anlegt, und wechselt erst,
+   * wenn sie angekommen ist.
+   */
+  const clientId = useRef(neueClientId());
+
   // Das `return` ist tragend: die Hülle wartet auf diese Zusage.
-  const absenden = (w: FormWerte) => {
-    return onAnlegen({
+  const absenden = async (w: FormWerte) => {
+    const ergebnis = await onAnlegen({
       art: w.art.trim(),
       bezeichnung: w.bezeichnung?.trim() || undefined,
       anzahl: w.anzahl ?? undefined,
@@ -257,7 +265,10 @@ export default function NachforderungFormular({
       begruendung: w.begruendung?.trim() || undefined,
       prioritaet: w.prioritaet,
       betreuungsstelle_id: bezug?.betreuungsstelleId,
+      client_id: clientId.current,
     });
+    clientId.current = neueClientId();
+    return ergebnis;
   };
 
   /** Jeder Wert, der von der Vorgabe abweicht, steht im Kopf — eingeklappt bleibt nichts verborgen. */

@@ -323,11 +323,9 @@ pub async fn aufbewahrungsfrist_setzen(
         ));
     }
 
-    let audit = match (alt, neue_frist.as_deref()) {
-        (_, None) => "Aufbewahrungsfrist aufgehoben (unbegrenzt)".to_string(),
-        (None, Some(neu)) => format!("Aufbewahrungsfrist gesetzt auf {neu}"),
-        (Some(a), Some(neu)) => format!("Aufbewahrungsfrist geändert von {a} auf {neu}"),
-    };
+    // Alte und neue Frist im ETB in Zone und Darstellung des Einsatzes (LLH-1540).
+    let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, id).await?;
+    let audit = repo::frist_audit(&stil, alt, neue_frist.as_deref());
 
     let ergebnis = repo::frist_setzen(
         &state.pool,

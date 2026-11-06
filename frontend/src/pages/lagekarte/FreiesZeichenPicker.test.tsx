@@ -339,6 +339,21 @@ describe('FreiesZeichenPicker — nur Zeichenbares unter „Details“', () => {
     waehle('Brandbekämpfung');
     expect(zuletzt(onChange)).toEqual({ kind: 'formation', bodyMarks: ['fire-fighting'] });
   });
+
+  it('setzt die Dekontamination von Personal mit „P“ an der Marke (LLH-1522)', async () => {
+    const { onChange } = render(FORMATION);
+    expect(await optionenVon('Fachaufgabe', 'Dekontaminieren')).toEqual([
+      'Dekontaminieren',
+      'Dekontaminieren von Personal',
+      'Dekontaminieren von Gerät',
+    ]);
+    waehle('Dekontaminieren von Personal');
+    expect(zuletzt(onChange)).toEqual({
+      kind: 'formation',
+      bodyMarks: ['decontamination'],
+      labels: { center: 'P' },
+    });
+  });
 });
 
 describe('FreiesZeichenPicker — Farbe aus der Palette', () => {

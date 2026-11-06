@@ -1133,6 +1133,80 @@ async fn aufbewahrungsfrist_verkuerzung_ohne_bestaetigung_ist_409() {
     assert_eq!(status, StatusCode::CONFLICT);
 }
 
+/// LLH-1540, Spec `zeitdarstellung`, „Servertexte“: der ETB-Eintrag des Frist-PUT nennt alte
+/// und neue Frist in Zone und Darstellung des Einsatzes (Tokio), nicht der Organisation (New
+/// York) und nicht als UTC-String.
+#[tokio::test]
+async fn aufbewahrungsfrist_im_etb_folgt_dem_zeitstil_des_einsatzes() {
+    for (darstellung, gesetzt, geaendert) in [
+        (
+            "taktisch",
+            "Aufbewahrungsfrist gesetzt auf 010900jan30",
+            "Aufbewahrungsfrist geändert von 010900jan30 auf 012100jul31",
+        ),
+        (
+            "datum_uhrzeit",
+            "Aufbewahrungsfrist gesetzt auf 01.01.30 09:00",
+            "Aufbewahrungsfrist geändert von 01.01.30 09:00 auf 01.07.31 21:00",
+        ),
+    ] {
+        let (app, pool) = setup_mit_pool().await;
+        let admin = login_cookie(&app, "admin", "startpw12").await;
+        let (_, e) = einsatz_anlegen(&app, &admin, "Lage").await;
+        let id = e["id"].as_i64().unwrap();
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+             SELECT org_id, 'America/New_York', 'datum_uhrzeit' FROM einsatz WHERE id = ? \
+             ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+                zeitdarstellung = excluded.zeitdarstellung",
+        )
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+             VALUES (?, 'Asia/Tokyo', ?) \
+             ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+                zeitdarstellung = excluded.zeitdarstellung",
+        )
+        .bind(id)
+        .bind(darstellung)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let letzter = || async {
+            sqlx::query_scalar::<_, String>(
+                "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? ORDER BY lfd_nr DESC LIMIT 1",
+            )
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+
+        let (status, _) = frist_setzen(
+            &app,
+            &admin,
+            id,
+            json!({ "retention_bis": "2030-01-01 00:00:00", "bestaetigt": true }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(letzter().await, gesetzt);
+
+        let (status, _) = frist_setzen(
+            &app,
+            &admin,
+            id,
+            json!({ "retention_bis": "2031-07-01 12:00:00" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(letzter().await, geaendert);
+    }
+}
+
 #[tokio::test]
 async fn aufbewahrungsfrist_mit_bestaetigung_setzt_wert() {
     let app = setup().await;

@@ -66,7 +66,10 @@ Dieselbe Lagemeldung lässt sich auch im Modul „Meldungen“ erfassen, mit der
    „Seit letzter Lagebesprechung“ (nur, wenn eine abgehalten ist) und „Heute“; unter „Eigener
    Zeitraum“ lassen sich „von“ und „bis“ taktisch tippen, „bis“ leer heißt bis jetzt. Der Zeitraum
    gilt für die Ereigniszeit und steht mit festen Uhrzeiten in der Adresse der Seite; ein Link
-   übernimmt denselben Zeitraum, Suche, Ort und Herkunft nicht.
+   übernimmt denselben Zeitraum, Suche, Ort und Herkunft nicht. Unter „Seit letzter
+   Lagebesprechung“ steht über der Zeitachse außerdem, was nach der Besprechung übernommen wurde,
+   aber davor geschah („+1 Nachtrag vor 1330 übernommen“); „anzeigen“ erweitert den Zeitraum um
+   diese Lagemeldungen.
 3. Nach dem Ort filtern: „Mit Koordinaten“ oder „Ohne Koordinaten“; nach der Herkunft: „Gerät“
    (von einem gekoppelten Gerät erfasst) oder „Übernommen“ (Meldungen anderer Art, die in die Lage
    übernommen wurden). Der Kopf nennt dann „… von … Lagemeldungen“.

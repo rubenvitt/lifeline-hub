@@ -275,7 +275,8 @@ pub struct AnlegenBody {
 ///
 /// Ohne Netz vormerkbar mit Erfassungszeit (LLH-1330): Anlage (`erfasst_at`), Erst-Sichtung,
 /// Verbleib an der Betreuungsstelle und ihre ETB-Einträge tragen `zeitpunkt_at`; der ETB zeigt
-/// eine spät übertragene Aufnahme damit als nachgetragen. Der UHS-Eintritt bleibt beim Eingang.
+/// eine spät übertragene Aufnahme damit als nachgetragen. Ebenso der Eintritt in den Eingang
+/// einer UHS (LLH-1515): Wartezeit und ETB-Eintrag beginnen zur Erfassungszeit.
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibfreigabe<Personen>,
@@ -563,17 +564,19 @@ pub async fn anlegen(
                         None,
                         None,
                         ctx.benutzer.id,
+                        Some(&erfasst_at),
                     )
                     .await?;
                     let uhs = crate::uhs::repo::laden_tx(conn, einsatz_id, uhs_id).await?;
                     let text = crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung);
                     uhs_etb_id = Some(
-                        crate::etb::system_audit_tx(
+                        crate::etb::system_audit_zu_tx(
                             conn,
                             einsatz_id,
                             ctx.benutzer.id,
                             startwert,
                             &text,
+                            &erfasst_at,
                         )
                         .await?,
                     );

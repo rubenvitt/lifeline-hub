@@ -37,6 +37,9 @@ pub struct Zeile {
     pub bezug_id: i64,
     pub erstellt_at: String,
     pub quittiert_at: Option<String>,
+    /// Die gemeinte Einheit eines Hinweises zur ablösenden Einheit (LLH-1511); sonst und bei
+    /// Zeilen von vor 0275 `None`.
+    pub einheit_id: Option<i64>,
 }
 
 type RohZeile = (
@@ -49,10 +52,11 @@ type RohZeile = (
     i64,
     String,
     Option<String>,
+    Option<i64>,
 );
 
 const SPALTEN: &str = "id, einsatz_id, benutzer_id, art, stufe, bezug_typ, bezug_id, \
-     erstellt_at, quittiert_at";
+     erstellt_at, quittiert_at, einheit_id";
 
 /// Eine Zeile mit unbekanntem Katalogwert (Datenbank neuer als der Code) fällt weg, statt die
 /// ganze Antwort scheitern zu lassen.
@@ -67,6 +71,7 @@ fn aus_roh(r: RohZeile) -> Option<Zeile> {
         bezug_id: r.6,
         erstellt_at: r.7,
         quittiert_at: r.8,
+        einheit_id: r.9,
     })
 }
 
@@ -85,8 +90,8 @@ pub async fn anlegen(
         let quittiert = (stufe == BenachrichtigungStufe::Still).then_some(&jetzt);
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO benachrichtigung (einsatz_id, benutzer_id, art, stufe, bezug_typ, \
-                 bezug_id, ausloeser_id, erstellt_at, quittiert_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                 bezug_id, ausloeser_id, erstellt_at, quittiert_at, einheit_id) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(anlass.einsatz_id)
         .bind(benutzer_id)
@@ -97,6 +102,7 @@ pub async fn anlegen(
         .bind(anlass.ausloeser)
         .bind(&jetzt)
         .bind(quittiert)
+        .bind(anlass.einheit_id)
         .fetch_one(&mut *tx)
         .await?;
         zeilen.push((benutzer_id, stufe, id));

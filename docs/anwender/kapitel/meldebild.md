@@ -109,6 +109,16 @@ Für Einsatzleitung und Führungspersonal:
 
 4. „Nachtragen“ wählen.
 
+### Eine ganze Einsatzperiode nachtragen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Im Paneel „Zeitachse“ „Periode nachtragen“ wählen.
+2. Im Dialog „Periode nachtragen: …“ „Alarmierung“ oder „Eintreffen“ eintragen, oder beides, und
+   die „Entlassung“. Die Felder stehen leer; keine Zeit darf in der Zukunft liegen. Bei Bedarf
+   eine „Notiz (optional)“ eingeben.
+3. „Nachtragen“ wählen. Lehnt die App ab, steht der Grund im Dialog.
+
 ### Einen Zeitpunkt berichtigen
 
 Für Einsatzleitung und Führungspersonal:
@@ -222,6 +232,22 @@ Personen nicht, nennt die App sie und ändert nichts. Ereignisse aus der Ablösu
 berichtigen. Zur Schicht der Ablösung wirkt die Berichtigung wie eine Streichung mit anschließendem
 Nachtrag (Kapitel [Ablösung](abloesung.md)).
 
+### Eine Periode in einem Schritt
+
+„Periode nachtragen“ trägt Alarmierung und Eintreffen (oder eines davon) und die Entlassung in einem
+Schritt nach, mit einem Eintrag im Einsatztagebuch, etwa „Zeitachse: Einheit «Rettungsstaffel»
+Einsatzperiode nachgetragen: alarmiert …, eingetroffen …, entlassen …“. Die Notiz steht am ersten
+Ereignis. Geprüft wird nur das Ergebnis: Eine abgeschlossene Periode lässt sich so auch vor eine
+laufende setzen, wo eine einzelne Alarmierung als zweite der laufenden Periode gälte. Die neue
+Periode muss für sich stehen; liegt ein bestehendes Ereignis darin oder schlösse ihre Entlassung
+eine andere Periode, lehnt die App ab und ändert nichts. Ebenso, wenn die Alarmierung nach dem
+Eintreffen oder die Entlassung nicht nach dem Beginn liegt.
+
+An einer Einheit gilt die Periode wie ein Nachtrag auch für die jetzt zugeordneten Personen. Eine
+Person, zu deren Zeitachse sie nicht passt, bekommt keinen ihrer Einträge, auch nicht einen Teil.
+Eine Schicht der Ablösung beginnt dadurch nicht. Die Entlassung beendet eine laufende Schicht nur,
+wenn danach keine Periode mehr offen ist.
+
 ### Einsatzdauer und Ruhezeit
 
 Die Einsatzdauer zählt ab der Alarmierung, fehlt sie, ab dem Eintreffen. „gesamt“ addiert alle
@@ -239,11 +265,11 @@ im Statusband im Paneel des Moduls, neben der Auswahlzeile für die Mittel. Ohne
 Grund auch in der Tabelle, statt eines leeren Einsatzes. Ohne Personal ist die Stärke unbekannt und
 steht als „—“. Fehlt Personal, Fahrzeuge oder Material, ist „In Lagebericht übernehmen“ gesperrt,
 weil der Bericht sonst falsche Zahlen trüge. Ohne das Modul Aufträge steht in der Spalte „Auftrag“ „Modul Aufträge gesperrt“. Den Zulauf sieht nur, wer auch das Modul
-Nachforderungen lesen darf; sonst fehlt die Kennzahl ganz. Status setzen, nachtragen, Zeit berichtigen,
-streichen und in den Lagebericht übernehmen dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
+Nachforderungen lesen darf; sonst fehlt die Kennzahl ganz. Status setzen, nachtragen, eine Periode
+nachtragen, Zeit berichtigen, streichen und in den Lagebericht übernehmen dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
 (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
 
 ### Ohne Netz
 
 Meldebild und Zeitachse bleiben mit dem zuletzt geladenen Stand lesbar. Status setzen, Nachtragen,
-Zeit berichtigen und Streichen brauchen das Netz (Kapitel [Ohne Netz](ohne-netz.md)).
+Periode nachtragen, Zeit berichtigen und Streichen brauchen das Netz (Kapitel [Ohne Netz](ohne-netz.md)).

@@ -833,6 +833,49 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     expect(result.current.bezirke).toEqual([]);
   });
 
+  it('wiederhergestellter Stand ohne Server (LLH-1516): Stellen und Bezirke bleiben, beide Quellen stehen im Ausfall', async () => {
+    const BEZIRK = {
+      id: 31,
+      einsatz_id: 5,
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 640,
+      plan_erhebung: 'geschaetzt',
+      raeumung: 'laeuft',
+      flaechen: 0,
+      angelegt_at: '',
+    };
+    handler({}, () => HttpResponse.error());
+    // Der wiederhergestellte Stand (LFH-723): ein eigener Client, sonst räumt `gcTime: 0` ihn ab.
+    const quelle = new QueryClient();
+    quelle.setQueryData(['einsatz-betreuung', 5], { stellen: [STELLE, UNVERORTET] });
+    quelle.setQueryData(['einsatz-evakuierung', 5], { bezirke: [BEZIRK] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    hydrate(client, dehydrate(quelle));
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await waitFor(() =>
+      expect(result.current.fehlerhafteQuellen).toEqual([
+        'Betreuungsstellen',
+        'Evakuierungsbezirke',
+      ]),
+    );
+    // „Ein Fehler mit Daten ist ein Stand“ (`offline/AGENTS.md`): der letzte Stand bleibt sichtbar.
+    expect(result.current.alleVerortet.find((m) => m.typ === 'betreuungsstelle')).toMatchObject({
+      schluessel: 'betreuungsstelle-21',
+    });
+    expect(result.current.nichtVerortetAlle).toContainEqual({
+      typ: 'betreuungsstelle',
+      id: 22,
+      label: 'AS Rathaus',
+    });
+    expect(result.current.rohdaten.betreuungsstellen).toHaveLength(2);
+    expect(result.current.bezirke).toEqual([expect.objectContaining({ id: 31 })]);
+    expect(result.current.rohdaten.bezirke).toHaveLength(1);
+  });
+
   it('Bezirksfläche ohne Modulrecht: nur das Typwort, keine Bezirksangaben', async () => {
     handler({}, () => new HttpResponse(null, { status: 403 }));
     server.use(
@@ -1204,6 +1247,30 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
     const { result } = render();
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Tiere']));
     expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'tier')).toBe(false);
+  });
+
+  it('Neuabruf scheitert mitten in der Sitzung (LLH-1516): die Tiere bleiben, „Tiere“ steht im Ausfall', async () => {
+    handler({}, () => HttpResponse.json([VERORTET, UNVERORTET]));
+    const client = neuerQueryClient();
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await waitFor(() =>
+      expect(result.current.alleVerortet.some((m) => m.schluessel === 'tier-21')).toBe(true),
+    );
+    // Die Leitung bricht weg; der nächste Abruf scheitert, react-query lässt `data` stehen.
+    server.use(http.get('/api/einsaetze/5/tiere', () => HttpResponse.error()));
+    await client.invalidateQueries({ queryKey: ['einsatz-tiere', 5] });
+    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Tiere']));
+    expect(result.current.alleVerortet.some((m) => m.schluessel === 'tier-21')).toBe(true);
+    expect(result.current.nichtVerortetAlle).toContainEqual({
+      typ: 'tier',
+      id: 22,
+      label: 'T-004 (Hund)',
+    });
+    expect(result.current.rohdaten.tiere).toHaveLength(2);
   });
 
   it('Historien-Modus: Tiere kommen aus dem Dokument, kein Live-Request', async () => {

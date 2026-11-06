@@ -347,6 +347,77 @@ describe('LagemeldungenPage', () => {
       expect(screen.getByRole('button', { name: `Zeitraum seit LB ${hhmm}` })).toBeInTheDocument();
     });
 
+    it('nennt nach der Besprechung übernommene, früher geschehene als Nachtrag (LLH-1514)', async () => {
+      ladeModulFreigaben.mockResolvedValue(freigabenFixture());
+      fetchLagebesprechungStand.mockResolvedValue(stand);
+      listeLageMeldungen.mockResolvedValue([
+        // Um 08:10:35 geschehen, um 08:45 übernommen: unter „seit LB 0830“ der Nachtrag.
+        lage({
+          id: 1,
+          text: 'Nachgereicht',
+          ereigniszeit: '2026-06-12 08:10:35',
+          erstellt_at: '2026-06-12 08:45:00',
+        }),
+        // Dieselbe Minute, vorher übernommen: kein Nachtrag, aber unter „seit 0810“ zu sehen.
+        lage({
+          id: 4,
+          text: 'Gleiche Minute',
+          ereigniszeit: '2026-06-12 08:10:20',
+          erstellt_at: '2026-06-12 08:15:00',
+        }),
+        // Vor der Besprechung übernommen: war bekannt, kein Nachtrag.
+        lage({
+          id: 2,
+          text: 'Bekannt',
+          ereigniszeit: '2026-06-12 08:00:00',
+          erstellt_at: '2026-06-12 08:20:00',
+        }),
+        lage({
+          id: 3,
+          text: 'Danach',
+          ereigniszeit: '2026-06-12 08:40:00',
+          erstellt_at: '2026-06-12 08:41:00',
+        }),
+      ]);
+      renderPage('/einsaetze/1/lagemeldungen?von=2026-06-12%2008%3A30%3A00');
+      expect(await screen.findByText('Danach')).toBeInTheDocument();
+      expect(screen.queryByText('Nachgereicht')).toBeNull();
+      const hinweis = (await screen.findByText(/Nachtrag vor/)).closest<HTMLElement>(
+        '[data-lfh="lagemeldungen-nachtraege"]',
+      )!;
+      const grenze = alsOrtszeit('2026-06-12 08:30:00')!.format('DDHHmm');
+      expect(hinweis).toHaveTextContent(`+1 Nachtrag vor ${grenze} übernommen · anzeigen`);
+
+      await userEvent.click(within(hinweis).getByRole('button', { name: 'anzeigen' }));
+      expect(screen.getByText('Nachgereicht')).toBeInTheDocument();
+      expect(screen.getByText('Danach')).toBeInTheDocument();
+      expect(screen.getByText('Gleiche Minute')).toBeInTheDocument();
+      expect(screen.queryByText('Bekannt')).toBeNull();
+      // Die Grenze liegt auf der vollen Minute des frühesten Nachtrags.
+      expect(screen.getByTestId('adresse')).toHaveTextContent(/^\?von=2026-06-12 08:10:00$/);
+      // Die Grenze ist nicht mehr die der Besprechung: der Hinweis geht.
+      expect(document.querySelector('[data-lfh="lagemeldungen-nachtraege"]')).toBeNull();
+    });
+
+    it('ohne Wahl „seit LB“ kein Nachtrag-Hinweis (LLH-1514)', async () => {
+      ladeModulFreigaben.mockResolvedValue(freigabenFixture());
+      fetchLagebesprechungStand.mockResolvedValue(stand);
+      listeLageMeldungen.mockResolvedValue([
+        lage({
+          id: 1,
+          text: 'Nachgereicht',
+          ereigniszeit: '2026-06-12 08:10:00',
+          erstellt_at: '2026-06-12 08:45:00',
+        }),
+      ]);
+      // Dieselbe Grenze mit `bis` ist ein Zeitraum, nicht „seit LB“.
+      renderPage(
+        '/einsaetze/1/lagemeldungen?von=2026-06-12%2008%3A30%3A00&bis=2026-06-12%2009%3A00%3A00',
+      );
+      await screen.findByText('Keine Lagemeldung passt zum Filter');
+      expect(document.querySelector('[data-lfh="lagemeldungen-nachtraege"]')).toBeNull();
+    });
+
     it('ohne Freigabe der Lagebesprechung: keine Anfrage, keine Wahl', async () => {
       ladeModulFreigaben.mockResolvedValue(
         freigabenFixture({ lagebesprechung: { zugriff: false } }),

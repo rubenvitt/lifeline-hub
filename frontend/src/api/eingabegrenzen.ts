@@ -194,5 +194,7 @@ export const QUALI_SOLL_MAX = 10;
 export const QUALI_SOLL_ANZAHL_MAX = 50;
 /** Soll-Anzahl der Kräfte einer UHS (LLH-1553). */
 export const UHS_SOLL_ANZAHL_MAX = 200;
+/** Notiz eines Nachtrags oder einer nachgetragenen Periode in der Kräfte-Zeitachse (LLH-1538). */
+export const ZEITACHSE_NOTIZ_MAX = 500;
 /** Bezeichnung eines Lesezugangs für einen externen Lagemonitor (LLH-1484). */
 export const LAGEMONITOR_BEZEICHNUNG_MAX = 60;

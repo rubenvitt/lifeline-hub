@@ -145,7 +145,11 @@ test('390 px im Handschuh-Betrieb: Tag aus Vorlage und Verpflegungsplan ohne waa
       page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
-    await expect(page.locator('tr', { hasText: 'Mittagessen mit einem langen' })).toBeVisible();
+    // Mit Laufkennung: deaktivierte Zeilen früherer Läufe (Wiederholung, CI-Retry) stehen in
+    // derselben Temp-DB noch im Plan (LLH-1533).
+    await expect(
+      page.locator('tr', { hasText: `Mittagessen mit einem langen Namen ${LAUF}` }),
+    ).toBeVisible();
     expect(await ueberlauf()).toBeLessThanOrEqual(0);
 
     await page.goto(`/einsaetze/${e}/verpflegung/aus-vorlage?tag=2026-10-11`);

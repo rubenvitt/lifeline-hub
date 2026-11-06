@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect } from 'vitest';
 
@@ -27,11 +27,26 @@ export async function waehleMenueEintrag(
   eintrag: string | RegExp,
 ): Promise<void> {
   await userEvent.click(ausloeser);
-  const eintraege = await screen.findAllByRole('menuitem', { name: eintrag });
-  // Ein früher geöffnetes Menü bleibt in jsdom im Dokument; das zuletzt geöffnete gilt.
-  const ziel = eintraege[eintraege.length - 1];
+  // Nur im offenen Menü suchen: Ein früher geöffnetes bleibt in jsdom im Dokument, und ein
+  // gleichnamiger Eintrag dort darf einen fehlenden im neuen Menü nicht verdecken (LLH-1537).
+  const ziel = await waitFor(() => within(offenesMenue()).getByRole('menuitem', { name: eintrag }));
   await warteAufMenueFokus();
   await userEvent.click(ziel);
+}
+
+/**
+ * Das eine offene Dropdown. antd lässt die Portale geschlossener Dropdowns im Baum stehen. In jsdom
+ * läuft keine Bewegung zu Ende: Ein verlassendes Portal bleibt ohne `ant-dropdown-hidden` in
+ * `ant-slide-up-leave-active` stehen, verlässlich erkennbar an seinem `pointer-events: none`. Die
+ * Zählung ist streng, damit eine falsche Annahme laut wird.
+ */
+export function offenesMenue(): HTMLElement {
+  const offen = Array.from(
+    document.querySelectorAll<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden)'),
+  ).filter((d) => d.style.pointerEvents !== 'none');
+  if (offen.length !== 1)
+    throw new Error(`genau ein offenes Menü erwartet, ${offen.length} gefunden`);
+  return offen[0];
 }
 
 /**

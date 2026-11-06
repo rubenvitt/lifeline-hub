@@ -1,9 +1,15 @@
 import { apiGet, apiSend } from './client';
-import type { EinheitPerioden, PersonPerioden, Zeitachse, ZeitachseNachtragBody } from './types';
+import type {
+  EinheitPerioden,
+  PersonPerioden,
+  Zeitachse,
+  ZeitachseNachtragBody,
+  ZeitachsePeriodeBody,
+} from './types';
 
 /**
  * Kräfte-Zeitachse (LFH-552): Perioden je Einheit/Person, Zeitachse einer Kraft, Nachtrag,
- * Streichung und Berichtigung des Zeitpunkts (LLH-1455). Die Pfade liegen unter den Modulen Einheiten bzw. Personal und erben deren Sperre.
+ * Streichung, Berichtigung des Zeitpunkts (LLH-1455) und ganze Periode (LLH-1538). Die Pfade liegen unter den Modulen Einheiten bzw. Personal und erben deren Sperre.
  */
 export type KraftArt = 'einheit' | 'person';
 
@@ -34,6 +40,19 @@ export function trageNach(
   body: ZeitachseNachtragBody,
 ): Promise<Zeitachse> {
   return apiSend<Zeitachse>(kraftPfad(einsatzId, art, id), 'POST', body);
+}
+
+/**
+ * Trägt eine abgeschlossene Periode in einem Schritt nach (LLH-1538): Alarmierung und/oder
+ * Eintreffen und die Entlassung; geprüft wird nur das Ergebnis. An einer Einheit mit Fan-out.
+ */
+export function tragePeriodeNach(
+  einsatzId: number,
+  art: KraftArt,
+  id: number,
+  body: ZeitachsePeriodeBody,
+): Promise<Zeitachse> {
+  return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/periode`, 'POST', body);
 }
 
 /** Streicht ein Ereignis (unumkehrbar, Grund Pflicht); der alte Stand bleibt lesbar. */

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
-import { anmeldenAlsAdmin } from './rollen-kern';
+import { anmeldenOhneStartseite } from './lageplan-kern';
+import { ADMIN, ADMIN_PW, anmeldenAlsAdmin } from './rollen-kern';
 
 /**
  * Verpflegung (LFH-1044; Spec `funktionsansichten`): ein Tablet bei 1280 × 800, einsatzweit
@@ -10,7 +11,10 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * endet es ohne Neuladen.
  *
  * Seeding als Admin über die API, die Gerätesitzung in einem eigenen Kontext. Kein `networkidle`
- * (LFH-385).
+ * (LFH-385). Der Admin meldet sich über die API an (`anmeldenOhneStartseite`), denn seine Seite
+ * lädt nie eine Oberfläche: Das Formular lud die ganze App ein zweites Mal und kostete lokal 3,5
+ * bis 8 s, damit riss der Test das 30-s-Budget (LLH-1533, gemessen 25 bis 27 s). Was bleibt, ist
+ * das Gerät selbst (Koppeln und erste Ansicht 6 bis 11 s), 20 × „+1“ (1,6 s) und die Ruhe (3,4 s).
  *
  * Mutationsproben: in `geraetSicht.ts` `verpflegung-planen` für Geräte auf `true` → der Schritt
  * „kein Zeitfenster anlegen“ wird rot; `RUHE_MS` auf 0 in `verpflegung/ausgabeSammlung.ts` → der
@@ -27,7 +31,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
   page,
   browser,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   const einsatz = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Verpflegung ${Date.now()}`,
   });
@@ -158,7 +162,7 @@ test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an eine
   page,
   browser,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   const { id: e } = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Verpflegung Stellen ${Date.now()}`,
   });

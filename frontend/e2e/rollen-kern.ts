@@ -32,6 +32,11 @@ export interface Konto {
 
 export async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
   await page.goto('/login');
+  await anmeldenImFormular(page, benutzer, passwort);
+}
+
+/** Meldet im Formular der schon offenen Anmeldeseite an, ohne sie neu zu laden (LLH-1517). */
+export async function anmeldenImFormular(page: Page, benutzer: string, passwort: string) {
   await page.getByLabel('Benutzername').fill(benutzer);
   await page.getByLabel('Passwort').fill(passwort);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();

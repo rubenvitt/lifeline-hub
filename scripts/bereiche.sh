@@ -53,7 +53,7 @@ bereiche_von() {
       echo "frontend" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
-    # liest keine Suite; Prettier über `frontend/**/*.md` läuft in den Schnellprüfungen.
+    # liest keine Suite; Prettier über `frontend/` und `website/` läuft in den Schnellprüfungen.
     website/* | docs/* | openspec/* | .claude/* | *.md)
       echo "" ;;
     # ── Bereiche ─────────────────────────────────────────────────────────────────────

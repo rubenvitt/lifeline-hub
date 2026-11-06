@@ -29,6 +29,10 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   Name, Beschreibung und Reihenfolge der fertigen Module, ohne die Einstellungen.
 - **Formatierung:** `.prettierrc` wie in `frontend/` (einfache Anführungszeichen, Breite 100);
   ohne sie prüfte Prettier mit seinen Vorgaben und meldete jede Datei als unformatiert.
+  `scripts/check-fmt.sh` prüft ganz `website/` mit dem Prettier des Frontends (LLH-1529), also
+  in den Schnellprüfungen jedes PR; Ausnahmen mit Begründung in `.prettierignore`. Beheben:
+  in `website/` `mise exec -- ../frontend/node_modules/.bin/prettier --write .`.
+  `.astro`-Dateien sieht Prettier ohne Plugin nicht.
 - **Doku** (`src/pages/doku/`, LFH-1096): die Anwenderdokumentation aus
   `docs/anwender/kapitel/`, gelesen als Content-Collection (`src/content.config.ts`, Glob-Loader
   mit Basis außerhalb von `website/`), nie kopiert. Form und Regeln der Kapitel:
@@ -46,7 +50,7 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   das Schema der ADRs prüft ihren Kopf beim Bauen. Aufbereitung am gerenderten HTML in
   `src/daten/architektur.ts`: relative Links auf Kapitel, ADRs und Anwenderdoku werden Seiten
   der Website, alle übrigen und Pfade in Backticks (sofern es sie gibt) GitHub-Links auf
-  `alpha`; Codeblöcke einfarbig in den Rollen; ```` ```mermaid ```` zeichnet
+  `alpha`; Codeblöcke einfarbig in den Rollen; ` ```mermaid ` zeichnet
   `src/components/ArchitekturDiagramme.astro` im Browser mit dem Paket `mermaid` (exakt
   gepinnt, eigener Chunk, lädt nur auf Seiten mit Diagramm, Farben aus den Rollen, Vollbild per
   Klick). Ein reiner Doku-PR ändert nur `docs/architektur/`, also gehört auch

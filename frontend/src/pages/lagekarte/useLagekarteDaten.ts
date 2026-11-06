@@ -358,41 +358,32 @@ export function useLagekarteDaten({
       ? lageMeldungenQuery.data
       : undefined;
   const fkRoh = istSnapshot ? snap?.fuehrungskraefte : fkQuery.data;
-  // Ohne Modulrecht leer, auch wenn ein früherer Abruf im Cache steht; nach einem Fehler ebenso
-  // (react-query lässt `data` stehen).
+  // Ohne Modulrecht leer, auch wenn ein früherer Abruf im Cache steht. Ein Fehler mit Daten ist
+  // dagegen ein Stand (`offline/AGENTS.md`, LLH-1516): die Übersicht liegt im Lagebild ohne Netz,
+  // und scheitert der Abruf an der Leitung, zeichnet die Karte den letzten Stand;
+  // „Betreuungsstellen“ steht dann im Ausfall. Ein 403 sperrt über `betreuungZugriff`.
   const stellenRoh =
     betreuungZugriff !== 'frei'
       ? undefined
       : istSnapshot
         ? snap?.betreuungsstellen
-        : betreuungQuery.isError
-          ? undefined
-          : betreuungQuery.data?.stellen;
+        : betreuungQuery.data?.stellen;
   // Bezirke hinter der Grenze des Moduls Evakuierung: Bezeichnung und Räumungszustand beschriften
-  // die Bezirksflächen, die jeder Karten-Leser sieht.
+  // die Bezirksflächen, die jeder Karten-Leser sieht. Nach einem Fehler ebenso der letzte Stand,
+  // „Evakuierungsbezirke“ im Ausfall.
   const bezirkeRoh =
     evakuierungZugriff !== 'frei'
       ? undefined
       : istSnapshot
         ? snap?.evakuierungsbezirke
-        : evakuierungQuery.isError
-          ? undefined
-          : evakuierungQuery.data?.bezirke;
-  // Räume hinter derselben Grenze wie die Stellen, aber ein Fehler mit Daten ist ein Stand
-  // (`offline/AGENTS.md`, LLH-1318): die Liste liegt im Lagebild ohne Netz, und scheitert der
-  // Abruf an der Leitung, zeichnet die Karte den letzten Stand; „Bereitstellungsräume“ steht
-  // dann im Ausfall. Ein 403 sperrt über `brZugriff`.
+        : evakuierungQuery.data?.bezirke;
+  // Räume hinter derselben Grenze und nach derselben Regel (LLH-1318): letzter Stand nach einem
+  // Fehler, „Bereitstellungsräume“ im Ausfall, ein 403 sperrt über `brZugriff`.
   const raeumeRoh =
     brZugriff !== 'frei' ? undefined : istSnapshot ? snap?.bereitstellungsraeume : brQuery.data;
-  // Tiere hinter derselben Grenze.
-  const tiereRoh =
-    tierZugriff !== 'frei'
-      ? undefined
-      : istSnapshot
-        ? snap?.tiere
-        : tierQuery.isError
-          ? undefined
-          : tierQuery.data;
+  // Tiere ebenso. Sie liegen nicht im Lagebild ohne Netz, aber scheitert ein Neuabruf mitten in
+  // der Sitzung, bleibt der letzte Stand stehen und „Tiere“ steht im Ausfall.
+  const tiereRoh = tierZugriff !== 'frei' ? undefined : istSnapshot ? snap?.tiere : tierQuery.data;
   // Org-TZ-Default aus dem Dokument, nicht aus der Live-Query — sonst schriebe eine Org-Umbenennung
   // den historischen Stand um.
   const orgDefault = (istSnapshot ? snap?.org_default : orgQuery.data?.tz_organisation) ?? null;
@@ -773,6 +764,8 @@ export function useLagekarteDaten({
           freieZeichenQuery.dataUpdatedAt,
           lageMeldungenFrei ? lageMeldungenQuery.dataUpdatedAt : undefined,
           fkQuery.dataUpdatedAt,
+          // Die Stellen zeichnen nach einem Fehler den letzten Stand (LLH-1516), sein Alter zählt.
+          betreuungZugriff === 'frei' ? betreuungQuery.dataUpdatedAt : undefined,
           brZugriff === 'frei' ? brQuery.dataUpdatedAt : undefined,
           tierZugriff === 'frei' ? tierQuery.dataUpdatedAt : undefined,
           // Sammelstellen (LLH-1393) kommen aus der Bezirksliste.

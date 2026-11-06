@@ -1,0 +1,9 @@
+# LLH-1529: Was Prettier in website/ NICHT anfassen darf (Gate: scripts/check-fmt.sh).
+#
+# pnpm schreibt das Lockfile selbst; jede Formatierung wäre beim nächsten `pnpm install`
+# wieder weg (wie frontend/.prettierignore).
+pnpm-lock.yaml
+
+# Build- und Werkzeugausgaben von Astro. Nichts davon ist Quelltext, alles entsteht neu.
+dist/
+.astro/

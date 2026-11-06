@@ -192,13 +192,13 @@ Zustand nicht prüft.
 
 ### Requirement: Zeitachse einer entlassenen Person berichtigen
 
-Das System SHALL an einer entlassenen Person Nachtrag, Streichung und Berichtigung des Zeitpunkts
-an ihrer Zeitachse annehmen, mit denselben Regeln wie an einer aktiven Kraft. Danach MUST die
+Das System SHALL an einer entlassenen Person Nachtrag, Periode nachtragen, Streichung und
+Berichtigung des Zeitpunkts an ihrer Zeitachse annehmen, mit denselben Regeln wie an einer aktiven Kraft. Danach MUST die
 Person ohne offene Einsatzperiode sein, sonst MUST das System mit 422 antworten, nichts schreiben
 und auf das erneute Disponieren verweisen. Eine Streichung oder Berichtigung an ihrer früheren
 Einheit MUST die Kopie an der entlassenen Person stehen lassen. Der ETB-Eintrag MUST „berichtigt
 nach Entlassung“ bzw. bei der Berichtigung „(nach Entlassung)“ vermerken. An einer stornierten
-Person und an einer aufgelösten Einheit MUST alles drei weiter mit 409 scheitern.
+Person und an einer aufgelösten Einheit MUST alles weiter mit 409 scheitern.
 
 #### Scenario: Eintreffzeit nach dem Entlassen berichtigen
 - **WHEN** an einer um 14:00 entlassenen Person das Eintreffen 06:40 mit Grund „Zeit verwechselt“ gestrichen und ein Eintreffen 06:30 nachgetragen wird, während ihre Periode mit der Alarmierung 06:10 beginnt
@@ -239,6 +239,14 @@ Person und an einer aufgelösten Einheit MUST alles drei weiter mit 409 scheiter
 #### Scenario: Oberfläche einer entlassenen Person
 - **WHEN** eine Person mit Schreibrecht im aktiven Einsatz die Ansicht einer entlassenen Person öffnet
 - **THEN** bietet das Paneel „Zeitachse“ „Nachtragen“, „Zeit berichtigen“ und „Streichen“, an der abschließenden Entlassung steht „Streichen“ gesperrt mit Kurzgrund und „Zeit berichtigen“ offen, und Einteilung und Angaben bleiben nur lesbar
+
+#### Scenario: Fehlende Periode nach dem Entlassen nachtragen
+- **WHEN** an einer um 18:00 entlassenen Person mit einer Periode 14:00–18:00 eine Periode Eintreffen 06:40, Entlassung 12:00 nachgetragen wird
+- **THEN** gelingt es, die Person trägt zwei abgeschlossene Perioden, bleibt entlassen, und das ETB vermerkt „berichtigt nach Entlassung“
+
+#### Scenario: Periode an einer entlassenen Person verletzt die Regeln
+- **WHEN** an einer entlassenen Person eine Periode nachgetragen werden soll, die eine bestehende überschneidet
+- **THEN** antwortet das System mit 422 und die Zeitachse bleibt unverändert, auch ohne ETB-Eintrag
 
 ### Requirement: Entlassene im Nachweis
 

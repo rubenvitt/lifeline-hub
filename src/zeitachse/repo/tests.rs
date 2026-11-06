@@ -398,6 +398,131 @@ async fn ablosungsereignis_nur_ueber_ruecknahme() {
     assert!(matches!(r, Err(AppError::UnprocessableEntity(_))));
 }
 
+// ── Periode nachtragen (LLH-1538) ───────────────────────────────────────────────────────────
+
+fn neue_periode(a: Option<&str>, e: Option<&str>, ende: &str) -> perioden::NeuePeriode {
+    perioden::NeuePeriode {
+        alarmierung_at: a.map(t),
+        eintreffen_at: e.map(t),
+        entlassung_at: t(ende),
+    }
+}
+
+/// D2/D3: Die Periode vor der laufenden passt an der Einheit und bei Anna und Bert; Cem trägt im
+/// Zeitraum schon eine Periode und bekommt keine Kopie, auch keine halbe.
+#[tokio::test]
+async fn periode_nachtragen_mit_fan_out_ganz_oder_gar_nicht() {
+    let w = welt().await;
+    let f1 = Kraft::Einheit(w.f1);
+    let cem = Kraft::Person(w.p[2]);
+    schreibe(&w, cem, Eintreffen, "08:00", Q::Nachtrag).await;
+    schreibe(&w, cem, Entlassung, "09:00", Q::Nachtrag).await;
+    schreibe(&w, f1, Alarmierung, "22:00", Q::Status).await;
+
+    let mut conn = w.pool.acquire().await.unwrap();
+    let r = trage_periode_nach_tx(
+        &mut conn,
+        w.e,
+        w.b,
+        f1,
+        &neue_periode(Some("06:10"), Some("06:40"), "14:00"),
+        Some("Funkprotokoll"),
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    assert_eq!(r.ids.len(), 3);
+    assert_eq!(r.beruehrt.personen, vec![w.p[0], w.p[1]]);
+    assert_eq!(
+        folge(&w, f1).await,
+        vec![
+            ev("alarmierung", "06:10", "nachtrag"),
+            ev("eintreffen", "06:40", "nachtrag"),
+            ev("entlassung", "14:00", "nachtrag"),
+            ev("alarmierung", "22:00", "status"),
+        ]
+    );
+    let z = laden(&w.pool, w.e, f1).await.unwrap();
+    let notizen: Vec<Option<&str>> = z.ereignisse[..3]
+        .iter()
+        .map(|e| e.notiz.as_deref())
+        .collect();
+    assert_eq!(
+        notizen,
+        [Some("Funkprotokoll"), None, None],
+        "Notiz am Beginn"
+    );
+    let anna = laden(&w.pool, w.e, Kraft::Person(w.p[0])).await.unwrap();
+    let kopien: Vec<(ZeitachseArt, Option<i64>)> = anna
+        .ereignisse
+        .iter()
+        .filter(|e| e.zeitpunkt_at <= t("14:00"))
+        .map(|e| (e.art, e.ursprung_id))
+        .collect();
+    assert_eq!(
+        kopien,
+        vec![
+            (Alarmierung, Some(r.ids[0])),
+            (Eintreffen, Some(r.ids[1])),
+            (Entlassung, Some(r.ids[2])),
+        ]
+    );
+    assert_eq!(
+        folge(&w, cem).await,
+        vec![
+            ev("eintreffen", "08:00", "nachtrag"),
+            ev("entlassung", "09:00", "nachtrag"),
+            ev("alarmierung", "22:00", "einheit"),
+        ]
+    );
+}
+
+/// D2: Ein Ergebnis, in dem die Ereignisse keine eigene Periode bilden, gibt 422 und schreibt
+/// nichts, auch an keiner Person.
+#[tokio::test]
+async fn periode_nachtragen_ueberschneidung_schreibt_nichts() {
+    let w = welt().await;
+    let f1 = Kraft::Einheit(w.f1);
+    schreibe(&w, f1, Eintreffen, "11:00", Q::Status).await;
+    let vorher = folge(&w, Kraft::Person(w.p[0])).await;
+    let mut conn = w.pool.acquire().await.unwrap();
+    let r = trage_periode_nach_tx(
+        &mut conn,
+        w.e,
+        w.b,
+        f1,
+        &neue_periode(Some("10:00"), None, "12:00"),
+        None,
+    )
+    .await;
+    drop(conn);
+    assert!(matches!(r, Err(AppError::UnprocessableEntity(_))), "{r:?}");
+    assert_eq!(
+        folge(&w, f1).await,
+        vec![ev("eintreffen", "11:00", "status")]
+    );
+    assert_eq!(folge(&w, Kraft::Person(w.p[0])).await, vorher);
+}
+
+/// D5: ein ETB-Eintrag mit allen Zeitpunkten, an einer entlassenen Person mit Vermerk.
+#[test]
+fn etb_text_der_nachgetragenen_periode() {
+    let tz = crate::zeitdarstellung::Zeitstil::new(
+        chrono_tz::Europe::Berlin,
+        crate::zeitdarstellung::Zeitdarstellung::Taktisch,
+    );
+    let voll = neue_periode(Some("04:10"), Some("04:40"), "12:00");
+    assert_eq!(
+        etb_text_periode(Kraft::Einheit(1), "Florian 1", &voll, tz, false),
+        "Zeitachse: Einheit «Florian 1» Einsatzperiode nachgetragen: alarmiert 300610sep26, eingetroffen 300640sep26, entlassen 301400sep26"
+    );
+    let kurz = neue_periode(None, Some("04:40"), "12:00");
+    assert_eq!(
+        etb_text_periode(Kraft::Person(1), "Anna", &kurz, tz, true),
+        "Zeitachse: Person «Anna» Einsatzperiode nachgetragen: eingetroffen 300640sep26, entlassen 301400sep26 (berichtigt nach Entlassung)"
+    );
+}
+
 // ── Berichtigung (LLH-1455) ─────────────────────────────────────────────────────────────────
 
 async fn berichtige(
@@ -414,7 +539,7 @@ async fn berichtige(
 fn id_von(r: Schreibergebnis) -> i64 {
     match r {
         Schreibergebnis::Geschrieben(id) => id,
-        Schreibergebnis::Ausgelassen(v) => panic!("ausgelassen: {v}"),
+        Schreibergebnis::Ausgelassen(v) => panic!("ausgelassen: {v:?}"),
     }
 }
 
@@ -1250,4 +1375,80 @@ async fn migration_laesst_bestand_ohne_marke() {
         .unwrap();
         assert_eq!(mit_marke, 0, "{tabelle}");
     }
+}
+
+/// Organisation und Einsatz mit verschiedenen Zonen und Darstellungen (LLH-1541).
+async fn zeitstil_setzen(w: &Welt, org: (&str, &str), einsatz: (&str, &str)) {
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) VALUES (1, ?, ?) \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+         zeitdarstellung = excluded.zeitdarstellung",
+    )
+    .bind(org.0)
+    .bind(org.1)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+         VALUES (?, ?, ?) ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+         zeitdarstellung = excluded.zeitdarstellung",
+    )
+    .bind(w.e)
+    .bind(einsatz.0)
+    .bind(einsatz.1)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+}
+
+fn text_422(r: Result<Berichtigt, AppError>) -> String {
+    match r {
+        Err(AppError::UnprocessableEntity(m)) => m,
+        andere => panic!("422 erwartet, war {andere:?}"),
+    }
+}
+
+/// LLH-1541: die 422 der Kraft selbst nennt den Zeitpunkt in Zone und Darstellung des Einsatzes
+/// (Tokio, „Datum und Uhrzeit“), nicht der Organisation (New York, taktisch) und nicht im
+/// UTC-Drahtformat. 07:00 UTC ist in Tokio 16:00.
+#[tokio::test]
+async fn verstoss_der_kraft_nennt_den_zeitpunkt_im_zeitstil_des_einsatzes() {
+    let w = welt().await;
+    zeitstil_setzen(
+        &w,
+        ("America/New_York", "taktisch"),
+        ("Asia/Tokyo", "datum_uhrzeit"),
+    )
+    .await;
+    let f1 = Kraft::Einheit(w.f1);
+    let alarm = id_von(schreibe(&w, f1, Alarmierung, "06:10", Q::Status).await);
+    schreibe(&w, f1, Eintreffen, "06:40", Q::Status).await;
+    let m = text_422(berichtige(&w, f1, alarm, "07:00", "x").await);
+    assert_eq!(
+        m,
+        "Eine Alarmierung (30.09.26 16:00) darf nicht nach dem Eintreffen derselben Periode liegen"
+    );
+}
+
+/// LLH-1541: auch die 422 für eine Person der Kette nennt den Zeitpunkt im Zeitstil des
+/// Einsatzes (Tokio, taktisch), nicht der Organisation (New York, „Datum und Uhrzeit“).
+/// Berts Entlassung 06:50 UTC ist in Tokio 15:50.
+#[tokio::test]
+async fn verstoss_einer_person_nennt_den_zeitpunkt_im_zeitstil_des_einsatzes() {
+    let w = welt().await;
+    zeitstil_setzen(
+        &w,
+        ("America/New_York", "datum_uhrzeit"),
+        ("Asia/Tokyo", "taktisch"),
+    )
+    .await;
+    let id = id_von(schreibe(&w, Kraft::Einheit(w.f1), Eintreffen, "06:40", Q::Status).await);
+    schreibe(&w, Kraft::Person(w.p[1]), Entlassung, "06:50", Q::Status).await;
+    let m = text_422(berichtige(&w, Kraft::Einheit(w.f1), id, "07:00", "x").await);
+    assert_eq!(
+        m,
+        "Die Zeitachse von «Bert» verlöre ihre Ordnung: Zum Ende (301550sep26) gibt es keine \
+         offene Einsatzperiode"
+    );
 }

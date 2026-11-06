@@ -917,3 +917,129 @@ async fn vorgemerkte_vermisstmeldung_gilt_ab_ihrer_erfassungszeit() {
     assert_eq!(person["vermisst_seit"], vorgemerkt.as_str());
     assert_eq!(person["erfasst_at"], vorgemerkt.as_str());
 }
+
+// ---------- Aufnahme ohne Netz an der UHS (LLH-1515) ----------
+
+/// Einsatz mit aktiver UHS, der Einsatz vor einer Stunde begonnen. Liefert (Einsatz, UHS).
+async fn einsatz_mit_aktiver_uhs(
+    app: &axum::Router,
+    pool: &sqlx::SqlitePool,
+    cookie: &str,
+) -> (i64, i64) {
+    let e = einsatz_anlegen(app, cookie).await;
+    einsatz_begonnen_vor(pool, e, 60).await;
+    let (s, uhs) = post(
+        app,
+        cookie,
+        &format!("/api/einsaetze/{e}/uhs"),
+        json!({ "typ": "behandlungsplatz", "bezeichnung": "BHP Mitte" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{uhs}");
+    let u = uhs["id"].as_i64().unwrap();
+    let (s, v) = post(
+        app,
+        cookie,
+        &format!("/api/einsaetze/{e}/uhs/{u}/status"),
+        json!({ "status": "aktiv" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    (e, u)
+}
+
+#[tokio::test]
+async fn vorgemerkte_aufnahme_an_der_uhs_steht_ab_ihrer_erfassungszeit_im_eingang() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (e, u) = einsatz_mit_aktiver_uhs(&app, &pool, &admin).await;
+    // Um 14:10 ohne Netz mit UHS aufgenommen, um 14:30 übertragen.
+    let vorgemerkt = zeit(-1200);
+    let body = json!({ "uhs_id": u, "zeitpunkt_at": vorgemerkt, "client_id": "uhs-1" });
+    let pfad = format!("/api/einsaetze/{e}/personen");
+    let (s, person) = post(&app, &admin, &pfad, body.clone()).await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    let p = person["id"].as_i64().unwrap();
+
+    // Der Eintritt in den Eingang trägt 14:10: daran hängen Wartezeit und Aufenthalt.
+    let d = detail(&app, &admin, e, p).await;
+    assert_eq!(d["aufenthalt"]["uhs_id"], u, "{d}");
+    assert!(d["aufenthalt"]["platz_id"].is_null(), "im Eingang: {d}");
+    assert_eq!(
+        d["aufenthalt"]["seit"],
+        vorgemerkt.as_str(),
+        "im Eingang seit 14:10, nicht seit der Übertragung"
+    );
+    let (s, uhs) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/uhs/{u}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{uhs}");
+    let belegungen = uhs["belegungen"].as_array().unwrap();
+    assert_eq!(belegungen.len(), 1, "{uhs}");
+    assert_eq!(belegungen[0]["art"], "eintritt");
+    assert_eq!(belegungen[0]["zeitpunkt_at"], vorgemerkt.as_str());
+
+    let etb = system_etb(&app, &admin, e).await;
+    let aufnahme = etb
+        .iter()
+        .find(|z| z["inhalt"] == "Person R-001: Aufnahme in BHP Mitte (Inbox)")
+        .unwrap_or_else(|| panic!("kein ETB-Eintrag der UHS-Aufnahme: {etb:?}"));
+    assert_eq!(
+        aufnahme["ereigniszeit"],
+        vorgemerkt.as_str(),
+        "die UHS-Aufnahme steht zur Erfassungszeit im ETB (nachgetragen)"
+    );
+
+    // Der Replay derselben Aufnahme tritt nicht ein zweites Mal ein.
+    let (s, replay) = post(&app, &admin, &pfad, body).await;
+    assert_eq!(s, StatusCode::CREATED, "{replay}");
+    assert_eq!(replay["id"], p);
+    let (_, uhs) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/uhs/{u}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(uhs["belegungen"].as_array().unwrap().len(), 1, "{uhs}");
+    assert_eq!(system_etb(&app, &admin, e).await.len(), etb.len());
+}
+
+/// Folge des Eintritts zur Erfassungszeit: ein danach (14:20) vorgemerkter Abtransport, der
+/// ebenfalls erst später übertragen wird, ist jünger als der Zugang und nimmt die Person aus der
+/// UHS. Mit dem Eintritt zur Ankunftszeit (14:30) blieb sie fälschlich im Eingang.
+#[tokio::test]
+async fn spaeter_vorgemerkter_verbleib_nimmt_die_vorgemerkte_uhs_aufnahme_heraus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (e, u) = einsatz_mit_aktiver_uhs(&app, &pool, &admin).await;
+    let (s, person) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({ "uhs_id": u, "zeitpunkt_at": zeit(-1200), "client_id": "uhs-2" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    let p = person["id"].as_i64().unwrap();
+
+    let (s, v) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen/{p}/verbleib"),
+        json!({ "art": "transport", "ziel": "KH Mitte", "zeitpunkt_at": zeit(-600), "client_id": "v-uhs-2" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let d = detail(&app, &admin, e, p).await;
+    assert!(
+        d["aufenthalt"].is_null(),
+        "der jüngere Abtransport nimmt die Person aus der UHS: {d}"
+    );
+}

@@ -207,3 +207,66 @@ test('der Zeitraum ist die Schnellwahl des ETB und steht in der Adresse (LLH-132
   await expect(zeilen).toHaveCount(2);
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagemeldungen$`));
 });
+
+/**
+ * LLH-1514: unter „Seit letzter Lagebesprechung“ nennt die Seite wie das ETB die Nachträge — nach
+ * der Besprechung übernommen, davor geschehen. Sie fielen sonst still heraus, obwohl gerade sie für
+ * die nächste Besprechung neu sind. „anzeigen“ zieht die Grenze bis zum frühesten.
+ */
+test('unter „seit LB“ stehen die danach übernommenen, früher geschehenen als Nachtrag (LLH-1514)', async ({
+  page,
+}) => {
+  const { id } = await post(page, '/api/einsaetze', {
+    bezeichnung: `E2E Lage-Nachtrag ${Date.now()}`,
+  });
+  const freigaben = (await (
+    await page.request.get(`/api/einsaetze/${id}/modul-freigaben`)
+  ).json()) as Record<string, { zugriff: boolean }>;
+  expect(freigaben.lagebesprechung?.zugriff, 'Vorbedingung: Lagebesprechung frei').toBe(true);
+  // Die Besprechung vor fünf Minuten; beide Meldungen gehen erst danach in die Lage.
+  const vorMinuten = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  const lb = await page.request.post(`/api/einsaetze/${id}/lagebesprechungen`, {
+    data: { entschluss: 'Lage unverändert', abgehalten_at: vorMinuten(5) },
+  });
+  expect(lb.status(), `Abschluss: ${await lb.text()}`).toBe(201);
+  const inDieLage = async (inhalt: string, geschehenVorMinuten: number) => {
+    const m = await post(page, `/api/einsaetze/${id}/meldungen`, {
+      absender: 'Florian Nord 1',
+      meldeweg: 'funk',
+      meldungsart: 'rueckmeldung',
+      inhalt,
+      ereigniszeit: vorMinuten(geschehenVorMinuten),
+    });
+    await post(page, `/api/einsaetze/${id}/meldungen/${m.id}/lagerelevant`, {});
+  };
+  await inDieLage('Pegel Mühlbach steigt', 2);
+  // Vor der Besprechung geschehen, nach ihr übernommen: der Nachtrag.
+  await inDieLage('Deich Unterstadt hält', 20);
+
+  await page.goto(`/einsaetze/${id}/lagemeldungen`);
+  const zeilen = page.getByRole('region', { name: 'Lagemeldungen' }).getByRole('listitem');
+  await expect(zeilen).toHaveCount(2);
+  const hinweis = page.locator('[data-lfh="lagemeldungen-nachtraege"]');
+  // Ohne Wahl „seit LB“ kein Hinweis.
+  await expect(hinweis).toHaveCount(0);
+
+  const zeitraum = page.locator('[data-lfh="lagemeldungen-zeitraum"]');
+  await zeitraum.click();
+  const dialog = page.getByRole('dialog', { name: 'Zeitraum' });
+  await expect(dialog).toBeVisible();
+  // Erst wählen, wenn der Aufklapper steht (wie oben).
+  await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+  await dialog.getByRole('button', { name: /^Seit letzter Lagebesprechung/ }).click();
+  await expect(dialog).toBeHidden();
+
+  await expect(zeilen).toHaveCount(1);
+  await expect(zeilen).toContainText('Pegel Mühlbach steigt');
+  // Taktisch „1330“, liegt die Besprechung vor Mitternacht der Serveruhr „051330“.
+  await expect(hinweis).toHaveText(/^\+1 Nachtrag vor (\d{2})?\d{4} übernommen · anzeigen$/);
+
+  await hinweis.getByRole('button', { name: 'anzeigen' }).click();
+  await expect(zeilen).toHaveCount(2);
+  await expect(zeilen.filter({ hasText: 'Deich Unterstadt hält' })).toHaveCount(1);
+  // Die Grenze ist nun die des Nachtrags, nicht mehr die der Besprechung: der Hinweis geht.
+  await expect(hinweis).toHaveCount(0);
+});
