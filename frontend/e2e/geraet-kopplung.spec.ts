@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
-import { anmeldenAlsAdmin } from './rollen-kern';
+import { anmeldenOhneStartseite } from './lageplan-kern';
+import { ADMIN, ADMIN_PW } from './rollen-kern';
 
 /**
  * Gerätekopplung (LFH-892, Spec `geraete-kopplung` und `feldgeraet-bedienung`): die
@@ -13,6 +14,16 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  *
  * Mutationsprobe: in `RequireAuth` die Gerätemarke nicht beachtet → „Kopplung beendet“ rot (das
  * Gerät landet auf der Anmeldung).
+ *
+ * Zwei Fälle statt einem (LLH-1563): der Weg brauchte sieben volle Seitenladungen in zwei Kontexten
+ * (Anmeldung, Einstellungen, `/koppeln`, das Neuladen nach dem Einlösen, fremde Adresse, Neuladen
+ * der Liste, Neuladen des Geräts). Unter `--workers=3` kostet jede über den Vite-Dev-Server 3–7 s;
+ * der Fall lief lokal in jedem Lauf ins 30-s-Budget, immer an einer Ladung. Jetzt je vier
+ * Ladungen: der erste Fall koppelt über die Oberfläche, der zweite koppelt per API, löst den Code
+ * aber am Gerät über die Oberfläche ein (nur so setzt es seine Gerätemarke) und öffnet die Liste
+ * der Einsatzleitung erst danach, ohne Neuladen. Angemeldet wird über die API. Jede der vier
+ * übrigen Ladungen ist Gegenstand des Falls; unter `--workers=3` im Mix mit anderen
+ * Sitzungs-Specs brauchen die Fälle 20–24 s (06.11.2026, Cloud-Sitzung, 4 Kerne).
  */
 
 async function einsatzMitUhs(page: Page): Promise<{ einsatz: number; uhs: number }> {
@@ -39,12 +50,9 @@ async function geraetOeffnen(browser: Browser) {
   return { kontext, geraet: await kontext.newPage() };
 }
 
-test('LFH-892: koppeln, auf der Hülle bleiben, widerrufen → „Kopplung beendet“', async ({
-  page,
-  browser,
-}) => {
+test('LFH-892: in den Einstellungen koppeln, auf der Hülle bleiben', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await anmeldenAlsAdmin(page);
+  await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   const { einsatz } = await einsatzMitUhs(page);
 
   // Einsatzleitung: Tablet koppeln.
@@ -72,9 +80,32 @@ test('LFH-892: koppeln, auf der Hülle bleiben, widerrufen → „Kopplung beend
     // Eine fremde Adresse führt auf die Startseite der Hülle.
     await geraet.goto(`/einsaetze/${einsatz}/lagekarte`);
     await expect(geraet).toHaveURL(new RegExp(`/geraet/${einsatz}/patienten$`));
+  } finally {
+    await kontext.close();
+  }
+});
+
+test('LFH-892: widerrufen → „Kopplung beendet“, der Code gilt nicht noch einmal', async ({
+  page,
+  browser,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
+  const { einsatz, uhs } = await einsatzMitUhs(page);
+  const antwort = await page.request.post(`/api/einsaetze/${einsatz}/geraete`, {
+    data: { ansicht: 'uhs-tablet', uhs_id: uhs, bezeichnung: 'Tablet 1' },
+  });
+  expect(antwort.ok(), `Kopplung: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  const { code } = ((await antwort.json()) as { code: { code: string } }).code;
+
+  const { kontext, geraet } = await geraetOeffnen(browser);
+  try {
+    await geraet.goto(`/koppeln#${code}`);
+    await geraet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(geraet).toHaveURL(new RegExp(`/geraet/${einsatz}/patienten$`));
 
     // Die Liste der Einsatzleitung zeigt die Kopplung als gekoppelt.
-    await page.reload();
+    await page.goto(`/einsaetze/${einsatz}/einstellungen/geraete`);
     await expect(page.locator('[data-lfh="geraet-zustand"]')).toContainText('gekoppelt');
 
     // Widerruf mit Rückfrage.
