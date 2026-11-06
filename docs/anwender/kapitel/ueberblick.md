@@ -105,7 +105,8 @@ Beginn angekündigter Unwetterwarnungen der Stufen schwer und extrem und die Pro
 Veranstaltung aus dem Paneel „Ablauf“ der [Einsatzdaten](einsatzdaten.md). Eine verstrichene Frist
 steht als „überfällig“ ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben.
 Pegelprognose, Unwetterbeginn und Programmpunkte sind keine Fristen: Verstrichen fallen sie
-heraus. Programmpunkte sind nie hervorgehoben. Es stehen höchstens sechs Marken da, der Rest als „+… weitere“. Ein
+heraus. Pegelprognose und Unwetterbeginn sind unter 30 Minuten ebenso hervorgehoben, Programmpunkte
+nie. Es stehen höchstens sechs Marken da, der Rest als „+… weitere“. Ein
 Klick auf die Marke eines Auftrags oder einer Erinnerung öffnet den Auftrag oder die Erinnerung
 hervorgehoben im Modul, ein Klick auf einen Programmpunkt die Einsatzdaten.
 
