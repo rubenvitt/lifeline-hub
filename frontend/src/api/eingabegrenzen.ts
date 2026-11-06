@@ -190,6 +190,12 @@ export const ABLOESUNG_RHYTHMUS_MAX_MINUTEN = 10_080;
 export const ABLOESUNG_ABLOESER_MAX = 8;
 /** Neue Besatzung beim Besatzungswechsel im Request, gezählt vor dem Entdoppeln (LLH-1150). */
 export const ABLOESUNG_BESATZUNG_MAX = 50;
+/** Bezeichnung einer Betreuungsstelle (LLH-1582); steht wörtlich im ETB. */
+export const BETREUUNG_STELLE_BEZEICHNUNG_MAX = 200;
+/** Standort einer Betreuungsstelle (LLH-1582), Ortstext wie die übrigen Orte. */
+export const BETREUUNG_STELLE_STANDORT_MAX = 500;
+/** Notiz einer Betreuungsstelle (LLH-1582). */
+export const BETREUUNG_STELLE_NOTIZ_MAX = 2_000;
 /** Personen je Schicht des Schichtplans im Request, gezählt vor dem Entdoppeln (LLH-1552). */
 export const SCHICHTPLAN_PERSONEN_MAX = 50;
 /** Schichten, die „Schichten erzeugen“ auf einmal anlegt (LLH-1552). */
