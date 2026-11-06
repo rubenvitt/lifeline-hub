@@ -478,10 +478,17 @@ async fn periode_nachtragen_mit_fan_out_ganz_oder_gar_nicht() {
 }
 
 /// D2: Ein Ergebnis, in dem die Ereignisse keine eigene Periode bilden, gibt 422 und schreibt
-/// nichts, auch an keiner Person.
+/// nichts, auch an keiner Person. Der Text nennt den Beginn im Zeitstil des Einsatzes (LLH-1541,
+/// LLH-1578): 10:00 UTC ist in Tokio 19:00.
 #[tokio::test]
 async fn periode_nachtragen_ueberschneidung_schreibt_nichts() {
     let w = welt().await;
+    zeitstil_setzen(
+        &w,
+        ("America/New_York", "taktisch"),
+        ("Asia/Tokyo", "datum_uhrzeit"),
+    )
+    .await;
     let f1 = Kraft::Einheit(w.f1);
     schreibe(&w, f1, Eintreffen, "11:00", Q::Status).await;
     let vorher = folge(&w, Kraft::Person(w.p[0])).await;
@@ -496,7 +503,13 @@ async fn periode_nachtragen_ueberschneidung_schreibt_nichts() {
     )
     .await;
     drop(conn);
-    assert!(matches!(r, Err(AppError::UnprocessableEntity(_))), "{r:?}");
+    match r {
+        Err(AppError::UnprocessableEntity(m)) => assert_eq!(
+            m,
+            "Die Periode ab 30.09.26 19:00 überschneidet eine bestehende Einsatzperiode"
+        ),
+        andere => panic!("422 erwartet, war {andere:?}"),
+    }
     assert_eq!(
         folge(&w, f1).await,
         vec![ev("eintreffen", "11:00", "status")]
