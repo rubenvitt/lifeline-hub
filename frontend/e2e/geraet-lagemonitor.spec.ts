@@ -57,6 +57,8 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   page,
   browser,
 }) => {
+  // Der Anstieg der Sofortmeldungen kommt spätestens mit dem Abruftakt (30 s).
+  test.setTimeout(150_000);
   await anmeldenAlsAdmin(page);
   const einsatz = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Monitor ${Date.now()}`,
@@ -207,32 +209,62 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     );
     for (const groesse of ablaufText) expect(groesse).toBeGreaterThanOrEqual(28);
 
-    // Kein Bildlauf: alles passt in 1920 × 1080.
-    const masse = await monitor.evaluate(() => ({
-      hoehe: document.documentElement.scrollHeight,
-      breite: document.documentElement.scrollWidth,
-    }));
-    expect(masse.hoehe).toBeLessThanOrEqual(1080);
-    expect(masse.breite).toBeLessThanOrEqual(1920);
-    for (const kachel of [
-      'Betroffene',
-      'Kräfte',
-      'Belegung der Unfallhilfsstellen',
-      'Lagekarte',
-      'Meldungen',
-      'Ablauf',
-    ]) {
-      await expect(monitor.getByRole('region', { name: kachel })).toBeInViewport({ ratio: 1 });
-    }
-    // … und keine Kachel schneidet ihren Inhalt ab (sie läuft nicht still in sich über).
-    const abgeschnitten = await monitor
-      .locator('main section')
-      .evaluateAll((kacheln) =>
-        kacheln
-          .filter((k) => k.scrollHeight > k.clientHeight + 1)
-          .map((k) => k.getAttribute('aria-label')),
+    // Kein Bildlauf: alles passt in 1920 × 1080, und keine Kachel schneidet ihren Inhalt ab.
+    const passtGanz = async () => {
+      const masse = await monitor.evaluate(() => ({
+        hoehe: document.documentElement.scrollHeight,
+        breite: document.documentElement.scrollWidth,
+      }));
+      expect(masse.hoehe).toBeLessThanOrEqual(1080);
+      expect(masse.breite).toBeLessThanOrEqual(1920);
+      for (const kachel of [
+        'Betroffene',
+        'Kräfte',
+        'Belegung der Unfallhilfsstellen',
+        'Lagekarte',
+        'Meldungen',
+        'Ablauf',
+      ]) {
+        await expect(monitor.getByRole('region', { name: kachel })).toBeInViewport({ ratio: 1 });
+      }
+      // Eine Kachel läuft nicht still in sich über, die Bezeichnungen im Ablauf auch nicht.
+      const abgeschnitten = await monitor
+        .locator('main section')
+        .evaluateAll((kacheln) =>
+          kacheln
+            .filter((k) => k.scrollHeight > k.clientHeight + 1)
+            .map((k) => k.getAttribute('aria-label')),
+        );
+      expect(abgeschnitten).toEqual([]);
+      const namen = punkte.locator('[data-lfh="monitor-ablauf-bezeichnung"]');
+      await expect(namen).toHaveText([
+        langeBezeichnung('Pause'),
+        langeBezeichnung('Feuerwerk'),
+        langeBezeichnung('Zugabe'),
+      ]);
+      const quer = await namen.evaluateAll(
+        (el) => el.filter((n) => n.scrollWidth > n.clientWidth + 1).length,
       );
-    expect(abgeschnitten).toEqual([]);
+      expect(quer).toBe(0);
+    };
+    await passtGanz();
+
+    // Steigt die Zahl, verbreitert „Neue Sofortmeldung“ die Kachel „Meldungen“ neben dem
+    // Ablauf; auch dann bleibt alles ganz.
+    await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+      absender: 'EA Nord',
+      meldeweg: 'funk',
+      inhalt: 'Zweite Lage',
+      meldungsart: 'sofortmeldung',
+      prioritaet: 'sofort',
+      ereigniszeit: new Date().toISOString(),
+    });
+    const meldungen = monitor.getByRole('region', { name: 'Meldungen' });
+    await expect(meldungen.getByText('Neue Sofortmeldung')).toBeVisible({ timeout: 45_000 });
+    await expect(meldungen.locator('[data-lfh="monitor-zahl"]')).toHaveText(
+      '2Sofortmeldungen offen',
+    );
+    await passtGanz();
 
     // Großbild-Größen: Kennzahlen ab 72 px, Text ab 28 px.
     const groessen = await monitor
