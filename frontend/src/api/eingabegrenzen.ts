@@ -102,6 +102,8 @@ export const GEFAHR_GEMELDET_VON_MAX = 200;
 export const GEFAHR_GEBIET_LABEL_MAX = 200;
 /** Bezeichnung einer Zone der Lagekarte (LLH-1531); steht wörtlich im ETB. */
 export const ZONE_LABEL_MAX = 200;
+/** Notiz einer Zone der Lagekarte (LLH-1559). */
+export const ZONE_NOTIZ_MAX = 2_000;
 /** Stützpunkte einer Zone oder Abschnittsfläche (alle Ringe zusammen). */
 export const GEOMETRIE_STUETZPUNKTE_MAX = 5_000;
 /** Höchster Radius eines Kreises um einen Punkt in Metern (LLH-1043). */

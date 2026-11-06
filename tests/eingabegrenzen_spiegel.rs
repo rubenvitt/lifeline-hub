@@ -97,6 +97,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("GEFAHR_GEMELDET_VON_MAX", gefahr::GEMELDET_VON_MAX),
         ("GEFAHR_GEBIET_LABEL_MAX", gefahr::GEBIET_LABEL_MAX),
         ("ZONE_LABEL_MAX", lage_zone::LABEL_MAX),
+        ("ZONE_NOTIZ_MAX", lage_zone::NOTIZ_MAX),
         ("GEOMETRIE_STUETZPUNKTE_MAX", lage_zone::STUETZPUNKTE_MAX),
         ("KREIS_RADIUS_M_MAX", lage_zone::KREIS_RADIUS_M_MAX),
         ("SPRECHGRUPPE_BEDINGUNG_MAX", sprechgruppe::BEDINGUNG_MAX),
