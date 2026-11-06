@@ -4496,6 +4496,13 @@ export interface components {
          */
         MeAntwort: components["schemas"]["BenutzerAnzeige"] & {
             geraet?: components["schemas"]["GeraetAnzeige"] | null;
+            /**
+             * @description Öffentliche Kennung der Sitzung dieser Anfrage (LFH-1092, nie der Token-Hash). Ein Tab, der
+             *     abgemeldet hat, dessen Server-Abmeldung aber scheiterte, erkennt daran die alte Sitzung und
+             *     übernimmt sie nicht wieder (LLH-1535); jede neue Anmeldung bekommt eine neue Kennung. Fehlt
+             *     bei Altsitzungen ohne Kennung.
+             */
+            sitzung?: string | null;
         };
         /** @description Öffentliche Darstellung eines Medienkontakts. */
         MedienkontaktAnzeige: {

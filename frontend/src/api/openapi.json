@@ -11192,6 +11192,13 @@
                     "type": "null"
                   }
                 ]
+              },
+              "sitzung": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Öffentliche Kennung der Sitzung dieser Anfrage (LFH-1092, nie der Token-Hash). Ein Tab, der\nabgemeldet hat, dessen Server-Abmeldung aber scheiterte, erkennt daran die alte Sitzung und\nübernimmt sie nicht wieder (LLH-1535); jede neue Anmeldung bekommt eine neue Kennung. Fehlt\nbei Altsitzungen ohne Kennung."
               }
             }
           }

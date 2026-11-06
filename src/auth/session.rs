@@ -447,6 +447,31 @@ pub fn pruefe_erwarteten_benutzer(
     }
 }
 
+/// Kopf, mit dem ein Tab beim Nachholen einer gescheiterten Abmeldung die Sitzung nennt, die er
+/// beenden will (LLH-1535): ihre öffentliche Kennung aus `/me`.
+pub const ERWARTETE_SITZUNG_HEADER: &str = "x-erwartete-sitzung";
+
+/// Bindet `POST /api/auth/logout` an die erwartete Sitzung. Ohne Kopf bleibt alles wie bisher; ein
+/// Wert, der nicht die Kennung der Cookie-Sitzung ist, ist 412 — dann hat sich inzwischen jemand
+/// neu angemeldet, und dessen Sitzung bleibt. Eine Sitzung ohne Kennung passt zu keinem Wert.
+pub fn pruefe_erwartete_sitzung(
+    headers: &axum::http::HeaderMap,
+    kennung: Option<&SitzungKennung>,
+) -> Result<(), AppError> {
+    let Some(erwartet) = headers.get(ERWARTETE_SITZUNG_HEADER) else {
+        return Ok(());
+    };
+    let passt = match (erwartet.to_str(), kennung) {
+        (Ok(wert), Some(SitzungKennung(k))) => wert.trim() == k,
+        _ => false,
+    };
+    if passt {
+        Ok(())
+    } else {
+        Err(AppError::SitzungsBenutzerMismatch)
+    }
+}
+
 /// Extractor: der aktuell angemeldete Benutzer (aus Session-Cookie).
 /// Liefert 401, wenn kein gültiger Session-Cookie vorliegt, und 412, wenn eine schreibende
 /// Anfrage einen anderen Benutzer erwartet ([`pruefe_erwarteten_benutzer`], LFH-387). Weil

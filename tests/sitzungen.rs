@@ -141,6 +141,65 @@ async fn liste_zeigt_geraet_und_markiert_die_aktuelle() {
     }
 }
 
+/// `/me` nennt die Kennung der eigenen Sitzung (LLH-1535): ein Tab, dessen Server-Abmeldung
+/// scheiterte, erkennt daran die alte Sitzung; eine neue Anmeldung hat eine andere.
+#[tokio::test]
+async fn me_nennt_die_kennung_der_eigenen_sitzung() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    let firefox = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
+    let ipad = anmelden(&app, "marlene", "marlenepw1", IPAD).await;
+
+    let sitzungen = liste(&app, &firefox, "/api/auth/sitzungen").await;
+    for (cookie, geraet) in [(&firefox, "Firefox · Windows"), (&ipad, "Safari · iPadOS")] {
+        let (s, v) = anfrage(&app, "GET", "/api/auth/me", cookie, None).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["sitzung"], kennung(&sitzungen, geraet), "{v}");
+    }
+}
+
+/// Abmelden mit erwarteter Sitzung (LLH-1535); liefert den Status.
+async fn abmelden_erwartet(app: &axum::Router, cookie: &str, sitzung: &str) -> StatusCode {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/logout")
+                .header(header::COOKIE, cookie)
+                .header("x-erwartete-sitzung", sitzung)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+/// Eine nachgeholte Abmeldung nennt die Sitzung, die sie beenden will (LLH-1535). Gehört das Cookie
+/// inzwischen zu einer anderen Sitzung, ist das 412 und nichts wird beendet.
+#[tokio::test]
+async fn abmelden_mit_erwarteter_sitzung_trifft_nur_diese() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    let firefox = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
+    let sitzungen = liste(&app, &firefox, "/api/auth/sitzungen").await;
+    let eigene = kennung(&sitzungen, "Firefox · Windows");
+
+    assert_eq!(
+        abmelden_erwartet(&app, &firefox, "eine-andere").await,
+        StatusCode::PRECONDITION_FAILED
+    );
+    assert_eq!(me(&app, &firefox).await, StatusCode::OK, "Sitzung bleibt");
+
+    assert_eq!(
+        abmelden_erwartet(&app, &firefox, &eigene).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(me(&app, &firefox).await, StatusCode::UNAUTHORIZED);
+}
+
 #[tokio::test]
 async fn ohne_user_agent_fehlt_das_geraet() {
     let (app, _pool) = setup_mit_pool().await;
