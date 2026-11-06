@@ -1350,12 +1350,12 @@ export interface components {
          */
         BezugTyp: "schaden" | "uhs" | "person" | "lagebericht" | "meldung" | "auftrag";
         /**
-         * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048).
-         *     Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
-         *     (`migrations/0213_…`).
+         * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048,
+         *     Einheit LLH-1579). Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
+         *     (`migrations/0281_…`).
          * @enum {string}
          */
-        Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegungsstelle";
+        Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegungsstelle" | "einheit";
         /** @description Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2). */
         BrAbrufErgebnis: {
             /** @description Das Abruf-Ereignis der abgerufenen Kraft. */
@@ -3442,10 +3442,10 @@ export interface components {
         FunktionsArt: "leitung" | "sachgebiet" | "fuehrungshilfspersonal" | "fachberater";
         /**
          * @description Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-         *     `migrations/0213_geraet_kopplung_verpflegungsstelle.sql`.
+         *     `migrations/0281_geraet_kopplung_einheit.sql`.
          * @enum {string}
          */
-        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung";
+        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit";
         /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
          *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
@@ -4673,8 +4673,17 @@ export interface components {
             /** @description Abgeleitet: pflichtig, unbestätigt und Frist <= jetzt. */
             ist_ueberfaellig: boolean;
             lagerelevant: boolean;
+            /**
+             * Format: double
+             * @description Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder
+             *     der Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an
+             *     einer anderen Art steht nicht in der Lage, bis die Meldung übernommen wird.
+             */
+            lat?: number | null;
             /** Format: int64 */
             lfd_nr: number;
+            /** Format: double */
+            lon?: number | null;
             meldeweg: components["schemas"]["MeldeWeg"];
             meldungsart: components["schemas"]["Meldungsart"];
             prioritaet: components["schemas"]["Prioritaet"];

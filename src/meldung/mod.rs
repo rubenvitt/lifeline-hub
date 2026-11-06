@@ -187,6 +187,13 @@ pub struct MeldungAnzeige {
     /// Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_id: Option<i64>,
+    /// Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder
+    /// der Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an
+    /// einer anderen Art steht nicht in der Lage, bis die Meldung übernommen wird.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lon: Option<f64>,
     /// Abgeleitet (LLH-1382): die jüngste ETB-Berichtigung des Eintrags `etb_meldung_id`, für die
     /// Marke „berichtigt“ und den Sprung ins ETB. Der Wortlaut `inhalt` bleibt, wie er einging.
     #[serde(skip_serializing_if = "Option::is_none")]

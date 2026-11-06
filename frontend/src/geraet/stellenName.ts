@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ladeBetreuung } from '../api/betreuung';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { listeEinheiten } from '../api/einheiten';
 import { ladeBr } from '../api/einsatzBereitstellungsraum';
 import { ladeUhs } from '../api/einsatzUhs';
 import { ladeVerpflegung } from '../api/verpflegung';
@@ -12,7 +13,7 @@ import type { GeraetAnzeige } from '../api/types';
  * bleibt bis zum Neuladen der Sitzung stehen; benennt die Einsatzleitung die Stelle um, stünde
  * sonst der alte Name im Kopf. Gelesen wird deshalb aus derselben Abfrage, die die Seiten der
  * Ansicht ohnehin halten (gleicher Key, ein Abruf): das Ereignis der Stelle (`uhs`,
- * `bereitstellungsraum`, `abschnitt`, `betreuung`, `verpflegung`) frischt sie über den
+ * `bereitstellungsraum`, `abschnitt`, `betreuung`, `verpflegung`, `einheit`) frischt sie über den
  * Einsatzstrom auf. Solange sie nichts hat (Laden, ohne Netz, Fehler), gilt der Name der Sitzung.
  * Ohne Stelle (Lagemonitor, Verpflegung einsatzweit) `null`; die Verpflegungsstelle ist
  * wahlweise (LLH-1048).
@@ -40,6 +41,12 @@ export function useStellenName(geraet: GeraetAnzeige | null): string | null {
     enabled: ansicht === 'einsatzabschnitt' && id != null,
     select: (liste) => liste.find((a) => a.id === id)?.name,
   });
+  const einheit = useQuery({
+    queryKey: einsatzKeys.einheiten(eid),
+    queryFn: () => listeEinheiten(eid),
+    enabled: ansicht === 'einheit' && id != null,
+    select: (liste) => liste.find((e) => e.id === id)?.name,
+  });
   const betreuung = useQuery({
     queryKey: einsatzKeys.betreuung(eid),
     queryFn: () => ladeBetreuung(eid),
@@ -63,6 +70,8 @@ export function useStellenName(geraet: GeraetAnzeige | null): string | null {
           ? betreuung.data
           : ansicht === 'verpflegung'
             ? verpflegung.data
-            : undefined;
+            : ansicht === 'einheit'
+              ? einheit.data
+              : undefined;
   return live ?? geraet.stelle ?? null;
 }

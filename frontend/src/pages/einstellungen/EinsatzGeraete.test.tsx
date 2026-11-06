@@ -111,12 +111,12 @@ function stelleBereit(a: Aufbau = {}) {
   return { aufrufe, gelesen };
 }
 
-function rendern() {
+function rendern(route = '/einsaetze/1/einstellungen/geraete') {
   return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/einstellungen/geraete" element={<EinsatzGeraete />} />
     </Routes>,
-    { route: '/einsaetze/1/einstellungen/geraete' },
+    { route },
   );
 }
 
@@ -502,5 +502,33 @@ describe('EinsatzGeraete (LFH-892)', () => {
       await waitFor(() => expect(schalter).toBeChecked());
       expect(screen.getByText('zeigt diesen Einsatz')).toBeInTheDocument();
     });
+  });
+});
+
+describe('Gerät koppeln aus dem Einheiten-Detail (LLH-1579)', () => {
+  const MIT_EINHEIT = [
+    ...ANSICHTEN,
+    { ansicht: 'einheit', stellenart: 'einheit', stelle_pflicht: true },
+  ];
+
+  it('öffnet die Kopplung mit Ansicht und Einheit vorbelegt', async () => {
+    const { aufrufe } = stelleBereit({ kopplungen: [], ansichten: MIT_EINHEIT });
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([
+          { id: 11, name: 'Fußtrupp 1', funkrufname: 'Rotkreuz Musterstadt 74/1' },
+          { id: 12, name: 'Melder' },
+        ]),
+      ),
+    );
+    rendern('/einsaetze/1/einstellungen/geraete?einheit=11');
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      await within(dialog).findByTitle('Fußtrupp 1 (Rotkreuz Musterstadt 74/1)'),
+    ).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Gerätebezeichnung'), 'Handy');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Koppeln' }));
+    await waitFor(() => expect(aufrufe).toHaveLength(1));
+    expect(aufrufe[0].body).toEqual({ ansicht: 'einheit', stelle_id: 11, bezeichnung: 'Handy' });
   });
 });

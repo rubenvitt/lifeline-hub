@@ -1,21 +1,35 @@
 //! Bereich der Abschnittsansicht (LFH-1043, Spec `funktionsansichten`, „Bindung an einen
-//! Abschnitt“).
+//! Abschnitt“) und der Einheitenansicht (LLH-1579).
 //!
 //! Ein Abschnittsgerät ist an einen Abschnitt gebunden; sein Bereich ist der Teilbaum
 //! (Abschnitt samt Unterabschnitten) und die Einheiten, die dort arbeiten. Beides berechnet der
 //! Server bei jeder Anfrage neu, damit ein umgehängter Unterabschnitt sofort folgt. Fremdes ist
 //! beim Lesen 404, ein fremder Absender beim Melden 403.
+//!
+//! Ein Einheitengerät (LLH-1579, Konzept LLH-1571 S1) hat denselben Bereich mit genau einer
+//! Einheit und keinem Abschnitt: Aufträge an den Abschnitt der Einheit sieht es nicht (F4), es
+//! meldet immer als seine Einheit. So gelten Auftrags- und Meldungsfilter für beide Ansichten aus
+//! einer Hand.
 
 use super::{stelle, Bindungsart, Funktionsansicht, GeraetKontext};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
 
-/// Teilbaum und eigene Einheiten eines gebundenen Abschnitts.
+/// Woran der Bereich eines Geräts hängt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Wurzel {
+    /// Abschnittsgerät: der gebundene Abschnitt (Wurzel des Teilbaums).
+    Abschnitt(i64),
+    /// Einheitengerät (LLH-1579): die gebundene Einheit.
+    Einheit(i64),
+}
+
+/// Teilbaum und eigene Einheiten eines gebundenen Abschnitts, oder die eine Einheit eines
+/// Einheitengeräts (dann ohne Abschnitte).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Abschnittsbereich {
-    /// Der gebundene Abschnitt (Wurzel des Teilbaums).
-    pub abschnitt_id: i64,
+    pub wurzel: Wurzel,
     pub abschnitte: HashSet<i64>,
     pub einheiten: HashSet<i64>,
 }
@@ -39,10 +53,41 @@ impl Abschnittsbereich {
         .fetch_all(pool)
         .await?;
         Ok(Self {
-            abschnitt_id,
+            wurzel: Wurzel::Abschnitt(abschnitt_id),
             abschnitte,
             einheiten: einheiten.into_iter().collect(),
         })
+    }
+
+    /// Lädt den Bereich eines Einheitengeräts (LLH-1579): nur die Einheit, solange sie in diesem
+    /// Einsatz aktiv ist; aufgelöst oder fremd ergibt einen leeren Bereich (das Gerät sieht
+    /// nichts mehr und meldet nicht).
+    pub async fn laden_fuer_einheit(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        einheit_id: i64,
+    ) -> Result<Self, AppError> {
+        let aktiv: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM einsatz_einheit \
+             WHERE id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
+        )
+        .bind(einheit_id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+        Ok(Self {
+            wurzel: Wurzel::Einheit(einheit_id),
+            abschnitte: HashSet::new(),
+            einheiten: aktiv.into_iter().collect(),
+        })
+    }
+
+    /// Eine Einheit des Bereichs; sonst ist sie für das Gerät nicht vorhanden (404).
+    pub fn fordere_einheit(&self, einheit_id: i64) -> Result<(), AppError> {
+        self.einheiten
+            .contains(&einheit_id)
+            .then_some(())
+            .ok_or(AppError::NotFound)
     }
 
     /// Ein Abschnitt des Teilbaums; sonst ist er für das Gerät nicht vorhanden (404).
@@ -64,18 +109,37 @@ impl Abschnittsbereich {
     }
 
     /// Der Absender einer Meldung vom Gerät als `(einheit_id, abschnitt_id)`. Ohne Angabe gilt
-    /// der gebundene Abschnitt; ein Abschnitt oder eine Einheit außerhalb des Bereichs ist 403.
+    /// der gebundene Abschnitt bzw. die gebundene Einheit; ein Abschnitt oder eine Einheit
+    /// außerhalb des Bereichs ist 403. Ein Einheitengerät meldet nur als seine Einheit.
     pub fn meldungs_absender(
         &self,
         einheit_id: Option<i64>,
         abschnitt_id: Option<i64>,
     ) -> Result<(Option<i64>, Option<i64>), AppError> {
+        let wurzel = match self.wurzel {
+            Wurzel::Abschnitt(a) => a,
+            Wurzel::Einheit(eigene) => {
+                // Ohne eigene Einheit (aufgelöst) gibt es keinen Absender.
+                if !self.einheiten.contains(&eigene) {
+                    return Err(AppError::Forbidden);
+                }
+                return match (einheit_id, abschnitt_id) {
+                    (Some(_), Some(_)) => Err(AppError::UnprocessableEntity(
+                        "Eine Meldung kommt entweder von einer Einheit oder von einem Abschnitt"
+                            .into(),
+                    )),
+                    (None, None) => Ok((Some(eigene), None)),
+                    (Some(e), None) if e == eigene => Ok((Some(eigene), None)),
+                    _ => Err(AppError::Forbidden),
+                };
+            }
+        };
         // Ohne eigenen Abschnitt (aufgelöst) gibt es keinen Absender.
-        if !self.abschnitte.contains(&self.abschnitt_id) {
+        if !self.abschnitte.contains(&wurzel) {
             return Err(AppError::Forbidden);
         }
         match (einheit_id, abschnitt_id) {
-            (None, None) => Ok((None, Some(self.abschnitt_id))),
+            (None, None) => Ok((None, Some(wurzel))),
             (Some(e), None) if self.einheiten.contains(&e) => Ok((Some(e), None)),
             (None, Some(a)) if self.abschnitte.contains(&a) => Ok((None, Some(a))),
             (Some(_), Some(_)) => Err(AppError::UnprocessableEntity(
@@ -91,24 +155,35 @@ impl Abschnittsbereich {
     }
 }
 
-/// Der Bereich der Sitzung, wenn sie ein Abschnittsgerät ist; für Personen und andere Geräte
-/// `None`. Ist der gebundene Abschnitt weg, ist der Bereich leer (das Gerät sieht nichts mehr).
+/// Der Bereich der Sitzung, wenn sie ein Abschnitts- oder Einheitengerät ist; für Personen und
+/// andere Geräte `None`. Ist die gebundene Stelle weg, ist der Bereich leer (das Gerät sieht
+/// nichts mehr).
 pub async fn bereich(
     pool: &SqlitePool,
     geraet: Option<&GeraetKontext>,
 ) -> Result<Option<Abschnittsbereich>, AppError> {
-    let Some(g) = geraet.filter(|g| g.ansicht == Funktionsansicht::Einsatzabschnitt) else {
-        return Ok(None);
+    let Some(g) = geraet else { return Ok(None) };
+    let leer = |wurzel| Abschnittsbereich {
+        wurzel,
+        abschnitte: HashSet::new(),
+        einheiten: HashSet::new(),
     };
-    match stelle::eigene(Some(g), Bindungsart::Einsatzabschnitt) {
-        Some(id) => Ok(Some(
-            Abschnittsbereich::laden(pool, g.einsatz_id, id).await?,
-        )),
-        None => Ok(Some(Abschnittsbereich {
-            abschnitt_id: 0,
-            abschnitte: HashSet::new(),
-            einheiten: HashSet::new(),
-        })),
+    match g.ansicht {
+        Funktionsansicht::Einsatzabschnitt => {
+            match stelle::eigene(Some(g), Bindungsart::Einsatzabschnitt) {
+                Some(id) => Ok(Some(
+                    Abschnittsbereich::laden(pool, g.einsatz_id, id).await?,
+                )),
+                None => Ok(Some(leer(Wurzel::Abschnitt(0)))),
+            }
+        }
+        Funktionsansicht::Einheit => match stelle::eigene(Some(g), Bindungsart::Einheit) {
+            Some(id) => Ok(Some(
+                Abschnittsbereich::laden_fuer_einheit(pool, g.einsatz_id, id).await?,
+            )),
+            None => Ok(Some(leer(Wurzel::Einheit(0)))),
+        },
+        _ => Ok(None),
     }
 }
 
@@ -269,6 +344,67 @@ mod tests {
             leer.meldungs_absender(None, None),
             Err(AppError::Forbidden)
         ));
+    }
+
+    /// LLH-1579: das Einheitengerät hat nur seine Einheit, keinen Abschnitt; Aufträge an den
+    /// Abschnitt der Einheit sind nicht eigen (F4), gemeldet wird nur als die eigene Einheit.
+    #[tokio::test]
+    async fn einheitenbereich_kennt_nur_die_eigene_einheit() {
+        let pool = crate::db::test_pool().await;
+        let l = lage(&pool).await;
+        let b = Abschnittsbereich::laden_fuer_einheit(&pool, l.einsatz, l.zug_nord)
+            .await
+            .unwrap();
+        assert_eq!(b.wurzel, Wurzel::Einheit(l.zug_nord));
+        assert!(b.abschnitte.is_empty());
+        assert_eq!(b.einheiten, HashSet::from([l.zug_nord]));
+        assert!(b.fordere_einheit(l.zug_nord).is_ok());
+        assert!(matches!(
+            b.fordere_einheit(l.zug_ost),
+            Err(AppError::NotFound)
+        ));
+        assert!(b.ist_eigener_empfaenger(None, Some(l.zug_nord)));
+        assert!(!b.ist_eigener_empfaenger(Some(l.nord), None), "F4");
+        assert!(!b.ist_eigener_empfaenger(None, Some(l.zug_ost)));
+
+        assert_eq!(
+            b.meldungs_absender(None, None).unwrap(),
+            (Some(l.zug_nord), None)
+        );
+        assert_eq!(
+            b.meldungs_absender(Some(l.zug_nord), None).unwrap(),
+            (Some(l.zug_nord), None)
+        );
+        for (e, a) in [(Some(l.zug_ost), None), (None, Some(l.nord))] {
+            assert!(matches!(
+                b.meldungs_absender(e, a),
+                Err(AppError::Forbidden)
+            ));
+        }
+        assert!(matches!(
+            b.meldungs_absender(Some(l.zug_nord), Some(l.nord)),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+
+        // Aufgelöst oder aus einem anderen Einsatz: leerer Bereich, kein Absender.
+        sqlx::query("UPDATE einsatz_einheit SET aufgeloest_at = datetime('now') WHERE id = ?")
+            .bind(l.zug_nord)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let weg = Abschnittsbereich::laden_fuer_einheit(&pool, l.einsatz, l.zug_nord)
+            .await
+            .unwrap();
+        assert!(weg.einheiten.is_empty());
+        assert!(matches!(
+            weg.meldungs_absender(None, None),
+            Err(AppError::Forbidden)
+        ));
+        let anderer = einsatz(&pool, "Andere").await;
+        let fremd = Abschnittsbereich::laden_fuer_einheit(&pool, anderer, l.zug_ost)
+            .await
+            .unwrap();
+        assert!(fremd.einheiten.is_empty());
     }
 
     #[tokio::test]

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, App, Button, Form, Input, Modal, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import type { Dayjs } from 'dayjs';
 import { QRCodeSVG } from 'qrcode.react';
 import { IconKreuz, IconPlus, IconSchluessel, IconUhr } from '../../icons';
@@ -28,6 +28,7 @@ import { listeUhs } from '../../api/einsatzUhs';
 import { ladeBetreuung } from '../../api/betreuung';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
+import { listeEinheiten } from '../../api/einheiten';
 import { ladeVerpflegung } from '../../api/verpflegung';
 import { einsatzKeys } from '../../api/queryKeys';
 import type {
@@ -38,7 +39,7 @@ import type {
 } from '../../api/types';
 import { istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { modulRegistry } from '../../einsatz/modulRegistry';
-import { koppelnAdresse } from '../../routing/deeplinks';
+import { koppelnAdresse, parseRouteId } from '../../routing/deeplinks';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import {
   ANSICHT_LABEL,
@@ -93,6 +94,9 @@ function modulName(key: string): string {
  *
  * Rechte: der Server lässt nur die Einsatzleitung zu (`EinsatzLeitungszugriff`), auch keinen
  * System-Admin ohne Mitgliedschaft. Ohne sie lädt die Sektion nichts und nennt den Grund.
+ *
+ * `?einheit=<id>` ist der Auftrag „Gerät koppeln“ aus dem Einheiten-Detail (LLH-1579): die Maske
+ * öffnet mit Ansicht „Einheit“ und dieser Einheit; der Auftrag verfällt danach.
  */
 export default function EinsatzGeraete() {
   const { id } = useParams();
@@ -106,6 +110,9 @@ export default function EinsatzGeraete() {
   const darf = leitung && daten.istAktiv;
 
   const [anlegenOffen, setAnlegenOffen] = useState(false);
+  const [anlegenVorbelegung, setAnlegenVorbelegung] = useState<AnlegenWerte | undefined>();
+  const [suche, setSuche] = useSearchParams();
+  const einheitAuftrag = parseRouteId(suche.get('einheit') ?? undefined);
   const [anzeigeCode, setAnzeigeCode] = useState<KopplungMitCode | null>(null);
   const [verlaengernFuer, setVerlaengernFuer] = useState<KopplungAnzeige | null>(null);
   const [widerrufFuer, setWiderrufFuer] = useState<KopplungAnzeige | null>(null);
@@ -148,6 +155,31 @@ export default function EinsatzGeraete() {
     queryFn: () => ladeVerpflegung(einsatzId),
     enabled: darf && stellenart === 'verpflegungsstelle',
   });
+  // Einheiten (LLH-1579): die aktiven; eine aufgelöste lehnt der Server ab.
+  const einheitenQ = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+    enabled: darf && stellenart === 'einheit',
+  });
+
+  // Auftrag aus dem Einheiten-Detail: einmal öffnen, dann aus der Adresse nehmen. Ohne Recht
+  // verfällt er ebenso, die Sektion nennt dann ihren Grund.
+  const uebersichtDa = geraeteQ.data != null;
+  useEffect(() => {
+    if (einheitAuftrag == null || daten.laedt || (leitung && !uebersichtDa)) return;
+    if (darf) {
+      setAnlegenVorbelegung({ ansicht: 'einheit', stelle_id: einheitAuftrag });
+      setAnlegenOffen(true);
+    }
+    setSuche(
+      (vorher) => {
+        const rest = new URLSearchParams(vorher);
+        rest.delete('einheit');
+        return rest;
+      },
+      { replace: true },
+    );
+  }, [einheitAuftrag, daten.laedt, leitung, uebersichtDa, darf, setSuche]);
 
   /** Übernimmt eine geänderte Kopplung in die geladene Übersicht. */
   const uebernimm = (k: KopplungAnzeige) =>
@@ -217,6 +249,7 @@ export default function EinsatzGeraete() {
           bereitstellungsraeume: brQ.data,
           abschnitte: abschnitteQ.data,
           verpflegungsstellen: verpflegungQ.data?.stellen,
+          einheiten: einheitenQ.data,
         },
         stellenart,
       )
@@ -226,7 +259,8 @@ export default function EinsatzGeraete() {
     betreuungQ.isLoading ||
     brQ.isLoading ||
     abschnitteQ.isLoading ||
-    verpflegungQ.isLoading;
+    verpflegungQ.isLoading ||
+    einheitenQ.isLoading;
   const sperre = sperrSatz(sperren, gewaehlteAnsicht, modulName);
 
   return (
@@ -237,7 +271,14 @@ export default function EinsatzGeraete() {
         dataUpdatedAt={geraeteQ.dataUpdatedAt}
         aktion={
           darf && (
-            <Button type="primary" icon={<IconPlus />} onClick={() => setAnlegenOffen(true)}>
+            <Button
+              type="primary"
+              icon={<IconPlus />}
+              onClick={() => {
+                setAnlegenVorbelegung(undefined);
+                setAnlegenOffen(true);
+              }}
+            >
               Gerät koppeln
             </Button>
           )
@@ -319,6 +360,7 @@ export default function EinsatzGeraete() {
         offen={anlegenOffen}
         titel="Gerät koppeln"
         form={anlegenForm}
+        initialValues={anlegenVorbelegung}
         erfassenText="Koppeln"
         laeuft={anlegen.isPending}
         onErfassen={(w) =>

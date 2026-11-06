@@ -1062,6 +1062,11 @@ async fn notify_aufgeloest(
     if let Some(br_id) = ergebnis.br {
         super::einsatz_bereitstellungsraum::sse_br(state, einsatz_id, br_id);
     }
+    // Gekoppelte Handys der Einheit (LLH-1579) enden ohne Neuladen; ihr ETB-Eintrag erscheint live.
+    for g in &ergebnis.geraete {
+        state.live.melde_kopplung_ende(g.kopplung_id);
+        state.live.publiziere(einsatz_id, g.etb_id);
+    }
     super::abloesung::publish_kopplung(
         state,
         einsatz_id,
@@ -1291,6 +1296,15 @@ pub async fn status_setzen(
     let status_id = body
         .status_id
         .ok_or_else(|| AppError::Validation("status_id fehlt".into()))?;
+    // Ein Einheitengerät (LLH-1579) setzt nur den Status seiner eigenen Einheit (eine fremde ist
+    // für es nicht vorhanden, 404) und löscht ihn nicht: „kein Status“ ist eine Entscheidung der
+    // Führung.
+    if let Some(b) = crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
+        b.fordere_einheit(eid)?;
+        if status_id.is_none() {
+            return Err(AppError::Forbidden);
+        }
+    }
     require_aktiv(&state, einsatz_id, eid).await?;
     if let Some(sid) = status_id {
         if !crate::fahrzeug::status_repo::ist_in_org(&state.pool, ctx.einsatz.org_id, sid).await? {

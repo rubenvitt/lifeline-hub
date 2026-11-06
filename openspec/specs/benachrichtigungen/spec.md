@@ -744,8 +744,17 @@ dezenten Ton auslösen, keinen Alarmton.
 
 ### Requirement: Gekoppelte Geräte bleiben still
 
-Gekoppelte Geräte SHALL keine Benachrichtigungen erhalten und MUST NOT einen Ton spielen.
+Gekoppelte Geräte SHALL keine Benachrichtigungen erhalten und MUST NOT einen Ton spielen. Einzige Ausnahme ist das Gerät der Ansicht Einheit (LLH-1579): Es SHALL kurz vibrieren, wenn ein neuer Auftrag an die eigene Einheit eingeht, und spielt auch dann keinen Ton. Andere Ereignisse, auch Aufträge an andere Empfänger, lösen keine Vibration aus.
 
 #### Scenario: Gerät mit Modul Meldungen
 - **WHEN** eine Sofortmeldung eingeht und ein gekoppeltes Gerät der Ansicht Einsatzabschnitt den Einsatz zeigt
 - **THEN** spielt das Gerät keinen Ton
+
+#### Scenario: Einheitengerät bei neuem Auftrag
+- **WHEN** die Einsatzleitung einen Auftrag an die Einheit erteilt, an die ein Gerät der Ansicht Einheit gekoppelt ist
+- **THEN** vibriert das Gerät einmal kurz
+- **AND** spielt keinen Ton und zeigt keinen Toast
+
+#### Scenario: Einheitengerät beim Öffnen
+- **WHEN** das Einheitengerät startet oder neu lädt und bereits offene Aufträge an die Einheit bestehen
+- **THEN** vibriert es nicht

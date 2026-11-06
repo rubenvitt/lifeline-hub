@@ -136,7 +136,8 @@ fn ende_aus(eingabe: Option<&str>) -> Result<String, AppError> {
 /// Einsatzes ist 404. Eine UHS oder ein Bereitstellungsraum, storniert oder aufgelöst, ist 422;
 /// eine stornierte Betreuungsstelle 409, eine geschlossene ist zulässig (wie beim Verweis aus dem
 /// Verbleib). Ein Einsatzabschnitt muss nur bestehen. Eine Verpflegungsstelle (LLH-1048): storniert
-/// 409 (Lebenszyklus), aufgelöst 422 (Zustand), geplant und aktiv zulässig.
+/// 409 (Lebenszyklus), aufgelöst 422 (Zustand), geplant und aktiv zulässig. Eine Einheit
+/// (LLH-1579): aufgelöst 422.
 async fn stelle_pruefen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -177,6 +178,24 @@ async fn stelle_pruefen(
             Ok(crate::einsatzabschnitt::repo::load(pool, einsatz_id, id)
                 .await?
                 .name)
+        }
+        // LLH-1579: nur eine aktive Einheit (eine aufgelöste hätte nichts mehr zu tun).
+        Bindungsart::Einheit => {
+            let (name, aufgeloest): (String, bool) = sqlx::query_as(
+                "SELECT name, aufgeloest_at IS NOT NULL FROM einsatz_einheit \
+                 WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or(AppError::NotFound)?;
+            if aufgeloest {
+                return Err(AppError::UnprocessableEntity(
+                    "Die Einheit ist aufgelöst".into(),
+                ));
+            }
+            Ok(name)
         }
         Bindungsart::Verpflegungsstelle => {
             let stelle =

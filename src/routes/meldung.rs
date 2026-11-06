@@ -334,7 +334,14 @@ pub async fn anlegen(
     }
     crate::routes::support::pruefe_koordinate(req.lat, req.lon, "lat", "lon")?;
     let geo = req.lat.zip(req.lon);
-    if geo.is_some() && meldungsart != ART_LAGEMELDUNG {
+    // Ein Einheitengerät (LLH-1579, Konzept LLH-1571 F9) hängt seinen Standort auf Knopfdruck an
+    // jede Meldung: der Ort wird Teil der Meldung, nicht der Lage (erst eine Übernahme verortet
+    // sie dort, `als_lagerelevant` behält ihn).
+    let ort_an_jeder_meldung = ctx
+        .geraet
+        .as_ref()
+        .is_some_and(|g| g.ansicht == crate::geraet::Funktionsansicht::Einheit);
+    if geo.is_some() && meldungsart != ART_LAGEMELDUNG && !ort_an_jeder_meldung {
         return Err(AppError::UnprocessableEntity(
             "Verortet wird beim Erfassen nur eine Lagemeldung".into(),
         ));
@@ -354,7 +361,8 @@ pub async fn anlegen(
         req.empfaenger_funktion.as_deref(),
     )
     .await?;
-    // Ein Abschnittsgerät (LFH-1043) meldet als sein Abschnitt; ein fremder Absender ist 403.
+    // Ein Abschnittsgerät (LFH-1043) meldet als sein Abschnitt, ein Einheitengerät (LLH-1579) als
+    // seine Einheit; ein fremder Absender ist 403.
     let (einheit_id, abschnitt_id) =
         match crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
             Some(b) => b.meldungs_absender(req.einheit_id, req.abschnitt_id)?,

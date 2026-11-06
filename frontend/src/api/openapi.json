@@ -3328,13 +3328,14 @@
       },
       "Bindungsart": {
         "type": "string",
-        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048).\nJe Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel\n(`migrations/0213_…`).",
+        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048,\nEinheit LLH-1579). Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel\n(`migrations/0281_…`).",
         "enum": [
           "uhs",
           "betreuungsstelle",
           "bereitstellungsraum",
           "einsatzabschnitt",
-          "verpflegungsstelle"
+          "verpflegungsstelle",
+          "einheit"
         ]
       },
       "BrAbrufErgebnis": {
@@ -8479,7 +8480,7 @@
       },
       "Funktionsansicht": {
         "type": "string",
-        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0213_geraet_kopplung_verpflegungsstelle.sql`.",
+        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0281_geraet_kopplung_einheit.sql`.",
         "enum": [
           "uhs-tablet",
           "uhs-laptop",
@@ -8487,7 +8488,8 @@
           "betreuungsstelle",
           "bereitstellungsraum",
           "einsatzabschnitt",
-          "verpflegung"
+          "verpflegung",
+          "einheit"
         ]
       },
       "GefahrBewertungAnzeige": {
@@ -11625,9 +11627,24 @@
           "lagerelevant": {
             "type": "boolean"
           },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder\nder Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an\neiner anderen Art steht nicht in der Lage, bis die Meldung übernommen wird."
+          },
           "lfd_nr": {
             "type": "integer",
             "format": "int64"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
           },
           "meldeweg": {
             "$ref": "#/components/schemas/MeldeWeg"

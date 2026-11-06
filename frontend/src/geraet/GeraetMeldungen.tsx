@@ -12,6 +12,8 @@ import { Paneel, Segmentleiste } from '../components/instrument';
 import MeldungKarte from '../meldungen/MeldungKarte';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { serverJetzt } from '../offline/serveruhr';
+import type { Eigenposition } from '../pages/lagekarte/useEigenposition';
+import StandortFeld from './StandortFeld';
 
 const PRIORITAETEN: readonly { wert: MeldungPrioritaet; label: string }[] = [
   { wert: 'normal', label: 'normal' },
@@ -31,9 +33,16 @@ interface MeldungWerte {
   inhalt: string;
   art: GeraetArt;
   prioritaet: MeldungPrioritaet;
+  /** Nur mit `standort` (Einheitengerät, LLH-1579): auf Knopfdruck ermittelt, sonst ohne. */
+  standort?: Eigenposition | null;
 }
 
-const MELDUNG_START: MeldungWerte = { inhalt: '', art: 'meldung', prioritaet: 'normal' };
+const MELDUNG_START: MeldungWerte = {
+  inhalt: '',
+  art: 'meldung',
+  prioritaet: 'normal',
+  standort: null,
+};
 
 /** Segmentleiste der Art als Formularfeld. */
 function ArtFeld({
@@ -81,6 +90,9 @@ function PrioritaetFeld({
  * strukturierten Absender setzt beim Abschnittsgerät der Server. Ohne Netz merkt die
  * Warteschlange die Meldung vor.
  *
+ * `standort` (Einheitengerät, LLH-1579) bietet „Mein Standort“: einmal ermittelt, an jeder Art
+ * Meldung (F9), ohne Netz mit vorgemerkt. Keine laufende Ortung (F3).
+ *
  * `vorbelegung` füllt den Inhalt (etwa die Fehlmenge aus der Verpflegung, LFH-1044) — bewusst
  * per `setFieldsValue` statt `initialValues`: die Hülle setzt nach dem Senden darauf zurück, die
  * Meldung stünde sonst sofort wieder da (Muster `NachforderungFormular`).
@@ -90,6 +102,7 @@ export default function GeraetMeldungen({
   absender,
   schreibgeschuetzt,
   vorbelegung,
+  standort = false,
 }: {
   einsatzId: number;
   /** Absender als Freitext, z. B. „UHS Nord · Laptop 1“. */
@@ -97,6 +110,8 @@ export default function GeraetMeldungen({
   schreibgeschuetzt: boolean;
   /** Vorbelegter Inhalt; die Seite hält ihn identitätsstabil. */
   vorbelegung?: string | null;
+  /** „Mein Standort“ anbieten (Einheitengerät). */
+  standort?: boolean;
 }) {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
@@ -148,6 +163,7 @@ export default function GeraetMeldungen({
       prioritaet: w.prioritaet,
       inhalt: w.inhalt.trim(),
       ereigniszeit: alsBackendZeit(serverJetzt()),
+      ...(standort && w.standort ? { lat: w.standort.lat, lon: w.standort.lon } : {}),
     });
 
   const meldungen: Meldung[] = [...(meldungenQuery.data ?? [])].sort((a, b) =>
@@ -183,6 +199,11 @@ export default function GeraetMeldungen({
             <Form.Item<MeldungWerte> name="prioritaet" label="Priorität">
               <PrioritaetFeld />
             </Form.Item>
+            {standort && (
+              <Form.Item<MeldungWerte> name="standort" label="Standort">
+                <StandortFeld />
+              </Form.Item>
+            )}
           </ErfassungsFormular>
         </Paneel>
       )}

@@ -99,6 +99,21 @@ describe('MeldungKarte — Auftrags-Deeplink (F36/LFH-257)', () => {
   });
 });
 
+describe('MeldungKarte — Standort der Meldung (LLH-1579)', () => {
+  it('zeigt den Standort und springt mit ihm auf die Lagekarte', () => {
+    renderKarte(<MeldungKarte meldung={meldung({ lat: 50.11, lon: 8.68 })} einsatzId={7} />);
+    const link = screen.getByRole('link', { name: /50[.,]11/ });
+    expect(link.getAttribute('href')).toMatch(
+      /^\/einsaetze\/7\/lagekarte\?zentrum=50\.11(%2C|,)8\.68$/,
+    );
+  });
+
+  it('ohne Standort keine Angabe', () => {
+    renderKarte(<MeldungKarte meldung={meldung()} einsatzId={7} />);
+    expect(document.querySelector('[data-lfh="meldung-standort"]')).toBeNull();
+  });
+});
+
 // LLH-1177: Ein aufgehobener Auftrag sperrt die Meldung nicht mehr; die Karte zeigt den Hinweis
 // statt des Bezugs und bietet „Auftrag erteilen“ wieder an.
 describe('MeldungKarte — aufgehobener Auftrag (LLH-1177)', () => {
