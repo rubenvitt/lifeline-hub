@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { ApiError } from '../api/client';
+import {
+  BETREUUNG_STELLE_BEZEICHNUNG_MAX,
+  BETREUUNG_STELLE_NOTIZ_MAX,
+  BETREUUNG_STELLE_STANDORT_MAX,
+} from '../api/eingabegrenzen';
 import type { Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
@@ -764,6 +769,37 @@ describe('StelleAnlegenDialog', () => {
         kontaktweg: 'Kanal 3',
       }),
     );
+  });
+  it('LLH-1582: Bezeichnung, Standort und Notiz über der Grenze stehen am Feld und senden nicht', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <StelleAnlegenDialog
+        einsatzId={1}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    const felder = [
+      ['Bezeichnung', BETREUUNG_STELLE_BEZEICHNUNG_MAX, '200'],
+      ['Standort', BETREUUNG_STELLE_STANDORT_MAX, '500'],
+      ['Notiz', BETREUUNG_STELLE_NOTIZ_MAX, '2.000'],
+    ] as const;
+    for (const [label, max] of felder) {
+      await userEvent.click(within(dialog).getByLabelText(label));
+      await userEvent.paste('x'.repeat(max + 1));
+    }
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    for (const [label, , grenze] of felder) {
+      expect(
+        await within(dialog).findByText(`${label} darf höchstens ${grenze} Zeichen lang sein`),
+      ).toBeInTheDocument();
+    }
+    expect(onErfassen).not.toHaveBeenCalled();
   });
 });
 

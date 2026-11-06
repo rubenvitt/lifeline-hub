@@ -147,6 +147,19 @@ impl BetreuungsstelleStatus {
 /// also **400** — Vorbild `verpflegung::MAX_EP`.
 pub const MAX_PERSONEN: i64 = 1_000_000;
 
+/// Bezeichnung einer Betreuungsstelle (LLH-1582), wie die übrigen Bezeichnungen
+/// (`verpflegung::STELLE_BEZEICHNUNG_MAX`, `bereitstellungsraum::BEZEICHNUNG_MAX`). Steht
+/// wörtlich im ETB.
+pub const STELLE_BEZEICHNUNG_MAX: usize = 200;
+
+/// Standort einer Betreuungsstelle (LLH-1582): Ortstext aus dem Ortsfeld, so lang wie die
+/// übrigen Orte (`verpflegung::STANDORT_MAX`, `bereitstellungsraum::STANDORT_MAX`).
+pub const STELLE_STANDORT_MAX: usize = 500;
+
+/// Notiz einer Betreuungsstelle (LLH-1582), wie die übrigen Notizen
+/// (`bereitstellungsraum::NOTIZ_MAX`).
+pub const STELLE_NOTIZ_MAX: usize = 2_000;
+
 /// Leitung einer Betreuungsstelle (LLH-1044): ein Name, Freitext, höchstens so lang wie der
 /// Name einer Einheit (`einheit::NAME_MAX`). Personenbezogen: nie im ETB, geschwärzt mit dem
 /// Einsatz.
