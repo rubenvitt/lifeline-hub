@@ -626,14 +626,11 @@ function AblaufKachel({ punkte, jetzt }: { punkte: Programmpunkt[]; jetzt: numbe
             >
               <ZeitAnzeige wert={p.zeitpunkt_at} rolle="kurz" />
             </span>
+            {/* Keine Kachel schneidet ihren Inhalt ab: eine lange Bezeichnung bricht um, die
+                Karte darüber gibt die Höhe her. */}
             <span
-              style={{
-                flex: '1 1 auto',
-                minWidth: 0,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
+              data-lfh="monitor-ablauf-bezeichnung"
+              style={{ flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere' }}
             >
               {p.bezeichnung}
             </span>

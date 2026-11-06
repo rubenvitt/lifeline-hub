@@ -123,11 +123,18 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   // Ablauf der Veranstaltung (LLH-1570): der verstrichene Punkt fällt heraus, höchstens drei.
   const wireAb = (minuten: number) =>
     new Date(Date.now() + minuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+  // Die drei anstehenden tragen die längste zulässige Bezeichnung (100 Zeichen): sie brechen um,
+  // keine Kachel schneidet ab.
+  const langeBezeichnung = (anfang: string) =>
+    `${anfang} ${'Bühnenumbau und Soundcheck auf der Hauptbühne am Markt '.repeat(2)}`.slice(
+      0,
+      100,
+    );
   for (const [bezeichnung, minuten] of [
     ['Einlass', -30],
-    ['Pause', 60],
-    ['Feuerwerk', 90],
-    ['Zugabe', 200],
+    [langeBezeichnung('Pause'), 60],
+    [langeBezeichnung('Feuerwerk'), 90],
+    [langeBezeichnung('Zugabe'), 200],
     ['Ende', 240],
   ] as const) {
     await anlegen(page, `/api/einsaetze/${e}/programmpunkte`, {
@@ -191,6 +198,10 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     await expect(punkte.nth(1)).toContainText('Feuerwerk');
     await expect(punkte.nth(2)).toContainText('Zugabe');
     await expect(ablauf.getByText('Einlass')).toHaveCount(0);
+    // Die lange Bezeichnung steht ganz da, umbrochen statt abgeschnitten.
+    const name = punkte.nth(0).locator('[data-lfh="monitor-ablauf-bezeichnung"]');
+    expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    await expect(name).toHaveText(langeBezeichnung('Pause'));
     const ablaufText = await punkte.evaluateAll((zeilen) =>
       zeilen.map((z) => parseFloat(getComputedStyle(z).fontSize)),
     );
