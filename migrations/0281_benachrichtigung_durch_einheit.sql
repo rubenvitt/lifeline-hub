@@ -1,0 +1,17 @@
+-- LLH-1509 (Entscheidung LLH-1310 Punkt 2): Ein Hinweis zur ablösenden Einheit
+-- (`abloesung_abloeser`) zählt auch das Ereignis einer Untereinheit, wenn ein Verband als Ablöser
+-- geplant ist. Er nennt dann den Verband (`einheit_id`, LLH-1511, 0275), seine Detailzeile dazu
+-- die Untereinheit, deren Ereignis ihn ausgelöst hat („… (durch 1. Staffel)“). Diese Spalte hält
+-- sie fest.
+--
+-- Nur die ID, kein Name: design.md D1 (LLH-1207) „keine Textspalte“, der Name kommt beim Lesen aus
+-- `einsatz_einheit.name` (Retain). NULL, wenn die gemeinte Einheit selbst auslöste, bei jeder
+-- anderen Art und bei alten Zeilen.
+--
+-- Bewusst ohne REFERENCES, aus demselben Grund wie 0275: gemeldet wird nach dem Commit, und eine
+-- verschwundene Einheit nennt die Detailzeile nicht, statt das INSERT scheitern zu lassen.
+-- Aufbewahrung: Verweis ohne Personenbezug, retain (`einsatz::schwaerzung_registry`).
+--
+-- Leaf-Spalte ohne Default, kein Tabellen-Neubau. Wer `benachrichtigung` künftig neu baut (neue
+-- Art im CHECK, Muster 0255), nimmt `einheit_id` und diese Spalte mit.
+ALTER TABLE benachrichtigung ADD COLUMN durch_einheit_id INTEGER;

@@ -2934,6 +2934,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Die gemeinte Einheit eines Hinweises zur ablösenden Einheit (LLH-1511, 0275): nur
             // die ID, ohne FK; der Name kommt beim Lesen aus `einsatz_einheit.name`.
             retain("einheit_id", G_FK),
+            // Die auslösende Untereinheit eines geplanten Verbands (LLH-1509): wie `einheit_id`.
+            retain("durch_einheit_id", G_FK),
         ],
     },
     // Vorgabe je Funktion (LLH-1421, design.md D2): Einsatz-Konfiguration, keine Person; fällt mit

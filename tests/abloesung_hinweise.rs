@@ -725,3 +725,265 @@ async fn hinweis_einheit_bleibt_beim_aufloesen_stehen_und_ihre_id_frei() {
         "Ablösung für Rettungsstaffel: 2. Rettungsstaffel"
     );
 }
+
+// ───────────────────────── Teilbaum eines geplanten Verbands (LLH-1509) ─────────────────────────
+
+impl Welt {
+    /// Hängt `einheit` unter `ueber` (Gliederung).
+    async fn unter(&self, einheit: i64, ueber: i64) {
+        let (s, v) = anfrage(
+            &self.app,
+            "PATCH",
+            &self.pfad(&format!("einheiten/{einheit}")),
+            &self.admin,
+            Some(&json!({ "ueber_einheit_id": ueber }).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+
+    /// Nachtrag der Art vor `vor_minuten` an der Einheit, als `cookie`; die id des Ereignisses.
+    async fn nachtrag(&self, cookie: &str, einheit: i64, art: &str, vor_minuten: i64) -> i64 {
+        let (s, z) = anfrage(
+            &self.app,
+            "POST",
+            &self.pfad(&format!("einheiten/{einheit}/zeitachse")),
+            cookie,
+            Some(
+                &json!({
+                    "art": art,
+                    "zeitpunkt_at": wire(Utc::now() - Duration::minutes(vor_minuten)),
+                })
+                .to_string(),
+            ),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{z}");
+        z["ereignisse"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["art"] == art && e["gestrichen_at"].is_null())
+            .map(|e| e["id"].as_i64().unwrap())
+            .max()
+            .unwrap()
+    }
+
+    async fn streichen(&self, cookie: &str, einheit: i64, zid: i64) {
+        let (s, v) = anfrage(
+            &self.app,
+            "POST",
+            &self.pfad(&format!("einheiten/{einheit}/zeitachse/{zid}/streichen")),
+            cookie,
+            Some(r#"{"grund":"falsche Einheit erfasst"}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+
+    /// Ein aktiver Bereitstellungsraum; sein Pfad.
+    async fn bereitstellungsraum(&self, bezeichnung: &str) -> String {
+        let (s, br) = anfrage_json(
+            &self.app,
+            "POST",
+            &self.pfad("bereitstellungsraeume"),
+            &self.admin,
+            Some(&json!({ "bezeichnung": bezeichnung })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{br}");
+        let pfad = self.pfad(&format!(
+            "bereitstellungsraeume/{}",
+            br["id"].as_i64().unwrap()
+        ));
+        let (s, _) = anfrage_json(
+            &self.app,
+            "POST",
+            &format!("{pfad}/status"),
+            &self.admin,
+            Some(&json!({ "status": "aktiv" })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK);
+        pfad
+    }
+
+    /// Anzahl der Hinweise `abloesung_abloeser` mit dem Bezugstyp, über alle Empfänger.
+    async fn anzahl_hinweise(&self, bezug_typ: &str) -> i64 {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM benachrichtigung \
+             WHERE art = 'abloesung_abloeser' AND bezug_typ = ?",
+        )
+        .bind(bezug_typ)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap()
+    }
+}
+
+/// Akzeptanzkriterium LLH-1509: Verband geplant, eine Staffel alarmiert → ein Hinweis
+/// „Ablösende Einheit alarmiert“ zum Verband, das Detail nennt die Staffel; eine zweite Staffel
+/// meldet nichts mehr. Die Schicht liefert die Untereinheiten am Ablöser (für die Karte).
+#[tokio::test]
+async fn verband_geplant_erste_staffel_alarmiert_meldet_genau_einen_hinweis() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let verband = w.einheit("Verband Nord").await;
+    let st1 = w.einheit("1. Staffel").await;
+    let st2 = w.einheit("2. Staffel").await;
+    let trupp = w.einheit("Trupp").await;
+    w.unter(st1, verband).await;
+    w.unter(st2, verband).await;
+    w.unter(trupp, st2).await;
+    let id = w.schicht(rs, 480).await;
+    let v = w.aendern(id, json!({ "abloeser_ids": [verband] })).await;
+    let mut unter: Vec<i64> = v["abloeser"][0]["untereinheiten"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{v}"))
+        .iter()
+        .map(|x| x.as_i64().unwrap())
+        .collect();
+    unter.sort_unstable();
+    let mut erwartet = vec![st1, st2, trupp];
+    erwartet.sort_unstable();
+    assert_eq!(unter, erwartet, "der ganze Teilbaum, ohne den Verband: {v}");
+
+    let alarmiert = w.status_mit_marke("Alarmiert", "alarmierung").await;
+    let anna = w.cookie("annika").await;
+    w.handstatus(&anna, st1, alarmiert).await;
+    assert_eq!(
+        w.empfaenger("abloesung_abloeser", "abloeser_alarmiert")
+            .await,
+        vec![w.admin_id, w.bert, w.carl]
+    );
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_alarmiert").await,
+        "Ablösung für Rettungsstaffel: Verband Nord (durch 1. Staffel)"
+    );
+
+    w.handstatus(&anna, st2, alarmiert).await;
+    w.handstatus(&anna, trupp, alarmiert).await;
+    w.handstatus(&anna, verband, alarmiert).await;
+    assert_eq!(
+        w.anzahl_hinweise("abloeser_alarmiert").await,
+        3,
+        "weitere Einheiten des Teilbaums melden nichts"
+    );
+}
+
+/// Ein nicht geplanter Verband: die Alarmierung seiner Staffel meldet nichts; ein geplanter
+/// Vorfahr weiter oben zählt über die ganze Kette.
+#[tokio::test]
+async fn nur_ein_geplanter_vorfahr_zaehlt() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let bereitschaft = w.einheit("Bereitschaft").await;
+    let verband = w.einheit("Verband Nord").await;
+    let st1 = w.einheit("1. Staffel").await;
+    let fremd = w.einheit("Verband Süd").await;
+    let fremd_st = w.einheit("Staffel Süd").await;
+    w.unter(verband, bereitschaft).await;
+    w.unter(st1, verband).await;
+    w.unter(fremd_st, fremd).await;
+    let id = w.schicht(rs, 480).await;
+    w.aendern(id, json!({ "abloeser_ids": [bereitschaft] }))
+        .await;
+    let alarmiert = w.status_mit_marke("Alarmiert", "alarmierung").await;
+    let anna = w.cookie("annika").await;
+
+    w.handstatus(&anna, fremd_st, alarmiert).await;
+    assert_eq!(w.anzahl_hinweise("abloeser_alarmiert").await, 0);
+
+    w.handstatus(&anna, st1, alarmiert).await;
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_alarmiert").await,
+        "Ablösung für Rettungsstaffel: Bereitschaft (durch 1. Staffel)"
+    );
+}
+
+/// „Alarmierung … gestrichen“ erst, wenn im Teilbaum keine Einheit mehr alarmiert ist; das
+/// Detail nennt die Staffel, deren Streichung es auslöste.
+#[tokio::test]
+async fn gestrichen_erst_wenn_im_teilbaum_keine_alarmierung_mehr_offen_ist() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let verband = w.einheit("Verband Nord").await;
+    let st1 = w.einheit("1. Staffel").await;
+    let st2 = w.einheit("2. Staffel").await;
+    w.unter(st1, verband).await;
+    w.unter(st2, verband).await;
+    let id = w.schicht(rs, 480).await;
+    w.aendern(id, json!({ "abloeser_ids": [verband] })).await;
+    let anna = w.cookie("annika").await;
+    let a1 = w.nachtrag(&anna, st1, "alarmierung", 20).await;
+    let a2 = w.nachtrag(&anna, st2, "alarmierung", 10).await;
+    assert_eq!(w.anzahl_hinweise("abloeser_alarmiert").await, 3);
+
+    w.streichen(&anna, st1, a1).await;
+    assert_eq!(
+        w.anzahl_hinweise("abloeser_alarmierung_gestrichen").await,
+        0,
+        "2. Staffel ist noch alarmiert"
+    );
+
+    w.streichen(&anna, st2, a2).await;
+    assert_eq!(
+        w.empfaenger("abloesung_abloeser", "abloeser_alarmierung_gestrichen")
+            .await,
+        vec![w.admin_id, w.bert, w.carl]
+    );
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_alarmierung_gestrichen").await,
+        "Ablösung für Rettungsstaffel: Verband Nord (durch 2. Staffel)"
+    );
+}
+
+/// Bereitstellungsraum und Abruf: das erste Eintreffen im Raum und der erste Abruf im Teilbaum
+/// melden je einmal. Die beim Abruf mitgenommene Untereinheit gehört zu diesem Ereignis und hält
+/// den Hinweis nicht zurück.
+#[tokio::test]
+async fn raum_und_abruf_im_teilbaum_melden_je_einmal() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let verband = w.einheit("Verband Nord").await;
+    let st1 = w.einheit("1. Staffel").await;
+    let trupp = w.einheit("Trupp").await;
+    w.unter(st1, verband).await;
+    w.unter(trupp, st1).await;
+    let id = w.schicht(rs, 480).await;
+    w.aendern(id, json!({ "abloeser_ids": [verband] })).await;
+    let br = w.bereitstellungsraum("BR Sportplatz").await;
+    let anna = w.cookie("annika").await;
+    for e in [st1, trupp] {
+        let (s, v) = anfrage_json(
+            &w.app,
+            "POST",
+            &format!("{br}/eintreffen"),
+            &anna,
+            Some(&json!({ "kraft": { "objekt_typ": "einheit", "objekt_id": e } })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    assert_eq!(w.anzahl_hinweise("abloeser_br_eingetroffen").await, 3);
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_br_eingetroffen").await,
+        "Ablösung für Rettungsstaffel: Verband Nord (durch 1. Staffel)"
+    );
+
+    let (s, v) = anfrage_json(
+        &w.app,
+        "POST",
+        &format!("{br}/abruf"),
+        &anna,
+        Some(&json!({ "objekt_typ": "einheit", "objekt_id": st1 })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(
+        w.empfaenger("abloesung_abloeser", "abloeser_abgerufen")
+            .await,
+        vec![w.admin_id, w.bert, w.carl],
+        "der mitgenommene Trupp hält den Hinweis nicht zurück: {v}"
+    );
+}

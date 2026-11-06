@@ -79,7 +79,8 @@
         "description": "Ein Ablöser einer Schicht (Eintrag in `einsatz_abloesung_abloeser`).",
         "required": [
           "einheit_id",
-          "einheit_name"
+          "einheit_name",
+          "untereinheiten"
         ],
         "properties": {
           "einheit_id": {
@@ -88,6 +89,14 @@
           },
           "einheit_name": {
             "type": "string"
+          },
+          "untereinheiten": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Die aktiven Untereinheiten des Ablösers, nach ID (LLH-1509): ihr Teilbaum über\n`ueber_einheit_id`, ohne ihn selbst ([`untereinheiten`]). Ihre Ereignisse zählen für den\nStand an der Karte, wie für die Hinweise (`hinweis::anlaesse_tx`). Nur an einer laufenden\nSchicht; sonst leer."
           }
         }
       },

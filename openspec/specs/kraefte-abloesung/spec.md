@@ -789,6 +789,18 @@ erhalten. Jeder Hinweis `abloesung_abloeser` MUST die gemeinte Einheit beim Erze
 Einheit der Schicht; Hinweise ohne festgehaltene Einheit (vor LLH-1511) nennen die gerade
 geplante.
 
+Ist ein Verband geplant, SHALL das Ereignis einer seiner Untereinheiten (ganzer Teilbaum über
+`ueber_einheit_id`) für ihn zählen (LLH-1509); bei mehreren geplanten Vorfahren derselben Schicht
+der nächste. Je Ereignisart und Schicht MUST nur das erste Ereignis im Teilbaum melden: steht
+schon eine andere Einheit des Teilbaums (auch der Verband selbst) im selben Zustand (alarmiert,
+eingetroffen, im Bereitstellungsraum, abgerufen), MUST NOT ein weiterer Hinweis entstehen; die
+beim Abruf mitgenommenen Untereinheiten gehören zu diesem Abruf. Der Hinweis MUST den Verband als
+gemeinte Einheit festhalten und die auslösende Untereinheit dazu (nur ihre ID), die Detailzeile
+nennt sie: „Ablösung für Rettungsstaffel: Verband Nord (durch 1. Staffel)“. „Alarmierung bzw.
+Eintreffen der ablösenden Einheit gestrichen“ MUST erst entstehen, wenn im Teilbaum keine Einheit
+mehr alarmiert bzw. eingetroffen ist. Ohne Ereignisse im Teilbaum bleibt die Planung einer Einheit
+wie bisher.
+
 #### Scenario: Eingetroffen
 - **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und per Status eintrifft
 - **THEN** erhält jeder Leser des Moduls Ablösung genau einen Hinweis „Ablösende Einheit eingetroffen“ mit „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“ und Sprung zur Schicht der Rettungsstaffel, und Mitglieder ohne das Modul erhalten nichts
@@ -808,6 +820,18 @@ geplante.
 #### Scenario: Zweiter Ablöser der Liste
 - **WHEN** „2. Rettungsstaffel“ und „3. Rettungsstaffel“ als Ablöser geplant sind und „3. Rettungsstaffel“ alarmiert wird
 - **THEN** nennt der Hinweis „Ablösung für Rettungsstaffel: 3. Rettungsstaffel“
+
+#### Scenario: Staffel eines geplanten Verbands
+- **WHEN** „Verband Nord“ als Ablöser von „Rettungsstaffel“ geplant ist und seine „1. Staffel“ alarmiert wird
+- **THEN** erhält jeder Leser genau einen Hinweis „Ablösende Einheit alarmiert“ mit „Ablösung für Rettungsstaffel: Verband Nord (durch 1. Staffel)“
+
+#### Scenario: Weitere Staffel
+- **WHEN** danach die „2. Staffel“ desselben Verbands alarmiert wird
+- **THEN** entsteht kein weiterer Hinweis
+
+#### Scenario: Streichung im Teilbaum
+- **WHEN** beide Staffeln alarmiert sind und die Alarmierung der „1. Staffel“ gestrichen wird
+- **THEN** entsteht kein Hinweis „Alarmierung der ablösenden Einheit gestrichen“; erst die Streichung der Alarmierung der „2. Staffel“ meldet ihn, mit „(durch 2. Staffel)“
 
 ### Requirement: Planung entfällt
 
@@ -914,7 +938,11 @@ Bereitstellungsraum, MUST die Zeile den Zeitpunkt des Abrufs aus der Raumliste n
 („· abgerufen 1405“, LLH-1309); nach dem Ausrücken entfällt er. Der Raum MUST in Klammern stehen,
 solange der Ablöser in einem Bereitstellungsraum steht; ohne Freigabe des Moduls
 Bereitstellungsräume fehlen Klammer und Abruf, und die Raumliste wird nicht abgefragt. Ohne
-Freigabe des Moduls Einheiten fehlt der Stand. Trägt kein Ablöser ein Ereignis, bleibt die Zeile
+Freigabe des Moduls Einheiten fehlt der Stand. Ist ein Verband geplant, MUST der Stand seinen
+Teilbaum umfassen (LLH-1509): je Art der früheste Zeitpunkt seiner und seiner Untereinheiten, unter
+dem Namen des Verbands; der Raum ist der des gezeigten Abrufs, sonst der erste im Teilbaum. Welche
+Untereinheiten dazugehören, MUST der Server am Ablöser liefern (`untereinheiten`); der Client
+leitet sie nicht aus der Gliederung ab. Trägt kein Ablöser ein Ereignis, bleibt die Zeile
 „Ablösung geplant durch …“. Die Zeile MUST einzeilig bleiben, auch bei mehreren Ablösern (mit „; “
 getrennt), der ganze Text im Titel, und MUST sich über die bestehenden Live-Ereignisse
 aktualisieren (`einheit`, `fahrzeug`, `abloesung`, `bereitstellungsraum`), ohne eigenen Abruf.
@@ -926,6 +954,10 @@ aktualisieren (`einheit`, `fahrzeug`, `abloesung`, `bereitstellungsraum`), ohne 
 #### Scenario: Abgerufen
 - **WHEN** derselbe Ablöser um 14:25 aus dem „BR Sportplatz“ abgerufen wird
 - **THEN** zeigt die Zeile „Ablösung: 2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 · abgerufen 1425 (BR Sportplatz)“
+
+#### Scenario: Staffel eines geplanten Verbands
+- **WHEN** „Verband Nord“ als Ablöser geplant ist und seine „1. Staffel“ um 13:40, die „2. Staffel“ um 13:50 alarmiert wurde
+- **THEN** zeigt die Karte „Ablösung: Verband Nord · alarmiert 1340“
 
 #### Scenario: Noch kein Ereignis
 - **WHEN** der geplante Ablöser weder alarmiert noch eingetroffen ist
