@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 
+use lifeline_hub::abloesung::schichtplan;
 use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
     abloesung, auftrag, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage, einsatz,
@@ -202,6 +203,18 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ),
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
         ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),
+        ("SCHICHTPLAN_PERSONEN_MAX", schichtplan::PLAN_PERSONEN_MAX),
+        ("SCHICHTPLAN_ERZEUGEN_MAX", schichtplan::ERZEUGEN_MAX),
+        ("SCHICHTPLAN_NOTIZ_MAX", schichtplan::NOTIZ_MAX),
+        ("SCHICHTPLAN_HELFER_TEXT_MAX", schichtplan::HELFER_TEXT_MAX),
+        (
+            "SCHICHTPLAN_HELFER_TELEFON_MAX",
+            schichtplan::HELFER_TELEFON_MAX,
+        ),
+        (
+            "SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX",
+            schichtplan::HELFER_QUALIFIKATIONEN_MAX,
+        ),
         ("ZEITACHSE_GRUND_MAX", zeitachse::GRUND_MAX),
         ("ZEITACHSE_NOTIZ_MAX", zeitachse::NOTIZ_MAX),
         (

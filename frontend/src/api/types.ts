@@ -843,6 +843,83 @@ export interface BesatzungZielEingabe {
   fahrzeug_id?: number;
 }
 
+// ============================== LLH-1552 Schichtplan ==============================
+/** Der Schichtplan eines Einsatzes: Grenzwerte, Blöcke mit Befunden, Helfer (Soll, kein Ist). */
+export type Schichtplan = S['SchichtplanAnzeige'];
+export type SchichtplanBlock = S['PlanBlockAnzeige'];
+export type SchichtplanPerson = S['PlanPersonAnzeige'];
+export type SchichtplanHelfer = S['PlanHelferAnzeige'];
+export type SchichtplanGrenzwerte = S['SchichtplanGrenzwerte'];
+export type SchichtplanBefund = S['PlanBefund'];
+export type SchichtplanBefundArt = S['PlanBefundArt'];
+export type SchichtplanPostenArt = S['PostenArt'];
+export type SchichtplanPersonArt = S['PlanPersonArt'];
+
+/** Kein Backend-Schema: der Posten eines Blocks im Request (`schichtplan::PostenEingabe`). */
+export type SchichtplanPostenEingabe =
+  { art: 'einheit'; einheit_id: number } | { art: 'uhs'; uhs_id: number } | { art: 'pause' };
+
+/**
+ * Kein Backend-Schema: eine Person im Request (`schichtplan::PlanPersonEingabe`). `einsatz`
+ * nur für Ad-hoc-Kräfte; Stamm-Personal immer über `personal_id`, auch wenn disponiert.
+ */
+export type SchichtplanPersonEingabe =
+  | { art: 'stamm'; personal_id: number }
+  | { art: 'einsatz'; einsatz_personal_id: number }
+  | { art: 'helfer'; helfer_id: number };
+
+/**
+ * Kein Backend-Schema: `POST …/schichtplan/bloecke`. `soll_anzahl`/`quali_soll` fehlen = Vorgabe
+ * des Postens, `null` = kein Soll (an der Pause nie eins, sonst 422).
+ */
+export interface SchichtplanBlockBody {
+  posten: SchichtplanPostenEingabe;
+  von: string;
+  bis: string;
+  soll_anzahl?: number | null;
+  quali_soll?: QualiSollEingabe[] | null;
+  personen?: SchichtplanPersonEingabe[];
+  notiz?: string;
+}
+
+/** Kein Backend-Schema: `PATCH …/schichtplan/bloecke/{bid}`; `version` Pflicht (409). */
+export interface SchichtplanBlockAendernBody {
+  version: number;
+  posten?: SchichtplanPostenEingabe;
+  von?: string;
+  bis?: string;
+  soll_anzahl?: number | null;
+  quali_soll?: QualiSollEingabe[] | null;
+  /** Die ganze Liste. */
+  personen?: SchichtplanPersonEingabe[];
+  notiz?: string | null;
+}
+
+/** Kein Backend-Schema: `POST …/schichtplan/erzeugen`; ohne Länge gilt das Schichtmodell. */
+export interface SchichtplanErzeugenBody {
+  posten: SchichtplanPostenEingabe;
+  von: string;
+  bis: string;
+  laenge_minuten?: number;
+}
+
+/** Kein Backend-Schema: `PATCH …/schichtplan/grenzwerte`; `null` = Vorgabe (720 / 480 min). */
+export interface SchichtplanGrenzwerteBody {
+  max_dienst_minuten?: number | null;
+  min_ruhe_minuten?: number | null;
+}
+
+/** Kein Backend-Schema: `POST …/schichtplan/helfer` (Felder fehlen = leer). */
+export interface SchichtplanHelferBody {
+  name: string;
+  telefon?: string | null;
+  organisation?: string | null;
+  qualifikationen?: number[];
+}
+
+/** Kein Backend-Schema: `PATCH …/schichtplan/helfer/{hid}` (fehlt = unverändert). */
+export type SchichtplanHelferAendernBody = Partial<SchichtplanHelferBody>;
+
 // ============================== LLH-1375 Einsatz-Vorlagen ==============================
 /**
  * Modulsatz der Organisation mit optionaler Einsatzart und optionalem Schichtmodell (LLH-1313);

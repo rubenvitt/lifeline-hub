@@ -186,6 +186,18 @@ export const ABLOESUNG_RHYTHMUS_MAX_MINUTEN = 10_080;
 export const ABLOESUNG_ABLOESER_MAX = 8;
 /** Neue Besatzung beim Besatzungswechsel im Request, gezählt vor dem Entdoppeln (LLH-1150). */
 export const ABLOESUNG_BESATZUNG_MAX = 50;
+/** Personen je Schicht des Schichtplans im Request, gezählt vor dem Entdoppeln (LLH-1552). */
+export const SCHICHTPLAN_PERSONEN_MAX = 50;
+/** Schichten, die „Schichten erzeugen“ auf einmal anlegt (LLH-1552). */
+export const SCHICHTPLAN_ERZEUGEN_MAX = 100;
+/** Notiz einer Schicht des Schichtplans (LLH-1552). */
+export const SCHICHTPLAN_NOTIZ_MAX = 500;
+/** Name und Organisation eines Helfers des Schichtplans (LLH-1552). */
+export const SCHICHTPLAN_HELFER_TEXT_MAX = 200;
+/** Telefon eines Helfers des Schichtplans (LLH-1552). */
+export const SCHICHTPLAN_HELFER_TELEFON_MAX = 50;
+/** Qualifikationen eines Helfers im Request, gezählt vor dem Entdoppeln (LLH-1552). */
+export const SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX = 20;
 /** Leitung einer Betreuungsstelle (LLH-1044). */
 export const BETREUUNG_LEITUNG_MAX = 200;
 /** Kontakt der Leitung einer Betreuungsstelle (LLH-1044, Spalte `kontaktweg`). */

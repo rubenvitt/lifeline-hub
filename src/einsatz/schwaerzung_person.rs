@@ -368,6 +368,13 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         bezug: Bezug::Spalte("personal_id"),
         spalten: &[],
     },
+    // Eingeteilte Ad-hoc-Kraft im Schichtplan (LLH-1552): nur Verweise, nichts zu entfernen.
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "einsatz_planschicht_person",
+        bezug: Bezug::Spalte("einsatz_personal_id"),
+        spalten: &[],
+    },
     // Letzte Besetzung einer aufgelösten Einheit (LLH-1266): nur Verweise, nichts zu entfernen;
     // der Name geht mit `einsatz_personal`.
     PersonenBezug {
