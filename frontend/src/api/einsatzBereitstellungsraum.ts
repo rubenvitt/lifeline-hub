@@ -132,6 +132,11 @@ interface BrBelegungEingabe {
   objekt_id: number;
   art: Exclude<BrBelegungsArt, 'abruf' | 'abruf_aufgehoben'>;
   notiz?: string | null;
+  /**
+   * Nur bei `wechsel`: der Raum, aus dem verlegt wird. Steht die Kraft inzwischen woanders, lehnt
+   * der Server mit 409 ab, statt still aus dem neuen Raum zu wechseln (LLH-1521).
+   */
+  von_br_id?: number;
 }
 
 export function belegeBr(
