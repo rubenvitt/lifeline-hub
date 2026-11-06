@@ -12471,9 +12471,9 @@ mod tests {
     /// LLH-1568: vier Angaben am Verbleib, Bestand bleibt ohne Angabe, die CHECKs nehmen nur die
     /// Katalogwerte.
     #[tokio::test]
-    async fn migration_0277_person_verbleib_angaben() {
+    async fn migration_0280_person_verbleib_angaben() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 277;
+        const VERSION: i64 = 280;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
