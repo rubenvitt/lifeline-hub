@@ -14,6 +14,7 @@ use crate::geraet::stelle;
 use crate::geraet::Bindungsart;
 use crate::live::LiveEvent;
 use crate::person::abgleich_repo::AbgleichAnzeige;
+use crate::person::anlass_repo::{self, AnlassAnzeige, PersonAnlass};
 use crate::person::audit_repo::ZugriffAnzeige;
 use crate::person::massnahme_repo::{self, MassnahmeAnzeige};
 use crate::person::sichtung_repo::SichtungAnzeige;
@@ -54,6 +55,8 @@ pub struct PersonDetail {
     pub aufenthalt: Option<AufenthaltAnzeige>,
     /// Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf.
     pub transporte: Vec<TransportAnzeige>,
+    /// Anlass-Verlauf (LLH-1566), der aktuelle Stand zuerst; ein Stand ohne Anlass hebt auf.
+    pub anlaesse: Vec<AnlassAnzeige>,
     /// Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`.
     pub massnahmen: Vec<MassnahmeAnzeige>,
     /// Verletzungen (LLH-1113) in Erfassungsfolge, aufgehobene mit `aufgehoben_at`.
@@ -249,6 +252,9 @@ pub struct AnlegenBody {
     /// Namentliche Bestätigung der Erst-Sichtung am Gerät (LFH-1046): Kennung in
     /// `einsatz_personal`. Nur mit `sichtung` und nur an einem gekoppelten Gerät (sonst 422).
     pub bestaetigt_personal_id: Option<i64>,
+    /// Optionaler Anlass der Hilfeleistung (LLH-1566), in DERSELBEN Transaktion wie die Anlage
+    /// und nur bei einer wirklich neuen Person, wie die Erst-Sichtung. Nie im ETB.
+    pub anlass: Option<String>,
     /// Optionaler Eintritt in den UHS-Wartebereich in derselben Transaktion wie die
     /// Person-Anlage (LFH-458). Ein client_id-Replay erzeugt keine zweite Belegung.
     pub uhs_id: Option<i64>,
@@ -302,12 +308,10 @@ pub async fn anlegen(
     // Aufnahme an der Betreuungsstelle (LFH-1041, Spec `funktionsansichten`): im selben Schritt
     // der Verbleib „Notunterkunft“ an der eigenen Stelle. Eine Erst-Sichtung gibt es dort nicht.
     let betreuungsstelle = stelle::eigene(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle);
-    if betreuungsstelle.is_some()
-        && body
-            .sichtung
-            .as_deref()
-            .is_some_and(|s| !s.trim().is_empty())
-    {
+    // Ebenso keinen Anlass der Hilfeleistung (LLH-1566): er ist ein Gesundheitsdatum wie die
+    // Sichtung, und die Route `…/anlass` fehlt der Betreuungsstelle.
+    let gesetzt = |feld: &Option<String>| feld.as_deref().is_some_and(|s| !s.trim().is_empty());
+    if betreuungsstelle.is_some() && (gesetzt(&body.sichtung) || gesetzt(&body.anlass)) {
         return Err(AppError::Forbidden);
     }
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
@@ -420,6 +424,17 @@ pub async fn anlegen(
     {
         return Err(AppError::UnprocessableEntity(
             "Eine Erst-Sichtung ist nur mit Status erfasst oder betroffen zulässig".into(),
+        ));
+    }
+    // Anlass (LLH-1566): das Feld für sich → 400, ohne angetroffene Person → 422 wie die Sichtung.
+    let anlass = parse_enum_opt(
+        PersonAnlass::parse,
+        trimme(body.anlass).as_deref(),
+        "Unbekannter Anlass",
+    )?;
+    if anlass.is_some() && !matches!(status_enum, PersonStatus::Erfasst | PersonStatus::Betroffen) {
+        return Err(AppError::UnprocessableEntity(
+            "Ein Anlass ist nur mit Status erfasst oder betroffen zulässig".into(),
         ));
     }
     if kategorie.is_none() && body.bestaetigt_personal_id.is_some() {
@@ -552,6 +567,20 @@ pub async fn anlegen(
                         startwert,
                         &text,
                         &erfasst_at,
+                    )
+                    .await?;
+                }
+                if anlass.is_some() {
+                    anlass_repo::erfassen_tx(
+                        conn,
+                        einsatz_id,
+                        id,
+                        &anlass_repo::NeuerAnlass {
+                            anlass,
+                            zeitpunkt_at: &erfasst_at,
+                            client_id: None,
+                        },
+                        ctx.benutzer.id,
                     )
                     .await?;
                 }
@@ -693,6 +722,7 @@ async fn detail_mit_audit(
     let verbleib = verbleib_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let aufenthalt = belegung_repo::aufenthalt(&state.pool, einsatz_id, person_id).await?;
     let transporte = transport_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let anlaesse = anlass_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let massnahmen = massnahme_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let verletzungen = verletzung_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     // Den Abgleich mit Vermisstenmeldungen führt kein Gerät (Scope-Matrix): er nennt andere
@@ -711,6 +741,7 @@ async fn detail_mit_audit(
         abgleiche,
         aufenthalt,
         transporte,
+        anlaesse,
         massnahmen,
         verletzungen,
     }))

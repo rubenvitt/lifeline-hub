@@ -2228,6 +2228,18 @@ async fn aufnahme_am_tablet_steht_im_eingang_der_eigenen_uhs() {
         "in der Patientenliste des Tablets: {v}"
     );
 
+    // Den Anlass der Hilfeleistung setzt das Tablet an Personen der eigenen UHS (LLH-1566).
+    let pid = p["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/anlass"),
+        &geraet,
+        Some(&json!({"anlass": "hitze_kaelte"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
     // Eine andere UHS lässt das Tablet nicht zu.
     let (s, v) = anfrage_json(
         &app,
@@ -2344,6 +2356,11 @@ async fn person_der_anderen_uhs_ist_fuer_das_tablet_404() {
                 "POST",
                 format!("{basis}/notizen"),
                 Some(json!({"text": "x"})),
+            ),
+            (
+                "POST",
+                format!("{basis}/anlass"),
+                Some(json!({"anlass": "intoxikation"})),
             ),
             (
                 "POST",
@@ -5425,10 +5442,11 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     assert_eq!(v["stellen"][0]["belegung"]["belegt"], 40, "{v}");
     assert_eq!(v["namentlich"], json!([{"stelle_id": nord, "anzahl": 1}]));
 
-    // Keine Erst-Sichtung, keine UHS, keine vermisste Person.
+    // Keine Erst-Sichtung, kein Anlass (LLH-1566), keine UHS, keine vermisste Person.
     for body in [
         json!({"name": "A", "sichtung": "SK3"}),
         json!({"name": "B", "uhs_id": 1}),
+        json!({"name": "D", "anlass": "verletzung"}),
     ] {
         let (s, v) = anfrage_json(
             &app,
@@ -5450,16 +5468,21 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
 
-    // Sichtung über die eigene Route gibt es am Gerät ebenfalls nicht.
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{aufgenommen}/sichtung"),
-        &geraet,
-        Some(&json!({"kategorie": "SK3"})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::FORBIDDEN);
+    // Sichtung und Anlass über die eigene Route gibt es am Gerät ebenfalls nicht.
+    for (route, body) in [
+        ("sichtung", json!({"kategorie": "SK3"})),
+        ("anlass", json!({"anlass": "psychisch"})),
+    ] {
+        let (s, _) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/personen/{aufgenommen}/{route}"),
+            &geraet,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{route}");
+    }
 }
 
 /// LLH-1330: eine ohne Netz vorgemerkte Aufnahme an der Betreuungsstelle trägt ihre

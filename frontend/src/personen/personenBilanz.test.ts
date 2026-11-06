@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Person } from '../api/types';
 import {
+  anlassbild,
   hatLuecke,
   istAngetroffen,
   lueckenText,
@@ -310,6 +311,30 @@ describe('sichtungsbild', () => {
     expect(bild).toEqual({
       gesamt: 7,
       je: { sk1: 1, sk2: 0, sk3: 2, sk4: 0, tot: 1, unverletzt: 1, ohne: 2 },
+    });
+  });
+});
+
+describe('anlassbild (LLH-1566)', () => {
+  it('zählt je Anlass, „ohne“ für Personen ohne Anlass, Vermisste nicht, Abgeschlossene mit', () => {
+    const bild = anlassbild([
+      p({ anlass: 'intoxikation' }),
+      p({ anlass: 'intoxikation', versorgung: 'abgeschlossen' }),
+      p({ anlass: 'verletzung' }),
+      p({}),
+      p({ status: 'vermisst', anlass: 'psychisch' }),
+    ]);
+    expect(bild.gesamt).toBe(4);
+    expect(bild.je).toEqual({
+      verletzung: 1,
+      internistisch: 0,
+      neurologisch: 0,
+      intoxikation: 2,
+      hitze_kaelte: 0,
+      allergie: 0,
+      psychisch: 0,
+      sonstiges: 0,
+      ohne: 1,
     });
   });
 });

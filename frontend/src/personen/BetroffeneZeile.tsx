@@ -10,13 +10,14 @@ import { useViewport } from '../components/useViewport';
 import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
 import { formatKoordinate } from './koordinate';
 import {
+  ANLASS_KUERZEL,
   SICHTUNG_BUCHSTABEN,
   loeseBefehl,
   loeseUhsAuf,
   parsePersonBefehl,
   type BefehlTeil,
 } from './personBefehl';
-import { SK_META } from './personMeta';
+import { ANLASS_REIHE, ANLASS_WORT, SK_META } from './personMeta';
 
 /** Aus dem Bild, nicht aus dem Baum: der Vorleser liest die Kürzel weiter als Feldbeschreibung. */
 const NUR_VORLESER = {
@@ -78,6 +79,12 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       return <span style={{ ...monoStil(12), color: rollen.gedaempft }}>{teil.text}</span>;
     case 'sichtung':
       return <SichtungsTag kategorie={teil.wert} style={{ marginInlineEnd: 0 }} />;
+    case 'anlass':
+      return (
+        <span style={{ fontSize: 13, color: rollen.text }} title="Anlass">
+          {ANLASS_WORT[teil.wert]}
+        </span>
+      );
     case 'uhs': {
       const a = loeseUhsAuf(teil.suche, uhsListe);
       return 'uhs' in a ? (
@@ -214,6 +221,10 @@ export default function BetroffeneZeile({
               {SICHTUNG_BUCHSTABEN.map((k) => `${k.kuerzel} = ${SK_META[k.kategorie].label}`).join(
                 ' · ',
               )}
+            </span>
+            {/* Anlass (LLH-1566): je Anlass das erste Kürzel, aus derselben Quelle wie der Parser. */}
+            <span style={{ color: rollen.gedaempft }}>
+              !Anlass: {ANLASS_REIHE.map((a) => ANLASS_KUERZEL[a][0]).join(' · ')}
             </span>
             {/* Das Format zeigt der Platzhalter nicht, also hier. */}
             <span style={{ color: rollen.gedaempft }}>#Fundort (52.2691/9.1342)</span>

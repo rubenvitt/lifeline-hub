@@ -1,11 +1,13 @@
 import type { ApiSendOptionen } from '../api/client';
 import {
   createMassnahme,
+  saveAnlass,
   createVerletzung,
   erfasseSichtung,
   erfasseVerbleib,
   legeNotizAn,
   saveTransport,
+  type AnlassEingabe,
   type MassnahmeEingabe,
   type NotizEingabe,
   type SichtungEingabe,
@@ -14,6 +16,7 @@ import {
   type VerletzungEingabe,
 } from '../api/einsatzPerson';
 import type {
+  Anlass,
   Massnahme,
   Sichtung,
   Transport,
@@ -26,7 +29,7 @@ import type { OfflineSchreibaktion } from './queue';
 /**
  * Die medizinischen Einträge einer Person, die ohne Netz vorgemerkt werden (LLH-1138, Change
  * `y18v58dt-pat-kern`, design.md D8; Spec `personen-verlauf`): Sichtung, Verbleib, Verlaufsnotiz,
- * Transport, Maßnahme und Verletzung. Jede Art hat genau einen POST, der `client_id` und
+ * Transport, Anlass der Hilfeleistung (LLH-1566), Maßnahme und Verletzung. Jede Art hat genau einen POST, der `client_id` und
  * `zeitpunkt_at` annimmt. Das Aufheben einer Maßnahme oder Verletzung gehört nicht dazu: seine
  * Route kennt weder `client_id` noch Erfassungszeit, ein Replay endete in 409.
  */
@@ -35,6 +38,7 @@ export interface PersonEintragDaten {
   verbleib: VerbleibEingabe;
   notiz: NotizEingabe;
   transport: TransportEingabe;
+  anlass: AnlassEingabe;
   massnahme: MassnahmeEingabe;
   verletzung: VerletzungEingabe;
 }
@@ -45,6 +49,7 @@ export interface PersonEintragAntwort {
   verbleib: Verbleib;
   notiz: Verlaufsnotiz;
   transport: Transport;
+  anlass: Anlass;
   massnahme: Massnahme;
   verletzung: Verletzung;
 }
@@ -54,6 +59,7 @@ export type PersonEintragArt = keyof PersonEintragDaten;
 /** Alle Arten, in der Folge des Patientenkopfs. */
 export const PERSON_EINTRAG_ARTEN = [
   'sichtung',
+  'anlass',
   'verbleib',
   'transport',
   'massnahme',
@@ -86,6 +92,7 @@ export const PERSON_EINTRAG_ABGELEHNT: Record<PersonEintragArt, string> = {
   verbleib: 'Abgelehnter Verbleib',
   notiz: 'Abgelehnte Verlaufsnotiz',
   transport: 'Abgelehnter Transport',
+  anlass: 'Abgelehnter Anlass',
   massnahme: 'Abgelehnte Maßnahme',
   verletzung: 'Abgelehnte Verletzung',
 };
@@ -109,6 +116,8 @@ export function sendPersonEintrag(
       return legeNotizAn(einsatzId, pid, aktion.daten, optionen);
     case 'transport':
       return saveTransport(einsatzId, pid, aktion.daten, optionen);
+    case 'anlass':
+      return saveAnlass(einsatzId, pid, aktion.daten, optionen);
     case 'massnahme':
       return createMassnahme(einsatzId, pid, aktion.daten, optionen);
     case 'verletzung':

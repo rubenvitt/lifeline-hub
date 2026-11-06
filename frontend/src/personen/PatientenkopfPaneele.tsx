@@ -2,11 +2,12 @@ import { Button, Flex, Form, Popconfirm, Typography } from 'antd';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useRef } from 'react';
-import type { MassnahmeEingabe, TransportEingabe } from '../api/einsatzPerson';
+import type { AnlassEingabe, MassnahmeEingabe, TransportEingabe } from '../api/einsatzPerson';
 import type {
   Fachrichtung,
   Massnahme,
   MassnahmeArt,
+  PersonAnlass,
   PersonDetail,
   TransportArt,
   TransportPrioritaet,
@@ -20,6 +21,7 @@ import { Segmentleiste, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import BestaetigtVonFeld, { BESTAETIGT_FELD } from '../geraet/BestaetigtVonFeld';
+import AnlassWahl from './AnlassWahl';
 import FlaechenWahl from './FlaechenWahl';
 import {
   FACHRICHTUNG_WORT,
@@ -32,9 +34,9 @@ import {
 import { uhrzeit } from '../anzeige/zeitDarstellung';
 
 /**
- * Die Paneele „Transport festlegen“ und „Maßnahme erfassen“ des Patientenkopfs (Change
- * `y18v58dt-pat-kern`, design.md D14, Spec `personen-detail`, „Sichten, Verbleib und Notiz ohne
- * Dialog“). Wie Sichtung und Verbleib: die Mutation hält der Kopf (Wechselsperre), das Paneel
+ * Die Paneele „Anlass festlegen“ (LLH-1566), „Transport festlegen“ und „Maßnahme erfassen“ des
+ * Patientenkopfs (Change `y18v58dt-pat-kern`, design.md D14, Spec `personen-detail`, „Sichten,
+ * Verbleib und Notiz ohne Dialog“). Wie Sichtung und Verbleib: die Mutation hält der Kopf (Wechselsperre), das Paneel
  * schließt nur sich selbst, eine Ablehnung bleibt in ihm stehen. Am UHS-Gerät nennt
  * `BestaetigtVonFeld` die bestätigende Person.
  */
@@ -148,6 +150,51 @@ export function TransportPaneel({
           <Select<Fachrichtung> allowClear options={FACHRICHTUNG_OPTIONEN} />
         </Form.Item>
         <BestaetigtVonFeld einsatzId={einsatzId} />
+      </ErfassungsFormular>
+    </section>
+  );
+}
+
+interface AnlassWerte {
+  anlass?: PersonAnlass | null;
+}
+
+/**
+ * Anlass festlegen (LLH-1566): vorbelegt mit dem aktuellen Anlass. Ein anderer ersetzt ihn, der
+ * zurückgenommene (Tipp auf den gewählten) hebt ihn auf; beides steht danach im Verlauf. Ohne
+ * Anlass an der Person gibt es nichts aufzuheben, dann ist eine Wahl Pflicht.
+ */
+export function AnlassPaneel({
+  person,
+  mutation,
+  onSchliessen,
+}: {
+  person: PersonDetail;
+  mutation: UseMutationResult<unknown, Error, AnlassEingabe>;
+  onSchliessen: () => void;
+}) {
+  const [form] = Form.useForm<AnlassWerte>();
+  const hatAnlass = person.anlass != null;
+  return (
+    <section aria-label="Anlass festlegen" data-lfh="anlass-paneel">
+      <ErfassungsFormular<AnlassWerte>
+        form={form}
+        erfassenText="Anlass festlegen"
+        laeuft={mutation.isPending}
+        speicherung={mutation}
+        speicherFehlerTitel="Anlass nicht festgelegt"
+        initialValues={{ anlass: person.anlass ?? null }}
+        onErfassen={(v) => mutation.mutateAsync({ anlass: v.anlass ?? null })}
+        onFertig={onSchliessen}
+        onAbbrechen={onSchliessen}
+      >
+        <Form.Item
+          label="Anlass"
+          name="anlass"
+          rules={hatAnlass ? [] : [{ required: true, message: 'Bitte einen Anlass wählen' }]}
+        >
+          <AnlassWahl />
+        </Form.Item>
       </ErfassungsFormular>
     </section>
   );

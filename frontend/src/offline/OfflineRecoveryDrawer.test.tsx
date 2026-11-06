@@ -424,6 +424,7 @@ describe('OfflineRecoveryDrawer: abgelehnte Einträge einer Person (LLH-1138, de
       { prioritaet: 'dringlich', art: null, fachrichtung: null },
       'Abgelehnter Transport: R-012',
     ],
+    ['anlass', { anlass: 'intoxikation' }, 'Abgelehnter Anlass: R-012'],
     ['massnahme', { art: 'zugang' }, 'Abgelehnte Maßnahme: R-012'],
     [
       'verletzung',

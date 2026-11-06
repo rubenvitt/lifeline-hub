@@ -139,6 +139,7 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
         transporte: [],
         massnahmen: [],
         verletzungen: [],
+        anlaesse: [],
       } as PersonDetail),
     ),
     // Die Bestätiger-Liste („Bestätigt von“) holt das UHS-Tablet vorab, damit sie ohne Netz da
@@ -565,6 +566,7 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
           transporte: [],
           massnahmen: [],
           verletzungen: [],
+          anlaesse: [],
         } as PersonDetail),
       ),
     );

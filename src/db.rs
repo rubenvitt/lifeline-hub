@@ -12461,4 +12461,74 @@ mod tests {
             .await
             .expect_err("uhs.quali_soll nur JSON");
     }
+
+    /// LLH-1566: `person_anlass` nimmt nur Katalogwerte (leer hebt auf) und ist je Einsatz über
+    /// `client_id` eindeutig; der Cache an `einsatz_person` trägt denselben Katalog.
+    #[tokio::test]
+    async fn migration_0277_person_anlass() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 277;
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), VERSION).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let stand = |anlass: Option<&'static str>, client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_anlass (einsatz_id, person_id, anlass, zeitpunkt_at, \
+                        erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, '2026-11-06 20:00:00', '2026-11-06 20:00:05', ?, ?)",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(anlass)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        for a in [
+            "verletzung",
+            "internistisch",
+            "neurologisch",
+            "intoxikation",
+            "hitze_kaelte",
+            "allergie",
+            "psychisch",
+            "sonstiges",
+        ] {
+            stand(Some(a), None).await.unwrap();
+        }
+        stand(None, Some("a1")).await.expect("leer hebt auf");
+        stand(Some("sonstiges"), Some("a1"))
+            .await
+            .expect_err("derselbe Schlüssel im selben Einsatz");
+        stand(Some("kopfweh"), None)
+            .await
+            .expect_err("nur Katalogwerte");
+
+        let cache = |anlass: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query("UPDATE einsatz_person SET anlass = ?, anlass_at = ? WHERE id = ?")
+                    .bind(anlass)
+                    .bind("2026-11-06 20:00:00")
+                    .bind(p)
+                    .execute(&pool)
+                    .await
+            }
+        };
+        cache("intoxikation").await.unwrap();
+        cache("kopfweh").await.expect_err("Cache nur Katalogwerte");
+    }
 }

@@ -13,7 +13,7 @@ const SELECT_ALLE: &str = "\
            aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status, \
            aktuelle_verbleib_betreuungsstelle_id, pat_nummer, kontamination, \
            transport_prioritaet, transport_art, transport_fachrichtung, transport_at, \
-           aktueller_transport_durch, aktuelles_einsatz_fahrzeug_id \
+           aktueller_transport_durch, aktuelles_einsatz_fahrzeug_id, anlass, anlass_at \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);

@@ -405,6 +405,22 @@ export interface components {
          * @enum {string}
          */
         AnlageArt: "fernmeldeskizze" | "lageplan";
+        /** @description Ein Anlass-Stand (1:1 zu `person_anlass`). Ohne `anlass` heißt er „aufgehoben“. */
+        AnlassAnzeige: {
+            anlass?: components["schemas"]["PersonAnlass"] | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wann der Stand beim Server ankam. */
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            person_id: number;
+            /** @description Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt. */
+            zeitpunkt_at: string;
+        };
         /** @description Eine Zeile der Anmeldespur, wie die Verwaltung sie liest (LFH-1097). */
         AnmeldeEintragAnzeige: {
             /** Format: int64 */
@@ -5427,6 +5443,12 @@ export interface components {
             person_id: number;
         };
         /**
+         * @description Anlass der Hilfeleistung, fester Katalog (Ruben 05.11.2026: kein fester Statistikbogen).
+         *     String = CHECK in `migrations/0277_person_anlass.sql`. Kategorie Behandlung, nie im ETB.
+         * @enum {string}
+         */
+        PersonAnlass: "verletzung" | "internistisch" | "neurologisch" | "intoxikation" | "hitze_kaelte" | "allergie" | "psychisch" | "sonstiges";
+        /**
          * @description Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
          *     `org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,
          *     kein Snapshot wie bei Material.
@@ -5455,6 +5477,9 @@ export interface components {
             aktuelles_verbleib_ziel?: string | null;
             /** Format: int64 */
             alter_geschaetzt?: number | null;
+            anlass?: components["schemas"]["PersonAnlass"] | null;
+            /** @description Erfassungszeit des aktuellen Anlasses. */
+            anlass_at?: string | null;
             /**
              * Format: double
              * @description Fundort-Koordinate (WGS84), immer gemeinsam mit `antreff_lon` gesetzt oder leer.
@@ -5534,6 +5559,8 @@ export interface components {
          */
         PersonDetail: components["schemas"]["PersonAnzeige"] & {
             abgleiche: components["schemas"]["AbgleichAnzeige"][];
+            /** @description Anlass-Verlauf (LLH-1566), der aktuelle Stand zuerst; ein Stand ohne Anlass hebt auf. */
+            anlaesse: components["schemas"]["AnlassAnzeige"][];
             aufenthalt?: components["schemas"]["AufenthaltAnzeige"] | null;
             /** @description Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`. */
             massnahmen: components["schemas"]["MassnahmeAnzeige"][];

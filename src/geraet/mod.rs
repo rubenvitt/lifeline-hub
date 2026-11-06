@@ -268,6 +268,8 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
     // PAT-Kern (Change y18v58dt-pat-kern, Spec `funktionsansichten`).
     ("POST", "/api/einsaetze/{id}/personen/{pid}/transport"),
+    // Anlass der Hilfeleistung (LLH-1566), wie die Sichtung nur an der UHS.
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/anlass"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/massnahmen"),
     (
         "POST",
@@ -323,6 +325,8 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/transport"),
+    // Anlass der Hilfeleistung (LLH-1566), wie die Sichtung nur an der UHS.
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/anlass"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/massnahmen"),
     (
         "POST",

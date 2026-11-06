@@ -300,6 +300,8 @@ use utoipa::OpenApi;
         crate::person::massnahme_repo::MassnahmeAnzeige,
         crate::person::massnahme_repo::MassnahmeArt,
         crate::person::sichtung_repo::SichtungAnzeige,
+        crate::person::anlass_repo::AnlassAnzeige,
+        crate::person::anlass_repo::PersonAnlass,
         crate::person::transport_repo::Fachrichtung,
         crate::person::transport_repo::TransportAnzeige,
         crate::person::transport_repo::TransportArt,
