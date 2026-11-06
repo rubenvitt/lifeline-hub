@@ -16,6 +16,7 @@ import { benutzerFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
 import { warteAufMenueFokus } from '../test/menue';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
@@ -587,6 +588,24 @@ describe('MeldungenPage', () => {
     freigeben();
     await waitFor(() => expect(client.isFetching()).toBe(0));
     expect(screen.getByLabelText('Fundort')).toHaveValue('Bühne 3');
+  });
+
+  it('belegt mit Netz keine Einheit aus veraltetem Cache vor (LLH-1567)', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ einheit_id: 5 })]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // Der Cache kennt die Einheit noch, der Server hat sie inzwischen aufgelöst.
+    client.setQueryData(einsatzKeys.personenEinheiten(1), [
+      { id: 5, name: 'Streife 1', abschnitt_name: null },
+    ]);
+    server.use(http.get('/api/einsaetze/:eid/personen/einheiten', () => HttpResponse.json([])));
+    renderPage(undefined, client);
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: 'Patient anlegen' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Zu Meldung #1/)).toBeInTheDocument();
+    expect(within(dialog).queryByText('Streife 1')).not.toBeInTheDocument();
   });
 
   it('zeigt bei verknüpfter Meldung einen Backlink zum Auftrag statt der Erteilen-Aktion', async () => {

@@ -563,11 +563,13 @@ export default function MeldungenPage() {
   const auftragGesperrt = sprungGesperrt('auftraege');
   // „Patient anlegen“ schreibt in die Personen: ohne deren Freigabe gesperrt sichtbar.
   const personenGesperrt = sprungGesperrt('personen');
-  // Ohne Netz pausiert die Abfrage und bliebe ewig „pending“: dann öffnet die Maske ohne
-  // vorbelegte Einheit, statt gar nicht. Einmal offen, bleibt sie offen, auch wenn die Abfrage
-  // beim Wiederverbinden kurz lädt: ein Schließen und Wiederöffnen belegte sonst neu vor.
+  // Mit Netz wartet die Maske auf die frische Einheitenliste, damit kein veralteter Cache eine
+  // inzwischen aufgelöste Einheit vorbelegt. Ohne Netz pausiert die Abfrage: dann öffnet sie mit
+  // dem, was da ist (oder ohne Einheit), statt gar nicht. Einmal offen, bleibt sie offen, auch
+  // wenn die Abfrage beim Wiederverbinden lädt: ein Wiederöffnen belegte sonst neu vor.
   const versorgendeBereit =
-    !versorgendeQuery.isPending || versorgendeQuery.fetchStatus === 'paused';
+    versorgendeQuery.fetchStatus === 'paused' ||
+    (!versorgendeQuery.isPending && versorgendeQuery.fetchStatus === 'idle');
   const [patientGeoeffnet, setPatientGeoeffnet] = useState<DialogAuswahl | null>(null);
   if (patientMeldung && versorgendeBereit && patientGeoeffnet !== patientAuswahl) {
     setPatientGeoeffnet(patientAuswahl);
