@@ -245,8 +245,6 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.abloesungen,
     // Handstatus, Nachtrag und Streichung an einer Einheit (LFH-552).
     EINSATZ_KEYS.kraefteZeitachse,
-    // Wahl der versorgenden Einheit (LLH-1567): Name, Abschnitt, Auflösen.
-    EINSATZ_KEYS.personenEinheiten,
     EINSATZ_KEYS.lagemonitor,
     // „in «2. Zug»“ an den Kräften einer Vorlage (LLH-1049).
     EINSATZ_KEYS.einheitAusVorlage,
@@ -254,6 +252,8 @@ export const EINSATZ_STREAM_EVENTS = {
     // `GET …/verpflegung` (LLH-1055 D4); der Server verteilt `einheit` dafür auch an Leser der
     // Verpflegung.
     EINSATZ_KEYS.verpflegung,
+    // Wahl der versorgenden Einheit (LLH-1567): Name, Abschnitt, Auflösen.
+    EINSATZ_KEYS.personenEinheiten,
   ],
   // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke,
   // Betreuungsstellen, die BR-Liste, Einheiten und Dokumente tragen den Abschnittsnamen per Join.
