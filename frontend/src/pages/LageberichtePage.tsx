@@ -8,6 +8,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte, schreibeLageberichtFort } from '../api/lageberichte';
+import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
 import type { LageberichtAbschnitt, LageberichtVorlageKey } from '../api/types';
 import { anzahl } from '../anzeige/anzahl';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -88,6 +89,9 @@ export default function LageberichtePage() {
     queryKey: einsatzKeys.lageberichte(einsatzId),
     queryFn: () => listeLageberichte(einsatzId),
   });
+  // Gescheitert ohne Daten, auch während eines neuen Versuchs: TanStack setzt eine Abfrage ohne
+  // Daten beim Nachladen auf `pending` zurück, das Banner verschwände sonst (LLH-1581).
+  const berichteFehler = useFehlerOhneDaten(berichteQuery);
 
   const oeffne = (vars: { einsatzId: number }, neuId: number) => {
     void qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(vars.einsatzId) });
@@ -175,16 +179,18 @@ export default function LageberichtePage() {
       : null;
 
   const inhalt = (() => {
-    if (berichteQuery.isLoading) return <SeitenSkeleton />;
-    if (berichteQuery.isError && !berichteQuery.data) {
+    // Vor dem Laden: ein neuer Versuch nach dem Fehler ist auch `isLoading`.
+    if (berichteFehler.gescheitert) {
       return (
         <SeitenFehler
           text="Lageberichte nicht abrufbar · Stand unbekannt"
-          ursache={berichteQuery.error}
+          ursache={berichteFehler.fehler}
+          laedt={berichteFehler.laedt}
           onWiederholen={() => void berichteQuery.refetch()}
         />
       );
     }
+    if (berichteQuery.isLoading) return <SeitenSkeleton />;
     if (berichte.length === 0) {
       return (
         <SeitenLeer

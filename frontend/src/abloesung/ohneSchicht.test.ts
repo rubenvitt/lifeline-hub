@@ -157,8 +157,8 @@ describe('findOhneSchicht (LLH-1128)', () => {
           einheit_name: 'Florian 1',
           abloesende_einheit_id: 2,
           abloeser: [
-            { einheit_id: 2, einheit_name: 'Florian 2' },
-            { einheit_id: 3, einheit_name: 'Florian 3' },
+            { einheit_id: 2, einheit_name: 'Florian 2', untereinheiten: [] },
+            { einheit_id: 3, einheit_name: 'Florian 3', untereinheiten: [] },
           ],
         }),
       ],
@@ -188,7 +188,7 @@ describe('findOhneSchicht (LLH-1128)', () => {
         schicht({
           einheit_id: 1,
           einheit_name: 'Florian 1',
-          abloeser: [{ einheit_id: 2, einheit_name: 'Zug 2' }],
+          abloeser: [{ einheit_id: 2, einheit_name: 'Zug 2', untereinheiten: [] }],
         }),
       ],
     );

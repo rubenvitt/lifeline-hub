@@ -33,7 +33,9 @@ Einsatzleitung und Führungspersonal.
    ablösenden Einheiten („Ablösung geplant durch …“). Ist eine von ihnen alarmiert oder
    eingetroffen, steht dort ihr Stand, etwa „Ablösung: 2. Rettungsstaffel · alarmiert 1340 ·
    eingetroffen 1412 (BR Sportplatz)“. Wurde sie aus dem Bereitstellungsraum abgerufen, kommt
-   „· abgerufen 1425“ hinzu, bis sie ausrückt. Ist eine geplante Einheit schon für eine andere Schicht
+   „· abgerufen 1425“ hinzu, bis sie ausrückt. Ist ein Verband geplant, zählen seine
+   Untereinheiten mit: die Zeile nennt den Verband mit der jeweils frühesten Zeit, etwa die
+   Alarmierung seiner ersten Staffel. Ist eine geplante Einheit schon für eine andere Schicht
    geplant oder steht sie selbst im Einsatz, nennt die Zeile darunter das, etwa „Sanitätsgruppe UHS
    steht selbst im Einsatz seit 0820“.
 
@@ -219,8 +221,14 @@ die abzulösende Einheit. Hinweise aus älteren Versionen nennen die gerade gepl
 ist keine mehr geplant, nur die abzulösende. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
 Alarmiert und eingetroffen zählen nur am Anfang ihres Einsatzabschnitts in der
 Kräfte-Zeitachse, auch als Nachtrag; ein Nachtrag in einen abgeschlossenen Abschnitt und seine
-Streichung melden nichts. Bei einem
-Verband zählt nur die geplante Einheit, nicht ihre Untereinheiten.
+Streichung melden nichts.
+
+Ist ein Verband geplant, zählen auch seine Untereinheiten. Wird etwa seine erste Staffel
+alarmiert, kommt der Hinweis „Ablösende Einheit alarmiert“ mit der Zeile „Ablösung für
+Rettungsstaffel: Verband Nord (durch 1. Staffel)“. Jede weitere Staffel, die danach alarmiert wird,
+meldet nichts mehr; das gilt genauso für das Eintreffen, den Bereitstellungsraum und den Abruf.
+Einheiten, die beim Abruf mitgehen, melden nie eigens. „… gestrichen“ kommt erst, wenn im Verband
+keine Einheit mehr alarmiert bzw. eingetroffen ist.
 
 Wird die geplante Einheit aufgelöst oder entlassen, entfällt die Planung: die Karte zeigt keine
 geplante Ablösung mehr, das Einsatztagebuch hält „Planung der ablösenden Einheit entfallen“ fest,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { Alert, Breadcrumb, Button, Flex, Tag, Typography, theme } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
@@ -243,7 +244,8 @@ export default function SchaedenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
 
   const { token } = theme.useToken();
   const [sicht, setSicht] = useState<SchaedenSicht>('offen');
@@ -321,14 +323,16 @@ export default function SchaedenPage() {
   const csvExport = useCsvExport(einsatzId, 'schaeden', ladeSchaedenExport);
 
   // Schnellaktion: ?neu=1 öffnet die Erfassung (Command-Palette). Warten bis der Einsatz geladen
-  // ist; Param immer löschen, Modal nur bei Schreibrecht.
+  // ist; Param immer löschen, Modal nur bei Schreibrecht. Einmal je Verlaufseintrag
+  // (`useLinkAuftrag`, LLH-1558), geräumt aus einer Kopie statt der Instanz, die Render und andere
+  // Effekte lesen.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) setErfassenOffen(true);
-    searchParams.delete('neu');
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh]);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh]);
 
   /**
    * Seitenzustand — nur `einsatzQuery`: Breadcrumb, Titelzeile und Einsatz-Status hängen an

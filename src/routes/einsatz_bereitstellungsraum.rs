@@ -690,8 +690,9 @@ pub async fn abruf(
             &ergebnis.etb_text(),
         )
         .await?;
-        // Eine als ablösende geplante Einheit ist abgerufen (LLH-1131); mitgenommene
-        // Untereinheiten zählen nicht, wie beim Verband nur der Knoten.
+        // Eine als ablösende geplante Einheit ist abgerufen (LLH-1131), auch als Untereinheit
+        // eines geplanten Verbands (LLH-1509); mitgenommene Untereinheiten zählen nicht, wie
+        // beim Verband nur der Knoten.
         let hinweise = match typ {
             ObjektTyp::Einheit => {
                 crate::abloesung::hinweis::anlaesse_tx(

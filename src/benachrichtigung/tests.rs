@@ -913,7 +913,7 @@ async fn hinweis_zur_abloesenden_einheit_nennt_die_festgehaltene_einheit() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    let detail = |typ, einheit: Option<i64>| {
+    let detail_durch = |typ, einheit: Option<i64>, durch: Option<i64>| {
         let pool = pool.clone();
         async move {
             text::bilden_mit_einheit(
@@ -921,14 +921,31 @@ async fn hinweis_zur_abloesenden_einheit_nennt_die_festgehaltene_einheit() {
                 e,
                 BenachrichtigungArt::AbloesungAbloeser,
                 Bezug::neu(typ, schicht),
-                einheit,
+                text::HinweisEinheiten {
+                    einheit_id: einheit,
+                    durch_einheit_id: durch,
+                },
             )
             .await
             .unwrap()
             .detail
         }
     };
+    let detail = |typ, einheit: Option<i64>| detail_durch(typ, einheit, None);
     use BenachrichtigungBezugTyp as B;
+    // LLH-1509: hat eine Untereinheit ausgelöst, folgt sie; eine verschwundene fällt weg.
+    assert_eq!(
+        detail_durch(B::AbloeserAlarmiert, Some(rs2), Some(rs3))
+            .await
+            .as_deref(),
+        Some("Ablösung für Rettungsstaffel: 2. Rettungsstaffel (durch 3. Rettungsstaffel)")
+    );
+    assert_eq!(
+        detail_durch(B::AbloeserAlarmiert, Some(rs2), Some(rs2 + 1000))
+            .await
+            .as_deref(),
+        Some("Ablösung für Rettungsstaffel: 2. Rettungsstaffel")
+    );
     assert_eq!(
         detail(B::AbloeserAlarmiert, Some(rs2)).await.as_deref(),
         Some("Ablösung für Rettungsstaffel: 2. Rettungsstaffel"),

@@ -82,6 +82,7 @@ const lage: LagemonitorAnzeige = {
   zonen: [],
   abschnitte: [],
   sofortmeldungen_offen: 0,
+  programm: [],
 };
 
 let lagebildAntwort: () => Response;
@@ -414,6 +415,56 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
       strom!.emit('abloesung', JSON.stringify({ einsatz_id: 7, art: 'faellig' }));
     });
     expect(spieleAlarmTon).not.toHaveBeenCalled();
+  });
+});
+
+describe('Lagemonitor — Ablauf der Veranstaltung (LLH-1570)', () => {
+  // Je 30 s nach der vollen Minute: die Uhr läuft mit `shouldAdvanceTime` beim Laden ein paar
+  // Sekunden weiter, der Abstand bleibt trotzdem auf der Minute.
+  const programm = [
+    { id: 1, bezeichnung: 'Beginn', zeitpunkt_at: '2026-10-04 10:20:30' },
+    { id: 2, bezeichnung: 'Feuerwerk', zeitpunkt_at: '2026-10-04 11:05:30' },
+    { id: 3, bezeichnung: 'Ende', zeitpunkt_at: '2026-10-04 12:00:30' },
+  ];
+
+  it('zeigt die nächsten Programmpunkte mit Abstand, ohne Alarm', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, programm });
+    renderApp('/geraet/7/monitor');
+    const ablauf = await screen.findByRole('region', { name: 'Ablauf' });
+    const zeilen = within(ablauf).getAllByRole('listitem');
+    expect(zeilen.map((z) => z.textContent)).toEqual([
+      // Uhrzeit in der Anzeigezone (Europe/Berlin), dann Bezeichnung und Abstand.
+      expect.stringMatching(/^12:?20Beginnin 20 min$/),
+      expect.stringMatching(/Feuerwerkin 1 h 05 min$/),
+      expect.stringMatching(/Endein 2 h 00 min$/),
+    ]);
+    expect(within(ablauf).queryByText(/überfällig/)).toBeNull();
+    // Meldungen teilen sich die Zeile mit dem Ablauf.
+    expect(screen.getByRole('region', { name: 'Meldungen' })).toBeInTheDocument();
+  });
+
+  it('ein verstrichener Programmpunkt fällt mit der Monitoruhr heraus, auch ohne Abruf', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, programm });
+    renderApp('/geraet/7/monitor');
+    const ablauf = await screen.findByRole('region', { name: 'Ablauf' });
+    expect(within(ablauf).getByText('Beginn')).toBeInTheDocument();
+    // Der Server liefert weiter denselben Stand; die Uhr läuft über „Beginn“ hinaus.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20 * 60_000 + 40_000);
+    });
+    expect(within(ablauf).queryByText('Beginn')).toBeNull();
+    expect(within(ablauf).getByText('Feuerwerk')).toBeInTheDocument();
+  });
+
+  it('ohne anstehenden Programmpunkt fehlt die Kachel', async () => {
+    bereit();
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Betroffene' });
+    expect(screen.queryByRole('region', { name: 'Ablauf' })).toBeNull();
   });
 });
 

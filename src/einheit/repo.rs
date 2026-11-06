@@ -1396,6 +1396,12 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
                        WHERE einheit_vorher_id = ?1 OR einheit_nachher_id = ?1)",
         "Ein Besatzungswechsel nennt die Einheit",
     ),
+    // LLH-1552 (Mig 0277): ein Block des Schichtplans an der Einheit. Die Einheit bleibt
+    // aufgelöst stehen, der Block mit dem Befund „verfügbar“.
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_planschicht WHERE einheit_id = ?)",
+        "Der Schichtplan nennt die Einheit",
+    ),
     (
         "SELECT EXISTS(SELECT 1 FROM etb_eintrag_einheit WHERE einheit_id = ?)",
         "Einträge im Einsatztagebuch nennen die Einheit",

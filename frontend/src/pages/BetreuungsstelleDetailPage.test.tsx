@@ -14,6 +14,11 @@ import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
 import { waehleMenueEintrag } from '../test/menue';
+import {
+  BETREUUNG_STELLE_BEZEICHNUNG_MAX,
+  BETREUUNG_STELLE_NOTIZ_MAX,
+  BETREUUNG_STELLE_STANDORT_MAX,
+} from '../api/eingabegrenzen';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -241,6 +246,29 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
       await screen.findByText('Betreuungsstelle Turnhalle Ost gespeichert'),
     ).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByLabelText('Kapazität (Personen)')).toBeNull());
+  });
+
+  it('LLH-1582: Bezeichnung, Standort und Notiz über der Grenze stehen am Feld und senden nicht', async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const felder = [
+      ['Bezeichnung', BETREUUNG_STELLE_BEZEICHNUNG_MAX, '200'],
+      ['Standort', BETREUUNG_STELLE_STANDORT_MAX, '500'],
+      ['Notiz', BETREUUNG_STELLE_NOTIZ_MAX, '2.000'],
+    ] as const;
+    for (const [label, max] of felder) {
+      const feld = await screen.findByLabelText(label);
+      await userEvent.clear(feld);
+      await userEvent.click(feld);
+      await userEvent.paste('x'.repeat(max + 1));
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    for (const [label, , grenze] of felder) {
+      expect(
+        await screen.findByText(`${label} darf höchstens ${grenze} Zeichen lang sein`),
+      ).toBeInTheDocument();
+    }
+    expect(api.aendereStelle).not.toHaveBeenCalled();
   });
 
   /** Standort über das Ortsfeld (LLH-1121, design.md D3/D6). */

@@ -21,7 +21,13 @@ import {
 } from '../api/betreuung';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { BETREUUNG_KONTAKTWEG_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
+import {
+  BETREUUNG_KONTAKTWEG_MAX,
+  BETREUUNG_LEITUNG_MAX,
+  BETREUUNG_STELLE_BEZEICHNUNG_MAX,
+  BETREUUNG_STELLE_NOTIZ_MAX,
+  BETREUUNG_STELLE_STANDORT_MAX,
+} from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
   BelegungsmeldungEingabe,
@@ -66,7 +72,7 @@ import StatusTag from '../components/StatusTag';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
-import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
@@ -385,9 +391,15 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
 
   const stammdaten = (
     <Datenraster spalten={3} beschriftung="Stammdaten der Stelle">
-      {zelle('bezeichnung', 'Bezeichnung', <Input />, s.bezeichnung, {
-        rules: [bezeichnungRegel],
-      })}
+      {zelle(
+        'bezeichnung',
+        'Bezeichnung',
+        <Input count={zeichenGrenze(BETREUUNG_STELLE_BEZEICHNUNG_MAX)} />,
+        s.bezeichnung,
+        {
+          rules: [bezeichnungRegel, zeichenRegel(BETREUUNG_STELLE_BEZEICHNUNG_MAX, 'Bezeichnung')],
+        },
+      )}
       {zelle('art', 'Art', <Select options={ART_OPTIONEN} />, ART_LABEL[s.art], {
         rules: [{ required: true, message: 'Bitte eine Art wählen' }],
       })}
@@ -418,9 +430,13 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           einsatzId={einsatzId}
           etikett="Standort"
           exclude={`betreuungsstelle:${s.id}`}
+          count={zeichenGrenze(BETREUUNG_STELLE_STANDORT_MAX)}
         />,
         s.standort ?? leer,
-        { breit: bearbeiten },
+        {
+          breit: bearbeiten,
+          rules: [ortZeichenRegel(BETREUUNG_STELLE_STANDORT_MAX, 'Standort')],
+        },
       )}
       {!bearbeiten && (
         <Datenfeld label="Koordinate">
@@ -454,9 +470,16 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
         s.kontaktweg ?? leer,
         { mono: true, rules: [zeichenRegel(BETREUUNG_KONTAKTWEG_MAX, 'Kontakt')] },
       )}
-      {zelle('notiz', 'Notiz', <Input.TextArea autoSize={{ minRows: 2 }} />, s.notiz ?? leer, {
-        breit: true,
-      })}
+      {zelle(
+        'notiz',
+        'Notiz',
+        <Input.TextArea
+          autoSize={{ minRows: 2 }}
+          count={zeichenGrenze(BETREUUNG_STELLE_NOTIZ_MAX)}
+        />,
+        s.notiz ?? leer,
+        { breit: true, rules: [zeichenRegel(BETREUUNG_STELLE_NOTIZ_MAX, 'Notiz')] },
+      )}
     </Datenraster>
   );
 

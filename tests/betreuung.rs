@@ -2276,6 +2276,107 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     }
 }
 
+/// LLH-1582: Bezeichnung, Standort und Notiz einer Betreuungsstelle haben je eine Grenze, beim
+/// Anlegen wie beim Ändern. Genau die Grenze (nach dem Trimmen) geht durch, ein Zeichen mehr ist
+/// 400 und ändert nichts.
+#[tokio::test]
+async fn stelle_freitexte_haben_grenzen() {
+    use lifeline_hub::betreuung::{STELLE_BEZEICHNUNG_MAX, STELLE_NOTIZ_MAX, STELLE_STANDORT_MAX};
+    use serde_json::json;
+
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let felder = [
+        ("bezeichnung", "Bezeichnung", STELLE_BEZEICHNUNG_MAX),
+        ("standort", "Standort", STELLE_STANDORT_MAX),
+        ("notiz", "Notiz", STELLE_NOTIZ_MAX),
+    ];
+    let stellen = |u: Value| u["stellen"].as_array().unwrap().clone();
+
+    // Anlegen: ein Zeichen zu viel ist 400, je Feld mit seinem Namen; keine Stelle entsteht.
+    for (feld, name, max) in felder {
+        let mut body = json!({ "bezeichnung": "Gesamtschule", "art": "notunterkunft" });
+        body[feld] = json!("x".repeat(max + 1));
+        let (s, j) = anfrage(
+            &app,
+            "POST",
+            &format!("{}/stellen", pfad(e)),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}: {j:?}");
+        assert_eq!(
+            j["error"],
+            format!("{name} darf höchstens {max} Zeichen lang sein"),
+            "{feld}"
+        );
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(stellen(u).len(), 0);
+
+    // Anlegen: genau die Grenze geht, Rand-Leerzeichen zählen nicht mit.
+    let mut body = json!({ "art": "notunterkunft" });
+    for (feld, _, max) in felder {
+        body[feld] = json!(format!(" {} ", "ä".repeat(max)));
+    }
+    let (s, st) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen", pfad(e)),
+        &admin,
+        Some(&body.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{st:?}");
+    for (feld, _, max) in felder {
+        assert_eq!(st[feld], "ä".repeat(max).as_str(), "{feld}");
+    }
+    let sid = st["id"].as_i64().unwrap();
+
+    // Ändern: ein Zeichen zu viel ist 400 und ändert nichts.
+    for (feld, name, max) in felder {
+        let (s, j) = anfrage(
+            &app,
+            "PATCH",
+            &format!("{}/stellen/{sid}", pfad(e)),
+            &admin,
+            Some(&json!({ feld: "y".repeat(max + 1) }).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}: {j:?}");
+        assert_eq!(
+            j["error"],
+            format!("{name} darf höchstens {max} Zeichen lang sein"),
+            "{feld}"
+        );
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    let liste = stellen(u);
+    for (feld, _, max) in felder {
+        assert_eq!(
+            liste[0][feld],
+            "ä".repeat(max).as_str(),
+            "{feld} unverändert"
+        );
+    }
+
+    // Ändern: genau die Grenze geht.
+    for (feld, _, max) in felder {
+        let (s, j) = anfrage(
+            &app,
+            "PATCH",
+            &format!("{}/stellen/{sid}", pfad(e)),
+            &admin,
+            Some(&json!({ feld: "y".repeat(max) }).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{feld}: {j:?}");
+        assert_eq!(j[feld], "y".repeat(max).as_str(), "{feld}");
+    }
+}
+
 // ── LLH-1291: Abschnittsname per Join ────────────────────────────────────────────────────────
 
 /// Stellen und Bezirke tragen den Abschnittsnamen per Join, ihre Leser erreicht `abschnitt` aber

@@ -35,6 +35,13 @@ export interface components {
             /** Format: int64 */
             einheit_id: number;
             einheit_name: string;
+            /**
+             * @description Die aktiven Untereinheiten des Ablösers, nach ID (LLH-1509): ihr Teilbaum über
+             *     `ueber_einheit_id`, ohne ihn selbst ([`untereinheiten`]). Ihre Ereignisse zählen für den
+             *     Stand an der Karte, wie für die Hinweise (`hinweis::anlaesse_tx`). Nur an einer laufenden
+             *     Schicht; sonst leer.
+             */
+            untereinheiten: number[];
         };
         /** @description Öffentliche Darstellung einer Schicht. */
         AbloesungAnzeige: {
@@ -4182,6 +4189,11 @@ export interface components {
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
             /**
+             * @description Die nächsten anstehenden Programmpunkte der Veranstaltung (LLH-1570, höchstens
+             *     [`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen.
+             */
+            programm: components["schemas"]["Programmpunkt"][];
+            /**
              * Format: int64
              * @description Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
              */
@@ -4985,6 +4997,13 @@ export interface components {
          * @enum {string}
          */
         ObjektTyp: "einheit" | "fahrzeug";
+        /** @description Was von einer Anforderung offen bleibt. */
+        OffeneAnforderung: {
+            /** Format: int64 */
+            fehlen: number;
+            /** Format: int64 */
+            qualifikation_id: number;
+        };
         /**
          * @description Eine Offline-Karte als DB-Zeile (Admin-CRUD). `aktiv_basemap` = die von `/tiles` ausgelieferte
          *     Karte; `status` und die Download-Felder (groesse/sha256/download_at) pflegt LFH-181.
@@ -5659,6 +5678,108 @@ export interface components {
          * @enum {string}
          */
         PersonenArt: "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
+        /** @description Ein Prüfbefund an einem Block oder an einer Person in einem Block. */
+        PlanBefund: {
+            /**
+             * Format: int64
+             * @description Bei `doppelt`: der andere Block.
+             */
+            anderer_block_id?: number | null;
+            art: components["schemas"]["PlanBefundArt"];
+            /**
+             * Format: int64
+             * @description Bei `dienst`: Länge der Dienststrecke in Minuten.
+             */
+            dauer_minuten?: number | null;
+            /**
+             * Format: int64
+             * @description Bei `quali`: wie viele dieser Qualifikation fehlen.
+             */
+            fehlen?: number | null;
+            /**
+             * Format: int64
+             * @description Bei `quali`: die geforderte Qualifikation.
+             */
+            qualifikation_id?: number | null;
+        };
+        /**
+         * @description Art eines Prüfbefunds (Spec `kraefte-schichtplan`, „Prüfbefunde“). Befunde blockieren nie.
+         *     Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanBefundArt: "doppelt" | "quali" | "dienst" | "verfuegbar" | "abweichung";
+        /** @description Ein Block des Plans. */
+        PlanBlockAnzeige: {
+            /** @description Befunde des Blocks selbst (`quali`, `verfuegbar` des Postens). */
+            befunde: components["schemas"]["PlanBefund"][];
+            bis: string;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            /** @description Geforderte Qualifikationen, die die eingeteilten Personen nicht decken. */
+            offene_anforderungen: components["schemas"]["OffeneAnforderung"][];
+            /**
+             * Format: int64
+             * @description Plätze, die nach dem Soll noch frei sind.
+             */
+            offene_plaetze: number;
+            /** @description Ohne Freigabe des Moduls Personal `null`: dann nur die Anzahl, keine Namen. */
+            personen?: components["schemas"]["PlanPersonAnzeige"][] | null;
+            /** Format: int64 */
+            personen_anzahl: number;
+            posten: components["schemas"]["PlanPostenAnzeige"];
+            quali_soll?: components["schemas"]["QualiSollEintrag"][] | null;
+            /** Format: int64 */
+            soll_anzahl?: number | null;
+            /**
+             * Format: int64
+             * @description CAS-Zähler: PATCH und DELETE senden ihn mit (409 bei einem anderen Stand).
+             */
+            version: number;
+            von: string;
+        };
+        /** @description Ein Helfer des Plans. */
+        PlanHelferAnzeige: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            organisation?: string | null;
+            qualifikationen: number[];
+            telefon?: string | null;
+        };
+        /** @description Eine Person in einem Block. */
+        PlanPersonAnzeige: {
+            art: components["schemas"]["PlanPersonArt"];
+            befunde: components["schemas"]["PlanBefund"][];
+            /** Format: int64 */
+            einsatz_personal_id?: number | null;
+            /** Format: int64 */
+            helfer_id?: number | null;
+            /** @description Ob die Person gerade im Einsatz ist (disponiert und nicht entlassen). */
+            im_einsatz: boolean;
+            name: string;
+            /** Format: int64 */
+            personal_id?: number | null;
+            /** @description Kennungen der Qualifikationen (Katalog der Organisation); eine Ad-hoc-Kraft hat keine. */
+            qualifikationen: number[];
+        };
+        /**
+         * @description Woher eine Person im Plan kommt. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanPersonArt: "stamm" | "einsatz" | "helfer";
+        /** @description Der Posten eines Blocks in der Antwort, mit Bezeichnung. */
+        PlanPostenAnzeige: {
+            art: components["schemas"]["PostenArt"];
+            /** @description Einheit aufgelöst bzw. UHS aufgelöst oder storniert. */
+            aufgeloest: boolean;
+            /** @description Name der Einheit bzw. Bezeichnung der UHS; bei der Pause fehlt sie. */
+            bezeichnung?: string | null;
+            /** Format: int64 */
+            einheit_id?: number | null;
+            /** Format: int64 */
+            uhs_id?: number | null;
+        };
         /**
          * @description Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab
          *     LLH-1309: `einsatz_abloesung.planung_entfallen_grund`, CHECK in Migration 0259).
@@ -5696,6 +5817,11 @@ export interface components {
             gesamt: number;
             sonderkost: components["schemas"]["Sonderkost"];
         };
+        /**
+         * @description Art eines Postens im Plan (`einsatz_planschicht.posten_art`). Wire == `as_str()`.
+         * @enum {string}
+         */
+        PostenArt: "einheit" | "uhs" | "pause";
         /** @description Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element). */
         PressemitteilungAbschnitt: {
             schluessel: string;
@@ -5772,6 +5898,14 @@ export interface components {
          * @enum {string}
          */
         Prioritaet: "sofort" | "dringend" | "normal";
+        /** @description Ein Programmpunkt, wie ihn Einsatzdaten und Überblick lesen. */
+        Programmpunkt: {
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Zeitpunkt (UTC, `YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+        };
         /** @description Ein Eintrag in der Antwort, mit dem Label der Qualifikation. */
         QualiSollEintrag: {
             /** Format: int64 */
@@ -6031,6 +6165,33 @@ export interface components {
          * @enum {string}
          */
         SchichtmodellTyp: "rhythmus" | "wechselzeiten";
+        /** @description Der ganze Plan eines Einsatzes mit Befunden. */
+        SchichtplanAnzeige: {
+            /** @description Nach Posten (Art, Kennung) und Beginn. */
+            bloecke: components["schemas"]["PlanBlockAnzeige"][];
+            grenzwerte: components["schemas"]["SchichtplanGrenzwerte"];
+            /** @description Ohne Freigabe des Moduls Personal `null`. */
+            helfer?: components["schemas"]["PlanHelferAnzeige"][] | null;
+            /** @description Nächster Zeitpunkt, an dem sich ein uhrabhängiger Befund ändert; der Client fragt dann neu. */
+            naechste_pruefung_at?: string | null;
+        };
+        /** @description Grenzwerte des Dienst-Befunds. */
+        SchichtplanGrenzwerte: {
+            /** @description Ob der Einsatz den Höchstwert selbst setzt (sonst die Vorgabe 12 h). */
+            max_dienst_eigen: boolean;
+            /**
+             * Format: int64
+             * @description Wirksamer Höchstwert im Dienst in Minuten.
+             */
+            max_dienst_minuten: number;
+            /** @description Ob der Einsatz die Mindestruhe selbst setzt (sonst die Vorgabe 8 h). */
+            min_ruhe_eigen: boolean;
+            /**
+             * Format: int64
+             * @description Wirksame Mindestruhe in Minuten.
+             */
+            min_ruhe_minuten: number;
+        };
         /**
          * @description Schriftfeld der Skizze (J.5). Jedes Feld trägt den gespeicherten Wert, `null` = leer. Die
          *     Vorgabe des Herausgebers (Einsatzbezeichnung) setzt erst die Darstellung ein, damit
@@ -7459,7 +7620,7 @@ export interface components {
          *     Einsatz die der Disposition (LLH-1073). Wire == `as_str()`.
          * @enum {string}
          */
-        ZeilenArt: "personal" | "fahrzeug" | "material";
+        ZeilenArt: "personal" | "fahrzeug" | "material" | "planschicht";
         /**
          * @description Antwort einer an einzelnen Zeilen abgelehnten Mengen-Anfrage (422, LLH-1100): der Umschlag
          *     `{error}` und je abgelehnter Zeile ein [`ZeilenGrund`].

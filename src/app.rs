@@ -306,6 +306,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_fuehrungsstelle::lesen)
                 .patch(routes::einsatz_fuehrungsstelle::aendern),
         )
+        // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
+        // Rechten der Kopfdaten.
+        .route(
+            "/api/einsaetze/{id}/programmpunkte",
+            get(routes::programmpunkt::liste).post(routes::programmpunkt::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/programmpunkte/{pid}",
+            patch(routes::programmpunkt::aendern).delete(routes::programmpunkt::loeschen),
+        )
         // LFH-893: Einzel-Zuordnung (design.md D5), neben dem PATCH mit `sprechgruppe_ids`.
         .route(
             "/api/einsaetze/{id}/fuehrungsstelle/sprechgruppen/{sg}",
@@ -590,6 +600,37 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/abloesungen/schichtmodell",
             get(routes::abloesung::read_einsatz_vorgabe)
                 .put(routes::abloesung::set_einsatz_vorgabe),
+        )
+        // Schichtplan (LLH-1552): `schichtplan` ist ein festes Segment neben `{aid}`.
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan",
+            get(routes::abloesung_schichtplan::lesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke",
+            post(routes::abloesung_schichtplan::block_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}",
+            patch(routes::abloesung_schichtplan::block_aendern)
+                .delete(routes::abloesung_schichtplan::block_loeschen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/erzeugen",
+            post(routes::abloesung_schichtplan::erzeugen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/grenzwerte",
+            patch(routes::abloesung_schichtplan::grenzwerte_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/helfer",
+            post(routes::abloesung_schichtplan::helfer_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/helfer/{hid}",
+            patch(routes::abloesung_schichtplan::helfer_aendern)
+                .delete(routes::abloesung_schichtplan::helfer_loeschen),
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/{aid}",

@@ -68,6 +68,7 @@ import {
   type UebernahmeWerte,
 } from '../nachforderungen/materialUebernahme';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -125,6 +126,7 @@ export default function NachforderungenPage() {
   // Erfassung offen ist, auch über eine Serie; Schließen räumt ihn.
   const [bezugId, setBezugId] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
   // Filter „für Stelle“ (`?stelle=<id>`): Zustand in der Adresse.
   const stelleFilter = parseNachforderungStelle(searchParams);
   const setzeStelleFilter = (stelleId: number | null) => {
@@ -590,6 +592,9 @@ export default function NachforderungenPage() {
    * (`art`/`bezeichnung`/`anzahl`/`begruendung`) füllt sie. Apply-then-clean wie der
    * Platzier-Auftrag in `LagekartePage.tsx`: erst anwenden, dann räumen, `replace`, `searchParams`
    * kopiert statt mutiert. Ein stehengebliebener Auftrag öffnete das Formular bei jedem Neuladen.
+   * Einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1558): Bis der Router die Räumung committet,
+   * steht der Auftrag noch in `searchParams`, und ein neu geladenes Schreibrecht öffnete die
+   * geschlossene Erfassung sonst ein zweites Mal.
    *
    * Der Lade-Riegel steht vor dem Räumen: `darfImEinsatzSchreiben` liefert für einen noch nicht
    * geladenen Einsatz `false`; ohne Riegel ginge der Deeplink bei F5 oder aus einem neuen Tab still
@@ -603,18 +608,15 @@ export default function NachforderungenPage() {
     const hatVorbelegung = NACHFORDERUNG_VORBELEGUNG_PARAMS.some((k) => searchParams.has(k));
     const hatBezug = searchParams.has(NACHFORDERUNG_BEZUG_PARAM);
     if (!neu && !hatVorbelegung && !hatBezug) return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) {
       setVorbelegung(parseNachforderungVorbelegung(searchParams));
       setBezugId(parseNachforderungBezug(searchParams));
       setFormOffen(true);
     }
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('neu');
-    for (const k of NACHFORDERUNG_VORBELEGUNG_PARAMS) naechste.delete(k);
-    naechste.delete(NACHFORDERUNG_BEZUG_PARAM);
-    setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh]);
+    neuAuftrag.raeume('neu', ...NACHFORDERUNG_VORBELEGUNG_PARAMS, NACHFORDERUNG_BEZUG_PARAM);
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh]);
 
   /*
    * Gemerkt über den Datenstand, Handler über einen Ref-Bündel (LFH-949, D7): die Karten sind
