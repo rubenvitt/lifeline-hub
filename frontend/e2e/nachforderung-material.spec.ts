@@ -9,7 +9,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Herkunft. Zweiter Weg „Weiteren Posten übernehmen“. Danach führt der Verweis an der
  * Materialzeile zurück auf die hervorgehobene Karte. Dazu der Weg für schon erfasstes Material:
  * „Erfassten Posten zuordnen …“ (LLH-1259); „Material ↗“ springt dann auf den Posten (LLH-1260).
- * Und der Rückweg einer Fehlzuordnung: „Von Nachforderung lösen“ an der Materialzeile (LLH-1403).
+ * Und der Rückweg einer Fehlzuordnung: „Von Nachforderung lösen“ an der Materialzeile (LLH-1403),
+ * danach „Eintreffen zurücknehmen“ im ⋮-Menü der Karte (LLH-1539).
  * Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
 
@@ -160,6 +161,12 @@ test('vorhandenen Posten einer eingetroffenen Nachforderung zuordnen: die Karte 
   await expect(eingetroffen.locator(`[data-nachforderung-id="${nfId}"]`)).toContainText(
     'übernommen 1 von 3',
   );
+  // An der Karte steht die Rücknahme gesperrt mit dem Grund (LLH-1539).
+  await karte.getByRole('button', { name: /^Aktionen zu Nachforderung / }).click();
+  await expect(
+    page.getByRole('menuitem', { name: 'Eintreffen zurücknehmen (Material übernommen)' }),
+  ).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
 
   // Ein Posten im Einsatz: „Material ↗“ springt auf seine Zeile und hebt sie hervor (LLH-1260).
   await karte.getByRole('link', { name: 'Material' }).click();
@@ -200,17 +207,27 @@ test('Fehlzuordnung in der Materialliste lösen: der Posten bleibt, die Rücknah
     .poll(() => etbInhalte(page, einsatzId))
     .toContain(`Material «Tauchpumpe THW» (×1) von Nachforderung «${BEDARF}» gelöst`);
 
-  // Die Karte zählt den Posten nicht mehr, und „Eingetroffen“ lässt sich zurücknehmen.
+  // Die Karte zählt den Posten nicht mehr, und „Eingetroffen“ lässt sich an ihr zurücknehmen
+  // (LLH-1539).
   await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
   const karte = page
     .locator('[data-lfh="board-spalte"][data-stufe="eingetroffen"]')
     .locator(`[data-nachforderung-id="${nfId}"]`);
   await expect(karte.getByRole('button', { name: 'Als Material übernehmen' })).toBeVisible();
   await expect(karte).not.toContainText('Tauchpumpe THW');
-  const ruecknahme = await page.request.post(`${basis}/nachforderungen/${nfId}/status`, {
-    data: { status: 'unterwegs' },
-  });
-  expect(ruecknahme.status(), await ruecknahme.text()).toBe(200);
+  await karte.getByRole('button', { name: /^Aktionen zu Nachforderung / }).click();
+  const ruecknahme = page.waitForResponse(
+    (r) =>
+      r.url().endsWith(`${basis}/nachforderungen/${nfId}/status`) &&
+      r.request().method() === 'POST',
+  );
+  await page.getByRole('menuitem', { name: 'Eintreffen zurücknehmen' }).click();
+  expect((await ruecknahme).status()).toBe(200);
+  await expect(
+    page
+      .locator('[data-lfh="board-spalte"][data-stufe="unterwegs"]')
+      .locator(`[data-nachforderung-id="${nfId}"]`),
+  ).toBeVisible();
   const material = await page.request.get(`${basis}/material`);
   expect(((await material.json()) as { id: number }[]).map((m) => m.id)).toEqual([posten.id]);
 });

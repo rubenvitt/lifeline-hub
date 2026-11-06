@@ -189,6 +189,11 @@ pub struct EinsatzMaterialAnzeige {
     /// Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
     /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
     pub ist_demo: bool,
+    /// Bestandsdoppel (LLH-1528): der Stamm ist jetzt ein Gerät mit Bestandsnummer, also ein
+    /// bestimmtes Stück (LLH-1256), und die aktive Zeile steht nicht allein für dieses eine Stück:
+    /// eine weitere aktive Zeile desselben Stamms im Einsatz oder eine Menge über 1 (Bestand vor
+    /// LLH-1256/LLH-1398). Beendete Zeilen und Ad-hoc-Posten tragen es nie.
+    pub is_bestandsdoppel: bool,
     /// Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktivem Material.
     /// Nur `GET …/material?entlassene=1` liefert beendete Zeilen, und zwar nur herausgenommene
     /// (`beendet_als = entlassen`; die Oberfläche sagt „aus dem Einsatz genommen“).
@@ -215,6 +220,22 @@ impl EinsatzMaterialAnzeige {
             self.uhs_id,
             self.br_id,
         )
+    }
+}
+
+/// Bestandsdoppel nur aus den Zeilen, die der Leser sieht (LLH-1528, Review): ein gebundenes
+/// Gerät liest einen Ausschnitt (`frontend/src/geraet/AGENTS.md`, „Stellenbindung je Art“). Die
+/// Marke darf dort nicht verraten, dass dasselbe Stück außerhalb steht; es bleibt die Menge über 1
+/// und eine zweite sichtbare Zeile desselben Stamms. Nach dem Zuschnitt aufrufen.
+pub fn limit_bestandsdoppel_to_rows(liste: &mut [EinsatzMaterialAnzeige]) {
+    let sichtbar: Vec<(i64, Option<i64>)> =
+        liste.iter().map(|em| (em.id, em.material_id)).collect();
+    for em in liste.iter_mut() {
+        em.is_bestandsdoppel = em.is_bestandsdoppel
+            && (em.menge > 1
+                || sichtbar
+                    .iter()
+                    .any(|(id, mid)| *id != em.id && *mid == em.material_id));
     }
 }
 

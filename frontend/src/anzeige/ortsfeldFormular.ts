@@ -2,7 +2,7 @@ import type { FormRule } from 'antd';
 import { grenzeText, istZuLang } from '../components/zeichenGrenze';
 import type { OrtsfeldWert } from './Ortsfeld';
 
-/** Ortsangabe als Wire-Felder: Text und Koordinate, die Koordinate nur mit Text. */
+/** Ortsangabe als Wire-Felder: Text und Koordinate (nur mit Text oder als Kartenpunkt). */
 export interface OrtFelder {
   text: string | null;
   lat: number | null;
@@ -11,19 +11,23 @@ export interface OrtFelder {
 
 /**
  * Text und Koordinate eines Ortsfelds, wie sie hinausgehen (LLH-1121, design.md D2): getrimmter
- * Text oder `null`; die Koordinate nur neben einem Text — ein geleerter Text leert beide.
+ * Text oder `null`; die Koordinate neben einem Text — ein geleerter Text leert beide. Ein
+ * Kartenpunkt (`quelle: 'karte'`) geht auch ohne Text hinaus (LLH-1534): das Feld lässt ihn nur
+ * bei einem ohne Text gespeicherten Punkt stehen (etwa auf der Lagekarte verortet), sonst leert ein
+ * geleerter Text ihn (`nachTextaenderung`) und ein Punkt ins leere Feld bringt seinen Text mit
+ * (`nachKartenpunkt`). Was das Feld als Punkt zeigt, verschwindet so nie still.
  */
 export function ortFelder(w: OrtsfeldWert | null | undefined): OrtFelder {
   const t = w?.text.trim();
   const text = t ? t : null;
-  const k = text != null ? w?.koordinate : null;
+  const k = text != null || w?.quelle === 'karte' ? w?.koordinate : null;
   return { text, lat: k?.lat ?? null, lon: k?.lon ?? null };
 }
 
 /**
  * Gespeicherte Ortsangabe als Wert des Ortsfelds beim Bearbeiten (LLH-1121, design.md D3): eine
- * gespeicherte Koordinate steht als `quelle: 'karte'` im Feld. Eine Textkorrektur behält den
- * Punkt; ein neuer Treffer ersetzt ihn, ein geleerter Text leert beide.
+ * gespeicherte Koordinate steht als `quelle: 'karte'` im Feld, auch ohne Text. Eine Textkorrektur
+ * behält den Punkt; ein neuer Treffer ersetzt ihn, ein geleerter Text leert beide.
  */
 export function ortsfeldAusGespeichert(
   text: string | null | undefined,

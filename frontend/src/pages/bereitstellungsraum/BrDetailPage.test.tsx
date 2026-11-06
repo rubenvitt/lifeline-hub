@@ -2761,7 +2761,7 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     await waitFor(() => expect(gebucht).toHaveLength(1));
     expect(gebucht[0]).toEqual({
       br: '2',
-      daten: { objekt_typ: 'einheit', objekt_id: 10, art: 'wechsel' },
+      daten: { objekt_typ: 'einheit', objekt_id: 10, art: 'wechsel', von_br_id: 1 },
     });
     expect(await screen.findByText('Einheit „HLF 20“ nach BR Nord verlegt')).toBeInTheDocument();
   });
@@ -2773,7 +2773,12 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     await waehle('Ziel-Raum', 'BR Nord');
     await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
     await waitFor(() => expect(gebucht).toHaveLength(1));
-    expect(gebucht[0].daten).toEqual({ objekt_typ: 'fahrzeug', objekt_id: 20, art: 'wechsel' });
+    expect(gebucht[0].daten).toEqual({
+      objekt_typ: 'fahrzeug',
+      objekt_id: 20,
+      art: 'wechsel',
+      von_br_id: 1,
+    });
     expect(
       await screen.findByText('Fahrzeug „Florian 1“ nach BR Nord verlegt'),
     ).toBeInTheDocument();
@@ -2822,6 +2827,25 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
     expect(await within(dialog()).findByText('Nicht verlegt')).toBeInTheDocument();
     expect(within(dialog()).getByText('Bereitstellungsraum ist nicht aktiv')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('hat jemand anderes die Kraft schon verlegt, nennt der Dialog die Ablehnung (LLH-1521)', async () => {
+    seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }), {
+      wechsel: () =>
+        HttpResponse.json(
+          { error: 'Kraft steht inzwischen in einem anderen Raum' },
+          { status: 409 },
+        ),
+    });
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await waehle('Ziel-Raum', 'BR Nord');
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
+    expect(await within(dialog()).findByText('Nicht verlegt')).toBeInTheDocument();
+    expect(
+      within(dialog()).getByText('Kraft steht inzwischen in einem anderen Raum'),
+    ).toBeInTheDocument();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 

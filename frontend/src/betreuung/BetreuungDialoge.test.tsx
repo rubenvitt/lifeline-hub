@@ -9,6 +9,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { ApiError } from '../api/client';
 import type { Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
+import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { renderMitProviders } from '../test/utils';
 import { server } from '../test/server';
 import { tippeZeit } from '../test/zeitEingabe';
@@ -213,6 +214,18 @@ describe('PATCH nur mit geänderten Schlüsseln', () => {
         standort: ort(''),
       }),
     ).toStrictEqual({ status: 'geschlossen' });
+  });
+
+  it('LLH-1534: ein ohne Standort-Text verorteter Punkt bleibt, wenn nur die Bezeichnung sich ändert', () => {
+    const s = stelle({ standort: null, lat: 52.1, lon: 9.3 });
+    expect(
+      stellePatch(s, {
+        art: s.art,
+        bezeichnung: 'Turnhalle West',
+        kapazitaet_personen: s.kapazitaet_personen,
+        standort: ortsfeldAusGespeichert(s.standort, s.lat, s.lon),
+      }),
+    ).toStrictEqual({ bezeichnung: 'Turnhalle West' });
   });
 
   it('LLH-1044: Leitung und Kontaktweg getrimmt, geleert → null nur mit Vorwert, fehlend unberührt', () => {

@@ -475,6 +475,8 @@ function EinsatzortPaneel({
                     'Adresse',
                     // Die Koordinate geht nur mit, wenn sie neu ist (Treffer, Nadel, getippt);
                     // reiner Text schickt nur die Adresse (Spec `einsatzdaten-bearbeitung`).
+                    // Hat das Feld den gespeicherten Punkt verloren (geleerter Text, LLH-1534),
+                    // geht er als `null` mit: sonst bliebe ein Punkt, den die Maske nicht zeigte.
                     w.koordinate &&
                       (w.koordinate.lat !== punkt?.lat || w.koordinate.lon !== punkt?.lon)
                       ? {
@@ -482,7 +484,13 @@ function EinsatzortPaneel({
                           einsatzort_lat: w.koordinate.lat,
                           einsatzort_lon: w.koordinate.lon,
                         }
-                      : { einsatzort: leerZuNull(w.text) },
+                      : !w.koordinate && punkt
+                        ? {
+                            einsatzort: leerZuNull(w.text),
+                            einsatzort_lat: null,
+                            einsatzort_lon: null,
+                          }
+                        : { einsatzort: leerZuNull(w.text) },
                   )
                 }
                 eingabe={({ feld, popup, value, onChange }) => (

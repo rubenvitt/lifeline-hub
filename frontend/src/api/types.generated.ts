@@ -2398,6 +2398,13 @@ export interface components {
             einsatz_id: number;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Bestandsdoppel (LLH-1528): der Stamm ist jetzt ein Gerät mit Bestandsnummer, also ein
+             *     bestimmtes Stück (LLH-1256), und die aktive Zeile steht nicht allein für dieses eine Stück:
+             *     eine weitere aktive Zeile desselben Stamms im Einsatz oder eine Menge über 1 (Bestand vor
+             *     LLH-1256/LLH-1398). Beendete Zeilen und Ad-hoc-Posten tragen es nie.
+             */
+            is_bestandsdoppel: boolean;
             ist_adhoc: boolean;
             /**
              * @description Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
@@ -4505,6 +4512,13 @@ export interface components {
          */
         MeAntwort: components["schemas"]["BenutzerAnzeige"] & {
             geraet?: components["schemas"]["GeraetAnzeige"] | null;
+            /**
+             * @description Öffentliche Kennung der Sitzung dieser Anfrage (LFH-1092, nie der Token-Hash). Ein Tab, der
+             *     abgemeldet hat, dessen Server-Abmeldung aber scheiterte, erkennt daran die alte Sitzung und
+             *     übernimmt sie nicht wieder (LLH-1535); jede neue Anmeldung bekommt eine neue Kennung. Fehlt
+             *     bei Altsitzungen ohne Kennung.
+             */
+            sitzung?: string | null;
         };
         /** @description Öffentliche Darstellung eines Medienkontakts. */
         MedienkontaktAnzeige: {

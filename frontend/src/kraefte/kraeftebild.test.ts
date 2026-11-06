@@ -216,6 +216,7 @@ const mat = (
   uhs_id: null,
   ist_adhoc: false,
   ist_demo: false,
+  is_bestandsdoppel: false,
   bezeichnung: `M${id}`,
   kategorie: null,
   bestandsnummer: null,

@@ -5887,7 +5887,8 @@
           "ausgegeben",
           "status",
           "disponiert_at",
-          "ist_demo"
+          "ist_demo",
+          "is_bestandsdoppel"
         ],
         "properties": {
           "art": {
@@ -5979,6 +5980,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "is_bestandsdoppel": {
+            "type": "boolean",
+            "description": "Bestandsdoppel (LLH-1528): der Stamm ist jetzt ein Gerät mit Bestandsnummer, also ein\nbestimmtes Stück (LLH-1256), und die aktive Zeile steht nicht allein für dieses eine Stück:\neine weitere aktive Zeile desselben Stamms im Einsatz oder eine Menge über 1 (Bestand vor\nLLH-1256/LLH-1398). Beendete Zeilen und Ad-hoc-Posten tragen es nie."
           },
           "ist_adhoc": {
             "type": "boolean"
@@ -11227,6 +11232,13 @@
                     "type": "null"
                   }
                 ]
+              },
+              "sitzung": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Öffentliche Kennung der Sitzung dieser Anfrage (LFH-1092, nie der Token-Hash). Ein Tab, der\nabgemeldet hat, dessen Server-Abmeldung aber scheiterte, erkennt daran die alte Sitzung und\nübernimmt sie nicht wieder (LLH-1535); jede neue Anmeldung bekommt eine neue Kennung. Fehlt\nbei Altsitzungen ohne Kennung."
               }
             }
           }

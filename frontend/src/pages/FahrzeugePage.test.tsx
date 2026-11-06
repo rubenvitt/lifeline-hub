@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
+import { AdresseSteht } from '../test/adresseSteht';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -1590,6 +1591,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     einheiten: () => Response | Promise<Response> = () =>
       HttpResponse.json([{ id: 1, name: 'Zug 1', abschnitt_id: 10, abschnitt_name: 'EA Nord' }]),
     route = '/einsaetze/7/fahrzeuge?ansicht=tableau',
+    optionen: { adresseSteht?: boolean; daneben?: ReactNode } = {},
   ) {
     const patches: unknown[] = [];
     // Der Serverstand wandert mit dem PATCH — sonst holte der Refetch nach `onSettled` den alten
@@ -1619,7 +1621,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
         return HttpResponse.json(stand);
       }),
     );
-    renderMitProviders(
+    const seite = (
       <Routes>
         <Route
           path="/einsaetze/:id/fahrzeuge"
@@ -1630,11 +1632,46 @@ describe('FahrzeugePage — FMS-Tableau', () => {
             </>
           }
         />
-      </Routes>,
+      </Routes>
+    );
+    renderMitProviders(
+      <>
+        {optionen.adresseSteht ? <AdresseSteht>{seite}</AdresseSteht> : seite}
+        {optionen.daneben}
+      </>,
       { route, datenRouter: true },
     );
     return { patches };
   }
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1530): Bis der Router die Räumung committet, steht `?ansicht=`
+   * noch in der Adresse der Seite (`AdresseSteht`). Der Wechsel der Person auf die Liste holt das
+   * Tableau nicht zurück.
+   */
+  it('ein hängender Router-Commit holt die Vorgabe nach einem Ansichtswechsel nicht zurück (LLH-1530)', async () => {
+    renderTableau(undefined, undefined, { adresseSteht: true });
+    expect(await screen.findByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Liste' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull());
+    expect(within(ansicht).getByRole('radio', { name: 'Liste' })).toBeChecked();
+  });
+
+  it('ein neuer Link auf das Tableau wirkt wieder (LLH-1530)', async () => {
+    renderTableau(undefined, undefined, {
+      daneben: <Link to="/einsaetze/7/fahrzeuge?ansicht=tableau">Sprungmarke</Link>,
+    });
+    expect(await screen.findByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Liste' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull());
+
+    await userEvent.click(screen.getByRole('link', { name: 'Sprungmarke' }));
+    expect(await screen.findByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
+  });
 
   it('übernimmt ?ansicht=tableau und räumt den Parameter (apply-then-clean)', async () => {
     renderTableau();

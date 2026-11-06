@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation } from 'react-router';
+import { Link, Route, Routes, useLocation } from 'react-router';
+import { AdresseSteht } from '../test/adresseSteht';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -335,6 +336,65 @@ describe('EinsatzabschnittePage', () => {
         await new Promise((r) => setTimeout(r, 50));
       });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    /**
+     * Einmal je Verlaufseintrag (LLH-1530): Bis der Router die Räumung committet, steht `?neu=1`
+     * noch in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen
+     * neu an (Einsatz lädt neu), öffnet die Erfassung nicht noch einmal.
+     */
+    it('ein hängender Router-Commit öffnet die geschlossene Erfassung nach neuem Recht nicht wieder (LLH-1530)', async () => {
+      let rolle = 'einsatzleitung';
+      server.use(
+        http.get('/api/einsaetze/1', () =>
+          HttpResponse.json({ ...einsatz, meine_rolle: rolle, status: 'aktiv' }),
+        ),
+        ...handlers(),
+      );
+      const { client } = renderMitProviders(
+        <AdresseSteht>
+          <Routes>
+            <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+          </Routes>
+        </AdresseSteht>,
+        { route: '/einsaetze/1/einsatzabschnitte?neu=1' },
+      );
+      const dialog = await screen.findByRole('dialog', { name: 'Abschnitt anlegen' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      await waitFor(() => expect(isModalClosed()).toBe(true));
+
+      for (const naechste of ['beobachter', 'einsatzleitung']) {
+        rolle = naechste;
+        await act(async () => {
+          await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) });
+        });
+        await waitFor(() => expect(client.isFetching()).toBe(0));
+      }
+      expect(await screen.findByRole('button', { name: 'Abschnitt anlegen' })).toBeInTheDocument();
+      expect(isModalClosed()).toBe(true);
+    });
+
+    it('ein neuer Link ?neu=1 öffnet die Erfassung wieder (LLH-1530)', async () => {
+      server.use(...handlers());
+      renderMitProviders(
+        <>
+          <Routes>
+            <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+          </Routes>
+          <SuchAnzeige />
+          <Link to="/einsaetze/1/einsatzabschnitte?neu=1">neuer-link</Link>
+        </>,
+        { route: '/einsaetze/1/einsatzabschnitte?neu=1' },
+      );
+      const dialog = await screen.findByRole('dialog', { name: 'Abschnitt anlegen' });
+      await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      await waitFor(() => expect(isModalClosed()).toBe(true));
+
+      await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+      await waitFor(() => expect(isModalClosed()).toBe(false));
+      expect(screen.getByRole('dialog', { name: 'Abschnitt anlegen' })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     });
   });
 

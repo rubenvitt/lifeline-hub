@@ -156,6 +156,11 @@ pub fn validiere_neu(
     pruefe_geometrie_struktur(&v, "geometrie")
 }
 
+/// Bezeichnung einer Zone (`label`, LLH-1531): steht wörtlich im System-ETB („Lagezone «…»
+/// eingerichtet“) und wird beim Anlegen die Bezeichnung eines neuen Gefahrengebiets
+/// ([`crate::gefahr::GEBIET_LABEL_MAX`]). Kurz wie die übrigen Bezeichnungen.
+pub const LABEL_MAX: usize = 200;
+
 /// Höchstgröße des Geometrie-Strings einer Zone oder Abschnittsfläche in Bytes (LFH-937,
 /// design.md D7).
 pub const GEOMETRIE_BYTES_MAX: usize = 256 * 1024;

@@ -32,6 +32,7 @@ import {
   SeitenSkeleton,
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -216,34 +217,36 @@ export default function EinsatzabschnittePage() {
   // Schnellaktion: ?neu=1 öffnet die Erfassung eines neuen Abschnitts (Sprungpalette, LFH-506) —
   // dieselben Schritte wie `openAnlegen`, hier ausgeschrieben, weil die Funktion je Render neu
   // entsteht. Warten bis der Einsatz geladen ist; Param immer löschen, Erfassung nur bei
-  // Schreibrecht.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Schreibrecht. Beide Aufträge gelten einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1530): Bis
+  // der Router die Räumung committet, steht der Parameter noch in `searchParams`, und ein neues
+  // Recht (Einsatz lädt neu) öffnete die geschlossene Erfassung sonst ein zweites Mal.
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
+  const ansichtAuftrag = useLinkAuftrag();
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) {
       setIsAnlegenOpen(true);
       // Der neue Abschnitt steht danach gewählt in der Gliederung, nicht im Organigramm.
       setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
     }
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('neu');
-    setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
 
   // Sichtvorgabe ?ansicht= (LFH-626), apply-then-clean wie auf der Fahrzeugseite. Geräumt wird
   // auch ein unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
   useEffect(() => {
     if (!searchParams.has('ansicht')) return;
+    if (ansichtAuftrag.verbraucht()) return;
     // `?neu=1` gewinnt: der neue Abschnitt steht danach in der Gliederung (Review LFH-626).
     const vorgabe =
       searchParams.get('neu') === '1' ? undefined : parseAbschnitteAnsicht(searchParams);
     if (vorgabe) setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe }));
-    const rest = new URLSearchParams(searchParams);
-    rest.delete('ansicht');
-    setSearchParams(rest, { replace: true });
-  }, [searchParams, setSearchParams, einsatzId]);
+    ansichtAuftrag.raeume('ansicht');
+  }, [searchParams, ansichtAuftrag, einsatzId]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });

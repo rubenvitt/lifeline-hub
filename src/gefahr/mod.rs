@@ -9,6 +9,10 @@ use utoipa::ToSchema;
 pub const BESCHREIBUNG_MAX: usize = 2_000;
 /// „Gemeldet von“ einer Matrixzelle (LLH-1366): ein kurzer Name oder Rufname.
 pub const GEMELDET_VON_MAX: usize = 200;
+/// Bezeichnung eines Gefahrengebiets (`label`, LLH-1531): steht wörtlich im System-ETB der
+/// Beurteilung. Dieselbe Grenze wie die Bezeichnung einer Zone, aus der ein neues Gebiet sie
+/// übernimmt.
+pub const GEBIET_LABEL_MAX: usize = crate::lage_zone::LABEL_MAX;
 
 wire_enum! {
     /// Gefahrentyp (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `gefahrentyp`.

@@ -9,6 +9,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * erfassen — in den Einsatzdaten (Paneel „Einsatzort“) und im Dialog „Neuen Einsatz anlegen“.
  * LLH-1108: Vorschau mit Nadel und Ort-Zeile am Feld, Nadel ziehen, „Auf Karte wählen“ ohne Netz.
  * LLH-1376: Ortsname als Vorschlag auch beim Anlegen, über die Ort-Vorschau der Organisation.
+ * LLH-1534: ein Kartenpunkt ins leere Feld bringt die Koordinate als Text mit und wird gespeichert.
  *
  * Der Geocoder wird nie gefragt: `page.route` fängt die Ortssuche am Frontend ab (Muster
  * `lagekarte-ortssuche.spec.ts`). Gespeichert wird echt, über das e2e-Backend; der Kartenausschnitt
@@ -193,6 +194,51 @@ test('Einsatz anlegen: Nadel ziehen schlägt den Ortsnamen vor, ohne Einsatz und
   const e = await einsatzLesen(page, id);
   expect(e.einsatzort).toBe(ORTSNAME);
   expect(e.einsatzort_lon!).toBeGreaterThan(TREFFER.lon);
+});
+
+test('Einsatz anlegen: Punkt auf der Karte ins leere Feld — Koordinate als Text, Einsatz verortet (LLH-1534)', async ({
+  page,
+}) => {
+  await geocoder(page);
+  await kartenConfigBeantworten(page, {
+    offline_regionen: [
+      {
+        karte_id: 1,
+        name: 'Fixture',
+        tiles_url: '/api/karten/1/tiles/{z}/{x}/{y}.pbf',
+        format: 'vektor',
+        maxzoom: 14,
+      },
+    ],
+  });
+  await kachelnBeantworten(page, '/api/karten/1/tiles/', 'strassen');
+  await anmeldenAlsAdmin(page);
+  const dialog = await einsatzDialogOeffnen(page);
+  await dialog.getByLabel('Bezeichnung').fill(`E2E Anlegen Kartenpunkt ${Date.now()}`);
+  const feld = dialog.getByRole('textbox', { name: 'Einsatzort' });
+  await expect(feld).toHaveValue('');
+
+  await dialog.getByRole('button', { name: 'Auf Karte wählen' }).click();
+  const waehlen = page.getByRole('dialog', { name: 'Einsatzort auf Karte wählen' });
+  const karte = waehlen.getByRole('application', { name: 'Karte: Einsatzort' });
+  await expect(karte.locator('canvas')).toBeVisible();
+  await karte.click({ position: { x: 120, y: 90 } });
+  await waehlen.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(waehlen).toBeHidden();
+
+  // Das leere Feld trägt jetzt die Koordinate als Text; der Ortsname bleibt ein Vorschlag.
+  await expect(feld).toHaveValue(/^\d{1,2}\.\d{5}, \d{1,3}\.\d{5}$/);
+  const text = await feld.inputValue();
+  await expect(dialog.getByRole('button', { name: 'Als Adresse übernehmen' })).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Anlegen', exact: true }).click();
+  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
+  const id = Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
+  const e = await einsatzLesen(page, id);
+  expect(e.einsatzort).toBe(text);
+  const [lat, lon] = text.split(', ').map(Number);
+  expect(e.einsatzort_lat!).toBeCloseTo(lat, 4);
+  expect(e.einsatzort_lon!).toBeCloseTo(lon, 4);
 });
 
 test('Einsatzdaten: Nadel ziehen berichtigt die Koordinate, der Ortsname kommt als Vorschlag', async ({

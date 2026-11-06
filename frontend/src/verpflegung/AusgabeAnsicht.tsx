@@ -434,6 +434,7 @@ export default function AusgabeAnsicht() {
 
   const mitBedarf = KOSTFORMEN.filter((k) => zf.bedarf.sonderkost[k] > 0);
   const ohneBedarf = KOSTFORMEN.filter((k) => zf.bedarf.sonderkost[k] === 0);
+  const hatWeitereKostform = ohneBedarf.length > 0;
 
   // Schon in der Folge „jüngste zuerst“; zurückgehaltene fremde fehlen, der Banner nennt sie.
   const serverAusgaben = ausgabenZufluss.sichtbar;
@@ -767,7 +768,22 @@ export default function AusgabeAnsicht() {
 
         {/* ── Sonderkost ───────────────────────────────────────────────────────────── */}
         <section aria-label="Sonderkost" data-lfh="ausgabe-sonderkost">
-          <Flex wrap gap={abstand} align="center">
+          <div
+            // Schmal stehen die Kostformen untereinander, gleich breit und links bündig; das Menü
+            // weiterer Kostformen steht rechts neben der letzten (LLH-1504). Breit in einer Reihe.
+            style={
+              istSchmal
+                ? {
+                    display: 'grid',
+                    gridTemplateColumns: hatWeitereKostform
+                      ? 'minmax(0, 1fr) auto'
+                      : 'minmax(0, 1fr)',
+                    gap: abstand,
+                    alignItems: 'center',
+                  }
+                : { display: 'flex', flexWrap: 'wrap', gap: abstand, alignItems: 'center' }
+            }
+          >
             {mitBedarf.map((k) => {
               const n = sammlung.sonderkost[k];
               const fehlt = zf.fehlmenge.sonderkost[k];
@@ -783,33 +799,109 @@ export default function AusgabeAnsicht() {
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  style={{ ...uebrige, height: 'auto' }}
+                  style={{
+                    ...uebrige,
+                    height: 'auto',
+                    // Schmal darf ein langer Name umbrechen, statt in die Menüspalte zu ragen.
+                    ...(istSchmal
+                      ? {
+                          gridColumn: 1,
+                          justifyContent: 'flex-start',
+                          whiteSpace: 'normal',
+                          textAlign: 'start',
+                          // Passen die Zahlen nicht neben den Namen, stehen sie in einer eigenen
+                          // Zeile; ihr Platz ist fest, die Entscheidung also auch.
+                          flexWrap: 'wrap',
+                        }
+                      : {}),
+                  }}
                   disabled={tastenGesperrt}
                   aria-describedby={beschrieben(tastenGesperrt)}
                   onClick={() => sammlung.tippe(1, k)}
                 >
                   <span>{KOSTFORM_LABEL[k]}</span>{' '}
-                  <span style={monoStil(13)}>
-                    {zf.ausgegeben.sonderkost[k]}/{zf.bedarf.sonderkost[k]}
-                  </span>
-                  {fehlt > 0 && <span style={monoStil(12, 500)}> fehlt {fehlt}</span>}
-                  {/* Fester Platz für „+ n“: ein Tipp verbreitert die Taste nicht. */}
+                  {/* Die Zahlen stehen auf festem Platz, bemessen an den Stellen des Solls: eine
+                      Buchung („fehlt“ sinkt oder entfällt, ausgegeben wächst) ändert weder die
+                      Breite noch, wo der Name schmal umbricht, also auch keine Höhe (LLH-1504).
+                      Ausgegeben darf das Soll übersteigen: sein Platz hält eine Stelle mehr, also
+                      bis zum Zehnfachen des Solls. Reicht die Taste nicht für alle drei Plätze
+                      (vierstelliges Soll, Handschuh, 320 px), brechen sie einzeln um. */}
                   <span
-                    data-lfh="sonderkost-sammlung"
-                    style={{ ...monoStil(12, 500), display: 'inline-block', minWidth: '5ch' }}
+                    data-lfh="sonderkost-zahlen"
+                    style={{
+                      display: 'inline-flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'baseline',
+                      whiteSpace: 'nowrap',
+                      minWidth: 0,
+                      maxWidth: '100%',
+                    }}
                   >
-                    {n > 0 ? ` + ${n}` : ''}
+                    <span
+                      style={{
+                        ...monoStil(13),
+                        display: 'inline-block',
+                        minWidth: `${
+                          Math.max(
+                            ziffern(zf.bedarf.sonderkost[k]) + 1,
+                            ziffern(zf.ausgegeben.sonderkost[k]),
+                          ) +
+                          1 +
+                          ziffern(zf.bedarf.sonderkost[k])
+                        }ch`,
+                      }}
+                    >
+                      {zf.ausgegeben.sonderkost[k]}/{zf.bedarf.sonderkost[k]}
+                    </span>
+                    <span
+                      style={{
+                        ...monoStil(12, 500),
+                        display: 'inline-block',
+                        minWidth: `${ziffern(zf.bedarf.sonderkost[k]) + 6}ch`,
+                        marginInlineStart: '1ch',
+                        visibility: fehlt > 0 ? 'visible' : 'hidden',
+                      }}
+                    >
+                      fehlt {fehlt}
+                    </span>
+                    {/* Fester Platz für „+ n“: ein Tipp verbreitert die Taste nicht. Leer steht
+                        ein unsichtbarer Platzhalter darin, damit der Platz auch allein in seiner
+                        Zeile eine Zeile hoch ist und der erste Tipp die Taste nicht wachsen lässt. */}
+                    <span
+                      data-lfh="sonderkost-sammlung"
+                      style={{
+                        ...monoStil(12, 500),
+                        display: 'inline-block',
+                        minWidth: '5ch',
+                        visibility: n > 0 ? 'visible' : 'hidden',
+                      }}
+                    >
+                      {n > 0 ? ` + ${n}` : ' + 0'}
+                    </span>
                   </span>
                 </Button>
               );
             })}
-            <MenueAusloeser<Kostform>
-              eintraege={ohneBedarf.map((k) => ({ key: k, label: KOSTFORM_LABEL[k] }))}
-              zugaenglicherName="Weitere Kostform …"
-              gesperrt={tastenGesperrt}
-              onWahl={(k) => sammlung.tippe(1, k)}
-            />
-          </Flex>
+            {hatWeitereKostform && (
+              <div
+                style={
+                  istSchmal
+                    ? {
+                        gridColumn: mitBedarf.length > 0 ? 2 : 1,
+                        gridRow: Math.max(1, mitBedarf.length),
+                      }
+                    : { display: 'contents' }
+                }
+              >
+                <MenueAusloeser<Kostform>
+                  eintraege={ohneBedarf.map((k) => ({ key: k, label: KOSTFORM_LABEL[k] }))}
+                  zugaenglicherName="Weitere Kostform …"
+                  gesperrt={tastenGesperrt}
+                  onWahl={(k) => sammlung.tippe(1, k)}
+                />
+              </div>
+            )}
+          </div>
         </section>
 
         {/* ── Ablehnungen: unter den Sonderkost-Tasten, damit sie keine Taste verschieben (D6):
@@ -1089,4 +1181,9 @@ export default function AusgabeAnsicht() {
       )}
     </EinsatzSeite>
   );
+}
+
+/** Anzahl der Dezimalstellen einer nicht negativen Ganzzahl (für feste Zahlenplätze). */
+function ziffern(n: number): number {
+  return String(Math.max(0, Math.trunc(n))).length;
 }

@@ -8,7 +8,9 @@ use crate::extract::PfadParam;
 use crate::gefahr::repo::{self as gefahr_repo, BewertungDaten};
 use crate::gefahr::{self, GefahrBewertungAnzeige, GefahrengebietAnzeige};
 use crate::live::LiveEvent;
-use crate::routes::support::{deserialize_optional_field, optional_max, parse_enum, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, optional_max, optional_max_tri, parse_enum,
+};
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
@@ -178,8 +180,8 @@ pub async fn umbenennen(
     JsonBody(body): JsonBody<UmbenennenBody>,
 ) -> Result<Json<GefahrengebietAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let label = optional_max_tri(body.label, "Bezeichnung", gefahr::GEBIET_LABEL_MAX)?;
     gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
-    let label = trimme_tri(body.label);
     let g = gefahr_repo::gebiet_umbenennen(
         &state.pool,
         einsatz_id,

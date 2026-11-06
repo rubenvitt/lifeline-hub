@@ -9,6 +9,8 @@ import { antdToken, farbenHell, type Dichte } from '../theme/tokens';
 import { server } from '../test/server';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
+import { waehleMenueEintrag } from '../test/menue';
+import { ApiError } from '../api/client';
 import type { Nachforderung } from '../api/types';
 import NachforderungKarte, {
   type KartenFormular,
@@ -860,5 +862,76 @@ describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
     const chip = screen.getByText('Zurückgezogen', { exact: true }).closest('[data-ton]');
     expect(chip).toHaveAttribute('data-ton', 'neutral');
     expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+});
+
+/**
+ * LLH-1539: „Eingetroffen“ lässt sich dauerhaft an der Karte zurücknehmen, nicht nur im
+ * Rückgängig-Toast direkt danach. Die Sperren spiegeln den Server (`ruecknahmeSperre`).
+ */
+describe('NachforderungKarte — Eintreffen zurücknehmen (LLH-1539)', () => {
+  const eingetroffen = (over: Partial<Nachforderung> = {}) =>
+    nf({
+      bezeichnung: null,
+      status: 'eingetroffen',
+      ist_offen: false,
+      eingetroffen_at: '2026-06-12 09:30:00',
+      ...over,
+    });
+  const menue = () => screen.getByRole('button', { name: 'Aktionen zu Nachforderung 2× RTW' });
+
+  it('im ⋮-Menü der eingetroffenen Karte; die Wahl nimmt genau eine Stufe zurück', async () => {
+    const onStatus = vi.fn();
+    renderMitProviders(
+      <NachforderungKarte nachforderung={eingetroffen()} darfSchreiben onStatus={onStatus} />,
+    );
+    await waehleMenueEintrag(menue(), 'Eintreffen zurücknehmen');
+    expect(onStatus).toHaveBeenCalledWith(1, 'unterwegs');
+  });
+
+  it.each([
+    { fall: 'übernommenem Material', over: { material_ids: [7] }, grund: 'Material übernommen' },
+    { fall: 'verknüpfter Einheit', over: { einheit_ids: [11] }, grund: 'Einheiten verknüpft' },
+  ])('mit $fall gesperrt mit Grund, ein Klick meldet nichts', async ({ over, grund }) => {
+    const onStatus = vi.fn();
+    renderMitProviders(
+      <NachforderungKarte nachforderung={eingetroffen(over)} darfSchreiben onStatus={onStatus} />,
+    );
+    await userEvent.click(menue());
+    const eintrag = await screen.findByRole('menuitem', {
+      name: `Eintreffen zurücknehmen (${grund})`,
+    });
+    expect(eintrag).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(eintrag);
+    expect(onStatus).not.toHaveBeenCalled();
+  });
+
+  it('ohne Schreibrecht kein Menü', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={eingetroffen()}
+        darfSchreiben={false}
+        onStatus={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Aktionen zu Nachforderung/ })).toBeNull();
+  });
+
+  it('die Ablehnung steht an der Karte über den Knöpfen', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={eingetroffen()}
+        darfSchreiben
+        onStatus={vi.fn()}
+        fehlerGrund={{
+          fehler: new ApiError(422, 'Aus der Nachforderung ist Material übernommen'),
+          fallback: 'Statuswechsel fehlgeschlagen',
+        }}
+      />,
+    );
+    expect(screen.getByText('Aus der Nachforderung ist Material übernommen')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(menue()).toBeInTheDocument();
   });
 });

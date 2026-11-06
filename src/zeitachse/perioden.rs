@@ -65,9 +65,9 @@ impl Verstoss {
                 "Zum Ende ({}) gibt es keine offene Einsatzperiode",
                 stil.zeitpunkt_text(zeitpunkt_at)
             ),
-            Self::PeriodeUeberschneidet { beginn_at } => write!(
-                f,
-                "Die Periode ab {beginn_at} überschneidet eine bestehende Einsatzperiode"
+            Self::PeriodeUeberschneidet { beginn_at } => format!(
+                "Die Periode ab {} überschneidet eine bestehende Einsatzperiode",
+                stil.zeitpunkt_text(beginn_at)
             ),
         }
     }

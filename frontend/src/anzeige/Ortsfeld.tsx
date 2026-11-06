@@ -12,6 +12,7 @@ import type { OrtSucheAntwort, OrtTreffer } from '../api/karteOrtSuche';
 import { useAuthOptional } from '../auth/AuthContext';
 import { useRollen } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
+import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { Kartenausschnitt } from './Kartenausschnitt';
 import { KarteWaehlen } from './KarteWaehlen';
 import type { LatLon } from './koordinaten';
@@ -41,15 +42,54 @@ export interface OrtsfeldWert {
 /**
  * Wert nach einer Textänderung: eine getippte Koordinate wird ohne Server erkannt; ein auf der
  * Karte gesetzter Punkt bleibt; die Koordinate eines Treffers oder einer getippten Koordinate
- * fällt weg.
+ * fällt weg. Ein geleerter Text leert auch einen Kartenpunkt (LLH-1534): ohne Text geht keine
+ * Koordinate hinaus (`ortFelder`), die Maske zeigte sonst einen Punkt, der nie gespeichert wird.
+ * Neben einem Kartenpunkt steht als Koordinate im Text nur dieser Punkt (`nachKartenpunkt` schreibt
+ * ihn im eingestellten Format hinein). Nennt der Text in diesem Format denselben Punkt (etwa nach
+ * einem angehängten und wieder gelöschten Zeichen), bleibt der Kartenpunkt mit voller Genauigkeit;
+ * jede andere getippte Koordinate ersetzt ihn. Verglichen wird in der Genauigkeit des Formats,
+ * nicht mit einem festen Abstand: 52.50000 → 52.50009 ist eine Änderung, ein auf Sekunden
+ * gerundetes DMS derselbe Punkt.
  */
-export function nachTextaenderung(vorher: OrtsfeldWert, text: string): OrtsfeldWert {
+export function nachTextaenderung(
+  vorher: OrtsfeldWert,
+  text: string,
+  formatKoordinate: (lat: number, lon: number) => string,
+): OrtsfeldWert {
+  if (!text.trim()) return { text, koordinate: null };
   const getippt = erkenneKoordinate(text);
-  if (getippt) return { text, koordinate: getippt, quelle: 'koordinate' };
-  if (vorher.quelle === 'karte' && vorher.koordinate) {
-    return { text, koordinate: vorher.koordinate, quelle: 'karte' };
-  }
+  const kartenpunkt = vorher.quelle === 'karte' ? vorher.koordinate : null;
+  const alsText = kartenpunkt && formatKoordinate(kartenpunkt.lat, kartenpunkt.lon);
+  // Der Text selbst zählt vor der Rückrechnung: an einer UTM-Zonengrenze formatiert die erkannte
+  // Koordinate in die Nachbarzone und wäre sonst ein anderer Punkt.
+  const derselbe =
+    alsText != null &&
+    (text.trim() === alsText ||
+      (getippt != null && formatKoordinate(getippt.lat, getippt.lon) === alsText));
+  if (getippt && !derselbe) return { text, koordinate: getippt, quelle: 'koordinate' };
+  if (kartenpunkt) return { text, koordinate: kartenpunkt, quelle: 'karte' };
   return { text, koordinate: null };
+}
+
+/**
+ * Wert nach einem Punkt aus der Karte (Nadel gezogen, „Auf Karte wählen“): `quelle: 'karte'`, ein
+ * Text bleibt. Ist er leer, steht die Koordinate als Text da (LLH-1534), damit der Punkt mit
+ * gespeichert wird (`ortFelder` schickt eine Koordinate nur neben einem Text). Ist er eine
+ * Koordinate (eingetragen oder getippt), zieht er mit: sonst nennte der Text einen anderen Ort als
+ * die Nadel. Den Ortsnamen bietet danach „Als Adresse übernehmen“ an.
+ */
+export function nachKartenpunkt(
+  vorher: OrtsfeldWert,
+  punkt: LatLon,
+  formatKoordinate: (lat: number, lon: number) => string,
+): OrtsfeldWert {
+  const alt = vorher.text.trim();
+  const mitziehen = !alt || erkenneKoordinate(alt) != null;
+  return {
+    text: mitziehen ? formatKoordinate(punkt.lat, punkt.lon) : vorher.text,
+    koordinate: punkt,
+    quelle: 'karte',
+  };
 }
 
 /**
@@ -203,6 +243,7 @@ function OrtsfeldMitSuche({
 }: OrtsfeldGemeinsam & MitSuche) {
   const { token, rollen } = useRollen();
   const online = useOnline();
+  const { formatKoordinate } = useAnzeigeKonventionen();
   // Am gekoppelten Gerät keine Suche (LLH-1483): die Route steht nicht in seiner Liste.
   const sucheMoeglich = (useAuthOptional()?.geraet ?? null) == null;
   const [anfrage, setAnfrage] = useState<Anfrage | null>(null);
@@ -281,7 +322,7 @@ function OrtsfeldMitSuche({
           value={value.text}
           count={count}
           onChange={(e) => {
-            onChange?.(nachTextaenderung(value, e.target.value));
+            onChange?.(nachTextaenderung(value, e.target.value, formatKoordinate));
             setAnfrage(null);
           }}
           onKeyDown={tasten}
@@ -314,8 +355,8 @@ function OrtsfeldMitSuche({
 
 /**
  * Kartenvorschau, Ort-Zeile und „Auf Karte wählen“ unter dem Feld (LLH-1108). Jeder Punkt aus der
- * Karte kommt mit `quelle: 'karte'` und lässt den Text stehen; einen Ortsnamen gibt es nur als
- * Vorschlag zum Übernehmen.
+ * Karte kommt mit `quelle: 'karte'` und lässt einen getippten Text stehen (`nachKartenpunkt`);
+ * einen Ortsnamen gibt es nur als Vorschlag zum Übernehmen.
  */
 function OrtsfeldVorschau({
   karte,
@@ -328,8 +369,9 @@ function OrtsfeldVorschau({
 }) {
   const { token, rollen } = useRollen();
   const [waehlen, setWaehlen] = useState(false);
+  const { formatKoordinate } = useAnzeigeKonventionen();
   const punkt = value.koordinate;
-  const ausKarte = (p: LatLon) => onChange?.({ text: value.text, koordinate: p, quelle: 'karte' });
+  const ausKarte = (p: LatLon) => onChange?.(nachKartenpunkt(value, p, formatKoordinate));
 
   return (
     <>

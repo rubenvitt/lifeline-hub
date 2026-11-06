@@ -2716,6 +2716,7 @@ async fn abloeser_ausruecken_tx(
                     notiz: None,
                     client_id: None,
                     zeitpunkt_at: None,
+                    von_br_id: None,
                 },
                 benutzer_id,
             )
@@ -2833,6 +2834,7 @@ async fn verbleib_eintritt_tx(
             notiz: None,
             client_id: None,
             zeitpunkt_at: None,
+            von_br_id: None,
         },
         benutzer_id,
     )
@@ -3574,6 +3576,7 @@ async fn buchungen_zuruecknehmen_tx(
                 notiz: Some(crate::zeitachse::repo::GRUND_ABLOESUNG_ZURUECK),
                 client_id: None,
                 zeitpunkt_at: None,
+                von_br_id: None,
             },
             benutzer_id,
         )
