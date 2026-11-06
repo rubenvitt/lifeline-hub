@@ -186,10 +186,31 @@ export const ABLOESUNG_RHYTHMUS_MAX_MINUTEN = 10_080;
 export const ABLOESUNG_ABLOESER_MAX = 8;
 /** Neue Besatzung beim Besatzungswechsel im Request, gezählt vor dem Entdoppeln (LLH-1150). */
 export const ABLOESUNG_BESATZUNG_MAX = 50;
+/** Personen je Schicht des Schichtplans im Request, gezählt vor dem Entdoppeln (LLH-1552). */
+export const SCHICHTPLAN_PERSONEN_MAX = 50;
+/** Schichten, die „Schichten erzeugen“ auf einmal anlegt (LLH-1552). */
+export const SCHICHTPLAN_ERZEUGEN_MAX = 100;
+/** Notiz einer Schicht des Schichtplans (LLH-1552). */
+export const SCHICHTPLAN_NOTIZ_MAX = 500;
+/** Name und Organisation eines Helfers des Schichtplans (LLH-1552). */
+export const SCHICHTPLAN_HELFER_TEXT_MAX = 200;
+/** Telefon eines Helfers des Schichtplans (LLH-1552). */
+export const SCHICHTPLAN_HELFER_TELEFON_MAX = 50;
+/** Qualifikationen eines Helfers im Request, gezählt vor dem Entdoppeln (LLH-1552). */
+export const SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX = 20;
 /** Leitung einer Betreuungsstelle (LLH-1044). */
 export const BETREUUNG_LEITUNG_MAX = 200;
 /** Kontakt der Leitung einer Betreuungsstelle (LLH-1044, Spalte `kontaktweg`). */
 export const BETREUUNG_KONTAKTWEG_MAX = 200;
+/**
+ * Bezeichnung eines Evakuierungsbezirks (LLH-1560); die Lagekarte übernimmt sie beim Zeichnen als
+ * Bezeichnung der Zone, darf also nie über `ZONE_LABEL_MAX` liegen.
+ */
+export const EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX = 200;
+/** Sammelstelle eines Evakuierungsbezirks (LLH-1560), Ortstext wie die übrigen Orte. */
+export const EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX = 500;
+/** Notiz eines Evakuierungsbezirks (LLH-1560). */
+export const EVAKUIERUNG_BEZIRK_NOTIZ_MAX = 2_000;
 /** Grund einer Streichung oder Berichtigung in der Kräfte-Zeitachse (LLH-1455); steht im ETB. */
 export const ZEITACHSE_GRUND_MAX = 500;
 /** Einträge eines Qualifikationssolls (LLH-1553). */

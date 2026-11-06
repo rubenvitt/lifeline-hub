@@ -12338,6 +12338,24 @@
           "fahrzeug"
         ]
       },
+      "OffeneAnforderung": {
+        "type": "object",
+        "description": "Was von einer Anforderung offen bleibt.",
+        "required": [
+          "qualifikation_id",
+          "fehlen"
+        ],
+        "properties": {
+          "fehlen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "qualifikation_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "OfflineKarte": {
         "type": "object",
         "description": "Eine Offline-Karte als DB-Zeile (Admin-CRUD). `aktiv_basemap` = die von `/tiles` ausgelieferte\nKarte; `status` und die Download-Felder (groesse/sha256/download_at) pflegt LFH-181.",
@@ -14040,6 +14058,293 @@
           "medienkontakt"
         ]
       },
+      "PlanBefund": {
+        "type": "object",
+        "description": "Ein Prüfbefund an einem Block oder an einer Person in einem Block.",
+        "required": [
+          "art"
+        ],
+        "properties": {
+          "anderer_block_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bei `doppelt`: der andere Block."
+          },
+          "art": {
+            "$ref": "#/components/schemas/PlanBefundArt"
+          },
+          "dauer_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bei `dienst`: Länge der Dienststrecke in Minuten."
+          },
+          "fehlen": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bei `quali`: wie viele dieser Qualifikation fehlen."
+          },
+          "qualifikation_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bei `quali`: die geforderte Qualifikation."
+          }
+        }
+      },
+      "PlanBefundArt": {
+        "type": "string",
+        "description": "Art eines Prüfbefunds (Spec `kraefte-schichtplan`, „Prüfbefunde“). Befunde blockieren nie.\nWire == `as_str()`.",
+        "enum": [
+          "doppelt",
+          "quali",
+          "dienst",
+          "verfuegbar",
+          "abweichung"
+        ]
+      },
+      "PlanBlockAnzeige": {
+        "type": "object",
+        "description": "Ein Block des Plans.",
+        "required": [
+          "id",
+          "version",
+          "posten",
+          "von",
+          "bis",
+          "personen_anzahl",
+          "offene_plaetze",
+          "offene_anforderungen",
+          "befunde"
+        ],
+        "properties": {
+          "befunde": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanBefund"
+            },
+            "description": "Befunde des Blocks selbst (`quali`, `verfuegbar` des Postens)."
+          },
+          "bis": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "offene_anforderungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OffeneAnforderung"
+            },
+            "description": "Geforderte Qualifikationen, die die eingeteilten Personen nicht decken."
+          },
+          "offene_plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Plätze, die nach dem Soll noch frei sind."
+          },
+          "personen": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PlanPersonAnzeige"
+            },
+            "description": "Ohne Freigabe des Moduls Personal `null`: dann nur die Anzahl, keine Namen."
+          },
+          "personen_anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "posten": {
+            "$ref": "#/components/schemas/PlanPostenAnzeige"
+          },
+          "quali_soll": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QualiSollEintrag"
+            }
+          },
+          "soll_anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "CAS-Zähler: PATCH und DELETE senden ihn mit (409 bei einem anderen Stand)."
+          },
+          "von": {
+            "type": "string"
+          }
+        }
+      },
+      "PlanHelferAnzeige": {
+        "type": "object",
+        "description": "Ein Helfer des Plans.",
+        "required": [
+          "id",
+          "name",
+          "qualifikationen"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "organisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "qualifikationen": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "telefon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PlanPersonAnzeige": {
+        "type": "object",
+        "description": "Eine Person in einem Block.",
+        "required": [
+          "art",
+          "name",
+          "qualifikationen",
+          "im_einsatz",
+          "befunde"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/PlanPersonArt"
+          },
+          "befunde": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanBefund"
+            }
+          },
+          "einsatz_personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "helfer_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "im_einsatz": {
+            "type": "boolean",
+            "description": "Ob die Person gerade im Einsatz ist (disponiert und nicht entlassen)."
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "qualifikationen": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Kennungen der Qualifikationen (Katalog der Organisation); eine Ad-hoc-Kraft hat keine."
+          }
+        }
+      },
+      "PlanPersonArt": {
+        "type": "string",
+        "description": "Woher eine Person im Plan kommt. Wire == `as_str()`.",
+        "enum": [
+          "stamm",
+          "einsatz",
+          "helfer"
+        ]
+      },
+      "PlanPostenAnzeige": {
+        "type": "object",
+        "description": "Der Posten eines Blocks in der Antwort, mit Bezeichnung.",
+        "required": [
+          "art",
+          "aufgeloest"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/PostenArt"
+          },
+          "aufgeloest": {
+            "type": "boolean",
+            "description": "Einheit aufgelöst bzw. UHS aufgelöst oder storniert."
+          },
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Einheit bzw. Bezeichnung der UHS; bei der Pause fehlt sie."
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "PlanungEntfallenGrund": {
         "type": "string",
         "description": "Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab\nLLH-1309: `einsatz_abloesung.planung_entfallen_grund`, CHECK in Migration 0259).\nWire == `as_str()`.",
@@ -14134,6 +14439,15 @@
             "$ref": "#/components/schemas/Sonderkost"
           }
         }
+      },
+      "PostenArt": {
+        "type": "string",
+        "description": "Art eines Postens im Plan (`einsatz_planschicht.posten_art`). Wire == `as_str()`.",
+        "enum": [
+          "einheit",
+          "uhs",
+          "pause"
+        ]
       },
       "PressemitteilungAbschnitt": {
         "type": "object",
@@ -15046,6 +15360,73 @@
           "rhythmus",
           "wechselzeiten"
         ]
+      },
+      "SchichtplanAnzeige": {
+        "type": "object",
+        "description": "Der ganze Plan eines Einsatzes mit Befunden.",
+        "required": [
+          "grenzwerte",
+          "bloecke"
+        ],
+        "properties": {
+          "bloecke": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanBlockAnzeige"
+            },
+            "description": "Nach Posten (Art, Kennung) und Beginn."
+          },
+          "grenzwerte": {
+            "$ref": "#/components/schemas/SchichtplanGrenzwerte"
+          },
+          "helfer": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PlanHelferAnzeige"
+            },
+            "description": "Ohne Freigabe des Moduls Personal `null`."
+          },
+          "naechste_pruefung_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nächster Zeitpunkt, an dem sich ein uhrabhängiger Befund ändert; der Client fragt dann neu."
+          }
+        }
+      },
+      "SchichtplanGrenzwerte": {
+        "type": "object",
+        "description": "Grenzwerte des Dienst-Befunds.",
+        "required": [
+          "max_dienst_minuten",
+          "min_ruhe_minuten",
+          "max_dienst_eigen",
+          "min_ruhe_eigen"
+        ],
+        "properties": {
+          "max_dienst_eigen": {
+            "type": "boolean",
+            "description": "Ob der Einsatz den Höchstwert selbst setzt (sonst die Vorgabe 12 h)."
+          },
+          "max_dienst_minuten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Wirksamer Höchstwert im Dienst in Minuten."
+          },
+          "min_ruhe_eigen": {
+            "type": "boolean",
+            "description": "Ob der Einsatz die Mindestruhe selbst setzt (sonst die Vorgabe 8 h)."
+          },
+          "min_ruhe_minuten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Wirksame Mindestruhe in Minuten."
+          }
+        }
       },
       "Schriftfeld": {
         "type": "object",
@@ -18521,7 +18902,8 @@
         "enum": [
           "personal",
           "fahrzeug",
-          "material"
+          "material",
+          "planschicht"
         ]
       },
       "ZeilenFehler": {

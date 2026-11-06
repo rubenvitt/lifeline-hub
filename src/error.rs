@@ -67,6 +67,8 @@ crate::wire_enum::wire_enum! {
         Fahrzeug => "fahrzeug",
         /// Material-Position einer Einheiten-Vorlage (`einheit_vorlage_material.id`, LLH-1261).
         Material => "material",
+        /// Schicht eines Schichtplans (Zeitraum, der Index der erzeugten Schicht, LLH-1552).
+        Planschicht => "planschicht",
     }
     try_from = |s| format!("Ungültige Zeilenart: {s}");
 }

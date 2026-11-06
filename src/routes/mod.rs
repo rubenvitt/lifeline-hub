@@ -1,4 +1,5 @@
 pub mod abloesung;
+pub mod abloesung_schichtplan;
 pub mod anhang;
 pub mod aufbewahrung;
 pub mod auftrag;

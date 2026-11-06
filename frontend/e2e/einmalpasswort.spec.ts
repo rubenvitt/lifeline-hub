@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { anmeldenOhneStartseite } from './lageplan-kern';
 import { waehleImMenue } from './menue-kern';
-import { anmeldenAls, anmeldenAlsAdmin, benutzerAnlegen } from './rollen-kern';
+import { ADMIN, ADMIN_PW, benutzerAnlegen } from './rollen-kern';
 
 /*
  * LFH-1121 — Passwort vergessen: die Administration vergibt ein Einmalpasswort.
@@ -8,16 +9,23 @@ import { anmeldenAls, anmeldenAlsAdmin, benutzerAnlegen } from './rollen-kern';
  * Über die Oberfläche: der Admin vergibt es im Dialog „Benutzer bearbeiten“, die bisherige
  * Anmeldung der Person endet, und mit dem Einmalpasswort kommt sie erst nach „Neues Passwort
  * festlegen“ auf die Einsatzliste. Danach meldet das eigene Passwort direkt an.
+ *
+ * Admin und Gerät melden sich über die API an, nicht über das Formular (LLH-1563): beide
+ * Anmeldungen sind hier Vorbedingung, kosteten aber je eine volle Seitenladung samt Einsatzliste.
+ * Unter `--workers=3` braucht jede über den Vite-Dev-Server 6–10 s; mit vier Ladungen lief der
+ * Fall lokal ins 30-s-Budget (rot vor dem Menü „Bearbeiten“). Das Formular bleibt dort, wo es
+ * etwas belegt: bei der Anmeldung mit dem Einmalpasswort.
  */
 
 test('Einmalpasswort vergeben, anmelden, eigenes Passwort festlegen', async ({ page, browser }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   const person = await benutzerAnlegen(page, 'beobachter', 'E2E Vergessen');
 
-  // Die Person ist auf ihrem Gerät angemeldet.
+  // Die Person ist auf ihrem Gerät angemeldet (Sitzungscookie im eigenen Kontext).
   const kontext = await browser.newContext();
   const geraet = await kontext.newPage();
-  await anmeldenAls(geraet, person.benutzername, person.passwort);
+  await anmeldenOhneStartseite(geraet, person.benutzername, person.passwort);
+  expect((await geraet.request.get('/api/auth/me')).status()).toBe(200);
 
   // Der Admin vergibt das Einmalpasswort.
   await page.goto('/admin/benutzer');

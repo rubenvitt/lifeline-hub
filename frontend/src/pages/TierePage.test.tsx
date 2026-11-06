@@ -2,7 +2,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Link, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders, sortTarget } from '../test/utils';
@@ -16,6 +16,7 @@ import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import * as dateiSpeichern from '../components/dateiSpeichern';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { AdresseSteht } from '../test/adresseSteht';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -446,6 +447,68 @@ describe('TierePage', () => {
       await new Promise((r) => setTimeout(r, 50));
     });
     expect(document.querySelector('.ant-modal')).toBeNull();
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1` noch
+   * in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu an
+   * (Einsatz lädt neu), öffnet die Erfassung nicht noch einmal. Die Positivhälfte (Kopfknopf wieder
+   * da) steht vor der Negativaussage.
+   */
+  it('ein hängender Router-Commit öffnet die geschlossene Erfassung nach neuem Recht nicht wieder (LLH-1558)', async () => {
+    let einsatz = einsatzAktiv;
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+    );
+    const { client } = renderMitProviders(
+      <AdresseSteht>
+        <Routes>
+          <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+        </Routes>
+      </AdresseSteht>,
+      { route: '/einsaetze/1/tiere?neu=1' },
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await warteBisDialogWeg();
+
+    einsatz = einsatzBeobachter;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Tier erfassen' })).not.toBeInTheDocument(),
+    );
+    einsatz = einsatzAktiv;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    expect(await screen.findByRole('button', { name: 'Tier erfassen' })).toBeInTheDocument();
+    expect(document.querySelector('.ant-modal')).toBeNull();
+  });
+
+  it('ein neuer Link ?neu=1 öffnet die Erfassung wieder (LLH-1558)', async () => {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+        </Routes>
+        <SuchAnzeige />
+        <Link to="/einsaetze/1/tiere?neu=1">neuer-link</Link>
+      </>,
+      { route: '/einsaetze/1/tiere?neu=1' },
+    );
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await warteBisDialogWeg();
+
+    await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
   it('„Tier erfassen" schickt status=aktiv + spezies', async () => {

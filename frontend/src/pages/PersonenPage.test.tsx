@@ -1,11 +1,12 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Link, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
-import { renderMitProviders, setzeOnline, sortTarget } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, setzeOnline, sortTarget } from '../test/utils';
+import { AdresseSteht } from '../test/adresseSteht';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
@@ -1568,6 +1569,22 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
  * Hälften von apply-then-clean: die Sicht steht und die Parameter sind weg. Nur die erste wäre auch
  * grün, wenn die Seite den Filter bloß aus der URL spiegelte.
  */
+/**
+ * Schließt die Maske und wartet, bis sie aus dem Bild ist: jsdom meldet kein Bewegungsende, das
+ * Modal bliebe sonst in seiner Schließbewegung stehen.
+ */
+async function schliesseMaske(dialog: HTMLElement) {
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+  await waitFor(() => {
+    const modal = document.querySelector<HTMLElement>('.ant-modal');
+    if (modal) {
+      fireEvent.animationEnd(modal);
+      fireEvent.transitionEnd(modal);
+    }
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+}
+
 describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
   function Suche() {
     return <output data-testid="suche">{useLocation().search}</output>;
@@ -1636,6 +1653,111 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Zeilen' })).toBeChecked();
     await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?x=1'));
+  });
+
+  /**
+   * Zwei Aufträge eines Links räumen gemeinsam (LLH-1558): Steht der Einsatz schon im Cache, laufen
+   * Sichtvorgabe und `?neu=1` im selben Durchgang. Bisher rechnete das zweite Räumen vom Stand des
+   * Renders aus und stellte `?filter=` wieder her; die Seite navigierte ein zweites Mal.
+   */
+  it('?filter= und ?neu=1 räumen gemeinsam, ohne den ersten Parameter zurückzuholen (LLH-1558)', async () => {
+    const gesehen: string[] = [];
+    function Protokoll() {
+      const { search } = useLocation();
+      if (gesehen[gesehen.length - 1] !== search) gesehen.push(search);
+      return null;
+    }
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([person, unbekannt])),
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    );
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.einsatz(1), einsatzAktiv);
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/personen"
+          element={
+            <>
+              <Protokoll />
+              <Suche />
+              <PersonenPage />
+            </>
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/1/personen?filter=vermisst&neu=1', client },
+    );
+    expect(await screen.findByRole('dialog', { name: 'Betroffene erfassen' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(gesehen.slice(1).filter((s) => s.includes('filter='))).toEqual([]);
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1` noch
+   * in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu an
+   * (Einsatz lädt neu), öffnet die Maske nicht noch einmal. Die Positivhälfte (Kopfknopf wieder da)
+   * steht vor der Negativaussage.
+   */
+  it('ein hängender Router-Commit öffnet die geschlossene Maske nach neuem Recht nicht wieder (LLH-1558)', async () => {
+    let einsatz = einsatzAktiv;
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    );
+    const { client } = renderMitProviders(
+      <AdresseSteht>
+        <Routes>
+          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+        </Routes>
+      </AdresseSteht>,
+      { route: '/einsaetze/1/personen?neu=1' },
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Betroffene erfassen' });
+    await schliesseMaske(dialog);
+    const kopfknopf = () => screen.queryByRole('button', { name: 'Betroffene erfassen' });
+
+    einsatz = einsatzBeobachter;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(kopfknopf()).not.toBeInTheDocument());
+    einsatz = einsatzAktiv;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(kopfknopf()).toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('ein neuer Link ?neu=1 öffnet die Maske wieder (LLH-1558)', async () => {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+        </Routes>
+        <Suche />
+        <Link to="/einsaetze/1/personen?neu=1">neuer-link</Link>
+      </>,
+      { route: '/einsaetze/1/personen?neu=1' },
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Betroffene erfassen' });
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await schliesseMaske(dialog);
+
+    await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+    expect(await screen.findByRole('dialog', { name: 'Betroffene erfassen' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 });
 

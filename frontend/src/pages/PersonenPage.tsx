@@ -9,6 +9,7 @@ import {
   personDetailPfad,
   personenDruckPfad,
 } from '../routing/deeplinks';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -594,7 +595,9 @@ export default function PersonenPage() {
 
   // Deeplink ?person=<id> leitet auf die Detailseite um (rückwärtskompatibel, z. B. „Vollständig
   // öffnen" aus dem UHS-Drawer).
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const sichtAuftrag = useLinkAuftrag();
+  const neuAuftrag = useLinkAuftrag();
   useEffect(() => {
     const pid = searchParams.get('person');
     if (pid) navigate(personDetailPfad(einsatzId, Number(pid)), { replace: true });
@@ -609,6 +612,10 @@ export default function PersonenPage() {
   //
   // Keine Weiche „eigene gegen fremde Änderung" wie auf der ETB-Seite: `sicht` ist kontrollierter
   // Zustand, nichts wird neu aufgesetzt.
+  //
+  // Einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1558), ebenso `?neu=1` unten: Trägt ein Link
+  // beide, räumen sie gemeinsam. Bisher stellte das zweite Räumen (vom Stand des Renders aus) den
+  // schon geräumten Parameter des ersten wieder her, und die Seite navigierte ein zweites Mal.
   useEffect(() => {
     if (
       !searchParams.has('filter') &&
@@ -616,18 +623,15 @@ export default function PersonenPage() {
       !searchParams.has('abgeschlossen')
     )
       return;
+    if (sichtAuftrag.verbraucht()) return;
     const vorgabe = parsePersonenSicht(searchParams);
     setSichtNachEinsatz((alt) => {
       const bisher = alt[einsatzId] ?? SICHT_VORGABE;
       const neu = sichtNachSprung(bisher, vorgabe);
       return neu === bisher ? alt : { ...alt, [einsatzId]: neu };
     });
-    const rest = new URLSearchParams(searchParams);
-    rest.delete('filter');
-    rest.delete('ansicht');
-    rest.delete('abgeschlossen');
-    setSearchParams(rest, { replace: true });
-  }, [searchParams, setSearchParams, einsatzId]);
+    sichtAuftrag.raeume('filter', 'ansicht', 'abgeschlossen');
+  }, [searchParams, sichtAuftrag, einsatzId]);
 
   // Schnellaktion: ?neu=1 öffnet die eine Maske „Betroffene erfassen“ (Command-Palette). Warten bis der Einsatz
   // geladen ist; Param immer löschen, Modal nur bei Schreibrecht. Bewusst die Maske und nicht die
@@ -636,20 +640,13 @@ export default function PersonenPage() {
   // (`neueZeile` unten).
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     const e = einsatzQuery.data;
     const darfSchr = darfImEinsatzSchreiben(e);
     if (darfSchr) setModusFuer(einsatzId, 'erfassen');
-    searchParams.delete('neu');
-    setSearchParams(searchParams, { replace: true });
-  }, [
-    searchParams,
-    setSearchParams,
-    einsatzQuery.isLoading,
-    einsatzQuery.data,
-    benutzer,
-    einsatzId,
-  ]);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, einsatzQuery.data, benutzer, einsatzId]);
 
   const csvExport = useCsvExport(einsatzId, 'personen', ladePersonenExport);
 

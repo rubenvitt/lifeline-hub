@@ -247,6 +247,24 @@ describe('StabPage', () => {
     expect(screen.queryByRole('region', { name: /^S1 · / })).toBeNull();
   });
 
+  it('der Fehler bleibt stehen, solange „Erneut abrufen" lädt (LLH-1577)', async () => {
+    rendere({ stabStatus: 500 });
+    const knopf = await screen.findByRole('button', { name: 'Erneut abrufen' });
+    // Die Freigaben schalten den zweiten Beobachter (`useNetzQuellen`) ein, der die gescheiterte
+    // Abfrage noch einmal holt: erst danach steht der Fehler endgültig.
+    await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+
+    server.use(http.get('/api/einsaetze/1/stab', () => new Promise<never>(() => {})));
+    await userEvent.click(knopf);
+
+    await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Führungsorganisation konnte nicht geladen werden',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('kaputt');
+    expect(screen.queryByText('nicht vergeben')).toBeNull();
+  });
+
   it('Werkzeuge: ausgeblendet fehlt, gesperrt steht mit Grund (design.md D2)', async () => {
     rendere({
       freigaben: freigabenFixture({

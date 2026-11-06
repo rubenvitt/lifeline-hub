@@ -9,6 +9,11 @@ import { http, HttpResponse } from 'msw';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
+import {
+  EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX,
+  EVAKUIERUNG_BEZIRK_NOTIZ_MAX,
+  EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX,
+} from '../api/eingabegrenzen';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -467,6 +472,29 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       await userEvent.type(feld, '0');
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       expect(await screen.findByText('Mindestens 1 Person')).toBeInTheDocument();
+      expect(api.aendereBezirk).not.toHaveBeenCalled();
+    });
+
+    it('LLH-1560: Bezeichnung, Sammelstelle und Notiz über der Grenze stehen am Feld und senden nicht', async () => {
+      renderSeite();
+      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      const felder = [
+        ['Bezeichnung', EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX, '200'],
+        ['Sammelstelle', EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX, '500'],
+        ['Notiz', EVAKUIERUNG_BEZIRK_NOTIZ_MAX, '2.000'],
+      ] as const;
+      for (const [label, max] of felder) {
+        const feld = await screen.findByLabelText(label);
+        await userEvent.clear(feld);
+        await userEvent.click(feld);
+        await userEvent.paste('x'.repeat(max + 1));
+      }
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      for (const [label, , grenze] of felder) {
+        expect(
+          await screen.findByText(`${label} darf höchstens ${grenze} Zeichen lang sein`),
+        ).toBeInTheDocument();
+      }
       expect(api.aendereBezirk).not.toHaveBeenCalled();
     });
 

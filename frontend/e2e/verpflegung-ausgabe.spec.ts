@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { anmeldenAlsAdmin } from './rollen-kern';
+import { anmeldenOhneStartseite } from './lageplan-kern';
+import { ADMIN, ADMIN_PW, anmeldenAlsAdmin } from './rollen-kern';
 
 /**
  * Ausgabeansicht der Verpflegung am Stab (LLH-1032; Spec `kraefte-verpflegung`, „Ausgabe
@@ -36,9 +37,13 @@ async function saeen(
   {
     sonderkost = { vegetarisch: 4 },
     kraefte = 30,
-  }: { sonderkost?: Record<string, number>; kraefte?: number } = {},
+    ohneStartseite = false,
+  }: { sonderkost?: Record<string, number>; kraefte?: number; ohneStartseite?: boolean } = {},
 ) {
-  await anmeldenAlsAdmin(page);
+  // `ohneStartseite`: Anmeldung über die API. Das Formular lädt die ganze App einmal mehr
+  // (Einsatzliste), lokal 3,5 bis 8 s (LLH-1533); wer nur die Ausgabe misst, braucht das nicht.
+  if (ohneStartseite) await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
+  else await anmeldenAlsAdmin(page);
   const e = (await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Ausgabe ${Date.now()}` }))
     .id;
   const jetzt = Date.now();
@@ -665,20 +670,39 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
 test('Kennzahlen im Kopf laufen auch vierstellig nicht über (320 bis 390 px, kompakt und komfortabel)', async ({
   page,
 }) => {
-  const { e, zf } = await saeen(page, -10, 110, { kraefte: 1830 });
+  // Zwei volle Ladungen statt sieben (LLH-1564: Formular plus 2 Dichten × 3 Breiten riss unter
+  // Last das 30-s-Budget). Die Dichte liest `ThemeModeProvider` nur beim Montieren, also eine
+  // Ladung je Dichte. Die Breite wechselt ohne Neuladen: 320 bis 390 px liegen unter jeder
+  // antd-Schwelle (`useViewport`, `istSchmal` bleibt gleich), und das Band bricht über reines
+  // CSS-Grid um (`KENNZAHL_ZELLE_MIN` in `AusgabeAnsicht.tsx`). Breite und Überlauf stehen in
+  // EINER Messung: Das Lesen von `scrollWidth` erzwingt das Layout zur neuen Breite, ein Stand
+  // der alten Breite kann nicht grün durchrutschen.
+  // Mutationsproben: `KENNZAHL_ZELLE_MIN.komfortabel` auf 100 → „390 px, komfortabel“ rot;
+  // `KENNZAHL_ZELLE_MIN.kompakt` auf 90 → „360 px, kompakt“ rot, also nach einem Breitenwechsel.
+  const { e, zf } = await saeen(page, -10, 110, { kraefte: 1830, ohneStartseite: true });
+  // Die erste Ladung startet kompakt, ohne Umweg über eine zweite: nur ein leerer Speicher wird
+  // belegt, die Wahl „komfortabel“ unten überlebt den Reload.
+  await page.addInitScript((schluessel) => {
+    if (localStorage.getItem(schluessel) === null) localStorage.setItem(schluessel, 'kompakt');
+  }, 'lifeline-hub.dichte');
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
   for (const dichte of ['kompakt', 'komfortabel']) {
-    await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+    if (dichte !== 'kompakt') {
+      await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+      await page.reload();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    await expect(page.getByRole('group', { name: 'Deckung Mittag Deich' })).toContainText('1840');
     for (const breite of [390, 360, 320]) {
       await page.setViewportSize({ width: breite, height: 700 });
-      await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
-      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
-      await expect(page.getByRole('group', { name: 'Deckung Mittag Deich' })).toContainText('1840');
-      const ueberlauf = await page.evaluate(() =>
-        [...document.querySelectorAll<HTMLElement>('[data-lfh="kennzahlenband"] > *')].map(
-          (z) => z.scrollWidth - z.clientWidth,
-        ),
-      );
-      expect(ueberlauf, `${breite} px, ${dichte}`).toEqual([0, 0, 0]);
+      const stand = await page.evaluate(() => ({
+        breite: window.innerWidth,
+        ueberlauf: [
+          ...document.querySelectorAll<HTMLElement>('[data-lfh="kennzahlenband"] > *'),
+        ].map((z) => z.scrollWidth - z.clientWidth),
+      }));
+      expect(stand, `${breite} px, ${dichte}`).toEqual({ breite, ueberlauf: [0, 0, 0] });
     }
   }
 });

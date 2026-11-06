@@ -2350,3 +2350,110 @@ async fn abschnitt_umbenennen_und_aufloesen_meldet_stellen_und_bezirke() {
         .clone();
     assert!(turnhalle["abschnitt_name"].is_null(), "{turnhalle:?}");
 }
+
+/// LLH-1560: Bezeichnung, Sammelstelle und Notiz eines Evakuierungsbezirks haben je eine Grenze,
+/// beim Anlegen wie beim Ändern. Genau die Grenze (nach dem Trimmen) geht durch, ein Zeichen mehr
+/// ist 400 und ändert nichts. Die Bezeichnung trägt die Grenze der Zone, weil die Lagekarte sie
+/// beim Zeichnen der Bezirksfläche übernimmt.
+#[tokio::test]
+async fn bezirk_freitexte_haben_grenzen() {
+    use lifeline_hub::betreuung::{
+        BEZIRK_BEZEICHNUNG_MAX, BEZIRK_NOTIZ_MAX, BEZIRK_SAMMELSTELLE_MAX,
+    };
+    use serde_json::json;
+
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let felder = [
+        ("bezeichnung", "Bezeichnung", BEZIRK_BEZEICHNUNG_MAX),
+        ("sammelstelle", "Sammelstelle", BEZIRK_SAMMELSTELLE_MAX),
+        ("notiz", "Notiz", BEZIRK_NOTIZ_MAX),
+    ];
+    let anlegen = |feld: &str, wert: String| {
+        let mut body = json!({
+            "bezeichnung": "Uferstraße 12–40",
+            "plan_personen": 640,
+            "plan_erhebung": "geschaetzt",
+        });
+        body[feld] = json!(wert);
+        body.to_string()
+    };
+
+    // Anlegen: ein Zeichen zu viel ist 400, je Feld mit seinem Namen; kein Bezirk entsteht.
+    for (feld, name, max) in felder {
+        let (s, j) = anfrage(
+            &app,
+            "POST",
+            &format!("{}/bezirke", pfad_evak(e)),
+            &admin,
+            Some(&anlegen(feld, "x".repeat(max + 1))),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}: {j:?}");
+        assert_eq!(
+            j["error"],
+            format!("{name} darf höchstens {max} Zeichen lang sein"),
+            "{feld}"
+        );
+    }
+    assert_eq!(
+        bezirke_von(&app, &admin, e).await.as_array().unwrap().len(),
+        0
+    );
+
+    // Anlegen: genau die Grenze geht, Rand-Leerzeichen zählen nicht mit.
+    let mut body = json!({ "plan_personen": 640, "plan_erhebung": "geschaetzt" });
+    for (feld, _, max) in felder {
+        body[feld] = json!(format!(" {} ", "ä".repeat(max)));
+    }
+    let (s, b) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke", pfad_evak(e)),
+        &admin,
+        Some(&body.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{b:?}");
+    for (feld, _, max) in felder {
+        assert_eq!(b[feld], "ä".repeat(max).as_str(), "{feld}");
+    }
+    let bid = b["id"].as_i64().unwrap();
+
+    // Ändern: ein Zeichen zu viel ist 400 und ändert nichts.
+    for (feld, name, max) in felder {
+        let (s, j) = anfrage(
+            &app,
+            "PATCH",
+            &format!("{}/bezirke/{bid}", pfad_evak(e)),
+            &admin,
+            Some(&json!({ feld: "y".repeat(max + 1) }).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}: {j:?}");
+        assert_eq!(
+            j["error"],
+            format!("{name} darf höchstens {max} Zeichen lang sein"),
+            "{feld}"
+        );
+    }
+    let bz = bezirke_von(&app, &admin, e).await;
+    for (feld, _, max) in felder {
+        assert_eq!(bz[0][feld], "ä".repeat(max).as_str(), "{feld} unverändert");
+    }
+
+    // Ändern: genau die Grenze geht.
+    for (feld, _, max) in felder {
+        let (s, j) = anfrage(
+            &app,
+            "PATCH",
+            &format!("{}/bezirke/{bid}", pfad_evak(e)),
+            &admin,
+            Some(&json!({ feld: "y".repeat(max) }).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{feld}: {j:?}");
+        assert_eq!(j[feld], "y".repeat(max).as_str(), "{feld}");
+    }
+}

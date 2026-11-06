@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 
+use lifeline_hub::abloesung::schichtplan;
 use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
     abloesung, auftrag, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage, einsatz,
@@ -18,6 +19,15 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("ETB_INHALT_MAX", etb::INHALT_MAX),
         ("BETREUUNG_LEITUNG_MAX", betreuung::LEITUNG_MAX),
         ("BETREUUNG_KONTAKTWEG_MAX", betreuung::KONTAKTWEG_MAX),
+        (
+            "EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX",
+            betreuung::BEZIRK_BEZEICHNUNG_MAX,
+        ),
+        (
+            "EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX",
+            betreuung::BEZIRK_SAMMELSTELLE_MAX,
+        ),
+        ("EVAKUIERUNG_BEZIRK_NOTIZ_MAX", betreuung::BEZIRK_NOTIZ_MAX),
         ("ETB_PARTEI_MAX", etb::PARTEI_MAX),
         ("AUFTRAG_TEXT_MAX", auftrag::AUFTRAG_TEXT_MAX),
         ("AUFTRAG_BEFEHLSFELD_MAX", auftrag::BEFEHLSFELD_MAX),
@@ -202,6 +212,18 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ),
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
         ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),
+        ("SCHICHTPLAN_PERSONEN_MAX", schichtplan::PLAN_PERSONEN_MAX),
+        ("SCHICHTPLAN_ERZEUGEN_MAX", schichtplan::ERZEUGEN_MAX),
+        ("SCHICHTPLAN_NOTIZ_MAX", schichtplan::NOTIZ_MAX),
+        ("SCHICHTPLAN_HELFER_TEXT_MAX", schichtplan::HELFER_TEXT_MAX),
+        (
+            "SCHICHTPLAN_HELFER_TELEFON_MAX",
+            schichtplan::HELFER_TELEFON_MAX,
+        ),
+        (
+            "SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX",
+            schichtplan::HELFER_QUALIFIKATIONEN_MAX,
+        ),
         ("ZEITACHSE_GRUND_MAX", zeitachse::GRUND_MAX),
         ("ZEITACHSE_NOTIZ_MAX", zeitachse::NOTIZ_MAX),
         (
@@ -250,4 +272,12 @@ fn jede_grenze_des_frontends_entspricht_dem_backend() {
         .map(|(k, v)| (k.to_string(), v))
         .collect();
     assert_eq!(frontend(), b);
+}
+
+/// LLH-1560: Die Lagekarte übernimmt die Bezeichnung eines Evakuierungsbezirks beim Zeichnen als
+/// Bezeichnung der Zone. Läge die Bezirksgrenze darüber, scheiterte das Zeichnen an einem gültigen
+/// Bezirk mit 400.
+#[test]
+fn bezirksbezeichnung_passt_in_die_zonenbezeichnung() {
+    assert!(betreuung::BEZIRK_BEZEICHNUNG_MAX <= lage_zone::LABEL_MAX);
 }
