@@ -161,6 +161,24 @@ pub fn validiere_neu(
 /// ([`crate::gefahr::GEBIET_LABEL_MAX`]). Kurz wie die übrigen Bezeichnungen.
 pub const LABEL_MAX: usize = 200;
 
+/// Notiz einer Zone (LLH-1559): steht weder im ETB noch auf der Karte, nur im Inspektor. So lang
+/// wie die übrigen Notizen. Spiegel: `ZONE_NOTIZ_MAX` in `frontend/src/api/eingabegrenzen.ts`.
+pub const NOTIZ_MAX: usize = 2_000;
+
+/// Farbe einer freien Skizze (LLH-1559): Hex `#rrggbb`, wie sie der Farbwähler der Maske liefert
+/// und die Karte zeichnet. Groß- und Kleinschreibung gehen durch, gespeichert wird klein; alles
+/// andere ist ein Feldfehler (400) statt freier Länge. Geprüft nur an einer freien Skizze, jeder
+/// andere Typ verwirft die Farbe.
+pub fn farbe_normiert(farbe: &str) -> Result<String, crate::error::AppError> {
+    let ziffern = farbe.strip_prefix('#').unwrap_or("");
+    if ziffern.len() != 6 || !ziffern.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(crate::error::AppError::Validation(
+            "Farbe muss die Form #rrggbb haben".into(),
+        ));
+    }
+    Ok(farbe.to_ascii_lowercase())
+}
+
 /// Höchstgröße des Geometrie-Strings einer Zone oder Abschnittsfläche in Bytes (LFH-937,
 /// design.md D7).
 pub const GEOMETRIE_BYTES_MAX: usize = 256 * 1024;

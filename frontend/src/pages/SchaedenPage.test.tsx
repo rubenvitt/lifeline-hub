@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, isInaccessible, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useNavigate } from 'react-router';
+import { Link, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
@@ -13,6 +13,7 @@ import { FakeEventSource } from '../test/eventSource';
 import { schaedenAttrappe } from '../test/schaedenAttrappe';
 import * as dateiSpeichern from '../components/dateiSpeichern';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { AdresseSteht } from '../test/adresseSteht';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -787,6 +788,75 @@ describe('SchaedenPage', () => {
     // Tabelle muss laden (Seite ist gerendert)
     await screen.findByText('Keine Schäden in dieser Sicht');
     expect(screen.queryByText('Schaden erfassen')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1` noch
+   * in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu an
+   * (Einsatz lädt neu), öffnet die Erfassung nicht noch einmal. Bisher schützte davor nur, dass die
+   * Seite den Parameter aus der Instanz des Routers löschte (gegen die Klon-Regel, LFH-156).
+   */
+  it('ein hängender Router-Commit öffnet die geschlossene Erfassung nach neuem Recht nicht wieder (LLH-1558)', async () => {
+    let einsatz: object = einsatzAktiv;
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      ...schaedenAttrappe(1, () => []).handler,
+      http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    );
+    const { client } = renderMitProviders(
+      <AdresseSteht>
+        <Routes>
+          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+        </Routes>
+      </AdresseSteht>,
+      { route: '/einsaetze/1/schaeden?neu=1' },
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await warteBisDialogWeg();
+
+    einsatz = einsatzBeobachter;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Schaden erfassen' })).not.toBeInTheDocument(),
+    );
+    einsatz = einsatzAktiv;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    expect(await screen.findByRole('button', { name: 'Schaden erfassen' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('ein neuer Link ?neu=1 öffnet die Erfassung wieder (LLH-1558)', async () => {
+    function Suche() {
+      return <output data-testid="suche">{useLocation().search}</output>;
+    }
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      ...schaedenAttrappe(1, () => []).handler,
+      http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+        </Routes>
+        <Suche />
+        <Link to="/einsaetze/1/schaeden?neu=1">neuer-link</Link>
+      </>,
+      { route: '/einsaetze/1/schaeden?neu=1' },
+    );
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await warteBisDialogWeg();
+
+    await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
   it('verlinkt eine geschädigte Person auf ihre Detailseite (LFH-25)', async () => {

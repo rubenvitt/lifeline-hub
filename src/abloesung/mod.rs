@@ -53,6 +53,7 @@ use utoipa::ToSchema;
 pub mod hinweis;
 pub mod kopplung;
 pub mod repo;
+pub mod schichtplan;
 
 pub use crate::schichtmodell::{PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN};
 

@@ -72,7 +72,8 @@ Spec `eingabegrenzen`, Herleitung
   und Schreiben der Ablöser-Liste über `json_each`, Folgeschichten je Ablöser, gedeckelt durch
   `abloesung::ABLOESER_MAX`; beim Besatzungswechsel (LLH-1150) Prüfen der neuen Besatzung und
   Umhängen beider Besatzungen über `json_each`, Zeitachse und Zeile je Person, gedeckelt durch
-  `abloesung::BESATZUNG_MAX`.
+  `abloesung::BESATZUNG_MAX`. Ebenso die Personen eines **Schichtplan-Blocks** (LLH-1552): Prüfen
+  und Schreiben je Art über `json_each`, gedeckelt durch `schichtplan::PLAN_PERSONEN_MAX`.
 - **Geometrien** von Zonen und Flächen gehen durch `lage_zone::pruefe_geometrie_groesse` und
   `pruefe_geometrie_struktur` (400); kaputtes JSON und falscher Typ bleiben 422.
 - **Body-Limit** (LFH-1074): jede Route nimmt höchstens `JSON_BODY_MAX` (256 KiB, `app.rs`) an,

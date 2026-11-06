@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 
+use lifeline_hub::abloesung::schichtplan;
 use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
     abloesung, auftrag, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage, einsatz,
@@ -107,6 +108,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("GEFAHR_GEMELDET_VON_MAX", gefahr::GEMELDET_VON_MAX),
         ("GEFAHR_GEBIET_LABEL_MAX", gefahr::GEBIET_LABEL_MAX),
         ("ZONE_LABEL_MAX", lage_zone::LABEL_MAX),
+        ("ZONE_NOTIZ_MAX", lage_zone::NOTIZ_MAX),
         ("GEOMETRIE_STUETZPUNKTE_MAX", lage_zone::STUETZPUNKTE_MAX),
         ("KREIS_RADIUS_M_MAX", lage_zone::KREIS_RADIUS_M_MAX),
         ("SPRECHGRUPPE_BEDINGUNG_MAX", sprechgruppe::BEDINGUNG_MAX),
@@ -212,6 +214,18 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ),
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
         ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),
+        ("SCHICHTPLAN_PERSONEN_MAX", schichtplan::PLAN_PERSONEN_MAX),
+        ("SCHICHTPLAN_ERZEUGEN_MAX", schichtplan::ERZEUGEN_MAX),
+        ("SCHICHTPLAN_NOTIZ_MAX", schichtplan::NOTIZ_MAX),
+        ("SCHICHTPLAN_HELFER_TEXT_MAX", schichtplan::HELFER_TEXT_MAX),
+        (
+            "SCHICHTPLAN_HELFER_TELEFON_MAX",
+            schichtplan::HELFER_TELEFON_MAX,
+        ),
+        (
+            "SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX",
+            schichtplan::HELFER_QUALIFIKATIONEN_MAX,
+        ),
         ("ZEITACHSE_GRUND_MAX", zeitachse::GRUND_MAX),
         ("ZEITACHSE_NOTIZ_MAX", zeitachse::NOTIZ_MAX),
         (

@@ -13,7 +13,8 @@ use crate::live::LiveEvent;
 // ETB-Wortlaut der Zone: der Baustein liegt seit LFH-690 im Fachmodul (Demo-Import).
 use crate::lage_zone::{self, etb_text, LageZoneAnzeige};
 use crate::routes::support::{
-    deserialize_optional_field, optional_max, optional_max_tri, parse_enum, trimme, AnsichtFilter,
+    deserialize_optional_field, optional_max, optional_max_tri, parse_enum, trimme, trimme_tri,
+    AnsichtFilter,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -155,6 +156,16 @@ pub async fn anlegen(
     // Die Bezeichnung steht wörtlich im ETB und wird die eines neuen Gefahrengebiets (LLH-1531);
     // ein Feld für sich, also 400 vor jedem 422 der Geometrie.
     let label = optional_max(body.label.clone(), "Bezeichnung", lage_zone::LABEL_MAX)?;
+    // Notiz und Farbe sind ebenso Felder für sich (LLH-1559). Die Farbe trägt nur eine freie
+    // Skizze; an jedem anderen Typ wird sie wie bisher verworfen, ohne Prüfung.
+    let notiz = optional_max(body.notiz.clone(), "Notiz", lage_zone::NOTIZ_MAX)?;
+    let farbe = if body.typ == "freie_skizze" {
+        trimme(body.farbe.clone())
+            .map(|f| lage_zone::farbe_normiert(&f))
+            .transpose()?
+    } else {
+        None
+    };
     let (geometrie_typ, geometrie) = validiere_neu(&body)?;
     // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404.
     crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, body.ansicht_id)
@@ -162,14 +173,6 @@ pub async fn anlegen(
     if let Some(bid) = body.evakuierungsbezirk_id {
         pruefe_bezirk_zuordnung(&state, &ctx, &body.typ, bid).await?;
     }
-
-    let notiz = trimme(body.notiz.clone());
-    // farbe nur für freie_skizze; sonst ignorieren (Stil aus typ abgeleitet).
-    let farbe = if body.typ == "freie_skizze" {
-        trimme(body.farbe.clone())
-    } else {
-        None
-    };
 
     // F06/LFH-244 Tier-A: Zonen-INSERT (+ ggf. Gruppen-INSERT) + System-ETB-Eintrag atomar
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für
@@ -315,6 +318,24 @@ pub async fn aktualisieren(
     }
     // Bezeichnung wie beim Anlegen (LLH-1531): absent = unverändert, `null`/leer = leeren.
     let label_patch = optional_max_tri(body.label.clone(), "Bezeichnung", lage_zone::LABEL_MAX)?;
+    // Notiz und Farbe wie beim Anlegen (LLH-1559): absent = unverändert, `null`/leer = leeren.
+    let notiz_patch = optional_max_tri(body.notiz.clone(), "Notiz", lage_zone::NOTIZ_MAX)?;
+    // Ein unbekannter Typ ist ebenso ein Feldfehler (400) und geht jedem 422 des Kreises oder der
+    // Geometrie vor; die Passung zur gespeicherten Geometrie prüft unten der Zusammenhang.
+    if let Some(t) = &body.typ {
+        parse_enum(
+            lage_zone::LageZoneTyp::parse,
+            t,
+            format!("Unbekannter Zonen-Typ: {t}"),
+        )?;
+    }
+    // Die Farbe zählt nur, wenn die Zone danach eine freie Skizze ist (sonst wird sie unten
+    // genullt); nur dann wird sie geprüft.
+    let wird_freie_skizze = body.typ.as_deref().unwrap_or(vorher.typ.as_str()) == "freie_skizze";
+    let farbe_body = match trimme_tri(body.farbe.clone()) {
+        Some(Some(f)) if wird_freie_skizze => Some(Some(lage_zone::farbe_normiert(&f)?)),
+        sonst => sonst,
+    };
     if (body.kreis_radius_m.is_some() || neue_mitte.is_some()) && body.geometrie.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Kreisangaben und Geometrie schließen sich aus".into(),
@@ -370,13 +391,8 @@ pub async fn aktualisieren(
     // Effektiver neuer typ; wenn geändert: gültig + passt zur *gespeicherten* Geometrie.
     let neuer_typ = match &body.typ {
         Some(t) => {
-            // Feld isoliert unbrauchbar → 400; die Passung zur gespeicherten Geometrie
-            // darunter ist ein Zusammenhang → bleibt 422 (LFH-305).
-            parse_enum(
-                lage_zone::LageZoneTyp::parse,
-                t,
-                format!("Unbekannter Zonen-Typ: {t}"),
-            )?;
+            // Der Typ selbst ist oben geprüft (400); die Passung zur gespeicherten Geometrie ist
+            // ein Zusammenhang → bleibt 422 (LFH-305).
             if !lage_zone::geometrie_klasse_passt(t, &vorher.geometrie_typ) {
                 return Err(AppError::UnprocessableEntity(format!(
                     "Typ {t} ist mit der vorhandenen Geometrie ({}) nicht zulässig",
@@ -398,7 +414,7 @@ pub async fn aktualisieren(
     let farbe_patch: Option<Option<&str>> = if neuer_typ != "freie_skizze" {
         Some(None) // beim Wechsel weg von freie_skizze farbe nullen
     } else {
-        body.farbe.as_ref().map(|o| o.as_deref())
+        farbe_body.as_ref().map(|o| o.as_deref())
     };
 
     // Gruppen-Zuordnung: nur gefahrengebiet-Zonen; Merge-Ziel muss zum Einsatz gehören.
@@ -439,10 +455,7 @@ pub async fn aktualisieren(
             typ: body.typ.as_deref(),
             label: label_patch.as_ref().map(|o| o.as_deref()),
             farbe: farbe_patch,
-            notiz: body
-                .notiz
-                .as_ref()
-                .map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+            notiz: notiz_patch.as_ref().map(|o| o.as_deref()),
             gefahrengebiet_id: gebiet_patch,
             ansicht_id: body.ansicht_id,
             evakuierungsbezirk_id: body.evakuierungsbezirk_id,

@@ -162,3 +162,12 @@ die Ablöser-Liste (`einsatz_abloesung_planung_vorher`, `planung_gesichert`), di
 sie wieder her; der geplante Wechsel bleibt beim Vollzug stehen. Ziele, Vorbelegung und Texte
 („Besatzungswechsel geplant · neu: …“, „nach Besatzungswechsel · Besatzung: …“) bildet nur
 `abloesung/besatzung.ts`.
+
+**Schichtplan** (LLH-1552, Spec `kraefte-schichtplan`): Blöcke an Einheit, UHS oder Pause sind
+Soll; sie ändern weder Zuordnung noch Fälligkeit, und wer nur im Plan steht, ist nicht im Einsatz.
+Überschneidung (422), Soll-Kopie vom Posten, Lücke, offene Anforderungen und alle Befunde
+(`doppelt`, `quali`, `dienst`, `verfuegbar`, `abweichung`) rechnet der Server beim Lesen
+(`abloesung::schichtplan::pruefung`); der Client zeigt sie nur und rechnet nichts nach. Jeder
+Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Key
+`schichtplan` unter `abloesungen`, live über `abloesung`. Ohne Freigabe von Personal kommen
+`personen` und `helfer` als `null`.

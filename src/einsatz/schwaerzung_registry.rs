@@ -1348,6 +1348,68 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("fahrzeug_nachher_id", G_FK),
         ],
     },
+    // Helfer des Schichtplans (LLH-1552, Mig 0277): Personen außerhalb des Einsatzes. Name,
+    // Telefon und Organisation sind PII; die Qualifikationen sind Katalog-Verweise und ohne Namen
+    // anonym.
+    TabellenRegel {
+        tabelle: "einsatz_plan_helfer",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            // name ist NOT NULL → Platzhalter.
+            scrub("name", Strategie::Platzhalter, Z_EINSATZ),
+            scrub("telefon", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("organisation", Strategie::NullSetzen, Z_EINSATZ),
+            retain("qualifikationen", G_KONFIG),
+            retain("angelegt_at", G_ZEIT),
+            retain("angelegt_von", G_FK),
+        ],
+    },
+    // Planblöcke des Schichtplans (LLH-1552, Mig 0277): Posten, Zeit und Soll sind Struktur; die
+    // Notiz ist Freitext und kann Namen tragen.
+    TabellenRegel {
+        tabelle: "einsatz_planschicht",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("posten_art", G_ENUM),
+            retain("einheit_id", G_FK),
+            retain("uhs_id", G_FK),
+            retain("von", G_ZEIT),
+            retain("bis", G_ZEIT),
+            retain("soll_anzahl", G_ZAEHLER),
+            retain("quali_soll", G_KONFIG),
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
+            retain("version", G_ZAEHLER),
+            retain("angelegt_at", G_ZEIT),
+            retain("angelegt_von", G_FK),
+            retain("geaendert_at", G_ZEIT),
+            retain("geaendert_von", G_FK),
+        ],
+    },
+    // Eingeteilte Personen eines Planblocks (LLH-1552, Mig 0277): nur Verweise; die Namen stecken
+    // in `personal`, `einsatz_personal` und `einsatz_plan_helfer` → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_planschicht_person",
+        scoping: Scoping::UeberParent {
+            fk: "planschicht_id",
+            parent: "einsatz_planschicht",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("planschicht_id", G_FK),
+            retain("personal_id", G_FK),
+            retain("einsatz_personal_id", G_FK),
+            retain("helfer_id", G_FK),
+        ],
+    },
     // Geplanter Besatzungswechsel einer Schicht (LLH-1319, Mig 0264): wer kommen soll und wohin.
     // Nur Verweise und Zeit; der Name steckt in `einsatz_personal` → RETAIN.
     TabellenRegel {
@@ -1918,6 +1980,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("rueckmeldung_frist_min", G_KONFIG),
             retain("auto_etb_eintraege", G_KONFIG),
             retain("retention_dauer_tage", G_KONFIG),
+            retain("schichtplan_max_dienst_min", G_KONFIG),
+            retain("schichtplan_min_ruhe_min", G_KONFIG),
         ],
     },
     TabellenRegel {

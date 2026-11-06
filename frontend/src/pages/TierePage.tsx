@@ -30,6 +30,7 @@ import {
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { parseListenZustand, tiereDetailPfad, tiereDruckPfad } from '../routing/deeplinks';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import {
   SPEZIES_META,
@@ -282,18 +283,20 @@ export default function TierePage() {
   }, [aktuellerModus, einsatzId, form, formular.da, formular.jeDa]);
 
   // Schnellaktion: ?neu=1 öffnet „Tier erfassen" (Sprungpalette, LFH-506). Warten bis der
-  // Einsatz geladen ist; Param immer löschen, Maske nur bei Schreibrecht. Eine Kopie statt
-  // In-place-Mutation, sonst sähe der zweite StrictMode-Durchlauf den Parameter nicht mehr.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Einsatz geladen ist; Param immer löschen, Maske nur bei Schreibrecht. Einmal je
+  // Verlaufseintrag (`useLinkAuftrag`, LLH-1558): Bis der Router die Räumung committet, steht
+  // `?neu=1` noch in `searchParams`, und ein neu geladenes Schreibrecht öffnete die geschlossene
+  // Maske sonst ein zweites Mal.
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) setModus({ einsatzId, wert: 'erfassen' });
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('neu');
-    setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
 
   const csvExport = useCsvExport(einsatzId, 'tiere', ladeTiereExport);
 

@@ -7,6 +7,7 @@ import { ladeModulZaehler } from '../api/modulZaehler';
 import { ladeMedienkontaktKennzahlen } from '../api/presse';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
+import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
 import type { Sachgebiet } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { RechteHinweis } from '../components/SpeicherHinweis';
@@ -83,6 +84,11 @@ export default function StabPage() {
     queryKey: einsatzKeys.medienkontaktKennzahlen(einsatzId),
     queryFn: () => ladeMedienkontaktKennzahlen(einsatzId),
   });
+  // Fehler ≠ leer: ohne Daten tritt der Fehler an die Stelle des Rasters — sechs „nicht vergeben"
+  // wären sonst eine Aussage über eine Menge, die nie ankam. Der Fehler bleibt stehen, solange ein
+  // neuer Versuch läuft; auch der aus `useFunkplanLuecken`, dessen Stab-Beobachter erst nach den
+  // Freigaben einschaltet (LLH-1577).
+  const stabFehler = useFehlerOhneDaten(stabQuery);
   const funkplan = useFunkplanLuecken(einsatzId);
   const ohneVerbindung = useOhneVerbindung();
   const zahlQuellen: WerkzeugZahlQuellen = {
@@ -106,9 +112,6 @@ export default function StabPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  // Fehler ≠ leer: ohne Daten tritt der Fehler an die Stelle des Rasters — sechs „nicht vergeben"
-  // wären sonst eine Aussage über eine Menge, die nie ankam.
-  const stabGescheitert = stabQuery.isError && !stabQuery.data;
   const standVeraltet = stabQuery.isError && stabQuery.data != null;
   const sachgebiete = mitWirksamemLabel(katalogQuery.data ?? []);
   const offenerEintrag = sachgebiete.find((s) => s.sachgebiet === offenFuer);
@@ -141,10 +144,11 @@ export default function StabPage() {
         freigaben={freigabenQuery.data}
       />
 
-      {stabGescheitert ? (
+      {stabFehler.gescheitert ? (
         <SeitenFehler
           text="Führungsorganisation konnte nicht geladen werden"
-          ursache={stabQuery.error}
+          ursache={stabFehler.fehler}
+          laedt={stabFehler.laedt}
           onWiederholen={() => void stabQuery.refetch()}
         />
       ) : (
