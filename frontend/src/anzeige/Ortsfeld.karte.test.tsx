@@ -7,8 +7,14 @@ import type { OrtSucheAntwort } from '../api/karteOrtSuche';
 import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
-import type { LatLon } from './koordinaten';
-import { nachTextaenderung, Ortsfeld, type OrtsfeldKarte, type OrtsfeldWert } from './Ortsfeld';
+import { formatiere, type LatLon } from './koordinaten';
+import {
+  nachKartenpunkt,
+  nachTextaenderung,
+  Ortsfeld,
+  type OrtsfeldKarte,
+  type OrtsfeldWert,
+} from './Ortsfeld';
 
 /**
  * Ortsfeld mit Koordinate im Feld, Kartenvorschau und ohne Suche (LLH-1108, Spec `ortsfeld`).
@@ -22,6 +28,13 @@ import { nachTextaenderung, Ortsfeld, type OrtsfeldKarte, type OrtsfeldWert } fr
  *   die Koordinate auch ohne Netz“.
  * - Vorschlag ohne Abgleich mit dem Text: rot in „schlägt den Ortsnamen nicht vor, wenn …“.
  * - `ohneSuche` rendert das Feld mit Suche: rot in „ist reiner Text …“.
+ * - `nachTextaenderung` behält den Kartenpunkt auch bei leerem Text (LLH-1534): rot in
+ *   „ein geleerter Text leert auch einen Kartenpunkt“ und „ein Kartenpunkt ins leere Feld …“.
+ * - `nachKartenpunkt` lässt einen leeren Text leer: rot in „nachKartenpunkt“ und „ein Kartenpunkt
+ *   ins leere Feld …“.
+ * - Gleichheit über festen Abstand (1e-4°) statt über das Format: rot in „eine Koordinate im Text,
+ *   die der Kartenpunkt ist …“ (52.50009) und „… im Format dms“.
+ * - Nur die Rückrechnung zählt, nicht der Text selbst: rot in „… an der UTM-Zonengrenze …“.
  */
 
 const karte = vi.hoisted(() => ({
@@ -153,32 +166,133 @@ beforeEach(() => {
 afterEach(() => setzeOnline(true));
 
 describe('nachTextaenderung', () => {
+  const fmt = (lat: number, lon: number) => formatiere(lat, lon, 'wgs84');
+
   it('erkennt eine Koordinate, lässt eine Treffer-Koordinate fallen, behält einen Kartenpunkt', () => {
     const leer: OrtsfeldWert = { text: '', koordinate: null };
-    expect(nachTextaenderung(leer, '51.16040, 10.45140')).toEqual({
+    expect(nachTextaenderung(leer, '51.16040, 10.45140', fmt)).toEqual({
       text: '51.16040, 10.45140',
       koordinate: { lat: 51.1604, lon: 10.4514 },
       quelle: 'koordinate',
     });
     const treffer: OrtsfeldWert = { text: 'A', koordinate: { lat: 1, lon: 2 }, quelle: 'adresse' };
-    expect(nachTextaenderung(treffer, 'AB')).toEqual({ text: 'AB', koordinate: null });
+    expect(nachTextaenderung(treffer, 'AB', fmt)).toEqual({ text: 'AB', koordinate: null });
     const getippt: OrtsfeldWert = {
       text: '51.16040, 10.45140',
       koordinate: { lat: 51.1604, lon: 10.4514 },
       quelle: 'koordinate',
     };
-    expect(nachTextaenderung(getippt, '51.16040, 10.45')).toEqual({
+    expect(nachTextaenderung(getippt, '51.16040, 10.45', fmt)).toEqual({
       text: '51.16040, 10.45',
       koordinate: null,
     });
     const gesetzt: OrtsfeldWert = { text: 'A', koordinate: { lat: 1, lon: 2 }, quelle: 'karte' };
-    expect(nachTextaenderung(gesetzt, 'Hinterhof')).toEqual({
+    expect(nachTextaenderung(gesetzt, 'Hinterhof', fmt)).toEqual({
       text: 'Hinterhof',
       koordinate: { lat: 1, lon: 2 },
       quelle: 'karte',
     });
     // „12 34“ ist eine Hausnummer, keine Koordinate.
-    expect(nachTextaenderung(leer, '12 34')).toEqual({ text: '12 34', koordinate: null });
+    expect(nachTextaenderung(leer, '12 34', fmt)).toEqual({ text: '12 34', koordinate: null });
+  });
+
+  it('eine Koordinate im Text, die der Kartenpunkt ist, lässt ihn stehen; eine andere ersetzt ihn', () => {
+    const gesetzt: OrtsfeldWert = {
+      text: '52.50000, 13.40000',
+      koordinate: { lat: 52.5, lon: 13.4 },
+      quelle: 'karte',
+    };
+    // Zeichen anhängen und wieder löschen: der Punkt bleibt über alle Zwischenstände.
+    const l = nachTextaenderung(gesetzt, '52.50000, 13.40000 l', fmt);
+    expect(l).toEqual({ ...gesetzt, text: '52.50000, 13.40000 l' });
+    expect(nachTextaenderung(l, '52.50000, 13.40000', fmt)).toEqual(gesetzt);
+    // Gerundet wie in der Anzeige ist es derselbe Punkt.
+    const fein: OrtsfeldWert = { ...gesetzt, koordinate: { lat: 52.500003, lon: 13.399998 } };
+    expect(nachTextaenderung(fein, '52.50000, 13.40000', fmt).koordinate).toEqual(fein.koordinate);
+    // Eine Änderung in der Genauigkeit des Formats ist eine andere Stelle, kein Rundungsrest.
+    expect(nachTextaenderung(gesetzt, '52.50009, 13.40000', fmt)).toEqual({
+      text: '52.50009, 13.40000',
+      koordinate: { lat: 52.50009, lon: 13.4 },
+      quelle: 'koordinate',
+    });
+    // Eine andere getippte Koordinate ersetzt ihn.
+    expect(nachTextaenderung(gesetzt, '52.50000, 13.41000', fmt)).toEqual({
+      text: '52.50000, 13.41000',
+      koordinate: { lat: 52.5, lon: 13.41 },
+      quelle: 'koordinate',
+    });
+  });
+
+  it('ein geleerter Text leert auch einen Kartenpunkt (LLH-1534)', () => {
+    const gesetzt: OrtsfeldWert = { text: 'A', koordinate: { lat: 1, lon: 2 }, quelle: 'karte' };
+    expect(nachTextaenderung(gesetzt, '', fmt)).toEqual({ text: '', koordinate: null });
+    expect(nachTextaenderung(gesetzt, '  ', fmt)).toEqual({ text: '  ', koordinate: null });
+  });
+
+  it.each(['wgs84', 'dms', 'utm', 'mgrs', 'gk'] as const)(
+    'ein Kartenpunkt übersteht das Nachtippen seines Textes im Format %s',
+    (format) => {
+      const fmtF = (lat: number, lon: number) => formatiere(lat, lon, format);
+      const punkt = { lat: 52.517234, lon: 13.389876 };
+      const gesetzt = nachKartenpunkt({ text: '', koordinate: null }, punkt, fmtF);
+      const mitLeerzeichen = nachTextaenderung(gesetzt, `${gesetzt.text} `, fmtF);
+      expect(mitLeerzeichen.koordinate).toEqual(punkt);
+      expect(nachTextaenderung(mitLeerzeichen, gesetzt.text, fmtF)).toEqual(gesetzt);
+    },
+  );
+
+  it('ein Kartenpunkt an der UTM-Zonengrenze übersteht das Nachtippen seines Textes', () => {
+    const fmtUtm = (lat: number, lon: number) => formatiere(lat, lon, 'utm');
+    const punkt = { lat: 48, lon: 12 };
+    const gesetzt = nachKartenpunkt({ text: '', koordinate: null }, punkt, fmtUtm);
+    const mitLeerzeichen = nachTextaenderung(gesetzt, `${gesetzt.text} `, fmtUtm);
+    expect(mitLeerzeichen).toEqual({ ...gesetzt, text: `${gesetzt.text} ` });
+    expect(nachTextaenderung(mitLeerzeichen, `${gesetzt.text} x`, fmtUtm).koordinate).toEqual(
+      punkt,
+    );
+  });
+});
+
+describe('nachKartenpunkt', () => {
+  const fmt = (lat: number, lon: number) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  const p = { lat: 52.5, lon: 13.4 };
+
+  it('setzt in ein leeres Feld die Koordinate als Text', () => {
+    expect(nachKartenpunkt({ text: '', koordinate: null }, p, fmt)).toEqual({
+      text: '52.50000, 13.40000',
+      koordinate: p,
+      quelle: 'karte',
+    });
+    expect(nachKartenpunkt({ text: ' ', koordinate: null }, p, fmt).text).toBe(
+      '52.50000, 13.40000',
+    );
+  });
+
+  it('lässt einen Text stehen, der keine Koordinate ist', () => {
+    const vorher: OrtsfeldWert = {
+      text: 'Waldweg',
+      koordinate: { lat: 1, lon: 2 },
+      quelle: 'adresse',
+    };
+    expect(nachKartenpunkt(vorher, p, fmt)).toEqual({
+      text: 'Waldweg',
+      koordinate: p,
+      quelle: 'karte',
+    });
+  });
+
+  it('zieht eine Koordinate im Text mit, eingetragen oder getippt', () => {
+    const eingetragen: OrtsfeldWert = {
+      text: '51.16040, 10.45140',
+      koordinate: { lat: 51.1604, lon: 10.4514 },
+      quelle: 'karte',
+    };
+    expect(nachKartenpunkt(eingetragen, p, fmt).text).toBe('52.50000, 13.40000');
+    // Getippt, auch in einem anderen Format: sonst nennte der Text einen anderen Ort als die Nadel.
+    expect(
+      nachKartenpunkt({ ...eingetragen, text: '32U MB 12345 67890', quelle: 'koordinate' }, p, fmt)
+        .text,
+    ).toBe('52.50000, 13.40000');
   });
 });
 
@@ -349,6 +463,35 @@ describe('Ortsfeld — Kartenvorschau', () => {
     });
     expect(screen.queryByRole('dialog', { name: 'Karte wählen' })).not.toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Karte: Einsatzort' })).toBeInTheDocument();
+  });
+
+  it('ein Kartenpunkt ins leere Feld setzt die Koordinate als Text, ein geleerter Text nimmt ihn weg (LLH-1534)', async () => {
+    ortVorschau();
+    renderMitProviders(<Aufbau kartenProp={{ etikett: 'Einsatzort', einsatzId: 7 }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Auf Karte wählen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Punkt übernehmen' }));
+    expect(wert()).toEqual({
+      text: '53.10000, 8.80000',
+      koordinate: { lat: 53.1, lon: 8.8 },
+      quelle: 'karte',
+    });
+    // Der Ortsname bleibt ein Vorschlag.
+    expect(
+      await screen.findByRole('button', { name: 'Als Adresse übernehmen' }),
+    ).toBeInTheDocument();
+
+    // Die Koordinate als Text zieht mit der Nadel mit.
+    await userEvent.click(screen.getByRole('button', { name: 'Nadel ziehen' }));
+    expect(wert()).toEqual({
+      text: '52.50000, 13.40000',
+      koordinate: { lat: 52.5, lon: 13.4 },
+      quelle: 'karte',
+    });
+
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Ort' }));
+    expect(wert()).toEqual({ text: '', koordinate: null });
+    expect(screen.getByText('Nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Karte: Einsatzort' })).not.toBeInTheDocument();
   });
 
   it('„Auf Karte wählen“ geht auch ohne Netz; Abbrechen lässt den Wert', async () => {
