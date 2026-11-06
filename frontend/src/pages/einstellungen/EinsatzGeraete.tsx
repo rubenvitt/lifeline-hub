@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, App, Button, Form, Input, Modal, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router';
@@ -11,6 +11,8 @@ import { MenueAusloeser } from '../../components/MenueAusloeser';
 import { Select } from '../../components/Select';
 import KopierbarerText from '../../components/KopierbarerText';
 import { ErfassungsModal } from '../../components/Erfassung';
+import FormularEingehaengt from '../../components/FormularEingehaengt';
+import { useFormularEingehaengt } from '../../components/useFormularEingehaengt';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
@@ -181,17 +183,15 @@ export default function EinsatzGeraete() {
     );
   }, [einheitAuftrag, daten.laedt, leitung, uebersichtDa, darf, setSuche]);
 
-  // Die Vorbelegung lebt im Formularspeicher weiter (Abbrechen und Erfolg setzen auf sie zurück,
-  // das Abhängen hält sie): ein Öffnen ohne Auftrag beginnt deshalb wieder leer.
-  const warVorbelegt = useRef(false);
+  // Vorbelegen ist kein Reset (`frontend/AGENTS.md`, Erfassung): erst wenn das Formular hängt,
+  // und nicht als `initialValues`, sonst setzten Abbrechen und Erfolg auf die Einheit zurück und
+  // ein späteres „Gerät koppeln“ begänne nicht leer.
+  const anlegenFormular = useFormularEingehaengt();
   useEffect(() => {
-    if (!anlegenOffen) return;
-    if (anlegenVorbelegung) warVorbelegt.current = true;
-    else if (warVorbelegt.current) {
-      warVorbelegt.current = false;
-      anlegenForm.resetFields();
-    }
-  }, [anlegenOffen, anlegenVorbelegung, anlegenForm]);
+    if (!anlegenFormular.da || !anlegenVorbelegung) return;
+    anlegenForm.setFieldsValue(anlegenVorbelegung);
+    setAnlegenVorbelegung(undefined);
+  }, [anlegenFormular.da, anlegenVorbelegung, anlegenForm]);
 
   /** Übernimmt eine geänderte Kopplung in die geladene Übersicht. */
   const uebernimm = (k: KopplungAnzeige) =>
@@ -372,7 +372,6 @@ export default function EinsatzGeraete() {
         offen={anlegenOffen}
         titel="Gerät koppeln"
         form={anlegenForm}
-        initialValues={anlegenVorbelegung}
         erfassenText="Koppeln"
         laeuft={anlegen.isPending}
         onErfassen={(w) =>
@@ -388,6 +387,7 @@ export default function EinsatzGeraete() {
           setAnlegenOffen(false);
         }}
       >
+        <FormularEingehaengt onWechsel={anlegenFormular.melde} />
         <Form.Item
           label="Ansicht"
           name="ansicht"
