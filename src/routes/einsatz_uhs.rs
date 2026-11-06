@@ -152,8 +152,20 @@ pub async fn detail(
         (Vec::new(), Vec::new())
     } else {
         (
-            material_repo::list_je_uhs(&state.pool, einsatz_id, uhs_id, ctx.einsatz.ist_aktiv())
-                .await?,
+            {
+                let mut material = material_repo::list_je_uhs(
+                    &state.pool,
+                    einsatz_id,
+                    uhs_id,
+                    ctx.einsatz.ist_aktiv(),
+                )
+                .await?;
+                // Der Laptop sieht nur seine UHS: Bestandsdoppel nur aus diesen Zeilen (LLH-1528).
+                if ctx.geraet.is_some() {
+                    crate::material::limit_bestandsdoppel_to_rows(&mut material);
+                }
+                material
+            },
             crate::uhs::kraefte::liste(
                 &state.pool,
                 einsatz_id,
