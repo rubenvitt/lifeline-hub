@@ -1095,6 +1095,39 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     expect((await vorgemerkt()).map((a) => a.art)).toEqual(['verbleib', 'transport', 'massnahme']);
   });
 
+  it('Anlass: ein ohne Netz vorgemerkter Anlass lässt sich ohne Serverstand wieder aufheben', async () => {
+    const user = userEvent.setup();
+    const { kopf } = zeige();
+    let paneel = await paneelOhneNetz(kopf, 'Anlass festlegen', 'Anlass festlegen');
+    await user.click(
+      within(within(paneel).getByRole('radiogroup', { name: 'Anlass' })).getByRole('radio', {
+        name: 'Intoxikation',
+      }),
+    );
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    // Der Kopf zeigt weiter den Serverstand.
+    expect(kopf.querySelector('[data-lfh="anlass"]')?.textContent).toBe('kein Anlass');
+
+    // Mutationsprobe: die Pflicht nur am Serverstand festmachen — „kein Anlass“ bleibt gesperrt, rot.
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    expect(within(kopf).queryByText('Bitte einen Anlass wählen')).toBeNull();
+    expect(gesendet).toEqual([]);
+    expect(
+      (await vorgemerkt()).map((a) => [a.art, (a.daten as { anlass?: unknown }).anlass]),
+    ).toEqual([
+      ['anlass', 'intoxikation'],
+      ['anlass', null],
+    ]);
+  });
+
   it('Maßnahme aufheben bleibt ohne Netz mit Grund gesperrt', async () => {
     const { kopf } = zeige(vollerKern);
     const paneel = await paneelOhneNetz(kopf, 'Maßnahme erfassen', 'Maßnahme erfassen');

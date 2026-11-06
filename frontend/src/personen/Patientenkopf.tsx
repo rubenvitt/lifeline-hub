@@ -459,7 +459,12 @@ export default function Patientenkopf({
         />
       )}
       {offen === 'anlass' && (
-        <AnlassPaneel person={person} mutation={anlassMutation} onSchliessen={close('anlass')} />
+        <AnlassPaneel
+          person={person}
+          mutation={anlassMutation}
+          onSchliessen={close('anlass')}
+          anlassVorgemerkt={vorgemerkt.some((v) => v.aktion.art === 'anlass')}
+        />
       )}
       {offen === 'transport' && (
         <TransportPaneel
