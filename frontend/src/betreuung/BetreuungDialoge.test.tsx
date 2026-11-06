@@ -7,6 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { ApiError } from '../api/client';
+import {
+  EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX,
+  EVAKUIERUNG_BEZIRK_NOTIZ_MAX,
+  EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX,
+  ZONE_LABEL_MAX,
+} from '../api/eingabegrenzen';
 import type { Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
@@ -423,6 +429,44 @@ describe('BezirkAnlegenDialog', () => {
         { wahl: 'flaeche' },
       ),
     );
+  });
+
+  it('LLH-1560: Bezeichnung, Sammelstelle und Notiz über der Grenze stehen am Feld und senden nicht', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <BezirkAnlegenDialog
+        einsatzId={1}
+        abschnitte={ABSCHNITTE}
+        karteGesperrt={false}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '640');
+    const felder = [
+      ['Bezeichnung', EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX, '200'],
+      ['Sammelstelle', EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX, '500'],
+      ['Notiz', EVAKUIERUNG_BEZIRK_NOTIZ_MAX, '2.000'],
+    ] as const;
+    for (const [label, max] of felder) {
+      await userEvent.click(within(dialog).getByLabelText(label));
+      await userEvent.paste('x'.repeat(max + 1));
+    }
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    for (const [label, , grenze] of felder) {
+      expect(
+        await within(dialog).findByText(`${label} darf höchstens ${grenze} Zeichen lang sein`),
+      ).toBeInTheDocument();
+    }
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('LLH-1560: die Bezirksbezeichnung passt in die Zonenbezeichnung, die die Lagekarte daraus macht', () => {
+    expect(EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX).toBeLessThanOrEqual(ZONE_LABEL_MAX);
   });
 
   it('Gebiet: Vorgabe „Fläche zeichnen“ bei freier Lagekarte, „Keins“ wählbar (LLH-1069)', async () => {

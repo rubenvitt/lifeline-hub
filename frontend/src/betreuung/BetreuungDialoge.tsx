@@ -30,8 +30,14 @@ import { Segmentleiste, type SegmentOption } from '../components/instrument';
 import RadiusEingabe from '../components/RadiusEingabe';
 import type { GebietKreis } from './gebietZeichnen';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
-import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { BETREUUNG_KONTAKTWEG_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
+import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import {
+  BETREUUNG_KONTAKTWEG_MAX,
+  BETREUUNG_LEITUNG_MAX,
+  EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX,
+  EVAKUIERUNG_BEZIRK_NOTIZ_MAX,
+  EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX,
+} from '../api/eingabegrenzen';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { raeumungszustand } from '../theme/statusFarben';
 import {
@@ -492,9 +498,15 @@ export function BezirkAnlegenDialog({
         label="Bezeichnung"
         // Datenschutz: die Bezeichnung steht im Einsatztagebuch.
         extra="Keine Namen von Bewohnern."
-        rules={[{ required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+          zeichenRegel(EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX, 'Bezeichnung'),
+        ]}
       >
-        <Input placeholder="z. B. Lindenstr. 1–20 oder Bezirk 3" />
+        <Input
+          placeholder="z. B. Lindenstr. 1–20 oder Bezirk 3"
+          count={zeichenGrenze(EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX)}
+        />
       </Form.Item>
       {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
       {erhebungFeld('plan_erhebung', 'Erhebung')}
@@ -513,11 +525,27 @@ export function BezirkAnlegenDialog({
       {weitere(
         <>
           {abschnittFeld(abschnitte)}
-          <Form.Item name="sammelstelle" label="Sammelstelle">
-            <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Sammelstelle" />
+          <Form.Item
+            name="sammelstelle"
+            label="Sammelstelle"
+            rules={[ortZeichenRegel(EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX, 'Sammelstelle')]}
+          >
+            <EinsatzOrtsfeld
+              einsatzId={einsatzId}
+              etikett="Sammelstelle"
+              count={zeichenGrenze(EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX)}
+            />
           </Form.Item>
-          <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
-            <Input.TextArea autoSize={{ minRows: 2 }} />
+          <Form.Item
+            name="notiz"
+            label="Notiz"
+            rules={[zeichenRegel(EVAKUIERUNG_BEZIRK_NOTIZ_MAX, 'Notiz')]}
+            style={{ marginBottom: 0 }}
+          >
+            <Input.TextArea
+              autoSize={{ minRows: 2 }}
+              count={zeichenGrenze(EVAKUIERUNG_BEZIRK_NOTIZ_MAX)}
+            />
           </Form.Item>
         </>,
       )}

@@ -10,6 +10,12 @@ import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { Datenfeld, DatenfeldEingabe, Datenraster, Paneel } from '../components/instrument';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
+import {
+  EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX,
+  EVAKUIERUNG_BEZIRK_NOTIZ_MAX,
+  EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX,
+} from '../api/eingabegrenzen';
+import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { bezirkPatchDreiseitig, type BezirkWerte } from './BetreuungDialoge';
 import { ERHEBUNG_LABEL, mengeText, personenZahl } from './betreuungText';
 
@@ -110,9 +116,18 @@ export default function BezirkStammdaten({
 
   const raster = (
     <Datenraster spalten={3} beschriftung={`Stammdaten Bezirk ${bezirk.bezeichnung}`}>
-      {zelle('bezeichnung', 'Bezeichnung', <Input />, bezirk.bezeichnung, {
-        rules: [{ required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' }],
-      })}
+      {zelle(
+        'bezeichnung',
+        'Bezeichnung',
+        <Input count={zeichenGrenze(EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX)} />,
+        bezirk.bezeichnung,
+        {
+          rules: [
+            { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
+            zeichenRegel(EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX, 'Bezeichnung'),
+          ],
+        },
+      )}
       {zelle(
         'plan_personen',
         'Plangröße (Personen)',
@@ -141,13 +156,27 @@ export default function BezirkStammdaten({
       {zelle(
         'sammelstelle',
         'Sammelstelle',
-        <EinsatzOrtsfeld einsatzId={bezirk.einsatz_id} etikett="Sammelstelle" />,
+        <EinsatzOrtsfeld
+          einsatzId={bezirk.einsatz_id}
+          etikett="Sammelstelle"
+          count={zeichenGrenze(EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX)}
+        />,
         <Sammelstelle bezirk={bezirk} />,
-        { breit: bearbeiten },
+        {
+          breit: bearbeiten,
+          rules: [ortZeichenRegel(EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX, 'Sammelstelle')],
+        },
       )}
-      {zelle('notiz', 'Notiz', <Input.TextArea autoSize={{ minRows: 2 }} />, bezirk.notiz ?? leer, {
-        breit: true,
-      })}
+      {zelle(
+        'notiz',
+        'Notiz',
+        <Input.TextArea
+          autoSize={{ minRows: 2 }}
+          count={zeichenGrenze(EVAKUIERUNG_BEZIRK_NOTIZ_MAX)}
+        />,
+        bezirk.notiz ?? leer,
+        { breit: true, rules: [zeichenRegel(EVAKUIERUNG_BEZIRK_NOTIZ_MAX, 'Notiz')] },
+      )}
     </Datenraster>
   );
 
