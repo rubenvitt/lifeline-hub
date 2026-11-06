@@ -7491,6 +7491,26 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
+    // Veraltete Liste am Handy: „In Bearbeitung“ holt den vollzogenen Auftrag nicht zurück.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/{}/vollzug", id(&an_zug)),
+        &geraet,
+        Some(&json!({"status": "in_arbeit"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let (_, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/{}", id(&an_zug)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(v["vollzug_status"], "vollzogen", "{v}");
+    assert!(v["vollzogen_at"].is_string(), "{v}");
     let (s, _) = anfrage_json(
         &app,
         "POST",
