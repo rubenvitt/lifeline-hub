@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
@@ -555,7 +556,9 @@ describe('MeldungenPage', () => {
   });
 
   it('öffnet „Patient anlegen“ auch ohne Netz, dann ohne vorbelegte Einheit (LLH-1567)', async () => {
-    renderPage();
+    listeMeldungen.mockResolvedValue([meldung({ lat: 53.07, lon: 8.81 })]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(undefined, client);
     await screen.findByText('Florian Nord 1');
     setzeOnline(false);
     await userEvent.click(
@@ -563,6 +566,27 @@ describe('MeldungenPage', () => {
     );
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/Zu Meldung #1/)).toBeInTheDocument();
+
+    // Beim Wiederverbinden lädt die Abfrage nach; die Maske bleibt dabei offen, statt zu
+    // schließen und beim Wiederöffnen neu vorzubelegen.
+    const fundort = within(dialog).getByLabelText('Fundort');
+    await userEvent.clear(fundort);
+    await userEvent.type(fundort, 'Bühne 3');
+    let freigeben!: () => void;
+    const antwort = new Promise<void>((r) => (freigeben = r));
+    let angefragt = false;
+    server.use(
+      http.get('/api/einsaetze/:eid/personen/einheiten', async () => {
+        angefragt = true;
+        await antwort;
+        return HttpResponse.json([]);
+      }),
+    );
+    setzeOnline(true);
+    await waitFor(() => expect(angefragt).toBe(true));
+    freigeben();
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.getByLabelText('Fundort')).toHaveValue('Bühne 3');
   });
 
   it('zeigt bei verknüpfter Meldung einen Backlink zum Auftrag statt der Erteilen-Aktion', async () => {

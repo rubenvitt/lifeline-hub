@@ -563,11 +563,19 @@ export default function MeldungenPage() {
   const auftragGesperrt = sprungGesperrt('auftraege');
   // „Patient anlegen“ schreibt in die Personen: ohne deren Freigabe gesperrt sichtbar.
   const personenGesperrt = sprungGesperrt('personen');
+  // Ohne Netz pausiert die Abfrage und bliebe ewig „pending“: dann öffnet die Maske ohne
+  // vorbelegte Einheit, statt gar nicht. Einmal offen, bleibt sie offen, auch wenn die Abfrage
+  // beim Wiederverbinden kurz lädt: ein Schließen und Wiederöffnen belegte sonst neu vor.
+  const versorgendeBereit =
+    !versorgendeQuery.isPending || versorgendeQuery.fetchStatus === 'paused';
+  const [patientGeoeffnet, setPatientGeoeffnet] = useState<DialogAuswahl | null>(null);
+  if (patientMeldung && versorgendeBereit && patientGeoeffnet !== patientAuswahl) {
+    setPatientGeoeffnet(patientAuswahl);
+  }
+  const patientOffen =
+    patientMeldung != null && (versorgendeBereit || patientGeoeffnet === patientAuswahl);
   const ausMeldung = useMemo<AusMeldung | null>(() => {
-    // Ohne Netz pausiert die Abfrage und bliebe ewig „pending“: dann öffnet die Maske ohne
-    // vorbelegte Einheit, statt gar nicht.
-    const wartet = versorgendeQuery.isPending && versorgendeQuery.fetchStatus !== 'paused';
-    if (!patientMeldung || wartet) return null;
+    if (!patientMeldung || !patientOffen) return null;
     const einheitId = patientMeldung.einheit_id;
     const aktiv =
       einheitId != null && (versorgendeQuery.data ?? []).some((e) => e.id === einheitId);
@@ -578,12 +586,7 @@ export default function MeldungenPage() {
       lat: patientMeldung.lat,
       lon: patientMeldung.lon,
     };
-  }, [
-    patientMeldung,
-    versorgendeQuery.isPending,
-    versorgendeQuery.fetchStatus,
-    versorgendeQuery.data,
-  ]);
+  }, [patientMeldung, patientOffen, versorgendeQuery.data]);
 
   /*
    * Offene Übernahme an der Meldung (LLH-1075, design.md D14): die Meldung einer unangemeldeten
