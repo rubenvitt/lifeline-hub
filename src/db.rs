@@ -12683,9 +12683,9 @@ mod tests {
     /// LLH-1566: `person_anlass` nimmt nur Katalogwerte (leer hebt auf) und ist je Einsatz über
     /// `client_id` eindeutig; der Cache an `einsatz_person` trägt denselben Katalog.
     #[tokio::test]
-    async fn migration_0278_person_anlass() {
+    async fn migration_0284_person_anlass() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 278;
+        const VERSION: i64 = 284;
         let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), VERSION).await;
         let (e, b) = bild_grundlage(&pool).await;
         let p: i64 = sqlx::query_scalar(

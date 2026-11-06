@@ -13406,7 +13406,7 @@
       },
       "PersonAnlass": {
         "type": "string",
-        "description": "Anlass der Hilfeleistung, fester Katalog (Ruben 05.11.2026: kein fester Statistikbogen).\nString = CHECK in `migrations/0283_person_anlass.sql`. Kategorie Behandlung, nie im ETB.",
+        "description": "Anlass der Hilfeleistung, fester Katalog (Ruben 05.11.2026: kein fester Statistikbogen).\nString = CHECK in `migrations/0284_person_anlass.sql`. Kategorie Behandlung, nie im ETB.",
         "enum": [
           "verletzung",
           "internistisch",
