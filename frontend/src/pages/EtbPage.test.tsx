@@ -16,6 +16,7 @@ import type { EtbEintragAnzeige } from '../api/types';
 import { adminFixture, freigabenFixture } from '../test/fixtures';
 import { SCHLUESSEL_ETB_STANDARD_RUFNAME } from '../etb/standardRufname';
 import { warteAufMenueFokus } from '../test/menue';
+import { AdresseSteht } from '../test/adresseSteht';
 
 /**
  * Sperre vor dem Laden der Entwürfe: offen, bis ein Test sie schließt. Damit montiert die
@@ -623,6 +624,105 @@ describe('EtbPage', () => {
     await waitFor(() => expect(document.querySelector('.etb-erfassung-sticky')).toBeTruthy());
     // Der ?neu=1-Handler muss den Param aus der URL entfernen.
     await waitFor(() => expect(screen.getByTestId('ort-suche').textContent).not.toContain('neu'));
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1` noch
+   * in der Adresse der Seite (`AdresseSteht`). Wer die Leiste verlässt, bekommt sie bei der
+   * nächsten Datenänderung nicht wieder aufgeklappt: der Render liest den verbrauchten Auftrag
+   * nicht mehr als Fokus in der Leiste. Unter `md`, wo die Leiste ohne Fokus einklappt.
+   */
+  it('ein hängender Router-Commit klappt die verlassene Leiste bei neuen Daten nicht wieder auf (LLH-1558)', async () => {
+    setzeViewportBreite(390);
+    setupMSW();
+    const { client } = renderMitProviders(
+      <AdresseSteht>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+      </AdresseSteht>,
+      { route: '/einsaetze/7/etb?neu=1' },
+    );
+    const feld = await screen.findByPlaceholderText(/^Inhalt/);
+    await waitFor(() => expect(feld).toHaveFocus());
+    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull());
+
+    const zwei = { ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Zweite Meldung' };
+    server.use(http.get('/api/einsaetze/7/etb', () => HttpResponse.json([zwei, eintrag])));
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.etb(7) }));
+    expect(await screen.findByText('Zweite Meldung')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull();
+  });
+
+  it('ein neuer Link ?neu=1 fokussiert die verlassene Leiste wieder (LLH-1558)', async () => {
+    setzeViewportBreite(390);
+    setupMSW();
+    renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+        <OrtSpy />
+        <Link to="/einsaetze/7/etb?neu=1">neuer-link</Link>
+      </>,
+      { route: '/einsaetze/7/etb?neu=1' },
+    );
+    const feld = await screen.findByPlaceholderText(/^Inhalt/);
+    await waitFor(() => expect(feld).toHaveFocus());
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull());
+
+    await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+    await waitFor(() => expect(screen.getByPlaceholderText(/^Inhalt/)).toHaveFocus());
+    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1558): Lädt das Tagebuch nach dem Sprung neu, bevor der Router
+   * die Räumung von `?eintrag=` committet (`AdresseSteht`), springt die Seite nicht noch einmal
+   * hin. Ein zweiter Sprung rollte die Person aus dem, was sie inzwischen liest.
+   */
+  it('ein hängender Router-Commit springt nach neuen Daten nicht noch einmal zum ?eintrag= (LLH-1558)', async () => {
+    setzeViewportBreite(1366);
+    const gerollt: unknown[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
+      if (this.getAttribute('data-zeile') === 'eintrag-1') gerollt.push(arg);
+    };
+    try {
+      setupMSW();
+      const { client, container } = renderMitProviders(
+        <AdresseSteht>
+          <Routes>
+            <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+          </Routes>
+        </AdresseSteht>,
+        { route: '/einsaetze/7/etb?eintrag=1' },
+      );
+      await waitFor(() =>
+        expect(container.querySelector('[data-zeile="eintrag-1"]')).toHaveClass(
+          'zeile-hervorgehoben',
+        ),
+      );
+      await waitFor(() => expect(gerollt).toContainEqual({ block: 'center' }));
+      const spruenge = gerollt.length;
+
+      const zwei = { ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Zweite Meldung' };
+      server.use(http.get('/api/einsaetze/7/etb', () => HttpResponse.json([zwei, eintrag])));
+      await act(() => client.invalidateQueries({ queryKey: einsatzKeys.etb(7) }));
+      expect(await screen.findByText('Zweite Meldung')).toBeInTheDocument();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      expect(gerollt).toHaveLength(spruenge);
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
   });
 });
 

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Link, Route, Routes, useLocation, useNavigate } from 'react-router';
+import type { ReactNode } from 'react';
 import { server } from '../../test/server';
 import { renderMitProviders, sortTarget } from '../../test/utils';
 import BereitstellungsraeumePage from './BereitstellungsraeumePage';
@@ -12,6 +13,7 @@ import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProv
 import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { setzeViewportBreite } from '../../test/viewport';
 import { kopfFilterWaehlen } from '../../test/kopfFilter';
+import { AdresseSteht } from '../../test/adresseSteht';
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return einsatzFixture({ bezeichnung: 'Lage', ...over });
@@ -44,16 +46,31 @@ function SuchAnzeige() {
   return <span data-testid="suche">{useLocation().search}</span>;
 }
 
-function renderPage(route = '/einsaetze/1/bereitstellungsraeume/liste') {
+function renderPage(
+  route = '/einsaetze/1/bereitstellungsraeume/liste',
+  {
+    adresseSteht = false,
+    daneben = null,
+  }: {
+    /** Hält den Router-Commit an (LLH-1558). */
+    adresseSteht?: boolean;
+    /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
+    daneben?: ReactNode;
+  } = {},
+) {
+  const seite = (
+    <Routes>
+      <Route
+        path="/einsaetze/:id/bereitstellungsraeume/liste"
+        element={<BereitstellungsraeumePage />}
+      />
+    </Routes>
+  );
   return renderMitProviders(
     <CommandPaletteProvider>
-      <Routes>
-        <Route
-          path="/einsaetze/:id/bereitstellungsraeume/liste"
-          element={<BereitstellungsraeumePage />}
-        />
-      </Routes>
+      {adresseSteht ? <AdresseSteht>{seite}</AdresseSteht> : seite}
       <SuchAnzeige />
+      {daneben}
     </CommandPaletteProvider>,
     { route },
   );
@@ -246,6 +263,49 @@ describe('BereitstellungsraeumePage', () => {
         await new Promise((r) => setTimeout(r, 50));
       });
       expect(screen.queryByPlaceholderText('z. B. BR Ost')).not.toBeInTheDocument();
+    });
+
+    /**
+     * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1`
+     * noch in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu
+     * an (Einsatz lädt neu), öffnet der Drawer nicht noch einmal. Die Positivhälfte (Knopf „Neu“
+     * wieder da) steht vor der Negativaussage.
+     */
+    it('ein hängender Router-Commit öffnet den geschlossenen Drawer nach neuem Recht nicht wieder (LLH-1558)', async () => {
+      let e = einsatz();
+      server.use(
+        http.get('/api/einsaetze/1', () => HttpResponse.json(e)),
+        http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([br()])),
+      );
+      const { client } = renderPage('/einsaetze/1/bereitstellungsraeume/liste?neu=1', {
+        adresseSteht: true,
+      });
+      expect(await screen.findByPlaceholderText('z. B. BR Ost')).toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => expect(document.querySelector('.ant-drawer-open')).toBeNull());
+
+      e = einsatz({ meine_rolle: 'beobachter' });
+      await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Neu' })).toBeDisabled());
+      e = einsatz();
+      await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Neu' })).toBeEnabled());
+      expect(document.querySelector('.ant-drawer-open')).toBeNull();
+    });
+
+    it('ein neuer Link ?neu=1 öffnet den Drawer wieder (LLH-1558)', async () => {
+      mitListe();
+      renderPage('/einsaetze/1/bereitstellungsraeume/liste?neu=1', {
+        daneben: <Link to="/einsaetze/1/bereitstellungsraeume/liste?neu=1">neuer-link</Link>,
+      });
+      expect(await screen.findByPlaceholderText('z. B. BR Ost')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => expect(document.querySelector('.ant-drawer-open')).toBeNull());
+
+      await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+      await waitFor(() => expect(document.querySelector('.ant-drawer-open')).not.toBeNull());
+      await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     });
   });
 

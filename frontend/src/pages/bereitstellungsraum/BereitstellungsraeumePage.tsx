@@ -7,6 +7,7 @@ import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { MODUL_EINHEITEN_GESPERRT } from '../../components/nurAnsicht';
 import { useEffect, useMemo, useState } from 'react';
 import { bereitstellungsraumDetailPfad, einsaetzePfad, einsatzPfad } from '../../routing/deeplinks';
+import { useLinkAuftrag } from '../../routing/useLinkAuftrag';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
@@ -103,16 +104,18 @@ export default function BereitstellungsraeumePage() {
   // Schnellaktion: ?neu=1 öffnet den Anlege-Drawer (Sprungpalette, LFH-506). Gelesen auf der
   // LISTEN-Route — `BereitstellungsraeumeDefault` am baren Modulpfad liest den Parameter nicht,
   // deshalb zeigt `bereitstellungsraeumeListePfad` hierher. Warten bis der Einsatz geladen ist;
-  // Param immer löschen, Drawer nur bei Schreibrecht.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Param immer löschen, Drawer nur bei Schreibrecht. Einmal je Verlaufseintrag
+  // (`useLinkAuftrag`, LLH-1558): ein neu geladenes Schreibrecht öffnete den geschlossenen Drawer
+  // sonst ein zweites Mal, solange der Router die Räumung noch nicht committet hat.
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     if (!schreibgeschuetzt) setAnlegen(true);
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('neu');
-    setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, schreibgeschuetzt]);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, schreibgeschuetzt]);
 
   // Filterwerte Abschnitt aus den geladenen Räumen, stabil über einen Namensschlüssel.
   const abschnittSchluessel = [

@@ -25,6 +25,7 @@ import { listeEinheiten } from '../api/einheiten';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { etbDruckPfad, etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -108,7 +109,12 @@ export default function EtbPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  // Schnellaktion `?neu=1` und Sprung `?eintrag=` gelten einmal je Verlaufseintrag
+  // (`useLinkAuftrag`, LLH-1558) und räumen aus einer Kopie statt der Instanz, die Render und andere
+  // Effekte lesen. Bis der Router die Räumung committet, steht der Auftrag noch in `searchParams`.
+  const neuAuftrag = useLinkAuftrag();
+  const eintragAuftrag = useLinkAuftrag();
   const navigate = useNavigate();
   // Live-Updates über useEinsatzLiveStream im EinsatzLayout: der etb-Listener invalidiert ['etb',
   // einsatzId] (der Prefix deckt die gefilterte Liste ab).
@@ -415,7 +421,10 @@ export default function EtbPage() {
   const { fokusInLeiste, setFokusInLeiste, leistenFokus } = useFokusInLeiste();
   // `?neu=1` (Schnellaktion) gilt als Fokus in der Leiste: kommt sie erst nach dem Laden der
   // Entwürfe, montiert sie damit aufgeklappt und fokussiert ihr Feld selbst (`startFokus`).
-  if (searchParams.get('neu') === '1' && !fokusInLeiste) setFokusInLeiste(true);
+  // Ein verbrauchter Auftrag zählt nicht mehr: wer die Leiste vor dem Commit der Räumung verlässt,
+  // bekommt den Fokus nicht zurückgeschoben.
+  if (searchParams.get('neu') === '1' && !neuAuftrag.verbraucht() && !fokusInLeiste)
+    setFokusInLeiste(true);
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11): sonst rollte der Browser jeden per
@@ -485,6 +494,7 @@ export default function EtbPage() {
   // Schnellaktion: ?neu=1 fokussiert die angepinnte Erfassungszeile (Command-Palette).
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     const leiste = document.querySelector('.etb-erfassung-sticky');
     if (leiste instanceof HTMLElement) {
       // Die Leiste steht am Seitenfuß — ins Bild rollt ihr unteres Ende.
@@ -492,9 +502,8 @@ export default function EtbPage() {
       const feld = leiste.querySelector('textarea, input');
       if (feld instanceof HTMLElement) feld.focus();
     }
-    searchParams.delete('neu');
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag]);
 
   // Deeplink ?eintrag=<id>: die Seite blättert in die Richtung des Ziels (LFH-947, design.md D4:
   // die Kennung wächst mit der laufenden Nummer), bis es im Fenster liegt; mit `maxPages` fällt
@@ -503,6 +512,7 @@ export default function EtbPage() {
   const zielEintragId = parseRouteId(searchParams.get('eintrag') ?? undefined);
   useEffect(() => {
     if (zielEintragId == null) return;
+    if (eintragAuftrag.verbraucht()) return;
     if (etbQuery.isLoading) return;
     if (etbQuery.isFetchingNextPage || etbQuery.isFetchingPreviousPage) return;
     const richtung = sprungRichtung(etbQuery.data?.pages ?? [], zielEintragId);
@@ -530,8 +540,7 @@ export default function EtbPage() {
     if (richtung === 'da') {
       setHervorhebung((v) => ({ id: zielEintragId, marke: (v?.marke ?? 0) + 1 }));
     }
-    searchParams.delete('eintrag');
-    setSearchParams(searchParams, { replace: true });
+    eintragAuftrag.raeume('eintrag');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     zielEintragId,
@@ -544,6 +553,7 @@ export default function EtbPage() {
     etbQuery.isFetchPreviousPageError,
     etbQuery.isLoading,
     filter.ohne_system,
+    eintragAuftrag,
   ]);
 
   useEffect(() => {
