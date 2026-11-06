@@ -9840,14 +9840,14 @@ mod tests {
         }
     }
 
-    // ── LLH-1579: Einheitengerät an einer Einheit (0281) ─────────────────────────────────
+    // ── LLH-1579: Einheitengerät an einer Einheit (0283) ─────────────────────────────────
 
     /// Der Rebuild von `geraet_kopplung` (Muster 0213) hält Codes, Ereignisse und
     /// Gerätesitzungen 1:1, nimmt die Ansicht `einheit` an, bindet höchstens eine Stelle über alle
     /// sechs Spalten, und eine gelöschte Einheit leert nur die Bindung der (widerrufenen) Zeile.
     #[tokio::test]
-    async fn migration_0281_erhaelt_kinder_und_bindet_einheit() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 280).await;
+    async fn migration_0283_erhaelt_kinder_und_bindet_einheit() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 282).await;
         let (e, b) = bild_grundlage(&pool).await;
         let konto = |name: &'static str| {
             let pool = pool.clone();
@@ -9925,7 +9925,7 @@ mod tests {
         };
         let vorher = bestand().await;
 
-        migriere_bis(&pool, 281).await;
+        migriere_bis(&pool, 283).await;
 
         for t in [
             "geraet_kopplung",

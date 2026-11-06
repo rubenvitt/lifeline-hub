@@ -18,7 +18,7 @@
 -- Eine Einheit ohne jede Spur wird beim Auflösen echt gelöscht (`einheit::repo::aufloesen_tx`).
 -- Das Auflösen widerruft ihre Kopplungen vorher; ON DELETE SET NULL hält die widerrufene Zeile
 -- dann stehen (wie `abschnitt_id`), statt das Löschen der Einheit zu blockieren.
--- Abgesichert von db::tests::migration_0281_*.
+-- Abgesichert von db::tests::migration_0283_*.
 
 PRAGMA foreign_keys = OFF;
 

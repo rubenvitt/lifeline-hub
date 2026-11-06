@@ -1699,7 +1699,7 @@ fn pfad_match_ist_token_genau() {
 }
 
 /// LFH-892/LFH-1040/LLH-1048/LLH-1579: Gerätekopplung. Die Ansichten stehen als CHECK in
-/// `migrations/0281_geraet_kopplung_einheit.sql`; das Frontend wählt nach ihnen Hülle
+/// `migrations/0283_geraet_kopplung_einheit.sql`; das Frontend wählt nach ihnen Hülle
 /// und Startseite, nach der Bindungsart die Stellenauswahl der Kopplungsmaske.
 #[test]
 fn geraet_kopplung_wire() {

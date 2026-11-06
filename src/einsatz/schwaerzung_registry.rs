@@ -2845,7 +2845,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // ---------- Gerätekopplung (LFH-892, migrations/0147; Stellen LFH-1040, 0158;
-    // Verpflegungsstelle LLH-1048, 0213; Einheit LLH-1579, 0281) ----------
+    // Verpflegungsstelle LLH-1048, 0213; Einheit LLH-1579, 0283) ----------
     TabellenRegel {
         tabelle: "geraet_kopplung",
         scoping: Scoping::EinsatzId,
