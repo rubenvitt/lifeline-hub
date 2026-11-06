@@ -14,7 +14,7 @@ use utoipa::ToSchema;
 
 wire_enum! {
     /// Anlass der Hilfeleistung, fester Katalog (Ruben 05.11.2026: kein fester Statistikbogen).
-    /// String = CHECK in `migrations/0278_person_anlass.sql`. Kategorie Behandlung, nie im ETB.
+    /// String = CHECK in `migrations/0283_person_anlass.sql`. Kategorie Behandlung, nie im ETB.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum PersonAnlass {
         Verletzung => "verletzung",
