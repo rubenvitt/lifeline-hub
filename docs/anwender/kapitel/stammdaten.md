@@ -297,7 +297,8 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
 - „Sanitätsdienst“ zeigt „Fernmeldewesen“ und „Wetter & Pegel“, weil jeder Sanitätsdienst einen
   Funkplan hat und Veranstaltungen im Freien am Wetter hängen; „Lagemeldungen“ bleibt abgewählt.
   Eine Organisation, die es vor dieser Änderung schon gab, behält ihre Vorlage „Sanitätsdienst“
-  ohne die beiden Module; dort lassen sich die Häkchen in der Vorlage setzen.
+  ohne die beiden Module, also mit 22 statt 24 sichtbaren Modulen; dort lassen sich die Häkchen in
+  der Vorlage setzen.
 - Eine Vorlage merkt sich die Module ohne Häkchen. Ein Modul, das mit einer neuen Version
   hinzukommt, ist deshalb in jeder Vorlage sichtbar. „Einsatzdaten“ und „Einstellungen“ sind
   „immer sichtbar“ und lassen sich nicht abwählen.
