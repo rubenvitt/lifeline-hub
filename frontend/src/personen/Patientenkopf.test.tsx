@@ -1126,6 +1126,21 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
       ['anlass', 'intoxikation'],
       ['anlass', null],
     ]);
+
+    // Ist die Aufhebung vorgemerkt, verlangt das Paneel wieder eine Wahl: kein zweites „aufgehoben“.
+    // Mutationsprobe: nur auf irgendeinen vorgemerkten Anlass schauen, nicht auf den jüngsten, rot.
+    await waitFor(() =>
+      expect(
+        within(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).getAllByRole(
+          'listitem',
+        ),
+      ).toHaveLength(2),
+    );
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
+    expect(await vorgemerkt()).toHaveLength(2);
   });
 
   it('Maßnahme aufheben bleibt ohne Netz mit Grund gesperrt', async () => {

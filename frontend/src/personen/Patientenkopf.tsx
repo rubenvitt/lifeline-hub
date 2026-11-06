@@ -463,7 +463,7 @@ export default function Patientenkopf({
           person={person}
           mutation={anlassMutation}
           onSchliessen={close('anlass')}
-          anlassVorgemerkt={vorgemerkt.some((v) => v.aktion.art === 'anlass')}
+          vorgemerkterAnlass={vorgemerkterAnlass(vorgemerkt)}
         />
       )}
       {offen === 'transport' && (
@@ -583,6 +583,18 @@ function SichtungsAnzeige({
 
 /** Grund, warum ohne Netz nicht aufgehoben wird (LFH-966: wenige Wörter). */
 export const AUFHEBEN_OHNE_NETZ = 'Aufheben ohne Netz nicht möglich';
+
+/**
+ * Der jüngste ohne Netz vorgemerkte Anlass-Stand dieser Person, `undefined` ohne Vormerkung. Die
+ * Warteschlange spielt in ihrer Folge ab, also gilt der letzte Eintrag, auch eine Aufhebung (`null`).
+ */
+function vorgemerkterAnlass(
+  vorgemerkt: readonly VorgemerkterPersonEintrag[],
+): AnlassEingabe['anlass'] | undefined {
+  let stand: AnlassEingabe['anlass'] | undefined;
+  for (const v of vorgemerkt) if (v.aktion.art === 'anlass') stand = v.aktion.daten.anlass;
+  return stand;
+}
 
 /**
  * Quittung „Offline vorgemerkt“ im Kopf (LLH-1138, Spec `personen-detail`, „Nachsichtung am

@@ -168,17 +168,20 @@ export function AnlassPaneel({
   person,
   mutation,
   onSchliessen,
-  anlassVorgemerkt = false,
+  vorgemerkterAnlass,
 }: {
   person: PersonDetail;
   mutation: UseMutationResult<unknown, Error, AnlassEingabe>;
   onSchliessen: () => void;
-  /** Ohne Netz ist bereits ein Anlass vorgemerkt: „kein Anlass“ muss ihn aufheben können. */
-  anlassVorgemerkt?: boolean;
+  /**
+   * Der jüngste ohne Netz vorgemerkte Stand (`null` = vorgemerkte Aufhebung), `undefined` ohne
+   * Vormerkung. „Kein Anlass“ muss einen vorgemerkten Anlass aufheben können.
+   */
+  vorgemerkterAnlass?: AnlassEingabe['anlass'];
 }) {
   const [form] = Form.useForm<AnlassWerte>();
-  // Anzeige bleibt der Serverstand; nur die Pflicht entfällt, sobald etwas aufzuheben ist.
-  const hatAnlass = person.anlass != null || anlassVorgemerkt;
+  // Anzeige bleibt der Serverstand; die Pflicht folgt dem Stand, der nach dem Abgleich gilt.
+  const hatAnlass = (vorgemerkterAnlass !== undefined ? vorgemerkterAnlass : person.anlass) != null;
   return (
     <section aria-label="Anlass festlegen" data-lfh="anlass-paneel">
       <ErfassungsFormular<AnlassWerte>
