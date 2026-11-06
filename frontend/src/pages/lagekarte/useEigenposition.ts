@@ -25,9 +25,9 @@ export const EIGENPOSITION_SPERRGRUND: Record<
   fehlt: 'Dieses Gerät oder dieser Browser liefert keinen Standort.',
 };
 
-const MELDUNG_VERWEIGERT =
+export const MELDUNG_VERWEIGERT =
   'Standortzugriff verweigert – im Browser für diese Seite freigeben, dann erneut einschalten.';
-const MELDUNG_KEIN_STANDORT = 'Kein Standort ermittelbar.';
+export const MELDUNG_KEIN_STANDORT = 'Kein Standort ermittelbar.';
 
 /**
  * Bei jedem Aufruf gelesen: zur Laufzeit ändert sich beides nicht, aber ein Test stellt es um.

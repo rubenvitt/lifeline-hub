@@ -14,7 +14,7 @@ describe('EinheitAufloesen', () => {
     const blase = await screen.findByRole('tooltip');
     // Ein kurzer Satz zur Folge aus LLH-1079, kein Bedienhinweis (LFH-1078).
     expect(blase.querySelector('.ant-popconfirm-description')).toHaveTextContent(
-      /^Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch\.$/,
+      /^Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden\.$/,
     );
     await user.click(within(blase).getByRole('button', { name: 'Einheit auflösen' }));
   }

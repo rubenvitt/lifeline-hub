@@ -1442,7 +1442,8 @@ export interface NeueMeldung {
   /** Strukturierter Absender: Einheit ODER Abschnitt dieses Einsatzes, nie beide. */
   einheit_id?: number;
   abschnitt_id?: number;
-  /** Verortung, nur bei der Art Lagemeldung (sonst 422); lat und lon nur gemeinsam. */
+  /** Verortung, nur bei der Art Lagemeldung (sonst 422), vom Einheitengerät an jeder Art
+   *  (LLH-1579); lat und lon nur gemeinsam. */
   lat?: number;
   lon?: number;
 }

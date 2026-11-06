@@ -8,6 +8,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Funktionsansicht, GeraetAnzeige, ModulFreigaben } from '../api/types';
 import {
   IconBesteck,
+  IconFunkmast,
   IconHausHerz,
   IconKachelraster,
   IconKarte,
@@ -40,6 +41,7 @@ import {
   geraetMeldungenPfad,
   geraetMonitorPfad,
   geraetPatientenPfad,
+  geraetStatusPfad,
   geraetStellePfad,
   geraetUhsPfad,
   geraetVerpflegungPfad,
@@ -57,6 +59,7 @@ import GeraetStellePage from './GeraetStellePage';
 import LagemonitorPage from './LagemonitorPage';
 import { useKeepBestaetigerLoaded } from './BestaetigtVonFeld';
 import { GeraeteKopf } from './GeraeteKopf';
+import { useAuftragsVibration } from './auftragsVibration';
 import { geraetDarf } from './geraetSicht';
 
 /** Ob die Ansicht eine der UHS-Ansichten ist, die die Seiten unter {@link GeraetUhsRahmen} nutzen. */
@@ -68,7 +71,7 @@ export function istUhsAnsicht(ansicht: Funktionsansicht): boolean {
  * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, die
  * Betreuungsstelle mit ihren Betroffenen, der Lagemonitor mit seinem Großbild, der
  * Bereitstellungsraum mit seinem Raum (LFH-1042), die Verpflegung mit ihren Zeitfenstern
- * (LFH-1044). Eine Ansicht ohne eigene Seiten (noch nicht freigeschaltet, LFH-1040) hat keine:
+ * (LFH-1044), die Einheit mit ihren Aufträgen (LLH-1579). Eine Ansicht ohne eigene Seiten (noch nicht freigeschaltet, LFH-1040) hat keine:
  * `null`.
  */
 export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
@@ -86,6 +89,8 @@ export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
       return geraet.stelle_id == null ? null : geraetBrPfad(geraet.einsatz_id, geraet.stelle_id);
     case 'verpflegung':
       return geraetVerpflegungPfad(geraet.einsatz_id);
+    case 'einheit':
+      return geraetAuftraegePfad(geraet.einsatz_id);
   }
 }
 
@@ -125,6 +130,25 @@ export function GeraetBetreuungRahmen() {
 export function GeraetAbschnittRahmen() {
   const { geraet } = useAuth();
   if (!geraet || geraet.ansicht !== 'einsatzabschnitt') return <GeraetStart />;
+  return <Outlet />;
+}
+
+/**
+ * Aufträge und Melden (LFH-1043, LLH-1579): Abschnittsgerät und Einheitengerät teilen die Seiten,
+ * den Bereich schneidet der Server zu. Jede andere Ansicht landet auf ihrer Startseite.
+ */
+export function GeraetFuehrungRahmen() {
+  const { geraet } = useAuth();
+  if (!geraet || (geraet.ansicht !== 'einsatzabschnitt' && geraet.ansicht !== 'einheit')) {
+    return <GeraetStart />;
+  }
+  return <Outlet />;
+}
+
+/** Die Seiten nur des Einheitengeräts (LLH-1579): der Status der eigenen Einheit. */
+export function GeraetEinheitRahmen() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'einheit') return <GeraetStart />;
   return <Outlet />;
 }
 
@@ -349,11 +373,38 @@ function AbschnittNavigation({ eid }: { eid: number }) {
   );
 }
 
+/** Aufträge, Status und Melden des Einheitengeräts (LLH-1579). Keine Karte in dieser Stufe. */
+function EinheitNavigation({ eid }: { eid: number }) {
+  const { data: freigaben } = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(eid),
+    queryFn: () => ladeModulFreigaben(eid),
+  });
+  return (
+    <>
+      {navigationZeigt('auftraege', freigaben) && (
+        <NavZiel zu={geraetAuftraegePfad(eid)} Icon={IconKlemmbrettListe}>
+          Aufträge
+        </NavZiel>
+      )}
+      {navigationZeigt('einheiten', freigaben) && (
+        <NavZiel zu={geraetStatusPfad(eid)} Icon={IconFunkmast}>
+          Status
+        </NavZiel>
+      )}
+      {navigationZeigt('meldungen', freigaben) && (
+        <NavZiel zu={geraetMeldenPfad(eid)} Icon={IconPapierflieger}>
+          Melden
+        </NavZiel>
+      )}
+    </>
+  );
+}
+
 /**
  * Feste Navigation am unteren Rand, in Daumenreichweite (Spec `feldgeraet-bedienung`): Patienten,
  * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen. Das
- * Abschnittsgerät, der Bereitstellungsraum, die Betreuungsstelle und die Verpflegung haben eigene
- * Ziele ({@link AbschnittNavigation}, {@link BrNavigationsziele},
+ * Abschnittsgerät, die Einheit, der Bereitstellungsraum, die Betreuungsstelle und die Verpflegung
+ * haben eigene Ziele ({@link AbschnittNavigation}, {@link EinheitNavigation}, {@link BrNavigationsziele},
  * {@link BetreuungNavigationsziele}, {@link VerpflegungNavigationsziele}).
  */
 function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
@@ -374,6 +425,8 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
         <BetreuungNavigationsziele eid={eid} />
       ) : geraet.ansicht === 'einsatzabschnitt' ? (
         <AbschnittNavigation eid={eid} />
+      ) : geraet.ansicht === 'einheit' ? (
+        <EinheitNavigation eid={eid} />
       ) : geraet.ansicht === 'bereitstellungsraum' ? (
         <BrNavigationsziele geraet={geraet} />
       ) : geraet.ansicht === 'verpflegung' ? (
@@ -431,6 +484,9 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
   useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
   // „Bestätigt von“ bleibt ohne Netz wählbar: die Liste liegt im Speicher, solange die Hülle steht.
   useKeepBestaetigerLoaded(geraet);
+  // Einzige Ausnahme von „Geräte bleiben still“: das Einheitengerät vibriert kurz bei einem neuen
+  // Auftrag an die eigene Einheit (LLH-1579, Spec `benachrichtigungen`).
+  useAuftragsVibration(geraet);
   const pfade = geraet.ansicht === 'betreuungsstelle' ? GERAET_BETREUUNG_PFADE : GERAET_PFADE;
   return (
     <EinsatzPfadeProvider pfade={pfade}>

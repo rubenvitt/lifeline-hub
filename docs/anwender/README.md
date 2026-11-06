@@ -74,6 +74,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Gekoppelte Geräte | [Betreuungsstelle am Gerät](kapitel/geraet-betreuungsstelle.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Bereitstellungsraum am Gerät](kapitel/geraet-bereitstellungsraum.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Einsatzabschnitt am Gerät](kapitel/geraet-einsatzabschnitt.md) | Gekoppelte Geräte |
+| Gekoppelte Geräte | [Einheit am Gerät](kapitel/geraet-einheit.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Verpflegung am Gerät](kapitel/geraet-verpflegung.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Lagemonitor](kapitel/lagemonitor.md) | Gekoppelte Geräte |
 | Gekoppelte Geräte | [Externe Lagemonitore](kapitel/externe-lagemonitore.md) | Führung, Administration |

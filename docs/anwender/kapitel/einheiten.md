@@ -14,7 +14,8 @@ Soll-Stärke trägt die Führung ein.
 
 Das Modul zeigt die Gliederung aller Einheiten; jede Einheit hat eine eigene Seite mit den
 Paneelen „Kopfdaten“, „Fahrzeuge und Besatzung“, „Zeitachse“, „Material“, „Funk und
-Kommunikation“ und „Taktisches Zeichen“, zuletzt „Einheit auflösen“. „Fahrzeuge und Besatzung“
+Kommunikation“ und „Taktisches Zeichen“; für die Einsatzleitung „Gerät“ mit „Gerät koppeln“ für
+das Handy der Einheit (siehe [Einheit am Gerät](geraet-einheit.md)), zuletzt „Einheit auflösen“. „Fahrzeuge und Besatzung“
 zeigt je Fahrzeug, wer darauf sitzt, und darunter, wer ohne Fahrzeug zur Einheit gehört. Jede
 Angabe wird an ihrem Wert geändert. Eine stehende Einheit wie ein Sanitätszug lässt sich in einem Zug aus ihrer
 Einheiten-Vorlage bilden, samt Untereinheiten, Fahrzeugen und Besatzung. Bilden, ändern und
@@ -175,7 +176,7 @@ Für Einsatzleitung und Führungspersonal:
 1. Die Einheit öffnen.
 2. Im letzten Paneel „Einheit auflösen“ „Einheit auflösen“ wählen.
 3. Die Rückfrage „Einheit auflösen?“ mit „Einheit auflösen“ bestätigen. Die Mitglieder werden frei,
-   unterstellte Einheiten rücken eine Ebene hoch.
+   unterstellte Einheiten rücken eine Ebene hoch, und gekoppelte Geräte der Einheit enden.
 4. Auf der Seite „Einheiten“ steht die aufgelöste Einheit unter der Gliederung im Block
    „Aufgelöst“ mit dem Zeitpunkt.
 
@@ -317,7 +318,8 @@ Organisation: …“).
 
 Eine aufgelöste Einheit verschwindet aus Gliederung, Stärke, Statusband, Lagemonitor, Karte und
 Auswahllisten. Ihre Mitglieder bleiben im Einsatz, nur ohne Einheit; eine laufende Ablösung endet,
-ein Bereitstellungsraum trägt ihren Austritt ein. Mit Zeitachse und Einsatztagebuch bleibt sie im
+ein Bereitstellungsraum trägt ihren Austritt ein, ein gekoppeltes Handy der Einheit endet wie bei
+einem Widerruf. Mit Zeitachse und Einsatztagebuch bleibt sie im
 Nachweis: im Block „Aufgelöst“, in „insgesamt eingesetzt“ und in der Anlage „Einheiten mit
 Einsatzzeiten“ des Einsatzberichts. Wer und was beim Auflösen zur Einheit gehörte, hält die App
 fest; die Seite der aufgelösten Einheit zeigt es nur lesend („Eine aufgelöste Einheit nachlesen“).
