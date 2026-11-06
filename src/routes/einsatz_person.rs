@@ -488,7 +488,8 @@ pub async fn anlegen(
     if let Some(meldung_id) = body.meldung_id {
         ctx.fordere_zielmodul::<crate::einsatz::modul::Meldungen>(&state.pool)
             .await?;
-        repo::pruefe_meldung(&state.pool, einsatz_id, meldung_id).await?;
+        let nur_von = ctx.geraet.is_some().then_some(ctx.benutzer.id);
+        repo::pruefe_meldung(&state.pool, einsatz_id, meldung_id, nur_von).await?;
     }
 
     // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx

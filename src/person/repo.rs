@@ -374,20 +374,28 @@ pub async fn pruefe_versorgende_einheit(
 
 /// Prüft die Herkunftsmeldung einer Person (LLH-1567, design.md D5): sie gehört zum Einsatz,
 /// sonst 422.
+///
+/// `nur_von`: ein gekoppeltes Gerät liest nur die eigenen Meldungen (LFH-892) und darf daher
+/// auch nur an diese verknüpfen; eine fremde Meldung antwortet wie eine unbekannte, damit ihre
+/// Existenz nicht durchsickert.
 pub async fn pruefe_meldung(
     pool: &SqlitePool,
     einsatz_id: i64,
     meldung_id: i64,
+    nur_von: Option<i64>,
 ) -> Result<(), AppError> {
-    let da: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM meldung WHERE id = ? AND einsatz_id = ?")
+    let erfasser: Option<i64> =
+        sqlx::query_scalar("SELECT erfasst_von_id FROM meldung WHERE id = ? AND einsatz_id = ?")
             .bind(meldung_id)
             .bind(einsatz_id)
             .fetch_optional(pool)
             .await?;
-    da.map(|_| ()).ok_or_else(|| {
-        AppError::UnprocessableEntity("Die Meldung gehört nicht zu diesem Einsatz".into())
-    })
+    match erfasser {
+        Some(von) if nur_von.is_none_or(|eigen| eigen == von) => Ok(()),
+        _ => Err(AppError::UnprocessableEntity(
+            "Die Meldung gehört nicht zu diesem Einsatz".into(),
+        )),
+    }
 }
 
 /// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige. Delegiert an [`anlegen_tx`].
@@ -924,7 +932,8 @@ mod tests {
             vermisst_seit: Some(Some("2026-09-22 06:00:00")),
             pat_nummer: Some(Some("W-pat")),
             kontamination: Some(Some(true)),
-            // Ein Verweis braucht eine Einheit im Einsatz; eigener Test unten (LLH-1567).
+            // Ein Verweis braucht eine Einheit im Einsatz; Feld-CAS mit dem Nachbarn `kontamination` in
+            // `tests/person_einheit_meldung.rs` (LLH-1567).
             versorgende_einheit_id: None,
         }
     }

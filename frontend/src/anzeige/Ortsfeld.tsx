@@ -4,6 +4,7 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -121,7 +122,8 @@ export interface OrtsfeldKarte {
   /**
    * Knopf „Eigene Position“ (LLH-1567, design.md D7): ein einmaliger Standort des Geräts wirkt wie
    * ein Punkt aus der Karte. Ohne sicheren Kontext oder Standort gesperrt mit Grund. Der Standort
-   * verlässt das Gerät nur als gespeicherter Ort.
+   * wird nicht verfolgt und nur als Fundort gespeichert; bis dahin gilt er wie jeder Kartenpunkt
+   * (Adressvorschau, Kacheln).
    */
   eigenePosition?: boolean;
 }
@@ -400,7 +402,9 @@ function OrtsfeldVorschau({
   const ausKarte = (p: LatLon) => onChange?.(nachKartenpunkt(value, p, formatKoordinate));
   // Der Standort kommt später: er wirkt auf den Wert, der dann im Feld steht, nicht auf den beim Tippen.
   const aktuell = useRef({ value, onChange });
-  aktuell.current = { value, onChange };
+  useLayoutEffect(() => {
+    aktuell.current = { value, onChange };
+  });
   const [ortet, setOrtet] = useState(false);
   const [ortungsFehler, setOrtungsFehler] = useState<string | null>(null);
   const verfuegbarkeit = karte.eigenePosition ? eigenpositionVerfuegbarkeit() : null;

@@ -554,6 +554,17 @@ describe('MeldungenPage', () => {
     );
   });
 
+  it('öffnet „Patient anlegen“ auch ohne Netz, dann ohne vorbelegte Einheit (LLH-1567)', async () => {
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    setzeOnline(false);
+    await userEvent.click(
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: 'Patient anlegen' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Zu Meldung #1/)).toBeInTheDocument();
+  });
+
   it('zeigt bei verknüpfter Meldung einen Backlink zum Auftrag statt der Erteilen-Aktion', async () => {
     listeMeldungen.mockResolvedValue([meldung({ auftrag_id: 42 })]);
     renderPage();

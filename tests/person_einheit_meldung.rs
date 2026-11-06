@@ -200,6 +200,68 @@ async fn einheit_aendern_leeren_und_feld_cas() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+/// Feld-CAS der Einheit zusammen mit dem gleichtypigen Nachbarn `kontamination` (beide als
+/// Ganzzahl gebunden): jede Bedingung liest ihren eigenen Altwert, ein vertauschter Bind fiele
+/// hier auf.
+#[tokio::test]
+async fn einheit_und_kontamination_vergleichen_je_ihren_altwert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Zwei Einheiten vorweg, damit keine die Id 1 trägt (= `kontamination: true`).
+    einheit_bilden(&app, &admin, e, "Vorweg").await;
+    let streife = einheit_bilden(&app, &admin, e, "Streife 1").await;
+    let rtw = einheit_bilden(&app, &admin, e, "RTW 1").await;
+    assert!(streife != 1 && rtw != 1);
+    let (_, p) = person_post(&app, &admin, e, json!({})).await;
+    let pid = p["id"].as_i64().unwrap();
+    let (s, v) = person_patch(
+        &app,
+        &admin,
+        e,
+        pid,
+        json!({ "versorgende_einheit_id": streife, "kontamination": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    for (erwartet, fall) in [
+        (
+            json!({ "versorgende_einheit_id": rtw, "kontamination": true }),
+            "Einheit",
+        ),
+        (
+            json!({ "versorgende_einheit_id": streife, "kontamination": false }),
+            "Kontamination",
+        ),
+    ] {
+        let (s, v) = person_patch(
+            &app,
+            &admin,
+            e,
+            pid,
+            json!({ "versorgende_einheit_id": rtw, "kontamination": false, "erwartet": erwartet }),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{fall}: {v}");
+    }
+    let (s, v) = person_patch(
+        &app,
+        &admin,
+        e,
+        pid,
+        json!({
+            "versorgende_einheit_id": rtw,
+            "kontamination": false,
+            "erwartet": { "versorgende_einheit_id": streife, "kontamination": true },
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["versorgende_einheit_id"], rtw);
+    assert_eq!(v["kontamination"], false);
+}
+
 #[tokio::test]
 async fn fremde_und_aufgeloeste_einheit_sind_422() {
     let app = setup().await;
@@ -434,4 +496,79 @@ async fn meldung_traegt_ihre_verortung() {
     let karte = liste.iter().find(|x| x["id"] == m["id"]).unwrap();
     assert_eq!(karte["lat"], 52.27, "{karte}");
     assert_eq!(karte["lon"], 9.13, "{karte}");
+}
+
+/// Koppelt einen UHS-Laptop an eine neue, aktive UHS; liefert das Geräte-Cookie.
+async fn uhs_laptop(app: &axum::Router, admin: &str, e: i64) -> String {
+    let (s, v) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/uhs"),
+        admin,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "UHS Nord"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let uhs = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/uhs/{uhs}/status"),
+        admin,
+        Some(&json!({"status": "aktiv"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/geraete"),
+        admin,
+        Some(
+            &json!({"ansicht": "uhs-laptop", "uhs_id": uhs, "bezeichnung": "Laptop 1"}).to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let code = v["code"]["code"].as_str().unwrap().to_string();
+    let resp = tower::ServiceExt::oneshot(
+        app.clone(),
+        axum::http::Request::builder()
+            .method("POST")
+            .uri("/api/geraete/koppeln")
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(json!({ "code": code }).to_string()))
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    resp.headers()[axum::http::header::SET_COOKIE]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string()
+}
+
+/// Ein Gerät liest nur die eigenen Meldungen und verknüpft daher auch nur an diese; eine fremde
+/// antwortet wie eine unbekannte (422).
+#[tokio::test]
+async fn geraet_verknuepft_nur_eigene_meldungen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let laptop = uhs_laptop(&app, &admin, e).await;
+    let fremd = meldung_anlegen(&app, &admin, e, json!({})).await;
+    let eigen = meldung_anlegen(&app, &laptop, e, json!({})).await;
+
+    let (s, v) = person_post(&app, &laptop, e, json!({ "meldung_id": fremd["id"] })).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let (s, v) = person_post(&app, &laptop, e, json!({ "meldung_id": eigen["id"] })).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["meldung_id"], eigen["id"]);
+    // Die Leitung verknüpft weiter an jede Meldung des Einsatzes.
+    let (s, v) = person_post(&app, &admin, e, json!({ "meldung_id": eigen["id"] })).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
 }

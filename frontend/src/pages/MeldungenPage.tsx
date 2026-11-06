@@ -564,7 +564,10 @@ export default function MeldungenPage() {
   // „Patient anlegen“ schreibt in die Personen: ohne deren Freigabe gesperrt sichtbar.
   const personenGesperrt = sprungGesperrt('personen');
   const ausMeldung = useMemo<AusMeldung | null>(() => {
-    if (!patientMeldung || versorgendeQuery.isPending) return null;
+    // Ohne Netz pausiert die Abfrage und bliebe ewig „pending“: dann öffnet die Maske ohne
+    // vorbelegte Einheit, statt gar nicht.
+    const wartet = versorgendeQuery.isPending && versorgendeQuery.fetchStatus !== 'paused';
+    if (!patientMeldung || wartet) return null;
     const einheitId = patientMeldung.einheit_id;
     const aktiv =
       einheitId != null && (versorgendeQuery.data ?? []).some((e) => e.id === einheitId);
@@ -575,7 +578,12 @@ export default function MeldungenPage() {
       lat: patientMeldung.lat,
       lon: patientMeldung.lon,
     };
-  }, [patientMeldung, versorgendeQuery.isPending, versorgendeQuery.data]);
+  }, [
+    patientMeldung,
+    versorgendeQuery.isPending,
+    versorgendeQuery.fetchStatus,
+    versorgendeQuery.data,
+  ]);
 
   /*
    * Offene Übernahme an der Meldung (LLH-1075, design.md D14): die Meldung einer unangemeldeten

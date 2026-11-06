@@ -422,8 +422,9 @@ den Standort einmal abfragen (`getCurrentPosition`) und wie ein Punkt aus der Ka
 (`nachKartenpunkt`: ein leerer Text wird zur Koordinate, ein getippter bleibt). Ohne sicheren
 Kontext oder ohne Standort am Gerät MUST er gesperrt stehen, `aria-disabled`, mit dem Grund aus
 `EIGENPOSITION_SPERRGRUND` auf Tipp und für Vorlesende. Scheitert die Abfrage, MUST der Grund
-am Knopf stehen und der Wert bleiben. Der Standort MUST das Gerät nur als gespeicherter Ort
-verlassen.
+am Knopf stehen und der Wert bleiben. Der Standort MUST NOT fortlaufend verfolgt oder außerhalb
+des Fundorts gespeichert werden; bis zum Speichern behandelt ihn das Feld wie jeden Kartenpunkt
+(Adressvorschau über den Geocoder der Organisation, Kartenkacheln).
 
 #### Scenario: Standort ins leere Feld
 - **WHEN** im leeren Fundort „Eigene Position“ gewählt wird und das Gerät 53.07/8.81 meldet

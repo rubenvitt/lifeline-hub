@@ -366,8 +366,9 @@ Gezählt werden alle nicht stornierten Patienten, auch abgeschlossene.
 Eine Meldung kann mehrere Patienten haben, ein Patient höchstens eine Meldung. Der Bezug entsteht
 nur über „Patient anlegen“ an der Meldung ([Meldungen](meldungen.md)) und bleibt danach fest.
 
-„Eigene Position“ fragt den Standort einmal ab. Er verlässt das Gerät nur als gespeicherter
-Fundort. Ohne sichere Verbindung (https) oder ohne Standort am Gerät steht der Knopf gesperrt, ein
+„Eigene Position“ fragt den Standort einmal ab, verfolgt ihn nicht weiter und speichert ihn nur als
+Fundort. Bis dahin wirkt er wie ein Punkt aus der Karte: die App sucht die Adresse dazu und zeigt
+den Kartenausschnitt. Ohne sichere Verbindung (https) oder ohne Standort am Gerät steht der Knopf gesperrt, ein
 Tipp nennt den Grund.
 
 ### Arbeiten in der Liste
