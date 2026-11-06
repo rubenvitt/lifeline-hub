@@ -14,7 +14,7 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   erst dann `geraetDarf`.
 - **Stellenbindung je Art** (LFH-1040, LLH-1048, LLH-1579): UHS, Betreuungsstelle,
   Bereitstellungsraum, Einsatzabschnitt, Verpflegungsstelle und Einheit haben je eine Spalte in
-  `geraet_kopplung` (Migration 0283, höchstens eine gesetzt); `Funktionsansicht::stellenart` nennt die Art,
+  `geraet_kopplung` (Migration 0286, höchstens eine gesetzt); `Funktionsansicht::stellenart` nennt die Art,
   `GeraetKontext.stelle` die Stelle. Die Helfer in `stelle.rs` gelten streng: ein Gerät, das
   nicht an eine Stelle genau dieser Art gebunden ist, sieht keine (`sicht` → `Keine`), Personen
   nur über `sichtbare_personen` / `fordere_person` seiner Art. Wer eine Route mehreren Ansichten
