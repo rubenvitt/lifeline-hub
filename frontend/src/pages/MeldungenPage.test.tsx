@@ -608,6 +608,47 @@ describe('MeldungenPage', () => {
     expect(within(dialog).queryByText('Streife 1')).not.toBeInTheDocument();
   });
 
+  it('fragt die Einheiten auch bei frischem Cache neu ab (LLH-1567)', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ einheit_id: 5 })]);
+    // Wie in der App: zehn Sekunden gilt der Cache als frisch.
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 10_000 } },
+    });
+    client.setQueryData(einsatzKeys.personenEinheiten(1), [
+      { id: 5, name: 'Streife 1', abschnitt_name: null },
+    ]);
+    server.use(http.get('/api/einsaetze/:eid/personen/einheiten', () => HttpResponse.json([])));
+    renderPage(undefined, client);
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: 'Patient anlegen' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Zu Meldung #1/)).toBeInTheDocument();
+    expect(within(dialog).queryByText('Streife 1')).not.toBeInTheDocument();
+  });
+
+  it('belegt nach gescheitertem Abruf keine Einheit aus dem Cache vor (LLH-1567)', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ einheit_id: 5 })]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(einsatzKeys.personenEinheiten(1), [
+      { id: 5, name: 'Streife 1', abschnitt_name: null },
+    ]);
+    server.use(
+      http.get('/api/einsaetze/:eid/personen/einheiten', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderPage(undefined, client);
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: 'Patient anlegen' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Zu Meldung #1/)).toBeInTheDocument();
+    expect(within(dialog).queryByText('Streife 1')).not.toBeInTheDocument();
+  });
+
   it('zeigt bei verknüpfter Meldung einen Backlink zum Auftrag statt der Erteilen-Aktion', async () => {
     listeMeldungen.mockResolvedValue([meldung({ auftrag_id: 42 })]);
     renderPage();

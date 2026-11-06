@@ -148,6 +148,8 @@ export default function MeldungenPage() {
     queryKey: einsatzKeys.personenEinheiten(einsatzId),
     queryFn: () => ladeVersorgendeEinheiten(einsatzId),
     enabled: patientMeldung != null,
+    // Jedes Öffnen fragt neu: auch ein wenige Sekunden alter Cache kann eine aufgelöste Einheit tragen.
+    staleTime: 0,
   });
   // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
@@ -579,8 +581,9 @@ export default function MeldungenPage() {
   const ausMeldung = useMemo<AusMeldung | null>(() => {
     if (!patientMeldung || !patientOffen) return null;
     const einheitId = patientMeldung.einheit_id;
-    const aktiv =
-      einheitId != null && (versorgendeQuery.data ?? []).some((e) => e.id === einheitId);
+    // Scheiterte der Abruf, ist die Liste der alte Cache: dann lieber ohne Einheit vorbelegen.
+    const liste = versorgendeQuery.isError ? [] : (versorgendeQuery.data ?? []);
+    const aktiv = einheitId != null && liste.some((e) => e.id === einheitId);
     return {
       id: patientMeldung.id,
       lfd_nr: patientMeldung.lfd_nr,
@@ -588,7 +591,7 @@ export default function MeldungenPage() {
       lat: patientMeldung.lat,
       lon: patientMeldung.lon,
     };
-  }, [patientMeldung, patientOffen, versorgendeQuery.data]);
+  }, [patientMeldung, patientOffen, versorgendeQuery.data, versorgendeQuery.isError]);
 
   /*
    * Offene Übernahme an der Meldung (LLH-1075, design.md D14): die Meldung einer unangemeldeten
