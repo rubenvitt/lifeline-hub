@@ -8,7 +8,7 @@ import {
   PERSON_ZUSTAND_MAX,
 } from '../api/eingabegrenzen';
 import type { PersonEingabe } from '../api/einsatzPerson';
-import type { Sichtungskategorie } from '../api/types';
+import type { PersonAnlass, Sichtungskategorie } from '../api/types';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortFelder, ortRegeln } from '../anzeige/ortsfeldFormular';
@@ -16,6 +16,7 @@ import { useAuthOptional } from '../auth/AuthContext';
 import { parseKoordinate } from './koordinate';
 import { KoordinateFeld, VermisstSeitFeld } from './LagedatenFelder';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
+import AnlassWahl from './AnlassWahl';
 import SichtungsWahl from './SichtungsWahl';
 import { VersorgendeEinheitFeld } from './VersorgtVon';
 
@@ -28,6 +29,8 @@ export type AufnahmeEingabe = PersonEingabe & {
   sichtung?: Sichtungskategorie;
   /** Wer die Erst-Sichtung am UHS-Gerät bestätigt (LFH-1046); ohne Sichtung fällt es weg. */
   bestaetigt_personal_id?: number | null;
+  /** Anlass der Hilfeleistung (LLH-1566), im selben Anlege-POST. */
+  anlass?: PersonAnlass;
 };
 
 /**
@@ -38,11 +41,12 @@ export type AufnahmeEingabe = PersonEingabe & {
  */
 export type AufnahmeWerte = Omit<
   AufnahmeEingabe,
-  'antreff_ort' | 'antreff_lat' | 'antreff_lon' | 'sichtung'
+  'antreff_ort' | 'antreff_lat' | 'antreff_lon' | 'sichtung' | 'anlass'
 > & {
   antreff_ort?: OrtsfeldWert;
   koordinate?: string;
   sichtung?: Sichtungskategorie | null;
+  anlass?: PersonAnlass | null;
 };
 
 /** Ein gemerkter Fundort (nur Text, `components/erfassungsSitzung.ts`) als Wert des Felds. */
@@ -64,6 +68,7 @@ export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
     bestaetigt_personal_id,
     sichtung,
     versorgende_einheit_id,
+    anlass,
     ...rest
   } = werte;
   const ort = ortFelder(antreff_ort);
@@ -81,6 +86,8 @@ export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
     ...(sichtung ? { sichtung } : {}),
     // Ohne Erst-Sichtung gibt es nichts zu bestätigen (sonst 422).
     ...(sichtung && bestaetigt_personal_id != null ? { bestaetigt_personal_id } : {}),
+    // Ein zurückgenommener Anlass (`AnlassWahl` meldet `null`) heißt: ohne Anlass.
+    ...(anlass ? { anlass } : {}),
     ...(k ? { antreff_lat: k.lat, antreff_lon: k.lon } : {}),
     ...(vermisst_seit ? { vermisst_seit } : {}),
     // Eine zurückgenommene Wahl heißt: ohne Einheit (LLH-1567).
@@ -113,9 +120,9 @@ export const FOLGESTATUS_HINWEIS = 'Status: erfasst · mit Sichtung → betroffe
  * Routenliste, `src/geraet/mod.rs`): dort ist der Fundort Text, und die Koordinate steht als
  * eigenes Feld unter „Weitere Angaben" (geprüft über `personen/koordinate.ts`).
  *
- * Unter „Weitere Angaben" liegt außerdem der Zustand, im Vermisst-Modus statt seiner „vermisst
- * seit". Der Collapse bleibt
- * OHNE `forceRender` (Beleg in `PersonErfassungModal.test.tsx`): ein Wert entsteht nur
+ * Unter „Weitere Angaben" liegen außerdem der Anlass der Hilfeleistung (LLH-1566, nicht an der
+ * Betreuungsstelle) und der Zustand, im Vermisst-Modus statt beider „vermisst seit". Der Collapse
+ * bleibt OHNE `forceRender` (Beleg in `PersonErfassungModal.test.tsx`): ein Wert entsteht nur
  * aufgeklappt, und einmal aufgeklappt bleibt der Bereich eingehängt.
  *
  * Jeder Freitext trägt die Grenze des Servers (LLH-1329, `api/eingabegrenzen.ts`): Zähler ab
@@ -176,6 +183,12 @@ export default function AufnahmeFelder({
       {modus !== 'vermisst' && (
         <>
           {einsatzId != null && <BestaetigtVonFeld einsatzId={einsatzId} />}
+          {/* Wie die Sichtung ein Gesundheitsdatum: an der Betreuungsstelle nicht (403). */}
+          {!ohneSichtung && (
+            <Form.Item label="Anlass" name="anlass">
+              <AnlassWahl />
+            </Form.Item>
+          )}
           <Form.Item
             label="Zustand / Verdacht"
             name="zustand"

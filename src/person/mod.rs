@@ -1,5 +1,6 @@
 pub mod abgleich_repo;
 pub mod anhang;
+pub mod anlass_repo;
 pub mod audit_repo;
 pub mod massnahme_repo;
 pub mod repo;
@@ -564,6 +565,14 @@ pub struct PersonAnzeige {
     /// Laufende Nummer dieser Meldung, für „aus Meldung #n“.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meldung_lfd_nr: Option<i64>,
+    /// Anlass der Hilfeleistung (LLH-1566, Cache des jüngsten Stands in `person_anlass`);
+    /// fehlt ohne Anlass oder nach dem Aufheben. Kategorie Behandlung, nie im ETB.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<anlass_repo::PersonAnlass>)]
+    pub anlass: Option<String>,
+    /// Erfassungszeit des aktuellen Anlasses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anlass_at: Option<String>,
 }
 
 impl PersonAnzeige {

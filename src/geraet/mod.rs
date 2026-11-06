@@ -36,7 +36,7 @@ pub const BEZEICHNUNG_MAX: usize = 60;
 
 wire_enum! {
     /// Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-    /// `migrations/0213_geraet_kopplung_verpflegungsstelle.sql`.
+    /// `migrations/0286_geraet_kopplung_einheit.sql`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum Funktionsansicht {
         UhsTablet => "uhs-tablet",
@@ -46,14 +46,15 @@ wire_enum! {
         Bereitstellungsraum => "bereitstellungsraum",
         Einsatzabschnitt => "einsatzabschnitt",
         Verpflegung => "verpflegung",
+        Einheit => "einheit",
     }
     try_from = |s| format!("Ungültige Funktionsansicht: {s}");
 }
 
 wire_enum! {
-    /// Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048).
-    /// Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
-    /// (`migrations/0213_…`).
+    /// Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048,
+    /// Einheit LLH-1579). Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
+    /// (`migrations/0286_…`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum Bindungsart {
         Uhs => "uhs",
@@ -61,6 +62,7 @@ wire_enum! {
         Bereitstellungsraum => "bereitstellungsraum",
         Einsatzabschnitt => "einsatzabschnitt",
         Verpflegungsstelle => "verpflegungsstelle",
+        Einheit => "einheit",
     }
 }
 
@@ -72,13 +74,16 @@ pub struct Stelle {
 }
 
 /// Routen, die jede Gerätesitzung erreicht, gleich welche Ansicht: Anmeldestatus, Abmelden,
-/// Branding der Organisation und die lesenden Kartengrundlagen. Gegen tote Einträge wacht
+/// Branding der Organisation, ihr Statuskatalog (Beschriftung und Farbe der Status, ohne
+/// Personenbezug; das Einheitengerät setzt damit seinen Status, LLH-1579) und die lesenden
+/// Kartengrundlagen. Gegen tote Einträge wacht
 /// `tests/geraet_routen_guard.rs`.
 pub const ALLE_GERAETE: &[(&str, &str)] = &[
     ("GET", "/api/auth/me"),
     ("POST", "/api/auth/logout"),
     ("GET", "/api/organisation"),
     ("GET", "/api/organisation/logo"),
+    ("GET", "/api/fahrzeug-status"),
     ("GET", "/api/karte/config"),
     ("GET", "/api/karte/offline/tiles/{z}/{x}/{y}"),
     ("GET", "/api/karte/offline/welt/tiles/{z}/{x}/{y}"),
@@ -117,6 +122,7 @@ impl Funktionsansicht {
             Funktionsansicht::Bereitstellungsraum => "Bereitstellungsraum",
             Funktionsansicht::Einsatzabschnitt => "Einsatzabschnitt",
             Funktionsansicht::Verpflegung => "Verpflegung",
+            Funktionsansicht::Einheit => "Einheit",
         }
     }
 
@@ -130,6 +136,7 @@ impl Funktionsansicht {
             Funktionsansicht::Bereitstellungsraum => Some(Bindungsart::Bereitstellungsraum),
             Funktionsansicht::Einsatzabschnitt => Some(Bindungsart::Einsatzabschnitt),
             Funktionsansicht::Verpflegung => Some(Bindungsart::Verpflegungsstelle),
+            Funktionsansicht::Einheit => Some(Bindungsart::Einheit),
             Funktionsansicht::Lagemonitor => None,
         }
     }
@@ -158,6 +165,7 @@ impl Funktionsansicht {
                 | Funktionsansicht::Bereitstellungsraum
                 | Funktionsansicht::Einsatzabschnitt
                 | Funktionsansicht::Verpflegung
+                | Funktionsansicht::Einheit
         )
     }
 
@@ -179,11 +187,12 @@ impl Funktionsansicht {
                 EinsatzRolle::Fuehrungspersonal
             }
             Funktionsansicht::Lagemonitor => EinsatzRolle::Beobachter,
-            // Alle vier schreiben an ihrer Stelle; die Routenliste verengt die Rolle.
+            // Alle fünf schreiben an ihrer Stelle; die Routenliste verengt die Rolle.
             Funktionsansicht::Betreuungsstelle
             | Funktionsansicht::Bereitstellungsraum
             | Funktionsansicht::Einsatzabschnitt
-            | Funktionsansicht::Verpflegung => EinsatzRolle::Fuehrungspersonal,
+            | Funktionsansicht::Verpflegung
+            | Funktionsansicht::Einheit => EinsatzRolle::Fuehrungspersonal,
         }
     }
 
@@ -222,6 +231,9 @@ impl Funktionsansicht {
             // Kein `einheiten` (LLH-1055 D4): die Empfängerliste steckt in `verpflegung`, und
             // `einheit`/`abschnitt` tragen `verpflegung` in ihrer Gate-Menge.
             Funktionsansicht::Verpflegung => &["verpflegung", "meldungen"],
+            // LLH-1579: die eigene Einheit (Status), ihre Aufträge und ihre Meldungen. Keine
+            // Lagekarte: S1 hat keine Karte (Konzept LLH-1571, Abschnitt 3).
+            Funktionsansicht::Einheit => &["einheiten", "auftraege", "meldungen"],
         }
     }
 
@@ -237,6 +249,7 @@ impl Funktionsansicht {
             Funktionsansicht::Einsatzabschnitt => EINSATZABSCHNITT,
             Funktionsansicht::Betreuungsstelle => BETREUUNGSSTELLE,
             Funktionsansicht::Verpflegung => VERPFLEGUNG,
+            Funktionsansicht::Einheit => EINHEIT,
         }
     }
 }
@@ -268,6 +281,8 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
     // PAT-Kern (Change y18v58dt-pat-kern, Spec `funktionsansichten`).
     ("POST", "/api/einsaetze/{id}/personen/{pid}/transport"),
+    // Anlass der Hilfeleistung (LLH-1566), wie die Sichtung nur an der UHS.
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/anlass"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/massnahmen"),
     (
         "POST",
@@ -323,6 +338,8 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/transport"),
+    // Anlass der Hilfeleistung (LLH-1566), wie die Sichtung nur an der UHS.
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/anlass"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/massnahmen"),
     (
         "POST",
@@ -478,6 +495,27 @@ const VERPFLEGUNG: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen",
     ),
+    ("GET", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/meldungen"),
+];
+
+/// Zusätzliche Einsatzrouten des Einheitengeräts (LLH-1579, Konzept LLH-1571 S1): die eigene
+/// Einheit lesen und ihren Handstatus setzen (den Statuskatalog liest jedes Gerät), Aufträge
+/// mit Empfänger = eigene Einheit lesen, die eigene Empfängerzeile quittieren und den Vollzug
+/// melden, Meldungen an die Einsatzleitung anlegen (Absender fest die eigene Einheit) und die
+/// eigenen lesen. Jeder Handler schneidet über [`abschnitt::bereich`] zu, der für dieses Gerät
+/// nur die eine Einheit enthält; Aufträge an ihren Abschnitt sieht es nicht (F4). Abschnitte,
+/// Einsatzbefehle, Karte und Gefahrenzonen, Personal, Fahrzeuge und Material fehlen bewusst.
+const EINHEIT: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/einheiten"),
+    ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
+    ("GET", "/api/einsaetze/{id}/auftraege"),
+    ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+    ),
+    ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
 ];
@@ -659,6 +697,7 @@ mod tests {
             F::Verpflegung.stellenart(),
             Some(Bindungsart::Verpflegungsstelle)
         );
+        assert_eq!(F::Einheit.stellenart(), Some(Bindungsart::Einheit));
         assert_eq!(F::Lagemonitor.stellenart(), None);
     }
 
@@ -887,6 +926,53 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/lagemonitor"),
         ] {
             assert!(!darf_route(a, m, p), "Abschnittsgerät darf {m} {p} nicht");
+        }
+    }
+
+    /// LLH-1579 (Konzept LLH-1571 S1): Aufträge, Status und Melden der eigenen Einheit. Keine
+    /// Abschnitte, keine Befehle, keine Karte und keine Führungshandlung an Einheiten.
+    #[test]
+    fn einheitengeraet_meldet_status_und_quittiert_aber_fuehrt_nicht() {
+        let e = Funktionsansicht::Einheit;
+        assert!(e.ist_verfuegbar());
+        assert!(e.ist_stellengebunden());
+        assert_eq!(e.stellenart(), Some(Bindungsart::Einheit));
+        assert!(e.rolle().darf_schreiben());
+        assert_eq!(e.lese_module(), ["einheiten", "auftraege", "meldungen"]);
+        for (m, p) in [
+            ("GET", "/api/fahrzeug-status"),
+            ("GET", "/api/einsaetze/{id}/einheiten"),
+            ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
+            ("GET", "/api/einsaetze/{id}/auftraege"),
+            ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+            ),
+            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
+            ("GET", "/api/einsaetze/{id}/meldungen"),
+            ("POST", "/api/einsaetze/{id}/meldungen"),
+        ] {
+            assert!(darf_route(e, m, p), "Einheitengerät darf {m} {p}");
+        }
+        for (m, p) in [
+            ("GET", "/api/einsaetze/{id}/abschnitte"),
+            ("GET", "/api/einsaetze/{id}/befehle"),
+            ("GET", "/api/einsaetze/{id}/zonen"),
+            ("GET", "/api/einsaetze/{id}/fahrzeuge"),
+            ("GET", "/api/einsaetze/{id}/personal"),
+            ("GET", "/api/einsaetze/{id}/personen"),
+            ("POST", "/api/einsaetze/{id}/einheiten"),
+            ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
+            ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}/position"),
+            ("DELETE", "/api/einsaetze/{id}/einheiten/{eid}"),
+            ("POST", "/api/einsaetze/{id}/auftraege"),
+            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
+            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/aufheben"),
+            ("PATCH", "/api/einsaetze/{id}/meldungen/{mid}"),
+            ("POST", "/api/fahrzeug-status"),
+        ] {
+            assert!(!darf_route(e, m, p), "Einheitengerät darf {m} {p} nicht");
         }
     }
 

@@ -1,4 +1,4 @@
-import type { Sichtungskategorie, Uhs } from '../api/types';
+import type { PersonAnlass, Sichtungskategorie, Uhs } from '../api/types';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import { istZuLang } from '../components/zeichenGrenze';
@@ -19,14 +19,17 @@ import { parseKoordinate } from './koordinate';
  *                  getrennt `SK III` / `SK 3`. Groß-/Kleinschreibung egal.
  *  · Unfallhilfsstelle  `@` + Bezeichnung (`@Weserstadion`, `@UHS Weserstadion`); `uhs_id`
  *                  geht im SELBEN Anlege-POST mit. Das `@` nimmt die folgenden Wörter bis zur
- *                  nächsten Sichtung, zum nächsten Geschlecht oder zum nächsten `@`/`#`; Zahlen
+ *                  nächsten Sichtung, zum nächsten Geschlecht oder zum nächsten `@`/`#`/`!`; Zahlen
  *                  gehören zur Bezeichnung („@UHS 2").
+ *  · Anlass        `!` + Kürzel (`!intox`, `!verl`, `!hitze` …, Liste {@link ANLASS_KUERZEL}): der
+ *                  Anlass der Hilfeleistung (LLH-1566) im SELBEN POST. Groß-/Kleinschreibung egal,
+ *                  „ä“ auch als „ae“.
  *  · Koordinate    `#` + Breite/Länge (`#52.2691/9.1342`, `#52,2691/9,1342`) — der Fundort,
  *                  im SELBEN POST als `antreff_lat`/`antreff_lon`, gelesen über
  *                  `personen/koordinate.ts`. Ein `#`-Wort wird nie als Namensteil geschluckt.
  *
  * ── UNERKANNTES SPERRT DAS ABSENDEN ─────────────────────────────────────────────────────
- * Doppelte Angaben, ein Alter außerhalb 0–120, ein Name oder Vorname über `PERSON_NAME_MAX`
+ * Doppelte Angaben, ein unbekannter Anlass, ein Alter außerhalb 0–120, ein Name oder Vorname über `PERSON_NAME_MAX`
  * (LLH-1329), ein unbrauchbares `#`, ein `@` ohne Bezeichnung und eine nicht eindeutige UHS
  * erzeugen je ein PROBLEM, und dann wird nicht gesendet: ein halb
  * verstandener Befehl legte eine Person mit falscher Sichtung oder in der falschen UHS an.
@@ -37,6 +40,7 @@ export type BefehlTeil =
   | { art: 'geschlecht'; text: string; wert: GeschlechtWert; alter?: number }
   | { art: 'alter'; text: string; wert: number }
   | { art: 'sichtung'; text: string; wert: Sichtungskategorie }
+  | { art: 'anlass'; text: string; wert: PersonAnlass }
   | { art: 'uhs'; text: string; suche: string }
   | { art: 'koordinate'; text: string; lat: number; lon: number }
   | { art: 'unerkannt'; text: string; grund: string };
@@ -54,6 +58,7 @@ interface PersonBefehl {
     | 'geschlecht'
     | 'alter_geschaetzt'
     | 'sichtung'
+    | 'anlass'
     | 'antreff_lat'
     | 'antreff_lon'
   >;
@@ -101,6 +106,34 @@ export const SICHTUNG_BUCHSTABEN: readonly { kuerzel: string; kategorie: Sichtun
   ['t', 'u'] as const
 ).map((b) => ({ kuerzel: `sk${b}`, kategorie: ROEMISCH[b] }));
 
+/**
+ * Die Kürzel des Anlasses (LLH-1566) hinter `!`, je Anlass das erste zuerst: die Hinweiszeile der
+ * Schnellerfassung zeigt es, damit Hinweis und Erkennung aus einer Quelle kommen (wie
+ * {@link SICHTUNG_BUCHSTABEN}).
+ */
+export const ANLASS_KUERZEL: Readonly<Record<PersonAnlass, readonly string[]>> = {
+  verletzung: ['verl', 'verletzung', 'trauma'],
+  internistisch: ['intern', 'internistisch'],
+  neurologisch: ['neuro', 'neurologisch'],
+  intoxikation: ['intox', 'intoxikation'],
+  hitze_kaelte: ['hitze', 'kaelte'],
+  allergie: ['allergie', 'stich'],
+  psychisch: ['psych', 'psychisch'],
+  sonstiges: ['sonst', 'sonstiges'],
+};
+
+const ANLASS_NACH_KUERZEL: ReadonlyMap<string, PersonAnlass> = new Map(
+  (Object.entries(ANLASS_KUERZEL) as [PersonAnlass, readonly string[]][]).flatMap(([a, ks]) =>
+    ks.map((k) => [k, a] as const),
+  ),
+);
+
+/** Anlass aus einem `!`-Wort (`!intox`, `!Kälte`) — sonst `null`. */
+export function anlassAus(wort: string): PersonAnlass | null {
+  const kuerzel = wort.slice(1).toLowerCase().replace(/ä/g, 'ae');
+  return ANLASS_NACH_KUERZEL.get(kuerzel) ?? null;
+}
+
 const ALTER_MUSTER = /^~?(\d{1,3})$/;
 const GESCHLECHT_ALTER_MUSTER = /^([mwd])(~?\d{1,3})$/i;
 const SK_EIN_WORT = /^sk(i{1,3}|iv|[1-4tu])$/i;
@@ -120,7 +153,7 @@ function sichtungAus(wort: string): Sichtungskategorie | null {
 }
 
 /**
- * Beendet dieses Wort einen `@`-Suchtext? Sichtung, Geschlecht (auch `w34`), `@`, `#`. Eine
+ * Beendet dieses Wort einen `@`-Suchtext? Sichtung, Geschlecht (auch `w34`), `@`, `#`, `!`. Eine
  * NACKTE Zahl nicht: „UHS 2" ist üblich, und ein Alter steht hinter dem Geschlecht.
  */
 function beendetUhsSuche(wort: string, naechstes: string | undefined): boolean {
@@ -129,7 +162,7 @@ function beendetUhsSuche(wort: string, naechstes: string | undefined): boolean {
   if (klein === 'sk' && naechstes != null && ROEMISCH[naechstes.toLowerCase()] != null) return true;
   if (GESCHLECHT[klein] != null) return true;
   if (GESCHLECHT_ALTER_MUSTER.test(wort)) return true;
-  return wort.startsWith('@') || wort.startsWith('#');
+  return wort.startsWith('@') || wort.startsWith('#') || wort.startsWith('!');
 }
 
 /** „Nachname, Vorname" → Teile; `unbekannt`/`?` → kein Name. */
@@ -153,6 +186,7 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
   const namensWoerter: string[] = [];
   let namensIndex = -1;
   let sichtung: Sichtungskategorie | undefined;
+  let anlass: PersonAnlass | undefined;
   let geschlecht: GeschlechtWert | undefined;
   let alter: number | undefined;
   let uhsSuche: string | null = null;
@@ -196,6 +230,21 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
       } else {
         koordinate = { lat: k.lat, lon: k.lon };
         teile.push({ art: 'koordinate', text: wort, lat: k.lat, lon: k.lon });
+      }
+      continue;
+    }
+
+    if (wort.startsWith('!')) {
+      const wert = anlassAus(wort);
+      if (wert == null) {
+        teile.push({ art: 'unerkannt', text: wort, grund: 'Anlass unbekannt' });
+        probleme.push(`Unbekannter Anlass („${wort}")`);
+      } else if (anlass != null) {
+        teile.push({ art: 'unerkannt', text: wort, grund: 'Anlass doppelt' });
+        probleme.push(`Anlass doppelt angegeben („${wort}")`);
+      } else {
+        anlass = wert;
+        teile.push({ art: 'anlass', text: wort, wert });
       }
       continue;
     }
@@ -287,6 +336,7 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
       ...(geschlecht != null ? { geschlecht } : {}),
       ...(alter != null ? { alter_geschaetzt: alter } : {}),
       ...(sichtung != null ? { sichtung } : {}),
+      ...(anlass != null ? { anlass } : {}),
       ...(koordinate != null ? { antreff_lat: koordinate.lat, antreff_lon: koordinate.lon } : {}),
     },
     uhsSuche,

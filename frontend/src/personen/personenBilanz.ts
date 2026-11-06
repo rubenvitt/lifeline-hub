@@ -1,4 +1,5 @@
-import type { Person, Sichtungskategorie, VerbleibArt } from '../api/types';
+import type { Person, PersonAnlass, Sichtungskategorie, VerbleibArt } from '../api/types';
+import { ANLASS_REIHE } from './personMeta';
 import { hatKoordinate } from './koordinate';
 import { nichtGeladen } from '../offline/lagebildKuerzung';
 
@@ -304,4 +305,34 @@ export function kontakteJeEinheit(
   return [...je.values()].sort(
     (a, b) => b.wert - a.wert || a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }),
   );
+}
+
+// ── Anlass der Hilfeleistung (LLH-1566) ─────────────────────────────────────────────────
+
+/** Schlüssel der Anlass-Zählung: der Katalog in seiner Folge, dann „ohne“. */
+export type AnlassbildSchluessel = PersonAnlass | 'ohne';
+
+interface Anlassbild {
+  /** Gezählte Kontakte: alle gelieferten Personen außer den vermissten. */
+  gesamt: number;
+  je: Record<AnlassbildSchluessel, number>;
+}
+
+/**
+ * Kontakte je Anlass der Hilfeleistung (LLH-1566), Grundlage für Lagebild (LLH-1574) und Bericht
+ * (LLH-1575). Abgeschlossene zählen mit: im Sanitätsdienst ist der versorgte und entlassene Fall
+ * der häufigste Kontakt. Vermisste sind kein Kontakt und zählen nicht; ohne Anlass unter `ohne`.
+ */
+export function anlassbild(alle: readonly Pick<Person, 'status' | 'anlass'>[]): Anlassbild {
+  const je = Object.fromEntries([...ANLASS_REIHE, 'ohne'].map((k) => [k, 0])) as Record<
+    AnlassbildSchluessel,
+    number
+  >;
+  let gesamt = 0;
+  for (const p of alle) {
+    if (p.status === 'vermisst') continue;
+    je[p.anlass ?? 'ohne']++;
+    gesamt++;
+  }
+  return { gesamt, je };
 }

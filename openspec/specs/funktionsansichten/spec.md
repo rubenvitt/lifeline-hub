@@ -9,10 +9,12 @@ schreiben darf und wie der Server diese Schranke durchsetzt.
 ### Requirement: Katalog der Funktionsansichten
 
 Das System SHALL genau diese Funktionsansichten kennen: `uhs-tablet`, `uhs-laptop`,
-`lagemonitor`, `betreuungsstelle`, `bereitstellungsraum`, `einsatzabschnitt` und `verpflegung`.
+`lagemonitor`, `betreuungsstelle`, `bereitstellungsraum`, `einsatzabschnitt`, `verpflegung` und
+`einheit` (LLH-1579).
 Die beiden UHS-Ansichten MUST an genau eine UHS des Einsatzes gebunden sein, `betreuungsstelle`
 an genau eine Betreuungsstelle, `bereitstellungsraum` an genau einen Bereitstellungsraum und
-`einsatzabschnitt` an genau einen Einsatzabschnitt. `verpflegung` MAY an genau eine
+`einsatzabschnitt` an genau einen Einsatzabschnitt und `einheit` an genau eine aktive Einheit des
+Einsatzes; eine aufgelöste Einheit MUST 422 sein. `verpflegung` MAY an genau eine
 Verpflegungsstelle des Einsatzes gebunden sein; ohne Stelle MUST sie einsatzweit gelten
 (LLH-1048). `lagemonitor` MUST an keine Stelle gebunden sein. Ein unbekannter Ansichtswert MUST
 beim Anlegen einer Kopplung 400 sein, ebenso eine fehlende Stelle bei einer Ansicht mit
@@ -27,7 +29,7 @@ Ansicht die Art ihrer Stelle nennen und ob die Stelle Pflicht ist.
 #### Scenario: Alle Ansichten wählbar
 
 - **WHEN** die Einsatzleitung die Kopplungsmaske öffnet
-- **THEN** bietet sie alle sieben Ansichten an, jede mit der Stellenart, an die sie gebunden ist oder sein kann, oder ohne Stelle
+- **THEN** bietet sie alle acht Ansichten an, jede mit der Stellenart, an die sie gebunden ist oder sein kann, oder ohne Stelle
 - **AND** nennt sie die Stelle der Verpflegung als wahlweise, die der übrigen gebundenen Ansichten als Pflicht
 
 #### Scenario: Gebundene Ansicht ohne Stelle
@@ -51,7 +53,7 @@ Die Ansichten `uhs-tablet`, `uhs-laptop` und `lagemonitor` SHALL genau die folge
 haben, je Modul getrennt nach Lesen (L) und Schreiben (S). Was die Tabelle nicht nennt, MUST
 verboten sein. „Eigene UHS“ heißt die UHS der Kopplung. Die übrigen Ansichten regelt je eine
 eigene Anforderung („Ansicht Betreuungsstelle“, „Ansicht Bereitstellungsraum“, „Ansicht
-Einsatzabschnitt“, „Ansicht Verpflegung“).
+Einsatzabschnitt“, „Ansicht Verpflegung“, „Ansicht Einheit“).
 
 | Modul / Bereich | UHS-Tablet | UHS-Laptop | Lagemonitor |
 | --- | --- | --- | --- |
@@ -721,3 +723,72 @@ des Einsatzes.
 - **WHEN** die Einsatzleitung die Kopplung widerruft
 - **AND** das Gerät danach seinen Abschnitt abruft
 - **THEN** antwortet der Server mit 401
+
+### Requirement: Ansicht Einheit
+
+Die Funktionsansicht `einheit` (LLH-1579, Konzept LLH-1571 Stufe S1) SHALL an genau eine aktive
+Einheit gebunden sein, die Einsatzrolle Führungspersonal tragen und genau diese Rechte haben;
+was die Tabelle nicht nennt, MUST verboten sein. Der Bereich MUST die eigene Einheit allein
+sein, ohne ihren Abschnitt und ohne Unter-Einheiten. Löst die Einsatzleitung die Einheit auf
+(auch spurlos), MUST die Kopplung enden, mit ETB-Eintrag wie bei einem Widerruf. Einsatzweite
+Modulzähler MUST das Gerät nicht erhalten. Gefahrenzonen und Karte gehören nicht zu dieser Stufe.
+
+| Modul / Bereich | Einheit |
+| --- | --- |
+| Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal, Statuskatalog der Organisation | L |
+| `einheiten`: die eigene Einheit | L |
+| `einheiten`: Handstatus der eigenen Einheit setzen (nicht löschen) | S |
+| `einheiten`: anlegen, ändern, auflösen, Position, fremde Einheiten | — |
+| `auftraege`: Aufträge mit der eigenen Einheit als Empfänger | L |
+| `auftraege`: die eigene Empfängerzeile quittieren, Vollzug melden | S |
+| `auftraege`: erteilen, abnehmen, Kennzahlen; Aufträge nur an den Abschnitt der Einheit | — |
+| `meldungen`: Meldung an die Einsatzleitung anlegen (Absender fest die eigene Einheit), wahlweise mit Standort, eigene Meldungen lesen | L/S |
+| `einsatzabschnitte`, `befehle`, `lagekarte`, alle übrigen Module, Einstellungen, Verwaltung | — |
+
+#### Scenario: Nur die eigene Einheit
+
+- **WHEN** das Gerät des 2. Zugs die Einheiten abruft
+- **THEN** enthält die Liste nur den 2. Zug
+
+#### Scenario: Auftrag an den Abschnitt
+
+- **WHEN** ein Auftrag nur an den Abschnitt des 2. Zugs geht
+- **THEN** sieht das Gerät des 2. Zugs ihn nicht (404)
+
+#### Scenario: Status setzen
+
+- **WHEN** das Gerät den Status seiner Einheit setzt
+- **THEN** speichert der Server ihn mit ETB-Eintrag und die Einsatzleitung sieht ihn live
+- **AND** ist eine fremde Einheit 404 und das Löschen des Status 403
+
+#### Scenario: Einheit mit Fahrzeug
+
+- **WHEN** die Einheit ein Fahrzeug führt
+- **THEN** zeigt das Gerät den Status nur an
+- **AND** lehnt der Server das Setzen mit 422 ab
+
+#### Scenario: Absender fest
+
+- **WHEN** das Gerät eine Meldung ohne Bezug sendet
+- **THEN** trägt sie die eigene Einheit als Absender
+- **AND** ist ein anderer Bezug (fremde Einheit, Abschnitt) 403
+
+#### Scenario: Standort auf Knopfdruck
+
+- **WHEN** das Gerät eine Meldung beliebiger Art mit Standort sendet
+- **THEN** speichert der Server den Ort an der Meldung
+- **AND** ermittelt das Gerät den Standort nur auf Knopfdruck, nie laufend
+- **AND** bleibt der Ort bei jeder Korrektur außerhalb der Lage und verortet die Meldung bei der Übernahme in die Lage
+- **AND** nimmt erst die Rücknahme aus der Lage ihn mit
+
+#### Scenario: Ohne Netz
+
+- **WHEN** das Gerät keine Verbindung hat
+- **THEN** zeigt es Aufträge und Status mit dem letzten Stand und sperrt Quittung, Vollzug und Status
+- **AND** merkt es eine Meldung vor
+
+#### Scenario: Auflösen beendet die Kopplung
+
+- **WHEN** die Einsatzleitung die Einheit auflöst
+- **THEN** antwortet die nächste Anfrage des Geräts mit 401
+- **AND** nennt das ETB das Gerät und die aufgelöste Einheit

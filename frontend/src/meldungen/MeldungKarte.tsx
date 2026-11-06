@@ -3,7 +3,7 @@ import { Button, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { memo, useState, type ReactNode } from 'react';
-import { auftraegePfad, personDetailPfad } from '../routing/deeplinks';
+import { auftraegePfad, lagekartePfad, personDetailPfad } from '../routing/deeplinks';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Meldung, MeldungKorrekturPatch, MeldungStatus } from '../api/types';
 import {
@@ -166,7 +166,7 @@ function MeldungKarte({
   // Ein Gerät (UHS-Laptop) springt nicht in die Aufträge (LFH-892).
   const darf = useGeraetDarf();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
-  const { zeitpunkt } = useAnzeigeKonventionen();
+  const { zeitpunkt, formatKoordinate } = useAnzeigeKonventionen();
   const status = MELDUNG_STATUS[m.status] ?? MELDUNG_STATUS.neu;
   // Hervorhebung einer unbestätigten überfälligen/eskalierten Sofortmeldung; dieselbe Regel
   // zählt das Kennzahlenband (`meldungKennzahlen.ts`).
@@ -348,6 +348,19 @@ function MeldungKarte({
         {m.empfaenger && (
           <Text type="secondary" style={{ fontSize: 12 }}>
             → {m.empfaenger}
+          </Text>
+        )}
+        {/* Standort der Meldung (Einheitengerät auf Knopfdruck, LLH-1579 F9); die Führung springt
+           damit auf die Karte, ein Gerät sieht ihn nur. */}
+        {m.lat != null && m.lon != null && (
+          <Text type="secondary" style={{ fontSize: 12 }} data-lfh="meldung-standort">
+            {darf('fremde-module') ? (
+              <KennungsLink to={lagekartePfad(einsatzId, { zentrum: { lat: m.lat, lon: m.lon } })}>
+                {formatKoordinate(m.lat, m.lon)}
+              </KennungsLink>
+            ) : (
+              formatKoordinate(m.lat, m.lon)
+            )}
           </Text>
         )}
       </Space>

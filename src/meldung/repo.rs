@@ -115,9 +115,9 @@ const ANZEIGE_SELECT: &str = concat!(
     " AS ist_bestaetigt, ",
     ist_ueberfaellig_sql!(),
     " AS ist_ueberfaellig, \
-            m.einheit_id, m.abschnitt_id, ",
+            m.einheit_id, m.abschnitt_id, m.lat, m.lon, ",
     etb_berichtigung_sql!(),
-    ", m.lat, m.lon, \
+    ", \
             (SELECT json_group_array(json_object('id', p.id, 'registrier_nr', p.registrier_nr)) \
              FROM (SELECT id, registrier_nr FROM einsatz_person \
                    WHERE meldung_id = m.id AND storniert_at IS NULL \

@@ -12,6 +12,7 @@ import {
 } from '../offline/personEintrag';
 import { savePersonEintragOfflineCapable, type OfflineSchreibErgebnis } from '../offline/schreiben';
 import {
+  ANLASS_WORT,
   MASSNAHME_WORT,
   SK_META,
   VERLETZUNG_ART_WORT,
@@ -31,8 +32,8 @@ export type SavePersonEintrag = <A extends PersonEintragArt>(
 ) => Promise<OfflineSchreibErgebnis<PersonEintragAntwort[A]>>;
 
 /**
- * Der eine Schreibweg der medizinischen Einträge an jeder Ansatzstelle (LLH-1138, design.md D8):
- * Patientenkopf, Zeilen-Sichtung, Sichtungsdialog, Verbleib-Dialog und Grundriss. Ohne Netz merkt
+ * Der eine Schreibweg der medizinischen Einträge an jeder Ansatzstelle (LLH-1138, design.md D8;
+ * Anlass LLH-1566): Patientenkopf, Zeilen-Sichtung, Sichtungsdialog, Verbleib-Dialog und Grundriss. Ohne Netz merkt
  * er vor (`savePersonEintragOfflineCapable`); die Mutation dazu läuft mit `networkMode: 'always'`
  * (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
  *
@@ -88,6 +89,8 @@ export function vormerkungText(aktion: PersonEintragAktion): string {
           transport_fachrichtung: aktion.daten.fachrichtung,
         }) ?? 'aufgehoben'
       }`;
+    case 'anlass':
+      return `Anlass ${aktion.daten.anlass ? ANLASS_WORT[aktion.daten.anlass] : 'aufgehoben'}`;
     case 'massnahme':
       return `Maßnahme ${MASSNAHME_WORT[aktion.daten.art]}`;
     case 'verletzung':

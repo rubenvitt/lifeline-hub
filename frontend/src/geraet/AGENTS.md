@@ -12,15 +12,16 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Client blendet `geraetDarf`/`useGeraetDarf` (`geraet/geraetSicht.ts`) nur aus, was der Server
   ablehnt. Eine neue Fähigkeit beginnt mit Listeneintrag und Test in `tests/geraet_kopplung.rs`,
   erst dann `geraetDarf`.
-- **Stellenbindung je Art** (LFH-1040, LLH-1048): UHS, Betreuungsstelle, Bereitstellungsraum,
-  Einsatzabschnitt und Verpflegungsstelle haben je eine Spalte in `geraet_kopplung` (Migration
-  0213, höchstens eine gesetzt); `Funktionsansicht::stellenart` nennt die Art,
+- **Stellenbindung je Art** (LFH-1040, LLH-1048, LLH-1579): UHS, Betreuungsstelle,
+  Bereitstellungsraum, Einsatzabschnitt, Verpflegungsstelle und Einheit haben je eine Spalte in
+  `geraet_kopplung` (Migration 0286, höchstens eine gesetzt); `Funktionsansicht::stellenart` nennt die Art,
   `GeraetKontext.stelle` die Stelle. Die Helfer in `stelle.rs` gelten streng: ein Gerät, das
   nicht an eine Stelle genau dieser Art gebunden ist, sieht keine (`sicht` → `Keine`), Personen
   nur über `sichtbare_personen` / `fordere_person` seiner Art. Wer eine Route mehreren Ansichten
   öffnet, filtert über diese Helfer, nie über `ctx.geraet.is_none()`. Ein aufgelöster Abschnitt
-  widerruft seine Kopplungen; eine aufgelöste UHS, ein aufgelöster BR und eine aufgelöste
-  Verpflegungsstelle nicht. **Einzige wahlweise Stelle ist die Verpflegung**
+  widerruft seine Kopplungen, ebenso eine aufgelöste oder stornierte Einheit (`aufloesen_tx`,
+  vor dem Löschen; die Kopplung ist keine Spur, `ON DELETE SET NULL` leert nur die Bindung); eine
+  aufgelöste UHS, ein aufgelöster BR und eine aufgelöste Verpflegungsstelle nicht. **Einzige wahlweise Stelle ist die Verpflegung**
   (`stelle_wahlweise`, LLH-1024 F7, `AnsichtAuswahl.stelle_pflicht = false`): ohne Stelle bleibt
   das Gerät einsatzweit. Ihre Handler fragen `sicht_wahlweise` / `ziel_stelle_wahlweise`, nie die
   strenge `sicht`; eine neue wahlweise Ansicht braucht dieselbe Entscheidung in jedem Handler.
@@ -37,6 +38,22 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Gefahrenzonen zeigt das Gerät einsatzweit, Bezirke und Skizzen nicht. Einsatzweite Zähler
   (`modul_zaehler.rs`) bekommt es nicht. Die Karte kommt ohne gespeicherte Kartenansicht aus,
   die steht in keiner Routenliste.
+- **Einheitenansicht** (LLH-1579, Konzept LLH-1571 S1): ein Handy für genau eine Einheit. Der
+  Bereich ist dieselbe Struktur wie beim Abschnitt (`abschnitt::Abschnittsbereich`, Wurzel
+  `Wurzel::Einheit`): `einheiten` = nur die eigene, `abschnitte` leer, deshalb sieht das Gerät
+  nur Aufträge mit der Einheit selbst als Empfänger, nie die ihres Abschnitts (F4). Handstatus
+  nur der eigenen Einheit (`fordere_einheit`, fremde 404), Löschen 403, mit Fahrzeug 422 wie
+  überall (F8). Meldungsabsender fest die eigene Einheit; nur dieses Gerät darf einen Ort an jede
+  Art Meldung hängen (F9, `routes/meldung.rs`), die Karte zeigt ihn als Kartensprung
+  (`MeldungKarte`). Kein `zonen`, keine `abschnitte`, keine `befehle`: Startseite ist
+  `GeraetAuftraegePage` (ohne Abschnitte und Befehle), dazu `GeraetStatusPage` (Flächen aus dem
+  Org-Katalog, „kein Status“ fehlt) und `GeraetMeldenPage` mit `StandortFeld` (einmal
+  `getCurrentPosition`, nie `watchPosition`, F3). Ohne Verbindung sperren Aufträge und Status mit
+  letztem Stand (`useOhneVerbindung`, nichts vorgemerkt, F5); Melden merkt vor. Die einzige
+  Ausnahme von „Geräte bleiben still“ ist `useAuftragsVibration` (F7): kurze Vibration bei einer
+  neuen Auftragskennung in derselben Abfrage wie die Seite, nie beim ersten Stand, nie Ton.
+  „Gerät koppeln“ am Einheiten-Detail führt über `einsatzEinstellungenPfad(…, 'geraete', {
+einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öffnen).
 - **Eine Ansicht wird verfügbar, wenn sie fertig ist:** `Funktionsansicht::ist_verfuegbar` erst
   setzen, wenn Routenliste, Stellenfilter, Server-Test und Hülle stehen. Vorher ist das Koppeln
   422, und die Kopplungsmaske bietet nur, was `GeraeteUebersicht.ansichten` nennt;
@@ -52,7 +69,8 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   steht in keiner Liste), kein `EinsatzAnzeigeProvider` (lädt `/einstellungen`, 403), kein Ton
   und keine Benachrichtigung: beide Hüllen öffnen den Einsatzstrom mit `stumm` (Spec
   `benachrichtigungen`, „Gekoppelte Geräte bleiben still“; Nachweis `geraet/GeraetAbschnitt.test.tsx`,
-  `geraet/LagemonitorPage.test.tsx`). Der Einsatzstrom ist Pflicht: schließt ihn der Server nach einem Widerruf, endet das Gerät ohne
+  `geraet/LagemonitorPage.test.tsx`; einzige Ausnahme die Vibration des Einheitengeräts,
+  `geraet/GeraetEinheit.test.tsx`). Der Einsatzstrom ist Pflicht: schließt ihn der Server nach einem Widerruf, endet das Gerät ohne
   Neuladen (Nachweis `e2e/geraet-uhs-tablet.spec.ts`).
 - **Vorhandene Flächen statt eigener Seiten.** Seiten, die die Hülle einbindet, führen ihre Wege
   über `useEinsatzPfade()` (`routing/EinsatzPfade.tsx`), nie direkt über `personDetailPfad`,
@@ -152,7 +170,8 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Entscheidung 15.10.2026) und bucht „Ausrücken buchen“ als Austritt über `…/belegung`; „Austragen“
   steht an Desktop und Gerät im Aktionsmenü der Zeile. Meldungen an
   die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum,
-  Verpflegung); das Navigationsziel heißt bei Abschnitt, Bereitstellungsraum und Verpflegung „Melden“.
+  Verpflegung, Einheit); das Navigationsziel heißt bei Abschnitt, Einheit, Bereitstellungsraum und
+  Verpflegung „Melden“.
   Neben der Priorität wählt die `Segmentleiste` „Art“ zwischen Meldung und Lagemeldung (LLH-1031):
   Lagemeldung sendet `meldungsart = 'lagemeldung'` auch mit Priorität sofort, Meldung wie bisher
   (`sofortmeldung` bei sofort, sonst `sonstige`); nach dem Senden steht wieder „Meldung“. Der

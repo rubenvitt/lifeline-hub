@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Person } from '../api/types';
 import {
+  anlassbild,
   hatLuecke,
   istAngetroffen,
   kontakteJeEinheit,
@@ -342,5 +343,29 @@ describe('kontakteJeEinheit (LLH-1567, design.md D8)', () => {
   it('ordnet bei gleicher Zahl nach Name und ist ohne Einheit leer', () => {
     expect(kontakteJeEinheit([mit(3), mit(2)]).map((k) => k.einheitId)).toEqual([2, 3]);
     expect(kontakteJeEinheit([mit(null)])).toEqual([]);
+  });
+});
+
+describe('anlassbild (LLH-1566)', () => {
+  it('zählt je Anlass, „ohne“ für Personen ohne Anlass, Vermisste nicht, Abgeschlossene mit', () => {
+    const bild = anlassbild([
+      p({ anlass: 'intoxikation' }),
+      p({ anlass: 'intoxikation', versorgung: 'abgeschlossen' }),
+      p({ anlass: 'verletzung' }),
+      p({}),
+      p({ status: 'vermisst', anlass: 'psychisch' }),
+    ]);
+    expect(bild.gesamt).toBe(4);
+    expect(bild.je).toEqual({
+      verletzung: 1,
+      internistisch: 0,
+      neurologisch: 0,
+      intoxikation: 2,
+      hitze_kaelte: 0,
+      allergie: 0,
+      psychisch: 0,
+      sonstiges: 0,
+      ohne: 1,
+    });
   });
 });

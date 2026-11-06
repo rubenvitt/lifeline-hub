@@ -477,6 +477,42 @@ test('Nachsichten im Patientenkopf ohne Dialog', async ({ page }) => {
   expect(((await detail.json()) as { aktuelle_sichtung: string }).aktuelle_sichtung).toBe('sk1');
 });
 
+test('Anlass: per Kurzeingabe „!intox“ erfassen, im Patientenkopf wechseln (LLH-1566)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const e = await einsatzPerApi(page, `E2E Anlass ${Date.now()}`);
+  await page.goto(`/einsaetze/${e}/personen`);
+
+  const feld = page.getByRole('textbox', { name: 'Kurzeingabe Person' });
+  await feld.fill('Bauer sk3 !intox');
+  await feld.press('Enter');
+  await expect(feld).toHaveValue('');
+  await expect(page.locator('tr.ant-table-row')).toHaveCount(1);
+
+  const liste = await page.request.get(`/api/einsaetze/${e}/personen`);
+  const [person] = (await liste.json()) as { id: number; anlass?: string }[];
+  expect(person.anlass).toBe('intoxikation');
+
+  await page.goto(`/einsaetze/${e}/personen/${person.id}`);
+  const kopf = patientenkopf(page);
+  await expect(kopf.locator('[data-lfh="anlass"]')).toHaveText('Intoxikation');
+  await kopf.getByRole('button', { name: 'Anlass festlegen' }).click();
+
+  const paneel = page.getByRole('region', { name: 'Anlass festlegen' });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(paneel.getByRole('radio', { name: 'Intoxikation' })).toBeChecked();
+  await paneel.getByRole('radio', { name: 'Hitze / Kälte' }).click();
+  await paneel.getByRole('button', { name: 'Anlass festlegen' }).click();
+
+  await expect(paneel).toHaveCount(0);
+  await expect(kopf.locator('[data-lfh="anlass"]')).toHaveText('Hitze / Kälte');
+  const detail = await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`);
+  const d = (await detail.json()) as { anlass?: string; anlaesse: unknown[] };
+  expect(d.anlass).toBe('hitze_kaelte');
+  expect(d.anlaesse).toHaveLength(2);
+});
+
 test('Bezug hinzufügen: ein Tier über die gemeinsame Suche, die Liste sagt „Halter von …"', async ({
   page,
 }) => {

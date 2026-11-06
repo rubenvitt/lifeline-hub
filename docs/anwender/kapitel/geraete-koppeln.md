@@ -17,7 +17,8 @@ koppeln, einen neuen Code ausstellen, verlängern und widerrufen. Was die einzel
 Gerät zeigen, steht in den Kapiteln [Gerät bedienen](geraet-bedienen.md),
 [UHS-Tablet und UHS-Laptop](geraet-uhs.md), [Betreuungsstelle](geraet-betreuungsstelle.md),
 [Bereitstellungsraum](geraet-bereitstellungsraum.md),
-[Einsatzabschnitt](geraet-einsatzabschnitt.md), [Verpflegung](geraet-verpflegung.md) und
+[Einsatzabschnitt](geraet-einsatzabschnitt.md), [Einheit](geraet-einheit.md),
+[Verpflegung](geraet-verpflegung.md) und
 [Lagemonitor](lagemonitor.md).
 
 ## Abläufe

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import {
   revokeMassnahme,
   revokeVerletzung,
+  type AnlassEingabe,
   type MassnahmeEingabe,
   type TransportEingabe,
   type VerbleibEingabe,
@@ -34,6 +35,7 @@ import { useMinutenTakt } from '../components/useMinutenTakt';
 import { sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
 import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
 import {
+  ANLASS_WORT,
   MASSNAHME_WORT,
   SK_WORT,
   VERLETZUNG_ART_WORT,
@@ -44,7 +46,7 @@ import {
 import { nummeriere, regionName } from './koerperschema/koerperschemaKern';
 import Koerperschema, { KoerperschemaMini } from './koerperschema/Koerperschema';
 import PatKennzeichen from './PatKennzeichen';
-import { MassnahmePaneel, TransportPaneel } from './PatientenkopfPaneele';
+import { AnlassPaneel, MassnahmePaneel, TransportPaneel } from './PatientenkopfPaneele';
 import { istAngetroffen } from './personenBilanz';
 import { ZustandSchreiben } from './personenSpalten';
 import { SichtungFelder, useSaveSichtung, type SichtungWerte } from './SichtungDialog';
@@ -126,6 +128,11 @@ export default function Patientenkopf({
     mutationFn: (eingabe: VerbleibEingabe) => save(einsatzId, person, 'verbleib', eingabe),
     onSuccess: nachSpeichern,
   });
+  const anlassMutation = useMutation({
+    networkMode: 'always',
+    mutationFn: (eingabe: AnlassEingabe) => save(einsatzId, person, 'anlass', eingabe),
+    onSuccess: nachSpeichern,
+  });
   const transportMutation = useMutation({
     networkMode: 'always',
     mutationFn: (eingabe: TransportEingabe) => save(einsatzId, person, 'transport', eingabe),
@@ -154,6 +161,7 @@ export default function Patientenkopf({
   const isSpeichernd =
     sichtungMutation.isPending ||
     verbleibMutation.isPending ||
+    anlassMutation.isPending ||
     transportMutation.isPending ||
     massnahmeMutation.isPending ||
     massnahmeAufhebenMutation.isPending ||
@@ -237,6 +245,27 @@ export default function Patientenkopf({
                 </Typography.Text>
               )}
             </Flex>
+          </Datenfeld>
+
+          {/* Anlass der Hilfeleistung (LLH-1566): wer sichten darf, legt ihn fest; am Gerät nur
+              die UHS. Ein Gesundheitsdatum, nie im ETB. */}
+          <Datenfeld label="Anlass">
+            <span data-lfh="anlass">
+              {person.anlass ? (
+                ANLASS_WORT[person.anlass]
+              ) : (
+                <Typography.Text type="secondary">kein Anlass</Typography.Text>
+              )}
+            </span>
+            {bedienbar && darfSichten && angetroffen && (
+              <PaneelKnopf
+                offen={offen === 'anlass'}
+                gesperrt={isSpeichernd}
+                onClick={() => toggle('anlass')}
+              >
+                Anlass festlegen
+              </PaneelKnopf>
+            )}
           </Datenfeld>
 
           <Datenfeld label="Zustand / Verdacht">
@@ -446,6 +475,14 @@ export default function Patientenkopf({
           onSchliessen={close('verbleib')}
         />
       )}
+      {offen === 'anlass' && (
+        <AnlassPaneel
+          person={person}
+          mutation={anlassMutation}
+          onSchliessen={close('anlass')}
+          vorgemerkterAnlass={vorgemerkterAnlass(vorgemerkt)}
+        />
+      )}
       {offen === 'transport' && (
         <TransportPaneel
           einsatzId={einsatzId}
@@ -565,6 +602,18 @@ function SichtungsAnzeige({
 export const AUFHEBEN_OHNE_NETZ = 'Aufheben ohne Netz nicht möglich';
 
 /**
+ * Der jüngste ohne Netz vorgemerkte Anlass-Stand dieser Person, `undefined` ohne Vormerkung. Die
+ * Warteschlange spielt in ihrer Folge ab, also gilt der letzte Eintrag, auch eine Aufhebung (`null`).
+ */
+function vorgemerkterAnlass(
+  vorgemerkt: readonly VorgemerkterPersonEintrag[],
+): AnlassEingabe['anlass'] | undefined {
+  let stand: AnlassEingabe['anlass'] | undefined;
+  for (const v of vorgemerkt) if (v.aktion.art === 'anlass') stand = v.aktion.daten.anlass;
+  return stand;
+}
+
+/**
  * Quittung „Offline vorgemerkt“ im Kopf (LLH-1138, Spec `personen-detail`, „Nachsichtung am
  * Tablet ohne Netz“): was an dieser Person in der Warteschlange liegt, mit Erfassungszeit. Es
  * verschwindet, sobald der Abgleich den Eintrag gesendet und das Detail neu geladen hat; eine
@@ -646,7 +695,8 @@ function GekuerzteListe({
   );
 }
 
-type Paneel = 'sichtung' | 'verbleib' | 'uebergabe' | 'transport' | 'massnahme' | 'verletzung';
+type Paneel =
+  'sichtung' | 'anlass' | 'verbleib' | 'uebergabe' | 'transport' | 'massnahme' | 'verletzung';
 
 /** Auslöser eines Paneels im Datenfeld; solange ein Paneel speichert, wechselt keiner. */
 function PaneelKnopf({

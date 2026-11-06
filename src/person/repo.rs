@@ -13,7 +13,7 @@ const SELECT_ALLE: &str = "\
            aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status, \
            aktuelle_verbleib_betreuungsstelle_id, pat_nummer, kontamination, \
            transport_prioritaet, transport_art, transport_fachrichtung, transport_at, \
-           aktueller_transport_durch, aktuelles_einsatz_fahrzeug_id, \
+           aktueller_transport_durch, aktuelles_einsatz_fahrzeug_id, anlass, anlass_at, \
            versorgende_einheit_id, meldung_id, \
            (SELECT e.name FROM einsatz_einheit e \
              WHERE e.id = einsatz_person.versorgende_einheit_id) AS versorgende_einheit_name, \

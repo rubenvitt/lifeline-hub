@@ -155,7 +155,14 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("aktuelles_verbleib_ziel", Mit),
             ("pat_nummer", Mit),
             ("transport_fachrichtung", Mit),
+            ("anlass", Mit),
         ],
+    },
+    PersonenBezug {
+        art: PersonenArt::Betroffene,
+        tabelle: "person_anlass",
+        bezug: Bezug::Spalte("person_id"),
+        spalten: &[("anlass", Mit)],
     },
     PersonenBezug {
         art: PersonenArt::Betroffene,

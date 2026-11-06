@@ -68,6 +68,10 @@ describe('geraeteKern (LFH-892)', () => {
         { id: 9, bezeichnung: 'Feldküche', status: 'geplant' },
         { id: 10, bezeichnung: 'Alte Küche', status: 'aufgeloest' },
       ],
+      einheiten: [
+        { id: 11, name: 'Fußtrupp 1', funkrufname: 'Rotkreuz Musterstadt 74/1' },
+        { id: 12, name: 'Melder', funkrufname: null },
+      ],
     };
     expect(stellenOptionen(quellen, 'uhs')).toEqual([{ value: 1, label: 'UHS Nord' }]);
     expect(stellenOptionen(quellen, 'betreuungsstelle')).toEqual([
@@ -77,6 +81,11 @@ describe('geraeteKern (LFH-892)', () => {
     expect(stellenOptionen(quellen, 'einsatzabschnitt')).toEqual([{ value: 8, label: 'EA Nord' }]);
     expect(stellenOptionen(quellen, 'verpflegungsstelle')).toEqual([
       { value: 9, label: 'Feldküche' },
+    ]);
+    // LLH-1579: aktive Einheiten (der Server liefert nur sie), mit Funkrufnamen, wo gepflegt.
+    expect(stellenOptionen(quellen, 'einheit')).toEqual([
+      { value: 11, label: 'Fußtrupp 1 (Rotkreuz Musterstadt 74/1)' },
+      { value: 12, label: 'Melder' },
     ]);
     expect(stellenOptionen({}, 'uhs')).toEqual([]);
   });

@@ -1,11 +1,11 @@
-import { App, Breadcrumb } from 'antd';
+import { App, Breadcrumb, Button } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, useRollen } from '../components/instrument';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import KraftZeitachse from '../kraefte/KraftZeitachse';
 import { listeEinheitTypen } from '../api/einheitTypen';
@@ -32,7 +32,12 @@ import type { Einheit, EinsatzAnzeige } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { GewanderteGruende } from '../components/GewanderteGruende';
-import { einheitenPfad, nachforderungenPfad, parseRouteId } from '../routing/deeplinks';
+import {
+  einheitenPfad,
+  einsatzEinstellungenPfad,
+  nachforderungenPfad,
+  parseRouteId,
+} from '../routing/deeplinks';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import {
@@ -534,6 +539,20 @@ function EinheitAnsicht({
               onStornieren={() => uebernahmeStorno.mutateAsync()}
             />
           )}
+        {/* Koppeln nur durch die Einsatzleitung (`EinsatzLeitungszugriff`), LLH-1579. */}
+        {darfSchreiben && istEinsatzLeitung(einsatz) && (
+          <Paneel titel="Gerät" koerperPolster>
+            <Button
+              onClick={() =>
+                void navigate(
+                  einsatzEinstellungenPfad(einsatzId, 'geraete', { einheit: einheitId }),
+                )
+              }
+            >
+              Gerät koppeln
+            </Button>
+          </Paneel>
+        )}
         {rechte.canEditEinheit && <EinheitAufloesen onAufloesen={() => aufloesen.mutateAsync()} />}
       </div>
     </EinsatzSeite>

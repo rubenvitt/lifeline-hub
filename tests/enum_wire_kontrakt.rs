@@ -178,6 +178,17 @@ fn serde_wire_gleich_as_str() {
         Bestaetigt,
         Verworfen,
     });
+    // Anlass der Hilfeleistung (LLH-1566)
+    enum_wire!(lifeline_hub::person::anlass_repo::PersonAnlass {
+        Verletzung => "verletzung",
+        Internistisch => "internistisch",
+        Neurologisch => "neurologisch",
+        Intoxikation => "intoxikation",
+        HitzeKaelte => "hitze_kaelte",
+        Allergie => "allergie",
+        Psychisch => "psychisch",
+        Sonstiges => "sonstiges",
+    });
     // Transport (LLH-1325, Spec `personen-transport`)
     enum_wire!(lifeline_hub::person::transport_repo::TransportPrioritaet {
         Sofort => "sofort",
@@ -1719,8 +1730,8 @@ fn pfad_match_ist_token_genau() {
     assert!(!pfad_kommt_vor(text, "lifeline_hub::person::Geschlecht"));
 }
 
-/// LFH-892/LFH-1040/LLH-1048: Gerätekopplung. Die Ansichten stehen als CHECK in
-/// `migrations/0213_geraet_kopplung_verpflegungsstelle.sql`; das Frontend wählt nach ihnen Hülle
+/// LFH-892/LFH-1040/LLH-1048/LLH-1579: Gerätekopplung. Die Ansichten stehen als CHECK in
+/// `migrations/0286_geraet_kopplung_einheit.sql`; das Frontend wählt nach ihnen Hülle
 /// und Startseite, nach der Bindungsart die Stellenauswahl der Kopplungsmaske.
 #[test]
 fn geraet_kopplung_wire() {
@@ -1732,6 +1743,7 @@ fn geraet_kopplung_wire() {
         Bereitstellungsraum => "bereitstellungsraum",
         Einsatzabschnitt => "einsatzabschnitt",
         Verpflegung => "verpflegung",
+        Einheit => "einheit",
     } in lifeline_hub::geraet::Funktionsansicht::ALLE);
     enum_wire!(lifeline_hub::geraet::Bindungsart {
         Uhs => "uhs",
@@ -1739,6 +1751,7 @@ fn geraet_kopplung_wire() {
         Bereitstellungsraum => "bereitstellungsraum",
         Einsatzabschnitt => "einsatzabschnitt",
         Verpflegungsstelle => "verpflegungsstelle",
+        Einheit => "einheit",
     } in lifeline_hub::geraet::Bindungsart::ALLE);
     enum_wire!(lifeline_hub::geraet::repo::KopplungStatus {
         Wartend => "wartend",

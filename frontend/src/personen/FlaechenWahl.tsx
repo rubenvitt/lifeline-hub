@@ -15,7 +15,10 @@ import { useRollen } from '../components/instrument';
  *
  * FORMULARVERTRAG wie ein antd-Feld (`value`/`onChange`), damit die Wahl in einem `Form.Item`
  * hängt. Ein Tipp auf die gewählte Fläche meldet sie noch einmal: am Körperschema speichert schon
- * der Tipp (zweiter Tipp nach dem auf die Region), ein Wiederholen ist dort gewollt.
+ * der Tipp (zweiter Tipp nach dem auf die Region), ein Wiederholen ist dort gewollt. Mit
+ * `onAbwaehlen` nimmt der Tipp auf die gewählte Fläche die Wahl stattdessen zurück (Anlass der
+ * Hilfeleistung, LLH-1566: eine Person darf ohne Anlass bleiben), wie `abwaehlbar` der
+ * Sichtungswahl.
  */
 export interface FlaechenOption<W extends string> {
   wert: W;
@@ -26,6 +29,8 @@ export interface FlaechenWahlProps<W extends string> {
   optionen: readonly FlaechenOption<W>[];
   value?: W | null;
   onChange?: (wert: W) => void;
+  /** Tipp auf die gewählte Fläche nimmt die Wahl zurück, statt sie zu wiederholen. */
+  onAbwaehlen?: () => void;
   disabled?: boolean;
   id?: string;
   'aria-label': string;
@@ -61,6 +66,7 @@ export default function FlaechenWahl<W extends string>({
   optionen,
   value = null,
   onChange,
+  onAbwaehlen,
   disabled = false,
   id,
   'aria-label': ariaLabel,
@@ -113,7 +119,9 @@ export default function FlaechenWahl<W extends string>({
             tabIndex={index === fokusIndex ? 0 : -1}
             data-erfassung-fokus={index === fokusIndex ? '' : undefined}
             onClick={() => {
-              if (!disabled) onChange?.(o.wert);
+              if (disabled) return;
+              if (gewaehlt && onAbwaehlen) onAbwaehlen();
+              else onChange?.(o.wert);
             }}
             onKeyDown={(e) => taste(e, index)}
             style={{

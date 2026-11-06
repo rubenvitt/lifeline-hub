@@ -1369,15 +1369,17 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
 /**
  * Sektions-Route der Einsatz-Einstellungen. Ohne Sektion der bare Modulpfad, der auf die erste
  * Sektion umleitet. `neu` ist der Auftrag der Schnellaktion „Mitglied aufnehmen“ (LFH-1170): die
- * Sektion „Zugriff“ öffnet damit die Personenauswahl.
+ * Sektion „Zugriff“ öffnet damit die Personenauswahl. `einheit` ist der Auftrag „Gerät koppeln“
+ * aus dem Einheiten-Detail (LLH-1579): die Sektion „Geräte“ öffnet die Kopplung vorbelegt.
  */
 export function einsatzEinstellungenPfad(
   einsatzId: number,
   sektion: EinstellungenSektion = 'allgemein',
-  opts: { neu?: boolean } = {},
+  opts: { neu?: boolean; einheit?: number } = {},
 ): string {
   return mitQuery(`${einsatzModulPfad(einsatzId, 'einstellungen')}/${sektion}`, {
     neu: opts.neu ? 1 : undefined,
+    einheit: opts.einheit,
   });
 }
 
@@ -1519,14 +1521,19 @@ export function geraetAbschnittPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/abschnitt`;
 }
 
-/** Aufträge an den Bereich des Abschnittsgeräts. */
+/** Aufträge an den Bereich des Abschnittsgeräts; beim Einheitengerät die Startseite (LLH-1579). */
 export function geraetAuftraegePfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/auftraege`;
 }
 
-/** Meldung des Abschnittsgeräts an die Einsatzleitung. */
+/** Meldung des Abschnitts- oder Einheitengeräts an die Einsatzleitung. */
 export function geraetMeldenPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/melden`;
+}
+
+/** Status der eigenen Einheit am Einheitengerät (LLH-1579). */
+export function geraetStatusPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/status`;
 }
 
 /** Karte des Abschnittsgeräts. */

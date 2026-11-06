@@ -1202,6 +1202,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/personen/{pid}/transport",
             post(routes::person_transport::festlegen),
         )
+        // LLH-1566: Anlass der Hilfeleistung (Kategorie Behandlung, kein ETB).
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/anlass",
+            post(routes::person_anlass::festlegen),
+        )
         .route(
             "/api/einsaetze/{id}/personen/{pid}/massnahmen",
             post(routes::person_massnahme::erfassen),

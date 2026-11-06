@@ -412,6 +412,22 @@ export interface components {
          * @enum {string}
          */
         AnlageArt: "fernmeldeskizze" | "lageplan";
+        /** @description Ein Anlass-Stand (1:1 zu `person_anlass`). Ohne `anlass` heißt er „aufgehoben“. */
+        AnlassAnzeige: {
+            anlass?: components["schemas"]["PersonAnlass"] | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wann der Stand beim Server ankam. */
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            person_id: number;
+            /** @description Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt. */
+            zeitpunkt_at: string;
+        };
         /** @description Eine Zeile der Anmeldespur, wie die Verwaltung sie liest (LFH-1097). */
         AnmeldeEintragAnzeige: {
             /** Format: int64 */
@@ -1357,12 +1373,12 @@ export interface components {
          */
         BezugTyp: "schaden" | "uhs" | "person" | "lagebericht" | "meldung" | "auftrag";
         /**
-         * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048).
-         *     Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
-         *     (`migrations/0213_…`).
+         * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048,
+         *     Einheit LLH-1579). Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
+         *     (`migrations/0286_…`).
          * @enum {string}
          */
-        Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegungsstelle";
+        Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegungsstelle" | "einheit";
         /** @description Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2). */
         BrAbrufErgebnis: {
             /** @description Das Abruf-Ereignis der abgerufenen Kraft. */
@@ -3449,10 +3465,10 @@ export interface components {
         FunktionsArt: "leitung" | "sachgebiet" | "fuehrungshilfspersonal" | "fachberater";
         /**
          * @description Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-         *     `migrations/0213_geraet_kopplung_verpflegungsstelle.sql`.
+         *     `migrations/0286_geraet_kopplung_einheit.sql`.
          * @enum {string}
          */
-        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung";
+        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit";
         /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
          *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
@@ -4687,7 +4703,10 @@ export interface components {
             lagerelevant: boolean;
             /**
              * Format: double
-             * @description Verortung (LLH-1031), auch für den Fundort eines Patienten aus der Meldung (LLH-1567).
+             * @description Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder
+             *     der Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an
+             *     einer anderen Art steht nicht in der Lage, bis die Meldung übernommen wird. Auch der Fundort
+             *     eines Patienten aus der Meldung (LLH-1567).
              */
             lat?: number | null;
             /** Format: int64 */
@@ -5466,6 +5485,12 @@ export interface components {
             person_id: number;
         };
         /**
+         * @description Anlass der Hilfeleistung, fester Katalog (Ruben 05.11.2026: kein fester Statistikbogen).
+         *     String = CHECK in `migrations/0284_person_anlass.sql`. Kategorie Behandlung, nie im ETB.
+         * @enum {string}
+         */
+        PersonAnlass: "verletzung" | "internistisch" | "neurologisch" | "intoxikation" | "hitze_kaelte" | "allergie" | "psychisch" | "sonstiges";
+        /**
          * @description Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
          *     `org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,
          *     kein Snapshot wie bei Material.
@@ -5494,6 +5519,9 @@ export interface components {
             aktuelles_verbleib_ziel?: string | null;
             /** Format: int64 */
             alter_geschaetzt?: number | null;
+            anlass?: components["schemas"]["PersonAnlass"] | null;
+            /** @description Erfassungszeit des aktuellen Anlasses. */
+            anlass_at?: string | null;
             /**
              * Format: double
              * @description Fundort-Koordinate (WGS84), immer gemeinsam mit `antreff_lon` gesetzt oder leer.
@@ -5596,6 +5624,8 @@ export interface components {
          */
         PersonDetail: components["schemas"]["PersonAnzeige"] & {
             abgleiche: components["schemas"]["AbgleichAnzeige"][];
+            /** @description Anlass-Verlauf (LLH-1566), der aktuelle Stand zuerst; ein Stand ohne Anlass hebt auf. */
+            anlaesse: components["schemas"]["AnlassAnzeige"][];
             aufenthalt?: components["schemas"]["AufenthaltAnzeige"] | null;
             /** @description Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`. */
             massnahmen: components["schemas"]["MassnahmeAnzeige"][];

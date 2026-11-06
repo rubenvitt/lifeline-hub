@@ -187,6 +187,14 @@ pub struct MeldungAnzeige {
     /// Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_id: Option<i64>,
+    /// Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder
+    /// der Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an
+    /// einer anderen Art steht nicht in der Lage, bis die Meldung übernommen wird. Auch der Fundort
+    /// eines Patienten aus der Meldung (LLH-1567).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lon: Option<f64>,
     /// Abgeleitet (LLH-1382): die jüngste ETB-Berichtigung des Eintrags `etb_meldung_id`, für die
     /// Marke „berichtigt“ und den Sprung ins ETB. Der Wortlaut `inhalt` bleibt, wie er einging.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -195,11 +203,6 @@ pub struct MeldungAnzeige {
     /// `etb_berichtigung_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub etb_berichtigung_lfd_nr: Option<i64>,
-    /// Verortung (LLH-1031), auch für den Fundort eines Patienten aus der Meldung (LLH-1567).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lat: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lon: Option<f64>,
     /// Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser
     /// Meldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB. Fehlt ohne Patienten
     /// (auch in älteren Lageständen).

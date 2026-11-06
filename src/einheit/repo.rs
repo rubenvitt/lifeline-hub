@@ -1500,6 +1500,16 @@ pub struct Aufgeloest {
     /// Entfallene Planungen als ablösende Einheit (LLH-1131): ETB-Einträge und Hinweise, nach
     /// dem Commit über `routes::abloesung::publish_kopplung`.
     pub abloesung_wirkung: crate::abloesung::hinweis::Wirkung,
+    /// Widerrufene Kopplungen von Einheitengeräten (LLH-1579) mit ihrem ETB-Eintrag; der
+    /// Aufrufer meldet sie nach dem Commit dem Live-Kanal.
+    pub geraete: Vec<GeraetWiderrufen>,
+}
+
+/// Eine beim Auflösen widerrufene Kopplung (LLH-1579).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GeraetWiderrufen {
+    pub kopplung_id: i64,
+    pub etb_id: i64,
 }
 
 /// Löst eine Einheit auf einer offenen Verbindung auf (atomar mit dem System-ETB, LLH-1079,
@@ -1538,6 +1548,34 @@ pub async fn aufloesen_tx(
         geloescht: spur.is_none(),
         ..Aufgeloest::default()
     };
+    // Gekoppelte Handys der Einheit (LLH-1579) enden mit ihr, wie bei einem Widerruf durch die
+    // Einsatzleitung; vor dem Löschen, das die Bindung sonst nur leerte.
+    let geraete =
+        crate::geraet::repo::widerrufe_an_einheit(conn, einsatz_id, id, benutzer_id).await?;
+    if !geraete.is_empty() {
+        let name: String = sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+        let startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
+            .await?
+            .etb_startwert();
+        let wie = match art {
+            Aufloesung::Aufloesen => "aufgelöst",
+            Aufloesung::Stornieren => "storniert",
+        };
+        for (kopplung_id, anzeigename) in geraete {
+            let text =
+                format!("Gerät „{anzeigename}“ (Einheit) widerrufen: Einheit «{name}» {wie}.");
+            let etb_id =
+                crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &text)
+                    .await?;
+            ergebnis.geraete.push(GeraetWiderrufen {
+                kopplung_id,
+                etb_id,
+            });
+        }
+    }
     // Vor dem Lösen, nur wenn die Einheit stehen bleibt (LLH-1266, design.md D1).
     if !ergebnis.geloescht {
         festhalten_letzte_besetzung_tx(conn, id).await?;
@@ -3341,7 +3379,9 @@ mod tests {
     /// sind nur die Unterstellung (rückt beim Auflösen hoch), die Sprechgruppen und die
     /// Verbindungen (LLH-1134; beide Angaben der Einheit selbst, sie gehen per Kaskade mit) und
     /// die letzte Besetzung (LLH-1266): sie entsteht erst beim Auflösen einer Einheit, die
-    /// ohnehin stehen bleibt, und geht per Kaskade mit ihr.
+    /// ohnehin stehen bleibt, und geht per Kaskade mit ihr. Ebenso die Kopplung eines
+    /// Einheitengeräts (LLH-1579): das Auflösen widerruft sie samt ETB-Eintrag, und eine spurlos
+    /// gelöschte Einheit leert nur ihre Bindung (`ON DELETE SET NULL`).
     #[tokio::test]
     async fn jeder_verweis_auf_eine_einheit_ist_spur() {
         const KEINE_SPUR: &[(&str, &str)] = &[
@@ -3349,6 +3389,7 @@ mod tests {
             ("einsatz_einheit_letzte_besetzung", "einheit_id"),
             ("einsatz_einheit_sprechgruppe", "einheit_id"),
             ("einsatz_verbindung", "einheit_id"),
+            ("geraet_kopplung", "einheit_id"),
         ];
         let pool = crate::db::test_pool().await;
         let verweise: Vec<(String, String)> = sqlx::query_as(

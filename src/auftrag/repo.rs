@@ -844,30 +844,61 @@ pub(crate) async fn snap_anzeige_fuer(
 }
 
 /// Setzt Vollzug → 'in_arbeit' (geteilte Achse) und hält den Zeitstempel am Auftrag.
+///
+/// Nur aus `offen` oder `in_arbeit` und nicht am aufgehobenen Auftrag (LLH-1579): ein
+/// vollzogener Auftrag fiele sonst still zurück und verlöre Vollzugszeit und -person, etwa wenn
+/// ein Gerät mit veralteter Liste „In Bearbeitung“ tippt, nachdem ein anderes den Vollzug
+/// gemeldet hat. Beide Bedingungen stehen in den schreibenden Anweisungen einer Transaktion,
+/// damit kein paralleler Vollzug oder kein Aufheben zwischen Prüfen und Schreiben fällt
+/// (wie [`melde_vollzug_tx`], LLH-1098). Zustandsfehler → 422, nichts wird geschrieben.
 pub async fn setze_in_arbeit(
     pool: &SqlitePool,
     org_id: i64,
     einsatz_id: i64,
     auftrag_id: i64,
-    von_id: i64,
+    _von_id: i64,
     jetzt: &str,
 ) -> Result<(), AppError> {
-    krepo::setze_vollzug(
-        pool,
-        org_id,
-        einsatz_id,
-        OBJEKT_AUFTRAG,
-        auftrag_id,
-        VOLLZUG_IN_ARBEIT,
-        von_id,
-        jetzt,
+    let mut tx = pool.begin().await?;
+    let offen = sqlx::query(
+        "UPDATE auftrag SET in_arbeit_at = COALESCE(in_arbeit_at, ?) \
+         WHERE id = ? AND aufgehoben_at IS NULL",
     )
-    .await?;
-    sqlx::query("UPDATE auftrag SET in_arbeit_at = COALESCE(in_arbeit_at, ?) WHERE id = ?")
-        .bind(jetzt)
-        .bind(auftrag_id)
-        .execute(pool)
-        .await?;
+    .bind(jetzt)
+    .bind(auftrag_id)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if offen == 0 {
+        return Err(AppError::UnprocessableEntity(
+            "Der Auftrag ist aufgehoben".into(),
+        ));
+    }
+    let geschrieben = sqlx::query(
+        "INSERT INTO kommunikation_status \
+           (org_id, einsatz_id, objekt_typ, objekt_id, vollzug_status, vollzogen_at, vollzogen_von_id) \
+         VALUES (?, ?, ?, ?, ?, NULL, NULL) \
+         ON CONFLICT(objekt_typ, objekt_id) DO UPDATE SET \
+           vollzug_status = excluded.vollzug_status, \
+           vollzogen_at = NULL, vollzogen_von_id = NULL \
+         WHERE kommunikation_status.vollzug_status IN (?, ?)",
+    )
+    .bind(org_id)
+    .bind(einsatz_id)
+    .bind(OBJEKT_AUFTRAG)
+    .bind(auftrag_id)
+    .bind(VOLLZUG_IN_ARBEIT)
+    .bind(VOLLZUG_OFFEN)
+    .bind(VOLLZUG_IN_ARBEIT)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if geschrieben == 0 {
+        return Err(AppError::UnprocessableEntity(
+            "Der Auftrag ist bereits vollzogen".into(),
+        ));
+    }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -2102,6 +2133,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn in_arbeit_holt_einen_vollzogenen_auftrag_nicht_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        melde_vollzug(
+            &pool,
+            1,
+            e,
+            d.auftrag.id,
+            b,
+            "Erledigt",
+            "2026-06-11 10:00:00",
+        )
+        .await
+        .unwrap();
+        let err = setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:05:00")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:06:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            nach.auftrag.bearbeitungsstatus,
+            AuftragBearbeitungsstatus::Vollzogen
+        );
+        assert_eq!(nach.auftrag.vollzug_status, VOLLZUG_VOLLZOGEN);
+        assert_eq!(
+            nach.auftrag.vollzogen_at.as_deref(),
+            Some("2026-06-11 10:00:00")
+        );
+        assert_eq!(nach.auftrag.in_arbeit_at, None);
+    }
+
+    #[tokio::test]
     async fn melde_vollzug_setzt_text_status_und_etb_meldung() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
@@ -2287,6 +2361,17 @@ mod tests {
             matches!(abnahme, Err(AppError::UnprocessableEntity(_))),
             "{abnahme:?}"
         );
+
+        let in_arbeit = setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 11:30:00").await;
+        assert!(
+            matches!(in_arbeit, Err(AppError::UnprocessableEntity(_))),
+            "{in_arbeit:?}"
+        );
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:31:00")
+            .await
+            .unwrap();
+        assert_eq!(nach.auftrag.vollzug_status, VOLLZUG_OFFEN);
+        assert_eq!(nach.auftrag.in_arbeit_at, None);
 
         let quittung =
             quittiere_empfaenger(&pool, d.empfaenger[0].id, b, "2026-06-11 12:00:00").await;
