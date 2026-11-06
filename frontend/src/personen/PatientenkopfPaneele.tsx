@@ -1,7 +1,7 @@
 import { Button, Flex, Form, Popconfirm, Typography } from 'antd';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AnlassEingabe, MassnahmeEingabe, TransportEingabe } from '../api/einsatzPerson';
 import type {
   Fachrichtung,
@@ -182,8 +182,12 @@ export function AnlassPaneel({
   const [form] = Form.useForm<AnlassWerte>();
   // Der Kopf zeigt weiter den Serverstand. Das Paneel arbeitet am Stand, der nach dem Abgleich gilt:
   // ihn wählt es vor, an ihm hängt die Pflicht, und unverändert abgeschickt sendet es nichts. Sonst
-  // höbe die Vorbelegung mit dem Serverwert eine vorgemerkte Aufhebung wieder auf.
-  const wirksam = vorgemerkterAnlass !== undefined ? vorgemerkterAnlass : (person.anlass ?? null);
+  // höbe die Vorbelegung mit dem Serverwert eine vorgemerkte Aufhebung wieder auf. Festgehalten beim
+  // Öffnen: merkt ein anderer Tab währenddessen etwas vor, sendet ein unverändertes Abschicken nicht
+  // die alte Vorwahl zurück, und eine bearbeitete Wahl bleibt, wie sie ist.
+  const [wirksam] = useState(() =>
+    vorgemerkterAnlass !== undefined ? vorgemerkterAnlass : (person.anlass ?? null),
+  );
   const hatAnlass = wirksam != null;
   return (
     <section aria-label="Anlass festlegen" data-lfh="anlass-paneel">

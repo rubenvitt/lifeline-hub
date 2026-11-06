@@ -9,7 +9,11 @@ import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { EinsatzPfadeProvider, GERAET_BETREUUNG_PFADE } from '../routing/EinsatzPfade';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
-import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
+import {
+  queueLeerenFuerTests,
+  schreibaktionEinreihen,
+  schreibaktionenLaden,
+} from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import {
   OHNE_VERBINDUNG_NICHT_AENDERBAR,
@@ -1185,6 +1189,64 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     expect(await within(paneel).findByText('Bitte einen Anlass wählen')).toBeInTheDocument();
     expect((await vorgemerkt()).map((a) => (a.daten as { anlass?: unknown }).anlass)).toEqual([
       null,
+    ]);
+  });
+
+  it('Anlass: merkt ein anderer Tab bei offenem Paneel etwas vor, geht keine alte Vorwahl zurück', async () => {
+    const user = userEvent.setup();
+    const { kopf } = zeige({ anlass: 'psychisch' });
+    const anderer = () =>
+      schreibaktionEinreihen(TABLET, 1, {
+        art: 'anlass',
+        person_id: 10,
+        bezeichnung: 'R-012',
+        daten: {
+          anlass: 'verletzung',
+          client_id: 'anderer-tab',
+          zeitpunkt_at: '2026-11-06 10:00:00',
+        },
+      });
+
+    // Unverändert abgeschickt: nichts geht hinaus, der Stand des anderen Tabs bleibt der letzte.
+    // Mutationsprobe: gegen den laufend nachgeführten Stand vergleichen — „Psychisch“ ginge zurück, rot.
+    let paneel = await paneelOhneNetz(kopf, 'Anlass festlegen', 'Anlass festlegen');
+    await anderer();
+    await waitFor(() =>
+      expect(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).toHaveTextContent(
+        'Verletzung',
+      ),
+    );
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    expect((await vorgemerkt()).map((a) => (a.daten as { anlass?: unknown }).anlass)).toEqual([
+      'verletzung',
+    ]);
+
+    // Eine bearbeitete Wahl bleibt und geht hinaus.
+    await queueLeerenFuerTests();
+    await user.click(within(kopf).getByRole('button', { name: 'Anlass festlegen' }));
+    paneel = screen.getByRole('region', { name: 'Anlass festlegen' });
+    const gruppe = within(paneel).getByRole('radiogroup', { name: 'Anlass' });
+    await user.click(within(gruppe).getByRole('radio', { name: 'Allergie / Insektenstich' }));
+    await anderer();
+    await waitFor(() =>
+      expect(within(kopf).getByRole('region', { name: 'Offline vorgemerkt' })).toHaveTextContent(
+        'Verletzung',
+      ),
+    );
+    expect(within(gruppe).getByRole('radio', { name: 'Allergie / Insektenstich' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await user.click(within(paneel).getByRole('button', { name: 'Anlass festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Anlass festlegen' })).toBeNull(),
+    );
+    expect((await vorgemerkt()).map((a) => (a.daten as { anlass?: unknown }).anlass)).toEqual([
+      'verletzung',
+      'allergie',
     ]);
   });
 
