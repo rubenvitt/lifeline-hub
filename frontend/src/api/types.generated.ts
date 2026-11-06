@@ -35,6 +35,13 @@ export interface components {
             /** Format: int64 */
             einheit_id: number;
             einheit_name: string;
+            /**
+             * @description Die aktiven Untereinheiten des Ablösers, nach ID (LLH-1509): ihr Teilbaum über
+             *     `ueber_einheit_id`, ohne ihn selbst ([`untereinheiten`]). Ihre Ereignisse zählen für den
+             *     Stand an der Karte, wie für die Hinweise (`hinweis::anlaesse_tx`). Nur an einer laufenden
+             *     Schicht; sonst leer.
+             */
+            untereinheiten: number[];
         };
         /** @description Öffentliche Darstellung einer Schicht. */
         AbloesungAnzeige: {

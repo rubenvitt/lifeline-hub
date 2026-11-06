@@ -15,6 +15,11 @@
  *
  * Welche Einheiten geplant sind, liest `abloeserIds` (Liste, ohne Liste der Spiegel). Der Client
  * rechnet keine Vererbung und kein „geplant“ nach (`frontend/src/kraefte/AGENTS.md`, „Ablösung“).
+ *
+ * Teilbaum (LLH-1509): Ist ein Verband geplant, zählen die Ereignisse seiner Untereinheiten mit,
+ * je Art der früheste Zeitpunkt im Teilbaum. Welche Untereinheiten dazugehören, liefert der Server
+ * am Ablöser (`untereinheiten`); der Client sucht sie nicht selbst über die Gliederung. Der Raum ist
+ * der des gezeigten Abrufs, sonst der erste im Teilbaum (der Ablöser selbst zuerst).
  */
 import type { Abloesung, EinheitPerioden } from '../api/types';
 import { type AnzeigeKonventionen } from '../anzeige/format';
@@ -55,6 +60,18 @@ function abrufIm(
   return abruf && br != null && abruf.br_id === br ? abruf.seit_at : null;
 }
 
+/** Der frühere zweier Wire-Strings (gleiches Format, daher lexikografisch); `null` zählt nicht. */
+function frueher(a: string | null, b: string | null): string | null {
+  if (a == null) return b;
+  if (b == null) return a;
+  return b < a ? b : a;
+}
+
+/** Der Ablöser und seine Untereinheiten (vom Server), der Ablöser zuerst. */
+function teilbaum(s: Abloesung, id: number): number[] {
+  return [id, ...(s.abloeser.find((a) => a.einheit_id === id)?.untereinheiten ?? [])];
+}
+
 /** Name eines Ablösers aus Liste oder Spiegel. */
 function abloeserName(s: Abloesung, id: number): string {
   return (
@@ -85,16 +102,35 @@ export function buildAbloeserStand(
     if (e.aktueller_br_id != null) brJeEinheit.set(e.id, e.aktueller_br_id);
   }
   const stand = ids.map((id): AbloeserStand => {
-    const p = offen.get(id);
-    const br = brJeEinheit.get(id);
+    let alarmiert: string | null = null;
+    let eingetroffen: string | null = null;
+    let abgerufen: string | null = null;
+    let abrufRaum: number | undefined;
+    let ersterRaum: number | undefined;
+    for (const k of teilbaum(s, id)) {
+      const p = offen.get(k);
+      const br = brJeEinheit.get(k);
+      alarmiert = frueher(alarmiert, p && p.anker === 'alarmierung' ? p.beginn_at : null);
+      // Begann die Periode mit dem Eintreffen, ist ihr Beginn das Eintreffen.
+      eingetroffen = frueher(
+        eingetroffen,
+        p?.eintreffen_at ?? (p?.anker === 'eintreffen' ? p.beginn_at : null),
+      );
+      const abruf = abrufIm(quellen.abrufe?.get(k), br);
+      if (abruf != null && (abgerufen == null || abruf < abgerufen)) {
+        abgerufen = abruf;
+        abrufRaum = br;
+      }
+      ersterRaum ??= br;
+    }
+    const raum = abrufRaum ?? ersterRaum;
     return {
       einheit_id: id,
       einheit_name: abloeserName(s, id),
-      alarmiert_at: p && p.anker === 'alarmierung' ? p.beginn_at : null,
-      // Begann die Periode mit dem Eintreffen, ist ihr Beginn das Eintreffen.
-      eingetroffen_at: p?.eintreffen_at ?? (p?.anker === 'eintreffen' ? p.beginn_at : null),
-      abgerufen_at: abrufIm(quellen.abrufe?.get(id), br),
-      br_name: br != null ? (quellen.brNamen?.get(br) ?? null) : null,
+      alarmiert_at: alarmiert,
+      eingetroffen_at: eingetroffen,
+      abgerufen_at: abgerufen,
+      br_name: raum != null ? (quellen.brNamen?.get(raum) ?? null) : null,
     };
   });
   return stand.some(hasAbloeserStand) ? stand : null;

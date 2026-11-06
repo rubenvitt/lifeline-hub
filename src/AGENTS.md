@@ -349,7 +349,9 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Detailzeile und Pfad bildet `text::bilden` beim Lesen; die Detailzeile liest nur Retain-Spalten
   (Guard `detail_liest_nur_retain_spalten`). Trägt der Bezug die gemeinte Einheit nicht allein
   (Hinweis zur ablösenden Einheit), hält `Anlass::einheit` ihre ID fest (`benachrichtigung.einheit_id`,
-  LLH-1511, ohne FK); ein Neubau der Tabelle für den CHECK nimmt die Spalte mit. Eine neue Art braucht Variante, Titel, Migration
+  LLH-1511, ohne FK), bei einem geplanten Verband dazu `Anlass::durch` die auslösende Untereinheit
+  (`benachrichtigung.durch_einheit_id`, LLH-1509); ein Neubau der Tabelle für den CHECK nimmt beide
+  Spalten mit. Eine neue Art braucht Variante, Titel, Migration
   für den CHECK (`check_listen_entsprechen_dem_katalog`) und ihre Stufe in `stufe()`; ein neuer
   Bezug sein Modul (`BenachrichtigungBezugTyp::modul`) und seinen Pfad.
 - **Zustellung nur über `benachrichtigung::zustellen`:** Einsatz-Arten als `benachrichtigung`,

@@ -1314,8 +1314,8 @@ async fn vollzug_mit_liste_und_abschnittsuebergabe() {
     assert_eq!(
         geplant["abloeser"],
         serde_json::json!([
-            {"einheit_id": f3, "einheit_name": "Florian 3"},
-            {"einheit_id": f2, "einheit_name": "Florian 2"}
+            {"einheit_id": f3, "einheit_name": "Florian 3", "untereinheiten": []},
+            {"einheit_id": f2, "einheit_name": "Florian 2", "untereinheiten": []}
         ])
     );
 

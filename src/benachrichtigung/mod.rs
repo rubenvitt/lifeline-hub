@@ -323,6 +323,10 @@ pub struct Anlass {
     /// Einheit die geplante Einheit, um die es geht (LLH-1511). Die Zeile hält nur die ID fest,
     /// den Namen liest die Detailzeile beim Lesen (design.md D1, keine Textspalte).
     pub einheit_id: Option<i64>,
+    /// Die Untereinheit, deren Ereignis den Hinweis ausgelöst hat, wenn nicht die gemeinte
+    /// Einheit selbst (LLH-1509: geplanter Verband, alarmiert wurde seine Staffel). Nur die ID,
+    /// wie [`Self::einheit_id`].
+    pub durch_einheit_id: Option<i64>,
 }
 
 impl Anlass {
@@ -335,6 +339,7 @@ impl Anlass {
             ausloeser: None,
             adressaten: Vec::new(),
             einheit_id: None,
+            durch_einheit_id: None,
         }
     }
 
@@ -353,6 +358,12 @@ impl Anlass {
     /// Hält die gemeinte Einheit fest (LLH-1511).
     pub fn einheit(mut self, einheit_id: i64) -> Self {
         self.einheit_id = Some(einheit_id);
+        self
+    }
+
+    /// Hält die Untereinheit fest, deren Ereignis den Hinweis ausgelöst hat (LLH-1509).
+    pub fn durch(mut self, einheit_id: i64) -> Self {
+        self.durch_einheit_id = Some(einheit_id);
         self
     }
 }

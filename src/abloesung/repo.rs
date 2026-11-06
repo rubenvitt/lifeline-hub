@@ -14,13 +14,13 @@ use std::collections::{HashMap, HashSet};
 
 use super::hinweis::{self, Wirkung};
 use super::{
-    einstufung, faelligkeit, planung_warnungen, rhythmus_text, vererbung, vorwarnzeit,
-    AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung, AbloesungBesatzungPlan,
-    AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungPlanungEntfallen,
-    AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
-    BeendetGrund, BeginnQuelle, BesatzungRolle, BesatzungZiel, PlanungEntfallenGrund,
-    PlanungsStand, RhythmusQuelle, ABLOESER_MAX, PLANUNGSVORLAUF_VORGABE_MINUTEN,
-    VORWARNUNG_VORGABE_MINUTEN,
+    einstufung, faelligkeit, planung_warnungen, rhythmus_text, untereinheiten, vererbung,
+    vorwarnzeit, AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung,
+    AbloesungBesatzungPlan, AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge,
+    AbloesungPlanungEntfallen, AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige,
+    AbloesungVorgabeAnzeige, BeendetGrund, BeginnQuelle, BesatzungRolle, BesatzungZiel,
+    PlanungEntfallenGrund, PlanungsStand, RhythmusQuelle, ABLOESER_MAX,
+    PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
@@ -281,8 +281,9 @@ pub async fn liste(
         .fetch_all(pool)
         .await?;
     let mut liste: Vec<AbloesungAnzeige> = zeilen.into_iter().map(|z| z.anzeige(jetzt)).collect();
-    attach_erben(pool, einsatz_id, &mut liste).await?;
+    // Erst die Listen: die Erben hängen an die Ablöser ihre Untereinheiten (LLH-1509).
     attach_listen(pool, einsatz_id, &mut liste).await?;
+    attach_erben(pool, einsatz_id, &mut liste).await?;
     Ok(liste)
 }
 
@@ -313,6 +314,7 @@ async fn attach_listen(
             .push(AbloesungAbloeser {
                 einheit_id,
                 einheit_name,
+                untereinheiten: Vec::new(),
             });
     }
     #[derive(sqlx::FromRow)]
@@ -487,8 +489,9 @@ async fn load_gliederung(
     Ok(g)
 }
 
-/// Hängt an jede laufende Schicht die Untereinheiten, die sie erben (nach Name, dann ID), und
-/// die Warnungen zu ihrer geplanten ablösenden Einheit (LLH-1131).
+/// Hängt an jede laufende Schicht die Untereinheiten, die sie erben (nach Name, dann ID), die
+/// Warnungen zu ihrer geplanten ablösenden Einheit (LLH-1131) und an ihre Ablöser deren
+/// Untereinheiten (LLH-1509). Läuft nach [`attach_listen`].
 async fn attach_erben(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -519,8 +522,22 @@ async fn attach_erben(
             });
             a.erbende_einheiten = erben;
         }
+        for abloeser in &mut a.abloeser {
+            abloeser.untereinheiten = untereinheiten(&g.ueber, abloeser.einheit_id);
+        }
     }
     Ok(())
+}
+
+/// Die aktiven Untereinheiten einer Einheit (LLH-1509, [`untereinheiten`]): derselbe Teilbaum,
+/// den die Karte zum Stand eines Ablösers liest.
+pub(crate) async fn load_untereinheiten_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let g = load_gliederung(&mut *conn, einsatz_id).await?;
+    Ok(untereinheiten(&g.ueber, einheit_id))
 }
 
 /// Die Planungswarnungen der laufenden Schichten in `liste` ([`planung_warnungen`]), gegen
@@ -648,8 +665,9 @@ pub async fn laden(
     .map(|z| z.anzeige(jetzt))
     .ok_or(AppError::NotFound)?;
     let mut eine = [a];
-    attach_erben(pool, einsatz_id, &mut eine).await?;
+    // Erst die Listen: die Erben hängen an die Ablöser ihre Untereinheiten (LLH-1509).
     attach_listen(pool, einsatz_id, &mut eine).await?;
+    attach_erben(pool, einsatz_id, &mut eine).await?;
     let [a] = eine;
     Ok(a)
 }
