@@ -114,6 +114,9 @@ pub struct LagemonitorAnzeige {
     pub abschnitte: Vec<LagemonitorAbschnitt>,
     /// Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
     pub sofortmeldungen_offen: i64,
+    /// Die nächsten anstehenden Programmpunkte der Veranstaltung (LLH-1570, höchstens
+    /// [`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen.
+    pub programm: Vec<crate::programmpunkt::Programmpunkt>,
 }
 
 /// GET /api/einsaetze/{id}/lagemonitor — nur für einen gekoppelten Lagemonitor; eine Person und
@@ -278,8 +281,17 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
 
     let sofortmeldungen_offen = crate::meldung::repo::count_sofort_offen(pool, einsatz_id).await?;
 
+    let stand_at = crate::zeit::jetzt();
+    let programm = crate::programmpunkt::repo::anstehende(
+        pool,
+        einsatz_id,
+        &stand_at,
+        crate::programmpunkt::MONITOR_ANZAHL,
+    )
+    .await?;
+
     Ok(LagemonitorAnzeige {
-        stand_at: crate::zeit::jetzt(),
+        stand_at,
         betroffene,
         kraefte: LagemonitorKraefte {
             einheiten,
@@ -290,5 +302,6 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
         zonen,
         abschnitte,
         sofortmeldungen_offen,
+        programm,
     })
 }

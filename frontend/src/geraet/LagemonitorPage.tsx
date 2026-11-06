@@ -16,13 +16,18 @@ import { useAuth } from '../auth/AuthContext';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ladeLagemonitor } from '../api/lagemonitor';
 import { einsatzKeys } from '../api/queryKeys';
-import type { GeraetAnzeige, LagemonitorAnzeige } from '../api/types';
+import type { GeraetAnzeige, LagemonitorAnzeige, Programmpunkt } from '../api/types';
 import { useRollen } from '../components/instrument';
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
 import { schrift } from '../theme/tokens';
 import LagemonitorKarte from './LagemonitorKarte';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
+import { anstehendeProgrammpunkte } from '../programmpunkt/programmpunkt';
 
 /** Ab diesem Alter gilt der Datenstand als veraltet (Spec `lagemonitor`, „Veralteter Stand“). */
 export const VERALTET_AB_MS = 2 * 60_000;
@@ -354,10 +359,24 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
  * verdichtet; der Monitor kennt weder Text noch Absender. Steigt sie, steht das Wort in der
  * Titelzeile.
  */
-function MeldungenKachel({ offen, neu }: { offen: number | undefined; neu: boolean }) {
+function MeldungenKachel({
+  offen,
+  neu,
+  allein,
+}: {
+  offen: number | undefined;
+  neu: boolean;
+  /** Ohne Ablauf daneben nimmt die Kachel die ganze Zeile. */
+  allein: boolean;
+}) {
   const { rollen } = useRollen();
   return (
-    <Kachel titel="Meldungen" zusatz={neu ? 'Neue Sofortmeldung' : undefined} zusatzAlarm={neu}>
+    <Kachel
+      titel="Meldungen"
+      zusatz={neu ? 'Neue Sofortmeldung' : undefined}
+      zusatzAlarm={neu}
+      style={{ flex: allein ? '1 1 0' : '0 0 auto' }}
+    >
       <div style={{ display: 'flex' }}>
         <Zahl
           wert={offen ?? '–'}
@@ -563,6 +582,74 @@ function Statusleiste({
  * Einsatz, Gerät, Verbindung und den Datenstand mit Alter; nach 3 s Drücken öffnet sie das
  * Gerätemenü. „Anzeige starten“ fordert Vollbild und Wachhalten an.
  */
+dayjs.extend(utc);
+
+/** So viele Programmpunkte trägt die Kachel „Ablauf“, wie der Server liefert (design.md D4). */
+const ABLAUF_SICHTBAR = 3;
+
+/** „in 1 h 05 min“, unter einer Minute „in < 1 min“ (dieselben Wörter wie im Überblick). */
+function abstandText(zeitpunktAt: string, jetztMs: number): string {
+  const minuten = Math.floor((dayjs.utc(zeitpunktAt).valueOf() - jetztMs) / 60_000);
+  return minuten <= 0 ? 'in < 1 min' : `in ${dauerText(minuten)}`;
+}
+
+/**
+ * Die nächsten Programmpunkte der Veranstaltung (LLH-1570, Spec `ablaufplan`): Uhrzeit,
+ * Bezeichnung, Abstand, ohne Alarm. Ein verstrichener Punkt fällt mit dem Takt der Monitoruhr
+ * heraus, auch zwischen zwei Abrufen; ohne anstehenden Punkt fehlt die Kachel ganz.
+ */
+function AblaufKachel({ punkte, jetzt }: { punkte: Programmpunkt[]; jetzt: number }) {
+  const { rollen } = useRollen();
+  return (
+    <Kachel titel="Ablauf" style={{ flex: '1 1 0', minWidth: 0 }}>
+      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
+        {punkte.map((p) => (
+          <li
+            key={p.id}
+            data-lfh="monitor-ablauf"
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 24,
+              fontSize: GROSS.text,
+              lineHeight: 1.25,
+              minWidth: 0,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: schrift.zahl,
+                fontVariantNumeric: 'tabular-nums',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <ZeitAnzeige wert={p.zeitpunkt_at} rolle="kurz" />
+            </span>
+            {/* Keine Kachel schneidet ihren Inhalt ab: eine lange Bezeichnung bricht um, die
+                Karte darüber gibt die Höhe her. */}
+            <span
+              data-lfh="monitor-ablauf-bezeichnung"
+              style={{ flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere' }}
+            >
+              {p.bezeichnung}
+            </span>
+            <span
+              style={{
+                color: rollen.gedaempft,
+                whiteSpace: 'nowrap',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {abstandText(p.zeitpunkt_at, jetzt)}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Kachel>
+  );
+}
+
 export default function LagemonitorPage() {
   const { geraet } = useAuth();
   const { rollen } = useRollen();
@@ -588,6 +675,7 @@ export default function LagemonitorPage() {
   const lage = lageQuery.data;
   const sofortNeu = useAnstieg(lage?.sofortmeldungen_offen);
   const sk1Neu = useAnstieg(lage?.betroffene.sk1);
+  const ablauf = anstehendeProgrammpunkte(lage?.programm ?? [], dayjs(jetzt), ABLAUF_SICHTBAR);
   const schliesseMenue = useCallback(() => setMenueOffen(false), []);
 
   if (!geraet) return null;
@@ -630,7 +718,16 @@ export default function LagemonitorPage() {
               />
             </div>
           </Kachel>
-          <MeldungenKachel offen={lage?.sofortmeldungen_offen} neu={sofortNeu} />
+          {/* Meldungen und Ablauf teilen die untere Zeile; ohne anstehenden Programmpunkt nimmt
+              „Meldungen“ sie allein (LLH-1570, design.md D4). */}
+          <div style={{ display: 'flex', gap: 16, minWidth: 0 }}>
+            <MeldungenKachel
+              offen={lage?.sofortmeldungen_offen}
+              neu={sofortNeu}
+              allein={ablauf.length === 0}
+            />
+            {ablauf.length > 0 && <AblaufKachel punkte={ablauf} jetzt={jetzt} />}
+          </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
           {lage ? (

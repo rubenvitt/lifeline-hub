@@ -14,6 +14,16 @@
 //!
 //! **Geplant** heißt: die laufende Schicht trägt die Einheit als `abloesende_einheit_id` oder in
 //! der Liste `einsatz_abloesung_abloeser` (LLH-1118 Punkt 3; beschrieben ab LLH-1132).
+//!
+//! **Teilbaum eines geplanten Verbands** (LLH-1509, Entscheidung LLH-1310 Punkt 2): das Ereignis
+//! einer Untereinheit zählt für die Schicht, die ihren nächsten geplanten Vorfahren plant (wie der
+//! Autostart, `kopplung::is_geplanter_abloeser_tx`). Der Hinweis nennt den Verband und hält die
+//! Untereinheit fest (`Anlass::durch`). Je Art und Schicht meldet nur das erste Ereignis im
+//! Teilbaum: steht eine andere Einheit des Teilbaums schon im selben Zustand (alarmiert,
+//! eingetroffen, im Raum, abgerufen), bleibt es still. Ebenso „… gestrichen“: erst, wenn im
+//! Teilbaum keine Einheit mehr alarmiert bzw. eingetroffen ist. Plant die Schicht die Einheit
+//! selbst, gilt dieselbe Regel für ihren eigenen Teilbaum; ohne Ereignisse darin bleibt alles wie
+//! bisher.
 
 use sqlx::SqliteConnection;
 
@@ -63,9 +73,46 @@ pub(crate) async fn load_geplante_tx(
     .await?)
 }
 
-/// Je laufender Schicht, die `einheit_id` als ablösende plant, ein Anlass `abloesung_abloeser`
-/// mit dem Ereignis `typ` (ein `abloeser_*`-Bezug), ausgelöst von `von`, mit der Einheit
-/// festgehalten (LLH-1511). Leer, wenn die Einheit nirgends geplant ist.
+/// Die laufenden Schichten, die `einheit_id` oder einen ihrer Vorfahren als ablösende planen
+/// (LLH-1509), je Schicht einmal mit der nächsten geplanten Einheit der Kette: `(Schicht,
+/// geplante Einheit)`, die Einheit selbst vor ihren Vorfahren. Die Kette läuft über
+/// `ueber_einheit_id` mit Besucht-Menge, ein korrupter Zyklus terminiert.
+pub(crate) async fn load_geplante_vorfahren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<Vec<(i64, i64)>, AppError> {
+    let mut besucht = std::collections::HashSet::new();
+    let mut schichten = std::collections::HashSet::new();
+    let mut ergebnis = Vec::new();
+    let mut knoten = Some(einheit_id);
+    while let Some(k) = knoten {
+        if !besucht.insert(k) {
+            break;
+        }
+        for schicht in load_geplante_tx(conn, einsatz_id, k).await? {
+            if schichten.insert(schicht) {
+                ergebnis.push((schicht, k));
+            }
+        }
+        knoten = sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT ueber_einheit_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(k)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .flatten();
+    }
+    Ok(ergebnis)
+}
+
+/// Je laufender Schicht, die `einheit_id` oder einen ihrer Vorfahren als ablösende plant
+/// ([`load_geplante_vorfahren_tx`]), ein Anlass `abloesung_abloeser` mit dem Ereignis `typ` (ein
+/// `abloeser_*`-Bezug), ausgelöst von `von`, mit der geplanten Einheit festgehalten (LLH-1511)
+/// und, ist es ein Vorfahr, `einheit_id` als auslösende Untereinheit (LLH-1509). Nur das erste
+/// Ereignis im Teilbaum der geplanten Einheit meldet ([`is_teilbaum_im_zustand_tx`]). Leer, wenn
+/// nichts davon geplant ist.
 pub(crate) async fn anlaesse_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -74,11 +121,82 @@ pub(crate) async fn anlaesse_tx(
     von: i64,
 ) -> Result<Vec<Anlass>, AppError> {
     debug_assert!(crate::benachrichtigung::text::abloeser_titel(typ).is_some());
-    Ok(load_geplante_tx(conn, einsatz_id, einheit_id)
-        .await?
-        .into_iter()
-        .map(|schicht| anlass(einsatz_id, schicht, typ, von).einheit(einheit_id))
-        .collect())
+    let mut anlaesse = Vec::new();
+    for (schicht, geplant) in load_geplante_vorfahren_tx(conn, einsatz_id, einheit_id).await? {
+        if is_teilbaum_im_zustand_tx(conn, einsatz_id, geplant, einheit_id, typ).await? {
+            continue;
+        }
+        let a = anlass(einsatz_id, schicht, typ, von).einheit(geplant);
+        anlaesse.push(if geplant == einheit_id {
+            a
+        } else {
+            a.durch(einheit_id)
+        });
+    }
+    Ok(anlaesse)
+}
+
+/// Ob eine andere Einheit als `ausloeser` im Teilbaum von `geplant` (sie selbst und ihre
+/// aktiven Untereinheiten, `repo::load_untereinheiten_tx`) schon im Zustand steht, den `typ`
+/// meldet (LLH-1509): alarmiert bzw. eingetroffen (Beginn ihrer offenen Periode, wie
+/// `kopplung`), im Bereitstellungsraum, abgerufen (Abruf-Ereignis im Raum, in dem sie steht; vom
+/// Abruf des Auslösers mitgenommene zählen nicht, sie gehören zu seinem Ereignis). Dann hat der
+/// Teilbaum dieses Ereignis schon gemeldet, bzw. ist es nach einer Streichung noch offen.
+async fn is_teilbaum_im_zustand_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    geplant: i64,
+    ausloeser: i64,
+    typ: BenachrichtigungBezugTyp,
+) -> Result<bool, AppError> {
+    use BenachrichtigungBezugTyp as B;
+    let mut teilbaum = super::repo::load_untereinheiten_tx(conn, einsatz_id, geplant).await?;
+    teilbaum.insert(0, geplant);
+    for k in teilbaum.into_iter().filter(|&k| k != ausloeser) {
+        let im_zustand = match typ {
+            B::AbloeserAlarmiert | B::AbloeserAlarmierungGestrichen => {
+                crate::zeitachse::repo::offene_alarmierung_tx(conn, k)
+                    .await?
+                    .is_some()
+            }
+            B::AbloeserEingetroffen | B::AbloeserEintreffenGestrichen => {
+                crate::zeitachse::repo::offenes_eintreffen_tx(conn, k)
+                    .await?
+                    .is_some()
+            }
+            B::AbloeserBrEingetroffen => sqlx::query_scalar::<_, i64>(
+                "SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ? \
+                   AND aufgeloest_at IS NULL AND aktueller_br_id IS NOT NULL",
+            )
+            .bind(k)
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .is_some(),
+            B::AbloeserAbgerufen => sqlx::query_scalar::<_, i64>(
+                "SELECT 1 FROM einsatz_einheit e \
+                 JOIN br_belegung b ON b.id = ( \
+                     SELECT MAX(x.id) FROM br_belegung x \
+                     WHERE x.objekt_typ = 'einheit' AND x.objekt_id = e.id \
+                       AND x.einsatz_id = e.einsatz_id) \
+                 LEFT JOIN br_belegung w ON w.id = b.mit_abruf_id \
+                 WHERE e.id = ? AND e.einsatz_id = ? AND e.aufgeloest_at IS NULL \
+                   AND b.art = 'abruf' AND b.br_id = e.aktueller_br_id \
+                   AND NOT (w.objekt_typ IS 'einheit' AND w.objekt_id IS ?)",
+            )
+            .bind(k)
+            .bind(einsatz_id)
+            .bind(ausloeser)
+            .fetch_optional(&mut *conn)
+            .await?
+            .is_some(),
+            _ => false,
+        };
+        if im_zustand {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Der Anlass eines Hinweises zur ablösenden Einheit einer Schicht. Die gemeinte Einheit hält

@@ -257,7 +257,9 @@ function wieGesetzt(eigenschaft: 'boxShadow' | 'background' | 'color', wert: str
   return probe.style[eigenschaft];
 }
 
-const geplant = schicht({ abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel' }] });
+const geplant = schicht({
+  abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel', untereinheiten: [] }],
+});
 
 const stand = (over: Partial<AbloeserStand> = {}): AbloeserStand => ({
   einheit_id: 21,
@@ -306,8 +308,8 @@ describe('AbloesungKarte — Stand der ablösenden Einheit (LLH-1131 Teil II)', 
       <AbloesungKarte
         schicht={schicht({
           abloeser: [
-            { einheit_id: 21, einheit_name: '2. Rettungsstaffel' },
-            { einheit_id: 22, einheit_name: 'Florian 3' },
+            { einheit_id: 21, einheit_name: '2. Rettungsstaffel', untereinheiten: [] },
+            { einheit_id: 22, einheit_name: 'Florian 3', untereinheiten: [] },
           ],
         })}
         jetzt={jetzt}
@@ -353,7 +355,7 @@ describe('AbloesungKarte — Stand der ablösenden Einheit (LLH-1131 Teil II)', 
         schicht={schicht({
           status: 'abgeloest',
           vollzogen_at: '2026-10-17 11:00:00',
-          abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel' }],
+          abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel', untereinheiten: [] }],
         })}
         jetzt={jetzt}
         darfSchreiben={false}
@@ -366,7 +368,7 @@ describe('AbloesungKarte — Stand der ablösenden Einheit (LLH-1131 Teil II)', 
 
 describe('AbloesungKarte — Warnungen zur Planung (LLH-1131 Teil II)', () => {
   const mitWarnungen = schicht({
-    abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel' }],
+    abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel', untereinheiten: [] }],
     planung_warnungen: [
       {
         art: 'schon_geplant',

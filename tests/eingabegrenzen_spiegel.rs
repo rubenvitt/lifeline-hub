@@ -10,13 +10,22 @@ use lifeline_hub::{
     abloesung, auftrag, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage, einsatz,
     einsatz_vorlage, etb, externe_stelle, fahrzeug, fuehrung, gefahr, infotelefon,
     kraefte_disposition, lage_zone, lagebesprechung, lagemonitor_zugang, material, nachforderung,
-    person, personal, presse, schaden, schichtmodell, sprechgruppe, verpflegung, vorlagendokument,
-    zeitachse,
+    person, personal, presse, programmpunkt, schaden, schichtmodell, sprechgruppe, verpflegung,
+    vorlagendokument, zeitachse,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
     BTreeMap::from([
         ("ETB_INHALT_MAX", etb::INHALT_MAX),
+        (
+            "BETREUUNG_STELLE_BEZEICHNUNG_MAX",
+            betreuung::STELLE_BEZEICHNUNG_MAX,
+        ),
+        (
+            "BETREUUNG_STELLE_STANDORT_MAX",
+            betreuung::STELLE_STANDORT_MAX,
+        ),
+        ("BETREUUNG_STELLE_NOTIZ_MAX", betreuung::STELLE_NOTIZ_MAX),
         ("BETREUUNG_LEITUNG_MAX", betreuung::LEITUNG_MAX),
         ("BETREUUNG_KONTAKTWEG_MAX", betreuung::KONTAKTWEG_MAX),
         (
@@ -107,6 +116,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("GEFAHR_GEMELDET_VON_MAX", gefahr::GEMELDET_VON_MAX),
         ("GEFAHR_GEBIET_LABEL_MAX", gefahr::GEBIET_LABEL_MAX),
         ("ZONE_LABEL_MAX", lage_zone::LABEL_MAX),
+        ("ZONE_NOTIZ_MAX", lage_zone::NOTIZ_MAX),
         ("GEOMETRIE_STUETZPUNKTE_MAX", lage_zone::STUETZPUNKTE_MAX),
         ("KREIS_RADIUS_M_MAX", lage_zone::KREIS_RADIUS_M_MAX),
         ("SPRECHGRUPPE_BEDINGUNG_MAX", sprechgruppe::BEDINGUNG_MAX),
@@ -127,6 +137,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
         (
             "EINSATZLEITER_NAME_MAX",
             fuehrungsstelle::EINSATZLEITER_NAME_MAX,
+        ),
+        (
+            "PROGRAMMPUNKT_BEZEICHNUNG_MAX",
+            programmpunkt::PROGRAMMPUNKT_BEZEICHNUNG_MAX,
         ),
         ("EINHEIT_VORLAGE_NAME_MAX", einheit_vorlage::NAME_MAX),
         ("EINHEIT_BEMERKUNG_MAX", einheit::BEMERKUNG_MAX),
