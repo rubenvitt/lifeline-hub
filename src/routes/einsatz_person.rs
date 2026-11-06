@@ -488,7 +488,17 @@ pub async fn anlegen(
     if let Some(meldung_id) = body.meldung_id {
         ctx.fordere_zielmodul::<crate::einsatz::modul::Meldungen>(&state.pool)
             .await?;
-        let nur_von = ctx.geraet.is_some().then_some(ctx.benutzer.id);
+        // Ein Gerät verknüpft nur, was es lesen darf: Meldungen in seiner Ansicht und davon nur
+        // die eigenen (LFH-892). Ohne Meldungen in der Ansicht (UHS-Tablet) wie unbekannt.
+        let nur_von = match ctx.geraet.as_ref() {
+            Some(g) if !g.ansicht.lese_module().contains(&"meldungen") => {
+                return Err(AppError::UnprocessableEntity(
+                    "Die Meldung gehört nicht zu diesem Einsatz".into(),
+                ));
+            }
+            Some(_) => Some(ctx.benutzer.id),
+            None => None,
+        };
         repo::pruefe_meldung(&state.pool, einsatz_id, meldung_id, nur_von).await?;
     }
 

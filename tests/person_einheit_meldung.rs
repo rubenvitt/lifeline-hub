@@ -498,8 +498,8 @@ async fn meldung_traegt_ihre_verortung() {
     assert_eq!(karte["lon"], 9.13, "{karte}");
 }
 
-/// Koppelt einen UHS-Laptop an eine neue, aktive UHS; liefert das Geräte-Cookie.
-async fn uhs_laptop(app: &axum::Router, admin: &str, e: i64) -> String {
+/// Koppelt ein UHS-Gerät (`ansicht`) an eine neue, aktive UHS; liefert das Geräte-Cookie.
+async fn uhs_geraet(app: &axum::Router, admin: &str, e: i64, ansicht: &str) -> String {
     let (s, v) = anfrage(
         app,
         "POST",
@@ -524,9 +524,7 @@ async fn uhs_laptop(app: &axum::Router, admin: &str, e: i64) -> String {
         "POST",
         &format!("/api/einsaetze/{e}/geraete"),
         admin,
-        Some(
-            &json!({"ansicht": "uhs-laptop", "uhs_id": uhs, "bezeichnung": "Laptop 1"}).to_string(),
-        ),
+        Some(&json!({"ansicht": ansicht, "uhs_id": uhs, "bezeichnung": "Gerät 1"}).to_string()),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -559,7 +557,7 @@ async fn geraet_verknuepft_nur_eigene_meldungen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let laptop = uhs_laptop(&app, &admin, e).await;
+    let laptop = uhs_geraet(&app, &admin, e, "uhs-laptop").await;
     let fremd = meldung_anlegen(&app, &admin, e, json!({})).await;
     let eigen = meldung_anlegen(&app, &laptop, e, json!({})).await;
 
@@ -571,4 +569,32 @@ async fn geraet_verknuepft_nur_eigene_meldungen() {
     // Die Leitung verknüpft weiter an jede Meldung des Einsatzes.
     let (s, v) = person_post(&app, &admin, e, json!({ "meldung_id": eigen["id"] })).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
+}
+
+/// Das UHS-Tablet liest keine Meldungen: auch eine ihm zugeschriebene verknüpft es nicht (422).
+#[tokio::test]
+async fn tablet_ohne_meldungen_verknuepft_keine() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let tablet = uhs_geraet(&app, &admin, e, "uhs-tablet").await;
+    let (s, ich) = anfrage(&app, "GET", "/api/auth/me", &tablet, None).await;
+    assert_eq!(s, StatusCode::OK, "{ich}");
+    let m = meldung_anlegen(&app, &admin, e, json!({})).await;
+    // Über die API erfasst das Tablet keine Meldung; die Zuschreibung von Hand prüft, dass nicht
+    // erst die Eigentümerprüfung greift.
+    sqlx::query("UPDATE meldung SET erfasst_von_id = ? WHERE id = ?")
+        .bind(ich["id"].as_i64().unwrap())
+        .bind(m["id"].as_i64().unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, v) = person_post(&app, &tablet, e, json!({ "meldung_id": m["id"] })).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let (s, v) = person_post(&app, &tablet, e, json!({})).await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "ohne Meldung legt das Tablet an: {v}"
+    );
 }
