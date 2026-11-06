@@ -1,3 +1,84 @@
+## [1.0.0-alpha.174](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.173...v1.0.0-alpha.174) (2026-11-06)
+
+### Wichtige Änderungen
+
+- **Fünf neue Datenbank-Migrationen** werden beim Start automatisch eingespielt:
+  - **Bereinigung im Bereitstellungsraum:** Fahrzeuge, die einer Einheit zugeordnet wurden, aber noch im Raum standen, bekommen nachträglich den Austritt „Einheit zugeordnet“. Danach erscheinen sie nicht mehr doppelt, zählen nicht mehr als belegt, und der Raum lässt sich wieder auflösen. Gibt es keinen solchen Altbestand, ändert die Migration nichts.
+  - **Ablösung:** Der Vermerk einer entfallenen Planung merkt sich jetzt die Entlassung, durch die sie entfallen ist.
+  - **Nachforderungen:** Jede Nachforderung bekommt einen Schlüssel gegen doppeltes Anlegen.
+  - **Hinweise zur Ablösung:** Ein Hinweis merkt sich, welche Einheit er meint.
+  - **Qualifikationen:** Neu sind der Einschluss zwischen Qualifikationen und das Qualifikationssoll. Im Bestand werden die Ketten (z. B. Notfallsanitäter → Rettungssanitäter → Sanitäter) nur dort gesetzt, wo die Bezeichnungen genau übereinstimmen.
+- **Geänderte Schnittstellen:**
+  - Die Abfrage der eigenen Anmeldung nennt jetzt auch die Kennung der Sitzung.
+  - Die Abmeldung nimmt die erwartete Sitzung an. Passt sie nicht zur aktuellen Sitzung, antwortet der Server mit 412 und beendet nichts.
+  - Beim Wechsel zwischen Bereitstellungsräumen kann der Raum mitgeschickt werden, aus dem verlegt wird. Steht die Kraft inzwischen woanders, lehnt der Server mit 409 ab.
+  - Nachforderungen nehmen beim Anlegen einen Schlüssel an (höchstens 64 Zeichen). Wird derselbe Schlüssel erneut gesendet, liefert der Server die schon gespeicherte Nachforderung zurück.
+  - Neu ist ein Weg, an der Zeitachse eine ganze Einsatzperiode nachzutragen.
+  - Taktische Zeichen nehmen bei der Dekontamination den Zusatz „P“ oder „G“ an. Jeder andere Zusatz wird mit 400 abgelehnt.
+- **Neue Längengrenzen:**
+  - Die Bezeichnung von Lagezonen und Gefahrengebieten darf höchstens 200 Zeichen lang sein, sonst 400.
+  - Die Notiz beim Nachtragen an der Zeitachse darf höchstens 500 Zeichen lang sein.
+
+### Kräfte und Mittel
+
+- **Periode nachtragen:** An der Zeitachse von Einheit und Person lassen sich Alarmierung und/oder Eintreffen und die Entlassung in einem Schritt nachtragen. Das geht auch an einer schon entlassenen Person, ohne sie neu zu disponieren, und auch vor einer laufenden Periode. An einer Einheit gilt der Nachtrag für alle zugeordneten Personen oder für keine. Im ETB entsteht ein einziger Eintrag.
+- **Qualifikationen:** Eine Qualifikation kann andere einschließen, z. B. Zugführer → Gruppenführer → Truppführer. Einheitentypen, Vorlagen, Einheiten und Unfallhilfsstellen (UHS) tragen ein Qualifikationssoll. Vorlage und Einheit übernehmen es vom Typ, die UHS bekommt zusätzlich eine Soll-Anzahl.
+- Fehlermeldungen an der Zeitachse nennen Zeitpunkte in der Zeitzone und Schreibweise des Einsatzes, nicht mehr in UTC mit Sekunden.
+- **Ablösung:**
+  - Wird die Entlassung einer ablösenden Einheit gestrichen, ist die Einheit wieder als Ablöser geplant. Das ETB hält das fest, und die Leser bekommen einen Hinweis.
+  - Wird ein Eintreffen gestrichen, entfällt auch die Schicht, die mit ihm automatisch begonnen hat. Eine Planung an dieser Schicht entfällt mit. Wird das Eintreffen nur berichtigt, verschiebt sich die Schicht auf die neue Zeit.
+  - Ohne Freigabe für das Modul Einheiten zeigen Vollzug und „Ablösung planen“ die geplanten Ablöser jetzt mit Namen, statt nur ihre Kennungen oder eine leere Liste. Unter der Auswahl steht, warum sie gesperrt ist.
+  - Wird der Besatzungswechsel erst gesperrt, während der Dialog schon offen ist, erscheint der Grund an der Auswahl der Ablöseart. Im Vollzug wird die Art dabei nicht mehr still umgestellt.
+  - Die Freigabe für Einheiten ist nur noch nötig, wenn beim Vollzug tatsächlich ein Abschnitt übergeben wird.
+  - Ein Hinweis zur ablösenden Einheit nennt die Einheit, die er meint, auch wenn danach umgeplant wurde.
+- **Bereitstellungsraum:**
+  - Hat jemand anderes die Kraft schon in einen anderen Raum verlegt, lehnt der Verlegen-Dialog jetzt ab und sagt das im Dialog. Bisher entstand dabei still ein zweiter Wechsel.
+- **Material:**
+  - Steht ein Gerät aus dem Stamm mehrfach im Einsatz (Altbestand), trägt seine Materialzeile die Marke „doppelt“. Ein solches Doppel lässt sich über „Als Gerät führen“ auflösen, wenn das Gerät nur in einer Zeile steht, oder über „Aus dem Einsatz nehmen“.
+- **Nachforderungen:**
+  - Eine eingetroffene Nachforderung hat jetzt ein eigenes Kartenmenü mit „Eintreffen zurücknehmen“. Hängt schon übernommenes Material oder eine verknüpfte Einheit an ihr, ist der Eintrag gesperrt und nennt den Grund.
+  - Bricht die Verbindung nach dem Speichern ab und wird der Versuch wiederholt, entsteht keine doppelte Nachforderung mehr. Das gilt auch für den Unterkunfts-Dialog.
+- Wird ein Abschnitt umbenannt oder aufgelöst, zeigen Einheiten, Dokumente und Ablösung den neuen Stand sofort, ohne Neuladen.
+
+### Lagekarte
+
+- **Dekontamination:** Im Zeichen-Picker gibt es unter „Fachaufgabe“ jetzt „Dekontaminieren von Personal“ und „Dekontaminieren von Gerät“. Das Zeichen trägt dann „P“ oder „G“ zwischen den Klammern.
+- Bei Ausmaß „katastrophal“ sind die Schadensgrad-Diagonalen auf dem rot gefüllten Gefahr-Dreieck jetzt sichtbar.
+- Scheitert ein Abruf, auch nach einem Neuladen ohne Netz, zeichnet die Karte Betreuungsstellen, Evakuierungsbezirke und Tiere weiter mit dem letzten Stand. Die Ebene wird als ausgefallen angezeigt.
+- Die Felder für die Bezeichnung von Zonen und Gefahrengebieten begrenzen die Eingabe auf 200 Zeichen.
+
+### Einsatzdaten und Ortsangaben
+
+- Ein Punkt, der in einem leeren Ortsfeld auf der Karte gewählt wurde, geht beim Speichern nicht mehr verloren. Das Feld trägt dann die Koordinate im eingestellten Format als Text ein.
+- Auch ein Punkt, der auf der Lagekarte ohne Text verortet wurde, bleibt beim Bearbeiten und Speichern erhalten.
+- Koordinate im Text und Nadel auf der Karte nennen immer denselben Ort. Kleine Korrekturen am Text verschieben den Punkt nicht.
+- Wird der Text geleert, entfällt auch der Kartenpunkt. In den Einsatzdaten wird dann auch die gespeicherte Koordinate gelöscht.
+
+### Einsatztagebuch und Meldungen
+
+- ETB-Einträge zur Aufbewahrung nennen Fristen und Löschvormerkungen in der Zeitzone und Schreibweise des Einsatzes.
+- In den Lagemeldungen steht unter „Seit letzter Lagebesprechung“ ein Hinweis auf Nachträge, die zwar nach der Besprechung erfasst wurden, aber davor geschahen. Über „anzeigen“ werden sie eingeblendet.
+- Zeichenzähler zählen ohne Leerzeichen am Anfang und Ende, wie es auch beim Speichern gezählt wird. „Zu lang“ erscheint nicht mehr fälschlich.
+
+### Betroffene und Betreuung
+
+- **UHS:** Eine ohne Netz vorgemerkte Aufnahme kommt zur Zeit ihrer Erfassung in den Eingang, nicht erst bei der Übertragung. Die Wartezeit und der ETB-Eintrag stimmen damit.
+- **Verpflegung:**
+  - Auf dem Handy behält eine Kurzzeile Soll, ausgegeben und fehlt beim Scrollen im Blick.
+  - Auf dem Gerät reicht das Tastenfeld bis an die Bildschirmkante.
+  - Die Sonderkost-Tasten stehen auf dem Handy gleich breit untereinander. Lange Namen brechen um.
+  - Die Zahlen auf den Tasten haben einen festen Platz: Eine Buchung verändert die Größe der Taste nicht mehr, auch nicht bei vierstelligem Soll oder bei mehr Ausgaben als Soll.
+- **Unterkunftsrechner:** Die Knöpfe „Abzug hinzufügen“ und „Raum entfernen“ stehen weiter auseinander, damit man sie auch mit Handschuhen sicher trifft.
+
+### Bedienung
+
+- Ein Link, der eine Listenseite in einer bestimmten Ansicht öffnet, wirkt nur noch einmal. Ein späterer Ansichtswechsel wird nicht mehr zurückgesetzt, etwa im Infotelefon oder auf der Fahrzeugseite. Auch eine geschlossene Erfassung öffnet sich nicht mehr von selbst.
+
+### Anmeldung und Sitzung
+
+- Scheitert die Abmeldung beim Server (Netzfehler, Serverfehler), bleibt man trotzdem abgemeldet. Kein anderer Tab und kein Neuladen übernimmt die aufgegebene Sitzung. Die Abmeldung beim Server wird später nachgeholt.
+- Das Nachholen trifft nur genau die Sitzung, die abgemeldet werden sollte. Hat sich inzwischen jemand neu angemeldet, bleibt diese Sitzung bestehen.
+
 ## [1.0.0-alpha.173](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.172...v1.0.0-alpha.173) (2026-11-05)
 
 ### Wichtige Änderungen
