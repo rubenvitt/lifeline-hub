@@ -16,6 +16,7 @@ export function einheitVorlageFixture(overrides: Partial<EinheitVorlage> = {}): 
     typ_id: 1,
     typ_label: 'Zug',
     soll_eigen: false,
+    quali_soll_eigen: false,
     sortier: 0,
     aktiv: true,
     ist_demo: false,

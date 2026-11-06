@@ -1561,6 +1561,7 @@ async fn aus_vorlage_umhaengen_meldet_den_raum() {
             tz_fachaufgabe: None,
             tz_organisation: None,
             soll: None,
+            quali_soll: None,
             bemerkung: None,
             sortier: 0,
         },

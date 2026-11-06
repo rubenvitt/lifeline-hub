@@ -78,6 +78,7 @@ fn neu_vorlage(name: &str, typ_id: i64) -> NewVorlage<'_> {
         tz_fachaufgabe: Some("rettungswesen"),
         tz_organisation: Some("hilfsorganisation"),
         soll: None,
+        quali_soll: None,
         bemerkung: Some("Stammdaten-Notiz"),
         sortier: 0,
     }
@@ -949,6 +950,86 @@ async fn einheitenbaum_mit_kopfdaten_der_vorlage() {
     // Ohne Namen übernimmt die Wurzel den der Vorlage.
     let g = bilde(&pool, &z, &anfrage(&[], &[])).await.unwrap();
     assert_eq!(g.einheiten[0].name, "Sanitätszug Musterstadt");
+}
+
+/// LLH-1553 (Spec `qualifikationen`, „Wirksames Qualifikationssoll einer Einheit“, Szenario „Aus
+/// Vorlage“): das eigene Qualifikationssoll der Vorlage wird zum eigenen Wert der Einheit und
+/// bleibt, wenn die Vorlage danach geändert wird. Ohne eigenes erbt die Einheit vom Typ.
+#[tokio::test]
+async fn qualifikationssoll_der_vorlage_wird_eigen_und_bleibt() {
+    let pool = crate::db::test_pool().await;
+    let z = setup(&pool).await;
+    let rs = crate::personal::qualifikation_repo::anlegen(&pool, 1, "Rettungssanitäter", 20)
+        .await
+        .unwrap();
+    let san = crate::personal::qualifikation_repo::anlegen(&pool, 1, "Sanitäter", 10)
+        .await
+        .unwrap();
+    let eigen = format!(r#"[{{"q":{},"n":1}}]"#, rs.id);
+    vrepo::update(
+        &pool,
+        1,
+        z.zug,
+        VorlagePatch {
+            quali_soll: Some(Some(&eigen)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    // Die Staffel hat kein eigenes; ihr Typ fordert 2 Sanitäter.
+    sqlx::query("UPDATE einheit_typ SET quali_soll = ? WHERE id = ?")
+        .bind(format!(r#"[{{"q":{},"n":2}}]"#, san.id))
+        .bind(z.typ_staffel)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let vorlage_staffel = vrepo::list(&pool, 1, true)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|v| v.id == z.staffel)
+        .unwrap();
+    assert!(!vorlage_staffel.quali_soll_eigen);
+    assert_eq!(
+        vorlage_staffel.quali_soll.as_ref().unwrap().0[0].label,
+        "Sanitäter",
+        "die Vorlage meldet das des Typs als wirksam"
+    );
+
+    let g = bilde(&pool, &z, &anfrage(&[], &[])).await.unwrap();
+    let zug = einheit_repo::laden(&pool, z.k.einsatz_id, g.einheiten[0].id)
+        .await
+        .unwrap();
+    let staffel = einheit_repo::laden(&pool, z.k.einsatz_id, g.einheiten[1].id)
+        .await
+        .unwrap();
+    assert!(zug.quali_soll_eigen);
+    let q = &zug.quali_soll.as_ref().unwrap().0;
+    assert_eq!((q[0].qualifikation_id, q[0].anzahl), (rs.id, 1));
+    assert!(
+        !staffel.quali_soll_eigen,
+        "ohne eigenes der Vorlage erbt sie vom Typ"
+    );
+    assert_eq!(staffel.quali_soll.as_ref().unwrap().0[0].anzahl, 2);
+
+    // Spätere Änderung an Vorlage und Typ ändert die gebildete Einheit nicht.
+    let neu = format!(r#"[{{"q":{},"n":5}}]"#, san.id);
+    vrepo::update(
+        &pool,
+        1,
+        z.zug,
+        VorlagePatch {
+            quali_soll: Some(Some(&neu)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let nachher = einheit_repo::laden(&pool, z.k.einsatz_id, zug.id)
+        .await
+        .unwrap();
+    assert_eq!(nachher.quali_soll, zug.quali_soll);
 }
 
 /// Drei Ebenen, deren Enkel in der Sortierung vor seinem Elternteil steht (erst alphabetisch bei

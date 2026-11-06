@@ -11,6 +11,7 @@ use crate::live::LiveEvent;
 use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
 use crate::person::{registrier_anzeige, repo as person_repo};
+use crate::personal::quali_soll::{self, QualiSollEingabe};
 use crate::routes::support::{
     deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri,
     pruefe_koordinate, trimme,
@@ -201,6 +202,12 @@ pub struct PatchBody {
     pub lat: Option<Option<f64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub lon: Option<Option<f64>>,
+    /// Soll-Anzahl (LLH-1553), 1 bis [`crate::uhs::SOLL_ANZAHL_MAX`]; `null` = kein Soll.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub soll_anzahl: Option<Option<i64>>,
+    /// Qualifikationssoll (LLH-1553); `null` oder `[]` = keins.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub quali_soll: Option<Option<Vec<QualiSollEingabe>>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
     /// Konfliktdialog), wird bewusst blind geschrieben.
@@ -216,6 +223,16 @@ pub async fn aktualisieren(
 ) -> Result<Json<UhsAnzeige>, AppError> {
     stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
+    // Feldprüfung des Solls (400) vor jedem Zusammenhang (LLH-1553).
+    if let Some(Some(n)) = body.soll_anzahl {
+        if !(1..=crate::uhs::SOLL_ANZAHL_MAX).contains(&n) {
+            return Err(AppError::Validation(format!(
+                "Soll-Anzahl von 1 bis {}",
+                crate::uhs::SOLL_ANZAHL_MAX
+            )));
+        }
+    }
+    let quali_soll = quali_soll::form_tri(body.quali_soll)?;
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -235,6 +252,9 @@ pub async fn aktualisieren(
     let notiz = body
         .notiz
         .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+    if let Some(gespeichert) = &quali_soll {
+        quali_soll::pruefe_org(&state.pool, ctx.einsatz.org_id, gespeichert.as_deref()).await?;
+    }
 
     let nachher = uhs_repo::aktualisiere(
         &state.pool,
@@ -249,6 +269,8 @@ pub async fn aktualisieren(
             notiz: notiz.as_ref().map(|o| o.as_deref()),
             lat: body.lat,
             lon: body.lon,
+            soll_anzahl: body.soll_anzahl,
+            quali_soll: quali_soll.as_ref().map(|o| o.as_deref()),
         },
     )
     .await?;

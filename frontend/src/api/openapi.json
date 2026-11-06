@@ -4704,6 +4704,7 @@
           "einsatz_id",
           "name",
           "sortier",
+          "quali_soll_eigen",
           "ist",
           "ist_kumuliert",
           "personal_mitglieder",
@@ -4850,6 +4851,20 @@
             "items": {
               "$ref": "#/components/schemas/EinheitMitgliedPerson"
             }
+          },
+          "quali_soll": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QualiSollEintrag"
+            },
+            "description": "Wirksames Qualifikationssoll (LLH-1553, design.md D4): das eigene, sonst das des Typs;\n`None` = keins. Kein Urteil: „unterbesetzt“ urteilt weiter nur nach F/UF/M."
+          },
+          "quali_soll_eigen": {
+            "type": "boolean",
+            "description": "Ob [`Self::quali_soll`] der eigene Wert der Einheit ist (sonst der des Typs)."
           },
           "soll": {
             "oneOf": [
@@ -5142,6 +5157,16 @@
           "label": {
             "type": "string"
           },
+          "quali_soll": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QualiSollEintrag"
+            },
+            "description": "Qualifikationssoll des Typs (LLH-1553); `None` = kein Soll."
+          },
           "soll": {
             "oneOf": [
               {
@@ -5185,6 +5210,7 @@
           "typ_id",
           "typ_label",
           "soll_eigen",
+          "quali_soll_eigen",
           "sortier",
           "aktiv",
           "ist_demo",
@@ -5237,6 +5263,20 @@
             "items": {
               "$ref": "#/components/schemas/EinheitVorlagePersonal"
             }
+          },
+          "quali_soll": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QualiSollEintrag"
+            },
+            "description": "Wirksames Qualifikationssoll (LLH-1553): das eigene, sonst das des Einheitstyps; fehlt,\nwenn keins gilt."
+          },
+          "quali_soll_eigen": {
+            "type": "boolean",
+            "description": "Ob [`Self::quali_soll`] das eigene der Vorlage ist (sonst das des Typs)."
           },
           "soll": {
             "oneOf": [
@@ -14231,6 +14271,28 @@
           "normal"
         ]
       },
+      "QualiSollEintrag": {
+        "type": "object",
+        "description": "Ein Eintrag in der Antwort, mit dem Label der Qualifikation.",
+        "required": [
+          "qualifikation_id",
+          "label",
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": "string"
+          },
+          "qualifikation_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "Qualifikation": {
         "type": "object",
         "description": "Qualifikations-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert\n(Listen-Endpunkt liefert ohnehin nur aktive).",
@@ -14246,6 +14308,14 @@
           },
           "label": {
             "type": "string"
+          },
+          "schliesst_ein_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Qualifikation, die diese direkt einschließt (LLH-1553); transitiv gilt die ganze\nKette. Fehlt, wenn sie nur sich selbst deckt."
           },
           "sortier": {
             "type": "integer",
@@ -16409,6 +16479,24 @@
               "string",
               "null"
             ]
+          },
+          "quali_soll": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QualiSollEintrag"
+            },
+            "description": "Qualifikationssoll (LLH-1553); `None` = keins. Die UHS hat keinen Typ-Katalog, es gibt nur\nden eigenen Wert."
+          },
+          "soll_anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Soll-Anzahl der Kräfte (LLH-1553); `None` = kein Soll."
           },
           "staerke": {
             "$ref": "#/components/schemas/Staerke",

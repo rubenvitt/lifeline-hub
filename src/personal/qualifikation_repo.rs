@@ -1,6 +1,6 @@
 use super::Qualifikation;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Funktion einer Person als kommaseparierter Text ihrer **aktiven** Qualifikationen, nach
 /// `sortier`, dann `id`; `None` ohne aktive Qualifikation. **Einzige Quelle der
@@ -36,86 +36,191 @@ fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
     Err(e.into())
 }
 
+const SPALTEN: &str = "id, label, sortier, schliesst_ein_id";
+
 /// Lädt eine Qualifikation der Org (ignoriert `aktiv`); `NotFound` bei fremder id.
 pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<Qualifikation, AppError> {
-    sqlx::query_as::<_, Qualifikation>(
-        "SELECT id, label, sortier FROM qualifikation WHERE id = ? AND org_id = ?",
-    )
+    laden_tx(&mut *pool.acquire().await?, org_id, id).await
+}
+
+async fn laden_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    id: i64,
+) -> Result<Qualifikation, AppError> {
+    sqlx::query_as::<_, Qualifikation>(sqlx::AssertSqlSafe(format!(
+        "SELECT {SPALTEN} FROM qualifikation WHERE id = ? AND org_id = ?"
+    )))
     .bind(id)
     .bind(org_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)
 }
 
 /// Nur aktive Qualifikationen der Org, sortiert nach `sortier`, dann `id`.
 pub async fn liste(pool: &SqlitePool, org_id: i64) -> Result<Vec<Qualifikation>, AppError> {
-    sqlx::query_as::<_, Qualifikation>(
-        "SELECT id, label, sortier FROM qualifikation WHERE org_id = ? AND aktiv = 1 ORDER BY sortier, id",
-    )
-    .bind(org_id).fetch_all(pool).await.map_err(Into::into)
+    sqlx::query_as::<_, Qualifikation>(sqlx::AssertSqlSafe(format!(
+        "SELECT {SPALTEN} FROM qualifikation WHERE org_id = ? AND aktiv = 1 ORDER BY sortier, id"
+    )))
+    .bind(org_id)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
 }
 
-/// Legt eine Qualifikation an. Dublette `label` je Org → `Conflict`.
+/// Einschlüsse des ganzen Katalogs der Org, auch deaktivierter Einträge (sie bleiben in Ketten
+/// wirksam, LLH-1553 design.md D1): Grundlage der Deckungsregel auf dem Server.
+pub async fn einschluesse(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    org_id: i64,
+) -> Result<super::qualifikation_deckung::Einschluesse, AppError> {
+    let rows: Vec<(i64, Option<i64>)> =
+        sqlx::query_as("SELECT id, schliesst_ein_id FROM qualifikation WHERE org_id = ?")
+            .bind(org_id)
+            .fetch_all(executor)
+            .await?;
+    Ok(rows.into_iter().collect())
+}
+
+/// Prüft einen Einschluss (LLH-1553, Spec `qualifikationen`, „Einschluss im Katalog“): `ziel`
+/// gehört zur Org, ist nicht die Qualifikation selbst und schließt sie nicht schon über die
+/// Kette ein (das wäre ein Kreis). Alles 422. `selbst` fehlt beim Anlegen.
+async fn pruefe_einschluss_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    selbst: Option<i64>,
+    ziel: i64,
+) -> Result<(), AppError> {
+    if selbst == Some(ziel) {
+        return Err(AppError::UnprocessableEntity(
+            "Eine Qualifikation kann sich nicht selbst einschließen".into(),
+        ));
+    }
+    let in_org: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM qualifikation WHERE id = ? AND org_id = ?")
+            .bind(ziel)
+            .bind(org_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    if in_org.is_none() {
+        return Err(AppError::UnprocessableEntity(
+            "Eingeschlossene Qualifikation gehört nicht zur Organisation".into(),
+        ));
+    }
+    let Some(selbst) = selbst else {
+        return Ok(());
+    };
+    // Die Kette ab dem Ziel abwärts; erreicht sie die Qualifikation selbst, entstünde ein Kreis.
+    // UNION (nicht UNION ALL) endet auch auf einem Bestand mit Kreis.
+    let kreis: bool = sqlx::query_scalar(
+        "WITH RECURSIVE kette(id) AS ( \
+            SELECT ?1 \
+            UNION \
+            SELECT q.schliesst_ein_id FROM qualifikation q JOIN kette k ON q.id = k.id \
+            WHERE q.schliesst_ein_id IS NOT NULL \
+         ) SELECT EXISTS (SELECT 1 FROM kette WHERE id = ?2)",
+    )
+    .bind(ziel)
+    .bind(selbst)
+    .fetch_one(&mut *conn)
+    .await?;
+    if kreis {
+        return Err(AppError::UnprocessableEntity(
+            "Die Qualifikation würde sich über die Kette selbst einschließen".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Legt eine Qualifikation an, optional mit Einschluss. Dublette `label` je Org → `Conflict`,
+/// ungültiger Einschluss → 422.
 pub async fn anlegen(
     pool: &SqlitePool,
     org_id: i64,
     label: &str,
     sortier: i64,
 ) -> Result<Qualifikation, AppError> {
-    let ergebnis = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO qualifikation (org_id, label, sortier) VALUES (?, ?, ?) RETURNING id",
-    )
-    .bind(org_id)
-    .bind(label)
-    .bind(sortier)
-    .fetch_one(pool)
-    .await;
-    let id = match ergebnis {
-        Ok(id) => id,
-        Err(e) => return label_conflict(e),
-    };
-    laden(pool, org_id, id).await
+    anlegen_mit(pool, org_id, label, sortier, None).await
 }
 
-/// Teil-Patch von label/sortier: `None` lässt die Spalte unverändert. Ohne nullable Spalte gibt
-/// es keinen Tri-State; ein nicht gesendetes `sortier` fällt nicht mehr auf 0.
+/// Wie [`anlegen`], mit Einschluss.
+pub async fn anlegen_mit(
+    pool: &SqlitePool,
+    org_id: i64,
+    label: &str,
+    sortier: i64,
+    schliesst_ein_id: Option<i64>,
+) -> Result<Qualifikation, AppError> {
+    crate::write_retry!(pool, |conn| {
+        if let Some(ziel) = schliesst_ein_id {
+            pruefe_einschluss_tx(conn, org_id, None, ziel).await?;
+        }
+        let ergebnis = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO qualifikation (org_id, label, sortier, schliesst_ein_id) \
+             VALUES (?, ?, ?, ?) RETURNING id",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(sortier)
+        .bind(schliesst_ein_id)
+        .fetch_one(&mut *conn)
+        .await;
+        let id = match ergebnis {
+            Ok(id) => id,
+            Err(e) => return label_conflict(e),
+        };
+        laden_tx(conn, org_id, id).await
+    })
+}
+
+/// Teil-Patch: `None` lässt die Spalte unverändert. `schliesst_ein_id` ist Tri-State
+/// (`Some(None)` = kein Einschluss mehr). Ein nicht gesendetes `sortier` fällt nicht auf 0.
 #[derive(Debug, Default)]
 pub struct QualifikationPatch<'a> {
     pub label: Option<&'a str>,
     pub sortier: Option<i64>,
+    pub schliesst_ein_id: Option<Option<i64>>,
 }
 
-/// Teil-Patch von label/sortier (org-scoped); `NotFound`/`Conflict` wie beim Stamm.
-/// Nummerierte Parameter, abgesichert von `patche_setzt_jede_spalte_an_ihren_platz`.
+/// Teil-Patch (org-scoped); `NotFound`/`Conflict` wie beim Stamm, ungültiger Einschluss 422.
+/// Prüfung und Schreiben laufen in EINER Transaktion, damit zwei gleichzeitige Änderungen keinen
+/// Kreis bilden. Nummerierte Parameter, abgesichert von
+/// `patche_setzt_jede_spalte_an_ihren_platz`.
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
     patch: QualifikationPatch<'_>,
 ) -> Result<Qualifikation, AppError> {
-    let ergebnis = sqlx::query(
-        "UPDATE qualifikation SET \
-            label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
-            sortier = CASE WHEN ?3 IS NULL THEN sortier ELSE ?4 END \
-         WHERE id = ?5 AND org_id = ?6",
-    )
-    .bind(patch.label.map(|_| 1_i64))
-    .bind(patch.label)
-    .bind(patch.sortier.map(|_| 1_i64))
-    .bind(patch.sortier)
-    .bind(id)
-    .bind(org_id)
-    .execute(pool)
-    .await;
-    let resultat = match ergebnis {
-        Ok(r) => r,
-        Err(e) => return label_conflict(e),
-    };
-    if resultat.rows_affected() == 0 {
-        return Err(AppError::NotFound);
-    }
-    laden(pool, org_id, id).await
+    crate::write_retry!(pool, |conn| {
+        // 404 vor jeder Einschluss-Prüfung.
+        laden_tx(conn, org_id, id).await?;
+        if let Some(Some(ziel)) = patch.schliesst_ein_id {
+            pruefe_einschluss_tx(conn, org_id, Some(id), ziel).await?;
+        }
+        let ergebnis = sqlx::query(
+            "UPDATE qualifikation SET \
+                label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
+                sortier = CASE WHEN ?3 IS NULL THEN sortier ELSE ?4 END, \
+                schliesst_ein_id = CASE WHEN ?5 IS NULL THEN schliesst_ein_id ELSE ?6 END \
+             WHERE id = ?7 AND org_id = ?8",
+        )
+        .bind(patch.label.map(|_| 1_i64))
+        .bind(patch.label)
+        .bind(patch.sortier.map(|_| 1_i64))
+        .bind(patch.sortier)
+        .bind(patch.schliesst_ein_id.map(|_| 1_i64))
+        .bind(patch.schliesst_ein_id.flatten())
+        .bind(id)
+        .bind(org_id)
+        .execute(&mut *conn)
+        .await;
+        if let Err(e) = ergebnis {
+            return label_conflict(e);
+        }
+        laden_tx(conn, org_id, id).await
+    })
 }
 
 /// Deaktiviert eine Qualifikation (Soft-Delete `aktiv = 0`); bestehende Zuordnungen
@@ -197,6 +302,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         let q = anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
+        let ziel = anlegen(&pool, 1, "Helfer", 5).await.unwrap();
         let neu = patche(
             &pool,
             1,
@@ -204,12 +310,14 @@ mod tests {
             QualifikationPatch {
                 label: Some("Rettungssanitäter"),
                 sortier: Some(42),
+                schliesst_ein_id: Some(Some(ziel.id)),
             },
         )
         .await
         .unwrap();
         assert_eq!(neu.label, "Rettungssanitäter");
         assert_eq!(neu.sortier, 42);
+        assert_eq!(neu.schliesst_ein_id, Some(ziel.id));
     }
 
     /// Ein Patch fasst NUR die gesendeten Spalten an (ein Body ohne `sortier` setzte sonst 0).
@@ -324,5 +432,105 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(funktion_text(&pool, pid).await.unwrap(), None);
+    }
+
+    /// Kette, Kreis, Selbstverweis, fremde Org (LLH-1553, Spec `qualifikationen`).
+    #[tokio::test]
+    async fn einschluss_regeln() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        org(&pool, 2).await;
+        let san = anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
+        let rs = anlegen_mit(&pool, 1, "Rettungssanitäter", 20, Some(san.id))
+            .await
+            .unwrap();
+        assert_eq!(rs.schliesst_ein_id, Some(san.id));
+        let ns = anlegen_mit(&pool, 1, "Notfallsanitäter", 30, Some(rs.id))
+            .await
+            .unwrap();
+        let fremd = anlegen(&pool, 2, "Sanitäter", 10).await.unwrap();
+
+        let setze = |id: i64, ziel: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                patche(
+                    &pool,
+                    1,
+                    id,
+                    QualifikationPatch {
+                        schliesst_ein_id: Some(ziel),
+                        ..Default::default()
+                    },
+                )
+                .await
+            }
+        };
+        // Kreis über zwei Stufen: Sanitäter → Notfallsanitäter.
+        assert!(matches!(
+            setze(san.id, Some(ns.id)).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        // Kreis über eine Stufe.
+        assert!(matches!(
+            setze(san.id, Some(rs.id)).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            setze(san.id, Some(san.id)).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            setze(san.id, Some(fremd.id)).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            anlegen_mit(&pool, 1, "Neu", 1, Some(fremd.id)).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert_eq!(
+            laden(&pool, 1, san.id).await.unwrap().schliesst_ein_id,
+            None
+        );
+
+        // Lösen und neu verketten.
+        assert_eq!(setze(ns.id, None).await.unwrap().schliesst_ein_id, None);
+        assert_eq!(
+            setze(ns.id, Some(san.id)).await.unwrap().schliesst_ein_id,
+            Some(san.id)
+        );
+
+        // Die Deckungsregel liest den Katalog samt Kette.
+        let k = einschluesse(&pool, 1).await.unwrap();
+        assert!(crate::personal::qualifikation_deckung::deckt(
+            &k,
+            &[rs.id],
+            san.id
+        ));
+        assert!(!crate::personal::qualifikation_deckung::deckt(
+            &k,
+            &[san.id],
+            rs.id
+        ));
+    }
+
+    /// Eine deaktivierte Qualifikation bleibt in der Kette wirksam (design.md D1).
+    #[tokio::test]
+    async fn deaktivierte_bleibt_in_der_kette() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let san = anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
+        let rs = anlegen_mit(&pool, 1, "Rettungssanitäter", 20, Some(san.id))
+            .await
+            .unwrap();
+        let ns = anlegen_mit(&pool, 1, "Notfallsanitäter", 30, Some(rs.id))
+            .await
+            .unwrap();
+        deaktivieren(&pool, 1, rs.id).await.unwrap();
+        let k = einschluesse(&pool, 1).await.unwrap();
+        assert!(crate::personal::qualifikation_deckung::deckt(
+            &k,
+            &[ns.id],
+            san.id
+        ));
     }
 }

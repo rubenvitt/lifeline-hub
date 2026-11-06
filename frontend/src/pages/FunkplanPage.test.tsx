@@ -120,6 +120,7 @@ const EINHEITEN = [
   {
     id: 10,
     einsatz_id: 1,
+    quali_soll_eigen: false,
     name: '1. Zug',
     funkrufname: 'Florian 1/10',
     fuehrer_name: 'Bernd Führer',

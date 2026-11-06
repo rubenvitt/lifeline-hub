@@ -192,6 +192,12 @@ export const BETREUUNG_LEITUNG_MAX = 200;
 export const BETREUUNG_KONTAKTWEG_MAX = 200;
 /** Grund einer Streichung oder Berichtigung in der Kräfte-Zeitachse (LLH-1455); steht im ETB. */
 export const ZEITACHSE_GRUND_MAX = 500;
+/** Einträge eines Qualifikationssolls (LLH-1553). */
+export const QUALI_SOLL_MAX = 10;
+/** Anzahl je Qualifikation im Qualifikationssoll (LLH-1553). */
+export const QUALI_SOLL_ANZAHL_MAX = 50;
+/** Soll-Anzahl der Kräfte einer UHS (LLH-1553). */
+export const UHS_SOLL_ANZAHL_MAX = 200;
 /** Notiz eines Nachtrags oder einer nachgetragenen Periode in der Kräfte-Zeitachse (LLH-1538). */
 export const ZEITACHSE_NOTIZ_MAX = 500;
 /** Bezeichnung eines Lesezugangs für einen externen Lagemonitor (LLH-1484). */

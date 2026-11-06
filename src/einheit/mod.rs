@@ -74,6 +74,9 @@ pub struct EinheitTyp {
     pub label: String,
     /// Standard-Soll-Stärke; `None`, wenn der Typ keine Soll-Stärke definiert.
     pub soll: Option<Staerke>,
+    /// Qualifikationssoll des Typs (LLH-1553); `None` = kein Soll.
+    #[schema(value_type = Option<Vec<crate::personal::quali_soll::QualiSollEintrag>>)]
+    pub quali_soll: Option<crate::personal::quali_soll::QualiSoll>,
     pub sortier: i64,
 }
 
@@ -213,6 +216,12 @@ pub struct EinheitAnzeige {
     /// BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
     pub aktueller_br_id: Option<i64>,
     pub soll: Option<crate::staerke::Staerke>,
+    /// Wirksames Qualifikationssoll (LLH-1553, design.md D4): das eigene, sonst das des Typs;
+    /// `None` = keins. Kein Urteil: „unterbesetzt“ urteilt weiter nur nach F/UF/M.
+    #[schema(value_type = Option<Vec<crate::personal::quali_soll::QualiSollEintrag>>)]
+    pub quali_soll: Option<crate::personal::quali_soll::QualiSoll>,
+    /// Ob [`Self::quali_soll`] der eigene Wert der Einheit ist (sonst der des Typs).
+    pub quali_soll_eigen: bool,
     pub ist: crate::staerke::Staerke,
     pub ist_kumuliert: crate::staerke::Staerke,
     pub personal_mitglieder: Vec<EinheitMitgliedPerson>,

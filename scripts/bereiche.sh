@@ -29,9 +29,11 @@ bereiche_von() {
     # Vitest liest: die Fachebenen-Quellen (fachebenen.test.ts), das gemeinsame Fixture der
     # Zählregeln (verdichtungFixture.test.ts) und die Werteliste der Zeichenbeschreibung
     # (zeichenWerte.guard.test.ts, LFH-836), dazu Fallsammlung und Basis-Richtwerte des
-    # Unterkunftsrechners (rechnerFixture.test.ts, richtwerte.ts, LLH-1520).
+    # Unterkunftsrechners (rechnerFixture.test.ts, richtwerte.ts, LLH-1520), dazu die Fälle der
+    # Deckungsregel für Qualifikationen (qualiDeckung.test.ts, LLH-1553).
     src/karte/quellen.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
-      | tests/fixtures/unterkunft/* | src/unterkunft/richtwerte_basis.json)
+      | tests/fixtures/unterkunft/* | src/unterkunft/richtwerte_basis.json \
+      | tests/fixtures/quali_deckung_faelle.json)
       echo "rust frontend e2e" ;;
     # Das Frontend bindet die CHANGELOG.md als Neuigkeiten ein (vite.config.ts, neuigkeiten/);
     # e2e liest sie für den Versionshinweis (e2e/neuigkeiten.spec.ts). Steht vor `*.md` unten.

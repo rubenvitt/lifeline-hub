@@ -14,6 +14,8 @@ import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSc
 import { typVorgabe } from '../components/vorgabeText';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
+import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../kraefte/QualiSollFeld';
+import { gleichesQualiSoll, qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
 import { staerkeText } from '../anzeige/staerke';
 import EinheitZeichen from '../kraefte/EinheitZeichen';
 import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS } from '../pages/lagekarte/taktischesZeichen';
@@ -27,7 +29,13 @@ import {
 } from '../api/eingabegrenzen';
 import { leerZuNull } from '../api/patchTriState';
 import { globalKeys } from '../api/queryKeys';
-import type { EinheitTyp, EinheitVorlage, PatchEinheitVorlage, Staerke } from '../api/types';
+import type {
+  EinheitTyp,
+  EinheitVorlage,
+  PatchEinheitVorlage,
+  QualiSollEingabe,
+  Staerke,
+} from '../api/types';
 import { parseRouteId } from '../routing/deeplinks';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { einheitVorlageDetailPath, einheitVorlageListPath } from './stammdatenDetail';
@@ -48,6 +56,7 @@ interface FormValues {
   tz_fachaufgabe?: string | null;
   tz_organisation?: string | null;
   soll?: Staerke | null;
+  quali_soll?: QualiSollZeile[];
   bemerkung?: string;
 }
 
@@ -61,6 +70,8 @@ interface Head {
   tz_fachaufgabe: string | null;
   tz_organisation: string | null;
   soll: Staerke | null;
+  /** Nur das EIGENE Qualifikationssoll; `[]` = es gilt das des Typs (LLH-1553). */
+  quali_soll: QualiSollEingabe[];
   bemerkung: string | null;
 }
 
@@ -74,6 +85,7 @@ const FIELD_LABELS: Record<keyof Head, string> = {
   tz_fachaufgabe: 'Fachaufgabe',
   tz_organisation: 'Organisation',
   soll: 'Soll-Stärke',
+  quali_soll: 'Qualifikationssoll',
   bemerkung: 'Bemerkung',
 };
 
@@ -88,6 +100,7 @@ function headOf(v: EinheitVorlage): Head {
     tz_organisation: v.tz_organisation ?? null,
     // Nur das EIGENE Soll steht im Feld; das des Typs ist die Vorgabe darunter.
     soll: v.soll_eigen ? (v.soll ?? null) : null,
+    quali_soll: v.quali_soll_eigen ? qualiSollEingabe(v.quali_soll) : [],
     bemerkung: v.bemerkung ?? null,
   };
 }
@@ -102,6 +115,7 @@ function headFromForm(w: FormValues): Head {
     tz_fachaufgabe: w.tz_fachaufgabe ?? null,
     tz_organisation: w.tz_organisation ?? null,
     soll: w.soll ?? null,
+    quali_soll: vollstaendig(w.quali_soll),
     bemerkung: leerZuNull(w.bemerkung),
   };
 }
@@ -151,6 +165,9 @@ function changedFields(
     patch.soll_unterfuehrer = next.soll?.unterfuehrer ?? null;
     patch.soll_mannschaft = next.soll?.mannschaft ?? null;
     labels.push(FIELD_LABELS.soll);
+  }
+  if (!gleichesQualiSoll(next.quali_soll, base.quali_soll)) {
+    set('quali_soll', 'quali_soll', next.quali_soll);
   }
   if (next.bemerkung !== base.bemerkung) set('bemerkung', 'bemerkung', next.bemerkung);
   return labels.length > 0 ? { patch, labels } : null;
@@ -385,7 +402,7 @@ function DetailContent({
           </Formularpaneel>
 
           <Formularpaneel titel="Soll">
-            <SollField typen={typen} />
+            <SollField typen={typen} vorlage={vorlage} />
           </Formularpaneel>
 
           <Formularpaneel titel="Freitext">
@@ -429,6 +446,7 @@ function toFormValues(h: Head): FormValues {
     tz_fachaufgabe: h.tz_fachaufgabe ?? undefined,
     tz_organisation: h.tz_organisation ?? undefined,
     soll: h.soll,
+    quali_soll: h.quali_soll,
     bemerkung: h.bemerkung ?? undefined,
   };
 }
@@ -453,20 +471,37 @@ function ZeichenVorschau({ typen }: { typen: EinheitTyp[] }) {
 }
 
 /** Eigenes Soll; leer gilt das des gewählten Typs, und das steht als Vorgabe darunter. */
-function SollField({ typen }: { typen: EinheitTyp[] }) {
+function SollField({ typen, vorlage }: { typen: EinheitTyp[]; vorlage: EinheitVorlage }) {
   const form = Form.useFormInstance<FormValues>();
   const typId = Form.useWatch('typ_id', form);
   const soll = Form.useWatch('soll', form);
-  const typSoll = typen.find((t) => t.id === typId)?.soll;
+  const qualiSoll = Form.useWatch('quali_soll', form);
+  const typ = typen.find((t) => t.id === typId);
+  const typSoll = typ?.soll;
+  const typQualiSoll = qualiSollText(typ?.quali_soll);
   return (
-    // EIN `Form.Item` für das Trio: der Server prüft „alle drei oder keiner“ (Muster
-    // `FahrzeugDetailPage`).
-    <Form.Item
-      label="Soll-Stärke"
-      name="soll"
-      extra={soll == null && typSoll ? typVorgabe(staerkeText(typSoll)) : undefined}
-    >
-      <StaerkeEingabe />
-    </Form.Item>
+    <>
+      {/* EIN `Form.Item` für das Trio: der Server prüft „alle drei oder keiner“ (Muster
+          `FahrzeugDetailPage`). */}
+      <Form.Item
+        label="Soll-Stärke"
+        name="soll"
+        extra={soll == null && typSoll ? typVorgabe(staerkeText(typSoll)) : undefined}
+      >
+        <StaerkeEingabe />
+      </Form.Item>
+      <Form.Item
+        label="Qualifikationssoll"
+        name="quali_soll"
+        extra={
+          vollstaendig(qualiSoll).length === 0 && typQualiSoll
+            ? typVorgabe(typQualiSoll)
+            : undefined
+        }
+      >
+        {/* Labels deaktivierter Qualifikationen aus dem eigenen Soll (LLH-1553). */}
+        <QualiSollFeld bekannt={vorlage.quali_soll_eigen ? vorlage.quali_soll : null} />
+      </Form.Item>
+    </>
   );
 }

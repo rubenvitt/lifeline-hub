@@ -11,9 +11,11 @@ Zuordnungen und die Pflege in der Verwaltung fest (LLH-1042).
 ### Requirement: Katalog der Einheiten-Vorlagen
 Das System SHALL je Organisation einen Katalog von Einheiten-Vorlagen führen. Eine Vorlage MUST
 einen Namen und einen Einheitstyp der eigenen Organisation tragen und MAY Funkrufname, taktisches
-Zeichen (Fachaufgabe, Organisation), Soll-Stärke F/UF/M, Bemerkung und Sortierung tragen. Die
-Soll-Stärke MUST entweder in allen drei Werten oder in keinem gesetzt sein; ohne eigenes Soll
-MUST die Antwort das Soll des Einheitstyps als wirksames Soll melden. Unter den aktiven Vorlagen
+Zeichen (Fachaufgabe, Organisation), Soll-Stärke F/UF/M, Qualifikationssoll (Spec
+`qualifikationen`), Bemerkung und Sortierung tragen. Die Soll-Stärke MUST entweder in allen drei
+Werten oder in keinem gesetzt sein; ohne eigenes Soll MUST die Antwort das Soll des Einheitstyps
+als wirksames Soll melden. Dasselbe MUST für das Qualifikationssoll gelten, und die Antwort MUST
+melden, ob es eigen ist (LLH-1553). Unter den aktiven Vorlagen
 einer Organisation MUST der Name eindeutig sein (409 bei Dublette). Eine Vorlage MUST NOT gelöscht
 werden; sie wird deaktiviert und kann wieder aktiviert werden.
 

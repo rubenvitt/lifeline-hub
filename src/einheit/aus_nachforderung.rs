@@ -246,6 +246,7 @@ pub async fn uebernehmen_tx(
                             soll_fuehrer: None,
                             soll_unterfuehrer: None,
                             soll_mannschaft: None,
+                            quali_soll: None,
                             bemerkung: None,
                             funkrufname: Some(name),
                             sortier: 0,

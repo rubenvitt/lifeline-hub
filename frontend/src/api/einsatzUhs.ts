@@ -12,6 +12,7 @@ import type {
   AnhangZugriff,
   UhsKraft,
   StaerkePosition,
+  QualiSollEingabe,
 } from './types';
 import {
   apiGet,
@@ -105,6 +106,10 @@ export interface UhsPatch {
   /** lat/lon werden gemeinsam gesendet (beide Zahl = setzen, beide null = löschen). */
   lat?: number | null;
   lon?: number | null;
+  /** LLH-1553: Soll-Anzahl der Kräfte, `null` = keins. */
+  soll_anzahl?: number | null;
+  /** LLH-1553: Qualifikationssoll, `[]` oder `null` = keins. */
+  quali_soll?: QualiSollEingabe[] | null;
 }
 
 export function aktualisiereUhs(einsatzId: number, uhsId: number, daten: UhsPatch): Promise<Uhs> {

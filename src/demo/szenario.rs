@@ -273,6 +273,8 @@ pub struct EinheitVorlageStamm {
     /// Schlüssel aus [`FAHRZEUGE`], in Anzeigereihenfolge.
     pub fahrzeuge: &'static [&'static str],
     pub personal: &'static [VorlagePerson],
+    /// Qualifikationssoll als (Label, Anzahl) (LLH-1553); leer = keins.
+    pub quali_soll: &'static [(&'static str, i64)],
     pub sortier: i64,
 }
 
@@ -324,6 +326,7 @@ pub const EINHEITEN_VORLAGEN: [EinheitVorlageStamm; 2] = [
             vp("zugfuehrer", Some("elw"), Some(StaerkePosition::Fuehrer)),
             vp("funker", Some("elw"), None),
         ],
+        quali_soll: &[],
         sortier: 10,
     },
     EinheitVorlageStamm {
@@ -340,6 +343,7 @@ pub const EINHEITEN_VORLAGEN: [EinheitVorlageStamm; 2] = [
             vp("rettsan1", Some("rtw2"), None),
             vp("rettsan2", Some("rtw2"), None),
         ],
+        quali_soll: &[("Notfallsanitäter", 1), ("Rettungssanitäter", 2)],
         sortier: 20,
     },
 ];
@@ -1666,14 +1670,19 @@ pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
     bedarf
 }
 
-/// Katalogbedarf der Stammdaten-Anlage: die Qualifikationen des Personals, dann die
-/// Einheitstypen der Vorlagen, jeder einmal, in der Reihenfolge ihres ersten Vorkommens.
+/// Katalogbedarf der Stammdaten-Anlage: die Qualifikationen des Personals und des
+/// Qualifikationssolls der Vorlagen, dann die Einheitstypen der Vorlagen, jeder einmal, in der Reihenfolge ihres ersten Vorkommens.
 /// Fahrzeugtyp und Materialkategorie sind Freitext und brauchen keinen Katalog.
 pub fn katalog_bedarf_stammdaten() -> Vec<Katalogeintrag> {
     let mut bedarf = Vec::new();
     let qualifikationen = PERSONAL
         .iter()
         .flat_map(|p| p.qualifikationen.iter())
+        .chain(
+            EINHEITEN_VORLAGEN
+                .iter()
+                .flat_map(|v| v.quali_soll.iter().map(|(label, _)| label)),
+        )
         .map(|label| Katalogeintrag::Qualifikation(label));
     let typen = EINHEITEN_VORLAGEN
         .iter()

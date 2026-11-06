@@ -4,6 +4,7 @@ use super::{
 };
 use crate::error::AppError;
 use crate::katalog::StatusKategorie;
+use crate::personal::quali_soll::QualiSoll;
 use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::{HashMap, HashSet};
@@ -19,6 +20,9 @@ pub struct EinheitDaten<'a> {
     pub soll_fuehrer: Option<i64>,
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
+    /// Eigenes Qualifikationssoll in gespeicherter Form (LLH-1553, `personal::quali_soll::form`);
+    /// ohne erbt die Einheit das des Typs.
+    pub quali_soll: Option<&'a str>,
     pub bemerkung: Option<&'a str>,
     /// Eigener Rufname der Einheit (Freitext, z. B. „Florian HM 12/44“).
     pub funkrufname: Option<&'a str>,
@@ -55,6 +59,8 @@ struct Row {
     typ_soll_fuehrer: Option<i64>,
     typ_soll_unterfuehrer: Option<i64>,
     typ_soll_mannschaft: Option<i64>,
+    quali_soll: Option<QualiSoll>,
+    typ_quali_soll: Option<QualiSoll>,
     status_seit: Option<String>,
     hand_status_id: Option<i64>,
     hand_status_label: Option<String>,
@@ -200,6 +206,14 @@ const SELECT_AUFGELOEST: &str = "\
            e.soll_fuehrer, e.soll_unterfuehrer, e.soll_mannschaft, \
            t.soll_fuehrer AS typ_soll_fuehrer, t.soll_unterfuehrer AS typ_soll_unterfuehrer, \
            t.soll_mannschaft AS typ_soll_mannschaft, \
+           (CASE WHEN e.quali_soll IS NULL THEN NULL ELSE (SELECT json_group_array(json_object(\
+            'qualifikation_id', qs_q.id, 'label', qs_q.label, 'anzahl', qs_j.value ->> 'n') \
+            ORDER BY qs_j.key) FROM json_each(e.quali_soll) qs_j \
+            JOIN qualifikation qs_q ON qs_q.id = qs_j.value ->> 'q') END) AS quali_soll, \
+           (CASE WHEN t.quali_soll IS NULL THEN NULL ELSE (SELECT json_group_array(json_object(\
+            'qualifikation_id', qs_q.id, 'label', qs_q.label, 'anzahl', qs_j.value ->> 'n') \
+            ORDER BY qs_j.key) FROM json_each(t.quali_soll) qs_j \
+            JOIN qualifikation qs_q ON qs_q.id = qs_j.value ->> 'q') END) AS typ_quali_soll, \
            e.status_seit, hs.id AS hand_status_id, hs.label AS hand_status_label, \
            hs.kategorie AS hand_status_kategorie, hs.farbe AS hand_status_farbe, \
            hs.fms_anker AS hand_status_fms_anker, hs.sortier AS hand_status_sortier, \
@@ -352,6 +366,12 @@ async fn zu_anzeige_batch(
         )
         .unwrap_or(None);
         let soll = override_soll.or(typ_soll);
+        // Qualifikationssoll wie das Soll F/UF/M: eigen → Typ → keins (LLH-1553, D4).
+        let quali_soll_eigen = row.quali_soll.is_some();
+        let quali_soll = row
+            .quali_soll
+            .clone()
+            .or_else(|| row.typ_quali_soll.clone());
 
         let ist = anreicherung.staerken.eigene(row.id);
         let ist_kumuliert = anreicherung.staerken.kumuliert(row.id);
@@ -393,6 +413,8 @@ async fn zu_anzeige_batch(
             tz_organisation: row.tz_organisation,
             aktueller_br_id: row.aktueller_br_id,
             soll,
+            quali_soll,
+            quali_soll_eigen,
             ist,
             ist_kumuliert,
             personal_mitglieder,
@@ -726,6 +748,7 @@ async fn validiere(
     if let Some(parent) = daten.ueber_einheit_id {
         check_gehoert_zum_einsatz(&mut *conn, einsatz_id, parent).await?;
     }
+    crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, daten.quali_soll).await?;
     Ok(())
 }
 
@@ -760,8 +783,8 @@ pub async fn anlegen_tx(
         "INSERT INTO einsatz_einheit \
             (einsatz_id, abschnitt_id, ueber_einheit_id, typ_id, name, \
              soll_fuehrer, soll_unterfuehrer, soll_mannschaft, bemerkung, funkrufname, \
-             sortier, angelegt_von, tz_fachaufgabe, tz_organisation) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             sortier, angelegt_von, tz_fachaufgabe, tz_organisation, quali_soll) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.abschnitt_id)
@@ -777,6 +800,7 @@ pub async fn anlegen_tx(
     .bind(angelegt_von)
     .bind(daten.tz_fachaufgabe)
     .bind(daten.tz_organisation)
+    .bind(daten.quali_soll)
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
@@ -795,6 +819,8 @@ pub struct EinheitPatch<'a> {
     pub soll_mannschaft: Option<Option<i64>>,
     pub bemerkung: Option<Option<&'a str>>,
     pub funkrufname: Option<Option<&'a str>>,
+    /// Eigenes Qualifikationssoll, gespeicherte Form (LLH-1553); `Some(None)` = erbt vom Typ.
+    pub quali_soll: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
 }
 
@@ -822,6 +848,9 @@ async fn validiere_patch(
                 "Einheit darf nicht eigener Vorfahr werden".into(),
             ));
         }
+    }
+    if let Some(gespeichert) = patch.quali_soll {
+        crate::personal::quali_soll::pruefe_org(pool, org_id, gespeichert).await?;
     }
     Ok(())
 }
@@ -871,7 +900,8 @@ pub async fn patche(
             soll_mannschaft = CASE WHEN ?13 IS NULL THEN soll_mannschaft ELSE ?14 END, \
             bemerkung = CASE WHEN ?15 IS NULL THEN bemerkung ELSE ?16 END, \
             sortier = CASE WHEN ?17 IS NULL THEN sortier ELSE ?18 END, \
-            funkrufname = CASE WHEN ?19 IS NULL THEN funkrufname ELSE ?20 END \
+            funkrufname = CASE WHEN ?19 IS NULL THEN funkrufname ELSE ?20 END, \
+            quali_soll = CASE WHEN ?23 IS NULL THEN quali_soll ELSE ?24 END \
          WHERE id = ?21 AND einsatz_id = ?22",
     )
     .bind(patch.abschnitt_id.map(|_| 1_i64))
@@ -896,6 +926,8 @@ pub async fn patche(
     .bind(patch.funkrufname.and_then(|v| v))
     .bind(id)
     .bind(einsatz_id)
+    .bind(patch.quali_soll.map(|_| 1_i64))
+    .bind(patch.quali_soll.flatten())
     .execute(pool)
     .await?;
     if resultat.rows_affected() == 0 {
@@ -1615,6 +1647,14 @@ mod tests {
                 "nicht_uebernommen_seit",
             ),
             (super::super::unangemeldet_sql!(), "unangemeldet"),
+            (
+                crate::personal::quali_soll::quali_soll_sql!("e.quali_soll"),
+                "quali_soll",
+            ),
+            (
+                crate::personal::quali_soll::quali_soll_sql!("t.quali_soll"),
+                "typ_quali_soll",
+            ),
         ] {
             let erwartet = format!("{} AS {alias}", flach(makro));
             assert!(
@@ -1808,6 +1848,7 @@ mod tests {
             soll_fuehrer: f,
             soll_unterfuehrer: u,
             soll_mannschaft: m,
+            quali_soll: None,
             bemerkung: None,
             funkrufname: None,
             sortier: 0,
@@ -1982,6 +2023,101 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(ohne.soll, None);
+    }
+
+    /// LLH-1553 (Spec `qualifikationen`, „Wirksames Qualifikationssoll einer Einheit“): eigen →
+    /// Typ → keins; eine fremde Qualifikation ist 422.
+    #[tokio::test]
+    async fn quali_soll_eigen_vor_typ() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let rs = crate::personal::qualifikation_repo::anlegen(&pool, 1, "Rettungssanitäter", 20)
+            .await
+            .unwrap();
+        let san = crate::personal::qualifikation_repo::anlegen(&pool, 1, "Sanitäter", 10)
+            .await
+            .unwrap();
+        let typ: i64 = sqlx::query_scalar(
+            "INSERT INTO einheit_typ (org_id, label, quali_soll) VALUES (1, 'RTW', ?) RETURNING id",
+        )
+        .bind(format!(r#"[{{"q":{},"n":1}}]"#, rs.id))
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let erbt = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("RTW 1", Some(typ), None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        assert!(!erbt.quali_soll_eigen);
+        let q = &erbt.quali_soll.as_ref().expect("vom Typ").0;
+        assert_eq!((q[0].label.as_str(), q[0].anzahl), ("Rettungssanitäter", 1));
+
+        let eigen_json = format!(r#"[{{"q":{},"n":2}}]"#, san.id);
+        let eigen = patche(
+            &pool,
+            einsatz,
+            1,
+            erbt.id,
+            EinheitPatch {
+                quali_soll: Some(Some(&eigen_json)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert!(eigen.quali_soll_eigen);
+        assert_eq!(eigen.quali_soll.as_ref().unwrap().0[0].label, "Sanitäter");
+
+        // Zurück auf „erbt“.
+        let zurueck = patche(
+            &pool,
+            einsatz,
+            1,
+            erbt.id,
+            EinheitPatch {
+                quali_soll: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert!(!zurueck.quali_soll_eigen);
+        assert_eq!(zurueck.quali_soll, erbt.quali_soll);
+
+        let ohne = anlegen(&pool, einsatz, 1, daten("Frei", None, None, None, None), b)
+            .await
+            .unwrap();
+        assert_eq!(ohne.quali_soll, None);
+        assert!(!ohne.quali_soll_eigen);
+
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Fremd')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let fremd = crate::personal::qualifikation_repo::anlegen(&pool, 2, "Fremd", 1)
+            .await
+            .unwrap();
+        let fremd_json = format!(r#"[{{"q":{},"n":1}}]"#, fremd.id);
+        assert!(matches!(
+            patche(
+                &pool,
+                einsatz,
+                1,
+                erbt.id,
+                EinheitPatch {
+                    quali_soll: Some(Some(&fremd_json)),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
     }
 
     #[tokio::test]
@@ -2168,6 +2304,7 @@ mod tests {
                 soll_fuehrer: Some(1),
                 soll_unterfuehrer: Some(3),
                 soll_mannschaft: Some(18),
+                quali_soll: None,
                 bemerkung: Some("Bem"),
                 funkrufname: Some("Florian HM 12/44"),
                 sortier: 42,
@@ -2203,6 +2340,10 @@ mod tests {
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
+        let san = crate::personal::qualifikation_repo::anlegen(&pool, 1, "Sanitäter", 10)
+            .await
+            .unwrap();
+        let quali = format!(r#"[{{"q":{},"n":3}}]"#, san.id);
         let typ: i64 = sqlx::query_scalar(
             "INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug') RETURNING id",
         )
@@ -2236,11 +2377,14 @@ mod tests {
                 soll_mannschaft: Some(Some(30)),
                 bemerkung: Some(Some("B")),
                 funkrufname: Some(Some("F")),
+                quali_soll: Some(Some(&quali)),
                 sortier: Some(7),
             },
         )
         .await
         .unwrap();
+        assert!(nachher.quali_soll_eigen);
+        assert_eq!(nachher.quali_soll.as_ref().unwrap().0[0].anzahl, 3);
         assert_eq!(nachher.name, "Neu");
         assert_eq!(nachher.abschnitt_id, None);
         assert_eq!(nachher.ueber_einheit_id, Some(parent.id));

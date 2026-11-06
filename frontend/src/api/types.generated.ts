@@ -1966,6 +1966,13 @@ export interface components {
              */
             nicht_uebernommen_seit?: string | null;
             personal_mitglieder: components["schemas"]["EinheitMitgliedPerson"][];
+            /**
+             * @description Wirksames Qualifikationssoll (LLH-1553, design.md D4): das eigene, sonst das des Typs;
+             *     `None` = keins. Kein Urteil: „unterbesetzt“ urteilt weiter nur nach F/UF/M.
+             */
+            quali_soll?: components["schemas"]["QualiSollEintrag"][] | null;
+            /** @description Ob [`Self::quali_soll`] der eigene Wert der Einheit ist (sonst der des Typs). */
+            quali_soll_eigen: boolean;
             soll?: components["schemas"]["Staerke"] | null;
             /** Format: int64 */
             sortier: number;
@@ -2077,6 +2084,8 @@ export interface components {
             /** Format: int64 */
             id: number;
             label: string;
+            /** @description Qualifikationssoll des Typs (LLH-1553); `None` = kein Soll. */
+            quali_soll?: components["schemas"]["QualiSollEintrag"][] | null;
             soll?: components["schemas"]["Staerke"] | null;
             /** Format: int64 */
             sortier: number;
@@ -2108,6 +2117,13 @@ export interface components {
             material: components["schemas"]["EinheitVorlageMaterial"][];
             name: string;
             personal: components["schemas"]["EinheitVorlagePersonal"][];
+            /**
+             * @description Wirksames Qualifikationssoll (LLH-1553): das eigene, sonst das des Einheitstyps; fehlt,
+             *     wenn keins gilt.
+             */
+            quali_soll?: components["schemas"]["QualiSollEintrag"][] | null;
+            /** @description Ob [`Self::quali_soll`] das eigene der Vorlage ist (sonst das des Typs). */
+            quali_soll_eigen: boolean;
             soll?: components["schemas"]["Staerke"] | null;
             /** @description Ob [`Self::soll`] das eigene Soll der Vorlage ist (sonst das des Typs). */
             soll_eigen: boolean;
@@ -5713,6 +5729,14 @@ export interface components {
          * @enum {string}
          */
         Prioritaet: "sofort" | "dringend" | "normal";
+        /** @description Ein Eintrag in der Antwort, mit dem Label der Qualifikation. */
+        QualiSollEintrag: {
+            /** Format: int64 */
+            anzahl: number;
+            label: string;
+            /** Format: int64 */
+            qualifikation_id: number;
+        };
         /**
          * @description Qualifikations-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
          *     (Listen-Endpunkt liefert ohnehin nur aktive).
@@ -5721,6 +5745,12 @@ export interface components {
             /** Format: int64 */
             id: number;
             label: string;
+            /**
+             * Format: int64
+             * @description Die Qualifikation, die diese direkt einschließt (LLH-1553); transitiv gilt die ganze
+             *     Kette. Fehlt, wenn sie nur sich selbst deckt.
+             */
+            schliesst_ein_id?: number | null;
             /** Format: int64 */
             sortier: number;
         };
@@ -6551,6 +6581,16 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             notiz?: string | null;
+            /**
+             * @description Qualifikationssoll (LLH-1553); `None` = keins. Die UHS hat keinen Typ-Katalog, es gibt nur
+             *     den eigenen Wert.
+             */
+            quali_soll?: components["schemas"]["QualiSollEintrag"][] | null;
+            /**
+             * Format: int64
+             * @description Soll-Anzahl der Kräfte (LLH-1553); `None` = kein Soll.
+             */
+            soll_anzahl?: number | null;
             /**
              * @description Stärke aus den zugeordneten Einsatzkräften (LFH-1045, Spec `uhs-staerke`), berechnet in
              *     `repo::SELECT_ALLE`, nie gespeichert. `0/0/0` ohne Kräfte.

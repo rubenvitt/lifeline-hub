@@ -12324,4 +12324,141 @@ mod tests {
             "der Verlauf zeigt je verwaistem Fahrzeug den Austritt"
         );
     }
+
+    /// LLH-1553: Ketten der Startliste nur bei exakten Labels und leerem Einschluss; die neuen
+    /// `quali_soll`-Spalten nehmen nur gültiges JSON, `uhs.soll_anzahl` nur 1 bis 200.
+    #[tokio::test]
+    async fn migration_0276_qualifikation_einschluss_soll() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 276;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Andere')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let q = |org: i64, label: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO qualifikation (org_id, label) VALUES (?, ?) RETURNING id",
+                )
+                .bind(org)
+                .bind(label)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        // Org 1: Startliste.
+        let san = q(1, "Sanitäter").await;
+        let rs = q(1, "Rettungssanitäter").await;
+        let ns = q(1, "Notfallsanitäter").await;
+        let na = q(1, "Notarzt").await;
+        let tf = q(1, "Truppführer").await;
+        let gf = q(1, "Gruppenführer").await;
+        let zf = q(1, "Zugführer").await;
+        // Org 2: eigenes Label für RS, kein Truppführer.
+        let san2 = q(2, "Sanitäter").await;
+        let rs2 = q(2, "Rettungssanitäter/in").await;
+        let ns2 = q(2, "Notfallsanitäter").await;
+        let gf2 = q(2, "Gruppenführer").await;
+
+        migriere_bis(&pool, VERSION).await;
+
+        let ein = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, Option<i64>>(
+                    "SELECT schliesst_ein_id FROM qualifikation WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(ein(ns).await, Some(rs));
+        assert_eq!(ein(rs).await, Some(san));
+        assert_eq!(ein(san).await, None);
+        assert_eq!(ein(na).await, None, "Notarzt schließt nichts ein");
+        assert_eq!(ein(zf).await, Some(gf));
+        assert_eq!(ein(gf).await, Some(tf));
+        assert_eq!(ein(tf).await, None);
+        // Org 2: nie über die Organisation hinweg, eigenes Label bleibt ohne.
+        assert_eq!(
+            ein(rs2).await,
+            None,
+            "eigenes Label bekommt keinen Einschluss"
+        );
+        assert_eq!(ein(ns2).await, None, "Rettungssanitäter fehlt in Org 2");
+        assert_eq!(ein(gf2).await, None, "Truppführer fehlt in Org 2");
+        assert_eq!(ein(san2).await, None);
+
+        // CHECKs der neuen Spalten.
+        let typ: i64 = sqlx::query_scalar(
+            "INSERT INTO einheit_typ (org_id, label, quali_soll) VALUES (1, 'RTW', ?) RETURNING id",
+        )
+        .bind(format!(r#"[{{"q":{rs},"n":1}}]"#))
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(typ > 0);
+        sqlx::query(
+            "INSERT INTO einheit_typ (org_id, label, quali_soll) VALUES (1, 'X', 'kein json')",
+        )
+        .execute(&pool)
+        .await
+        .expect_err("einheit_typ.quali_soll nur JSON");
+        sqlx::query("INSERT INTO einheit_typ (org_id, label, quali_soll) VALUES (1, 'Y', '{}')")
+            .execute(&pool)
+            .await
+            .expect_err("einheit_typ.quali_soll nur als Liste");
+        sqlx::query(
+            "INSERT INTO einheit_vorlage (org_id, name, typ_id, quali_soll) VALUES (1, 'V', ?, '[')",
+        )
+        .bind(typ)
+        .execute(&pool)
+        .await
+        .expect_err("einheit_vorlage.quali_soll nur JSON");
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (einsatz_id, name, quali_soll) VALUES (?, 'E', '{x')",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .expect_err("einsatz_einheit.quali_soll nur JSON");
+        let uhs =
+            |soll_anzahl: Option<i64>, quali_soll: Option<&'static str>, name: &'static str| {
+                let pool = pool.clone();
+                async move {
+                    sqlx::query(
+                    "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von, \
+                        soll_anzahl, quali_soll) VALUES (?, 'sonstige', ?, ?, ?, ?, ?)",
+                )
+                .bind(e)
+                .bind(name)
+                .bind(b)
+                .bind(b)
+                .bind(soll_anzahl)
+                .bind(quali_soll)
+                .execute(&pool)
+                .await
+                }
+            };
+        uhs(Some(1), Some("[]"), "A").await.unwrap();
+        uhs(Some(200), None, "B").await.unwrap();
+        uhs(None, None, "C").await.unwrap();
+        uhs(Some(0), None, "D").await.expect_err("soll_anzahl ab 1");
+        uhs(Some(201), None, "E")
+            .await
+            .expect_err("soll_anzahl bis 200");
+        uhs(None, Some("nein"), "F")
+            .await
+            .expect_err("uhs.quali_soll nur JSON");
+    }
 }

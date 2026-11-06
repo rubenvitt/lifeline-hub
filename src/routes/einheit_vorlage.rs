@@ -14,6 +14,7 @@ use crate::einheit_vorlage::{
 };
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
+use crate::personal::quali_soll::{self, QualiSollEingabe};
 use crate::routes::support::{
     deserialize_optional_field, hoechstens, optional_max, parse_enum_opt, pflicht_max,
     pflicht_max_tri, trimme_tri,
@@ -53,6 +54,10 @@ pub struct VorlageBody {
     pub soll_fuehrer: Option<i64>,
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
+    /// Eigenes Qualifikationssoll (LLH-1553); fehlt, `null` oder `[]` = keins (dann gilt das des
+    /// Typs).
+    #[serde(default)]
+    pub quali_soll: Option<Vec<QualiSollEingabe>>,
     pub bemerkung: Option<String>,
     #[serde(default)]
     pub sortier: i64,
@@ -76,6 +81,7 @@ pub async fn create(
         body.soll_mannschaft,
     )
     .map_err(AppError::Validation)?;
+    let quali_soll = quali_soll::form_opt(body.quali_soll.as_deref())?;
     let vorlage = repo::create(
         &state.pool,
         benutzer.org_id,
@@ -87,6 +93,7 @@ pub async fn create(
             tz_fachaufgabe: tz_fachaufgabe.as_deref(),
             tz_organisation: tz_organisation.as_deref(),
             soll,
+            quali_soll: quali_soll.as_deref(),
             bemerkung: bemerkung.as_deref(),
             sortier: body.sortier,
         },
@@ -116,6 +123,9 @@ pub struct PatchVorlage {
     pub soll_unterfuehrer: Option<Option<i64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub soll_mannschaft: Option<Option<i64>>,
+    /// Tri-State (LLH-1553): `null` oder `[]` = kein eigenes Qualifikationssoll mehr.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub quali_soll: Option<Option<Vec<QualiSollEingabe>>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
     pub sortier: Option<i64>,
@@ -148,6 +158,7 @@ pub async fn update(
     let tz_fachaufgabe = check_tri(body.tz_fachaufgabe, "Fachaufgabe", TZ_MAX)?;
     let tz_organisation = check_tri(body.tz_organisation, "Organisation", TZ_MAX)?;
     let bemerkung = check_tri(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
+    let quali_soll = quali_soll::form_tri(body.quali_soll)?;
     let vorlage = repo::update(
         &state.pool,
         benutzer.org_id,
@@ -162,6 +173,7 @@ pub async fn update(
             soll_fuehrer: body.soll_fuehrer,
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
+            quali_soll: quali_soll.as_ref().map(|v| v.as_deref()),
             bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
             aktiv: body.aktiv,

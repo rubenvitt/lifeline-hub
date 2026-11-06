@@ -20,7 +20,7 @@ import { globalKeys } from '../api/queryKeys';
 import type { EinheitVorlage } from '../api/types';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { einheitVorlageDetailPath } from './stammdatenDetail';
-import { orderAsTree, sollText, type VorlageRow } from './einheitVorlagenBaum';
+import { orderAsTree, qualiSollTextVon, sollText, type VorlageRow } from './einheitVorlagenBaum';
 import EinheitVorlageFormModal from './EinheitVorlageFormModal';
 
 /** Einzug je Stufe der Unterstellung. */
@@ -101,7 +101,16 @@ export default function EinheitVorlagenTab() {
     {
       title: 'Soll',
       key: 'soll',
-      render: (_, { vorlage }) => <span style={monoStil(12)}>{sollText(vorlage)}</span>,
+      // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
+      render: (_, { vorlage }) => {
+        const quali = qualiSollTextVon(vorlage);
+        return (
+          <>
+            <span style={monoStil(12)}>{sollText(vorlage)}</span>
+            {quali ? ` · ${quali}` : null}
+          </>
+        );
+      },
     },
     {
       title: 'Aktiv',

@@ -855,6 +855,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
   const einheit = (id: number, name: string, br: number | null): Einheit => ({
     id,
     einsatz_id: 7,
+    quali_soll_eigen: false,
     abschnitt_id: null,
     ueber_einheit_id: null,
     typ_label: null,

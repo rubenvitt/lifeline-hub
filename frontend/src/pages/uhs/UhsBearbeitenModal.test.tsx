@@ -75,6 +75,39 @@ describe('uhsPatchAus · Teil-Patch gegen den Stand beim Öffnen', () => {
       }),
     ).toEqual({});
   });
+
+  it('Soll-Anzahl und Qualifikationssoll gehen nur geändert hinaus, leer heißt keins (LLH-1553)', () => {
+    const mitSoll = {
+      ...basis,
+      soll_anzahl: 4,
+      quali_soll: [{ qualifikation_id: 2, label: 'Rettungssanitäter', anzahl: 1 }],
+    } as Uhs;
+    const ort = { text: 'Halle 1', koordinate: punkt, quelle: 'karte' as const };
+    expect(
+      uhsPatchAus(mitSoll, {
+        bezeichnung: 'BHP 50',
+        standort: ort,
+        soll_anzahl: 4,
+        quali_soll: [{ qualifikation_id: 2, anzahl: 1 }, { anzahl: 1 }],
+      }),
+    ).toEqual({});
+    expect(
+      uhsPatchAus(mitSoll, {
+        bezeichnung: 'BHP 50',
+        standort: ort,
+        soll_anzahl: null,
+        quali_soll: [],
+      }),
+    ).toEqual({ soll_anzahl: null, quali_soll: null });
+    expect(
+      uhsPatchAus(basis, {
+        bezeichnung: 'BHP 50',
+        standort: ort,
+        soll_anzahl: 6,
+        quali_soll: [{ qualifikation_id: 1, anzahl: 2 }],
+      }),
+    ).toEqual({ soll_anzahl: 6, quali_soll: [{ qualifikation_id: 1, anzahl: 2 }] });
+  });
 });
 
 const TREFFER = {

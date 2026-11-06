@@ -850,6 +850,12 @@ pub async fn bilde_tx(
             _ => k.name.as_str(),
         };
         let soll = if k.soll_eigen { k.soll } else { None };
+        // Wie das Soll: nur ein eigenes Qualifikationssoll der Vorlage wird zum eigenen Wert der
+        // Einheit; sonst erbt sie vom Typ (LLH-1553, design.md D4).
+        let quali_soll = match (&k.quali_soll, k.quali_soll_eigen) {
+            (Some(q), true) => Some(q.gespeichert()),
+            _ => None,
+        };
         // Eltern stehen vor ihren Kindern (`load_tree_tx`); ein fehlender Elternteil ist ein
         // Programmfehler, keine eigenständige Einheit.
         let ueber = if wurzel {
@@ -878,6 +884,7 @@ pub async fn bilde_tx(
                 soll_fuehrer: soll.map(|s| i64::from(s.fuehrer)),
                 soll_unterfuehrer: soll.map(|s| i64::from(s.unterfuehrer)),
                 soll_mannschaft: soll.map(|s| i64::from(s.mannschaft)),
+                quali_soll: quali_soll.as_deref(),
                 bemerkung: None,
                 funkrufname: k.funkrufname.as_deref(),
                 sortier: k.sortier,

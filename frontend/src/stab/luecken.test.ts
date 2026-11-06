@@ -63,6 +63,7 @@ function einheit(
   return {
     id,
     einsatz_id: 1,
+    quali_soll_eigen: false,
     name: `E${id}`,
     sortier: id,
     sprechgruppen,

@@ -37,13 +37,17 @@ Ein Lageplan als Hintergrund des Grundrisses lässt sich über „Plan“ hochla
 der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und „Plätze anlegen“ hinter
 „Plätze bearbeiten“; dort lassen sich Plätze auch verschieben und löschen.
 
-### Bezeichnung, Standort und Notiz ändern
+### Bezeichnung, Standort, Soll und Notiz ändern
 
 1. Die Stelle öffnen und oben „Bearbeiten“ wählen.
 2. „Bezeichnung“, „Standort (optional)“ oder „Notiz (optional)“ ändern. Den Standort mit Enter
    oder „Ort suchen“ suchen und einen Treffer wählen, eine Koordinate eintippen oder den Punkt über
    „Auf Karte wählen“ setzen; ein geleerter Standort löscht auch die Koordinate.
-3. „Speichern“ wählen. Gespeichert wird nur, was sich geändert hat.
+3. Unter „Soll-Anzahl (optional)“ eintragen, wie viele Kräfte die Stelle braucht (1 bis 200), und
+   unter „Qualifikationssoll“ mit „Qualifikation fordern“, welche Qualifikationen mindestens dabei
+   sein müssen.
+4. „Speichern“ wählen. Gespeichert wird nur, was sich geändert hat. Das Soll steht im Kopf der
+   Stelle vor der Notiz.
 
 Eine aufgelöste oder stornierte Stelle lässt sich nicht mehr bearbeiten.
 

@@ -80,6 +80,13 @@ pub struct EinheitVorlage {
     pub soll: Option<Staerke>,
     /// Ob [`Self::soll`] das eigene Soll der Vorlage ist (sonst das des Typs).
     pub soll_eigen: bool,
+    /// Wirksames Qualifikationssoll (LLH-1553): das eigene, sonst das des Einheitstyps; fehlt,
+    /// wenn keins gilt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Vec<crate::personal::quali_soll::QualiSollEintrag>>)]
+    pub quali_soll: Option<crate::personal::quali_soll::QualiSoll>,
+    /// Ob [`Self::quali_soll`] das eigene der Vorlage ist (sonst das des Typs).
+    pub quali_soll_eigen: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bemerkung: Option<String>,
     pub sortier: i64,

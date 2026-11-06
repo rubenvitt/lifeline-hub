@@ -146,6 +146,7 @@ const EINHEITEN = [
   {
     id: 10,
     einsatz_id: 1,
+    quali_soll_eigen: false,
     name: '1. Zug',
     funkrufname: 'Florian 1/10',
     verbindungen: [{ id: 42, mittel: 'mobil', wert: '0160 222', hinweis: null }],

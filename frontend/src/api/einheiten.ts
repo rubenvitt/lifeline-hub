@@ -5,6 +5,7 @@ import type {
   EinheitenAusNachforderungEingabe,
   Nachforderung,
   NeueVerbindung,
+  QualiSollEingabe,
   UebernahmeBody,
   VorlageVorschau,
 } from './types';
@@ -19,6 +20,8 @@ export interface EinheitEingabe {
   soll_fuehrer?: number | null;
   soll_unterfuehrer?: number | null;
   soll_mannschaft?: number | null;
+  /** LLH-1553: eigenes Qualifikationssoll; `[]` = keins, es gilt das des Typs. */
+  quali_soll?: QualiSollEingabe[] | null;
   bemerkung?: string | null;
   /** LFH-614: eigener Funkrufname der Einheit (Freitext, `null` leert). */
   funkrufname?: string | null;

@@ -14,6 +14,7 @@ use super::{
 use crate::error::AppError;
 use crate::katalog::DIENSTSTATUS_IN_DIENST;
 use crate::material::MaterialArt;
+use crate::personal::quali_soll::QualiSoll;
 use crate::staerke::{Staerke, StaerkePosition};
 use crate::write_retry;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -29,6 +30,8 @@ pub struct NewVorlage<'a> {
     pub tz_fachaufgabe: Option<&'a str>,
     pub tz_organisation: Option<&'a str>,
     pub soll: Option<Staerke>,
+    /// Eigenes Qualifikationssoll in gespeicherter Form (LLH-1553, `personal::quali_soll::form`).
+    pub quali_soll: Option<&'a str>,
     pub bemerkung: Option<&'a str>,
     pub sortier: i64,
 }
@@ -46,6 +49,8 @@ pub struct VorlagePatch<'a> {
     pub soll_fuehrer: Option<Option<i64>>,
     pub soll_unterfuehrer: Option<Option<i64>>,
     pub soll_mannschaft: Option<Option<i64>>,
+    /// Eigenes Qualifikationssoll, gespeicherte Form (LLH-1553); `Some(None)` = keins.
+    pub quali_soll: Option<Option<&'a str>>,
     pub bemerkung: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
     pub aktiv: Option<bool>,
@@ -172,6 +177,8 @@ struct HeadRow {
     typ_soll_fuehrer: Option<i64>,
     typ_soll_unterfuehrer: Option<i64>,
     typ_soll_mannschaft: Option<i64>,
+    quali_soll: Option<QualiSoll>,
+    typ_quali_soll: Option<QualiSoll>,
     bemerkung: Option<String>,
     sortier: i64,
     aktiv: bool,
@@ -257,12 +264,16 @@ async fn load_where(
         Selection::All(nur_aktive) => (*nur_aktive, None),
         Selection::Ids(ids) => (false, Some(json_ids(ids.iter().copied())?)),
     };
-    let heads: Vec<HeadRow> = sqlx::query_as(
+    let heads: Vec<HeadRow> = sqlx::query_as(concat!(
         "SELECT v.id, v.name, v.typ_id, t.label AS typ_label, v.ueber_vorlage_id, \
                 v.funkrufname, v.tz_fachaufgabe, v.tz_organisation, \
                 v.soll_fuehrer, v.soll_unterfuehrer, v.soll_mannschaft, \
                 t.soll_fuehrer AS typ_soll_fuehrer, t.soll_unterfuehrer AS typ_soll_unterfuehrer, \
-                t.soll_mannschaft AS typ_soll_mannschaft, \
+                t.soll_mannschaft AS typ_soll_mannschaft, ",
+        crate::personal::quali_soll::quali_soll_sql!("v.quali_soll"),
+        " AS quali_soll, ",
+        crate::personal::quali_soll::quali_soll_sql!("t.quali_soll"),
+        " AS typ_quali_soll, \
                 v.bemerkung, v.sortier, v.aktiv, \
                 EXISTS(SELECT 1 FROM demo_herkunft dh \
                        WHERE dh.tabelle = 'einheit_vorlage' AND dh.datensatz_id = v.id) AS ist_demo \
@@ -270,7 +281,7 @@ async fn load_where(
          WHERE v.org_id = ?1 AND (?2 = 0 OR v.aktiv = 1) \
            AND (?3 IS NULL OR v.id IN (SELECT value FROM json_each(?3))) \
          ORDER BY v.sortier, v.name COLLATE NOCASE, v.id",
-    )
+    ))
     .bind(org_id)
     .bind(nur_aktive)
     .bind(ids.as_deref())
@@ -397,6 +408,8 @@ async fn load_where(
                 personal: personal_je.remove(&k.id).unwrap_or_default(),
                 material: material_je.remove(&k.id).unwrap_or_default(),
                 soll_eigen: eigen.is_some(),
+                quali_soll_eigen: k.quali_soll.is_some(),
+                quali_soll: k.quali_soll.or(k.typ_quali_soll),
                 soll: eigen.or_else(|| {
                     trio(
                         k.typ_soll_fuehrer,
@@ -508,6 +521,7 @@ pub async fn create_tx(
     daten: &NewVorlage<'_>,
 ) -> Result<i64, AppError> {
     check_typ(conn, org_id, daten.typ_id).await?;
+    crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, daten.quali_soll).await?;
     if let Some(ueber) = daten.ueber_vorlage_id {
         let edges = Edges::load(conn, org_id).await?;
         if !edges.parents.contains_key(&ueber) {
@@ -525,8 +539,8 @@ pub async fn create_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO einheit_vorlage (org_id, name, typ_id, ueber_vorlage_id, funkrufname, \
              tz_fachaufgabe, tz_organisation, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, \
-             bemerkung, sortier) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             quali_soll, bemerkung, sortier) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(daten.name)
@@ -538,6 +552,7 @@ pub async fn create_tx(
     .bind(f)
     .bind(u)
     .bind(m)
+    .bind(daten.quali_soll)
     .bind(daten.bemerkung)
     .bind(daten.sortier)
     .fetch_one(&mut *conn)
@@ -646,6 +661,9 @@ pub async fn update_tx(
     if let Some(typ_id) = patch.typ_id {
         check_typ(conn, org_id, typ_id).await?;
     }
+    if let Some(gespeichert) = patch.quali_soll {
+        crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, gespeichert).await?;
+    }
     if let Some(Some(ueber)) = patch.ueber_vorlage_id {
         if bestand.3 != Some(ueber) {
             let edges = Edges::load(conn, org_id).await?;
@@ -683,7 +701,8 @@ pub async fn update_tx(
             soll_mannschaft = CASE WHEN ?17 IS NULL THEN soll_mannschaft ELSE ?18 END, \
             bemerkung = CASE WHEN ?19 IS NULL THEN bemerkung ELSE ?20 END, \
             sortier = CASE WHEN ?21 IS NULL THEN sortier ELSE ?22 END, \
-            aktiv = CASE WHEN ?23 IS NULL THEN aktiv ELSE ?24 END \
+            aktiv = CASE WHEN ?23 IS NULL THEN aktiv ELSE ?24 END, \
+            quali_soll = CASE WHEN ?27 IS NULL THEN quali_soll ELSE ?28 END \
          WHERE id = ?25 AND org_id = ?26",
     )
     .bind(patch.name.map(|_| 1_i64))
@@ -712,6 +731,8 @@ pub async fn update_tx(
     .bind(patch.aktiv)
     .bind(id)
     .bind(org_id)
+    .bind(patch.quali_soll.map(|_| 1_i64))
+    .bind(patch.quali_soll.flatten())
     .execute(&mut *conn)
     .await
     .map_err(AppError::from)

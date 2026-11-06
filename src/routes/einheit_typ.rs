@@ -5,6 +5,7 @@ use crate::einheit::EinheitTyp;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::personal::quali_soll::{self, QualiSollEingabe};
 use crate::routes::support::{deserialize_optional_field, pflicht};
 use crate::staerke::Staerke;
 use axum::extract::State;
@@ -18,6 +19,9 @@ pub struct TypBody {
     pub soll_fuehrer: Option<i64>,
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
+    /// Qualifikationssoll (LLH-1553); fehlt, `null` oder `[]` = kein Soll.
+    #[serde(default)]
+    pub quali_soll: Option<Vec<QualiSollEingabe>>,
     #[serde(default)]
     pub sortier: i64,
 }
@@ -28,6 +32,7 @@ struct Normalisiert {
     soll_fuehrer: Option<i64>,
     soll_unterfuehrer: Option<i64>,
     soll_mannschaft: Option<i64>,
+    quali_soll: Option<String>,
     sortier: i64,
 }
 
@@ -38,6 +43,7 @@ impl Normalisiert {
             soll_fuehrer: self.soll_fuehrer,
             soll_unterfuehrer: self.soll_unterfuehrer,
             soll_mannschaft: self.soll_mannschaft,
+            quali_soll: self.quali_soll.as_deref(),
             sortier: self.sortier,
         }
     }
@@ -55,11 +61,13 @@ fn normalisiere(body: TypBody) -> Result<Normalisiert, AppError> {
         body.soll_mannschaft,
     )
     .map_err(AppError::Validation)?;
+    let quali_soll = quali_soll::form_opt(body.quali_soll.as_deref())?;
     Ok(Normalisiert {
         label,
         soll_fuehrer: body.soll_fuehrer,
         soll_unterfuehrer: body.soll_unterfuehrer,
         soll_mannschaft: body.soll_mannschaft,
+        quali_soll,
         sortier: body.sortier,
     })
 }
@@ -77,6 +85,9 @@ pub struct PatchTyp {
     pub soll_unterfuehrer: Option<Option<i64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub soll_mannschaft: Option<Option<i64>>,
+    /// Tri-State (LLH-1553): fehlt = unverändert, `null` oder `[]` = kein Soll.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub quali_soll: Option<Option<Vec<QualiSollEingabe>>>,
     pub sortier: Option<i64>,
 }
 
@@ -86,6 +97,7 @@ struct PatchNormalisiert {
     soll_fuehrer: Option<Option<i64>>,
     soll_unterfuehrer: Option<Option<i64>>,
     soll_mannschaft: Option<Option<i64>>,
+    quali_soll: Option<Option<String>>,
     sortier: Option<i64>,
 }
 
@@ -96,6 +108,7 @@ impl PatchNormalisiert {
             soll_fuehrer: self.soll_fuehrer,
             soll_unterfuehrer: self.soll_unterfuehrer,
             soll_mannschaft: self.soll_mannschaft,
+            quali_soll: self.quali_soll.as_ref().map(|q| q.as_deref()),
             sortier: self.sortier,
         }
     }
@@ -130,11 +143,13 @@ fn normalisiere_patch(
         effektiv(body.soll_mannschaft, bestand.2),
     )
     .map_err(AppError::Validation)?;
+    let quali_soll = quali_soll::form_tri(body.quali_soll)?;
     Ok(PatchNormalisiert {
         label,
         soll_fuehrer: body.soll_fuehrer,
         soll_unterfuehrer: body.soll_unterfuehrer,
         soll_mannschaft: body.soll_mannschaft,
+        quali_soll,
         sortier: body.sortier,
     })
 }
@@ -155,6 +170,7 @@ pub async fn anlegen(
     JsonBody(body): JsonBody<TypBody>,
 ) -> Result<(StatusCode, Json<EinheitTyp>), AppError> {
     let n = normalisiere(body)?;
+    quali_soll::pruefe_org(&state.pool, benutzer.org_id, n.quali_soll.as_deref()).await?;
     let t = typ_repo::anlegen(&state.pool, benutzer.org_id, n.daten()).await?;
     Ok((StatusCode::CREATED, Json(t)))
 }
@@ -170,6 +186,9 @@ pub async fn aktualisieren(
     // Bestand vor der Validierung — liefert zugleich das 404 für fremde/unbekannte id.
     let bestand = typ_repo::soll_roh(&state.pool, benutzer.org_id, id).await?;
     let n = normalisiere_patch(body, bestand)?;
+    if let Some(gespeichert) = &n.quali_soll {
+        quali_soll::pruefe_org(&state.pool, benutzer.org_id, gespeichert.as_deref()).await?;
+    }
     let t = typ_repo::patche(&state.pool, benutzer.org_id, id, n.patch()).await?;
     Ok(Json(t))
 }
@@ -198,6 +217,7 @@ mod tests {
             soll_fuehrer: f,
             soll_unterfuehrer: u,
             soll_mannschaft: m,
+            quali_soll: None,
             sortier: 0,
         }
     }
@@ -232,8 +252,41 @@ mod tests {
             soll_fuehrer: None,
             soll_unterfuehrer: None,
             soll_mannschaft: None,
+            quali_soll: None,
             sortier: None,
         }
+    }
+
+    /// LLH-1553: Grenzen des Qualifikationssolls sind 400, `[]` wird zu „kein Soll“.
+    #[test]
+    fn quali_soll_grenzen_und_leere_liste() {
+        let eintrag = |q, n| QualiSollEingabe {
+            qualifikation_id: q,
+            anzahl: n,
+        };
+        let mut b = body("RTW", None);
+        b.quali_soll = Some(vec![eintrag(1, 1), eintrag(1, 2)]);
+        assert!(matches!(
+            normalisiere(b).unwrap_err(),
+            AppError::Validation(_)
+        ));
+        let mut b = body("RTW", None);
+        b.quali_soll = Some(vec![]);
+        assert_eq!(normalisiere(b).unwrap().quali_soll, None);
+        let mut p = leerer_patch();
+        p.quali_soll = Some(Some(vec![]));
+        assert_eq!(
+            normalisiere_patch(p, (None, None, None))
+                .unwrap()
+                .quali_soll,
+            Some(None)
+        );
+        let mut p = leerer_patch();
+        p.quali_soll = Some(Some(vec![eintrag(1, 0)]));
+        assert!(matches!(
+            normalisiere_patch(p, (None, None, None)).unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 
     /// Kern der Effektivzustands-Prüfung: EIN Soll-Feld zu patchen ist zulässig, solange

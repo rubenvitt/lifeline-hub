@@ -8,11 +8,14 @@ import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import { globalKeys } from '../api/queryKeys';
 import KatalogVerwaltung from './KatalogVerwaltung';
+import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../kraefte/QualiSollFeld';
+import { qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
 
 interface FormWerte {
   label: string;
   soll?: Staerke | null;
   sortier: number;
+  quali_soll?: QualiSollZeile[];
 }
 
 // Keine Filterspalte in diesem Katalog: `EinheitTyp` trägt weder Status noch Kategorie, und
@@ -34,10 +37,14 @@ const spalten: TableColumnsType<EinheitTyp> = [
     sorter: nachZahl((t: EinheitTyp) => staerkeSumme(t.soll)),
     // Mono an der AUFRUFSTELLE, nicht im Primitiv: `StaerkeAnzeige` rendert bewusst ein
     // Fragment, damit zusammengesetzte Textzeilen nicht in mehrere Textknoten zerfallen.
+    // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
     render: (_, t) => (
-      <span style={monoStil(12)}>
-        <StaerkeAnzeige wert={t.soll ?? null} />
-      </span>
+      <>
+        <span style={monoStil(12)}>
+          <StaerkeAnzeige wert={t.soll ?? null} />
+        </span>
+        {t.quali_soll?.length ? ` · ${qualiSollText(t.quali_soll)}` : null}
+      </>
     ),
   },
   {
@@ -54,6 +61,7 @@ const vorbelegung = (t: EinheitTyp): FormWerte => ({
   label: t.label,
   soll: t.soll,
   sortier: t.sortier,
+  quali_soll: qualiSollEingabe(t.quali_soll),
 });
 
 /** Schnellerfassung: Pflicht ist allein das Label; die Soll-Stärke bleibt leer. */
@@ -73,9 +81,10 @@ const aktualisiere = (id: number, werte: FormWerte) =>
     soll_unterfuehrer: werte.soll?.unterfuehrer ?? null,
     soll_mannschaft: werte.soll?.mannschaft ?? null,
     sortier: werte.sortier ?? 0,
+    quali_soll: vollstaendig(werte.quali_soll),
   });
 
-const felder = (
+const felder = (bearbeite: EinheitTyp | null) => (
   <>
     <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
       <Input placeholder="z. B. Zug" />
@@ -83,6 +92,9 @@ const felder = (
     {/* „Alle drei oder keiner“ setzt `StaerkeEingabe` selbst durch (leere Felder zählen als 0). */}
     <Form.Item label="Soll-Stärke" name="soll">
       <StaerkeEingabe />
+    </Form.Item>
+    <Form.Item label="Qualifikationssoll" name="quali_soll">
+      <QualiSollFeld bekannt={bearbeite?.quali_soll} />
     </Form.Item>
     <Form.Item label="Sortierung" name="sortier">
       <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />

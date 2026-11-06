@@ -249,6 +249,13 @@ export type StaerkePosition = S['StaerkePosition'];
 export type Personal = S['PersonalAnzeige'];
 export type PersonalVorschlaege = S['PersonalVorschlaege'];
 export type Qualifikation = S['Qualifikation'];
+/** Qualifikationssoll (LLH-1553): wirksame Einträge mit Label. */
+export type QualiSollEintrag = S['QualiSollEintrag'];
+/** Eingabe des Qualifikationssolls; `[]` = kein eigenes. */
+export interface QualiSollEingabe {
+  qualifikation_id: number;
+  anzahl: number;
+}
 export type PersonalStatus = S['PersonalStatus'];
 export type EinheitTyp = S['EinheitTyp'];
 export type EinsatzPersonal = S['EinsatzPersonalAnzeige'];
@@ -300,6 +307,8 @@ export interface NeueEinheitVorlage {
   soll_fuehrer?: number | null;
   soll_unterfuehrer?: number | null;
   soll_mannschaft?: number | null;
+  /** Eigenes Qualifikationssoll (LLH-1553); `[]` = keins, es gilt das des Typs. */
+  quali_soll?: QualiSollEingabe[] | null;
   bemerkung?: string | null;
   sortier?: number;
 }
@@ -316,6 +325,8 @@ export interface PatchEinheitVorlage {
   soll_fuehrer?: number | null;
   soll_unterfuehrer?: number | null;
   soll_mannschaft?: number | null;
+  /** Eigenes Qualifikationssoll (LLH-1553); `[]` = keins, es gilt das des Typs. */
+  quali_soll?: QualiSollEingabe[] | null;
   bemerkung?: string | null;
   sortier?: number;
   aktiv?: boolean;

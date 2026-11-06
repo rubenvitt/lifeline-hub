@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
 ---
 
 ## Überblick
@@ -79,6 +79,30 @@ gleich:
 3. Zum Ändern in der Zeile „Bearbeiten“ wählen.
 4. Zum Entfernen „Deaktivieren“ wählen und die Rückfrage „Qualifikation deaktivieren?“ mit
    „Qualifikation deaktivieren“ bestätigen.
+
+### Qualifikationen verketten
+
+Eine Qualifikation kann eine andere einschließen: Wer Notfallsanitäter ist, zählt auch als
+Rettungssanitäter und als Sanitäter. Die Ketten Notfallsanitäter → Rettungssanitäter → Sanitäter
+und Zugführer → Gruppenführer → Truppführer sind voreingestellt.
+
+1. Unter „Stammdaten“ „Qualifikationen“ öffnen.
+2. In der Zeile „Bearbeiten“ wählen.
+3. Unter „Schließt ein“ die nächstniedrigere Qualifikation wählen, zum Lösen das Feld leeren.
+4. „Speichern“ wählen. Die Spalte „Schließt ein“ zeigt die Kette.
+
+Zur Wahl stehen nur Qualifikationen, die keinen Kreis bilden.
+
+### Qualifikationen fordern
+
+Einheitstyp, Einheiten-Vorlage, Einheit und Unfallhilfsstelle können ein Qualifikationssoll
+tragen, etwa „mind. 1 Notfallsanitäter, 2 Rettungssanitäter“.
+
+1. Beim Einheitstyp „Bearbeiten“ wählen, bei der Einheiten-Vorlage ihre Seite öffnen.
+2. Unter „Qualifikationssoll“ „Qualifikation fordern“ wählen, die Qualifikation und die Anzahl
+   eintragen. Eine weitere Zeile kommt mit demselben Knopf dazu, eine Zeile geht mit dem
+   Papierkorb.
+3. „Speichern“ wählen. Das Soll steht hinter der Soll-Stärke.
 
 ### Externe Stellen pflegen
 
@@ -290,6 +314,19 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
   Stichworte die Kopplung; die Stichworte bleiben.
 - Jede Bezeichnung gibt es in der Organisation nur einmal, höchstens 100 Zeichen lang.
 
+### Qualifikationen und Qualifikationssoll
+
+- Eine Qualifikation schließt höchstens eine andere direkt ein; die Kette gilt durchgehend. Eine
+  Person deckt eine geforderte Qualifikation, wenn sie sie hat oder eine, die sie einschließt.
+  Jede Person zählt für höchstens eine Forderung.
+- Ein Qualifikationssoll hat höchstens 10 Zeilen, je Zeile 1 bis 50 Personen, jede Qualifikation
+  einmal.
+- Eine deaktivierte Qualifikation bleibt in Ketten und in einem bestehenden Soll wirksam.
+- Wer eine Einheit aus einer Vorlage bildet, bekommt deren eigenes Qualifikationssoll mit.
+- Die Ketten der Startliste gelten für neue Organisationen. Bestehende Organisationen haben sie
+  beim Update nur bekommen, wo beide Bezeichnungen genau so lauten und noch kein Einschluss gesetzt
+  war; eine Qualifikation wie „Rettungssanitäter/in“ bleibt ohne Kette.
+
 ### Einheiten-Vorlagen
 
 - Eine Vorlage hat einen Namen, einen Einheitstyp und nach Bedarf eine übergeordnete Vorlage.
@@ -309,7 +346,7 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
   einmal. Neu hinzufügen lässt sich nur Material in Dienst; später außer Dienst genommenes bleibt
   und trägt „außer Dienst“. Höchstens 50 Zeilen je Vorlage.
 - Ohne eigene Soll-Stärke gilt die des Einheitstyps. Sie steht als „Vorgabe des Einheitstyps“
-  unter dem Feld und in der Liste mit „(Vorgabe)“. Ohne Position einer Person gilt die Position
+  unter dem Feld und in der Liste mit „(Vorgabe)“. Für das Qualifikationssoll gilt dasselbe. Ohne Position einer Person gilt die Position
   aus ihren Stammdaten.
 - Eine Vorlage lässt sich nicht löschen. Mit dem Schalter „Aktiv“ wird sie stillgelegt und
   wieder aktiviert. Eine stillgelegte Vorlage steht nicht mehr als Unterstellung zur Wahl (außer

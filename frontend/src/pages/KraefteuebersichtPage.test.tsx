@@ -122,6 +122,7 @@ const ABSCHNITT_A1 = {
 const EINHEIT_E10 = {
   id: 20,
   einsatz_id: 1,
+  quali_soll_eigen: false,
   abschnitt_id: 10,
   abschnitt_name: 'Abschnitt Nord',
   ueber_einheit_id: null,

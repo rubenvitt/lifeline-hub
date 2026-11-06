@@ -1,0 +1,117 @@
+{
+  "zweck": "LLH-1553: gemeinsame Fälle der Deckungsregel. Gelesen von src/personal/qualifikation_deckung.rs und frontend/src/kraefte/qualiDeckung.test.ts. Personen sind Listen von Qualifikations-IDs, offen ist die erwartete Lücke je Qualifikation in der Reihenfolge des Solls.",
+  "katalog": [
+    { "id": 1, "label": "Sanitäter", "schliesst_ein_id": null },
+    { "id": 2, "label": "Rettungssanitäter", "schliesst_ein_id": 1 },
+    { "id": 3, "label": "Notfallsanitäter", "schliesst_ein_id": 2 },
+    { "id": 4, "label": "Notarzt", "schliesst_ein_id": null },
+    { "id": 5, "label": "Truppführer", "schliesst_ein_id": null },
+    { "id": 6, "label": "Gruppenführer", "schliesst_ein_id": 5 },
+    { "id": 7, "label": "Zugführer", "schliesst_ein_id": 6 },
+    { "id": 8, "label": "Maschinist", "schliesst_ein_id": null }
+  ],
+  "faelle": [
+    {
+      "name": "Kette: Notfallsanitäter deckt Sanitäter",
+      "soll": [{ "qualifikation_id": 1, "anzahl": 1 }],
+      "personen": [[3]],
+      "offen": []
+    },
+    {
+      "name": "Ohne Einschluss deckt eine Qualifikation nur sich selbst",
+      "soll": [{ "qualifikation_id": 1, "anzahl": 1 }],
+      "personen": [[4]],
+      "offen": [{ "qualifikation_id": 1, "fehlen": 1 }]
+    },
+    {
+      "name": "Niedrigere deckt höhere nicht",
+      "soll": [{ "qualifikation_id": 2, "anzahl": 1 }],
+      "personen": [[1], [1]],
+      "offen": [{ "qualifikation_id": 2, "fehlen": 1 }]
+    },
+    {
+      "name": "Vielseitige Person",
+      "soll": [
+        { "qualifikation_id": 2, "anzahl": 1 },
+        { "qualifikation_id": 1, "anzahl": 1 }
+      ],
+      "personen": [[2], [1]],
+      "offen": []
+    },
+    {
+      "name": "Falsche Reihenfolge wäre zu streng",
+      "soll": [
+        { "qualifikation_id": 1, "anzahl": 1 },
+        { "qualifikation_id": 2, "anzahl": 1 }
+      ],
+      "personen": [[3], [2]],
+      "offen": []
+    },
+    {
+      "name": "Vielseitige Person verbaut nicht die einzige Stelle",
+      "soll": [
+        { "qualifikation_id": 1, "anzahl": 1 },
+        { "qualifikation_id": 8, "anzahl": 1 }
+      ],
+      "personen": [[1, 8], [1]],
+      "offen": []
+    },
+    {
+      "name": "Eine Person deckt höchstens einen Platz",
+      "soll": [
+        { "qualifikation_id": 2, "anzahl": 1 },
+        { "qualifikation_id": 8, "anzahl": 1 }
+      ],
+      "personen": [[2, 8]],
+      "offen": [{ "qualifikation_id": 8, "fehlen": 1 }]
+    },
+    {
+      "name": "Strengster Platz zuerst: die Lücke bleibt beim niedrigeren",
+      "soll": [
+        { "qualifikation_id": 1, "anzahl": 1 },
+        { "qualifikation_id": 2, "anzahl": 1 }
+      ],
+      "personen": [[2]],
+      "offen": [{ "qualifikation_id": 1, "fehlen": 1 }]
+    },
+    {
+      "name": "Anzahl größer eins",
+      "soll": [{ "qualifikation_id": 1, "anzahl": 3 }],
+      "personen": [[1], [2], [5]],
+      "offen": [{ "qualifikation_id": 1, "fehlen": 1 }]
+    },
+    {
+      "name": "Zweite Kette",
+      "soll": [
+        { "qualifikation_id": 6, "anzahl": 1 },
+        { "qualifikation_id": 5, "anzahl": 2 }
+      ],
+      "personen": [[7], [6], [5]],
+      "offen": []
+    },
+    {
+      "name": "Mehrere Lücken in der Reihenfolge des Solls",
+      "soll": [
+        { "qualifikation_id": 3, "anzahl": 1 },
+        { "qualifikation_id": 1, "anzahl": 2 }
+      ],
+      "personen": [[1]],
+      "offen": [
+        { "qualifikation_id": 3, "fehlen": 1 },
+        { "qualifikation_id": 1, "fehlen": 1 }
+      ]
+    },
+    {
+      "name": "Leeres Soll",
+      "soll": [],
+      "personen": [[1]],
+      "offen": []
+    },
+    {
+      "name": "Unbekannte Qualifikation einer Person zählt nur für sich",
+      "soll": [{ "qualifikation_id": 1, "anzahl": 1 }],
+      "personen": [[99]],
+      "offen": [{ "qualifikation_id": 1, "fehlen": 1 }]
+    }
+  ]
+}

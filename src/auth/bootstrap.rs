@@ -4,7 +4,8 @@ use crate::error::AppError;
 use crate::etb_baustein::ETB_BAUSTEIN_STARTLISTE;
 use crate::fahrzeug::STATUS_STARTLISTE;
 use crate::personal::{
-    PERSONAL_STATUS_STARTLISTE, PERSONAL_STATUS_STARTMARKEN, QUALIFIKATION_STARTLISTE,
+    PERSONAL_STATUS_STARTLISTE, PERSONAL_STATUS_STARTMARKEN, QUALIFIKATION_EINSCHLUSS_STARTLISTE,
+    QUALIFIKATION_STARTLISTE,
 };
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 use sqlx::SqlitePool;
@@ -135,6 +136,19 @@ pub async fn bootstrap_admin(
             .execute(&mut *tx)
             .await?;
     }
+    // Ketten der Startliste (LLH-1553, design.md D2): wie das Bestands-Update in 0276.
+    for (label, schliesst_ein) in QUALIFIKATION_EINSCHLUSS_STARTLISTE {
+        sqlx::query(
+            "UPDATE qualifikation SET schliesst_ein_id = \
+                (SELECT z.id FROM qualifikation z WHERE z.org_id = ?1 AND z.label = ?3) \
+             WHERE org_id = ?1 AND label = ?2",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(schliesst_ein)
+        .execute(&mut *tx)
+        .await?;
+    }
 
     for (label, kategorie, sortier) in PERSONAL_STATUS_STARTLISTE {
         let marke = PERSONAL_STATUS_STARTMARKEN
@@ -260,6 +274,36 @@ mod tests {
                 .await
                 .unwrap();
         assert!(password::verifizieren(&pw, &hash));
+    }
+
+    /// LLH-1553: die Startliste bringt die Ketten mit, Notarzt schließt nichts ein.
+    #[tokio::test]
+    async fn seedet_qualifikations_ketten_fuer_neue_org() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        let ketten: Vec<(String, Option<String>)> = sqlx::query_as(
+            "SELECT q.label, z.label FROM qualifikation q \
+             LEFT JOIN qualifikation z ON z.id = q.schliesst_ein_id ORDER BY q.sortier",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let ein = |l: &str| ketten.iter().find(|(q, _)| q == l).unwrap().1.clone();
+        assert_eq!(
+            ein("Notfallsanitäter").as_deref(),
+            Some("Rettungssanitäter")
+        );
+        assert_eq!(ein("Rettungssanitäter").as_deref(), Some("Sanitäter"));
+        assert_eq!(ein("Zugführer").as_deref(), Some("Gruppenführer"));
+        assert_eq!(ein("Gruppenführer").as_deref(), Some("Truppführer"));
+        assert_eq!(ein("Notarzt"), None);
+        assert_eq!(ein("Sanitäter"), None);
+        assert_eq!(
+            ketten.iter().filter(|(_, z)| z.is_some()).count(),
+            QUALIFIKATION_EINSCHLUSS_STARTLISTE.len()
+        );
     }
 
     #[tokio::test]

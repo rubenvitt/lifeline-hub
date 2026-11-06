@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { EinheitVorlage } from '../api/types';
-import { orderAsTree, sollText, subtreeIds, treeIds, vorlagePfad } from './einheitVorlagenBaum';
+import {
+  orderAsTree,
+  qualiSollTextVon,
+  sollText,
+  subtreeIds,
+  treeIds,
+  vorlagePfad,
+} from './einheitVorlagenBaum';
 
 function vorlage(id: number, name: string, ueber?: number): EinheitVorlage {
   return {
@@ -10,6 +17,7 @@ function vorlage(id: number, name: string, ueber?: number): EinheitVorlage {
     typ_label: 'Zug',
     ueber_vorlage_id: ueber,
     soll_eigen: false,
+    quali_soll_eigen: false,
     sortier: 0,
     aktiv: true,
     ist_demo: false,
@@ -91,5 +99,16 @@ describe('vorlagePfad (LLH-1049)', () => {
     expect(vorlagePfad(vorlagen, vorlagen[0])).toBe('Zug');
     // Deaktivierte Elternvorlage (nicht in der aktiven Liste): die Untervorlage steht allein.
     expect(vorlagePfad([vorlagen[1]], vorlagen[1])).toBe('Staffel');
+  });
+
+  it('Qualifikationssoll: eigen ohne, vom Typ mit „(Vorgabe)“, ohne leer (LLH-1553)', () => {
+    const quali_soll = [{ qualifikation_id: 2, label: 'Rettungssanitäter', anzahl: 1 }];
+    expect(qualiSollTextVon(vorlage(1, 'A'))).toBe('');
+    expect(qualiSollTextVon({ ...vorlage(1, 'A'), quali_soll, quali_soll_eigen: true })).toBe(
+      'mind. 1 Rettungssanitäter',
+    );
+    expect(qualiSollTextVon({ ...vorlage(1, 'A'), quali_soll })).toBe(
+      'mind. 1 Rettungssanitäter (Vorgabe)',
+    );
   });
 });

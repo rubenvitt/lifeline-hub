@@ -99,6 +99,7 @@ fn neu(name: &str, typ_id: i64) -> NewVorlage<'_> {
         tz_fachaufgabe: None,
         tz_organisation: None,
         soll: None,
+        quali_soll: None,
         bemerkung: None,
         sortier: 0,
     }

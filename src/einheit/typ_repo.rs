@@ -1,5 +1,6 @@
 use super::EinheitTyp;
 use crate::error::AppError;
+use crate::personal::quali_soll::QualiSoll;
 use crate::staerke::Staerke;
 use sqlx::SqlitePool;
 
@@ -11,6 +12,8 @@ pub struct TypDaten<'a> {
     pub soll_fuehrer: Option<i64>,
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
+    /// Qualifikationssoll in gespeicherter Form (`personal::quali_soll::form`), geprüft.
+    pub quali_soll: Option<&'a str>,
     pub sortier: i64,
 }
 
@@ -22,10 +25,15 @@ struct Row {
     soll_fuehrer: Option<i64>,
     soll_unterfuehrer: Option<i64>,
     soll_mannschaft: Option<i64>,
+    quali_soll: Option<QualiSoll>,
     sortier: i64,
 }
 
-const SPALTEN: &str = "id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier";
+const SPALTEN: &str = concat!(
+    "id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, ",
+    crate::personal::quali_soll::quali_soll_sql!("einheit_typ.quali_soll"),
+    " AS quali_soll, sortier"
+);
 
 /// Baut die Anzeige; Soll wird best-effort aus den drei Spalten zusammengesetzt
 /// (gespeicherte Werte sind durch den Handler bereits konsistent).
@@ -36,6 +44,7 @@ fn zu_typ(row: Row) -> EinheitTyp {
         id: row.id,
         label: row.label,
         soll,
+        quali_soll: row.quali_soll,
         sortier: row.sortier,
     }
 }
@@ -82,11 +91,12 @@ pub async fn anlegen(
     daten: TypDaten<'_>,
 ) -> Result<EinheitTyp, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO einheit_typ (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier) \
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO einheit_typ (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, quali_soll, sortier) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id).bind(daten.label)
     .bind(daten.soll_fuehrer).bind(daten.soll_unterfuehrer).bind(daten.soll_mannschaft)
+    .bind(daten.quali_soll)
     .bind(daten.sortier)
     .fetch_one(pool).await;
     let id = match ergebnis {
@@ -104,6 +114,8 @@ pub struct TypPatch<'a> {
     pub soll_fuehrer: Option<Option<i64>>,
     pub soll_unterfuehrer: Option<Option<i64>>,
     pub soll_mannschaft: Option<Option<i64>>,
+    /// Qualifikationssoll in gespeicherter Form, Tri-State (`Some(None)` = kein Soll).
+    pub quali_soll: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
 }
 
@@ -143,7 +155,8 @@ pub async fn patche(
             soll_fuehrer = CASE WHEN ?3 IS NULL THEN soll_fuehrer ELSE ?4 END, \
             soll_unterfuehrer = CASE WHEN ?5 IS NULL THEN soll_unterfuehrer ELSE ?6 END, \
             soll_mannschaft = CASE WHEN ?7 IS NULL THEN soll_mannschaft ELSE ?8 END, \
-            sortier = CASE WHEN ?9 IS NULL THEN sortier ELSE ?10 END \
+            sortier = CASE WHEN ?9 IS NULL THEN sortier ELSE ?10 END, \
+            quali_soll = CASE WHEN ?13 IS NULL THEN quali_soll ELSE ?14 END \
          WHERE id = ?11 AND org_id = ?12",
     )
     .bind(patch.label.map(|_| 1_i64))
@@ -158,6 +171,8 @@ pub async fn patche(
     .bind(patch.sortier)
     .bind(id)
     .bind(org_id)
+    .bind(patch.quali_soll.map(|_| 1_i64))
+    .bind(patch.quali_soll.flatten())
     .execute(pool)
     .await;
     let resultat = match ergebnis {
@@ -222,6 +237,7 @@ mod tests {
             soll_fuehrer: f,
             soll_unterfuehrer: u,
             soll_mannschaft: m,
+            quali_soll: None,
             sortier,
         }
     }
@@ -274,6 +290,16 @@ mod tests {
         let t = anlegen(&pool, 1, daten("Zug", Some((1, 3, 18)), 40))
             .await
             .unwrap();
+        let rs = crate::personal::qualifikation_repo::anlegen(&pool, 1, "Rettungssanitäter", 20)
+            .await
+            .unwrap();
+        let quali =
+            crate::personal::quali_soll::form(&[crate::personal::quali_soll::QualiSollEingabe {
+                qualifikation_id: rs.id,
+                anzahl: 2,
+            }])
+            .unwrap()
+            .unwrap();
         let neu = patche(
             &pool,
             1,
@@ -283,6 +309,7 @@ mod tests {
                 soll_fuehrer: Some(None),
                 soll_unterfuehrer: Some(None),
                 soll_mannschaft: Some(None),
+                quali_soll: Some(Some(&quali)),
                 sortier: Some(45),
             },
         )
@@ -291,6 +318,35 @@ mod tests {
         assert_eq!(neu.label, "Verstärkter Zug");
         assert_eq!(neu.soll, None);
         assert_eq!(neu.sortier, 45);
+        let eintraege = &neu
+            .quali_soll
+            .as_ref()
+            .expect("Qualifikationssoll gesetzt")
+            .0;
+        assert_eq!(
+            (
+                eintraege[0].qualifikation_id,
+                eintraege[0].label.as_str(),
+                eintraege[0].anzahl
+            ),
+            (rs.id, "Rettungssanitäter", 2)
+        );
+
+        // Tri-State: fehlt = bleibt, null = weg.
+        let bleibt = patche(&pool, 1, t.id, TypPatch::default()).await.unwrap();
+        assert_eq!(bleibt.quali_soll, neu.quali_soll);
+        let weg = patche(
+            &pool,
+            1,
+            t.id,
+            TypPatch {
+                quali_soll: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(weg.quali_soll, None);
     }
 
     /// Nicht gesendete Spalten bleiben stehen (Soll-Trio, `sortier`).

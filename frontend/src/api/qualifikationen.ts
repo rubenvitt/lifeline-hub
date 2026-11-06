@@ -4,6 +4,8 @@ import { katalogApi } from './katalogApi';
 export interface QualifikationEingabe {
   label: string;
   sortier: number;
+  /** Direkt eingeschlossene Qualifikation (LLH-1553); `null` löst den Einschluss. */
+  schliesst_ein_id?: number | null;
 }
 
 const api = katalogApi<Qualifikation, QualifikationEingabe>('/api/qualifikationen');
