@@ -22,6 +22,7 @@ import DokumentBearbeitenModal from '../dokumente/DokumentBearbeitenModal';
 import DownloadAnker from '../components/DownloadAnker';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 
 /**
  * Dokumentenablage eines Einsatzes (LFH-632), strukturgleich zu `SchaedenPage`.
@@ -253,7 +254,8 @@ export default function DokumentePage() {
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
   const [ablegenOffen, setAblegenOffen] = useState(false);
   const [entferntGerade, setEntferntGerade] = useState<ReadonlySet<number>>(() => new Set());
   const [inBearbeitung, setInBearbeitung] = useState<Dokument | null>(null);
@@ -308,14 +310,15 @@ export default function DokumentePage() {
   );
 
   // Schnellaktion: ?neu=1 öffnet den Dialog (Command-Palette). Param immer löschen, Dialog nur mit
-  // Schreibrecht.
+  // Schreibrecht. Einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1558), geräumt aus einer Kopie
+  // statt der Instanz, die Render und andere Effekte lesen.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) setAblegenOffen(true);
-    searchParams.delete('neu');
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh]);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh]);
 
   // Seitenzustand — nur `einsatzQuery`: ohne Einsatz gibt es keinen Rahmen.
   if (einsatzQuery.isLoading) {

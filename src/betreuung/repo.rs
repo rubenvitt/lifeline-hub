@@ -19,6 +19,7 @@ use super::{
     etb_text, BelegungKopfzahl, BelegungKopfzahlStelle, BelegungsmeldungAnzeige,
     BetreuungUebersicht, BetreuungsstelleAnzeige, BetreuungsstelleArt, BetreuungsstelleStatus,
     Erhebung, EvakuierungsbezirkAnzeige, EvakuierungsstandAnzeige, Raeumungszustand,
+    BEZIRK_BEZEICHNUNG_MAX, BEZIRK_NOTIZ_MAX, BEZIRK_SAMMELSTELLE_MAX,
 };
 use crate::error::AppError;
 use crate::etb::repo::EintragDaten;
@@ -909,8 +910,14 @@ pub async fn bezirk_anlegen_tx(
     startwert: i64,
     eingabe: &BezirkEingabe,
 ) -> Result<Geschrieben, AppError> {
-    let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
+    let bezeichnung = pflicht_max(&eingabe.bezeichnung, "Bezeichnung", BEZIRK_BEZEICHNUNG_MAX)?;
     plan_pruefen(eingabe.plan_personen)?;
+    let sammelstelle = optional_max(
+        eingabe.sammelstelle.clone(),
+        "Sammelstelle",
+        BEZIRK_SAMMELSTELLE_MAX,
+    )?;
+    let notiz = optional_max(eingabe.notiz.clone(), "Notiz", BEZIRK_NOTIZ_MAX)?;
     pruefe_koordinate(
         eingabe.sammelstelle_lat,
         eingabe.sammelstelle_lon,
@@ -930,10 +937,10 @@ pub async fn bezirk_anlegen_tx(
     .bind(&bezeichnung)
     .bind(eingabe.plan_personen)
     .bind(eingabe.plan_erhebung.as_str())
-    .bind(text_opt(eingabe.sammelstelle.as_deref()))
+    .bind(&sammelstelle)
     .bind(eingabe.sammelstelle_lat)
     .bind(eingabe.sammelstelle_lon)
-    .bind(text_opt(eingabe.notiz.as_deref()))
+    .bind(&notiz)
     .bind(benutzer_id)
     .fetch_one(&mut *conn)
     .await?;
@@ -969,7 +976,7 @@ pub async fn bezirk_aendern_tx(
     bezirk_lebt(&roh)?;
 
     let bezeichnung = match &eingabe.bezeichnung {
-        Some(b) => pflicht(b, "bezeichnung")?,
+        Some(b) => pflicht_max(b, "Bezeichnung", BEZIRK_BEZEICHNUNG_MAX)?,
         None => roh.bezeichnung.clone(),
     };
     let abschnitt_id = eingabe.abschnitt_id.unwrap_or(roh.abschnitt_id);
@@ -978,11 +985,11 @@ pub async fn bezirk_aendern_tx(
     let erhebung = eingabe.plan_erhebung.unwrap_or(roh.plan_erhebung);
     let raeumung = eingabe.raeumung.unwrap_or(roh.raeumung);
     let sammelstelle = match &eingabe.sammelstelle {
-        Some(v) => text_opt(v.as_deref()),
+        Some(v) => optional_max(v.clone(), "Sammelstelle", BEZIRK_SAMMELSTELLE_MAX)?,
         None => roh.sammelstelle.clone(),
     };
     let notiz = match &eingabe.notiz {
-        Some(v) => text_opt(v.as_deref()),
+        Some(v) => optional_max(v.clone(), "Notiz", BEZIRK_NOTIZ_MAX)?,
         None => roh.notiz.clone(),
     };
     // Koordinate der Sammelstelle (LLH-1121) wie die einer Stelle: Effektivpaar gegen den

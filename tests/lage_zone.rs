@@ -69,11 +69,6 @@ async fn anlegen_setzt_zone_und_schreibt_etb_eingerichtet() {
     );
 }
 
-/// Trennlinie der Statuscode-Konvention an einer Stelle: b1 scheitert am Feld selbst
-/// (unbekannter Enum-Wert) → 400; b2 und b3 haben lauter gültige Felder und scheitern erst
-/// am Zusammenhang (Typ passt nicht zur Geometrie-Klasse bzw. geometrie.type widerspricht
-/// dem deklarierten geometrie_typ) → 422. Beide Hälften bewusst in EINEM Test, damit die
-/// Datei nicht pauschal auf einen der beiden Codes gekippt wird (LFH-305).
 /// Die Bezeichnung einer Zone hat eine Grenze (LLH-1531): sie steht wörtlich im System-ETB und
 /// wird die eines neuen Gefahrengebiets. Genau die Grenze geht durch (gezählt nach dem Trimmen),
 /// ein Zeichen mehr ist 400 beim Anlegen wie beim Ändern, noch vor dem 422 der Geometrie, und
@@ -155,6 +150,170 @@ async fn zu_lange_bezeichnung_ist_400_beim_anlegen_und_aendern() {
     );
 }
 
+/// Notiz und Farbe einer Zone sind Felder für sich (LLH-1559): die Notiz hat eine Grenze
+/// (gezählt nach dem Trimmen, genau die Grenze geht durch), die Farbe die Form `#rrggbb`
+/// (gespeichert klein). Ein Verstoß ist 400 beim Anlegen wie beim Ändern, noch vor dem 422 der
+/// Geometrie, und schreibt nichts.
+#[tokio::test]
+async fn zu_lange_notiz_und_ungueltige_farbe_sind_400_beim_anlegen_und_aendern() {
+    use lifeline_hub::lage_zone::NOTIZ_MAX;
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let u = format!("/api/einsaetze/{einsatz}/zonen");
+    let notiz_fehler = format!("Notiz darf höchstens {NOTIZ_MAX} Zeichen lang sein");
+    let farbe_fehler = "Farbe muss die Form #rrggbb haben";
+
+    let genau = "ä".repeat(NOTIZ_MAX);
+    let (status, z) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(
+            &json!({
+                "typ":"freie_skizze","geometrie_typ":"Polygon","geometrie":POLY,
+                "notiz":format!("  {genau}  "),"farbe":" #00FF7f "
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{z:?}");
+    assert_eq!(z["notiz"], genau.as_str());
+    assert_eq!(z["farbe"], "#00ff7f", "getrimmt und klein gespeichert");
+    let zid = z["id"].as_i64().unwrap();
+
+    let zu_lang = "x".repeat(NOTIZ_MAX + 1);
+    for (body, fehler) in [
+        (
+            json!({"typ":"freie_skizze","geometrie_typ":"Polygon","geometrie":POLY,"notiz":zu_lang}),
+            notiz_fehler.as_str(),
+        ),
+        // Feld vor Zusammenhang: Kreis und Geometrie zugleich wäre 422.
+        (
+            json!({
+                "typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY,
+                "kreis":{"mitte_lat":50.1,"mitte_lon":8.6,"radius_m":100.0},"notiz":zu_lang
+            }),
+            notiz_fehler.as_str(),
+        ),
+        (
+            json!({"typ":"freie_skizze","geometrie_typ":"Polygon","geometrie":POLY,"farbe":"red"}),
+            farbe_fehler,
+        ),
+        (
+            json!({"typ":"freie_skizze","geometrie_typ":"Polygon","geometrie":POLY,"farbe":"#12345"}),
+            farbe_fehler,
+        ),
+        (
+            json!({"typ":"freie_skizze","geometrie_typ":"Polygon","geometrie":POLY,"farbe":"#12345g"}),
+            farbe_fehler,
+        ),
+        (
+            json!({
+                "typ":"freie_skizze","geometrie_typ":"Polygon","geometrie":POLY,
+                "kreis":{"mitte_lat":50.1,"mitte_lon":8.6,"radius_m":100.0},
+                "farbe":"#".repeat(10_000)
+            }),
+            farbe_fehler,
+        ),
+    ] {
+        let (status, f) = anfrage(&app, "POST", &u, &admin, Some(&body.to_string())).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body} → {f:?}");
+        assert_eq!(f["error"], fehler, "{body}");
+    }
+
+    for (body, fehler) in [
+        (json!({ "notiz": zu_lang }), notiz_fehler.as_str()),
+        (json!({ "farbe": "#ff00" }), farbe_fehler),
+        (json!({ "farbe": "rgb(1,2,3)" }), farbe_fehler),
+        // Feld vor Zusammenhang: Kreisangaben an einer Zone ohne Kreis wären 422.
+        (
+            json!({ "farbe": "blau", "kreis_radius_m": 50.0 }),
+            farbe_fehler,
+        ),
+        // Ebenso der unbekannte Typ: 400 vor dem 422 des Kreises.
+        (
+            json!({ "typ": "ungueltig", "farbe": "red", "kreis_radius_m": 50.0 }),
+            "Unbekannter Zonen-Typ: ungueltig",
+        ),
+    ] {
+        let (status, f) = anfrage(
+            &app,
+            "PATCH",
+            &format!("{u}/{zid}"),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body} → {f:?}");
+        assert_eq!(f["error"], fehler, "{body}");
+    }
+
+    let (_, liste) = anfrage(&app, "GET", &u, &admin, None).await;
+    let liste = liste.as_array().unwrap();
+    assert_eq!(liste.len(), 1, "keine abgelehnte Zone entsteht");
+    assert_eq!(
+        liste[0]["notiz"],
+        genau.as_str(),
+        "das Ändern schreibt nichts"
+    );
+    assert_eq!(liste[0]["farbe"], "#00ff7f", "das Ändern schreibt nichts");
+
+    // Andere Typen tragen keine Farbe: sie wird verworfen, nicht geprüft (wie vor LLH-1559).
+    let (status, g) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(&json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY,"farbe":"red"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{g:?}");
+    assert!(g["farbe"].is_null(), "{g:?}");
+    let gid = g["id"].as_i64().unwrap();
+    let (status, g) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{u}/{gid}"),
+        &admin,
+        Some(r#"{"farbe":"red"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{g:?}");
+    assert!(g["farbe"].is_null(), "{g:?}");
+    // Wird die Zone mit dem PATCH zur freien Skizze, gilt die Prüfung.
+    let (status, f) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{u}/{gid}"),
+        &admin,
+        Some(r#"{"typ":"freie_skizze","farbe":"red"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{f:?}");
+    assert_eq!(f["error"], farbe_fehler);
+
+    // Gültig geht durch, leer leert.
+    let (status, z) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{u}/{zid}"),
+        &admin,
+        Some(r##"{"farbe":"#ABCDEF","notiz":"   "}"##),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{z:?}");
+    assert_eq!(z["farbe"], "#abcdef");
+    assert!(z["notiz"].is_null(), "{z:?}");
+}
+
+/// Trennlinie der Statuscode-Konvention an einer Stelle: b1 scheitert am Feld selbst
+/// (unbekannter Enum-Wert) → 400; b2 und b3 haben lauter gültige Felder und scheitern erst
+/// am Zusammenhang (Typ passt nicht zur Geometrie-Klasse bzw. geometrie.type widerspricht
+/// dem deklarierten geometrie_typ) → 422. Beide Hälften bewusst in EINEM Test, damit die
+/// Datei nicht pauschal auf einen der beiden Codes gekippt wird (LFH-305).
 #[tokio::test]
 async fn ungueltiger_typ_ist_400_kombination_bleibt_422() {
     let (app, _live) = setup_mit_live().await;

@@ -158,6 +158,8 @@ interface SeitenFehlerProps {
   ursache?: unknown;
   /** Gesetzt = die Seite bietet einen erneuten Abruf an. */
   onWiederholen?: () => void;
+  /** Ein neuer Versuch läuft: der Knopf dreht, das Banner bleibt stehen (LLH-1577). */
+  laedt?: boolean;
 }
 
 /**
@@ -165,14 +167,20 @@ interface SeitenFehlerProps {
  * Wiederholen-Knopf ist ein rohes `<button>` mit eigener Pixelhöhe und umginge die
  * Dichte-Staffel. `role="alert"` liefert `Alert` selbst.
  */
-export function SeitenFehler({ text, ursache, onWiederholen }: SeitenFehlerProps) {
+export function SeitenFehler({ text, ursache, onWiederholen, laedt }: SeitenFehlerProps) {
   return (
     <Alert
       type="error"
       showIcon
       title={text}
       description={ursacheText(ursache)}
-      action={onWiederholen && <Button onClick={onWiederholen}>Erneut abrufen</Button>}
+      action={
+        onWiederholen && (
+          <Button loading={laedt} onClick={onWiederholen}>
+            Erneut abrufen
+          </Button>
+        )
+      }
     />
   );
 }

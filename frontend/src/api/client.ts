@@ -85,6 +85,8 @@ const ZEILEN_ARTEN_JE: Readonly<Record<ZeilenArt, true>> = {
   fahrzeug: true,
   // Material-Position einer Einheiten-Vorlage (LLH-1261).
   material: true,
+  // Schicht aus „Schichten erzeugen“ im Schichtplan (LLH-1552).
+  planschicht: true,
 };
 const ZEILEN_ARTEN = Object.keys(ZEILEN_ARTEN_JE) as readonly ZeilenArt[];
 

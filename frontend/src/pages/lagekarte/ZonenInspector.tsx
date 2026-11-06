@@ -20,7 +20,8 @@ import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
 import { Augenbraue, Datenfeld, Datenraster, monoStil } from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
 import { formatRadius, kreisAusZone, parseGeometry, geoKennzahlen, radiusGueltig } from './geo';
-import { KREIS_RADIUS_M_MAX, ZONE_LABEL_MAX } from '../../api/eingabegrenzen';
+import { KREIS_RADIUS_M_MAX, ZONE_LABEL_MAX, ZONE_NOTIZ_MAX } from '../../api/eingabegrenzen';
+import { istZuLang, zeichenGrenze } from '../../components/zeichenGrenze';
 import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
@@ -263,6 +264,8 @@ export default function ZonenInspector({
 
   const gesperrt = !darfSchreiben || speicherStatus === 'speichert';
   const istFreieSkizze = entwurf.typ === 'freie_skizze';
+  // Die Notiz kürzt nie (LLH-1559): über der Grenze bleibt sie stehen und geht nicht hinaus.
+  const notizZuLang = istZuLang(entwurf.notiz, ZONE_NOTIZ_MAX);
   const erlaubteTypen = ZONE_TYPEN.filter(
     (t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ,
   );
@@ -543,8 +546,12 @@ export default function ZonenInspector({
           value={entwurf.notiz}
           disabled={gesperrt}
           rows={2}
+          count={zeichenGrenze(ZONE_NOTIZ_MAX)}
+          aria-invalid={notizZuLang || undefined}
           onChange={(e) => setEntwurf((alt) => ({ ...alt, notiz: e.target.value }))}
           onBlur={() => {
+            // Der Server lehnte mit 400 ab; der Entwurf bleibt, bis gekürzt ist.
+            if (notizZuLang) return;
             const notiz = entwurf.notiz.trim();
             setEntwurf((alt) => ({ ...alt, notiz }));
             if (notiz !== (zone.notiz ?? '')) void speichern({ notiz: notiz || null });

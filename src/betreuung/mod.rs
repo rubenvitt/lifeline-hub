@@ -169,6 +169,20 @@ pub const LEITUNG_MAX: usize = 200;
 /// Kanal, Freitext; in der Oberfläche „Kontakt“. Personenbezogen wie [`LEITUNG_MAX`].
 pub const KONTAKTWEG_MAX: usize = 200;
 
+/// Bezeichnung eines Evakuierungsbezirks (LLH-1560). Die Lagekarte übernimmt sie beim Zeichnen
+/// der Bezirksfläche als Bezeichnung der Zone; die Grenze ist deshalb genau die der Zone
+/// ([`crate::lage_zone::LABEL_MAX`]), sonst scheiterte das Zeichnen an einem gültigen Bezirk.
+/// Steht wörtlich im ETB.
+pub const BEZIRK_BEZEICHNUNG_MAX: usize = crate::lage_zone::LABEL_MAX;
+
+/// Sammelstelle eines Evakuierungsbezirks (LLH-1560): Ortstext aus dem Ortsfeld, so lang wie die
+/// übrigen Orte (`verpflegung::ORT_MAX`, `bereitstellungsraum::STANDORT_MAX`).
+pub const BEZIRK_SAMMELSTELLE_MAX: usize = 500;
+
+/// Notiz eines Evakuierungsbezirks (LLH-1560), wie die übrigen Notizen
+/// (`bereitstellungsraum::NOTIZ_MAX`).
+pub const BEZIRK_NOTIZ_MAX: usize = 2_000;
+
 /// Liest einen Enum-Wert aus einer Eingabe. Ein unbekannter Wert scheitert am Feld für sich
 /// und ist deshalb **400** (src/AGENTS.md „Statuscode-Konvention“, `src/error.rs`), nicht 422.
 pub fn enum_wert<T: TryFrom<String, Error = String>>(s: &str) -> Result<T, AppError> {

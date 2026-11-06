@@ -3,7 +3,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import UnfallhilfsstellenPage from './UnfallhilfsstellenPage';
@@ -12,12 +12,13 @@ import { liesLetzteUhs } from './uhs/uhsAuswahl';
 import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { App as AntApp } from 'antd';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { AdresseSteht } from '../test/adresseSteht';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -52,8 +53,25 @@ function OrtAnzeige() {
   return <span data-testid="liste-ort">{ort.pathname + ort.search}</span>;
 }
 
-function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
+function renderPage(
+  route = '/einsaetze/1/unfallhilfsstellen/liste',
+  {
+    adresseSteht = false,
+    daneben = null,
+  }: {
+    /** Hält den Router-Commit an (LLH-1558); die Anzeige sieht die Adresse weiter. */
+    adresseSteht?: boolean;
+    /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
+    daneben?: ReactNode;
+  } = {},
+) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const seite = (
+    <Routes>
+      <Route path="/einsaetze/:id/unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
+      <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+    </Routes>
+  );
   return {
     qc,
     ...render(
@@ -62,16 +80,8 @@ function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
           <AuthProvider>
             <MemoryRouter initialEntries={[route]}>
               <OrtAnzeige />
-              <Routes>
-                <Route
-                  path="/einsaetze/:id/unfallhilfsstellen/liste"
-                  element={<UnfallhilfsstellenPage />}
-                />
-                <Route
-                  path="/einsaetze/:id/unfallhilfsstellen/:uhsId"
-                  element={<UhsDetailPage />}
-                />
-              </Routes>
+              {adresseSteht ? <AdresseSteht>{seite}</AdresseSteht> : seite}
+              {daneben}
             </MemoryRouter>
           </AuthProvider>
         </AntApp>
@@ -120,6 +130,12 @@ function renderUhsDrawer(onClose: () => void, onAngelegt: () => void) {
   );
 }
 
+/** Schließt den Anlegen-Drawer über sein Kreuz und wartet, bis er zu ist. */
+async function schliesseDrawer() {
+  await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+  await waitFor(() => expect(document.querySelector('.ant-drawer-open')).toBeNull());
+}
+
 describe('UnfallhilfsstellenPage', () => {
   it('schließt den UHS-Drawer mit Provider per Escape genau einmal', async () => {
     const onClose = vi.fn();
@@ -159,6 +175,59 @@ describe('UnfallhilfsstellenPage', () => {
     );
     renderPage('/einsaetze/1/unfallhilfsstellen/liste?neu=1');
     expect(await screen.findByText('Unfallhilfsstelle anlegen')).toBeInTheDocument();
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1` noch
+   * in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu an
+   * (Einsatz lädt neu), öffnet der Drawer nicht noch einmal. Bisher schützte davor nur, dass die
+   * Seite den Parameter aus der Instanz des Routers löschte (gegen die Klon-Regel, LFH-156).
+   */
+  it('ein hängender Router-Commit öffnet den geschlossenen Drawer nach neuem Recht nicht wieder (LLH-1558)', async () => {
+    let rolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung';
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort(rolle))),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    );
+    const { qc } = renderPage('/einsaetze/1/unfallhilfsstellen/liste?neu=1', {
+      adresseSteht: true,
+    });
+    expect(await screen.findByText('Unfallhilfsstelle anlegen')).toBeInTheDocument();
+    await schliesseDrawer();
+    const knopf = () => screen.getByRole('button', { name: 'Neu' });
+
+    rolle = 'beobachter';
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(knopf()).toBeDisabled());
+    rolle = 'einsatzleitung';
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(knopf()).toBeEnabled());
+    expect(document.querySelector('.ant-drawer-open')).toBeNull();
+  });
+
+  it('ein neuer Link ?neu=1 öffnet den Drawer wieder (LLH-1558)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    );
+    renderPage('/einsaetze/1/unfallhilfsstellen/liste?neu=1', {
+      daneben: <Link to="/einsaetze/1/unfallhilfsstellen/liste?neu=1">neuer-link</Link>,
+    });
+    expect(await screen.findByText('Unfallhilfsstelle anlegen')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('liste-ort')).toHaveTextContent(
+        /^\/einsaetze\/1\/unfallhilfsstellen\/liste$/,
+      ),
+    );
+    await schliesseDrawer();
+
+    await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+    await waitFor(() => expect(document.querySelector('.ant-drawer-open')).not.toBeNull());
+    await waitFor(() =>
+      expect(screen.getByTestId('liste-ort')).toHaveTextContent(
+        /^\/einsaetze\/1\/unfallhilfsstellen\/liste$/,
+      ),
+    );
   });
 
   it('rendert die UHS-Liste mit Status-Badge', async () => {
