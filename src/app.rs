@@ -591,6 +591,37 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::abloesung::read_einsatz_vorgabe)
                 .put(routes::abloesung::set_einsatz_vorgabe),
         )
+        // Schichtplan (LLH-1552): `schichtplan` ist ein festes Segment neben `{aid}`.
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan",
+            get(routes::abloesung_schichtplan::lesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke",
+            post(routes::abloesung_schichtplan::block_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}",
+            patch(routes::abloesung_schichtplan::block_aendern)
+                .delete(routes::abloesung_schichtplan::block_loeschen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/erzeugen",
+            post(routes::abloesung_schichtplan::erzeugen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/grenzwerte",
+            patch(routes::abloesung_schichtplan::grenzwerte_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/helfer",
+            post(routes::abloesung_schichtplan::helfer_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/helfer/{hid}",
+            patch(routes::abloesung_schichtplan::helfer_aendern)
+                .delete(routes::abloesung_schichtplan::helfer_loeschen),
+        )
         .route(
             "/api/einsaetze/{id}/abloesungen/{aid}",
             patch(routes::abloesung::aendern),

@@ -12467,4 +12467,216 @@ mod tests {
             .await
             .expect_err("uhs.quali_soll nur JSON");
     }
+
+    #[tokio::test]
+    async fn migration_0277_einsatz_schichtplan() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 277;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        migriere_bis(&pool, VERSION).await;
+
+        let id = |sql: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sql)
+                    .bind(e)
+                    .bind(b)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+        let einheit = id(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'RTW 1') \
+             RETURNING id + 0 * ?",
+        )
+        .await;
+        let uhs = id(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?1, 'sonstige', 'Markt', ?2, ?2) RETURNING id",
+        )
+        .await;
+        let personal: i64 = sqlx::query_scalar(
+            "INSERT INTO personal (org_id, name) VALUES (1, 'Anna') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let adhoc = id(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Ben') \
+             RETURNING id + 0 * ?",
+        )
+        .await;
+        let helfer = id(
+            "INSERT INTO einsatz_plan_helfer (einsatz_id, name, angelegt_von) \
+             VALUES (?, 'Cem', ?) RETURNING id",
+        )
+        .await;
+
+        let block = |art: &'static str,
+                     einheit_id: Option<i64>,
+                     uhs_id: Option<i64>,
+                     von: &'static str,
+                     bis: &'static str,
+                     soll: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_planschicht (einsatz_id, posten_art, einheit_id, uhs_id, \
+                        von, bis, soll_anzahl) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(art)
+                .bind(einheit_id)
+                .bind(uhs_id)
+                .bind(von)
+                .bind(bis)
+                .bind(soll)
+                .fetch_one(&pool)
+                .await
+            }
+        };
+        let (a, z) = ("2026-11-06 10:00:00", "2026-11-06 12:00:00");
+        let b_einheit = block("einheit", Some(einheit), None, a, z, Some(2))
+            .await
+            .unwrap();
+        let b_uhs = block("uhs", None, Some(uhs), a, z, None).await.unwrap();
+        let b_pause = block("pause", None, None, a, z, None).await.unwrap();
+        // Genau die zur Art passende Spalte.
+        block("einheit", None, None, a, z, None)
+            .await
+            .expect_err("Einheit ohne einheit_id");
+        block("uhs", Some(einheit), Some(uhs), a, z, None)
+            .await
+            .expect_err("UHS mit einheit_id");
+        block("pause", Some(einheit), None, a, z, None)
+            .await
+            .expect_err("Pause mit einheit_id");
+        block("zelt", None, None, a, z, None)
+            .await
+            .expect_err("unbekannte Art");
+        block("pause", None, None, a, z, Some(1))
+            .await
+            .expect_err("Pause ohne Soll");
+        block("einheit", Some(einheit), None, z, a, None)
+            .await
+            .expect_err("bis nach von");
+        block("einheit", Some(einheit), None, a, z, Some(0))
+            .await
+            .expect_err("soll_anzahl ab 1");
+        block("einheit", Some(einheit), None, a, z, Some(201))
+            .await
+            .expect_err("soll_anzahl bis 200");
+        sqlx::query("UPDATE einsatz_planschicht SET quali_soll = 'nein' WHERE id = ?")
+            .bind(b_einheit)
+            .execute(&pool)
+            .await
+            .expect_err("quali_soll nur JSON");
+        sqlx::query("UPDATE einsatz_plan_helfer SET qualifikationen = '{}' WHERE id = ?")
+            .bind(helfer)
+            .execute(&pool)
+            .await
+            .expect_err("qualifikationen nur JSON-Liste");
+
+        // Personen: genau eine Herkunft, je Block einmal.
+        let person = |bid: i64, p: Option<i64>, ep: Option<i64>, h: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO einsatz_planschicht_person (planschicht_id, personal_id, \
+                        einsatz_personal_id, helfer_id) VALUES (?, ?, ?, ?)",
+                )
+                .bind(bid)
+                .bind(p)
+                .bind(ep)
+                .bind(h)
+                .execute(&pool)
+                .await
+            }
+        };
+        person(b_einheit, Some(personal), None, None).await.unwrap();
+        person(b_einheit, None, Some(adhoc), None).await.unwrap();
+        person(b_einheit, None, None, Some(helfer)).await.unwrap();
+        person(b_pause, Some(personal), None, None).await.unwrap();
+        person(b_einheit, Some(personal), None, None)
+            .await
+            .expect_err("je Block und Person einmal");
+        person(b_uhs, None, None, None)
+            .await
+            .expect_err("ohne Herkunft");
+        person(b_uhs, Some(personal), Some(adhoc), None)
+            .await
+            .expect_err("zwei Herkünfte");
+
+        let zaehle = |sql: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sql)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+        // CASCADE: Helfer weg → aus dem Block; Einheit weg → Block und seine Personen weg.
+        sqlx::query("DELETE FROM einsatz_plan_helfer WHERE id = ?")
+            .bind(helfer)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz_planschicht_person WHERE helfer_id IS NOT NULL")
+                .await,
+            0
+        );
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz_planschicht").await,
+            2,
+            "Block der Einheit gelöscht"
+        );
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz_planschicht_person").await,
+            1,
+            "nur die Pause trägt noch eine Person"
+        );
+        // Stamm-Personal: NO ACTION wie jeder Verweis auf die Stammdaten.
+        sqlx::query("DELETE FROM personal WHERE id = ?")
+            .bind(personal)
+            .execute(&pool)
+            .await
+            .expect_err("Stamm-Person im Plan bleibt");
+
+        // Grenzwerte: neue Spalten, NULL = Vorgabe.
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, schichtplan_max_dienst_min, \
+                schichtplan_min_ruhe_min) VALUES (?, 600, 0)",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Einsatz weg → Blöcke, Personen und Helfer weg.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        for t in [
+            "SELECT COUNT(*) FROM einsatz_planschicht",
+            "SELECT COUNT(*) FROM einsatz_planschicht_person",
+            "SELECT COUNT(*) FROM einsatz_plan_helfer",
+        ] {
+            assert_eq!(zaehle(t).await, 0, "{t}");
+        }
+    }
 }

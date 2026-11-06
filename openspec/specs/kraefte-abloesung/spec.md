@@ -31,6 +31,11 @@ Besatzung wird beim Vollzug auf die Einheit, ihre Erben und deren Fahrzeuge vert
 Folgeschicht nennt die Besatzung, mit der sie begann. Die Rücknahme eines Vollzugs stellt die
 Planung von vor dem Vollzug wieder her.
 
+LLH-1552 (Konzept LLH-1523) hebt das Non-Goal „kein Schichtplan im Voraus“ aus LFH-635 auf: der
+Einsatz hat einen Schichtplan mit Blöcken an Einheiten, UHS und der Pause (Spec
+`kraefte-schichtplan`, Pfade unter `…/abloesungen/schichtplan`, Modul Ablösung). Der Plan ist
+Soll; Fälligkeit, Vollzug und Kräfte-Zeitachse bleiben, bis LLH-1555 Plan und Wechsel koppelt.
+
 ## Requirements
 
 ### Requirement: Schicht einer Einheit
