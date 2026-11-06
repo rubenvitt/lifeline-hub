@@ -559,8 +559,49 @@ describe('NachforderungenPage', () => {
       within(karte as HTMLElement)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Als Einheit übernehmen', 'Als Material übernehmen', 'Erfassten Posten zuordnen …']);
+    ).toEqual([
+      'Als Einheit übernehmen',
+      'Als Material übernehmen',
+      'Erfassten Posten zuordnen …',
+      // ⋮ mit „Eintreffen zurücknehmen“ (LLH-1539), ohne Text.
+      '',
+    ]);
     expect(stufeVon('2 RTW zur Verstärkung')).toBe('eingetroffen');
+  });
+
+  /**
+   * LLH-1539: der Rückweg aus „Eingetroffen“ steht dauerhaft im ⋮-Menü der Karte, nicht nur im
+   * Rückgängig-Toast direkt nach dem Eintreffen. Danach bietet der Toast den Weg nach vorn.
+   */
+  it('nimmt „Eingetroffen“ über das Kartenmenü zurück, auch ohne Toast', async () => {
+    listeNachforderungen.mockResolvedValue([
+      nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
+    ]);
+    setzeNachforderungStatus.mockResolvedValue(nf({ status: 'unterwegs' }));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waehleImMenue('Eintreffen zurücknehmen');
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledWith(1, 1, 'unterwegs'));
+    expect(await screen.findByText(/Status: Unterwegs/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() =>
+      expect(setzeNachforderungStatus).toHaveBeenLastCalledWith(1, 1, 'eingetroffen'),
+    );
+  });
+
+  it('ohne Schreibrecht kein Kartenmenü an der eingetroffenen Karte', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    listeNachforderungen.mockResolvedValue([
+      nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
+    ]);
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    expect(screen.queryByRole('button', { name: /^Aktionen zu Nachforderung/ })).toBeNull();
   });
 
   describe('Vorbelegung per Deeplink (LFH-634)', () => {
@@ -1386,6 +1427,31 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     } finally {
       Element.prototype.scrollIntoView = vorher;
     }
+  });
+
+  it('Eintreffen zurücknehmen über die Karte abgelehnt: der Grund steht an der Karte, kein Toast', async () => {
+    listeNachforderungen.mockResolvedValue([
+      nf({
+        id: 4,
+        status: 'eingetroffen',
+        ist_offen: false,
+        eingetroffen_at: '2026-06-12 10:00:00',
+      }),
+    ]);
+    setzeNachforderungStatus.mockRejectedValue(
+      new ApiError(422, 'Aus der Nachforderung ist Material übernommen'),
+    );
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waehleImMenue('Eintreffen zurücknehmen');
+    const karte = screen
+      .getByText('2 RTW zur Verstärkung')
+      .closest('[data-lfh="komm-karte"]') as HTMLElement;
+    expect(
+      await within(karte).findByText('Aus der Nachforderung ist Material übernommen'),
+    ).toHaveAttribute('data-fehler');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"]')).toBeNull();
   });
 
   it('Rücknahme nach Übernahme: der Grund steht im Seitenhinweis', async () => {

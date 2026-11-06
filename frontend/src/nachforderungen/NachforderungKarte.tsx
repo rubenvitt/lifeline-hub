@@ -42,6 +42,7 @@ import {
   EINHEITEN_VERKNUEPFT,
   einheitenGruppen,
   kannAbschliessen,
+  ruecknahmeSperre,
   type EinheitenEinleitung,
 } from './nurVorwaerts';
 import { zielZeile, type ZielAbschnitt, type ZielNamen, type ZielRaum } from './zielVorschlaege';
@@ -85,8 +86,11 @@ export interface StellenVerweis {
 /** Das Formular, das an einer Karte offen ist (LLH-1097 D10): höchstens eines je Seite. */
 export type KartenFormular = 'zusage' | 'bearbeiten';
 
-/** Die Einträge des ⋮-Menüs einer offenen Karte (D10). */
-type MenueAktion = 'bearbeiten' | 'zurueckziehen' | 'ablehnen';
+/**
+ * Die Einträge des ⋮-Menüs: an einer offenen Karte Bearbeiten und die Abschlüsse (D10), an einer
+ * eingetroffenen die Rücknahme des Eintreffens (LLH-1539).
+ */
+type MenueAktion = 'bearbeiten' | 'zurueckziehen' | 'ablehnen' | 'eintreffen-zuruecknehmen';
 
 /** Zustand eines aus dem Einsatz genommenen Postens, Wortlaut der Materialliste (LLH-1093). */
 const AUS_DEM_EINSATZ = 'aus dem Einsatz genommen';
@@ -361,7 +365,8 @@ function StellenBezug({ verweis }: { verweis: StellenVerweis | undefined }) {
  * Teilung, LLH-1097 D11), Zeitzeilen (`kartenZeiten`, mit dem erwarteten Eintreffen),
  * übernommenes Material, Grund einer Ablehnung oder des Zurückziehens. Genau eine Primäraktion:
  * die Fortschaltung um eine Stufe; „Zusage erfassen“ öffnet dafür das Formular an der Karte.
- * Bearbeiten, Zurückziehen und Ablehnen stehen im ⋮-Menü (D10).
+ * Bearbeiten, Zurückziehen und Ablehnen stehen im ⋮-Menü (D10), an der eingetroffenen Karte
+ * „Eintreffen zurücknehmen“ (LLH-1539).
  */
 export default memo(NachforderungKarte);
 
@@ -441,8 +446,12 @@ function NachforderungKarte({
           ...(onAblehnen ? [abschluss('ablehnen', 'Ablehnen')] : []),
         ]
       : [];
+  // Gesperrt, wo der Server die Rücknahme ablehnt (übernommenes Material, verknüpfte Einheit).
+  const eintreffenSperre = n.status === 'eingetroffen' ? ruecknahmeSperre(n) : null;
   const waehle = (key: MenueAktion) => {
-    if (key === 'bearbeiten') onFormular?.(n.id, 'bearbeiten');
+    if (key === 'eintreffen-zuruecknehmen') {
+      if (eintreffenSperre == null) onStatus?.(n.id, 'unterwegs');
+    } else if (key === 'bearbeiten') onFormular?.(n.id, 'bearbeiten');
     else if (abschlussGesperrt) return;
     else if (key === 'zurueckziehen') onZurueckziehen?.(n.id);
     else onAblehnen?.(n.id);
@@ -513,6 +522,33 @@ function NachforderungKarte({
         <Button key="zuordnen" onClick={() => onPostenZuordnen(n.id)}>
           Erfassten Posten zuordnen …
         </Button>,
+      );
+    }
+    /*
+     * Rückweg aus „Eingetroffen“ (LLH-1539): dauerhaft im ⋮-Menü, nicht nur im Rückgängig-Toast
+     * direkt nach dem Eintreffen. Der Server nimmt genau eine Stufe zurück (`uebergang_erlaubt`);
+     * mit übernommenem Material oder verknüpfter Einheit lehnt er ab, dann steht der Eintrag
+     * gesperrt mit dem Grund (Muster LLH-1395). Nicht rot: der Rückgängig-Toast danach führt
+     * wieder vor. Eine Ablehnung steht über den Knöpfen dieser Karte (`fehlerGrund`).
+     */
+    if (onStatus) {
+      const etikett = 'Eintreffen zurücknehmen';
+      aktionen.push(
+        <MenueAusloeser<MenueAktion>
+          key="menue"
+          eintraege={[
+            eintreffenSperre == null
+              ? { key: 'eintreffen-zuruecknehmen', label: etikett }
+              : {
+                  key: 'eintreffen-zuruecknehmen',
+                  label: `${etikett} (${eintreffenSperre})`,
+                  gesperrt: true,
+                },
+          ]}
+          zugaenglicherName={`Aktionen zu Nachforderung ${name}`}
+          laeuft={laeuft}
+          onWahl={waehle}
+        />,
       );
     }
   }
