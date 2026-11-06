@@ -51,7 +51,7 @@ fn startliste_zeigt_die_modulzahlen_aus_dem_entwurf() {
         zahlen,
         [
             ("Kleinlage", 14, 20),
-            ("Sanitätsdienst", 22, 12),
+            ("Sanitätsdienst", 24, 10),
             ("MANV", 27, 7),
             ("Personensuche", 25, 9),
             ("Evakuierung und Betreuung", 30, 4),
@@ -89,6 +89,18 @@ fn manv_blendet_stab_und_tiere_aus_und_zeigt_unfallhilfsstellen() {
     assert!(aus.contains(&"stab"));
     assert!(aus.contains(&"tiere"));
     assert!(!aus.contains(&"unfallhilfsstellen"));
+}
+
+#[test]
+fn sanitaetsdienst_zeigt_funk_und_wetter_aber_keine_lagemeldungen() {
+    let san = EINSATZ_VORLAGE_STARTLISTE
+        .iter()
+        .find(|s| s.bezeichnung == "Sanitätsdienst")
+        .unwrap();
+    let aus = san.ausgeblendet();
+    assert!(!aus.contains(&"fernmeldewesen"));
+    assert!(!aus.contains(&"wetter-pegel"));
+    assert!(aus.contains(&"lagemeldungen"));
 }
 
 #[test]

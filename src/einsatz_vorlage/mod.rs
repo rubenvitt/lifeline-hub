@@ -86,8 +86,9 @@ impl StartVorlage {
 }
 
 /// Mitgelieferte Vorlagen je Organisation (design.md D4). Neue Organisationen bekommen sie in
-/// `bootstrap_admin`, bestehende per `migrations/0238_einsatz_vorlage.sql` — beide synchron
-/// halten (Netz: `db::tests::migration_0238_seedet_die_startliste`).
+/// `bootstrap_admin`, bestehende per `migrations/0238_einsatz_vorlage.sql`. Seit LLH-1569 zeigt
+/// „Sanitätsdienst“ auch Funk und Wetter; 0238 bleibt beim alten Stand, bestehende Vorlagen
+/// ändert kein Update (Netz: `db::tests::migration_0238_seedet_die_startliste`).
 pub const EINSATZ_VORLAGE_STARTLISTE: [StartVorlage; 6] = [
     StartVorlage {
         bezeichnung: "Kleinlage",
@@ -111,6 +112,8 @@ pub const EINSATZ_VORLAGE_STARTLISTE: [StartVorlage; 6] = [
             "abloesung",
             "nachforderungen",
             "lage-dashboard",
+            "fernmeldewesen",
+            "wetter-pegel",
         ],
     },
     StartVorlage {

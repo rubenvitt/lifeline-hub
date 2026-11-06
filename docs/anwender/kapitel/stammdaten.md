@@ -291,9 +291,14 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
 ### Einsatz-Vorlagen
 
 - Jede Organisation bringt sechs Vorlagen mit: „Kleinlage“ (14 sichtbare Module),
-  „Sanitätsdienst“ (22), „MANV“ (27), „Personensuche“ (25), „Evakuierung und Betreuung“ (30) und
+  „Sanitätsdienst“ (24), „MANV“ (27), „Personensuche“ (25), „Evakuierung und Betreuung“ (30) und
   „Unwetter“ (28). „Sanitätsdienst“ belegt die Einsatzart „Sanitätsdienst“ vor, die übrigen
   „Realeinsatz“. „Stab“ zeigt keine von ihnen. Die Liste lässt sich ändern und löschen.
+- „Sanitätsdienst“ zeigt „Fernmeldewesen“ und „Wetter & Pegel“, weil jeder Sanitätsdienst einen
+  Funkplan hat und Veranstaltungen im Freien am Wetter hängen; „Lagemeldungen“ bleibt abgewählt.
+  Eine Organisation, die es vor dieser Änderung schon gab, behält ihre Vorlage „Sanitätsdienst“
+  ohne die beiden Module, also mit 22 statt 24 sichtbaren Modulen; dort lassen sich die Häkchen in
+  der Vorlage setzen.
 - Eine Vorlage merkt sich die Module ohne Häkchen. Ein Modul, das mit einer neuen Version
   hinzukommt, ist deshalb in jeder Vorlage sichtbar. „Einsatzdaten“ und „Einstellungen“ sind
   „immer sichtbar“ und lassen sich nicht abwählen.

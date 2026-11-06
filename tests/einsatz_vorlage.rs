@@ -422,6 +422,37 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
     assert_eq!(freigaben["unfallhilfsstellen"]["sichtbar"], true);
 }
 
+/// LLH-1569: Ein neuer Einsatz aus der Start-Vorlage „Sanitätsdienst“ zeigt Funk und Wetter;
+/// Lagemeldungen bleiben ausgeblendet.
+#[tokio::test]
+async fn sanitaetsdienst_zeigt_funk_und_wetter() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let san = vorlage_id(&app, &admin, "Sanitätsdienst").await;
+
+    let (status, json) = einsatz_mit_vorlage(&app, &admin, Some(san)).await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    let eid = json["id"].as_i64().unwrap();
+
+    let (_, freigaben) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{eid}/modul-freigaben"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        freigaben["fernmeldewesen"]["sichtbar"], true,
+        "{freigaben:?}"
+    );
+    assert_eq!(freigaben["wetter-pegel"]["sichtbar"], true, "{freigaben:?}");
+    assert_eq!(
+        freigaben["lagemeldungen"]["sichtbar"], false,
+        "{freigaben:?}"
+    );
+}
+
 #[tokio::test]
 async fn org_ausblendung_bleibt_neben_der_vorlage() {
     let (app, _pool) = setup_mit_pool().await;

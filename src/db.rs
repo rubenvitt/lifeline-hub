@@ -10411,7 +10411,8 @@ mod tests {
 
     /// LLH-1375: jede bestehende Organisation bekommt die Startliste der Einsatz-Vorlagen genau
     /// wie `EINSATZ_VORLAGE_STARTLISTE` (Bezeichnung, Einsatzart, Sortierung, ausgeblendete
-    /// Module); bestehende Stichworte bleiben ohne Kopplung.
+    /// Module; „Sanitätsdienst“ im Stand vor LLH-1569); bestehende Stichworte bleiben ohne
+    /// Kopplung.
     #[tokio::test]
     async fn migration_0238_seedet_die_startliste() {
         use crate::einsatz_vorlage::EINSATZ_VORLAGE_STARTLISTE;
@@ -10457,11 +10458,16 @@ mod tests {
                 .unwrap()
                 .into_iter()
                 .collect();
-                let erwartet: BTreeSet<String> = start
+                let mut erwartet: BTreeSet<String> = start
                     .ausgeblendet()
                     .into_iter()
                     .map(str::to_string)
                     .collect();
+                // LLH-1569 nahm Funk und Wetter in „Sanitätsdienst“ auf; 0238 bleibt beim Stand
+                // davor, bestehende Vorlagen ändert kein Update.
+                if start.bezeichnung == "Sanitätsdienst" {
+                    erwartet.extend(["fernmeldewesen".to_string(), "wetter-pegel".to_string()]);
+                }
                 assert_eq!(aus, erwartet, "{}", start.bezeichnung);
             }
         }
