@@ -4182,6 +4182,11 @@ export interface components {
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
             /**
+             * @description Die nächsten anstehenden Programmpunkte der Veranstaltung (LLH-1570, höchstens
+             *     [`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen.
+             */
+            programm: components["schemas"]["Programmpunkt"][];
+            /**
              * Format: int64
              * @description Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
              */
@@ -5729,6 +5734,14 @@ export interface components {
          * @enum {string}
          */
         Prioritaet: "sofort" | "dringend" | "normal";
+        /** @description Ein Programmpunkt, wie ihn Einsatzdaten und Überblick lesen. */
+        Programmpunkt: {
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Zeitpunkt (UTC, `YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+        };
         /** @description Ein Eintrag in der Antwort, mit dem Label der Qualifikation. */
         QualiSollEintrag: {
             /** Format: int64 */

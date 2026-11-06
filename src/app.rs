@@ -306,6 +306,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_fuehrungsstelle::lesen)
                 .patch(routes::einsatz_fuehrungsstelle::aendern),
         )
+        // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
+        // Rechten der Kopfdaten.
+        .route(
+            "/api/einsaetze/{id}/programmpunkte",
+            get(routes::programmpunkt::liste).post(routes::programmpunkt::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/programmpunkte/{pid}",
+            patch(routes::programmpunkt::aendern).delete(routes::programmpunkt::loeschen),
+        )
         // LFH-893: Einzel-Zuordnung (design.md D5), neben dem PATCH mit `sprechgruppe_ids`.
         .route(
             "/api/einsaetze/{id}/fuehrungsstelle/sprechgruppen/{sg}",

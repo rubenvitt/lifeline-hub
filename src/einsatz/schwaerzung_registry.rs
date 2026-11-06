@@ -2683,6 +2683,23 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
         ],
     },
+    TabellenRegel {
+        // Programmpunkte der Veranstaltung (LLH-1570): die Bezeichnung ist Freitext und kann
+        // einen Namen tragen („Auftritt …“), darum wie der Titel der Erinnerung geschwärzt.
+        tabelle: "programmpunkt",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            scrub("bezeichnung", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erstellt_von_id", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
     // ---------- Kommunikations-Status / -Zustellung (reines Status-Skelett) ----------
     TabellenRegel {
         tabelle: "kommunikation_status",

@@ -120,6 +120,21 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     prioritaet: 'sofort',
     ereigniszeit: new Date().toISOString(),
   });
+  // Ablauf der Veranstaltung (LLH-1570): der verstrichene Punkt fällt heraus, höchstens drei.
+  const wireAb = (minuten: number) =>
+    new Date(Date.now() + minuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+  for (const [bezeichnung, minuten] of [
+    ['Einlass', -30],
+    ['Pause', 60],
+    ['Feuerwerk', 90],
+    ['Zugabe', 200],
+    ['Ende', 240],
+  ] as const) {
+    await anlegen(page, `/api/einsaetze/${e}/programmpunkte`, {
+      bezeichnung,
+      zeitpunkt_at: wireAb(minuten),
+    });
+  }
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
     `/api/einsaetze/${e}/geraete`,
@@ -169,6 +184,17 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     await expect(monitor.getByText('Keller', { exact: false })).toHaveCount(0);
     const betroffene = monitor.getByRole('region', { name: 'Betroffene' });
     await expect(betroffene.getByText('gesamt')).toBeVisible();
+    const ablauf = monitor.getByRole('region', { name: 'Ablauf' });
+    const punkte = ablauf.locator('[data-lfh="monitor-ablauf"]');
+    await expect(punkte).toHaveCount(3);
+    await expect(punkte.nth(0)).toContainText('Pause');
+    await expect(punkte.nth(1)).toContainText('Feuerwerk');
+    await expect(punkte.nth(2)).toContainText('Zugabe');
+    await expect(ablauf.getByText('Einlass')).toHaveCount(0);
+    const ablaufText = await punkte.evaluateAll((zeilen) =>
+      zeilen.map((z) => parseFloat(getComputedStyle(z).fontSize)),
+    );
+    for (const groesse of ablaufText) expect(groesse).toBeGreaterThanOrEqual(28);
 
     // Kein Bildlauf: alles passt in 1920 × 1080.
     const masse = await monitor.evaluate(() => ({
@@ -183,6 +209,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
       'Belegung der Unfallhilfsstellen',
       'Lagekarte',
       'Meldungen',
+      'Ablauf',
     ]) {
       await expect(monitor.getByRole('region', { name: kachel })).toBeInViewport({ ratio: 1 });
     }

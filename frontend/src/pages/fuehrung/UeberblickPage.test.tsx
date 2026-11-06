@@ -1029,6 +1029,24 @@ describe('UeberblickPage', () => {
     expect(marken[3]).toHaveAttribute('href', '/einsaetze/1/lagebesprechung');
   });
 
+  it('Nächste Marken: Programmpunkt neutral, führt in die Einsatzdaten (LLH-1570)', async () => {
+    stelleBereit(volleDaten);
+    server.use(
+      http.get('/api/einsaetze/1/programmpunkte', () =>
+        HttpResponse.json([
+          { id: 5, bezeichnung: 'Feuerwerk', zeitpunkt_at: nach(15) },
+          { id: 6, bezeichnung: 'Einlass', zeitpunkt_at: vor(30) },
+        ]),
+      ),
+    );
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    const marke = (await within(p).findByText('Feuerwerk')).closest('a')!;
+    expect(marke).toHaveAttribute('href', '/einsaetze/1/einsatzdaten');
+    expect(marke).toHaveAttribute('data-ton', 'neutral');
+    expect(within(p).queryByText('Einlass')).toBeNull();
+  });
+
   describe('Nächste Marken: offene Pegel-Prognose (LFH-628), Ziel nach LFH-633', () => {
     // Wire-Zeit UTC ohne Zone, relativ zur echten Uhr (die Seite rechnet mit ihr).
     const wire = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');

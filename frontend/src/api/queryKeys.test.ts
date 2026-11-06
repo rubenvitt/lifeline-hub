@@ -225,6 +225,9 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       'einsatz-fuehrungsstelle',
       // LLH-1421: die Vorgabe je Funktion meldet sich über `kopf_geaendert`.
       'einsatz-benachrichtigung-vorgaben',
+      // LLH-1570: Programmpunkte der Veranstaltung und der Lagemonitor, der die nächsten zeigt.
+      'einsatz-programmpunkte',
+      'einsatz-lagemonitor',
     ]);
     expect(EINSATZ_STREAM_EVENTS.einsatz).not.toContain('einsatz-stab');
   });

@@ -176,6 +176,7 @@ use utoipa::OpenApi;
         crate::erinnerung::ErinnerungAnzeige,
         crate::erinnerung::ErinnerungKennzahlen,
         crate::erinnerung::ErinnerungStatus,
+        crate::programmpunkt::Programmpunkt,
         crate::etb::EtbEintragAnzeige,
         crate::etb::FolgeauftragVerweis,
         crate::etb::BerichtigungVerweis,

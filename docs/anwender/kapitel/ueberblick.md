@@ -99,13 +99,15 @@ selbst angelegten. Ablösungen gehören zu keiner Stelle und bleiben vollständi
 
 ### Nächste Marken
 
-Die Marken kommen aus sechs Quellen: Aufträge mit Frist, offene Erinnerungen, die nächste
-Lagebesprechung, der erwartete Höchststand an einem maßgeblichen Pegel, fällige Ablösungen und der
-Beginn angekündigter Unwetterwarnungen der Stufen schwer und extrem. Eine verstrichene Frist steht
-als „überfällig“ ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben. Pegelprognose
-und Unwetterbeginn sind Erwartungen, keine Fristen: Verstrichen fallen sie heraus. Es stehen
-höchstens sechs Marken da, der Rest als „+… weitere“. Ein Klick auf die Marke eines Auftrags oder
-einer Erinnerung öffnet den Auftrag oder die Erinnerung hervorgehoben im Modul.
+Die Marken kommen aus sieben Quellen: Aufträge mit Frist, offene Erinnerungen, die nächste
+Lagebesprechung, der erwartete Höchststand an einem maßgeblichen Pegel, fällige Ablösungen, der
+Beginn angekündigter Unwetterwarnungen der Stufen schwer und extrem und die Programmpunkte der
+Veranstaltung aus dem Paneel „Ablauf“ der [Einsatzdaten](einsatzdaten.md). Eine verstrichene Frist
+steht als „überfällig“ ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben.
+Pegelprognose, Unwetterbeginn und Programmpunkte sind keine Fristen: Sie sind nie hervorgehoben
+und fallen verstrichen heraus. Es stehen höchstens sechs Marken da, der Rest als „+… weitere“. Ein
+Klick auf die Marke eines Auftrags oder einer Erinnerung öffnet den Auftrag oder die Erinnerung
+hervorgehoben im Modul, ein Klick auf einen Programmpunkt die Einsatzdaten.
 
 ### Rechte und gesperrte Module
 

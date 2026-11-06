@@ -99,6 +99,7 @@ import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleit
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
+import AblaufPaneel from '../programmpunkt/AblaufPaneel';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -1365,6 +1366,9 @@ export default function EinsatzdatenPage() {
           darfSchreiben={darfBearbeiten}
           speichern={feldSpeichern}
         />
+
+        {/* Programmpunkte der Veranstaltung (LLH-1570): Marken im Überblick und auf dem Monitor. */}
+        <AblaufPaneel einsatzId={einsatzId} darfSchreiben={darfBearbeiten} />
 
         <Paneel titel="Erstmeldung">
           <Angaben
