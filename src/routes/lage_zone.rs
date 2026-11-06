@@ -12,7 +12,9 @@ use crate::lage_zone::repo::{self as zone_repo, ZoneNeu, ZonePatch};
 use crate::live::LiveEvent;
 // ETB-Wortlaut der Zone: der Baustein liegt seit LFH-690 im Fachmodul (Demo-Import).
 use crate::lage_zone::{self, etb_text, LageZoneAnzeige};
-use crate::routes::support::{deserialize_optional_field, parse_enum, trimme, AnsichtFilter};
+use crate::routes::support::{
+    deserialize_optional_field, optional_max, optional_max_tri, parse_enum, trimme, AnsichtFilter,
+};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -150,6 +152,9 @@ pub async fn anlegen(
     JsonBody(body): JsonBody<ZoneBody>,
 ) -> Result<(StatusCode, Json<LageZoneAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Die Bezeichnung steht wörtlich im ETB und wird die eines neuen Gefahrengebiets (LLH-1531);
+    // ein Feld für sich, also 400 vor jedem 422 der Geometrie.
+    let label = optional_max(body.label.clone(), "Bezeichnung", lage_zone::LABEL_MAX)?;
     let (geometrie_typ, geometrie) = validiere_neu(&body)?;
     // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404.
     crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, body.ansicht_id)
@@ -158,7 +163,6 @@ pub async fn anlegen(
         pruefe_bezirk_zuordnung(&state, &ctx, &body.typ, bid).await?;
     }
 
-    let label = trimme(body.label.clone());
     let notiz = trimme(body.notiz.clone());
     // farbe nur für freie_skizze; sonst ignorieren (Stil aus typ abgeleitet).
     let farbe = if body.typ == "freie_skizze" {
@@ -309,6 +313,8 @@ pub async fn aktualisieren(
     if let Some(g) = &body.geometrie {
         lage_zone::pruefe_geometrie_groesse(g, "geometrie")?;
     }
+    // Bezeichnung wie beim Anlegen (LLH-1531): absent = unverändert, `null`/leer = leeren.
+    let label_patch = optional_max_tri(body.label.clone(), "Bezeichnung", lage_zone::LABEL_MAX)?;
     if (body.kreis_radius_m.is_some() || neue_mitte.is_some()) && body.geometrie.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Kreisangaben und Geometrie schließen sich aus".into(),
@@ -383,8 +389,8 @@ pub async fn aktualisieren(
     };
 
     // Effektives label (getrimmt).
-    let neues_label: Option<String> = match &body.label {
-        Some(opt) => opt.clone().and_then(|s| trimme(Some(s))),
+    let neues_label: Option<String> = match &label_patch {
+        Some(opt) => opt.clone(),
         None => vorher.label.clone(),
     };
 
@@ -431,10 +437,7 @@ pub async fn aktualisieren(
         ctx.benutzer.id,
         ZonePatch {
             typ: body.typ.as_deref(),
-            label: body
-                .label
-                .as_ref()
-                .map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+            label: label_patch.as_ref().map(|o| o.as_deref()),
             farbe: farbe_patch,
             notiz: body
                 .notiz

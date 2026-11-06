@@ -31,6 +31,7 @@ import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import EinsatzSeite, { type SeitenNebenwege } from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
 import { InlineAngabe } from '../../components/InlineAngabe';
+import { GEFAHR_GEBIET_LABEL_MAX } from '../../api/eingabegrenzen';
 import { KennungsLink } from '../../components/kennungsLink';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
 import { RechteHinweis, SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -353,6 +354,7 @@ export default function GefahrenPage() {
                   eingabe={({ feld, value, onChange }) => (
                     <Input
                       {...feld}
+                      maxLength={GEFAHR_GEBIET_LABEL_MAX}
                       value={value}
                       onChange={(e) => onChange(e.target.value)}
                       style={{ minWidth: 'min(16rem, 100%)' }}

@@ -20,7 +20,7 @@ import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
 import { Augenbraue, Datenfeld, Datenraster, monoStil } from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
 import { formatRadius, kreisAusZone, parseGeometry, geoKennzahlen, radiusGueltig } from './geo';
-import { KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
+import { KREIS_RADIUS_M_MAX, ZONE_LABEL_MAX } from '../../api/eingabegrenzen';
 import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
@@ -409,6 +409,7 @@ export default function ZonenInspector({
         <Input
           aria-label="Label"
           placeholder="Bezeichnung"
+          maxLength={ZONE_LABEL_MAX}
           value={entwurf.label}
           disabled={gesperrt}
           onChange={(e) => setEntwurf((alt) => ({ ...alt, label: e.target.value }))}

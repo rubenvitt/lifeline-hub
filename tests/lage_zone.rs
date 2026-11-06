@@ -74,6 +74,87 @@ async fn anlegen_setzt_zone_und_schreibt_etb_eingerichtet() {
 /// am Zusammenhang (Typ passt nicht zur Geometrie-Klasse bzw. geometrie.type widerspricht
 /// dem deklarierten geometrie_typ) → 422. Beide Hälften bewusst in EINEM Test, damit die
 /// Datei nicht pauschal auf einen der beiden Codes gekippt wird (LFH-305).
+/// Die Bezeichnung einer Zone hat eine Grenze (LLH-1531): sie steht wörtlich im System-ETB und
+/// wird die eines neuen Gefahrengebiets. Genau die Grenze geht durch (gezählt nach dem Trimmen),
+/// ein Zeichen mehr ist 400 beim Anlegen wie beim Ändern, noch vor dem 422 der Geometrie, und
+/// schreibt nichts.
+#[tokio::test]
+async fn zu_lange_bezeichnung_ist_400_beim_anlegen_und_aendern() {
+    use lifeline_hub::lage_zone::LABEL_MAX;
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let u = format!("/api/einsaetze/{einsatz}/zonen");
+    let fehler = format!("Bezeichnung darf höchstens {LABEL_MAX} Zeichen lang sein");
+
+    let genau = "ä".repeat(LABEL_MAX);
+    let (status, z) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(&json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY,"label":format!("  {genau}  ")}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{z:?}");
+    assert_eq!(z["label"], genau.as_str());
+    let zid = z["id"].as_i64().unwrap();
+
+    let zu_lang = "x".repeat(LABEL_MAX + 1);
+    let (status, f) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(&json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY,"label":zu_lang}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{f:?}");
+    assert_eq!(f["error"], fehler.as_str());
+    // Feld vor Zusammenhang: Kreis und Geometrie zugleich wäre 422.
+    let (status, f) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(
+            &json!({
+                "typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY,
+                "kreis":{"mitte_lat":50.1,"mitte_lon":8.6,"radius_m":100.0},"label":zu_lang
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{f:?}");
+    assert_eq!(f["error"], fehler.as_str());
+
+    let (status, f) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{u}/{zid}"),
+        &admin,
+        Some(&json!({"label":zu_lang}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{f:?}");
+    assert_eq!(f["error"], fehler.as_str());
+
+    let (_, liste) = anfrage(&app, "GET", &u, &admin, None).await;
+    let liste = liste.as_array().unwrap();
+    assert_eq!(liste.len(), 1, "die zu lange Zone entsteht nicht");
+    assert_eq!(
+        liste[0]["label"],
+        genau.as_str(),
+        "das Ändern schreibt nichts"
+    );
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        !etb.iter().any(|t| t.contains(&zu_lang)),
+        "keine überlange Bezeichnung im ETB: {etb:?}"
+    );
+}
+
 #[tokio::test]
 async fn ungueltiger_typ_ist_400_kombination_bleibt_422() {
     let (app, _live) = setup_mit_live().await;
