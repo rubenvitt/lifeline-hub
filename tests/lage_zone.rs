@@ -256,6 +256,40 @@ async fn zu_lange_notiz_und_ungueltige_farbe_sind_400_beim_anlegen_und_aendern()
     );
     assert_eq!(liste[0]["farbe"], "#00ff7f", "das Ändern schreibt nichts");
 
+    // Andere Typen tragen keine Farbe: sie wird verworfen, nicht geprüft (wie vor LLH-1559).
+    let (status, g) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(&json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY,"farbe":"red"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{g:?}");
+    assert!(g["farbe"].is_null(), "{g:?}");
+    let gid = g["id"].as_i64().unwrap();
+    let (status, g) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{u}/{gid}"),
+        &admin,
+        Some(r#"{"farbe":"red"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{g:?}");
+    assert!(g["farbe"].is_null(), "{g:?}");
+    // Wird die Zone mit dem PATCH zur freien Skizze, gilt die Prüfung.
+    let (status, f) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{u}/{gid}"),
+        &admin,
+        Some(r#"{"typ":"freie_skizze","farbe":"red"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{f:?}");
+    assert_eq!(f["error"], farbe_fehler);
+
     // Gültig geht durch, leer leert.
     let (status, z) = anfrage(
         &app,

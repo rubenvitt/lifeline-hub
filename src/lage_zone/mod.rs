@@ -167,7 +167,8 @@ pub const NOTIZ_MAX: usize = 2_000;
 
 /// Farbe einer freien Skizze (LLH-1559): Hex `#rrggbb`, wie sie der Farbwähler der Maske liefert
 /// und die Karte zeichnet. Groß- und Kleinschreibung gehen durch, gespeichert wird klein; alles
-/// andere ist ein Feldfehler (400) statt freier Länge.
+/// andere ist ein Feldfehler (400) statt freier Länge. Geprüft nur an einer freien Skizze, jeder
+/// andere Typ verwirft die Farbe.
 pub fn farbe_normiert(farbe: &str) -> Result<String, crate::error::AppError> {
     let ziffern = farbe.strip_prefix('#').unwrap_or("");
     if ziffern.len() != 6 || !ziffern.chars().all(|c| c.is_ascii_hexdigit()) {

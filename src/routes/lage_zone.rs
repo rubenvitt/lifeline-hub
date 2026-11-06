@@ -156,12 +156,16 @@ pub async fn anlegen(
     // Die Bezeichnung steht wörtlich im ETB und wird die eines neuen Gefahrengebiets (LLH-1531);
     // ein Feld für sich, also 400 vor jedem 422 der Geometrie.
     let label = optional_max(body.label.clone(), "Bezeichnung", lage_zone::LABEL_MAX)?;
-    // Notiz und Farbe sind ebenso Felder für sich (LLH-1559). Die Farbe zählt nur an einer
-    // freien Skizze, geprüft wird sie aber, sobald sie dasteht.
+    // Notiz und Farbe sind ebenso Felder für sich (LLH-1559). Die Farbe trägt nur eine freie
+    // Skizze; an jedem anderen Typ wird sie wie bisher verworfen, ohne Prüfung.
     let notiz = optional_max(body.notiz.clone(), "Notiz", lage_zone::NOTIZ_MAX)?;
-    let farbe = trimme(body.farbe.clone())
-        .map(|f| lage_zone::farbe_normiert(&f))
-        .transpose()?;
+    let farbe = if body.typ == "freie_skizze" {
+        trimme(body.farbe.clone())
+            .map(|f| lage_zone::farbe_normiert(&f))
+            .transpose()?
+    } else {
+        None
+    };
     let (geometrie_typ, geometrie) = validiere_neu(&body)?;
     // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404.
     crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, body.ansicht_id)
@@ -169,13 +173,6 @@ pub async fn anlegen(
     if let Some(bid) = body.evakuierungsbezirk_id {
         pruefe_bezirk_zuordnung(&state, &ctx, &body.typ, bid).await?;
     }
-
-    // farbe nur für freie_skizze; sonst ignorieren (Stil aus typ abgeleitet).
-    let farbe = if body.typ == "freie_skizze" {
-        farbe
-    } else {
-        None
-    };
 
     // F06/LFH-244 Tier-A: Zonen-INSERT (+ ggf. Gruppen-INSERT) + System-ETB-Eintrag atomar
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für
@@ -323,8 +320,11 @@ pub async fn aktualisieren(
     let label_patch = optional_max_tri(body.label.clone(), "Bezeichnung", lage_zone::LABEL_MAX)?;
     // Notiz und Farbe wie beim Anlegen (LLH-1559): absent = unverändert, `null`/leer = leeren.
     let notiz_patch = optional_max_tri(body.notiz.clone(), "Notiz", lage_zone::NOTIZ_MAX)?;
+    // Die Farbe zählt nur, wenn die Zone danach eine freie Skizze ist (sonst wird sie unten
+    // genullt); nur dann wird sie geprüft.
+    let wird_freie_skizze = body.typ.as_deref().unwrap_or(vorher.typ.as_str()) == "freie_skizze";
     let farbe_body = match trimme_tri(body.farbe.clone()) {
-        Some(Some(f)) => Some(Some(lage_zone::farbe_normiert(&f)?)),
+        Some(Some(f)) if wird_freie_skizze => Some(Some(lage_zone::farbe_normiert(&f)?)),
         sonst => sonst,
     };
     if (body.kreis_radius_m.is_some() || neue_mitte.is_some()) && body.geometrie.is_some() {
