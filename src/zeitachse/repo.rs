@@ -626,8 +626,9 @@ pub async fn trage_periode_nach_tx(
 ) -> Result<PeriodeNachgetragen, AppError> {
     kraft_name_tx(conn, einsatz_id, kraft).await?;
     let bestand = bestand_tx(conn, kraft).await?;
-    perioden::fuege_periode_ein(&bestand, neu)
-        .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
+    if let Err(v) = perioden::fuege_periode_ein(&bestand, neu) {
+        return Err(verstoss_tx(conn, einsatz_id, &v).await?);
+    }
 
     // Fan-out: je Person am Ergebnis prüfen, bevor irgendetwas geschrieben wird.
     let mut personen = Vec::new();
