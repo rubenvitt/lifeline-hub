@@ -72,7 +72,8 @@ Spec `eingabegrenzen`, Herleitung
   und Schreiben der Ablöser-Liste über `json_each`, Folgeschichten je Ablöser, gedeckelt durch
   `abloesung::ABLOESER_MAX`; beim Besatzungswechsel (LLH-1150) Prüfen der neuen Besatzung und
   Umhängen beider Besatzungen über `json_each`, Zeitachse und Zeile je Person, gedeckelt durch
-  `abloesung::BESATZUNG_MAX`.
+  `abloesung::BESATZUNG_MAX`. Ebenso die Personen eines **Schichtplan-Blocks** (LLH-1552): Prüfen
+  und Schreiben je Art über `json_each`, gedeckelt durch `schichtplan::PLAN_PERSONEN_MAX`.
 - **Geometrien** von Zonen und Flächen gehen durch `lage_zone::pruefe_geometrie_groesse` und
   `pruefe_geometrie_struktur` (400); kaputtes JSON und falscher Typ bleiben 422.
 - **Body-Limit** (LFH-1074): jede Route nimmt höchstens `JSON_BODY_MAX` (256 KiB, `app.rs`) an,
@@ -348,7 +349,9 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Detailzeile und Pfad bildet `text::bilden` beim Lesen; die Detailzeile liest nur Retain-Spalten
   (Guard `detail_liest_nur_retain_spalten`). Trägt der Bezug die gemeinte Einheit nicht allein
   (Hinweis zur ablösenden Einheit), hält `Anlass::einheit` ihre ID fest (`benachrichtigung.einheit_id`,
-  LLH-1511, ohne FK); ein Neubau der Tabelle für den CHECK nimmt die Spalte mit. Eine neue Art braucht Variante, Titel, Migration
+  LLH-1511, ohne FK), bei einem geplanten Verband dazu `Anlass::durch` die auslösende Untereinheit
+  (`benachrichtigung.durch_einheit_id`, LLH-1509); ein Neubau der Tabelle für den CHECK nimmt beide
+  Spalten mit. Eine neue Art braucht Variante, Titel, Migration
   für den CHECK (`check_listen_entsprechen_dem_katalog`) und ihre Stufe in `stufe()`; ein neuer
   Bezug sein Modul (`BenachrichtigungBezugTyp::modul`) und seinen Pfad.
 - **Zustellung nur über `benachrichtigung::zustellen`:** Einsatz-Arten als `benachrichtigung`,

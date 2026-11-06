@@ -2,15 +2,15 @@
 titel: Lagemonitor
 gruppen: [geraete]
 reihenfolge: 770
-quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
 ---
 
 ## Überblick
 
 Der **Lagemonitor** ist ein Großbildschirm im Stabsraum oder Führungsfahrzeug. Er zeigt das
-Lagebild des Einsatzes verdichtet in festen Kacheln: Lagekarte, offene Sofortmeldungen,
-Betroffene, Kräfte und die Belegung der Unfallhilfsstellen, unten eine Statusleiste. Er zeigt
-**keine Namen** und keinen Meldungstext, spielt keinen Ton und wird nicht bedient: Antippen und
+Lagebild des Einsatzes verdichtet in festen Kacheln: Lagekarte, offene Sofortmeldungen, die
+nächsten Programmpunkte der Veranstaltung, Betroffene, Kräfte und die Belegung der
+Unfallhilfsstellen, unten eine Statusleiste. Er zeigt **keine Namen** und keinen Meldungstext, spielt keinen Ton und wird nicht bedient: Antippen und
 Ziehen auf den Kacheln bleiben ohne Wirkung.
 
 Den Monitor koppelt die Einsatzleitung mit der Ansicht „Lagemonitor“ (siehe
@@ -47,9 +47,12 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    Einsatzabschnitte mit ihrer Kurzbezeichnung, ohne Kurzbezeichnung mit ihrem Namen.
 5. „Meldungen“ unter der Karte zählt die „Sofortmeldungen offen“, die noch niemand bestätigt
    hat.
-6. Steigt die Zahl der offenen Sofortmeldungen oder die Zahl in SK I, ist sie eine Minute lang
+6. „Ablauf“ neben „Meldungen“ nennt die nächsten drei Programmpunkte aus den
+   [Einsatzdaten](einsatzdaten.md) mit Uhrzeit, Bezeichnung und Abstand, etwa „in 1 h 30 min“.
+   Ein Punkt fällt mit seiner Uhrzeit heraus; steht keiner mehr an, fehlt die Kachel.
+7. Steigt die Zahl der offenen Sofortmeldungen oder die Zahl in SK I, ist sie eine Minute lang
    farbig hinterlegt, und oben in der Kachel steht „Neue Sofortmeldung“ bzw. „Neu in SK I“.
-7. Die Statusleiste nennt Einsatz, Gerät, Verbindung („live“, „verbinde …“, „getrennt“), den
+8. Die Statusleiste nennt Einsatz, Gerät, Verbindung („live“, „verbinde …“, „getrennt“), den
    Stand der Daten mit Alter und die Uhr.
 
 ### Gerätemenü öffnen
@@ -84,7 +87,9 @@ null, endet sie vorzeitig.
 
 ### Was der Monitor zeigt und was nicht
 
-Der Monitor zeigt nur Zahlen und die Karte, keine Personendaten und keine Namen. Er schreibt
+Der Monitor zeigt nur Zahlen, die Karte und die Bezeichnungen der nächsten Programmpunkte, keine
+Personendaten und keine Namen. Ein Programmpunkt löst am Monitor keinen Alarm aus und wird nicht
+hervorgehoben. Er schreibt
 nichts: Er ist ein reiner Beobachter des Einsatzes. Hat der Einsatz keinen verorteten Einsatzort,
 keine verortete UHS und keine Fläche, zeigt die Kartenkachel „Kein Einsatzort verortet“.
 Kann der Browser des Monitors keine Karte zeichnen (Voraussetzung wie bei der

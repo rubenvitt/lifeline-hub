@@ -106,8 +106,10 @@ Den Stand eines geplanten Ablösers an der Karte („Ablösung: … · alarmiert
 Zeitachse; der Raum kommt aus `aktueller_br_id` und der Raumliste, die nur mit Freigabe der
 Bereitstellungsräume und nur bei einem Ablöser im Raum abgefragt wird, „· abgerufen …“ aus deren
 `abrufe` (LLH-1309: das Abruf-Ereignis der BR-Belegung, kein Zeitachsen-Ereignis, keine Spalte an
-der Einheit; nach dem Ausrücken fällt es weg). Kein eigener Abruf, kein DTO-Feld der Ablösung:
-live über die bestehenden Ereignisse. Den Vermerk „Planung entfallen“ (LLH-1309, mit der
+der Einheit; nach dem Ausrücken fällt es weg). Kein eigener Abruf: live über die bestehenden
+Ereignisse. Bei einem geplanten Verband zählt sein Teilbaum (LLH-1509, je Art der früheste
+Zeitpunkt); welche Untereinheiten dazugehören, liefert der Server am Ablöser (`untereinheiten`),
+der Client geht die Gliederung dafür nicht selbst ab. Den Vermerk „Planung entfallen“ (LLH-1309, mit der
 auslösenden Entlassung ab LLH-1510) schreibt nur `drop_planungen_tx`, räumt `set_abloeser_tx` und die Streichung
 der Entlassung (`restore_entfallene_planungen_tx`: holt die Planung zurück, nur solange der
 Vermerk noch Grund `entlassung` und genau diese Entlassung trägt; eine Berichtigung hebt „wiederhergestellt“
@@ -162,3 +164,12 @@ die Ablöser-Liste (`einsatz_abloesung_planung_vorher`, `planung_gesichert`), di
 sie wieder her; der geplante Wechsel bleibt beim Vollzug stehen. Ziele, Vorbelegung und Texte
 („Besatzungswechsel geplant · neu: …“, „nach Besatzungswechsel · Besatzung: …“) bildet nur
 `abloesung/besatzung.ts`.
+
+**Schichtplan** (LLH-1552, Spec `kraefte-schichtplan`): Blöcke an Einheit, UHS oder Pause sind
+Soll; sie ändern weder Zuordnung noch Fälligkeit, und wer nur im Plan steht, ist nicht im Einsatz.
+Überschneidung (422), Soll-Kopie vom Posten, Lücke, offene Anforderungen und alle Befunde
+(`doppelt`, `quali`, `dienst`, `verfuegbar`, `abweichung`) rechnet der Server beim Lesen
+(`abloesung::schichtplan::pruefung`); der Client zeigt sie nur und rechnet nichts nach. Jeder
+Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Key
+`schichtplan` unter `abloesungen`, live über `abloesung`. Ohne Freigabe von Personal kommen
+`personen` und `helfer` als `null`.

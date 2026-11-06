@@ -65,7 +65,10 @@ async fn anzeige(
         z.einsatz_id,
         z.art,
         Bezug::neu(z.bezug_typ, z.bezug_id),
-        z.einheit_id,
+        text::HinweisEinheiten {
+            einheit_id: z.einheit_id,
+            durch_einheit_id: z.durch_einheit_id,
+        },
     )
     .await?;
     Ok(Some(BenachrichtigungAnzeige {

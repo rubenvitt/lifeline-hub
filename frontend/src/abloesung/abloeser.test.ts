@@ -44,8 +44,8 @@ describe('abloeser (LLH-1132)', () => {
           einheit_id: 1,
           abloesende_einheit_id: 3,
           abloeser: [
-            { einheit_id: 3, einheit_name: 'Florian 3' },
-            { einheit_id: 2, einheit_name: 'Florian 2' },
+            { einheit_id: 3, einheit_name: 'Florian 3', untereinheiten: [] },
+            { einheit_id: 2, einheit_name: 'Florian 2', untereinheiten: [] },
           ],
         }),
       ),
@@ -60,8 +60,8 @@ describe('abloeser (LLH-1132)', () => {
       einheit_id: 1,
       status: 'abgeloest',
       abloeser: [
-        { einheit_id: 2, einheit_name: 'Florian 2' },
-        { einheit_id: 3, einheit_name: 'Florian 3' },
+        { einheit_id: 2, einheit_name: 'Florian 2', untereinheiten: [] },
+        { einheit_id: 3, einheit_name: 'Florian 3', untereinheiten: [] },
       ],
       folgeschichten: [
         { id: 8, einheit_id: 2, einheit_name: 'Florian 2', status: 'laufend', uebernommen: true },
@@ -99,8 +99,8 @@ describe('geplanteAbloeserOptionen (LLH-1542)', () => {
           id: 1,
           einheit_id: 1,
           abloeser: [
-            { einheit_id: 3, einheit_name: 'Florian 3' },
-            { einheit_id: 2, einheit_name: 'Florian 2' },
+            { einheit_id: 3, einheit_name: 'Florian 3', untereinheiten: [] },
+            { einheit_id: 2, einheit_name: 'Florian 2', untereinheiten: [] },
           ],
         }),
       ),

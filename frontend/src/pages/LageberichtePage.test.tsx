@@ -1045,6 +1045,32 @@ describe('LageberichtePage — Übersicht (LLH-1064)', () => {
     expect(screen.queryByText('Noch keine Lageberichte')).toBeNull();
   });
 
+  it('der Fehler bleibt stehen, solange „Erneut abrufen" lädt (LLH-1581)', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/lageberichte', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
+      </Routes>,
+      { route: '/einsaetze/7/lageberichte' },
+    );
+    const knopf = await screen.findByRole('button', { name: 'Erneut abrufen' });
+    expect(knopf).not.toHaveClass('ant-btn-loading');
+
+    server.use(http.get('/api/einsaetze/7/lageberichte', () => new Promise<never>(() => {})));
+    await userEvent.click(knopf);
+
+    // Vorher stand hier das Ladeskelett: der neue Versuch ist auch `isLoading`.
+    await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Lageberichte nicht abrufbar');
+    expect(screen.getByRole('alert')).toHaveTextContent('kaputt');
+  });
+
   it('trägt Überschrift und Mengen im Kopf', async () => {
     setupListe([vorgaenger, freigegeben, entwurf]);
     expect(

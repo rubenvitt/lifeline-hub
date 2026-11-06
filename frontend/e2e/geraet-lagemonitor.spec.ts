@@ -57,6 +57,8 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   page,
   browser,
 }) => {
+  // Der Anstieg der Sofortmeldungen kommt spätestens mit dem Abruftakt (30 s).
+  test.setTimeout(150_000);
   await anmeldenAlsAdmin(page);
   const einsatz = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Monitor ${Date.now()}`,
@@ -120,6 +122,28 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     prioritaet: 'sofort',
     ereigniszeit: new Date().toISOString(),
   });
+  // Ablauf der Veranstaltung (LLH-1570): der verstrichene Punkt fällt heraus, höchstens drei.
+  const wireAb = (minuten: number) =>
+    new Date(Date.now() + minuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+  // Die drei anstehenden tragen die längste zulässige Bezeichnung (100 Zeichen): sie brechen um,
+  // keine Kachel schneidet ab.
+  const langeBezeichnung = (anfang: string) =>
+    `${anfang} ${'Bühnenumbau und Soundcheck auf der Hauptbühne am Markt '.repeat(2)}`.slice(
+      0,
+      100,
+    );
+  for (const [bezeichnung, minuten] of [
+    ['Einlass', -30],
+    [langeBezeichnung('Pause'), 60],
+    [langeBezeichnung('Feuerwerk'), 90],
+    [langeBezeichnung('Zugabe'), 200],
+    ['Ende', 240],
+  ] as const) {
+    await anlegen(page, `/api/einsaetze/${e}/programmpunkte`, {
+      bezeichnung,
+      zeitpunkt_at: wireAb(minuten),
+    });
+  }
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
     `/api/einsaetze/${e}/geraete`,
@@ -169,32 +193,78 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     await expect(monitor.getByText('Keller', { exact: false })).toHaveCount(0);
     const betroffene = monitor.getByRole('region', { name: 'Betroffene' });
     await expect(betroffene.getByText('gesamt')).toBeVisible();
+    const ablauf = monitor.getByRole('region', { name: 'Ablauf' });
+    const punkte = ablauf.locator('[data-lfh="monitor-ablauf"]');
+    await expect(punkte).toHaveCount(3);
+    await expect(punkte.nth(0)).toContainText('Pause');
+    await expect(punkte.nth(1)).toContainText('Feuerwerk');
+    await expect(punkte.nth(2)).toContainText('Zugabe');
+    await expect(ablauf.getByText('Einlass')).toHaveCount(0);
+    // Die lange Bezeichnung steht ganz da, umbrochen statt abgeschnitten.
+    const name = punkte.nth(0).locator('[data-lfh="monitor-ablauf-bezeichnung"]');
+    expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    await expect(name).toHaveText(langeBezeichnung('Pause'));
+    const ablaufText = await punkte.evaluateAll((zeilen) =>
+      zeilen.map((z) => parseFloat(getComputedStyle(z).fontSize)),
+    );
+    for (const groesse of ablaufText) expect(groesse).toBeGreaterThanOrEqual(28);
 
-    // Kein Bildlauf: alles passt in 1920 × 1080.
-    const masse = await monitor.evaluate(() => ({
-      hoehe: document.documentElement.scrollHeight,
-      breite: document.documentElement.scrollWidth,
-    }));
-    expect(masse.hoehe).toBeLessThanOrEqual(1080);
-    expect(masse.breite).toBeLessThanOrEqual(1920);
-    for (const kachel of [
-      'Betroffene',
-      'Kräfte',
-      'Belegung der Unfallhilfsstellen',
-      'Lagekarte',
-      'Meldungen',
-    ]) {
-      await expect(monitor.getByRole('region', { name: kachel })).toBeInViewport({ ratio: 1 });
-    }
-    // … und keine Kachel schneidet ihren Inhalt ab (sie läuft nicht still in sich über).
-    const abgeschnitten = await monitor
-      .locator('main section')
-      .evaluateAll((kacheln) =>
-        kacheln
-          .filter((k) => k.scrollHeight > k.clientHeight + 1)
-          .map((k) => k.getAttribute('aria-label')),
+    // Kein Bildlauf: alles passt in 1920 × 1080, und keine Kachel schneidet ihren Inhalt ab.
+    const passtGanz = async () => {
+      const masse = await monitor.evaluate(() => ({
+        hoehe: document.documentElement.scrollHeight,
+        breite: document.documentElement.scrollWidth,
+      }));
+      expect(masse.hoehe).toBeLessThanOrEqual(1080);
+      expect(masse.breite).toBeLessThanOrEqual(1920);
+      for (const kachel of [
+        'Betroffene',
+        'Kräfte',
+        'Belegung der Unfallhilfsstellen',
+        'Lagekarte',
+        'Meldungen',
+        'Ablauf',
+      ]) {
+        await expect(monitor.getByRole('region', { name: kachel })).toBeInViewport({ ratio: 1 });
+      }
+      // Eine Kachel läuft nicht still in sich über, die Bezeichnungen im Ablauf auch nicht.
+      const abgeschnitten = await monitor
+        .locator('main section')
+        .evaluateAll((kacheln) =>
+          kacheln
+            .filter((k) => k.scrollHeight > k.clientHeight + 1)
+            .map((k) => k.getAttribute('aria-label')),
+        );
+      expect(abgeschnitten).toEqual([]);
+      const namen = punkte.locator('[data-lfh="monitor-ablauf-bezeichnung"]');
+      await expect(namen).toHaveText([
+        langeBezeichnung('Pause'),
+        langeBezeichnung('Feuerwerk'),
+        langeBezeichnung('Zugabe'),
+      ]);
+      const quer = await namen.evaluateAll(
+        (el) => el.filter((n) => n.scrollWidth > n.clientWidth + 1).length,
       );
-    expect(abgeschnitten).toEqual([]);
+      expect(quer).toBe(0);
+    };
+    await passtGanz();
+
+    // Steigt die Zahl, verbreitert „Neue Sofortmeldung“ die Kachel „Meldungen“ neben dem
+    // Ablauf; auch dann bleibt alles ganz.
+    await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+      absender: 'EA Nord',
+      meldeweg: 'funk',
+      inhalt: 'Zweite Lage',
+      meldungsart: 'sofortmeldung',
+      prioritaet: 'sofort',
+      ereigniszeit: new Date().toISOString(),
+    });
+    const meldungen = monitor.getByRole('region', { name: 'Meldungen' });
+    await expect(meldungen.getByText('Neue Sofortmeldung')).toBeVisible({ timeout: 45_000 });
+    await expect(meldungen.locator('[data-lfh="monitor-zahl"]')).toHaveText(
+      '2Sofortmeldungen offen',
+    );
+    await passtGanz();
 
     // Großbild-Größen: Kennzahlen ab 72 px, Text ab 28 px.
     const groessen = await monitor

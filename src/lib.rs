@@ -62,6 +62,7 @@ pub mod pegel;
 pub mod person;
 pub mod personal;
 pub mod presse;
+pub mod programmpunkt;
 pub mod routes;
 pub mod schaden;
 pub mod schichtmodell;

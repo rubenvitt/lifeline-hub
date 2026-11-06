@@ -129,7 +129,10 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie) und Abschnittsflächen
   (Bezeichnung und Fläche) für die Karte (LLH-1153) und die offenen Sofortmeldungen nur als
   Zahl (`sofortmeldungen_offen`, D12 der Change `kcjecn9e-benachrichtigungskonzept`); `/zonen`
-  und `/abschnitte` bleiben ihm gesperrt, sie tragen Notizen und Leiternamen. Steigt diese Zahl
+  und `/abschnitte` bleiben ihm gesperrt, sie tragen Notizen und Leiternamen. Die nächsten drei
+  Programmpunkte (LLH-1570, `programm`: Bezeichnung und Zeitpunkt) kommen ebenfalls von dort,
+  `/programmpunkte` bleibt ihm gesperrt; die Kachel „Ablauf“ filtert verstrichene Punkte mit der
+  Monitoruhr und fehlt, wenn keiner ansteht, ohne Alarm und Hervorhebung. Steigt diese Zahl
   oder SK I gegenüber dem letzten Stand, hebt `useAnstieg` sie 60 s mit Farbe und Wort hervor,
   ohne Ton und Blinken. Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren

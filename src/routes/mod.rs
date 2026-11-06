@@ -1,4 +1,5 @@
 pub mod abloesung;
+pub mod abloesung_schichtplan;
 pub mod anhang;
 pub mod aufbewahrung;
 pub mod auftrag;
@@ -73,6 +74,7 @@ pub mod person_verletzung;
 pub mod personal;
 pub mod personal_status;
 pub mod presse;
+pub mod programmpunkt;
 pub mod qualifikation;
 pub mod schaden_anhang;
 pub mod schichtmodell;

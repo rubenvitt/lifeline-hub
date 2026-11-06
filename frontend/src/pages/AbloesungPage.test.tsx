@@ -617,7 +617,12 @@ describe('AbloesungPage (LFH-635)', () => {
 
   it('Vollzug ohne Freigabe des Moduls Einheiten: die Planung mit Namen, Grund an der Auswahl, ohne Abruf (LLH-1542)', async () => {
     freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
-    laufendLiefert([schicht({ id: 1, abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }] })]);
+    laufendLiefert([
+      schicht({
+        id: 1,
+        abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2', untereinheiten: [] }],
+      }),
+    ]);
     vi.mocked(listeEinheiten).mockClear();
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
@@ -631,7 +636,12 @@ describe('AbloesungPage (LFH-635)', () => {
 
   it('Ablösung planen ohne Freigabe des Moduls Einheiten: keine leere Auswahl ohne Grund (LLH-1542)', async () => {
     freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
-    laufendLiefert([schicht({ id: 1, abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }] })]);
+    laufendLiefert([
+      schicht({
+        id: 1,
+        abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2', untereinheiten: [] }],
+      }),
+    ]);
     vi.mocked(listeEinheiten).mockClear();
     renderPage();
     await screen.findAllByRole('article');
@@ -1492,7 +1502,10 @@ describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
 
 describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-1131 Teil II)', () => {
   const geplant = () =>
-    schicht({ id: 1, abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }] });
+    schicht({
+      id: 1,
+      abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2', untereinheiten: [] }],
+    });
   const zeile = (k: HTMLElement) => k.querySelector<HTMLElement>('[data-lfh="abloesung-abloeser"]');
 
   beforeEach(() => {
@@ -1631,7 +1644,7 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
     laufendLiefert([
       schicht({
         id: 1,
-        abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }],
+        abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2', untereinheiten: [] }],
         planung_warnungen: [
           {
             art: 'schon_geplant',

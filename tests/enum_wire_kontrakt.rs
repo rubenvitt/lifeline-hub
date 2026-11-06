@@ -1070,6 +1070,27 @@ fn abloesung_warnung_art_wire() {
 /// LLH-1150: Art des Vollzugs (DB-CHECK `art` in `migrations/0212_schichtmodell.sql`) und Rolle
 /// einer Person beim Besatzungswechsel (DB-CHECK in `migrations/0216_abloesung_besatzung.sql`).
 #[test]
+fn schichtplan_wire() {
+    enum_wire!(lifeline_hub::abloesung::schichtplan::PostenArt {
+        Einheit => "einheit",
+        Uhs => "uhs",
+        Pause => "pause",
+    } in lifeline_hub::abloesung::schichtplan::PostenArt::ALLE);
+    enum_wire!(lifeline_hub::abloesung::schichtplan::PlanPersonArt {
+        Stamm => "stamm",
+        Einsatz => "einsatz",
+        Helfer => "helfer",
+    } in lifeline_hub::abloesung::schichtplan::PlanPersonArt::ALLE);
+    enum_wire!(lifeline_hub::abloesung::schichtplan::PlanBefundArt {
+        Doppelt => "doppelt",
+        Quali => "quali",
+        Dienst => "dienst",
+        Verfuegbar => "verfuegbar",
+        Abweichung => "abweichung",
+    } in lifeline_hub::abloesung::schichtplan::PlanBefundArt::ALLE);
+}
+
+#[test]
 fn abloesung_art_und_besatzung_rolle_wire() {
     enum_wire!(lifeline_hub::abloesung::AbloesungArt {
         Einheit => "einheit",
@@ -1756,6 +1777,7 @@ fn zeilen_art_wire() {
         Personal => "personal",
         Fahrzeug => "fahrzeug",
         Material => "material",
+        Planschicht => "planschicht",
     } in lifeline_hub::error::ZeilenArt::ALLE);
 }
 

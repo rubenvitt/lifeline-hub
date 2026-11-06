@@ -2,7 +2,8 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router';
+import { Link, Route, Routes, useLocation } from 'react-router';
+import type { ReactNode } from 'react';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -12,6 +13,8 @@ import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import { warteAufMenueFokus } from '../test/menue';
+import { AdresseSteht } from '../test/adresseSteht';
+import { einsatzKeys } from '../api/queryKeys';
 
 // Gewartet wird mit RTLs `waitFor` (5 s, `test/setup.ts`), nicht mit `vi.waitFor`: dessen Budget
 // steht fest auf 1 s, und unter Last kam der Einsatz später — „?neu=1 … NICHT für Beobachter“
@@ -59,7 +62,19 @@ let aenderungen: { id: string; body: unknown }[] = [];
 function rendere(
   einsatz: object,
   dokumente: object[],
-  { route = '/einsaetze/1/dokumente', listeStatus = 200 } = {},
+  {
+    route = '/einsaetze/1/dokumente',
+    listeStatus = 200,
+    adresseSteht = false,
+    daneben = null,
+  }: {
+    route?: string;
+    listeStatus?: number;
+    /** Hält den Router-Commit an (LLH-1558). */
+    adresseSteht?: boolean;
+    /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
+    daneben?: ReactNode;
+  } = {},
 ) {
   loeschAufrufe = [];
   aenderungen = [];
@@ -84,7 +99,7 @@ function rendere(
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/etb', () => HttpResponse.json([])),
   );
-  return renderMitProviders(
+  const seite = (
     <Routes>
       <Route
         path="/einsaetze/:id/dokumente"
@@ -95,9 +110,28 @@ function rendere(
           </>
         }
       />
-    </Routes>,
+    </Routes>
+  );
+  return renderMitProviders(
+    <>
+      {adresseSteht ? <AdresseSteht>{seite}</AdresseSteht> : seite}
+      {daneben}
+    </>,
     { route },
   );
+}
+
+/** Schließt den Ablage-Dialog und wartet, bis er aus dem Bild ist (jsdom kennt kein Bewegungsende). */
+async function schliesseAblegen() {
+  await userEvent.click(within(await dialogAblegen()).getByRole('button', { name: 'Abbrechen' }));
+  await waitFor(() => {
+    const modal = document.querySelector<HTMLElement>('.ant-modal');
+    if (modal) {
+      fireEvent.animationEnd(modal);
+      fireEvent.transitionEnd(modal);
+    }
+    expect(screen.queryAllByRole('dialog')).toHaveLength(0);
+  });
 }
 
 /** Der Dialog über seinen Titel, nicht über den zugänglichen Namen (antd verknüpft ihn in
@@ -216,6 +250,43 @@ describe('DokumentePage', () => {
       await new Promise((r) => setTimeout(r, 50));
     });
     expect(document.querySelector('.ant-modal')).toBeNull();
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1` noch
+   * in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu an
+   * (Einsatz lädt neu), öffnet der Dialog nicht noch einmal. Bisher schützte davor nur, dass die
+   * Seite den Parameter aus der Instanz des Routers löschte (gegen die Klon-Regel, LFH-156).
+   */
+  it('ein hängender Router-Commit öffnet den geschlossenen Dialog nach neuem Recht nicht wieder (LLH-1558)', async () => {
+    const { client } = rendere(einsatzAktiv, [], {
+      route: '/einsaetze/1/dokumente?neu=1',
+      adresseSteht: true,
+    });
+    await schliesseAblegen();
+    const knopf = () => within(kopfAktionen()).getByRole('button', { name: 'Dokument ablegen' });
+
+    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzBeobachter)));
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(knopf()).toBeDisabled());
+    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)));
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(knopf()).toBeEnabled());
+    expect(screen.queryAllByRole('dialog')).toHaveLength(0);
+  });
+
+  it('ein neuer Link ?neu=1 öffnet den Dialog wieder (LLH-1558)', async () => {
+    rendere(einsatzAktiv, [], {
+      route: '/einsaetze/1/dokumente?neu=1',
+      daneben: <Link to="/einsaetze/1/dokumente?neu=1">neuer-link</Link>,
+    });
+    await dialogAblegen();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await schliesseAblegen();
+
+    await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+    expect(await dialogAblegen()).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
   it('Beobachter: Knopf gesperrt statt fehlend, Rechte-Hinweis, kein Entfernen', async () => {

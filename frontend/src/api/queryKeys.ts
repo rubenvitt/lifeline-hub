@@ -111,6 +111,8 @@ export const EINSATZ_KEYS = {
   einsatz: 'einsatz',
   // Eigene Führungsstelle (LFH-849): eigener Endpunkt, live über dasselbe `einsatz`-Ereignis.
   fuehrungsstelle: 'einsatz-fuehrungsstelle',
+  // Programmpunkte der Veranstaltung (LLH-1570): eigener Endpunkt, live über das `einsatz`-Ereignis.
+  programmpunkte: 'einsatz-programmpunkte',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einstellungen: 'einsatz-einstellungen',
   mitglieder: 'einsatz-mitglieder',
@@ -383,6 +385,10 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.lagebesprechung,
     EINSATZ_KEYS.fuehrungsstelle,
     EINSATZ_KEYS.benachrichtigungVorgaben,
+    // Programmpunkte (LLH-1570) melden ihre Änderung über dasselbe Ereignis; der Lagemonitor
+    // zeigt die nächsten davon.
+    EINSATZ_KEYS.programmpunkte,
+    EINSATZ_KEYS.lagemonitor,
   ],
   // Medienkontakte, Pressemitteilungen und ihre Details unter EINEM Prefix. Die Freigabe schreibt
   // den ETB-Snapshot; der kommt über das eigene `etb`-Ereignis.
@@ -613,6 +619,7 @@ export const einsatzKeys = {
   einsatz: (einsatzId: number | null) => [EINSATZ_KEYS.einsatz, einsatzId] as const,
   /** Eigene Führungsstelle (LFH-849), live über `einsatz`. */
   fuehrungsstelle: (einsatzId: number) => [EINSATZ_KEYS.fuehrungsstelle, einsatzId] as const,
+  programmpunkte: (einsatzId: number) => [EINSATZ_KEYS.programmpunkte, einsatzId] as const,
   einstellungen: (einsatzId: number) => [EINSATZ_KEYS.einstellungen, einsatzId] as const,
   /** Aufbewahrung je Datenkategorie (LFH-749) — Unter-Key der Einstellungen: dieselbe Seite,
    *  dieselbe Invalidierung, kein Live-Ereignis, kein Personenbezug. */
@@ -804,6 +811,8 @@ export const einsatzKeys = {
   /** Vorgabe des Einsatzes (LLH-1122); live über `abloesung` wie die Abschnittsvorgaben. */
   abloesungEinsatzVorgabe: (einsatzId: number) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'schichtmodell'] as const,
+  /** Schichtplan des Einsatzes (LLH-1552); live über `abloesung` wie die Schichten. */
+  schichtplan: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId, 'schichtplan'] as const,
   // Kräfte-Zeitachse (LFH-552): argumentlos = Invalidierungs-Prefix; Perioden-Listen je Kraftart
   // und die Zeitachse einer Kraft hängen als Sub-Keys darunter.
   kraefteZeitachse: (einsatzId: number) => [EINSATZ_KEYS.kraefteZeitachse, einsatzId] as const,

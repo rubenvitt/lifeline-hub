@@ -17,7 +17,7 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   status: 'laufend',
   ruecknehmbar: false,
   erbende_einheiten: [],
-  abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel' }],
+  abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel', untereinheiten: [] }],
   folgeschichten: [],
   uebernommen_bei_vollzug: false,
   art: 'einheit',
@@ -100,8 +100,8 @@ describe('buildAbloeserStand (LLH-1131 Teil II)', () => {
     const stand = buildAbloeserStand(
       schicht({
         abloeser: [
-          { einheit_id: 21, einheit_name: '2. Rettungsstaffel' },
-          { einheit_id: 22, einheit_name: 'Florian 3' },
+          { einheit_id: 21, einheit_name: '2. Rettungsstaffel', untereinheiten: [] },
+          { einheit_id: 22, einheit_name: 'Florian 3', untereinheiten: [] },
         ],
       }),
       {
@@ -216,5 +216,71 @@ describe('buildAbloeserStand (LLH-1131 Teil II)', () => {
         abrufe,
       })?.[0].abgerufen_at,
     ).toBeNull();
+  });
+});
+
+describe('buildAbloeserStand: Teilbaum eines geplanten Verbands (LLH-1509)', () => {
+  const verband = schicht({
+    abloeser: [{ einheit_id: 30, einheit_name: 'Verband Nord', untereinheiten: [31, 32] }],
+  });
+
+  it('je Art der früheste Zeitpunkt im Teilbaum, unter dem Namen des Verbands', () => {
+    const stand = buildAbloeserStand(verband, {
+      perioden: [
+        perioden(31, { anker: 'alarmierung', beginn_at: '2026-01-05 12:50:00' }),
+        perioden(32, {
+          anker: 'alarmierung',
+          beginn_at: '2026-01-05 12:40:00',
+          eintreffen_at: '2026-01-05 13:12:00',
+        }),
+        // Keine Untereinheit laut Server: zählt nicht, auch wenn sie früher alarmiert ist.
+        perioden(99, { anker: 'alarmierung', beginn_at: '2026-01-05 11:00:00' }),
+      ],
+    });
+    expect(stand).toEqual([
+      {
+        einheit_id: 30,
+        einheit_name: 'Verband Nord',
+        alarmiert_at: '2026-01-05 12:40:00',
+        eingetroffen_at: '2026-01-05 13:12:00',
+        abgerufen_at: null,
+        br_name: null,
+      },
+    ]);
+    expect(abloeserStandText(stand!, konv)).toBe(
+      'Ablösung: Verband Nord · alarmiert 051340 · eingetroffen 051412',
+    );
+  });
+
+  it('ohne Ereignis im Teilbaum kein Stand', () => {
+    expect(buildAbloeserStand(verband, { perioden: [] })).toBeNull();
+  });
+
+  it('Raum und Abruf: der früheste Abruf mit seinem Raum, sonst der erste Raum im Teilbaum', () => {
+    const p = [perioden(31, { anker: 'eintreffen' as const, beginn_at: '2026-01-05 13:00:00' })];
+    const einheiten = [
+      { id: 31, aktueller_br_id: 4 },
+      { id: 32, aktueller_br_id: 5 },
+    ];
+    const brNamen = new Map([
+      [4, 'BR Sportplatz'],
+      [5, 'BR Halle'],
+    ]);
+    expect(buildAbloeserStand(verband, { perioden: p, einheiten, brNamen })?.[0].br_name).toBe(
+      'BR Sportplatz',
+    );
+    const stand = buildAbloeserStand(verband, {
+      perioden: p,
+      einheiten,
+      brNamen,
+      abrufe: new Map([
+        [31, { br_id: 4, seit_at: '2026-01-05 13:30:00' }],
+        [32, { br_id: 5, seit_at: '2026-01-05 13:25:00' }],
+      ]),
+    });
+    expect(stand?.[0]).toMatchObject({
+      abgerufen_at: '2026-01-05 13:25:00',
+      br_name: 'BR Halle',
+    });
   });
 });
