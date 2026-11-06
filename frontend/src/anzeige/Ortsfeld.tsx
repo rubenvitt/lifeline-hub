@@ -405,6 +405,13 @@ function OrtsfeldVorschau({
   useLayoutEffect(() => {
     aktuell.current = { value, onChange };
   });
+  // Der zuletzt geholte Standort: solange der Punkt er ist, merkt die Ort-Vorschau sich nichts.
+  const [eigenerPunkt, setEigenerPunkt] = useState<LatLon | null>(null);
+  const istEigenerPunkt =
+    punkt != null &&
+    eigenerPunkt != null &&
+    punkt.lat === eigenerPunkt.lat &&
+    punkt.lon === eigenerPunkt.lon;
   const [ortet, setOrtet] = useState(false);
   const [ortungsFehler, setOrtungsFehler] = useState<string | null>(null);
   const verfuegbarkeit = karte.eigenePosition ? eigenpositionVerfuegbarkeit() : null;
@@ -429,13 +436,9 @@ function OrtsfeldVorschau({
         if (!eingehaengt.current) return;
         setOrtet(false);
         const { value: jetzt, onChange: melden } = aktuell.current;
-        melden?.(
-          nachKartenpunkt(
-            jetzt,
-            { lat: p.coords.latitude, lon: p.coords.longitude },
-            formatKoordinate,
-          ),
-        );
+        const standort = { lat: p.coords.latitude, lon: p.coords.longitude };
+        setEigenerPunkt(standort);
+        melden?.(nachKartenpunkt(jetzt, standort, formatKoordinate));
       },
       (e) => {
         if (!eingehaengt.current) return;
@@ -463,6 +466,7 @@ function OrtsfeldVorschau({
           einsatzId={karte.einsatzId ?? null}
           exclude={karte.exclude}
           wert={{ ...value, koordinate: punkt }}
+          merken={!istEigenerPunkt}
           onUebernehmen={(ortsname) =>
             onChange?.({ text: ortsname, koordinate: punkt, quelle: 'karte' })
           }
@@ -527,15 +531,18 @@ function OrtVorschlag({
   einsatzId,
   exclude,
   wert,
+  merken,
   onUebernehmen,
 }: {
   /** `null`: ohne Einsatz, Ort-Vorschau der Organisation (nur der Ortsname). */
   einsatzId: number | null;
   exclude?: string;
   wert: OrtsfeldWert & { koordinate: LatLon };
+  /** `false` bei der eigenen Position: der Ortsname bleibt nicht im Local-Store. */
+  merken: boolean;
   onUebernehmen: (ortsname: string) => void;
 }) {
-  const { data } = useOrtVorschau(einsatzId, wert.koordinate, exclude);
+  const { data } = useOrtVorschau(einsatzId, wert.koordinate, exclude, undefined, merken);
   const ortsname = data?.ortsname?.trim();
   const vorschlagen =
     (wert.quelle === 'karte' || wert.quelle === 'koordinate') &&
@@ -545,7 +552,7 @@ function OrtVorschlag({
     <div
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}
     >
-      <OrtZeile einsatzId={einsatzId} koord={wert.koordinate} exclude={exclude} />
+      <OrtZeile einsatzId={einsatzId} koord={wert.koordinate} exclude={exclude} merken={merken} />
       {vorschlagen && (
         <Button type="link" style={{ paddingInline: 0 }} onClick={() => onUebernehmen(ortsname)}>
           Als Adresse übernehmen

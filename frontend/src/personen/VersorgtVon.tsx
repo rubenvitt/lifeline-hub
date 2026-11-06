@@ -77,7 +77,12 @@ export default function VersorgtVon({
     queryKey: einsatzKeys.personenEinheiten(einsatzId),
     queryFn: () => ladeVersorgendeEinheiten(einsatzId),
     enabled: schreibt && geoeffnet,
+    // Jedes Öffnen fragt neu: auch ein wenige Sekunden alter Cache kann eine aufgelöste Einheit tragen.
+    staleTime: 0,
   });
+  // Angeboten wird nur die frisch geladene Liste; bis dahin (oder nach einem Fehler) steht nur die
+  // aktuelle Einheit da, und Leeren geht immer.
+  const frisch = wahl.isSuccess && !wahl.isFetching;
   const mutation = useMutation({
     mutationFn: (einheitId: number | null) =>
       savePersonEinheit(einsatzId, person.id, einheitId, beimOeffnen.current),
@@ -98,7 +103,7 @@ export default function VersorgtVon({
     <Typography.Text type="secondary">—</Typography.Text>
   );
   // Die aktuelle Einheit steht in der Wahl, auch wenn sie inzwischen aufgelöst ist.
-  const optionen = einheitOptionen(wahl.data);
+  const optionen = einheitOptionen(frisch ? wahl.data : []);
   if (
     person.versorgende_einheit_id != null &&
     !optionen.some((o) => o.value === person.versorgende_einheit_id)
@@ -123,7 +128,8 @@ export default function VersorgtVon({
           gesperrt={ohneVerbindung ? EINHEIT_OHNE_NETZ : undefined}
           onOeffnen={() => {
             beimOeffnen.current = person.versorgende_einheit_id ?? null;
-            setGeoeffnet(true);
+            if (geoeffnet) void wahl.refetch();
+            else setGeoeffnet(true);
           }}
           onSpeichern={(w) => mutation.mutateAsync(w)}
           eingabe={({ feld, value, onChange, popup }) => (
@@ -131,7 +137,7 @@ export default function VersorgtVon({
               {...feld}
               {...popup}
               allowClear
-              loading={wahl.isLoading}
+              loading={wahl.isFetching}
               value={value ?? undefined}
               onChange={(w) => onChange(w ?? null)}
               options={optionen}

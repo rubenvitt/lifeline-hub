@@ -21,12 +21,16 @@ function runde(n: number): number {
  * Am gekoppelten Gerät fragt sie nie (LLH-1483): seine Routenliste (`src/geraet/mod.rs`) kennt
  * keine Ort-Vorschau, und die Peilung zeigte auf Marker außerhalb seiner Ansicht. Die Ort-Zeile
  * bleibt dort leer, an jeder Fläche, die sie einbindet.
+ *
+ * `merken: false` legt den Ortsnamen nicht im Local-Store ab: für die eigene Position, die vor dem
+ * Speichern nirgends bleiben soll (LLH-1567, design.md D7).
  */
 export function useOrtVorschau(
   einsatzId: number | null,
   koord: LatLon | null,
   exclude?: string,
   debounceMs = 700,
+  merken = true,
 ) {
   const [debounced, setDebounced] = useState<LatLon | null>(null);
   const amGeraet = (useAuthOptional()?.geraet ?? null) != null;
@@ -66,7 +70,7 @@ export function useOrtVorschau(
         if (live.ortsname) {
           // Ortsname (unveränderlich) lang persistieren. Nicht abwarten: die Vorschau steht
           // schon, und ein blockiertes Öffnen der DB hielte sie sonst fest (LFH-941).
-          void setzeOrt(key, live.ortsname);
+          if (merken) void setzeOrt(key, live.ortsname);
           return live;
         }
         // Live ohne Ortsname (offline/Rate-Limit) → persistierten Ort als Fallback zeigen

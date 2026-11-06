@@ -11,6 +11,7 @@ import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
+import { erzeugeQueryClient } from '../api/queryClient';
 import {
   OHNE_VERBINDUNG_NICHT_AENDERBAR,
   meldeServerErreichbar,
@@ -19,7 +20,7 @@ import {
 import Patientenkopf, { AUFHEBEN_OHNE_NETZ } from './Patientenkopf';
 import { PAT_OHNE_NETZ } from './PatKennzeichen';
 import { EINHEIT_OHNE_NETZ } from './VersorgtVon';
-import { waehle } from '../test/auswahlListe';
+import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 
 /**
  * Der Patientenkopf (LLH-1094, Spec `personen-detail`): die Patientenfragen auf einen Blick, Sichten,
@@ -1439,6 +1440,32 @@ describe('Patientenkopf — Versorgt von (LLH-1567)', () => {
       ]),
     );
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+  });
+
+  it('bietet nur die frisch geladenen Einheiten an, nicht einen frischen Cache', async () => {
+    // Wie in der App: zehn Sekunden gilt der Cache als frisch.
+    const client = erzeugeQueryClient({
+      queries: { retry: false, staleTime: 10_000 },
+      mutations: { retry: false },
+    });
+    // Der Cache kennt eine Einheit, die der Server inzwischen aufgelöst hat.
+    client.setQueryData(einsatzKeys.personenEinheiten(1), [{ id: 9, name: 'Wache Alt' }]);
+    renderMitProviders(
+      <Patientenkopf
+        einsatzId={1}
+        person={basis as PersonDetail}
+        darfSchreiben
+        onGeschrieben={vi.fn()}
+      />,
+      { client },
+    );
+    const kopf = screen.getByRole('region', { name: 'Patientenkopf' });
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Versorgende Einheit eintragen' }),
+    );
+    await oeffne('Versorgende Einheit');
+    await waitFor(() => expect(optionenVon('Versorgende Einheit')).toContain('RTW 1'));
+    expect(optionenVon('Versorgende Einheit')).not.toContain('Wache Alt');
   });
 
   it('sperrt die Einheit ohne Server mit Grund', () => {

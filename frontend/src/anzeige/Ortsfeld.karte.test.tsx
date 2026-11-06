@@ -8,6 +8,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import { formatiere, type LatLon } from './koordinaten';
+import { holeOrt, ortCacheRaeumen, ortKeyVon } from './ortCache';
 import { EIGENPOSITION_SPERRGRUND } from '../pages/lagekarte/useEigenposition';
 import {
   EIGENE_POSITION_VERWEIGERT,
@@ -165,7 +166,10 @@ beforeEach(() => {
   karte.ausschnitte.length = 0;
   karte.dialog = null;
 });
-afterEach(() => setzeOnline(true));
+afterEach(() => {
+  setzeOnline(true);
+  ortCacheRaeumen();
+});
 
 describe('nachTextaenderung', () => {
   const fmt = (lat: number, lon: number) => formatiere(lat, lon, 'wgs84');
@@ -581,6 +585,28 @@ describe('Ortsfeld — Eigene Position', () => {
       koordinate: { lat: 53.07, lon: 8.81 },
       quelle: 'karte',
     });
+  });
+
+  it('zeigt zur eigenen Position den Ortsnamen, merkt ihn sich aber nicht; ein gezogener Punkt schon', async () => {
+    ortVorschau();
+    stelle(true, {
+      getCurrentPosition: (ok: PositionCallback) =>
+        ok({ coords: { latitude: 53.07, longitude: 8.81, accuracy: 12 } } as GeolocationPosition),
+    });
+    renderMitProviders(<Aufbau kartenProp={{ ...MIT_POSITION, einsatzId: 7 }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Eigene Position' }));
+    await screen.findByRole('button', { name: 'Als Adresse übernehmen' });
+    // Der Local-Store schreibt ohne Abwarten: kurz Zeit lassen, damit ein Schreiben sichtbar wäre.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await holeOrt(ortKeyVon(53.07, 8.81))).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nadel ziehen' }));
+    expect(wert().koordinate).toEqual({ lat: 52.5, lon: 13.4 });
+    await vi.waitFor(
+      async () =>
+        expect(await holeOrt(ortKeyVon(52.5, 13.4))).toBe('Marktplatz 3, 12345 Musterstadt'),
+      { timeout: 3000 },
+    );
   });
 
   it('lässt einen getippten Text stehen', async () => {
