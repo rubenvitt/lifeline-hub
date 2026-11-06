@@ -233,6 +233,11 @@ async fn zu_lange_notiz_und_ungueltige_farbe_sind_400_beim_anlegen_und_aendern()
             json!({ "farbe": "blau", "kreis_radius_m": 50.0 }),
             farbe_fehler,
         ),
+        // Ebenso der unbekannte Typ: 400 vor dem 422 des Kreises.
+        (
+            json!({ "typ": "ungueltig", "farbe": "red", "kreis_radius_m": 50.0 }),
+            "Unbekannter Zonen-Typ: ungueltig",
+        ),
     ] {
         let (status, f) = anfrage(
             &app,

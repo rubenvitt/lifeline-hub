@@ -320,6 +320,15 @@ pub async fn aktualisieren(
     let label_patch = optional_max_tri(body.label.clone(), "Bezeichnung", lage_zone::LABEL_MAX)?;
     // Notiz und Farbe wie beim Anlegen (LLH-1559): absent = unverändert, `null`/leer = leeren.
     let notiz_patch = optional_max_tri(body.notiz.clone(), "Notiz", lage_zone::NOTIZ_MAX)?;
+    // Ein unbekannter Typ ist ebenso ein Feldfehler (400) und geht jedem 422 des Kreises oder der
+    // Geometrie vor; die Passung zur gespeicherten Geometrie prüft unten der Zusammenhang.
+    if let Some(t) = &body.typ {
+        parse_enum(
+            lage_zone::LageZoneTyp::parse,
+            t,
+            format!("Unbekannter Zonen-Typ: {t}"),
+        )?;
+    }
     // Die Farbe zählt nur, wenn die Zone danach eine freie Skizze ist (sonst wird sie unten
     // genullt); nur dann wird sie geprüft.
     let wird_freie_skizze = body.typ.as_deref().unwrap_or(vorher.typ.as_str()) == "freie_skizze";
@@ -382,13 +391,8 @@ pub async fn aktualisieren(
     // Effektiver neuer typ; wenn geändert: gültig + passt zur *gespeicherten* Geometrie.
     let neuer_typ = match &body.typ {
         Some(t) => {
-            // Feld isoliert unbrauchbar → 400; die Passung zur gespeicherten Geometrie
-            // darunter ist ein Zusammenhang → bleibt 422 (LFH-305).
-            parse_enum(
-                lage_zone::LageZoneTyp::parse,
-                t,
-                format!("Unbekannter Zonen-Typ: {t}"),
-            )?;
+            // Der Typ selbst ist oben geprüft (400); die Passung zur gespeicherten Geometrie ist
+            // ein Zusammenhang → bleibt 422 (LFH-305).
             if !lage_zone::geometrie_klasse_passt(t, &vorher.geometrie_typ) {
                 return Err(AppError::UnprocessableEntity(format!(
                     "Typ {t} ist mit der vorhandenen Geometrie ({}) nicht zulässig",
