@@ -11,12 +11,14 @@ import {
   SK_WORT,
   STATUS_META,
   gueltig,
+  kurzVerbleib,
   transportText,
 } from './personMeta';
 
 /**
  * Das Blatt einer Person (LLH-1120, Spec `druck-dokumente`, „Druckansicht einer Person“):
- * Personendaten, Lage (Sichtung, Zustand / Verdacht, Transport, PAT-Nummer, Kontamination),
+ * Personendaten, Lage (Sichtung, Zustand / Verdacht, Transport, Verbleib, PAT-Nummer,
+ * Kontamination),
  * Maßnahmen und das Körperschema mit nummerierter Liste. Es zeigt nur, was erfasst ist (kein
  * PAT-Ersatz als Formular, design.md Non-Goals). Schwarz-weiß: die Figur zeichnet ohne Fläche in
  * `currentColor`, Sternchen und Liste tragen Nummer und Form, keine Farbe. Die Listen kommen aus
@@ -56,6 +58,9 @@ export default function PersonDruckBlatt({
 
   const k = p.aktuelle_sichtung;
   const transport = transportText(p);
+  // Der jüngste Verbleib (Detail liefert die jüngste Erfassung zuerst), mit den Angaben aus
+  // LLH-1568 (Spec `verbleib-angaben`, „Anzeige in Verlauf und Druck“).
+  const verbleib = p.verbleib?.[0];
   const lage: Zeile[] = [
     {
       etikett: 'Sichtung',
@@ -69,6 +74,12 @@ export default function PersonDruckBlatt({
       wert: transport
         ? `${transport}${p.transport_at ? ` · ${zeitpunkt(p.transport_at)}` : ''}`
         : 'kein Transport',
+    },
+    {
+      etikett: 'Verbleib',
+      wert: verbleib
+        ? `${kurzVerbleib(verbleib)} · ${zeitpunkt(verbleib.zeitpunkt_at)}`
+        : 'kein Verbleib',
     },
     { etikett: 'PAT-Nummer', wert: p.pat_nummer || '—' },
     {

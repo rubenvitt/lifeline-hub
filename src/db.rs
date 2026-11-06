@@ -12467,4 +12467,92 @@ mod tests {
             .await
             .expect_err("uhs.quali_soll nur JSON");
     }
+
+    /// LLH-1568: vier Angaben am Verbleib, Bestand bleibt ohne Angabe, die CHECKs nehmen nur die
+    /// Katalogwerte.
+    #[tokio::test]
+    async fn migration_0277_person_verbleib_angaben() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 277;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, erfasst_von) \
+             VALUES (?, ?, 'entlassung', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT leitstelle_einsatznummer, entlassen_an, gegen_rat, unterschrift \
+                 FROM person_verbleib WHERE id = ?",
+        )
+        .bind(alt)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(bestand, (None, None, None, None), "Bestand ohne Angabe");
+
+        let setze = |spalte: &'static str, wert: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(sqlx::AssertSqlSafe(format!(
+                    "INSERT INTO person_verbleib (einsatz_id, person_id, art, erfasst_von, {spalte}) \
+                     VALUES (?, ?, 'entlassung', ?, ?)"
+                )))
+                .bind(e)
+                .bind(p)
+                .bind(b)
+                .bind(wert)
+                .execute(&pool)
+                .await
+            }
+        };
+        setze("leitstelle_einsatznummer", "2611-0815")
+            .await
+            .unwrap();
+        for w in ["selbst", "begleitung", "sorgeberechtigte", "polizei"] {
+            setze("entlassen_an", w).await.unwrap();
+        }
+        for w in ["behandlung", "transport"] {
+            setze("gegen_rat", w).await.unwrap();
+        }
+        for w in ["liegt_vor", "verweigert"] {
+            setze("unterschrift", w).await.unwrap();
+        }
+        setze("entlassen_an", "nachbar")
+            .await
+            .expect_err("entlassen_an nur Katalog");
+        setze("gegen_rat", "alles")
+            .await
+            .expect_err("gegen_rat nur Katalog");
+        setze("unterschrift", "ja")
+            .await
+            .expect_err("unterschrift nur Katalog");
+    }
 }

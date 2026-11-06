@@ -1,6 +1,8 @@
 import type {
   Bestaetiger,
+  EntlassenAn,
   Fachrichtung,
+  GegenRat,
   KoerperRegion,
   Massnahme,
   MassnahmeArt,
@@ -17,6 +19,7 @@ import type {
   TransportPrioritaet,
   TransportDurch,
   TransportmittelAuswahl,
+  Unterschrift,
   Verbleib,
   VerbleibArt,
   VerbleibStatus,
@@ -328,6 +331,14 @@ export interface VerbleibEingabe extends OfflineEintragEingabe {
   transport_durch?: TransportDurch | null;
   /** Disposition des Fahrzeugs eines Eigentransports (LLH-1332), Pflicht bei `eigen`. */
   einsatz_fahrzeug_id?: number | null;
+  /** Einsatznummer der Leitstelle (LLH-1568), nur beim fremden Transport. */
+  leitstelle_einsatznummer?: string | null;
+  /** An wen entlassen wurde (LLH-1568), nur bei `entlassung`. */
+  entlassen_an?: EntlassenAn | null;
+  /** Was gegen Rat abgelehnt wurde (LLH-1568), bei Entlassung und Transport. */
+  gegen_rat?: GegenRat | null;
+  /** Unterschrift zur Ablehnung (LLH-1568), nur mit `gegen_rat`. */
+  unterschrift?: Unterschrift | null;
 }
 export function erfasseVerbleib(
   einsatzId: number,

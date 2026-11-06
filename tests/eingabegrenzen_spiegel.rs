@@ -47,6 +47,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ),
         ("FUNKTION_TEXT_MAX", fuehrung::TEXT_MAX),
         ("PAT_NUMMER_MAX", person::PAT_NUMMER_MAX),
+        ("EINSATZNUMMER_MAX", person::EINSATZNUMMER_MAX),
         ("VERLETZUNG_NOTIZ_MAX", person::VERLETZUNG_NOTIZ_MAX),
         ("PERSON_NAME_MAX", person::PERSON_NAME_MAX),
         ("PERSON_ANGABE_MAX", person::PERSON_ANGABE_MAX),

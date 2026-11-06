@@ -117,7 +117,8 @@ Vormerkung, Schwärzung und jede Änderung einer Frist stehen im Einsatztagebuch
 ### Fristen je Datenkategorie
 
 - **Behandlung**: Zustand, PAT-Nummer und benötigte Fachrichtung der Personen, Lage und Notiz
-  ihrer Verletzungen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung.
+  ihrer Verletzungen, die Einsatznummer der Leitstelle am Transport sowie die Notizen zu
+  Sichtung, Verlauf und UHS-Belegung.
 - **Personenauskunft**: Herkunftsadresse und Melderkontakt der Personen.
 - **Anhänge**: Datei-Anhänge und die Bilder der Lagekarte.
 

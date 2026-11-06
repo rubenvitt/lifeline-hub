@@ -324,3 +324,45 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
     expect(onSchliessen).not.toHaveBeenCalled();
   });
 });
+
+describe('VerbleibErfassung — Angaben am Verbleib (LLH-1568)', () => {
+  it('Entlassung: „Entlassen an“ sichtbar, gegen Rat unter „Weitere Angaben“', async () => {
+    const user = userEvent.setup();
+    zeige();
+    await waehle(user, 'Art', 'Entlassung vor Ort');
+    const dialog = screen.getByRole('dialog');
+    expect(feldZahl(dialog)).toBe(3);
+    await waehle(user, 'Entlassen an', 'Polizei');
+    await user.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    expect(within(dialog).queryByRole('combobox', { name: 'Unterschrift' })).toBeNull();
+    expect(within(dialog).queryByLabelText('Einsatznummer Leitstelle')).toBeNull();
+    await waehle(user, 'Gegen Rat', 'Transport abgelehnt');
+    await waehle(user, 'Unterschrift', 'liegt auf Papier vor');
+    await user.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      art: 'entlassung',
+      entlassen_an: 'polizei',
+      gegen_rat: 'transport',
+      unterschrift: 'liegt_vor',
+    });
+  });
+
+  it('fremder Transport: Einsatznummer der Leitstelle unter „Weitere Angaben“', async () => {
+    const user = userEvent.setup();
+    zeige();
+    await waehle(user, 'Art', 'Transport');
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByRole('combobox', { name: /Rettungsmittel/ }), 'RTW 1');
+    await user.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await user.type(await within(dialog).findByLabelText('Einsatznummer Leitstelle'), '2611-0815');
+    await user.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      art: 'transport',
+      transport_durch: 'fremd',
+      leitstelle_einsatznummer: '2611-0815',
+    });
+    expect(gesendet[0]).not.toHaveProperty('entlassen_an');
+  });
+});

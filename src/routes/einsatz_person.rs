@@ -1512,6 +1512,18 @@ pub struct VerbleibBody {
     /// Disposition des Fahrzeugs eines Eigentransports (LLH-1332), Pflicht bei `eigen`.
     #[serde(default)]
     pub einsatz_fahrzeug_id: Option<i64>,
+    /// Einsatznummer der Leitstelle (LLH-1568), nur beim fremden Transport.
+    #[serde(default)]
+    pub leitstelle_einsatznummer: Option<String>,
+    /// An wen entlassen wurde (LLH-1568), nur bei `entlassung`.
+    #[serde(default)]
+    pub entlassen_an: Option<String>,
+    /// Was gegen Rat abgelehnt wurde (LLH-1568), bei Entlassung und Transport.
+    #[serde(default)]
+    pub gegen_rat: Option<String>,
+    /// Unterschrift zur Ablehnung (LLH-1568), nur mit `gegen_rat`.
+    #[serde(default)]
+    pub unterschrift: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/verbleib — Verbleib-Ereignis erfassen.
@@ -1559,6 +1571,29 @@ pub async fn verbleib(
         body.transport_durch.as_deref(),
         "Unbekannte Fahrer-Angabe",
     )?;
+    // Angaben aus LLH-1568 (Spec `verbleib-angaben`): erst das Feld für sich (400).
+    let angaben = VerbleibAngaben {
+        einsatznummer: crate::routes::support::optional_max(
+            body.leitstelle_einsatznummer,
+            "Einsatznummer",
+            crate::person::EINSATZNUMMER_MAX,
+        )?,
+        entlassen_an: parse_enum_opt(
+            crate::person::EntlassenAn::parse,
+            body.entlassen_an.as_deref(),
+            "Unbekannte Angabe „Entlassen an“",
+        )?,
+        gegen_rat: parse_enum_opt(
+            crate::person::GegenRat::parse,
+            body.gegen_rat.as_deref(),
+            "Unbekannte Angabe „Gegen Rat“",
+        )?,
+        unterschrift: parse_enum_opt(
+            crate::person::Unterschrift::parse,
+            body.unterschrift.as_deref(),
+            "Unbekannte Angabe zur Unterschrift",
+        )?,
+    };
     // Das Feld für sich (400) vor jedem Zusammenhang (422); die Untergrenze kommt mit der Person.
     let jetzt = chrono::Utc::now();
     crate::routes::support::meldezeitpunkt(body.zeitpunkt_at.as_deref(), jetzt)?;
@@ -1607,6 +1642,7 @@ pub async fn verbleib(
     // Fahrer-Angabe (LLH-1332, design.md D2): Paarung vor dem Lesen des Fahrzeugs, die
     // Momentaufnahme des Funkrufnamens ersetzt einen mitgeschickten Text.
     pruefe_fahrer_angabe(art, status, durch, body.einsatz_fahrzeug_id)?;
+    pruefe_verbleib_angaben(art, status, durch, &angaben)?;
     let uebergabe = status == Some(VerbleibStatus::Uebergeben);
     if uebergabe {
         pruefe_uebergabe(
@@ -1660,6 +1696,10 @@ pub async fn verbleib(
         client_id: client_id.as_deref(),
         transport_durch: durch.map(|d| d.as_str()),
         einsatz_fahrzeug_id: body.einsatz_fahrzeug_id,
+        leitstelle_einsatznummer: angaben.einsatznummer.as_deref(),
+        entlassen_an: angaben.entlassen_an,
+        gegen_rat: angaben.gegen_rat,
+        unterschrift: angaben.unterschrift,
     };
     let ergebnis = crate::write_retry!(&state.pool, |conn| {
         if let Some(cid) = client_id.as_deref() {
@@ -1778,6 +1818,52 @@ fn pruefe_fahrer_angabe(
     }
     if status == Some(VerbleibStatus::Uebergeben) && !eigen {
         return fehler("Eine Übergabe gibt es nur beim Eigentransport");
+    }
+    Ok(())
+}
+
+/// Angaben am Verbleib aus LLH-1568, jede für sich schon geprüft (400).
+struct VerbleibAngaben {
+    einsatznummer: Option<String>,
+    entlassen_an: Option<crate::person::EntlassenAn>,
+    gegen_rat: Option<crate::person::GegenRat>,
+    unterschrift: Option<crate::person::Unterschrift>,
+}
+
+/// Paarung der Angaben aus LLH-1568 mit der Art (Spec `verbleib-angaben`, design.md D3): die
+/// Einsatznummer nur beim fremden Transport, „Entlassen an“ nur bei der Entlassung, „Gegen Rat“
+/// bei Entlassung und Transport, die Unterschrift nur mit „Gegen Rat“, nichts davon an einer
+/// Übergabe. Jeder Verstoß ist 422.
+fn pruefe_verbleib_angaben(
+    art: VerbleibArt,
+    status: Option<VerbleibStatus>,
+    durch: Option<TransportDurch>,
+    a: &VerbleibAngaben,
+) -> Result<(), AppError> {
+    let fehler = |text: &str| Err(AppError::UnprocessableEntity(text.into()));
+    let uebergabe = status == Some(VerbleibStatus::Uebergeben);
+    let hat_angabe = a.einsatznummer.is_some()
+        || a.entlassen_an.is_some()
+        || a.gegen_rat.is_some()
+        || a.unterschrift.is_some();
+    if uebergabe && hat_angabe {
+        return fehler("Eine Übergabe trägt keine weiteren Angaben zum Verbleib");
+    }
+    if a.einsatznummer.is_some()
+        && (art != VerbleibArt::Transport || durch == Some(TransportDurch::Eigen))
+    {
+        return fehler(
+            "Eine Einsatznummer der Leitstelle gibt es nur beim Transport durch ein fremdes Rettungsmittel",
+        );
+    }
+    if a.entlassen_an.is_some() && art != VerbleibArt::Entlassung {
+        return fehler("„Entlassen an“ gibt es nur bei der Entlassung");
+    }
+    if a.gegen_rat.is_some() && !matches!(art, VerbleibArt::Entlassung | VerbleibArt::Transport) {
+        return fehler("„Gegen Rat“ gibt es nur bei Entlassung und Transport");
+    }
+    if a.unterschrift.is_some() && a.gegen_rat.is_none() {
+        return fehler("Eine Unterschrift gibt es nur zu einer Ablehnung gegen Rat");
     }
     Ok(())
 }

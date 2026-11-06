@@ -1,10 +1,13 @@
 import type {
+  EntlassenAn,
   Fachrichtung,
+  GegenRat,
   MassnahmeArt,
   Person,
   Sichtungskategorie,
   TransportArt,
   TransportPrioritaet,
+  Unterschrift,
   Verbleib,
   VerletzungArt,
   VerletzungSchwere,
@@ -22,11 +25,49 @@ export function istPatient(p: { aktuelle_sichtung?: Sichtungskategorie | null })
   return p.aktuelle_sichtung != null && PATIENT_SK.includes(p.aktuelle_sichtung);
 }
 
-/** Einzeilige Kurzfassung eines Verbleib-Eintrags für den Personen-Verlauf. */
-export function kurzVerbleib(
-  v: Pick<Verbleib, 'art' | 'ziel' | 'transportmittel'> &
-    Partial<Pick<Verbleib, 'status' | 'transport_durch'>>,
-): string {
+/** An wen entlassen wurde (LLH-1568, Spec `verbleib-angaben`); Reihenfolge der Auswahl. */
+export const ENTLASSEN_AN_WORT: Record<EntlassenAn, string> = {
+  selbst: 'selbst',
+  begleitung: 'Angehörige / Begleitung',
+  sorgeberechtigte: 'Sorgeberechtigte',
+  polizei: 'Polizei',
+};
+
+/** Was gegen Rat abgelehnt wurde (LLH-1568). */
+export const GEGEN_RAT_WORT: Record<GegenRat, string> = {
+  behandlung: 'Behandlung abgelehnt',
+  transport: 'Transport abgelehnt',
+};
+
+/** Unterschrift zur Ablehnung gegen Rat (LLH-1568); sie selbst bleibt auf Papier. */
+export const UNTERSCHRIFT_WORT: Record<Unterschrift, string> = {
+  liegt_vor: 'Unterschrift liegt vor',
+  verweigert: 'Unterschrift verweigert',
+};
+
+/** Felder eines Verbleibs, die `kurzVerbleib` liest. */
+export type VerbleibKurz = Pick<Verbleib, 'art' | 'ziel' | 'transportmittel'> &
+  Partial<
+    Pick<
+      Verbleib,
+      | 'status'
+      | 'transport_durch'
+      | 'leitstelle_einsatznummer'
+      | 'entlassen_an'
+      | 'gegen_rat'
+      | 'unterschrift'
+    >
+  >;
+
+/**
+ * Einzeilige Kurzfassung eines Verbleib-Eintrags für den Personen-Verlauf, mit den Angaben aus
+ * LLH-1568 (an wen entlassen, Einsatznummer, gegen Rat).
+ */
+export function kurzVerbleib(v: VerbleibKurz): string {
+  return `${verbleibKopf(v)}${verbleibZusatz(v)}`;
+}
+
+function verbleibKopf(v: VerbleibKurz): string {
   const ziel = v.ziel ? ` → ${v.ziel}` : '';
   const tm = v.transportmittel ? ` (${v.transportmittel})` : '';
   switch (v.art) {
@@ -37,7 +78,8 @@ export function kurzVerbleib(
       }
       return `Transport${ziel}${tm}`;
     case 'entlassung':
-      return 'entlassen';
+      if (v.entlassen_an === 'selbst') return 'entlassen, geht selbst';
+      return v.entlassen_an ? `entlassen an ${ENTLASSEN_AN_WORT[v.entlassen_an]}` : 'entlassen';
     case 'vor_ort':
       return 'verbleibt vor Ort';
     case 'verstorben':
@@ -45,6 +87,17 @@ export function kurzVerbleib(
     case 'notunterkunft':
       return `Notunterkunft${ziel}`;
   }
+}
+
+/** „ · Einsatznr. …“ und „ · gegen Rat: …“ hinter dem Kopf; leer ohne Angabe. */
+function verbleibZusatz(v: VerbleibKurz): string {
+  let zusatz = '';
+  if (v.leitstelle_einsatznummer) zusatz += ` · Einsatznr. ${v.leitstelle_einsatznummer}`;
+  if (v.gegen_rat) {
+    zusatz += ` · gegen Rat: ${GEGEN_RAT_WORT[v.gegen_rat]}`;
+    if (v.unterschrift) zusatz += `, ${UNTERSCHRIFT_WORT[v.unterschrift]}`;
+  }
+  return zusatz;
 }
 
 // Kompatible Exportnamen; die Farbachsen liegen im Theme.

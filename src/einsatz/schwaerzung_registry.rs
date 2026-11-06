@@ -441,6 +441,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Momentaufnahme in `transportmittel` und fällt mit ihm.
             retain("transport_durch", G_TRIAGE),
             retain("einsatz_fahrzeug_id", G_FK),
+            // LLH-1568 (design.md D6): die Einsatznummer der Leitstelle verknüpft die Person mit
+            // dem Rettungsdiensteinsatz → mit der Behandlung; die Katalogwerte bleiben als
+            // Statistik-Skelett für den Bericht.
+            scrub(
+                "leitstelle_einsatznummer",
+                Strategie::NullSetzen,
+                Z_BEHANDLUNG,
+            ),
+            retain("entlassen_an", G_TRIAGE),
+            retain("gegen_rat", G_TRIAGE),
+            retain("unterschrift", G_TRIAGE),
         ],
     },
     TabellenRegel {
@@ -3875,6 +3886,7 @@ mod tests {
                     "person_sichtung.notiz",
                     "person_transport.fachrichtung",
                     "person_uhs_belegung.notiz",
+                    "person_verbleib.leitstelle_einsatznummer",
                     "person_verlaufsnotiz.text",
                     "person_verletzung.notiz",
                     "person_verletzung.x",

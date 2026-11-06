@@ -203,6 +203,7 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("transportmittel", Mit),
             ("ziel", Mit),
             ("notiz", Mit),
+            ("leitstelle_einsatznummer", Mit),
             ("bestaetigt_name", Ohne(O_BESTAETIGT)),
         ],
     },
@@ -345,6 +346,7 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("transportmittel", Ohne(O_BEHANDELT)),
             ("ziel", Ohne(O_BEHANDELT)),
             ("notiz", Ohne(O_BEHANDELT)),
+            ("leitstelle_einsatznummer", Ohne(O_BEHANDELT)),
         ],
     },
     PersonenBezug {

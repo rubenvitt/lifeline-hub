@@ -79,6 +79,10 @@ export function vormerkungText(aktion: PersonEintragAktion): string {
         transportmittel: aktion.daten.transportmittel ?? null,
         status: aktion.daten.status ?? null,
         transport_durch: aktion.daten.transport_durch ?? null,
+        leitstelle_einsatznummer: aktion.daten.leitstelle_einsatznummer ?? null,
+        entlassen_an: aktion.daten.entlassen_an ?? null,
+        gegen_rat: aktion.daten.gegen_rat ?? null,
+        unterschrift: aktion.daten.unterschrift ?? null,
       })}`;
     case 'transport':
       return `Transport ${
