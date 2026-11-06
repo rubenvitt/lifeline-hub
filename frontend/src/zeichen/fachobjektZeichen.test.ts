@@ -483,32 +483,35 @@ describe('fachobjektZeichen — Schaden mit Gefahrenart und Schadensgrad (LLH-11
     });
   });
 
-  // Rote Diagonalen auf rotem Dreieck verschwanden (LLH-1513). @einsatzzeichen legt sie dort auf
-  // eine weiße Unterlegung und zieht die Kontur darüber neu; die übrigen Ausmaße bleiben gleich.
-  it.each(['angeschlagen', 'teilzerstoert', 'zerstoert'] as const)(
-    'unterlegt den Schadensgrad %s auf dem rot gefüllten Dreieck weiß',
-    (grad) => {
-      const { drawing } = fachobjektZeichen(schadenTz('katastrophal', undefined, grad))!;
-      const rot = drawing.children.filter((c) => c.type === 'line' && c.style?.stroke === 'rot');
-      const weiss = drawing.children.filter(
-        (c) => c.type === 'line' && c.style?.stroke === 'weiss',
-      );
-      expect(rot.length).toBeGreaterThan(0);
-      expect(weiss).toHaveLength(rot.length);
-      expect(drawing.children.indexOf(weiss[weiss.length - 1]!)).toBeLessThan(
-        drawing.children.indexOf(rot[0]!),
-      );
-    },
-  );
+  // Rote Diagonalen verschwanden auf rotem Dreieck (LLH-1513) und setzten sich von Grün und Orange
+  // nur im Farbton ab (LLH-1550, Rot-Grün-Schwäche, Druckgrau). @einsatzzeichen legt sie überall,
+  // wo Rot unter 3 : 1 Helligkeitskontrast bleibt, auf eine weiße Unterlegung und zieht die Kontur
+  // darüber neu. Nur Gelb (Ausmaß mittel) hält den Kontrast und bleibt unverändert.
+  it.each([
+    ['gering', 'angeschlagen'],
+    ['gering', 'zerstoert'],
+    ['gross', 'teilzerstoert'],
+    ['gross', 'zerstoert'],
+    ['katastrophal', 'angeschlagen'],
+    ['katastrophal', 'teilzerstoert'],
+    ['katastrophal', 'zerstoert'],
+  ] as const)('unterlegt den Schadensgrad bei Ausmaß %s (%s) weiß', (ausmass, grad) => {
+    const { drawing } = fachobjektZeichen(schadenTz(ausmass, undefined, grad))!;
+    const rot = drawing.children.filter((c) => c.type === 'line' && c.style?.stroke === 'rot');
+    const weiss = drawing.children.filter((c) => c.type === 'line' && c.style?.stroke === 'weiss');
+    expect(rot.length).toBeGreaterThan(0);
+    expect(weiss).toHaveLength(rot.length);
+    expect(drawing.children.indexOf(weiss[weiss.length - 1]!)).toBeLessThan(
+      drawing.children.indexOf(rot[0]!),
+    );
+    expect(drawing.children[drawing.children.length - 1]?.role).toBe('bodyExtra');
+  });
 
-  it.each(['gering', 'mittel', 'gross'] as const)(
-    'lässt den Schadensgrad bei Ausmaß %s ohne Unterlegung',
-    (ausmass) => {
-      const { drawing } = fachobjektZeichen(schadenTz(ausmass, undefined, 'zerstoert'))!;
-      expect(drawing.children.some((c) => c.style?.stroke === 'weiss')).toBe(false);
-      expect(drawing.children.some((c) => c.role === 'bodyExtra')).toBe(false);
-    },
-  );
+  it('lässt den Schadensgrad bei Ausmaß mittel (Gelb) ohne Unterlegung', () => {
+    const { drawing } = fachobjektZeichen(schadenTz('mittel', undefined, 'zerstoert'))!;
+    expect(drawing.children.some((c) => c.style?.stroke === 'weiss')).toBe(false);
+    expect(drawing.children.some((c) => c.role === 'bodyExtra')).toBe(false);
+  });
 
   it('trägt Gefahrenhinweis und Schadensgrad zugleich', () => {
     expect(wirksam(schadenTz('gross', 'explosion', 'zerstoert')).states).toEqual([
