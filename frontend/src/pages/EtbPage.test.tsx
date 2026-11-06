@@ -2191,13 +2191,34 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
       ),
       http.get('/api/einsaetze/7/etb', ({ request }) => {
         const p = new URL(request.url).searchParams;
+        // Nachtrag Nr. 52 um 11:20:35, Nr. 45 lag schon vorher in derselben Minute (11:20:20).
+        const nachtrag = {
+          ...eintrag,
+          id: 52,
+          lfd_nr: 52,
+          inhalt: 'Nachtrag',
+          ereigniszeit: '2026-05-23 11:20:35',
+        };
+        const gleicheMinute = {
+          ...eintrag,
+          id: 45,
+          lfd_nr: 45,
+          inhalt: 'Gleiche Minute',
+          ereigniszeit: '2026-05-23 11:20:20',
+        };
         if (p.get('bis') === '2026-05-23 11:30:00') {
           return HttpResponse.json([
-            { ...eintrag, id: 52, lfd_nr: 52, ereigniszeit: '2026-05-23 11:20:00' },
+            nachtrag,
             { ...eintrag, id: 50, lfd_nr: 50, ereigniszeit: '2026-05-23 11:30:00' },
+            gleicheMinute,
             { ...eintrag, id: 40, lfd_nr: 40, ereigniszeit: '2026-05-23 11:00:00' },
           ]);
         }
+        // Der Server filtert `von` sekundengenau: nur die volle Minute holt Nr. 45 mit.
+        if (p.get('von') === '2026-05-23 11:20:00') {
+          return HttpResponse.json([nachtrag, gleicheMinute]);
+        }
+        if (p.get('von') === '2026-05-23 11:20:35') return HttpResponse.json([nachtrag]);
         return HttpResponse.json([eintrag]);
       }),
     ]);
@@ -2205,6 +2226,17 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
     // Das Datum der Probe ist nicht heute: die Grenze trägt den Tag (`231330`), heute nur `1330`.
     await waitFor(() => expect(band).toHaveTextContent(/\+1 Nachtrag vor (\d{2})?\d{4} erfasst/));
     expect(band).toHaveTextContent('seit LB');
+
+    // „anzeigen“ setzt die Grenze auf die volle Minute des frühesten Nachtrags (LLH-1565).
+    await userEvent
+      .setup()
+      .click(within(band as HTMLElement).getByRole('button', { name: 'anzeigen' }));
+    await waitFor(() =>
+      expect(
+        new URLSearchParams(screen.getByTestId('ort-suche').textContent ?? '').get('von'),
+      ).toBe('2026-05-23 11:20:00'),
+    );
+    expect(await screen.findByText('Gleiche Minute')).toBeInTheDocument();
   });
 });
 
