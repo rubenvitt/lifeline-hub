@@ -168,8 +168,10 @@ describe('PersonDruckPage', () => {
     );
     await fertig();
     const dt = within(wurzel()).getByText('Verbleib', { selector: 'dt' });
+    // Minute 30 ist der jüngste Verbleib (10:30), der ältere stünde auf 00; die Minuten hängen
+    // nicht von der Anzeigezeitzone ab.
     expect(dt.nextElementSibling?.textContent ?? '').toMatch(
-      /^entlassen an Polizei · gegen Rat: Transport abgelehnt, Unterschrift verweigert · \d{6}/,
+      /^entlassen an Polizei · gegen Rat: Transport abgelehnt, Unterschrift verweigert · \d{4}30(?!\d)/,
     );
   });
 
