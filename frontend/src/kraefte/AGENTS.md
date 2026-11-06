@@ -26,6 +26,13 @@ Kopien, nie der heutigen Zuordnung; eine Person der Kette, deren Folge bräche o
 Entlassene eine offene Periode bekäme, macht alles zur 422 mit Namen. Die Kopplung an die
 Ablösung läuft wie Streichung, dann Nachtrag; der Schichtbeginn wandert nicht mit. Ein
 ETB-Eintrag „… berichtigt von … auf … — Grund: …“.
+„Periode nachtragen“ (LLH-1538, `zeitachse::repo::trage_periode_nach_tx`, Routen
+`…/zeitachse/periode`) schreibt Alarmierung und/oder Eintreffen und die Entlassung in einer
+Transaktion (Quelle `nachtrag`, Notiz am Beginn); die Regeln gelten nur am Ergebnis, und die
+Ereignisse müssen darin eine eigene Periode bilden (`perioden::fuege_periode_ein`, sonst 422).
+Fan-out an die jetzt zugeordneten Personen ganz oder gar nicht, nie eine halbe Periode; Kopplung
+erst am fertigen Stand: Alarmierung/Eintreffen der abgeschlossenen Periode wirken nicht, die
+Entlassung beendet eine laufende Schicht nur, wenn danach keine Periode offen ist. Einziger INSERT bleibt `insert_tx`.
 Einziger Schreibpfad
 `zeitachse::repo::schreibe_tx` (Perioden-Regeln rein in `zeitachse/perioden.rs`; ein Verstoß
 bricht nie den Statuswechsel). Ereignisse entstehen aus `zeitachse_marke` am Status-Katalog
@@ -100,8 +107,11 @@ Zeitachse; der Raum kommt aus `aktueller_br_id` und der Raumliste, die nur mit F
 Bereitstellungsräume und nur bei einem Ablöser im Raum abgefragt wird, „· abgerufen …“ aus deren
 `abrufe` (LLH-1309: das Abruf-Ereignis der BR-Belegung, kein Zeitachsen-Ereignis, keine Spalte an
 der Einheit; nach dem Ausrücken fällt es weg). Kein eigener Abruf, kein DTO-Feld der Ablösung:
-live über die bestehenden Ereignisse. Den Vermerk „Planung entfallen“ (LLH-1309) schreibt nur
-`drop_planungen_tx`, räumt nur `set_abloeser_tx`; ob er gilt (laufend, kein Ablöser), entscheidet
+live über die bestehenden Ereignisse. Den Vermerk „Planung entfallen“ (LLH-1309, mit der
+auslösenden Entlassung ab LLH-1510) schreibt nur `drop_planungen_tx`, räumt `set_abloeser_tx` und die Streichung
+der Entlassung (`restore_entfallene_planungen_tx`: holt die Planung zurück, nur solange der
+Vermerk noch Grund `entlassung` und genau diese Entlassung trägt; eine Berichtigung hebt „wiederhergestellt“
+und „entfallen“ gegeneinander auf); ob er gilt (laufend, kein Ablöser), entscheidet
 der Server (`planung_entfallen`), der Client zeigt ihn nur (`abloesung/planungWarnung.ts`). Jede Benachrichtigung der Ablösung springt zu
 ihrer Schicht (`abloesungPfad(…, { schicht })`, Server `benachrichtigung::text::pfad`, beide
 gleich); die Seite nimmt `?schicht=` nach `useQueryParamSelektion` an.

@@ -267,7 +267,9 @@ export default function GrundlageEingabe({
                     </Button>
                   </div>
                 ))}
-                <Space wrap>
+                {/* Zielabstand der Dichte-Staffel (LLH-1525): `marginSM` = 7 / 11 / 16 px, antds
+                    Vorgabe `paddingXS` ließ 3 / 5 / 7 px zwischen „Abzug hinzufügen“ und „… entfernen“. */}
+                <Space wrap size={token.marginSM}>
                   <Button
                     onClick={() =>
                       setzeRaum(i, {

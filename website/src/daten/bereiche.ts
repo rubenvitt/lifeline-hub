@@ -6,19 +6,19 @@
  * Bereich ändert, zieht es hier nach (website/AGENTS.md).
  */
 export const BEREICHE = [
-  "Einstieg",
-  "Führungsmittel",
-  "Lage",
-  "Kräfte",
-  "Stab",
-  "Betroffene",
-  "Einstellungen und Verwaltung",
-  "Gekoppelte Geräte",
+  'Einstieg',
+  'Führungsmittel',
+  'Lage',
+  'Kräfte',
+  'Stab',
+  'Betroffene',
+  'Einstellungen und Verwaltung',
+  'Gekoppelte Geräte',
 ] as const;
 
 /** Name des Bereichs, zu dem eine `reihenfolge` gehört. */
 export function bereichVon(reihenfolge: number): string {
-  return BEREICHE[Math.floor(reihenfolge / 100)] ?? "Sonstige";
+  return BEREICHE[Math.floor(reihenfolge / 100)] ?? 'Sonstige';
 }
 
 /**
@@ -28,10 +28,10 @@ export function bereichVon(reihenfolge: number): string {
  */
 export function kurztext(text: string): string {
   const m = /(?:^|\n)## Überblick\n+([\s\S]*?)(?:\n\s*\n|$)/.exec(text);
-  if (!m) return "";
+  if (!m) return '';
   return m[1]
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/\s+/g, " ")
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\s+/g, ' ')
     .trim();
 }

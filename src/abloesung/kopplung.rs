@@ -12,7 +12,9 @@
 //!   keine: ihre Schicht entsteht mit dem Vollzug als Folgeschicht.
 //! - **Entlassung**, die die letzte Periode schließt: die laufende Schicht der Einheit endet als
 //!   `beendet` mit Grund `entlassung`, ihre Fristen schließen.
-//! - **Streichung dieser Entlassung**: die Schicht läuft wieder, samt Fristen.
+//! - **Streichung dieser Entlassung**: die Schicht läuft wieder, samt Fristen, und die mit der
+//!   Entlassung entfallenen Planungen kommen zurück (LLH-1510,
+//!   [`repo::restore_entfallene_planungen_tx`]).
 //! - **Streichung des Eintreffens** der offenen Periode: hat es die laufende Schicht der Einheit
 //!   automatisch begonnen und hängt nichts anderes an ihr (kein Vollzug, Beginn und Rhythmus
 //!   nicht von Hand), entfällt sie samt Fristen und Planung (LLH-1508,
@@ -24,9 +26,10 @@
 //! als ablösende geplant, wird ihre Alarmierung und ihr Eintreffen (beide nur als Beginn der
 //! offenen Periode) je geplanter Schicht ein Anlass; das Eintreffen am Bereitstellungsraum meldet
 //! dessen Buchung selbst. Ihre Entlassung ohne offene Periode danach hebt die Planung auf
-//! (Hinweis und ETB „Planung der ablösenden Einheit entfallen“). Wird die Alarmierung oder das
-//! Eintreffen gestrichen, mit dem ihre offene Periode begann, folgt der Hinweis „… gestrichen“
-//! (LLH-1425, [`vor_streichung_tx`]).
+//! (Hinweis und ETB „Planung der ablösenden Einheit entfallen“), die Streichung dieser
+//! Entlassung holt sie zurück (Hinweis und ETB „… wiederhergestellt“, LLH-1510). Wird die
+//! Alarmierung oder das Eintreffen gestrichen, mit dem ihre offene Periode begann, folgt der
+//! Hinweis „… gestrichen“ (LLH-1425, [`vor_streichung_tx`]).
 //!
 //! **Ein Fehler hier bricht nie den Anlass** (gleiche Regel wie ein Perioden-Verstoß beim
 //! Statuswechsel): die Kopplung läuft in einem eigenen `SAVEPOINT`, ein Fehler rollt nur sie
@@ -50,12 +53,15 @@ pub const WIE_AUTOSTART: &str = "mit dem Eintreffen begonnen";
 /// Nach einem geschriebenen Ereignis an einer Einheit. Liefert die ETB-Einträge, die die
 /// Kopplung geschrieben hat (für Kurzruf und `LiveEvent::Abloesung` nach dem Commit), und die
 /// Anlässe der Hinweise zur ablösenden Einheit; leer ohne Wirkung oder nach einem verschluckten
-/// Fehler.
+/// Fehler. `ereignis_id` ist die Zeile des Ereignisses in der Kräfte-Zeitachse; eine Entlassung
+/// hält sie am Vermerk der entfallenen Planung fest (LLH-1510).
+#[allow(clippy::too_many_arguments)]
 pub async fn nach_ereignis_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    ereignis_id: i64,
     art: ZeitachseArt,
     quelle: ZeitachseQuelle,
     zeitpunkt_at: &str,
@@ -67,7 +73,9 @@ pub async fn nach_ereignis_tx(
             // (`abloeser_br_eingetroffen`), auch wenn die Zeitachse es auslässt.
             hinweis: quelle != ZeitachseQuelle::Bereitstellungsraum,
         },
-        ZeitachseArt::Entlassung => Schritt::Ende,
+        ZeitachseArt::Entlassung => Schritt::Ende {
+            entlassung_id: ereignis_id,
+        },
         ZeitachseArt::Abloesung => return Ok(Wirkung::default()),
     };
     isoliert(
@@ -114,26 +122,30 @@ pub async fn vor_streichung_tx(
 }
 
 /// Nach einem gestrichenen Ereignis an einer Einheit. Eine gestrichene Entlassung öffnet die mit
-/// ihr beendete Schicht. War es der Beginn der offenen Periode (`hinweis` aus
-/// [`vor_streichung_tx`]), geht je Schicht, die die Einheit als ablösende plant, der Hinweis
-/// „Alarmierung/Eintreffen der ablösenden Einheit gestrichen“ hinaus (LLH-1425): der frühere
-/// Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht mehr. War es das Eintreffen, entfällt
-/// dazu die Schicht, die es automatisch begonnen hat (LLH-1508, [`repo::drop_autostart_tx`]);
-/// ist es nur berichtigt (`berichtigt_auf`, das neue Eintreffen folgt), wandert sie stattdessen
-/// mit ([`repo::move_autostart_tx`]).
+/// ihr beendete Schicht und holt die mit ihr entfallenen Planungen zurück (LLH-1510). War es der
+/// Beginn der offenen Periode (`hinweis` aus [`vor_streichung_tx`]), geht je Schicht, die die
+/// Einheit als ablösende plant, der Hinweis „Alarmierung/Eintreffen der ablösenden Einheit
+/// gestrichen“ hinaus (LLH-1425): der frühere Hinweis „alarmiert“ bzw. „eingetroffen“ gilt nicht
+/// mehr. War es das Eintreffen, entfällt dazu die Schicht, die es automatisch begonnen hat
+/// (LLH-1508, [`repo::drop_autostart_tx`]); ist es nur berichtigt (`berichtigt_auf`, das neue
+/// Eintreffen folgt), wandert sie stattdessen mit ([`repo::move_autostart_tx`]). `ereignis_id`
+/// ist die gestrichene Zeile der Kräfte-Zeitachse.
 #[allow(clippy::too_many_arguments)]
 pub async fn nach_streichung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    ereignis_id: i64,
     art: ZeitachseArt,
     zeitpunkt_at: &str,
     hinweis: Option<BenachrichtigungBezugTyp>,
     berichtigt_auf: Option<&str>,
 ) -> Result<Wirkung, AppError> {
     let schritt = match (art, hinweis) {
-        (ZeitachseArt::Entlassung, _) => Schritt::Wiederaufnahme,
+        (ZeitachseArt::Entlassung, _) => Schritt::Wiederaufnahme {
+            entlassung_id: ereignis_id,
+        },
         (ZeitachseArt::Eintreffen, Some(typ)) => Schritt::EintreffenGestrichen {
             typ,
             neu: berichtigt_auf,
@@ -158,11 +170,11 @@ enum Schritt<'a> {
     /// Nur der Hinweis „alarmiert“, keine Schicht.
     Alarmierung,
     /// `hinweis`: dazu der Hinweis „eingetroffen“.
-    Autostart {
-        hinweis: bool,
-    },
-    Ende,
-    Wiederaufnahme,
+    Autostart { hinweis: bool },
+    /// Mit der Zeile der Entlassung in der Zeitachse.
+    Ende { entlassung_id: i64 },
+    /// Mit der Zeile der gestrichenen Entlassung.
+    Wiederaufnahme { entlassung_id: i64 },
     /// Nur der Hinweis „… gestrichen“ mit diesem Bezugstyp, keine Schicht.
     Gestrichen(BenachrichtigungBezugTyp),
     /// Der Hinweis „Eintreffen … gestrichen“, dazu entfällt die mit ihm begonnene Schicht; mit
@@ -202,9 +214,27 @@ async fn isoliert(
             )
             .await
         }
-        Schritt::Ende => end_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await,
-        Schritt::Wiederaufnahme => {
-            reopen_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await
+        Schritt::Ende { entlassung_id } => {
+            end_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                entlassung_id,
+                zeitpunkt_at,
+            )
+            .await
+        }
+        Schritt::Wiederaufnahme { entlassung_id } => {
+            reopen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                entlassung_id,
+                zeitpunkt_at,
+            )
+            .await
         }
         Schritt::Gestrichen(typ) => {
             hinweis::anlaesse_tx(conn, einsatz_id, einheit_id, typ, benutzer_id)
@@ -449,6 +479,7 @@ async fn end_tx(
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    entlassung_id: i64,
     entlassung_at: &str,
 ) -> Result<Wirkung, AppError> {
     // Nur eine Entlassung, nach der keine Periode mehr offen ist: eine in eine frühere Periode
@@ -464,6 +495,7 @@ async fn end_tx(
         benutzer_id,
         einheit_id,
         PlanungEntfallenGrund::Entlassung,
+        Some(entlassung_id),
         &jetzt,
     )
     .await?;
@@ -497,10 +529,12 @@ async fn reopen_tx(
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
+    entlassung_id: i64,
     entlassung_at: &str,
 ) -> Result<Wirkung, AppError> {
     let jetzt = crate::zeit::jetzt();
-    let Some((_, name)) = repo::reopen_nach_entlassung_tx(
+    let mut wirkung = Wirkung::default();
+    if let Some((_, name)) = repo::reopen_nach_entlassung_tx(
         conn,
         einsatz_id,
         benutzer_id,
@@ -509,20 +543,31 @@ async fn reopen_tx(
         &jetzt,
     )
     .await?
-    else {
-        return Ok(Wirkung::default());
-    };
-    let startwert = crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
-    let etb_id = crate::etb::system_audit_tx(
-        conn,
-        einsatz_id,
-        benutzer_id,
-        startwert,
-        &format!("Ablösung: Schicht von «{name}» läuft wieder, Entlassung gestrichen"),
-    )
-    .await?;
-    Ok(Wirkung {
-        etb: vec![etb_id],
-        anlaesse: Vec::new(),
-    })
+    {
+        let startwert =
+            crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
+        wirkung.etb.push(
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                startwert,
+                &format!("Ablösung: Schicht von «{name}» läuft wieder, Entlassung gestrichen"),
+            )
+            .await?,
+        );
+    }
+    // Die mit genau dieser Entlassung entfallenen Planungen kommen zurück (LLH-1510).
+    wirkung.append(
+        repo::restore_entfallene_planungen_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            einheit_id,
+            entlassung_id,
+            &jetzt,
+        )
+        .await?,
+    );
+    Ok(wirkung)
 }

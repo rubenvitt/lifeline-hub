@@ -611,6 +611,8 @@ pub async fn abschliessen(
     // Kategorie-Fristen (Spec `aufbewahrung-kategorien`, „Kategorie-Frist beim Abschluss“).
     let kategorie_vorgaben =
         crate::org::aufbewahrung_kategorie::laden(pool, org_id.unwrap_or(0)).await?;
+    // Die Fristen im ETB in Zone und Darstellung des Einsatzes (LLH-1540).
+    let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
 
     let mut etb_eintrag_ids = Vec::new();
     let mut tx = pool.begin().await?;
@@ -659,8 +661,9 @@ pub async fn abschliessen(
                     .execute(&mut *tx)
                     .await?;
                     let audit = format!(
-                        "Aufbewahrungsfrist automatisch gesetzt auf {neue_frist} \
-                         (Aufbewahrungs-Dauer {dauer} Tage ab Abschluss)"
+                        "Aufbewahrungsfrist automatisch gesetzt auf {} \
+                         (Aufbewahrungs-Dauer {dauer} Tage ab Abschluss)",
+                        stil.zeitpunkt_text(&neue_frist)
                     );
                     let etb_id = crate::etb::repo::anlegen_tx(
                         &mut tx,
@@ -696,6 +699,7 @@ pub async fn abschliessen(
                     einsatz_id,
                     von_benutzer_id,
                     einstellungen.etb_startwert(),
+                    stil,
                     &abgeschlossen_at,
                     &kategorie_vorgaben,
                 )
@@ -709,6 +713,28 @@ pub async fn abschliessen(
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,
     })
+}
+
+/// Der ETB-Text einer manuell gesetzten, geänderten oder aufgehobenen Aufbewahrungsfrist
+/// (LFH-130) für [`frist_setzen`]: alte und neue Frist (Drahtformat) in Zone und Darstellung
+/// des Einsatzes (LLH-1540, Spec `zeitdarstellung`, „Servertexte“).
+pub fn frist_audit(
+    stil: &crate::zeitdarstellung::Zeitstil,
+    alt: Option<&str>,
+    neu: Option<&str>,
+) -> String {
+    match (alt, neu) {
+        (_, None) => "Aufbewahrungsfrist aufgehoben (unbegrenzt)".to_string(),
+        (None, Some(neu)) => format!(
+            "Aufbewahrungsfrist gesetzt auf {}",
+            stil.zeitpunkt_text(neu)
+        ),
+        (Some(a), Some(neu)) => format!(
+            "Aufbewahrungsfrist geändert von {} auf {}",
+            stil.zeitpunkt_text(a),
+            stil.zeitpunkt_text(neu)
+        ),
+    }
 }
 
 /// Setzt die Aufbewahrungsfrist (`retention_bis`) eines Einsatzes und schreibt in
@@ -982,6 +1008,8 @@ pub async fn wiederherstellen(
     jetzt: chrono::DateTime<Utc>,
 ) -> Result<i64, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
+    // Vormerkung und neue Frist im ETB in Zone und Darstellung des Einsatzes (LLH-1540).
+    let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
     // `write_retry!` (BEGIN IMMEDIATE, F09/LFH-240): der Körper liest vor dem Schreiben; in
     // einer verzögerten Transaktion bräche der Lock-Aufstieg bei jedem parallelen Schreiber
     // (etwa dem Purge-Lauf) sofort mit SQLITE_BUSY ab. Der Körper ist reine DB-Arbeit und
@@ -1040,8 +1068,10 @@ pub async fn wiederherstellen(
         let audit = format!(
             "Löschvormerkung vom {} aufgehoben (Wiederherstellung während der Karenz). \
              Aufbewahrungsfrist neu: {}",
-            geloescht_at.as_deref().unwrap_or("?"),
-            neue_frist.unwrap_or("unbegrenzt"),
+            geloescht_at
+                .as_deref()
+                .map_or_else(|| "?".to_string(), |g| stil.zeitpunkt_text(g)),
+            neue_frist.map_or_else(|| "unbegrenzt".to_string(), |f| stil.zeitpunkt_text(f)),
         );
         crate::etb::repo::anlegen_tx(
             &mut *conn,
@@ -3624,7 +3654,7 @@ mod tests {
             einsatz.id,
             leit,
             Some("2030-01-01 00:00:00"),
-            "Aufbewahrungsfrist gesetzt auf 2030-01-01 00:00:00",
+            "Aufbewahrungsfrist gesetzt auf 010100jan30",
             Utc::now(),
         )
         .await
@@ -4593,6 +4623,134 @@ mod tests {
         );
     }
 
+    // ---------- LLH-1540: Aufbewahrungsfristen im ETB im Zeitstil des Einsatzes ----------
+
+    /// Organisation New York, Einsatz Tokio (UTC+9) in der gegebenen Darstellung. Nach
+    /// `setze_dauer`, das die Einstellungen des Einsatzes neu schreibt.
+    async fn zeitstil_einsatz_tokio(pool: &SqlitePool, einsatz: i64, darstellung: &str) {
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+             VALUES (1, 'America/New_York', 'datum_uhrzeit') \
+             ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+                zeitdarstellung = excluded.zeitdarstellung",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone, zeitdarstellung) \
+             VALUES (?, 'Asia/Tokyo', ?) \
+             ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+                zeitdarstellung = excluded.zeitdarstellung",
+        )
+        .bind(einsatz)
+        .bind(darstellung)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn letzter_etb_text(pool: &SqlitePool, einsatz: i64) -> String {
+        sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? ORDER BY lfd_nr DESC LIMIT 1",
+        )
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Spec `zeitdarstellung`, „Servertexte“: die Frist beim Abschluss, beim manuellen Setzen
+    /// und Ändern und beim Wiederherstellen steht in Zone und Darstellung des Einsatzes (Tokio),
+    /// nicht der Organisation (New York) und nicht als UTC-String.
+    #[tokio::test]
+    async fn aufbewahrungsfristen_im_etb_folgen_dem_zeitstil_des_einsatzes() {
+        use crate::zeitdarstellung::{Zeitdarstellung, Zeitstil};
+        // (Darstellung, 25.06. 12:00Z, 28.09. 12:00Z, 01.01.30 00:00Z)
+        for (darstellung, d, juni, sept, neujahr) in [
+            (
+                "taktisch",
+                Zeitdarstellung::Taktisch,
+                "252100jun26",
+                "282100sep26",
+                "010900jan30",
+            ),
+            (
+                "datum_uhrzeit",
+                Zeitdarstellung::DatumUhrzeit,
+                "25.06.26 21:00",
+                "28.09.26 21:00",
+                "01.01.30 09:00",
+            ),
+        ] {
+            let pool = crate::db::test_pool().await;
+            let leit = benutzer_anlegen(&pool, "leit").await;
+            let admin = benutzer_anlegen(&pool, "admin").await;
+            let tokio = Zeitstil::new(chrono_tz::Asia::Tokyo, d);
+
+            // Abschluss: „automatisch gesetzt auf …“.
+            let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+            setze_dauer(&pool, einsatz.id, leit, 30).await;
+            zeitstil_einsatz_tokio(&pool, einsatz.id, darstellung).await;
+            let frist = abschliessen(&pool, einsatz.id, leit)
+                .await
+                .unwrap()
+                .einsatz
+                .retention_bis
+                .unwrap();
+            let text = letzter_etb_text(&pool, einsatz.id).await;
+            assert!(
+                text.contains(&format!(
+                    "automatisch gesetzt auf {} (",
+                    tokio.zeitpunkt_text(&frist)
+                )),
+                "{darstellung}: {text}"
+            );
+            assert!(!text.contains(&frist), "kein UTC-String: {text}");
+
+            // Manuell (Text der Route): „gesetzt auf …“, „geändert von … auf …“.
+            let stil = crate::zeitdarstellung::zeitstil_laden(&pool, einsatz.id)
+                .await
+                .unwrap();
+            assert_eq!(
+                frist_audit(&stil, None, Some("2030-01-01 00:00:00")),
+                format!("Aufbewahrungsfrist gesetzt auf {neujahr}")
+            );
+            assert_eq!(
+                frist_audit(
+                    &stil,
+                    Some("2026-09-28 12:00:00"),
+                    Some("2030-01-01 00:00:00")
+                ),
+                format!("Aufbewahrungsfrist geändert von {sept} auf {neujahr}")
+            );
+            assert_eq!(
+                frist_audit(&stil, Some("2026-09-28 12:00:00"), None),
+                "Aufbewahrungsfrist aufgehoben (unbegrenzt)"
+            );
+
+            // Wiederherstellen: „Löschvormerkung vom … aufgehoben … Aufbewahrungsfrist neu: …“.
+            let e = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;
+            zeitstil_einsatz_tokio(&pool, e, darstellung).await;
+            wiederherstellen(
+                &pool,
+                e,
+                admin,
+                1,
+                Some("2026-09-28 12:00:00"),
+                zeit("2026-06-30 12:00:00"),
+            )
+            .await
+            .unwrap();
+            let text = letzter_etb_text(&pool, e).await;
+            assert!(
+                text.contains(&format!("Löschvormerkung vom {juni} aufgehoben"))
+                    && text.contains(&format!("Aufbewahrungsfrist neu: {sept}")),
+                "{darstellung}: {text}"
+            );
+        }
+    }
+
     // ---------- LFH-23: Wiederherstellen während der Karenz ----------
 
     fn zeit(s: &str) -> chrono::DateTime<Utc> {
@@ -4671,8 +4829,12 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!((erfasser, typ.as_str()), (admin, "system"));
-        assert!(inhalt.contains("2026-06-25 12:00:00"), "{inhalt}");
-        assert!(inhalt.contains("2026-09-28 12:00:00"), "{inhalt}");
+        // Vormerkung und neue Frist in der Vorgabe-Zeitdarstellung (LLH-1540).
+        assert!(inhalt.contains("vom 251400jun26 aufgehoben"), "{inhalt}");
+        assert!(
+            inhalt.contains("Aufbewahrungsfrist neu: 281400sep26"),
+            "{inhalt}"
+        );
 
         // Unbegrenzt: ein zweiter Einsatz, Frist None.
         let e2 = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;

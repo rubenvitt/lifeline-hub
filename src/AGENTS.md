@@ -346,7 +346,9 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   abgeschaltete Hinweis-Art). Kein Aufrufer filtert selbst, keiner schreibt in die Tabelle.
 - **Kein Text in der Tabelle:** eine Zeile je Empfänger mit Art, Stufe und Bezug. Titel,
   Detailzeile und Pfad bildet `text::bilden` beim Lesen; die Detailzeile liest nur Retain-Spalten
-  (Guard `detail_liest_nur_retain_spalten`). Eine neue Art braucht Variante, Titel, Migration
+  (Guard `detail_liest_nur_retain_spalten`). Trägt der Bezug die gemeinte Einheit nicht allein
+  (Hinweis zur ablösenden Einheit), hält `Anlass::einheit` ihre ID fest (`benachrichtigung.einheit_id`,
+  LLH-1511, ohne FK); ein Neubau der Tabelle für den CHECK nimmt die Spalte mit. Eine neue Art braucht Variante, Titel, Migration
   für den CHECK (`check_listen_entsprechen_dem_katalog`) und ihre Stufe in `stufe()`; ein neuer
   Bezug sein Modul (`BenachrichtigungBezugTyp::modul`) und seinen Pfad.
 - **Zustellung nur über `benachrichtigung::zustellen`:** Einsatz-Arten als `benachrichtigung`,
@@ -465,6 +467,8 @@ Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
 - **Verband-Austritt und Wechsel-Sperre stehen in `belege_tx`, nicht in der Route.** Der Austritt
   einer abgerufenen Einheit bucht ihre mitgenommenen Untereinheiten mit aus; ein Wechsel einer
   abgerufenen Kraft ist 422. So gilt das für jeden Weg, der `belege_tx` ruft (Route, Gerät).
+  Ebenso der erwartete Quellraum (`Buchung::von_br_id`, LLH-1521): ein Wechsel, dessen Kraft
+  nicht mehr dort steht, ist 409 ohne Spur; wer aus einem gewählten Raum verlegt, sendet ihn mit.
 - „Abgerufen“ ist abgeleitet aus dem jüngsten Ereignis je Kraft, nie gespeichert; `seit` und
   `aktueller_br_id` sehen nur `eintritt`, `wechsel` und `austritt`.
 - **Die Koordinate des Raums prüft `repo::update_tx`, nicht der Handler** (LLH-1107): das

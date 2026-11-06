@@ -19,7 +19,8 @@ use super::{
     AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge, AbloesungPlanungEntfallen,
     AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
     BeendetGrund, BeginnQuelle, BesatzungRolle, BesatzungZiel, PlanungEntfallenGrund,
-    PlanungsStand, RhythmusQuelle, PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
+    PlanungsStand, RhythmusQuelle, ABLOESER_MAX, PLANUNGSVORLAUF_VORGABE_MINUTEN,
+    VORWARNUNG_VORGABE_MINUTEN,
 };
 use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::einsatz::einstellungen::etb_startwert;
@@ -92,6 +93,10 @@ pub struct VollzugEingabe {
     pub abloeser: Vec<i64>,
     /// Den Abschnitt der abgelösten Einheit an die Ablöser übergeben, die den Knoten bilden.
     pub abschnitt_uebergeben: bool,
+    /// Dem Benutzer fehlt die Freigabe des Moduls Einheiten (LLH-1512). Eine Übergabe, die
+    /// etwas übergäbe (Abschnitt da, mindestens ein Knoten-Ablöser), wird dann mit 403
+    /// abgewiesen, bevor etwas geschrieben bleibt; eine ohne Wirkung wird wie sonst übergangen.
+    pub ohne_freigabe_einheiten: bool,
     /// Ganze Einheit oder Besatzungswechsel (LLH-1150); beim Besatzungswechsel sind `abloeser`
     /// leer und `abschnitt_uebergeben` aus (die Route prüft das).
     pub art: AbloesungArt,
@@ -779,9 +784,11 @@ async fn load_abloeser_ids_tx(conn: &mut SqliteConnection, id: i64) -> Result<Ve
 
 /// Ersetzt die Liste der Ablöser einer Schicht (Reihenfolge wie übergeben, EINE Anweisung über
 /// `json_each`) und zieht den Spiegel nach. Einziger Schreibweg der Liste und des Spiegels
-/// `abloesende_einheit_id` (= erster Eintrag, Migration 0215) neben [`sync_spiegel_tx`]. Räumt
-/// den Vermerk einer entfallenen Planung (LLH-1309): jede Planung, Umplanung, Leerung und der
-/// Vollzug machen ihn gegenstandslos.
+/// `abloesende_einheit_id` (= erster Eintrag, Migration 0215) neben [`sync_spiegel_tx`] und den
+/// beiden Wegen der Entlassung ([`drop_planungen_tx`] nimmt einen Eintrag heraus,
+/// [`restore_entfallene_planungen_tx`] hängt ihn wieder an). Räumt den Vermerk einer entfallenen
+/// Planung (LLH-1309): jede Planung, Umplanung, Leerung und der Vollzug machen ihn
+/// gegenstandslos, auch für das Zurückholen (LLH-1510).
 async fn set_abloeser_tx(
     conn: &mut SqliteConnection,
     id: i64,
@@ -789,7 +796,8 @@ async fn set_abloeser_tx(
 ) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE einsatz_abloesung SET planung_entfallen_at = NULL, \
-            planung_entfallen_grund = NULL, planung_entfallen_einheit_name = NULL WHERE id = ?",
+            planung_entfallen_grund = NULL, planung_entfallen_einheit_name = NULL, \
+            planung_entfallen_entlassung_id = NULL WHERE id = ?",
     )
     .bind(id)
     .execute(&mut *conn)
@@ -1274,6 +1282,7 @@ pub async fn release_einheit_tx(
         benutzer_id,
         einheit_id,
         PlanungEntfallenGrund::Aufloesung,
+        None,
         jetzt,
     )
     .await?;
@@ -1304,14 +1313,16 @@ pub async fn release_einheit_tx(
 /// trägt (Einzelplanung und Ablöser-Liste), weil die Einheit aufgelöst oder entlassen ist
 /// (LLH-1131, Spec `kraefte-abloesung` „Planung entfällt“): je Schicht ein ETB-Eintrag
 /// „Ablösung «…»: Planung der ablösenden Einheit entfallen, «…» aufgelöst“, ein Hinweis
-/// `abloeser_entfallen`, der Vermerk an der Schicht (LLH-1309, der jüngste gewinnt) und, ohne
-/// verbleibende Planung, wieder die Planungs-Frist. Läuft in der Transaktion des Aufrufers.
+/// `abloeser_entfallen`, der Vermerk an der Schicht (LLH-1309, der jüngste gewinnt; mit
+/// `entlassung_id` die auslösende Entlassung, LLH-1510) und, ohne verbleibende Planung, wieder
+/// die Planungs-Frist. Läuft in der Transaktion des Aufrufers.
 pub(crate) async fn drop_planungen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
     grund: PlanungEntfallenGrund,
+    entlassung_id: Option<i64>,
     jetzt: &str,
 ) -> Result<Wirkung, AppError> {
     let schichten = hinweis::load_geplante_tx(conn, einsatz_id, einheit_id).await?;
@@ -1345,14 +1356,16 @@ pub(crate) async fn drop_planungen_tx(
         .await?;
         // Rückt ein weiterer Ablöser der Liste nach, wird er der Spiegel (LLH-1132).
         sync_spiegel_tx(conn, id).await?;
-        // Vermerk für die Karte (LLH-1309); er zeigt sich nur, solange kein Ablöser bleibt.
+        // Vermerk für die Karte (LLH-1309); er zeigt sich nur, solange kein Ablöser bleibt. Die
+        // Entlassung braucht ihre Streichung (LLH-1510, [`restore_entfallene_planungen_tx`]).
         sqlx::query(
             "UPDATE einsatz_abloesung SET planung_entfallen_at = ?, planung_entfallen_grund = ?, \
-                planung_entfallen_einheit_name = ? WHERE id = ?",
+                planung_entfallen_einheit_name = ?, planung_entfallen_entlassung_id = ? WHERE id = ?",
         )
         .bind(jetzt)
         .bind(grund.as_str())
         .bind(&abloeser_name)
+        .bind(entlassung_id)
         .bind(id)
         .execute(&mut *conn)
         .await?;
@@ -1388,12 +1401,138 @@ pub(crate) async fn drop_planungen_tx(
             )
             .await?,
         );
-        wirkung.anlaesse.push(hinweis::anlass(
+        // Die entfallene Einheit festhalten (LLH-1511): der Spiegel ist jetzt leer oder nennt den
+        // nachgerückten Ablöser.
+        wirkung.anlaesse.push(
+            hinweis::anlass(
+                einsatz_id,
+                id,
+                BenachrichtigungBezugTyp::AbloeserEntfallen,
+                benutzer_id,
+            )
+            .einheit(einheit_id),
+        );
+    }
+    Ok(wirkung)
+}
+
+/// Holt nach der Streichung einer Entlassung die Planungen zurück, die [`drop_planungen_tx`] mit
+/// ihr hat entfallen lassen (LLH-1510, Entscheidung LLH-1310 Punkt 3, Spec `kraefte-abloesung`
+/// „Gestrichene Entlassung holt die Planung zurück“). Leitlinie: eine Streichung ist eine
+/// Korrektur, ihre Folgen gehen mit, solange nichts anderes daran hängt.
+///
+/// Zurückgeholt wird an jeder laufenden Schicht, deren Vermerk (LLH-1309) noch Grund
+/// `entlassung` und genau diese Entlassung (`entlassung_id`, Zeile der Kräfte-Zeitachse) trägt;
+/// eine Planung, Umplanung oder Leerung von Hand ([`set_abloeser_tx`]) und eine jüngere
+/// entfallene Planung haben ihn überschrieben, und der Vermerk einer älteren, weiter geltenden
+/// Entlassung derselben Einheit bleibt stehen. Nur, wenn
+/// die Einheit wieder im Einsatz ist (aktiv, offene Periode), nirgends sonst als Ablöser geplant
+/// ist und die Schicht keinen Besatzungswechsel plant (eine Planung je Schicht) und noch Platz
+/// in der Liste hat ([`ABLOESER_MAX`]). Die Einheit reiht sich hinten in die Liste ein, ein
+/// verbliebener Ablöser bleibt Spiegel. Je Schicht: Vermerk geräumt, Planungs-Frist neu
+/// bewertet, ein ETB-Eintrag und ein Hinweis `abloeser_wiederhergestellt`, weil die Führung
+/// vorher „entfallen“ bekam. Läuft in der Transaktion des Aufrufers.
+pub(crate) async fn restore_entfallene_planungen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    entlassung_id: i64,
+    jetzt: &str,
+) -> Result<Wirkung, AppError> {
+    let schichten: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT a.id, e.name, a.faellig_at FROM einsatz_abloesung a \
+         JOIN einsatz_einheit e ON e.id = a.einheit_id \
+         WHERE a.einsatz_id = ? AND a.status = 'laufend' \
+           AND a.planung_entfallen_grund = ? AND a.planung_entfallen_entlassung_id = ? \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_abloesung_besatzung_plan p \
+                           WHERE p.abloesung_id = a.id) \
+         ORDER BY a.id",
+    )
+    .bind(einsatz_id)
+    .bind(PlanungEntfallenGrund::Entlassung.as_str())
+    .bind(entlassung_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    if schichten.is_empty() {
+        return Ok(Wirkung::default());
+    }
+    let abloeser_name: Option<String> = sqlx::query_scalar(
+        "SELECT name FROM einsatz_einheit \
+         WHERE id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some(abloeser_name) = abloeser_name else {
+        return Ok(Wirkung::default());
+    };
+    if !crate::zeitachse::repo::has_offene_periode_tx(conn, einheit_id).await?
+        || !hinweis::load_geplante_tx(conn, einsatz_id, einheit_id)
+            .await?
+            .is_empty()
+    {
+        return Ok(Wirkung::default());
+    }
+    let startwert = etb_startwert(&mut *conn, einsatz_id).await?;
+    let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+    let mut wirkung = Wirkung::default();
+    for (id, name, faellig_at) in schichten {
+        if load_abloeser_ids_tx(conn, id).await?.len() >= ABLOESER_MAX {
+            continue;
+        }
+        sqlx::query(
+            "INSERT INTO einsatz_abloesung_abloeser (abloesung_id, einheit_id) VALUES (?, ?)",
+        )
+        .bind(id)
+        .bind(einheit_id)
+        .execute(&mut *conn)
+        .await?;
+        sync_spiegel_tx(conn, id).await?;
+        sqlx::query(
+            "UPDATE einsatz_abloesung SET planung_entfallen_at = NULL, \
+                planung_entfallen_grund = NULL, planung_entfallen_einheit_name = NULL, \
+                planung_entfallen_entlassung_id = NULL WHERE id = ?",
+        )
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        set_planung_frist_tx(
+            conn,
             einsatz_id,
-            id,
-            BenachrichtigungBezugTyp::AbloeserEntfallen,
             benutzer_id,
-        ));
+            id,
+            &name,
+            &faellig_at,
+            vorgabe.planungsvorlauf(),
+            jetzt,
+        )
+        .await?;
+        wirkung.etb.push(
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                startwert,
+                &format!(
+                    "Ablösung «{name}»: Planung der ablösenden Einheit wiederhergestellt, \
+                     Entlassung von «{abloeser_name}» gestrichen"
+                ),
+            )
+            .await?,
+        );
+        // Die zurückgeholte Einheit festhalten (LLH-1511): bleibt ein anderer Ablöser vorn, trägt
+        // der Spiegel diesen.
+        wirkung.anlaesse.push(
+            hinweis::anlass(
+                einsatz_id,
+                id,
+                BenachrichtigungBezugTyp::AbloeserWiederhergestellt,
+                benutzer_id,
+            )
+            .einheit(einheit_id),
+        );
     }
     Ok(wirkung)
 }
@@ -2265,6 +2404,10 @@ async fn vollziehen_einheit_tx(
     let erben = erben_von(&g, roh.einheit_id);
     // Übergeben wird nur, was es gibt: ein Abschnitt und mindestens ein Knoten-Ablöser.
     let uebergabe = abschnitt_vorher.filter(|_| eingabe.abschnitt_uebergeben && !knoten.is_empty());
+    // Erst eine wirksame Übergabe schreibt, was sonst das Modul Einheiten schreibt (LLH-1512).
+    if uebergabe.is_some() && eingabe.ohne_freigabe_einheiten {
+        return Err(AppError::Forbidden);
+    }
 
     let verbleib_br_id = match eingabe.verbleib {
         AbloesungVerbleib::Bereitstellungsraum => eingabe.verbleib_br_id,
@@ -2573,6 +2716,7 @@ async fn abloeser_ausruecken_tx(
                     notiz: None,
                     client_id: None,
                     zeitpunkt_at: None,
+                    von_br_id: None,
                 },
                 benutzer_id,
             )
@@ -2690,6 +2834,7 @@ async fn verbleib_eintritt_tx(
             notiz: None,
             client_id: None,
             zeitpunkt_at: None,
+            von_br_id: None,
         },
         benutzer_id,
     )
@@ -3431,6 +3576,7 @@ async fn buchungen_zuruecknehmen_tx(
                 notiz: Some(crate::zeitachse::repo::GRUND_ABLOESUNG_ZURUECK),
                 client_id: None,
                 zeitpunkt_at: None,
+                von_br_id: None,
             },
             benutzer_id,
         )

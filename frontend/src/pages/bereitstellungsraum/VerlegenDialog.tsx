@@ -45,7 +45,8 @@ export interface VerlegenDialogProps {
  * „UI-Form-Leitlinie“). Gebucht wird ein Wechsel am **Ziel**-Raum über `…/belegung`: der Server
  * setzt den Raum der Kraft um, schreibt das ETB, und der Verlauf beider Räume nennt den Wechsel.
  * Eine abgerufene Kraft verlegt die Seite nicht (der Server lehnt sie mit 422 ab, LLH-1085 D12);
- * eine Ablehnung steht im Dialog, ohne Fehler-Toast. Ein Gerät verlegt nie (`br-verlegen`).
+ * steht die Kraft inzwischen in einem anderen Raum, lehnt er mit 409 ab (`von_br_id`, LLH-1521).
+ * Eine Ablehnung steht im Dialog, ohne Fehler-Toast. Ein Gerät verlegt nie (`br-verlegen`).
  */
 export default function VerlegenDialog({
   einsatzId,
@@ -65,6 +66,9 @@ export default function VerlegenDialog({
         objekt_typ: kraft.objekt_typ,
         objekt_id: kraft.objekt_id,
         art: 'wechsel',
+        // Der Server prüft den Quellraum in der Transaktion (LLH-1521): das Fenster zwischen
+        // einer fremden Verlegung und dem Live-Stand (`kraftImRaum`) bucht keinen zweiten Wechsel.
+        von_br_id: brId,
       }),
     onSuccess: (_antwort, { kraft, raum }) => {
       message.success({

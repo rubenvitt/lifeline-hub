@@ -177,6 +177,7 @@ pub async fn schreibe_tx(
             einsatz_id,
             benutzer_id,
             einheit_id,
+            *ursprung,
             neu.art,
             neu.quelle,
             neu.zeitpunkt_at,
@@ -200,6 +201,22 @@ async fn schreibe_einzeln_tx(
     if let Err(v) = perioden::pruefe_einfuegen(&bestand, neu.art, neu.zeitpunkt_at) {
         return Ok(Schreibergebnis::Ausgelassen(v));
     }
+    insert_tx(conn, einsatz_id, benutzer_id, kraft, neu, ursprung_id)
+        .await
+        .map(Schreibergebnis::Geschrieben)
+}
+
+/// Der eine INSERT der Zeitachse (Guard `repo_ist_append_only`). Ohne Prüfung: der Aufrufer hat
+/// die Perioden-Regeln schon geprüft, einzeln ([`schreibe_einzeln_tx`]) oder am Ergebnis
+/// ([`trage_periode_nach_tx`]).
+async fn insert_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    kraft: Kraft,
+    neu: Neu<'_>,
+    ursprung_id: Option<i64>,
+) -> Result<i64, AppError> {
     let (einheit_id, personal_id) = match kraft {
         Kraft::Einheit(id) => (Some(id), None),
         Kraft::Person(id) => (None, Some(id)),
@@ -221,7 +238,7 @@ async fn schreibe_einzeln_tx(
     .bind(benutzer_id)
     .fetch_one(&mut *conn)
     .await?;
-    Ok(Schreibergebnis::Geschrieben(id))
+    Ok(id)
 }
 
 /// Ein gestrichenes Ereignis samt Fan-out-Kette.
@@ -337,9 +354,22 @@ async fn person_verstoss_tx(
     v: Verstoss,
 ) -> Result<AppError, AppError> {
     let name = kraft_name_tx(conn, einsatz_id, Kraft::Person(person)).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
     Ok(AppError::UnprocessableEntity(format!(
-        "Die Zeitachse von «{name}» verlöre ihre Ordnung: {v}"
+        "Die Zeitachse von «{name}» verlöre ihre Ordnung: {}",
+        v.text(&stil)
     )))
+}
+
+/// 422 aus einem Verstoß der Kraft selbst; der Zeitpunkt im Zeitstil des Einsatzes (LLH-1541).
+/// Der Stil wird erst im Fehlerfall geladen, der Schreibweg bleibt ohne Zusatzabfrage.
+async fn verstoss_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    v: &Verstoss,
+) -> Result<AppError, AppError> {
+    let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
+    Ok(AppError::UnprocessableEntity(v.text(&stil)))
 }
 
 /// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien an Personen,
@@ -360,8 +390,9 @@ pub async fn streiche_tx(
     } = lade_streichbar_tx(conn, einsatz_id, kraft, id, durch_ruecknahme).await?;
 
     let bestand = bestand_tx(conn, kraft).await?;
-    perioden::pruefe_streichen(&bestand, &[id])
-        .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
+    if let Err(v) = perioden::pruefe_streichen(&bestand, &[id]) {
+        return Err(verstoss_tx(conn, einsatz_id, &v).await?);
+    }
 
     // Fan-out-Kopien: je Person einzeln prüfen, bevor irgendetwas geschrieben wird.
     let kopien = kopien_tx(conn, id).await?;
@@ -392,6 +423,7 @@ pub async fn streiche_tx(
                 einsatz_id,
                 benutzer_id,
                 einheit_id,
+                id,
                 art,
                 &zeitpunkt_at,
                 hinweis,
@@ -456,8 +488,9 @@ pub async fn berichtige_tx(
     let art = alt.art;
 
     let bestand = bestand_tx(conn, kraft).await?;
-    perioden::ersetze(&bestand, id, art, zeitpunkt_at)
-        .map_err(|v| AppError::UnprocessableEntity(v.to_string()))?;
+    if let Err(v) = perioden::ersetze(&bestand, id, art, zeitpunkt_at) {
+        return Err(verstoss_tx(conn, einsatz_id, &v).await?);
+    }
 
     let kopien = kopien_tx(conn, id).await?;
     for (kopie, person) in &kopien {
@@ -484,6 +517,7 @@ pub async fn berichtige_tx(
             einsatz_id,
             benutzer_id,
             einheit_id,
+            id,
             art,
             &alt.zeitpunkt_at,
             hinweis,
@@ -500,25 +534,24 @@ pub async fn berichtige_tx(
         quelle: ZeitachseQuelle::Nachtrag,
         notiz: alt.notiz.as_deref(),
     };
-    let neu_id =
-        geschrieben(schreibe_einzeln_tx(conn, einsatz_id, benutzer_id, kraft, neu, None).await?)?;
+    let r = schreibe_einzeln_tx(conn, einsatz_id, benutzer_id, kraft, neu, None).await?;
+    let neu_id = geschrieben_tx(conn, einsatz_id, r).await?;
     for (_, person) in &kopien {
         let kopie = Neu {
             quelle: ZeitachseQuelle::Einheit,
             notiz: None,
             ..neu
         };
-        geschrieben(
-            schreibe_einzeln_tx(
-                conn,
-                einsatz_id,
-                benutzer_id,
-                Kraft::Person(*person),
-                kopie,
-                Some(neu_id),
-            )
-            .await?,
-        )?;
+        let r = schreibe_einzeln_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            Kraft::Person(*person),
+            kopie,
+            Some(neu_id),
+        )
+        .await?;
+        geschrieben_tx(conn, einsatz_id, r).await?;
         beruehrt.personen.push(*person);
     }
     if let Kraft::Einheit(einheit_id) = kraft {
@@ -527,6 +560,7 @@ pub async fn berichtige_tx(
             einsatz_id,
             benutzer_id,
             einheit_id,
+            neu_id,
             art,
             neu.quelle,
             zeitpunkt_at,
@@ -534,6 +568,9 @@ pub async fn berichtige_tx(
         .await?;
         beruehrt.abloesung.extend(w.etb);
         beruehrt.hinweise.extend(w.anlaesse);
+        if art == ZeitachseArt::Entlassung {
+            crate::abloesung::hinweis::cancel_wiederhergestellt_entfallen(&mut beruehrt.hinweise);
+        }
     }
     Ok(Berichtigt {
         art,
@@ -545,11 +582,123 @@ pub async fn berichtige_tx(
 
 /// Nach der Prüfung am Ergebnis kann das Einfügen nicht mehr ausgelassen werden; geschieht es
 /// doch, bricht die Berichtigung mit 422 statt still eine Kopie zu verlieren.
-fn geschrieben(r: Schreibergebnis) -> Result<i64, AppError> {
+async fn geschrieben_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    r: Schreibergebnis,
+) -> Result<i64, AppError> {
     match r {
         Schreibergebnis::Geschrieben(id) => Ok(id),
-        Schreibergebnis::Ausgelassen(v) => Err(AppError::UnprocessableEntity(v.to_string())),
+        Schreibergebnis::Ausgelassen(v) => Err(verstoss_tx(conn, einsatz_id, &v).await?),
     }
+}
+
+/// Eine nachgetragene Periode (LLH-1538).
+#[derive(Debug, Clone)]
+pub struct PeriodeNachgetragen {
+    /// Die neuen Ereignisse an der Kraft in Zeitfolge.
+    pub ids: Vec<i64>,
+    pub beruehrt: Beruehrt,
+}
+
+/// Trägt eine abgeschlossene Periode in einem Schritt nach (LLH-1538, Spec `kraefte-zeitachse`
+/// „Periode nachtragen“, design.md der Change `srlxd826-periode-nachtragen`): Alarmierung
+/// und/oder Eintreffen und die Entlassung, Quelle `nachtrag`, die Notiz am Beginn.
+///
+/// - Die Perioden-Regeln gelten nur für das **Ergebnis**, und die Ereignisse müssen darin eine
+///   eigene Periode bilden ([`perioden::fuege_periode_ein`], D2); sonst 422, nichts geschrieben.
+/// - Fan-out an einer Einheit wie beim Nachtrag an die JETZT zugeordneten Personen, aber ganz
+///   oder gar nicht (D3): eine Person, in deren Folge die Periode nicht passt, bekommt keine Kopie.
+/// - Kopplung an die Ablösung erst nach allen Einfügungen, je Ereignis in Zeitfolge (D4): am
+///   fertigen Stand tragen Alarmierung und Eintreffen nie die offene Periode und wirken nicht
+///   (kein Hinweis, kein Schichtbeginn); die Entlassung beendet eine laufende Schicht nur, wenn
+///   danach keine Periode offen ist.
+///
+/// Die Reihenfolge der Zeitpunkte und die Prüfung „keine offene Periode“ an einer entlassenen
+/// Person macht der Aufrufer, wie beim Nachtrag.
+pub async fn trage_periode_nach_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    kraft: Kraft,
+    neu: &perioden::NeuePeriode,
+    notiz: Option<&str>,
+) -> Result<PeriodeNachgetragen, AppError> {
+    kraft_name_tx(conn, einsatz_id, kraft).await?;
+    let bestand = bestand_tx(conn, kraft).await?;
+    if let Err(v) = perioden::fuege_periode_ein(&bestand, neu) {
+        return Err(verstoss_tx(conn, einsatz_id, &v).await?);
+    }
+
+    // Fan-out: je Person am Ergebnis prüfen, bevor irgendetwas geschrieben wird.
+    let mut personen = Vec::new();
+    if let Kraft::Einheit(einheit_id) = kraft {
+        let zugeordnet: Vec<i64> = sqlx::query_scalar(
+            "SELECT id FROM einsatz_personal \
+             WHERE einsatz_id = ? AND einheit_id = ? AND beendet_at IS NULL ORDER BY id",
+        )
+        .bind(einsatz_id)
+        .bind(einheit_id)
+        .fetch_all(&mut *conn)
+        .await?;
+        for person in zugeordnet {
+            let bestand = bestand_tx(conn, Kraft::Person(person)).await?;
+            if perioden::fuege_periode_ein(&bestand, neu).is_ok() {
+                personen.push(person);
+            }
+        }
+    }
+
+    let mut ids = Vec::new();
+    for (i, (art, zeitpunkt_at)) in neu.ereignisse().into_iter().enumerate() {
+        let ereignis = Neu {
+            art,
+            zeitpunkt_at,
+            quelle: ZeitachseQuelle::Nachtrag,
+            notiz: if i == 0 { notiz } else { None },
+        };
+        let id = insert_tx(conn, einsatz_id, benutzer_id, kraft, ereignis, None).await?;
+        for person in &personen {
+            let kopie = Neu {
+                quelle: ZeitachseQuelle::Einheit,
+                notiz: None,
+                ..ereignis
+            };
+            insert_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                Kraft::Person(*person),
+                kopie,
+                Some(id),
+            )
+            .await?;
+        }
+        ids.push(id);
+    }
+
+    let mut beruehrt = Beruehrt {
+        personen,
+        ..Beruehrt::default()
+    };
+    if let Kraft::Einheit(einheit_id) = kraft {
+        for (&id, (art, zeitpunkt_at)) in ids.iter().zip(neu.ereignisse()) {
+            let w = crate::abloesung::kopplung::nach_ereignis_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                id,
+                art,
+                ZeitachseQuelle::Nachtrag,
+                zeitpunkt_at,
+            )
+            .await?;
+            beruehrt.abloesung.extend(w.etb);
+            beruehrt.hinweise.extend(w.anlaesse);
+        }
+    }
+    Ok(PeriodeNachgetragen { ids, beruehrt })
 }
 
 // ── Aus Statuswechseln ──────────────────────────────────────────────────────────────────────
@@ -1064,6 +1213,33 @@ pub fn etb_text_berichtigung(
         art.partizip(),
         stil.zeitpunkt_text(alt_at),
         stil.zeitpunkt_text(neu_at)
+    )
+}
+
+/// „Zeitachse: Einheit «Florian 1» Einsatzperiode nachgetragen: alarmiert 300610sep26,
+/// eingetroffen 300640sep26, entlassen 301400sep26“ (LLH-1538, design.md D5), an einer
+/// entlassenen Person (`is_berichtigung`) mit „ (berichtigt nach Entlassung)“.
+pub fn etb_text_periode(
+    kraft: Kraft,
+    name: &str,
+    neu: &perioden::NeuePeriode,
+    stil: Zeitstil,
+    is_berichtigung: bool,
+) -> String {
+    let teile: Vec<String> = neu
+        .ereignisse()
+        .into_iter()
+        .map(|(art, z)| format!("{} {}", art.partizip(), stil.zeitpunkt_text(z)))
+        .collect();
+    let vermerk = if is_berichtigung {
+        format!(" ({BERICHTIGT})")
+    } else {
+        String::new()
+    };
+    format!(
+        "Zeitachse: {} «{name}» Einsatzperiode nachgetragen: {}{vermerk}",
+        kraft_wort(kraft),
+        teile.join(", ")
     )
 }
 

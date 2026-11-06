@@ -177,7 +177,9 @@ Für die Einsatzleitung:
   Adresse ab, passen beide nicht zusammen.
 - Ein Punkt, der auf der Karte gesetzt wurde (Nadel gezogen, „Auf Karte wählen“), bleibt, auch
   wenn der Text danach geändert wird. Ergibt der Punkt einen anderen Ortsnamen als den Text, bietet
-  das Feld „Als Adresse übernehmen“ an; von sich aus überschreibt es den Text nie.
+  das Feld „Als Adresse übernehmen“ an; einen eingetragenen Text überschreibt es von sich aus nie.
+- Ist das Feld leer, wenn ein Punkt auf der Karte gesetzt wird, steht danach die Koordinate als
+  Text darin. So wird der Punkt mit gespeichert. Wer das Feld leert, nimmt auch den Punkt weg.
 - Eine Koordinate im Adressfeld erkennt die App beim Tippen, ohne Anfrage an den Server. „Ort
   suchen“ bleibt dann gesperrt.
 - Die Suche fragt zuerst die Adressen der installierten Offline-Karten auf dem Server, dann den

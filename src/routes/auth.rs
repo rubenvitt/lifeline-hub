@@ -1,7 +1,9 @@
 use crate::app::AppState;
 use crate::auth::geraet_bezeichnung::GeraetAngabe;
 use crate::auth::provider::Anmeldeweg;
-use crate::auth::session::{self, CurrentUser, SichererTransport, SESSION_COOKIE};
+use crate::auth::session::{
+    self, AktuelleSitzung, CurrentUser, SichererTransport, SitzungKennung, SESSION_COOKIE,
+};
 use crate::auth::Benutzer;
 use crate::error::AppError;
 use crate::extract::PfadParam;
@@ -441,8 +443,12 @@ pub async fn logout(
     jar: CookieJar,
 ) -> Result<(CookieJar, StatusCode), AppError> {
     if let Some(cookie) = jar.get(SESSION_COOKIE) {
-        if let Ok(inhaber) = session::benutzer_aus_token(&state.pool, cookie.value()).await {
+        if let Ok((inhaber, _, kennung)) =
+            session::sitzung_aus_token(&state.pool, cookie.value()).await
+        {
             session::pruefe_erwarteten_benutzer(&Method::POST, &headers, inhaber.id)?;
+            // Nachgeholte Abmeldung (LLH-1535): nur die Sitzung, die der Tab gesehen hat.
+            session::pruefe_erwartete_sitzung(&headers, kennung.as_ref())?;
         }
         // Wer sich abmeldet, wird vor dem Löschen bestimmt — danach ist die Zuordnung weg.
         let (benutzer_id, anmeldeweg) =
@@ -473,6 +479,7 @@ pub async fn logout(
 pub async fn me(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
+    AktuelleSitzung(sitzung): AktuelleSitzung,
     geraet: Option<axum::Extension<crate::geraet::GeraetKontext>>,
 ) -> Result<Json<MeAntwort>, AppError> {
     let totp_aktiviert: bool =
@@ -494,6 +501,7 @@ pub async fn me(
     Ok(Json(MeAntwort {
         benutzer: benutzer.anzeige(totp_aktiviert),
         geraet,
+        sitzung: sitzung.map(|SitzungKennung(k)| k),
     }))
 }
 
@@ -504,6 +512,12 @@ pub struct MeAntwort {
     #[serde(flatten)]
     pub benutzer: crate::auth::BenutzerAnzeige,
     pub geraet: Option<crate::geraet::GeraetAnzeige>,
+    /// Öffentliche Kennung der Sitzung dieser Anfrage (LFH-1092, nie der Token-Hash). Ein Tab, der
+    /// abgemeldet hat, dessen Server-Abmeldung aber scheiterte, erkennt daran die alte Sitzung und
+    /// übernimmt sie nicht wieder (LLH-1535); jede neue Anmeldung bekommt eine neue Kennung. Fehlt
+    /// bei Altsitzungen ohne Kennung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sitzung: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

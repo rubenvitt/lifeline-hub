@@ -1426,6 +1426,7 @@ fn benachrichtigung_wire() {
         AbloeserEntfallen => "abloeser_entfallen",
         AbloeserAlarmierungGestrichen => "abloeser_alarmierung_gestrichen",
         AbloeserEintreffenGestrichen => "abloeser_eintreffen_gestrichen",
+        AbloeserWiederhergestellt => "abloeser_wiederhergestellt",
         Lagebesprechung => "lagebesprechung",
         Nachforderung => "nachforderung",
         NachforderungZugesagt => "nachforderung_zugesagt",

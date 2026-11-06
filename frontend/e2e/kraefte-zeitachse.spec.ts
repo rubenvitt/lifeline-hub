@@ -48,7 +48,7 @@ test('Nachtrag an der Einheit wird zur Einsatzdauer im Meldebild — Schreib- un
   await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
   const paneel = zeitachsePaneel(page);
   await expect(paneel.getByText(/Noch keine Ereignisse/)).toBeVisible();
-  await paneel.getByRole('button', { name: 'Nachtragen' }).click();
+  await paneel.getByRole('button', { name: 'Nachtragen', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: /Zeitachse nachtragen/ });
   // Erst in der stehenden Liste wählen; ein verlorener Klick wird hier rot, nicht erst als
   // offener Dialog (`auswahl-kern.ts`).
@@ -69,7 +69,7 @@ test('Nachtrag an der Einheit wird zur Einsatzdauer im Meldebild — Schreib- un
   await page.goto(`/einsaetze/${einsatzId}/einheiten/${einheitId}`);
   const lesePaneel = zeitachsePaneel(page);
   await expect(lesePaneel.locator('[data-lfh="zeitachse-ereignis"]')).toHaveCount(1);
-  const knopf = lesePaneel.getByRole('button', { name: 'Nachtragen' });
+  const knopf = lesePaneel.getByRole('button', { name: 'Nachtragen', exact: true });
   await expect(knopf).toBeDisabled();
   await expect(lesePaneel).toContainText('Schreibrecht');
 });

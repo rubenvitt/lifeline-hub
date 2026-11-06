@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
+import { AdresseSteht } from '../test/adresseSteht';
 import { useQueryParamSelektion } from './useQueryParamSelektion';
 
 function wrapper(initial: string) {
@@ -63,5 +64,52 @@ describe('useQueryParamSelektion (LFH-25)', () => {
     );
     expect(angewendet).toEqual([]);
     expect(result.current.search).toBe('?einheit=5');
+  });
+});
+
+/**
+ * Einmal je Verlaufseintrag (LLH-1530): Bis der Router die Räumung committet, steht der Param noch
+ * in `searchParams`. Wechselt `bereit` in dieser Zeit (die Liste lädt neu), setzte der Effekt die
+ * Selektion sonst ein zweites Mal.
+ */
+describe('useQueryParamSelektion: einmal je Verlaufseintrag (LLH-1530)', () => {
+  it('ein hängender Router-Commit wendet die Selektion nach einem Wechsel von bereit nicht noch einmal an', async () => {
+    const angewendet: number[] = [];
+    const { rerender } = renderHook(
+      ({ bereit }: { bereit: boolean }) =>
+        useQueryParamSelektion('einheit', bereit, (id) => angewendet.push(id)),
+      {
+        initialProps: { bereit: true },
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <MemoryRouter initialEntries={['/x?einheit=5']}>
+            <AdresseSteht>{children}</AdresseSteht>
+          </MemoryRouter>
+        ),
+      },
+    );
+    await waitFor(() => expect(angewendet).toEqual([5]));
+
+    rerender({ bereit: false });
+    rerender({ bereit: true });
+    expect(angewendet).toEqual([5]);
+  });
+
+  it('ein neuer Link derselben Art wirkt wieder', async () => {
+    const angewendet: number[] = [];
+    const { result } = renderHook(
+      () => {
+        useQueryParamSelektion('einheit', true, (id) => angewendet.push(id));
+        return { location: useLocation(), navigate: useNavigate() };
+      },
+      { wrapper: wrapper('/x?einheit=5') },
+    );
+    await waitFor(() => expect(result.current.location.search).toBe(''));
+    expect(angewendet).toEqual([5]);
+
+    act(() => {
+      void result.current.navigate('/x?einheit=5');
+    });
+    await waitFor(() => expect(angewendet).toEqual([5, 5]));
+    await waitFor(() => expect(result.current.location.search).toBe(''));
   });
 });

@@ -561,7 +561,8 @@ function ausAltspalten(e: FreiesZeichenEingabe, verloren: boolean): FreiesZeiche
   return kaskade(mitRolle, verloren || ohneNachfolger);
 }
 
-// Die Felder einer `SymbolSpec` je Stufe der Kaskade, von „alles außer Symbol“ bis „Körper“.
+// Die Felder einer `SymbolSpec` je Stufe der Kaskade, von „alles außer Symbol“ bis „Körper“. Der
+// Lauf (`labels`) gehört zur Marke: „P“/„G“ der Dekontamination (LLH-1522) fällt mit ihr.
 const KOERPER_FELDER = ['kind', 'vehicleCategory', 'bodyVariant', 'whiteInnerContour'];
 const FELDSTUFEN: readonly (readonly string[])[] = [
   [
@@ -574,6 +575,7 @@ const FELDSTUFEN: readonly (readonly string[])[] = [
     'technicalHeadMark',
     'bodyMarks',
     'bodyMarkRenditions',
+    'labels',
   ],
   [
     ...KOERPER_FELDER,

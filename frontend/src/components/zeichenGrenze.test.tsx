@@ -101,6 +101,27 @@ describe('zeichenGrenze an einem antd-Feld', () => {
     expect(zaehler(container)).toBe('13 / 10 · zu lang');
   });
 
+  it('zählt wie Regel und Server nach dem Trimmen: Rand-Leerzeichen lösen keinen Alarm aus (LLH-1532)', () => {
+    const { container } = render(<Feld max={10} />);
+    const feld = screen.getByLabelText('Text');
+    const wert = `  ${'a'.repeat(10)}\n `;
+    fireEvent.change(feld, { target: { value: wert } });
+    expect(feld).toHaveValue(wert);
+    expect(zaehler(container)).toBe('10 / 10');
+    const marke = container.querySelector<HTMLElement>('[data-lfh="zeichen-zaehler"]');
+    expect(marke?.style.color).toBe('');
+    expect(container.querySelector('.ant-input-out-of-range')).toBeNull();
+  });
+
+  it('nennt eine Überlänge nach dem Trimmen weiter „zu lang“ (LLH-1532)', () => {
+    const { container } = render(<Feld max={10} />);
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: ` ${'a'.repeat(11)} ` } });
+    expect(zaehler(container)).toBe('11 / 10 · zu lang');
+    const marke = container.querySelector<HTMLElement>('[data-lfh="zeichen-zaehler"]');
+    expect(marke?.style.color).not.toBe('');
+    expect(container.querySelector('.ant-input-out-of-range')).not.toBeNull();
+  });
+
   it('kürzt einen vorbelegten Wert über der Grenze nicht still, sondern zeigt die Überlänge', () => {
     const { container } = render(<Feld max={10} start={'a'.repeat(12)} />);
     expect(screen.getByLabelText('Text')).toHaveValue('a'.repeat(12));

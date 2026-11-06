@@ -115,6 +115,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Zuletzt übernommene Werte des Vorschlagsfelds (LLH-1144), etwa Absender und Empfänger; Freitext kann einen Personennamen tragen, und die Kataloge liefert der Server wieder.',
   },
   {
+    ort: 'localStorage lfh:abmeldung-offen',
+    datei: 'auth/abmeldungOffen.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Merker einer Abmeldung, deren Serverruf scheiterte (LLH-1535): nur Benutzer-id und Sitzungskennung. Muss jeden Ausgang überleben, sonst übernähme ein Tab die noch gültige Sitzung wieder; fällt mit der nachgeholten Abmeldung oder der nächsten Anmeldung.',
+  },
+  {
     ort: 'localStorage lfh:offline-quittung-signal',
     datei: 'offline/ereignisse.ts',
     entscheidung: 'bleibt',

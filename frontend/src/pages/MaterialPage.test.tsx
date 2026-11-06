@@ -1719,6 +1719,112 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     );
   });
 
+  /**
+   * LLH-1528: ein Stamm-Gerät mit Bestandsnummer, das aus altem Bestand doppelt im Einsatz steht,
+   * trägt an jeder seiner Zeilen die Marke „doppelt“; nach dem Herausnehmen einer Zeile meldet der
+   * Server keine Doppel mehr, die Marke verschwindet.
+   */
+  it('Bestandsdoppel: beide Zeilen tragen „doppelt“, nach dem Herausnehmen keine mehr', async () => {
+    const stueck = {
+      ...em,
+      material_id: 7,
+      bezeichnung: 'Stromerzeuger',
+      bestandsnummer: 'SE-1',
+      art: 'geraet',
+      menge: 1,
+    };
+    const doppel = [
+      { ...stueck, id: 10, is_bestandsdoppel: true },
+      { ...stueck, id: 11, is_bestandsdoppel: true },
+    ];
+    const decke = { ...em, id: 12, material_id: 5, is_bestandsdoppel: false };
+    server.use(
+      http.post('/api/einsaetze/1/material/11/entlassen', () => {
+        server.use(
+          http.get('/api/einsaetze/1/material', ({ request }) =>
+            HttpResponse.json(
+              new URL(request.url).searchParams.has('entlassene')
+                ? []
+                : [{ ...stueck, id: 10, is_bestandsdoppel: false }, decke],
+            ),
+          ),
+        );
+        return HttpResponse.json({ ...doppel[1], beendet_als: 'entlassen' });
+      }),
+    );
+    const { container } = render(einsatzAktiv, [...doppel, decke] as never);
+    await screen.findByText('Wolldecke');
+    const zeile = (id: number) => container.querySelector(`[data-row-key="${id}"]`) as HTMLElement;
+    expect(within(zeile(10)).getByText('doppelt')).toBeInTheDocument();
+    expect(within(zeile(11)).getByText('doppelt')).toBeInTheDocument();
+    expect(within(zeile(12)).queryByText('doppelt')).toBeNull();
+
+    await userEvent.click(
+      within(zeile(11)).getByRole('button', { name: 'Stromerzeuger aus dem Einsatz nehmen' }),
+    );
+    await waitFor(() => expect(container.querySelector('[data-row-key="11"]')).toBeNull());
+    expect(within(zeile(10)).queryByText('doppelt')).toBeNull();
+  });
+
+  /**
+   * LLH-1528: ein Bestandsdoppel als Verbrauchsgut (Menge über 1) bietet „Als Gerät führen“, obwohl
+   * es ein Stamm-Posten ist; der Wechsel schickt die Menge 1 mit. Mit Ausgabe oder einer zweiten
+   * aktiven Zeile desselben Stücks ist er gesperrt.
+   */
+  it('Bestandsdoppel als Verbrauchsgut: „Als Gerät führen“ schickt Art und Menge 1', async () => {
+    const gesendet: unknown[] = [];
+    const posten = {
+      ...em,
+      material_id: 7,
+      bezeichnung: 'Stromerzeuger',
+      bestandsnummer: 'SE-1',
+      menge: 3,
+      is_bestandsdoppel: true,
+    };
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...posten, art: 'geraet', menge: 1, is_bestandsdoppel: false });
+      }),
+    );
+    render(einsatzAktiv, [
+      posten,
+      { ...posten, id: 11, material_id: 8, bezeichnung: 'Lichtmast', ausgegeben: 1 },
+      { ...posten, id: 13, material_id: 9, bezeichnung: 'Pumpe', menge: 1 },
+      { ...posten, id: 14, material_id: 9, bezeichnung: 'Pumpe', menge: 1 },
+      { ...em, id: 12, material_id: 5, is_bestandsdoppel: false },
+    ] as never);
+    await screen.findByText('Stromerzeuger');
+    const gesperrt = await openZeilenmenue('Lichtmast');
+    expect(
+      within(gesperrt).getByRole('menuitem', { name: 'Als Gerät führen · Ausgabe gebucht' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{Escape}');
+    // Steht dasselbe Stück in einer zweiten Zeile, löst erst „Aus dem Einsatz nehmen“.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Weitere Aktionen zu Pumpe' })[0]);
+    await warteAufMenueFokus();
+    const offen = document.querySelectorAll<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(
+      within(offen[offen.length - 1]).getByRole('menuitem', {
+        name: 'Als Gerät führen · schon im Einsatz',
+      }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{Escape}');
+    // Ein gewöhnlicher Stamm-Posten wechselt die Art nicht.
+    const gewoehnlich = await openZeilenmenue('Wolldecke');
+    expect(
+      within(gewoehnlich)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).not.toContain('Als Gerät führen');
+    await userEvent.keyboard('{Escape}');
+    const menue = await openZeilenmenue('Stromerzeuger');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Als Gerät führen' }));
+    await waitFor(() => expect(gesendet).toEqual([{ art: 'geraet', menge: 1 }]));
+  });
+
   it('Art wechseln ist gesperrt mit Grund, wo der Server ablehnte (LLH-1225 D6)', async () => {
     const adhoc = { ...em, ist_adhoc: true, material_id: null };
     render(einsatzAktiv, [

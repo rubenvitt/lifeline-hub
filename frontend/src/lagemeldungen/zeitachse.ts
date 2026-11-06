@@ -155,6 +155,33 @@ export function filtereLagemeldungen<T extends LageEintragKern>(
   });
 }
 
+/**
+ * Nachträge vor der Lagebesprechung (LLH-1514, wie im ETB nach der Entscheidung vom 17.10.2026):
+ * „Seit letzter Lagebesprechung“ grenzt nach Ereigniszeit ab. Eine Lagemeldung, die nach der
+ * Besprechung übernommen wurde (`erstellt_at`), aber davor geschah, fiele still heraus — dabei ist
+ * gerade sie für die nächste Besprechung neu.
+ *
+ * Dieselben übrigen Filter wie die Achse, der Zeitraum fällt weg. Davor heißt vor der Grenze der
+ * Wahl (`von`, volle Minute: was ab ihr geschah, steht schon da); danach übernommen heißt nach dem
+ * sekundengenauen Ende der Besprechung (`abgehaltenAt`). Ohne eine der beiden leer.
+ */
+export function nachtraegeVorLb<T extends LageEintragKern & { erstellt_at: string }>(
+  eintraege: readonly T[],
+  f: LageFilter,
+  lb: { von?: string | null; abgehaltenAt?: string | null },
+): T[] {
+  const grenze = alsZeitpunkt(lb.von ?? undefined);
+  const ende = alsZeitpunkt(lb.abgehaltenAt ?? undefined);
+  if (!grenze || !ende) return [];
+  return filtereLagemeldungen(eintraege, { ...f, von: undefined, bis: undefined }).filter((l) => {
+    const ereignis = alsZeitpunkt(l.ereigniszeit);
+    const uebergabe = alsZeitpunkt(l.erstellt_at);
+    return (
+      ereignis != null && uebergabe != null && ereignis.isBefore(grenze) && uebergabe.isAfter(ende)
+    );
+  });
+}
+
 interface Tagesgruppe<T> {
   schluessel: string;
   etikett: string;

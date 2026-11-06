@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useLocation, useSearchParams, type Location } from 'react-router';
 
 export interface LinkAuftrag {
@@ -40,6 +40,20 @@ export function useLinkAuftrag(): LinkAuftrag {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const verbrauchtRef = useRef<string | null>(null);
+  /*
+   * StrictMode hängt eine frische Instanz zum Test einmal aus und wieder ein (nur Entwicklung, auch
+   * im e2e-Lauf gegen den Vite-Server): alle Effekte laufen ein zweites Mal, mit den Werten DESSELBEN
+   * Renders. Andere Effekte setzen dabei Zustand erneut, den der Auftrag im ersten Lauf überschrieben
+   * hat (etwa die Vorauswahl einer `ListeDetail`, die den Sprung räumt, LLH-1530). Ein Aushängen gibt
+   * den Eintrag deshalb frei: der Auftrag läuft im zweiten Durchgang wie jeder andere Effekt mit.
+   * Gegen geänderte Abhängigkeiten bleibt er geschützt, die hängen nichts aus.
+   */
+  useEffect(
+    () => () => {
+      verbrauchtRef.current = null;
+    },
+    [],
+  );
   return useMemo(() => {
     const weiter = (aendere: (naechste: URLSearchParams) => void) => {
       verbrauchtRef.current = location.key;

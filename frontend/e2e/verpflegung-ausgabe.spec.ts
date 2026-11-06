@@ -299,14 +299,9 @@ async function pruefeHoehe(
     page.evaluate((sel) => {
       const b = sel ? document.querySelector<HTMLElement>(sel)! : document.documentElement;
       const sicht = sel ? b.clientHeight : window.innerHeight;
-      // Die Kante, an der ein Fuß mit `bottom: 0` klebt: am Gerät über der Polsterung des
-      // `main`, am Stab die Fensterkante.
-      const kante = sel
-        ? b.getBoundingClientRect().top +
-          b.clientTop +
-          b.clientHeight -
-          parseFloat(getComputedStyle(b).paddingBottom)
-        : sicht;
+      // Die Unterkante des Bildlaufs: am Gerät die des `main` (über dessen Polsterung hinweg,
+      // LLH-1504), am Stab die Fensterkante.
+      const kante = sel ? b.getBoundingClientRect().top + b.clientTop + b.clientHeight : sicht;
       const feld = document.querySelector('[data-lfh="zaehltasten"]')!.getBoundingClientRect();
       return {
         // Wie weit sich der Scrollbereich rollen lässt.
@@ -385,6 +380,35 @@ for (const flaeche of [
 }
 
 /**
+ * Schmal (LLH-1504): auch ein langer Name („ohne Schweinefleisch 0/100 fehlt 100“) bleibt in seiner
+ * Sonderkost-Taste, und das Menü weiterer Kostformen steht rechts neben der letzten, auf ihrer Höhe.
+ * Mutationsprobe: `whiteSpace: 'normal'` an der Taste entfernt → bei 320 px läuft sie über, rot.
+ */
+async function pruefeSonderkostLage(page: Page, wo: string) {
+  const lage = await page.evaluate(() => {
+    const tasten = [
+      ...document.querySelectorAll<HTMLElement>('[data-lfh="ausgabe-sonderkost"] [data-kostform]'),
+    ];
+    const letzte = tasten[tasten.length - 1].getBoundingClientRect();
+    const menue = document
+      .querySelector('[data-lfh="ausgabe-sonderkost"] [aria-label="Weitere Kostform …"]')!
+      .getBoundingClientRect();
+    return {
+      ueberlauf: tasten
+        .filter((t) => t.scrollWidth > t.clientWidth + 1)
+        .map((t) => t.dataset.kostform),
+      rechts: menue.left >= letzte.right,
+      aufHoehe: menue.top < letzte.bottom && menue.bottom > letzte.top,
+    };
+  });
+  expect(lage, `${wo}: Sonderkost-Tasten und Menü`).toEqual({
+    ueberlauf: [],
+    rechts: true,
+    aufHoehe: true,
+  });
+}
+
+/**
  * Handy mit Touch ohne gespeicherte Wahl (LLH-1504): die Ansicht beginnt in `komfortabel` und ist
  * bei 390 × 700 höher als der Schirm; das Kennzahlenband steht dort zweizeilig. Rollt es unter
  * die obere Kante (am Stab unter den Rahmen, am Gerät an die Oberkante des `main`), stehen Soll,
@@ -399,7 +423,9 @@ for (const flaeche of [
  * die Zeile rollt mit hinaus, rot; `kurzzeileSichtbar` immer `false` → rot ab dem ersten Schritt
  * unter der Kante; die Regel `:root:has([data-lfh='ausgabe-kurzzeile'])` bzw. `main:has(…)` in
  * `index.css` entfernt → rückwärts getabbt steht ein Ziel hinter der Zeile, rot; der Polsterungsabzug in
- * `restHoeheVon` (Gerät) entfernt → die Zeile steht 12 px unter der Kante, rot.
+ * `restHoeheVon` (Gerät) entfernt → die Zeile steht 12 px unter der Kante, rot; `bottom` des
+ * Tastenfelds wieder `0` → am Gerät steht es beim Rollen 12 px über der Unterkante, die Liste
+ * scheint darunter durch, rot.
  */
 async function pruefeKurzzeile(page: Page, wo: string, scrollbereich: string | null) {
   await expect(page.locator('html'), wo).toHaveAttribute('data-dichte', 'komfortabel');
@@ -417,6 +443,18 @@ async function pruefeKurzzeile(page: Page, wo: string, scrollbereich: string | n
   }, scrollbereich);
   expect(vorab.strecke, `${wo}: die Ansicht rollt`).toBeGreaterThan(200);
   expect(vorab.zeilen, `${wo}: das Kennzahlenband steht zweizeilig`).toBe(2);
+  // Schmal stehen die Sonderkost-Tasten untereinander und gleich breit, links bündig.
+  const sonderkost = await page
+    .locator('[data-lfh="ausgabe-sonderkost"] [data-kostform]')
+    .evaluateAll((el) =>
+      el.map((e) => {
+        const r = e.getBoundingClientRect();
+        return { links: Math.round(r.left), breite: Math.round(r.width) };
+      }),
+    );
+  expect(sonderkost, `${wo}: Sonderkost`).toHaveLength(2);
+  expect(sonderkost[1], `${wo}: Sonderkost gleich breit, untereinander`).toEqual(sonderkost[0]);
+  await pruefeSonderkostLage(page, wo);
   await expect(kurzzeile, `${wo}: ohne Bildlauf keine Kurzzeile`).toHaveAttribute(
     'data-sichtbar',
     'false',
@@ -462,6 +500,12 @@ async function pruefeKurzzeile(page: Page, wo: string, scrollbereich: string | n
             aus.push(`${y}: „${w.textContent}“ im Kopf nicht frei, Kurzzeile verborgen`);
           }
         }
+      }
+      // Das Tastenfeld steht an jeder Stelle an der Unterkante: nichts schiene darunter durch,
+      // und keine Taste verschiebt sich beim Rollen.
+      const feld = document.querySelector('[data-lfh="zaehltasten"]')!.getBoundingClientRect();
+      if (Math.abs(feld.bottom - unten()) > 1) {
+        aus.push(`${y}: Tastenfeld endet bei ${feld.bottom}, Unterkante ${unten()}`);
       }
       if (y >= ende) break;
     }
@@ -524,7 +568,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
   /** Zeitfenster mit Sonderkost und zehn Buchungen: die Liste ist lang. */
   async function saeenLang(page: Page) {
     const { e, zf } = await saeen(page, -60, 60, {
-      sonderkost: { vegetarisch: 4, vegan: 2 },
+      sonderkost: { vegetarisch: 4, ohne_schwein: 100 },
       kraefte: 1830,
     });
     for (let n = 1; n <= 10; n += 1) {
@@ -543,6 +587,53 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
     await expect(page.locator('[data-lfh="ausgabe-zeile"]')).toHaveCount(10);
     await pruefeKurzzeile(page, 'Stab', null);
+    await page.setViewportSize({ width: 320, height: 700 });
+    await pruefeSonderkostLage(page, 'Stab, 320 px');
+    // Eine Buchung, die „fehlt“ einer Kostform auf null setzt, ändert keine Taste: die Zahlen
+    // bleiben in ihrer eigenen Zeile, nichts darunter rückt nach oben. In `kompakt` bei 390 px
+    // passten sie ohne „fehlt“ neben den Namen, mit ihm nicht, und die Taste würde niedriger
+    // (Mutationsprobe: „fehlt“ bei null ausgeblendet statt unsichtbar → rot). In `komfortabel`
+    // trägt die Mindesthöhe zwei Zeilen.
+    await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+    await expect(page.locator('[data-kostform="ohne_schwein"]')).toBeVisible();
+    const tasten = page.locator('[data-lfh="ausgabe-sonderkost"] [data-kostform]');
+    // Taste und Zahlenplatz: auch innerhalb der Taste wandern die Zahlen nicht.
+    const lagen = () =>
+      tasten.evaluateAll((el) =>
+        el.map((e) => {
+          const r = e.getBoundingClientRect();
+          const z = e.querySelector('[data-lfh="sonderkost-zahlen"]')!.getBoundingClientRect();
+          return [r.left, r.top, r.width, r.height, z.left, z.width].map(Math.round);
+        }),
+      );
+    const vorher = await lagen();
+    await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster/${zf}/ausgaben`, {
+      menge: 100,
+      sonderkost: { ohne_schwein: 100 },
+    });
+    await expect(page.locator('[data-kostform="ohne_schwein"]')).toHaveAttribute(
+      'aria-label',
+      /^ohne Schweinefleisch 100\/100$/,
+    );
+    expect(await lagen(), 'Stab, 390 px kompakt: Sonderkost-Tasten nach der Buchung').toEqual(
+      vorher,
+    );
+    // Ausgegeben über dem Soll (4 → 10/4) wächst um eine Stelle und bleibt im festen Platz
+    // (Mutationsprobe: Platz nur nach den Stellen des Solls → rot).
+    await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster/${zf}/ausgaben`, {
+      menge: 10,
+      sonderkost: { vegetarisch: 10 },
+    });
+    await expect(page.locator('[data-kostform="vegetarisch"]')).toHaveAttribute(
+      'aria-label',
+      /^vegetarisch 10\/4$/,
+    );
+    expect(await lagen(), 'Stab, 390 px kompakt: Sonderkost-Tasten nach Überdeckung').toEqual(
+      vorher,
+    );
   });
 
   test('am Gerät: Soll, ausgegeben und fehlt bleiben beim Rollen im Bild, das Tastenfeld unten', async ({
@@ -590,4 +681,41 @@ test('Kennzahlen im Kopf laufen auch vierstellig nicht über (320 bis 390 px, ko
       expect(ueberlauf, `${breite} px, ${dichte}`).toEqual([0, 0, 0]);
     }
   }
+});
+
+test('Sonderkost mit vierstelligem Soll läuft bei 320 px nicht über (alle Dichten)', async ({
+  page,
+}) => {
+  const { e, zf } = await saeen(page, -10, 110, {
+    sonderkost: { vegetarisch: 4, ohne_schwein: 1000 },
+    kraefte: 1830,
+  });
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const dichte of ['kompakt', 'komfortabel', 'handschuh']) {
+    await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+    await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    await expect(page.locator('[data-kostform="ohne_schwein"]')).toHaveAttribute(
+      'aria-label',
+      /^ohne Schweinefleisch 0\/1000 fehlt 1000$/,
+    );
+    await pruefeSonderkostLage(page, `320 px, ${dichte}, Soll 1000`);
+  }
+  // Der erste Tipp füllt den Sammelplatz („+ 1“). Im Handschuh bei 320 px bricht er allein in
+  // eine eigene Zeile um; auch leer hält er dort eine Zeile, also wächst und rückt keine Taste
+  // (Mutationsprobe: leerer Sammelplatz ohne Text, 0 px hoch → rot).
+  const lagen = () =>
+    page.locator('[data-lfh="ausgabe-sonderkost"] [data-kostform]').evaluateAll((el) =>
+      el.map((e) => {
+        const r = e.getBoundingClientRect();
+        const s = e.querySelector('[data-lfh="sonderkost-sammlung"]')!.getBoundingClientRect();
+        // Seitenbezogen: der Klick rollt die Taste ins Bild.
+        return [r.left, r.top + window.scrollY, r.width, r.height, s.height].map(Math.round);
+      }),
+    );
+  const taste = page.locator('[data-kostform="ohne_schwein"]');
+  const vorher = await lagen();
+  await taste.click();
+  await expect(taste).toHaveAttribute('aria-label', /\+ 1$/);
+  expect(await lagen(), '320 px, handschuh: erster Tipp').toEqual(vorher);
 });

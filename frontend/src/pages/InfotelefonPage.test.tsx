@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Link, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { AdresseSteht } from '../test/adresseSteht';
 import { renderMitProviders } from '../test/utils';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import {
@@ -258,6 +259,32 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(screen.getByText('Sperrung B 3')).toBeInTheDocument();
   });
 
+  /**
+   * Einmal je Verlaufseintrag (LLH-1530): Bis der Router die Räumung committet, steht `?anruf=` noch
+   * in der Adresse der Seite (`AdresseSteht`). Wechselt die Person die Sicht, lädt die Liste neu
+   * (`bereit` fällt und steigt); der Sprung holt sie nicht auf „alle“ zurück.
+   */
+  it('ein hängender Router-Commit holt nach dem Sichtwechsel nicht auf „alle“ zurück (LLH-1530)', async () => {
+    renderMitProviders(
+      <AdresseSteht>
+        <Routes>
+          <Route path="/einsaetze/:id/stab/infotelefon" element={<InfotelefonPage />} />
+        </Routes>
+      </AdresseSteht>,
+      { route: '/einsaetze/1/stab/infotelefon?anruf=1' },
+    );
+    await waitFor(() =>
+      expect(document.querySelector('[data-anruf="1"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'offene Rückrufe' }));
+    await waitFor(() =>
+      expect(loadAnrufe).toHaveBeenCalledWith(1, { status: 'offen', vor: undefined }),
+    );
+    await waitFor(() => expect(screen.queryByText('Sperrung B 3')).toBeNull());
+    expect(screen.getByRole('radio', { name: 'offene Rückrufe' })).toBeChecked();
+    expect(screen.getByText('sucht Vater')).toBeInTheDocument();
+  });
+
   it('filtert auf offene Rückrufe am Server', async () => {
     setup();
     await screen.findByText('Sperrung B 3');
@@ -467,6 +494,61 @@ describe('InfotelefonPage · ?neu=1', () => {
     await screen.findByText('Sperrung B 3');
     await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
     expect(screen.queryByRole('combobox', { name: 'Anliegen' })).toBeNull();
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1530): Bis der Router die Räumung committet, steht `?neu=1` noch
+   * in der Adresse der Seite (`AdresseSteht`). Ein neu geladener Einsatz holt den Fokus nicht aus
+   * der Arbeit der Person zurück in die Erfassung.
+   */
+  it('ein hängender Router-Commit holt den Fokus nach neuem Einsatzstand nicht zurück (LLH-1530)', async () => {
+    const { client } = renderMitProviders(
+      <AdresseSteht>
+        <Routes>
+          <Route path="/einsaetze/:id/stab/infotelefon" element={<InfotelefonPage />} />
+        </Routes>
+      </AdresseSteht>,
+      { route: '/einsaetze/1/stab/infotelefon?neu=1' },
+    );
+    const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
+    await waitFor(() => expect(anliegen).toHaveFocus());
+    const sicht = screen.getByRole('radio', { name: 'offene Rückrufe' });
+    act(() => sicht.focus());
+
+    const abrufe = vi.mocked(ladeEinsatz).mock.calls.length;
+    vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, bezeichnung: 'Hochwasser Süd' });
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(vi.mocked(ladeEinsatz).mock.calls.length).toBeGreaterThan(abrufe));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(anliegen).not.toHaveFocus();
+    expect(sicht).toHaveFocus();
+  });
+
+  it('ein neuer Link ?neu=1 setzt den Fokus wieder in die Erfassung (LLH-1530)', async () => {
+    renderMitProviders(
+      <>
+        <Routes>
+          <Route
+            path="/einsaetze/:id/stab/infotelefon"
+            element={
+              <>
+                <InfotelefonPage />
+                <LocationProbe />
+              </>
+            }
+          />
+        </Routes>
+        <Link to="/einsaetze/1/stab/infotelefon?neu=1">neuer-link</Link>
+      </>,
+      { route: '/einsaetze/1/stab/infotelefon?neu=1' },
+    );
+    const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
+    await waitFor(() => expect(anliegen).toHaveFocus());
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
+
+    await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
+    await waitFor(() => expect(anliegen).toHaveFocus());
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
   });
 
   it('räumt den Auftrag bei gesperrtem Stab und zeigt keine Daten', async () => {

@@ -12,6 +12,9 @@ export type HttpMethode = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  * einem Benutzerwechsel keine fremde lokale Queue unter der neuen Sitzung leeren. */
 export interface ApiSendOptionen {
   offlineQueueBenutzerId?: number;
+  /** Zusätzliche Köpfe; sie gehen den Schreibköpfen vor (die nachgeholte Abmeldung, LLH-1535,
+   *  nennt so Benutzer und Sitzung, die sie beenden will, während der Tab niemanden zeigt). */
+  koepfe?: Record<string, string>;
 }
 
 export const OFFLINE_QUEUE_BENUTZER_HEADER = 'X-Offline-Queue-Benutzer-Id';
@@ -371,6 +374,7 @@ export async function apiSend<T>(
     if (optionen.offlineQueueBenutzerId != null) {
       headers[OFFLINE_QUEUE_BENUTZER_HEADER] = String(optionen.offlineQueueBenutzerId);
     }
+    Object.assign(headers, optionen.koepfe);
     const res = await fetch(pfad, {
       method: methode,
       credentials: 'same-origin',

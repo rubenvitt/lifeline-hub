@@ -722,8 +722,11 @@ anwendbar), „nicht geprüft" ist keins.
   `anzeige/Kartenausschnitt.tsx`. Im Formular einer Sache im Einsatz nimmt man
   `anzeige/EinsatzOrtsfeld.tsx` (Suche im Einsatz, `karte` mit Einsatzort als Umgebung) und die
   Abbildungen aus `anzeige/ortsfeldFormular.ts` (LLH-1121): `ortFelder` (Text und Koordinate
-  gehen gemeinsam hinaus, die Koordinate nur mit Text), `ortsfeldAusGespeichert` (beim Bearbeiten
-  steht eine gespeicherte Koordinate als `quelle: 'karte'`, eine Textkorrektur behält sie),
+  gehen gemeinsam hinaus, die Koordinate nur mit Text oder als Kartenpunkt; ein geleerter Text
+  leert auch einen Kartenpunkt, ein Kartenpunkt ins leere Feld setzt die Koordinate als Text, beides
+  in `Ortsfeld` über `nachTextaenderung`/`nachKartenpunkt`, LLH-1534), `ortsfeldAusGespeichert` (beim Bearbeiten
+  steht eine gespeicherte Koordinate als `quelle: 'karte'`, auch ohne Text; eine Textkorrektur
+  behält sie),
   `ortRegeln` (Pflicht und Länge am Text), `ortEingabe` (für einen POST: ohne Angabe fehlt das Feld).
   Eingebaut in Einsatzort, Schaden, Standort der Betreuungs- und Verpflegungsstelle, Sammelstelle
   des Bezirks, Standort von UHS und Bereitstellungsraum, Fundort eines Tiers und Ziel eines

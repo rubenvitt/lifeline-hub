@@ -1,0 +1,19 @@
+-- LLH-1511 (Entscheidung LLH-1310 Punkt 4): Ein Hinweis zur ablösenden Einheit
+-- (`abloesung_abloeser`) hält die gemeinte Einheit beim Erzeugen fest. Bisher las die Detailzeile
+-- beim Lesen den Spiegel `einsatz_abloesung.abloesende_einheit_id`: nach dem Umplanen nannte ein
+-- alter Hinweis die neue Einheit, „Planung entfallen“ gar keine, ein Hinweis zum zweiten Ablöser
+-- der Liste (LLH-1132) den ersten.
+--
+-- Nur die ID, kein Name: design.md D1 (LLH-1207) „keine Textspalte“ bleibt, der Name kommt beim
+-- Lesen aus `einsatz_einheit.name` (Retain). NULL bei jeder anderen Art und bei alten Zeilen; die
+-- Detailzeile liest dann wie bisher den Spiegel.
+--
+-- Bewusst ohne REFERENCES: gemeldet wird nach dem Commit, und das Auflösen einer Einheit ohne
+-- Spur löscht ihre Zeile in derselben Transaktion, die „Planung entfallen“ auslöst
+-- (`einheit::repo`, `abloesung::repo::release_einheit_tx`). Ein FK ließe das INSERT des Hinweises
+-- scheitern. Eine verschwundene Einheit nennt die Detailzeile nicht, statt eine falsche.
+-- Aufbewahrung: Verweis ohne Personenbezug, retain (`einsatz::schwaerzung_registry`).
+--
+-- Leaf-Spalte ohne Default, kein Tabellen-Neubau. Wer `benachrichtigung` künftig neu baut (neue
+-- Art im CHECK, Muster 0255), nimmt die Spalte mit.
+ALTER TABLE benachrichtigung ADD COLUMN einheit_id INTEGER;

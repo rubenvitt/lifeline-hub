@@ -81,6 +81,19 @@ bietet nach jedem Schritt sechs Sekunden lang „Rückgängig“. Ist schon eine
 Nachforderung verknüpft, nennt der Hinweis nur die neue Stufe, etwa „Status: Eingetroffen ·
 Einheiten verknüpft, kein Rückgängig“.
 
+### „Eingetroffen“ später zurücknehmen
+
+Für Einsatzleitung und Führungspersonal, wenn „Eintreffen melden“ zu früh oder an der falschen
+Karte gewählt wurde und der Hinweis schon weg ist:
+
+1. In der Spalte „Eingetroffen“ an der Karte das Menü ⋮ öffnen.
+2. „Eintreffen zurücknehmen“ wählen. Eine Rückfrage gibt es nicht.
+
+Die Karte steht wieder unter „Unterwegs“; der Hinweis unten bietet einige Sekunden lang
+„Rückgängig“. Ist aus der Nachforderung Material übernommen oder eine Einheit mit ihr verknüpft,
+steht im Menü „Eintreffen zurücknehmen (Material übernommen)“ bzw. „(Einheiten verknüpft)“ und
+lässt sich nicht wählen. Dann erst den Posten lösen oder die Einheit stornieren (siehe unten).
+
 ### Eine Zusage erfassen
 
 Für Einsatzleitung und Führungspersonal:
@@ -147,7 +160,7 @@ nächste Fuhre Sandsäcke:
 
 1. An der Karte „Weiteren Posten übernehmen“ wählen.
 
-   ![Karte einer eingetroffenen Nachforderung „Sandsäcke“ mit dem übernommenen Posten „Sandsäcke · 1200 · Rettungsstaffel“, „übernommen 1200 von 2000“, „Material ↗“ und den Knöpfen „Weiteren Posten übernehmen“ und „Erfassten Posten zuordnen …“](../bilder/nachforderung/nachforderung-material-posten.png)
+   ![Karte einer eingetroffenen Nachforderung „Sandsäcke“ mit dem übernommenen Posten „Sandsäcke · 1200 · Rettungsstaffel“, „übernommen 1200 von 2000“, „Material ↗“ und den Knöpfen „Weiteren Posten übernehmen“ und „Erfassten Posten zuordnen …“, darunter das Menü ⋮](../bilder/nachforderung/nachforderung-material-posten.png)
 
 2. Art, Menge und Ort wie beim ersten Posten setzen. Die Menge ist mit dem Rest der Anzahl
    vorbelegt.
@@ -184,7 +197,7 @@ sind, etwa wenn die Tauchpumpe der falschen Nachforderung zugeordnet wurde:
 
 Der Posten bleibt mit Menge, Ort und Status in der Liste und lässt sich danach der richtigen
 Nachforderung zuordnen. Steht an der Karte kein übernommener Posten und keine Einheit mehr, lässt
-sich „Eingetroffen“ zurücknehmen. Bei mehreren Posten wird jeder einzeln gelöst; ein aus dem
+sich im Menü ⋮ der Karte „Eintreffen zurücknehmen“ wählen. Bei mehreren Posten wird jeder einzeln gelöst; ein aus dem
 Einsatz genommener Posten erst nach „Erneut disponieren“.
 
 ### Eingetroffene Kräfte als Einheit übernehmen
@@ -216,7 +229,7 @@ ist, etwa der dritte von drei KTW:
 
 1. An der Karte „Weitere Einheit übernehmen“ wählen.
 
-   ![Karte einer eingetroffenen Nachforderung „KTW“ mit „Als Einheit übernommen: Nachbarstadt 85-1 ↗, Nachbarstadt 85-2 ↗“ und dem Knopf „Weitere Einheit übernehmen“](../bilder/nachforderung/nachforderung-einheit-weitere.png)
+   ![Karte einer eingetroffenen Nachforderung „KTW“ mit „Als Einheit übernommen: Nachbarstadt 85-1 ↗, Nachbarstadt 85-2 ↗“ dem Knopf „Weitere Einheit übernehmen“ und dem Menü ⋮](../bilder/nachforderung/nachforderung-einheit-weitere.png)
 
 2. Unter „Einheiten“ die fehlenden Rufnamen prüfen. Vorbelegt sind die Rufnamen der Zusage, die
    noch keine Einheit tragen; es passen höchstens so viele Einträge, wie noch fehlen.
@@ -235,8 +248,8 @@ sind, etwa wenn „83-1“ der falschen Nachforderung zugeordnet wurde:
 3. Die Rückfrage mit „Übernahme stornieren“ bestätigen.
 
 Die App springt zurück ins Board und hebt die Karte hervor. Steht dort keine übernommene Einheit
-mehr, lässt sich „Eingetroffen“ zurücknehmen. Bei mehreren übernommenen Einheiten wird jede
-einzeln storniert.
+mehr, lässt sich im Menü ⋮ der Karte „Eintreffen zurücknehmen“ wählen. Bei mehreren übernommenen
+Einheiten wird jede einzeln storniert.
 
 ### Eine Nachforderung bearbeiten
 

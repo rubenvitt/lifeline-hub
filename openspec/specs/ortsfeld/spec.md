@@ -38,8 +38,9 @@ Wählt die Person einen Treffer, SHALL das Ortsfeld als Text die Kurzadresse des
 übernehmen (ohne Kurzadresse die Beschriftung des Geocoders) und die Koordinate des Treffers
 mitführen. Ändert die Person den Text danach, MUST das Feld die Koordinate des Treffers wieder
 fallen lassen: der Wert ist dann reiner Text. Eine auf der Karte gesetzte Koordinate (Nadel
-gezogen, auf der Karte gewählt, Ortsname übernommen) MUST eine Textänderung überstehen. Freitext
-ohne Treffer SHALL erlaubt bleiben.
+gezogen, auf der Karte gewählt, Ortsname übernommen) MUST eine Textänderung überstehen, außer
+der Text wird geleert: ein leerer Text MUST jede Koordinate fallen lassen. Freitext ohne Treffer
+SHALL erlaubt bleiben.
 
 #### Scenario: Treffer wählen
 - **WHEN** die Person nach „Bahnhofstraße 1“ sucht und den Treffer „Bahnhofstraße 1, 12345 Musterstadt“ wählt
@@ -56,6 +57,10 @@ ohne Treffer SHALL erlaubt bleiben.
 #### Scenario: Text nach Kartenwahl geändert
 - **WHEN** die Person die Nadel gezogen hat und danach „ links“ an den Text anhängt
 - **THEN** trägt der Wert weiter die Koordinate der Nadel
+
+#### Scenario: Text nach Kartenwahl geleert
+- **WHEN** die Person die Nadel gezogen hat und danach den Text leert
+- **THEN** trägt der Wert keine Koordinate mehr, und unter dem Feld steht „Nicht verortet“
 
 ### Requirement: Koordinate im Feld
 Tippt die Person eine Koordinate in das Ortsfeld, SHALL das Feld sie beim Tippen erkennen, in jeder
@@ -226,7 +231,11 @@ Seite bleiben.
 ### Requirement: Nadel verschieben
 Die Nadel der Kartenvorschau SHALL sich mit Maus, Finger und Pfeiltasten verschieben lassen (mit
 Umschalt in großen Schritten). Das Verschieben MUST die Koordinate des Werts ändern und den Text
-stehen lassen. Die Nadel MUST ein Bedienziel mit der Steuerhöhe der aktiven Dichtestufe im
+stehen lassen; ist der Text eine Koordinate (beim Setzen eingetragen oder getippt), MUST er die
+neue Koordinate tragen, damit Text und Nadel denselben Ort nennen. Eine Textänderung, nach der der
+Text wieder den Punkt der Nadel nennt, MUST den Kartenpunkt stehen lassen; erst eine andere
+getippte Koordinate ersetzt ihn. „Derselbe Punkt“ heißt: gleich in der Genauigkeit des
+eingestellten Koordinatenformats, nicht innerhalb eines festen Abstands. Die Nadel MUST ein Bedienziel mit der Steuerhöhe der aktiven Dichtestufe im
 Quadrat sein.
 
 #### Scenario: Gezogen
@@ -261,7 +270,10 @@ aus überschreiben.
 Koordinate des Felds mit Nadel, sonst an der Umgebung (meist der Einsatzort), sonst über
 Deutschland. Ein Klick in die Karte SHALL die Nadel setzen, die Nadel ist ziehbar. „Übernehmen“
 MUST bis zur ersten Nadel gesperrt sein und setzt die Koordinate, ohne den Text zu ändern;
-„Abbrechen“ lässt den Wert. Die Kartengrundlage folgt dem Kartenausschnitt; ohne Netz MUST der
+„Abbrechen“ lässt den Wert. Ist der Text leer, MUST „Übernehmen“ die Koordinate im eingestellten
+Koordinatenformat als Text setzen, damit der Punkt mit gespeichert wird; den Ortsnamen bietet
+danach „Als Adresse übernehmen“ an. Kein Weg MUST zu einem Feld führen, das einen Punkt zeigt,
+dessen Sache beim Speichern nicht verortet ist. Die Kartengrundlage folgt dem Kartenausschnitt; ohne Netz MUST der
 Dialog mit Offline-Karten oder ohne Kacheln weiter gehen. Kann das Gerät keine Karte zeichnen,
 MUST im Dialog „Karte auf diesem Gerät nicht darstellbar“ stehen, und „Abbrechen“ MUST gehen.
 
@@ -272,6 +284,11 @@ MUST im Dialog „Karte auf diesem Gerät nicht darstellbar“ stehen, und „Ab
 #### Scenario: Abbrechen
 - **WHEN** die Person im Dialog einen Punkt setzt und „Abbrechen“ wählt
 - **THEN** ist der Wert unverändert
+
+#### Scenario: Punkt in ein leeres Feld
+- **WHEN** das Feld leer ist, das Koordinatenformat WGS84 dezimal ist und die Person auf der Karte 53,1° N 8,8° O wählt und übernimmt
+- **THEN** steht „53.10000, 8.80000“ als Text im Feld, der Wert trägt diesen Punkt, und die Sache wird mit Text und Koordinate gespeichert
+- **AND** zieht die Person danach die Nadel, steht die neue Koordinate als Text da
 
 ### Requirement: Ortsfeld ohne Suche
 Eine personenbezogene Ortsangabe (Herkunft / Adresse einer Person) SHALL das Ortsfeld ohne Suche
@@ -290,8 +307,10 @@ Ortssuche im Einsatz nehmen; „Auf Karte wählen“ beginnt am Einsatzort. Ein 
 eine getippte Koordinate oder ein auf der Karte gesetzter Punkt MUST Text und Koordinate
 gemeinsam speichern; ohne Auswahl MUST nur der Text gespeichert werden, die Sache bleibt nicht
 verortet. Ein geleerter Text MUST auch die Koordinate leeren. Beim Bearbeiten MUST eine
-gespeicherte Koordinate als Punkt im Feld stehen und eine Textkorrektur überleben; die
-Koordinate MUST nur hinausgehen, wenn sie sich geändert hat. Der Erfassungsdialog eines
+gespeicherte Koordinate als Punkt im Feld stehen und eine Textkorrektur überleben, auch eine
+ohne gespeicherten Text (etwa auf der Lagekarte verortet): sie MUST beim Speichern erhalten
+bleiben, solange das Feld sie zeigt; die Koordinate MUST nur hinausgehen, wenn sie sich geändert
+hat. Der Erfassungsdialog eines
 Schadens MUST kein eigenes Koordinatenfeld mehr tragen. Ohne Netz MUST der Ort als Freitext oder
 getippte Koordinate erfassbar bleiben.
 
@@ -306,6 +325,10 @@ getippte Koordinate erfassbar bleiben.
 #### Scenario: Textkorrektur am verorteten Ort
 - **WHEN** an einem verorteten Schaden der Ort von „Hauptstr. 17“ auf „Hauptstr. 17a“ berichtigt und gespeichert wird
 - **THEN** geht nur der Text hinaus, und der Schaden behält seine Koordinate
+
+#### Scenario: Auf der Lagekarte verortete Stelle bearbeiten
+- **WHEN** eine Betreuungsstelle ohne Standort-Text auf der Lagekarte verortet wurde und die Person im Bearbeiten-Dialog nur die Bezeichnung ändert und speichert
+- **THEN** zeigt das Standortfeld den Punkt, und die Stelle behält ihre Koordinate
 
 #### Scenario: Betreuungsstelle mit Standort anlegen
 - **WHEN** die Person beim Anlegen einer Betreuungsstelle unter „Weitere Angaben“ einen Standort-Treffer wählt

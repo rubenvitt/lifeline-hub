@@ -23,6 +23,10 @@ pub mod repo;
 /// im ETB-Eintrag und am gestrichenen Ereignis.
 pub const GRUND_MAX: usize = 500;
 
+/// Höchstlänge der Notiz eines Nachtrags oder einer nachgetragenen Periode (Zeichen nach dem
+/// Trimmen); sie steht am Ereignis der Zeitachse.
+pub const NOTIZ_MAX: usize = 500;
+
 wire_enum! {
     /// Art eines Ereignisses. Wire == `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

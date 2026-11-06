@@ -20,6 +20,10 @@ pub struct Buchung<'a> {
     pub notiz: Option<&'a str>,
     pub client_id: Option<&'a str>,
     pub zeitpunkt_at: Option<&'a str>,
+    /// Nur beim Wechsel: der Raum, aus dem der Aufrufer die Kraft verlegt (LLH-1521). Steht sie
+    /// inzwischen woanders, lehnt [`belege_tx`] ab (`Conflict`), statt still aus dem neuen Raum
+    /// zu wechseln. `None` prüft nicht (Gerät, Ablösung).
+    pub von_br_id: Option<i64>,
 }
 
 /// Bucht ein Objekt (Einheit oder Fahrzeug) in einen Bereitstellungsraum ein,
@@ -43,6 +47,7 @@ pub async fn belege(
         objekt_id,
         art,
         notiz,
+        None,
         benutzer_id,
     )
     .await?
@@ -64,9 +69,11 @@ pub struct Belegt {
 ///
 /// # Regeln (in Reihenfolge)
 /// 1. `objekt_typ` unbekannt → `Validation`
-/// 2. `art` unbekannt → `Validation`; `abruf`/`abruf_aufgehoben` → `UnprocessableEntity`, sie
-///    haben eigene Routen (LLH-1085, design.md D2)
-/// 3. ab hier [`belege_tx`]
+/// 2. `art` unbekannt → `Validation`
+/// 3. `von_br_id` bei einer anderen Art als `wechsel` → `Validation` (LLH-1521)
+/// 4. `abruf`/`abruf_aufgehoben` → `UnprocessableEntity`, sie haben eigene Routen (LLH-1085,
+///    design.md D2)
+/// 5. ab hier [`belege_tx`]
 #[allow(clippy::too_many_arguments)]
 pub async fn belege_mit_folgen(
     pool: &SqlitePool,
@@ -76,6 +83,7 @@ pub async fn belege_mit_folgen(
     objekt_id: i64,
     art: &str,
     notiz: Option<&str>,
+    von_br_id: Option<i64>,
     benutzer_id: i64,
 ) -> Result<Belegt, AppError> {
     // 1. Objekt-Typ parsen
@@ -85,6 +93,12 @@ pub async fn belege_mit_folgen(
     // 2. Art parsen
     let belegungs_art = BrBelegungsArt::parse(art)
         .ok_or_else(|| AppError::Validation(format!("Unbekannte art: '{art}'")))?;
+    // 3. Der erwartete Quellraum gehört nur zum Wechsel (LLH-1521), auch vor Abruf und Rücknahme.
+    if von_br_id.is_some() && belegungs_art != BrBelegungsArt::Wechsel {
+        return Err(AppError::Validation(
+            "von_br_id gibt es nur beim Wechsel".into(),
+        ));
+    }
     check_belegungs_art(belegungs_art)?;
 
     let buchung = Buchung {
@@ -92,6 +106,7 @@ pub async fn belege_mit_folgen(
         notiz,
         client_id: None,
         zeitpunkt_at: None,
+        von_br_id,
     };
     // read-then-write-Atomizität in einer Transaktion (F09: BEGIN IMMEDIATE + Retry)
     let ergebnis = crate::write_retry!(pool, |conn| {
@@ -143,11 +158,13 @@ pub struct BelegungsErgebnis {
 ///    (`UnprocessableEntity`) – in der Transaktion, gegen das Rennen mit „Auflösen“
 /// 2. Objekt muss im selben Einsatz existieren und aktiv sein → `NotFound` / `Conflict`
 /// 3. `fahrzeug`: `einheit_id` nicht NULL → `Conflict`
-/// 4. Art-Vorbedingung: `eintritt` → `aktueller_br_id` muss NULL; `wechsel`/`austritt` → muss
+/// 4. Wechsel mit erwartetem Quellraum (`von_br_id`), den die Kraft inzwischen verlassen hat →
+///    `Conflict`, ohne Ereignis und Cache-Änderung (LLH-1521)
+/// 5. Art-Vorbedingung: `eintritt` → `aktueller_br_id` muss NULL; `wechsel`/`austritt` → muss
 ///    gesetzt sein; `abruf`/`abruf_aufgehoben` → `UnprocessableEntity`
-/// 5. Ein Wechsel einer abgerufenen Kraft → `UnprocessableEntity` (LLH-1085, design.md D12)
-/// 6. Event-Insert + Cache-Update
-/// 7. Austritt einer abgerufenen Einheit: genau die mit ihr abgerufenen Untereinheiten treten
+/// 6. Ein Wechsel einer abgerufenen Kraft → `UnprocessableEntity` (LLH-1085, design.md D12)
+/// 7. Event-Insert + Cache-Update
+/// 8. Austritt einer abgerufenen Einheit: genau die mit ihr abgerufenen Untereinheiten treten
 ///    mit aus (D10). Hier statt in der Route, damit jeder Aufrufer (auch der Vollzug einer
 ///    Ablösung, LLH-1132) die Regel erbt (`src/AGENTS.md`, „Backend — Bereitstellungsraum“).
 pub async fn belege_tx(
@@ -178,6 +195,9 @@ pub async fn belege_tx(
         }
     };
 
+    // Der Quellraum zuerst: hat jemand die Kraft inzwischen ausgetragen, nennt der Dialog das
+    // statt der allgemeinen Art-Vorbedingung (LLH-1521).
+    check_quellraum(buchung, aktueller_br_id)?;
     check_art_vorbedingung(&buchung.art, aktueller_br_id, br_id)?;
     let vorher_abruf = match aktueller_br_id {
         Some(raum) => offener_abruf_tx(&mut *conn, einsatz_id, typ, objekt_id, raum).await?,
@@ -998,6 +1018,25 @@ pub(super) fn check_art_vorbedingung(
         BrBelegungsArt::Austritt if aktueller_br_id != Some(br_id) => Err(AppError::Conflict(
             "Objekt ist nicht in diesem Bereitstellungsraum".into(),
         )),
+        _ => Ok(()),
+    }
+}
+
+/// Ein Wechsel mit erwartetem Quellraum (LLH-1521): steht die Kraft nicht mehr dort, hat sie
+/// inzwischen jemand anderes verlegt, ausgetragen oder eingebucht. Ein Wechsel aus dem neuen Raum
+/// wäre eine zweite Verlegung, die niemand so gewählt hat, also `Conflict`. Ohne `von_br_id`
+/// prüft die Funktion nichts.
+pub(super) fn check_quellraum(
+    buchung: &Buchung<'_>,
+    aktueller_br_id: Option<i64>,
+) -> Result<(), AppError> {
+    match (buchung.art, buchung.von_br_id, aktueller_br_id) {
+        (BrBelegungsArt::Wechsel, Some(_), None) => Err(AppError::Conflict(
+            "Kraft steht inzwischen in keinem Raum mehr".into(),
+        )),
+        (BrBelegungsArt::Wechsel, Some(von), Some(jetzt)) if jetzt != von => Err(
+            AppError::Conflict("Kraft steht inzwischen in einem anderen Raum".into()),
+        ),
         _ => Ok(()),
     }
 }
@@ -1966,7 +2005,63 @@ mod tests {
             notiz: None,
             client_id: None,
             zeitpunkt_at: None,
+            von_br_id: None,
         }
+    }
+
+    /// LLH-1521: ein Wechsel mit erwartetem Quellraum bucht nur, solange die Kraft dort steht;
+    /// ohne Quellraum und bei anderen Arten prüft `check_quellraum` nichts.
+    #[test]
+    fn quellraum_nur_beim_wechsel_geprueft() {
+        let wechsel = |von| Buchung {
+            art: BrBelegungsArt::Wechsel,
+            von_br_id: von,
+            ..eintritt()
+        };
+        assert!(check_quellraum(&wechsel(Some(1)), Some(1)).is_ok());
+        assert!(matches!(
+            check_quellraum(&wechsel(Some(1)), Some(2)),
+            Err(AppError::Conflict(_))
+        ));
+        assert!(matches!(
+            check_quellraum(&wechsel(Some(1)), None),
+            Err(AppError::Conflict(_))
+        ));
+        assert!(check_quellraum(&wechsel(None), Some(2)).is_ok());
+        assert!(check_quellraum(&eintritt(), Some(2)).is_ok());
+    }
+
+    /// LLH-1521: der abgelehnte Wechsel schreibt in `belege_tx` weder Ereignis noch Cache.
+    #[tokio::test]
+    async fn belege_tx_wechsel_aus_verlassenem_raum_schreibt_nichts() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let a = aktiven_br(&pool, e, b, "BR A").await;
+        let ziel = aktiven_br(&pool, e, b, "BR B").await;
+        let fremd = aktiven_br(&pool, e, b, "BR C").await;
+        let fahrzeug = neues_fahrzeug_ohne_einheit(&pool, e).await;
+        let mut tx = pool.begin().await.unwrap();
+        belege_tx(&mut tx, e, a, ObjektTyp::Fahrzeug, fahrzeug, &eintritt(), b)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        let buchung = Buchung {
+            art: BrBelegungsArt::Wechsel,
+            von_br_id: Some(fremd),
+            ..eintritt()
+        };
+        let mut tx = pool.begin().await.unwrap();
+        let r = belege_tx(&mut tx, e, ziel, ObjektTyp::Fahrzeug, fahrzeug, &buchung, b).await;
+        assert!(matches!(r, Err(AppError::Conflict(_))), "{r:?}");
+        tx.commit().await.unwrap();
+        assert_eq!(cache_fahrzeug(&pool, fahrzeug).await, Some(a));
+        let zeilen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM br_belegung WHERE br_id = ?")
+            .bind(ziel)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(zeilen, 0);
     }
 
     /// LLH-1075 (design.md D2, Schritt 1): die Prüfung „aktiv, nicht storniert“ liegt in der
@@ -2369,7 +2464,7 @@ mod tests {
             },
         )
         .await;
-        let aus = belege_mit_folgen(&pool, e, br, "einheit", hlf, "austritt", None, b)
+        let aus = belege_mit_folgen(&pool, e, br, "einheit", hlf, "austritt", None, None, b)
             .await
             .unwrap();
         assert_eq!(aus.mitgenommen, vec![(g1, "Gruppe 1".to_string())]);
@@ -2423,7 +2518,7 @@ mod tests {
         )
         .await;
         hebe_auf(&pool, (b, e, br), ObjektTyp::Einheit, hlf).await;
-        let aus = belege_mit_folgen(&pool, e, br, "einheit", hlf, "austritt", None, b)
+        let aus = belege_mit_folgen(&pool, e, br, "einheit", hlf, "austritt", None, None, b)
             .await
             .unwrap();
         assert_eq!(aus.vorher_abruf, None);

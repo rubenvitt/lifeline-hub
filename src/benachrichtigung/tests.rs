@@ -241,6 +241,7 @@ fn jede_tabellenspalte_der_benachrichtigung_ist_retain() {
         "ausloeser_id",
         "erstellt_at",
         "quittiert_at",
+        "einheit_id",
     ] {
         assert!(
             matches!(
@@ -286,6 +287,7 @@ fn pfade_folgen_den_deeplinks() {
         B::AbloeserEntfallen,
         B::AbloeserAlarmierungGestrichen,
         B::AbloeserEintreffenGestrichen,
+        B::AbloeserWiederhergestellt,
     ] {
         assert_eq!(
             p(typ, 3),
@@ -678,6 +680,11 @@ async fn hinweis_zur_abloesenden_einheit_nennt_titel_aus_dem_bezug_und_beide_ein
             BenachrichtigungBezugTyp::AbloeserEintreffenGestrichen,
             "Eintreffen der ablösenden Einheit gestrichen",
         ),
+        // Gestrichene Entlassung holt die Planung zurück (LLH-1510).
+        (
+            BenachrichtigungBezugTyp::AbloeserWiederhergestellt,
+            "Planung der ablösenden Einheit wiederhergestellt",
+        ),
     ] {
         let t = text::bilden(&pool, e, art, Bezug::neu(typ, schicht))
             .await
@@ -863,4 +870,102 @@ async fn detail_eines_fahrzeugs_folgt_dem_stamm() {
         .await
         .unwrap();
     assert_eq!(detail().await.as_deref(), Some("Florian 1"));
+}
+
+/// LLH-1511: Ein Hinweis zur ablösenden Einheit nennt die Einheit, die beim Erzeugen gemeint war
+/// (`benachrichtigung.einheit_id`), nicht den Spiegel der Schicht: nach dem Umplanen weiter die
+/// alte, nach entfallener Planung die entfallene, beim zweiten Ablöser der Liste diesen. Ohne
+/// festgehaltene Einheit (Zeilen von vor 0275) bleibt die bisherige Zeile; eine verschwundene
+/// Einheit nennt das Detail nicht, statt den Spiegel.
+#[tokio::test]
+async fn hinweis_zur_abloesenden_einheit_nennt_die_festgehaltene_einheit() {
+    let pool = crate::db::test_pool().await;
+    let (b, e) = setup(&pool).await;
+    let mut ids = Vec::new();
+    for name in [
+        "Rettungsstaffel",
+        "2. Rettungsstaffel",
+        "3. Rettungsstaffel",
+    ] {
+        ids.push(
+            sqlx::query_scalar::<_, i64>(
+                "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+            )
+            .bind(e)
+            .bind(name)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        );
+    }
+    let (rs, rs2, rs3) = (ids[0], ids[1], ids[2]);
+    // Geplant ist inzwischen rs3 (umgeplant oder als erster der Liste im Spiegel).
+    let schicht: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_abloesung (einsatz_id, einheit_id, beginn_at, rhythmus_minuten, \
+             rhythmus_quelle, faellig_at, abloesende_einheit_id, angelegt_von_id) \
+         VALUES (?, ?, '2026-09-22 09:30:00', 240, 'einheit', '2026-09-22 13:30:00', ?, ?) \
+         RETURNING id",
+    )
+    .bind(e)
+    .bind(rs)
+    .bind(rs3)
+    .bind(b)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let detail = |typ, einheit: Option<i64>| {
+        let pool = pool.clone();
+        async move {
+            text::bilden_mit_einheit(
+                &pool,
+                e,
+                BenachrichtigungArt::AbloesungAbloeser,
+                Bezug::neu(typ, schicht),
+                einheit,
+            )
+            .await
+            .unwrap()
+            .detail
+        }
+    };
+    use BenachrichtigungBezugTyp as B;
+    assert_eq!(
+        detail(B::AbloeserAlarmiert, Some(rs2)).await.as_deref(),
+        Some("Ablösung für Rettungsstaffel: 2. Rettungsstaffel"),
+        "die gemeinte Einheit, nicht der Spiegel"
+    );
+    assert_eq!(
+        detail(B::AbloeserAlarmiert, None).await.as_deref(),
+        Some("Ablösung für Rettungsstaffel: 3. Rettungsstaffel"),
+        "alte Zeile ohne Einheit: wie bisher der Spiegel"
+    );
+
+    sqlx::query("UPDATE einsatz_abloesung SET abloesende_einheit_id = NULL WHERE id = ?")
+        .bind(schicht)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        detail(B::AbloeserEntfallen, Some(rs3)).await.as_deref(),
+        Some("Ablösung für Rettungsstaffel: 3. Rettungsstaffel"),
+        "„entfallen“ nennt die entfallene Einheit"
+    );
+    assert_eq!(
+        detail(B::AbloeserEntfallen, None).await.as_deref(),
+        Some("Ablösung für Rettungsstaffel")
+    );
+
+    // Verschwunden (gelöscht) oder aus einem anderen Einsatz: kein Name, auch nicht der Spiegel.
+    sqlx::query("UPDATE einsatz_abloesung SET abloesende_einheit_id = ? WHERE id = ?")
+        .bind(rs3)
+        .bind(schicht)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        detail(B::AbloeserEntfallen, Some(rs2 + 1000))
+            .await
+            .as_deref(),
+        Some("Ablösung für Rettungsstaffel")
+    );
 }

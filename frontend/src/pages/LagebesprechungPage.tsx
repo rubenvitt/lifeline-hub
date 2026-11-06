@@ -18,6 +18,7 @@ import LagebesprechungModal from '../lagebesprechung/LagebesprechungModal';
 import TerminPaneel from '../lagebesprechung/TerminPaneel';
 import VorbereitungPaneel from '../lagebesprechung/VorbereitungPaneel';
 import { zeigeAbschlussToast } from '../lagebesprechung/abschlussToast';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 
 /**
  * Modul „Lagebesprechung“ (LLH-1111): Termin, Vorbereitung, Abschluss und Verlauf an einem Ort,
@@ -38,7 +39,8 @@ export default function LagebesprechungPage() {
   const einsatzId = Number(id);
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
   const [isAbschlussOffen, setIsAbschlussOffen] = useState(false);
 
   const einsatzQuery = useQuery({
@@ -74,15 +76,18 @@ export default function LagebesprechungPage() {
   // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` ordnet
   // den Leser über den Dateinamen dem Modul zu. Warten, bis Einsatz und Stand geladen sind;
   // Parameter immer räumen (apply-then-clean), die Maske nur mit Schreibrecht und Stand öffnen.
+  // Einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1530): Bis der Router die Räumung committet,
+  // steht `?neu=1` noch in `searchParams`, und ein neuer Stand öffnete die geschlossene Maske sonst
+  // ein zweites Mal.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading || standQuery.isLoading) return;
     if (darfSchreiben && hasStand) setIsAbschlussOffen(true);
-    searchParams.delete('neu');
-    setSearchParams(searchParams, { replace: true });
+    neuAuftrag.raeume('neu');
   }, [
     searchParams,
-    setSearchParams,
+    neuAuftrag,
     einsatzQuery.isLoading,
     standQuery.isLoading,
     darfSchreiben,

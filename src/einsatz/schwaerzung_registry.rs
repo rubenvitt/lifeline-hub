@@ -1266,6 +1266,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("planung_entfallen_at", G_ZEIT),
             retain("planung_entfallen_einheit_name", G_OP_LABEL),
             retain("planung_entfallen_grund", G_ENUM),
+            // LLH-1510 (0273): die Entlassung des Vermerks als Verweis auf die Zeitachse, damit
+            // ihre Streichung die Planung zurückholen kann.
+            retain("planung_entfallen_entlassung_id", G_FK),
             // LLH-1308 (0260): Verbleib der abgelösten Einheit beim Vollzug.
             retain("verbleib", G_ENUM),
             retain("verbleib_br_id", G_FK),
@@ -2545,6 +2548,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("teilung_aus_id", G_FK),
             retain("zurueckgezogen_at", G_ZEIT),
             scrub("zurueckgezogen_grund", Strategie::NullSetzen, Z_EINSATZ),
+            // Idempotenzschlüssel der Anlage (LLH-1526): zufällige UUID ohne Inhalt.
+            retain("client_id", G_IDEMPOTENZ),
         ],
     },
     // ---------- Chat / Erinnerungen (Freitexte gescrubbt) ----------
@@ -2921,6 +2926,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("ausloeser_id", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("quittiert_at", G_ZEIT),
+            // Die gemeinte Einheit eines Hinweises zur ablösenden Einheit (LLH-1511, 0275): nur
+            // die ID, ohne FK; der Name kommt beim Lesen aus `einsatz_einheit.name`.
+            retain("einheit_id", G_FK),
         ],
     },
     // Vorgabe je Funktion (LLH-1421, design.md D2): Einsatz-Konfiguration, keine Person; fällt mit

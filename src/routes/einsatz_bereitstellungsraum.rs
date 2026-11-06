@@ -496,6 +496,9 @@ pub struct BelegungBody {
     pub objekt_id: i64,
     pub art: String,
     pub notiz: Option<String>,
+    /// Nur bei `wechsel`: der Raum, aus dem verlegt wird. Steht die Kraft inzwischen woanders,
+    /// ist der Wechsel 409 (LLH-1521).
+    pub von_br_id: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung
@@ -520,6 +523,7 @@ pub async fn belegung(
         body.objekt_id,
         &body.art,
         notiz.as_deref(),
+        body.von_br_id,
         ctx.benutzer.id,
     )
     .await?;

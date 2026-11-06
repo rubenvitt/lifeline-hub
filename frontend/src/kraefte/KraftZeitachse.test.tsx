@@ -240,10 +240,139 @@ describe('KraftZeitachse (LFH-552)', () => {
     await waitFor(() => expect(eintraege()).toHaveLength(3));
     expect(screen.getByText(ZEITACHSE_RECHTE_TEXT)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Periode nachtragen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Alarmierung .* streichen$/ })).toBeDisabled();
     expect(
       screen.getByRole('button', { name: /^Alarmierung .* Zeit berichtigen$/ }),
     ).toBeDisabled();
+  });
+
+  describe('Periode nachtragen (LLH-1538)', () => {
+    function rendereBerlin() {
+      server.use(http.get(PFAD, () => HttpResponse.json(ZEITACHSE)));
+      return renderMitProviders(
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <KraftZeitachse einsatzId={1} art="person" id={7} kennung="Anna" darfSchreiben />
+        </AnzeigeKonventionenProvider>,
+      );
+    }
+
+    it('leer geöffnet, schickt Alarmierung, Eintreffen und Entlassung als UTC samt Notiz', async () => {
+      let rumpf: Record<string, unknown> | null = null;
+      server.use(
+        http.post(`${PFAD}/periode`, async ({ request }) => {
+          rumpf = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(ZEITACHSE, { status: 201 });
+        }),
+      );
+      rendereBerlin();
+      await waitFor(() => expect(eintraege()).toHaveLength(3));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Periode nachtragen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Periode nachtragen: Anna' });
+      for (const name of ['Alarmierung', 'Eintreffen', 'Entlassung']) {
+        expect(within(dialog).getByRole('textbox', { name })).toHaveValue('');
+      }
+      await user.type(within(dialog).getByLabelText('Notiz (optional)'), ' Funkprotokoll ');
+      // Enter im letzten Zeitfeld sendet den Dialog.
+      await tippeZeit(
+        user,
+        within(dialog).getByRole('textbox', { name: 'Alarmierung' }),
+        '290610sep26',
+      );
+      await tippeZeit(
+        user,
+        within(dialog).getByRole('textbox', { name: 'Eintreffen' }),
+        '290640sep26',
+      );
+      await tippeZeit(
+        user,
+        within(dialog).getByRole('textbox', { name: 'Entlassung' }),
+        '291400sep26',
+      );
+      await waitFor(() =>
+        expect(rumpf).toEqual({
+          alarmierung_at: '2026-09-29 04:10:00',
+          eintreffen_at: '2026-09-29 04:40:00',
+          entlassung_at: '2026-09-29 12:00:00',
+          notiz: 'Funkprotokoll',
+        }),
+      );
+    });
+
+    it('verlangt Alarmierung oder Eintreffen und die Entlassung; nur das Eintreffen genügt', async () => {
+      let rumpf: Record<string, unknown> | null = null;
+      server.use(
+        http.post(`${PFAD}/periode`, async ({ request }) => {
+          rumpf = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(ZEITACHSE, { status: 201 });
+        }),
+      );
+      rendereBerlin();
+      await waitFor(() => expect(eintraege()).toHaveLength(3));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Periode nachtragen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Periode nachtragen: Anna' });
+      await user.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      expect(
+        await within(dialog).findByText('Bitte Alarmierung oder Eintreffen angeben'),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByText('Bitte einen Zeitpunkt angeben')).toBeInTheDocument();
+      expect(rumpf).toBeNull();
+
+      await tippeZeit(
+        user,
+        within(dialog).getByRole('textbox', { name: 'Eintreffen' }),
+        '290640sep26',
+      );
+      await tippeZeit(
+        user,
+        within(dialog).getByRole('textbox', { name: 'Entlassung' }),
+        '291400sep26',
+      );
+      await waitFor(() =>
+        expect(rumpf).toEqual({
+          eintreffen_at: '2026-09-29 04:40:00',
+          entlassung_at: '2026-09-29 12:00:00',
+        }),
+      );
+    });
+
+    it('eine 422 steht im Dialog, nicht im Toast, und die Felder bleiben', async () => {
+      server.use(
+        http.post(`${PFAD}/periode`, () =>
+          HttpResponse.json(
+            {
+              error:
+                'Die Periode ab 2026-09-29 04:40:00 überschneidet eine bestehende Einsatzperiode',
+            },
+            { status: 422 },
+          ),
+        ),
+      );
+      rendereBerlin();
+      await waitFor(() => expect(eintraege()).toHaveLength(3));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Periode nachtragen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Periode nachtragen: Anna' });
+      await tippeZeit(
+        user,
+        within(dialog).getByRole('textbox', { name: 'Eintreffen' }),
+        '290640sep26',
+      );
+      await tippeZeit(
+        user,
+        within(dialog).getByRole('textbox', { name: 'Entlassung' }),
+        '291400sep26',
+      );
+      expect(
+        await within(dialog).findByText(/überschneidet eine bestehende Einsatzperiode/),
+      ).toBeInTheDocument();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+      expect(within(dialog).getByRole('textbox', { name: 'Eintreffen' })).toHaveValue(
+        '290640sep26',
+      );
+    });
   });
 
   describe('Zeit berichtigen (LLH-1455)', () => {

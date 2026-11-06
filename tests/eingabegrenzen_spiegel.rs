@@ -95,6 +95,8 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("SCHADEN_BESCHREIBUNG_MAX", schaden::BESCHREIBUNG_MAX),
         ("GEFAHR_BESCHREIBUNG_MAX", gefahr::BESCHREIBUNG_MAX),
         ("GEFAHR_GEMELDET_VON_MAX", gefahr::GEMELDET_VON_MAX),
+        ("GEFAHR_GEBIET_LABEL_MAX", gefahr::GEBIET_LABEL_MAX),
+        ("ZONE_LABEL_MAX", lage_zone::LABEL_MAX),
         ("GEOMETRIE_STUETZPUNKTE_MAX", lage_zone::STUETZPUNKTE_MAX),
         ("KREIS_RADIUS_M_MAX", lage_zone::KREIS_RADIUS_M_MAX),
         ("SPRECHGRUPPE_BEDINGUNG_MAX", sprechgruppe::BEDINGUNG_MAX),
@@ -201,6 +203,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("ABLOESUNG_ABLOESER_MAX", abloesung::ABLOESER_MAX),
         ("ABLOESUNG_BESATZUNG_MAX", abloesung::BESATZUNG_MAX),
         ("ZEITACHSE_GRUND_MAX", zeitachse::GRUND_MAX),
+        ("ZEITACHSE_NOTIZ_MAX", zeitachse::NOTIZ_MAX),
         (
             "LAGEMONITOR_BEZEICHNUNG_MAX",
             lagemonitor_zugang::BEZEICHNUNG_MAX,

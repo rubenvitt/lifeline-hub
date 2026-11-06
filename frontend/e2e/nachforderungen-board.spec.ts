@@ -6,6 +6,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Browser: drei offene Nachforderungen in drei Stufen stehen ab `md` in ihrer Spalte; „Zusage
  * erfassen“ trägt die Karte nach „Zugesagt“, ohne dass die übrigen springen, und „Rückgängig“
  * zurück. Am Handy (390 px) eine Segmentleiste der Stufen mit Zahl, ohne waagrechten Überlauf.
+ * „Eingetroffen“ lässt sich auch nach dem Rückgängig-Hinweis im ⋮-Menü der Karte zurücknehmen
+ * (LLH-1539).
  * Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
 
@@ -140,4 +142,29 @@ test('Teilzusage teilt in zwei Karten; Zurückziehen über das Menü (LLH-1097)'
     .click();
   await expect(spalte(page, 'zurueckgezogen')).toContainText('Zurückgezogen');
   await expect(spalte(page, 'zurueckgezogen')).toContainText('nicht mehr benötigt');
+});
+
+test('Eintreffen nach dem Neuladen über das Kartenmenü zurücknehmen (LLH-1539)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  const { einsatzId, pumpen } = await seed(page);
+  await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
+  const unterwegs = () => spalte(page, 'unterwegs').locator(`[data-nachforderung-id="${pumpen}"]`);
+  const eingetroffen = () =>
+    spalte(page, 'eingetroffen').locator(`[data-nachforderung-id="${pumpen}"]`);
+  await unterwegs().getByRole('button', { name: 'Eintreffen melden' }).click();
+  await expect(eingetroffen()).toBeVisible();
+
+  // Der Rückgängig-Hinweis ist nach dem Neuladen weg; der Weg an der Karte bleibt.
+  await page.reload();
+  await expect(eingetroffen()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rückgängig' })).toHaveCount(0);
+  await eingetroffen()
+    .getByRole('button', { name: /^Aktionen zu Nachforderung / })
+    .click();
+  await page.getByRole('menuitem', { name: 'Eintreffen zurücknehmen' }).click();
+  await expect(unterwegs()).toBeVisible();
+  await expect(unterwegs().getByRole('button', { name: 'Eintreffen melden' })).toBeVisible();
+  await expect(spalte(page, 'eingetroffen')).toContainText('keine');
 });

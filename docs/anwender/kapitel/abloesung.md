@@ -213,7 +213,10 @@ einen Hinweis mit dezentem Ton, wenn diese Einheit
   Hinweis gilt dann nicht mehr.
 
 Die Zeile darunter nennt beide Einheiten, etwa „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“;
-„Öffnen“ führt zur Schicht. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
+„Öffnen“ führt zur Schicht. Sie nennt die Einheit, um die es beim Hinweis ging, auch nach einem
+Umplanen oder einer entfallenen Planung. Ist diese Einheit inzwischen gelöscht, nennt die Zeile nur
+die abzulösende Einheit. Hinweise aus älteren Versionen nennen die gerade geplante Einheit, und
+ist keine mehr geplant, nur die abzulösende. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
 Alarmiert und eingetroffen zählen nur am Anfang ihres Einsatzabschnitts in der
 Kräfte-Zeitachse, auch als Nachtrag; ein Nachtrag in einen abgeschlossenen Abschnitt und seine
 Streichung melden nichts. Bei einem
@@ -225,6 +228,14 @@ und die Leser bekommen den Hinweis „Planung der ablösenden Einheit entfallen�
 Hinweis „Keine ablösende Einheit geplant“ wieder an. Bleibt kein Ablöser geplant, nennt die Karte
 den Grund, etwa „Planung entfallen · 2. Rettungsstaffel aufgelöst“, bis wieder eine Einheit
 geplant ist.
+
+Wird die Entlassung, mit der die Planung entfiel, in der Kräfte-Zeitachse gestrichen, ist die
+Einheit wieder geplant: sie reiht sich hinter einem noch geplanten Ablöser ein, der Vermerk an der
+Karte verschwindet, das Einsatztagebuch hält „Planung der ablösenden Einheit wiederhergestellt“
+fest, und die Leser bekommen den gleichnamigen Hinweis. Das gilt nur, solange niemand die Planung
+der Schicht inzwischen von Hand geändert hat, die Schicht noch läuft und die Einheit nicht schon
+an einer anderen Schicht geplant ist. Wird nur die Zeit der Entlassung berichtigt, bleibt die
+Planung entfallen, und es kommt kein weiterer Hinweis.
 
 ### Sprung zur Schicht
 

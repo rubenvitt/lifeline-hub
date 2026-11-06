@@ -4723,3 +4723,134 @@ async fn umbenennen_im_stamm_zeigt_der_raum_live() {
     let d = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
     assert_eq!(d["fahrzeuge"][0]["funkrufname"], "Florian 1/83-1", "{d}");
 }
+
+// ============================== LLH-1521 ==============================
+// Verlegen gegen den erwarteten Quellraum: zwei Bedienplätze verlegen dieselbe Kraft fast
+// gleichzeitig aus A, einer nach B, der andere nach C. Der zweite Wechsel nennt `von_br_id = A`,
+// die Kraft steht aber schon in B: 409, kein Ereignis, kein ETB, der Raum bleibt B.
+
+#[tokio::test]
+async fn wechsel_aus_verlassenem_quellraum_409_ohne_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let b = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Schule").await;
+    let c = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Halle").await;
+    let zug: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+    )
+    .bind(eid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    belegen(&app, &cookie, eid, a, "einheit", zug, "eintritt").await;
+
+    let verlegen = |ziel: i64| {
+        let app = app.clone();
+        let cookie = cookie.clone();
+        async move {
+            anfrage_json(
+                &app,
+                "POST",
+                &format!("{}/belegung", br_pfad(eid, ziel)),
+                &cookie,
+                Some(&json!({
+                    "objekt_typ": "einheit", "objekt_id": zug, "art": "wechsel", "von_br_id": a,
+                })),
+            )
+            .await
+        }
+    };
+    let (s, v) = verlegen(b).await;
+    assert_eq!(s, StatusCode::CREATED, "erster Wechsel A→B: {v}");
+    let etb_vorher = etb_inhalte(&app, &cookie, eid).await;
+    let zeilen_vorher: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM br_belegung")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    let (s, v) = verlegen(c).await;
+    assert_eq!(s, StatusCode::CONFLICT, "zweiter Wechsel A→C: {v}");
+    assert!(
+        v.to_string()
+            .contains("Kraft steht inzwischen in einem anderen Raum"),
+        "{v}"
+    );
+    let raum: Option<i64> =
+        sqlx::query_scalar("SELECT aktueller_br_id FROM einsatz_einheit WHERE id = ?")
+            .bind(zug)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(raum, Some(b), "die Kraft bleibt in BR Schule");
+    let zeilen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM br_belegung")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(zeilen, zeilen_vorher, "kein Ereignis");
+    assert_eq!(
+        etb_inhalte(&app, &cookie, eid).await,
+        etb_vorher,
+        "kein ETB"
+    );
+
+    // Mit dem richtigen Quellraum geht es weiter, ohne `von_br_id` wie bisher.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/belegung", br_pfad(eid, c)),
+        &cookie,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": zug, "art": "wechsel", "von_br_id": b})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "B→C mit passendem Quellraum: {v}");
+    belegen(&app, &cookie, eid, a, "einheit", zug, "wechsel").await;
+
+    // Hat jemand die Kraft inzwischen ausgetragen, nennt die Ablehnung genau das (409).
+    belegen(&app, &cookie, eid, a, "einheit", zug, "austritt").await;
+    let (s, v) = verlegen(b).await;
+    assert_eq!(s, StatusCode::CONFLICT, "Wechsel nach Austritt: {v}");
+    assert!(
+        v.to_string()
+            .contains("Kraft steht inzwischen in keinem Raum mehr"),
+        "{v}"
+    );
+}
+
+/// `von_br_id` gehört nur zum Wechsel: bei Eintritt oder Austritt ist es 400 und bucht nichts.
+#[tokio::test]
+async fn von_br_id_ausserhalb_des_wechsels_400() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Sportplatz").await;
+    let zug: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+    )
+    .bind(eid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    for art in ["eintritt", "abruf", "austritt"] {
+        if art == "austritt" {
+            belegen(&app, &cookie, eid, a, "einheit", zug, "eintritt").await;
+        }
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{}/belegung", br_pfad(eid, a)),
+            &cookie,
+            Some(&json!({"objekt_typ": "einheit", "objekt_id": zug, "art": art, "von_br_id": a})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{art}: {v}");
+    }
+    let raum: Option<i64> =
+        sqlx::query_scalar("SELECT aktueller_br_id FROM einsatz_einheit WHERE id = ?")
+            .bind(zug)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(raum, Some(a));
+}

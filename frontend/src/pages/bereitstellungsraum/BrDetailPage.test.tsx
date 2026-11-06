@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { delay, http, HttpResponse } from 'msw';
@@ -243,6 +243,10 @@ function renderBrBei(route: string) {
 
 describe('BrDetailPage — Deeplink-Robustheit (LFH-25)', () => {
   it('leitet bei ungültiger BR-ID auf die Liste um', async () => {
+    // Der Einsatz lädt vor der Umleitung an (Hooks vor dem Rücksprung). Ohne Handler scheiterte
+    // die Anfrage am Mock, und ein am Mock gescheiterter Abruf ist ein Rennen mit dem nächsten
+    // Test derselben Datei (LLH-1518, wie LLH-1536).
+    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())));
     renderBrBei('/einsaetze/1/bereitstellungsraeume/abc');
     expect(await screen.findByText('BR-LISTE')).toBeInTheDocument();
   });
@@ -2241,6 +2245,10 @@ describe('BrDetailPage — Eintreffen ohne Netz (LLH-1075 Teil III)', () => {
     );
   });
   afterEach(() => {
+    // Erst aushängen, dann online melden: mit der Seite noch im DOM lud das „online“ Einsatz und
+    // Raum nach, nachdem `setup.ts` die Handler zurückgesetzt hatte. Die Anfragen scheiterten
+    // dann am Mock im Takt des nächsten Tests (LLH-1518).
+    cleanup();
     setzeOnline(true);
   });
 
@@ -2752,7 +2760,7 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     await waitFor(() => expect(gebucht).toHaveLength(1));
     expect(gebucht[0]).toEqual({
       br: '2',
-      daten: { objekt_typ: 'einheit', objekt_id: 10, art: 'wechsel' },
+      daten: { objekt_typ: 'einheit', objekt_id: 10, art: 'wechsel', von_br_id: 1 },
     });
     expect(await screen.findByText('Einheit „HLF 20“ nach BR Nord verlegt')).toBeInTheDocument();
   });
@@ -2764,7 +2772,12 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     await waehle('Ziel-Raum', 'BR Nord');
     await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
     await waitFor(() => expect(gebucht).toHaveLength(1));
-    expect(gebucht[0].daten).toEqual({ objekt_typ: 'fahrzeug', objekt_id: 20, art: 'wechsel' });
+    expect(gebucht[0].daten).toEqual({
+      objekt_typ: 'fahrzeug',
+      objekt_id: 20,
+      art: 'wechsel',
+      von_br_id: 1,
+    });
     expect(
       await screen.findByText('Fahrzeug „Florian 1“ nach BR Nord verlegt'),
     ).toBeInTheDocument();
@@ -2813,6 +2826,25 @@ describe('BrDetailPage — Verlegen in einen anderen Raum (LLH-1315)', () => {
     await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
     expect(await within(dialog()).findByText('Nicht verlegt')).toBeInTheDocument();
     expect(within(dialog()).getByText('Bereitstellungsraum ist nicht aktiv')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('hat jemand anderes die Kraft schon verlegt, nennt der Dialog die Ablehnung (LLH-1521)', async () => {
+    seite(brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }), {
+      wechsel: () =>
+        HttpResponse.json(
+          { error: 'Kraft steht inzwischen in einem anderen Raum' },
+          { status: 409 },
+        ),
+    });
+    await screen.findByText('HLF 20');
+    await verlegenWaehlen('HLF 20');
+    await waehle('Ziel-Raum', 'BR Nord');
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Verlegen/ }));
+    expect(await within(dialog()).findByText('Nicht verlegt')).toBeInTheDocument();
+    expect(
+      within(dialog()).getByText('Kraft steht inzwischen in einem anderen Raum'),
+    ).toBeInTheDocument();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 

@@ -1413,6 +1413,116 @@ async fn vollzug_mit_liste_und_abschnittsuebergabe() {
     assert_eq!(v["abgeloest"]["abschnitt_uebergeben"], false);
 }
 
+/// LLH-1512: „Abschnitt übergeben“ verlangt die Freigabe des Moduls Einheiten nur, wenn die
+/// Übergabe wirkt (Abschnitt da und mindestens ein Ablöser). Ohne Abschnitt oder ohne Ablöser
+/// gelingt der Vollzug auch ohne Freigabe, mit demselben Ergebnis wie ohne das Flag.
+#[tokio::test]
+async fn vollzug_uebergabe_ohne_wirkung_braucht_keine_freigabe_einheiten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt(&app, &admin, e, "Deichwache Nord").await;
+    let ohne = einheit(&app, &admin, e, "Florian 4", None).await;
+    let mit = einheit(&app, &admin, e, "Florian 1", Some(nord)).await;
+    let f2 = einheit(&app, &admin, e, "Florian 2", None).await;
+    let f3 = einheit(&app, &admin, e, "Florian 3", None).await;
+    let mut schichten = Vec::new();
+    for einheit_id in [ohne, mit] {
+        let (s, j) = anfrage(
+            &app,
+            "POST",
+            &pfad(e),
+            &admin,
+            Some(&format!(
+                r#"{{"einheit_id":{einheit_id},"rhythmus_minuten":360}}"#
+            )),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{j:?}");
+        schichten.push(format!("{}/{}/vollzug", pfad(e), j["id"].as_i64().unwrap()));
+    }
+
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    // Einheit ohne Abschnitt, mit Ablöser: nichts zu übergeben → 200 wie ohne das Flag.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &schichten[0],
+        &frieda,
+        Some(&format!(
+            r#"{{"abloeser_ids":[{f2}],"abschnitt_uebergeben":true}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["abgeloest"]["status"], "abgeloest");
+    assert_eq!(v["abgeloest"]["abschnitt_uebergeben"], false);
+    assert_eq!(
+        v["abgeloest"]["uebergebener_abschnitt_name"],
+        serde_json::Value::Null
+    );
+    assert_eq!(v["folgeschicht"]["einheit_id"], f2);
+    assert_eq!(
+        abschnitt_von(&app, &admin, e, f2).await,
+        serde_json::Value::Null
+    );
+
+    // Einheit mit Abschnitt und Ablöser: die Übergabe wirkt → 403, nichts geschrieben.
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &schichten[1],
+        &frieda,
+        Some(&format!(
+            r#"{{"abloeser_ids":[{f3}],"abschnitt_uebergeben":true}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{j:?}");
+    assert_eq!(abschnitt_von(&app, &admin, e, mit).await, nord);
+    assert_eq!(
+        abschnitt_von(&app, &admin, e, f3).await,
+        serde_json::Value::Null
+    );
+    let (s, liste) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|x| x["einheit_id"] == mit && x["status"] == "laufend"),
+        "Schicht läuft noch: {liste:?}"
+    );
+
+    // Einheit mit Abschnitt, ohne Ablöser: nichts zu übergeben → 200, der Abschnitt bleibt.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &schichten[1],
+        &frieda,
+        Some(r#"{"abschnitt_uebergeben":true}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["abgeloest"]["status"], "abgeloest");
+    assert_eq!(v["abgeloest"]["abschnitt_uebergeben"], false);
+    assert_eq!(v["folgeschichten"], serde_json::json!([]));
+    assert_eq!(abschnitt_von(&app, &admin, e, mit).await, nord);
+}
+
 /// Eine ad hoc disponierte Person, optional einer Einheit zugeordnet.
 async fn person(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: Option<i64>) -> i64 {
     let (s, p) = anfrage(

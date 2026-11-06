@@ -110,6 +110,77 @@ async fn betriebsstoff_ist_eine_nachforderung_mit_freier_art() {
         .contains("Kraftstoff Diesel"));
 }
 
+/// LLH-1526: Bricht die Leitung nach dem Speichern ab, schickt der Client dieselbe Anlage mit
+/// derselben `client_id` noch einmal. Der zweite POST liefert die gespeicherte Nachforderung,
+/// statt eine zweite anzulegen; der ETB trägt die Anforderung nur einmal.
+#[tokio::test]
+async fn gleicher_post_mit_gleicher_client_id_ergibt_eine_nachforderung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let url = format!("/api/einsaetze/{e}/nachforderungen");
+    let mit_schluessel = serde_json::json!({
+        "art": "Feldbetten", "anzahl": 50, "adressat_kategorie": "leitstelle",
+        "client_id": "  5f0c2b7e-unterkunft-feldbetten  "
+    })
+    .to_string();
+    let (s1, n1) = anfrage(&app, "POST", &url, &admin, Some(&mit_schluessel)).await;
+    assert_eq!(s1, StatusCode::CREATED, "{n1:?}");
+    let (s2, n2) = anfrage(&app, "POST", &url, &admin, Some(&mit_schluessel)).await;
+    assert_eq!(s2, StatusCode::CREATED, "{n2:?}");
+    assert_eq!(n1["id"], n2["id"]);
+    assert_eq!(n1["etb_nachforderung_id"], n2["etb_nachforderung_id"]);
+
+    let (_, liste) = anfrage(&app, "GET", &url, &admin, None).await;
+    assert_eq!(liste.as_array().unwrap().len(), 1, "{liste:?}");
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let anforderungen = etb
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|x| {
+            x["inhalt"]
+                .as_str()
+                .is_some_and(|i| i.contains("Feldbetten"))
+        })
+        .count();
+    assert_eq!(anforderungen, 1, "{etb:?}");
+
+    // Ohne Schlüssel bleibt jede Anlage eine neue.
+    let ohne =
+        serde_json::json!({ "art": "Decken", "adressat_kategorie": "leitstelle" }).to_string();
+    let (_, a) = anfrage(&app, "POST", &url, &admin, Some(&ohne)).await;
+    let (_, b) = anfrage(&app, "POST", &url, &admin, Some(&ohne)).await;
+    assert_ne!(a["id"], b["id"]);
+}
+
+#[tokio::test]
+async fn zu_lange_client_id_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let b = serde_json::json!({
+        "art": "RTW", "adressat_kategorie": "leitstelle", "client_id": "x".repeat(65)
+    })
+    .to_string();
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &admin,
+        Some(&b),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
 #[tokio::test]
 async fn anlegen_ungueltige_adressat_kategorie_ist_400() {
     let app = setup().await;

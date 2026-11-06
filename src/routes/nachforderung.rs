@@ -104,6 +104,10 @@ pub struct NeueNachforderung {
     /// Bedarfszeit „benötigt bis“ (UTC); leer = sofort.
     #[serde(default)]
     pub benoetigt_bis: Option<String>,
+    /// Idempotenzschlüssel (LLH-1526): leer = fehlend, > 64 Zeichen = 400. Ein erneuter Versuch
+    /// mit demselben Schlüssel liefert die schon gespeicherte Nachforderung.
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 /// LLH-1089 (design.md D8): ein Ziel aus Raum oder Abschnitt wird wie die Betreuungsstelle
@@ -170,6 +174,17 @@ pub async fn anlegen(
     JsonBody(req): JsonBody<NeueNachforderung>,
 ) -> Result<(StatusCode, Json<NachforderungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Wiederholung einer schon gespeicherten Anlage (LLH-1526) vor den Feldprüfungen, wie in
+    // `routes/meldung.rs`: sie kommt unverändert zurück und publiziert nichts.
+    let client_id = support::parse_client_id(req.client_id.as_deref())?;
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(id) = repo::id_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            return Ok((
+                StatusCode::CREATED,
+                Json(repo::load(&state.pool, id).await?),
+            ));
+        }
+    }
     let art = pflicht_max(&req.art, "Art", crate::nachforderung::ART_MAX)?;
     let bezeichnung = optional_max(
         req.bezeichnung.clone(),
@@ -234,7 +249,7 @@ pub async fn anlegen(
     }
     pruefe_ziel(&state, &ctx, req.ziel_br_id, req.ziel_abschnitt_id).await?;
 
-    let n = repo::create(
+    let angelegt = repo::anlegen(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -252,15 +267,21 @@ pub async fn anlegen(
             ziel_abschnitt_id: req.ziel_abschnitt_id,
             ziel_text: ziel_text.as_deref(),
             benoetigt_bis: benoetigt_bis.as_deref(),
+            client_id: client_id.as_deref(),
         },
     )
     .await?;
+    let n = angelegt.nachforderung;
 
-    // Erzeugte ETB-Meldung in den Live-Feed (wie Auftrag/Meldung) + nachforderung-Event.
-    if let Some(etb_id) = n.etb_nachforderung_id {
-        state.live.publiziere(einsatz_id, etb_id);
+    // Erzeugte ETB-Meldung in den Live-Feed (wie Auftrag/Meldung) + nachforderung-Event. Eine
+    // Wiederholung, die erst in der Transaktion auffällt (zwei gleichzeitige Versuche), schrieb
+    // nichts.
+    if angelegt.neu {
+        if let Some(etb_id) = n.etb_nachforderung_id {
+            state.live.publiziere(einsatz_id, etb_id);
+        }
+        sse(&state, einsatz_id);
     }
-    sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(n)))
 }
 

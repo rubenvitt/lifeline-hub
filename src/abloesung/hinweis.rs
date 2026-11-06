@@ -64,8 +64,8 @@ pub(crate) async fn load_geplante_tx(
 }
 
 /// Je laufender Schicht, die `einheit_id` als ablösende plant, ein Anlass `abloesung_abloeser`
-/// mit dem Ereignis `typ` (ein `abloeser_*`-Bezug), ausgelöst von `von`. Leer, wenn die Einheit
-/// nirgends geplant ist.
+/// mit dem Ereignis `typ` (ein `abloeser_*`-Bezug), ausgelöst von `von`, mit der Einheit
+/// festgehalten (LLH-1511). Leer, wenn die Einheit nirgends geplant ist.
 pub(crate) async fn anlaesse_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -77,11 +77,13 @@ pub(crate) async fn anlaesse_tx(
     Ok(load_geplante_tx(conn, einsatz_id, einheit_id)
         .await?
         .into_iter()
-        .map(|schicht| anlass(einsatz_id, schicht, typ, von))
+        .map(|schicht| anlass(einsatz_id, schicht, typ, von).einheit(einheit_id))
         .collect())
 }
 
-/// Der Anlass eines Hinweises zur ablösenden Einheit einer Schicht.
+/// Der Anlass eines Hinweises zur ablösenden Einheit einer Schicht. Die gemeinte Einheit hält
+/// [`Anlass::einheit`] fest (LLH-1511); ohne sie liest die Detailzeile den Spiegel der Schicht,
+/// also die gerade geplante, nicht die gemeinte Einheit.
 pub(crate) fn anlass(
     einsatz_id: i64,
     schicht: i64,
@@ -95,4 +97,32 @@ pub(crate) fn anlass(
     )
     .von(von)
     .an(Adressat::ModulLeser("abloesung"))
+}
+
+/// Hebt die Hinweise „wiederhergestellt“ und „entfallen“ derselben Schicht gegeneinander auf.
+/// Für die Berichtigung einer Entlassung (LLH-1455: Streichung, dann Nachtrag in einer
+/// Transaktion): die Streichung holt die Planung zurück (LLH-1510), der Nachtrag lässt sie gleich
+/// wieder entfallen. Die Führung hat „entfallen“ schon bekommen; zwei Hinweise, die sich
+/// aufheben, sagten ihr nichts Neues. Die ETB-Einträge bleiben als Spur.
+pub(crate) fn cancel_wiederhergestellt_entfallen(anlaesse: &mut Vec<Anlass>) {
+    use std::collections::HashSet;
+    let schichten = |typ: BenachrichtigungBezugTyp| {
+        anlaesse
+            .iter()
+            .filter(|a| a.bezug.typ == typ)
+            .map(|a| a.bezug.id)
+            .collect::<HashSet<_>>()
+    };
+    let wieder = schichten(BenachrichtigungBezugTyp::AbloeserWiederhergestellt);
+    let beide: HashSet<i64> = schichten(BenachrichtigungBezugTyp::AbloeserEntfallen)
+        .intersection(&wieder)
+        .copied()
+        .collect();
+    anlaesse.retain(|a| {
+        !(matches!(
+            a.bezug.typ,
+            BenachrichtigungBezugTyp::AbloeserWiederhergestellt
+                | BenachrichtigungBezugTyp::AbloeserEntfallen
+        ) && beide.contains(&a.bezug.id))
+    });
 }

@@ -590,3 +590,138 @@ async fn planen_einer_schon_geplanten_einheit_warnt_in_der_antwort() {
     assert_eq!(warnung["art"], "im_einsatz");
     assert!(warnung["seit_at"].is_string(), "{v}");
 }
+
+// ───────────────────────── Gemeinte Einheit (LLH-1511) ─────────────────────────
+
+impl Welt {
+    /// Die Detailzeile des einzigen Hinweises `bezug_typ`, wie der Admin ihn liest.
+    async fn detail_fuer_admin(&self, bezug_typ: &str) -> Value {
+        let (s, v) = anfrage(
+            &self.app,
+            "GET",
+            &format!("/api/benachrichtigungen?einsatz_id={}", self.einsatz),
+            &self.admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        let treffer: Vec<&Value> = v
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["bezug_typ"] == bezug_typ)
+            .collect();
+        assert_eq!(treffer.len(), 1, "{bezug_typ}: {v}");
+        treffer[0]["detail"].clone()
+    }
+}
+
+/// Hinweis zu A, danach Umplanen auf B: der alte Hinweis nennt weiter A.
+#[tokio::test]
+async fn hinweis_nennt_nach_dem_umplanen_weiter_die_alte_einheit() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let rs2 = w.einheit("2. Rettungsstaffel").await;
+    let rs3 = w.einheit("3. Rettungsstaffel").await;
+    let id = w.schicht(rs, 480).await;
+    w.aendern(id, json!({ "abloesende_einheit_id": rs2 })).await;
+    let alarmiert = w.status_mit_marke("Alarmiert", "alarmierung").await;
+    let anna = w.cookie("annika").await;
+    w.handstatus(&anna, rs2, alarmiert).await;
+
+    w.aendern(id, json!({ "abloesende_einheit_id": rs3 })).await;
+
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_alarmiert").await,
+        "Ablösung für Rettungsstaffel: 2. Rettungsstaffel"
+    );
+}
+
+/// Der Hinweis zum zweiten Ablöser der Liste nennt diesen, nicht den ersten (den Spiegel).
+#[tokio::test]
+async fn hinweis_zum_zweiten_abloeser_der_liste_nennt_diesen() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let rs2 = w.einheit("2. Rettungsstaffel").await;
+    let rs3 = w.einheit("3. Rettungsstaffel").await;
+    let id = w.schicht(rs, 480).await;
+    w.aendern(id, json!({ "abloeser_ids": [rs2, rs3] })).await;
+    let alarmiert = w.status_mit_marke("Alarmiert", "alarmierung").await;
+    let anna = w.cookie("annika").await;
+    w.handstatus(&anna, rs3, alarmiert).await;
+
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_alarmiert").await,
+        "Ablösung für Rettungsstaffel: 3. Rettungsstaffel"
+    );
+}
+
+/// „Planung entfallen“ nennt die entfallene Einheit, auch wenn ein weiterer Ablöser der Liste
+/// nachrückt und der Spiegel ihn trägt.
+#[tokio::test]
+async fn hinweis_planung_entfallen_nennt_die_entfallene_einheit() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let rs2 = w.einheit("2. Rettungsstaffel").await;
+    let rs3 = w.einheit("3. Rettungsstaffel").await;
+    let id = w.schicht(rs, 480).await;
+    w.aendern(id, json!({ "abloeser_ids": [rs2, rs3] })).await;
+    // Mit Alarmierung hat rs2 eine Spur: das Auflösen entlässt sie, statt sie zu löschen.
+    let alarmiert = w.status_mit_marke("Alarmiert", "alarmierung").await;
+    w.handstatus(&w.admin, rs2, alarmiert).await;
+    let anna = w.cookie("annika").await;
+
+    let (s, v) = anfrage(
+        &w.app,
+        "DELETE",
+        &w.pfad(&format!("einheiten/{rs2}")),
+        &anna,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_entfallen").await,
+        "Ablösung für Rettungsstaffel: 2. Rettungsstaffel"
+    );
+}
+
+/// Eine Einheit, die ein Hinweis nennt, hat eine Spur und wird nie gelöscht: Auflösen lässt
+/// ihre Zeile stehen, SQLite vergibt ihre ID (kein AUTOINCREMENT) also nicht neu, und der
+/// festgehaltene Hinweis kann keine fremde Einheit nennen.
+#[tokio::test]
+async fn hinweis_einheit_bleibt_beim_aufloesen_stehen_und_ihre_id_frei() {
+    let w = welt().await;
+    let rs = w.einheit("Rettungsstaffel").await;
+    let rs2 = w.einheit("2. Rettungsstaffel").await;
+    let id = w.schicht(rs, 480).await;
+    w.aendern(id, json!({ "abloesende_einheit_id": rs2 })).await;
+    let anna = w.cookie("annika").await;
+    let (s, v) = anfrage(
+        &w.app,
+        "DELETE",
+        &w.pfad(&format!("einheiten/{rs2}")),
+        &anna,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    let steht: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE id = ?")
+        .bind(rs2)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        steht, 1,
+        "die Planung ist eine Spur: aufgelöst, nicht gelöscht"
+    );
+
+    let neu = w.einheit("Florian 7").await;
+    assert_ne!(neu, rs2, "die ID der aufgelösten Einheit bleibt belegt");
+
+    assert_eq!(
+        w.detail_fuer_admin("abloeser_entfallen").await,
+        "Ablösung für Rettungsstaffel: 2. Rettungsstaffel"
+    );
+}

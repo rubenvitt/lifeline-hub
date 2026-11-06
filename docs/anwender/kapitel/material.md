@@ -138,6 +138,8 @@ Ein Verbrauchsgut wird nur mit Menge 1 und ohne Ausgabe ein Gerät; sonst steht 
 gesperrt mit dem Grund, etwa „Als Gerät führen · Menge über 1“. Ein Gerät mit „verbraucht“ oder
 „Desinfektion nötig“ wird kein Verbrauchsgut: „Als Verbrauchsgut führen · Status verbraucht“.
 Ein Posten aus dem Materialstamm hat keine Art-Einträge, seine Art steht im Materialstamm.
+Ausnahme ist ein Posten mit der Marke „doppelt“, der als Verbrauchsgut steht: „Als Gerät führen“
+macht ihn wieder zu dem einen Stück, mit Menge 1.
 
 ### Status und Bemerkung ändern
 
@@ -221,7 +223,9 @@ Ad-hoc-Posten bekommt die Art aus dem Dialog und wechselt sie über das Zeilenme
 - **Gerät:** steht je Stück im Einsatz, mit Menge 1 und einem der fünf Status. Wer zwei Tragen
   braucht, disponiert sie zweimal. Ein Gerät mit Bestandsnummer ist ein bestimmtes Stück und
   steht höchstens einmal im Einsatz; erst wenn es aus dem Einsatz genommen ist, lässt es sich
-  wieder disponieren.
+  wieder disponieren. Steht ein solches Stück aus älterem Bestand doch zweimal im Einsatz oder
+  als Verbrauchsgut mit Menge über 1, tragen seine Zeilen die Marke „doppelt“. Sie verschwindet,
+  sobald eine der Zeilen aus dem Einsatz genommen ist oder der Posten als Gerät geführt wird.
 - **Verbrauchsgut:** steht mit seiner Menge im Einsatz und kennt nur einsatzbereit, im Einsatz und
   defekt. Was davon ausgegeben ist, zeigt die Mengenzelle als Rest, etwa „30 von 50 übrig“;
   ohne Ausgabe steht nur die Menge. Ist

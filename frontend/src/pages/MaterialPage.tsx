@@ -133,6 +133,9 @@ function BezeichnungZelle({
   const marken = [
     em.ist_adhoc && <Tag key="adhoc">ad-hoc</Tag>,
     em.ist_demo && <DemoMarke key="demo" />,
+    // Bestandsdoppel eines bestimmten Stücks (LLH-1528): aufgelöst über „Aus dem Einsatz nehmen“
+    // oder „Als Gerät führen“.
+    em.is_bestandsdoppel && <Tag key="doppelt">doppelt</Tag>,
   ];
   // Herkunft aus einer Nachforderung (LLH-1226 D11) als eigene Zeile darunter, auch im Kartenmodus.
   // Dort rendert der Kartentitel diese Zelle in einem fetten `<strong>` (einem Inline-Element):
@@ -431,8 +434,11 @@ function MaterialInhalt() {
   });
   // Art wechseln (D6) ohne Rückfrage, umkehrbar; eine Ablehnung (422) steht an der Zeile.
   const artMutation = useMutation({
-    mutationFn: (v: { emId: number; art: MaterialArt }) =>
-      updateDisposition(einsatzId, v.emId, { art: v.art }),
+    mutationFn: (v: { emId: number; art: MaterialArt; menge?: number }) =>
+      updateDisposition(einsatzId, v.emId, {
+        art: v.art,
+        ...(v.menge != null && { menge: v.menge }),
+      }),
     onMutate: (v) => zeilen.beginne(v.emId),
     onSuccess: () => {
       message.success('Art gespeichert');
@@ -593,7 +599,8 @@ function MaterialInhalt() {
    * „Stornieren“. Was es für die Art nicht gibt, fehlt; was es gibt, aber gerade nicht geht, steht
    * gesperrt mit dem Grund im Etikett — ein Etikett ist nur Text, ein Tooltip erscheint am
    * Touchschirm nicht. Die Art wechseln nur Ad-hoc-Posten: ein Stamm-Posten trägt die Art seines
-   * Stamms (LLH-1224, Nachtrag Review).
+   * Stamms (LLH-1224, Nachtrag Review). Ausnahme ist ein Bestandsdoppel als Verbrauchsgut
+   * (LLH-1528): „Als Gerät führen“ macht es wieder zu dem einen Stück, mit Menge 1.
    */
   const menueEintraege = (em: EinsatzMaterial): MenueEintrag[] => {
     const eintraege: MenueEintrag[] = [];
@@ -618,7 +625,18 @@ function MaterialInhalt() {
             : { key: 'aufteilen', label: 'Aufteilen · Rest 1', gesperrt: true },
       );
       // Zum Gerät nur mit Menge 1 ohne Ausgabe (LLH-1224 D2/D10, der Server prüft dasselbe).
-      if (em.ist_adhoc) {
+      if (em.is_bestandsdoppel) {
+        // Ein bestimmtes Stück ist genau eins: die Menge geht mit auf 1 (LLH-1528). Steht es noch
+        // in einer zweiten Zeile, löst erst „Aus dem Einsatz nehmen“ (der Server lehnt mit 409 ab).
+        const zweiteZeile = ems.some((o) => o.id !== em.id && o.material_id === em.material_id);
+        eintraege.push(
+          zweiteZeile
+            ? { key: 'art', label: `Als Gerät führen · ${STUECK_IM_EINSATZ}`, gesperrt: true }
+            : em.ausgegeben > 0
+              ? { key: 'art', label: 'Als Gerät führen · Ausgabe gebucht', gesperrt: true }
+              : { key: 'art', label: 'Als Gerät führen' },
+        );
+      } else if (em.ist_adhoc) {
         eintraege.push(
           em.menge > 1
             ? { key: 'art', label: 'Als Gerät führen · Menge über 1', gesperrt: true }
@@ -672,7 +690,11 @@ function MaterialInhalt() {
     } else if (key === 'zuruecknehmen') {
       openAusgabe(em, 'zuruecknehmen');
     } else if (key === 'art') {
-      artMutation.mutate({ emId: em.id, art: em.art === 'geraet' ? 'verbrauchsgut' : 'geraet' });
+      artMutation.mutate(
+        em.art === 'geraet'
+          ? { emId: em.id, art: 'verbrauchsgut' }
+          : { emId: em.id, art: 'geraet', ...(em.is_bestandsdoppel && { menge: 1 }) },
+      );
     } else if (key === 'aufteilen') {
       aufteilenMutation.reset();
       setAufteilenFuer(em);

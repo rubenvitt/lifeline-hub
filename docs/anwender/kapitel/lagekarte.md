@@ -90,7 +90,8 @@ wer im Einsatz schreiben darf.
 2. Ein Grundzeichen wählen, bei Bedarf ein Symbol; beide Listen lassen sich durchsuchen. Ein
    Symbol ohne Grundzeichen, etwa ein Piktogramm oder einen Zustand, setzt „Kein Grundzeichen“
    und danach das Symbol. Unter „Details“ stehen Organisation, Fachaufgabe, Einheit, Farbe und
-   „Bezeichnung“.
+   „Bezeichnung“. Die Fachaufgabe „Dekontaminieren“ gibt es auch „von Personal“ und „von Gerät“;
+   das Zeichen trägt dann „P“ oder „G“ zwischen den Klammern.
 
    ![Zeichenwahl mit dem Grundzeichen „Landfahrzeug“, darunter die Symbole und die Knöpfe „Platzieren“ und „Abbrechen“](../bilder/lagekarte/taktisches-zeichen.png)
 

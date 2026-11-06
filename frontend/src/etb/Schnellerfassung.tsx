@@ -21,7 +21,7 @@ import { ERFASSBARE_TYPEN } from './typFarben';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
-import { Zeichenzaehler, zaehlerText, zeichenZahl } from '../components/zeichenGrenze';
+import { Zeichenzaehler, zaehlZeichen, zaehlerText } from '../components/zeichenGrenze';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
@@ -901,7 +901,7 @@ export default function Schnellerfassung({
   const grenzSichtbar =
     laengenHinweis != null ||
     zeitBefehlGrund != null ||
-    zaehlerText(zeichenZahl(inhalt), ETB_INHALT_MAX) != null;
+    zaehlerText(zaehlZeichen(inhalt), ETB_INHALT_MAX) != null;
   const grenzTeil = (
     <>
       {zeitBefehlGrund && (

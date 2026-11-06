@@ -49,7 +49,9 @@ senden. Eine Zeile trägt genau ein Feld, mit zwei Ausnahmen: Die Zeile „Koord
 `einsatzort_lat` und `einsatzort_lon` als Paar. Die Zeile „Adresse“ des Einsatzorts sendet mit
 einer neuen Koordinate (gewählter Treffer der Ortssuche, gezogene Nadel, auf der Karte gewählter
 Punkt, getippte Koordinate) `einsatzort`, `einsatzort_lat` und `einsatzort_lon` in einer
-Anfrage; ohne neue Koordinate sendet sie nur `einsatzort`, und die Koordinate bleibt. Ist der
+Anfrage; ohne neue Koordinate sendet sie nur `einsatzort`, und die Koordinate bleibt. Hat das
+Ortsfeld den gespeicherten Punkt verloren (geleerter Text), sendet sie beide Koordinatenfelder als
+`null`. Ist der
 neue Wert gleich dem bisherigen, MUST keine Anfrage gesendet werden. Eine leer gespeicherte
 optionale Angabe MUST als `null` gesendet werden, die geleerte Koordinate als beide Felder
 `null`.
@@ -65,6 +67,10 @@ optionale Angabe MUST als `null` gesendet werden, die geleerte Koordinate als be
 #### Scenario: Optionale Angabe leeren
 - **WHEN** eine Person den Einsatzort leert und speichert
 - **THEN** sendet die Seite `{ "einsatzort": null }`, und die Zeile zeigt danach die Aufforderung zum Eintragen
+
+#### Scenario: Adresse mit Punkt leeren
+- **WHEN** eine Person an der Zeile „Adresse“ eines verorteten Einsatzorts den Text leert und speichert
+- **THEN** sendet die Seite `{ "einsatzort": null, "einsatzort_lat": null, "einsatzort_lon": null }`, weil ein geleerter Text im Ortsfeld auch den Punkt leert (Spec `ortsfeld`)
 
 #### Scenario: Koordinate setzen
 - **WHEN** eine Person an der Zeile „Koordinate“ 52.52, 13.405 einträgt und speichert
