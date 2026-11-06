@@ -422,8 +422,11 @@ Schicht beginnt mit dem Vollzug der Ablösung, eine eigene ließe den Vollzug sc
 Die Ansicht braucht Einheiten und Kräfte-Zeitachse und damit das Modul Einheiten. Fehlt es der
 Person, steht „Ohne Schicht“ gesperrt mit „Modul Einheiten gesperrt“, ein Sprung dorthin zeigt
 „Laufend“, und der Überblick nennt keine Zahl ohne Schicht. Der Grund steht auch sichtbar unter der
-Ansichtsleiste. „Schicht beginnen“ ist dann gesperrt: ohne die Einheiten gibt es keine zur Wahl. Die gewählte Ansicht steht in der
-Adresse der Seite; ein Lesezeichen und der Weg zurück im Browser treffen sie wieder.
+Ansichtsleiste. „Schicht beginnen“ ist dann gesperrt: ohne die Einheiten gibt es keine zur Wahl.
+Beim Vollziehen und unter „Ablösung planen“ bietet „Ablösende Einheiten“ dann nur die schon
+geplanten, darunter steht „Modul Einheiten gesperrt“; eine Planung lässt sich so noch aufheben. Die
+gewählte Ansicht steht in der Adresse der Seite; ein Lesezeichen und der Weg zurück im Browser
+treffen sie wieder.
 
 Kommt eine Einheit ohne Schicht hinzu, während die Ansicht offen ist, zählt die Zahl sie sofort mit;
 die gezeigten Zeilen bleiben, wo sie sind, und ein Hinweis über der Liste nennt die neue, bis

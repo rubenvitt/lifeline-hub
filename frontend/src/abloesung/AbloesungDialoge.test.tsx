@@ -5,7 +5,12 @@ import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenConte
 import type { Abloesung } from '../api/types';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
-import { optionenVon, oeffne as oeffneListe, waehle } from '../test/auswahlListe';
+import {
+  gewaehlteOptionen,
+  optionenVon,
+  oeffne as oeffneListe,
+  waehle,
+} from '../test/auswahlListe';
 import { tippeZeit } from '../test/zeitEingabe';
 import {
   AbloeserDialog,
@@ -633,6 +638,30 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     };
   }
 
+  it('Freigaben erst nach dem Öffnen: bei gewähltem Besatzungswechsel bleibt der Grund an der Art (LLH-1542)', async () => {
+    const { onErfassen, neu } = vollzug({ schicht: geplant });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    neu({
+      schicht: geplant,
+      einheitenGesperrt: 'Modul Einheiten gesperrt',
+      besatzungGesperrt: 'Modul Einheiten gesperrt',
+    });
+    // Die Art bleibt: still auf „Ganze Einheit“ umgestellt, beendete der Vollzug die Einheit.
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
+        'Modul Einheiten gesperrt',
+      ),
+    );
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
+    // Hinaus geht der Besatzungswechsel (der Server lehnt ihn ab), nie ein Vollzug der Einheit.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalled());
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({ art: 'besatzung' });
+    expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('abloeser_ids');
+  });
+
   it('verteilt im Klappteil auf Gruppe und Fahrzeug; der Kopf nennt die Abweichung', async () => {
     const { onErfassen } = vollzug();
     const dialog = await screen.findByRole('dialog');
@@ -840,6 +869,37 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     expect(onErfassen).not.toHaveBeenCalled();
   });
 
+  it('Planen, Sperre erst nach dem Öffnen: zurück auf „Ganze Einheit“, die Planung bleibt (LLH-1542)', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onSchliessen = vi.fn();
+    const ui = (besatzungGesperrt?: string) => (
+      <AbloeserDialog
+        schicht={geplant}
+        einheiten={[]}
+        bisherigeBesatzung={['Anna Alt']}
+        personen={personen}
+        verteilung={verteilung}
+        besatzungGesperrt={besatzungGesperrt}
+        einheitenGesperrt={besatzungGesperrt}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={onSchliessen}
+      />
+    );
+    const r = renderMitProviders(ui());
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
+    r.rerender(ui('Modul Einheiten gesperrt'));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked(),
+    );
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
   it('Planen gesperrt: nur die Ablöser gehen hinaus, die Planung bleibt unberührt', async () => {
     const onErfassen = planung({ besatzungGesperrt: 'Modul Personal gesperrt' });
     const dialog = await screen.findByRole('dialog');
@@ -933,5 +993,118 @@ describe('Ablösung — Vollzug mit Verbleib (LLH-1308)', () => {
       expect(onErfassen).toHaveBeenCalledWith(expect.objectContaining({ verbleib: 'entlassen' })),
     );
     expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('verbleib_br_id');
+  });
+});
+
+/**
+ * LLH-1542: Ohne Freigabe des Moduls Einheiten fehlt die Einheitenliste. Die Ablöser bieten dann
+ * nur die geplanten (mit Namen), und der Grund steht unter der Auswahl, statt sie leer und ohne
+ * Grund zu zeigen. Sperrt dasselbe Modul den Besatzungswechsel, steht der Grund nur einmal.
+ */
+describe('Ablösung — Ablöser ohne Freigabe des Moduls Einheiten (LLH-1542)', () => {
+  const GRUND = 'Modul Einheiten gesperrt';
+  const schicht = {
+    id: 3,
+    einheit_name: 'Florian 1',
+    abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }],
+    besatzung_plan: [],
+  } as unknown as Abloesung;
+  const geplante = [{ value: 12, label: 'Florian 2' }];
+
+  it('Vollzug: die Planung mit Namen, der Grund an der Auswahl und einmal für die Art', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <VollzugDialog
+        schicht={schicht}
+        einheiten={geplante}
+        abschnittName={null}
+        einheitenGesperrt={GRUND}
+        besatzungGesperrt={GRUND}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }),
+    ).toHaveAccessibleDescription(GRUND);
+    expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(GRUND);
+    expect(within(dialog).getAllByText(GRUND)).toHaveLength(1);
+    // Mit Namen, nicht als nackte ID: ohne die Option stünde „12“ im Feld.
+    expect(await gewaehlteOptionen('Ablösende Einheiten')).toEqual(['Florian 2']);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(expect.objectContaining({ abloeser_ids: [12] })),
+    );
+  });
+
+  it('Planen ohne geplante Ablöser: leere Auswahl mit Grund', async () => {
+    renderMitProviders(
+      <AbloeserDialog
+        schicht={{ ...schicht, abloeser: [] }}
+        einheiten={[]}
+        einheitenGesperrt={GRUND}
+        besatzungGesperrt={GRUND}
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }),
+    ).toHaveAccessibleDescription(GRUND);
+    expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(GRUND);
+    expect(within(dialog).getAllByText(GRUND)).toHaveLength(1);
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeDisabled();
+  });
+
+  it('Planen: die geplanten bleiben aufhebbar', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <AbloeserDialog
+        schicht={schicht}
+        einheiten={geplante}
+        einheitenGesperrt={GRUND}
+        besatzungGesperrt={GRUND}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    const auswahl = within(dialog)
+      .getByRole('combobox', { name: 'Ablösende Einheiten' })
+      .closest<HTMLElement>('.ant-select')!;
+    await userEvent.hover(auswahl);
+    await userEvent.click(auswahl.querySelector<HTMLElement>('.ant-select-clear')!);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ abloeser_ids: [] }));
+  });
+
+  it('ein anderes Modul für die Art: beide Gründe an ihrem Feld', async () => {
+    renderMitProviders(
+      <AbloeserDialog
+        schicht={schicht}
+        einheiten={geplante}
+        einheitenGesperrt={GRUND}
+        besatzungGesperrt="Modul Personal gesperrt"
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
+      'Modul Personal gesperrt',
+    );
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }),
+    ).toHaveAccessibleDescription(GRUND);
   });
 });

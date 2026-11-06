@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Abloesung } from '../api/types';
-import { abloeserIds, abloeserOptionen, abloeserText } from './abloeser';
+import { abloeserIds, abloeserOptionen, abloeserText, geplanteAbloeserOptionen } from './abloeser';
 
 const schicht = (over: Partial<Abloesung> & { id: number; einheit_id: number }): Abloesung => ({
   einsatz_id: 1,
@@ -88,5 +88,39 @@ describe('abloeser (LLH-1132)', () => {
       { value: 2, label: 'Florian 2 · Schicht läuft' },
       { value: 4, label: 'Florian 4' },
     ]);
+  });
+});
+
+describe('geplanteAbloeserOptionen (LLH-1542)', () => {
+  it('die Liste mit Namen aus der Schicht, in ihrer Reihenfolge', () => {
+    expect(
+      geplanteAbloeserOptionen(
+        schicht({
+          id: 1,
+          einheit_id: 1,
+          abloeser: [
+            { einheit_id: 3, einheit_name: 'Florian 3' },
+            { einheit_id: 2, einheit_name: 'Florian 2' },
+          ],
+        }),
+      ),
+    ).toEqual([
+      { value: 3, label: 'Florian 3' },
+      { value: 2, label: 'Florian 2' },
+    ]);
+  });
+
+  it('ohne Liste der Spiegel, ohne Planung nichts', () => {
+    expect(
+      geplanteAbloeserOptionen(
+        schicht({
+          id: 1,
+          einheit_id: 1,
+          abloesende_einheit_id: 4,
+          abloesende_einheit_name: 'Florian 4',
+        }),
+      ),
+    ).toEqual([{ value: 4, label: 'Florian 4' }]);
+    expect(geplanteAbloeserOptionen(schicht({ id: 1, einheit_id: 1 }))).toEqual([]);
   });
 });
