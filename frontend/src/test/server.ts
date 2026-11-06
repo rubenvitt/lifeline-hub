@@ -48,6 +48,11 @@ export const server = setupServer(
     HttpResponse.json({ art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [] }),
   ),
   /**
+   * Programmpunkte der Veranstaltung (LLH-1570) — keine als Default. Überblick und Einsatzdaten
+   * lesen sie mit; Tests mit Ablauf überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:id/programmpunkte', () => HttpResponse.json([])),
+  /**
    * Versionsstand der Instanz — „nichts Neues" als Default (Lesestand gleich laufende Version,
    * also keine Hinweiskarte und kein Punkt). Tests der Neuigkeiten überschreiben per `server.use()`.
    */

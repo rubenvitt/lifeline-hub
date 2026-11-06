@@ -28,6 +28,7 @@ import type {
   LetzteRueckmeldung,
   PegelAnzeige,
   Person,
+  Programmpunkt,
   Rueckmeldungen,
   Warnstufe,
   WetterWarnstufe,
@@ -481,13 +482,20 @@ export function entscheidungenAuswahl(
 
 export type MarkenTon = 'neutral' | 'achtung' | 'alarm';
 export type MarkenArt =
-  'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose' | 'abloesung' | 'unwetter';
+  | 'auftrag'
+  | 'erinnerung'
+  | 'lagebesprechung'
+  | 'pegelprognose'
+  | 'abloesung'
+  | 'unwetter'
+  | 'programmpunkt';
 
 export interface Marke {
   key: string;
   art: MarkenArt;
   /**
-   * id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei Lagebesprechung, Ablösung (eine
+   * id des Auftrags, der Erinnerung, des Pegels bzw. des Programmpunkts; `null` bei
+   * Lagebesprechung, Ablösung (eine
    * Ablösungsmarke fasst mehrere Schichten zusammen) und Unwetter (Warnungen tragen keine id).
    */
   id: number | null;
@@ -508,7 +516,8 @@ interface MarkenAuswahl {
  * Ton und Wort einer Frist: überfällig `alarm`, unter {@link KNAPP_MINUTEN} `achtung`, sonst
  * `neutral`. Ausnahme ist die überfällige Lagebesprechung: sie liest Ton und Wort aus
  * `lagebesprechungUeberfaellig`, damit die Seite Lagebesprechung und diese Liste denselben Termin
- * gleich zeigen (LFH-859, `lagebesprechung/AGENTS.md`).
+ * gleich zeigen (LFH-859, `lagebesprechung/AGENTS.md`). Ein Programmpunkt ist keine Frist und
+ * bleibt immer `neutral` (LLH-1570, Spec `ablaufplan`: Marke ohne Alarm).
  */
 export function markenBewertung(
   zeit: Dayjs,
@@ -522,8 +531,14 @@ export function markenBewertung(
   const abstand = zeit.valueOf() - jetzt.valueOf();
   if (abstand <= 0) return { ton: 'alarm', wort: 'überfällig' };
   const minuten = Math.floor(abstand / 60_000);
-  const wort = minuten === 0 ? 'in < 1 min' : `in ${dauerText(minuten)}`;
+  const wort = abstandText(minuten);
+  if (art === 'programmpunkt') return { ton: 'neutral', wort };
   return { ton: minuten < KNAPP_MINUTEN ? 'achtung' : 'neutral', wort };
+}
+
+/** „in 23 min“, unter einer Minute „in < 1 min“. */
+function abstandText(minuten: number): string {
+  return minuten <= 0 ? 'in < 1 min' : `in ${dauerText(minuten)}`;
 }
 
 /** „HANN. MÜNDEN (WESER)" — Station mit Gewässer, ohne Gewässer nur die Station. Rein. */
@@ -533,12 +548,13 @@ function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): string {
 }
 
 /**
- * Anstehende Fristen aus sechs Quellen: offene Aufträge, offene Erinnerungen, nächste
+ * Anstehende Fristen aus sieben Quellen: offene Aufträge, offene Erinnerungen, nächste
  * Lagebesprechung, erwarteter Höchststand an einem maßgeblichen Pegel, fällige Ablösungen,
- * Beginn angekündigter Unwetterwarnungen. Aufsteigend nach Zeit, Überfälliges also oben.
+ * Beginn angekündigter Unwetterwarnungen und Programmpunkte der Veranstaltung (LLH-1570).
+ * Aufsteigend nach Zeit, Überfälliges also oben.
  *
- * Pegel-Prognose und Unwetterbeginn sind keine Fristen, sondern Erwartungen: verstrichen sind
- * sie vorbei, nicht „überfällig", und fallen vor dem Sortieren heraus. Ein begonnenes Unwetter
+ * Pegel-Prognose, Unwetterbeginn und Programmpunkt sind keine Fristen, sondern Erwartungen:
+ * verstrichen sind sie vorbei, nicht „überfällig", und fallen vor dem Sortieren heraus. Ein begonnenes Unwetter
  * trägt der Modulzähler weiter (LFH-663). Ablösungen kommen als eigene Quelle (je
  * Abschnitt und Minute zusammengefasst); ihre Auto-Fristen in den Erinnerungen werden deshalb
  * übersprungen, sonst stünde dieselbe Ablösung doppelt.
@@ -555,6 +571,7 @@ export function naechsteMarken(
     ereignis: string;
     beginn?: string | null;
   }[] = [],
+  programm: readonly Programmpunkt[] = [],
 ): MarkenAuswahl {
   const roh: { key: string; art: MarkenArt; id: number | null; zeit: string; text: string }[] = [];
   for (const a of auftraege) {
@@ -619,6 +636,17 @@ export function naechsteMarken(
     // Zwei Ausgaben derselben Warnung zum selben Beginn sind eine Marke.
     if (roh.some((m) => m.key === key)) continue;
     roh.push({ key, art: 'unwetter', id: null, zeit: w.beginn!, text: unwetterMarkenText(w) });
+  }
+  for (const p of programm) {
+    const zeit = zeitpunkt(p.zeitpunkt_at);
+    if (!zeit || !zeit.isAfter(jetzt)) continue;
+    roh.push({
+      key: `pp-${p.id}`,
+      art: 'programmpunkt',
+      id: p.id,
+      zeit: p.zeitpunkt_at,
+      text: p.bezeichnung,
+    });
   }
   const sortiert = roh.sort(
     (a, b) => (ms(a.zeit) ?? 0) - (ms(b.zeit) ?? 0) || a.key.localeCompare(b.key),

@@ -481,6 +481,29 @@ describe('Nächste Marken', () => {
     expect(r.marken.some((m) => m.ton === 'alarm')).toBe(false);
   });
 
+  it('führt Programmpunkte neutral bis zu ihrem Zeitpunkt, nie überfällig (LLH-1570)', () => {
+    const r = naechsteMarken(
+      [auftrag({ id: 101, auftrag_text: 'Frist', frist_at: nach(45) })],
+      [],
+      null,
+      JETZT,
+      [],
+      [],
+      [],
+      [
+        { id: 1, bezeichnung: 'Feuerwerk', zeitpunkt_at: nach(10) },
+        { id: 2, bezeichnung: 'Ende', zeitpunkt_at: nach(90) },
+        // Verstrichen: fällt heraus, statt „überfällig“ zu stehen.
+        { id: 3, bezeichnung: 'Einlass', zeitpunkt_at: nach(-5) },
+      ],
+    );
+    expect(r.marken.map((m) => [m.art, m.id, m.text, m.ton, m.wort])).toEqual([
+      ['programmpunkt', 1, 'Feuerwerk', 'neutral', 'in 10 min'],
+      ['auftrag', 101, 'Frist', 'neutral', 'in 45 min'],
+      ['programmpunkt', 2, 'Ende', 'neutral', 'in 1 h 30 min'],
+    ]);
+  });
+
   it('deckelt auf sechs und zählt den Rest', () => {
     const viele = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => auftrag({ frist_at: nach(i * 10) }));
     const r = naechsteMarken(viele, [], null, JETZT);

@@ -381,6 +381,8 @@ export type FuehrungsstellenArt = S['FuehrungsstellenArt'];
 /** Der Einsatzleiter an der eigenen Führungsstelle (LFH-1199). */
 export type Einsatzleiter = S['EinsatzleiterAnzeige'];
 export type EinsatzleiterArt = S['EinsatzleiterArt'];
+/** Programmpunkt der Veranstaltung (LLH-1570): Bezeichnung und Zeitpunkt. */
+export type Programmpunkt = S['Programmpunkt'];
 
 /**
  * Ein neuer Einsatzleiter im PATCH der Führungsstelle: eine disponierte Person oder ein externer

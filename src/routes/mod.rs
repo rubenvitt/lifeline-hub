@@ -74,6 +74,7 @@ pub mod person_verletzung;
 pub mod personal;
 pub mod personal_status;
 pub mod presse;
+pub mod programmpunkt;
 pub mod qualifikation;
 pub mod schaden_anhang;
 pub mod schichtmodell;
