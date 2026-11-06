@@ -11456,8 +11456,7 @@
           "bestaetigung_pflicht",
           "eskaliert",
           "ist_bestaetigt",
-          "ist_ueberfaellig",
-          "patienten"
+          "ist_ueberfaellig"
         ],
         "properties": {
           "abschnitt_id": {
@@ -11652,11 +11651,14 @@
             "$ref": "#/components/schemas/Meldungsart"
           },
           "patienten": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "$ref": "#/components/schemas/MeldungPatient"
             },
-            "description": "Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser\nMeldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB."
+            "description": "Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser\nMeldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB. Fehlt ohne Patienten\n(auch in älteren Lageständen)."
           },
           "prioritaet": {
             "$ref": "#/components/schemas/Prioritaet"

@@ -100,7 +100,13 @@ async fn einheit_beim_anlegen_mit_name_und_abschnitt_aus_der_einheit() {
     .await;
     assert!(s.is_success(), "Abschnitt setzen: {s} {v}");
 
-    let (s, p) = person_post(&app, &admin, e, json!({ "versorgende_einheit_id": streife })).await;
+    let (s, p) = person_post(
+        &app,
+        &admin,
+        e,
+        json!({ "versorgende_einheit_id": streife }),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED, "{p}");
     assert_eq!(p["versorgende_einheit_id"], streife);
     assert_eq!(p["versorgende_einheit_name"], "Streife 2");
@@ -168,9 +174,19 @@ async fn einheit_aendern_leeren_und_feld_cas() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["versorgende_einheit_id"], rtw);
 
-    let (s, v) = person_patch(&app, &admin, e, pid, json!({ "versorgende_einheit_id": null })).await;
+    let (s, v) = person_patch(
+        &app,
+        &admin,
+        e,
+        pid,
+        json!({ "versorgende_einheit_id": null }),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    assert!(!v.as_object().unwrap().contains_key("versorgende_einheit_id"));
+    assert!(!v
+        .as_object()
+        .unwrap()
+        .contains_key("versorgende_einheit_id"));
 
     // Altwert ohne Änderung desselben Felds: 422.
     let (s, _) = person_patch(
@@ -193,12 +209,24 @@ async fn fremde_und_aufgeloeste_einheit_sind_422() {
     let fremd = einheit_bilden(&app, &admin, anderer, "Fremde Streife").await;
     let (s, _) = person_post(&app, &admin, e, json!({ "versorgende_einheit_id": fremd })).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    let (s, _) = person_post(&app, &admin, e, json!({ "versorgende_einheit_id": 999_999 })).await;
+    let (s, _) = person_post(
+        &app,
+        &admin,
+        e,
+        json!({ "versorgende_einheit_id": 999_999 }),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
     // Aufgelöst mit Spur (versorgter Patient): die Einheit bleibt stehen, neue Bezüge sind 422.
     let streife = einheit_bilden(&app, &admin, e, "Streife 3").await;
-    let (s, p) = person_post(&app, &admin, e, json!({ "versorgende_einheit_id": streife })).await;
+    let (s, p) = person_post(
+        &app,
+        &admin,
+        e,
+        json!({ "versorgende_einheit_id": streife }),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED, "{p}");
     let (s, v) = anfrage(
         &app,
@@ -209,7 +237,13 @@ async fn fremde_und_aufgeloeste_einheit_sind_422() {
     )
     .await;
     assert!(s.is_success(), "auflösen: {s} {v}");
-    let (s, _) = person_post(&app, &admin, e, json!({ "versorgende_einheit_id": streife })).await;
+    let (s, _) = person_post(
+        &app,
+        &admin,
+        e,
+        json!({ "versorgende_einheit_id": streife }),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
     let (s, _) = person_patch(
         &app,
@@ -240,7 +274,13 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let streife = einheit_bilden(&app, &admin, e, "Streife 4").await;
-    person_post(&app, &admin, e, json!({ "versorgende_einheit_id": streife })).await;
+    person_post(
+        &app,
+        &admin,
+        e,
+        json!({ "versorgende_einheit_id": streife }),
+    )
+    .await;
     let (s, v) = anfrage(
         &app,
         "POST",
@@ -334,7 +374,10 @@ async fn patient_aus_meldung_in_beide_richtungen_sichtbar() {
     let e = einsatz_anlegen(&app, &admin).await;
     let m = meldung_anlegen(&app, &admin, e, json!({})).await;
     let mid = m["id"].as_i64().unwrap();
-    assert_eq!(m["patienten"], json!([]), "noch ohne Patienten: {m}");
+    assert!(
+        !m.as_object().unwrap().contains_key("patienten"),
+        "ohne Patienten fehlt der Schlüssel: {m}"
+    );
 
     let (s, p1) = person_post(&app, &admin, e, json!({ "meldung_id": mid })).await;
     assert_eq!(s, StatusCode::CREATED, "{p1}");

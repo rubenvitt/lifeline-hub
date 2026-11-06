@@ -4686,9 +4686,10 @@ export interface components {
             meldungsart: components["schemas"]["Meldungsart"];
             /**
              * @description Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser
-             *     Meldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB.
+             *     Meldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB. Fehlt ohne Patienten
+             *     (auch in älteren Lageständen).
              */
-            patienten: components["schemas"]["MeldungPatient"][];
+            patienten?: components["schemas"]["MeldungPatient"][] | null;
             prioritaet: components["schemas"]["Prioritaet"];
             /** @description Richtung intern/extern (LFH-87). */
             richtung: components["schemas"]["Richtung"];

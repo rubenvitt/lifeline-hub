@@ -262,3 +262,46 @@ export function sichtungsbild(alle: readonly Pick<Person, 'aktuelle_sichtung'>[]
   for (const p of alle) je[p.aktuelle_sichtung ?? 'ohne']++;
   return { gesamt: alle.length, je };
 }
+
+// ── Kontakte je Einheit ─────────────────────────────────────────────────────────────────
+
+/** Ein Posten „Versorgt von“: die Einheit, ihr Abschnitt zur Abfragezeit und die Zahl ihrer Kontakte. */
+export interface KontaktePosten {
+  einheitId: number;
+  name: string;
+  abschnitt: string | null;
+  wert: number;
+}
+
+/**
+ * Kontakte je Einheit (LLH-1567, design.md D8): je versorgender Einheit die Zahl ihrer Patienten,
+ * ohne Stornierte, mit Abgeschlossenen (ein Kontakt bleibt ein Kontakt). Personen ohne Einheit
+ * zählen nicht. Absteigend nach Zahl, dann nach Name. Seitenleiste, Lagebild und Bericht zählen
+ * mit dieser einen Funktion.
+ */
+export function kontakteJeEinheit(
+  alle: readonly Pick<
+    Person,
+    | 'storniert_at'
+    | 'versorgende_einheit_id'
+    | 'versorgende_einheit_name'
+    | 'versorgende_einheit_abschnitt_name'
+  >[],
+): KontaktePosten[] {
+  const je = new Map<number, KontaktePosten>();
+  for (const p of alle) {
+    if (p.storniert_at != null || p.versorgende_einheit_id == null) continue;
+    const bisher = je.get(p.versorgende_einheit_id);
+    if (bisher) bisher.wert++;
+    else
+      je.set(p.versorgende_einheit_id, {
+        einheitId: p.versorgende_einheit_id,
+        name: p.versorgende_einheit_name ?? 'Einheit',
+        abschnitt: p.versorgende_einheit_abschnitt_name ?? null,
+        wert: 1,
+      });
+  }
+  return [...je.values()].sort(
+    (a, b) => b.wert - a.wert || a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }),
+  );
+}

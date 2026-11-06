@@ -36,7 +36,10 @@ import type {
 import EinheitUebernahme from './einheit/EinheitUebernahme';
 import { KennungsLink } from '../components/kennungsLink';
 import { einheitDetailPfad } from '../routing/deeplinks';
-import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
+import { erfasseMeldungOfflineFaehig, erfassePersonOfflineFaehig } from '../offline/schreiben';
+import { ladeVersorgendeEinheiten, registrierAnzeige } from '../api/einsatzPerson';
+import PersonErfassungModal, { type AusMeldung } from '../personen/PersonErfassungModal';
+import type { AufnahmeEingabe } from '../personen/AufnahmeFelder';
 import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import MeldungListe from '../meldungen/MeldungListe';
@@ -137,6 +140,15 @@ export default function MeldungenPage() {
   const [lageAuswahl, setLageAuswahl] = useState<DialogAuswahl | null>(null);
   const auftragMeldung = auftragAuswahl?.einsatzId === einsatzId ? auftragAuswahl.meldung : null;
   const lageMeldung = lageAuswahl?.einsatzId === einsatzId ? lageAuswahl.meldung : null;
+  // „Patient anlegen“ (LLH-1567, design.md D5): dieselbe Maske wie in den Betroffenen, vorbelegt.
+  const [patientAuswahl, setPatientAuswahl] = useState<DialogAuswahl | null>(null);
+  const patientMeldung = patientAuswahl?.einsatzId === einsatzId ? patientAuswahl.meldung : null;
+  // Die Wahl der Maske: vorbelegt wird nur eine Einheit, die dort steht (aktiv, im Einsatz).
+  const versorgendeQuery = useQuery({
+    queryKey: einsatzKeys.personenEinheiten(einsatzId),
+    queryFn: () => ladeVersorgendeEinheiten(einsatzId),
+    enabled: patientMeldung != null,
+  });
   // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
   // Absender/Empfänger aus Einsatz und Stammdaten (LLH-1144); abgerufen nur bei offenem Formular.
@@ -440,6 +452,23 @@ export default function MeldungenPage() {
    * Korrektur an der Karte und „Aus der Lage nehmen“ (LLH-1066): Grund an der Karte wie Status und
    * Bestätigen. Die Lage liest dieselben Spalten, ihre Liste lädt mit.
    */
+  // Wie die Betroffenen: ohne Netz vorgemerkt. Der Server meldet die Meldung live neu (D6).
+  const patientMutation = useMutation({
+    networkMode: 'always',
+    mutationFn: ({ einsatzId: eid, daten }: { einsatzId: number; daten: AufnahmeEingabe }) => {
+      if (!benutzer) throw new Error('Nicht angemeldet');
+      return erfassePersonOfflineFaehig(benutzer.id, eid, { ...daten, status: 'erfasst' });
+    },
+    onSuccess: (ergebnis, { einsatzId: eid }) => {
+      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(eid) });
+      invalidiere(eid);
+      if (ergebnis.zustand === 'vorgemerkt') {
+        message.warning('Offline vorgemerkt · R-…');
+        return;
+      }
+      message.success(`${registrierAnzeige(ergebnis.daten.registrier_nr)} erfasst`);
+    },
+  });
   const korrekturMutation = useMutation({
     mutationFn: (v: { einsatzId: number; meldungId: number; aenderung: MeldungKorrekturPatch }) =>
       korrigiereMeldung(v.einsatzId, v.meldungId, v.aenderung),
@@ -502,6 +531,10 @@ export default function MeldungenPage() {
     (meldung: Meldung) => setAuftragAuswahl({ einsatzId, meldung }),
     [einsatzId],
   );
+  const onPatientAnlegen = useCallback(
+    (meldung: Meldung) => setPatientAuswahl({ einsatzId, meldung }),
+    [einsatzId],
+  );
   const onBestaetigen = useCallback(
     (meldungId: number) => bestaetigen({ einsatzId, meldungId }),
     [bestaetigen, einsatzId],
@@ -528,6 +561,21 @@ export default function MeldungenPage() {
   // „Auftrag erteilen“ schreibt in die Aufträge: ohne deren Freigabe gesperrt sichtbar (LFH-1051).
   const sprungGesperrt = useSprungSperre(einsatzId);
   const auftragGesperrt = sprungGesperrt('auftraege');
+  // „Patient anlegen“ schreibt in die Personen: ohne deren Freigabe gesperrt sichtbar.
+  const personenGesperrt = sprungGesperrt('personen');
+  const ausMeldung = useMemo<AusMeldung | null>(() => {
+    if (!patientMeldung || versorgendeQuery.isPending) return null;
+    const einheitId = patientMeldung.einheit_id;
+    const aktiv =
+      einheitId != null && (versorgendeQuery.data ?? []).some((e) => e.id === einheitId);
+    return {
+      id: patientMeldung.id,
+      lfd_nr: patientMeldung.lfd_nr,
+      einheit_id: aktiv ? einheitId : null,
+      lat: patientMeldung.lat,
+      lon: patientMeldung.lon,
+    };
+  }, [patientMeldung, versorgendeQuery.isPending, versorgendeQuery.data]);
 
   /*
    * Offene Übernahme an der Meldung (LLH-1075, design.md D14): die Meldung einer unangemeldeten
@@ -596,6 +644,7 @@ export default function MeldungenPage() {
 
   const lageSpeicherung = imEinsatz(lageMutation);
   const auftragSpeicherung = imEinsatz(auftragMutation);
+  const patientSpeicherung = imEinsatz(patientMutation);
 
   const listenProps = {
     einsatzId,
@@ -612,6 +661,8 @@ export default function MeldungenPage() {
     funktionsOptionen,
     onAusDerLage,
     auftragGesperrt,
+    onPatientAnlegen,
+    personenGesperrt,
     kartenFehler: kartenFehler.grund,
     uebernahme,
   };
@@ -888,6 +939,16 @@ export default function MeldungenPage() {
             : Promise.reject(new Error('Keine Quellmeldung'))
         }
         speicherung={auftragSpeicherung}
+      />
+      <PersonErfassungModal
+        einsatzId={einsatzId}
+        modus={ausMeldung ? 'erfassen' : null}
+        ausMeldung={ausMeldung}
+        isPending={patientSpeicherung.isPending}
+        speicherung={patientSpeicherung}
+        onCancel={() => setPatientAuswahl(null)}
+        onFertig={() => setPatientAuswahl(null)}
+        onErfassen={(daten) => patientMutation.mutateAsync({ einsatzId, daten })}
       />
     </EinsatzSeite>
   );

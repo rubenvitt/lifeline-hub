@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/personen/PersonErfassungModal.tsx]
 ---
 
 ## Überblick
@@ -123,6 +123,24 @@ der Punkt gesperrt als „Auftrag erteilen (keine Berechtigung)“ da.
 Wird der Auftrag später aufgehoben, steht an der Karte „Auftrag aufgehoben“ statt des Verweises,
 und „Auftrag erteilen“ ist wieder da. Ein neu erteilter Auftrag tritt an die Stelle des alten; der
 aufgehobene bleibt in den Aufträgen unter „Abgeschlossen“ und im Einsatztagebuch nachlesbar.
+
+### Aus einer Meldung einen Patienten anlegen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. An der Karte „Patient anlegen“ wählen, bei vielen Aktionen im Menü der Karte.
+2. Die Maske „Betroffene erfassen“ nennt oben „Zu Meldung #…“. Ist die Meldung verortet, steht
+   ihr Punkt schon im „Fundort“; kam sie von einer Einheit, steht diese unter „Weitere Angaben“
+   als „Versorgende Einheit“.
+3. Sichtung und Angaben wie im Kapitel [Betroffene und Sichtung](betroffene.md) ergänzen und
+   „Erfassen“ wählen. Mehrere Patienten derselben Meldung („zwei Personen gestürzt“) erfasst
+   „Speichern und nächste“ nacheinander; mit „Werte behalten“ bleiben Fundort und Einheit stehen.
+4. Die Karte zeigt danach je Patient seine Registriernummer, etwa „↗ R-012“; ein Klick öffnet die
+   Person. Im Kopf der Person steht umgekehrt „aus Meldung #…“.
+
+Ist das Modul Betroffene im Einsatz nicht freigegeben, steht der Punkt gesperrt als „Patient
+anlegen (keine Berechtigung)“ da, und die Karte nennt die Registriernummer ohne Verweis. Der Bezug
+auf die Meldung entsteht nur beim Anlegen und lässt sich danach nicht ändern.
 
 ### Eine Meldung korrigieren
 

@@ -694,3 +694,75 @@ describe('MeldungKarte — Empfängerfunktion korrigieren (LLH-1381)', () => {
     expect(screen.queryByRole('combobox', { name: 'Empfängerfunktion' })).toBeNull();
   });
 });
+
+// LLH-1567 (design.md D5/D6): „Patient anlegen“ öffnet die Maske mit Bezug, die Patienten der
+// Meldung stehen als Verweis R-n in der Markenzeile.
+describe('MeldungKarte — Patient aus der Meldung (LLH-1567)', () => {
+  it('bietet „Patient anlegen“ an und übergibt die Meldung', async () => {
+    const cb = { darfSchreiben: true, onPatientAnlegen: vi.fn() };
+    const m = meldung();
+    renderKarte(<MeldungKarte meldung={m} einsatzId={7} {...cb} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Patient anlegen' }));
+    expect(cb.onPatientAnlegen).toHaveBeenCalledWith(m);
+  });
+
+  it('bietet „Patient anlegen“ auch nach dem ersten Patienten an: eine Meldung, mehrere Patienten', async () => {
+    const cb = { darfSchreiben: true, onPatientAnlegen: vi.fn() };
+    renderKarte(
+      <MeldungKarte
+        meldung={meldung({ patienten: [{ id: 5, registrier_nr: 12 }] })}
+        einsatzId={7}
+        {...cb}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Patient anlegen' })).toBeInTheDocument();
+  });
+
+  it('sperrt „Patient anlegen“ mit Grund, wenn die Personen nicht freigegeben sind', () => {
+    const cb = { darfSchreiben: true, onPatientAnlegen: vi.fn() };
+    renderKarte(<MeldungKarte meldung={meldung()} einsatzId={7} {...cb} personenGesperrt />);
+    const knopf = screen.getByRole('button', { name: 'Patient anlegen (Keine Berechtigung)' });
+    expect(knopf).toBeDisabled();
+    fireEvent.click(knopf);
+    expect(cb.onPatientAnlegen).not.toHaveBeenCalled();
+  });
+
+  it('bietet „Patient anlegen“ ohne Schreibrecht nicht an', () => {
+    renderKarte(<MeldungKarte meldung={meldung()} einsatzId={7} onPatientAnlegen={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /Patient anlegen/ })).toBeNull();
+  });
+
+  it('verweist je Patient mit der Registriernummer auf die Personen-Detailseite', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={meldung({
+          patienten: [
+            { id: 5, registrier_nr: 12 },
+            { id: 6, registrier_nr: 13 },
+          ],
+        })}
+        einsatzId={7}
+      />,
+    );
+    expect(screen.getByRole('link', { name: '↗ R-012' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/personen/5',
+    );
+    expect(screen.getByRole('link', { name: '↗ R-013' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/personen/6',
+    );
+  });
+
+  it('zeigt ohne Freigabe der Personen nur die Nummer als Text', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={meldung({ patienten: [{ id: 5, registrier_nr: 12 }] })}
+        einsatzId={7}
+        personenGesperrt
+      />,
+    );
+    expect(screen.queryByRole('link', { name: /R-012/ })).toBeNull();
+    expect(screen.getByText('R-012')).toBeInTheDocument();
+  });
+});

@@ -201,9 +201,11 @@ pub struct MeldungAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lon: Option<f64>,
     /// Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser
-    /// Meldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB.
+    /// Meldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB. Fehlt ohne Patienten
+    /// (auch in älteren Lageständen).
     #[sqlx(try_from = "String")]
-    #[schema(value_type = Vec<MeldungPatient>)]
+    #[serde(skip_serializing_if = "MeldungPatienten::is_empty")]
+    #[schema(value_type = Option<Vec<MeldungPatient>>)]
     pub patienten: MeldungPatienten,
 }
 
@@ -218,6 +220,12 @@ pub struct MeldungPatient {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub struct MeldungPatienten(pub Vec<MeldungPatient>);
+
+impl MeldungPatienten {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
 
 impl TryFrom<String> for MeldungPatienten {
     type Error = serde_json::Error;

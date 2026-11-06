@@ -1,10 +1,12 @@
 import { useQuery, type QueryKey } from '@tanstack/react-query';
-import { Button, Input, Space, type InputProps, type InputRef } from 'antd';
+import { Button, Input, Popover, Space, type InputProps, type InputRef } from 'antd';
 import {
   useEffect,
+  useId,
   useImperativeHandle,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type Ref,
 } from 'react';
@@ -20,6 +22,10 @@ import { erkenneKoordinate } from './koordinatenErkennung';
 import { OrtZeile } from './OrtZeile';
 import { adressAussage, adressBegriff, OFFLINE_KARTE_ZUSATZ } from './ortssuche';
 import { useOrtVorschau } from './useOrtVorschau';
+import {
+  EIGENPOSITION_SPERRGRUND,
+  eigenpositionVerfuegbarkeit,
+} from '../pages/lagekarte/useEigenposition';
 
 /**
  * Woher die Koordinate eines Ortsfelds kommt (LLH-1108). `adresse` (gewählter Treffer) und
@@ -112,7 +118,27 @@ export interface OrtsfeldKarte {
   umgebung?: LatLon | null;
   /** Höhe der Vorschau in Pixeln. */
   hoehe?: number;
+  /**
+   * Knopf „Eigene Position“ (LLH-1567, design.md D7): ein einmaliger Standort des Geräts wirkt wie
+   * ein Punkt aus der Karte. Ohne sicheren Kontext oder Standort gesperrt mit Grund. Der Standort
+   * verlässt das Gerät nur als gespeicherter Ort.
+   */
+  eigenePosition?: boolean;
 }
+
+/** Nur für Vorlesende: der Grund der Sperre steht so auch ohne Antippen am Knopf. */
+const NUR_VORLESEN: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+};
+
+/** Gründe, wenn der einmalige Standort scheitert. */
+export const EIGENE_POSITION_VERWEIGERT = 'Standortzugriff verweigert';
+export const EIGENE_POSITION_FEHLT = 'Kein Standort ermittelbar';
 
 /** Vorgabehöhe der Vorschau unter dem Feld: klein, sie bestätigt den Ort. */
 const VORSCHAU_HOEHE = 160;
@@ -372,6 +398,51 @@ function OrtsfeldVorschau({
   const { formatKoordinate } = useAnzeigeKonventionen();
   const punkt = value.koordinate;
   const ausKarte = (p: LatLon) => onChange?.(nachKartenpunkt(value, p, formatKoordinate));
+  // Der Standort kommt später: er wirkt auf den Wert, der dann im Feld steht, nicht auf den beim Tippen.
+  const aktuell = useRef({ value, onChange });
+  aktuell.current = { value, onChange };
+  const [ortet, setOrtet] = useState(false);
+  const [ortungsFehler, setOrtungsFehler] = useState<string | null>(null);
+  const verfuegbarkeit = karte.eigenePosition ? eigenpositionVerfuegbarkeit() : null;
+  const sperrGrund =
+    verfuegbarkeit == null || verfuegbarkeit === 'bereit'
+      ? null
+      : EIGENPOSITION_SPERRGRUND[verfuegbarkeit];
+  const grundId = useId();
+  const eingehaengt = useRef(true);
+  useEffect(() => {
+    eingehaengt.current = true;
+    return () => {
+      eingehaengt.current = false;
+    };
+  }, []);
+
+  function eigenePositionHolen() {
+    setOrtungsFehler(null);
+    setOrtet(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        if (!eingehaengt.current) return;
+        setOrtet(false);
+        const { value: jetzt, onChange: melden } = aktuell.current;
+        melden?.(
+          nachKartenpunkt(
+            jetzt,
+            { lat: p.coords.latitude, lon: p.coords.longitude },
+            formatKoordinate,
+          ),
+        );
+      },
+      (e) => {
+        if (!eingehaengt.current) return;
+        setOrtet(false);
+        setOrtungsFehler(
+          e.code === e.PERMISSION_DENIED ? EIGENE_POSITION_VERWEIGERT : EIGENE_POSITION_FEHLT,
+        );
+      },
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 30_000 },
+    );
+  }
 
   return (
     <>
@@ -396,6 +467,38 @@ function OrtsfeldVorschau({
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginXS }}>
         {!punkt && <span style={{ color: rollen.text2 }}>Nicht verortet</span>}
         <Button onClick={() => setWaehlen(true)}>Auf Karte wählen</Button>
+        {karte.eigenePosition &&
+          (sperrGrund == null ? (
+            <Button
+              loading={ortet}
+              aria-describedby={ortungsFehler ? grundId : undefined}
+              onClick={eigenePositionHolen}
+            >
+              Eigene Position
+            </Button>
+          ) : (
+            // `aria-disabled` statt `disabled`: der Tipp zeigt den Grund (auf Touch erscheint
+            // kein `title`), wie der Knopf der Eigenposition an der Lagekarte.
+            <>
+              <Popover trigger={['click']} content={sperrGrund}>
+                <Button
+                  aria-disabled
+                  aria-describedby={grundId}
+                  style={{ color: rollen.gedaempft, cursor: 'not-allowed' }}
+                >
+                  Eigene Position
+                </Button>
+              </Popover>
+              <span id={grundId} style={NUR_VORLESEN}>
+                {sperrGrund}
+              </span>
+            </>
+          ))}
+        {ortungsFehler && sperrGrund == null && (
+          <span id={grundId} role="status" style={{ color: rollen.text2 }}>
+            {ortungsFehler}
+          </span>
+        )}
       </div>
       <KarteWaehlen
         offen={waehlen}

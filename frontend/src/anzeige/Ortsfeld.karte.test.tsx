@@ -8,7 +8,9 @@ import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import { formatiere, type LatLon } from './koordinaten';
+import { EIGENPOSITION_SPERRGRUND } from '../pages/lagekarte/useEigenposition';
 import {
+  EIGENE_POSITION_VERWEIGERT,
   nachKartenpunkt,
   nachTextaenderung,
   Ortsfeld,
@@ -542,5 +544,89 @@ describe('Ortsfeld — ohne Suche', () => {
     } finally {
       server.events.removeListener('request:start', merken);
     }
+  });
+});
+
+/**
+ * „Eigene Position“ (LLH-1567, design.md D7): ein einmaliger Standort wirkt wie ein Kartenpunkt;
+ * ohne sicheren Kontext oder Standort gesperrt mit Grund.
+ */
+describe('Ortsfeld — Eigene Position', () => {
+  const ursprung = {
+    sicher: Object.getOwnPropertyDescriptor(window, 'isSecureContext'),
+    geo: Object.getOwnPropertyDescriptor(navigator, 'geolocation'),
+  };
+  function stelle(sicher: boolean, geo: unknown) {
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: sicher });
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geo });
+  }
+  afterEach(() => {
+    if (ursprung.sicher) Object.defineProperty(window, 'isSecureContext', ursprung.sicher);
+    else delete (window as { isSecureContext?: boolean }).isSecureContext;
+    if (ursprung.geo) Object.defineProperty(navigator, 'geolocation', ursprung.geo);
+    else delete (navigator as { geolocation?: unknown }).geolocation;
+  });
+  const MIT_POSITION: OrtsfeldKarte = { etikett: 'Fundort', eigenePosition: true };
+
+  it('setzt den Standort als Kartenpunkt, die Koordinate steht im leeren Text', async () => {
+    const getCurrentPosition = vi.fn((ok: PositionCallback) =>
+      ok({ coords: { latitude: 53.07, longitude: 8.81, accuracy: 12 } } as GeolocationPosition),
+    );
+    stelle(true, { getCurrentPosition });
+    renderMitProviders(<Aufbau kartenProp={MIT_POSITION} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Eigene Position' }));
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(wert()).toEqual({
+      text: expect.stringMatching(/53[.,]07/),
+      koordinate: { lat: 53.07, lon: 8.81 },
+      quelle: 'karte',
+    });
+  });
+
+  it('lässt einen getippten Text stehen', async () => {
+    stelle(true, {
+      getCurrentPosition: (ok: PositionCallback) =>
+        ok({ coords: { latitude: 53.07, longitude: 8.81, accuracy: 12 } } as GeolocationPosition),
+    });
+    renderMitProviders(
+      <Aufbau start={{ text: 'Hinter der Bühne', koordinate: null }} kartenProp={MIT_POSITION} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Eigene Position' }));
+    expect(wert()).toEqual({
+      text: 'Hinter der Bühne',
+      koordinate: { lat: 53.07, lon: 8.81 },
+      quelle: 'karte',
+    });
+  });
+
+  it('nennt den Grund, wenn der Standort verweigert wird, und lässt den Wert', async () => {
+    stelle(true, {
+      getCurrentPosition: (_ok: PositionCallback, fehler: PositionErrorCallback) =>
+        fehler({ code: 1, PERMISSION_DENIED: 1 } as GeolocationPositionError),
+    });
+    renderMitProviders(<Aufbau kartenProp={MIT_POSITION} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Eigene Position' }));
+    expect(screen.getByRole('button', { name: 'Eigene Position' })).toHaveAccessibleDescription(
+      EIGENE_POSITION_VERWEIGERT,
+    );
+    expect(screen.getByText(EIGENE_POSITION_VERWEIGERT)).toBeVisible();
+    expect(wert()).toEqual({ text: '', koordinate: null });
+  });
+
+  it('steht ohne sicheren Kontext gesperrt mit Grund und fragt keinen Standort ab', async () => {
+    const getCurrentPosition = vi.fn();
+    stelle(false, { getCurrentPosition });
+    renderMitProviders(<Aufbau kartenProp={MIT_POSITION} />);
+    const knopf = screen.getByRole('button', { name: 'Eigene Position' });
+    expect(knopf).toHaveAttribute('aria-disabled', 'true');
+    expect(knopf).toHaveAccessibleDescription(EIGENPOSITION_SPERRGRUND.unsicher);
+    await userEvent.click(knopf);
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+  });
+
+  it('fehlt ohne `eigenePosition`', () => {
+    stelle(true, { getCurrentPosition: vi.fn() });
+    renderMitProviders(<Aufbau kartenProp={{ etikett: 'Einsatzort' }} />);
+    expect(screen.queryByRole('button', { name: 'Eigene Position' })).toBeNull();
   });
 });

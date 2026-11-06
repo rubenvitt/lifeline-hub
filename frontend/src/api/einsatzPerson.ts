@@ -17,6 +17,7 @@ import type {
   TransportPrioritaet,
   TransportDurch,
   TransportmittelAuswahl,
+  VersorgendeEinheitAuswahl,
   Verbleib,
   VerbleibArt,
   VerbleibStatus,
@@ -70,6 +71,13 @@ export interface PersonEingabe {
   pat_nummer?: string | null;
   /** Kontamination: `true`/`false`, `null` = keine Angabe (nicht „nein“). Nur im PATCH. */
   kontamination?: boolean | null;
+  /**
+   * Versorgende Einheit (LLH-1567, design.md D4): aktiv und im Einsatz (sonst 422); `null` leert
+   * im PATCH.
+   */
+  versorgende_einheit_id?: number | null;
+  /** Meldung, aus der die Person angelegt wird (LLH-1567, D5). Nur beim Anlegen. */
+  meldung_id?: number;
 }
 
 /**
@@ -304,6 +312,30 @@ export function erfasseSichtung(
  * der Lagemonitor bekommen 403. */
 export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
   return apiGet<Bestaetiger[]>(`/api/einsaetze/${einsatzId}/personen/bestaetiger`);
+}
+
+/**
+ * Wahl der versorgenden Einheit (LLH-1567, design.md D4): aktive Einheiten des Einsatzes mit
+ * Abschnitt, am Modul Personen. Nicht am gekoppelten Gerät.
+ */
+export function ladeVersorgendeEinheiten(einsatzId: number): Promise<VersorgendeEinheitAuswahl[]> {
+  return apiGet<VersorgendeEinheitAuswahl[]>(`/api/einsaetze/${einsatzId}/personen/einheiten`);
+}
+
+/**
+ * Die versorgende Einheit setzen oder leeren (LLH-1567, D4), mit Feld-CAS wie die Personendaten:
+ * `erwartet` ist die Einheit beim Öffnen (`null` = keine); weicht sie ab, antwortet der Server 409.
+ */
+export function savePersonEinheit(
+  einsatzId: number,
+  personId: number,
+  einheitId: number | null,
+  erwartet: number | null,
+): Promise<Person> {
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', {
+    versorgende_einheit_id: einheitId,
+    erwartet: { versorgende_einheit_id: erwartet },
+  });
 }
 
 /** Vorschläge zum Rettungsmittel der Verbleib-Maske (LLH-1332, Spec `patienten-uebergabe`). */

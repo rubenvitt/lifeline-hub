@@ -3,6 +3,7 @@ import type { Person } from '../api/types';
 import {
   hatLuecke,
   istAngetroffen,
+  kontakteJeEinheit,
   lueckenText,
   lueckenVon,
   offeneFelder,
@@ -311,5 +312,35 @@ describe('sichtungsbild', () => {
       gesamt: 7,
       je: { sk1: 1, sk2: 0, sk3: 2, sk4: 0, tot: 1, unverletzt: 1, ohne: 2 },
     });
+  });
+});
+
+describe('kontakteJeEinheit (LLH-1567, design.md D8)', () => {
+  const mit = (id: number | null, extra: Partial<Person> = {}): Person => ({
+    ...basis,
+    versorgende_einheit_id: id,
+    versorgende_einheit_name: id == null ? null : `Streife ${id}`,
+    versorgende_einheit_abschnitt_name: id === 1 ? 'Bühne' : null,
+    ...extra,
+  });
+
+  it('zählt je Einheit, ohne Stornierte, mit Abgeschlossenen, absteigend nach Zahl', () => {
+    expect(
+      kontakteJeEinheit([
+        mit(2),
+        mit(1),
+        mit(1, { versorgung: 'abgeschlossen' }),
+        mit(1, { storniert_at: '2026-05-27 10:00:00' }),
+        mit(null),
+      ]),
+    ).toEqual([
+      { einheitId: 1, name: 'Streife 1', abschnitt: 'Bühne', wert: 2 },
+      { einheitId: 2, name: 'Streife 2', abschnitt: null, wert: 1 },
+    ]);
+  });
+
+  it('ordnet bei gleicher Zahl nach Name und ist ohne Einheit leer', () => {
+    expect(kontakteJeEinheit([mit(3), mit(2)]).map((k) => k.einheitId)).toEqual([2, 3]);
+    expect(kontakteJeEinheit([mit(null)])).toEqual([]);
   });
 });

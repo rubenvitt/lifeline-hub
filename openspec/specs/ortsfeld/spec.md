@@ -413,3 +413,23 @@ Ausschnitt und kein „Nicht verortet“ zeigen.
 #### Scenario: Ohne Lagekarte
 - **WHEN** die Lagekarte für die Person nicht freigegeben ist
 - **THEN** steht der Ausschnitt, aber kein „Auf Lagekarte zeigen“
+
+### Requirement: Eigene Position im Fundort
+
+Das Ortsfeld SHALL über die Kartenvorschau den Knopf „Eigene Position“ anbieten, wenn der Aufrufer
+es verlangt (`karte.eigenePosition`); gesetzt nur im Fundort der Personenaufnahme. Der Knopf MUST
+den Standort einmal abfragen (`getCurrentPosition`) und wie ein Punkt aus der Karte wirken
+(`nachKartenpunkt`: ein leerer Text wird zur Koordinate, ein getippter bleibt). Ohne sicheren
+Kontext oder ohne Standort am Gerät MUST er gesperrt stehen, `aria-disabled`, mit dem Grund aus
+`EIGENPOSITION_SPERRGRUND` auf Tipp und für Vorlesende. Scheitert die Abfrage, MUST der Grund
+am Knopf stehen und der Wert bleiben. Der Standort MUST das Gerät nur als gespeicherter Ort
+verlassen.
+
+#### Scenario: Standort ins leere Feld
+- **WHEN** im leeren Fundort „Eigene Position“ gewählt wird und das Gerät 53.07/8.81 meldet
+- **THEN** steht die Koordinate als Text und Kartenpunkt im Feld
+
+#### Scenario: Ohne https
+- **WHEN** die App ohne sicheren Kontext läuft
+- **THEN** steht „Eigene Position“ gesperrt, und ein Tipp nennt den Grund, ohne den Standort
+  abzufragen
