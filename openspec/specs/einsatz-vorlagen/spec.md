@@ -46,10 +46,12 @@ ohne zu speichern.
 Jede Organisation MUST die Vorlagen „Kleinlage“, „Sanitätsdienst“, „MANV“, „Personensuche“,
 „Evakuierung und Betreuung“ und „Unwetter“ besitzen: bestehende Organisationen per Migration
 `0238`, neue beim Anlegen (`bootstrap_admin`). Die Modulsätze MUST `EINSATZ_VORLAGE_STARTLISTE`
-in `src/einsatz_vorlage/mod.rs` entsprechen (sichtbar 14, 22, 27, 25, 30 und 28 von 34 Modulen,
+in `src/einsatz_vorlage/mod.rs` entsprechen (sichtbar 14, 24, 27, 25, 30 und 28 von 34 Modulen,
 `stab` in keiner; Einsatzart „Sanitätsdienst“ bei „Sanitätsdienst“, sonst „Realeinsatz“).
 Stichwort-Kopplungen MUST nicht mitgeliefert werden. Jede Organisation darf die Startliste danach
-ändern oder löschen.
+ändern oder löschen. „Sanitätsdienst“ MUST Funk (`fernmeldewesen`) und Wetter (`wetter-pegel`)
+zeigen (LLH-1569); Organisationen, die vorher bestanden, behalten ihre Vorlage im Stand von `0238`
+(ohne Funk und Wetter), kein Update ändert bestehende Vorlagen oder Einsätze.
 
 #### Scenario: Bestehende Organisation nach dem Update
 - **WHEN** eine Organisation vor dieser Änderung bestand
@@ -58,6 +60,10 @@ Stichwort-Kopplungen MUST nicht mitgeliefert werden. Jede Organisation darf die 
 #### Scenario: Neue Installation
 - **WHEN** der erste Start eine Organisation anlegt
 - **THEN** besitzt sie die sechs Vorlagen, und kein Stichwort-Vorschlag zeigt auf eine Vorlage
+
+#### Scenario: Sanitätsdienst mit Funk und Wetter
+- **WHEN** eine neue Organisation einen Einsatz mit der Vorlage „Sanitätsdienst“ anlegt
+- **THEN** sind Funk und Wetter sichtbar und Lagemeldungen ausgeblendet
 
 ### Requirement: Ein Stichwort-Vorschlag kann auf eine Vorlage zeigen
 Ein Stichwort-Vorschlag MUST optional auf eine Vorlage derselben Organisation zeigen
