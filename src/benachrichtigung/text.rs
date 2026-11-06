@@ -175,49 +175,60 @@ pub const fn abloeser_titel(typ: BenachrichtigungBezugTyp) -> Option<&'static st
 /// Rettungsstaffel: 2. Rettungsstaffel“: die Namen der abzulösenden Einheit über die Schicht und
 /// der gemeinten Einheit über die festgehaltene ID (LLH-1511), ohne sie über den Spiegel der
 /// Schicht; alle Retain (Guard `detail_liest_nur_retain_spalten`).
-pub const DETAIL_ABLOESER_SPALTEN: [(&str, &str); 6] = [
+pub const DETAIL_ABLOESER_SPALTEN: [(&str, &str); 7] = [
     ("einsatz_einheit", "name"),
     ("einsatz_einheit", "einsatz_id"),
     ("einsatz_abloesung", "einheit_id"),
     ("einsatz_abloesung", "abloesende_einheit_id"),
     ("einsatz_abloesung", "einsatz_id"),
     ("benachrichtigung", "einheit_id"),
+    ("benachrichtigung", "durch_einheit_id"),
 ];
 
 /// Die Abfrage der Detailzeile; liest nur [`DETAIL_ABLOESER_SPALTEN`]. Parameter: `?1` die
 /// festgehaltene Einheit der Benachrichtigung (`benachrichtigung.einheit_id`, `NULL` bei Zeilen
-/// von vor LLH-1511), `?2` die Schicht, `?3` der Einsatz. Mit Einheit nennt sie deren Namen,
-/// auch wenn die Schicht inzwischen eine andere oder keine plant; ist die Einheit verschwunden
-/// (gelöscht), keinen. Ohne Einheit wie bisher den Spiegel der Schicht.
+/// von vor LLH-1511), `?2` die Schicht, `?3` der Einsatz, `?4` die auslösende Untereinheit
+/// (`benachrichtigung.durch_einheit_id`, LLH-1509, sonst `NULL`). Mit Einheit nennt sie deren
+/// Namen, auch wenn die Schicht inzwischen eine andere oder keine plant; ist die Einheit
+/// verschwunden (gelöscht), keinen. Ohne Einheit wie bisher den Spiegel der Schicht. Die
+/// Untereinheit nennt sie, solange sie besteht.
 pub const DETAIL_ABLOESER_SQL: &str = "SELECT e.name, \
-         CASE WHEN ?1 IS NULL THEN ae.name ELSE ge.name END \
+         CASE WHEN ?1 IS NULL THEN ae.name ELSE ge.name END, de.name \
      FROM einsatz_abloesung a \
      JOIN einsatz_einheit e ON e.id = a.einheit_id \
      LEFT JOIN einsatz_einheit ae ON ae.id = a.abloesende_einheit_id \
      LEFT JOIN einsatz_einheit ge ON ge.id = ?1 AND ge.einsatz_id = a.einsatz_id \
+     LEFT JOIN einsatz_einheit de ON de.id = ?4 AND de.einsatz_id = a.einsatz_id \
      WHERE a.id = ?2 AND a.einsatz_id = ?3";
 
 /// Text eines Hinweises zur ablösenden Einheit: Titel aus dem Bezug, Detail „Ablösung für
 /// Rettungsstaffel: 2. Rettungsstaffel“. Die gemeinte Einheit hält die Zeile beim Erzeugen als
 /// ID fest (LLH-1511), den Namen liest das Detail beim Lesen (die Zeile trägt keinen Text). Alte
 /// Zeilen ohne Einheit lesen den Spiegel der Schicht; ist die Planung dort entfallen, nennt das
-/// Detail nur die abzulösende Einheit.
+/// Detail nur die abzulösende Einheit. Hat eine Untereinheit der gemeinten das Ereignis
+/// ausgelöst (geplanter Verband, LLH-1509), folgt sie: „… : Verband (durch 1. Staffel)“.
 async fn abloeser_text(
     pool: &SqlitePool,
     einsatz_id: i64,
     titel: &str,
     bezug: Bezug,
-    einheit_id: Option<i64>,
+    einheiten: HinweisEinheiten,
 ) -> Result<Text, AppError> {
-    let zeile: Option<(String, Option<String>)> = sqlx::query_as(DETAIL_ABLOESER_SQL)
-        .bind(einheit_id)
-        .bind(bezug.id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?;
-    let detail = zeile.map(|(einheit, abloesende)| match abloesende {
-        Some(a) if !a.trim().is_empty() => format!("Ablösung für {einheit}: {a}"),
-        _ => format!("Ablösung für {einheit}"),
+    let zeile: Option<(String, Option<String>, Option<String>)> =
+        sqlx::query_as(DETAIL_ABLOESER_SQL)
+            .bind(einheiten.einheit_id)
+            .bind(bezug.id)
+            .bind(einsatz_id)
+            .bind(einheiten.durch_einheit_id)
+            .fetch_optional(pool)
+            .await?;
+    let nicht_leer = |n: Option<String>| n.filter(|n| !n.trim().is_empty());
+    let detail = zeile.map(|(einheit, abloesende, durch)| {
+        match (nicht_leer(abloesende), nicht_leer(durch)) {
+            (Some(a), Some(d)) => format!("Ablösung für {einheit}: {a} (durch {d})"),
+            (Some(a), None) => format!("Ablösung für {einheit}: {a}"),
+            (None, _) => format!("Ablösung für {einheit}"),
+        }
     });
     Ok(Text {
         titel: titel.to_string(),
@@ -496,6 +507,15 @@ async fn nachforderung_text(
     })
 }
 
+/// Die festgehaltenen Einheiten eines Hinweises zur ablösenden Einheit: die gemeinte
+/// (`benachrichtigung.einheit_id`, LLH-1511) und die auslösende Untereinheit
+/// (`benachrichtigung.durch_einheit_id`, LLH-1509). Beide fehlen bei jeder anderen Art.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct HinweisEinheiten {
+    pub einheit_id: Option<i64>,
+    pub durch_einheit_id: Option<i64>,
+}
+
 /// Bildet den Text einer Benachrichtigung ohne festgehaltene Einheit, siehe
 /// [`bilden_mit_einheit`].
 pub async fn bilden(
@@ -504,18 +524,17 @@ pub async fn bilden(
     art: BenachrichtigungArt,
     bezug: Bezug,
 ) -> Result<Text, AppError> {
-    bilden_mit_einheit(pool, einsatz_id, art, bezug, None).await
+    bilden_mit_einheit(pool, einsatz_id, art, bezug, HinweisEinheiten::default()).await
 }
 
-/// Bildet den Text einer gespeicherten Benachrichtigung mit ihrer festgehaltenen Einheit
-/// (`benachrichtigung.einheit_id`, LLH-1511). Ein gelöschter Bezug lässt nur die Detailzeile
-/// weg.
+/// Bildet den Text einer gespeicherten Benachrichtigung mit ihren festgehaltenen Einheiten
+/// ([`HinweisEinheiten`]). Ein gelöschter Bezug lässt nur die Detailzeile weg.
 pub async fn bilden_mit_einheit(
     pool: &SqlitePool,
     einsatz_id: i64,
     art: BenachrichtigungArt,
     bezug: Bezug,
-    einheit_id: Option<i64>,
+    einheiten: HinweisEinheiten,
 ) -> Result<Text, AppError> {
     if bezug.typ == BenachrichtigungBezugTyp::AuftragEmpfaenger {
         return auftrag_empfaenger_text(pool, einsatz_id, art, bezug).await;
@@ -527,7 +546,7 @@ pub async fn bilden_mit_einheit(
         return chat_nachricht_text(pool, einsatz_id, art, bezug).await;
     }
     if let Some(titel) = abloeser_titel(bezug.typ) {
-        return abloeser_text(pool, einsatz_id, titel, bezug, einheit_id).await;
+        return abloeser_text(pool, einsatz_id, titel, bezug, einheiten).await;
     }
     let detail = match detail_quelle(bezug.typ) {
         None if bezug.typ == BenachrichtigungBezugTyp::Abloesung => {

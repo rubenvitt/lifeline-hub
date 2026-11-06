@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs]
 ---
 
 ## Überblick
@@ -10,8 +10,9 @@ quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/Inlin
 Die Seite „Einsatzdaten“ hält die Stammangaben des Einsatzes. Im Seitenkopf stehen neben dem
 Titel die Einsatznummer und die Leitstellen-Nr., darunter die Kopfleiste mit Stichwort,
 Alarmzeit, Einsatzort und Einsatzleitung. Es folgen die Paneele „Einsatz“, „Einsatzort“ mit
-Adresse, Koordinate und Kartenausschnitt, „Erstmeldung“ und „Eigene Führungsstelle“ mit dem
-Einsatzleiter, am breiten Schirm in zwei Spalten. Lesen können alle Mitglieder des Einsatzes.
+Adresse, Koordinate und Kartenausschnitt, „Ablauf“ mit den Programmpunkten der Veranstaltung,
+„Erstmeldung“ und „Eigene Führungsstelle“ mit dem Einsatzleiter, am breiten Schirm in zwei
+Spalten. Lesen können alle Mitglieder des Einsatzes.
 Ändern dürfen Einsatzleitung und Führungspersonal sowie die Administration der Organisation, der
 der Einsatz gehört. Wer in den Einsatz darf, regelt die Einsatzleitung in den Einstellungen unter
 „Zugriff“ (siehe [Rechte im Einsatz](rechte-im-einsatz.md)).
@@ -22,7 +23,7 @@ der Einsatz gehört. Wer in den Einsatz darf, regelt die Einsatzleitung in den E
 
 1. „Einsatzdaten“ öffnen.
 
-   ![Seite „Einsatzdaten“ mit Kennungen im Seitenkopf, Kopfleiste und den Paneelen Einsatz, Einsatzort, Erstmeldung und Eigene Führungsstelle](../bilder/einsatzdaten/einsatzdaten.png)
+   ![Seite „Einsatzdaten“ mit Kennungen im Seitenkopf, Kopfleiste und den Paneelen Einsatz, Einsatzort, Ablauf, Erstmeldung und Eigene Führungsstelle](../bilder/einsatzdaten/einsatzdaten.png)
 
 2. Den Wert der Zeile wählen (Stift daneben) oder, wenn die Zeile leer ist, „… eintragen“.
 3. Den neuen Wert eingeben.
@@ -70,6 +71,18 @@ anderer Text eintragen.
    vorliegt.
 3. „Speichern“ wählen. Ist die Eingabe nicht lesbar, steht unter dem Feld „Ungültige Koordinate
    im Format …“; „Speichern“ übernimmt dann nichts, und die Zeile bleibt offen.
+
+### Den Ablauf der Veranstaltung pflegen
+
+Bei einem Sanitätsdienst steht hier das Programm: Einlass, Feuerwerk, Ende.
+
+1. Im Paneel „Ablauf“ oben rechts „Programmpunkt“ wählen.
+2. Im Dialog „Programmpunkt anlegen“ den „Zeitpunkt“ und die „Bezeichnung“ eintragen, etwa
+   „Feuerwerk“.
+3. „Anlegen“ wählen oder Enter drücken. Der Punkt steht in der Liste nach Zeit.
+4. Zeitpunkt oder Bezeichnung eines Punkts ändern wie jede andere Angabe: den Wert wählen, ändern,
+   mit Enter oder „Speichern“ übernehmen.
+5. Zum Löschen das Mülleimer-Zeichen der Zeile wählen und „Löschen“ bestätigen.
 
 ### Die eigene Führungsstelle erfassen
 
@@ -168,6 +181,18 @@ Für die Einsatzleitung:
   Vorschlag übernimmt Enter erst, wenn er mit den Pfeiltasten angesteuert ist. Trägt die
   Führungsstelle genau ein Fahrzeug, steht dessen Funkrufname grau im leeren Feld; gespeichert
   wird er erst, wenn ihn jemand wählt.
+
+### Programmpunkte
+
+- Ein Programmpunkt ist eine Uhrzeit der Veranstaltung, keine Frist und keine Erinnerung: Er
+  löst keinen Ton und keine Benachrichtigung aus und hat keinen Status. Die anstehenden Punkte
+  stehen im [Überblick](ueberblick.md) unter „Nächste Marken“ und, wenn ein
+  [Lagemonitor](lagemonitor.md) gekoppelt ist, dort in der Kachel „Ablauf“. Mit ihrer Uhrzeit
+  fallen sie dort heraus; im Paneel „Ablauf“ bleiben sie gedämpft stehen.
+- Pflegen dürfen dieselben Personen wie die übrigen Angaben, solange der Einsatz läuft. Ein
+  Einsatz hat höchstens 50 Programmpunkte, die Bezeichnung höchstens 100 Zeichen.
+- Die Bezeichnung steht auf dem Lagemonitor im Stabsraum: Namen von Personen gehören nicht
+  hinein. Bei der Schwärzung des Einsatzes wird sie ersetzt, die Uhrzeit bleibt.
 
 ### Adresse und Koordinate des Einsatzorts
 

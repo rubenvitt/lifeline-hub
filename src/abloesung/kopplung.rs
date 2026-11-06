@@ -23,7 +23,8 @@
 //!   Zeit ([`repo::move_autostart_tx`]).
 //!
 //! Dazu die **Hinweise zur ablösenden Einheit** (LLH-1131, [`super::hinweis`]): ist die Einheit
-//! als ablösende geplant, wird ihre Alarmierung und ihr Eintreffen (beide nur als Beginn der
+//! oder ein Vorfahr (LLH-1509, erstes Ereignis im Teilbaum) als ablösende geplant, wird ihre
+//! Alarmierung und ihr Eintreffen (beide nur als Beginn der
 //! offenen Periode) je geplanter Schicht ein Anlass; das Eintreffen am Bereitstellungsraum meldet
 //! dessen Buchung selbst. Ihre Entlassung ohne offene Periode danach hebt die Planung auf
 //! (Hinweis und ETB „Planung der ablösenden Einheit entfallen“), die Streichung dieser
@@ -397,37 +398,20 @@ async fn is_aktiv_tx(
 }
 
 /// Ob eine laufende Schicht des Einsatzes die Einheit oder einen ihrer Vorfahren als Ablöser
-/// plant ([`hinweis::load_geplante_tx`]: Einzelplanung oder Eintrag der Liste
+/// plant ([`hinweis::load_geplante_vorfahren_tx`]: Einzelplanung oder Eintrag der Liste
 /// `einsatz_abloesung_abloeser`, LLH-1132). Der Vorfahr zählt mit, weil ein Verband als Knoten
 /// ablöst: seine Untereinheiten erben die Folgeschicht, die der Vollzug ihm anlegt (LLH-1118
-/// Punkt 1). Die Kette läuft mit Besucht-Menge, ein korrupter Zyklus terminiert.
+/// Punkt 1). Dieselbe Kette führt die Hinweise (LLH-1509).
 async fn is_geplanter_abloeser_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
 ) -> Result<bool, AppError> {
-    let mut besucht = std::collections::HashSet::new();
-    let mut knoten = Some(einheit_id);
-    while let Some(k) = knoten {
-        if !besucht.insert(k) {
-            break;
-        }
-        if !super::hinweis::load_geplante_tx(conn, einsatz_id, k)
+    Ok(
+        !hinweis::load_geplante_vorfahren_tx(conn, einsatz_id, einheit_id)
             .await?
-            .is_empty()
-        {
-            return Ok(true);
-        }
-        knoten = sqlx::query_scalar::<_, Option<i64>>(
-            "SELECT ueber_einheit_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
-        )
-        .bind(k)
-        .bind(einsatz_id)
-        .fetch_optional(&mut *conn)
-        .await?
-        .flatten();
-    }
-    Ok(false)
+            .is_empty(),
+    )
 }
 
 async fn autostart_tx(

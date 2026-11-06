@@ -79,7 +79,8 @@
         "description": "Ein Ablöser einer Schicht (Eintrag in `einsatz_abloesung_abloeser`).",
         "required": [
           "einheit_id",
-          "einheit_name"
+          "einheit_name",
+          "untereinheiten"
         ],
         "properties": {
           "einheit_id": {
@@ -88,6 +89,14 @@
           },
           "einheit_name": {
             "type": "string"
+          },
+          "untereinheiten": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Die aktiven Untereinheiten des Ablösers, nach ID (LLH-1509): ihr Teilbaum über\n`ueber_einheit_id`, ohne ihn selbst ([`untereinheiten`]). Ihre Ereignisse zählen für den\nStand an der Karte, wie für die Hinweise (`hinweis::anlaesse_tx`). Nur an einer laufenden\nSchicht; sonst leer."
           }
         }
       },
@@ -10384,7 +10393,8 @@
           "uhs",
           "zonen",
           "abschnitte",
-          "sofortmeldungen_offen"
+          "sofortmeldungen_offen",
+          "programm"
         ],
         "properties": {
           "abschnitte": {
@@ -10399,6 +10409,13 @@
           },
           "kraefte": {
             "$ref": "#/components/schemas/LagemonitorKraefte"
+          },
+          "programm": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Programmpunkt"
+            },
+            "description": "Die nächsten anstehenden Programmpunkte der Veranstaltung (LLH-1570, höchstens\n[`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen."
           },
           "sofortmeldungen_offen": {
             "type": "integer",
@@ -14602,6 +14619,28 @@
           "dringend",
           "normal"
         ]
+      },
+      "Programmpunkt": {
+        "type": "object",
+        "description": "Ein Programmpunkt, wie ihn Einsatzdaten und Überblick lesen.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "zeitpunkt_at"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Zeitpunkt (UTC, `YYYY-MM-DD HH:MM:SS`)."
+          }
+        }
       },
       "QualiSollEintrag": {
         "type": "object",

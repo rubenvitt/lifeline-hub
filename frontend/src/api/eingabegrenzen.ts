@@ -124,6 +124,8 @@ export const EXTERNE_STELLE_KURZ_MAX = 100;
 export const MELDENDE_STELLE_MAX = 200;
 /** Freitext eines externen Einsatzleiters an der eigenen Führungsstelle (LFH-1199). */
 export const EINSATZLEITER_NAME_MAX = 200;
+/** Bezeichnung eines Programmpunkts der Veranstaltung (LLH-1570). */
+export const PROGRAMMPUNKT_BEZEICHNUNG_MAX = 100;
 /** Name einer Einheiten-Vorlage (LLH-1042). */
 export const EINHEIT_VORLAGE_NAME_MAX = 200;
 /** Funkrufname einer Einheiten-Vorlage. */

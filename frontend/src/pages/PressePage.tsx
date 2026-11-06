@@ -27,6 +27,7 @@ import {
   type MedienkontaktStatusEingabe,
 } from '../api/presse';
 import { einsatzKeys } from '../api/queryKeys';
+import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
 import type {
   Medienkontakt,
   MedienkontaktArt,
@@ -204,6 +205,10 @@ export default function PressePage() {
       letzte.length < MEDIENKONTAKTE_SEITE ? undefined : eingangCursor(letzte[letzte.length - 1]),
     enabled: frei,
   });
+  // Gescheitert ohne Daten, auch während eines neuen Versuchs: TanStack setzt eine Abfrage ohne
+  // Daten beim Nachladen auf `pending` zurück, das Banner verschwände sonst (LLH-1581).
+  const offeneFehler = useFehlerOhneDaten(offeneQuery);
+  const erledigteFehler = useFehlerOhneDaten(erledigteQuery);
   const kennzahlenQuery = useQuery({
     queryKey: einsatzKeys.medienkontaktKennzahlen(einsatzId),
     queryFn: () => ladeMedienkontaktKennzahlen(einsatzId),
@@ -323,7 +328,8 @@ export default function PressePage() {
   // Die offenen sind vollständig geladen: die Zahl stimmt ohne Kennzahlen.
   const offeneAnfragen = (offene ?? []).filter((k) => k.art === 'anfrage').length;
   const kennzahlen = kennzahlenQuery.data;
-  const listeGescheitert = offeneQuery.isError || (erledigteQuery.isError && !erledigteQuery.data);
+  const offeneGescheitert = offeneQuery.isError || offeneFehler.gescheitert;
+  const listeGescheitert = offeneGescheitert || erledigteFehler.gescheitert;
   // Treffer unter dem Kopffilter aus den Kennzahlen je Art (beide Phasen), nie aus dem Fenster.
   const trefferGesamt =
     kennzahlen == null
@@ -432,7 +438,8 @@ export default function PressePage() {
             {listeGescheitert ? (
               <SeitenFehler
                 text="Presse-Log konnte nicht geladen werden"
-                ursache={offeneQuery.error ?? erledigteQuery.error}
+                ursache={offeneGescheitert ? offeneFehler.fehler : erledigteFehler.fehler}
+                laedt={offeneFehler.laedt || erledigteFehler.laedt}
                 onWiederholen={() => {
                   void offeneQuery.refetch();
                   void erledigteQuery.refetch();

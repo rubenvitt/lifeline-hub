@@ -54,6 +54,7 @@ import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeAuftraege } from '../../api/auftraege';
 import { listeNachforderungen } from '../../api/nachforderungen';
 import { listeOffeneErinnerungen } from '../../api/erinnerungen';
+import { ladeProgrammpunkte } from '../../api/programmpunkte';
 import { listeEtb } from '../../api/etb';
 import { holeRueckmeldungen, listeOffeneMeldungen } from '../../api/meldungen';
 import { useAuth } from '../../auth/AuthContext';
@@ -79,6 +80,7 @@ import {
   einheitenPfad,
   einsaetzePfad,
   einsatzModulPfad,
+  einsatzdatenPfad,
   einsatzabschnittePfad,
   erinnerungenPfad,
   etbPfad,
@@ -254,6 +256,11 @@ export default function UeberblickPage() {
   const einsatzQ = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
+  });
+  // Programmpunkte der Veranstaltung (LLH-1570): kein Modul, wie der Einsatzkopf.
+  const programmQ = useQuery({
+    queryKey: einsatzKeys.programmpunkte(einsatzId),
+    queryFn: () => ladeProgrammpunkte(einsatzId),
   });
   // Modulgrenze (LFH-669, Dateikopf): die Freigaben vor den Listen, jede gebundene Liste mit
   // `enabled` an ihrem Modul (Keys nach `PFAD_KEY` in `src/einsatz/modul.rs`).
@@ -471,6 +478,7 @@ export default function UeberblickPage() {
         pegel ?? [],
         abloesungSichtbar ? (abloesungenQ.data ?? []) : [],
         angekuendigtesUnwetter,
+        programmQ.data ?? [],
       ),
     [
       auftraege,
@@ -481,10 +489,12 @@ export default function UeberblickPage() {
       abloesungSichtbar,
       abloesungenQ.data,
       angekuendigtesUnwetter,
+      programmQ.data,
     ],
   );
 
   const qEinsatz: Quelle = { q: einsatzQ, frei: true };
+  const qProgramm: Quelle = { q: programmQ, frei: true };
   const qPersonen: Quelle = { q: personenQ, frei: personenFrei };
   const qPersonal: Quelle = { q: personalQ, frei: personalFrei };
   const qFahrzeuge: Quelle = { q: fahrzeugeQ, frei: fahrzeugeFrei };
@@ -520,7 +530,12 @@ export default function UeberblickPage() {
   const zVorgaenge = freigabenStand === 'da' ? 'daten' : freigabenStand;
   // Die Marken sammeln Fristen aus mehreren Quellen; eine gesperrte trägt nichts bei, die
   // Lagebesprechung bleibt. Was fehlt, nennt der Hinweis — sonst läse sich die Liste vollständig.
-  const zMarken = zustandVon(freigabenStand, qEinsatz, ...ohneGesperrte(qAuftraege, qErinnerungen));
+  const zMarken = zustandVon(
+    freigabenStand,
+    qEinsatz,
+    qProgramm,
+    ...ohneGesperrte(qAuftraege, qErinnerungen),
+  );
   const markenHinweis = ohneFreigabeHinweis(freigaben, [
     { key: 'auftraege', frei: auftraegeFrei },
     { key: 'erinnerungen', frei: erinnerungenFrei },
@@ -561,9 +576,11 @@ export default function UeberblickPage() {
             ? abloesungPfad(einsatzId)
             : m.art === 'unwetter'
               ? wetterPegelPfad(einsatzId)
-              : lagebesprechungGesperrt
-                ? undefined
-                : lagebesprechungPfad(einsatzId);
+              : m.art === 'programmpunkt'
+                ? einsatzdatenPfad(einsatzId)
+                : lagebesprechungGesperrt
+                  ? undefined
+                  : lagebesprechungPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 
@@ -879,7 +896,7 @@ export default function UeberblickPage() {
                         : 'Keine anstehenden Fristen.'
                     }
                     gesperrtText={GESPERRT}
-                    onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
+                    onNeuladen={() => nachladen(qEinsatz, qProgramm, qAuftraege, qErinnerungen)}
                     eintraege={marken.marken}
                     max={marken.marken.length}
                     schluessel={(m) => m.key}

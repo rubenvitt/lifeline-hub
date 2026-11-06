@@ -473,6 +473,11 @@ pub struct AbloesungAnzeige {
 pub struct AbloesungAbloeser {
     pub einheit_id: i64,
     pub einheit_name: String,
+    /// Die aktiven Untereinheiten des Ablösers, nach ID (LLH-1509): ihr Teilbaum über
+    /// `ueber_einheit_id`, ohne ihn selbst ([`untereinheiten`]). Ihre Ereignisse zählen für den
+    /// Stand an der Karte, wie für die Hinweise (`hinweis::anlaesse_tx`). Nur an einer laufenden
+    /// Schicht; sonst leer.
+    pub untereinheiten: Vec<i64>,
 }
 
 /// Eine Person der alten oder neuen Besatzung (Eintrag in `einsatz_abloesung_besatzung`).
@@ -563,6 +568,32 @@ pub fn vererbung(
         }
     }
     erbt
+}
+
+/// Die Untereinheiten von `wurzel` (LLH-1509), rein: alle Einheiten, deren Kette über `ueber`
+/// zu ihr führt, ohne sie selbst, nach ID. Breitensuche mit Besucht-Menge, damit ein korrupter
+/// Zyklus terminiert. Fehlt eine Einheit in `ueber` (aufgelöst), fehlt auch ihr Teilbaum, denn das
+/// Auflösen hängt ihre Kinder um.
+pub fn untereinheiten(ueber: &HashMap<i64, Option<i64>>, wurzel: i64) -> Vec<i64> {
+    let mut kinder: HashMap<i64, Vec<i64>> = HashMap::new();
+    for (&einheit, &vater) in ueber {
+        if let Some(v) = vater {
+            kinder.entry(v).or_default().push(einheit);
+        }
+    }
+    let mut besucht = HashSet::from([wurzel]);
+    let mut offen = vec![wurzel];
+    let mut ergebnis = Vec::new();
+    while let Some(k) = offen.pop() {
+        for &kind in kinder.get(&k).map(Vec::as_slice).unwrap_or_default() {
+            if besucht.insert(kind) {
+                ergebnis.push(kind);
+                offen.push(kind);
+            }
+        }
+    }
+    ergebnis.sort_unstable();
+    ergebnis
 }
 
 /// Rhythmus-Vorgabe eines Einsatzabschnitts.
@@ -716,6 +747,31 @@ mod tests {
         assert_eq!(erbt.get(&7), None, "ohne Träger keine Schicht");
         assert_eq!(erbt.get(&8), None, "Zyklus ohne Träger terminiert");
         assert_eq!(erbt.len(), 3);
+    }
+
+    /// LLH-1509: der ganze Teilbaum unter der Wurzel, ohne sie selbst und ohne Fremdes, nach ID;
+    /// ein Zyklus terminiert.
+    #[test]
+    fn untereinheiten_umfassen_den_ganzen_teilbaum() {
+        // 1 ─ 2 ─ 3 ─ 4,  2 ─ 5,  6 ─ 7,  8 ⇄ 9 (Zyklus)
+        let ueber: HashMap<i64, Option<i64>> = [
+            (1, None),
+            (2, Some(1)),
+            (3, Some(2)),
+            (4, Some(3)),
+            (5, Some(2)),
+            (6, None),
+            (7, Some(6)),
+            (8, Some(9)),
+            (9, Some(8)),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(untereinheiten(&ueber, 1), vec![2, 3, 4, 5]);
+        assert_eq!(untereinheiten(&ueber, 3), vec![4]);
+        assert!(untereinheiten(&ueber, 4).is_empty());
+        assert_eq!(untereinheiten(&ueber, 8), vec![9], "Zyklus terminiert");
+        assert!(untereinheiten(&ueber, 42).is_empty(), "unbekannte Einheit");
     }
 
     /// LLH-1131: eine geplante Einheit, die auch eine andere Schicht plant, warnt „schon

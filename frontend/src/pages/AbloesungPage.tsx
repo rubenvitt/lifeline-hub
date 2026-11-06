@@ -340,11 +340,16 @@ export default function AbloesungPage() {
   // Stand der geplanten Ablöser (LLH-1131 Teil II): Zeitpunkte aus der Zeitachse, der Raum aus
   // `aktueller_br_id` der Einheit und dem Namen in der Raumliste, der Abruf aus deren `abrufe`
   // (LLH-1309). Die Liste der Räume gehört dem Modul Bereitstellungsräume und wird nur geholt,
-  // wenn ein Ablöser gerade in einem Raum steht (ein abgerufener steht noch im Raum) oder der
-  // Vollzug-Dialog offen ist (LLH-1308: „Danach“ bietet die aktiven Räume an).
+  // wenn ein Ablöser oder eine seiner Untereinheiten (LLH-1509) gerade in einem Raum steht (ein
+  // abgerufener steht noch im Raum) oder der Vollzug-Dialog offen ist (LLH-1308: „Danach“ bietet
+  // die aktiven Räume an).
   const brFrei = istKeyFreigegeben('bereitstellungsraeume', freigabenQuery.data);
   const abloeserImBr = useMemo(() => {
-    const ids = new Set(laufende.flatMap(abloeserIds));
+    // Mit den Untereinheiten eines geplanten Verbands (LLH-1509, vom Server am Ablöser).
+    const ids = new Set([
+      ...laufende.flatMap(abloeserIds),
+      ...laufende.flatMap((s) => s.abloeser.flatMap((a) => a.untereinheiten)),
+    ]);
     return (einheitenQuery.data ?? []).some((e) => ids.has(e.id) && e.aktueller_br_id != null);
   }, [laufende, einheitenQuery.data]);
   const brQuery = useQuery({
