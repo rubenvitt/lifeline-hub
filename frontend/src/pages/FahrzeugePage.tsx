@@ -26,6 +26,7 @@ import {
 } from '../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
+import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
 import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
@@ -474,6 +475,13 @@ function FahrzeugeInhalt() {
     queryFn: () => listeEinheiten(einsatzId),
     enabled: einheitenFrei,
   });
+  // Gescheitert ohne Daten, auch während eines neuen Versuchs: TanStack setzt eine Abfrage ohne
+  // Daten beim Nachladen auf `pending` zurück, Banner und Hinweis verschwänden sonst (LLH-1581).
+  // Die Fahrzeugliste hat einen zweiten Beobachter mit spätem `enabled` (`Verdichtungszeile`,
+  // hinter den Freigaben), der eine gescheiterte Liste ohne Klick neu lädt.
+  const efFehler = useFehlerOhneDaten(efQuery);
+  const statusFehler = useFehlerOhneDaten(statusQuery);
+  const einheitenFehler = useFehlerOhneDaten(einheitenQuery);
   // Der Rang der Abschnitte ordnet die Einheit-Auswahl wie den Kräftebaum; ohne Freigabe die
   // Eingabefolge (wie die Personalliste, LLH-1060).
   const abschnitteQuery = useQuery({
@@ -685,7 +693,7 @@ function FahrzeugeInhalt() {
    * Nicht zu verwechseln mit dem Statuskatalog-Banner weiter unten: das steht zusätzlich über der
    * Tabelle und tauscht nichts aus.
    */
-  const listeGescheitert = efQuery.isError && efs.length === 0;
+  const listeGescheitert = (efQuery.isError && efs.length === 0) || efFehler.gescheitert;
   const standVeraltet = efQuery.isError && efs.length > 0;
 
   const stati = statusQuery.data ?? [];
@@ -1091,11 +1099,12 @@ function FahrzeugeInhalt() {
 
           An `darfSchreiben` gekoppelt: wer nur liest, sieht `StatusBadge` aus den Zeilendaten
           und verliert nichts. */}
-      {darfSchreiben && statusQuery.isError && (
+      {darfSchreiben && (statusQuery.isError || statusFehler.gescheitert) && (
         <div style={{ marginBottom: abstand.md }}>
           <SeitenFehler
             text="Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich"
-            ursache={statusQuery.error}
+            ursache={statusFehler.fehler}
+            laedt={statusFehler.laedt}
             onWiederholen={() => void statusQuery.refetch()}
           />
         </div>
@@ -1108,7 +1117,8 @@ function FahrzeugeInhalt() {
       {listeGescheitert ? (
         <SeitenFehler
           text="Disponierte Fahrzeuge konnten nicht geladen werden"
-          ursache={efQuery.error}
+          ursache={efFehler.fehler}
+          laedt={efFehler.laedt}
           onWiederholen={() => void efQuery.refetch()}
         />
       ) : (
@@ -1127,14 +1137,19 @@ function FahrzeugeInhalt() {
               einheitenHinweis={
                 freigabenQuery.isSuccess && !einheitenFrei
                   ? `${MODUL_EINHEITEN_GESPERRT} · Fahrzeuge ohne Gliederung`
-                  : einheitenQuery.isError && !einheitenQuery.data
+                  : einheitenFehler.gescheitert
                     ? 'Einheiten nicht abrufbar — Fahrzeuge ohne Gliederung'
                     : undefined
               }
               darfSchreiben={darfSchreiben}
               bedienungVon={statusBedienungVon}
               zeilenFehler={(f) => zeilen.grund(f.id)}
-              ladend={efQuery.isLoading || freigabenQuery.isLoading || einheitenQuery.isLoading}
+              // Ein neuer Versuch nach gescheiterten Einheiten lässt das ungegliederte Tableau stehen.
+              ladend={
+                efQuery.isLoading ||
+                freigabenQuery.isLoading ||
+                (einheitenQuery.isLoading && !einheitenFehler.gescheitert)
+              }
             />
           ) : (
             <Datensicht

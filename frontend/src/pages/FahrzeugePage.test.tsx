@@ -1337,6 +1337,39 @@ describe('FahrzeugePage · Datenzustände', () => {
     expect(screen.queryByText('Noch keine Fahrzeuge disponiert')).not.toBeInTheDocument();
   });
 
+  it('der Fehler der Dispositionsliste bleibt stehen, solange „Erneut abrufen" lädt (LLH-1581)', async () => {
+    zeige(http.get('/api/einsaetze/7/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
+    const text = 'Disponierte Fahrzeuge konnten nicht geladen werden';
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    const alarm = screen.getByText(text).closest<HTMLElement>('[role="alert"]')!;
+    const knopf = within(alarm).getByRole('button', { name: 'Erneut abrufen' });
+    // Der zweite Beobachter (`Verdichtungszeile`) schaltet erst mit den Freigaben ein und holt die
+    // gescheiterte Liste noch einmal: erst danach steht der Fehler endgültig.
+    await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+
+    server.use(http.get('/api/einsaetze/7/fahrzeuge', () => new Promise<never>(() => {})));
+    await userEvent.click(knopf);
+
+    await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
+    expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Fahrzeuge disponiert')).not.toBeInTheDocument();
+  });
+
+  it('der Fehler des Statuskatalogs bleibt stehen, solange „Erneut abrufen" lädt (LLH-1581)', async () => {
+    zeige(http.get('/api/fahrzeug-status', () => new HttpResponse(null, { status: 500 })));
+    const text = 'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich';
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    const alarm = screen.getByText(text).closest<HTMLElement>('[role="alert"]')!;
+    const knopf = within(alarm).getByRole('button', { name: 'Erneut abrufen' });
+    await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+
+    server.use(http.get('/api/fahrzeug-status', () => new Promise<never>(() => {})));
+    await userEvent.click(knopf);
+
+    await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
+    expect(screen.getByText(text)).toBeInTheDocument();
+  });
+
   it('leere Dispositionsliste: Leertext und KEIN Fehler', async () => {
     zeige();
     expect(await screen.findByText('Noch keine Fahrzeuge disponiert')).toBeInTheDocument();
@@ -1756,6 +1789,36 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
     expect(within(tableau).getByRole('heading', { name: 'EA Nord' })).toBeInTheDocument();
     expect(within(tableau).queryByText(/Einheiten nicht abrufbar/)).toBeNull();
+  });
+
+  it('ein neuer Versuch nach gescheiterten Einheiten lässt Hinweis und Tableau stehen (LLH-1581)', async () => {
+    let abrufe = 0;
+    let haengen = false;
+    renderTableau(() => {
+      abrufe += 1;
+      return haengen
+        ? new Promise<never>(() => {})
+        : HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+    });
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    expect(await within(tableau).findByText(/Einheiten nicht abrufbar/)).toBeInTheDocument();
+    const knopf = await within(tableau).findByRole('button', {
+      name: 'Status von Florian 1 ändern',
+    });
+
+    // Der Statuswechsel invalidiert die Einheiten: der neue Abruf hängt.
+    haengen = true;
+    const vorher = abrufe;
+    act(() => knopf.focus());
+    fireEvent.keyDown(knopf, { key: '4' });
+    await waitFor(() => expect(abrufe).toBeGreaterThan(vorher));
+
+    // Vorher fiel das Tableau für die Dauer des Abrufs aufs Skelett, und der Hinweis verschwand.
+    // Frisch gesucht: ein ausgehängtes Tableau fände `within(tableau)` noch.
+    const jetzt = () => screen.getByRole('region', { name: 'FMS-Tableau' });
+    await waitFor(() => expect(within(jetzt()).getByText('S4')).toBeInTheDocument());
+    expect(within(jetzt()).getByText(/Einheiten nicht abrufbar/)).toBeInTheDocument();
+    expect(within(jetzt()).getByRole('heading', { name: 'Alle Fahrzeuge' })).toBeInTheDocument();
   });
 
   it('zeigt bis zur Antwort der Einheiten keine ungegliederte Fläche', async () => {
