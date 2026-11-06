@@ -180,8 +180,11 @@ export function AnlassPaneel({
   vorgemerkterAnlass?: AnlassEingabe['anlass'];
 }) {
   const [form] = Form.useForm<AnlassWerte>();
-  // Anzeige bleibt der Serverstand; die Pflicht folgt dem Stand, der nach dem Abgleich gilt.
-  const hatAnlass = (vorgemerkterAnlass !== undefined ? vorgemerkterAnlass : person.anlass) != null;
+  // Der Kopf zeigt weiter den Serverstand. Das Paneel arbeitet am Stand, der nach dem Abgleich gilt:
+  // ihn wählt es vor, an ihm hängt die Pflicht, und unverändert abgeschickt sendet es nichts. Sonst
+  // höbe die Vorbelegung mit dem Serverwert eine vorgemerkte Aufhebung wieder auf.
+  const wirksam = vorgemerkterAnlass !== undefined ? vorgemerkterAnlass : (person.anlass ?? null);
+  const hatAnlass = wirksam != null;
   return (
     <section aria-label="Anlass festlegen" data-lfh="anlass-paneel">
       <ErfassungsFormular<AnlassWerte>
@@ -190,8 +193,11 @@ export function AnlassPaneel({
         laeuft={mutation.isPending}
         speicherung={mutation}
         speicherFehlerTitel="Anlass nicht festgelegt"
-        initialValues={{ anlass: person.anlass ?? null }}
-        onErfassen={(v) => mutation.mutateAsync({ anlass: v.anlass ?? null })}
+        initialValues={{ anlass: wirksam }}
+        onErfassen={async (v) => {
+          const anlass = v.anlass ?? null;
+          if (anlass !== wirksam) await mutation.mutateAsync({ anlass });
+        }}
         onFertig={onSchliessen}
         onAbbrechen={onSchliessen}
       >

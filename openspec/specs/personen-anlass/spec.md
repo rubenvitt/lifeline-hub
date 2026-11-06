@@ -34,7 +34,15 @@ Der Anlass SHALL sich in der Erfassungsmaske (unter „Weitere Angaben“), im P
 der Kurzeingabe mit `!` und einem Kürzel (`!intox`, `!verl` …) setzen lassen. Ein unbekanntes
 oder zweites Kürzel MUST die Kurzeingabe als „Nicht erfasst“ melden und nichts anlegen. Ohne Netz
 MUST der Anlass wie Sichtung und Transport vorgemerkt werden und mit seiner Erfassungszeit
-hinausgehen.
+hinausgehen. Der Patientenkopf MUST dabei weiter den Serverstand zeigen; sein Paneel MUST den Stand
+vorwählen, der nach dem Abgleich gilt (den jüngsten vorgemerkten, sonst den Serverstand), und
+unverändert abgeschickt nichts senden.
+
+#### Scenario: Vorgemerkte Aufhebung bleibt stehen
+- **WHEN** an R-012 mit Anlass „Psychisch“ ohne Netz die Aufhebung vorgemerkt ist
+- **AND** jemand das Paneel erneut öffnet
+- **THEN** ist kein Anlass vorgewählt
+- **AND** ohne Wahl verlangt das Paneel einen Anlass, statt „Psychisch“ erneut vorzumerken
 
 #### Scenario: Kurzeingabe mit Anlass
 - **WHEN** jemand „Kowalski sk2 !intox“ eingibt und speichert
