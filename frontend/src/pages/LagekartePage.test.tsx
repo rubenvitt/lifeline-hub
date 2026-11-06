@@ -3,8 +3,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useContext, useState, type ReactNode } from 'react';
-import { Route, Routes, UNSAFE_LocationContext, useLocation, useNavigate } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { AdresseSteht } from '../test/adresseSteht';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -543,17 +543,6 @@ function platzierModusAn(): boolean {
 function LocationSonde() {
   const location = useLocation();
   return <div data-testid="location-search">{location.search}</div>;
-}
-
-/**
- * Hält den Router-Commit an: Die Seite sieht weiter die Adresse des ersten Renders, auch nachdem sie
- * navigiert hat. So steht es unter Last, solange React Router die Räumung eines Link-Auftrags noch
- * in einer Transition rendert (LLH-1361).
- */
-function AdresseSteht({ children }: { children: ReactNode }) {
-  const aktuell = useContext(UNSAFE_LocationContext);
-  const [fest] = useState(aktuell);
-  return <UNSAFE_LocationContext.Provider value={fest}>{children}</UNSAFE_LocationContext.Provider>;
 }
 
 function renderSeiteMitSonde(route: string) {

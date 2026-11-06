@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { useQueryParamSelektion } from './useQueryParamSelektion';
 
 // Der Hook darf die vom Router gelieferte searchParams-Instanz nicht in-place räumen, sonst
@@ -20,7 +21,11 @@ describe('useQueryParamSelektion – Nicht-Mutation (LFH-156)', () => {
     h.ref.sp = new URLSearchParams('einheit=5');
     h.setSearchParams.mockClear();
     const angewendet: number[] = [];
-    renderHook(() => useQueryParamSelektion('einheit', true, (id) => angewendet.push(id)));
+    // Der Router liefert nur noch den Verlaufseintrag (`useLinkAuftrag`), die Parameter kommen aus
+    // der Attrappe.
+    renderHook(() => useQueryParamSelektion('einheit', true, (id) => angewendet.push(id)), {
+      wrapper: MemoryRouter,
+    });
 
     // Der Effekt lief (die ID wurde angewandt) …
     await waitFor(() => expect(angewendet).toEqual([5]));

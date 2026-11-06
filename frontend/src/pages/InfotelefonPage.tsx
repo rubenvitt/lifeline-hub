@@ -53,6 +53,7 @@ import {
 } from '../infotelefon/zufluss';
 import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
 import { personenPfad, stabPfad } from '../routing/deeplinks';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
@@ -111,7 +112,8 @@ export default function InfotelefonPage() {
   const { istSchmal } = useViewport();
   const { fokusInLeiste, leistenFokus } = useFokusInLeiste();
   const [anliegenOffen, setAnliegenOffen] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
   const [focusRequest, setFocusRequest] = useState(0);
   const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
   // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
@@ -179,18 +181,21 @@ export default function InfotelefonPage() {
   // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` verlangt
   // den Leser auf genau dieser Stab-Unterseite. Warten, bis Freigabe und Einsatz feststehen; den
   // Parameter immer räumen (apply-then-clean), fokussieren nur mit Freigabe und Schreibrecht.
+  // Einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1530): Bis der Router die Räumung committet,
+  // steht `?neu=1` noch in `searchParams`, und ein neu geladener Einsatz holte den Fokus sonst aus
+  // der Arbeit der Person zurück in die Erfassung.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
     if (stabFreigabe.zustand === 'laden') return;
     if (frei && einsatzQuery.isLoading) return;
     if (frei && einsatzQuery.data && darfImEinsatzSchreiben(einsatzQuery.data)) {
       setFocusRequest((n) => n + 1);
     }
-    searchParams.delete('neu');
-    setSearchParams(searchParams, { replace: true });
+    neuAuftrag.raeume('neu');
   }, [
     searchParams,
-    setSearchParams,
+    neuAuftrag,
     stabFreigabe.zustand,
     frei,
     einsatzQuery.isLoading,

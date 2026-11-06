@@ -2,10 +2,12 @@ import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router';
+import { Link, Route, Routes, useLocation } from 'react-router';
+import type { ReactNode } from 'react';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Lagebesprechung, LagebesprechungStand } from '../api/types';
+import { AdresseSteht } from '../test/adresseSteht';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import LagebesprechungPage from './LagebesprechungPage';
@@ -99,6 +101,10 @@ function rendere({
   route = '/einsaetze/1/lagebesprechung',
   post = () => HttpResponse.json(leererStand, { status: 201 }) as Response,
   lage = {} as Lagequellen,
+  /** Hält den Router-Commit an (LLH-1530). */
+  adresseSteht = false,
+  /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
+  daneben = null as ReactNode,
 } = {}) {
   const zaehle = (liste: string) => {
     if (lage.abrufe) lage.abrufe[liste] = (lage.abrufe[liste] ?? 0) + 1;
@@ -152,7 +158,7 @@ function rendere({
     ),
     http.get('/api/einsaetze/1/modul-zaehler', () => HttpResponse.json(lage.zaehler ?? ZAEHLER)),
   );
-  const ergebnis = renderMitProviders(
+  const seite = (
     <Routes>
       <Route
         path="/einsaetze/:id/lagebesprechung"
@@ -164,7 +170,13 @@ function rendere({
         }
       />
       <Route path="/einsaetze/:id/lageberichte/:lbId" element={<Ort />} />
-    </Routes>,
+    </Routes>
+  );
+  const ergebnis = renderMitProviders(
+    <>
+      {adresseSteht ? <AdresseSteht>{seite}</AdresseSteht> : seite}
+      {daneben}
+    </>,
     { route },
   );
   return { ...ergebnis, termine };
@@ -428,6 +440,49 @@ describe('LagebesprechungPage · ?neu=1 (Schnellaktion)', () => {
     // Positiv zuerst: der Leser ist gelaufen. Sonst wäre das `null` unten trivial.
     await waitFor(() => expect(ort()).toHaveTextContent(/^\/einsaetze\/1\/lagebesprechung$/));
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  /**
+   * Einmal je Verlaufseintrag (LLH-1530): Bis der Router die Räumung committet, steht `?neu=1` noch
+   * in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu an,
+   * öffnet die Maske nicht noch einmal. Die Positivhälfte (Kopfaktion wieder frei) steht vor der
+   * Negativaussage.
+   */
+  it('ein hängender Router-Commit öffnet die geschlossene Maske nach neuem Recht nicht wieder (LLH-1530)', async () => {
+    const { client } = rendere({ route: '/einsaetze/1/lagebesprechung?neu=1', adresseSteht: true });
+    const u = userEvent.setup();
+    const dialog = await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
+    await u.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0));
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: 'beobachter' }))),
+    );
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    expect(await screen.findByText('Nur Ansicht')).toBeInTheDocument();
+
+    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())));
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(async () => expect(await kopfaktion()).toBeEnabled());
+    expect(screen.queryAllByRole('dialog')).toHaveLength(0);
+  });
+
+  it('ein neuer Link ?neu=1 öffnet die Maske wieder (LLH-1530)', async () => {
+    rendere({
+      route: '/einsaetze/1/lagebesprechung?neu=1',
+      daneben: <Link to="/einsaetze/1/lagebesprechung?neu=1">neuer-link</Link>,
+    });
+    const u = userEvent.setup();
+    const dialog = await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
+    await waitFor(() => expect(ort()).toHaveTextContent(/^\/einsaetze\/1\/lagebesprechung$/));
+    await u.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0));
+
+    await u.click(screen.getByRole('link', { name: 'neuer-link' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(ort()).toHaveTextContent(/^\/einsaetze\/1\/lagebesprechung$/));
   });
 });
 

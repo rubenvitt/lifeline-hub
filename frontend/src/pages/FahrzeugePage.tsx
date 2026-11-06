@@ -8,6 +8,7 @@ import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, darfVerwaltung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { POSITION_LABELS } from '../api/personal';
@@ -397,9 +398,12 @@ function FahrzeugeInhalt() {
 
   // Sichtvorgabe ?ansicht= (Sprungmarke „FMS-Tableau"), apply-then-clean. Geräumt wird auch ein
   // unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag. Über den Setter
-  // direkt (stabil, `setzeAnsicht` ist je Render neu). Geklont statt in-place gelöscht:
-  // `?fahrzeug=` räumt `useQueryParamSelektion` getrennt und später.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // direkt (stabil, `setzeAnsicht` ist je Render neu). Einmal je Verlaufseintrag
+  // (`useLinkAuftrag`, LLH-1530): Bis der Router die Räumung committet, steht `?ansicht=` noch in
+  // `searchParams`, und ein Wechsel der Ansicht durch die Person holte die Vorgabe sonst zurück.
+  // `?fahrzeug=` räumt `useQueryParamSelektion` getrennt, beide Räumungen bauen aufeinander auf.
+  const [searchParams] = useSearchParams();
+  const ansichtAuftrag = useLinkAuftrag();
   /**
    * Sortierung, Kopffilter und Suche der Liste stehen in der Adresse (LLH-1096, Muster der
    * Schadenliste): Zurück, Neuladen und ein geteilter Link zeigen dieselbe Liste. Der Hook gehört
@@ -412,14 +416,13 @@ function FahrzeugeInhalt() {
   });
   useEffect(() => {
     if (!searchParams.has('ansicht')) return;
+    if (ansichtAuftrag.verbraucht()) return;
     const vorgabe = parseFahrzeugeAnsicht(searchParams);
     // Die Sprungmarke bleibt auf dem Pfad, `useBlocker` hält sie nicht an: wie die Leiste fragen.
     if (vorgabe && vorgabe !== ansicht)
       nachRueckfrage(() => setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe })));
-    const rest = new URLSearchParams(searchParams);
-    rest.delete('ansicht');
-    setSearchParams(rest, { replace: true });
-  }, [searchParams, setSearchParams, einsatzId, ansicht, nachRueckfrage]);
+    ansichtAuftrag.raeume('ansicht');
+  }, [searchParams, ansichtAuftrag, einsatzId, ansicht, nachRueckfrage]);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
