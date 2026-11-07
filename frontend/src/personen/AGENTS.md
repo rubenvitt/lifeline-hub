@@ -139,6 +139,13 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Person `offen`, `unterwegs` oder `abgeschlossen` ist, leitet NUR der Server ab (`versorgung`);
   der Client rechnet nicht nach. Eine Verbleib-Maske für alle Orte (`useVerbleibFelder`, der
   Grundriss nimmt `VerbleibErfassung` mit `vorbelegung`).
+- **Angaben am Verbleib** (LLH-1568, Spec `verbleib-angaben`): Einsatznummer der Leitstelle
+  (fremder Transport), „Entlassen an“ (Entlassung), „Gegen Rat“ und „Unterschrift“ (Entlassung,
+  Transport) gehören zum Ereignis, nicht zur Person; welche zur Art passen, sagt nur
+  `sichtbareVerbleibAngaben`, den Body baut `verbleibBody`. „Entlassen an“ ist das dritte
+  sichtbare Feld, die übrigen stehen unter „Weitere Angaben“. Wörter nur aus `personMeta.ts`
+  (`ENTLASSEN_AN_WORT`, `GEGEN_RAT_WORT`, `UNTERSCHRIFT_WORT`), die Kurzform aus `kurzVerbleib`;
+  das ETB nennt keine der Angaben.
 - **Abgeschlossene stehen nicht in den Standardansichten** (LLH-1332, Spec
   `betroffene-lagedaten`): Zeilen, Board und Kartenansicht folgen `PersonenSicht.abgeschlossen`
   (Schalter „Abgeschlossene zeigen (n)“, nur bei n > 0 oder eingeschaltet; Auftrag

@@ -16,6 +16,8 @@ pub const ZIEL_KLARTEXTE: &[&str] = &[
     "Herr Yilmaz klagt über Atemnot",
     "Hund-Chip-276",
     "Gartenweg 7",
+    // LLH-1568: Einsatznummer der Leitstelle am Transport.
+    "2611-0815",
     "Externer Hans",
     "THW OV Nord",
     "Hans Funk 0172",
@@ -198,8 +200,8 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
     exec(
         pool,
         "INSERT INTO person_verbleib (einsatz_id, person_id, art, transportmittel, ziel, \
-            notiz, erfasst_von) \
-         VALUES (?, ?, 'transport', 'RTW', 'Klinik Nord', 'Gartenweg 7', ?)",
+            notiz, erfasst_von, leitstelle_einsatznummer) \
+         VALUES (?, ?, 'transport', 'RTW', 'Klinik Nord', 'Gartenweg 7', ?, '2611-0815')",
         &[e1, p1, leitung],
     )
     .await;

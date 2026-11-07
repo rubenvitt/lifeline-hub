@@ -122,11 +122,18 @@ Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansic
    „Verbleib des Leichnams“. Dazu das „Ziel“ und beim Transport das „Rettungsmittel“: ein
    Fahrzeug unter „Im Einsatz“ wählen, wenn ein Fahrzeug des Einsatzes fährt (die Marke am Feld
    zeigt „Eigentransport“), sonst das fremde Rettungsmittel eintippen oder unter „Bisher
-   verwendet“ bzw. „Fahrzeugstamm“ wählen (Marke „fremdes Rettungsmittel“).
+   verwendet“ bzw. „Fahrzeugstamm“ wählen (Marke „fremdes Rettungsmittel“). Bei „Entlassung vor
+   Ort“ sagt „Entlassen an“, wer die Person übernimmt: „selbst“, „Angehörige / Begleitung“,
+   „Sorgeberechtigte“ oder „Polizei“.
 
    ![Patientenkopf mit aufgeklapptem Paneel „Verbleib erfassen“: Art Transport, Ziel und Rettungsmittel](../bilder/betroffene/verbleib.png)
 
-4. „Verbleib erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib.
+4. Unter „Weitere Angaben“ stehen beim fremden Transport die „Einsatznummer Leitstelle“ und bei
+   Entlassung und Transport „Gegen Rat“: „Behandlung abgelehnt“ oder „Transport abgelehnt“.
+   Ist das gewählt, hält „Unterschrift“ fest, ob die Unterschrift auf Papier vorliegt oder
+   verweigert wurde. Die Unterschrift selbst bleibt auf dem Papier.
+5. „Verbleib erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib, etwa „entlassen an
+   Polizei · gegen Rat: Transport abgelehnt, Unterschrift liegt vor“.
 
 Bei „Notunterkunft“ bietet das Paneel die Betreuungsstellen des Einsatzes an; die gewählte Stelle
 wird zum Ziel. Mit Zugriff auf das Modul Betreuung öffnet ein Klick auf den Verbleib die Seite der
@@ -220,8 +227,9 @@ Person aus einer Meldung angelegt, steht dahinter „aus Meldung #…“, ein Kl
 
 1. Die Person öffnen und im Kopf der Seite „Druckansicht“ wählen; auf schmalen Bildschirmen
    steht der Punkt unter dem Menü im Kopf.
-2. Die Druckansicht zeigt Personendaten, Sichtung, Zustand / Verdacht, Transport, PAT-Nummer,
-   Kontamination, Maßnahmen und das Körperschema mit der nummerierten Liste.
+2. Die Druckansicht zeigt Personendaten, Sichtung, Zustand / Verdacht, Transport, den jüngsten
+   Verbleib mit seinen Angaben, PAT-Nummer, Kontamination, Maßnahmen und das Körperschema mit der
+   nummerierten Liste.
 3. „Drucken / als PDF“ wählen ([Drucken und Export](drucken-export.md)).
 
 Die Druckansicht ist ein fester Stand: Neues holt „Neu laden“. Gibt es die Person im Einsatz
@@ -450,7 +458,9 @@ Das Einsatztagebuch führt Betroffene nur mit Registriernummer, ohne Namen: „P
 Stornierungen. Ein nachgereichter älterer Eintrag steht dort zu seiner Erfassungszeit mit
 „nachgetragen“, bei Sichtung und Transportpriorität mit dem Wert, der weiter gilt. Art und
 Fachrichtung des Transports, Anlass, Maßnahmen, Verletzungen, PAT-Nummer und Kontamination stehen
-nicht im Einsatztagebuch. Die Notiz im Patientenkopf ist nicht änderbar und erscheint nicht im
+nicht im Einsatztagebuch, ebenso wenig die Einsatznummer der Leitstelle, „Entlassen an“ und „Gegen
+Rat“: dort steht nur „entlassen“ oder „abtransportiert“. Die Notiz im Patientenkopf ist nicht
+änderbar und erscheint nicht im
 Einsatztagebuch.
 
 Jedes Öffnen der Seite einer Person wird protokolliert, ebenso jedes Öffnen ihrer Druckansicht,

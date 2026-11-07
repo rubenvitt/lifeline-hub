@@ -1,6 +1,9 @@
 use crate::error::AppError;
 use crate::geraet::bestaetigung::Bestaetigung;
-use crate::person::{verbleib_kurzform, TransportDurch, VerbleibArt, VerbleibStatus};
+use crate::person::{
+    verbleib_kurzform, EntlassenAn, GegenRat, TransportDurch, Unterschrift, VerbleibArt,
+    VerbleibStatus,
+};
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::{HashMap, HashSet};
@@ -36,6 +39,18 @@ pub struct VerbleibAnzeige {
     /// Disposition des Fahrzeugs eines Eigentransports (LLH-1332).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatz_fahrzeug_id: Option<i64>,
+    /// Einsatznummer der Leitstelle bei Transport durch ein fremdes Rettungsmittel (LLH-1568).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leitstelle_einsatznummer: Option<String>,
+    /// An wen entlassen wurde (LLH-1568), nur bei `entlassung`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entlassen_an: Option<EntlassenAn>,
+    /// Was gegen Rat abgelehnt wurde (LLH-1568); Zeitpunkt ist `zeitpunkt_at`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gegen_rat: Option<GegenRat>,
+    /// Ob die Unterschrift zur Ablehnung auf Papier vorliegt (LLH-1568), nur mit `gegen_rat`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unterschrift: Option<Unterschrift>,
 }
 
 /// Eingabedaten beim Erfassen; Strings bereits getrimmt (Handler). `art`/`status`
@@ -59,12 +74,18 @@ pub struct VerbleibDaten<'a> {
     pub transport_durch: Option<&'a str>,
     /// Disposition eines Eigentransports, bereits auf Einsatz und Erfassungszeit geprüft.
     pub einsatz_fahrzeug_id: Option<i64>,
+    /// Angaben aus LLH-1568; Paarung mit der Art prüft der Handler, Text bereits getrimmt.
+    pub leitstelle_einsatznummer: Option<&'a str>,
+    pub entlassen_an: Option<EntlassenAn>,
+    pub gegen_rat: Option<GegenRat>,
+    pub unterschrift: Option<Unterschrift>,
 }
 
 const SELECT_VERBLEIB: &str = "\
     SELECT id, einsatz_id, person_id, art, transportmittel, ziel, status, notiz, \
            zeitpunkt_at, erfasst_von, betreuungsstelle_id, bestaetigt_name, eingegangen_at, \
-           transport_durch, einsatz_fahrzeug_id \
+           transport_durch, einsatz_fahrzeug_id, leitstelle_einsatznummer, entlassen_an, \
+           gegen_rat, unterschrift \
     FROM person_verbleib";
 
 /// „Aktuell“ (Spec `personen-verlauf`, design.md D6): der Verbleib mit dem jüngsten
@@ -115,10 +136,11 @@ pub async fn erfassen_tx(
         "INSERT INTO person_verbleib \
             (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, erfasst_von, \
              betreuungsstelle_id, bestaetigt_personal_id, bestaetigt_name, zeitpunkt_at, \
-             eingegangen_at, client_id, transport_durch, einsatz_fahrzeug_id) \
+             eingegangen_at, client_id, transport_durch, einsatz_fahrzeug_id, \
+             leitstelle_einsatznummer, entlassen_an, gegen_rat, unterschrift) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
                  COALESCE(?, strftime('%Y-%m-%d %H:%M:%S','now')), \
-                 strftime('%Y-%m-%d %H:%M:%S','now'), ?, ?, ?) RETURNING id",
+                 strftime('%Y-%m-%d %H:%M:%S','now'), ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(person_id)
@@ -135,6 +157,10 @@ pub async fn erfassen_tx(
     .bind(daten.client_id)
     .bind(daten.transport_durch)
     .bind(daten.einsatz_fahrzeug_id)
+    .bind(daten.leitstelle_einsatznummer)
+    .bind(daten.entlassen_an.map(|w| w.as_str()))
+    .bind(daten.gegen_rat.map(|w| w.as_str()))
+    .bind(daten.unterschrift.map(|w| w.as_str()))
     .fetch_one(&mut *conn)
     .await?;
     // Der Cache folgt dem jüngsten Ereignis (D6), nicht der Einfügung; die Kurzform wird aus der
@@ -472,6 +498,55 @@ mod tests {
             verlauf[1].betreuungsstelle_id,
             Some(stelle),
             "Verlauf behält den Verweis"
+        );
+    }
+
+    /// LLH-1568: die Angaben gehen ins Ereignis und kommen in der Anzeige zurück; ohne Angabe
+    /// fehlen die Felder.
+    #[tokio::test]
+    async fn erfassen_traegt_verbleib_angaben() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        let v = erfassen(
+            &pool,
+            e,
+            p,
+            VerbleibDaten {
+                entlassen_an: Some(EntlassenAn::Polizei),
+                gegen_rat: Some(GegenRat::Transport),
+                unterschrift: Some(Unterschrift::LiegtVor),
+                ..daten("entlassung", None)
+            },
+            b,
+        )
+        .await
+        .unwrap();
+        assert_eq!(v.entlassen_an, Some(EntlassenAn::Polizei));
+        assert_eq!(v.gegen_rat, Some(GegenRat::Transport));
+        assert_eq!(v.unterschrift, Some(Unterschrift::LiegtVor));
+        let t = erfassen(
+            &pool,
+            e,
+            p,
+            VerbleibDaten {
+                leitstelle_einsatznummer: Some("2611-0815"),
+                ..daten("transport", Some("KH Mitte"))
+            },
+            b,
+        )
+        .await
+        .unwrap();
+        assert_eq!(t.leitstelle_einsatznummer.as_deref(), Some("2611-0815"));
+        let json = serde_json::to_value(&t).unwrap();
+        let obj = json.as_object().unwrap();
+        for feld in ["entlassen_an", "gegen_rat", "unterschrift"] {
+            assert!(!obj.contains_key(feld), "{feld} fehlt ohne Angabe");
+        }
+        let verlauf = liste_je_person(&pool, e, p).await.unwrap();
+        assert_eq!(
+            verlauf[1].entlassen_an,
+            Some(EntlassenAn::Polizei),
+            "Verlauf behält"
         );
     }
 

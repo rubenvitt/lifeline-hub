@@ -466,6 +466,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Momentaufnahme in `transportmittel` und fällt mit ihm.
             retain("transport_durch", G_TRIAGE),
             retain("einsatz_fahrzeug_id", G_FK),
+            // LLH-1568 (design.md D6): die Einsatznummer der Leitstelle verknüpft die Person mit
+            // dem Rettungsdiensteinsatz → mit der Behandlung; die Katalogwerte bleiben als
+            // Statistik-Skelett für den Bericht.
+            scrub(
+                "leitstelle_einsatznummer",
+                Strategie::NullSetzen,
+                Z_BEHANDLUNG,
+            ),
+            retain("entlassen_an", G_TRIAGE),
+            retain("gegen_rat", G_TRIAGE),
+            retain("unterschrift", G_TRIAGE),
         ],
     },
     TabellenRegel {
@@ -3209,7 +3220,8 @@ pub(super) fn set_zuweisungen(scrubs: &[(&'static str, Strategie)]) -> (Vec<Stri
 
 /// Tabellen, deren Zeilen einer Person einen Behandlungsbezug geben (design.md D3), jeweils
 /// über `person_id`. Dazu kommen an `einsatz_person` selbst der Zustand, die PAT-Nummer und eine
-/// Kontamination „ja“ (LLH-1326, Change `y18v58dt-pat-kern`, design.md D4). Ohne `storniert_at`-Filter: auch
+/// Kontamination „ja“ (LLH-1326, Change `y18v58dt-pat-kern`, design.md D4) sowie ein Verbleib mit
+/// Einsatznummer der Leitstelle (LLH-1568). Ohne `storniert_at`-Filter: auch
 /// eine stornierte Sichtung war eine medizinische Einschätzung. Gepinnt in
 /// `tests::behandlungsbezug_kennt_jede_personentabelle`.
 pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
@@ -3233,6 +3245,11 @@ fn behandlungsbezug_sql() -> String {
         "p.zustand IS NOT NULL".to_string(),
         "p.pat_nummer IS NOT NULL".to_string(),
         "p.kontamination = 1".to_string(),
+        // LLH-1568: die Einsatznummer der Leitstelle gehört zur Behandlung (Übergabe an den
+        // Rettungsdienst); ein Verbleib ohne sie bleibt Personenstamm.
+        "EXISTS (SELECT 1 FROM person_verbleib x WHERE x.person_id = p.id \
+            AND x.leitstelle_einsatznummer IS NOT NULL)"
+            .to_string(),
     ];
     for t in BEHANDLUNGSBEZUG_TABELLEN {
         teile.push(format!(
@@ -3988,6 +4005,7 @@ mod tests {
                     "person_sichtung.notiz",
                     "person_transport.fachrichtung",
                     "person_uhs_belegung.notiz",
+                    "person_verbleib.leitstelle_einsatznummer",
                     "person_verlaufsnotiz.text",
                     "person_verletzung.notiz",
                     "person_verletzung.x",
@@ -4063,7 +4081,8 @@ mod tests {
         const KEIN_BEHANDLUNGSBEZUG: &[(&str, &str)] = &[
             (
                 "person_verbleib",
-                "Verbleib: Personenstamm, dient beiden Zwecken",
+                "Verbleib: Personenstamm, dient beiden Zwecken; Behandlungsbezug nur mit \
+                 Einsatznummer der Leitstelle (LLH-1568, eigene Bedingung in behandlungsbezug_sql)",
             ),
             (
                 "person_abgleich",

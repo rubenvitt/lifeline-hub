@@ -48,7 +48,8 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
 5. „Meldungen“ unter der Karte zählt die „Sofortmeldungen offen“, die noch niemand bestätigt
    hat.
 6. „Ablauf“ neben „Meldungen“ nennt die nächsten drei Programmpunkte aus den
-   [Einsatzdaten](einsatzdaten.md) mit Uhrzeit, Bezeichnung und Abstand, etwa „in 1 h 30 min“.
+   [Einsatzdaten](einsatzdaten.md): oben Uhrzeit und Abstand, etwa „in 1 h 30 min“, darunter
+   die Bezeichnung über die ganze Breite der Kachel.
    Ein Punkt fällt mit seiner Uhrzeit heraus; steht keiner mehr an, fehlt die Kachel.
 7. Steigt die Zahl der offenen Sofortmeldungen oder die Zahl in SK I, ist sie eine Minute lang
    farbig hinterlegt, und oben in der Kachel steht „Neue Sofortmeldung“ bzw. „Neu in SK I“.

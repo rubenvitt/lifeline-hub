@@ -1,5 +1,14 @@
 import type { VerbleibEingabe } from '../api/einsatzPerson';
-import type { Betreuungsstelle, Person, TransportmittelAuswahl, VerbleibArt } from '../api/types';
+import type {
+  Betreuungsstelle,
+  EntlassenAn,
+  GegenRat,
+  Person,
+  TransportmittelAuswahl,
+  Unterschrift,
+  VerbleibArt,
+} from '../api/types';
+import { ENTLASSEN_AN_WORT, GEGEN_RAT_WORT } from './personMeta';
 
 /**
  * Reiner Kern des Verbleib-Dialogs (`VerbleibErfassung.tsx`). Felder je Art halten das Budget:
@@ -22,6 +31,43 @@ export interface VerbleibFormWerte {
    * dann ist der Transport ein Eigentransport. Jede Texteingabe danach leert sie.
    */
   einsatz_fahrzeug_id?: number | null;
+  /** Angaben aus LLH-1568 (Spec `verbleib-angaben`); welche mitgehen, sagt `verbleibAngaben`. */
+  leitstelle_einsatznummer?: string;
+  entlassen_an?: EntlassenAn | null;
+  gegen_rat?: GegenRat | null;
+  unterschrift?: Unterschrift | null;
+}
+
+export const ENTLASSEN_AN_OPTIONEN: { value: EntlassenAn; label: string }[] = (
+  Object.keys(ENTLASSEN_AN_WORT) as EntlassenAn[]
+).map((value) => ({ value, label: ENTLASSEN_AN_WORT[value] }));
+
+export const GEGEN_RAT_OPTIONEN: { value: GegenRat; label: string }[] = (
+  Object.keys(GEGEN_RAT_WORT) as GegenRat[]
+).map((value) => ({ value, label: GEGEN_RAT_WORT[value] }));
+
+/** Auswahl „Unterschrift“: die Unterschrift selbst bleibt auf Papier (LLH-1568, design.md D1). */
+export const UNTERSCHRIFT_OPTIONEN: { value: Unterschrift; label: string }[] = [
+  { value: 'liegt_vor', label: 'liegt auf Papier vor' },
+  { value: 'verweigert', label: 'verweigert' },
+];
+
+/**
+ * Welche Angaben aus LLH-1568 zur Art passen (design.md D3/D4): die Einsatznummer nur beim
+ * Transport ohne Fahrzeug aus „Im Einsatz“, „Entlassen an“ nur bei der Entlassung, „Gegen Rat“
+ * bei Entlassung und Transport, die Unterschrift nur mit gewählter Ablehnung.
+ */
+export function sichtbareVerbleibAngaben(
+  art: VerbleibArt | undefined,
+  w: { einsatz_fahrzeug_id?: number | null; gegen_rat?: GegenRat | null },
+): { einsatznummer: boolean; entlassenAn: boolean; gegenRat: boolean; unterschrift: boolean } {
+  const gegenRat = art === 'entlassung' || art === 'transport';
+  return {
+    einsatznummer: art === 'transport' && w.einsatz_fahrzeug_id == null,
+    entlassenAn: art === 'entlassung',
+    gegenRat,
+    unterschrift: gegenRat && w.gegen_rat != null,
+  };
 }
 
 export const VERBLEIB_ART_OPTIONEN: { value: VerbleibArt; label: string }[] = [
@@ -110,6 +156,13 @@ export function verbleibBody(
       body.transport_durch = 'fremd';
     }
   }
+  // Angaben aus LLH-1568: nur, was zur Art passt (antd hält ausgeblendete Werte, sonst 422).
+  const angaben = sichtbareVerbleibAngaben(w.art, w);
+  const einsatznummer = w.leitstelle_einsatznummer?.trim();
+  if (angaben.einsatznummer && einsatznummer) body.leitstelle_einsatznummer = einsatznummer;
+  if (angaben.entlassenAn && w.entlassen_an != null) body.entlassen_an = w.entlassen_an;
+  if (angaben.gegenRat && w.gegen_rat != null) body.gegen_rat = w.gegen_rat;
+  if (angaben.unterschrift && w.unterschrift != null) body.unterschrift = w.unterschrift;
   if (stelleSichtbar && w.art === 'notunterkunft' && w.betreuungsstelle_id != null) {
     body.betreuungsstelle_id = w.betreuungsstelle_id;
   }

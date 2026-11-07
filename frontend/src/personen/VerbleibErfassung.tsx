@@ -6,6 +6,7 @@ import { ladeBetreuung } from '../api/betreuung';
 import { ApiError } from '../api/client';
 import { useAuthOptional } from '../auth/AuthContext';
 import type { VerbleibEingabe } from '../api/einsatzPerson';
+import { EINSATZNUMMER_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Betreuungsstelle, VerbleibArt } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -15,7 +16,11 @@ import { modulRegistry } from '../einsatz/modulRegistry';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import { betreuungZugriffVon } from '../pages/lagekarte/betreuungEbene';
 import {
+  ENTLASSEN_AN_OPTIONEN,
+  GEGEN_RAT_OPTIONEN,
+  UNTERSCHRIFT_OPTIONEN,
   VERBLEIB_ART_OPTIONEN,
+  sichtbareVerbleibAngaben,
   sichtbareVerbleibFelder,
   stellenOptionen,
   verbleibBody,
@@ -86,6 +91,11 @@ export function useVerbleibFelder(
   });
   const stellen = betreuungQuery.data?.stellen ?? [];
   const felder = sichtbareVerbleibFelder(art, zugriff === 'frei');
+  // Angaben aus LLH-1568 (Spec `verbleib-angaben`, design.md D4).
+  const angaben = sichtbareVerbleibAngaben(art, {
+    einsatz_fahrzeug_id: Form.useWatch('einsatz_fahrzeug_id', form),
+    gegen_rat: Form.useWatch('gegen_rat', form),
+  });
 
   // Die zuletzt gewählte Stelle — nur so erkennt die Vorbelegung, ob „Ziel" noch ihren Namen
   // trägt oder eigener Text ist.
@@ -153,6 +163,11 @@ export function useVerbleibFelder(
       {felder.transportmittel && (
         <RettungsmittelFeld einsatzId={einsatzId} form={form} fokus={artVorbelegt} />
       )}
+      {angaben.entlassenAn && (
+        <Form.Item label="Entlassen an" name="entlassen_an">
+          <Select allowClear options={ENTLASSEN_AN_OPTIONEN} />
+        </Form.Item>
+      )}
       <Collapse
         ghost
         items={[
@@ -164,6 +179,21 @@ export function useVerbleibFelder(
                 {/* Am UHS-Gerät (LFH-1046); hier, weil Art, Ziel und Transportmittel das Budget
                     schon füllen. */}
                 <BestaetigtVonFeld einsatzId={einsatzId} />
+                {angaben.einsatznummer && (
+                  <Form.Item label="Einsatznummer Leitstelle" name="leitstelle_einsatznummer">
+                    <Input maxLength={EINSATZNUMMER_MAX} />
+                  </Form.Item>
+                )}
+                {angaben.gegenRat && (
+                  <Form.Item label="Gegen Rat" name="gegen_rat">
+                    <Select allowClear options={GEGEN_RAT_OPTIONEN} />
+                  </Form.Item>
+                )}
+                {angaben.unterschrift && (
+                  <Form.Item label="Unterschrift" name="unterschrift">
+                    <Select allowClear options={UNTERSCHRIFT_OPTIONEN} />
+                  </Form.Item>
+                )}
                 <Form.Item label="Notiz" name="notiz" style={{ marginBottom: 0 }}>
                   <Input.TextArea rows={2} />
                 </Form.Item>
@@ -183,11 +213,13 @@ export function useVerbleibFelder(
  * Montiert = offen, jede Öffnung hat eine frische Mutation. Fehler stehen IM Dialog; die
  * Mutation hat kein `onError`, `mutateAsync` lehnt ab, die Hülle lässt die Felder stehen.
  *
- * Felder je Art halten das Budget (≤ 3): Transportmittel nur beim Transport, die
+ * Felder je Art halten das Budget (≤ 3): Transportmittel nur beim Transport, „Entlassen an“ nur
+ * bei der Entlassung (LLH-1568), die
  * Betreuungsstelle nur bei der Notunterkunft UND mit Lesezugriff auf das Modul Betreuung — die
  * Grenze sitzt an der Datenquelle (ohne Zugriff kein Abruf, ein 403 heißt „keine Auswahl").
  * Die Notiz liegt unter „Weitere Angaben", OHNE `forceRender` (sie hat keine Vorbelegung, und
- * nur so bleibt „≤ 3 sichtbar" widerlegbar); am UHS-Gerät dort auch „Bestätigt von“ (LFH-1046).
+ * nur so bleibt „≤ 3 sichtbar" widerlegbar); am UHS-Gerät dort auch „Bestätigt von“ (LFH-1046),
+ * dazu je Art „Einsatznummer Leitstelle“, „Gegen Rat“ und „Unterschrift“ (LLH-1568).
  *
  * Die Stellenwahl belegt „Ziel" sichtbar und änderbar mit dem Namen vor; gespeichert wird, was
  * dort steht.

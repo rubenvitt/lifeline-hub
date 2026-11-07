@@ -142,6 +142,46 @@ describe('PersonDruckPage', () => {
     }
   });
 
+  it('druckt den Verbleib mit den Angaben aus LLH-1568 (Spec `verbleib-angaben`)', async () => {
+    const verbleib = (teil: Record<string, unknown>) => ({
+      einsatz_id: 5,
+      person_id: 10,
+      erfasst_von: 1,
+      ...teil,
+    });
+    renderPage(() =>
+      HttpResponse.json(
+        person({
+          verbleib: [
+            verbleib({
+              id: 2,
+              art: 'entlassung',
+              entlassen_an: 'polizei',
+              gegen_rat: 'transport',
+              unterschrift: 'verweigert',
+              zeitpunkt_at: '2026-10-18 10:30:00',
+            }),
+            verbleib({ id: 1, art: 'vor_ort', zeitpunkt_at: '2026-10-18 10:00:00' }),
+          ],
+        } as Partial<PersonDetail>),
+      ),
+    );
+    await fertig();
+    const dt = within(wurzel()).getByText('Verbleib', { selector: 'dt' });
+    // Minute 30 ist der jüngste Verbleib (10:30), der ältere stünde auf 00; die Minuten hängen
+    // nicht von der Anzeigezeitzone ab.
+    expect(dt.nextElementSibling?.textContent ?? '').toMatch(
+      /^entlassen an Polizei · gegen Rat: Transport abgelehnt, Unterschrift verweigert · \d{4}30(?!\d)/,
+    );
+  });
+
+  it('ohne Verbleib steht „kein Verbleib“', async () => {
+    renderPage(() => HttpResponse.json(person()));
+    await fertig();
+    const dt = within(wurzel()).getByText('Verbleib', { selector: 'dt' });
+    expect(dt.nextElementSibling).toHaveTextContent(/^kein Verbleib$/);
+  });
+
   it('druckt das Geburtsdatum als TT.MM.JJJJ (LLH-1103)', async () => {
     renderPage(() => HttpResponse.json({ ...person(), geburtsdatum: '1980-07-14' }));
     await fertig();
