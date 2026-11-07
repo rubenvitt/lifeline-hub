@@ -297,14 +297,15 @@ export default function NachforderungenPage() {
     queryKey: einsatzKeys.person(einsatzId, personBezugId),
     queryFn: () => ladePerson(einsatzId, personBezugId as number),
     enabled: personenFrei && personBezugId != null,
-    // Jeder Abruf des Details schreibt „Detail geöffnet“ ins Zugriffsprotokoll: für die Vorgabe
-    // genügt ein Abruf je Erfassung (oder der Stand aus dem Cache der Personenseite), kein
-    // Nachladen bei Fokus, neuer Verbindung oder erneutem Einhängen.
-    staleTime: Infinity,
+    // Jeder Abruf des Details schreibt „Detail geöffnet“ ins Zugriffsprotokoll, und das Detail ist
+    // nicht live (`queryKeys`, Ereignis `person`): genau ein Abruf beim Öffnen der Erfassung, auch
+    // wenn die Personenseite einen (womöglich älteren) Stand hält, damit UHS und Priorität stimmen.
+    // Kein Nachladen bei Fokus; eine neue Verbindung holt nur einen gescheiterten Abruf nach.
+    staleTime: 0,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
+    refetchOnReconnect: (q) => q.state.status === 'error',
   });
+  const personNeuLaden = personQuery.refetch;
   // Gemerkt (die Karten sind `memo`): ohne Freigabe Personen keine Verweise, nur die Nummer.
   const personPfad = useMemo(
     () => (personenFrei ? (pid: number) => personDetailPfad(einsatzId, pid) : null),
@@ -312,15 +313,30 @@ export default function NachforderungenPage() {
   );
   const personBezug = useMemo<NachforderungPersonBezug | null>(() => {
     if (personBezugId == null) return null;
-    const p = personenFrei ? personQuery.data : undefined;
+    // Erst der frische Abruf dieser Erfassung belegt vor: ein älterer Stand aus dem Cache stünde
+    // sonst schon in „Wohin“, bevor der neue kommt (das Feld wird nur leer vorbelegt).
+    const frisch = personQuery.isSuccess && personQuery.isFetchedAfterMount;
+    const p = personenFrei && frisch ? personQuery.data : undefined;
     return {
       personId: personBezugId,
       registrierNr: p?.registrier_nr,
       pfad: p ? personDetailPfad(einsatzId, personBezugId) : undefined,
       uhs: p?.aufenthalt?.uhs_bezeichnung,
       prioritaet: prioritaetAusTransport(p?.transport_prioritaet),
+      ladefehler: personenFrei && personQuery.isError && !personQuery.isFetching,
+      erneutLaden: () => void personNeuLaden(),
     };
-  }, [personBezugId, personenFrei, personQuery.data, einsatzId]);
+  }, [
+    personBezugId,
+    personenFrei,
+    personQuery.data,
+    personQuery.isSuccess,
+    personQuery.isFetchedAfterMount,
+    personQuery.isError,
+    personQuery.isFetching,
+    personNeuLaden,
+    einsatzId,
+  ]);
   const bezug = useMemo<NachforderungBezug | null>(
     () =>
       bezugId == null

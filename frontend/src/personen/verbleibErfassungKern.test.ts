@@ -365,4 +365,14 @@ describe('Vorbelegung aus dem Rettungsmittel (LLH-1573, design.md D6)', () => {
       verbleibAusRettungsmittel({ rettungsmittel: stand, aktuelle_verbleib_art: 'transport' }),
     ).toBeUndefined();
   });
+
+  it('nichts aus dem gekürzten Stand ohne Netz (ohne Rufnamen und Nummer)', () => {
+    const gekuerzt = {
+      ...stand,
+      rufnamen: [],
+      leitstelle_einsatznummer: undefined,
+      nicht_geladen: ['leitstelle_einsatznummer', 'rufnamen'],
+    };
+    expect(verbleibAusRettungsmittel({ rettungsmittel: gekuerzt })).toBeUndefined();
+  });
 });

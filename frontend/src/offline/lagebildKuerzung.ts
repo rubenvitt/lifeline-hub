@@ -123,12 +123,13 @@ const MARKE = 'nicht_geladen';
  * Kennung, Status und erwartetes Eintreffen; die Art nur als gängiges Kürzel (`GAENGIGE_ARTEN`),
  * sonst neutral „Rettungsmittel“, denn „Was“ ist Freitext. Ohne Rufnamen (Freitext) und ohne
  * Einsatznummer der Leitstelle (personengebunden). Die Marke an der UHS braucht nur Art und
- * Status; die Verbleib-Vorbelegung fällt ohne Netz auf die Art zurück. Wiederholt angewandt gleich.
+ * Status. Die Marke `nicht_geladen` am Stand nennt die ausgelassenen Felder: aus ihm belegt der
+ * Verbleib nichts vor (`rettungsmittelGekuerzt`). Wiederholt angewandt gleich.
  */
 function rettungsmittelKuerzen(r: unknown): unknown {
   if (r === null || typeof r !== 'object') return r;
   const quelle = r as Record<string, unknown>;
-  const gekuerzt: Record<string, unknown> = { rufnamen: [] };
+  const gekuerzt: Record<string, unknown> = { rufnamen: [], [MARKE]: RETTUNGSMITTEL_AUSGELASSEN };
   for (const feld of ['nachforderung_id', 'status', 'eintreffen_erwartet_at']) {
     if (feld in quelle) gekuerzt[feld] = quelle[feld];
   }
@@ -140,6 +141,16 @@ function rettungsmittelKuerzen(r: unknown): unknown {
 }
 
 /** Art eines Rettungsmittels ohne Netz, wenn „Was“ kein gängiges Kürzel ist. */
+const RETTUNGSMITTEL_AUSGELASSEN = ['leitstelle_einsatznummer', 'rufnamen'];
+
+/**
+ * Ist dieser Rettungsmittel-Stand der gekürzte von der Platte (ohne Rufnamen und Einsatznummer)?
+ * Dann taugt er nicht als Vorbelegung des Verbleibs: leere Rufnamen hieße sonst „keine zugesagt“.
+ */
+export function rettungsmittelGekuerzt(r: object | null | undefined): boolean {
+  return r != null && MARKE in r;
+}
+
 export const RETTUNGSMITTEL_NEUTRAL = 'Rettungsmittel';
 
 function personKuerzen(p: unknown): unknown {

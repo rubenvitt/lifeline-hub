@@ -9,6 +9,7 @@ import type {
   Unterschrift,
   VerbleibArt,
 } from '../api/types';
+import { rettungsmittelGekuerzt } from '../offline/lagebildKuerzung';
 import { ENTLASSEN_AN_WORT, GEGEN_RAT_WORT } from './personMeta';
 
 /**
@@ -237,6 +238,9 @@ export function verbleibAusRettungsmittel(
   if (stand?.status !== 'eingetroffen' || person.aktuelle_verbleib_art === 'transport') {
     return undefined;
   }
+  // Der gekürzte Stand von der Platte (ohne Netz) kennt weder Rufnamen noch Einsatznummer: keine
+  // halbe Vorbelegung, die wie eine vollständige aussieht.
+  if (rettungsmittelGekuerzt(stand)) return undefined;
   return {
     art: 'transport',
     transportmittel: stand.rufnamen[0] ?? stand.art,

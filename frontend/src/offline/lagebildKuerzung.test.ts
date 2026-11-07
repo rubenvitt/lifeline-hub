@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Person, PersonAuswahl } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
-import { lagebildKuerzen, nichtGeladen, PERSON_AUF_DER_PLATTE } from './lagebildKuerzung';
+import {
+  lagebildKuerzen,
+  nichtGeladen,
+  PERSON_AUF_DER_PLATTE,
+  rettungsmittelGekuerzt,
+} from './lagebildKuerzung';
 
 // LFH-1095 (design.md D2): die Felder einer Person, die auf die Platte dürfen — als LITERAL
 // gegen die Registry, sonst prüfte die Positivliste sich selbst.
@@ -177,7 +182,10 @@ describe('lagebildKuerzen', () => {
       art: 'RTW',
       status: 'unterwegs',
       rufnamen: [],
+      nicht_geladen: ['leitstelle_einsatznummer', 'rufnamen'],
     });
+    expect(rettungsmittelGekuerzt(p.rettungsmittel as object)).toBe(true);
+    expect(rettungsmittelGekuerzt(VOLL.rettungsmittel)).toBe(false);
   });
 
   it('kürzt das Rettungsmittel auf eine Positivliste, freie Art neutral (LLH-1573)', () => {
@@ -202,6 +210,7 @@ describe('lagebildKuerzen', () => {
       status: 'zugesagt',
       rufnamen: [],
       eintreffen_erwartet_at: '2026-10-18 10:00:00',
+      nicht_geladen: ['leitstelle_einsatznummer', 'rufnamen'],
     });
   });
 

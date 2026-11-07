@@ -467,4 +467,20 @@ describe('NachforderungFormular — Personenbezug (LLH-1573)', () => {
       ),
     );
   });
+
+  it('zeigt ein nicht geladenes Detail mit „Erneut laden“', async () => {
+    const erneutLaden = vi.fn();
+    renderMitProviders(
+      <NachforderungFormular
+        card={false}
+        senden={false}
+        onAnlegen={vi.fn()}
+        personBezug={{ personId: 10, ladefehler: true, erneutLaden }}
+      />,
+    );
+    const bezug = document.querySelector('[data-lfh="nachforderung-bezug"]') as HTMLElement;
+    expect(bezug).toHaveTextContent('Für eine Person · nicht geladen');
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut laden' }));
+    expect(erneutLaden).toHaveBeenCalledOnce();
+  });
 });

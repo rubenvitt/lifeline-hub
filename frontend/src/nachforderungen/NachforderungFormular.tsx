@@ -113,6 +113,9 @@ export interface NachforderungPersonBezug {
   uhs?: string;
   /** Vorgabe für die Priorität, aus der Transportpriorität der Person. */
   prioritaet?: NachforderungPrioritaet;
+  /** Das Detail der Person kam nicht: Nummer, UHS und Priorität fehlen, darum sichtbar. */
+  ladefehler?: boolean;
+  erneutLaden?: () => void;
 }
 
 /** Was ein Personenbezug vorbelegt: ein Rettungsmittel, in der Regel ein RTW. */
@@ -395,6 +398,15 @@ export default function NachforderungFormular({
             </>
           ) : (
             'Für eine Person'
+          )}
+          {personBezug.ladefehler && (
+            <>
+              {' · '}
+              <Typography.Text type="warning">nicht geladen</Typography.Text>{' '}
+              <Button type="link" onClick={personBezug.erneutLaden}>
+                Erneut laden
+              </Button>
+            </>
           )}
         </Typography.Paragraph>
       )}
