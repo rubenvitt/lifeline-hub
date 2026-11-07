@@ -795,7 +795,8 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
     org_rolle: 'fuehrungskraft',
   });
 
-  function demoStatus(antwort: 'aus' | { importiert: boolean }) {
+  /** `importiert` gilt für den Starkregen, `stadtfest` für die zweite Lage (LLH-1576). */
+  function demoStatus(antwort: 'aus' | { importiert: boolean; stadtfest?: boolean }) {
     const zaehler = { get: 0 };
     let stand = antwort;
     server.use(
@@ -803,7 +804,12 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
         zaehler.get += 1;
         return stand === 'aus'
           ? HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 })
-          : HttpResponse.json(stand);
+          : HttpResponse.json({
+              lagen: [
+                { lage: 'starkregen', importiert: stand.importiert },
+                { lage: 'stadtfest', importiert: stand.stadtfest ?? false },
+              ],
+            });
       }),
     );
     return { zaehler, setze: (s: typeof antwort) => (stand = s) };
@@ -927,6 +933,15 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
 
   it('importiert: kein Hinweis', async () => {
     const { zaehler } = demoStatus({ importiert: true });
+    rendern(admin);
+    await waitFor(() => expect(zaehler.get).toBe(1));
+    expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(hinweisLink()).toBeNull();
+  });
+
+  it('nur die zweite Lage importiert: kein Hinweis (LLH-1576)', async () => {
+    const { zaehler } = demoStatus({ importiert: false, stadtfest: true });
     rendern(admin);
     await waitFor(() => expect(zaehler.get).toBe(1));
     expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();

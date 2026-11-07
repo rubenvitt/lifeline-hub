@@ -22,7 +22,7 @@ stehen, dass der harte Löschweg für Demo-Daten erreichbar ist.
 - **THEN** ist der Demo-Import nicht freigeschaltet
 
 #### Scenario: Ohne Freischaltung ist der Pfad unbekannt
-- **WHEN** ohne Freischaltung `GET`, `POST` oder `DELETE` auf `/api/demo-daten` bzw. `POST` auf `/api/demo-daten/neu` gesendet wird, einmal anonym und einmal als System-Admin
+- **WHEN** ohne Freischaltung `GET` auf `/api/demo-daten`, `POST` oder `DELETE` auf `/api/demo-daten/{lage}` bzw. `POST` auf `/api/demo-daten/{lage}/neu` gesendet wird, einmal anonym und einmal als System-Admin
 - **THEN** antwortet das System in jedem Fall mit 404 und demselben Fehler-Body wie bei einem unbekannten `/api/`-Pfad
 - **AND** nie mit 401, 403 oder 405
 
@@ -53,29 +53,30 @@ auf eine Organisation, die aus einer Reihenfolge abgeleitet ist.
 
 ### Requirement: Status der Demo-Daten
 
-`GET /api/demo-daten` SHALL für die Organisation des Admins melden, ob ein aktiver Import
-besteht. Besteht einer, MUST die Antwort den Importzeitpunkt, den Demo-Einsatz (ID und
-Bezeichnung) und den Bericht des Imports tragen. Nach einem Entfernen MUST die Antwort
-„nicht importiert“ lauten und den Bericht des Entfernens tragen.
+`GET /api/demo-daten` SHALL für die Organisation des Admins je Lage melden, ob ein aktiver
+Import besteht, immer für alle Lagen in fester Reihenfolge. Besteht einer, MUST der Eintrag
+den Importzeitpunkt, den Demo-Einsatz (ID und Bezeichnung) und den Bericht des Imports tragen.
+Nach einem Entfernen MUST der Eintrag „nicht importiert“ lauten und den Bericht des Entfernens
+tragen.
 
 #### Scenario: Nichts importiert
 - **WHEN** der Admin den Status abfragt und nie importiert wurde
-- **THEN** meldet die Antwort „nicht importiert“ ohne Bericht
+- **THEN** meldet die Antwort jede Lage als „nicht importiert“ ohne Bericht
 
 #### Scenario: Importiert
-- **WHEN** der Admin nach einem Import den Status abfragt
-- **THEN** nennt die Antwort Importzeitpunkt, Einsatz-ID, Einsatzbezeichnung und den Bericht mit „angelegt“ und „mitbenutzt“ je Stammdatenart
+- **WHEN** der Admin nach einem Import einer Lage den Status abfragt
+- **THEN** nennt der Eintrag dieser Lage Importzeitpunkt, Einsatz-ID, Einsatzbezeichnung und den Bericht mit „angelegt“ und „mitbenutzt“ je Stammdatenart
 
 ### Requirement: Herkunftsmarke
 
-Das System SHALL jeden Import als Kopf-Datensatz führen, samt Organisation, importierender
+Das System SHALL jeden Import als Kopf-Datensatz führen, samt Organisation, Lage, importierender
 Person, Zeitpunkt, Demo-Einsatz und Bericht. Jede Stammdatenzeile, die der Import neu
 anlegt, MUST dem Kopf zugeordnet sein. Mitbenutzte Stammdaten MUST NOT eine Marke
-bekommen. Je Organisation MUST höchstens ein aktiver Import bestehen. Nach dem Entfernen
+bekommen. Je Organisation und Lage MUST höchstens ein aktiver Import bestehen. Nach dem Entfernen
 MUST der Kopf als Historie mit Entfernzeitpunkt stehen bleiben.
 
 #### Scenario: Zweiter Import
-- **WHEN** der Admin importiert, während für seine Organisation schon ein aktiver Import besteht
+- **WHEN** der Admin eine Lage importiert, während für seine Organisation schon ein aktiver Import dieser Lage besteht
 - **THEN** antwortet das System mit 409 und legt nichts an
 
 #### Scenario: Mitbenutzter Datensatz bleibt unmarkiert
@@ -85,15 +86,16 @@ MUST der Kopf als Historie mit Entfernzeitpunkt stehen bleiben.
 
 ### Requirement: Stammdaten mit Konfliktregel
 
-Der Import SHALL die Stammdaten anlegen, die das Szenario braucht: Fahrzeuge, Personal,
-Material, Einheiten-Vorlagen und ein Schichtmodell (LLH-1122) der Organisation. Ein vorhandener
+Der Import SHALL die Stammdaten anlegen, die das Szenario der Lage braucht: Fahrzeuge,
+Personal, Material und, soweit die Lage sie vorsieht, Einheiten-Vorlagen und ein Schichtmodell
+(LLH-1122) der Organisation. Ein vorhandener
 Datensatz derselben Organisation mit Dienststatus `in_dienst` (bei Einheiten-Vorlagen: aktiv)
 und derselben fachlichen Kennung MUST mitbenutzt statt angelegt werden. Die Kennung ist beim
 Fahrzeug der Funkrufname, beim Personal die Personalnummer, beim Material die Bestandsnummer,
 bei der Einheiten-Vorlage der Name und beim Schichtmodell die Bezeichnung ohne Unterschied von
 Groß- und Kleinschreibung. Ein angelegtes Schichtmodell MUST NOT die Vorgabe der Organisation
-werden; hat der Demo-Einsatz bei seiner Anlage keine Vorgabe bekommen, MUST er das
-Szenario-Modell als Kopie zur Vorgabe bekommen. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
+werden; sieht die Lage ein Schichtmodell vor und hat der Demo-Einsatz bei seiner Anlage keine
+Vorgabe bekommen, MUST er das Szenario-Modell als Kopie zur Vorgabe bekommen. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
 Datensatz MUST unverändert bleiben. Kataloge (Fahrzeug- und Personalstatus, Einheitstypen,
 Qualifikationen) MUST nur mitbenutzt werden, und zwar nur aktive
 Einträge. Fehlt ein benötigter Katalogeintrag, MUST der Import mit 422 abbrechen, den
@@ -117,19 +119,20 @@ und MUST NOT eine Zuordnung zwischen Personal und Benutzerkonto setzen.
 - **THEN** ist die Zahl der Benutzerkonten vorher und nachher gleich
 
 #### Scenario: Demo-Schichtmodell
-- **WHEN** der Admin in eine Organisation ohne Schichtmodelle importiert
+- **WHEN** der Admin die Lage „Starkregen“ in eine Organisation ohne Schichtmodelle importiert
 - **THEN** steht danach das Schichtmodell „12-h-Schicht Hochwasser“ mit Demo-Marke, nicht als Vorgabe der Organisation
 - **AND** der Demo-Einsatz hat es als Vorgabe der Ablösung
 
 #### Scenario: Demo-Vorlage mit Untereinheit
-- **WHEN** der Admin in eine Organisation ohne Vorlagen importiert
+- **WHEN** der Admin die Lage „Starkregen“ in eine Organisation ohne Vorlagen importiert
 - **THEN** steht danach die Vorlage „Sanitätszug Musterstadt“ mit der Untereinheit „Rettungsstaffel“, beide mit Demo-Marke und mit Demo-Fahrzeugen
 
 ### Requirement: Demo-Einsatz
 
-Der Import SHALL genau einen Einsatz anlegen: Einsatzart `uebung`, Bezeichnung beginnend
-mit „ÜBUNG – “, Stichwort aus dem Bereich Unwetter bzw. Starkregen, ein fiktiver Ort,
-erkennbar fiktive Personennamen. Der Einsatz MUST befüllen: Einsatzabschnitte Betreuung,
+Der Import SHALL je Lage genau einen Einsatz anlegen: Einsatzart `uebung`, Bezeichnung
+beginnend mit „ÜBUNG – “, ein fiktiver Ort, erkennbar fiktive Personennamen. Der Einsatz der
+Lage „Starkregen“ MUST ein Stichwort aus dem Bereich Unwetter bzw. Starkregen tragen und
+befüllen: Einsatzabschnitte Betreuung,
 Sanitätsdienst und Logistik mit unterschiedlichem Lagezustand, Einheiten mit Fahrzeugen im
 FMS-Status und Rückmeldungen, von denen mindestens eine überfällig ist, eine UHS mit
 gesichteten Betroffenen aller Kategorien SK I–IV nach BBK, einen Bereitstellungsraum, eine
@@ -142,11 +145,11 @@ festlegen. Nummernkreise (Einsatznummer, ETB, Meldungen, Aufträge, Registriernu
 MUST über dieselben Funktionen vergeben werden wie im Betrieb.
 
 #### Scenario: Überblick zeigt die Lage
-- **WHEN** der Admin nach dem Import den Demo-Einsatz öffnet
+- **WHEN** der Admin nach dem Import der Lage „Starkregen“ den Demo-Einsatz öffnet
 - **THEN** zeigt die Einsatzliste ihn mit Einsatzart Übung, und der Einsatz meldet die Lagekennzahl „evakuiert“, aber keine „pegel“
 
 #### Scenario: Sichtung nach BBK
-- **WHEN** die Betroffenen des Demo-Einsatzes abgefragt werden
+- **WHEN** die Betroffenen des Demo-Einsatzes der Lage „Starkregen“ abgefragt werden
 - **THEN** kommt jede der Kategorien SK I, SK II, SK III und SK IV mindestens einmal vor
 
 #### Scenario: Einzige Mitgliedschaft
@@ -179,24 +182,25 @@ gelten, und es MUST keine unbestätigte Meldung mit abgelaufener Bestätigungsfr
 ### Requirement: Import ist atomar
 
 Der Import SHALL in einer einzigen Schreibtransaktion laufen. Scheitert ein Schritt, MUST
-die Datenbank im Stand vor dem Import bleiben: kein Einsatz, keine Stammdaten, kein
-Kopf-Datensatz.
+die Datenbank im Stand vor dem Import bleiben: kein Einsatz, keine Stammdaten und kein
+Kopf-Datensatz dieser Lage; eine schon aktive andere Lage bleibt unverändert.
 
 #### Scenario: Abbruch mitten im Import
 - **WHEN** ein Schritt des Imports scheitert, etwa an einem fehlenden Katalogeintrag
-- **THEN** existieren danach weder Demo-Einsatz noch Demo-Stammdaten noch ein aktiver Kopf-Datensatz
+- **THEN** existieren danach weder Demo-Einsatz noch Demo-Stammdaten noch ein aktiver Kopf-Datensatz dieser Lage, und eine schon aktive andere Lage ist zeilengleich erhalten
 
 ### Requirement: Demo-Daten entfernen
 
-`DELETE /api/demo-daten` SHALL in einer Schreibtransaktion den Demo-Einsatz der eigenen
-Organisation samt allem, was an ihm hängt, hart löschen und danach die markierten
+`DELETE /api/demo-daten/{lage}` SHALL in einer Schreibtransaktion den Demo-Einsatz dieser Lage
+der eigenen Organisation samt allem, was an ihm hängt, hart löschen und danach die markierten
 Stammdaten. Der Löschweg MUST an die Marke gebunden sein: Er löscht nur den Einsatz, den
-der aktive Kopf-Datensatz der eigenen Organisation nennt, und nur Stammdatenzeilen aus der
+der aktive Kopf-Datensatz dieser Lage der eigenen Organisation nennt, und nur Stammdatenzeilen aus der
 Marke. Eine markierte Stammdatenzeile, auf die nach dem Löschen des Einsatzes noch
 irgendein Datensatz verweist, MUST stehen bleiben und ihre Marke verlieren. Der Bericht
-MUST sie als „behalten“ zählen. Besteht kein aktiver Import, MUST das System mit 409
+MUST sie als „behalten“ zählen. Besteht kein aktiver Import der Lage, MUST das System mit 409
 antworten. Nach dem Entfernen MUST die Datenbank in allen Nutzdatentabellen dieselben Zeilen
-tragen wie vor dem Import. Ausgenommen sind der Kopf-Datensatz als Historie, die als
+tragen wie vor dem Import dieser Lage, abgesehen von dem, was zwischen Import und Entfernen
+außerhalb dieser Lage entstanden ist, etwa eine andere Lage. Ausgenommen sind der Kopf-Datensatz als Historie, die als
 „behalten“ gemeldeten Stammdaten, Sitzungen und Anmeldeprotokoll, Benutzereinstellungen,
 SQLite-Verwaltungstabellen und die Schattentabellen der Volltextsuche.
 
@@ -214,7 +218,7 @@ SQLite-Verwaltungstabellen und die Schattentabellen der Volltextsuche.
 - **AND** die Disposition im echten Einsatz ist unverändert
 
 #### Scenario: Nichts zu entfernen
-- **WHEN** der Admin entfernt, ohne dass ein aktiver Import besteht
+- **WHEN** der Admin eine Lage entfernt, ohne dass ein aktiver Import dieser Lage besteht
 - **THEN** antwortet das System mit 409 und ändert nichts
 
 #### Scenario: Soft-gelöschter Demo-Einsatz
@@ -223,9 +227,10 @@ SQLite-Verwaltungstabellen und die Schattentabellen der Volltextsuche.
 
 ### Requirement: Neu importieren
 
-`POST /api/demo-daten/neu` SHALL Entfernen und Import in einer einzigen Schreibtransaktion
-ausführen. Scheitert der Import, MUST der bisherige Demo-Stand erhalten bleiben. Besteht
-kein aktiver Import, MUST der Vorgang wie ein erstmaliger Import laufen.
+`POST /api/demo-daten/{lage}/neu` SHALL Entfernen und Import dieser Lage in einer einzigen
+Schreibtransaktion ausführen. Scheitert der Import, MUST der bisherige Demo-Stand erhalten
+bleiben. Besteht kein aktiver Import der Lage, MUST der Vorgang wie ein erstmaliger Import
+laufen.
 
 #### Scenario: Import, Entfernen, Import gegen das aktuelle Schema
 - **WHEN** gegen die vollständig migrierte Datenbank importiert, entfernt und erneut importiert wird
@@ -233,7 +238,7 @@ kein aktiver Import, MUST der Vorgang wie ein erstmaliger Import laufen.
 
 #### Scenario: Neu importieren ersetzt den Stand
 - **WHEN** der Admin bei aktivem Import „Neu importieren“ auslöst
-- **THEN** besteht danach genau ein aktiver Import mit einem neuen Demo-Einsatz, und der alte Demo-Einsatz existiert nicht mehr
+- **THEN** besteht danach für diese Lage genau ein aktiver Import mit einem neuen Demo-Einsatz, und der alte Demo-Einsatz existiert nicht mehr
 
 ### Requirement: Keine Wiederverwendung der Einsatz-ID
 
@@ -260,12 +265,13 @@ die Abfragen des betroffenen Demo-Einsatzes neu laden.
 ### Requirement: Verwaltungssektion Demo-Daten
 
 Die Verwaltung SHALL eine Sektion „Demo-Daten“ zeigen, und zwar nur dem System-Admin und
-nur, wenn der Import freigeschaltet ist. Die Sektion MUST den Status zeigen (nicht
-importiert, oder importiert am … mit Einsatz) sowie den Bericht des letzten Vorgangs. Sie
-MUST die Aktionen „Importieren“ (ohne aktiven Import), „Neu importieren“ und „Entfernen“
-(mit aktivem Import) anbieten. „Neu importieren“ und „Entfernen“ MUST eine Rückfrage mit
-`danger`-Knopf verlangen. Ein Fehler MUST an der Seite stehen und nicht nur im Toast. Eine
-zweite Auslösung während eines laufenden Vorgangs MUST wirkungslos sein.
+nur, wenn der Import freigeschaltet ist. Die Sektion MUST je Lage ein Paneel mit dem Status
+(nicht importiert, oder importiert am … mit Einsatz) und dem Bericht des letzten Vorgangs der
+Lage zeigen. Jedes Paneel MUST die Aktionen „Importieren“ (ohne aktiven Import der Lage), „Neu
+importieren“ und „Entfernen“ (mit aktivem Import der Lage) anbieten. „Neu importieren“ und
+„Entfernen“ MUST eine Rückfrage mit `danger`-Knopf verlangen, die die Lage nennt. Ein Fehler
+MUST an der Seite stehen und nicht nur im Toast. Eine zweite Auslösung während eines laufenden
+Vorgangs MUST wirkungslos sein, auch an der anderen Lage.
 
 #### Scenario: Ohne Freischaltung kein Einstieg
 - **WHEN** der Status-Endpunkt mit 404 antwortet
@@ -280,20 +286,24 @@ zweite Auslösung während eines laufenden Vorgangs MUST wirkungslos sein.
 - **THEN** sieht sie keine Sektion „Demo-Daten“, und die Route leitet sie weg
 
 #### Scenario: Entfernen mit Rückfrage
-- **WHEN** der Admin „Entfernen“ wählt
-- **THEN** erscheint eine Rückfrage mit `danger`-Knopf, und erst die Bestätigung sendet `DELETE`
+- **WHEN** der Admin im Paneel einer Lage „Entfernen“ wählt
+- **THEN** erscheint eine Rückfrage mit `danger`-Knopf, die die Lage nennt, und erst die Bestätigung sendet `DELETE` für diese Lage
 
 ### Requirement: Hinweis in der Einsatzliste
 
 Die Einsatzliste SHALL dem System-Admin einen Hinweis mit Verweis auf die Sektion
-„Demo-Daten“ zeigen, solange der Import freigeschaltet ist und für seine Organisation kein
-aktiver Import besteht. Anderen Rollen MUST der Hinweis fehlen, und für sie MUST die
+„Demo-Daten“ zeigen, solange der Import freigeschaltet ist und für seine Organisation keine
+Lage importiert ist. Anderen Rollen MUST der Hinweis fehlen, und für sie MUST die
 Einsatzliste den Demo-Status gar nicht abfragen. Nach dem Import MUST der Hinweis
 verschwinden.
 
 #### Scenario: Freigeschaltet und nicht importiert
 - **WHEN** der System-Admin die Einsatzliste öffnet, der Import freigeschaltet ist und nichts importiert wurde
 - **THEN** steht ein Hinweis mit Verweis auf die Sektion „Demo-Daten“
+
+#### Scenario: Eine Lage importiert
+- **WHEN** der System-Admin die Einsatzliste öffnet und nur eine der Lagen importiert ist
+- **THEN** steht kein Hinweis
 
 #### Scenario: Nicht freigeschaltet
 - **WHEN** der Status-Endpunkt mit 404 antwortet
@@ -404,3 +414,40 @@ im Bericht als „behalten“ zählen.
 #### Scenario: Eigene Untereinheit unter der Demo-Vorlage
 - **WHEN** ein Admin eine eigene Vorlage unter die Demo-Vorlage gestellt hat und die Demo-Daten entfernt
 - **THEN** bleibt die Demo-Vorlage ohne Marke stehen und erscheint im Bericht unter „behalten“
+
+### Requirement: Zwei Demo-Lagen nebeneinander
+
+Das System SHALL zwei Demo-Lagen anbieten, „Starkregen“ (`starkregen`) und „Stadtfest“
+(`stadtfest`). Jede Lage MUST für sich importiert, neu importiert und entfernt werden können;
+je Organisation und Lage MUST höchstens ein aktiver Import bestehen. Ein Vorgang an einer Lage
+MUST den Einsatz, den Kopf und die Stammdaten der anderen Lage unberührt lassen. Die Lagen MUST
+getrennte Stammdaten-Kennungen tragen.
+
+#### Scenario: Beide Lagen importiert
+- **WHEN** der Admin erst die Lage „Starkregen“ und danach die Lage „Stadtfest“ importiert
+- **THEN** bestehen zwei aktive Importe mit je eigenem Übungseinsatz
+
+#### Scenario: Entfernen nur der eigenen Lage
+- **WHEN** beide Lagen importiert sind und der Admin die Lage „Stadtfest“ entfernt
+- **THEN** sind Einsatz und Demo-Stammdaten der Stadtfest-Lage gelöscht, und Einsatz, Kopf und Stammdaten der Starkregen-Lage sind zeilengleich erhalten
+
+#### Scenario: Dieselbe Lage zweimal
+- **WHEN** die Lage „Stadtfest“ aktiv ist und der Admin sie erneut importiert
+- **THEN** antwortet das System mit 409 und ändert nichts
+
+#### Scenario: Unbekannte Lage
+- **WHEN** ein Vorgang eine Lage nennt, die es nicht gibt
+- **THEN** antwortet das System mit 404
+
+### Requirement: Lage „Stadtfest“
+
+Die Lage „Stadtfest“ SHALL einen Sanitätsdienst als Übung abbilden: Einsatzart Übung, die
+Abschnitte Bühne, Eingang und Festmeile, zwei Streifen, eine UHS mit Plätzen im Grundriss, ein
+KTW und 20 Kontakte über den Abend. Jeder Kontakt MUST einen Anlass aus dem festen Katalog und
+eine versorgende Einheit tragen; mindestens ein Kontakt MUST mit einem Transport durch ein
+fremdes Rettungsmittel samt Einsatznummer der Leitstelle enden. Die Lage MUST weder eine
+Einheiten-Vorlage noch ein Schichtmodell anlegen und beim Import keinen Alarm auslösen.
+
+#### Scenario: Transport über die Leitstelle
+- **WHEN** der Admin die Lage „Stadtfest“ importiert
+- **THEN** hat genau ein Kontakt als aktuellen Verbleib einen Transport „fremd“ mit Einsatznummer der Leitstelle

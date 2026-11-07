@@ -1,5 +1,6 @@
-//! Demo-Daten zur Laufzeit (LFH-690): ein Übungseinsatz samt Stammdaten, den der System-Admin
-//! seiner Organisation einspielt und wieder entfernt.
+//! Demo-Daten zur Laufzeit (LFH-690): Übungslagen samt Stammdaten, die der System-Admin seiner
+//! Organisation einspielt und wieder entfernt. Seit LLH-1576 gibt es zwei Lagen
+//! ([`DemoLage`]), jede mit eigenem Kopf, die nebeneinander bestehen.
 //!
 //! **Nur mit Schalter.** Die Routen existieren ausschließlich mit `--demo-daten`
 //! (`app::RouterOptionen`); ohne ihn antwortet `/api/demo-daten` wie ein unbekannter Pfad.
@@ -7,10 +8,10 @@
 //! Dieses Modul trägt die Antwortformen, den Import [`import::importieren_tx`], den Löschweg
 //! [`entfernen::entfernen_tx`], die Stammdaten-Anlage
 //! [`stammdaten::stammdaten_importieren_tx`] mit dem Katalog-Lookup [`katalog`] und das
-//! Szenario samt Drehbuch als reine Daten ([`szenario`]). Der Bericht liegt als JSON am
-//! Import-Kopf, deshalb sind die Typen auch `Deserialize`.
+//! Szenarien samt Drehbuch als reine Daten ([`szenario`], [`szenario_stadtfest`]). Der Bericht
+//! liegt als JSON am Import-Kopf, deshalb sind die Typen auch `Deserialize`.
 //!
-//! Spec: `openspec/changes/archive/2026-09-29-lfh-690-demo-daten-laufzeit-import/`
+//! Spec: `openspec/specs/demo-daten/spec.md`
 
 use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};
@@ -21,6 +22,7 @@ pub mod import;
 pub mod katalog;
 pub mod stammdaten;
 pub mod szenario;
+pub mod szenario_stadtfest;
 
 #[cfg(test)]
 mod entfernen_tests;
@@ -29,19 +31,52 @@ mod import_tests;
 #[cfg(test)]
 mod schema_tests;
 #[cfg(test)]
+mod stadtfest_tests;
+#[cfg(test)]
 mod stammdaten_tests;
 #[cfg(test)]
 pub(crate) mod test_hilfen;
 
-/// Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte.
+wire_enum! {
+    /// Eine Demo-Lage (LLH-1576, design.md D1). Wire == `as_str()` == `demo_import.szenario`
+    /// (CHECK in `migrations/0290_demo_import_szenario.sql`) == Pfadsegment der Routen.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+    pub enum DemoLage {
+        /// „ÜBUNG – Starkregen Musterstadt“, die Lage aus LFH-690.
+        Starkregen => "starkregen",
+        /// „ÜBUNG – Sanitätsdienst Stadtfest Musterstadt“ (LLH-1576).
+        Stadtfest => "stadtfest",
+    }
+}
+
+impl DemoLage {
+    /// Das Szenario der Lage: Stammdaten, Kopfdaten und Drehbuch.
+    pub fn szenario(&self) -> &'static szenario::Szenario {
+        match self {
+            DemoLage::Starkregen => &szenario::STARKREGEN,
+            DemoLage::Stadtfest => &szenario_stadtfest::STADTFEST,
+        }
+    }
+}
+
+/// Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte: je Lage ein
+/// Eintrag, immer alle Lagen in der Reihenfolge von [`DemoLage::ALLE`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct DemoDatenStatus {
-    /// Ob für die Organisation ein aktiver Import besteht.
+    pub lagen: Vec<DemoLageStatus>,
+}
+
+/// Stand einer Lage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct DemoLageStatus {
+    pub lage: DemoLage,
+    /// Ob für die Organisation ein aktiver Import dieser Lage besteht.
     pub importiert: bool,
     /// Der aktive Import; fehlt, wenn keiner besteht.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub import: Option<DemoImportKopf>,
-    /// Bericht des letzten Vorgangs (Import oder Entfernen); fehlt, wenn es keinen gab.
+    /// Bericht des letzten Vorgangs (Import oder Entfernen) dieser Lage; fehlt, wenn es keinen
+    /// gab.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bericht: Option<DemoBericht>,
 }
@@ -110,7 +145,8 @@ mod tests {
     /// Der Bericht liegt später als JSON in der DB — Hin- und Rückweg müssen verlustfrei sein.
     #[test]
     fn bericht_round_trip_ueber_json() {
-        let status = DemoDatenStatus {
+        let status = DemoLageStatus {
+            lage: DemoLage::Stadtfest,
             importiert: true,
             import: Some(DemoImportKopf {
                 id: 1,
@@ -132,16 +168,30 @@ mod tests {
         };
         let json = serde_json::to_string(&status).unwrap();
         assert_eq!(
-            serde_json::from_str::<DemoDatenStatus>(&json).unwrap(),
+            serde_json::from_str::<DemoLageStatus>(&json).unwrap(),
             status
         );
+    }
+
+    /// Jede Lage nennt ihr eigenes Szenario, und der Wire-Wert ist der CHECK der Migration.
+    #[test]
+    fn lagen_und_szenarien_passen_zusammen() {
+        assert_eq!(
+            DemoLage::ALLE.map(|l| l.as_str()),
+            ["starkregen", "stadtfest"]
+        );
+        for lage in DemoLage::ALLE {
+            assert_eq!(lage.szenario().lage, lage);
+            assert_eq!(DemoLage::parse(lage.as_str()), Some(lage));
+        }
     }
 
     /// Optionale Felder fehlen im Wire, statt `null` zu tragen (LFH-265) — und eine Antwort
     /// ohne sie liest sich zurück.
     #[test]
     fn nicht_importiert_ohne_optionale_felder() {
-        let status = DemoDatenStatus {
+        let status = DemoLageStatus {
+            lage: DemoLage::Starkregen,
             importiert: false,
             import: None,
             bericht: None,
@@ -150,9 +200,6 @@ mod tests {
         let o = v.as_object().unwrap();
         assert!(!o.contains_key("import"));
         assert!(!o.contains_key("bericht"));
-        assert_eq!(
-            serde_json::from_value::<DemoDatenStatus>(v).unwrap(),
-            status
-        );
+        assert_eq!(serde_json::from_value::<DemoLageStatus>(v).unwrap(), status);
     }
 }

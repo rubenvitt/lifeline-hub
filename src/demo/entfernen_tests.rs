@@ -11,7 +11,7 @@ use super::test_hilfen::{
     admin_anlegen, anzahl, einsatz_anlegen, fahrzeug_anlegen, kopf_anlegen, material_anlegen,
     org_anlegen, personal_anlegen, zeilen,
 };
-use super::{DemoBericht, DemoBerichtZeile, DemoStammdatenArt, DemoVorgang};
+use super::{DemoBericht, DemoBerichtZeile, DemoLage, DemoStammdatenArt, DemoVorgang};
 use crate::error::AppError;
 
 // ---------------------------------------------------------------------------------------------
@@ -174,7 +174,9 @@ async fn demo_anlegen(pool: &SqlitePool, org_id: i64, admin_id: i64) -> Demo {
 
 /// Der Löschweg so, wie ihn der Aufrufer fährt: eine `write_retry!`-Transaktion.
 async fn entfernen(pool: &SqlitePool, org_id: i64) -> Result<DemoBericht, AppError> {
-    crate::write_retry!(pool, |conn| { entfernen_tx(conn, org_id).await })
+    crate::write_retry!(pool, |conn| {
+        entfernen_tx(conn, org_id, DemoLage::Starkregen).await
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1010,7 +1012,7 @@ async fn aufgeschobene_fremdschluessel_brechen_den_loeschweg_ab() {
         sqlx::query("PRAGMA defer_foreign_keys = ON")
             .execute(&mut *conn)
             .await?;
-        entfernen_tx(conn, 1).await
+        entfernen_tx(conn, 1, DemoLage::Starkregen).await
     });
     assert!(
         matches!(ergebnis, Err(AppError::Internal(_))),
