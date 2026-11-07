@@ -295,6 +295,7 @@ use utoipa::OpenApi;
         crate::person::Versorgung,
         crate::person::verbleib_repo::EinsatzTransportfahrzeug,
         crate::person::verbleib_repo::TransportmittelAuswahl,
+        crate::person::verbleib_repo::VerbleibAngaben,
         crate::person::abgleich_repo::AbgleichAnzeige,
         crate::person::audit_repo::ZugriffAnzeige,
         crate::person::audit_repo::ZugriffArt,

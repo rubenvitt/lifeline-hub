@@ -6975,6 +6975,20 @@ export interface components {
          * @enum {string}
          */
         Verbindungsstatus: "bestehend" | "geplant";
+        /**
+         * @description Angaben des maßgeblichen Verbleibs einer Person für den Einsatzbericht (LLH-1575, design.md
+         *     D3): Rettungsmittel, „Entlassen an“, „gegen Rat“ und Unterschrift, die die Personenliste
+         *     nicht trägt. Keine Personendaten: die Kennung dient nur der Zuordnung zur Liste.
+         */
+        VerbleibAngaben: {
+            entlassen_an?: components["schemas"]["EntlassenAn"] | null;
+            gegen_rat?: components["schemas"]["GegenRat"] | null;
+            /** Format: int64 */
+            person_id: number;
+            /** @description Rettungsmittel des Transports (Funkrufname beim Eigentransport, sonst Freitext), getrimmt. */
+            transportmittel?: string | null;
+            unterschrift?: components["schemas"]["Unterschrift"] | null;
+        };
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];

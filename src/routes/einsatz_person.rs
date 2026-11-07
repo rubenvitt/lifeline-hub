@@ -227,6 +227,22 @@ pub async fn transportmittel(
     ))
 }
 
+/// GET /api/einsaetze/{id}/personen/verbleib-angaben — Angaben des maßgeblichen Verbleibs je
+/// Person für den Einsatzbericht (LLH-1575, design.md D3): Rettungsmittel, „Entlassen an“, „gegen
+/// Rat“, Unterschrift. Am Modul Personen wie die Liste und wie sie NICHT auditiert (sie trägt
+/// weniger als die Liste). Geräte erreichen die Route nicht; bekäme eines sie, gälte die
+/// Stellenbindung der Liste.
+pub async fn verbleib_angaben(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+) -> Result<Json<Vec<verbleib_repo::VerbleibAngaben>>, AppError> {
+    let mut angaben = verbleib_repo::angaben_je_person(&state.pool, ctx.einsatz.id).await?;
+    if let Some(sichtbar) = stelle::sichtbare_personen(&state.pool, ctx.geraet.as_ref()).await? {
+        angaben.retain(|a| sichtbar.contains(&a.person_id));
+    }
+    Ok(Json(angaben))
+}
+
 /// GET /api/einsaetze/{id}/personen/einheiten — Wahl der versorgenden Einheit (LLH-1567,
 /// design.md D4). Am Modul Personen wie `transportmittel`; nicht auditiert (kein Personenbezug).
 /// Nicht am gekoppelten Gerät: dort wird die Einheit nicht gesetzt.

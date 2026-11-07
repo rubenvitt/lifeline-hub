@@ -1,12 +1,21 @@
 import { useId, type ReactNode } from 'react';
 import { Button, Checkbox, Typography, theme } from 'antd';
 import { Paneel } from '../../components/instrument';
-import { BLOECKE, STANDARDUMFANG, istStandardumfang, ordneAuswahl } from './auswahl';
+import {
+  BLOECKE,
+  KURZBERICHT,
+  STANDARDUMFANG,
+  istKurzbericht,
+  istStandardumfang,
+  ordneAuswahl,
+} from './auswahl';
 import type { BlockDef, BlockSchluessel } from './auswahl';
 
 /**
  * Auswahl der Blöcke des Einsatzberichts (LFH-902, design.md D4). Bedienung, nicht Blatt: die
  * Leiste steht außerhalb der Druckwurzel, `druck/druck.css` blendet sie im Ausdruck aus.
+ *
+ * Oben zwei Voreinstellungen: „Kurzbericht für den Auftraggeber“ (LLH-1575) und „Standardumfang“.
  *
  * Jede Zeile ist als Ganzes Bedienziel (Höhe aus `controlHeight`, wächst mit der Dichte-Staffel bis
  * Handschuh). Der zuletzt gewählte Block ist gesperrt: ein Bericht ohne Block gibt es nicht.
@@ -66,12 +75,19 @@ export default function Auswahlleiste({
       titel="Blöcke"
       koerperPolster
       aktion={
-        <Button
-          onClick={() => onAendern([...STANDARDUMFANG])}
-          disabled={istStandardumfang(auswahl)}
-        >
-          Standardumfang
-        </Button>
+        // Zwei Voreinstellungen der Auswahl; der Kurzbericht ist kein eigenes Dokument (LLH-1575,
+        // design.md D5).
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: zielAbstand(token) }}>
+          <Button onClick={() => onAendern([...KURZBERICHT])} disabled={istKurzbericht(auswahl)}>
+            Kurzbericht für den Auftraggeber
+          </Button>
+          <Button
+            onClick={() => onAendern([...STANDARDUMFANG])}
+            disabled={istStandardumfang(auswahl)}
+          >
+            Standardumfang
+          </Button>
+        </div>
       }
       style={{ marginBlockEnd: token.marginLG }}
     >
