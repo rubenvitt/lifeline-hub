@@ -189,7 +189,8 @@ pub struct MeldungAnzeige {
     pub abschnitt_id: Option<i64>,
     /// Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder
     /// der Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an
-    /// einer anderen Art steht nicht in der Lage, bis die Meldung übernommen wird.
+    /// einer anderen Art steht nicht in der Lage, bis die Meldung übernommen wird. Auch der Fundort
+    /// eines Patienten aus der Meldung (LLH-1567).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lat: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -202,6 +203,39 @@ pub struct MeldungAnzeige {
     /// `etb_berichtigung_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub etb_berichtigung_lfd_nr: Option<i64>,
+    /// Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser
+    /// Meldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB. Fehlt ohne Patienten
+    /// (auch in älteren Lageständen).
+    #[sqlx(try_from = "String")]
+    #[serde(skip_serializing_if = "MeldungPatienten::is_empty")]
+    #[schema(value_type = Option<Vec<MeldungPatient>>)]
+    pub patienten: MeldungPatienten,
+}
+
+/// Ein aus einer Meldung angelegter Patient (LLH-1567): Kennung und Registriernummer, sonst nichts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
+pub struct MeldungPatient {
+    pub id: i64,
+    pub registrier_nr: i64,
+}
+
+/// Die Patienten einer Meldung, gelesen als JSON-Feld der Anzeige-Abfrage (`json_group_array`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct MeldungPatienten(pub Vec<MeldungPatient>);
+
+impl MeldungPatienten {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl TryFrom<String> for MeldungPatienten {
+    type Error = serde_json::Error;
+
+    fn try_from(json: String) -> Result<Self, Self::Error> {
+        serde_json::from_str(&json).map(MeldungPatienten)
+    }
 }
 
 impl MeldungAnzeige {

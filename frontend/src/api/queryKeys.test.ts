@@ -117,6 +117,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.einheitAusVorlage,
       // Die Empfängerliste der Verpflegung ist eine Projektion der Einheiten (LLH-1055 D4).
       EINSATZ_KEYS.verpflegung,
+      // Die Wahl der versorgenden Einheit am Patienten (LLH-1567).
+      EINSATZ_KEYS.personenEinheiten,
     ]);
   });
 

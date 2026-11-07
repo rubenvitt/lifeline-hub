@@ -14,6 +14,8 @@ Er MUST enthalten:
 - die aktuelle Sichtung mit taktischer Zeit (DTG), Abstand zu jetzt („vor n min“) und dem Namen
   dessen, der bestätigt hat, falls es ihn gibt;
 - „Zustand / Verdacht“;
+- „Versorgt von“ mit versorgender Einheit und Abschnitt und dem Verweis „aus Meldung #n“, falls
+  es sie gibt oder Schreibrecht besteht;
 - den Aufenthalt (UHS mit Platz oder Wartebereich und seit wann) oder nach dem Austritt den
   letzten Verbleib (Art, Ziel, Transportmittel, Zeit);
 - den Transportstand (Priorität, Art, benötigte Fachrichtung), falls es einen gibt;
@@ -124,3 +126,35 @@ er erst beim Aufklappen laden.
 #### Scenario: Keine Bezüge
 - **WHEN** eine Person weder Tier noch Schaden als Bezug hat
 - **THEN** zeigt der Abschnitt „Bezüge 0“ und mit Schreibrecht den Knopf „Bezug hinzufügen“
+
+### Requirement: Versorgende Einheit und Meldung im Patientenkopf
+
+Der Patientenkopf SHALL unter „Zustand / Verdacht“ die Zeile „Versorgt von“ zeigen: die
+versorgende Einheit mit dem Abschnitt dahinter („Streife 2 · Bühne“) und, wenn die Person aus
+einer Meldung angelegt wurde, den Verweis „aus Meldung #n“ auf `meldungen?meldung=<id>`. Der
+Abschnitt MUST zur Abfragezeit aus der Einheit folgen, nicht aus einem Schnappschuss. Mit
+Schreibrecht MUST die Einheit inline änderbar und leerbar sein, über einen PATCH mit Feld-CAS
+(`erwartet` = Einheit beim Öffnen); zur Wahl stehen die nicht aufgelösten Einheiten des Einsatzes
+über `GET …/personen/einheiten`, die erst beim Öffnen lädt. Ohne Netz MUST das Feld mit Grund
+gesperrt stehen, am gekoppelten Gerät nur lesend. Lesend fehlt die Zeile ohne Einheit und
+Meldung. Ohne Zugriff auf das Modul Meldungen MUST „aus Meldung #n“ Text ohne Verweis sein. Der
+Meldungsbezug MUST nach dem Anlegen fest bleiben.
+
+#### Scenario: Einheit eintragen
+- **WHEN** jemand mit Schreibrecht bei einer Person ohne Einheit „Versorgende Einheit eintragen“
+  wählt, „Streife 2 · Bühne“ wählt und speichert
+- **THEN** geht ein PATCH mit `versorgende_einheit_id` und `erwartet.versorgende_einheit_id: null`,
+  und der Kopf zeigt „Streife 2 · Bühne“
+
+#### Scenario: Gleichzeitige Änderung
+- **WHEN** zwei die Einheit derselben Person gleichzeitig ändern
+- **THEN** gilt die erste, die zweite bekommt 409, und der Kopf lädt den neuen Stand
+
+#### Scenario: Aus einer Meldung angelegt
+- **WHEN** das Detail einer Person geöffnet wird, die über „Patient anlegen“ an Meldung #17
+  entstand
+- **THEN** steht im Kopf „aus Meldung #17“ mit Verweis auf die Meldung
+
+#### Scenario: Ohne Netz
+- **WHEN** der Server nicht erreichbar ist
+- **THEN** steht die Einheit lesend mit dem Grund „ohne Netz nicht änderbar“

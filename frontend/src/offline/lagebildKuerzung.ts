@@ -65,6 +65,14 @@ export const PERSON_AUF_DER_PLATTE = {
   aktueller_transport_durch: 'behalten',
   aktuelles_einsatz_fahrzeug_id: 'behalten',
   versorgung: 'behalten',
+  // LLH-1567: versorgende Einheit und Herkunftsmeldung sind Verweise ohne Gesundheitsdatum; der
+  // Patientenkopf nennt sie auch ohne Netz.
+  versorgende_einheit_id: 'behalten',
+  versorgende_einheit_name: 'behalten',
+  versorgende_einheit_abschnitt_id: 'behalten',
+  versorgende_einheit_abschnitt_name: 'behalten',
+  meldung_id: 'behalten',
+  meldung_lfd_nr: 'behalten',
   // LLH-1566: der Anlass ist ein Katalogwert und bleibt ohne Netz wie die Sichtung (LLH-1109:
   // ohne Netz nur Katalogwerte); seine Zeit braucht ohne Netz niemand.
   anlass: 'behalten',

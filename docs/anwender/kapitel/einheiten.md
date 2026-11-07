@@ -325,7 +325,7 @@ Einsatzzeiten“ des Einsatzberichts. Wer und was beim Auflösen zur Einheit geh
 fest; die Seite der aufgelösten Einheit zeigt es nur lesend („Eine aufgelöste Einheit nachlesen“).
 Eine Person, die danach als Fehldisposition storniert wird, fehlt dort. Eine Einheit ohne jede Spur (keine Mitglieder, keine
 Ereignisse, kein Eintrag im Tagebuch, keine Ablösung, kein Bereitstellungsraum, kein Auftrag, keine
-Meldung, kein Dokument, kein Verteiler, keine Verpflegungsausgabe) wird beim Auflösen ganz
+Meldung, kein versorgter Patient, kein Dokument, kein Verteiler, keine Verpflegungsausgabe) wird beim Auflösen ganz
 gelöscht. Eine Einheit, an die Verpflegung ausgegeben wurde, bleibt als aufgelöst stehen, auch wenn
 die Ausgabe zurückgenommen ist; die Ausgabe nennt sie weiter. An einer aufgelösten Einheit lässt
 sich nichts mehr ändern.

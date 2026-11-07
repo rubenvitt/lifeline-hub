@@ -91,6 +91,21 @@ describe('useOrtVorschau', () => {
     );
   });
 
+  it('legt mit `merken: false` nichts im Local-Store ab (eigene Position, LLH-1567)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: 'Hauptstr. 5, Musterstadt' }),
+      ),
+    );
+    const { result } = renderHook(
+      () => useOrtVorschau(1, { lat: 51.5, lon: 10.25 }, undefined, 0, false),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.data?.ortsname).toBe('Hauptstr. 5, Musterstadt'));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await holeOrt(ortKeyVon(51.5, 10.25))).toBeNull();
+  });
+
   it('fällt auf den persistierten Ortsnamen zurück, wenn die Live-Antwort ortsname=null hat', async () => {
     await setzeOrt(ortKeyVon(48.1, 11.6), 'Aus Local-Store');
     server.use(

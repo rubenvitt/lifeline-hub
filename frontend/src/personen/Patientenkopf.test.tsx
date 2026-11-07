@@ -15,6 +15,7 @@ import {
   schreibaktionenLaden,
 } from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
+import { erzeugeQueryClient } from '../api/queryClient';
 import {
   OHNE_VERBINDUNG_NICHT_AENDERBAR,
   meldeServerErreichbar,
@@ -22,6 +23,8 @@ import {
 } from '../offline/verbindung';
 import Patientenkopf, { AUFHEBEN_OHNE_NETZ } from './Patientenkopf';
 import { PAT_OHNE_NETZ } from './PatKennzeichen';
+import { EINHEIT_OHNE_NETZ } from './VersorgtVon';
+import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 
 /**
  * Der Patientenkopf (LLH-1094, Spec `personen-detail`): die Patientenfragen auf einen Blick, Sichten,
@@ -1516,6 +1519,116 @@ describe('Patientenkopf — Zustand / Verdacht ohne Netz (LLH-1103)', () => {
       within(kopf).getByRole('button', { name: 'Zustand / Verdacht zu R-012 bearbeiten' }),
     ).toBeEnabled();
     expect(within(kopf).queryByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeNull();
+  });
+});
+
+/**
+ * „Versorgt von“ (LLH-1567, design.md D4/D6): die versorgende Einheit mit Abschnitt, „aus Meldung
+ * #n“ als Verweis; mit Schreibrecht inline änderbar mit Feld-CAS, ohne Netz gesperrt.
+ */
+describe('Patientenkopf — Versorgt von (LLH-1567)', () => {
+  let gepatcht: unknown[];
+  beforeEach(() => {
+    gepatcht = [];
+    server.use(
+      http.get('/api/einsaetze/1/personen/einheiten', () =>
+        HttpResponse.json([
+          { id: 4, name: 'Streife 2', abschnitt_id: 1, abschnitt_name: 'Bühne' },
+          { id: 5, name: 'RTW 1' },
+        ]),
+      ),
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        gepatcht.push(await request.json());
+        return HttpResponse.json({ ...basis });
+      }),
+    );
+  });
+  afterEach(() => verbindungZuruecksetzenFuerTests());
+
+  const versorgt = {
+    versorgende_einheit_id: 4,
+    versorgende_einheit_name: 'Streife 2',
+    versorgende_einheit_abschnitt_name: 'Bühne',
+    meldung_id: 17,
+    meldung_lfd_nr: 3,
+  };
+
+  it('nennt Einheit mit Abschnitt und verweist auf die Meldung', () => {
+    const { kopf } = zeige(versorgt, { darfSchreiben: false });
+    expect(within(kopf).getByText('Versorgt von')).toBeInTheDocument();
+    expect(kopf.querySelector('[data-lfh="versorgt-von"]')?.textContent).toBe('Streife 2 · Bühne');
+    expect(within(kopf).getByRole('link', { name: 'aus Meldung #3' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/meldungen?meldung=17',
+    );
+  });
+
+  it('nennt die Meldung ohne Freigabe der Meldungen nur als Text', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ meldungen: { zugriff: false } })),
+      ),
+    );
+    const { kopf } = zeige(versorgt, { darfSchreiben: false });
+    await waitFor(() =>
+      expect(within(kopf).queryByRole('link', { name: 'aus Meldung #3' })).toBeNull(),
+    );
+    expect(within(kopf).getByText('aus Meldung #3')).toBeInTheDocument();
+  });
+
+  it('lässt die Zeile lesend ohne Einheit und Meldung weg', () => {
+    const { kopf } = zeige({}, { darfSchreiben: false });
+    expect(within(kopf).queryByText('Versorgt von')).toBeNull();
+  });
+
+  it('trägt die Einheit inline ein, mit dem Stand beim Öffnen als erwartet', async () => {
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Versorgende Einheit eintragen' }),
+    );
+    await waehle('Versorgende Einheit', 'Streife 2 · Bühne');
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Versorgende Einheit speichern' }),
+    );
+    await waitFor(() =>
+      expect(gepatcht).toEqual([
+        { versorgende_einheit_id: 4, erwartet: { versorgende_einheit_id: null } },
+      ]),
+    );
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+  });
+
+  it('bietet nur die frisch geladenen Einheiten an, nicht einen frischen Cache', async () => {
+    // Wie in der App: zehn Sekunden gilt der Cache als frisch.
+    const client = erzeugeQueryClient({
+      queries: { retry: false, staleTime: 10_000 },
+      mutations: { retry: false },
+    });
+    // Der Cache kennt eine Einheit, die der Server inzwischen aufgelöst hat.
+    client.setQueryData(einsatzKeys.personenEinheiten(1), [{ id: 9, name: 'Wache Alt' }]);
+    renderMitProviders(
+      <Patientenkopf
+        einsatzId={1}
+        person={basis as PersonDetail}
+        darfSchreiben
+        onGeschrieben={vi.fn()}
+      />,
+      { client },
+    );
+    const kopf = screen.getByRole('region', { name: 'Patientenkopf' });
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Versorgende Einheit eintragen' }),
+    );
+    await oeffne('Versorgende Einheit');
+    await waitFor(() => expect(optionenVon('Versorgende Einheit')).toContain('RTW 1'));
+    expect(optionenVon('Versorgende Einheit')).not.toContain('Wache Alt');
+  });
+
+  it('sperrt die Einheit ohne Server mit Grund', () => {
+    const { kopf } = zeige(versorgt);
+    act(() => meldeServerErreichbar(false));
+    expect(within(kopf).getByText(EINHEIT_OHNE_NETZ)).toBeInTheDocument();
+    expect(kopf.querySelector('[data-lfh="versorgt-von"]')?.textContent).toBe('Streife 2 · Bühne');
   });
 });
 

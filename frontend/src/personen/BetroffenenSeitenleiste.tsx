@@ -13,6 +13,7 @@ import { sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
 import { SK_WORT } from './personMeta';
 import {
+  kontakteJeEinheit,
   offeneFelder,
   ohneAbgeschlossene,
   sichtungsbild,
@@ -20,9 +21,11 @@ import {
   verbleibZaehlung,
   type SichtungsbildSchluessel,
 } from './personenBilanz';
+import { einheitText } from './VersorgtVon';
 
 /**
- * Rechte Seitenleiste der Betroffenen-Seite: „Sichtungsbild", „Verbleib", „Offene Felder". Alle
+ * Rechte Seitenleiste der Betroffenen-Seite: „Sichtungsbild", „Verbleib", „Versorgt von" (nur mit
+ * mindestens einer versorgenden Einheit, LLH-1567), „Offene Felder". Alle
  * Zahlen aus `personen/personenBilanz.ts` über DIESELBE Menge wie die Liste; über einem
  * Ladefehler steht sie nicht, sonst meldete sie Nullen, die niemand erhoben hat.
  *
@@ -92,6 +95,7 @@ export default function BetroffenenSeitenleiste({
   const bild = sichtungsbild(ohneAbgeschlossene(alle));
   const verbleib = verbleibZaehlung(alle, uhsName);
   const offen = offeneFelder(alle);
+  const kontakte = kontakteJeEinheit(alle);
   // Alle Kategorien, auch die leeren: der zugängliche Name zählt sie vollständig auf.
   const segmente: Segment[] = SICHTUNGSBILD_REIHE.map((k) => ({
     label: k === 'ohne' ? 'ohne Sichtung' : kuerzel(k),
@@ -185,6 +189,30 @@ export default function BetroffenenSeitenleiste({
           ))}
         </ul>
       </Paneel>
+
+      {kontakte.length > 0 && (
+        <Paneel titel="Versorgt von">
+          <ul aria-label="Versorgt von" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {kontakte.map((k) => (
+              <li key={k.einheitId} data-kontakte-einheit={k.einheitId}>
+                <PaneelZeile
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    gap: token.marginSM,
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: rollen.gedaempft }}>
+                    {einheitText(k.name, k.abschnitt)}
+                  </span>
+                  <span style={{ ...monoStil(14), color: rollen.text }}>{k.wert}</span>
+                </PaneelZeile>
+              </li>
+            ))}
+          </ul>
+        </Paneel>
+      )}
 
       <Paneel titel="Offene Felder">
         <div

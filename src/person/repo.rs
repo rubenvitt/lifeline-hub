@@ -13,7 +13,18 @@ const SELECT_ALLE: &str = "\
            aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status, \
            aktuelle_verbleib_betreuungsstelle_id, pat_nummer, kontamination, \
            transport_prioritaet, transport_art, transport_fachrichtung, transport_at, \
-           aktueller_transport_durch, aktuelles_einsatz_fahrzeug_id, anlass, anlass_at \
+           aktueller_transport_durch, aktuelles_einsatz_fahrzeug_id, anlass, anlass_at, \
+           versorgende_einheit_id, meldung_id, \
+           (SELECT e.name FROM einsatz_einheit e \
+             WHERE e.id = einsatz_person.versorgende_einheit_id) AS versorgende_einheit_name, \
+           (SELECT e.abschnitt_id FROM einsatz_einheit e \
+             WHERE e.id = einsatz_person.versorgende_einheit_id) \
+             AS versorgende_einheit_abschnitt_id, \
+           (SELECT a.name FROM einsatz_einheit e JOIN einsatzabschnitt a ON a.id = e.abschnitt_id \
+             WHERE e.id = einsatz_person.versorgende_einheit_id) \
+             AS versorgende_einheit_abschnitt_name, \
+           (SELECT m.lfd_nr FROM meldung m WHERE m.id = einsatz_person.meldung_id) \
+             AS meldung_lfd_nr \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);
@@ -38,6 +49,10 @@ pub struct NeueDaten<'a> {
     pub antreff_lat: Option<f64>,
     pub antreff_lon: Option<f64>,
     pub vermisst_seit: Option<&'a str>,
+    /// LLH-1567 (design.md D1): versorgende Einheit und Herkunftsmeldung. Zugehörigkeit zum
+    /// Einsatz und „nicht aufgelöst“ prüft der Handler (422).
+    pub versorgende_einheit_id: Option<i64>,
+    pub meldung_id: Option<i64>,
 }
 
 /// Patch-Daten mit Tri-State-Semantik (LFH-266/F12):
@@ -71,6 +86,8 @@ pub struct PatchDaten<'a> {
     // einzeln dreiwertig; `Some(None)` heißt „keine Angabe“, nicht „nein“.
     pub pat_nummer: Option<Option<&'a str>>,
     pub kontamination: Option<Option<bool>>,
+    // LLH-1567 (design.md D4): versorgende Einheit, dreiwertig; Zugehörigkeit prüft der Handler.
+    pub versorgende_einheit_id: Option<Option<i64>>,
 }
 
 /// Ein erwarteter Spaltenwert des Feld-CAS, getypt für den Bind (`None` = leer erwartet).
@@ -102,6 +119,10 @@ impl<'a> ExpectedValue<'a> {
             ("vermisst_seit", erwartet.vermisst_seit.map(Text)),
             ("pat_nummer", erwartet.pat_nummer.map(Text)),
             ("kontamination", erwartet.kontamination.map(Bool)),
+            (
+                "versorgende_einheit_id",
+                erwartet.versorgende_einheit_id.map(Integer),
+            ),
         ]
         .into_iter()
         .filter_map(|(spalte, wert)| wert.map(|w| (spalte, w)))
@@ -256,10 +277,12 @@ pub async fn anlegen_tx_mit_optionen(
             (einsatz_id, registrier_nr, status, name, vorname, geschlecht, \
              geburtsdatum, alter_geschaetzt, herkunft_adresse, antreff_ort, \
              melder_kontakt, notiz, erfasst_von, geaendert_von, client_id, \
-             zustand, antreff_lat, antreff_lon, vermisst_seit, erfasst_at) \
+             zustand, antreff_lat, antreff_lon, vermisst_seit, erfasst_at, \
+             versorgende_einheit_id, meldung_id) \
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, ?2, ?3, ?4, ?5, \
                 ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13, \
-                ?14, ?15, ?16, ?17, COALESCE(?18, strftime('%Y-%m-%d %H:%M:%S','now')) \
+                ?14, ?15, ?16, ?17, COALESCE(?18, strftime('%Y-%m-%d %H:%M:%S','now')), \
+                ?19, ?20 \
          FROM einsatz_person WHERE einsatz_id = ?1 \
          RETURNING id, registrier_nr",
     )
@@ -281,6 +304,8 @@ pub async fn anlegen_tx_mit_optionen(
     .bind(daten.antreff_lon)
     .bind(daten.vermisst_seit)
     .bind(erfasst_at)
+    .bind(daten.versorgende_einheit_id)
+    .bind(daten.meldung_id)
     .fetch_one(&mut *conn)
     .await?;
     Ok((row.0, row.1, true))
@@ -303,6 +328,74 @@ pub async fn laden_nach_client_id(
         .await?
         .map(PersonAnzeige::mit_versorgung),
     )
+}
+
+/// Aktive Einheiten eines Einsatzes zur Wahl der versorgenden Einheit (LLH-1567, design.md D4),
+/// in der Folge der Einheitenliste (`sortier`, dann Name).
+pub async fn versorgende_einheiten(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<super::VersorgendeEinheitAuswahl>, AppError> {
+    Ok(sqlx::query_as::<_, super::VersorgendeEinheitAuswahl>(
+        "SELECT e.id, e.name, e.abschnitt_id, a.name AS abschnitt_name \
+         FROM einsatz_einheit e LEFT JOIN einsatzabschnitt a ON a.id = e.abschnitt_id \
+         WHERE e.einsatz_id = ? AND e.aufgeloest_at IS NULL \
+         ORDER BY e.sortier, e.name COLLATE NOCASE, e.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Prüft die versorgende Einheit einer Person (LLH-1567, design.md D4): sie gehört zum Einsatz
+/// und ist nicht aufgelöst, sonst 422 (der Zusammenhang, `src/AGENTS.md`).
+pub async fn pruefe_versorgende_einheit(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<(), AppError> {
+    let aufgeloest: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
+    match aufgeloest {
+        None => Err(AppError::UnprocessableEntity(
+            "Die Einheit gehört nicht zu diesem Einsatz".into(),
+        )),
+        Some(Some(_)) => Err(AppError::UnprocessableEntity(
+            "Die Einheit ist aufgelöst".into(),
+        )),
+        Some(None) => Ok(()),
+    }
+}
+
+/// Prüft die Herkunftsmeldung einer Person (LLH-1567, design.md D5): sie gehört zum Einsatz,
+/// sonst 422.
+///
+/// `nur_von`: ein gekoppeltes Gerät liest nur die eigenen Meldungen (LFH-892) und darf daher
+/// auch nur an diese verknüpfen; eine fremde Meldung antwortet wie eine unbekannte, damit ihre
+/// Existenz nicht durchsickert.
+pub async fn pruefe_meldung(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    meldung_id: i64,
+    nur_von: Option<i64>,
+) -> Result<(), AppError> {
+    let erfasser: Option<i64> =
+        sqlx::query_scalar("SELECT erfasst_von_id FROM meldung WHERE id = ? AND einsatz_id = ?")
+            .bind(meldung_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    match erfasser {
+        Some(von) if nur_von.is_none_or(|eigen| eigen == von) => Ok(()),
+        _ => Err(AppError::UnprocessableEntity(
+            "Die Meldung gehört nicht zu diesem Einsatz".into(),
+        )),
+    }
 }
 
 /// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige. Delegiert an [`anlegen_tx`].
@@ -370,13 +463,15 @@ pub async fn aktualisiere(
             vermisst_seit = CASE WHEN ?25 IS NULL THEN vermisst_seit ELSE ?26 END, \
             pat_nummer = CASE WHEN ?27 IS NULL THEN pat_nummer ELSE ?28 END, \
             kontamination = CASE WHEN ?29 IS NULL THEN kontamination ELSE ?30 END, \
+            versorgende_einheit_id = \
+                CASE WHEN ?31 IS NULL THEN versorgende_einheit_id ELSE ?32 END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_von = ?31 \
-         WHERE id = ?32 AND einsatz_id = ?33",
+            geaendert_von = ?33 \
+         WHERE id = ?34 AND einsatz_id = ?35",
     );
-    let mut nummer = 34;
+    let mut nummer = 36;
     if erwartet_geaendert_at.is_some() {
-        sql.push_str(" AND geaendert_at = ?34");
+        sql.push_str(" AND geaendert_at = ?36");
         nummer += 1;
     }
     // Spaltennamen nur aus der festen Liste in `ExpectedValue::aus`, nie aus der Anfrage: das
@@ -427,6 +522,8 @@ pub async fn aktualisiere(
         .bind(daten.pat_nummer.and_then(|v| v))
         .bind(daten.kontamination.map(|_| 1_i64))
         .bind(daten.kontamination.and_then(|v| v))
+        .bind(daten.versorgende_einheit_id.map(|_| 1_i64))
+        .bind(daten.versorgende_einheit_id.and_then(|v| v))
         .bind(geaendert_von)
         .bind(person_id)
         .bind(einsatz_id);
@@ -640,6 +737,8 @@ mod tests {
             antreff_lat: None,
             antreff_lon: None,
             vermisst_seit: None,
+            versorgende_einheit_id: None,
+            meldung_id: None,
         }
     }
 
@@ -833,6 +932,9 @@ mod tests {
             vermisst_seit: Some(Some("2026-09-22 06:00:00")),
             pat_nummer: Some(Some("W-pat")),
             kontamination: Some(Some(true)),
+            // Ein Verweis braucht eine Einheit im Einsatz; Feld-CAS mit dem Nachbarn `kontamination` in
+            // `tests/person_einheit_meldung.rs` (LLH-1567).
+            versorgende_einheit_id: None,
         }
     }
 

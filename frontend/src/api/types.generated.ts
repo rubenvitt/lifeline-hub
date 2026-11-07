@@ -4717,7 +4717,8 @@ export interface components {
              * Format: double
              * @description Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder
              *     der Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an
-             *     einer anderen Art steht nicht in der Lage, bis die Meldung übernommen wird.
+             *     einer anderen Art steht nicht in der Lage, bis die Meldung übernommen wird. Auch der Fundort
+             *     eines Patienten aus der Meldung (LLH-1567).
              */
             lat?: number | null;
             /** Format: int64 */
@@ -4726,6 +4727,12 @@ export interface components {
             lon?: number | null;
             meldeweg: components["schemas"]["MeldeWeg"];
             meldungsart: components["schemas"]["Meldungsart"];
+            /**
+             * @description Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser
+             *     Meldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB. Fehlt ohne Patienten
+             *     (auch in älteren Lageständen).
+             */
+            patienten?: components["schemas"]["MeldungPatient"][] | null;
             prioritaet: components["schemas"]["Prioritaet"];
             /** @description Richtung intern/extern (LFH-87). */
             richtung: components["schemas"]["Richtung"];
@@ -4756,6 +4763,13 @@ export interface components {
              * @description Offen und noch von niemandem angefasst (Status `neu`).
              */
             unbearbeitet: number;
+        };
+        /** @description Ein aus einer Meldung angelegter Patient (LLH-1567): Kennung und Registriernummer, sonst nichts. */
+        MeldungPatient: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            registrier_nr: number;
         };
         /**
          * @description Triage-Status einer Meldung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
@@ -5547,6 +5561,16 @@ export interface components {
              */
             kontamination?: boolean | null;
             melder_kontakt?: string | null;
+            /**
+             * Format: int64
+             * @description Meldung, aus der die Person angelegt wurde (LLH-1567, design.md D6); nur beim Anlegen.
+             */
+            meldung_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer dieser Meldung, für „aus Meldung #n“.
+             */
+            meldung_lfd_nr?: number | null;
             name?: string | null;
             notiz?: string | null;
             /** @description Nummer der Papier-Patientenanhängetasche (LLH-1326), zum Abgleich; nicht eindeutig. */
@@ -5565,6 +5589,19 @@ export interface components {
              *     `vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen.
              */
             vermisst_seit?: string | null;
+            /**
+             * Format: int64
+             * @description Abschnitt der versorgenden Einheit, zur Abfragezeit aus der Einheit (design.md D2).
+             */
+            versorgende_einheit_abschnitt_id?: number | null;
+            versorgende_einheit_abschnitt_name?: string | null;
+            /**
+             * Format: int64
+             * @description Einheit, die die Person versorgt (LLH-1567, design.md D1): Streife, UHS-Trupp, RTW.
+             */
+            versorgende_einheit_id?: number | null;
+            /** @description Name der versorgenden Einheit, beim Lesen aufgelöst (auch nach dem Auflösen der Einheit). */
+            versorgende_einheit_name?: string | null;
             /**
              * @description Abgeleiteter Versorgungszustand (LLH-1332, design.md D3). Nie gespeichert: das Repo setzt
              *     ihn nach jedem Lesen über [`PersonAnzeige::mit_versorgung`].
@@ -7171,6 +7208,19 @@ export interface components {
             laufend: string;
             /** @description Die Version davor, nur wenn ein Versionswechsel stattfand. */
             zuletzt_gestartet?: string | null;
+        };
+        /**
+         * @description Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/personen/einheiten`): je aktiver
+         *     Einheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf
+         *     die Kräfte geht.
+         */
+        VersorgendeEinheitAuswahl: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            abschnitt_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            name: string;
         };
         /**
          * @description Versorgungszustand einer Person (LLH-1332, design.md D3), abgeleitet aus dem jüngsten

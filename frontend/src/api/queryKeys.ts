@@ -160,6 +160,8 @@ export const EINSATZ_KEYS = {
   // Vorschläge zum Rettungsmittel der Verbleib-Maske (LLH-1332): eigener Prefix, live über
   // `person` (bisher verwendete) und `fahrzeug` (Fahrzeuge im Einsatz).
   personenTransportmittel: 'einsatz-personen-transportmittel',
+  // Wahl der versorgenden Einheit (LLH-1567): eigener Prefix, live über `einheit`.
+  personenEinheiten: 'einsatz-personen-einheiten',
   // Fotos und Dateien an einer Person (LFH-757): live über das `person`-Ereignis. Nicht im
   // Lagebild offline (Patientenfotos und ihre Dateinamen bleiben vom Gerät fern, LFH-767).
   personAnhaenge: 'einsatz-person-anhaenge',
@@ -252,6 +254,8 @@ export const EINSATZ_STREAM_EVENTS = {
     // `GET …/verpflegung` (LLH-1055 D4); der Server verteilt `einheit` dafür auch an Leser der
     // Verpflegung.
     EINSATZ_KEYS.verpflegung,
+    // Wahl der versorgenden Einheit (LLH-1567): Name, Abschnitt, Auflösen.
+    EINSATZ_KEYS.personenEinheiten,
   ],
   // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke,
   // Betreuungsstellen, die BR-Liste, Einheiten und Dokumente tragen den Abschnittsnamen per Join.
@@ -673,6 +677,7 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.personenBestaetiger, einsatzId] as const,
   personenTransportmittel: (einsatzId: number) =>
     [EINSATZ_KEYS.personenTransportmittel, einsatzId] as const,
+  personenEinheiten: (einsatzId: number) => [EINSATZ_KEYS.personenEinheiten, einsatzId] as const,
   personAnhaenge: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAnhaenge, einsatzId, personId] as const,
   personal: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId] as const,

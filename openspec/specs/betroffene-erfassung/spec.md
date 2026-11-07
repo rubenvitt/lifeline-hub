@@ -52,3 +52,50 @@ Ein Pflichtfeld MUST nie hinter dem aufklappbaren Bereich stehen.
 #### Scenario: Vermisst melden
 - **WHEN** „Vermisst melden“ auf der Tiere-Liste geöffnet ist
 - **THEN** sind höchstens vier Eingabefelder sichtbar, und Farbe, Kennzeichnung und Halter-Kontakt erscheinen erst nach dem Aufklappen von „Weitere Angaben“
+
+### Requirement: Versorgende Einheit in der Maske
+
+Die Maske „Betroffene erfassen“ SHALL unter „Weitere Angaben“ das Feld „Versorgende Einheit“
+führen (aktive Einheiten des Einsatzes mit Abschnitt), damit das Budget von vier sichtbaren
+Feldern bleibt. Ohne Wahl MUST der POST kein `versorgende_einheit_id` tragen. Am gekoppelten Gerät
+MUST das Feld fehlen. Der Server MUST eine Einheit eines anderen Einsatzes oder eine aufgelöste
+mit 422 ablehnen. Eine Einheit mit einem nicht stornierten Patienten MUST beim Auflösen als
+aufgelöst stehen bleiben („Die Einheit hat Patienten versorgt“).
+
+#### Scenario: Einheit beim Erfassen
+- **WHEN** in der Maske unter „Weitere Angaben“ „RTW 1“ gewählt und „Erfassen“ gewählt wird
+- **THEN** trägt der POST `versorgende_einheit_id` von „RTW 1“
+
+### Requirement: Patient aus einer Meldung anlegen
+
+Die Meldungskarte SHALL mit Schreibrecht im ⋮-Menü „Patient anlegen“ anbieten; ohne Freigabe des
+Moduls Betroffene MUST der Eintrag gesperrt mit Grund stehen. Er MUST dieselbe Maske „Betroffene
+erfassen“ auf der Meldungsseite öffnen, mit der Zeile „Zu Meldung #n“, der Verortung der Meldung
+als Fundort-Koordinate (falls verortet) und der Absender-Einheit als versorgender Einheit (falls
+strukturiert und nicht aufgelöst); dann steht „Weitere Angaben“ offen. Jede so erfasste Person
+MUST `meldung_id` tragen, im Serienlauf auch die folgenden. Eine Meldung MAY mehrere Patienten
+haben, eine Person höchstens eine Meldung. Die Karte MUST je nicht stornierten Patienten einen
+Verweis mit der Registriernummer („↗ R-012“) auf die Personen-Detailseite zeigen, ohne Zugriff
+auf die Betroffenen nur die Nummer. Eine Anlage mit Meldungsbezug MUST zusätzlich das Live-Ereignis
+der Meldungen auslösen.
+
+#### Scenario: Patient aus verorteter Meldung einer Streife
+- **WHEN** an Meldung #17 der „Streife 2“ mit Verortung „Patient anlegen“ gewählt und „Erfassen“
+  gewählt wird
+- **THEN** trägt der POST `meldung_id` 17, die Koordinate der Meldung und die Einheit „Streife 2“,
+  und die Karte zeigt danach „↗ R-…“ der neuen Person
+
+#### Scenario: Meldung eines anderen Einsatzes
+- **WHEN** ein POST eine `meldung_id` eines anderen Einsatzes trägt
+- **THEN** antwortet der Server mit 422
+
+### Requirement: Kontakte je Einheit
+
+Die Seitenleiste der Betroffenen SHALL einen Block „Versorgt von“ zeigen, sobald mindestens eine
+Person eine versorgende Einheit hat: je Einheit (mit Abschnitt) die Zahl ihrer Patienten, ohne
+Stornierte, mit Abgeschlossenen, absteigend nach Zahl. Die Zählung MUST eine reine Funktion
+(`kontakteJeEinheit`) sein, die Lagebild und Bericht mitnutzen.
+
+#### Scenario: Zwei Patienten einer Streife
+- **WHEN** zwei Personen „Streife 2“ als Einheit tragen, eine davon abgeschlossen
+- **THEN** zeigt „Versorgt von“ „Streife 2 · Bühne“ mit 2
