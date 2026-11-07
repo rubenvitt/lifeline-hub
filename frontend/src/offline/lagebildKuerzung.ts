@@ -78,7 +78,8 @@ export const PERSON_AUF_DER_PLATTE = {
   anlass: 'behalten',
   anlass_at: 'auslassen',
   // LLH-1573: der Stand des angeforderten Rettungsmittels hält die Marke „RTW unterwegs“ an der
-  // UHS auch ohne Netz; Art, Status, Rufnamen und Einsatznummer sind kein Gesundheitsdatum.
+  // UHS auch ohne Netz. Behalten werden nur Art, Status und Zeit (`rettungsmittelKuerzen`): die
+  // Rufnamen sind Freitext, die Einsatznummer der Leitstelle hängt an der Person.
   rettungsmittel: 'behalten',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
 
@@ -116,11 +117,26 @@ const AUSWAHL_BEHALTEN = (
  */
 const MARKE = 'nicht_geladen';
 
+/**
+ * Rettungsmittel ohne Netz (LLH-1573): ohne Rufnamen (Freitext) und ohne Einsatznummer der
+ * Leitstelle (personengebunden). Die Marke an der UHS braucht nur Art und Status; die
+ * Verbleib-Vorbelegung fällt ohne Netz auf die Art zurück. Wiederholt angewandt gleich.
+ */
+function rettungsmittelKuerzen(r: unknown): unknown {
+  if (r === null || typeof r !== 'object') return r;
+  const gekuerzt: Record<string, unknown> = { ...(r as Record<string, unknown>), rufnamen: [] };
+  delete gekuerzt.leitstelle_einsatznummer;
+  return gekuerzt;
+}
+
 function personKuerzen(p: unknown): unknown {
   if (p === null || typeof p !== 'object') return p;
   const quelle = p as Record<string, unknown>;
   const gekuerzt: Record<string, unknown> = {};
   for (const feld of BEHALTEN) if (feld in quelle) gekuerzt[feld] = quelle[feld];
+  if ('rettungsmittel' in gekuerzt) {
+    gekuerzt.rettungsmittel = rettungsmittelKuerzen(gekuerzt.rettungsmittel);
+  }
   gekuerzt[MARKE] = [...AUSGELASSEN];
   return gekuerzt;
 }

@@ -297,6 +297,13 @@ export default function NachforderungenPage() {
     queryKey: einsatzKeys.person(einsatzId, personBezugId),
     queryFn: () => ladePerson(einsatzId, personBezugId as number),
     enabled: personenFrei && personBezugId != null,
+    // Jeder Abruf des Details schreibt „Detail geöffnet“ ins Zugriffsprotokoll: für die Vorgabe
+    // genügt ein Abruf je Erfassung (oder der Stand aus dem Cache der Personenseite), kein
+    // Nachladen bei Fokus, neuer Verbindung oder erneutem Einhängen.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
   // Gemerkt (die Karten sind `memo`): ohne Freigabe Personen keine Verweise, nur die Nummer.
   const personPfad = useMemo(

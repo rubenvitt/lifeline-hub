@@ -166,9 +166,18 @@ describe('lagebildKuerzen', () => {
       '53.07',
       'A-4711',
       'psychiatrie',
+      // LLH-1573: Rufnamen (Freitext) und Einsatznummer der Leitstelle bleiben vom Gerät fern.
+      'RTW 1/83-1',
+      '2611-0815',
     ]) {
       expect(text).not.toContain(wert);
     }
+    expect(p.rettungsmittel).toEqual({
+      nachforderung_id: 3,
+      art: 'RTW',
+      status: 'unterwegs',
+      rufnamen: [],
+    });
   });
 
   it('lässt ein unbekanntes Feld weg (Positivliste)', () => {

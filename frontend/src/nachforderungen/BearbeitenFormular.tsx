@@ -118,7 +118,12 @@ export default function BearbeitenFormular({
         erfassenText="Änderung speichern"
       >
         <Form.Item name="anzahl" label="Anzahl" rules={mengenRegeln}>
-          <MengenFeld beschriftung="Anzahl" style={{ width: '100%' }} />
+          <MengenFeld
+            beschriftung="Anzahl"
+            style={{ width: '100%' }}
+            // Eine Anforderung für eine Person gilt für genau ein Rettungsmittel (LLH-1573 D1).
+            disabled={mitEinsatznummer(n)}
+          />
         </Form.Item>
         <Form.Item name="wohin" label="Wohin">
           <AutoComplete
