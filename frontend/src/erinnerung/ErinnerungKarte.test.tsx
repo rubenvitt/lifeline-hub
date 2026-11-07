@@ -81,7 +81,7 @@ describe('ErinnerungKarte — Bezug-Deeplink (F36/LFH-257)', () => {
       <ErinnerungKarte erinnerung={erinnerung({ bezug_typ: 'abloesung', bezug_id: 11 })} />,
     );
     const link = screen.getByRole('link', { name: '↗ Ablösung' });
-    expect(link).toHaveAttribute('href', '/einsaetze/7/abloesung');
+    expect(link).toHaveAttribute('href', '/einsaetze/7/abloesung?ansicht=laufend');
     expect(screen.queryByText(/#11/)).toBeNull();
   });
 

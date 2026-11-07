@@ -211,6 +211,9 @@ pub(crate) async fn anlegen_tx(
     )
     .await?;
     write_vorlage_overrides_tx(conn, einsatz_id, &vorlage_aus, ersteller_id).await?;
+    // LLH-1574 (design.md D4): ein Sanitätsdienst, auch über die Start-Vorlage, beginnt mit der
+    // Reihe „Sanitätsdienst“ im Lagebild.
+    super::lagekennzahl::vorbelegen_tx(conn, einsatz_id, daten.einsatzart, ersteller_id).await?;
     Ok(einsatz_id)
 }
 
@@ -290,7 +293,7 @@ macro_rules! einsatzleiter_joins {
 
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
-    // Die drei EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607/LLH-1371); sie
+    // Die vier EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607/LLH-1371/LLH-1574); sie
     // stehen wortgleich auch in `liste_fuer`, das Bezirksprädikat wie `istAktiverBezirk` im
     // Frontend — siehe `lagekennzahl::ableiten`.
     sqlx::query_as::<_, Einsatz>(concat!(
@@ -305,7 +308,9 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
                     AS evakuierung_angeordnet, \
                 EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = e.id \
-                        AND w.kennzahl = 'nachforderungen') AS nachforderungen_gewaehlt, ",
+                        AND w.kennzahl = 'nachforderungen') AS nachforderungen_gewaehlt, \
+                EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = e.id \
+                        AND w.kennzahl = 'sanitaetsdienst') AS sanitaetsdienst_gewaehlt, ",
         teilschwaerzungen_spalte!(),
         ", ",
         einsatzleiter_spalten!(),
@@ -427,6 +432,7 @@ pub async fn liste_fuer(
         pegel_festgelegt: bool,
         evakuierung_angeordnet: bool,
         nachforderungen_gewaehlt: bool,
+        sanitaetsdienst_gewaehlt: bool,
         teilschwaerzungen: Option<i64>,
         #[sqlx(flatten)]
         einsatzleiter: super::fuehrungsstelle::EinsatzleiterSpalten,
@@ -459,7 +465,9 @@ pub async fn liste_fuer(
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
                     AS evakuierung_angeordnet, \
                 EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = e.id \
-                        AND w.kennzahl = 'nachforderungen') AS nachforderungen_gewaehlt, ",
+                        AND w.kennzahl = 'nachforderungen') AS nachforderungen_gewaehlt, \
+                EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = e.id \
+                        AND w.kennzahl = 'sanitaetsdienst') AS sanitaetsdienst_gewaehlt, ",
         teilschwaerzungen_spalte!(),
         ", ",
         einsatzleiter_spalten!(),
@@ -571,6 +579,7 @@ pub async fn liste_fuer(
                     r.pegel_festgelegt,
                     r.evakuierung_angeordnet,
                     r.nachforderungen_gewaehlt,
+                    r.sanitaetsdienst_gewaehlt,
                 ),
                 teilschwaerzungen: r.teilschwaerzungen,
                 einsatzleiter: r.einsatzleiter.anzeige(),

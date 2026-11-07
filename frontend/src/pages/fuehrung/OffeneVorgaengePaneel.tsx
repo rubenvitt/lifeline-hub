@@ -469,7 +469,7 @@ export default function OffeneVorgaengePaneel({
           leer: 'keine',
           eintraege: abListe,
           schluessel: (a) => a.id,
-          sprung: { ziel: abloesungPfad(einsatzId), name: 'Ablösungen' },
+          sprung: { ziel: abloesungPfad(einsatzId, { ansicht: 'laufend' }), name: 'Ablösungen' },
           onNeuladen: () => void abloesungen.q.refetch(),
           zeile: (a) => {
             const ueberfaellig = einstufungOf(a, dayjs(jetzt)) === 'ueberfaellig';

@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { mitProzessZone } from '../test/prozessZone';
 import {
+  stunde,
   datum,
   kalendertag,
   tagUndUhrzeit,
@@ -195,5 +196,18 @@ describe('wirksameZeitdarstellung — Gerät vor Einsatz vor Organisation vor Vo
     expect(
       wirksameZeitdarstellung({ geraet: 'taktisch', einsatz: 'datum_uhrzeit', druck: true }),
     ).toBe('datum_uhrzeit');
+  });
+});
+
+describe('stunde — Achse eines Stundenverlaufs (LLH-1574)', () => {
+  it('zweistellige Stunde der Anzeigezone, in beiden Darstellungen gleich', () => {
+    expect(stunde('2026-06-11 12:20:00', { zeitzone: 'Europe/Berlin' })).toBe('14');
+    expect(
+      stunde('2026-06-11 00:05:00', {
+        zeitzone: 'Asia/Kolkata',
+        zeitdarstellung: 'datum_uhrzeit',
+      }),
+    ).toBe('05');
+    expect(stunde(null, { zeitzone: 'Europe/Berlin' })).toBe('');
   });
 });

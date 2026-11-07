@@ -1,8 +1,9 @@
 //! Wahl der Lagekennzahlen eines Einsatzes (LLH-1371).
 //!
 //! `PUT /api/einsaetze/{id}/lagekennzahl-wahl` ersetzt die gewählten Lagekennzahlen vollständig.
-//! Heute ist nur „Nachforderungen offen“ wählbar (Lageplatz B hinter „Evakuiert“, Frontend
-//! `pages/lage-dashboard/lagebild.ts`). Gelesen wird die Wahl nicht hier, sondern als Teil von
+//! Wählbar sind „Nachforderungen offen“ (Lageplatz B hinter „Evakuiert“) und die Reihe
+//! „Sanitätsdienst“ (LLH-1574, ganze Reihe und Paneel „Verlauf“), beide im Frontend
+//! `pages/lage-dashboard/lagebild.ts`. Gelesen wird die Wahl nicht hier, sondern als Teil von
 //! `EinsatzAnzeige.lagekennzahlen` — jeder Leser des Einsatzes sieht, DASS gewählt ist; die Zahl
 //! selbst liefert nur der Modulzähler, der ohne Modulrecht fehlt (design.md D5).
 //!

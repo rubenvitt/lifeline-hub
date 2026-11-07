@@ -2,6 +2,9 @@ import type { GlobalToken } from 'antd';
 import {
   etbTypFarbenDunkel,
   etbTypFarbenHell,
+  anlassVerlaufFarbenDunkel,
+  anlassVerlaufFarbenHell,
+  type AnlassVerlaufTon,
   fachebeneFarbenDunkel,
   fachebeneFarbenHell,
   farbenDunkel,
@@ -877,4 +880,12 @@ export function fachebeneFarbe(quelle: FachebeneQuelle, token: GlobalToken): str
   return (istDunklerModus(token) ? fachebeneFarbenDunkel : fachebeneFarbenHell)[
     FACHEBENE_TON[quelle]
   ];
+}
+
+/**
+ * Säulenfarbe eines Anlass-Tons im Paneel „Verlauf“ (LLH-1574) im aktiven Modus. Nur Farbe; der
+ * zweite Kanal ist das Wort in Legende und Ablesung.
+ */
+export function anlassVerlaufFarbe(ton: AnlassVerlaufTon, token: GlobalToken): string {
+  return (istDunklerModus(token) ? anlassVerlaufFarbenDunkel : anlassVerlaufFarbenHell)[ton];
 }

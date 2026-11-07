@@ -1204,7 +1204,7 @@ describe('UeberblickPage', () => {
     rendern();
     const p = await waitFor(() => paneel('Nächste Marken'));
     const marke = await within(p).findByText('Ablösung Deichwache Nord, 2 Einheiten');
-    expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/abloesung');
+    expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/abloesung?ansicht=laufend');
     expect(within(p).queryByText('Ablösung fällig: Florian 1')).toBeNull();
   });
 

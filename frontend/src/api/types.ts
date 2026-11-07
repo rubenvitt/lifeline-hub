@@ -22,6 +22,7 @@ export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
 export type LagemonitorUhs = S['LagemonitorUhs'];
 export type LagemonitorZone = S['LagemonitorZone'];
 export type LagemonitorAbschnitt = S['LagemonitorAbschnitt'];
+export type LagemonitorSanitaetsdienst = S['LagemonitorSanitaetsdienst'];
 export type KopplungAnzeige = S['KopplungAnzeige'];
 export type KopplungStatus = S['KopplungStatus'];
 export type KopplungMitCode = S['KopplungMitCode'];

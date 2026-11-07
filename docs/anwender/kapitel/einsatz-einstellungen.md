@@ -16,7 +16,8 @@ fehlt auch die, die Vorgabe des Systems.
 Bedient wird das Modul von der Einsatzleitung und dem Führungspersonal, die Reiter „Module“ und
 „Zugriff“ nur von der Einsatzleitung. Der Reiter „Ablösung“ legt das Schichtmodell fest, nach dem
 die Ablösung des Einsatzes rechnet (Kapitel [Ablösung](abloesung.md)). Der Reiter „Kennzahlen“
-wählt, was Platz 3 der Kennzahlen im Lagebild zeigt. Der Reiter „Benachrichtigungen“ legt fest,
+wählt, was Platz 3 der Kennzahlen im Lagebild zeigt, und schaltet die Reihe für den
+Sanitätsdienst. Der Reiter „Benachrichtigungen“ legt fest,
 welche Eingänge für welche Funktion still bleiben. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
 [Aufbewahrung](aufbewahrung.md), die Reiter „Pegel“ und „Geräte“ die Kapitel zu Wetter und
 Pegeln und zu gekoppelten Geräten, den Reiter „Zugriff“ (wer im Einsatz mit welcher Rolle
@@ -96,6 +97,19 @@ Für Einsatzleitung und Führungspersonal:
 
 Jede Änderung gilt sofort, ohne „Speichern“.
 
+### Lagebild für den Sanitätsdienst zuschneiden
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Den Reiter „Kennzahlen“ öffnen.
+2. „Reihe Sanitätsdienst“ einschalten. Das Lagebild zeigt dann Kontakte, letzte Stunde, in
+   Versorgung, Transporte, verfügbare Einheiten und Vermisste, dazu das Paneel „Verlauf“ statt der
+   Gefahrenmatrix (Kapitel [Lagebild](lagebild.md)).
+3. Zum Zurücknehmen den Schalter ausschalten.
+
+Ein Einsatz, der mit der Einsatzart Sanitätsdienst angelegt wird, etwa über die Vorlage
+„Sanitätsdienst“, beginnt mit eingeschalteter Reihe.
+
 ### Eingänge für Funktionen still stellen
 
 Für Einsatzleitung und Führungspersonal:
@@ -174,6 +188,11 @@ nennt das unter dem Schalter. Die Wahl bleibt gespeichert und wirkt wieder, soba
 aufgehoben ist. Wer das Modul Nachforderungen nicht sehen darf, sieht auf Platz 3 „Nachforderungen
 offen“ mit „—“ und „nicht freigegeben“, nie eine Zahl. Lagebilder, die gerade offen sind, bieten
 den neuen Zuschnitt über den Hinweis „Kennzahlreihe geändert: …“ an.
+
+Die „Reihe Sanitätsdienst“ ersetzt alle sechs Plätze. Solange sie gilt, wirkt „Nachforderungen
+offen auf Platz 3“ nicht, und der Reiter nennt das unter dem Schalter; die Wahl bleibt gespeichert.
+Eine spätere Änderung der Einsatzart schaltet die Reihe nicht um. Der Lagemonitor zeigt in dieser
+Reihe die Kachel „Hilfeleistungen“ (Kapitel [Lagemonitor](lagemonitor.md)).
 
 ### Still je Funktion
 

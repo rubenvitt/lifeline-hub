@@ -191,6 +191,7 @@ use utoipa::OpenApi;
         crate::routes::lagemonitor::LagemonitorUhs,
         crate::routes::lagemonitor::LagemonitorZone,
         crate::routes::lagemonitor::LagemonitorAbschnitt,
+        crate::routes::lagemonitor::LagemonitorSanitaetsdienst,
         crate::routes::lagemonitor_v1::LagemonitorLage,
         crate::routes::lagemonitor_v1::LagemonitorEinsatz,
         crate::routes::lagemonitor_v1::LagemonitorUhsZahl,
