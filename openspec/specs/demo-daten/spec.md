@@ -86,15 +86,16 @@ MUST der Kopf als Historie mit Entfernzeitpunkt stehen bleiben.
 
 ### Requirement: Stammdaten mit Konfliktregel
 
-Der Import SHALL die Stammdaten anlegen, die das Szenario braucht: Fahrzeuge, Personal,
-Material, Einheiten-Vorlagen und ein Schichtmodell (LLH-1122) der Organisation. Ein vorhandener
+Der Import SHALL die Stammdaten anlegen, die das Szenario der Lage braucht: Fahrzeuge,
+Personal, Material und, soweit die Lage sie vorsieht, Einheiten-Vorlagen und ein Schichtmodell
+(LLH-1122) der Organisation. Ein vorhandener
 Datensatz derselben Organisation mit Dienststatus `in_dienst` (bei Einheiten-Vorlagen: aktiv)
 und derselben fachlichen Kennung MUST mitbenutzt statt angelegt werden. Die Kennung ist beim
 Fahrzeug der Funkrufname, beim Personal die Personalnummer, beim Material die Bestandsnummer,
 bei der Einheiten-Vorlage der Name und beim Schichtmodell die Bezeichnung ohne Unterschied von
 Groß- und Kleinschreibung. Ein angelegtes Schichtmodell MUST NOT die Vorgabe der Organisation
-werden; hat der Demo-Einsatz bei seiner Anlage keine Vorgabe bekommen, MUST er das
-Szenario-Modell als Kopie zur Vorgabe bekommen. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
+werden; sieht die Lage ein Schichtmodell vor und hat der Demo-Einsatz bei seiner Anlage keine
+Vorgabe bekommen, MUST er das Szenario-Modell als Kopie zur Vorgabe bekommen. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
 Datensatz MUST unverändert bleiben. Kataloge (Fahrzeug- und Personalstatus, Einheitstypen,
 Qualifikationen) MUST nur mitbenutzt werden, und zwar nur aktive
 Einträge. Fehlt ein benötigter Katalogeintrag, MUST der Import mit 422 abbrechen, den
@@ -118,19 +119,20 @@ und MUST NOT eine Zuordnung zwischen Personal und Benutzerkonto setzen.
 - **THEN** ist die Zahl der Benutzerkonten vorher und nachher gleich
 
 #### Scenario: Demo-Schichtmodell
-- **WHEN** der Admin in eine Organisation ohne Schichtmodelle importiert
+- **WHEN** der Admin die Lage „Starkregen“ in eine Organisation ohne Schichtmodelle importiert
 - **THEN** steht danach das Schichtmodell „12-h-Schicht Hochwasser“ mit Demo-Marke, nicht als Vorgabe der Organisation
 - **AND** der Demo-Einsatz hat es als Vorgabe der Ablösung
 
 #### Scenario: Demo-Vorlage mit Untereinheit
-- **WHEN** der Admin in eine Organisation ohne Vorlagen importiert
+- **WHEN** der Admin die Lage „Starkregen“ in eine Organisation ohne Vorlagen importiert
 - **THEN** steht danach die Vorlage „Sanitätszug Musterstadt“ mit der Untereinheit „Rettungsstaffel“, beide mit Demo-Marke und mit Demo-Fahrzeugen
 
 ### Requirement: Demo-Einsatz
 
-Der Import SHALL genau einen Einsatz anlegen: Einsatzart `uebung`, Bezeichnung beginnend
-mit „ÜBUNG – “, Stichwort aus dem Bereich Unwetter bzw. Starkregen, ein fiktiver Ort,
-erkennbar fiktive Personennamen. Der Einsatz MUST befüllen: Einsatzabschnitte Betreuung,
+Der Import SHALL je Lage genau einen Einsatz anlegen: Einsatzart `uebung`, Bezeichnung
+beginnend mit „ÜBUNG – “, ein fiktiver Ort, erkennbar fiktive Personennamen. Der Einsatz der
+Lage „Starkregen“ MUST ein Stichwort aus dem Bereich Unwetter bzw. Starkregen tragen und
+befüllen: Einsatzabschnitte Betreuung,
 Sanitätsdienst und Logistik mit unterschiedlichem Lagezustand, Einheiten mit Fahrzeugen im
 FMS-Status und Rückmeldungen, von denen mindestens eine überfällig ist, eine UHS mit
 gesichteten Betroffenen aller Kategorien SK I–IV nach BBK, einen Bereitstellungsraum, eine
@@ -143,11 +145,11 @@ festlegen. Nummernkreise (Einsatznummer, ETB, Meldungen, Aufträge, Registriernu
 MUST über dieselben Funktionen vergeben werden wie im Betrieb.
 
 #### Scenario: Überblick zeigt die Lage
-- **WHEN** der Admin nach dem Import den Demo-Einsatz öffnet
+- **WHEN** der Admin nach dem Import der Lage „Starkregen“ den Demo-Einsatz öffnet
 - **THEN** zeigt die Einsatzliste ihn mit Einsatzart Übung, und der Einsatz meldet die Lagekennzahl „evakuiert“, aber keine „pegel“
 
 #### Scenario: Sichtung nach BBK
-- **WHEN** die Betroffenen des Demo-Einsatzes abgefragt werden
+- **WHEN** die Betroffenen des Demo-Einsatzes der Lage „Starkregen“ abgefragt werden
 - **THEN** kommt jede der Kategorien SK I, SK II, SK III und SK IV mindestens einmal vor
 
 #### Scenario: Einzige Mitgliedschaft
@@ -180,12 +182,12 @@ gelten, und es MUST keine unbestätigte Meldung mit abgelaufener Bestätigungsfr
 ### Requirement: Import ist atomar
 
 Der Import SHALL in einer einzigen Schreibtransaktion laufen. Scheitert ein Schritt, MUST
-die Datenbank im Stand vor dem Import bleiben: kein Einsatz, keine Stammdaten, kein
-Kopf-Datensatz.
+die Datenbank im Stand vor dem Import bleiben: kein Einsatz, keine Stammdaten und kein
+Kopf-Datensatz dieser Lage; eine schon aktive andere Lage bleibt unverändert.
 
 #### Scenario: Abbruch mitten im Import
 - **WHEN** ein Schritt des Imports scheitert, etwa an einem fehlenden Katalogeintrag
-- **THEN** existieren danach weder Demo-Einsatz noch Demo-Stammdaten noch ein aktiver Kopf-Datensatz
+- **THEN** existieren danach weder Demo-Einsatz noch Demo-Stammdaten noch ein aktiver Kopf-Datensatz dieser Lage, und eine schon aktive andere Lage ist zeilengleich erhalten
 
 ### Requirement: Demo-Daten entfernen
 
@@ -197,7 +199,8 @@ Marke. Eine markierte Stammdatenzeile, auf die nach dem Löschen des Einsatzes n
 irgendein Datensatz verweist, MUST stehen bleiben und ihre Marke verlieren. Der Bericht
 MUST sie als „behalten“ zählen. Besteht kein aktiver Import der Lage, MUST das System mit 409
 antworten. Nach dem Entfernen MUST die Datenbank in allen Nutzdatentabellen dieselben Zeilen
-tragen wie vor dem Import. Ausgenommen sind der Kopf-Datensatz als Historie, die als
+tragen wie vor dem Import dieser Lage, abgesehen von dem, was zwischen Import und Entfernen
+außerhalb dieser Lage entstanden ist, etwa eine andere Lage. Ausgenommen sind der Kopf-Datensatz als Historie, die als
 „behalten“ gemeldeten Stammdaten, Sitzungen und Anmeldeprotokoll, Benutzereinstellungen,
 SQLite-Verwaltungstabellen und die Schattentabellen der Volltextsuche.
 
