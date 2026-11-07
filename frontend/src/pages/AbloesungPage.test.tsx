@@ -75,6 +75,25 @@ vi.mock('../api/abloesungen', () => ({
   setzeAbloesungVorgabe: (...a: unknown[]) => setzeAbloesungVorgabe(...a),
 }));
 
+// Schichtplan (LLH-1554): Plan, UHS, Stamm-Personal und Qualifikationen der Ansicht „Schichtplan“.
+const fetchSchichtplan = vi.fn();
+vi.mock('../api/schichtplan', async (orig) => ({
+  ...(await orig<typeof import('../api/schichtplan')>()),
+  fetchSchichtplan: (...a: unknown[]) => fetchSchichtplan(...a),
+}));
+vi.mock('../api/einsatzUhs', async (orig) => ({
+  ...(await orig<typeof import('../api/einsatzUhs')>()),
+  listeUhs: vi.fn(() => Promise.resolve([])),
+}));
+vi.mock('../api/personal', async (orig) => ({
+  ...(await orig<typeof import('../api/personal')>()),
+  listePersonal: vi.fn(() => Promise.resolve([])),
+}));
+vi.mock('../api/qualifikationen', async (orig) => ({
+  ...(await orig<typeof import('../api/qualifikationen')>()),
+  listeQualifikationen: vi.fn(() => Promise.resolve([])),
+}));
+
 /** Wire-Zeit (UTC ohne Zone) relativ zu jetzt. */
 const inMinuten = (m: number) => dayjs.utc().add(m, 'minute').format('YYYY-MM-DD HH:mm:ss');
 
@@ -1424,7 +1443,11 @@ describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
     setzeViewportBreite(390);
     renderPage();
     await screen.findByText('1 laufend · 0 fällig · 1 ohne Schicht');
+    // Schichten und Plan in einer eigenen Leiste darüber (LLH-1554), die Werkzeugzeile mit dem
+    // Banner trägt weiter drei Segmente.
     expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual([
+      'Schichten',
+      'Plan',
       'Laufend',
       'Ohne Schicht',
       'Vergangen',
@@ -1777,5 +1800,109 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
     const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
     await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
     expect(screen.getByRole('radio', { name: /^Laufend/ })).toBeChecked();
+  });
+});
+
+describe('AbloesungPage — Schichtplan (LLH-1554)', () => {
+  const segment = (name: RegExp | string) => screen.getByRole('radio', { name });
+  const PLAN = {
+    bloecke: [
+      {
+        id: 1,
+        von: inMinuten(-30),
+        bis: inMinuten(90),
+        posten: { art: 'einheit', einheit_id: 11, bezeichnung: 'Florian 1', aufgeloest: false },
+        befunde: [],
+        offene_anforderungen: [],
+        offene_plaetze: 1,
+        personen: [],
+        personen_anzahl: 0,
+        soll_anzahl: 1,
+        version: 1,
+      },
+    ],
+    grenzwerte: {
+      max_dienst_eigen: false,
+      max_dienst_minuten: 720,
+      min_ruhe_eigen: false,
+      min_ruhe_minuten: 600,
+    },
+    helfer: [],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setzeViewportBreite(1440);
+    freigaben.wert = freigabenFixture();
+    einsatz.wert = {
+      id: 1,
+      bezeichnung: 'Stadtfest',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      einsatzart: 'sanitaetsdienst',
+      begonnen_at: inMinuten(-120),
+    } as typeof einsatz.wert;
+    laufendLiefert([]);
+    listeEinheitenPerioden.mockResolvedValue([]);
+    listeEinsatzPersonal.mockResolvedValue([]);
+    fetchEinsatzSchichtmodell.mockResolvedValue({ vorwarnung_minuten: 30, laufende_schichten: 0 });
+    listeAbloesungVorgaben.mockResolvedValue([
+      { abschnitt_id: 7, abschnitt_name: 'Deichwache Nord', rhythmus_minuten: 360 },
+    ]);
+    fetchSchichtplan.mockResolvedValue(PLAN);
+  });
+
+  it('ein Sanitätsdienst öffnet die Ablösung auf dem Schichtplan, ohne Parameter', async () => {
+    renderPage();
+    const raster = await screen.findByRole('region', { name: 'Schichtplan' });
+    expect(segment('Schichtplan')).toBeChecked();
+    expect(adresse.suche).toBe('');
+    // Zeilen nach Abschnitt, der Block mit Ampel und Wort.
+    const block = await within(raster).findByRole('button', { name: /^Florian 1 / });
+    expect(block).toHaveAttribute('data-ampel', 'luecke');
+    expect(block).toHaveAccessibleName(/1 offen$/);
+    expect(within(raster).getByText('Deichwache Nord')).toBeInTheDocument();
+    // Rhythmus und Vorgabe gehören zu den laufenden Schichten, nicht zum Plan.
+    expect(screen.queryByText('Rhythmus je Abschnitt')).toBeNull();
+    // „Laufend“ ist hier die Abweichung und steht in der Adresse.
+    await userEvent.click(segment(/^Laufend/));
+    await waitFor(() => expect(adresse.suche).toBe('?ansicht=laufend'));
+    await userEvent.click(segment('Schichtplan'));
+    await waitFor(() => expect(adresse.suche).toBe(''));
+  });
+
+  it('in einem anderen Einsatz steht der Plan unter ?ansicht=plan', async () => {
+    einsatz.wert = {
+      id: 1,
+      bezeichnung: 'Hochwasser',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    };
+    renderPage('/einsaetze/1/abloesung?ansicht=plan');
+    expect(await screen.findByRole('region', { name: 'Schichtplan' })).toBeInTheDocument();
+    expect(segment('Schichtplan')).toBeChecked();
+  });
+
+  it('ohne Freigabe Personal sperrt die Seitenleiste mit Grund', async () => {
+    freigaben.wert = freigabenFixture({ personal: { zugriff: false } });
+    renderPage();
+    const leiste = await screen.findByRole('complementary', { name: 'Personen zum Einteilen' });
+    expect(within(leiste).getByText('Modul Personal gesperrt')).toBeInTheDocument();
+    expect(leiste.querySelector('[data-lfh="schichtplan-person"]')).toBeNull();
+  });
+
+  it('auf dem Handschirm steht je Posten „jetzt“ und „als Nächstes“', async () => {
+    setzeViewportBreite(390);
+    renderPage();
+    const liste = await screen.findByRole('region', { name: 'Schichtplan je Posten' });
+    expect(await within(liste).findByRole('button', { name: /^Florian 1 jetzt / })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Schichtplan' })).toBeNull();
+    expect(screen.queryByRole('radio', { name: '6 h' })).toBeNull();
+    // Im Plan steht nur die Leiste „Schichten | Plan“; „Schichten“ führt zu den laufenden.
+    expect(screen.getByRole('radio', { name: 'Plan' })).toBeChecked();
+    expect(document.querySelector('[data-lfh="abloesung-werkzeugzeile"]')).toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Schichten' }));
+    await waitFor(() => expect(adresse.suche).toBe('?ansicht=laufend'));
+    expect(screen.getByRole('radio', { name: 'Laufend' })).toBeChecked();
   });
 });

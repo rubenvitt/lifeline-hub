@@ -563,7 +563,7 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       '/einsaetze/5/abloesung?ansicht=ohne-schicht',
     );
     expect(abloesungPfad(E, { ansicht: 'laufend' })).toBe('/einsaetze/5/abloesung');
-    for (const a of ['ohne-schicht', 'vergangen', 'laufend'] as const) {
+    for (const a of ['ohne-schicht', 'vergangen', 'laufend', 'plan'] as const) {
       const pfad = abloesungPfad(E, { ansicht: a });
       const params = new URLSearchParams(pfad.split('?')[1] ?? '');
       expect(parseAbloesungAnsicht(params) ?? 'laufend').toBe(a);
