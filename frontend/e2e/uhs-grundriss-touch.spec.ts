@@ -581,7 +581,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
   });
 
   /**
-   * Ein belegter Platz trägt im Handschuh acht Einträge à 72 px — mehr, als über oder unter
+   * Ein belegter Platz trägt im Handschuh neun Einträge à 72 px — mehr, als über oder unter
    * der Karte Platz hat; mit antds Vorgabe stand das Menü aus dem Fenster. Zugesichert: JEDER
    * Eintrag liegt vollständig im Fenster.
    */
@@ -616,7 +616,10 @@ test.describe('UHS-Grundriss unter Touch', () => {
     const eintraege = popup.getByRole('menuitem');
     await expect(eintraege.first()).toContainText('Verbleib / Entlassung erfassen');
     const zahl = await eintraege.count();
-    expect(zahl, 'Verbleib, Person, Rückweg, vier Verfügbarkeiten, zurückweisen').toBe(8);
+    expect(
+      zahl,
+      'Verbleib, Rettungsmittel (LLH-1573), Person, Rückweg, vier Verfügbarkeiten, zurückweisen',
+    ).toBe(9);
     for (let i = 0; i < zahl; i++) {
       await expect(eintraege.nth(i), `Eintrag ${i} liegt im Fenster`).toBeInViewport({
         ratio: 1,
