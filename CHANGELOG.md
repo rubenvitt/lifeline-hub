@@ -1,3 +1,85 @@
+## [1.0.0-alpha.176](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.175...v1.0.0-alpha.176) (2026-11-07)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Dieses Release spielt beim Start drei neue Migrationen ein:
+  - Personen können eine versorgende Einheit und die Meldung tragen, aus der sie entstanden sind.
+  - Am Einsatz lässt sich die neue Kennzahlreihe „Sanitätsdienst“ wählen.
+  - Demo-Importe werden je Lage geführt.
+- **Schnittstelle Demo-Daten geändert:** Die Lage ist jetzt Teil der Adresse (`/api/demo-daten/{lage}`, Neuimport über `/api/demo-daten/{lage}/neu`). Die Abfrage liefert alle Lagen gemeinsam als Liste. Eine unbekannte Lage beantwortet der Server mit 404. Aufrufe der bisherigen Pfade ohne Lage müssen angepasst werden.
+- **Lagemonitor und Schnittstelle v1:** Ist am Einsatz die Reihe Sanitätsdienst gewählt, enthalten die Antworten einen zusätzlichen, optionalen Block `sanitaetsdienst`.
+
+### Lagebild
+
+- **Neue Kennzahlreihe „Sanitätsdienst“:** Statt der sechs Plätze zeigt sie diese Werte:
+  - Kontakte
+  - Kontakte der letzten Stunde
+  - Patienten in Versorgung
+  - Transporte
+  - verfügbare Einheiten
+  - Vermisste
+- **Paneel „Verlauf“:** Bei dieser Reihe ersetzt es die Gefahrenmatrix. Es zeigt die Kontakte je Stunde über zwölf Stunden, gestapelt nach Anlass.
+- **Einstellung und Umschalten:** Die Reihe wird unter Einstellungen › Kennzahlen eingeschaltet. Ein Wechsel wirkt sofort, offene Lagebilder weisen mit „Kennzahlreihe geändert“ darauf hin.
+- **Einsätze der Art Sanitätsdienst:** Sie wählen die Reihe beim Anlegen bereits vor, auch über die Start-Vorlage.
+- **Lagemonitor:** Bei Sanitätsdienst-Einsätzen zeigt er die Kachel „Hilfeleistungen“ statt „Betroffene“.
+
+### Kräfte und Mittel – Ablösung
+
+- **Neue Ansicht „Schichtplan“:** Je Posten gibt es eine Zeile, sortiert in dieser Reihenfolge:
+  - Einheiten und UHS nach Abschnitt
+  - Posten ohne Abschnitt
+  - die Pause
+
+  Die Zeitachse lässt sich auf 6 h, 12 h oder den ganzen Einsatz stellen, eine Linie markiert die aktuelle Zeit.
+- **Blöcke bearbeiten:**
+  - Ein Block entsteht durch Aufziehen mit der Maus.
+  - Er lässt sich verschieben, auch in eine andere Zeile, und an den Kanten verlängern oder kürzen.
+  - Das Raster beträgt 5 Minuten, ein Block dauert mindestens 10 Minuten.
+  - Blöcke dürfen sich nicht überschneiden, außer in der Pause. Esc bricht ab.
+- **Personen zuordnen:** Personen werden aus der Seitenleiste auf einen Block gezogen. Angeboten werden Verfügbare, Personen im Einsatz, Stammpersonal im Dienst und Helfer. Ohne das Modul Personal ist das Zuordnen gesperrt, ein Hinweis nennt den Grund.
+- **Blockdialog:**
+  - Er enthält Posten, Zeit, Personen, Soll-Stärke und eine Notiz.
+  - Lücken und Befunde (etwa doppelt verplant) stehen dort in Worten.
+  - Löschen fragt vorher nach.
+- **Ohne Maus bedienbar:** „Block anlegen“ und jeder einzelne Block sind als Knöpfe erreichbar.
+- **Ampel mit Text:** Sie zeigt „besetzt“, „n offen“, „Befund“, „ohne Soll“, „unbesetzt“ oder „Pause“. Ein Pausenblock mit Befund zeigt jetzt den Befund an.
+- **Auf dem Handy:** Je Posten stehen „jetzt“ und „als Nächstes“. Zwischen „Schichten“ und „Plan“ wechselt eine eigene Leiste.
+- **Sanitätsdienst-Einsätze:** Bei der Einsatzart Sanitätsdienst öffnet die Ablösung direkt den Plan.
+- **Links auf fällige Schichten:** Erinnerungen, die Marke im Überblick und der Sprung „Ablösungen“ bei den offenen Vorgängen führen ausdrücklich zu den laufenden Schichten.
+- **Dienstdauer lesbarer:** „zu lange im Dienst“ zeigt die Dauer jetzt in der Form „45 min“ oder „12:30 h“.
+
+### Betroffene
+
+- **„Versorgt von“ im Patientenkopf:** Eine neue Zeile nennt Einheit und Abschnitt der versorgenden Einheit.
+  - Wer Schreibrechte hat, ändert sie direkt an Ort und Stelle.
+  - Ohne Netz ist das Feld gesperrt, an gekoppelten Geräten nur lesbar.
+- **Verweis auf die Meldung:** Ist ein Patient aus einer Meldung entstanden, verweist „aus Meldung #n“ auf sie.
+- **Maske „Betroffene erfassen“:** Unter „Weitere Angaben“ gibt es das neue Feld „Versorgende Einheit“.
+- **Seitenleiste:** Der neue Block „Versorgt von“ zählt die Kontakte je Einheit, ohne stornierte und mit abgeschlossenen.
+- **„Eigene Position“ beim Fundort:** Der Standort wird einmalig übernommen und nicht verfolgt. Ohne HTTPS ist die Funktion gesperrt, ein Hinweis nennt den Grund.
+- **Spuren der Einheit:** Ein versorgter Patient erscheint als Spur der Einheit.
+
+### Kommunikation – Meldungen
+
+- **„Patient anlegen“ an der Meldungskarte:** Öffnet die Erfassungsmaske mit vorbelegtem Bezug, Verortung und Absender-Einheit. Jeder so angelegte Patient erscheint an der Meldung als Verweis.
+- **Aktuelle Einheitenliste:** Die Maske fragt die Einheiten bei jedem Öffnen neu ab. Eine inzwischen aufgelöste Einheit wird nicht mehr vorbelegt.
+- **Ohne Netz:** Die Maske öffnet sofort mit den vorhandenen Daten, aber ohne vorbelegte Einheit. Beim Wiederverbinden bleibt sie offen und behält die Eingaben.
+- **Gekoppelte Geräte:**
+  - Ein Gerät verknüpft Patienten nur mit Meldungen, die es selbst erfasst hat.
+  - Ein Gerät ohne Zugriff auf Meldungen, etwa das UHS-Tablet, kann keine Meldung verknüpfen.
+
+### Verwaltung – Demo-Daten
+
+- **Zweite Demo-Lage „Stadtfest“:** Sie bildet einen Sanitätsdienst als Übung ab:
+  - Abschnitte Bühne, Eingang und Festmeile
+  - zwei Streifen
+  - eine UHS mit Plätzen im Grundriss
+  - ein KTW
+  - 20 Kontakte über den Abend, jeweils mit Anlass, versorgender Einheit und meist mit Verbleib, darunter ein Transport über die Leitstelle mit Einsatznummer
+- **Lagen unabhängig verwalten:** Starkregen und Stadtfest werden je für sich importiert, neu importiert und entfernt. Das Entfernen einer Lage lässt die andere stehen.
+- **Bedienung:** Jede Lage hat ein eigenes Paneel, Rückfragen und Meldungen nennen die jeweilige Lage. Der Hinweis auf Demo-Daten in der Einsatzliste erscheint nur, solange noch keine Lage importiert ist.
+- **Anwenderdokumentation:** Abbildungen und Texte zu Betroffenen, Meldungen, Einheiten und Demo-Daten sind auf den neuen Stand gebracht.
+
 ## [1.0.0-alpha.175](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.174...v1.0.0-alpha.175) (2026-11-07)
 
 ### Wichtige Änderungen
