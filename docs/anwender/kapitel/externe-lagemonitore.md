@@ -66,7 +66,9 @@ Abschluss des Einsatzes endet jede Freigabe an ihm.
 
 Der Monitor erhält Bezeichnung, Stichwort, Einsatzart und Beginn des Einsatzes, die Zahlen zu
 Betroffenen und Kräften, die Belegung der Unfallhilfsstellen und die Zahl der offenen
-Sofortmeldungen, also dieselben Zahlen wie der [Lagemonitor](lagemonitor.md). Dazu kommt die
+Sofortmeldungen, also dieselben Zahlen wie der [Lagemonitor](lagemonitor.md); in der Reihe
+„Sanitätsdienst“ auch die Hilfeleistungen (Kontakte, letzte Stunde, in Versorgung, Transporte).
+Dazu kommt die
 „Zusammenfassung“ des zuletzt freigegebenen Lageberichts (siehe
 [Lageberichte](lageberichte.md)); ein Entwurf geht nicht hinaus. Die Zusammenfassung geht so
 hinaus, wie sie freigegeben ist: Bei einem freigegebenen Einsatz gehören keine Namen hinein.

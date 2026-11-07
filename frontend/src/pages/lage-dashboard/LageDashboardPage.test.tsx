@@ -906,6 +906,93 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     });
   });
 
+  describe('Reihe „Sanitätsdienst“ (LLH-1574)', () => {
+    const SAN = [
+      'Kontakte',
+      'Letzte Stunde',
+      'In Versorgung',
+      'Transporte',
+      'Einheiten verfügbar',
+      'Vermisste',
+    ];
+
+    it('gewählt: eigene Reihe und „Verlauf“ statt der Gefahrenmatrix, ohne Personenbezug', async () => {
+      // Vor fünf Minuten erfasst: die laufende Stunde oder die davor, in jedem Fall im Fenster.
+      const vorhin = new Date(Date.now() - 5 * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+      mockEndpunkte({
+        lagekennzahlen: ['sanitaetsdienst'],
+        personen: [
+          person(null, 'betroffen', {
+            anlass: 'verletzung',
+            name: 'Muster',
+            vorname: 'Erika',
+            erfasst_at: vorhin,
+          }),
+          person(null, 'betroffen', { anlass: 'internistisch', erfasst_at: vorhin }),
+        ],
+      });
+      render();
+      const kontakte = await kennzahlGeladen('Kontakte');
+      expect(etiketten()).toEqual(SAN);
+      await waitFor(() =>
+        expect(kontakte.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2'),
+      );
+      expect(kontakte).toHaveAttribute('href', '/einsaetze/1/personen');
+      expect(screen.queryByRole('region', { name: 'Gefahrenmatrix' })).toBeNull();
+      const verlauf = paneel('Verlauf');
+      // Zwölf Säulen; beide Kontakte stehen in einer, die Ablesung nennt die Anlässe.
+      const saeulen = verlauf.querySelectorAll('[data-lfh="verlauf-saeule"]');
+      expect(saeulen).toHaveLength(12);
+      const voll = [...saeulen].filter((el) => el.getAttribute('data-gesamt') === '2');
+      expect(voll).toHaveLength(1);
+      expect(voll[0].getAttribute('aria-label')).toMatch(
+        /2 Kontakte · Verletzung 1 · Internistisch 1$/,
+      );
+      // Nur Zahlen: der Name einer Person steht nirgends im Lagebild.
+      expect(screen.queryByText(/Erika/)).toBeNull();
+    });
+
+    it('Umschalten während der Betrachtung: Banner, und Band und Paneel wechseln gemeinsam', async () => {
+      const daten: Daten = { lagekennzahlen: [] };
+      mockEndpunkte(daten);
+      const { client } = render();
+      await kennzahlGeladen('Verbleib offen');
+      daten.lagekennzahlen = ['sanitaetsdienst'];
+      await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+      const banner = await screen.findByText(
+        /^Kennzahlreihe geändert: Kontakte statt Verbleib offen/,
+      );
+      // Gehalten: noch die alte Reihe und die Gefahrenmatrix.
+      expect(etiketten()).toEqual(REIHE_OHNE_AUSLOESER);
+      expect(paneel('Gefahrenmatrix')).toBeInTheDocument();
+      await userEvent.click(
+        within(banner.closest('[data-lfh="sammelbanner"]') as HTMLElement).getByRole('button', {
+          name: 'übernehmen',
+        }),
+      );
+      await waitFor(() => expect(etiketten()).toEqual(SAN));
+      expect(paneel('Verlauf')).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Gefahrenmatrix' })).toBeNull();
+    });
+
+    it('Personen gesperrt: Kontaktzahlen „—“ mit Grund, „Verlauf“ nennt den Grund', async () => {
+      const abrufe: Record<string, number> = {};
+      mockEndpunkte({
+        lagekennzahlen: ['sanitaetsdienst'],
+        freigaben: { personen: { zugriff: false } },
+        abrufe,
+      });
+      render();
+      await kennzahlGeladen('Einheiten verfügbar');
+      await waitFor(() => expect(kennzahl('Kontakte')).toHaveTextContent('nicht freigegeben'));
+      expect(kennzahl('Kontakte').tagName).not.toBe('A');
+      expect(
+        within(paneel('Verlauf')).getByText('Modul Personen nicht freigegeben.'),
+      ).toBeInTheDocument();
+      expect(abrufe.personen).toBeUndefined();
+    });
+  });
+
   it('Deep-Link: Klick auf „Betroffene" führt ins Personen-Modul', async () => {
     mockEndpunkte({ personen: [person('sk1')] });
     render();

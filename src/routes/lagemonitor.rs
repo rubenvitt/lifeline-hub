@@ -101,6 +101,65 @@ pub struct LagemonitorAbschnitt {
     pub flaeche_geojson: String,
 }
 
+/// Hilfeleistungen in Zahlen für die Reihe „Sanitätsdienst“ (LLH-1574, design.md D6): dieselben
+/// Regeln wie die Kennzahlen des Lagebilds (`pages/lage-dashboard/lagebild.ts`). Nur Zahlen.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LagemonitorSanitaetsdienst {
+    /// Kontakte: alle Personen außer Vermissten, Abgeschlossene eingeschlossen
+    /// (`anlassbild().gesamt` im Client).
+    pub kontakte: i64,
+    /// Kontakte, die in den letzten 60 Minuten erfasst wurden.
+    pub kontakte_letzte_stunde: i64,
+    /// Angetroffene, die noch nicht abgeschlossen sind (offen oder unterwegs).
+    pub in_versorgung: i64,
+    /// Transporte wie im Einsatzbericht (`transportBilanz().transportiert`): Verbleib Transport,
+    /// nicht nur angemeldet.
+    pub transporte: i64,
+}
+
+/// Eine Person für [`zaehle_sanitaetsdienst`]: Status, Verbleib-Art und -Status, Versorgung und
+/// ob sie in der letzten Stunde erfasst wurde.
+pub struct SanitaetsdienstZeile {
+    pub status: PersonStatus,
+    pub art: Option<VerbleibArt>,
+    pub verbleib_status: Option<VerbleibStatus>,
+    pub versorgung: crate::person::Versorgung,
+    pub letzte_stunde: bool,
+}
+
+/// Die Zählung der Reihe „Sanitätsdienst“ (LLH-1574). Rein; stornierte Personen hat der Aufrufer
+/// schon weggelassen.
+pub fn zaehle_sanitaetsdienst(
+    zeilen: impl IntoIterator<Item = SanitaetsdienstZeile>,
+) -> LagemonitorSanitaetsdienst {
+    let mut z = LagemonitorSanitaetsdienst::default();
+    for p in zeilen {
+        if p.status == PersonStatus::Vermisst {
+            continue;
+        }
+        z.kontakte += 1;
+        if p.letzte_stunde {
+            z.kontakte_letzte_stunde += 1;
+        }
+        let angetroffen = matches!(
+            p.status,
+            PersonStatus::Erfasst | PersonStatus::Betroffen | PersonStatus::Verstorben
+        );
+        if !angetroffen {
+            continue;
+        }
+        if p.versorgung != crate::person::Versorgung::Abgeschlossen {
+            z.in_versorgung += 1;
+        }
+        if p.art == Some(VerbleibArt::Transport)
+            && p.verbleib_status != Some(VerbleibStatus::Angemeldet)
+        {
+            z.transporte += 1;
+        }
+    }
+    z
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LagemonitorAnzeige {
     /// Zeitpunkt der Berechnung (UTC, SQLite-Format).
@@ -117,6 +176,10 @@ pub struct LagemonitorAnzeige {
     /// Die nächsten anstehenden Programmpunkte der Veranstaltung (LLH-1570, höchstens
     /// [`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen.
     pub programm: Vec<crate::programmpunkt::Programmpunkt>,
+    /// Hilfeleistungen in Zahlen, nur wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt ist
+    /// (LLH-1574); dann zeigt der Monitor sie statt der Sichtungszeile.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sanitaetsdienst: Option<LagemonitorSanitaetsdienst>,
 }
 
 /// GET /api/einsaetze/{id}/lagemonitor — nur für einen gekoppelten Lagemonitor; eine Person und
@@ -138,16 +201,18 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
     let mut betroffene = LagemonitorBetroffene::default();
     // Sichtung und Versorgungszustand je Person; die Zählung ist die gemeinsame Regel
     // (`person::zaehle_lage_sichtung`, Fixture `regeln.json` Abschnitt `versorgung`).
+    // Die letzte Stunde zählt gegen die Uhr der Datenbank, wie `erfasst_at` geschrieben wird.
     type Zeile = (
         String,
         Option<Sichtungskategorie>,
         Option<VerbleibArt>,
         Option<VerbleibStatus>,
         Option<TransportDurch>,
+        bool,
     );
     let zeilen: Vec<Zeile> = sqlx::query_as(
         "SELECT status, aktuelle_sichtung, aktuelle_verbleib_art, aktueller_verbleib_status, \
-                aktueller_transport_durch \
+                aktueller_transport_durch, erfasst_at >= datetime('now', '-1 hour') \
          FROM einsatz_person WHERE einsatz_id = ? AND storniert_at IS NULL",
     )
     .bind(einsatz_id)
@@ -155,10 +220,27 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
     .await?;
     betroffene.gesamt = zeilen.len() as i64;
     let mut lage_zeilen = Vec::with_capacity(zeilen.len());
-    for (person, sk, art, status, durch) in zeilen {
+    let mut san_zeilen = Vec::with_capacity(zeilen.len());
+    for (person, sk, art, status, durch, letzte_stunde) in zeilen {
         let person = PersonStatus::try_from(person).map_err(AppError::Internal)?;
-        lage_zeilen.push((sk, versorgung_von(person, art, status, durch)));
+        let versorgung = versorgung_von(person, art, status, durch);
+        lage_zeilen.push((sk, versorgung));
+        san_zeilen.push(SanitaetsdienstZeile {
+            status: person,
+            art,
+            verbleib_status: status,
+            versorgung,
+            letzte_stunde,
+        });
     }
+    let sanitaetsdienst_gewaehlt: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl \
+                        WHERE einsatz_id = ? AND kennzahl = 'sanitaetsdienst')",
+    )
+    .bind(einsatz_id)
+    .fetch_one(pool)
+    .await?;
+    let sanitaetsdienst = sanitaetsdienst_gewaehlt.then(|| zaehle_sanitaetsdienst(san_zeilen));
     let lage = zaehle_lage_sichtung(lage_zeilen);
     betroffene.sk1 = lage.sk1;
     betroffene.sk2 = lage.sk2;
@@ -303,5 +385,69 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
         abschnitte,
         sofortmeldungen_offen,
         programm,
+        sanitaetsdienst,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::person::Versorgung;
+
+    fn zeile(
+        status: PersonStatus,
+        art: Option<VerbleibArt>,
+        verbleib_status: Option<VerbleibStatus>,
+        letzte_stunde: bool,
+    ) -> SanitaetsdienstZeile {
+        SanitaetsdienstZeile {
+            status,
+            art,
+            verbleib_status,
+            versorgung: versorgung_von(status, art, verbleib_status, None),
+            letzte_stunde,
+        }
+    }
+
+    #[test]
+    fn sanitaetsdienst_zaehlt_wie_das_lagebild() {
+        use PersonStatus::*;
+        let z = zaehle_sanitaetsdienst([
+            // offen, frisch
+            zeile(Betroffen, None, None, true),
+            // entlassen: Kontakt, aber nicht mehr in Versorgung
+            zeile(Erfasst, Some(VerbleibArt::Entlassung), None, false),
+            // Transport übergeben: Transport, abgeschlossen
+            zeile(
+                Betroffen,
+                Some(VerbleibArt::Transport),
+                Some(VerbleibStatus::Uebergeben),
+                true,
+            ),
+            // nur angemeldet: kein Transport, noch in Versorgung
+            zeile(
+                Betroffen,
+                Some(VerbleibArt::Transport),
+                Some(VerbleibStatus::Angemeldet),
+                false,
+            ),
+            // vermisst: kein Kontakt
+            zeile(Vermisst, None, None, true),
+            // abgemeldet: Kontakt, nicht angetroffen
+            zeile(Abgemeldet, None, None, false),
+        ]);
+        assert_eq!(
+            z,
+            LagemonitorSanitaetsdienst {
+                kontakte: 5,
+                kontakte_letzte_stunde: 2,
+                in_versorgung: 2,
+                transporte: 1,
+            }
+        );
+        assert_eq!(
+            zeile(Betroffen, None, None, false).versorgung,
+            Versorgung::Offen
+        );
+    }
 }

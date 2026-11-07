@@ -2,7 +2,7 @@
 titel: Lagebild
 gruppen: [alle, fuehrung]
 reihenfolge: 210
-quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/verlauf.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -53,6 +53,16 @@ aus dem Modul, in dem sie erfasst wird.
   „Nachforderungen offen“ zählt wie das Modulmenü und die Seite „Nachforderungen“: angefordert,
   zugesagt und unterwegs, darunter, wie viele unterwegs sind.
 
+Im Sanitätsdienst lautet die Reihe anders, wenn sie in den Einstellungen des Einsatzes unter
+„Kennzahlen“ als „Reihe Sanitätsdienst“ gewählt ist; ein Einsatz mit der Einsatzart
+Sanitätsdienst beginnt mit ihr. Dann stehen dort „Kontakte“ (alle Hilfeleistungen außer
+Vermissten, auch abgeschlossene, darunter der häufigste Anlass oder wie viele noch keinen haben),
+„Letzte Stunde“ (darunter die Stunde davor), „In Versorgung“ (darunter in einer UHS und
+unterwegs), „Transporte“ (wie im Einsatzbericht; ein nur angemeldeter Transport zählt nicht),
+„Einheiten verfügbar“ (Einheiten mit einem verfügbaren Status, darunter der Bestand und die
+Einheit mit den meisten Kontakten) und „Vermisste“. Statt der Gefahrenmatrix steht das Paneel
+„Verlauf“; Pegel, Evakuierung und „Nachforderungen offen“ wirken in dieser Reihe nicht.
+
 Wer die Plätze belegt, steht am Einsatz. Ändert sich das, während das Lagebild offen ist, tauscht
 die Reihe nicht unter dem Blick: Ein Hinweis „Kennzahlreihe geändert: …“ bietet den neuen
 Zuschnitt an, „übernehmen“ setzt ihn. „Vermisste“ nennt dazu, wie viele Fälle seit über vier
@@ -79,6 +89,12 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
   Gebiete, deren Matrix noch nicht beurteilt ist, etwa „Hangrutsch Kirchberg: nicht beurteilt“,
   bei mehr als zwei nur ihre Zahl. Bewertet und beurteilt wird im Kapitel
   [Gefahren](gefahren.md).
+- **Verlauf** (nur in der Reihe „Sanitätsdienst“): die Kontakte je Stunde der letzten zwölf
+  Stunden bis zur laufenden, nach der Uhrzeit der Erfassung. Die Säulen sind nach dem Anlass der
+  Hilfeleistung geteilt: Verletzung, Internistisch, Intoxikation und Hitze / Kälte in eigenen
+  Farben, alle übrigen Anlässe und Kontakte ohne Anlass grau als „Übrige“. Über der höchsten
+  Säule steht ihre Zahl, am Fuß „Spitze“ mit Stunde und Zahl. Wer auf eine Säule zeigt oder sie
+  mit der Tastatur ansteuert, liest jeden Anlass einzeln. Namen stehen nirgends.
 - **Sichtung:** die Betroffenen in Versorgung je Sichtungskategorie, dazu „Ohne Sichtung“ und
   „Unterwegs / offen / abgeschlossen“: unterwegs im Eigentransport, ohne Verbleib, abgeschlossen
   (übergeben, entlassen, Notunterkunft, Verbleib des Leichnams). Abgeschlossene zählen in keiner

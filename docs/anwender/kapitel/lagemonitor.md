@@ -37,7 +37,9 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
 1. „Betroffene“ zählt gesamt, Patienten und vermisst, darunter die Sichtungskategorien SK I bis
    SK IV und „ungesichtet“. Patienten und Sichtungskategorien zählen nur, wer noch in Versorgung
    oder unterwegs ist; übergebene, entlassene und abgeschlossene Patienten zählen nur in
-   „gesamt“.
+   „gesamt“. Ist am Einsatz die Reihe „Sanitätsdienst“ gewählt (Kapitel [Lagebild](lagebild.md)),
+   steht dort „Hilfeleistungen“: Kontakte, letzte Stunde und vermisst, darunter in Versorgung,
+   Transporte und SK I.
 2. „Kräfte“ zählt Personal, Einheiten und die Stärke F/UF/M; oben rechts steht, wie viele Kräfte an
    Unfallhilfsstellen arbeiten.
 3. „Belegung der Unfallhilfsstellen“ nennt je UHS Belegte und Plätze, die vollsten zuerst, bis zu

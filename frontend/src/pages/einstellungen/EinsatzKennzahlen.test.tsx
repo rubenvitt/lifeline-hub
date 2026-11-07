@@ -41,7 +41,10 @@ function stelleBereit(a: Aufbau = {}) {
       const body = (await request.json()) as { gewaehlt: string[] };
       aufrufe.push(body);
       if (a.putStatus) return HttpResponse.json({ error: 'nein' }, { status: a.putStatus });
-      lagekennzahlen = [...lagekennzahlen.filter((k) => k !== 'nachforderungen'), ...body.gewaehlt];
+      lagekennzahlen = [
+        ...lagekennzahlen.filter((k) => k !== 'nachforderungen' && k !== 'sanitaetsdienst'),
+        ...body.gewaehlt,
+      ];
       return HttpResponse.json({ gewaehlt: body.gewaehlt });
     }),
   );
@@ -124,5 +127,35 @@ describe('EinsatzKennzahlen (LLH-1371)', () => {
     await userEvent.click(s);
     expect(await screen.findByText('nein')).toBeInTheDocument();
     expect(s).not.toBeChecked();
+  });
+
+  describe('Reihe Sanitätsdienst (LLH-1574)', () => {
+    const san = () => screen.findByRole('switch', { name: 'Reihe Sanitätsdienst' });
+
+    it('Einschalten behält die übrige Wahl', async () => {
+      const { aufrufe } = stelleBereit({ lagekennzahlen: ['nachforderungen'] });
+      rendern();
+      const s = await san();
+      expect(s).not.toBeChecked();
+      await userEvent.click(s);
+      await waitFor(() =>
+        expect(aufrufe).toEqual([{ gewaehlt: ['nachforderungen', 'sanitaetsdienst'] }]),
+      );
+      await waitFor(() => expect(s).toBeChecked());
+      // Die Wahl „Nachforderungen“ bleibt gespeichert, wirkt aber nicht.
+      expect(
+        await screen.findByText('Gilt nicht in der Reihe Sanitätsdienst.'),
+      ).toBeInTheDocument();
+    });
+
+    it('gewählt: Ausschalten nimmt nur die Reihe heraus; kein Satz zu „Evakuiert“', async () => {
+      const { aufrufe } = stelleBereit({ lagekennzahlen: ['evakuiert', 'sanitaetsdienst'] });
+      rendern();
+      const s = await san();
+      await waitFor(() => expect(s).toBeChecked());
+      expect(screen.queryByText(/solange eine Evakuierung angeordnet ist/)).toBeNull();
+      await userEvent.click(s);
+      await waitFor(() => expect(aufrufe).toEqual([{ gewaehlt: [] }]));
+    });
   });
 });

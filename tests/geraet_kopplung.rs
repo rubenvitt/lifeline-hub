@@ -2911,6 +2911,59 @@ async fn lagemonitor_zaehlt_abgeschlossene_nicht_als_patienten() {
     assert_eq!(v["betroffene"]["gesamt"], json!(3));
 }
 
+/// LLH-1574 (Spec `lagemonitor`, „Hilfeleistungen in der Reihe Sanitätsdienst“): der Block
+/// `sanitaetsdienst` steht nur mit der Wahl in der Antwort und zählt wie das Lagebild.
+#[tokio::test]
+async fn lagemonitor_zaehlt_hilfeleistungen_nur_in_der_reihe_sanitaetsdienst() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    for _ in 0..2 {
+        person_in(&app, &admin, einsatz, Some(nord)).await;
+    }
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &admin,
+        Some(&json!({"name": "Vermisstfrau", "status": "vermisst"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let lagebild = format!("/api/einsaetze/{einsatz}/lagemonitor");
+
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(
+        v.get("sanitaetsdienst").is_none(),
+        "ohne Wahl kein Block: {v}"
+    );
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/lagekennzahl-wahl"),
+        &admin,
+        Some(&json!({"gewaehlt": ["sanitaetsdienst"]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // Zwei Kontakte (die Vermisste zählt nicht), beide eben erfasst und in der UHS.
+    assert_eq!(
+        v["sanitaetsdienst"],
+        json!({
+            "kontakte": 2,
+            "kontakte_letzte_stunde": 2,
+            "in_versorgung": 2,
+            "transporte": 0
+        }),
+        "{v}"
+    );
+}
+
 #[tokio::test]
 async fn lagemonitor_antwort_traegt_keine_personen() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
