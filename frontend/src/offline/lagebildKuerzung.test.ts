@@ -180,6 +180,31 @@ describe('lagebildKuerzen', () => {
     });
   });
 
+  it('kürzt das Rettungsmittel auf eine Positivliste, freie Art neutral (LLH-1573)', () => {
+    const frei = {
+      ...VOLL,
+      rettungsmittel: {
+        nachforderung_id: 4,
+        art: 'Wagen für Frau Müller',
+        status: 'zugesagt' as const,
+        rufnamen: ['DRK Musterstadt'],
+        eintreffen_erwartet_at: '2026-10-18 10:00:00',
+        kuenftiges_feld: 'geheim',
+      },
+    } as Person;
+    const [p] = lagebildKuerzen(eintrag(einsatzKeys.personen(7), [frei])).state.data as Record<
+      string,
+      unknown
+    >[];
+    expect(p.rettungsmittel).toEqual({
+      nachforderung_id: 4,
+      art: 'Rettungsmittel',
+      status: 'zugesagt',
+      rufnamen: [],
+      eintreffen_erwartet_at: '2026-10-18 10:00:00',
+    });
+  });
+
   it('lässt ein unbekanntes Feld weg (Positivliste)', () => {
     const neu = { ...VOLL, kuenftiges_feld: 'geheim' };
     const [p] = lagebildKuerzen(eintrag(einsatzKeys.personen(7), [neu])).state.data as object[];

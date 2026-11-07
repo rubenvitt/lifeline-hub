@@ -1,5 +1,6 @@
 import { EINSATZ_KEYS } from '../api/queryKeys';
 import type { Person, PersonAuswahl } from '../api/types';
+import { GAENGIGE_ARTEN } from '../nachforderungen/artVorschlaege';
 
 /**
  * Datensparsamkeit an der Grenze zur Platte (LFH-1095, design.md D1/D2): was eine Ansicht ohne
@@ -118,16 +119,28 @@ const AUSWAHL_BEHALTEN = (
 const MARKE = 'nicht_geladen';
 
 /**
- * Rettungsmittel ohne Netz (LLH-1573): ohne Rufnamen (Freitext) und ohne Einsatznummer der
- * Leitstelle (personengebunden). Die Marke an der UHS braucht nur Art und Status; die
- * Verbleib-Vorbelegung fällt ohne Netz auf die Art zurück. Wiederholt angewandt gleich.
+ * Rettungsmittel ohne Netz (LLH-1573): eine Positivliste wie die Person selbst. Behalten werden
+ * Kennung, Status und erwartetes Eintreffen; die Art nur als gängiges Kürzel (`GAENGIGE_ARTEN`),
+ * sonst neutral „Rettungsmittel“, denn „Was“ ist Freitext. Ohne Rufnamen (Freitext) und ohne
+ * Einsatznummer der Leitstelle (personengebunden). Die Marke an der UHS braucht nur Art und
+ * Status; die Verbleib-Vorbelegung fällt ohne Netz auf die Art zurück. Wiederholt angewandt gleich.
  */
 function rettungsmittelKuerzen(r: unknown): unknown {
   if (r === null || typeof r !== 'object') return r;
-  const gekuerzt: Record<string, unknown> = { ...(r as Record<string, unknown>), rufnamen: [] };
-  delete gekuerzt.leitstelle_einsatznummer;
+  const quelle = r as Record<string, unknown>;
+  const gekuerzt: Record<string, unknown> = { rufnamen: [] };
+  for (const feld of ['nachforderung_id', 'status', 'eintreffen_erwartet_at']) {
+    if (feld in quelle) gekuerzt[feld] = quelle[feld];
+  }
+  gekuerzt.art =
+    typeof quelle.art === 'string' && GAENGIGE_ARTEN.includes(quelle.art)
+      ? quelle.art
+      : RETTUNGSMITTEL_NEUTRAL;
   return gekuerzt;
 }
+
+/** Art eines Rettungsmittels ohne Netz, wenn „Was“ kein gängiges Kürzel ist. */
+export const RETTUNGSMITTEL_NEUTRAL = 'Rettungsmittel';
 
 function personKuerzen(p: unknown): unknown {
   if (p === null || typeof p !== 'object') return p;
