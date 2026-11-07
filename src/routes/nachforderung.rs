@@ -26,8 +26,10 @@ pub(super) fn sse(state: &AppState, einsatz_id: i64) {
 }
 
 /// Wie [`sse`], und bei einer Nachforderung mit Personenbezug zusätzlich `person` (LLH-1573
-/// design.md D4): die Personenantwort trägt den Stand des Rettungsmittels, Patientenkopf und UHS
-/// laden ihn so ohne Leserecht auf Nachforderungen nach.
+/// design.md D4): die Personenantwort trägt den Stand des Rettungsmittels, die Personenliste (UHS,
+/// Lage) lädt ihn so ohne Leserecht auf Nachforderungen nach. Das Detail einer Person (Patientenkopf)
+/// bleibt wie bei jeder anderen Änderung nicht live: jeder Detailabruf schreibt eine Audit-Zeile; es
+/// lädt beim nächsten Öffnen.
 fn sse_mit_person(state: &AppState, n: &NachforderungAnzeige) {
     sse(state, n.einsatz_id);
     if n.person_id.is_some() {
