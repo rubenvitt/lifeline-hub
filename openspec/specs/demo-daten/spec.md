@@ -22,7 +22,7 @@ stehen, dass der harte Löschweg für Demo-Daten erreichbar ist.
 - **THEN** ist der Demo-Import nicht freigeschaltet
 
 #### Scenario: Ohne Freischaltung ist der Pfad unbekannt
-- **WHEN** ohne Freischaltung `GET`, `POST` oder `DELETE` auf `/api/demo-daten` bzw. `POST` auf `/api/demo-daten/neu` gesendet wird, einmal anonym und einmal als System-Admin
+- **WHEN** ohne Freischaltung `GET` auf `/api/demo-daten`, `POST` oder `DELETE` auf `/api/demo-daten/{lage}` bzw. `POST` auf `/api/demo-daten/{lage}/neu` gesendet wird, einmal anonym und einmal als System-Admin
 - **THEN** antwortet das System in jedem Fall mit 404 und demselben Fehler-Body wie bei einem unbekannten `/api/`-Pfad
 - **AND** nie mit 401, 403 oder 405
 
@@ -69,14 +69,14 @@ tragen.
 
 ### Requirement: Herkunftsmarke
 
-Das System SHALL jeden Import als Kopf-Datensatz führen, samt Organisation, importierender
+Das System SHALL jeden Import als Kopf-Datensatz führen, samt Organisation, Lage, importierender
 Person, Zeitpunkt, Demo-Einsatz und Bericht. Jede Stammdatenzeile, die der Import neu
 anlegt, MUST dem Kopf zugeordnet sein. Mitbenutzte Stammdaten MUST NOT eine Marke
-bekommen. Je Organisation MUST höchstens ein aktiver Import bestehen. Nach dem Entfernen
+bekommen. Je Organisation und Lage MUST höchstens ein aktiver Import bestehen. Nach dem Entfernen
 MUST der Kopf als Historie mit Entfernzeitpunkt stehen bleiben.
 
 #### Scenario: Zweiter Import
-- **WHEN** der Admin importiert, während für seine Organisation schon ein aktiver Import besteht
+- **WHEN** der Admin eine Lage importiert, während für seine Organisation schon ein aktiver Import dieser Lage besteht
 - **THEN** antwortet das System mit 409 und legt nichts an
 
 #### Scenario: Mitbenutzter Datensatz bleibt unmarkiert
@@ -189,13 +189,13 @@ Kopf-Datensatz.
 
 ### Requirement: Demo-Daten entfernen
 
-`DELETE /api/demo-daten` SHALL in einer Schreibtransaktion den Demo-Einsatz der eigenen
-Organisation samt allem, was an ihm hängt, hart löschen und danach die markierten
+`DELETE /api/demo-daten/{lage}` SHALL in einer Schreibtransaktion den Demo-Einsatz dieser Lage
+der eigenen Organisation samt allem, was an ihm hängt, hart löschen und danach die markierten
 Stammdaten. Der Löschweg MUST an die Marke gebunden sein: Er löscht nur den Einsatz, den
-der aktive Kopf-Datensatz der eigenen Organisation nennt, und nur Stammdatenzeilen aus der
+der aktive Kopf-Datensatz dieser Lage der eigenen Organisation nennt, und nur Stammdatenzeilen aus der
 Marke. Eine markierte Stammdatenzeile, auf die nach dem Löschen des Einsatzes noch
 irgendein Datensatz verweist, MUST stehen bleiben und ihre Marke verlieren. Der Bericht
-MUST sie als „behalten“ zählen. Besteht kein aktiver Import, MUST das System mit 409
+MUST sie als „behalten“ zählen. Besteht kein aktiver Import der Lage, MUST das System mit 409
 antworten. Nach dem Entfernen MUST die Datenbank in allen Nutzdatentabellen dieselben Zeilen
 tragen wie vor dem Import. Ausgenommen sind der Kopf-Datensatz als Historie, die als
 „behalten“ gemeldeten Stammdaten, Sitzungen und Anmeldeprotokoll, Benutzereinstellungen,
@@ -215,7 +215,7 @@ SQLite-Verwaltungstabellen und die Schattentabellen der Volltextsuche.
 - **AND** die Disposition im echten Einsatz ist unverändert
 
 #### Scenario: Nichts zu entfernen
-- **WHEN** der Admin entfernt, ohne dass ein aktiver Import besteht
+- **WHEN** der Admin eine Lage entfernt, ohne dass ein aktiver Import dieser Lage besteht
 - **THEN** antwortet das System mit 409 und ändert nichts
 
 #### Scenario: Soft-gelöschter Demo-Einsatz
@@ -224,9 +224,10 @@ SQLite-Verwaltungstabellen und die Schattentabellen der Volltextsuche.
 
 ### Requirement: Neu importieren
 
-`POST /api/demo-daten/neu` SHALL Entfernen und Import in einer einzigen Schreibtransaktion
-ausführen. Scheitert der Import, MUST der bisherige Demo-Stand erhalten bleiben. Besteht
-kein aktiver Import, MUST der Vorgang wie ein erstmaliger Import laufen.
+`POST /api/demo-daten/{lage}/neu` SHALL Entfernen und Import dieser Lage in einer einzigen
+Schreibtransaktion ausführen. Scheitert der Import, MUST der bisherige Demo-Stand erhalten
+bleiben. Besteht kein aktiver Import der Lage, MUST der Vorgang wie ein erstmaliger Import
+laufen.
 
 #### Scenario: Import, Entfernen, Import gegen das aktuelle Schema
 - **WHEN** gegen die vollständig migrierte Datenbank importiert, entfernt und erneut importiert wird
@@ -234,7 +235,7 @@ kein aktiver Import, MUST der Vorgang wie ein erstmaliger Import laufen.
 
 #### Scenario: Neu importieren ersetzt den Stand
 - **WHEN** der Admin bei aktivem Import „Neu importieren“ auslöst
-- **THEN** besteht danach genau ein aktiver Import mit einem neuen Demo-Einsatz, und der alte Demo-Einsatz existiert nicht mehr
+- **THEN** besteht danach für diese Lage genau ein aktiver Import mit einem neuen Demo-Einsatz, und der alte Demo-Einsatz existiert nicht mehr
 
 ### Requirement: Keine Wiederverwendung der Einsatz-ID
 
