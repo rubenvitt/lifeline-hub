@@ -11,6 +11,7 @@ export function OrtZeile({
   exclude,
   debounceMs,
   maxZeilen,
+  merken,
 }: {
   einsatzId: number | null;
   koord: LatLon;
@@ -20,9 +21,11 @@ export function OrtZeile({
    * Kürzt auf so viele Zeilen; der volle Wortlaut bleibt als Tooltip. Opt-in für schmale Flächen.
    */
   maxZeilen?: number;
+  /** `false`: den Ortsnamen nicht im Local-Store ablegen (eigene Position, `useOrtVorschau`). */
+  merken?: boolean;
 }) {
   const { formatDistanz } = useAnzeigeKonventionen();
-  const { data, isFetching } = useOrtVorschau(einsatzId, koord, exclude, debounceMs);
+  const { data, isFetching } = useOrtVorschau(einsatzId, koord, exclude, debounceMs, merken);
 
   if (!data) {
     return isFetching ? (

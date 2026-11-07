@@ -54,6 +54,7 @@ import { useSavePersonEintrag, vormerkungText } from './personEintragSpeichern';
 import { useVerbleibFelder } from './VerbleibErfassung';
 import { UebergabePaneel } from './UebergabeQuittieren';
 import VerbleibText from './VerbleibText';
+import VersorgtVon, { hatVersorgtVon } from './VersorgtVon';
 import type { VerbleibFormWerte } from './verbleibErfassungKern';
 
 export interface PatientenkopfProps {
@@ -193,7 +194,10 @@ export default function Patientenkopf({
   const aufhebenGesperrt = ohneVerbindung ? AUFHEBEN_OHNE_NETZ : undefined;
   // Vorgemerkt an dieser Person, getrennt vom Serverstand (`frontend/src/offline/AGENTS.md`, „Was
   // vorgemerkt ist, kennt der Server noch nicht“); die Notizen quittiert die Notizzeile.
-  const benutzerId = useAuthOptional()?.benutzer?.id;
+  const auth = useAuthOptional();
+  const benutzerId = auth?.benutzer?.id;
+  // Am gekoppelten Gerät wird die versorgende Einheit nicht gesetzt (LLH-1567, design.md D4).
+  const amGeraet = auth?.geraet != null;
   const vorgemerkt = useVorgemerktePersonEintraege(benutzerId, einsatzId).filter(
     (v) => v.aktion.person_id === person.id,
   );
@@ -273,6 +277,19 @@ export default function Patientenkopf({
               <span data-lfh="zustand">{person.zustand || '—'}</span>
             )}
           </Datenfeld>
+
+          {/* Versorgende Einheit und Herkunftsmeldung (LLH-1567, design.md D4/D6): eine Zeile,
+              lesend nur, wenn es etwas zu nennen gibt. */}
+          {((bedienbar && angetroffen && !amGeraet) || hatVersorgtVon(person)) && (
+            <Datenfeld label="Versorgt von">
+              <VersorgtVon
+                einsatzId={einsatzId}
+                person={person}
+                bedienbar={bedienbar && angetroffen}
+                onGeschrieben={onGeschrieben}
+              />
+            </Datenfeld>
+          )}
 
           <Datenfeld label={person.aufenthalt || !letzterVerbleib ? 'Aufenthalt' : 'Verbleib'}>
             <Flex vertical gap={token.marginXS}>

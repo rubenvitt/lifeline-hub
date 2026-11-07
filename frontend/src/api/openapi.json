@@ -11716,7 +11716,7 @@
               "null"
             ],
             "format": "double",
-            "description": "Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder\nder Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an\neiner anderen Art steht nicht in der Lage, bis die Meldung übernommen wird."
+            "description": "Ort der Meldung (WGS84), nur gemeinsam: die Verortung einer Lagemeldung (LLH-1031) oder\nder Standort, den ein Einheitengerät auf Knopfdruck anhängt (LLH-1579, F9). Ein Ort an\neiner anderen Art steht nicht in der Lage, bis die Meldung übernommen wird. Auch der Fundort\neines Patienten aus der Meldung (LLH-1567)."
           },
           "lfd_nr": {
             "type": "integer",
@@ -11734,6 +11734,16 @@
           },
           "meldungsart": {
             "$ref": "#/components/schemas/Meldungsart"
+          },
+          "patienten": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/MeldungPatient"
+            },
+            "description": "Abgeleitet (LLH-1567, design.md D6): die nicht stornierten Personen, die aus dieser\nMeldung angelegt wurden, nach Registriernummer. Pseudonym wie im ETB. Fehlt ohne Patienten\n(auch in älteren Lageständen)."
           },
           "prioritaet": {
             "$ref": "#/components/schemas/Prioritaet"
@@ -11776,6 +11786,24 @@
             "type": "integer",
             "format": "int64",
             "description": "Offen und noch von niemandem angefasst (Status `neu`)."
+          }
+        }
+      },
+      "MeldungPatient": {
+        "type": "object",
+        "description": "Ein aus einer Meldung angelegter Patient (LLH-1567): Kennung und Registriernummer, sonst nichts.",
+        "required": [
+          "id",
+          "registrier_nr"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -13661,6 +13689,22 @@
               "null"
             ]
           },
+          "meldung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Meldung, aus der die Person angelegt wurde (LLH-1567, design.md D6); nur beim Anlegen."
+          },
+          "meldung_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer dieser Meldung, für „aus Meldung #n“."
+          },
           "name": {
             "type": [
               "string",
@@ -13737,6 +13781,35 @@
               "null"
             ],
             "description": "Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status\n`vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen."
+          },
+          "versorgende_einheit_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abschnitt der versorgenden Einheit, zur Abfragezeit aus der Einheit (design.md D2)."
+          },
+          "versorgende_einheit_abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "versorgende_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Einheit, die die Person versorgt (LLH-1567, design.md D1): Streife, UHS-Trupp, RTW."
+          },
+          "versorgende_einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der versorgenden Einheit, beim Lesen aufgelöst (auch nach dem Auflösen der Einheit)."
           },
           "versorgung": {
             "$ref": "#/components/schemas/Versorgung",
@@ -17959,6 +18032,36 @@
               "null"
             ],
             "description": "Die Version davor, nur wenn ein Versionswechsel stattfand."
+          }
+        }
+      },
+      "VersorgendeEinheitAuswahl": {
+        "type": "object",
+        "description": "Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/personen/einheiten`): je aktiver\nEinheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf\ndie Kräfte geht.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },

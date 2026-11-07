@@ -36,6 +36,10 @@ interface MeldungListeProps {
   onAusDerLage?: (meldungId: number) => void;
   /** Aufträge ohne Freigabe: „Auftrag erteilen“ steht gesperrt mit Grund. */
   auftragGesperrt?: boolean;
+  /** Öffnet „Betroffene erfassen“ mit Bezug auf die Meldung (LLH-1567). */
+  onPatientAnlegen?: (m: Meldung) => void;
+  /** Personen ohne Freigabe: „Patient anlegen“ gesperrt mit Grund, Verweise R-n nur als Text. */
+  personenGesperrt?: boolean;
   /**
    * Grund der zuletzt abgelehnten Karten-Aktion je Meldung (`grund` aus `useZeilenFehler`). Jede
    * Karte bekommt nur ihren Grund, ein stabiles Objekt: die übrigen bleiben gemerkt (LFH-1077).
@@ -63,6 +67,8 @@ export default function MeldungListe({
   funktionsOptionen,
   onAusDerLage,
   auftragGesperrt,
+  onPatientAnlegen,
+  personenGesperrt,
   kartenFehler,
   uebernahme,
 }: MeldungListeProps) {
@@ -88,6 +94,8 @@ export default function MeldungListe({
           funktionsOptionen={funktionsOptionen}
           onAusDerLage={onAusDerLage}
           auftragGesperrt={auftragGesperrt}
+          onPatientAnlegen={onPatientAnlegen}
+          personenGesperrt={personenGesperrt}
           fehlerGrund={kartenFehler?.(m.id) ?? null}
           uebernahme={uebernahme?.(m) ?? null}
         />

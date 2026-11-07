@@ -36,6 +36,13 @@ const ERWARTET_BEHALTEN = [
   'aktueller_transport_durch',
   'aktuelles_einsatz_fahrzeug_id',
   'versorgung',
+  // LLH-1567 (design.md D9): Kennungen und Name der Einheit, kein Gesundheitsdatum.
+  'versorgende_einheit_id',
+  'versorgende_einheit_name',
+  'versorgende_einheit_abschnitt_id',
+  'versorgende_einheit_abschnitt_name',
+  'meldung_id',
+  'meldung_lfd_nr',
   'anlass',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
@@ -94,6 +101,12 @@ const VOLL: Person = {
   transport_art: 'liegend',
   transport_fachrichtung: 'psychiatrie',
   transport_at: '2026-10-18 09:00:00',
+  versorgende_einheit_id: 4,
+  versorgende_einheit_name: 'Streife 2',
+  versorgende_einheit_abschnitt_id: 1,
+  versorgende_einheit_abschnitt_name: 'Bühne',
+  meldung_id: 17,
+  meldung_lfd_nr: 3,
   anlass: 'intoxikation',
   anlass_at: '2026-10-18 09:01:00',
 };

@@ -1,5 +1,7 @@
-import { Form } from 'antd';
+import { Form, Typography } from 'antd';
 import { useEffect, useRef } from 'react';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { nachKartenpunkt } from '../anzeige/Ortsfeld';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
@@ -14,6 +16,18 @@ import AufnahmeFelder, {
   type AufnahmeModus,
   type AufnahmeWerte,
 } from './AufnahmeFelder';
+
+/**
+ * Vorbelegung aus einer Meldung (LLH-1567, design.md D5): der Bezug, die Verortung der Meldung als
+ * Fundort-Koordinate und die Absender-Einheit als versorgende Einheit (nur eine aktive).
+ */
+export interface AusMeldung {
+  id: number;
+  lfd_nr: number;
+  einheit_id?: number | null;
+  lat?: number | null;
+  lon?: number | null;
+}
 
 /** Erfassungs-Modi der Personenmaske („Betroffene erfassen“, „Vermisst melden“). `null` = Modal geschlossen. */
 export type ErfassungsModus = AufnahmeModus;
@@ -45,6 +59,11 @@ interface Props {
    * und räumt ihn beim Öffnen und Abbrechen. Die Erfassungszeile meldet ihre Fehler selbst.
    */
   speicherung?: Speicherung;
+  /**
+   * Anlegen aus einer Meldung (LLH-1567, D5): die Maske nennt die Meldung, legt jede Person mit
+   * ihrem Bezug an und belegt Fundort-Koordinate und Einheit vor.
+   */
+  ausMeldung?: AusMeldung | null;
 }
 
 /**
@@ -68,13 +87,16 @@ export default function PersonErfassungModal({
   onFertig,
   onCancel,
   speicherung,
+  ausMeldung = null,
 }: Props) {
   const [form] = Form.useForm<AufnahmeWerte>();
+  const { formatKoordinate } = useAnzeigeKonventionen();
   const geladeneOeffnung = useRef<string | null>(null);
   const formular = useFormularEingehaengt();
 
   useEffect(() => {
-    const oeffnung = modus === null ? null : `${einsatzId}:person`;
+    const oeffnung =
+      modus === null ? null : `${einsatzId}:person:${ausMeldung ? ausMeldung.id : '-'}`;
     if (oeffnung === null) {
       geladeneOeffnung.current = null;
       return;
@@ -84,9 +106,26 @@ export default function PersonErfassungModal({
     if (!formular.da) return;
     if (geladeneOeffnung.current === oeffnung) return;
     geladeneOeffnung.current = oeffnung;
+    if (ausMeldung) {
+      // Aus einer Meldung: ihr Ort statt des gemerkten (design.md D5).
+      if (ausMeldung.lat != null && ausMeldung.lon != null) {
+        form.setFieldValue(
+          'antreff_ort',
+          nachKartenpunkt(
+            { text: '', koordinate: null },
+            { lat: ausMeldung.lat, lon: ausMeldung.lon },
+            formatKoordinate,
+          ),
+        );
+      }
+      if (ausMeldung.einheit_id != null) {
+        form.setFieldValue('versorgende_einheit_id', ausMeldung.einheit_id);
+      }
+      return;
+    }
     const ort = liesErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort');
     if (ort !== undefined) form.setFieldValue('antreff_ort', fundortAusText(ort));
-  }, [einsatzId, form, formular.da, modus]);
+  }, [ausMeldung, einsatzId, form, formatKoordinate, formular.da, modus]);
 
   // Gemerkt wird nur der Text: der Sitzungsspeicher hält rohe Strings.
   const ortMerken = (daten: AufnahmeWerte) => {
@@ -102,18 +141,34 @@ export default function PersonErfassungModal({
       form={form}
       // Die Koordinate ist im Formular EIN Textfeld; zerlegt wird hier (dieselbe Funktion wie an der
       // Aufnahme-Route).
-      onErfassen={(werte) => onErfassen(aufnahmeZuEingabe(werte))}
-      onErfasst={ortMerken}
+      onErfassen={(werte) =>
+        onErfassen({
+          ...aufnahmeZuEingabe(werte),
+          ...(ausMeldung ? { meldung_id: ausMeldung.id } : {}),
+        })
+      }
+      // Der Ort einer Meldung ist kein Ort der Sitzung: er bliebe sonst für die nächste Maske stehen.
+      onErfasst={ausMeldung ? undefined : ortMerken}
       onFertig={onFertig}
       onAbbrechen={onCancel}
       laeuft={isPending}
       speicherung={speicherung}
       speicherFehlerTitel="Person nicht erfasst"
       serie
-      uebernahme={['antreff_ort']}
+      // Mehrere Patienten einer Meldung („zwei Personen gestürzt“) teilen Ort und Einheit.
+      uebernahme={ausMeldung ? ['antreff_ort', 'versorgende_einheit_id'] : ['antreff_ort']}
     >
       <FormularEingehaengt onWechsel={formular.melde} />
-      <AufnahmeFelder modus={modus ?? 'erfassen'} einsatzId={einsatzId} />
+      {ausMeldung && (
+        <Typography.Paragraph data-lfh="aus-meldung" strong>
+          Zu Meldung #{ausMeldung.lfd_nr}
+        </Typography.Paragraph>
+      )}
+      <AufnahmeFelder
+        modus={modus ?? 'erfassen'}
+        einsatzId={einsatzId}
+        weitereOffen={ausMeldung?.einheit_id != null}
+      />
     </ErfassungsModal>
   );
 }

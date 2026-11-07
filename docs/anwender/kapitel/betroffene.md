@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs, frontend/src/personen/VersorgtVon.tsx, frontend/src/anzeige/Ortsfeld.tsx, src/person/repo.rs]
 ---
 
 ## Überblick
@@ -31,7 +31,9 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
 
 2. Rechts zählt das „Sichtungsbild“ die Personen in Versorgung je Sichtungskategorie, „Verbleib“
    zählt alle angetroffenen Personen je Verbleib („Unterwegs“, „Transport“, „Notunterkunft“ …)
-   und Unfallhilfsstelle, „Offene Felder“ nennt, wem Verbleib oder Fundort fehlt.
+   und Unfallhilfsstelle, „Offene Felder“ nennt, wem Verbleib oder Fundort fehlt. Sobald eine
+   Person eine versorgende Einheit hat, zählt „Versorgt von“ die Patienten je Einheit, etwa
+   „Streife 2 · Bühne 3“.
 3. Mit „Nur Lücken zeigen“ bleiben nur die Personen mit offenen Feldern in der Liste.
 4. Über die Leiste oben wechselt die Ansicht zwischen „Zeilen“, „Sichtungsraster“ und „Karte“
    (Fundorte mit Koordinate). Das Sichtungsraster zeigt je Kategorie eine Spalte mit Zahl, darin
@@ -58,13 +60,14 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
    Alter (Jahre)“ und „Fundort“, soweit bekannt. Ein zweiter Tipp auf die gewählte Fläche nimmt
    die Wahl zurück; die Person wird dann ohne Sichtung erfasst. Im „Fundort“ mit Enter oder „Ort
    suchen“ suchen und einen Treffer wählen, eine Koordinate eintippen (etwa „52.2691/9.1342“) oder
-   den Punkt über „Auf Karte wählen“ setzen: dann ist der Fundort gleich verortet, der
-   Kartenausschnitt unter dem Feld zeigt ihn. Enter im Fundort erfasst die Person nicht. Ohne
+   den Punkt über „Auf Karte wählen“ setzen; am Handy übernimmt „Eigene Position“ den Standort
+   des Geräts als Punkt. Dann ist der Fundort gleich verortet, der Kartenausschnitt unter dem Feld
+   zeigt ihn. Enter im Fundort erfasst die Person nicht. Ohne
    Treffer bleibt der Fundort freier Text.
 
    ![Maske „Betroffene erfassen“ mit gewählter Sichtungskategorie SK II, Geschlecht, Alter und Fundort](../bilder/betroffene/erfassen.png)
 
-3. Name, Vorname, Zustand, „Anlass“ und Notiz stehen unter „Weitere Angaben“.
+3. Name, Vorname, Zustand, „Anlass“, Notiz und „Versorgende Einheit“ stehen unter „Weitere Angaben“.
 4. „Erfassen“ wählen. Die Quittung nennt die neue Registriernummer („Erfasst als R-…“).
 
 Kommen mehrere Personen nacheinander, speichert „Speichern und nächste“ (Strg + Enter) und hält
@@ -210,6 +213,15 @@ sich auch mit der Tastatur erreichen: die Pfeiltasten wandern von Stelle zu Stel
 
 Ein Klick auf einen eingetragenen Wert öffnet ihn wieder zum Bearbeiten. Nur „kontaminiert“ trägt
 eine Marke, in Kopf und Liste.
+
+### Die versorgende Einheit eintragen
+
+1. Im Patientenkopf unter „Versorgt von“ „Versorgende Einheit eintragen“ wählen.
+2. Die Einheit wählen (die Liste nennt sie mit Abschnitt, etwa „Streife 2 · Bühne“) und
+   „Speichern“ wählen. Der Kopf zeigt sie in derselben Form.
+
+Ein Klick auf die eingetragene Einheit öffnet sie wieder; das Kreuz im Feld leert sie. Ist die
+Person aus einer Meldung angelegt, steht dahinter „aus Meldung #…“, ein Klick öffnet die Meldung.
 
 ### Das Blatt einer Person drucken
 
@@ -366,6 +378,27 @@ Als Lücke zählt nur, wer angetroffen wurde (erfasst, betroffen, verstorben). O
 weder ein Verbleib noch eine Unfallhilfsstelle. Ohne Fundort heißt: weder eine Ortsangabe noch
 eine Koordinate. Solche Zeilen sind in der Liste markiert.
 
+### Versorgende Einheit und Meldung
+
+Die versorgende Einheit sagt, welche Streife, welcher Trupp oder welches Rettungsmittel den
+Patienten versorgt hat. Zur Wahl stehen die nicht aufgelösten Einheiten des Einsatzes. Der
+Abschnitt gehört nicht zur Person, er folgt der Einheit: wechselt sie den Abschnitt, steht der
+Patient mit dem neuen da. Ändern zwei gleichzeitig die Einheit, gilt die erste Änderung; die
+zweite wird abgelehnt und der Kopf zeigt den neuen Stand.
+
+Eine Einheit, die einen Patienten versorgt hat, bleibt beim Auflösen als aufgelöst stehen
+([Einheiten](einheiten.md)); so bleiben die Kontakte je Einheit für Lage und Bericht erhalten, und
+der Patient nennt sie weiter.
+Gezählt werden alle nicht stornierten Patienten, auch abgeschlossene.
+
+Eine Meldung kann mehrere Patienten haben, ein Patient höchstens eine Meldung. Der Bezug entsteht
+nur über „Patient anlegen“ an der Meldung ([Meldungen](meldungen.md)) und bleibt danach fest.
+
+„Eigene Position“ fragt den Standort einmal ab, verfolgt ihn nicht weiter und speichert ihn nur als
+Fundort. Bis dahin wirkt er wie ein Punkt aus der Karte: die App sucht die Adresse dazu und zeigt
+den Kartenausschnitt. Ohne sichere Verbindung (https) oder ohne Standort am Gerät steht der Knopf gesperrt, ein
+Tipp nennt den Grund.
+
 ### Arbeiten in der Liste
 
 Solange die Sichtungswahl, das Menü einer Zeile oder ein Dialog aus der Zeile offen ist, rücken
@@ -443,7 +476,8 @@ Grund („nur Einsatzleitung und Führungspersonal“ bzw. „Einsatz abgeschlos
 „Verbleib erfassen“ und das Menü der Zeilen fehlen dann, ebenso „Anlass festlegen“, „Transport
 festlegen“, „Maßnahme erfassen“, „Verletzung markieren“ und das Eintragen von PAT-Nummer und
 Kontamination; die Angaben stehen lesend da, leere Personendaten als Satz „Ohne Angabe: …“. Am Gerät (UHS,
-Betreuungsstelle) lassen sich die Personendaten ebenso schreiben. Am UHS-Gerät lässt sich aus der
+Betreuungsstelle) lassen sich die Personendaten ebenso schreiben; die versorgende Einheit steht
+dort nur lesend, und die Maske fragt sie nicht ab. Am UHS-Gerät lässt sich aus der
 Liste sichten, aber nicht verorten,
 und eine Druckansicht gibt es dort nicht ([UHS-Tablet und UHS-Laptop](geraet-uhs.md)).
 
@@ -456,7 +490,7 @@ und Verbleib; am Ort
 steht dann „Offline vorgemerkt“, und der Eintrag geht mit seiner Erfassungszeit hinaus, sobald
 Netz da ist. Aufheben, PAT-Nummer, Kontamination, „Zustand / Verdacht“ (im Kopf und in der Liste)
 und die Personendaten brauchen Netz und stehen bis dahin mit Grund gesperrt („Ohne Verbindung
-nicht änderbar“); eine Änderung der Personendaten wird nicht vorgemerkt. Ein schon getippter
+nicht änderbar“), die versorgende Einheit ebenso („ohne Netz nicht änderbar“); eine Änderung der Personendaten wird nicht vorgemerkt. Ein schon getippter
 Zustand bleibt im Feld stehen und lässt sich mit Netz speichern.
 
 Lesbar bleiben in der Liste Sichtung, Verbleib, Unfallhilfsstelle, Kontamination sowie Priorität

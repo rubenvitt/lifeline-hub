@@ -117,7 +117,12 @@ const ANZEIGE_SELECT: &str = concat!(
     " AS ist_ueberfaellig, \
             m.einheit_id, m.abschnitt_id, m.lat, m.lon, ",
     etb_berichtigung_sql!(),
-    " FROM meldung m \
+    ", \
+            (SELECT json_group_array(json_object('id', p.id, 'registrier_nr', p.registrier_nr)) \
+             FROM (SELECT id, registrier_nr FROM einsatz_person \
+                   WHERE meldung_id = m.id AND storniert_at IS NULL \
+                   ORDER BY registrier_nr) p) AS patienten \
+     FROM meldung m \
      LEFT JOIN benutzer b ON b.id = m.bearbeiter_id",
     quittung_join_sql!(),
     " LEFT JOIN benutzer qb ON qb.id = ks.quittiert_von_id"

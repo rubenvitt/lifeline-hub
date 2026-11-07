@@ -296,6 +296,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("transport_art", G_TRIAGE),
             scrub("transport_fachrichtung", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("transport_at", G_ZEIT),
+            // LLH-1567 (design.md D1/D9): versorgende Einheit und Herkunftsmeldung sind Verweise
+            // ohne Personenbezug; der Bericht zählt Kontakte je Einheit auch nach der Schwärzung.
+            retain("versorgende_einheit_id", G_FK),
+            retain("meldung_id", G_FK),
             // LLH-1566: der Anlass der Hilfeleistung ist diagnosenah (psychisch, Intoxikation)
             // und fällt mit der Behandlung (LLH-1109); seine Zeit bleibt wie die des Transports.
             scrub("anlass", Strategie::NullSetzen, Z_BEHANDLUNG),

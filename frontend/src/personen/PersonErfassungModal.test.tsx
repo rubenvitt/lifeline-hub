@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { tippeZeit } from '../test/zeitEingabe';
-import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungModal';
+import { waehle } from '../test/auswahlListe';
+import PersonErfassungModal, {
+  type AusMeldung,
+  type ErfassungsModus,
+} from './PersonErfassungModal';
 
 /**
  * Unit-Netz für die Erfassungsmaske der Betroffenen: was die Hülle zusichert (Fokus, Enter,
@@ -13,7 +17,14 @@ import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungMod
  */
 
 /** Modal mit Standard-Zusagen; einzelne Rückrufe überschreibbar. */
-function zeige(opts: { modus?: ErfassungsModus; onErfassen?: Mock; einsatzId?: number } = {}) {
+function zeige(
+  opts: {
+    modus?: ErfassungsModus;
+    onErfassen?: Mock;
+    einsatzId?: number;
+    ausMeldung?: AusMeldung;
+  } = {},
+) {
   const onErfassen: Mock = opts.onErfassen ?? vi.fn().mockResolvedValue(undefined);
   const onFertig: Mock = vi.fn();
   const onCancel: Mock = vi.fn();
@@ -25,6 +36,7 @@ function zeige(opts: { modus?: ErfassungsModus; onErfassen?: Mock; einsatzId?: n
       onErfassen={onErfassen}
       onFertig={onFertig}
       onCancel={onCancel}
+      ausMeldung={opts.ausMeldung}
     />,
   );
   return { ...ansicht, onErfassen, onFertig, onCancel };
@@ -54,6 +66,12 @@ beforeEach(() => {
   server.use(
     http.get('/api/einsaetze/:eid', ({ params }) =>
       HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
+    ),
+    http.get('/api/einsaetze/:eid/personen/einheiten', () =>
+      HttpResponse.json([
+        { id: 4, name: 'Streife 2', abschnitt_id: 1, abschnitt_name: 'Bühne' },
+        { id: 5, name: 'RTW 1' },
+      ]),
     ),
     http.get('/api/einsaetze/:eid/ort-vorschau', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
@@ -398,5 +416,58 @@ describe('PersonErfassungModal — sitzungsweiter Fundort', () => {
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Fundort')).toHaveValue('');
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+  });
+});
+
+/** Anlegen aus einer Meldung (LLH-1567, design.md D5): Bezug, Ort und Einheit vorbelegt. */
+describe('PersonErfassungModal — aus einer Meldung', () => {
+  it('nennt die Meldung, belegt Fundort-Koordinate und Einheit vor und schickt den Bezug mit', async () => {
+    const { onErfassen } = zeige({
+      ausMeldung: { id: 17, lfd_nr: 3, einheit_id: 4, lat: 52.2691, lon: 9.1342 },
+    });
+    const nutzer = userEvent.setup();
+    expect(screen.getByText('Zu Meldung #3')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Karte: Fundort' })).toHaveTextContent(
+        '52.2691,9.1342',
+      ),
+    );
+    // Mit Einheit steht „Weitere Angaben“ offen: die Vorbelegung ist zu sehen.
+    expect(await screen.findByText('Streife 2 · Bühne')).toBeInTheDocument();
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({
+      meldung_id: 17,
+      versorgende_einheit_id: 4,
+      antreff_lat: 52.2691,
+      antreff_lon: 9.1342,
+    });
+  });
+
+  it('nimmt ohne Verortung den gemerkten Ort nicht und ohne Einheit keine', async () => {
+    sessionStorage.setItem('lfh:erfassung:1:person:antreff_ort', 'Sammelstelle Süd');
+    const { onErfassen } = zeige({ ausMeldung: { id: 17, lfd_nr: 3 } });
+    const nutzer = userEvent.setup();
+    expect(screen.getByLabelText('Fundort')).toHaveValue('');
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    const daten = onErfassen.mock.calls[0][0];
+    expect(daten).toMatchObject({ meldung_id: 17 });
+    expect(daten).not.toHaveProperty('versorgende_einheit_id');
+  });
+});
+
+/** Die versorgende Einheit steht unter „Weitere Angaben“ (LLH-1567, D4) und geht mit. */
+describe('PersonErfassungModal — versorgende Einheit', () => {
+  it('schickt die gewählte Einheit mit, ohne Wahl kein Feld', async () => {
+    const { onErfassen } = zeige();
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await waehle('Versorgende Einheit', 'RTW 1');
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({ versorgende_einheit_id: 5 });
+    expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('meldung_id');
   });
 });

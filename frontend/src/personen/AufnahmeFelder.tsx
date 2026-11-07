@@ -18,6 +18,7 @@ import { KoordinateFeld, VermisstSeitFeld } from './LagedatenFelder';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import AnlassWahl from './AnlassWahl';
 import SichtungsWahl from './SichtungsWahl';
+import { VersorgendeEinheitFeld } from './VersorgtVon';
 
 /**
  * Werte der Personen-Aufnahme: `PersonEingabe` plus Erst-Sichtung — `status` leitet der
@@ -66,6 +67,7 @@ export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
     vermisst_seit,
     bestaetigt_personal_id,
     sichtung,
+    versorgende_einheit_id,
     anlass,
     ...rest
   } = werte;
@@ -88,6 +90,8 @@ export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
     ...(anlass ? { anlass } : {}),
     ...(k ? { antreff_lat: k.lat, antreff_lon: k.lon } : {}),
     ...(vermisst_seit ? { vermisst_seit } : {}),
+    // Eine zurückgenommene Wahl heißt: ohne Einheit (LLH-1567).
+    ...(versorgende_einheit_id != null ? { versorgende_einheit_id } : {}),
   };
 }
 
@@ -135,6 +139,7 @@ export default function AufnahmeFelder({
   modus,
   einsatzId,
   ohneSichtung = false,
+  weitereOffen = false,
 }: {
   modus: AufnahmeModus;
   /**
@@ -144,6 +149,11 @@ export default function AufnahmeFelder({
   einsatzId?: number;
   /** Ohne Sichtung und ohne ihren Folgestatus, etwa am Gerät einer Betreuungsstelle (LFH-1041). */
   ohneSichtung?: boolean;
+  /**
+   * „Weitere Angaben“ aufgeklappt öffnen, etwa wenn dort ein Wert vorbelegt ist (versorgende
+   * Einheit aus einer Meldung, LLH-1567, design.md D5): ein Wert entsteht nur aufgeklappt.
+   */
+  weitereOffen?: boolean;
 }) {
   const geraet = useAuthOptional()?.geraet ?? null;
   const ortssuche = einsatzId != null && geraet == null;
@@ -190,6 +200,8 @@ export default function AufnahmeFelder({
             />
           </Form.Item>
           {!ortssuche && <KoordinateFeld />}
+          {/* Nicht am gekoppelten Gerät (LLH-1567, design.md D4); dort fehlt auch die Ortssuche. */}
+          {ortssuche && <VersorgendeEinheitFeld einsatzId={einsatzId} />}
         </>
       )}
       <Form.Item label="Notiz" name="notiz" rules={[zeichenRegel(PERSON_NOTIZ_MAX, 'Notiz')]}>
@@ -242,6 +254,7 @@ export default function AufnahmeFelder({
             einsatzId={einsatzId}
             etikett="Fundort"
             count={zeichenGrenze(PERSON_ANGABE_MAX)}
+            eigenePosition
           />
         </Form.Item>
       ) : (
@@ -261,6 +274,7 @@ export default function AufnahmeFelder({
       )}
       <Collapse
         ghost
+        defaultActiveKey={weitereOffen ? ['weitere'] : undefined}
         items={[{ key: 'weitere', label: 'Weitere Angaben', children: weitereAngaben }]}
       />
     </>

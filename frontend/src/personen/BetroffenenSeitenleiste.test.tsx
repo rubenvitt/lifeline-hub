@@ -106,3 +106,29 @@ describe('BetroffenenSeitenleiste — ohne Netz nicht geladene Fundorte (LFH-109
     expect(satz()).toHaveTextContent(/^1 ohne Verbleib, Fundort nicht geladen — 1 Datensatz$/);
   });
 });
+
+describe('BetroffenenSeitenleiste — Versorgt von (LLH-1567)', () => {
+  it('zählt die Kontakte je Einheit mit Abschnitt', () => {
+    zeige([
+      p({
+        versorgende_einheit_id: 4,
+        versorgende_einheit_name: 'Streife 2',
+        versorgende_einheit_abschnitt_name: 'Bühne',
+      }),
+      p({
+        versorgende_einheit_id: 4,
+        versorgende_einheit_name: 'Streife 2',
+        versorgende_einheit_abschnitt_name: 'Bühne',
+      }),
+      p({}),
+    ]);
+    const liste = screen.getByRole('list', { name: 'Versorgt von' });
+    expect(liste).toHaveTextContent('Streife 2 · Bühne');
+    expect(liste).toHaveTextContent('2');
+  });
+
+  it('steht nicht da, solange keine Person eine Einheit hat', () => {
+    zeige([p({})]);
+    expect(screen.queryByRole('list', { name: 'Versorgt von' })).toBeNull();
+  });
+});

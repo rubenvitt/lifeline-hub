@@ -9,6 +9,8 @@ interface Props extends OrtsfeldGemeinsam {
   etikett: string;
   /** `typ:id` der bearbeiteten Sache, damit die Peilung nicht auf sie selbst zeigt. */
   exclude?: string;
+  /** Knopf „Eigene Position“ an der Karte (LLH-1567, nur im Fundort der Personenmaske). */
+  eigenePosition?: boolean;
 }
 
 /**
@@ -16,14 +18,14 @@ interface Props extends OrtsfeldGemeinsam {
  * mit Ort-Zeile, „Auf Karte wählen“ beginnt am Einsatzort. `Form.Item` reicht Wert, `onChange`,
  * `id` und `ref` herein.
  */
-export function EinsatzOrtsfeld({ einsatzId, etikett, exclude, ...feld }: Props) {
+export function EinsatzOrtsfeld({ einsatzId, etikett, exclude, eigenePosition, ...feld }: Props) {
   const umgebung = useEinsatzortPunkt(einsatzId);
   return (
     <Ortsfeld
       {...feld}
       suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
       suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(einsatzId, begriff)}
-      karte={{ etikett, einsatzId, exclude, umgebung }}
+      karte={{ etikett, einsatzId, exclude, umgebung, eigenePosition }}
     />
   );
 }

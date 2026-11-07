@@ -3,7 +3,8 @@ import { Button, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { memo, useState, type ReactNode } from 'react';
-import { auftraegePfad, lagekartePfad } from '../routing/deeplinks';
+import { auftraegePfad, lagekartePfad, personDetailPfad } from '../routing/deeplinks';
+import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Meldung, MeldungKorrekturPatch, MeldungStatus } from '../api/types';
 import {
   MELDUNG_HANDLUNG,
@@ -81,6 +82,13 @@ interface MeldungKarteProps {
    */
   auftragGesperrt?: boolean;
   /**
+   * „Patient anlegen“ (LLH-1567, design.md D5): öffnet „Betroffene erfassen“ mit Bezug auf die
+   * Meldung. Nur mit Schreibrecht; ohne Freigabe der Personen gesperrt mit Grund.
+   */
+  onPatientAnlegen?: (m: Meldung) => void;
+  /** Personen ohne Freigabe: „Patient anlegen“ gesperrt, die Verweise R-n nur als Text (D6). */
+  personenGesperrt?: boolean;
+  /**
    * Grund der zuletzt abgelehnten Karten-Aktion (Status, Bearbeiter, Bestätigen, Korrektur), aus
    * `components/useZeilenFehler.ts`. Ein stabiles Objekt je Grund, die Karte bleibt `memo`.
    */
@@ -149,6 +157,8 @@ function MeldungKarte({
   funktionsOptionen,
   onAusDerLage,
   auftragGesperrt = false,
+  onPatientAnlegen,
+  personenGesperrt = false,
   fehlerGrund,
   uebernahme = null,
 }: MeldungKarteProps) {
@@ -249,8 +259,23 @@ function MeldungKarte({
                 : { key: 'ae', label: 'Auftrag erteilen', onClick: () => onAuftragErteilen(m) },
             ]
           : []),
+        // Ein Hilfeersuchen kann mehrere Patienten haben: der Eintrag bleibt nach der ersten Anlage.
+        ...(onPatientAnlegen
+          ? [
+              personenGesperrt
+                ? {
+                    key: 'pa',
+                    label: `Patient anlegen (${KEINE_BERECHTIGUNG})`,
+                    onClick: () => {},
+                    gesperrt: true as const,
+                  }
+                : { key: 'pa', label: 'Patient anlegen', onClick: () => onPatientAnlegen(m) },
+            ]
+          : []),
       ]
     : [];
+  // Patienten aus dieser Meldung (D6): die pseudonyme Registriernummer, mit Zugriff als Verweis.
+  const patientenVerweis = !personenGesperrt && darf('fremde-module');
 
   // Gebündelt wird ERST AB DREI Aktionen, gezählt NACH Sichtbarkeits- und Rechteprüfung —
   // darunter wäre ein Menü ein Umweg.
@@ -288,6 +313,21 @@ function MeldungKarte({
                 ↗ Auftrag
               </KennungsLink>
             ))}
+          {(m.patienten ?? []).map((p) =>
+            patientenVerweis ? (
+              <KennungsLink
+                key={p.id}
+                data-lfh="meldung-patient"
+                to={personDetailPfad(einsatzId, p.id)}
+              >
+                ↗ {registrierAnzeige(p.registrier_nr)}
+              </KennungsLink>
+            ) : (
+              <Text key={p.id} type="secondary" data-lfh="meldung-patient">
+                {registrierAnzeige(p.registrier_nr)}
+              </Text>
+            ),
+          )}
           {/* Eine ETB-Berichtigung des Eintrags dieser Meldung (LLH-1382): der Wortlaut unten bleibt. */}
           <BerichtigtMarke
             einsatzId={einsatzId}
