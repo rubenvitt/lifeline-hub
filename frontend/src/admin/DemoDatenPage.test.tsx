@@ -9,7 +9,7 @@ import { renderMitProviders } from '../test/utils';
 import { NetzFehler } from '../api/client';
 import { erzeugeQueryClient } from '../api/queryClient';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import type { DemoDatenStatus } from '../api/types';
+import type { DemoDatenStatus, DemoLage, DemoLageStatus } from '../api/types';
 import AdminLayout from './AdminLayout';
 import DemoDatenPage from './DemoDatenPage';
 import { adminDemoDatenPfad } from './adminNav';
@@ -26,9 +26,25 @@ const admin = adminFixture({ anzeigename: 'Chef' });
 
 const fuehrungskraft = benutzerFixture({ id: 2, anzeigename: 'Eva', org_rolle: 'fuehrungskraft' });
 
-const NICHT_IMPORTIERT: DemoDatenStatus = { importiert: false };
+type LageStand = Omit<DemoLageStatus, 'lage'>;
 
-function importiert(einsatzId: number, bezeichnung: string, zeit: string): DemoDatenStatus {
+const NIE: LageStand = { importiert: false };
+
+/** Der ganze Status: beide Lagen in der Reihenfolge des Servers (LLH-1576). */
+function gesamt(starkregen: LageStand, stadtfest: LageStand = NIE): DemoDatenStatus {
+  return {
+    lagen: [
+      { lage: 'starkregen', ...starkregen },
+      { lage: 'stadtfest', ...stadtfest },
+    ],
+  };
+}
+
+function mitLage(s: DemoDatenStatus, lage: DemoLage, l: LageStand): DemoDatenStatus {
+  return { lagen: s.lagen.map((x) => (x.lage === lage ? { lage, ...l } : x)) };
+}
+
+function importiert(einsatzId: number, bezeichnung: string, zeit: string): LageStand {
   return {
     importiert: true,
     import: {
@@ -50,10 +66,26 @@ function importiert(einsatzId: number, bezeichnung: string, zeit: string): DemoD
   };
 }
 
-const IMPORTIERT = importiert(41, 'ÜBUNG – Starkregen Musterstadt', '2026-09-24 08:00:00');
-const NEU_IMPORTIERT = importiert(52, 'ÜBUNG – Starkregen Musterstadt', '2026-09-24 11:15:00');
-
-const ENTFERNT: DemoDatenStatus = {
+const REGEN = importiert(41, 'ÜBUNG – Starkregen Musterstadt', '2026-09-24 08:00:00');
+const REGEN_NEU = importiert(52, 'ÜBUNG – Starkregen Musterstadt', '2026-09-24 11:15:00');
+const FEST: LageStand = {
+  importiert: true,
+  import: {
+    id: 60,
+    importiert_at: '2026-09-24 12:00:00',
+    einsatz_id: 60,
+    einsatz_bezeichnung: 'ÜBUNG – Sanitätsdienst Stadtfest Musterstadt',
+  },
+  bericht: {
+    vorgang: 'importiert',
+    zeitpunkt: '2026-09-24 12:00:00',
+    je_art: [
+      { art: 'fahrzeug', angelegt: 2, mitbenutzt: 0, entfernt: 0, behalten: 0 },
+      { art: 'personal', angelegt: 11, mitbenutzt: 0, entfernt: 0, behalten: 0 },
+    ],
+  },
+};
+const REGEN_ENTFERNT: LageStand = {
   importiert: false,
   bericht: {
     vorgang: 'entfernt',
@@ -66,44 +98,68 @@ const ENTFERNT: DemoDatenStatus = {
     ],
   },
 };
+const FEST_ENTFERNT: LageStand = {
+  importiert: false,
+  bericht: {
+    vorgang: 'entfernt',
+    zeitpunkt: '2026-09-24 13:00:00',
+    je_art: [{ art: 'fahrzeug', angelegt: 0, mitbenutzt: 0, entfernt: 2, behalten: 0 }],
+  },
+};
+
+const NICHT_IMPORTIERT = gesamt(NIE);
+const IMPORTIERT = gesamt(REGEN);
+const ENTFERNT = gesamt(REGEN_ENTFERNT);
+
+/** Was ein Vorgang je Lage aus dem Stand macht, wie im Backend. */
+const NACH: Record<'post' | 'neu' | 'delete', Record<DemoLage, LageStand>> = {
+  post: { starkregen: REGEN, stadtfest: FEST },
+  neu: { starkregen: REGEN_NEU, stadtfest: FEST },
+  delete: { starkregen: REGEN_ENTFERNT, stadtfest: FEST_ENTFERNT },
+};
 
 interface Zaehler {
   get: number;
   post: number;
   neu: number;
   delete: number;
+  /** Jeder Schreibvorgang als `METHODE pfad`. */
+  pfade: string[];
 }
 
 /**
- * Ein kleiner Server mit Zustand: jeder Schreibvorgang setzt den Stand, den das nächste GET
- * liefert, wie im Backend. `'aus'` ist der Zustand ohne `--demo-daten`: 404 auf allem.
+ * Ein kleiner Server mit Zustand: jeder Schreibvorgang setzt den Stand seiner Lage, den das
+ * nächste GET liefert, wie im Backend. `'aus'` ist der Zustand ohne `--demo-daten`: 404 auf allem.
  */
 function demoServer(start: DemoDatenStatus | 'aus'): Zaehler {
-  const z: Zaehler = { get: 0, post: 0, neu: 0, delete: 0 };
-  let stand = start;
+  const z: Zaehler = { get: 0, post: 0, neu: 0, delete: 0, pfade: [] };
+  let jetzt = start;
   const aus = () => HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 });
+  const schreibe =
+    (art: 'post' | 'neu' | 'delete', code = 200) =>
+    ({ request, params }: { request: Request; params: Record<string, unknown> }) => {
+      z[art] += 1;
+      z.pfade.push(`${request.method} ${new URL(request.url).pathname}`);
+      if (jetzt === 'aus') return aus();
+      const lage = params.lage as DemoLage;
+      jetzt = mitLage(jetzt, lage, NACH[art][lage]);
+      return HttpResponse.json(jetzt, { status: code });
+    };
   server.use(
     http.get('/api/demo-daten', () => {
       z.get += 1;
-      return stand === 'aus' ? aus() : HttpResponse.json(stand);
+      return jetzt === 'aus' ? aus() : HttpResponse.json(jetzt);
     }),
-    http.post('/api/demo-daten', () => {
-      z.post += 1;
-      stand = IMPORTIERT;
-      return HttpResponse.json(IMPORTIERT, { status: 201 });
-    }),
-    http.post('/api/demo-daten/neu', () => {
-      z.neu += 1;
-      stand = NEU_IMPORTIERT;
-      return HttpResponse.json(NEU_IMPORTIERT);
-    }),
-    http.delete('/api/demo-daten', () => {
-      z.delete += 1;
-      stand = ENTFERNT;
-      return HttpResponse.json(ENTFERNT);
-    }),
+    http.post('/api/demo-daten/:lage', schreibe('post', 201)),
+    http.post('/api/demo-daten/:lage/neu', schreibe('neu')),
+    http.delete('/api/demo-daten/:lage', schreibe('delete')),
   );
   return z;
+}
+
+/** Ein Knopf im Paneel einer Lage: ohne Import tragen beide Paneele „Importieren“. */
+async function knopfIn(name: string | RegExp, lage = 'Starkregen') {
+  return within(await screen.findByRole('region', { name: lage })).findByRole('button', { name });
 }
 
 function Pfad() {
@@ -267,29 +323,35 @@ describe('DemoDatenPage — Status-Abfrage scheitert (Spec „Status-Abfrage sch
 });
 
 describe('DemoDatenPage — nicht importiert', () => {
-  it('genau eine Primäraktion „Importieren“ im Kopf, keine Aktion im Inhalt', async () => {
+  it('je Lage ein Paneel mit „Importieren“, kein Knopf im Kopf (LLH-1576)', async () => {
     demoServer(NICHT_IMPORTIERT);
     setup(admin);
-    expect(await screen.findByText('Nicht importiert')).toBeInTheDocument();
-    const kopf = document.querySelector<HTMLElement>('[data-lfh="adminpage-aktionen"]');
-    expect(kopf).not.toBeNull();
-    const knoepfe = within(kopf!).getAllByRole('button');
-    expect(knoepfe).toHaveLength(1);
-    expect(knoepfe[0]).toHaveAccessibleName('Importieren');
-    expect(knoepfe[0]).toHaveClass('ant-btn-primary');
+    const regen = await screen.findByRole('region', { name: 'Starkregen' });
+    const fest = screen.getByRole('region', { name: 'Stadtfest' });
+    // Reihenfolge des Status: erst Starkregen, dann Stadtfest.
+    expect(regen.compareDocumentPosition(fest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const paneel of [regen, fest]) {
+      expect(within(paneel).getByText('Nicht importiert')).toBeInTheDocument();
+      const knoepfe = within(paneel).getAllByRole('button');
+      expect(knoepfe).toHaveLength(1);
+      expect(knoepfe[0]).toHaveAccessibleName('Importieren');
+      // Zwei gleichrangige Lagen: keine von beiden ist DIE Primäraktion.
+      expect(knoepfe[0]).not.toHaveClass('ant-btn-primary');
+    }
+    expect(document.querySelector('[data-lfh="adminpage-aktionen"]')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Neu importieren' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
     // Ohne je importiert zu haben gibt es keinen Bericht.
-    expect(screen.queryByRole('region', { name: 'Letzter Vorgang' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /Letzter Vorgang/ })).not.toBeInTheDocument();
   });
 
   it('Importieren sendet POST, zeigt danach den Status und quittiert per Toast', async () => {
     const z = demoServer(NICHT_IMPORTIERT);
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
+    await userEvent.click(await knopfIn('Importieren'));
     expect(await screen.findByText('241000sep26')).toBeInTheDocument();
     expect(z.post).toBe(1);
-    expect(toastsMit('Demo-Daten importiert')).toHaveLength(1);
+    expect(toastsMit('Demo-Lage Starkregen importiert')).toHaveLength(1);
     // Der Kopf-Slot ist bei aktivem Import leer.
     expect(document.querySelector('[data-lfh="adminpage-aktionen"]')).toBeNull();
   });
@@ -299,14 +361,14 @@ describe('DemoDatenPage — importiert', () => {
   it('Status mit Datum in Ortszeit und Einsatz als Link, Bericht je Art', async () => {
     demoServer(IMPORTIERT);
     setup(admin);
-    const stand = await screen.findByRole('region', { name: 'Stand' });
+    const stand = await screen.findByRole('region', { name: 'Starkregen' });
     expect(within(stand).getByText('Importiert')).toBeInTheDocument();
     // 08:00 UTC → 10:00 in Berlin (Sommerzeit). `dayjs(s)` läse 08:00.
     expect(within(stand).getByText('241000sep26')).toBeInTheDocument();
     const link = within(stand).getByRole('link', { name: 'ÜBUNG – Starkregen Musterstadt' });
     expect(link).toHaveAttribute('href', '/einsaetze/41');
 
-    const bericht = screen.getByRole('region', { name: 'Letzter Vorgang' });
+    const bericht = screen.getByRole('region', { name: 'Letzter Vorgang Starkregen' });
     expect(within(bericht).getByText('12 angelegt · 1 mitbenutzt')).toBeInTheDocument();
     expect(within(bericht).getByText('30 angelegt · 0 mitbenutzt')).toBeInTheDocument();
     expect(within(bericht).getByText('8 angelegt · 2 mitbenutzt')).toBeInTheDocument();
@@ -316,7 +378,7 @@ describe('DemoDatenPage — importiert', () => {
     expect(within(bericht).getByText('Einheiten-Vorlagen')).toBeInTheDocument();
     expect(within(bericht).getByText('2 angelegt · 0 mitbenutzt')).toBeInTheDocument();
 
-    // Keine Primäraktion im Kopf; die beiden Vorgänge stehen beim Status und sind `danger`.
+    // Kein Knopf im Kopf; die beiden Vorgänge stehen beim Status und sind `danger`.
     expect(document.querySelector('[data-lfh="adminpage-aktionen"]')).toBeNull();
     expect(within(stand).getByRole('button', { name: 'Neu importieren' })).toHaveClass(
       'ant-btn-dangerous',
@@ -327,9 +389,9 @@ describe('DemoDatenPage — importiert', () => {
   });
 
   it('verwaister Kopf (Einsatz fehlt): neutraler Ersatztext statt leerem Link', async () => {
-    demoServer(importiert(41, '', '2026-09-24 08:00:00'));
+    demoServer(gesamt(importiert(41, '', '2026-09-24 08:00:00')));
     setup(admin);
-    const stand = await screen.findByRole('region', { name: 'Stand' });
+    const stand = await screen.findByRole('region', { name: 'Starkregen' });
     expect(within(stand).getByText('Einsatz nicht mehr vorhanden')).toBeInTheDocument();
     expect(within(stand).queryByRole('link')).not.toBeInTheDocument();
   });
@@ -337,8 +399,8 @@ describe('DemoDatenPage — importiert', () => {
   it('Entfernen: Rückfrage mit danger-Knopf, DELETE erst nach Bestätigung', async () => {
     const z = demoServer(IMPORTIERT);
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
-    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(await knopfIn('Entfernen'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen entfernen?');
     const ok = within(dialog).getByRole('button', { name: 'Endgültig entfernen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     // Genau EIN kurzer Satz zur Folge (LFH-1078).
@@ -352,21 +414,21 @@ describe('DemoDatenPage — importiert', () => {
     await userEvent.click(ok);
     await waitFor(() => expect(z.delete).toBe(1));
 
-    // Danach: nicht importiert, Bericht des Entfernens, wieder die Primäraktion im Kopf.
-    const stand = await screen.findByRole('region', { name: 'Stand' });
+    // Danach: nicht importiert, Bericht des Entfernens, wieder „Importieren“ im Paneel.
+    const stand = await screen.findByRole('region', { name: 'Starkregen' });
     expect(await within(stand).findByText('Nicht importiert')).toBeInTheDocument();
-    const bericht = screen.getByRole('region', { name: 'Letzter Vorgang' });
+    const bericht = screen.getByRole('region', { name: 'Letzter Vorgang Starkregen' });
     expect(within(bericht).getByText('11 entfernt · 1 behalten')).toBeInTheDocument();
     expect(within(bericht).getByText('30 entfernt · 0 behalten')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Importieren' })).toBeInTheDocument();
-    expect(toastsMit('Demo-Daten entfernt')).toHaveLength(1);
+    expect(await knopfIn('Importieren')).toBeInTheDocument();
+    expect(toastsMit('Demo-Lage Starkregen entfernt')).toHaveLength(1);
   });
 
   it('Entfernen abbrechen sendet nichts', async () => {
     const z = demoServer(IMPORTIERT);
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
-    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(await knopfIn('Entfernen'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen entfernen?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     await new Promise((r) => setTimeout(r, 50));
     expect(z.delete).toBe(0);
@@ -375,8 +437,8 @@ describe('DemoDatenPage — importiert', () => {
   it('Neu importieren: Rückfrage mit danger-Knopf, POST /neu erst nach Bestätigung', async () => {
     const z = demoServer(IMPORTIERT);
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Neu importieren' }));
-    const dialog = await offenerDialog('Demo-Daten neu importieren?');
+    await userEvent.click(await knopfIn('Neu importieren'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen neu importieren?');
     const ok = within(dialog).getByRole('button', { name: 'Ersetzen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(
@@ -390,7 +452,7 @@ describe('DemoDatenPage — importiert', () => {
       'href',
       '/einsaetze/52',
     );
-    expect(toastsMit('Demo-Daten neu importiert')).toHaveLength(1);
+    expect(toastsMit('Demo-Lage Starkregen neu importiert')).toHaveLength(1);
   });
 });
 
@@ -398,24 +460,24 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
   it('409 beim Import: Alert an der Seite mit Servertext, nicht in der Message-Queue', async () => {
     demoServer(NICHT_IMPORTIERT);
     server.use(
-      http.post('/api/demo-daten', () =>
+      http.post('/api/demo-daten/starkregen', () =>
         HttpResponse.json({ error: 'Demo-Daten sind bereits importiert' }, { status: 409 }),
       ),
     );
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
+    await userEvent.click(await knopfIn('Importieren'));
     const treffer = await screen.findByText('Demo-Daten sind bereits importiert');
     expect(treffer.closest('.ant-message')).toBeNull();
     expect(treffer.closest('[role="alert"]')).not.toBeNull();
-    expect(screen.getByText('Import fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByText('Import Starkregen fehlgeschlagen')).toBeInTheDocument();
     expect(toastsMit('Demo-Daten sind bereits importiert')).toHaveLength(0);
-    expect(toastsMit('Demo-Daten importiert')).toHaveLength(0);
+    expect(toastsMit('Demo-Lage Starkregen importiert')).toHaveLength(0);
   });
 
   it('422 beim Neu-Import: Alert an der Seite, der Dialog ist zu', async () => {
     demoServer(IMPORTIERT);
     server.use(
-      http.post('/api/demo-daten/neu', () =>
+      http.post('/api/demo-daten/starkregen/neu', () =>
         HttpResponse.json(
           { error: 'Katalogeintrag fehlt: Einheitstyp „Betreuungszug“' },
           { status: 422 },
@@ -423,13 +485,13 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
       ),
     );
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Neu importieren' }));
-    const dialog = await offenerDialog('Demo-Daten neu importieren?');
+    await userEvent.click(await knopfIn('Neu importieren'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen neu importieren?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ersetzen' }));
     const treffer = await screen.findByText('Katalogeintrag fehlt: Einheitstyp „Betreuungszug“');
     expect(treffer.closest('.ant-message')).toBeNull();
     expect(treffer.closest('.ant-modal')).toBeNull();
-    expect(screen.getByText('Neu-Import fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByText('Neu-Import Starkregen fehlgeschlagen')).toBeInTheDocument();
     expect(toastsMit('Katalogeintrag fehlt')).toHaveLength(0);
     // Der Stand ist unverändert.
     expect(screen.getByText('241000sep26')).toBeInTheDocument();
@@ -446,20 +508,20 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
         // Ab dem gescheiterten DELETE liefert der Server den Stand des anderen Tabs.
         return HttpResponse.json(deletes > 0 ? ENTFERNT : IMPORTIERT);
       }),
-      http.delete('/api/demo-daten', () => {
+      http.delete('/api/demo-daten/starkregen', () => {
         deletes += 1;
         return HttpResponse.json({ error: 'Es sind keine Demo-Daten importiert' }, { status: 409 });
       }),
     );
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
-    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(await knopfIn('Entfernen'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen entfernen?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
     expect(await screen.findByText('Es sind keine Demo-Daten importiert')).toBeInTheDocument();
     await waitFor(() => expect(z.get).toBe(2));
-    const stand = screen.getByRole('region', { name: 'Stand' });
+    const stand = screen.getByRole('region', { name: 'Starkregen' });
     expect(await within(stand).findByText('Nicht importiert')).toBeInTheDocument();
-    expect(screen.getByText('Entfernen fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByText('Entfernen Starkregen fehlgeschlagen')).toBeInTheDocument();
     expect(screen.getByText('Es sind keine Demo-Daten importiert')).toBeInTheDocument();
   });
 
@@ -467,7 +529,7 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
     demoServer(NICHT_IMPORTIERT);
     let erster = true;
     server.use(
-      http.post('/api/demo-daten', () => {
+      http.post('/api/demo-daten/starkregen', () => {
         if (erster) {
           erster = false;
           return HttpResponse.json({ error: 'Kurz belegt' }, { status: 409 });
@@ -476,9 +538,9 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
       }),
     );
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
+    await userEvent.click(await knopfIn('Importieren'));
     expect(await screen.findByText('Kurz belegt')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Importieren' }));
+    await userEvent.click(await knopfIn('Importieren'));
     expect(await screen.findByText('241000sep26')).toBeInTheDocument();
     expect(screen.queryByText('Kurz belegt')).not.toBeInTheDocument();
   });
@@ -487,10 +549,10 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
 describe('DemoDatenPage — Netzfehler beim Vorgang', () => {
   it('nennt unter „Import fehlgeschlagen“ den Netzfehler, nicht „Speichern fehlgeschlagen“', async () => {
     demoServer(NICHT_IMPORTIERT);
-    server.use(http.post('/api/demo-daten', () => HttpResponse.error()));
+    server.use(http.post('/api/demo-daten/starkregen', () => HttpResponse.error()));
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
-    expect(await screen.findByText('Import fehlgeschlagen')).toBeInTheDocument();
+    await userEvent.click(await knopfIn('Importieren'));
+    expect(await screen.findByText('Import Starkregen fehlgeschlagen')).toBeInTheDocument();
     const text = screen.getByText(new NetzFehler().message);
     expect(text.closest('.ant-message')).toBeNull();
     expect(screen.queryByText('Speichern fehlgeschlagen')).toBeNull();
@@ -515,47 +577,136 @@ describe('DemoDatenPage — nach jedem Fehler wird neu geladen (D13)', () => {
 
   it('Netzfehler beim Import, der Server hat doch committet: die Seite zeigt den neuen Stand', async () => {
     const z = demoServer(NICHT_IMPORTIERT);
-    let stand: DemoDatenStatus = NICHT_IMPORTIERT;
+    let serverStand: DemoDatenStatus = NICHT_IMPORTIERT;
     server.use(
       http.get('/api/demo-daten', () => {
         z.get += 1;
-        return HttpResponse.json(stand);
+        return HttpResponse.json(serverStand);
       }),
-      http.post('/api/demo-daten', () => {
+      http.post('/api/demo-daten/starkregen', () => {
         // Die Antwort geht verloren, die Transaktion stand schon.
-        stand = IMPORTIERT;
+        serverStand = IMPORTIERT;
         return HttpResponse.error();
       }),
     );
     const client = clientMit([globalKeys.einsaetze(), globalKeys.fahrzeugeListe('alle')]);
     setup(admin, adminDemoDatenPfad(), client);
-    await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
-    expect(await screen.findByText('Import fehlgeschlagen')).toBeInTheDocument();
+    await userEvent.click(await knopfIn('Importieren'));
+    expect(await screen.findByText('Import Starkregen fehlgeschlagen')).toBeInTheDocument();
     await waitFor(() => expect(z.get).toBe(2));
-    const standPaneel = screen.getByRole('region', { name: 'Stand' });
+    const standPaneel = screen.getByRole('region', { name: 'Starkregen' });
     expect(await within(standPaneel).findByText('Importiert')).toBeInTheDocument();
     expect(invalidiert(client, globalKeys.einsaetze())).toBe(true);
     expect(invalidiert(client, globalKeys.fahrzeugeListe('alle'))).toBe(true);
     // Der Grund bleibt stehen: `vorgang.error` hängt nicht an der Abfrage.
-    expect(screen.getByText('Import fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByText('Import Starkregen fehlgeschlagen')).toBeInTheDocument();
   });
 
   it('500 beim Entfernen: Stand neu geladen, Abfragen des alten Demo-Einsatzes invalidiert', async () => {
     const z = demoServer(IMPORTIERT);
     server.use(
-      http.delete('/api/demo-daten', () =>
+      http.delete('/api/demo-daten/starkregen', () =>
         HttpResponse.json({ error: 'Datenbank belegt' }, { status: 500 }),
       ),
     );
     const client = clientMit([einsatzKeys.etb(41), einsatzKeys.etb(99)]);
     setup(admin, adminDemoDatenPfad(), client);
-    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
-    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(await knopfIn('Entfernen'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen entfernen?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
     expect(await screen.findByText('Datenbank belegt')).toBeInTheDocument();
     await waitFor(() => expect(z.get).toBe(2));
     expect(invalidiert(client, einsatzKeys.etb(41))).toBe(true);
     expect(invalidiert(client, einsatzKeys.etb(99))).toBe(false);
+  });
+});
+
+describe('DemoDatenPage — zwei Lagen nebeneinander (LLH-1576)', () => {
+  it('Stadtfest importieren trifft nur die eigene Lage', async () => {
+    const z = demoServer(IMPORTIERT);
+    setup(admin);
+    await userEvent.click(await knopfIn('Importieren', 'Stadtfest'));
+    const fest = screen.getByRole('region', { name: 'Stadtfest' });
+    expect(
+      await within(fest).findByRole('link', {
+        name: 'ÜBUNG – Sanitätsdienst Stadtfest Musterstadt',
+      }),
+    ).toHaveAttribute('href', '/einsaetze/60');
+    expect(z.pfade).toEqual(['POST /api/demo-daten/stadtfest']);
+    expect(toastsMit('Demo-Lage Stadtfest importiert')).toHaveLength(1);
+    // Der Starkregen steht unverändert daneben.
+    const regen = screen.getByRole('region', { name: 'Starkregen' });
+    expect(
+      within(regen).getByRole('link', { name: 'ÜBUNG – Starkregen Musterstadt' }),
+    ).toHaveAttribute('href', '/einsaetze/41');
+    expect(screen.getByRole('region', { name: 'Letzter Vorgang Stadtfest' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Letzter Vorgang Starkregen' })).toBeInTheDocument();
+  });
+
+  it('Entfernen der Stadtfest-Lage nennt sie in der Rückfrage und lässt den Starkregen stehen', async () => {
+    const z = demoServer(gesamt(REGEN, FEST));
+    const client = erzeugeQueryClient({
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { retry: false },
+    });
+    for (const k of [einsatzKeys.etb(41), einsatzKeys.etb(60)]) client.setQueryData(k, []);
+    setup(admin, adminDemoDatenPfad(), client);
+    await userEvent.click(await knopfIn('Entfernen', 'Stadtfest'));
+    const dialog = await offenerDialog('Demo-Lage Stadtfest entfernen?');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
+    await waitFor(() => expect(z.pfade).toEqual(['DELETE /api/demo-daten/stadtfest']));
+    const fest = screen.getByRole('region', { name: 'Stadtfest' });
+    expect(await within(fest).findByText('Nicht importiert')).toBeInTheDocument();
+    expect(toastsMit('Demo-Lage Stadtfest entfernt')).toHaveLength(1);
+    expect(
+      within(screen.getByRole('region', { name: 'Starkregen' })).getByText('Importiert'),
+    ).toBeInTheDocument();
+    // Invalidiert wird der Einsatz der entfernten Lage, nicht der der anderen.
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.etb(60))?.isInvalidated).toBe(true),
+    );
+    expect(client.getQueryState(einsatzKeys.etb(41))?.isInvalidated).toBe(false);
+  });
+
+  it('ein Fehler nennt die Lage im Titel', async () => {
+    demoServer(IMPORTIERT);
+    server.use(
+      http.post('/api/demo-daten/stadtfest', () =>
+        HttpResponse.json(
+          { error: 'Diese Demo-Lage ist für die Organisation bereits importiert.' },
+          { status: 409 },
+        ),
+      ),
+    );
+    setup(admin);
+    await userEvent.click(await knopfIn('Importieren', 'Stadtfest'));
+    expect(await screen.findByText('Import Stadtfest fehlgeschlagen')).toBeInTheDocument();
+    expect(
+      screen.getByText('Diese Demo-Lage ist für die Organisation bereits importiert.'),
+    ).toBeInTheDocument();
+  });
+
+  it('ein laufender Vorgang sperrt auch die Knöpfe der anderen Lage', async () => {
+    demoServer(IMPORTIERT);
+    let freigeben: () => void = () => {};
+    server.use(
+      http.delete('/api/demo-daten/starkregen', async () => {
+        await new Promise<void>((r) => {
+          freigeben = r;
+        });
+        return HttpResponse.json(ENTFERNT);
+      }),
+    );
+    setup(admin);
+    await userEvent.click(await knopfIn('Entfernen'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen entfernen?');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
+    const fest = screen.getByRole('region', { name: 'Stadtfest' });
+    await waitFor(() =>
+      expect(within(fest).getByRole('button', { name: 'Importieren' })).toBeDisabled(),
+    );
+    freigeben();
+    await waitFor(() => expect(toastsMit('Demo-Lage Starkregen entfernt')).toHaveLength(1));
   });
 });
 
@@ -565,7 +716,7 @@ describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
     let freigeben: () => void = () => {};
     let posts = 0;
     server.use(
-      http.post('/api/demo-daten', async () => {
+      http.post('/api/demo-daten/starkregen', async () => {
         posts += 1;
         await new Promise<void>((r) => {
           freigeben = r;
@@ -574,7 +725,7 @@ describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
       }),
     );
     setup(admin);
-    const knopf = await screen.findByRole('button', { name: 'Importieren' });
+    const knopf = await knopfIn('Importieren');
     // Zwei synchrone Klicks: react-query meldet `pending` erst im nächsten Takt, antds `loading`
     // sperrt den zweiten nicht. Trägt nur der Riegel in der Absende-Funktion.
     fireEvent.click(knopf);
@@ -587,7 +738,7 @@ describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
     freigeben();
     // Quittung statt Stand: dieser Handler setzt den Serverstand nicht, das Nachladen nach
     // der Invalidierung zeigt also wieder „nicht importiert“.
-    await waitFor(() => expect(toastsMit('Demo-Daten importiert')).toHaveLength(1));
+    await waitFor(() => expect(toastsMit('Demo-Lage Starkregen importiert')).toHaveLength(1));
     expect(posts).toBe(1);
   });
 });
@@ -597,7 +748,7 @@ describe('DemoDatenPage — laufender Vorgang sperrt beide Knöpfe sichtbar', ()
     demoServer(IMPORTIERT);
     let freigeben: () => void = () => {};
     server.use(
-      http.delete('/api/demo-daten', async () => {
+      http.delete('/api/demo-daten/starkregen', async () => {
         await new Promise<void>((r) => {
           freigeben = r;
         });
@@ -605,17 +756,17 @@ describe('DemoDatenPage — laufender Vorgang sperrt beide Knöpfe sichtbar', ()
       }),
     );
     setup(admin);
-    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
-    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(await knopfIn('Entfernen'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen entfernen?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
-    const stand = screen.getByRole('region', { name: 'Stand' });
+    const stand = screen.getByRole('region', { name: 'Starkregen' });
     await waitFor(() =>
       expect(within(stand).getByRole('button', { name: 'Neu importieren' })).toBeDisabled(),
     );
     expect(within(stand).getByRole('button', { name: /Entfernen/ })).toBeDisabled();
     freigeben();
     // Quittung statt Stand: dieser Handler setzt den Serverstand nicht (siehe Doppelklick-Test).
-    await waitFor(() => expect(toastsMit('Demo-Daten entfernt')).toHaveLength(1));
+    await waitFor(() => expect(toastsMit('Demo-Lage Starkregen entfernt')).toHaveLength(1));
   });
 });
 
@@ -663,8 +814,8 @@ describe('DemoDatenPage — Invalidierung nach dem Vorgang (D13)', () => {
     const z = demoServer(IMPORTIERT);
     const { client, betroffen, unberuehrt } = clientMitFaechern();
     setup(admin, adminDemoDatenPfad(), client);
-    await userEvent.click(await screen.findByRole('button', { name: 'Neu importieren' }));
-    const dialog = await offenerDialog('Demo-Daten neu importieren?');
+    await userEvent.click(await knopfIn('Neu importieren'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen neu importieren?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ersetzen' }));
     await waitFor(() => expect(z.neu).toBe(1));
     await waitFor(() => expect(invalidiert(client, globalKeys.einsaetze())).toBe(true));
@@ -686,8 +837,8 @@ describe('DemoDatenPage — Invalidierung nach dem Vorgang (D13)', () => {
     demoServer(IMPORTIERT);
     const { client } = clientMitFaechern();
     setup(admin, adminDemoDatenPfad(), client);
-    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
-    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(await knopfIn('Entfernen'));
+    const dialog = await offenerDialog('Demo-Lage Starkregen entfernen?');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
     await waitFor(() => expect(invalidiert(client, einsatzKeys.etb(41))).toBe(true));
     expect(invalidiert(client, einsatzKeys.person(41, 3))).toBe(true);

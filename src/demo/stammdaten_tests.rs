@@ -15,7 +15,7 @@ use super::test_hilfen::{
     admin_anlegen, anzahl, einsatz_anlegen, fahrzeug_anlegen, kataloge_seeden, kopf_anlegen,
     material_anlegen, org_anlegen, personal_anlegen, zeilen,
 };
-use super::{DemoBerichtZeile, DemoStammdatenArt};
+use super::{DemoBerichtZeile, DemoLage, DemoStammdatenArt};
 use crate::error::AppError;
 use crate::katalog::StatusKategorie;
 
@@ -50,7 +50,7 @@ async fn importieren(
     import_id: i64,
 ) -> Result<StammdatenErgebnis, AppError> {
     crate::write_retry!(pool, |conn| {
-        stammdaten_importieren_tx(conn, org_id, import_id).await
+        stammdaten_importieren_tx(conn, org_id, import_id, &szenario::STARKREGEN).await
     })
 }
 
@@ -296,7 +296,12 @@ async fn leere_org_legt_alles_an_und_markiert_jede_zeile() {
     }
 
     assert_eq!(
-        marke(&pool, "schichtmodell", erg.schichtmodell).await,
+        marke(
+            &pool,
+            "schichtmodell",
+            erg.schichtmodell.expect("Starkregen hat ein Modell")
+        )
+        .await,
         Some(a.kopf),
         "Schichtmodell"
     );
@@ -747,7 +752,7 @@ async fn kataloge_einer_fremden_org_zaehlen_nicht() {
     let kopf = kopf_anlegen(&pool, 2, einsatz).await;
     let vorher = bild_org(&pool, 2).await;
 
-    let erster = match szenario::katalog_bedarf_stammdaten()[0] {
+    let erster = match szenario::STARKREGEN.katalog_bedarf_stammdaten()[0] {
         Katalogeintrag::Qualifikation(l) => l,
         andere => panic!("{andere:?}"),
     };
@@ -765,7 +770,9 @@ async fn deaktivierter_einheitstyp_ist_422() {
     let pool = crate::db::test_pool().await;
     let a = aufbau(&pool, 1).await;
     assert!(
-        szenario::katalog_bedarf().contains(&Katalogeintrag::Einheitstyp("Gruppe")),
+        szenario::STARKREGEN
+            .katalog_bedarf()
+            .contains(&Katalogeintrag::Einheitstyp("Gruppe")),
         "Vorbedingung: das Szenario braucht die Gruppe"
     );
     katalog_deaktivieren(
@@ -778,7 +785,8 @@ async fn deaktivierter_einheitstyp_ist_422() {
 
     let mut conn = pool.acquire().await.unwrap();
     let direkt = katalog::einheitstyp_tx(&mut conn, a.org, "Gruppe").await;
-    let gesamt = katalog::aufloesen_tx(&mut conn, a.org, &szenario::katalog_bedarf()).await;
+    let gesamt =
+        katalog::aufloesen_tx(&mut conn, a.org, &szenario::STARKREGEN.katalog_bedarf()).await;
     drop(conn);
     for ergebnis in [direkt.map(|_| ()), gesamt.map(|_| ())] {
         match ergebnis {
@@ -877,7 +885,7 @@ async fn frisch_gebootstrappte_org_hat_den_ganzen_katalogbedarf() {
             .await
             .unwrap();
 
-    let bedarf = szenario::katalog_bedarf();
+    let bedarf = szenario::STARKREGEN.katalog_bedarf();
     let mut conn = pool.acquire().await.unwrap();
     let ids = katalog::aufloesen_tx(&mut conn, org_id, &bedarf)
         .await
@@ -932,8 +940,10 @@ async fn rundlauf_angelegtes_verschwindet_mitbenutztes_bleibt() {
         .collect();
     let angelegt_m: Vec<i64> = erg.material.values().copied().collect();
 
-    let bericht =
-        crate::write_retry!(&pool, |conn| { entfernen_tx(conn, a.org).await }).expect("entfernen");
+    let bericht = crate::write_retry!(&pool, |conn| {
+        entfernen_tx(conn, a.org, DemoLage::Starkregen).await
+    })
+    .expect("entfernen");
 
     for id in &angelegt_f {
         assert_eq!(
@@ -1069,7 +1079,10 @@ async fn vorlagen(pool: &SqlitePool, org_id: i64) -> Vec<crate::einheit_vorlage:
 }
 
 async fn entfernen(pool: &SqlitePool, org_id: i64) -> super::DemoBericht {
-    crate::write_retry!(pool, |conn| { entfernen_tx(conn, org_id).await }).expect("entfernen")
+    crate::write_retry!(pool, |conn| {
+        entfernen_tx(conn, org_id, DemoLage::Starkregen).await
+    })
+    .expect("entfernen")
 }
 
 fn entfernt_behalten(bericht: &super::DemoBericht, art: DemoStammdatenArt) -> (i64, i64) {
@@ -1341,7 +1354,7 @@ async fn schichtmodell_wird_angelegt_und_markiert_oder_mitbenutzt() {
         .await
         .unwrap();
     assert_eq!(modelle.len(), 1);
-    assert_eq!(modelle[0].id, erg.schichtmodell);
+    assert_eq!(Some(modelle[0].id), erg.schichtmodell);
     assert_eq!(modelle[0].bezeichnung, szenario::SCHICHTMODELL_BEZEICHNUNG);
     assert!(modelle[0].ist_demo, "angelegt → Demo-Marke");
     assert!(
@@ -1363,7 +1376,7 @@ async fn schichtmodell_wird_angelegt_und_markiert_oder_mitbenutzt() {
     let erg = importieren(&pool, a.org, a.kopf)
         .await
         .expect("importieren");
-    assert_eq!(erg.schichtmodell, eigen);
+    assert_eq!(erg.schichtmodell, Some(eigen));
     assert_eq!(
         zeile(&erg, DemoStammdatenArt::Schichtmodell),
         DemoBerichtZeile {
@@ -1415,8 +1428,7 @@ async fn einsatz_vorlage_haelt_das_demo_schichtmodell() {
             .await
             .unwrap();
     assert_eq!(
-        verweis,
-        Some(erg.schichtmodell),
+        verweis, erg.schichtmodell,
         "die Vorlage zeigt weiter darauf"
     );
 

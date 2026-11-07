@@ -26,7 +26,7 @@ use std::collections::BTreeMap;
 use sqlx::SqliteConnection;
 
 use super::katalog;
-use super::szenario::{self, Katalogeintrag};
+use super::szenario::{Katalogeintrag, Szenario};
 use super::{DemoBerichtZeile, DemoStammdatenArt};
 use crate::einheit_vorlage::repo::{self as vorlage_repo, NewVorlage};
 use crate::einheit_vorlage::PersonalEntry;
@@ -41,16 +41,17 @@ use crate::staerke::Staerke;
 /// disponiert, und die Berichtszeilen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StammdatenErgebnis {
-    /// Fahrzeug-ID je Schlüssel aus [`szenario::FAHRZEUGE`].
+    /// Fahrzeug-ID je Schlüssel aus [`Szenario::fahrzeuge`].
     pub fahrzeuge: BTreeMap<&'static str, i64>,
-    /// Personal-ID je Schlüssel aus [`szenario::PERSONAL`].
+    /// Personal-ID je Schlüssel aus [`Szenario::personal`].
     pub personal: BTreeMap<&'static str, i64>,
-    /// Material-ID je Schlüssel aus [`szenario::MATERIAL`].
+    /// Material-ID je Schlüssel aus [`Szenario::material`].
     pub material: BTreeMap<&'static str, i64>,
-    /// Vorlagen-ID je Schlüssel aus [`szenario::EINHEITEN_VORLAGEN`].
+    /// Vorlagen-ID je Schlüssel aus [`Szenario::einheiten_vorlagen`].
     pub einheit_vorlagen: BTreeMap<&'static str, i64>,
-    /// ID des Schichtmodells [`szenario::SCHICHTMODELL_BEZEICHNUNG`] (LLH-1122).
-    pub schichtmodell: i64,
+    /// ID des Schichtmodells aus [`Szenario::schichtmodell`] (LLH-1122); `None`, wenn die Lage
+    /// keins mitbringt (Stadtfest, LLH-1576).
+    pub schichtmodell: Option<i64>,
     /// Je Art eine Zeile, in Enum-Reihenfolge (Fahrzeug, Personal, Material, Einheiten-Vorlage,
     /// Schichtmodell).
     /// Gezählt sind
@@ -88,7 +89,7 @@ fn nachschlagen(
     })
 }
 
-/// Legt die Stammdaten des Szenarios an oder benutzt vorhandene mit und markiert jede neu
+/// Legt die Stammdaten des Szenarios `sz` an oder benutzt vorhandene mit und markiert jede neu
 /// angelegte Zeile mit `import_id`.
 ///
 /// `import_id` muss der aktive Kopf von `org_id` sein, sonst `Internal`: eine Marke an einem
@@ -98,6 +99,7 @@ pub async fn stammdaten_importieren_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     import_id: i64,
+    sz: &Szenario,
 ) -> Result<StammdatenErgebnis, AppError> {
     let kopf_aktiv: Option<i64> = sqlx::query_scalar(
         "SELECT id FROM demo_import WHERE id = ? AND org_id = ? AND entfernt_at IS NULL",
@@ -114,12 +116,11 @@ pub async fn stammdaten_importieren_tx(
 
     // Erst alle Kataloge auflösen, dann schreiben: ein fehlender Eintrag bricht ab, bevor
     // eine Zeile entsteht.
-    let kataloge =
-        katalog::aufloesen_tx(conn, org_id, &szenario::katalog_bedarf_stammdaten()).await?;
+    let kataloge = katalog::aufloesen_tx(conn, org_id, &sz.katalog_bedarf_stammdaten()).await?;
 
     let mut fahrzeuge = BTreeMap::new();
     let (mut f_angelegt, mut f_mitbenutzt) = (0, 0);
-    for vorlage in &szenario::FAHRZEUGE {
+    for vorlage in sz.fahrzeuge {
         let vorhanden: Option<i64> = sqlx::query_scalar(
             "SELECT id FROM fahrzeug \
              WHERE org_id = ? AND funkrufname = ? AND dienststatus = 'in_dienst'",
@@ -140,12 +141,12 @@ pub async fn stammdaten_importieren_tx(
                     traegerorganisation: None,
                     kennzeichen: None,
                     opta: None,
-                    standort: Some(szenario::STANDORT),
+                    standort: Some(sz.standort),
                     fms_issi: None,
                     sondersignal: vorlage.sondersignal,
                     tragenkapazitaet: vorlage.tragenkapazitaet,
                     staerke: vorlage.staerke.map(|(f, u, m)| Staerke::neu(f, u, m)),
-                    bemerkung: Some(szenario::BEMERKUNG),
+                    bemerkung: Some(sz.bemerkung),
                 };
                 let id = fahrzeug_repo::anlegen_tx(conn, org_id, &daten).await?.id;
                 markieren(conn, import_id, DemoStammdatenArt::Fahrzeug, id).await?;
@@ -158,7 +159,7 @@ pub async fn stammdaten_importieren_tx(
 
     let mut personal = BTreeMap::new();
     let (mut p_angelegt, mut p_mitbenutzt) = (0, 0);
-    for vorlage in &szenario::PERSONAL {
+    for vorlage in sz.personal {
         let vorhanden: Option<i64> = sqlx::query_scalar(
             "SELECT id FROM personal \
              WHERE org_id = ? AND personalnummer = ? AND dienststatus = 'in_dienst'",
@@ -186,7 +187,7 @@ pub async fn stammdaten_importieren_tx(
                     traegerorganisation: None,
                     telefon: None,
                     staerke_position: Some(vorlage.staerke_position),
-                    bemerkung: Some(szenario::BEMERKUNG),
+                    bemerkung: Some(sz.bemerkung),
                 };
                 let id = personal_repo::anlegen_tx(conn, org_id, &daten, &qualifikation_ids)
                     .await?
@@ -201,7 +202,7 @@ pub async fn stammdaten_importieren_tx(
 
     let mut material = BTreeMap::new();
     let (mut m_angelegt, mut m_mitbenutzt) = (0, 0);
-    for vorlage in &szenario::MATERIAL {
+    for vorlage in sz.material {
         let vorhanden: Option<i64> = sqlx::query_scalar(
             "SELECT id FROM material \
              WHERE org_id = ? AND bestandsnummer = ? AND dienststatus = 'in_dienst'",
@@ -221,8 +222,8 @@ pub async fn stammdaten_importieren_tx(
                     kategorie: Some(vorlage.kategorie),
                     bestandsnummer: Some(vorlage.bestandsnummer),
                     traegerorganisation: None,
-                    standort: Some(szenario::STANDORT),
-                    bemerkung: Some(szenario::BEMERKUNG),
+                    standort: Some(sz.standort),
+                    bemerkung: Some(sz.bemerkung),
                     art: vorlage.art,
                 };
                 let id = material_repo::anlegen_tx(conn, org_id, &daten).await?.id;
@@ -237,7 +238,7 @@ pub async fn stammdaten_importieren_tx(
     let mut einheit_vorlagen: BTreeMap<&'static str, i64> = BTreeMap::new();
     let mut angelegte_vorlagen: Vec<&'static str> = Vec::new();
     let (mut v_angelegt, mut v_mitbenutzt) = (0, 0);
-    for vorlage in &szenario::EINHEITEN_VORLAGEN {
+    for vorlage in sz.einheiten_vorlagen {
         let vorhanden: Option<i64> = sqlx::query_scalar(
             "SELECT id FROM einheit_vorlage WHERE org_id = ? AND name = ? AND aktiv = 1",
         )
@@ -279,7 +280,7 @@ pub async fn stammdaten_importieren_tx(
                     tz_organisation: vorlage.tz_organisation,
                     soll: None,
                     quali_soll: quali_soll.as_deref(),
-                    bemerkung: Some(szenario::BEMERKUNG),
+                    bemerkung: Some(sz.bemerkung),
                     sortier: vorlage.sortier,
                 };
                 let id = vorlage_repo::create_tx(conn, org_id, &daten).await?;
@@ -316,23 +317,28 @@ pub async fn stammdaten_importieren_tx(
     // Schichtmodell (LLH-1122): Kennung ist die Bezeichnung ohne Groß-/Kleinschreibung, wie der
     // 409 der Stammdaten. Ein angelegtes wird nie die Vorgabe der Organisation: das Demo-Modell
     // soll keinen echten Einsatz prägen; der Demo-Einsatz bekommt es in `importieren_tx`.
-    let modelle: Vec<(i64, String)> =
-        sqlx::query_as("SELECT id, bezeichnung FROM schichtmodell WHERE org_id = ?")
-            .bind(org_id)
-            .fetch_all(&mut *conn)
-            .await?;
-    let gesucht = szenario::SCHICHTMODELL_BEZEICHNUNG.to_lowercase();
-    let (schichtmodell, s_angelegt, s_mitbenutzt) = match modelle
-        .iter()
-        .find(|(_, b)| b.trim().to_lowercase() == gesucht)
-    {
-        Some((id, _)) => (*id, 0, 1),
-        None => {
-            let id =
-                schichtmodell_repo::insert_tx(conn, org_id, &szenario::schichtmodell()?, false)
+    let (schichtmodell, s_angelegt, s_mitbenutzt) = match sz.schichtmodell {
+        None => (None, 0, 0),
+        Some(vorlage) => {
+            let modelle: Vec<(i64, String)> =
+                sqlx::query_as("SELECT id, bezeichnung FROM schichtmodell WHERE org_id = ?")
+                    .bind(org_id)
+                    .fetch_all(&mut *conn)
                     .await?;
-            markieren(conn, import_id, DemoStammdatenArt::Schichtmodell, id).await?;
-            (id, 1, 0)
+            let gesucht = vorlage.bezeichnung.to_lowercase();
+            match modelle
+                .iter()
+                .find(|(_, b)| b.trim().to_lowercase() == gesucht)
+            {
+                Some((id, _)) => (Some(*id), 0, 1),
+                None => {
+                    let id =
+                        schichtmodell_repo::insert_tx(conn, org_id, &(vorlage.werte)()?, false)
+                            .await?;
+                    markieren(conn, import_id, DemoStammdatenArt::Schichtmodell, id).await?;
+                    (Some(id), 1, 0)
+                }
+            }
         }
     };
 

@@ -1,7 +1,8 @@
 //! Import des Demo-Szenarios (LFH-690, design.md D5, D6, D8, D9).
 //!
-//! [`importieren_tx`] legt in **einer** Transaktion des Aufrufers an: Einsatz, Kopf,
-//! Stammdaten und das [`szenario::DREHBUCH`] in Zeitfolge. Jeder Vorgang läuft über die
+//! [`importieren_tx`] legt für eine [`DemoLage`] in **einer** Transaktion des Aufrufers an:
+//! Einsatz, Kopf, Stammdaten und das Drehbuch des Szenarios ([`super::szenario::Szenario::drehbuch`]) in
+//! Zeitfolge. Jeder Vorgang läuft über die
 //! `_tx`-Funktion des Fach-Repos und schreibt den System-ETB-Eintrag, den der Handler im
 //! Betrieb schreibt, mit derselben Textfunktion über [`crate::etb::system_audit_tx`]
 //! (D5). Degradiert wird nichts: scheitert ein Eintrag, scheitert der Import, und der
@@ -31,8 +32,8 @@ use sqlx::SqliteConnection;
 
 use super::katalog::{self, KatalogIds};
 use super::stammdaten::{stammdaten_importieren_tx, StammdatenErgebnis};
-use super::szenario::{self, DokumentVorlage, Katalogeintrag, Punkt, Schritt, Vorgang};
-use super::{DemoBericht, DemoVorgang};
+use super::szenario::{DokumentVorlage, Katalogeintrag, Punkt, Schritt, Vorgang};
+use super::{DemoBericht, DemoLage, DemoVorgang};
 use crate::error::AppError;
 use crate::katalog::StatusKategorie;
 
@@ -51,7 +52,7 @@ fn schrittzeit(jetzt: NaiveDateTime, vor_min: i64) -> String {
     crate::zeit::formatiere(jetzt - chrono::Duration::minutes(vor_min))
 }
 
-/// Spielt das Demo-Szenario für `org_id` ein. `admin_id` wird Einsatzleitung und steht als
+/// Spielt die Demo-Lage `lage` für `org_id` ein. `admin_id` wird Einsatzleitung und steht als
 /// Erfasser an jedem ETB-Eintrag; `jetzt` ist der Importzeitpunkt (UTC), von dem aus alle
 /// Schrittzeiten rückwärts gerechnet werden. Die Funktion committet nicht.
 ///
@@ -62,14 +63,16 @@ fn schrittzeit(jetzt: NaiveDateTime, vor_min: i64) -> String {
 /// Fehler, jeweils **bevor** etwas geschrieben ist:
 /// - `admin_id` gehört nicht zu `org_id` → `Internal`: der Einsatz fiele sonst in die Org
 ///   des Admins, Kopf und Stammdaten in `org_id`.
-/// - aktiver Import der Org → `Conflict` (409, D3).
+/// - aktiver Import derselben Lage in der Org → `Conflict` (409, D3; je Lage seit LLH-1576).
 /// - fehlender oder deaktivierter Katalogeintrag → `UnprocessableEntity` (422) mit Namen.
 pub async fn importieren_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     admin_id: i64,
+    lage: DemoLage,
     jetzt: NaiveDateTime,
 ) -> Result<ImportErgebnis, AppError> {
+    let sz = lage.szenario();
     let admin_org: Option<i64> = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE id = ?")
         .bind(admin_id)
         .fetch_optional(&mut *conn)
@@ -80,30 +83,32 @@ pub async fn importieren_tx(
         )));
     }
 
-    // 1. Ein aktiver Import je Org. Der partielle UNIQUE-Index hält das Rennen, diese
+    // 1. Ein aktiver Import je Org und Lage. Der partielle UNIQUE-Index hält das Rennen, diese
     //    Prüfung liefert die Meldung.
-    let aktiv: Option<i64> =
-        sqlx::query_scalar("SELECT id FROM demo_import WHERE org_id = ? AND entfernt_at IS NULL")
-            .bind(org_id)
-            .fetch_optional(&mut *conn)
-            .await?;
+    let aktiv: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM demo_import WHERE org_id = ? AND szenario = ? AND entfernt_at IS NULL",
+    )
+    .bind(org_id)
+    .bind(lage.as_str())
+    .fetch_optional(&mut *conn)
+    .await?;
     if aktiv.is_some() {
         return Err(AppError::Conflict(
-            "Für diese Organisation sind bereits Demo-Daten importiert.".into(),
+            "Diese Demo-Lage ist für die Organisation bereits importiert.".into(),
         ));
     }
 
     // 2. Den ganzen Katalogbedarf auflösen, bevor geschrieben wird.
-    let kataloge = katalog::aufloesen_tx(conn, org_id, &szenario::katalog_bedarf()).await?;
+    let kataloge = katalog::aufloesen_tx(conn, org_id, &sz.katalog_bedarf()).await?;
 
     // 3. Der Einsatz über den Betriebsweg: Einsatznummer, ID-Sperre (D6), Admin als
     //    Einsatzleitung.
-    let begonnen_at = schrittzeit(jetzt, szenario::BEGINN_VOR_MIN);
+    let begonnen_at = schrittzeit(jetzt, sz.beginn_vor_min);
     let einsatz_id = crate::einsatz::repo::anlegen_tx(
         conn,
         &crate::einsatz::repo::NeuerEinsatzDaten {
-            bezeichnung: szenario::EINSATZ_BEZEICHNUNG,
-            stichwort: Some(szenario::EINSATZ_STICHWORT),
+            bezeichnung: sz.einsatz_bezeichnung,
+            stichwort: Some(sz.einsatz_stichwort),
             einsatzart: Some(crate::einsatz::EINSATZART_UEBUNG),
             begonnen_at: Some(&begonnen_at),
             ort: Default::default(),
@@ -123,31 +128,35 @@ pub async fn importieren_tx(
         je_art: Vec::new(),
     };
     let import_id: i64 = sqlx::query_scalar(
-        "INSERT INTO demo_import (org_id, einsatz_id, importiert_von, importiert_at, bericht) \
-         VALUES (?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO demo_import (org_id, einsatz_id, importiert_von, importiert_at, bericht, \
+            szenario) \
+         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(einsatz_id)
     .bind(admin_id)
     .bind(&importiert_at)
     .bind(bericht_json(&vorlaeufig)?)
+    .bind(lage.as_str())
     .fetch_one(&mut *conn)
     .await?;
 
     // 5. Stammdaten (D8).
-    let stamm = stammdaten_importieren_tx(conn, org_id, import_id).await?;
+    let stamm = stammdaten_importieren_tx(conn, org_id, import_id, sz).await?;
 
     // 5a. Schichtmodell (LLH-1122): hat der Demo-Einsatz bei der Anlage keine Vorgabe der
     //     Organisation bekommen, wird das Szenario-Modell seine Vorgabe (eine Kopie wie bei der
-    //     Anlage). Eine vorhandene Org-Vorgabe bleibt die des Demo-Einsatzes.
-    if crate::schichtmodell::repo::load_einsatz_tx(conn, einsatz_id)
-        .await?
-        .is_none()
-    {
-        let werte =
-            crate::schichtmodell::repo::load_werte_tx(conn, org_id, stamm.schichtmodell).await?;
-        crate::schichtmodell::repo::set_einsatz_tx(conn, einsatz_id, Some(&werte), admin_id)
-            .await?;
+    //     Anlage). Eine vorhandene Org-Vorgabe bleibt die des Demo-Einsatzes. Eine Lage ohne
+    //     Modell (Stadtfest) lässt den Einsatz, wie die Anlage ihn gesetzt hat.
+    if let Some(modell) = stamm.schichtmodell {
+        if crate::schichtmodell::repo::load_einsatz_tx(conn, einsatz_id)
+            .await?
+            .is_none()
+        {
+            let werte = crate::schichtmodell::repo::load_werte_tx(conn, org_id, modell).await?;
+            crate::schichtmodell::repo::set_einsatz_tx(conn, einsatz_id, Some(&werte), admin_id)
+                .await?;
+        }
     }
 
     // 6. Das Drehbuch in Zeitfolge. Die Einstellungen von Einsatz und Org werden einmal auf
@@ -175,13 +184,15 @@ pub async fn importieren_tx(
         personal: BTreeMap::new(),
         material: BTreeMap::new(),
         uhs: BTreeMap::new(),
+        plaetze: BTreeMap::new(),
+        personen: BTreeMap::new(),
         bezirke: BTreeMap::new(),
         stellen: BTreeMap::new(),
         auftraege: BTreeMap::new(),
         erinnerungen: BTreeMap::new(),
     };
     let mut letzte_etb_id = 0;
-    for schritt in szenario::DREHBUCH {
+    for schritt in sz.drehbuch {
         let zeit = schrittzeit(jetzt, schritt.vor_min);
         ablauf.schritt(conn, schritt, &zeit).await?;
         letzte_etb_id = uhr_stellen(conn, einsatz_id, letzte_etb_id, &zeit).await?;
@@ -291,6 +302,10 @@ struct Ablauf<'a> {
     material: BTreeMap<&'static str, i64>,
     /// UHS-ID je Schlüssel.
     uhs: BTreeMap<&'static str, i64>,
+    /// Platz-ID je UHS-Schlüssel und Platzbezeichnung (LLH-1576).
+    plaetze: BTreeMap<(&'static str, &'static str), i64>,
+    /// Personen-ID und Registriernummer je Schlüssel (LLH-1576, für den Verbleib).
+    personen: BTreeMap<&'static str, (i64, i64)>,
     /// Evakuierungsbezirk-ID je Schlüssel.
     bezirke: BTreeMap<&'static str, i64>,
     /// Betreuungsstellen-ID je Schlüssel.
@@ -387,6 +402,127 @@ impl Ablauf<'_> {
             }
         }
         Ok(())
+    }
+
+    /// Verbleib wie `routes/einsatz_person.rs::verbleib` (LLH-1576): dieselben Paarungsregeln
+    /// (422 als `Internal`, das Drehbuch wäre falsch), das Ereignis mit der Schrittzeit, der
+    /// Auto-Austritt aus der UHS bei Transport, Entlassung und Notunterkunft und der System-Eintrag
+    /// ohne die Angaben aus LLH-1568. Ein Eigentransport nennt den Funkrufnamen des Fahrzeugs.
+    ///
+    /// Nachtrag D9: Der Austritt schreibt seine Zeit im Repo mit `datetime('now')`; der Zweig
+    /// stellt genau das Austritts-Ereignis dieses Schritts auf die Schrittzeit, sonst läge jeder
+    /// Aufenthalt in der UHS bis zum Import.
+    async fn verbleib(
+        &mut self,
+        conn: &mut SqliteConnection,
+        v: &super::szenario::VerbleibVorlage,
+        zeit: &str,
+    ) -> Result<(), AppError> {
+        use crate::person::VerbleibArt;
+        use crate::routes::einsatz_person::{
+            pruefe_fahrer_angabe, pruefe_verbleib_angaben, VerbleibAngaben,
+        };
+        let drehbuch =
+            |e: AppError| AppError::Internal(format!("Demo-Drehbuch: Verbleib {}: {e}", v.person));
+        let (person_id, reg) = frueher(&self.personen, "Person", v.person)?;
+        let ef_id = match v.fahrzeug {
+            Some(f) => Some(frueher(&self.fahrzeuge, "Fahrzeug", f)?),
+            None => None,
+        };
+        pruefe_fahrer_angabe(v.art, v.status, v.durch, ef_id).map_err(drehbuch)?;
+        pruefe_verbleib_angaben(
+            v.art,
+            v.status,
+            v.durch,
+            &VerbleibAngaben {
+                einsatznummer: v.einsatznummer.map(str::to_string),
+                entlassen_an: v.entlassen_an,
+                gegen_rat: v.gegen_rat,
+                unterschrift: v.unterschrift,
+            },
+        )
+        .map_err(drehbuch)?;
+        let transportmittel = match ef_id {
+            Some(ef_id) => Some(
+                crate::fahrzeug::disposition_repo::load_anzeige_tx(
+                    conn,
+                    self.einsatz_id,
+                    ef_id,
+                    true,
+                )
+                .await?
+                .funkrufname,
+            ),
+            None => v.transportmittel.map(str::to_string),
+        };
+        let erfasst = crate::person::verbleib_repo::erfassen_tx(
+            conn,
+            self.einsatz_id,
+            person_id,
+            crate::person::verbleib_repo::VerbleibDaten {
+                art: v.art.as_str(),
+                transportmittel: transportmittel.as_deref(),
+                ziel: v.ziel,
+                status: v.status.map(|s| s.as_str()),
+                zeitpunkt_at: Some(zeit),
+                transport_durch: v.durch.map(|d| d.as_str()),
+                einsatz_fahrzeug_id: ef_id,
+                leitstelle_einsatznummer: v.einsatznummer,
+                entlassen_an: v.entlassen_an,
+                gegen_rat: v.gegen_rat,
+                unterschrift: v.unterschrift,
+                ..Default::default()
+            },
+            self.admin_id,
+        )
+        .await?;
+        if !erfasst.gewinnt {
+            return Err(AppError::Internal(format!(
+                "Demo-Drehbuch: Verbleib {} ist nicht der jüngste",
+                v.person
+            )));
+        }
+        // Reihenfolge wie die Route: Ereignis, Austritt samt eigenem ETB-Eintrag, dann der
+        // Eintrag des Verbleibs. Das Drehbuch kennt keinen nachgereichten Verbleib und keinen
+        // späteren Zugang, die übrigen Bedingungen der Route entfallen.
+        if matches!(
+            v.art,
+            VerbleibArt::Transport | VerbleibArt::Entlassung | VerbleibArt::Notunterkunft
+        ) {
+            let merker: i64 = sqlx::query_scalar(
+                "SELECT COALESCE(MAX(id), 0) FROM person_uhs_belegung WHERE einsatz_id = ?",
+            )
+            .bind(self.einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            let ausgetreten = crate::uhs::auto_austritt_tx(
+                conn,
+                self.einsatz_id,
+                person_id,
+                &format!("durch Verbleib {}", v.art.as_str()),
+                self.admin_id,
+                self.startwert,
+            )
+            .await?;
+            if ausgetreten.is_some() {
+                sqlx::query(
+                    "UPDATE person_uhs_belegung SET zeitpunkt_at = ? \
+                     WHERE einsatz_id = ? AND person_id = ? AND art = 'austritt' AND id > ?",
+                )
+                .bind(zeit)
+                .bind(self.einsatz_id)
+                .bind(person_id)
+                .bind(merker)
+                .execute(&mut *conn)
+                .await?;
+            }
+        }
+        let text = format!(
+            "Person {}: {}",
+            crate::person::registrier_anzeige(reg),
+            crate::person::verbleib_etb_sachverhalt(v.art, v.status, v.durch)
+        );
+        self.system_etb(conn, &text).await
     }
 
     /// Ein Schritt: der Vorgang wie im Handler, samt seinem System-ETB-Eintrag. Ein neuer
@@ -877,7 +1013,7 @@ impl Ablauf<'_> {
                 )
                 .await?;
                 for platz in v.plaetze {
-                    crate::uhs::platz_repo::anlegen_tx(
+                    let angelegt = crate::uhs::platz_repo::anlegen_tx(
                         conn,
                         uhs.id,
                         &crate::uhs::platz_repo::NeuerPlatz {
@@ -888,6 +1024,8 @@ impl Ablauf<'_> {
                         },
                     )
                     .await?;
+                    self.plaetze
+                        .insert((v.schluessel, platz.bezeichnung), angelegt.id);
                 }
                 // Wie `routes/einsatz_uhs.rs::status_wechsel`: Übergang prüfen, setzen, ETB.
                 if !crate::uhs::darf_uebergehen(uhs.status.as_str(), "aktiv") {
@@ -945,10 +1083,23 @@ impl Ablauf<'_> {
             }
             Vorgang::Person(v) => {
                 // Wie `routes/einsatz_person.rs::anlegen` mit Status `erfasst`: Anlage,
-                // Erst-Sichtung (hebt auf `betroffen`) und UHS-Eintritt in die Inbox, je mit
-                // System-ETB.
+                // Erst-Sichtung (hebt auf `betroffen`), Anlass und UHS-Eintritt in die Inbox oder
+                // auf einen Platz, je mit System-ETB. Erfassungs-, Sichtungs-, Anlass- und
+                // Eintrittszeit sind die Schrittzeit (LLH-1576: Kontakte über den Abend).
                 let uhs_id = match v.uhs {
                     Some(k) => Some(frueher(&self.uhs, "UHS", k)?),
+                    None => None,
+                };
+                let platz_id = match (v.uhs, v.platz) {
+                    (Some(u), Some(p)) => {
+                        Some(self.plaetze.get(&(u, p)).copied().ok_or_else(|| {
+                            AppError::Internal(format!("Demo-Drehbuch: Platz {p:?} in {u:?} fehlt"))
+                        })?)
+                    }
+                    _ => None,
+                };
+                let versorgende_einheit_id = match v.einheit {
+                    Some(k) => Some(frueher(&self.einheiten, "Einheit", k)?.0),
                     None => None,
                 };
                 let (person_id, reg, war_neu) = crate::person::repo::anlegen_tx_mit_optionen(
@@ -957,7 +1108,7 @@ impl Ablauf<'_> {
                     self.admin_id,
                     crate::person::PersonStatus::Erfasst.as_str(),
                     None,
-                    None,
+                    Some(zeit),
                     crate::person::repo::NeueDaten {
                         name: Some(v.name),
                         vorname: Some(v.vorname),
@@ -972,7 +1123,7 @@ impl Ablauf<'_> {
                         antreff_lat: v.antreff.map(|(_, lat)| lat),
                         antreff_lon: v.antreff.map(|(lon, _)| lon),
                         vermisst_seit: None,
-                        versorgende_einheit_id: None,
+                        versorgende_einheit_id,
                         meldung_id: None,
                     },
                 )
@@ -981,6 +1132,9 @@ impl Ablauf<'_> {
                     return Err(AppError::Internal(
                         "Demo-Import: Person ohne client_id nicht neu angelegt".into(),
                     ));
+                }
+                if let Some(k) = v.schluessel {
+                    self.personen.insert(k, (person_id, reg));
                 }
                 self.system_etb(conn, &crate::person::etb_text_erfasst(reg))
                     .await?;
@@ -991,6 +1145,7 @@ impl Ablauf<'_> {
                         person_id,
                         &crate::person::sichtung_repo::NeueSichtung {
                             kategorie: kategorie.as_str(),
+                            gesichtet_at: Some(zeit),
                             ..Default::default()
                         },
                         self.admin_id,
@@ -1000,16 +1155,31 @@ impl Ablauf<'_> {
                     self.system_etb(conn, &crate::person::etb_text_sichtung(reg, kategorie))
                         .await?;
                 }
+                // Der Anlass steht nie im ETB (Kategorie Behandlung, LLH-1566).
+                if v.anlass.is_some() {
+                    crate::person::anlass_repo::erfassen_tx(
+                        conn,
+                        self.einsatz_id,
+                        person_id,
+                        &crate::person::anlass_repo::NeuerAnlass {
+                            anlass: v.anlass,
+                            zeitpunkt_at: zeit,
+                            client_id: None,
+                        },
+                        self.admin_id,
+                    )
+                    .await?;
+                }
                 if let Some(uhs_id) = uhs_id {
                     crate::uhs::belegung_repo::eintritt_tx(
                         conn,
                         self.einsatz_id,
                         person_id,
                         uhs_id,
-                        None,
+                        platz_id,
                         None,
                         self.admin_id,
-                        None,
+                        Some(zeit),
                     )
                     .await?;
                     let uhs = crate::uhs::repo::laden_tx(conn, self.einsatz_id, uhs_id).await?;
@@ -1021,6 +1191,7 @@ impl Ablauf<'_> {
                 }
                 Ok(())
             }
+            Vorgang::Verbleib(v) => self.verbleib(conn, &v, zeit).await,
             Vorgang::Bezirk(v) => {
                 let abschnitt = frueher(&self.abschnitte, "Abschnitt", v.abschnitt)?;
                 let geschrieben = crate::betreuung::repo::bezirk_anlegen_tx(

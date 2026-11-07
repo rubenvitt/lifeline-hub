@@ -174,16 +174,20 @@ function apiVon(quelle: Page | APIRequestContext): APIRequestContext {
   return 'goto' in quelle ? quelle.request : quelle;
 }
 
-/** Der Übungseinsatz aus `POST /api/demo-daten` (eingespielt in `vorbereitung.ts`). */
+/** Der Übungseinsatz aus `POST /api/demo-daten/starkregen` (eingespielt in `vorbereitung.ts`). */
 export async function demoEinsatz(quelle: Page | APIRequestContext): Promise<DemoEinsatz> {
   const antwort = await apiVon(quelle).get('/api/demo-daten');
   expect(antwort.ok(), `Demo-Daten: ${antwort.status()}`).toBe(true);
   const status = (await antwort.json()) as {
-    importiert: boolean;
-    import?: { einsatz_id: number; einsatz_bezeichnung: string; importiert_at: string };
+    lagen: {
+      lage: string;
+      importiert: boolean;
+      import?: { einsatz_id: number; einsatz_bezeichnung: string; importiert_at: string };
+    }[];
   };
-  expect(status.importiert && status.import, 'Demo-Daten nicht eingespielt').toBeTruthy();
-  const kopf = status.import!;
+  const lage = status.lagen.find((l) => l.lage === 'starkregen');
+  expect(lage?.importiert && lage.import, 'Demo-Daten nicht eingespielt').toBeTruthy();
+  const kopf = lage!.import!;
   return {
     id: kopf.einsatz_id,
     bezeichnung: kopf.einsatz_bezeichnung,

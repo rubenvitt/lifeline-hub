@@ -362,7 +362,14 @@ test.describe('Seitenleiste der Verwaltung', () => {
         (url) => url.pathname === '/api/demo-daten',
         (route) =>
           route.request().method() === 'GET'
-            ? route.fulfill({ json: { importiert: false } })
+            ? route.fulfill({
+                json: {
+                  lagen: [
+                    { lage: 'starkregen', importiert: false },
+                    { lage: 'stadtfest', importiert: false },
+                  ],
+                },
+              })
             : route.fallback(),
       );
       await anmeldenAlsAdmin(page);

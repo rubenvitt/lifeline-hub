@@ -59,7 +59,14 @@ for (const modus of ['light', 'dark'] as const) {
         (url) => url.pathname === '/api/demo-daten',
         (route) =>
           route.request().method() === 'GET'
-            ? route.fulfill({ json: { importiert: false } })
+            ? route.fulfill({
+                json: {
+                  lagen: [
+                    { lage: 'starkregen', importiert: false },
+                    { lage: 'stadtfest', importiert: false },
+                  ],
+                },
+              })
             : route.fallback(),
       );
       await anmelden(page);
