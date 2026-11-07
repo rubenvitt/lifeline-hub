@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   MINUTE_MS,
   STUNDE_MS,
+  KANTE_PX,
+  griffAn,
+  griffKanten,
   jetztUndNaechstes,
   markenSchritt,
   pruefeZug,
@@ -130,6 +133,25 @@ describe('raster (LLH-1554)', () => {
       expect(
         pruefeZug(schieben, { zeile: 'einheit:2', von: min(30), bis: min(90) }, ZEILEN, bloecke),
       ).toBe('ueberschneidung');
+    });
+
+    it('eine Kante am Fensterrand ist kein Griff, die echte Kante bleibt einer', () => {
+      const spanne = { von: min(0), bis: min(360) };
+      // Beginnt vor der Spanne: links nur verschieben, rechts die echte Kante.
+      const frueh = griffKanten({ von: min(-120), bis: min(60) }, spanne, 200);
+      expect(frueh).toEqual({ anfang: false, ende: true });
+      expect(griffAn(2, 200, frueh)).toBe('verschieben');
+      expect(griffAn(198, 200, frueh)).toBe('ende');
+      // Endet nach der Spanne: rechts nur verschieben.
+      const spaet = griffKanten({ von: min(300), bis: min(480) }, spanne, 200);
+      expect(spaet).toEqual({ anfang: true, ende: false });
+      expect(griffAn(2, 200, spaet)).toBe('anfang');
+      expect(griffAn(198, 200, spaet)).toBe('verschieben');
+      // Zu schmal für Griffe.
+      expect(griffKanten({ von: min(0), bis: min(10) }, spanne, 3 * KANTE_PX)).toEqual({
+        anfang: false,
+        ende: false,
+      });
     });
 
     it('in der Pause dürfen Blöcke übereinander liegen', () => {

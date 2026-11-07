@@ -13,6 +13,9 @@ import {
 import { monoStil, useRollen } from '../../components/instrument';
 import { statusFlaeche, type StatusTon } from '../../components/instrument/statusFlaeche';
 import {
+  griffAn,
+  griffKanten,
+  KANTE_PX,
   markenSchritt,
   pruefeZug,
   pxJeStunde,
@@ -29,6 +32,8 @@ import {
   type ZugPruefung,
   type ZugStand,
 } from './raster';
+
+const KEINE_KANTEN = { anfang: false, ende: false } as const;
 
 /**
  * Das Raster des Schichtplans (LLH-1554, Konzept LLH-1523 Abschnitt 6): Zeilen = Posten,
@@ -78,7 +83,6 @@ const TITEL_BREITE = 168;
 /** Unter dieser Stundenbreite rollt das Raster waagerecht (5 min = 4 px). */
 const MINDEST_JE_STUNDE = 48;
 /** Kantenbreite zum Ziehen der Dauer. */
-const KANTE_PX = 8;
 /** Ab so vielen Pixeln Weg wird aus einem Druck ein Zug. */
 const ZUG_SCHWELLE_PX = 4;
 /** Marken näher am Rand stehen bündig. */
@@ -364,36 +368,40 @@ export default function SchichtplanRaster({
                     backgroundPositionX: x(Math.ceil(spanne.von / STUNDE_MS) * STUNDE_MS),
                   }}
                 >
-                  {eigene.map((b) => (
-                    <BlockKachel
-                      key={b.id}
-                      block={b}
-                      zeileTitel={z.titel}
-                      links={x(Math.max(b.von, spanne.von))}
-                      breite={Math.max(
-                        2,
-                        x(Math.min(b.bis, spanne.bis)) - x(Math.max(b.von, spanne.von)),
-                      )}
-                      hoehe={zeilenHoehe}
-                      laeuft={jetzt != null && b.von <= jetzt && jetzt < b.bis}
-                      gezogen={gezogenerBlock === b.id}
-                      darfSchreiben={darfSchreiben}
-                      personenZiel={personenZiel}
-                      formatZeit={formatZeit}
-                      onDruck={(e, art) => {
-                        const zeit = zeitAmZeiger(e.clientX);
-                        const zug: Zug =
-                          art === 'verschieben'
-                            ? { art, blockId: b.id, von: b.von, bis: b.bis, griff: zeit - b.von }
-                            : { art, blockId: b.id, zeile: b.zeile, von: b.von, bis: b.bis };
-                        starte(e, zug, b.zeile);
-                      }}
-                      onKlick={() => {
-                        if (klickSchlucken.current) return;
-                        onOeffnen(b.id);
-                      }}
-                    />
-                  ))}
+                  {eigene.map((b) => {
+                    const breite = Math.max(
+                      2,
+                      x(Math.min(b.bis, spanne.bis)) - x(Math.max(b.von, spanne.von)),
+                    );
+                    return (
+                      <BlockKachel
+                        key={b.id}
+                        block={b}
+                        zeileTitel={z.titel}
+                        links={x(Math.max(b.von, spanne.von))}
+                        breite={breite}
+                        kanten={darfSchreiben ? griffKanten(b, spanne, breite) : KEINE_KANTEN}
+                        hoehe={zeilenHoehe}
+                        laeuft={jetzt != null && b.von <= jetzt && jetzt < b.bis}
+                        gezogen={gezogenerBlock === b.id}
+                        darfSchreiben={darfSchreiben}
+                        personenZiel={personenZiel}
+                        formatZeit={formatZeit}
+                        onDruck={(e, art) => {
+                          const zeit = zeitAmZeiger(e.clientX);
+                          const zug: Zug =
+                            art === 'verschieben'
+                              ? { art, blockId: b.id, von: b.von, bis: b.bis, griff: zeit - b.von }
+                              : { art, blockId: b.id, zeile: b.zeile, von: b.von, bis: b.bis };
+                          starte(e, zug, b.zeile);
+                        }}
+                        onKlick={() => {
+                          if (klickSchlucken.current) return;
+                          onOeffnen(b.id);
+                        }}
+                      />
+                    );
+                  })}
                   {schatten && schatten.stand.zeile === z.schluessel && (
                     <div
                       data-lfh="schichtplan-schatten"
@@ -454,6 +462,8 @@ interface BlockKachelProps {
   block: RasterBlock;
   zeileTitel: string;
   links: number;
+  /** Kanten mit Griff; eine Kante außerhalb der Spanne ist der Fensterrand und hat keinen. */
+  kanten: { anfang: boolean; ende: boolean };
   breite: number;
   hoehe: number;
   laeuft: boolean;
@@ -475,6 +485,7 @@ function BlockKachel({
   block,
   zeileTitel,
   links,
+  kanten,
   breite,
   hoehe,
   laeuft,
@@ -495,7 +506,6 @@ function BlockKachel({
     disabled: !personenZiel,
   });
   const ton = statusFlaeche(rollen, AMPEL_TON[block.ampel]);
-  const kanten = darfSchreiben && breite > 3 * KANTE_PX;
   return (
     <button
       ref={setNodeRef}
@@ -509,14 +519,7 @@ function BlockKachel({
       onClick={onKlick}
       onPointerDown={(e) => {
         const rand = e.currentTarget.getBoundingClientRect();
-        const versatz = e.clientX - rand.left;
-        const art =
-          kanten && versatz < KANTE_PX
-            ? 'anfang'
-            : kanten && versatz > rand.width - KANTE_PX
-              ? 'ende'
-              : 'verschieben';
-        onDruck(e, art);
+        onDruck(e, griffAn(e.clientX - rand.left, rand.width, kanten));
       }}
       style={{
         position: 'absolute',
@@ -561,12 +564,8 @@ function BlockKachel({
       >
         {block.text}
       </span>
-      {kanten && (
-        <>
-          <span aria-hidden="true" style={kanteStil('left')} />
-          <span aria-hidden="true" style={kanteStil('right')} />
-        </>
-      )}
+      {kanten.anfang && <span aria-hidden="true" style={kanteStil('left')} />}
+      {kanten.ende && <span aria-hidden="true" style={kanteStil('right')} />}
     </button>
   );
 }

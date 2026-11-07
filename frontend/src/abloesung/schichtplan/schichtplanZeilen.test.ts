@@ -134,6 +134,15 @@ describe('schichtplanZeilen (LLH-1554)', () => {
         ampel: 'ohne-soll',
         wort: 'Pause',
       });
+      // Wer in der Pause und zugleich am Posten steht, ist auch in der Pause doppelt verplant.
+      expect(
+        ampelVon(
+          block({
+            posten: { art: 'pause', aufgeloest: false },
+            personen: [person({ name: 'A', befunde: [{ art: 'doppelt' }] })],
+          }),
+        ),
+      ).toEqual({ ampel: 'befund', wort: 'doppelt verplant' });
     });
 
     it('nennt Lücke und Befunde in Worten', () => {

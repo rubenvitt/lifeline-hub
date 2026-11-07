@@ -86,6 +86,30 @@ export type Zug =
   /** Eine Kante ziehen. */
   | { art: 'anfang' | 'ende'; blockId: number; zeile: string; von: number; bis: number };
 
+/** Breite eines Kantengriffs in Pixeln. */
+export const KANTE_PX = 8;
+
+/** Welche Kanten eines Blocks Griffe tragen: nur echte Kanten in der Spanne, nur mit Platz. */
+export function griffKanten(
+  block: { von: number; bis: number },
+  spanne: Spanne,
+  breitePx: number,
+): { anfang: boolean; ende: boolean } {
+  const platz = breitePx > 3 * KANTE_PX;
+  return { anfang: platz && block.von >= spanne.von, ende: platz && block.bis <= spanne.bis };
+}
+
+/** Was ein Druck an der Stelle `versatzPx` im Block fasst. */
+export function griffAn(
+  versatzPx: number,
+  breitePx: number,
+  kanten: { anfang: boolean; ende: boolean },
+): 'anfang' | 'ende' | 'verschieben' {
+  if (kanten.anfang && versatzPx < KANTE_PX) return 'anfang';
+  if (kanten.ende && versatzPx > breitePx - KANTE_PX) return 'ende';
+  return 'verschieben';
+}
+
 export interface ZugStand {
   zeile: string;
   von: number;

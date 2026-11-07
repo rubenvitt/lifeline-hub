@@ -132,13 +132,13 @@ export function befundWort(art: SchichtplanBefund['art']): string {
 }
 
 /**
- * Ampel mit Wort: ein Befund geht vor der Lücke, die Lücke vor „besetzt“. Die Pause und ein Block
- * ohne Soll haben keine Ampel, nur das Wort.
+ * Ampel mit Wort: ein Befund geht vor der Lücke, die Lücke vor „besetzt“. Die Pause ohne Befund und
+ * ein Block ohne Soll haben keine Ampel, nur das Wort.
  */
 export function ampelVon(block: SchichtplanBlock): { ampel: Ampel; wort: string } {
-  if (block.posten.art === 'pause') return { ampel: 'ohne-soll', wort: 'Pause' };
   const arten = befundArten(block);
   if (arten.length > 0) return { ampel: 'befund', wort: befundWort(arten[0]) };
+  if (block.posten.art === 'pause') return { ampel: 'ohne-soll', wort: 'Pause' };
   if (block.offene_plaetze > 0) return { ampel: 'luecke', wort: `${block.offene_plaetze} offen` };
   if (block.soll_anzahl == null)
     return { ampel: 'ohne-soll', wort: block.personen_anzahl > 0 ? 'ohne Soll' : 'unbesetzt' };
