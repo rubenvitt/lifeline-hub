@@ -13027,4 +13027,66 @@ mod tests {
             .await
             .expect_err("unterschrift nur Katalog");
     }
+
+    /// LLH-1576: Bestand wird zur Lage „starkregen“; je Organisation und Lage höchstens ein
+    /// aktiver Kopf, zwei Lagen nebeneinander sind erlaubt, eine fremde Lage nimmt der CHECK nicht.
+    #[tokio::test]
+    async fn migration_0290_demo_import_szenario() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 290;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, _b) = bild_grundlage(&pool).await;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO demo_import (org_id, einsatz_id, bericht) VALUES (1, ?, '{}') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let lage: String = sqlx::query_scalar("SELECT szenario FROM demo_import WHERE id = ?")
+            .bind(alt)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(lage, "starkregen", "Bestand ist die Starkregen-Lage");
+
+        let kopf = |lage: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO demo_import (org_id, einsatz_id, bericht, szenario) \
+                     VALUES (1, 999, '{}', ?)",
+                )
+                .bind(lage)
+                .execute(&pool)
+                .await
+            }
+        };
+        kopf("stadtfest")
+            .await
+            .expect("zweite Lage neben der ersten");
+        kopf("stadtfest")
+            .await
+            .expect_err("dieselbe Lage nur einmal aktiv");
+        kopf("starkregen")
+            .await
+            .expect_err("Bestand bleibt der aktive Starkregen-Kopf");
+        kopf("hochwasser").await.expect_err("nur bekannte Lagen");
+
+        sqlx::query("UPDATE demo_import SET entfernt_at = datetime('now') WHERE id = ?")
+            .bind(alt)
+            .execute(&pool)
+            .await
+            .unwrap();
+        kopf("starkregen")
+            .await
+            .expect("nach dem Entfernen wieder frei");
+    }
 }

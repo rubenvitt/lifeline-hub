@@ -1840,12 +1840,12 @@ export interface components {
              */
             mitbenutzt: number;
         };
-        /** @description Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte. */
+        /**
+         * @description Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte: je Lage ein
+         *     Eintrag, immer alle Lagen in der Reihenfolge von [`DemoLage::ALLE`].
+         */
         DemoDatenStatus: {
-            bericht?: components["schemas"]["DemoBericht"] | null;
-            import?: components["schemas"]["DemoImportKopf"] | null;
-            /** @description Ob für die Organisation ein aktiver Import besteht. */
-            importiert: boolean;
+            lagen: components["schemas"]["DemoLageStatus"][];
         };
         /** @description Kopf eines aktiven Imports. */
         DemoImportKopf: {
@@ -1856,6 +1856,20 @@ export interface components {
             id: number;
             /** @description UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             importiert_at: string;
+        };
+        /**
+         * @description Eine Demo-Lage (LLH-1576, design.md D1). Wire == `as_str()` == `demo_import.szenario`
+         *     (CHECK in `migrations/0290_demo_import_szenario.sql`) == Pfadsegment der Routen.
+         * @enum {string}
+         */
+        DemoLage: "starkregen" | "stadtfest";
+        /** @description Stand einer Lage. */
+        DemoLageStatus: {
+            bericht?: components["schemas"]["DemoBericht"] | null;
+            import?: components["schemas"]["DemoImportKopf"] | null;
+            /** @description Ob für die Organisation ein aktiver Import dieser Lage besteht. */
+            importiert: boolean;
+            lage: components["schemas"]["DemoLage"];
         };
         /**
          * @description Stammdatenart im Bericht. Wire == `as_str()`.

@@ -1313,6 +1313,11 @@ fn demo_bericht_enums_wire() {
         EinheitVorlage => "einheit_vorlage",
         Schichtmodell => "schichtmodell",
     });
+    // LLH-1576: Die Lage steht im Pfad und als `szenario` am Import-Kopf (CHECK in 0290).
+    enum_wire!(lifeline_hub::demo::DemoLage {
+        Starkregen => "starkregen",
+        Stadtfest => "stadtfest",
+    } in lifeline_hub::demo::DemoLage::ALLE);
 }
 
 #[test]

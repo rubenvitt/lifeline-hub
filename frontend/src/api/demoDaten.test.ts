@@ -10,7 +10,12 @@ import {
 } from './demoDaten';
 import type { DemoDatenStatus } from './types';
 
-const NIE: DemoDatenStatus = { importiert: false };
+const NIE: DemoDatenStatus = {
+  lagen: [
+    { lage: 'starkregen', importiert: false },
+    { lage: 'stadtfest', importiert: false },
+  ],
+};
 
 describe('api/demoDaten (LFH-690)', () => {
   it('der Default-Handler ist der echte Serverzustand ohne Freischaltung: 404', async () => {
@@ -22,7 +27,7 @@ describe('api/demoDaten (LFH-690)', () => {
     expect((fehler as ApiError).status).toBe(404);
   });
 
-  it('die vier Vorgänge treffen Methode und Pfad aus D3', async () => {
+  it('die Vorgänge treffen Methode und Pfad je Lage (LLH-1576)', async () => {
     const gesehen: string[] = [];
     const merke = ({ request }: { request: Request }) => {
       gesehen.push(`${request.method} ${new URL(request.url).pathname}`);
@@ -30,29 +35,29 @@ describe('api/demoDaten (LFH-690)', () => {
     };
     server.use(
       http.get('/api/demo-daten', merke),
-      http.post('/api/demo-daten', merke),
-      http.post('/api/demo-daten/neu', merke),
-      http.delete('/api/demo-daten', merke),
+      http.post('/api/demo-daten/:lage', merke),
+      http.post('/api/demo-daten/:lage/neu', merke),
+      http.delete('/api/demo-daten/:lage', merke),
     );
     await ladeDemoDatenStatus();
-    await importiereDemoDaten();
-    await importiereDemoDatenNeu();
-    await entferneDemoDaten();
+    await importiereDemoDaten('stadtfest');
+    await importiereDemoDatenNeu('stadtfest');
+    await entferneDemoDaten('starkregen');
     expect(gesehen).toEqual([
       'GET /api/demo-daten',
-      'POST /api/demo-daten',
-      'POST /api/demo-daten/neu',
-      'DELETE /api/demo-daten',
+      'POST /api/demo-daten/stadtfest',
+      'POST /api/demo-daten/stadtfest/neu',
+      'DELETE /api/demo-daten/starkregen',
     ]);
   });
 
   it('reicht einen 409 als ApiError mit Servertext durch', async () => {
     server.use(
-      http.post('/api/demo-daten', () =>
+      http.post('/api/demo-daten/starkregen', () =>
         HttpResponse.json({ error: 'Demo-Daten sind bereits importiert' }, { status: 409 }),
       ),
     );
-    const fehler = await importiereDemoDaten().catch((e: unknown) => e);
+    const fehler = await importiereDemoDaten('starkregen').catch((e: unknown) => e);
     expect(fehler).toBeInstanceOf(ApiError);
     expect((fehler as ApiError).status).toBe(409);
     expect((fehler as ApiError).message).toBe('Demo-Daten sind bereits importiert');

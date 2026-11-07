@@ -20,7 +20,7 @@
 
 use sqlx::SqliteConnection;
 
-use super::{DemoBericht, DemoBerichtZeile, DemoStammdatenArt, DemoVorgang};
+use super::{DemoBericht, DemoBerichtZeile, DemoLage, DemoStammdatenArt, DemoVorgang};
 use crate::error::AppError;
 
 /// Wie eine Stammdatenart gelöscht wird. Alle Statements sind feste Literale je Tabelle, ohne
@@ -109,9 +109,10 @@ enum Ausgang {
     NichtVorhanden,
 }
 
-/// Entfernt die Demo-Daten der Organisation und liefert den Bericht.
+/// Entfernt die Demo-Lage `lage` der Organisation und liefert den Bericht.
 ///
-/// 1. Aktiven Kopf der Org laden, sonst `Conflict` (409).
+/// 1. Aktiven Kopf der Org und Lage laden, sonst `Conflict` (409). Die andere Lage bleibt
+///    unberührt (LLH-1576): ihr Kopf, ihr Einsatz und ihre Marken hängen an einem anderen Kopf.
 /// 2. Den Einsatz des Kopfes löschen; die Kaskade räumt alles darunter, auch einen
 ///    soft-gelöschten oder geschwärzten Demo-Einsatz.
 /// 3. Je markierter Stammdatenzeile `SAVEPOINT` → `DELETE` → `RELEASE`; bei einem
@@ -123,15 +124,18 @@ enum Ausgang {
 pub async fn entfernen_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
+    lage: DemoLage,
 ) -> Result<DemoBericht, AppError> {
     let (kopf_id, einsatz_id): (i64, i64) = sqlx::query_as(
-        "SELECT id, einsatz_id FROM demo_import WHERE org_id = ? AND entfernt_at IS NULL",
+        "SELECT id, einsatz_id FROM demo_import \
+         WHERE org_id = ? AND szenario = ? AND entfernt_at IS NULL",
     )
     .bind(org_id)
+    .bind(lage.as_str())
     .fetch_optional(&mut *conn)
     .await?
     .ok_or_else(|| {
-        AppError::Conflict("Für diese Organisation sind keine Demo-Daten importiert.".into())
+        AppError::Conflict("Diese Demo-Lage ist für die Organisation nicht importiert.".into())
     })?;
 
     // Der Savepoint erkennt „noch verwiesen“ nur, wenn die Verbindung Fremdschlüssel sofort

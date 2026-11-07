@@ -13,9 +13,12 @@ use tower::ServiceExt;
 /// Alle Demo-Endpunkte als `(Methode, Pfad)`.
 const ENDPUNKTE: &[(&str, &str)] = &[
     ("GET", "/api/demo-daten"),
-    ("POST", "/api/demo-daten"),
-    ("DELETE", "/api/demo-daten"),
-    ("POST", "/api/demo-daten/neu"),
+    ("POST", "/api/demo-daten/starkregen"),
+    ("DELETE", "/api/demo-daten/starkregen"),
+    ("POST", "/api/demo-daten/starkregen/neu"),
+    ("POST", "/api/demo-daten/stadtfest"),
+    ("DELETE", "/api/demo-daten/stadtfest"),
+    ("POST", "/api/demo-daten/stadtfest/neu"),
 ];
 
 /// Ein garantiert nicht registrierter `/api/`-Pfad als Vergleichsmaßstab.
@@ -142,10 +145,18 @@ async fn mit_freischaltung_admin_status_nicht_importiert() {
 
     let (status, v) = common::anfrage(&app, "GET", "/api/demo-daten", &admin, None).await;
     assert_eq!(status, StatusCode::OK, "{v}");
-    assert_eq!(v["importiert"], Value::Bool(false));
-    let o = v.as_object().expect("Objekt");
-    assert!(!o.contains_key("import"), "import muss ABSENT sein: {v}");
-    assert!(!o.contains_key("bericht"), "bericht muss ABSENT sein: {v}");
+    let lagen: Vec<&Value> = v["lagen"].as_array().expect("lagen").iter().collect();
+    assert_eq!(
+        lagen.iter().map(|l| l["lage"].clone()).collect::<Vec<_>>(),
+        ["starkregen", "stadtfest"],
+        "beide Lagen in fester Reihenfolge"
+    );
+    for l in lagen {
+        assert_eq!(l["importiert"], Value::Bool(false));
+        let o = l.as_object().expect("Objekt");
+        assert!(!o.contains_key("import"), "import muss ABSENT sein: {v}");
+        assert!(!o.contains_key("bericht"), "bericht muss ABSENT sein: {v}");
+    }
 }
 
 /// Mit Freischaltung: die schreibenden Endpunkte tragen die echten Codes. Ohne aktiven Import
@@ -161,21 +172,37 @@ async fn mit_freischaltung_schreibende_endpunkte_tragen_die_codes_aus_d3() {
     .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, v) = common::anfrage(&app, "DELETE", "/api/demo-daten", &admin, None).await;
+    let (status, v) =
+        common::anfrage(&app, "DELETE", "/api/demo-daten/starkregen", &admin, None).await;
     assert_eq!(status, StatusCode::CONFLICT, "DELETE ohne Import: {v}");
     assert!(v["error"].is_string(), "{v}");
 
-    let (status, v) = common::anfrage(&app, "POST", "/api/demo-daten", &admin, None).await;
+    let (status, v) =
+        common::anfrage(&app, "POST", "/api/demo-daten/starkregen", &admin, None).await;
     assert_eq!(status, StatusCode::CREATED, "POST: {v}");
-    assert_eq!(v["importiert"], Value::Bool(true), "{v}");
+    assert_eq!(
+        lage(&v, "starkregen")["importiert"],
+        Value::Bool(true),
+        "{v}"
+    );
 
-    let (status, v) = common::anfrage(&app, "POST", "/api/demo-daten/neu", &admin, None).await;
+    let (status, v) =
+        common::anfrage(&app, "POST", "/api/demo-daten/starkregen/neu", &admin, None).await;
     assert_eq!(status, StatusCode::OK, "POST /neu: {v}");
-    assert_eq!(v["importiert"], Value::Bool(true), "{v}");
+    assert_eq!(
+        lage(&v, "starkregen")["importiert"],
+        Value::Bool(true),
+        "{v}"
+    );
 
-    let (status, v) = common::anfrage(&app, "DELETE", "/api/demo-daten", &admin, None).await;
+    let (status, v) =
+        common::anfrage(&app, "DELETE", "/api/demo-daten/starkregen", &admin, None).await;
     assert_eq!(status, StatusCode::OK, "DELETE: {v}");
-    assert_eq!(v["importiert"], Value::Bool(false), "{v}");
+    assert_eq!(
+        lage(&v, "starkregen")["importiert"],
+        Value::Bool(false),
+        "{v}"
+    );
 }
 
 /// `build_router` ist die Vorgabe „aus“: ohne Optionen gibt es keinen Demo-Pfad.
@@ -200,9 +227,15 @@ async fn demo_importieren(pool: &sqlx::SqlitePool) -> (i64, chrono::NaiveDateTim
             .unwrap();
     let jetzt = chrono::Utc::now().naive_utc();
     let mut tx = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
-    let erg = lifeline_hub::demo::import::importieren_tx(&mut tx, org, admin_id, jetzt)
-        .await
-        .expect("importieren");
+    let erg = lifeline_hub::demo::import::importieren_tx(
+        &mut tx,
+        org,
+        admin_id,
+        lifeline_hub::demo::DemoLage::Starkregen,
+        jetzt,
+    )
+    .await
+    .expect("importieren");
     tx.commit().await.unwrap();
     (erg.einsatz_id, jetzt)
 }
@@ -386,9 +419,26 @@ const AN: RouterOptionen = RouterOptionen {
     heic_decoder_verzeichnis: None,
 };
 
-/// Einen Demo-Endpunkt aufrufen; liefert `(Status, Body)`.
+/// Einen Demo-Endpunkt aufrufen; liefert `(Status, Body)`. Ein Status (`{lagen}`) kommt als
+/// Eintrag der Starkregen-Lage zurück, die diese Tests treiben (LLH-1576); ein Fehler als
+/// `{error}`-Envelope.
 async fn demo(app: &axum::Router, cookie: &str, methode: &str, pfad: &str) -> (StatusCode, Value) {
-    common::anfrage(app, methode, pfad, cookie, None).await
+    let (status, v) = common::anfrage(app, methode, pfad, cookie, None).await;
+    if v.get("lagen").is_some() {
+        (status, lage(&v, "starkregen").clone())
+    } else {
+        (status, v)
+    }
+}
+
+/// Der Eintrag einer Lage im Status `{lagen: [...]}`.
+fn lage<'a>(status: &'a Value, lage: &str) -> &'a Value {
+    status["lagen"]
+        .as_array()
+        .unwrap_or_else(|| panic!("kein Status: {status}"))
+        .iter()
+        .find(|l| l["lage"] == lage)
+        .unwrap_or_else(|| panic!("Lage {lage} fehlt: {status}"))
 }
 
 /// Der Status über GET. Jede Schreibantwort muss ihm gleichen: sie trägt den neuen Stand, damit
@@ -450,9 +500,12 @@ async fn status_vorher_nachher_und_409_paare() {
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
 
     let vorher = status_lesen(&app, &admin).await;
-    assert_eq!(vorher, serde_json::json!({ "importiert": false }));
+    assert_eq!(
+        vorher,
+        serde_json::json!({ "lage": "starkregen", "importiert": false })
+    );
 
-    let (status, importiert) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (status, importiert) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CREATED, "{importiert}");
     assert_eq!(importiert, status_lesen(&app, &admin).await);
     assert_eq!(importiert["importiert"], true);
@@ -475,12 +528,12 @@ async fn status_vorher_nachher_und_409_paare() {
     }
 
     // Zweiter Import: 409, und der Stand bleibt.
-    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CONFLICT, "{v}");
     assert!(v["error"].is_string(), "{v}");
     assert_eq!(status_lesen(&app, &admin).await, importiert);
 
-    let (status, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    let (status, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::OK, "{entfernt}");
     assert_eq!(entfernt, status_lesen(&app, &admin).await);
     assert_eq!(entfernt["importiert"], false);
@@ -496,7 +549,7 @@ async fn status_vorher_nachher_und_409_paare() {
     assert!(!einsatz_existiert(&pool, e).await);
 
     // Zweites Entfernen: 409, und der Bericht des Entfernens bleibt stehen.
-    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CONFLICT, "{v}");
     assert!(v["error"].is_string(), "{v}");
     assert_eq!(status_lesen(&app, &admin).await, entfernt);
@@ -511,11 +564,11 @@ async fn import_entfernen_import_meldet_dieselben_zahlen() {
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
     let org = org_von(&pool, "admin").await;
 
-    let (s1, erster) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (s1, erster) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(s1, StatusCode::CREATED, "{erster}");
-    let (s2, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    let (s2, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(s2, StatusCode::OK, "{entfernt}");
-    let (s3, zweiter) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (s3, zweiter) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(s3, StatusCode::CREATED, "{zweiter}");
 
     assert_eq!(zweiter["bericht"]["vorgang"], "importiert");
@@ -535,11 +588,11 @@ async fn neu_import_ersetzt_den_einsatz_und_sendet_lagged() {
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
     let org = org_von(&pool, "admin").await;
 
-    let (_, erster) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (_, erster) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     let alt = einsatz_id(&erster);
     let mut rx = live.abonniere(alt);
 
-    let (status, neu) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    let (status, neu) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen/neu").await;
     assert_eq!(status, StatusCode::OK, "{neu}");
     assert_eq!(neu, status_lesen(&app, &admin).await);
     assert_eq!(neu["importiert"], true);
@@ -568,12 +621,109 @@ async fn neu_import_ohne_aktiven_import_importiert() {
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
     let org = org_von(&pool, "admin").await;
 
-    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen/neu").await;
     assert_eq!(status, StatusCode::OK, "{v}");
     assert_eq!(v, status_lesen(&app, &admin).await);
     assert_eq!(v["importiert"], true);
     assert!(einsatz_existiert(&pool, einsatz_id(&v)).await);
     assert_eq!(aktive_koepfe(&pool, org).await, 1);
+}
+
+/// LLH-1576: Eine unbekannte Lage im Pfad ist 404, bei jeder schreibenden Methode, und ändert
+/// nichts.
+#[tokio::test]
+async fn unbekannte_lage_ist_404() {
+    let (app, pool) = common::setup_mit_optionen(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+
+    for (methode, pfad) in [
+        ("POST", "/api/demo-daten/erdbeben"),
+        ("DELETE", "/api/demo-daten/erdbeben"),
+        ("POST", "/api/demo-daten/erdbeben/neu"),
+        ("POST", "/api/demo-daten/Stadtfest"),
+    ] {
+        let (status, v) = common::anfrage(&app, methode, pfad, &admin, None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{methode} {pfad}: {v}");
+    }
+    assert_eq!(aktive_koepfe(&pool, org).await, 0);
+}
+
+/// LLH-1576: Beide Lagen stehen nebeneinander. Jede eigene Lage hat ihren eigenen Einsatz und
+/// ihr eigenes 409, „Neu importieren“ und „Entfernen“ der einen lassen die andere stehen.
+#[tokio::test]
+async fn beide_lagen_nebeneinander_ueber_http() {
+    let (app, pool) = common::setup_mit_optionen(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+
+    let (s, regen) =
+        common::anfrage(&app, "POST", "/api/demo-daten/starkregen", &admin, None).await;
+    assert_eq!(s, StatusCode::CREATED, "{regen}");
+    let (s, fest) = common::anfrage(&app, "POST", "/api/demo-daten/stadtfest", &admin, None).await;
+    assert_eq!(s, StatusCode::CREATED, "{fest}");
+    assert_eq!(fest, status_lesen_roh(&app, &admin).await);
+    assert_eq!(aktive_koepfe(&pool, org).await, 2);
+
+    let e_regen = einsatz_id(lage(&fest, "starkregen"));
+    let e_fest = einsatz_id(lage(&fest, "stadtfest"));
+    assert_ne!(e_regen, e_fest);
+    assert_eq!(
+        lage(&fest, "stadtfest")["import"]["einsatz_bezeichnung"],
+        "ÜBUNG – Sanitätsdienst Stadtfest Musterstadt"
+    );
+    assert_eq!(lage(&fest, "stadtfest")["bericht"]["vorgang"], "importiert");
+    // Jede Lage trägt ihren eigenen Bericht: das Stadtfest legt zwei Fahrzeuge an, der
+    // Starkregen mehr.
+    let fahrzeuge = |l: &Value| {
+        l["bericht"]["je_art"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["art"] == "fahrzeug")
+            .map(|a| a["angelegt"].clone())
+            .unwrap()
+    };
+    assert_eq!(fahrzeuge(lage(&fest, "stadtfest")), 2);
+    assert_eq!(
+        fahrzeuge(lage(&fest, "starkregen")),
+        fahrzeuge(lage(&regen, "starkregen"))
+    );
+    assert_ne!(fahrzeuge(lage(&fest, "starkregen")), 2);
+
+    let (s, v) = common::anfrage(&app, "POST", "/api/demo-daten/stadtfest", &admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+
+    // Neu importieren der Stadtfest-Lage lässt den Starkregen-Einsatz stehen.
+    let (s, neu) =
+        common::anfrage(&app, "POST", "/api/demo-daten/stadtfest/neu", &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{neu}");
+    assert_eq!(einsatz_id(lage(&neu, "starkregen")), e_regen);
+    assert!(einsatz_id(lage(&neu, "stadtfest")) > e_fest);
+    assert!(!einsatz_existiert(&pool, e_fest).await);
+    assert!(einsatz_existiert(&pool, e_regen).await);
+
+    // Entfernen trifft nur die eigene Lage.
+    let (s, weg) = common::anfrage(&app, "DELETE", "/api/demo-daten/stadtfest", &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{weg}");
+    assert_eq!(lage(&weg, "stadtfest")["importiert"], false);
+    assert_eq!(lage(&weg, "stadtfest")["bericht"]["vorgang"], "entfernt");
+    assert_eq!(lage(&weg, "starkregen")["importiert"], true);
+    assert!(einsatz_existiert(&pool, e_regen).await);
+    assert_eq!(aktive_koepfe(&pool, org).await, 1);
+
+    let (s, v) = common::anfrage(&app, "DELETE", "/api/demo-daten/stadtfest", &admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let (s, v) = common::anfrage(&app, "DELETE", "/api/demo-daten/starkregen", &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(aktive_koepfe(&pool, org).await, 0);
+}
+
+/// Der ganze Status über GET, mit allen Lagen.
+async fn status_lesen_roh(app: &axum::Router, cookie: &str) -> Value {
+    let (status, v) = common::anfrage(app, "GET", "/api/demo-daten", cookie, None).await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    v
 }
 
 /// Alle Zeilen einer Tabelle, jede als Text aus `quote()` aller Spalten, in `rowid`-Folge.
@@ -654,7 +804,7 @@ async fn neu_import_mit_importfehler_laesst_den_alten_stand_stehen() {
     let (app, pool, live) = common::setup_mit_optionen_und_live(AN).await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
 
-    let (_, erster) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (_, erster) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     let alt = einsatz_id(&erster);
     let mut rx = live.abonniere(alt);
 
@@ -667,7 +817,7 @@ async fn neu_import_mit_importfehler_laesst_den_alten_stand_stehen() {
     .unwrap();
     let vorher = demo_stand(&pool).await;
 
-    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen/neu").await;
     // Der Trigger-Abbruch ist kein fachlicher Fall, sondern ein unerwarteter DB-Fehler: 500 mit
     // Envelope. Tragend ist der unveränderte Stand darunter.
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{v}");
@@ -689,7 +839,7 @@ async fn neu_import_mit_importfehler_laesst_den_alten_stand_stehen() {
         .execute(&pool)
         .await
         .unwrap();
-    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen/neu").await;
     assert_eq!(status, StatusCode::OK, "Gegenprobe ohne Trigger: {v}");
     assert!(!einsatz_existiert(&pool, alt).await);
 }
@@ -780,18 +930,18 @@ async fn zwei_organisationen_bleiben_getrennt() {
     let (org_b, admin_b) = zweite_org_mit_admin(&app, &pool).await;
     assert_ne!(org_a, org_b);
 
-    let (status, a) = demo(&app, &admin_a, "POST", "/api/demo-daten").await;
+    let (status, a) = demo(&app, &admin_a, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CREATED, "{a}");
     assert_eq!(
         status_lesen(&app, &admin_b).await,
-        serde_json::json!({ "importiert": false }),
+        serde_json::json!({ "lage": "starkregen", "importiert": false }),
         "B sieht den Import von A nicht"
     );
     // B hat nichts zu entfernen, auch wenn A importiert hat.
-    let (status, v) = demo(&app, &admin_b, "DELETE", "/api/demo-daten").await;
+    let (status, v) = demo(&app, &admin_b, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CONFLICT, "{v}");
 
-    let (status, b) = demo(&app, &admin_b, "POST", "/api/demo-daten").await;
+    let (status, b) = demo(&app, &admin_b, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(
         status,
         StatusCode::CREATED,
@@ -841,7 +991,7 @@ async fn zwei_organisationen_bleiben_getrennt() {
 
     let mut rx_a = live.abonniere(e_a);
     let mut rx_b = live.abonniere(e_b);
-    let (status, v) = demo(&app, &admin_b, "DELETE", "/api/demo-daten").await;
+    let (status, v) = demo(&app, &admin_b, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::OK, "{v}");
     assert_eq!(v["importiert"], false);
     assert!(!einsatz_existiert(&pool, e_b).await);
@@ -873,12 +1023,12 @@ async fn entfernen_sendet_lagged_an_den_kanal_des_demo_einsatzes() {
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
     let nachbar = common::einsatz_anlegen(&app, &admin).await;
 
-    let (_, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (_, v) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     let e = einsatz_id(&v);
     let mut rx = live.abonniere(e);
     let mut rx_nachbar = live.abonniere(nachbar);
 
-    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::OK, "{v}");
 
     let n = naechste(&mut rx).await.expect("lagged nach dem Entfernen");
@@ -947,7 +1097,7 @@ async fn import_neuimport_und_entfernen_melden_liste_und_stammdaten() {
     let fremd = org_abonnent(&pool, "fremdfk").await;
     let mut rx = live.abonniere_org();
 
-    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CREATED, "{v}");
     assert_eq!(
         org_erreicht(&mut rx, &[&a, &m, &fremd]),
@@ -961,7 +1111,7 @@ async fn import_neuimport_und_entfernen_melden_liste_und_stammdaten() {
 
     common::rolle_setzen(&app, &admin, einsatz_id(&v), mitglied_id, "beobachter").await;
     org_erreicht(&mut rx, &[]);
-    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen/neu").await;
     assert_eq!(status, StatusCode::OK, "{v}");
     assert_eq!(
         org_erreicht(&mut rx, &[&a, &m, &fremd]),
@@ -975,7 +1125,7 @@ async fn import_neuimport_und_entfernen_melden_liste_und_stammdaten() {
 
     common::rolle_setzen(&app, &admin, einsatz_id(&v), mitglied_id, "beobachter").await;
     org_erreicht(&mut rx, &[]);
-    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::OK, "{v}");
     assert_eq!(
         org_erreicht(&mut rx, &[&a, &m, &fremd]),
@@ -994,7 +1144,7 @@ async fn abgelehntes_entfernen_meldet_nichts() {
     let (app, _pool, live) = common::setup_mit_optionen_und_live(AN).await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
     let mut rx = live.abonniere_org();
-    let (status, _) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    let (status, _) = demo(&app, &admin, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert!(rx.try_recv().is_err());
 }
@@ -1007,7 +1157,7 @@ async fn echter_einsatz_nach_dem_entfernen_hat_eine_groessere_id() {
     let (app, pool) = common::setup_mit_optionen(AN).await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
 
-    let (_, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (_, v) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     let demo_id = einsatz_id(&v);
     let hoechste: i64 = sqlx::query_scalar("SELECT MAX(id) FROM einsatz")
         .fetch_one(&pool)
@@ -1018,7 +1168,7 @@ async fn echter_einsatz_nach_dem_entfernen_hat_eine_groessere_id() {
         "Vorbedingung: Demo-Einsatz ist der jüngste"
     );
 
-    let (status, _) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    let (status, _) = demo(&app, &admin, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::OK);
     let echt = common::einsatz_anlegen(&app, &admin).await;
     assert!(
@@ -1175,7 +1325,7 @@ async fn import_entfernen_stellt_den_stand_wieder_her() {
         vorher.len()
     );
 
-    let (status, importiert) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let (status, importiert) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CREATED, "{importiert}");
     for zeile in importiert["bericht"]["je_art"].as_array().unwrap() {
         assert_eq!(
@@ -1183,7 +1333,7 @@ async fn import_entfernen_stellt_den_stand_wieder_her() {
             "je Art genau die eine freie Zeile: {zeile}"
         );
     }
-    let (status, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    let (status, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::OK, "{entfernt}");
     for zeile in entfernt["bericht"]["je_art"].as_array().unwrap() {
         assert_eq!(zeile["behalten"], 0, "{zeile}");
@@ -1227,18 +1377,18 @@ async fn messen(app: &axum::Router, admin: &str) -> (f64, f64) {
     let mut import = Vec::new();
     for _ in 0..MESSLAEUFE {
         let t = std::time::Instant::now();
-        let (status, v) = demo(app, admin, "POST", "/api/demo-daten").await;
+        let (status, v) = demo(app, admin, "POST", "/api/demo-daten/starkregen").await;
         import.push(t.elapsed());
         assert_eq!(status, StatusCode::CREATED, "{v}");
-        let (status, v) = demo(app, admin, "DELETE", "/api/demo-daten").await;
+        let (status, v) = demo(app, admin, "DELETE", "/api/demo-daten/starkregen").await;
         assert_eq!(status, StatusCode::OK, "{v}");
     }
-    let (status, v) = demo(app, admin, "POST", "/api/demo-daten").await;
+    let (status, v) = demo(app, admin, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CREATED, "{v}");
     let mut neu = Vec::new();
     for _ in 0..MESSLAEUFE {
         let t = std::time::Instant::now();
-        let (status, v) = demo(app, admin, "POST", "/api/demo-daten/neu").await;
+        let (status, v) = demo(app, admin, "POST", "/api/demo-daten/starkregen/neu").await;
         neu.push(t.elapsed());
         assert_eq!(status, StatusCode::OK, "{v}");
     }

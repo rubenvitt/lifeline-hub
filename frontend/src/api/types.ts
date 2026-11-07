@@ -102,9 +102,12 @@ export type DatentraegerStatus = S['DatentraegerStatus'];
 export type DatentraegerOrt = S['DatentraegerOrt'];
 
 // ============================== Demo-Daten ==============================
-/** Stand der Demo-Daten der eigenen Organisation, die eine Antwort aller vier Endpunkte.
- *  `import` fehlt ohne aktiven Import, `bericht` fehlt, solange nie importiert wurde. */
+/** Stand der Demo-Daten der eigenen Organisation, die eine Antwort aller Endpunkte: je Lage ein
+ *  Eintrag (LLH-1576). `import` fehlt ohne aktiven Import der Lage, `bericht` fehlt, solange sie
+ *  nie importiert wurde. */
 export type DemoDatenStatus = S['DemoDatenStatus'];
+export type DemoLage = S['DemoLage'];
+export type DemoLageStatus = S['DemoLageStatus'];
 export type DemoBerichtZeile = S['DemoBerichtZeile'];
 export type DemoStammdatenArt = S['DemoStammdatenArt'];
 export type DemoVorgang = S['DemoVorgang'];

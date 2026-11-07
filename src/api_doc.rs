@@ -115,6 +115,8 @@ use utoipa::OpenApi;
         crate::demo::DemoBerichtZeile,
         crate::demo::DemoDatenStatus,
         crate::demo::DemoImportKopf,
+        crate::demo::DemoLage,
+        crate::demo::DemoLageStatus,
         crate::demo::DemoStammdatenArt,
         crate::demo::DemoVorgang,
         crate::dokument::DokumentAnzeige,

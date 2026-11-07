@@ -190,7 +190,7 @@ function EinsaetzeInhalt() {
 
   /**
    * Hinweis auf die Demo-Daten (LFH-690, design.md D13): nur für den System-Admin, nur bei
-   * Freischaltung (Status 200) und nur, solange für die Organisation nichts importiert ist. Ein 404
+   * Freischaltung (Status 200) und nur, solange für die Organisation keine Lage importiert ist (LLH-1576). Ein 404
    * ist kein Fehlerbild.
    *
    * Nicht im Leerzustand: der ist aktionslos und rechnet je Benutzer, „nicht importiert" ist eine
@@ -207,7 +207,7 @@ function EinsaetzeInhalt() {
   const demoPfad = adminDemoDatenPfad();
   const zuDenDemoDaten = useLinkClickHandler<HTMLElement>(demoPfad);
   const demoHinweis =
-    demo.freigeschaltet && demo.status?.importiert === false ? (
+    demo.freigeschaltet && demo.status?.lagen.every((l) => !l.importiert) === true ? (
       <Alert
         type="info"
         showIcon

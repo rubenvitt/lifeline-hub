@@ -4492,36 +4492,16 @@
       },
       "DemoDatenStatus": {
         "type": "object",
-        "description": "Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte.",
+        "description": "Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte: je Lage ein\nEintrag, immer alle Lagen in der Reihenfolge von [`DemoLage::ALLE`].",
         "required": [
-          "importiert"
+          "lagen"
         ],
         "properties": {
-          "bericht": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/DemoBericht",
-                "description": "Bericht des letzten Vorgangs (Import oder Entfernen); fehlt, wenn es keinen gab."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "import": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/DemoImportKopf",
-                "description": "Der aktive Import; fehlt, wenn keiner besteht."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "importiert": {
-            "type": "boolean",
-            "description": "Ob für die Organisation ein aktiver Import besteht."
+          "lagen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoLageStatus"
+            }
           }
         }
       },
@@ -4549,6 +4529,53 @@
           "importiert_at": {
             "type": "string",
             "description": "UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          }
+        }
+      },
+      "DemoLage": {
+        "type": "string",
+        "description": "Eine Demo-Lage (LLH-1576, design.md D1). Wire == `as_str()` == `demo_import.szenario`\n(CHECK in `migrations/0290_demo_import_szenario.sql`) == Pfadsegment der Routen.",
+        "enum": [
+          "starkregen",
+          "stadtfest"
+        ]
+      },
+      "DemoLageStatus": {
+        "type": "object",
+        "description": "Stand einer Lage.",
+        "required": [
+          "lage",
+          "importiert"
+        ],
+        "properties": {
+          "bericht": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DemoBericht",
+                "description": "Bericht des letzten Vorgangs (Import oder Entfernen) dieser Lage; fehlt, wenn es keinen\ngab."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "import": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DemoImportKopf",
+                "description": "Der aktive Import; fehlt, wenn keiner besteht."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "importiert": {
+            "type": "boolean",
+            "description": "Ob für die Organisation ein aktiver Import dieser Lage besteht."
+          },
+          "lage": {
+            "$ref": "#/components/schemas/DemoLage"
           }
         }
       },

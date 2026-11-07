@@ -2873,6 +2873,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Mengenbericht des letzten Demo-Vorgangs (JSON mit Zählern je Stammdatenart, \
                  kein Personenbezug)",
             ),
+            retain(
+                "szenario",
+                "Welche Demo-Lage der Kopf trägt (LLH-1576, fester Katalogwert), kein \
+                 Personenbezug",
+            ),
         ],
     },
     // ---------- Löschprotokoll der endgültigen Löschung (LFH-750) ----------
