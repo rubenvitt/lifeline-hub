@@ -1032,6 +1032,7 @@ async fn ueberblick_zeigt_evakuiert_und_keinen_pegel() {
         e.pegel_festgelegt,
         e.evakuierung_angeordnet,
         e.nachforderungen_gewaehlt,
+        e.sanitaetsdienst_gewaehlt,
     );
     assert_eq!(
         kennzahlen,

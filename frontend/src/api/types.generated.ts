@@ -4188,7 +4188,7 @@ export interface components {
          *     Reihenfolge der Ausgabe von [`ableiten`].
          * @enum {string}
          */
-        Lagekennzahl: "pegel" | "evakuiert" | "nachforderungen";
+        Lagekennzahl: "pegel" | "evakuiert" | "nachforderungen" | "sanitaetsdienst";
         /** @description Antwort der Wahl: die gespeicherten gewählten Lagekennzahlen. */
         LagekennzahlWahl: {
             gewaehlt: components["schemas"]["Lagekennzahl"][];
@@ -4221,6 +4221,7 @@ export interface components {
              *     [`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen.
              */
             programm: components["schemas"]["Programmpunkt"][];
+            sanitaetsdienst?: components["schemas"]["LagemonitorSanitaetsdienst"] | null;
             /**
              * Format: int64
              * @description Sofortmeldungen, die noch unbestätigt und nicht erledigt sind; nur die Zahl.
@@ -4278,6 +4279,7 @@ export interface components {
             einsatzart: components["schemas"]["Einsatzart"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
             lagemeldung: components["schemas"]["LagemonitorLagemeldung"] | null;
+            sanitaetsdienst?: components["schemas"]["LagemonitorSanitaetsdienst"] | null;
             /**
              * Format: int64
              * @description Unbestätigte, nicht erledigte Sofortmeldungen; nur die Zahl.
@@ -4311,6 +4313,34 @@ export interface components {
             /** @description Freigabe des Lageberichts (UTC, SQLite-Format). */
             freigegeben_at: string;
             text: string;
+        };
+        /**
+         * @description Hilfeleistungen in Zahlen für die Reihe „Sanitätsdienst“ (LLH-1574, design.md D6): dieselben
+         *     Regeln wie die Kennzahlen des Lagebilds (`pages/lage-dashboard/lagebild.ts`). Nur Zahlen.
+         */
+        LagemonitorSanitaetsdienst: {
+            /**
+             * Format: int64
+             * @description Angetroffene, die noch nicht abgeschlossen sind (offen oder unterwegs).
+             */
+            in_versorgung: number;
+            /**
+             * Format: int64
+             * @description Kontakte: alle Personen außer Vermissten, Abgeschlossene eingeschlossen
+             *     (`anlassbild().gesamt` im Client).
+             */
+            kontakte: number;
+            /**
+             * Format: int64
+             * @description Kontakte, die in den letzten 60 Minuten erfasst wurden.
+             */
+            kontakte_letzte_stunde: number;
+            /**
+             * Format: int64
+             * @description Transporte wie im Einsatzbericht (`transportBilanz().transportiert`): Verbleib Transport,
+             *     nicht nur angemeldet.
+             */
+            transporte: number;
         };
         /** @description Eine nicht aufgelöste UHS mit ihrer Belegung als Zahl. */
         LagemonitorUhs: {

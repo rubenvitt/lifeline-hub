@@ -178,6 +178,17 @@ export function uhrzeit(wert: Zeitwert, konv: AnzeigeKonventionen): string {
   return nurUhrzeit(d, darstellung(konv));
 }
 
+/**
+ * Rolle „Stunde“: die volle Stunde der Anzeigezone, zweistellig (`14`), für die Achse eines
+ * Stundenverlaufs (Paneel „Verlauf“, LLH-1574). In beiden Darstellungen gleich: eine Stunde allein
+ * hat keinen Doppelpunkt.
+ */
+export function stunde(wert: Zeitwert, konv: AnzeigeKonventionen): string {
+  const d = wanduhr(wert, konv);
+  if (!d) return '';
+  return d.format('HH');
+}
+
 /** `HH:MM` am Anfang einer Wanduhrzeit vom Server (`src/uhrzeit.rs`). */
 const WANDUHRZEIT = /^(\d{2}):(\d{2})/;
 

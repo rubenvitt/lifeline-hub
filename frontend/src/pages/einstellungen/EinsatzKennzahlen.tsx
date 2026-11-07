@@ -12,12 +12,24 @@ import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 
 /** Die wählbaren Lagekennzahlen — gespiegelt zu `Lagekennzahl::ist_waehlbar` im Backend. */
-const WAEHLBAR: readonly Lagekennzahl[] = ['nachforderungen'];
+const WAEHLBAR: readonly Lagekennzahl[] = ['nachforderungen', 'sanitaetsdienst'];
+
+/** Die Wahl mit `kennzahl` an oder aus, die übrigen bleiben. */
+function umgeschaltet(
+  gewaehlt: readonly Lagekennzahl[],
+  kennzahl: Lagekennzahl,
+  an: boolean,
+): Lagekennzahl[] {
+  const ohne = gewaehlt.filter((k) => k !== kennzahl);
+  return an ? [...ohne, kennzahl] : ohne;
+}
 
 /**
  * Sektion `…/einstellungen/kennzahlen` — die Wahl der Lagekennzahlen im Kennzahlenband des
- * Lage-Dashboards (LLH-1371, Regel LFH-640: Lageplätze nur per Entscheidung am Einsatz). Heute
- * ein Schalter: „Nachforderungen offen" auf Platz 3, hinter einer angeordneten Evakuierung.
+ * Lage-Dashboards (LLH-1371, Regel LFH-640: Lageplätze nur per Entscheidung am Einsatz). Zwei
+ * Schalter: „Nachforderungen offen" auf Platz 3, hinter einer angeordneten Evakuierung, und die
+ * Reihe „Sanitätsdienst“ (LLH-1574), die alle sechs Plätze und die Gefahrenmatrix ersetzt; ein
+ * Einsatz mit Einsatzart Sanitätsdienst beginnt mit ihr.
  * Herleitung `/mnt/project-files/llh-1021/llh-1371/design.md` D3, D8.
  *
  * Gelesen wird die Wahl aus `EinsatzAnzeige.lagekennzahlen`, geschrieben über
@@ -49,8 +61,10 @@ export default function EinsatzKennzahlen() {
   const aktiv = daten.einsatz.lagekennzahlen;
   const gewaehlt = aktiv.filter((k) => WAEHLBAR.includes(k));
   const nachforderungen = gewaehlt.includes('nachforderungen');
+  const sanitaetsdienst = gewaehlt.includes('sanitaetsdienst');
   const darf = darfImEinsatzSchreiben(daten.einsatz);
   const feldId = 'lagekennzahl-nachforderungen';
+  const sanFeldId = 'lagekennzahl-sanitaetsdienst';
 
   return (
     <>
@@ -68,24 +82,36 @@ export default function EinsatzKennzahlen() {
               checked={nachforderungen}
               disabled={!darf}
               loading={waehlen.isPending}
-              onChange={(an) =>
-                waehlen.mutate(
-                  an
-                    ? [...gewaehlt.filter((k) => k !== 'nachforderungen'), 'nachforderungen']
-                    : gewaehlt.filter((k) => k !== 'nachforderungen'),
-                )
-              }
+              onChange={(an) => waehlen.mutate(umgeschaltet(gewaehlt, 'nachforderungen', an))}
             />
             <label htmlFor={feldId}>Nachforderungen offen auf Platz 3</label>
           </Flex>
           {/* Zustand, keine Bedienung (`frontend/AGENTS.md`, „Texte: zeigen statt erklären“): die
               Wahl ist gespeichert, wirkt aber gerade nicht. Erklärt wird im Kapitel
               `docs/anwender/kapitel/einsatz-einstellungen.md`. */}
-          {aktiv.includes('evakuiert') && (
+          {sanitaetsdienst && nachforderungen ? (
             <Typography.Text type="secondary">
-              Platz 3 zeigt „Evakuiert“, solange eine Evakuierung angeordnet ist.
+              Gilt nicht in der Reihe Sanitätsdienst.
             </Typography.Text>
+          ) : (
+            aktiv.includes('evakuiert') &&
+            !sanitaetsdienst && (
+              <Typography.Text type="secondary">
+                Platz 3 zeigt „Evakuiert“, solange eine Evakuierung angeordnet ist.
+              </Typography.Text>
+            )
           )}
+          <Flex align="center" gap={token.marginSM}>
+            <Switch
+              id={sanFeldId}
+              aria-label="Reihe Sanitätsdienst"
+              checked={sanitaetsdienst}
+              disabled={!darf}
+              loading={waehlen.isPending}
+              onChange={(an) => waehlen.mutate(umgeschaltet(gewaehlt, 'sanitaetsdienst', an))}
+            />
+            <label htmlFor={sanFeldId}>Reihe Sanitätsdienst</label>
+          </Flex>
         </Flex>
       </Formularpaneel>
     </>

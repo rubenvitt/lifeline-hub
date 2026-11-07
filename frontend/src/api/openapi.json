@@ -10374,7 +10374,8 @@
         "enum": [
           "pegel",
           "evakuiert",
-          "nachforderungen"
+          "nachforderungen",
+          "sanitaetsdienst"
         ]
       },
       "LagekennzahlWahl": {
@@ -10466,6 +10467,17 @@
               "$ref": "#/components/schemas/Programmpunkt"
             },
             "description": "Die nächsten anstehenden Programmpunkte der Veranstaltung (LLH-1570, höchstens\n[`crate::programmpunkt::MONITOR_ANZAHL`]), aufsteigend; verstrichene fehlen."
+          },
+          "sanitaetsdienst": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorSanitaetsdienst",
+                "description": "Hilfeleistungen in Zahlen, nur wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt ist\n(LLH-1574); dann zeigt der Monitor sie statt der Sichtungszeile."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sofortmeldungen_offen": {
             "type": "integer",
@@ -10598,6 +10610,17 @@
               }
             ]
           },
+          "sanitaetsdienst": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorSanitaetsdienst",
+                "description": "Hilfeleistungen in Zahlen, nur wenn am Einsatz die Reihe „Sanitätsdienst“ gewählt ist\n(LLH-1574). Neues optionales Feld, `api_version` bleibt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sofortmeldungen_offen": {
             "type": "integer",
             "format": "int64",
@@ -10703,6 +10726,38 @@
           },
           "text": {
             "type": "string"
+          }
+        }
+      },
+      "LagemonitorSanitaetsdienst": {
+        "type": "object",
+        "description": "Hilfeleistungen in Zahlen für die Reihe „Sanitätsdienst“ (LLH-1574, design.md D6): dieselben\nRegeln wie die Kennzahlen des Lagebilds (`pages/lage-dashboard/lagebild.ts`). Nur Zahlen.",
+        "required": [
+          "kontakte",
+          "kontakte_letzte_stunde",
+          "in_versorgung",
+          "transporte"
+        ],
+        "properties": {
+          "in_versorgung": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Angetroffene, die noch nicht abgeschlossen sind (offen oder unterwegs)."
+          },
+          "kontakte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kontakte: alle Personen außer Vermissten, Abgeschlossene eingeschlossen\n(`anlassbild().gesamt` im Client)."
+          },
+          "kontakte_letzte_stunde": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kontakte, die in den letzten 60 Minuten erfasst wurden."
+          },
+          "transporte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Transporte wie im Einsatzbericht (`transportBilanz().transportiert`): Verbleib Transport,\nnicht nur angemeldet."
           }
         }
       },

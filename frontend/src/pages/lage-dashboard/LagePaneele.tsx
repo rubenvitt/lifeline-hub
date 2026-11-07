@@ -1,6 +1,7 @@
 /**
  * Die drei Paneele des Lage-Dashboards: Gefahrenmatrix · Sichtung · Jüngste ETB-Einträge (im Code
- * „Meldungsstrom“). Rein darstellend
+ * „Meldungsstrom“); in der Reihe „Sanitätsdienst“ (LLH-1574) steht „Verlauf“ statt der
+ * Gefahrenmatrix. Rein darstellend
  * — Abfragen, Zustände und Wassermarke hält `LageDashboardPage.tsx`, die Ableitungen liegen in
  * `lageVerdichtung.ts` und `meldungsstrom.ts`.
  *
@@ -10,7 +11,9 @@
  */
 import type { EtbEintragAnzeige, Sichtungskategorie } from '../../api/types';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
+import { Tooltip } from 'antd';
 import {
+  DashboardPaneel,
   MatrixPaneel,
   StromPaneel,
   VerteilungsPaneel,
@@ -19,10 +22,22 @@ import {
   useRollen,
 } from '../../components/instrument';
 import type { LiveVerbindungsStatus } from '../../live/liveVerbindung';
-import { etbTyp, sichtung, warnstufeBalkenFarbe } from '../../theme/statusFarben';
+import {
+  anlassVerlaufFarbe,
+  etbTyp,
+  sichtung,
+  warnstufeBalkenFarbe,
+} from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
 import { warnstufeTon, type Quellzustand } from './lagebild';
+import {
+  VERLAUF_STUNDEN,
+  VERLAUF_TOENE,
+  VERLAUF_TON_WORT,
+  ablesung,
+  type Verlauf,
+} from './verlauf';
 import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';
 import BerichtigtMarke from '../../etb/BerichtigtMarke';
 import { modulName } from '../../einsatz/modulRegistry';
@@ -316,5 +331,177 @@ export function MeldungsstromPaneel({
         </Zeitachseneintrag>
       ))}
     </StromPaneel>
+  );
+}
+
+/** Höhe der Säulenfläche in px; fest, damit das Paneel beim Nachladen nicht springt. */
+const VERLAUF_HOEHE = 112;
+/** Kleinste Skala: drei Kontakte in einer Stunde dürfen nicht wie Spitzenlast aussehen. */
+const VERLAUF_MIN_SKALA = 4;
+/** Platz über der höchsten Säule für ihren Wert und die Fugen zwischen den Teilen. */
+const VERLAUF_KOPF = 24;
+
+/**
+ * Paneel „Verlauf“ im Lagebild Sanitätsdienst (LLH-1574, design.md D3): Kontakte je Stunde,
+ * gestapelt nach Anlass, statt der Gefahrenmatrix. Säulen als HTML (Fugenraster, Tooltip je
+ * Säule), die Farbe trägt der Anlass-Ton (`anlassVerlaufFarbe`), das Wort steht in Legende und
+ * Ablesung. Beschriftet ist nur die Spitze (Wert über der Säule) und jede Stunde darunter.
+ */
+export function VerlaufPaneel({
+  zustand,
+  verlauf,
+  onNeuladen,
+  onPersonen,
+  onAufnehmen,
+}: {
+  /** `gesperrt`: Modul Personen nicht freigegeben — Grund statt Fehler, kein Weg dorthin. */
+  zustand: Quellzustand;
+  verlauf: Verlauf;
+  onNeuladen: () => void;
+  onPersonen: () => void;
+  onAufnehmen: () => void;
+}) {
+  const { token, rollen } = useRollen();
+  const skala = Math.max(VERLAUF_MIN_SKALA, verlauf.spitze?.gesamt ?? 0);
+  const leer = zustand === 'daten' && verlauf.imFenster === 0 ? 'leer' : zustand;
+  return (
+    <DashboardPaneel
+      titel="Verlauf"
+      zustand={leer}
+      meta={zustand === 'daten' ? `${VERLAUF_STUNDEN} h` : undefined}
+      sprung={{ label: modulName('personen'), onKlick: onPersonen }}
+      fuss={
+        leer === 'daten' && verlauf.spitze ? (
+          <span
+            data-lfh="verlauf-spitze"
+            style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
+          >
+            <span style={{ fontSize: 11, color: rollen.schwach }}>Spitze</span>
+            <span style={{ ...monoStil(12), color: rollen.text2 }}>
+              {verlauf.spitze.stunde} Uhr · {verlauf.spitze.gesamt}
+            </span>
+          </span>
+        ) : undefined
+      }
+      leerText={`Keine Kontakte in den letzten ${VERLAUF_STUNDEN} Stunden.`}
+      gesperrtText="Modul Personen nicht freigegeben."
+      leerAktion={{ label: 'Person aufnehmen', onKlick: onAufnehmen }}
+      onNeuladen={onNeuladen}
+    >
+      <div data-lfh="verlauf" style={{ display: 'grid', gap: token.paddingXS }}>
+        <ol
+          aria-label="Kontakte je Stunde"
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${verlauf.stunden.length}, minmax(0, 1fr))`,
+            gap: 2,
+          }}
+        >
+          {verlauf.stunden.map((s) => {
+            const text = ablesung(s);
+            const istSpitze = verlauf.spitze === s;
+            return (
+              <li key={s.beginn} style={{ minWidth: 0 }}>
+                <Tooltip title={text}>
+                  <div
+                    data-lfh="verlauf-saeule"
+                    data-stunde={s.stunde}
+                    data-gesamt={s.gesamt}
+                    role="img"
+                    aria-label={text}
+                    tabIndex={0}
+                    style={{
+                      height: VERLAUF_HOEHE,
+                      display: 'flex',
+                      flexDirection: 'column-reverse',
+                      gap: 2,
+                      outlineOffset: 2,
+                    }}
+                  >
+                    {VERLAUF_TOENE.filter((t) => s.je[t] > 0).map((t, i, sichtbar) => (
+                      <div
+                        key={t}
+                        data-ton={t}
+                        style={{
+                          // Pixel statt Prozent: über der Spitze steht ihr Wert.
+                          height: Math.max(2, (s.je[t] / skala) * (VERLAUF_HOEHE - VERLAUF_KOPF)),
+                          background: anlassVerlaufFarbe(t, token),
+                          // Nur das obere Ende rund; die Säule steht auf der Grundlinie.
+                          borderRadius: i === sichtbar.length - 1 ? '3px 3px 0 0' : 0,
+                        }}
+                      />
+                    ))}
+                    {istSpitze && (
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          ...monoStil(10),
+                          color: rollen.text2,
+                          textAlign: 'center',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {s.gesamt}
+                      </span>
+                    )}
+                  </div>
+                </Tooltip>
+                <div
+                  aria-hidden="true"
+                  style={{
+                    ...monoStil(10),
+                    textAlign: 'center',
+                    borderTop: `1px solid ${rollen.linieStark}`,
+                    paddingTop: 2,
+                    color: s.laufend ? rollen.text2 : rollen.schwach,
+                  }}
+                >
+                  {s.stunde}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <ul
+          aria-label="Legende"
+          data-lfh="verlauf-legende"
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: `${token.paddingXXS}px ${token.paddingSM}px`,
+          }}
+        >
+          {VERLAUF_TOENE.map((t) => (
+            <li
+              key={t}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 11,
+                color: rollen.gedaempft,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 2,
+                  background: anlassVerlaufFarbe(t, token),
+                }}
+              />
+              {VERLAUF_TON_WORT[t]}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </DashboardPaneel>
   );
 }

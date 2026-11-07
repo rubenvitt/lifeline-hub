@@ -216,6 +216,64 @@ sein. Trägt der Einsatz `evakuiert`, MUST der Reiter den Vorrang von „Evakuie
 - **WHEN** der Einsatz `evakuiert` trägt
 - **THEN** steht unter dem Schalter „Platz 3 zeigt „Evakuiert“, solange eine Evakuierung angeordnet ist.“
 
+### Requirement: Reihe „Sanitätsdienst“ als Wahl am Einsatz
+
+Das System SHALL die Reihe „Sanitätsdienst“ (LLH-1574) als wählbare Lagekennzahl
+`sanitaetsdienst` führen, mit derselben Wahl, denselben Rechten und derselben Live-Meldung wie
+„Nachforderungen offen“. Ein Einsatz, der mit der Einsatzart `sanitaetsdienst` angelegt wird, MUST
+die Wahl beim Anlegen tragen; eine spätere Änderung der Einsatzart MUST die Wahl nicht ändern.
+Bestehende Einsätze MUST die Wahl nicht nachträglich bekommen.
+
+#### Scenario: Anlegen als Sanitätsdienst
+- **WHEN** ein Einsatz mit der Einsatzart Sanitätsdienst angelegt wird
+- **THEN** enthält `lagekennzahlen` `sanitaetsdienst`
+
+#### Scenario: Anlegen als Realeinsatz
+- **WHEN** ein Einsatz mit der Einsatzart Realeinsatz angelegt wird
+- **THEN** enthält `lagekennzahlen` `sanitaetsdienst` nicht
+
+#### Scenario: Beide wählbar
+- **WHEN** die Einsatzleitung `{"gewaehlt":["nachforderungen","sanitaetsdienst"]}` sendet
+- **THEN** enthält `lagekennzahlen` beide
+
+### Requirement: Kennzahlen der Reihe „Sanitätsdienst“
+
+Trägt der Einsatz `sanitaetsdienst`, SHALL das Lage-Dashboard die Reihe Kontakte · Letzte
+Stunde · In Versorgung · Transporte · Einheiten verfügbar · Vermisste zeigen, gleich welche
+anderen Auslöser er trägt. „Kontakte“ MUST alle nicht stornierten Personen außer Vermissten
+zählen, Abgeschlossene eingeschlossen; „Letzte Stunde“ die Kontakte, deren Erfassung in den
+letzten 60 Minuten liegt; „In Versorgung“ die angetroffenen, nicht abgeschlossenen Personen;
+„Transporte“ wie der Einsatzbericht (Verbleib Transport, nicht nur angemeldet); „Einheiten
+verfügbar“ die nicht aufgelösten Einheiten mit einem Status der Kategorie „verfügbar“. Die Zellen
+MUST nur Zahlen zeigen, keine Namen. Ist das Modul Personen gesperrt, MUST jede Zelle aus den
+Personen „—“ mit „nicht freigegeben“ zeigen.
+
+#### Scenario: Reihe ersetzt Lageplätze
+- **WHEN** der Einsatz `pegel`, `evakuiert` und `sanitaetsdienst` trägt
+- **THEN** lautet die Reihe Kontakte · Letzte Stunde · In Versorgung · Transporte · Einheiten verfügbar · Vermisste
+
+#### Scenario: Umschalten während der Betrachtung
+- **WHEN** während der Betrachtung `sanitaetsdienst` hinzukommt
+- **THEN** bietet das Banner den neuen Zuschnitt an, und erst „übernehmen“ wechselt Reihe und Paneel gemeinsam
+
+#### Scenario: Angemeldeter Transport
+- **WHEN** für eine Person nur ein Transport angemeldet ist
+- **THEN** zählt sie in „In Versorgung“, nicht in „Transporte“
+
+### Requirement: Paneel „Verlauf“
+
+In der Reihe „Sanitätsdienst“ SHALL statt der Gefahrenmatrix das Paneel „Verlauf“ stehen: die
+Kontakte je volle Stunde der Anzeigezone über die letzten zwölf Stunden bis zur laufenden,
+zugeordnet nach der Erfassung, gestapelt nach Anlass. Verletzung, Internistisch, Intoxikation
+und Hitze / Kälte MUST eine eigene Farbe tragen, alle übrigen Anlässe und Kontakte ohne Anlass
+MUST als „Übrige“ grau stehen. Jede Säule MUST eine Ablesung mit jedem Anlass einzeln tragen;
+eine Legende MUST jede Farbe mit Wort nennen. Ist das Modul Personen gesperrt, MUST das Paneel
+den Grund nennen.
+
+#### Scenario: Zwei Kontakte in der laufenden Stunde
+- **WHEN** vor fünf Minuten je ein Kontakt mit Anlass Verletzung und Internistisch erfasst wurde
+- **THEN** trägt eine Säule die Zahl 2 und die Ablesung „… 2 Kontakte · Verletzung 1 · Internistisch 1“
+
 ### Requirement: Zeiten in der Kennzahlreihe
 
 Zeitangaben in den Notizen der Kennzahlreihe und im Seitenkopf des Dashboards SHALL in der Rolle
