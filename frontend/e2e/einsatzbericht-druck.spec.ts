@@ -156,9 +156,7 @@ test('Einsatzbericht: Einstieg, acht Blöcke, nicht genutztes Modul, kein Person
   // Hilfeleistungen zählen dieselbe Person über den Server, auch die Verbleib-Angaben (LLH-1575).
   const hilfe = page.locator('[data-lfh="einsatzbericht-block-hilfeleistungen"]');
   await expect(
-    hilfe
-      .locator('dt', { hasText: /^Kontakte gesamt$/ })
-      .locator('xpath=following-sibling::dd[1]'),
+    hilfe.locator('dt', { hasText: /^Kontakte gesamt$/ }).locator('xpath=following-sibling::dd[1]'),
   ).toHaveText('1');
 
   // Kein Personenbezug Betroffener auf dem Blatt.

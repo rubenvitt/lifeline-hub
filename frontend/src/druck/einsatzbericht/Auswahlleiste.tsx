@@ -15,7 +15,7 @@ import type { BlockDef, BlockSchluessel } from './auswahl';
  * Auswahl der Blöcke des Einsatzberichts (LFH-902, design.md D4). Bedienung, nicht Blatt: die
  * Leiste steht außerhalb der Druckwurzel, `druck/druck.css` blendet sie im Ausdruck aus.
  *
- * Oben zwei Voreinstellungen: „Kurzbericht für den Auftraggeber“ (LLH-1575) und „Standardumfang“.
+ * Über den Häkchen zwei Voreinstellungen: „Kurzbericht für den Auftraggeber“ (LLH-1575) und „Standardumfang“.
  *
  * Jede Zeile ist als Ganzes Bedienziel (Höhe aus `controlHeight`, wächst mit der Dichte-Staffel bis
  * Handschuh). Der zuletzt gewählte Block ist gesperrt: ein Bericht ohne Block gibt es nicht.
@@ -71,26 +71,28 @@ export default function Auswahlleiste({
   );
 
   return (
-    <Paneel
-      titel="Blöcke"
-      koerperPolster
-      aktion={
-        // Zwei Voreinstellungen der Auswahl; der Kurzbericht ist kein eigenes Dokument (LLH-1575,
-        // design.md D5).
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: zielAbstand(token) }}>
-          <Button onClick={() => onAendern([...KURZBERICHT])} disabled={istKurzbericht(auswahl)}>
-            Kurzbericht für den Auftraggeber
-          </Button>
-          <Button
-            onClick={() => onAendern([...STANDARDUMFANG])}
-            disabled={istStandardumfang(auswahl)}
-          >
-            Standardumfang
-          </Button>
-        </div>
-      }
-      style={{ marginBlockEnd: token.marginLG }}
-    >
+    <Paneel titel="Blöcke" koerperPolster style={{ marginBlockEnd: token.marginLG }}>
+      {/* Zwei Voreinstellungen der Auswahl; der Kurzbericht ist kein eigenes Dokument (LLH-1575,
+          design.md D5). Im Körper statt im Kopf: dort bricht die Aktion nicht um, am Handy wäre
+          die Seite sonst breiter als 390 px. */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: zielAbstand(token),
+          marginBlockEnd: token.marginSM,
+        }}
+      >
+        <Button onClick={() => onAendern([...KURZBERICHT])} disabled={istKurzbericht(auswahl)}>
+          Kurzbericht für den Auftraggeber
+        </Button>
+        <Button
+          onClick={() => onAendern([...STANDARDUMFANG])}
+          disabled={istStandardumfang(auswahl)}
+        >
+          Standardumfang
+        </Button>
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: token.marginXL }}>
         {gruppe(
           'Bericht',
