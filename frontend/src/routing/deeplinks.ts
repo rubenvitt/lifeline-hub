@@ -909,6 +909,9 @@ export interface NachforderungVorbelegung {
  * `?betreuungsstelle=<id>` — ein Auftrag, die neue Nachforderung für diese Betreuungsstelle
  * anzufordern; die Seite räumt ihn wie die Vorbelegung. `stelle` setzt `?stelle=<id>`, den
  * Filter „für Stelle“: Zustand, er bleibt in der Adresse.
+ *
+ * Personenbezug (LLH-1573, design.md D3): `bezugPerson` setzt `neu=1` und `?person=<id>` — ein
+ * Rettungsmittel für diesen Patienten anfordern; geräumt wie der Stellenbezug.
  */
 export function nachforderungenPfad(
   einsatzId: number,
@@ -917,18 +920,20 @@ export function nachforderungenPfad(
     vorbelegung?: NachforderungVorbelegung;
     nachforderung?: number;
     bezugStelle?: number;
+    bezugPerson?: number;
     stelle?: number;
   } = {},
 ): string {
   const v = opts.vorbelegung;
   return mitQuery(einsatzModulPfad(einsatzId, 'nachforderungen'), {
     nachforderung: opts.nachforderung,
-    neu: opts.neu || v || opts.bezugStelle != null ? 1 : undefined,
+    neu: opts.neu || v || opts.bezugStelle != null || opts.bezugPerson != null ? 1 : undefined,
     art: v?.art,
     bezeichnung: v?.bezeichnung,
     anzahl: v?.anzahl,
     begruendung: v?.begruendung,
     betreuungsstelle: opts.bezugStelle,
+    person: opts.bezugPerson,
     stelle: opts.stelle,
   });
 }
@@ -943,6 +948,17 @@ export const NACHFORDERUNG_BEZUG_PARAM = 'betreuungsstelle';
  */
 export function parseNachforderungBezug(params: URLSearchParams): number | null {
   return parseRouteId(params.get(NACHFORDERUNG_BEZUG_PARAM) ?? undefined);
+}
+
+/** Der Query-Schlüssel des Personenbezugs einer neuen Nachforderung (LLH-1573) — die Seite räumt ihn. */
+export const NACHFORDERUNG_PERSON_PARAM = 'person';
+
+/**
+ * Liest den Personenbezug einer neuen Nachforderung aus `?person=<id>` (LLH-1573). Nur eine
+ * positive Ganzzahl gilt, sonst kein Bezug; der Server prüft die Person ohnehin (403/404/409).
+ */
+export function parseNachforderungPerson(params: URLSearchParams): number | null {
+  return parseRouteId(params.get(NACHFORDERUNG_PERSON_PARAM) ?? undefined);
 }
 
 /** Liest den Filter „für Stelle“ aus `?stelle=<id>` (LLH-1082); Unlesbares heißt kein Filter. */

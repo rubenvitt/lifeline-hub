@@ -6,6 +6,7 @@ import {
   stellenOptionen,
   rettungsmittelOptionen,
   uebergabeBody,
+  verbleibAusRettungsmittel,
   verbleibBody,
   zielNachArtwechsel,
   zielNachStellenwahl,
@@ -326,5 +327,42 @@ describe('Angaben am Verbleib (LLH-1568, Spec `verbleib-angaben`)', () => {
         false,
       ),
     ).not.toHaveProperty('leitstelle_einsatznummer');
+  });
+});
+
+describe('Vorbelegung aus dem Rettungsmittel (LLH-1573, design.md D6)', () => {
+  const stand = {
+    nachforderung_id: 3,
+    art: 'RTW',
+    status: 'eingetroffen' as const,
+    rufnamen: ['RTW 1/83-1'],
+    leitstelle_einsatznummer: '2611-0815',
+  };
+
+  it('eingetroffen: Transport fremd mit Rufname und Einsatznummer', () => {
+    expect(verbleibAusRettungsmittel({ rettungsmittel: stand })).toEqual({
+      art: 'transport',
+      transportmittel: 'RTW 1/83-1',
+      einsatz_fahrzeug_id: null,
+      leitstelle_einsatznummer: '2611-0815',
+    });
+  });
+
+  it('ohne Rufname die Art, ohne Nummer keine', () => {
+    expect(
+      verbleibAusRettungsmittel({
+        rettungsmittel: { ...stand, rufnamen: [], leitstelle_einsatznummer: null },
+      }),
+    ).toEqual({ art: 'transport', transportmittel: 'RTW', einsatz_fahrzeug_id: null });
+  });
+
+  it('nichts vor dem Eintreffen, ohne Stand oder mit erfasstem Transport', () => {
+    expect(verbleibAusRettungsmittel({})).toBeUndefined();
+    expect(
+      verbleibAusRettungsmittel({ rettungsmittel: { ...stand, status: 'unterwegs' } }),
+    ).toBeUndefined();
+    expect(
+      verbleibAusRettungsmittel({ rettungsmittel: stand, aktuelle_verbleib_art: 'transport' }),
+    ).toBeUndefined();
   });
 });

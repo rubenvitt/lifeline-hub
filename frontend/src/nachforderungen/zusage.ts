@@ -31,11 +31,18 @@ export interface ZusageWerte {
   anzahl: number | null;
   wer: string[];
   eintreffen: Dayjs | null;
+  /** Einsatznummer der Leitstelle (LLH-1573 D5), nur bei einer Anforderung für eine Person. */
+  einsatznummer?: string;
 }
 
 /** Startwerte: die angeforderte Menge als Vorgabe (D1), sonst leer. */
 export function zusageStart(n: Pick<Nachforderung, 'anzahl'>): ZusageWerte {
-  return { anzahl: n.anzahl ?? null, wer: [], eintreffen: null };
+  return { anzahl: n.anzahl ?? null, wer: [], eintreffen: null, einsatznummer: '' };
+}
+
+/** Hat die Nachforderung eine Einsatznummer der Leitstelle? Nur mit Personenbezug (LLH-1573 D5). */
+export function mitEinsatznummer(n: Pick<Nachforderung, 'person_id'>): boolean {
+  return n.person_id != null;
 }
 
 /** Body von `POST …/zusage`: nur Gesetztes; eine kleinere Menge teilt der Server (D1). */
@@ -45,6 +52,7 @@ export function zusageBody(w: ZusageWerte): NachforderungZusageEingabe {
     ...(w.anzahl != null ? { anzahl: w.anzahl } : {}),
     ...(rufnamen.length > 0 ? { rufnamen } : {}),
     ...(w.eintreffen ? { eintreffen_erwartet_at: alsBackendZeit(w.eintreffen) } : {}),
+    ...(w.einsatznummer?.trim() ? { leitstelle_einsatznummer: w.einsatznummer.trim() } : {}),
   };
 }
 
@@ -62,6 +70,8 @@ export interface AenderungWerte {
   bezeichnung: string;
   wer: string[];
   eintreffen: Dayjs | null;
+  /** Einsatznummer der Leitstelle (LLH-1573 D5), nur mit Personenbezug. */
+  einsatznummer: string;
 }
 
 /** Startwerte des Bearbeitens; `wohin` ist der gezeigte Name des Ziels (ohne Pfeil). */
@@ -73,6 +83,7 @@ export function aenderungStart(n: Nachforderung, wohin: string, eintreffen: Dayj
     bezeichnung: n.bezeichnung ?? '',
     wer: [...n.zusage_rufnamen],
     eintreffen,
+    einsatznummer: n.leitstelle_einsatznummer ?? '',
   } satisfies AenderungWerte;
 }
 
@@ -108,6 +119,10 @@ export function aenderungBody(
     if (!gleich(wer, n.zusage_rufnamen)) body.rufnamen = wer;
     const eintreffen = w.eintreffen ? alsBackendZeit(w.eintreffen) : null;
     if (eintreffen !== (n.eintreffen_erwartet_at ?? null)) body.eintreffen_erwartet_at = eintreffen;
+    if (mitEinsatznummer(n)) {
+      const nummer = w.einsatznummer.trim() || null;
+      if (nummer !== (n.leitstelle_einsatznummer ?? null)) body.leitstelle_einsatznummer = nummer;
+    }
   }
   return body;
 }
@@ -117,7 +132,14 @@ export function aenderungBody(
  * zugesagt“ (solange weniger zugesagt als angefordert war) bzw. „Rest einer Teilzusage“.
  */
 export function zusageZeilen(
-  n: Pick<Nachforderung, 'zusage_rufnamen' | 'anzahl' | 'anzahl_angefordert' | 'teilung_aus_id'>,
+  n: Pick<
+    Nachforderung,
+    | 'zusage_rufnamen'
+    | 'anzahl'
+    | 'anzahl_angefordert'
+    | 'teilung_aus_id'
+    | 'leitstelle_einsatznummer'
+  >,
 ): string[] {
   const zeilen: string[] = [];
   if (n.anzahl != null && n.anzahl_angefordert != null && n.anzahl < n.anzahl_angefordert) {
@@ -125,5 +147,7 @@ export function zusageZeilen(
   }
   if (n.teilung_aus_id != null) zeilen.push('Rest einer Teilzusage');
   if (n.zusage_rufnamen.length > 0) zeilen.push(`Wer: ${n.zusage_rufnamen.join(', ')}`);
+  // Einsatznummer der Leitstelle (LLH-1573 D5), nur an einer Anforderung für eine Person.
+  if (n.leitstelle_einsatznummer) zeilen.push(`Einsatznr. ${n.leitstelle_einsatznummer}`);
   return zeilen;
 }

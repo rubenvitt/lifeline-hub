@@ -637,6 +637,29 @@ pub struct PersonAnzeige {
     /// Erfassungszeit des aktuellen Anlasses.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anlass_at: Option<String>,
+    /// Stand des für diese Person angeforderten Rettungsmittels (LLH-1573 design.md D4): die
+    /// jüngste Nachforderung mit Bezug auf sie, ohne zurückgezogene. Beim Lesen abgeleitet; so
+    /// sehen ihn Patientenkopf und UHS auch ohne Leserecht auf Nachforderungen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<RettungsmittelStand>)]
+    pub rettungsmittel: Option<sqlx::types::Json<RettungsmittelStand>>,
+}
+
+/// Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus
+/// einem `json_object` in `repo::SELECT_ALLE`. Nur, was Kopf, UHS und die Vorbelegung des
+/// Verbleibs brauchen (D6): Art, Status, Rufnamen der Zusage, Eintreffen, Einsatznummer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
+pub struct RettungsmittelStand {
+    pub nachforderung_id: i64,
+    pub art: String,
+    #[schema(value_type = crate::nachforderung::NachforderungStatus)]
+    pub status: String,
+    /// Zugesagte Rufnamen in Eingabefolge, leer ohne Angabe.
+    pub rufnamen: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eintreffen_erwartet_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leitstelle_einsatznummer: Option<String>,
 }
 
 impl PersonAnzeige {

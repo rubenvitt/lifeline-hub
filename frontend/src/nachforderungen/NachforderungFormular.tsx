@@ -29,6 +29,7 @@ import {
 import { teilwortSuche } from '../components/teilwortSuche';
 import { neueClientId } from '../offline/clientId';
 import { KennungsLink } from '../components/kennungsLink';
+import { registrierAnzeige } from '../api/einsatzPerson';
 import { artOptionen, schnellwahlArten } from './artVorschlaege';
 import {
   zielAusText,
@@ -98,6 +99,31 @@ export function bezugBegruendung(bezug: NachforderungBezug | null | undefined): 
 }
 
 /**
+ * Personenbezug einer neuen Nachforderung (LLH-1573, design.md D3): ein Rettungsmittel für diesen
+ * Patienten. Registriernummer, UHS und Transportpriorität liest die Seite aus der Person (nur mit
+ * Freigabe Personen); ohne sie steht „Für eine Person“, gesendet wird die Kennung trotzdem.
+ * Keine medizinischen Angaben: nichts davon landet im Text.
+ */
+export interface NachforderungPersonBezug {
+  personId: number;
+  registrierNr?: number;
+  /** Sprung auf die Person (der Weg zurück). */
+  pfad?: string;
+  /** Name der UHS, in der die Person liegt: Vorgabe für „Wohin“. */
+  uhs?: string;
+  /** Vorgabe für die Priorität, aus der Transportpriorität der Person. */
+  prioritaet?: NachforderungPrioritaet;
+}
+
+/** Was ein Personenbezug vorbelegt: ein Rettungsmittel, in der Regel ein RTW. */
+export const PERSON_BEZUG_ART = 'RTW';
+
+/** Vorbelegte Begründung eines Personenbezugs („Für R-12“); leer, solange die Nummer fehlt. */
+export function personBegruendung(bezug: NachforderungPersonBezug | null | undefined): string {
+  return bezug?.registrierNr != null ? `Für ${registrierAnzeige(bezug.registrierNr)}` : '';
+}
+
+/**
  * Wiederholfelder einer Serie: meist mehreres bei DERSELBEN Stelle an DENSELBEN Meldeort; Art,
  * Anzahl, Details und Bedarfszeit wechseln und werden geleert.
  */
@@ -118,6 +144,7 @@ export default function NachforderungFormular({
   card = true,
   vorbelegung,
   bezug,
+  personBezug,
   speicherung,
   fruehereArten = KEINE_ARTEN,
   orgArten = KEINE_ARTEN,
@@ -146,6 +173,12 @@ export default function NachforderungFormular({
    * Absetzen wieder da; Art und Bezeichnung bleiben leer, eine Dublette entsteht so nicht.
    */
   bezug?: NachforderungBezug | null;
+  /**
+   * Personenbezug (LLH-1573): steht über den Feldern, geht als `person_id` mit, die Anzahl steht
+   * fest auf 1, und Was, Wohin, Priorität und Begründung sind vorbelegt. Die Seite schließt die
+   * Erfassung nach dem Absetzen (ein Rettungsmittel je Anforderung).
+   */
+  personBezug?: NachforderungPersonBezug | null;
   /**
    * Die Anlege-Mutation: ihr Fehler steht im Formular bis zum nächsten Absetzen; Einhängen und
    * Abbrechen räumen ihn (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
@@ -181,7 +214,7 @@ export default function NachforderungFormular({
     [fruehereArten, typen, orgArten],
   );
   const wohinOptionen = useMemo(() => zielOptionen(raeume, abschnitte), [raeume, abschnitte]);
-  const wohinVorgabe = zielVorgabe(raeume);
+  const wohinVorgabe = personBezug?.uhs ?? zielVorgabe(raeume);
   // Katalog „Externe Stellen“ (LFH-1194, design.md D8): Vorschläge für die Adressat-Bezeichnung,
   // die zuständige Leitstelle als Vorgabe bei der Kategorie „Leitstelle“.
   const stellen = useExterneStellen().data;
@@ -230,12 +263,20 @@ export default function NachforderungFormular({
   // Der Name der Stelle kommt mit der Betreuungsübersicht, oft nach dem Einhängen: dann vorbelegen,
   // solange die Begründung leer und unberührt ist. Den Reset nach dem Absetzen decken die
   // Startwerte ab.
-  const begruendungVorgabe = bezugBegruendung(bezug);
+  const begruendungVorgabe = bezugBegruendung(bezug) || personBegruendung(personBezug);
   useEffect(() => {
     if (!begruendungVorgabe) return;
     if (form.getFieldValue('begruendung') || form.isFieldTouched('begruendung')) return;
     form.setFieldValue('begruendung', begruendungVorgabe);
   }, [form, begruendungVorgabe]);
+
+  // Die Transportpriorität der Person kommt mit ihr, oft nach dem Einhängen: vorbelegen, solange
+  // das Feld unberührt ist.
+  const prioritaetVorgabe = personBezug?.prioritaet;
+  useEffect(() => {
+    if (!prioritaetVorgabe || form.isFieldTouched('prioritaet')) return;
+    form.setFieldValue('prioritaet', prioritaetVorgabe);
+  }, [form, prioritaetVorgabe]);
 
   /** Schnellwahl: setzt „Was“ und markiert die Anzahl, sodass eine Ziffer die Vorgabe ersetzt. */
   const waehle = (art: string) => {
@@ -257,7 +298,8 @@ export default function NachforderungFormular({
     const ergebnis = await onAnlegen({
       art: w.art.trim(),
       bezeichnung: w.bezeichnung?.trim() || undefined,
-      anzahl: w.anzahl ?? undefined,
+      // Ein Rettungsmittel für einen Patienten (LLH-1573 D1).
+      anzahl: personBezug ? 1 : (w.anzahl ?? undefined),
       ...zielAusText(w.wohin, raeume, abschnitte),
       benoetigt_bis: w.benoetigtBis ? alsBackendZeit(w.benoetigtBis) : undefined,
       adressat_kategorie: w.adressatKategorie,
@@ -265,6 +307,7 @@ export default function NachforderungFormular({
       begruendung: w.begruendung?.trim() || undefined,
       prioritaet: w.prioritaet,
       betreuungsstelle_id: bezug?.betreuungsstelleId,
+      person_id: personBezug?.personId,
       client_id: clientId.current,
     });
     clientId.current = neueClientId();
@@ -280,7 +323,7 @@ export default function NachforderungFormular({
       ? adressatBezeichnung.trim()
       : undefined,
     // `useWatch` liefert im ersten Render `undefined`: ohne den Riegel stünde kurz „Priorität “ da.
-    prioritaet && prioritaet !== 'normal'
+    prioritaet && prioritaet !== (prioritaetVorgabe ?? 'normal')
       ? `Priorität ${PRIORITAET_OPTIONEN.find((o) => o.value === prioritaet)?.label ?? ''}`
       : undefined,
     benoetigtBis ? `bis ${zeitKurz(alsBackendZeit(benoetigtBis))}` : undefined,
@@ -292,13 +335,13 @@ export default function NachforderungFormular({
     <ErfassungsFormular<FormWerte>
       form={form}
       initialValues={{
-        art: '',
+        art: personBezug ? PERSON_BEZUG_ART : '',
         anzahl: 1,
         wohin: wohinVorgabe,
         bezeichnung: '',
         adressatKategorie: 'leitstelle',
         adressatBezeichnung: vorgabeLeitstelle,
-        prioritaet: 'normal',
+        prioritaet: prioritaetVorgabe ?? 'normal',
         benoetigtBis: null,
         begruendung: begruendungVorgabe,
       }}
@@ -336,6 +379,25 @@ export default function NachforderungFormular({
           )}
         </Typography.Paragraph>
       )}
+      {personBezug && (
+        // Wie der Stellenbezug: keine Eingabe, und die Nummer ist der Weg zurück zur Person.
+        <Typography.Paragraph data-lfh="nachforderung-bezug" style={{ marginBottom: 12 }}>
+          {personBezug.registrierNr != null ? (
+            <>
+              Für{' '}
+              {personBezug.pfad ? (
+                <KennungsLink to={personBezug.pfad}>
+                  {registrierAnzeige(personBezug.registrierNr)} <span aria-hidden="true">↗</span>
+                </KennungsLink>
+              ) : (
+                <strong>{registrierAnzeige(personBezug.registrierNr)}</strong>
+              )}
+            </>
+          ) : (
+            'Für eine Person'
+          )}
+        </Typography.Paragraph>
+      )}
       <Space role="group" aria-label="Schnellwahl" wrap style={{ marginBottom: 16 }}>
         {schnellwahl.map((art) => (
           <Button key={art} icon={<IconPlus />} onClick={() => waehle(art)}>
@@ -361,7 +423,11 @@ export default function NachforderungFormular({
         </Col>
         <Col xs={24} sm={4} ref={anzahlRef}>
           <Form.Item name="anzahl" label="Anzahl">
-            <MengenFeld beschriftung="Anzahl" style={{ width: '100%' }} />
+            <MengenFeld
+              beschriftung="Anzahl"
+              style={{ width: '100%' }}
+              disabled={personBezug != null}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={10}>

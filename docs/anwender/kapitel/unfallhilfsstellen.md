@@ -170,6 +170,11 @@ Zurück in den Wartebereich führt das Platzmenü („…“) mit „Zurück in 
 „zurückweisen“ nimmt einen Patienten aus der Stelle, ohne einen Verbleib zu erfassen; er steht
 dann wieder unter „Noch nicht aufgenommen“.
 
+Braucht der Patient ein Rettungsmittel, öffnet „Rettungsmittel anfordern“ im Menü des Platzes die
+Nachforderung für ihn ([Nachforderungen](nachforderung.md)). Platz und Wartebereich zeigen dann den
+Stand, etwa „RTW unterwegs“ oder „RTW da“. Ist es da, belegt „Verbleib / Entlassung erfassen“ den
+Transport mit ihm vor.
+
 ### Eine Unfallhilfsstelle auflösen
 
 1. Alle Patienten der Stelle entlassen, verlegen oder zurückweisen. Solange noch jemand in der

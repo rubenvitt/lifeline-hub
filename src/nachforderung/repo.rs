@@ -114,6 +114,9 @@ pub struct NachforderungDaten<'a> {
     /// Idempotenzschlüssel der Anlage (LLH-1526), von der Route getrimmt und begrenzt. Dieselbe
     /// `client_id` im Einsatz legt nichts Neues an, sondern liefert die gespeicherte Nachforderung.
     pub client_id: Option<&'a str>,
+    /// Person, für die angefordert wird (LLH-1573 design.md D1); Einsatz, Storno, Anzahl und den
+    /// Ausschluss des Stellenbezugs hat die Route geprüft.
+    pub person_id: Option<i64>,
 }
 
 /// Inhalt des ETB-Eintrags der Anlage (LLH-1089 design.md D9): „Nachforderung: 2× RTW → BR Nord,
@@ -196,7 +199,11 @@ const ANZEIGE_SELECT: &str =
              WHERE ee.nachforderung_id = n.id) AS einheit_ids, \
             (SELECT json_group_array(ee.id ORDER BY ee.id) FROM einsatz_einheit ee \
              WHERE ee.nachforderung_id = n.id AND ee.nachforderung_am_raum = 1) \
-              AS einheit_ids_am_raum \
+              AS einheit_ids_am_raum, \
+            n.person_id, \
+            (SELECT p.registrier_nr FROM einsatz_person p WHERE p.id = n.person_id) \
+              AS person_registrier_nr, \
+            n.leitstelle_einsatznummer \
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
@@ -227,8 +234,8 @@ pub async fn create_tx(
         "INSERT INTO nachforderung \
            (einsatz_id, art, bezeichnung, anzahl, adressat_kategorie, adressat_bezeichnung, \
             begruendung, prioritaet, angefordert_at, erstellt_von_id, betreuungsstelle_id, \
-            ziel_br_id, ziel_abschnitt_id, ziel_text, benoetigt_bis, client_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            ziel_br_id, ziel_abschnitt_id, ziel_text, benoetigt_bis, client_id, person_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.art)
@@ -246,6 +253,7 @@ pub async fn create_tx(
     .bind(daten.ziel_text)
     .bind(daten.benoetigt_bis)
     .bind(daten.client_id)
+    .bind(daten.person_id)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -678,6 +686,8 @@ pub struct ZusageDaten<'a> {
     pub anzahl: Option<i64>,
     pub rufnamen: &'a [String],
     pub eintreffen_erwartet_at: Option<&'a str>,
+    /// Einsatznummer der Leitstelle (LLH-1573 design.md D5), nur mit Personenbezug (422 sonst).
+    pub leitstelle_einsatznummer: Option<&'a str>,
 }
 
 /// Was eine Zusage geschrieben hat: den ETB-Eintrag und bei einer Teilzusage die Restposition.
@@ -737,21 +747,27 @@ pub async fn sage_zu(
 ) -> Result<ZusageErgebnis, AppError> {
     let rufnamen = rufnamen_json(daten.rufnamen)?;
     crate::write_retry!(pool, |conn| {
-        let (status, anzahl, art, angefordert_at): (String, Option<i64>, String, String) =
-            sqlx::query_as(
-                "SELECT status, anzahl, art, angefordert_at FROM nachforderung \
-                 WHERE id = ? AND einsatz_id = ?",
-            )
-            .bind(id)
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?
-            .ok_or(AppError::NotFound)?;
+        let (status, anzahl, art, angefordert_at, person_id): (
+            String,
+            Option<i64>,
+            String,
+            String,
+            Option<i64>,
+        ) = sqlx::query_as(
+            "SELECT status, anzahl, art, angefordert_at, person_id FROM nachforderung \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
         if status != super::STATUS_ANGEFORDERT {
             return Err(AppError::UnprocessableEntity(format!(
                 "Übergang {status} → zugesagt nicht erlaubt"
             )));
         }
+        pruefe_einsatznummer(daten.leitstelle_einsatznummer, person_id)?;
         let zugesagt = daten.anzahl.or(anzahl);
         let rest = match (zugesagt, anzahl) {
             (Some(z), Some(a)) if z > a => {
@@ -767,7 +783,8 @@ pub async fn sage_zu(
 
         let r = sqlx::query(
             "UPDATE nachforderung SET status = ?, zugesagt_at = COALESCE(zugesagt_at, ?), \
-             anzahl = ?, anzahl_angefordert = ?, zusage_rufnamen = ?, eintreffen_erwartet_at = ? \
+             anzahl = ?, anzahl_angefordert = ?, zusage_rufnamen = ?, eintreffen_erwartet_at = ?, \
+             leitstelle_einsatznummer = ? \
              WHERE id = ? AND status = ?",
         )
         .bind(super::STATUS_ZUGESAGT)
@@ -776,6 +793,7 @@ pub async fn sage_zu(
         .bind(rest.and(anzahl))
         .bind(rufnamen.as_deref())
         .bind(daten.eintreffen_erwartet_at)
+        .bind(daten.leitstelle_einsatznummer)
         .bind(id)
         .bind(super::STATUS_ANGEFORDERT)
         .execute(&mut *conn)
@@ -845,6 +863,17 @@ fn pruefe_rufnamen_zahl(rufnamen: &[String], anzahl: Option<i64>) -> Result<(), 
     }
 }
 
+/// Eine Einsatznummer der Leitstelle gibt es nur an einer Nachforderung mit Personenbezug
+/// (LLH-1573 design.md D5): sie belegt den Verbleib des Patienten vor.
+fn pruefe_einsatznummer(nummer: Option<&str>, person_id: Option<i64>) -> Result<(), AppError> {
+    if nummer.is_some() && person_id.is_none() {
+        return Err(AppError::UnprocessableEntity(
+            "Eine Einsatznummer der Leitstelle gehört zu einer Anforderung für eine Person".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Das erwartete Eintreffen liegt nicht vor der Anforderung (D3). Beide Zeiten sind normalisiert
 /// ('YYYY-MM-DD HH:MM:SS', UTC): der Textvergleich ordnet sie.
 fn pruefe_eintreffen(eta: Option<&str>, angefordert_at: &str) -> Result<(), AppError> {
@@ -911,6 +940,8 @@ pub struct Aenderung<'a> {
     pub ziel: Option<Ziel<'a>>,
     pub eintreffen_erwartet_at: Option<Option<&'a str>>,
     pub rufnamen: Option<&'a [String]>,
+    /// Einsatznummer der Leitstelle (LLH-1573 D5): gehört zur Zusage, nur mit Personenbezug.
+    pub leitstelle_einsatznummer: Option<Option<&'a str>>,
 }
 
 /// Bestand einer Nachforderung, wie das Bearbeiten ihn vergleicht.
@@ -927,6 +958,8 @@ struct Bestand {
     ziel_text: Option<String>,
     eintreffen_erwartet_at: Option<String>,
     zusage_rufnamen: String,
+    person_id: Option<i64>,
+    leitstelle_einsatznummer: Option<String>,
 }
 
 /// Bearbeitet eine offene Nachforderung (D9) in EINER Transaktion: 404 fremd oder unbekannt, 422
@@ -945,7 +978,8 @@ pub async fn aktualisiere(
         let alt: Bestand = sqlx::query_as(
             "SELECT status, art, anzahl, angefordert_at, prioritaet, bezeichnung, ziel_br_id, \
                 ziel_abschnitt_id, ziel_text, eintreffen_erwartet_at, \
-                COALESCE(zusage_rufnamen, '[]') AS zusage_rufnamen \
+                COALESCE(zusage_rufnamen, '[]') AS zusage_rufnamen, person_id, \
+                leitstelle_einsatznummer \
              FROM nachforderung WHERE id = ? AND einsatz_id = ?",
         )
         .bind(id)
@@ -959,8 +993,9 @@ pub async fn aktualisiere(
                 "Eine abgeschlossene Nachforderung lässt sich nicht bearbeiten".into(),
             ));
         }
-        let zusage_feld =
-            aenderung.eintreffen_erwartet_at.is_some() || aenderung.rufnamen.is_some();
+        let zusage_feld = aenderung.eintreffen_erwartet_at.is_some()
+            || aenderung.rufnamen.is_some()
+            || aenderung.leitstelle_einsatznummer.is_some();
         if zusage_feld && alt.status == super::STATUS_ANGEFORDERT {
             return Err(AppError::UnprocessableEntity(
                 "Wer und Eintreffen gehören zur Zusage".into(),
@@ -987,6 +1022,19 @@ pub async fn aktualisiere(
         };
         let rufnamen: &[String] = aenderung.rufnamen.unwrap_or(&alte_rufnamen);
         pruefe_rufnamen_zahl(rufnamen, anzahl)?;
+        let einsatznummer = match aenderung.leitstelle_einsatznummer {
+            Some(n) => n,
+            None => alt.leitstelle_einsatznummer.as_deref(),
+        };
+        if aenderung.leitstelle_einsatznummer.is_some() {
+            pruefe_einsatznummer(einsatznummer, alt.person_id)?;
+        }
+        // Ein Rettungsmittel für einen Patienten (LLH-1573 D1).
+        if alt.person_id.is_some() && anzahl.is_some_and(|a| a > 1) {
+            return Err(AppError::UnprocessableEntity(
+                "Für eine Person wird genau ein Rettungsmittel angefordert".into(),
+            ));
+        }
         // Nicht unter die verknüpften Einheiten (LLH-1387 D5).
         if let Some(a) = aenderung.anzahl {
             let verknuepft: i64 = sqlx::query_scalar(
@@ -1043,6 +1091,19 @@ pub async fn aktualisiere(
                 format!("Wer: {}", rufnamen.join(", "))
             });
         }
+        // Die Nummer selbst nie im Wortlaut (LLH-1573 D8): sie wird wie am Verbleib geschwärzt.
+        if einsatznummer != alt.leitstelle_einsatznummer.as_deref() {
+            teile.push(
+                match (
+                    alt.leitstelle_einsatznummer.is_some(),
+                    einsatznummer.is_some(),
+                ) {
+                    (false, _) => "Einsatznummer der Leitstelle nachgetragen".into(),
+                    (true, true) => "Einsatznummer der Leitstelle geändert".into(),
+                    (true, false) => "ohne Einsatznummer der Leitstelle".into(),
+                },
+            );
+        }
         if teile.is_empty() {
             return Ok(None);
         }
@@ -1050,7 +1111,7 @@ pub async fn aktualisiere(
         sqlx::query(
             "UPDATE nachforderung SET anzahl = ?, prioritaet = ?, bezeichnung = ?, \
                 ziel_br_id = ?, ziel_abschnitt_id = ?, ziel_text = ?, \
-                eintreffen_erwartet_at = ?, zusage_rufnamen = ? \
+                eintreffen_erwartet_at = ?, zusage_rufnamen = ?, leitstelle_einsatznummer = ? \
              WHERE id = ?",
         )
         .bind(anzahl)
@@ -1061,6 +1122,7 @@ pub async fn aktualisiere(
         .bind(ziel.text)
         .bind(eta)
         .bind(rufnamen_json(rufnamen)?)
+        .bind(einsatznummer)
         .bind(id)
         .execute(&mut *conn)
         .await?;
@@ -2012,6 +2074,7 @@ mod tests {
                 anzahl: None,
                 rufnamen: &wer,
                 eintreffen_erwartet_at: Some("2026-06-12 13:30:00"),
+                leitstelle_einsatznummer: None,
             },
             "2026-06-12 09:05:00",
         )
@@ -2061,6 +2124,7 @@ mod tests {
                 anzahl: None,
                 rufnamen: &namen(&[]),
                 eintreffen_erwartet_at: Some("2026-06-12 13:30:00"),
+                leitstelle_einsatznummer: None,
             },
             "2026-06-12 09:05:00",
         )
@@ -2106,6 +2170,7 @@ mod tests {
                 anzahl: Some(1),
                 rufnamen: &wer,
                 eintreffen_erwartet_at: None,
+                leitstelle_einsatznummer: None,
             },
             "2026-06-12 09:05:00",
         )
@@ -2160,6 +2225,7 @@ mod tests {
                         anzahl,
                         rufnamen: &wer,
                         eintreffen_erwartet_at: eta,
+                        leitstelle_einsatznummer: None,
                     },
                     "2026-06-12 09:05:00",
                 )
@@ -2257,6 +2323,7 @@ mod tests {
                 anzahl: Some(1),
                 rufnamen: &wer,
                 eintreffen_erwartet_at: Some("2026-06-12 13:30:00"),
+                leitstelle_einsatznummer: None,
             },
             "2026-06-12 09:05:00",
         )
@@ -2300,6 +2367,7 @@ mod tests {
                 anzahl: None,
                 rufnamen: &wer,
                 eintreffen_erwartet_at: Some("2026-06-12 13:30:00"),
+                leitstelle_einsatznummer: None,
             },
             "2026-06-12 09:05:00",
         )

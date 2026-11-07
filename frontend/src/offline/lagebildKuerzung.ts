@@ -77,6 +77,9 @@ export const PERSON_AUF_DER_PLATTE = {
   // ohne Netz nur Katalogwerte); seine Zeit braucht ohne Netz niemand.
   anlass: 'behalten',
   anlass_at: 'auslassen',
+  // LLH-1573: der Stand des angeforderten Rettungsmittels hält die Marke „RTW unterwegs“ an der
+  // UHS auch ohne Netz; Art, Status, Rufnamen und Einsatznummer sind kein Gesundheitsdatum.
+  rettungsmittel: 'behalten',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
 
 /**

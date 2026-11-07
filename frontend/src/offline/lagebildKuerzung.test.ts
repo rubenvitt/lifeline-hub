@@ -44,6 +44,7 @@ const ERWARTET_BEHALTEN = [
   'meldung_id',
   'meldung_lfd_nr',
   'anlass',
+  'rettungsmittel',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
   'herkunft_adresse',
@@ -109,6 +110,13 @@ const VOLL: Person = {
   meldung_lfd_nr: 3,
   anlass: 'intoxikation',
   anlass_at: '2026-10-18 09:01:00',
+  rettungsmittel: {
+    nachforderung_id: 3,
+    art: 'RTW',
+    status: 'unterwegs',
+    rufnamen: ['RTW 1/83-1'],
+    leitstelle_einsatznummer: '2611-0815',
+  },
 };
 
 function eintrag(queryKey: readonly unknown[], data: unknown) {

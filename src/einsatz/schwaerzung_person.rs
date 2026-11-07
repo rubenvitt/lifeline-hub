@@ -129,6 +129,8 @@ const O_BESTAETIGT: &str = "Name der bestätigenden Einsatzkraft, nicht der betr
 const O_BEHANDELT: &str = "beschreibt die betroffene Person, nicht die bestätigende Kraft";
 const O_FUEHRUNGSSTELLE_ORT: &str =
     "Standort der Führungsstelle (LFH-1181), nicht des Einsatzleiters";
+const O_NACHFORDERUNG: &str =
+    "beschreibt die Anforderung des Rettungsmittels (Führungsvorgang), nicht die Person";
 const KEINE: &[(&str, Markierung)] = &[];
 
 /// Alle Personenbezüge. Reihenfolge = Ausführungsreihenfolge (reihenfolgeunabhängig korrekt).
@@ -268,6 +270,24 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("beschreibung", Mit),
             ("geschaedigt_kontakt", Mit),
             ("uebergeben_an", Ohne(O_UEBERGABE)),
+        ],
+    },
+    // Rettungsmittel für eine Person (LLH-1573, design.md D8): die Einsatznummer der Leitstelle
+    // führt dort zum Transport dieser Person; die übrigen Freitexte gehören zur Anforderung.
+    PersonenBezug {
+        art: PersonenArt::Betroffene,
+        tabelle: "nachforderung",
+        bezug: Bezug::Spalte("person_id"),
+        spalten: &[
+            ("art", Ohne(O_NACHFORDERUNG)),
+            ("bezeichnung", Ohne(O_NACHFORDERUNG)),
+            ("adressat_bezeichnung", Ohne(O_NACHFORDERUNG)),
+            ("begruendung", Ohne(O_NACHFORDERUNG)),
+            ("abgelehnt_grund", Ohne(O_NACHFORDERUNG)),
+            ("ziel_text", Ohne(O_NACHFORDERUNG)),
+            ("zusage_rufnamen", Ohne(O_NACHFORDERUNG)),
+            ("zurueckgezogen_grund", Ohne(O_NACHFORDERUNG)),
+            ("leitstelle_einsatznummer", Mit),
         ],
     },
     // ---------- Externe Kräfte (einsatz_personal ohne Stammdatenbezug) ----------

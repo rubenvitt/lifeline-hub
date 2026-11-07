@@ -52,7 +52,10 @@ import NachforderungBoard, {
 import { boardGruppe, offenText, vorgabeStufe } from '../nachforderungen/nachforderungStufen';
 import NachforderungFormular, {
   type NachforderungBezug,
+  type NachforderungPersonBezug,
 } from '../nachforderungen/NachforderungFormular';
+import { ladePerson } from '../api/einsatzPerson';
+import { prioritaetAusTransport } from '../nachforderungen/personBezug';
 import type { KartenFormular, StellenVerweis } from '../nachforderungen/NachforderungKarte';
 import MaterialUebernahmeModal from '../nachforderungen/MaterialUebernahmeModal';
 import PostenZuordnenModal from '../nachforderungen/PostenZuordnenModal';
@@ -82,9 +85,12 @@ import { ruecknahmeSperre } from '../nachforderungen/nurVorwaerts';
 import type { ZielNamen } from '../nachforderungen/zielVorschlaege';
 import {
   NACHFORDERUNG_BEZUG_PARAM,
+  NACHFORDERUNG_PERSON_PARAM,
   NACHFORDERUNG_VORBELEGUNG_PARAMS,
   betreuungsstellePfad,
   parseNachforderungBezug,
+  parseNachforderungPerson,
+  personDetailPfad,
   parseNachforderungStelle,
   parseNachforderungVorbelegung,
   type NachforderungVorbelegung,
@@ -125,6 +131,9 @@ export default function NachforderungenPage() {
   // Stellenbezug aus `?neu=1&betreuungsstelle=<id>` (LLH-1082, design.md D7): gilt, solange die
   // Erfassung offen ist, auch über eine Serie; Schließen räumt ihn.
   const [bezugId, setBezugId] = useState<number | null>(null);
+  // Personenbezug aus `?neu=1&person=<id>` (LLH-1573, design.md D3): wie der Stellenbezug, aber
+  // nur für eine Anforderung; nach dem Absetzen schließt die Erfassung.
+  const [personBezugId, setPersonBezugId] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const neuAuftrag = useLinkAuftrag();
   // Filter „für Stelle“ (`?stelle=<id>`): Zustand in der Adresse.
@@ -139,6 +148,7 @@ export default function NachforderungenPage() {
     setFormOffen(false);
     setVorbelegung(null);
     setBezugId(null);
+    setPersonBezugId(null);
   };
   // Grund einer abgelehnten Rücknahme aus dem Rückgängig-Toast: die Karte ist dann oft gewandert,
   // der Grund steht im Hinweis der Seite (LFH-1077).
@@ -277,6 +287,33 @@ export default function NachforderungenPage() {
         : null,
     [betreuungFrei, betreuungQuery.data, einsatzId],
   );
+  /*
+   * Registriernummer, UHS und Transportpriorität für den Personenbezug (LLH-1573, design.md D3):
+   * aus dem Detail der Person (derselbe Cache wie deren Seite), nur mit Freigabe Personen. Die
+   * Karten nennen die Nummer aus der Nachforderung selbst (`person_registrier_nr`).
+   */
+  const personenFrei = istKeyFreigegeben('personen', freigaben);
+  const personQuery = useQuery({
+    queryKey: einsatzKeys.person(einsatzId, personBezugId),
+    queryFn: () => ladePerson(einsatzId, personBezugId as number),
+    enabled: personenFrei && personBezugId != null,
+  });
+  // Gemerkt (die Karten sind `memo`): ohne Freigabe Personen keine Verweise, nur die Nummer.
+  const personPfad = useMemo(
+    () => (personenFrei ? (pid: number) => personDetailPfad(einsatzId, pid) : null),
+    [personenFrei, einsatzId],
+  );
+  const personBezug = useMemo<NachforderungPersonBezug | null>(() => {
+    if (personBezugId == null) return null;
+    const p = personenFrei ? personQuery.data : undefined;
+    return {
+      personId: personBezugId,
+      registrierNr: p?.registrier_nr,
+      pfad: p ? personDetailPfad(einsatzId, personBezugId) : undefined,
+      uhs: p?.aufenthalt?.uhs_bezeichnung,
+      prioritaet: prioritaetAusTransport(p?.transport_prioritaet),
+    };
+  }, [personBezugId, personenFrei, personQuery.data, einsatzId]);
   const bezug = useMemo<NachforderungBezug | null>(
     () =>
       bezugId == null
@@ -370,9 +407,11 @@ export default function NachforderungenPage() {
     mutationFn: (d: NeueNachforderung) => legeNachforderungAn(einsatzId, d),
     // Das Inline-Formular bleibt nach dem Anlegen offen, damit die nächste Nachforderung ohne
     // Aufklappen folgt; ein Zuklappen unmountete es samt Serienzähler und Wertübernahme.
-    onSuccess: () => {
+    onSuccess: (_n, d) => {
       invalidiere();
       message.success('Nachforderung abgesetzt');
+      // Ein Rettungsmittel je Anforderung (LLH-1573 D1): keine Serie für dieselbe Person.
+      if (d.person_id != null) schliesseFormular();
     },
     onError: invalidiere,
   });
@@ -606,16 +645,23 @@ export default function NachforderungenPage() {
   useEffect(() => {
     const neu = searchParams.get('neu') === '1';
     const hatVorbelegung = NACHFORDERUNG_VORBELEGUNG_PARAMS.some((k) => searchParams.has(k));
-    const hatBezug = searchParams.has(NACHFORDERUNG_BEZUG_PARAM);
+    const hatBezug =
+      searchParams.has(NACHFORDERUNG_BEZUG_PARAM) || searchParams.has(NACHFORDERUNG_PERSON_PARAM);
     if (!neu && !hatVorbelegung && !hatBezug) return;
     if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) {
       setVorbelegung(parseNachforderungVorbelegung(searchParams));
       setBezugId(parseNachforderungBezug(searchParams));
+      setPersonBezugId(parseNachforderungPerson(searchParams));
       setFormOffen(true);
     }
-    neuAuftrag.raeume('neu', ...NACHFORDERUNG_VORBELEGUNG_PARAMS, NACHFORDERUNG_BEZUG_PARAM);
+    neuAuftrag.raeume(
+      'neu',
+      ...NACHFORDERUNG_VORBELEGUNG_PARAMS,
+      NACHFORDERUNG_BEZUG_PARAM,
+      NACHFORDERUNG_PERSON_PARAM,
+    );
   }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh]);
 
   /*
@@ -845,6 +891,7 @@ export default function NachforderungenPage() {
     laeuftId: statusMutation.isPending ? statusMutation.variables?.nfId : null,
     stellenJeId,
     zielNamen,
+    personPfad,
   };
   // Filterwahl nur mit Namen (Freigabe Betreuung) und sobald es Bezüge gibt (design.md D7).
   const stellenOptionen =
@@ -960,6 +1007,7 @@ export default function NachforderungenPage() {
             card={false}
             vorbelegung={vorbelegung}
             bezug={bezug}
+            personBezug={personBezug}
             fruehereArten={arten}
             orgArten={orgArten}
             raeume={raeume}

@@ -35,6 +35,10 @@ pub const ABLEHNEN_GRUND_MAX: usize = 200;
 /// (LLH-1383 design.md D2; so viele wie Rufnamen einer Zusage). Spiegel:
 /// `frontend/src/api/eingabegrenzen.ts`.
 pub const UEBERNAHME_EINHEITEN_MAX: usize = ZUSAGE_RUFNAMEN_MAX;
+/// Höchstlänge der Einsatznummer der Leitstelle aus der Zusage (LLH-1573 design.md D5): dieselbe
+/// wie am Verbleib (LLH-1568), denn sie belegt ihn vor. Spiegel: `EINSATZNUMMER_MAX` in
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const LEITSTELLE_EINSATZNUMMER_MAX: usize = crate::person::EINSATZNUMMER_MAX;
 
 /// Priorität (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
@@ -223,6 +227,17 @@ pub struct NachforderungAnzeige {
     #[sqlx(try_from = "String")]
     #[schema(value_type = Vec<i64>)]
     pub einheit_ids_am_raum: MaterialIds,
+    /// Person, für die angefordert wurde (LLH-1573 design.md D1/D2): nur beim Anlegen gesetzt,
+    /// danach fest. Fehlt ohne Bezug.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub person_id: Option<i64>,
+    /// Abgeleitet: Registriernummer dieser Person für „Für R-12“ (D7). Pseudonym wie im ETB; den
+    /// Namen liest die Oberfläche nie von hier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub person_registrier_nr: Option<i64>,
+    /// Einsatznummer der Leitstelle aus der Zusage (D5); fehlt ohne Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leitstelle_einsatznummer: Option<String>,
 }
 
 /// Rufnamen einer Zusage, gelesen aus dem JSON-Array der Spalte `zusage_rufnamen` (NULL → `[]` im

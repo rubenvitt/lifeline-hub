@@ -4922,12 +4922,26 @@ export interface components {
             id: number;
             /** @description Abgeleitet: status NOT IN ('eingetroffen','abgelehnt','zurueckgezogen'). */
             ist_offen: boolean;
+            /** @description Einsatznummer der Leitstelle aus der Zusage (D5); fehlt ohne Angabe. */
+            leitstelle_einsatznummer?: string | null;
             /**
              * @description Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten
              *     Materialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:
              *     Bezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material.
              */
             material_ids: number[];
+            /**
+             * Format: int64
+             * @description Person, für die angefordert wurde (LLH-1573 design.md D1/D2): nur beim Anlegen gesetzt,
+             *     danach fest. Fehlt ohne Bezug.
+             */
+            person_id?: number | null;
+            /**
+             * Format: int64
+             * @description Abgeleitet: Registriernummer dieser Person für „Für R-12“ (D7). Pseudonym wie im ETB; den
+             *     Namen liest die Oberfläche nie von hier.
+             */
+            person_registrier_nr?: number | null;
             prioritaet: components["schemas"]["Prioritaet"];
             status: components["schemas"]["NachforderungStatus"];
             /**
@@ -5577,6 +5591,7 @@ export interface components {
             pat_nummer?: string | null;
             /** Format: int64 */
             registrier_nr: number;
+            rettungsmittel?: components["schemas"]["RettungsmittelStand"] | null;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
             transport_art?: components["schemas"]["TransportArt"] | null;
@@ -5997,6 +6012,21 @@ export interface components {
             name: string;
             region: string;
             slug: string;
+        };
+        /**
+         * @description Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus
+         *     einem `json_object` in `repo::SELECT_ALLE`. Nur, was Kopf, UHS und die Vorbelegung des
+         *     Verbleibs brauchen (D6): Art, Status, Rufnamen der Zusage, Eintreffen, Einsatznummer.
+         */
+        RettungsmittelStand: {
+            art: string;
+            eintreffen_erwartet_at?: string | null;
+            leitstelle_einsatznummer?: string | null;
+            /** Format: int64 */
+            nachforderung_id: number;
+            /** @description Zugesagte Rufnamen in Eingabefolge, leer ohne Angabe. */
+            rufnamen: string[];
+            status: components["schemas"]["NachforderungStatus"];
         };
         /**
          * @description Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.

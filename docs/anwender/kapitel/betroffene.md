@@ -223,6 +223,20 @@ eine Marke, in Kopf und Liste.
 Ein Klick auf die eingetragene Einheit öffnet sie wieder; das Kreuz im Feld leert sie. Ist die
 Person aus einer Meldung angelegt, steht dahinter „aus Meldung #…“, ein Klick öffnet die Meldung.
 
+### Ein Rettungsmittel anfordern
+
+1. Im Patientenkopf unter „Rettungsmittel“ „Rettungsmittel anfordern“ wählen. Die Seite
+   „Nachforderungen“ öffnet das Formular mit „Für R-…“, der Art „RTW“, der Unfallhilfsstelle als
+   Ziel und der Priorität aus der Transportpriorität. Die Begründung nennt nur die
+   Registriernummer, keine medizinischen Angaben.
+2. Art und Adressat prüfen und „Nachforderung absetzen“ wählen.
+
+Danach steht unter „Rettungsmittel“ der Stand, etwa „RTW · Zugesagt · RTW 1/83-1 · erwartet … ·
+Einsatznr. …“; ein Klick auf die Art öffnet die Karte der Nachforderung. Erst nach einer Absage
+lässt sich wieder anfordern. Ist das Rettungsmittel eingetroffen, belegt „Verbleib erfassen“ den
+Transport mit ihm und der Einsatznummer der Leitstelle vor; gespeichert wird erst mit „Verbleib
+erfassen“. Am gekoppelten Gerät steht nur der Stand.
+
 ### Das Blatt einer Person drucken
 
 1. Die Person öffnen und im Kopf der Seite „Druckansicht“ wählen; auf schmalen Bildschirmen
@@ -459,7 +473,8 @@ Stornierungen. Ein nachgereichter älterer Eintrag steht dort zu seiner Erfassun
 „nachgetragen“, bei Sichtung und Transportpriorität mit dem Wert, der weiter gilt. Art und
 Fachrichtung des Transports, Anlass, Maßnahmen, Verletzungen, PAT-Nummer und Kontamination stehen
 nicht im Einsatztagebuch, ebenso wenig die Einsatznummer der Leitstelle, „Entlassen an“ und „Gegen
-Rat“: dort steht nur „entlassen“ oder „abtransportiert“. Die Notiz im Patientenkopf ist nicht
+Rat“: dort steht nur „entlassen“ oder „abtransportiert“. Auch an einer Nachforderung für eine
+Person steht dort nur „Einsatznummer der Leitstelle nachgetragen“. Die Notiz im Patientenkopf ist nicht
 änderbar und erscheint nicht im
 Einsatztagebuch.
 

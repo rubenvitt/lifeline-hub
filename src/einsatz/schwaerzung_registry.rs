@@ -2655,6 +2655,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("zurueckgezogen_grund", Strategie::NullSetzen, Z_EINSATZ),
             // Idempotenzschlüssel der Anlage (LLH-1526): zufällige UUID ohne Inhalt.
             retain("client_id", G_IDEMPOTENZ),
+            // LLH-1573 (design.md D8): die Person, für die angefordert wurde, als Verweis wie die
+            // Betreuungsstelle (die Person trägt nach der Schwärzung nur ihre Registriernummer).
+            // Die Einsatznummer der Leitstelle ist ein Freitext der Zusage und geht wie „Wer“;
+            // sie steht nie im ETB-Wortlaut.
+            retain("person_id", G_FK),
+            scrub("leitstelle_einsatznummer", Strategie::NullSetzen, Z_EINSATZ),
         ],
     },
     // ---------- Chat / Erinnerungen (Freitexte gescrubbt) ----------
@@ -4097,6 +4103,11 @@ mod tests {
                 "Geschädigte Person eines Sachschadens: Personenauskunft",
             ),
             ("einsatz_tier", "Halter eines Tiers: Personenauskunft"),
+            (
+                "nachforderung",
+                "Rettungsmittel für eine Person (LLH-1573): Führungsvorgang; die Versorgung \
+                 belegen Sichtung, Verlauf und Belegung",
+            ),
             (
                 "einsatz_person_anhang",
                 "Fotos und Dateien (LFH-757): Kategorie anhaenge, die Zeilen gehen mit ihr und \

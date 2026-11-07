@@ -76,6 +76,7 @@ import {
   chatPfad,
   nachforderungenPfad,
   parseNachforderungBezug,
+  parseNachforderungPerson,
   parseNachforderungStelle,
   parseNachforderungVorbelegung,
   auftraegePfad,
@@ -1113,6 +1114,18 @@ describe('deeplinks — Nachforderung mit Vorbelegung (LFH-634)', () => {
     const p = new URLSearchParams({ betreuungsstelle: wert, stelle: wert });
     expect(parseNachforderungBezug(p)).toBeNull();
     expect(parseNachforderungStelle(p)).toBeNull();
+  });
+
+  it('Personenbezug setzt neu=1 und person, ohne Vorbelegung (LLH-1573)', () => {
+    const pfad = nachforderungenPfad(E, { bezugPerson: 12 });
+    expect(pfad).toBe('/einsaetze/5/nachforderungen?neu=1&person=12');
+    const p = params(pfad);
+    expect(parseNachforderungPerson(p)).toBe(12);
+    expect(parseNachforderungBezug(p)).toBeNull();
+    expect(parseNachforderungVorbelegung(p)).toBeNull();
+    for (const wert of ['0', '-1', 'abc', '']) {
+      expect(parseNachforderungPerson(new URLSearchParams({ person: wert }))).toBeNull();
+    }
   });
 
   it('?nachforderung= steuert eine Nachforderung an und übersteht den Round-Trip (LLH-1226 D10)', () => {

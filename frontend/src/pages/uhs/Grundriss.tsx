@@ -9,6 +9,7 @@ import {
   IconPfeilZurueckGebogen,
   IconSchloss,
   IconSchraubenschluessel,
+  IconTelefon,
 } from '../../icons';
 import {
   App,
@@ -50,7 +51,11 @@ import {
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import VerbleibErfassung from '../../personen/VerbleibErfassung';
 import { UebergabeDialog } from '../../personen/UebergabeQuittieren';
+import { useNavigate } from 'react-router';
 import { useAuthOptional } from '../../auth/AuthContext';
+import { useSprungSperre } from '../../einsatz/useSprungSperre';
+import { rettungsmittelAnforderbar, rettungsmittelMarke } from '../../nachforderungen/personBezug';
+import { nachforderungenPfad } from '../../routing/deeplinks';
 import { useVorgemerktePersonEintraege } from '../../offline/useVorgemerkteSchreibaktionen';
 import type { Person, PlatzTyp, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -175,6 +180,8 @@ interface PlatzMenueLage {
    * bleibt stehen, gesperrt, und nennt den Grund im Wort (LFH-1078: sichtbar, nicht im Tooltip).
    */
   niemandWartet?: boolean;
+  /** Für die belegende Person darf ein Rettungsmittel angefordert werden (LLH-1573, D3). */
+  rettungsmittel?: boolean;
 }
 
 const VERFUEGBARKEIT_EINTRAEGE = [
@@ -203,8 +210,16 @@ const VERFUEGBARKEIT_EINTRAEGE = [
  * Teilstring.
  */
 export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps['items']> {
-  const { form, belegt, zuweisbar, wartebereich, bearbeitbar, belegungLaeuft, niemandWartet } =
-    lage;
+  const {
+    form,
+    belegt,
+    zuweisbar,
+    wartebereich,
+    bearbeitbar,
+    belegungLaeuft,
+    niemandWartet,
+    rettungsmittel,
+  } = lage;
   const karte = form === 'karte';
   const trenner = { type: 'divider' as const };
   const zuweisen = zuweisbar
@@ -227,6 +242,11 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
         },
       ]
     : [];
+  // Sprung in die Erfassung der Nachforderung mit Bezug auf die Person (LLH-1573, design.md D3).
+  const anfordern =
+    belegt && rettungsmittel
+      ? [{ key: 'rettungsmittel', label: 'Rettungsmittel anfordern', icon: <IconTelefon /> }]
+      : [];
   const person =
     karte && belegt ? [{ key: 'person', label: 'Person öffnen', icon: <IconPerson /> }] : [];
   // Rückweg in den Wartebereich: der Drag auf `drop-inbox` ist in der Reiterform strukturell weg (anderer
@@ -257,14 +277,20 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
       ? [{ key: 'storno', label: 'Platz löschen', icon: <IconMuelleimer />, danger: true }]
       : []),
   ];
-  const kopf = [...zuweisen, ...verbleib, ...person, ...rueckweg];
+  const kopf = [...zuweisen, ...verbleib, ...anfordern, ...person, ...rueckweg];
   // Zeilenform: der Trenner steht nur hinter „zuweisen", Verbleib und Rückweg gehen bündig in die
   // Verfügbarkeiten über (von den Zeilen-Tests gepinnt).
   const kopfMitTrenner = karte
     ? kopf.length > 0
       ? [...kopf, trenner]
       : []
-    : [...zuweisen, ...(zuweisen.length > 0 ? [trenner] : []), ...verbleib, ...rueckweg];
+    : [
+        ...zuweisen,
+        ...(zuweisen.length > 0 ? [trenner] : []),
+        ...verbleib,
+        ...anfordern,
+        ...rueckweg,
+      ];
   return [
     ...kopfMitTrenner,
     ...VERFUEGBARKEIT_EINTRAEGE,
@@ -369,6 +395,20 @@ function VerbleibVorgemerkt() {
       style={{ fontSize: token.fontSizeSM, color: rollen.text2, whiteSpace: 'nowrap' }}
     >
       Offline vorgemerkt
+    </span>
+  );
+}
+
+/** „RTW unterwegs“ an der Person (LLH-1573, design.md D4); nichts ohne laufende Anforderung. */
+function RettungsmittelMarke({ person }: { person: Person }) {
+  const marke = rettungsmittelMarke(person.rettungsmittel);
+  if (!marke) return null;
+  return (
+    <span data-lfh="rettungsmittel-marke">
+      <StatusChip
+        ton={person.rettungsmittel?.status === 'eingetroffen' ? 'normal' : 'achtung'}
+        wort={marke}
+      />
     </span>
   );
 }
@@ -499,6 +539,8 @@ interface PlatzKarteProps {
   abgelehnt?: boolean;
   /** Der Verbleib der belegenden Person ist ohne Netz vorgemerkt (LLH-1138). */
   verbleibVorgemerkt?: boolean;
+  /** Nur gesetzt, wenn für die belegende Person angefordert werden darf (LLH-1573). */
+  onRettungsmittel?: () => void;
 }
 
 function PlatzKarte({
@@ -517,6 +559,7 @@ function PlatzKarte({
   onZurueckInWartebereich,
   abgelehnt = false,
   verbleibVorgemerkt = false,
+  onRettungsmittel,
 }: PlatzKarteProps) {
   // Die Platzkarte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus — Drag-Source
   // (Layout verschieben).
@@ -606,10 +649,12 @@ function PlatzKarte({
     bearbeitbar,
     belegungLaeuft,
     niemandWartet,
+    rettungsmittel: onRettungsmittel != null,
   });
   const waehle = (key: string) => {
     if (key === 'zuweisen') onZuweisen();
     else if (key === 'verbleib') onTransport();
+    else if (key === 'rettungsmittel') onRettungsmittel?.();
     else if (key === 'person') {
       if (belegtVon) onOeffnen(belegtVon.id);
     } else if (key === 'wartebereich') onZurueckInWartebereich?.();
@@ -711,6 +756,10 @@ function PlatzKarte({
             und Personenmarke. */}
         {belegtVon && verbleibVorgemerkt ? (
           <VerbleibVorgemerkt />
+        ) : belegtVon && rettungsmittelMarke(belegtVon.rettungsmittel) ? (
+          // Angefordertes Rettungsmittel (LLH-1573, design.md D4) statt „belegt“: belegt zeigen
+          // schon Fläche und Personenmarke.
+          <RettungsmittelMarke person={belegtVon} />
         ) : (
           belegtVon && <StatusChip ton="bedien" wort="belegt" />
         )}
@@ -963,6 +1012,7 @@ function PersonenSpalte({
                     <Wartezeit seit={p.erfasst_at} vorwort="erfasst vor" />
                   )}
                   {vorgemerkt?.has(p.id) && <VerbleibVorgemerkt />}
+                  <RettungsmittelMarke person={p} />
                 </span>
                 {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in
                     keinem klickbaren Vorfahren und braucht keinen `stopPropagation`-Riegel. Ein
@@ -1556,7 +1606,20 @@ export default function Grundriss({
   // „Unterwegs“. Ohne Netz merkt der Schreibweg vor (LLH-1138, design.md D8, Regel in
   // `frontend/src/offline/AGENTS.md`): die Person bleibt dann, wo sie steht, bis der Abgleich sendet.
   // Vorgemerkte Verbleibe zeigt der Ort, nicht nur die Meldung (`frontend/src/offline/AGENTS.md`).
-  const benutzerId = useAuthOptional()?.benutzer?.id;
+  const auth = useAuthOptional();
+  const benutzerId = auth?.benutzer?.id;
+  // „Rettungsmittel anfordern“ am Platz (LLH-1573, design.md D3): nicht am gekoppelten Gerät, nur
+  // mit Schreibrecht und freigegebenen Nachforderungen; der Sprung öffnet deren Erfassung.
+  const navigate = useNavigate();
+  const nachforderungGesperrt = useSprungSperre(einsatzId)('nachforderungen');
+  const anfordernFuer = (person: Person | undefined) =>
+    person &&
+    !schreibgeschuetzt &&
+    auth?.geraet == null &&
+    !nachforderungGesperrt &&
+    rettungsmittelAnforderbar(person.rettungsmittel)
+      ? () => navigate(nachforderungenPfad(einsatzId, { bezugPerson: person.id }))
+      : undefined;
   const vorgemerkteEintraege = useVorgemerktePersonEintraege(benutzerId, einsatzId);
   const verbleibVorgemerkt = useMemo(
     () =>
@@ -1782,6 +1845,7 @@ export default function Grundriss({
                   bearbeitbar={platzEditAktiv && !layoutMut.isPending}
                   abgelehnt={platzFehler.grund(p.id) != null}
                   verbleibVorgemerkt={belegt != null && verbleibVorgemerkt.has(belegt.id)}
+                  onRettungsmittel={anfordernFuer(belegt)}
                   onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
                   onAustritt={() => {
                     const b = belegtAn(p.id);

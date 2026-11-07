@@ -128,6 +128,8 @@ export interface BoardKartenProps {
   laeuftId?: number | null;
   stellenJeId?: ReadonlyMap<number, StellenVerweis> | null;
   zielNamen?: ZielNamen | null;
+  /** Sprung auf die Person einer Anforderung (LLH-1573), nur mit Freigabe Personen. */
+  personPfad?: ((personId: number) => string) | null;
 }
 
 interface NachforderungBoardProps {
@@ -282,6 +284,7 @@ export default function NachforderungBoard({
             laeuft={n.id === karten.laeuftId}
             stellenJeId={karten.stellenJeId}
             zielNamen={karten.zielNamen}
+            personPfad={karten.personPfad}
           />
         );
       })}

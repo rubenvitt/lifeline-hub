@@ -25,6 +25,18 @@ pub(super) fn sse(state: &AppState, einsatz_id: i64) {
         .publiziere_einsatz(einsatz_id, LiveEvent::Nachforderung);
 }
 
+/// Wie [`sse`], und bei einer Nachforderung mit Personenbezug zusätzlich `person` (LLH-1573
+/// design.md D4): die Personenantwort trägt den Stand des Rettungsmittels, Patientenkopf und UHS
+/// laden ihn so ohne Leserecht auf Nachforderungen nach.
+fn sse_mit_person(state: &AppState, n: &NachforderungAnzeige) {
+    sse(state, n.einsatz_id);
+    if n.person_id.is_some() {
+        state
+            .live
+            .publiziere_einsatz(n.einsatz_id, LiveEvent::Person);
+    }
+}
+
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
 fn parse_zeit(roh: &str) -> Result<String, AppError> {
     crate::zeit::normalisiere_eingabe(roh)
@@ -108,6 +120,31 @@ pub struct NeueNachforderung {
     /// mit demselben Schlüssel liefert die schon gespeicherte Nachforderung.
     #[serde(default)]
     pub client_id: Option<String>,
+    /// Person, für die angefordert wird (LLH-1573 design.md D1): ein Rettungsmittel für einen
+    /// Patienten. Fehlt = ohne Bezug.
+    #[serde(default)]
+    pub person_id: Option<i64>,
+}
+
+/// LLH-1573 (design.md D2): ein Bezug auf eine Person wird wie die Betreuungsstelle geprüft — 403
+/// ohne Lesezugriff auf das Modul Personen (VOR jedem Lesen, sonst verrieten 404/409 ihre
+/// Existenz), 404 bei fremder oder unbekannter Person, 409 bei stornierter.
+async fn pruefe_person(
+    state: &AppState,
+    ctx: &EinsatzSchreibzugriff<Nachforderungen>,
+    person_id: i64,
+) -> Result<(), AppError> {
+    ctx.fordere_modul_zugriff(
+        &state.pool,
+        <crate::einsatz::modul::Personen as crate::einsatz::modul::ModulMarker>::KEY
+            .expect("Personen ist an ein Modul gebunden"),
+    )
+    .await?;
+    let person = crate::person::repo::laden(&state.pool, ctx.einsatz.id, person_id).await?;
+    if person.storniert_at.is_some() {
+        return Err(AppError::Conflict("Die Person ist storniert".into()));
+    }
+    Ok(())
 }
 
 /// LLH-1089 (design.md D8): ein Ziel aus Raum oder Abschnitt wird wie die Betreuungsstelle
@@ -244,8 +281,27 @@ pub async fn anlegen(
             "„Benötigt bis“ liegt vor der Anforderung".into(),
         ));
     }
+    // Ein Rettungsmittel für einen Patienten (LLH-1573 D1): leer wird 1, mehr ist ein Widerspruch,
+    // und Person und Betreuungsstelle schließen sich aus.
+    let anzahl = match (req.person_id, req.anzahl) {
+        (Some(_), None) => Some(1),
+        (Some(_), Some(a)) if a > 1 => {
+            return Err(AppError::UnprocessableEntity(
+                "Für eine Person wird genau ein Rettungsmittel angefordert".into(),
+            ));
+        }
+        (_, a) => a,
+    };
+    if req.person_id.is_some() && req.betreuungsstelle_id.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "Höchstens ein Bezug: Person oder Betreuungsstelle".into(),
+        ));
+    }
     if let Some(stelle_id) = req.betreuungsstelle_id {
         pruefe_betreuungsstelle(&state, &ctx, stelle_id).await?;
+    }
+    if let Some(person_id) = req.person_id {
+        pruefe_person(&state, &ctx, person_id).await?;
     }
     pruefe_ziel(&state, &ctx, req.ziel_br_id, req.ziel_abschnitt_id).await?;
 
@@ -256,7 +312,7 @@ pub async fn anlegen(
         repo::NachforderungDaten {
             art: &art,
             bezeichnung: bezeichnung.as_deref(),
-            anzahl: req.anzahl,
+            anzahl,
             adressat_kategorie: adressat,
             adressat_bezeichnung: trimme(&req.adressat_bezeichnung),
             begruendung: trimme(&req.begruendung),
@@ -268,6 +324,7 @@ pub async fn anlegen(
             ziel_text: ziel_text.as_deref(),
             benoetigt_bis: benoetigt_bis.as_deref(),
             client_id: client_id.as_deref(),
+            person_id: req.person_id,
         },
     )
     .await?;
@@ -280,7 +337,7 @@ pub async fn anlegen(
         if let Some(etb_id) = n.etb_nachforderung_id {
             state.live.publiziere(einsatz_id, etb_id);
         }
-        sse(&state, einsatz_id);
+        sse_mit_person(&state, &n);
     }
     Ok((StatusCode::CREATED, Json(n)))
 }
@@ -367,7 +424,7 @@ pub async fn status(
     };
     let n = repo::load(&state.pool, nachforderung_id).await?;
     state.live.publiziere(einsatz_id, etb_id);
-    sse(&state, einsatz_id);
+    sse_mit_person(&state, &n);
     // Das UPDATE hat den Status geändert (sonst 422 oben): Ersteller und S4 erfahren den Status,
     // den DIESE Anfrage gesetzt hat, nicht den inzwischen gelesenen.
     if let Some(gesetzt) = NachforderungStatus::parse(neu) {
@@ -429,7 +486,7 @@ pub async fn ablehnen(
     };
     let n = repo::load(&state.pool, nachforderung_id).await?;
     state.live.publiziere(einsatz_id, etb_id);
-    sse(&state, einsatz_id);
+    sse_mit_person(&state, &n);
     crate::nachforderung::benachrichtigung::status_gewechselt(
         &state.pool,
         &state.live,
@@ -474,6 +531,9 @@ pub struct ZusageReq {
     /// Voraussichtliches Eintreffen (UTC, D3); leer = ohne.
     #[serde(default)]
     pub eintreffen_erwartet_at: Option<String>,
+    /// Einsatznummer der Leitstelle (LLH-1573 design.md D5); leer = ohne. Nur mit Personenbezug.
+    #[serde(default)]
+    pub leitstelle_einsatznummer: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/nachforderungen/{nid}/zusage — Zusage mit Menge, Rufnamen und
@@ -492,6 +552,11 @@ pub async fn zusage(
     let eta = trimme(&req.eintreffen_erwartet_at)
         .map(parse_zeit)
         .transpose()?;
+    let einsatznummer = optional_max(
+        req.leitstelle_einsatznummer,
+        "Einsatznummer",
+        crate::nachforderung::LEITSTELLE_EINSATZNUMMER_MAX,
+    )?;
     // Den Zusammenhang (422) und den Bezug (404) prüft das Repo an der Zeile, in der Transaktion.
     let ergebnis = repo::sage_zu(
         &state.pool,
@@ -502,13 +567,14 @@ pub async fn zusage(
             anzahl: req.anzahl,
             rufnamen: &rufnamen,
             eintreffen_erwartet_at: eta.as_deref(),
+            leitstelle_einsatznummer: einsatznummer.as_deref(),
         },
         &jetzt(),
     )
     .await?;
     let n = repo::load(&state.pool, nachforderung_id).await?;
     state.live.publiziere(einsatz_id, ergebnis.etb_id);
-    sse(&state, einsatz_id);
+    sse_mit_person(&state, &n);
     crate::nachforderung::benachrichtigung::status_gewechselt(
         &state.pool,
         &state.live,
@@ -570,7 +636,7 @@ pub async fn zurueckziehen(
     };
     let n = repo::load(&state.pool, nachforderung_id).await?;
     state.live.publiziere(einsatz_id, etb_id);
-    sse(&state, einsatz_id);
+    sse_mit_person(&state, &n);
     Ok(Json(n))
 }
 
@@ -594,6 +660,9 @@ pub struct PatchNachforderung {
     pub eintreffen_erwartet_at: Option<Option<String>>,
     #[serde(default)]
     pub rufnamen: Option<Vec<String>>,
+    /// Einsatznummer der Leitstelle (LLH-1573 D5); `null` entfernt sie.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub leitstelle_einsatznummer: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id}/nachforderungen/{nid} — eine offene Nachforderung bearbeiten:
@@ -629,6 +698,11 @@ pub async fn bearbeiten(
         .map(|e| e.as_deref().map(parse_zeit).transpose())
         .transpose()?;
     let rufnamen = req.rufnamen.as_deref().map(pruefe_rufnamen).transpose()?;
+    let einsatznummer = support::optional_max_tri(
+        req.leitstelle_einsatznummer,
+        "Einsatznummer",
+        crate::nachforderung::LEITSTELLE_EINSATZNUMMER_MAX,
+    )?;
     // 422: der Zusammenhang; dann der Bezug des neuen Ziels (403/404/409), nur wenn es sich ändert.
     let ziel_im_body =
         req.ziel_br_id.is_some() || req.ziel_abschnitt_id.is_some() || ziel_text.is_some();
@@ -663,13 +737,14 @@ pub async fn bearbeiten(
             ziel,
             eintreffen_erwartet_at: eta.as_ref().map(|e| e.as_deref()),
             rufnamen: rufnamen.as_deref(),
+            leitstelle_einsatznummer: einsatznummer.as_ref().map(|n| n.as_deref()),
         },
     )
     .await?;
     let n = repo::load(&state.pool, nachforderung_id).await?;
     if let Some(etb_id) = etb_id {
         state.live.publiziere(einsatz_id, etb_id);
-        sse(&state, einsatz_id);
+        sse_mit_person(&state, &n);
     }
     Ok(Json(n))
 }
