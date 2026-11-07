@@ -558,11 +558,11 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('abloesungPfad mit ?schicht= wie der Server-Pfad der Benachrichtigung (LLH-1131 Teil II)', () => {
     expect(abloesungPfad(E, { schicht: 9 })).toBe('/einsaetze/5/abloesung?schicht=9');
   });
-  it('abloesungPfad mit ?ansicht= (LLH-1312): „laufend“ ohne Parameter, Umkehr verwirft Unbekanntes', () => {
+  it('abloesungPfad mit ?ansicht= (LLH-1312): „laufend“ ausdrücklich (Vorgabe im Sanitätsdienst ist der Plan, LLH-1554), Umkehr verwirft Unbekanntes', () => {
     expect(abloesungPfad(E, { ansicht: 'ohne-schicht' })).toBe(
       '/einsaetze/5/abloesung?ansicht=ohne-schicht',
     );
-    expect(abloesungPfad(E, { ansicht: 'laufend' })).toBe('/einsaetze/5/abloesung');
+    expect(abloesungPfad(E, { ansicht: 'laufend' })).toBe('/einsaetze/5/abloesung?ansicht=laufend');
     for (const a of ['ohne-schicht', 'vergangen', 'laufend', 'plan'] as const) {
       const pfad = abloesungPfad(E, { ansicht: a });
       const params = new URLSearchParams(pfad.split('?')[1] ?? '');

@@ -152,6 +152,7 @@ describe('schichtplanZeilen (LLH-1554)', () => {
       expect(befundText({ art: 'dienst', dauer_minuten: 750 }, namen, 'Anna')).toBe(
         'Anna: 12:30 h im Dienst',
       );
+      expect(befundText({ art: 'dienst', dauer_minuten: 45 }, namen)).toBe('45 min im Dienst');
       expect(befundText({ art: 'quali', qualifikation_id: 3, fehlen: 1 }, namen)).toBe(
         '1 × Rettungssanitäter fehlt',
       );

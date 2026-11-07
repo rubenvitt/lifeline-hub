@@ -332,9 +332,9 @@ export function dokumentePfad(einsatzId: number, opts: { neu?: boolean } = {}): 
  * Schicht (LLH-1131 Teil II): die Seite wählt ihre Ansicht, rollt sie ins Bild und hebt sie kurz
  * hervor. Gebaut wie der Pfad in `src/benachrichtigung/text.rs` (Bezüge der Ablösung).
  * `?ansicht=` ist ZUSTAND wie bei {@link funkplanPfad} (LLH-1312): er bleibt in der Adresse,
- * damit Browser-Zurück und Lesezeichen die Ansicht treffen; „laufend“ steht ohne Parameter.
- * Ohne Parameter öffnet die Seite ihre Vorgabe: „laufend“, im Sanitätsdienst den Schichtplan
- * (LLH-1554, `pages/AbloesungPage.tsx`).
+ * damit Browser-Zurück und Lesezeichen die Ansicht treffen. Ohne Parameter öffnet die Seite ihre
+ * Vorgabe: „laufend“, im Sanitätsdienst den Schichtplan (LLH-1554, `pages/AbloesungPage.tsx`).
+ * Wer zu fälligen Schichten führt, nennt „laufend“ deshalb ausdrücklich.
  */
 export function abloesungPfad(
   einsatzId: number,
@@ -342,7 +342,7 @@ export function abloesungPfad(
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'abloesung'), {
     schicht: opts.schicht,
-    ansicht: opts.ansicht === 'laufend' ? undefined : opts.ansicht,
+    ansicht: opts.ansicht,
   });
 }
 

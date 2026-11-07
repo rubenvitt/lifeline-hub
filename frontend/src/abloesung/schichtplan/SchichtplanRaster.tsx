@@ -305,7 +305,11 @@ export default function SchichtplanRaster({
         {zeilen.map((z) => {
           const kopf = z.gruppe !== letzteGruppe && z.gruppe != null;
           letzteGruppe = z.gruppe;
-          const eigene = bloecke.filter((b) => b.zeile === z.schluessel);
+          // Nur was die Spanne berührt: ein Block davor oder danach läge sonst als Streifen am Rand
+          // oder machte die Rollfläche breiter als die Achse.
+          const eigene = bloecke.filter(
+            (b) => b.zeile === z.schluessel && b.bis > spanne.von && b.von < spanne.bis,
+          );
           return (
             <Fragment key={z.schluessel}>
               {kopf && (

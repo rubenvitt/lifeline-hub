@@ -14,6 +14,7 @@ import type {
 } from '../../api/types';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import { abschnittDerEinheit } from '../../kraefte/kraeftebaumKern';
+import { formatDauer } from '../dauer';
 import type { Ampel, RasterBlock, RasterZeile } from './raster';
 
 /**
@@ -182,12 +183,8 @@ export function befundText(
   switch (befund.art) {
     case 'quali':
       return `${vorn}${befund.fehlen ?? 1} × ${qualiNamen.get(befund.qualifikation_id ?? -1) ?? 'Qualifikation'} fehlt`;
-    case 'dienst': {
-      const min = befund.dauer_minuten ?? 0;
-      const h = Math.floor(min / 60);
-      const rest = min % 60;
-      return `${vorn}${rest ? `${h}:${String(rest).padStart(2, '0')}` : h} h im Dienst`;
-    }
+    case 'dienst':
+      return `${vorn}${formatDauer(befund.dauer_minuten ?? 0)} im Dienst`;
     default:
       return `${vorn}${befundWort(befund.art)}`;
   }
