@@ -1,3 +1,85 @@
+## [1.0.0-alpha.175](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.174...v1.0.0-alpha.175) (2026-11-07)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Beim ersten Start werden mehrere Migrationen automatisch eingespielt. Sie legen neue Tabellen und Spalten an: Schichtplan samt Helfern und Grenzwerten, Programmpunkte der Veranstaltung, Anlass der Hilfeleistung an der Person, zusätzliche Angaben zum Verbleib, die Kopplung eines Geräts an eine Einheit und den Auslöser bei Ablösungshinweisen. Vor dem Update eine Sicherung anlegen.
+- **Neue Längengrenzen bei Eingaben:** Längere Eingaben lehnt der Server jetzt mit einer Fehlermeldung ab. Das gilt für:
+  - Betreuungsstellen: Bezeichnung bis 200, Standort bis 500, Notiz bis 2.000 Zeichen
+  - Evakuierungsbezirke: Bezeichnung bis 200, Sammelstelle bis 500, Notiz bis 2.000 Zeichen
+  - Lagezonen: Notiz bis 2.000 Zeichen; die Farbe einer freien Skizze muss die Form `#rrggbb` haben
+
+  Wer Daten über die Schnittstelle einspielt, sollte das berücksichtigen.
+- **Schnittstelle Lagemonitor:** Die Antwort enthält jetzt zusätzlich die anstehenden Programmpunkte. Die externe Schnittstelle v1 bleibt unverändert.
+
+### Betroffene
+
+- **Anlass der Hilfeleistung:** Jede Person kann einen Anlass aus einem festen Katalog tragen: Verletzung, internistisch, neurologisch, Intoxikation, Hitze/Kälte, Allergie/Insektenstich, psychisch oder Sonstiges. Er lässt sich an drei Stellen setzen und wechseln:
+  - in der Erfassungsmaske unter „Weitere Angaben“
+  - im Patientenkopf
+  - in der Kurzeingabe per Kürzel (z. B. `!intox`, `!verl`)
+
+  Jede Änderung steht im Verlauf, und ohne Netz wird der Anlass vorgemerkt. Der Anlass zählt datenschutzrechtlich zur Kategorie Behandlung und erscheint nie im Einsatztagebuch.
+- **Mehr Angaben zum Verbleib:** Zum Verbleib lassen sich jetzt vier weitere Angaben erfassen:
+  - die Einsatznummer der Leitstelle, wenn ein fremdes Rettungsmittel transportiert
+  - an wen entlassen wurde (selbst, Angehörige/Begleitung, Sorgeberechtigte, Polizei)
+  - ob Behandlung oder Transport gegen ärztlichen Rat abgelehnt wurden
+  - ob die Unterschrift dazu auf Papier vorliegt oder verweigert wurde
+
+  Die Angaben stehen im Patientenkopf, im Dialog, im Grundriss der Unfallhilfsstelle und am gekoppelten Gerät zur Verfügung. Verlauf, Kopf und Druckansicht zeigen sie an, das Einsatztagebuch nennt keine davon.
+- **Aufbewahrung:** Ist die Einsatznummer der Leitstelle der einzige Behandlungsbezug einer Person, bleibt ihr Personenstamm jetzt so lange erhalten wie bei anderen Behandlungsdaten. Bisher wurde er schon mit der Personenauskunft gelöscht.
+
+### Gekoppelte Geräte
+
+- **Neue Funktionsansicht „Einheit“:** Ein gekoppeltes Handy kann jetzt für genau eine Einheit des Einsatzes arbeiten. Gekoppelt wird auch direkt aus dem Einheiten-Detail über „Gerät koppeln“. Auf dem Gerät kann die Einheit:
+  - ihre eigenen Aufträge sehen (Startseite), quittieren und den Vollzug melden
+  - ihren Status über Flächen aus dem Katalog der Organisation setzen
+  - Meldungen absenden, auf Knopfdruck mit dem eigenen Standort
+
+  Ein neuer Auftrag löst eine kurze Vibration aus. Ohne Verbindung sind Quittung, Vollzug und Status gesperrt, das Gerät zeigt dann den letzten Stand. Die Führung sieht den Standort einer Meldung und kann zur Karte springen.
+- Wird eine Einheit aufgelöst oder storniert, werden ihre Gerätekopplungen automatisch widerrufen und im Einsatztagebuch vermerkt.
+
+### Aufträge
+
+- „In Bearbeitung“ kann einen bereits vollzogenen oder aufgehobenen Auftrag nicht mehr zurücksetzen. Bisher konnte ein Gerät mit veralteter Liste dabei still Vollzugszeit und -person löschen.
+
+### Kräfte und Mittel
+
+- **Schichtplan im Einsatz (Grundlage, die Oberfläche folgt):**
+  - Planblöcke für Einheiten, Unfallhilfsstellen und Pausen, jeweils mit Soll-Anzahl, Qualifikationssoll und eingeteilten Personen
+  - Einteilen lassen sich Stammpersonal, Ad-hoc-Kräfte und reine Planhelfer
+  - Der Plan meldet Lücken und gibt Hinweise, ohne etwas zu blockieren: doppelt verplant, Qualifikation fehlt, zu lange im Dienst (einstellbar, Vorgabe 12 h Dienst / 8 h Ruhe), nicht verfügbar, Abweichung vom Ist
+  - „Schichten erzeugen“ füllt einen Zeitraum nach Schichtlänge oder Schichtmodell
+- **Ablösung durch Verbände:** Ist ein Verband als Ablöser geplant, zählen Alarmierung und Eintreffen jeder seiner Untereinheiten für den Verband. Der Hinweis nennt den Verband und die auslösende Untereinheit, z. B. „Verband Nord (durch 1. Staffel)“. Die Karte zeigt je Art den frühesten Zeitpunkt im Verband.
+
+### Einsatzdaten, Überblick und Lagemonitor
+
+- **Ablauf der Veranstaltung:** Die Einsatzdaten haben ein neues Paneel „Ablauf“ für Programmpunkte wie Einlass, Feuerwerk oder Ende. Punkte lassen sich anlegen, ändern und löschen; verstrichene Punkte bleiben gedämpft stehen.
+  - Im Überblick erscheinen anstehende Programmpunkte als „Nächste Marken“, ohne Hervorhebung. Ein Klick führt in die Einsatzdaten.
+  - Auf dem Lagemonitor zeigt die neue Kachel „Ablauf“ höchstens drei anstehende Punkte. Lange Bezeichnungen werden umgebrochen statt abgeschnitten.
+
+### Einsatztagebuch
+
+- „anzeigen“ bei Nachträgen vor der Lagebesprechung setzt den Zeitraum jetzt auf die volle Minute. Einträge aus derselben Minute bleiben nicht mehr verborgen.
+
+### Lagekarte
+
+- Taktische Zeichen mit Schadensgrad „gering“ (Grün) und „groß“ (Orange) erhalten wie „katastrophal“ eine weiße Unterlegung der roten Diagonalen und sind dadurch besser lesbar. Die Strichelung einer Organisation bleibt erhalten.
+- Der Zoneninspektor zählt die Zeichen der Notiz ab 80 % der Grenze und schickt eine zu lange Notiz nicht ab, statt sie zu kürzen.
+
+### Betreuung und Evakuierung
+
+- Die Masken für Betreuungsstellen und Evakuierungsbezirke zeigen die neuen Längengrenzen mit Zeichenzähler an.
+- Ein langer Bezirksname verhindert nicht mehr das Zeichnen des Bezirks auf der Lagekarte.
+
+### Bedienung allgemein
+
+- Fehlerbanner bleiben jetzt stehen, während ein neuer Abruf läuft, und „Erneut abrufen“ zeigt den Ladezustand. Das gilt für Stab, Lagebesprechung, Presse, Lageberichte und Fahrzeuge.
+- Direktlinks, die eine Erfassung öffnen, wirken jetzt nur einmal und öffnen eine geschlossene Erfassung nicht erneut. Betroffen sind Tiere, Bereitstellungsräume, Nachforderungen, Schäden, Dokumente, Unfallhilfsstellen, Einsatztagebuch und Personen. Auf der Personenseite bleibt ein gesetzter Filter dabei erhalten.
+
+### Verwaltung
+
+- Die mitgelieferte Einsatzvorlage „Sanitätsdienst“ zeigt jetzt auch Fernmeldewesen sowie Wetter & Pegel. Das gilt nur für neue Organisationen; bestehende Vorlagen und Einsätze bleiben unverändert.
+
 ## [1.0.0-alpha.174](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.173...v1.0.0-alpha.174) (2026-11-06)
 
 ### Wichtige Änderungen
