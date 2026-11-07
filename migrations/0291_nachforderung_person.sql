@@ -11,7 +11,7 @@
 --
 -- Aufbewahrung: `person_id` ist ein Verweis (retain wie `betreuungsstelle_id`), die Einsatznummer
 -- wird geschwärzt (`einsatz::schwaerzung_registry`). Rein additiv per ADD COLUMN, nullable, kein
--- Backfill. Abgesichert von db::tests::migration_0289_*.
+-- Backfill. Abgesichert von db::tests::migration_0291_*.
 ALTER TABLE nachforderung ADD COLUMN person_id INTEGER
     REFERENCES einsatz_person(id) ON DELETE SET NULL;
 ALTER TABLE nachforderung ADD COLUMN leitstelle_einsatznummer TEXT;
