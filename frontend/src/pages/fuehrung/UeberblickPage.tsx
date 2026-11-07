@@ -573,7 +573,7 @@ export default function UeberblickPage() {
         : m.art === 'pegelprognose'
           ? pegelZielPfad(einsatzId, wetterPegelFrei)
           : m.art === 'abloesung'
-            ? abloesungPfad(einsatzId)
+            ? abloesungPfad(einsatzId, { ansicht: 'laufend' })
             : m.art === 'unwetter'
               ? wetterPegelPfad(einsatzId)
               : m.art === 'programmpunkt'
