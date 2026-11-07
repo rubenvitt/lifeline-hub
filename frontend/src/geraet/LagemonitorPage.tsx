@@ -602,15 +602,19 @@ function AblaufKachel({ punkte, jetzt }: { punkte: Programmpunkt[]; jetzt: numbe
   const { rollen } = useRollen();
   return (
     <Kachel titel="Ablauf" style={{ flex: '1 1 0', minWidth: 0 }}>
-      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
+      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 12 }}>
         {punkte.map((p) => (
+          // Uhrzeit und Abstand stehen über der Bezeichnung, die die ganze Breite der Kachel hat:
+          // neben der Uhrzeit bliebe ihr nach Mitternacht (Uhrzeit mit Datum) und mit breiter
+          // Meldungskachel so wenig, dass sie in viele Zeilen bricht und der Karte die Höhe nimmt.
           <li
             key={p.id}
             data-lfh="monitor-ablauf"
             style={{
-              display: 'flex',
+              display: 'grid',
+              gridTemplateColumns: 'max-content minmax(0, 1fr)',
+              columnGap: 24,
               alignItems: 'baseline',
-              gap: 24,
               fontSize: GROSS.text,
               lineHeight: 1.25,
               minWidth: 0,
@@ -618,6 +622,8 @@ function AblaufKachel({ punkte, jetzt }: { punkte: Programmpunkt[]; jetzt: numbe
           >
             <span
               style={{
+                gridColumn: 1,
+                gridRow: 1,
                 fontFamily: schrift.zahl,
                 fontVariantNumeric: 'tabular-nums',
                 fontWeight: 600,
@@ -630,12 +636,14 @@ function AblaufKachel({ punkte, jetzt }: { punkte: Programmpunkt[]; jetzt: numbe
                 Karte darüber gibt die Höhe her. */}
             <span
               data-lfh="monitor-ablauf-bezeichnung"
-              style={{ flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere' }}
+              style={{ gridColumn: '1 / -1', gridRow: 2, minWidth: 0, overflowWrap: 'anywhere' }}
             >
               {p.bezeichnung}
             </span>
             <span
               style={{
+                gridColumn: 2,
+                gridRow: 1,
                 color: rollen.gedaempft,
                 whiteSpace: 'nowrap',
                 fontVariantNumeric: 'tabular-nums',

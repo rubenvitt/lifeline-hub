@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Betreuungsstelle } from '../api/types';
 import {
+  sichtbareVerbleibAngaben,
   sichtbareVerbleibFelder,
   stellenOptionen,
   rettungsmittelOptionen,
@@ -234,5 +235,96 @@ describe('Fahrer-Angabe (LLH-1332, Spec `patienten-uebergabe`)', () => {
     expect(
       uebergabeBody({ aktuelles_einsatz_fahrzeug_id: 9, aktuelles_verbleib_ziel: 'KH Mitte' }, {}),
     ).toMatchObject({ ziel: 'KH Mitte' });
+  });
+});
+
+describe('Angaben am Verbleib (LLH-1568, Spec `verbleib-angaben`)', () => {
+  it('zeigt je Art nur die passenden Angaben', () => {
+    expect(sichtbareVerbleibAngaben('entlassung', {})).toEqual({
+      einsatznummer: false,
+      entlassenAn: true,
+      gegenRat: true,
+      unterschrift: false,
+    });
+    expect(sichtbareVerbleibAngaben('transport', {})).toMatchObject({
+      einsatznummer: true,
+      entlassenAn: false,
+      gegenRat: true,
+    });
+    expect(
+      sichtbareVerbleibAngaben('transport', { einsatz_fahrzeug_id: 9 }).einsatznummer,
+      'Eigentransport ohne Einsatznummer',
+    ).toBe(false);
+    expect(sichtbareVerbleibAngaben('entlassung', { gegen_rat: 'behandlung' }).unterschrift).toBe(
+      true,
+    );
+    for (const art of ['vor_ort', 'notunterkunft', 'verstorben'] as const) {
+      expect(sichtbareVerbleibAngaben(art, { gegen_rat: 'transport' })).toEqual({
+        einsatznummer: false,
+        entlassenAn: false,
+        gegenRat: false,
+        unterschrift: false,
+      });
+    }
+  });
+
+  it('schickt die Angaben der Entlassung mit', () => {
+    expect(
+      verbleibBody(
+        {
+          art: 'entlassung',
+          entlassen_an: 'polizei',
+          gegen_rat: 'transport',
+          unterschrift: 'liegt_vor',
+        },
+        false,
+      ),
+    ).toMatchObject({ entlassen_an: 'polizei', gegen_rat: 'transport', unterschrift: 'liegt_vor' });
+  });
+
+  it('lässt nach einem Artwechsel liegengebliebene Angaben weg (sonst 422)', () => {
+    const body = verbleibBody(
+      { art: 'transport', transportmittel: 'RTW', entlassen_an: 'polizei' },
+      false,
+    );
+    expect(body).not.toHaveProperty('entlassen_an');
+    const vorOrt = verbleibBody(
+      { art: 'vor_ort', gegen_rat: 'behandlung', unterschrift: 'verweigert' },
+      false,
+    );
+    expect(vorOrt).not.toHaveProperty('gegen_rat');
+    expect(vorOrt).not.toHaveProperty('unterschrift');
+  });
+
+  it('schickt die Unterschrift nur mit einer Ablehnung', () => {
+    expect(
+      verbleibBody({ art: 'entlassung', gegen_rat: null, unterschrift: 'liegt_vor' }, false),
+    ).not.toHaveProperty('unterschrift');
+  });
+
+  it('schickt die Einsatznummer getrimmt und nur beim fremden Transport', () => {
+    expect(
+      verbleibBody(
+        { art: 'transport', transportmittel: 'RTW', leitstelle_einsatznummer: ' 4711 ' },
+        false,
+      ),
+    ).toMatchObject({ transport_durch: 'fremd', leitstelle_einsatznummer: '4711' });
+    expect(
+      verbleibBody(
+        {
+          art: 'transport',
+          transportmittel: '1/83-1',
+          einsatz_fahrzeug_id: 9,
+          leitstelle_einsatznummer: '4711',
+        },
+        false,
+      ),
+    ).not.toHaveProperty('leitstelle_einsatznummer');
+    expect(
+      verbleibBody(
+        { art: 'transport', transportmittel: 'RTW', leitstelle_einsatznummer: '   ' },
+        false,
+      ),
+    ).not.toHaveProperty('leitstelle_einsatznummer');
   });
 });

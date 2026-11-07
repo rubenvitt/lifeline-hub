@@ -2345,6 +2345,67 @@ mod tests {
         );
     }
 
+    /// LLH-1568 (Spec `aufbewahrung-kategorien`): ein Verbleib mit Einsatznummer der Leitstelle
+    /// gibt Behandlungsbezug, ein Verbleib ohne sie nicht. Die Schwärzung der Behandlung leert
+    /// die Nummer; „gegen Rat“ bleibt als Katalogwert.
+    #[tokio::test]
+    async fn einsatznummer_haelt_den_stamm_und_die_behandlung_leert_sie() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        let mit = volle_person(&pool, einsatz, 1, leit).await;
+        let ohne = volle_person(&pool, einsatz, 2, leit).await;
+        for (p, nummer) in [(mit, Some("2611-0815")), (ohne, None)] {
+            sqlx::query(
+                "INSERT INTO person_verbleib (einsatz_id, person_id, art, ziel, transportmittel, \
+                    status, transport_durch, leitstelle_einsatznummer, gegen_rat, erfasst_von) \
+                 VALUES (?, ?, 'transport', 'KH Mitte', 'RTW', 'abtransportiert', 'fremd', ?, \
+                    'behandlung', ?)",
+            )
+            .bind(einsatz)
+            .bind(p)
+            .bind(nummer)
+            .bind(leit)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        schliessen(&pool, einsatz, leit).await;
+        erst_auskunft_dann_behandlung(&pool, einsatz).await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Personenauskunft, t(JETZT))
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            person_felder(&pool, mit).await.0.as_deref(),
+            Some("Mustermann"),
+            "die Einsatznummer ist ein Behandlungsbezug"
+        );
+        assert_eq!(
+            person_felder(&pool, ohne).await.0,
+            None,
+            "ein Verbleib ohne Einsatznummer allein ist keiner"
+        );
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Behandlung, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let verbleib: (Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT leitstelle_einsatznummer, gegen_rat FROM person_verbleib WHERE person_id = ?",
+        )
+        .bind(mit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(verbleib, (None, Some("behandlung".into())));
+        assert_eq!(
+            person_felder(&pool, mit).await.0,
+            None,
+            "beide Zwecke abgelaufen"
+        );
+    }
+
     #[tokio::test]
     async fn anhaenge_schwaerzung_laesst_anderes_stehen_und_ist_idempotent() {
         let pool = crate::db::test_pool().await;

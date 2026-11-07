@@ -117,7 +117,8 @@ Vormerkung, Schwärzung und jede Änderung einer Frist stehen im Einsatztagebuch
 ### Fristen je Datenkategorie
 
 - **Behandlung**: Zustand, PAT-Nummer, benötigte Fachrichtung und Anlass der Hilfeleistung der
-  Personen, Lage und Notiz ihrer Verletzungen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung.
+  Personen, Lage und Notiz ihrer Verletzungen, die Einsatznummer der Leitstelle am Transport sowie
+  die Notizen zu Sichtung, Verlauf und UHS-Belegung.
 - **Personenauskunft**: Herkunftsadresse und Melderkontakt der Personen.
 - **Anhänge**: Datei-Anhänge und die Bilder der Lagekarte.
 
@@ -126,13 +127,15 @@ früher abläuft als die des Einsatzes. Danach wird die Kategorie vorgemerkt und
 Karenz geschwärzt; der Einsatz selbst bleibt lesbar. Name, Geburtsdatum, Fundort und Verbleib
 einer Person bleiben, bis alle Zwecke der Person abgelaufen sind. Zur Behandlung gehört eine
 Person, sobald sie eine Sichtung, eine Verlaufsnotiz, eine UHS-Belegung, einen Zustand, eine
-Verletzung, eine Maßnahme, einen Transport, eine PAT-Nummer oder die Kontamination
-„kontaminiert“ trägt, auch wenn der Eintrag aufgehoben ist („nicht kontaminiert“ zählt nicht); ihr
-Name bleibt dann bis zum Ablauf der Behandlung.
+Verletzung, eine Maßnahme, einen Transport, eine PAT-Nummer, die Kontamination
+„kontaminiert“ oder am Verbleib eine Einsatznummer der Leitstelle trägt, auch wenn der Eintrag
+aufgehoben ist („nicht kontaminiert“ zählt nicht); ihr Name bleibt dann bis zum Ablauf der
+Behandlung.
 
 Auch nach der Schwärzung bleiben die Angaben aus festen Listen ohne Freitext:
 Sichtungskategorie, Körperregion, Ansicht, Art und Schwere einer Verletzung, die Maßnahmen,
-Priorität und Art des Transports und die Kontamination.
+Priorität und Art des Transports, die Kontamination sowie am Verbleib „Entlassen an“, die
+Ablehnung gegen Rat und der Stand der Unterschrift.
 
 Während der Karenz bleiben die Daten der Kategorie lesbar, auch in Druck und Export. Wer eine
 Höchstfrist einhalten muss, wählt die Dauer deshalb so, dass Dauer und 30 Tage Karenz zusammen

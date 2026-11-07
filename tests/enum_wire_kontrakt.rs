@@ -168,6 +168,20 @@ fn serde_wire_gleich_as_str() {
     });
     // Übergabe und Versorgungszustand (LLH-1332, Spec `patienten-uebergabe`)
     enum_wire_as_str!(lifeline_hub::person::TransportDurch { Fremd, Eigen });
+    enum_wire_as_str!(lifeline_hub::person::EntlassenAn {
+        Selbst,
+        Begleitung,
+        Sorgeberechtigte,
+        Polizei
+    });
+    enum_wire_as_str!(lifeline_hub::person::GegenRat {
+        Behandlung,
+        Transport
+    });
+    enum_wire_as_str!(lifeline_hub::person::Unterschrift {
+        LiegtVor,
+        Verweigert
+    });
     enum_wire_as_str!(lifeline_hub::person::Versorgung {
         Offen,
         Unterwegs,

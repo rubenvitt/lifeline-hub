@@ -32,6 +32,8 @@ export const VERTEILER_BEZEICHNUNG_MAX = 200;
 export const FUNKTION_TEXT_MAX = 200;
 /** PAT-Nummer einer Person, die Nummer der Papier-Patientenanhängetasche (LLH-1326). */
 export const PAT_NUMMER_MAX = 32;
+/** Einsatznummer der Leitstelle an einem Transport durch ein fremdes Rettungsmittel (LLH-1568). */
+export const EINSATZNUMMER_MAX = 50;
 /** Kurze Notiz einer Verletzung am Körperschema (LLH-1113). */
 export const VERLETZUNG_NOTIZ_MAX = 200;
 /** Name und Vorname einer Person (LLH-1329). */

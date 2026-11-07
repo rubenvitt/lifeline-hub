@@ -2848,6 +2848,12 @@ export interface components {
          */
         EmpfaengerTyp: "abschnitt" | "einheit" | "funktion" | "person" | "fahrzeug" | "extern";
         /**
+         * @description An wen eine Person entlassen wurde (LLH-1568, Spec `verbleib-angaben`), nur bei
+         *     `art = entlassung`. Fester Katalog (LLH-1109): zählbar für den Bericht.
+         * @enum {string}
+         */
+        EntlassenAn: "selbst" | "begleitung" | "sorgeberechtigte" | "polizei";
+        /**
          * @description Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
          *     `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und
          *     `0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test
@@ -3519,6 +3525,12 @@ export interface components {
          * @enum {string}
          */
         Gefahrentyp: "atemgifte" | "angstreaktion" | "ausbreitung" | "atomare_strahlung" | "chemische_stoffe" | "erkrankung_verletzung" | "explosion" | "elektrizitaet" | "einsturz" | "absturz" | "brand" | "durchbruch" | "ertrinken";
+        /**
+         * @description Was ein Patient gegen Rat abgelehnt hat (LLH-1568, design.md D1/D2), nur bei Entlassung
+         *     und Transport. Der Zeitpunkt ist die Erfassungszeit des Verbleibs.
+         * @enum {string}
+         */
+        GegenRat: "behandlung" | "transport";
         /** @description Body von `POST …/benachrichtigungen/gelesen`. */
         GelesenEingabe: {
             /**
@@ -6895,6 +6907,12 @@ export interface components {
             werte: components["schemas"]["RichtwertEbenen"][];
         };
         /**
+         * @description Unterschrift zu einer Ablehnung gegen Rat (LLH-1568): sie bleibt auf Papier, Lifeline Hub
+         *     vermerkt nur, ob es sie gibt. Nur zusammen mit [`GegenRat`].
+         * @enum {string}
+         */
+        Unterschrift: "liegt_vor" | "verweigert";
+        /**
          * @description Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die
          *     Erreichbarkeit steht im Kommunikationsplan.
          * @enum {string}
@@ -6943,16 +6961,21 @@ export interface components {
             einsatz_fahrzeug_id?: number | null;
             /** Format: int64 */
             einsatz_id: number;
+            entlassen_an?: components["schemas"]["EntlassenAn"] | null;
             /** Format: int64 */
             erfasst_von: number;
+            gegen_rat?: components["schemas"]["GegenRat"] | null;
             /** Format: int64 */
             id: number;
+            /** @description Einsatznummer der Leitstelle bei Transport durch ein fremdes Rettungsmittel (LLH-1568). */
+            leitstelle_einsatznummer?: string | null;
             notiz?: string | null;
             /** Format: int64 */
             person_id: number;
             status?: components["schemas"]["VerbleibStatus"] | null;
             transport_durch?: components["schemas"]["TransportDurch"] | null;
             transportmittel?: string | null;
+            unterschrift?: components["schemas"]["Unterschrift"] | null;
             zeitpunkt_at: string;
             ziel?: string | null;
         };

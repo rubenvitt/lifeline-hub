@@ -51,7 +51,9 @@ erst schwärzen, wenn alle Zwecke dieser Person geschwärzt sind. Eine Person mi
 Behandlungsbezug MUST die Zwecke `behandlung` und `personenauskunft` tragen, jede andere nur
 `personenauskunft`. Behandlungsbezug MUST bestehen, sobald eine Sichtung, eine Verlaufsnotiz,
 eine UHS-Belegung, ein Zustand, eine Verletzung, eine Maßnahme, ein Transportstand, ein
-Anlass, eine PAT-Nummer oder Kontamination „ja“ vorliegt, auch storniert oder aufgehoben. „Nicht kontaminiert“
+Anlass, eine PAT-Nummer, Kontamination „ja“ oder ein Verbleib mit Einsatznummer der Leitstelle
+vorliegt, auch storniert oder aufgehoben. Ein Verbleib ohne Einsatznummer MUST NOT allein als
+Behandlungsbezug zählen. „Nicht kontaminiert“
 MUST NOT als Behandlungsbezug zählen.
 
 #### Scenario: Nur registriert

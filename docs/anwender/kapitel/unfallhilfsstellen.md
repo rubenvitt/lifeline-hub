@@ -158,7 +158,9 @@ Zurück in den Wartebereich führt das Platzmenü („…“) mit „Zurück in 
 1. Am belegten Platz „Verbleib / Entlassung erfassen“ wählen (Symbol mit dem Fahrzeug).
 2. Im Dialog „Verbleib erfassen — …“ die „Art“ prüfen; vorgewählt ist „Transport“. Beim
    Transport das „Rettungsmittel“ angeben: ein Fahrzeug unter „Im Einsatz“ für einen
-   Eigentransport, sonst das fremde Rettungsmittel. Dazu das „Ziel“ eintragen.
+   Eigentransport, sonst das fremde Rettungsmittel. Dazu das „Ziel“ eintragen. Bei der
+   Entlassung sagt „Entlassen an“, wer die Person übernimmt; „Einsatznummer Leitstelle“ und
+   „Gegen Rat“ stehen unter „Weitere Angaben“ ([Betroffene](betroffene.md)).
 3. „Erfassen“ wählen. Der Patient verlässt die Stelle; im Eigentransport steht er unter
    „Unterwegs“, bis dort „Übergabe quittieren“ gewählt ist. Mit einem fremden Rettungsmittel ist
    er übergeben und steht nirgends mehr im Grundriss.

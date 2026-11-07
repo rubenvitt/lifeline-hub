@@ -215,6 +215,70 @@ where
 }
 
 wire_enum! {
+    /// An wen eine Person entlassen wurde (LLH-1568, Spec `verbleib-angaben`), nur bei
+    /// `art = entlassung`. Fester Katalog (LLH-1109): zählbar für den Bericht.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum EntlassenAn {
+        /// Geht selbst.
+        Selbst => "selbst",
+        /// Angehörige oder Begleitung.
+        Begleitung => "begleitung",
+        /// Sorgeberechtigte einer minderjährigen Person.
+        Sorgeberechtigte => "sorgeberechtigte",
+        Polizei => "polizei",
+    }
+}
+
+wire_enum! {
+    /// Was ein Patient gegen Rat abgelehnt hat (LLH-1568, design.md D1/D2), nur bei Entlassung
+    /// und Transport. Der Zeitpunkt ist die Erfassungszeit des Verbleibs.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum GegenRat {
+        Behandlung => "behandlung",
+        Transport => "transport",
+    }
+}
+
+wire_enum! {
+    /// Unterschrift zu einer Ablehnung gegen Rat (LLH-1568): sie bleibt auf Papier, Lifeline Hub
+    /// vermerkt nur, ob es sie gibt. Nur zusammen mit [`GegenRat`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Unterschrift {
+        LiegtVor => "liegt_vor",
+        Verweigert => "verweigert",
+    }
+}
+
+/// `Type`/`Decode` für nullable Katalogspalten des Verbleibs (Muster [`VerbleibStatus`]).
+macro_rules! text_spalte {
+    ($($name:ident),+) => {$(
+        impl<DB: sqlx::Database> sqlx::Type<DB> for $name
+        where
+            str: sqlx::Type<DB>,
+        {
+            fn type_info() -> DB::TypeInfo {
+                <str as sqlx::Type<DB>>::type_info()
+            }
+        }
+
+        impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for $name
+        where
+            &'r str: sqlx::Decode<'r, DB>,
+        {
+            fn decode(
+                value: <DB as sqlx::Database>::ValueRef<'r>,
+            ) -> Result<Self, sqlx::error::BoxDynError> {
+                let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+                $name::parse(s)
+                    .ok_or_else(|| format!(concat!("Ungültiger Wert für ", stringify!($name), ": {}"), s).into())
+            }
+        }
+    )+};
+}
+
+text_spalte!(EntlassenAn, GegenRat, Unterschrift);
+
+wire_enum! {
     /// Versorgungszustand einer Person (LLH-1332, design.md D3), abgeleitet aus dem jüngsten
     /// Verbleib, nie gespeichert. Die eine Regel steht in [`versorgung_von`].
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, ToSchema)]
@@ -787,6 +851,10 @@ pub const PERSON_NOTIZ_MAX: usize = 2_000;
 
 /// Höchstlänge einer Verlaufsnotiz (`POST …/notizen`, LLH-1329).
 pub const VERLAUFSNOTIZ_MAX: usize = 2_000;
+
+/// Höchstlänge der Einsatznummer der Leitstelle an einem Transport (LLH-1568, Spec
+/// `verbleib-angaben`). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+pub const EINSATZNUMMER_MAX: usize = 50;
 
 /// Höchstlänge der Notiz einer Verletzung (LLH-1113, Spec `personen-verletzungen`): ein kurzer
 /// Zusatz zur Markierung am Körperschema, kein Befundtext. Spiegel:

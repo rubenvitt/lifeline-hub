@@ -7117,6 +7117,16 @@
           "extern"
         ]
       },
+      "EntlassenAn": {
+        "type": "string",
+        "description": "An wen eine Person entlassen wurde (LLH-1568, Spec `verbleib-angaben`), nur bei\n`art = entlassung`. Fester Katalog (LLH-1109): zählbar für den Bericht.",
+        "enum": [
+          "selbst",
+          "begleitung",
+          "sorgeberechtigte",
+          "polizei"
+        ]
+      },
       "Ereignis": {
         "type": "string",
         "description": "Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in\n`migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und\n`0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test\n`jede_variante_passiert_den_db_check`). Zugleich Schema-Anker der Union in\n[`AnmeldeEintragAnzeige`] (LFH-120).",
@@ -8684,6 +8694,14 @@
           "brand",
           "durchbruch",
           "ertrinken"
+        ]
+      },
+      "GegenRat": {
+        "type": "string",
+        "description": "Was ein Patient gegen Rat abgelehnt hat (LLH-1568, design.md D1/D2), nur bei Entlassung\nund Transport. Der Zeitpunkt ist die Erfassungszeit des Verbleibs.",
+        "enum": [
+          "behandlung",
+          "transport"
         ]
       },
       "GelesenEingabe": {
@@ -17308,6 +17326,14 @@
           }
         }
       },
+      "Unterschrift": {
+        "type": "string",
+        "description": "Unterschrift zu einer Ablehnung gegen Rat (LLH-1568): sie bleibt auf Papier, Lifeline Hub\nvermerkt nur, ob es sie gibt. Nur zusammen mit [`GegenRat`].",
+        "enum": [
+          "liegt_vor",
+          "verweigert"
+        ]
+      },
       "Verbindungsart": {
         "type": "string",
         "description": "Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die\nErreichbarkeit steht im Kommunikationsplan.",
@@ -17401,13 +17427,42 @@
             "type": "integer",
             "format": "int64"
           },
+          "entlassen_an": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EntlassenAn",
+                "description": "An wen entlassen wurde (LLH-1568), nur bei `entlassung`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "erfasst_von": {
             "type": "integer",
             "format": "int64"
           },
+          "gegen_rat": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GegenRat",
+                "description": "Was gegen Rat abgelehnt wurde (LLH-1568); Zeitpunkt ist `zeitpunkt_at`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "leitstelle_einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatznummer der Leitstelle bei Transport durch ein fremdes Rettungsmittel (LLH-1568)."
           },
           "notiz": {
             "type": [
@@ -17444,6 +17499,17 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "unterschrift": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Unterschrift",
+                "description": "Ob die Unterschrift zur Ablehnung auf Papier vorliegt (LLH-1568), nur mit `gegen_rat`."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "zeitpunkt_at": {

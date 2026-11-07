@@ -2,7 +2,7 @@ import type { Verbleib } from '../api/types';
 import { KennungsLink } from '../components/kennungsLink';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
-import { kurzVerbleib } from './personMeta';
+import { kurzVerbleib, type VerbleibKurz } from './personMeta';
 
 /**
  * Kurzform eines Verbleibs (`kurzVerbleib`). Zeigt ein Verbleib „Notunterkunft“ auf eine
@@ -13,8 +13,9 @@ import { kurzVerbleib } from './personMeta';
 export default function VerbleibText({
   verbleib,
 }: {
-  verbleib: Pick<Verbleib, 'art' | 'ziel' | 'transportmittel' | 'einsatz_id'> &
-    Partial<Pick<Verbleib, 'status' | 'transport_durch' | 'betreuungsstelle_id'>>;
+  verbleib: VerbleibKurz &
+    Pick<Verbleib, 'einsatz_id'> &
+    Partial<Pick<Verbleib, 'betreuungsstelle_id'>>;
 }) {
   const pfad = useEinsatzPfade().betreuungsstelle;
   const text = kurzVerbleib(verbleib);

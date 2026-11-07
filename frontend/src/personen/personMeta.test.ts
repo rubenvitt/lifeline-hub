@@ -33,3 +33,34 @@ describe('kurzVerbleib (LLH-1332)', () => {
     );
   });
 });
+
+describe('kurzVerbleib mit Angaben (LLH-1568, Spec `verbleib-angaben`)', () => {
+  const e = { art: 'entlassung' as const, ziel: null, transportmittel: null };
+  it('nennt, an wen entlassen wurde', () => {
+    expect(kurzVerbleib(e)).toBe('entlassen');
+    expect(kurzVerbleib({ ...e, entlassen_an: 'polizei' })).toBe('entlassen an Polizei');
+    expect(kurzVerbleib({ ...e, entlassen_an: 'begleitung' })).toBe(
+      'entlassen an Angehörige / Begleitung',
+    );
+    expect(kurzVerbleib({ ...e, entlassen_an: 'selbst' })).toBe('entlassen, geht selbst');
+  });
+  it('hängt gegen Rat mit Unterschrift an', () => {
+    expect(kurzVerbleib({ ...e, gegen_rat: 'transport', unterschrift: 'liegt_vor' })).toBe(
+      'entlassen · gegen Rat: Transport abgelehnt, Unterschrift liegt vor',
+    );
+    expect(kurzVerbleib({ ...e, gegen_rat: 'behandlung' })).toBe(
+      'entlassen · gegen Rat: Behandlung abgelehnt',
+    );
+  });
+  it('nennt die Einsatznummer der Leitstelle beim Transport', () => {
+    expect(
+      kurzVerbleib({
+        art: 'transport',
+        ziel: 'KH Mitte',
+        transportmittel: 'RTW 3/83-2',
+        transport_durch: 'fremd',
+        leitstelle_einsatznummer: '2611-0815',
+      }),
+    ).toBe('Transport → KH Mitte (RTW 3/83-2) · Einsatznr. 2611-0815');
+  });
+});
