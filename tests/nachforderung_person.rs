@@ -2,7 +2,7 @@
 //! Nachforderung verweist auf die Person (`person_id`), die Zusage trägt die Einsatznummer der
 //! Leitstelle, und die Personenantwort zeigt den Stand (`rettungsmittel`).
 //!
-//! Die Schwärzung prüft `einsatz::purge_scheduler`, die Spalten `db::tests::migration_0289_*`.
+//! Die Schwärzung prüft `einsatz::purge_scheduler`, die Spalten `db::tests::migration_0291_*`.
 
 use axum::http::StatusCode;
 use serde_json::Value;

@@ -13031,9 +13031,9 @@ mod tests {
     /// LLH-1573: Personenbezug und Einsatznummer an der Nachforderung; Bestand bleibt ohne, der
     /// Purge der Person löst den Bezug.
     #[tokio::test]
-    async fn migration_0289_nachforderung_person() {
+    async fn migration_0291_nachforderung_person() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 289;
+        const VERSION: i64 = 291;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
