@@ -13293,11 +13293,12 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        // Org 1: Startliste mit „Pause“; Org 2: umbenannt klein, dazu ein deaktivierter.
+        // Org 1: Startliste mit „Pause“; Org 2: umbenannt klein, davor ein deaktivierter „PAUSE“,
+        // den nur der Filter `aktiv = 1` auslässt.
         for (org, label, aktiv) in [
             (1, "im Einsatz", 1),
             (1, "Pause", 1),
-            (2, "alt pause", 0),
+            (2, "PAUSE", 0),
             (2, " pause ", 1),
         ] {
             sqlx::query(
