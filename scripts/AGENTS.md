@@ -33,6 +33,8 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   `mise exec -- …`, Workflows `jdx/mise-action` ohne `install_args`. `packageManager`,
   `engines.node` und der Devcontainer spiegeln die Zahl; `scripts/check-toolversionen.sh`
   prüft das und bricht an jedem harten `node@…`/`pnpm@…` in `scripts/`, `.github/`, README, Skills.
+- Das **OpenSpec-CLI** steht ebenfalls in `[tools]` (`npm:@fission-ai/openspec`), Aufruf
+  `mise exec -- openspec …`; kein globales `npm i -g`. Das Gate ruft es nicht.
 - Env-Hygiene über `scripts/lib/dev-env.sh`, keine handgepflegte `env -u`-Liste; Isolation wo
   möglich im Test (`config::tests::parse_hermetisch`).
 - **Jeder Checkout baut in sein eigenes `target/`** (LFH-520, `.cargo/config.toml`, schlägt
