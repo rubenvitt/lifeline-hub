@@ -13166,9 +13166,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn migration_0293_abloesung_laut_plan() {
+    async fn migration_0294_abloesung_laut_plan() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 293;
+        const VERSION: i64 = 294;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,

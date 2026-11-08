@@ -25,7 +25,7 @@
 -- nicht).
 --
 -- Rein additiv per ADD COLUMN, kein Backfill. Abgesichert von
--- db::tests::migration_0293_abloesung_laut_plan.
+-- db::tests::migration_0294_abloesung_laut_plan.
 ALTER TABLE einsatz_abloesung ADD COLUMN faellig_laut_plan INTEGER NOT NULL DEFAULT 0
     CHECK (faellig_laut_plan IN (0, 1));
 ALTER TABLE einsatz_abloesung ADD COLUMN plan_block_id INTEGER
