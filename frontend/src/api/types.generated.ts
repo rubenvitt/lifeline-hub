@@ -6045,7 +6045,7 @@ export interface components {
              * Format: int64
              * @description `null`, wenn der Block inzwischen gelöscht ist.
              */
-            planschicht_id?: number | null;
+            planschicht_id: number | null;
             /** Format: int64 */
             uhs_id?: number | null;
             vollzogen_at: string;
@@ -8006,7 +8006,7 @@ export interface components {
         WechselArt: "uhs" | "pause_beginn" | "pause_ende";
         /** @description Der nächste Wechsel eines Blocks zum Vorbelegen des Dialogs. */
         WechselVorlage: {
-            art?: components["schemas"]["WechselArt"] | null;
+            art: components["schemas"]["WechselArt"] | null;
             /** @description UHS: Kräfte an dieser UHS, die im Block stehen. */
             bleiben: components["schemas"]["WechselVorlagePerson"][];
             /** Format: int64 */
@@ -8039,12 +8039,12 @@ export interface components {
         WechselVorlagePerson: {
             /** @description Eine andere UHS, an der die Kraft gerade steht (sie wechselt). */
             andere_uhs?: string | null;
-            art?: components["schemas"]["PlanPersonArt"] | null;
+            art: components["schemas"]["PlanPersonArt"] | null;
             /**
              * Format: int64
              * @description Die Kraft des Einsatzes; `null` = nicht im Einsatz (kommt erst mit dem Wechsel).
              */
-            einsatz_personal_id?: number | null;
+            einsatz_personal_id: number | null;
             /** Format: int64 */
             helfer_id?: number | null;
             name: string;

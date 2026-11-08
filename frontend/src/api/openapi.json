@@ -14983,6 +14983,7 @@
         "required": [
           "id",
           "art",
+          "planschicht_id",
           "zeitpunkt",
           "vollzogen_at"
         ],
@@ -20201,6 +20202,7 @@
         "description": "Der nächste Wechsel eines Blocks zum Vorbelegen des Dialogs.",
         "required": [
           "block_id",
+          "art",
           "zeitpunkt",
           "kommen",
           "gehen",
@@ -20296,6 +20298,8 @@
         "type": "object",
         "description": "Eine Person der Vorlage: aus dem Block (mit ihrer Herkunft im Plan) oder eine Kraft an der UHS.",
         "required": [
+          "art",
+          "einsatz_personal_id",
           "name"
         ],
         "properties": {

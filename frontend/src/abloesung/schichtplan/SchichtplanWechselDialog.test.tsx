@@ -24,7 +24,7 @@ const uhsVorlage: SchichtplanWechselVorlage = {
       andere_uhs: 'Bahnhof',
     },
   ],
-  gehen: [{ einsatz_personal_id: 21, name: 'Anna' }],
+  gehen: [{ art: null, einsatz_personal_id: 21, name: 'Anna' }],
   bleiben: [{ art: 'einsatz', einsatz_personal_id: 23, name: 'Dana' }],
   uebersprungen: [],
   wechsel: [],

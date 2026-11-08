@@ -58,7 +58,7 @@ pub async fn anlegen(
     org_id: i64,
     daten: StatusDaten<'_>,
 ) -> Result<PersonalStatus, AppError> {
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     if daten.pause {
         pause_abgeben_tx(&mut tx, org_id).await?;
     }
@@ -136,7 +136,7 @@ pub async fn patche(
     id: i64,
     patch: StatusPatch<'_>,
 ) -> Result<PersonalStatus, AppError> {
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     if patch.pause == Some(true) {
         let eigen: Option<i64> =
             sqlx::query_scalar("SELECT 1 FROM personal_status WHERE id = ? AND org_id = ?")

@@ -82,6 +82,7 @@ pub struct PlanWechselAnzeige {
     #[schema(value_type = WechselArt)]
     pub art: WechselArt,
     /// `null`, wenn der Block inzwischen gelöscht ist.
+    #[schema(required)]
     pub planschicht_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uhs_id: Option<i64>,
@@ -96,13 +97,14 @@ pub struct PlanWechselAnzeige {
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct WechselVorlagePerson {
     /// Herkunft im Plan; `null` bei einer Kraft, die nur an der UHS steht.
-    #[schema(value_type = Option<PlanPersonArt>)]
+    #[schema(value_type = Option<PlanPersonArt>, required)]
     pub art: Option<PlanPersonArt>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub personal_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub helfer_id: Option<i64>,
     /// Die Kraft des Einsatzes; `null` = nicht im Einsatz (kommt erst mit dem Wechsel).
+    #[schema(required)]
     pub einsatz_personal_id: Option<i64>,
     pub name: String,
     /// Eine andere UHS, an der die Kraft gerade steht (sie wechselt).
@@ -121,7 +123,7 @@ pub struct WechselVorlagePerson {
 pub struct WechselVorlage {
     pub block_id: i64,
     /// Die Art des nächsten Wechsels; `null`, wenn alle Wechsel des Blocks vollzogen sind.
-    #[schema(value_type = Option<WechselArt>)]
+    #[schema(value_type = Option<WechselArt>, required)]
     pub art: Option<WechselArt>,
     /// Zeitpunkt laut Plan des nächsten Wechsels.
     pub zeitpunkt: String,
