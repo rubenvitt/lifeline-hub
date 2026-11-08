@@ -44,7 +44,7 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 | Phase | Wer | Werkzeug | Checkpoint? |
 |---|---|---|---|
 | 0 Laden & Statuskontext | Main-Loop | Zunder-Connector, ggf. Worktree | — |
-| 1 Scope/Verstehen | **Fan-out** (Workflow oder Subagents) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, bei Unklarheit; Route bestätigen** |
+| 1 Scope/Verstehen | **Fan-out** (Workflow oder Subagents) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, Pflicht: Lösungsweg gemeinsam ausarbeiten** |
 | 2 Entwurf | **Main-Loop** (`/opsx:propose` je Task auf `entwurf`), optional Judge-Panel (**Workflow** oder Subagents) als Zulieferer | eine Change je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Changes** |
 | 3 Dev (umsetzen) | Main-Loop **oder** Workflow | Moduswahl: sequenziell-interaktiv vs. autonom | nur bei Blocker |
 | 4 Review | **Fan-out** (Workflow oder Subagents) + Main-Loop | Dimensionen→finden→verifizieren, dann Review-Anfrage | bei Findings |
@@ -105,17 +105,19 @@ bei `entwurf` mit den zutreffenden Gründen E1–E3). Ergebnis ist eine **strukt
   anderen Tasks behalten ihre Route.
 - Jede andere Route → kein `/opsx:explore`.
 
-**Checkpoint.** Die Route ist ein Vorschlag des Readers, also bestätigst oder korrigierst du
-sie hier. E3 prüfst du an den Pfaden der Map nach. Gibt es offene Fragen, widersprüchliche
-Annahmen, mehrere sinnvolle Schnitte oder eine strittige Route → Map kompakt präsentieren und
-**den User fragen**, gern mit konkreten Optionen (s. „Checkpoints & Entscheidungen“). Ist alles
-klar → ohne Stopp weiter, aber die Map samt Routen in 2–3 Zeilen zusammenfassen.
+**Checkpoint — Pflicht (08.11.2026).** Die Route ist ein Vorschlag des Readers, also bestätigst
+oder korrigierst du sie hier. E3 prüfst du an den Pfaden der Map nach. Dann legst du die Map
+kompakt vor, je Task mit Route und Lösungsweg, dazu offene Fragen, Varianten und Schnitte mit
+Empfehlung (s. „Checkpoints & Entscheidungen“), und **wartest auf die Antwort**, auch wenn alles
+klar scheint. Das ist die Abstimmung aus `dev-zunder-ausfuehren`, „Gemeinsam ausarbeiten, bevor
+Code entsteht“; Tasks nur auf `trivial` brauchen sie nicht.
 
 **Zerlegen:** Zeigt der Scope, dass ein Task ohne Subtasks in Teile gehört, und stimmt der
 Mensch am Checkpoint zu, legt `decompose_task` die Subtasks in einem Schritt an (alles oder
 nichts).
 
-**Status:** `in_progress`, Route in `plan` (`dev-zunder-ausfuehren`, „Board-Status mitführen“).
+**Status:** `in_progress`, Route in `plan`; am Checkpoint `blocked`, mit der Antwort zurück auf
+`in_progress` (`dev-zunder-ausfuehren`, „Board-Status mitführen“).
 
 ## Phase 2 — Entwurf (Main-Loop mit `/opsx:propose`)
 
@@ -217,6 +219,8 @@ sequenziell — aber das nur, wenn der Schnitt sauber ist.
   `release_task` für jede reservierte Aufgabe.
 - Commit-Body und PR-Beschreibung tragen je (Sub)Task die Zeile
   `Zunder: https://zunder.rubeen.dev/#/aufgabe/<uuid>`.
+- **Bilder der Änderung** je Subtask in PR und Meldung (Regel und Technik:
+  `dev-zunder-ausfuehren`, „Bilder der Änderung“).
 - **Eine** Abschlussmeldung an den Menschen für den ganzen Task — Inhalt/Form und der
   Startbefehl für den Dev-Stack stehen in `dev-zunder-ausfuehren` (Abschnitt
   „Abschlussmeldung an den Menschen"), hier nicht duplizieren. `dev-zunder-ausfuehren`
@@ -241,9 +245,10 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 
 ## Checkpoints & Entscheidungen
 
-- **Sparsam, aber echt.** Checkpoint nur, wenn die Phase eine Unklarheit, einen Konflikt
-  oder mehrere vertretbare Optionen aufwirft („da wo es Sinn macht"). Sonst kurz
-  zusammenfassen und weiterlaufen.
+- **Zwei Halte immer:** nach Phase 1 (Lösungsweg gemeinsam ausarbeiten) und nach Phase 2
+  (Freigabe der Changes). Weitere Checkpoints sparsam, nur wenn eine Phase eine Unklarheit,
+  einen Konflikt oder mehrere vertretbare Optionen aufwirft; sonst kurz zusammenfassen und
+  weiterlaufen.
 - **Optionen anbieten, nicht offene Fragen stellen.** Wenn du fragst, leg konkrete Optionen
   mit Trade-offs vor und gib eine Empfehlung. Nutze dafür den interaktiven Frage-Mechanismus.
 - **Zwischenstand = Artefakt zeigen.** Präsentiere das, was die Phase produziert hat

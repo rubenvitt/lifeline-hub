@@ -88,6 +88,8 @@ sagt, **wann** welcher Status gilt; `dev-zunder-orchestrieren` verweist hierher.
 | Arbeit beginnt (Schritt 1, nach `claim_task`) | `in_progress` | — |
 | Branch steht (Schritt 2) | — | `branch` |
 | Route gewählt (Schritt 3) | — | `plan`: Route, bei `entwurf` der Change-Name |
+| Lösungsweg liegt zur Abstimmung vor („Gemeinsam ausarbeiten“) | `blocked` | Kommentar: was zur Entscheidung steht |
+| Lösungsweg abgestimmt | `in_progress` | `plan`: der abgestimmte Weg |
 | Change liegt zur Freigabe vor (Route `entwurf`) | `blocked` | `plan`: „Change `<name>` wartet auf Freigabe“ |
 | Freigabe erteilt, `/opsx:apply` beginnt | `in_progress` | `plan` nachziehen |
 | PR gegen `alpha` offen (Schritt 4) | `review` | `pr_url` |
@@ -162,6 +164,27 @@ Die Wahl dem User in **einem Satz** melden („Branch `feat/a1b2c3d4-…` angele
 erfragen. Fremde Arbeit wird dabei nie umbenannt oder überschrieben — im Zweifel neuer
 Worktree.
 
+## Gemeinsam ausarbeiten, bevor Code entsteht
+
+**Festlegung des Users vom 08.11.2026: „vor Implementierung gern mit mir gemeinsam
+ausarbeiten“.** Auf jeder Route außer `trivial` legst du den Lösungsweg dem Menschen vor,
+**bevor die erste Zeile Projektcode entsteht**, und baust erst nach seiner Antwort. Nicht allein
+nach eigener Empfehlung losbauen, auch wenn der Weg klar scheint.
+
+- **Was vorher ohne Halt läuft:** lesen, Scope klären, reproduzieren, messen, die Ursache eines
+  Bugs suchen. Das ist Vorarbeit für den Entwurf, kein Bauen.
+- **Was du vorlegst, kurz:** was sich aus Bediensicht ändert, die Varianten mit Empfehlung und
+  Begründung, die offenen Fragen. Fragen mit konkreten Optionen stellen, nicht offen, und
+  gesammelt statt einzeln nacheinander. Bei `bug-unklar` kommt die gefundene Ursache dazu.
+- **Währenddessen** steht der Task auf `blocked` (Tabelle „Board-Status mitführen“). Mit der
+  Antwort zurück auf `in_progress`, der abgestimmte Weg kommt in `plan`.
+- **Route `entwurf`:** Die Abstimmung liegt **vor** `/opsx:propose`, damit die Change schon den
+  gemeinsamen Weg beschreibt. Der Freigabe-Checkpoint danach bleibt unverändert Pflicht.
+- **Ändert sich der Weg beim Bauen** (neue Variante, verworfene Annahme, größerer Schnitt),
+  wieder vorlegen, bevor du ihn verlässt. Kleinigkeiten innerhalb des abgestimmten Wegs nicht.
+- **Ruft `dev-zunder-orchestrieren` auf,** zählt dessen Phase-1-Checkpoint als diese
+  Abstimmung, sofern dort der Weg je Task vorlag. Kein zweiter Halt je Subtask.
+
 ## Schritt 3: Komplexität einschätzen → Routing
 
 Komplexität aus Task-Beschreibung selbst einschätzen und den passenden Skill wählen. Der Task
@@ -176,6 +199,9 @@ Spalte „Route“ ist der Schlüssel, den auch die Scope-Map von `dev-zunder-or
 | `bug-unklar` | Bug, Ursache unklar | **`superpowers:systematic-debugging`** |
 | `klar` | Feature/Bugfix, klare Spec | **`superpowers:test-driven-development`** |
 | `entwurf` | Entwurf nötig (E1–E3, s. u.) | **`/opsx:propose`** → ⟨Checkpoint, `blocked`⟩ → **`/opsx:apply`** |
+
+Vor TDD, Fix oder `/opsx:propose` steht auf allen Routen außer `trivial` die Abstimmung aus
+„Gemeinsam ausarbeiten, bevor Code entsteht“.
 
 **Wann eine OpenSpec-Change entsteht — genau auf der Route `entwurf`** (LFH-589, Spec
 `entwurfs-hoheit`). Die Route `entwurf` gilt, sobald **mindestens einer** dieser Gründe
@@ -235,6 +261,8 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   macht eine abgehakte, nicht archivierte Change rot. Kästchen, die erst die CI des PRs belegt
   („`check-all.sh` grün“), werden mit Verweis auf diesen Lauf abgehakt, nicht offen gelassen.
 - **`superpowers:requesting-code-review`** vor dem Mergen
+- **Bilder der Änderung** in PR-Beschreibung und Meldung an den Menschen (Abschnitt „Bilder der
+  Änderung“ unten)
 - Commit-Body und PR-Beschreibung tragen die Zeile
   `Zunder: https://zunder.rubeen.dev/#/aufgabe/<uuid>` (Konvention: `AGENTS.md`, Abschnitt „Zunder“)
 - Integration → **`superpowers:finishing-a-development-branch`**, **Ziel `alpha`** (PR-Base
@@ -250,6 +278,32 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 - Wird der Task verworfen statt umgesetzt → **Status: `dropped`**, `release_task`
 - Danach: **Abschlussmeldung an den Menschen** (s. u.) — letzter Schritt, nach Merge und
   Board-Status.
+
+## Bilder der Änderung
+
+**Festlegung des Users vom 08.11.2026: „am Ende Screenshots, damit ich verstehe, was gemacht
+wurde“.** Jede Entwicklung endet mit Bildern der geänderten Stellen, und zwar an zwei Orten:
+im PR (Abschnitt „Bilder“ der Vorlage) und in der Meldung an den Menschen, sobald der PR offen
+ist.
+
+- **Was:** jede sichtbar geänderte Stelle im echten Zustand, mit den Daten, an denen der
+  Unterschied auffällt. Vorher und nachher nebeneinander, wo sich Bestehendes ändert. Weitere
+  Zustände (leer, Fehler, Druck, schmal) nur, wenn die Änderung sie betrifft.
+- **Ohne sichtbare Wirkung** (reines Backend, Tests, Gates, Anleitungen): kein Ersatzbild,
+  sondern ein Satz, warum es keins gibt.
+- **Aufnehmen** per Wegwerf-Spec im Bildlauf, die nie committet wird:
+  `frontend/e2e/doku-bilder/zz-<kurz>.bilder.ts` mit den Helfern aus `kern.ts`
+  (`anmelden`, `uhrAnhalten`, `demoEinsatz`, `fuelle`), aber `page.screenshot`/
+  `locator.screenshot` mit Pfad **außerhalb** von `docs/anwender/bilder/`. Lauf in `frontend/`:
+  `mise exec -- pnpm exec playwright test -c playwright.doku.config.ts e2e/doku-bilder/zz-<kurz>.bilder.ts`.
+  Die Demo-Daten sind dort schon eingespielt. Für Druckansichten
+  `page.emulateMedia({ media: 'print' })`, sonst verdecken Kopfleiste und Devtools-Knopf das Bild.
+  Danach die Spec löschen.
+- **Im PR:** GitHub nimmt Bilder nicht per API an. Deshalb die Bilder in einem eigenen Commit
+  unter `pr-bilder/<kurz>/` pushen, in der Beschreibung mit
+  `https://github.com/<owner>/<repo>/blob/<sha>/pr-bilder/<kurz>/<name>.png?raw=true` (SHA
+  dieses Commits) einbinden und im nächsten Commit wieder entfernen.
+- **In der Meldung:** die Bilder als Dateien mitschicken, nicht nur verlinken.
 
 ## Abschlussmeldung an den Menschen
 
