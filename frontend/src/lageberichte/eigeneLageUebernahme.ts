@@ -22,8 +22,8 @@ import {
   rendereFuehrungsorganisationMarkdown,
   wurzelFuehrungsstelle,
 } from '../pages/einsatzabschnitte/fuehrungsorganisation';
-import { einsatzleiterDarstellung } from '../stab/einsatzleiter';
-import { ZUSTAND_GRUND } from '../stab/funkplan';
+import { einsatzleiterDarstellung } from '../einsatz/einsatzleiter';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { gesperrt, ladeListe, type Geladen, type UebernahmeQuelle } from './uebernahmeQuelle';
 
 /**

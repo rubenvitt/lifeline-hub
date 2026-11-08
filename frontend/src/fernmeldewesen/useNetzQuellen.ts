@@ -12,8 +12,9 @@ import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import { ladeStab } from '../api/stab';
 import type { EinsatzFahrzeug, ModulFreigaben, Stabsfunktion } from '../api/types';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
-import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
-import type { KanalQuellen, Quelle, SkizzenQuelle } from './luecken';
+import type { FuehrungsstelleQuelle } from '../einsatz/fuehrungsstelle';
+import type { KanalQuellen, SkizzenQuelle } from './luecken';
+import type { Quelle } from '../api/abrufZustand';
 import type { ModulFreigabe } from '../einsatz/useModulFreigabe';
 
 /**
@@ -56,7 +57,7 @@ function useFuehrungsstelleQuelle(q: {
   return useMemo(() => ({ zustand, daten: data }), [zustand, data]);
 }
 
-/** Die Quelle „Daten der Skizze“: wie eine Liste, aber eine Angabe (`stab/luecken.ts`). */
+/** Die Quelle „Daten der Skizze“: wie eine Liste, aber eine Angabe (`fernmeldewesen/luecken.ts`). */
 function useSkizzenQuelle(
   q: {
     data: SkizzenQuelle['daten'] | undefined;

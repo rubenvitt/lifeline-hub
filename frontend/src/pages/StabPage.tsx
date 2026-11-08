@@ -19,7 +19,7 @@ import LagebesprechungZeile from '../lagebesprechung/LagebesprechungZeile';
 import BesetzungModal from '../stab/BesetzungModal';
 import ChecklistePaneel from '../stab/ChecklistePaneel';
 import { besetzungRechteText, zeileFuer } from '../stab/besetzung';
-import { mitWirksamemLabel } from '../stab/sachgebiete';
+import { mitWirksamemLabel } from '../fuehrung/sachgebiete';
 import SachgebietKachel from '../stab/SachgebietKachel';
 import { stabRasterStil, stabSpalten } from '../stab/stabRaster';
 import { useFunkplanLuecken } from '../stab/useFunkplanLuecken';

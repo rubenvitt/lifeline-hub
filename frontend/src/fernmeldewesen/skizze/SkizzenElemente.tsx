@@ -15,7 +15,7 @@
  */
 import type { RenderTheme } from '@einsatzzeichen/core';
 import type { CSSProperties, ReactNode } from 'react';
-import { useRollen } from '../../components/instrument';
+import { useRollen } from '../../components/instrument/index';
 import EinsatzZeichen, { FunktionsZeichen } from '../../zeichen/EinsatzZeichen';
 import type {
   AusstattungsZeichen,
@@ -78,7 +78,7 @@ export interface Zustand {
 /**
  * Deckkraft eines zurückgenommenen Elements: es tritt zurück, sein Text hält aber das Ziel der
  * Textstufen, hell 7,36 : 1 (Tag ≥ 7), dunkel 8,43 : 1 (Nacht ≥ 5); zurückgenommen ist nicht
- * gesperrt (Prüfliste Kriterium 5, `stab/AGENTS.md`, gerechnet in `zurueckKontrast.test.ts`; 0,6
+ * gesperrt (Prüfliste Kriterium 5, `fernmeldewesen/AGENTS.md`, gerechnet in `zurueckKontrast.test.ts`; 0,6
  * hielt hell nur 4,83 : 1, 0,7 nur 6,84 : 1). Die Hervorhebung trägt die Strichstärke, nicht die
  * Deckkraft.
  */

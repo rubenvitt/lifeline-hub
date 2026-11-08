@@ -49,9 +49,9 @@ import { ADMIN, ADMIN_PW, anmeldenAls, wechsleZuRolle } from './rollen-kern';
  *
  * Druck (Format, Umbruch, Graustufen): `fernmeldeskizze-druck.spec.ts`.
  *
- * Mutationsproben (Prüfliste): `rufnamenHoehe` in `stab/fernmeldeskizzeLayout.ts` auf eine
+ * Mutationsproben (Prüfliste): `rufnamenHoehe` in `fernmeldewesen/fernmeldeskizzeLayout.ts` auf eine
  * feste Zeile → die Messung wird rot (Text unter dem Platz); `status` in `Leitungsbild`
- * (`stab/skizzenZeichen.tsx`) fest auf „bestehend“ → der Geplant-Test wird rot; `istSchmal` in der Rechteweiche weg → der 390-px-Test wird rot.
+ * (`fernmeldewesen/skizzenZeichen.tsx`) fest auf „bestehend“ → der Geplant-Test wird rot; `istSchmal` in der Rechteweiche weg → der 390-px-Test wird rot.
  */
 
 const FUEKW = { width: 1366, height: 768 };

@@ -26,8 +26,8 @@ import {
   einheitenOhneSprechgruppe,
   lokaleSprechgruppenOhneZuordnung,
   verbindungenOhneGemeinsameSprechgruppe,
-  type Quelle,
 } from './luecken';
+import { type Quelle } from '../api/abrufZustand';
 
 /**
  * Das Netzmodell der taktischen Fernmeldeskizze (LFH-893 D2): Szenarien aus dem Spec-Delta

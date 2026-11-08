@@ -28,7 +28,7 @@ import { ApiError, AusgangUnbekannt, NetzFehler, fehlerText } from '../api/clien
 export interface SkizzenBefehl {
   /** Für Knopf-Titel und Meldungen, z. B. „Zuordnung DMO 314_F* an 1. Zug“. */
   beschreibung: string;
-  /** Das Element, an dem ein Scheitern gemeldet wird (Schlüssel aus `stab/fernmeldeskizze.ts`). */
+  /** Das Element, an dem ein Scheitern gemeldet wird (Schlüssel aus `fernmeldewesen/fernmeldeskizze.ts`). */
   element: string;
   /** Die Handlung, für Wiederholen. */
   ausfuehren: () => Promise<void>;

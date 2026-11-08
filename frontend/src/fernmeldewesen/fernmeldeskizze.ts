@@ -25,11 +25,10 @@ import {
   einsatzdatenPfad,
   kommunikationsplanPfad,
 } from '../routing/deeplinks';
-import { fuehrungsstelleErfasst } from './fuehrungsstelle';
-import { ZUSTAND_GRUND } from './funkplan';
+import { fuehrungsstelleErfasst } from '../einsatz/fuehrungsstelle';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { STELLENART_LABEL } from './kommunikationsplan';
 import {
-  type Quelle,
   abschnitteOhneSprechgruppe,
   einheitenOhneSprechgruppe,
   kanalbelegung,
@@ -41,7 +40,8 @@ import {
   type KanalTeilnehmer,
   type Luecke,
 } from './luecken';
-import { SACHGEBIETE } from './sachgebiete';
+import { type Quelle } from '../api/abrufZustand';
+import { SACHGEBIETE } from '../fuehrung/sachgebiete';
 import { bedingungszeichenText, komponentenartWort, leitungsBeschreibung } from './skizzenZeichen';
 import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 import type { Herkunft } from './sprechgruppenplan';
@@ -49,16 +49,16 @@ import type { Herkunft } from './sprechgruppenplan';
 /**
  * Das Netz der taktischen Fernmeldeskizze nach BBK „Taktische Zeichen im Bevölkerungsschutz“,
  * Anhang J.5: Teilnehmer an gemeinsamen Kanälen statt Kanten je Eltern-Kind-Paar. Die eine
- * Quelle für Bild, Lücken am Element, Druck und Übernahme (`stab/funkplan.ts`).
+ * Quelle für Bild, Lücken am Element, Druck und Übernahme (`fernmeldewesen/funkplan.ts`).
  *
  * - **Stellen** `fs`, `ab-<id>`, `eh-<id>`, `ks-<id>` (externe Stelle des Kommunikationsplans,
  *   nie eine Führungsfunktion), `ko-<id>` (Komponente), in Fokusfolge: Führungsstelle, Baum der
  *   Führungsorganisation, externe Stellen, Komponenten (D6).
- * - **Schienen** `sg-<id>` aus der Kanalbelegung (`stab/luecken.ts:kanalbelegung`): jede
+ * - **Schienen** `sg-<id>` aus der Kanalbelegung (`fernmeldewesen/luecken.ts:kanalbelegung`): jede
  *   Sprechgruppe, die eine Stelle oder Komponente trägt, jede einsatzlokale und jede mit
  *   Lagezeile, TMO vor DMO. Je Schiene die Stichleitungen mit Status (D7).
  * - **Verbindungen** `vb-<id>` und **Bereiche** `be-<id>` aus den Skizzendaten (D3).
- * - **Lücken je Element** ausschließlich über `stab/luecken.ts` (D11): das Bild zählt dieselben
+ * - **Lücken je Element** ausschließlich über `fernmeldewesen/luecken.ts` (D11): das Bild zählt dieselben
  *   Treffer wie das Paneel.
  * - **Ausstattung je Kasten** (LFH-1029): Führungsmittel und Funktionen als kleine Zeichen in
  *   Führungsstelle und Abschnitt, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus).
@@ -107,7 +107,7 @@ export interface ElementLuecke {
   gegenstelle?: string;
 }
 
-/** Wie ein Ausstattungszeichen gezeichnet wird (`stab/skizze/SkizzenElemente.tsx:AusstattungsZeichenBild`). */
+/** Wie ein Ausstattungszeichen gezeichnet wird (`fernmeldewesen/skizze/SkizzenElemente.tsx:AusstattungsZeichenBild`). */
 export type AusstattungsZeichen =
   /** Führungsfahrzeug: Zeichen aus `baueTzProps`, Einstufung wie auf der Lagekarte. */
   | { art: 'tz'; tz: TzProps }
@@ -194,7 +194,7 @@ export interface NetzSchiene {
   id: number;
   betriebsart: Betriebsart;
   bezeichnung: string;
-  /** Inhalt des Bedingungszeichens, z. B. „TMO BN_BOS“ (`stab/skizzenZeichen.tsx`). */
+  /** Inhalt des Bedingungszeichens, z. B. „TMO BN_BOS“ (`fernmeldewesen/skizzenZeichen.tsx`). */
   zeichen: string;
   /** Stehen mit dem Hinweis unter dem Bedingungszeichen (D12, LFH-1030). */
   netz: string | null;
@@ -619,7 +619,7 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
     }));
   const schieneJeKey = new Map(schienen.map((s) => [s.key, s]));
 
-  // ── Lücken je Element, nur über `stab/luecken.ts` (D11) ──────────────────────────────────────
+  // ── Lücken je Element, nur über `fernmeldewesen/luecken.ts` (D11) ──────────────────────────────────────
   const haenge = (key: string, art: ElementLueckeArt, gegenstelle?: string) => {
     const element = stelleJeKey.get(key) ?? schieneJeKey.get(key);
     if (!element) return;

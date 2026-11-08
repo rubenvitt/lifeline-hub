@@ -1,6 +1,6 @@
 /**
  * Ansicht der Fernmeldeskizze (LFH-893 D1): Zoom und Verschieben als reine Rechnung über eine
- * `viewBox`, ohne DOM. Die Fläche (`stab/skizze/SkizzenFlaeche.tsx`) misst nur ihre Größe in
+ * `viewBox`, ohne DOM. Die Fläche (`fernmeldewesen/skizze/SkizzenFlaeche.tsx`) misst nur ihre Größe in
  * Pixeln und hält eine {@link Ansicht}; alles andere steht hier und ist getestet.
  *
  * - **Eingepasst** (`null`): die ganze Skizze steht in der Fläche, über `viewBox` auf die

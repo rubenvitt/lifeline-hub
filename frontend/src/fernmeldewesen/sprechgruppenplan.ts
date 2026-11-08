@@ -11,10 +11,12 @@ import {
   einsatzdatenPfad,
   kommunikationsplanPfad,
 } from '../routing/deeplinks';
-import { FUEHRUNGSSTELLE_STELLE } from './fuehrungsstelle';
-import { ZUSTAND_GRUND, type FunkplanQuellen } from './funkplan';
+import { FUEHRUNGSSTELLE_STELLE } from '../einsatz/fuehrungsstelle';
+import { type FunkplanQuellen } from './funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { STELLENART_LABEL } from './kommunikationsplan';
-import type { Quelle, SkizzenQuelle } from './luecken';
+import type { SkizzenQuelle } from './luecken';
+import type { Quelle } from '../api/abrufZustand';
 import { kanalBedingung, komponentenartWort } from './skizzenZeichen';
 import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 
@@ -27,7 +29,7 @@ import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
  *   Sprechgruppe plus jede einsatzlokale, nach `id` entdoppelt (ein lokaler und ein
  *   Katalog-Eintrag können dieselbe Bezeichnung tragen, wie in `verbindungsurteil`). Ein
  *   Katalog-Eintrag ohne Zuordnung ist keine Sprechgruppe DIESES Einsatzes und fehlt.
- * - **Ordnung:** TMO vor DMO, sonst wie die Quelle (`stab/sprechgruppenOrdnung.ts`).
+ * - **Ordnung:** TMO vor DMO, sonst wie die Quelle (`fernmeldewesen/sprechgruppenOrdnung.ts`).
  * - **Teilnehmer:** zuerst die eigene Führungsstelle (Rufname, Ziel Einsatzdaten wie Tabelle und
  *   Skizze, LFH-1018), dann Abschnitte (Name, Kurzbezeichnung), dann Einheiten (Name,
  *   Funkrufname), je in der Reihenfolge ihrer Liste, mit Ziel wie im Funkplan. Auch die
@@ -37,7 +39,7 @@ import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
  * - **Netz (LFH-893):** reicht der Aufrufer Stellen und Skizzendaten mit, tragen auch externe
  *   Stellen des Kommunikationsplans (mit Status, Ziel Kommunikationsplan) und Komponenten der
  *   Skizze (ohne Ziel) Sprechgruppen; beide sind dann eigene Strukturquellen. Eine
- *   Führungsfunktion ist nie Teilnehmer (wie `kanalbelegung` in `stab/luecken.ts`).
+ *   Führungsfunktion ist nie Teilnehmer (wie `kanalbelegung` in `fernmeldewesen/luecken.ts`).
  *
  * Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D8),
  * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`; Spec

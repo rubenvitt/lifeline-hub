@@ -1342,7 +1342,7 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
 //
 // Vitest belegt für `werkzeugZelleStil` nur den Inline-Style, nicht dass die Werkzeugzelle im
 // Fugenraster der Kachel die Höhe im Layout ERREICHT (LLH-1124). Gemessen werden:
-//  - die Werkzeug-Links je Gruppe „Werkzeuge S…"; die Zahl kommt aus `stab/sachgebiete.ts`
+//  - die Werkzeug-Links je Gruppe „Werkzeuge S…"; die Zahl kommt aus `fuehrung/sachgebiete.ts`
 //    und steht exakt, damit ein Modul, das aus der Freigabe fällt, auffällt.
 //  - die sechs Knöpfe „Besetzung ändern" und die Zeilen der Arbeitsaufnahme.
 //  - der Sprung „Zur Lagebesprechung" in der Zeile „Nächste Lagebesprechung" (LLH-1111): Termin,
@@ -1352,7 +1352,7 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
 // Kopfzeilen-Links in die Zählungen; die Brotkrume misst der Block „Ortspfad“ (LFH-909).
 
 /**
- * 4 + 3 + 3 + 3 + 2 + 4 Werkzeuge aus `stab/sachgebiete.ts` (LLH-1124): Registry-Module, alle
+ * 4 + 3 + 3 + 3 + 2 + 4 Werkzeuge aus `fuehrung/sachgebiete.ts` (LLH-1124): Registry-Module, alle
  * `fertig`, dazu die Unterseiten aus `stab/unterseiten.ts` — „Pressearbeit“ und
  * „Informationstelefon“ in der Kachel S5 (LFH-554), Funkplan, Fernmeldeskizze, Sprechgruppen und
  * Kommunikationsplan in der Kachel S6 (LLH-1180). Alle in derselben Werkzeugzelle.
@@ -1711,13 +1711,13 @@ test('Lagebesprechung (Beobachter): ETB-Links, gesperrte Schnellwahl und gesperr
 // ── Funkplan (LFH-548) ──────────────────────────────────────────────────────────────────
 //
 // Handgebaute Ziele: die Titel-Links der Baumtabelle (`Datensicht`, `minHeight`
-// `controlHeight`) und die Verweise der Lücken (`stabZeilenzielStil`). Dazu die antd-Knöpfe der
+// `controlHeight`) und die Verweise der Lücken (`linkZeilenzielStil`). Dazu die antd-Knöpfe der
 // Werkzeugzeile. Gesät wird je Ebene eine Zeile und je Lücke ein Treffer mit Verweis.
 
 // ── Presse und Informationstelefon S5 (LFH-554) ──────────────────────────────────────
 //
 // Gemessen werden die Ziele, die Vitest nur als Stil belegt: der Titel-Link der
-// Pressemitteilung (`stabZeilenzielStil`), der Sprung „Vermisste ↗“, die Statusanzeigen als
+// Pressemitteilung (`linkZeilenzielStil`), der Sprung „Vermisste ↗“, die Statusanzeigen als
 // Auslöser (`StatusWahl`) und die antd-Knöpfe (Kopfaktionen, „Beantworten“, „Erfassen“).
 
 async function presseSaeen(page: Page, einsatzId: string) {
@@ -2060,7 +2060,7 @@ test('Baumtabellen: das Aufklappsymbol hält 30 / 48 / 72 px in Einheiten, Melde
 
 // ── Kommunikationsplan S6 (LFH-848) ──────────────────────────────────────────────────
 //
-// Wählbare Nummern (`tel:`) als handgebaute Bedienziele (`stabZeilenzielStil`), die Titel-Links
+// Wählbare Nummern (`tel:`) als handgebaute Bedienziele (`linkZeilenzielStil`), die Titel-Links
 // abgeleiteter Zeilen, „+ Verbindung“, der Menüauslöser und die Seitenknöpfe. Der Beobachter
 // misst ohne Aktionsspalte und ohne „Stelle hinzufügen“.
 
@@ -2242,7 +2242,7 @@ for (const schreibend of [true, false]) {
 //
 // Die Bedienung um die Zeichenfläche: Werkzeugleiste (antd-`Button`, zwei `Segmentleiste`n),
 // Palette (Einträge mit „Setzen“/„Zeigen“, die drei Anlegen-Knöpfe), Eigenschaftspaneel des
-// gewählten Elements, die Wahlknöpfe des Lücken-Paneels (handgebaut, `stabZeilenzielStil`) und
+// gewählten Elements, die Wahlknöpfe des Lücken-Paneels (handgebaut, `linkZeilenzielStil`) und
 // der Umschalter der Darstellung. Die Elemente AUF der Fläche skalieren mit dem Maßstab, nicht
 // mit der Dichte; unter dem Mindestmaßstab der Stufe ist die Fläche Übersicht, und das erste
 // Tippen zoomt (LFH-1038). Ihre Trefffläche misst `fernmeldeskizze.spec.ts` („Prüfliste 1 und 2“).

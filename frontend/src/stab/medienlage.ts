@@ -6,8 +6,8 @@ import type {
   MedienkontaktKennzahlen,
   PressemitteilungStatus,
 } from '../api/types';
-import { ZUSTAND_GRUND } from './funkplan';
-import type { Quelle } from './luecken';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
+import type { Quelle } from '../api/abrufZustand';
 import {
   ANLIEGEN_LABEL,
   ANLIEGEN_REIHENFOLGE,

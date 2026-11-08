@@ -39,7 +39,7 @@ import { zeitpunkt } from '../anzeige/zeitDarstellung';
 /**
  * Die Zeichenfläche als Ganzes (LFH-893, Spec-Szenarien aus `stab-fernmeldeskizze` und
  * `stab-fernmeldeskizze-bearbeitung`). Die Rechnungen dahinter prüfen die reinen Module in
- * `stab/skizze/*.test.ts`; hier geht es um das Zusammenspiel: Wahl, Tasten, Ziehen, Dialoge,
+ * `fernmeldewesen/skizze/*.test.ts`; hier geht es um das Zusammenspiel: Wahl, Tasten, Ziehen, Dialoge,
  * Rechte und Druck, gegen gefälschte `SkizzenAktionen` (die Fläche ruft nie selbst das API).
  */
 

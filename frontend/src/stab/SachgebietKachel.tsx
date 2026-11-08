@@ -6,7 +6,7 @@ import { fugenrasterGrund } from '../components/instrument/fugenraster';
 import { useRollen } from '../components/instrument/rollenwerte';
 import StatusTag from '../components/StatusTag';
 import { besetzungDarstellung } from './besetzung';
-import type { SachgebietEintrag } from './sachgebiete';
+import type { SachgebietEintrag } from '../fuehrung/sachgebiete';
 import WerkzeugZelle from './WerkzeugZelle';
 import { werkzeugZahl, type WerkzeugZahlQuellen } from './werkzeugZahlen';
 import { werkzeugState, type SichtbaresWerkzeug } from './werkzeuge';

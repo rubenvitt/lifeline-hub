@@ -13,16 +13,16 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## 2. Umzug Frontend (D5, refactor)
 
-- [ ] 2.1 Allgemeine Helfer verschieben:
+- [x] 2.1 Allgemeine Helfer verschieben:
   - `md` nach `lib/markdown.ts`
   - `ZUSTAND_GRUND` und `Quelle<T>` nach `api/abrufZustand.ts`
   - `zeilenziel.ts` nach `components/zeilenziel.ts` (`zeilenzielStil`)
 
   Alle Importe (Lageberichte, Lagebesprechung, Organigramm, Seiten) werden umgestellt.
   `pnpm exec tsc --noEmit`, `pnpm lint` und die betroffenen Vitest-Dateien sind grün.
-- [ ] 2.2 `einsatzleiter.ts` und `fuehrungsstelle.ts` samt Tests nach `einsatz/` verschieben. Die Importeure (Einsatzdaten, Einsätze, Einsatzleiter-Angabe, Organigramm, Einsatzbericht, Eigene Lage) werden umgestellt. Vitest ist grün.
-- [ ] 2.3 Fernmeldewesen-Dateien aus `stab/` nach `fernmeldewesen/` verschieben, samt `skizze/`, `luecken`, `useNetzQuellen`, `SkizzenAufnahme`, `rufnameVorschlaege` und Tests. Dazu `e2e/fernmeldeskizze-ausstattung.spec.ts` (Import) und die `quellen:` in `docs/anwender/kapitel/{funkplan,einsatzdaten,einsatzabschnitte,einsatzabschluss}.md` anpassen. Vitest und `anwenderdoku.guard.test.ts` sind grün.
-- [ ] 2.4 Den Fernmeldewesen-Teil von `stab/AGENTS.md` nach `fernmeldewesen/AGENTS.md` übernehmen. Die Tabelle in der Wurzel-`AGENTS.md` und die Verweise nachziehen (`grep -rn "stab/AGENTS.md"` hat keinen Treffer außer dem Rest-Abschnitt). Prettier ist grün.
+- [x] 2.2 `einsatzleiter.ts` und `fuehrungsstelle.ts` samt Tests nach `einsatz/` verschieben. Die Importeure (Einsatzdaten, Einsätze, Einsatzleiter-Angabe, Organigramm, Einsatzbericht, Eigene Lage) werden umgestellt. Vitest ist grün.
+- [x] 2.3 Fernmeldewesen-Dateien aus `stab/` nach `fernmeldewesen/` verschieben, samt `skizze/`, `luecken`, `useNetzQuellen`, `SkizzenAufnahme`, `rufnameVorschlaege` und Tests. Dazu `e2e/fernmeldeskizze-ausstattung.spec.ts` (Import) und die `quellen:` in `docs/anwender/kapitel/{funkplan,einsatzdaten,einsatzabschnitte,einsatzabschluss}.md` anpassen. Vitest und `anwenderdoku.guard.test.ts` sind grün.
+- [x] 2.4 Den Fernmeldewesen-Teil von `stab/AGENTS.md` nach `fernmeldewesen/AGENTS.md` übernehmen. Die Tabelle in der Wurzel-`AGENTS.md` und die Verweise nachziehen (`grep -rn "stab/AGENTS.md"` hat keinen Treffer außer dem Rest-Abschnitt). Prettier ist grün.
 
 ## 3. Umzug Backend (D5, refactor)
 

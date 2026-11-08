@@ -12,7 +12,7 @@ import type {
   SkizzenVerbindung,
   Verbindungsstatus,
 } from '../api/fernmeldeskizzeVertrag';
-import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
+import type { FuehrungsstelleQuelle } from '../einsatz/fuehrungsstelle';
 import {
   abschnitteOhneSprechgruppe,
   kanalbelegung,
@@ -29,8 +29,8 @@ import {
   type Verbindung,
   verbindungenOhneGemeinsameSprechgruppe,
   verbindungsurteil,
-  type Quelle,
 } from './luecken';
+import { type Quelle } from '../api/abrufZustand';
 
 function sg(id: number, bezeichnung: string, lokal = false): Sprechgruppe {
   return {

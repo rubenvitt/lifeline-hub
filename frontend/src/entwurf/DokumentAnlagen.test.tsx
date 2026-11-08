@@ -32,7 +32,7 @@ vi.mock('../offline/verbindung', async (original) => ({
 /** Was die Aufnahme meldet; die echte zeichnet im Browser (e2e). */
 let aufnahme: { art: 'bild' } | { art: 'fehler'; fehler: unknown } = { art: 'bild' };
 const BILD = new Blob(['png'], { type: 'image/png' });
-vi.mock('../stab/SkizzenAufnahme', () => ({
+vi.mock('../fernmeldewesen/SkizzenAufnahme', () => ({
   default: function Attrappe({
     onBild,
     onFehler,

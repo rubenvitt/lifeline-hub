@@ -2,7 +2,7 @@
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
 reihenfolge: 420
-quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/stab/einsatzleiter.ts]
+quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/einsatz/einsatzleiter.ts]
 ---
 
 ## Überblick

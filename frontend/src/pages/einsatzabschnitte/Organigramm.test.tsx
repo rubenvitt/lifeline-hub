@@ -14,8 +14,8 @@ import type {
   Stab,
   Stabsfunktion,
 } from '../../api/types';
-import type { Quelle } from '../../stab/luecken';
-import type { EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
+import type { Quelle } from '../../api/abrufZustand';
+import type { EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';

@@ -6,7 +6,7 @@ import {
   type ModulEintrag,
 } from '../einsatz/modulRegistry';
 import { einsatzModulPfad } from '../routing/deeplinks';
-import type { WerkzeugEintrag } from './sachgebiete';
+import type { WerkzeugEintrag } from '../fuehrung/sachgebiete';
 import { unterseitenFuer } from './unterseiten';
 
 /** Ein Werkzeug, das in der Kachel steht: frei als Sprung oder gesperrt mit Grund. */

@@ -275,7 +275,7 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
   `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan; Vorlage für Auto-Layout
   und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
-  „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `stab/einsatzleiter.ts`
+  „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `einsatz/einsatzleiter.ts`
   (LFH-1199); Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
   das Gerüst `components/organigramm/HaengenderBaum` (erste Ebene als Spalten-Grid,
   `SPALTE_MIN_PX` gemessen, tiefer senkrecht) — keine
@@ -447,10 +447,11 @@ hinter „Fernmeldewesen“ (Ziel `fernmeldewesen`, LLH-1180), eine Marke „Fun
 heißt mit Schloss, nicht weg. Jede Marke steht auch in der Sprungpalette (Gruppe „Ansichten“,
 `frontend/src/command-palette/AGENTS.md`) und trägt dafür `schlagworte`.
 
-**Stab und Fernmeldewesen** (Fernmeldewesen mit Funkplan, Skizze und Kommunikationsplan,
-Checkliste Arbeitsaufnahme, Presse und Medienarbeit S5; auch `pages/StabPage.tsx`,
-`pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, `fernmeldewesen/`, die S5-Seiten,
-`src/stab/`, `src/presse/`, `src/infotelefon/`): `frontend/src/stab/AGENTS.md`. **Lagebesprechung** (eigenes Modul, Termin,
+**Fernmeldewesen** (Funkplan, Skizze, Sprechgruppen, Kommunikationsplan, Einsatzleiter; auch
+`pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`): `frontend/src/fernmeldewesen/AGENTS.md`.
+**Stab** (Checkliste Arbeitsaufnahme, Presse und Medienarbeit S5, Informationstelefon; auch
+`pages/StabPage.tsx`, die S5-Seiten, `src/stab/`, `src/presse/`, `src/infotelefon/`):
+`frontend/src/stab/AGENTS.md`. **Lagebesprechung** (eigenes Modul, Termin,
 Vorbereitung, überfälliger Termin; auch `pages/LagebesprechungPage.tsx`, `src/lagebesprechung/`):
 `frontend/src/lagebesprechung/AGENTS.md`.
 **Führungsfunktionen** (Katalog, Codespalte neben Freitext, Besetzung zur Lesezeit; auch

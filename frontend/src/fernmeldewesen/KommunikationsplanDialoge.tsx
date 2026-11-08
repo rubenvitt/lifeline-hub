@@ -313,7 +313,7 @@ export function VerbindungModal({
  * mitgehen. Ein Dialog statt `Popconfirm`, weil der Auslöser ein Menüeintrag ist, an dem kein
  * Popover hängen kann. Ohne Verbindungen entfernt die Seite ohne Rückfrage.
  */
-/** Rückfrage beim Entfernen; der Text nennt, was mitgeht (`stab/kommunikationsplan.ts:entfernText`). */
+/** Rückfrage beim Entfernen; der Text nennt, was mitgeht (`fernmeldewesen/kommunikationsplan.ts:entfernText`). */
 export function StelleEntfernenRueckfrage({
   text,
   laeuft,

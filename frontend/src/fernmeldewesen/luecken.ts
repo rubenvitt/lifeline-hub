@@ -1,4 +1,4 @@
-import { schlechtesterZustand, type AbrufZustand } from '../api/abrufZustand';
+import { schlechtesterZustand, type AbrufZustand, type Quelle } from '../api/abrufZustand';
 import type {
   Einheit,
   Einsatzabschnitt,
@@ -9,7 +9,7 @@ import type {
   Verbindungsstatus,
 } from '../api/types';
 import { telefonVerbindungen } from '../components/verbindungen';
-import { FUEHRUNGSSTELLE_STELLE, type FuehrungsstelleQuelle } from './fuehrungsstelle';
+import { FUEHRUNGSSTELLE_STELLE, type FuehrungsstelleQuelle } from '../einsatz/fuehrungsstelle';
 import type { NetzLuecken } from './fernmeldeskizze';
 import type { FunkplanLuecken } from './funkplan';
 import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
@@ -22,11 +22,6 @@ import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
  * Eine Lücke ohne geladene Daten hat keine Zahl: `treffer` bleibt leer, und der Zustand sagt,
  * warum. Aufrufer zeigen dann „—" mit Grund, nie „0".
  */
-export interface Quelle<T> {
-  zustand: AbrufZustand;
-  daten: readonly T[];
-}
-
 export interface Luecke<T> {
   zustand: AbrufZustand;
   treffer: T[];
@@ -189,7 +184,7 @@ export interface Kanal {
  * Quellen fällen die Lücken, die Skizze nennt sie. Eine Lagezeile ohne bekannte Sprechgruppe ist
  * verwaist und fehlt.
  *
- * Die eine Belegung für die Schienen der Skizze (`stab/fernmeldeskizze.ts`) und die Lücke
+ * Die eine Belegung für die Schienen der Skizze (`fernmeldewesen/fernmeldeskizze.ts`) und die Lücke
  * {@link schienenMitEinemTeilnehmer}: Bild und Paneel zählen dieselben Stichleitungen.
  */
 export function kanalbelegung(q: KanalQuellen): Map<number, Kanal> {
@@ -264,7 +259,7 @@ export function schienenMitEinemTeilnehmer(q: KanalQuellen): Luecke<Sprechgruppe
 
 /**
  * Das Urteil über die Verbindung einer Stelle zu ihrer übergeordneten Stelle — die eine Regel für
- * die Kante der Fernmeldeskizze (`stab/fernmeldeskizze.ts`) und die Lücke im Funkplan.
+ * die Kante der Fernmeldeskizze (`fernmeldewesen/fernmeldeskizze.ts`) und die Lücke im Funkplan.
  *
  * - `gemeinsam`: die Sprechgruppen, die beiden zugeordnet sind, nach Betriebsart (Bezeichnungen).
  * - `keine`: beide Seiten haben Sprechgruppen, aber keine gemeinsame.

@@ -31,8 +31,8 @@ import type {
   KommunikationsStelle,
   Sprechgruppe,
 } from '../api/types';
-import type { Fernmeldenetz } from '../stab/fernmeldeskizze';
-import type { SkizzenAktionen } from '../stab/skizzenAktionen';
+import type { Fernmeldenetz } from '../fernmeldewesen/fernmeldeskizze';
+import type { SkizzenAktionen } from '../fernmeldewesen/skizzenAktionen';
 
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(),
@@ -58,7 +58,7 @@ vi.mock('../api/stab', async (orig) => ({
 }));
 
 /**
- * Die Zeichenfläche (LFH-893, `stab/FernmeldeskizzeBild.tsx`) hat eigene Tests. Hier zählt, was
+ * Die Zeichenfläche (LFH-893, `fernmeldewesen/FernmeldeskizzeBild.tsx`) hat eigene Tests. Hier zählt, was
  * die Seite ihr gibt: das Netz, die Aktionen, die Wahl. Der Stub nennt die Stellen als Text.
  */
 interface BildProps {
@@ -70,7 +70,7 @@ interface BildProps {
   druckt?: boolean;
 }
 const { bild } = vi.hoisted(() => ({ bild: { props: null as BildProps | null } }));
-vi.mock('../stab/FernmeldeskizzeBild', () => ({
+vi.mock('../fernmeldewesen/FernmeldeskizzeBild', () => ({
   default: (p: BildProps) => {
     bild.props = p;
     return (

@@ -1,4 +1,5 @@
-import type { AbrufZustand } from '../api/abrufZustand';
+import { ZUSTAND_GRUND, type AbrufZustand } from '../api/abrufZustand';
+import { md } from '../lib/markdown';
 import type {
   Einheit,
   EinsatzFahrzeug,
@@ -13,13 +14,13 @@ import {
   einsatzleiterDarstellung,
   einsatzleiterKurz,
   type EinsatzleiterDarstellung,
-} from './einsatzleiter';
+} from '../einsatz/einsatzleiter';
 import type { Fernmeldenetz, NetzStelle } from './fernmeldeskizze';
 import {
   FUEHRUNGSSTELLE_STELLE,
   fuehrungsstelleErfasst,
   type FuehrungsstelleQuelle,
-} from './fuehrungsstelle';
+} from '../einsatz/fuehrungsstelle';
 import {
   abschnitteOhneSprechgruppe,
   einheitenOhneFunkrufname,
@@ -29,10 +30,10 @@ import {
   verbindungenOhneGemeinsameSprechgruppe,
   type KanalTeilnehmer,
   type Luecke,
-  type Quelle,
   type Verbindung,
   type WeitereKanalQuellen,
 } from './luecken';
+import { type Quelle } from '../api/abrufZustand';
 
 /**
  * Der Funkplan des Sachgebiets S6 (FwDV 100 Anlage 5, LFH-548) als reine Ableitung aus den
@@ -340,11 +341,6 @@ export function funkplanLuecken(q: LueckenQuellen): FunkplanLuecken {
 }
 
 /** Warum eine Zahl oder Zelle fehlt — derselbe Wortlaut auf Seite, Druck und Lagebericht. */
-export const ZUSTAND_GRUND: Record<Exclude<AbrufZustand, 'daten'>, string> = {
-  gesperrt: 'nicht freigegeben',
-  fehler: 'nicht geladen',
-  laden: 'lädt',
-};
 
 /** Die Quellen, deren Fehlen eine Ebene oder Spalte leert — mit ihrem Namen für Seite und Bericht. */
 export const QUELLEN_NAME: Record<
@@ -398,29 +394,6 @@ export function gegenstelleHinweis(q: Pick<FunkplanQuellen, 'fuehrungsstelle'>):
 }
 
 // ── Markdown für den Lagebericht ───────────────────────────────────────────────────────────────
-
-/** Wortverbindungszeichen: unsichtbar, ohne Breite, kein Umbruch. */
-const WJ = '\u2060';
-
-/**
- * Entschärft, was `components/Markdown.tsx` (remark-gfm) als Auszeichnung läse: Backslash,
- * Backtick, Stern, Unterstrich, eckige Klammern, die Tilde (GFM streicht schon `~x~` durch) und
- * `<` (spitzer Autolink `<https://x>`, `<a@b.de>`).
- *
- * GFM-Autolink-Literale (`www.`, `http(s)://`, E-Mail, LFH-868) hilft kein Backslash: remark-gfm
- * sucht sie erst NACH dem Auflösen der Escapes im fertigen Textknoten (`www\.x.de` wird trotzdem
- * ein Link). Deshalb steht dort ein {@link WJ} zwischen `www` und `.`, zwischen `:` und `//` und
- * vor dem `@`: die Muster greifen nicht mehr, sichtbar bleibt derselbe Text.
- * Auch die Vorbereitung der Lagebesprechung (`lagebesprechung/vorbereitung.ts`) und das Organigramm
- * (`pages/einsatzabschnitte/fuehrungsorganisation.ts`) maskieren hierüber.
- */
-export function md(text: string): string {
-  return text
-    .replace(/[\\`*_[\]~<]/g, (z) => `\\${z}`)
-    .replace(/(www)(?=\.)/gi, `$1${WJ}`)
-    .replace(/(https?:)(?=\/\/)/gi, `$1${WJ}`)
-    .replace(/(?<=[-.\w+])@/g, `${WJ}@`);
-}
 
 function leitungMarkdown(z: FunkplanZeile): string | null {
   const wort =

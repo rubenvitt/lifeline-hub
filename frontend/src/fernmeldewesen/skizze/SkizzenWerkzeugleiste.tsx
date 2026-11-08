@@ -5,7 +5,7 @@
  * steht im Eigenschaftspaneel); Zoom und Filter gehen immer.
  */
 import { Button, Flex } from 'antd';
-import { Segmentleiste, useRollen } from '../../components/instrument';
+import { Segmentleiste, useRollen } from '../../components/instrument/index';
 import Tastenkuerzel from '../../components/Tastenkuerzel';
 import {
   IconMinus,
@@ -13,7 +13,7 @@ import {
   IconSeitenleisteAuf,
   IconSeitenleisteZu,
   IconVollbildEcken,
-} from '../../icons';
+} from '../../icons/index';
 import type { BefehlsStand } from '../skizzenBefehle';
 import { DRUCKFORMAT_OPTIONEN, type Druckformat } from './druckformat';
 import { EBENENFILTER, type Ebenenfilter } from './ebenen';

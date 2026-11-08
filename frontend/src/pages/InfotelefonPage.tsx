@@ -56,7 +56,7 @@ import { personenPfad, stabPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
-import { stabZeilenzielStil } from '../stab/zeilenziel';
+import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { infotelefonStatus } from '../theme/statusFarben';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
@@ -521,7 +521,7 @@ export default function InfotelefonPage() {
                     a.anliegen === 'vermisstensuche' && personenFrei ? (
                       <Link
                         to={personenPfad(einsatzId, { ansicht: 'zeilen', filter: 'vermisst' })}
-                        style={stabZeilenzielStil(token)}
+                        style={linkZeilenzielStil(token)}
                       >
                         Vermisste <span aria-hidden>↗</span>
                       </Link>

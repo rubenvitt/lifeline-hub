@@ -8,10 +8,11 @@ import type {
 } from '../../api/types';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import { besetzungDarstellung } from '../../stab/besetzung';
-import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
-import { md, ZUSTAND_GRUND } from '../../stab/funkplan';
-import { SACHGEBIETE } from '../../stab/sachgebiete';
-import { fuehrungsstelleErfasst } from '../../stab/fuehrungsstelle';
+import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
+import { ZUSTAND_GRUND } from '../../api/abrufZustand';
+import { md } from '../../lib/markdown';
+import { SACHGEBIETE } from '../../fuehrung/sachgebiete';
+import { fuehrungsstelleErfasst } from '../../einsatz/fuehrungsstelle';
 import { baueTzProps, type TzProps } from '../lagekarte/taktischesZeichen';
 import { abschnittStaerken } from './abschnittStaerke';
 
@@ -20,7 +21,7 @@ import { abschnittStaerken } from './abschnittStaerke';
  * Abschnitten und Einheiten, ohne eigene Datenhaltung (LFH-626). Bildschirm, Druck und Lagebericht
  * lesen alle dieses eine Modell.
  *
- * - **Platzierung wie im Funkplan** (`stab/funkplan.ts:baueFunkplan`) und im Meldebild:
+ * - **Platzierung wie im Funkplan** (`fernmeldewesen/funkplan.ts:baueFunkplan`) und im Meldebild:
  *   Unterabschnitte unter ihren Abschnitt, Waisen an die Wurzel; oberste Einheiten unter ihren
  *   Abschnitt, Untereinheiten unter ihre Einheit; Einheiten ohne Abschnitt in den Sammelknoten.
  *   Dieselben Schlüssel (`ab-<id>`, `eh-<id>`, `sammel`), damit der Kommunikationsplan (LFH-625)

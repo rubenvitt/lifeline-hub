@@ -1,7 +1,7 @@
 import { ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import type { LageberichtAbschnitt, LageberichtVorlageKey, ModulFreigaben } from '../api/types';
-import { ZUSTAND_GRUND } from '../stab/funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import type { UebernahmeKontext, UebernahmeQuelle } from './uebernahmeQuelle';
 import { UEBERNAHMEN } from './uebernahmen';
 import { standJetzt } from './standFeld';

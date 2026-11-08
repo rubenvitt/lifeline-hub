@@ -8,7 +8,8 @@ import type {
   Sprechgruppe,
 } from '../api/types';
 import type { FunkplanQuellen } from './funkplan';
-import type { Quelle, SkizzenQuelle } from './luecken';
+import type { SkizzenQuelle } from './luecken';
+import type { Quelle } from '../api/abrufZustand';
 import {
   HERKUNFT_LABEL,
   type FehlendeStruktur,

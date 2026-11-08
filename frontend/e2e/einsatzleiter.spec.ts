@@ -9,7 +9,7 @@ import { doppelteSchluesselVerbieten } from './react-schluessel-kern';
  * Wahl, Schwärzung) pinnen `tests/einsatz_fuehrungsstelle.rs` und die Vitest-Suiten; hier steht
  * der Weg durch Browser, Server und Live-Strom.
  *
- * Mutationsprobe: in `stab/funkplan.ts:fuehrungsstelleZeile` `leitung: { art: 'leer' }` setzen →
+ * Mutationsprobe: in `fernmeldewesen/funkplan.ts:fuehrungsstelleZeile` `leitung: { art: 'leer' }` setzen →
  * der Funkplan-Nachweis wird rot. In `Organigramm.tsx` `kopfLaedt={false}` an `OrganigrammBild`
  * geben → der Organigramm-Kopf bleibt auf „Leitung: lädt“ (LLH-1166).
  */

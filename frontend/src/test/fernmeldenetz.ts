@@ -14,8 +14,8 @@ import type {
   Sprechgruppe,
   Stabsfunktion,
 } from '../api/types';
-import type { FernmeldenetzQuellen } from '../stab/fernmeldeskizze';
-import type { Quelle } from '../stab/luecken';
+import type { FernmeldenetzQuellen } from '../fernmeldewesen/fernmeldeskizze';
+import type { Quelle } from '../api/abrufZustand';
 
 /**
  * Datenfabriken für Tests der Fernmeldeskizze (LFH-893): Quellen für `baueFernmeldenetz` mit

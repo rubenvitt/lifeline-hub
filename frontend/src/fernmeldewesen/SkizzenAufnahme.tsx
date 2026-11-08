@@ -5,7 +5,7 @@ import { useOhneVerbindung } from '../offline/verbindung';
 import { antdAlgorithmus, antdToken, farbenHell } from '../theme/tokens';
 import { baueFernmeldenetz, type Fernmeldenetz } from './fernmeldeskizze';
 import FernmeldeskizzeBild from './FernmeldeskizzeBild';
-import { ZUSTAND_GRUND } from './funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { skizzeAlsPng } from './skizze/skizzeAlsBild';
 import { useNetzQuellen } from './useNetzQuellen';
 import { useModulFreigabe } from '../einsatz/useModulFreigabe';

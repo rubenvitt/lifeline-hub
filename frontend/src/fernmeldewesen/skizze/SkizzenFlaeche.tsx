@@ -31,7 +31,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import { useRollen } from '../../components/instrument';
+import { useRollen } from '../../components/instrument/index';
 import { zeichenTheme } from '../../zeichen/zeichenTheme';
 import type { Fernmeldenetz, NetzStelle } from '../fernmeldeskizze';
 import type { Platz, SkizzenLayout } from '../fernmeldeskizzeLayout';

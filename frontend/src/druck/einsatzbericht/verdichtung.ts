@@ -53,8 +53,8 @@ import {
   GEGEN_RAT_WORT,
   UNTERSCHRIFT_WORT,
 } from '../../personen/personMeta';
-import { einsatzleiterDarstellung, einsatzleiterKurz } from '../../stab/einsatzleiter';
-import { SACHGEBIETE } from '../../stab/sachgebiete';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../../einsatz/einsatzleiter';
+import { SACHGEBIETE } from '../../fuehrung/sachgebiete';
 import { GEFAHR_LABEL, GEFAHRENARTEN, SCHADENSGRAD_LABEL } from '../../pages/schaeden/gefahrWorte';
 import {
   etbTyp,

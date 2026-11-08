@@ -6,7 +6,7 @@ import type { Stabsfunktion } from '../api/types';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import BesetzungModal from './BesetzungModal';
-import { SACHGEBIETE } from './sachgebiete';
+import { SACHGEBIETE } from '../fuehrung/sachgebiete';
 
 const S2 = SACHGEBIETE[1];
 const personal = [

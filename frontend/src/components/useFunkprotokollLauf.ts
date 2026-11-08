@@ -19,7 +19,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
  * 3. **Anker beim Nachladen oben.** Ändert sich die älteste Zeile (ältere Seite davor, oder die
  *    älteste Seite fällt aus dem Fenster), hält die zuletzt gesehene oberste Zeile ihren Platz am
  *    Schirm. Die Ankerung des Browsers ist dafür aus (`overflow-anchor: none` am Dokument, wie
- *    `stab/skizze/useAmSchirmHalten.ts`): Chromium und Firefox glichen sonst teilweise selbst aus,
+ *    `fernmeldewesen/skizze/useAmSchirmHalten.ts`): Chromium und Firefox glichen sonst teilweise selbst aus,
  *    beide zusammen schöben doppelt, und WebKit kennt sie nicht.
  *
  * Gemessen wird nur in Effekten und im Bildlauf-Zuhörer, nie im Render.

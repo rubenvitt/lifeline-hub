@@ -4,7 +4,7 @@ import type { ModulZaehler, Stabsfunktion } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import SachgebietKachel from './SachgebietKachel';
-import { SACHGEBIETE } from './sachgebiete';
+import { SACHGEBIETE } from '../fuehrung/sachgebiete';
 import type { WerkzeugZahlQuellen } from './werkzeugZahlen';
 
 const S3 = SACHGEBIETE.find((s) => s.sachgebiet === 's3')!;

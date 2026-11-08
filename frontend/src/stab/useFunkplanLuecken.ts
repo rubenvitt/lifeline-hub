@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import type { AbrufZustand } from '../api/abrufZustand';
 import { useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { useOhneVerbindung } from '../offline/verbindung';
-import { baueFernmeldenetz } from './fernmeldeskizze';
-import { funkplanLuecken } from './funkplan';
-import { countLuecken } from './luecken';
-import { useNetzQuellen } from './useNetzQuellen';
+import { baueFernmeldenetz } from '../fernmeldewesen/fernmeldeskizze';
+import { funkplanLuecken } from '../fernmeldewesen/funkplan';
+import { countLuecken } from '../fernmeldewesen/luecken';
+import { useNetzQuellen } from '../fernmeldewesen/useNetzQuellen';
 
 /**
  * Die Zahl der Funkplan-Lücken für das Werkzeug „Funkplan“ der Stab-Seite (LLH-1124,

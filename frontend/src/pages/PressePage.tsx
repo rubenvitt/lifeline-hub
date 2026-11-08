@@ -56,7 +56,7 @@ import { pressemitteilungPfad, stabPfad } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { baueMedienlage, rendereMedienlageMarkdown } from '../stab/medienlage';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
-import { stabZeilenzielStil } from '../stab/zeilenziel';
+import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { medienkontaktStatus, pressemitteilungStatus } from '../theme/statusFarben';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
@@ -533,7 +533,7 @@ export default function PressePage() {
                     <Space wrap>
                       <Link
                         to={pressemitteilungPfad(einsatzId, k.kopf.id)}
-                        style={stabZeilenzielStil(token)}
+                        style={linkZeilenzielStil(token)}
                       >
                         {k.kopf.titel}
                       </Link>

@@ -14,18 +14,19 @@ import {
   baueFunkplan,
   funkplanLuecken,
   gegenstelleHinweis,
-  md,
   rendereFunkplanMarkdown,
   type FunkplanQuellen,
   type FunkplanZeile,
 } from './funkplan';
+import { md } from '../lib/markdown';
 import type {
   Fernmeldeskizze,
   KommunikationsStelleMitKanaelen,
 } from '../api/fernmeldeskizzeVertrag';
 import { baueFernmeldenetz } from './fernmeldeskizze';
-import { fuehrungsstelleErfasst } from './fuehrungsstelle';
-import type { Quelle, SkizzenQuelle } from './luecken';
+import { fuehrungsstelleErfasst } from '../einsatz/fuehrungsstelle';
+import type { SkizzenQuelle } from './luecken';
+import type { Quelle } from '../api/abrufZustand';
 
 /** Namen, die remark-gfm ohne Schutz als Link läse (LFH-868). */
 const AUTOLINKS = {

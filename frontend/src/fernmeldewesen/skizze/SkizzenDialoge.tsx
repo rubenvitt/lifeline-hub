@@ -9,7 +9,7 @@ import { Button, Flex, Form, Input, Modal, Typography } from 'antd';
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { Komponentenart, Verbindungsart } from '../../api/fernmeldeskizzeVertrag';
 import { ErfassungsModal } from '../../components/Erfassung';
-import { useRollen } from '../../components/instrument';
+import { useRollen } from '../../components/instrument/index';
 import { Select } from '../../components/Select';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import type { Fernmeldenetz } from '../fernmeldeskizze';

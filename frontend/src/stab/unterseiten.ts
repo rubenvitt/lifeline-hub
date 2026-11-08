@@ -12,7 +12,7 @@ import {
  * Modul, Sperre und Sichtbarkeit vom Stab; S6 Funkplan, Fernmeldeskizze, Sprechgruppen und
  * Kommunikationsplan (LFH-548, LFH-893, LFH-848) als Sprung in das eigene Modul Fernmeldewesen
  * (LLH-1180), mit dessen Sperre. Skizze und Sprechgruppen sind Darstellungen des Funkplans
- * (`?ansicht=`). Die Kacheln der Stab-Seite reihen sie über `stab/sachgebiete.ts` ein.
+ * (`?ansicht=`). Die Kacheln der Stab-Seite reihen sie über `fuehrung/sachgebiete.ts` ein.
  *
  * Eine Tabelle statt eines Zweigs je Sachgebiet im Rendern: ein drittes Ziel ist ein Eintrag.
  */

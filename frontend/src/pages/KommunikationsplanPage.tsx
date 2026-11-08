@@ -40,14 +40,14 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useOhneVerbindung } from '../offline/verbindung';
-import { ZUSTAND_GRUND } from '../stab/funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import {
   BezeichnungModal,
   StelleAnlegenModal,
   StelleEntfernenRueckfrage,
   VerbindungModal,
   type StelleVorbelegung,
-} from '../stab/KommunikationsplanDialoge';
+} from '../fernmeldewesen/KommunikationsplanDialoge';
 import {
   baueKommunikationsplan,
   brauchtRueckfrage,
@@ -57,12 +57,13 @@ import {
   type KommunikationsGruppe,
   type KommunikationsZeile,
   type VerbindungsAnzeige,
-} from '../stab/kommunikationsplan';
-import { leitstelleOhneVerbindung, type Quelle } from '../stab/luecken';
+} from '../fernmeldewesen/kommunikationsplan';
+import { leitstelleOhneVerbindung } from '../fernmeldewesen/luecken';
+import { type Quelle } from '../api/abrufZustand';
 import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { modulName } from '../einsatz/modulRegistry';
 import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
-import { stabZeilenzielStil } from '../stab/zeilenziel';
+import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import './kommunikationsplanPrint.css';
@@ -172,7 +173,7 @@ function VerbindungenZelle({ verbindungen }: { verbindungen: VerbindungsAnzeige[
               // Ein Bedienziel wie die Zeilenziele des Stabs: Höhe aus `controlHeight` (Gate 3).
               <a
                 href={v.verweis}
-                style={{ ...stabZeilenzielStil(token), ...monoStil(14), overflowWrap: 'anywhere' }}
+                style={{ ...linkZeilenzielStil(token), ...monoStil(14), overflowWrap: 'anywhere' }}
               >
                 {v.wert}
               </a>

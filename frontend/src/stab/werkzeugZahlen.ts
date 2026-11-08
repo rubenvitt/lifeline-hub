@@ -10,7 +10,7 @@ import {
   NICHT_FREIGEGEBEN,
   type ZaehlerAbfrage,
 } from '../pages/lage-dashboard/fuehrungsZahlen';
-import { ZUSTAND_GRUND } from './funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import type { SichtbaresWerkzeug } from './werkzeuge';
 
 /** Was eine Werkzeugzelle als Zahl zeigt. `laden`/`fehler` tragen keinen Wert. */

@@ -8,8 +8,8 @@
 import { useDraggable } from '@dnd-kit/core';
 import { Button, Flex } from 'antd';
 import type { Sprechgruppe } from '../../api/types';
-import { Augenbraue, useRollen } from '../../components/instrument';
-import { IconPlus } from '../../icons';
+import { Augenbraue, useRollen } from '../../components/instrument/index';
+import { IconPlus } from '../../icons/index';
 import type { Fernmeldenetz } from '../fernmeldeskizze';
 import { bedingungszeichenText } from '../skizzenZeichen';
 import type { AnlegenArt } from './SkizzenDialoge';

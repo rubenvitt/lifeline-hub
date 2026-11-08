@@ -37,7 +37,7 @@ import {
  *
  * Maße und Abstände sind benannte Konstanten, die die Darstellung teilt; die Breite des
  * Bedingungszeichens misst das Paket (`bedingungszeichenBreite`), andere Textbreiten schätzt
- * `stab/skizzenZeichen.tsx` (`schaetzeTextbreite`), damit Layout und Bild dieselbe Zahl rechnen.
+ * `fernmeldewesen/skizzenZeichen.tsx` (`schaetzeTextbreite`), damit Layout und Bild dieselbe Zahl rechnen.
  * Die Werte sind vorläufig bis zur Messung (tasks.md 1.1, Nachtrag in design.md D4).
  */
 

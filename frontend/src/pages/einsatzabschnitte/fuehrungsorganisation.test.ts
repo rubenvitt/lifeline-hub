@@ -3,8 +3,8 @@ import { createElement } from 'react';
 import { render } from '@testing-library/react';
 import Markdown from '../../components/Markdown';
 import type { Einheit, Einsatzabschnitt, Stabsfunktion } from '../../api/types';
-import { baueFunkplan, type FunkplanZeile } from '../../stab/funkplan';
-import type { EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
+import { baueFunkplan, type FunkplanZeile } from '../../fernmeldewesen/funkplan';
+import type { EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { abschnittStaerken } from './abschnittStaerke';
 import {
   baueFuehrungsorganisation,

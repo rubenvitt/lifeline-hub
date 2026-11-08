@@ -2,7 +2,7 @@
 titel: Einsatz abschließen und Einsatzbericht
 gruppen: [fuehrung]
 reihenfolge: 610
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/stab/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
 ---
 
 ## Überblick

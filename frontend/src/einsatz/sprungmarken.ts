@@ -6,7 +6,7 @@ import {
   kommunikationsplanPfad,
   personenPfad,
 } from '../routing/deeplinks';
-import { SACHGEBIETE } from '../stab/sachgebiete';
+import { SACHGEBIETE } from '../fuehrung/sachgebiete';
 import { unterseitenFuer } from '../stab/unterseiten';
 import {
   istModulFreigegeben,

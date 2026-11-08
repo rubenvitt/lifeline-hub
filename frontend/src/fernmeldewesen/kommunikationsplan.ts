@@ -16,15 +16,15 @@ import type {
 import { anzahl } from '../anzeige/anzahl';
 import { VERBINDUNGSMITTEL_LABEL, verbindungsVerweis } from '../components/verbindungen';
 import { einheitDetailPfad, einsatzabschnittePfad, einsatzdatenPfad } from '../routing/deeplinks';
-import { besetzungDarstellung, zeileFuer } from './besetzung';
-import { einsatzleiterDarstellung, einsatzleiterKurz } from './einsatzleiter';
+import { besetzungDarstellung, zeileFuer } from '../stab/besetzung';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../einsatz/einsatzleiter';
 import {
   FUEHRUNGSSTELLE_STELLE,
   fuehrungsstelleErfasst,
   type FuehrungsstelleQuelle,
-} from './fuehrungsstelle';
-import { ZUSTAND_GRUND } from './funkplan';
-import type { Quelle } from './luecken';
+} from '../einsatz/fuehrungsstelle';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
+import type { Quelle } from '../api/abrufZustand';
 import { bedingungszeichenText } from './skizzenZeichen';
 
 /**

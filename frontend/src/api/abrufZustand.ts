@@ -51,3 +51,16 @@ export function zustandNachFreigabe(
   if (frei === undefined) return freigabenGescheitert ? 'fehler' : 'laden';
   return abrufZustand(q);
 }
+
+/** Kurzgrund für eine Quelle ohne Daten, wie Seite und Bericht ihn nennen („— (nicht geladen)“). */
+export const ZUSTAND_GRUND: Record<Exclude<AbrufZustand, 'daten'>, string> = {
+  gesperrt: 'nicht freigegeben',
+  fehler: 'nicht geladen',
+  laden: 'lädt',
+};
+
+/** Eine geladene Liste mit ihrem Abrufzustand; ohne `daten`-Zustand ist `daten` leer und zählt nicht. */
+export interface Quelle<T> {
+  zustand: AbrufZustand;
+  daten: readonly T[];
+}

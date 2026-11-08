@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { EinsatzFahrzeug, Fahrzeug } from '../api/types';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument/index';
 import { DEMO_GROUP, DemoLabel, splitDemo } from '../stammdaten/demoAuswahl';
 import { isFuehrungsfahrzeug } from './fernmeldeskizze';
 

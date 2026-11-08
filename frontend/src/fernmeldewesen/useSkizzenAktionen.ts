@@ -44,7 +44,7 @@ import type { NetzRechte } from './fernmeldeskizze';
 import type { SkizzenAktionen } from './skizzenAktionen';
 
 /**
- * Die Schreibwege der Fernmeldeskizze (LFH-893, `stab/skizzenAktionen.ts`) gegen das API
+ * Die Schreibwege der Fernmeldeskizze (LFH-893, `fernmeldewesen/skizzenAktionen.ts`) gegen das API
  * (`api/fernmeldeskizze.ts`, design.md D5, D14).
  *
  * - **Cache wie beim Kommunikationsplan:** Antworten mit Datensatz (Lage, Komponente, Verbindung,

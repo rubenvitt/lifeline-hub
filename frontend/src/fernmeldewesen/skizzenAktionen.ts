@@ -15,7 +15,7 @@ import type {
 
 /**
  * Die Schreibwege der Fernmeldeskizze (LFH-893) als eine Schnittstelle zwischen Zeichenfläche
- * und Seite: `stab/FernmeldeskizzeBild.tsx` ruft nur diese Funktionen, `stab/useSkizzenAktionen.ts`
+ * und Seite: `fernmeldewesen/FernmeldeskizzeBild.tsx` ruft nur diese Funktionen, `fernmeldewesen/useSkizzenAktionen.ts`
  * setzt sie gegen das API um (design.md D5, D14). Jede Funktion wirft bei Ablehnung den Fehler des
  * API-Clients; die Fläche zeigt den Grund am Element (`befehlsGrund`).
  *

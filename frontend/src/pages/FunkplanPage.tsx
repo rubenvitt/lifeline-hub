@@ -35,17 +35,16 @@ import {
   parseFunkplanAnsicht,
   type FunkplanAnsicht,
 } from '../routing/deeplinks';
-import { baueFernmeldenetz, type Fernmeldenetz } from '../stab/fernmeldeskizze';
-import FernmeldeskizzeBild from '../stab/FernmeldeskizzeBild';
+import { baueFernmeldenetz, type Fernmeldenetz } from '../fernmeldewesen/fernmeldeskizze';
+import FernmeldeskizzeBild from '../fernmeldewesen/FernmeldeskizzeBild';
 import {
   DRUCKFORMAT_VORGABE,
   skizzenDruckKlasse,
   type Druckformat,
-} from '../stab/skizze/druckformat';
-import { Befehlsstapel } from '../stab/skizzenBefehle';
+} from '../fernmeldewesen/skizze/druckformat';
+import { Befehlsstapel } from '../fernmeldewesen/skizzenBefehle';
 import {
   GEGENSTELLE_HINWEIS,
-  ZUSTAND_GRUND,
   fehlendeQuellen,
   strukturVollstaendig,
   aufklappbareSchluessel,
@@ -55,10 +54,11 @@ import {
   rendereFunkplanMarkdown,
   type FunkplanQuellen,
   type FunkplanZeile,
-} from '../stab/funkplan';
-import { countLuecken, type Luecke, type Verbindung } from '../stab/luecken';
+} from '../fernmeldewesen/funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
+import { countLuecken, type Luecke, type Verbindung } from '../fernmeldewesen/luecken';
 import { anzahl } from '../anzeige/anzahl';
-import type { SkizzenAktionen } from '../stab/skizzenAktionen';
+import type { SkizzenAktionen } from '../fernmeldewesen/skizzenAktionen';
 import {
   HERKUNFT_LABEL,
   baueSprechgruppenplan,
@@ -67,10 +67,10 @@ import {
   type Herkunft,
   type SprechgruppenZeile,
   type TeilnehmerAngabe,
-} from '../stab/sprechgruppenplan';
-import { stabZeilenzielStil } from '../stab/zeilenziel';
-import { skizzenRechte, useSkizzenAktionen } from '../stab/useSkizzenAktionen';
-import { useNetzQuellen, useQuelle } from '../stab/useNetzQuellen';
+} from '../fernmeldewesen/sprechgruppenplan';
+import { linkZeilenzielStil } from '../components/linkZeilenziel';
+import { skizzenRechte, useSkizzenAktionen } from '../fernmeldewesen/useSkizzenAktionen';
+import { useNetzQuellen, useQuelle } from '../fernmeldewesen/useNetzQuellen';
 import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { modulName } from '../einsatz/modulRegistry';
 import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
@@ -100,8 +100,8 @@ import './funkplanPrint.css';
  *   30.09.2026). Funk steht getrennt davon in Rufname, TMO und DMO.
  * - **Drei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6;
  *   LFH-848, `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` D8): „Tabelle“, „Skizze“
- *   (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`) und „Sprechgruppen“ (Kanalbelegung,
- *   `stab/sprechgruppenplan.ts`). Dieselben Quellen, dasselbe Lücken-Paneel, dieselbe Übernahme
+ *   (Fernmeldeskizze, `fernmeldewesen/FernmeldeskizzeBild.tsx`) und „Sprechgruppen“ (Kanalbelegung,
+ *   `fernmeldewesen/sprechgruppenplan.ts`). Dieselben Quellen, dasselbe Lücken-Paneel, dieselbe Übernahme
  *   (sie schreibt immer die Tabelle); eine Druckwurzel, der Druckkopf nennt die aktive
  *   Darstellung. Die Tabelle klappt, die Sprechgruppen sind flach.
  * - **Taktische Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/
@@ -255,12 +255,12 @@ function TeilnehmerZelle({ angabe }: { angabe: TeilnehmerAngabe }) {
       {angabe.teilnehmer.map((t) => (
         <Flex key={t.key} wrap align="center" style={{ overflowWrap: 'anywhere' }}>
           {t.ziel ? (
-            <Link to={t.ziel} style={stabZeilenzielStil(token)}>
+            <Link to={t.ziel} style={linkZeilenzielStil(token)}>
               {t.name}
             </Link>
           ) : (
             // Eine Komponente lebt nur in der Skizze: kein Pflegeort außerhalb.
-            <span style={stabZeilenzielStil(token)}>{t.name}</span>
+            <span style={linkZeilenzielStil(token)}>{t.name}</span>
           )}
           {t.rufname && <Mono>{t.rufname}</Mono>}
           {/* Eine geplante Teilnahme ist keine Tatsache (LFH-893 D7): das Wort steht da. */}
@@ -418,7 +418,7 @@ function WahlKnopf({ name, onWahl }: { name: string; onWahl: () => void }) {
       type="button"
       onClick={onWahl}
       style={{
-        ...stabZeilenzielStil(token),
+        ...linkZeilenzielStil(token),
         background: 'none',
         border: 'none',
         font: 'inherit',
@@ -469,11 +469,11 @@ function LueckenZeile<T>({
               onWahl && t.element ? (
                 <WahlKnopf key={t.key} name={t.name} onWahl={() => onWahl(t.element!)} />
               ) : t.ziel ? (
-                <Link key={t.key} to={t.ziel} style={stabZeilenzielStil(token)}>
+                <Link key={t.key} to={t.ziel} style={linkZeilenzielStil(token)}>
                   {t.name}
                 </Link>
               ) : (
-                <span key={t.key} style={{ ...stabZeilenzielStil(token), ...monoStil(12) }}>
+                <span key={t.key} style={{ ...linkZeilenzielStil(token), ...monoStil(12) }}>
                   {t.name}
                 </span>
               ),
@@ -587,7 +587,7 @@ export default function FunkplanPage() {
   const freigabe = useModulFreigabe(einsatzId, 'fernmeldewesen');
   // Modulgrenze (LFH-669): eine Liste läuft erst, wenn das Fernmeldewesen frei ist (sonst zeigt die
   // Seite ohnehin nichts) UND der Server ihr Modul freigibt. Keys nach `PFAD_KEY`. Die Quellen des
-  // Netzes teilt die Seite mit der Skizze als Anlage (`stab/useNetzQuellen.ts`).
+  // Netzes teilt die Seite mit der Skizze als Anlage (`fernmeldewesen/useNetzQuellen.ts`).
   const ohneVerbindung = useOhneVerbindung();
   const netzQuellen = useNetzQuellen(einsatzId, freigabe, ohneVerbindung);
   const {
@@ -893,7 +893,7 @@ export default function FunkplanPage() {
           className="funkplan-no-print"
         />
         {/* Das Blatt: Druckkopf, Lücken und Darstellung. In der Skizze trägt es die Klasse des
-            Papierformats (A3/A4 quer, `stab/skizze/skizzeDruck.css`); die Anlage steht dahinter. */}
+            Papierformats (A3/A4 quer, `fernmeldewesen/skizze/skizzeDruck.css`); die Anlage steht dahinter. */}
         <div
           ref={blatt}
           data-lfh="funkplan-blatt"
@@ -1016,7 +1016,7 @@ export default function FunkplanPage() {
                         )}
                         <Link
                           to={kommunikationsplanPfad(einsatzId)}
-                          style={stabZeilenzielStil(token)}
+                          style={linkZeilenzielStil(token)}
                         >
                           im Kommunikationsplan erfassen
                         </Link>
@@ -1048,7 +1048,7 @@ export default function FunkplanPage() {
                     <span style={{ color: rollen.gedaempft }}>{gegenstelle}</span>
                     {/* In derselben Zeile, mit der Trefffläche der übrigen Lücken-Verweise. */}
                     {quellen.fuehrungsstelle.zustand === 'daten' && (
-                      <Link to={einsatzdatenPfad(einsatzId)} style={stabZeilenzielStil(token)}>
+                      <Link to={einsatzdatenPfad(einsatzId)} style={linkZeilenzielStil(token)}>
                         auf Einsatzdaten erfassen
                       </Link>
                     )}

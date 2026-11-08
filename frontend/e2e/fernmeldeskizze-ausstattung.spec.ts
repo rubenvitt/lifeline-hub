@@ -7,7 +7,7 @@ import {
   oeffneSkizze,
   seedeGrund,
 } from './fernmeldeskizze-kern';
-import { NAME_SCHRIFT } from '../src/stab/fernmeldeskizzeLayout';
+import { NAME_SCHRIFT } from '../src/fernmeldewesen/fernmeldeskizzeLayout';
 import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
 import { waehleIn } from './auswahl-kern';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';

@@ -26,9 +26,12 @@ import {
   einsatzabschnittePfad,
   lageberichtDetailPfad,
 } from '../../routing/deeplinks';
-import { ZUSTAND_GRUND } from '../../stab/funkplan';
-import { einsatzleiterDarstellung, type EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
-import type { Quelle } from '../../stab/luecken';
+import { ZUSTAND_GRUND } from '../../api/abrufZustand';
+import {
+  einsatzleiterDarstellung,
+  type EinsatzleiterDarstellung,
+} from '../../einsatz/einsatzleiter';
+import type { Quelle } from '../../api/abrufZustand';
 import { useStabFreigabe } from '../../stab/useStabFreigabe';
 import type { RenderTheme } from '@einsatzzeichen/core';
 import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
@@ -55,7 +58,7 @@ import './organigrammPrint.css';
  *   (Spalten der ersten Ebene, senkrechte Zweige, Klappziele, Druckregeln), geteilt mit der
  *   Fernmeldeskizze des S6 (LFH-625 D4).
  * - **Einsatzleitung ohne erfundene Leitung** (D5, LFH-1199): die Wurzel zeigt den Einsatzleiter,
- *   der an der eigenen Führungsstelle erfasst ist (`stab/einsatzleiter.ts`), sonst die benannte
+ *   der an der eigenen Führungsstelle erfasst ist (`einsatz/einsatzleiter.ts`), sonst die benannte
  *   Lücke — nie die App-Rolle. Darüber stehen Bezeichnung und Rufname der Führungsstelle
  *   (`openspec/changes/archive/2026-10-11-lfh-1181-fuehrungsstelle-ort/design.md`, D6). Der Stab
  *   steht nur mit Stab-Freigabe daneben — fail-closed über `useStabFreigabe`.

@@ -22,7 +22,7 @@ import {
   verbindungsVerweis,
   type KommunikationsplanQuellen,
 } from './kommunikationsplan';
-import type { Quelle } from './luecken';
+import type { Quelle } from '../api/abrufZustand';
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
   return {

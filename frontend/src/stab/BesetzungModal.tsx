@@ -17,7 +17,7 @@ import {
   type BesetzungAktion,
   type BesetzungFormWerte,
 } from './besetzung';
-import type { SachgebietEintrag } from './sachgebiete';
+import type { SachgebietEintrag } from '../fuehrung/sachgebiete';
 
 /** Wert des letzten Personen-Eintrags; keine gültige `einsatz_personal.id` (positiv). */
 const ADHOC = -1;

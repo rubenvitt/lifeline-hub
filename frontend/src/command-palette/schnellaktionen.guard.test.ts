@@ -4,7 +4,7 @@ import { SCHNELLAKTIONEN, type SchnellaktionParameter } from './befehle';
 import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
 import { einsatzModulPfad, parseZeichnenAuftrag } from '../routing/deeplinks';
 import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
-import { SACHGEBIETE } from '../stab/sachgebiete';
+import { SACHGEBIETE } from '../fuehrung/sachgebiete';
 import { unterseitenFuer } from '../stab/unterseiten';
 
 /**

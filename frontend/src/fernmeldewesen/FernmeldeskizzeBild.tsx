@@ -2,15 +2,15 @@
  * Die taktische Fernmeldeskizze des S6 (LFH-893) — Zeichenfläche, Palette, Werkzeugleiste und
  * Eigenschaftspaneel. Herleitung: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`
  * (D1 Fläche, D4 Lage und ruhige Fläche, D6 Bedienung, D8 Rechte, D10 Hervorheben und Filter,
- * D13 Druck). Die Logik steht rein und getestet in `stab/skizze/` (`ansicht.ts` Zoom,
+ * D13 Druck). Die Logik steht rein und getestet in `fernmeldewesen/skizze/` (`ansicht.ts` Zoom,
  * `ebenen.ts` Filter und Hervorheben, `geometrie.ts` Treffer, `bedienung.ts` Fokusfolge, Tasten
  * und Rechte, `wirkung.ts` was Ziehen und Tasten schreiben, `schriftfeld.ts`); diese Datei
  * verbindet sie. Die Fläche ruft nie selbst das API: jede Änderung geht über `aktionen`.
  *
  * ── Props ────────────────────────────────────────────────────────────────────────────────────
- * - `netz` — das Modell aus `baueFernmeldenetz` (`stab/fernmeldeskizze.ts`), live von der Seite.
- * - `aktionen` — die Schreibwege (`stab/skizzenAktionen.ts`, umgesetzt in
- *   `stab/useSkizzenAktionen.ts`); `null` = ohne Schreibrecht im Einsatz: schreibgeschützt,
+ * - `netz` — das Modell aus `baueFernmeldenetz` (`fernmeldewesen/fernmeldeskizze.ts`), live von der Seite.
+ * - `aktionen` — die Schreibwege (`fernmeldewesen/skizzenAktionen.ts`, umgesetzt in
+ *   `fernmeldewesen/useSkizzenAktionen.ts`); `null` = ohne Schreibrecht im Einsatz: schreibgeschützt,
  *   Hervorheben, Filtern und Zoomen gehen weiter.
  * - `einsatzbezeichnung` — für Titel und Herausgeber-Vorgabe des Schriftfelds.
  * - `gewaehlt?` / `onWahl?` — das gewählte Element (Schlüssel aus dem Netz, z. B. `eh-10`,
@@ -36,9 +36,9 @@
  * Element dem Stand.
  *
  * ── Druck (Schnittstelle zur Seite) ──────────────────────────────────────────────────────────
- * Die Seite setzt `skizzenDruckKlasse(druckFormat)` (`stab/skizze/druckformat.ts`) an das Element
+ * Die Seite setzt `skizzenDruckKlasse(druckFormat)` (`fernmeldewesen/skizze/druckformat.ts`) an das Element
  * in der Druckwurzel, das Druckkopf, diese Komponente und das Lücken-Paneel trägt; daraus macht
- * `stab/skizze/skizzeDruck.css` die benannte Druckseite A3 bzw. A4 quer. Die Funkplan-Tabelle als
+ * `fernmeldewesen/skizze/skizzeDruck.css` die benannte Druckseite A3 bzw. A4 quer. Die Funkplan-Tabelle als
  * Anlage folgt mit der Umbruchmechanik von `druck/druck.css` auf einer neuen Seite. Bedienung
  * trägt `lfh-skizze-bedienung` und fehlt im Druck.
  *
@@ -68,14 +68,14 @@ import { useNavigate } from 'react-router';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { Verbindungsart } from '../api/fernmeldeskizzeVertrag';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { useRollen } from '../components/instrument';
+import { useRollen } from '../components/instrument/index';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { ZugPointerSensor } from '../components/zugPointerSensor';
 import PunktankerMenue from '../pages/lagekarte/PunktankerMenue';
 import type { Fernmeldenetz } from './fernmeldeskizze';
 import { layoutFernmeldenetz, type Platz } from './fernmeldeskizzeLayout';
-import { ZUSTAND_GRUND } from './funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import type { SkizzenAktionen } from './skizzenAktionen';
 import { Befehlsstapel } from './skizzenBefehle';
 import { VERBINDUNGSARTEN, bedingungszeichenText, verbindungsartWort } from './skizzenZeichen';

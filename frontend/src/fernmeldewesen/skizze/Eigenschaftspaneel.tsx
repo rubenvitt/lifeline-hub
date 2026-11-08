@@ -34,14 +34,14 @@ import {
   Paneel,
   Segmentleiste,
   useRollen,
-} from '../../components/instrument';
+} from '../../components/instrument/index';
 import { Select } from '../../components/Select';
 import Tastenkuerzel from '../../components/Tastenkuerzel';
 import { funkplanPfad } from '../../routing/deeplinks';
 import type { Fernmeldenetz, NetzStelle } from '../fernmeldeskizze';
 import { STELLENART_LABEL } from '../kommunikationsplan';
 import { HERKUNFT_LABEL } from '../sprechgruppenplan';
-import { stabZeilenzielStil } from '../zeilenziel';
+import { linkZeilenzielStil } from '../../components/linkZeilenziel';
 import {
   KOMPONENTENARTEN,
   VERBINDUNGSARTEN,
@@ -220,7 +220,7 @@ function Sprung({ ziel, children }: { ziel: string; children: ReactNode }) {
   // Handgebautes Ziel in einer Textzeile: Trefffläche der Stab-Ziele (Gate 3, LFH-893).
   const { token } = theme.useToken();
   return (
-    <Link to={ziel} data-lfh="inspector-sprung" style={stabZeilenzielStil(token)}>
+    <Link to={ziel} data-lfh="inspector-sprung" style={linkZeilenzielStil(token)}>
       {children} <span aria-hidden="true">↗</span>
     </Link>
   );

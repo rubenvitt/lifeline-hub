@@ -23,7 +23,7 @@ import {
   stellenMasse,
   type Platz,
 } from './fernmeldeskizzeLayout';
-import type { Quelle } from './luecken';
+import type { Quelle } from '../api/abrufZustand';
 import { sammelschienenMindestbreite } from './skizzenZeichen';
 
 /** Auto-Layout der Fernmeldeskizze (LFH-893 D4): Szenarien aus `stab-fernmeldeskizze-bearbeitung`. */

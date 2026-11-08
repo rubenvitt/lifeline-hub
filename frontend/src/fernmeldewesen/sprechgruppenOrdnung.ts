@@ -4,7 +4,7 @@ import type { Sprechgruppe } from '../api/types';
  * Die Ordnung der Sprechgruppen eines Einsatzes: TMO vor DMO, sonst wie die Quelle
  * (`ORDER BY sortier, bezeichnung` in `src/sprechgruppe/repo.rs`, deshalb binär verglichen). Die
  * Quelle selbst ordnet nach `betriebsart` alphabetisch, also DMO zuerst; das kehrt die Spec um.
- * Eine Ordnung für Kanalbelegung (`stab/sprechgruppenplan.ts`, LFH-848 D8), Lücken und die
+ * Eine Ordnung für Kanalbelegung (`fernmeldewesen/sprechgruppenplan.ts`, LFH-848 D8), Lücken und die
  * Schienen der Fernmeldeskizze (LFH-893 D2).
  */
 const BETRIEBSART_RANG: Record<string, number> = { TMO: 0, DMO: 1 };

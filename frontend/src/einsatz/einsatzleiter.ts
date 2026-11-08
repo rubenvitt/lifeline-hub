@@ -1,7 +1,8 @@
 import type { Einsatzleiter } from '../api/types';
 import { type AnzeigeKonventionen } from '../anzeige/format';
 import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
-import { md, ZUSTAND_GRUND } from './funkplan';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
+import { md } from '../lib/markdown';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /**

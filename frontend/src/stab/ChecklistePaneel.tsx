@@ -9,8 +9,8 @@ import { abrufZustand } from '../api/abrufZustand';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzdatenPfad } from '../routing/deeplinks';
 import { Link } from 'react-router';
-import { ZUSTAND_GRUND } from './funkplan';
-import { stabZeilenzielStil } from './zeilenziel';
+import { ZUSTAND_GRUND } from '../api/abrufZustand';
+import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import type { ChecklistenEintrag, ChecklistenPunkt, ChecklistenPunktBody } from '../api/types';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Liste, ListenEintrag } from '../components/Liste';
@@ -298,7 +298,7 @@ function FuehrungsstellenStandort({ einsatzId }: { einsatzId: number }) {
       <Link
         to={einsatzdatenPfad(einsatzId)}
         aria-label="Standort der Führungsstelle in Einsatzdaten"
-        style={stabZeilenzielStil(token)}
+        style={linkZeilenzielStil(token)}
       >
         Einsatzdaten
       </Link>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { modulRegistry } from '../einsatz/modulRegistry';
 import { mitWirksamemLabel, SACHGEBIETE } from './sachgebiete';
-import { unterseitenFuer } from './unterseiten';
+import { unterseitenFuer } from '../stab/unterseiten';
 
 describe('SACHGEBIETE', () => {
   it('führt genau die sechs Sachgebiete in Anlage-2-Reihenfolge', () => {

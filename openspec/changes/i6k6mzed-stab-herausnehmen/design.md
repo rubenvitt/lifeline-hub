@@ -186,8 +186,10 @@ Entscheidung Ruben, 08.11.2026. Neue Migrationen werden angehängt, Nummern grö
   - `md` kommt nach `frontend/src/lib/markdown.ts`.
   - `ZUSTAND_GRUND` und `Quelle<T>` kommen nach `frontend/src/api/abrufZustand.ts`, wo
     `AbrufZustand` steht.
-  - `zeilenziel.ts` kommt nach `frontend/src/components/zeilenziel.ts`, mit neutralem Namen
-    (`zeilenzielStil`).
+  - `zeilenziel.ts` kommt nach `frontend/src/components/linkZeilenziel.ts` (`linkZeilenzielStil`;
+    `zeilenzielStil` ist schon in `pages/einstellungen/Anmeldeverfahren.tsx` vergeben).
+  - `sachgebiete.ts` (Labels und Zeichen S1–S6) kommt nach `frontend/src/fuehrung/`, weil
+    Organigramm, Skizze und Einsatzbericht die Sachgebiete nach D7 weiter brauchen.
   - `frontend/src/stab/AGENTS.md` wird zu `frontend/src/fernmeldewesen/AGENTS.md`, ohne die
     Stab-, Checklisten- und S5-Abschnitte. Der Absatz zum Informationstelefon zieht in
     `frontend/AGENTS.md` oder in eine neue Bereichsdatei unter `infotelefon/`; die Tabelle in der

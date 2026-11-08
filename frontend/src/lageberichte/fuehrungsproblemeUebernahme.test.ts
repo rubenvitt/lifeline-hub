@@ -20,7 +20,7 @@ import type {
   Meldung,
   ModulZaehler,
 } from '../api/types';
-import { funkplanLuecken, funkplanLueckenZeilen } from '../stab/funkplan';
+import { funkplanLuecken, funkplanLueckenZeilen } from '../fernmeldewesen/funkplan';
 import { freigabenFixture } from '../test/fixtures';
 import { FUEHRUNGSPROBLEME_QUELLE } from './fuehrungsproblemeUebernahme';
 
