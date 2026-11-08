@@ -34,7 +34,7 @@
 ## 5. Skizze auf den Baustein (D3, D4)
 
 - [x] 5.1 `SkizzenFlaeche.tsx`: eigenen Langdruck-Zeitgeber und `onContextMenu` am Element durch `useKontextMenue` ersetzen; `onKontext(key, px)` bleibt die Schnittstelle zu `FernmeldeskizzeBild`
-- [ ] 5.2 Bestehende Skizzen-Tests und `e2e/fernmeldeskizze.spec.ts` (Kontextmenü, langer Druck, Tasten) grün; Verhalten aus Spec `stab-fernmeldeskizze-bearbeitung` unverändert
+- [x] 5.2 Bestehende Skizzen-Tests und `e2e/fernmeldeskizze.spec.ts` (Kontextmenü, langer Druck, Tasten) grün; Verhalten aus Spec `stab-fernmeldeskizze-bearbeitung` unverändert
 
 ## 6. Wächter, Regeln, Doku
 
@@ -44,10 +44,10 @@
 
 ## 7. Browser-Nachweis und Gate
 
-- [ ] 7.1 e2e `frontend/e2e/kontextmenue-datensatz.spec.ts`: Rechtsklick auf eine Materialzeile zeigt Primäraktion und ⋮-Einträge; Rechtsklick auf den Titel-Link öffnet kein eigenes Menü; Umschalt+F10 auf dem Titel-Link öffnet es, Escape gibt den Fokus zurück; langer Druck per CDP-Touch bei 390 px öffnet es und das Abheben navigiert nicht
-- [ ] 7.2 `e2e/lagekarte-touch.spec.ts` grün (Riegel verschoben)
+- [x] 7.1 e2e `frontend/e2e/kontextmenue-datensatz.spec.ts`: Rechtsklick auf eine Materialzeile zeigt Primäraktion und ⋮-Einträge; Rechtsklick auf den Titel-Link öffnet kein eigenes Menü; Umschalt+F10 auf dem Titel-Link öffnet es, Escape gibt den Fokus zurück; langer Druck per CDP-Touch bei 390 px öffnet es und das Abheben navigiert nicht
+- [x] 7.2 `e2e/lagekarte-touch.spec.ts` grün (Riegel verschoben)
 - [ ] 7.3 `./scripts/check-all.sh` grün
-- [ ] 7.4 Bilder der Änderung (Kontextmenü in Tabelle und Karte) per Wegwerf-Spec aufnehmen
+- [x] 7.4 Bilder der Änderung (Kontextmenü in Tabelle und Karte) per Wegwerf-Spec aufnehmen
 
 ## Workflow follow-up
 
