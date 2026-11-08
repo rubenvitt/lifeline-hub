@@ -367,7 +367,7 @@ describe('StabPage', () => {
     ).toHaveAttribute('href', '/einsaetze/1/stab/presse');
     expect(within(s5).getByRole('link', { name: 'Informationstelefon' })).toHaveAttribute(
       'href',
-      '/einsaetze/1/stab/infotelefon',
+      '/einsaetze/1/infotelefon',
     );
   });
 

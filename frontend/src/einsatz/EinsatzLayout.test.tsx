@@ -79,6 +79,12 @@ async function freigabenAngekommen() {
   expect(await screen.findByTestId('freigaben-da')).toBeInTheDocument();
 }
 
+/** Inhalt des Informationstelefons: zeigt, welchen Anruf die Adresse ansteuert. */
+function AnrufSonde() {
+  const { search } = useLocation();
+  return <div>{`Anruf ${new URLSearchParams(search).get('anruf') ?? '—'}`}</div>;
+}
+
 /** Liest den aktuellen Pfad aus der `PfadAnzeige`-Sonde. */
 function pfad(): string {
   return screen.getByTestId('pfad').textContent ?? '';
@@ -988,6 +994,8 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
               }
             />
             <Route path="stab/presse" element={<div>Presse-Inhalt</div>} />
+            <Route path="infotelefon" element={<AnrufSonde />} />
+            <Route path="stab/infotelefon" element={<AltpfadWeiterleitung modul="infotelefon" />} />
             <Route
               path="verpflegung/:zeitfensterId/ausgabe"
               element={<div>Ausgabeansicht-Inhalt</div>}
@@ -1099,6 +1107,29 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(await screen.findByText('Funkplan-Inhalt')).toBeInTheDocument();
     expect(pfad()).toBe('/einsaetze/7/fernmeldewesen');
     expect(screen.getByTestId('pfad')).toHaveAttribute('data-suche', '?ansicht=skizze');
+  });
+
+  // i6k6mzed, design.md D3/D8: die Altadresse des Informationstelefons leitet dauerhaft um, mit
+  // Query, und gehört dem neuen Modul.
+  it('Altadresse des Informationstelefons leitet bei ausgeblendetem Stab um, samt Anruf', async () => {
+    setupWaechter(
+      '/einsaetze/7/stab/infotelefon?anruf=42',
+      freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
+    );
+    expect(await screen.findByText('Anruf 42')).toBeInTheDocument();
+    expect(pfad()).toBe('/einsaetze/7/infotelefon');
+    expect(screen.getByTestId('pfad')).toHaveAttribute('data-suche', '?anruf=42');
+  });
+
+  it('Altadresse bei gesperrtem Informationstelefon zeigt den Hinweis für „Informationstelefon“', async () => {
+    setupWaechter(
+      '/einsaetze/7/stab/infotelefon?neu=1',
+      freigabenFixture({ infotelefon: { zugriff: false } }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Informationstelefon/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Anruf/)).not.toBeInTheDocument();
   });
 
   it('Altadresse des Kommunikationsplans leitet ins Fernmeldewesen', async () => {

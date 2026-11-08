@@ -19,10 +19,7 @@ describe('unterseitenFuer', () => {
     ]);
   });
 
-  it('S5 führt Pressearbeit und Informationstelefon unter dem Stab', () => {
-    expect(unterseitenFuer('s5').map((u) => [u.key, u.modul])).toEqual([
-      ['presse', 'stab'],
-      ['infotelefon', 'stab'],
-    ]);
+  it('S5 führt die Pressearbeit unter dem Stab; das Informationstelefon ist ein Modul (i6k6mzed)', () => {
+    expect(unterseitenFuer('s5').map((u) => [u.key, u.modul])).toEqual([['presse', 'stab']]);
   });
 });

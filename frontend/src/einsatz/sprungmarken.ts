@@ -67,7 +67,6 @@ export interface Sprungmarke {
 /** Suchworte der Stab-Unterseiten je Schlüssel aus `stab/unterseiten.ts`; das Kürzel (s5) kommt dazu. */
 const STAB_SCHLAGWORTE: Record<string, string[]> = {
   presse: ['presse', 'medien', 'pressemitteilung', 'medienlage'],
-  infotelefon: ['bürgertelefon', 'anrufe', 'hotline', 'infotelefon', 'informationstelefon'],
 };
 
 /**

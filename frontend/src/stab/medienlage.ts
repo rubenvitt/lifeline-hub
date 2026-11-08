@@ -8,12 +8,8 @@ import type {
 } from '../api/types';
 import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import type { Quelle } from '../api/abrufZustand';
-import {
-  ANLIEGEN_LABEL,
-  ANLIEGEN_REIHENFOLGE,
-  ART_REIHENFOLGE,
-  MEDIENKONTAKT_ART_LABEL,
-} from '../presse/labels';
+import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../infotelefon/labels';
+import { ART_REIHENFOLGE, MEDIENKONTAKT_ART_LABEL } from '../presse/labels';
 
 /**
  * Die Medienlage des Sachgebiets S5 (LFH-554, Spec `stab-medienlage`): eine Verdichtung von

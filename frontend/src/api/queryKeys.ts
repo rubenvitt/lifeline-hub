@@ -103,8 +103,9 @@ export const EINSATZ_KEYS = {
   // Evakuierungsbezirke (LLH-1034): eigenes Modul neben der Betreuung, eigener Prefix.
   evakuierung: 'einsatz-evakuierung',
   verpflegung: 'einsatz-verpflegung',
-  // Presse- und Medienarbeit S5 (LFH-554): Presse-Log und Pressemitteilungen unter EINEM Prefix,
-  // das Informationstelefon unter einem eigenen. Beide NICHT im Lagebild offline (Personenbezug).
+  // Presse- und Medienarbeit S5 (LFH-554): Presse-Log und Pressemitteilungen unter EINEM Prefix.
+  // Das Informationstelefon (seit i6k6mzed ein eigenes Modul) unter einem eigenen. Beide NICHT im
+  // Lagebild offline (Personenbezug).
   presse: 'einsatz-presse',
   infotelefon: 'einsatz-infotelefon',
   // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
@@ -404,6 +405,7 @@ export const EINSATZ_STREAM_EVENTS = {
   // Medienkontakte, Pressemitteilungen und ihre Details unter EINEM Prefix. Die Freigabe schreibt
   // den ETB-Snapshot; der kommt über das eigene `etb`-Ereignis.
   presse: [EINSATZ_KEYS.presse],
+  // Anrufe des Moduls Informationstelefon; der Server gatet das Ereignis nach `infotelefon`.
   infotelefon: [EINSATZ_KEYS.infotelefon],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 

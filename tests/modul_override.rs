@@ -532,6 +532,9 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     // LLH-1180: die S6-Pfade bleiben unter `…/stab`, gehören aber dem Fernmeldewesen.
     ("fernmeldewesen", "stab/kommunikationsplan"),
     ("fernmeldewesen", "stab/fernmeldeskizze"),
+    // i6k6mzed (design.md D3): das Informationstelefon behält seinen Pfad unter `…/stab`, ist
+    // aber ein eigenes Modul.
+    ("infotelefon", "stab/infotelefon"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):

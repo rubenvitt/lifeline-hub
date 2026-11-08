@@ -269,8 +269,10 @@ Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
 
 Einige Einträge der Modulliste sind **Sprungmarken** in ein anderes Modul: „Entscheidungen“
 (Einsatztagebuch, nur Entscheidungen), „Patienten“ und „Vermisste“ (Betroffene), „FMS-Tableau“
-(Fahrzeuge), unter „Stab“ dessen Arbeitsseiten „Pressearbeit“ und „Informationstelefon“ sowie
-unter „Fernmeldewesen“ (Kategorie „Kommunikation“) „Fernmeldeskizze“ und „Kommunikationsplan“.
+(Fahrzeuge), unter „Stab“ dessen Arbeitsseite „Pressearbeit“ sowie unter „Fernmeldewesen“
+(Kategorie „Kommunikation“) „Fernmeldeskizze“ und „Kommunikationsplan“. Das
+„Informationstelefon“ ist keine Sprungmarke, sondern ein eigenes Modul der Kategorie
+„Kommunikation“.
 Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder fehlt.
 
 Wer aus einem Einsatz ins Profil oder in die Verwaltung wechselt, findet dort „Zurück zu …“: Es

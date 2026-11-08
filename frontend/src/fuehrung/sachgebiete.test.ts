@@ -62,10 +62,10 @@ describe('SACHGEBIETE', () => {
     expect(keysVon('s3')).toEqual(['einsatzabschnitte', 'auftraege', 'meldungen']);
   });
 
-  it('S5 führt Pressearbeit und Informationstelefon als Unterseiten', () => {
+  it('S5 führt die Pressearbeit als Unterseite und das Informationstelefon als Modul (i6k6mzed)', () => {
     expect(SACHGEBIETE.find((s) => s.sachgebiet === 's5')!.werkzeuge).toEqual([
       { art: 'seite', key: 'presse' },
-      { art: 'seite', key: 'infotelefon' },
+      { art: 'modul', key: 'infotelefon' },
     ]);
   });
 

@@ -183,6 +183,8 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   // LLH-1180: die Modulroute des Fernmeldewesens zeigt den Funkplan (Reiter Funkplan,
   // Fernmeldeskizze, Sprechgruppen); der Kommunikationsplan ist die Unterroute daneben.
   fernmeldewesen: <FunkplanPage />,
+  // i6k6mzed: das Informationstelefon ist ein eigenes Modul (design.md D3).
+  infotelefon: <InfotelefonPage />,
   dokumente: <DokumentePage />,
   abloesung: <AbloesungPage />,
   'wetter-pegel': <WetterPegelPage />,
@@ -449,13 +451,15 @@ export const appRouten = createRoutesFromElements(
             path="stab/kommunikationsplan"
             element={<AltpfadWeiterleitung modul="fernmeldewesen" unterpfad="kommunikationsplan" />}
           />
+          {/* Altadresse des Informationstelefons (i6k6mzed, design.md D3/D8): leitet dauerhaft auf
+              das eigene Modul um, samt `?anruf=` und `?neu=1`; `modulAusPfad` gatet sie danach. */}
+          <Route path="stab/infotelefon" element={<AltpfadWeiterleitung modul="infotelefon" />} />
           {/* Presse- und Medienarbeit S5 (LFH-554): Unterrouten des Stabs, kein eigenes Modul. */}
           <Route path="stab/presse" element={<PressePage />} />
           <Route
             path="stab/presse/mitteilungen/:mitteilungId"
             element={<PressemitteilungDetailPage />}
           />
-          <Route path="stab/infotelefon" element={<InfotelefonPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
           <Route path="personen/:personId/druck" element={<PersonDruckPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />

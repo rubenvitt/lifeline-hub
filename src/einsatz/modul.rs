@@ -9,7 +9,7 @@
 
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
-pub const MODUL_KEYS: [&str; 34] = [
+pub const MODUL_KEYS: [&str; 35] = [
     // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
     "ueberblick",
     "einsatzdaten",
@@ -49,6 +49,8 @@ pub const MODUL_KEYS: [&str; 34] = [
     "erinnerungen",
     "meldungen",
     "fernmeldewesen",
+    // i6k6mzed: das Informationstelefon ist ein eigenes Modul statt einer Unterseite des Stabs.
+    "infotelefon",
     // Einstellungen
     "einsatz-einstellungen",
 ];
@@ -121,6 +123,7 @@ modul_marker! {
     Lagekarte => "lagekarte",
     Stab => "stab",
     Fernmeldewesen => "fernmeldewesen",
+    Infotelefon => "infotelefon",
     Dokumente => "dokumente",
     Abloesung => "abloesung",
     Betreuung => "betreuung",
@@ -181,6 +184,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         "/api/einsaetze/{id}/stab/fernmeldeskizze",
         Some("fernmeldewesen"),
     ),
+    // i6k6mzed: das Informationstelefon behält seinen Pfad unter `…/stab`, ist aber das eigene
+    // Modul `infotelefon` (Herleitung `openspec/changes/i6k6mzed-stab-herausnehmen/design.md`,
+    // D3) — der längere Präfix gewinnt.
+    ("/api/einsaetze/{id}/stab/infotelefon", Some("infotelefon")),
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
@@ -374,6 +381,7 @@ mod tests {
         assert_eq!(Lagebesprechung::KEY, Some("lagebesprechung"));
         assert_eq!(Stab::KEY, Some("stab"));
         assert_eq!(Fernmeldewesen::KEY, Some("fernmeldewesen"));
+        assert_eq!(Infotelefon::KEY, Some("infotelefon"));
         assert_eq!(Dokumente::KEY, Some("dokumente"));
         assert_eq!(Abloesung::KEY, Some("abloesung"));
         assert_eq!(Betreuung::KEY, Some("betreuung"));
@@ -447,6 +455,15 @@ mod tests {
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche/{bid}"),
             Some(Some("fernmeldewesen"))
+        );
+        // Informationstelefon (i6k6mzed, design.md D3): eigenes Modul unter dem alten Pfad.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/stab/infotelefon"),
+            Some(Some("infotelefon"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/stab/infotelefon/{aid}/status"),
+            Some(Some("infotelefon"))
         );
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/stab/besetzung/{sachgebiet}"),

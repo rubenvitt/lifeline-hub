@@ -141,7 +141,7 @@ describe('ModulAkkordeon · Stab-Marken', () => {
     const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
     const stab = knoepfe.findIndex((t) => t?.startsWith('Stab'));
     expect(stab).toBeGreaterThanOrEqual(0);
-    expect(knoepfe.slice(stab + 1, stab + 3)).toEqual(['Pressearbeit', 'Informationstelefon']);
+    expect(knoepfe.slice(stab + 1, stab + 2)).toEqual(['Pressearbeit']);
   });
 
   it('führt die Marken des Fernmeldewesens im Drawer hinter „Fernmeldewesen“ (LLH-1180)', () => {

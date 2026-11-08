@@ -2,15 +2,15 @@
 titel: Presse und Infotelefon
 gruppen: [fuehrung]
 reihenfolge: 450
-quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/entwurf/EntwurfNavigationSchutz.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
+quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/entwurf/EntwurfNavigationSchutz.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/useModulFreigabe.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/modul.rs, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
 ---
 
 ## Überblick
 
-Für das Sachgebiet S5 gibt es zwei Seiten unter „Stab“. Die **Pressearbeit** führt das Presse-Log
-der Medienkontakte, die Pressemitteilungen mit Freigabe und eine Medienlage ohne Personenbezug.
-Das **Informationstelefon** protokolliert Anrufe aus der Bevölkerung und hält offene Rückrufe
-nach. Lesen können alle Mitglieder des Einsatzes, erfassen dürfen Einsatzleitung und
+Die **Pressearbeit** ist eine Seite unter „Stab“ (Sachgebiet S5). Sie führt das Presse-Log der
+Medienkontakte, die Pressemitteilungen mit Freigabe und eine Medienlage ohne Personenbezug. Das
+**Informationstelefon** ist ein eigenes Modul in der Kategorie „Kommunikation“. Es protokolliert
+Anrufe aus der Bevölkerung und hält offene Rückrufe nach. Lesen können alle Mitglieder des Einsatzes, erfassen dürfen Einsatzleitung und
 Führungspersonal. Eine Pressemitteilung gibt nur die Einsatzleitung frei.
 
 ## Abläufe
@@ -64,7 +64,8 @@ neuen Entwurf an, der auf ihr aufbaut.
 ### Einen Anruf am Informationstelefon erfassen
 
 1. In der Sprungpalette „Anruf erfassen“ wählen: das Informationstelefon öffnet sich, der Cursor
-   steht im „Anliegen“. Ohne Palette: in der Modulliste unter „Stab“ „Informationstelefon“ wählen.
+   steht im „Anliegen“. Ohne Palette: in der Modulliste unter „Kommunikation“ „Informationstelefon“
+   wählen.
 2. In der Leiste unten das „Anliegen“ wählen und eine „Notiz zum Anruf“ eintragen.
 
    ![Informationstelefon mit Kennzahlen, Aufgliederung nach Anliegen, Anrufprotokoll und Erfassungsleiste](../bilder/presse-infotelefon/infotelefon.png)
@@ -85,8 +86,11 @@ neuen Entwurf an, der auf ihr aufbaut.
 Medienkontakte, Entwürfe und Anrufe erfassen Einsatzleitung und Führungspersonal, solange der
 Einsatz läuft. **Freigeben darf nur die Einsatzleitung**; das Führungspersonal sieht „Freigeben“
 gesperrt mit dem Hinweis „nur Einsatzleitung“. Einzelheiten stehen in
-[Rechte im Einsatz](rechte-im-einsatz.md). Ist das Modul Stab nicht freigegeben, sind beide Seiten
-gesperrt.
+[Rechte im Einsatz](rechte-im-einsatz.md). Ist das Modul Stab nicht freigegeben, ist die
+Pressearbeit gesperrt. Das Informationstelefon folgt allein der Freigabe des eigenen Moduls
+„Informationstelefon“: Wer es ausblendet oder auf eine Rolle beschränkt, tut das unter „Module“
+in den Einstellungen des Einsatzes, unabhängig vom Stab. Neue Anrufe anderer Plätze erreichen nur,
+wer das Informationstelefon öffnen darf.
 
 ### Entwurf speichern und verlassen
 

@@ -39,7 +39,7 @@ import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusWahl from '../components/StatusWahl';
 import StatusTag from '../components/StatusTag';
 import { useViewport } from '../components/useViewport';
-import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import AnrufErfassung from '../infotelefon/AnrufErfassung';
@@ -51,18 +51,20 @@ import {
   zuflussText,
   type Einfrierstand,
 } from '../infotelefon/zufluss';
-import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
-import { personenPfad, stabPfad } from '../routing/deeplinks';
+import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../infotelefon/labels';
+import { personenPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
-import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
+import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { infotelefonStatus } from '../theme/statusFarben';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
- * Informationstelefon des Sachgebiets S5 (LFH-554, Spec `stab-infotelefon`): das Protokoll der
- * Anrufe aus der Bevölkerung. Ein Protokoll wird gelesen — Zeitachse wie das ETB in
+ * Informationstelefon (LFH-554, Spec `stab-infotelefon`): das Protokoll der Anrufe aus der
+ * Bevölkerung. Seit i6k6mzed ein eigenes Modul `infotelefon` (design.md D3); die Seite prüft seine
+ * Freigabe selbst (`useModulFreigabe`), weil der Rahmen bei gescheitertem Abruf weiter rendert.
+ * Ein Protokoll wird gelesen — Zeitachse wie das ETB in
  * Funkprotokoll-Ordnung (LLH-1149): ältester Anruf oben, jüngster unten direkt über der
  * Erfassung, die Seite öffnet am Ende und läuft dort neuen Anrufen nach
  * (`components/useFunkprotokollLauf.ts`). Keine Sortierung, kein Spaltenfilter; nur die
@@ -90,7 +92,9 @@ type Sicht = 'alle' | 'offen';
 
 const ANLIEGEN_ID = 'infotelefon-nach-anliegen';
 
-const SEITE = { titel: 'Informationstelefon', mitArtikel: 'das Informationstelefon' };
+const MODUL = 'infotelefon';
+
+const SEITE = { titel: modulName(MODUL), mitArtikel: `das ${modulName(MODUL)}` };
 
 /** Optionen der Statuswahl: ein offener Rückruf wird erledigt, ein erledigter mit Nummer geöffnet. */
 function statusOptionen(a: InfotelefonAnruf): InfotelefonStatus[] {
@@ -106,8 +110,8 @@ export default function InfotelefonPage() {
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
-  const stabFreigabe = useStabFreigabe(einsatzId);
-  const frei = stabFreigabe.zustand === 'frei';
+  const freigabe = useModulFreigabe(einsatzId, MODUL);
+  const frei = freigabe.zustand === 'frei';
   const [sicht, setSicht] = useState<Sicht>('alle');
   const { istSchmal } = useViewport();
   const { fokusInLeiste, leistenFokus } = useFokusInLeiste();
@@ -179,7 +183,7 @@ export default function InfotelefonPage() {
 
   // Schnellaktion „Anruf erfassen“ (LLH-1127): ?neu=1 legt den Fokus in die Erfassung. Das Literal
   // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` verlangt
-  // den Leser auf genau dieser Stab-Unterseite. Warten, bis Freigabe und Einsatz feststehen; den
+  // den Leser in einer Seite des Moduls. Warten, bis Freigabe und Einsatz feststehen; den
   // Parameter immer räumen (apply-then-clean), fokussieren nur mit Freigabe und Schreibrecht.
   // Einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1530): Bis der Router die Räumung committet,
   // steht `?neu=1` noch in `searchParams`, und ein neu geladener Einsatz holte den Fokus sonst aus
@@ -187,20 +191,13 @@ export default function InfotelefonPage() {
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (neuAuftrag.verbraucht()) return;
-    if (stabFreigabe.zustand === 'laden') return;
+    if (freigabe.zustand === 'laden') return;
     if (frei && einsatzQuery.isLoading) return;
     if (frei && einsatzQuery.data && darfImEinsatzSchreiben(einsatzQuery.data)) {
       setFocusRequest((n) => n + 1);
     }
     neuAuftrag.raeume('neu');
-  }, [
-    searchParams,
-    neuAuftrag,
-    stabFreigabe.zustand,
-    frei,
-    einsatzQuery.isLoading,
-    einsatzQuery.data,
-  ]);
+  }, [searchParams, neuAuftrag, freigabe.zustand, frei, einsatzQuery.isLoading, einsatzQuery.data]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.infotelefon(einsatzId) });
 
@@ -331,7 +328,7 @@ export default function InfotelefonPage() {
     [zaehler],
   );
 
-  if (stabFreigabe.zustand !== 'frei') return stabFreigabeAnzeige(stabFreigabe, SEITE, einsatzId);
+  if (freigabe.zustand !== 'frei') return modulFreigabeAnzeige(freigabe, MODUL, SEITE, einsatzId);
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -344,7 +341,7 @@ export default function InfotelefonPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  const personenFrei = istKeyFreigegeben('personen', stabFreigabe.freigaben);
+  const personenFrei = istKeyFreigegeben('personen', freigabe.freigaben);
   // Die Zahlen kommen allein aus der Zählung; ohne sie steht keine Zahl da (LLH-732).
   const zustand: KennzahlZustand = zaehlerQuery.isPending
     ? 'laden'
@@ -395,7 +392,7 @@ export default function InfotelefonPage() {
 
   return (
     <EinsatzSeite
-      titel="Informationstelefon"
+      titel={modulName(MODUL)}
       meta={meta}
       // Unter `md` steht die Segmentleiste im Kopf wie die Typleiste des ETB: über der Zeitachse
       // kostete sie eine eigene Zeile samt Abstand.
@@ -422,8 +419,7 @@ export default function InfotelefonPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={stabPfad(einsatzId)}>Stab</Link> },
-            { title: 'Informationstelefon' },
+            { title: modulName(MODUL) },
           ]}
         />
       }

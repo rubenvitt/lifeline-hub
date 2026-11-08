@@ -59,10 +59,10 @@ Besetzung und Checkliste bedienen Einsatzleitung und Führungspersonal, solange 
 Wer das nicht darf, sieht den Grund unter dem Seitenkopf. Einzelheiten stehen in
 [Rechte im Einsatz](rechte-im-einsatz.md).
 
-Ist das Modul Stab für den Einsatz nicht freigegeben, sind auch seine Unterseiten (Pressearbeit,
-Informationstelefon) gesperrt: „… nicht verfügbar“, „Modul Stab nicht freigegeben“. Die
-Lagebesprechung und das Fernmeldewesen (Funkplan, Fernmeldeskizze, Kommunikationsplan) haben ihre
-eigene Freigabe und bleiben nutzbar, wenn der Stab ausgeblendet ist; ist eines davon gesperrt,
+Ist das Modul Stab für den Einsatz nicht freigegeben, ist auch seine Unterseite Pressearbeit
+gesperrt: „… nicht verfügbar“, „Modul Stab nicht freigegeben“. Die Lagebesprechung, das
+Informationstelefon und das Fernmeldewesen (Funkplan, Fernmeldeskizze, Kommunikationsplan) haben
+ihre eigene Freigabe und bleiben nutzbar, wenn der Stab ausgeblendet ist; ist eines davon gesperrt,
 steht der Verweis dorthin gesperrt da, etwa „Funkplan (Keine Berechtigung)“.
 
 ### Die Kacheln
@@ -97,13 +97,12 @@ Einsatztagebuch.
 
 ### Ohne Umweg über die Stab-Seite
 
-Pressearbeit und Informationstelefon stehen auch in der Modulliste direkt unter „Stab“, in dieser
-Reihenfolge, und in der Sprungpalette unter „Ansichten“: „Bürgertelefon“ findet das
-Informationstelefon. Fernmeldeskizze und Kommunikationsplan stehen unter „Fernmeldewesen“ in der
-Kategorie „Kommunikation“; „Funk“ findet das Fernmeldewesen. „Anruf erfassen“
-in der Palette öffnet das Informationstelefon mit dem Cursor in der Erfassung. Ist der Stab
-gesperrt, stehen die Einträge in der Modulliste mit Schloss und fehlen in der Palette; ist er
-ausgeblendet, fehlen sie überall.
+Die Pressearbeit steht auch in der Modulliste direkt unter „Stab“ und in der Sprungpalette unter
+„Ansichten“. Das Informationstelefon ist ein eigenes Modul in der Kategorie „Kommunikation“.
+Fernmeldeskizze und Kommunikationsplan stehen unter „Fernmeldewesen“ in derselben Kategorie;
+„Funk“ findet das Fernmeldewesen. „Anruf erfassen“ in der Palette öffnet das Informationstelefon
+mit dem Cursor in der Erfassung. Ist der Stab gesperrt, steht die Pressearbeit in der Modulliste
+mit Schloss und fehlt in der Palette; ist er ausgeblendet, fehlt sie überall.
 
 ### Was ins Einsatztagebuch geht
 

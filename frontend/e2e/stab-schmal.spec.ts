@@ -254,7 +254,7 @@ test.describe('Informationstelefon am Handschirm (LFH-978)', () => {
       await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
       await anmeldenAlsAdmin(page);
       const einsatzId = await einsatzAnlegen(page, []);
-      await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+      await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
       await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
 
       const zeile = page.locator('.lfh-schnellerfassung');

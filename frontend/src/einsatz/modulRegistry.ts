@@ -37,6 +37,7 @@ import {
   IconSprechblaseGefuellt,
   IconSprechblaseRund,
   IconFunkmast,
+  IconTelefon,
   IconWarndreieck,
   IconZahnrad,
   IconZahnradGefuellt,
@@ -494,6 +495,17 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Funkplan, Skizze, Kommunikationsplan',
   },
+  {
+    // i6k6mzed (design.md D3): eigenes Modul statt Unterseite des Stabs; ohne Modulzähler. Die
+    // API bleibt unter `…/stab/infotelefon`, `PFAD_KEY` ordnet sie `infotelefon` zu.
+    key: 'infotelefon',
+    kategorie: 'kommunikation',
+    label: 'Informationstelefon',
+    icon: IconTelefon,
+    route: 'infotelefon',
+    status: 'fertig',
+    beschreibung: 'Bürgeranrufe, Rückrufe, Anliegen',
+  },
   // Einstellungen
   {
     key: 'einsatz-einstellungen',
@@ -564,11 +576,12 @@ export function modulAusPfad(
  * Weiterleitung, damit der Rahmen sie nach dessen Freigabe gatet. Sonst finge ein ausgeblendeter
  * Stab `stab/funkplan` ab, bevor die Weiterleitung ins Fernmeldewesen läuft. Spiegel von
  * `PFAD_KEY` im Backend (`src/einsatz/modul.rs`), wo dieselben Pfade per längstem Präfix
- * `fernmeldewesen` gehören.
+ * `fernmeldewesen` bzw. `infotelefon` gehören (i6k6mzed, design.md D3).
  */
 const ALTPFAD_MODUL: Readonly<Record<string, string>> = {
   'stab/funkplan': 'fernmeldewesen',
   'stab/kommunikationsplan': 'fernmeldewesen',
+  'stab/infotelefon': 'infotelefon',
 };
 
 /** Module, die nicht ausgeblendet werden dürfen (Spiegel von `NICHT_AUSBLENDBAR` im Backend). */

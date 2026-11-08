@@ -595,8 +595,9 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
  */
 describe('ModulListe — Stab-Marken', () => {
   const fuehrung = modulRegistry.filter((m) => m.kategorie === 'fuehrung');
-  // S6 steht seit LLH-1180 hinter „Fernmeldewesen“ (Kommunikation), siehe unten.
-  const STAB_MARKEN = ['Pressearbeit', 'Informationstelefon'];
+  // S6 steht seit LLH-1180 hinter „Fernmeldewesen“ (Kommunikation), siehe unten; das
+  // Informationstelefon ist seit i6k6mzed ein eigenes Modul der Kommunikation, keine Marke.
+  const STAB_MARKEN = ['Pressearbeit'];
   const zeige = (props: { freigaben?: ModulFreigaben; onSprungKlick?: (m: Sprungmarke) => void }) =>
     renderMitProviders(
       <ModulPanel
@@ -616,12 +617,11 @@ describe('ModulListe — Stab-Marken', () => {
     // Die Modulzeile trägt ihre Beschreibung als zweite Zeile im Text.
     const stab = knoepfe.findIndex((t) => t?.startsWith('Stab'));
     expect(stab).toBeGreaterThanOrEqual(0);
-    expect(knoepfe.slice(stab + 1, stab + 3)).toEqual(STAB_MARKEN);
+    expect(knoepfe.slice(stab + 1, stab + 2)).toEqual(STAB_MARKEN);
     expect(screen.queryByRole('button', { name: /^Funkplan, springt zu/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Informationstelefon, springt zu/ })).toBeNull();
     expect(
-      screen.getByRole('button', {
-        name: 'Informationstelefon, springt zu Stab · Informationstelefon',
-      }),
+      screen.getByRole('button', { name: 'Pressearbeit, springt zu Stab · Pressearbeit' }),
     ).toBeEnabled();
   });
 
@@ -678,6 +678,14 @@ describe('ModulListe — Marken des Fernmeldewesens', () => {
     expect(
       screen.getByRole('button', { name: 'Fernmeldeskizze, springt zu Fernmeldewesen · Skizze' }),
     ).not.toHaveAttribute('aria-current');
+  });
+
+  it('vor dem Informationstelefon, das als Modulzeile ohne Zahl folgt (i6k6mzed)', () => {
+    zeige({});
+    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    const modul = knoepfe.findIndex((t) => t?.startsWith('Fernmeldewesen'));
+    expect(knoepfe[modul + 3]).toMatch(/^Informationstelefon/);
+    expect(screen.queryByRole('button', { name: /^Informationstelefon, springt zu/ })).toBeNull();
   });
 
   it('bleiben bei ausgeblendetem Stab stehen', () => {

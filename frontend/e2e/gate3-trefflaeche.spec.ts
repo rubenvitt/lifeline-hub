@@ -1353,9 +1353,10 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
 
 /**
  * 4 + 3 + 3 + 3 + 2 + 4 Werkzeuge aus `fuehrung/sachgebiete.ts` (LLH-1124): Registry-Module, alle
- * `fertig`, dazu die Unterseiten aus `stab/unterseiten.ts` — „Pressearbeit“ und
- * „Informationstelefon“ in der Kachel S5 (LFH-554), Funkplan, Fernmeldeskizze, Sprechgruppen und
- * Kommunikationsplan in der Kachel S6 (LLH-1180). Alle in derselben Werkzeugzelle.
+ * `fertig` (darunter seit i6k6mzed das Informationstelefon in der Kachel S5), dazu die Unterseiten
+ * aus `stab/unterseiten.ts` — „Pressearbeit“ in der Kachel S5 (LFH-554), Funkplan,
+ * Fernmeldeskizze, Sprechgruppen und Kommunikationsplan in der Kachel S6 (LLH-1180). Alle in
+ * derselben Werkzeugzelle.
  */
 const STAB_WERKZEUG_LINKS = 19;
 /** Jede Kachel trägt eine Gruppe „Werkzeuge S…“. */
@@ -1786,7 +1787,7 @@ test('Presse S5: Kopfaktionen, Titel-Link, Statusauslöser, „Beantworten“ un
       `Beantworten (${dichte})`,
     );
 
-    await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+    await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
     await expect(page.getByText('sucht Vater')).toHaveCount(1);
     const erfassen = await haeltStufe(
       page.getByRole('button', { name: 'Erfassen', exact: true }),
@@ -1837,7 +1838,7 @@ test('Presse S5 (Beobachter): Titel-Link und „Vermisste ↗“ folgen der Staf
       `Titel-Link (${dichte})`,
     );
 
-    await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+    await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
     await expect(page.getByText('sucht Vater')).toHaveCount(1);
     await expect(
       page.getByRole('button', { name: 'Erfassen', exact: true }),

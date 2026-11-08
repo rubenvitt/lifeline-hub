@@ -50,12 +50,12 @@ fn startliste_zeigt_die_modulzahlen_aus_dem_entwurf() {
     assert_eq!(
         zahlen,
         [
-            ("Kleinlage", 14, 20),
-            ("Sanitätsdienst", 24, 10),
-            ("MANV", 27, 7),
-            ("Personensuche", 25, 9),
-            ("Evakuierung und Betreuung", 30, 4),
-            ("Unwetter", 28, 6),
+            ("Kleinlage", 14, 21),
+            ("Sanitätsdienst", 24, 11),
+            ("MANV", 27, 8),
+            ("Personensuche", 25, 10),
+            ("Evakuierung und Betreuung", 30, 5),
+            ("Unwetter", 28, 7),
         ]
     );
 }
@@ -80,13 +80,13 @@ fn startliste_traegt_einsatzart_und_sortierung() {
 }
 
 #[test]
-fn manv_blendet_stab_und_tiere_aus_und_zeigt_unfallhilfsstellen() {
+fn manv_blendet_infotelefon_und_tiere_aus_und_zeigt_unfallhilfsstellen() {
     let manv = EINSATZ_VORLAGE_STARTLISTE
         .iter()
         .find(|s| s.bezeichnung == "MANV")
         .unwrap();
     let aus = manv.ausgeblendet();
-    assert!(aus.contains(&"stab"));
+    assert!(aus.contains(&"infotelefon"));
     assert!(aus.contains(&"tiere"));
     assert!(!aus.contains(&"unfallhilfsstellen"));
 }
@@ -103,11 +103,13 @@ fn sanitaetsdienst_zeigt_funk_und_wetter_aber_keine_lagemeldungen() {
     assert!(aus.contains(&"lagemeldungen"));
 }
 
+/// Das Informationstelefon erbt die Ausblendung des Stabs (i6k6mzed, design.md D3): keine
+/// mitgelieferte Vorlage zeigt es.
 #[test]
-fn stab_steht_in_keiner_vorlage() {
+fn infotelefon_steht_in_keiner_vorlage() {
     for start in EINSATZ_VORLAGE_STARTLISTE {
         assert!(
-            start.ausgeblendet().contains(&"stab"),
+            start.ausgeblendet().contains(&"infotelefon"),
             "{}",
             start.bezeichnung
         );

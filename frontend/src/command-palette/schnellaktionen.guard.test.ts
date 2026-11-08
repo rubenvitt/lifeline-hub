@@ -35,9 +35,10 @@ import { unterseitenFuer } from '../stab/unterseiten';
  *  5. DIE ZUORDNUNG HÄNGT AM DATEINAMEN; ein Leser ohne passenden Registry-Eintrag wird gemeldet,
  *     nicht zugeordnet.
  *
- * STAB-UNTERSEITEN (LLH-1127): Pressearbeit und Informationstelefon sind kein Modul, sondern
- * Unterrouten des Stabs (`stab/unterseiten.ts`). Ihre Seiten zählen zum Träger `stab`
- * (`InfotelefonPage.tsx` → `stab`); Funkplan und Kommunikationsplan zählen zum Fernmeldewesen
+ * STAB-UNTERSEITEN (LLH-1127): Die Pressearbeit ist kein Modul, sondern eine Unterroute des
+ * Stabs (`stab/unterseiten.ts`). Ihre Seite zählt zum Träger `stab` (`PressePage.tsx` → `stab`);
+ * das Informationstelefon ist seit i6k6mzed ein eigenes Modul (`InfotelefonPage.tsx` →
+ * `infotelefon`, design.md D3). Funkplan und Kommunikationsplan zählen zum Fernmeldewesen
  * (LLH-1180), dem Modul, das ihre Unterseite in `stab/unterseiten.ts` nennt. Zeigt eine Schnellaktion auf `…/stab/<unterseite>`, muss
  * der Leser in GENAU dieser Seite stehen: ein Leser auf der Stab-Seite selbst deckte sie sonst, und
  * die Aktion liefe ins Leere. (Die Lagebesprechung hat seit LLH-1111 ein eigenes Modul.)
@@ -122,7 +123,7 @@ const LESER = new Map<SchnellaktionParameter, Leser[]>(
 /** Vergleichsform für die Dateiname-↔-Registry-Zuordnung: nur Buchstaben und Ziffern. */
 const normal = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** Basisname einer Datei in Vergleichsform, ohne Endung und ohne `Page` (`InfotelefonPage.tsx` → `infotelefon`). */
+/** Basisname einer Datei in Vergleichsform, ohne Endung und ohne `Page` (`PressePage.tsx` → `presse`). */
 const fileBase = (pfad: string): string =>
   normal((pfad.split('/').pop() ?? '').replace(/\.tsx?$/, '')).replace(/page$/, '');
 
@@ -140,8 +141,8 @@ const STAB_UNTERSEITEN = new Set(
 );
 
 /**
- * Die Stab-Unterseite, auf die ein Ziel zeigt (`/einsaetze/1/stab/infotelefon?neu=1` →
- * `infotelefon`), oder `null`. Nur für den Träger `stab`.
+ * Die Stab-Unterseite, auf die ein Ziel zeigt (`/einsaetze/1/stab/presse?neu=1` → `presse`),
+ * oder `null`. Nur für den Träger `stab`.
  */
 export function findStabUnterseite(modulKey: string, ziel: string, basis: string): string | null {
   if (modulKey !== 'stab') return null;
@@ -154,7 +155,7 @@ export function findStabUnterseite(modulKey: string, ziel: string, basis: string
 /**
  * Die Leser-Dateien eines Trägermoduls, die einen Eintrag DECKEN (Kopfkommentar, Stab-Unterseiten):
  * zeigt das Ziel auf eine Stab-Unterseite, nur deren Seite; zeigt es auf den Stab selbst, nur
- * Dateien, die keine Unterseite sind — sonst deckte das Informationstelefon die Stab-Seite.
+ * Dateien, die keine Unterseite sind — sonst deckte die Pressearbeit die Stab-Seite.
  */
 export function findCoveringFiles(
   modulKey: string,
@@ -240,25 +241,26 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
   });
 
   it('ordnet die Seiten der Unterseiten ihrem Modul zu und erkennt die Ziele unter dem Stab (LLH-1127, LLH-1180)', () => {
-    expect(modulZuLeserDatei('/src/pages/InfotelefonPage.tsx')).toEqual(['stab']);
+    expect(modulZuLeserDatei('/src/pages/PressePage.tsx')).toEqual(['stab']);
     expect(modulZuLeserDatei('/src/pages/FunkplanPage.tsx')).toEqual(['fernmeldewesen']);
     expect(modulZuLeserDatei('/src/pages/StabPage.tsx')).toEqual(['stab']);
+    // Das Informationstelefon ist ein eigenes Modul (i6k6mzed, design.md D3), keine Unterseite.
+    expect(modulZuLeserDatei('/src/pages/InfotelefonPage.tsx')).toEqual(['infotelefon']);
     const basis = '/einsaetze/1/stab';
-    expect(findStabUnterseite('stab', `${basis}/infotelefon?neu=1`, basis)).toBe('infotelefon');
+    expect(findStabUnterseite('stab', `${basis}/presse?neu=1`, basis)).toBe('presse');
+    expect(findStabUnterseite('stab', `${basis}/infotelefon?neu=1`, basis)).toBeNull();
     expect(findStabUnterseite('stab', `${basis}?neu=1`, basis)).toBeNull();
     expect(findStabUnterseite('stab', `${basis}/unbekannt?neu=1`, basis)).toBeNull();
-    expect(
-      findStabUnterseite('etb', '/einsaetze/1/etb/infotelefon', '/einsaetze/1/etb'),
-    ).toBeNull();
+    expect(findStabUnterseite('etb', '/einsaetze/1/etb/presse', '/einsaetze/1/etb')).toBeNull();
     // Selbstbeweis der Deckung: kein Leser der falschen Seite deckt.
     const stabSeite = '/src/pages/StabPage.tsx';
-    const infotelefon = '/src/pages/InfotelefonPage.tsx';
-    expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [infotelefon])).toEqual([]);
+    const presse = '/src/pages/PressePage.tsx';
+    expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [presse])).toEqual([]);
     expect(findCoveringFiles('stab', `${basis}/presse?neu=1`, basis, [stabSeite])).toEqual([]);
-    expect(
-      findCoveringFiles('stab', `${basis}/infotelefon?neu=1`, basis, [stabSeite, infotelefon]),
-    ).toEqual([infotelefon]);
-    expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [stabSeite, infotelefon])).toEqual([
+    expect(findCoveringFiles('stab', `${basis}/presse?neu=1`, basis, [stabSeite, presse])).toEqual([
+      presse,
+    ]);
+    expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [stabSeite, presse])).toEqual([
       stabSeite,
     ]);
   });

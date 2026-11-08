@@ -90,7 +90,7 @@ async fn neue_organisation_hat_die_startliste() {
     );
     let manv = &liste[2];
     let aus = texte(&manv["ausgeblendet"]);
-    assert!(aus.contains(&"stab".to_string()) && aus.contains(&"tiere".to_string()));
+    assert!(aus.contains(&"infotelefon".to_string()) && aus.contains(&"tiere".to_string()));
     assert_eq!(manv["einsatzart"], "realeinsatz");
     assert_eq!(liste[1]["einsatzart"], "sanitaetsdienst");
 }
@@ -387,10 +387,10 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
     .await;
     assert_eq!(status, StatusCode::OK);
     let map = overrides.as_object().unwrap();
-    let stab = &map["stab"];
-    assert_eq!(stab["sichtbar"], false);
-    assert_eq!(stab["benoetigte_rolle"], Value::Null);
-    assert_eq!(stab["geaendert_von"], fk_id);
+    let infotelefon = &map["infotelefon"];
+    assert_eq!(infotelefon["sichtbar"], false);
+    assert_eq!(infotelefon["benoetigte_rolle"], Value::Null);
+    assert_eq!(infotelefon["geaendert_von"], fk_id);
     assert!(
         !map.contains_key("unfallhilfsstellen"),
         "sichtbare Module bekommen keine Zeile"
@@ -402,6 +402,7 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
         [
             "betreuung",
             "evakuierung",
+            "infotelefon",
             "schaeden",
             "stab",
             "tiere",
@@ -418,7 +419,7 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
         None,
     )
     .await;
-    assert_eq!(freigaben["stab"]["sichtbar"], false);
+    assert_eq!(freigaben["infotelefon"]["sichtbar"], false);
     assert_eq!(freigaben["unfallhilfsstellen"]["sichtbar"], true);
 }
 

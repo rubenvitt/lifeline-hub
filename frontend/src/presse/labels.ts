@@ -1,9 +1,9 @@
-import type { InfotelefonAnliegen, MedienkontaktArt } from '../api/types';
+import type { MedienkontaktArt } from '../api/types';
 
 /**
  * Wortlaute der S5-Enums (LFH-554). Exhaustive `Record`s: eine neue Backend-Variante bricht den
  * Typcheck statt still ohne Wort zu erscheinen. Farben stehen NICHT hier, sondern im Vertrag
- * `theme/statusFarben.ts`.
+ * `theme/statusFarben.ts`. Die Anliegen des Informationstelefons stehen in `infotelefon/labels.ts`.
  */
 export const MEDIENKONTAKT_ART_LABEL: Record<MedienkontaktArt, string> = {
   anfrage: 'Anfrage',
@@ -11,16 +11,4 @@ export const MEDIENKONTAKT_ART_LABEL: Record<MedienkontaktArt, string> = {
   termin: 'Termin',
 };
 
-/** Reihenfolge und Wortlaut der Anliegen am Informationstelefon. */
-export const ANLIEGEN_LABEL: Record<InfotelefonAnliegen, string> = {
-  vermisstensuche: 'Vermisstensuche',
-  auskunft_lage: 'Auskunft zur Lage',
-  hinweis: 'Hinweis zur Lage',
-  hilfeangebot: 'Hilfeangebot',
-  beschwerde: 'Beschwerde',
-  presse: 'Presseanfrage',
-  sonstiges: 'Sonstiges',
-};
-
-export const ANLIEGEN_REIHENFOLGE = Object.keys(ANLIEGEN_LABEL) as InfotelefonAnliegen[];
 export const ART_REIHENFOLGE = Object.keys(MEDIENKONTAKT_ART_LABEL) as MedienkontaktArt[];

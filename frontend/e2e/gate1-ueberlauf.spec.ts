@@ -863,8 +863,8 @@ function gate1RoutenStab(einsatzId: string): Gate1Route[] {
       },
     },
     {
-      // Informationstelefon S5 (LFH-554): der gesäte Anruf in der Zeitachse.
-      pfad: `/einsaetze/${einsatzId}/stab/infotelefon`,
+      // Informationstelefon (LFH-554, eigenes Modul seit i6k6mzed): der gesäte Anruf.
+      pfad: `/einsaetze/${einsatzId}/infotelefon`,
       anker: (p: Page) => p.getByText(ANRUF_NOTIZ),
       lesend: {
         vorbedingung: async (p: Page) => {

@@ -1,5 +1,6 @@
-//! Integrationstests des Informationstelefons S5 (LFH-554) unter
-//! `/api/einsaetze/{id}/stab/infotelefon`: Statuscodes, Rechte, Lebenszyklus, Live. Die
+//! Integrationstests des Informationstelefons (LFH-554) unter
+//! `/api/einsaetze/{id}/stab/infotelefon`: Statuscodes, Rechte, Lebenszyklus, Live. Seit
+//! i6k6mzed (design.md D3) ist es das eigene Modul `infotelefon`; der Pfad bleibt. Die
 //! Fachlogik prüft `src/infotelefon/repo/tests.rs`.
 
 use axum::http::StatusCode;
@@ -237,5 +238,191 @@ async fn parameter_der_liste() {
     ] {
         let (s, v) = anfrage(&app, "GET", &format!("{}{query}", pfad(e)), &admin, None).await;
         assert_eq!(s, erwartet, "{query}: {v:?}");
+    }
+}
+
+// ---------- Eigenes Modul `infotelefon` (i6k6mzed, design.md D3) ----------
+
+/// Setzt einen Modul-Override im Einsatz (Sichtbarkeit und benötigte Rolle).
+async fn override_setzen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    modul: &str,
+    sichtbar: bool,
+    rolle: Option<&str>,
+) {
+    let rolle = rolle.map_or("null".to_string(), |r| format!(r#""{r}""#));
+    let (s, j) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        cookie,
+        Some(&format!(
+            r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Override {modul}: {j:?}");
+}
+
+/// Alle Routen des Informationstelefons mit Methode und Body, für einen vorhandenen Anruf.
+fn alle_routen(e: i64, id: i64) -> Vec<(&'static str, String, Option<&'static str>)> {
+    vec![
+        ("GET", pfad(e), None),
+        ("GET", format!("{}/zaehler", pfad(e)), None),
+        ("GET", format!("{}/{id}", pfad(e)), None),
+        ("POST", pfad(e), Some(RUECKRUF)),
+        (
+            "POST",
+            format!("{}/{id}/status", pfad(e)),
+            Some(r#"{"status":"erledigt"}"#),
+        ),
+    ]
+}
+
+/// Führungskraft mit Einsatzrolle Führungspersonal; liefert ihren Cookie.
+async fn kraft(app: &axum::Router, admin: &str, e: i64, name: &str, org_rolle: &str) -> String {
+    let id = benutzer_anlegen(app, admin, name, org_rolle).await;
+    rolle_setzen(app, admin, e, id, "fuehrungspersonal").await;
+    login_cookie(app, name, &format!("{name}pw1")).await
+}
+
+/// Spec `stab-infotelefon`, „Das Informationstelefon ist ein eigenes Modul“: ausgeblendet sind
+/// alle Routen zu, auch die Zählung.
+#[tokio::test]
+async fn ausgeblendetes_infotelefon_sperrt_alle_routen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &pfad(e), &admin, Some(RUECKRUF)).await;
+    let id = a["id"].as_i64().unwrap();
+    let frieda = kraft(&app, &admin, e, "frieda", "fuehrungskraft").await;
+    override_setzen(&app, &admin, e, "infotelefon", false, None).await;
+
+    for (methode, uri, body) in alle_routen(e, id) {
+        let (s, _) = anfrage(&app, methode, &uri, &frieda, body).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{methode} {uri}");
+    }
+}
+
+/// Seine Freigabe hängt von keinem anderen Modul ab: der Stab aus, das Informationstelefon offen.
+#[tokio::test]
+async fn ohne_stab_bleibt_das_infotelefon_nutzbar() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &pfad(e), &admin, Some(RUECKRUF)).await;
+    let id = a["id"].as_i64().unwrap();
+    let frieda = kraft(&app, &admin, e, "frieda", "fuehrungskraft").await;
+    override_setzen(&app, &admin, e, "stab", false, None).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/stab"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Vorbedingung: Stab ist zu");
+    for (methode, uri, body) in alle_routen(e, id) {
+        let (s, j) = anfrage(&app, methode, &uri, &frieda, body).await;
+        assert!(s.is_success(), "{methode} {uri}: {s} {j:?}");
+    }
+}
+
+/// Spec „Gesperrtes Modul“: auf eine Rolle beschränkt, 403 für alle anderen, auch beim Lesen.
+#[tokio::test]
+async fn auf_eine_rolle_beschraenkt_ist_403_fuer_andere() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &pfad(e), &admin, Some(RUECKRUF)).await;
+    let id = a["id"].as_i64().unwrap();
+    let frieda = kraft(&app, &admin, e, "frieda", "keine").await;
+    let gustav = kraft(&app, &admin, e, "gustav", "fuehrungskraft").await;
+    override_setzen(&app, &admin, e, "infotelefon", true, Some("fuehrungskraft")).await;
+
+    for (methode, uri, body) in alle_routen(e, id) {
+        let (s, _) = anfrage(&app, methode, &uri, &frieda, body).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "frieda {methode} {uri}");
+        let (s, j) = anfrage(&app, methode, &uri, &gustav, body).await;
+        assert!(s.is_success(), "gustav {methode} {uri}: {s} {j:?}");
+    }
+}
+
+/// Spec „Live ohne Freigabe“: das Ereignis `infotelefon` erreicht nur Leser mit dem Recht
+/// `infotelefon`; das Recht `stab` allein genügt nicht.
+#[tokio::test]
+async fn live_ereignis_nur_an_leser_mit_recht_infotelefon() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let frieda = kraft(&app, &admin, e, "frieda", "keine").await;
+    let gustav = kraft(&app, &admin, e, "gustav", "fuehrungskraft").await;
+    override_setzen(&app, &admin, e, "infotelefon", true, Some("fuehrungskraft")).await;
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/stab"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: Frieda liest den Stab");
+    let (s, _) = anfrage(&app, "GET", &pfad(e), &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Vorbedingung: Frieda ohne Recht");
+
+    let feed_gustav = live_oeffnen(&app, &gustav, e).await;
+    let feed_frieda = live_oeffnen(&app, &frieda, e).await;
+
+    let (s, a) = anfrage(&app, "POST", &pfad(e), &admin, Some(RUECKRUF)).await;
+    assert_eq!(s, StatusCode::CREATED, "{a:?}");
+    // Ein Ereignis, das Frieda sehen darf, sonst bewiese ein leerer Feed nichts.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(r#"{"name":"Muster","vorname":"Max"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let bei_gustav = sse_anfang_lesen(feed_gustav.into_body(), 400).await;
+    let bei_frieda = sse_anfang_lesen(feed_frieda.into_body(), 400).await;
+    assert!(
+        bei_gustav.contains("event: infotelefon"),
+        "Leser mit Recht bekommt das Ereignis: {bei_gustav:?}"
+    );
+    assert!(
+        bei_frieda.contains("event: person"),
+        "Friedas Feed läuft: {bei_frieda:?}"
+    );
+    assert!(
+        !bei_frieda.contains("event: infotelefon"),
+        "Leser ohne Recht bekommt kein Ereignis: {bei_frieda:?}"
+    );
+}
+
+/// Fremde Organisation: 403 oder 404 auf jeder Route (wie `tests/cross_org.rs`), ohne Daten.
+#[tokio::test]
+async fn fremde_organisation_wird_auf_allen_routen_abgewiesen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &pfad(e), &admin, Some(RUECKRUF)).await;
+    let id = a["id"].as_i64().unwrap();
+    fremde_org_anlegen(&pool, "Fremd-Orga", "fremd", "fremdpw1", "fuehrungskraft").await;
+    let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
+
+    for (methode, uri, body) in alle_routen(e, id) {
+        let (s, j) = anfrage(&app, methode, &uri, &fremd, body).await;
+        assert!(
+            s == StatusCode::FORBIDDEN || s == StatusCode::NOT_FOUND,
+            "{methode} {uri}: erwartet 403/404, war {s} {j:?}"
+        );
+        assert!(!j.to_string().contains("Meyer"), "keine Daten: {j:?}");
     }
 }

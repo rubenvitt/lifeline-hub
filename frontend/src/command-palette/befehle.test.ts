@@ -163,7 +163,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:bereitstellungsraeume', '/einsaetze/5/bereitstellungsraeume/liste?neu=1'],
       ['aktion:einsatzabschnitte', '/einsaetze/5/einsatzabschnitte?neu=1'],
       ['aktion:lagekarte-gefahrengebiet', '/einsaetze/5/lagekarte?zeichnen=gefahrengebiet'],
-      ['aktion:infotelefon-anruf', '/einsaetze/5/stab/infotelefon?neu=1'],
+      ['aktion:infotelefon-anruf', '/einsaetze/5/infotelefon?neu=1'],
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);
@@ -181,17 +181,26 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(etb.kontext).toBe(modulEtb.label);
     expect(etb.icon).toBe(modulEtb.icon);
     expect(b.find((x) => x.id === 'aktion:personen')!.label).toBe('Person erfassen');
-    // Träger der Stab-Unterseite ist der Stab (LLH-1127).
+    // Träger ist das eigene Modul Informationstelefon (i6k6mzed, design.md D3).
     const anruf = b.find((x) => x.id === 'aktion:infotelefon-anruf')!;
+    const modulInfotelefon = b.find((x) => x.id === 'modul:infotelefon')!;
     expect(anruf.label).toBe('Anruf erfassen');
-    expect(anruf.kontext).toBe('Stab');
+    expect(anruf.kontext).toBe('Informationstelefon');
+    expect(anruf.icon).toBe(modulInfotelefon.icon);
   });
-  it('führt „Anruf erfassen“ nur mit Schreibrecht und freiem Stab (LLH-1127)', () => {
+  it('führt „Anruf erfassen“ nur mit Schreibrecht und freiem Informationstelefon', () => {
     const hat = (k: BefehlKontext) =>
       baueBefehle(k).some((x) => x.id === 'aktion:infotelefon-anruf');
     expect(hat(kontext())).toBe(true);
     expect(hat(kontext({ darfSchreibenImEinsatz: false }))).toBe(false);
-    expect(hat(kontext({ freigaben: freigabenFixture({ stab: { zugriff: false } }) }))).toBe(false);
+    expect(hat(kontext({ freigaben: freigabenFixture({ infotelefon: { zugriff: false } }) }))).toBe(
+      false,
+    );
+    expect(
+      hat(kontext({ freigaben: freigabenFixture({ infotelefon: { sichtbar: false } }) })),
+    ).toBe(false);
+    // Die Freigabe des Stabs spielt keine Rolle mehr.
+    expect(hat(kontext({ freigaben: freigabenFixture({ stab: { zugriff: false } }) }))).toBe(true);
     const q = 'bürgertelefon anruf';
     expect(ordneTreffer(filtereBefehle(baueBefehle(kontext()), q), q)[0]?.id).toBe(
       'aktion:infotelefon-anruf',
@@ -960,7 +969,7 @@ describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
 });
 
 describe('baueBefehle — Ansichten (LLH-1127)', () => {
-  const STAB = ['presse', 'infotelefon'];
+  const STAB = ['presse'];
   // LLH-1180: die Ansichten des Fernmeldewesens hängen an dessen Freigabe, nicht am Stab.
   const FERNMELDEWESEN = ['fernmeldeskizze', 'kommunikationsplan'];
   const ansichten = (k: BefehlKontext) => baueBefehle(k).filter((b) => b.gruppe === 'ansichten');
@@ -1036,8 +1045,9 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
     const k = kontext();
     // LLH-1180: „Funk“ trifft das Modul über seine Beschreibung, nicht mehr eine Marke.
     expect(suche(k, 'Funk')[0]).toBe('Fernmeldewesen');
-    expect(suche(k, 'bürgertelefon')).toContain('Informationstelefon');
+    // Das Informationstelefon ist ein Modul (i6k6mzed), keine Marke mehr.
     expect(suche(k, 'Info')).toContain('Informationstelefon');
+    expect(ansichten(k).some((b) => b.id === 'ansicht:infotelefon')).toBe(false);
     expect(suche(k, 'sprechgruppe')[0]).toBe('Fernmeldeskizze');
     expect(suche(k, 'Kommunikationsplan')[0]).toBe('Kommunikationsplan');
     expect(suche(k, 'presse')).toContain('Pressearbeit');

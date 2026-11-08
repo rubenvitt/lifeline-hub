@@ -1,8 +1,8 @@
-//! Routen des Informationstelefons S5 (LFH-554) unter `/api/einsaetze/{id}/stab/infotelefon`.
+//! Routen des Informationstelefons (LFH-554) unter `/api/einsaetze/{id}/stab/infotelefon`.
 //!
-//! Gates über `EinsatzLesezugriff<Stab>` bzw. `EinsatzSchreibzugriff<Stab>`; das Protokoll
-//! erbt die Sperre des Stab-Moduls. Live: `LiveEvent::Infotelefon` nur mit Kennungen, nie mit
-//! Namen, Nummern oder Notizen.
+//! Gates über `EinsatzLesezugriff<Infotelefon>` bzw. `EinsatzSchreibzugriff<Infotelefon>`: seit
+//! i6k6mzed (design.md D3) ein eigenes Modul, der Pfad unter `…/stab` bleibt (Grenzwert-Regel).
+//! Live: `LiveEvent::Infotelefon` nur mit Kennungen, nie mit Namen, Nummern oder Notizen.
 
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -11,7 +11,7 @@ use serde::Deserialize;
 
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Stab;
+use crate::einsatz::modul::Infotelefon;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::infotelefon::repo::{self, AnrufEingabe, AnrufFilter};
@@ -49,7 +49,7 @@ fn parse_filter(status: Option<&str>) -> Result<AnrufFilter, AppError> {
 /// [`crate::kommunikation::parse_page`]).
 pub async fn liste(
     State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Stab>,
+    ctx: EinsatzLesezugriff<Infotelefon>,
     Query(p): Query<ListParams>,
 ) -> Result<Json<Vec<InfotelefonAnrufAnzeige>>, AppError> {
     let filter = parse_filter(p.status.as_deref())?;
@@ -68,7 +68,7 @@ pub struct CountParams {
 /// Seiten (LLH-732). Seitenparameter gehören nicht zum Filter und werden nicht gelesen.
 pub async fn zaehler(
     State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Stab>,
+    ctx: EinsatzLesezugriff<Infotelefon>,
     Query(p): Query<CountParams>,
 ) -> Result<Json<InfotelefonZaehler>, AppError> {
     let filter = parse_filter(p.status.as_deref())?;
@@ -81,7 +81,7 @@ pub async fn zaehler(
 /// Deeplink auf einen Anruf außerhalb der geladenen Seiten.
 pub async fn detail(
     State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Stab>,
+    ctx: EinsatzLesezugriff<Infotelefon>,
     PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<InfotelefonAnrufAnzeige>, AppError> {
     Ok(Json(repo::laden(&state.pool, ctx.einsatz.id, aid).await?))
@@ -107,7 +107,7 @@ pub struct AnrufAnlegen {
 /// POST /api/einsaetze/{id}/stab/infotelefon
 pub async fn anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Infotelefon>,
     JsonBody(req): JsonBody<AnrufAnlegen>,
 ) -> Result<(StatusCode, Json<InfotelefonAnrufAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
@@ -149,7 +149,7 @@ pub struct AnrufStatusSetzen {
 /// POST /api/einsaetze/{id}/stab/infotelefon/{aid}/status — Rückruf erledigen oder öffnen.
 pub async fn status_setzen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
+    ctx: EinsatzSchreibzugriff<Infotelefon>,
     PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<AnrufStatusSetzen>,
 ) -> Result<Json<InfotelefonAnrufAnzeige>, AppError> {

@@ -153,6 +153,10 @@
       {
         "name": "Fernmeldewesen",
         "beschreibung": "Funkplan, Skizze, Kommunikationsplan"
+      },
+      {
+        "name": "Informationstelefon",
+        "beschreibung": "Bürgeranrufe, Rückrufe, Anliegen"
       }
     ]
   }

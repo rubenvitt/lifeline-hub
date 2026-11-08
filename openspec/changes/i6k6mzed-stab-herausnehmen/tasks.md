@@ -32,24 +32,24 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## 4. Informationstelefon als eigenes Modul (D3)
 
-- [ ] 4.1 Backend:
+- [x] 4.1 Backend:
   - `infotelefon` in `MODUL_KEYS` aufnehmen, Marker `Infotelefon`, Unterpräfix `…/stab/infotelefon` → `infotelefon` in `PFAD_KEY`
   - Handler in `routes/infotelefon.rs` auf `<Infotelefon>` umstellen
   - `LiveEvent::Infotelefon` auf das Gate `["infotelefon"]`
   - Registry-Eintrag aus 4.4 im selben Commit, weil `backend_modul_keys_decken_frontend_registry` beide verlangt
 
   `marker_key_werte_stimmen`, `pfad_key_laengster_praefix_gewinnt`, `gate_mengen_sind_gepinnt`, `tests/enum_wire_kontrakt.rs` und `tests/einsatz_kontext_guard.rs` sind grün.
-- [ ] 4.2 Gate-Tests nach dem Muster `tests/lagebesprechung.rs:64-138` in `tests/stab_infotelefon.rs`:
+- [x] 4.2 Gate-Tests nach dem Muster `tests/lagebesprechung.rs:64-138` in `tests/stab_infotelefon.rs`:
   - Infotelefon ausgeblendet → alle Infotelefon-Routen 403
   - auf eine Rolle beschränkt → 403 für andere
   - Leser ohne Recht `infotelefon` erhält kein Live-Ereignis
   - fremde Organisation → 404
 
   `tests/infotelefon_zaehler.rs` und `tests/modul_override.rs` (`MODUL_GET_PFADE`) sind grün.
-- [ ] 4.3 Migration A „infotelefon_modul“ (Nummer vorher mit `git fetch origin alpha && scripts/check-migrationen.sh` geprüft): Rolle und Sichtbarkeit von `stab` auf `infotelefon` übernehmen, in `einsatz_modul_override`, `org_modul_einstellung` und `einsatz_vorlage_modul_aus`. Danach alle Zeilen mit `modul_key = 'stab'` löschen. Die Startvorlagen (`EINSATZ_VORLAGE_STARTLISTE`) blenden `infotelefon` aus.
+- [x] 4.3 Migration A „infotelefon_modul“ (Nummer vorher mit `git fetch origin alpha && scripts/check-migrationen.sh` geprüft): Rolle und Sichtbarkeit von `stab` auf `infotelefon` übernehmen, in `einsatz_modul_override`, `org_modul_einstellung` und `einsatz_vorlage_modul_aus`. Danach alle Zeilen mit `modul_key = 'stab'` löschen. Die Startvorlagen (`EINSATZ_VORLAGE_STARTLISTE`) blenden `infotelefon` aus.
   - Test `migration_<nr>_uebernimmt_stab_freigaben_fuer_infotelefon` in `src/db.rs` deckt Rolle, Ausblendung, Vorlagen-Ausblendung und das Löschen ab.
   - `einsatz_vorlage/tests.rs` ist grün, mit `stab_steht_in_keiner_vorlage` umgestellt auf `infotelefon`.
-- [ ] 4.4 Frontend:
+- [x] 4.4 Frontend:
   - Registry-Eintrag `infotelefon` (Kommunikation, `IconTelefon`, „Bürgeranrufe, Rückrufe, Anliegen“)
   - `MODUL_ELEMENTE.infotelefon`
   - `ALTPFAD_MODUL['stab/infotelefon']` mit Weiterleitung, die `?anruf=` und `?neu=1` erhält
@@ -60,7 +60,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
   - Infotelefon-Marke aus `sprungmarken.ts` entfernen
 
   Vitest grün: `modulRegistry.test.ts` (Reihenfolge-Pin, 40 Zeichen), `InfotelefonPage.test.tsx`, `deeplinks.test.ts`, `befehle.test.ts`, `schnellaktionen.guard.test.ts`, `sprungmarken.test.ts`, `websiteModule.guard.test.ts` (mit `website/src/daten/module.json`).
-- [ ] 4.5 Typ-Codegen (`scripts/check-typ-codegen.sh`, `openapi.json` und `types.generated.ts` mitcommittet), `liveEvent.contract.test.ts` grün.
+- [x] 4.5 Typ-Codegen (`scripts/check-typ-codegen.sh`, `openapi.json` und `types.generated.ts` mitcommittet), `liveEvent.contract.test.ts` grün.
 - [ ] 4.6 Anwenderdoku: `presse-infotelefon.md` wird `infotelefon.md` (Bereich, `quellen:`, Adresse). `e2e/doku-bilder/presse-infotelefon.bilder.ts` wird `infotelefon.bilder.ts`, die Bilder neu aufnehmen. Die e2e-Specs mit dem Pfad `/stab/infotelefon` umstellen (`leisten-flaeche`, `fokus-verdeckung`, `command-palette`, `stab-schmal`). Grün sind `anwenderdoku.guard.test.ts`, der Bildlauf des Kapitels und die betroffenen e2e-Specs.
 
 ## 5. Auflösung über die Mitgliedschaft (D2, D7)

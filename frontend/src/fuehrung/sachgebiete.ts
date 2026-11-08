@@ -79,7 +79,8 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     label: 'Presse- und Medienarbeit',
     aufgaben: 'Presse- und Medienlage, Presseinformationen, Informationstelefone',
     seite: 59,
-    werkzeuge: [alsSeite('presse'), alsSeite('infotelefon')],
+    // Das Informationstelefon ist seit i6k6mzed ein eigenes Modul (design.md D3).
+    werkzeuge: [alsSeite('presse'), alsModul('infotelefon')],
   },
   {
     sachgebiet: 's6',

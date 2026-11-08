@@ -93,7 +93,7 @@ describe('werkzeugZahl (design.md D4)', () => {
   });
 
   it('ein Modul ohne Zähler zeigt keine Zahl', () => {
-    expect(werkzeugZahl(werkzeug('infotelefon', 'stab'), quellen())).toBeNull();
+    expect(werkzeugZahl(werkzeug('infotelefon'), quellen())).toBeNull();
   });
 
   it('fehlt das Feld in der Antwort, steht „—“ mit Grund, nie 0', () => {

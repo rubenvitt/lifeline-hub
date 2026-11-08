@@ -1616,7 +1616,7 @@ test('Informationstelefon (LFH-554): kein Statusauslöser verschwindet beim Tabb
     await page.setViewportSize(flaeche);
     for (const dichte of ['kompakt', 'handschuh']) {
       const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
-      await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+      await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
       await stelleDichte(page, dichte);
       await expect(page.getByText(/^Probe \d+: Wasser im Keller$/)).toHaveCount(ANZAHL);
       await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');

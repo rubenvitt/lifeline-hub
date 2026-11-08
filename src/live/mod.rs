@@ -188,11 +188,13 @@ impl LiveEvent {
             // die Oberfläche aus der Nachforderungs-Query auf, und die frischt deren eigenes
             // Ereignis auf (design.md D6). Der ETB-Nachweis läuft über `etb`.
             LiveEvent::Verpflegung => &["verpflegung"],
-            // Nur `stab`: Medienkontakte, Pressemitteilungen und Anrufe sind Datenobjekte der
-            // S5-Seiten unter dem Stab (LFH-554), deren Routen die Stab-Sperre erben. Der
-            // ETB-Nachweis einer freigegebenen Mitteilung läuft über `etb`.
+            // Nur `stab`: Medienkontakte und Pressemitteilungen sind Datenobjekte der S5-Seiten
+            // unter dem Stab (LFH-554), deren Routen die Stab-Sperre erben. Der ETB-Nachweis einer
+            // freigegebenen Mitteilung läuft über `etb`.
             LiveEvent::Presse => &["stab"],
-            LiveEvent::Infotelefon => &["stab"],
+            // Nur `infotelefon`: Anrufe sind Datenobjekte des eigenen Moduls (i6k6mzed,
+            // design.md D3). NICHT `stab`: wer nur den Stab liest, erführe sonst von jedem Anruf.
+            LiveEvent::Infotelefon => &["infotelefon"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).
             LiveEvent::KartenAnsicht => &["lagekarte"],
@@ -1036,7 +1038,7 @@ mod tests {
             (LiveEvent::Evakuierung, &["evakuierung"]),
             (LiveEvent::Verpflegung, &["verpflegung"]),
             (LiveEvent::Presse, &["stab"]),
-            (LiveEvent::Infotelefon, &["stab"]),
+            (LiveEvent::Infotelefon, &["infotelefon"]),
             (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),

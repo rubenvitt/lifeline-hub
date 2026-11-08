@@ -13,7 +13,7 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
-import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
+import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from './labels';
 
 /**
  * Schnellerfassung des Informationstelefons (LFH-554, Spec `stab-infotelefon`): am Fuß der Seite,

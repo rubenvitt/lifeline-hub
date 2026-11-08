@@ -24,9 +24,9 @@ describe('Sprungmarken (LFH-620)', () => {
       'fms-tableau',
       // Einheiten ohne Schicht auf der Seite Ablösung (LLH-1312).
       'ohne-schicht',
-      // Arbeitsseiten des Stabs (LLH-1127), Sachgebiet S5.
+      // Arbeitsseite des Stabs (LLH-1127), Sachgebiet S5. Das Informationstelefon ist seit
+      // i6k6mzed ein eigenes Modul, keine Marke (design.md D3).
       'presse',
-      'infotelefon',
       // Ansichten des Fernmeldewesens (LLH-1180); den Funkplan öffnet das Modul selbst.
       'fernmeldeskizze',
       'kommunikationsplan',
@@ -43,7 +43,6 @@ describe('Sprungmarken (LFH-620)', () => {
       'fms-tableau': '/einsaetze/7/fahrzeuge?ansicht=tableau',
       'ohne-schicht': '/einsaetze/7/abloesung?ansicht=ohne-schicht',
       presse: '/einsaetze/7/stab/presse',
-      infotelefon: '/einsaetze/7/stab/infotelefon',
       fernmeldeskizze: '/einsaetze/7/fernmeldewesen?ansicht=skizze',
       kommunikationsplan: '/einsaetze/7/fernmeldewesen/kommunikationsplan',
     });
@@ -78,7 +77,6 @@ describe('Sprungmarken (LFH-620)', () => {
       'lagebesprechung',
       'stab',
       '↗presse',
-      '↗infotelefon',
       'dokumente',
     ]);
     expect(
@@ -90,6 +88,8 @@ describe('Sprungmarken (LFH-620)', () => {
       'fernmeldewesen',
       '↗fernmeldeskizze',
       '↗kommunikationsplan',
+      // Das Informationstelefon steht als Modulzeile hinter den Marken des Fernmeldewesens.
+      'infotelefon',
     ]);
     expect(folge(moduleNachKategorie('erfassung'), sprungmarkenNachKategorie('erfassung'))).toEqual(
       [
@@ -150,7 +150,6 @@ describe('Sprungmarken (LFH-620)', () => {
     const hinweise = Object.fromEntries(sprungmarken.map((m) => [m.key, m.hinweis]));
     expect(hinweise).toMatchObject({
       presse: 'Stab · Pressearbeit',
-      infotelefon: 'Stab · Informationstelefon',
       fernmeldeskizze: 'Fernmeldewesen · Skizze',
       kommunikationsplan: 'Fernmeldewesen · Kommunikationsplan',
     });
@@ -168,9 +167,6 @@ describe('Sprungmarken (LFH-620)', () => {
       expect.arrayContaining(['telefon', 'rufnummer', 'leitstelle', 's6']),
     );
     expect(worte('presse')).toEqual(expect.arrayContaining(['presse', 'medien', 's5']));
-    expect(worte('infotelefon')).toEqual(
-      expect.arrayContaining(['bürgertelefon', 'anrufe', 'hotline', 's5']),
-    );
     expect(worte('fernmeldeskizze')).toEqual(expect.arrayContaining(['skizze', 's6']));
   });
 

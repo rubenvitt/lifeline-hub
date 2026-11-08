@@ -156,7 +156,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/stab/infotelefon`);
+    await page.goto(`/einsaetze/${demo.id}/infotelefon`);
     const protokoll = page.getByRole('list', { name: 'Anrufprotokoll' });
     await expect(protokoll.getByText('Sucht Nachbarin aus der Mühlbachstraße 14')).toBeVisible();
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

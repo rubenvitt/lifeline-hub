@@ -715,7 +715,21 @@ mod tests {
         .await
         .unwrap();
 
-        migrate(&pool).await.expect("0186 läuft durch");
+        // Genau bis 0186: `infotelefon_modul` schriebe die Vorgaben ohne echten Einsatz bei
+        // wieder eingeschalteten Fremdschlüsseln neu.
+        Migrator {
+            migrations: Cow::Owned(
+                sqlx::migrate!("./migrations")
+                    .iter()
+                    .filter(|m| m.version <= 186)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("0186 läuft durch");
 
         let einsatz: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
             "SELECT einsatz_id, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
@@ -836,6 +850,130 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(betreuung, 3);
+    }
+
+    /// i6k6mzed (Migration `infotelefon_modul`, design.md D3/D4): `infotelefon` übernimmt jede
+    /// Vorgabe von `stab` vollständig (Rolle und Sichtbarkeit) am Einsatz, an der Organisation und
+    /// in den Einsatz-Vorlagen; danach gibt es in keiner der drei Tabellen eine Zeile `stab` mehr.
+    /// Andere Module bleiben unberührt. Die Nummer wandert beim Umlegen (LFH-1014), deshalb über
+    /// den Namen.
+    #[tokio::test]
+    async fn migration_0299_uebernimmt_stab_freigaben_fuer_infotelefon() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .unwrap();
+        let alle = sqlx::migrate!("./migrations");
+        let nummer = alle
+            .iter()
+            .find(|m| m.description == "infotelefon modul")
+            .expect("Migration infotelefon_modul")
+            .version;
+        let vorher: Vec<_> = alle
+            .iter()
+            .filter(|m| m.version < nummer)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor infotelefon_modul");
+        // Die Vorgaben hier brauchen keinen echten Einsatz, keine Organisation und keine Vorlage.
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'stab', NULL, 'fuehrungskraft'), (2, 'stab', 0, NULL), \
+                    (3, 'stab', 1, 'admin'), (4, 'etb', 0, 'admin')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO org_modul_einstellung (org_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'stab', 0, NULL), (2, 'etb', NULL, 'admin'), \
+                    (3, 'stab', NULL, 'einsatzfuehrung')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_vorlage_modul_aus (vorlage_id, modul_key) \
+             VALUES (1, 'stab'), (1, 'tiere'), (2, 'tiere')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migrate(&pool).await.expect("infotelefon_modul läuft durch");
+
+        let einsatz: Vec<(i64, String, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT einsatz_id, modul_key, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
+             ORDER BY einsatz_id, modul_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            einsatz,
+            [
+                (1, "infotelefon".into(), None, Some("fuehrungskraft".into())),
+                // Ausgeblendet bleibt ausgeblendet: wer den Stab nicht sah, sieht das
+                // Informationstelefon nicht.
+                (2, "infotelefon".into(), Some(0), None),
+                (3, "infotelefon".into(), Some(1), Some("admin".into())),
+                (4, "etb".into(), Some(0), Some("admin".into())),
+            ]
+        );
+        let org: Vec<(i64, String, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT org_id, modul_key, sichtbar, benoetigte_rolle FROM org_modul_einstellung \
+             ORDER BY org_id, modul_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            org,
+            [
+                (1, "infotelefon".into(), Some(0), None),
+                (2, "etb".into(), None, Some("admin".into())),
+                (
+                    3,
+                    "infotelefon".into(),
+                    None,
+                    Some("einsatzfuehrung".into())
+                ),
+            ]
+        );
+        let vorlagen: Vec<(i64, String)> = sqlx::query_as(
+            "SELECT vorlage_id, modul_key FROM einsatz_vorlage_modul_aus \
+             ORDER BY vorlage_id, modul_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            vorlagen,
+            [
+                (1, "infotelefon".into()),
+                (1, "tiere".into()),
+                // Eine Vorlage, die den Stab zeigte, zeigt auch das Informationstelefon.
+                (2, "tiere".into()),
+            ]
+        );
     }
 
     /// LLH-1053 (Migration `zeitdarstellung`): Aus „Zeitformat“ wird „Zeitdarstellung“. 24h/12h hatte nie Wirkung,
@@ -10658,6 +10796,9 @@ mod tests {
                 if start.bezeichnung == "Sanitätsdienst" {
                     erwartet.extend(["fernmeldewesen".to_string(), "wetter-pegel".to_string()]);
                 }
+                // Das Informationstelefon kam erst mit `infotelefon_modul` (i6k6mzed); dort erbt es
+                // die Ausblendung des Stabs.
+                erwartet.remove("infotelefon");
                 assert_eq!(aus, erwartet, "{}", start.bezeichnung);
             }
         }

@@ -562,15 +562,16 @@ export function pressemitteilungPfad(einsatzId: number, mitteilungId: number): s
 }
 
 /**
- * Anrufprotokoll des Informationstelefons (S5, LFH-554), Unterroute des Stabs. `?anruf=<id>`
- * rollt zu einem Anruf; `?neu=1` setzt den Fokus in die Anruferfassung (Schnellaktion „Anruf
- * erfassen“, LLH-1127; apply-then-clean).
+ * Anrufprotokoll des Informationstelefons (LFH-554), seit i6k6mzed ein eigenes Modul (design.md
+ * D3; die Altadresse `…/stab/infotelefon` leitet um). `?anruf=<id>` rollt zu einem Anruf;
+ * `?neu=1` setzt den Fokus in die Anruferfassung (Schnellaktion „Anruf erfassen“, LLH-1127;
+ * apply-then-clean).
  */
 export function infotelefonPfad(
   einsatzId: number,
   opts: { anruf?: number; neu?: boolean } = {},
 ): string {
-  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/infotelefon`, {
+  return mitQuery(einsatzModulPfad(einsatzId, 'infotelefon'), {
     anruf: opts.anruf,
     neu: opts.neu ? 1 : undefined,
   });
