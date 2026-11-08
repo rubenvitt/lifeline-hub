@@ -144,7 +144,13 @@ interface ErfassungsFormularProps<T> {
    * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
    * sonst leert die Hülle die Felder, obwohl der Datensatz nie ankam.
    */
-  onErfassen: (werte: T) => Promise<unknown>;
+  onErfassen: (werte: T, aktion?: string) => Promise<unknown>;
+  /**
+   * Weitere Abschlüsse neben dem Primär-Knopf (LLH-1580: „Zur UHS“ und „RTW nötig“ neben
+   * „Entlassen“). Jeder prüft das Formular wie der Primär-Knopf und reicht seinen `schluessel` als
+   * zweites Argument an `onErfassen`; der Primär-Knopf und das Tastenkürzel reichen keinen.
+   */
+  nebenaktionen?: readonly Nebenaktion[];
   /**
    * Nach erfolgreichem Speichern und bestandener Abbruchprüfung. Geeignet für
    * lokale Folgewirkungen, die ein Abbruch während der Mutation nicht auslösen darf.
@@ -215,6 +221,15 @@ interface ErfassungsFormularProps<T> {
   children: ReactNode;
 }
 
+/** Ein weiterer Abschluss eines Erfassungsformulars ({@link ErfassungsFormularProps.nebenaktionen}). */
+export interface Nebenaktion {
+  schluessel: string;
+  text: string;
+  /** Rot wie ein Alarm (etwa „RTW nötig“). */
+  danger?: boolean;
+  gesperrt?: boolean;
+}
+
 /** Was die Hülle von einer Mutation braucht (`useMutation` erfüllt es). */
 export interface Speicherung {
   error: unknown;
@@ -246,6 +261,7 @@ export function ErfassungsFormular<T extends object>({
   speicherFehlerFallback,
   zusammenfassung,
   fussKlebt = false,
+  nebenaktionen,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
@@ -258,6 +274,9 @@ export function ErfassungsFormular<T extends object>({
   const [behalten, setBehalten] = useState(false);
   // Ref statt State: der Wert wird zwischen Klick und `onFinish` im selben Zug gelesen.
   const serienlaufRef = useRef(false);
+  // Die gewählte Nebenaktion, wie `serienlaufRef`: gesetzt beim Klick, gelesen und geräumt in
+  // `abschicken`, geräumt auch bei gescheiterter Prüfung (sonst trüge der nächste Primär-Klick sie).
+  const nebenaktionRef = useRef<string | undefined>(undefined);
   // „Ein Absenden ist unterwegs." Ref, weil der Riegel im selben Zug greifen muss.
   const sendetRef = useRef(false);
   // Jeder Abbruch macht einen bereits laufenden Abschluss ungültig. Die Mutation
@@ -315,6 +334,8 @@ export function ErfassungsFormular<T extends object>({
       const abbruchGeneration = abbruchGenerationRef.current;
       const serienlauf = serienlaufRef.current;
       serienlaufRef.current = false;
+      const aktion = nebenaktionRef.current;
+      nebenaktionRef.current = undefined;
       // Werte VOR dem Zurücksetzen sichern — danach sind sie weg.
       const behaltene = Object.fromEntries(
         (uebernahme ?? []).map((feld) => [feld, werte[feld]]),
@@ -322,7 +343,7 @@ export function ErfassungsFormular<T extends object>({
       let serverErfolg = false;
       try {
         try {
-          await onErfassen(werte);
+          await (aktion === undefined ? onErfassen(werte) : onErfassen(werte, aktion));
           serverErfolg = true;
         } catch {
           // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
@@ -423,6 +444,7 @@ export function ErfassungsFormular<T extends object>({
         onFinish={abschicken}
         onFinishFailed={({ errorFields }) => {
           serienlaufRef.current = false;
+          nebenaktionRef.current = undefined;
           onPruefungGescheitert?.(errorFields.map((f) => f.name.join('.')));
         }}
       >
@@ -520,6 +542,24 @@ export function ErfassungsFormular<T extends object>({
                     </span>
                   </Button>
                 )}
+                {nebenaktionen?.map((a) => (
+                  // htmlType="button" wie „Speichern und nächste“: der Klick setzt erst die Aktion,
+                  // dann prüft und sendet `form.submit()`.
+                  <Button
+                    key={a.schluessel}
+                    block={istSchmal}
+                    danger={a.danger}
+                    loading={laeuft}
+                    disabled={a.gesperrt}
+                    onClick={() => {
+                      if (sendetRef.current) return;
+                      nebenaktionRef.current = a.schluessel;
+                      form.submit();
+                    }}
+                  >
+                    {a.text}
+                  </Button>
+                ))}
                 <Button
                   type="primary"
                   htmlType="submit"

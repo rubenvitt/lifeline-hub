@@ -162,6 +162,9 @@ export const EINSATZ_KEYS = {
   personenTransportmittel: 'einsatz-personen-transportmittel',
   // Wahl der versorgenden Einheit (LLH-1567): eigener Prefix, live über `einheit`.
   personenEinheiten: 'einsatz-personen-einheiten',
+  // Ziel „Zur UHS“ am Einheitengerät (LLH-1580): eigener Prefix, live über `uhs` (das Gerät selbst
+  // bekommt `uhs` nicht und lädt beim Öffnen des Kontakts neu).
+  personenUhs: 'einsatz-personen-uhs',
   // Fotos und Dateien an einer Person (LFH-757): live über das `person`-Ereignis. Nicht im
   // Lagebild offline (Patientenfotos und ihre Dateinamen bleiben vom Gerät fern, LFH-767).
   personAnhaenge: 'einsatz-person-anhaenge',
@@ -186,6 +189,8 @@ export const EINSATZ_KEYS = {
   auftragDruck: 'einsatz-auftrag-druck',
   // Druckansicht einer Person: Schnappschuss, eigener Prefix außerhalb von `person` (LLH-1120).
   personDruck: 'einsatz-person-druck',
+  // Druckansicht des Schichtplans: Schnappschuss, eigener Prefix außerhalb von `abloesungen` (LLH-1557).
+  schichtplanDruck: 'einsatz-schichtplan-druck',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -210,6 +215,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.uhsDetail,
     EINSATZ_KEYS.uhsAnhaenge,
     EINSATZ_KEYS.lagemonitor,
+    // Ziel „Zur UHS“ am Einheitengerät (LLH-1580).
+    EINSATZ_KEYS.personenUhs,
   ],
   // Ablegen und Entfernen einer Datei verteilen `schaden`; die Anhangliste der Detailseite hängt
   // deshalb mit daran. Gezielt (Zeile, Anhangliste) ordnet {@link EINSATZ_STREAM_ZIELE} zu.
@@ -534,6 +541,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Ereignis `auftrag` per Präfix mit.
  * - `personDruck` (LLH-1120): derselbe Schnappschuss-Grundsatz für das Blatt einer Person; jeder
  *   Abruf schreibt einen `druck`-Eintrag ins Zugriffsprotokoll, ein Live-Refetch schriebe weitere.
+ * - `schichtplanDruck` (LLH-1557): derselbe Schnappschuss-Grundsatz für Aushang und Zettel des
+ *   Schichtplans; unter `abloesungen` zöge ihn das Ereignis `abloesung` per Präfix mit.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
  *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
  * - `uhsPlanBild` (LFH-999): der Key trägt den sha256 aus dem live geführten Detail; ein neuer
@@ -572,6 +581,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einsatzberichtDruck,
   EINSATZ_KEYS.auftragDruck,
   EINSATZ_KEYS.personDruck,
+  EINSATZ_KEYS.schichtplanDruck,
   EINSATZ_KEYS.uhsAnhangZugriffe,
   EINSATZ_KEYS.uhsPlanBild,
   EINSATZ_KEYS.personenListenzugriffe,
@@ -678,6 +688,7 @@ export const einsatzKeys = {
   personenTransportmittel: (einsatzId: number) =>
     [EINSATZ_KEYS.personenTransportmittel, einsatzId] as const,
   personenEinheiten: (einsatzId: number) => [EINSATZ_KEYS.personenEinheiten, einsatzId] as const,
+  personenUhs: (einsatzId: number) => [EINSATZ_KEYS.personenUhs, einsatzId] as const,
   personAnhaenge: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAnhaenge, einsatzId, personId] as const,
   personal: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId] as const,
@@ -821,6 +832,7 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.abloesungen, einsatzId, 'plan-vorlage', abloesungId] as const,
   /** Schichtplan des Einsatzes (LLH-1552); live über `abloesung` wie die Schichten. */
   schichtplan: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId, 'schichtplan'] as const,
+  schichtplanDruck: (einsatzId: number) => [EINSATZ_KEYS.schichtplanDruck, einsatzId] as const,
   // Kräfte-Zeitachse (LFH-552): argumentlos = Invalidierungs-Prefix; Perioden-Listen je Kraftart
   // und die Zeitachse einer Kraft hängen als Sub-Keys darunter.
   kraefteZeitachse: (einsatzId: number) => [EINSATZ_KEYS.kraefteZeitachse, einsatzId] as const,

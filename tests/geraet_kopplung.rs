@@ -13,9 +13,9 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, anfrage_json, benutzer_anlegen, einheit_bilden, einsatz_anlegen, einsatz_anlegen_mit,
-    login_cookie, plan_hochladen, png_bytes, rolle_setzen, setup_mit_pool_und_live,
-    system_etb_inhalte,
+    anfrage, anfrage_json, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einheit_bilden,
+    einsatz_anlegen, einsatz_anlegen_mit, login_cookie, plan_hochladen, png_bytes, rolle_setzen,
+    setup_mit_pool_und_live, system_etb_inhalte,
 };
 
 // ---------- Helfer ----------
@@ -7995,4 +7995,403 @@ async fn aufgeloeste_einheit_beendet_ihre_kopplung() {
             "ETB nennt das Gerät von {name}: {etb:?}"
         );
     }
+}
+
+// ---------- Kontakt am Einheitengerät (LLH-1580) ----------
+
+/// Ein Kontakt am Einheitengerät: Anlass, Ausgang und Fundort, nie Personalien (Entwurf K5).
+fn kontakt(extra: Value) -> Value {
+    let mut k = json!({
+        "status": "betroffen",
+        "anlass": "hitze_kaelte",
+        "massnahmen": ["kuehlung"],
+        "antreff_ort": "Bühne 2",
+        "antreff_lat": 50.11,
+        "antreff_lon": 8.68,
+    });
+    k.as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    k
+}
+
+/// Entlassen schreibt einen Eintrag mit der Einheit; die versorgende Einheit setzt der Server.
+/// Das Gerät sieht nur die Personen seiner Einheit, ohne Personalien, auch wenn die Führung sie
+/// ergänzt; eine fremde Person ist 404, ein Detail gibt es am Handy nicht (K4/K5).
+#[tokio::test]
+async fn einheitengeraet_erfasst_kontakt_und_sieht_nur_eigene_ohne_namen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &geraet,
+        Some(&kontakt(json!({"entlassen": true}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let eigene = v["id"].as_i64().unwrap();
+    assert_eq!(v["versorgende_einheit_id"], l.zug_ost, "fest die eigene");
+    assert_eq!(v["aktuelle_verbleib_art"], "entlassung");
+    assert_eq!(v["anlass"], "hitze_kaelte");
+    assert_eq!(v["antreff_ort"], "Bühne 2");
+
+    // Die Führung ergänzt den Namen und legt eine Person einer anderen Einheit an.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{personen}/{eigene}"),
+        &admin,
+        Some(&json!({"name": "Meier", "alter_geschaetzt": 34})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &admin,
+        Some(&json!({"name": "Fremd", "versorgende_einheit_id": l.zug_nord})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let fremde = v["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage(&app, "GET", &personen, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let liste = v.as_array().unwrap();
+    assert_eq!(liste.len(), 1, "nur die eigene: {v}");
+    assert_eq!(liste[0]["id"], eigene);
+    assert_eq!(liste[0]["name"], Value::Null, "ohne Namen: {v}");
+    assert_eq!(liste[0]["alter_geschaetzt"], Value::Null);
+    assert_eq!(liste[0]["anlass"], "hitze_kaelte");
+
+    for p in [
+        format!("{personen}/{eigene}"),
+        format!("{personen}/{fremde}"),
+    ] {
+        let (s, _) = anfrage(&app, "GET", &p, &geraet, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "kein Detail am Handy: {p}");
+    }
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{personen}/{fremde}/verbleib"),
+        &geraet,
+        Some(&json!({"art": "entlassung"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    let etb = system_etb_inhalte(&app, &admin, l.einsatz).await;
+    let reg = etb
+        .iter()
+        .filter(|t| t.contains("von 2. Zug"))
+        .collect::<Vec<_>>();
+    assert_eq!(reg.len(), 1, "ein Eintrag je Kontakt: {etb:?}");
+    assert!(
+        reg[0].ends_with("von 2. Zug versorgt und entlassen"),
+        "{reg:?}"
+    );
+    assert!(
+        !etb.iter()
+            .any(|t| t.contains("Hitze") || t.contains("Kühlung")),
+        "nichts Medizinisches im ETB: {etb:?}"
+    );
+}
+
+/// Ein Replay derselben `client_id` am Handy bleibt ohne Personalien, auch wenn die Führung sie
+/// inzwischen ergänzt hat, und die `client_id` einer Person einer anderen Einheit ist 404.
+#[tokio::test]
+async fn einheitengeraet_replay_ohne_personalien_und_nur_eigene() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+
+    let eigener = kontakt(json!({"entlassen": true, "client_id": "kontakt-1"}));
+    let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&eigener)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let id = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{personen}/{id}"),
+        &admin,
+        Some(&json!({"name": "Meier", "alter_geschaetzt": 34})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&eigener)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["id"], id, "Replay legt nichts neu an");
+    assert_eq!(v["name"], Value::Null, "ohne Namen: {v}");
+    assert_eq!(v["alter_geschaetzt"], Value::Null);
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &admin,
+        Some(&json!({
+            "name": "Fremd",
+            "versorgende_einheit_id": l.zug_nord,
+            "client_id": "fremd-1",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &geraet,
+        Some(&kontakt(json!({"entlassen": true, "client_id": "fremd-1"}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde client_id: {v}");
+}
+
+/// Personalien, Sichtung oder eine fremde versorgende Einheit vom Handy sind 403 (F6, K5); kein
+/// oder mehr als ein Ausgang ist 422.
+#[tokio::test]
+async fn einheitengeraet_kontakt_ohne_personalien_und_mit_einem_ausgang() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, l.einsatz, "UHS Bühne").await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+
+    for extra in [
+        json!({"name": "Meier"}),
+        json!({"alter_geschaetzt": 34}),
+        json!({"notiz": "x"}),
+        json!({"zustand": "blass"}),
+        json!({"sichtung": "sk3"}),
+        json!({"versorgende_einheit_id": l.zug_nord}),
+    ] {
+        let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&kontakt(extra))).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    }
+    for extra in [
+        json!({}),
+        json!({"entlassen": false}),
+        json!({"entlassen": true, "uhs_id": uhs}),
+        json!({"entlassen": true, "rtw": true}),
+        json!({"uhs_id": uhs, "rtw": true}),
+        // Ein Kontakt ist versorgt, nicht gesucht: ohne Anlass, damit die Status-Regel greift.
+        json!({"rtw": true, "client_id": "v-1", "status": "vermisst", "anlass": null, "massnahmen": null}),
+    ] {
+        let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&kontakt(extra))).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    }
+    // Eine RTW-Anforderung gibt es nur am Einheitengerät.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &admin,
+        Some(&kontakt(json!({"rtw": true}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+}
+
+/// „Zur UHS“ bucht in den Eingang einer aktiven UHS, auch wenn das Gerät nicht an sie gebunden
+/// ist; die UHS sieht den Kontakt sofort. Eine nicht aktive UHS steht nicht zur Wahl (K3).
+#[tokio::test]
+async fn einheitengeraet_bringt_kontakt_zur_uhs() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, l.einsatz, "UHS Bühne").await;
+    // Eine stornierte UHS behält ihren Status, steht aber nicht zur Wahl.
+    let storniert = uhs_anlegen(&app, &admin, l.einsatz, "UHS Fehleingabe").await;
+    sqlx::query("UPDATE uhs SET storniert_at = '2026-11-08 10:00:00' WHERE id = ?")
+        .bind(storniert)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{}/uhs", l.einsatz),
+        &admin,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "UHS geplant"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let geplant = v["id"].as_i64().unwrap();
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let basis = format!("/api/einsaetze/{}", l.einsatz);
+
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/personen/uhs"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, json!([{"id": uhs, "bezeichnung": "UHS Bühne"}]));
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&kontakt(json!({"uhs_id": geplant}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "nur aktive: {v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&kontakt(json!({"uhs_id": uhs}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let pid = v["id"].as_i64().unwrap();
+    assert_eq!(v["aktuelle_uhs_id"], uhs);
+    assert_eq!(v["versorgende_einheit_id"], l.zug_ost);
+
+    // Das UHS-Tablet sieht ihn im Eingang.
+    let (_, code) = kopplung(
+        &app,
+        &admin,
+        l.einsatz,
+        json!({"ansicht": "uhs-tablet", "uhs_id": uhs, "bezeichnung": "Tablet"}),
+    )
+    .await;
+    let tablet = koppeln(&app, &code, None).await.cookie.expect("Cookie");
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/personen"), &tablet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.as_array().unwrap().iter().any(|p| p["id"] == pid), "{v}");
+
+    let etb = system_etb_inhalte(&app, &admin, l.einsatz).await;
+    let eintraege: Vec<_> = etb.iter().filter(|t| t.contains("R-")).collect();
+    assert_eq!(eintraege.len(), 1, "ein Eintrag: {etb:?}");
+    assert!(
+        eintraege[0].ends_with("von 2. Zug in UHS Bühne gebracht"),
+        "{eintraege:?}"
+    );
+}
+
+/// „RTW nötig“: Person und Sofortmeldung der eigenen Einheit in einem Schritt, Text vom Server,
+/// Bestätigungspflicht, Bezug über `meldung_id`; das Gerät sieht die Meldung. Aus der
+/// Offline-Warteschlange 422 (K1/K2).
+#[tokio::test]
+async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let basis = format!("/api/einsaetze/{}", l.einsatz);
+
+    let (_, ich) = me(&app, &geraet).await;
+    let benutzer = ich["benutzer"]["id"]
+        .as_i64()
+        .or(ich["id"].as_i64())
+        .unwrap_or(1);
+    let (s, v) = anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&kontakt(json!({"rtw": true, "client_id": "k-1"})).to_string()),
+        benutzer,
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "ohne Netz über Funk: {v}"
+    );
+
+    // Ohne `client_id` keine RTW-Anforderung: eine Wiederholung legte sonst eine zweite an.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&kontakt(json!({"rtw": true}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+
+    let (s, person) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&kontakt(json!({"rtw": true, "client_id": "rtw-0"}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    let meldung_id = person["meldung_id"]
+        .as_i64()
+        .expect("Bezug auf die Meldung");
+    // Ein Replay derselben Anforderung liefert sie, ohne zweite Person oder zweite Meldung; er
+    // stellt die Zustellung erneut sicher (idempotent).
+    let erneut = kontakt(json!({"rtw": true, "client_id": "rtw-1"}));
+    let (s, erste) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&erneut),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{erste}");
+    let (s, zweite) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&erneut),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{zweite}");
+    assert_eq!(zweite["id"], erste["id"]);
+    assert_eq!(zweite["meldung_id"], erste["meldung_id"]);
+    assert_eq!(zweite["rtw_angefordert"], true);
+    assert_eq!(person["versorgung"], "offen");
+    assert_eq!(person["rtw_angefordert"], true, "{person}");
+    let reg = format!("R-{:03}", person["registrier_nr"].as_i64().unwrap());
+
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/meldungen"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let m = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == meldung_id)
+        .expect("das Gerät sieht seine RTW-Meldung")
+        .clone();
+    assert_eq!(
+        m["inhalt"],
+        format!("RTW angefordert, Reg.-Nr. {reg}, Ort: Bühne 2")
+    );
+    assert_eq!(m["meldungsart"], "sofortmeldung");
+    assert_eq!(m["prioritaet"], "sofort");
+    assert_eq!(m["bestaetigung_pflicht"], true);
+    assert!(m["bestaetigung_frist_at"].is_string(), "{m}");
+    assert_eq!(m["einheit_id"], l.zug_ost);
+    assert_eq!(m["absender"], "2. Zug · Handy");
+    assert_eq!(m["lat"], 50.11);
+    for wort in ["Hitze", "hitze", "Kühlung", "kuehlung"] {
+        assert!(!m["inhalt"].as_str().unwrap().contains(wort), "{m}");
+    }
+
+    let etb = system_etb_inhalte(&app, &admin, l.einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t == &format!("Person {reg} von 2. Zug erfasst")),
+        "{etb:?}"
+    );
 }

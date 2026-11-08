@@ -192,7 +192,7 @@ afterEach(async () => {
 });
 
 describe('Einheitengerät — Startseite und Navigation', () => {
-  it('beginnt mit den Aufträgen der Einheit; Status und Melden daneben, keine Karte', async () => {
+  it('beginnt mit den Aufträgen der Einheit; Status, Melden und Kontakte daneben, keine Karte', async () => {
     const { abgerufen } = stelleBereit();
     const router = renderApp('/geraet');
     expect(await screen.findByText('Pumpe aufbauen')).toBeVisible();
@@ -202,7 +202,7 @@ describe('Einheitengerät — Startseite und Navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((l) => l.textContent),
-    ).toEqual(['Aufträge', 'Status', 'Melden']);
+    ).toEqual(['Aufträge', 'Status', 'Melden', 'Kontakte']);
     // Abschnitte und Befehle gehören nicht zur Ansicht (403): die Seite fragt sie nicht ab.
     expect(abgerufen).toEqual([]);
   });

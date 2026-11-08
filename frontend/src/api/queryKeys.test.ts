@@ -184,6 +184,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       'einsatz-uhs-detail',
       'einsatz-uhs-anhaenge',
       'einsatz-lagemonitor',
+      'einsatz-personen-uhs',
     ]);
     expect(NICHT_LIVE_KEYS).toContain('einsatz-uhs-anhang-zugriffe');
   });

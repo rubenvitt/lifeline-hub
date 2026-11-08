@@ -304,6 +304,7 @@ use utoipa::OpenApi;
         crate::person::RettungsmittelStand,
         crate::person::PersonAuswahl,
         crate::person::VersorgendeEinheitAuswahl,
+        crate::person::UhsZielAuswahl,
         crate::person::PersonStatus,
         crate::person::Sichtungskategorie,
         crate::person::TransportDurch,

@@ -181,9 +181,26 @@ pub async fn personen_der_betreuungsstelle(
     Ok(ids.into_iter().collect())
 }
 
+/// Personen, die die Einheit versorgt (LLH-1567), auch nach Entlassung oder Übergabe an die UHS.
+/// Das Einheitengerät sieht sie und nur sie (LLH-1580, Entwurf K4); stornierte zählen nicht.
+pub async fn personen_der_einheit(
+    pool: &SqlitePool,
+    einheit_id: i64,
+) -> Result<HashSet<i64>, AppError> {
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_person \
+         WHERE versorgende_einheit_id = ? AND storniert_at IS NULL",
+    )
+    .bind(einheit_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(ids.into_iter().collect())
+}
+
 /// Die Personen, die die Sitzung sieht: `None` für eine Person (alle, es gelten ihre Rechte),
 /// sonst die Personen der eigenen Stelle. Eine UHS sieht, wer je in ihr belegt war, eine
-/// Betreuungsstelle, wer je in ihr untergebracht war; jedes andere Gerät sieht keine Person.
+/// Betreuungsstelle, wer je in ihr untergebracht war, eine Einheit, wen sie versorgt (LLH-1580);
+/// jedes andere Gerät sieht keine Person.
 pub async fn sichtbare_personen(
     pool: &SqlitePool,
     geraet: Option<&GeraetKontext>,
@@ -197,6 +214,7 @@ pub async fn sichtbare_personen(
         (Bindungsart::Betreuungsstelle, Some(id)) => {
             personen_der_betreuungsstelle(pool, id).await?
         }
+        (Bindungsart::Einheit, Some(id)) => personen_der_einheit(pool, id).await?,
         _ => HashSet::new(),
     };
     Ok(Some(ids))
@@ -218,6 +236,10 @@ pub async fn fordere_person(
         (Some(Bindungsart::Betreuungsstelle), Some(_)) => {
             "SELECT 1 FROM person_verbleib WHERE art = 'notunterkunft' \
              AND betreuungsstelle_id = ? AND person_id = ? LIMIT 1"
+        }
+        (Some(Bindungsart::Einheit), Some(_)) => {
+            "SELECT 1 FROM einsatz_person WHERE versorgende_einheit_id = ? AND id = ? \
+             AND storniert_at IS NULL LIMIT 1"
         }
         _ => return Err(AppError::NotFound),
     };

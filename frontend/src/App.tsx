@@ -34,6 +34,7 @@ import GeraetAbschnittPage from './geraet/GeraetAbschnittPage';
 import GeraetAuftraegePage from './geraet/GeraetAuftraegePage';
 import GeraetMeldenPage from './geraet/GeraetMeldenPage';
 import GeraetStatusPage from './geraet/GeraetStatusPage';
+import GeraetKontaktePage from './geraet/GeraetKontaktePage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
@@ -109,6 +110,7 @@ import LageberichtePage from './pages/LageberichtePage';
 import LageberichtDetailPage from './pages/LageberichtDetailPage';
 import BefehlDetailPage from './pages/BefehlDetailPage';
 import AuftragDruckPage from './pages/AuftragDruckPage';
+import SchichtplanDruckPage from './pages/SchichtplanDruckPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
@@ -338,9 +340,10 @@ export const appRouten = createRoutesFromElements(
             <Route path="auftraege" element={<GeraetAuftraegePage />} />
             <Route path="melden" element={<GeraetMeldenPage />} />
           </Route>
-          {/* Status der eigenen Einheit (LLH-1579). */}
+          {/* Status und Kontakte der eigenen Einheit (LLH-1579, LLH-1580). */}
           <Route element={<GeraetEinheitRahmen />}>
             <Route path="status" element={<GeraetStatusPage />} />
+            <Route path="kontakte" element={<GeraetKontaktePage />} />
           </Route>
           <Route path="*" element={<GeraetStart />} />
         </Route>
@@ -413,6 +416,8 @@ export const appRouten = createRoutesFromElements(
           <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
           {/* Druckansicht eines Auftrags (LLH-1171): das Detail führt hierher, Modul aus `auftraege/`. */}
           <Route path="auftraege/:auftragId/druck" element={<AuftragDruckPage />} />
+          {/* Druckansicht des Schichtplans (LLH-1557): Unterroute der Ablösung. */}
+          <Route path="abloesung/schichtplan/druck" element={<SchichtplanDruckPage />} />
           <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
           {/* Einheit aus Vorlage bilden (LLH-1049): Ziel des Dialogs „Einheit bilden“. */}
           <Route path="einheiten/aus-vorlage/:vorlageId" element={<EinheitAusVorlagePage />} />

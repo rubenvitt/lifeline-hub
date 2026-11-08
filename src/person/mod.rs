@@ -525,6 +525,15 @@ pub struct VersorgendeEinheitAuswahl {
     pub abschnitt_name: Option<String>,
 }
 
+/// Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/personen/uhs`): je aktiver UHS
+/// des Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul
+/// Unfallhilfsstellen wählen kann; keine Belegung, keine Plätze.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct UhsZielAuswahl {
+    pub id: i64,
+    pub bezeichnung: String,
+}
+
 /// Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
 /// `org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,
 /// kein Snapshot wie bei Material.
@@ -629,6 +638,11 @@ pub struct PersonAnzeige {
     /// Laufende Nummer dieser Meldung, für „aus Meldung #n“.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meldung_lfd_nr: Option<i64>,
+    /// LLH-1580 (K1): `meldung_id` ist die RTW-Anforderung des Einheitengeräts, nicht die Meldung,
+    /// aus der die Einsatzleitung die Person angelegt hat. Fehlt, wenn nicht.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[schema(required = false)]
+    pub rtw_angefordert: bool,
     /// Anlass der Hilfeleistung (LLH-1566, Cache des jüngsten Stands in `person_anlass`);
     /// fehlt ohne Anlass oder nach dem Aufheben. Kategorie Behandlung, nie im ETB.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -663,6 +677,39 @@ pub struct RettungsmittelStand {
 }
 
 impl PersonAnzeige {
+    /// Was das Einheitengerät von einer Person sieht (LLH-1580, Entwurf K5, Konzept LLH-1571 F6):
+    /// Registriernummer, Zeit, Fundort, Anlass, Ausgang (Verbleibart, UHS, Versorgungszustand),
+    /// Herkunftsmeldung und Stand des Rettungsmittels. Personalien, Sichtung, Freitexte,
+    /// Verbleibziele und Transportangaben fallen weg, auch wenn UHS oder Einsatzleitung sie
+    /// später ergänzen. Streifenkräfte nutzen oft private Handys.
+    pub fn ohne_personalien(&mut self) {
+        self.name = None;
+        self.vorname = None;
+        self.geschlecht = None;
+        self.geburtsdatum = None;
+        self.alter_geschaetzt = None;
+        self.herkunft_adresse = None;
+        self.melder_kontakt = None;
+        self.notiz = None;
+        self.zustand = None;
+        self.vermisst_seit = None;
+        self.aktuelle_sichtung = None;
+        self.aktuelle_sichtung_at = None;
+        self.aktueller_verbleib = None;
+        self.aktueller_platz_id = None;
+        self.aktuelles_verbleib_ziel = None;
+        self.aktueller_verbleib_status = None;
+        self.aktuelle_verbleib_betreuungsstelle_id = None;
+        self.aktueller_transport_durch = None;
+        self.aktuelles_einsatz_fahrzeug_id = None;
+        self.pat_nummer = None;
+        self.kontamination = None;
+        self.transport_prioritaet = None;
+        self.transport_art = None;
+        self.transport_fachrichtung = None;
+        self.transport_at = None;
+    }
+
     /// Setzt den abgeleiteten Versorgungszustand aus den Verbleib-Caches.
     pub fn mit_versorgung(mut self) -> Self {
         self.versorgung = versorgung_von(
@@ -959,6 +1006,43 @@ pub fn etb_text_versorgt_entlassen(registrier_nr: i64, uhs_bezeichnung: Option<&
     }
 }
 
+/// System-ETB eines Kontakts am Einheitengerät (LLH-1580, Entwurf K7): EIN Eintrag je Kontakt,
+/// mit der versorgenden Einheit, ohne Anlass und Maßnahmen (LLH-1109).
+pub fn etb_text_kontakt_einheit(
+    registrier_nr: i64,
+    einheit: &str,
+    ausgang: KontaktAusgang<'_>,
+) -> String {
+    let reg = registrier_anzeige(registrier_nr);
+    match ausgang {
+        KontaktAusgang::Entlassen => format!("Person {reg} von {einheit} versorgt und entlassen"),
+        KontaktAusgang::ZurUhs(uhs) => format!("Person {reg} von {einheit} in {uhs} gebracht"),
+        KontaktAusgang::Offen => format!("Person {reg} von {einheit} erfasst"),
+    }
+}
+
+/// Ausgang eines Kontakts am Einheitengerät für [`etb_text_kontakt_einheit`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KontaktAusgang<'a> {
+    /// Vor Ort versorgt und entlassen.
+    Entlassen,
+    /// In den Eingang dieser UHS gebucht.
+    ZurUhs(&'a str),
+    /// Weder noch, etwa mit RTW-Anforderung: die Person bleibt offen.
+    Offen,
+}
+
+/// Text der Sofortmeldung „RTW nötig“ am Einheitengerät (LLH-1580, Entwurf K1). Der Server bildet
+/// ihn selbst, damit nichts Medizinisches ins ETB gelangt (LLH-1109): nur Registriernummer und
+/// Ort, kein Anlass, keine Maßnahme, kein Freitext des Geräts außer dem Fundort.
+pub fn rtw_meldung_text(registrier_nr: i64, ort: Option<&str>) -> String {
+    let reg = registrier_anzeige(registrier_nr);
+    match ort.map(str::trim).filter(|o| !o.is_empty()) {
+        Some(ort) => format!("RTW angefordert, Reg.-Nr. {reg}, Ort: {ort}"),
+        None => format!("RTW angefordert, Reg.-Nr. {reg}"),
+    }
+}
+
 pub fn etb_text_uhs_aufnahme(registrier_nr: i64, uhs_bezeichnung: &str) -> String {
     format!(
         "Person {}: Aufnahme in {} (Inbox)",
@@ -981,6 +1065,36 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_uhs_aufnahme(7, "BHP 50"),
             "Person R-007: Aufnahme in BHP 50 (Inbox)"
+        );
+    }
+
+    /// LLH-1580 (Entwurf K1/K7): ein Eintrag je Kontakt am Einheitengerät, die RTW-Meldung nur
+    /// mit Registriernummer und Ort.
+    #[test]
+    fn kontakt_am_einheitengeraet() {
+        assert_eq!(
+            etb_text_kontakt_einheit(12, "Streife 2", KontaktAusgang::Entlassen),
+            "Person R-012 von Streife 2 versorgt und entlassen"
+        );
+        assert_eq!(
+            etb_text_kontakt_einheit(13, "Streife 2", KontaktAusgang::ZurUhs("UHS Bühne")),
+            "Person R-013 von Streife 2 in UHS Bühne gebracht"
+        );
+        assert_eq!(
+            etb_text_kontakt_einheit(14, "Streife 2", KontaktAusgang::Offen),
+            "Person R-014 von Streife 2 erfasst"
+        );
+        assert_eq!(
+            rtw_meldung_text(14, Some(" Bühne 2 ")),
+            "RTW angefordert, Reg.-Nr. R-014, Ort: Bühne 2"
+        );
+        assert_eq!(
+            rtw_meldung_text(14, Some("  ")),
+            "RTW angefordert, Reg.-Nr. R-014"
+        );
+        assert_eq!(
+            rtw_meldung_text(14, None),
+            "RTW angefordert, Reg.-Nr. R-014"
         );
     }
 }
