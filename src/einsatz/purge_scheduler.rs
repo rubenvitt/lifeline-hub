@@ -4439,4 +4439,100 @@ mod tests {
             wal_bytes(&pfad)
         );
     }
+
+    /// Spec `vorplanung`, Aufbewahrung: scheitert in Phase C3 eine einzelne Planung, meldet der
+    /// Lauf die übrigen trotzdem live und schreibt für sie den WAL zurück. Blockiert ein Lesender
+    /// den Rückschrieb, bleibt er vorgemerkt; der nächste Tick holt ihn nach und löscht die
+    /// Planung, sobald sie nicht mehr gesperrt ist. Wartet einmal `busy_timeout` (5 s).
+    #[tokio::test]
+    async fn phase_c3_meldet_geloeschte_planungen_trotz_teilfehler() {
+        let (_dir, _pfad, pool) = produktions_pool().await;
+        let org: i64 = sqlx::query_scalar(
+            "INSERT INTO organisation (name, tz_organisation) VALUES ('Org', 'hilfsorganisation') \
+             RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut ids = Vec::new();
+        for name in ["A", "B", "C"] {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO planung (org_id, bezeichnung, von, bis) \
+                 VALUES (?, ?, '2026-01-10 08:00:00', '2026-01-10 18:00:00') RETURNING id",
+            )
+            .bind(org)
+            .bind(name)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            ids.push(id);
+        }
+        sqlx::query(
+            "CREATE TRIGGER sperre_b BEFORE DELETE ON planung WHEN OLD.bezeichnung = 'B' \
+             BEGIN SELECT RAISE(ABORT, 'gesperrt'); END",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        fn planungen(
+            rx: &mut tokio::sync::broadcast::Receiver<crate::live::org::OrgNachricht>,
+        ) -> Vec<(i64, String)> {
+            let mut aus = Vec::new();
+            while let Ok(n) = rx.try_recv() {
+                if n.event == crate::live::org::OrgLiveEvent::Planung {
+                    aus.push((
+                        n.org_id,
+                        n.nutzlast.as_deref().unwrap_or_default().to_owned(),
+                    ));
+                }
+            }
+            aus
+        }
+
+        let mut leser = pool.acquire().await.unwrap();
+        sqlx::query("BEGIN").execute(&mut *leser).await.unwrap();
+        sqlx::query("SELECT count(*) FROM planung")
+            .execute(&mut *leser)
+            .await
+            .unwrap();
+
+        let live = LiveHub::new();
+        let mut rx = live.abonniere_org();
+        let mut ausstehend = false;
+        assert_eq!(
+            tick_mit_rueckschrieb(&pool, &live, t("2026-05-01 12:00:00"), &mut ausstehend).await,
+            2
+        );
+        assert_eq!(
+            planungen(&mut rx),
+            vec![
+                (org, format!(r#"{{"id":{}}}"#, ids[0])),
+                (org, format!(r#"{{"id":{}}}"#, ids[2])),
+            ]
+        );
+        assert!(ausstehend, "blockierter Rückschrieb bleibt vorgemerkt");
+
+        sqlx::query("COMMIT").execute(&mut *leser).await.unwrap();
+        drop(leser);
+        sqlx::query("DROP TRIGGER sperre_b")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            tick_mit_rueckschrieb(&pool, &live, t("2026-05-01 12:10:00"), &mut ausstehend).await,
+            1
+        );
+        assert_eq!(
+            planungen(&mut rx),
+            vec![(org, format!(r#"{{"id":{}}}"#, ids[1]))]
+        );
+        assert!(!ausstehend, "der nächste Tick holt den Rückschrieb nach");
+        let rest: i64 = sqlx::query_scalar("SELECT count(*) FROM planung")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0);
+    }
 }
