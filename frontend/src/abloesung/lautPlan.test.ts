@@ -71,7 +71,7 @@ describe('lautPlan (LLH-1555)', () => {
       { wort: 'Bleibt', text: 'keine' },
       { wort: 'Geht', text: 'keine' },
     ]);
-    expect(vorlageZeilen(vorlage({ fehlen: ['Erik', 'Fred'] })).at(-1)).toEqual({
+    expect(vorlageZeilen(vorlage({ fehlen: ['Erik', 'Fred'] }))[3]).toEqual({
       wort: 'Fehlt',
       text: 'Erik, Fred',
     });
