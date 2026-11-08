@@ -5,7 +5,7 @@ import { loadEinheitVorlagen } from '../api/einheitVorlagen';
 import {
   PLANUNG_ABSCHNITT_MAX,
   PLANUNG_BEZEICHNUNG_MAX,
-  SCHICHTPLAN_PERSONEN_MAX,
+  SCHICHTPLAN_SOLL_ANZAHL_MAX,
 } from '../api/eingabegrenzen';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { globalKeys } from '../api/queryKeys';
@@ -274,7 +274,7 @@ export default function PlanungPostenDialog({
         <Form.Item<PostenWerte> label="Soll" name="soll">
           <InputNumber
             min={0}
-            max={SCHICHTPLAN_PERSONEN_MAX}
+            max={SCHICHTPLAN_SOLL_ANZAHL_MAX}
             precision={0}
             placeholder={sollPlatzhalter}
             style={{ width: '100%' }}

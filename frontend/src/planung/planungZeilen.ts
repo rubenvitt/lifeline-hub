@@ -196,17 +196,20 @@ export function planungTage(
   const von = alsZeitpunkt(kopf.von);
   const bis = alsZeitpunkt(kopf.bis);
   if (!von || !bis) return [];
-  const inZone = (ms: number) => (z ? dayjs(ms).tz(z) : dayjs(ms));
+  // Tagesbeginne als Wanduhr „Datum 00:00“ direkt in der Zone: `startOf('day')` auf einem
+  // Zonen-Datum nimmt bei der Zeitumstellung den Versatz der Browserzone (dayjs-tz).
+  const beginn = (datum: string) =>
+    (z ? dayjs.tz(`${datum} 00:00:00`, z) : dayjs(`${datum}T00:00:00`)).valueOf();
+  const folgetag = (datum: string) => dayjs(datum).add(1, 'day').format('YYYY-MM-DD');
   const tage: PlanungTag[] = [];
-  let tag = inZone(von.valueOf()).startOf('day');
-  for (let i = 0; i < TAGE_MAX && tag.valueOf() < bis.valueOf(); i++) {
-    const naechster = tag.add(1, 'day').startOf('day');
-    tage.push({
-      schluessel: `tag:${tag.format('YYYY-MM-DD')}`,
-      von: tag.valueOf(),
-      bis: naechster.valueOf(),
-    });
-    tag = naechster;
+  let datum = (z ? dayjs(von.valueOf()).tz(z) : dayjs(von.valueOf())).format('YYYY-MM-DD');
+  let start = beginn(datum);
+  for (let i = 0; i < TAGE_MAX && start < bis.valueOf(); i++) {
+    const naechstes = folgetag(datum);
+    const ende = beginn(naechstes);
+    tage.push({ schluessel: `tag:${datum}`, von: start, bis: ende });
+    datum = naechstes;
+    start = ende;
   }
   return tage;
 }

@@ -146,6 +146,26 @@ describe('planungZeilen (LLH-1586)', () => {
     expect(tage[0].bis - tage[0].von).toBe(24 * 3_600_000);
   });
 
+  it('Tage der Planung in der Anzeigezone, auch wenn der Browser in einer anderen Zone läuft', () => {
+    // Zeitumstellung in Berlin am 25.10.2026: der Tag hat 25 Stunden. Der Browser steht in New York,
+    // dessen Umstellung erst eine Woche später kommt.
+    const vorher = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      const tage = planungTage(
+        { von: '2026-10-24 06:00:00', bis: '2026-10-25 22:00:00' },
+        'Europe/Berlin',
+      );
+      expect(tage.map((t) => [t.schluessel, new Date(t.von).toISOString()])).toEqual([
+        ['tag:2026-10-24', '2026-10-23T22:00:00.000Z'],
+        ['tag:2026-10-25', '2026-10-24T22:00:00.000Z'],
+      ]);
+      expect(tage[1].bis - tage[1].von).toBe(25 * 3_600_000);
+    } finally {
+      process.env.TZ = vorher;
+    }
+  });
+
   it('Spanne: ein Tag ganz, sonst die Planung auf volle Stunden samt Blöcken außerhalb', () => {
     const kopf = { von: '2027-06-12 06:30:00', bis: '2027-06-12 16:10:00' };
     const tage = planungTage(kopf, 'Europe/Berlin');
