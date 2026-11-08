@@ -1,3 +1,32 @@
+## [1.0.0-alpha.177](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.176...v1.0.0-alpha.177) (2026-11-08)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration:** Nachforderungen erhalten zwei neue Felder: den Bezug auf eine betroffene Person und die Einsatznummer der Leitstelle. Die Migration kommt mit dem Update. Vorher eine Sicherung anlegen.
+
+### Betroffene
+
+- **Rettungsmittel für einen Patienten anfordern:** Im Patientenkopf und am belegten Platz der UHS gibt es den neuen Eintrag „Rettungsmittel anfordern“. Er öffnet die Erfassung der Nachforderung mit Bezug auf diesen Patienten. Einiges ist schon eingetragen:
+  - als Mittel ein RTW, als Ziel die UHS
+  - die Priorität aus der Transportpriorität des Patienten
+  - als Begründung nur „Für R-…“, also keine weiteren Angaben zur Person
+- **Stand an der Person:** An der Person steht, wie weit die Anforderung ist: angefordert, zugesagt, unterwegs oder eingetroffen. Der Stand ändert sich mit jeder Änderung der Nachforderung sofort mit. Am Platz und im Wartebereich der UHS zeigt eine Marke den Stand.
+- **Verbleib vorbelegt:** Ist das Rettungsmittel eingetroffen, trägt die Verbleib-Maske bei „Transport fremd“ das Rettungsmittel und die Einsatznummer der Leitstelle schon ein.
+- Die Vorgaben werden beim Öffnen der Erfassung einmal frisch geladen und nicht aus einem älteren Stand der Personenseite übernommen. Klappt das Laden nicht, steht dort „nicht geladen“ mit der Schaltfläche „Erneut laden“.
+
+### Kräfte und Mittel
+
+- **Nachforderung mit Personenbezug:** Die Karte der Nachforderung zeigt „Für R-…“ und springt auf Klick zur Person. Bei einer Anforderung für eine Person ist die Anzahl auf 1 festgelegt und lässt sich auch beim Bearbeiten nicht ändern.
+- **Einsatznummer der Leitstelle:** Bei der Zusage lässt sich die Einsatznummer der Leitstelle erfassen. Sie steht nie im Einsatztagebuch.
+
+### Betrieb ohne Netz
+
+- Ohne Netz zeigt der Stand des Rettungsmittels weniger: keine Rufnamen und keine Einsatznummer der Leitstelle. Die Art erscheint nur als gängige Abkürzung, ein frei eingegebener Text wird zu „Rettungsmittel“. Die Marke an der UHS bleibt sichtbar, der Verbleib wird ohne Netz aber nicht vorbelegt.
+
+### Datenschutz
+
+- Beim Schwärzen bleibt der Bezug zwischen Nachforderung und Person erhalten. Die Einsatznummer der Leitstelle wird entfernt, sobald der Einsatz geschwärzt wird oder ein Löschersuchen für die Person umgesetzt wird.
+
 ## [1.0.0-alpha.176](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.175...v1.0.0-alpha.176) (2026-11-07)
 
 ### Wichtige Änderungen
