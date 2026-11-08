@@ -9,7 +9,7 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 
 ## 1. Machbarkeit der Tabellenlöschung (D4, zuerst)
 
-- [ ] 1.1 Migrationstest in `src/db.rs` gegen das gebündelte SQLite: Eine Test-DB mit ETB-Einträgen, die auf eine Pressemitteilung zeigen, führt `ALTER TABLE etb_eintrag DROP COLUMN pressemitteilung_id` und danach `DROP TABLE medienkontakt`, `pressemitteilung` aus. Danach gelingt ein ETB-INSERT. Mit `PRAGMA foreign_key_check` gibt es keinen Treffer. Ergebnis und Laufzeit bei Demo-Größe kommen als Notiz in `design.md` D4. Schlägt der Test fehl, gilt der Rückfall aus D4 (leere `pressemitteilung` bleibt, Spalte NULL), und D4 wird angepasst, bevor Gruppe 6 beginnt.
+- [x] 1.1 Migrationstest in `src/db.rs` gegen das gebündelte SQLite: Eine Test-DB mit ETB-Einträgen, die auf eine Pressemitteilung zeigen, führt `ALTER TABLE etb_eintrag DROP COLUMN pressemitteilung_id` und danach `DROP TABLE medienkontakt`, `pressemitteilung` aus. Danach gelingt ein ETB-INSERT. Mit `PRAGMA foreign_key_check` gibt es keinen Treffer. Ergebnis und Laufzeit bei Demo-Größe kommen als Notiz in `design.md` D4. Schlägt der Test fehl, gilt der Rückfall aus D4 (leere `pressemitteilung` bleibt, Spalte NULL), und D4 wird angepasst, bevor Gruppe 6 beginnt.
 
 ## 2. Umzug Frontend (D5, refactor)
 

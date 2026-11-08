@@ -13692,4 +13692,86 @@ mod tests {
         setze(1).await.expect("1 geht");
         setze(2).await.expect_err("nur 0 und 1");
     }
+
+    /// i6k6mzed (design.md D4, Aufgabe 1.1): Das gebündelte SQLite löscht die Spalte
+    /// `etb_eintrag.pressemitteilung_id` samt Fremdschlüssel, danach `medienkontakt` und
+    /// `pressemitteilung`, bei eingeschalteten Fremdschlüsseln und mit Daten, die aufeinander
+    /// zeigen. Danach schreibt und findet das ETB weiter, und `foreign_key_check` ist leer.
+    #[tokio::test]
+    async fn etb_spalte_pressemitteilung_und_presse_tabellen_lassen_sich_loeschen() {
+        let pool = test_pool().await;
+        let mut conn = pool.acquire().await.unwrap();
+        for sql in [
+            "INSERT INTO organisation (id, name) VALUES (1, 'Orga')",
+            "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 1, 'Leit', 'leit', 'h')",
+            "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
+            "INSERT INTO etb_eintrag (id, einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (1, 1, 1, 'meldung', 'Pressemitteilung Nr. 1 freigegeben', 1, '2026-11-08 10:00:00')",
+            "INSERT INTO pressemitteilung (id, einsatz_id, vorlage, titel, zeitstand, status, abschnitte, \
+             ersteller_id, freigegeben_von_id, freigegeben_at, etb_eintrag_id) \
+             VALUES (1, 1, 'freitext', 'PM 1', '2026-11-08 10:00:00', 'freigegeben', '[]', 1, 1, \
+             '2026-11-08 10:00:00', 1)",
+            "UPDATE etb_eintrag SET pressemitteilung_id = 1 WHERE id = 1",
+            "INSERT INTO medienkontakt (einsatz_id, art, medium, thema, eingang_at, status, antwort, \
+             pressemitteilung_id, angelegt_von_id) \
+             VALUES (1, 'anfrage', 'Radio', 'Deich', '2026-11-08 09:00:00', 'beantwortet', 'siehe PM', 1, 1)",
+        ] {
+            sqlx::query(sql).execute(&mut *conn).await.unwrap();
+        }
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("PRAGMA foreign_keys")
+                .fetch_one(&mut *conn)
+                .await
+                .unwrap(),
+            1
+        );
+
+        let start = std::time::Instant::now();
+        let mut tx = sqlx::Connection::begin(&mut *conn).await.unwrap();
+        for sql in [
+            "ALTER TABLE etb_eintrag DROP COLUMN pressemitteilung_id",
+            "DROP TABLE medienkontakt",
+            "DROP TABLE pressemitteilung",
+        ] {
+            sqlx::query(sql)
+                .execute(&mut *tx)
+                .await
+                .unwrap_or_else(|e| panic!("{sql}: {e}"));
+        }
+        tx.commit().await.unwrap();
+        eprintln!("Löschen dauerte {:?}", start.elapsed());
+
+        sqlx::query(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (1, 2, 'meldung', 'Deich hält', 1, '2026-11-08 11:00:00')",
+        )
+        .execute(&mut *conn)
+        .await
+        .expect("ETB schreibt nach dem Löschen");
+        let verletzt: Vec<sqlx::sqlite::SqliteRow> = sqlx::query("PRAGMA foreign_key_check")
+            .fetch_all(&mut *conn)
+            .await
+            .unwrap();
+        assert!(verletzt.is_empty(), "keine verwaisten Fremdschlüssel");
+        let spalten: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_table_info('etb_eintrag')")
+                .fetch_all(&mut *conn)
+                .await
+                .unwrap();
+        assert!(!spalten.iter().any(|s| s == "pressemitteilung_id"));
+        let alt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = 1")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        assert_eq!(
+            alt, "Pressemitteilung Nr. 1 freigegeben",
+            "der alte Eintrag bleibt als Text"
+        );
+        let version: String = sqlx::query_scalar("SELECT sqlite_version()")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        eprintln!("SQLite {version}");
+    }
 }

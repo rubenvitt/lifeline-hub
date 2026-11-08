@@ -156,6 +156,12 @@ Entscheidung Ruben, 08.11.2026. Neue Migrationen werden angehängt, Nummern grö
     Fremdschlüsselziel stehen gelassen. Die Spalte wird auf NULL gesetzt, und das wird hier im
     Design nachgetragen.
   - Ein voller Neubau von `etb_eintrag` (FTS, viele eingehende Fremdschlüssel) ist verworfen.
+  - **Ergebnis Aufgabe 1.1 (08.11.2026):** Das gebündelte SQLite 3.51.3 löscht die Spalte und
+    danach beide Tabellen, mit eingeschalteten Fremdschlüsseln und Daten, die aufeinander zeigen.
+    Danach gelingt ein ETB-INSERT, `foreign_key_check` ist leer, und alte Einträge bleiben als Text
+    (Test `db::tests::etb_spalte_pressemitteilung_und_presse_tabellen_lassen_sich_loeschen`,
+    22 ms auf der Test-DB). Der Rückfall wird nicht gebraucht. Die Messung in Demo-Größe folgt in
+    Aufgabe 8.2.
 - **Schwärzung und Aufbewahrung:** Die Registry-Einträge der vier Tabellen und der Spalte fallen
   weg. Ebenso entfallen `PERSONENBEZUEGE` für Stabsfunktion und Medienkontakt, die Personensuche
   über Medienkontakte und die Ausnahmen in `tests/aufbewahrung_e2e.rs`. Die DB-getriebenen Guards
