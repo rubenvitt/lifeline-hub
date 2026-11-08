@@ -258,7 +258,8 @@ async fn block_personen_tx(
          LEFT JOIN einsatz_personal ep ON ep.einsatz_id = ?2 AND ep.beendet_at IS NULL \
               AND ep.id = CASE \
                   WHEN pp.personal_id IS NOT NULL THEN (SELECT x.id FROM einsatz_personal x \
-                       WHERE x.einsatz_id = ?2 AND x.personal_id = pp.personal_id) \
+                       WHERE x.einsatz_id = ?2 AND x.personal_id = pp.personal_id \
+                         AND x.beendet_at IS NULL) \
                   WHEN pp.helfer_id IS NOT NULL THEN h.einsatz_personal_id \
                   ELSE pp.einsatz_personal_id END \
          LEFT JOIN uhs u ON u.id = ep.uhs_id \
