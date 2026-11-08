@@ -418,7 +418,7 @@ describe('PlanungPage (LLH-1586)', () => {
       ).toBeInTheDocument();
     });
 
-    it('ein laufender Einsatz muss erst gewählt werden; ohne Schreibrecht steht er nicht zur Wahl', async () => {
+    it('ein laufender Einsatz muss erst gewählt werden; ohne Schreibrecht oder fremd steht er nicht zur Wahl', async () => {
       const anfragen: unknown[] = [];
       setup();
       server.use(
@@ -427,17 +427,32 @@ describe('PlanungPage (LLH-1586)', () => {
           HttpResponse.json([
             {
               id: 7,
+              org_id: 1,
               bezeichnung: 'Konzert',
               einsatznummer_intern: 'E-2027-0007',
               status: 'aktiv',
               meine_rolle: 'einsatzleitung',
             },
-            { id: 8, bezeichnung: 'Nur lesen', status: 'aktiv', meine_rolle: 'beobachter' },
+            {
+              id: 8,
+              org_id: 1,
+              bezeichnung: 'Nur lesen',
+              status: 'aktiv',
+              meine_rolle: 'beobachter',
+            },
             {
               id: 9,
+              org_id: 1,
               bezeichnung: 'Vorbei',
               status: 'abgeschlossen',
               meine_rolle: 'einsatzleitung',
+            },
+            {
+              id: 10,
+              org_id: 2,
+              bezeichnung: 'Fremde Organisation',
+              status: 'aktiv',
+              meine_rolle: 'fuehrungspersonal',
             },
           ]),
         ),

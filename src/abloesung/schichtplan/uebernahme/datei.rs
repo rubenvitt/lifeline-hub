@@ -908,6 +908,7 @@ pub fn lies_paket(bytes: &[u8], zone: Tz) -> Result<(PlanPaket, Vec<ImportMeldun
                     bis: crate::zeit::formatiere_utc(zeile.bis),
                     soll_anzahl: zeile.soll_anzahl,
                     quali_soll: zeile.quali_soll.clone(),
+                    ohne_vorgabe: false,
                     notiz: None,
                     personen: Vec::new(),
                     zeile: Some(zeile.nr),

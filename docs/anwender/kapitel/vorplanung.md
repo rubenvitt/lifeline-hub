@@ -119,12 +119,14 @@ verschwindet aus allen Blöcken.
 Jeder Posten wird eine Einheit oder eine UHS im Einsatz; in einem laufenden Einsatz schlägt die
 Vorschau eine vorhandene Einheit oder UHS gleichen Namens vor. Ein Posten aus einer
 Einheitenvorlage wird eine Einheit nach dieser Vorlage, ein Posten mit Stamm-Fahrzeug eine Einheit
-ohne das Fahrzeug: disponiert wird es nicht, die Vorschau nennt es als Hinweis. Ein Abschnitt der
+ohne das Fahrzeug: disponiert wird es nicht, die Vorschau nennt es als Hinweis „Stamm-Fahrzeug
+nicht disponiert“. Ein Abschnitt der
 Planung, den es im Einsatz nicht gibt, bleibt als Hinweis stehen, die Einheit kommt ohne Abschnitt.
 Stamm-Personal kommt als feste Zuordnung in den Plan; wer inzwischen außer Dienst ist, macht die
 Übernahme mit einem Fehler unmöglich, bis er aus der Planung genommen ist. Helfer der Planung
-werden Helfer im Plan des Einsatzes mit der Herkunft „vorplanung“; ein zweiter Lauf in denselben
-Einsatz findet sie wieder. Die Grenzwerte der Planung gelten im Einsatz, solange er keine eigenen
+werden Helfer im Plan des Einsatzes mit der Herkunft „vorplanung“. Jeder Block nimmt sein Soll
+und Qualifikationssoll aus der Planung mit; ein Block ohne Soll bleibt auch im Einsatz ohne. Die
+Grenzwerte der Planung gelten im Einsatz, solange er keine eigenen
 hat. Niemand wird alarmiert oder disponiert, und niemand ist damit schon im Einsatz: wer im Plan
 steht, kommt wie bei jeder Schicht erst mit dem Wechsel in den Einsatz (Kapitel
 [Ablösung](abloesung.md)). Das ETB des Einsatzes vermerkt „Planung „…“ übernommen“ mit der
@@ -150,8 +152,8 @@ Lesen und schreiben dürfen nur der System-Admin und die Führungskräfte der Or
 anderen fehlt „Planungen“ in der Kopfleiste, und der Server lehnt ab. Übernehmen in einen
 laufenden Einsatz verlangt dort zusätzlich das Schreibrecht (Einsatzleitung oder
 Führungspersonal) und die Module Ablösung und Personal; neue Einheiten und UHS verlangen ihre
-Module. Blendet die gewählte Einsatz-Vorlage Ablösung oder Personal aus, lehnt der Server die
-Übernahme in den neuen Einsatz ab. Planungen einer anderen
+Module. Sind Ablösung oder Personal im neuen Einsatz nicht freigegeben, etwa weil die gewählte
+Einsatz-Vorlage oder die Organisation sie ausblendet, lehnt der Server die Übernahme ab. Planungen einer anderen
 Organisation gibt es für niemanden. Was jemand an einer Planung ändert, sehen alle, die sie offen
 haben, ohne neu zu laden. Die Vorplanung gehört nicht zu dem, was die App für die Arbeit ohne Netz
 vorhält (Kapitel [Ohne Netz](ohne-netz.md)).

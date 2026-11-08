@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { listeEinsaetze } from '../api/einsaetze';
+import { useAuth } from '../auth/AuthContext';
 import { listeEinsatzVorlagen } from '../api/einsatzVorlagen';
 import { planungUebernahmeVorschau, planungUebernehmen } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
@@ -67,6 +68,7 @@ export default function PlanungUebernahmeDialog({
   const planungId = planung.kopf.id;
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { benutzer } = useAuth();
   const { token } = useRollen();
   const grundId = useId();
   const [art, setArt] = useState<ZielArt>('neu');
@@ -83,7 +85,10 @@ export default function PlanungUebernahmeDialog({
     queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
   });
-  const laufende = einsaetze.filter((e) => darfImEinsatzSchreiben(e));
+  // Nur Einsätze der eigenen Organisation nehmen eine Planung an (Server 404 sonst).
+  const laufende = einsaetze.filter(
+    (e) => e.org_id === benutzer?.org_id && darfImEinsatzSchreiben(e),
+  );
 
   const vorschauMut = useMutation({
     mutationFn: (v: { ziel: PlanungUebernahmeZiel; wahl: SchichtplanEntscheidungenEingabe }) =>
@@ -108,6 +113,8 @@ export default function PlanungUebernahmeDialog({
 
   /** Neues Ziel: die Wahl gilt nur für ein Ziel, die Vorschau kommt neu. */
   const changeZiel = (a: ZielArt, vorlage: number | null, einsatz: number | null) => {
+    // Eine laufende Übernahme schreibt weiter; ihr Stand darf nicht verloren gehen.
+    if (uebernehmenMut.isPending) return;
     setArt(a);
     setVorlageId(vorlage);
     setEinsatzId(einsatz);
@@ -210,7 +217,11 @@ export default function PlanungUebernahmeDialog({
               <Segmentleiste<ZielArt>
                 beschriftung="Ziel der Übernahme"
                 wert={art}
-                optionen={ZIEL_OPTIONEN}
+                optionen={
+                  uebernehmenMut.isPending
+                    ? ZIEL_OPTIONEN.map((o) => ({ ...o, gesperrt: 'Übernahme läuft' }))
+                    : ZIEL_OPTIONEN
+                }
                 onWechsel={(a) => changeZiel(a, a === 'neu' ? vorlageId : null, null)}
                 style={{ flex: 'none' }}
               />

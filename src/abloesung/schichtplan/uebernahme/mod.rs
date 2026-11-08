@@ -111,6 +111,9 @@ pub struct PaketBlock {
     pub soll_anzahl: Option<i64>,
     /// Fehlt = Vorgabe des Postens.
     pub quali_soll: Option<Vec<PaketQualiSoll>>,
+    /// Ein fehlendes Soll heißt „kein Soll“, nicht „Vorgabe des Postens“ (LLH-1587): die
+    /// Vorplanung trägt ihr Soll je Block schon fertig. Aus der Datei `false`.
+    pub ohne_vorgabe: bool,
     pub notiz: Option<String>,
     /// Schlüssel der Personen.
     pub personen: Vec<String>,

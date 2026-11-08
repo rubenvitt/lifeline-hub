@@ -6,8 +6,8 @@
 //! derselbe wie beim Einlesen einer Datei (LLH-1556). Posten werden Einheiten (frei, aus ihrer
 //! Einheitenvorlage oder mit ihrem Stamm-Fahrzeug, das nur verglichen, nicht disponiert wird) oder
 //! UHS ihres Typs; Stamm-Personal kommt mit festem Bezug, Helfer der Planung als Angabe mit der
-//! Herkunft [`HERKUNFT`] und einer Kennung je Helfer, sodass ein zweiter Lauf in denselben
-//! Einsatz sie wiederfindet.
+//! Herkunft [`HERKUNFT`] und einer Kennung je Helfer (eindeutig über alle Planungen, nie eine
+//! Personalnummer). Jeder Block trägt sein Soll fertig (`ohne_vorgabe`): leer bleibt leer.
 //!
 //! **Zwei Ziele.** Ein **neuer Einsatz** entsteht in derselben Transaktion wie Abgleich und
 //! Schreiben (`einsatz::repo::anlegen_tx`): alles oder nichts. Seine Vorschau legt ihn in einer
@@ -60,7 +60,7 @@ pub enum Ziel {
 
 /// Ein [`Ziel`], dessen Rechte außerhalb der Transaktion geprüft sind.
 #[derive(Debug, Clone, Copy)]
-enum Geprueft {
+enum CheckedZiel {
     Neu { vorlage_id: Option<i64> },
     Einsatz { einsatz_id: i64, rechte: Rechte },
 }
@@ -80,7 +80,7 @@ pub struct Uebernommen {
 
 /// Kopf der Planung, aus dem ein neuer Einsatz entsteht.
 #[derive(Debug, Clone, sqlx::FromRow)]
-struct Quelle {
+struct Source {
     bezeichnung: String,
     einsatzart: String,
     ort: Option<String>,
@@ -152,9 +152,9 @@ async fn build_paket_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     planung_id: i64,
-) -> Result<(Quelle, PlanPaket), AppError> {
+) -> Result<(Source, PlanPaket), AppError> {
     super::repo::check_schreibbar_tx(conn, org_id, planung_id).await?;
-    let quelle: Quelle = sqlx::query_as(
+    let quelle: Source = sqlx::query_as(
         "SELECT bezeichnung, einsatzart, ort, ort_lat, ort_lon, max_dienst_min, min_ruhe_min \
          FROM planung WHERE id = ?",
     )
@@ -254,6 +254,8 @@ async fn build_paket_tx(
             bis,
             soll_anzahl: soll,
             quali_soll: parse_quali_soll(quali.as_deref())?,
+            // Die Planung trägt ihr Soll je Block fertig; leer heißt kein Soll.
+            ohne_vorgabe: true,
             notiz,
             personen,
             zeile: None,
@@ -317,9 +319,9 @@ async fn check_ziel(
     pool: &SqlitePool,
     benutzer: &Benutzer,
     ziel: Ziel,
-) -> Result<Geprueft, AppError> {
+) -> Result<CheckedZiel, AppError> {
     let einsatz_id = match ziel {
-        Ziel::Neu { vorlage_id } => return Ok(Geprueft::Neu { vorlage_id }),
+        Ziel::Neu { vorlage_id } => return Ok(CheckedZiel::Neu { vorlage_id }),
         Ziel::Einsatz { einsatz_id } => einsatz_id,
     };
     let einsatz = einsatz_repo::laden(pool, einsatz_id).await?;
@@ -328,7 +330,7 @@ async fn check_ziel(
     }
     let rolle = einsatz_repo::rolle_von(pool, einsatz_id, benutzer.id).await?;
     berechtigung::fordere_schreibrecht(rolle)?;
-    let darf = |k: &'static str| async move {
+    let can_use = |k: &'static str| async move {
         match berechtigung::fordere_modul_zugriff_laden(
             pool,
             einsatz_id,
@@ -344,21 +346,22 @@ async fn check_ziel(
             Err(e) => Err(e),
         }
     };
-    if !darf(key::<Abloesung>()).await? || !darf(key::<Personal>()).await? {
+    if !can_use(key::<Abloesung>()).await? || !can_use(key::<Personal>()).await? {
         return Err(AppError::Forbidden);
     }
     berechtigung::fordere_aktiv(&einsatz)?;
-    Ok(Geprueft::Einsatz {
+    Ok(CheckedZiel::Einsatz {
         einsatz_id,
         rechte: Rechte {
-            einheiten: darf(key::<Einheiten>()).await?,
-            uhs: darf(key::<Unfallhilfsstellen>()).await?,
+            einheiten: can_use(key::<Einheiten>()).await?,
+            uhs: can_use(key::<Unfallhilfsstellen>()).await?,
         },
     })
 }
 
-/// Rechte im eben angelegten Einsatz: die Einsatzleitung, samt der Module, die eine Vorlage
-/// ausblendet. Blendet sie Ablösung oder Personal aus, nimmt der Einsatz keinen Plan an (422).
+/// Rechte im eben angelegten Einsatz: die Einsatzleitung, samt der Module, die eine Vorlage oder
+/// die Organisation ausblendet oder einer Rolle vorbehält. Fehlt Ablösung oder Personal, nimmt der
+/// Einsatz keinen Plan an (422).
 async fn load_rechte_neu_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -373,7 +376,7 @@ async fn load_rechte_neu_tx(
             .await?
         {
             return Err(AppError::UnprocessableEntity(format!(
-                "Die Einsatz-Vorlage blendet das Modul {name} aus; der Plan hätte keinen Platz"
+                "Modul {name} im neuen Einsatz nicht freigegeben; der Plan hätte keinen Platz"
             )));
         }
     }
@@ -404,9 +407,9 @@ async fn load_rechte_neu_tx(
 // ---------------------------------------------------------------------------------------------
 
 /// Was Vorschau und Übernehmen in der Transaktion vorbereiten.
-struct Vorbereitet {
+struct Prepared {
     einsatz_id: i64,
-    quelle: Quelle,
+    quelle: Source,
     planung: kern::Planung,
 }
 
@@ -416,14 +419,14 @@ async fn prepare_tx(
     conn: &mut SqliteConnection,
     benutzer: &Benutzer,
     planung_id: i64,
-    ziel: Geprueft,
+    ziel: CheckedZiel,
     entscheidungen: &Entscheidungen,
     jetzt: DateTime<Utc>,
-) -> Result<Vorbereitet, AppError> {
+) -> Result<Prepared, AppError> {
     let (quelle, paket) = build_paket_tx(conn, benutzer.org_id, planung_id).await?;
     let (einsatz_id, rechte) = match ziel {
-        Geprueft::Einsatz { einsatz_id, rechte } => (einsatz_id, rechte),
-        Geprueft::Neu { vorlage_id } => {
+        CheckedZiel::Einsatz { einsatz_id, rechte } => (einsatz_id, rechte),
+        CheckedZiel::Neu { vorlage_id } => {
             let id = einsatz_repo::anlegen_tx(
                 conn,
                 &einsatz_repo::NeuerEinsatzDaten {
@@ -446,7 +449,7 @@ async fn prepare_tx(
     };
     let bestand = bestand_tx(conn, einsatz_id, benutzer.org_id).await?;
     let planung = planen(&bestand, &paket, Vec::new(), entscheidungen, rechte)?;
-    Ok(Vorbereitet {
+    Ok(Prepared {
         einsatz_id,
         quelle,
         planung,
@@ -464,7 +467,7 @@ pub async fn vorschau(
 ) -> Result<ImportVorschau, AppError> {
     let ziel = check_ziel(pool, benutzer, ziel).await?;
     let jetzt = Utc::now();
-    if let Geprueft::Einsatz { .. } = ziel {
+    if let CheckedZiel::Einsatz { .. } = ziel {
         let mut conn = pool.acquire().await?;
         return Ok(
             prepare_tx(&mut conn, benutzer, planung_id, ziel, entscheidungen, jetzt)
@@ -487,8 +490,12 @@ pub async fn vorschau(
             Err(e) => return Err(e.into()),
         };
         let ergebnis = prepare_tx(&mut tx, benutzer, planung_id, ziel, entscheidungen, jetzt).await;
-        tx.rollback().await?;
-        return Ok(ergebnis?.planung.vorschau);
+        // Der Fehler der Vorschau geht vor: hat SQLite die Transaktion nach ihm schon selbst
+        // beendet, scheitert auch der Rollback.
+        let zurueck = tx.rollback().await;
+        let v = ergebnis?;
+        zurueck?;
+        return Ok(v.planung.vorschau);
     }
 }
 
@@ -525,7 +532,7 @@ pub async fn uebernehmen(
         mark_uebernommen_tx(conn, benutzer, planung_id, v.einsatz_id, &jetzt_text).await?;
         Ok(Uebernommen {
             einsatz_id: v.einsatz_id,
-            neu: matches!(ziel, Geprueft::Neu { .. }),
+            neu: matches!(ziel, CheckedZiel::Neu { .. }),
             geschrieben,
         })
     })

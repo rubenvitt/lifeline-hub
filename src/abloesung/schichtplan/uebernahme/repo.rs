@@ -326,9 +326,10 @@ struct GeplanterBlock {
     bis: String,
     zustand: BlockZustand,
     block_id: Option<i64>,
-    /// Soll aus dem Paket; fehlt = Vorgabe des Postens.
+    /// Soll aus dem Paket; fehlt = Vorgabe des Postens, außer bei `ohne_vorgabe`.
     soll_anzahl: Option<i64>,
     quali_soll: Option<String>,
+    ohne_vorgabe: bool,
     notiz: Option<String>,
     /// Alle Personen laut Paket, entdoppelt.
     personen: Vec<Wer>,
@@ -603,14 +604,14 @@ pub fn planen(
             }
             z => z,
         };
-        if let Some(fid) = p.fahrzeug_id {
+        if p.fahrzeug_id.is_some() {
             if matches!(
                 ziel,
                 Ziel::NeueEinheit(_) | Ziel::Bestehend(Posten::Einheit(_))
             ) {
                 meldungen.push(ImportMeldung::hinweis(
                     zeile,
-                    format!("Posten «{}»: Fahrzeug #{fid} nicht disponiert", p.name),
+                    format!("Posten «{}»: Stamm-Fahrzeug nicht disponiert", p.name),
                 ));
             }
         }
@@ -750,6 +751,7 @@ pub fn planen(
                     block_id: None,
                     soll_anzahl: b.soll_anzahl,
                     quali_soll,
+                    ohne_vorgabe: b.ohne_vorgabe,
                     notiz: b.notiz.clone(),
                     personen,
                     neue: Vec::new(),
@@ -1501,6 +1503,8 @@ pub async fn schreiben_tx(
                     plan_repo::soll_vorgabe_tx(&mut *conn, posten).await?;
                 let (soll, quali) = if posten == Posten::Pause {
                     (None, None)
+                } else if g.ohne_vorgabe {
+                    (g.soll_anzahl, g.quali_soll.clone())
                 } else {
                     (
                         g.soll_anzahl.or(vorgabe_anzahl),
@@ -1737,6 +1741,7 @@ mod tests {
             bis: bis.into(),
             soll_anzahl: None,
             quali_soll: None,
+            ohne_vorgabe: false,
             notiz: None,
             personen: personen.iter().map(|s| s.to_string()).collect(),
             zeile: Some(zeile),

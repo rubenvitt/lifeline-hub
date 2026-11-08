@@ -410,3 +410,82 @@ async fn entscheidung_neu_statt_bestehender_einheit() {
     assert_eq!(s, StatusCode::OK, "{ergebnis}");
     assert_eq!(ergebnis["zaehlung"]["einheiten_neu"], 1, "{ergebnis}");
 }
+
+#[tokio::test]
+async fn block_ohne_soll_bleibt_ohne_soll_auch_mit_vorlage() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let typ: i64 = sqlx::query_scalar("SELECT id FROM einheit_typ WHERE org_id = ? LIMIT 1")
+        .bind(org)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let vorlage: i64 = sqlx::query_scalar(
+        "INSERT INTO einheit_vorlage (org_id, name, typ_id, soll_fuehrer, soll_unterfuehrer, \
+         soll_mannschaft) VALUES (?, 'SanTrupp', ?, 0, 1, 2) RETURNING id",
+    )
+    .bind(org)
+    .bind(typ)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let (s, plan) = post(
+        &app,
+        &admin,
+        PFAD,
+        json!({"bezeichnung": "Konzert", "von": "2027-03-13 08:00:00", "bis": "2027-03-13 23:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let p = plan["kopf"]["id"].as_i64().unwrap();
+    let (s, plan) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/posten"),
+        json!({"bezeichnung": "Trupp", "art": "einheit", "einheit_vorlage_id": vorlage}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let posten = plan["posten"][0]["id"].as_i64().unwrap();
+    for (von, bis, soll) in [
+        ("2027-03-13 10:00:00", "2027-03-13 12:00:00", json!(null)),
+        ("2027-03-13 12:00:00", "2027-03-13 14:00:00", json!(1)),
+    ] {
+        let (s, v) = post(
+            &app,
+            &admin,
+            &format!("{PFAD}/{p}/bloecke"),
+            json!({"posten_id": posten, "von": von, "bis": bis, "soll_anzahl": soll}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+
+    let (s, ergebnis) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/uebernahme"),
+        json!({"ziel": {"art": "neu"}, "entscheidungen": {"posten": {
+            format!("posten-{posten}"): {"art": "neu", "einheit_vorlage_id": vorlage}}}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{ergebnis}");
+    let einsatz = ergebnis["einsatz_id"].as_i64().unwrap();
+    let plan = get(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{einsatz}/abloesungen/schichtplan"),
+    )
+    .await;
+    let bloecke = plan["bloecke"].as_array().unwrap();
+    assert_eq!(bloecke.len(), 2, "{plan}");
+    assert!(
+        bloecke[0].get("soll_anzahl").is_none(),
+        "leer bleibt leer, nicht das Soll 3 der Vorlage: {plan}"
+    );
+    assert_eq!(bloecke[1]["soll_anzahl"], 1, "{plan}");
+}
