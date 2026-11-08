@@ -213,8 +213,8 @@ Für Einsatzleitung und Führungspersonal:
    Einsatzes den Zeitraum, im Feld steht es als Vorgabe, etwa „4 h (Vorgabe Einsatz)“; hat der
    Einsatz keins, ist die Länge Pflicht. Die Blöcke bekommen das Soll des Postens und keine
    Personen. Überschneidet sich auch nur eine erzeugte Schicht mit einem Block, entsteht keine,
-   und der Dialog nennt je erzeugter Schicht den frühesten Block, mit dem sie sich überschneidet,
-   etwa „überschneidet sich mit 1000–1400“. Weitere Blöcke derselben Schicht nennt er nicht.
+   und der Dialog nennt jeden Block, mit dem sich eine erzeugte Schicht überschneidet, einmal,
+   etwa „überschneidet sich mit 1000–1400“.
 9. Ohne Maus: „Block anlegen“ öffnet denselben Dialog leer. Ein Block im Raster ist ein Knopf und
    öffnet mit der Eingabetaste seinen Dialog.
 
