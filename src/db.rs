@@ -13590,6 +13590,69 @@ mod tests {
         );
     }
 
+    /// LLH-1556: Kennung und Herkunft am Helfer des Plans; Bestand ohne, je Einsatz ist das Paar
+    /// eindeutig (fehlende Herkunft = leer), ohne Kennung beliebig oft.
+    #[tokio::test]
+    async fn migration_0297_plan_helfer_kennung() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 297;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_plan_helfer (einsatz_id, name, angelegt_von) \
+             VALUES (?, 'Cem', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT kennung, herkunft FROM einsatz_plan_helfer WHERE id = ?")
+                .bind(alt)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bestand, (None, None), "Bestand ohne Kennung");
+
+        let helfer = |kennung: Option<&'static str>, herkunft: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO einsatz_plan_helfer (einsatz_id, name, kennung, herkunft) \
+                     VALUES (?, 'Dana', ?, ?)",
+                )
+                .bind(e)
+                .bind(kennung)
+                .bind(herkunft)
+                .execute(&pool)
+                .await
+            }
+        };
+        helfer(None, None).await.expect("ohne Kennung beliebig oft");
+        helfer(None, Some("Helferplanung"))
+            .await
+            .expect("ohne Kennung beliebig oft");
+        helfer(Some("4711"), Some("Helferplanung")).await.unwrap();
+        helfer(Some("4711"), Some("Helferplanung"))
+            .await
+            .expect_err("Paar je Einsatz eindeutig");
+        helfer(Some("4711"), Some("vorplanung"))
+            .await
+            .expect("andere Herkunft, gleiche Kennung");
+        helfer(Some("4711"), None).await.unwrap();
+        helfer(Some("4711"), Some(""))
+            .await
+            .expect_err("fehlende Herkunft zählt als leer");
+    }
+
     /// LLH-1580 (K1): der Bestand ist keine RTW-Anforderung, die Spalte nimmt nur 0 und 1.
     #[tokio::test]
     async fn migration_0298_person_rtw_angefordert() {

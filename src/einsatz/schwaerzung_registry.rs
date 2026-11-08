@@ -1397,6 +1397,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("telefon", Strategie::NullSetzen, Z_EINSATZ),
             scrub("organisation", Strategie::NullSetzen, Z_EINSATZ),
             retain("qualifikationen", G_KONFIG),
+            // Externe Kennung und ihre Herkunft aus dem Einlesen (LLH-1556, Mig 0297)
+            // führen zur Person zurück.
+            scrub("kennung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("herkunft", Strategie::NullSetzen, Z_EINSATZ),
             retain("angelegt_at", G_ZEIT),
             retain("angelegt_von", G_FK),
             // LLH-1555 (0294): die Kraft, als die der Helfer übernommen wurde.

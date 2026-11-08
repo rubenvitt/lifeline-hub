@@ -3495,6 +3495,16 @@
           "einheit"
         ]
       },
+      "BlockZustand": {
+        "type": "string",
+        "description": "Was mit einem Block geschieht. Wire == `as_str()`.",
+        "enum": [
+          "neu",
+          "ergaenzt",
+          "unveraendert",
+          "fehler"
+        ]
+      },
       "BrAbrufErgebnis": {
         "type": "object",
         "description": "Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2).",
@@ -9073,6 +9083,188 @@
           }
         }
       },
+      "ImportAuswahl": {
+        "type": "object",
+        "description": "Was zur Wahl steht: aktive Einheiten, UHS und Einheiten-Vorlagen.",
+        "required": [
+          "einheiten",
+          "uhs",
+          "vorlagen",
+          "abschnitte"
+        ],
+        "properties": {
+          "abschnitte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WahlEintrag"
+            }
+          },
+          "einheiten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WahlEintrag"
+            }
+          },
+          "uhs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WahlEintrag"
+            }
+          },
+          "vorlagen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WahlEintrag"
+            }
+          }
+        }
+      },
+      "ImportErgebnis": {
+        "type": "object",
+        "description": "Antwort des Übernehmens.",
+        "required": [
+          "zaehlung",
+          "plan"
+        ],
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/SchichtplanAnzeige"
+          },
+          "zaehlung": {
+            "$ref": "#/components/schemas/ImportZaehlung"
+          }
+        }
+      },
+      "ImportMeldung": {
+        "type": "object",
+        "description": "Ein Fehler oder Hinweis, mit der Zeile der Datei, wenn es eine gibt.",
+        "required": [
+          "stufe",
+          "text"
+        ],
+        "properties": {
+          "stufe": {
+            "$ref": "#/components/schemas/MeldungStufe"
+          },
+          "text": {
+            "type": "string"
+          },
+          "zeile": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "ImportVorschau": {
+        "type": "object",
+        "description": "Antwort der Vorschau: nichts ist geschrieben.",
+        "required": [
+          "posten",
+          "personen",
+          "bloecke",
+          "meldungen",
+          "zaehlung",
+          "auswahl",
+          "uebernehmbar"
+        ],
+        "properties": {
+          "auswahl": {
+            "$ref": "#/components/schemas/ImportAuswahl"
+          },
+          "bloecke": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorschauBlock"
+            }
+          },
+          "meldungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportMeldung"
+            },
+            "description": "Fehler zuerst, dann Hinweise, je nach Zeile."
+          },
+          "personen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorschauPerson"
+            }
+          },
+          "posten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VorschauPosten"
+            }
+          },
+          "uebernehmbar": {
+            "type": "boolean",
+            "description": "Ob „Übernehmen“ geht: kein Fehler."
+          },
+          "zaehlung": {
+            "$ref": "#/components/schemas/ImportZaehlung"
+          }
+        }
+      },
+      "ImportZaehlung": {
+        "type": "object",
+        "description": "Zählung der Änderungen. Alles 0 außer `*_unveraendert` heißt: nichts zu tun.",
+        "required": [
+          "einheiten_neu",
+          "uhs_neu",
+          "bloecke_neu",
+          "bloecke_ergaenzt",
+          "bloecke_unveraendert",
+          "helfer_neu",
+          "einteilungen_neu",
+          "grenzwerte_neu",
+          "aenderungen"
+        ],
+        "properties": {
+          "aenderungen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Summe aller Änderungen; 0 = das Übernehmen schreibt nichts."
+          },
+          "bloecke_ergaenzt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bloecke_neu": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bloecke_unveraendert": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einheiten_neu": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einteilungen_neu": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Personen, die neu in einen Block kommen (über alle Blöcke)."
+          },
+          "grenzwerte_neu": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grenzwerte des Dienst-Befunds, die die Vorplanung setzt (LLH-1561); aus einer Datei 0."
+          },
+          "helfer_neu": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uhs_neu": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "InfotelefonAnliegen": {
         "type": "string",
         "description": "Anliegen eines Anrufs. Wire == `as_str()`.",
@@ -12004,6 +12196,14 @@
           "erledigt"
         ]
       },
+      "MeldungStufe": {
+        "type": "string",
+        "description": "Stufe einer Meldung der Vorschau. Ein Fehler sperrt das Übernehmen. Wire == `as_str()`.",
+        "enum": [
+          "fehler",
+          "hinweis"
+        ]
+      },
       "MeldungsZaehler": {
         "type": "object",
         "description": "Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu\"), und die\nMeldungen mit überfälliger Bestätigungspflicht.",
@@ -13417,6 +13617,16 @@
           }
         }
       },
+      "PaketPostenArt": {
+        "type": "string",
+        "description": "Art eines Postens im Paket. `fahrzeug` sucht wie `einheit` eine Einheit, auch über ihren\nFunkrufnamen. Wire == `as_str()`.",
+        "enum": [
+          "einheit",
+          "fahrzeug",
+          "uhs",
+          "pause"
+        ]
+      },
       "PegelAnzeige": {
         "type": "object",
         "description": "Ein festgelegter Pegel eines Einsatzes.",
@@ -14563,9 +14773,23 @@
           "qualifikationen"
         ],
         "properties": {
+          "herkunft": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Herkunft der Kennung: freier Name der Quelle."
+          },
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "kennung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennung aus einer Schichtplan-Datei oder der Vorplanung, eine externe Kennung (LLH-1556);\nnur lesend."
           },
           "name": {
             "type": "string"
@@ -17682,6 +17906,28 @@
           }
         }
       },
+      "Treffer": {
+        "type": "string",
+        "description": "Wie sicher ein Vorschlag ist. Wire == `as_str()`.",
+        "enum": [
+          "sicher",
+          "unsicher",
+          "neu"
+        ]
+      },
+      "TrefferGrund": {
+        "type": "string",
+        "description": "Woran eine Person erkannt wurde. Wire == `as_str()`.",
+        "enum": [
+          "kennung",
+          "kennung_name",
+          "kennung_ohne_name",
+          "name_telefon",
+          "name",
+          "bezug",
+          "wahl"
+        ]
+      },
       "UebernahmeBody": {
         "type": "object",
         "description": "Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional.",
@@ -19066,6 +19312,59 @@
           }
         }
       },
+      "VorschauBlock": {
+        "type": "object",
+        "description": "Ein Block in der Vorschau.",
+        "required": [
+          "posten",
+          "von",
+          "bis",
+          "zustand",
+          "personen",
+          "neue_personen"
+        ],
+        "properties": {
+          "bis": {
+            "type": "string"
+          },
+          "block_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der bestehende Block, wenn er schon da ist."
+          },
+          "neue_personen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon neu im Block."
+          },
+          "personen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Personen des Blocks laut Paket."
+          },
+          "posten": {
+            "type": "string",
+            "description": "Schlüssel des Postens."
+          },
+          "von": {
+            "type": "string"
+          },
+          "zeile": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/BlockZustand"
+          }
+        }
+      },
       "VorschauFahrzeug": {
         "type": "object",
         "description": "Ein Stamm-Fahrzeug der Vorlage und sein Zustand im Einsatz.",
@@ -19262,6 +19561,205 @@
           "im_einsatz"
         ]
       },
+      "VorschauPerson": {
+        "type": "object",
+        "description": "Eine Person in der Vorschau.",
+        "required": [
+          "schluessel",
+          "name",
+          "ziel",
+          "treffer",
+          "kandidaten",
+          "zeilen",
+          "bloecke"
+        ],
+        "properties": {
+          "bloecke": {
+            "type": "integer",
+            "format": "int64",
+            "description": "In wie vielen Blöcken sie steht."
+          },
+          "grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TrefferGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "herkunft": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kandidaten": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "personal_id",
+                    "name",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "stamm"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "personal_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "helfer_id",
+                    "name",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "helfer"
+                      ]
+                    },
+                    "helfer_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "neu"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "description": "Ziel einer Person in der Vorschau, eingebettet wie [`PostenZiel`]."
+            },
+            "description": "Gefundene Kandidaten, aus denen gewählt werden kann (ohne „neu“)."
+          },
+          "kennung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "schluessel": {
+            "type": "string"
+          },
+          "telefon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "treffer": {
+            "$ref": "#/components/schemas/Treffer"
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          "ziel": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "personal_id",
+                  "name",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "stamm"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "personal_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "helfer_id",
+                  "name",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "helfer"
+                    ]
+                  },
+                  "helfer_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "neu"
+                    ]
+                  }
+                }
+              }
+            ],
+            "description": "Ziel einer Person in der Vorschau, eingebettet wie [`PostenZiel`]."
+          }
+        }
+      },
       "VorschauPersonal": {
         "type": "object",
         "description": "Eine Person der Stammbesetzung und ihr Zustand im Einsatz.",
@@ -19343,6 +19841,236 @@
           }
         }
       },
+      "VorschauPosten": {
+        "type": "object",
+        "description": "Ein Posten in der Vorschau.",
+        "required": [
+          "schluessel",
+          "art",
+          "name",
+          "ziel",
+          "treffer",
+          "kandidaten",
+          "zeilen",
+          "bloecke"
+        ],
+        "properties": {
+          "abschnitt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der gefundene Abschnitt; bei einem neuen Posten liegt er dort."
+          },
+          "art": {
+            "$ref": "#/components/schemas/PaketPostenArt"
+          },
+          "bloecke": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kandidaten": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "einheit_id",
+                    "bezeichnung",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "einheit"
+                      ]
+                    },
+                    "bezeichnung": {
+                      "type": "string"
+                    },
+                    "einheit_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "uhs_id",
+                    "bezeichnung",
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "uhs"
+                      ]
+                    },
+                    "bezeichnung": {
+                      "type": "string"
+                    },
+                    "uhs_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "neu"
+                      ]
+                    },
+                    "einheit_vorlage_id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "format": "int64"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "art"
+                  ],
+                  "properties": {
+                    "art": {
+                      "type": "string",
+                      "enum": [
+                        "pause"
+                      ]
+                    }
+                  }
+                }
+              ],
+              "description": "Ziel eines Postens in der Vorschau. Im Schema eingebettet (`#[schema(inline)]`): ein Enum mit\nDaten passt nicht in den Wire-Kontrakt (`tests/enum_wire_kontrakt.rs`)."
+            },
+            "description": "Weitere gleich gute Kandidaten (Einheiten bzw. UHS), wenn der Treffer unsicher ist."
+          },
+          "name": {
+            "type": "string"
+          },
+          "schluessel": {
+            "type": "string"
+          },
+          "treffer": {
+            "$ref": "#/components/schemas/Treffer"
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          "ziel": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "einheit_id",
+                  "bezeichnung",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "einheit"
+                    ]
+                  },
+                  "bezeichnung": {
+                    "type": "string"
+                  },
+                  "einheit_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "uhs_id",
+                  "bezeichnung",
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "uhs"
+                    ]
+                  },
+                  "bezeichnung": {
+                    "type": "string"
+                  },
+                  "uhs_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "neu"
+                    ]
+                  },
+                  "einheit_vorlage_id": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int64"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "art"
+                ],
+                "properties": {
+                  "art": {
+                    "type": "string",
+                    "enum": [
+                      "pause"
+                    ]
+                  }
+                }
+              }
+            ],
+            "description": "Ziel eines Postens in der Vorschau. Im Schema eingebettet (`#[schema(inline)]`): ein Enum mit\nDaten passt nicht in den Wire-Kontrakt (`tests/enum_wire_kontrakt.rs`)."
+          }
+        }
+      },
       "VorschauZustand": {
         "type": "string",
         "description": "Zustand einer Kraft der Vorlage im Einsatz (D4). Wire == `as_str()`.",
@@ -19361,6 +20089,30 @@
           "keiner",
           "vs_nfd"
         ]
+      },
+      "WahlEintrag": {
+        "type": "object",
+        "description": "Eine wählbare Einheit, UHS oder Vorlage.",
+        "required": [
+          "id",
+          "bezeichnung"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "Warnstufe": {
         "type": "string",
@@ -19916,7 +20668,8 @@
           "personal",
           "fahrzeug",
           "material",
-          "planschicht"
+          "planschicht",
+          "dateizeile"
         ]
       },
       "ZeilenFehler": {

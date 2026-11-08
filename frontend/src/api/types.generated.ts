@@ -1423,6 +1423,11 @@ export interface components {
          * @enum {string}
          */
         Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegungsstelle" | "einheit";
+        /**
+         * @description Was mit einem Block geschieht. Wire == `as_str()`.
+         * @enum {string}
+         */
+        BlockZustand: "neu" | "ergaenzt" | "unveraendert" | "fehler";
         /** @description Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2). */
         BrAbrufErgebnis: {
             /** @description Das Abruf-Ereignis der abgerufenen Kraft. */
@@ -3687,6 +3692,67 @@ export interface components {
             reihenfolge: number;
             sichtbar: boolean;
         };
+        /** @description Was zur Wahl steht: aktive Einheiten, UHS und Einheiten-Vorlagen. */
+        ImportAuswahl: {
+            abschnitte: components["schemas"]["WahlEintrag"][];
+            einheiten: components["schemas"]["WahlEintrag"][];
+            uhs: components["schemas"]["WahlEintrag"][];
+            vorlagen: components["schemas"]["WahlEintrag"][];
+        };
+        /** @description Antwort des Übernehmens. */
+        ImportErgebnis: {
+            plan: components["schemas"]["SchichtplanAnzeige"];
+            zaehlung: components["schemas"]["ImportZaehlung"];
+        };
+        /** @description Ein Fehler oder Hinweis, mit der Zeile der Datei, wenn es eine gibt. */
+        ImportMeldung: {
+            stufe: components["schemas"]["MeldungStufe"];
+            text: string;
+            /** Format: int32 */
+            zeile?: number | null;
+        };
+        /** @description Antwort der Vorschau: nichts ist geschrieben. */
+        ImportVorschau: {
+            auswahl: components["schemas"]["ImportAuswahl"];
+            bloecke: components["schemas"]["VorschauBlock"][];
+            /** @description Fehler zuerst, dann Hinweise, je nach Zeile. */
+            meldungen: components["schemas"]["ImportMeldung"][];
+            personen: components["schemas"]["VorschauPerson"][];
+            posten: components["schemas"]["VorschauPosten"][];
+            /** @description Ob „Übernehmen“ geht: kein Fehler. */
+            uebernehmbar: boolean;
+            zaehlung: components["schemas"]["ImportZaehlung"];
+        };
+        /** @description Zählung der Änderungen. Alles 0 außer `*_unveraendert` heißt: nichts zu tun. */
+        ImportZaehlung: {
+            /**
+             * Format: int64
+             * @description Summe aller Änderungen; 0 = das Übernehmen schreibt nichts.
+             */
+            aenderungen: number;
+            /** Format: int64 */
+            bloecke_ergaenzt: number;
+            /** Format: int64 */
+            bloecke_neu: number;
+            /** Format: int64 */
+            bloecke_unveraendert: number;
+            /** Format: int64 */
+            einheiten_neu: number;
+            /**
+             * Format: int64
+             * @description Personen, die neu in einen Block kommen (über alle Blöcke).
+             */
+            einteilungen_neu: number;
+            /**
+             * Format: int64
+             * @description Grenzwerte des Dienst-Befunds, die die Vorplanung setzt (LLH-1561); aus einer Datei 0.
+             */
+            grenzwerte_neu: number;
+            /** Format: int64 */
+            helfer_neu: number;
+            /** Format: int64 */
+            uhs_neu: number;
+        };
         /**
          * @description Anliegen eines Anrufs. Wire == `as_str()`.
          * @enum {string}
@@ -4866,6 +4932,11 @@ export interface components {
          */
         MeldungStatus: "neu" | "gesichtet" | "in_bearbeitung" | "erledigt";
         /**
+         * @description Stufe einer Meldung der Vorschau. Ein Fehler sperrt das Übernehmen. Wire == `as_str()`.
+         * @enum {string}
+         */
+        MeldungStufe: "fehler" | "hinweis";
+        /**
          * @description Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu"), und die
          *     Meldungen mit überfälliger Bestätigungspflicht.
          */
@@ -5458,6 +5529,12 @@ export interface components {
             ortsname?: string | null;
             peilung?: components["schemas"]["PeilungAntwort"] | null;
         };
+        /**
+         * @description Art eines Postens im Paket. `fahrzeug` sucht wie `einheit` eine Einheit, auch über ihren
+         *     Funkrufnamen. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PaketPostenArt: "einheit" | "fahrzeug" | "uhs" | "pause";
         /** @description Ein festgelegter Pegel eines Einsatzes. */
         PegelAnzeige: {
             gewaesser?: string | null;
@@ -5891,8 +5968,15 @@ export interface components {
         };
         /** @description Ein Helfer des Plans. */
         PlanHelferAnzeige: {
+            /** @description Herkunft der Kennung: freier Name der Quelle. */
+            herkunft?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Kennung aus einer Schichtplan-Datei oder der Vorplanung, eine externe Kennung (LLH-1556);
+             *     nur lesend.
+             */
+            kennung?: string | null;
             name: string;
             organisation?: string | null;
             qualifikationen: number[];
@@ -7069,6 +7153,16 @@ export interface components {
             im_einsatz: components["schemas"]["EinsatzTransportfahrzeug"][];
             stamm: string[];
         };
+        /**
+         * @description Wie sicher ein Vorschlag ist. Wire == `as_str()`.
+         * @enum {string}
+         */
+        Treffer: "sicher" | "unsicher" | "neu";
+        /**
+         * @description Woran eine Person erkannt wurde. Wire == `as_str()`.
+         * @enum {string}
+         */
+        TrefferGrund: "kennung" | "kennung_name" | "kennung_ohne_name" | "name_telefon" | "name" | "bezug" | "wahl";
         /** @description Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional. */
         UebernahmeBody: {
             /** Format: int64 */
@@ -7619,6 +7713,31 @@ export interface components {
             /** Format: int64 */
             vorlage_id: number;
         };
+        /** @description Ein Block in der Vorschau. */
+        VorschauBlock: {
+            bis: string;
+            /**
+             * Format: int64
+             * @description Der bestehende Block, wenn er schon da ist.
+             */
+            block_id?: number | null;
+            /**
+             * Format: int64
+             * @description Davon neu im Block.
+             */
+            neue_personen: number;
+            /**
+             * Format: int64
+             * @description Personen des Blocks laut Paket.
+             */
+            personen: number;
+            /** @description Schlüssel des Postens. */
+            posten: string;
+            von: string;
+            /** Format: int32 */
+            zeile?: number | null;
+            zustand: components["schemas"]["BlockZustand"];
+        };
         /** @description Ein Stamm-Fahrzeug der Vorlage und sein Zustand im Einsatz. */
         VorschauFahrzeug: {
             /**
@@ -7690,6 +7809,56 @@ export interface components {
          * @enum {string}
          */
         VorschauMaterialZustand: "neu" | "ausser_dienst" | "im_einsatz";
+        /** @description Eine Person in der Vorschau. */
+        VorschauPerson: {
+            /**
+             * Format: int64
+             * @description In wie vielen Blöcken sie steht.
+             */
+            bloecke: number;
+            grund?: components["schemas"]["TrefferGrund"] | null;
+            herkunft?: string | null;
+            /** @description Gefundene Kandidaten, aus denen gewählt werden kann (ohne „neu“). */
+            kandidaten: ({
+                /** @enum {string} */
+                art: "stamm";
+                name: string;
+                /** Format: int64 */
+                personal_id: number;
+            } | {
+                /** @enum {string} */
+                art: "helfer";
+                /** Format: int64 */
+                helfer_id: number;
+                name: string;
+            } | {
+                /** @enum {string} */
+                art: "neu";
+            })[];
+            kennung?: string | null;
+            name: string;
+            schluessel: string;
+            telefon?: string | null;
+            treffer: components["schemas"]["Treffer"];
+            zeilen: number[];
+            /** @description Ziel einer Person in der Vorschau, eingebettet wie [`PostenZiel`]. */
+            ziel: {
+                /** @enum {string} */
+                art: "stamm";
+                name: string;
+                /** Format: int64 */
+                personal_id: number;
+            } | {
+                /** @enum {string} */
+                art: "helfer";
+                /** Format: int64 */
+                helfer_id: number;
+                name: string;
+            } | {
+                /** @enum {string} */
+                art: "neu";
+            };
+        };
         /** @description Eine Person der Stammbesetzung und ihr Zustand im Einsatz. */
         VorschauPersonal: {
             /**
@@ -7723,6 +7892,69 @@ export interface components {
             staerke_position?: components["schemas"]["StaerkePosition"] | null;
             zustand: components["schemas"]["VorschauZustand"];
         };
+        /** @description Ein Posten in der Vorschau. */
+        VorschauPosten: {
+            abschnitt?: string | null;
+            /**
+             * Format: int64
+             * @description Der gefundene Abschnitt; bei einem neuen Posten liegt er dort.
+             */
+            abschnitt_id?: number | null;
+            art: components["schemas"]["PaketPostenArt"];
+            /** Format: int64 */
+            bloecke: number;
+            /** @description Weitere gleich gute Kandidaten (Einheiten bzw. UHS), wenn der Treffer unsicher ist. */
+            kandidaten: ({
+                /** @enum {string} */
+                art: "einheit";
+                bezeichnung: string;
+                /** Format: int64 */
+                einheit_id: number;
+            } | {
+                /** @enum {string} */
+                art: "uhs";
+                bezeichnung: string;
+                /** Format: int64 */
+                uhs_id: number;
+            } | {
+                /** @enum {string} */
+                art: "neu";
+                /** Format: int64 */
+                einheit_vorlage_id?: number | null;
+            } | {
+                /** @enum {string} */
+                art: "pause";
+            })[];
+            name: string;
+            schluessel: string;
+            treffer: components["schemas"]["Treffer"];
+            zeilen: number[];
+            /**
+             * @description Ziel eines Postens in der Vorschau. Im Schema eingebettet (`#[schema(inline)]`): ein Enum mit
+             *     Daten passt nicht in den Wire-Kontrakt (`tests/enum_wire_kontrakt.rs`).
+             */
+            ziel: {
+                /** @enum {string} */
+                art: "einheit";
+                bezeichnung: string;
+                /** Format: int64 */
+                einheit_id: number;
+            } | {
+                /** @enum {string} */
+                art: "uhs";
+                bezeichnung: string;
+                /** Format: int64 */
+                uhs_id: number;
+            } | {
+                /** @enum {string} */
+                art: "neu";
+                /** Format: int64 */
+                einheit_vorlage_id?: number | null;
+            } | {
+                /** @enum {string} */
+                art: "pause";
+            };
+        };
         /**
          * @description Zustand einer Kraft der Vorlage im Einsatz (D4). Wire == `as_str()`.
          * @enum {string}
@@ -7733,6 +7965,14 @@ export interface components {
          * @enum {string}
          */
         VsVermerk: "keiner" | "vs_nfd";
+        /** @description Eine wählbare Einheit, UHS oder Vorlage. */
+        WahlEintrag: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+        };
         /**
          * @description Warnstufe (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `warnstufe`.
          * @enum {string}
@@ -7985,7 +8225,7 @@ export interface components {
          *     Einsatz die der Disposition (LLH-1073). Wire == `as_str()`.
          * @enum {string}
          */
-        ZeilenArt: "personal" | "fahrzeug" | "material" | "planschicht";
+        ZeilenArt: "personal" | "fahrzeug" | "material" | "planschicht" | "dateizeile";
         /**
          * @description Antwort einer an einzelnen Zeilen abgelehnten Mengen-Anfrage (422, LLH-1100): der Umschlag
          *     `{error}` und je abgelehnter Zeile ein [`ZeilenGrund`].
