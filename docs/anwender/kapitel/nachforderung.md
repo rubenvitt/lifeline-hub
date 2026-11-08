@@ -300,9 +300,8 @@ Einheit mit ihr verknüpft, steht im Menü „Ablehnen (Einheiten verknüpft)“
 ### Benachrichtigungen zum Stand
 
 Wechselt eine Nachforderung auf „Zugesagt“, „Unterwegs“, „Eingetroffen“ oder „Abgelehnt“, erhalten
-die Person, die sie angelegt hat, und die Personen, die S4 besetzen (laut Stab-Besetzung, sonst
-laut Funktion in der Mitgliedschaft), einen Hinweis mit der neuen Stufe, etwa „Nachforderung
-eingetroffen“ mit „2× an Leitstelle“. Art, Details, Ziel, Adressat-Bezeichnung und Ablehnungsgrund
+die Person, die sie angelegt hat, und die Personen, die S4 in ihrer Mitgliedschaft tragen, einen
+Hinweis mit der neuen Stufe, etwa „Nachforderung eingetroffen“ mit „2× an Leitstelle“. Art, Details, Ziel, Adressat-Bezeichnung und Ablehnungsgrund
 stehen nie im Hinweis; er führt in das Modul „Nachforderungen“. Auch ein „Rückgängig“ zurück auf
 „Zugesagt“ oder „Unterwegs“ meldet die neue Stufe, eines zurück auf „Angefordert“ meldet nichts.
 Das Absetzen selbst meldet nichts, ebenso wenig ein Zurückziehen oder Bearbeiten.

@@ -227,8 +227,8 @@ nichts. Mit Strg, ⌘ oder Alt ist eine Ziffer kein Statuswechsel.
 Wechselt ein Fahrzeug aus einem gebundenen oder nicht verfügbaren Status in einen verfügbaren,
 etwa von „3 – Auf Anfahrt“ auf „2 – Frei auf Wache“, bekommen Einsatzleitung und S3 einen Hinweis
 „Wieder verfügbar“ mit dem Funkrufnamen, der zum Fahrzeug führt. Wer EL und S3 ist, ergibt die
-Besetzung im Stab, sonst die Funktion im Einsatz; der Hinweis erreicht nur, wer das Modul
-Fahrzeuge lesen darf. Ob ein Status verfügbar, gebunden oder nicht verfügbar ist, legt seine
+Funktion in der Mitgliedschaft (für EL zuerst der Einsatzleiter der Führungsstelle); der Hinweis
+erreicht nur, wer das Modul Fahrzeuge lesen darf. Ob ein Status verfügbar, gebunden oder nicht verfügbar ist, legt seine
 Kategorie im Statuskatalog fest. Still bleiben ein Wechsel innerhalb einer Kategorie (etwa von 3
 auf 4), von einem verfügbaren Status in einen anderen, der erste Status eines Fahrzeugs ohne
 vorigen und der eigene Wechsel: wer ein Fahrzeug selbst freimeldet, bekommt keinen Hinweis.

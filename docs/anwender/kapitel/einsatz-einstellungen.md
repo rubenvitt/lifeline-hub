@@ -201,11 +201,11 @@ Zahl, wie eine Art, die jemand für sich abgeschaltet hat (Kapitel
 [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Sie geht an dieselben Personen wie sonst; die
 Einstellung ändert nur, wie laut sie bei ihnen ankommt.
 
-Die Funktionen einer Person sind ihre Besetzung im Stab (EL über die Führungsstelle, S1 bis S6
-über die Sachgebiete; ein Sachgebiet „bei der Einsatzleitung“ zählt für die Einsatzleitung) und die
-Funktion ihrer Mitgliedschaft im Einsatz. Hat sie keine, gilt „ohne Funktion“. Still wird ein
-Eingang nur, wenn er für jede ihrer Funktionen still steht: Wer S2 und S4 ist, bekommt einen
-Auftrag als Eingang, solange nur S2 still steht. Wer eine Art unter „Benachrichtigungen“ im
+Die Funktionen einer Person sind die Funktion ihrer Mitgliedschaft im Einsatz (gepflegt unter
+„Mitglieder“) und EL, wenn sie als Einsatzleiter an der eigenen Führungsstelle erfasst ist. Hat
+sie keine, gilt „ohne Funktion“. Still wird ein Eingang nur, wenn er für jede ihrer Funktionen
+still steht: Wer als Einsatzleiter erfasst ist und S2 trägt, bekommt einen Auftrag als Eingang,
+solange nur S2 still steht. Wer eine Art unter „Benachrichtigungen“ im
 Benutzermenü selbst abgeschaltet hat, bekommt sie weiter still, gleich was hier steht.
 
 Ohne Einstellung ist „Neuer Lagebericht“ still, alle anderen Eingänge sind laut. Alarme, die

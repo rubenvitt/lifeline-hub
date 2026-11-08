@@ -235,8 +235,8 @@ im Lagedashboard, in der Vorbereitung der Lagebesprechung und im Lagebericht.
 
 Wer einen Auftrag bekommt oder erteilt hat, erhält einen Hinweis, ohne das Modul offen zu haben:
 
-- **„Neuer Auftrag“** geht beim Erteilen an jede Person, die eine Empfänger-Funktion besetzt
-  (laut Stab-Besetzung, sonst laut Funktion in der Mitgliedschaft), und an eine Einsatzkraft als
+- **„Neuer Auftrag“** geht beim Erteilen an jede Person, die eine Empfänger-Funktion in ihrer
+  Mitgliedschaft trägt (EL: zuerst der Einsatzleiter der Führungsstelle), und an eine Einsatzkraft als
   Empfänger, wenn ihr Personal mit einem Konto verknüpft ist. Das gilt auch für Aufträge aus
   einem ETB-Eintrag, einer Meldung oder dem Chat. Einheiten, Abschnitte, Fahrzeuge, externe
   Stellen und eine frei eingetippte Funktion erreichen niemanden. Kommt durch eine Berichtigung
@@ -303,8 +303,8 @@ neue Fassung mit eigener Freigabe.
 
 ### Benachrichtigung bei der Freigabe eines Befehls
 
-Mit der Freigabe erhält jede Person, die eine Funktion aus dem Verteiler besetzt (laut
-Stab-Besetzung, sonst laut Funktion in der Mitgliedschaft), den Hinweis „Neuer Befehl“ mit der
+Mit der Freigabe erhält jede Person, die eine Funktion aus dem Verteiler in ihrer Mitgliedschaft
+trägt (EL: zuerst der Einsatzleiter der Führungsstelle), den Hinweis „Neuer Befehl“ mit der
 Fassung, etwa „Version 2“, und dem Sprung zum Befehl. Einsatzabschnitte, Einheiten, externe
 Stellen und eine frei eingetippte Funktion im Verteiler erreichen niemanden. Wer das Modul
 „Aufträge/Befehle“ nicht sehen darf, bekommt keinen Hinweis.

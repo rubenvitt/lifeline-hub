@@ -20,7 +20,10 @@ Beide Wege setzen den Termin über `SQL_TERMIN_SETZEN` in `src/lagebesprechung/r
 Anweisung leert bei einer echten Änderung auch die Merker der Ankündigung
 (`lagebesprechung_angekuendigt_*_at`, LLH-1215). Ein neuer Schreibweg nimmt sie mit, sonst gilt
 die Ankündigung dem alten Termin. Angekündigt wird nur im Erinnerungs-Scheduler
-(`src/lagebesprechung/ankuendigung.rs`), je Termin einmal und nur im Zeitfenster.
+(`src/lagebesprechung/ankuendigung.rs`), je Termin einmal und nur im Zeitfenster, an die Nutzer
+der Funktionen EL und S1–S7. Wer sie trägt, sagt allein die Mitgliedschaft (EL zuerst der
+Einsatzleiter der Führungsstelle; `frontend/src/fuehrung/AGENTS.md`, i6k6mzed D2), nie das Modul
+Stab.
 
 **Vorbereitung der Lagebesprechung** (LFH-550, `lagebesprechung/VorbereitungPaneel.tsx`,
 `lagebesprechung/vorbereitung.ts`): Paneel der Seite Lagebesprechung, rechnet keine Zahl selbst

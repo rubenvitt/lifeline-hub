@@ -163,8 +163,8 @@ bleibt „System“ der Empfänger. Auf dem Papier steht er im Kopf des Blatts.
 
 ### Benachrichtigung bei der Freigabe
 
-Mit der Freigabe erhält jede Person, die eine Funktion aus dem Verteiler besetzt (laut
-Stab-Besetzung, sonst laut Funktion in der Mitgliedschaft), die Benachrichtigung „Neuer
+Mit der Freigabe erhält jede Person, die eine Funktion aus dem Verteiler in ihrer Mitgliedschaft
+trägt (EL: zuerst der Einsatzleiter der Führungsstelle), die Benachrichtigung „Neuer
 Lagebericht“ mit der Fassung, etwa „Version 2“, und dem Sprung zum Bericht. Sie ist still: Sie
 steht unter „Eingänge“ bei „Früher“, ohne Band, Ton und Zahl. Für welche Funktionen sie als Eingang
 kommt, legt der Reiter „Benachrichtigungen“ der Einstellungen fest (Kapitel

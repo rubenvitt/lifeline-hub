@@ -130,8 +130,8 @@ Für Einsatzleitung und Führungspersonal:
 
 Abschnitte anlegen, ändern und auflösen dürfen Einsatzleitung und Führungspersonal, solange der
 Einsatz läuft. „In Lagebericht übernehmen“ erscheint nur für sie und nur, wenn das Modul
-Lageberichte freigegeben ist. Den Stab zeigt das Organigramm nur, wenn das Modul Stab freigegeben
-ist. „Auf Karte zeigen ↗“ steht für alle, die den Abschnitt lesen; ohne Zugriff auf die Lagekarte
+Lageberichte freigegeben ist. Den Stab zeigt das Organigramm allen, die den Einsatz lesen; ein
+Modul braucht es dafür nicht. „Auf Karte zeigen ↗“ steht für alle, die den Abschnitt lesen; ohne Zugriff auf die Lagekarte
 lautet er „Auf Karte zeigen (Keine Berechtigung)“ und ist gesperrt. Einzelheiten stehen in
 [Rechte im Einsatz](rechte-im-einsatz.md).
 
@@ -180,12 +180,18 @@ sofort.
 ### Das Organigramm
 
 Das Organigramm wird nicht gepflegt, es entsteht aus Abschnitten, Einheiten, der eigenen
-Führungsstelle und der Besetzung des Stabs. Im Kasten der Einsatzleitung stehen Bezeichnung und
+Führungsstelle und den Führungsfunktionen der Mitglieder. Im Kasten der Einsatzleitung stehen Bezeichnung und
 Rufname der eigenen Führungsstelle, sobald sie in den Einsatzdaten erfasst sind, und darunter der
 Einsatzleiter mit „seit“, wie er in „Einsatzdaten“ festgelegt ist (siehe
 [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Ist keiner festgelegt, steht dort „Leitung
 nicht erfasst“; die Rolle Einsatzleitung im „Zugriff“ macht niemanden zum Einsatzleiter. An der
 Wurzel steht keine Stärke; die Gesamtstärke zeigt das Meldebild.
+
+Daneben steht der Kasten „Stab“, sobald ein Mitglied ein Sachgebiet S1 bis S6 führt. Er nennt je
+Sachgebiet die Namen der Mitglieder, die es tragen, mehrere alphabetisch; ein Sachgebiet ohne
+Mitglied fehlt. Gepflegt wird die Funktion als Führungsstelle der Mitglieder im Reiter „Zugriff“
+der Einstellungen (siehe [Rechte im Einsatz](rechte-im-einsatz.md)). „In Lagebericht übernehmen“ schreibt dazu die Zeile
+„Führungsfunktionen“ mit EL und S1 bis S7 in den Bericht.
 
 ### Führungsfunktionen
 
@@ -193,7 +199,10 @@ Wo die App eine Führungsfunktion anbietet (etwa als Führungsstelle eines Mitgl
 eines Auftrags oder im Feld „An“ des Einsatztagebuchs), kommt sie aus einem festen Katalog:
 Einsatzleitung, S1 bis S7, Führungshilfspersonal und Fachberater. Die Bezeichnungen und ob es S7
 gibt, legt die Organisation fest. Ein Freitext wie „S3“ wird nie als Funktion gedeutet. Gespeichert
-wird die Funktion, nicht die Person; wer sie besetzt, zeigt die App erst beim Lesen.
+wird die Funktion, nicht die Person; wer sie trägt, zeigt die App erst beim Lesen, aus den
+Funktionen der Mitglieder. Tragen mehrere Mitglieder dieselbe Funktion, gelten alle, und ihre
+Namen stehen alphabetisch, getrennt durch Komma. Wer einen Einsatz nur über ein gekoppeltes Gerät
+liest, sieht keine Namen.
 
 ### Ohne Netz
 

@@ -2,7 +2,7 @@
 titel: Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/fernmeldewesen/funkplan.ts, frontend/src/fernmeldewesen/luecken.ts, frontend/src/fernmeldewesen/sprechgruppenplan.ts, frontend/src/fernmeldewesen/FernmeldeskizzeBild.tsx, frontend/src/fernmeldewesen/skizze/, frontend/src/fernmeldewesen/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/fernmeldewesen/KommunikationsplanDialoge.tsx, frontend/src/fernmeldewesen/kommunikationsplan.ts, frontend/src/einsatz/fuehrungsstelle.ts, frontend/src/einsatz/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/fernmeldewesen.rs, src/fernmeldewesen/kommunikation.rs, src/fernmeldewesen/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/fernmeldewesen/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql, frontend/src/stammdaten/externeStellenVorschlaege.ts]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/fernmeldewesen/funkplan.ts, frontend/src/fernmeldewesen/luecken.ts, frontend/src/fernmeldewesen/sprechgruppenplan.ts, frontend/src/fernmeldewesen/FernmeldeskizzeBild.tsx, frontend/src/fernmeldewesen/skizze/, frontend/src/fernmeldewesen/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/fernmeldewesen/KommunikationsplanDialoge.tsx, frontend/src/fernmeldewesen/kommunikationsplan.ts, frontend/src/einsatz/fuehrungsstelle.ts, frontend/src/einsatz/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/fernmeldewesen.rs, src/fernmeldewesen/kommunikation.rs, src/fernmeldewesen/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/fernmeldewesen/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/fuehrung/besetzungAusMitgliedern.ts]
 ---
 
 ## Überblick
@@ -111,9 +111,13 @@ Bezeichnung und Rufnummer vorbelegt.
 
 Das Fernmeldewesen hat eine eigene Freigabe, unabhängig vom Stab: Ist der Stab ausgeblendet oder
 gesperrt, bleibt das Fernmeldewesen voll nutzbar; ist das Fernmeldewesen gesperrt, hilft auch ein
-freier Stab nicht. Ohne Stab fehlt nur, was vom Stab kommt: im Kommunikationsplan steht als
-Besetzung einer Führungsfunktion „—“ (Stab nicht freigegeben), und die Skizze zeigt im Kasten
-„Einsatzleitung“ keine Sachgebiete. Bei Einführung des Moduls galt die Rollen-Vorgabe des Stabs
+freier Stab nicht. Die Namen in der Spalte „Besetzung“ des Kommunikationsplans und die
+Sachgebiete im Kasten „Einsatzleitung“ der Skizze kommen aus den Führungsfunktionen der Mitglieder
+(Reiter „Zugriff“ der Einstellungen, siehe [Rechte im Einsatz](rechte-im-einsatz.md)); dafür
+braucht es kein weiteres Modul. Tragen mehrere Mitglieder dieselbe Funktion, nennt der
+Kommunikationsplan alle Namen alphabetisch, die Skizze das Sachgebiet einmal. Lassen sich die
+Mitglieder nicht laden, steht als Besetzung „—“ mit dem Grund, und die Skizze nennt
+„Mitglieder: nicht geladen“. Bei Einführung des Moduls galt die Rollen-Vorgabe des Stabs
 auch für das Fernmeldewesen, eine Ausblendung des Stabs nicht. Kommunikationsplan und
 Fernmeldeskizze pflegen Einsatzleitung und Führungspersonal, solange der Einsatz läuft. „In Lagebericht übernehmen“ braucht zusätzlich das Modul Lageberichte, „In Befehl
 übernehmen“ das Modul Aufträge. Auf schmalen Bildschirmen und ohne Netz ist die Skizze nur
@@ -176,7 +180,7 @@ Quelle, steht dort keine Zahl. Dieselbe Zahl steht auf der Seite „Stab“ am W
 - Die Spalte „Telefon“ zeigt die Tabelle am Bildschirm erst bei großer Fensterbreite, im Druck
   immer, im Lagebericht nie.
 - Kontaktangaben des Personals stehen nie im Kommunikationsplan; die Besetzung einer Funktion
-  steht dort nur als Nebentext.
+  steht dort nur als Nebentext, mit den Namen der Mitglieder, die sie tragen.
 - Die Skizze zeigt keine Rufnummern und keine Personennamen; im Eigenschaftspaneel einer Stelle
   steht nur der Rufname, Telefon und weitere Verbindungen pflegt man am Datensatz.
 - Weder Funkplan noch Skizze noch Kommunikationsplan schreiben ins Einsatztagebuch. Ausnahme:

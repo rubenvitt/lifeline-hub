@@ -6,10 +6,12 @@ Gilt für `frontend/src/fernmeldewesen/`, `pages/FunkplanPage.tsx`, `pages/Kommu
 
 **Fernmeldewesen** (LLH-1180, `openspec/changes/archive/2026-10-13-nrptfg8r-fernmeldewesen-modul/design.md`): eigenes
 Modul `fernmeldewesen` (Kategorie Kommunikation) mit Funkplan, Fernmeldeskizze, Sprechgruppen und
-Kommunikationsplan; die Dateien liegen unter `fernmeldewesen/` (umgezogen mit LLH-1602). **Die Stab-Freigabe wirkt dort nirgends**,
-außer an Stab-Daten selbst: die Besetzung (Nebentext im Kommunikationsplan, Sachgebiete im Kasten
-„Einsatzleitung“) hat eine eigene Weiche auf `stab` und fehlt ohne sie mit Grund
-(`fernmeldewesen/useNetzQuellen.ts`, `fernmeldewesen/kommunikationsplan.ts:STAB_NICHT_FREI_GRUND`), nie die ganze Seite.
+Kommunikationsplan; die Dateien liegen unter `fernmeldewesen/` (umgezogen mit LLH-1602). **Die Stab-Freigabe wirkt dort nirgends.**
+Die Besetzung (Nebentext im Kommunikationsplan, Sachgebiete im Kasten „Einsatzleitung“) kommt aus
+den Mitgliedern (`GET …/mitglieder`, ohne eigenes Modulrecht, über
+`fuehrung/besetzungAusMitgliedern.ts`; i6k6mzed D7) und ist eine eigene Quelle mit Weiche
+(`fernmeldewesen/useNetzQuellen.ts`, Quelle „Mitglieder“): fehlt sie, steht „—“ mit Grund bzw.
+„Mitglieder: nicht geladen“, nie die ganze Seite.
 Seiten prüfen `useModulFreigabe(einsatzId, 'fernmeldewesen')` fail-closed (der Rahmen rendert bei
 gescheitertem Freigabeabruf). Die API-Pfade bleiben `…/stab/kommunikationsplan…` und
 `…/stab/fernmeldeskizze…` (Marker `Fernmeldewesen`, `PFAD_KEY`), live über `fernmeldewesen`, Keys
@@ -40,7 +42,7 @@ Lagebericht-Übernahmen, der Einsatzbericht, der Nebentext der Zeile `fs` im Kom
 die Einsatzkachel („EL …“, aus `EinsatzAnzeige.einsatzleiter` über `einsatzleiterAusAngabe`;
 LLH-1168,
 `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`).
-**Nie aus der App-Rolle `einsatzleitung` oder der Stab-Besetzung ableiten**; fehlt er, steht „nicht erfasst“, fehlt die Quelle, ihr Grund. In der
+**Nie aus der App-Rolle `einsatzleitung` oder den Führungsfunktionen der Mitglieder ableiten**; fehlt er, steht „nicht erfasst“, fehlt die Quelle, ihr Grund. In der
 Fernmeldeskizze steht kein Name (Regel unten).
 
 **Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`;
@@ -83,8 +85,8 @@ Breite, nicht im Abstand. Nachweis e2e „Prüfliste 1 und 2“; e2e wählen Ele
 Zeichen mit Wort darunter, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus). Ein
 Führungsfahrzeug (Fachaufgabe `fuehrung` aus `baueTzProps`, dieselbe Regel wie die Lagekarte) steht
 im Kasten des nächsten Abschnitts über seiner Einheit im Baum; „EAL“/„UEAL“ nur mit eingetragener
-Leitung; im Kasten „Einsatzleitung“ die Sachgebiete aus der Stab-Besetzung ohne `rueckwaertig`,
-danach die der Führungsstelle zugeordneten Fahrzeuge (`fahrzeug_ids`, LFH-1106, jede Fachaufgabe).
+Leitung; im Kasten „Einsatzleitung“ je Sachgebiet S1–S6, das mindestens ein Mitglied führt, ein
+Zeichen (aus `sachgebietZeilen`, ohne Namen), danach die der Führungsstelle zugeordneten Fahrzeuge (`fahrzeug_ids`, LFH-1106, jede Fachaufgabe).
 Ein zugeordnetes Fahrzeug steht nur dort, im Funkplan unter der Zeile `fs`; die Führungsstelle
 liefert nur IDs, Namen kommen aus der Fahrzeug-Quelle (mit deren Freigabe).
 Zeichen der Funktionen nur über `zeichen/fachobjektZeichen.ts:funktionsZeichen`; Höhe und Plätze nur
@@ -125,11 +127,12 @@ S6-Eintrag in `stab/unterseiten.ts`, `useModulFreigabe('fernmeldewesen')` fail-c
 dem Katalog, Leitstelle, Behörde, Verbindungsperson, sonstige) mit Verbindungen (`src/fernmeldewesen/kommunikation.rs`,
 zwei Tabellen, eine Funktion je Einsatz, FHP/FB je Bezeichnung); **Abschnitte und Einheiten werden
 abgeleitet** (alle `verbindungen` des Datensatzes, LLH-1134; Zeile führt zum Datensatz, keine zweite
-Datenhaltung). Die Besetzung ist nur Nebentext, **Kontaktangaben des Personals kommen nie vor**.
+Datenhaltung). Die Besetzung ist nur Nebentext (Namen der Mitglieder mit der Funktion,
+alphabetisch, sonst „nicht vergeben“), **Kontaktangaben des Personals kommen nie vor**.
 Kern `fernmeldewesen/kommunikationsplan.ts`, Lücke „Leitstelle“ nur über `fernmeldewesen/luecken.ts`. `tel:` nur
 Festnetz/Mobil, `mailto:` nur mit `@`. **Kein Lagebericht**, Druck ja (im Druck flach, ohne
 Aktionsspalte). **Offline lesbar** als einziger Unter-Key des Fernmeldewesens in `LAGEBILD_OFFLINE` (der Stab hat
-keinen); ohne Netz Bedienung gesperrt, nicht versteckt, Besetzung „nicht geladen“, ohne Stab „—“. Schreibantworten tragen den ganzen
+keinen); ohne Netz Bedienung gesperrt, nicht versteckt, Besetzung „—“ mit Grund „nicht geladen“ (die Mitglieder liegen nicht auf der Platte). Schreibantworten tragen den ganzen
 Plan (`setQueryData`). **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist abgeleitet wie
 Abschnitte und Einheiten: erfasst (`fuehrungsstelleErfasst`, die eine Regel) erste Zeile `fs` in
 „Einsatzleitung und Stab“ (Rufname, alle ihre `verbindungen`, führt zu

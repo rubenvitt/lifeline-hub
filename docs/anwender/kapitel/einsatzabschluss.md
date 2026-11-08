@@ -95,6 +95,11 @@ Der Block „Führung“ nennt unter „Einsatzleitung“ den Einsatzleiter mit 
 „nicht erfasst“. Mitglieder mit der Rolle Einsatzleitung stehen dort nicht; die Rolle ist ein
 Recht, keine Führungsfunktion.
 
+Darunter nennt der Block unter „Führungsfunktionen“ für EL und S1 bis S6 die Mitglieder, die die
+Funktion in ihrer Mitgliedschaft tragen, mehrere alphabetisch, sonst „nicht vergeben“; S7 steht
+nur, wenn jemand es trägt. Gepflegt wird die Funktion im Reiter „Zugriff“ der Einstellungen (siehe
+[Rechte im Einsatz](rechte-im-einsatz.md)).
+
 ### Was die Hilfeleistungen zählen
 
 Der Block „Hilfeleistungen“ zählt Kontakte: jede erfasste Person außer den vermissten. Er nennt

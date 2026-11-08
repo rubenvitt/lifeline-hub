@@ -238,9 +238,9 @@ dieser Funktion und die Einsatzleitung; eine normale Meldung mit Empfängerfunkt
 Personen der Funktion. Wählt man im Formular die Meldungsart
 „Lagemeldung“, steht S2 als Empfängerfunktion schon da; sie lässt sich ändern oder leeren.
 
-Wer eine Funktion besetzt, steht in der Stab-Besetzung; ist die Funktion dort nicht besetzt
-oder ihr Personal mit keinem Konto verknüpft, gilt die Funktion in der Mitgliedschaft des
-Einsatzes. Wer das Modul „Meldungen“ nicht sehen darf, bekommt keinen Hinweis.
+Wer eine Funktion trägt, steht in der Mitgliedschaft des Einsatzes; tragen mehrere Mitglieder
+sie, bekommen alle den Hinweis. Für EL gilt zuerst der Einsatzleiter der Führungsstelle, wenn er
+mit einem Konto verknüpft ist. Wer das Modul „Meldungen“ nicht sehen darf, bekommt keinen Hinweis.
 
 Wird eine Meldung, die keine Lagemeldung ist, zum ersten Mal in die Lage übernommen, bekommen S2
 und die Einsatzleitung den Hinweis **„In die Lage übernommen“** mit Sprung zu den Lagemeldungen.

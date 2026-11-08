@@ -103,9 +103,9 @@ der Marke im Führungsüberblick.
 
 Steht ein Termin, bekommt der Stab zwei Hinweise mit Sprung zur Seite „Lagebesprechung“:
 10 Minuten vorher „Lagebesprechung in 10 Minuten“ und zum Termin „Lagebesprechung jetzt fällig“.
-Zum Stab zählen die Personen, die EL oder ein Sachgebiet S1 bis S7 besetzen, laut Stab-Besetzung,
-sonst laut Funktion in der Mitgliedschaft. Wer die Lagebesprechung nicht sehen darf, bekommt
-nichts.
+Zum Stab zählen die Personen, die EL oder ein Sachgebiet S1 bis S7 als Funktion ihrer
+Mitgliedschaft tragen; für EL zuerst der Einsatzleiter der Führungsstelle. Wer die
+Lagebesprechung nicht sehen darf, bekommt nichts.
 
 - Jeder Hinweis kommt je Termin einmal. Derselbe Termin noch einmal gesetzt löst nichts neu aus.
 - Wird der Termin verschoben, über „Termin“ oder beim Abschluss, gelten die Hinweise dem neuen
