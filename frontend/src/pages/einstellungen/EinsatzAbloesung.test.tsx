@@ -1,15 +1,19 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { freigabenFixture } from '../../test/fixtures';
 import { renderMitProviders } from '../../test/utils';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { ModulFreigaben } from '../../api/types';
 import EinsatzAbloesung from './EinsatzAbloesung';
 
-/** Sektion „Ablösung“ der Einsatz-Einstellungen (LLH-1122): Vorgabe des Einsatzes. */
+/**
+ * Sektion „Ablösung“ der Einsatz-Einstellungen (LLH-1122): Vorgabe des Einsatzes. Dazu das
+ * Paneel „Dienst und Ruhe“ (LLH-1603): Höchstdienst und Mindestruhe des Einsatzes.
+ */
 
 const einsatz = (meine_rolle = 'einsatzleitung') => ({
   id: 1,
@@ -53,16 +57,33 @@ const MODELLE = [
   },
 ];
 
+interface Grenzwerte {
+  max_dienst_minuten: number;
+  min_ruhe_minuten: number;
+  max_dienst_eigen: boolean;
+  min_ruhe_eigen: boolean;
+}
+
+const VORGABEN: Grenzwerte = {
+  max_dienst_minuten: 720,
+  min_ruhe_minuten: 480,
+  max_dienst_eigen: false,
+  min_ruhe_eigen: false,
+};
+
 interface Aufbau {
   rolle?: string;
   vorgabe?: unknown | null;
   freigaben?: ModulFreigaben;
   putStatus?: number;
+  grenzwerte?: Grenzwerte;
 }
 
 function stelleBereit(a: Aufbau = {}) {
   const puts: unknown[] = [];
+  const patches: Record<string, number | null>[] = [];
   let lesend = 0;
+  let grenzwerte: Grenzwerte = a.grenzwerte ?? VORGABEN;
   let stand: unknown = a.vorgabe === undefined ? HOCHWASSER : a.vorgabe;
   const antwort = () => ({
     ...(stand ? { schichtmodell: stand } : {}),
@@ -78,6 +99,23 @@ function stelleBereit(a: Aufbau = {}) {
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
     ),
     http.get('/api/schichtmodelle', () => HttpResponse.json(MODELLE)),
+    // Das Paneel „Dienst und Ruhe“ liest nur `grenzwerte` aus dem Plan (LLH-1603, D2).
+    http.get('/api/einsaetze/1/abloesungen/schichtplan', () => HttpResponse.json({ grenzwerte })),
+    http.patch('/api/einsaetze/1/abloesungen/schichtplan/grenzwerte', async ({ request }) => {
+      const body = (await request.json()) as Record<string, number | null>;
+      patches.push(body);
+      const neu = { ...grenzwerte };
+      if ('max_dienst_minuten' in body) {
+        neu.max_dienst_eigen = body.max_dienst_minuten !== null;
+        neu.max_dienst_minuten = body.max_dienst_minuten ?? 720;
+      }
+      if ('min_ruhe_minuten' in body) {
+        neu.min_ruhe_eigen = body.min_ruhe_minuten !== null;
+        neu.min_ruhe_minuten = body.min_ruhe_minuten ?? 480;
+      }
+      grenzwerte = neu;
+      return HttpResponse.json({ grenzwerte });
+    }),
     http.get('/api/einsaetze/1/abloesungen/schichtmodell', () => {
       lesend += 1;
       return HttpResponse.json(antwort());
@@ -104,7 +142,7 @@ function stelleBereit(a: Aufbau = {}) {
       return HttpResponse.json(antwort());
     }),
   );
-  return { puts, lesend: () => lesend };
+  return { puts, patches, lesend: () => lesend };
 }
 
 function rendern() {
@@ -244,5 +282,67 @@ describe('EinsatzAbloesung (LLH-1122)', () => {
     rendern();
     expect(await screen.findByText('Modul „Ablösung“ nicht freigegeben')).toBeInTheDocument();
     expect(lesend()).toBe(0);
+  });
+});
+
+const grenzPaneel = () => screen.findByRole('region', { name: 'Dienst und Ruhe' });
+
+describe('EinsatzAbloesung, Paneel „Dienst und Ruhe“ (LLH-1603)', () => {
+  it('kennzeichnet die Vorgaben und bietet ohne eigenen Wert kein Wiederherstellen', async () => {
+    stelleBereit();
+    rendern();
+    const p = await grenzPaneel();
+    await within(p).findByText('12 h (Vorgabe)');
+    expect(within(p).getByText('8 h (Vorgabe)')).toBeInTheDocument();
+    expect(within(p).queryByRole('button', { name: 'Vorgaben wiederherstellen' })).toBeNull();
+  });
+
+  it('setzt den Höchstdienst über den Dialog; nur das geänderte Feld geht hinaus', async () => {
+    const { patches } = stelleBereit();
+    const { client } = rendern();
+    // Die Einstufung in Meldebild und Personal liest eigene Keys (LLH-730); sie werden neu geholt.
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    const p = await grenzPaneel();
+    await within(p).findByText('12 h (Vorgabe)');
+    await userEvent.click(within(p).getByRole('button', { name: 'Werte ändern' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Dienst und Ruhe' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Höchstdienst' }), '10');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patches).toEqual([{ max_dienst_minuten: 600 }]));
+    expect(await within(p).findByText('10 h')).toBeInTheDocument();
+    expect(within(p).getByText('8 h (Vorgabe)')).toBeInTheDocument();
+    for (const modul of ['einheiten', 'personal'] as const) {
+      expect(invalidiert).toHaveBeenCalledWith({
+        queryKey: einsatzKeys.kraefteZeitachseGrenzwerte(1, modul),
+      });
+    }
+  });
+
+  it('stellt die Vorgaben ohne Rückfrage wieder her; Rückgängig setzt die alten Minuten', async () => {
+    const { patches } = stelleBereit({
+      grenzwerte: { ...VORGABEN, min_ruhe_minuten: 450, min_ruhe_eigen: true },
+    });
+    rendern();
+    const p = await grenzPaneel();
+    await within(p).findByText('7:30 h');
+    await userEvent.click(within(p).getByRole('button', { name: 'Vorgaben wiederherstellen' }));
+    await waitFor(() => expect(patches).toEqual([{ min_ruhe_minuten: null }]));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await within(p).findByText('8 h (Vorgabe)')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
+    await waitFor(() => expect(patches[1]).toEqual({ min_ruhe_minuten: 450 }));
+    expect(await within(p).findByText('7:30 h')).toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht: Werte sichtbar, keine Wege zum Ändern', async () => {
+    stelleBereit({
+      rolle: 'beobachter',
+      grenzwerte: { ...VORGABEN, max_dienst_minuten: 600, max_dienst_eigen: true },
+    });
+    rendern();
+    const p = await grenzPaneel();
+    await within(p).findByText('10 h');
+    expect(within(p).queryByRole('button', { name: 'Werte ändern' })).toBeNull();
+    expect(within(p).queryByRole('button', { name: 'Vorgaben wiederherstellen' })).toBeNull();
   });
 });

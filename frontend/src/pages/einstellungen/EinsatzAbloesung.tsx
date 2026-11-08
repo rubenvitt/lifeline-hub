@@ -21,6 +21,7 @@ import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import { demoGroupedOptions } from '../../stammdaten/demoAuswahl';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import EinsatzGrenzwerte from './EinsatzGrenzwerte';
 
 const { Text } = Typography;
 
@@ -34,6 +35,10 @@ const { Text } = Typography;
  * Stammdaten übernehmen, eigene Werte setzen (`SchichtmodellModal`, vorbelegt mit der Vorgabe)
  * oder die Vorgabe entfernen. Entfernen ist über den Rückgängig-Toast umkehrbar (derselbe PUT mit
  * den alten Werten), deshalb ohne Rückfrage (LFH-343/LFH-363).
+ *
+ * Darunter steht das Paneel „Dienst und Ruhe“ (`EinsatzGrenzwerte`, LLH-1603): Höchstdienst und
+ * Mindestruhe des Einsatzes. Gegen sie prüfen der Plan-Befund `dienst` und die Einstufung der
+ * Kräfte-Zeitachse. Es ist die einzige Bedienstelle; der Schichtplan nennt die Werte nur.
  *
  * Rechte wie die Abschnittsvorgabe (`EinsatzSchreibzugriff<Abloesung>`): Einsatzleitung und
  * Führungspersonal eines laufenden Einsatzes; der Admin ohne Rolle bekäme 403. Ohne Freigabe des
@@ -238,6 +243,8 @@ export default function EinsatzAbloesung() {
           </>
         )}
       </Formularpaneel>
+
+      <EinsatzGrenzwerte einsatzId={einsatzId} darf={darf} />
 
       {eigeneOffen && (
         <SchichtmodellModal
