@@ -125,7 +125,7 @@ Vorbelegt MUST kommen, wer im Block steht und nicht an der UHS ist, und gehen, w
 und nicht im Block steht; beide Listen lassen sich abwählen. Stamm-Personen und Helfer MUST dabei
 in den Einsatz übernommen werden. Kommende ohne Einheit MUST ein Eintreffen bekommen, Gehende ohne
 Einheit eine Ablösung (Quelle `abloesung`). Ein ETB-Eintrag MUST UHS, Gehende, Kommende und
-Bleibende nennen. Der Wechsel MUST die Freigaben der Module Unfallhilfsstellen und Personal
+Bleibende nennen. Kommen MUST nur, wer beim Vollzug im Block steht (sonst 422). Der Wechsel MUST die Freigaben der Module Unfallhilfsstellen und Personal
 verlangen (403); eine aufgelöste oder stornierte UHS MUST 409 sein.
 
 #### Scenario: UHS Markt um 18:00
@@ -135,7 +135,7 @@ verlangen (403); eine aufgelöste oder stornierte UHS MUST 409 sein.
 ### Requirement: Pause aus dem Plan
 Das System SHALL zum Beginn eines Pausenblocks den Kräften des Blocks den Status setzen, den der
 Katalog als Pause kennzeichnet (höchstens einer je Organisation), und zum Ende den vorigen Status
-zurückgeben, wenn die Kraft dann noch den Pausenstatus trägt. Ohne gekennzeichneten Status MUST
+zurückgeben (auch einen leeren), wenn die Kraft dann noch den Pausenstatus trägt. Ohne gekennzeichneten Status MUST
 der Wechsel gesperrt sein (422 mit Grund); ein Ende ohne Beginn MUST 422 sein. Wer nicht im
 Einsatz ist, MUST übersprungen und genannt werden. Der Wechsel MUST die Freigabe des Moduls
 Personal verlangen (403).
@@ -149,4 +149,5 @@ Ein Wechsel aus dem Plan MUST je Block und Art höchstens einmal offen vollzogen
 Die Rücknahme MUST nur zurücklegen, was noch den Stand des Wechsels trägt: an der UHS die Zuordnung
 der Kraft, in der Pause den Status. Sie MUST die Ereignisse der Zeitachse streichen und einen
 ETB-Eintrag schreiben. Den Beginn einer Pause MUST sie erst nach Rücknahme ihres Endes zulassen
-(409). Danach lässt sich der Wechsel erneut vollziehen.
+(409). Danach lässt sich der Wechsel erneut vollziehen. Einen Pausenblock mit begonnener, nicht
+beendeter Pause MUST das System weder löschen noch aus der Zeile „Pause“ verschieben (409).

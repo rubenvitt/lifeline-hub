@@ -285,7 +285,9 @@ ohne Einheit geht, eine Ablösung; wer zu einer Einheit gehört, folgt deren Zei
 
 Welcher Status „Pause“ ist, legen die Stammdaten fest (Schalter „Pause im Schichtplan“ am
 Personal-Status). Trägt ihn keiner, ist der Wechsel in der Pause gesperrt. Das Ende gibt nur
-zurück, wer dann noch „Pause“ trägt; wer zwischendurch einen anderen Status bekam, behält ihn.
+zurück, wer dann noch „Pause“ trägt; wer zwischendurch einen anderen Status bekam, behält ihn. Ein
+Block mit begonnener Pause lässt sich erst löschen oder in eine andere Zeile schieben, wenn die
+Pause beendet oder ihr Beginn zurückgenommen ist.
 
 Jeder Block wechselt einmal je Art: an der UHS einmal, in der Pause einmal zum Beginn und einmal
 zum Ende. Die Rücknahme legt nur zurück, was noch so steht, wie der Wechsel es hinterließ; den

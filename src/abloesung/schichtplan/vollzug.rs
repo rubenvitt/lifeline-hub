@@ -426,6 +426,26 @@ async fn status_label_tx(
     Ok(label.unwrap_or_else(|| "—".into()))
 }
 
+/// Hat der Block eine begonnene, noch nicht beendete Pause? Dann darf er weder gehen noch die
+/// Zeile „Pause“ verlassen, sonst bliebe die Pause ohne Ende und ohne Rücknahme.
+pub(crate) async fn pause_offen_tx(
+    conn: &mut SqliteConnection,
+    bid: i64,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM einsatz_plan_wechsel WHERE planschicht_id = ?1 \
+             AND art = 'pause_beginn' AND zurueckgenommen_at IS NULL) \
+         AND NOT EXISTS(SELECT 1 FROM einsatz_plan_wechsel WHERE planschicht_id = ?1 \
+             AND art = 'pause_ende' AND zurueckgenommen_at IS NULL)",
+    )
+    .bind(bid)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Sperrgrund für Löschen und Verschieben aus der Zeile „Pause“.
+pub(crate) const PAUSE_OFFEN: &str = "Erst die Pause beenden oder ihren Beginn zurücknehmen";
+
 /// Die vollzogenen Wechsel einer Art zum Block, die nicht zurückgenommen sind.
 fn offen_von(wechsel: &[PlanWechselAnzeige], art: WechselArt) -> Option<&PlanWechselAnzeige> {
     wechsel.iter().find(|w| w.art == art)
@@ -549,14 +569,24 @@ pub async fn art_von(pool: &SqlitePool, einsatz_id: i64, wid: i64) -> Result<Wec
 
 /// Setzt den Status einer Kraft über denselben Weg wie ein Statuswechsel von Hand (Zeitachse der
 /// Marke des Status, LFH-552); der ETB-Eintrag kommt vom Wechsel.
+/// Ohne Status (`None`, nur beim Zurückgeben eines leeren Stands) ohne Zeitachse.
 async fn status_setzen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     ep: i64,
-    status_id: i64,
+    status_id: Option<i64>,
     jetzt: &str,
 ) -> Result<(), AppError> {
+    let Some(status_id) = status_id else {
+        disposition_repo::require_aktiv_tx(conn, einsatz_id, ep).await?;
+        sqlx::query("UPDATE einsatz_personal SET status_id = NULL WHERE id = ? AND einsatz_id = ?")
+            .bind(ep)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+        return Ok(());
+    };
     disposition_repo::update_tx(
         conn,
         einsatz_id,
@@ -741,6 +771,16 @@ async fn uhs_tx_vollziehen(
     let (uhs, grund) = uhs_tx(conn, einsatz_id, uhs_id).await?;
     if let Some(grund) = grund {
         return Err(AppError::Conflict(grund.into()));
+    }
+    // Kommen darf nur, wer jetzt im Block steht (der Dialog kann veraltet sein).
+    let im_block = block_personen_tx(conn, einsatz_id, bid).await?;
+    if kommen
+        .iter()
+        .any(|p| !im_block.iter().any(|b| b.person == *p))
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Eine kommende Person steht nicht im Block".into(),
+        ));
     }
     let org_id = org_tx(conn, einsatz_id).await?;
     let mut wirkung = WechselWirkung {
@@ -956,7 +996,7 @@ async fn pause_beginn_tx(
         if p.status_id == Some(pause_id) || wirkung.personen.contains(&ep) {
             continue;
         }
-        status_setzen_tx(conn, einsatz_id, benutzer_id, ep, pause_id, jetzt).await?;
+        status_setzen_tx(conn, einsatz_id, benutzer_id, ep, Some(pause_id), jetzt).await?;
         person_einfuegen_tx(
             conn,
             wid,
@@ -1012,11 +1052,10 @@ async fn pause_ende_tx(
     let mut zurueck: Vec<String> = Vec::new();
     for (ep, name, vorher, nachher) in status_personen_tx(conn, beginn).await? {
         let (status, aktiv) = kraft_status_tx(conn, ep).await?;
-        let Some(vorher_id) = vorher else { continue };
         if !aktiv || status != nachher {
             continue;
         }
-        status_setzen_tx(conn, einsatz_id, benutzer_id, ep, vorher_id, jetzt).await?;
+        status_setzen_tx(conn, einsatz_id, benutzer_id, ep, vorher, jetzt).await?;
         person_einfuegen_tx(conn, wid, ep, "neu", None, (status, vorher), None, false).await?;
         wirkung.personen.push(ep);
         let label = status_label_tx(conn, vorher).await?;
@@ -1103,11 +1142,10 @@ pub async fn zuruecknehmen(
                 let mut namen: Vec<String> = Vec::new();
                 for (ep, name, vorher, nachher) in status_personen_tx(conn, wid).await? {
                     let (status, aktiv) = kraft_status_tx(conn, ep).await?;
-                    let Some(vorher_id) = vorher else { continue };
                     if !aktiv || status != nachher {
                         continue;
                     }
-                    status_setzen_tx(conn, einsatz_id, benutzer_id, ep, vorher_id, jetzt).await?;
+                    status_setzen_tx(conn, einsatz_id, benutzer_id, ep, vorher, jetzt).await?;
                     wirkung.personen.push(ep);
                     let label = status_label_tx(conn, vorher).await?;
                     namen.push(format!("«{name}» wieder «{label}»"));

@@ -696,3 +696,90 @@ async fn posten_felder_und_rechte() {
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
+
+/// Review #1213: eine begonnene Pause hält ihren Block fest (Löschen und Verschieben aus der
+/// Zeile „Pause“ sind 409), ein leerer Status vor der Pause kommt zurück, und kommen darf nur, wer
+/// jetzt im Block steht.
+#[tokio::test]
+async fn offene_pause_leerer_status_und_fremde_kommende() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anna = adhoc(&app, &admin, e, "Anna").await;
+    sqlx::query("UPDATE einsatz_personal SET status_id = NULL WHERE id = ?")
+        .bind(anna)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let bid = block(
+        &app,
+        &admin,
+        e,
+        json!({"art": "pause"}),
+        json!([{"art": "einsatz", "einsatz_personal_id": anna}]),
+    )
+    .await;
+    let beginn = vollziehen(&app, &admin, e, bid, json!({"art": "pause_beginn"})).await;
+    let pause = status_id(&app, &admin, "Pause").await;
+    assert_eq!(kraft(&app, &admin, e, anna).await["status_id"], pause);
+
+    let (s, v) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/bloecke/{bid}?version=1", plan(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let markt = uhs_anlegen(&app, &admin, e, "Markt").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{}/bloecke/{bid}", plan(e)),
+        &admin,
+        Some(&json!({"version": 1, "posten": {"art": "uhs", "uhs_id": markt}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+
+    // Ende: der leere Stand kommt zurück; Rücknahme des Endes setzt wieder „Pause“.
+    let ende = vollziehen(&app, &admin, e, bid, json!({"art": "pause_ende"})).await;
+    assert!(kraft(&app, &admin, e, anna).await["status_id"].is_null());
+    zuruecknehmen(&app, &admin, e, ende["id"].as_i64().unwrap()).await;
+    assert_eq!(kraft(&app, &admin, e, anna).await["status_id"], pause);
+    // Rücknahme des Beginns: ebenso leer.
+    zuruecknehmen(&app, &admin, e, beginn["id"].as_i64().unwrap()).await;
+    assert!(kraft(&app, &admin, e, anna).await["status_id"].is_null());
+    let (s, v) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/bloecke/{bid}?version=1", plan(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+
+    // Kommen nur aus dem Block.
+    let ben = adhoc(&app, &admin, e, "Ben").await;
+    let finn = adhoc(&app, &admin, e, "Finn").await;
+    let uhs_block = block(
+        &app,
+        &admin,
+        e,
+        json!({"art": "uhs", "uhs_id": markt}),
+        json!([{"art": "einsatz", "einsatz_personal_id": ben}]),
+    )
+    .await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &wechsel_pfad(e, uhs_block),
+        &admin,
+        Some(&json!({"art": "uhs", "kommen": [{"art": "einsatz", "einsatz_personal_id": finn}]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(kraft(&app, &admin, e, finn).await["uhs_id"].is_null());
+}

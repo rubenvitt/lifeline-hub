@@ -899,6 +899,12 @@ pub async fn block_aendern(
         if let Some(personen) = &patch.personen {
             pruefe_personen_tx(conn, einsatz_id, org_id, personen).await?;
         }
+        if posten_alt == Posten::Pause
+            && posten != Posten::Pause
+            && super::vollzug::pause_offen_tx(conn, bid).await?
+        {
+            return Err(AppError::Conflict(super::vollzug::PAUSE_OFFEN.into()));
+        }
         pruefe_frei_tx(conn, einsatz_id, posten, &von, &bis, Some(bid)).await?;
         let notiz = match &patch.notiz {
             Some(n) => n.clone(),
@@ -979,6 +985,9 @@ pub async fn block_loeschen(
             if belegt {
                 return Err(AppError::Forbidden);
             }
+        }
+        if super::vollzug::pause_offen_tx(conn, bid).await? {
+            return Err(AppError::Conflict(super::vollzug::PAUSE_OFFEN.into()));
         }
         sqlx::query("DELETE FROM einsatz_planschicht WHERE id = ?")
             .bind(bid)
