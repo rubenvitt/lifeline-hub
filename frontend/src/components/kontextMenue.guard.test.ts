@@ -1,5 +1,5 @@
 /**
- * Kontextmenü-Guard (LLH-1596, `openspec/changes/om9oxxiq-kontextmenue-baustein/design.md` D8): ein
+ * Kontextmenü-Guard (LLH-1596, `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md` D8): ein
  * Kontextmenü entsteht nur über `components/useKontextMenue.ts`.
  *
  * ── Warum ───────────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
  * Kontextmenü eines Datensatzes (LLH-1596, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/om9oxxiq-kontextmenue-baustein/design.md`) im echten Browser: Rechtsklick,
+ * `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`) im echten Browser: Rechtsklick,
  * Umschalt+F10 und langer Druck öffnen an einer Zeile der Datensicht dasselbe wie Primärknopf und
  * ⋮-Menü; auf dem Titel-Link bleibt das Browsermenü. Gewartet wird auf Inhaltsanker, nie auf
  * `networkidle` (LFH-385).

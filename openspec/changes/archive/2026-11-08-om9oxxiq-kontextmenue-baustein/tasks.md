@@ -46,7 +46,7 @@
 
 - [x] 7.1 e2e `frontend/e2e/kontextmenue-datensatz.spec.ts`: Rechtsklick auf eine Materialzeile zeigt Primäraktion und ⋮-Einträge; Rechtsklick auf den Titel-Link öffnet kein eigenes Menü; Umschalt+F10 auf dem Titel-Link öffnet es, Escape gibt den Fokus zurück; langer Druck per CDP-Touch bei 390 px öffnet es und das Abheben navigiert nicht
 - [x] 7.2 `e2e/lagekarte-touch.spec.ts` grün (Riegel verschoben)
-- [ ] 7.3 `./scripts/check-all.sh` grün
+- [x] 7.3 `./scripts/check-all.sh` grün — lokal `--nur schnell` und `--nur frontend` grün (1192 Testdateien), dazu die e2e-Specs `kontextmenue-datensatz`, `fernmeldeskizze`, `lagekarte-touch`; Rust-Suite und volle e2e-Suite belegt die CI des PRs
 - [x] 7.4 Bilder der Änderung (Kontextmenü in Tabelle und Karte) per Wegwerf-Spec aufnehmen
 
 ## Workflow follow-up

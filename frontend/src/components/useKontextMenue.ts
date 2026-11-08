@@ -1,6 +1,6 @@
 /**
  * Auslöser des Kontextmenüs (LLH-1596, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/om9oxxiq-kontextmenue-baustein/design.md` D1–D4).
+ * `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md` D1–D4).
  *
  * EINE Mechanik für Rechtsklick, langen Druck und die Tasten Kontextmenü / Umschalt+F10. Der Hook
  * zeigt kein Menü; er meldet `onOeffnen(schluessel, oeffnung)`, und der Aufrufer rendert das Menü

@@ -1,6 +1,6 @@
 /**
  * Kontextmenü der `Datensicht` (LLH-1596, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/om9oxxiq-kontextmenue-baustein/design.md` D7): Rechtsklick, langer Druck und
+ * `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md` D7): Rechtsklick, langer Druck und
  * Tastatur öffnen ein Menü aus `karte.aktion` und `karte.weitere`, in Tabelle und Karte.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';

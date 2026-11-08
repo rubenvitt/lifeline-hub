@@ -1,6 +1,6 @@
 /**
  * Kontextmenü eines Datensatzes (LLH-1596, Spec `datensatz-aktionsmenue`,
- * `openspec/changes/om9oxxiq-kontextmenue-baustein/design.md` D5/D6).
+ * `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md` D5/D6).
  *
  * Zeigt dieselben `MenueEintrag[]` wie das ⋮-Menü (`MenueAusloeser`) über dieselbe Funktion
  * `menueEintraege`: Gefahr rot hinter einem Trenner, gesperrte Einträge deaktiviert. Die Schale ist

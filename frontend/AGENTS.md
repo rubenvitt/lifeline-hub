@@ -650,7 +650,7 @@ anwendbar), „nicht geprüft" ist keins.
   `.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]` + `within`. Kartenmodus: `Datensicht`
   baut `weitere`.
 - **Kontextmenü nur über den Baustein** (LLH-1596, Spec `datensatz-aktionsmenue`,
-  `openspec/changes/om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,
+  `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,
   8 px) und Kontextmenü-Taste/Umschalt+F10 kommen aus **`components/useKontextMenue.ts`**, das Menü
   eines Datensatzes ist **`components/KontextMenue.tsx`** in der Schale `PunktankerMenue`. Die
   Einträge kommen aus derselben Quelle wie Primärknopf und ⋮-Menü (`Datensicht`:
