@@ -84,7 +84,8 @@ Im Main-Loop danach:
 - **Checkpoint, Pflicht:** Map samt Routen und Lösungsweg je Task vorlegen und auf die Antwort
   warten, auch ohne `open_questions`, File-Überschneidungen (→ relevant für den Phase-3-Modus)
   oder strittige Route; diese gehören dann mit Empfehlung dazu. Entfällt nur, wenn alle Tasks auf
-  `trivial` stehen (`SKILL.md`, Phase 1).
+  `trivial` stehen (`SKILL.md`, Phase 1). Ein Task auf `bug-unklar` bekommt nach der
+  Ursachensuche in Phase 3 einen eigenen Halt mit Ursache und Fix.
 - Die Einträge mit `route: 'entwurf'` sind die Eingabe für Phase 2 (`/opsx:propose` je Task).
   Überschneiden sich zwei Subtasks **auf `entwurf`** in `faehigkeiten`, bekommen sie eine
   gemeinsame Change am Parent. Ein Subtask auf einer anderen Route bleibt ohne Change.

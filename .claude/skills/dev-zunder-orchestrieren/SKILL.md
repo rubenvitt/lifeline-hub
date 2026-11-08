@@ -116,8 +116,8 @@ Code entsteht“; Tasks nur auf `trivial` brauchen sie nicht.
 Mensch am Checkpoint zu, legt `decompose_task` die Subtasks in einem Schritt an (alles oder
 nichts).
 
-**Status:** `in_progress`, Route in `plan`; am Checkpoint `blocked`, mit der Antwort zurück auf
-`in_progress` (`dev-zunder-ausfuehren`, „Board-Status mitführen“).
+**Status:** `in_progress`, Route in `plan`; am Checkpoint `blocked`, erst mit der Zustimmung zurück
+auf `in_progress` (`dev-zunder-ausfuehren`, „Board-Status mitführen“).
 
 ## Phase 2 — Entwurf (Main-Loop mit `/opsx:propose`)
 
@@ -146,7 +146,9 @@ Plan-Workflow „je Subtask“ gibt es nicht mehr, denn die `tasks.md` der Chang
 Wegen), bewertet vorher ein Workflow oder eine Handvoll Subagents konkurrierende Entwürfe
 (Skelett: `references/workflow-bausteine.md` → „Design-Judge-Panel“). Das Panel liest nur. Den Sieger
 übergibst du `/opsx:propose` als Entscheidung, die übrigen als verworfene Alternativen, und
-beides landet in `design.md`. Zwischen Panel und Proposal hältst du **nicht** an. Die Wahl
+beides landet in `design.md`. Zwischen Panel und Proposal hältst du **nicht** an, solange der
+Sieger dem in Phase 1 abgestimmten Weg folgt; weicht er davon ab, legst du die Abweichung vorher
+erneut vor. Die Wahl
 trifft der Mensch am Freigabe-Checkpoint, und will er einen anderen Weg, läuft `/opsx:update`.
 
 **Größere UI:** Regel und Pflichten (Entwurf mit `/design`, Design System neu erzeugen und nach

@@ -184,7 +184,9 @@ nach eigener Empfehlung losbauen, auch wenn der Weg klar scheint.
 - **Ändert sich der Weg beim Bauen** (neue Variante, verworfene Annahme, größerer Schnitt),
   wieder vorlegen, bevor du ihn verlässt. Kleinigkeiten innerhalb des abgestimmten Wegs nicht.
 - **Ruft `dev-zunder-orchestrieren` auf,** zählt dessen Phase-1-Checkpoint als diese
-  Abstimmung, sofern dort der Weg je Task vorlag. Kein zweiter Halt je Subtask.
+  Abstimmung, sofern dort der Weg je Task vorlag. Kein zweiter Halt je Subtask, außer bei
+  `bug-unklar`: Die Ursache findet erst Phase 3, also legst du Ursache und Fix nach der Suche
+  erneut vor, bevor der Fix entsteht.
 
 ## Schritt 3: Komplexität einschätzen → Routing
 
