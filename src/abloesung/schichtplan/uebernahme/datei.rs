@@ -300,16 +300,33 @@ fn lies_xlsx(bytes: &[u8]) -> Result<Tabelle, AppError> {
     // Zeile (0-basiert) → belegte Zellen mit Spalte.
     let mut belegt: BTreeMap<u32, Vec<(u32, Zelle)>> = BTreeMap::new();
     let mut breite: u32 = 0;
+    let mut text_bytes: u64 = 0;
     {
         let mut leser = mappe
             .worksheet_cells_reader(&blatt)
             .map_err(|_| unlesbar("XLSX"))?;
         while let Some(c) = leser.next_cell().map_err(|_| unlesbar("XLSX"))? {
+            let (zeile, spalte) = c.get_position();
+            // Eine Position zweimal umginge die Grenzen unten.
+            if belegt
+                .get(&zeile)
+                .is_some_and(|zellen| zellen.iter().any(|(s, _)| *s == spalte))
+            {
+                return Err(AppError::Validation(
+                    "Die Datei enthält eine Zelle doppelt".into(),
+                ));
+            }
             let z = zelle(c.get_value());
             if matches!(z, Zelle::Leer) {
                 continue;
             }
-            let (zeile, spalte) = c.get_position();
+            // Viele Zellen auf einen langen gemeinsamen Text vervielfachten ihn im Speicher.
+            if let Zelle::Text(t) = &z {
+                text_bytes = text_bytes.saturating_add(t.len() as u64);
+                if text_bytes > XLSX_ENTPACKT_MAX_BYTES {
+                    return Err(AppError::Validation("Die XLSX ist entpackt zu groß".into()));
+                }
+            }
             if spalte >= XLSX_SPALTEN_MAX {
                 return Err(AppError::Validation(format!(
                     "Die Datei hat mehr als {XLSX_SPALTEN_MAX} Spalten"
@@ -989,12 +1006,16 @@ mod tests {
     use super::*;
 
     /// Kleinste XLSX mit einem Blatt; `zellen` als (Bezug wie „A1“, Text). Ein Text mit `#`
-    /// vorn wird eine Zahlzelle.
+    /// vorn wird eine Zahlzelle, `$` ein Verweis auf den gemeinsamen Text.
     fn mini_xlsx(zellen: &[(&str, &str)]) -> Vec<u8> {
         mini_xlsx_mit(zellen, false)
     }
 
     fn mini_xlsx_mit(zellen: &[(&str, &str)], datum_1904: bool) -> Vec<u8> {
+        mini_xlsx_voll(zellen, datum_1904, None)
+    }
+
+    fn mini_xlsx_voll(zellen: &[(&str, &str)], datum_1904: bool, geteilt: Option<&str>) -> Vec<u8> {
         use std::io::Write;
         let mut zeilen: std::collections::BTreeMap<u32, String> = Default::default();
         for (bezug, text) in zellen {
@@ -1004,6 +1025,7 @@ mod tests {
                 .unwrap();
             let c = match text.strip_prefix('#') {
                 Some(zahl) => format!(r#"<c r="{bezug}"><v>{zahl}</v></c>"#),
+                None if *text == "$" => format!(r#"<c r="{bezug}" t="s"><v>0</v></c>"#),
                 None => format!(r#"<c r="{bezug}" t="inlineStr"><is><t>{text}</t></is></c>"#),
             };
             zeilen.entry(nr).or_default().push_str(&c);
@@ -1015,7 +1037,7 @@ mod tests {
         let teile = [
             (
                 "[Content_Types].xml",
-                r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#.to_string(),
+                r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>"#.to_string(),
             ),
             (
                 "_rels/.rels",
@@ -1027,7 +1049,14 @@ mod tests {
             ),
             (
                 "xl/_rels/workbook.xml.rels",
-                r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#.to_string(),
+                r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>"#.to_string(),
+            ),
+            (
+                "xl/sharedStrings.xml",
+                format!(
+                    r#"<?xml version="1.0" encoding="UTF-8"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><t>{}</t></si></sst>"#,
+                    geteilt.unwrap_or("x")
+                ),
             ),
             (
                 "xl/worksheets/sheet1.xml",
@@ -1088,6 +1117,39 @@ mod tests {
         let weit_unten = lies_xlsx(&mini_xlsx(&[("A1", "Posten"), ("A1048576", "x")])).unwrap();
         assert_eq!(weit_unten.zeilen.len(), 1);
         assert_eq!(weit_unten.zeilen[0].0, 1_048_576);
+    }
+
+    #[test]
+    fn xlsx_mit_doppelter_zelle_ist_ein_fehler() {
+        let r = lies_xlsx(&mini_xlsx(&[("A1", "Posten"), ("A2", "x"), ("A2", "y")]));
+        assert!(
+            matches!(&r, Err(AppError::Validation(m)) if m.contains("doppelt")),
+            "{r:?}"
+        );
+    }
+
+    #[test]
+    fn xlsx_vervielfacht_keinen_gemeinsamen_text() {
+        // Ein Text von 1 MiB, auf den mehr Zellen zeigen, als entpackt Platz hätten.
+        let lang = "x".repeat(1024 * 1024);
+        let n = (XLSX_ENTPACKT_MAX_BYTES / (1024 * 1024)) as usize + 1;
+        let bezuege: Vec<String> = (2..2 + n).map(|i| format!("A{i}")).collect();
+        let mut zellen: Vec<(&str, &str)> = vec![("A1", "Posten")];
+        zellen.extend(bezuege.iter().map(|b| (b.as_str(), "$")));
+        let r = lies_xlsx(&mini_xlsx_voll(&zellen, false, Some(&lang)));
+        assert!(
+            matches!(&r, Err(AppError::Validation(m)) if m.contains("zu groß")),
+            "{:?}",
+            r.as_ref().map(|t| t.zeilen.len())
+        );
+        // Wenige Verweise sind in Ordnung.
+        let t = lies_xlsx(&mini_xlsx_voll(
+            &[("A1", "Posten"), ("A2", "$")],
+            false,
+            Some("Helferplanung"),
+        ))
+        .unwrap();
+        assert_eq!(t.zeilen[0].1[0].text().as_deref(), Some("Helferplanung"));
     }
 
     use crate::abloesung::schichtplan::uebernahme::MeldungStufe;

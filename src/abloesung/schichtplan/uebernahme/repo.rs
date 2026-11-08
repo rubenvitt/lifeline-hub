@@ -1862,6 +1862,52 @@ mod tests {
             PostenZiel::Einheit { .. }
         ));
         assert!(p.vorschau.posten[0].kandidaten.is_empty());
+
+        // Ohne Freigabe für UHS ebenso; Einheiten bleiben sichtbar.
+        let mut mit_uhs = bestand();
+        mit_uhs.uhs.push(BestandUhs {
+            id: 70,
+            bezeichnung: "UHS Markt".into(),
+            abschnitt_id: None,
+        });
+        mit_uhs.uhs_namen.insert("uhs markt".into());
+        let paket = PlanPaket {
+            posten: vec![
+                posten("p1", PaketPostenArt::Uhs, "UHS Markt", 2),
+                posten("p2", PaketPostenArt::Einheit, "Streife 1", 3),
+            ],
+            bloecke: vec![
+                block("p1", "2026-07-04T08:00:00Z", "2026-07-04T12:00:00Z", &[], 2),
+                block("p2", "2026-07-04T08:00:00Z", "2026-07-04T12:00:00Z", &[], 3),
+            ],
+            ..Default::default()
+        };
+        let p = planen(&mit_uhs, &paket, vec![], &Entscheidungen::default(), ALLE).unwrap();
+        assert!(matches!(
+            p.vorschau.posten[0].ziel,
+            PostenZiel::Uhs { uhs_id: 70, .. }
+        ));
+        let ohne_uhs = Rechte {
+            einheiten: true,
+            uhs: false,
+        };
+        let p = planen(
+            &mit_uhs,
+            &paket,
+            vec![],
+            &Entscheidungen::default(),
+            ohne_uhs,
+        )
+        .unwrap();
+        assert!(p.fehlende_rechte);
+        assert!(p.vorschau.auswahl.uhs.is_empty());
+        assert!(!matches!(p.vorschau.posten[0].ziel, PostenZiel::Uhs { .. }));
+        assert!(p.vorschau.posten[0].kandidaten.is_empty());
+        assert!(matches!(
+            p.vorschau.posten[1].ziel,
+            PostenZiel::Einheit { einheit_id: 10, .. }
+        ));
+        assert!(!p.vorschau.auswahl.einheiten.is_empty());
     }
 
     #[test]
