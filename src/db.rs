@@ -13592,9 +13592,9 @@ mod tests {
 
     /// LLH-1580 (K1): der Bestand ist keine RTW-Anforderung, die Spalte nimmt nur 0 und 1.
     #[tokio::test]
-    async fn migration_0297_person_rtw_angefordert() {
+    async fn migration_0298_person_rtw_angefordert() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 297;
+        const VERSION: i64 = 298;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,
