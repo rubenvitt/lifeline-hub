@@ -404,6 +404,13 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         bezug: Bezug::Spalte("einsatz_personal_id"),
         spalten: &[],
     },
+    // Kraft eines Wechsels aus dem Plan (LLH-1555, Mig 0299): nur Verweise, nichts zu entfernen.
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "einsatz_plan_wechsel_person",
+        bezug: Bezug::Spalte("einsatz_personal_id"),
+        spalten: &[],
+    },
     // Ein Helfer des Plans, als Kraft in den Einsatz übernommen (LLH-1555): dieselbe Person,
     // also gehen Name, Telefon, Organisation und die externe Kennung samt Herkunft (LLH-1556)
     // mit ihr.

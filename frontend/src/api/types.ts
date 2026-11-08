@@ -974,6 +974,23 @@ export interface SchichtplanHelferBody {
 /** Kein Backend-Schema: `PATCH …/schichtplan/helfer/{hid}` (fehlt = unverändert). */
 export type SchichtplanHelferAendernBody = Partial<SchichtplanHelferBody>;
 
+/** Der nächste Wechsel eines UHS- oder Pausenblocks zum Vorbelegen (LLH-1555). */
+export type SchichtplanWechselVorlage = S['WechselVorlage'];
+export type SchichtplanWechselPerson = S['WechselVorlagePerson'];
+export type SchichtplanWechsel = S['PlanWechselAnzeige'];
+export type SchichtplanWechselArt = S['WechselArt'];
+
+/**
+ * Kein Backend-Schema: `POST …/schichtplan/bloecke/{bid}/wechsel`. `kommen` und `gehen` nur an der
+ * UHS (sonst 400); fehlt `vollzogen_at`, gilt jetzt.
+ */
+export interface SchichtplanWechselBody {
+  art: SchichtplanWechselArt;
+  vollzogen_at?: string;
+  kommen?: SchichtplanPersonEingabe[];
+  gehen?: number[];
+}
+
 // ============================== LLH-1561 Vorplanung ohne Einsatz ==============================
 /** Eine Planung der Organisation: Kopf, Posten, Blöcke mit Befunden, Helfer, Kennzahlen. */
 export type Planung = S['PlanungAnzeige'];

@@ -14558,7 +14558,8 @@
           "id",
           "label",
           "kategorie",
-          "sortier"
+          "sortier",
+          "pause"
         ],
         "properties": {
           "farbe": {
@@ -14576,6 +14577,10 @@
           },
           "label": {
             "type": "string"
+          },
+          "pause": {
+            "type": "boolean",
+            "description": "LLH-1555: der Status „Pause“ des Schichtplans (höchstens einer je Organisation)."
           },
           "sortier": {
             "type": "integer",
@@ -14973,6 +14978,54 @@
             "type": "integer",
             "format": "int64",
             "description": "`einsatz_personal.id`"
+          }
+        }
+      },
+      "PlanWechselAnzeige": {
+        "type": "object",
+        "description": "Ein vollzogener Wechsel.",
+        "required": [
+          "id",
+          "art",
+          "planschicht_id",
+          "zeitpunkt",
+          "vollzogen_at"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/WechselArt"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "planschicht_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`null`, wenn der Block inzwischen gelöscht ist."
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vollzogen_at": {
+            "type": "string"
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt laut Plan (Beginn, beim Pausenende das Ende des Blocks)."
+          },
+          "zurueckgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -20153,6 +20206,180 @@
               "$ref": "#/components/schemas/BenachrichtigungArt"
             },
             "description": "Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne\nAbo leer."
+          }
+        }
+      },
+      "WechselArt": {
+        "type": "string",
+        "description": "Art eines Wechsels aus dem Plan (`einsatz_plan_wechsel.art`). Wire == `as_str()`.",
+        "enum": [
+          "uhs",
+          "pause_beginn",
+          "pause_ende"
+        ]
+      },
+      "WechselVorlage": {
+        "type": "object",
+        "description": "Der nächste Wechsel eines Blocks zum Vorbelegen des Dialogs.",
+        "required": [
+          "block_id",
+          "art",
+          "zeitpunkt",
+          "kommen",
+          "gehen",
+          "bleiben",
+          "uebersprungen",
+          "wechsel"
+        ],
+        "properties": {
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WechselArt",
+                "description": "Die Art des nächsten Wechsels; `null`, wenn alle Wechsel des Blocks vollzogen sind."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bleiben": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WechselVorlagePerson"
+            },
+            "description": "UHS: Kräfte an dieser UHS, die im Block stehen."
+          },
+          "block_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gehen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WechselVorlagePerson"
+            },
+            "description": "UHS: Kräfte an dieser UHS, die nicht im Block stehen."
+          },
+          "gesperrt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Warum der Wechsel gerade nicht geht (kein Pausenstatus, die Pause hat nicht begonnen, die\nUHS ist aufgelöst)."
+          },
+          "kommen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WechselVorlagePerson"
+            },
+            "description": "UHS: Personen des Blocks, die nicht an dieser UHS stehen. Pause: wer den Status wechselt."
+          },
+          "pause_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pause: das Label des gekennzeichneten Status."
+          },
+          "uebersprungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WechselVorlagePerson"
+            },
+            "description": "Pause: Personen des Blocks, die nicht im Einsatz sind (beim Ende: die nicht mehr in Pause\nsind)."
+          },
+          "uhs": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "wechsel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanWechselAnzeige"
+            },
+            "description": "Die vollzogenen Wechsel des Blocks, die nicht zurückgenommen sind."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt laut Plan des nächsten Wechsels."
+          }
+        }
+      },
+      "WechselVorlagePerson": {
+        "type": "object",
+        "description": "Eine Person der Vorlage: aus dem Block (mit ihrer Herkunft im Plan) oder eine Kraft an der UHS.",
+        "required": [
+          "art",
+          "einsatz_personal_id",
+          "name"
+        ],
+        "properties": {
+          "andere_uhs": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eine andere UHS, an der die Kraft gerade steht (sie wechselt)."
+          },
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PlanPersonArt",
+                "description": "Herkunft im Plan; `null` bei einer Kraft, die nur an der UHS steht."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "einsatz_personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Kraft des Einsatzes; `null` = nicht im Einsatz (kommt erst mit dem Wechsel)."
+          },
+          "helfer_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ihr Status jetzt (Pause)."
+          },
+          "status_zurueck": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Beim Pausenende: der gemerkte Status, den sie zurückbekommt."
           }
         }
       },

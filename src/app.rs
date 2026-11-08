@@ -620,6 +620,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             patch(routes::abloesung_schichtplan::block_aendern)
                 .delete(routes::abloesung_schichtplan::block_loeschen),
         )
+        // Wechsel aus dem Plan an einer UHS und in der Pause (LLH-1555).
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}/wechsel",
+            get(routes::abloesung_schichtplan::wechsel_vorlage)
+                .post(routes::abloesung_schichtplan::wechsel_vollziehen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/wechsel/{wid}/zuruecknehmen",
+            post(routes::abloesung_schichtplan::wechsel_zuruecknehmen),
+        )
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/erzeugen",
             post(routes::abloesung_schichtplan::erzeugen),

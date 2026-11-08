@@ -832,6 +832,9 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.abloesungen, einsatzId, 'plan-vorlage', abloesungId] as const,
   /** Schichtplan des Einsatzes (LLH-1552); live über `abloesung` wie die Schichten. */
   schichtplan: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId, 'schichtplan'] as const,
+  /** Der nächste Wechsel eines Blocks (LLH-1555); unter dem Plan, live mit ihm. */
+  schichtplanWechsel: (einsatzId: number, blockId: number) =>
+    [EINSATZ_KEYS.abloesungen, einsatzId, 'schichtplan', 'wechsel', blockId] as const,
   schichtplanDruck: (einsatzId: number) => [EINSATZ_KEYS.schichtplanDruck, einsatzId] as const,
   // Kräfte-Zeitachse (LFH-552): argumentlos = Invalidierungs-Prefix; Perioden-Listen je Kraftart
   // und die Zeitachse einer Kraft hängen als Sub-Keys darunter.

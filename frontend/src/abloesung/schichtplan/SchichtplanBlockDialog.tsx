@@ -93,6 +93,8 @@ interface SchichtplanBlockDialogProps {
   loeschFehler?: unknown;
   onSpeichern: (s: BlockSpeichern) => Promise<unknown>;
   onLoeschen?: (block: SchichtplanBlock) => void;
+  /** Wechsel aus dem Plan an einer UHS oder in der Pause (LLH-1555); fehlt = nicht möglich. */
+  onWechsel?: (block: SchichtplanBlock) => void;
   /** „Als nächsten Block kopieren“; ohne gibt es den Knopf nicht. */
   onKopieren?: (block: SchichtplanBlock) => void;
   kopierenLaeuft?: boolean;
@@ -121,6 +123,7 @@ export default function SchichtplanBlockDialog({
   loeschFehler,
   onSpeichern,
   onLoeschen,
+  onWechsel,
   onKopieren,
   kopierenLaeuft,
   kopierFehler,
@@ -448,6 +451,16 @@ export default function SchichtplanBlockDialog({
             style={{ marginTop: 8, marginInlineEnd: 8 }}
           >
             Als nächsten Block kopieren
+          </Button>
+        )}
+        {block && onWechsel && (
+          <Button
+            data-lfh="schichtplan-block-wechsel"
+            disabled={geaendert || laeuft || loeschenLaeuft || kopierenLaeuft}
+            onClick={() => onWechsel(block)}
+            style={{ marginTop: 8, marginInlineEnd: 8 }}
+          >
+            Wechsel vollziehen
           </Button>
         )}
         {block && onLoeschen && darfSchreiben && (

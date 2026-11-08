@@ -39,12 +39,14 @@ pub(super) async fn kataloge_seeden(pool: &SqlitePool, org_id: i64) {
     }
     for (label, kategorie, sortier) in crate::personal::PERSONAL_STATUS_STARTLISTE {
         sqlx::query(
-            "INSERT INTO personal_status (org_id, label, kategorie, sortier) VALUES (?, ?, ?, ?)",
+            "INSERT INTO personal_status (org_id, label, kategorie, sortier, pause) \
+             VALUES (?, ?, ?, ?, ?)",
         )
         .bind(org_id)
         .bind(label)
         .bind(kategorie)
         .bind(sortier)
+        .bind(label == crate::personal::PERSONAL_STATUS_STARTPAUSE)
         .execute(pool)
         .await
         .unwrap();

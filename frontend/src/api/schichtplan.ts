@@ -11,6 +11,9 @@ import type {
   SchichtplanHelfer,
   SchichtplanHelferAendernBody,
   SchichtplanHelferBody,
+  SchichtplanWechsel,
+  SchichtplanWechselBody,
+  SchichtplanWechselVorlage,
 } from './types';
 
 /**
@@ -83,6 +86,41 @@ export function aendereSchichtplanHelfer(
 /** Nimmt den Helfer aus allen Blöcken. */
 export function loescheSchichtplanHelfer(einsatzId: number, helferId: number): Promise<void> {
   return apiSend<void>(`${basis(einsatzId)}/helfer/${helferId}`, 'DELETE');
+}
+
+/**
+ * Der nächste Wechsel eines UHS- oder Pausenblocks (LLH-1555): wer kommt, geht, bleibt oder in
+ * Pause geht. Verlangt Personal, an der UHS dazu Unfallhilfsstellen (403).
+ */
+export function fetchSchichtplanWechsel(
+  einsatzId: number,
+  blockId: number,
+): Promise<SchichtplanWechselVorlage> {
+  return apiGet<SchichtplanWechselVorlage>(`${basis(einsatzId)}/bloecke/${blockId}/wechsel`);
+}
+
+/** Schon vollzogen ist 409; kein Pausenstatus oder Pause nicht begonnen ist 422. */
+export function vollzieheSchichtplanWechsel(
+  einsatzId: number,
+  blockId: number,
+  body: SchichtplanWechselBody,
+): Promise<SchichtplanWechsel> {
+  return apiSend<SchichtplanWechsel>(
+    `${basis(einsatzId)}/bloecke/${blockId}/wechsel`,
+    'POST',
+    body,
+  );
+}
+
+/** Legt zurück, was noch den Stand des Wechsels trägt; den Pausenbeginn erst nach dem Ende. */
+export function nimmSchichtplanWechselZurueck(
+  einsatzId: number,
+  wechselId: number,
+): Promise<SchichtplanWechsel> {
+  return apiSend<SchichtplanWechsel>(
+    `${basis(einsatzId)}/wechsel/${wechselId}/zuruecknehmen`,
+    'POST',
+  );
 }
 
 function einleseDaten(datei: File, entscheidungen: SchichtplanEntscheidungenEingabe): FormData {

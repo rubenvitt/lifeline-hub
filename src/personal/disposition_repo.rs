@@ -1052,6 +1052,7 @@ mod tests {
                 farbe: None,
                 sortier: 20,
                 zeitachse_marke: None,
+                pause: false,
             },
         )
         .await
@@ -1509,6 +1510,7 @@ mod tests {
                 farbe: None,
                 sortier: 40,
                 zeitachse_marke: None,
+                pause: false,
             },
         )
         .await
@@ -1833,6 +1835,7 @@ mod tests {
                 farbe: None,
                 sortier: 40,
                 zeitachse_marke: Some("eintreffen"),
+                pause: false,
             },
         )
         .await

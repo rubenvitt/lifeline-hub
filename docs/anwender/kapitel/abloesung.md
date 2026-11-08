@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, src/abloesung/schichtplan/vollzug.rs]
 ---
 
 ## Überblick
@@ -245,6 +245,34 @@ Für Einsatzleitung und Führungspersonal:
 Soll es anders laufen, unter „Art“ „Besatzungswechsel“ oder „Ganze Einheit“ wählen. Endet der
 Posten, steht „Ganze Einheit“ ohne ablösende Einheit bereit, und der Knopf heißt „Abziehen“.
 
+### An der UHS wechseln
+
+Blöcke an einer Unfallhilfsstelle wechseln im Schichtplan selbst. Für Einsatzleitung und
+Führungspersonal mit den Modulen Personal und Unfallhilfsstellen:
+
+1. Im Schichtplan den Block öffnen und „Wechsel vollziehen“ wählen.
+2. Unter „Kommt“, „Geht“ und „Bleibt“ stehen die Kräfte, vorbelegt aus dem Block und der UHS. Wer
+   nicht wechseln soll, abwählen. „neu im Einsatz“ kommt erst mit dem Wechsel in den Einsatz,
+   „von …“ wechselt von einer anderen UHS.
+3. „Wechsel vollziehen“ wählen.
+
+Unter „Vollzogen“ steht jeder Wechsel des Blocks mit „Zurücknehmen“.
+
+### In der Pause wechseln
+
+Blöcke in der Zeile „Pause“ wechseln ebenfalls im Schichtplan. Für Einsatzleitung und
+Führungspersonal mit dem Modul Personal:
+
+1. Im Schichtplan den Pausenblock öffnen und „Wechsel vollziehen“ wählen.
+2. „Pause beginnen“ wählen. Wer im Block steht und im Einsatz ist, bekommt den Status „Pause“;
+   „Nicht im Einsatz“ nennt, wer übersprungen wird. Wer schon „Pause“ trägt, erfasst der Beginn
+   nicht; beim Ende bekommt er deshalb keinen früheren Status zurück, sein Status ist danach von
+   Hand zu prüfen.
+3. Zum Ende der Pause den Block wieder öffnen, „Wechsel vollziehen“ und dann „Pause beenden“
+   wählen. Unter „Zurück“ steht, wer seinen vorigen Status wiederbekommt.
+
+Unter „Vollzogen“ steht jeder Wechsel des Blocks mit „Zurücknehmen“.
+
 ### Einen Schichtplan einlesen
 
 Für Einsatzleitung und Führungspersonal mit Freigabe des Moduls Personal, wenn der Plan schon in
@@ -320,6 +348,26 @@ einer solchen Schicht ändert nur der Block. Fällt der letzte Block weg, gilt w
 Wer laut Plan wechselt, gehört bis zu 15 Minuten vor dem nächsten Block schon zu ihm: Die
 Folgeschicht ist dann zum Ende dieses Blocks fällig. Die Rücknahme legt die Besatzung zurück; wer
 erst mit dem Wechsel in den Einsatz kam, bleibt im Einsatz, ohne Einheit.
+
+### Wechsel an der UHS und in der Pause
+
+An der UHS bekommt, wer kommt, die UHS, und wer geht, verliert sie; die Einheit einer Kraft bleibt
+dabei, wie sie ist. Wer ohne Einheit kommt, bekommt in der Kräfte-Zeitachse ein Eintreffen, wer
+ohne Einheit geht, eine Ablösung; wer zu einer Einheit gehört, folgt deren Zeitachse.
+
+Welcher Status „Pause“ ist, legen die Stammdaten fest (Schalter „Pause im Schichtplan“ am
+Personal-Status). Trägt ihn keiner, lässt sich keine Pause beginnen; eine begonnene Pause lässt
+sich trotzdem beenden. Das Ende gibt nur
+zurück, wer dann noch „Pause“ trägt; wer zwischendurch einen anderen Status bekam, behält ihn. Ein
+Block mit begonnener Pause lässt sich erst löschen oder in eine andere Zeile schieben, wenn die
+Pause beendet oder ihr Beginn zurückgenommen ist.
+
+Jeder Block wechselt einmal je Art: an der UHS einmal, in der Pause einmal zum Beginn und einmal
+zum Ende. Ist ein Wechsel zurückgenommen, lässt sich dieselbe Art erneut vollziehen. Die Rücknahme legt nur zurück, was noch so steht, wie der Wechsel es hinterließ; den
+Beginn einer Pause erst, wenn ihr Ende zurückgenommen ist. Ist der Pausenblock gelöscht oder in
+eine andere Zeile geschoben, lassen sich seine Wechsel nicht mehr zurücknehmen. Wer seither an einer UHS erneut gewechselt hat, bleibt bei der Rücknahme, wo er ist. Wer erst mit dem Wechsel in den
+Einsatz kam, bleibt im Einsatz. Jeder Wechsel und jede Rücknahme steht im Einsatztagebuch, etwa
+„Wechsel UHS «Markt»: Geht «Anna». Kommt «Ben». Bleibt «Dana».“
 
 ### Hinweise zur ablösenden Einheit
 

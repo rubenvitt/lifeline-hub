@@ -29,6 +29,7 @@ pub mod kopplung;
 pub mod pruefung;
 pub mod repo;
 pub mod uebernahme;
+pub mod vollzug;
 pub mod zerlegung;
 
 /// Personen je Block, gezählt vor dem Entdoppeln (wie `abloesung::BESATZUNG_MAX`). Spiegel:

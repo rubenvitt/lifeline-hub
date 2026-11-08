@@ -728,8 +728,25 @@ pub async fn aus_personalstatus_tx(
     status_id: i64,
     jetzt: &str,
 ) -> Result<bool, AppError> {
+    Ok(
+        aus_personalstatus_id_tx(conn, einsatz_id, benutzer_id, ep_id, status_id, jetzt)
+            .await?
+            .is_some(),
+    )
+}
+
+/// Wie [`aus_personalstatus_tx`], liefert aber die ID des geschriebenen Ereignisses, damit ein
+/// Wechsel aus dem Schichtplan es bei seiner Rücknahme streichen kann (LLH-1555).
+pub async fn aus_personalstatus_id_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    ep_id: i64,
+    status_id: i64,
+    jetzt: &str,
+) -> Result<Option<i64>, AppError> {
     let Some(marke) = marke_tx(conn, "personal_status", status_id).await? else {
-        return Ok(false);
+        return Ok(None);
     };
     let (r, _) = schreibe_tx(
         conn,
@@ -744,7 +761,10 @@ pub async fn aus_personalstatus_tx(
         },
     )
     .await?;
-    Ok(matches!(r, Schreibergebnis::Geschrieben(_)))
+    Ok(match r {
+        Schreibergebnis::Geschrieben(id) => Some(id),
+        Schreibergebnis::Ausgelassen(_) => None,
+    })
 }
 
 /// Ein Fahrzeug hat auf `status_id` gewechselt. Wirkt nur über seine Einheit: Alarmierung und
