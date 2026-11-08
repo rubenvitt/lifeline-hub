@@ -18,7 +18,6 @@ import type {
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { nachText, werteAus } from '../components/katalogVergleich';
-import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { teilwortSuche } from '../components/teilwortSuche';
@@ -255,10 +254,8 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
       ),
     },
   ];
-  const gedaechtnis = useListenGedaechtnis('planung-helfer', spalten, {
-    ausDaten: ['organisation', 'qualifikationen'],
-  });
 
+  // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint die Planung.
   return (
     <div data-lfh="planung-helfer">
       <Space style={{ marginBottom: 12 }}>
@@ -275,7 +272,6 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
         rowKey="id"
         dataSource={planung.helfer}
         columns={spalten}
-        gedaechtnis={gedaechtnis}
         spaltenSchalter={{ bezeichnung: 'Helfer' }}
         mehrzahl="Helfern"
         suche={{ platzhalter: 'Name, Organisation oder Qualifikation' }}

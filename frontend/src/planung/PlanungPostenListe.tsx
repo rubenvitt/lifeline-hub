@@ -12,7 +12,6 @@ import type { Planung, PlanungPosten } from '../api/types';
 import { formatDauer } from '../abloesung/dauer';
 import { monoStil, StatusChip } from '../components/instrument';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
-import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { qualiSollText } from '../kraefte/qualiSoll';
@@ -163,8 +162,8 @@ export default function PlanungPostenListe({ planung }: { planung: Planung }) {
       },
     },
   ];
-  const gedaechtnis = useListenGedaechtnis('planung-posten', spalten);
 
+  // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint die Planung.
   return (
     <div data-lfh="planung-posten">
       <Space style={{ marginBottom: 12 }}>
@@ -182,7 +181,6 @@ export default function PlanungPostenListe({ planung }: { planung: Planung }) {
         rowKey="id"
         dataSource={posten}
         columns={spalten}
-        gedaechtnis={gedaechtnis}
         spaltenSchalter={{ bezeichnung: 'Posten' }}
         mehrzahl="Posten"
         locale={{ emptyText: 'Noch keine Posten' }}
