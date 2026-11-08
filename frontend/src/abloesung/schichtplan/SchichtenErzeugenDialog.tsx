@@ -146,6 +146,8 @@ export default function SchichtenErzeugenDialog({
         name="laenge"
         label="Länge je Schicht"
         required={pflicht}
+        // Die Pflicht hängt am Posten (dessen Schichtlänge ist die Vorgabe): ein Wechsel prüft neu.
+        dependencies={['posten']}
         rules={[
           dauerRegel({
             pflicht,

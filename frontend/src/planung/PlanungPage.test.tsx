@@ -282,6 +282,16 @@ describe('PlanungPage (LLH-1586)', () => {
     );
   });
 
+  it('Schichten erzeugen: der Längenfehler fällt weg, sobald der Posten eine Länge vorgibt', async () => {
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Schichten erzeugen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Schichten erzeugen' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schichten erzeugen' }));
+    expect(await within(dialog).findByText('Bitte eine Länge angeben')).toBeInTheDocument();
+    await waehle('Posten', 'RTW 1');
+    await waitFor(() => expect(within(dialog).queryByText('Bitte eine Länge angeben')).toBeNull());
+  });
+
   it('Handy: Liste mit allen Blöcken je Posten', async () => {
     setzeViewportBreite(390);
     setup();

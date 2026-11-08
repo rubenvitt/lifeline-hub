@@ -109,6 +109,7 @@ export default function PlanungenPage() {
       key: 'einsatzart',
       abBreite: 'xl',
       suchText: (p) => EINSATZART_LABELS[p.einsatzart],
+      sorter: nachText((p: PlanungListeneintrag) => EINSATZART_LABELS[p.einsatzart]),
       render: (_, p) => EINSATZART_LABELS[p.einsatzart],
     },
     kennzahl('Soll', 'soll'),

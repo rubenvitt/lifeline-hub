@@ -17,7 +17,7 @@ import type {
 } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
-import { nachText } from '../components/katalogVergleich';
+import { nachText, werteAus } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -187,6 +187,11 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
     planung.bloecke.filter((b) => b.personen.some((p) => p.helfer_id === h.id)).length;
   const loeschAnzahl = zuLoeschen ? bloeckeMit(zuLoeschen) : 0;
 
+  const organisationWerte = werteAus(planung.helfer, (h) => h.organisation);
+  const qualiWerte = werteAus(planung.helfer, (h) =>
+    h.qualifikationen.map((id) => qualiNamen.get(id)),
+  );
+
   const spalten: KatalogSpalte<SchichtplanHelfer>[] = [
     {
       title: 'Name',
@@ -200,6 +205,8 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
       key: 'organisation',
       suchText: (h) => h.organisation,
       sorter: nachText((h: SchichtplanHelfer) => h.organisation),
+      filters: organisationWerte.length > 0 ? organisationWerte : undefined,
+      onFilter: (wert, h) => h.organisation === wert,
       render: (_, h) => h.organisation ?? '—',
     },
     {
@@ -207,12 +214,16 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
       key: 'telefon',
       abBreite: 'md',
       suchText: (h) => h.telefon,
+      sorter: nachText((h: SchichtplanHelfer) => h.telefon),
       render: (_, h) => h.telefon ?? '—',
     },
     {
       title: 'Qualifikationen',
       key: 'qualifikationen',
       suchText: qualiText,
+      // Ein Helfer trägt mehrere: der Filter trifft, wer den Wert unter seinen hat.
+      filters: qualiWerte.length > 0 ? qualiWerte : undefined,
+      onFilter: (wert, h) => h.qualifikationen.some((id) => qualiNamen.get(id) === wert),
       render: (_, h) => qualiText(h) || '—',
     },
     {
@@ -244,7 +255,9 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
       ),
     },
   ];
-  const gedaechtnis = useListenGedaechtnis('planung-helfer', spalten);
+  const gedaechtnis = useListenGedaechtnis('planung-helfer', spalten, {
+    ausDaten: ['organisation', 'qualifikationen'],
+  });
 
   return (
     <div data-lfh="planung-helfer">

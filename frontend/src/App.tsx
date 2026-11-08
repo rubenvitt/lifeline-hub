@@ -119,6 +119,7 @@ import AdminLayout from './admin/AdminLayout';
 import DemoDatenPage from './admin/DemoDatenPage';
 import AufbewahrungUebersicht from './aufbewahrung/AufbewahrungUebersicht';
 import ZugangsprotokollPage from './zugangsprotokoll/ZugangsprotokollPage';
+import NurMitPlanungsrecht from './planung/NurMitPlanungsrecht';
 import ArchivAktePage from './aufbewahrung/ArchivAktePage';
 import {
   adminGruppen,
@@ -356,8 +357,22 @@ export const appRouten = createRoutesFromElements(
         <Route element={<AppLayout />}>
           <Route path="/einsaetze" element={<EinsaetzePage />} />
           <Route path="/neuigkeiten" element={<NeuigkeitenPage />} />
-          <Route path="/planungen" element={<PlanungenPage />} />
-          <Route path="/planungen/:planungId" element={<PlanungPage />} />
+          <Route
+            path="/planungen"
+            element={
+              <NurMitPlanungsrecht>
+                <PlanungenPage />
+              </NurMitPlanungsrecht>
+            }
+          />
+          <Route
+            path="/planungen/:planungId"
+            element={
+              <NurMitPlanungsrecht>
+                <PlanungPage />
+              </NurMitPlanungsrecht>
+            }
+          />
           {/* Alt-Link bleibt als Redirect in die Admin-Sidebar. */}
           <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
           <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
