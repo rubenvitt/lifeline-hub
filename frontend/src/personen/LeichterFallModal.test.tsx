@@ -12,6 +12,8 @@ import { renderMitProviders } from '../test/utils';
 import LeichterFallModal, {
   fundortAusEinheit,
   fundortAusUhs,
+  KONTAKT_AUSGANG,
+  kontaktZuEingabe,
   leichterFallZuEingabe,
   type LeichterFallStelle,
 } from './LeichterFallModal';
@@ -69,6 +71,57 @@ describe('leichterFallZuEingabe', () => {
     const e = leichterFallZuEingabe({ anlass: 'sonstiges', versorgt_von: 'einheit:7' }, STELLE);
     expect(e.uhs_id).toBe(3);
     expect(e).not.toHaveProperty('versorgende_einheit_id');
+  });
+});
+
+describe('kontaktZuEingabe (LLH-1580)', () => {
+  const EINHEIT: Extract<LeichterFallStelle, { art: 'einheit' }> = {
+    art: 'einheit',
+    einheit: { id: 5, name: 'Streife 2' },
+    uhsZiele: [
+      { id: 3, bezeichnung: 'UHS Bühne' },
+      { id: 4, bezeichnung: 'UHS Eingang' },
+    ],
+  };
+
+  it('ohne Ausgang entlassen, fest an der eigenen Einheit, mit Standort', () => {
+    expect(
+      kontaktZuEingabe(
+        {
+          anlass: 'hitze_kaelte',
+          massnahmen: ['kuehlung'],
+          antreff_ort: { text: 'Bühne 2', koordinate: null },
+          standort: { lat: 50.11, lon: 8.68, genauigkeit: 12 },
+          name: 'darf nicht mit',
+        },
+        EINHEIT,
+      ),
+    ).toEqual({
+      status: 'betroffen',
+      versorgende_einheit_id: 5,
+      entlassen: true,
+      anlass: 'hitze_kaelte',
+      massnahmen: ['kuehlung'],
+      antreff_ort: 'Bühne 2',
+      antreff_lat: 50.11,
+      antreff_lon: 8.68,
+    });
+  });
+
+  it('„Zur UHS“ nimmt die gewählte UHS, sonst die erste; nie zugleich entlassen', () => {
+    const erste = kontaktZuEingabe({ anlass: 'sonstiges' }, EINHEIT, KONTAKT_AUSGANG.zurUhs);
+    expect(erste).toMatchObject({ uhs_id: 3 });
+    expect(erste).not.toHaveProperty('entlassen');
+    expect(
+      kontaktZuEingabe({ anlass: 'sonstiges', ziel_uhs: '4' }, EINHEIT, KONTAKT_AUSGANG.zurUhs),
+    ).toMatchObject({ uhs_id: 4 });
+  });
+
+  it('„RTW nötig“ setzt nur rtw, weder UHS noch entlassen', () => {
+    const e = kontaktZuEingabe({ anlass: 'sonstiges' }, EINHEIT, KONTAKT_AUSGANG.rtw);
+    expect(e).toMatchObject({ rtw: true, versorgende_einheit_id: 5 });
+    expect(e).not.toHaveProperty('uhs_id');
+    expect(e).not.toHaveProperty('entlassen');
   });
 });
 

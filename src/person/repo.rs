@@ -14,7 +14,7 @@ const SELECT_ALLE: &str = "\
            aktuelle_verbleib_betreuungsstelle_id, pat_nummer, kontamination, \
            transport_prioritaet, transport_art, transport_fachrichtung, transport_at, \
            aktueller_transport_durch, aktuelles_einsatz_fahrzeug_id, anlass, anlass_at, \
-           versorgende_einheit_id, meldung_id, \
+           versorgende_einheit_id, meldung_id, rtw_angefordert, \
            (SELECT e.name FROM einsatz_einheit e \
              WHERE e.id = einsatz_person.versorgende_einheit_id) AS versorgende_einheit_name, \
            (SELECT e.abschnitt_id FROM einsatz_einheit e \
@@ -352,6 +352,57 @@ pub async fn versorgende_einheiten(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?)
+}
+
+/// Aktive UHS des Einsatzes als Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3).
+pub async fn uhs_ziele(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<super::UhsZielAuswahl>, AppError> {
+    Ok(sqlx::query_as::<_, super::UhsZielAuswahl>(
+        "SELECT id, bezeichnung FROM uhs \
+         WHERE einsatz_id = ? AND status = 'aktiv' AND storniert_at IS NULL \
+         ORDER BY bezeichnung COLLATE NOCASE, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Name der Einheit im Einsatz, für ETB und Absender des Einheitengeräts (LLH-1580).
+pub async fn einheit_name(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
+/// Verknüpft eine frisch angelegte Person mit der Meldung, die ihre Anlage im selben Schritt
+/// erzeugt hat (RTW-Anforderung am Einheitengerät, LLH-1580 K1), und merkt sie als
+/// RTW-Anforderung: eine Herkunftsmeldung (LLH-1567) ist keine. Nur innerhalb der Anlage.
+pub async fn setze_rtw_meldung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    meldung_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_person SET meldung_id = ?, rtw_angefordert = 1 \
+         WHERE id = ? AND einsatz_id = ? AND meldung_id IS NULL",
+    )
+    .bind(meldung_id)
+    .bind(person_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Prüft die versorgende Einheit einer Person (LLH-1567, design.md D4): sie gehört zum Einsatz
