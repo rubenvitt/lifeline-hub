@@ -445,6 +445,11 @@ async fn patient_aus_meldung_in_beide_richtungen_sichtbar() {
     assert_eq!(s, StatusCode::CREATED, "{p1}");
     assert_eq!(p1["meldung_id"], mid);
     assert_eq!(p1["meldung_lfd_nr"], m["lfd_nr"]);
+    // LLH-1580: eine Herkunftsmeldung ist keine RTW-Anforderung des Einheitengeräts.
+    assert!(
+        !p1.as_object().unwrap().contains_key("rtw_angefordert"),
+        "{p1}"
+    );
     let (_, p2) = person_post(&app, &admin, e, json!({ "meldung_id": mid })).await;
     let (_, storniert) = person_post(&app, &admin, e, json!({ "meldung_id": mid })).await;
     let (s, _) = anfrage(

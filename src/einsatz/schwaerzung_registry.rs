@@ -300,6 +300,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // ohne Personenbezug; der Bericht zählt Kontakte je Einheit auch nach der Schwärzung.
             retain("versorgende_einheit_id", G_FK),
             retain("meldung_id", G_FK),
+            // LLH-1580 (K1): ob `meldung_id` die RTW-Anforderung des Einheitengeräts ist; ein
+            // Merkmal 0/1 wie ein Katalogwert, ohne Personenbezug.
+            retain("rtw_angefordert", G_ENUM),
             // LLH-1566: der Anlass der Hilfeleistung ist diagnosenah (psychisch, Intoxikation)
             // und fällt mit der Behandlung (LLH-1109); seine Zeit bleibt wie die des Transports.
             scrub("anlass", Strategie::NullSetzen, Z_BEHANDLUNG),

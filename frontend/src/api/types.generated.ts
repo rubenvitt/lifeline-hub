@@ -5758,6 +5758,11 @@ export interface components {
             /** Format: int64 */
             registrier_nr: number;
             rettungsmittel?: components["schemas"]["RettungsmittelStand"] | null;
+            /**
+             * @description LLH-1580 (K1): `meldung_id` ist die RTW-Anforderung des Einheitengeräts, nicht die Meldung,
+             *     aus der die Einsatzleitung die Person angelegt hat. Fehlt, wenn nicht.
+             */
+            rtw_angefordert?: boolean;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
             transport_art?: components["schemas"]["TransportArt"] | null;
@@ -7324,6 +7329,16 @@ export interface components {
          * @enum {string}
          */
         UhsTyp: "patientenablage" | "behandlungsplatz" | "verletztensammelstelle" | "sonstige";
+        /**
+         * @description Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/personen/uhs`): je aktiver UHS
+         *     des Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul
+         *     Unfallhilfsstellen wählen kann; keine Belegung, keine Plätze.
+         */
+        UhsZielAuswahl: {
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+        };
         /** @description Unangemeldete Kraft (design.md D1/D2). */
         UnangemeldetEingabe: {
             /** @description Freitext an der Einheit; nie in Meldung oder ETB. */

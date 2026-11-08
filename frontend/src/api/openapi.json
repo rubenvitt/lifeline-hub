@@ -14160,6 +14160,10 @@
               }
             ]
           },
+          "rtw_angefordert": {
+            "type": "boolean",
+            "description": "LLH-1580 (K1): `meldung_id` ist die RTW-Anforderung des Einheitengeräts, nicht die Meldung,\naus der die Einsatzleitung die Person angelegt hat. Fehlt, wenn nicht."
+          },
           "status": {
             "$ref": "#/components/schemas/PersonStatus"
           },
@@ -18360,6 +18364,23 @@
           "verletztensammelstelle",
           "sonstige"
         ]
+      },
+      "UhsZielAuswahl": {
+        "type": "object",
+        "description": "Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/personen/uhs`): je aktiver UHS\ndes Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul\nUnfallhilfsstellen wählen kann; keine Belegung, keine Plätze.",
+        "required": [
+          "id",
+          "bezeichnung"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "UnangemeldetEingabe": {
         "type": "object",

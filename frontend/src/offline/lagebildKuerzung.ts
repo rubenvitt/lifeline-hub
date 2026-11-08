@@ -74,6 +74,7 @@ export const PERSON_AUF_DER_PLATTE = {
   versorgende_einheit_abschnitt_name: 'behalten',
   meldung_id: 'behalten',
   meldung_lfd_nr: 'behalten',
+  rtw_angefordert: 'behalten',
   // LLH-1566: der Anlass ist ein Katalogwert und bleibt ohne Netz wie die Sichtung (LLH-1109:
   // ohne Netz nur Katalogwerte); seine Zeit braucht ohne Netz niemand.
   anlass: 'behalten',

@@ -13810,4 +13810,44 @@ mod tests {
             .await
             .expect_err("fehlende Herkunft zählt als leer");
     }
+
+    /// LLH-1580 (K1): der Bestand ist keine RTW-Anforderung, die Spalte nimmt nur 0 und 1.
+    #[tokio::test]
+    async fn migration_0298_person_rtw_angefordert() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 298;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: i64 =
+            sqlx::query_scalar("SELECT rtw_angefordert FROM einsatz_person WHERE id = ?")
+                .bind(p)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bestand, 0, "Bestand ist keine RTW-Anforderung");
+        let setze = |wert: i64| {
+            sqlx::query("UPDATE einsatz_person SET rtw_angefordert = ? WHERE id = ?")
+                .bind(wert)
+                .bind(p)
+                .execute(&pool)
+        };
+        setze(1).await.expect("1 geht");
+        setze(2).await.expect_err("nur 0 und 1");
+    }
 }

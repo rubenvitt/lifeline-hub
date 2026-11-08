@@ -439,6 +439,7 @@ export type Versorgung = S['Versorgung'];
 export type TransportmittelAuswahl = S['TransportmittelAuswahl'];
 export type VerbleibAngaben = S['VerbleibAngaben'];
 export type VersorgendeEinheitAuswahl = S['VersorgendeEinheitAuswahl'];
+export type UhsZielAuswahl = S['UhsZielAuswahl'];
 export type MeldungPatient = S['MeldungPatient'];
 export type EinsatzTransportfahrzeug = S['EinsatzTransportfahrzeug'];
 export type Sichtung = S['SichtungAnzeige'];

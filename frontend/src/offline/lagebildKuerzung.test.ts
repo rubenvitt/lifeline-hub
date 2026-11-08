@@ -48,6 +48,7 @@ const ERWARTET_BEHALTEN = [
   'versorgende_einheit_abschnitt_name',
   'meldung_id',
   'meldung_lfd_nr',
+  'rtw_angefordert',
   'anlass',
   'rettungsmittel',
 ].sort();
@@ -113,6 +114,7 @@ const VOLL: Person = {
   versorgende_einheit_abschnitt_name: 'Bühne',
   meldung_id: 17,
   meldung_lfd_nr: 3,
+  rtw_angefordert: true,
   anlass: 'intoxikation',
   anlass_at: '2026-10-18 09:01:00',
   rettungsmittel: {
