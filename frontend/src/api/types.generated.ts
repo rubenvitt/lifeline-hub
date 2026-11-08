@@ -371,7 +371,7 @@ export interface components {
          * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
          *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
          *     `0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und
-         *     `0299_admin_audit_instanz.sql` — beide Seiten
+         *     `0300_admin_audit_instanz.sql` — beide Seiten
          *     müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}

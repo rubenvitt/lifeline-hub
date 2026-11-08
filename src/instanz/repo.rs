@@ -1,4 +1,4 @@
-//! Speicher der Instanzkopplung (design.md D2, D3, D6, D9; `migrations/0298_instanz_kopplung.sql`).
+//! Speicher der Instanzkopplung (design.md D2, D3, D6, D9; `migrations/0299_instanz_kopplung.sql`).
 
 use super::basis32::{b64, b64_lesen, fingerabdruck};
 use super::code::Ableitung;

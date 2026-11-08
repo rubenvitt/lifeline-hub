@@ -23,7 +23,7 @@ CREATE TABLE admin_audit_neu (
                          'unterschrift_widerrufen', 'unterschrift_abgelehnt')),
     -- Handelnde Person. Der Name steht als Schnappschuss daneben, damit der Eintrag ohne Join
     -- lesbar bleibt. ON DELETE SET NULL wie in auth_audit: die Spur überlebt ihren Benutzer.
-    -- NULL bei Einträgen, die eine gekoppelte Instanz ausgelöst hat (0299).
+    -- NULL bei Einträgen, die eine gekoppelte Instanz ausgelöst hat (0300).
     akteur_id        INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
     akteur_name      TEXT,
     -- Betroffenes Konto; NULL, wenn das Ziel ein Anmeldeweg ist.
