@@ -1,27 +1,27 @@
 ## 1. Schale und Riegel nach `components/` (D3, D5)
 
-- [ ] 1.1 Verweise auf `pages/lagekarte/PunktankerMenue` und `pages/lagekarte/nachklickRiegel` im Repo greppen (Code, `AGENTS.md`, `docs/`, `openspec/specs/`); Liste für 1.4 festhalten
-- [ ] 1.2 `PunktankerMenue.tsx` samt Test nach `frontend/src/components/` verschieben (`git mv`), Importe in Kartenfläche, Flächenwahl und Skizze nachziehen; bestehende Tests grün
-- [ ] 1.3 `nachklickRiegel.ts` samt Test nach `frontend/src/components/` verschieben, Lagekarte importiert von dort; bestehende Tests grün
-- [ ] 1.4 Verweise aus 1.1 nachziehen (`pages/lagekarte/AGENTS.md`, Kommentare, aktive Specs); archivierte Changes bleiben unverändert
-- [ ] 1.5 `PunktankerMenue` bekommt `bezug: 'huelle' | 'fenster'` per TDD: Test, dass der Anker bei `'fenster'` in `document.body` mit `position: fixed` an den Fensterkoordinaten steht und bei `'huelle'` unverändert absolut
+- [x] 1.1 Verweise auf `pages/lagekarte/PunktankerMenue` und `pages/lagekarte/nachklickRiegel` im Repo greppen (Code, `AGENTS.md`, `docs/`, `openspec/specs/`); Liste für 1.4 festhalten
+- [x] 1.2 `PunktankerMenue.tsx` samt Test nach `frontend/src/components/` verschieben (`git mv`), Importe in Kartenfläche, Flächenwahl und Skizze nachziehen; bestehende Tests grün
+- [x] 1.3 `nachklickRiegel.ts` samt Test nach `frontend/src/components/` verschieben, Lagekarte importiert von dort; bestehende Tests grün
+- [x] 1.4 Verweise aus 1.1 nachziehen (`pages/lagekarte/AGENTS.md`, Kommentare, aktive Specs); archivierte Changes bleiben unverändert
+- [x] 1.5 `PunktankerMenue` bekommt `bezug: 'huelle' | 'fenster'` per TDD: Test, dass der Anker bei `'fenster'` in `document.body` mit `position: fixed` an den Fensterkoordinaten steht und bei `'huelle'` unverändert absolut
 
 ## 2. Auslöser `useKontextMenue` (D1–D4)
 
-- [ ] 2.1 TDD: Rechtsklick (Maus) auf ein Element mit Einträgen ruft `onOeffnen` mit Zeigerpunkt und `ursprung: 'zeiger'` und verhindert das Browsermenü
-- [ ] 2.2 TDD: kein `preventDefault` und kein Öffnen auf `a[href]`, `input`, `textarea`, `select`, `[contenteditable]`, auf markiertem Text im Ziel und wenn `onOeffnen` „keine Einträge“ meldet
-- [ ] 2.3 TDD mit Scheinzeit: Touchdruck über 550 ms ohne Bewegung öffnet; Bewegung über 8 px, `pointerup` oder `pointercancel` davor öffnet nicht; Maus startet keinen Zeitgeber
-- [ ] 2.4 TDD: natives `contextmenu` während eines Touchdrucks wird unterdrückt (kein Doppelöffnen); `user-select`/`-webkit-touch-callout` am Element während des Drucks gesetzt und danach zurückgenommen
-- [ ] 2.5 TDD: nach dem Öffnen per langem Druck schärft der Hook den Nachklick-Riegel; das Abheben erzeugt keinen `click` am Element
-- [ ] 2.6 TDD: `ContextMenu` und Umschalt+F10 öffnen am Element (`ursprung: 'tastatur'`, Anker untere linke Ecke), auch auf einem Link, nicht in einem Eingabefeld; ein Folge-`contextmenu` innerhalb von 500 ms wird verworfen
-- [ ] 2.7 `istKontextTaste`, `LANGDRUCK_MS` und `LANGDRUCK_WEG` aus dem Hook exportieren; `stab/skizze/bedienung.ts` nutzt `istKontextTaste` (Test `bedienung.test.ts` bleibt grün)
+- [x] 2.1 TDD: Rechtsklick (Maus) auf ein Element mit Einträgen ruft `onOeffnen` mit Zeigerpunkt und `ursprung: 'zeiger'` und verhindert das Browsermenü
+- [x] 2.2 TDD: kein `preventDefault` und kein Öffnen auf `a[href]`, `input`, `textarea`, `select`, `[contenteditable]`, auf markiertem Text im Ziel und wenn `onOeffnen` „keine Einträge“ meldet
+- [x] 2.3 TDD mit Scheinzeit: Touchdruck über 550 ms ohne Bewegung öffnet; Bewegung über 8 px, `pointerup` oder `pointercancel` davor öffnet nicht; Maus startet keinen Zeitgeber
+- [x] 2.4 TDD: natives `contextmenu` während eines Touchdrucks wird unterdrückt (kein Doppelöffnen); `user-select`/`-webkit-touch-callout` am Element während des Drucks gesetzt und danach zurückgenommen
+- [x] 2.5 TDD: nach dem Öffnen per langem Druck schärft der Hook den Nachklick-Riegel; das Abheben erzeugt keinen `click` am Element
+- [x] 2.6 TDD: `ContextMenu` und Umschalt+F10 öffnen am Element (`ursprung: 'tastatur'`, Anker untere linke Ecke), auch auf einem Link, nicht in einem Eingabefeld; ein Folge-`contextmenu` innerhalb von 500 ms wird verworfen
+- [x] 2.7 `istKontextTaste`, `LANGDRUCK_MS` und `LANGDRUCK_WEG` aus dem Hook exportieren; `stab/skizze/bedienung.ts` nutzt `istKontextTaste` (Test `bedienung.test.ts` bleibt grün)
 
 ## 3. `KontextMenue` für Datensätze (D6)
 
-- [ ] 3.1 TDD: `KontextMenue` zeigt `MenueEintrag[]` über `menueEintraege()` (Gefahr rot hinter einem Trenner, gesperrte Einträge deaktiviert) mit `aria-label`, Fokus im Menü
-- [ ] 3.2 TDD: Wahl ruft `onWahl(key)` genau einmal und löst kein Klickereignis eines umgebenden Elements aus; Escape schließt und gibt den Fokus an das Ursprungselement zurück
-- [ ] 3.3 TDD: `kontextEintraege(karte, zeile)` liefert Primäraktion (`__primaer`, nur wenn `sichtbar`) vor `weitere`, bei `laeuft` die `weitere`-Einträge gesperrt, ohne Aktionen eine leere Liste
-- [ ] 3.4 TDD: Wahl von `__primaer` mit `bestaetigung` öffnet `modal.confirm` mit gleichem Titel, Knopfbeschriftung und Gefahrfarbe; erst OK ruft `onKlick`; ohne `bestaetigung` ruft die Wahl `onKlick` sofort
+- [x] 3.1 TDD: `KontextMenue` zeigt `MenueEintrag[]` über `menueEintraege()` (Gefahr rot hinter einem Trenner, gesperrte Einträge deaktiviert) mit `aria-label`, Fokus im Menü
+- [x] 3.2 TDD: Wahl ruft `onWahl(key)` genau einmal und löst kein Klickereignis eines umgebenden Elements aus; Escape schließt und gibt den Fokus an das Ursprungselement zurück
+- [x] 3.3 TDD: `kontextEintraege(karte, zeile)` liefert Primäraktion (`__primaer`, nur wenn `sichtbar`) vor `weitere`, bei `laeuft` die `weitere`-Einträge gesperrt, ohne Aktionen eine leere Liste
+- [x] 3.4 TDD: Wahl von `__primaer` mit `bestaetigung` öffnet `modal.confirm` mit gleichem Titel, Knopfbeschriftung und Gefahrfarbe; erst OK ruft `onKlick`; ohne `bestaetigung` ruft die Wahl `onKlick` sofort
 
 ## 4. Anbindung der `Datensicht` (D7)
 

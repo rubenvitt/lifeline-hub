@@ -257,3 +257,12 @@ main:has([data-lfh='zaehltasten']) {
 main:has([data-lfh='ausgabe-kurzzeile']) {
   scroll-padding-block-start: var(--lfh-ausgabe-kurzzeile-fokusabstand, 0px);
 }
+
+/* Touchdruck auf einen Datensatz mit Kontextmenü (LLH-1596, `components/useKontextMenue.ts`, D3):
+   solange der Finger liegt, markiert iOS keinen Text und zeigt keine Blase, sonst käme beides vor
+   dem Zeitgeber des langen Drucks. Das Attribut steht nur während des Drucks. */
+[data-kontext-druck] {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}

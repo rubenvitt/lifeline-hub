@@ -1,16 +1,18 @@
 /**
- * Menü an einem Punkt der Lagekarte — die gemeinsame Schale des Flächen-Auswahlmenüs (LFH-812) und
- * des Kontextmenüs (LFH-776, `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D1).
+ * Menü an einem Punkt — die gemeinsame Schale des Flächen-Auswahlmenüs (LFH-812), des Kontextmenüs
+ * der Karte und der Skizze und des Kontextmenüs eines Datensatzes (`KontextMenue`, LLH-1596).
+ * Herkunft: Kontextmenü der Karte (LFH-776, `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D1).
  *
  * Bedienung nach Leitlinie „Datensatz-Aktionen": antds `Dropdown` im Portal mit `autoFocus`
  * (Pfeile, Enter, Esc bringt das Menü mit), Einträge in der Steuerhöhe der Dichtestufe
  * (`punktmenueEintragStil`). Ein Kopf (`kopf`) steht über dem Menü, nicht als antd-Gruppe darin: rc-menu
  * fokussiert mit `autoFocus` sonst die Gruppe statt des ersten Eintrags. Verankert an einem unsichtbaren Punkt in Pixeln
- * relativ zur Kartenhülle. Geschlossen wird allein über `onOpenChange`; jeder Weg hinaus gibt den
+ * relativ zur Hülle oder zum Fenster (`bezug`). Geschlossen wird allein über `onOpenChange`; jeder Weg hinaus gibt den
  * Fokus an die Karte zurück (`fokusZiel`). Esc bei offenem Menü erkennt der Zeichnen-Esc über
  * `escGehoertOverlay` als Overlay.
  */
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Dropdown, theme, type MenuProps } from 'antd';
 
 type Items = NonNullable<MenuProps['items']>;
@@ -66,8 +68,15 @@ function mitEintragStil(items: Items, stil: ReturnType<typeof punktmenueEintragS
 }
 
 export interface PunktankerMenueProps {
-  /** Ankerpunkt in Pixeln relativ zur Kartenhülle; `null` = kein Menü. */
+  /** Ankerpunkt in Pixeln (relativ zur Hülle oder zum Fenster, s. `bezug`); `null` = kein Menü. */
   anker: { x: number; y: number } | null;
+  /**
+   * Worauf sich `anker` bezieht (LLH-1596, design.md D5). `huelle` (Vorgabe): absolut im
+   * positionierten Elternteil (Karte, Skizze). `fenster`: Fensterkoordinaten, der Anker hängt per
+   * Portal unter `body` und steht `fixed`, damit Bildlauf und `transform` der Vorfahren ihn nicht
+   * versetzen (Kontextmenü eines Datensatzes).
+   */
+  bezug?: 'huelle' | 'fenster';
   ariaLabel: string;
   /** `data-lfh` des Ankers (Nachweise im e2e). */
   ankerKennung: string;
@@ -82,6 +91,7 @@ export interface PunktankerMenueProps {
 
 export default function PunktankerMenue({
   anker,
+  bezug = 'huelle',
   ariaLabel,
   ankerKennung,
   items,
@@ -112,7 +122,7 @@ export default function PunktankerMenue({
     fokusZiel?.()?.focus({ preventScroll: true });
   };
 
-  return (
+  const menue = (
     <Dropdown
       open
       trigger={['click']}
@@ -164,7 +174,7 @@ export default function PunktankerMenue({
         aria-hidden="true"
         data-lfh={ankerKennung}
         style={{
-          position: 'absolute',
+          position: bezug === 'fenster' ? 'fixed' : 'absolute',
           left: anker.x,
           top: anker.y,
           width: 1,
@@ -174,4 +184,5 @@ export default function PunktankerMenue({
       />
     </Dropdown>
   );
+  return bezug === 'fenster' ? createPortal(menue, document.body) : menue;
 }

@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { MenuProps } from 'antd';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders } from '../test/utils';
 import PunktankerMenue, { punktmenueEintragStil } from './PunktankerMenue';
-import { escGehoertOverlay } from './zeichnenEsc';
+import { escGehoertOverlay } from '../pages/lagekarte/zeichnenEsc';
 
 const offenesMenue = () =>
   document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
@@ -142,6 +142,47 @@ describe('PunktankerMenue (LFH-776, Schale aus LFH-812)', () => {
     rerender(<PunktankerMenue anker={null} {...props} />);
     await waitFor(() => expect(document.activeElement).toBe(karte));
     expect(props.onSchliessen).not.toHaveBeenCalled();
+  });
+});
+
+describe('PunktankerMenue, Bezug des Ankers (LLH-1596, design.md D5)', () => {
+  const props = {
+    ariaLabel: 'Aktionen',
+    items: ITEMS,
+    onWaehlen: vi.fn(),
+    onSchliessen: vi.fn(),
+  };
+
+  it('verankert bei „huelle“ (Vorgabe) absolut im eigenen Elternteil', () => {
+    const { container } = renderMitProviders(
+      <div data-testid="huelle">
+        <PunktankerMenue anker={{ x: 40, y: 50 }} ankerKennung="anker-huelle" {...props} />
+      </div>,
+    );
+    const anker = document.querySelector<HTMLElement>('[data-lfh="anker-huelle"]')!;
+    expect(container.contains(anker)).toBe(true);
+    expect(anker.style.position).toBe('absolute');
+    expect(anker.style.left).toBe('40px');
+    expect(anker.style.top).toBe('50px');
+  });
+
+  it('verankert bei „fenster“ fest am Fensterpunkt, im Portal unter body', () => {
+    const { container } = renderMitProviders(
+      <div style={{ transform: 'translateX(10px)' }}>
+        <PunktankerMenue
+          anker={{ x: 120, y: 80 }}
+          bezug="fenster"
+          ankerKennung="anker-fenster"
+          {...props}
+        />
+      </div>,
+    );
+    const anker = document.querySelector<HTMLElement>('[data-lfh="anker-fenster"]')!;
+    expect(container.contains(anker)).toBe(false);
+    expect(anker.parentElement).toBe(document.body);
+    expect(anker.style.position).toBe('fixed');
+    expect(anker.style.left).toBe('120px');
+    expect(anker.style.top).toBe('80px');
   });
 });
 
