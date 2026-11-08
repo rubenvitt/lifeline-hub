@@ -354,6 +354,43 @@ describe('useKontextMenue — Befunde aus dem Review (LLH-1596)', () => {
   });
 });
 
+describe('useKontextMenue — Befunde aus dem PR-Review (CodeRabbit)', () => {
+  it('ein abgebrochener zweiter Finger lässt den Rechtsklick nicht gesperrt zurück', () => {
+    vi.useFakeTimers();
+    const { onOeffnen } = aufbau();
+    const text = screen.getByTestId('text');
+    fireEvent.pointerDown(text, { ...touch, pointerId: 1, clientX: 50, clientY: 60 });
+    // Zweiter Finger auf dem Link: bricht vor dem Zeitgeber ab, kein Druck mehr.
+    fireEvent.pointerDown(screen.getByRole('link'), { ...touch, pointerId: 2 });
+    fireEvent.pointerUp(screen.getByRole('link'), { ...touch, pointerId: 2 });
+    fireEvent.pointerUp(text, { ...touch, pointerId: 1 });
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    expect(rechtsklick(text)).toBe(false);
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+
+  it('Stift: hebt er über dem Menü ab (Portal), löst der Riegel trotzdem', () => {
+    vi.useFakeTimers();
+    const beiKlick = vi.fn();
+    const { zeile } = aufbau();
+    zeile.addEventListener('click', beiKlick);
+    const text = screen.getByTestId('text');
+    const stift = { ...touch, pointerType: 'pen' };
+    fireEvent.pointerDown(text, { ...stift, clientX: 50, clientY: 60 });
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    // Das Menü liegt unter der Spitze: `pointerup` trifft das Portal, nicht den Datensatz.
+    const menue = document.createElement('div');
+    document.body.appendChild(menue);
+    fireEvent.pointerUp(menue, stift);
+    fireEvent.click(text);
+    expect(beiKlick).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1000));
+    fireEvent.click(text);
+    expect(beiKlick).toHaveBeenCalledTimes(1);
+    menue.remove();
+  });
+});
+
 describe('istKontextTaste', () => {
   it('erkennt Kontextmenü-Taste und Umschalt+F10, sonst nichts', () => {
     expect(istKontextTaste({ key: 'ContextMenu', shiftKey: false })).toBe(true);

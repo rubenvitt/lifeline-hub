@@ -206,6 +206,33 @@ export function useKontextMenue<S>(
 
   useEffect(() => loesen, [loesen]);
 
+  /** Ende eines Drucks: Zeitgeber und Sperre weg, Stift-Riegel läuft ab jetzt nur noch nach. */
+  const druckEnde = useCallback(() => {
+    loesen();
+    touchAktiv.current = false;
+    const st = stiftRiegel.current;
+    if (st != null && st.bis === Infinity) {
+      stiftRiegel.current = { bis: performance.now() + NACHLAUF_MS };
+    }
+  }, [loesen]);
+
+  useEffect(() => {
+    // Rückfall am `window`: ein Stift hat keine implizite Pointer-Capture, und nach dem langen
+    // Druck liegt das Menü (Portal) unter der Spitze; sein `pointerup` erreicht den Datensatz
+    // dann nicht. Ohne diesen Hörer bliebe der Stift-Riegel scharf und schluckte jeden Klick.
+    const abgehoben = () => {
+      if (druck.current != null || touchAktiv.current || stiftRiegel.current?.bis === Infinity) {
+        druckEnde();
+      }
+    };
+    window.addEventListener('pointerup', abgehoben, true);
+    window.addEventListener('pointercancel', abgehoben, true);
+    return () => {
+      window.removeEventListener('pointerup', abgehoben, true);
+      window.removeEventListener('pointercancel', abgehoben, true);
+    };
+  }, [druckEnde]);
+
   return useCallback(
     <E extends Element = Element>(schluessel: S): KontextHandler<E> => {
       const oeffne = (
@@ -219,14 +246,6 @@ export function useKontextMenue<S>(
           element,
           vorherFokus: document.activeElement,
         });
-
-      const druckEnde = () => {
-        loesen();
-        touchAktiv.current = false;
-        const st = stiftRiegel.current;
-        if (st != null && st.bis === Infinity)
-          stiftRiegel.current = { bis: performance.now() + NACHLAUF_MS };
-      };
 
       return {
         onContextMenu: (e) => {
@@ -298,6 +317,6 @@ export function useKontextMenue<S>(
         },
       };
     },
-    [loesen],
+    [loesen, druckEnde],
   );
 }
