@@ -42,9 +42,10 @@ diese Zusage.
   als EIN maplibre-Ereignis `contextmenu` (`Kartenflaeche.tsx`); offen nur an einem Ort
   (`istOrtsziel` in `klickziel.ts`: freie Karte, Fläche — nie Punktziel oder Trefferzone), gesperrt
   über die Prop `kontextmenue` (`null` im exklusiven Modus). Nach dem langen Druck liegt der Finger
-  noch: `nachklickRiegel.ts` hängt VOR jedem Dropdown am `window` (Capture) und schluckt die
+  noch: `components/nachklickRiegel.ts` hängt VOR jedem Dropdown am `window` (Capture) und schluckt die
   Ereignisse des Abhebens. Einträge und Rechte nur aus `kontextEintraege` (`kontextmenue.ts`).
-  Punktmenüs der Karte (Flächenwahl, Kontextmenü) teilen die Schale `PunktankerMenue.tsx`; ein Kopf
+  Punktmenüs der Karte (Flächenwahl, Kontextmenü) teilen die Schale `components/PunktankerMenue.tsx` (mit Skizze und Datensatz-Kontextmenü,
+  LLH-1596); ein Kopf
   steht über dem Menü, nie als antd-Gruppe (rc-menu fokussierte sonst die Gruppe). Nachweis
   `e2e/lagekarte-touch.spec.ts` (langer Druck per CDP, Rechtsklick).
 - **Betreuung auf der Karte** (LFH-673, `openspec/changes/archive/2026-09-29-lfh-673-betreuung-auf-der-lagekarte/design.md`):
