@@ -3,8 +3,9 @@ import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
-import { adminFixture } from '../test/fixtures';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { adminFixture, freigabenFixture } from '../test/fixtures';
+import { einsatzKeys } from '../api/queryKeys';
 import type { Schichtplan } from '../api/types';
 import SchichtplanDruckPage from './SchichtplanDruckPage';
 
@@ -39,7 +40,7 @@ const PLAN: Schichtplan = {
   helfer: [],
 };
 
-function zeigen(handler: Parameters<typeof server.use>) {
+function zeigen(handler: Parameters<typeof server.use>, client = neuerQueryClient()) {
   server.use(
     meHandler(adminFixture()),
     http.get('/api/einsaetze/5', () =>
@@ -58,7 +59,7 @@ function zeigen(handler: Parameters<typeof server.use>) {
     <Routes>
       <Route path="/einsaetze/:id/abloesung/schichtplan/druck" element={<SchichtplanDruckPage />} />
     </Routes>,
-    { route: '/einsaetze/5/abloesung/schichtplan/druck' },
+    { route: '/einsaetze/5/abloesung/schichtplan/druck', client },
   );
 }
 
@@ -93,6 +94,27 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
     ]);
     await waitFor(() => expect(druckKnopf()).toBeEnabled());
     expect(screen.getByRole('heading', { name: /Aushang – UHS Marktplatz/ })).toBeInTheDocument();
+  });
+
+  it('Alter Stand der Freigaben im Cache: der Schnappschuss wartet auf den frischen', async () => {
+    const client = neuerQueryClient();
+    client.setQueryData(
+      einsatzKeys.modulFreigaben(5),
+      freigabenFixture({ unfallhilfsstellen: { zugriff: false } }),
+      { updatedAt: 0 },
+    );
+    let uhsAbrufe = 0;
+    zeigen(
+      [
+        http.get('/api/einsaetze/5/uhs', () => {
+          uhsAbrufe += 1;
+          return HttpResponse.json([]);
+        }),
+      ],
+      client,
+    );
+    await waitFor(() => expect(druckKnopf()).toBeEnabled());
+    expect(uhsAbrufe).toBe(1);
   });
 
   it('Katalog scheitert: Ladefehler, Druck gesperrt', async () => {

@@ -65,7 +65,7 @@ export default function SchichtplanDruckPage() {
   // Einheiten und UHS nur abfragen, wenn ihr Modul frei ist. Sind die Freigaben unbekannt
   // (Abruf gescheitert), wird trotzdem gefragt; ein 403 heißt dann wie bei veralteten Freigaben:
   // Modul gesperrt, Posten ohne Abschnitt. Jeder andere Fehler scheitert sichtbar.
-  const { freigaben, gescheitert } = useModulFreigabenStand(einsatzId);
+  const { freigaben, gescheitert, laedt: freigabenLaden } = useModulFreigabenStand(einsatzId);
   const einheitenFrei = freigaben == null || istKeyFreigegeben('einheiten', freigaben);
   const uhsFrei = freigaben == null || istKeyFreigegeben('unfallhilfsstellen', freigaben);
 
@@ -92,7 +92,8 @@ export default function SchichtplanDruckPage() {
         geladenAt: new Date().toISOString(),
       };
     },
-    enabled: freigaben != null || gescheitert,
+    // Ein laufender Abruf der Freigaben (alter Stand im Cache) wird abgewartet.
+    enabled: (freigaben != null || gescheitert) && !freigabenLaden,
     ...DRUCK_ABFRAGE,
     gcTime: 0,
   });
@@ -170,7 +171,7 @@ export default function SchichtplanDruckPage() {
             Zurück zum Schichtplan
           </Button>
           {!keinZugriff && (
-            <Button onClick={() => void refetch()} disabled={isFetching}>
+            <Button onClick={() => void refetch()} disabled={isFetching || freigabenLaden}>
               Neu laden
             </Button>
           )}
