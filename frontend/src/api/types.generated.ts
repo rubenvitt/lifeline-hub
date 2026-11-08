@@ -4555,7 +4555,7 @@ export interface components {
         };
         /**
          * @description Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in
-         *     `migrations/0292_person_massnahme_sanitaetsdienst.sql` (die vier letzten aus LLH-1572).
+         *     `migrations/0295_person_massnahme_sanitaetsdienst.sql` (die vier letzten aus LLH-1572).
          *     Katalogwert (Retain), nie im ETB oder Live-Kanal.
          * @enum {string}
          */

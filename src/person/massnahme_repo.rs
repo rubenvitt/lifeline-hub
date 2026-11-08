@@ -15,7 +15,7 @@ use utoipa::ToSchema;
 
 wire_enum! {
     /// Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in
-    /// `migrations/0292_person_massnahme_sanitaetsdienst.sql` (die vier letzten aus LLH-1572).
+    /// `migrations/0295_person_massnahme_sanitaetsdienst.sql` (die vier letzten aus LLH-1572).
     /// Katalogwert (Retain), nie im ETB oder Live-Kanal.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum MassnahmeArt {
