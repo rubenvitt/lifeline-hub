@@ -1384,8 +1384,10 @@ export default function PersonenPage() {
           isPending: leichtLaeuft,
           reset: () => setLeichtFehler(null),
         }}
-        onAbbrechen={() => setLeichterFallFuer(null)}
-        onFertig={() => setLeichterFallFuer(null)}
+        // Nur den eigenen Dialog schließen: eine späte Antwort aus Einsatz A darf den inzwischen
+        // in Einsatz B geöffneten Dialog nicht zuklappen.
+        onAbbrechen={() => setLeichterFallFuer((alt) => (alt === einsatzId ? null : alt))}
+        onFertig={() => setLeichterFallFuer((alt) => (alt === einsatzId ? null : alt))}
         onErfassen={(daten) => {
           if (!benutzer) return Promise.reject(new Error('Nicht angemeldet'));
           return anlegenMutation.mutateAsync({

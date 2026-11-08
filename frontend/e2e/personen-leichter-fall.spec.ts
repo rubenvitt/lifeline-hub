@@ -123,6 +123,11 @@ test('LLH-1572: UHS-Tablet ohne Netz — vorgemerkt, mit Netz einmal angelegt un
       aktuelle_uhs_id: null,
       anlass: 'hitze_kaelte',
     });
+    // Die vorgemerkte Maßnahme kommt mit dem Replay an.
+    const detail = await page.request.get(`/api/einsaetze/${e}/personen/${p.id}`);
+    expect(detail.ok()).toBeTruthy();
+    const { massnahmen } = (await detail.json()) as { massnahmen: { art: string }[] };
+    expect(massnahmen.map((m) => m.art)).toEqual(['kuehlung']);
     const reg = `R-${String(p.registrier_nr).padStart(3, '0')}`;
     const zurPerson = (await etbTexte(page, e)).filter((t) => t.includes(reg));
     expect(zurPerson).toEqual([`Person ${reg}: in UHS Bühne versorgt und entlassen`]);
