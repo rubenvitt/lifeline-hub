@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './client';
+import { apiDatei, apiGet, apiSend } from './client';
 import type {
   Planung,
   PlanungAendernBody,
@@ -112,4 +112,16 @@ export function aenderePlanungHelfer(
 /** Nimmt den Helfer aus allen Blöcken. */
 export function loeschePlanungHelfer(id: number, helferId: number): Promise<void> {
   return apiSend<void>(`${basis(id)}/helfer/${helferId}`, 'DELETE');
+}
+
+/** Zeit für das Schreiben einer großen Mappe, wie beim Schichtplan eines Einsatzes. */
+const MAPPE_TIMEOUT_MS = 60_000;
+
+/**
+ * Die Planung als Excel-Mappe (LLH-1557 Teil B, Spec `vorplanung`): dieselben Blätter wie der
+ * Schichtplan eines Einsatzes, Zeiten in der Zone der Organisation. Der Server schickt keinen
+ * Dateinamen.
+ */
+export function loadPlanungMappe(id: number): Promise<Blob> {
+  return apiDatei(`${basis(id)}/export`, { timeoutMs: MAPPE_TIMEOUT_MS });
 }

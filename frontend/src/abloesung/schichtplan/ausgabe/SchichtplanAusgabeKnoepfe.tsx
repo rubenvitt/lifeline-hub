@@ -20,36 +20,70 @@ interface SchichtplanAusgabeKnoepfeProps {
 
 /**
  * Ausgabewege des Schichtplans im Slot `werkzeuge` der Ansicht (LLH-1557, design D2), auch ohne
- * Schreibrecht. „Drucken“ führt zur Druckansicht: ein Link in Knopfgestalt, damit Strg/⌘+Klick
- * einen neuen Tab öffnet wie jeder Link. „Excel“ lädt die Mappe vom Server und bietet sie als Datei
- * an (`apiDatei` + `speichereDatei`, kein Download-Anker); ein Fehler steht an der Seite, nicht im
- * Toast, und verschwindet beim nächsten Versuch.
+ * Schreibrecht. Die Knöpfe selbst sind {@link AusgabeKnoepfe}, die auch die Planungsseite nutzt.
  */
 export default function SchichtplanAusgabeKnoepfe({
   einsatzId,
   einsatzBezeichnung,
   personalFrei,
 }: SchichtplanAusgabeKnoepfeProps) {
+  return (
+    <AusgabeKnoepfe
+      druckPfad={schichtplanDruckPfad(einsatzId)}
+      schluessel={`einsatz-${einsatzId}`}
+      ladeMappe={() => loadSchichtplanMappe(einsatzId)}
+      dateiname={() => mappeDateiname(einsatzBezeichnung, `einsatz-${einsatzId}`)}
+      personalFrei={personalFrei}
+    />
+  );
+}
+
+interface AusgabeKnoepfeProps {
+  /** Ziel von „Drucken“. */
+  druckPfad: string;
+  /** Eindeutig je Plan (`einsatz-5`, `planung-3`): Laden und Fehler gelten nur für diesen. */
+  schluessel: string;
+  ladeMappe: () => Promise<Blob>;
+  dateiname: () => string;
+  /** Ohne Freigabe des Moduls Personal ist „Excel“ gesperrt und nennt den Grund; `undefined`:
+   *  gesperrt, solange die Freigaben laden, noch ohne Grund. */
+  personalFrei: boolean | undefined;
+}
+
+/**
+ * „Drucken“ und „Excel“ eines Plans (Einsatz oder Planung, LLH-1557). „Drucken“ führt zur
+ * Druckansicht: ein Link in Knopfgestalt, damit Strg/⌘+Klick einen neuen Tab öffnet wie jeder
+ * Link. „Excel“ lädt die Mappe vom Server und bietet sie als Datei an (`apiDatei` +
+ * `speichereDatei`, kein Download-Anker); ein Fehler steht an der Seite, nicht im Toast, und
+ * verschwindet beim nächsten Versuch.
+ */
+export function AusgabeKnoepfe({
+  druckPfad,
+  schluessel,
+  ladeMappe,
+  dateiname,
+  personalFrei,
+}: AusgabeKnoepfeProps) {
   const navigate = useNavigate();
   const grundId = useId();
-  const druck = schichtplanDruckPfad(einsatzId);
   // `networkMode: 'always'` wie `useCsvExport`: ohne Netz sofort scheitern statt still warten.
-  const mappe = useMutation({
+  // Die Variable ist der Schlüssel des Plans, für den geladen wird.
+  const mappe = useMutation<void, Error, string>({
     networkMode: 'always',
-    mutationFn: async (id: number) => {
-      const datei = await loadSchichtplanMappe(id);
-      speichereDatei(datei, mappeDateiname(einsatzBezeichnung, `einsatz-${id}`));
+    mutationFn: async () => {
+      const datei = await ladeMappe();
+      speichereDatei(datei, dateiname());
     },
   });
-  const fuerDiesen = mappe.variables === einsatzId;
+  const fuerDiesen = mappe.variables === schluessel;
   return (
     <>
       <Button
-        href={druck}
+        href={druckPfad}
         onClick={(e) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
           e.preventDefault();
-          navigate(druck);
+          navigate(druckPfad);
         }}
       >
         Drucken
@@ -58,7 +92,7 @@ export default function SchichtplanAusgabeKnoepfe({
         disabled={personalFrei !== true}
         loading={fuerDiesen && mappe.isPending}
         aria-describedby={personalFrei === false ? grundId : undefined}
-        onClick={() => mappe.mutate(einsatzId)}
+        onClick={() => mappe.mutate(schluessel)}
       >
         Excel
       </Button>

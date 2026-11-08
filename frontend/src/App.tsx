@@ -159,6 +159,7 @@ const NeuigkeitenPage = lazy(() => import('./neuigkeiten/NeuigkeitenPage'));
 // Vorplanung ohne Einsatz (LLH-1586): eigener Chunk, nur Planer kommen hierher.
 const PlanungenPage = lazy(() => import('./planung/PlanungenPage'));
 const PlanungPage = lazy(() => import('./planung/PlanungPage'));
+const PlanungDruckPage = lazy(() => import('./planung/PlanungDruckPage'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -373,6 +374,14 @@ export const appRouten = createRoutesFromElements(
             element={
               <NurMitPlanungsrecht>
                 <PlanungPage />
+              </NurMitPlanungsrecht>
+            }
+          />
+          <Route
+            path="/planungen/:planungId/druck"
+            element={
+              <NurMitPlanungsrecht>
+                <PlanungDruckPage />
               </NurMitPlanungsrecht>
             }
           />

@@ -1078,6 +1078,9 @@ export const GLOBAL_KEYS = {
   zugangsprotokoll: 'zugangsprotokoll',
   // Vorplanung ohne Einsatz (LLH-1585): Liste und Planungen, nur für Planer der Organisation.
   planungen: 'planungen',
+  // Druckansicht einer Planung (LLH-1593): ein Schnappschuss außerhalb von `planungen`, damit das
+  // Ereignis `planung` ihn nicht per Präfix auffrischt.
+  planungDruck: 'planung-druck',
 
   // Stammdaten-Kataloge
   personal: 'personal',
@@ -1203,6 +1206,7 @@ export const globalKeys = {
   /** Liste der Planungen; zugleich Prefix jeder einzelnen Planung (LLH-1585). */
   planungen: () => [GLOBAL_KEYS.planungen] as const,
   planung: (planungId: number) => [GLOBAL_KEYS.planungen, planungId] as const,
+  planungDruck: (planungId: number) => [GLOBAL_KEYS.planungDruck, planungId] as const,
   /** Seitenkette einer Spur mit ihrem Filter. */
   zugangsprotokollSeiten: (
     spur: ZugangsprotokollSpur,
@@ -1358,6 +1362,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  *   Suchtext kann eine Personenadresse sein).
  * - `orgOrtVorschau`: abgeleiteter Geo-Lookup wie `ortVorschau` (LLH-1376); live zu invalidieren
  *   wäre schädlich (Nominatim-ToS).
+ * - `planungDruck` (LLH-1593): derselbe Schnappschuss-Grundsatz wie `schichtplanDruck`; eine
+ *   Änderung an der Planung darf Aushang und Zettel vor dem Druck nicht still ändern.
  */
 export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
@@ -1375,6 +1381,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.zugangsprotokoll,
   GLOBAL_KEYS.orgOrtSuche,
   GLOBAL_KEYS.orgOrtVorschau,
+  GLOBAL_KEYS.planungDruck,
 ] as const satisfies readonly GlobalKey[];
 
 /**

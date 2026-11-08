@@ -1,8 +1,7 @@
 /**
  * Der Schichtplan zum Ausgeben (LLH-1557, Change `jwqanxja-schichtplan-ausgeben`, design D1):
  * eine fachneutrale Form, aus der Aushang je Posten und Zettel je Person entstehen. Der Plan eines
- * Einsatzes kommt über `ausEinsatzPlan.ts` herein, die Vorplanung später über einen eigenen
- * Adapter. Gerechnet wird hier nur, was die Blätter ordnen und summieren; offene Plätze liefert
+ * Einsatzes kommt über `ausEinsatzPlan.ts` herein, die Vorplanung über `planung/ausPlanung.ts`. Gerechnet wird hier nur, was die Blätter ordnen und summieren; offene Plätze liefert
  * der Server.
  */
 

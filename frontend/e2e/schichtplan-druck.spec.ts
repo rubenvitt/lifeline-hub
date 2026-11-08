@@ -13,6 +13,9 @@ import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
  * Gesät wird ein Einsatz mit der UHS „UHS Marktplatz“ (30 Schichten zu 30 Minuten, also über eine
  * Seite), der Einheit „Fußstreife 1“, einer Pause, einer Ad-hoc-Kraft und einem Helfer des Plans.
  *
+ * Die Planung ohne Einsatz (LLH-1593) druckt dieselben Blätter von ihrer Seite aus; ihr Test sät
+ * eine Planung mit zwei Posten und einem Helfer über die API.
+ *
  * Mutationsprobe: jedes Blatt in ein eigenes `div` gelegt (die Kapitel sind keine Geschwister
  * mehr, die Regel in `druck/druck.css` greift nicht) → `break-before` ist `auto`, rot.
  */
@@ -189,5 +192,91 @@ test('Zettel je Person: Pause als Zeile, Stunden ohne Pause, Telefon beim Helfer
         .breakInside,
   );
   expect(bruch).toBe('avoid');
+  await page.emulateMedia({ media: null });
+});
+
+/** Eine Planung eine Woche voraus mit „RTW 1“ (20 Schichten) und „Fußtrupp“, ein Helfer. */
+async function seedePlanung(page: Page): Promise<number> {
+  const beginn = Math.ceil((Date.now() + 7 * 24 * 3_600_000) / 3_600_000) * 3_600_000;
+  const wire = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+  const halbe = 30 * 60_000;
+  const neu = await page.request.post('/api/planungen', {
+    data: {
+      bezeichnung: `E2E Planung Druck ${Date.now()}`,
+      von: wire(beginn),
+      bis: wire(beginn + 12 * 3_600_000),
+    },
+  });
+  expect(neu.ok(), `Planung: ${neu.status()} ${await neu.text()}`).toBeTruthy();
+  const planungId = ((await neu.json()) as { kopf: { id: number } }).kopf.id;
+  const sende = async (pfad: string, data: unknown) => {
+    const a = await page.request.post(`/api/planungen/${planungId}/${pfad}`, { data });
+    expect(a.ok(), `${pfad}: ${a.status()} ${await a.text()}`).toBeTruthy();
+    return (await a.json()) as { id: number; posten: { id: number; bezeichnung: string }[] };
+  };
+  await sende('posten', { bezeichnung: 'RTW 1', art: 'einheit' });
+  const mitFuss = await sende('posten', { bezeichnung: 'Fußtrupp', art: 'einheit' });
+  const rtw = mitFuss.posten.find((p) => p.bezeichnung === 'RTW 1')!.id;
+  const fuss = mitFuss.posten.find((p) => p.bezeichnung === 'Fußtrupp')!.id;
+  const helfer = await sende('helfer', {
+    name: 'Paul Planer',
+    telefon: '0170 1112233',
+    organisation: 'Bereitschaft Nord',
+  });
+  const personen = [{ art: 'helfer', helfer_id: helfer.id }];
+  for (let i = 0; i < 20; i++) {
+    await sende('bloecke', {
+      posten_id: rtw,
+      von: wire(beginn + i * halbe),
+      bis: wire(beginn + (i + 1) * halbe),
+      soll_anzahl: 2,
+      personen,
+    });
+  }
+  await sende('bloecke', {
+    posten_id: fuss,
+    von: wire(beginn + 20 * halbe),
+    bis: wire(beginn + 24 * halbe),
+    personen,
+  });
+  return planungId;
+}
+
+test('Planung: Aushang von der Planungsseite, der Kopf nennt die Planung', async ({ page }) => {
+  test.setTimeout(180_000);
+  await anmeldenAls(page, ADMIN, ADMIN_PW);
+  const planungId = await seedePlanung(page);
+  await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
+
+  await page.goto(`/planungen/${planungId}`);
+  await page.getByRole('link', { name: 'Drucken' }).click();
+  await expect(page).toHaveURL(new RegExp(`/planungen/${planungId}/druck$`));
+
+  const blaetter = page.locator('[data-lfh="druckwurzel"] [data-lfh="druck-kapitel"]');
+  await expect(blaetter).toHaveCount(2);
+  await expect(blaetter.nth(0).getByRole('heading')).toHaveText('Aushang – RTW 1');
+  await expect(blaetter.nth(1).getByRole('heading')).toHaveText('Aushang – Fußtrupp');
+  await expect(blaetter.nth(0).locator('tbody tr')).toHaveCount(20);
+  await expect(blaetter.nth(0).getByText('Planung', { exact: true })).toBeVisible();
+
+  await drucke(page);
+  const lage = await page.evaluate(() => {
+    const wurzel = document.querySelector('[data-lfh="druckwurzel"]')!.getBoundingClientRect();
+    const kapitel = Array.from(document.querySelectorAll('[data-lfh="druck-kapitel"]'));
+    const zellen = Array.from(document.querySelectorAll('[data-lfh="druckwurzel"] :is(td, th)'));
+    return {
+      wurzelRechts: wurzel.right,
+      zellenRechts: Math.max(...zellen.map((z) => z.getBoundingClientRect().right)),
+      zweiterBruch: getComputedStyle(kapitel[1]).breakBefore,
+      zeileBricht: getComputedStyle(
+        document.querySelector('[data-lfh="schichtplan-aushang"] tbody tr')!,
+      ).breakInside,
+    };
+  });
+  expect(lage.zweiterBruch, 'jedes weitere Blatt beginnt auf neuer Seite').toBe('page');
+  expect(lage.zeileBricht, 'eine Schicht bricht nicht über die Seite').toBe('avoid');
+  expect(lage.zellenRechts, 'keine Zelle über der Druckwurzel').toBeLessThanOrEqual(
+    lage.wurzelRechts + SUBPIXEL,
+  );
   await page.emulateMedia({ media: null });
 });
