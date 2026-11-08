@@ -63,8 +63,8 @@ diesem Vertrauensanker auf. Deshalb kommt er zuerst und ohne Nutzdaten.
 - **Backend:** neues Modul `src/instanz/` (Identität, Kopplung, Signatur, Melden), neues Modul
   `src/auth/unterschrift/` (Unterschriftsschlüssel, Prüfen), Routen, Hintergrund-Task zum Melden,
   neue Migrationen (nächste freie Nummer über `origin/alpha`), neue `AdminAktion`-Varianten mit
-  CHECK-Migration. Neue direkte Abhängigkeit `ed25519-dalek` (schon transitiv im Lockfile);
-  `webauthn-rs` mit Feature `danger-credential-internals` im Hauptbau.
+  CHECK-Migration. Neue direkte Abhängigkeiten `ed25519-dalek`, `p256`, `hmac`, `hkdf`
+  (alle schon im Lockfile).
 - **Frontend:** Admin-Seite „Instanzkopplung“ in `frontend/src/admin/adminNav.tsx`, API-Modul,
   generierte Typen.
 - **Doku:** ADR + Kapitel 9, Kapitel 5/6/8/11/12 der Architektur, Anwenderkapitel zur

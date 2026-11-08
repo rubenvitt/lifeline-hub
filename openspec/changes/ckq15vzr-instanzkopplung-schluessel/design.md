@@ -14,9 +14,10 @@ Motivation in `proposal.md`, Verhalten in den beiden Specs. Was den Weg bestimmt
 - **Rollen:** „Org-Admin“ ist `system_rolle = 'admin'` mit `org_id` (`src/auth/mod.rs`). Ein Admin
   schreibt nur in der eigenen Org (`src/AGENTS.md`, Admin-Schreibwege). `admin_audit.akteur_id`
   darf NULL sein (`migrations/0269`).
-- **Passkeys:** `webauthn-rs 0.5`; der öffentliche Schlüssel liegt nur im opaken `Passkey`-JSON,
-  offen gelegt erst mit `danger-credential-internals` (heute nur in `[dev-dependencies]`).
-  Zeremonie-Zustand im Prozessspeicher (R10). Nur der Passwortweg ist admin-tauglich (ADR-0011).
+- **Passkeys:** `webauthn-rs 0.5`; `Passkey::get_public_key()` liefert den öffentlichen Schlüssel
+  als `COSEKey` (ohne Feature-Schalter, nachgeprüft bei der Umsetzung). Passkey-Registrierungen
+  bieten nur ES256 und RS256 an (`COSEAlgorithm::secure_algs`). Zeremonie-Zustand im
+  Prozessspeicher (R10). Nur der Passwortweg ist admin-tauglich (ADR-0011).
 - **Abgestimmt mit Ruben am 08.11.2026** (Zunder-Kommentar an LLH-1490): Anfrage-JWT, eigener
   Unterschrifts-Passkey, Gegenzeichnung durch bekannten Admin, Protokoll N/N−1.
 
@@ -59,9 +60,10 @@ Admin und Ablauf (`instanz_kopplungscode`), nie den Code.
 Ablauf (die einlösende Instanz heißt E, die ausstellende A):
 
 1. E schickt an `POST <A>/api/instanz/koppeln`: `suche`, Protokoll, eigene Kennung, Schlüssel,
-   Name, Softwarestand und `mac_e = HMAC(k_einloeser, Transkript_E)`. Das Transkript enthält die
-   normalisierte Adresse von A, damit ein Code nicht an eine andere Instanz weitergereicht werden
-   kann.
+   Name, Softwarestand, eine `jti` und `mac_e = HMAC(k_einloeser, Transkript_E)`. Das Transkript
+   bindet `suche`, Kennung und Schlüssel von E. Die Adresse von A gehört nicht hinein: A kennt
+   seine öffentliche Adresse hinter einem Proxy nicht verlässlich, und ein an eine fremde Instanz
+   weitergereichter Code scheitert dort ohnehin, weil nur A den Datensatz zu `suche` hat.
 2. A prüft `mac_e`, verbraucht den Code per bedingtem `UPDATE` und legt die Kopplung im Zustand
    `angebahnt` an. Die Antwort trägt Kennung, Schlüssel, Name, Stand von A, die Org (Kennung,
    Name), die Unterschriftsschlüssel der Org und `mac_a = HMAC(k_aussteller, Transkript_E ‖
@@ -146,12 +148,12 @@ braucht diese Change nicht.
 
 ### D7 Unterschriftsschlüssel: eigene WebAuthn-Zeremonie, eigene Tabelle
 
-Registrierung über `webauthn-rs` mit eigenem Zeremonie-Zustand, `userVerification = required`,
-erlaubte Algorithmen nur ES256 und EdDSA. Den öffentlichen Schlüssel liest
-`danger-credential-internals` aus `Passkey` heraus; das Feature wandert dafür aus
-`[dev-dependencies]` in die Hauptabhängigkeit. Gespeichert wird eine eigene, schlanke Form
-(`alg`, Schlüsselbytes), nicht das `Passkey`-JSON, damit die Prüfung an einer anderen Instanz nicht
-an `webauthn-rs` hängt.
+Registrierung über `webauthn-rs` mit eigenem Zeremonie-Zustand und eigenem, zufälligem
+User-Handle je Schlüssel (der Anmeldeweg findet ihn nie), `userVerification = required`. Den
+öffentlichen Schlüssel liefert `Passkey::get_public_key()`; angenommen wird nur ES256 (P-256),
+ein RS256-Passkey wird mit 422 abgelehnt. Gespeichert wird eine eigene, schlanke Form (`alg`,
+SEC1-Punkt), nicht das `Passkey`-JSON, damit die Prüfung an einer anderen Instanz nicht an
+`webauthn-rs` hängt.
 
 `unterschrift_schluessel (id, org_id, herkunft, kopplung_org_id NULL, benutzer_id NULL,
 benutzer_name, credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand,
@@ -170,16 +172,18 @@ Server und wird im Zeremonie-Zustand gehalten (Muster `auth::webauthn::state`), 
 keine eigene Erklärung unterschreiben lässt.
 
 - *Alternative Anmelde-Passkeys:* von Ruben verworfen.
-- *Alternative Attestation selbst parsen:* braucht einen CBOR-Parser; `danger-credential-internals`
-  liefert dasselbe aus der schon geprüften Registrierung.
+- *Alternative Attestation selbst parsen:* braucht einen CBOR-Parser; `get_public_key()` liefert
+  dasselbe aus der schon geprüften Registrierung.
+- *Alternative `danger-credential-internals`:* im Entwurf vorgesehen, bei der Umsetzung unnötig
+  geworden, weil `get_public_key()` öffentlich ist.
 
 ### D8 Prüfer für eine Unterschrift über eine vorgegebene Erklärung
 
 `auth::unterschrift::pruefe(erklaerung_hash, assertion, schluessel)` ohne `webauthn-rs`:
 `clientDataJSON` mit `type = "webauthn.get"`, `challenge = b64url(erklaerung_hash)`, `origin =
 schluessel.origin`; `authenticatorData` mit `rpIdHash = SHA-256(schluessel.rp_id)`, Flags UP und UV;
-Signatur über `authenticatorData ‖ SHA-256(clientDataJSON)` mit ES256 (`p256`, schon im Lockfile)
-oder EdDSA. Der Signaturzähler bleibt ungeprüft (Passkeys melden oft 0). Tests bauen Assertions mit
+Signatur über `authenticatorData ‖ SHA-256(clientDataJSON)` mit ES256 (`p256`, schon im
+Lockfile). Der Signaturzähler bleibt ungeprüft (Passkeys melden oft 0). Tests bauen Assertions mit
 einem Software-Schlüssel im Test selbst. LLH-1491 nutzt denselben Prüfer für die Notübernahme.
 
 ### D9 Widerruf
@@ -237,8 +241,6 @@ Abschnitt „Instanzkopplung“ in `src/AGENTS.md`.
   Change. Neues Risiko in Kapitel 11.
 - [Uhr eines ELW ohne Netz läuft falsch] → 300 s Toleranz, sichtbarer Hinweis „Uhr weicht ab“
   mit der Zeit des Gegenübers.
-- [`danger-credential-internals` im Hauptbau] → Es legt nur Interna offen. Genutzt nur in
-  `auth::unterschrift`; ein Kommentar am Feature nennt den Grund.
 - [Kompromittierter Hub widerruft alle Admin-Schlüssel] → Er schadet nur der Verfügbarkeit;
   die Notübernahme hat den Code-Fallback (Entscheidung 9). Der Schutz „letzter Schlüssel“ greift
   nur am ehrlichen Hub.

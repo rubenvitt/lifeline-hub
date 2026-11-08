@@ -46,6 +46,9 @@ pub enum AppError {
     /// Body über dem Limit der Route (413, LFH-1074): abgewiesen beim Lesen, vor dem Handler
     /// (`crate::extract::JsonBody`).
     PayloadTooLarge(String),
+    /// Das Gegenüber einer Instanzkopplung spricht eine zu alte oder zu neue Protokollversion
+    /// (426, LLH-1490, design.md D5): nur Melden geht noch.
+    UpgradeRequired(String),
     /// Eine Mengen-Anfrage scheitert an einzelnen Zeilen (422, LLH-1100, Change
     /// `iw7x9980-sammel-disposition` D2): `{error, zeilen: [{art, id, grund}]}`. Additiv zum
     /// Umschlag, damit der Client je Zeile markieren kann; nichts ist geschrieben.
@@ -116,6 +119,7 @@ impl std::fmt::Display for AppError {
             AppError::ServiceUnavailable(m) => write!(f, "{m}"),
             AppError::TooManyRequests(m) => write!(f, "{m}"),
             AppError::PayloadTooLarge(m) => write!(f, "{m}"),
+            AppError::UpgradeRequired(m) => write!(f, "{m}"),
             AppError::Zeilen { meldung, .. } => write!(f, "{meldung}"),
         }
     }
@@ -161,6 +165,7 @@ impl AppError {
             AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             AppError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
+            AppError::UpgradeRequired(_) => StatusCode::UPGRADE_REQUIRED,
             AppError::Zeilen { .. } => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }

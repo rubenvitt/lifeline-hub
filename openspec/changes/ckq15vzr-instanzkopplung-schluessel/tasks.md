@@ -6,7 +6,7 @@ Code. Migrationen bekommen die nächste freie Nummer über `origin/alpha`
 
 ## 1. Identität der Instanz (D1)
 
-- [ ] 1.1 `ed25519-dalek` (Version aus dem Lockfile) und `p256` als direkte Abhängigkeiten; `webauthn-rs` mit `danger-credential-internals` im Hauptbau samt Kommentar (D7, Risiko); prüfen mit `cargo tree -d` (keine zweite Version) und `cargo build`
+- [ ] 1.1 `ed25519-dalek`, `p256`, `hmac`, `hkdf` (Versionen aus dem Lockfile) als direkte Abhängigkeiten samt Kommentar; `danger-credential-internals` bleibt in `[dev-dependencies]`, weil `Passkey::get_public_key()` genügt (D7); prüfen mit `cargo tree -d` (keine neue zweite Version) und `cargo build`
 - [ ] 1.2 Migration `instanz_identitaet` (Einzeile per CHECK) und `instanz::identitaet::laden_oder_erzeugen` beim Start; Tests: zweiter Aufruf liefert dieselbe Kennung und denselben Schlüssel, zwei gleichzeitige Aufrufe ergeben eine Zeile, Debug-Ausgabe der Struktur enthält den privaten Schlüssel nicht
 - [ ] 1.3 Fingerabdruck (20 Byte SHA-256, Crockford in Vierergruppen) als reine Funktion; Test mit festem Schlüssel und erwarteter Zeichenkette
 - [ ] 1.4 Optionen `--instanz-name`/`LIFELINE_INSTANZ_NAME` (Vorgabe RP-ID) und `--instanz-melden-sekunden`/`LIFELINE_INSTANZ_MELDEN_SEKUNDEN` (Vorgabe 60) in `src/config.rs`; Test der Vorgaben und der Untergrenze (mindestens 10 s)
@@ -35,8 +35,8 @@ Code. Migrationen bekommen die nächste freie Nummer über `origin/alpha`
 ## 5. Unterschriftsschlüssel (D7, D8)
 
 - [ ] 5.1 Migration `unterschrift_schluessel` mit Wire-Enums `SchluesselHerkunft`, `SchluesselZustand` und monotonem `stand` je Org
-- [ ] 5.2 Prüfer `auth::unterschrift::pruefe` für ES256 und EdDSA; Tests mit im Test erzeugten Assertions: gültig, falsche Challenge, falsche RP-ID, falsche Herkunft, ohne UV, ohne UP, Signatur einer anderen Erklärung, unbekannter `alg`
-- [ ] 5.3 Registrierung: Zeremonie-Routen nur `AdminUser`, UV required, nur ES256/EdDSA, eigene Tabelle; erster Schlüssel einer Org ohne Kopplung `gueltig`, sonst `wartet_auf_gegenzeichnung`; Tests: Nicht-Admin 403, Anmeldung mit dem Unterschriftsschlüssel scheitert (Passkey-Anmeldung findet ihn nicht)
+- [ ] 5.2 Prüfer `auth::unterschrift::pruefe` für ES256; Tests mit im Test erzeugten Assertions: gültig, falsche Challenge, falsche RP-ID, falsche Herkunft, ohne UV, ohne UP, Signatur einer anderen Erklärung, unbekannter `alg`
+- [ ] 5.3 Registrierung: Zeremonie-Routen nur `AdminUser`, UV required, eigener User-Handle je Schlüssel, nur ES256 (RS256 → 422), eigene Tabelle; erster Schlüssel einer Org ohne Kopplung `gueltig`, sonst `wartet_auf_gegenzeichnung`; Tests: Nicht-Admin 403, Anmeldung mit dem Unterschriftsschlüssel scheitert (Passkey-Anmeldung findet ihn nicht)
 - [ ] 5.4 Gegenzeichnung: Server bildet die Erklärung (kanonisches JSON) und die Challenge im Zeremonie-Zustand, prüft per 5.2 mit einem gültigen Schlüssel der Org, setzt `gueltig` und erhöht `stand`; Tests: Gegenzeichnung mit widerrufenem Schlüssel oder fremder Org scheitert
 - [ ] 5.5 Annahme am Einlöser (Grundstock und Nachlieferung aus 4.2): neuer Schlüssel nur mit gültiger Gegenzeichnung eines bekannten Schlüssels derselben Org, sonst verwerfen + Hinweis + Admin-Spur; Widerruf ohne Gegenzeichnung; Tests: untergeschobener Schlüssel ohne Gegenzeichnung wird verworfen, gegengezeichneter angenommen, Widerruf übernommen
 - [ ] 5.6 Widerruf: durch Admin der Org; automatisch beim Deaktivieren oder Herabstufen eines Admins im selben Commit; letzter gültiger Schlüssel einer Org mit aktiver Kopplung → 409; Tests für alle drei Wege
