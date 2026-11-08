@@ -5,8 +5,9 @@
 ### Requirement: Wer vom Einsatzkopf erfährt
 Das Ereignis `einsatz` MUST jeden Abonnenten erreichen, der den Live-Strom des Einsatzes öffnen darf,
 unabhängig von seinen Modulfreigaben. Die Tür des Stroms und die des Einsatzkopfs sind dieselbe
-(Lesezugriff auf den Einsatz ohne Modul). Außer `einsatz` und dem Kontrollereignis `lagged` MUST
-jedes Einsatz-Ereignis mindestens einem Modul zugeordnet bleiben. Die Org-Ereignisse `einsatzliste`
+(Lesezugriff auf den Einsatz ohne Modul). Außer `einsatz`, `mitglieder` (Führungsfunktionen der
+Mitglieder, LLH-1602) und dem Kontrollereignis `lagged` MUST jedes Einsatz-Ereignis mindestens
+einem Modul zugeordnet bleiben. Die Org-Ereignisse `einsatzliste`
 und `stammdaten`, die derselbe Strom mitträgt (LFH-734), sind keine Einsatz-Ereignisse: sie gehören
 keinem Modul und folgen den Gates der Fähigkeit `org-live`. Ihre Wire-Namen MUST sich von allen
 Einsatz-Ereignissen unterscheiden.
