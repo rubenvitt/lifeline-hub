@@ -13,12 +13,14 @@ use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::{HashMap, HashSet};
 
 use super::hinweis::{self, Wirkung};
+use super::schichtplan::kopplung;
 use super::{
     einstufung, faelligkeit, planung_warnungen, rhythmus_text, untereinheiten, vererbung,
     vorwarnzeit, AbloesungAbloeser, AbloesungAnzeige, AbloesungArt, AbloesungBesatzung,
     AbloesungBesatzungPlan, AbloesungEinsatzVorgabeAnzeige, AbloesungErbe, AbloesungFolge,
-    AbloesungPlanungEntfallen, AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige,
-    AbloesungVorgabeAnzeige, BeendetGrund, BeginnQuelle, BesatzungRolle, BesatzungZiel,
+    AbloesungPlanFolgeblock, AbloesungPlanVorlage, AbloesungPlanungEntfallen, AbloesungStatus,
+    AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BeendetGrund,
+    BeginnQuelle, BesatzungRolle, BesatzungZiel, PlanVorlageKommen, PlanVorlagePerson,
     PlanungEntfallenGrund, PlanungsStand, RhythmusQuelle, ABLOESER_MAX,
     PLANUNGSVORLAUF_VORGABE_MINUTEN, VORWARNUNG_VORGABE_MINUTEN,
 };
@@ -103,11 +105,38 @@ pub struct VollzugEingabe {
     /// Beim Besatzungswechsel die neue Besatzung mit ihrem Ziel (LLH-1319), begrenzt und nach
     /// Person entdoppelt; sonst leer.
     pub besatzung: Vec<BesatzungZiel>,
+    /// Beim Besatzungswechsel Personen aus dem Schichtplan, die dabei erst in den Einsatz kommen
+    /// (LLH-1555, design.md D5); sonst leer.
+    pub uebernahme: Vec<PlanUebernahme>,
+    /// Beim Besatzungswechsel, wer aus der bisherigen Besatzung bleibt (`einsatz_personal.id`,
+    /// LLH-1555); sonst leer.
+    pub bleiben: Vec<i64>,
+    /// Der Folgeblock, in den der Besatzungswechsel laut Plan wechselt (LLH-1555): muss der der
+    /// Schicht sein (422), die Folgeschicht ankert darin.
+    pub plan_block_id: Option<i64>,
     /// Was danach mit der abgelösten Einheit geschieht (LLH-1308); beim Besatzungswechsel
     /// immer `ruhe` (die Route prüft das).
     pub verbleib: AbloesungVerbleib,
     /// Der Raum genau beim Verbleib `bereitstellungsraum` (die Route prüft das).
     pub verbleib_br_id: Option<i64>,
+}
+
+/// Woher eine Person aus dem Schichtplan kommt, die beim Vollzug in den Einsatz übernommen wird
+/// (LLH-1555).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UebernahmeQuelle {
+    /// Stamm-Personal der Organisation (`personal.id`).
+    Stamm(i64),
+    /// Helfer des Plans (`einsatz_plan_helfer.id`).
+    Helfer(i64),
+}
+
+/// Eine Person aus dem Schichtplan mit ihrem Ziel wie [`BesatzungZiel`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlanUebernahme {
+    pub quelle: UebernahmeQuelle,
+    pub einheit_id: Option<i64>,
+    pub fahrzeug_id: Option<i64>,
 }
 
 /// Eine Zeile, wie sie die Anzeige-Projektion liefert.
@@ -151,6 +180,12 @@ struct Zeile {
     #[sqlx(try_from = "String")]
     verbleib: AbloesungVerbleib,
     verbleib_br_bezeichnung: Option<String>,
+    faellig_laut_plan: bool,
+    plan_block_id: Option<i64>,
+    folgeblock_id: Option<i64>,
+    folgeblock_von: Option<String>,
+    folgeblock_bis: Option<String>,
+    folgeblock_personen: i64,
     angelegt_at: String,
 }
 
@@ -224,6 +259,17 @@ impl Zeile {
             erbende_einheiten: Vec::new(),
             planung_warnungen: Vec::new(),
             planung_entfallen,
+            faellig_laut_plan: self.faellig_laut_plan,
+            plan_block_id: self.plan_block_id,
+            plan_folgeblock: match (self.folgeblock_id, self.folgeblock_von, self.folgeblock_bis) {
+                (Some(id), Some(von), Some(bis)) => Some(AbloesungPlanFolgeblock {
+                    id,
+                    von,
+                    bis,
+                    personen: self.folgeblock_personen,
+                }),
+                _ => None,
+            },
             angelegt_at: self.angelegt_at,
         }
     }
@@ -239,7 +285,8 @@ impl Zeile {
 /// Die Vorwarnung kommt aus der Kopie des Schichtmodells am Einsatz (LLH-1122), ohne sie 30 min
 /// ([`VORWARNUNG_VORGABE_MINUTEN`], im SQL als Literal; `vorwarnung_vorgabe_im_sql` hält beide
 /// gleich).
-const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS einheit_name, \
+const ANZEIGE_SELECT: &str = concat!(
+    "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS einheit_name, \
             a.abschnitt_id, s.name AS abschnitt_name, a.beginn_at, a.beginn_quelle, \
             a.rhythmus_minuten, \
             a.rhythmus_quelle, a.faellig_at, \
@@ -258,7 +305,11 @@ const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS
             a.abschnitt_uebergeben, ua.name AS uebergebener_abschnitt_name, a.art, \
             a.planung_entfallen_at, a.planung_entfallen_grund, \
             a.planung_entfallen_einheit_name, a.verbleib, \
-            vb.bezeichnung AS verbleib_br_bezeichnung, a.angelegt_at \
+            vb.bezeichnung AS verbleib_br_bezeichnung, a.faellig_laut_plan, a.plan_block_id, \
+            fb.id AS folgeblock_id, fb.von AS folgeblock_von, fb.bis AS folgeblock_bis, \
+            (SELECT COUNT(*) FROM einsatz_planschicht_person fp WHERE fp.planschicht_id = fb.id) \
+               AS folgeblock_personen, \
+            a.angelegt_at \
      FROM einsatz_abloesung a \
      JOIN einsatz_einheit e ON e.id = a.einheit_id \
      LEFT JOIN einsatzabschnitt s ON s.id = a.abschnitt_id \
@@ -266,7 +317,11 @@ const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS
      LEFT JOIN einsatz_schichtmodell m ON m.einsatz_id = a.einsatz_id \
      LEFT JOIN einsatzabschnitt ua ON ua.id = a.abgeloest_abschnitt_vorher_id \
                AND a.abschnitt_uebergeben = 1 \
-     LEFT JOIN bereitstellungsraum vb ON vb.id = a.verbleib_br_id";
+     LEFT JOIN bereitstellungsraum vb ON vb.id = a.verbleib_br_id \
+     LEFT JOIN einsatz_planschicht fb \
+            ON a.faellig_laut_plan = 1 AND a.status = 'laufend' AND fb.id = ",
+    kopplung::folgeblock_sql!()
+);
 
 /// Laufende nach Fälligkeit (die dringendste zuerst), abgelöste nach Vollzug und beendete
 /// nach ihrem Ende, beide absteigend. Laufende tragen ihre erbenden Untereinheiten.
@@ -966,12 +1021,17 @@ struct Roh {
     art: AbloesungArt,
     #[sqlx(try_from = "String")]
     verbleib: AbloesungVerbleib,
+    /// Die Fälligkeit kommt aus dem Schichtplan (LLH-1555).
+    faellig_laut_plan: bool,
+    /// Der Block, in den ein Vollzug aus dem Plan gewechselt hat (Anker, design.md D2).
+    plan_block_id: Option<i64>,
 }
 
 async fn roh_tx(conn: &mut SqliteConnection, einsatz_id: i64, id: i64) -> Result<Roh, AppError> {
     sqlx::query_as(
         "SELECT einheit_id, abschnitt_id, beginn_at, rhythmus_minuten, rhythmus_quelle, \
-                faellig_at, status, vollzogen_at, etb_vollzug_id, art, verbleib \
+                faellig_at, status, vollzogen_at, etb_vollzug_id, art, verbleib, \
+                faellig_laut_plan, plan_block_id \
          FROM einsatz_abloesung WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
@@ -1043,6 +1103,142 @@ fn compute_faellig(
     }
 }
 
+/// Fälligkeit nach Rangfolge einer gespeicherten Schicht (ohne den Plan). Folgt sie der Vorgabe
+/// des Einsatzes, rechnet deren Regel; sonst gilt die gespeicherte sekundengenau (Review PR #833),
+/// außer sie kommt aus dem Plan: dann Beginn + Rhythmus.
+fn regulaer(roh: &Roh, vorgabe: &EinsatzVorgabe) -> Result<(String, i64), AppError> {
+    match (roh.rhythmus_quelle, &vorgabe.werte) {
+        (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
+            &roh.beginn_at,
+            roh.rhythmus_minuten,
+            roh.rhythmus_quelle,
+            vorgabe,
+        ),
+        _ if roh.faellig_laut_plan => Ok((
+            faellig_oder_400(&roh.beginn_at, roh.rhythmus_minuten)?,
+            roh.rhythmus_minuten,
+        )),
+        _ => Ok((roh.faellig_at.clone(), roh.rhythmus_minuten)),
+    }
+}
+
+/// Die Fälligkeit einer Schicht mit dem Schichtplan (LLH-1555, design.md D2): `regulaer` ist die
+/// nach Rangfolge, der Plan zieht sie vor oder gibt sie im Block. Liefert die gültige und ob sie
+/// aus dem Plan kommt.
+async fn mit_plan_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    beginn_at: &str,
+    plan_block_id: Option<i64>,
+    regulaer: String,
+) -> Result<(String, bool), AppError> {
+    let anker = kopplung::load_anker_tx(conn, einheit_id, plan_block_id).await?;
+    let bloecke = kopplung::load_bloecke_tx(conn, einsatz_id, einheit_id, beginn_at).await?;
+    Ok(
+        match kopplung::plan_faelligkeit(beginn_at, anker.as_deref(), &bloecke, &regulaer) {
+            Some(p) => (p.faellig_at, true),
+            None => (regulaer, false),
+        },
+    )
+}
+
+/// Zieht die laufenden Schichten der Einheiten nach dem Schichtplan nach (LLH-1555, design.md
+/// D3), in der Transaktion des Schreibwegs, der den Plan geändert hat: Fälligkeit und Kennzeichen
+/// neu, die Fristen nur bei neuer Fälligkeit (sonst löste eine schon gemeldete erneut aus), der
+/// Planungshinweis immer (ein Folgeblock mit Personen gilt als geplant). Kein ETB (der Plan ist
+/// Soll, LLH-1552 D7).
+pub(crate) async fn nachziehen_plan_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheiten: &[i64],
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    let mut einheiten = einheiten.to_vec();
+    einheiten.sort_unstable();
+    einheiten.dedup();
+    let mut vorgabe: Option<EinsatzVorgabe> = None;
+    for einheit_id in einheiten {
+        let id: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM einsatz_abloesung \
+             WHERE einsatz_id = ? AND einheit_id = ? AND status = 'laufend'",
+        )
+        .bind(einsatz_id)
+        .bind(einheit_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some(id) = id else {
+            continue;
+        };
+        if vorgabe.is_none() {
+            vorgabe = Some(load_einsatz_vorgabe_tx(conn, einsatz_id).await?);
+        }
+        let vorgabe = vorgabe.as_ref().expect("eben geladen");
+        let roh = roh_tx(conn, einsatz_id, id).await?;
+        let (regulaer, _) = regulaer(&roh, vorgabe)?;
+        let (faellig_at, laut_plan) = mit_plan_tx(
+            conn,
+            einsatz_id,
+            einheit_id,
+            &roh.beginn_at,
+            roh.plan_block_id,
+            regulaer,
+        )
+        .await?;
+        if faellig_at == roh.faellig_at && laut_plan == roh.faellig_laut_plan {
+            let (name, _) = einheit_tx(conn, einsatz_id, einheit_id).await?;
+            set_planung_frist_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                id,
+                &name,
+                &faellig_at,
+                vorgabe.planungsvorlauf(),
+                jetzt,
+            )
+            .await?;
+            continue;
+        }
+        sqlx::query(
+            "UPDATE einsatz_abloesung SET faellig_at = ?, faellig_laut_plan = ? WHERE id = ?",
+        )
+        .bind(&faellig_at)
+        .bind(laut_plan)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        let (name, _) = einheit_tx(conn, einsatz_id, einheit_id).await?;
+        if faellig_at != roh.faellig_at {
+            set_fristen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                id,
+                &name,
+                &faellig_at,
+                vorgabe,
+                jetzt,
+            )
+            .await?;
+        } else {
+            set_planung_frist_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                id,
+                &name,
+                &faellig_at,
+                vorgabe.planungsvorlauf(),
+                jetzt,
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
+
 /// Wie der Rhythmus einer Schicht im ETB heißt: bei Wechselzeiten aus der Einsatzvorgabe deren
 /// Regel in der Darstellung des Einsatzes („Wechsel 0600/1800, Mindestdauer 4 h“), sonst die
 /// Dauer („6 h“).
@@ -1105,17 +1301,21 @@ async fn set_fristen_tx(
     .await
 }
 
-/// Ob für die Schicht eine Ablösung geplant ist: Einzelplanung, Ablöser-Liste oder ein
-/// geplanter Besatzungswechsel (LLH-1319).
+/// Ob für die Schicht eine Ablösung geplant ist: Einzelplanung, Ablöser-Liste, ein geplanter
+/// Besatzungswechsel (LLH-1319) oder, laut Plan, ein Folgeblock mit Personen; laut Plan ohne
+/// Folgeblock endet der Posten und braucht keine Planung (LLH-1555, design.md D4).
 async fn has_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<bool, AppError> {
-    let r: Option<i64> = sqlx::query_scalar(
+    let r: Option<i64> = sqlx::query_scalar(concat!(
         "SELECT 1 FROM einsatz_abloesung a WHERE a.id = ? \
            AND (a.abloesende_einheit_id IS NOT NULL \
                 OR EXISTS (SELECT 1 FROM einsatz_abloesung_abloeser l \
                            WHERE l.abloesung_id = a.id) \
                 OR EXISTS (SELECT 1 FROM einsatz_abloesung_besatzung_plan p \
-                           WHERE p.abloesung_id = a.id))",
-    )
+                           WHERE p.abloesung_id = a.id) \
+                OR ",
+        kopplung::plan_braucht_keine_planung_sql!(),
+        ")"
+    ))
     .bind(id)
     .fetch_optional(&mut *conn)
     .await?;
@@ -1556,7 +1756,9 @@ pub(crate) async fn restore_entfallene_planungen_tx(
 }
 
 /// Legt eine laufende Schicht an und setzt ihre Fristen. Rhythmus und Fälligkeit rechnet
-/// [`compute_faellig`] aus der Quelle. Liefert die neue ID und den Rhythmus.
+/// [`compute_faellig`] aus der Quelle, der Schichtplan der Einheit überlagert sie (LLH-1555);
+/// `plan_block_id` ist der Block, in den ein Vollzug aus dem Plan wechselt. Liefert die neue ID
+/// und den Rhythmus.
 #[allow(clippy::too_many_arguments)]
 async fn create_schicht_tx(
     conn: &mut SqliteConnection,
@@ -1571,6 +1773,7 @@ async fn create_schicht_tx(
     vorgabe: &EinsatzVorgabe,
     vorgaenger_id: Option<i64>,
     beginn_quelle: BeginnQuelle,
+    plan_block_id: Option<i64>,
     jetzt: &str,
 ) -> Result<(i64, i64), AppError> {
     if has_laufende_tx(conn, einheit_id).await? {
@@ -1578,12 +1781,22 @@ async fn create_schicht_tx(
             "Einheit «{einheit_name}» hat bereits eine laufende Schicht"
         )));
     }
-    let (faellig_at, rhythmus) = compute_faellig(beginn_at, rhythmus, quelle, vorgabe)?;
+    let (regulaer, rhythmus) = compute_faellig(beginn_at, rhythmus, quelle, vorgabe)?;
+    let (faellig_at, laut_plan) = mit_plan_tx(
+        conn,
+        einsatz_id,
+        einheit_id,
+        beginn_at,
+        plan_block_id,
+        regulaer,
+    )
+    .await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO einsatz_abloesung \
             (einsatz_id, einheit_id, abschnitt_id, beginn_at, rhythmus_minuten, rhythmus_quelle, \
-             faellig_at, vorgaenger_id, angelegt_von_id, beginn_quelle) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             faellig_at, vorgaenger_id, angelegt_von_id, beginn_quelle, faellig_laut_plan, \
+             plan_block_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(einheit_id)
@@ -1595,6 +1808,8 @@ async fn create_schicht_tx(
     .bind(vorgaenger_id)
     .bind(benutzer_id)
     .bind(beginn_quelle.as_str())
+    .bind(laut_plan)
+    .bind(plan_block_id)
     .fetch_one(&mut *conn)
     .await?;
     set_fristen_tx(
@@ -1709,6 +1924,7 @@ pub(crate) async fn start_schicht_tx(
         &vorgabe,
         None,
         s.beginn_quelle,
+        None,
         jetzt,
     )
     .await?;
@@ -1757,6 +1973,17 @@ pub async fn aendern(
         let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
         let mut teile: Vec<String> = Vec::new();
 
+        // Laut Plan gibt der Block die Fälligkeit (LLH-1555, design.md D3): wer abweichen will,
+        // ändert den Block.
+        if roh.faellig_laut_plan
+            && matches!(eingabe.rhythmus_minuten, Some(Some(r))
+                if r != roh.rhythmus_minuten || roh.rhythmus_quelle != RhythmusQuelle::Einheit)
+        {
+            return Err(AppError::UnprocessableEntity(
+                "Die Schicht folgt dem Schichtplan".into(),
+            ));
+        }
+
         // Rhythmus. Zurück zur Vorgabe heißt: die des Abschnitts, sonst die des Einsatzes.
         let (rhythmus, quelle) = match eingabe.rhythmus_minuten {
             None => (roh.rhythmus_minuten, roh.rhythmus_quelle),
@@ -1785,11 +2012,25 @@ pub async fn aendern(
         // Ohne neuen Beginn und ohne Rhythmusangabe bleibt die gespeicherte Fälligkeit: nach einer
         // entfernten Wechselzeiten-Vorgabe ergäbe Beginn + aufgerundeter Rhythmus sonst eine um
         // Sekunden verschobene Fälligkeit samt neu gesetzter Fristen (Review PR #833).
-        let (faellig_at, rhythmus) =
+        let (faellig_at, rhythmus, laut_plan) =
             if eingabe.rhythmus_minuten.is_none() && beginn_at == roh.beginn_at {
-                (roh.faellig_at.clone(), roh.rhythmus_minuten)
+                (
+                    roh.faellig_at.clone(),
+                    roh.rhythmus_minuten,
+                    roh.faellig_laut_plan,
+                )
             } else {
-                compute_faellig(&beginn_at, rhythmus, quelle, &vorgabe)?
+                let (regulaer, rhythmus) = compute_faellig(&beginn_at, rhythmus, quelle, &vorgabe)?;
+                let (faellig_at, laut_plan) = mit_plan_tx(
+                    conn,
+                    einsatz_id,
+                    roh.einheit_id,
+                    &beginn_at,
+                    roh.plan_block_id,
+                    regulaer,
+                )
+                .await?;
+                (faellig_at, rhythmus, laut_plan)
             };
         // Bei der Einsatzvorgabe folgt der Rhythmus der Regel; ändert ihn nur der Beginn
         // (Wechselzeiten), ist das keine Rhythmusänderung.
@@ -1894,7 +2135,7 @@ pub async fn aendern(
         // begonnen; eine Folgeschicht bleibt Folgeschicht (LLH-1312, design.md D2).
         sqlx::query(
             "UPDATE einsatz_abloesung SET beginn_at = ?, rhythmus_minuten = ?, \
-                rhythmus_quelle = ?, faellig_at = ?, \
+                rhythmus_quelle = ?, faellig_at = ?, faellig_laut_plan = ?, \
                 beginn_quelle = CASE WHEN ? AND beginn_quelle = 'eintreffen' THEN 'hand' \
                     ELSE beginn_quelle END \
              WHERE id = ?",
@@ -1903,6 +2144,7 @@ pub async fn aendern(
         .bind(rhythmus)
         .bind(quelle.as_str())
         .bind(&faellig_at)
+        .bind(laut_plan)
         .bind(beginn_at != roh.beginn_at)
         .bind(id)
         .execute(&mut *conn)
@@ -1926,7 +2168,7 @@ pub async fn aendern(
                 jetzt,
             )
             .await?;
-        } else if abloeser_geaendert {
+        } else if abloeser_geaendert || laut_plan != roh.faellig_laut_plan {
             // Geplant schließt den Planungshinweis, aufgehoben setzt ihn wieder (LLH-1131).
             set_planung_frist_tx(
                 conn,
@@ -1988,8 +2230,10 @@ pub async fn vorgabe_setzen(
         // gültigen Rhythmus stehen (Spec: „Vorgabe entfernen").
         if let Some(neu) = rhythmus_minuten {
             let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
-            let folgende: Vec<(i64, String, i64)> = sqlx::query_as(
-                "SELECT a.id, a.beginn_at, a.einheit_id FROM einsatz_abloesung a \
+            let folgende: Vec<(i64, String, i64, String, bool, Option<i64>)> = sqlx::query_as(
+                "SELECT a.id, a.beginn_at, a.einheit_id, a.faellig_at, a.faellig_laut_plan, \
+                        a.plan_block_id \
+                 FROM einsatz_abloesung a \
                  WHERE a.einsatz_id = ? AND a.abschnitt_id = ? AND a.status = 'laufend' \
                    AND a.rhythmus_quelle = 'abschnitt'",
             )
@@ -1997,16 +2241,31 @@ pub async fn vorgabe_setzen(
             .bind(abschnitt_id)
             .fetch_all(&mut *conn)
             .await?;
-            for (id, beginn_at, einheit_id) in folgende {
-                let faellig_at = faellig_oder_400(&beginn_at, neu)?;
+            for (id, beginn_at, einheit_id, vorher_at, vorher_laut, plan_block_id) in folgende {
+                // Der Plan überlagert die neue Rangfolge (LLH-1555): im Block bleibt seine
+                // Fälligkeit, und er zieht weiter vor.
+                let (faellig_at, laut_plan) = mit_plan_tx(
+                    conn,
+                    einsatz_id,
+                    einheit_id,
+                    &beginn_at,
+                    plan_block_id,
+                    faellig_oder_400(&beginn_at, neu)?,
+                )
+                .await?;
                 sqlx::query(
-                    "UPDATE einsatz_abloesung SET rhythmus_minuten = ?, faellig_at = ? WHERE id = ?",
+                    "UPDATE einsatz_abloesung SET rhythmus_minuten = ?, faellig_at = ?, \
+                        faellig_laut_plan = ? WHERE id = ?",
                 )
                 .bind(neu)
                 .bind(&faellig_at)
+                .bind(laut_plan)
                 .bind(id)
                 .execute(&mut *conn)
                 .await?;
+                if faellig_at == vorher_at && laut_plan == vorher_laut {
+                    continue;
+                }
                 let (name, _) = einheit_tx(conn, einsatz_id, einheit_id).await?;
                 set_fristen_tx(
                     conn,
@@ -2058,6 +2317,163 @@ pub async fn vorgabe_setzen(
         .await?;
         Ok(Some(etb_id))
     })
+}
+
+/// Die Vorlage des Besatzungswechsels aus dem Plan (LLH-1555, design.md D5). Die Folgeblöcke
+/// sind der der Einheit und die der erbenden Untereinheiten, die am Wechsel (Fälligkeit, binnen
+/// der Toleranz) beginnen; ihre Personen kommen in die Einheit ihres Blocks. Wer schon zur
+/// Besatzung gehört (Einheit und Erben), bleibt; die übrige Besatzung geht. Stamm-Personal und
+/// Helfer, die schon im Einsatz sind, stehen als Kraft des Einsatzes, sonst zur Übernahme.
+/// Nur eine laufende Schicht laut Plan (422 sonst).
+pub async fn plan_vorlage(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<AbloesungPlanVorlage, AppError> {
+    let mut conn = pool.acquire().await?;
+    let conn = &mut *conn;
+    let roh = roh_tx(conn, einsatz_id, id).await?;
+    if roh.status != AbloesungStatus::Laufend || !roh.faellig_laut_plan {
+        return Err(AppError::UnprocessableEntity(
+            "Die Schicht folgt keinem Block im Schichtplan".into(),
+        ));
+    }
+    let g = load_gliederung(&mut *conn, einsatz_id).await?;
+    let einheiten: Vec<i64> = std::iter::once(roh.einheit_id)
+        .chain(erben_von(&g, roh.einheit_id))
+        .collect();
+    let einheiten_json = crate::kraefte_disposition::ids_json(&einheiten);
+
+    // Je Einheit der früheste Block am Wechsel, wie `kopplung::folgeblock_sql!`.
+    #[derive(sqlx::FromRow)]
+    struct Kommt {
+        einheit_id: i64,
+        personal_id: Option<i64>,
+        helfer_id: Option<i64>,
+        name: Option<String>,
+        /// Die Kraft des Einsatzes, als die die Person schon da ist.
+        kraft: Option<i64>,
+        /// Sie kann nicht kommen (außer Dienst, entlassene Ad-hoc-Kraft).
+        gesperrt: bool,
+    }
+    let kommen: Vec<Kommt> = sqlx::query_as(concat!(
+        "WITH folge AS ( \
+           SELECT e.value AS einheit_id, \
+                  (SELECT f.id FROM einsatz_planschicht f \
+                   WHERE f.einsatz_id = ?1 AND f.posten_art = 'einheit' \
+                     AND f.einheit_id = e.value AND f.uhs_id IS NULL \
+                     AND f.von >= ?3 AND f.von <= datetime(?3, ",
+        crate::abloesung::schichtplan::kopplung::toleranz_sql!(),
+        ") ORDER BY f.von, f.id LIMIT 1) AS block_id \
+           FROM json_each(?2) e) \
+         SELECT fo.einheit_id, pp.personal_id, pp.helfer_id, \
+                COALESCE(st.name, ad.snap_name, h.name) AS name, \
+                COALESCE(sk.id, CASE WHEN ad.beendet_at IS NULL THEN ad.id END, hk.id) AS kraft, \
+                (st.id IS NOT NULL AND sk.id IS NULL AND st.dienststatus <> 'in_dienst') \
+                  OR (ad.id IS NOT NULL AND ad.beendet_at IS NOT NULL) AS gesperrt \
+         FROM folge fo \
+         JOIN einsatz_planschicht_person pp ON pp.planschicht_id = fo.block_id \
+         LEFT JOIN personal st ON st.id = pp.personal_id \
+         LEFT JOIN einsatz_personal sk ON sk.personal_id = pp.personal_id \
+              AND sk.einsatz_id = ?1 AND sk.beendet_at IS NULL \
+         LEFT JOIN einsatz_personal ad ON ad.id = pp.einsatz_personal_id \
+         LEFT JOIN einsatz_plan_helfer h ON h.id = pp.helfer_id \
+         LEFT JOIN einsatz_personal hk ON hk.id = h.einsatz_personal_id AND hk.beendet_at IS NULL \
+         ORDER BY CASE WHEN fo.einheit_id = ?4 THEN 0 ELSE 1 END, fo.einheit_id, pp.rowid",
+    ))
+    .bind(einsatz_id)
+    .bind(&einheiten_json)
+    .bind(&roh.faellig_at)
+    .bind(roh.einheit_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let folgeblock_id: Option<i64> = sqlx::query_scalar(concat!(
+        "SELECT ",
+        kopplung::folgeblock_sql!(),
+        " FROM einsatz_abloesung a WHERE a.id = ?"
+    ))
+    .bind(id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let besatzung: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT p.id, p.snap_name FROM einsatz_personal p \
+         WHERE p.einsatz_id = ?1 AND p.beendet_at IS NULL \
+           AND p.einheit_id IN (SELECT value FROM json_each(?2)) \
+         ORDER BY p.id",
+    )
+    .bind(einsatz_id)
+    .bind(&einheiten_json)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let mut vorlage = AbloesungPlanVorlage {
+        folgeblock_id,
+        wechsel_at: roh.faellig_at.clone(),
+        bleiben: Vec::new(),
+        kommen: Vec::new(),
+        gehen: Vec::new(),
+        fehlen: Vec::new(),
+    };
+    let mut gesehen: HashSet<(u8, i64)> = HashSet::new();
+    for k in kommen {
+        let name = k.name.unwrap_or_default();
+        if k.gesperrt {
+            vorlage.fehlen.push(name);
+            continue;
+        }
+        let (schluessel, eintrag) = match (k.kraft, k.personal_id, k.helfer_id) {
+            (Some(kraft), ..) => (
+                (0, kraft),
+                PlanVorlageKommen {
+                    personal_id: Some(kraft),
+                    stamm_personal_id: None,
+                    plan_helfer_id: None,
+                    name,
+                    einheit_id: k.einheit_id,
+                },
+            ),
+            (None, Some(pid), _) => (
+                (1, pid),
+                PlanVorlageKommen {
+                    personal_id: None,
+                    stamm_personal_id: Some(pid),
+                    plan_helfer_id: None,
+                    name,
+                    einheit_id: k.einheit_id,
+                },
+            ),
+            (None, None, Some(hid)) => (
+                (2, hid),
+                PlanVorlageKommen {
+                    personal_id: None,
+                    stamm_personal_id: None,
+                    plan_helfer_id: Some(hid),
+                    name,
+                    einheit_id: k.einheit_id,
+                },
+            ),
+            // Eine Ad-hoc-Kraft ohne Zeile (gelöscht): der Plan verliert sie per CASCADE.
+            (None, None, None) => continue,
+        };
+        if !gesehen.insert(schluessel) {
+            continue;
+        }
+        match eintrag.personal_id {
+            Some(kraft) if besatzung.iter().any(|(b, _)| *b == kraft) => {
+                vorlage.bleiben.push(PlanVorlagePerson {
+                    personal_id: kraft,
+                    name: eintrag.name,
+                });
+            }
+            _ => vorlage.kommen.push(eintrag),
+        }
+    }
+    vorlage.gehen = besatzung
+        .into_iter()
+        .filter(|(b, _)| !vorlage.bleiben.iter().any(|p| p.personal_id == *b))
+        .map(|(personal_id, name)| PlanVorlagePerson { personal_id, name })
+        .collect();
+    Ok(vorlage)
 }
 
 /// Vorgabe des Einsatzes (LLH-1122) samt wirksamer Vorwarnung und der Zahl der laufenden
@@ -2141,9 +2557,12 @@ pub async fn set_einsatz_vorgabe(
             #[sqlx(try_from = "String")]
             rhythmus_quelle: RhythmusQuelle,
             faellig_at: String,
+            faellig_laut_plan: bool,
+            plan_block_id: Option<i64>,
         }
         let laufende: Vec<Laufend> = sqlx::query_as(
-            "SELECT id, einheit_id, beginn_at, rhythmus_minuten, rhythmus_quelle, faellig_at \
+            "SELECT id, einheit_id, beginn_at, rhythmus_minuten, rhythmus_quelle, faellig_at, \
+                    faellig_laut_plan, plan_block_id \
              FROM einsatz_abloesung WHERE einsatz_id = ? AND status = 'laufend' ORDER BY id",
         )
         .bind(einsatz_id)
@@ -2152,23 +2571,44 @@ pub async fn set_einsatz_vorgabe(
         for s in laufende {
             // Neu gerechnet wird nur, wer der neuen Vorgabe folgt. Eine entfernte Vorgabe lässt
             // die gespeicherte Fälligkeit sekundengenau stehen (Review PR #833).
-            let (faellig_at, rhythmus) = match (s.rhythmus_quelle, &vorgabe.werte) {
-                (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
-                    &s.beginn_at,
+            let (faellig_at, rhythmus, laut_plan) = match (s.rhythmus_quelle, &vorgabe.werte) {
+                (RhythmusQuelle::Einsatz, Some(_)) => {
+                    let (regulaer, rhythmus) = compute_faellig(
+                        &s.beginn_at,
+                        s.rhythmus_minuten,
+                        s.rhythmus_quelle,
+                        &vorgabe,
+                    )?;
+                    // Der Plan überlagert die neue Regel (LLH-1555).
+                    let (faellig_at, laut_plan) = mit_plan_tx(
+                        conn,
+                        einsatz_id,
+                        s.einheit_id,
+                        &s.beginn_at,
+                        s.plan_block_id,
+                        regulaer,
+                    )
+                    .await?;
+                    (faellig_at, rhythmus, laut_plan)
+                }
+                _ => (
+                    s.faellig_at.clone(),
                     s.rhythmus_minuten,
-                    s.rhythmus_quelle,
-                    &vorgabe,
-                )?,
-                _ => (s.faellig_at.clone(), s.rhythmus_minuten),
+                    s.faellig_laut_plan,
+                ),
             };
             let faellig_geaendert = faellig_at != s.faellig_at;
-            if faellig_geaendert || rhythmus != s.rhythmus_minuten {
+            if faellig_geaendert
+                || rhythmus != s.rhythmus_minuten
+                || laut_plan != s.faellig_laut_plan
+            {
                 sqlx::query(
-                    "UPDATE einsatz_abloesung SET rhythmus_minuten = ?, faellig_at = ? \
-                     WHERE id = ?",
+                    "UPDATE einsatz_abloesung SET rhythmus_minuten = ?, faellig_at = ?, \
+                        faellig_laut_plan = ? WHERE id = ?",
                 )
                 .bind(rhythmus)
                 .bind(&faellig_at)
+                .bind(laut_plan)
                 .bind(s.id)
                 .execute(&mut *conn)
                 .await?;
@@ -2338,8 +2778,7 @@ pub async fn vollziehen(
         let (folge_ids, inhalt, wirkung) = match eingabe.art {
             AbloesungArt::Einheit => vollziehen_einheit_tx(conn, &vorgang, &roh, eingabe).await?,
             AbloesungArt::Besatzung => {
-                vollziehen_besatzung_tx(conn, &vorgang, &roh, vollzogen_at, &eingabe.besatzung)
-                    .await?
+                vollziehen_besatzung_tx(conn, &vorgang, &roh, eingabe).await?
             }
         };
         let etb_id = crate::etb::repo::anlegen_tx(
@@ -2507,6 +2946,7 @@ async fn vollziehen_einheit_tx(
                     &vorgabe,
                     Some(id),
                     BeginnQuelle::Vollzug,
+                    None,
                     jetzt,
                 )
                 .await?;
@@ -3081,6 +3521,121 @@ fn personen_text<'a>(namen: impl Iterator<Item = &'a str>) -> String {
     }
 }
 
+/// Bringt Personen aus dem Schichtplan in den Einsatz (LLH-1555, design.md D5), in der
+/// Transaktion des Vollzugs. Stamm-Personal: schon disponiert → diese Kraft, entlassen oder
+/// storniert → wieder aufgenommen, sonst disponiert (fremd 404, außer Dienst 422 wie die
+/// Disposition). Helfer: die Kraft, als die er schon übernommen wurde, sonst eine Ad-hoc-Kraft
+/// mit seinem Namen, seiner Organisation und seinen Qualifikationen als Funktion; der Helfer bleibt
+/// im Plan und verweist auf sie. Jede neue Kraft bekommt die Zeitachse ihres Initialstatus wie bei
+/// der Disposition. Liefert je Eintrag das Ziel und ob die Kraft erst jetzt in den Einsatz kam.
+async fn uebernehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    liste: &[PlanUebernahme],
+) -> Result<Vec<(BesatzungZiel, bool)>, AppError> {
+    use crate::personal::disposition_repo::{
+        disponieren_adhoc_tx, disponieren_stamm_tx, reaktivieren_tx, start_zeitachse_tx, AdhocDaten,
+    };
+    if liste.is_empty() {
+        return Ok(Vec::new());
+    }
+    let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    let mut aus = Vec::new();
+    for u in liste {
+        let (kraft, neu) = match u.quelle {
+            UebernahmeQuelle::Stamm(pid) => {
+                let bestehend: Option<(i64, bool)> = sqlx::query_as(
+                    "SELECT id, beendet_at IS NOT NULL FROM einsatz_personal \
+                     WHERE einsatz_id = ? AND personal_id = ?",
+                )
+                .bind(einsatz_id)
+                .bind(pid)
+                .fetch_optional(&mut *conn)
+                .await?;
+                match bestehend {
+                    Some((ep, false)) => (ep, false),
+                    _ => {
+                        let d =
+                            disponieren_stamm_tx(conn, einsatz_id, org_id, pid, None, benutzer_id)
+                                .await?;
+                        start_zeitachse_tx(conn, einsatz_id, benutzer_id, d.id).await?;
+                        (d.id, true)
+                    }
+                }
+            }
+            UebernahmeQuelle::Helfer(hid) => {
+                type Helfer = (
+                    String,
+                    Option<String>,
+                    Option<String>,
+                    Option<i64>,
+                    Option<bool>,
+                );
+                let h: Option<Helfer> = sqlx::query_as(
+                    "SELECT h.name, h.organisation, \
+                            (SELECT group_concat(q.label, ', ') FROM json_each(h.qualifikationen) j \
+                             JOIN qualifikation q ON q.id = j.value), \
+                            ep.id, ep.beendet_at IS NOT NULL \
+                     FROM einsatz_plan_helfer h \
+                     LEFT JOIN einsatz_personal ep \
+                            ON ep.id = h.einsatz_personal_id AND ep.einsatz_id = h.einsatz_id \
+                     WHERE h.id = ? AND h.einsatz_id = ?",
+                )
+                .bind(hid)
+                .bind(einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+                let (name, organisation, funktion, ep, beendet) = h.ok_or(AppError::NotFound)?;
+                match (ep, beendet) {
+                    (Some(ep), Some(false)) => (ep, false),
+                    (Some(ep), _) => {
+                        reaktivieren_tx(conn, einsatz_id, org_id, ep, None, benutzer_id).await?;
+                        start_zeitachse_tx(conn, einsatz_id, benutzer_id, ep).await?;
+                        (ep, true)
+                    }
+                    (None, _) => {
+                        let ep = disponieren_adhoc_tx(
+                            conn,
+                            einsatz_id,
+                            org_id,
+                            AdhocDaten {
+                                name: &name,
+                                funktion: funktion.as_deref(),
+                                traegerorganisation: organisation.as_deref(),
+                                staerke_position: None,
+                            },
+                            benutzer_id,
+                        )
+                        .await?;
+                        start_zeitachse_tx(conn, einsatz_id, benutzer_id, ep).await?;
+                        sqlx::query(
+                            "UPDATE einsatz_plan_helfer SET einsatz_personal_id = ? WHERE id = ?",
+                        )
+                        .bind(ep)
+                        .bind(hid)
+                        .execute(&mut *conn)
+                        .await?;
+                        (ep, true)
+                    }
+                }
+            }
+        };
+        aus.push((
+            BesatzungZiel {
+                personal_id: kraft,
+                einheit_id: u.einheit_id,
+                fahrzeug_id: u.fahrzeug_id,
+            },
+            neu,
+        ));
+    }
+    Ok(aus)
+}
+
 /// Vollzug als Besatzungswechsel (LLH-1150, Entscheidung LLH-1118 Punkt 4): die Einheit, ihr
 /// Fahrzeug und ihr Abschnitt bleiben, die Folgeschicht hängt an derselben Einheit (Beginn =
 /// Vollzug, Rhythmus und Einsatzstelle der abgelösten Schicht). Die alte Besatzung ist die
@@ -3094,12 +3649,16 @@ fn personen_text<'a>(namen: impl Iterator<Item = &'a str>) -> String {
 /// LLH-1319: die neue Besatzung kommt je Person in ihre Ziel-Einheit (die Einheit oder eine
 /// erbende Untereinheit) und, mit Ziel-Fahrzeug, auf dieses; die Zeile hält Ziel und vorheriges
 /// Fahrzeug für die Rücknahme.
+///
+/// LLH-1555 (design.md D5): `bleiben` nimmt Personen aus der alten Besatzung heraus (sie behalten
+/// Einheit, Fahrzeug und Führung, ohne Ereignis); `uebernahme` bringt Personen aus dem Plan erst
+/// in den Einsatz ([`uebernehmen_tx`]); `plan_block_id` muss der Folgeblock der Schicht sein und
+/// wird der Anker der Folgeschicht.
 async fn vollziehen_besatzung_tx(
     conn: &mut SqliteConnection,
     v: &Vorgang<'_>,
     roh: &Roh,
-    vollzogen_at: &str,
-    ziele: &[BesatzungZiel],
+    eingabe: &VollzugEingabe,
 ) -> Result<(Vec<i64>, String, VollzugWirkung), AppError> {
     use crate::zeitachse::ZeitachseArt;
     let Vorgang {
@@ -3108,13 +3667,65 @@ async fn vollziehen_besatzung_tx(
         benutzer_id,
         jetzt,
     } = *v;
+    let vollzogen_at = eingabe.vollzogen_at.as_str();
     let (name, _) = einheit_tx(conn, einsatz_id, roh.einheit_id).await?;
     let g = load_gliederung(&mut *conn, einsatz_id).await?;
     let einheiten: Vec<i64> = std::iter::once(roh.einheit_id)
         .chain(erben_von(&g, roh.einheit_id))
         .collect();
     let einheiten_json = crate::kraefte_disposition::ids_json(&einheiten);
-    let neu = check_neue_besatzung_tx(conn, einsatz_id, &einheiten, ziele).await?;
+    let bleiben_json = crate::kraefte_disposition::ids_json(&eingabe.bleiben);
+
+    // Wer bleibt, gehört zur bisherigen Besatzung (LLH-1555).
+    let bleibende: Vec<(i64, Option<String>)> = sqlx::query_as(
+        "SELECT j.value AS id, p.snap_name FROM json_each(?1) j \
+         LEFT JOIN einsatz_personal p ON p.id = j.value AND p.einsatz_id = ?2 \
+              AND p.beendet_at IS NULL AND p.einheit_id IN (SELECT value FROM json_each(?3)) \
+         ORDER BY j.key",
+    )
+    .bind(&bleiben_json)
+    .bind(einsatz_id)
+    .bind(&einheiten_json)
+    .fetch_all(&mut *conn)
+    .await?;
+    let Some(bleibende) = bleibende
+        .into_iter()
+        .map(|(_, n)| n)
+        .collect::<Option<Vec<String>>>()
+    else {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Wer bleibt, gehört zur bisherigen Besatzung von «{name}»"
+        )));
+    };
+    if let Some(block) = eingabe.plan_block_id {
+        let folgeblock: Option<i64> = sqlx::query_scalar(concat!(
+            "SELECT ",
+            kopplung::folgeblock_sql!(),
+            " FROM einsatz_abloesung a WHERE a.id = ? AND a.faellig_laut_plan = 1"
+        ))
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .flatten();
+        if folgeblock != Some(block) {
+            return Err(AppError::UnprocessableEntity(
+                "Der Block ist nicht der Folgeblock dieser Schicht im Schichtplan".into(),
+            ));
+        }
+    }
+    // Erst übernehmen, dann prüfen: die Prüfung läuft auf den Kräften des Einsatzes.
+    let uebernommen = uebernehmen_tx(conn, einsatz_id, benutzer_id, &eingabe.uebernahme).await?;
+    let mut ziele = eingabe.besatzung.clone();
+    for (z, _) in &uebernommen {
+        if !ziele.iter().any(|b| b.personal_id == z.personal_id) {
+            ziele.push(*z);
+        }
+    }
+    let neu_dazu: HashSet<i64> = uebernommen
+        .iter()
+        .filter_map(|(z, neu)| neu.then_some(z.personal_id))
+        .collect();
+    let neu = check_neue_besatzung_tx(conn, einsatz_id, &einheiten, &ziele).await?;
 
     // Die alte Besatzung, wie der Vollzug sie vorfindet: das Fahrzeug nur, wenn es einer dieser
     // Einheiten gehört, die Führung nur die der eigenen Einheit.
@@ -3127,10 +3738,12 @@ async fn vollziehen_besatzung_tx(
          FROM einsatz_personal p \
          WHERE p.einsatz_id = ?1 AND p.beendet_at IS NULL \
            AND p.einheit_id IN (SELECT value FROM json_each(?2)) \
+           AND p.id NOT IN (SELECT value FROM json_each(?3)) \
          ORDER BY p.id",
     )
     .bind(einsatz_id)
     .bind(&einheiten_json)
+    .bind(&bleiben_json)
     .fetch_all(&mut *conn)
     .await?;
 
@@ -3152,8 +3765,8 @@ async fn vollziehen_besatzung_tx(
 
     let zeile = "INSERT INTO einsatz_abloesung_besatzung \
             (abloesung_id, personal_id, rolle, einheit_vorher_id, fahrzeug_vorher_id, \
-             war_fuehrer, zeitachse_id, einheit_nachher_id, fahrzeug_nachher_id) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+             war_fuehrer, zeitachse_id, einheit_nachher_id, fahrzeug_nachher_id, uebernommen) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     for (person, _, einheit, fahrzeug, fuehrer) in &alt {
         let z = besatzung_ereignis_tx(
             conn,
@@ -3174,6 +3787,7 @@ async fn vollziehen_besatzung_tx(
             .bind(z)
             .bind(None::<i64>)
             .bind(None::<i64>)
+            .bind(false)
             .execute(&mut *conn)
             .await?;
     }
@@ -3199,6 +3813,7 @@ async fn vollziehen_besatzung_tx(
             .bind(z)
             .bind(p.ziel_einheit)
             .bind(ziel_fahrzeug)
+            .bind(neu_dazu.contains(&p.id))
             .execute(&mut *conn)
             .await?;
     }
@@ -3251,6 +3866,7 @@ async fn vollziehen_besatzung_tx(
         &vorgabe,
         Some(id),
         BeginnQuelle::Vollzug,
+        eingabe.plan_block_id,
         jetzt,
     )
     .await?;
@@ -3262,12 +3878,28 @@ async fn vollziehen_besatzung_tx(
         .extend(neu.iter().filter_map(|p| p.einheit_id));
     wirkung.personen.extend(alt.iter().map(|(p, ..)| *p));
     wirkung.personen.extend(neu.iter().map(|p| p.id));
-    let inhalt = format!(
+    let mut inhalt = format!(
         "Ablösung vollzogen: Besatzungswechsel «{name}», Einheit und Fahrzeug bleiben. \
          Alte Besatzung: {}. Neue Besatzung: {}.",
         personen_text(alt.iter().map(|(_, n, ..)| n.as_str())),
         verteilung_text(&neu, roh.einheit_id),
     );
+    if !bleibende.is_empty() {
+        inhalt.push_str(&format!(
+            " Bleibt: {}.",
+            personen_text(bleibende.iter().map(String::as_str))
+        ));
+    }
+    if !neu_dazu.is_empty() {
+        inhalt.push_str(&format!(
+            " Aus dem Schichtplan in den Einsatz übernommen: {}.",
+            personen_text(
+                neu.iter()
+                    .filter(|p| neu_dazu.contains(&p.id))
+                    .map(|p| p.name.as_str())
+            )
+        ));
+    }
     Ok((vec![folge], inhalt, wirkung))
 }
 
@@ -3354,11 +3986,12 @@ pub async fn zuruecknehmen(
         .await?;
 
         let mut wirkung = VollzugWirkung::default();
+        let mut uebernommen: Vec<String> = Vec::new();
         match roh.art {
             // LLH-1150: Personen-Ereignisse streichen und die Besatzung zurücklegen; die
             // Einheiten hatten kein Ereignis.
             AbloesungArt::Besatzung => {
-                wirkung = zuruecknehmen_besatzung_tx(
+                (wirkung, uebernommen) = zuruecknehmen_besatzung_tx(
                     conn,
                     &Vorgang {
                         einsatz_id,
@@ -3449,6 +4082,12 @@ pub async fn zuruecknehmen(
         }
         if roh.art == AbloesungArt::Besatzung {
             inhalt.push_str(" Besatzungswechsel rückgängig.");
+        }
+        if !uebernommen.is_empty() {
+            inhalt.push_str(&format!(
+                " Im Einsatz bleiben, ohne Einheit: {}.",
+                personen_text(uebernommen.iter().map(String::as_str))
+            ));
         }
         if roh.verbleib == AbloesungVerbleib::Entlassen {
             inhalt.push_str(" Entlassung gestrichen.");
@@ -3623,7 +4262,7 @@ async fn zuruecknehmen_besatzung_tx(
     conn: &mut SqliteConnection,
     v: &Vorgang<'_>,
     einheit_id: i64,
-) -> Result<VollzugWirkung, AppError> {
+) -> Result<(VollzugWirkung, Vec<String>), AppError> {
     use crate::zeitachse::repo::{streiche_tx, Kraft, GRUND_ABLOESUNG_ZURUECK};
     let Vorgang {
         einsatz_id,
@@ -3723,6 +4362,16 @@ async fn zuruecknehmen_besatzung_tx(
     .bind(id)
     .execute(&mut *conn)
     .await?;
+    // Wer mit dem Vollzug erst aus dem Plan kam, bleibt im Einsatz (LLH-1555, design.md D5);
+    // die Rücknahme nennt sie.
+    let uebernommen: Vec<String> = sqlx::query_scalar(
+        "SELECT p.snap_name FROM einsatz_abloesung_besatzung b \
+         JOIN einsatz_personal p ON p.id = b.personal_id \
+         WHERE b.abloesung_id = ? AND b.rolle = 'neu' AND b.uebernommen = 1 ORDER BY b.rowid",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
     let alle: Vec<i64> = sqlx::query_scalar(
         "DELETE FROM einsatz_abloesung_besatzung WHERE abloesung_id = ? RETURNING personal_id",
     )
@@ -3734,7 +4383,7 @@ async fn zuruecknehmen_besatzung_tx(
         .einheiten
         .extend(neu.iter().chain(alt.iter()).filter_map(|(_, e)| *e));
     wirkung.personen = alle;
-    Ok(wirkung)
+    Ok((wirkung, uebernommen))
 }
 
 /// Fristen einer wieder laufenden Schicht (Rücknahme des Vollzugs, gestrichene Entlassung) nach
@@ -3753,15 +4402,24 @@ async fn restore_fristen_tx(
 ) -> Result<(), AppError> {
     let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
     let vorwarnung = vorgabe.vorwarnung();
-    let (faellig_at, rhythmus) = match (roh.rhythmus_quelle, &vorgabe.werte) {
-        (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
-            &roh.beginn_at,
-            roh.rhythmus_minuten,
-            roh.rhythmus_quelle,
-            &vorgabe,
-        )?,
-        _ => (roh.faellig_at.clone(), roh.rhythmus_minuten),
-    };
+    let (regulaer, rhythmus) = regulaer(roh, &vorgabe)?;
+    // Der Plan gilt wie beim Beginn (LLH-1555): er kann sich seit dem Vollzug geändert haben.
+    let (faellig_at, laut_plan) = mit_plan_tx(
+        conn,
+        einsatz_id,
+        roh.einheit_id,
+        &roh.beginn_at,
+        roh.plan_block_id,
+        regulaer,
+    )
+    .await?;
+    if laut_plan != roh.faellig_laut_plan {
+        sqlx::query("UPDATE einsatz_abloesung SET faellig_laut_plan = ? WHERE id = ?")
+            .bind(laut_plan)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+    }
     if faellig_at != roh.faellig_at {
         sqlx::query(
             "UPDATE einsatz_abloesung SET rhythmus_minuten = ?, faellig_at = ? WHERE id = ?",
@@ -3973,15 +4631,25 @@ pub(crate) async fn move_autostart_tx(
     };
     let roh = roh_tx(conn, einsatz_id, id).await?;
     let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
-    let (faellig_at, rhythmus) =
+    let (regulaer, rhythmus) =
         compute_faellig(neu_at, roh.rhythmus_minuten, roh.rhythmus_quelle, &vorgabe)?;
+    let (faellig_at, laut_plan) = mit_plan_tx(
+        conn,
+        einsatz_id,
+        einheit_id,
+        neu_at,
+        roh.plan_block_id,
+        regulaer,
+    )
+    .await?;
     sqlx::query(
-        "UPDATE einsatz_abloesung SET beginn_at = ?, faellig_at = ?, rhythmus_minuten = ? \
-         WHERE id = ?",
+        "UPDATE einsatz_abloesung SET beginn_at = ?, faellig_at = ?, rhythmus_minuten = ?, \
+            faellig_laut_plan = ? WHERE id = ?",
     )
     .bind(neu_at)
     .bind(&faellig_at)
     .bind(rhythmus)
+    .bind(laut_plan)
     .bind(id)
     .execute(&mut *conn)
     .await?;

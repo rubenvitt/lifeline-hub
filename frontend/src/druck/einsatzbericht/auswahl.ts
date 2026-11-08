@@ -17,14 +17,16 @@ export type BlockSchluessel =
   | 'kraefte'
   | 'lage'
   | 'bilanz'
+  | 'hilfeleistungen'
   | 'etb'
   | 'einheiten-zeiten'
-  | 'personal-kopf';
+  | 'personal-kopf'
+  | 'materialverbrauch';
 
 export interface BlockDef {
   schluessel: BlockSchluessel;
   titel: string;
-  /** Teil des Standardumfangs (der Bericht aus LFH-726); sonst eine optionale Anlage. */
+  /** Teil des Standardumfangs (LFH-726, seit LLH-1575 mit Hilfeleistungen); sonst eine Anlage. */
   standard: boolean;
 }
 
@@ -39,14 +41,29 @@ export const BLOECKE: readonly BlockDef[] = [
   { schluessel: 'kraefte', titel: 'Kräfte', standard: true },
   { schluessel: 'lage', titel: 'Lage', standard: true },
   { schluessel: 'bilanz', titel: 'Bilanz', standard: true },
+  // LLH-1575 (design.md D1): Zählungen eines Sanitätsdienstes, im Standardumfang.
+  { schluessel: 'hilfeleistungen', titel: 'Hilfeleistungen', standard: true },
   { schluessel: 'etb', titel: 'ETB-Auszug', standard: true },
   { schluessel: 'einheiten-zeiten', titel: 'Anlage Einheiten mit Einsatzzeiten', standard: false },
   { schluessel: 'personal-kopf', titel: 'Anlage Personal je Kopf', standard: false },
+  { schluessel: 'materialverbrauch', titel: 'Anlage Materialverbrauch', standard: false },
 ];
 
 export const STANDARDUMFANG: readonly BlockSchluessel[] = BLOECKE.filter((b) => b.standard).map(
   (b) => b.schluessel,
 );
+
+/**
+ * Kurzbericht für den Auftraggeber (LLH-1575, design.md D5): eine Voreinstellung der Auswahl, kein
+ * eigenes Dokument. Ohne Führung, Lage, Bilanz, ETB-Auszug und Anlagen; die Helferstunden stehen
+ * im Block Kräfte.
+ */
+export const KURZBERICHT: readonly BlockSchluessel[] = [
+  'stammdaten',
+  'zeiten',
+  'kraefte',
+  'hilfeleistungen',
+];
 
 /** Name des Adressparameters. */
 export const AUSWAHL_PARAM = 'bloecke';
@@ -67,10 +84,21 @@ export function parseBerichtAuswahl(params: URLSearchParams): BlockSchluessel[] 
   return auswahl.length > 0 ? auswahl : [...STANDARDUMFANG];
 }
 
+/** Genau diese Menge, ohne Rücksicht auf Reihenfolge und Doppeltes. */
+function gleicheMenge(
+  auswahl: readonly BlockSchluessel[],
+  menge: readonly BlockSchluessel[],
+): boolean {
+  const a = new Set(auswahl);
+  return a.size === menge.length && menge.every((b) => a.has(b));
+}
+
 export function istStandardumfang(auswahl: readonly BlockSchluessel[]): boolean {
-  return (
-    auswahl.length === STANDARDUMFANG.length && STANDARDUMFANG.every((b) => auswahl.includes(b))
-  );
+  return gleicheMenge(auswahl, STANDARDUMFANG);
+}
+
+export function istKurzbericht(auswahl: readonly BlockSchluessel[]): boolean {
+  return gleicheMenge(auswahl, KURZBERICHT);
 }
 
 /** Der Wert für `?bloecke=`; `undefined` beim Standardumfang, damit dessen Adresse kurz bleibt. */
@@ -86,7 +114,8 @@ export function auswahlSchluessel(auswahl: readonly BlockSchluessel[]): string {
 
 /**
  * Die Zeilen des Druckkopfs (Spec „Druckkopf nennt den Umfang“): ein Ausdruck sagt, OB er eine
- * Auswahl ist und welche — wie „vollständiges Tagebuch“ im ETB-Druck (`etb/druckAuswahl.ts`).
+ * Auswahl ist und welche — wie „vollständiges Tagebuch“ im ETB-Druck (`etb/druckAuswahl.ts`). Der
+ * Kurzbericht heißt bei genau seiner Menge so (LLH-1575, design.md D5).
  * Die Personal-Anlage trägt Namen von Einsatzkräften; das steht ausdrücklich im Kopf.
  */
 export function umfangZeilen(
@@ -98,9 +127,11 @@ export function umfangZeilen(
       etikett: 'Umfang',
       wert: istStandardumfang(geordnet)
         ? 'Standardumfang'
-        : `Auswahl: ${BLOECKE.filter((b) => geordnet.includes(b.schluessel))
-            .map((b) => b.titel)
-            .join(', ')}`,
+        : istKurzbericht(geordnet)
+          ? 'Kurzbericht für den Auftraggeber'
+          : `Auswahl: ${BLOECKE.filter((b) => geordnet.includes(b.schluessel))
+              .map((b) => b.titel)
+              .join(', ')}`,
     },
   ];
   if (geordnet.includes('personal-kopf')) {

@@ -101,6 +101,11 @@ export interface components {
             erbende_einheiten: components["schemas"]["AbloesungErbe"][];
             faellig_at: string;
             /**
+             * @description Die Fälligkeit kommt aus dem Schichtplan (LLH-1555): der nächste Wechsel der Blöcke der
+             *     Einheit, nicht der Rhythmus. Dann ändert sich der Rhythmus nicht von Hand (422).
+             */
+            faellig_laut_plan: boolean;
+            /**
              * Format: int64
              * @description Die jüngste Folgeschicht, die beim Vollzug dieser Schicht entstand oder übernommen wurde.
              */
@@ -114,6 +119,12 @@ export interface components {
              *     Wechsels (Rolle `neu`, LLH-1319); sonst leer.
              */
             nach_besatzungswechsel: components["schemas"]["AbloesungBesatzung"][];
+            /**
+             * Format: int64
+             * @description Der Block, in den ein Vollzug aus dem Plan in diese Schicht gewechselt hat.
+             */
+            plan_block_id?: number | null;
+            plan_folgeblock?: components["schemas"]["AbloesungPlanFolgeblock"] | null;
             planung_entfallen?: components["schemas"]["AbloesungPlanungEntfallen"] | null;
             /**
              * @description Warnungen zur geplanten ablösenden Einheit (LLH-1131): schon für eine andere Schicht
@@ -233,6 +244,39 @@ export interface components {
             status: components["schemas"]["AbloesungStatus"];
             /** @description Übernommen statt neu angelegt (ungeplanter Ablöser mit eigener laufender Schicht). */
             uebernommen: boolean;
+        };
+        /** @description Der Folgeblock einer Schicht laut Plan (LLH-1555, design.md D2). */
+        AbloesungPlanFolgeblock: {
+            bis: string;
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Zahl der eingeteilten Personen; 0 heißt, der Wechsel ist noch nicht geplant.
+             */
+            personen: number;
+            von: string;
+        };
+        /**
+         * @description Die Vorlage des Besatzungswechsels aus dem Schichtplan (LLH-1555, design.md D5), vom Server
+         *     gerechnet: wer bleibt, wer kommt (mit Ziel), wer geht. Verlangt die Freigabe Personal.
+         */
+        AbloesungPlanVorlage: {
+            bleiben: components["schemas"]["PlanVorlagePerson"][];
+            /**
+             * @description Personen der Folgeblöcke, die nicht kommen können (außer Dienst, eine entlassene
+             *     Ad-hoc-Kraft); nur ihre Namen.
+             */
+            fehlen: string[];
+            /**
+             * Format: int64
+             * @description Der Folgeblock der Schicht; fehlt er, endet der Posten (dann sind `kommen` und `bleiben`
+             *     leer, und der Vollzug ist „Abziehen“).
+             */
+            folgeblock_id?: number | null;
+            gehen: components["schemas"]["PlanVorlagePerson"][];
+            kommen: components["schemas"]["PlanVorlageKommen"][];
+            wechsel_at: string;
         };
         /**
          * @description Die zuletzt entfallene Planung einer laufenden Schicht ohne Ablöser (LLH-1309, Spec
@@ -4555,7 +4599,7 @@ export interface components {
         };
         /**
          * @description Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in
-         *     `migrations/0292_person_massnahme_sanitaetsdienst.sql` (die vier letzten aus LLH-1572).
+         *     `migrations/0295_person_massnahme_sanitaetsdienst.sql` (die vier letzten aus LLH-1572).
          *     Katalogwert (Retain), nie im ETB oder Live-Kanal.
          * @enum {string}
          */
@@ -5883,6 +5927,30 @@ export interface components {
             uhs_id?: number | null;
         };
         /**
+         * @description Wer laut Plan kommt: genau eine der drei Kennungen, so wie der Vollzug sie nimmt
+         *     (`personal_id` in `besatzung`, die anderen in `uebernahme`), und die Einheit des Blocks.
+         */
+        PlanVorlageKommen: {
+            /** Format: int64 */
+            einheit_id: number;
+            name: string;
+            /** Format: int64 */
+            personal_id?: number | null;
+            /** Format: int64 */
+            plan_helfer_id?: number | null;
+            /** Format: int64 */
+            stamm_personal_id?: number | null;
+        };
+        /** @description Eine Kraft des Einsatzes in der Vorlage. */
+        PlanVorlagePerson: {
+            name: string;
+            /**
+             * Format: int64
+             * @description `einsatz_personal.id`
+             */
+            personal_id: number;
+        };
+        /**
          * @description Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab
          *     LLH-1309: `einsatz_abloesung.planung_entfallen_grund`, CHECK in Migration 0259).
          *     Wire == `as_str()`.
@@ -7060,6 +7128,20 @@ export interface components {
          * @enum {string}
          */
         Verbindungsstatus: "bestehend" | "geplant";
+        /**
+         * @description Angaben des maßgeblichen Verbleibs einer Person für den Einsatzbericht (LLH-1575, design.md
+         *     D3): Rettungsmittel, „Entlassen an“, „gegen Rat“ und Unterschrift, die die Personenliste
+         *     nicht trägt. Keine Personendaten: die Kennung dient nur der Zuordnung zur Liste.
+         */
+        VerbleibAngaben: {
+            entlassen_an?: components["schemas"]["EntlassenAn"] | null;
+            gegen_rat?: components["schemas"]["GegenRat"] | null;
+            /** Format: int64 */
+            person_id: number;
+            /** @description Rettungsmittel des Transports (Funkrufname beim Eigentransport, sonst Freitext), getrimmt. */
+            transportmittel?: string | null;
+            unterschrift?: components["schemas"]["Unterschrift"] | null;
+        };
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];

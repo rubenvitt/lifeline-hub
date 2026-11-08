@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type {
+  EinsatzMaterial,
+  Person,
+  VerbleibAngaben,
   BetreuungUebersicht,
   EvakuierungUebersicht,
   Einheit,
@@ -17,6 +20,7 @@ import {
   etbEintrag,
   lagebericht,
   lageberichtQuelle,
+  material,
   periode,
   person,
   rohBericht,
@@ -74,7 +78,7 @@ function einsatz(teil: Partial<EinsatzAnzeige>) {
 }
 
 describe('verdichteEinsatzbericht – Blöcke', () => {
-  it('liefert die sieben Blöcke in fester Reihenfolge', () => {
+  it('liefert die acht Blöcke in fester Reihenfolge', () => {
     const b = verdichteEinsatzbericht(rohBericht(), konv);
     expect(b.bloecke.map((x) => x.titel)).toEqual([
       'Stammdaten',
@@ -83,6 +87,7 @@ describe('verdichteEinsatzbericht – Blöcke', () => {
       'Kräfte',
       'Lage',
       'Bilanz',
+      'Hilfeleistungen',
       'ETB-Auszug',
     ]);
   });
@@ -609,7 +614,7 @@ describe('3.5 ETB-Auszug', () => {
 });
 
 describe('Auswahl der Blöcke (LFH-902)', () => {
-  it('ohne Auswahl die sieben Standardblöcke, keine Anlage', () => {
+  it('ohne Auswahl die acht Standardblöcke, keine Anlage', () => {
     const b = verdichteEinsatzbericht(rohBericht(), konv);
     expect(b.bloecke.map((x) => x.schluessel)).toEqual(STANDARDUMFANG);
   });
@@ -622,11 +627,12 @@ describe('Auswahl der Blöcke (LFH-902)', () => {
   it('liest abgewählte Quellen nicht (sie sind nicht abgerufen)', () => {
     const roh = rohBericht({
       personen: { zustand: 'nicht-gewaehlt' },
+      personenVerbleibAngaben: { zustand: 'nicht-gewaehlt' },
       schaeden: { zustand: 'nicht-gewaehlt' },
       betreuung: { zustand: 'nicht-gewaehlt' },
       verpflegung: { zustand: 'nicht-gewaehlt' },
     });
-    const auswahl = STANDARDUMFANG.filter((s) => s !== 'bilanz');
+    const auswahl = STANDARDUMFANG.filter((s) => s !== 'bilanz' && s !== 'hilfeleistungen');
     const b = verdichteEinsatzbericht(roh, konv, auswahl);
     expect(b.bloecke.map((x) => x.schluessel)).toEqual(auswahl);
   });
@@ -895,5 +901,247 @@ describe('Anlage Personal je Kopf (LFH-902, design.md D5)', () => {
     expect(vermerke(anlage(verdichteEinsatzbericht(leer, konv, ['personal-kopf'])))).toEqual([
       KEINE_EINTRAEGE,
     ]);
+  });
+});
+
+describe('Block Hilfeleistungen (LLH-1575, design.md D2)', () => {
+  const auswahl = ['hilfeleistungen'] as const;
+  let id = 100;
+  beforeEach(() => {
+    id = 100;
+  });
+  /** Ein Kontakt am 12.06.2026; Stunde in Berliner Sommerzeit (UTC+2). */
+  const kontakt = (stunde: number, teil: Partial<Person> = {}) =>
+    person({
+      id: ++id,
+      registrier_nr: id,
+      aktuelle_sichtung: 'sk3',
+      erfasst_at: `2026-06-12T${String(stunde - 2).padStart(2, '0')}:15:00`,
+      ...teil,
+    });
+  const transport = (stunde: number, teil: Partial<Person> = {}) =>
+    kontakt(stunde, {
+      aktuelle_verbleib_art: 'transport',
+      aktueller_verbleib_status: 'abtransportiert',
+      versorgung: 'abgeschlossen',
+      ...teil,
+    });
+
+  function bericht(personen: Person[], angaben: VerbleibAngaben[] = []) {
+    return verdichteEinsatzbericht(
+      rohBericht({ personen: daten(personen), personenVerbleibAngaben: daten(angaben) }),
+      konv,
+      [...auswahl],
+    );
+  }
+
+  it('Kontakte gesamt und nach Anlass, Vermisste zählen nicht', () => {
+    const b = bericht([
+      kontakt(18, { anlass: 'verletzung' }),
+      kontakt(18, { anlass: 'verletzung' }),
+      kontakt(20, { anlass: 'verletzung' }),
+      kontakt(20, { anlass: 'hitze_kaelte' }),
+      kontakt(20),
+      kontakt(20, { status: 'vermisst', anlass: 'psychisch' }),
+    ]);
+    const a = abschnitt(b, 'hilfeleistungen', 'Kontakte');
+    expect(wert(a, 'Kontakte gesamt')).toBe('5');
+    const gruppe = a.inhalt.find((i) => i.art === 'zeilen' && i.titel === 'Nach Anlass');
+    expect(gruppe?.art === 'zeilen' && gruppe.zeilen.map((z) => [z.etikett, z.wert])).toEqual([
+      ['Verletzung', '3'],
+      ['Hitze / Kälte', '1'],
+      ['Ohne Anlass', '1'],
+    ]);
+  });
+
+  it('Kontakte je Stunde in der Zone der Organisation, Stunden ohne Kontakt mit 0', () => {
+    const b = bericht([kontakt(18), kontakt(18), kontakt(20)]);
+    const t = tabelle(abschnitt(b, 'hilfeleistungen', 'Kontakte nach Stunde'));
+    expect(t.kopf).toEqual(['Stunde ab', 'Kontakte']);
+    expect(t.zeilen).toEqual([
+      ['121800jun26', '2'],
+      ['121900jun26', '0'],
+      ['122000jun26', '1'],
+    ]);
+  });
+
+  it('Transporte nach Rettungsmittel und Ziel, Voranmeldung zählt nicht', () => {
+    const b = bericht(
+      [
+        transport(18, { aktuelles_verbleib_ziel: 'Klinikum Mitte' }),
+        transport(19, { aktuelles_verbleib_ziel: 'Klinikum Mitte' }),
+        transport(19, { aktuelles_verbleib_ziel: 'klinikum mitte ' }),
+        transport(20, { aktuelles_verbleib_ziel: null, aktueller_transport_durch: 'eigen' }),
+        transport(20, { aktueller_verbleib_status: 'angemeldet', versorgung: 'offen' }),
+      ],
+      [
+        { person_id: 101, transportmittel: 'RTW 1-83-1' },
+        { person_id: 102, transportmittel: 'RTW 1-83-1' },
+        { person_id: 103, transportmittel: 'RTW 1-83-1' },
+        { person_id: 104, transportmittel: 'KTW 1' },
+        { person_id: 105, transportmittel: 'RTW 2' },
+      ],
+    );
+    const a = abschnitt(b, 'hilfeleistungen', 'Transporte');
+    expect(wert(a, 'Transporte gesamt')).toBe('4');
+    const gruppe = (titel: string) => {
+      const g = a.inhalt.find((i) => i.art === 'zeilen' && i.titel === titel);
+      return g?.art === 'zeilen' ? g.zeilen.map((z) => [z.etikett, z.wert]) : null;
+    };
+    expect(gruppe('Nach Rettungsmittel')).toEqual([
+      ['RTW 1-83-1', '3'],
+      ['KTW 1', '1'],
+    ]);
+    expect(gruppe('Nach Ziel')).toEqual([
+      ['Klinikum Mitte', '3'],
+      ['Ohne Angabe', '1'],
+    ]);
+  });
+
+  it('ohne Transport nur „Transporte gesamt 0“', () => {
+    const a = abschnitt(bericht([kontakt(18)]), 'hilfeleistungen', 'Transporte');
+    expect(wert(a, 'Transporte gesamt')).toBe('0');
+    expect(a.inhalt).toHaveLength(1);
+  });
+
+  it('Verbleib wie in der Bilanz, dazu „Entlassen an“ nur bei Entlassungen', () => {
+    const entlassen = (teil: Partial<Person> = {}) =>
+      kontakt(18, { aktuelle_verbleib_art: 'entlassung', versorgung: 'abgeschlossen', ...teil });
+    const b = bericht(
+      [entlassen(), entlassen(), entlassen(), kontakt(19, { aktuelle_verbleib_art: 'vor_ort' })],
+      [
+        { person_id: 101, entlassen_an: 'polizei' },
+        { person_id: 102, entlassen_an: 'polizei' },
+        { person_id: 103, entlassen_an: 'selbst' },
+      ],
+    );
+    const a = abschnitt(b, 'hilfeleistungen', 'Verbleib');
+    expect(wert(a, 'Entlassen')).toBe('3');
+    const g = a.inhalt.find((i) => i.art === 'zeilen' && i.titel === 'Entlassen an');
+    expect(g?.art === 'zeilen' && g.zeilen.map((z) => [z.etikett, z.wert])).toEqual([
+      ['Selbst', '1'],
+      ['Polizei', '2'],
+    ]);
+    const ohne = abschnitt(bericht([kontakt(18)]), 'hilfeleistungen', 'Verbleib');
+    expect(ohne.inhalt.some((i) => i.art === 'zeilen' && i.titel === 'Entlassen an')).toBe(false);
+  });
+
+  it('Verweigerungen gegen Rat, „Unterschrift verweigert“ nur mit Fall', () => {
+    const b = bericht(
+      [kontakt(18), kontakt(18), kontakt(19), kontakt(19, { status: 'vermisst' })],
+      [
+        { person_id: 101, gegen_rat: 'behandlung', unterschrift: 'verweigert' },
+        { person_id: 102, gegen_rat: 'transport', unterschrift: 'liegt_vor' },
+        { person_id: 103, gegen_rat: 'transport' },
+        { person_id: 104, gegen_rat: 'behandlung' },
+      ],
+    );
+    const a = abschnitt(b, 'hilfeleistungen', 'Verweigerungen gegen Rat');
+    expect(wert(a, 'Behandlung abgelehnt')).toBe('1');
+    expect(wert(a, 'Transport abgelehnt')).toBe('2');
+    expect(wert(a, 'Unterschrift verweigert')).toBe('1');
+    const keine = abschnitt(bericht([kontakt(18)]), 'hilfeleistungen', 'Verweigerungen gegen Rat');
+    expect(wert(keine, 'Behandlung abgelehnt')).toBe('0');
+    expect(wert(keine, 'Unterschrift verweigert')).toBeUndefined();
+  });
+
+  it('Kontakte je Einheit mit Abschnitt, ohne Einheit als Vermerk', () => {
+    const einheit = (eid: number, name: string, abschnittName: string | null) => ({
+      versorgende_einheit_id: eid,
+      versorgende_einheit_name: name,
+      versorgende_einheit_abschnitt_name: abschnittName,
+    });
+    const b = bericht([
+      kontakt(18, einheit(1, 'Streife 1', 'Bühne')),
+      kontakt(18, einheit(2, 'UHS', null)),
+      kontakt(19, einheit(2, 'UHS', null)),
+      kontakt(19),
+    ]);
+    const a = abschnitt(b, 'hilfeleistungen', 'Kontakte je Einheit');
+    expect(tabelle(a).zeilen).toEqual([
+      ['UHS', '—', '2'],
+      ['Streife 1', 'Bühne', '1'],
+    ]);
+    expect(vermerke(a)).toEqual(['Ohne versorgende Einheit: 1']);
+  });
+
+  it('enthält keinen Namen, kein Geburtsdatum, keine Registriernummer Betroffener', () => {
+    const text = JSON.stringify(
+      bericht(
+        [person({ antreff_ort: 'Fundort Quastenflosser', zustand: 'Wendelin-Zustand' })],
+        [{ person_id: 1, transportmittel: 'RTW 1', gegen_rat: 'behandlung' }],
+      ),
+    );
+    for (const merkmal of [...BETROFFENEN_MERKMALE, '"42"']) expect(text).not.toContain(merkmal);
+  });
+
+  it('ohne Kontakt „keine Einträge“, Modul ausgeblendet „nicht genutzt“', () => {
+    expect(vermerke(block(bericht([]), 'hilfeleistungen').abschnitte[0])).toEqual([
+      KEINE_EINTRAEGE,
+    ]);
+    const aus = verdichteEinsatzbericht(
+      rohBericht({
+        personen: { zustand: 'nicht-genutzt' },
+        personenVerbleibAngaben: { zustand: 'nicht-genutzt' },
+      }),
+      konv,
+      [...auswahl],
+    );
+    expect(vermerke(block(aus, 'hilfeleistungen').abschnitte[0])).toEqual([NICHT_GENUTZT]);
+  });
+});
+
+describe('Anlage Materialverbrauch (LLH-1575, design.md D6)', () => {
+  const auswahl = ['materialverbrauch'] as const;
+  function anlage(aktiv: EinsatzMaterial[], entlassen: EinsatzMaterial[] = []) {
+    const b = verdichteEinsatzbericht(
+      rohBericht({ material: daten(aktiv), materialEntlassen: daten(entlassen) }),
+      konv,
+      [...auswahl],
+    );
+    return block(b, 'materialverbrauch').abschnitte[0];
+  }
+
+  it('summiert je Material über Posten, auch aus dem Einsatz genommene; Geräte fehlen', () => {
+    const a = anlage(
+      [
+        material({ id: 1, ausgegeben: 4 }),
+        material({ id: 2, material_id: 32, bezeichnung: 'Trage', art: 'geraet', menge: 1 }),
+        material({
+          id: 3,
+          material_id: 33,
+          bezeichnung: 'Kühlpack',
+          kategorie: 'Sanitätsmaterial',
+          ausgegeben: 0,
+        }),
+        material({
+          id: 4,
+          material_id: null,
+          ist_adhoc: true,
+          bezeichnung: 'Wasser 0,5 l',
+          kategorie: null,
+          ausgegeben: 24,
+        }),
+      ],
+      [material({ id: 5, ausgegeben: 2 })],
+    );
+    expect(tabelle(a).kopf).toEqual(['Material', 'Kategorie', 'Ausgegeben']);
+    expect(tabelle(a).zeilen).toEqual([
+      ['Rettungsdecke', 'Sanitätsmaterial', '6'],
+      ['Wasser 0,5 l', '—', '24'],
+    ]);
+  });
+
+  it('ohne Verbrauch „keine Einträge“, Modul ausgeblendet „nicht genutzt“', () => {
+    expect(vermerke(anlage([material({ ausgegeben: 0 })]))).toEqual([KEINE_EINTRAEGE]);
+    const aus = verdichteEinsatzbericht(
+      rohBericht({
+        material: { zustand: 'nicht-genutzt' },
+        materialEntlassen: { zustand: 'nicht-genutzt' },
+      }),
+      konv,
+      [...auswahl],
+    );
+    expect(vermerke(block(aus, 'materialverbrauch').abschnitte[0])).toEqual([NICHT_GENUTZT]);
   });
 });

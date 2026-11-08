@@ -1,9 +1,15 @@
 import { Checkbox, Collapse, Form, Input, Radio, Typography, type FormInstance } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useId, useRef, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
-import type { Abloesung, AbloesungArt, BesatzungZielEingabe, VollzugBody } from '../api/types';
+import type {
+  Abloesung,
+  AbloesungArt,
+  AbloesungPlanVorlage,
+  BesatzungZielEingabe,
+  VollzugBody,
+} from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -29,6 +35,13 @@ import {
 import { verbleibBody, verbleibOptionen, type VerbleibRaum, type VerbleibWert } from './verbleib';
 import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import {
+  folgtPlan,
+  planVollzugBody,
+  postenEndet,
+  vorlageWechselt,
+  vorlageZeilen,
+} from './lautPlan';
 
 /**
  * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog
@@ -195,8 +208,11 @@ export function SchichtBeginnenDialog({
 
 // ── Vollzug ───────────────────────────────────────────────────────────────────
 
+/** Die Art im Vollzug; `plan` ist der Besatzungswechsel aus der Vorlage des Schichtplans (LLH-1555). */
+type VollzugArt = AbloesungArt | 'plan';
+
 interface VollzugWerte {
-  art?: AbloesungArt;
+  art?: VollzugArt;
   zeitpunkt?: Dayjs | null;
   abloeser_ids?: number[];
   abschnitt_uebergeben?: boolean;
@@ -210,9 +226,53 @@ const ART_OPTIONEN: { value: AbloesungArt; label: string }[] = [
   { value: 'besatzung', label: 'Besatzungswechsel' },
 ];
 
+const PLAN_OPTION: { value: VollzugArt; label: string } = { value: 'plan', label: 'Laut Plan' };
+
+/**
+ * Belegt den Vollzug aus der Vorlage des Schichtplans vor (LLH-1555, design.md D5), sobald sie da
+ * ist: sie lädt mit dem offenen Dialog. Einmal je Dialog und nur, solange niemand Art oder Ablöser
+ * angefasst hat. Mit Wechsel laut Plan steht die Art auf „Laut Plan“; endet der Posten, auf der
+ * ganzen Einheit ohne Ablöser („Abziehen“).
+ */
+function useVorlageVorbelegung(
+  form: FormInstance<VollzugWerte>,
+  vorlage: AbloesungPlanVorlage | null | undefined,
+) {
+  const erledigt = useRef(false);
+  useEffect(() => {
+    if (erledigt.current || vorlage == null) return;
+    erledigt.current = true;
+    if (form.isFieldTouched('art') || form.isFieldTouched('abloeser_ids')) return;
+    if (vorlageWechselt(vorlage)) form.setFieldsValue({ art: 'plan' });
+    else if (postenEndet(vorlage)) form.setFieldsValue({ art: 'einheit', abloeser_ids: [] });
+  }, [form, vorlage]);
+}
+
+/** Die Vorlage als Zeilen „Kommt: …“, „Bleibt: …“, „Geht: …“ (dazu „Fehlt: …“), einzeilig. */
+function VorlageZeilen({ vorlage }: { vorlage: AbloesungPlanVorlage }) {
+  const { konventionen } = useAnzeigeKonventionen();
+  return (
+    <div data-lfh="vollzug-plan-vorlage">
+      <Typography.Paragraph type="secondary" data-lfh="vollzug-plan-wechsel">
+        Wechsel laut Plan {zeitKurz(vorlage.wechsel_at, konventionen)}
+      </Typography.Paragraph>
+      {vorlageZeilen(vorlage).map((z) => (
+        <Typography.Paragraph
+          key={z.wort}
+          data-lfh={`vollzug-plan-${z.wort.toLowerCase()}`}
+          ellipsis={{ rows: 1, tooltip: false }}
+          title={`${z.wort}: ${z.text}`}
+          style={{ marginBottom: 4 }}
+        >
+          {z.wort}: {z.text}
+        </Typography.Paragraph>
+      ))}
+    </div>
+  );
+}
+
 /** Die Felder des Besatzungswechsels, die Vollzug und Planung teilen. */
 interface BesatzungWerte {
-  art?: AbloesungArt;
   besatzung_ids?: number[];
   verteilung?: Verteilung;
 }
@@ -413,6 +473,13 @@ interface VollzugProps {
   raeume?: VerbleibRaum[];
   /** Grund in wenigen Wörtern, warum kein Raum wählbar ist (Modul Bereitstellungsräume). */
   raumGesperrt?: string;
+  /**
+   * Vorlage des Wechsels aus dem Schichtplan (LLH-1555, `GET …/plan-vorlage`): `undefined` ohne
+   * (die Schicht folgt keinem Plan, Freigaben fehlen, Fehler), `null`, solange sie lädt.
+   */
+  planVorlage?: AbloesungPlanVorlage | null;
+  /** Die Vorlage wird gerade (neu) abgerufen, etwa nach einer Änderung am Plan. */
+  planVorlageLaedt?: boolean;
   laeuft: boolean;
   fehler: unknown;
   onErfassen: (body: VollzugBody) => Promise<unknown>;
@@ -438,6 +505,11 @@ interface VollzugProps {
  * LLH-1319: Der Besatzungswechsel verteilt die neue Besatzung im Klappteil „Verteilen“ auf die
  * Einheit, ihre Erben und deren Fahrzeuge. Ein geplanter Besatzungswechsel belegt Art, Personen
  * (die noch wählbaren) und Verteilung vor.
+ *
+ * LLH-1555: Folgt die Schicht dem Schichtplan, bietet die Art zuerst „Laut Plan“: die Vorlage des
+ * Servers (kommt, bleibt, geht) statt der Kräfte, abgeschickt als Besatzungswechsel mit Übernahme
+ * und Bleibenden. Die anderen Arten bleiben wählbar. Endet der Posten, steht die Art auf der
+ * ganzen Einheit ohne Ablöser, und der Knopf heißt „Abziehen“.
  */
 export function VollzugDialog({
   schicht,
@@ -451,6 +523,8 @@ export function VollzugDialog({
   besatzungGesperrt,
   raeume = [],
   raumGesperrt,
+  planVorlage,
+  planVorlageLaedt = false,
   laeuft,
   fehler,
   onErfassen,
@@ -472,23 +546,42 @@ export function VollzugDialog({
   // Kein `useArtBeiSperre` hier: ein still umgestellter Vollzug beendete die ganze Einheit statt
   // die Besatzung zu wechseln. Die Art bleibt, der Grund steht an ihr, der Server lehnt ab (403).
   usePlanVorbelegung(form, schicht, personen, verteilung, gesperrt);
+  useVorlageVorbelegung(form, planVorlage);
+  const mitPlan = planVorlage != null && vorlageWechselt(planVorlage);
+  // Endet der Posten laut Plan? Die Vorlage weiß es genauer; ohne sie (Freigabe Personal fehlt,
+  // lädt noch) sagt es die Schicht selbst (kein Folgeblock).
+  const endet =
+    planVorlage != null
+      ? postenEndet(planVorlage)
+      : schicht != null && folgtPlan(schicht) && schicht.plan_folgeblock == null;
+  const abloeser = (Form.useWatch('abloeser_ids', form) as number[] | undefined) ?? [];
+  const abziehen = endet && art === 'einheit' && abloeser.length === 0;
+  // Solange die Vorlage aussteht, steht die Vorbelegung noch nicht: Vollziehen erst mit ihr, außer
+  // die Art ist selbst gewählt. „Laut Plan“ wartet auch auf einen neuen Abruf (Plan geändert).
+  const [artGewaehlt, setArtGewaehlt] = useState(false);
+  const vorlageSteht = planVorlage === null && !artGewaehlt;
+  const sperre = vorlageSteht || (art === 'plan' && planVorlageLaedt);
   return (
     <ErfassungsModal<VollzugWerte>
       offen={schicht != null}
       titel={schicht ? `Ablösung ${schicht.einheit_name} vollziehen` : 'Ablösung vollziehen'}
       form={form}
-      erfassenText="Vollziehen"
+      erfassenText={abziehen ? 'Abziehen' : 'Vollziehen'}
       laeuft={laeuft}
+      gesperrt={sperre}
       initialValues={{
-        art: artVorgabe(schicht, gesperrt),
-        abloeser_ids: schicht ? abloeserIds(schicht) : [],
+        art: mitPlan ? 'plan' : artVorgabe(schicht, gesperrt),
+        abloeser_ids: schicht && !endet ? abloeserIds(schicht) : [],
         abschnitt_uebergeben: uebergabeMoeglich,
         besatzung_ids: [],
         verbleib: 'ruhe',
       }}
       onErfassen={(w) => {
         const vollzogen_at = w.zeitpunkt ? alsBackendZeit(w.zeitpunkt) : undefined;
-        if (w.art === 'besatzung' && schicht) {
+        if (w.art === 'plan' && schicht && planVorlage && mitPlan) {
+          return onErfassen(planVollzugBody(schicht, planVorlage, w.zeitpunkt));
+        }
+        if ((w.art === 'besatzung' || w.art === 'plan') && schicht) {
           return onErfassen({
             vollzogen_at,
             art: 'besatzung',
@@ -510,8 +603,9 @@ export function VollzugDialog({
       <Form.Item<VollzugWerte> name="art" label="Art">
         <Radio.Group
           optionType="button"
+          onChange={() => setArtGewaehlt(true)}
           aria-describedby={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
-          options={ART_OPTIONEN.map((o) => ({
+          options={[...(mitPlan ? [PLAN_OPTION] : []), ...ART_OPTIONEN].map((o) => ({
             ...o,
             disabled: o.value === 'besatzung' && besatzungGesperrt != null,
           }))}
@@ -522,7 +616,14 @@ export function VollzugDialog({
           {artGrund}
         </Typography.Text>
       )}
-      {art === 'besatzung' ? (
+      {planVorlage === null && (
+        <Typography.Text type="secondary" data-lfh="vollzug-plan-laedt">
+          Schichtplan lädt …
+        </Typography.Text>
+      )}
+      {art === 'plan' && planVorlage && mitPlan ? (
+        <VorlageZeilen vorlage={planVorlage} />
+      ) : art === 'besatzung' || art === 'plan' ? (
         <BesatzungFelder
           form={form}
           schicht={schicht}
@@ -557,7 +658,7 @@ export function VollzugDialog({
       <Form.Item<VollzugWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
-      {art !== 'besatzung' && (
+      {art === 'einheit' && (
         <>
           {abschnittName != null && (
             <Form.Item<VollzugWerte> name="abschnitt_uebergeben" valuePropName="checked">

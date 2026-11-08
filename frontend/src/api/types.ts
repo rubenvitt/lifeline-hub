@@ -437,6 +437,7 @@ export type GegenRat = S['GegenRat'];
 export type Unterschrift = S['Unterschrift'];
 export type Versorgung = S['Versorgung'];
 export type TransportmittelAuswahl = S['TransportmittelAuswahl'];
+export type VerbleibAngaben = S['VerbleibAngaben'];
 export type VersorgendeEinheitAuswahl = S['VersorgendeEinheitAuswahl'];
 export type UhsZielAuswahl = S['UhsZielAuswahl'];
 export type MeldungPatient = S['MeldungPatient'];
@@ -839,6 +840,11 @@ export type AbloesungPlanungEntfallen = S['AbloesungPlanungEntfallen'];
 export type PlanungEntfallenGrund = S['PlanungEntfallenGrund'];
 /** Art des Vollzugs und eine Person beim Besatzungswechsel (LLH-1150). */
 export type AbloesungArt = S['AbloesungArt'];
+/** Fälligkeit laut Schichtplan (LLH-1555): Folgeblock der Schicht und die Vorlage ihres Wechsels. */
+export type AbloesungPlanFolgeblock = S['AbloesungPlanFolgeblock'];
+export type AbloesungPlanVorlage = S['AbloesungPlanVorlage'];
+export type PlanVorlagePerson = S['PlanVorlagePerson'];
+export type PlanVorlageKommen = S['PlanVorlageKommen'];
 /** Verbleib der abgelösten Einheit nach dem Vollzug (LLH-1308). */
 export type AbloesungVerbleib = S['AbloesungVerbleib'];
 /** Wie eine Schicht begann: von Hand, mit dem Eintreffen oder als Folgeschicht (LLH-1312). */
@@ -1019,6 +1025,17 @@ export interface SchichtAendernBody {
 }
 
 /**
+ * Kein Backend-Schema: eine Person aus dem Schichtplan, die der Vollzug in den Einsatz übernimmt
+ * (LLH-1555): genau eins von `stamm_personal_id` (Personal der Organisation) und `plan_helfer_id`
+ * (Helfer des Plans); `einheit_id` ist das Ziel der Verteilung (fehlt = die Einheit der Schicht).
+ */
+export interface UebernahmeEingabe {
+  stamm_personal_id?: number;
+  plan_helfer_id?: number;
+  einheit_id?: number;
+}
+
+/**
  * Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. `abloeser_ids`
  * (LLH-1132): je Knoten-Ablöser eine Folgeschicht, eine schon laufende ohne Vorgänger wird
  * übernommen. `abschnitt_uebergeben` verlangt die Freigabe des Moduls Einheiten (sonst 403).
@@ -1031,6 +1048,12 @@ export interface SchichtAendernBody {
  */
 export interface VollzugBody {
   vollzogen_at?: string;
+  /** Aus dem Schichtplan (LLH-1555): Personen, die erst in den Einsatz kommen. */
+  uebernahme?: UebernahmeEingabe[];
+  /** Aus dem Schichtplan: Kräfte der bisherigen Besatzung, die im Folgeblock bleiben. */
+  bleiben?: number[];
+  /** Der Folgeblock, in den der Vollzug wechselt; muss der der Schicht sein (sonst 422). */
+  plan_block_id?: number;
   abloesende_einheit_id?: number;
   abloeser_ids?: number[];
   abschnitt_uebergeben?: boolean;
