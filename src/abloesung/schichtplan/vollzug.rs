@@ -1017,19 +1017,31 @@ async fn pause_beginn_tx(
         gesetzt.push(&p.name);
     }
     let stil = zeitstil_laden(&mut *conn, einsatz_id).await?;
-    let mut text = format!(
-        "Pause laut Plan ab {}: {} auf «{pause}».",
-        stil.zeitpunkt_text(&block.von),
-        personen_text(gesetzt.into_iter())
+    let text = etb_text_pause_beginn(
+        &stil.zeitpunkt_text(&block.von),
+        &pause,
+        &gesetzt,
+        &nicht_da,
     );
+    wirkung.etb_id = etb_tx(conn, einsatz_id, benutzer_id, wid, &text).await?;
+    Ok((wid, wirkung))
+}
+
+/// ETB-Text zum Beginn einer Pause; ohne gesetzte Kraft „niemand“.
+fn etb_text_pause_beginn(zeit: &str, pause: &str, gesetzt: &[&str], nicht_da: &[&str]) -> String {
+    let wer = if gesetzt.is_empty() {
+        "niemand".to_string()
+    } else {
+        personen_text(gesetzt.iter().copied())
+    };
+    let mut text = format!("Pause laut Plan ab {zeit}: {wer} auf «{pause}».");
     if !nicht_da.is_empty() {
         text.push_str(&format!(
             " Nicht im Einsatz: {}.",
-            personen_text(nicht_da.into_iter())
+            personen_text(nicht_da.iter().copied())
         ));
     }
-    wirkung.etb_id = etb_tx(conn, einsatz_id, benutzer_id, wid, &text).await?;
-    Ok((wid, wirkung))
+    text
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1293,6 +1305,18 @@ async fn uhs_zuruecknehmen_tx(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn etb_pause_beginn_ohne_gesetzte_nennt_niemand() {
+        assert_eq!(
+            etb_text_pause_beginn("18:00", "Pause", &[], &["Cora"]),
+            "Pause laut Plan ab 18:00: niemand auf «Pause». Nicht im Einsatz: «Cora»."
+        );
+        assert_eq!(
+            etb_text_pause_beginn("18:00", "Pause", &["Anna"], &[]),
+            "Pause laut Plan ab 18:00: «Anna» auf «Pause»."
+        );
+    }
 
     #[test]
     fn etb_uhs_nennt_nur_was_geschieht() {
