@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
-import FlaechenWahl, { flaecheStil, flaechenLuecke } from './FlaechenWahl';
+import FlaechenWahl, { FlaechenMehrfachWahl, flaecheStil, flaechenLuecke } from './FlaechenWahl';
 
 /** Die Flächenwahl (Change `y18v58dt-pat-kern`): Böden als Literale, Rollen, Tastatur. */
 
@@ -85,5 +85,50 @@ describe('FlaechenWahl', () => {
     expect(onChange).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('radio', { name: 'Infusion' }));
     expect(onChange).toHaveBeenCalledWith('c');
+  });
+});
+
+describe('FlaechenMehrfachWahl (LLH-1572)', () => {
+  function zeige(value: ('a' | 'b' | 'c')[], max?: number) {
+    const onChange = vi.fn();
+    render(
+      <ConfigProvider>
+        <FlaechenMehrfachWahl
+          optionen={OPTIONEN}
+          value={value}
+          onChange={onChange}
+          max={max}
+          aria-label="Maßnahmen"
+        />
+      </ConfigProvider>,
+    );
+    return onChange;
+  }
+
+  it('ist eine Gruppe von Schaltern, gewählte tragen ✓', () => {
+    zeige(['b']);
+    expect(screen.getByRole('group', { name: 'Maßnahmen' })).toBeInTheDocument();
+    const zugang = screen.getByRole('button', { name: 'Zugang' });
+    expect(zugang).toHaveAttribute('aria-pressed', 'true');
+    expect(zugang.textContent).toBe('✓\u00a0Zugang');
+    expect(screen.getByRole('button', { name: 'Infusion' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('fügt in der Folge der Optionen hinzu und nimmt per Tipp zurück', async () => {
+    const onChange = zeige(['c']);
+    await userEvent.click(screen.getByRole('button', { name: 'Blutstillung' }));
+    expect(onChange).toHaveBeenLastCalledWith(['a', 'c']);
+    await userEvent.click(screen.getByRole('button', { name: 'Infusion' }));
+    expect(onChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('sperrt am Maximum die übrigen, gewählte bleiben abwählbar', async () => {
+    const onChange = zeige(['a', 'b'], 2);
+    expect(screen.getByRole('button', { name: 'Infusion' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Zugang' }));
+    expect(onChange).toHaveBeenLastCalledWith(['a']);
   });
 });

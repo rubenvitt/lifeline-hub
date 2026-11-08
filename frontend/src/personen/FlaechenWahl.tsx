@@ -62,6 +62,36 @@ export function flaechenLuecke(token: { controlHeight: number }): number {
   return token.controlHeight <= 30 ? 8 : 16;
 }
 
+type Rollen = ReturnType<typeof useRollen>['rollen'];
+
+/** Eine Fläche, gewählt oder nicht: dieselbe Gestalt für Einfach- und Mehrfachwahl. */
+function knopfStil(
+  masse: CSSProperties,
+  fontSize: number,
+  rollen: Rollen,
+  gewaehlt: boolean,
+  strich: 'dashed' | 'solid',
+  gesperrt: boolean,
+): CSSProperties {
+  return {
+    ...masse,
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 0,
+    borderRadius: 0,
+    font: 'inherit',
+    fontSize,
+    fontWeight: gewaehlt ? 700 : 400,
+    textAlign: 'center',
+    cursor: gesperrt ? 'not-allowed' : 'pointer',
+    background: gewaehlt ? rollen.auswahlFlaeche : rollen.flaeche,
+    color: rollen.text,
+    border: gewaehlt ? `3px ${strich} ${rollen.text}` : `1px ${strich} ${rollen.steuerRahmen}`,
+  };
+}
+
 export default function FlaechenWahl<W extends string>({
   optionen,
   value = null,
@@ -124,25 +154,87 @@ export default function FlaechenWahl<W extends string>({
               else onChange?.(o.wert);
             }}
             onKeyDown={(e) => taste(e, index)}
-            style={{
-              ...masse,
-              boxSizing: 'border-box',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: 0,
-              borderRadius: 0,
-              font: 'inherit',
-              fontSize: token.fontSize,
-              fontWeight: gewaehlt ? 700 : 400,
-              textAlign: 'center',
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              background: gewaehlt ? rollen.auswahlFlaeche : rollen.flaeche,
-              color: rollen.text,
-              border: gewaehlt
-                ? `3px ${strich} ${rollen.text}`
-                : `1px ${strich} ${rollen.steuerRahmen}`,
+            style={knopfStil(masse, token.fontSize, rollen, gewaehlt, strich, disabled)}
+          >
+            {gewaehlt && <span aria-hidden="true">✓&nbsp;</span>}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export interface FlaechenMehrfachWahlProps<W extends string> {
+  optionen: readonly FlaechenOption<W>[];
+  value?: readonly W[];
+  onChange?: (werte: W[]) => void;
+  /** Höchstens so viele: danach sind die übrigen Flächen gesperrt, bis eine abgewählt ist. */
+  max?: number;
+  disabled?: boolean;
+  id?: string;
+  'aria-label': string;
+}
+
+/**
+ * Mehrfachwahl aus einem festen Katalog als Flächen (LLH-1572: bis zu drei Maßnahmen eines
+ * leichten Falls). Gestalt wie {@link FlaechenWahl}, aber jede Fläche ist ein Schalter
+ * (`aria-pressed`) in einer benannten Gruppe: ein Tipp wählt, ein zweiter nimmt zurück. Ist
+ * `max` erreicht, stehen die übrigen Flächen gesperrt (gestrichelt), die gewählten bleiben
+ * abwählbar. Die Folge der Werte ist die Folge der Optionen, nicht die der Tipps.
+ */
+export function FlaechenMehrfachWahl<W extends string>({
+  optionen,
+  value = [],
+  onChange,
+  max,
+  disabled = false,
+  id,
+  'aria-label': ariaLabel,
+}: FlaechenMehrfachWahlProps<W>) {
+  const { token, rollen } = useRollen();
+  const masse = flaecheStil(token);
+  const voll = max != null && value.length >= max;
+
+  return (
+    <div
+      id={id}
+      role="group"
+      aria-label={ariaLabel}
+      aria-disabled={disabled || undefined}
+      data-lfh="flaechenwahl"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fill, minmax(${FLAECHE_BREITE}px, 1fr))`,
+        gap: flaechenLuecke(token),
+      }}
+    >
+      {optionen.map((o, index) => {
+        const gewaehlt = value.includes(o.wert);
+        const gesperrt = disabled || (voll && !gewaehlt);
+        return (
+          <button
+            key={o.wert}
+            type="button"
+            aria-pressed={gewaehlt}
+            aria-label={o.label}
+            disabled={gesperrt}
+            data-erfassung-fokus={index === 0 ? '' : undefined}
+            onClick={() => {
+              if (gesperrt) return;
+              const neu = gewaehlt
+                ? value.filter((w) => w !== o.wert)
+                : optionen.map((x) => x.wert).filter((w) => w === o.wert || value.includes(w));
+              onChange?.(neu);
             }}
+            style={knopfStil(
+              masse,
+              token.fontSize,
+              rollen,
+              gewaehlt,
+              gesperrt ? 'dashed' : 'solid',
+              gesperrt,
+            )}
           >
             {gewaehlt && <span aria-hidden="true">✓&nbsp;</span>}
             {o.label}
