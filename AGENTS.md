@@ -121,6 +121,9 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   `finishing-a-development-branch`.
 - **`/opsx:apply` bringt keine Disziplin mit:** jede Aufgabe per `test-driven-development`, vor
   jedem „fertig" `verification-before-completion` und `requesting-code-review`.
+- **Mit dem Menschen** (08.11.2026): vor dem ersten Code den Lösungsweg gemeinsam ausarbeiten
+  (außer `trivial`), am Ende Bilder der Änderung in PR und Meldung. Ablauf:
+  `dev-zunder-ausfuehren`, „Gemeinsam ausarbeiten, bevor Code entsteht“ und „Bilder der Änderung“.
 - **Pflicht-Checkpoint:** `/opsx:propose` hält nach den Artefakten an (kein Fehlschlag) —
   vorlegen (Aufgabe auf `blocked`), Freigabe abwarten, dann `in_progress` und `/opsx:apply`.
 - **Entwurfs-Hoheit** (LFH-589, Spec `entwurfs-hoheit`,

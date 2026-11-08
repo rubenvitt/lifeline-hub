@@ -81,9 +81,11 @@ Im Main-Loop danach:
 - **Routen bestätigen.** E3 an den `files` nachprüfen und strittige Routen korrigieren.
 - Für jeden Eintrag mit `route: 'unklar'` läuft **`/opsx:explore` im Main-Loop**, danach wird
   neu geroutet.
-- Gibt es `open_questions`, File-Überschneidungen zwischen Subtasks (→ relevant für den
-  Phase-3-Modus) oder eine strittige Route → **Checkpoint**. Sonst Map samt Routen kurz
-  zusammenfassen und weiter.
+- **Checkpoint, Pflicht:** Map samt Routen und Lösungsweg je Task vorlegen und auf die Antwort
+  warten, auch ohne `open_questions`, File-Überschneidungen (→ relevant für den Phase-3-Modus)
+  oder strittige Route; diese gehören dann mit Empfehlung dazu. Entfällt nur, wenn alle Tasks auf
+  `trivial` stehen (`SKILL.md`, Phase 1). Ein Task auf `bug-unklar` bekommt nach der
+  Ursachensuche in Phase 3 einen eigenen Halt mit Ursache und Fix.
 - Die Einträge mit `route: 'entwurf'` sind die Eingabe für Phase 2 (`/opsx:propose` je Task).
   Überschneiden sich zwei Subtasks **auf `entwurf`** in `faehigkeiten`, bekommen sie eine
   gemeinsame Change am Parent. Ein Subtask auf einer anderen Route bleibt ohne Change.
