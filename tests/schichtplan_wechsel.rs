@@ -988,3 +988,40 @@ async fn zurueck_an_die_erste_uhs_behaelt_zuordnung() {
         .await
         .contains(&ereignis("eintreffen", "abloesung", false)));
 }
+
+/// Trägt der Pausenstatus eine Zeitachsen-Marke, streicht die Rücknahme das Ereignis des Wechsels
+/// und schreibt beim Zurücksetzen des Status kein neues.
+#[tokio::test]
+async fn pause_mit_marke_streicht_ereignis_bei_ruecknahme() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let im_einsatz = status_id(&app, &admin, "im Einsatz").await;
+    let pause = status_id(&app, &admin, "Pause").await;
+    sqlx::query("UPDATE personal_status SET zeitachse_marke = 'entlassung' WHERE id = ?")
+        .bind(pause)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let anna = adhoc(&app, &admin, e, "Anna").await;
+    status_setzen(&app, &admin, e, anna, im_einsatz).await;
+    let vorher = zeitachse(&pool, anna).await;
+    let bid = block(
+        &app,
+        &admin,
+        e,
+        json!({"art": "pause"}),
+        json!([{"art": "einsatz", "einsatz_personal_id": anna}]),
+    )
+    .await;
+    let beginn = vollziehen(&app, &admin, e, bid, json!({"art": "pause_beginn"})).await;
+    assert!(zeitachse(&pool, anna)
+        .await
+        .contains(&ereignis("entlassung", "status", false)));
+
+    zuruecknehmen(&app, &admin, e, beginn["id"].as_i64().unwrap()).await;
+    assert_eq!(kraft(&app, &admin, e, anna).await["status_id"], im_einsatz);
+    let mut erwartet = vorher.clone();
+    erwartet.push(ereignis("entlassung", "status", true));
+    assert_eq!(zeitachse(&pool, anna).await, erwartet);
+}

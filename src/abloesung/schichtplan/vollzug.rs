@@ -573,8 +573,9 @@ pub async fn art_von(pool: &SqlitePool, einsatz_id: i64, wid: i64) -> Result<Wec
 }
 
 /// Setzt den Status einer Kraft über denselben Weg wie ein Statuswechsel von Hand (Zeitachse der
-/// Marke des Status, LFH-552); der ETB-Eintrag kommt vom Wechsel.
-/// Ohne Status (`None`, nur beim Zurückgeben eines leeren Stands) ohne Zeitachse.
+/// Marke des Status, LFH-552); der ETB-Eintrag kommt vom Wechsel. Liefert das geschriebene
+/// Ereignis. Ohne Status (`None`, nur beim Zurückgeben eines leeren Stands) und bei der Rücknahme
+/// (`ereignis = false`, sie streicht stattdessen das Ereignis des Wechsels) ohne Zeitachse.
 async fn status_setzen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -582,7 +583,8 @@ async fn status_setzen_tx(
     ep: i64,
     status_id: Option<i64>,
     jetzt: &str,
-) -> Result<(), AppError> {
+    ereignis: bool,
+) -> Result<Option<i64>, AppError> {
     let Some(status_id) = status_id else {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, ep).await?;
         sqlx::query("UPDATE einsatz_personal SET status_id = NULL WHERE id = ? AND einsatz_id = ?")
@@ -590,7 +592,7 @@ async fn status_setzen_tx(
             .bind(einsatz_id)
             .execute(&mut *conn)
             .await?;
-        return Ok(());
+        return Ok(None);
     };
     disposition_repo::update_tx(
         conn,
@@ -602,7 +604,10 @@ async fn status_setzen_tx(
         },
     )
     .await?;
-    crate::zeitachse::repo::aus_personalstatus_tx(
+    if !ereignis {
+        return Ok(None);
+    }
+    crate::zeitachse::repo::aus_personalstatus_id_tx(
         conn,
         einsatz_id,
         benutzer_id,
@@ -610,8 +615,7 @@ async fn status_setzen_tx(
         status_id,
         jetzt,
     )
-    .await?;
-    Ok(())
+    .await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1001,7 +1005,16 @@ async fn pause_beginn_tx(
         if p.status_id == Some(pause_id) || wirkung.personen.contains(&ep) {
             continue;
         }
-        status_setzen_tx(conn, einsatz_id, benutzer_id, ep, Some(pause_id), jetzt).await?;
+        let z = status_setzen_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            ep,
+            Some(pause_id),
+            jetzt,
+            true,
+        )
+        .await?;
         person_einfuegen_tx(
             conn,
             wid,
@@ -1009,7 +1022,7 @@ async fn pause_beginn_tx(
             "neu",
             None,
             (p.status_id, Some(pause_id)),
-            None,
+            z,
             false,
         )
         .await?;
@@ -1072,8 +1085,8 @@ async fn pause_ende_tx(
         if !aktiv || status != nachher {
             continue;
         }
-        status_setzen_tx(conn, einsatz_id, benutzer_id, ep, vorher, jetzt).await?;
-        person_einfuegen_tx(conn, wid, ep, "neu", None, (status, vorher), None, false).await?;
+        let z = status_setzen_tx(conn, einsatz_id, benutzer_id, ep, vorher, jetzt, true).await?;
+        person_einfuegen_tx(conn, wid, ep, "neu", None, (status, vorher), z, false).await?;
         wirkung.personen.push(ep);
         let label = status_label_tx(conn, vorher).await?;
         zurueck.push(format!("«{name}» wieder «{label}»"));
@@ -1177,7 +1190,10 @@ pub async fn zuruecknehmen(
                     if !aktiv || status != nachher {
                         continue;
                     }
-                    status_setzen_tx(conn, einsatz_id, benutzer_id, ep, vorher, jetzt).await?;
+                    pause_ereignis_streichen_tx(conn, einsatz_id, benutzer_id, wid, ep, &name)
+                        .await?;
+                    status_setzen_tx(conn, einsatz_id, benutzer_id, ep, vorher, jetzt, false)
+                        .await?;
                     wirkung.personen.push(ep);
                     let label = status_label_tx(conn, vorher).await?;
                     namen.push(format!("«{name}» wieder «{label}»"));
@@ -1200,6 +1216,48 @@ pub async fn zuruecknehmen(
         };
         Ok((wechsel_laden_tx(conn, einsatz_id, wid).await?, wirkung))
     })
+}
+
+/// Streicht das Ereignis, das der Pausenwechsel `wid` über die Marke des Status an `ep` schrieb,
+/// solange es nicht schon gestrichen ist.
+async fn pause_ereignis_streichen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    wid: i64,
+    ep: i64,
+    name: &str,
+) -> Result<(), AppError> {
+    use crate::zeitachse::repo::{streiche_tx, Kraft};
+    let ereignis: Option<i64> = sqlx::query_scalar(
+        "SELECT z.id FROM einsatz_plan_wechsel_person w \
+         JOIN einsatz_kraft_zeitachse z ON z.id = w.zeitachse_id AND z.gestrichen_at IS NULL \
+         WHERE w.wechsel_id = ? AND w.einsatz_personal_id = ?",
+    )
+    .bind(wid)
+    .bind(ep)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some(ereignis) = ereignis else {
+        return Ok(());
+    };
+    streiche_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        Kraft::Person(ep),
+        ereignis,
+        GRUND_WECHSEL_ZURUECK,
+        true,
+    )
+    .await
+    .map_err(|e| match e {
+        AppError::UnprocessableEntity(m) => AppError::UnprocessableEntity(format!(
+            "Die Zeitachse von «{name}» verlöre ihre Ordnung: {m}"
+        )),
+        e => e,
+    })?;
+    Ok(())
 }
 
 /// Legt die UHS-Zuordnung zurück, soweit sie noch den Stand des Wechsels trägt, und streicht die
