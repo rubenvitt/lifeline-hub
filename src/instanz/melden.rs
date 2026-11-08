@@ -666,28 +666,35 @@ mod tests {
     /// Schlüsseln dauerhaft an einer unlesbaren Antwort hängen.
     #[test]
     fn groesste_antwort_passt_in_die_lesegrenze() {
-        // Großzügig gerechnet: Credential-ID 1023 Byte (WebAuthn-Höchstwert) in Base64url, Namen
-        // und Bezeichnung mit Umlauten, eine Gegenzeichnung samt Erklärung und Assertion.
-        let cid = "A".repeat(1364);
+        // Jedes Feld so groß, wie es beim Registrieren und Gegenzeichnen höchstens angenommen
+        // wird; Namen und Bezeichnung mit Umlauten (zwei Byte je Zeichen).
+        use crate::auth::unterschrift::pruefen::{
+            AUTHENTICATOR_DATA_MAX, CLIENT_DATA_JSON_MAX, CREDENTIAL_ID_MAX, SIGNATUR_MAX,
+        };
+        let cid = "A".repeat(CREDENTIAL_ID_MAX);
+        let name = "ü".repeat(unterschrift::NAME_MAX);
+        let bezeichnung = "ü".repeat(crate::routes::instanz::BEZEICHNUNG_MAX);
         let erklaerung = serde_json::to_string(&serde_json::json!({
             "typ": "unterschriftsschluessel-aufnahme", "org": "k".repeat(88),
             "credential_id": cid, "schluessel_hash": "h".repeat(43),
-            "fingerabdruck": "F".repeat(39), "inhaber": "ü".repeat(200),
+            "fingerabdruck": "F".repeat(39), "inhaber": name,
             "zeitpunkt": "2026-11-08 12:00:00", "rp_id": "r".repeat(253),
             "origin": "o".repeat(261), "alg": "es256"
         }))
         .expect("Erklärung");
         let lieferung: UnterschriftSchluesselLieferung =
             serde_json::from_value(serde_json::json!({
-                "id": i64::MAX, "benutzer_name": "ü".repeat(200), "credential_id": cid,
+                "id": i64::MAX, "benutzer_name": name, "credential_id": cid,
                 "schluessel": "s".repeat(87), "alg": "es256", "rp_id": "r".repeat(253),
-                "origin": "o".repeat(261), "bezeichnung": "ü".repeat(80),
+                "origin": "o".repeat(261), "bezeichnung": bezeichnung,
                 "zustand": "widerrufen", "stand": i64::MAX,
                 "gegenzeichnung": {
                     "erklaerung": erklaerung,
                     "assertion": {
-                        "credential_id": cid, "authenticator_data": "a".repeat(400),
-                        "client_data_json": "c".repeat(800), "signatur": "s".repeat(100)
+                        "credential_id": cid,
+                        "authenticator_data": "a".repeat(AUTHENTICATOR_DATA_MAX),
+                        "client_data_json": "c".repeat(CLIENT_DATA_JSON_MAX),
+                        "signatur": "s".repeat(SIGNATUR_MAX)
                     },
                     "unterzeichner_credential_id": cid
                 }

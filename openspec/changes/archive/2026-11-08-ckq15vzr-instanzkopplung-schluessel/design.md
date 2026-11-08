@@ -279,7 +279,10 @@ Ein adversariales Review vor dem PR fand Lücken; behoben und mit Tests belegt
 - **Listen von der Gegenstelle** sind begrenzt: höchstens 256 Orgs und 256 Widerrufe je Meldung
   (sonst 400, gezählt vor dem Entdoppeln) und je Antwort höchstens 256 Orgs. Eine Antwort trägt
   über alle Orgs zusammen höchstens 64 Unterschriftsschlüssel, ein Grundstock ebenso; gelesen wird
-  eine Antwort bis 1 MiB, und ein Test rechnet die größte zulässige Antwort dagegen. Die
+  eine Antwort bis 1 MiB, und ein Test rechnet die größte zulässige Antwort dagegen. Damit das
+  gilt, hat jedes gelieferte Feld eine Obergrenze: Die Prüfung einer Assertion lehnt übergroße
+  Felder vor der Signatur ab, beim Registrieren ist die Credential-ID auf 1023 Byte begrenzt und
+  der Inhabername auf 200 Zeichen gekürzt. Die
   Nachlieferung liefert nach Stand sortiert, der Rest folgt mit der nächsten Meldung. Der
   Grundstock wird nie abgeschnitten: Hat die Org mehr gültige Schlüssel, scheitert Code ausstellen
   mit 409 und Grund, ein Einlösen danach scheitert ganz (am Einlöser ohne Grund, wie jedes

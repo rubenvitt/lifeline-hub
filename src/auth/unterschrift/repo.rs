@@ -40,6 +40,9 @@ pub struct SchluesselZeile {
 /// liefert nach `stand` sortiert; was darüber liegt, folgt mit der nächsten Meldung, weil der Stand
 /// der Gegenseite mitwandert. Ein Grundstock darüber ist ein 409.
 pub const LIEFERUNGEN_MAX: usize = 64;
+/// Länge des Inhabernamens an einem Schlüssel; der Anzeigename selbst hat keine Obergrenze, darum
+/// wird er beim Registrieren gekürzt.
+pub const NAME_MAX: usize = 200;
 
 const SPALTEN: &str = "id, org_id, herkunft, kopplung_org_id, fremde_id, benutzer_id, \
      benutzer_name, credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, \
@@ -129,6 +132,14 @@ pub async fn create_lokal(
     conn: &mut SqliteConnection,
     neu: &NeuerSchluessel<'_>,
 ) -> Result<i64, AppError> {
+    // Alles, was hier gespeichert wird, geht später mit jeder Lieferung hinaus und muss in
+    // `melden::ANTWORT_MAX` passen (Test `groesste_antwort_passt_in_die_lesegrenze`).
+    if neu.credential_id.len() > super::pruefen::CREDENTIAL_ID_MAX {
+        return Err(AppError::Validation(
+            "Die Kennung des Passkeys ist zu lang.".into(),
+        ));
+    }
+    let benutzer_name: String = neu.benutzer_name.chars().take(NAME_MAX).collect();
     let zustand = if is_org_verteilt(conn, neu.org_id).await? {
         UnterschriftSchluesselZustand::WartetAufGegenzeichnung
     } else {
@@ -145,7 +156,7 @@ pub async fn create_lokal(
     )
     .bind(neu.org_id)
     .bind(neu.benutzer_id)
-    .bind(neu.benutzer_name)
+    .bind(&benutzer_name)
     .bind(neu.credential_id)
     .bind(ALG_ES256)
     .bind(neu.schluessel)

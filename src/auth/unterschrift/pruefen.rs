@@ -24,6 +24,17 @@ pub struct UnterschriftAssertion {
     pub signatur: String,
 }
 
+/// Obergrenzen der Felder einer Assertion (Base64url-Zeichen). Eine geprüfte Gegenzeichnung wird
+/// gespeichert und geht mit jeder Nachlieferung hinaus; ohne Grenze könnten wenige übergroße,
+/// gültig signierte Assertions jede Antwort über `melden::ANTWORT_MAX` treiben. Echte Werte liegen
+/// weit darunter: `clientDataJSON` um 200 Byte, `authenticatorData` 37 Byte plus Erweiterungen,
+/// eine DER-Signatur höchstens 72 Byte.
+pub const CLIENT_DATA_JSON_MAX: usize = 2048;
+pub const AUTHENTICATOR_DATA_MAX: usize = 1024;
+pub const SIGNATUR_MAX: usize = 256;
+/// Credential-ID: höchstens 1023 Byte (WebAuthn), Base64url ohne Auffüllung.
+pub const CREDENTIAL_ID_MAX: usize = 1364;
+
 /// Der Schlüssel, gegen den geprüft wird.
 #[derive(Debug, Clone)]
 pub struct VerifySchluessel<'a> {
@@ -38,6 +49,8 @@ pub struct VerifySchluessel<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifyError {
     Form,
+    /// Ein Feld über seiner Obergrenze ([`CLIENT_DATA_JSON_MAX`] und Nachbarn).
+    Groesse,
     Schluessel,
     Credential,
     Typ,
@@ -53,6 +66,7 @@ impl std::fmt::Display for VerifyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let text = match self {
             VerifyError::Form => "Unterschrift unlesbar",
+            VerifyError::Groesse => "Unterschrift zu groß",
             VerifyError::Schluessel => "Schlüssel unlesbar",
             VerifyError::Credential => "anderer Schlüssel",
             VerifyError::Typ => "keine Unterschrift (falscher Typ)",
@@ -96,6 +110,13 @@ pub fn verify(
     assertion: &UnterschriftAssertion,
     schluessel: &VerifySchluessel<'_>,
 ) -> Result<(), VerifyError> {
+    if assertion.client_data_json.len() > CLIENT_DATA_JSON_MAX
+        || assertion.authenticator_data.len() > AUTHENTICATOR_DATA_MAX
+        || assertion.signatur.len() > SIGNATUR_MAX
+        || assertion.credential_id.len() > CREDENTIAL_ID_MAX
+    {
+        return Err(VerifyError::Groesse);
+    }
     if assertion.credential_id != schluessel.credential_id {
         return Err(VerifyError::Credential);
     }
@@ -238,6 +259,27 @@ mod tests {
         let p = passkey();
         let a = p.sign(ERKL, ORIGIN, RP, 0x05);
         assert_eq!(pruefe_mit(&p, ERKL, &a), Ok(()));
+    }
+
+    #[test]
+    fn uebergrosse_felder_scheitern_vor_der_signatur() {
+        // Gültig signiert, aber zu groß: sie ginge mit jeder Nachlieferung hinaus.
+        let p = passkey();
+        let gross = "A".repeat(CLIENT_DATA_JSON_MAX + 1);
+        for feld in 0..4 {
+            let mut a = p.sign(ERKL, ORIGIN, RP, 0x05);
+            match feld {
+                0 => a.client_data_json = gross.clone(),
+                1 => a.authenticator_data = gross.clone(),
+                2 => a.signatur = gross.clone(),
+                _ => a.credential_id = "A".repeat(CREDENTIAL_ID_MAX + 1),
+            }
+            assert_eq!(
+                pruefe_mit(&p, ERKL, &a),
+                Err(VerifyError::Groesse),
+                "Feld {feld}"
+            );
+        }
     }
 
     #[test]

@@ -529,3 +529,36 @@ async fn lokaler_gueltiger(conn: &mut SqliteConnection, stand: i64) {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn registrieren_begrenzt_credential_id_und_kuerzt_den_namen() {
+    let pool = pool_mit_admin().await;
+    let mut conn = pool.acquire().await.unwrap();
+    let p = SoftwarePasskey::new("a", [1u8; 32]);
+    let oeff = p.oeffentlich();
+    let lang = "A".repeat(super::super::pruefen::CREDENTIAL_ID_MAX + 1);
+    let name = "ü".repeat(500);
+    let neu = |cid: &'static str| NeuerSchluessel {
+        org_id: 1,
+        benutzer_id: 1,
+        benutzer_name: &name,
+        credential_id: cid,
+        schluessel: &oeff,
+        rp_id: RP,
+        origin: ORIGIN,
+        bezeichnung: "Stick",
+    };
+    let lang: &'static str = Box::leak(lang.into_boxed_str());
+    assert!(matches!(
+        create_lokal(&mut conn, &neu(lang)).await,
+        Err(AppError::Validation(_))
+    ));
+    let id = create_lokal(&mut conn, &neu("kurz")).await.unwrap();
+    let gespeichert: String =
+        sqlx::query_scalar("SELECT benutzer_name FROM unterschrift_schluessel WHERE id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert_eq!(gespeichert.chars().count(), NAME_MAX);
+}
