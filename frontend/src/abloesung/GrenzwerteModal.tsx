@@ -1,4 +1,5 @@
 import { Form, Input } from 'antd';
+import { useState } from 'react';
 import {
   SCHICHTPLAN_MAX_DIENST_MAX_MINUTEN,
   SCHICHTPLAN_MAX_DIENST_MIN_MINUTEN,
@@ -23,11 +24,12 @@ import {
  *
  * Dauern als Text über `abloesung/dauer.ts`. Ein leeres Feld heißt Vorgabe, und der Platzhalter
  * nennt sie. Gesendet wird nur, was sich geändert hat (`grenzwerte.ts:grenzwerteBody`); ändert
- * sich nichts, schließt der Dialog ohne Aufruf. Der Aufrufer montiert ihn je Öffnen frisch.
+ * sich nichts, schließt der Dialog ohne Aufruf. Verglichen wird mit dem Stand beim Öffnen, nicht
+ * mit einem späteren Live-Stand. Der Aufrufer montiert den Dialog je Öffnen frisch.
  */
 
 interface GrenzwerteModalProps {
-  /** Der Stand, gegen den der Dialog vergleicht (aus dem Plan). */
+  /** Stand aus dem Plan; der Dialog vergleicht mit dem Wert beim Öffnen. */
   grenzwerte: SchichtplanGrenzwerte;
   speicherung: Speicherung;
   /** Lehnt bei Ablehnung ab (`mutateAsync`), damit die Felder stehen bleiben. */
@@ -42,6 +44,9 @@ export default function GrenzwerteModal({
   onSchliessen,
 }: GrenzwerteModalProps) {
   const [form] = Form.useForm<GrenzwerteFormWerte>();
+  // Stand beim Öffnen: ein Live-Refetch während der Eingabe darf den Vergleich nicht verschieben,
+  // sonst ginge ein unverändertes Feld mit seinem alten Text gegen den neuen Wert hinaus.
+  const [stand] = useState(grenzwerte);
 
   return (
     <ErfassungsModal<GrenzwerteFormWerte>
@@ -51,9 +56,9 @@ export default function GrenzwerteModal({
       erfassenText="Speichern"
       laeuft={speicherung.isPending}
       speicherung={speicherung}
-      initialValues={grenzwerteFormWerte(grenzwerte)}
+      initialValues={grenzwerteFormWerte(stand)}
       onErfassen={async (w) => {
-        const body = grenzwerteBody(grenzwerte, w);
+        const body = grenzwerteBody(stand, w);
         if (body) await onSpeichern(body);
       }}
       onFertig={onSchliessen}

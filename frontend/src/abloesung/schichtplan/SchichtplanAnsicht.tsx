@@ -458,7 +458,7 @@ export default function SchichtplanAnsicht({
         <GrenzwerteZeile
           einsatzId={einsatzId}
           grenzwerte={plan.grenzwerte}
-          darfSchreiben={darfSchreiben}
+          canWrite={darfSchreiben}
         />
       )}
       {planQuery.isError && (

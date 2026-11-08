@@ -80,6 +80,25 @@ describe('GrenzwerteModal (LLH-1603)', () => {
     await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith({ min_ruhe_minuten: null }));
   });
 
+  it('vergleicht mit dem Stand beim Öffnen, nicht mit einem späteren Live-Stand', async () => {
+    const eigen = { ...VORGABEN, max_dienst_minuten: 600, max_dienst_eigen: true };
+    const onSpeichern = vi.fn<(b: SchichtplanGrenzwerteBody) => Promise<unknown>>(() =>
+      Promise.resolve(),
+    );
+    const props = {
+      speicherung: { error: null, isPending: false, reset: () => {} },
+      onSpeichern,
+      onSchliessen: () => {},
+    };
+    const { rerender } = renderMitProviders(<GrenzwerteModal grenzwerte={eigen} {...props} />);
+    // Eine andere Sitzung setzt inzwischen 11 h; der Refetch reicht den neuen Stand herein.
+    rerender(<GrenzwerteModal grenzwerte={{ ...eigen, max_dienst_minuten: 660 }} {...props} />);
+    const dialog = screen.getByRole('dialog', { name: 'Dienst und Ruhe' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Mindestruhe' }), '6 h');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith({ min_ruhe_minuten: 360 }));
+  });
+
   it('schließt ohne Aufruf, wenn sich nichts ändert', async () => {
     const { speichern, onSpeichern, onSchliessen } = zeige(VORGABEN);
     await userEvent.click(speichern);

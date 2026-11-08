@@ -7,7 +7,7 @@ import type { Schichtplan, SchichtplanGrenzwerteBody } from '../../api/types';
 import GrenzwerteModal from '../../abloesung/GrenzwerteModal';
 import { grenzwertText, rueckgaengigBody, vorgabenBody } from '../../abloesung/grenzwerte';
 import { Datenfeld, Datenraster, Formularpaneel, useRollen } from '../../components/instrument';
-import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 
 const { Text } = Typography;
@@ -29,25 +29,25 @@ const { Text } = Typography;
 
 interface EinsatzGrenzwerteProps {
   einsatzId: number;
-  darf: boolean;
+  canWrite: boolean;
 }
 
-/** `rueckgaengig` markiert den Weg zurück; er bietet selbst kein Rückgängig an. */
-interface Setzen {
+/** `isRueckgaengig` markiert den Weg zurück; er bietet selbst kein Rückgängig an. */
+interface ResetVariables {
   body: SchichtplanGrenzwerteBody;
-  rueckgaengig?: boolean;
+  isRueckgaengig?: boolean;
 }
 
-export default function EinsatzGrenzwerte({ einsatzId, darf }: EinsatzGrenzwerteProps) {
+export default function EinsatzGrenzwerte({ einsatzId, canWrite }: EinsatzGrenzwerteProps) {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = useRollen();
-  const [offen, setOffen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const planKey = einsatzKeys.schichtplan(einsatzId);
 
   const planQ = useQuery({ queryKey: planKey, queryFn: () => fetchSchichtplan(einsatzId) });
 
-  const uebernimm = (plan: Schichtplan) => {
+  const applyPlan = (plan: Schichtplan) => {
     qc.setQueryData(planKey, plan);
     for (const modul of ['einheiten', 'personal'] as const) {
       void qc.invalidateQueries({
@@ -56,45 +56,47 @@ export default function EinsatzGrenzwerte({ einsatzId, darf }: EinsatzGrenzwerte
     }
   };
 
-  // Fehler über dem Raster; der Fehler des Dialogs steht im Dialog.
-  const wiederherstellen = useMutation({
-    mutationFn: ({ body }: Setzen) => setzeSchichtplanGrenzwerte(einsatzId, body),
+  // Fehler über dem Paneel (`SeitenHinweise`, auch für Rückgängig aus dem Toast); der Fehler des
+  // Dialogs steht im Dialog.
+  const reset = useMutation({
+    mutationFn: ({ body }: ResetVariables) => setzeSchichtplanGrenzwerte(einsatzId, body),
     onMutate: () => qc.getQueryData<Schichtplan>(planKey)?.grenzwerte,
-    onSuccess: (plan, { rueckgaengig }, alt) => {
-      uebernimm(plan);
-      if (rueckgaengig || !alt) {
+    onSuccess: (plan, { isRueckgaengig }, alt) => {
+      applyPlan(plan);
+      if (isRueckgaengig || !alt) {
         message.success('Dienst und Ruhe gespeichert');
         return;
       }
       zeigeRueckgaengig(message, 'Vorgaben wiederhergestellt', () =>
-        wiederherstellen.mutate({ body: rueckgaengigBody(alt), rueckgaengig: true }),
+        reset.mutate({ body: rueckgaengigBody(alt), isRueckgaengig: true }),
       );
     },
   });
-  const aendern = useMutation({
+  const update = useMutation({
     mutationFn: (body: SchichtplanGrenzwerteBody) => setzeSchichtplanGrenzwerte(einsatzId, body),
     onSuccess: (plan) => {
-      uebernimm(plan);
+      applyPlan(plan);
       message.success('Dienst und Ruhe gespeichert');
     },
   });
 
   const g = planQ.data?.grenzwerte;
-  const zuruecksetzen = g ? vorgabenBody(g) : null;
-  const laeuft = aendern.isPending || wiederherstellen.isPending;
+  const resetBody = g ? vorgabenBody(g) : null;
+  const isPending = update.isPending || reset.isPending;
 
   return (
     <>
+      <SeitenHinweise fehler={reset.error} fehlerTitel="Dienst und Ruhe nicht geändert" />
       <Formularpaneel
         titel="Dienst und Ruhe"
         dataUpdatedAt={planQ.dataUpdatedAt}
         aktion={
-          darf && g ? (
+          canWrite && g ? (
             <Button
-              disabled={laeuft}
+              disabled={isPending}
               onClick={() => {
-                aendern.reset();
-                setOffen(true);
+                update.reset();
+                setIsOpen(true);
               }}
             >
               Werte ändern
@@ -102,14 +104,6 @@ export default function EinsatzGrenzwerte({ einsatzId, darf }: EinsatzGrenzwerte
           ) : undefined
         }
       >
-        {wiederherstellen.error != null && (
-          <div style={{ marginBottom: token.marginSM }}>
-            <SpeicherFehler
-              fehler={wiederherstellen.error}
-              titel="Dienst und Ruhe nicht geändert"
-            />
-          </div>
-        )}
         {g ? (
           <Datenraster beschriftung="Dienst und Ruhe">
             <Datenfeld label="Höchstdienst" mono>
@@ -127,12 +121,12 @@ export default function EinsatzGrenzwerte({ einsatzId, darf }: EinsatzGrenzwerte
             {planQ.isError && <Button onClick={() => void planQ.refetch()}>Erneut abrufen</Button>}
           </Flex>
         )}
-        {darf && zuruecksetzen && (
+        {canWrite && resetBody && (
           <Flex justify="flex-end" style={{ marginBlockStart: token.margin }}>
             <Button
-              disabled={laeuft}
-              loading={wiederherstellen.isPending}
-              onClick={() => wiederherstellen.mutate({ body: zuruecksetzen })}
+              disabled={isPending}
+              loading={reset.isPending}
+              onClick={() => reset.mutate({ body: resetBody })}
             >
               Vorgaben wiederherstellen
             </Button>
@@ -140,12 +134,12 @@ export default function EinsatzGrenzwerte({ einsatzId, darf }: EinsatzGrenzwerte
         )}
       </Formularpaneel>
 
-      {offen && g && (
+      {isOpen && g && (
         <GrenzwerteModal
           grenzwerte={g}
-          speicherung={aendern}
-          onSpeichern={(body) => aendern.mutateAsync(body)}
-          onSchliessen={() => setOffen(false)}
+          speicherung={update}
+          onSpeichern={(body) => update.mutateAsync(body)}
+          onSchliessen={() => setIsOpen(false)}
         />
       )}
     </>

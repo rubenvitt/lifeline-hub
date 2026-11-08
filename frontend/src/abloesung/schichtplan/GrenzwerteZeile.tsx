@@ -16,14 +16,10 @@ const { Text } = Typography;
 interface GrenzwerteZeileProps {
   einsatzId: number;
   grenzwerte: SchichtplanGrenzwerte;
-  darfSchreiben: boolean;
+  canWrite: boolean;
 }
 
-export default function GrenzwerteZeile({
-  einsatzId,
-  grenzwerte,
-  darfSchreiben,
-}: GrenzwerteZeileProps) {
+export default function GrenzwerteZeile({ einsatzId, grenzwerte, canWrite }: GrenzwerteZeileProps) {
   const { token } = useRollen();
   return (
     <Flex
@@ -34,7 +30,7 @@ export default function GrenzwerteZeile({
       style={{ marginBottom: token.marginSM }}
     >
       <Text type="secondary">{grenzwerteZeile(grenzwerte)}</Text>
-      {darfSchreiben && (
+      {canWrite && (
         <Link
           to={einsatzEinstellungenPfad(einsatzId, 'abloesung')}
           aria-label="Dienst und Ruhe ändern"

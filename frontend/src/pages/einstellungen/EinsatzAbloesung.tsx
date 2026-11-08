@@ -244,7 +244,7 @@ export default function EinsatzAbloesung() {
         )}
       </Formularpaneel>
 
-      <EinsatzGrenzwerte einsatzId={einsatzId} darf={darf} />
+      <EinsatzGrenzwerte einsatzId={einsatzId} canWrite={darf} />
 
       {eigeneOffen && (
         <SchichtmodellModal

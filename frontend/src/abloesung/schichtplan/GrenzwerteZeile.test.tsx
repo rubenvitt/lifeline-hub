@@ -15,14 +15,14 @@ const VORGABEN: SchichtplanGrenzwerte = {
 
 describe('GrenzwerteZeile (LLH-1603)', () => {
   it('nennt beide Werte und kennzeichnet die Vorgabe', () => {
-    renderMitProviders(<GrenzwerteZeile einsatzId={1} grenzwerte={VORGABEN} darfSchreiben />);
+    renderMitProviders(<GrenzwerteZeile einsatzId={1} grenzwerte={VORGABEN} canWrite />);
     expect(
       screen.getByText('Höchstdienst 12 h (Vorgabe) · Mindestruhe 8 h (Vorgabe)'),
     ).toBeInTheDocument();
   });
 
   it('springt mit Schreibrecht über „ändern“ in die Einstellungen der Ablösung', () => {
-    renderMitProviders(<GrenzwerteZeile einsatzId={7} grenzwerte={VORGABEN} darfSchreiben />);
+    renderMitProviders(<GrenzwerteZeile einsatzId={7} grenzwerte={VORGABEN} canWrite />);
     expect(screen.getByRole('link', { name: 'Dienst und Ruhe ändern' })).toHaveAttribute(
       'href',
       '/einsaetze/7/einstellungen/abloesung',
@@ -34,7 +34,7 @@ describe('GrenzwerteZeile (LLH-1603)', () => {
       <GrenzwerteZeile
         einsatzId={1}
         grenzwerte={{ ...VORGABEN, max_dienst_minuten: 600, max_dienst_eigen: true }}
-        darfSchreiben={false}
+        canWrite={false}
       />,
     );
     expect(screen.getByText('Höchstdienst 10 h · Mindestruhe 8 h (Vorgabe)')).toBeInTheDocument();
