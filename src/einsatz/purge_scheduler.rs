@@ -248,6 +248,11 @@ pub async fn tick_mit_rueckschrieb(
         Err(e) => tracing::warn!("Purge Phase C: Auth-Audit-Purge fehlgeschlagen: {e}"),
     }
 
+    // Instanzkopplung (LLH-1490): abgelaufene `jti` des Wiederholschutzes und Kopplungscodes.
+    if let Err(e) = crate::instanz::repo::purge(pool, &crate::zeit::jetzt()).await {
+        tracing::error!("Purge Instanzkopplung fehlgeschlagen: {e}");
+    }
+
     // Admin-Spur (LFH-1005): dieselbe Lage wie das Auth-Audit, eigene, längere Frist.
     match crate::auth::admin_audit::purge_abgelaufene(pool).await {
         Ok(0) => {}

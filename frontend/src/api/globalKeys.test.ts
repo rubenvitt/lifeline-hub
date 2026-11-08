@@ -36,6 +36,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.planungDruck(7)).toEqual(['planung-druck', 7]);
     // Lesezugänge externer Lagemonitore (LLH-1484), Verwaltung → Einstellungen.
     expect(globalKeys.lagemonitorZugaenge()).toEqual(['lagemonitor-zugaenge']);
+    expect(globalKeys.instanzkopplung()).toEqual(['instanzkopplung']);
     expect(globalKeys.zugangsprotokollSeiten('anmeldungen', { konto: 'root' })).toEqual([
       'zugangsprotokoll',
       'anmeldungen',

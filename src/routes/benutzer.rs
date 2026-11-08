@@ -300,8 +300,17 @@ pub async fn deaktivieren(
         .execute(&mut *tx)
         .await?;
     let beendet = session::alle_loeschen(&mut tx, id).await?;
+    // Unterschriftsschlüssel gehen mit dem Konto (LLH-1490, Spec `org-admin-unterschrift`).
+    let schluessel = crate::auth::unterschrift::repo::alle_des_benutzers_widerrufen(
+        &mut tx,
+        id,
+        &crate::zeit::jetzt(),
+    )
+    .await?;
     tx.commit().await?;
     state.live.melde_sitzung_ende(beendet);
+    write_schluessel_widerruf_spur(&state.pool, &admin, &ziel.anzeigename, &schluessel, peer_ip)
+        .await;
 
     admin_audit::schreibe(
         &state.pool,
@@ -321,6 +330,32 @@ pub async fn deaktivieren(
     let aktualisiert = anzeige_laden(&state.pool, id).await?;
 
     Ok(Json(aktualisiert))
+}
+
+/// Je widerrufenem Unterschriftsschlüssel ein Eintrag der Admin-Spur (LLH-1490).
+async fn write_schluessel_widerruf_spur(
+    pool: &sqlx::SqlitePool,
+    admin: &crate::auth::Benutzer,
+    inhaber: &str,
+    fingerabdruecke: &[String],
+    peer_ip: Option<std::net::IpAddr>,
+) {
+    for fp in fingerabdruecke {
+        admin_audit::schreibe(
+            pool,
+            AdminEintrag {
+                aktion: AdminAktion::UnterschriftWiderrufen,
+                akteur: admin,
+                ziel: Ziel::Unterschrift(inhaber),
+                angaben: Some(ZugangsAngaben {
+                    fingerabdruck: Some(fp.clone()),
+                    ..ZugangsAngaben::default()
+                }),
+                peer_ip,
+            },
+        )
+        .await;
+    }
 }
 
 /// PATCH /api/benutzer/{id} — bestehenden Benutzer bearbeiten (LFH-286). Admin-only.
@@ -389,8 +424,21 @@ pub async fn bearbeiten(
     } else {
         session::alle_loeschen(&mut tx, id).await?
     };
+    // Wer kein aktiver Admin mehr ist, verliert seine Unterschriftsschlüssel im selben Commit
+    // (LLH-1490, Spec `org-admin-unterschrift`).
+    let schluessel = if bleibt_aktiver_admin {
+        Vec::new()
+    } else {
+        crate::auth::unterschrift::repo::alle_des_benutzers_widerrufen(
+            &mut tx,
+            id,
+            &crate::zeit::jetzt(),
+        )
+        .await?
+    };
     tx.commit().await?;
     state.live.melde_sitzung_ende(beendet);
+    write_schluessel_widerruf_spur(&state.pool, &admin, &anzeigename, &schluessel, peer_ip).await;
 
     // Je geänderter Rolle alt → neu (LFH-1152: strukturiert, die Verwaltung beschriftet).
     let mut rollen = ZugangsAngaben::default();
