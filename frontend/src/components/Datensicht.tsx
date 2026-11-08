@@ -1505,6 +1505,8 @@ export default function Datensicht<T extends object, const K extends string>(
       : null;
   const [kontext, setKontext] = useState<{ k: Key; offen: KontextMenueOffen } | null>(null);
   const kontextAusloeser = useKontextMenue<T>({
+    kannOeffnen: (zeile) =>
+      zeilenAktionen != null && kontextEintraege(zeilenAktionen, zeile).length > 0,
     onOeffnen: (zeile, { anker, vorherFokus }) => {
       if (zeilenAktionen == null || kontextEintraege(zeilenAktionen, zeile).length === 0) {
         return false;

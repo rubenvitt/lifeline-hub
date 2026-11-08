@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { createPortal } from 'react-dom';
 import {
   DRUCK_ATTRIBUT,
   LANGDRUCK_MS,
@@ -15,8 +16,17 @@ import {
 
 type Oeffnen = (schluessel: string, oeffnung: KontextOeffnung) => boolean;
 
-function Probe({ onOeffnen }: { onOeffnen: Oeffnen }) {
-  const ausloeser = useKontextMenue<string>({ onOeffnen });
+function Probe({
+  onOeffnen,
+  kannOeffnen,
+}: {
+  onOeffnen: Oeffnen;
+  kannOeffnen?: (schluessel: string) => boolean;
+}) {
+  const ausloeser = useKontextMenue<string>({
+    onOeffnen,
+    ...(kannOeffnen ? { kannOeffnen } : {}),
+  });
   return (
     <ul>
       <li data-testid="zeile" tabIndex={-1} {...ausloeser('z1')}>
@@ -30,14 +40,21 @@ function Probe({ onOeffnen }: { onOeffnen: Oeffnen }) {
         <div data-testid="editierbar" contentEditable suppressContentEditableWarning>
           frei
         </div>
+        {/* Ein Portal in der Zeile (offenes ⋮-Menü): seine Ereignisse steigen im React-Baum auf. */}
+        {createPortal(
+          <button type="button" data-testid="portal">
+            Eintrag im ⋮-Menü
+          </button>,
+          document.body,
+        )}
       </li>
     </ul>
   );
 }
 
-function aufbau(ergebnis = true) {
+function aufbau(ergebnis = true, kannOeffnen?: (schluessel: string) => boolean) {
   const onOeffnen = vi.fn<Oeffnen>(() => ergebnis);
-  render(<Probe onOeffnen={onOeffnen} />);
+  render(<Probe onOeffnen={onOeffnen} {...(kannOeffnen ? { kannOeffnen } : {})} />);
   return { onOeffnen, zeile: screen.getByTestId('zeile') };
 }
 
@@ -262,6 +279,78 @@ describe('useKontextMenue — Tastatur (D4)', () => {
     act(() => vi.advanceTimersByTime(TASTEN_NACHLAUF_MS + 1));
     rechtsklick(screen.getByTestId('text'));
     expect(onOeffnen).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('useKontextMenue — Befunde aus dem Review (LLH-1596)', () => {
+  it('ein Portal in der Zeile öffnet nichts: Rechtsklick, Taste, langer Druck', () => {
+    vi.useFakeTimers();
+    const { onOeffnen } = aufbau();
+    const portal = screen.getByTestId('portal');
+    expect(rechtsklick(portal)).toBe(true);
+    expect(fireEvent.keyDown(portal, { key: 'F10', shiftKey: true })).toBe(true);
+    fireEvent.pointerDown(portal, { ...touch, clientX: 5, clientY: 5 });
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    expect(onOeffnen).not.toHaveBeenCalled();
+  });
+
+  it('langer Druck auf einen Datensatz ohne Einträge sperrt weder Markieren noch Browsermenü', () => {
+    vi.useFakeTimers();
+    const { onOeffnen, zeile } = aufbau(false, () => false);
+    const text = screen.getByTestId('text');
+    fireEvent.pointerDown(text, { ...touch, clientX: 50, clientY: 60 });
+    expect(zeile).not.toHaveAttribute(DRUCK_ATTRIBUT);
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS + 10));
+    // Android-Chrome schiebt sein natives Menü nach: es bleibt.
+    expect(rechtsklick(text)).toBe(true);
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet `onOeffnen` beim Zeitgeber „keine Einträge“, endet der Druck', () => {
+    vi.useFakeTimers();
+    const { zeile } = aufbau(false);
+    const text = screen.getByTestId('text');
+    fireEvent.pointerDown(text, { ...touch, clientX: 50, clientY: 60 });
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    expect(zeile).not.toHaveAttribute(DRUCK_ATTRIBUT);
+    expect(rechtsklick(text)).toBe(true);
+  });
+
+  it('das nachgeschobene `contextmenu` der Taste wird auch am fokussierten Menü verworfen', () => {
+    vi.useFakeTimers();
+    const { zeile } = aufbau();
+    fireEvent.keyDown(zeile, { key: 'ContextMenu' });
+    // Der Browser schickt es an das fokussierte Element, das schon im Menü (Portal) steht.
+    const imMenue = document.createElement('div');
+    document.body.appendChild(imMenue);
+    const draussenGesehen = vi.fn();
+    window.addEventListener('contextmenu', draussenGesehen, true);
+    expect(fireEvent.contextMenu(imMenue, { button: 0 })).toBe(false);
+    // rc-trigger hört am `window` (Capture) und schlösse das Menü: es sieht das Ereignis nicht.
+    expect(draussenGesehen).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(TASTEN_NACHLAUF_MS + 1));
+    expect(fireEvent.contextMenu(imMenue, { button: 2 })).toBe(true);
+    expect(draussenGesehen).toHaveBeenCalledTimes(1);
+    window.removeEventListener('contextmenu', draussenGesehen, true);
+    imMenue.remove();
+  });
+
+  it('Stift ohne Touch-Ereignisse: das Abheben nach dem langen Druck wirkt nicht als Klick', () => {
+    vi.useFakeTimers();
+    const beiKlick = vi.fn();
+    const { zeile } = aufbau();
+    zeile.addEventListener('click', beiKlick);
+    const text = screen.getByTestId('text');
+    const stift = { ...touch, pointerType: 'pen' };
+    fireEvent.pointerDown(text, { ...stift, clientX: 50, clientY: 60 });
+    act(() => vi.advanceTimersByTime(LANGDRUCK_MS));
+    fireEvent.pointerUp(text, stift);
+    fireEvent.mouseUp(text);
+    fireEvent.click(text);
+    expect(beiKlick).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1000));
+    fireEvent.click(text);
+    expect(beiKlick).toHaveBeenCalledTimes(1);
   });
 });
 

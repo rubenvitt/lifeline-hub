@@ -197,6 +197,37 @@ describe('Datensicht · Kontextmenü im Kartenzweig (4.2)', () => {
   });
 });
 
+describe('Datensicht · Befunde aus dem Review', () => {
+  it('ein Rechtsklick im offenen ⋮-Menü einer Karte öffnet kein zweites Menü', async () => {
+    setzeViewportBreite(390);
+    renderMitProviders(sicht(plan()));
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Rotkreuz 2' }));
+    const punkte = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    const eintrag = within(punkte).getByRole('menuitem', { name: 'Bearbeiten' });
+    fireEvent.contextMenu(eintrag, { button: 2 });
+    expect(kontextAnker()).toBeNull();
+  });
+
+  it('langer Druck auf eine Karte ohne Einträge sperrt das Markieren nicht', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(
+      sicht(plan(vi.fn(), vi.fn(), (f) => (f.id === 2 ? [] : [{ key: 'b', label: 'B' }]), false)),
+    );
+    const karte = screen
+      .getByRole('link', { name: 'Rotkreuz 2' })
+      .closest<HTMLElement>('[data-lfh="datensicht-karte"]')!;
+    fireEvent.pointerDown(karte, { isPrimary: true, pointerId: 4, pointerType: 'touch' });
+    expect(karte).not.toHaveAttribute('data-kontext-druck');
+    fireEvent.pointerUp(karte, { pointerId: 4, pointerType: 'touch' });
+  });
+});
+
 describe('Datensicht · offenes Kontextmenü (4.3)', () => {
   const zeilenZahl = (c: HTMLElement) => c.querySelectorAll('tr.ant-table-row').length;
 

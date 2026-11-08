@@ -20,7 +20,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { erzeugeNachklickRiegel, type NachklickRiegel } from './nachklickRiegel';
+import { NACHLAUF_MS, erzeugeNachklickRiegel, type NachklickRiegel } from './nachklickRiegel';
 
 /** Ab dieser Dauer öffnet ein Druck ohne Bewegung das Kontextmenü (Touch, Stift). */
 export const LANGDRUCK_MS = 550;
@@ -47,6 +47,12 @@ export interface KontextOeffnung {
 export interface KontextMenueOptionen<S> {
   /** Menü öffnen. `false` ⇒ keine Einträge: kein Menü, das Browsermenü bleibt. */
   onOeffnen: (schluessel: S, oeffnung: KontextOeffnung) => boolean;
+  /**
+   * Hat der Datensatz überhaupt Einträge? Gefragt beim Aufsetzen des Fingers, bevor der Druck
+   * Markieren und Systemblase sperrt: ohne Einträge bleiben beide und das Browsermenü (D2).
+   * Fehlt die Prüfung, entscheidet erst `onOeffnen`.
+   */
+  kannOeffnen?: (schluessel: S) => boolean;
   /**
    * Anker bei der Tastatur. Vorgabe: untere linke Ecke des Elements (das Menü klappt unter die
    * Zeile, ohne sie zu verdecken).
@@ -96,6 +102,18 @@ export function browsermenueBleibt(ziel: EventTarget | null): boolean {
   return false;
 }
 
+/**
+ * Kommt das Ereignis aus dem eigenen DOM-Teilbaum? React lässt Ereignisse aus Portalen (offenes
+ * ⋮-Menü, Auswahlliste, Rückfrage) durch den Komponentenbaum aufsteigen; sie gehören nicht dem
+ * Datensatz (wie der Riegel des Zeilenklicks in `Datensicht`).
+ */
+function ausEigenemBaum(e: { currentTarget: EventTarget; target: EventTarget }): boolean {
+  const huelle = e.currentTarget as Node;
+  return e.target instanceof Node && huelle.contains(e.target);
+}
+
+const GESCHLUCKT_NACH_STIFT = ['mousedown', 'mouseup', 'click', 'contextmenu'] as const;
+
 function untenLinks(element: HTMLElement | SVGElement): KontextAnker {
   const r = element.getBoundingClientRect();
   return { x: r.left, y: r.bottom };
@@ -130,15 +148,51 @@ export function useKontextMenue<S>(
   const touchAktiv = useRef(false);
   const tasteZeit = useRef(-Infinity);
   const riegel = useRef<NachklickRiegel | null>(null);
+  /**
+   * Riegel für einen Zeiger ohne Touch-Ereignisse (Stift unter Windows): der Touch-Riegel sieht
+   * kein `touchstart` und bliebe stumpf. `bis` steht bis zum Abheben auf Unendlich.
+   */
+  const stiftRiegel = useRef<{ bis: number } | null>(null);
 
   useEffect(() => {
     // Der Riegel (LFH-776 D3) hängt vor jedem Dropdown am `window` und schluckt nach einem langen
     // Druck die Ereignisse des Abhebens. Scharf erst, wenn dieser Hook wirklich öffnet.
     const r = erzeugeNachklickRiegel(document.documentElement);
     riegel.current = r;
+
+    // Das `contextmenu`, das der Browser auf die Taste hin nachschiebt (Windows beim `keyup`),
+    // trifft das fokussierte Element, und das steht dann schon im Menü (Portal), nicht im
+    // Datensatz. Darum am `window` in der Capture-Phase, vor rc-trigger, das das Menü sonst
+    // schlösse (D4). Der Hörer hängt seit dem Einhängen, also vor jedem Menü.
+    const tasteNachlauf = (e: Event) => {
+      if (performance.now() - tasteZeit.current > TASTEN_NACHLAUF_MS) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    const stiftNachlauf = (e: Event) => {
+      const st = stiftRiegel.current;
+      if (st == null) return;
+      if (performance.now() > st.bis) {
+        stiftRiegel.current = null;
+        return;
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    // Ein neuer Zeiger nach dem Abheben ist eine neue Absicht (wie `touchstart` im Touch-Riegel).
+    const neuerZeiger = () => {
+      const st = stiftRiegel.current;
+      if (st != null && st.bis !== Infinity) stiftRiegel.current = null;
+    };
+    window.addEventListener('contextmenu', tasteNachlauf, true);
+    window.addEventListener('pointerdown', neuerZeiger, true);
+    for (const t of GESCHLUCKT_NACH_STIFT) window.addEventListener(t, stiftNachlauf, true);
     return () => {
       r.abbauen();
       riegel.current = null;
+      window.removeEventListener('contextmenu', tasteNachlauf, true);
+      window.removeEventListener('pointerdown', neuerZeiger, true);
+      for (const t of GESCHLUCKT_NACH_STIFT) window.removeEventListener(t, stiftNachlauf, true);
     };
   }, []);
 
@@ -169,16 +223,14 @@ export function useKontextMenue<S>(
       const druckEnde = () => {
         loesen();
         touchAktiv.current = false;
+        const st = stiftRiegel.current;
+        if (st != null && st.bis === Infinity)
+          stiftRiegel.current = { bis: performance.now() + NACHLAUF_MS };
       };
 
       return {
         onContextMenu: (e) => {
-          if (performance.now() - tasteZeit.current <= TASTEN_NACHLAUF_MS) {
-            // Der Browser schiebt auf die Taste hin ein eigenes `contextmenu` nach (D4).
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
+          if (!ausEigenemBaum(e)) return;
           if (touchAktiv.current) {
             // Android-Chrome meldet den langen Druck selbst; der eigene Zeitgeber öffnet (D3).
             e.preventDefault();
@@ -193,9 +245,10 @@ export function useKontextMenue<S>(
         },
 
         onPointerDown: (e) => {
-          if (e.pointerType === 'mouse') return;
+          if (e.pointerType === 'mouse' || !ausEigenemBaum(e)) return;
           loesen();
           if (browsermenueBleibt(e.target)) return;
+          if (optionenRef.current.kannOeffnen?.(schluessel) === false) return;
           const element = e.currentTarget as unknown as HTMLElement | SVGElement;
           element.setAttribute(DRUCK_ATTRIBUT, '');
           const x = e.clientX;
@@ -206,8 +259,16 @@ export function useKontextMenue<S>(
             if (d?.timer !== timer) return;
             // Der Druck bleibt bis zum Abheben „aktiv“: das native Menü kommt oft erst danach.
             druck.current = { ...d, timer: -1 };
-            const offen = oeffne(element, { x, y }, 'zeiger');
-            if (offen) riegel.current?.quelleFuerKontextmenue();
+            if (!oeffne(element, { x, y }, 'zeiger')) {
+              // Doch keine Einträge: Markieren und Browsermenü wieder frei (D2).
+              druckEnde();
+              return;
+            }
+            // Ohne Finger (Stift ohne Touch-Ereignisse) bleibt der Touch-Riegel stumpf; dann
+            // schluckt der eigene die Ereignisse des Abhebens.
+            if (riegel.current?.quelleFuerKontextmenue() !== 'touch') {
+              stiftRiegel.current = { bis: Infinity };
+            }
           }, LANGDRUCK_MS);
           druck.current = { timer, x, y, pointerId: e.pointerId, element };
         },
@@ -227,7 +288,7 @@ export function useKontextMenue<S>(
         },
 
         onKeyDown: (e) => {
-          if (!istKontextTaste(e) || inEingabe(e.target)) return;
+          if (!istKontextTaste(e) || inEingabe(e.target) || !ausEigenemBaum(e)) return;
           const element = e.currentTarget as unknown as HTMLElement | SVGElement;
           const anker = (optionenRef.current.tastaturAnker ?? untenLinks)(element);
           if (!oeffne(element, anker, 'tastatur')) return;

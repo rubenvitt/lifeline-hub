@@ -143,6 +143,24 @@ Spalte und Kartenplan übereinstimmen.
 Menü) und die Übersicht der Skizze (unterdrückt nur). Ein Eintrag ohne Fund färbt den Wächter rot,
 wie in `menueAusloeser.guard.test.ts`.
 
+### D9 Nachträge aus dem Review (08.11.2026)
+
+- **Nur Ereignisse aus dem eigenen DOM-Teilbaum.** React lässt Ereignisse aus Portalen (offenes
+  ⋮-Menü, Auswahlliste, Rückfrage) durch den Komponentenbaum aufsteigen. Ohne Prüfung öffnete ein
+  Rechtsklick in das offene ⋮-Menü ein zweites Menü. Alle Handler prüfen deshalb
+  `currentTarget.contains(target)`, wie der Riegel des Zeilenklicks in `Datensicht`.
+- **`kannOeffnen` vor dem Druck.** Erst beim Aufsetzen des Fingers zu fragen, ob es Einträge gibt,
+  hält Markieren, Systemblase und Browsermenü an Datensätzen ohne Einträge frei (D2). Meldet
+  `onOeffnen` beim Zeitgeber doch „keine“, endet der Druck.
+- **Tasten-Nachlauf am `window`.** Das nachgeschobene `contextmenu` der Taste trifft das schon
+  fokussierte Menü (Portal), nicht den Datensatz. Der Hook verwirft es deshalb in der
+  Capture-Phase am `window`, vor rc-trigger, das das Menü sonst schlösse (statt in `onContextMenu`
+  wie in D4 zuerst gedacht).
+- **Stift ohne Touch-Ereignisse.** Der Touch-Riegel wird nur mit einem gesehenen `touchstart`
+  scharf. Liefert der Zeiger keins (Stift unter Windows), schluckt ein eigener Riegel des Hooks
+  `mousedown`, `mouseup`, `click` und `contextmenu` bis 400 ms nach dem Abheben; ein neuer Zeiger
+  löst ihn sofort.
+
 ## Risks / Trade-offs
 
 - [Am Touchgerät lässt sich in Zeilen mit Kontextmenü kein Text mehr per langem Druck markieren
