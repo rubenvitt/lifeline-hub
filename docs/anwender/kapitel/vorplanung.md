@@ -138,7 +138,7 @@ Einlesen derselben Mappe ändert dort nichts mehr.
 
 ### Was die Übernahme anlegt
 
-Jeder Posten wird eine Einheit oder eine UHS im Einsatz; in einem laufenden Einsatz schlägt die
+Jeder Posten wird eine Einheit oder eine UHS im Einsatz, auch einer ohne Block; in einem laufenden Einsatz schlägt die
 Vorschau eine vorhandene Einheit oder UHS gleichen Namens vor. Ein Posten aus einer
 Einheitenvorlage wird eine Einheit nach dieser Vorlage, ein Posten mit Stamm-Fahrzeug eine Einheit
 ohne das Fahrzeug: disponiert wird es nicht, die Vorschau nennt es als Hinweis „Stamm-Fahrzeug

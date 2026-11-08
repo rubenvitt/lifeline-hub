@@ -11,7 +11,7 @@
 //! Transaktion, sodass Vorschau und Schreiben denselben Stand sehen. LLH-1561 (Vorplanung) legt
 //! den Einsatz an und ruft die drei Schritte in derselben Transaktion.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -380,6 +380,10 @@ pub struct Planung {
     neue_einheiten: Vec<NeueEinheit>,
     neue_uhs: Vec<NeueUhs>,
     neue_helfer: Vec<NeuerHelfer>,
+    /// Indizes in `neue_einheiten` bzw. `neue_uhs`, die das Übernehmen anlegt: gebraucht von
+    /// einem wirksamen Block oder ein Posten mit `ohne_block_anlegen`. Aufsteigend.
+    anlegen_einheiten: Vec<usize>,
+    anlegen_uhs: Vec<usize>,
     bloecke: Vec<GeplanterBlock>,
     /// Grenzwerte, die das Übernehmen setzt (je Wert nur ohne eigenen des Einsatzes).
     grenzwerte: Option<(Option<i64>, Option<i64>)>,
@@ -963,18 +967,29 @@ pub fn planen(
             format!("Höchstens {PLAN_HELFER_MAX} Helfer je Einsatz"),
         ));
     }
-    let gebraucht_einheiten: HashSet<usize> = gruppen
+    // Ein Posten mit `ohne_block_anlegen` braucht keinen Block (Vorplanung, LLH-1587).
+    let ohne_block: Vec<Ziel> = paket
+        .posten
+        .iter()
+        .filter(|p| p.ohne_block_anlegen)
+        .filter_map(|p| posten_ziel.get(p.schluessel.as_str()).copied())
+        .collect();
+    let gebraucht_einheiten: BTreeSet<usize> = gruppen
         .iter()
         .filter(wirksam)
-        .filter_map(|g| match g.ziel {
+        .map(|g| g.ziel)
+        .chain(ohne_block.iter().copied())
+        .filter_map(|z| match z {
             Ziel::NeueEinheit(i) => Some(i),
             _ => None,
         })
         .collect();
-    let gebraucht_uhs: HashSet<usize> = gruppen
+    let gebraucht_uhs: BTreeSet<usize> = gruppen
         .iter()
         .filter(wirksam)
-        .filter_map(|g| match g.ziel {
+        .map(|g| g.ziel)
+        .chain(ohne_block.iter().copied())
+        .filter_map(|z| match z {
             Ziel::NeueUhs(i) => Some(i),
             _ => None,
         })
@@ -1102,6 +1117,8 @@ pub fn planen(
         neue_einheiten,
         neue_uhs,
         neue_helfer,
+        anlegen_einheiten: gebraucht_einheiten.into_iter().collect(),
+        anlegen_uhs: gebraucht_uhs.into_iter().collect(),
         bloecke: gruppen,
         grenzwerte,
         fehlende_rechte,
@@ -1428,11 +1445,16 @@ pub async fn schreiben_tx(
     let wirksam =
         |g: &GeplanterBlock| matches!(g.zustand, BlockZustand::Neu | BlockZustand::Ergaenzt);
 
-    // Neue Einheiten und UHS, nur die gebrauchten.
+    // Neue Einheiten und UHS, nur die gebrauchten (`Planung::anlegen_einheiten`, `anlegen_uhs`).
     let mut einheit_id: HashMap<usize, i64> = HashMap::new();
     let mut uhs_id: HashMap<usize, i64> = HashMap::new();
-    for g in planung.bloecke.iter().filter(|g| wirksam(g)) {
-        match g.ziel {
+    let anlegen = planung
+        .anlegen_einheiten
+        .iter()
+        .map(|&i| Ziel::NeueEinheit(i))
+        .chain(planung.anlegen_uhs.iter().map(|&i| Ziel::NeueUhs(i)));
+    for ziel in anlegen {
+        match ziel {
             Ziel::NeueEinheit(i) if !einheit_id.contains_key(&i) => {
                 let e = &planung.neue_einheiten[i];
                 let sortier = match e.sortier {
@@ -1817,6 +1839,7 @@ mod tests {
             uhs_typ: None,
             sortier: None,
             zeilen: vec![zeile],
+            ohne_block_anlegen: false,
         }
     }
 

@@ -108,7 +108,8 @@ je Helfer. Die Vorschau MUST nichts schreiben; für einen neuen Einsatz MUST sie
 sehen wie das Übernehmen. Das Übernehmen MUST in EINER Transaktion laufen, ein neuer Einsatz
 (Bezeichnung, Einsatzart und Ort der Planung, wahlweise mit Einsatz-Vorlage, Ersteller als
 Einsatzleitung) eingeschlossen; Fehler des Abgleichs MUST es mit 422 ablehnen, ohne etwas zu
-schreiben. Ein laufender Einsatz MUST zur eigenen Organisation gehören (404 sonst) und verlangt
+schreiben, ebenso eine Übernahme in einen laufenden Einsatz ohne jede Änderung. Jeder Posten MUST
+eine Einheit oder UHS werden oder einer vorhandenen zugeordnet sein, auch ohne Block. Ein laufender Einsatz MUST zur eigenen Organisation gehören (404 sonst) und verlangt
 Schreibrecht und die Module Ablösung und Personal (403), aktiv (409). Niemand wird alarmiert oder
 disponiert. Danach MUST die Planung schreibgeschützt sein: jeder Schreibweg und eine zweite
 Übernahme antworten mit 409, Lesen und Löschen bleiben. Kopf und Liste MUST Zeitpunkt, Einsatz und

@@ -489,3 +489,68 @@ async fn block_ohne_soll_bleibt_ohne_soll_auch_mit_vorlage() {
     );
     assert_eq!(bloecke[1]["soll_anzahl"], 1, "{plan}");
 }
+
+#[tokio::test]
+async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist_422() {
+    let app = setup().await;
+    let admin = admin(&app).await;
+    let (s, plan) = post(
+        &app,
+        &admin,
+        PFAD,
+        json!({"bezeichnung": "Konzert", "von": "2027-03-13 08:00:00", "bis": "2027-03-13 23:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let p = plan["kopf"]["id"].as_i64().unwrap();
+    for body in [
+        json!({"bezeichnung": "Reserve", "art": "einheit"}),
+        json!({"bezeichnung": "UHS Bühne", "art": "uhs", "uhs_typ": "behandlungsplatz"}),
+    ] {
+        let (s, v) = post(&app, &admin, &format!("{PFAD}/{p}/posten"), body).await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+
+    // In einen laufenden Einsatz, der beide schon hat: nichts zu tun, 422, Planung bleibt offen.
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Konzert").await;
+    einheit_bilden(&app, &admin, einsatz, "Reserve").await;
+    let (s, v) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        json!({"bezeichnung": "UHS Bühne", "typ": "behandlungsplatz"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let ziel = json!({"ziel": {"art": "einsatz", "einsatz_id": einsatz}});
+    let (s, vorschau) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/uebernahme/vorschau"),
+        ziel.clone(),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{vorschau}");
+    assert_eq!(vorschau["zaehlung"]["aenderungen"], 0, "{vorschau}");
+    let (s, v) = post(&app, &admin, &format!("{PFAD}/{p}/uebernahme"), ziel).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let plan = get(&app, &admin, &format!("{PFAD}/{p}")).await;
+    assert!(plan["kopf"].get("uebernahme").is_none(), "{plan}");
+
+    // In einen neuen Einsatz: beide Posten entstehen, obwohl kein Block sie braucht.
+    let (s, ergebnis) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/uebernahme"),
+        json!({"ziel": {"art": "neu"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{ergebnis}");
+    assert_eq!(ergebnis["zaehlung"]["einheiten_neu"], 1, "{ergebnis}");
+    assert_eq!(ergebnis["zaehlung"]["uhs_neu"], 1, "{ergebnis}");
+    let neu = ergebnis["einsatz_id"].as_i64().unwrap();
+    let einheiten = get(&app, &admin, &format!("/api/einsaetze/{neu}/einheiten")).await;
+    assert!(einheiten.to_string().contains("\"Reserve\""), "{einheiten}");
+    let uhs = get(&app, &admin, &format!("/api/einsaetze/{neu}/uhs")).await;
+    assert!(uhs.to_string().contains("\"UHS Bühne\""), "{uhs}");
+}

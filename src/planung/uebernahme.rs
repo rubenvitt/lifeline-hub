@@ -215,6 +215,8 @@ async fn build_paket_tx(
                         .filter(|t| *t != UhsTyp::Sonstige),
                     sortier: Some(sortier),
                     zeilen: Vec::new(),
+                    // Jeder Posten der Planung wird eine Einheit oder UHS, auch ohne Block.
+                    ohne_block_anlegen: true,
                 }
             },
         )
@@ -230,6 +232,7 @@ async fn build_paket_tx(
             uhs_typ: None,
             sortier: None,
             zeilen: Vec::new(),
+            ohne_block_anlegen: false,
         });
     }
 
@@ -501,7 +504,7 @@ pub async fn vorschau(
 
 /// Übernimmt in EINER Transaktion: neuer Einsatz, Abgleich, Schreiben und der Vermerk an der
 /// Planung. Fehler des Abgleichs 422 (Zeilen), fehlende Freigabe eines Moduls 403, schon
-/// übernommen 409.
+/// übernommen 409, in einen laufenden Einsatz ohne jede Änderung 422.
 pub async fn uebernehmen(
     pool: &SqlitePool,
     benutzer: &Benutzer,
@@ -529,6 +532,13 @@ pub async fn uebernehmen(
             &anlass,
         )
         .await?;
+        // In einen laufenden Einsatz nur mit Wirkung: sonst wäre die Planung gesperrt, ohne dass
+        // etwas übernommen ist (der Dialog sperrt „Übernehmen“ dann mit „Keine Änderungen“).
+        if matches!(ziel, CheckedZiel::Einsatz { .. }) && geschrieben.zaehlung.aenderungen == 0 {
+            return Err(AppError::UnprocessableEntity(
+                "Die Planung bringt in diesen Einsatz keine Änderungen".into(),
+            ));
+        }
         mark_uebernommen_tx(conn, benutzer, planung_id, v.einsatz_id, &jetzt_text).await?;
         Ok(Uebernommen {
             einsatz_id: v.einsatz_id,
