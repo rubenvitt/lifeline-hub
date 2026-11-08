@@ -1151,6 +1151,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::transportmittel),
         )
         .route(
+            "/api/einsaetze/{id}/personen/verbleib-angaben",
+            get(routes::einsatz_person::verbleib_angaben),
+        )
+        .route(
             "/api/einsaetze/{id}/personen/einheiten",
             get(routes::einsatz_person::einheiten),
         )

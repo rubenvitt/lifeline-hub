@@ -437,6 +437,7 @@ export type GegenRat = S['GegenRat'];
 export type Unterschrift = S['Unterschrift'];
 export type Versorgung = S['Versorgung'];
 export type TransportmittelAuswahl = S['TransportmittelAuswahl'];
+export type VerbleibAngaben = S['VerbleibAngaben'];
 export type VersorgendeEinheitAuswahl = S['VersorgendeEinheitAuswahl'];
 export type MeldungPatient = S['MeldungPatient'];
 export type EinsatzTransportfahrzeug = S['EinsatzTransportfahrzeug'];

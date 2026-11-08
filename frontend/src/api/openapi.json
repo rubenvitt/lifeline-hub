@@ -17608,6 +17608,56 @@
           "geplant"
         ]
       },
+      "VerbleibAngaben": {
+        "type": "object",
+        "description": "Angaben des maßgeblichen Verbleibs einer Person für den Einsatzbericht (LLH-1575, design.md\nD3): Rettungsmittel, „Entlassen an“, „gegen Rat“ und Unterschrift, die die Personenliste\nnicht trägt. Keine Personendaten: die Kennung dient nur der Zuordnung zur Liste.",
+        "required": [
+          "person_id"
+        ],
+        "properties": {
+          "entlassen_an": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EntlassenAn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gegen_rat": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GegenRat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transportmittel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Rettungsmittel des Transports (Funkrufname beim Eigentransport, sonst Freitext), getrimmt."
+          },
+          "unterschrift": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Unterschrift"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "VerbleibAnzeige": {
         "type": "object",
         "description": "Ein Verbleib-Ereignis (1:1 zu `person_verbleib`).",

@@ -4,7 +4,8 @@ import { ladeEvakuierung } from '../../api/evakuierung';
 import { ladeEinsatz, ladeFuehrungsstelle } from '../../api/einsaetze';
 import { listAufgeloesteEinheiten, listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
-import { listePersonen } from '../../api/einsatzPerson';
+import { ladeVerbleibAngaben, listePersonen } from '../../api/einsatzPerson';
+import { listEinsatzMaterial, listEntlassenesMaterial } from '../../api/einsatzMaterial';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../../api/einsatzPersonal';
 import { listeSchaeden } from '../../api/einsatzSchaden';
 import { ladeEtbZaehler } from '../../api/etb';
@@ -51,12 +52,15 @@ const ABRUF = {
   fahrzeuge: listeEinsatzFahrzeuge,
   lageberichte: ladeLageberichtQuelle,
   personen: (id: number) => listePersonen(id),
+  personenVerbleibAngaben: ladeVerbleibAngaben,
   schaeden: (id: number) => listeSchaeden(id),
   evakuierung: ladeEvakuierung,
   betreuung: ladeBetreuung,
   verpflegung: ladeVerpflegung,
   etbZaehler: (id: number) => ladeEtbZaehler(id),
   etbEntscheidungen: (id: number) => ladeEtbVollstaendig(id, { typ: 'entscheidung' }),
+  material: listEinsatzMaterial,
+  materialEntlassen: listEntlassenesMaterial,
 } satisfies Record<QuellenSchluessel, (einsatzId: number) => Promise<unknown>>;
 
 type Abruf = typeof ABRUF;

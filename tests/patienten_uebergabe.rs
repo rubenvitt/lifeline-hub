@@ -432,3 +432,84 @@ async fn vermisste_person_bleibt_offen_trotz_verbleib() {
         .unwrap();
     assert_eq!(w.detail(p).await["versorgung"], "offen");
 }
+
+/// LLH-1575 (design.md D3): `GET …/personen/verbleib-angaben` liefert je Person die Angaben des
+/// jüngsten Verbleibs ohne Übergabe; Stornierte und Personen ohne Angabe fehlen. Am Modul
+/// Personen: wer es nicht lesen darf, bekommt 403.
+#[tokio::test]
+async fn verbleib_angaben_fuer_den_bericht() {
+    let w = Welt::neu().await;
+    let ef = w.fahrzeug(w.einsatz, "1/83-1").await;
+    let eigen = w.person().await;
+    let (s, v) = w
+        .verbleib(
+            eigen,
+            json!({ "art": "transport", "transport_durch": "eigen", "einsatz_fahrzeug_id": ef,
+                    "ziel": "KH Mitte", "status": "abtransportiert",
+                    "gegen_rat": "behandlung", "unterschrift": "verweigert" }),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = w
+        .verbleib(
+            eigen,
+            json!({ "art": "transport", "transport_durch": "eigen", "einsatz_fahrzeug_id": ef,
+                    "ziel": "KH Mitte", "status": "uebergeben" }),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let fremd = w.person().await;
+    let (s, v) = w
+        .verbleib(
+            fremd,
+            json!({ "art": "transport", "transport_durch": "fremd",
+                    "transportmittel": " RTW 3/83-2 ", "status": "abtransportiert" }),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let storniert = w.person().await;
+    let (s, v) = w
+        .verbleib(
+            storniert,
+            json!({ "art": "entlassung", "entlassen_an": "polizei" }),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    sqlx::query("UPDATE einsatz_person SET storniert_at = '2026-06-12 20:00:00' WHERE id = ?")
+        .bind(storniert)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let ohne = w.person().await;
+    let (s, v) = w.verbleib(ohne, json!({ "art": "vor_ort" })).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let pfad = format!("/api/einsaetze/{}/personen/verbleib-angaben", w.einsatz);
+    let (s, v) = anfrage(&w.app, "GET", &pfad, &w.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v,
+        json!([
+            { "person_id": eigen, "transportmittel": "1/83-1",
+              "gegen_rat": "behandlung", "unterschrift": "verweigert" },
+            { "person_id": fremd, "transportmittel": "RTW 3/83-2" },
+        ])
+    );
+
+    let fid = benutzer_anlegen(&w.app, &w.admin, "frieda", "keine").await;
+    rolle_setzen(&w.app, &w.admin, w.einsatz, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&w.app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(&w.app, "GET", &pfad, &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "mit Lesezugriff auf Personen");
+    let (s, _) = anfrage(
+        &w.app,
+        "PUT",
+        &format!("/api/einsaetze/{}/modul-overrides/personen", w.einsatz),
+        &w.admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage(&w.app, "GET", &pfad, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
