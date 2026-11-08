@@ -152,5 +152,14 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Druckkopf. Eine Quelle nennt alle Blöcke, die aus ihr schöpfen. Anlagen stehen am Ende und sind
   aus; die Personal-Anlage nimmt nur Name, Funktion, Einheit und Zeiten (Feld-Whitelist) und setzt
   „Personenbezug“ in den Kopf.
+- **Hilfeleistungen, Kurzbericht, Materialverbrauch** (LLH-1575, Spec `einsatzbericht`): Block
+  `hilfeleistungen` im Standardumfang nach der Bilanz, zählt mit den Funktionen aus
+  `personen/personenBilanz.ts` (`anlassbild`, `kontakteJeStunde`, `istTransportiert`,
+  `kontakteJeEinheit`), nie mit einem zweiten Zähler. Rettungsmittel und Angaben „gegen Rat“
+  liefert die eigene Quelle `personenVerbleibAngaben` (`GET …/personen/verbleib-angaben`,
+  jüngster Verbleib ohne Übergabe); die Kennung verlässt die Verdichtung nicht. Der Kurzbericht ist
+  nur eine Voreinstellung der Auswahl (`KURZBERICHT` in `auswahl.ts`) mit eigenem Namen im Kopf,
+  kein Dokument und kein Parameter. Die Anlage `materialverbrauch` liest aktives und
+  herausgenommenes Material.
 - **Org-Branding** (`PATCH /api/organisation`, `…/organisation/logo`, PNG/JPEG ≤ 1 MiB,
   Virenscan) liegt außerhalb der Schwärzung (`schwaerzung_registry.rs`).

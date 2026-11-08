@@ -30,7 +30,7 @@
 -- Fremdschlüssel: innerhalb der Planung CASCADE; `organisation`, `personal`, `fahrzeug` und
 -- `einheit_vorlage` NO ACTION wie jeder Verweis auf die Stammdaten (`src/demo/schema_tests.rs`).
 -- Keine Spalte verweist auf einen Einsatz: die Planung liegt außerhalb der einsatz-scoped Menge
--- (Schwärzungs-Registry, GUARD 5). Abgesichert von db::tests::migration_0293_planung.
+-- (Schwärzungs-Registry, GUARD 5). Abgesichert von db::tests::migration_0295_planung.
 CREATE TABLE planung (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     org_id         INTEGER NOT NULL REFERENCES organisation(id),

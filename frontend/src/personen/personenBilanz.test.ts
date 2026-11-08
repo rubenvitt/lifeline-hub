@@ -5,6 +5,7 @@ import {
   hatLuecke,
   istAngetroffen,
   kontakteJeEinheit,
+  kontakteJeStunde,
   lueckenText,
   lueckenVon,
   offeneFelder,
@@ -367,5 +368,54 @@ describe('anlassbild (LLH-1566)', () => {
       sonstiges: 0,
       ohne: 1,
     });
+  });
+});
+
+describe('kontakteJeStunde (LLH-1575)', () => {
+  const berlin = { zeitzone: 'Europe/Berlin' };
+
+  it('zählt je Stunde der Zone, füllt Stunden ohne Kontakt mit 0, Vermisste zählen nicht', () => {
+    // 18:10 und 18:59 Berliner Sommerzeit = 16:10/16:59 UTC; 20:30 = 18:30 UTC.
+    const reihe = kontakteJeStunde(
+      [
+        p({ erfasst_at: '2026-06-12 16:10:00', anlass: 'verletzung' }),
+        p({ erfasst_at: '2026-06-12 16:59:59' }),
+        p({ erfasst_at: '2026-06-12 18:30:00', anlass: 'verletzung' }),
+        p({ erfasst_at: '2026-06-12 17:30:00', status: 'vermisst' }),
+      ],
+      berlin,
+    );
+    expect(reihe.map((s) => [s.beginn, s.wert])).toEqual([
+      ['2026-06-12 16:00:00', 2],
+      ['2026-06-12 17:00:00', 0],
+      ['2026-06-12 18:00:00', 1],
+    ]);
+    expect(reihe[0].je.verletzung).toBe(1);
+    expect(reihe[0].je.ohne).toBe(1);
+  });
+
+  it('stellt die Stunde in der Zone der Konventionen, nicht in UTC', () => {
+    // 05:45 UTC ist in Kolkata (UTC+5:30) 11:15, die Stunde beginnt dort 11:00 = 05:30 UTC.
+    const reihe = kontakteJeStunde([p({ erfasst_at: '2026-06-12 05:45:00' })], {
+      zeitzone: 'Asia/Kolkata',
+    });
+    expect(reihe).toHaveLength(1);
+    expect(reihe[0].beginn).toBe('2026-06-12 05:30:00');
+  });
+
+  it('zählt in der Nacht der Zeitumstellung beide Stunden 02 Uhr getrennt', () => {
+    // 25.10.2026: 02:30 MESZ = 00:30 UTC, 02:30 MEZ = 01:30 UTC.
+    const reihe = kontakteJeStunde(
+      [p({ erfasst_at: '2026-10-25 00:30:00' }), p({ erfasst_at: '2026-10-25 01:30:00' })],
+      berlin,
+    );
+    expect(reihe.map((s) => [s.beginn, s.wert])).toEqual([
+      ['2026-10-25 00:00:00', 1],
+      ['2026-10-25 01:00:00', 1],
+    ]);
+  });
+
+  it('liefert ohne Kontakt eine leere Liste', () => {
+    expect(kontakteJeStunde([p({ status: 'vermisst' })], berlin)).toEqual([]);
   });
 });

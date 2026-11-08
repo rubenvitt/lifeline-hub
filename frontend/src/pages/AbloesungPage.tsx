@@ -7,6 +7,7 @@ import {
   aendereSchicht,
   beginneSchicht,
   fetchEinsatzSchichtmodell,
+  ladePlanVorlage,
   listeAbloesungen,
   listeAbloesungVorgaben,
   nimmVollzugZurueck,
@@ -45,6 +46,7 @@ import {
 } from '../abloesung/AbloesungDialoge';
 import { formatDauer } from '../abloesung/dauer';
 import { verbleibRaeume } from '../abloesung/verbleib';
+import { folgtPlan } from '../abloesung/lautPlan';
 import { planungWarnungText } from '../abloesung/planungWarnung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { countFaellige } from '../abloesung/einstufung';
@@ -321,6 +323,27 @@ export default function AbloesungPage() {
         : !personalFrei
           ? MODUL_PERSONAL_GESPERRT
           : undefined;
+  // Vollzug laut Schichtplan (LLH-1555): die Vorlage rechnet der Server; sie nennt Personen und
+  // wird ein Besatzungswechsel, braucht also beide Freigaben. Ohne sie oder bei einem Fehler bleibt
+  // der Dialog, wie er ist.
+  const planSchicht =
+    vollzugSchicht != null &&
+    folgtPlan(vollzugSchicht) &&
+    freigabenQuery.data != null &&
+    besatzungGesperrt == null
+      ? vollzugSchicht
+      : null;
+  const planVorlageQuery = useQuery({
+    queryKey: einsatzKeys.abloesungPlanVorlage(einsatzId, planSchicht?.id ?? 0),
+    queryFn: () => ladePlanVorlage(einsatzId, planSchicht?.id ?? 0),
+    enabled: planSchicht != null,
+    // Je Öffnen frisch: eine Vorlage aus dem Cache kennt eine Personenänderung im selben Block
+    // nicht. Geschlossen hat der Schlüssel keinen Beobachter mehr und fällt sofort heraus.
+    gcTime: 0,
+  });
+  const planVorlage =
+    planSchicht == null || planVorlageQuery.isError ? undefined : (planVorlageQuery.data ?? null);
+  const planVorlageLaedt = planSchicht != null && planVorlageQuery.isFetching;
   // Die Felder des Besatzungswechsels, wie Vollzug und Planung sie brauchen (LLH-1319): Personen
   // `null`, solange das Personal lädt, Ziele `undefined`, solange die Einheiten fehlen. Auch ein
   // Fehler bleibt `undefined`: die Ziele eines geplanten Wechsels sind dann unbekannt, nicht leer.
@@ -1120,6 +1143,8 @@ export default function AbloesungPage() {
           {...besatzungProps(vollzugSchicht)}
           raeume={verbleibRaeume(brFrei ? brQuery.data : undefined)}
           raumGesperrt={raumGesperrt}
+          planVorlage={planVorlage}
+          planVorlageLaedt={planVorlageLaedt}
           laeuft={vollzugMut.isPending}
           fehler={vollzugMut.error}
           onErfassen={(body) => vollzugMut.mutateAsync({ abloesungId: vollzugSchicht.id, body })}

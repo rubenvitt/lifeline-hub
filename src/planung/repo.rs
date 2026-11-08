@@ -797,7 +797,7 @@ async fn loeschen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppErro
         .bind(id)
         .execute(&mut *conn)
         .await?;
-    // Die Demo-Markierung zeigt ohne FK auf die Planung (0212, 0293).
+    // Die Demo-Markierung zeigt ohne FK auf die Planung (0212, 0295).
     sqlx::query("DELETE FROM demo_herkunft WHERE tabelle = 'planung' AND datensatz_id = ?")
         .bind(id)
         .execute(&mut *conn)
