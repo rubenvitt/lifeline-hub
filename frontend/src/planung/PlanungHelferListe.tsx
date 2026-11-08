@@ -261,6 +261,7 @@ export default function PlanungHelferListe({ planung }: { planung: Planung }) {
         dataSource={planung.helfer}
         columns={spalten}
         gedaechtnis={gedaechtnis}
+        spaltenSchalter={{ bezeichnung: 'Helfer' }}
         mehrzahl="Helfern"
         suche={{ platzhalter: 'Name, Organisation oder Qualifikation' }}
         locale={{ emptyText: 'Noch keine Helfer' }}

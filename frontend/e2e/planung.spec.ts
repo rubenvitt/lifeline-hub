@@ -86,7 +86,11 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await page.getByRole('button', { name: 'Schichten erzeugen' }).click();
   const erzeugen = page.getByRole('dialog', { name: 'Schichten erzeugen' });
   await erzeugen.getByRole('combobox', { name: 'Posten' }).click();
-  await page.getByRole('option', { name: 'RTW 1' }).click();
+  // Die sichtbare Zeile, nicht das versteckte Vorleser-Element mit `role="option"`.
+  await page
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
+    .filter({ hasText: 'RTW 1' })
+    .click();
   await expect(erzeugen.getByPlaceholder('4 h (Vorgabe)')).toBeVisible();
   await erzeugen.getByPlaceholder('Beginn').fill(`${tag} 08:00`);
   await erzeugen.getByPlaceholder('Ende').fill(`${tag} 16:00`);

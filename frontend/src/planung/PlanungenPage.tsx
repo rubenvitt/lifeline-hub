@@ -140,6 +140,7 @@ export default function PlanungenPage() {
           dataSource={query.data ?? []}
           columns={spalten}
           gedaechtnis={gedaechtnis}
+          spaltenSchalter={{ bezeichnung: 'Planungen' }}
           mehrzahl="Planungen"
           suche={{ platzhalter: 'Bezeichnung, Ort oder Zeitraum' }}
           locale={{ emptyText: 'Noch keine Planungen' }}

@@ -182,6 +182,7 @@ export default function PlanungPostenListe({ planung }: { planung: Planung }) {
         dataSource={posten}
         columns={spalten}
         gedaechtnis={gedaechtnis}
+        spaltenSchalter={{ bezeichnung: 'Posten' }}
         mehrzahl="Posten"
         locale={{ emptyText: 'Noch keine Posten' }}
       />

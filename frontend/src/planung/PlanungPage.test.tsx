@@ -15,7 +15,9 @@ import PlanungPage from './PlanungPage';
 
 /** Planungsseite der Vorplanung (LLH-1586, Spec `vorplanung`). */
 
-const posten = (p: Partial<PlanungPosten> & { id: number; bezeichnung: string }): PlanungPosten => ({
+const posten = (
+  p: Partial<PlanungPosten> & { id: number; bezeichnung: string },
+): PlanungPosten => ({
   art: 'einheit',
   sortier: p.id * 10,
   nicht_verfuegbar: false,
@@ -118,7 +120,9 @@ describe('PlanungPage (LLH-1586)', () => {
     server.use(
       http.patch('/api/planungen/5', async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json(planung({ kopf: { ...planung().kopf, version: 4, ort: 'Rathaus' } }));
+        return HttpResponse.json(
+          planung({ kopf: { ...planung().kopf, version: 4, ort: 'Rathaus' } }),
+        );
       }),
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Planung bearbeiten' }));
@@ -127,7 +131,9 @@ describe('PlanungPage (LLH-1586)', () => {
     await userEvent.type(ort, 'Rathaus');
     await userEvent.type(screen.getByLabelText('Höchstens im Dienst'), '10 h');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(body).toEqual({ version: 3, ort: 'Rathaus', max_dienst_minuten: 600 }));
+    await waitFor(() =>
+      expect(body).toEqual({ version: 3, ort: 'Rathaus', max_dienst_minuten: 600 }),
+    );
     expect(await screen.findByText('Rathaus')).toBeInTheDocument();
   });
 

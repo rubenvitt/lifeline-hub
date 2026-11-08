@@ -85,8 +85,10 @@ export default function SchichtplanListe({
                 paddingInline: token.paddingXS,
                 margin: 0,
                 marginBottom: 2,
-                border: `1px solid ${ton.kante}`,
-                borderLeftWidth: 3,
+                // Ohne Kurzform: `border` neben `borderLeftWidth` warnt React beim Wechsel der Farbe.
+                borderStyle: 'solid',
+                borderColor: ton.kante,
+                borderWidth: '1px 1px 1px 3px',
                 background: ton.grund,
                 color: ton.text,
                 textAlign: 'left',

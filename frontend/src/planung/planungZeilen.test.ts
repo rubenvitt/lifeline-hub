@@ -17,7 +17,9 @@ import {
   zeileVon,
 } from './planungZeilen';
 
-const posten = (p: Partial<PlanungPosten> & { id: number; bezeichnung: string }): PlanungPosten => ({
+const posten = (
+  p: Partial<PlanungPosten> & { id: number; bezeichnung: string },
+): PlanungPosten => ({
   art: 'einheit',
   sortier: p.id * 10,
   nicht_verfuegbar: false,
@@ -51,7 +53,10 @@ describe('planungZeilen (LLH-1586)', () => {
       ['Fußtrupp', OHNE_ABSCHNITT],
       ['Pause', null],
     ]);
-    expect(zeilen.at(-1)).toMatchObject({ schluessel: PAUSE, ueberlappungErlaubt: true });
+    expect(zeilen[zeilen.length - 1]).toMatchObject({
+      schluessel: PAUSE,
+      ueberlappungErlaubt: true,
+    });
   });
 
   it('ohne jeden Abschnitt keine Gruppenköpfe', () => {
@@ -104,9 +109,9 @@ describe('planungZeilen (LLH-1586)', () => {
     });
     // Ohne Postenwechsel fehlt posten_id (es hieße sonst „an die Pause“).
     expect(blockAendernBody({ version: 4, von: 'x' })).toEqual({ version: 4, von: 'x' });
-    expect(
-      erzeugenBody({ posten: { art: 'einheit', einheit_id: 5 }, von: 'a', bis: 'b' }),
-    ).toEqual({ posten_id: 5, von: 'a', bis: 'b' });
+    expect(erzeugenBody({ posten: { art: 'einheit', einheit_id: 5 }, von: 'a', bis: 'b' })).toEqual(
+      { posten_id: 5, von: 'a', bis: 'b' },
+    );
   });
 
   it('Vorgaben je Zeile: Soll und Schichtlänge des Postens', () => {
