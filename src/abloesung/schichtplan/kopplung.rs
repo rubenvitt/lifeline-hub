@@ -24,17 +24,29 @@ use crate::zeit;
 /// ebenso beginnt ein Folgeblock höchstens so viele Minuten nach dem Wechselpunkt.
 pub const WECHSEL_TOLERANZ_MINUTEN: i64 = 15;
 
+/// SQL-Literal der Toleranz für `datetime(…, <toleranz>)`. Die 15 im Text hält
+/// `toleranz_im_sql_wie_die_konstante` gleich [`WECHSEL_TOLERANZ_MINUTEN`]; jede Abfrage mit
+/// der Toleranz nimmt dieses Makro statt eines eigenen Literals.
+macro_rules! toleranz_sql {
+    () => {
+        "'+15 minutes'"
+    };
+}
+pub(crate) use toleranz_sql;
+
 /// SQL-Fragment: der Folgeblock einer Schicht mit dem Alias `a`, wie [`plan_faelligkeit`] ihn
 /// wählt (Beginn binnen der Toleranz ab der Fälligkeit, der früheste). `uhs_id IS NULL` lässt
-/// `idx_planschicht_posten` bis `von` greifen. Die 15 im Text hält
-/// `toleranz_im_sql_wie_die_konstante` gleich [`WECHSEL_TOLERANZ_MINUTEN`].
+/// `idx_planschicht_posten` bis `von` greifen.
 macro_rules! folgeblock_sql {
     () => {
-        "(SELECT f.id FROM einsatz_planschicht f \
-          WHERE f.einsatz_id = a.einsatz_id AND f.posten_art = 'einheit' \
-            AND f.einheit_id = a.einheit_id AND f.uhs_id IS NULL \
-            AND f.von >= a.faellig_at AND f.von <= datetime(a.faellig_at, '+15 minutes') \
-          ORDER BY f.von, f.id LIMIT 1)"
+        concat!(
+            "(SELECT f.id FROM einsatz_planschicht f \
+              WHERE f.einsatz_id = a.einsatz_id AND f.posten_art = 'einheit' \
+                AND f.einheit_id = a.einheit_id AND f.uhs_id IS NULL \
+                AND f.von >= a.faellig_at AND f.von <= datetime(a.faellig_at, ",
+            $crate::abloesung::schichtplan::kopplung::toleranz_sql!(),
+            ") ORDER BY f.von, f.id LIMIT 1)"
+        )
     };
 }
 pub(crate) use folgeblock_sql;
@@ -245,7 +257,11 @@ mod tests {
 
     #[test]
     fn toleranz_im_sql_wie_die_konstante() {
-        assert!(folgeblock_sql!().contains(&format!("'+{WECHSEL_TOLERANZ_MINUTEN} minutes'")));
+        assert_eq!(
+            toleranz_sql!(),
+            format!("'+{WECHSEL_TOLERANZ_MINUTEN} minutes'")
+        );
+        assert!(folgeblock_sql!().contains(toleranz_sql!()));
     }
 
     #[test]

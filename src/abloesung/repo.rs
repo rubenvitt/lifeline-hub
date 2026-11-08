@@ -2356,14 +2356,15 @@ pub async fn plan_vorlage(
         /// Sie kann nicht kommen (außer Dienst, entlassene Ad-hoc-Kraft).
         gesperrt: bool,
     }
-    let kommen: Vec<Kommt> = sqlx::query_as(
+    let kommen: Vec<Kommt> = sqlx::query_as(concat!(
         "WITH folge AS ( \
            SELECT e.value AS einheit_id, \
                   (SELECT f.id FROM einsatz_planschicht f \
                    WHERE f.einsatz_id = ?1 AND f.posten_art = 'einheit' \
                      AND f.einheit_id = e.value AND f.uhs_id IS NULL \
-                     AND f.von >= ?3 AND f.von <= datetime(?3, '+15 minutes') \
-                   ORDER BY f.von, f.id LIMIT 1) AS block_id \
+                     AND f.von >= ?3 AND f.von <= datetime(?3, ",
+        crate::abloesung::schichtplan::kopplung::toleranz_sql!(),
+        ") ORDER BY f.von, f.id LIMIT 1) AS block_id \
            FROM json_each(?2) e) \
          SELECT fo.einheit_id, pp.personal_id, pp.helfer_id, \
                 COALESCE(st.name, ad.snap_name, h.name) AS name, \
@@ -2379,7 +2380,7 @@ pub async fn plan_vorlage(
          LEFT JOIN einsatz_plan_helfer h ON h.id = pp.helfer_id \
          LEFT JOIN einsatz_personal hk ON hk.id = h.einsatz_personal_id AND hk.beendet_at IS NULL \
          ORDER BY CASE WHEN fo.einheit_id = ?4 THEN 0 ELSE 1 END, fo.einheit_id, pp.rowid",
-    )
+    ))
     .bind(einsatz_id)
     .bind(&einheiten_json)
     .bind(&roh.faellig_at)

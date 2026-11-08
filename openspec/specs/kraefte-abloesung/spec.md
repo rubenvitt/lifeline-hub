@@ -1137,13 +1137,14 @@ Vollzugszeitpunkt, Rhythmus und Einsatzstelle der abgelösten Schicht, eigene Fr
 Besatzung MUST die Personalzuordnung der Einheit und jeder Untereinheit sein, die die Schicht erbt
 (Knoten-Vererbung, dieselbe Menge wie der Fan-out der ganzen Einheit); jede ihrer Personen MUST
 ihre Einheit, ein Fahrzeug dieser Einheiten und deren Führung verlassen. Die neue Besatzung
-(Pflicht, höchstens `BESATZUNG_MAX = 50` Personen des Einsatzes) MUST der Einheit zugeordnet
+(Pflicht außer aus dem Plan, höchstens `BESATZUNG_MAX = 50` Personen des Einsatzes) MUST der Einheit zugeordnet
 werden, sofern der Vollzug sie nicht verteilt (Requirement „Besatzungswechsel verteilen“). Die Schicht MUST beide Besatzungen nennen (`besatzung`, Rolle `alt`/`neu`, Tabelle
 `einsatz_abloesung_besatzung`), und ein ETB-Eintrag MUST Einheit, alte und neue Besatzung nennen.
 Abgelehnt werden MUST, ohne etwas zu ändern: eine unbekannte oder fremde Person (404), eine
 entlassene oder stornierte (409), eine aus der alten Besatzung oder die Führung einer anderen
-Einheit (422), ablösende Einheiten oder „Abschnitt übergeben“ beim Besatzungswechsel (422). Leere
-oder zu lange Liste und eine unbekannte Art MUST 400 sein. Der Besatzungswechsel MUST die Freigabe
+Einheit (422), ablösende Einheiten oder „Abschnitt übergeben“ beim Besatzungswechsel (422). Eine leere
+Liste außer aus dem Plan (Requirement „Vollzug aus dem Plan“), eine zu lange Liste und eine
+unbekannte Art MUST 400 sein. Der Besatzungswechsel MUST die Freigabe
 des Moduls Einheiten verlangen (403 ohne). Grenzwerte und Ruhezeiten je Person rechnet er nicht
 (LFH-860).
 
@@ -1164,7 +1165,7 @@ mit Übernahme oder mit Bleibenden und dem Folgeblock (Requirement „Vollzug au
 - **THEN** antwortet das System mit 422, und die Schicht bleibt laufend
 
 #### Scenario: Ohne neue Besatzung
-- **WHEN** ein Besatzungswechsel ohne `besatzung_ids` abgeschickt wird
+- **WHEN** ein Besatzungswechsel ohne `besatzung_ids`, ohne Übernahme und ohne Folgeblock abgeschickt wird
 - **THEN** antwortet das System mit 400
 
 #### Scenario: Einer von zweien wechselt
