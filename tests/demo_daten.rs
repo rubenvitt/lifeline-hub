@@ -522,9 +522,15 @@ async fn status_vorher_nachher_und_409_paare() {
     );
     assert_eq!(importiert["bericht"]["vorgang"], "importiert");
     let je_art = importiert["bericht"]["je_art"].as_array().unwrap();
-    assert_eq!(je_art.len(), 5, "{importiert}");
+    assert_eq!(je_art.len(), 6, "{importiert}");
     for zeile in je_art {
-        assert!(zeile["angelegt"].as_i64().unwrap() > 0, "{zeile}");
+        // Eine Planung bringt nur die Lage „Stadtfest“ mit.
+        let erwartet_leer = zeile["art"] == "planung";
+        assert_eq!(
+            zeile["angelegt"].as_i64().unwrap() == 0,
+            erwartet_leer,
+            "{zeile}"
+        );
     }
 
     // Zweiter Import: 409, und der Stand bleibt.
@@ -543,7 +549,12 @@ async fn status_vorher_nachher_und_409_paare() {
     );
     assert_eq!(entfernt["bericht"]["vorgang"], "entfernt");
     for zeile in entfernt["bericht"]["je_art"].as_array().unwrap() {
-        assert!(zeile["entfernt"].as_i64().unwrap() > 0, "{zeile}");
+        let erwartet_leer = zeile["art"] == "planung";
+        assert_eq!(
+            zeile["entfernt"].as_i64().unwrap() == 0,
+            erwartet_leer,
+            "{zeile}"
+        );
         assert_eq!(zeile["behalten"], 0, "{zeile}");
     }
     assert!(!einsatz_existiert(&pool, e).await);
@@ -1328,6 +1339,9 @@ async fn import_entfernen_stellt_den_stand_wieder_her() {
     let (status, importiert) = demo(&app, &admin, "POST", "/api/demo-daten/starkregen").await;
     assert_eq!(status, StatusCode::CREATED, "{importiert}");
     for zeile in importiert["bericht"]["je_art"].as_array().unwrap() {
+        if zeile["art"] == "planung" {
+            continue; // Die Lage „Starkregen“ plant nichts vor.
+        }
         assert_eq!(
             zeile["mitbenutzt"], 1,
             "je Art genau die eine freie Zeile: {zeile}"

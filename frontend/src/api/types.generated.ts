@@ -1919,7 +1919,7 @@ export interface components {
          * @description Stammdatenart im Bericht. Wire == `as_str()`.
          * @enum {string}
          */
-        DemoStammdatenArt: "fahrzeug" | "personal" | "material" | "einheit_vorlage" | "schichtmodell";
+        DemoStammdatenArt: "fahrzeug" | "personal" | "material" | "einheit_vorlage" | "schichtmodell" | "planung";
         /**
          * @description Vorgang, den ein Bericht beschreibt. Wire == `as_str()`.
          * @enum {string}
@@ -5391,7 +5391,7 @@ export interface components {
          *     `ORG_STREAM_EVENTS` (`api/queryKeys.ts`) auf die globalen Query-Keys ab.
          * @enum {string}
          */
-        OrgLiveEvent: "einsatzliste" | "stammdaten" | "org_benachrichtigung";
+        OrgLiveEvent: "einsatzliste" | "stammdaten" | "org_benachrichtigung" | "planung";
         /** @description Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`. */
         OrgLogoAnzeige: {
             geaendert_at: string;
@@ -5950,6 +5950,50 @@ export interface components {
              */
             personal_id: number;
         };
+        /** @description Die ganze Planung mit Befunden und Kennzahlen. */
+        PlanungAnzeige: {
+            /** @description Nach Posten (Reihenfolge, Pause zuletzt) und Beginn. */
+            bloecke: components["schemas"]["PlanungBlockAnzeige"][];
+            helfer: components["schemas"]["PlanHelferAnzeige"][];
+            kennzahlen: components["schemas"]["PlanungKennzahlen"];
+            kopf: components["schemas"]["PlanungKopf"];
+            /** @description Nach `sortier`. */
+            posten: components["schemas"]["PlanungPostenAnzeige"][];
+        };
+        /** @description Ein Block der Planung, in der Form von `PlanBlockAnzeige` des Einsatzes. */
+        PlanungBlockAnzeige: {
+            /** @description Befunde des Blocks selbst (`quali`, `verfuegbar` des Postens). */
+            befunde: components["schemas"]["PlanBefund"][];
+            bis: string;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            /** @description Geforderte Qualifikationen, die die eingeteilten Personen nicht decken. */
+            offene_anforderungen: components["schemas"]["OffeneAnforderung"][];
+            /**
+             * Format: int64
+             * @description Plätze, die nach dem Soll noch frei sind.
+             */
+            offene_plaetze: number;
+            /** @description Stamm-Personal und Helfer; `im_einsatz` ist hier immer `false`. */
+            personen: components["schemas"]["PlanPersonAnzeige"][];
+            /** Format: int64 */
+            personen_anzahl: number;
+            /**
+             * Format: int64
+             * @description Der Posten; `null` = die Zeile „Pause“.
+             */
+            posten_id: number | null;
+            quali_soll?: components["schemas"]["QualiSollEintrag"][] | null;
+            /** Format: int64 */
+            soll_anzahl?: number | null;
+            /**
+             * Format: int64
+             * @description CAS-Zähler: PATCH und DELETE senden ihn mit (409 bei einem anderen Stand).
+             */
+            version: number;
+            von: string;
+        };
         /**
          * @description Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab
          *     LLH-1309: `einsatz_abloesung.planung_entfallen_grund`, CHECK in Migration 0259).
@@ -5957,6 +6001,102 @@ export interface components {
          * @enum {string}
          */
         PlanungEntfallenGrund: "aufloesung" | "entlassung";
+        /**
+         * @description Soll, Ist, Offen und Konflikte einer Planung (design.md D7), gerechnet aus denselben Befunden
+         *     wie die Planung selbst.
+         */
+        PlanungKennzahlen: {
+            /**
+             * Format: int64
+             * @description Eingeteilte Personen in diesen Blöcken, je Block höchstens bis zum Soll.
+             */
+            ist: number;
+            /**
+             * Format: int64
+             * @description Befunde an Personen in Blöcken und an Blöcken.
+             */
+            konflikte: number;
+            /**
+             * Format: int64
+             * @description Summe der offenen Plätze.
+             */
+            offen: number;
+            /**
+             * Format: int64
+             * @description Summe des Solls aller Blöcke an Posten (ohne Pause).
+             */
+            soll: number;
+        };
+        /** @description Kopf einer Planung. */
+        PlanungKopf: {
+            angelegt_at: string;
+            bezeichnung: string;
+            bis: string;
+            einsatzart: components["schemas"]["Einsatzart"];
+            grenzwerte: components["schemas"]["SchichtplanGrenzwerte"];
+            /** Format: int64 */
+            id: number;
+            /** @description Wann der Aufbewahrungslauf die Planung löscht ([`AUFBEWAHRUNG_TAGE`] nach `bis`). */
+            loeschung_at: string;
+            ort?: string | null;
+            /** Format: double */
+            ort_lat?: number | null;
+            /** Format: double */
+            ort_lon?: number | null;
+            /**
+             * Format: int64
+             * @description CAS-Zähler des Kopfs: PATCH sendet ihn mit (409 bei einem anderen Stand).
+             */
+            version: number;
+            von: string;
+        };
+        /** @description Eine Zeile der Liste der Planungen. */
+        PlanungListeneintrag: {
+            bezeichnung: string;
+            bis: string;
+            /** Format: int64 */
+            bloecke_anzahl: number;
+            einsatzart: components["schemas"]["Einsatzart"];
+            /** Format: int64 */
+            id: number;
+            kennzahlen?: components["schemas"]["PlanungKennzahlen"] | null;
+            loeschung_at: string;
+            ort?: string | null;
+            /** Format: int64 */
+            posten_anzahl: number;
+            von: string;
+        };
+        /** @description Ein Posten der Planung. */
+        PlanungPostenAnzeige: {
+            abschnitt?: string | null;
+            art: components["schemas"]["PlanungPostenArt"];
+            bezeichnung: string;
+            /** Format: int64 */
+            einheit_vorlage_id?: number | null;
+            /** @description Name der Einheitenvorlage. */
+            einheit_vorlage_name?: string | null;
+            /** @description Funkrufname des Stamm-Fahrzeugs. */
+            fahrzeug_funkrufname?: string | null;
+            /** Format: int64 */
+            fahrzeug_id?: number | null;
+            /** Format: int64 */
+            id: number;
+            /** @description Stamm-Fahrzeug außer Dienst oder Einheitenvorlage gelöscht. */
+            nicht_verfuegbar: boolean;
+            quali_soll?: components["schemas"]["QualiSollEintrag"][] | null;
+            /** Format: int64 */
+            schichtlaenge_minuten?: number | null;
+            /** Format: int64 */
+            soll_anzahl?: number | null;
+            /** Format: int64 */
+            sortier: number;
+            uhs_typ?: components["schemas"]["UhsTyp"] | null;
+        };
+        /**
+         * @description Art eines Postens der Planung (`planung_posten.art`). Wire == `as_str()`.
+         * @enum {string}
+         */
+        PlanungPostenArt: "einheit" | "uhs";
         /** @description Serialisierbare Platz-Anzeige (1:1 zur Tabelle). */
         PlatzAnzeige: {
             bezeichnung: string;

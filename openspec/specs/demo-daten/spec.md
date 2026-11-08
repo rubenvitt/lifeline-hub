@@ -446,7 +446,9 @@ Abschnitte Bühne, Eingang und Festmeile, zwei Streifen, eine UHS mit Plätzen i
 KTW und 20 Kontakte über den Abend. Jeder Kontakt MUST einen Anlass aus dem festen Katalog und
 eine versorgende Einheit tragen; mindestens ein Kontakt MUST mit einem Transport durch ein
 fremdes Rettungsmittel samt Einsatznummer der Leitstelle enden. Die Lage MUST weder eine
-Einheiten-Vorlage noch ein Schichtmodell anlegen und beim Import keinen Alarm auslösen.
+Einheiten-Vorlage noch ein Schichtmodell anlegen und beim Import keinen Alarm auslösen. Dazu
+SHALL sie die Demo-Planung „Stadtfest Musterstadt“ anlegen (Spec `vorplanung`, „Demo-Planung der
+Lage Stadtfest“); der Bericht MUST sie in einer eigenen Zeile „Planungen“ zählen.
 
 #### Scenario: Transport über die Leitstelle
 - **WHEN** der Admin die Lage „Stadtfest“ importiert

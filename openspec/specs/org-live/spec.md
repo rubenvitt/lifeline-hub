@@ -136,6 +136,17 @@ neu abrufen.
 - **WHEN** ein Entwickler einen globalen Query-Key ergänzt, ohne ihn einem Org-Ereignis oder der nicht-live-Liste zuzuordnen
 - **THEN** schlägt ein Test fehl
 
+### Requirement: Ereignis für die Planungen
+Das System SHALL ein SSE-Ereignis mit dem Wire-Namen `planung` und der Nutzlast `{"id": …}`
+verteilen, sobald eine Planung der Organisation angelegt, geändert, gelöscht oder von der
+Löschfrist entfernt wird (Spec `vorplanung`). Es MUST nur Benutzer derselben Organisation
+erreichen, die planen dürfen. Das Frontend SHALL daraufhin die Planungen und den Stand der
+Demo-Daten neu abrufen.
+
+#### Scenario: Nur die Planer
+- **WHEN** eine Führungskraft eine Planung ändert
+- **THEN** erhält ein Benutzer ohne Org-Rolle derselben Organisation kein Ereignis `planung`
+
 ### Requirement: Bewusst nicht live in der Organisation
 Folgende Änderungen SHALL kein Org-Ereignis auslösen und werden erst beim nächsten Abruf sichtbar:
 der zeitgesteuerte Ablauf der Nachlauffrist oder der Aufbewahrungsfrist, Stab-Besetzungen

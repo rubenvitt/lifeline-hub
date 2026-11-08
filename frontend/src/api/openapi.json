@@ -4687,7 +4687,8 @@
           "personal",
           "material",
           "einheit_vorlage",
-          "schichtmodell"
+          "schichtmodell",
+          "planung"
         ]
       },
       "DemoVorgang": {
@@ -13235,7 +13236,8 @@
         "enum": [
           "einsatzliste",
           "stammdaten",
-          "org_benachrichtigung"
+          "org_benachrichtigung",
+          "planung"
         ]
       },
       "OrgLogoAnzeige": {
@@ -14746,12 +14748,410 @@
           }
         }
       },
+      "PlanungAnzeige": {
+        "type": "object",
+        "description": "Die ganze Planung mit Befunden und Kennzahlen.",
+        "required": [
+          "kopf",
+          "posten",
+          "bloecke",
+          "helfer",
+          "kennzahlen"
+        ],
+        "properties": {
+          "bloecke": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanungBlockAnzeige"
+            },
+            "description": "Nach Posten (Reihenfolge, Pause zuletzt) und Beginn."
+          },
+          "helfer": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanHelferAnzeige"
+            }
+          },
+          "kennzahlen": {
+            "$ref": "#/components/schemas/PlanungKennzahlen"
+          },
+          "kopf": {
+            "$ref": "#/components/schemas/PlanungKopf"
+          },
+          "posten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanungPostenAnzeige"
+            },
+            "description": "Nach `sortier`."
+          }
+        }
+      },
+      "PlanungBlockAnzeige": {
+        "type": "object",
+        "description": "Ein Block der Planung, in der Form von `PlanBlockAnzeige` des Einsatzes.",
+        "required": [
+          "id",
+          "version",
+          "posten_id",
+          "von",
+          "bis",
+          "personen_anzahl",
+          "personen",
+          "offene_plaetze",
+          "offene_anforderungen",
+          "befunde"
+        ],
+        "properties": {
+          "befunde": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanBefund"
+            },
+            "description": "Befunde des Blocks selbst (`quali`, `verfuegbar` des Postens)."
+          },
+          "bis": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "offene_anforderungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OffeneAnforderung"
+            },
+            "description": "Geforderte Qualifikationen, die die eingeteilten Personen nicht decken."
+          },
+          "offene_plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Plätze, die nach dem Soll noch frei sind."
+          },
+          "personen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanPersonAnzeige"
+            },
+            "description": "Stamm-Personal und Helfer; `im_einsatz` ist hier immer `false`."
+          },
+          "personen_anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "posten_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Der Posten; `null` = die Zeile „Pause“."
+          },
+          "quali_soll": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QualiSollEintrag"
+            }
+          },
+          "soll_anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "CAS-Zähler: PATCH und DELETE senden ihn mit (409 bei einem anderen Stand)."
+          },
+          "von": {
+            "type": "string"
+          }
+        }
+      },
       "PlanungEntfallenGrund": {
         "type": "string",
         "description": "Warum die Planung einer ablösenden Einheit entfiel (LLH-1131, Vermerk an der Schicht ab\nLLH-1309: `einsatz_abloesung.planung_entfallen_grund`, CHECK in Migration 0259).\nWire == `as_str()`.",
         "enum": [
           "aufloesung",
           "entlassung"
+        ]
+      },
+      "PlanungKennzahlen": {
+        "type": "object",
+        "description": "Soll, Ist, Offen und Konflikte einer Planung (design.md D7), gerechnet aus denselben Befunden\nwie die Planung selbst.",
+        "required": [
+          "soll",
+          "ist",
+          "offen",
+          "konflikte"
+        ],
+        "properties": {
+          "ist": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Eingeteilte Personen in diesen Blöcken, je Block höchstens bis zum Soll."
+          },
+          "konflikte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Befunde an Personen in Blöcken und an Blöcken."
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Summe der offenen Plätze."
+          },
+          "soll": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Summe des Solls aller Blöcke an Posten (ohne Pause)."
+          }
+        }
+      },
+      "PlanungKopf": {
+        "type": "object",
+        "description": "Kopf einer Planung.",
+        "required": [
+          "id",
+          "version",
+          "bezeichnung",
+          "einsatzart",
+          "von",
+          "bis",
+          "grenzwerte",
+          "loeschung_at",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "bis": {
+            "type": "string"
+          },
+          "einsatzart": {
+            "$ref": "#/components/schemas/Einsatzart"
+          },
+          "grenzwerte": {
+            "$ref": "#/components/schemas/SchichtplanGrenzwerte"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "loeschung_at": {
+            "type": "string",
+            "description": "Wann der Aufbewahrungslauf die Planung löscht ([`AUFBEWAHRUNG_TAGE`] nach `bis`)."
+          },
+          "ort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ort_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "ort_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "CAS-Zähler des Kopfs: PATCH sendet ihn mit (409 bei einem anderen Stand)."
+          },
+          "von": {
+            "type": "string"
+          }
+        }
+      },
+      "PlanungListeneintrag": {
+        "type": "object",
+        "description": "Eine Zeile der Liste der Planungen.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "einsatzart",
+          "von",
+          "bis",
+          "posten_anzahl",
+          "bloecke_anzahl",
+          "loeschung_at"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "bis": {
+            "type": "string"
+          },
+          "bloecke_anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatzart": {
+            "$ref": "#/components/schemas/Einsatzart"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kennzahlen": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PlanungKennzahlen",
+                "description": "Fehlt, wenn das Ende länger als [`KENNZAHLEN_TAGE`] zurückliegt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "loeschung_at": {
+            "type": "string"
+          },
+          "ort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "posten_anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "von": {
+            "type": "string"
+          }
+        }
+      },
+      "PlanungPostenAnzeige": {
+        "type": "object",
+        "description": "Ein Posten der Planung.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "art",
+          "sortier",
+          "nicht_verfuegbar"
+        ],
+        "properties": {
+          "abschnitt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "art": {
+            "$ref": "#/components/schemas/PlanungPostenArt"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einheit_vorlage_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einheit_vorlage_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Einheitenvorlage."
+          },
+          "fahrzeug_funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funkrufname des Stamm-Fahrzeugs."
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nicht_verfuegbar": {
+            "type": "boolean",
+            "description": "Stamm-Fahrzeug außer Dienst oder Einheitenvorlage gelöscht."
+          },
+          "quali_soll": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QualiSollEintrag"
+            }
+          },
+          "schichtlaenge_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "soll_anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uhs_typ": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UhsTyp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PlanungPostenArt": {
+        "type": "string",
+        "description": "Art eines Postens der Planung (`planung_posten.art`). Wire == `as_str()`.",
+        "enum": [
+          "einheit",
+          "uhs"
         ]
       },
       "PlatzAnzeige": {
