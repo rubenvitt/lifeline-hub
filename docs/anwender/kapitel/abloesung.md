@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx]
 ---
 
 ## Überblick
@@ -224,6 +224,25 @@ Auf dem Handy steht statt des Rasters je Posten, was „jetzt“ läuft und was 
 Ein Eintrag öffnet den Dialog des Blocks; angelegt wird über „Block anlegen“ und „Schichten
 erzeugen“.
 
+### Den Wechsel laut Plan vollziehen
+
+Hat die Einheit Blöcke im Schichtplan, steht auf ihrer Karte statt des Rhythmus „Laut Plan · danach
+1600–1800 · 3 Personen“: der nächste Block und wie viele darin eingeteilt sind. Ohne nächsten Block
+steht dort „Laut Plan · Posten endet“.
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Auf der Karte „Ablösung vollziehen“ wählen. Unter „Art“ steht „Laut Plan“; darunter, wann der
+   Plan wechselt und wer „Kommt“, „Bleibt“ und „Geht“. „Fehlt“ nennt Eingeteilte, die nicht kommen
+   können, etwa außer Dienst.
+2. „Zeitpunkt“ leer lassen für jetzt oder den Zeitpunkt der Übergabe wählen. Ein früherer Wechsel
+   gehört schon zum nächsten Block.
+3. „Vollziehen“ wählen. Wer kommt, gehört danach zur Einheit; wer nur im Plan stand (Stamm oder
+   Helfer), ist damit im Einsatz. Wer bleibt, behält Einheit und Fahrzeug.
+
+Soll es anders laufen, unter „Art“ „Besatzungswechsel“ oder „Ganze Einheit“ wählen. Endet der
+Posten, steht „Ganze Einheit“ ohne ablösende Einheit bereit, und der Knopf heißt „Abziehen“.
+
 ## Hintergrund
 
 ### Fälligkeit und Hinweise
@@ -239,8 +258,9 @@ Marken.
 Ist zwei Stunden vor der Fälligkeit noch keine ablösende Einheit geplant, kommt der Hinweis
 „Keine ablösende Einheit geplant“, ebenfalls mit Einheit und Uhrzeit der Fälligkeit. Wie lange
 vorher, legt der Planungsvorlauf des Schichtmodells fest. Er kommt einmal; ändert sich die
-Fälligkeit, kommt er zur neuen Zeit. Ist eine Einheit oder ein Besatzungswechsel geplant, kommt
-er nicht; wird die Planung
+Fälligkeit, kommt er zur neuen Zeit. Ist eine Einheit oder ein Besatzungswechsel geplant oder
+steht im nächsten Block laut Plan jemand, kommt er nicht; endet der Posten laut Plan, auch nicht.
+Wird die Planung
 aufgehoben oder entfällt sie, steht er wieder an, solange seine Zeit noch nicht vorbei ist. Er
 ändert die Einstufung der Karte nicht.
 
@@ -248,6 +268,18 @@ Alle drei bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal. D
 jede Person unter „Benachrichtigungen“ abschalten, den Alarm „Ablösung fällig“ nicht (Kapitel
 [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). In den Erinnerungen steht die
 Ablösung zwar, meldet sich aber nicht noch einmal als „Erinnerung fällig“.
+
+### Fälligkeit laut Plan
+
+Hat die Einheit einer Schicht Blöcke im Schichtplan, ist sie fällig, wenn ihr Block endet oder der
+nächste beginnt, sobald die Schicht in einem Block läuft oder der Plan früher wechselt als der
+Rhythmus. Später als der Rhythmus schiebt der Plan eine Schicht nie. Wer einen Block verschiebt,
+verlängert oder löscht, verschiebt damit Fälligkeit, Vorwarnung und Planungshinweis; den Rhythmus
+einer solchen Schicht ändert nur der Block. Fällt der letzte Block weg, gilt wieder der Rhythmus.
+
+Wer laut Plan wechselt, gehört bis zu 15 Minuten vor dem nächsten Block schon zu ihm: Die
+Folgeschicht ist dann zum Ende dieses Blocks fällig. Die Rücknahme legt die Besatzung zurück; wer
+erst mit dem Wechsel in den Einsatz kam, bleibt im Einsatz, ohne Einheit.
 
 ### Hinweise zur ablösenden Einheit
 

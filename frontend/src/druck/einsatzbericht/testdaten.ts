@@ -4,6 +4,7 @@ import type {
   Einheit,
   EinheitPerioden,
   EinsatzFahrzeug,
+  EinsatzMaterial,
   EinsatzPersonal,
   Einsatzperiode,
   EtbEintragAnzeige,
@@ -15,6 +16,7 @@ import type {
   PersonPerioden,
   Schaden,
   Stab,
+  VerbleibAngaben,
   Verpflegung,
 } from '../../api/types';
 import { einsatzFixture } from '../../test/fixtures';
@@ -62,6 +64,26 @@ export function person(teil: Partial<Person> = {}): Person {
     erfasst_at: '2026-03-29T00:40:00',
     ...teil,
   } as Person;
+}
+
+/** Ein Materialposten (LLH-1575, Anlage Materialverbrauch). */
+export function material(teil: Partial<EinsatzMaterial> = {}): EinsatzMaterial {
+  return {
+    id: 1,
+    einsatz_id: 5,
+    material_id: 31,
+    bezeichnung: 'Rettungsdecke',
+    kategorie: 'Sanitätsmaterial',
+    art: 'verbrauchsgut',
+    menge: 10,
+    ausgegeben: 0,
+    status: 'im_einsatz',
+    ist_adhoc: false,
+    ist_demo: false,
+    is_bestandsdoppel: false,
+    disponiert_at: '2026-03-29T00:40:00',
+    ...teil,
+  } as EinsatzMaterial;
 }
 
 export function lagebericht(teil: Partial<LageberichtAnzeige> = {}): LageberichtAnzeige {
@@ -185,6 +207,7 @@ export function rohBericht(
     fahrzeuge: daten([{ id: 21 }, { id: 22 }] as EinsatzFahrzeug[]),
     lageberichte: daten(lageberichtQuelle([lagebericht()])),
     personen: daten([person()]),
+    personenVerbleibAngaben: daten([] as VerbleibAngaben[]),
     schaeden: daten([
       {
         id: 1,
@@ -211,6 +234,8 @@ export function rohBericht(
       hoechsteLfdNr: 37,
       geladenAt: geladenAt,
     }),
+    material: daten([material({ ausgegeben: 4 })]),
+    materialEntlassen: daten([] as EinsatzMaterial[]),
   };
   return { quellen: { ...basis, ...quellen }, geladenAt };
 }
