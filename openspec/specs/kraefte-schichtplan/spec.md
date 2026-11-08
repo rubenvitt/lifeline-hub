@@ -6,9 +6,7 @@ eingeteilten Personen. Der Plan ist Soll und ändert kein Ist. Prüfbefunde zeig
 blockieren nie (LLH-1552, Konzept LLH-1523). Er gibt einer laufenden Schicht die Fälligkeit und
 belegt den Wechsel vor (`kraefte-abloesung`, „Fälligkeit laut Plan“ und „Vollzug aus dem Plan“,
 LLH-1555); der Wechsel selbst ist ein Griff, kein Automatismus. Das Raster regelt LLH-1554, das Einlesen aus einer Datei LLH-1556.
-
 ## Requirements
-
 ### Requirement: Planschicht
 Ein Einsatz SHALL Planschichten an einer Einheit, einer UHS oder der Pause führen können, mit
 Beginn, Ende, Soll-Anzahl, Qualifikationssoll, Personen und Notiz. Beginn und Ende MUST auf vollen
@@ -71,8 +69,9 @@ Das Lesen des Plans MUST je Block und Person Befunde liefern, ohne Schreiben zu 
 - `abweichung`: ab Blockbeginn plus 10 Minuten bis Blockende ist eine eingeteilte Person nicht am
   Posten.
 
-Die Kräfte-Zeitachse MUST weiterhin nicht gegen Grenzwerte einstufen; der Dienst-Befund liest
-nur Planblöcke.
+Der Dienst-Befund liest nur Planblöcke. Das Ist der Kräfte-Zeitachse stuft dieselbe Regel gegen
+dieselben Grenzwerte ein (Capability `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des
+Einsatzes“); ein Befund des Plans entsteht daraus nicht.
 
 #### Scenario: Doppelt
 - **WHEN** Anna in Streife 2 14:00–16:00 und an der UHS 15:00–19:00 steht
@@ -101,7 +100,16 @@ nur Planblöcke.
 ### Requirement: Grenzwerte des Einsatzes
 Ein Einsatz SHALL einen Höchstwert für den Dienst (60 bis 1440 Minuten) und eine Mindestruhe (0
 bis 1440 Minuten) tragen. Ohne eigenen Wert MUST 12 Stunden bzw. 8 Stunden gelten. Eine Änderung
-MUST einen ETB-Systemsatz schreiben.
+MUST einen ETB-Systemsatz schreiben. Dieselben wirksamen Werte MUST auch die Einstufung der
+Kräfte-Zeitachse lesen; es gibt keine zweite Einstellung.
+
+#### Scenario: Vorgabe ohne eigenen Wert
+- **WHEN** ein Einsatz keinen eigenen Höchstwert und keine eigene Mindestruhe setzt
+- **THEN** gelten 12 h und 8 h im Plan und in der Einstufung der Kräfte-Zeitachse
+
+#### Scenario: Eigener Wert gilt für Plan und Ist
+- **WHEN** jemand den Höchstwert des Einsatzes auf 10 h setzt
+- **THEN** entsteht ein ETB-Systemsatz, und Plan-Befund `dienst` und Einstufung der Kräfte-Zeitachse prüfen gegen 10 h
 
 ### Requirement: Schichten erzeugen
 Das System SHALL einen Zeitraum an einem Posten mit Blöcken füllen: mit angegebener Länge oder
@@ -199,3 +207,4 @@ geschnitten werden.
 - **WHEN** ein Posten mehr Schichten hat, als auf eine Seite passen
 - **THEN** läuft die Tabelle auf der nächsten Seite mit wiederholtem Tabellenkopf weiter, und
   keine Zeile ist abgeschnitten
+

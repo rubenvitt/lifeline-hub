@@ -31,6 +31,8 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
+use crate::abloesung::schichtplan::repo as schichtplan_repo;
+use crate::abloesung::schichtplan::SchichtplanGrenzwerte;
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
@@ -452,6 +454,17 @@ pub async fn einheiten_perioden(
     ))
 }
 
+/// GET /api/einsaetze/{id}/einheiten/zeitachse/grenzwerte — wirksame Grenzwerte des
+/// Schichtplans für die Einstufung im Meldebild (LLH-730); ohne das Modul Ablösung.
+pub async fn einheiten_grenzwerte(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Einheiten>,
+) -> Result<Json<SchichtplanGrenzwerte>, AppError> {
+    Ok(Json(
+        schichtplan_repo::grenzwerte(&state.pool, ctx.einsatz.id).await?,
+    ))
+}
+
 /// GET /api/einsaetze/{id}/einheiten/{eid}/zeitachse
 pub async fn einheit_laden(
     State(state): State<AppState>,
@@ -548,6 +561,17 @@ pub async fn personal_perioden(
 ) -> Result<Json<Vec<PersonPerioden>>, AppError> {
     Ok(Json(
         repo::perioden_personal(&state.pool, ctx.einsatz.id).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/personal/zeitachse/grenzwerte — wirksame Grenzwerte des
+/// Schichtplans für die Einstufung auf der Personal-Seite (LLH-730); ohne das Modul Ablösung.
+pub async fn personal_grenzwerte(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personal>,
+) -> Result<Json<SchichtplanGrenzwerte>, AppError> {
+    Ok(Json(
+        schichtplan_repo::grenzwerte(&state.pool, ctx.einsatz.id).await?,
     ))
 }
 

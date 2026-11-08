@@ -840,6 +840,11 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'einheiten'] as const,
   kraefteZeitachsePersonal: (einsatzId: number) =>
     [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'personal'] as const,
+  // Wirksame Grenzwerte des Schichtplans für die Einstufung (LLH-730) — unter dem Unterbereich des
+  // Moduls, damit eine Modulsperre sie mit räumt (`einsatz/gesperrteListen.ts`) und `abloesung`
+  // (Grenzwerte setzen) sie über den Prefix trifft.
+  kraefteZeitachseGrenzwerte: (einsatzId: number, modul: 'einheiten' | 'personal') =>
+    [EINSATZ_KEYS.kraefteZeitachse, einsatzId, modul, 'grenzwerte'] as const,
   kraefteZeitachseEinheit: (einsatzId: number, einheitId: number) =>
     [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'einheit', einheitId] as const,
   kraefteZeitachsePerson: (einsatzId: number, epId: number) =>

@@ -1,7 +1,9 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { formatDauer } from '../abloesung/dauer';
 import type {
   Einsatzperiode,
+  SchichtplanGrenzwerte,
   ZeitachseArt,
   ZeitachseEreignis,
   ZeitachseMarke,
@@ -13,7 +15,8 @@ dayjs.extend(utc);
 /**
  * Kräfte-Zeitachse (LFH-552): Einsatzdauer, Gesamteinsatzzeit und Ruhezeit aus den Perioden,
  * die der Server bildet — gerechnet gegen die Uhr des Clients, damit die Dauer ohne neuen Abruf
- * weiterläuft (design.md D4). Keine Grenzwerte, keine Einstufung: die Zahl steht neutral da.
+ * weiterläuft (design.md D4). Die Zahl steht neutral da; eingestuft wird nur über
+ * {@link stufeEin} gegen die Grenzwerte des Schichtplans (LLH-730).
  *
  * **Keine erfundenen Daten:** ohne Ereignis gibt es keine Dauer (`null`), nie `0`.
  *
@@ -105,6 +108,91 @@ export function dauerText(minuten: number): string {
   const h = Math.floor(minuten / 60);
   const m = String(minuten % 60).padStart(2, '0');
   return `${h} h ${m}`;
+}
+
+/**
+ * Einstufung der laufenden Periode gegen die wirksamen Grenzwerte des Einsatzes (LLH-730, Spec
+ * `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des Einsatzes“). Dieselben Werte und
+ * dieselbe Trennregel wie der Plan-Befund `dienst` (`src/abloesung/schichtplan/pruefung.rs`,
+ * `dienststrecken`): eine Lücke trennt zwei Strecken nur, wenn sie größer als null und mindestens
+ * die Mindestruhe ist. Wer eine Seite ändert, ändert die andere mit.
+ *
+ * - `zu_lang`: die laufende Strecke (vom Beginn ihrer ersten Periode bis jetzt) ist echt länger
+ *   als der Höchstdienst.
+ * - `ruhe_zu_kurz`: die Lücke vor der offenen Periode liegt über null und unter der Mindestruhe;
+ *   nur, wenn nicht schon `zu_lang`.
+ *
+ * Ohne offene Periode, ohne Perioden oder ohne Grenzwerte `null`: keine erfundene Einstufung.
+ */
+export interface Einstufung {
+  wort: 'zu_lang' | 'ruhe_zu_kurz';
+  /** Beginn der laufenden Dienststrecke (Wirestring). */
+  streckeBeginnAt: string;
+  streckeMinuten: number;
+  /** Ruhe vor der offenen Periode; `null`, wenn keine Periode davor liegt. */
+  ruheMinuten: number | null;
+}
+
+export function stufeEin(
+  perioden: readonly Einsatzperiode[] | undefined,
+  grenzwerte: SchichtplanGrenzwerte | undefined,
+  jetztMs: number,
+): Einstufung | null {
+  if (!perioden || perioden.length === 0 || !grenzwerte) return null;
+  const folge = perioden
+    .map((p) => ({ p, von: ms(p.beginn_at), bis: ms(p.ende_at) }))
+    .filter((x): x is { p: Einsatzperiode; von: number; bis: number | null } => x.von != null)
+    .sort((a, b) => a.von - b.von);
+  const offen = folge[folge.length - 1];
+  if (!offen || offen.p.ende_at) return null;
+
+  const ruheMs = grenzwerte.min_ruhe_minuten * 60_000;
+  let beginn = folge[0];
+  let ende = folge[0].bis ?? jetztMs;
+  for (const x of folge.slice(1)) {
+    const luecke = x.von - ende;
+    if (luecke > 0 && luecke >= ruheMs) beginn = x;
+    ende = Math.max(ende, x.bis ?? jetztMs);
+  }
+  const streckeMinuten = minutenZwischen(beginn.von, jetztMs);
+
+  const vorher = folge.length > 1 ? folge[folge.length - 2] : null;
+  const vorherEnde = vorher ? (vorher.bis ?? null) : null;
+  const ruheMinuten = vorherEnde == null ? null : minutenZwischen(vorherEnde, offen.von);
+  const ruheLueckeMs = vorherEnde == null ? null : offen.von - vorherEnde;
+
+  let wort: Einstufung['wort'] | null = null;
+  if (streckeMinuten > grenzwerte.max_dienst_minuten) wort = 'zu_lang';
+  else if (ruheLueckeMs != null && ruheLueckeMs > 0 && ruheLueckeMs < ruheMs) wort = 'ruhe_zu_kurz';
+  if (!wort) return null;
+  return { wort, streckeBeginnAt: beginn.p.beginn_at, streckeMinuten, ruheMinuten };
+}
+
+/** Das Wort der Einstufung, zweiter Kanal neben der Farbe. */
+export const EINSTUFUNG_WORT: Record<Einstufung['wort'], string> = {
+  zu_lang: 'zu lang',
+  ruhe_zu_kurz: 'Ruhe zu kurz',
+};
+
+/**
+ * Beschreibung der Einstufung (Tooltip und Screenreader): Strecke mit Höchstwert, dazu die kurze
+ * Ruhe mit Mindestruhe; die Angabe, die das Wort begründet, steht vorn.
+ */
+export function einstufungText(
+  e: Einstufung,
+  grenzwerte: SchichtplanGrenzwerte,
+  zeit: (utc: string) => string,
+): string {
+  const dienst = `Im Dienst seit ${zeit(e.streckeBeginnAt)}: ${dauerText(e.streckeMinuten)}, Höchstwert ${formatDauer(grenzwerte.max_dienst_minuten)}`;
+  // Eine Lücke von 0 ist durchgehender Dienst, keine Ruhe: dann kein Ruhe-Teil.
+  const kurz =
+    e.ruheMinuten != null &&
+    (e.wort === 'ruhe_zu_kurz' ||
+      (e.ruheMinuten > 0 && e.ruheMinuten < grenzwerte.min_ruhe_minuten))
+      ? `Ruhe davor ${dauerText(e.ruheMinuten)}, Mindestruhe ${formatDauer(grenzwerte.min_ruhe_minuten)}`
+      : null;
+  const teile = e.wort === 'ruhe_zu_kurz' ? [kurz, dienst] : [dienst, kurz];
+  return teile.filter((t): t is string => t != null).join(' · ');
 }
 
 /** Wort je Ereignisart. */

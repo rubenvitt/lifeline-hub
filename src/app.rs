@@ -1095,6 +1095,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::zeitachse::personal_perioden),
         )
         .route(
+            "/api/einsaetze/{id}/personal/zeitachse/grenzwerte",
+            get(routes::zeitachse::personal_grenzwerte),
+        )
+        .route(
             "/api/einsaetze/{id}/personal/{ep_id}/zeitachse",
             get(routes::zeitachse::person_laden).post(routes::zeitachse::person_nachtragen),
         )
@@ -2159,6 +2163,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/zeitachse",
             get(routes::zeitachse::einheiten_perioden),
+        )
+        // Grenzwerte des Schichtplans für die Einstufung (LLH-730).
+        .route(
+            "/api/einsaetze/{id}/einheiten/zeitachse/grenzwerte",
+            get(routes::zeitachse::einheiten_grenzwerte),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/zeitachse",
