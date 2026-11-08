@@ -87,6 +87,8 @@ const ZEILEN_ARTEN_JE: Readonly<Record<ZeilenArt, true>> = {
   material: true,
   // Schicht aus „Schichten erzeugen“ im Schichtplan (LLH-1552).
   planschicht: true,
+  // Zeile einer eingelesenen Schichtplan-Datei, 0 = die ganze Datei (LLH-1556).
+  dateizeile: true,
 };
 const ZEILEN_ARTEN = Object.keys(ZEILEN_ARTEN_JE) as readonly ZeilenArt[];
 

@@ -88,6 +88,11 @@ const AUTH_CODE_BODY_MAX: usize = 4 * 1024;
 /// Darüber lehnt `JsonBody` mit 413 ab, bevor der Handler läuft.
 const JSON_BODY_MAX: usize = 256 * 1024;
 
+/// Schichtplan einlesen (LLH-1556): die Datei bis 2 MiB
+/// (`abloesung::schichtplan::uebernahme::DATEI_MAX_BYTES`) plus Entscheidungen und Rahmen. So
+/// bleibt die Prüfung der Datei (400 mit Meldung) die wirksame Grenze.
+const SCHICHTPLAN_IMPORT_BODY_MAX: usize = 2 * 1024 * 1024 + 512 * 1024;
+
 /// Zone anlegen und Abschnittsfläche setzen (LFH-1074): Geometrie bis 256 KiB
 /// (`lage_zone::pruefe_geometrie_groesse`) plus Rahmen. So bleibt die Geometrieprüfung (400 mit
 /// Feldmeldung) die wirksame Grenze.
@@ -626,6 +631,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/helfer",
             post(routes::abloesung_schichtplan::helfer_anlegen),
+        )
+        // Schichtplan einlesen (LLH-1556): Multipart mit der Datei (höchstens 2 MiB) und den
+        // Entscheidungen; die Datei-Grenze selbst prüft `uebernahme::datei` (400).
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/import/vorschau",
+            post(routes::abloesung_schichtplan::import_vorschau)
+                .layer(DefaultBodyLimit::max(SCHICHTPLAN_IMPORT_BODY_MAX)),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/import",
+            post(routes::abloesung_schichtplan::import_uebernehmen)
+                .layer(DefaultBodyLimit::max(SCHICHTPLAN_IMPORT_BODY_MAX)),
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/helfer/{hid}",

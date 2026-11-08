@@ -1810,6 +1810,7 @@ fn zeilen_art_wire() {
         Fahrzeug => "fahrzeug",
         Material => "material",
         Planschicht => "planschicht",
+        Dateizeile => "dateizeile",
     } in lifeline_hub::error::ZeilenArt::ALLE);
 }
 

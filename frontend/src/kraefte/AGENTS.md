@@ -173,3 +173,10 @@ Soll; sie ändern weder Zuordnung noch Fälligkeit, und wer nur im Plan steht, i
 Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Key
 `schichtplan` unter `abloesungen`, live über `abloesung`. Ohne Freigabe von Personal kommen
 `personen` und `helfer` als `null`.
+
+**Schichtplan einlesen** (LLH-1556, `abloesung/schichtplan/SchichtplanEinlesen.tsx`): Datei und
+Wahl gehen bei Vorschau UND Übernehmen als Multipart an den Server, der jedes Mal neu liest und
+abgleicht; der Client hält keinen Inhalt der Datei und rechnet keinen Abgleich nach. Jede Wahl
+fragt die Vorschau neu ab. Der Plan aus der Antwort des Übernehmens ersetzt den Cache. Der
+gemeinsame Kern mit der Vorplanung (LLH-1561) ist `abloesung::schichtplan::uebernahme`
+(`PlanPaket` → `bestand_tx` → `planen` → `schreiben_tx`).

@@ -25,6 +25,7 @@ use crate::wire_enum::wire_enum;
 
 pub mod pruefung;
 pub mod repo;
+pub mod uebernahme;
 pub mod zerlegung;
 
 /// Personen je Block, gezählt vor dem Entdoppeln (wie `abloesung::BESATZUNG_MAX`). Spiegel:
@@ -354,6 +355,13 @@ pub struct PlanHelferAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub organisation: Option<String>,
     pub qualifikationen: Vec<i64>,
+    /// Kennung aus einer Schichtplan-Datei oder der Vorplanung, etwa die HiOrg-ID (LLH-1556);
+    /// nur lesend.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kennung: Option<String>,
+    /// Herkunft der Kennung, etwa `HiOrg`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub herkunft: Option<String>,
 }
 
 /// Grenzwerte des Dienst-Befunds.

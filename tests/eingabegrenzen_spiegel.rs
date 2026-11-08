@@ -230,6 +230,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("SCHICHTPLAN_PERSONEN_MAX", schichtplan::PLAN_PERSONEN_MAX),
         ("SCHICHTPLAN_ERZEUGEN_MAX", schichtplan::ERZEUGEN_MAX),
         ("SCHICHTPLAN_NOTIZ_MAX", schichtplan::NOTIZ_MAX),
+        (
+            "SCHICHTPLAN_DATEI_MAX_BYTES",
+            schichtplan::uebernahme::DATEI_MAX_BYTES,
+        ),
         ("SCHICHTPLAN_HELFER_TEXT_MAX", schichtplan::HELFER_TEXT_MAX),
         (
             "SCHICHTPLAN_HELFER_TELEFON_MAX",
