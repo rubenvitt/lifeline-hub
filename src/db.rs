@@ -13280,9 +13280,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn migration_0298_plan_wechsel_uhs_pause() {
+    async fn migration_0299_plan_wechsel_uhs_pause() {
         // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-        const VERSION: i64 = 298;
+        const VERSION: i64 = 299;
         let pool = pool_bis(
             SqliteConnectOptions::new().filename(":memory:"),
             VERSION - 1,

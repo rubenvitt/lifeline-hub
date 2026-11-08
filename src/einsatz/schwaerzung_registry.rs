@@ -1449,7 +1449,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("helfer_id", G_FK),
         ],
     },
-    // Vollzogene Wechsel aus dem Schichtplan an einer UHS und in der Pause (LLH-1555, Mig 0298):
+    // Vollzogene Wechsel aus dem Schichtplan an einer UHS und in der Pause (LLH-1555, Mig 0299):
     // Art, Block, Zeit und Verweise, kein Freitext → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_plan_wechsel",
@@ -1470,7 +1470,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("etb_id", G_FK),
         ],
     },
-    // Kräfte eines Wechsels aus dem Plan (LLH-1555, Mig 0298): nur Verweise und Stand davor und
+    // Kräfte eines Wechsels aus dem Plan (LLH-1555, Mig 0299): nur Verweise und Stand davor und
     // danach; der Name steckt in `einsatz_personal` → RETAIN.
     TabellenRegel {
         tabelle: "einsatz_plan_wechsel_person",

@@ -29,7 +29,7 @@
 -- Fremdschlüssel: Einsatz, Wechsel und Kraft CASCADE; Block, UHS, ETB und Ereignis SET NULL,
 -- damit das Löschen eines ganzen Einsatzes in jeder Reihenfolge gelingt; die Status-Verweise
 -- NO ACTION wie `einsatz_personal.status_id` (ein Status wird nur deaktiviert).
--- Abgesichert von db::tests::migration_0298_plan_wechsel_uhs_pause.
+-- Abgesichert von db::tests::migration_0299_plan_wechsel_uhs_pause.
 CREATE TABLE einsatz_plan_wechsel (
     id                  INTEGER PRIMARY KEY,
     einsatz_id          INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,

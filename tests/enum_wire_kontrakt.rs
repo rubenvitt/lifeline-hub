@@ -1155,7 +1155,7 @@ fn schichtplan_wire() {
         Einheit => "einheit",
         Uhs => "uhs",
     } in lifeline_hub::planung::PlanungPostenArt::ALLE);
-    // Wechsel aus dem Plan (LLH-1555, DB-CHECK in `migrations/0298_plan_wechsel_uhs_pause.sql`)
+    // Wechsel aus dem Plan (LLH-1555, DB-CHECK in `migrations/0299_plan_wechsel_uhs_pause.sql`)
     enum_wire!(lifeline_hub::abloesung::schichtplan::vollzug::WechselArt {
         Uhs => "uhs",
         PauseBeginn => "pause_beginn",

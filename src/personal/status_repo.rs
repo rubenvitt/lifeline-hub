@@ -14,7 +14,7 @@ pub struct StatusDaten<'a> {
     /// Bereits gegen [`crate::zeitachse::ZeitachseMarke`] geprüft.
     pub zeitachse_marke: Option<&'a str>,
     /// LLH-1555: der Status „Pause“ des Schichtplans. Setzen nimmt das Kennzeichen jedem anderen
-    /// Status der Organisation (höchstens einer, Teilindex 0298).
+    /// Status der Organisation (höchstens einer, Teilindex 0299).
     pub pause: bool,
 }
 
