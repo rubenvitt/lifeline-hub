@@ -155,11 +155,14 @@ fn verify<C: DeserializeOwned>(
         .ok_or(SignaturError::Form)
 }
 
+/// Rechnet ohne Überlauf: die Zeitstempel kommen signiert, aber von der Gegenstelle.
 fn is_zeit_valid(iat: i64, exp: i64, jetzt: i64) -> bool {
     exp > iat
-        && exp - iat <= LEBENSDAUER_S
-        && iat <= jetzt + UHR_TOLERANZ_S
-        && exp >= jetzt - UHR_TOLERANZ_S
+        && exp
+            .checked_sub(iat)
+            .is_some_and(|dauer| dauer <= LEBENSDAUER_S)
+        && iat <= jetzt.saturating_add(UHR_TOLERANZ_S)
+        && exp >= jetzt.saturating_sub(UHR_TOLERANZ_S)
 }
 
 /// Was eine Anfrage beschreibt, bevor sie signiert wird.
@@ -431,6 +434,20 @@ mod tests {
         };
         let t = sign(&i, TYP_ANFRAGE, &claims);
         assert_eq!(pruefe(&t, b"{}", JETZT), Err(SignaturError::Zeit));
+    }
+
+    #[test]
+    fn extreme_zeitstempel_laufen_nicht_ueber() {
+        // `exp - iat` liefe mit `iat = i64::MIN` über und läge im Release-Build unter der
+        // Lebensdauergrenze, im Debug-Build panikte die Prüfung.
+        assert!(!is_zeit_valid(i64::MIN, JETZT, JETZT));
+        assert!(!is_zeit_valid(i64::MIN, i64::MAX, JETZT));
+        assert!(!is_zeit_valid(JETZT, i64::MAX, i64::MAX));
+        assert!(
+            is_zeit_valid(i64::MIN, i64::MIN + 1, i64::MIN),
+            "am Rand des Wertebereichs rechnet die Toleranz gesättigt statt zu paniken"
+        );
+        assert!(is_zeit_valid(JETZT, JETZT + 60, JETZT));
     }
 
     #[test]

@@ -543,6 +543,9 @@ async fn send_einloesen(
     };
     let a: KoppelnAntwort =
         serde_json::from_slice(&rumpf).map_err(|_| nicht_vertrauenswuerdig("Antwort unlesbar"))?;
+    if a.unterschrift.len() > unterschrift::LIEFERUNGEN_MAX {
+        return Err(nicht_vertrauenswuerdig("zu viele Unterschriftsschlüssel"));
+    }
     let transkript_a = kcode::transkript_aussteller(&transkript_e, &a.kennung, &a.schluessel);
     if !kcode::is_pruefwert_valid(&ableitung.k_aussteller, &transkript_a, &a.pruefwert) {
         return Err(nicht_vertrauenswuerdig("Prüfwert stimmt nicht"));

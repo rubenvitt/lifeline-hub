@@ -274,6 +274,13 @@ Ein adversariales Review vor dem PR fand Lücken; behoben und mit Tests belegt
 - **Extractor:** außer Melden nur bei aktiver Kopplung.
 - **Fehlermeldung beim Einlösen** ohne Netzdetails (sonst ein Port-Scanner für Org-Admins); der
   Grund steht im Log.
+- **Listen von der Gegenstelle** sind begrenzt: höchstens 256 Orgs und 256 Widerrufe je Meldung
+  (sonst 400, gezählt vor dem Entdoppeln) und je Antwort höchstens 256 Orgs. Je Org gehen höchstens
+  256 Unterschriftsschlüssel in eine Lieferung. Grundstock und Nachlieferung liefern nach Stand
+  sortiert, der Rest folgt mit der nächsten Meldung. Eine Antwort mit einer Org doppelt ist
+  ungültig, statt entdoppelt zu werden, damit die Reihenfolge nicht über einen Widerruf entscheidet.
+- **Zeitstempel** werden ohne Überlauf verrechnet (`checked_sub`, gesättigt), denn sie kommen
+  signiert, aber von der Gegenstelle.
 
 Offen als Restrisiko (Entscheidung beim Menschen): **Ein kompromittierter Hub kann eine
 Gegenzeichnung erschleichen.** Der Unterschriftsschlüssel ist an die RP-ID des Hubs gebunden, und

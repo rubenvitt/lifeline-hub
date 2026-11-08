@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
@@ -20,7 +20,13 @@ vi.mock('../api/instanz', () => ({
 }));
 
 import { useAuth } from '../auth/AuthContext';
-import { gegenzeichne, loadInstanzUebersicht, issueKopplungscode } from '../api/instanz';
+import {
+  gegenzeichne,
+  loadInstanzUebersicht,
+  issueKopplungscode,
+  widerrufeKopplung,
+  widerrufeUnterschriftsschluessel,
+} from '../api/instanz';
 import { adminFixture, authWertFixture, benutzerFixture } from '../test/fixtures';
 
 const uebersicht = (teil: Partial<InstanzUebersicht> = {}): InstanzUebersicht => ({
@@ -114,6 +120,40 @@ describe('InstanzkopplungSeite', () => {
     );
     await userEvent.click(await screen.findByText('Gegenzeichnen'));
     await waitFor(() => expect(gegenzeichne).toHaveBeenCalledWith(7));
+  });
+
+  it.each([
+    {
+      was: 'Kopplung',
+      menue: 'Aktionen zur Kopplung mit Hub Landesverband',
+      eintrag: 'Widerrufen …',
+      dialog: 'Kopplung mit Hub Landesverband widerrufen?',
+      anfrage: widerrufeKopplung,
+    },
+    {
+      was: 'Schlüssel',
+      menue: 'Aktionen zum Schlüssel Stick B von Bea Admin',
+      eintrag: 'Widerrufen …',
+      dialog: 'Schlüssel Stick B von Bea Admin widerrufen?',
+      anfrage: widerrufeUnterschriftsschluessel,
+    },
+  ])('Widerruf ($was): solange er läuft, führt kein Knopf aus dem Dialog', async (fall) => {
+    let ablehnen: (e: Error) => void = () => {};
+    vi.mocked(fall.anfrage).mockReturnValue(
+      new Promise<never>((_, reject) => {
+        ablehnen = reject;
+      }),
+    );
+    renderMitProviders(<InstanzkopplungSeite />);
+    await userEvent.click(await screen.findByRole('button', { name: fall.menue }));
+    await userEvent.click(await screen.findByText(fall.eintrag));
+    const dialog = await screen.findByRole('dialog', { name: fall.dialog });
+    await userEvent.click(within(dialog).getByRole('button', { name: /Widerrufen/ }));
+    await waitFor(() => expect(fall.anfrage).toHaveBeenCalled());
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: /close|schließen/i })).toBeDisabled();
+    ablehnen(new Error('Gegenstelle lehnt ab'));
+    expect(await within(dialog).findByText('Nicht widerrufen')).toBeInTheDocument();
   });
 
   it('ohne Admin-Rolle nur Ansicht', async () => {

@@ -34,6 +34,11 @@ pub struct SchluesselZeile {
     pub widerrufen_at: Option<String>,
 }
 
+/// Höchstzahl gelieferter Unterschriftsschlüssel je Org und Lieferung (`src/AGENTS.md`, Listen
+/// von außen). Grundstock und Nachlieferung liefern nach `stand` sortiert höchstens so viele; was
+/// darüber liegt, folgt mit der nächsten Meldung, weil der Stand der Gegenseite mitwandert.
+pub const LIEFERUNGEN_MAX: usize = 256;
+
 const SPALTEN: &str = "id, org_id, herkunft, kopplung_org_id, fremde_id, benutzer_id, \
      benutzer_name, credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, \
      zustand, gegenzeichnung, stand, erstellt_at, widerrufen_at";
@@ -281,7 +286,7 @@ pub async fn grundstock(
 ) -> Result<(Vec<UnterschriftSchluesselLieferung>, i64), AppError> {
     let zeilen: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
-         AND zustand = 'gueltig' ORDER BY stand"
+         AND zustand = 'gueltig' ORDER BY stand LIMIT {LIEFERUNGEN_MAX}"
     )))
     .bind(org_id)
     .fetch_all(&mut *conn)
@@ -307,7 +312,7 @@ pub async fn nachlieferung(
 ) -> Result<Vec<UnterschriftSchluesselLieferung>, AppError> {
     let zeilen: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
-         AND stand > ? AND zustand IN ('gueltig', 'widerrufen') ORDER BY stand"
+         AND stand > ? AND zustand IN ('gueltig', 'widerrufen') ORDER BY stand LIMIT {LIEFERUNGEN_MAX}"
     )))
     .bind(org_id)
     .bind(seit)
@@ -380,6 +385,13 @@ pub async fn accept_lieferungen(
     grundstock: bool,
     jetzt: &str,
 ) -> Result<Vec<Abgelehnt>, AppError> {
+    if lieferungen.len() > LIEFERUNGEN_MAX {
+        return Err(AppError::Validation(format!(
+            "Eine Lieferung darf höchstens {LIEFERUNGEN_MAX} Unterschriftsschlüssel je Org enthalten."
+        )));
+    }
+    // Nicht entdoppelt: jede Zeile wird über ihre id nachgeschlagen, eine doppelte ändert nichts,
+    // und ein späterer Widerruf derselben id soll greifen. Die Grenze deckelt die Arbeit.
     let mut abgelehnt = Vec::new();
     for l in lieferungen {
         let fp = parse_b64(&l.schluessel)

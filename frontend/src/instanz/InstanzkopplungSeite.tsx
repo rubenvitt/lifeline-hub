@@ -456,7 +456,14 @@ export default function InstanzkopplungSeite() {
         cancelText="Abbrechen"
         okButtonProps={{ danger: true, loading: kopplungWiderrufen.isPending }}
         onOk={() => widerrufKopplung && kopplungWiderrufen.mutate(widerrufKopplung)}
-        onCancel={() => setWiderrufKopplung(null)}
+        // Solange der Widerruf läuft, führt kein Weg hinaus: ein Fehlschlag ginge sonst still verloren.
+        onCancel={() => {
+          if (!kopplungWiderrufen.isPending) setWiderrufKopplung(null);
+        }}
+        cancelButtonProps={{ disabled: kopplungWiderrufen.isPending }}
+        closable={kopplungWiderrufen.isPending ? { disabled: true } : true}
+        mask={{ closable: !kopplungWiderrufen.isPending }}
+        keyboard={!kopplungWiderrufen.isPending}
         destroyOnHidden
       >
         <p>
@@ -477,7 +484,14 @@ export default function InstanzkopplungSeite() {
         cancelText="Abbrechen"
         okButtonProps={{ danger: true, loading: schluesselWiderrufen.isPending }}
         onOk={() => widerrufSchluessel && schluesselWiderrufen.mutate(widerrufSchluessel)}
-        onCancel={() => setWiderrufSchluessel(null)}
+        // Solange der Widerruf läuft, führt kein Weg hinaus: ein Fehlschlag ginge sonst still verloren.
+        onCancel={() => {
+          if (!schluesselWiderrufen.isPending) setWiderrufSchluessel(null);
+        }}
+        cancelButtonProps={{ disabled: schluesselWiderrufen.isPending }}
+        closable={schluesselWiderrufen.isPending ? { disabled: true } : true}
+        mask={{ closable: !schluesselWiderrufen.isPending }}
+        keyboard={!schluesselWiderrufen.isPending}
         destroyOnHidden
       >
         <p>Gekoppelte Instanzen nehmen keine Unterschrift mit diesem Schlüssel mehr an.</p>

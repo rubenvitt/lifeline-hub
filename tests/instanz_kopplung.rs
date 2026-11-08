@@ -581,6 +581,23 @@ async fn zu_alter_stand_zeigt_update_noetig() {
     );
 }
 
+#[tokio::test]
+async fn meldung_ueber_der_listengrenze_ist_400() {
+    let (hub, elw) = gekoppelt().await;
+    let elw_i = identitaet_von(&elw).await;
+    let hub_k = identitaet_von(&hub).await.kennung;
+    let orgs: Vec<Value> = (0..=lifeline_hub::instanz::melden::ORGS_MAX)
+        .map(|i| json!({"org": format!("x/{i}"), "unterschrift_stand": 0}))
+        .collect();
+    let body = json!({"name": "ELW", "softwarestand": "9.9.9", "protokoll": 1, "orgs": orgs})
+        .to_string()
+        .into_bytes();
+    assert_eq!(
+        melden_roh(&hub, &elw_i, &hub_k, &body, &body, "/api/instanz/melden").await,
+        StatusCode::BAD_REQUEST
+    );
+}
+
 // ── Widerruf ─────────────────────────────────────────────────────────────────────────────────
 
 async fn widerrufen(i: &Instanz) -> Value {

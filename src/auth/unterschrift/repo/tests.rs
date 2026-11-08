@@ -421,3 +421,81 @@ async fn erklaerung_bindet_herkunft_und_rp_des_neuen_schluessels() {
         .unwrap();
     assert_eq!(ab.len(), 1, "{ab:?}");
 }
+
+#[tokio::test]
+async fn lieferung_ueber_der_grenze_wird_abgelehnt_und_ein_widerruf_derselben_id_greift() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let ziel = Ziel {
+        kopplung_org_id: ko,
+        org_id: 1,
+        fremde_org_kennung: FREMDE_ORG,
+    };
+    let mut conn = pool.acquire().await.unwrap();
+    let zu_viele: Vec<_> = (0..=LIEFERUNGEN_MAX as i64)
+        .map(|i| lieferung(i, &a, UnterschriftSchluesselZustand::Gueltig, i))
+        .collect();
+    assert!(matches!(
+        accept_lieferungen(&mut conn, &ziel, &zu_viele, true, JETZT).await,
+        Err(AppError::Validation(_))
+    ));
+    assert!(gueltige_fremde(&mut conn).await.is_empty());
+
+    accept_lieferungen(
+        &mut conn,
+        &ziel,
+        &[
+            lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 3),
+            lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 3),
+            lieferung(10, &a, UnterschriftSchluesselZustand::Widerrufen, 4),
+        ],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert!(
+        gueltige_fremde(&mut conn).await.is_empty(),
+        "der Widerruf derselben id gilt"
+    );
+}
+
+#[tokio::test]
+async fn grundstock_und_nachlieferung_liefern_hoechstens_die_grenze_und_der_rest_folgt() {
+    let pool = pool_mit_admin().await;
+    let mut conn = pool.acquire().await.unwrap();
+    let anzahl = LIEFERUNGEN_MAX as i64 + 1;
+    for stand in 1..=anzahl {
+        sqlx::query(
+            "INSERT INTO unterschrift_schluessel (org_id, herkunft, benutzer_id, benutzer_name, \
+             credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand, \
+             stand) VALUES (1, 'lokal', 1, 'admin', ?, 'es256', 'AAAA', ?, ?, 'Stick', 'fp', \
+             'gueltig', ?)",
+        )
+        .bind(format!("c{stand}"))
+        .bind(RP)
+        .bind(ORIGIN)
+        .bind(stand)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    }
+    let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
+    assert_eq!(grund.len(), LIEFERUNGEN_MAX);
+    let bis = grund.last().unwrap().stand;
+    assert_eq!(
+        bis, LIEFERUNGEN_MAX as i64,
+        "nach Stand sortiert, die ältesten zuerst"
+    );
+    let rest = nachlieferung(&mut conn, 1, bis).await.unwrap();
+    assert_eq!(
+        rest.iter().map(|l| l.stand).collect::<Vec<_>>(),
+        [anzahl],
+        "der Rest folgt mit der nächsten Meldung"
+    );
+    assert_eq!(
+        nachlieferung(&mut conn, 1, 0).await.unwrap().len(),
+        LIEFERUNGEN_MAX
+    );
+}

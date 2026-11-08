@@ -25,6 +25,9 @@ use std::time::Duration;
 pub const ANTWORT_MAX: usize = 256 * 1024;
 /// Obergrenze des Abstands bei wiederholten Fehlern.
 pub const ABSTAND_MAX_S: u64 = 600;
+/// Höchstzahl Orgs je Meldung und je Antwort, ebenso Widerrufe je Meldung (`src/AGENTS.md`,
+/// Listen von außen).
+pub const ORGS_MAX: usize = 256;
 /// Wie lange eine angebahnte Kopplung auf ihre erste Meldung wartet (D2).
 pub const ANGEBAHNT_MINUTEN: i64 = 15;
 
@@ -236,8 +239,56 @@ pub async fn send_signed<A: Serialize, T: DeserializeOwned>(
         .map_err(|e| SendError::AntwortUngueltig(format!("Body unlesbar: {e}")))?;
     Ok(VerifiedAntwort {
         wert,
-        uhr_abweichung_s: claims.iat - jetzt,
+        uhr_abweichung_s: claims.iat.saturating_sub(jetzt),
     })
+}
+
+/// Prüft die Listen einer Meldung gegen [`ORGS_MAX`] (gezählt vor dem Entdoppeln) und
+/// entdoppelt sie: je Org-Kennung zählt der erste Eintrag.
+fn dedupe_anfrage(anfrage: &MeldenAnfrage) -> Result<(Vec<&MeldenOrg>, Vec<&str>), AppError> {
+    if anfrage.orgs.len() > ORGS_MAX || anfrage.widerrufen.len() > ORGS_MAX {
+        return Err(AppError::Validation(format!(
+            "Eine Meldung darf höchstens {ORGS_MAX} Orgs und {ORGS_MAX} Widerrufe nennen."
+        )));
+    }
+    let mut gesehen = std::collections::HashSet::new();
+    let orgs = anfrage
+        .orgs
+        .iter()
+        .filter(|o| gesehen.insert(o.org.as_str()))
+        .collect();
+    let mut gesehen = std::collections::HashSet::new();
+    let widerrufen = anfrage
+        .widerrufen
+        .iter()
+        .map(String::as_str)
+        .filter(|w| gesehen.insert(*w))
+        .collect();
+    Ok((orgs, widerrufen))
+}
+
+/// Prüft die Listen einer Antwort gegen [`ORGS_MAX`] und [`unterschrift::LIEFERUNGEN_MAX`]. Eine
+/// Org doppelt macht die Antwort ungültig, statt entdoppelt zu werden: sonst entschiede die
+/// Reihenfolge, ob ein Widerruf gilt.
+fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
+    if antwort.orgs.len() > ORGS_MAX {
+        return Err(format!("mehr als {ORGS_MAX} Orgs in der Antwort"));
+    }
+    if antwort
+        .orgs
+        .iter()
+        .any(|o| o.unterschrift.len() > unterschrift::LIEFERUNGEN_MAX)
+    {
+        return Err(format!(
+            "mehr als {} Unterschriftsschlüssel je Org in der Antwort",
+            unterschrift::LIEFERUNGEN_MAX
+        ));
+    }
+    let mut gesehen = std::collections::HashSet::new();
+    if !antwort.orgs.iter().all(|o| gesehen.insert(o.org.as_str())) {
+        return Err("eine Org doppelt in der Antwort".into());
+    }
+    Ok(())
 }
 
 // ── Meldende Seite ───────────────────────────────────────────────────────────────────────────
@@ -273,7 +324,10 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
     let jetzt = crate::zeit::jetzt();
     let ergebnis =
         send_signed::<_, MeldenAntwort>(&identitaet, kopplung, MELDEN_PFAD, &anfrage).await;
-    let antwort = match ergebnis {
+    let antwort = match ergebnis.and_then(|a| match check_antwort(&a.wert) {
+        Ok(()) => Ok(a),
+        Err(grund) => Err(SendError::AntwortUngueltig(grund)),
+    }) {
         Ok(a) => a,
         Err(f) => {
             let abstand = next_abstand(abstand_s(), kopplung.fehlversuche as u32 + 1);
@@ -432,6 +486,7 @@ pub async fn handle_meldung(
     if kopplung.richtung() != Some(super::InstanzKopplungRichtung::WirdGemeldet) {
         return Err(AppError::Forbidden);
     }
+    let (anfrage_orgs, anfrage_widerrufen) = dedupe_anfrage(anfrage)?;
     let jetzt = crate::zeit::jetzt();
     let mut vom_gegenueber = Vec::new();
     let orgs = crate::write_retry!(pool, |conn| {
@@ -447,19 +502,19 @@ pub async fn handle_meldung(
         .await?;
         let alle = repo::list_orgs(conn, kopplung.id).await?;
         let kennung = |o: &repo::OrgZeile| org_kennung(&identitaet.kennung, o.org_id);
-        for w in &anfrage.widerrufen {
+        for w in anfrage_widerrufen.iter().copied() {
             if let Some(o) = alle
                 .iter()
-                .find(|o| o.widerrufen_at.is_none() && kennung(o) == *w)
+                .find(|o| o.widerrufen_at.is_none() && kennung(o) == w)
             {
                 if repo::org_widerrufen(conn, o.id, None, &jetzt, true).await? {
                     vom_gegenueber.push(o.clone());
                 }
             }
         }
-        let mut orgs = Vec::with_capacity(anfrage.orgs.len());
+        let mut orgs = Vec::with_capacity(anfrage_orgs.len());
         let mut gemeldet = Vec::new();
-        for mo in &anfrage.orgs {
+        for mo in anfrage_orgs.iter().copied() {
             // Die jüngste Zuordnung mit dieser Kennung entscheidet.
             let zuordnung = alle.iter().rev().find(|o| kennung(o) == mo.org);
             let aktiv = zuordnung.filter(|o| {
@@ -523,6 +578,83 @@ pub async fn handle_meldung(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn anfrage(orgs: &[&str], widerrufen: &[&str]) -> MeldenAnfrage {
+        MeldenAnfrage {
+            name: "ELW".into(),
+            softwarestand: "1".into(),
+            protokoll: PROTOKOLL,
+            orgs: orgs
+                .iter()
+                .enumerate()
+                .map(|(i, o)| MeldenOrg {
+                    org: (*o).into(),
+                    unterschrift_stand: i as i64,
+                })
+                .collect(),
+            widerrufen: widerrufen.iter().map(|w| (*w).into()).collect(),
+        }
+    }
+
+    #[test]
+    fn meldung_wird_entdoppelt_und_der_erste_eintrag_zaehlt() {
+        let a = anfrage(&["h/1", "h/2", "h/1"], &["h/3", "h/3"]);
+        let (orgs, widerrufen) = dedupe_anfrage(&a).unwrap();
+        assert_eq!(
+            orgs.iter()
+                .map(|o| (o.org.as_str(), o.unterschrift_stand))
+                .collect::<Vec<_>>(),
+            [("h/1", 0), ("h/2", 1)]
+        );
+        assert_eq!(widerrufen, ["h/3"]);
+    }
+
+    #[test]
+    fn meldung_ueber_der_grenze_wird_abgelehnt_auch_wenn_doppelt() {
+        let viele = vec!["h/1"; ORGS_MAX + 1];
+        assert!(matches!(
+            dedupe_anfrage(&anfrage(&viele, &[])),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            dedupe_anfrage(&anfrage(&[], &viele)),
+            Err(AppError::Validation(_))
+        ));
+        assert!(dedupe_anfrage(&anfrage(&vec!["h/1"; ORGS_MAX], &vec!["h/1"; ORGS_MAX])).is_ok());
+    }
+
+    fn antwort(orgs: usize, lieferungen: usize) -> MeldenAntwort {
+        let lieferung: UnterschriftSchluesselLieferung =
+            serde_json::from_value(serde_json::json!({
+                "id": 1, "benutzer_name": "A", "credential_id": "c", "schluessel": "s",
+                "alg": "ES256", "rp_id": "r", "origin": "o", "bezeichnung": "b",
+                "zustand": "gueltig", "stand": 1
+            }))
+            .expect("Lieferung");
+        MeldenAntwort {
+            name: "Hub".into(),
+            softwarestand: "1".into(),
+            protokoll: PROTOKOLL,
+            orgs: (0..orgs)
+                .map(|i| MeldenOrgAntwort {
+                    org: format!("h/{i}"),
+                    widerrufen: false,
+                    unterschrift: vec![lieferung.clone(); lieferungen],
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn antwort_ueber_der_grenze_oder_mit_doppelter_org_ist_ungueltig() {
+        assert!(check_antwort(&antwort(2, unterschrift::LIEFERUNGEN_MAX)).is_ok());
+        let mut doppelt = antwort(2, 0);
+        doppelt.orgs[1].org = doppelt.orgs[0].org.clone();
+        assert!(check_antwort(&doppelt).is_err(), "Org doppelt");
+        assert!(check_antwort(&antwort(ORGS_MAX, 0)).is_ok());
+        assert!(check_antwort(&antwort(ORGS_MAX + 1, 0)).is_err());
+        assert!(check_antwort(&antwort(1, unterschrift::LIEFERUNGEN_MAX + 1)).is_err());
+    }
 
     #[test]
     fn abstand_verdoppelt_sich_bis_zur_obergrenze() {
