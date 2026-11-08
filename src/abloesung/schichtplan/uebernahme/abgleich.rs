@@ -311,6 +311,10 @@ pub struct BestandEinsatzkraft {
 /// Stamm-Personal (`stamm`), eine Ad-hoc-Kraft oder einen Helfer **dieses** Einsatzes, und der
 /// Name passt: dann ist es diese Person, sicher. Sonst `None`, und die Regeln 1 bis 5 gelten wie
 /// für jede Zeile (anderer Einsatz, andere Organisation, anderer Name).
+///
+/// Trägt schon ein Helfer dieses Plans genau diese Kennung und Herkunft (ein früheres Einlesen
+/// fand den Bezug nicht und legte ihn an), bleibt es bei ihm (Regel 1): sonst käme dieselbe
+/// Person ein zweites Mal in den Block, sobald der Bezug später trifft.
 pub fn eigener_treffer(
     angabe: &PersonAngabe,
     stamm: &[BestandStamm],
@@ -320,7 +324,14 @@ pub fn eigener_treffer(
     if herkunft_norm(angabe.herkunft.as_deref()) != norm(EIGENE_HERKUNFT) {
         return None;
     }
-    let bezug = EigenerBezug::from_kennung(angabe.kennung.as_deref()?)?;
+    let kennung = angabe.kennung.as_deref()?.trim();
+    if helfer.iter().any(|h| {
+        h.kennung.as_deref().map(str::trim) == Some(kennung)
+            && herkunft_norm(h.herkunft.as_deref()) == norm(EIGENE_HERKUNFT)
+    }) {
+        return None;
+    }
+    let bezug = EigenerBezug::from_kennung(kennung)?;
     let formen = namensformen(&angabe.nachname, angabe.vorname.as_deref());
     let ziel = match bezug {
         EigenerBezug::Personal(id) => stamm
@@ -662,6 +673,22 @@ mod tests {
         // Herkunft ohne Rücksicht auf Groß/klein und Leerraum.
         fremd.herkunft = Some("  lifeline   HUB ".into());
         assert!(eigener_treffer(&fremd, &s, &[], &h).is_some());
+    }
+
+    #[test]
+    fn ein_helfer_mit_derselben_kennung_geht_dem_bezug_vor() {
+        let s = [stamm(7, "Sophie Vorlage", None, None)];
+        let h = [helfer(
+            12,
+            "Sophie Vorlage",
+            Some("personal-7"),
+            Some("Lifeline Hub"),
+        )];
+        let angabe = eigen("Sophie Vorlage", "personal-7");
+        assert!(eigener_treffer(&angabe, &s, &[], &h).is_none());
+        let v = person_vorschlag(&angabe, &s, &h);
+        assert_eq!(v.treffer, Treffer::Sicher);
+        assert!(matches!(v.ziel, PersonZiel::Helfer { helfer_id: 12, .. }));
     }
 
     #[test]
