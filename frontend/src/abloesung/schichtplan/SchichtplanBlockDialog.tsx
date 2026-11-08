@@ -278,6 +278,8 @@ export default function SchichtplanBlockDialog({
     if (!block || !werte) return false;
     const z = werte.zeit === undefined ? anfang.zeit : werte.zeit;
     if (!zeitraumGueltig(z)) return true;
+    // Eine Qualifikationszeile ohne Qualifikation fiele beim Speichern weg, ist aber Eingabe.
+    if (werte.quali?.some((q) => q.qualifikation_id == null)) return true;
     const body = aenderungAus(
       block,
       { ...anfang, ...werte },

@@ -182,6 +182,14 @@ describe('SchichtplanBlockDialog · Als nächsten Block kopieren (LLH-1584)', ()
     expect(onKopieren).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }));
   });
 
+  it('eine Qualifikationszeile ohne Qualifikation sperrt den Knopf ebenso', async () => {
+    const { dialog } = zeige(block());
+    const knopf = within(dialog).getByRole('button', { name: 'Als nächsten Block kopieren' });
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Qualifikationssoll/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Qualifikation fordern' }));
+    await waitFor(() => expect(knopf).toBeDisabled());
+  });
+
   it('beim Anlegen gibt es keinen Knopf', () => {
     zeige(null);
     expect(screen.queryByRole('button', { name: 'Als nächsten Block kopieren' })).toBeNull();

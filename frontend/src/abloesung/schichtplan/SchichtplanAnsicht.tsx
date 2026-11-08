@@ -352,11 +352,15 @@ export default function SchichtplanAnsicht({
   const kopiereAlsNaechsten = (block: SchichtplanBlock) => {
     const body = naechsterBlockBody(block);
     if (!body) return;
+    // Die Kopie ist der neue Block; an der Pause kann schon einer mit gleichem Beginn stehen.
+    const vorher = new Set(plan?.bloecke.map((b) => b.id));
     kopierenMut.mutate(body, {
       onSuccess: (p) => {
         const neu = p.bloecke.find(
           (b) =>
-            postenSchluessel(b.posten) === postenSchluessel(block.posten) && b.von === body.von,
+            !vorher.has(b.id) &&
+            postenSchluessel(b.posten) === postenSchluessel(block.posten) &&
+            b.von === body.von,
         );
         // Nur wenn der Dialog noch den Ausgangsblock zeigt; geschlossen oder gewechselt bleibt er.
         const d = dialogJetzt.current;
