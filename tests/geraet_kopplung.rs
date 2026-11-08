@@ -8188,7 +8188,7 @@ async fn einheitengeraet_kontakt_ohne_personalien_und_mit_einem_ausgang() {
         json!({"entlassen": true, "rtw": true}),
         json!({"uhs_id": uhs, "rtw": true}),
         // Ein Kontakt ist versorgt, nicht gesucht: ohne Anlass, damit die Status-Regel greift.
-        json!({"rtw": true, "status": "vermisst", "anlass": null, "massnahmen": null}),
+        json!({"rtw": true, "client_id": "v-1", "status": "vermisst", "anlass": null, "massnahmen": null}),
     ] {
         let (s, v) = anfrage_json(&app, "POST", &personen, &geraet, Some(&kontakt(extra))).await;
         assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
@@ -8313,12 +8313,23 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
         "ohne Netz über Funk: {v}"
     );
 
-    let (s, person) = anfrage_json(
+    // Ohne `client_id` keine RTW-Anforderung: eine Wiederholung legte sonst eine zweite an.
+    let (s, v) = anfrage_json(
         &app,
         "POST",
         &format!("{basis}/personen"),
         &geraet,
         Some(&kontakt(json!({"rtw": true}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+
+    let (s, person) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &geraet,
+        Some(&kontakt(json!({"rtw": true, "client_id": "rtw-0"}))),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{person}");

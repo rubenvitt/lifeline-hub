@@ -481,6 +481,16 @@ pub async fn anlegen(
                 "Die RTW-Anforderung ist selbst die Meldung der Person".into(),
             ));
         }
+        // Ohne Schlüssel legte eine Wiederholung nach einem Fehler eine zweite Anforderung an.
+        if !body
+            .client_id
+            .as_deref()
+            .is_some_and(|c| !c.trim().is_empty())
+        {
+            return Err(AppError::UnprocessableEntity(
+                "Eine RTW-Anforderung braucht eine client_id".into(),
+            ));
+        }
         ctx.fordere_zielmodul::<crate::einsatz::modul::Meldungen>(&state.pool)
             .await?;
     }
