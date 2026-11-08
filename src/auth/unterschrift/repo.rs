@@ -349,6 +349,9 @@ fn gegenzeichnung_gilt(
         || e.org != ziel.fremde_org_kennung
         || e.credential_id != l.credential_id
         || e.schluessel_hash != sha256_b64(&schluessel_bytes)
+        || e.rp_id != l.rp_id
+        || e.origin != l.origin
+        || e.alg != l.alg
     {
         return Err("Erklärung passt nicht zum Schlüssel".into());
     }
@@ -407,6 +410,30 @@ pub async fn annehmen(
             | (UnterschriftSchluesselZustand::WartetAufGegenzeichnung, _)
             | (UnterschriftSchluesselZustand::Gueltig, Some(_)) => {}
             (UnterschriftSchluesselZustand::Gueltig, None) => {
+                // Derselbe Schlüssel unter anderer id: ein widerrufener lebt nie wieder auf, ein
+                // gültiger steht schon da.
+                let schon: Option<String> = sqlx::query_scalar(
+                    "SELECT zustand FROM unterschrift_schluessel WHERE kopplung_org_id = ? \
+                     AND (credential_id = ? OR schluessel = ?) \
+                     ORDER BY zustand = 'widerrufen' DESC LIMIT 1",
+                )
+                .bind(ziel.kopplung_org_id)
+                .bind(&l.credential_id)
+                .bind(&l.schluessel)
+                .fetch_optional(&mut *conn)
+                .await?;
+                match schon.as_deref() {
+                    Some("widerrufen") => {
+                        abgelehnt.push(Abgelehnt {
+                            fingerabdruck: fp,
+                            benutzer_name: l.benutzer_name.clone(),
+                            grund: "Schlüssel war widerrufen".into(),
+                        });
+                        continue;
+                    }
+                    Some(_) => continue,
+                    None => {}
+                }
                 if l.alg != ALG_ES256 {
                     abgelehnt.push(Abgelehnt {
                         fingerabdruck: fp,
@@ -470,6 +497,23 @@ pub async fn annehmen(
     .execute(&mut *conn)
     .await?;
     Ok(abgelehnt)
+}
+
+/// Widerruft die vom Gegenüber übernommenen Schlüssel einer Org-Zuordnung (deren Widerruf).
+pub async fn fremde_der_zuordnung_widerrufen(
+    conn: &mut SqliteConnection,
+    kopplung_org_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
+         widerrufen_at = COALESCE(widerrufen_at, ?) WHERE kopplung_org_id = ? AND zustand <> 'widerrufen'",
+    )
+    .bind(jetzt)
+    .bind(kopplung_org_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Alle Schlüssel einer Org für die Admin-Seite: lokale und die gekoppelter Instanzen.

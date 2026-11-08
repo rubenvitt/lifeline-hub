@@ -129,7 +129,7 @@ export default function InstanzkopplungSeite() {
       breite="schmal"
       aktionen={
         istAdmin && (
-          <Space wrap>
+          <Space wrap size={token.marginSM}>
             <Tooltip title={sperre}>
               <Button
                 type="primary"
@@ -266,7 +266,6 @@ export default function InstanzkopplungSeite() {
             aktion={
               istAdmin && u.passkeys_eingerichtet ? (
                 <Button
-                  size="small"
                   icon={<IconPlus />}
                   onClick={() => setRegistrierenOffen(true)}
                   data-lfh="instanz-schluessel-registrieren"
@@ -288,7 +287,7 @@ export default function InstanzkopplungSeite() {
               emptyText="Noch kein Unterschriftsschlüssel"
               renderItem={(s) => {
                 const eintraege: MenueEintrag[] = [];
-                if (s.zustand === 'wartet_auf_gegenzeichnung' && u.eigener_schluessel && !s.eigen) {
+                if (s.zustand === 'wartet_auf_gegenzeichnung' && u.eigener_schluessel) {
                   eintraege.push({ key: 'gegenzeichnen', label: 'Gegenzeichnen' });
                 }
                 if (s.herkunft === 'lokal' && s.zustand !== 'widerrufen') {

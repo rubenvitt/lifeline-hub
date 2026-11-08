@@ -37,7 +37,7 @@ async fn kopplung_org(pool: &SqlitePool, richtung: InstanzKopplungRichtung) -> i
     )
     .await
     .unwrap();
-    kopplung::org_zuordnen(&mut conn, k, 1, FREMDE_ORG, "Hub-Org", Some(1))
+    kopplung::org_zuordnen(&mut conn, k, 1, FREMDE_ORG, "Hub-Org", Some(1), true)
         .await
         .unwrap()
 }
@@ -76,6 +76,9 @@ fn gegengezeichnet(
         fingerabdruck: "x".into(),
         inhaber: l.benutzer_name.clone(),
         zeitpunkt: JETZT.into(),
+        rp_id: l.rp_id.clone(),
+        origin: l.origin.clone(),
+        alg: l.alg.clone(),
     })
     .unwrap();
     let assertion = unterzeichner.unterschreibe(&erklaerung, ORIGIN, RP, 0x05);
@@ -328,4 +331,93 @@ async fn lokaler_schluessel_gilt_ohne_kopplung_und_wartet_mit() {
     let n = nachlieferung(&mut conn, 1, 1).await.unwrap();
     assert_eq!(n.len(), 1);
     assert_eq!(n[0].zustand, UnterschriftSchluesselZustand::Widerrufen);
+}
+
+#[tokio::test]
+async fn widerrufener_schluessel_lebt_unter_neuer_id_nicht_wieder_auf() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::neu("a", [1u8; 32]);
+    let b = SoftwarePasskey::neu("b", [2u8; 32]);
+    let ziel = Ziel {
+        kopplung_org_id: ko,
+        org_id: 1,
+        fremde_org_kennung: FREMDE_ORG,
+    };
+    let mut conn = pool.acquire().await.unwrap();
+    annehmen(
+        &mut conn,
+        &ziel,
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    let neu = gegengezeichnet(
+        lieferung(11, &b, UnterschriftSchluesselZustand::Gueltig, 2),
+        &a,
+        FREMDE_ORG,
+    );
+    annehmen(&mut conn, &ziel, &[neu], false, JETZT)
+        .await
+        .unwrap();
+    annehmen(
+        &mut conn,
+        &ziel,
+        &[lieferung(
+            11,
+            &b,
+            UnterschriftSchluesselZustand::Widerrufen,
+            3,
+        )],
+        false,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    // Derselbe Schlüssel mit derselben alten Gegenzeichnung unter neuer id
+    let wieder = gegengezeichnet(
+        lieferung(12, &b, UnterschriftSchluesselZustand::Gueltig, 4),
+        &a,
+        FREMDE_ORG,
+    );
+    let ab = annehmen(&mut conn, &ziel, &[wieder], false, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(gueltige_fremde(&mut conn).await, vec!["a"]);
+}
+
+#[tokio::test]
+async fn erklaerung_bindet_herkunft_und_rp_des_neuen_schluessels() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::neu("a", [1u8; 32]);
+    let b = SoftwarePasskey::neu("b", [2u8; 32]);
+    let ziel = Ziel {
+        kopplung_org_id: ko,
+        org_id: 1,
+        fremde_org_kennung: FREMDE_ORG,
+    };
+    let mut conn = pool.acquire().await.unwrap();
+    annehmen(
+        &mut conn,
+        &ziel,
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    let mut neu = gegengezeichnet(
+        lieferung(11, &b, UnterschriftSchluesselZustand::Gueltig, 2),
+        &a,
+        FREMDE_ORG,
+    );
+    neu.origin = "https://boese.example".into();
+    let ab = annehmen(&mut conn, &ziel, &[neu], false, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
 }

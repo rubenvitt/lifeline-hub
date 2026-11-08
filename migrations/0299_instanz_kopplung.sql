@@ -61,7 +61,11 @@ CREATE TABLE instanz_kopplung_org (
     -- Erreichte Seite: wann das Gegenüber den Widerruf signiert erhalten hat.
     widerruf_gemeldet_at TEXT,
     -- Meldende Seite: höchster `stand` der Unterschriftsschlüssel, den wir vom Gegenüber haben.
-    unterschrift_stand   INTEGER NOT NULL DEFAULT 0
+    unterschrift_stand   INTEGER NOT NULL DEFAULT 0,
+    -- Erreichte Seite: wann das Gegenüber diese Zuordnung zum ersten Mal gemeldet hat. Bis dahin
+    -- gilt sie als angebahnt und verfällt wie eine angebahnte Kopplung; auf der meldenden Seite
+    -- beim Anlegen gesetzt.
+    bestaetigt_at        TEXT
 );
 CREATE UNIQUE INDEX idx_instanz_kopplung_org_aktiv
     ON instanz_kopplung_org (kopplung_id, org_id) WHERE widerrufen_at IS NULL;
@@ -128,3 +132,7 @@ CREATE UNIQUE INDEX idx_unterschrift_schluessel_fremd
     ON unterschrift_schluessel (kopplung_org_id, fremde_id) WHERE herkunft = 'gegenueber';
 CREATE UNIQUE INDEX idx_unterschrift_schluessel_credential
     ON unterschrift_schluessel (credential_id) WHERE herkunft = 'lokal';
+-- Je Org-Zuordnung ein Schlüssel höchstens einmal, auch widerrufen: ein widerrufener lebt unter
+-- neuer id nicht wieder auf.
+CREATE UNIQUE INDEX idx_unterschrift_schluessel_fremd_credential
+    ON unterschrift_schluessel (kopplung_org_id, credential_id) WHERE herkunft = 'gegenueber';

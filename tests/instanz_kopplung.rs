@@ -883,3 +883,154 @@ async fn registrieren_nur_fuer_admins() {
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
+
+// ── Befunde aus dem Review (08.11.2026) ──────────────────────────────────────────────────────
+
+/// Löst einen Code am Hub direkt ein, als `als` (Kennung) mit dem Schlüssel `schluessel_von`,
+/// ohne danach zu melden. Liefert den Status.
+async fn koppeln_roh(
+    hub: &Instanz,
+    code: &str,
+    als: &str,
+    schluessel_von: &Identitaet,
+    org: (&str, &str),
+) -> StatusCode {
+    use lifeline_hub::instanz::code as kcode;
+    let c = kcode::normalisiere(code).unwrap();
+    let a = kcode::ableiten(&c);
+    let schluessel = schluessel_von.oeffentlich_b64();
+    let t = kcode::transkript_einloeser(
+        &a.suche,
+        als,
+        &schluessel,
+        org.0,
+        org.1,
+        "Angreifer",
+        "j-roh",
+    );
+    let body = json!({
+        "suche": a.suche, "jti": "j-roh", "protokoll": 1, "kennung": als, "schluessel": schluessel,
+        "name": "Angreifer", "softwarestand": "1", "org": {"kennung": org.0, "name": org.1},
+        "pruefwert": kcode::pruefwert(&a.k_einloeser, &t),
+    });
+    hub.app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/instanz/koppeln")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+/// Org Y am Hub mit eigenem Admin und Schlüssel; liefert einen Code dieser Org.
+async fn code_org_y(hub: &Instanz) -> String {
+    let (org_y, id_y) = org_admin(&hub.pool, "Org Y", "yadmin").await;
+    {
+        let p = SoftwarePasskey::neu("y", [6u8; 32]);
+        let oeff = p.oeffentlich();
+        let mut conn = hub.pool.acquire().await.unwrap();
+        unterschrift::anlegen_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: org_y,
+                benutzer_id: id_y,
+                benutzer_name: "Y",
+                credential_id: "y",
+                schluessel: &oeff,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "Y",
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let y = common::login_cookie(&hub.app, "yadmin", "yadminpw1").await;
+    let (s, v) = common::anfrage(&hub.app, "POST", "/api/admin/instanz/codes", &y, None).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["code"].as_str().unwrap().to_string()
+}
+
+#[tokio::test]
+async fn fremder_schluessel_unter_bekannter_kennung_wird_abgelehnt() {
+    let (hub, elw) = gekoppelt().await;
+    let elw_i = identitaet_von(&elw).await;
+    let schluessel_vorher: String =
+        sqlx::query_scalar("SELECT gegenueber_schluessel FROM instanz_kopplung")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    let c = code_org_y(&hub).await;
+    let angreifer = Identitaet::aus_teilen("egal", [99u8; 32]);
+    let s = koppeln_roh(&hub, &c, &elw_i.kennung, &angreifer, ("m/1", "M")).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let schluessel_nachher: String =
+        sqlx::query_scalar("SELECT gegenueber_schluessel FROM instanz_kopplung")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(schluessel_vorher, schluessel_nachher);
+}
+
+#[tokio::test]
+async fn unbestaetigte_org_zuordnung_verfaellt() {
+    let (hub, elw) = gekoppelt().await;
+    let elw_i = identitaet_von(&elw).await;
+    let c = code_org_y(&hub).await;
+    // Der echte ELW löst ein, verwirft aber die Antwort (meldet die Org nie).
+    let s = koppeln_roh(&hub, &c, &elw_i.kennung, &elw_i, ("elw/9", "Org ELW Y")).await;
+    assert_eq!(s, StatusCode::OK);
+    lifeline_hub::instanz::repo::angebahnte_verwerfen(&hub.pool, "2999-01-01 00:00:00")
+        .await
+        .unwrap();
+    let aktiv: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM instanz_kopplung_org WHERE widerrufen_at IS NULL")
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        aktiv, 1,
+        "nur die bestätigte Zuordnung der ersten Org bleibt"
+    );
+    assert_eq!(uebersicht(&hub).await["kopplungen"][0]["zustand"], "aktiv");
+}
+
+#[tokio::test]
+async fn alter_offener_widerruf_zerstoert_die_neue_kopplung_nicht() {
+    let (hub, elw) = gekoppelt().await;
+    // ELW widerruft ohne Netz: Zeile bleibt ungemeldet.
+    sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-08 10:00:00'")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE instanz_kopplung SET zustand = 'widerrufen'")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    // Der Hub-Admin widerruft ebenfalls, dann wird neu gekoppelt.
+    widerrufen(&hub).await;
+    let c = code(&hub).await;
+    let (s, v) = einloesen(&elw, &hub.adresse, &c).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["zustand"], "aktiv", "{v}");
+    elw_meldet(&elw).await;
+    assert_eq!(
+        uebersicht(&hub).await["kopplungen"][0]["org"].get("widerrufen_at"),
+        None
+    );
+    assert_eq!(uebersicht(&elw).await["kopplungen"][0]["zustand"], "aktiv");
+}
+
+#[tokio::test]
+async fn schluessel_einer_widerrufenen_zuordnung_gelten_nicht_mehr() {
+    let (hub, elw) = gekoppelt().await;
+    widerrufen(&hub).await;
+    elw_meldet(&elw).await;
+    assert!(gueltige_fremde(&uebersicht(&elw).await).is_empty());
+}

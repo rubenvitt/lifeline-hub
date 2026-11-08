@@ -98,6 +98,12 @@ impl FromRequest<AppState> for GekoppelteInstanz {
             return Err(abgelehnt("Wiederholung", Some(&kopf.kid)));
         }
         protokoll_zulaessig(parts.uri.path(), claims.pv)?;
+        // Außer Melden (das Widerrufe überbringt) nur bei aktiver Kopplung.
+        if parts.uri.path() != MELDEN_PFAD
+            && kopplung.zustand() != Some(super::InstanzKopplungZustand::Aktiv)
+        {
+            return Err(abgelehnt("Kopplung nicht aktiv", Some(&kopf.kid)));
+        }
         Ok(GekoppelteInstanz {
             kopplung,
             claims,

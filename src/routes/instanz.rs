@@ -236,7 +236,8 @@ pub async fn koppeln(
     let ergebnis = koppeln_pruefen(&state, &i, &a).await;
     let (org_id, antwort) = match ergebnis {
         Ok(wert) => wert,
-        Err(AppError::Unauthorized) => {
+        // Nach außen einheitlich 401, auch bei einem Konflikt mit einer bestehenden Kopplung.
+        Err(AppError::Unauthorized | AppError::Conflict(_)) => {
             if let Some(ip) = peer_ip {
                 crate::auth::rate_limit::fehlversuch(ip, None);
             }
@@ -295,6 +296,8 @@ async fn koppeln_pruefen(
         &a.schluessel,
         &a.org.kennung,
         &a.org.name,
+        &a.name,
+        &a.jti,
     );
     let (org_id, unterschrift, k_aussteller) = crate::write_retry!(&state.pool, |conn| {
         let Some(code) = repo::code_offen(conn, &a.suche, &jetzt).await? else {
@@ -328,6 +331,7 @@ async fn koppeln_pruefen(
             &a.org.kennung,
             &a.org.name,
             code.ausgestellt_von,
+            false,
         )
         .await?;
         let (lieferung, _) = unterschrift::grundstock(conn, code.org_id).await?;
@@ -414,6 +418,7 @@ pub async fn einloesen(
             &antwort.org.kennung,
             &antwort.org.name,
             Some(admin.id),
+            true,
         )
         .await?;
         let ziel = unterschrift::Ziel {
@@ -460,14 +465,16 @@ async fn einloesen_senden(
     eigene_org: &OrgLeitung,
 ) -> Result<KoppelnAntwort, AppError> {
     let schluessel = i.oeffentlich_b64();
+    let jti = signatur::neue_jti();
     let transkript_e = kcode::transkript_einloeser(
         &ableitung.suche,
         &i.kennung,
         &schluessel,
         &eigene_org.kennung,
         &eigene_org.name,
+        crate::instanz::name(),
+        &jti,
     );
-    let jti = signatur::neue_jti();
     let anfrage = KoppelnAnfrage {
         suche: ableitung.suche.clone(),
         jti: jti.clone(),
@@ -817,6 +824,9 @@ pub async fn gegenzeichnen_start(
         fingerabdruck: ziel.fingerabdruck.clone(),
         inhaber: ziel.benutzer_name.clone(),
         zeitpunkt: crate::zeit::jetzt(),
+        rp_id: ziel.rp_id.clone(),
+        origin: ziel.origin.clone(),
+        alg: ziel.alg.clone(),
     })
     .expect("serialisierbar");
     let challenge = pruefen::challenge(&erklaerung);

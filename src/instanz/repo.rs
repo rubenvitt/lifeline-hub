@@ -197,6 +197,16 @@ pub async fn kopplung_anlegen_oder_erneuern(
                 "Mit dieser Instanz besteht schon eine Kopplung in der anderen Richtung.".into(),
             ));
         }
+        // Ein anderer Schlüssel unter bekannter Kennung: solange eine Org-Zuordnung gilt, nie.
+        // Die Kennung ist nicht geheim, sonst übernähme ein Code einer anderen Org die Kopplung.
+        if alt.gegenueber_schluessel != g.schluessel_b64
+            && !orgs_aktiv(conn, alt.id).await?.is_empty()
+        {
+            return Err(AppError::Conflict(
+                "Unter dieser Kennung ist schon eine Instanz mit einem anderen Schlüssel gekoppelt."
+                    .into(),
+            ));
+        }
         let aktiv = alt.zustand() == Some(InstanzKopplungZustand::Aktiv);
         sqlx::query(
             "UPDATE instanz_kopplung SET gegenueber_schluessel = ?, gegenueber_name = ?, \
@@ -248,6 +258,7 @@ pub async fn org_zuordnen(
     fremde_org_kennung: &str,
     fremde_org_name: &str,
     von: Option<i64>,
+    bestaetigt: bool,
 ) -> Result<i64, AppError> {
     let schon: Option<i64> = sqlx::query_scalar(
         "SELECT id FROM instanz_kopplung_org WHERE kopplung_id = ? AND widerrufen_at IS NULL \
@@ -263,17 +274,46 @@ pub async fn org_zuordnen(
             "Diese Organisation ist mit dieser Instanz schon gekoppelt.".into(),
         ));
     }
+    // Ein älterer, nie gemeldeter Widerruf derselben Zuordnung ist mit der neuen erledigt; er
+    // ginge sonst mit der nächsten Meldung hinaus und träfe die neue.
+    sqlx::query(
+        "UPDATE instanz_kopplung_org SET widerruf_gemeldet_at = datetime('now') \
+         WHERE kopplung_id = ? AND widerrufen_at IS NOT NULL AND widerruf_gemeldet_at IS NULL \
+         AND (org_id = ? OR fremde_org_kennung = ?)",
+    )
+    .bind(kopplung_id)
+    .bind(org_id)
+    .bind(fremde_org_kennung)
+    .execute(&mut *conn)
+    .await?;
     Ok(sqlx::query_scalar(
         "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
-         fremde_org_name, angelegt_von) VALUES (?, ?, ?, ?, ?) RETURNING id",
+         fremde_org_name, angelegt_von, bestaetigt_at) \
+         VALUES (?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now') END) RETURNING id",
     )
     .bind(kopplung_id)
     .bind(org_id)
     .bind(fremde_org_kennung)
     .bind(fremde_org_name)
     .bind(von)
+    .bind(bestaetigt)
     .fetch_one(&mut *conn)
     .await?)
+}
+
+/// Erreichte Seite: das Gegenüber hat die Zuordnung gemeldet.
+pub async fn org_bestaetigen(
+    conn: &mut SqliteConnection,
+    org_zeile_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE instanz_kopplung_org SET bestaetigt_at = datetime('now') \
+         WHERE id = ? AND bestaetigt_at IS NULL",
+    )
+    .bind(org_zeile_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Alle Org-Zuordnungen einer Kopplung, die noch gelten.
@@ -348,6 +388,10 @@ pub async fn org_widerrufen(
     .execute(&mut *conn)
     .await?
     .rows_affected();
+    if n == 1 {
+        crate::auth::unterschrift::repo::fremde_der_zuordnung_widerrufen(conn, org_zeile_id, jetzt)
+            .await?;
+    }
     Ok(n == 1)
 }
 
@@ -456,8 +500,21 @@ pub async fn angebahnte_verwerfen(pool: &SqlitePool, grenze: &str) -> Result<u64
         .execute(&mut *tx)
         .await?;
     }
+    // Org-Zuordnungen, die das Gegenüber nie gemeldet hat (etwa eine zweite Org, deren Antwort
+    // beim Einlösen verworfen wurde), verfallen ebenso.
+    let verwaist: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT id, kopplung_id FROM instanz_kopplung_org \
+         WHERE widerrufen_at IS NULL AND bestaetigt_at IS NULL AND angelegt_at <= ?",
+    )
+    .bind(grenze)
+    .fetch_all(&mut *tx)
+    .await?;
+    for (org_id, kopplung_id) in &verwaist {
+        org_widerrufen(&mut *tx, *org_id, None, grenze, true).await?;
+        zustand_nach_orgs(&mut *tx, *kopplung_id, InstanzKopplungZustand::Widerrufen).await?;
+    }
     tx.commit().await?;
-    Ok(ids.len() as u64)
+    Ok((ids.len() + verwaist.len()) as u64)
 }
 
 /// Setzt einen bleibenden Hinweis an der Kopplung.

@@ -463,6 +463,9 @@ pub async fn beantworten(
             let aktiv = zuordnung.filter(|o| {
                 o.widerrufen_at.is_none() && !vom_gegenueber.iter().any(|v| v.id == o.id)
             });
+            if let Some(o) = aktiv {
+                repo::org_bestaetigen(conn, o.id).await?;
+            }
             match aktiv {
                 Some(o) => orgs.push(MeldenOrgAntwort {
                     org: mo.org.clone(),

@@ -90,17 +90,28 @@ pub fn ableiten(code: &str) -> Ableitung {
     }
 }
 
-/// Was die einlösende Seite bindet: `suche`, ihre Kennung, ihren Schlüssel und die Org, an die
-/// sie koppelt. Längenpräfixe, damit keine zwei Belegungen dasselbe Transkript ergeben.
+/// Was die einlösende Seite bindet: `suche`, ihre Kennung, ihren Schlüssel, die Org, an die sie
+/// koppelt, ihren Namen und die `jti` der Anfrage. Längenpräfixe, damit keine zwei Belegungen
+/// dasselbe Transkript ergeben.
 pub fn transkript_einloeser(
     suche: &str,
     kennung: &str,
     schluessel_b64: &str,
     org_kennung: &str,
     org_name: &str,
+    name: &str,
+    jti: &str,
 ) -> Vec<u8> {
     let mut t = b"einloeser".to_vec();
-    for teil in [suche, kennung, schluessel_b64, org_kennung, org_name] {
+    for teil in [
+        suche,
+        kennung,
+        schluessel_b64,
+        org_kennung,
+        org_name,
+        name,
+        jti,
+    ] {
         t.extend_from_slice(&(teil.len() as u32).to_be_bytes());
         t.extend_from_slice(teil.as_bytes());
     }
@@ -176,10 +187,26 @@ mod tests {
     #[test]
     fn pruefwert_scheitert_an_ausgetauschtem_schluessel_und_anderem_code() {
         let a = ableiten("ABCDEFGHJKMNPQRS");
-        let t = transkript_einloeser(&a.suche, "elw", "SCHLUESSEL_ELW", "elw/1", "Org");
+        let t = transkript_einloeser(
+            &a.suche,
+            "elw",
+            "SCHLUESSEL_ELW",
+            "elw/1",
+            "Org",
+            "ELW",
+            "j",
+        );
         let p = pruefwert(&a.k_einloeser, &t);
         assert!(pruefwert_stimmt(&a.k_einloeser, &t, &p));
-        let getauscht = transkript_einloeser(&a.suche, "elw", "SCHLUESSEL_MITTE", "elw/1", "Org");
+        let getauscht = transkript_einloeser(
+            &a.suche,
+            "elw",
+            "SCHLUESSEL_MITTE",
+            "elw/1",
+            "Org",
+            "ELW",
+            "j",
+        );
         assert!(!pruefwert_stimmt(&a.k_einloeser, &getauscht, &p));
         let anderer = ableiten("ABCDEFGHJKMNPQRT");
         assert!(!pruefwert_stimmt(&anderer.k_einloeser, &t, &p));
@@ -193,8 +220,8 @@ mod tests {
     #[test]
     fn transkript_ist_eindeutig_trotz_verschobener_grenzen() {
         assert_ne!(
-            transkript_einloeser("ab", "c", "d", "e", "f"),
-            transkript_einloeser("a", "bc", "d", "e", "f")
+            transkript_einloeser("ab", "c", "d", "e", "f", "g", "h"),
+            transkript_einloeser("a", "bc", "d", "e", "f", "g", "h")
         );
     }
 

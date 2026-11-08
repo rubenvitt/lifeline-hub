@@ -23,7 +23,30 @@ static RP: std::sync::OnceLock<(String, String)> = std::sync::OnceLock::new();
 /// Ein Unterschriftsschlüssel trägt beides, damit eine andere Instanz seine Unterschrift prüfen
 /// kann.
 pub fn set_rp(rp_id: String, origin: String) {
-    let _ = RP.set((rp_id, origin));
+    let _ = RP.set((rp_id, origin_normalisieren(&origin)));
+}
+
+/// Herkunft so, wie der Browser sie ins `clientDataJSON` schreibt (`https://host[:port]`, klein,
+/// ohne Standardport und Schrägstrich); eine unlesbare Angabe bleibt, wie sie ist.
+pub fn origin_normalisieren(origin: &str) -> String {
+    reqwest::Url::parse(origin.trim())
+        .map(|u| u.origin().ascii_serialization())
+        .unwrap_or_else(|_| origin.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn origin_wie_der_browser() {
+        assert_eq!(
+            super::origin_normalisieren("https://Hub.Example.org:443/"),
+            "https://hub.example.org"
+        );
+        assert_eq!(
+            super::origin_normalisieren("http://localhost:8080"),
+            "http://localhost:8080"
+        );
+    }
 }
 
 /// RP-ID und Herkunft; `None`, wenn Passkeys hier nicht eingerichtet sind.
@@ -81,6 +104,11 @@ pub struct AufnahmeErklaerung {
     pub fingerabdruck: String,
     pub inhaber: String,
     pub zeitpunkt: String,
+    /// RP-ID, Herkunft und Algorithmus des neuen Schlüssels: die Lieferung trägt sie, die
+    /// Erklärung bindet sie.
+    pub rp_id: String,
+    pub origin: String,
+    pub alg: String,
 }
 
 /// Ein Schlüssel, wie er an gekoppelte Instanzen geht (Grundstock beim Koppeln, Nachlieferung

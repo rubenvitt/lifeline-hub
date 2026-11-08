@@ -252,6 +252,37 @@ Abschnitt „Instanzkopplung“ in `src/AGENTS.md`.
   Schlüssel desselben Admins; die Seite empfiehlt zwei Schlüssel je Org.
 - [Öffentlicher Einlöse-Endpunkt] → IP-Sperre, Body-Grenze, einheitlich 401.
 
+## Nachträge aus dem Review (08.11.2026)
+
+Ein adversariales Review vor dem PR fand Lücken; behoben und mit Tests belegt
+(`tests/instanz_kopplung.rs`, Abschnitt „Befunde aus dem Review“, und
+`src/auth/unterschrift/repo/tests.rs`):
+
+- **Fremder Schlüssel unter bekannter Kennung:** Die Kennung ist nicht geheim. Ein Code einer
+  anderen Org überschrieb sonst Schlüssel und Adresse einer bestehenden Kopplung. Solange eine
+  Org-Zuordnung gilt, bleibt der Schlüssel; ein abweichender ist ein Konflikt (nach außen 401).
+- **Widerrufener Schlüssel unter neuer id:** Die id vergibt der Aussteller. Je Org-Zuordnung ist
+  ein Schlüssel (`credential_id`) eindeutig, auch widerrufen, und lebt nie wieder auf.
+- **Zuordnung bestätigt:** Auf der erreichten Seite trägt eine Org-Zuordnung `bestaetigt_at`,
+  gesetzt mit der ersten Meldung, die sie nennt; unbestätigt verfällt sie nach 15 Minuten wie eine
+  angebahnte Kopplung.
+- **Alter, nie gemeldeter Widerruf** gilt mit einer neuen Zuordnung derselben Orgs als erledigt.
+- **Widerruf einer Zuordnung** widerruft die von dort übernommenen Unterschriftsschlüssel.
+- **Erklärung** bindet zusätzlich `rp_id`, `origin` und `alg` des neuen Schlüssels; das
+  Transkript der einlösenden Seite zusätzlich Name und `jti`.
+- **Herkunft** wird wie im Browser normalisiert (`Url::origin`), bevor sie in einen Schlüssel geht.
+- **Extractor:** außer Melden nur bei aktiver Kopplung.
+- **Fehlermeldung beim Einlösen** ohne Netzdetails (sonst ein Port-Scanner für Org-Admins); der
+  Grund steht im Log.
+
+Offen als Restrisiko (Entscheidung beim Menschen): **Ein kompromittierter Hub kann eine
+Gegenzeichnung erschleichen.** Der Unterschriftsschlüssel ist an die RP-ID des Hubs gebunden, und
+dessen Seite liefert der Hub selbst aus. Bösartiges JavaScript kann `navigator.credentials.get`
+mit der Challenge einer Erklärung für einen eigenen Schlüssel aufrufen; der Authenticator zeigt
+den Inhalt nicht. Unterschreibt ein Admin am kompromittierten Hub irgendetwas, nimmt der ELW den
+untergeschobenen Schlüssel an. Das Ziel „ein kompromittierter Hub schiebt keinen Schlüssel
+unter“ gilt damit nur, solange niemand am kompromittierten Hub unterschreibt.
+
 ## Migration Plan
 
 Nur neue Tabellen und neue CHECK-Werte, keine Änderung an bestehenden Daten. Die Identität entsteht
