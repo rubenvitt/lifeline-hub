@@ -72,6 +72,8 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
       return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').letzter);
     }),
     json('/personen', 'personen'),
+    json('/personen/verbleib-angaben', 'personenVerbleibAngaben'),
+    mitBeendeten('/material', 'material', 'entlassene', 'materialEntlassen'),
     json('/schaeden', 'schaeden'),
     json('/evakuierung', 'evakuierung'),
     json('/betreuung', 'betreuung'),
@@ -136,7 +138,7 @@ async function fertig() {
 }
 
 describe('EinsatzberichtDruckPage', () => {
-  it('zeigt die sieben Blöcke in einer Druckwurzel, laufender Einsatz vorläufig', async () => {
+  it('zeigt die acht Blöcke in einer Druckwurzel, laufender Einsatz vorläufig', async () => {
     quellen();
     rendere();
     await fertig();
@@ -152,6 +154,7 @@ describe('EinsatzberichtDruckPage', () => {
       'Kräfte',
       'Lage',
       'Bilanz',
+      'Hilfeleistungen',
       'ETB-Auszug',
     ]);
     const kopf = document.querySelector('[data-lfh="druckkopf"]') as HTMLElement;
@@ -331,7 +334,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
   const adresse = () => screen.getByTestId('adresse').textContent ?? '';
   const auswahlleiste = () => screen.getByRole('region', { name: 'Blöcke' });
 
-  it('ohne Auswahl: Standardumfang, alle sieben gewählt, Anlagen nicht', async () => {
+  it('ohne Auswahl: Standardumfang, alle acht gewählt, Anlagen nicht', async () => {
     quellen();
     rendere();
     await fertig();
@@ -358,14 +361,15 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
       'Führung',
       'Kräfte',
       'Lage',
+      'Hilfeleistungen',
       'ETB-Auszug',
     ]);
     expect(document.querySelector('[data-lfh="einsatzbericht-block-bilanz"]')).toBeNull();
     expect(new URLSearchParams(adresse()).get('bloecke')).toBe(
-      'stammdaten,zeiten,fuehrung,kraefte,lage,etb',
+      'stammdaten,zeiten,fuehrung,kraefte,lage,hilfeleistungen,etb',
     );
     expect(kopf()).toHaveTextContent(
-      'Auswahl: Stammdaten, Zeiten, Führung, Kräfte, Lage, ETB-Auszug',
+      'Auswahl: Stammdaten, Zeiten, Führung, Kräfte, Lage, Hilfeleistungen, ETB-Auszug',
     );
   });
 
@@ -391,7 +395,9 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     await userEvent.click(bilanz());
     await waitFor(() => expect(blockTitel()).toContain('Bilanz'));
     await fertig();
-    expect(aufrufe.get('/personen')).toBe(2);
+    // Je Schnappschuss ein Abruf: die Hilfeleistungen lesen die Personen auch ohne Bilanz
+    // (LLH-1575), also auch die Zwischenauswahl.
+    expect(aufrufe.get('/personen')).toBe(3);
   });
 
   it('der letzte gewählte Block lässt sich nicht abwählen', async () => {
@@ -407,11 +413,45 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     rendere('?bloecke=stammdaten');
     await fertig();
     await userEvent.click(within(auswahlleiste()).getByRole('button', { name: 'Standardumfang' }));
-    await waitFor(() => expect(blockTitel()).toHaveLength(7));
+    await waitFor(() => expect(blockTitel()).toHaveLength(8));
     expect(adresse()).toBe('');
   });
 
-  it('Personen gesperrt, Bilanz abgewählt: druckbar ohne Abruf der Personen', async () => {
+  it('„Kurzbericht für den Auftraggeber“ wählt vier Blöcke und nennt sich im Kopf (LLH-1575)', async () => {
+    const aufrufe = quellen();
+    rendere();
+    await fertig();
+    await userEvent.click(
+      within(auswahlleiste()).getByRole('button', { name: 'Kurzbericht für den Auftraggeber' }),
+    );
+    await waitFor(() =>
+      expect(blockTitel()).toEqual(['Stammdaten', 'Zeiten', 'Kräfte', 'Hilfeleistungen']),
+    );
+    await fertig();
+    expect(new URLSearchParams(adresse()).get('bloecke')).toBe(
+      'stammdaten,zeiten,kraefte,hilfeleistungen',
+    );
+    expect(kopf()).toHaveTextContent('Kurzbericht für den Auftraggeber');
+    expect(
+      within(auswahlleiste()).getByRole('button', { name: 'Kurzbericht für den Auftraggeber' }),
+    ).toBeDisabled();
+    expect(aufrufe.get('/personen/verbleib-angaben')).toBeGreaterThan(0);
+  });
+
+  it('Anlage Materialverbrauch ruft aktives und herausgenommenes Material ab (LLH-1575)', async () => {
+    const aufrufe = quellen();
+    rendere('?bloecke=materialverbrauch');
+    await fertig();
+    expect(blockTitel()).toEqual(['Anlage Materialverbrauch']);
+    expect(aufrufe.get('/material')).toBe(1);
+    expect(aufrufe.get('/material?entlassene=1')).toBe(1);
+    const anlage = document.querySelector(
+      '[data-lfh="einsatzbericht-block-materialverbrauch"]',
+    ) as HTMLElement;
+    expect(within(anlage).getByText('Rettungsdecke')).toBeInTheDocument();
+  });
+
+  it('Personen gesperrt, Bilanz und Hilfeleistungen abgewählt: druckbar ohne Abruf der Personen', async () => {
     const aufrufe = quellen();
     freigaben({ personen: { zugriff: false } });
     rendere();
@@ -421,9 +461,16 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
       name: 'Bilanz – kein Zugriff: Betroffene',
     });
     await userEvent.click(bilanz);
+    await userEvent.click(
+      within(auswahlleiste()).getByRole('checkbox', {
+        name: 'Hilfeleistungen – kein Zugriff: Betroffene',
+      }),
+    );
     await fertig();
     expect(blockTitel()).not.toContain('Bilanz');
+    expect(blockTitel()).not.toContain('Hilfeleistungen');
     expect(aufrufe.get('/personen')).toBeUndefined();
+    expect(aufrufe.get('/personen/verbleib-angaben')).toBeUndefined();
     // Auch abgewählt nennt der Block sein gesperrtes Modul: wer ihn wieder wählt, weiß vorher, warum
     // das Drucken dann sperrt.
     expect(

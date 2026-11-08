@@ -399,6 +399,55 @@ pub async fn liste_je_person(
     )
 }
 
+/// Angaben des maßgeblichen Verbleibs einer Person für den Einsatzbericht (LLH-1575, design.md
+/// D3): Rettungsmittel, „Entlassen an“, „gegen Rat“ und Unterschrift, die die Personenliste
+/// nicht trägt. Keine Personendaten: die Kennung dient nur der Zuordnung zur Liste.
+#[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow, ToSchema)]
+pub struct VerbleibAngaben {
+    pub person_id: i64,
+    /// Rettungsmittel des Transports (Funkrufname beim Eigentransport, sonst Freitext), getrimmt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transportmittel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entlassen_an: Option<EntlassenAn>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gegen_rat: Option<GegenRat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unterschrift: Option<Unterschrift>,
+}
+
+/// Je nicht stornierter Person die Angaben ihres maßgeblichen Verbleibs (LLH-1575, design.md D3),
+/// nur Personen mit mindestens einer Angabe, nach Kennung.
+///
+/// Maßgeblich ist der jüngste Verbleib in der Ordnung `verbleibfolge!` **ohne Übergaben**: die
+/// Übergabe quittiert den Eigentransport davor mit demselben Fahrzeug und trägt „gegen Rat“ nie
+/// (LLH-1568, D1). Ohne diese Ausnahme fiele eine Verweigerung mit der Übergabe weg.
+pub async fn angaben_je_person(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<VerbleibAngaben>, AppError> {
+    Ok(sqlx::query_as::<_, VerbleibAngaben>(concat!(
+        "SELECT v.person_id, NULLIF(TRIM(COALESCE(v.transportmittel, '')), '') AS transportmittel, \
+                v.entlassen_an, v.gegen_rat, v.unterschrift \
+         FROM ( \
+             SELECT person_id, transportmittel, entlassen_an, gegen_rat, unterschrift, \
+                    ROW_NUMBER() OVER (PARTITION BY person_id ",
+        verbleibfolge!(),
+        ") AS rang \
+             FROM person_verbleib \
+             WHERE einsatz_id = ?1 AND (status IS NULL OR status <> 'uebergeben') \
+         ) v \
+         JOIN einsatz_person p ON p.id = v.person_id AND p.einsatz_id = ?1 \
+         WHERE v.rang = 1 AND p.storniert_at IS NULL \
+           AND (TRIM(COALESCE(v.transportmittel, '')) <> '' OR v.entlassen_an IS NOT NULL \
+                OR v.gegen_rat IS NOT NULL) \
+         ORDER BY v.person_id"
+    ))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -547,6 +596,127 @@ mod tests {
             verlauf[1].entlassen_an,
             Some(EntlassenAn::Polizei),
             "Verlauf behält"
+        );
+    }
+
+    async fn weitere_person(pool: &SqlitePool, e: i64, b: i64, nr: i64) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, ?, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(nr)
+        .bind(b)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LLH-1575 (design.md D3): maßgeblich ist der jüngste Verbleib ohne Übergabe; ein späterer
+    /// Verbleib ersetzt die Angaben, Stornierte und Personen ohne Angabe fehlen.
+    #[tokio::test]
+    async fn angaben_je_person_nimmt_juengsten_verbleib_ohne_uebergabe() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        // p: Eigentransport gegen Rat, danach übergeben → Angaben des Transports.
+        erfassen(
+            &pool,
+            e,
+            p,
+            VerbleibDaten {
+                transportmittel: Some("  KTW 1  "),
+                gegen_rat: Some(GegenRat::Behandlung),
+                unterschrift: Some(Unterschrift::Verweigert),
+                ..daten("transport", Some("KH Mitte"))
+            },
+            b,
+        )
+        .await
+        .unwrap();
+        erfassen(
+            &pool,
+            e,
+            p,
+            VerbleibDaten {
+                transportmittel: Some("KTW 1"),
+                status: Some("uebergeben"),
+                ..daten("transport", Some("KH Mitte"))
+            },
+            b,
+        )
+        .await
+        .unwrap();
+        // q: erst entlassen an die Polizei, dann doch vor Ort → keine Angabe mehr.
+        let q = weitere_person(&pool, e, b, 2).await;
+        erfassen(
+            &pool,
+            e,
+            q,
+            VerbleibDaten {
+                entlassen_an: Some(EntlassenAn::Polizei),
+                ..daten("entlassung", None)
+            },
+            b,
+        )
+        .await
+        .unwrap();
+        erfassen(&pool, e, q, daten("vor_ort", None), b)
+            .await
+            .unwrap();
+        // r: an die Polizei entlassen, dann storniert → fehlt.
+        let r = weitere_person(&pool, e, b, 3).await;
+        erfassen(
+            &pool,
+            e,
+            r,
+            VerbleibDaten {
+                entlassen_an: Some(EntlassenAn::Polizei),
+                ..daten("entlassung", None)
+            },
+            b,
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_person SET storniert_at = '2026-05-27 12:00:00' WHERE id = ?")
+            .bind(r)
+            .execute(&pool)
+            .await
+            .unwrap();
+        // s: fremder Transport mit Rettungsmittel.
+        let s = weitere_person(&pool, e, b, 4).await;
+        erfassen(
+            &pool,
+            e,
+            s,
+            VerbleibDaten {
+                transportmittel: Some("RTW 1-83-1"),
+                ..daten("transport", Some("KH Mitte"))
+            },
+            b,
+        )
+        .await
+        .unwrap();
+
+        let angaben = angaben_je_person(&pool, e).await.unwrap();
+        assert_eq!(
+            angaben,
+            vec![
+                VerbleibAngaben {
+                    person_id: p,
+                    transportmittel: Some("KTW 1".into()),
+                    entlassen_an: None,
+                    gegen_rat: Some(GegenRat::Behandlung),
+                    unterschrift: Some(Unterschrift::Verweigert),
+                },
+                VerbleibAngaben {
+                    person_id: s,
+                    transportmittel: Some("RTW 1-83-1".into()),
+                    entlassen_an: None,
+                    gegen_rat: None,
+                    unterschrift: None,
+                },
+            ]
         );
     }
 

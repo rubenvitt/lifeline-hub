@@ -2,7 +2,7 @@
 titel: Einsatz abschließen und Einsatzbericht
 gruppen: [fuehrung]
 reihenfolge: 610
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/stab/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
 ---
 
 ## Überblick
@@ -10,8 +10,9 @@ quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/Einsatzber
 Ist ein Einsatz vorbei, schließt die Einsatzleitung ihn in den Einsatzdaten ab. Danach ist er
 schreibgeschützt: niemand legt mehr Einträge an oder berichtigt sie. Der Einsatzbericht fasst
 den Einsatz zum Drucken oder als PDF zusammen, aus Stammdaten, Zeiten, Führung, Kräften, Lage,
-Bilanz und einem Auszug des Einsatztagebuchs. Er lässt sich jederzeit erzeugen, auch während der
-Einsatz noch läuft.
+Bilanz, Hilfeleistungen und einem Auszug des Einsatztagebuchs. Er lässt sich jederzeit erzeugen,
+auch während der Einsatz noch läuft. Für den Auftraggeber eines Sanitätsdienstes gibt es einen
+Kurzbericht ohne Einsatztagebuch und ohne Anlagen.
 
 ## Abläufe
 
@@ -29,6 +30,16 @@ Einsatz noch läuft.
 
 „Standardumfang“ stellt die Auswahl auf alle Blöcke des Berichts ohne Anlagen zurück. „Neu laden“
 holt den aktuellen Stand, „Zurück zu den Einsatzdaten“ verlässt die Druckansicht.
+
+### Kurzbericht für den Auftraggeber
+
+1. Die Druckansicht wie oben öffnen.
+2. Unter „Blöcke“ „Kurzbericht für den Auftraggeber“ wählen. Gewählt sind dann „Stammdaten“,
+   „Zeiten“, „Kräfte“ und „Hilfeleistungen“, der Kopf nennt als Umfang „Kurzbericht für den
+   Auftraggeber“.
+3. Bei Bedarf eine Anlage dazunehmen, etwa „Anlage Materialverbrauch“. Der Kopf nennt dann die
+   gewählten Blöcke als „Auswahl“.
+4. „Drucken / als PDF“ wählen.
 
 ### Einsatz abschließen
 
@@ -84,6 +95,16 @@ Der Block „Führung“ nennt unter „Einsatzleitung“ den Einsatzleiter mit 
 „nicht erfasst“. Mitglieder mit der Rolle Einsatzleitung stehen dort nicht; die Rolle ist ein
 Recht, keine Führungsfunktion.
 
+### Was die Hilfeleistungen zählen
+
+Der Block „Hilfeleistungen“ zählt Kontakte: jede erfasste Person außer den vermissten. Er nennt
+sie nach Anlass, nach Stunde der Erfassung (in der Zeitzone der Organisation), nach Verbleib und
+„Entlassen an“, dazu die Transporte nach Rettungsmittel und Ziel, die Ablehnungen gegen Rat und
+die Kontakte je versorgender Einheit. Es sind nur Zahlen: kein Name, keine Registriernummer, kein
+Fundort. Ein vorangemeldeter Transport zählt noch nicht als Transport. Eine Ablehnung gegen Rat
+bleibt gezählt, wenn der Eigentransport danach übergeben wird. Das Ziel steht nur bei
+Transporten im Bericht. Der Block braucht das Recht am Modul Betroffene, wie die Bilanz.
+
 ### Stand, Anlagen und Adresse
 
 - Ein Bericht zu einem laufenden Einsatz trägt im Kopf „Vorläufig – Einsatz läuft“.
@@ -91,6 +112,9 @@ Recht, keine Führungsfunktion.
   „Neu laden“.
 - Die „Anlage Personal je Kopf“ „enthält Namen von Einsatzkräften“; vor der Weitergabe
   bedenken, wer den Ausdruck bekommt.
+- Die „Anlage Materialverbrauch“ nennt je Verbrauchsgut die ausgegebene Menge, auch von Posten,
+  die aus dem Einsatz genommen sind. Geräte stehen nicht darin. Sie braucht das Recht am Modul
+  Material.
 - Mindestens ein Block bleibt immer gewählt; der letzte lässt sich nicht abwählen.
 - Die Auswahl steht in der Adresse der Seite. Ein Lesezeichen oder ein geteilter Link öffnet
   den Bericht mit denselben Blöcken.

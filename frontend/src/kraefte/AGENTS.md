@@ -166,7 +166,12 @@ sie wieder her; der geplante Wechsel bleibt beim Vollzug stehen. Ziele, Vorbeleg
 `abloesung/besatzung.ts`.
 
 **Schichtplan** (LLH-1552, Spec `kraefte-schichtplan`): Blöcke an Einheit, UHS oder Pause sind
-Soll; sie ändern weder Zuordnung noch Fälligkeit, und wer nur im Plan steht, ist nicht im Einsatz.
+Soll; sie ändern keine Zuordnung, und wer nur im Plan steht, ist nicht im Einsatz. Die Fälligkeit
+einer laufenden Schicht kommt aus den Blöcken ihrer Einheit, wenn der Server es so rechnet
+(LLH-1555, `faellig_laut_plan`, `plan_folgeblock`); der Client zeigt nur die Zeile „Laut Plan · …“
+(`abloesung/lautPlan.ts`) und bietet dann kein „Rhythmus ändern“. Die Vorlage des Wechsels
+(`ladePlanVorlage`, Key `abloesungPlanVorlage`) rechnet der Server; der Vollzug-Dialog schickt sie
+als Art „Laut Plan“ ab und rechnet Bleibende, Übernahme und Folgeblock nie selbst nach.
 Überschneidung (422), Soll-Kopie vom Posten, Lücke, offene Anforderungen und alle Befunde
 (`doppelt`, `quali`, `dienst`, `verfuegbar`, `abweichung`) rechnet der Server beim Lesen
 (`abloesung::schichtplan::pruefung`); der Client zeigt sie nur und rechnet nichts nach. Jeder

@@ -12,16 +12,17 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::abloesung::repo::{
-    self, AenderungEingabe, BeginnEingabe, EinsatzVorgabeInput, VollzugEingabe, VollzugWirkung,
+    self, AenderungEingabe, BeginnEingabe, EinsatzVorgabeInput, PlanUebernahme, UebernahmeQuelle,
+    VollzugEingabe, VollzugWirkung,
 };
 use crate::abloesung::{
-    AbloesungAnzeige, AbloesungArt, AbloesungEinsatzVorgabeAnzeige, AbloesungStatus,
-    AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, BesatzungZiel,
-    ABLOESER_MAX, BESATZUNG_MAX, RHYTHMUS_MAX_MINUTEN,
+    AbloesungAnzeige, AbloesungArt, AbloesungEinsatzVorgabeAnzeige, AbloesungPlanVorlage,
+    AbloesungStatus, AbloesungVerbleib, AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige,
+    BesatzungZiel, ABLOESER_MAX, BESATZUNG_MAX, RHYTHMUS_MAX_MINUTEN,
 };
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Abloesung, Bereitstellungsraeume, Einheiten};
+use crate::einsatz::modul::{Abloesung, Bereitstellungsraeume, Einheiten, Personal};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
@@ -350,6 +351,73 @@ pub struct Vollziehen {
     /// Der Raum genau beim Verbleib `bereitstellungsraum`.
     #[serde(default)]
     verbleib_br_id: Option<i64>,
+    /// Beim Besatzungswechsel Personen aus dem Schichtplan, die erst noch in den Einsatz kommen
+    /// (LLH-1555): Stamm-Personal oder Helfer des Plans, je mit Ziel wie `besatzung`.
+    #[serde(default)]
+    uebernahme: Option<Vec<UebernahmeBody>>,
+    /// Beim Besatzungswechsel, wer aus der bisherigen Besatzung bleibt (`einsatz_personal.id`,
+    /// höchstens [`BESATZUNG_MAX`], LLH-1555).
+    #[serde(default)]
+    bleiben: Option<Vec<i64>>,
+    /// Der Folgeblock des Plans, in den der Besatzungswechsel wechselt (LLH-1555); die
+    /// Folgeschicht ankert darin.
+    #[serde(default)]
+    plan_block_id: Option<i64>,
+}
+
+/// Eine Person aus dem Schichtplan, die beim Vollzug in den Einsatz kommt: genau eins von
+/// `stamm_personal_id` (`personal.id`) und `plan_helfer_id`.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UebernahmeBody {
+    #[serde(default)]
+    stamm_personal_id: Option<i64>,
+    #[serde(default)]
+    plan_helfer_id: Option<i64>,
+    #[serde(default)]
+    einheit_id: Option<i64>,
+    #[serde(default)]
+    fahrzeug_id: Option<i64>,
+}
+
+/// Die Übernahme eines Vollzugs (LLH-1555): je Eintrag genau eine Quelle (400 sonst), nach Quelle
+/// entdoppelt in ihrer Reihenfolge.
+fn uebernahme_aus(liste: Vec<UebernahmeBody>) -> Result<Vec<PlanUebernahme>, AppError> {
+    if liste.len() > BESATZUNG_MAX {
+        return Err(AppError::Validation(format!(
+            "uebernahme: höchstens {BESATZUNG_MAX} Personen"
+        )));
+    }
+    let mut aus: Vec<PlanUebernahme> = Vec::new();
+    for u in liste {
+        let quelle =
+            match (u.stamm_personal_id, u.plan_helfer_id) {
+                (Some(p), None) => UebernahmeQuelle::Stamm(p),
+                (None, Some(h)) => UebernahmeQuelle::Helfer(h),
+                _ => return Err(AppError::Validation(
+                    "uebernahme: je Eintrag genau eins von stamm_personal_id und plan_helfer_id"
+                        .into(),
+                )),
+            };
+        if !aus.iter().any(|a| a.quelle == quelle) {
+            aus.push(PlanUebernahme {
+                quelle,
+                einheit_id: u.einheit_id,
+                fahrzeug_id: u.fahrzeug_id,
+            });
+        }
+    }
+    Ok(aus)
+}
+
+/// Die Bleibenden eines Vollzugs (LLH-1555): höchstens [`BESATZUNG_MAX`] (400), entdoppelt.
+fn bleiben_aus(ids: Vec<i64>) -> Result<Vec<i64>, AppError> {
+    if ids.len() > BESATZUNG_MAX {
+        return Err(AppError::Validation(format!(
+            "bleiben: höchstens {BESATZUNG_MAX} Personen"
+        )));
+    }
+    Ok(crate::kraefte_disposition::dedupe(&ids, |i| *i))
 }
 
 /// Verbleib der abgelösten Einheit (LLH-1308, design.md D1): unbekannter Wert → 400; Raum ohne
@@ -388,12 +456,14 @@ fn vollzug_verbleib(
 
 /// Art und neue Besatzung eines Vollzugs (LLH-1150), erst die Felder für sich (400), dann der
 /// Zusammenhang (422): unbekannte Art und mehr als [`BESATZUNG_MAX`] Personen (gezählt vor dem
-/// Entdoppeln) → 400, ein Besatzungswechsel ohne neue Besatzung → 400; beim Besatzungswechsel
-/// ablösende Einheiten oder „Abschnitt übergeben“ → 422, `besatzung_ids` ohne Besatzungswechsel
-/// → 422. Liefert die Art und die neue Besatzung entdoppelt in ihrer Reihenfolge.
+/// Entdoppeln) → 400, ein Besatzungswechsel ohne neue Besatzung → 400 (außer `aus_plan`:
+/// Übernahme oder Bleibende mit Folgeblock, LLH-1555); beim Besatzungswechsel ablösende Einheiten
+/// oder „Abschnitt übergeben“ → 422, `besatzung_ids` ohne Besatzungswechsel → 422. Liefert die Art
+/// und die neue Besatzung entdoppelt in ihrer Reihenfolge.
 fn vollzug_art(
     art: Option<&str>,
     besatzung: Option<&[BesatzungZiel]>,
+    aus_plan: bool,
     abloeser: &[i64],
     abschnitt_uebergeben: bool,
 ) -> Result<(AbloesungArt, Vec<BesatzungZiel>), AppError> {
@@ -408,7 +478,7 @@ fn vollzug_art(
     let ids = check_besatzung(besatzung.unwrap_or_default(), "besatzung")?;
     match art {
         AbloesungArt::Besatzung => {
-            if ids.is_empty() {
+            if ids.is_empty() && !aus_plan {
                 return Err(AppError::Validation(
                     "besatzung fehlt: ein Besatzungswechsel braucht die neue Besatzung".into(),
                 ));
@@ -450,18 +520,39 @@ pub async fn vollziehen(
     let abloeser =
         abloeser_aus(req.abloeser_ids, req.abloesende_einheit_id.map(Some))?.unwrap_or_default();
     let besatzung = besatzung_aus(req.besatzung_ids, req.besatzung)?;
+    let uebernahme = uebernahme_aus(req.uebernahme.unwrap_or_default())?;
+    let bleiben = bleiben_aus(req.bleiben.unwrap_or_default())?;
+    if besatzung.as_deref().map_or(0, <[_]>::len) + uebernahme.len() > BESATZUNG_MAX {
+        return Err(AppError::Validation(format!(
+            "besatzung und uebernahme: höchstens {BESATZUNG_MAX} Personen"
+        )));
+    }
     let (art, besatzung) = vollzug_art(
         req.art.as_deref(),
         besatzung.as_deref(),
+        // Aus dem Plan darf die neue Besatzung leer sein, wenn die Übernahme sie stellt oder alle
+        // bleiben, die im Folgeblock stehen (LLH-1555).
+        !uebernahme.is_empty() || (req.plan_block_id.is_some() && !bleiben.is_empty()),
         &abloeser,
         req.abschnitt_uebergeben,
     )?;
+    if art == AbloesungArt::Einheit
+        && (!uebernahme.is_empty() || !bleiben.is_empty() || req.plan_block_id.is_some())
+    {
+        return Err(AppError::UnprocessableEntity(
+            "uebernahme, bleiben und plan_block_id gelten nur beim Besatzungswechsel".into(),
+        ));
+    }
     let (verbleib, verbleib_br_id) =
         vollzug_verbleib(req.verbleib.as_deref(), req.verbleib_br_id, art)?;
     // Besatzungswechsel und Abschnittsübergabe schreiben, was sonst das Modul Einheiten schreibt
     // (Personalzuordnung, Unterstellung).
     if art == AbloesungArt::Besatzung {
         ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
+    }
+    // Die Übernahme aus dem Plan disponiert, was sonst das Modul Personal disponiert (LLH-1555).
+    if !uebernahme.is_empty() {
+        ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     }
     // Die Übergabe nur, wenn sie wirkt (LLH-1512): Ob die Einheit einen Abschnitt hat und ein
     // Ablöser übernimmt, entscheidet die Transaktion; sie weist eine wirksame Übergabe ohne
@@ -491,6 +582,9 @@ pub async fn vollziehen(
             ohne_freigabe_einheiten,
             art,
             besatzung,
+            uebernahme,
+            bleiben,
+            plan_block_id: req.plan_block_id,
             verbleib,
             verbleib_br_id,
         },
@@ -500,6 +594,20 @@ pub async fn vollziehen(
     publiziere(&state, einsatz_id, Some(etb_id));
     publish_zeitachse(&state, einsatz_id, wirkung).await;
     Ok(Json(anzeige))
+}
+
+/// GET /api/einsaetze/{id}/abloesungen/{aid}/plan-vorlage — der Besatzungswechsel aus dem
+/// Schichtplan zum Vorbelegen des Vollzugs (LLH-1555). Nennt Personen, also verlangt es die
+/// Freigabe Personal (403); eine Schicht ohne Plan ist 422.
+pub async fn plan_vorlage(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Abloesung>,
+    PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
+) -> Result<Json<AbloesungPlanVorlage>, AppError> {
+    ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
+    Ok(Json(
+        repo::plan_vorlage(&state.pool, ctx.einsatz.id, aid).await?,
+    ))
 }
 
 /// POST /api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen
@@ -693,18 +801,19 @@ mod tests {
         let code =
             |r: Result<(AbloesungArt, Vec<BesatzungZiel>), AppError>| r.unwrap_err().status();
         assert_eq!(
-            personen(vollzug_art(None, None, &[3], true).unwrap()),
+            personen(vollzug_art(None, None, false, &[3], true).unwrap()),
             (AbloesungArt::Einheit, vec![]),
             "ohne Art die ganze Einheit"
         );
         assert_eq!(
-            code(vollzug_art(Some("fahrzeug"), None, &[], false)),
+            code(vollzug_art(Some("fahrzeug"), None, false, &[], false)),
             StatusCode::BAD_REQUEST
         );
         assert_eq!(
             code(vollzug_art(
                 Some("besatzung"),
                 Some(&ziele(&[])),
+                false,
                 &[],
                 false
             )),
@@ -712,19 +821,25 @@ mod tests {
             "leere neue Besatzung"
         );
         assert_eq!(
-            code(vollzug_art(Some("besatzung"), None, &[], false)),
+            code(vollzug_art(Some("besatzung"), None, false, &[], false)),
             StatusCode::BAD_REQUEST,
             "fehlende neue Besatzung"
         );
         let viele = ziele(&(1..=BESATZUNG_MAX as i64 + 1).collect::<Vec<_>>());
         assert_eq!(
-            code(vollzug_art(Some("besatzung"), Some(&viele), &[7], false)),
+            code(vollzug_art(
+                Some("besatzung"),
+                Some(&viele),
+                false,
+                &[7],
+                false
+            )),
             StatusCode::BAD_REQUEST,
             "Grenze vor dem Zusammenhang"
         );
         let genau = ziele(&(1..=BESATZUNG_MAX as i64).collect::<Vec<_>>());
         assert_eq!(
-            vollzug_art(Some("besatzung"), Some(&genau), &[], false)
+            vollzug_art(Some("besatzung"), Some(&genau), false, &[], false)
                 .unwrap()
                 .1
                 .len(),
@@ -734,6 +849,7 @@ mod tests {
             code(vollzug_art(
                 Some("besatzung"),
                 Some(&ziele(&[1])),
+                false,
                 &[7],
                 false
             )),
@@ -744,6 +860,7 @@ mod tests {
             code(vollzug_art(
                 Some("besatzung"),
                 Some(&ziele(&[1])),
+                false,
                 &[],
                 true
             )),
@@ -751,12 +868,27 @@ mod tests {
             "mit Abschnittsübergabe"
         );
         assert_eq!(
-            code(vollzug_art(Some("einheit"), Some(&ziele(&[1])), &[], false)),
+            code(vollzug_art(
+                Some("einheit"),
+                Some(&ziele(&[1])),
+                false,
+                &[],
+                false
+            )),
             StatusCode::UNPROCESSABLE_ENTITY,
             "neue Besatzung ohne Besatzungswechsel"
         );
         assert_eq!(
-            personen(vollzug_art(Some("besatzung"), Some(&ziele(&[4, 2, 4])), &[], false).unwrap()),
+            personen(
+                vollzug_art(
+                    Some("besatzung"),
+                    Some(&ziele(&[4, 2, 4])),
+                    false,
+                    &[],
+                    false
+                )
+                .unwrap()
+            ),
             (AbloesungArt::Besatzung, vec![4, 2]),
             "entdoppelt in der Reihenfolge"
         );

@@ -28,6 +28,7 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   beginn_quelle: 'hand' as const,
   abschnitt_uebergeben: false,
   planung_warnungen: [],
+  faellig_laut_plan: false,
   angelegt_at: '2026-01-05 06:00:00',
   ...over,
 });

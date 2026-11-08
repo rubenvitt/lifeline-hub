@@ -10,8 +10,8 @@ import {
 import { einsatzAnlegen } from './einsatz-kern';
 
 /**
- * Einsatzbericht (LFH-726) gegen einen echten Server: Einstieg über die Einsatzdaten, sieben
- * Blöcke in fester Reihenfolge, „In diesem Einsatz nicht genutzt“ für ein ausgeblendetes Modul,
+ * Einsatzbericht (LFH-726) gegen einen echten Server: Einstieg über die Einsatzdaten, acht
+ * Blöcke in fester Reihenfolge (seit LLH-1575 mit Hilfeleistungen), „In diesem Einsatz nicht genutzt“ für ein ausgeblendetes Modul,
  * kein Name einer betroffenen Person auf dem Blatt, Vorläufig-Vermerk im Kopf und das Druckbild.
  *
  * Der zweite Fall läuft als Beobachter (nicht privilegiert, `e2e/rollen-kern.ts`; ein Admin
@@ -103,7 +103,7 @@ async function saeen(page: Page, einsatzId: string) {
   });
 }
 
-test('Einsatzbericht: Einstieg, sieben Blöcke, nicht genutztes Modul, kein Personenbezug, Druckbild', async ({
+test('Einsatzbericht: Einstieg, acht Blöcke, nicht genutztes Modul, kein Personenbezug, Druckbild', async ({
   page,
 }) => {
   await anmelden(page);
@@ -127,6 +127,7 @@ test('Einsatzbericht: Einstieg, sieben Blöcke, nicht genutztes Modul, kein Pers
     'Kräfte',
     'Lage',
     'Bilanz',
+    'Hilfeleistungen',
     'ETB-Auszug',
   ]);
 
@@ -152,6 +153,11 @@ test('Einsatzbericht: Einstieg, sieben Blöcke, nicht genutztes Modul, kein Pers
     bilanz.locator('dt', { hasText: /^SK II$/ }).locator('xpath=following-sibling::dd[1]'),
   ).toHaveText('1');
   await expect(bilanz.getByText('In diesem Einsatz nicht genutzt')).toHaveCount(1);
+  // Hilfeleistungen zählen dieselbe Person über den Server, auch die Verbleib-Angaben (LLH-1575).
+  const hilfe = page.locator('[data-lfh="einsatzbericht-block-hilfeleistungen"]');
+  await expect(
+    hilfe.locator('dt', { hasText: /^Kontakte gesamt$/ }).locator('xpath=following-sibling::dd[1]'),
+  ).toHaveText('1');
 
   // Kein Personenbezug Betroffener auf dem Blatt.
   const text = await wurzel.innerText();
@@ -327,6 +333,7 @@ test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der
     'Zeiten',
     'Führung',
     'Kräfte',
+    'Hilfeleistungen',
     'ETB-Auszug',
     'Anlage Personal je Kopf',
   ];
@@ -351,6 +358,18 @@ test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der
   await expect(wurzel.getByRole('heading', { level: 3 })).toHaveText(['Stammdaten']);
   await expect(kopf).toContainText('Auswahl: Stammdaten');
   await expect(kopf).not.toContainText('kosten');
+
+  // ── Kurzbericht für den Auftraggeber (LLH-1575): vier Blöcke, eigener Name im Kopf.
+  await leiste.getByRole('button', { name: 'Kurzbericht für den Auftraggeber' }).click();
+  await expect(drucken).toBeEnabled({ timeout: 60_000 });
+  await expect(wurzel.getByRole('heading', { level: 3 })).toHaveText([
+    'Stammdaten',
+    'Zeiten',
+    'Kräfte',
+    'Hilfeleistungen',
+  ]);
+  await expect(kopf).toContainText('Kurzbericht für den Auftraggeber');
+  await expect(page).toHaveURL(/bloecke=stammdaten%2Czeiten%2Ckraefte%2Chilfeleistungen/);
 
   // ── Druckbild: die Auswahlleiste steht nicht auf dem Papier (keine Box, auch wenn ein Vorfahr
   // statt ihrer selbst ausgeblendet ist).
