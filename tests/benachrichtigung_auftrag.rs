@@ -8,8 +8,8 @@ use serde_json::{json, Value};
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen,
-    setup_mit_pool,
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, funktion_setzen, login_cookie,
+    rolle_setzen, setup_mit_pool,
 };
 
 struct Welt {
@@ -88,20 +88,18 @@ impl Welt {
         v["id"].as_i64().unwrap()
     }
 
-    /// Besetzt ein Sachgebiet mit dem Einsatzpersonal `ep`.
-    async fn besetzen(&self, sachgebiet: &str, ep: i64) {
-        let (s, v) = anfrage(
+    /// Gibt dem Mitglied `benutzer_id` die Führungsfunktion `sachgebiet` (Mitgliedschaft,
+    /// i6k6mzed D2).
+    async fn besetzen(&self, sachgebiet: &str, benutzer_id: i64) {
+        funktion_setzen(
             &self.app,
-            "PUT",
-            &format!(
-                "/api/einsaetze/{}/stab/besetzung/{sachgebiet}",
-                self.einsatz
-            ),
             &self.admin,
-            Some(&json!({ "besetzung_art": "personal", "personal_id": ep }).to_string()),
+            self.einsatz,
+            benutzer_id,
+            "fuehrungspersonal",
+            Some(sachgebiet),
         )
         .await;
-        assert!(s.is_success(), "besetzen {sachgebiet}: {s} {v}");
     }
 
     /// Erteilt als `cookie` einen Auftrag an `empfaenger`; liefert die Antwort.
@@ -237,10 +235,8 @@ async fn auftrag_an_eine_einheit_benachrichtigt_niemanden() {
 #[tokio::test]
 async fn auftrag_an_die_eigene_funktion_benachrichtigt_den_ausloeser_nicht() {
     let w = welt().await;
-    let ep_anna = w.personal("Anna Albers", Some(w.anna)).await;
-    let ep_bert = w.personal("Bert Brandt", Some(w.bert)).await;
-    w.besetzen("s4", ep_anna).await;
-    w.besetzen("s2", ep_bert).await;
+    w.besetzen("s4", w.anna).await;
+    w.besetzen("s2", w.bert).await;
     let anna = w.cookie("annika").await;
 
     w.erteilen(&anna, json!([funktion("s4")])).await;
@@ -266,7 +262,7 @@ async fn auftrag_an_die_eigene_funktion_benachrichtigt_den_ausloeser_nicht() {
 async fn zwei_wege_zum_selben_nutzer_ergeben_einen_hinweis() {
     let w = welt().await;
     let ep = w.personal("Bert Brandt", Some(w.bert)).await;
-    w.besetzen("s2", ep).await;
+    w.besetzen("s2", w.bert).await;
     w.erteilen(&w.admin, json!([funktion("s2"), person(ep)]))
         .await;
     assert_eq!(w.zeilen_der_art("auftrag_erteilt").await.len(), 1);
@@ -349,8 +345,7 @@ async fn erteilen_aus_etb_meldung_und_chat_meldet_ebenso() {
 async fn berichtigung_meldet_nur_hinzugekommene_empfaenger() {
     let w = welt().await;
     let ep_anna = w.personal("Anna Albers", Some(w.anna)).await;
-    let ep_bert = w.personal("Bert Brandt", Some(w.bert)).await;
-    w.besetzen("s2", ep_bert).await;
+    w.besetzen("s2", w.bert).await;
     let a = w.erteilen(&w.admin, json!([person(ep_anna)])).await;
     let auftrag = a["id"].as_i64().unwrap();
     let patch = |body: Value| {
@@ -394,8 +389,7 @@ async fn berichtigung_meldet_nur_hinzugekommene_empfaenger() {
 #[tokio::test]
 async fn quittung_meldet_dem_auftraggeber_mit_dem_empfaenger() {
     let w = welt().await;
-    let ep_bert = w.personal("Bert Brandt", Some(w.bert)).await;
-    w.besetzen("s2", ep_bert).await;
+    w.besetzen("s2", w.bert).await;
     let anna = w.cookie("annika").await;
     let bert = w.cookie("bertram").await;
     let a = w.erteilen(&anna, json!([funktion("s2")])).await;
@@ -479,8 +473,7 @@ async fn quittung_einer_person_nennt_keinen_namen() {
 #[tokio::test]
 async fn eigene_quittung_des_auftraggebers_bleibt_still() {
     let w = welt().await;
-    let ep_anna = w.personal("Anna Albers", Some(w.anna)).await;
-    w.besetzen("s2", ep_anna).await;
+    w.besetzen("s2", w.anna).await;
     let anna = w.cookie("annika").await;
     let a = w.erteilen(&anna, json!([funktion("s2")])).await;
     let zeile = a["empfaenger"][0]["id"].as_i64().unwrap();

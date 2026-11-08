@@ -366,15 +366,7 @@ async fn grenzen_und_pruefung_der_eintraege() {
 async fn anzeigename_ueberlebt_das_loeschen_und_nennt_keine_besetzung() {
     let u = umgebung().await;
     let sued = u.abschnitt("EA Süd").await;
-    let (s, j) = anfrage(
-        &u.app,
-        "PUT",
-        &format!("/api/einsaetze/{}/stab/besetzung/s3", u.einsatz),
-        &u.admin,
-        Some(r#"{"besetzung_art":"extern","bezeichnung":"Schulz"}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK, "Besetzung: {j:?}");
+    mitglied_mit_funktion(&u.app, &u.admin, u.einsatz, "Schulz", "schulz", "s3").await;
     let mut ids = Vec::new();
     for art in ARTEN {
         let id = u.anlegen(art).await;

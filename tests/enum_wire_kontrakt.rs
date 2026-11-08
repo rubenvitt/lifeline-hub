@@ -1429,6 +1429,7 @@ fn live_event_wire() {
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
         Einsatz => "einsatz",
+        Mitglieder => "mitglieder",
         Benachrichtigung => "benachrichtigung",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);

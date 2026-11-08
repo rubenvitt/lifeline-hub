@@ -35,8 +35,8 @@ wire_enum! {
         S7 => "s7",
         Fuehrungshilfspersonal => "fuehrungshilfspersonal",
         Fachberater => "fachberater",
-        /// Mitglied ohne Funktion im Einsatz (keine Stab-Besetzung, keine Funktion der
-        /// Mitgliedschaft). Abschnittsleitung und Sichtung fallen darunter, solange der Katalog
+        /// Mitglied ohne Funktion im Einsatz (nicht Einsatzleiter der Führungsstelle, keine
+        /// Funktion der Mitgliedschaft). Abschnittsleitung und Sichtung fallen darunter, solange der Katalog
         /// sie nicht kennt.
         Ohne => "ohne",
     }
@@ -535,15 +535,15 @@ mod tests {
         assert!(a.still_ids.is_empty());
     }
 
-    /// Lauter gewinnt (design.md D3): die Einsatzleitung besetzt per Zusammenlegung auch S2 und
-    /// ist so EL und S2; nur S2 still lässt ihr den Eingang, beide still nehmen ihn.
+    /// Lauter gewinnt (design.md D3): die Leiterin ist Einsatzleiter der Führungsstelle und trägt
+    /// S2 in ihrer Mitgliedschaft, ist also EL und S2; nur S2 still lässt ihr den Eingang, beide
+    /// still nehmen ihn (Spec „Zwei Funktionen“).
     #[tokio::test]
     async fn wer_eine_laute_funktion_hat_bekommt_den_eingang() {
         let pool = crate::db::test_pool().await;
-        let (e, ids) = welt(&pool, &[Some("s3")]).await;
+        let (e, ids) = welt(&pool, &[Some("s2")]).await;
         let leiter = ids[0];
-        // Die Leiterin ist über die Führungsstelle EL und, weil S2 „bei der Einsatzleitung“
-        // liegt, auch S2; die Mitgliedschaft nennt S3.
+        // EL über die Führungsstelle, S2 über die Mitgliedschaft.
         let personal: i64 = sqlx::query_scalar(
             "INSERT INTO personal (org_id, name, benutzer_id) VALUES (1, 'Leiterin', ?) \
              RETURNING id",
@@ -570,15 +570,6 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        sqlx::query(
-            "INSERT INTO einsatz_stabsfunktion (einsatz_id, sachgebiet, besetzung_art, \
-                 gesetzt_von_id) VALUES (?, 's2', 'einsatzleitung', ?)",
-        )
-        .bind(e)
-        .bind(leiter)
-        .execute(&pool)
-        .await
-        .unwrap();
         let karte = Labelkarte::standard();
         let art = BenachrichtigungArt::Befehl;
         let an_s2 = || anlass(e, art).an(Adressat::Funktion(Fuehrungsfunktion::S2));
@@ -594,16 +585,10 @@ mod tests {
         .await
         .unwrap();
         let a = aufloesung::empfaenger(&pool, &an_s2()).await.unwrap();
-        assert_eq!(a.benutzer_ids, vec![leiter], "EL und S3 sind laut");
+        assert_eq!(a.benutzer_ids, vec![leiter], "EL ist laut");
 
-        let alle_drei = menge(&[
-            VorgabeFunktion::El,
-            VorgabeFunktion::S2,
-            VorgabeFunktion::S3,
-        ]);
-        setzen(&pool, e, art, &alle_drei, leiter, &karte)
-            .await
-            .unwrap();
+        let beide = menge(&[VorgabeFunktion::El, VorgabeFunktion::S2]);
+        setzen(&pool, e, art, &beide, leiter, &karte).await.unwrap();
         let a = aufloesung::empfaenger(&pool, &an_s2()).await.unwrap();
         assert_eq!(a.still_ids, vec![leiter], "jede ihrer Funktionen ist still");
         assert!(a.benutzer_ids.is_empty());

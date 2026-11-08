@@ -2,20 +2,22 @@
 //! **aktuelle** Besetzung dieses Sachgebiets im Einsatz.
 //!
 //! Der Snapshot (`auftrag_empfaenger.snap_anzeige`) ist die historische Wahrheit und trägt nur
-//! das Funktionslabel — der Personenname kommt ausschließlich hier, zur Lesezeit, aus
-//! `einsatz_stabsfunktion` (Scrub): nach der Schwärzung ist er weg. Der Snapshot selbst wird
-//! seit LFH-701 mitgeschwärzt; sein Wortlaut bleibt im ETB der Anordnung.
+//! das Funktionslabel — der Personenname kommt ausschließlich hier, zur Lesezeit, aus der
+//! Führungsfunktion der Mitgliedschaft (`einsatz_mitgliedschaft.fuehrungsfunktion`, i6k6mzed,
+//! `openspec/changes/i6k6mzed-stab-herausnehmen/design.md` D2). Führen mehrere Mitglieder
+//! dasselbe Sachgebiet, gelten alle: ihre Namen stehen alphabetisch, getrennt durch „, “.
 //!
-//! Wer das Stab-Modul im Einsatz nicht lesen darf, bekommt keine Auflösung (das Feld fehlt) —
-//! dieselbe Filterlogik wie beim Modulzähler. Ein Gerät liest dafür nur die Module seiner Ansicht
-//! (LLH-1156).
+//! Die Mitgliedschaft überlebt die Schwärzung, der Name darf es nicht: an einem geschwärzten
+//! Einsatz (`einsatz.geschwaerzt_at`) bleibt der Zustand `personal`, aber ohne Namen. Der
+//! Snapshot selbst wird seit LFH-701 mitgeschwärzt; sein Wortlaut bleibt im ETB der Anordnung.
+//!
+//! Die Auflösung braucht kein Modulrecht: dieselben Namen stehen in `GET …/mitglieder`, das jedes
+//! Mitglied lesen darf. Ein gekoppeltes Gerät (LFH-892) bekommt keine Auflösung (das Feld fehlt).
 
 use super::Fuehrungsfunktion;
-use crate::auth::Benutzer;
-use crate::einsatz::EinsatzRolle;
 use crate::error::AppError;
+use crate::fuehrung::Sachgebiet;
 use crate::geraet::GeraetKontext;
-use crate::stab::{BesetzungArt, Sachgebiet};
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -23,9 +25,11 @@ use std::collections::BTreeMap;
 use utoipa::ToSchema;
 
 wire_enum! {
-    /// Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers. Anders als
-    /// [`BesetzungArt`] mit „nicht vergeben“ als eigenem Wert — hier ist die Abwesenheit einer
-    /// Zeile eine Auskunft, kein fehlendes Feld.
+    /// Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers, mit „nicht vergeben“ als
+    /// eigenem Wert — hier ist die Abwesenheit eines Mitglieds eine Auskunft, kein fehlendes
+    /// Feld. Erzeugt werden nur noch `personal` und `nicht_vergeben` (i6k6mzed, D2);
+    /// `einsatzleitung`, `extern` und `rueckwaertig` bleiben als Wire-Werte der früheren
+    /// Stab-Besetzung stehen (Grenzwert-Regel, `AGENTS.md`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum BesetzungsZustand {
         NichtVergeben => "nicht_vergeben",
@@ -49,63 +53,68 @@ pub struct AktuelleBesetzung {
 /// Die Besetzung eines Einsatzes, einmal je Anfrage geladen (keine N+1-Abfrage).
 #[derive(Debug, Clone, Default)]
 pub struct Aufloeser {
-    /// `None` = die Person darf den Stab nicht lesen → nie auflösen.
+    /// `None` = keine Auflösung (gekoppeltes Gerät) → das Feld fehlt.
     besetzung: Option<BTreeMap<Sachgebiet, AktuelleBesetzung>>,
 }
 
 impl Aufloeser {
-    /// Ohne Recht: löst nichts auf.
-    pub fn ohne_recht() -> Self {
+    /// Löst nichts auf.
+    pub fn ohne_aufloesung() -> Self {
         Self { besetzung: None }
     }
 
-    pub async fn laden(
-        conn: &mut SqliteConnection,
-        einsatz_id: i64,
-        darf_stab: bool,
-    ) -> Result<Self, AppError> {
-        if !darf_stab {
-            return Ok(Self::ohne_recht());
-        }
-        let zeilen = sqlx::query_as::<_, (String, String, Option<String>, Option<String>)>(
-            "SELECT sachgebiet, besetzung_art, snap_name, bezeichnung \
-             FROM einsatz_stabsfunktion WHERE einsatz_id = ?",
+    /// Lädt die Führungsfunktionen S1–S6 der Mitglieder des Einsatzes.
+    pub async fn laden(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Self, AppError> {
+        let geschwaerzt: bool =
+            sqlx::query_scalar("SELECT geschwaerzt_at IS NOT NULL FROM einsatz WHERE id = ?")
+                .bind(einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?
+                .unwrap_or(false);
+        let zeilen = sqlx::query_as::<_, (String, String)>(
+            "SELECT m.fuehrungsfunktion, b.anzeigename \
+             FROM einsatz_mitgliedschaft m JOIN benutzer b ON b.id = m.benutzer_id \
+             WHERE m.einsatz_id = ? AND m.fuehrungsfunktion IS NOT NULL",
         )
         .bind(einsatz_id)
         .fetch_all(&mut *conn)
         .await?;
-        let mut besetzung = BTreeMap::new();
-        for (sg, art, snap_name, bezeichnung) in zeilen {
-            let (Some(sg), Some(art)) = (Sachgebiet::parse(&sg), BesetzungArt::parse(&art)) else {
-                continue;
-            };
-            let (zustand, name) = match art {
-                BesetzungArt::Einsatzleitung => (BesetzungsZustand::Einsatzleitung, None),
-                BesetzungArt::Personal => (BesetzungsZustand::Personal, snap_name),
-                BesetzungArt::Extern => (BesetzungsZustand::Extern, bezeichnung),
-                BesetzungArt::Rueckwaertig => (BesetzungsZustand::Rueckwaertig, bezeichnung),
-            };
-            besetzung.insert(sg, AktuelleBesetzung { zustand, name });
+        let mut namen: BTreeMap<Sachgebiet, Vec<String>> = BTreeMap::new();
+        for (code, name) in zeilen {
+            if let Some(sg) = Fuehrungsfunktion::parse(&code).and_then(|f| f.sachgebiet()) {
+                namen.entry(sg).or_default().push(name);
+            }
         }
+        let besetzung = namen
+            .into_iter()
+            .map(|(sg, namen)| {
+                let name = (!geschwaerzt).then(|| namensliste(namen));
+                (
+                    sg,
+                    AktuelleBesetzung {
+                        zustand: BesetzungsZustand::Personal,
+                        name,
+                    },
+                )
+            })
+            .collect();
         Ok(Self {
             besetzung: Some(besetzung),
         })
     }
 
-    /// Lädt mit Rechteprüfung: das Stab-Modul muss für `benutzer` im Einsatz freigegeben sein,
-    /// bei einem Gerät zudem in der Ansicht liegen.
+    /// Lädt für eine Anfrage: ein gekoppeltes Gerät bekommt keine Auflösung (D2), sonst genügt
+    /// der Lesezugriff, den der Extractor der aufrufenden Route schon geprüft hat.
     pub async fn laden_fuer(
         pool: &SqlitePool,
         einsatz_id: i64,
-        org_id: i64,
-        benutzer: &Benutzer,
-        einsatz_rolle: Option<EinsatzRolle>,
         geraet: Option<&GeraetKontext>,
     ) -> Result<Self, AppError> {
-        let darf =
-            darf_stab_lesen(pool, einsatz_id, org_id, benutzer, einsatz_rolle, geraet).await?;
+        if geraet.is_some() {
+            return Ok(Self::ohne_aufloesung());
+        }
         let mut conn = pool.acquire().await?;
-        Self::laden(&mut conn, einsatz_id, darf).await
+        Self::laden(&mut conn, einsatz_id).await
     }
 
     /// Die Auflösung für einen Empfänger; nur s1–s6, sonst `None`.
@@ -119,28 +128,47 @@ impl Aufloeser {
     }
 }
 
-/// Ob `benutzer` das Stab-Modul im Einsatz lesen darf (Modulfreigabe; die Mitgliedschaft
-/// prüft bereits der Extractor der aufrufenden Route). Ein Gerät (LFH-892) darf es nur, wenn
-/// `stab` zu den Lese-Modulen seiner Ansicht gehört, wie bei Live-Feed und Modulzähler.
-pub async fn darf_stab_lesen(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    org_id: i64,
-    benutzer: &Benutzer,
-    einsatz_rolle: Option<EinsatzRolle>,
-    geraet: Option<&GeraetKontext>,
-) -> Result<bool, AppError> {
-    let mut erlaubt = crate::einsatz::berechtigung::erlaubte_module(
-        pool,
-        einsatz_id,
-        org_id,
-        benutzer,
-        einsatz_rolle,
-    )
-    .await?;
-    if let Some(g) = geraet {
-        erlaubt = g.schneide_module(erlaubt);
+/// Namen alphabetisch, getrennt durch „, “ — die eine Schreibweise für mehrere Träger einer
+/// Funktion (Spec `fuehrungsfunktionen`, „Mehrere Mitglieder mit derselben Führungsfunktion“).
+/// Verglichen wird ohne Groß- und Kleinschreibung und mit Umlauten wie ihrem Grundlaut, wie
+/// `localeCompare('de')` im Client (`frontend/src/fuehrung/besetzungAusMitgliedern.ts`).
+pub fn namensliste(mut namen: Vec<String>) -> String {
+    namen.sort_by(|a, b| {
+        sortierschluessel(a)
+            .cmp(&sortierschluessel(b))
+            .then_with(|| a.cmp(b))
+    });
+    namen.join(", ")
+}
+
+fn sortierschluessel(name: &str) -> String {
+    name.to_lowercase()
+        .chars()
+        .map(|c| match c {
+            'ä' => "a".to_string(),
+            'ö' => "o".to_string(),
+            'ü' => "u".to_string(),
+            'ß' => "ss".to_string(),
+            c => c.to_string(),
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::namensliste;
+
+    #[test]
+    fn mehrere_namen_alphabetisch_mit_komma() {
+        assert_eq!(
+            namensliste(vec!["Schulz".into(), "Müller".into(), "albers".into()]),
+            "albers, Müller, Schulz"
+        );
+        // Umlaut wie Grundlaut: „Mü“ vor „Mz“.
+        assert_eq!(
+            namensliste(vec!["Mzyk".into(), "Müller".into()]),
+            "Müller, Mzyk"
+        );
+        assert_eq!(namensliste(vec!["Weber".into()]), "Weber");
     }
-    use crate::einsatz::modul::{ModulMarker, Stab};
-    Ok(Stab::KEY.is_some_and(|key| erlaubt.contains(key)))
 }

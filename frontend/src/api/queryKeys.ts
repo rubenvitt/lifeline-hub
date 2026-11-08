@@ -351,13 +351,17 @@ export const EINSATZ_STREAM_EVENTS = {
   // „Für den Einsatz speichern“ aktualisiert den Ansichts-Switcher aller Betrachter.
   karten_ansicht: [EINSATZ_KEYS.kartenAnsicht],
   lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
-  // Führungsorganisation (Besetzung S1–S6 und Checkliste unter EINEM Prefix). Die Lagebesprechung
-  // (LLH-1111) und das Fernmeldewesen (LLH-1180) haben ihr eigenes Ereignis.
-  // Aufträge und Erinnerungen an ein Sachgebiet lösen zur Lesezeit auf die Besetzung auf
-  // (LFH-549): ein Besetzungswechsel ändert ihre Anzeige. Beide sind gezählte Listen, deshalb geht
-  // der Modulzähler mit (Regel aus `queryKeys.test.ts`), auch wenn sich die Zahl hier nicht ändert.
-  stab: [
-    EINSATZ_KEYS.stab,
+  // Stab-Seite (Besetzung S1–S6 und Checkliste unter EINEM Prefix). Die Lagebesprechung
+  // (LLH-1111) und das Fernmeldewesen (LLH-1180) haben ihr eigenes Ereignis. Aufträge und
+  // Erinnerungen lösen seit i6k6mzed über die Mitgliedschaft auf (`mitglieder`).
+  stab: [EINSATZ_KEYS.stab],
+  // Mitgliederliste (i6k6mzed, design.md D2): Aufnahme, Rolle, Führungsfunktion, Entfernen. Aus ihr
+  // lösen Aufträge und Erinnerungen an ein Sachgebiet zur Lesezeit auf (LFH-549), Organigramm,
+  // Fernmeldeskizze und Kommunikationsplan lesen sie direkt. Aufträge und Erinnerungen sind
+  // gezählte Listen, deshalb geht der Modulzähler mit (Regel aus `queryKeys.test.ts`), auch wenn
+  // sich die Zahl hier nicht ändert. Den Kopf (`meine_*`) frischt das zugleich verteilte `einsatz`.
+  mitglieder: [
+    EINSATZ_KEYS.mitglieder,
     EINSATZ_KEYS.auftraege,
     EINSATZ_KEYS.erinnerungen,
     EINSATZ_KEYS.modulZaehler,
@@ -366,7 +370,7 @@ export const EINSATZ_STREAM_EVENTS = {
   // zählt nichts); der ETB-Nachweis des Abschlusses kommt über das eigene `etb`-Ereignis.
   lagebesprechung: [EINSATZ_KEYS.lagebesprechung],
   // Fernmeldewesen (LLH-1180): Kommunikationsplan und Skizze. Kein Modulzähler (das Modul zählt
-  // nichts); die Besetzung im Nebentext kommt über `stab`.
+  // nichts); die Besetzung im Nebentext kommt über `mitglieder`.
   fernmeldewesen: [EINSATZ_KEYS.fernmeldewesen],
   // Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
   dokument: [EINSATZ_KEYS.dokumente, EINSATZ_KEYS.modulZaehler],
@@ -388,8 +392,8 @@ export const EINSATZ_STREAM_EVENTS = {
   // Einsatzkopf (LFH-555). Der Stand der Lagebesprechung liefert den Termin der nächsten
   // Lagebesprechung aus derselben Spalte mit (LFH-46, Entscheidung 11; LLH-1111), deshalb hängt er
   // hier mit dran: eine Terminwahrheit, zwei Caches. `lagekennzahlen` lösen es aus, aber nur beim Umschalten einer
-  // Kennzahl, nicht bei jeder Pegel- oder Bezirksänderung (LFH-855). Die Stab-Besetzung
-  // (`meine_sachgebiete`) löst es nicht aus; sie wird beim nächsten Abruf frisch. Die eigene
+  // Kennzahl, nicht bei jeder Pegel- oder Bezirksänderung (LFH-855). Eine Änderung der
+  // Mitgliedschaft (`meine_*`, LFH-854, i6k6mzed) löst es aus, daneben `mitglieder`. Die eigene
   // Führungsstelle (LFH-849) meldet ihre Änderung über dasselbe Ereignis.
   // Die Vorgabe je Funktion (LLH-1421, design.md D4) meldet ihr Setzen über dasselbe Ereignis.
   einsatz: [
@@ -498,10 +502,10 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  * `queryKeys.guard.test.ts` verlangt, dass jeder Key aus {@link EINSATZ_KEYS} entweder in
  * {@link EINSATZ_STREAM_EVENTS} auftaucht ODER hier steht.
  *
- * - `einstellungen`/`mitglieder`/`sprechgruppen`: selten geändert, kein Live-Event. Der
- *   Einsatzkopf `einsatz` ist seit LFH-555 live.
- * - `mitgliedAuswahl` (LFH-1141): wie `mitglieder`; die eigene Aufnahme oder Entfernung
- *   invalidiert sie, eine neu angelegte Person erscheint beim nächsten Abruf.
+ * - `einstellungen`/`sprechgruppen`: selten geändert, kein Live-Event. Der Einsatzkopf
+ *   `einsatz` ist seit LFH-555 live, die Mitglieder sind es seit i6k6mzed (`mitglieder`).
+ * - `mitgliedAuswahl` (LFH-1141): die eigene Aufnahme oder Entfernung invalidiert sie, eine neu
+ *   angelegte Person erscheint beim nächsten Abruf.
  * - `person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
@@ -556,7 +560,6 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einstellungen,
-  EINSATZ_KEYS.mitglieder,
   EINSATZ_KEYS.mitgliedAuswahl,
   EINSATZ_KEYS.sprechgruppen,
   EINSATZ_KEYS.modulOverrides,

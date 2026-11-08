@@ -343,14 +343,14 @@ pub async fn rolle_von(
     Ok(rolle.and_then(|s| EinsatzRolle::parse(&s)))
 }
 
-/// Eigene Führungsstelle, ausdrücklich auf Benutzer UND Einsatz begrenzt — als
-/// Vorbelegungstext der ETB-Erfassung (LFH-549): Kürzel eines Katalogwerts („S2“),
-/// „Fachberater: THW“ oder der Freitext.
+/// Eigene Führungsstelle (Code und Text), ausdrücklich auf Benutzer UND Einsatz begrenzt —
+/// Quelle von `meine_fuehrungsstelle`, `meine_sachgebiete` und `meine_funktion`
+/// (`MeineFelder`, i6k6mzed D2). `None` ohne Mitgliedschaft.
 pub async fn fuehrungsstelle_von(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,
-) -> Result<Option<String>, AppError> {
+) -> Result<Option<crate::fuehrung::Funktionsangabe>, AppError> {
     let zeile: Option<(Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT fuehrungsfunktion, fuehrungsstelle FROM einsatz_mitgliedschaft \
          WHERE einsatz_id = ? AND benutzer_id = ?",
@@ -359,11 +359,7 @@ pub async fn fuehrungsstelle_von(
     .bind(benutzer_id)
     .fetch_optional(pool)
     .await?;
-    let Some((code, text)) = zeile else {
-        return Ok(None);
-    };
-    let karte = labelkarte(pool, einsatz_id).await?;
-    Ok(vorbelegung(&karte, code.as_deref(), text))
+    Ok(zeile.map(|(code, text)| crate::fuehrung::aus_spalten(code.as_deref(), text)))
 }
 
 /// Vorbelegungstext aus Code und Text einer Führungsstelle (LFH-549).
@@ -492,12 +488,6 @@ pub async fn liste_fuer(
     }
     let rows: Vec<Row> = q.fetch_all(pool).await?;
 
-    // ZWEITE, ebenfalls EINMALIGE Abfrage (LFH-46): die Sachgebiete des Benutzers über ALLE
-    // Einsätze. Die Detail-Abfrage (`stab::repo::sachgebiete_von`) je Zeile zu rufen wäre N+1
-    // auf `GET /api/einsaetze` — der Route hinter der Einsatzauswahl. Zwei Statements bleiben
-    // O(1) in der Zahl der Einsätze; genau das sichert `liste_fuer` zu.
-    let mut sachgebiete = crate::stab::repo::sachgebiete_je_einsatz(pool, benutzer.id).await?;
-
     let rows: Vec<Row> = rows
         .into_iter()
         .filter(|r| {
@@ -532,21 +522,20 @@ pub async fn liste_fuer(
     Ok(rows
         .into_iter()
         .map(|r| {
-            let meine_sachgebiete = sachgebiete.remove(&r.id).unwrap_or_default();
             let karte = karten.get(&r.org_id).cloned().unwrap_or_default();
-            // Dieselbe reine Ableitung wie `Einsatz::anzeige` — aus Werten, die diese
-            // Funktion ohnehin schon geladen hat, also ohne dritte Abfrage.
-            let meine_funktion = super::funktion::ableiten(
-                &meine_sachgebiete,
-                r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
-                &karte,
-            )
-            .map(|f| f.bezeichnung);
-            let meine_fuehrungsstelle = vorbelegung(
-                &karte,
-                r.meine_fuehrungsfunktion.as_deref(),
-                r.meine_fuehrungsstelle,
-            );
+            // Dieselbe reine Ableitung wie `Einsatz::anzeige` — aus der Mitgliedschaft, die die
+            // Listenabfrage ohnehin mitliest, also ohne zweite Abfrage (i6k6mzed D2).
+            let stelle = r.meine_rolle.as_ref().map(|_| {
+                crate::fuehrung::aus_spalten(
+                    r.meine_fuehrungsfunktion.as_deref(),
+                    r.meine_fuehrungsstelle.clone(),
+                )
+            });
+            let super::MeineFelder {
+                fuehrungsstelle: meine_fuehrungsstelle,
+                sachgebiete: meine_sachgebiete,
+                funktion: meine_funktion,
+            } = super::MeineFelder::ableiten(r.meine_rolle.as_deref(), stelle, &karte);
             EinsatzAnzeige {
                 id: r.id,
                 org_id: r.org_id,
@@ -571,8 +560,6 @@ pub async fn liste_fuer(
                 retention_bis: r.retention_bis,
                 meine_rolle: r.meine_rolle,
                 meine_fuehrungsstelle,
-                // `remove` statt `get` (oben): jede Einsatz-id kommt genau einmal vor, der
-                // Eintrag wird also nicht mehr gebraucht — das spart das Klonen des Vec.
                 meine_sachgebiete,
                 meine_funktion,
                 lagekennzahlen: super::lagekennzahl::ableiten(

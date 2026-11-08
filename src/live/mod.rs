@@ -58,6 +58,10 @@ wire_enum! {
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
         Einsatz => "einsatz",
+        /// Mitgliederliste des Einsatzes (i6k6mzed, design.md D2): Aufnahme, Rolle,
+        /// Führungsfunktion, Entfernen. Aus ihr lösen Aufträge, Erinnerungen, Organigramm,
+        /// Fernmeldeskizze und Kommunikationsplan S1–S6 auf.
+        Mitglieder => "mitglieder",
         /// Benachrichtigungen eines `melden`-Aufrufs (LLH-1207, design.md D2): EINE Nachricht im
         /// Ring, je Verbindung nur mit der Nutzlast ihres Nutzers ([`LiveNachricht::empfaenger`]).
         Benachrichtigung => "benachrichtigung",
@@ -70,10 +74,10 @@ impl LiveEvent {
     /// Live-Filters (F01/LFH-227). Ein Abonnent erhält das Event, wenn er MINDESTENS
     /// EINES dieser Module sehen darf. Eine leere Menge heißt „gehört keinem Modul — erreicht
     /// jeden, der die Tür des Stroms passiert" (`EinsatzLesezugriff` ohne Modul, `routes/live.rs`).
-    /// Sie steht nur drei Events zu: dem Kontroll-Event `lagged`, dem Einsatzkopf `einsatz`,
-    /// dessen GET hinter genau derselben Tür liegt (LFH-555), und der Benachrichtigung, die statt
-    /// eines Moduls eine Empfängerliste trägt (LLH-1207). Gepinnt von
-    /// `ungegatet_sind_nur_lagged_einsatz_und_benachrichtigung`.
+    /// Sie steht nur vier Events zu: dem Kontroll-Event `lagged`, dem Einsatzkopf `einsatz` und
+    /// der Mitgliederliste `mitglieder`, deren GETs hinter genau derselben Tür liegen (LFH-555,
+    /// i6k6mzed), und der Benachrichtigung, die statt eines Moduls eine Empfängerliste trägt
+    /// (LLH-1207). Gepinnt von `ungegatet_sind_nur_lagged_einsatz_mitglieder_und_benachrichtigung`.
     ///
     /// **Füll-Regel (sicherheitstragend):** hier steht das Modul, zu dessen Datenobjekt
     /// das Event gehört — NICHT das Modul der Route, die es ausgelöst hat. Ein
@@ -210,6 +214,10 @@ impl LiveEvent {
             // Auch eine Mitgliedschaftsänderung feuert es (LFH-854): kein Leck, denn die
             // Mitgliederliste mit allen Rollen liegt ebenfalls hinter dieser Tür.
             LiveEvent::Einsatz => &[],
+            // Mitgliederliste (i6k6mzed, design.md D2): gehört keinem Modul. `GET …/mitglieder`
+            // liegt hinter derselben Tür wie der Strom (`EinsatzLesezugriff` ohne Modul); dieselbe
+            // Änderung meldet ohnehin `einsatz`. Nutzlast nur die Einsatzkennung.
+            LiveEvent::Mitglieder => &[],
             // Benachrichtigung (LLH-1207, design.md D2): ungegatet, weil ihr Empfängerfilter enger
             // ist als jedes Modul. Sie erreicht nur die Verbindungen der Nutzer in
             // `LiveNachricht::empfaenger`, je mit seiner Nutzlast (Live und Replay,
@@ -886,21 +894,24 @@ mod tests {
         }
     }
 
-    /// Ungegatet sind genau das Kontroll-Event `lagged`, der Einsatzkopf `einsatz` (LFH-555)
-    /// und die Benachrichtigung (LLH-1207). Die ersten beiden gehören keinem Modul und erreichen
-    /// jeden, der die Tür des Stroms passiert; die Benachrichtigung ist enger als jedes Modul,
+    /// Ungegatet sind genau das Kontroll-Event `lagged`, der Einsatzkopf `einsatz` (LFH-555), die
+    /// Mitgliederliste `mitglieder` (i6k6mzed) und die Benachrichtigung (LLH-1207). Die ersten drei
+    /// gehören keinem Modul und erreichen jeden, der die Tür des Stroms passiert; die Benachrichtigung ist enger als jedes Modul,
     /// weil sie nur an ihre Empfänger geht ([`LiveEvent::braucht_empfaenger`], unten gepinnt).
     /// Rutschte ein Fach-Event versehentlich auf `&[]`, liefe es an JEDEM Modul-Gate vorbei —
     /// die Lücke, die F01 schließt.
     #[test]
-    fn ungegatet_sind_nur_lagged_einsatz_und_benachrichtigung() {
+    fn ungegatet_sind_nur_lagged_einsatz_mitglieder_und_benachrichtigung() {
         let mut ungegatet: Vec<&str> = LiveEvent::ALLE
             .iter()
             .filter(|ev| ev.modul_keys().is_empty())
             .map(|ev| ev.as_str())
             .collect();
         ungegatet.sort_unstable();
-        assert_eq!(ungegatet, vec!["benachrichtigung", "einsatz", "lagged"]);
+        assert_eq!(
+            ungegatet,
+            vec!["benachrichtigung", "einsatz", "lagged", "mitglieder"]
+        );
         let mit_empfaengern: Vec<&str> = LiveEvent::ALLE
             .iter()
             .filter(|ev| ev.braucht_empfaenger())
@@ -1043,6 +1054,8 @@ mod tests {
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),
             (LiveEvent::Einsatz, &[]),
+            // Tür des Stroms wie `einsatz` (i6k6mzed, Begründung an der Variante).
+            (LiveEvent::Mitglieder, &[]),
             // Empfängerfilter statt Modul-Gate (LLH-1207, Begründung an der Variante).
             (LiveEvent::Benachrichtigung, &[]),
             (LiveEvent::Lagged, &[]),
@@ -1071,6 +1084,8 @@ mod tests {
         assert!(LiveEvent::Lagged.sichtbar_fuer(&HashSet::new()));
         // Einsatzkopf (LFH-555): erreicht auch ein Mitglied ohne jede Modulfreigabe.
         assert!(LiveEvent::Einsatz.sichtbar_fuer(&HashSet::new()));
+        // Mitgliederliste (i6k6mzed): ebenso.
+        assert!(LiveEvent::Mitglieder.sichtbar_fuer(&HashSet::new()));
         // Dual gegatetes Event: EIN passendes Modul genügt.
         let nur_lage: HashSet<&'static str> = HashSet::from(["lagemeldungen"]);
         assert!(LiveEvent::Meldung.sichtbar_fuer(&nur_lage));

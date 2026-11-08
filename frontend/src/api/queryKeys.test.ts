@@ -236,11 +236,13 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   });
 
   // LLH-1180: Kommunikationsplan und Skizze gehören dem Fernmeldewesen. Sein Ereignis trifft nur
-  // den eigenen Prefix; `stab` behält Besetzung samt Auflösung (Aufträge, Erinnerungen).
+  // den eigenen Prefix. Seit i6k6mzed (design.md D2) lösen Aufträge und Erinnerungen über die
+  // Mitgliedschaft auf: `mitglieder` zieht sie mit, `stab` trifft nur noch die Stab-Seite.
   it('bildet fernmeldewesen auf das eigene Modul ab, stab nicht mehr auf Kommunikationsplan und Skizze', () => {
     expect(EINSATZ_STREAM_EVENTS.fernmeldewesen).toEqual(['einsatz-fernmeldewesen']);
-    expect(EINSATZ_STREAM_EVENTS.stab).toEqual([
-      'einsatz-stab',
+    expect(EINSATZ_STREAM_EVENTS.stab).toEqual(['einsatz-stab']);
+    expect(EINSATZ_STREAM_EVENTS.mitglieder).toEqual([
+      'einsatz-mitglieder',
       'einsatz-auftraege',
       'einsatz-erinnerungen',
       'einsatz-modul-zaehler',
@@ -274,6 +276,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
         'erinnerung',
         'chat',
         'dokument',
+        // i6k6mzed: die Auflösung S1–S6 ändert Aufträge und Erinnerungen.
+        'mitglieder',
       ]),
     );
     for (const [ev, keys] of betroffen) {

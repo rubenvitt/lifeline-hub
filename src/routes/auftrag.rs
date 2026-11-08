@@ -133,16 +133,7 @@ pub async fn liste(
         &jetzt(),
     )
     .await?;
-    anreichern_alle(
-        &state.pool,
-        einsatz_id,
-        ctx.einsatz.org_id,
-        &ctx.benutzer,
-        ctx.modul_rolle(),
-        ctx.geraet.as_ref(),
-        &mut liste,
-    )
-    .await?;
+    anreichern_alle(&state.pool, einsatz_id, ctx.geraet.as_ref(), &mut liste).await?;
     Ok(Json(liste))
 }
 
@@ -190,9 +181,6 @@ pub async fn detail(
     anreichern_alle(
         &state.pool,
         ctx.einsatz.id,
-        ctx.einsatz.org_id,
-        &ctx.benutzer,
-        ctx.modul_rolle(),
         ctx.geraet.as_ref(),
         std::slice::from_mut(&mut d),
     )
@@ -240,9 +228,6 @@ pub async fn anlegen(
     anreichern_alle(
         &state.pool,
         einsatz_id,
-        ctx.einsatz.org_id,
-        &ctx.benutzer,
-        ctx.modul_rolle(),
         ctx.geraet.as_ref(),
         std::slice::from_mut(&mut d),
     )
@@ -335,9 +320,6 @@ pub async fn quittieren(
     anreichern_alle(
         &state.pool,
         einsatz_id,
-        ctx.einsatz.org_id,
-        &ctx.benutzer,
-        ctx.modul_rolle(),
         ctx.geraet.as_ref(),
         std::slice::from_mut(&mut d),
     )
@@ -469,9 +451,6 @@ pub async fn vollzug(
     anreichern_alle(
         &state.pool,
         einsatz_id,
-        ctx.einsatz.org_id,
-        &ctx.benutzer,
-        ctx.modul_rolle(),
         ctx.geraet.as_ref(),
         std::slice::from_mut(&mut d),
     )
@@ -505,9 +484,6 @@ pub async fn abnehmen(
     anreichern_alle(
         &state.pool,
         einsatz_id,
-        ctx.einsatz.org_id,
-        &ctx.benutzer,
-        ctx.modul_rolle(),
         ctx.geraet.as_ref(),
         std::slice::from_mut(&mut d),
     )
@@ -569,9 +545,6 @@ pub async fn aufheben(
     anreichern_alle(
         &state.pool,
         einsatz_id,
-        ctx.einsatz.org_id,
-        &ctx.benutzer,
-        ctx.modul_rolle(),
         ctx.geraet.as_ref(),
         std::slice::from_mut(&mut d),
     )
@@ -623,9 +596,6 @@ pub async fn berichtigen(
     anreichern_alle(
         &state.pool,
         einsatz_id,
-        ctx.einsatz.org_id,
-        &ctx.benutzer,
-        ctx.modul_rolle(),
         ctx.geraet.as_ref(),
         std::slice::from_mut(&mut d),
     )

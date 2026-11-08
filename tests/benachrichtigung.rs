@@ -95,21 +95,6 @@ impl Welt {
         v["id"].as_i64().unwrap()
     }
 
-    async fn besetzen(&self, sachgebiet: &str, body: Value) {
-        let (s, v) = anfrage(
-            &self.app,
-            "PUT",
-            &format!(
-                "/api/einsaetze/{}/stab/besetzung/{sachgebiet}",
-                self.einsatz
-            ),
-            &self.admin,
-            Some(&body.to_string()),
-        )
-        .await;
-        assert!(s.is_success(), "besetzen {sachgebiet}: {s} {v}");
-    }
-
     async fn funktion_setzen(&self, benutzer_id: i64, funktion: &str) {
         let (s, v) = anfrage(
             &self.app,
@@ -172,16 +157,11 @@ impl Welt {
 
 // ───────────────────────── Empfängerauflösung ─────────────────────────
 
-/// Spec-Szenario „Auftrag an S4“: die Stab-Besetzung S4 bekommt ihn, ein anderes Mitglied nicht.
+/// Spec-Szenario „Auftrag an S4“: das Mitglied mit S4 bekommt ihn, ein anderes Mitglied nicht.
 #[tokio::test]
-async fn auftrag_an_s4_erreicht_nur_die_besetzung() {
+async fn auftrag_an_s4_erreicht_nur_das_mitglied_mit_s4() {
     let w = welt().await;
-    let ep = w.personal("Anna", Some(w.anna)).await;
-    w.besetzen(
-        "s4",
-        json!({ "besetzung_art": "personal", "personal_id": ep }),
-    )
-    .await;
+    w.funktion_setzen(w.anna, "s4").await;
     let an = w
         .melden(
             w.anlass(Art::AuftragErteilt, Typ::Auftrag, 1)
@@ -193,16 +173,12 @@ async fn auftrag_an_s4_erreicht_nur_die_besetzung() {
     assert_eq!(w.zeilen().await, 1);
 }
 
-/// Die Stab-Besetzung geht der Funktion aus der Mitgliedschaft vor.
+/// Spec „Meine Funktion“, Szenario „Zwei Mitglieder mit derselben Funktion“: beide bekommen sie
+/// (i6k6mzed, design.md D2).
 #[tokio::test]
-async fn stab_besetzung_geht_der_mitgliedschaft_vor() {
+async fn zwei_mitglieder_mit_s4_bekommen_beide() {
     let w = welt().await;
-    let ep = w.personal("Anna", Some(w.anna)).await;
-    w.besetzen(
-        "s4",
-        json!({ "besetzung_art": "personal", "personal_id": ep }),
-    )
-    .await;
+    w.funktion_setzen(w.anna, "s4").await;
     w.funktion_setzen(w.bert, "s4").await;
     let an = w
         .melden(
@@ -210,12 +186,12 @@ async fn stab_besetzung_geht_der_mitgliedschaft_vor() {
                 .an(Adressat::Funktion(Fuehrungsfunktion::S4)),
         )
         .await;
-    assert_eq!(an, vec![w.anna]);
+    assert_eq!(an, vec![w.anna, w.bert]);
 }
 
-/// Ohne Stab-Besetzung gilt die Funktion der Mitgliedschaft (Spec „Meine Funktion“).
+/// Spec „Meine Funktion“, Szenario „Ersatz über die Mitgliedschaft“.
 #[tokio::test]
-async fn ohne_besetzung_gilt_die_funktion_der_mitgliedschaft() {
+async fn funktion_der_mitgliedschaft_erreicht_ihren_traeger() {
     let w = welt().await;
     w.funktion_setzen(w.bert, "s4").await;
     let an = w
@@ -241,11 +217,20 @@ async fn unbesetzte_funktion_erzeugt_nichts() {
     assert_eq!(w.zeilen().await, 0);
 }
 
-/// EL ist der Einsatzleiter der Führungsstelle; ein Sachgebiet „bei der Einsatzleitung“ löst
-/// ebenso auf.
+/// EL ist der Einsatzleiter der Führungsstelle; er geht der Funktion EL aus der Mitgliedschaft
+/// vor (Spec „Meine Funktion“, Szenario „Stab-Besetzung geht vor“). Ohne erfassten Einsatzleiter
+/// gilt die Mitgliedschaft.
 #[tokio::test]
-async fn el_und_sachgebiet_bei_der_einsatzleitung_erreichen_den_einsatzleiter() {
+async fn el_erreicht_den_einsatzleiter_vor_der_mitgliedschaft() {
     let w = welt().await;
+    w.funktion_setzen(w.bert, "el").await;
+    let an = w
+        .melden(
+            w.anlass(Art::Befehl, Typ::Befehl, 1)
+                .an(Adressat::Funktion(Fuehrungsfunktion::El)),
+        )
+        .await;
+    assert_eq!(an, vec![w.bert], "ohne Einsatzleiter: Mitgliedschaft");
     let ep = w.personal("Anna", Some(w.anna)).await;
     let geaendert = sqlx::query(
         "UPDATE einsatz_fuehrungsstelle SET einsatzleiter_art = 'personal', \
@@ -276,17 +261,7 @@ async fn el_und_sachgebiet_bei_der_einsatzleitung_erreichen_den_einsatzleiter() 
                 .an(Adressat::Funktion(Fuehrungsfunktion::El)),
         )
         .await;
-    assert_eq!(an, vec![w.anna], "EL");
-
-    w.besetzen("s2", json!({ "besetzung_art": "einsatzleitung" }))
-        .await;
-    let an = w
-        .melden(
-            w.anlass(Art::Befehl, Typ::Befehl, 1)
-                .an(Adressat::Funktion(Fuehrungsfunktion::S2)),
-        )
-        .await;
-    assert_eq!(an, vec![w.anna], "S2 bei der Einsatzleitung");
+    assert_eq!(an, vec![w.anna], "EL der Führungsstelle geht vor");
 }
 
 /// Wer das Modul des Bezugs nicht lesen darf, bekommt nichts — auch wenn seine Funktion
@@ -294,12 +269,7 @@ async fn el_und_sachgebiet_bei_der_einsatzleitung_erreichen_den_einsatzleiter() 
 #[tokio::test]
 async fn ohne_modulrecht_am_bezug_entfaellt_der_empfaenger() {
     let w = welt().await;
-    let ep = w.personal("Anna", Some(w.anna)).await;
-    w.besetzen(
-        "s4",
-        json!({ "besetzung_art": "personal", "personal_id": ep }),
-    )
-    .await;
+    w.funktion_setzen(w.anna, "s4").await;
     w.modul_nur_fuer_admins("auftraege").await;
     let an = w
         .melden(
@@ -339,12 +309,7 @@ async fn eigene_sofortmeldung_erreicht_die_anderen_leser_nicht_den_ausloeser() {
 #[tokio::test]
 async fn auftrag_an_die_eigene_funktion_benachrichtigt_niemanden() {
     let w = welt().await;
-    let ep = w.personal("Anna", Some(w.anna)).await;
-    w.besetzen(
-        "s4",
-        json!({ "besetzung_art": "personal", "personal_id": ep }),
-    )
-    .await;
+    w.funktion_setzen(w.anna, "s4").await;
     let an = w
         .melden(
             w.anlass(Art::AuftragErteilt, Typ::Auftrag, 1)

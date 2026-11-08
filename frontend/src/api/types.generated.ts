@@ -1309,9 +1309,11 @@ export interface components {
          */
         BesetzungArt: "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
         /**
-         * @description Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers. Anders als
-         *     [`BesetzungArt`] mit „nicht vergeben“ als eigenem Wert — hier ist die Abwesenheit einer
-         *     Zeile eine Auskunft, kein fehlendes Feld.
+         * @description Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers, mit „nicht vergeben“ als
+         *     eigenem Wert — hier ist die Abwesenheit eines Mitglieds eine Auskunft, kein fehlendes
+         *     Feld. Erzeugt werden nur noch `personal` und `nicht_vergeben` (i6k6mzed, D2);
+         *     `einsatzleitung`, `extern` und `rueckwaertig` bleiben als Wire-Werte der früheren
+         *     Stab-Besetzung stehen (Grenzwert-Regel, `AGENTS.md`).
          * @enum {string}
          */
         BesetzungsZustand: "nicht_vergeben" | "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
@@ -2333,14 +2335,15 @@ export interface components {
             meine_fuehrungsstelle?: string | null;
             /**
              * @description Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf
-             *     („S2 Lage", „S2/S3", „Einsatzleitung"; LFH-615). Abgeleitet aus `meine_sachgebiete`
-             *     und `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt.
+             *     („S2 Lage", „Fachberater: THW", „Einsatzleitung"; LFH-615). Abgeleitet aus der
+             *     Führungsfunktion der Mitgliedschaft und `meine_rolle` über `funktion::ableiten` — fehlt,
+             *     wenn keine Funktion folgt.
              */
             meine_funktion?: string | null;
             meine_rolle?: components["schemas"]["EinsatzRolle"] | null;
             /**
-             * @description Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
-             *     diesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.
+             * @description Sachgebiet der eigenen Führungsfunktion in diesem Einsatz, höchstens eines (LFH-46;
+             *     seit i6k6mzed aus `einsatz_mitgliedschaft.fuehrungsfunktion`, design.md D2).
              *
              *     **Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und
              *     KEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über
@@ -4641,7 +4644,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "benachrichtigung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];

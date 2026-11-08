@@ -3242,7 +3242,7 @@
       },
       "BesetzungsZustand": {
         "type": "string",
-        "description": "Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers. Anders als\n[`BesetzungArt`] mit „nicht vergeben“ als eigenem Wert — hier ist die Abwesenheit einer\nZeile eine Auskunft, kein fehlendes Feld.",
+        "description": "Besetzungszustand eines Sachgebiets aus Sicht eines Empfängers, mit „nicht vergeben“ als\neigenem Wert — hier ist die Abwesenheit eines Mitglieds eine Auskunft, kein fehlendes\nFeld. Erzeugt werden nur noch `personal` und `nicht_vergeben` (i6k6mzed, D2);\n`einsatzleitung`, `extern` und `rueckwaertig` bleiben als Wire-Werte der früheren\nStab-Besetzung stehen (Grenzwert-Regel, `AGENTS.md`).",
         "enum": [
           "nicht_vergeben",
           "einsatzleitung",
@@ -5806,7 +5806,7 @@
               "string",
               "null"
             ],
-            "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „S2/S3\", „Einsatzleitung\"; LFH-615). Abgeleitet aus `meine_sachgebiete`\nund `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt."
+            "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „Fachberater: THW\", „Einsatzleitung\"; LFH-615). Abgeleitet aus der\nFührungsfunktion der Mitgliedschaft und `meine_rolle` über `funktion::ableiten` — fehlt,\nwenn keine Funktion folgt."
           },
           "meine_rolle": {
             "oneOf": [
@@ -5823,7 +5823,7 @@
             "items": {
               "$ref": "#/components/schemas/Sachgebiet"
             },
-            "description": "Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in\ndiesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.\n\n**Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und\nKEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über\n`Einsatz::anzeige`, Liste über das Struct-Literal in `repo::liste_fuer`), und ein\nPfad, der auslässt, während der andere `[]` schickt, wäre nach der\nOptionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung."
+            "description": "Sachgebiet der eigenen Führungsfunktion in diesem Einsatz, höchstens eines (LFH-46;\nseit i6k6mzed aus `einsatz_mitgliedschaft.fuehrungsfunktion`, design.md D2).\n\n**Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und\nKEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über\n`Einsatz::anzeige`, Liste über das Struct-Literal in `repo::liste_fuer`), und ein\nPfad, der auslässt, während der andere `[]` schickt, wäre nach der\nOptionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung."
           },
           "meldende_stelle": {
             "type": [
@@ -11510,6 +11510,7 @@
           "lage_snapshot",
           "sofortmeldung",
           "einsatz",
+          "mitglieder",
           "benachrichtigung",
           "lagged"
         ]
