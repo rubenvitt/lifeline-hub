@@ -187,7 +187,10 @@ fn posten_schluessel(posten_id: Option<i64>) -> Posten {
 }
 
 /// Zone und Darstellung der Organisation für Servertexte.
-async fn zeitstil_org(conn: &mut SqliteConnection, org_id: i64) -> Result<Zeitstil, AppError> {
+pub(crate) async fn zeitstil_org(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<Zeitstil, AppError> {
     let zeile: Option<(Option<String>, Option<String>)> =
         sqlx::query_as("SELECT zeitzone, zeitdarstellung FROM org_einstellungen WHERE org_id = ?")
             .bind(org_id)

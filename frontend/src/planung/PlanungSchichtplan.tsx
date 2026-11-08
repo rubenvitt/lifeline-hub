@@ -16,6 +16,7 @@ import {
   aenderePlanungBlock,
   erzeugePlanungSchichten,
   legePlanungBlockAn,
+  loadPlanungMappe,
   loeschePlanungBlock,
 } from '../api/planungen';
 import { listeQualifikationen } from '../api/qualifikationen';
@@ -36,6 +37,8 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useViewport } from '../components/useViewport';
 import { ZugPointerSensor } from '../components/zugPointerSensor';
 import type { ZugStand } from '../abloesung/schichtplan/raster';
+import { AusgabeKnoepfe } from '../abloesung/schichtplan/ausgabe/SchichtplanAusgabeKnoepfe';
+import { mappeDateiname } from '../abloesung/schichtplan/ausgabe/mappeDateiname';
 import SchichtenErzeugenDialog from '../abloesung/schichtplan/SchichtenErzeugenDialog';
 import SchichtplanBlockDialog, {
   type BlockSpeichern,
@@ -53,6 +56,7 @@ import {
   postenSchluessel,
 } from '../abloesung/schichtplan/schichtplanZeilen';
 import { useUhr } from '../abloesung/useUhr';
+import { planungDruckPfad } from '../routing/deeplinks';
 import {
   blockAendernBody,
   blockBody,
@@ -367,6 +371,15 @@ export default function PlanungSchichtplan({
             </Button>
           </>
         )}
+        {/* Ausgabe wie im Einsatz (LLH-1593): Aushang und Zettel, Excel-Mappe. Wer die Planung
+            lesen darf, sieht auch das Personal; „Excel“ ist deshalb nie gesperrt. */}
+        <AusgabeKnoepfe
+          druckPfad={planungDruckPfad(planungId)}
+          schluessel={`planung-${planungId}`}
+          ladeMappe={() => loadPlanungMappe(planungId)}
+          dateiname={() => mappeDateiname(planung.kopf.bezeichnung, `planung-${planungId}`)}
+          personalFrei
+        />
       </Flex>
       {zugFehler != null && (
         <div style={{ marginBottom: token.marginSM }}>

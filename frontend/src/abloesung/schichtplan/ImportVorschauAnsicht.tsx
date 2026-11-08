@@ -78,6 +78,8 @@ function personWert(z: SchichtplanImportPersonZiel): string {
       return `stamm:${z.personal_id}`;
     case 'helfer':
       return `helfer:${z.helfer_id}`;
+    case 'einsatz':
+      return `einsatz:${z.einsatz_personal_id}`;
     case 'neu':
       return 'neu';
   }
@@ -87,11 +89,13 @@ function personWahl(wert: string): SchichtplanPersonWahlEingabe {
   const [art, id] = wert.split(':');
   if (art === 'stamm') return { art: 'stamm', personal_id: Number(id) };
   if (art === 'helfer') return { art: 'helfer', helfer_id: Number(id) };
+  if (art === 'einsatz') return { art: 'einsatz', einsatz_personal_id: Number(id) };
   return { art: 'neu' };
 }
 
 function personLabel(z: SchichtplanImportPersonZiel): string {
   if (z.art === 'neu') return 'Neu als Helfer';
+  if (z.art === 'einsatz') return `${z.name} (Einsatzkraft)`;
   return z.art === 'stamm' ? z.name : `${z.name} (Helfer)`;
 }
 

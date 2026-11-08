@@ -144,6 +144,34 @@ describe('SchichtplanEinlesen', () => {
     expect(qc.getQueryData(einsatzKeys.schichtplan(7))).toBe(plan);
   });
 
+  it('nennt eine Einsatzkraft als Ziel und schickt ihre Wahl zurück', async () => {
+    const person = vorschau().personen[0];
+    vorschauApi.mockResolvedValue(
+      vorschau({
+        personen: [
+          {
+            ...person,
+            herkunft: 'Lifeline Hub',
+            kennung: 'einsatzkraft-12',
+            ziel: { art: 'neu' },
+            treffer: 'unsicher',
+            kandidaten: [{ art: 'einsatz', einsatz_personal_id: 12, name: 'Jonas Fiktiv' }],
+          },
+        ],
+      }),
+    );
+    zeichne();
+    const { dialog, datei } = await oeffneUndWaehle();
+    await within(dialog).findByText('Jonas Fiktiv');
+    await waehle('Person für Jonas Fiktiv', 'Jonas Fiktiv (Einsatzkraft)');
+    await waitFor(() =>
+      expect(vorschauApi).toHaveBeenLastCalledWith(7, datei, {
+        posten: {},
+        personen: { m1: { art: 'einsatz', einsatz_personal_id: 12 } },
+      }),
+    );
+  });
+
   it('sperrt Übernehmen bei Fehlern und ohne Änderung, mit Grund', async () => {
     vorschauApi.mockResolvedValueOnce(
       vorschau({

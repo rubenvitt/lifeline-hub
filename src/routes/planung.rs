@@ -50,6 +50,22 @@ async fn planung(state: &AppState, z: &PlanungsZugriff) -> Result<PlanungAnzeige
     repo::laden(&state.pool, z.benutzer.org_id, z.planung_id).await
 }
 
+/// GET /api/planungen/{id}/export — die Planung als Excel-Mappe (LLH-1557, design.md D5): wer
+/// die Planung lesen darf. Helfer der Planung sind immer sichtbar (keine Modulsperre).
+pub async fn export(
+    State(state): State<AppState>,
+    z: PlanungsZugriff,
+) -> Result<axum::response::Response, AppError> {
+    let plan = crate::abloesung::schichtplan::ausgabe::repo::planung(
+        &state.pool,
+        z.benutzer.org_id,
+        z.planung_id,
+        &jetzt(),
+    )
+    .await?;
+    crate::routes::abloesung_schichtplan::mappe_antwort(plan).await
+}
+
 /// Ein Zeitpunkt des Zeitraums einer Planung: normalisiert, im Jahresbereich (400).
 fn planungszeit(wert: &str, was: &str) -> Result<String, AppError> {
     crate::zeit::im_jahresbereich(crate::etb::normalisiere_zeit(wert.trim())?, was)

@@ -27,8 +27,10 @@ interface Props {
   sicht: BlattSicht;
   /** Schlüssel eines Postens bzw. einer Person; `null` = alle Blätter. */
   auswahl: string | null;
-  /** Für den Druckkopf: Einsatz (bzw. später die Planung). */
+  /** Für den Druckkopf: der Einsatz oder die Planung. */
   einsatz: { bezeichnung: string; einsatznummer_intern?: string | null };
+  /** Etikett im Druckkopf; Vorgabe „Einsatz“, bei einer Vorplanung „Planung“. */
+  bezug?: string;
   /** Bezeichnungen der Qualifikationen im Katalog der Organisation. */
   qualiNamen: ReadonlyMap<number, string>;
   /** Wann der Plan geladen wurde (Wire oder ISO). */
@@ -47,6 +49,7 @@ export default function SchichtplanBlaetter({
   sicht,
   auswahl,
   einsatz,
+  bezug,
   qualiNamen,
   geladenAt,
 }: Props) {
@@ -136,6 +139,7 @@ export default function SchichtplanBlaetter({
                 dokumentart="Aushang"
                 titel={a.posten.titel}
                 einsatz={einsatz}
+                bezug={bezug}
                 sichtbarkeit="immer"
                 ebene={2}
                 zeilen={[
@@ -186,6 +190,7 @@ export default function SchichtplanBlaetter({
               dokumentart="Schichtzettel"
               titel={z.person.name}
               einsatz={einsatz}
+              bezug={bezug}
               sichtbarkeit="immer"
               ebene={2}
               zeilen={[

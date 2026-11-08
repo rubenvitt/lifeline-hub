@@ -72,7 +72,7 @@ import { useRollen } from '../components/instrument';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { ZugPointerSensor } from '../components/zugPointerSensor';
-import PunktankerMenue from '../pages/lagekarte/PunktankerMenue';
+import PunktankerMenue from '../components/PunktankerMenue';
 import type { Fernmeldenetz } from './fernmeldeskizze';
 import { layoutFernmeldenetz, type Platz } from './fernmeldeskizzeLayout';
 import { ZUSTAND_GRUND } from './funkplan';

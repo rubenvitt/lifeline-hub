@@ -642,6 +642,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/abloesungen/schichtplan/helfer",
             post(routes::abloesung_schichtplan::helfer_anlegen),
         )
+        // Schichtplan als Excel-Mappe (LLH-1557): nur Lesen.
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtplan/export",
+            get(routes::abloesung_schichtplan::export),
+        )
         // Schichtplan einlesen (LLH-1556): Multipart mit der Datei (höchstens 2 MiB) und den
         // Entscheidungen; die Datei-Grenze selbst prüft `uebernahme::datei` (400).
         .route(
@@ -1949,6 +1954,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/planungen/{id}/erzeugen",
             post(routes::planung::erzeugen),
         )
+        .route("/api/planungen/{id}/export", get(routes::planung::export))
         .route(
             "/api/planungen/{id}/helfer",
             post(routes::planung::helfer_anlegen),

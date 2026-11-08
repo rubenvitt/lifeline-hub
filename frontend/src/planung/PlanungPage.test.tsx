@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Planung, PlanungPosten, SchichtplanImportVorschau } from '../api/types';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -10,6 +10,7 @@ import { adminFixture } from '../test/fixtures';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import { waehleMenueEintrag } from '../test/menue';
 import { setzeViewportBreite } from '../test/viewport';
+import * as dateiSpeichern from '../components/dateiSpeichern';
 import { planungPfad } from '../routing/deeplinks';
 import PlanungPage from './PlanungPage';
 
@@ -100,6 +101,8 @@ function setup(p: Planung = planung(), route = planungPfad(5)) {
     { route, datenRouter: true },
   );
 }
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('PlanungPage (LLH-1586)', () => {
   it('zeigt Kopf, Kennzahlen und die drei Reiter; der Reiter steht in der Adresse', async () => {
@@ -325,6 +328,20 @@ describe('PlanungPage (LLH-1586)', () => {
       ),
     );
     expect(await screen.findByText('Diese Planung gibt es nicht')).toBeInTheDocument();
+  });
+  it('„Drucken“ führt zur Druckansicht, „Excel“ speichert die Mappe der Planung (LLH-1593)', async () => {
+    const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    setup();
+    server.use(http.get('/api/planungen/5/export', () => new HttpResponse('PK-planung')));
+    const drucken = await screen.findByRole('link', { name: 'Drucken' });
+    expect(drucken).toHaveAttribute('href', '/planungen/5/druck');
+    const excel = screen.getByRole('button', { name: 'Excel' });
+    expect(excel).toBeEnabled();
+    await userEvent.click(excel);
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    const [datei, name] = speichern.mock.calls[0];
+    expect(await (datei as Blob).text()).toBe('PK-planung');
+    expect(name).toMatch(/^schichtplan-stadtfest-\d{4}-\d{2}-\d{2}\.xlsx$/);
   });
 
   describe('In Einsatz übernehmen (LLH-1587)', () => {

@@ -737,6 +737,45 @@ async fn einlesen_vorbereiten(
     Ok((paket, meldungen, entscheidungen, rechte))
 }
 
+/// Die Mappe als Antwort: Medientyp XLSX, ohne Dateinamen (den bildet das Frontend). Das
+/// Schreiben läuft außerhalb der Async-Worker.
+pub(crate) async fn mappe_antwort(
+    plan: crate::abloesung::schichtplan::ausgabe::plan::AusgabePlan,
+) -> Result<axum::response::Response, AppError> {
+    use crate::abloesung::schichtplan::ausgabe::mappe;
+    use axum::response::IntoResponse;
+    let bytes = tokio::task::spawn_blocking(move || mappe::write_mappe(&plan))
+        .await
+        .map_err(|e| AppError::Internal(format!("Excel-Mappe des Schichtplans: {e}")))??;
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, mappe::MEDIENTYP)],
+        bytes,
+    )
+        .into_response())
+}
+
+/// GET /api/einsaetze/{id}/abloesungen/schichtplan/export — der Plan als Excel-Mappe (LLH-1557,
+/// design.md D4/D5): Lesen der Ablösung und das Modul Personal (403 ohne), auch im
+/// abgeschlossenen Einsatz. Kein ETB, kein Live-Ereignis.
+pub async fn export(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Abloesung>,
+) -> Result<axum::response::Response, AppError> {
+    ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
+    let sicht = crate::abloesung::schichtplan::ausgabe::repo::Sicht {
+        einheiten: darf::<Einheiten>(&state, &ctx).await?,
+        uhs: darf::<Unfallhilfsstellen>(&state, &ctx).await?,
+    };
+    let plan = crate::abloesung::schichtplan::ausgabe::repo::einsatz(
+        &state.pool,
+        &ctx.einsatz,
+        sicht,
+        &jetzt(),
+    )
+    .await?;
+    mappe_antwort(plan).await
+}
+
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/import/vorschau — Multipart mit `datei` und
 /// optional `entscheidungen`. Gleicht ab und schreibt nichts; Fehler stehen in der Antwort (200).
 /// Eine unlesbare Datei ist 400.
