@@ -13164,4 +13164,96 @@ mod tests {
             "SET NULL löst nur den Bezug"
         );
     }
+
+    /// LLH-1572 (design.md D8): der Katalog nimmt die vier Maßnahmen des Sanitätsdienstes, der
+    /// Bestand bleibt mit seinen ids und seinem Aufheben stehen, `client_id` bleibt je Einsatz
+    /// eindeutig und Fremdwerte bleiben draußen.
+    #[tokio::test]
+    async fn migration_0292_person_massnahme_sanitaetsdienst() {
+        // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+        const VERSION: i64 = 292;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            VERSION - 1,
+        )
+        .await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, erfasst_at, \
+                erfasst_von, aufgehoben_at, aufgehoben_von_id, client_id) \
+             VALUES (?, ?, 'sauerstoff', '2026-11-08 08:00:00', '2026-11-08 08:00:05', ?, \
+                '2026-11-08 08:10:00', ?, 'm1') RETURNING id",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, VERSION).await;
+
+        let bestand: (i64, String, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT id, art, aufgehoben_at, client_id FROM person_massnahme WHERE person_id = ?",
+        )
+        .bind(p)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            bestand,
+            (
+                alt,
+                "sauerstoff".into(),
+                Some("2026-11-08 08:10:00".into()),
+                Some("m1".into())
+            ),
+            "der Bestand bleibt 1:1"
+        );
+        let massnahme = |art: &'static str, client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, \
+                        erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, '2026-11-08 09:00:00', '2026-11-08 09:00:05', ?, ?)",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(art)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        for art in [
+            "blutstillung",
+            "dekontamination",
+            "wundversorgung",
+            "kuehlung",
+            "lagerung",
+            "betreuung_gespraech",
+        ] {
+            massnahme(art, None)
+                .await
+                .unwrap_or_else(|f| panic!("{art}: {f}"));
+        }
+        massnahme("tourniquet", None)
+            .await
+            .expect_err("nur der Katalog");
+        massnahme("kuehlung", Some("m1"))
+            .await
+            .expect_err("derselbe Schlüssel im selben Einsatz");
+    }
 }

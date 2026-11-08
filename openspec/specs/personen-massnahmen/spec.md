@@ -11,7 +11,8 @@ nichts ab.
 
 Wer im Einsatz Schreibrecht auf das Modul Personen hat, SHALL an einer angetroffenen Person eine
 Maßnahme aus dem festen Katalog erfassen können: `blutstillung`, `zugang`, `infusion`,
-`sauerstoff`, `atemweg`, `analgesie`, `immobilisation`, `waermeerhalt`, `dekontamination`. Die
+`sauerstoff`, `atemweg`, `analgesie`, `immobilisation`, `waermeerhalt`, `dekontamination` und
+für den Sanitätsdienst `wundversorgung`, `kuehlung`, `lagerung`, `betreuung_gespraech`. Die
 Uhrzeit der Durchführung MUST optional sein. Ohne Angabe gilt der Zeitpunkt der Erfassung. Die
 Uhrzeit MAY vor dem Anlegen der Person liegen und MUST dann unverändert gelten. Liegt sie vor dem
 Beginn des Einsatzes (oder, falls das Anlegen früher liegt, vor dem Anlegen), MUST der Server mit

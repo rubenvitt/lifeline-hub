@@ -16,7 +16,7 @@ use crate::live::LiveEvent;
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::anlass_repo::{self, AnlassAnzeige, PersonAnlass};
 use crate::person::audit_repo::ZugriffAnzeige;
-use crate::person::massnahme_repo::{self, MassnahmeAnzeige};
+use crate::person::massnahme_repo::{self, MassnahmeAnzeige, MassnahmeArt};
 use crate::person::sichtung_repo::SichtungAnzeige;
 use crate::person::transport_repo::{self, TransportAnzeige};
 use crate::person::verbleib_repo::VerbleibAnzeige;
@@ -294,6 +294,15 @@ pub struct AnlegenBody {
     /// 422), mit Zugriff auf das Modul Meldungen. Später nicht änderbar.
     #[serde(default)]
     pub meldung_id: Option<i64>,
+    /// LLH-1572 (design.md D1): Maßnahmen aus dem Katalog, in DERSELBEN Transaktion wie die
+    /// Anlage und nur bei einer wirklich neuen Person, zur Erfassungszeit. Ohne Doppelte (400).
+    #[serde(default)]
+    pub massnahmen: Option<Vec<String>>,
+    /// LLH-1572 (design.md D1/D6/D7): der leichte Fall, versorgt und entlassen. Setzt im selben
+    /// Schritt den Verbleib „Entlassung“ (an einer UHS mit Austritt zur Erfassungszeit) und
+    /// schreibt EINEN ETB-Eintrag statt der einzelnen.
+    #[serde(default)]
+    pub entlassen: Option<bool>,
 }
 
 /// POST /api/einsaetze/{id}/personen — Person anlegen (initial erfasst/vermisst/betroffen).
@@ -331,7 +340,13 @@ pub async fn anlegen(
     // Ebenso keinen Anlass der Hilfeleistung (LLH-1566): er ist ein Gesundheitsdatum wie die
     // Sichtung, und die Route `…/anlass` fehlt der Betreuungsstelle.
     let gesetzt = |feld: &Option<String>| feld.as_deref().is_some_and(|s| !s.trim().is_empty());
-    if betreuungsstelle.is_some() && (gesetzt(&body.sichtung) || gesetzt(&body.anlass)) {
+    // Maßnahmen und Entlassung ebenso (LLH-1572, design.md D9): die Betreuungsstelle behandelt
+    // nicht und nimmt in die Notunterkunft auf, sie entlässt nicht.
+    let entlassen = body.entlassen == Some(true);
+    let hat_massnahmen = body.massnahmen.as_ref().is_some_and(|m| !m.is_empty());
+    if betreuungsstelle.is_some()
+        && (gesetzt(&body.sichtung) || gesetzt(&body.anlass) || hat_massnahmen || entlassen)
+    {
         return Err(AppError::Forbidden);
     }
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
@@ -457,6 +472,22 @@ pub async fn anlegen(
             "Ein Anlass ist nur mit Status erfasst oder betroffen zulässig".into(),
         ));
     }
+    // Maßnahmen (LLH-1572): jedes Feld für sich → 400, ohne angetroffene Person → 422.
+    let mut massnahmen: Vec<MassnahmeArt> = Vec::new();
+    for roh in body.massnahmen.take().unwrap_or_default() {
+        let art = parse_enum(MassnahmeArt::parse, roh.trim(), "Unbekannte Maßnahme")?;
+        if massnahmen.contains(&art) {
+            return Err(AppError::Validation("Maßnahme doppelt angegeben".into()));
+        }
+        massnahmen.push(art);
+    }
+    if (!massnahmen.is_empty() || entlassen)
+        && !matches!(status_enum, PersonStatus::Erfasst | PersonStatus::Betroffen)
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Maßnahmen und Entlassung sind nur mit Status erfasst oder betroffen zulässig".into(),
+        ));
+    }
     if kategorie.is_none() && body.bestaetigt_personal_id.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Eine Bestätigung gibt es nur zu einer Erst-Sichtung".into(),
@@ -555,16 +586,19 @@ pub async fn anlegen(
                 // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
                 // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
                 // ein zweiter Roundtrip für einen Wert, der schon dasteht.
-                let text = crate::person::etb_text_erfasst(reg);
-                crate::etb::system_audit_zu_tx(
-                    conn,
-                    einsatz_id,
-                    ctx.benutzer.id,
-                    startwert,
-                    &text,
-                    &erfasst_at,
-                )
-                .await?;
+                // Ein leichter Fall schreibt am Ende EINEN Eintrag (design.md D7).
+                if !entlassen {
+                    let text = crate::person::etb_text_erfasst(reg);
+                    crate::etb::system_audit_zu_tx(
+                        conn,
+                        einsatz_id,
+                        ctx.benutzer.id,
+                        startwert,
+                        &text,
+                        &erfasst_at,
+                    )
+                    .await?;
+                }
 
                 /*
                  * Erst-Sichtung NUR bei einer wirklich neuen Person: bei einem Offline-Replay
@@ -626,6 +660,22 @@ pub async fn anlegen(
                     )
                     .await?;
                 }
+                for art in &massnahmen {
+                    massnahme_repo::anlegen_tx(
+                        conn,
+                        einsatz_id,
+                        id,
+                        &massnahme_repo::NeueMassnahme {
+                            art: *art,
+                            zeitpunkt_at: &erfasst_at,
+                            client_id: None,
+                            bestaetigung: None,
+                        },
+                        ctx.benutzer.id,
+                    )
+                    .await?;
+                }
+                let mut uhs_bezeichnung = None;
                 if let Some(uhs_id) = body.uhs_id {
                     crate::uhs::belegung_repo::eintritt_tx(
                         conn,
@@ -639,8 +689,53 @@ pub async fn anlegen(
                     )
                     .await?;
                     let uhs = crate::uhs::repo::laden_tx(conn, einsatz_id, uhs_id).await?;
-                    let text = crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung);
-                    uhs_etb_id = Some(
+                    if !entlassen {
+                        let text = crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung);
+                        uhs_etb_id = Some(
+                            crate::etb::system_audit_zu_tx(
+                                conn,
+                                einsatz_id,
+                                ctx.benutzer.id,
+                                startwert,
+                                &text,
+                                &erfasst_at,
+                            )
+                            .await?,
+                        );
+                    }
+                    uhs_bezeichnung = Some(uhs.bezeichnung);
+                }
+                if entlassen {
+                    // Der leichte Fall (design.md D1/D6/D7): Verbleib „Entlassung“ zur
+                    // Erfassungszeit, an der UHS der Austritt zur selben Zeit (die Person bleibt
+                    // in den Bewegungen und auf dem Tablet), dann EIN ETB-Eintrag.
+                    let art = VerbleibArt::Entlassung;
+                    verbleib_repo::erfassen_tx(
+                        conn,
+                        einsatz_id,
+                        id,
+                        verbleib_repo::VerbleibDaten {
+                            art: art.as_str(),
+                            zeitpunkt_at: Some(&erfasst_at),
+                            ..Default::default()
+                        },
+                        ctx.benutzer.id,
+                    )
+                    .await?;
+                    if body.uhs_id.is_some() {
+                        crate::uhs::belegung_repo::austritt_zum_tx(
+                            conn,
+                            einsatz_id,
+                            id,
+                            Some(&format!("durch Verbleib {}", art.as_str())),
+                            ctx.benutzer.id,
+                            Some(&erfasst_at),
+                        )
+                        .await?;
+                    }
+                    let text =
+                        crate::person::etb_text_versorgt_entlassen(reg, uhs_bezeichnung.as_deref());
+                    verbleib_etb_id = Some(
                         crate::etb::system_audit_zu_tx(
                             conn,
                             einsatz_id,

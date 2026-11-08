@@ -119,6 +119,13 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
    * Anlage, Erst-Sichtung, Eintritt in den UHS-Eingang (LLH-1515) und ihre ETB-Einträge tragen sie.
    * Fehlt sie, gilt die Serverzeit. Setzt nur die Warteschlange. */
   zeitpunkt_at?: string | null;
+  /** Maßnahmen in derselben Anlage (LLH-1572), ohne Doppelte; mit `status: 'vermisst'` 422. */
+  massnahmen?: MassnahmeArt[];
+  /**
+   * Der leichte Fall, versorgt und entlassen (LLH-1572, design.md D1): Verbleib „Entlassung“ im
+   * selben Schritt, an einer UHS mit Austritt, und EIN ETB-Eintrag.
+   */
+  entlassen?: boolean;
 }
 
 export function listePersonen(

@@ -15,7 +15,8 @@ use utoipa::ToSchema;
 
 wire_enum! {
     /// Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in
-    /// `migrations/0220_person_massnahme.sql`. Katalogwert (Retain), nie im ETB oder Live-Kanal.
+    /// `migrations/0292_person_massnahme_sanitaetsdienst.sql` (die vier letzten aus LLH-1572).
+    /// Katalogwert (Retain), nie im ETB oder Live-Kanal.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum MassnahmeArt {
         Blutstillung => "blutstillung",
@@ -27,6 +28,10 @@ wire_enum! {
         Immobilisation => "immobilisation",
         Waermeerhalt => "waermeerhalt",
         Dekontamination => "dekontamination",
+        Wundversorgung => "wundversorgung",
+        Kuehlung => "kuehlung",
+        Lagerung => "lagerung",
+        BetreuungGespraech => "betreuung_gespraech",
     }
 }
 
@@ -84,23 +89,36 @@ pub async fn anlegen(
                 return Ok(replay);
             }
         }
-        let id: i64 = sqlx::query_scalar(
-            "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, \
-                erfasst_at, erfasst_von, bestaetigt_personal_id, bestaetigt_name, client_id) \
-             VALUES (?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S','now'), ?, ?, ?, ?) RETURNING id",
-        )
-        .bind(einsatz_id)
-        .bind(person_id)
-        .bind(neu.art.as_str())
-        .bind(neu.zeitpunkt_at)
-        .bind(erfasst_von)
-        .bind(neu.bestaetigung.map(|b| b.personal_id))
-        .bind(neu.bestaetigung.map(|b| b.name.as_str()))
-        .bind(neu.client_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        laden_tx(conn, einsatz_id, person_id, id).await
+        anlegen_tx(conn, einsatz_id, person_id, neu, erfasst_von).await
     })
+}
+
+/// Der INSERT von [`anlegen`] in einer laufenden Transaktion, ohne Replay-Prüfung: der Aufrufer
+/// hält die Idempotenz selbst, etwa die Anlage eines leichten Falls (LLH-1572, design.md D1)
+/// über die `client_id` der Person.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    neu: &NeueMassnahme<'_>,
+    erfasst_von: i64,
+) -> Result<MassnahmeAnzeige, AppError> {
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, \
+            erfasst_at, erfasst_von, bestaetigt_personal_id, bestaetigt_name, client_id) \
+         VALUES (?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S','now'), ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(person_id)
+    .bind(neu.art.as_str())
+    .bind(neu.zeitpunkt_at)
+    .bind(erfasst_von)
+    .bind(neu.bestaetigung.map(|b| b.personal_id))
+    .bind(neu.bestaetigung.map(|b| b.name.as_str()))
+    .bind(neu.client_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    laden_tx(conn, einsatz_id, person_id, id).await
 }
 
 /// Hebt eine Maßnahme genau einmal auf: die Bedingung `aufgehoben_at IS NULL` steht im UPDATE

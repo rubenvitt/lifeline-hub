@@ -14,7 +14,8 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   `<Form>`) für Modal und `/einsaetze/:id/personen/aufnahme`; Budget verschieben, nicht dehnen.
 - **Eine Maske „Betroffene erfassen“, ein Wort „erfasst“** (LFH-963, Spec `betroffene-erfassung`,
   Entscheidung 9): Kopfknopf, `?neu=1` und Aufnahme-Route öffnen dieselbe Maske
-  (`AufnahmeModus` `erfassen | vermisst`), neben ihr nur „Vermisst melden“. Angelegt wird mit
+  (`AufnahmeModus` `erfassen | vermisst`), neben ihr nur „Vermisst melden“ und der leichte
+  Fall „Versorgt und entlassen“ (eigener Dialog, siehe unten). Angelegt wird mit
   Status `erfasst`; die Maske sagt es (`FOLGESTATUS_HINWEIS`: „mit Sichtung → betroffen“).
   Filter, Tabelle und Dialog nennen den Status gleich („Erfasst“, nie „Neu“). Summen heißen
   „gesamt“, weil „erfasst“ ein Status ist. Unter `xl` steht die `Sichtungszeile` über dem
@@ -77,6 +78,14 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Wege: Maske („Weitere Angaben“), Kopf-Paneel, Kurzeingabe `!kürzel` (`ANLASS_KUERZEL` in
   `personBefehl.ts`, Hinweiszeile aus derselben Quelle). Nie im ETB; Zählung `anlassbild` in
   `personenBilanz.ts` für Lagebild und Bericht.
+- **Leichter Fall „Versorgt und entlassen“** (LLH-1572, Spec `betroffene-erfassung`):
+  `personen/LeichterFallModal.tsx` auf `ErfassungsModal` (Anlass Pflicht, ≤ 3 Maßnahmen über
+  `FlaechenMehrfachWahl`, Kurzliste `LEICHTE_MASSNAHMEN`), in der Liste und am UHS-Gerät
+  (`stelle` = eigene UHS). EIN `POST …/personen` mit `massnahmen` und `entlassen: true`, Status
+  `betroffen`, ohne Sichtung, offlinefähig wie jede Anlage; der Server schreibt Maßnahmen,
+  Verbleib und UHS-Ein-/Austritt zur Erfassungszeit und EINEN ETB-Eintrag. Kurzeingabe `+kürzel`
+  (`MASSNAHME_KUERZEL`) und `>entl` (`ENTLASSEN_KUERZEL`) in `personBefehl.ts`, Hinweiszeile aus
+  derselben Quelle. „Versorgt von“ belegt den Fundort vor und bleibt als Sitzungswert stehen.
 - **Transport, Maßnahme, Verletzung** (Specs `personen-transport`, `personen-massnahmen`,
   `personen-verletzungen`): Transport ist ein voller Stand (Priorität, Art, Fachrichtung, alles
   leer hebt auf), Maßnahme und Verletzung werden angehängt und genau einmal aufgehoben (zweites

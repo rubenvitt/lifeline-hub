@@ -4555,10 +4555,11 @@ export interface components {
         };
         /**
          * @description Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in
-         *     `migrations/0220_person_massnahme.sql`. Katalogwert (Retain), nie im ETB oder Live-Kanal.
+         *     `migrations/0292_person_massnahme_sanitaetsdienst.sql` (die vier letzten aus LLH-1572).
+         *     Katalogwert (Retain), nie im ETB oder Live-Kanal.
          * @enum {string}
          */
-        MassnahmeArt: "blutstillung" | "zugang" | "infusion" | "sauerstoff" | "atemweg" | "analgesie" | "immobilisation" | "waermeerhalt" | "dekontamination";
+        MassnahmeArt: "blutstillung" | "zugang" | "infusion" | "sauerstoff" | "atemweg" | "analgesie" | "immobilisation" | "waermeerhalt" | "dekontamination" | "wundversorgung" | "kuehlung" | "lagerung" | "betreuung_gespraech";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
