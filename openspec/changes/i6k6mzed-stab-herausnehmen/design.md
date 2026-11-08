@@ -143,7 +143,9 @@ Entscheidung Ruben, 08.11.2026. Neue Migrationen werden angehängt, Nummern grö
 - **Löschersuchen:** `PersonenArt::Medienkontakt` entfällt als Suchergebnis, ein reiner
   Ausgabewert. Der Antragswert `ziel_art = 'medienkontakt'` bleibt lesbar, damit alte Ersuchen im
   Verlauf stehen bleiben. Neue Ersuchen mit diesem Ziel lehnt der Server mit 422 ab. Der CHECK
-  in 0140 bleibt unverändert.
+  in 0140 bleibt unverändert. Ein Ersuchen, das beim Update noch offen ist (24-Stunden-Fenster),
+  gilt mit Migration B als vollzogen, weil sein Ziel dann gelöscht ist. Die Migration setzt es
+  auf den Vollzugsstand, und der Verlauf nennt den Grund „Modul entfernt“.
 - **Datenverlust** ist gewollt. Was davon im ETB steht, bleibt als Text: Besetzungswechsel,
   freigegebene Pressemitteilungen, die Meldung an die Leitstelle aus der Checkliste.
 

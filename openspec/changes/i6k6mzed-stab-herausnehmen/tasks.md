@@ -163,4 +163,5 @@ Doku selbst mit. Die Umzüge (Gruppen 2 und 3) sind `refactor`-Commits ohne Verh
 ## Workflow follow-up
 
 - `/opsx:archive i6k6mzed-stab-herausnehmen` im selben Branch vor dem PR, Spec-Sync und Verweise eingeschlossen. Die Specs `stab-uebersicht`, `stab-checkliste`, `stab-presse-log`, `stab-pressemitteilung` und `stab-medienlage` sind danach leer und werden entfernt.
+- Beim Archivieren die `## Purpose`-Texte von Hand berichtigen, weil ein Delta sie nicht ändert: `stab-infotelefon` („des Sachgebiets S5“), `dokument-entwurf` (Pressemitteilung), `nachforderungen-board` („Stab-Seite“), `lage-verdichtung` („der Stab“).
 - PR gegen `alpha` mit Bildern. Board-Status `review`, `pr_url` und `release_task`.
