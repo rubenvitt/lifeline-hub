@@ -2,7 +2,11 @@ import { AutoComplete, Form, Input } from 'antd';
 import type { Rule } from 'antd/es/form';
 import { useMemo, useState } from 'react';
 import type { Nachforderung, NachforderungPrioritaet, PatchNachforderung } from '../api/types';
-import { NACHFORDERUNG_BEZEICHNUNG_MAX, NACHFORDERUNG_ZIEL_TEXT_MAX } from '../api/eingabegrenzen';
+import {
+  EINSATZNUMMER_MAX,
+  NACHFORDERUNG_BEZEICHNUNG_MAX,
+  NACHFORDERUNG_ZIEL_TEXT_MAX,
+} from '../api/eingabegrenzen';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
@@ -18,7 +22,13 @@ import {
   type ZielNamen,
   type ZielRaum,
 } from './zielVorschlaege';
-import { aenderungBody, aenderungStart, hatZusage, type AenderungWerte } from './zusage';
+import {
+  aenderungBody,
+  aenderungStart,
+  hatZusage,
+  mitEinsatznummer,
+  type AenderungWerte,
+} from './zusage';
 
 const PRIORITAET_OPTIONEN: { value: NachforderungPrioritaet; label: string }[] = [
   { value: 'sofort', label: 'Sofort' },
@@ -108,7 +118,12 @@ export default function BearbeitenFormular({
         erfassenText="Änderung speichern"
       >
         <Form.Item name="anzahl" label="Anzahl" rules={mengenRegeln}>
-          <MengenFeld beschriftung="Anzahl" style={{ width: '100%' }} />
+          <MengenFeld
+            beschriftung="Anzahl"
+            style={{ width: '100%' }}
+            // Eine Anforderung für eine Person gilt für genau ein Rettungsmittel (LLH-1573 D1).
+            disabled={mitEinsatznummer(n)}
+          />
         </Form.Item>
         <Form.Item name="wohin" label="Wohin">
           <AutoComplete
@@ -127,6 +142,11 @@ export default function BearbeitenFormular({
         </Form.Item>
         {mitZusage && (
           <>
+            {mitEinsatznummer(n) && (
+              <Form.Item name="einsatznummer" label="Einsatznummer Leitstelle">
+                <Input aria-label="Einsatznummer Leitstelle" maxLength={EINSATZNUMMER_MAX} />
+              </Form.Item>
+            )}
             <Form.Item name="wer" label="Wer" dependencies={['anzahl']} rules={werRegeln('anzahl')}>
               <WerFeld aria-label="Wer" vorschlaege={werVorschlaege} />
             </Form.Item>

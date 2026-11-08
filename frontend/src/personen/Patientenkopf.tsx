@@ -55,7 +55,8 @@ import { useVerbleibFelder } from './VerbleibErfassung';
 import { UebergabePaneel } from './UebergabeQuittieren';
 import VerbleibText from './VerbleibText';
 import VersorgtVon, { hatVersorgtVon } from './VersorgtVon';
-import type { VerbleibFormWerte } from './verbleibErfassungKern';
+import { verbleibAusRettungsmittel, type VerbleibFormWerte } from './verbleibErfassungKern';
+import RettungsmittelZeile, { hatRettungsmittel } from './RettungsmittelZeile';
 
 export interface PatientenkopfProps {
   einsatzId: number;
@@ -370,6 +371,17 @@ export default function Patientenkopf({
               </PaneelKnopf>
             )}
           </Datenfeld>
+
+          {/* Angefordertes Rettungsmittel (LLH-1573, design.md D3/D4): lesend nur mit Stand. */}
+          {((bedienbar && angetroffen && !amGeraet) || hatRettungsmittel(person)) && (
+            <Datenfeld label="Rettungsmittel">
+              <RettungsmittelZeile
+                einsatzId={einsatzId}
+                person={person}
+                bedienbar={bedienbar && angetroffen}
+              />
+            </Datenfeld>
+          )}
         </Datenraster>
 
         <Datenraster spalten={1} beschriftung="Behandlung">
@@ -471,6 +483,7 @@ export default function Patientenkopf({
       {offen === 'verbleib' && (
         <VerbleibPaneel
           einsatzId={einsatzId}
+          vorbelegung={verbleibAusRettungsmittel(person)}
           mutation={verbleibMutation}
           onSchliessen={close('verbleib')}
         />
@@ -751,19 +764,28 @@ function SichtungPaneel({
 /** Verbleib in der Ansicht: dieselben Felder wie der Dialog (`useVerbleibFelder`). */
 function VerbleibPaneel({
   einsatzId,
+  vorbelegung,
   mutation,
   onSchliessen,
 }: {
   einsatzId: number;
+  /** Aus dem eingetroffenen Rettungsmittel (LLH-1573, design.md D6). */
+  vorbelegung?: Partial<VerbleibFormWerte>;
   mutation: UseMutationResult<unknown, Error, VerbleibEingabe>;
   onSchliessen: () => void;
 }) {
   const [form] = Form.useForm<VerbleibFormWerte>();
-  const { elemente, body } = useVerbleibFelder(einsatzId, form);
+  const { elemente, body } = useVerbleibFelder(
+    einsatzId,
+    form,
+    vorbelegung?.art,
+    vorbelegung?.leitstelle_einsatznummer != null,
+  );
   return (
     <section aria-label="Verbleib erfassen" data-lfh="verbleib-paneel">
       <ErfassungsFormular<VerbleibFormWerte>
         form={form}
+        initialValues={vorbelegung}
         erfassenText="Verbleib erfassen"
         laeuft={mutation.isPending}
         speicherung={mutation}

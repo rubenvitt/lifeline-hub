@@ -12305,6 +12305,13 @@
             "type": "boolean",
             "description": "Abgeleitet: status NOT IN ('eingetroffen','abgelehnt','zurueckgezogen')."
           },
+          "leitstelle_einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Einsatznummer der Leitstelle aus der Zusage (D5); fehlt ohne Angabe."
+          },
           "material_ids": {
             "type": "array",
             "items": {
@@ -12312,6 +12319,22 @@
               "format": "int64"
             },
             "description": "Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten\nMaterialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:\nBezeichnung, Menge und Ort liest die Oberfläche aus dem Modul Material."
+          },
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Person, für die angefordert wurde (LLH-1573 design.md D1/D2): nur beim Anlegen gesetzt,\ndanach fest. Fehlt ohne Bezug."
+          },
+          "person_registrier_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abgeleitet: Registriernummer dieser Person für „Für R-12“ (D7). Pseudonym wie im ETB; den\nNamen liest die Oberfläche nie von hier."
           },
           "prioritaet": {
             "$ref": "#/components/schemas/Prioritaet"
@@ -13810,6 +13833,17 @@
             "type": "integer",
             "format": "int64"
           },
+          "rettungsmittel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RettungsmittelStand",
+                "description": "Stand des für diese Person angeforderten Rettungsmittels (LLH-1573 design.md D4): die\njüngste Nachforderung mit Bezug auf sie, ohne zurückgezogene. Beim Lesen abgeleitet; so\nsehen ihn Patientenkopf und UHS auch ohne Leserecht auf Nachforderungen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "$ref": "#/components/schemas/PersonStatus"
           },
@@ -15002,6 +15036,47 @@
           },
           "slug": {
             "type": "string"
+          }
+        }
+      },
+      "RettungsmittelStand": {
+        "type": "object",
+        "description": "Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus\neinem `json_object` in `repo::SELECT_ALLE`. Nur, was Kopf, UHS und die Vorbelegung des\nVerbleibs brauchen (D6): Art, Status, Rufnamen der Zusage, Eintreffen, Einsatznummer.",
+        "required": [
+          "nachforderung_id",
+          "art",
+          "status",
+          "rufnamen"
+        ],
+        "properties": {
+          "art": {
+            "type": "string"
+          },
+          "eintreffen_erwartet_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "leitstelle_einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nachforderung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rufnamen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Zugesagte Rufnamen in Eingabefolge, leer ohne Angabe."
+          },
+          "status": {
+            "$ref": "#/components/schemas/NachforderungStatus"
           }
         }
       },

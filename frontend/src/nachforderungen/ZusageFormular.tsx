@@ -1,8 +1,9 @@
-import { Form } from 'antd';
+import { Form, Input } from 'antd';
 import { useMemo } from 'react';
 import type { Rule } from 'antd/es/form';
 import type { Nachforderung, NachforderungZusageEingabe } from '../api/types';
 import {
+  EINSATZNUMMER_MAX,
   NACHFORDERUNG_ZUSAGE_RUFNAME_MAX,
   NACHFORDERUNG_ZUSAGE_RUFNAMEN_MAX,
 } from '../api/eingabegrenzen';
@@ -11,7 +12,13 @@ import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
 import { Select } from '../components/Select';
 import { nachforderungName } from './nachforderungName';
-import { bereinigeWer, zusageBody, zusageStart, type ZusageWerte } from './zusage';
+import {
+  bereinigeWer,
+  mitEinsatznummer,
+  zusageBody,
+  zusageStart,
+  type ZusageWerte,
+} from './zusage';
 
 const KEINE: string[] = [];
 
@@ -120,9 +127,17 @@ export default function ZusageFormular({
         speicherFehlerFallback="Zusage fehlgeschlagen"
         erfassenText="Zusage erfassen"
       >
-        <Form.Item name="anzahl" label="Zugesagt" rules={mengenRegeln}>
-          <MengenFeld beschriftung="Zugesagt" style={{ width: '100%' }} />
-        </Form.Item>
+        {/* Für eine Person ist es genau ein Rettungsmittel (LLH-1573 D1): statt der Menge die
+            Einsatznummer der Leitstelle (D5), das Budget bleibt bei drei Feldern. */}
+        {mitEinsatznummer(n) ? (
+          <Form.Item name="einsatznummer" label="Einsatznummer Leitstelle">
+            <Input aria-label="Einsatznummer Leitstelle" maxLength={EINSATZNUMMER_MAX} />
+          </Form.Item>
+        ) : (
+          <Form.Item name="anzahl" label="Zugesagt" rules={mengenRegeln}>
+            <MengenFeld beschriftung="Zugesagt" style={{ width: '100%' }} />
+          </Form.Item>
+        )}
         <Form.Item name="wer" label="Wer" dependencies={['anzahl']} rules={werRegeln('anzahl')}>
           <WerFeld aria-label="Wer" vorschlaege={werVorschlaege} />
         </Form.Item>

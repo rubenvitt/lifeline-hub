@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Person, PersonAuswahl } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
-import { lagebildKuerzen, nichtGeladen, PERSON_AUF_DER_PLATTE } from './lagebildKuerzung';
+import {
+  lagebildKuerzen,
+  nichtGeladen,
+  PERSON_AUF_DER_PLATTE,
+  rettungsmittelGekuerzt,
+} from './lagebildKuerzung';
 
 // LFH-1095 (design.md D2): die Felder einer Person, die auf die Platte dürfen — als LITERAL
 // gegen die Registry, sonst prüfte die Positivliste sich selbst.
@@ -44,6 +49,7 @@ const ERWARTET_BEHALTEN = [
   'meldung_id',
   'meldung_lfd_nr',
   'anlass',
+  'rettungsmittel',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
   'herkunft_adresse',
@@ -109,6 +115,13 @@ const VOLL: Person = {
   meldung_lfd_nr: 3,
   anlass: 'intoxikation',
   anlass_at: '2026-10-18 09:01:00',
+  rettungsmittel: {
+    nachforderung_id: 3,
+    art: 'RTW',
+    status: 'unterwegs',
+    rufnamen: ['RTW 1/83-1'],
+    leitstelle_einsatznummer: '2611-0815',
+  },
 };
 
 function eintrag(queryKey: readonly unknown[], data: unknown) {
@@ -158,9 +171,47 @@ describe('lagebildKuerzen', () => {
       '53.07',
       'A-4711',
       'psychiatrie',
+      // LLH-1573: Rufnamen (Freitext) und Einsatznummer der Leitstelle bleiben vom Gerät fern.
+      'RTW 1/83-1',
+      '2611-0815',
     ]) {
       expect(text).not.toContain(wert);
     }
+    expect(p.rettungsmittel).toEqual({
+      nachforderung_id: 3,
+      art: 'RTW',
+      status: 'unterwegs',
+      rufnamen: [],
+      nicht_geladen: ['leitstelle_einsatznummer', 'rufnamen'],
+    });
+    expect(rettungsmittelGekuerzt(p.rettungsmittel as object)).toBe(true);
+    expect(rettungsmittelGekuerzt(VOLL.rettungsmittel)).toBe(false);
+  });
+
+  it('kürzt das Rettungsmittel auf eine Positivliste, freie Art neutral (LLH-1573)', () => {
+    const frei = {
+      ...VOLL,
+      rettungsmittel: {
+        nachforderung_id: 4,
+        art: 'Wagen für Frau Müller',
+        status: 'zugesagt' as const,
+        rufnamen: ['DRK Musterstadt'],
+        eintreffen_erwartet_at: '2026-10-18 10:00:00',
+        kuenftiges_feld: 'geheim',
+      },
+    } as Person;
+    const [p] = lagebildKuerzen(eintrag(einsatzKeys.personen(7), [frei])).state.data as Record<
+      string,
+      unknown
+    >[];
+    expect(p.rettungsmittel).toEqual({
+      nachforderung_id: 4,
+      art: 'Rettungsmittel',
+      status: 'zugesagt',
+      rufnamen: [],
+      eintreffen_erwartet_at: '2026-10-18 10:00:00',
+      nicht_geladen: ['leitstelle_einsatznummer', 'rufnamen'],
+    });
   });
 
   it('lässt ein unbekanntes Feld weg (Positivliste)', () => {

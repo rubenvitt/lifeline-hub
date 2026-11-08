@@ -288,6 +288,7 @@ use utoipa::OpenApi;
         crate::person::AbgleichStatus,
         crate::person::Geschlecht,
         crate::person::PersonAnzeige,
+        crate::person::RettungsmittelStand,
         crate::person::PersonAuswahl,
         crate::person::VersorgendeEinheitAuswahl,
         crate::person::PersonStatus,

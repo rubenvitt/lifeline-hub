@@ -515,6 +515,38 @@ describe('NachforderungKarte — Stellenbezug (LLH-1082)', () => {
   });
 });
 
+/** LLH-1573 (design.md D7): der Personenbezug steht als „Für R-…“ mit Sprung auf die Person. */
+describe('NachforderungKarte — Personenbezug (LLH-1573)', () => {
+  it('„Für R-012 ↗“ führt auf die Person, die Einsatznummer steht bei der Zusage', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({
+          person_id: 10,
+          person_registrier_nr: 12,
+          status: 'zugesagt',
+          leitstelle_einsatznummer: '2611-0815',
+        })}
+        personPfad={(id) => `/einsaetze/1/personen/${id}`}
+      />,
+    );
+    const zeile = document.querySelector('[data-lfh="nachforderung-person"]');
+    expect(zeile?.textContent).toMatch(/^Für R-0*12/);
+    expect(screen.getByRole('link', { name: /R-0*12/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/personen/10',
+    );
+    expect(screen.getByText('Einsatznr. 2611-0815')).toBeInTheDocument();
+  });
+
+  it('ohne Zugang zu den Personen: die Nummer ohne Sprung', () => {
+    renderMitProviders(
+      <NachforderungKarte nachforderung={nf({ person_id: 10, person_registrier_nr: 12 })} />,
+    );
+    expect(document.querySelector('[data-lfh="nachforderung-person"]')).not.toBeNull();
+    expect(screen.queryByRole('link', { name: /R-0*12/ })).toBeNull();
+  });
+});
+
 /** LLH-1078: die kompakte Karte im Board. */
 describe('NachforderungKarte — im Board (LLH-1078)', () => {
   it('in ihrer Spalte ohne Statusetikett, mit Alter und der Handlung als Knopf', async () => {

@@ -25,6 +25,7 @@ import { monoStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import { KennungsLink } from '../components/kennungsLink';
+import { registrierAnzeige } from '../api/einsatzPerson';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { useMaterialOrtKontext } from '../kraefte/MaterialOrtAngabe';
 import { mengeText, ortText, ortVon } from '../kraefte/materialPosten';
@@ -338,6 +339,34 @@ interface NachforderungKarteProps {
    * steht „→ Bereitstellungsraum“ bzw. „→ Einsatzabschnitt“.
    */
   zielNamen?: ZielNamen | null;
+  /**
+   * Sprung auf eine Person (LLH-1573, design.md D7), nur mit Freigabe Personen; ohne steht „Für
+   * R-12“ als Text (die Registriernummer ist pseudonym wie im ETB).
+   */
+  personPfad?: ((personId: number) => string) | null;
+}
+
+/** Zeile „Für R-12“ einer Nachforderung mit Personenbezug (LLH-1573, design.md D7). */
+function PersonBezugZeile({
+  nr,
+  pfad,
+}: {
+  nr: number | null | undefined;
+  pfad: string | undefined;
+}) {
+  const kennung = nr != null ? registrierAnzeige(nr) : 'eine Person';
+  return (
+    <Text type="secondary" style={{ fontSize: 13 }} data-lfh="nachforderung-person">
+      Für{' '}
+      {pfad && nr != null ? (
+        <KennungsLink to={pfad}>
+          {kennung} <span aria-hidden="true">↗</span>
+        </KennungsLink>
+      ) : (
+        kennung
+      )}
+    </Text>
+  );
 }
 
 /** Zeile „Für Betreuungsstelle …“ einer Nachforderung mit Stellenbezug (LLH-1082). */
@@ -399,6 +428,7 @@ function NachforderungKarte({
   laeuft = false,
   stellenJeId,
   zielNamen,
+  personPfad,
 }: NachforderungKarteProps) {
   const { zeitpunkt } = useAnzeigeKonventionen();
   const { token, rollen } = useRollen();
@@ -603,6 +633,12 @@ function NachforderungKarte({
         {n.bezeichnung && <Text style={{ overflowWrap: 'anywhere' }}>{n.bezeichnung}</Text>}
         {n.betreuungsstelle_id != null && (
           <StellenBezug verweis={stellenJeId?.get(n.betreuungsstelle_id)} />
+        )}
+        {n.person_id != null && (
+          <PersonBezugZeile
+            nr={n.person_registrier_nr}
+            pfad={personPfad ? personPfad(n.person_id) : undefined}
+          />
         )}
         {n.begruendung && <Text type="secondary">{n.begruendung}</Text>}
         {zusage.length > 0 && (

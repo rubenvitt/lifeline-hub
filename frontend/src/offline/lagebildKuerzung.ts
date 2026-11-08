@@ -1,5 +1,6 @@
 import { EINSATZ_KEYS } from '../api/queryKeys';
 import type { Person, PersonAuswahl } from '../api/types';
+import { GAENGIGE_ARTEN } from '../nachforderungen/artVorschlaege';
 
 /**
  * Datensparsamkeit an der Grenze zur Platte (LFH-1095, design.md D1/D2): was eine Ansicht ohne
@@ -77,6 +78,10 @@ export const PERSON_AUF_DER_PLATTE = {
   // ohne Netz nur Katalogwerte); seine Zeit braucht ohne Netz niemand.
   anlass: 'behalten',
   anlass_at: 'auslassen',
+  // LLH-1573: der Stand des angeforderten Rettungsmittels hält die Marke „RTW unterwegs“ an der
+  // UHS auch ohne Netz. Behalten werden nur Art, Status und Zeit (`rettungsmittelKuerzen`): die
+  // Rufnamen sind Freitext, die Einsatznummer der Leitstelle hängt an der Person.
+  rettungsmittel: 'behalten',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
 
 /**
@@ -113,11 +118,49 @@ const AUSWAHL_BEHALTEN = (
  */
 const MARKE = 'nicht_geladen';
 
+/**
+ * Rettungsmittel ohne Netz (LLH-1573): eine Positivliste wie die Person selbst. Behalten werden
+ * Kennung, Status und erwartetes Eintreffen; die Art nur als gängiges Kürzel (`GAENGIGE_ARTEN`),
+ * sonst neutral „Rettungsmittel“, denn „Was“ ist Freitext. Ohne Rufnamen (Freitext) und ohne
+ * Einsatznummer der Leitstelle (personengebunden). Die Marke an der UHS braucht nur Art und
+ * Status. Die Marke `nicht_geladen` am Stand nennt die ausgelassenen Felder: aus ihm belegt der
+ * Verbleib nichts vor (`rettungsmittelGekuerzt`). Wiederholt angewandt gleich.
+ */
+function rettungsmittelKuerzen(r: unknown): unknown {
+  if (r === null || typeof r !== 'object') return r;
+  const quelle = r as Record<string, unknown>;
+  const gekuerzt: Record<string, unknown> = { rufnamen: [], [MARKE]: RETTUNGSMITTEL_AUSGELASSEN };
+  for (const feld of ['nachforderung_id', 'status', 'eintreffen_erwartet_at']) {
+    if (feld in quelle) gekuerzt[feld] = quelle[feld];
+  }
+  gekuerzt.art =
+    typeof quelle.art === 'string' && GAENGIGE_ARTEN.includes(quelle.art)
+      ? quelle.art
+      : RETTUNGSMITTEL_NEUTRAL;
+  return gekuerzt;
+}
+
+/** Art eines Rettungsmittels ohne Netz, wenn „Was“ kein gängiges Kürzel ist. */
+const RETTUNGSMITTEL_AUSGELASSEN = ['leitstelle_einsatznummer', 'rufnamen'];
+
+/**
+ * Ist dieser Rettungsmittel-Stand der gekürzte von der Platte (ohne Rufnamen und Einsatznummer)?
+ * Dann taugt er nicht als Vorbelegung des Verbleibs: leere Rufnamen hieße sonst „keine zugesagt“.
+ */
+export function rettungsmittelGekuerzt(r: object | null | undefined): boolean {
+  return r != null && MARKE in r;
+}
+
+export const RETTUNGSMITTEL_NEUTRAL = 'Rettungsmittel';
+
 function personKuerzen(p: unknown): unknown {
   if (p === null || typeof p !== 'object') return p;
   const quelle = p as Record<string, unknown>;
   const gekuerzt: Record<string, unknown> = {};
   for (const feld of BEHALTEN) if (feld in quelle) gekuerzt[feld] = quelle[feld];
+  if ('rettungsmittel' in gekuerzt) {
+    gekuerzt.rettungsmittel = rettungsmittelKuerzen(gekuerzt.rettungsmittel);
+  }
   gekuerzt[MARKE] = [...AUSGELASSEN];
   return gekuerzt;
 }

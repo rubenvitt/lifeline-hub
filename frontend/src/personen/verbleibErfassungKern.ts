@@ -4,10 +4,12 @@ import type {
   EntlassenAn,
   GegenRat,
   Person,
+  RettungsmittelStand,
   TransportmittelAuswahl,
   Unterschrift,
   VerbleibArt,
 } from '../api/types';
+import { rettungsmittelGekuerzt } from '../offline/lagebildKuerzung';
 import { ENTLASSEN_AN_WORT, GEGEN_RAT_WORT } from './personMeta';
 
 /**
@@ -218,5 +220,33 @@ export function uebergabeBody(
     status: 'uebergeben',
     ziel,
     ...(werte.zeitpunkt_at ? { zeitpunkt_at: werte.zeitpunkt_at } : {}),
+  };
+}
+
+/**
+ * Vorbelegung der Verbleib-Maske aus dem angeforderten Rettungsmittel (LLH-1573, design.md D6):
+ * ist es eingetroffen, steht „Transport“ mit fremdem Rettungsmittel (erster Rufname, sonst die
+ * Art) und der Einsatznummer der Leitstelle schon da. Nur vorbelegt, nie geschrieben; ist der
+ * Transport schon erfasst, bleibt die Maske leer.
+ */
+export function verbleibAusRettungsmittel(
+  person: Pick<Person, 'aktuelle_verbleib_art'> & {
+    rettungsmittel?: RettungsmittelStand | null;
+  },
+): Partial<VerbleibFormWerte> | undefined {
+  const stand = person.rettungsmittel;
+  if (stand?.status !== 'eingetroffen' || person.aktuelle_verbleib_art === 'transport') {
+    return undefined;
+  }
+  // Der gekürzte Stand von der Platte (ohne Netz) kennt weder Rufnamen noch Einsatznummer: keine
+  // halbe Vorbelegung, die wie eine vollständige aussieht.
+  if (rettungsmittelGekuerzt(stand)) return undefined;
+  return {
+    art: 'transport',
+    transportmittel: stand.rufnamen[0] ?? stand.art,
+    einsatz_fahrzeug_id: null,
+    ...(stand.leitstelle_einsatznummer
+      ? { leitstelle_einsatznummer: stand.leitstelle_einsatznummer }
+      : {}),
   };
 }

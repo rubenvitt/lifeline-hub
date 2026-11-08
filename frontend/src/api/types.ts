@@ -446,6 +446,8 @@ export type Verbleib = S['VerbleibAnzeige'];
 export type Bestaetiger = S['Bestaetiger'];
 export type Abgleich = S['AbgleichAnzeige'];
 export type PersonDetail = S['PersonDetail'];
+/** Stand des für eine Person angeforderten Rettungsmittels (LLH-1573). */
+export type RettungsmittelStand = S['RettungsmittelStand'];
 export type PersonZugriff = S['ZugriffAnzeige'];
 export type PersonZugriffArt = S['ZugriffArt'];
 export type PersonAnhang = S['PersonAnhangAnzeige'];
@@ -1527,6 +1529,11 @@ export interface NeueNachforderung {
    * liefert die schon gespeicherte Nachforderung statt einer zweiten.
    */
   client_id?: string;
+  /**
+   * Person, für die ein Rettungsmittel angefordert wird (LLH-1573); dann gilt Anzahl 1 und kein
+   * Stellenbezug daneben.
+   */
+  person_id?: number;
 }
 
 /**
@@ -1540,6 +1547,8 @@ export interface NachforderungZusageEingabe {
   rufnamen?: string[];
   /** Voraussichtliches Eintreffen (UTC); fehlt = ohne. */
   eintreffen_erwartet_at?: string;
+  /** Einsatznummer der Leitstelle (LLH-1573), nur mit Personenbezug. */
+  leitstelle_einsatznummer?: string;
 }
 
 /**
@@ -1556,6 +1565,8 @@ export interface PatchNachforderung {
   ziel_text?: string | null;
   eintreffen_erwartet_at?: string | null;
   rufnamen?: string[];
+  /** Einsatznummer der Leitstelle (LLH-1573), nur mit Personenbezug und nach der Zusage. */
+  leitstelle_einsatznummer?: string | null;
 }
 
 /**

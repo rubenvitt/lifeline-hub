@@ -147,7 +147,10 @@ function renderPage(
   {
     adresseSteht = false,
     daneben = null,
+    vorher,
   }: {
+    /** Füllt den Cache vor dem Rendern, etwa mit dem Stand einer anderen Seite. */
+    vorher?: (client: QueryClient) => void;
     /** Hält den Router-Commit an (LLH-1558); die Sonde sieht die Adresse weiter. */
     adresseSteht?: boolean;
     /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
@@ -155,6 +158,7 @@ function renderPage(
   } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vorher?.(client);
   zuletztClient = client;
   const seite = (
     <Routes>
@@ -1799,5 +1803,59 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
     });
     expect(betreuungAbrufe).toBe(0);
     expect(screen.queryByRole('combobox', { name: 'Für Stelle' })).toBeNull();
+  });
+});
+
+describe('NachforderungenPage — Personenbezug (LLH-1573)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listeNachforderungen.mockResolvedValue([]);
+    ladeModulFreigaben.mockResolvedValue(freigabenFixture());
+  });
+
+  it('lädt das Detail beim Öffnen einmal frisch, auch wenn die Personenseite es hält', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () => {
+        abrufe++;
+        return HttpResponse.json({
+          id: 10,
+          registrier_nr: 12,
+          transport_prioritaet: null,
+          aufenthalt: { uhs_bezeichnung: 'UHS Nord' },
+        });
+      }),
+    );
+    renderPage(nachforderungenPfad(1, { bezugPerson: 10 }), {
+      // Älterer Stand der Personenseite: noch in der alten UHS.
+      vorher: (c) =>
+        c.setQueryData(einsatzKeys.person(1, 10), {
+          id: 10,
+          registrier_nr: 12,
+          aufenthalt: { uhs_bezeichnung: 'UHS Alt' },
+        }),
+    });
+    expect(await screen.findByLabelText('Was')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Wohin')).toHaveValue('UHS Nord'));
+    expect(abrufe).toBe(1);
+  });
+
+  it('ein gescheitertes Detail steht als „nicht geladen“ mit „Erneut laden“', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () => {
+        abrufe++;
+        return abrufe === 1
+          ? HttpResponse.json({ fehler: 'kaputt' }, { status: 500 })
+          : HttpResponse.json({ id: 10, registrier_nr: 12, transport_prioritaet: null });
+      }),
+    );
+    renderPage(nachforderungenPfad(1, { bezugPerson: 10 }));
+    expect(await screen.findByLabelText('Was')).toBeInTheDocument();
+    const bezug = document.querySelector('[data-lfh="nachforderung-bezug"]') as HTMLElement;
+    await waitFor(() => expect(bezug).toHaveTextContent('Für eine Person · nicht geladen'));
+    await userEvent.click(within(bezug).getByRole('button', { name: 'Erneut laden' }));
+    await waitFor(() => expect(bezug).toHaveTextContent(/^Für R-0*12 ↗$/));
+    expect(abrufe).toBe(2);
   });
 });
