@@ -74,20 +74,22 @@ impl std::fmt::Debug for Ableitung {
 
 /// Leitet aus einem normalisierten Code die drei Werte ab.
 pub fn derive(code: &str) -> Ableitung {
-    let hk = Hkdf::<Sha256>::new(Some(SALZ), code.as_bytes());
-    let mut suche = [0u8; 32];
-    let mut k_einloeser = [0u8; 32];
-    let mut k_aussteller = [0u8; 32];
-    hk.expand(b"suche", &mut suche).expect("32 Byte passen");
-    hk.expand(b"einloeser", &mut k_einloeser)
-        .expect("32 Byte passen");
-    hk.expand(b"aussteller", &mut k_aussteller)
-        .expect("32 Byte passen");
+    let (prk, _) = Hkdf::<Sha256>::extract(Some(SALZ), code.as_bytes());
     Ableitung {
-        suche: b64(&suche),
-        k_einloeser,
-        k_aussteller,
+        suche: b64(&expand_block(&prk, b"suche")),
+        k_einloeser: expand_block(&prk, b"einloeser"),
+        k_aussteller: expand_block(&prk, b"aussteller"),
     }
+}
+
+/// HKDF-Expand (RFC 5869, Abschnitt 2.3) für genau einen Block: `T(1) = HMAC(PRK, info ‖ 0x01)`,
+/// dieselben Bytes wie `Hkdf::expand` mit 32 Byte Länge. Ohne vorbelegten Ausgabepuffer, den
+/// CodeQL sonst als festen Schlüssel liest (`rust/hard-coded-cryptographic-value`).
+fn expand_block(prk: &[u8], info: &[u8]) -> [u8; 32] {
+    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(prk).expect("jede Länge");
+    mac.update(info);
+    mac.update(&[1]);
+    mac.finalize().into_bytes().into()
 }
 
 /// Was die einlösende Seite bindet: `suche`, ihre Kennung, ihren Schlüssel, die Org, an die sie
@@ -182,6 +184,23 @@ mod tests {
         assert_ne!(a.suche, c.suche);
         assert_ne!(a.k_einloeser, a.k_aussteller);
         assert_eq!(a.suche.len(), 43);
+    }
+
+    #[test]
+    fn ableitung_gleicht_hkdf_expand_byte_fuer_byte() {
+        let code = "ABCDEFGHJKMNPQRS";
+        let hk = Hkdf::<Sha256>::new(Some(SALZ), code.as_bytes());
+        let mut erwartet = [[1u8; 32]; 3];
+        for (info, puffer) in [b"suche".as_slice(), b"einloeser", b"aussteller"]
+            .into_iter()
+            .zip(erwartet.iter_mut())
+        {
+            hk.expand(info, puffer).expect("32 Byte passen");
+        }
+        let a = derive(code);
+        assert_eq!(a.suche, b64(&erwartet[0]));
+        assert_eq!(a.k_einloeser, erwartet[1]);
+        assert_eq!(a.k_aussteller, erwartet[2]);
     }
 
     #[test]
