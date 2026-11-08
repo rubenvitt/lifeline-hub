@@ -102,7 +102,12 @@ test('Vorplanung: anlegen, Posten, Helfer, Schichten erzeugen, einteilen, Befund
   await expect(bloecke.first()).toHaveAttribute('data-ampel', 'luecke');
 
   // ── Helfer per Zug in den ersten Block ───────────────────────────────────────────────────────
+  // Die Liste führt vor den Helfern der Planung den Stamm der Organisation; den füllen andere Specs
+  // in derselben Datenbank, bis Hanna unter dem sichtbaren Rand der Liste liegt. Die Suche holt
+  // sie nach oben, wie es ein Mensch täte.
+  await page.getByRole('textbox', { name: 'Personen suchen' }).fill('Hanna Helfer');
   const hanna = page.locator('[data-lfh="schichtplan-person"]').filter({ hasText: 'Hanna Helfer' });
+  await hanna.scrollIntoViewIfNeeded();
   const von = await mitte(hanna);
   const nach = await mitte(bloecke.first());
   await page.mouse.move(von.x, von.y);
