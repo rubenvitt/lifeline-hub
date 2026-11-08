@@ -17,11 +17,13 @@ export function useModulFreigaben(einsatzId: number): ModulFreigaben | undefined
 /**
  * {@link useModulFreigaben} samt Fehlerzweig (LLH-1462): Eine Seite, die ihre Nachbarlisten erst
  * mit bekannter Freigabe abfragt, stünde sonst bei gescheiterten Freigaben für immer im Laden.
- * `gescheitert` gilt nur ohne Daten; ein alter Stand im Cache bleibt maßgeblich.
+ * `gescheitert` gilt nur ohne Daten; ein alter Stand im Cache bleibt maßgeblich. `laedt` zeigt
+ * einen laufenden Abruf, auch über einem alten Stand: ein Schnappschuss wartet darauf (LLH-1557).
  */
 export function useModulFreigabenStand(einsatzId: number): {
   freigaben: ModulFreigaben | undefined;
   gescheitert: boolean;
+  laedt: boolean;
   wiederholen: () => void;
 } {
   const query = useQuery({
@@ -36,6 +38,7 @@ export function useModulFreigabenStand(einsatzId: number): {
   return {
     freigaben: query.data,
     gescheitert: query.isError && query.data === undefined,
+    laedt: query.isFetching,
     wiederholen,
   };
 }

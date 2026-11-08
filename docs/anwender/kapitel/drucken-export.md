@@ -16,6 +16,7 @@ Gedruckt werden können unter anderem:
 - das Einsatztagebuch, als eigene Druckansicht,
 - die Listen der Betroffenen, Tiere und Schäden, ebenfalls als Druckansicht,
 - einzelne Aufträge, als Druckansicht,
+- der Schichtplan als Aushang je Posten oder Schichtzettel je Person ([Ablösung](abloesung.md)),
 - das Blatt einer Person, als Druckansicht ([Betroffene und Sichtung](betroffene.md)),
 - Einsatzbefehle, Lageberichte und Pressemitteilungen,
 - Meldebild, Funkplan, Kommunikationsplan und das Organigramm der Einsatzabschnitte,
