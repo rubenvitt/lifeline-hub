@@ -366,9 +366,10 @@ export interface StundenPosten {
 }
 
 /**
- * Kontakte je Stunde (LLH-1575, design.md D4; Lagebild LLH-1574 nimmt dieselbe Funktion): Zeit
- * des Kontakts ist `erfasst_at` (bei einer vorgemerkten Aufnahme die Erfassungszeit). Gezählt
- * wird wie in {@link anlassbild}, ohne Vermisste. Die Stunden gelten in der Zone der
+ * Kontakte je Stunde über den ganzen Einsatz (LLH-1575, design.md D4; das Lagebild zählt in
+ * einem festen Fenster, `pages/lage-dashboard/verlauf.ts`): Zeit des Kontakts ist `erfasst_at`
+ * (bei einer vorgemerkten Aufnahme die Erfassungszeit). Gezählt wird wie in {@link anlassbild},
+ * ohne Vermisste. Die Stunden gelten in der Zone der
  * Konventionen (`konv.zeitzone`, im Bericht die der Organisation); jede Stunde vom ersten bis zum
  * letzten Kontakt steht da, eine ohne Kontakt mit 0. Ohne Kontakt eine leere Liste.
  */
