@@ -21,7 +21,7 @@ export function ausEinsatzPlan(plan: Schichtplan, zeilen: readonly RasterZeile[]
     schluessel: z.schluessel,
     titel: z.titel,
     abschnitt: z.gruppe == null || z.gruppe === OHNE_ABSCHNITT ? null : z.gruppe,
-    istPause: z.schluessel === PAUSE,
+    isPause: z.schluessel === PAUSE,
   }));
   const bekannt = new Set(posten.map((p) => p.schluessel));
   // Ein Block an einem Posten, den die Zeilen nicht kennen, stünde sonst auf keinem Blatt.
@@ -33,7 +33,7 @@ export function ausEinsatzPlan(plan: Schichtplan, zeilen: readonly RasterZeile[]
       schluessel: s,
       titel: b.posten.bezeichnung ?? (b.posten.art === 'uhs' ? 'UHS' : 'Einheit'),
       abschnitt: null,
-      istPause: s === PAUSE,
+      isPause: s === PAUSE,
     });
   }
 

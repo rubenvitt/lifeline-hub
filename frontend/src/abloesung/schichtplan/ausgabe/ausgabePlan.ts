@@ -13,7 +13,7 @@ export interface AusgabePosten {
   /** Name des Abschnitts; `null` = ohne Abschnitt. */
   abschnitt: string | null;
   /** Die Pause hat keinen Aushang und zählt nicht zu den Stunden. */
-  istPause: boolean;
+  isPause: boolean;
 }
 
 /** Eine eingeteilte Person. */
@@ -104,7 +104,7 @@ const sollGleich = (a: AusgabeSchicht, b: AusgabeSchicht) =>
 export function aushaenge(plan: AusgabePlan): Aushang[] {
   const personen = personenVon(plan);
   return plan.posten
-    .filter((p) => !p.istPause)
+    .filter((p) => !p.isPause)
     .map((posten) => {
       const schichten = plan.schichten
         .filter((s) => s.posten === posten.schluessel)
@@ -153,14 +153,14 @@ export function zettel(plan: AusgabePlan): Zettel[] {
       liste.push({
         schicht,
         posten: p,
-        mit: p.istPause ? [] : alle.filter((o) => o.schluessel !== person.schluessel),
+        mit: p.isPause ? [] : alle.filter((o) => o.schluessel !== person.schluessel),
       });
       jePerson.set(person.schluessel, liste);
     }
   }
   return [...jePerson.entries()]
     .map(([schluessel, zeilen]) => {
-      const dienst = zeilen.filter((z) => !z.posten.istPause);
+      const dienst = zeilen.filter((z) => !z.posten.isPause);
       return {
         person: personen.get(schluessel)!,
         zeilen,

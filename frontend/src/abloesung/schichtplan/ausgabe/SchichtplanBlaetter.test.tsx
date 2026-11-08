@@ -32,9 +32,9 @@ const schicht = (s: Partial<AusgabeSchicht> & { id: string; posten: string }): A
 
 const PLAN: AusgabePlan = {
   posten: [
-    { schluessel: 'uhs:9', titel: 'UHS Marktplatz', abschnitt: 'Innenstadt', istPause: false },
-    { schluessel: 'einheit:4', titel: 'Fußstreife 1', abschnitt: null, istPause: false },
-    { schluessel: 'pause', titel: 'Pause', abschnitt: null, istPause: true },
+    { schluessel: 'uhs:9', titel: 'UHS Marktplatz', abschnitt: 'Innenstadt', isPause: false },
+    { schluessel: 'einheit:4', titel: 'Fußstreife 1', abschnitt: null, isPause: false },
+    { schluessel: 'pause', titel: 'Pause', abschnitt: null, isPause: true },
   ],
   schichten: [
     schicht({ id: '1', posten: 'uhs:9', personen: ['stamm:1', 'helfer:3'], personenAnzahl: 2 }),

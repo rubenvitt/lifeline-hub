@@ -109,7 +109,7 @@ test('Aushang je Posten: Blatt je Posten auf neuer Seite, Zeilen ganz, nichts ra
   const lage = await page.evaluate(() => {
     const wurzel = document.querySelector('[data-lfh="druckwurzel"]')!.getBoundingClientRect();
     const kapitel = Array.from(document.querySelectorAll('[data-lfh="druck-kapitel"]'));
-    const zellen = Array.from(document.querySelectorAll('[data-lfh="druckwurzel"] td, th'));
+    const zellen = Array.from(document.querySelectorAll('[data-lfh="druckwurzel"] :is(td, th)'));
     const zeile = document.querySelector('[data-lfh="schichtplan-aushang"] tbody tr')!;
     return {
       wurzelRechts: wurzel.right,

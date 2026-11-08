@@ -12,7 +12,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
   `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`,
-  `einsatzbericht-deckel-druck`, `koerperschema-druck`, `gefahren-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `einsatzbericht-deckel-druck`, `koerperschema-druck`, `gefahren-druck`, `schichtplan-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium). Druck-Specs mit Lagekarte (`lagekarte-druck`) stehen in `KARTEN_DRUCK_SPECS`:
   Chromium und WebKit, denn der headless Firefox hat kein WebGL2 (LLH-1051).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
