@@ -5,9 +5,9 @@ import type {
   ExterneStelle,
   ExterneStelleArt,
   KommunikationsStelle,
+  MitgliedAnzeige,
   NeueVerbindung,
   SkizzenVerbindung,
-  Stab,
   StellenKanal,
   Stellenart,
   KommunikationsVerbindung,
@@ -16,7 +16,7 @@ import type {
 import { anzahl } from '../anzeige/anzahl';
 import { VERBINDUNGSMITTEL_LABEL, verbindungsVerweis } from '../components/verbindungen';
 import { einheitDetailPfad, einsatzabschnittePfad, einsatzdatenPfad } from '../routing/deeplinks';
-import { besetzungDarstellung, zeileFuer } from '../stab/besetzung';
+import { besetzungJeSachgebiet } from '../fuehrung/besetzungAusMitgliedern';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../einsatz/einsatzleiter';
 import {
   FUEHRUNGSSTELLE_STELLE,
@@ -39,7 +39,7 @@ import { bedingungszeichenText } from './skizzenZeichen';
  * - **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist ebenso abgeleitet: erste Zeile der
  *   Gruppe „Einsatzleitung und Stab“, sobald sie erfasst ist (`fuehrungsstelleErfasst`, dieselbe
  *   Regel wie im Funkplan), gepflegt auf Einsatzdaten.
- * - **Die Verbindung gehört der Stelle.** Die Besetzung aus dem Stab ist nur Nebentext;
+ * - **Die Verbindung gehört der Stelle.** Die Besetzung aus den Mitgliedern ist nur Nebentext;
  *   Kontaktangaben des Einsatzpersonals kommen hier nie vor.
  * - Eine fehlende Quelle ist kein leerer Bestand: die Gruppe trägt ihren Zustand.
  */
@@ -147,8 +147,8 @@ interface ZeileBasis {
   /** Nebentext unter der Kennung (Besetzung, Art der Stelle), `null` = keiner. */
   nebentext: string | null;
   /**
-   * Warum der Nebentext nur „—“ zeigt (LLH-1180, design.md D8): die Besetzung kommt vom Stab, und
-   * der ist für die Person nicht frei. Fehlt, wenn der Nebentext für sich spricht.
+   * Warum der Nebentext nur „—“ zeigt: die Besetzung kommt aus den Mitgliedern, und die sind nicht
+   * geladen (i6k6mzed, D7). Fehlt, wenn der Nebentext für sich spricht.
    */
   nebentextGrund?: string;
   /**
@@ -179,8 +179,8 @@ export interface KommunikationsplanQuellen {
   stellen: Quelle<KommunikationsStelle>;
   abschnitte: Quelle<Einsatzabschnitt>;
   einheiten: Quelle<Einheit>;
-  /** Besetzung des Stabs; nur für den Nebentext der Sachgebiete. */
-  stab: { zustand: AbrufZustand; daten: Stab | undefined };
+  /** Mitglieder des Einsatzes; nur für den Nebentext der Sachgebiete (i6k6mzed, D7). */
+  mitglieder: Quelle<MitgliedAnzeige>;
   /** Die eigene Führungsstelle (LFH-849), eine einzelne Angabe mit eigener Weiche. */
   fuehrungsstelle: FuehrungsstelleQuelle;
 }
@@ -202,25 +202,24 @@ function anzeigen(
   }));
 }
 
-/** Grund am „—“ der Besetzung, wenn der Stab nicht frei ist (LLH-1180, design.md D8). */
-export const STAB_NICHT_FREI_GRUND = 'Stab nicht freigegeben';
-
 /**
- * Nebentext einer Funktionszeile: die Besetzung der Sachgebiete S1–S6, sonst keiner. Ist der Stab
- * für die Person nicht frei, steht „—“ mit Grund: die Verbindung gehört der Stelle (Spec
- * `stab-kommunikationsplan`), nur ihre Besetzung fehlt.
+ * Nebentext einer Funktionszeile: die Namen der Mitglieder, die das Sachgebiet S1–S6 führen
+ * (`fuehrung/besetzungAusMitgliedern.ts`), sonst keiner. Fehlen die Mitglieder, steht „—“ mit
+ * Grund: die Verbindung gehört der Stelle (Spec `stab-kommunikationsplan`), nur ihre Besetzung
+ * fehlt.
  */
 function besetzungsText(
   stelle: KommunikationsStelle,
-  stab: KommunikationsplanQuellen['stab'],
+  mitglieder: KommunikationsplanQuellen['mitglieder'],
 ): { nebentext: string | null; nebentextGrund?: string } {
   const f = stelle.funktion;
   if (f !== 's1' && f !== 's2' && f !== 's3' && f !== 's4' && f !== 's5' && f !== 's6') {
     return { nebentext: null };
   }
-  if (stab.zustand === 'gesperrt') return { nebentext: '—', nebentextGrund: STAB_NICHT_FREI_GRUND };
-  if (stab.zustand !== 'daten') return { nebentext: `Besetzung ${ZUSTAND_GRUND[stab.zustand]}` };
-  return { nebentext: besetzungDarstellung(zeileFuer(stab.daten, f)).label };
+  if (mitglieder.zustand !== 'daten') {
+    return { nebentext: '—', nebentextGrund: ZUSTAND_GRUND[mitglieder.zustand] };
+  }
+  return { nebentext: besetzungJeSachgebiet(mitglieder.daten).get(f) ?? 'nicht vergeben' };
 }
 
 /** Ein Kanal als Text: Bedingungszeichen wie in der Skizze, „geplant“ als Wort (D7). */
@@ -231,7 +230,7 @@ function kanalText(k: StellenKanal): string {
 
 function gepflegteZeile(
   stelle: KommunikationsStelle,
-  stab: KommunikationsplanQuellen['stab'],
+  mitglieder: KommunikationsplanQuellen['mitglieder'],
 ): KommunikationsZeile {
   const schluessel = `st-${stelle.id}`;
   const istFunktion = stelle.stellenart === 'funktion';
@@ -243,7 +242,7 @@ function gepflegteZeile(
     schluessel,
     kennung,
     ...(istFunktion
-      ? besetzungsText(stelle, stab)
+      ? besetzungsText(stelle, mitglieder)
       : { nebentext: STELLENART_LABEL[stelle.stellenart] }),
     kanaele: istFunktion ? [] : stelle.sprechgruppen.map(kanalText),
     stelle,
@@ -304,7 +303,9 @@ export function baueKommunikationsplan(q: KommunikationsplanQuellen): Kommunikat
   return [
     gruppe('stab', q.stellen.zustand, [
       ...(fs ? [fs] : []),
-      ...stellen.filter((s) => s.stellenart === 'funktion').map((s) => gepflegteZeile(s, q.stab)),
+      ...stellen
+        .filter((s) => s.stellenart === 'funktion')
+        .map((s) => gepflegteZeile(s, q.mitglieder)),
     ]),
     gruppe(
       'abschnitte',
@@ -341,7 +342,9 @@ export function baueKommunikationsplan(q: KommunikationsplanQuellen): Kommunikat
     gruppe(
       'extern',
       q.stellen.zustand,
-      stellen.filter((s) => s.stellenart !== 'funktion').map((s) => gepflegteZeile(s, q.stab)),
+      stellen
+        .filter((s) => s.stellenart !== 'funktion')
+        .map((s) => gepflegteZeile(s, q.mitglieder)),
     ),
   ];
 }

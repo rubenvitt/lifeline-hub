@@ -12,10 +12,10 @@ import type {
   LageberichtAnzeige,
   Lagebesprechung,
   Fuehrungsstelle,
+  MitgliedAnzeige,
   Person,
   PersonPerioden,
   Schaden,
-  Stab,
   VerbleibAngaben,
   Verpflegung,
 } from '../../api/types';
@@ -165,12 +165,13 @@ export function rohBericht(
         seit: '2026-03-29 00:40:00',
       },
     } as Fuehrungsstelle),
-    stab: daten({
-      besetzung: [
-        { sachgebiet: 's2', besetzung_art: 'personal', name: 'Sven Lage' },
-        { sachgebiet: 's1', besetzung_art: 'einsatzleitung' },
-      ],
-    } as unknown as Stab),
+    // Die Führungsfunktionen aus der Mitgliedschaft (i6k6mzed, D7).
+    mitglieder: daten([
+      { benutzer_id: 1, anzeigename: 'Sven Lage', fuehrungsfunktion: 's2' },
+      { benutzer_id: 2, anzeigename: 'Ute Lage', fuehrungsfunktion: 's2' },
+      { benutzer_id: 3, anzeigename: 'Max Leiter', fuehrungsfunktion: 'el' },
+      { benutzer_id: 4, anzeigename: 'Otto Ohne' },
+    ] as unknown as MitgliedAnzeige[]),
     lagebesprechungen: daten([
       {
         id: 1,

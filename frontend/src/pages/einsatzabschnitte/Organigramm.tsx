@@ -1,19 +1,18 @@
 import { Button, Space } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
 import { abrufZustand } from '../../api/abrufZustand';
 import { legeLageberichtAn } from '../../api/lageberichte';
-import { ladeStab } from '../../api/stab';
 import { einsatzKeys } from '../../api/queryKeys';
 import DruckKnopf from '../../components/druck/DruckKnopf';
 import Druckkopf from '../../components/druck/Druckkopf';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
-import type { Einheit, EinsatzAnzeige, Einsatzabschnitt, Stabsfunktion } from '../../api/types';
+import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
 import { staerkeText } from '../../anzeige/staerke';
 import { monoStil, useRollen } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
@@ -32,7 +31,12 @@ import {
   type EinsatzleiterDarstellung,
 } from '../../einsatz/einsatzleiter';
 import type { Quelle } from '../../api/abrufZustand';
-import { useStabFreigabe } from '../../stab/useStabFreigabe';
+import {
+  fuehrungsfunktionZeilen,
+  mitgliederAbfrage,
+  sachgebietZeilen,
+  type SachgebietZeile,
+} from '../../fuehrung/besetzungAusMitgliedern';
 import type { RenderTheme } from '@einsatzzeichen/core';
 import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
 import { useZeichenTheme } from '../../zeichen/useZeichenTheme';
@@ -40,7 +44,6 @@ import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import {
   baueFuehrungsorganisation,
   rendereFuehrungsorganisationMarkdown,
-  stabZeilen,
   wurzelFuehrungsstelle,
   type Fuehrungsorganisation,
   type OrgKnoten,
@@ -60,26 +63,23 @@ import './organigrammPrint.css';
  * - **Einsatzleitung ohne erfundene Leitung** (D5, LFH-1199): die Wurzel zeigt den Einsatzleiter,
  *   der an der eigenen Führungsstelle erfasst ist (`einsatz/einsatzleiter.ts`), sonst die benannte
  *   Lücke — nie die App-Rolle. Darüber stehen Bezeichnung und Rufname der Führungsstelle
- *   (`openspec/changes/archive/2026-10-11-lfh-1181-fuehrungsstelle-ort/design.md`, D6). Der Stab
- *   steht nur mit Stab-Freigabe daneben — fail-closed über `useStabFreigabe`.
+ *   (`openspec/changes/archive/2026-10-11-lfh-1181-fuehrungsstelle-ort/design.md`, D6). Die
+ *   Stabsstelle steht daneben, sobald ein Mitglied ein Sachgebiet S1–S6 führt (i6k6mzed, D7), ohne
+ *   Modulfreigabe; ein Sachgebiet ohne Mitglied fehlt, ohne Mitglieder fehlt die Stabsstelle.
  * - **Keine Zahl an der Wurzel** (D4): die Einsatzstärke hat ihre Heimat im Meldebild (LFH-550).
  */
 
 const ZEICHEN_PX = 22;
-
-export type StabsstelleZustand =
-  | { zustand: 'aus' }
-  | { zustand: 'fehler' }
-  | { zustand: 'daten'; besetzung: readonly Stabsfunktion[] };
 
 interface BildProps {
   einsatzId: number;
   org: Fuehrungsorganisation;
   /** Aus der Führungsstelle (LFH-1199); der Aufrufer lädt sie. */
   einsatzleiter: EinsatzleiterDarstellung;
-  stab: StabsstelleZustand;
+  /** Die geführten Sachgebiete aus den Mitgliedern; leer = keine Stabsstelle. */
+  stab: readonly SachgebietZeile[];
   fuehrungsstelle?: WurzelFuehrungsstelle | null;
-  /** Führungsstelle oder Stabsstelle laden noch: die Schleuse hält den Kopf nicht (LLH-1166). */
+  /** Führungsstelle oder Mitglieder laden noch: die Schleuse hält den Kopf nicht (LLH-1166). */
   kopfLaedt?: boolean;
   zugeklappt: ReadonlySet<string>;
   onUmschalten: (key: string) => void;
@@ -96,7 +96,7 @@ function OrganigrammKopf({
   fuehrungsstelle,
 }: {
   einsatzleiter: EinsatzleiterDarstellung;
-  stab: StabsstelleZustand;
+  stab: readonly SachgebietZeile[];
   fuehrungsstelle: WurzelFuehrungsstelle | null;
 }) {
   const { token, rollen } = useRollen();
@@ -149,7 +149,7 @@ function OrganigrammKopf({
           </div>
         )}
       </div>
-      {stab.zustand !== 'aus' && (
+      {stab.length > 0 && (
         <>
           {/* Stabslinie: der Stab ist beigeordnet, nicht unterstellt (FwDV 100). */}
           <span
@@ -164,7 +164,7 @@ function OrganigrammKopf({
                   }
             }
           />
-          <Stabsstelle stab={stab} stil={kasten} />
+          <Stabsstelle zeilen={stab} stil={kasten} />
         </>
       )}
     </div>
@@ -214,32 +214,26 @@ export function OrganigrammBild({
   );
 }
 
-function Stabsstelle({ stab, stil }: { stab: StabsstelleZustand; stil: CSSProperties }) {
-  const { token, rollen } = useRollen();
-  let inhalt: ReactNode;
-  if (stab.zustand === 'fehler') {
-    inhalt = <div style={{ color: rollen.gedaempft }}>Besetzung nicht geladen</div>;
-  } else if (stab.zustand === 'daten') {
-    // S-Folge aus der einen Liste; unbesetzte Sachgebiete erscheinen nicht.
-    const zeilen = stabZeilen(stab.besetzung);
-    inhalt =
-      zeilen.length === 0 ? (
-        <div style={{ color: rollen.gedaempft }}>Kein Sachgebiet besetzt</div>
-      ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {zeilen.map((z) => (
-            <li key={z.kuerzel} style={{ display: 'flex', gap: token.marginXS }}>
-              <span style={monoStil(12, 500)}>{z.kuerzel}</span>
-              <span style={{ overflowWrap: 'anywhere' }}>{z.text}</span>
-            </li>
-          ))}
-        </ul>
-      );
-  }
+/** Die Stabsstelle: je geführtem Sachgebiet in S-Folge das Kürzel und die Namen der Mitglieder. */
+function Stabsstelle({
+  zeilen,
+  stil,
+}: {
+  zeilen: readonly SachgebietZeile[];
+  stil: CSSProperties;
+}) {
+  const { token } = useRollen();
   return (
     <div role="group" aria-label="Stab" data-lfh="org-stab" style={stil}>
       <div style={{ fontWeight: 600 }}>Stab</div>
-      {inhalt}
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {zeilen.map((z) => (
+          <li key={z.kuerzel} style={{ display: 'flex', gap: token.marginXS }}>
+            <span style={monoStil(12, 500)}>{z.kuerzel}</span>
+            <span style={{ overflowWrap: 'anywhere' }}>{z.namen}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -355,29 +349,15 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
   });
   const fuehrungsstelle = wurzelFuehrungsstelle(fuehrungsstelleQuery.data);
 
-  const stabFreigabe = useStabFreigabe(einsatz.id);
-  const stabFrei = stabFreigabe.zustand === 'frei';
-  const stabQuery = useQuery({
-    queryKey: einsatzKeys.stab(einsatz.id),
-    queryFn: () => ladeStab(einsatz.id),
-    enabled: stabFrei,
-  });
-  // Fail-closed: ohne ermittelte Freigabe und solange nichts da ist, steht keine Stabsstelle da.
-  const stab: StabsstelleZustand = !stabFrei
-    ? { zustand: 'aus' }
-    : stabQuery.data
-      ? { zustand: 'daten', besetzung: stabQuery.data.besetzung }
-      : stabQuery.isError
-        ? { zustand: 'fehler' }
-        : { zustand: 'aus' };
-  // Die Quellen des Kopfs: Führungsstelle und Stabsstelle samt ihrer Freigabe (LLH-1166).
-  const kopfLaedt =
-    fuehrungsstelleQuery.isPending ||
-    stabFreigabe.zustand === 'laden' ||
-    (stabFrei && stabQuery.isPending);
+  // Die Mitglieder liest jedes Mitglied ohne Modul (i6k6mzed, D7); aus ihren Führungsfunktionen
+  // entsteht die Stabsstelle. Solange nichts da ist oder der Abruf scheitert, steht keine da.
+  const mitgliederQuery = useQuery(mitgliederAbfrage(einsatz.id));
+  const stab = useMemo(() => sachgebietZeilen(mitgliederQuery.data), [mitgliederQuery.data]);
+  // Die Quellen des Kopfs: Führungsstelle und Mitglieder (LLH-1166).
+  const kopfLaedt = fuehrungsstelleQuery.isPending || mitgliederQuery.isPending;
 
-  // Dieselbe Abfrage wie `useStabFreigabe` (gemeinsamer Cache): die Übernahme legt einen
-  // Lagebericht an, also braucht es Schreibrecht UND das freigegebene Modul Lageberichte.
+  // Die Übernahme legt einen Lagebericht an, also braucht es Schreibrecht UND das freigegebene
+  // Modul Lageberichte.
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatz.id),
     queryFn: () => ladeModulFreigaben(einsatz.id),
@@ -386,9 +366,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
     darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('lageberichte', freigabenQuery.data);
   // Solange eine Quelle lädt, stünde „lädt“ im unveränderlichen Bericht.
   const quellenLaden =
-    einheiten.zustand === 'laden' ||
-    fuehrungsstelleQuery.isPending ||
-    (stabFrei && stabQuery.isPending);
+    einheiten.zustand === 'laden' || fuehrungsstelleQuery.isPending || mitgliederQuery.isPending;
 
   const uebernehmen = useMutation({
     mutationFn: async () => {
@@ -405,12 +383,9 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
             schluessel: 'text',
             text: rendereFuehrungsorganisationMarkdown(org, {
               stand,
-              stab:
-                stab.zustand === 'daten'
-                  ? stab.besetzung
-                  : stab.zustand === 'fehler'
-                    ? 'fehler'
-                    : null,
+              fuehrungsfunktionen: mitgliederQuery.data
+                ? fuehrungsfunktionZeilen(mitgliederQuery.data)
+                : 'fehler',
               einheitenZustand: einheiten.zustand,
               fuehrungsstelle,
               einsatzleiter,

@@ -6,16 +6,14 @@ import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge, listEntlasseneFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listEinsatzMaterial, listEntlassenesMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
-import { ladeStab } from '../api/stab';
-import { ladeFuehrungsstelle } from '../api/einsaetze';
+import { ladeFuehrungsstelle, ladeMitglieder } from '../api/einsaetze';
 import type {
   Einheit,
   EinsatzFahrzeug,
   EinsatzMaterial,
   EinsatzPersonal,
   Einsatzabschnitt,
-  Stab,
-  Stabsfunktion,
+  MitgliedAnzeige,
 } from '../api/types';
 import { baueKraeftebild, rendereMeldebildMarkdown } from '../kraefte/kraeftebild';
 import {
@@ -39,8 +37,7 @@ vi.mock('../api/einsatzMaterial', () => ({
   listEinsatzMaterial: vi.fn(),
   listEntlassenesMaterial: vi.fn(),
 }));
-vi.mock('../api/stab', () => ({ ladeStab: vi.fn() }));
-vi.mock('../api/einsaetze', () => ({ ladeFuehrungsstelle: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeFuehrungsstelle: vi.fn(), ladeMitglieder: vi.fn() }));
 
 const ABSCHNITTE = [
   {
@@ -99,11 +96,25 @@ const FAHRZEUGE = [
     status_label: '2',
   },
 ] as unknown as EinsatzFahrzeug[];
-const STAB = {
-  besetzung: [
-    { sachgebiet: 's1', besetzung_art: 'einsatzleitung', personal_noch_disponiert: false },
-  ] as unknown as Stabsfunktion[],
-} as unknown as Stab;
+/** Die Führungsfunktionen kommen aus den Mitgliedern (i6k6mzed, D7). */
+const MITGLIEDER = [
+  {
+    benutzer_id: 3,
+    anzeigename: 'Lea Leitung',
+    benutzername: 'lea',
+    einsatz_rolle: 'einsatzleitung',
+    zugewiesen_at: '2026-10-01 10:00:00',
+    fuehrungsfunktion: 'el',
+  },
+  {
+    benutzer_id: 4,
+    anzeigename: 'Bert Personal',
+    benutzername: 'bert',
+    einsatz_rolle: 'fuehrungspersonal',
+    zugewiesen_at: '2026-10-01 10:00:00',
+    fuehrungsfunktion: 's1',
+  },
+] as MitgliedAnzeige[];
 
 const STAND = 'STAND';
 const dtg = () => STAND;
@@ -121,7 +132,7 @@ beforeEach(() => {
   vi.mocked(listEntlasseneFahrzeuge).mockReset().mockResolvedValue([]);
   vi.mocked(listEinsatzMaterial).mockReset().mockResolvedValue([]);
   vi.mocked(listEntlassenesMaterial).mockReset().mockResolvedValue([]);
-  vi.mocked(ladeStab).mockReset().mockResolvedValue(STAB);
+  vi.mocked(ladeMitglieder).mockReset().mockResolvedValue(MITGLIEDER);
   vi.mocked(ladeFuehrungsstelle)
     .mockReset()
     .mockResolvedValue({ art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [] });
@@ -140,7 +151,10 @@ const ORG = (
 ) =>
   rendereFuehrungsorganisationMarkdown(baueFuehrungsorganisation(ABSCHNITTE, einheiten), {
     stand: STAND,
-    stab: STAB.besetzung,
+    fuehrungsfunktionen: [
+      { funktion: 'el', kuerzel: 'EL', namen: 'Lea Leitung' },
+      { funktion: 's1', kuerzel: 'S1', namen: 'Bert Personal' },
+    ],
     einheitenZustand: 'daten',
     einsatzleiter: { art: 'nicht-erfasst' },
     dtg,
@@ -292,11 +306,19 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     expect(text).not.toContain('Leitung nicht erfasst');
   });
 
-  it('sagt ohne Stab-Freigabe kein Wort über den Stab und ruft ihn nicht ab', async () => {
+  // Design D7 (i6k6mzed): die Zeile heißt „Führungsfunktionen“ und kommt aus den Mitgliedern,
+  // auch ohne Stab-Freigabe.
+  it('nennt die Führungsfunktionen aus den Mitgliedern, auch ohne Stab-Freigabe', async () => {
     const text = await erzeuge(freigabenFixture({ stab: { sichtbar: false } }));
-    expect(ladeStab).not.toHaveBeenCalled();
-    expect(text).toBe(`${MELDEBILD()}\n${ORG({ stab: null })}`);
+    expect(text).toBe(`${MELDEBILD()}\n${ORG()}`);
+    expect(text).toContain('- Führungsfunktionen: EL Lea Leitung · S1 Bert Personal\n');
     expect(text).not.toContain('Stab:');
+  });
+
+  it('nennt nicht geladene Mitglieder mit Grund', async () => {
+    vi.mocked(ladeMitglieder).mockRejectedValue(new Error('500'));
+    const text = await erzeuge();
+    expect(text).toContain('- Führungsfunktionen: Mitglieder nicht geladen\n');
   });
 
   it('nennt die erfasste Führungsstelle wie die Einzelübernahme; gescheitert bleibt sie weg (LFH-1181)', async () => {

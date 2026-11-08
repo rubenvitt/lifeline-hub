@@ -23,7 +23,7 @@ export function useFunkplanLuecken(einsatzId: number): {
   const freigabe = useModulFreigabe(einsatzId, 'fernmeldewesen');
   const ohneVerbindung = useOhneVerbindung();
   const q = useNetzQuellen(einsatzId, freigabe, ohneVerbindung);
-  const { abschnitte, einheiten, fahrzeuge, besetzung, sprechgruppen, fuehrungsstelle, stellen } =
+  const { abschnitte, einheiten, fahrzeuge, mitglieder, sprechgruppen, fuehrungsstelle, stellen } =
     q;
   const skizze = q.skizze;
   const freigabeZustand = freigabe.zustand;
@@ -44,7 +44,7 @@ export function useFunkplanLuecken(einsatzId: number): {
       abschnitte,
       einheiten,
       fahrzeuge,
-      besetzung,
+      mitglieder,
       fuehrungsstelle,
       sprechgruppen,
       stellen,
@@ -57,7 +57,7 @@ export function useFunkplanLuecken(einsatzId: number): {
     abschnitte,
     einheiten,
     fahrzeuge,
-    besetzung,
+    mitglieder,
     fuehrungsstelle,
     sprechgruppen,
     stellen,

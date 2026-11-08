@@ -1,17 +1,10 @@
 import type { AbrufZustand } from '../../api/abrufZustand';
-import type {
-  Einheit,
-  Einsatzabschnitt,
-  Fuehrungsstelle,
-  Staerke,
-  Stabsfunktion,
-} from '../../api/types';
+import type { Einheit, Einsatzabschnitt, Fuehrungsstelle, Staerke } from '../../api/types';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
-import { besetzungDarstellung } from '../../stab/besetzung';
+import type { FunktionZeile } from '../../fuehrung/besetzungAusMitgliedern';
 import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { ZUSTAND_GRUND } from '../../api/abrufZustand';
 import { md } from '../../lib/markdown';
-import { SACHGEBIETE } from '../../fuehrung/sachgebiete';
 import { fuehrungsstelleErfasst } from '../../einsatz/fuehrungsstelle';
 import { baueTzProps, type TzProps } from '../lagekarte/taktischesZeichen';
 import { abschnittStaerken } from './abschnittStaerke';
@@ -194,16 +187,6 @@ function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined
 
 // ── Markdown für den Lagebericht (D8) ──────────────────────────────────────────────────────────
 
-/** Der Stab in S-Folge mit dem Wortlaut der Stabseite; unbesetzte Sachgebiete fehlen. */
-export function stabZeilen(
-  besetzung: readonly Stabsfunktion[],
-): { kuerzel: string; text: string }[] {
-  return SACHGEBIETE.flatMap((s) => {
-    const zeile = besetzung.find((b) => b.sachgebiet === s.sachgebiet);
-    return zeile ? [{ kuerzel: s.kuerzel, text: besetzungDarstellung(zeile).label }] : [];
-  });
-}
-
 function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
   const einzug = '  '.repeat(tiefe);
   const kopf =
@@ -238,17 +221,20 @@ export function wurzelFuehrungsstelle(
 
 /**
  * Die Führungsorganisation als Freitext für „In Lagebericht übernehmen“: Kopf, Einsatzleitung
- * (der Einsatzleiter, LFH-1199; Stab nur, wenn übergeben — also freigegeben und geladen), fehlende
- * Quellen, dann die
- * Gliederung als verschachtelte Liste. Namen laufen durch `md()`: im Bericht stehen sie als Text,
- * nie als Auszeichnung. Telefon führt das Organigramm nicht, also auch nicht hier.
+ * (der Einsatzleiter, LFH-1199; die Führungsfunktionen EL und S1–S7 aus den Mitgliedern,
+ * i6k6mzed D7), fehlende Quellen, dann die Gliederung als verschachtelte Liste. Namen laufen durch
+ * `md()`: im Bericht stehen sie als Text, nie als Auszeichnung. Telefon führt das Organigramm nicht,
+ * also auch nicht hier.
  */
 export function rendereFuehrungsorganisationMarkdown(
   org: Fuehrungsorganisation,
   opts: {
     stand: string;
-    /** `null`: nicht freigegeben (kein Wort darüber) · `'fehler'`: Abruf gescheitert. */
-    stab: readonly Stabsfunktion[] | 'fehler' | null;
+    /**
+     * EL und S1–S7 mit ihren Trägern aus den Mitgliedern (`fuehrungsfunktionZeilen`, i6k6mzed D7);
+     * leer oder `null`: keine Zeile · `'fehler'`: Abruf der Mitglieder gescheitert.
+     */
+    fuehrungsfunktionen: readonly FunktionZeile[] | 'fehler' | null;
     einheitenZustand: AbrufZustand;
     /** Die erfasste eigene Führungsstelle (LFH-1181); fehlt sie, steht keine Zeile dafür da. */
     fuehrungsstelle?: WurzelFuehrungsstelle | null;
@@ -268,20 +254,13 @@ export function rendereFuehrungsorganisationMarkdown(
           ].join(' · ')}`,
         ]
       : [];
-  const stab =
-    opts.stab == null
-      ? []
-      : opts.stab === 'fehler'
-        ? ['- Stab: Besetzung nicht geladen']
-        : [
-            `- Stab: ${
-              opts.stab.length === 0 || stabZeilen(opts.stab).length === 0
-                ? 'kein Sachgebiet besetzt'
-                : stabZeilen(opts.stab)
-                    .map((z) => `${z.kuerzel} ${md(z.text)}`)
-                    .join(' · ')
-            }`,
-          ];
+  const f = opts.fuehrungsfunktionen;
+  const funktionen =
+    f === 'fehler'
+      ? ['- Führungsfunktionen: Mitglieder nicht geladen']
+      : f && f.length > 0
+        ? [`- Führungsfunktionen: ${f.map((z) => `${z.kuerzel} ${md(z.namen)}`).join(' · ')}`]
+        : [];
   // Der Bericht geht bei Freigabe unveränderlich ins ETB: was fehlt, steht darin.
   const quellen =
     opts.einheitenZustand !== 'daten'
@@ -309,7 +288,7 @@ export function rendereFuehrungsorganisationMarkdown(
     opts.einsatzleiter.art === 'nicht-erfasst'
       ? '- Leitung nicht erfasst'
       : `- Einsatzleiter: ${einsatzleiterMarkdown(opts.einsatzleiter, opts.dtg)}`,
-    ...stab,
+    ...funktionen,
     '',
     ...quellen,
     '## Gliederung',

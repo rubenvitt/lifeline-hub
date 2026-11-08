@@ -20,7 +20,7 @@ import {
   type FernmeldenetzQuellen,
   type NetzStelle,
 } from './fernmeldeskizze';
-import { besetzt, fahrzeug } from '../test/fernmeldenetz';
+import { fahrzeug, mitglied } from '../test/fernmeldenetz';
 import {
   abschnitteOhneSprechgruppe,
   einheitenOhneSprechgruppe,
@@ -148,7 +148,7 @@ function quellen(
     sprechgruppen: daten([]),
     stellen: daten([]),
     fahrzeuge: daten([]),
-    besetzung: daten([]),
+    mitglieder: daten([]),
     skizze: { zustand: 'daten', daten: { ...LEER_SKIZZE, ...skizze } },
     ...rest,
   };
@@ -869,20 +869,24 @@ describe('baueFernmeldenetz · Führungsmittel und Funktionen im Kasten (LFH-102
     expect(ausstattung(netz, 'ab-1')).toEqual([]);
   });
 
-  it('Stab der Einsatzleitung: S-Folge, ohne rückwärtig, ohne Namen, auch ohne erfasste Stelle', () => {
+  // Spec `stab-fernmeldeskizze`, Szenario „Stab der Einsatzleitung“ (i6k6mzed, D7): die
+  // Sachgebiete kommen aus den Führungsfunktionen der Mitglieder.
+  it('Stab der Einsatzleitung: S-Folge, je Sachgebiet einmal, ohne Namen, auch ohne erfasste Stelle', () => {
     const netz = baueFernmeldenetz(
       quellen({
-        besetzung: daten([
-          besetzt('s6', 'rueckwaertig', 'ILS Musterhausen'),
-          besetzt('s3', 'einsatzleitung'),
-          besetzt('s2', 'personal', 'Max Muster'),
-          besetzt('s5', 'extern', 'Pressestelle Kreis'),
+        mitglieder: daten([
+          mitglied(1, 'Max Muster', 's3'),
+          mitglied(2, 'Eva Weg', 's2'),
+          mitglied(3, 'Pia Presse', 's2'),
+          mitglied(4, 'Lea Leitung', 'el'),
+          mitglied(5, 'Fritz Fach', 'fachberater'),
+          mitglied(6, 'Otto Ohne'),
         ]),
       }),
     );
-    expect(ausstattung(netz, 'fs')).toEqual(['S2', 'S3', 'S5']);
+    expect(ausstattung(netz, 'fs')).toEqual(['S2', 'S3']);
     const fsStelle = stelleMit(netz, 'fs');
-    expect(JSON.stringify(fsStelle)).not.toMatch(/Max Muster|Pressestelle|ILS/);
+    expect(JSON.stringify(fsStelle)).not.toMatch(/Max Muster|Eva Weg|Pia Presse|Lea|Fritz|Otto/);
     expect(fsStelle.art === 'fuehrungsstelle' && fsStelle.ausstattung[0]).toMatchObject({
       art: 'funktion',
       titel: 'Sachgebiet S2',
@@ -890,24 +894,12 @@ describe('baueFernmeldenetz · Führungsmittel und Funktionen im Kasten (LFH-102
     });
   });
 
-  it('ein Sachgebiet, dessen Person nicht mehr disponiert ist, steht nicht im Kasten', () => {
-    const netz = baueFernmeldenetz(
-      quellen({
-        besetzung: daten([
-          besetzt('s1', 'personal', 'Max Muster'),
-          { ...besetzt('s4', 'personal', 'Eva Weg'), personal_noch_disponiert: false },
-        ]),
-      }),
-    );
-    expect(ausstattung(netz, 'fs')).toEqual(['S1']);
-  });
-
   it('Abschnitt ohne Leitung trägt keine Funktion', () => {
     const netz = baueFernmeldenetz(quellen({ abschnitte: daten([abschnitt(1)]) }));
     expect(ausstattung(netz, 'ab-1')).toEqual([]);
   });
 
-  it('fehlende Fahrzeuge und Besetzung werden benannt und zeigen keine Zeichen', () => {
+  it('fehlende Fahrzeuge und Mitglieder werden benannt und zeigen keine Zeichen', () => {
     const netz = baueFernmeldenetz(
       quellen({
         abschnitte: daten([abschnitt(1, { leiter_id: 5 })]),
@@ -917,12 +909,12 @@ describe('baueFernmeldenetz · Führungsmittel und Funktionen im Kasten (LFH-102
           zustand: 'gesperrt',
           daten: [fahrzeug(100, { einheit_id: 10, fahrzeugtyp: 'ELW 1' })],
         },
-        besetzung: { zustand: 'fehler', daten: [besetzt('s2', 'einsatzleitung')] },
+        mitglieder: { zustand: 'fehler', daten: [mitglied(1, 'Eva Weg', 's2')] },
       }),
     );
     expect(netz.fehlend.map((f) => `${f.name}: ${f.zustand}`)).toEqual([
       'Fahrzeuge: gesperrt',
-      'Stab-Besetzung: fehler',
+      'Mitglieder: fehler',
     ]);
     expect(netz.darstellbar).toBe(true);
     // Die Leitung kommt aus dem Abschnitt selbst und bleibt.
@@ -934,7 +926,7 @@ describe('baueFernmeldenetz · Führungsmittel und Funktionen im Kasten (LFH-102
     const basis = {
       abschnitte: daten([abschnitt(1, { leiter_id: 5 })]),
       einheiten: daten([einheit(10, { abschnitt_id: 1, name: 'FüGr EL' })]),
-      besetzung: daten([besetzt('s2', 'einsatzleitung')]),
+      mitglieder: daten([mitglied(1, 'Eva Weg', 's2')]),
       fahrzeuge: daten([
         fahrzeug(100, {
           einheit_id: 10,

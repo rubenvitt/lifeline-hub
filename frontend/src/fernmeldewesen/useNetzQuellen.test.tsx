@@ -15,14 +15,14 @@ function Probe() {
     <ul>
       <li>stellen: {q.stellen.zustand}</li>
       <li>skizze: {q.skizze.zustand}</li>
-      <li>besetzung: {q.besetzung.zustand}</li>
+      <li>mitglieder: {q.mitglieder.zustand}</li>
     </ul>
   );
 }
 
-/** Zählt die Abrufe der Stab-Anzeige; die Besetzung hat ihre eigene Weiche (design.md D8). */
+/** Zählt die Abrufe der Stab-Anzeige und der Mitglieder (i6k6mzed, D7). */
 function setup(freigaben: ModulFreigaben) {
-  const stabAbrufe = { anzahl: 0 };
+  const abrufe = { stab: 0, mitglieder: 0 };
   server.use(
     http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
@@ -47,37 +47,43 @@ function setup(freigaben: ModulFreigaben) {
       }),
     ),
     http.get('/api/einsaetze/7/stab', () => {
-      stabAbrufe.anzahl += 1;
+      abrufe.stab += 1;
       return HttpResponse.json({ besetzung: [] });
+    }),
+    http.get('/api/einsaetze/7/mitglieder', () => {
+      abrufe.mitglieder += 1;
+      return HttpResponse.json([]);
     }),
   );
   renderMitProviders(<Probe />);
-  return stabAbrufe;
+  return abrufe;
 }
 
 /**
- * Die Quellen des Fernmeldenetzes hängen an der Freigabe des Fernmeldewesens (LLH-1180); nur die
- * Stab-Besetzung fragt zusätzlich den Stab.
+ * Die Quellen des Fernmeldenetzes hängen an der Freigabe des Fernmeldewesens (LLH-1180). Die
+ * Mitglieder fragt die Skizze ohne eigenes Modulrecht ab; den Stab fragt sie nie (i6k6mzed, D7).
  */
 describe('useNetzQuellen', () => {
-  it('Stab ausgeblendet: Stellen und Skizze laden, die Besetzung ist gesperrt, kein Abruf am Stab', async () => {
-    const stabAbrufe = setup(freigabenFixture({ stab: { sichtbar: false, zugriff: false } }));
+  it('Stab ausgeblendet: Stellen, Skizze und Mitglieder laden, kein Abruf am Stab', async () => {
+    const abrufe = setup(freigabenFixture({ stab: { sichtbar: false, zugriff: false } }));
     expect(await screen.findByText('stellen: daten')).toBeInTheDocument();
     expect(await screen.findByText('skizze: daten')).toBeInTheDocument();
-    expect(screen.getByText('besetzung: gesperrt')).toBeInTheDocument();
-    expect(stabAbrufe.anzahl).toBe(0);
+    expect(await screen.findByText('mitglieder: daten')).toBeInTheDocument();
+    expect(abrufe.stab).toBe(0);
   });
 
   it('Fernmeldewesen gesperrt: keine Quelle des Moduls lädt', async () => {
-    setup(freigabenFixture({ fernmeldewesen: { zugriff: false } }));
+    const abrufe = setup(freigabenFixture({ fernmeldewesen: { zugriff: false } }));
     expect(await screen.findByText('stellen: gesperrt')).toBeInTheDocument();
     expect(screen.getByText('skizze: gesperrt')).toBeInTheDocument();
-    expect(screen.getByText('besetzung: gesperrt')).toBeInTheDocument();
+    expect(screen.getByText('mitglieder: gesperrt')).toBeInTheDocument();
+    expect(abrufe.mitglieder).toBe(0);
   });
 
-  it('beide frei: auch die Besetzung lädt', async () => {
-    const stabAbrufe = setup(freigabenFixture());
-    expect(await screen.findByText('besetzung: daten')).toBeInTheDocument();
-    expect(stabAbrufe.anzahl).toBe(1);
+  it('frei: die Mitglieder laden, der Stab nicht', async () => {
+    const abrufe = setup(freigabenFixture());
+    expect(await screen.findByText('mitglieder: daten')).toBeInTheDocument();
+    expect(abrufe.mitglieder).toBe(1);
+    expect(abrufe.stab).toBe(0);
   });
 });

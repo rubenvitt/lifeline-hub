@@ -267,11 +267,11 @@ describe('MitgliederAbschnitt', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
     );
-    // Der Vorrang vor der Ableitung steht an der Maske (Stab-Spec, Entscheidung 13), kurz und
-    // ohne „Leer lassen …“ (LFH-1078). Ein neuer ETB-Eintrag wird nicht vorbelegt (LFH-894): die
-    // Stelle ist nur der erste Vorschlag der Rufname-Abfrage.
+    // Was die Stelle trägt, steht kurz an der Maske, ohne „Leer lassen …“ (LFH-1078): seit
+    // i6k6mzed (D2) ist sie die Führungsfunktion im Einsatz. Ein neuer ETB-Eintrag wird nicht
+    // vorbelegt (LFH-894): die Stelle ist nur der erste Vorschlag der Rufname-Abfrage.
     expect(
-      screen.getByText('Erster Vorschlag für den ETB-Rufnamen, vor dem eigenen Sachgebiet'),
+      screen.getByText('Führungsfunktion im Einsatz und erster Vorschlag für den ETB-Rufnamen'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Leer lassen|als Empfänger vorbelegt/)).not.toBeInTheDocument();
     await userEvent.click(stellenFeld());

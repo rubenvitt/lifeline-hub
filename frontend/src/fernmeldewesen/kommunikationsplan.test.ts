@@ -8,7 +8,6 @@ import type {
   KommunikationsStelle,
   SkizzenVerbindung,
   Sprechgruppe,
-  Stab,
 } from '../api/types';
 import {
   baueKommunikationsplan,
@@ -23,6 +22,7 @@ import {
   type KommunikationsplanQuellen,
 } from './kommunikationsplan';
 import type { Quelle } from '../api/abrufZustand';
+import { mitglied } from '../test/fernmeldenetz';
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
   return {
@@ -67,17 +67,13 @@ function stelle(id: number, p: Partial<KommunikationsStelle> = {}): Kommunikatio
 
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 
-function stab(besetzung: Stab['besetzung']): Stab {
-  return { besetzung };
-}
-
 function quellen(p: Partial<KommunikationsplanQuellen> = {}): KommunikationsplanQuellen {
   return {
     einsatzId: 7,
     stellen: daten([]),
     abschnitte: daten([]),
     einheiten: daten([]),
-    stab: { zustand: 'daten', daten: stab([]) },
+    mitglieder: daten([]),
     fuehrungsstelle: { zustand: 'daten', daten: null },
     ...p,
   };
@@ -146,21 +142,9 @@ describe('baueKommunikationsplan', () => {
     expect(plan[0].zeilen[0].nebentext).toBeNull();
   });
 
-  it('zeigt die Besetzung nur bei S1–S6 als Nebentext', () => {
-    const besetzung = stab([
-      {
-        sachgebiet: 's2',
-        besetzung_art: 'personal',
-        name: 'Erika Muster',
-        personal_noch_disponiert: true,
-      } as Stab['besetzung'][number],
-      { sachgebiet: 's3', besetzung_art: 'einsatzleitung' } as Stab['besetzung'][number],
-      {
-        sachgebiet: 's6',
-        besetzung_art: 'rueckwaertig',
-        name: 'ILS Nord',
-      } as Stab['besetzung'][number],
-    ]);
+  // Spec `stab-kommunikationsplan`, „Verbindung an der Stelle, Besetzung nur als Nebentext“
+  // (i6k6mzed, D7): die Namen aus der Mitgliedschaft, mehrere alphabetisch.
+  it('zeigt die Besetzung nur bei S1–S6 als Nebentext, aus den Mitgliedern', () => {
     const f = (id: number, funktion: KommunikationsStelle['funktion']) =>
       stelle(id, {
         stellenart: 'funktion',
@@ -170,57 +154,49 @@ describe('baueKommunikationsplan', () => {
       });
     const plan = baueKommunikationsplan(
       quellen({
-        stellen: daten([f(1, 'el'), f(2, 's2'), f(3, 's3'), f(4, 's4'), f(5, 's6'), f(6, 's7')]),
-        stab: { zustand: 'daten', daten: besetzung },
+        stellen: daten([f(1, 'el'), f(2, 's2'), f(3, 's3'), f(4, 's4'), f(5, 's7')]),
+        mitglieder: daten([
+          mitglied(1, 'Schulz', 's2'),
+          mitglied(2, 'Müller', 's2'),
+          mitglied(3, 'Erika Muster', 's3'),
+          mitglied(4, 'Lea Leitung', 'el'),
+          mitglied(5, 'Paula Psnv', 's7'),
+        ]),
       }),
     );
     expect(plan[0].zeilen.map((z) => z.nebentext)).toEqual([
       null,
+      'Müller, Schulz',
       'Erika Muster',
-      'Einsatzleitung',
       'nicht vergeben',
-      'ILS Nord (rückwärtig)',
       null,
     ]);
   });
 
-  it('sagt beim Nebentext, warum die Besetzung fehlt, statt „nicht vergeben“ zu behaupten', () => {
-    const plan = baueKommunikationsplan(
-      quellen({
-        stellen: daten([
-          stelle(1, {
-            stellenart: 'funktion',
-            funktion: 's2',
-            funktion_label: 'S2 Lage',
-            bezeichnung: undefined,
-          }),
-        ]),
-        stab: { zustand: 'fehler', daten: undefined },
-      }),
-    );
-    expect(plan[0].zeilen[0].nebentext).toBe('Besetzung nicht geladen');
-    expect(plan[0].zeilen[0].nebentextGrund).toBeUndefined();
-  });
-
-  // LLH-1180, design.md D8: ohne Stab-Freigabe ein „—“ mit Grund, die Verbindungen bleiben.
-  it('ohne Stab-Freigabe steht „—“ mit dem Grund, die Verbindung der Stelle bleibt', () => {
-    const plan = baueKommunikationsplan(
-      quellen({
-        stellen: daten([
-          stelle(1, {
-            stellenart: 'funktion',
-            funktion: 's2',
-            funktion_label: 'S2 Lage',
-            bezeichnung: undefined,
-            verbindungen: [{ id: 9, mittel: 'mobil', wert: '0170 111', hinweis: null }],
-          }),
-        ]),
-        stab: { zustand: 'gesperrt', daten: undefined },
-      }),
-    );
-    expect(plan[0].zeilen[0].nebentext).toBe('—');
-    expect(plan[0].zeilen[0].nebentextGrund).toBe('Stab nicht freigegeben');
-    expect(plan[0].zeilen[0].verbindungen.map((v) => v.wert)).toEqual(['0170 111']);
+  // Spec `stab-kommunikationsplan`, „Rechteweiche je Quelle“, Szenario „Stab nicht frei“.
+  it('sagt beim Nebentext mit „—“ und Grund, warum die Besetzung fehlt; die Verbindung bleibt', () => {
+    for (const [zustand, grund] of [
+      ['fehler', 'nicht geladen'],
+      ['laden', 'lädt'],
+    ] as const) {
+      const plan = baueKommunikationsplan(
+        quellen({
+          stellen: daten([
+            stelle(1, {
+              stellenart: 'funktion',
+              funktion: 's2',
+              funktion_label: 'S2 Lage',
+              bezeichnung: undefined,
+              verbindungen: [{ id: 9, mittel: 'mobil', wert: '0170 111', hinweis: null }],
+            }),
+          ]),
+          mitglieder: { zustand, daten: [] },
+        }),
+      );
+      expect(plan[0].zeilen[0].nebentext).toBe('—');
+      expect(plan[0].zeilen[0].nebentextGrund).toBe(grund);
+      expect(plan[0].zeilen[0].verbindungen.map((v) => v.wert)).toEqual(['0170 111']);
+    }
   });
 
   it('übernimmt keine Telefonnummer aus dem Personal', () => {
@@ -236,18 +212,11 @@ describe('baueKommunikationsplan', () => {
             bezeichnung: undefined,
           }),
         ]),
-        stab: {
-          zustand: 'daten',
-          daten: stab([
-            {
-              sachgebiet: 's2',
-              besetzung_art: 'personal',
-              name: 'Erika Muster',
-              personal_noch_disponiert: true,
-              telefon: '0170 555',
-            } as unknown as Stab['besetzung'][number],
-          ]),
-        },
+        mitglieder: daten([
+          { ...mitglied(1, 'Erika Muster', 's2'), telefon: '0170 555' } as ReturnType<
+            typeof mitglied
+          >,
+        ]),
       }),
     );
     expect(JSON.stringify(plan)).not.toContain('0170 555');
@@ -434,19 +403,7 @@ describe('baueKommunikationsplan', () => {
             }),
           ]),
           fuehrungsstelle: fs({ rufname: 'Florian Kreis 10-1' }),
-          stab: {
-            zustand: 'daten',
-            daten: stab([
-              {
-                sachgebiet: 's2',
-                besetzung_art: 'personal',
-                name: 'Max Muster',
-                personal_noch_disponiert: true,
-                gesetzt_at: '2026-10-12 12:00:00',
-                gesetzt_von_id: 1,
-              },
-            ]),
-          },
+          mitglieder: daten([mitglied(1, 'Max Muster', 's2')]),
         }),
       );
       const [fuehrung, s2] = plan[0].zeilen;

@@ -109,7 +109,7 @@ function netz(
     sprechgruppen: daten([]),
     stellen: daten(p.stellen ?? []),
     fahrzeuge: daten(p.fahrzeuge ?? []),
-    besetzung: daten([]),
+    mitglieder: daten([]),
     skizze: { zustand: 'daten', daten: { ...LEER_SKIZZE, ...p.skizze } },
   };
   return baueFernmeldenetz(q);
@@ -364,7 +364,7 @@ describe('layoutFernmeldenetz · Auto-Layout aus der Führungsorganisation', () 
       sprechgruppen: daten([lokal]),
       stellen: daten([]),
       fahrzeuge: daten([]),
-      besetzung: daten([]),
+      mitglieder: daten([]),
       skizze: { zustand: 'daten', daten: LEER_SKIZZE },
     });
     const { plaetze } = layoutFernmeldenetz(n);

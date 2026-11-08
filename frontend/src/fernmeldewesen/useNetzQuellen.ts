@@ -9,8 +9,8 @@ import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
 import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
-import { ladeStab } from '../api/stab';
-import type { EinsatzFahrzeug, ModulFreigaben, Stabsfunktion } from '../api/types';
+import type { EinsatzFahrzeug, MitgliedAnzeige, ModulFreigaben } from '../api/types';
+import { mitgliederAbfrage } from '../fuehrung/besetzungAusMitgliedern';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import type { FuehrungsstelleQuelle } from '../einsatz/fuehrungsstelle';
 import type { KanalQuellen, SkizzenQuelle } from './luecken';
@@ -84,8 +84,8 @@ function useSkizzenQuelle(
 export interface NetzQuellen extends KanalQuellen {
   /** Disponierte Fahrzeuge: die Führungsfahrzeuge stehen im Kasten (LFH-1029). */
   fahrzeuge: Quelle<EinsatzFahrzeug>;
-  /** Stab-Besetzung: die besetzten Sachgebiete im Kasten der Einsatzleitung (LFH-1029). */
-  besetzung: Quelle<Stabsfunktion>;
+  /** Mitglieder: die Sachgebiete ihrer Führungsfunktionen im Kasten der Einsatzleitung (D7). */
+  mitglieder: Quelle<MitgliedAnzeige>;
   /** Die Modul-Freigaben, solange das Fernmeldewesen frei ist. */
   freigaben: ModulFreigaben | undefined;
   /** Cache-Zeitstempel der gezeigten Quellen, für `gemeinsamerDatenstand`. */
@@ -94,13 +94,13 @@ export interface NetzQuellen extends KanalQuellen {
 
 /**
  * Die Quellen des Fernmeldenetzes (LFH-893): Abschnitte, Einheiten, Fahrzeuge, Sprechgruppen,
- * eigene Führungsstelle, Stab-Besetzung, Stellen des Kommunikationsplans und Daten der Skizze,
+ * eigene Führungsstelle, Mitglieder, Stellen des Kommunikationsplans und Daten der Skizze,
  * jede mit eigener Weiche.
  * Der Funkplan liest sie für Tabelle, Skizze und Sprechgruppen, Lagebericht und Befehl für die
  * Skizze als Anlage (LFH-1028). Die Sperre des Fernmeldewesens gilt für alle (LLH-1180): eine
  * Liste läuft erst, wenn das Fernmeldewesen frei ist UND der Server ihr Modul freigibt (LFH-669,
- * Keys nach `PFAD_KEY`). Die Stab-Besetzung hat ihre eigene Weiche auf `stab` (design.md D8): ohne
- * Stab fehlen nur die Sachgebiete im Kasten, mit Grund.
+ * Keys nach `PFAD_KEY`). Die Mitglieder (Sachgebiete im Kasten) brauchen kein eigenes Modulrecht
+ * (i6k6mzed, D7); fehlen sie, fehlen nur die Sachgebiete im Kasten, mit Grund.
  */
 export function useNetzQuellen(
   einsatzId: number,
@@ -110,7 +110,6 @@ export function useNetzQuellen(
   const modulFrei = freigabe.zustand === 'frei';
   const freigaben = modulFrei ? freigabe.freigaben : undefined;
   const frei = (key: string) => modulFrei && istKeyFreigegeben(key, freigabe.freigaben);
-  const stabFrei = frei('stab');
   const abschnitteFrei = frei('einsatzabschnitte');
   const einheitenFrei = frei('einheiten');
   const fahrzeugeFrei = frei('fahrzeuge');
@@ -152,13 +151,9 @@ export function useNetzQuellen(
     queryFn: () => ladeFernmeldeskizze(einsatzId),
     enabled: modulFrei,
   });
-  // LFH-1029: die Stab-Besetzung für die Sachgebiete im Kasten der Einsatzleitung, live über `stab`.
-  const stabQuery = useQuery({
-    queryKey: einsatzKeys.stab(einsatzId),
-    queryFn: () => ladeStab(einsatzId),
-    enabled: stabFrei,
-    select: (stab) => stab.besetzung,
-  });
+  // LFH-1029, i6k6mzed (D7): die Mitglieder für die Sachgebiete im Kasten der Einsatzleitung, live
+  // über `mitglieder`. Kein eigenes Modulrecht, nur die Sperre des Fernmeldewesens.
+  const mitgliederQuery = useQuery({ ...mitgliederAbfrage(einsatzId), enabled: modulFrei });
 
   const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
@@ -167,13 +162,13 @@ export function useNetzQuellen(
   const fuehrungsstelle = useFuehrungsstelleQuelle(fuehrungsstelleQuery);
   const stellen = useQuelle(stellenQuery, modulFrei, ohneVerbindung);
   const skizze = useSkizzenQuelle(skizzeQuery, modulFrei, ohneVerbindung);
-  const besetzung = useQuelle(stabQuery, stabFrei, ohneVerbindung);
+  const mitglieder = useQuelle(mitgliederQuery, modulFrei, ohneVerbindung);
 
   return {
     abschnitte,
     einheiten,
     fahrzeuge,
-    besetzung,
+    mitglieder,
     sprechgruppen,
     fuehrungsstelle,
     stellen,
@@ -188,7 +183,7 @@ export function useNetzQuellen(
       fuehrungsstelleQuery.dataUpdatedAt,
       stellenQuery.dataUpdatedAt,
       skizzeQuery.dataUpdatedAt,
-      stabFrei ? stabQuery.dataUpdatedAt : undefined,
+      mitgliederQuery.dataUpdatedAt,
     ],
   };
 }

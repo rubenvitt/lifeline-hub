@@ -4,6 +4,7 @@ import { useMemo, useState, type Key, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
+import { mitgliederAbfrage } from '../fuehrung/besetzungAusMitgliedern';
 import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -19,9 +20,9 @@ import {
   legeVerbindungAn,
 } from '../api/kommunikationsplan';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeStab } from '../api/stab';
 import type {
   KommunikationsStelle,
+  MitgliedAnzeige,
   NeueKommunikationsStelle,
   NeueVerbindung,
   SkizzenVerbindung,
@@ -74,8 +75,9 @@ import './kommunikationsplanPrint.css';
  *
  * - **Ort:** Reiter „Kommunikationsplan“ des Moduls Fernmeldewesen (`kommunikationsplanPfad`,
  *   LLH-1180), Einstieg auch in der S6-Kachel. Sperre und Sichtbarkeit sind die des
- *   Fernmeldewesens, fail-closed über `useModulFreigabe` (design.md D6). Der Stab liefert nur noch
- *   die Besetzung als Nebentext, mit eigener Weiche (D8): ohne ihn steht „—“ mit Grund.
+ *   Fernmeldewesens, fail-closed über `useModulFreigabe` (design.md D6). Die Besetzung steht als
+ *   Nebentext aus den Mitgliedern (i6k6mzed, D7), ohne eigenes Modulrecht; fehlen sie, steht „—“
+ *   mit Grund.
  * - **Daten:** gepflegte Stellen (Funktionen und externe Stellen) vom Server; Abschnitte,
  *   Einheiten und die eigene Führungsstelle (LFH-1148) abgeleitet aus ihren eigenen Angaben,
  *   gepflegt wird dort (D4, D7). Die Besetzung ist nur Nebentext, Kontaktangaben des Personals
@@ -246,7 +248,7 @@ function planSpalten(
       width: 180,
       render: (_t, p) =>
         p.zeile && istFunktion(p.zeile) && p.zeile.nebentext ? (
-          // Ohne Stab (LLH-1180, D8): „—“ mit Grund am Zeiger und für Vorleser.
+          // Ohne geladene Mitglieder: „—“ mit Grund am Zeiger und für Vorleser.
           <span style={{ overflowWrap: 'anywhere' }} title={p.zeile.nebentextGrund}>
             {p.zeile.nebentext}
             {p.zeile.nebentextGrund && (
@@ -328,8 +330,6 @@ export default function KommunikationsplanPage() {
   const frei = (key: string) => modulFrei && istKeyFreigegeben(key, freigabe.freigaben);
   const abschnitteFrei = frei('einsatzabschnitte');
   const einheitenFrei = frei('einheiten');
-  // Eigene Weiche (design.md D8): ohne Stab fehlt nur die Besetzung im Nebentext.
-  const stabFrei = frei('stab');
 
   const planKey = einsatzKeys.fernmeldewesenKommunikationsplan(einsatzId);
   const stellenQuery = useQuery({
@@ -337,12 +337,9 @@ export default function KommunikationsplanPage() {
     queryFn: () => ladeKommunikationsplan(einsatzId),
     enabled: modulFrei,
   });
-  // Nur für den Nebentext der Sachgebiete; ohne Netz nicht gespeichert (D9) → „nicht geladen“.
-  const stabQuery = useQuery({
-    queryKey: einsatzKeys.stab(einsatzId),
-    queryFn: () => ladeStab(einsatzId),
-    enabled: stabFrei,
-  });
+  // Nur für den Nebentext der Sachgebiete (i6k6mzed, D7), ohne eigenes Modulrecht; ohne Netz
+  // nicht gespeichert (D9) → „nicht geladen“.
+  const mitgliederQuery = useQuery({ ...mitgliederAbfrage(einsatzId), enabled: modulFrei });
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
@@ -355,14 +352,14 @@ export default function KommunikationsplanPage() {
   });
 
   // Die eigene Führungsstelle (LFH-849, LFH-1148): Teil der Kopfdaten, kein Modul; live über
-  // `einsatz`. Nicht auf der Platte: ohne Netz gilt sie als nicht geladen wie die Besetzung.
+  // `einsatz`. Nicht auf der Platte: ohne Netz gilt sie als nicht geladen wie die Mitglieder.
   const fuehrungsstelleQuery = useQuery({
     queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
     queryFn: () => ladeFuehrungsstelle(einsatzId),
   });
 
   // Die Verbindungen der Fernmeldeskizze (LFH-893), eigene Quelle mit Weiche. Nicht auf der
-  // Platte: ohne Netz pausiert die Abfrage, dann gilt sie als nicht geladen wie die Besetzung.
+  // Platte: ohne Netz pausiert die Abfrage, dann gilt sie als nicht geladen wie die Mitglieder.
   const skizzeQuery = useQuery({
     queryKey: einsatzKeys.fernmeldewesenSkizze(einsatzId),
     queryFn: () => ladeFernmeldeskizze(einsatzId),
@@ -379,15 +376,20 @@ export default function KommunikationsplanPage() {
   const stellen = useQuelle(stellenQuery);
   const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
-  // Ohne Netz pausiert die Abfrage und bliebe für immer „lädt“; die Besetzung ist dann schlicht
-  // nicht geladen (D9: der Stab außer dem Plan liegt nicht auf der Platte).
-  const stabZustand: AbrufZustand = !stabFrei
+  // Ohne Netz pausiert die Abfrage und bliebe für immer „lädt“; die Mitglieder sind dann schlicht
+  // nicht geladen (D9: außer dem Plan liegt nichts davon auf der Platte).
+  const mitgliederZustand: AbrufZustand = !modulFrei
     ? 'gesperrt'
-    : stabQuery.data != null
+    : mitgliederQuery.data != null
       ? 'daten'
       : ohneVerbindung
         ? 'fehler'
-        : abrufZustand(stabQuery);
+        : abrufZustand(mitgliederQuery);
+  const mitgliederDaten = modulFrei ? mitgliederQuery.data : undefined;
+  const mitglieder: Quelle<MitgliedAnzeige> = useMemo(
+    () => ({ zustand: mitgliederZustand, daten: mitgliederDaten ?? [] }),
+    [mitgliederZustand, mitgliederDaten],
+  );
   const fuehrungsstelleZustand: AbrufZustand =
     fuehrungsstelleQuery.data != null
       ? 'daten'
@@ -402,7 +404,7 @@ export default function KommunikationsplanPage() {
         stellen,
         abschnitte,
         einheiten,
-        stab: { zustand: stabZustand, daten: stabQuery.data },
+        mitglieder,
         fuehrungsstelle: { zustand: fuehrungsstelleZustand, daten: fuehrungsstelleDaten },
       }),
     [
@@ -410,8 +412,7 @@ export default function KommunikationsplanPage() {
       stellen,
       abschnitte,
       einheiten,
-      stabZustand,
-      stabQuery.data,
+      mitglieder,
       fuehrungsstelleZustand,
       fuehrungsstelleDaten,
     ],

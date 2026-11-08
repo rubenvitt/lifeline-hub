@@ -4,10 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { Routes, Route } from 'react-router';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import KommunikationsplanPage from './KommunikationsplanPage';
-import { ladeEinsatz, ladeFuehrungsstelle, ladeModulFreigaben } from '../api/einsaetze';
+import {
+  ladeEinsatz,
+  ladeFuehrungsstelle,
+  ladeMitglieder,
+  ladeModulFreigaben,
+} from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { ladeStab } from '../api/stab';
 import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
 import {
   aendereVerbindung,
@@ -31,18 +35,18 @@ import type {
   FuehrungsfunktionEintrag,
   KommunikationsStelle,
   SkizzenVerbindung,
+  MitgliedAnzeige,
   Sprechgruppe,
-  Stab,
 } from '../api/types';
 
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(),
   ladeFuehrungsstelle: vi.fn(),
+  ladeMitglieder: vi.fn(),
   ladeModulFreigaben: vi.fn(),
 }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
-vi.mock('../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../api/fuehrungsfunktionen', () => ({ ladeFuehrungsfunktionen: vi.fn() }));
 vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
 vi.mock('../api/externeStellen', () => ({ fetchExterneStellen: vi.fn() }));
@@ -162,18 +166,17 @@ const EINHEITEN = [
   },
 ] as Einheit[];
 
-const STAB = {
-  besetzung: [
-    {
-      sachgebiet: 's2',
-      besetzung_art: 'personal',
-      name: 'Erika Muster',
-      personal_noch_disponiert: true,
-      gesetzt_at: '2026-10-01T10:00:00',
-      gesetzt_von_id: 1,
-    },
-  ],
-} as Stab;
+/** Die Besetzung kommt aus den Mitgliedern (i6k6mzed, D7). */
+const MITGLIEDER: MitgliedAnzeige[] = [
+  {
+    benutzer_id: 4,
+    anzeigename: 'Erika Muster',
+    benutzername: 'erika',
+    einsatz_rolle: 'fuehrungspersonal',
+    zugewiesen_at: '2026-10-01T10:00:00',
+    fuehrungsfunktion: 's2',
+  },
+];
 
 function funktion(
   f: FuehrungsfunktionEintrag['funktion'],
@@ -203,7 +206,7 @@ beforeEach(() => {
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(listeAbschnitte).mockResolvedValue(ABSCHNITTE);
   vi.mocked(listeEinheiten).mockResolvedValue(EINHEITEN);
-  vi.mocked(ladeStab).mockResolvedValue(STAB);
+  vi.mocked(ladeMitglieder).mockResolvedValue(MITGLIEDER);
   vi.mocked(ladeFuehrungsfunktionen).mockResolvedValue(KATALOG);
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, POLIZEI]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
@@ -535,17 +538,25 @@ describe('KommunikationsplanPage — Sperre des Fernmeldewesens', () => {
     expect(ladeKommunikationsplan).not.toHaveBeenCalled();
   });
 
-  // LLH-1180, design.md D8: der Stab ist nur noch die Quelle der Besetzung.
-  it('ohne Stab: Verbindungen und Schreiben bleiben, die Besetzung steht als „—“ mit Grund', async () => {
+  // i6k6mzed (D7): die Besetzung kommt aus den Mitgliedern, ohne Stab-Freigabe.
+  it('ohne Stab: Verbindungen, Schreiben und Besetzung bleiben', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
       freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
     );
     const { container } = setup();
     expect(await screen.findByText('0170 1234567')).toBeInTheDocument();
     const s2 = zeile(container, 'st-1');
-    expect(within(s2).getByTitle('Stab nicht freigegeben')).toHaveTextContent('—');
+    expect(await within(s2).findByText('Erika Muster')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Stelle hinzufügen' })).toBeEnabled();
-    expect(ladeStab).not.toHaveBeenCalled();
+  });
+
+  // Spec `stab-kommunikationsplan`, „Rechteweiche je Quelle“, Szenario „Stab nicht frei“.
+  it('Mitglieder nicht geladen: die Besetzung steht als „—“ mit Grund, die Verbindung bleibt', async () => {
+    vi.mocked(ladeMitglieder).mockRejectedValue(new ApiError(500, 'kaputt'));
+    const { container } = setup();
+    expect(await screen.findByText('0170 1234567')).toBeInTheDocument();
+    const s2 = zeile(container, 'st-1');
+    expect(await within(s2).findByTitle('nicht geladen')).toHaveTextContent('—');
   });
 });
 
@@ -577,14 +588,14 @@ describe('KommunikationsplanPage — Schreibrecht und Netz', () => {
 
 describe('KommunikationsplanPage — Besetzung ohne Netz', () => {
   it('sagt „nicht geladen“ statt ewig „lädt“, wenn die Besetzung ohne Netz fehlt', async () => {
-    vi.mocked(ladeStab).mockReturnValue(new Promise(() => {}));
+    vi.mocked(ladeMitglieder).mockReturnValue(new Promise(() => {}));
     const { container } = setup();
     await screen.findByText('Polizei PI Nord');
-    expect(within(zeile(container, 'st-1')).getByText('Besetzung lädt')).toBeInTheDocument();
+    expect(within(zeile(container, 'st-1')).getByTitle('lädt')).toHaveTextContent('—');
     setzeOnline(false);
-    expect(
-      await within(zeile(container, 'st-1')).findByText('Besetzung nicht geladen'),
-    ).toBeInTheDocument();
+    expect(await within(zeile(container, 'st-1')).findByTitle('nicht geladen')).toHaveTextContent(
+      '—',
+    );
   });
 });
 

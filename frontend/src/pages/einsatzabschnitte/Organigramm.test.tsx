@@ -2,17 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeFuehrungsstelle, ladeMitglieder, ladeModulFreigaben } from '../../api/einsaetze';
 import { freigabenFixture } from '../../test/fixtures';
-import { ladeStab } from '../../api/stab';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { ApiError } from '../../api/client';
 import type {
   Einheit,
   EinsatzAnzeige,
   Einsatzabschnitt,
-  Stab,
-  Stabsfunktion,
+  Fuehrungsfunktion,
+  MitgliedAnzeige,
 } from '../../api/types';
 import type { Quelle } from '../../api/abrufZustand';
 import type { EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
@@ -27,6 +26,7 @@ import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
 
 vi.mock('../../api/einsaetze', () => ({
   ladeModulFreigaben: vi.fn(),
+  ladeMitglieder: vi.fn(async () => []),
   ladeFuehrungsstelle: vi.fn(async () => ({
     art: 'mobil',
     sprechgruppen: [],
@@ -34,7 +34,6 @@ vi.mock('../../api/einsaetze', () => ({
     fahrzeug_ids: [],
   })),
 }));
-vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 77 })),
 }));
@@ -94,15 +93,16 @@ const EINHEITEN = [
 
 const daten = <T,>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 
-function besetzung(p: Partial<Stabsfunktion>): Stabsfunktion {
+/** Ein Mitglied mit Führungsfunktion: die Quelle der Stabsstelle (i6k6mzed, D7). */
+function mitglied(id: number, name: string, funktion?: Fuehrungsfunktion): MitgliedAnzeige {
   return {
-    sachgebiet: 's1',
-    besetzung_art: 'personal',
-    gesetzt_at: '2026-10-01T08:00:00',
-    gesetzt_von_id: 1,
-    personal_noch_disponiert: true,
-    ...p,
-  } as Stabsfunktion;
+    benutzer_id: id,
+    anzeigename: name,
+    benutzername: `konto${id}`,
+    einsatz_rolle: 'fuehrungspersonal',
+    zugewiesen_at: '2026-10-01T08:00:00',
+    ...(funktion ? { fuehrungsfunktion: funktion } : {}),
+  };
 }
 
 function bild(
@@ -119,7 +119,7 @@ function bild(
           einsatzId={1}
           org={org}
           einsatzleiter={einsatzleiter}
-          stab={{ zustand: 'aus' }}
+          stab={[]}
           zugeklappt={zugeklappt}
           onUmschalten={onUmschalten}
         />
@@ -142,7 +142,7 @@ describe('OrganigrammBild — Einsatzleitung', () => {
         einsatzId={1}
         org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
         einsatzleiter={{ art: 'nicht-erfasst' }}
-        stab={{ zustand: 'aus' }}
+        stab={[]}
         fuehrungsstelle={{ bezeichnung: 'ELW 2 Musterstadt', rufname: 'Florian Musterstadt 10/1' }}
         zugeklappt={new Set()}
         onUmschalten={vi.fn()}
@@ -160,7 +160,7 @@ describe('OrganigrammBild — Einsatzleitung', () => {
         einsatzId={1}
         org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
         einsatzleiter={{ art: 'nicht-erfasst' }}
-        stab={{ zustand: 'aus' }}
+        stab={[]}
         fuehrungsstelle={{ bezeichnung: null, rufname: 'Florian 10/1' }}
         zugeklappt={new Set()}
         onUmschalten={vi.fn()}
@@ -228,7 +228,7 @@ describe('OrganigrammBild — Knoten', () => {
         einsatzId={1}
         org={org}
         einsatzleiter={{ art: 'nicht-erfasst' }}
-        stab={{ zustand: 'aus' }}
+        stab={[]}
         zugeklappt={new Set()}
         onUmschalten={vi.fn()}
       />,
@@ -259,7 +259,7 @@ describe('OrganigrammBild — Knoten', () => {
             einsatzId={1}
             org={org}
             einsatzleiter={{ art: 'nicht-erfasst' }}
-            stab={{ zustand: 'aus' }}
+            stab={[]}
             zugeklappt={new Set()}
             onUmschalten={vi.fn()}
           />
@@ -289,7 +289,7 @@ describe('OrganigrammBild — Knoten', () => {
         einsatzId={1}
         org={org}
         einsatzleiter={{ art: 'nicht-erfasst' }}
-        stab={{ zustand: 'aus' }}
+        stab={[]}
         zugeklappt={new Set()}
         onUmschalten={vi.fn()}
       />,
@@ -315,7 +315,7 @@ describe('OrganigrammBild — Klappen', () => {
         einsatzId={1}
         org={org}
         einsatzleiter={{ art: 'nicht-erfasst' }}
-        stab={{ zustand: 'aus' }}
+        stab={[]}
         zugeklappt={new Set(['ab-1'])}
         onUmschalten={onUmschalten}
       />,
@@ -345,7 +345,7 @@ describe('Organigramm — Klappzustand im Container', () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
       freigabenFixture({ stab: { sichtbar: false } }),
     );
-    vi.mocked(ladeStab).mockReset();
+    vi.mocked(ladeMitglieder).mockReset().mockResolvedValue([]);
   });
 
   function container(abschnitte = ABSCHNITTE, einheiten = EINHEITEN) {
@@ -458,7 +458,8 @@ describe('Organigramm — Klappzustand im Container', () => {
 
 describe('Organigramm — Stabsstelle', () => {
   beforeEach(() => {
-    vi.mocked(ladeStab).mockReset();
+    vi.mocked(ladeMitglieder).mockReset().mockResolvedValue([]);
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   });
 
   function container() {
@@ -467,73 +468,63 @@ describe('Organigramm — Stabsstelle', () => {
     );
   }
 
-  it('zeigt bei freigegebenem Stab die besetzten Sachgebiete in S-Folge mit Besetzung', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
-    vi.mocked(ladeStab).mockResolvedValue({
-      besetzung: [
-        besetzung({ sachgebiet: 's2', name: 'Clara Lage' }),
-        besetzung({ sachgebiet: 's1', besetzung_art: 'einsatzleitung' }),
-        besetzung({ sachgebiet: 's5', besetzung_art: 'extern', name: 'Dr. Weber' }),
-      ],
-    } as Stab);
+  // Spec `fuehrungsorganisation`, „Einsatzleitung und Stab“ (i6k6mzed, D7).
+  it('zeigt die geführten Sachgebiete in S-Folge mit den Namen der Mitglieder, alphabetisch', async () => {
+    vi.mocked(ladeMitglieder).mockResolvedValue([
+      mitglied(1, 'Clara Lage', 's2'),
+      mitglied(2, 'Albert Lage', 's2'),
+      mitglied(3, 'Bert Personal', 's1'),
+      mitglied(4, 'Lea Leitung', 'el'),
+      mitglied(5, 'Otto Ohne'),
+    ]);
     container();
     const stab = await screen.findByRole('group', { name: 'Stab' });
     const zeilen = within(stab)
       .getAllByRole('listitem')
       .map((z) => z.textContent);
-    expect(zeilen).toEqual(['S1Einsatzleitung', 'S2Clara Lage', 'S5Dr. Weber (extern)']);
+    expect(zeilen).toEqual(['S1Bert Personal', 'S2Albert Lage, Clara Lage']);
   });
 
-  it('sagt „Kein Sachgebiet besetzt“, wenn die Besetzung leer ist', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
-    vi.mocked(ladeStab).mockResolvedValue({ besetzung: [] } as unknown as Stab);
+  it('zeigt ohne geführtes Sachgebiet keine Stabsstelle', async () => {
+    vi.mocked(ladeMitglieder).mockResolvedValue([mitglied(4, 'Lea Leitung', 'el')]);
     container();
-    const stab = await screen.findByRole('group', { name: 'Stab' });
-    expect(within(stab).getByText('Kein Sachgebiet besetzt')).toBeInTheDocument();
+    await waitFor(() => expect(ladeMitglieder).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
   });
 
-  it('zeigt bei gesperrtem Stab keine Stabsstelle und ruft die Besetzung nicht ab', async () => {
+  // Eine Modulfreigabe ist nicht nötig: das Modul Stab spielt keine Rolle mehr.
+  it('zeigt die Stabsstelle auch bei ausgeblendetem Stab', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
       freigabenFixture({ stab: { sichtbar: false } }),
     );
+    vi.mocked(ladeMitglieder).mockResolvedValue([mitglied(1, 'Clara Lage', 's2')]);
     container();
-    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
-    // Ein Tick für eine etwaige Folgeabfrage.
-    await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
-    expect(ladeStab).not.toHaveBeenCalled();
-  });
-
-  it('zeigt solange die Freigabe lädt keine Stabsstelle und ruft nichts ab', async () => {
-    vi.mocked(ladeModulFreigaben).mockReturnValue(new Promise(() => {}));
-    container();
-    await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
-    expect(ladeStab).not.toHaveBeenCalled();
+    const stab = await screen.findByRole('group', { name: 'Stab' });
+    expect(within(stab).getByText('Clara Lage')).toBeInTheDocument();
   });
 
   it('zeigt die Stabsstelle, sobald sie geladen ist, auch unter ruhendem Zeiger (LLH-1166)', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
-    let antworte: (s: Stab) => void = () => {};
-    vi.mocked(ladeStab).mockReturnValueOnce(new Promise((r) => (antworte = r)));
+    let antworte: (m: MitgliedAnzeige[]) => void = () => {};
+    vi.mocked(ladeMitglieder).mockReturnValueOnce(new Promise((r) => (antworte = r)));
     container();
     fireEvent.pointerEnter(screen.getByRole('region', { name: 'Organigramm' }), {
       pointerType: 'mouse',
     });
-    await waitFor(() => expect(ladeStab).toHaveBeenCalled());
+    await waitFor(() => expect(ladeMitglieder).toHaveBeenCalled());
     expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
-    await act(async () => antworte({ besetzung: [besetzung({ name: 'Clara Lage' })] } as Stab));
+    await act(async () => antworte([mitglied(1, 'Clara Lage', 's1')]));
     const stab = await screen.findByRole('group', { name: 'Stab' });
     expect(within(stab).getByText('Clara Lage')).toBeInTheDocument();
     expect(screen.getByText('Live pausiert')).toBeInTheDocument();
   });
 
-  it('sagt „Besetzung nicht geladen“, wenn der Abruf bei freigegebenem Stab scheitert', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
-    vi.mocked(ladeStab).mockRejectedValue(new Error('kaputt'));
+  it('zeigt keine Stabsstelle, wenn der Abruf der Mitglieder scheitert', async () => {
+    vi.mocked(ladeMitglieder).mockRejectedValue(new Error('kaputt'));
     container();
-    const stab = await screen.findByRole('group', { name: 'Stab' });
-    expect(await within(stab).findByText('Besetzung nicht geladen')).toBeInTheDocument();
+    await waitFor(() => expect(ladeMitglieder).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
   });
 });
 
@@ -544,7 +535,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
       freigabenFixture({ stab: { sichtbar: false } }),
     );
-    vi.mocked(ladeStab).mockReset();
+    vi.mocked(ladeMitglieder).mockReset().mockResolvedValue([]);
   });
 
   function container(einsatz = EINSATZ, einheiten: Quelle<Einheit> = daten(EINHEITEN)) {
@@ -618,26 +609,21 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     expect(eingabe.titel).toMatch(/^Führungsorganisation 01\d{4}jan26$/);
   });
 
-  it('schreibt einen gescheiterten Stababruf in den Bericht', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
-    vi.mocked(ladeStab).mockRejectedValue(new Error('kaputt'));
+  it('schreibt einen gescheiterten Abruf der Mitglieder in den Bericht', async () => {
+    vi.mocked(ladeMitglieder).mockRejectedValue(new Error('kaputt'));
     container();
-    const stab = await screen.findByRole('group', { name: 'Stab' });
-    await within(stab).findByText('Besetzung nicht geladen');
-    const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
+    await waitFor(() => expect(ladeMitglieder).toHaveBeenCalled());
+    const knopf = await screen.findByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
     expect(vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text).toContain(
-      '- Stab: Besetzung nicht geladen',
+      '- Führungsfunktionen: Mitglieder nicht geladen',
     );
   });
 
-  it('übernimmt den Stab nur, wenn er freigegeben und geladen ist', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
-    vi.mocked(ladeStab).mockResolvedValue({
-      besetzung: [besetzung({ sachgebiet: 's3', name: 'Dora Einsatz' })],
-    } as Stab);
+  it('übernimmt die Führungsfunktionen aus den Mitgliedern (i6k6mzed, D7)', async () => {
+    vi.mocked(ladeMitglieder).mockResolvedValue([mitglied(1, 'Dora Einsatz', 's3')]);
     container();
     await screen.findByRole('group', { name: 'Stab' });
     const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
@@ -645,7 +631,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     await userEvent.click(knopf);
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
     expect(vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text).toContain(
-      '- Stab: S3 Dora Einsatz',
+      '- Führungsfunktionen: S3 Dora Einsatz',
     );
   });
 
@@ -658,12 +644,11 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     );
   });
 
-  it('sperrt die Übernahme, solange die freigegebene Stabsbesetzung lädt', async () => {
-    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
-    vi.mocked(ladeStab).mockReturnValue(new Promise(() => {}));
+  it('sperrt die Übernahme, solange die Mitglieder laden', async () => {
+    vi.mocked(ladeMitglieder).mockReturnValue(new Promise(() => {}));
     container();
-    await waitFor(() => expect(ladeStab).toHaveBeenCalled());
-    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toBeDisabled();
+    await waitFor(() => expect(ladeMitglieder).toHaveBeenCalled());
+    expect(await screen.findByRole('button', { name: /In Lagebericht übernehmen/ })).toBeDisabled();
   });
 
   it('zeigt einen Fehler an der Seite und navigiert nicht', async () => {

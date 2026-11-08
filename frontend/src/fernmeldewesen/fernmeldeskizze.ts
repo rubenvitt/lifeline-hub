@@ -6,8 +6,8 @@ import type {
   Schriftfeld,
   SkizzenBezug,
   SkizzenLage,
+  MitgliedAnzeige,
   Sprechgruppe,
-  Stabsfunktion,
   Stellenart,
   Verbindungsart,
   Verbindungsmedium,
@@ -41,7 +41,7 @@ import {
   type Luecke,
 } from './luecken';
 import { type Quelle } from '../api/abrufZustand';
-import { SACHGEBIETE } from '../fuehrung/sachgebiete';
+import { sachgebietZeilen } from '../fuehrung/besetzungAusMitgliedern';
 import { bedingungszeichenText, komponentenartWort, leitungsBeschreibung } from './skizzenZeichen';
 import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 import type { Herkunft } from './sprechgruppenplan';
@@ -245,7 +245,7 @@ type NetzQuelle =
   | 'abschnitte'
   | 'einheiten'
   | 'fahrzeuge'
-  | 'besetzung'
+  | 'mitglieder'
   | 'fuehrungsstelle'
   | 'sprechgruppen'
   | 'stellen'
@@ -255,7 +255,7 @@ export const NETZ_QUELLEN_NAME: Record<NetzQuelle, string> = {
   abschnitte: 'Abschnitte',
   einheiten: 'Einheiten',
   fahrzeuge: 'Fahrzeuge',
-  besetzung: 'Stab-Besetzung',
+  mitglieder: 'Mitglieder',
   fuehrungsstelle: 'Führungsstelle',
   sprechgruppen: 'Sprechgruppen',
   stellen: 'Externe Stellen',
@@ -303,8 +303,11 @@ export interface FernmeldenetzQuellen extends KanalQuellen {
   einsatzId: number;
   /** Disponierte Fahrzeuge: die Führungsfahrzeuge stehen im Kasten (LFH-1029). */
   fahrzeuge: Quelle<EinsatzFahrzeug>;
-  /** Stab-Besetzung: die besetzten Sachgebiete stehen im Kasten der Einsatzleitung (LFH-1029). */
-  besetzung: Quelle<Stabsfunktion>;
+  /**
+   * Mitglieder des Einsatzes: die Sachgebiete ihrer Führungsfunktionen stehen im Kasten der
+   * Einsatzleitung (LFH-1029; i6k6mzed, D7).
+   */
+  mitglieder: Quelle<MitgliedAnzeige>;
   /** Fehlt es, ist die Skizze schreibgeschützt. */
   rechte?: NetzRechte;
 }
@@ -376,26 +379,18 @@ function fuehrungsmittel(f: EinsatzFahrzeug, nurFuehrung = true): SkizzenAusstat
 }
 
 /**
- * Die Sachgebiete, die an der Führungsstelle wahrgenommen werden, in S-Folge: bei der
- * Einsatzleitung, durch disponiertes Personal oder extern besetzt (Spec `stab-fernmeldeskizze`,
- * „Führungsmittel und Funktionen im Kasten“). Rückwärtig und eine nicht mehr disponierte Person
- * zählen nicht.
+ * Die Sachgebiete, die an der Führungsstelle wahrgenommen werden, in S-Folge: jedes, das
+ * mindestens ein Mitglied in seiner Mitgliedschaft führt, genau einmal und ohne Namen (Spec
+ * `stab-fernmeldeskizze`, „Führungsmittel und Funktionen im Kasten“; i6k6mzed, D7).
  */
-function stabAusstattung(besetzung: readonly Stabsfunktion[]): SkizzenAusstattung[] {
-  return SACHGEBIETE.flatMap(({ sachgebiet, kuerzel }) => {
-    const zeile = besetzung.find((b) => b.sachgebiet === sachgebiet);
-    if (!zeile || zeile.besetzung_art === 'rueckwaertig') return [];
-    if (zeile.besetzung_art === 'personal' && !zeile.personal_noch_disponiert) return [];
-    return [
-      {
-        art: 'funktion' as const,
-        schluessel: sachgebiet,
-        text: kuerzel,
-        titel: `Sachgebiet ${kuerzel}`,
-        zeichen: { art: 'kuerzel' as const, kuerzel },
-      },
-    ];
-  });
+function sachgebietAusstattung(mitglieder: readonly MitgliedAnzeige[]): SkizzenAusstattung[] {
+  return sachgebietZeilen(mitglieder).map(({ sachgebiet, kuerzel }) => ({
+    art: 'funktion' as const,
+    schluessel: sachgebiet,
+    text: kuerzel,
+    titel: `Sachgebiet ${kuerzel}`,
+    zeichen: { art: 'kuerzel' as const, kuerzel },
+  }));
 }
 
 function leitungAusstattung(unterabschnitt: boolean): SkizzenAusstattung {
@@ -499,9 +494,9 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
           ? null
           : 'Gegenstelle nicht erfasst',
     tz: baueTzProps({ objekttyp: 'abschnitt' }),
-    // Die Besetzung ist eine eigene Angabe: sie steht auch ohne erfasste Gegenstelle.
+    // Die Sachgebiete sind eine eigene Angabe: sie stehen auch ohne erfasste Gegenstelle.
     ausstattung: [
-      ...(q.besetzung.zustand === 'daten' ? stabAusstattung(q.besetzung.daten) : []),
+      ...(q.mitglieder.zustand === 'daten' ? sachgebietAusstattung(q.mitglieder.daten) : []),
       ...fsMittel,
     ],
   });

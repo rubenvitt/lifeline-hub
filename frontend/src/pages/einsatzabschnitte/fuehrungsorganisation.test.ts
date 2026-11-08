@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { render } from '@testing-library/react';
 import Markdown from '../../components/Markdown';
-import type { Einheit, Einsatzabschnitt, Stabsfunktion } from '../../api/types';
+import type { Einheit, Einsatzabschnitt } from '../../api/types';
 import { baueFunkplan, type FunkplanZeile } from '../../fernmeldewesen/funkplan';
 import type { EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { abschnittStaerken } from './abschnittStaerke';
@@ -311,7 +311,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       baueFuehrungsorganisation(abschnitte, einheiten),
       {
         stand: '011200Okt26',
-        stab: null,
+        fuehrungsfunktionen: null,
         einheitenZustand: 'daten',
         einsatzleiter: OHNE_EL,
         dtg: DTG,
@@ -321,7 +321,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     expect(md).toContain('**Stand:** 011200Okt26');
     expect(md).toContain('## Einsatzleitung\n\n- Leitung nicht erfasst\n');
     expect(md).not.toContain('Führungsstelle');
-    expect(md).not.toContain('Stab:');
+    expect(md).not.toContain('Führungsfunktionen:');
     expect(md).not.toContain('## Quellen');
     expect(md).toContain('- **EA Nord** · Rufname EA-N · Leitung Anna Leiter · Stärke 1/2/6//9');
     expect(md).toContain(
@@ -341,7 +341,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     const org = baueFuehrungsorganisation(abschnitte, einheiten);
     const mit = rendereFuehrungsorganisationMarkdown(org, {
       stand: 'x',
-      stab: null,
+      fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
       einsatzleiter: {
         art: 'erfasst',
@@ -357,7 +357,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     expect(mit).not.toContain('Leitung nicht erfasst');
     const grund = rendereFuehrungsorganisationMarkdown(org, {
       stand: 'x',
-      stab: null,
+      fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
       einsatzleiter: { art: 'zustand', grund: 'nicht geladen' },
       dtg: DTG,
@@ -365,48 +365,45 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     expect(grund).toContain('## Einsatzleitung\n\n- Einsatzleiter: nicht geladen\n');
   });
 
-  it('nennt den Stab nur, wenn er übergeben wird, in S-Folge mit Besetzung', () => {
+  // Design D7 (i6k6mzed): die Zeile heißt „Führungsfunktionen“ und nennt EL und S1–S7 aus den
+  // Mitgliedern; ohne Träger keine Zeile.
+  it('nennt die Führungsfunktionen nur mit Trägern, in Katalogfolge mit Namen', () => {
     const org = baueFuehrungsorganisation(abschnitte, einheiten);
-    const besetzung = [
-      {
-        sachgebiet: 's2',
-        besetzung_art: 'personal',
-        name: 'Clara Lage',
-        personal_noch_disponiert: true,
-      },
-      { sachgebiet: 's1', besetzung_art: 'einsatzleitung', personal_noch_disponiert: false },
-    ] as unknown as Stabsfunktion[];
     const md = rendereFuehrungsorganisationMarkdown(org, {
       stand: 'x',
-      stab: besetzung,
+      fuehrungsfunktionen: [
+        { funktion: 'el', kuerzel: 'EL', namen: 'Lea Leitung' },
+        { funktion: 's2', kuerzel: 'S2', namen: 'Clara Lage, *Dora*' },
+      ],
       einheitenZustand: 'daten',
       einsatzleiter: OHNE_EL,
       dtg: DTG,
     });
-    expect(md).toContain('- Stab: S1 Einsatzleitung · S2 Clara Lage\n');
+    expect(md).toContain('- Führungsfunktionen: EL Lea Leitung · S2 Clara Lage, \\*Dora\\*\n');
+    expect(md).not.toContain('Stab:');
     const leer = rendereFuehrungsorganisationMarkdown(org, {
       stand: 'x',
-      stab: [],
+      fuehrungsfunktionen: [],
       einheitenZustand: 'daten',
       einsatzleiter: OHNE_EL,
       dtg: DTG,
     });
-    expect(leer).toContain('- Stab: kein Sachgebiet besetzt\n');
-    // Was fehlt, steht darin: ein gescheiterter Abruf ist kein leerer Stab.
+    expect(leer).not.toContain('Führungsfunktionen:');
+    // Was fehlt, steht darin: ein gescheiterter Abruf ist keine leere Liste.
     const fehler = rendereFuehrungsorganisationMarkdown(org, {
       stand: 'x',
-      stab: 'fehler',
+      fuehrungsfunktionen: 'fehler',
       einheitenZustand: 'daten',
       einsatzleiter: OHNE_EL,
       dtg: DTG,
     });
-    expect(fehler).toContain('- Stab: Besetzung nicht geladen\n');
+    expect(fehler).toContain('- Führungsfunktionen: Mitglieder nicht geladen\n');
   });
 
   it('nennt fehlende Einheiten als Quelle und schreibt die Stärke als „—“', () => {
     const md = rendereFuehrungsorganisationMarkdown(baueFuehrungsorganisation(abschnitte, null), {
       stand: 'x',
-      stab: null,
+      fuehrungsfunktionen: null,
       einheitenZustand: 'gesperrt',
       einsatzleiter: OHNE_EL,
       dtg: DTG,
@@ -420,7 +417,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
   it('schreibt ohne Abschnitte einen Leervermerk statt einer leeren Liste', () => {
     const md = rendereFuehrungsorganisationMarkdown(baueFuehrungsorganisation([], []), {
       stand: 'x',
-      stab: null,
+      fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
       einsatzleiter: OHNE_EL,
       dtg: DTG,
@@ -433,7 +430,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       baueFuehrungsorganisation([abschnitt(1, { name: '*Nord* [alt]', leiter_name: '_Kai_' })], []),
       {
         stand: 'x',
-        stab: null,
+        fuehrungsfunktionen: null,
         einheitenZustand: 'daten',
         einsatzleiter: OHNE_EL,
         dtg: DTG,
@@ -455,7 +452,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       ),
       {
         stand: 'x',
-        stab: null,
+        fuehrungsfunktionen: null,
         einheitenZustand: 'daten',
         einsatzleiter: OHNE_EL,
         dtg: DTG,
@@ -473,7 +470,7 @@ describe('rendereFuehrungsorganisationMarkdown · Führungsstelle (LFH-1181)', (
     const org = baueFuehrungsorganisation([], []);
     const mit = rendereFuehrungsorganisationMarkdown(org, {
       stand: 'x',
-      stab: null,
+      fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
       einsatzleiter: { art: 'nicht-erfasst' },
       dtg: (utc) => utc,
@@ -484,7 +481,7 @@ describe('rendereFuehrungsorganisationMarkdown · Führungsstelle (LFH-1181)', (
     );
     const ohne = rendereFuehrungsorganisationMarkdown(org, {
       stand: 'x',
-      stab: null,
+      fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
       einsatzleiter: { art: 'nicht-erfasst' },
       dtg: (utc) => utc,

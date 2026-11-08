@@ -25,8 +25,8 @@ import {
  * Laufweite und keinen Druckmaßstab.
  *
  * - KASTEN: „EAL“ und „ELW 1“ stehen im Kasten des Abschnitts, „S2“ und „S3“ im Kasten
- *   „Einsatzleitung“, das rückwärtige „S6“ nicht; kein Personenname. Jedes Wort liegt im Kasten,
- *   am Schirm und im Druck A4 quer.
+ *   „Einsatzleitung“ (aus den Führungsfunktionen der Mitglieder, i6k6mzed D7), EL nicht; kein
+ *   Personenname. Jedes Wort liegt im Kasten, am Schirm und im Druck A4 quer.
  * - FÜHRUNGSSTELLE (LFH-1106): ein auf Einsatzdaten der Führungsstelle zugeordneter ELW 2 steht
  *   im Kasten „Einsatzleitung“ und nicht im Kasten seines Abschnitts.
  * - MESSUNG: Höhe der Wörter im Druck A4 und A3 quer bei acht obersten Abschnitten,
@@ -48,7 +48,32 @@ const FUEKW = { width: 1366, height: 768 };
 const LEITUNG = 'Erika Muster';
 const S2_NAME = 'Max Lagemann';
 
-/** Grundnetz, dazu Leitung und ELW 1 für „Einsatzabschnitt Nord“ und eine Stab-Besetzung. */
+/**
+ * Ein Konto mit `anzeigename` als Mitglied mit der Führungsfunktion `funktion` (i6k6mzed, D2).
+ * Es meldet sich nie an, braucht also keinen Erstwechsel.
+ */
+async function mitgliedMitFunktion(
+  page: Page,
+  einsatzId: string,
+  anzeigename: string,
+  funktion: string,
+) {
+  const antwort = await page.request.post('/api/benutzer', {
+    data: {
+      anzeigename,
+      benutzername: `e2e-ausstattung-${Date.now()}-${funktion}`,
+      passwort: 'e2e-ausstattung-pw-123',
+    },
+  });
+  expect(antwort.ok(), `Konto ${anzeigename}: ${antwort.status()}`).toBeTruthy();
+  const { id } = (await antwort.json()) as { id: number };
+  await api(page, einsatzId).put(`mitglieder/${id}`, {
+    einsatz_rolle: 'fuehrungspersonal',
+    fuehrungsfunktion: funktion,
+  });
+}
+
+/** Grundnetz, dazu Leitung und ELW 1 für „Einsatzabschnitt Nord“ und Mitglieder mit S2, S3, EL. */
 async function seedeAusstattung(page: Page, einsatzId: string) {
   const n = await seedeGrund(page, einsatzId);
   const a = api(page, einsatzId);
@@ -60,10 +85,9 @@ async function seedeAusstattung(page: Page, einsatzId: string) {
     })
   ).id;
   await a.put(`einheiten/${n.zug}/fahrzeug/${elw}`);
-  const s2 = (await a.post('personal', { adhoc: { name: S2_NAME } })).id;
-  await a.put('stab/besetzung/s2', { besetzung_art: 'personal', personal_id: s2 });
-  await a.put('stab/besetzung/s3', { besetzung_art: 'einsatzleitung' });
-  await a.put('stab/besetzung/s6', { besetzung_art: 'rueckwaertig', bezeichnung: 'ILS' });
+  await mitgliedMitFunktion(page, einsatzId, S2_NAME, 's2');
+  await mitgliedMitFunktion(page, einsatzId, 'Sabine Einsatz', 's3');
+  await mitgliedMitFunktion(page, einsatzId, 'Lena Leitung', 'el');
   return { ...n, elw };
 }
 
@@ -190,7 +214,7 @@ test('Messung: Schriftgrad der Ausstattung im Druck A4 und A3 quer bei acht ober
     rufname: 'Florian Musterstadt 10/1',
     sprechgruppe_ids: [tmo],
   });
-  await a.put('stab/besetzung/s2', { besetzung_art: 'einsatzleitung' });
+  await mitgliedMitFunktion(page, einsatzId, 'Max Lagemann', 's2');
   let erstes = 0;
   for (let i = 1; i <= 8; i++) {
     const leitung = (await a.post('personal', { adhoc: { name: `Leitung ${i}` } })).id;
