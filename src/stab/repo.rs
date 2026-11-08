@@ -131,33 +131,6 @@ fn zustand_text(art: Option<BesetzungArt>, name: Option<&str>) -> String {
 }
 
 /// Der Vorherstand einer Zeile, als Text für den ETB-Eintrag.
-/// Riegel gegen den Lebenszyklus INNERHALB einer Schreibtransaktion.
-///
-/// `fordere_aktiv` läuft im Extractor und liest einen Stand von VOR der Transaktion.
-/// `write_retry!` wartet bei BUSY am `BEGIN IMMEDIATE` mit Backoff — hält ein
-/// konkurrierendes „Einsatz abschliessen" gerade den Schreib-Lock, wartet der Aufruf also
-/// absichtlich, bis jenes committet hat, und schriebe danach in einen geschlossenen Einsatz.
-/// Der Retry-Pfad VERBREITERT das Fenster, statt es zu schliessen.
-///
-/// 409 wie `fordere_aktiv` am Route-Gate (Lebenszyklus, src/AGENTS.md) — zwei Codes für dieselbe
-/// Tatsache, unterschieden nur durch Timing, könnte ein Client nicht auseinanderhalten.
-pub(crate) async fn fordere_aktiv_in_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-) -> Result<(), AppError> {
-    let aktiv: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM einsatz WHERE id = ? AND status = 'aktiv'")
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-    if aktiv.is_none() {
-        return Err(AppError::Conflict(
-            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-        ));
-    }
-    Ok(())
-}
-
 /// Der fachliche Stand einer Zeile: `None` = nicht vergeben.
 type Stand = Option<(BesetzungArt, Option<i64>, Option<String>)>;
 
@@ -217,7 +190,7 @@ pub async fn setzen(
         //    dort trägt er zusätzlich die Atomaritäts-Zusicherung und muss deshalb hinter den
         //    Inserts stehen; hier gibt es keinen solchen Grund, und in einen abgeschlossenen
         //    Einsatz soll gar nichts erst geschrieben werden.
-        fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
 
         // 1. Vorherstand lesen — er geht in den ETB-Text ein, entscheidet über den
         //    Gleichheitsfall und ist nach dem Upsert weg.
@@ -341,7 +314,7 @@ pub async fn entfernen(
     write_retry!(pool, |conn| {
         // Vor dem DELETE, damit auch der No-op-Pfad 409 antwortet statt eines irreführenden
         // 204 „schon nicht vergeben" auf einem abgeschlossenen Einsatz.
-        fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         let vorher = stand_text(&vorher_stand(conn, einsatz_id, sachgebiet).await?);
         let betroffen = sqlx::query(
             "DELETE FROM einsatz_stabsfunktion WHERE einsatz_id = ? AND sachgebiet = ?",

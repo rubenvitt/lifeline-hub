@@ -63,7 +63,7 @@ pub struct FuehrungsstelleAnzeige {
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
     /// Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
     /// Personenbezogen: wird geschwärzt und steht nie im Lagebericht.
-    pub verbindungen: Vec<crate::stab::kommunikation::KommunikationsVerbindung>,
+    pub verbindungen: Vec<crate::fernmeldewesen::kommunikation::KommunikationsVerbindung>,
     /// Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.
     /// Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
     /// Fahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“).
@@ -489,7 +489,7 @@ async fn save_einsatzleiter_tx(
 ) -> Result<Option<i64>, AppError> {
     // Ein abgeschlossener Einsatz bekommt keinen Eintrag mehr: der Extractor prüft vor der
     // Transaktion, ein konkurrierender Abschluss kann dazwischenliegen (D3).
-    crate::stab::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+    crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
     let vorher = einsatzleiter_stand(conn, einsatz_id).await?;
     let (nachher, seit): (Stand, Option<&str>) = match eingabe {
         None => (None, None),

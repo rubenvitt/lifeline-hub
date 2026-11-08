@@ -19,7 +19,7 @@ pub mod skelett_loeschung;
 pub mod verbindungen;
 pub mod zaehler;
 
-use crate::stab::Sachgebiet;
+use crate::fuehrung::Sachgebiet;
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;

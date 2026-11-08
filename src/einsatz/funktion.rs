@@ -19,8 +19,8 @@
 
 use super::EinsatzRolle;
 use crate::error::AppError;
+use crate::fuehrung::Sachgebiet;
 use crate::fuehrung::{Fuehrungsfunktion, Labelkarte};
-use crate::stab::Sachgebiet;
 use sqlx::SqliteConnection;
 
 /// Abgeleitete Funktion in zwei Schreibweisen.

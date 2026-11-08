@@ -4,7 +4,7 @@
 //!
 //! **Zuordnungen bleiben, wo sie liegen.** Abschnitt, Einheit und Führungsstelle tragen ihre
 //! Sprechgruppen selbst (`sprechgruppe::repo::Zuordnungsziel`), externe Stellen ihre Kanäle am
-//! Datensatz des Kommunikationsplans (`stab::kommunikation`). Die Skizze liest sie, sie kopiert
+//! Datensatz des Kommunikationsplans (`fernmeldewesen::kommunikation`). Die Skizze liest sie, sie kopiert
 //! sie nicht.
 //!
 //! **Polymorphe Bezüge** (`von_art`/`von_id`, `nach_art`/`nach_id`, `element`) tragen keinen
@@ -21,7 +21,7 @@ use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
-use super::repo::fordere_aktiv_in_tx;
+use crate::einsatz::repo::fordere_aktiv_in_tx;
 use crate::error::AppError;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
 use crate::wire_enum::wire_enum;
@@ -1298,12 +1298,12 @@ mod tests {
             ("einsatz_einheit", "src/einheit/repo.rs", "aufloesen_tx"),
             (
                 "einsatz_kommunikation_stelle",
-                "src/stab/kommunikation.rs",
+                "src/fernmeldewesen/kommunikation.rs",
                 "stelle_entfernen",
             ),
             (
                 "fernmeldeskizze_komponente",
-                "src/stab/fernmeldeskizze.rs",
+                "src/fernmeldewesen/fernmeldeskizze.rs",
                 "komponente_entfernen",
             ),
         ];

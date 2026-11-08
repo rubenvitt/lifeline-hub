@@ -1008,7 +1008,7 @@ async fn besetzung_schreiben_auf_abgeschlossenem_einsatz_ist_409() {
     let setzen = lifeline_hub::stab::repo::setzen(
         &pool,
         einsatz,
-        lifeline_hub::stab::Sachgebiet::S3,
+        lifeline_hub::fuehrung::Sachgebiet::S3,
         1,
         &lifeline_hub::stab::repo::BesetzungEingabe {
             besetzung_art: lifeline_hub::stab::BesetzungArt::Einsatzleitung,
@@ -1023,9 +1023,13 @@ async fn besetzung_schreiben_auf_abgeschlossenem_einsatz_ist_409() {
     );
 
     // Belegte Zeile: kein Entfernen auf einem abgeschlossenen Einsatz.
-    let entfernen_belegt =
-        lifeline_hub::stab::repo::entfernen(&pool, einsatz, lifeline_hub::stab::Sachgebiet::S2, 1)
-            .await;
+    let entfernen_belegt = lifeline_hub::stab::repo::entfernen(
+        &pool,
+        einsatz,
+        lifeline_hub::fuehrung::Sachgebiet::S2,
+        1,
+    )
+    .await;
     assert_eq!(
         entfernen_belegt
             .expect_err("entfernen muss scheitern")
@@ -1034,9 +1038,13 @@ async fn besetzung_schreiben_auf_abgeschlossenem_einsatz_ist_409() {
     );
 
     // LEERE Zeile: auch hier 409 statt eines „erfolgreichen" No-ops.
-    let entfernen_leer =
-        lifeline_hub::stab::repo::entfernen(&pool, einsatz, lifeline_hub::stab::Sachgebiet::S5, 1)
-            .await;
+    let entfernen_leer = lifeline_hub::stab::repo::entfernen(
+        &pool,
+        einsatz,
+        lifeline_hub::fuehrung::Sachgebiet::S5,
+        1,
+    )
+    .await;
     assert_eq!(
         entfernen_leer
             .expect_err("auch der No-op darf keinen Erfolg melden")

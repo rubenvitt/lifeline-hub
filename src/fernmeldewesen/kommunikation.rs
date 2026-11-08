@@ -291,7 +291,7 @@ pub async fn stelle_anlegen(
     eingabe: &StelleEingabe,
 ) -> Result<(i64, Vec<KommunikationsStelle>), AppError> {
     let id = write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         if let Some(f) = eingabe.funktion {
             let vorhanden: Option<i64> = sqlx::query_scalar(
                 "SELECT 1 FROM einsatz_kommunikation_stelle \
@@ -339,7 +339,7 @@ pub async fn stelle_umbenennen(
     bezeichnung: Option<&str>,
 ) -> Result<Vec<KommunikationsStelle>, AppError> {
     write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         let stelle = stelle_im_einsatz(conn, einsatz_id, stelle_id).await?;
         let art = Stellenart::parse(&stelle.stellenart).unwrap_or(Stellenart::Sonstige);
         // S7 zählt nur beim Anlegen: eine bestehende Stelle bleibt umbenennbar, auch wenn der
@@ -415,7 +415,7 @@ pub async fn stelle_entfernen(
     stelle_id: i64,
 ) -> Result<Vec<KommunikationsStelle>, AppError> {
     write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         stelle_im_einsatz(conn, einsatz_id, stelle_id).await?;
         fernmeldeskizze::vergiss(
             conn,
@@ -464,7 +464,7 @@ pub async fn kanal_setzen(
     crate::sprechgruppe::repo::pruefe_zuordenbar(pool, org_id, einsatz_id, &[sprechgruppe_id])
         .await?;
     write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         externe_stelle(conn, einsatz_id, stelle_id).await?;
         let r = sqlx::query(
             "INSERT INTO einsatz_kommunikation_stelle_sprechgruppe \
@@ -490,7 +490,7 @@ pub async fn kanal_loesen(
     sprechgruppe_id: i64,
 ) -> Result<bool, AppError> {
     write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         externe_stelle(conn, einsatz_id, stelle_id).await?;
         let r = sqlx::query(
             "DELETE FROM einsatz_kommunikation_stelle_sprechgruppe \
@@ -513,7 +513,7 @@ pub async fn verbindung_anlegen(
     eingabe: &VerbindungEingabe,
 ) -> Result<Vec<KommunikationsStelle>, AppError> {
     write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         stelle_im_einsatz(conn, einsatz_id, stelle_id).await?;
         sqlx::query(
             "INSERT INTO einsatz_kommunikation_verbindung \
@@ -544,7 +544,7 @@ pub async fn verbindung_aendern(
     patch: &VerbindungPatch,
 ) -> Result<Vec<KommunikationsStelle>, AppError> {
     write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         let treffer = sqlx::query(
             "UPDATE einsatz_kommunikation_verbindung SET \
                 mittel = COALESCE(?1, mittel), \
@@ -577,7 +577,7 @@ pub async fn verbindung_entfernen(
     verbindung_id: i64,
 ) -> Result<Vec<KommunikationsStelle>, AppError> {
     write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         let treffer = sqlx::query(
             "DELETE FROM einsatz_kommunikation_verbindung WHERE id = ? AND einsatz_id = ?",
         )

@@ -142,7 +142,7 @@ pub async fn setzen(
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
 
     let wirkung = write_retry!(pool, |conn| {
-        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
 
         // Vorherstand: nur der Haken entscheidet über den Beleg. `None` = keine Zeile.
         let vorher_zeile: Option<bool> = sqlx::query_scalar(

@@ -1559,6 +1559,33 @@ pub async fn zaehle_einsatzleitung(pool: &SqlitePool, einsatz_id: i64) -> Result
     .map_err(Into::into)
 }
 
+/// Riegel gegen den Lebenszyklus INNERHALB einer Schreibtransaktion.
+///
+/// `fordere_aktiv` läuft im Extractor und liest einen Stand von VOR der Transaktion.
+/// `write_retry!` wartet bei BUSY am `BEGIN IMMEDIATE` mit Backoff — hält ein
+/// konkurrierendes „Einsatz abschliessen" gerade den Schreib-Lock, wartet der Aufruf also
+/// absichtlich, bis jenes committet hat, und schriebe danach in einen geschlossenen Einsatz.
+/// Der Retry-Pfad VERBREITERT das Fenster, statt es zu schliessen.
+///
+/// 409 wie `fordere_aktiv` am Route-Gate (Lebenszyklus, src/AGENTS.md) — zwei Codes für dieselbe
+/// Tatsache, unterschieden nur durch Timing, könnte ein Client nicht auseinanderhalten.
+pub(crate) async fn fordere_aktiv_in_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<(), AppError> {
+    let aktiv: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz WHERE id = ? AND status = 'aktiv'")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    if aktiv.is_none() {
+        return Err(AppError::Conflict(
+            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2814,7 +2841,7 @@ mod tests {
         .await
         .unwrap();
         let liste = [crate::einsatz::verbindungen::Verbindung {
-            mittel: crate::stab::kommunikation::Verbindungsmittel::Mobil,
+            mittel: crate::fernmeldewesen::kommunikation::Verbindungsmittel::Mobil,
             wert: "0170 98765".into(),
             hinweis: Some("nur Anna".into()),
         }];

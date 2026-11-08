@@ -38,6 +38,7 @@ pub mod evakuierung;
 pub mod externe_stelle;
 pub mod fahrzeug;
 pub mod fahrzeug_status;
+pub mod fernmeldewesen;
 pub mod freies_zeichen;
 pub mod fuehrungsfunktion;
 pub mod gefahr;

@@ -1,8 +1,8 @@
 # Fernmeldewesen — Regeln
 
 Gilt für `frontend/src/fernmeldewesen/`, `pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`,
-`einsatz/einsatzleiter.ts`, `einsatz/fuehrungsstelle.ts` und `src/stab/kommunikation.rs`,
-`src/stab/fernmeldeskizze.rs`; ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
+`einsatz/einsatzleiter.ts`, `einsatz/fuehrungsstelle.ts` und `src/fernmeldewesen/kommunikation.rs`,
+`src/fernmeldewesen/fernmeldeskizze.rs`; ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
 **Fernmeldewesen** (LLH-1180, `openspec/changes/archive/2026-10-13-nrptfg8r-fernmeldewesen-modul/design.md`): eigenes
 Modul `fernmeldewesen` (Kategorie Kommunikation) mit Funkplan, Fernmeldeskizze, Sprechgruppen und
@@ -57,7 +57,7 @@ Kommunikationsskizze `sketch.*`, LFH-1033), keine eigene Geometrie; 1 mm des Pak
 „geplant“ immer Strichmuster **und** Wort. **Eine Wahrheit:** Zuordnungen schreibt die Fläche über
 die Einzel-Endpunkte in die Datensätze (Abschnitt, Einheit, Führungsstelle, Kommunikationsstelle),
 externe Stellen sind die des Kommunikationsplans; die Skizze speichert nur Lage, Komponenten,
-Verbindungen, Bereiche, Schriftfeld (`src/stab/fernmeldeskizze.rs`, Bezüge polymorph, jeder
+Verbindungen, Bereiche, Schriftfeld (`src/fernmeldewesen/fernmeldeskizze.rs`, Bezüge polymorph, jeder
 Löschpfad ruft `vergiss`); Recht am Skizzeneigenen ist `fernmeldewesen` (`Rechtsquelle`). Schreibwege der Fläche nur über `fernmeldewesen/skizzenAktionen.ts`
 (umgesetzt in `fernmeldewesen/useSkizzenAktionen.ts`), Rückgängig über `fernmeldewesen/skizzenBefehle.ts`; Lage mit
 `version` (409 statt stillem Überschreiben). Rechte je Element nach dem Datensatz, mobil und ohne
@@ -122,7 +122,7 @@ ihrer Sprechgruppen und Strukturquelle (LFH-1018). Fehlt eine Strukturquelle, st
 `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md`): Unterroute
 `fernmeldewesen/kommunikationsplan` (`kommunikationsplanPfad`), Reiter des Moduls und zweiter
 S6-Eintrag in `stab/unterseiten.ts`, `useModulFreigabe('fernmeldewesen')` fail-closed. Gepflegt werden nur Stellen ohne eigenes Heim (Führungsfunktion aus
-dem Katalog, Leitstelle, Behörde, Verbindungsperson, sonstige) mit Verbindungen (`src/stab/kommunikation.rs`,
+dem Katalog, Leitstelle, Behörde, Verbindungsperson, sonstige) mit Verbindungen (`src/fernmeldewesen/kommunikation.rs`,
 zwei Tabellen, eine Funktion je Einsatz, FHP/FB je Bezeichnung); **Abschnitte und Einheiten werden
 abgeleitet** (alle `verbindungen` des Datensatzes, LLH-1134; Zeile führt zum Datensatz, keine zweite
 Datenhaltung). Die Besetzung ist nur Nebentext, **Kontaktangaben des Personals kommen nie vor**.

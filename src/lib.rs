@@ -33,6 +33,7 @@ pub mod etb_baustein;
 pub mod externe_stelle;
 pub mod extract;
 pub mod fahrzeug;
+pub mod fernmeldewesen;
 pub mod freies_zeichen;
 pub mod fuehrung;
 pub mod gefahr;

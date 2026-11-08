@@ -778,7 +778,7 @@ fn orphan_enums_wire() {
 /// Constraint-Sicherheitsnetz statt in einer fachlichen Antwort. `BesetzungArt` ebenso.
 #[test]
 fn stab_sachgebiet_wire() {
-    enum_wire_as_str!(lifeline_hub::stab::Sachgebiet {
+    enum_wire_as_str!(lifeline_hub::fuehrung::Sachgebiet {
         S1,
         S2,
         S3,
@@ -831,18 +831,18 @@ fn einsatz_fuehrungsstellen_art_wire() {
 
 #[test]
 fn stab_kommunikation_stellenart_wire() {
-    enum_wire!(lifeline_hub::stab::kommunikation::Stellenart {
+    enum_wire!(lifeline_hub::fernmeldewesen::kommunikation::Stellenart {
         Funktion => "funktion",
         Leitstelle => "leitstelle",
         Behoerde => "behoerde",
         Verbindungsperson => "verbindungsperson",
         Sonstige => "sonstige",
-    } in lifeline_hub::stab::kommunikation::Stellenart::ALLE);
+    } in lifeline_hub::fernmeldewesen::kommunikation::Stellenart::ALLE);
 }
 
 #[test]
 fn stab_kommunikation_verbindungsmittel_wire() {
-    enum_wire!(lifeline_hub::stab::kommunikation::Verbindungsmittel {
+    enum_wire!(lifeline_hub::fernmeldewesen::kommunikation::Verbindungsmittel {
         Festnetz => "festnetz",
         Mobil => "mobil",
         Fax => "fax",
@@ -850,22 +850,22 @@ fn stab_kommunikation_verbindungsmittel_wire() {
         Messenger => "messenger",
         Melder => "melder",
         Sonstiges => "sonstiges",
-    } in lifeline_hub::stab::kommunikation::Verbindungsmittel::ALLE);
+    } in lifeline_hub::fernmeldewesen::kommunikation::Verbindungsmittel::ALLE);
 }
 
 /// LFH-893: taktische Fernmeldeskizze. Die Werte stehen als CHECK in
 /// `migrations/0148_fernmeldeskizze.sql`; der Client zeichnet je Wert ein Zeichen (J.1–J.3).
 #[test]
 fn stab_fernmeldeskizze_wire() {
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Komponentenart {
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Komponentenart {
         Repeater => "repeater",
         Gateway => "gateway",
         Basisstation => "basisstation",
         MobileBasisstation => "mobile_basisstation",
         Antenne => "antenne",
         Vermittlung => "vermittlung",
-    } in lifeline_hub::stab::fernmeldeskizze::Komponentenart::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsart {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Komponentenart::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsart {
         Telefon => "telefon",
         Fax => "fax",
         Daten => "daten",
@@ -875,30 +875,30 @@ fn stab_fernmeldeskizze_wire() {
         Richtfunk => "richtfunk",
         Satellit => "satellit",
         Sonstige => "sonstige",
-    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsart::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsmedium {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsart::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsmedium {
         Funk => "funk",
         Leitung => "leitung",
-    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsmedium::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsstatus {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsmedium::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsstatus {
         Bestehend => "bestehend",
         Geplant => "geplant",
-    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsstatus::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verkehrsart {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Verbindungsstatus::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::Verkehrsart {
         Wechsel => "wechsel",
         Gegen => "gegen",
-    } in lifeline_hub::stab::fernmeldeskizze::Verkehrsart::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::VsVermerk {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::Verkehrsart::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::VsVermerk {
         Keiner => "keiner",
         VsNfd => "vs_nfd",
-    } in lifeline_hub::stab::fernmeldeskizze::VsVermerk::ALLE);
-    enum_wire!(lifeline_hub::stab::fernmeldeskizze::SkizzenBezugArt {
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::VsVermerk::ALLE);
+    enum_wire!(lifeline_hub::fernmeldewesen::fernmeldeskizze::SkizzenBezugArt {
         Fuehrungsstelle => "fuehrungsstelle",
         Abschnitt => "abschnitt",
         Einheit => "einheit",
         Stelle => "stelle",
         Komponente => "komponente",
-    } in lifeline_hub::stab::fernmeldeskizze::SkizzenBezugArt::ALLE);
+    } in lifeline_hub::fernmeldewesen::fernmeldeskizze::SkizzenBezugArt::ALLE);
 }
 
 /// LFH-1199: Art des Einsatzleiters an der eigenen Führungsstelle; die Werte trägt der CHECK von
