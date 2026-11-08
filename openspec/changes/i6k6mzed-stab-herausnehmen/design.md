@@ -17,7 +17,8 @@ Scope-Scan vom 08.11.2026 (Stand `d22ba2f`, höchste Migration 0298):
   - die Stabsstelle im Organigramm, die Sachgebietszeichen in der Fernmeldeskizze, die Spalte
     „Besetzung“ im Kommunikationsplan, „Stab:“ in der Eigenen Lage und der Block im Einsatzbericht.
 - **`einsatz_mitgliedschaft.fuehrungsfunktion`** (0128, Katalog EL, S1–S7, FHP, FB) ist schon da.
-  Die Einsatzleitung pflegt sie im Abschnitt „Mitglieder“ (`PUT …/mitglieder/{benutzer_id}`), und
+  Die Einsatzleitung pflegt sie in den Einstellungen des Einsatzes, Reiter „Zugriff“, Spalte
+  „Führungsstelle“ (`PUT …/mitglieder/{benutzer_id}`), und
   jedes Mitglied darf sie lesen (`GET …/mitglieder`, `EinsatzLesezugriff`).
 - **`src/stab/` und `src/routes/stab.rs`** enthalten auch das Fernmeldewesen: `kommunikation.rs`,
   `fernmeldeskizze.rs`, 25 Handler und `sse_fernmeldewesen`. Ebenso liegt der allgemeine
