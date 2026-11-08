@@ -349,6 +349,7 @@ flowchart TB
 | Pfad | Zweck | Gegenstück im Backend |
 | --- | --- | --- |
 | `frontend/src/personen` | Betroffene, Sichtung, Patientenkopf, Erfassung, Druck ([AGENTS.md](../../frontend/src/personen/AGENTS.md)) | `src/person`, `src/uhs` |
+| `frontend/src/planung` | Vorplanung ohne Einsatz: Liste, Planungsseite mit Kopf, Posten, Helfern und Plan; Adapter `planungZeilen.ts` auf Raster, Blockdialog und Handy-Liste des Schichtplans (LLH-1586) | `src/planung` |
 | `frontend/src/betreuung` | Evakuierungsbezirke und Betreuungsstellen ([AGENTS.md](../../frontend/src/betreuung/AGENTS.md)) | `src/betreuung` |
 | `frontend/src/verpflegung` | Zeitfenster, Deckung, Ausgabeansicht, Stellen | `src/verpflegung` |
 
