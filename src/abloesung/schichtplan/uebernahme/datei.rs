@@ -240,8 +240,16 @@ fn pruefe_entpackt(bytes: &[u8]) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Spalten einer XLSX, die gelesen werden; eine Zelle weiter rechts ist ein Fehler.
+const XLSX_SPALTEN_MAX: u32 = 100;
+
+/// Liest das Blatt Zelle für Zelle. `worksheet_range` legte eine dichte Tabelle bis zur letzten
+/// belegten Zelle an: eine einzelne Zelle in XFD1048576 kostete Gigabyte. Gezählt werden deshalb
+/// Spalten (höchstens [`XLSX_SPALTEN_MAX`]) und belegte Zeilen (höchstens [`ZEILEN_MAX`] plus
+/// Kopf), bevor etwas wächst.
 fn lies_xlsx(bytes: &[u8]) -> Result<Tabelle, AppError> {
-    use calamine::{Data, Reader, Xlsx};
+    use calamine::{DataRef, Reader, Xlsx};
+    use std::collections::BTreeMap;
     pruefe_entpackt(bytes)?;
     let mut mappe: Xlsx<_> =
         calamine::open_workbook_from_rs(Cursor::new(bytes)).map_err(|_| unlesbar("XLSX"))?;
@@ -253,48 +261,71 @@ fn lies_xlsx(bytes: &[u8]) -> Result<Tabelle, AppError> {
         .or_else(|| namen.first())
         .cloned()
         .ok_or_else(|| unlesbar("XLSX"))?;
-    let bereich = mappe
-        .worksheet_range(&blatt)
-        .map_err(|_| unlesbar("XLSX"))?;
-    let erste = bereich.start().map(|(r, _)| r).unwrap_or(0);
-    let spalte0 = bereich.start().map(|(_, c)| c).unwrap_or(0) as usize;
-    let mut zeilen_it = bereich.rows().enumerate();
-    let Some((_, kopf_zellen)) = zeilen_it.next() else {
-        return Err(AppError::Validation("Die Datei ist leer".into()));
-    };
-    let zelle = |d: &Data| -> Zelle {
-        match d {
-            Data::Empty | Data::Error(_) => Zelle::Leer,
-            Data::Int(i) => Zelle::Zahl(*i as f64),
-            Data::Float(f) => Zelle::Zahl(*f),
-            Data::String(s) | Data::DateTimeIso(s) | Data::DurationIso(s) => {
-                let t = s.trim();
-                if t.is_empty() {
-                    Zelle::Leer
-                } else {
-                    Zelle::Text(t.to_string())
-                }
+    let zelle = |d: &DataRef| -> Zelle {
+        let text = |t: &str| {
+            let t = t.trim();
+            if t.is_empty() {
+                Zelle::Leer
+            } else {
+                Zelle::Text(t.to_string())
             }
-            Data::Bool(b) => Zelle::Text(b.to_string()),
-            Data::DateTime(dt) if dt.is_datetime() => excel_seriell(dt.as_f64())
+        };
+        match d {
+            DataRef::Empty | DataRef::Error(_) => Zelle::Leer,
+            DataRef::Int(i) => Zelle::Zahl(*i as f64),
+            DataRef::Float(f) => Zelle::Zahl(*f),
+            DataRef::String(s) | DataRef::DateTimeIso(s) | DataRef::DurationIso(s) => text(s),
+            DataRef::SharedString(s) => text(s),
+            DataRef::Bool(b) => Zelle::Text(b.to_string()),
+            DataRef::DateTime(dt) if dt.is_datetime() => excel_seriell(dt.as_f64())
                 .map(Zelle::Zeit)
                 .unwrap_or(Zelle::Zahl(dt.as_f64())),
-            Data::DateTime(dt) => Zelle::Zahl(dt.as_f64()),
+            DataRef::DateTime(dt) => Zelle::Zahl(dt.as_f64()),
         }
     };
-    // Spalten links vom Bereich fehlen in `rows()`; auffüllen, damit die Kopfzeile passt.
-    let auffuellen = |zellen: &[Data]| -> Vec<Zelle> {
-        std::iter::repeat_n(Zelle::Leer, spalte0)
-            .chain(zellen.iter().map(zelle))
-            .collect()
+    // Zeile (0-basiert) → belegte Zellen mit Spalte.
+    let mut belegt: BTreeMap<u32, Vec<(u32, Zelle)>> = BTreeMap::new();
+    let mut breite: u32 = 0;
+    {
+        let mut leser = mappe
+            .worksheet_cells_reader(&blatt)
+            .map_err(|_| unlesbar("XLSX"))?;
+        while let Some(c) = leser.next_cell().map_err(|_| unlesbar("XLSX"))? {
+            let z = zelle(c.get_value());
+            if matches!(z, Zelle::Leer) {
+                continue;
+            }
+            let (zeile, spalte) = c.get_position();
+            if spalte >= XLSX_SPALTEN_MAX {
+                return Err(AppError::Validation(format!(
+                    "Die Datei hat mehr als {XLSX_SPALTEN_MAX} Spalten"
+                )));
+            }
+            if !belegt.contains_key(&zeile) && belegt.len() > ZEILEN_MAX {
+                return Err(AppError::Validation(format!(
+                    "Die Datei hat mehr als {ZEILEN_MAX} Zeilen"
+                )));
+            }
+            breite = breite.max(spalte + 1);
+            belegt.entry(zeile).or_default().push((spalte, z));
+        }
+    }
+    let ausbreiten = |zellen: Vec<(u32, Zelle)>| -> Vec<Zelle> {
+        let mut reihe = vec![Zelle::Leer; breite as usize];
+        for (spalte, z) in zellen {
+            reihe[spalte as usize] = z;
+        }
+        reihe
     };
-    let kopf = auffuellen(kopf_zellen)
+    let mut reihen = belegt.into_iter();
+    let Some((_, kopf_zellen)) = reihen.next() else {
+        return Err(AppError::Validation("Die Datei ist leer".into()));
+    };
+    let kopf = ausbreiten(kopf_zellen)
         .into_iter()
         .map(|z| z.text().unwrap_or_default())
         .collect();
-    let zeilen = zeilen_it
-        .map(|(i, z)| (erste + i as u32 + 1, auffuellen(z)))
-        .collect();
+    let zeilen = reihen.map(|(r, z)| (r + 1, ausbreiten(z))).collect();
     Ok(Tabelle {
         kopf,
         zeilen,
@@ -934,6 +965,85 @@ pub fn begrenzt_lesen(mut r: impl Read) -> Result<Vec<u8>, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Kleinste XLSX mit einem Blatt; `zellen` als (Bezug wie „A1“, Text).
+    fn mini_xlsx(zellen: &[(&str, &str)]) -> Vec<u8> {
+        use std::io::Write;
+        let mut zeilen: std::collections::BTreeMap<u32, String> = Default::default();
+        for (bezug, text) in zellen {
+            let nr: u32 = bezug
+                .trim_start_matches(|c: char| c.is_ascii_alphabetic())
+                .parse()
+                .unwrap();
+            zeilen.entry(nr).or_default().push_str(&format!(
+                r#"<c r="{bezug}" t="inlineStr"><is><t>{text}</t></is></c>"#
+            ));
+        }
+        let daten: String = zeilen
+            .iter()
+            .map(|(nr, c)| format!(r#"<row r="{nr}">{c}</row>"#))
+            .collect();
+        let teile = [
+            (
+                "[Content_Types].xml",
+                r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#.to_string(),
+            ),
+            (
+                "_rels/.rels",
+                r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#.to_string(),
+            ),
+            (
+                "xl/workbook.xml",
+                r#"<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Plan" sheetId="1" r:id="rId1"/></sheets></workbook>"#.to_string(),
+            ),
+            (
+                "xl/_rels/workbook.xml.rels",
+                r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#.to_string(),
+            ),
+            (
+                "xl/worksheets/sheet1.xml",
+                format!(
+                    r#"<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{daten}</sheetData></worksheet>"#
+                ),
+            ),
+        ];
+        let mut schreiber = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let opt = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        for (name, inhalt) in teile {
+            schreiber.start_file(name, opt).unwrap();
+            schreiber.write_all(inhalt.as_bytes()).unwrap();
+        }
+        schreiber.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn xlsx_wird_zellweise_gelesen() {
+        let t = lies_xlsx(&mini_xlsx(&[
+            ("B2", "Posten"),
+            ("C2", "Beginn"),
+            ("B4", "Streife 1"),
+        ]))
+        .unwrap();
+        assert_eq!(t.kopf, vec!["", "Posten", "Beginn"]);
+        assert_eq!(t.zeilen.len(), 1);
+        assert_eq!(t.zeilen[0].0, 4, "Zeilennummer wie in Excel");
+        assert_eq!(t.zeilen[0].1[1], Zelle::Text("Streife 1".into()));
+    }
+
+    #[test]
+    fn xlsx_mit_ferner_zelle_belegt_keinen_speicher() {
+        // Eine Zelle in der letzten Excel-Spalte bzw. Zeile: dicht gelesen wären das Gigabyte.
+        let weit_rechts = lies_xlsx(&mini_xlsx(&[("A1", "Posten"), ("XFD1", "x")]));
+        assert!(
+            matches!(&weit_rechts, Err(AppError::Validation(m)) if m.contains("Spalten")),
+            "{weit_rechts:?}"
+        );
+        let weit_unten = lies_xlsx(&mini_xlsx(&[("A1", "Posten"), ("A1048576", "x")])).unwrap();
+        assert_eq!(weit_unten.zeilen.len(), 1);
+        assert_eq!(weit_unten.zeilen[0].0, 1_048_576);
+    }
+
     use crate::abloesung::schichtplan::uebernahme::MeldungStufe;
 
     const BERLIN: Tz = chrono_tz::Europe::Berlin;

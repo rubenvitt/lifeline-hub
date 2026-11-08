@@ -456,6 +456,25 @@ pub fn planen(
     entscheidungen: &Entscheidungen,
     rechte: Rechte,
 ) -> Result<Planung, AppError> {
+    // Ohne Freigabe eines Moduls sieht der Abgleich dessen Bestand nicht: Einheiten (samt
+    // Vorlagen) bzw. UHS tauchen weder als Ziel noch als Kandidat oder Auswahl in der Vorschau
+    // auf. Ein Posten dorthin wird so „neu“ und scheitert an der fehlenden Freigabe.
+    let ohne_gesperrtes;
+    let bestand = if rechte.einheiten && rechte.uhs {
+        bestand
+    } else {
+        let mut b = bestand.clone();
+        if !rechte.einheiten {
+            b.einheiten.clear();
+            b.vorlagen.clear();
+        }
+        if !rechte.uhs {
+            b.uhs.clear();
+            b.uhs_namen.clear();
+        }
+        ohne_gesperrtes = b;
+        &ohne_gesperrtes
+    };
     let mut meldungen = meldungen;
     for s in entscheidungen.posten.keys() {
         if !paket.posten.iter().any(|p| &p.schluessel == s) {
@@ -1797,6 +1816,28 @@ mod tests {
         assert!(!p.fehlende_rechte);
         assert_eq!(p.vorschau.zaehlung.einheiten_neu, 1);
         assert!(p.vorschau.meldungen[0].text.contains("aufgelöst"));
+
+        // Ohne Freigabe zeigt die Vorschau keine bestehende Einheit, auch nicht die getroffene.
+        let paket = PlanPaket {
+            posten: vec![posten("p1", PaketPostenArt::Einheit, "Streife 1", 2)],
+            bloecke: vec![block(
+                "p1",
+                "2026-07-04T08:00:00Z",
+                "2026-07-04T12:00:00Z",
+                &[],
+                2,
+            )],
+            ..Default::default()
+        };
+        let p = planen(&bestand(), &paket, vec![], &Entscheidungen::default(), ohne).unwrap();
+        assert!(p.fehlende_rechte);
+        assert!(p.vorschau.auswahl.einheiten.is_empty());
+        assert!(p.vorschau.auswahl.vorlagen.is_empty());
+        assert!(!matches!(
+            p.vorschau.posten[0].ziel,
+            PostenZiel::Einheit { .. }
+        ));
+        assert!(p.vorschau.posten[0].kandidaten.is_empty());
     }
 
     #[test]

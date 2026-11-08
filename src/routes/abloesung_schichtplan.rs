@@ -555,7 +555,12 @@ async fn einlesen_vorbereiten(
     ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     let (datei, entscheidungen) = lies_einlese_anfrage(multipart).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(&state.pool, ctx.einsatz.id).await?;
-    let (paket, meldungen) = uebernahme::datei::lies_paket(&datei, stil.zone)?;
+    // Entpacken und Parsen (XLSX bis 2 MiB, 5.000 Zeilen) außerhalb der Async-Worker.
+    let zone = stil.zone;
+    let (paket, meldungen) =
+        tokio::task::spawn_blocking(move || uebernahme::datei::lies_paket(&datei, zone))
+            .await
+            .map_err(|e| AppError::Internal(format!("Einlesen der Schichtplan-Datei: {e}")))??;
     let rechte = Rechte {
         einheiten: darf::<Einheiten>(state, ctx).await?,
         uhs: darf::<Unfallhilfsstellen>(state, ctx).await?,
