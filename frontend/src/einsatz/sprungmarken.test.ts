@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { modulRegistry, moduleNachKategorie, type ModulEintrag } from './modulRegistry';
-import { unterseitenFuer } from '../stab/unterseiten';
 import {
   navZeilen,
   sprungmarken,
@@ -24,9 +23,6 @@ describe('Sprungmarken (LFH-620)', () => {
       'fms-tableau',
       // Einheiten ohne Schicht auf der Seite Ablösung (LLH-1312).
       'ohne-schicht',
-      // Arbeitsseite des Stabs (LLH-1127), Sachgebiet S5. Das Informationstelefon ist seit
-      // i6k6mzed ein eigenes Modul, keine Marke (design.md D3).
-      'presse',
       // Ansichten des Fernmeldewesens (LLH-1180); den Funkplan öffnet das Modul selbst.
       'fernmeldeskizze',
       'kommunikationsplan',
@@ -42,7 +38,6 @@ describe('Sprungmarken (LFH-620)', () => {
       vermisste: '/einsaetze/7/personen?filter=vermisst&ansicht=zeilen',
       'fms-tableau': '/einsaetze/7/fahrzeuge?ansicht=tableau',
       'ohne-schicht': '/einsaetze/7/abloesung?ansicht=ohne-schicht',
-      presse: '/einsaetze/7/stab/presse',
       fernmeldeskizze: '/einsaetze/7/fernmeldewesen?ansicht=skizze',
       kommunikationsplan: '/einsaetze/7/fernmeldewesen/kommunikationsplan',
     });
@@ -75,8 +70,6 @@ describe('Sprungmarken (LFH-620)', () => {
       'auftraege',
       '↗entscheidungen',
       'lagebesprechung',
-      'stab',
-      '↗presse',
       'dokumente',
     ]);
     expect(
@@ -119,37 +112,9 @@ describe('Sprungmarken (LFH-620)', () => {
     ]);
   });
 
-  it('führt jede Unterseite der Stab-Seite genau einmal, mit deren Namen, Adresse und Modul (LLH-1127)', () => {
-    // Eine Wahrheit: benennt die Stab-Seite eine Unterseite um, zieht das Menü mit.
-    const seiten = (['s1', 's2', 's3', 's4', 's5', 's6'] as const).flatMap((s) =>
-      unterseitenFuer(s),
-    );
-    expect(seiten.length).toBeGreaterThan(0);
-    for (const seite of seiten) {
-      const marken = sprungmarken.filter((m) => m.key === seite.key);
-      // Der Funkplan ist die Modulroute des Fernmeldewesens (LLH-1180): keine eigene Marke.
-      if (seite.key === 'funkplan') {
-        expect(marken, seite.key).toHaveLength(0);
-        expect(seite.pfad(7)).toBe('/einsaetze/7/fernmeldewesen');
-        continue;
-      }
-      // Die Sprechgruppen sind eine Darstellung des Funkplans (LLH-1124): keine eigene Marke,
-      // das Schlagwort „sprechgruppe“ führt in die Fernmeldeskizze.
-      if (seite.key === 'sprechgruppen') {
-        expect(marken, seite.key).toHaveLength(0);
-        continue;
-      }
-      expect(marken, seite.key).toHaveLength(1);
-      expect(marken[0].label).toBe(seite.label);
-      expect(marken[0].pfad(7)).toBe(seite.pfad(7));
-      expect(marken[0].zielModul).toBe(seite.modul);
-    }
-  });
-
   it('nennt das Ziel ohne Verb (LFH-1078)', () => {
     const hinweise = Object.fromEntries(sprungmarken.map((m) => [m.key, m.hinweis]));
     expect(hinweise).toMatchObject({
-      presse: 'Stab · Pressearbeit',
       fernmeldeskizze: 'Fernmeldewesen · Skizze',
       kommunikationsplan: 'Fernmeldewesen · Kommunikationsplan',
     });
@@ -166,7 +131,6 @@ describe('Sprungmarken (LFH-620)', () => {
     expect(worte('kommunikationsplan')).toEqual(
       expect.arrayContaining(['telefon', 'rufnummer', 'leitstelle', 's6']),
     );
-    expect(worte('presse')).toEqual(expect.arrayContaining(['presse', 'medien', 's5']));
     expect(worte('fernmeldeskizze')).toEqual(expect.arrayContaining(['skizze', 's6']));
   });
 

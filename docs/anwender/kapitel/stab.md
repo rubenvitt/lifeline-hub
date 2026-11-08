@@ -2,7 +2,7 @@
 titel: Stab und Checkliste
 gruppen: [fuehrung]
 reihenfolge: 430
-quellen: [frontend/src/pages/StabPage.tsx, frontend/src/stab/BesetzungModal.tsx, frontend/src/stab/besetzung.ts, frontend/src/fuehrung/sachgebiete.ts, frontend/src/stab/unterseiten.ts, frontend/src/stab/werkzeuge.ts, frontend/src/stab/werkzeugZahlen.ts, frontend/src/stab/SachgebietKachel.tsx, frontend/src/stab/WerkzeugZelle.tsx, frontend/src/stab/useFunkplanLuecken.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/stab/useStabFreigabe.tsx, frontend/src/lagebesprechung/LagebesprechungZeile.tsx, frontend/src/stab/ChecklistePaneel.tsx, frontend/src/stab/checkliste.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/stab.rs, src/stab/mod.rs, src/stab/repo.rs, src/stab/checkliste.rs, frontend/src/command-palette/]
+quellen: [frontend/src/fuehrung/sachgebiete.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/command-palette/]
 ---
 
 ## Überblick

@@ -79,8 +79,8 @@ import { zeitpunkt } from '../anzeige/zeitDarstellung';
  * `?anruf=` angesteuerter Anruf außerhalb des Fensters wird einzeln geholt und steht als ältester
  * oben.
  *
- * **Datenschutz:** Name, Rückrufnummer und Notiz stehen nur hier; die Medienlage und der
- * Lagebericht bekommen sie nie (`stab/medienlage.ts`).
+ * **Datenschutz:** Name, Rückrufnummer und Notiz stehen nur hier; der Lagebericht bekommt sie
+ * nie.
  *
  * **Unter `md` zuerst die Anrufe** (LFH-1067, Muster des ETB, `etb/AGENTS.md`, Erfassung): die
  * Erfassung startet eingeklappt, die Kennzahlen stehen als Meta im Kopf, „Nach Anliegen“ hinter

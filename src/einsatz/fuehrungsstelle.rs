@@ -87,8 +87,7 @@ wire_enum! {
     try_from = |s| format!("Ungültige Art des Einsatzleiters: {s}");
 }
 
-/// Höchstlänge des Freitexts eines externen Einsatzleiters, wie `stab::BEZEICHNUNG_MAX`
-/// (`src/AGENTS.md`, „Eingabegrenzen“). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+/// Höchstlänge des Freitexts eines externen Einsatzleiters (`src/AGENTS.md`, „Eingabegrenzen“). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
 pub const EINSATZLEITER_NAME_MAX: usize = 200;
 
 /// Der Einsatzleiter, wie der Client ihn liest.
@@ -448,7 +447,7 @@ fn uebergabe_text(vorher: &Stand, nachher: &Stand) -> Option<String> {
 }
 
 /// Prüft, dass `personal_id` eine Disposition **dieses** Einsatzes ist (sonst 422), und liefert
-/// ihren `snap_name` zum Einfrieren — Muster `stab::repo::snap_name_von`.
+/// ihren `snap_name` zum Einfrieren.
 async fn load_snap_name(
     conn: &mut SqliteConnection,
     einsatz_id: i64,

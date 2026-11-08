@@ -775,46 +775,6 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/lagebesprechungen",
             get(routes::lagebesprechung::list).post(routes::lagebesprechung::abschliessen),
         )
-        .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
-        .route(
-            "/api/einsaetze/{id}/stab/besetzung/{sachgebiet}",
-            put(routes::stab::besetzung_setzen).delete(routes::stab::besetzung_entfernen),
-        )
-        // LFH-554: Presse- und Medienarbeit S5; Stab-Sperre per Präfix (`PFAD_KEY`).
-        .route(
-            "/api/einsaetze/{id}/stab/medienkontakte",
-            get(routes::presse::medienkontakte_liste).post(routes::presse::medienkontakt_anlegen),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/medienkontakte/kennzahlen",
-            get(routes::presse::medienkontakte_kennzahlen),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/medienkontakte/{kid}",
-            get(routes::presse::medienkontakt_detail).patch(routes::presse::medienkontakt_aendern),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/medienkontakte/{kid}/status",
-            post(routes::presse::medienkontakt_status),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/pressemitteilungen",
-            get(routes::presse::pressemitteilungen_liste)
-                .post(routes::presse::pressemitteilung_anlegen),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}",
-            get(routes::presse::pressemitteilung_detail)
-                .patch(routes::presse::pressemitteilung_aktualisieren),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}/freigeben",
-            post(routes::presse::pressemitteilung_freigeben),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/pressemitteilungen/{mid}/fortschreiben",
-            post(routes::presse::pressemitteilung_fortschreiben),
-        )
         .route(
             "/api/einsaetze/{id}/stab/infotelefon",
             get(routes::infotelefon::liste).post(routes::infotelefon::anlegen),
@@ -830,14 +790,6 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/stab/infotelefon/{aid}/status",
             post(routes::infotelefon::status_setzen),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/checkliste",
-            get(routes::stab::checkliste_laden),
-        )
-        .route(
-            "/api/einsaetze/{id}/stab/checkliste/{punkt}",
-            put(routes::stab::checkliste_setzen),
         )
         .route(
             "/api/einsaetze/{id}/stab/kommunikationsplan",

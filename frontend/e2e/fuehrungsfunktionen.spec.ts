@@ -86,7 +86,9 @@ test('Auftrag an S3 zeigt die aktuelle Besetzung und folgt ihr live', async ({ p
   await expect(offen).toHaveCount(0);
 });
 
-test('Ohne Stab-Freigabe steht die Besetzung da (Führungspersonal)', async ({ page }) => {
+test('Ohne Modulrecht steht die Besetzung aus den Mitgliedern da (Führungspersonal)', async ({
+  page,
+}) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page);
   await mitgliedMitFunktion(page, einsatzId, 's3', 'Müller');
@@ -97,11 +99,7 @@ test('Ohne Stab-Freigabe steht die Besetzung da (Führungspersonal)', async ({ p
     },
   });
   expect(erteilt.ok(), `Auftrag: ${erteilt.status()} ${await erteilt.text()}`).toBeTruthy();
-  // Stab nur für Admins: die Besetzung hängt seit i6k6mzed nicht mehr daran.
-  const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/modul-overrides/stab`, {
-    data: { sichtbar: true, benoetigte_rolle: 'admin' },
-  });
-  expect(sperre.ok(), `Override: ${sperre.status()} ${await sperre.text()}`).toBeTruthy();
+  // Die Besetzung hängt seit i6k6mzed an keinem Modulrecht mehr, nur am Leserecht am Einsatz.
 
   await wechsleZuRolle(page, 'fuehrungspersonal', String(einsatzId));
   await page.goto(auftraegePfad(einsatzId));

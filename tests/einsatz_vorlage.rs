@@ -204,14 +204,14 @@ async fn vollersatz_und_loeschen() {
         &format!("{PFAD}/{kleinlage}"),
         &admin,
         Some(
-            r#"{"bezeichnung":"Kleine Lage","einsatzart":"uebung","ausgeblendet":["chat","stab"]}"#,
+            r#"{"bezeichnung":"Kleine Lage","einsatzart":"uebung","ausgeblendet":["chat","lagebesprechung"]}"#,
         ),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(json["bezeichnung"], "Kleine Lage");
     assert_eq!(json["einsatzart"], "uebung");
-    assert_eq!(texte(&json["ausgeblendet"]), ["stab", "chat"]);
+    assert_eq!(texte(&json["ausgeblendet"]), ["lagebesprechung", "chat"]);
     assert_eq!(json["sortier"], 10, "sortier bleibt");
 
     let (status, _) = anfrage(&app, "DELETE", &format!("{PFAD}/{kleinlage}"), &admin, None).await;
@@ -404,7 +404,6 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
             "evakuierung",
             "infotelefon",
             "schaeden",
-            "stab",
             "tiere",
             "verpflegung",
             "wetter-pegel"
@@ -586,7 +585,7 @@ async fn spaetere_aenderung_der_vorlage_wirkt_nur_auf_neue_einsaetze() {
         None,
     )
     .await;
-    assert!(keys(a).contains(&"stab".to_string()));
+    assert!(keys(a).contains(&"infotelefon".to_string()));
     assert_eq!(keys(n), ["chat"]);
 }
 
@@ -636,7 +635,7 @@ async fn vorlage_gibt_das_schichtmodell_vor() {
     .await;
     let unwetter = vorlage_id(&app, &admin, "Unwetter").await;
     let body = format!(
-        r#"{{"bezeichnung":"Unwetter","einsatzart":"realeinsatz","schichtmodell_id":{zwoelf},"ausgeblendet":["stab"]}}"#
+        r#"{{"bezeichnung":"Unwetter","einsatzart":"realeinsatz","schichtmodell_id":{zwoelf},"ausgeblendet":["lagebesprechung"]}}"#
     );
     let (status, json) = anfrage(
         &app,

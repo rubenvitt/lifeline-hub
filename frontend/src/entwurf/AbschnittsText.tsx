@@ -8,7 +8,7 @@ export type AbschnittsTextUnterEbene = 1 | 2 | 3 | 4;
 /**
  * Der Lesetext eines gegliederten Dokuments aus Gliederung und gefüllten Abschnitten: je Abschnitt
  * Titel und Markdown, ein leerer Abschnitt als „—“, damit das Schema vollständig bleibt. Geteilt
- * von Lagebericht, Befehl (`auftraege/BefehlLesefassung.tsx`), Pressemitteilung und der
+ * von Lagebericht, Befehl (`auftraege/BefehlLesefassung.tsx`) und der
  * Lesefassung des Entwurfs (`entwurf/DokumentEntwurf.tsx`) — so, wie es vorgetragen und gedruckt
  * wird.
  *

@@ -3,15 +3,14 @@ import { kopfFilterWaehlen } from './kopffilter-kern';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
- * Schadenliste und Presse-Log seitenweise (LFH-1075, Specs `schaden-liste-blaettern` und
- * `stab-presse-log`). Mit 2.000 Schäden lädt die Modulseite eine Seite, nennt den Bestand aus den
- * Kennzahlen, findet per Filter einen Schaden weit hinten ohne Nachladen und hängt mit „Ältere
- * laden“ an. Das Presse-Log lädt die offenen ganz und die erledigten seitenweise. Als Admin und
- * als Beobachter (`e2e/AGENTS.md`, Rollen): beide Seiten sind Lesepfade beider.
+ * Schadenliste seitenweise (LFH-1075, Spec `schaden-liste-blaettern`). Mit 2.000 Schäden lädt die
+ * Modulseite eine Seite, nennt den Bestand aus den Kennzahlen, findet per Filter einen Schaden weit
+ * hinten ohne Nachladen und hängt mit „Ältere laden“ an. Als Admin und als Beobachter
+ * (`e2e/AGENTS.md`, Rollen): die Seite ist Lesepfad beider. Das Presse-Log ist mit dem Modul Stab
+ * entfallen (i6k6mzed).
  */
 
 const SCHAEDEN = 2000;
-const ERLEDIGTE = 120;
 
 async function einsatz(page: Page, name: string): Promise<string> {
   const r = await page.request.post('/api/einsaetze', {
@@ -90,56 +89,5 @@ test.describe('Schadenliste seitenweise', () => {
     await wechsleZuRolle(page, 'beobachter', einsatzId);
     await pruefeSchaeden(page, einsatzId, schwerNr);
     await expect(page.getByRole('button', { name: 'Schaden erfassen' })).toHaveCount(0);
-  });
-});
-
-async function einsatzMitPresseLog(
-  page: Page,
-): Promise<{ einsatzId: string; aeltesterId: number }> {
-  const einsatzId = await einsatz(page, 'Presse blättern');
-  const basis = `/api/einsaetze/${einsatzId}/stab/medienkontakte`;
-  const ids = await saeen(page, basis, ERLEDIGTE, (i) => ({
-    art: 'termin',
-    medium: i % 2 ? 'RTL' : 'dpa',
-    thema: `Termin ${i + 1}`,
-    eingang_at: `2026-10-01 ${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}:00`,
-  }));
-  for (const id of ids) {
-    const r = await page.request.post(`${basis}/${id}/status`, { data: { status: 'erledigt' } });
-    expect(r.ok(), `Status ${id}: ${r.status()}`).toBe(true);
-  }
-  const offen = await page.request.post(basis, {
-    data: { art: 'anfrage', medium: 'NDR 1', thema: 'Noch offen' },
-  });
-  expect(offen.ok()).toBe(true);
-  return { einsatzId, aeltesterId: ids[0] };
-}
-
-async function pruefePresse(page: Page, einsatzId: string, aeltesterId: number) {
-  await page.goto(`/einsaetze/${einsatzId}/stab/presse`);
-  await expect(page.getByText('NDR 1 · Noch offen')).toBeVisible();
-  await expect(page.getByText(`101 von ${ERLEDIGTE + 1} geladen`)).toBeVisible();
-  await expect(page.getByText(`${ERLEDIGTE + 1} gesamt, davon 1 offen`)).toBeVisible();
-  await page.getByRole('button', { name: 'Ältere laden' }).click();
-  await expect(page.getByRole('button', { name: 'Ältere laden' })).toHaveCount(0);
-  await expect(page.getByText('dpa · Termin 1', { exact: true })).toBeVisible();
-
-  // Deeplink auf den ältesten: einzeln geholt, ohne bis zu ihm zu blättern.
-  await page.goto(`/einsaetze/${einsatzId}/stab/presse?kontakt=${aeltesterId}`);
-  await expect(page.locator('.zeile-hervorgehoben')).toContainText('dpa · Termin 1');
-  await expect(page.getByRole('button', { name: 'Ältere laden' })).toBeVisible();
-}
-
-test.describe('Presse-Log: erledigte seitenweise', () => {
-  test.setTimeout(120_000);
-
-  test('als Admin und als Beobachter', async ({ page }) => {
-    await anmeldenAlsAdmin(page);
-    const { einsatzId, aeltesterId } = await einsatzMitPresseLog(page);
-    await pruefePresse(page, einsatzId, aeltesterId);
-
-    await wechsleZuRolle(page, 'beobachter', einsatzId);
-    await pruefePresse(page, einsatzId, aeltesterId);
-    await expect(page.getByRole('button', { name: 'Medienkontakt erfassen' })).toBeDisabled();
   });
 });

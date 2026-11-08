@@ -1,6 +1,6 @@
-//! LFH-937: Freitexte von Infotelefon, Presse-Log und Schaden (Spec `eingabegrenzen`, design.md
-//! D6). Je Feld: `max` geht durch, `max+1` ist 400 mit dem Feldnamen; die bestehenden 422
-//! (Rückruf ohne Nummer, beantwortet ohne Antwort) bleiben.
+//! LFH-937: Freitexte von Infotelefon und Schaden (Spec `eingabegrenzen`, design.md D6). Je
+//! Feld: `max` geht durch, `max+1` ist 400 mit dem Feldnamen; die bestehende 422 (Rückruf ohne
+//! Nummer) bleibt. Das Presse-Log ist mit dem Modul Stab entfallen (i6k6mzed).
 
 use axum::http::StatusCode;
 use serde_json::{json, Value};
@@ -55,89 +55,6 @@ async fn infotelefon_notiz_name_rueckruf() {
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-}
-
-#[tokio::test]
-async fn presse_anlegen_aendern_und_status() {
-    let app = setup().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/stab/medienkontakte");
-    let kontakt = |medium: String, thema: String, name: String, erreichbar: String| {
-        json!({ "art": "anfrage", "medium": medium, "thema": thema, "kontakt_name": name,
-                "kontaktweg": erreichbar })
-    };
-
-    let (s, k) = post(&app, &admin, &uri, kontakt(x(200), x(500), x(200), x(500))).await;
-    assert_eq!(s, StatusCode::CREATED, "{k:?}");
-    let kid = k["id"].as_i64().unwrap();
-    for (body, feld) in [
-        (
-            kontakt(x(201), "T".into(), "N".into(), "E".into()),
-            "medium",
-        ),
-        (kontakt("M".into(), x(501), "N".into(), "E".into()), "thema"),
-        (
-            kontakt("M".into(), "T".into(), x(201), "E".into()),
-            "kontakt_name",
-        ),
-        (
-            kontakt("M".into(), "T".into(), "N".into(), x(501)),
-            "kontaktweg",
-        ),
-    ] {
-        let (s, j) = post(&app, &admin, &uri, body).await;
-        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}");
-        assert!(fehler_beginnt_mit(&j, feld), "{feld}: {j:?}");
-    }
-
-    let kid_uri = format!("{uri}/{kid}");
-    for (body, feld) in [
-        (json!({ "thema": x(501) }), "thema"),
-        (json!({ "medium": x(201) }), "medium"),
-        (json!({ "kontakt_name": x(201) }), "kontakt_name"),
-        (json!({ "kontaktweg": x(501) }), "kontaktweg"),
-    ] {
-        let (s, j) = patch(&app, &admin, &kid_uri, body).await;
-        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}");
-        assert!(fehler_beginnt_mit(&j, feld), "{feld}: {j:?}");
-    }
-
-    let status_uri = format!("{kid_uri}/status");
-    let (s, j) = post(
-        &app,
-        &admin,
-        &status_uri,
-        json!({ "status": "beantwortet", "antwort": x(8_001) }),
-    )
-    .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
-    assert!(fehler_beginnt_mit(&j, "antwort"));
-    let (s, j) = post(
-        &app,
-        &admin,
-        &status_uri,
-        json!({ "status": "beantwortet", "antwort": "A", "freigabe_durch": x(201) }),
-    )
-    .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
-    // Beantwortet ohne Antwort bleibt 422, mit Antwort an der Grenze geht es.
-    let (s, _) = post(
-        &app,
-        &admin,
-        &status_uri,
-        json!({ "status": "beantwortet" }),
-    )
-    .await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    let (s, j) = post(
-        &app,
-        &admin,
-        &status_uri,
-        json!({ "status": "beantwortet", "antwort": x(8_000), "freigabe_durch": x(200) }),
-    )
-    .await;
-    assert!(s.is_success(), "{s} {j:?}");
 }
 
 #[tokio::test]

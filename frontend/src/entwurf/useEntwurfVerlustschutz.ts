@@ -77,7 +77,7 @@ interface Verlustschutz<W extends object> {
  * Der Riegel fällt nur, wenn ihn noch derselbe Auftrag hält (`auftragRef`). Die API ist bewusst
  * eng: kein öffentlicher Weg, einen zweiten Speicherpfad daneben zu bauen.
  *
- * Befehls-, Lageberichts- und Pressemitteilungsentwurf nutzen zusätzlich
+ * Befehls- und Lageberichtsentwurf nutzen zusätzlich
  * `EntwurfNavigationSchutz` (`useBlocker`), der denselben Merker liest; dieser Hook selbst bleibt
  * routerunabhängig.
  *

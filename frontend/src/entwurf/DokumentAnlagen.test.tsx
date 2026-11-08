@@ -126,16 +126,6 @@ describe('DokumentAnlagen (LFH-1028)', () => {
     expect(screen.queryByText('Anlagen')).toBeNull();
   });
 
-  // LLH-1180: der Stab ist für die Skizze keine Voraussetzung mehr.
-  it('bietet „Fernmeldeskizze anfügen“ auch ohne Stab an, wenn das Fernmeldewesen frei ist', async () => {
-    freigabeJe = { stab: GESPERRT };
-    vi.mocked(anlagenApi.listeDokumentAnlagen).mockResolvedValue([]);
-    zeige(true);
-    expect(
-      await screen.findByRole('button', { name: 'Fernmeldeskizze anfügen' }),
-    ).toBeInTheDocument();
-  });
-
   it('zeigt eine eingefrorene Anlage nur lesbar und druckt sie auf eigenem Blatt', async () => {
     vi.mocked(anlagenApi.listeDokumentAnlagen).mockResolvedValue([anlage(1)]);
     const { container } = zeige(false);

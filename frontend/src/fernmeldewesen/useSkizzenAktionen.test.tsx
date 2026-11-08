@@ -362,10 +362,9 @@ describe('skizzenRechte (D5, D8)', () => {
     });
   });
 
-  // LLH-1180: das Skizzeneigene hängt am Fernmeldewesen, der Stab spielt keine Rolle.
-  it('Stab gesperrt: das Recht am Skizzeneigenen bleibt, Fernmeldewesen gesperrt: es fällt', () => {
-    const ohneStab = freigabenFixture({ stab: { sichtbar: false, zugriff: false } });
-    expect(skizzenRechte(aktiv, null, ohneStab).fernmeldewesen).toBe(true);
+  // LLH-1180: das Skizzeneigene hängt am Fernmeldewesen.
+  it('Fernmeldewesen frei: das Recht am Skizzeneigenen steht, Fernmeldewesen gesperrt: es fällt', () => {
+    expect(skizzenRechte(aktiv, null, freigabenFixture()).fernmeldewesen).toBe(true);
     const ohneFmw = freigabenFixture({ fernmeldewesen: { zugriff: false } });
     expect(skizzenRechte(aktiv, null, ohneFmw).fernmeldewesen).toBe(false);
   });

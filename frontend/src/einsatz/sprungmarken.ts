@@ -6,8 +6,6 @@ import {
   kommunikationsplanPfad,
   personenPfad,
 } from '../routing/deeplinks';
-import { SACHGEBIETE } from '../fuehrung/sachgebiete';
-import { unterseitenFuer } from '../stab/unterseiten';
 import {
   istModulFreigegeben,
   modulRegistry,
@@ -62,38 +60,6 @@ export interface Sprungmarke {
    */
   braucht?: string;
   pfad: (einsatzId: number) => string;
-}
-
-/** Suchworte der Stab-Unterseiten je Schlüssel aus `stab/unterseiten.ts`; das Kürzel (s5) kommt dazu. */
-const STAB_SCHLAGWORTE: Record<string, string[]> = {
-  presse: ['presse', 'medien', 'pressemitteilung', 'medienlage'],
-};
-
-/**
- * Die Arbeitsseiten des Stabs (LLH-1127) als Marken direkt hinter „Stab“, nach Sachgebiet: nur
- * die Unterseiten, die dem Stab gehören (S5). Name und Adresse kommen aus `stab/unterseiten.ts`,
- * EINE Wahrheit mit den Einstiegen der Stab-Seite. Sperre und Sichtbarkeit erben sie vom Stab.
- */
-function stabMarken(): Sprungmarke[] {
-  const marken: Sprungmarke[] = [];
-  let nach = 'stab';
-  for (const { sachgebiet, kuerzel } of SACHGEBIETE) {
-    for (const seite of unterseitenFuer(sachgebiet)) {
-      if (seite.modul !== 'stab') continue;
-      marken.push({
-        key: seite.key,
-        kategorie: 'fuehrung',
-        label: seite.label,
-        zielModul: 'stab',
-        nach,
-        hinweis: `Stab · ${seite.label}`,
-        schlagworte: [...(STAB_SCHLAGWORTE[seite.key] ?? []), kuerzel.toLowerCase()],
-        pfad: seite.pfad,
-      });
-      nach = seite.key;
-    }
-  }
-  return marken;
 }
 
 /**
@@ -196,7 +162,6 @@ export const sprungmarken: Sprungmarke[] = [
     braucht: 'einheiten',
     pfad: (einsatzId) => abloesungPfad(einsatzId, { ansicht: 'ohne-schicht' }),
   },
-  ...stabMarken(),
   ...FERNMELDEWESEN_MARKEN,
 ];
 

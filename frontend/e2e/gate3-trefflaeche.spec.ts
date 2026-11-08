@@ -42,7 +42,7 @@ import { oeffneAlleFachebenen, oeffneObjektGruppe, oeffneWerkzeugmenue } from '.
 /**
  * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
  * Einsatzauswahl, Einheiten-Detailroute, Einsatz-Navigationsrahmen, Kräfteübersicht mit
- * Verdichtungszeile, Stab- und Lagebesprechungs-Route. Alle Blöcke teilen die Helfer aus
+ * Verdichtungszeile und Lagebesprechungs-Route. Alle Blöcke teilen die Helfer aus
  * `trefflaeche-kern.ts` (LFH-724); wer etwas anhängt, nimmt dieselben Helfer statt einer Kopie.
  *
  * Browser statt Vitest: Vitest fährt mit `css: false`, jsdom rechnet kein Layout. Ein
@@ -1338,195 +1338,9 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Stab ────────────────────────────────────────────────────────────────────────────
-//
-// Vitest belegt für `werkzeugZelleStil` nur den Inline-Style, nicht dass die Werkzeugzelle im
-// Fugenraster der Kachel die Höhe im Layout ERREICHT (LLH-1124). Gemessen werden:
-//  - die Werkzeug-Links je Gruppe „Werkzeuge S…"; die Zahl kommt aus `fuehrung/sachgebiete.ts`
-//    und steht exakt, damit ein Modul, das aus der Freigabe fällt, auffällt.
-//  - die sechs Knöpfe „Besetzung ändern" und die Zeilen der Arbeitsaufnahme.
-//  - der Sprung „Zur Lagebesprechung" in der Zeile „Nächste Lagebesprechung" (LLH-1111): Termin,
-//    Vorbereitung, Abschluss und Verlauf trägt seit LLH-1111 die Seite Lagebesprechung (Block
-//    darunter); die Stab-Seite hat keine Kopfaktion mehr.
-// Der Boden ist für alle die Staffel. Die Locator sind gescopt, sonst zögen Breadcrumb und
-// Kopfzeilen-Links in die Zählungen; die Brotkrume misst der Block „Ortspfad“ (LFH-909).
-
-/**
- * 4 + 3 + 3 + 3 + 2 + 4 Werkzeuge aus `fuehrung/sachgebiete.ts` (LLH-1124): Registry-Module, alle
- * `fertig` (darunter seit i6k6mzed das Informationstelefon in der Kachel S5), dazu die Unterseiten
- * aus `stab/unterseiten.ts` — „Pressearbeit“ in der Kachel S5 (LFH-554), Funkplan,
- * Fernmeldeskizze, Sprechgruppen und Kommunikationsplan in der Kachel S6 (LLH-1180). Alle in
- * derselben Werkzeugzelle.
- */
-const STAB_WERKZEUG_LINKS = 19;
-/** Jede Kachel trägt eine Gruppe „Werkzeuge S…“. */
-const STAB_WERKZEUG_GRUPPEN = 6;
-/** Sechs feste Kacheln, je ein Knopf. */
-const STAB_BESETZUNG_KNOEPFE = 6;
-/**
- * Sieben feste Punkte der Arbeitsaufnahme (LFH-551), je ein Zeilen-Label um Box und Text. Die
- * antd-Box selbst erbt keine Steuerhöhe; das Label trägt den Boden (`checklistenZeileStil`).
- */
-const STAB_CHECKLISTE_ZEILEN = 7;
-
-/** Die Zeilen-Labels der Arbeitsaufnahme — antd rendert Box und Text als EIN `<label>`. */
-function checklistenZeilen(page: Page): Locator {
-  return page
-    .getByRole('region', { name: 'Arbeitsaufnahme', exact: true })
-    .locator('label.ant-checkbox-wrapper');
-}
-
-/**
- * Der Sprung in die Lagebesprechung (`SprungKnopf`, ein antd-`Button` mit `href`, also ein Link).
- * Der Beobachter liest die Lagebesprechung ebenfalls; für ihn steht der Sprung frei wie für den
- * Admin.
- */
-function lagebesprechungSprung(page: Page): Locator {
-  return page
-    .getByRole('group', { name: 'Nächste Lagebesprechung', exact: true })
-    .getByRole('link', { name: 'Zur Lagebesprechung', exact: true });
-}
-
-test('Stab: Werkzeug-Links, „Besetzung ändern", Arbeitsaufnahme und der Sprung „Zur Lagebesprechung" folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
-  page,
-}) => {
-  // Drei Stufen mit je einem Neuladen und 32 gemessenen Knoten je Stufe.
-  test.setTimeout(90_000);
-  await page.setViewportSize(FUEKW);
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung`);
-
-  const gemessen: string[] = [];
-
-  for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab`);
-    await stelleDichte(page, dichte);
-
-    // Anker: die Kacheln stehen (LLH-1124); die Locator bleiben auf die Kacheln gescopt.
-    const besetzung = page.getByRole('main');
-    await expect(page.getByRole('region', { name: /^S\d · / })).toHaveCount(6);
-
-    // (1) Werkzeug-Links, über ihre Gruppen gescopt.
-    const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
-    await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
-    const werkzeugLinks = gruppen.getByRole('link');
-    await expect(werkzeugLinks).toHaveCount(STAB_WERKZEUG_LINKS);
-    const werkzeug = await alleHaltenStufe(
-      werkzeugLinks,
-      soll,
-      `Werkzeug-Link (${dichte})`,
-      STAB_WERKZEUG_LINKS,
-    );
-
-    // (2) „Besetzung ändern" — der zugängliche Name trägt die Zeilenkennung.
-    const aendern = besetzung.getByRole('button', { name: /^Besetzung ändern – S\d / });
-    await expect(aendern).toHaveCount(STAB_BESETZUNG_KNOEPFE);
-    const knopf = await alleHaltenStufe(
-      aendern,
-      soll,
-      `„Besetzung ändern" (${dichte})`,
-      STAB_BESETZUNG_KNOEPFE,
-    );
-
-    // (3) Die Zeilen der Arbeitsaufnahme (LFH-551): erst bedienbar, dann gemessen.
-    const zeilen = checklistenZeilen(page);
-    await expect(zeilen).toHaveCount(STAB_CHECKLISTE_ZEILEN);
-    await expect(zeilen.getByRole('checkbox').first()).toBeEnabled();
-    const checkliste = await alleHaltenStufe(
-      zeilen,
-      soll,
-      `Arbeitsaufnahme-Zeile (${dichte})`,
-      STAB_CHECKLISTE_ZEILEN,
-    );
-
-    // (4) Der Sprung in die Lagebesprechung (LLH-1111); er muss auch dorthin zeigen.
-    const sprungZiel = lagebesprechungSprung(page);
-    await expect(sprungZiel).toHaveAttribute('href', `/einsaetze/${einsatzId}/lagebesprechung`);
-    const sprung = await haeltStufe(sprungZiel, soll, `„Zur Lagebesprechung" (${dichte})`);
-
-    gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Werkzeug-Link ${werkzeug}, Besetzung ändern ${knopf}, ` +
-        `Arbeitsaufnahme-Zeile ${checkliste}, Zur Lagebesprechung ${sprung}`,
-    );
-  }
-
-  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
-});
-
-test('Stab (Beobachter): Werkzeug-Links, Arbeitsaufnahme und der Sprung „Zur Lagebesprechung" folgen der Staffel', async ({
-  page,
-}) => {
-  // LFH-435: im Nur-Lese-Zweig des Stabs fehlt „Besetzung ändern" (versteckt), darüber steht der
-  // Rechtehinweis. Gemessen wird, was bleibt: Lese-Links, die gesperrte Arbeitsaufnahme und der
-  // Sprung in die Lagebesprechung, die der Beobachter lesen darf.
-  test.setTimeout(120_000);
-  await page.setViewportSize(FUEKW);
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung Lesend`);
-  await wechsleZuRolle(page, 'beobachter', einsatzId);
-
-  const gemessen: string[] = [];
-
-  for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab`);
-    await stelleDichte(page, dichte);
-
-    // Datenanker: die Kacheln und ihre Werkzeug-Gruppen stehen. Erst danach ist die Abwesenheit
-    // von „Besetzung ändern" eine Aussage.
-    const besetzung = page.getByRole('main');
-    await expect(page.getByRole('region', { name: /^S\d · / })).toHaveCount(6);
-    const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
-    await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
-
-    // ── VORBEDINGUNGEN: Rechtehinweis steht, „Besetzung ändern" fehlt.
-    await rechteHinweisSteht(page);
-    await expect(
-      besetzung.getByRole('button', { name: /^Besetzung ändern/ }),
-      'Vorbedingung: ohne Schreibrecht kein „Besetzung ändern"',
-    ).toHaveCount(0);
-
-    // ── Was bleibt.
-    const werkzeugLinks = gruppen.getByRole('link');
-    await expect(werkzeugLinks).toHaveCount(STAB_WERKZEUG_LINKS);
-    const werkzeug = await alleHaltenStufe(
-      werkzeugLinks,
-      soll,
-      `Werkzeug-Link (${dichte})`,
-      STAB_WERKZEUG_LINKS,
-    );
-
-    // Die Arbeitsaufnahme (LFH-551) steht lesend da: Vorbedingung gesperrte Boxen, dann die
-    // Zeilenhöhe — ein gesperrtes Ziel ist ein sichtbares Ziel.
-    const zeilen = checklistenZeilen(page);
-    await expect(zeilen).toHaveCount(STAB_CHECKLISTE_ZEILEN);
-    for (const box of await zeilen.getByRole('checkbox').all()) {
-      await expect(box, 'Vorbedingung: ohne Schreibrecht ist jeder Haken gesperrt').toBeDisabled();
-    }
-    const checkliste = await alleHaltenStufe(
-      zeilen,
-      soll,
-      `Arbeitsaufnahme-Zeile gesperrt (${dichte})`,
-      STAB_CHECKLISTE_ZEILEN,
-    );
-
-    const sprung = await haeltStufe(
-      lagebesprechungSprung(page),
-      soll,
-      `„Zur Lagebesprechung" (${dichte})`,
-    );
-
-    gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Werkzeug-Link ${werkzeug}, ` +
-        `Arbeitsaufnahme-Zeile gesperrt ${checkliste}, Zur Lagebesprechung ${sprung}`,
-    );
-  }
-
-  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
-});
-
 // ── Lagebesprechung (LLH-1111) ──────────────────────────────────────────────────────
 //
-// Die Teile, die bis LLH-1111 auf der Stab-Seite standen. Gemessen werden:
+// Termin, Vorbereitung, Abschluss und Verlauf der Seite Lagebesprechung. Gemessen werden:
 //  - die ETB-Links des Verlaufs, einer je Besprechung. ZWEI gesäte Lagebesprechungen → genau
 //    zwei Links, damit der Verlauf als Schleife belegt ist.
 //  - die Schnellwahl im Paneel „Termin" („+30 min", „+1 h", „+2 h", „kein Termin") und das Feld
@@ -1715,27 +1529,13 @@ test('Lagebesprechung (Beobachter): ETB-Links, gesperrte Schnellwahl und gesperr
 // `controlHeight`) und die Verweise der Lücken (`linkZeilenzielStil`). Dazu die antd-Knöpfe der
 // Werkzeugzeile. Gesät wird je Ebene eine Zeile und je Lücke ein Treffer mit Verweis.
 
-// ── Presse und Informationstelefon S5 (LFH-554) ──────────────────────────────────────
+// ── Informationstelefon (LFH-554) ────────────────────────────────────────────────────
 //
-// Gemessen werden die Ziele, die Vitest nur als Stil belegt: der Titel-Link der
-// Pressemitteilung (`linkZeilenzielStil`), der Sprung „Vermisste ↗“, die Statusanzeigen als
-// Auslöser (`StatusWahl`) und die antd-Knöpfe (Kopfaktionen, „Beantworten“, „Erfassen“).
+// Gemessen werden die Ziele, die Vitest nur als Stil belegt: der Sprung „Vermisste ↗“, die
+// Statusanzeige als Auslöser (`StatusWahl`) und der antd-Knopf „Erfassen“. Das Presse-Log ist mit
+// dem Modul Stab entfallen (i6k6mzed, design.md D1).
 
-async function presseSaeen(page: Page, einsatzId: string) {
-  await anlegen(
-    page,
-    einsatzId,
-    'stab/medienkontakte',
-    { art: 'anfrage', medium: 'NDR 1', thema: 'Evakuierte' },
-    'Medienkontakt',
-  );
-  await anlegen(
-    page,
-    einsatzId,
-    'stab/pressemitteilungen',
-    { vorlage: 'freitext', titel: 'Hochwasser Musterstadt' },
-    'Pressemitteilung',
-  );
+async function infotelefonSaeen(page: Page, einsatzId: string) {
   await anlegen(
     page,
     einsatzId,
@@ -1750,44 +1550,19 @@ async function presseSaeen(page: Page, einsatzId: string) {
   );
 }
 
-test('Presse S5: Kopfaktionen, Titel-Link, Statusauslöser, „Beantworten“ und die Telefon-Erfassung folgen der Staffel', async ({
+test('Informationstelefon: Erfassung, Statusauslöser und „Vermisste ↗“ folgen der Staffel', async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Presse`);
-  await presseSaeen(page, einsatzId);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Infotelefon`);
+  await infotelefonSaeen(page, einsatzId);
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/presse`);
-    await stelleDichte(page, dichte);
-    await expect(page.getByText('NDR 1 · Evakuierte')).toHaveCount(1);
-    const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
-    const aktionen = await alleHaltenStufe(
-      kopf.getByRole('button'),
-      soll,
-      `Kopfaktion (${dichte})`,
-      2,
-    );
-    const titel = await haeltStufe(
-      page.getByRole('link', { name: 'Hochwasser Musterstadt', exact: true }),
-      soll,
-      `Titel-Link (${dichte})`,
-    );
-    const status = await haeltStufe(
-      page.getByRole('button', { name: 'Status von NDR 1 · Evakuierte ändern' }),
-      soll,
-      `Statusauslöser (${dichte})`,
-    );
-    const beantworten = await haeltStufe(
-      page.getByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
-      soll,
-      `Beantworten (${dichte})`,
-    );
-
     await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
+    await stelleDichte(page, dichte);
     await expect(page.getByText('sucht Vater')).toHaveCount(1);
     const erfassen = await haeltStufe(
       page.getByRole('button', { name: 'Erfassen', exact: true }),
@@ -1805,41 +1580,29 @@ test('Presse S5: Kopfaktionen, Titel-Link, Statusauslöser, „Beantworten“ un
       `Vermisste (${dichte})`,
     );
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Kopf ${aktionen}, Titel ${titel}, Status ${status}, ` +
-        `Beantworten ${beantworten}, Erfassen ${erfassen}, Anruf-Status ${anrufStatus}, Vermisste ${vermisste}`,
+      `${dichte} (Soll ≥ ${soll}): Erfassen ${erfassen}, Anruf-Status ${anrufStatus}, ` +
+        `Vermisste ${vermisste}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Presse S5 (Beobachter): Titel-Link und „Vermisste ↗“ folgen der Staffel, Auslöser fehlen', async ({
+test('Informationstelefon (Beobachter): „Vermisste ↗“ folgt der Staffel, die Erfassung fehlt', async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Presse Lesend`);
-  await presseSaeen(page, einsatzId);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Infotelefon Lesend`);
+  await infotelefonSaeen(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/stab/presse`);
-    await stelleDichte(page, dichte);
-    await expect(page.getByText('NDR 1 · Evakuierte')).toHaveCount(1);
-    // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
-    await expect(
-      page.getByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
-      'Vorbedingung: ohne Schreibrecht kein „Beantworten“',
-    ).toHaveCount(0);
-    const titel = await haeltStufe(
-      page.getByRole('link', { name: 'Hochwasser Musterstadt', exact: true }),
-      soll,
-      `Titel-Link (${dichte})`,
-    );
-
     await page.goto(`/einsaetze/${einsatzId}/infotelefon`);
+    await stelleDichte(page, dichte);
     await expect(page.getByText('sucht Vater')).toHaveCount(1);
+    // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
     await expect(
       page.getByRole('button', { name: 'Erfassen', exact: true }),
       'Vorbedingung: ohne Schreibrecht keine Erfassung',
@@ -1849,7 +1612,7 @@ test('Presse S5 (Beobachter): Titel-Link und „Vermisste ↗“ folgen der Staf
       soll,
       `Vermisste (${dichte})`,
     );
-    gemessen.push(`${dichte} (Soll ≥ ${soll}): Titel ${titel}, Vermisste ${vermisste}`);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Vermisste ${vermisste}`);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
@@ -5058,7 +4821,7 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
 const TABLET_HOCH = { width: 820, height: 1180 };
 const TABLET_QUER = { width: 1180, height: 820 };
 
-/** Lagebericht, Befehl und Pressemitteilung, je freigegeben: erst dann trägt die Seite den Sprung. */
+/** Lagebericht und Befehl, je freigegeben: erst dann trägt die Seite den Sprung. */
 async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
   // Die Freigabe verlangt jeden Abschnitt der Vorlage mit Text (sonst 422).
@@ -5116,17 +4879,6 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
       // verankerte Leiste nur die Handlungen.
       aktionen: '[data-lfh="seitenkopf-aktionen"]',
       fortschreiben: 'Fortschreiben',
-    },
-    {
-      name: 'Pressemitteilung',
-      pfad: `${R}/stab/presse/mitteilungen/${await freigegeben(
-        'stab/pressemitteilungen',
-        { vorlage: 'erstinformation', titel: 'Presse 968' },
-        ['sachverhalt', 'massnahmen', 'hinweise', 'naechste_information', 'rueckfragen'],
-        'Pressemitteilung',
-      )}`,
-      aktionen: '[data-lfh="seitenkopf-aktionen"]',
-      fortschreiben: 'Folgemeldung schreiben',
     },
   ];
 }

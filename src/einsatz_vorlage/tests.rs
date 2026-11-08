@@ -50,12 +50,12 @@ fn startliste_zeigt_die_modulzahlen_aus_dem_entwurf() {
     assert_eq!(
         zahlen,
         [
-            ("Kleinlage", 14, 21),
-            ("Sanitätsdienst", 24, 11),
-            ("MANV", 27, 8),
-            ("Personensuche", 25, 10),
-            ("Evakuierung und Betreuung", 30, 5),
-            ("Unwetter", 28, 7),
+            ("Kleinlage", 14, 20),
+            ("Sanitätsdienst", 24, 10),
+            ("MANV", 27, 7),
+            ("Personensuche", 25, 9),
+            ("Evakuierung und Betreuung", 30, 4),
+            ("Unwetter", 28, 6),
         ]
     );
 }
@@ -118,8 +118,9 @@ fn infotelefon_steht_in_keiner_vorlage() {
 
 #[test]
 fn normalize_ausgeblendet_prueft_und_ordnet() {
-    let ok = normalize_ausgeblendet(&["tiere".into(), "stab".into(), "tiere".into()]).unwrap();
-    assert_eq!(ok, ["stab", "tiere"]);
+    let ok = normalize_ausgeblendet(&["tiere".into(), "lagebesprechung".into(), "tiere".into()])
+        .unwrap();
+    assert_eq!(ok, ["lagebesprechung", "tiere"]);
 
     let err = normalize_ausgeblendet(&["gibtsnicht".into()]).unwrap_err();
     assert!(matches!(err, AppError::Validation(_)), "{err:?}");
@@ -180,7 +181,7 @@ async fn anlegen_aendern_loeschen_je_organisation() {
             bezeichnung: "Großbrand groß",
             einsatzart: Some(Einsatzart::Uebung),
             schichtmodell_id: None,
-            ausgeblendet: &["stab", "chat"],
+            ausgeblendet: &["lagebesprechung", "chat"],
         },
     )
     .await
@@ -189,7 +190,7 @@ async fn anlegen_aendern_loeschen_je_organisation() {
     assert_eq!(geaendert.einsatzart, Some(Einsatzart::Uebung));
     assert_eq!(
         geaendert.ausgeblendet,
-        ["stab", "chat"],
+        ["lagebesprechung", "chat"],
         "Ordnung wie MODUL_KEYS"
     );
     assert_eq!(geaendert.sortier, 10);

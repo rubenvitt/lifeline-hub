@@ -4,7 +4,7 @@
 //! API-Vertrag `design.md` D14. Die tragenden Aussagen: Lesen mit Vorgaben, Lage mit erwarteter
 //! Version (409 statt stillem Überschreiben), Neu anordnen verwirft nur Lagen, Komponenten,
 //! Verbindungen und Bereiche mit Validierung (400/422), Schriftfeld Tri-State, jede Änderung sendet
-//! `stab` und nie `etb`, Bezüge verwaisen nicht, die Schwärzung nimmt Namen und Hinweise.
+//! `fernmeldewesen` und nie `etb`, Bezüge verwaisen nicht, die Schwärzung nimmt Namen und Hinweise.
 
 use axum::http::StatusCode;
 use lifeline_hub::live::{LiveEvent, LiveNachricht};
@@ -110,14 +110,13 @@ async fn verbindung(app: &axum::Router, cookie: &str, einsatz: i64, body: Value)
     json
 }
 
-/// Zählt (Fernmeldewesen, ETB). Die Skizze gehört dem Fernmeldewesen (LLH-1180): `stab` kommt nie.
+/// Zählt (Fernmeldewesen, ETB). Die Skizze gehört dem Fernmeldewesen (LLH-1180).
 fn zaehle(rx: &mut Receiver<LiveNachricht>) -> (usize, usize) {
     let (mut fernmeldewesen, mut etb) = (0, 0);
     while let Ok(n) = rx.try_recv() {
         match n.event {
             LiveEvent::Fernmeldewesen => fernmeldewesen += 1,
             LiveEvent::Etb => etb += 1,
-            LiveEvent::Stab => panic!("Fernmeldeskizze sendet nie `stab`"),
             _ => {}
         }
     }
@@ -171,23 +170,7 @@ async fn ohne_recht_am_fernmeldewesen_ist_lesen_und_schreiben_403() {
     .await;
     assert_eq!(status, StatusCode::OK);
 
-    // LLH-1180: eine Sperre am Stab trifft die Skizze nicht mehr …
-    let (status, _) = anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/stab"),
-        &admin,
-        Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-    let (status, _) = anfrage(&app, "GET", &basis(einsatz), &frieda, None).await;
-    assert_eq!(
-        status,
-        StatusCode::OK,
-        "Stab gesperrt → Skizze bleibt lesbar"
-    );
-    // … eine am Fernmeldewesen schon.
+    // LLH-1180: eine Sperre am Fernmeldewesen trifft die Skizze.
     let (status, _) = anfrage(
         &app,
         "PUT",
@@ -1045,7 +1028,7 @@ async fn jede_skizzenaenderung_sendet_fernmeldewesen_und_nie_etb() {
     assert_eq!(
         zaehle(&mut rx),
         (16, 0),
-        "16 Schreibaktionen, 16 × stab, kein etb"
+        "16 Schreibaktionen, 16 × fernmeldewesen, kein etb"
     );
     assert_eq!(
         system_etb_anzahl(&app, &admin, einsatz).await,

@@ -10797,8 +10797,10 @@ mod tests {
                     erwartet.extend(["fernmeldewesen".to_string(), "wetter-pegel".to_string()]);
                 }
                 // Das Informationstelefon kam erst mit `infotelefon_modul` (i6k6mzed); dort erbt es
-                // die Ausblendung des Stabs.
+                // die Ausblendung des Stabs, den es seither nicht mehr gibt. 0238 blendete ihn in
+                // jeder Startvorlage aus.
                 erwartet.remove("infotelefon");
+                erwartet.insert("stab".to_string());
                 assert_eq!(aus, erwartet, "{}", start.bezeichnung);
             }
         }
@@ -13834,14 +13836,46 @@ mod tests {
         setze(2).await.expect_err("nur 0 und 1");
     }
 
-    /// i6k6mzed (design.md D4, Aufgabe 1.1): Das gebündelte SQLite löscht die Spalte
-    /// `etb_eintrag.pressemitteilung_id` samt Fremdschlüssel, danach `medienkontakt` und
-    /// `pressemitteilung`, bei eingeschalteten Fremdschlüsseln und mit Daten, die aufeinander
-    /// zeigen. Danach schreibt und findet das ETB weiter, und `foreign_key_check` ist leer.
+    /// i6k6mzed (Migration `stab_presse_entfernen`, design.md D4): Die Migration setzt offene
+    /// Löschersuchen für einen Medienkontakt auf den Vollzugsstand und löscht danach die Spalte
+    /// `etb_eintrag.pressemitteilung_id`, `medienkontakt`, `pressemitteilung`,
+    /// `einsatz_stab_checkliste` und `einsatz_stabsfunktion`, bei eingeschalteten
+    /// Fremdschlüsseln und mit Daten, die aufeinander zeigen (Aufgabe 1.1: das gebündelte SQLite
+    /// kann das). Danach schreibt das ETB weiter, `foreign_key_check` ist leer, und alte
+    /// Einträge bleiben als Text. Die Nummer wandert beim Umlegen (LFH-1014), deshalb über den
+    /// Namen.
     #[tokio::test]
-    async fn etb_spalte_pressemitteilung_und_presse_tabellen_lassen_sich_loeschen() {
-        let pool = test_pool().await;
-        let mut conn = pool.acquire().await.unwrap();
+    async fn migration_stab_presse_entfernen_loescht_tabellen_und_spalte() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        let alle = sqlx::migrate!("./migrations");
+        let nummer = alle
+            .iter()
+            .find(|m| m.description == "stab presse entfernen")
+            .expect("Migration stab_presse_entfernen")
+            .version;
+        let vorher: Vec<_> = alle
+            .iter()
+            .filter(|m| m.version < nummer)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor stab_presse_entfernen");
         for sql in [
             "INSERT INTO organisation (id, name) VALUES (1, 'Orga')",
             "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
@@ -13853,64 +13887,107 @@ mod tests {
              ersteller_id, freigegeben_von_id, freigegeben_at, etb_eintrag_id) \
              VALUES (1, 1, 'freitext', 'PM 1', '2026-11-08 10:00:00', 'freigegeben', '[]', 1, 1, \
              '2026-11-08 10:00:00', 1)",
+            // Fortschreibung: ein Verweis der Tabelle auf sich selbst.
+            "INSERT INTO pressemitteilung (id, einsatz_id, vorlage, titel, zeitstand, abschnitte, \
+             version, vorgaenger_id, ersteller_id) \
+             VALUES (2, 1, 'freitext', 'PM 1', '2026-11-08 11:00:00', '[]', 2, 1, 1)",
             "UPDATE etb_eintrag SET pressemitteilung_id = 1 WHERE id = 1",
-            "INSERT INTO medienkontakt (einsatz_id, art, medium, thema, eingang_at, status, antwort, \
+            "INSERT INTO medienkontakt (id, einsatz_id, art, medium, thema, eingang_at, status, antwort, \
              pressemitteilung_id, angelegt_von_id) \
-             VALUES (1, 'anfrage', 'Radio', 'Deich', '2026-11-08 09:00:00', 'beantwortet', 'siehe PM', 1, 1)",
-        ] {
-            sqlx::query(sql).execute(&mut *conn).await.unwrap();
-        }
-        assert_eq!(
-            sqlx::query_scalar::<_, i64>("PRAGMA foreign_keys")
-                .fetch_one(&mut *conn)
-                .await
-                .unwrap(),
-            1
-        );
-
-        let start = std::time::Instant::now();
-        let mut tx = sqlx::Connection::begin(&mut *conn).await.unwrap();
-        for sql in [
-            "ALTER TABLE etb_eintrag DROP COLUMN pressemitteilung_id",
-            "DROP TABLE medienkontakt",
-            "DROP TABLE pressemitteilung",
+             VALUES (3, 1, 'anfrage', 'Radio', 'Deich', '2026-11-08 09:00:00', 'beantwortet', 'siehe PM', 1, 1)",
+            "INSERT INTO einsatz_stab_checkliste (einsatz_id, punkt, erledigt, erledigt_at, \
+             erledigt_von_id, geaendert_von_id) \
+             VALUES (1, 'leitstelle_gemeldet', 1, '2026-11-08 09:30:00', 1, 1)",
+            "INSERT INTO einsatz_stabsfunktion (einsatz_id, sachgebiet, besetzung_art, bezeichnung, \
+             gesetzt_von_id) VALUES (1, 's5', 'extern', 'Pressesprecherin', 1)",
+            // Löschersuchen: offen für einen Medienkontakt (wird vollzogen), schon vollzogen,
+            // zurückgenommen, und offen für eine Betroffene (bleibt offen).
+            "INSERT INTO schwaerzung_antrag (id, einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+             beantragt_von, beantragt_at, faellig_at) \
+             VALUES (1, 1, 'medienkontakt', 3, 'AZ-1', 1, '2026-11-08 12:00:00', '2026-11-09 12:00:00')",
+            "INSERT INTO schwaerzung_antrag (id, einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+             beantragt_von, beantragt_at, faellig_at, vollzogen_at) \
+             VALUES (2, 1, 'medienkontakt', 4, 'AZ-2', 1, '2026-11-01 12:00:00', '2026-11-02 12:00:00', \
+             '2026-11-02 12:05:00')",
+            "INSERT INTO schwaerzung_antrag (id, einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+             beantragt_von, beantragt_at, faellig_at, zurueckgenommen_at, zurueckgenommen_von) \
+             VALUES (3, 1, 'medienkontakt', 5, 'AZ-3', 1, '2026-11-03 12:00:00', '2026-11-04 12:00:00', \
+             '2026-11-03 13:00:00', 1)",
+            "INSERT INTO schwaerzung_antrag (id, einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+             beantragt_von, beantragt_at, faellig_at) \
+             VALUES (4, 1, 'betroffene', 9, 'AZ-4', 1, '2026-11-08 12:00:00', '2026-11-09 12:00:00')",
         ] {
             sqlx::query(sql)
-                .execute(&mut *tx)
+                .execute(&pool)
                 .await
                 .unwrap_or_else(|e| panic!("{sql}: {e}"));
         }
-        tx.commit().await.unwrap();
-        eprintln!("Löschen dauerte {:?}", start.elapsed());
 
+        let start = std::time::Instant::now();
+        migrate(&pool)
+            .await
+            .expect("stab_presse_entfernen läuft durch");
+        eprintln!("Migration dauerte {:?}", start.elapsed());
+
+        let tabellen: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN \
+             ('medienkontakt', 'pressemitteilung', 'einsatz_stab_checkliste', \
+              'einsatz_stabsfunktion')",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert!(tabellen.is_empty(), "Tabellen übrig: {tabellen:?}");
+        let spalten: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_table_info('etb_eintrag')")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(!spalten.iter().any(|s| s == "pressemitteilung_id"));
         sqlx::query(
             "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
              VALUES (1, 2, 'meldung', 'Deich hält', 1, '2026-11-08 11:00:00')",
         )
-        .execute(&mut *conn)
+        .execute(&pool)
         .await
         .expect("ETB schreibt nach dem Löschen");
         let verletzt: Vec<sqlx::sqlite::SqliteRow> = sqlx::query("PRAGMA foreign_key_check")
-            .fetch_all(&mut *conn)
+            .fetch_all(&pool)
             .await
             .unwrap();
         assert!(verletzt.is_empty(), "keine verwaisten Fremdschlüssel");
-        let spalten: Vec<String> =
-            sqlx::query_scalar("SELECT name FROM pragma_table_info('etb_eintrag')")
-                .fetch_all(&mut *conn)
-                .await
-                .unwrap();
-        assert!(!spalten.iter().any(|s| s == "pressemitteilung_id"));
         let alt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = 1")
-            .fetch_one(&mut *conn)
+            .fetch_one(&pool)
             .await
             .unwrap();
         assert_eq!(
             alt, "Pressemitteilung Nr. 1 freigegeben",
             "der alte Eintrag bleibt als Text"
         );
+
+        let antraege: Vec<(i64, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT id, vollzogen_at, zurueckgenommen_at FROM schwaerzung_antrag ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let (_, vollzogen, zurueck) = &antraege[0];
+        assert!(
+            vollzogen.as_deref().and_then(crate::zeit::parse).is_some(),
+            "das offene Ersuchen für den Medienkontakt gilt als vollzogen: {vollzogen:?}"
+        );
+        assert_eq!(zurueck, &None);
+        assert_eq!(
+            antraege[1..],
+            [
+                (2, Some("2026-11-02 12:05:00".into()), None),
+                (3, None, Some("2026-11-03 13:00:00".into())),
+                // Andere Ziele berührt die Migration nicht.
+                (4, None, None),
+            ]
+        );
         let version: String = sqlx::query_scalar("SELECT sqlite_version()")
-            .fetch_one(&mut *conn)
+            .fetch_one(&pool)
             .await
             .unwrap();
         eprintln!("SQLite {version}");

@@ -321,11 +321,6 @@ async fn lagebesprechung_mit_neuem_termin_feuert_einsatz_neben_lagebesprechung_u
 
     let alle = eingegangen(&mut rx);
     assert_eq!(anzahl(&alle, LiveEvent::Lagebesprechung), 1);
-    assert_eq!(
-        anzahl(&alle, LiveEvent::Stab),
-        0,
-        "kein `stab` mehr (design.md D6)"
-    );
     assert_eq!(anzahl(&alle, LiveEvent::Etb), 1);
     assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 1, "{alle:?}");
 }

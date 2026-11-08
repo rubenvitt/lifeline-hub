@@ -257,13 +257,6 @@ describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
     expect(text).toContain('- 1 mit überfälliger Bestätigung');
   });
 
-  it('liest die Funkplan-Lücken auch bei ausgeblendetem Stab (LLH-1180)', async () => {
-    const text = await erzeuge(freigabenFixture({ stab: { sichtbar: false, zugriff: false } }));
-    expect(listeAbschnitte).toHaveBeenCalled();
-    expect(listeEinsatzSprechgruppen).toHaveBeenCalled();
-    expect(text).not.toContain('**Funkplan**\n- — (nicht freigegeben)');
-  });
-
   it('nennt einen gescheiterten Zähler „— (nicht geladen)“', async () => {
     vi.mocked(ladeModulZaehler).mockRejectedValue(new Error('500'));
     const text = await erzeuge();
@@ -290,19 +283,6 @@ describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
           }),
         ),
       ).toEqual({ frei: false, grund: 'Aufträge, Meldungen und Fernmeldewesen nicht freigegeben' });
-    });
-
-    // LLH-1180: der Funkplan hängt am Fernmeldewesen, nicht mehr am Stab.
-    it('ist ohne Stab frei, solange das Fernmeldewesen frei ist', () => {
-      expect(
-        FUEHRUNGSPROBLEME_QUELLE.verfuegbar(
-          freigabenFixture({
-            auftraege: { zugriff: false },
-            meldungen: { zugriff: false },
-            stab: { sichtbar: false },
-          }),
-        ),
-      ).toEqual({ frei: true });
     });
   });
 });

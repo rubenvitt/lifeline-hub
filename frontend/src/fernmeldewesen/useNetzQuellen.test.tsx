@@ -20,9 +20,9 @@ function Probe() {
   );
 }
 
-/** Zählt die Abrufe der Stab-Anzeige und der Mitglieder (i6k6mzed, D7). */
+/** Zählt die Abrufe der Mitglieder (i6k6mzed, D7). */
 function setup(freigaben: ModulFreigaben) {
-  const abrufe = { stab: 0, mitglieder: 0 };
+  const abrufe = { mitglieder: 0 };
   server.use(
     http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
@@ -46,10 +46,6 @@ function setup(freigaben: ModulFreigaben) {
         stand: null,
       }),
     ),
-    http.get('/api/einsaetze/7/stab', () => {
-      abrufe.stab += 1;
-      return HttpResponse.json({ besetzung: [] });
-    }),
     http.get('/api/einsaetze/7/mitglieder', () => {
       abrufe.mitglieder += 1;
       return HttpResponse.json([]);
@@ -61,15 +57,15 @@ function setup(freigaben: ModulFreigaben) {
 
 /**
  * Die Quellen des Fernmeldenetzes hängen an der Freigabe des Fernmeldewesens (LLH-1180). Die
- * Mitglieder fragt die Skizze ohne eigenes Modulrecht ab; den Stab fragt sie nie (i6k6mzed, D7).
+ * Mitglieder fragt die Skizze ohne eigenes Modulrecht ab (i6k6mzed, D7).
  */
 describe('useNetzQuellen', () => {
-  it('Stab ausgeblendet: Stellen, Skizze und Mitglieder laden, kein Abruf am Stab', async () => {
-    const abrufe = setup(freigabenFixture({ stab: { sichtbar: false, zugriff: false } }));
+  it('Fernmeldewesen frei: Stellen, Skizze und Mitglieder laden', async () => {
+    const abrufe = setup(freigabenFixture());
     expect(await screen.findByText('stellen: daten')).toBeInTheDocument();
     expect(await screen.findByText('skizze: daten')).toBeInTheDocument();
     expect(await screen.findByText('mitglieder: daten')).toBeInTheDocument();
-    expect(abrufe.stab).toBe(0);
+    expect(abrufe.mitglieder).toBeGreaterThan(0);
   });
 
   it('Fernmeldewesen gesperrt: keine Quelle des Moduls lädt', async () => {
@@ -80,10 +76,9 @@ describe('useNetzQuellen', () => {
     expect(abrufe.mitglieder).toBe(0);
   });
 
-  it('frei: die Mitglieder laden, der Stab nicht', async () => {
+  it('frei: die Mitglieder laden genau einmal', async () => {
     const abrufe = setup(freigabenFixture());
     expect(await screen.findByText('mitglieder: daten')).toBeInTheDocument();
     expect(abrufe.mitglieder).toBe(1);
-    expect(abrufe.stab).toBe(0);
   });
 });

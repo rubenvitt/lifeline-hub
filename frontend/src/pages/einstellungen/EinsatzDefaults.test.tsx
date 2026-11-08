@@ -446,16 +446,16 @@ describe('EinsatzDefaults', () => {
 
   it('blendet ein Modul für alle Einsätze aus und schickt die Rolle aus dem Bestand mit', async () => {
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
-      stab: { benoetigte_rolle: 'fuehrungskraft', sichtbar: true },
+      lagebesprechung: { benoetigte_rolle: 'fuehrungskraft', sichtbar: true },
     } as never);
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
-    const schalter = await screen.findByRole('switch', { name: 'Sichtbar: Stab' });
+    const schalter = await screen.findByRole('switch', { name: 'Sichtbar: Lagebesprechung' });
     expect(schalter).toBeChecked();
     fireEvent.click(schalter);
 
     await waitFor(() =>
-      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('stab', {
+      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('lagebesprechung', {
         benoetigte_rolle: 'fuehrungskraft',
         sichtbar: false,
       }),
@@ -465,20 +465,22 @@ describe('EinsatzDefaults', () => {
 
   it('zeigt eine Ausblendung der Organisation und schickt sie beim Rollenwechsel mit', async () => {
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
-      stab: { benoetigte_rolle: null, sichtbar: false },
+      lagebesprechung: { benoetigte_rolle: null, sichtbar: false },
     } as never);
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
-    expect(await screen.findByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeChecked();
+    expect(
+      await screen.findByRole('switch', { name: 'Sichtbar: Lagebesprechung' }),
+    ).not.toBeChecked();
     // Ohne Vorgabe ist ein Modul sichtbar.
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeChecked();
 
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }));
     const optionen = await screen.findAllByText('Admin');
     fireEvent.click(optionen[optionen.length - 1]);
 
     await waitFor(() =>
-      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('stab', {
+      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('lagebesprechung', {
         benoetigte_rolle: 'admin',
         sichtbar: false,
       }),
@@ -488,12 +490,12 @@ describe('EinsatzDefaults', () => {
   it('sperrt den Sichtbar-Schalter für Führungskräfte und für nicht ausblendbare Module', async () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     expect(await screen.findByRole('switch', { name: 'Sichtbar: Einsatzdaten' })).toBeDisabled();
-    expect(screen.getByRole('switch', { name: 'Sichtbar: Stab' })).not.toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'Sichtbar: Lagebesprechung' })).not.toBeDisabled();
   });
 
   it('hält die Zeile gesperrt, bis der neue Bestand geladen ist — sonst hebt der nächste Klick die Ausblendung auf', async () => {
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValueOnce({
-      stab: { benoetigte_rolle: null, sichtbar: true },
+      lagebesprechung: { benoetigte_rolle: null, sichtbar: true },
     } as never);
     let neuLaden!: (v: unknown) => void;
     vi.mocked(ladeOrgModulEinstellungen).mockReturnValueOnce(
@@ -501,21 +503,25 @@ describe('EinsatzDefaults', () => {
     );
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
-    fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: Stab' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: Lagebesprechung' }));
     await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(ladeOrgModulEinstellungen).toHaveBeenCalledTimes(2));
     // Der PUT ist durch, der Bestand noch nicht: die Rollenauswahl bleibt gesperrt.
-    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).toBeDisabled();
+    expect(
+      screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }),
+    ).toBeDisabled();
 
-    neuLaden({ stab: { benoetigte_rolle: null, sichtbar: false } });
+    neuLaden({ lagebesprechung: { benoetigte_rolle: null, sichtbar: false } });
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).not.toBeDisabled(),
+      expect(
+        screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }),
+      ).not.toBeDisabled(),
     );
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }));
     const optionen = await screen.findAllByText('Admin');
     fireEvent.click(optionen[optionen.length - 1]);
     await waitFor(() =>
-      expect(setzeOrgModulEinstellung).toHaveBeenLastCalledWith('stab', {
+      expect(setzeOrgModulEinstellung).toHaveBeenLastCalledWith('lagebesprechung', {
         benoetigte_rolle: 'admin',
         sichtbar: false,
       }),
@@ -527,8 +533,10 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     // Ein Klick schickte sonst einen erfundenen Bestand (sichtbar, frei) als Vollersatz.
-    expect(await screen.findByRole('switch', { name: 'Sichtbar: Stab' })).toBeDisabled();
-    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Stab' })).toBeDisabled();
+    expect(await screen.findByRole('switch', { name: 'Sichtbar: Lagebesprechung' })).toBeDisabled();
+    expect(
+      screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }),
+    ).toBeDisabled();
   });
 
   it('deaktiviert nicht-ausblendbare Modul-Selects auch als Admin', async () => {

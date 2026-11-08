@@ -42,8 +42,6 @@ wire_enum! {
         ExterneKraft => "externe_kraft",
         /// Anrufende Person am Informationstelefon (`infotelefon_anruf`).
         InfotelefonAnruf => "infotelefon_anruf",
-        /// Ansprechperson im Presse-Log (`medienkontakt`).
-        Medienkontakt => "medienkontakt",
     }
 }
 
@@ -54,13 +52,12 @@ impl PersonenArt {
             PersonenArt::Betroffene => "einsatz_person",
             PersonenArt::ExterneKraft => "einsatz_personal",
             PersonenArt::InfotelefonAnruf => "infotelefon_anruf",
-            PersonenArt::Medienkontakt => "medienkontakt",
         }
     }
 
     /// Pseudonyme Kennung einer Zeile, wie Personensuche, Rückfrage und ETB sie nennen.
     /// Betroffene tragen ihre Registriernummer (`R-042`), die übrigen Arten die Zeilen-ID mit
-    /// Präfix (`EK-17`, `IT-5`, `MK-3`).
+    /// Präfix (`EK-17`, `IT-5`).
     pub fn kennung(self, id: i64, registrier_nr: Option<i64>) -> String {
         match self {
             PersonenArt::Betroffene => {
@@ -68,7 +65,6 @@ impl PersonenArt {
             }
             PersonenArt::ExterneKraft => format!("EK-{id}"),
             PersonenArt::InfotelefonAnruf => format!("IT-{id}"),
-            PersonenArt::Medienkontakt => format!("MK-{id}"),
         }
     }
 
@@ -78,7 +74,6 @@ impl PersonenArt {
             PersonenArt::Betroffene => "Betroffene Person",
             PersonenArt::ExterneKraft => "Externe Kraft",
             PersonenArt::InfotelefonAnruf => "Anruf am Informationstelefon",
-            PersonenArt::Medienkontakt => "Medienkontakt",
         }
     }
 }
@@ -313,12 +308,6 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("snap_anzeige", Mit),
         ],
     },
-    PersonenBezug {
-        art: PersonenArt::ExterneKraft,
-        tabelle: "einsatz_stabsfunktion",
-        bezug: Bezug::Spalte("personal_id"),
-        spalten: &[("snap_name", Mit), ("bezeichnung", Mit)],
-    },
     // Einsatzleiter an der eigenen Führungsstelle (LFH-1199).
     PersonenBezug {
         art: PersonenArt::ExterneKraft,
@@ -476,25 +465,12 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         },
         spalten: &[("wert", Mit), ("hinweis", Mit)],
     },
-    // ---------- Anrufende und Ansprechpersonen ----------
+    // ---------- Anrufende ----------
     PersonenBezug {
         art: PersonenArt::InfotelefonAnruf,
         tabelle: "infotelefon_anruf",
         bezug: Bezug::SelbstId,
         spalten: &[("notiz", Mit), ("anrufer_name", Mit), ("rueckruf", Mit)],
-    },
-    PersonenBezug {
-        art: PersonenArt::Medienkontakt,
-        tabelle: "medienkontakt",
-        bezug: Bezug::SelbstId,
-        spalten: &[
-            ("medium", Mit),
-            ("thema", Mit),
-            ("kontakt_name", Mit),
-            ("kontaktweg", Mit),
-            ("antwort", Mit),
-            ("freigabe_durch", Mit),
-        ],
     },
 ];
 

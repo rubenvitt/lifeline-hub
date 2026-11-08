@@ -87,12 +87,6 @@ export const NACHFORDERUNG_UEBERNAHME_EINHEITEN_MAX = 20;
 export const INFOTELEFON_NOTIZ_MAX = 2_000;
 /** Kurzfelder des Infotelefons (anrufer_name, rueckruf). */
 export const INFOTELEFON_KURZ_MAX = 200;
-/** Kurzfelder eines Medienkontakts (medium, kontakt_name, freigabe_durch). */
-export const PRESSE_KURZ_MAX = 200;
-/** Thema und Telefon / E-Mail eines Medienkontakts. */
-export const PRESSE_THEMA_MAX = 500;
-/** Antwort an ein Medium. */
-export const PRESSE_ANTWORT_MAX = 8_000;
 /** Ort und Kontakt des Geschädigten eines Schadens. */
 export const SCHADEN_ORT_MAX = 500;
 /** Einsatzort als Text (Adresse oder Freitext, LFH-1175). */

@@ -26,8 +26,10 @@ use utoipa::ToSchema;
 pub const AKTENZEICHEN_MAX: usize = 64;
 
 wire_enum! {
-    /// Zielart eines Schwärzungsantrags. Wire == `schwaerzung_antrag.ziel_art`; die vier
-    /// Personenarten tragen dieselben Werte wie [`PersonenArt`].
+    /// Zielart eines Schwärzungsantrags. Wire == `schwaerzung_antrag.ziel_art`; die
+    /// Personenarten tragen dieselben Werte wie [`PersonenArt`]. `medienkontakt` steht nur noch
+    /// in alten Anträgen: das Modul Presse und Medienarbeit ist entfernt (i6k6mzed, design.md
+    /// D4), ein neuer Antrag mit diesem Ziel ist 422.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AntragZielArt {
         Einsatz => "einsatz",
@@ -39,14 +41,14 @@ wire_enum! {
 }
 
 impl AntragZielArt {
-    /// Die Personenart, `None` beim Einsatz.
+    /// Die Personenart; `None` beim Einsatz und beim Medienkontakt, dessen Tabelle es nicht mehr
+    /// gibt (i6k6mzed, design.md D4).
     pub fn person(self) -> Option<PersonenArt> {
         match self {
-            AntragZielArt::Einsatz => None,
+            AntragZielArt::Einsatz | AntragZielArt::Medienkontakt => None,
             AntragZielArt::Betroffene => Some(PersonenArt::Betroffene),
             AntragZielArt::ExterneKraft => Some(PersonenArt::ExterneKraft),
             AntragZielArt::InfotelefonAnruf => Some(PersonenArt::InfotelefonAnruf),
-            AntragZielArt::Medienkontakt => Some(PersonenArt::Medienkontakt),
         }
     }
 
@@ -55,7 +57,15 @@ impl AntragZielArt {
             PersonenArt::Betroffene => AntragZielArt::Betroffene,
             PersonenArt::ExterneKraft => AntragZielArt::ExterneKraft,
             PersonenArt::InfotelefonAnruf => AntragZielArt::InfotelefonAnruf,
-            PersonenArt::Medienkontakt => AntragZielArt::Medienkontakt,
+        }
+    }
+
+    /// Bezeichnung für die Texte im ETB („Einsatz“, „Betroffene Person“, „Medienkontakt“).
+    fn bezeichnung(self) -> &'static str {
+        match (self, self.person()) {
+            (_, Some(p)) => p.bezeichnung(),
+            (AntragZielArt::Medienkontakt, None) => "Medienkontakt",
+            (_, None) => "Einsatz",
         }
     }
 }
@@ -142,10 +152,7 @@ pub fn einsatz_kennung(einsatznummer: Option<&str>, einsatz_id: i64) -> String {
 
 /// Ziel im Wortlaut der ETB-Einträge: „Einsatz E-2026-0751“ bzw. „Betroffene Person R-042“.
 fn ziel_text(art: AntragZielArt, kennung: &str) -> String {
-    match art.person() {
-        None => format!("Einsatz {kennung}"),
-        Some(p) => format!("{} {kennung}", p.bezeichnung()),
-    }
+    format!("{} {kennung}", art.bezeichnung())
 }
 
 /// Kennung einer Person dieses Einsatzes. `Ok(None)`, wenn die Zeile nicht zu diesem Einsatz
@@ -185,7 +192,7 @@ async fn person_kennung(
                 Some(None) => Some(art.kennung(id, None)),
             }
         }
-        PersonenArt::InfotelefonAnruf | PersonenArt::Medienkontakt => {
+        PersonenArt::InfotelefonAnruf => {
             let sql = format!(
                 "SELECT 1 FROM {} WHERE id = ? AND einsatz_id = ?",
                 art.wurzel()
@@ -351,7 +358,7 @@ async fn gespeicherte_kennung(
     einsatz_id: i64,
 ) -> Result<String, AppError> {
     match (art.person(), ziel_id) {
-        (None, _) => {
+        (None, _) if art == AntragZielArt::Einsatz => {
             let nummer: Option<String> =
                 sqlx::query_scalar("SELECT einsatznummer_intern FROM einsatz WHERE id = ?")
                     .bind(einsatz_id)
@@ -359,6 +366,8 @@ async fn gespeicherte_kennung(
                     .await?;
             Ok(einsatz_kennung(nummer.as_deref(), einsatz_id))
         }
+        // Medienkontakt (Modul entfernt, i6k6mzed): die Kennung wie beim Stellen.
+        (None, Some(id)) => Ok(format!("MK-{id}")),
         (Some(PersonenArt::Betroffene), Some(id)) => {
             let nr: Option<i64> =
                 sqlx::query_scalar("SELECT registrier_nr FROM einsatz_person WHERE id = ?")
@@ -368,7 +377,7 @@ async fn gespeicherte_kennung(
             Ok(PersonenArt::Betroffene.kennung(id, nr))
         }
         (Some(p), Some(id)) => Ok(p.kennung(id, None)),
-        (Some(_), None) => Err(AppError::Internal("Personen-Antrag ohne ziel_id".into())),
+        (_, None) => Err(AppError::Internal("Personen-Antrag ohne ziel_id".into())),
     }
 }
 
@@ -613,6 +622,17 @@ pub async fn vollziehen_ergebnis(
             )
         } else {
             match art.person() {
+                // Ein offenes Ersuchen für einen Medienkontakt setzt die Migration
+                // `stab_presse_entfernen` auf vollzogen, ein neues ist 422 (i6k6mzed, design.md
+                // D4). Kommt doch eines hierher, gibt es nichts mehr zu schwärzen.
+                None if art == AntragZielArt::Medienkontakt => (
+                    format!(
+                        "Löschersuchen (Aktenzeichen {}) für {ziel} erledigt: das Modul Presse \
+                         und Medienarbeit ist entfernt, seine Medienkontakte sind gelöscht.",
+                        z.aktenzeichen
+                    ),
+                    Vollzug::Nichts,
+                ),
                 None => {
                     if !crate::einsatz::repo::schwaerze_einsatz_auf_antrag_tx(
                         &mut *conn,

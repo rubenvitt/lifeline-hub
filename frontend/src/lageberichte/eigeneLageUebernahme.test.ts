@@ -306,10 +306,9 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     expect(text).not.toContain('Leitung nicht erfasst');
   });
 
-  // Design D7 (i6k6mzed): die Zeile heißt „Führungsfunktionen“ und kommt aus den Mitgliedern,
-  // auch ohne Stab-Freigabe.
-  it('nennt die Führungsfunktionen aus den Mitgliedern, auch ohne Stab-Freigabe', async () => {
-    const text = await erzeuge(freigabenFixture({ stab: { sichtbar: false } }));
+  // Design D7 (i6k6mzed): die Zeile heißt „Führungsfunktionen“ und kommt aus den Mitgliedern.
+  it('nennt die Führungsfunktionen aus den Mitgliedern', async () => {
+    const text = await erzeuge(freigabenFixture());
     expect(text).toBe(`${MELDEBILD()}\n${ORG()}`);
     expect(text).toContain('- Führungsfunktionen: EL Lea Leitung · S1 Bert Personal\n');
     expect(text).not.toContain('Stab:');

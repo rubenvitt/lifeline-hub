@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { lagebesprechungPfad, stabPfad } from '../src/routing/deeplinks';
+import { lagebesprechungPfad } from '../src/routing/deeplinks';
+import { kontrast } from './kontrast-kern';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 import { rechteHinweisSteht } from './trefflaeche-kern';
 
@@ -9,12 +10,15 @@ import { rechteHinweisSteht } from './trefflaeche-kern';
  * - ABLAUF: Termin über „Termin wählen“ und die Schnellwahl („+1 h“, ohne ETB-Eintrag) →
  *   Vorbereitung zeigt den Termin → Abschluss mit Entschluss → der Verlauf zeigt Nr. 1 mit dem
  *   Sprung auf den ETB-Eintrag. Geklickt, nicht nur `toBeVisible` (LFH-355).
- * - EIGENE FREIGABE: ist der Stab ausgeblendet, bleibt die Seite voll nutzbar. Gemessen als
- *   Führungspersonal, denn der Admin erreicht ein ausgeblendetes Modul trotzdem; Vorbedingung ist
- *   die Freigabe vom Server (Stab weder sichtbar noch zugänglich, Lagebesprechung frei).
- * - HANDY (390 px): kein Querlauf auf der Seite Lagebesprechung und in der Zeile „Nächste
- *   Lagebesprechung“ der Stab-Seite, als Admin und als Beobachter (LFH-435). Gemessen gegen die
- *   feste Gerätebreite, nicht gegen `innerWidth` (Begründung in `einsatzdaten-schmal.spec.ts`).
+ * - EIGENE FREIGABE: die Seite ist voll nutzbar, allein mit der Freigabe der Lagebesprechung (das
+ *   Modul Stab gibt es seit i6k6mzed nicht mehr). Gemessen als Führungspersonal; Vorbedingung ist
+ *   die Freigabe vom Server.
+ * - HANDY (390 px): kein Querlauf auf der Seite Lagebesprechung, als Admin und als Beobachter
+ *   (LFH-435). Gemessen gegen die feste Gerätebreite, nicht gegen `innerWidth` (Begründung in
+ *   `einsatzdaten-schmal.spec.ts`). Die alte Adresse `…/stab` führt in den Einsatz (i6k6mzed,
+ *   design.md D8), ohne Stab-Seite und ohne Zeile zur Lagebesprechung.
+ * - KONTRAST des Zeilenziels „ETB-Eintrag“ im Verlauf (`components/linkZeilenziel.ts`, LFH-695;
+ *   vorher an der Stab-Seite gemessen): Tag ≥ 7 : 1, Nacht ≥ 5 : 1, in Ruhe und unter dem Zeiger.
  *
  * Kein `networkidle` (SSE-Strom, LFH-385); gewartet wird auf Inhaltsanker.
  */
@@ -140,23 +144,18 @@ test.describe('LLH-1111: Modul Lagebesprechung', () => {
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/etb\\?eintrag=\\d+$`));
   });
 
-  test('Stab ausgeblendet: die Seite Lagebesprechung bleibt voll nutzbar', async ({ page }) => {
+  test('Führungspersonal: die Seite Lagebesprechung ist allein mit ihrer Freigabe voll nutzbar', async ({
+    page,
+  }) => {
     await anmeldenAlsAdmin(page);
     const id = await einsatzAnlegen(page);
-    const override = await page.request.put(`/api/einsaetze/${id}/modul-overrides/stab`, {
-      data: { sichtbar: false, benoetigte_rolle: null },
-    });
-    expect(override.ok(), `Override Stab: ${override.status()}`).toBeTruthy();
     await wechsleZuRolle(page, 'fuehrungspersonal', String(id));
 
-    // Vorbedingung: der Server blendet den Stab aus und sperrt ihn, die Lagebesprechung ist frei.
+    // Vorbedingung: einen Stab kennen die Freigaben nicht mehr, die Lagebesprechung ist frei.
     const freigaben = (await (
       await page.request.get(`/api/einsaetze/${id}/modul-freigaben`)
     ).json()) as Record<string, { sichtbar: boolean; zugriff: boolean }>;
-    expect(freigaben.stab, 'Vorbedingung: Stab ausgeblendet').toEqual({
-      sichtbar: false,
-      zugriff: false,
-    });
+    expect(freigaben.stab, 'Vorbedingung: kein Modul Stab').toBeUndefined();
     expect(freigaben.lagebesprechung, 'Vorbedingung: Lagebesprechung frei').toEqual({
       sichtbar: true,
       zugriff: true,
@@ -170,12 +169,12 @@ test.describe('LLH-1111: Modul Lagebesprechung', () => {
     expect((await antwort).ok()).toBeTruthy();
     await expect(kennzahl(page, 'Nächste Lagebesprechung')).toContainText(/in (29|30) min/);
 
-    // Die Vorbereitung liest keine Stab-Quelle: auch ihre Besprechungszeilen stehen.
+    // Die Vorbereitung steht mit ihren Besprechungszeilen.
     await expect(vorbereitungsZeile(page, 'besprechung').locator('[data-teil="wert"]')).toHaveText(
       'keine',
     );
 
-    await abschliessen(page, id, 'Ohne Stab: Lage unverändert');
+    await abschliessen(page, id, 'Lage unverändert');
     await verlaufZeigtNrEins(page, id);
   });
 });
@@ -216,7 +215,9 @@ test.describe('LLH-1111: Lagebesprechung am Handy', () => {
     return id;
   }
 
-  test('Admin, 390 px: Seite und Stab-Zeile laufen nicht über', async ({ page }) => {
+  test('Admin, 390 px: die Seite läuft nicht über, die alte Stab-Adresse führt in den Einsatz', async ({
+    page,
+  }) => {
     await anmeldenAlsAdmin(page);
     const id = await seede(page);
     await page.goto(lagebesprechungPfad(id));
@@ -234,13 +235,7 @@ test.describe('LLH-1111: Lagebesprechung am Handy', () => {
       'Lagebesprechung (Admin)',
     );
 
-    await page.goto(stabPfad(id));
-    const zeile = page.getByRole('group', { name: 'Nächste Lagebesprechung', exact: true });
-    const sprung = zeile.getByRole('link', { name: 'Zur Lagebesprechung', exact: true });
-    await expect(sprung).toBeVisible();
-    await keinQuerlauf(page, [zeile, sprung], 'Stab-Zeile (Admin)');
-    await sprung.click();
-    await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagebesprechung$`));
+    await altadresseFuehrtInDenEinsatz(page, id);
   });
 
   test('Beobachter, 390 px: gesperrte Bedienung läuft ebenso nicht über', async ({ page }) => {
@@ -272,12 +267,52 @@ test.describe('LLH-1111: Lagebesprechung am Handy', () => {
       ],
       'Lagebesprechung (Beobachter)',
     );
-
-    await page.goto(stabPfad(id));
-    const zeile = page.getByRole('group', { name: 'Nächste Lagebesprechung', exact: true });
-    await expect(
-      zeile.getByRole('link', { name: 'Zur Lagebesprechung', exact: true }),
-    ).toBeVisible();
-    await keinQuerlauf(page, [zeile], 'Stab-Zeile (Beobachter)');
   });
+});
+
+/**
+ * Die alte Adresse der Stab-Seite (i6k6mzed, design.md D8, Spec `lagebesprechung`, „Stab-Seite“):
+ * die App zeigt den Einsatz statt der Einsatzliste, weder eine Stab-Seite noch die Zeile
+ * „Nächste Lagebesprechung“.
+ */
+async function altadresseFuehrtInDenEinsatz(page: Page, einsatzId: number) {
+  await page.goto(`/einsaetze/${einsatzId}/stab`);
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/(?!stab)[a-z-]+`));
+  await expect(
+    page.getByRole('group', { name: 'Nächste Lagebesprechung', exact: true }),
+  ).toHaveCount(0);
+}
+
+test.describe('LFH-695: Kontrast des Zeilenziels im Verlauf', () => {
+  test.use({ viewport: { width: 1366, height: 900 } });
+  const TEXT = { light: 7, dark: 5 } as const;
+
+  for (const modus of ['light', 'dark'] as const) {
+    test(`ETB-Eintrag im Verlauf hält den Textboden im Modus ${modus}`, async ({ page }) => {
+      await anmeldenAlsAdmin(page);
+      const id = await einsatzAnlegen(page);
+      const r = await page.request.post(`/api/einsaetze/${id}/lagebesprechungen`, {
+        data: { entschluss: 'Lage unverändert' },
+      });
+      expect(r.status(), `Abschluss säen: ${await r.text()}`).toBe(201);
+      await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
+      await page.goto(lagebesprechungPfad(id));
+      await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+      const link = await verlaufZeigtNrEins(page, id);
+
+      for (const zustand of ['ruhe', 'zeiger'] as const) {
+        if (zustand === 'zeiger') await link.hover();
+        else await page.mouse.move(0, 0);
+        // antd blendet die Linkfarbe über `transition: color` über; erst eingeschwungen messen.
+        await link.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+        const m = await kontrast(link);
+        expect
+          .soft(
+            m.verhaeltnis,
+            `${modus}, ${zustand}: ${m.verhaeltnis.toFixed(2)} : 1 (Soll ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`,
+          )
+          .toBeGreaterThanOrEqual(TEXT[modus]);
+      }
+    });
+  }
 });

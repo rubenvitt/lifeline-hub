@@ -410,7 +410,12 @@ describe('ModulListe — Sprungmarken', () => {
   };
   const fuehrung: ModulEintrag[] = [
     basis({ key: 'auftraege', kategorie: 'fuehrung', label: 'Aufträge', status: 'fertig' }),
-    basis({ key: 'stab', kategorie: 'fuehrung', label: 'Stab', status: 'fertig' }),
+    basis({
+      key: 'lagebesprechung',
+      kategorie: 'fuehrung',
+      label: 'Lagebesprechung',
+      status: 'fertig',
+    }),
   ];
   const zeige = (props: { freigaben?: ModulFreigaben; onSprungKlick?: (m: Sprungmarke) => void }) =>
     renderMitProviders(
@@ -429,7 +434,7 @@ describe('ModulListe — Sprungmarken', () => {
     const klick = vi.fn();
     zeige({ onSprungKlick: klick });
     const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
-    expect(knoepfe).toEqual(['Aufträge', 'Entscheidungen', 'Stab']);
+    expect(knoepfe).toEqual(['Aufträge', 'Entscheidungen', 'Lagebesprechung']);
     const sprung = screen.getByRole('button', {
       name: 'Entscheidungen, springt zu ETB · Entscheidung',
     });
@@ -590,68 +595,8 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
 });
 
 /**
- * Die Arbeitsseiten des Stabs (LLH-1127) mit der echten Registry und den echten Marken: sie
- * stehen hinter „Stab“ und erben von ihm, nicht von ihrem Anker.
- */
-describe('ModulListe — Stab-Marken', () => {
-  const fuehrung = modulRegistry.filter((m) => m.kategorie === 'fuehrung');
-  // S6 steht seit LLH-1180 hinter „Fernmeldewesen“ (Kommunikation), siehe unten; das
-  // Informationstelefon ist seit i6k6mzed ein eigenes Modul der Kommunikation, keine Marke.
-  const STAB_MARKEN = ['Pressearbeit'];
-  const zeige = (props: { freigaben?: ModulFreigaben; onSprungKlick?: (m: Sprungmarke) => void }) =>
-    renderMitProviders(
-      <ModulPanel
-        titel="Führung"
-        module={fuehrung}
-        freigaben={freigaben()}
-        aktiverModulKey="stab"
-        onModulKlick={() => {}}
-        sprungmarken={sprungmarkenNachKategorie('fuehrung')}
-        {...props}
-      />,
-    );
-
-  it('folgen „Stab“ in der Reihenfolge des Sachgebiets und nennen ihr Ziel', () => {
-    zeige({});
-    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
-    // Die Modulzeile trägt ihre Beschreibung als zweite Zeile im Text.
-    const stab = knoepfe.findIndex((t) => t?.startsWith('Stab'));
-    expect(stab).toBeGreaterThanOrEqual(0);
-    expect(knoepfe.slice(stab + 1, stab + 2)).toEqual(STAB_MARKEN);
-    expect(screen.queryByRole('button', { name: /^Funkplan, springt zu/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Informationstelefon, springt zu/ })).toBeNull();
-    expect(
-      screen.getByRole('button', { name: 'Pressearbeit, springt zu Stab · Pressearbeit' }),
-    ).toBeEnabled();
-  });
-
-  it('sind mit gesperrtem Stab gesperrt und springen nicht (D3)', async () => {
-    const klick = vi.fn();
-    zeige({ freigaben: freigaben({ stab: { zugriff: false } }), onSprungKlick: klick });
-    for (const label of STAB_MARKEN) {
-      const knopf = screen.getByRole('button', { name: new RegExp(`^${label}, springt zu`) });
-      expect(knopf, label).toBeDisabled();
-      expect(knopf, label).toHaveAttribute('title', 'Keine Berechtigung');
-      expect(knopf.querySelector('[data-lfh-icon="schloss"]'), label).not.toBeNull();
-      await userEvent.click(knopf);
-    }
-    expect(klick).not.toHaveBeenCalled();
-  });
-
-  it('fehlen mit ausgeblendetem Stab', () => {
-    zeige({ freigaben: freigaben({ stab: { sichtbar: false, zugriff: false } }) });
-    for (const label of STAB_MARKEN) {
-      expect(
-        screen.queryByRole('button', { name: new RegExp(`^${label}, springt zu`) }),
-        label,
-      ).not.toBeInTheDocument();
-    }
-  });
-});
-
-/**
  * Die Ansichten des Fernmeldewesens (LLH-1180) stehen hinter „Fernmeldewesen“ in der Kategorie
- * Kommunikation und erben dessen Sperre, nicht die des Stabs.
+ * Kommunikation und erben dessen Sperre, nicht die eines anderen Moduls.
  */
 describe('ModulListe — Marken des Fernmeldewesens', () => {
   const kommunikation = modulRegistry.filter((m) => m.kategorie === 'kommunikation');
@@ -688,8 +633,8 @@ describe('ModulListe — Marken des Fernmeldewesens', () => {
     expect(screen.queryByRole('button', { name: /^Informationstelefon, springt zu/ })).toBeNull();
   });
 
-  it('bleiben bei ausgeblendetem Stab stehen', () => {
-    zeige({ freigaben: freigaben({ stab: { sichtbar: false, zugriff: false } }) });
+  it('bleiben bei ausgeblendetem Informationstelefon stehen', () => {
+    zeige({ freigaben: freigaben({ infotelefon: { sichtbar: false, zugriff: false } }) });
     for (const label of MARKEN) {
       expect(
         screen.getByRole('button', { name: new RegExp(`^${label}, springt zu`) }),

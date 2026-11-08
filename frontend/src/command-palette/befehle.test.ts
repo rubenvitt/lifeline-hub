@@ -199,8 +199,6 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(
       hat(kontext({ freigaben: freigabenFixture({ infotelefon: { sichtbar: false } }) })),
     ).toBe(false);
-    // Die Freigabe des Stabs spielt keine Rolle mehr.
-    expect(hat(kontext({ freigaben: freigabenFixture({ stab: { zugriff: false } }) }))).toBe(true);
     const q = 'bürgertelefon anruf';
     expect(ordneTreffer(filtereBefehle(baueBefehle(kontext()), q), q)[0]?.id).toBe(
       'aktion:infotelefon-anruf',
@@ -258,11 +256,10 @@ describe('baueBefehle — Schnellaktionen', () => {
     const freigaben = freigabenFixture({ etb: { sichtbar: false } });
     expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === 'aktion:etb')).toBe(false);
   });
-  // LLH-1111: „Lagebesprechung abschließen“ hängt an der Lagebesprechung, nicht am Stab; die Id
-  // bleibt `aktion:stab` (Gedächtnis „Zuletzt ausgeführt“).
-  it('Lagebesprechung abschließen folgt dem Modul Lagebesprechung, nicht dem Stab', () => {
-    const ohneStab = freigabenFixture({ stab: { sichtbar: false, zugriff: false } });
-    const zeile = baueBefehle(kontext({ freigaben: ohneStab })).find((x) => x.id === 'aktion:stab');
+  // LLH-1111: „Lagebesprechung abschließen“ hängt an der Lagebesprechung; die Id bleibt
+  // `aktion:stab` (Gedächtnis „Zuletzt ausgeführt“, gespeicherter Schlüssel).
+  it('Lagebesprechung abschließen folgt dem Modul Lagebesprechung', () => {
+    const zeile = baueBefehle(kontext()).find((x) => x.id === 'aktion:stab');
     expect(zeile?.label).toBe('Lagebesprechung abschließen');
     const ohneLb = freigabenFixture({ lagebesprechung: { sichtbar: false } });
     expect(baueBefehle(kontext({ freigaben: ohneLb })).some((x) => x.id === 'aktion:stab')).toBe(
@@ -969,8 +966,7 @@ describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
 });
 
 describe('baueBefehle — Ansichten (LLH-1127)', () => {
-  const STAB = ['presse'];
-  // LLH-1180: die Ansichten des Fernmeldewesens hängen an dessen Freigabe, nicht am Stab.
+  // LLH-1180: die Ansichten des Fernmeldewesens hängen an dessen Freigabe.
   const FERNMELDEWESEN = ['fernmeldeskizze', 'kommunikationsplan'];
   const ansichten = (k: BefehlKontext) => baueBefehle(k).filter((b) => b.gruppe === 'ansichten');
   const suche = (k: BefehlKontext, q: string) =>
@@ -993,23 +989,6 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
   });
 
   it('bietet keine Marke an, deren Zielmodul gesperrt oder ausgeblendet ist', () => {
-    const gesperrt = ansichten(
-      kontext({ freigaben: freigabenFixture({ stab: { zugriff: false } }) }),
-    );
-    for (const key of STAB)
-      expect(
-        gesperrt.some((b) => b.id === `ansicht:${key}`),
-        key,
-      ).toBe(false);
-    // Gegenprobe: die übrigen Marken bleiben, die Sperre trifft nur den Stab — auch die des
-    // Fernmeldewesens (LLH-1180).
-    expect(gesperrt.some((b) => b.id === 'ansicht:entscheidungen')).toBe(true);
-    for (const key of FERNMELDEWESEN)
-      expect(
-        gesperrt.some((b) => b.id === `ansicht:${key}`),
-        key,
-      ).toBe(true);
-
     const ohneFernmeldewesen = ansichten(
       kontext({ freigaben: freigabenFixture({ fernmeldewesen: { zugriff: false } }) }),
     );
@@ -1050,7 +1029,6 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
     expect(ansichten(k).some((b) => b.id === 'ansicht:infotelefon')).toBe(false);
     expect(suche(k, 'sprechgruppe')[0]).toBe('Fernmeldeskizze');
     expect(suche(k, 'Kommunikationsplan')[0]).toBe('Kommunikationsplan');
-    expect(suche(k, 'presse')).toContain('Pressearbeit');
     expect(suche(k, 'entscheid')).toContain('Entscheidungen');
     // LLH-1078: wer „Anforderung“ sucht, findet die Nachforderungen über ihre Beschreibung.
     expect(suche(k, 'Anforderung')).toContain('Nachforderungen');

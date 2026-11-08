@@ -306,7 +306,8 @@ async fn ausgeblendetes_infotelefon_sperrt_alle_routen() {
     }
 }
 
-/// Seine Freigabe hängt von keinem anderen Modul ab: der Stab aus, das Informationstelefon offen.
+/// Seine Freigabe hängt von keinem anderen Modul ab: das Modul Stab gibt es nicht mehr
+/// (i6k6mzed), das Informationstelefon bleibt unter seinem alten Pfad nutzbar.
 #[tokio::test]
 async fn ohne_stab_bleibt_das_infotelefon_nutzbar() {
     let app = setup().await;
@@ -315,7 +316,6 @@ async fn ohne_stab_bleibt_das_infotelefon_nutzbar() {
     let (_, a) = anfrage(&app, "POST", &pfad(e), &admin, Some(RUECKRUF)).await;
     let id = a["id"].as_i64().unwrap();
     let frieda = kraft(&app, &admin, e, "frieda", "fuehrungskraft").await;
-    override_setzen(&app, &admin, e, "stab", false, None).await;
 
     let (s, _) = anfrage(
         &app,
@@ -325,7 +325,11 @@ async fn ohne_stab_bleibt_das_infotelefon_nutzbar() {
         None,
     )
     .await;
-    assert_eq!(s, StatusCode::FORBIDDEN, "Vorbedingung: Stab ist zu");
+    assert_eq!(
+        s,
+        StatusCode::NOT_FOUND,
+        "Vorbedingung: der Stab ist entfernt"
+    );
     for (methode, uri, body) in alle_routen(e, id) {
         let (s, j) = anfrage(&app, methode, &uri, &frieda, body).await;
         assert!(s.is_success(), "{methode} {uri}: {s} {j:?}");
@@ -353,7 +357,7 @@ async fn auf_eine_rolle_beschraenkt_ist_403_fuer_andere() {
 }
 
 /// Spec „Live ohne Freigabe“: das Ereignis `infotelefon` erreicht nur Leser mit dem Recht
-/// `infotelefon`; das Recht `stab` allein genügt nicht.
+/// `infotelefon`; das Leserecht am Einsatz allein genügt nicht.
 #[tokio::test]
 async fn live_ereignis_nur_an_leser_mit_recht_infotelefon() {
     let app = setup().await;
@@ -365,12 +369,12 @@ async fn live_ereignis_nur_an_leser_mit_recht_infotelefon() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/stab"),
+        &format!("/api/einsaetze/{e}/etb"),
         &frieda,
         None,
     )
     .await;
-    assert_eq!(s, StatusCode::OK, "Vorbedingung: Frieda liest den Stab");
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: Frieda liest den Einsatz");
     let (s, _) = anfrage(&app, "GET", &pfad(e), &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Vorbedingung: Frieda ohne Recht");
 

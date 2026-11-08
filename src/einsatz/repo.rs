@@ -578,8 +578,7 @@ pub async fn liste_fuer(
 /// Ergebnis einer Einsatz-Mutation, die System-ETB-Einträge schreibt (LFH-858): der neu
 /// geladene Einsatz und die Kennungen der Einträge, in Schreibreihenfolge. Die Route meldet
 /// jede Kennung nach dem Commit als `etb`-Ereignis (`LiveHub::publiziere`), damit offene
-/// ETB-Schirme, die Kopfzahl und der Modulzähler ohne Neuladen nachziehen — Muster
-/// `stab::repo::AbschlussErgebnis`.
+/// ETB-Schirme, die Kopfzahl und der Modulzähler ohne Neuladen nachziehen.
 #[derive(Debug)]
 pub struct MitEtbEintraegen {
     pub einsatz: Einsatz,
@@ -1123,8 +1122,7 @@ pub(crate) fn schwaerzungs_audit(grund: &str) -> String {
          Foto-/Datei-Anhänge, Bilder der Lagekarte, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
          die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen sowie die \
          Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, Lageberichte, \
-         Befehle, Pressemitteilungen, Lagebesprechungen) und des Presse-Logs) wurden \
-         unwiderruflich entfernt. \
+         Befehle, Lagebesprechungen)) wurden unwiderruflich entfernt. \
          Erhalten bleiben das operative Skelett (Einsatz-Struktur, Zähler/registrier_nr, \
          operative Objekte, die Struktur von Chat, Erinnerungen und Führungsmodulen mit \
          Nummern, Zeitpunkten, Verfassern und Status), die Führungsdokumentation im ETB im \
@@ -1203,8 +1201,8 @@ async fn scrubbe_einsatz_ganz_tx(
 /// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz-Struktur,
 /// ETB im Wortlaut, Zähler/registrier_nr, anonymisierte Triage) bleibt erhalten.
 /// Chat- und Erinnerungs-Freitexte werden seit LFH-290 mitgeschwärzt, die Freitexte der
-/// Führungsmodule (Meldung, Auftrag, Nachforderung, Lagebericht, Befehl, Pressemitteilung,
-/// Lagebesprechung) seit LFH-701: Die Führungsdokumentation ist allein der ETB-Wortlaut
+/// Führungsmodule (Meldung, Auftrag, Nachforderung, Lagebericht, Befehl, Lagebesprechung) seit
+/// LFH-701: Die Führungsdokumentation ist allein der ETB-Wortlaut
 /// (`etb_eintrag.inhalt`/`von`/`an` sind Retain), dort bleiben auch heraufgestufte
 /// Chat-Nachrichten stehen.
 ///
@@ -3058,7 +3056,7 @@ mod tests {
     async fn schwaerzung_entfernt_fuehrungs_freitexte_und_haelt_das_etb() {
         // LFH-701, Linie A: Die Führungsdokumentation ist das ETB. Die Freitexte der
         // Führungsmodule (Meldung, Auftrag samt Empfänger, Nachforderung, Lagebericht, Befehl,
-        // Pressemitteilung, Lagebesprechung) werden geschwärzt, auch die, die nie ins ETB
+        // Lagebesprechung) werden geschwärzt, auch die, die nie ins ETB
         // gelangt sind (Fünf-Punkte-Felder, Entwürfe), samt Ablehnungsgrund und Ziel als Freitext
         // (LLH-1385). Struktur bleibt, der ETB-Wortlaut auch.
         let pool = crate::db::test_pool().await;
@@ -3132,7 +3130,6 @@ mod tests {
             ("lagebericht", "lagebericht", "freigegeben"),
             ("lagebericht", "lagebericht", "entwurf"),
             ("befehl", "befehl_lad", "entwurf"),
-            ("pressemitteilung", "freitext", "entwurf"),
         ] {
             let id: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
                 "INSERT INTO {tabelle} (einsatz_id, vorlage, titel, zeitstand, status, \
@@ -3339,10 +3336,9 @@ mod tests {
         assert!(
             audit.contains(
                 "Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, \
-                 Lageberichte, Befehle, Pressemitteilungen, Lagebesprechungen) und des \
-                 Presse-Logs"
+                 Lageberichte, Befehle, Lagebesprechungen))"
             ),
-            "Audit nennt die Führungs- und Presse-Log-Freitexte als entfernt: {audit}"
+            "Audit nennt die Führungs-Freitexte als entfernt: {audit}"
         );
         assert!(
             audit.contains("die Führungsdokumentation im ETB im Wortlaut"),

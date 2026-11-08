@@ -7,8 +7,8 @@ import { etbPfad } from '../routing/deeplinks';
 const ZIEL = 'Zum ETB-Eintrag';
 
 /**
- * Nebenweg „Zum ETB-Eintrag" einer Detailseite (Befehl, Lagebericht, Pressemitteilung), EINE
- * Stelle für alle drei. Seit LFH-1079 ein Eintrag für `EinsatzSeite.weitere`: ab `md` ein Sprung
+ * Nebenweg „Zum ETB-Eintrag" einer Detailseite (Befehl, Lagebericht), EINE
+ * Stelle für beide. Seit LFH-1079 ein Eintrag für `EinsatzSeite.weitere`: ab `md` ein Sprung
  * mit „↗“ (Strg/⌘+Klick öffnet einen Tab), unter `md` ein Eintrag hinter „Weitere“.
  *
  * Ist das ETB für den Benutzer gesperrt (LFH-888, Spec `modul-freigabe`, design.md D4), steht der

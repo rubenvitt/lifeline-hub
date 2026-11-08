@@ -135,15 +135,7 @@ describe('ModulAkkordeon · Dichte der Kopfzeile', () => {
   });
 });
 
-describe('ModulAkkordeon · Stab-Marken', () => {
-  it('führt die Stab-Marken auch im Navigations-Drawer hinter „Stab“ (LLH-1127)', () => {
-    zeige({ offeneKategorie: 'fuehrung', aktiverModulKey: 'stab', freigaben: freigabenFixture() });
-    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
-    const stab = knoepfe.findIndex((t) => t?.startsWith('Stab'));
-    expect(stab).toBeGreaterThanOrEqual(0);
-    expect(knoepfe.slice(stab + 1, stab + 2)).toEqual(['Pressearbeit']);
-  });
-
+describe('ModulAkkordeon · Sprungmarken', () => {
   it('führt die Marken des Fernmeldewesens im Drawer hinter „Fernmeldewesen“ (LLH-1180)', () => {
     zeige({
       offeneKategorie: 'kommunikation',

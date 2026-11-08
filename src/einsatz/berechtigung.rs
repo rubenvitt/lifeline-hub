@@ -1694,8 +1694,8 @@ mod tests {
         assert_eq!(
             modul_freigabe(
                 &HashMap::new(),
-                &org_blendet_aus("stab"),
-                "stab",
+                &org_blendet_aus("lagebesprechung"),
+                "lagebesprechung",
                 &normal,
                 EINSATZ_ORG,
                 None
@@ -1707,12 +1707,12 @@ mod tests {
     #[test]
     fn org_blendet_aus_einsatz_zeigt_ist_sichtbar() {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
-        let ov = overrides_mit(vec![override_zeile("stab", true, None)]);
+        let ov = overrides_mit(vec![override_zeile("lagebesprechung", true, None)]);
         assert_eq!(
             modul_freigabe(
                 &ov,
-                &org_blendet_aus("stab"),
-                "stab",
+                &org_blendet_aus("lagebesprechung"),
+                "lagebesprechung",
                 &normal,
                 EINSATZ_ORG,
                 None
@@ -1724,12 +1724,12 @@ mod tests {
     #[test]
     fn org_ohne_vorgabe_einsatz_blendet_aus_ist_ausgeblendet() {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
-        let ov = overrides_mit(vec![override_zeile("stab", false, None)]);
+        let ov = overrides_mit(vec![override_zeile("lagebesprechung", false, None)]);
         assert_eq!(
             modul_freigabe(
                 &ov,
                 &leere_org_defaults(),
-                "stab",
+                "lagebesprechung",
                 &normal,
                 EINSATZ_ORG,
                 None
@@ -1741,12 +1741,15 @@ mod tests {
     #[test]
     fn override_nur_mit_rolle_uebergeht_die_org_ausblendung_nicht() {
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
-        let ov = overrides_mit(vec![override_nur_rolle("stab", Some("fuehrungskraft"))]);
+        let ov = overrides_mit(vec![override_nur_rolle(
+            "lagebesprechung",
+            Some("fuehrungskraft"),
+        )]);
         assert_eq!(
             modul_freigabe(
                 &ov,
-                &org_blendet_aus("stab"),
-                "stab",
+                &org_blendet_aus("lagebesprechung"),
+                "lagebesprechung",
                 &fk,
                 EINSATZ_ORG,
                 None
@@ -1761,8 +1764,8 @@ mod tests {
         assert_eq!(
             modul_freigabe(
                 &HashMap::new(),
-                &org_blendet_aus("stab"),
-                "stab",
+                &org_blendet_aus("lagebesprechung"),
+                "lagebesprechung",
                 &admin,
                 EINSATZ_ORG,
                 None

@@ -39,7 +39,6 @@ wire_enum! {
         KarteBild => "karte_bild",
         Etb => "etb",
         Befehl => "befehl",
-        Stab => "stab",
         /// Termin, Abschluss und Verlauf der Lagebesprechung (LLH-1111).
         Lagebesprechung => "lagebesprechung",
         /// Kommunikationsplan und Fernmeldeskizze des Moduls Fernmeldewesen (LLH-1180).
@@ -50,8 +49,6 @@ wire_enum! {
         /// Evakuierungsbezirke und ihre Standmeldungen (LLH-1034).
         Evakuierung => "evakuierung",
         Verpflegung => "verpflegung",
-        /// Presse-Log und Pressemitteilungen des Sachgebiets S5 (LFH-554).
-        Presse => "presse",
         /// Anrufe am Informationstelefon (LFH-554).
         Infotelefon => "infotelefon",
         KartenAnsicht => "karten_ansicht",
@@ -136,22 +133,15 @@ impl LiveEvent {
             LiveEvent::Etb => &["etb"],
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
-            // Nur `stab`: Besetzung und Checkliste sind Datenobjekte des Stab-Moduls. Die
-            // Lagebesprechung (LLH-1111) und das Fernmeldewesen (LLH-1180) haben ihr eigenes
-            // Ereignis.
-            LiveEvent::Stab => &["stab"],
             // Nur `fernmeldewesen`: Kommunikationsplan und Skizze sind Datenobjekte dieses Moduls,
-            // auch wenn ihre Pfade unter `…/stab` liegen (LLH-1180, design.md D3). NICHT `stab`:
-            // sonst erführen Stab-Leser ohne dieses Recht von jeder Skizzenänderung, und
-            // Fernmeldewesen-Leser ohne Stab blieben ohne Ereignis.
+            // auch wenn ihre Pfade unter `…/stab` liegen (LLH-1180, design.md D3).
             LiveEvent::Fernmeldewesen => &["fernmeldewesen"],
             // Nur `lagebesprechung`: Abschluss und Termin sind Datenobjekte dieses Moduls. NICHT
             // `einsatzdaten`, obwohl beide `einsatz.naechste_lagebesprechung_at` schreiben
             // (LFH-46, Entscheidung 11): ein `einsatzdaten`-Leser ohne dieses Recht erführe sonst,
             // DASS eine Besprechung stattgefunden hat. Den neuen Termin erfährt jeder Kopf-Leser
             // über das eigene `einsatz`-Event — und das feuert nur, wenn sich der Termin
-            // TATSÄCHLICH ändert (LFH-555, design.md D3). NICHT `stab` (design.md D6): sonst
-            // erführen Stab-Leser ohne dieses Recht von jeder Besprechung.
+            // TATSÄCHLICH ändert (LFH-555, design.md D3).
             LiveEvent::Lagebesprechung => &["lagebesprechung"],
             // Nur `dokumente`: das Dokument ist ein Datenobjekt der Dokumentenablage; der
             // ETB-Nachweis läuft über das eigene `etb`-Ereignis. Den Abschnittsnamen am Bezug
@@ -192,12 +182,8 @@ impl LiveEvent {
             // die Oberfläche aus der Nachforderungs-Query auf, und die frischt deren eigenes
             // Ereignis auf (design.md D6). Der ETB-Nachweis läuft über `etb`.
             LiveEvent::Verpflegung => &["verpflegung"],
-            // Nur `stab`: Medienkontakte und Pressemitteilungen sind Datenobjekte der S5-Seiten
-            // unter dem Stab (LFH-554), deren Routen die Stab-Sperre erben. Der ETB-Nachweis einer
-            // freigegebenen Mitteilung läuft über `etb`.
-            LiveEvent::Presse => &["stab"],
             // Nur `infotelefon`: Anrufe sind Datenobjekte des eigenen Moduls (i6k6mzed,
-            // design.md D3). NICHT `stab`: wer nur den Stab liest, erführe sonst von jedem Anruf.
+            // design.md D3), auch wenn ihre Pfade unter `…/stab` liegen.
             LiveEvent::Infotelefon => &["infotelefon"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).
@@ -1039,7 +1025,6 @@ mod tests {
             (LiveEvent::KarteBild, &["lagekarte"]),
             (LiveEvent::Etb, &["etb"]),
             (LiveEvent::Befehl, &["auftraege"]),
-            (LiveEvent::Stab, &["stab"]),
             (LiveEvent::Lagebesprechung, &["lagebesprechung"]),
             (LiveEvent::Fernmeldewesen, &["fernmeldewesen"]),
             (LiveEvent::Dokument, &["dokumente"]),
@@ -1048,7 +1033,6 @@ mod tests {
             (LiveEvent::Betreuung, &["betreuung", "verpflegung"]),
             (LiveEvent::Evakuierung, &["evakuierung"]),
             (LiveEvent::Verpflegung, &["verpflegung"]),
-            (LiveEvent::Presse, &["stab"]),
             (LiveEvent::Infotelefon, &["infotelefon"]),
             (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::LageSnapshot, &["lagekarte"]),

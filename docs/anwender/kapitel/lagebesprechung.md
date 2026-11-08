@@ -2,7 +2,7 @@
 titel: Lagebesprechung
 gruppen: [fuehrung]
 reihenfolge: 470
-quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechung/TerminPaneel.tsx, frontend/src/lagebesprechung/VorbereitungPaneel.tsx, frontend/src/lagebesprechung/vorbereitung.ts, frontend/src/lagebesprechung/LagebesprechungModal.tsx, frontend/src/lagebesprechung/LagebesprechungHistorie.tsx, frontend/src/lagebesprechung/lagebesprechungZustand.ts, frontend/src/lagebesprechung/LagebesprechungZeile.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/lagebesprechung.rs, src/lagebesprechung/mod.rs, src/lagebesprechung/repo.rs, src/lagebesprechung/ankuendigung.rs, src/erinnerung/scheduler.rs, src/benachrichtigung/text.rs]
+quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechung/TerminPaneel.tsx, frontend/src/lagebesprechung/VorbereitungPaneel.tsx, frontend/src/lagebesprechung/vorbereitung.ts, frontend/src/lagebesprechung/LagebesprechungModal.tsx, frontend/src/lagebesprechung/LagebesprechungHistorie.tsx, frontend/src/lagebesprechung/lagebesprechungZustand.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/lagebesprechung.rs, src/lagebesprechung/mod.rs, src/lagebesprechung/repo.rs, src/lagebesprechung/ankuendigung.rs, src/erinnerung/scheduler.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick

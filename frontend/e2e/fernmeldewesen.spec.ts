@@ -5,13 +5,13 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 /**
  * Das Modul Fernmeldewesen (LLH-1180) im Browser:
  *
- * - EIGENE FREIGABE: ist der Stab ausgeblendet, sind Funkplan (alle drei Darstellungen),
- *   Kommunikationsplan und „Fernmeldeskizze anfügen“ voll nutzbar. Gemessen als Führungspersonal,
- *   denn der Admin erreicht ein ausgeblendetes Modul trotzdem; Vorbedingung ist die Freigabe vom
- *   Server (Stab weder sichtbar noch zugänglich, Fernmeldewesen frei).
- * - STAB-WEICHE: ohne Stab steht im Kommunikationsplan die Besetzung als „—“ mit Grund, die
- *   Verbindung der Stelle bleibt.
- * - ALTADRESSE: `…/stab/funkplan?ansicht=skizze` landet in der Skizze des Moduls, auch ohne Stab.
+ * - EIGENE FREIGABE: Funkplan (alle drei Darstellungen), Kommunikationsplan und „Fernmeldeskizze
+ *   anfügen“ sind allein mit der Freigabe des Fernmeldewesens voll nutzbar (das Modul Stab gibt es
+ *   seit i6k6mzed nicht mehr). Gemessen als Führungspersonal; Vorbedingung ist die Freigabe vom
+ *   Server (kein Modul Stab, Fernmeldewesen frei).
+ * - BESETZUNG: im Kommunikationsplan kommt die Besetzung aus den Mitgliedern (i6k6mzed, D7); ohne
+ *   Mitglied mit der Funktion steht „nicht vergeben“, die Verbindung der Stelle bleibt.
+ * - ALTADRESSE: `…/stab/funkplan?ansicht=skizze` landet in der Skizze des Moduls.
  * - HANDY (390 px): die vier Reiter ohne Querlauf.
  *
  * Kein `networkidle` (SSE-Strom, LFH-385); gewartet wird auf Inhaltsanker.
@@ -20,7 +20,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 const BREITE = 390;
 const NUMMER = '0170 1112223';
 
-/** Legt S2 mit einer Mobilnummer an; der Nebentext nennt sonst die Besetzung des Stabs. */
+/** Legt S2 mit einer Mobilnummer an; der Nebentext nennt die Besetzung aus den Mitgliedern. */
 async function seedeS2(page: Page, einsatzId: string) {
   const a = api(page, einsatzId);
   const plan = await a.post<{ id: number; funktion?: string }[]>(
@@ -37,21 +37,11 @@ async function seedeS2(page: Page, einsatzId: string) {
   });
 }
 
-async function stabAusblenden(page: Page, einsatzId: string) {
-  const override = await page.request.put(`/api/einsaetze/${einsatzId}/modul-overrides/stab`, {
-    data: { sichtbar: false, benoetigte_rolle: null },
-  });
-  expect(override.ok(), `Override Stab: ${override.status()}`).toBeTruthy();
-}
-
-async function vorbedingungStabAus(page: Page, einsatzId: string) {
+async function vorbedingungFreigabe(page: Page, einsatzId: string) {
   const freigaben = (await (
     await page.request.get(`/api/einsaetze/${einsatzId}/modul-freigaben`)
   ).json()) as Record<string, { sichtbar: boolean; zugriff: boolean }>;
-  expect(freigaben.stab, 'Vorbedingung: Stab ausgeblendet').toEqual({
-    sichtbar: false,
-    zugriff: false,
-  });
+  expect(freigaben.stab, 'Vorbedingung: kein Modul Stab').toBeUndefined();
   expect(freigaben.fernmeldewesen, 'Vorbedingung: Fernmeldewesen frei').toEqual({
     sichtbar: true,
     zugriff: true,
@@ -61,7 +51,7 @@ async function vorbedingungStabAus(page: Page, einsatzId: string) {
 const reiter = (page: Page, name: string) => page.getByRole('tablist').getByRole('tab', { name });
 
 test.describe('Fernmeldewesen (LLH-1180)', () => {
-  test('Stab ausgeblendet: alle vier Reiter voll nutzbar, alte Adresse führt in die Skizze', async ({
+  test('Führungspersonal: alle vier Reiter voll nutzbar, alte Adresse führt in die Skizze', async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -69,9 +59,8 @@ test.describe('Fernmeldewesen (LLH-1180)', () => {
     const id = await einsatzAnlegen(page, `E2E Fernmeldewesen ${Date.now()}`);
     await seedeGrund(page, id);
     await seedeS2(page, id);
-    await stabAusblenden(page, id);
     await wechsleZuRolle(page, 'fuehrungspersonal', id);
-    await vorbedingungStabAus(page, id);
+    await vorbedingungFreigabe(page, id);
 
     // Altadresse mit Darstellung: landet in der Skizze des Moduls, `?ansicht=` bleibt (LLH-1432).
     await page.goto(`/einsaetze/${id}/stab/funkplan?ansicht=skizze`);
@@ -86,16 +75,16 @@ test.describe('Fernmeldewesen (LLH-1180)', () => {
     await expect(reiter(page, 'Sprechgruppen')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('region', { name: 'Funkplan' })).toHaveCount(0);
 
-    // Kommunikationsplan: Verbindung da, Besetzung „—“ mit Grund, Schreiben möglich.
+    // Kommunikationsplan: Verbindung da, Besetzung aus den Mitgliedern, Schreiben möglich.
     await reiter(page, 'Kommunikationsplan').click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/fernmeldewesen/kommunikationsplan$`));
     const plan = page.getByRole('region', { name: 'Kommunikationsplan' });
     await expect(plan.getByRole('link', { name: NUMMER })).toBeVisible();
-    await expect(plan.getByTitle('Stab nicht freigegeben')).toHaveText(/^—/);
+    await expect(plan.getByText('nicht vergeben', { exact: true }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Stelle hinzufügen' })).toBeEnabled();
   });
 
-  test('Stab ausgeblendet: „Fernmeldeskizze anfügen“ steht am Befehl und gelingt', async ({
+  test('Führungspersonal: „Fernmeldeskizze anfügen“ steht am Befehl und gelingt', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -104,11 +93,10 @@ test.describe('Fernmeldewesen (LLH-1180)', () => {
     await seedeGrund(page, id);
     const { id: befehlId } = await api(page, id).post('befehle', {
       vorlage: 'befehl_lad',
-      titel: 'Befehl ohne Stab',
+      titel: 'Befehl mit Skizze',
     });
-    await stabAusblenden(page, id);
     await wechsleZuRolle(page, 'fuehrungspersonal', id);
-    await vorbedingungStabAus(page, id);
+    await vorbedingungFreigabe(page, id);
 
     await page.goto(`/einsaetze/${id}/auftraege/befehle/${befehlId}`);
     await page.getByRole('button', { name: 'Fernmeldeskizze anfügen' }).click();

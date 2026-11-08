@@ -283,19 +283,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
     },
     'Person',
   );
-  // Presse und Medienarbeit S5 (LFH-554): lange Medien-, Themen- und Notiztexte als Stoff für
-  // die Karten des Presse-Logs und die Zeitachse des Informationstelefons.
-  await anlegen(
-    'stab/medienkontakte',
-    {
-      art: 'anfrage',
-      medium: PRESSE_MEDIUM,
-      thema: PRESSE_THEMA,
-      kontakt_name: 'Redaktion Landespolitik, Maximiliane Kirchgassner-Wohlfahrt',
-      kontaktweg: 'landespolitik.redaktion@rundfunkanstalt-musterstadt.example',
-    },
-    'Medienkontakt',
-  );
+  // Informationstelefon (LFH-554): lange Notiz als Stoff für seine Zeitachse.
   await anlegen(
     'stab/infotelefon',
     {
@@ -307,17 +295,6 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
     },
     'Anruf',
   );
-  {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/stab/pressemitteilungen`, {
-      data: {
-        vorlage: 'erstinformation',
-        titel: PM_TITEL,
-        abschnitte: [{ schluessel: 'sachverhalt', text: ETB_STOFF }],
-      },
-    });
-    expect(antwort.ok(), `Seeding Pressemitteilung: ${antwort.status()}`).toBeTruthy();
-    PRESSEMITTEILUNG.set(einsatzId, ((await antwort.json()) as { id: number }).id);
-  }
   // Der Status-Default `aktiv` deckt sich mit dem Standardreiter der Tierseite.
   await anlegen(
     'tiere',
@@ -539,13 +516,8 @@ const ETB_STOFF =
   'Pegel Musterstadt-Nordwest steigt weiter, Deichverteidigung zwischen Kilometer 4,7 und 6,2 ' +
   'verstärken, Sandsackbefüllung am Bauhof Nordwestring anlaufen lassen';
 
-const PRESSE_MEDIUM = 'Norddeutscher Rundfunk Landesfunkhaus Niedersachsen Hörfunkredaktion';
-const PRESSE_THEMA = 'Zahl der Evakuierten im Abschnitt Deichverteidigung Nordwestring';
 const ANRUF_NOTIZ =
   'Sucht den Vater, zuletzt gesehen am Bahnübergang Nordwestring Höhe Kilometer 4,7, Rückruf erbeten';
-const PM_TITEL = 'Hochwasser Musterstadt-Nordwest: Evakuierung Deichverteidigung Nordwestring';
-/** Kennung der gesäten Pressemitteilung je Einsatz (die Detailroute braucht sie). */
-const PRESSEMITTEILUNG = new Map<string, number>();
 /** Einheiten-Vorlage je Einsatz für „Einheit aus Vorlage bilden“ (LLH-1049). */
 const VORLAGE = new Map<string, GesaeteVorlage>();
 /** Kennung der gesäten Betreuungsstelle je Einsatz (Detailseite, LLH-1044). */
@@ -600,7 +572,7 @@ const GATE1_DURCHGAENGE: readonly Gate1Durchgang[] = [
   { name: 'Lage und ETB', routen: gate1RoutenLage },
   { name: 'Verwaltung und Vorlagen', routen: gate1RoutenVerwaltung, vorlage: true },
   { name: 'Kräfte und Fernmeldewesen', routen: gate1RoutenKraefte },
-  { name: 'Führung und Stab', routen: gate1RoutenStab },
+  { name: 'Führung', routen: gate1RoutenFuehrung },
   { name: 'Betroffene und Evakuierung', routen: gate1RoutenBetroffene },
   { name: 'Betreuung, Verpflegung und Lagekarte', routen: gate1RoutenVersorgung },
 ];
@@ -789,7 +761,7 @@ function gate1RoutenKraefte(einsatzId: string): Gate1Route[] {
     },
     {
       // Fernmeldeskizze (LFH-893): Darstellung „Skizze“ des Funkplans, über die Sichtvorgabe
-      // geöffnet — gemessen im breitesten Zustand: Palette auf (wo es sie gibt: Stab-Schreibrecht,
+      // geöffnet — gemessen im breitesten Zustand: Palette auf (wo es sie gibt: Schreibrecht,
       // nicht mobil; ab `xxl` ohnehin offen) und die gesäte Einheit mit langem Namen gewählt,
       // also Werkzeugleiste, Palette, Fläche und Eigenschaftspaneel nebeneinander bzw. darunter.
       // Datenanker ist der Titel des Paneels mit ihrem Namen.
@@ -824,8 +796,8 @@ function gate1RoutenKraefte(einsatzId: string): Gate1Route[] {
   ];
 }
 
-/** Durchgang „Führung und Stab“: Organigramm, Presse, Informationstelefon, Stab und Aufträge. */
-function gate1RoutenStab(einsatzId: string): Gate1Route[] {
+/** Durchgang „Führung“: Organigramm, Informationstelefon und Aufträge. */
+function gate1RoutenFuehrung(einsatzId: string): Gate1Route[] {
   return [
     {
       // Organigramm der Führungsorganisation (LFH-626): Ansicht der Seite Einsatzabschnitte, über
@@ -845,24 +817,6 @@ function gate1RoutenStab(einsatzId: string): Gate1Route[] {
       },
     },
     {
-      // Pressearbeit S5 (LFH-554): die Karte des gesäten Medienkontakts im Presse-Log.
-      pfad: `/einsaetze/${einsatzId}/stab/presse`,
-      anker: (p: Page) => p.getByText(`${PRESSE_MEDIUM} · ${PRESSE_THEMA}`),
-      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
-    },
-    {
-      // Detailseite der Pressemitteilung: Entwurf mit Editor bzw. Lesetext ohne Schreibrecht.
-      pfad: `/einsaetze/${einsatzId}/stab/presse/mitteilungen/${PRESSEMITTEILUNG.get(einsatzId)}`,
-      anker: (p: Page) => p.getByRole('heading', { level: 1, name: PM_TITEL }),
-      lesend: {
-        vorbedingung: (p: Page) =>
-          expect(
-            p.getByRole('button', { name: 'Entwurf speichern' }),
-            'Vorbedingung: ohne Schreibrecht kein Editor',
-          ).toHaveCount(0),
-      },
-    },
-    {
       // Informationstelefon (LFH-554, eigenes Modul seit i6k6mzed): der gesäte Anruf.
       pfad: `/einsaetze/${einsatzId}/infotelefon`,
       anker: (p: Page) => p.getByText(ANRUF_NOTIZ),
@@ -874,26 +828,6 @@ function gate1RoutenStab(einsatzId: string): Gate1Route[] {
             'Vorbedingung: ohne Schreibrecht keine Erfassungsleiste',
           ).toHaveCount(0);
         },
-      },
-    },
-    {
-      // Stab mit der Zeile „Nächste Lagebesprechung“ (LLH-1111) und der Arbeitsaufnahme
-      // (LFH-551): die sieben Zeilen tragen die längsten Texte der Seite (Punkt + Quelle +
-      // Bemerkung). Datenanker ist die letzte Zeile — sie steht erst, wenn die Checkliste geladen
-      // ist.
-      pfad: `/einsaetze/${einsatzId}/stab`,
-      anker: (p: Page) =>
-        p
-          .getByRole('region', { name: 'Arbeitsaufnahme' })
-          .getByRole('checkbox', { name: 'Einsatzbereitschaft an die Leitstelle gemeldet' }),
-      lesend: {
-        vorbedingung: (p: Page) =>
-          expect(
-            p
-              .getByRole('region', { name: 'Arbeitsaufnahme' })
-              .getByRole('checkbox', { name: 'Einsatzbereitschaft an die Leitstelle gemeldet' }),
-            'Vorbedingung: ohne Schreibrecht ist der Haken gesperrt',
-          ).toBeDisabled(),
       },
     },
     {

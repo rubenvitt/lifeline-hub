@@ -699,20 +699,8 @@ export type UnterkunftRichtwerte = S['UnterkunftRichtwerte'];
 export type RichtwertEbenen = S['RichtwertEbenen'];
 export type RichtwertHerkunft = S['RichtwertHerkunft'];
 
-// ============================== LFH-46 Stab (S1–S6) ==============================
-export type Stab = S['StabAnzeige'];
-export type Stabsfunktion = S['StabsfunktionAnzeige'];
+// ============================== LFH-46 Sachgebiete S1–S6 ==============================
 export type Sachgebiet = S['Sachgebiet'];
-export type BesetzungArt = S['BesetzungArt'];
-export type ChecklistenEintrag = S['ChecklistenEintrag'];
-export type ChecklistenPunkt = S['ChecklistenPunkt'];
-
-/**
- * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/checkliste/{punkt}` (LFH-551), FE-lokal.
- * Beide Felder optional, mindestens eines Pflicht (sonst 400). `bemerkung: ''` oder `null` löscht.
- * Ein Bedienziel schickt genau SEIN Feld — der Server lässt das andere unverändert.
- */
-export type ChecklistenPunktBody = { erledigt: boolean } | { bemerkung: string | null };
 
 // Kommunikationsplan des S6 (LFH-848).
 export type KommunikationsStelle = S['KommunikationsStelle'];
@@ -749,17 +737,6 @@ export interface VerbindungPatch {
   mittel?: Verbindungsmittel;
   wert?: string;
   hinweis?: string | null;
-}
-
-/**
- * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.
- * `personal_id` ist `einsatz_personal.id` (= `EinsatzPersonal.id`). Überzählige Felder sind 422;
- * Aufrufer schicken NUR das Feld, das die Art verlangt.
- */
-export interface BesetzungBody {
-  besetzung_art: BesetzungArt;
-  personal_id?: number;
-  bezeichnung?: string;
 }
 
 // ============================== LLH-1111 Lagebesprechung ==============================
@@ -1679,9 +1656,10 @@ export interface FristSetzenBody {
 }
 
 // ---- Löschersuchen nach Art. 17 (LFH-751) ----
-/** Personenart eines Löschersuchens: Betroffene, externe Kraft, Anruf, Medienkontakt. */
+/** Personenart eines Löschersuchens: Betroffene, externe Kraft, Anruf. */
 export type PersonenArt = S['PersonenArt'];
-/** Zielart eines Antrags: `einsatz` oder eine {@link PersonenArt}. */
+/** Zielart eines Antrags: `einsatz` oder eine {@link PersonenArt}; `medienkontakt` nur in alten
+ *  Anträgen (das Modul Presse und Medienarbeit ist entfernt, i6k6mzed). */
 export type AntragZielArt = S['AntragZielArt'];
 export type AntragStand = S['AntragStand'];
 /** Ein Schwärzungsantrag der Archivakte — Ziel nur als Art und pseudonyme Kennung. */
@@ -1715,17 +1693,7 @@ export interface KategorieFristBody {
   rechtsgrundlage?: string;
 }
 
-// ============================== LFH-554 Presse- und Medienarbeit S5 ==============================
-export type MedienkontaktArt = S['MedienkontaktArt'];
-export type MedienkontaktStatus = S['MedienkontaktStatus'];
-export type Medienkontakt = S['MedienkontaktAnzeige'];
-export type MedienkontaktKennzahlen = S['MedienkontaktKennzahlen'];
-export type PressemitteilungVorlageKey = S['PressemitteilungVorlage'];
-export type PressemitteilungStatus = S['PressemitteilungStatus'];
-export type PressemitteilungAbschnitt = S['PressemitteilungAbschnitt'];
-export type Pressemitteilung = S['PressemitteilungAnzeige'];
-/** LFH-931: Listenzeile ohne Abschnitte. */
-export type PressemitteilungKopf = S['PressemitteilungKopf'];
+// ============================== LFH-554 Informationstelefon ==============================
 export type InfotelefonAnliegen = S['InfotelefonAnliegen'];
 export type InfotelefonStatus = S['InfotelefonStatus'];
 export type InfotelefonAnruf = S['InfotelefonAnrufAnzeige'];

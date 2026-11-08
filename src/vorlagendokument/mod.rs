@@ -1,5 +1,5 @@
-//! Gemeinsamer Kern der Vorlagen-Dokumente Befehl, Lagebericht und Pressemitteilung: Entwurf aus
-//! einer festen Vorlage, Freigabe als Snapshot ins ETB, Fortschreibung als neue Version.
+//! Gemeinsamer Kern der Vorlagen-Dokumente Befehl und Lagebericht: Entwurf aus einer festen
+//! Vorlage, Freigabe als Snapshot ins ETB, Fortschreibung als neue Version.
 //!
 //! Die Arten unterscheiden sich nur in den Werten von [`Dokumentart`] (Tabelle, ETB-Typ und
 //! -Rückverweis, Vorlagen, Wortlaut, Anlagen und Verteiler). Ihre Wire-Typen (`Abschnitt`, `…Anzeige`)
@@ -62,13 +62,13 @@ pub trait Dokumentart: Send + Sync + 'static {
     const ETB_VERWEIS: &'static str;
     /// Vorlagen-Registry der Art.
     const VORLAGEN: &'static [VorlageDef];
-    /// Nomen in den Meldungen („Befehl“, „Bericht“, „Pressemitteilung“).
+    /// Nomen in den Meldungen („Befehl“, „Bericht“).
     const NOMEN: &'static str;
     const NOMEN_PLURAL: &'static str;
-    /// Nomen mit bestimmtem Artikel im Nominativ („Der Bericht“, „Die Pressemitteilung“). Das
-    /// Genus steht je Art, weil die Pressemitteilung (LFH-554) als erste Art feminin ist.
+    /// Nomen mit bestimmtem Artikel im Nominativ („Der Bericht“, „Der Befehl“). Das Genus steht je
+    /// Art, damit eine Art mit anderem Genus keinen eigenen Wortlaut braucht.
     const NOMEN_MIT_ARTIKEL: &'static str;
-    /// Nomen mit Präposition im Dativ („im Bericht“, „in der Pressemitteilung“).
+    /// Nomen mit Präposition im Dativ („im Bericht“, „im Befehl“).
     const IM_NOMEN: &'static str;
     /// Linker der Bild-Anlagen (LFH-1028); `None` = die Art trägt keine Anlagen.
     const ANLAGEN: Option<&'static anlage::AnlagenTabelle> = None;

@@ -215,7 +215,6 @@ describe('modulRegistry', () => {
       'einsatzabschnitte',
       'auftraege',
       'lagebesprechung',
-      'stab',
       'dokumente',
     ]);
     const kraefte = moduleNachKategorie('kraefte');
@@ -424,15 +423,18 @@ describe('modulZuRoute / modulAusPfad', () => {
     expect(modulAusPfad('/einsaetze/7/fernmeldewesen/kommunikationsplan')?.key).toBe(
       'fernmeldewesen',
     );
-    // Die Altpfade unter dem Stab gehören dem Ziel ihrer Weiterleitung (design.md D7): sonst
-    // finge der Rahmen sie bei ausgeblendetem Stab ab, bevor sie umleiten.
+    // Die Altpfade unter `stab/` gehören dem Ziel ihrer Weiterleitung (design.md D7), damit der
+    // Rahmen sie nach dessen Freigabe gatet.
     expect(modulAusPfad('/einsaetze/7/stab/funkplan')?.key).toBe('fernmeldewesen');
     expect(modulAusPfad('/einsaetze/7/stab/kommunikationsplan')?.key).toBe('fernmeldewesen');
-    expect(modulAusPfad('/einsaetze/7/stab/funkplanung')?.key).toBe('stab');
+    // Den Stab gibt es nicht mehr (i6k6mzed, design.md D8): seine übrigen Adressen gehören keinem
+    // Modul und leiten in den Einsatz.
+    expect(modulAusPfad('/einsaetze/7/stab/funkplanung')).toBeNull();
     // Informationstelefon (i6k6mzed, design.md D3): eigenes Modul, die Altadresse gehört ihm.
     expect(modulAusPfad('/einsaetze/7/infotelefon')?.key).toBe('infotelefon');
     expect(modulAusPfad('/einsaetze/7/stab/infotelefon')?.key).toBe('infotelefon');
-    expect(modulAusPfad('/einsaetze/7/stab/presse')?.key).toBe('stab');
+    expect(modulAusPfad('/einsaetze/7/stab/presse')).toBeNull();
+    expect(modulAusPfad('/einsaetze/7/stab')).toBeNull();
     // Der Einsatzbericht (LFH-726) erbt die Einsatzdaten: nie ausgeblendet, nie gesperrt.
     expect(modulAusPfad('/einsaetze/7/einsatzdaten/bericht')?.key).toBe('einsatzdaten');
     expect(modulAusPfad('/einsaetze/7/verpflegung/3/ausgabe')?.key).toBe('verpflegung');

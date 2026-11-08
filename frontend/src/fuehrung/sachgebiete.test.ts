@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { modulRegistry } from '../einsatz/modulRegistry';
 import { mitWirksamemLabel, SACHGEBIETE } from './sachgebiete';
-import { unterseitenFuer } from '../stab/unterseiten';
 
 describe('SACHGEBIETE', () => {
   it('führt genau die sechs Sachgebiete in Anlage-2-Reihenfolge', () => {
@@ -21,62 +19,6 @@ describe('SACHGEBIETE', () => {
       'Versorgung',
       'Presse- und Medienarbeit',
       'Information und Kommunikation',
-    ]);
-  });
-
-  it('trägt je Zeile einen Aufgaben-Kurztext mit Seite aus Anlage 2 (S. 55–60)', () => {
-    SACHGEBIETE.forEach((s, i) => {
-      expect(s.aufgaben.length).toBeGreaterThan(0);
-      expect(s.seite).toBe(55 + i);
-    });
-  });
-
-  /** Ein vertippter Schlüssel fiele sonst still aus der Kachel — ohne Fehlerbild. */
-  it('verweist nur auf existierende Registry-Module und Unterseiten', () => {
-    const keys = new Set(modulRegistry.map((m) => m.key));
-    for (const s of SACHGEBIETE) {
-      const seiten = new Set(unterseitenFuer(s.sachgebiet).map((u) => u.key));
-      for (const w of s.werkzeuge) {
-        const bekannt = w.art === 'modul' ? keys.has(w.key) : seiten.has(w.key);
-        expect(bekannt, `${s.kuerzel}: ${w.art} ${w.key}`).toBe(true);
-      }
-    }
-  });
-
-  /** Literale je Kachel, damit ein stiller Tausch auffällt (design.md D2, LLH-1124). */
-  const keysVon = (sg: string) =>
-    SACHGEBIETE.find((s) => s.sachgebiet === sg)!.werkzeuge.map((w) => w.key);
-
-  it('S1 und S4 führen beide Nachforderungen', () => {
-    expect(keysVon('s1')).toEqual([
-      'personal',
-      'einheiten',
-      'bereitstellungsraeume',
-      'nachforderungen',
-    ]);
-    expect(keysVon('s4')).toEqual(['nachforderungen', 'verpflegung', 'material']);
-  });
-
-  it('S2 und S3 führen ihre Arbeitsmodule', () => {
-    expect(keysVon('s2')).toEqual(['lagekarte', 'lagemeldungen', 'etb']);
-    expect(keysVon('s3')).toEqual(['einsatzabschnitte', 'auftraege', 'meldungen']);
-  });
-
-  it('S5 führt die Pressearbeit als Unterseite und das Informationstelefon als Modul (i6k6mzed)', () => {
-    expect(SACHGEBIETE.find((s) => s.sachgebiet === 's5')!.werkzeuge).toEqual([
-      { art: 'seite', key: 'presse' },
-      { art: 'modul', key: 'infotelefon' },
-    ]);
-  });
-
-  it('S6 führt die vier Fernmelde-Einstiege in dieser Reihenfolge, keine Module anderer Sachgebiete', () => {
-    const s6 = SACHGEBIETE.find((s) => s.sachgebiet === 's6')!.werkzeuge;
-    expect(s6.every((w) => w.art === 'seite')).toBe(true);
-    expect(s6.map((w) => w.key)).toEqual([
-      'funkplan',
-      'fernmeldeskizze',
-      'sprechgruppen',
-      'kommunikationsplan',
     ]);
   });
 });

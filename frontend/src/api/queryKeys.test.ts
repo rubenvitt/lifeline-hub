@@ -26,9 +26,8 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.br).toBe('einsatz-br');
     expect(EINSATZ_KEYS.brDetail).toBe('einsatz-br-detail');
     expect(EINSATZ_KEYS.brVerlauf).toBe('einsatz-br-verlauf');
-    // Als HANDGESCHRIEBENES Literal, nicht über `EINSATZ_KEYS.stab`, sonst prüfte der Pin die
+    // Als HANDGESCHRIEBENES Literal, nicht über `EINSATZ_KEYS.…`, sonst prüfte der Pin die
     // Konstante gegen sich selbst. Ein geänderter Query-Key trifft still ein anderes Cache-Fach.
-    expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
     expect(EINSATZ_KEYS.lagebesprechung).toBe('einsatz-lagebesprechung');
     expect(EINSATZ_KEYS.fernmeldewesen).toBe('einsatz-fernmeldewesen');
     expect(EINSATZ_KEYS.modulZaehler).toBe('einsatz-modul-zaehler');
@@ -38,7 +37,6 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
     expect(EINSATZ_KEYS.evakuierung).toBe('einsatz-evakuierung');
     expect(EINSATZ_KEYS.verpflegung).toBe('einsatz-verpflegung');
-    expect(EINSATZ_KEYS.presse).toBe('einsatz-presse');
     expect(EINSATZ_KEYS.infotelefon).toBe('einsatz-infotelefon');
     expect(EINSATZ_KEYS.schadenAnhaenge).toBe('einsatz-schaden-anhaenge');
     expect(EINSATZ_KEYS.personAnhaenge).toBe('einsatz-person-anhaenge');
@@ -162,7 +160,6 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.karte_bild).toEqual([EINSATZ_KEYS.kartenbilder]);
     // Das DTO trägt keine Nachforderungsdaten, also kein Fan-out.
     expect(EINSATZ_STREAM_EVENTS.verpflegung).toEqual([EINSATZ_KEYS.verpflegung]);
-    expect(EINSATZ_STREAM_EVENTS.presse).toEqual(['einsatz-presse']);
     expect(EINSATZ_STREAM_EVENTS.infotelefon).toEqual(['einsatz-infotelefon']);
   });
 
@@ -220,7 +217,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
 
   // LLH-1111: die Lagebesprechung ist ein eigenes Modul. Ihr Ereignis trifft Stand und Verlauf
   // (gleicher Prefix); `einsatz` zieht sie mit, weil der Termin auch im Einsatzkopf steht.
-  it('bildet lagebesprechung und einsatz auf das eigene Modul ab, nicht mehr auf den Stab', () => {
+  it('bildet lagebesprechung und einsatz auf das eigene Modul ab', () => {
     expect(EINSATZ_STREAM_EVENTS.lagebesprechung).toEqual(['einsatz-lagebesprechung']);
     expect(EINSATZ_STREAM_EVENTS.einsatz).toEqual([
       'einsatz',
@@ -232,15 +229,15 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       'einsatz-programmpunkte',
       'einsatz-lagemonitor',
     ]);
-    expect(EINSATZ_STREAM_EVENTS.einsatz).not.toContain('einsatz-stab');
   });
 
   // LLH-1180: Kommunikationsplan und Skizze gehören dem Fernmeldewesen. Sein Ereignis trifft nur
   // den eigenen Prefix. Seit i6k6mzed (design.md D2) lösen Aufträge und Erinnerungen über die
-  // Mitgliedschaft auf: `mitglieder` zieht sie mit, `stab` trifft nur noch die Stab-Seite.
-  it('bildet fernmeldewesen auf das eigene Modul ab, stab nicht mehr auf Kommunikationsplan und Skizze', () => {
+  // Mitgliedschaft auf: `mitglieder` zieht sie mit. Ein Ereignis `stab` gibt es nicht mehr.
+  it('bildet fernmeldewesen auf das eigene Modul ab, mitglieder auf Aufträge und Erinnerungen', () => {
     expect(EINSATZ_STREAM_EVENTS.fernmeldewesen).toEqual(['einsatz-fernmeldewesen']);
-    expect(EINSATZ_STREAM_EVENTS.stab).toEqual(['einsatz-stab']);
+    expect(EINSATZ_STREAM_EVENTS).not.toHaveProperty('stab');
+    expect(EINSATZ_STREAM_EVENTS).not.toHaveProperty('presse');
     expect(EINSATZ_STREAM_EVENTS.mitglieder).toEqual([
       'einsatz-mitglieder',
       'einsatz-auftraege',
@@ -322,7 +319,6 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.auftraege(1)).toEqual(['einsatz-auftraege', 1]);
     expect(einsatzKeys.nachforderungen(1)).toEqual(['einsatz-nachforderungen', 1]);
     expect(einsatzKeys.etb(1)).toEqual(['etb', 1]);
-    expect(einsatzKeys.stab(1)).toEqual(['einsatz-stab', 1]);
     expect(einsatzKeys.dokumente(1)).toEqual(['einsatz-dokumente', 1]);
     expect(einsatzKeys.pegel(1)).toEqual(['einsatz-pegel', 1]);
     expect(einsatzKeys.pegelVorhersage(1, 7)).toEqual(['einsatz-pegel', 1, 'vorhersage', 7]);
@@ -458,8 +454,6 @@ describe('einsatzKeys (Factory-Output)', () => {
       'kommunikationsplan',
     ]);
     expect(einsatzKeys.fernmeldewesenSkizze(1)).toEqual(['einsatz-fernmeldewesen', 1, 'skizze']);
-    // LFH-551: unter demselben Prefix — das `stab`-Ereignis zieht die Checkliste mit.
-    expect(einsatzKeys.stabCheckliste(1)).toEqual(['einsatz-stab', 1, 'checkliste']);
     // Liste und Vorgaben UNTER dem Ablösungs-Prefix: das `abloesung`-Ereignis trifft beide.
     expect(einsatzKeys.abloesungen(1)).toEqual(['einsatz-abloesungen', 1]);
     expect(einsatzKeys.abloesungListe(1, 'laufend')).toEqual([
@@ -516,11 +510,6 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.evakuierung(1)).toEqual(['einsatz-evakuierung', 1]);
     expect(einsatzKeys.evakuierungVerlauf(1, 5)).toEqual(['einsatz-evakuierung', 1, 'verlauf', 5]);
     expect(einsatzKeys.verpflegung(1)).toEqual(['einsatz-verpflegung', 1]);
-    // Presse S5: Listen und Detail als Sub-Keys unter EINEM Prefix, das `presse`-Ereignis trifft alle.
-    expect(einsatzKeys.presse(1)).toEqual(['einsatz-presse', 1]);
-    expect(einsatzKeys.medienkontakte(1)).toEqual(['einsatz-presse', 1, 'medienkontakte']);
-    expect(einsatzKeys.pressemitteilungen(1)).toEqual(['einsatz-presse', 1, 'mitteilungen']);
-    expect(einsatzKeys.pressemitteilung(1, 4)).toEqual(['einsatz-presse', 1, 'mitteilung', 4]);
     expect(einsatzKeys.infotelefon(1)).toEqual(['einsatz-infotelefon', 1]);
     // Informationstelefon (LLH-732): Seitenkette, Zählung und Einzelabruf unter EINEM Prefix.
     expect(einsatzKeys.infotelefonListe(1, 'offen')).toEqual([
@@ -876,22 +865,8 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
   it('ohne Kennung fällt die Zuordnung auf die Prefixe zurück', () => {
     expect(ziele('lagebericht', { einsatz_id: 7 })).toBeNull();
     expect(ziele('schaden', { einsatz_id: 7 })).toBeNull();
-    expect(ziele('presse', { einsatz_id: 7 })).toBeNull();
     // Das Informationstelefon gleicht immer über den Prefix ab: Liste, Zählung, Einzelabruf.
     expect(EINSATZ_STREAM_ZIELE.infotelefon).toBeUndefined();
-  });
-
-  it('ein Medienkontakt gleicht seine Zeile ab, eine Pressemitteilung nie das Presse-Log', () => {
-    expect(ziele('presse', { einsatz_id: 7, medienkontakt_id: 12 })).toEqual([
-      { art: 'zeile', ziel: 'medienkontakte', id: 12 },
-      { art: 'key', key: einsatzKeys.medienkontaktKennzahlen(7) },
-    ]);
-    const mitteilung = ziele('presse', { einsatz_id: 7, pressemitteilung_id: 5 });
-    expect(mitteilung).toEqual([
-      { art: 'key', key: einsatzKeys.pressemitteilungen(7) },
-      { art: 'key', key: einsatzKeys.pressemitteilung(7, 5) },
-    ]);
-    expect(JSON.stringify(mitteilung)).not.toContain('medienkontakte');
   });
 
   it('ein Anhang trifft nur die Anhangliste, sonst Zeile und Geschädigten-Listen', () => {
@@ -913,7 +888,6 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
         { lagebericht_id: 1, anlagen: true },
       ],
       befehl: [{ befehl_id: 1 }, { befehl_id: 1, anlagen: true }],
-      presse: [{ medienkontakt_id: 1 }, { pressemitteilung_id: 1 }],
       schaden: [{ schaden_id: 1 }, { schaden_id: 1, anhang: true }],
     };
     for (const [event, payloads] of Object.entries(proben)) {

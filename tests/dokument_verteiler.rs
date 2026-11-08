@@ -157,31 +157,6 @@ async fn neues_dokument_hat_einen_leeren_verteiler() {
 }
 
 #[tokio::test]
-async fn pressemitteilung_traegt_keinen_verteiler() {
-    let u = umgebung().await;
-    let basis = format!("/api/einsaetze/{}/stab/pressemitteilungen", u.einsatz);
-    let (s, pm) = anfrage(
-        &u.app,
-        "POST",
-        &basis,
-        &u.admin,
-        Some(r#"{"vorlage":"erstinformation","titel":"X","abschnitte":[{"schluessel":"sachverhalt","text":"a"}]}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{pm:?}");
-    assert!(!pm.as_object().unwrap().contains_key("verteiler"), "{pm:?}");
-    let (s, j) = anfrage_json(
-        &u.app,
-        "PATCH",
-        &format!("{basis}/{}", pm["id"]),
-        &u.admin,
-        Some(&json!({"verteiler": [s3()]})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
-}
-
-#[tokio::test]
 async fn verteiler_wird_ersetzt_und_ein_patch_ohne_feld_laesst_ihn_stehen() {
     let u = umgebung().await;
     let sued = u.abschnitt("EA Süd").await;

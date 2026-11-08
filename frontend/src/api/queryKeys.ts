@@ -82,7 +82,6 @@ export const EINSATZ_KEYS = {
   befehlAnlagen: 'einsatz-befehl-anlagen',
   kartenAnsicht: 'einsatz-karten-ansicht',
   lageSnapshot: 'einsatz-lage-snapshot',
-  stab: 'einsatz-stab',
   // Lagebesprechung (LLH-1111): Stand und Verlauf unter EINEM Prefix, eigenes Ereignis.
   lagebesprechung: 'einsatz-lagebesprechung',
   // Fernmeldewesen (LLH-1180): Kommunikationsplan und Skizze unter EINEM Prefix, eigenes Ereignis.
@@ -103,10 +102,8 @@ export const EINSATZ_KEYS = {
   // Evakuierungsbezirke (LLH-1034): eigenes Modul neben der Betreuung, eigener Prefix.
   evakuierung: 'einsatz-evakuierung',
   verpflegung: 'einsatz-verpflegung',
-  // Presse- und Medienarbeit S5 (LFH-554): Presse-Log und Pressemitteilungen unter EINEM Prefix.
-  // Das Informationstelefon (seit i6k6mzed ein eigenes Modul) unter einem eigenen. Beide NICHT im
-  // Lagebild offline (Personenbezug).
-  presse: 'einsatz-presse',
+  // Informationstelefon (LFH-554, seit i6k6mzed ein eigenes Modul): NICHT im Lagebild offline
+  // (Personenbezug).
   infotelefon: 'einsatz-infotelefon',
   // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
   einsatz: 'einsatz',
@@ -351,10 +348,6 @@ export const EINSATZ_STREAM_EVENTS = {
   // „Für den Einsatz speichern“ aktualisiert den Ansichts-Switcher aller Betrachter.
   karten_ansicht: [EINSATZ_KEYS.kartenAnsicht],
   lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
-  // Stab-Seite (Besetzung S1–S6 und Checkliste unter EINEM Prefix). Die Lagebesprechung
-  // (LLH-1111) und das Fernmeldewesen (LLH-1180) haben ihr eigenes Ereignis. Aufträge und
-  // Erinnerungen lösen seit i6k6mzed über die Mitgliedschaft auf (`mitglieder`).
-  stab: [EINSATZ_KEYS.stab],
   // Mitgliederliste (i6k6mzed, design.md D2): Aufnahme, Rolle, Führungsfunktion, Entfernen. Aus ihr
   // lösen Aufträge und Erinnerungen an ein Sachgebiet zur Lesezeit auf (LFH-549), Organigramm,
   // Fernmeldeskizze und Kommunikationsplan lesen sie direkt. Aufträge und Erinnerungen sind
@@ -406,9 +399,6 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.programmpunkte,
     EINSATZ_KEYS.lagemonitor,
   ],
-  // Medienkontakte, Pressemitteilungen und ihre Details unter EINEM Prefix. Die Freigabe schreibt
-  // den ETB-Snapshot; der kommt über das eigene `etb`-Ereignis.
-  presse: [EINSATZ_KEYS.presse],
   // Anrufe des Moduls Informationstelefon; der Server gatet das Ereignis nach `infotelefon`.
   infotelefon: [EINSATZ_KEYS.infotelefon],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
@@ -416,7 +406,7 @@ export const EINSATZ_STREAM_EVENTS = {
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
 
 /** Listen, die ein Live-Ereignis zeilenweise abgleicht (`live/zeilenAbgleich.ts`, LFH-931). */
-export type ZeilenZiel = 'medienkontakte' | 'schaeden';
+export type ZeilenZiel = 'schaeden';
 
 /** Ein gezielter Abgleich: einen Key (samt Prefix-Match) oder eine Zeile einer Liste. */
 export type LiveAbgleich =
@@ -470,20 +460,6 @@ export const EINSATZ_STREAM_ZIELE: Partial<
       (id) => einsatzKeys.befehl(e, id),
       (id) => einsatzKeys.befehlAnlagen(e, id),
     )(p),
-  // Ein Ereignis teilt sich der Name mit den Pressemitteilungen: Medienkontakte gleichen
-  // zeilenweise ab, Mitteilungen wie ein Dokument. Keines von beiden trifft das andere.
-  presse: (p, e) => {
-    const kid = kennung(p, 'medienkontakt_id');
-    // Die Kennzahlen zählen den ganzen Bestand; sie gleichen bei jeder Änderung ab (LFH-1075).
-    if (kid !== null)
-      return [
-        { art: 'zeile', ziel: 'medienkontakte', id: kid },
-        key(einsatzKeys.medienkontaktKennzahlen(e)),
-      ];
-    return dokument('pressemitteilung_id', einsatzKeys.pressemitteilungen(e), (id) =>
-      einsatzKeys.pressemitteilung(e, id),
-    )(p);
-  },
   // `anhang`: eine Datei am Schaden; Liste und Marker tragen davon nichts.
   schaden: (p, e) => {
     const sid = kennung(p, 'schaden_id');
@@ -816,8 +792,6 @@ export const einsatzKeys = {
   personDruck: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personDruck, einsatzId, personId] as const,
 
-  // Stab: Führungsorganisation S1–S6.
-  stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,
   // Lagebesprechung (LLH-1111): Stand; der Verlauf hängt als Sub-Key unter DEMSELBEN Prefix.
   lagebesprechung: (einsatzId: number) => [EINSATZ_KEYS.lagebesprechung, einsatzId] as const,
   lagebesprechungen: (einsatzId: number) =>
@@ -867,53 +841,18 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.evakuierung, einsatzId, 'verlauf', bezirkId] as const,
   // Verpflegung: ein Abruf trägt alle Zeitfenster samt Deckung und Ausgaben.
   verpflegung: (einsatzId: number) => [EINSATZ_KEYS.verpflegung, einsatzId] as const,
-  // Presse S5 (LFH-554): argumentlos = Invalidierungs-Prefix; Listen und Detail als Sub-Keys.
-  presse: (einsatzId: number) => [EINSATZ_KEYS.presse, einsatzId] as const,
-  medienkontakte: (einsatzId: number) =>
-    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte'] as const,
-  /** Alle offenen Medienkontakte (LFH-1075). */
-  medienkontakteOffen: (einsatzId: number) =>
-    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'offen'] as const,
-  /**
-   * Seitenkette der erledigten Medienkontakte (LFH-1075); ohne `arten` zugleich der Prefix aller
-   * Ketten, mit ihnen die am Server nach Art gefilterte (LLH-1096, letztes Glied `anfrage,termin`).
-   */
-  medienkontakteErledigt: (einsatzId: number, arten: readonly string[] = []) =>
-    arten.length
-      ? ([
-          EINSATZ_KEYS.presse,
-          einsatzId,
-          'medienkontakte',
-          'abgeschlossen',
-          arten.join(','),
-        ] as const)
-      : ([EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'abgeschlossen'] as const),
-  /** Zahlen und Medien über den ganzen Bestand, Grundlage der Medienlage (LFH-1075). */
-  medienkontaktKennzahlen: (einsatzId: number) =>
-    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'kennzahlen'] as const,
-  /** Ein Medienkontakt für den Deeplink auf eine nicht geladene Zeile (LFH-1075). */
-  medienkontaktEinzeln: (einsatzId: number, kontaktId: number) =>
-    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'einzeln', kontaktId] as const,
-  medienkontaktEinzelnAlle: (einsatzId: number) =>
-    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'einzeln'] as const,
-  pressemitteilungen: (einsatzId: number) =>
-    [EINSATZ_KEYS.presse, einsatzId, 'mitteilungen'] as const,
-  pressemitteilung: (einsatzId: number, mitteilungId: number) =>
-    [EINSATZ_KEYS.presse, einsatzId, 'mitteilung', mitteilungId] as const,
   // Informationstelefon (LLH-732): argumentlos = Invalidierungs-Prefix, das `infotelefon`-Ereignis
   // trifft Seitenkette, Zählung und Einzelabruf zusammen.
   infotelefon: (einsatzId: number) => [EINSATZ_KEYS.infotelefon, einsatzId] as const,
   /** Seitenkette des Protokolls je Sicht der Segmentleiste. */
   infotelefonListe: (einsatzId: number, sicht: 'alle' | 'offen') =>
     [EINSATZ_KEYS.infotelefon, einsatzId, 'liste', sicht] as const,
-  /** Zahlen über den ganzen Bestand: Kennzahlen, „Nach Anliegen“, Medienlage. */
+  /** Zahlen über den ganzen Bestand: Kennzahlen und „Nach Anliegen“. */
   infotelefonZaehler: (einsatzId: number) =>
     [EINSATZ_KEYS.infotelefon, einsatzId, 'zaehler'] as const,
   /** Ein Anruf für den Deeplink auf eine nicht geladene Zeile. */
   infotelefonAnruf: (einsatzId: number, anrufId: number) =>
     [EINSATZ_KEYS.infotelefon, einsatzId, 'anruf', anrufId] as const,
-  /** Checkliste Arbeitsaufnahme (LFH-551), ebenfalls unter dem Stab-Prefix: kein eigenes Ereignis. */
-  stabCheckliste: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId, 'checkliste'] as const,
   /**
    * Kommunikationsplan (LFH-848), unter dem Prefix des Fernmeldewesens (LLH-1180): das
    * `fernmeldewesen`-Ereignis trifft ihn mit. Als einziger Key des Moduls ohne Netz lesbar
@@ -1399,9 +1338,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Führungsstelle (LFH-849: Telefon und Verbindungen sind personenbezogen), der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), die externen
  * Stellen (LFH-1194: ohne Netz bleibt die meldende Stelle Freitext; Rufnummern), die
- * Schichtmodelle (LLH-1122: der Einsatz trägt seine Kopie), dazu S5
- * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
- * LFH-554 design.md D8, offen mit LFH-767), die Daten der Fernmeldeskizze (LFH-893: bearbeitet
+ * Schichtmodelle (LLH-1122: der Einsatz trägt seine Kopie), das Informationstelefon
+ * (Rückrufnummern, LFH-554 design.md D8, offen mit LFH-767), die Daten der Fernmeldeskizze (LFH-893: bearbeitet
  * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“), die Bild-Anlagen an
  * Lagebericht und Befehl (LFH-1028: ohne Netz lädt kein Bild), die Tierliste und mit ihr die
  * Kartenebene „Tiere" (LLH-1123: sie trägt Halterkontakt und Kennzeichnung; ohne Netz zeigt die
@@ -1468,7 +1406,7 @@ export const LAGEBILD_OFFLINE = {
     [EINSATZ_KEYS.meldungen, 'rueckmeldungen'],
     // Kommunikationsplan (LFH-848, design.md D9): die Telefonliste wird gebraucht, wenn der Server
     // weg ist. Die Skizze unter demselben Prefix bleibt draußen (LLH-1180: Prefix des
-    // Fernmeldewesens; der Stab hat nichts mehr offline).
+    // Fernmeldewesens).
     [EINSATZ_KEYS.fernmeldewesen, 'kommunikationsplan'],
   ],
   global: [
