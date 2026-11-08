@@ -245,20 +245,31 @@ Für Einsatzleitung und Führungspersonal:
 Soll es anders laufen, unter „Art“ „Besatzungswechsel“ oder „Ganze Einheit“ wählen. Endet der
 Posten, steht „Ganze Einheit“ ohne ablösende Einheit bereit, und der Knopf heißt „Abziehen“.
 
-### An der UHS und in der Pause wechseln
+### An der UHS wechseln
 
-Blöcke an einer Unfallhilfsstelle und in der Zeile „Pause“ wechseln im Schichtplan selbst. Für
-Einsatzleitung und Führungspersonal mit den Modulen Personal und, an der UHS, Unfallhilfsstellen:
+Blöcke an einer Unfallhilfsstelle wechseln im Schichtplan selbst. Für Einsatzleitung und
+Führungspersonal mit den Modulen Personal und Unfallhilfsstellen:
 
 1. Im Schichtplan den Block öffnen und „Wechsel vollziehen“ wählen.
-2. An der UHS stehen „Kommt“, „Geht“ und „Bleibt“, vorbelegt aus dem Block und der UHS. Wer nicht
-   wechseln soll, abwählen. „neu im Einsatz“ kommt erst mit dem Wechsel in den Einsatz, „von …“
-   wechselt von einer anderen UHS.
+2. Unter „Kommt“, „Geht“ und „Bleibt“ stehen die Kräfte, vorbelegt aus dem Block und der UHS. Wer
+   nicht wechseln soll, abwählen. „neu im Einsatz“ kommt erst mit dem Wechsel in den Einsatz,
+   „von …“ wechselt von einer anderen UHS.
 3. „Wechsel vollziehen“ wählen.
 
-In der Pause heißt der Knopf zum Beginn „Pause beginnen“: Wer im Block steht und im Einsatz ist,
-bekommt den Status „Pause“; „Nicht im Einsatz“ nennt, wer übersprungen wird. Zum Ende heißt er
-„Pause beenden“: Unter „Zurück“ steht, wer seinen vorigen Status wiederbekommt.
+Unter „Vollzogen“ steht jeder Wechsel des Blocks mit „Zurücknehmen“.
+
+### In der Pause wechseln
+
+Blöcke in der Zeile „Pause“ wechseln ebenfalls im Schichtplan. Für Einsatzleitung und
+Führungspersonal mit dem Modul Personal:
+
+1. Im Schichtplan den Pausenblock öffnen und „Wechsel vollziehen“ wählen.
+2. „Pause beginnen“ wählen. Wer im Block steht und im Einsatz ist, bekommt den Status „Pause“;
+   „Nicht im Einsatz“ nennt, wer übersprungen wird. Wer schon „Pause“ trägt, erfasst der Beginn
+   nicht; beim Ende bekommt er deshalb keinen früheren Status zurück, sein Status ist danach von
+   Hand zu prüfen.
+3. Zum Ende der Pause den Block wieder öffnen, „Wechsel vollziehen“ und dann „Pause beenden“
+   wählen. Unter „Zurück“ steht, wer seinen vorigen Status wiederbekommt.
 
 Unter „Vollzogen“ steht jeder Wechsel des Blocks mit „Zurücknehmen“.
 
@@ -307,13 +318,14 @@ dabei, wie sie ist. Wer ohne Einheit kommt, bekommt in der Kräfte-Zeitachse ein
 ohne Einheit geht, eine Ablösung; wer zu einer Einheit gehört, folgt deren Zeitachse.
 
 Welcher Status „Pause“ ist, legen die Stammdaten fest (Schalter „Pause im Schichtplan“ am
-Personal-Status). Trägt ihn keiner, ist der Wechsel in der Pause gesperrt. Das Ende gibt nur
+Personal-Status). Trägt ihn keiner, lässt sich keine Pause beginnen; eine begonnene Pause lässt
+sich trotzdem beenden. Das Ende gibt nur
 zurück, wer dann noch „Pause“ trägt; wer zwischendurch einen anderen Status bekam, behält ihn. Ein
 Block mit begonnener Pause lässt sich erst löschen oder in eine andere Zeile schieben, wenn die
 Pause beendet oder ihr Beginn zurückgenommen ist.
 
 Jeder Block wechselt einmal je Art: an der UHS einmal, in der Pause einmal zum Beginn und einmal
-zum Ende. Die Rücknahme legt nur zurück, was noch so steht, wie der Wechsel es hinterließ; den
+zum Ende. Ist ein Wechsel zurückgenommen, lässt sich dieselbe Art erneut vollziehen. Die Rücknahme legt nur zurück, was noch so steht, wie der Wechsel es hinterließ; den
 Beginn einer Pause erst, wenn ihr Ende zurückgenommen ist. Wer erst mit dem Wechsel in den
 Einsatz kam, bleibt im Einsatz. Jeder Wechsel und jede Rücknahme steht im Einsatztagebuch, etwa
 „Wechsel UHS «Markt»: Geht «Anna». Kommt «Ben». Bleibt «Dana».“

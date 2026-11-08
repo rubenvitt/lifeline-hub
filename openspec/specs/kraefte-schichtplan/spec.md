@@ -136,7 +136,7 @@ verlangen (403); eine aufgelöste oder stornierte UHS MUST 409 sein.
 Das System SHALL zum Beginn eines Pausenblocks den Kräften des Blocks den Status setzen, den der
 Katalog als Pause kennzeichnet (höchstens einer je Organisation), und zum Ende den vorigen Status
 zurückgeben (auch einen leeren), wenn die Kraft dann noch den Pausenstatus trägt. Ohne gekennzeichneten Status MUST
-der Wechsel gesperrt sein (422 mit Grund); ein Ende ohne Beginn MUST 422 sein. Wer nicht im
+der Beginn gesperrt sein (422 mit Grund), das Ende einer begonnenen Pause MUST weiter gehen; ein Ende ohne Beginn MUST 422 sein. Wer nicht im
 Einsatz ist, MUST übersprungen und genannt werden. Der Wechsel MUST die Freigabe des Moduls
 Personal verlangen (403).
 
