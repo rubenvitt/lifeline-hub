@@ -8,6 +8,9 @@ import { jetztUndNaechstes, type Ampel, type RasterBlock, type RasterZeile } fro
  * Der Schichtplan auf dem Handy (LLH-1554): statt des Rasters eine Liste je Posten mit „jetzt“
  * und „als Nächstes“. Ein Block ist ein Knopf und öffnet denselben Blockdialog wie im Raster;
  * angelegt wird über „Block anlegen“ der Ansicht. Fachneutral wie das Raster.
+ *
+ * `alleBloecke` (Vorplanung, LLH-1586): je Posten alle Blöcke nach Beginn statt „jetzt“ und „als
+ * Nächstes“; eine Planung liegt meist in der Zukunft, „jetzt“ wäre immer leer.
  */
 
 const AMPEL_TON: Record<Ampel, StatusTon> = {
@@ -23,6 +26,8 @@ interface SchichtplanListeProps {
   jetzt: number;
   formatZeit: (ms: number) => string;
   onOeffnen: (blockId: number) => void;
+  /** Alle Blöcke je Posten nach Beginn, ohne „jetzt“ und „als Nächstes“. */
+  alleBloecke?: boolean;
 }
 
 export default function SchichtplanListe({
@@ -31,6 +36,7 @@ export default function SchichtplanListe({
   jetzt,
   formatZeit,
   onOeffnen,
+  alleBloecke = false,
 }: SchichtplanListeProps) {
   const { token, rollen } = useRollen();
   let letzteGruppe: string | null | undefined;
@@ -40,7 +46,10 @@ export default function SchichtplanListe({
         const kopf = z.gruppe !== letzteGruppe && z.gruppe != null;
         letzteGruppe = z.gruppe;
         const { jetzt: laufend, naechstes } = jetztUndNaechstes(bloecke, z.schluessel, jetzt);
-        const zeile = (wort: string, b: RasterBlock | null) => {
+        const eigene = alleBloecke
+          ? bloecke.filter((b) => b.zeile === z.schluessel).sort((a, b) => a.von - b.von)
+          : [];
+        const zeile = (wort: string | null, b: RasterBlock | null) => {
           if (!b)
             return (
               <div
@@ -51,7 +60,9 @@ export default function SchichtplanListe({
                   alignItems: 'center',
                 }}
               >
-                <span style={{ color: rollen.gedaempft, minWidth: '7em' }}>{wort}</span>
+                {wort != null && (
+                  <span style={{ color: rollen.gedaempft, minWidth: '7em' }}>{wort}</span>
+                )}
                 <span style={{ color: rollen.gedaempft }}>—</span>
               </div>
             );
@@ -62,7 +73,7 @@ export default function SchichtplanListe({
               type="button"
               data-lfh="schichtplan-listen-block"
               data-block-id={b.id}
-              aria-label={`${z.titel} ${wort} ${zeit}, ${b.text}, ${b.ampelWort}`}
+              aria-label={`${z.titel}${wort != null ? ` ${wort}` : ''} ${zeit}, ${b.text}, ${b.ampelWort}`}
               onClick={() => onOeffnen(b.id)}
               style={{
                 display: 'flex',
@@ -82,7 +93,7 @@ export default function SchichtplanListe({
                 cursor: 'pointer',
               }}
             >
-              <span style={{ minWidth: '7em' }}>{wort}</span>
+              {wort != null && <span style={{ minWidth: '7em' }}>{wort}</span>}
               <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>{zeit}</span>
               <span
                 style={{
@@ -121,10 +132,20 @@ export default function SchichtplanListe({
               <Typography.Text strong style={{ display: 'block' }}>
                 {z.titel}
               </Typography.Text>
-              {laufend.length === 0
-                ? zeile('jetzt', null)
-                : laufend.map((b) => <Fragment key={b.id}>{zeile('jetzt', b)}</Fragment>)}
-              {zeile('als Nächstes', naechstes)}
+              {alleBloecke ? (
+                eigene.length === 0 ? (
+                  zeile(null, null)
+                ) : (
+                  eigene.map((b) => <Fragment key={b.id}>{zeile(null, b)}</Fragment>)
+                )
+              ) : (
+                <>
+                  {laufend.length === 0
+                    ? zeile('jetzt', null)
+                    : laufend.map((b) => <Fragment key={b.id}>{zeile('jetzt', b)}</Fragment>)}
+                  {zeile('als Nächstes', naechstes)}
+                </>
+              )}
             </div>
           </Fragment>
         );

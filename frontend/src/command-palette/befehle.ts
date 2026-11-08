@@ -21,7 +21,7 @@ import {
   modulZielRoute,
   type KategorieKey,
 } from '../einsatz/modulRegistry';
-import { darfVerwaltung } from '../einsatz/schreibrecht';
+import { darfPlanen, darfVerwaltung } from '../einsatz/schreibrecht';
 import { sprungmarken, sprungVoraussetzungGesperrt, sprungZiel } from '../einsatz/sprungmarken';
 import {
   bereitstellungsraeumeListePfad,
@@ -36,6 +36,7 @@ import {
   infotelefonPfad,
   lagekartePfad,
   personenPfad,
+  planungenPfad,
   schaedenPfad,
   lagebesprechungPfad,
   tierePfad,
@@ -573,6 +574,16 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       label: 'Administration',
       icon: IconZahnrad,
       ...sprungZu('/admin', k.navigate),
+    });
+  }
+  // Vorplanung ohne Einsatz (LLH-1586): wie der Eintrag in der Kopfleiste nur für Planer.
+  if (darfPlanen(k.benutzer)) {
+    befehle.push({
+      id: 'nav:planungen',
+      gruppe: 'navigation',
+      label: 'Planungen',
+      icon: IconListe,
+      ...sprungZu(planungenPfad(), k.navigate),
     });
   }
   // Die Benutzerverwaltung bleibt strenger: `/benutzer` leitet auf `/admin/benutzer`, und

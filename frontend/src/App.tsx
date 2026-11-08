@@ -153,6 +153,9 @@ const GeraetAbschnittKarte = lazy(() => import('./geraet/GeraetAbschnittKarte'))
 // Hilfe (LFH-1096): eigener Chunk mit den Kapiteltexten; der Service Worker hält ihn vor.
 const HilfePage = lazy(() => import('./hilfe/HilfePage'));
 const NeuigkeitenPage = lazy(() => import('./neuigkeiten/NeuigkeitenPage'));
+// Vorplanung ohne Einsatz (LLH-1586): eigener Chunk, nur Planer kommen hierher.
+const PlanungenPage = lazy(() => import('./planung/PlanungenPage'));
+const PlanungPage = lazy(() => import('./planung/PlanungPage'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -353,6 +356,8 @@ export const appRouten = createRoutesFromElements(
         <Route element={<AppLayout />}>
           <Route path="/einsaetze" element={<EinsaetzePage />} />
           <Route path="/neuigkeiten" element={<NeuigkeitenPage />} />
+          <Route path="/planungen" element={<PlanungenPage />} />
+          <Route path="/planungen/:planungId" element={<PlanungPage />} />
           {/* Alt-Link bleibt als Redirect in die Admin-Sidebar. */}
           <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
           <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
