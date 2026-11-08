@@ -37,6 +37,8 @@ export function ebene1Seite(pathname: string): Ebene1Ort {
   if (teile[0] === 'benachrichtigungen') {
     return { titel: ['Benachrichtigungen'], ort: ['Benachrichtigungen'] };
   }
+  // Vorplanung ohne Einsatz (LLH-1586): die Detailseite bringt ihren eigenen Pfad mit Namen.
+  if (teile[0] === 'planungen') return { titel: ['Planungen'], ort: ['Planungen'] };
   if (teile[0] === 'admin') {
     const sektion = verwaltungsSektion(teile.slice(1));
     return sektion

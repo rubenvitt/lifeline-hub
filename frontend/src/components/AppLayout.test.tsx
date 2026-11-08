@@ -52,6 +52,8 @@ describe('AppLayout (globale Topbar)', () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
+    // Vorplanung (LLH-1586): wer planen darf, sieht „Planungen“.
+    expect(screen.getByRole('link', { name: 'Planungen' })).toHaveAttribute('href', '/planungen');
     // Benutzer ist kein Topbar-Link (steht in der Admin-Sidebar).
     expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
     expect(screen.getByText('Inhalt')).toBeInTheDocument();
@@ -65,6 +67,7 @@ describe('AppLayout (globale Topbar)', () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'Eva' });
     await waitFor(() => expect(screen.getByText('Eva')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Planungen' })).toBeInTheDocument();
     // Der Grund steht als sichtbarer Text (Tag), nicht nur im `title` — bei freier Berechtigung
     // darf er nicht erscheinen.
     expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
@@ -74,6 +77,8 @@ describe('AppLayout (globale Topbar)', () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'keine', anzeigename: 'Max' });
     await waitFor(() => expect(screen.getByText('Max')).toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Verwaltung' })).not.toBeInTheDocument();
+    // „Planungen“ fehlt ganz statt gesperrt (Abstimmung LLH-1586, anders als die Verwaltung).
+    expect(screen.queryByText('Planungen')).not.toBeInTheDocument();
     // Der Grund steht als sichtbarer Tag-Text (auf dem Führungs-Tablet gibt es kein Hover).
     const grundTags = screen.getAllByText('Keine Berechtigung');
     // GENAU einer — sonst bliebe „kein Benutzer-Eintrag" unbewiesen.
@@ -93,11 +98,12 @@ describe('AppLayout (globale Topbar)', () => {
    * `radio: 0` IST DIE NULLAUSSAGE und die einzige, die rot werden kann: sie schlägt an, sobald
    * IRGENDEIN Segmented oder Radio in die Kopfzeile zurückkehrt, unabhängig von der Beschriftung.
    */
-  it('AK1 — die Kopfzeile trägt nur noch 4 Bedienziele (vorher 10)', async () => {
+  it('AK1 — die Kopfzeile trägt nur noch 5 Bedienziele (vorher 10)', async () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
-    expect(bedienzieleNachRolle()).toEqual({ button: 2, radio: 0, link: 2 });
-    expect(zaehleBedienziele()).toBe(4);
+    // Seit LLH-1586 ein Link mehr: „Planungen“ für wer planen darf.
+    expect(bedienzieleNachRolle()).toEqual({ button: 2, radio: 0, link: 3 });
+    expect(zaehleBedienziele()).toBe(5);
   });
 
   /**

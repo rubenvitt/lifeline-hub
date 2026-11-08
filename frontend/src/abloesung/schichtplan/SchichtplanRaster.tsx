@@ -578,8 +578,10 @@ function BlockKachel({
         padding: 0,
         paddingInline: Math.min(token.paddingXS, Math.max(0, breite / 4)),
         margin: 0,
-        border: `1px solid ${ton.kante}`,
-        borderLeftWidth: 3,
+        // Ohne Kurzform: `border` neben `borderLeftWidth` warnt React beim Wechsel der Farbe.
+        borderStyle: 'solid',
+        borderColor: ton.kante,
+        borderWidth: '1px 1px 1px 3px',
         outline: isOver ? `2px solid ${rollen.bedien}` : undefined,
         outlineOffset: 1,
         boxShadow: laeuft ? `inset 0 0 0 1px ${ton.kante}` : undefined,
