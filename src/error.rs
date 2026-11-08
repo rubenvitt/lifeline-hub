@@ -69,6 +69,9 @@ crate::wire_enum::wire_enum! {
         Material => "material",
         /// Schicht eines Schichtplans (Zeitraum, der Index der erzeugten Schicht, LLH-1552).
         Planschicht => "planschicht",
+        /// Zeile einer eingelesenen Datei (Zeilennummer wie in der Tabelle, 0 = die ganze
+        /// Datei, LLH-1556).
+        Dateizeile => "dateizeile",
     }
     try_from = |s| format!("Ungültige Zeilenart: {s}");
 }

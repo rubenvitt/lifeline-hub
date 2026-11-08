@@ -23,8 +23,10 @@ bereiche_von() {
   case "$1" in
     # ── Querbezüge ────────────────────────────────────────────────────────────────────
     # Rust liest: openapi.json und eingabegrenzen.ts (Drift-Tests), die HEIC-Fixtures
-    # (tests/anhang_vorschau.rs), die Modul-Registry (tests/modul_override.rs).
-    frontend/src/api/* | frontend/src/heic/__fixtures__/* | frontend/src/einsatz/modulRegistry.ts)
+    # (tests/anhang_vorschau.rs), die Modul-Registry (tests/modul_override.rs), die
+    # Schichtplan-Beispieldateien (tests/schichtplan_import.rs, LLH-1556).
+    frontend/src/api/* | frontend/src/heic/__fixtures__/* | frontend/src/einsatz/modulRegistry.ts \
+      | frontend/public/beispiele/*)
       echo "rust frontend e2e" ;;
     # Vitest liest: die Fachebenen-Quellen (fachebenen.test.ts), das gemeinsame Fixture der
     # Zählregeln (verdichtungFixture.test.ts) und die Werteliste der Zeichenbeschreibung

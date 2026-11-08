@@ -492,6 +492,9 @@ async fn helfer_liste(
                 telefon,
                 organisation,
                 qualifikationen: json_ids(quals.as_deref()),
+                // Helfer der Vorplanung tragen (noch) keine externe Kennung.
+                kennung: None,
+                herkunft: None,
             },
         )
         .collect())
@@ -1654,6 +1657,8 @@ async fn helfer_laden_tx(
         telefon,
         organisation,
         qualifikationen: json_ids(quals.as_deref()),
+        kennung: None,
+        herkunft: None,
     })
 }
 
