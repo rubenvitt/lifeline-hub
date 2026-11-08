@@ -32,6 +32,14 @@ import {
   schichtplanDruckPfad,
 } from '../routing/deeplinks';
 
+/** Ein 403 einer Nachbarliste heißt „Modul gesperrt“: dann fehlt sie, statt den Druck zu sperren. */
+function ohneGesperrtesModul<T>(abruf: Promise<T>): Promise<T | undefined> {
+  return abruf.catch((e: unknown) => {
+    if (e instanceof ApiError && e.status === 403) return undefined;
+    throw e;
+  });
+}
+
 /**
  * Druckansicht des Schichtplans (LLH-1557, Change `jwqanxja-schichtplan-ausgeben` D2): Aushang je
  * Posten oder Zettel je Person, alle Blätter oder eines. Vorbild ist die Ausgabe der Suite: oben die
@@ -39,9 +47,9 @@ import {
  *
  * Der Stand ist ein Schnappschuss (`schichtplanDruck`, nicht live): ein Ereignis darf das Blatt vor
  * dem Druck nicht still ändern, „Neu laden“ holt neu. Einheiten und UHS liefern nur Abschnitt und
- * Reihenfolge der Posten; ist ihr Modul gesperrt, stehen die Posten ohne Abschnitt. Scheitert ein
- * Abruf, scheitert die ganze Ansicht (Ladefehler mit „Erneut laden“, kein Druck): sonst stünde ein
- * Blatt still ohne Abschnitt oder Qualifikation da.
+ * Reihenfolge der Posten; ist ihr Modul gesperrt (auch per 403), stehen die Posten ohne Abschnitt.
+ * Scheitert ein Abruf sonst, scheitert die ganze Ansicht (Ladefehler mit „Erneut laden“, kein
+ * Druck): sonst stünde ein Blatt still ohne Abschnitt oder Qualifikation da.
  * Ohne Modul Personal liefert der Plan keine Namen: dann nur der Aushang mit der Besetzung als
  * Zahl.
  */
@@ -54,10 +62,12 @@ export default function SchichtplanDruckPage() {
   const suche = searchParams.toString();
   const gewaehlt = useMemo(() => parseSchichtplanDruckAuswahl(new URLSearchParams(suche)), [suche]);
 
-  // Scheitern die Freigaben, druckt die Seite trotzdem: die Posten stehen dann ohne Abschnitt.
+  // Einheiten und UHS nur abfragen, wenn ihr Modul frei ist. Sind die Freigaben unbekannt
+  // (Abruf gescheitert), wird trotzdem gefragt; ein 403 heißt dann wie bei veralteten Freigaben:
+  // Modul gesperrt, Posten ohne Abschnitt. Jeder andere Fehler scheitert sichtbar.
   const { freigaben, gescheitert } = useModulFreigabenStand(einsatzId);
-  const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
-  const uhsFrei = istKeyFreigegeben('unfallhilfsstellen', freigaben);
+  const einheitenFrei = freigaben == null || istKeyFreigegeben('einheiten', freigaben);
+  const uhsFrei = freigaben == null || istKeyFreigegeben('unfallhilfsstellen', freigaben);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -69,8 +79,8 @@ export default function SchichtplanDruckPage() {
       const [plan, vorgaben, einheiten, uhs, qualifikationen] = await Promise.all([
         fetchSchichtplan(einsatzId),
         listeAbloesungVorgaben(einsatzId),
-        einheitenFrei ? listeEinheiten(einsatzId) : undefined,
-        uhsFrei ? listeUhs(einsatzId) : undefined,
+        einheitenFrei ? ohneGesperrtesModul(listeEinheiten(einsatzId)) : undefined,
+        uhsFrei ? ohneGesperrtesModul(listeUhs(einsatzId)) : undefined,
         listeQualifikationen(),
       ]);
       return {
