@@ -229,6 +229,34 @@ describe('PlanungPage (LLH-1586)', () => {
     await waitFor(() => expect(body).toEqual({ name: 'Carl', organisation: 'THW' }));
   });
 
+  it('Helfer in Serie: die Organisation bleibt auf Wunsch stehen', async () => {
+    const bodies: unknown[] = [];
+    setup(planung(), planungPfad(5, 'helfer'));
+    server.use(
+      http.post('/api/planungen/5/helfer', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: 10, name: 'Carl', qualifikationen: [] }, { status: 201 });
+      }),
+    );
+    expect(await screen.findByText('DLRG')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Helfer anlegen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Helfer anlegen' });
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Carl');
+    await userEvent.type(within(dialog).getByLabelText('Organisation'), 'THW');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(within(dialog).getByLabelText('Name')).toHaveValue(''));
+    expect(within(dialog).getByLabelText('Organisation')).toHaveValue('THW');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Dora');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { name: 'Carl', organisation: 'THW' },
+        { name: 'Dora', organisation: 'THW' },
+      ]),
+    );
+  });
+
   it('Schichten erzeugen ohne Länge nennt die Schichtlänge des Postens und schickt posten_id', async () => {
     let body: unknown;
     setup();

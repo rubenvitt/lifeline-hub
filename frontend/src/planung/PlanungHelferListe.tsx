@@ -103,6 +103,8 @@ function HelferDialog({
       laeuft={laeuft}
       speicherung={speicherung}
       speicherFehlerTitel={helfer ? 'Helfer nicht gespeichert' : 'Helfer nicht angelegt'}
+      serie={helfer == null}
+      uebernahme={['organisation']}
       onErfassen={speichern}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}

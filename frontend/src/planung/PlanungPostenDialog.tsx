@@ -193,6 +193,8 @@ export default function PlanungPostenDialog({
       laeuft={laeuft}
       speicherung={speicherung}
       speicherFehlerTitel={posten ? 'Posten nicht gespeichert' : 'Posten nicht angelegt'}
+      serie={posten == null}
+      uebernahme={['abschnitt', 'schichtlaenge']}
       onErfassen={speichern}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
